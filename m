@@ -1,61 +1,78 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 13 Nov 2016 19:34:07 +0100
-Subject: [PATCH] input: bma150: Only claim to support the bma180 if the
- separate iio bma180 driver is not build
-Message-ID: <20161113183407.12848-1-hdegoede@redhat.com>
+Date: Sun, 13 Nov 2016 19:59:15 +0100
+Subject: [linux-sunxi] [PATCH 1/3] ARM: sunxi: add support for H2+ SoC
+In-Reply-To: <20161111164654.15273-1-icenowy@aosc.xyz>
+References: <20161111164654.15273-1-icenowy@aosc.xyz>
+Message-ID: <8b57a230-d113-0a8d-e732-4115d0165910@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit ef3714fdbc8d ("Input: bma150 - extend chip detection for bma180"),
-adds bma180 chip-ids to the input bma150 driver, assuming that they are
-100% compatible, but the bma180 is not compatible with the bma150 at all,
-it has 14 bits resolution instead of 10, and it has quite different
-control registers too.
+Hi,
 
-Treating the bma180 as a bma150 wrt its data registers will just result
-in throwing away the lowest 4 bits, which is not too bad. But the ctrl
-registers are a different story. Things happen to just work but supporting
-that certainly does not make treating the bma180 the same as the bma150
-right.
+On 11-11-16 17:46, Icenowy Zheng wrote:
+> Allwinner H2+ is a quad-core Cortex-A7 SoC.
+>
+> It is very like H3, that they share the same SoC ID (0x1680), and H3
+> memory maps as well as drivers works well on the SoC.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-Since some setups depend on the evdev interface the bma150 driver offers
-on top of the bma180, we cannot simply remove the bma180 ids.
+I agree that given that the chip-id is 1680 for both
+this does seem to be the same die as the H3, and given
+that we do not have any datasheets, I agree that just
+treating the H2+ as a H3 is best for now, we can always
+change h2.dtsi to actually differentiate things later.
 
-So this commit only removes the bma180 id when the bma180 iio driver,
-which does treat the bma180 properly, is enabled.
+This entire series LGTM and is:
 
-Cc: Dr. H. Nikolaus Schaller <hns@goldelico.com>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/input/misc/bma150.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 
-diff --git a/drivers/input/misc/bma150.c b/drivers/input/misc/bma150.c
-index b0d4453..9fa1c9a 100644
---- a/drivers/input/misc/bma150.c
-+++ b/drivers/input/misc/bma150.c
-@@ -539,7 +539,11 @@ static int bma150_probe(struct i2c_client *client,
- 	}
- 
- 	chip_id = i2c_smbus_read_byte_data(client, BMA150_CHIP_ID_REG);
--	if (chip_id != BMA150_CHIP_ID && chip_id != BMA180_CHIP_ID) {
-+	if (chip_id != BMA150_CHIP_ID
-+#ifndef CONFIG_BMA180
-+	    && chip_id != BMA180_CHIP_ID
-+#endif
-+	    ) {
- 		dev_err(&client->dev, "BMA150 chip id error: %d\n", chip_id);
- 		return -EINVAL;
- 	}
-@@ -643,7 +647,9 @@ static UNIVERSAL_DEV_PM_OPS(bma150_pm, bma150_suspend, bma150_resume, NULL);
- 
- static const struct i2c_device_id bma150_id[] = {
- 	{ "bma150", 0 },
-+#ifndef CONFIG_BMA180
- 	{ "bma180", 0 },
-+#endif
- 	{ "smb380", 0 },
- 	{ "bma023", 0 },
- 	{ }
--- 
-2.9.3
+Regards,
+
+Hans
+
+> ---
+>  Documentation/arm/sunxi/README                  | 4 ++++
+>  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+>  arch/arm/mach-sunxi/sunxi.c                     | 1 +
+>  3 files changed, 6 insertions(+)
+>
+> diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+> index cd02433..1fe4d99c 100644
+> --- a/Documentation/arm/sunxi/README
+> +++ b/Documentation/arm/sunxi/README
+> @@ -63,6 +63,10 @@ SunXi family
+>          + User Manual
+>            http://dl.linux-sunxi.org/A33/A33%20user%20manual%20release%201.1.pdf
+>
+> +      - Allwinner H2+ (sun8i)
+> +        + No document available now, but is known to be working properly with
+> +          H3 drivers and memory map.
+> +
+>        - Allwinner H3 (sun8i)
+>          + Datasheet
+>            http://dl.linux-sunxi.org/H3/Allwinner_H3_Datasheet_V1.0.pdf
+> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+> index 3975d0a..0c0f277 100644
+> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+> @@ -13,5 +13,6 @@ using one of the following compatible strings:
+>    allwinner,sun8i-a33
+>    allwinner,sun8i-a83t
+>    allwinner,sun8i-h3
+> +  allwinner,sun8i-h2plus
+>    allwinner,sun9i-a80
+>    nextthing,gr8
+> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> index 2e2bde2..3647ad7 100644
+> --- a/arch/arm/mach-sunxi/sunxi.c
+> +++ b/arch/arm/mach-sunxi/sunxi.c
+> @@ -63,6 +63,7 @@ static const char * const sun8i_board_dt_compat[] = {
+>  	"allwinner,sun8i-a23",
+>  	"allwinner,sun8i-a33",
+>  	"allwinner,sun8i-a83t",
+> +	"allwinner,sun8i-h2plus",
+>  	"allwinner,sun8i-h3",
+>  	NULL,
+>  };
+>
