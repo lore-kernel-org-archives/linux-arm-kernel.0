@@ -1,153 +1,90 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Sun, 13 Nov 2016 11:12:09 +0100
-Subject: [PATCH devicetree/next] ARM: BCM5301X: Add DT for TP-LINK Archer C9 V1
-Message-ID: <20161113101209.22185-1-zajec5@gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sun, 13 Nov 2016 11:58:03 +0100
+Subject: [PATCH 0/2] mmc: allow mmc_alloc_host() and tmio_mmc_host_alloc()
+In-Reply-To: <CAK7LNAThxsE3QW4EdPUyxmxbnt_PPjeogi8Fox5AHkddsuu-Sg@mail.gmail.com>
+References: <1478784263-18777-1-git-send-email-yamada.masahiro@socionext.com>
+ <20161110133559.GA10191@kroah.com>
+ <CAK7LNAThxsE3QW4EdPUyxmxbnt_PPjeogi8Fox5AHkddsuu-Sg@mail.gmail.com>
+Message-ID: <20161113105803.GD8388@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+On Fri, Nov 11, 2016 at 12:19:05PM +0900, Masahiro Yamada wrote:
+> 2016-11-10 22:35 GMT+09:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
+> > On Thu, Nov 10, 2016 at 10:24:21PM +0900, Masahiro Yamada wrote:
+> >>
+> >> sdhci_alloc_host() returns an error pointer when it fails.
+> >> but mmc_alloc_host() cannot.
+> >>
+> >> This series allow to propagate a proper error code
+> >> when host-allocation fails.
+> >
+> > Why?  What can we really do about the error except give up?  Why does
+> > having a explicit error value make any difference to the caller, they
+> > can't do anything different, right?
+> 
+> 
+> The error code is shown in the console, like
+> 
+>   probe of 5a000000.sdhc failed with error -12
+> 
+> 
+> The proper error code will give a clue why the driver failed to probe.
 
-It's BCM4709A0 based device with 16 MiB flash, 128 MiB of RAM and two
-PCIe based on-PCB BCM4360 chipsets.
+Can't the mmc core show the reason once, and not require each and every
+individual driver to show/say the same thing?  All a driver needs to
+know is if it worked or didn't work.  Every time it didn't work, it
+needs to unwind stuff and then recover properly.
 
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
----
- arch/arm/boot/dts/Makefile                        |   1 +
- arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts | 114 ++++++++++++++++++++++
- 2 files changed, 115 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
+The drivers do not do different things based on what type of error
+happened, as they don't care at all.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 837703a..7a52a9f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -87,6 +87,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm4709-buffalo-wxr-1900dhp.dtb \
- 	bcm4709-netgear-r7000.dtb \
- 	bcm4709-netgear-r8000.dtb \
-+	bcm4709-tplink-archer-c9-v1.dtb \
- 	bcm47094-dlink-dir-885l.dtb \
- 	bcm47094-luxul-xwr-3100.dtb \
- 	bcm47094-netgear-r8500.dtb \
-diff --git a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
-new file mode 100644
-index 0000000..9a92c24
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
-@@ -0,0 +1,114 @@
-+/*
-+ * Copyright (C) 2016 Rafa? Mi?ecki <rafal@milecki.pl>
-+ *
-+ * Licensed under the ISC license.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm4709.dtsi"
-+
-+/ {
-+	compatible = "tplink,archer-c9-v1", "brcm,bcm4709", "brcm,bcm4708";
-+	model = "TP-LINK Archer C9 V1";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlycon";
-+	};
-+
-+	memory {
-+		reg = <0x00000000 0x08000000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		lan {
-+			label = "bcm53xx:blue:lan";
-+			gpios = <&chipcommon 1 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		wps {
-+			label = "bcm53xx:blue:wps";
-+			gpios = <&chipcommon 2 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		2ghz {
-+			label = "bcm53xx:blue:2ghz";
-+			gpios = <&chipcommon 4 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		5ghz {
-+			label = "bcm53xx:blue:5ghz";
-+			gpios = <&chipcommon 5 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		usb3 {
-+			label = "bcm53xx:blue:usb3";
-+			gpios = <&chipcommon 6 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		usb2 {
-+			label = "bcm53xx:blue:usb2";
-+			gpios = <&chipcommon 7 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		wan-blue {
-+			label = "bcm53xx:blue:wan";
-+			gpios = <&chipcommon 14 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		wan-amber {
-+			label = "bcm53xx:amber:wan";
-+			gpios = <&chipcommon 15 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		power {
-+			label = "bcm53xx:blue:power";
-+			gpios = <&chipcommon 18 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-on";
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		wps {
-+			label = "WPS";
-+			linux,code = <KEY_WPS_BUTTON>;
-+			gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		restart {
-+			label = "Reset";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&usb2 {
-+	vcc-gpio = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
-+};
-+
-+&usb3 {
-+	vcc-gpio = <&chipcommon 12 GPIO_ACTIVE_HIGH>;
-+};
-+
-+&spi_nor {
-+	status = "okay";
-+};
--- 
-2.10.1
+So I strongly suggest leaving it simple, as it is today, as this makes
+drivers simpler, they don't have to duplicate the same type of error
+reporting all over the place, and it's easy to audit for.
+
+It also makes it so that large patchsets that touch every driver like
+this are not needed at all.
+
+> > I suggest just leaving it as-is, it's simple, and you don't have to mess
+> > with PTR_ERR() anywhere.
+> 
+> 
+> Why?
+> 
+> Most of driver just give up probing for any error,
+> but we still do ERR_PTR()/PTR_ERR() here and there.
+> I think this patch is the same pattern.
+
+I think we need to get rid of more of the ERR_PTR() stuff, as again,
+it's useless.  All we need to know is an error happened, that's it.
+
+> If a function returns NULL on failure, we need to think about
+> "what is the most common failure case".
+> 
+> Currently, MMC drivers assume -ENOMEM is the best
+> fit for mmc_alloc_host(), but the assumption is fragile.
+> 
+> Already, mmc_alloc_host() calls a function
+> that returns not only -ENOMEM, but also -ENOSPC.
+> 
+> In the future, some other failure cases might be
+> added to mmc_alloc_host().
+> 
+> Once we decide the API returns an error pointer,
+> drivers just propagate the return value from the API.
+> This is much more stable implementation.
+
+Again, no, it makes more work for the different drivers, duplicates code
+all over the place, and really doesn't help any user, or developer, out
+at all.
+
+Just have the mmc core properly log what went wrong, and all should be
+fine.
+
+Again, keep it simple, that's the best policy for the kernel, and
+really, most software :)
+
+thanks,
+
+greg k-h
