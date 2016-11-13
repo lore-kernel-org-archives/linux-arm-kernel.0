@@ -1,151 +1,55 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Sun, 13 Nov 2016 16:09:31 +0100
-Subject: [PATCH] drm/sun4i: constify component_ops structures
-In-Reply-To: <1478971198-3659-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1478971198-3659-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <CAKMK7uGN_qSzPxfrYt_WsCYjxKSdZoQiM=UoSp7G=KXFWNe9Xw@mail.gmail.com>
+From: appro@openssl.org (Andy Polyakov)
+Date: Sun, 13 Nov 2016 16:12:35 +0100
+Subject: [PATCH v3] crypto: arm64/sha2: integrate OpenSSL implementations
+ of SHA256/SHA512
+In-Reply-To: <CAKv+Gu_Y-ik0L9mh4z-g3fHKjPt780_znCQNU-jAwXifLgAo4A@mail.gmail.com>
+References: <1478953953-11523-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20161112221520.GD24127@arm.com>
+ <CAKv+Gu_Y-ik0L9mh4z-g3fHKjPt780_znCQNU-jAwXifLgAo4A@mail.gmail.com>
+Message-ID: <c8306030-d4eb-fea7-441a-3476cd308496@openssl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 12, 2016 at 6:19 PM, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
-> These component_ops structures are only used as the second argument to
-> component_add and component_del, which are declared as const, so the
-> structures can be declared as const as well.
->
-> The semantic patch that makes this change is as follows:
-> (http://coccinelle.lip6.fr/)
->
-> // <smpl>
-> @r disable optional_qualifier@
-> identifier i;
-> position p;
-> @@
->
-> static struct component_ops i at p = { ... };
->
-> @ok1@
-> identifier r.i;
-> expression e1;
-> position p;
-> @@
->
-> component_add(e1,&i at p)
->
-> @ok2@
-> identifier r.i;
-> expression e1;
-> position p;
-> @@
->
-> component_del(e1, &i at p)
->
-> @bad@
-> position p != {r.p,ok1.p,ok2.p};
-> identifier r.i;
-> struct component_ops e;
-> @@
->
-> e at i@p
->
-> @depends on !bad disable optional_qualifier@
-> identifier r.i;
-> @@
->
-> static
-> +const
->  struct component_ops i = { ... };
-> // </smpl>
->
-> The result of the size command before the change is (arm):
->
->    text       data         bss     dec      hex filename
->    5266        236           8    5510     1586 sun4i_backend.o
->    6393        236           8    6637     19ed sun4i_tcon.o
->    3700        368           8    4076      fec sun4i_tv.o
->    1668        108           0    1776      6f0 sun6i_drc.o
->
-> and after the change:
->
->    text       data         bss     dec     hex filename
->    5274        228           8    5510    1586 sun4i_backend.o
->    6401        228           8    6637    19ed sun4i_tcon.o
->    3708        360           8    4076     fec sun4i_tv.o
->    1676        100           0    1776     6f0 sun6i_drc.o
->
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+> (+ Andy)
+> 
+> ...
+>>
+>> Looking at the generated code, I see references to __ARMEB__ and
+> __ILP32__.
+>> The former is probably a bug,
 
-Applied to drm-misc, thanks.
--Daniel
+Oh! You mean that it should be __AARCH64EB__/__AARCH64EL__! Apparently I
+simply went on assuming that it would be __ARMEB__/__ARMEL__ even in
+64-bit case. As Ard mentioned, there is a number of modules that can be
+compiled for either 32- or 64-bit case, and supposedly that's where this
+blunder stems from. Will fix... As for it being actually tested. No, I
+don't have big-endian AArch64 setup, and big-endian segments in AArch64
+are based on experience with endian neutrality elsewhere. I.e. it's
+based on observations what it takes to achieve the neutrality elsewhere,
+e.g. ARM, MIPS, PPC, and then exercising equivalent approach even here.
+Modulo fact that I apparently got macros wrong :-(
 
->
-> ---
->  drivers/gpu/drm/sun4i/sun4i_backend.c |    2 +-
->  drivers/gpu/drm/sun4i/sun4i_tcon.c    |    2 +-
->  drivers/gpu/drm/sun4i/sun4i_tv.c      |    2 +-
->  drivers/gpu/drm/sun4i/sun6i_drc.c     |    2 +-
->  4 files changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> index 7eb2a96..2e08f96 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> @@ -409,7 +409,7 @@ static void sun4i_backend_unbind(struct device *dev, struct device *master,
->         reset_control_assert(backend->reset);
->  }
->
-> -static struct component_ops sun4i_backend_ops = {
-> +static const struct component_ops sun4i_backend_ops = {
->         .bind   = sun4i_backend_bind,
->         .unbind = sun4i_backend_unbind,
->  };
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> index c6afb24..ea2906f 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -545,7 +545,7 @@ static void sun4i_tcon_unbind(struct device *dev, struct device *master,
->         sun4i_tcon_free_clocks(tcon);
->  }
->
-> -static struct component_ops sun4i_tcon_ops = {
-> +static const struct component_ops sun4i_tcon_ops = {
->         .bind   = sun4i_tcon_bind,
->         .unbind = sun4i_tcon_unbind,
->  };
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
-> index 1dd3d9e..d430b331 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tv.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
-> @@ -667,7 +667,7 @@ static void sun4i_tv_unbind(struct device *dev, struct device *master,
->         clk_disable_unprepare(tv->clk);
->  }
->
-> -static struct component_ops sun4i_tv_ops = {
-> +static const struct component_ops sun4i_tv_ops = {
->         .bind   = sun4i_tv_bind,
->         .unbind = sun4i_tv_unbind,
->  };
-> diff --git a/drivers/gpu/drm/sun4i/sun6i_drc.c b/drivers/gpu/drm/sun4i/sun6i_drc.c
-> index 6ef707c..09bba85 100644
-> --- a/drivers/gpu/drm/sun4i/sun6i_drc.c
-> +++ b/drivers/gpu/drm/sun4i/sun6i_drc.c
-> @@ -80,7 +80,7 @@ static void sun6i_drc_unbind(struct device *dev, struct device *master,
->         reset_control_assert(drc->reset);
->  }
->
-> -static struct component_ops sun6i_drc_ops = {
-> +static const struct component_ops sun6i_drc_ops = {
->         .bind   = sun6i_drc_bind,
->         .unbind = sun6i_drc_unbind,
->  };
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>> whilst the second is not required.
 
+Note that references to __ILP32__ are also inside #ifndef
+__KERNEL__/#endif, i.e. they won't be even evaluated when compiled for
+kernel. Or in other words it's shared code artefact just like #if[n]def
+__KERNEL__ itself. You either disregard it or remove altogether, but
+then code becomes specific and not shared :-)
 
+>> There are
+>> also some commented out instructions, which is weird.
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+Commented instructions denote those that are moved into next round in
+order to improve instruction scheduling on either of processors. In
+other words it means that you should spot it further below [in generated
+code]. Yes, it's weird, but it helps me to remember which instructions
+are moved. On side note it's not uncommon that instruction scheduling is
+result of compromise. In general I attempt to schedule instruction for
+near-optimal performance on *multiple* processors, but sometimes you
+have to make compromises. One is mentioned in commentary section for
+this very module, the Apple A7 vs. Cortex-A53 thing. Well, it's not like
+the commented instruction you're observing is the only result of the
+compromise, it's merely an example of how said compromises can manifest
+themselves, as somewhat weird irregularities in the code, possibly with
+commented instructions.
