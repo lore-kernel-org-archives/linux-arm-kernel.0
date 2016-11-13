@@ -1,36 +1,155 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 13 Nov 2016 09:50:47 -0200
-Subject: [PATCH] ARM: dts: imx6sx-udoo: Add board specific compatible
- strings
-In-Reply-To: <1478021892-18344-1-git-send-email-fabio.estevam@nxp.com>
-References: <1478021892-18344-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <CAOMZO5BD5oULHOKQ7Uii9FMxiSYNY_WiKC1XtxLaN=36jTeH0Q@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 13 Nov 2016 14:52:30 +0100
+Subject: PM regression with LED changes in next-20161109
+In-Reply-To: <b5ae20d7-8394-7ad5-1830-13173e9105c4@gmail.com>
+References: <20161109192301.GS26979@atomide.com>
+ <28234714-3994-6747-9cf8-1ff0b3257f7a@gmail.com>
+ <CGME20161110084919epcas3p2e8fbdd2905cabe15c5301b7a8e22416c@epcas3p2.samsung.com>
+ <f627c778-4378-e5da-09dd-3e0fb2ea4aba@redhat.com>
+ <5bd5333e-0dbb-6333-0a48-ca4d3a990f9c@samsung.com>
+ <20161110162925.GA28832@amd> <20161110175537.GF27724@atomide.com>
+ <20161110202910.GE28832@amd> <80b645e7-c3fa-8001-d9b1-c3c8c40394fd@gmail.com>
+ <20161111120114.GA1076@amd> <f7c9b2be-0003-f342-a4c7-802532faa424@gmail.com>
+ <d7ddbbb0-b99c-14a3-f462-3534b5ec67e6@redhat.com>
+ <4c31faef-144d-289c-0e32-83e76aff6178@gmail.com>
+ <3eb60c78-d891-27e5-6b7b-a54a5b547a1c@redhat.com>
+ <c01cac8b-a921-56d1-7e57-8071d4b9faf6@gmail.com>
+ <cb0aa3ce-ee48-66b8-510c-bd70917afec9@redhat.com>
+ <b5ae20d7-8394-7ad5-1830-13173e9105c4@gmail.com>
+Message-ID: <9b476f85-d45e-deb6-335d-fc56f6d90350@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi,
 
-On Tue, Nov 1, 2016 at 3:38 PM, Fabio Estevam <fabio.estevam@nxp.com> wrote:
-> Add a compatible entry for the specific board versions.
+On 13-11-16 12:44, Jacek Anaszewski wrote:
+> Hi,
 >
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> ---
->  arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts    | 2 +-
->  arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts | 2 +-
->  arch/arm/boot/dts/imx6sx-udoo-neo-full.dts     | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts b/arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts
-> index 0b88878..0c1fc1a 100644
-> --- a/arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts
-> +++ b/arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts
-> @@ -46,7 +46,7 @@
->
->  / {
->         model = "UDOO Neo Basic";
-> -       compatible = "fsl,imx6sx";
-> +       compatible = "udoo,neobasic", "fsl,imx6sx";
+> On 11/12/2016 10:14 PM, Hans de Goede wrote:
 
-Just to let you know that Rob has alreasy applied the patch that add
-udoo in vendor-prefixes.txt:
-https://git.kernel.org/cgit/linux/kernel/git/robh/linux.git/commit/?h=for-next&id=61bdc6a118e402543a724808c651bb7ca2751bd9
+<snip>
+
+>>>> So I would like to propose creating a new read-write
+>>>> user_brightness file.
+>>>>
+>>>> The write behavior would be 100% identical to the brightness
+>>>> file (in code terms it will call the same store function).
+>>>>
+>>>> The the read behavior otoh will be different: it will shows
+>>>> the last brightness as set by the user, this would show the
+>>>> read behavior we really want of brightness: show the real
+>>>> brightness when not blinking / triggers are active and show
+>>>> the brightness used when on when blinking / triggers are active.
+>>>>
+>>>> We could then add poll support on this new user_brightness
+>>>> file, thus avoiding the problem with the extra cpu-load on
+>>>> notifications on blinking / triggers.
+>>>
+>>> I agree that user_brightness allows to solve the issues you raised
+>>> about inconsistent write and read brightness' semantics
+>>> (which is not that painful IMHO).
+>>>
+>>> Reporting non-user brightness changes on user_brightness file
+>>> doesn't sound reasonable though.
+>>
+>> The changes I'm interested in are user brightness changes they
+>> are just not done through sysfs, but through a hardwired hotkey,
+>> they are however very much done by the user.
+>
+> Ah, so this file name would be misleading especially taking into account
+> the context in which "user" is used in kernel, which predominantly
+> means "userspace", e.g. copy_to_user(), copy_from_user().
+>
+>>> Also, how would we read the
+>>> brightness set by the firmware? We'd have to read brightness
+>>> file, so still two files would have to be opened which is
+>>> a second drawback of this approach.
+>>
+>> No, look carefully at the definition of the read behavior
+>> I plan to put in the ABI doc:
+>
+> OK, "user" was what confused me. So in this case changes made
+> by the firmware even if in a result of user activity
+> (pressing hardware key) obviously cannot be treated similarly
+> to the changes made from the userspace context.
+
+In the end both result on the brightness of the device
+changing, so any userspace process interested in monitoring
+the brightness will want to know about both type of changes.
+
+> Unless you're able to give references to the kernel code which
+> contradict my judgement.
+
+AFAIK the audio code will signal volume changes done by
+hardwired buttons the same way as audio changes done
+by userspace calling into the kernel. This also makes
+sense because in the end, what is interesting for a
+mixer app, is that the volume changed, and what the
+new volume is.
+
+>> "Reading this file will return the actual led brightness
+>> when not blinking and no triggers are active; reading this
+>> file will return the brightness used when the led is on
+>> when blinking or triggers are active."
+>
+> This is unnecessarily entangled. Blinking means timer trigger
+> is active.
+
+Ok.
+
+>> So for e.g. the backlit keyboard case reading this single
+>> file will return the actual brightness of the backlight,
+>> since this does not involve blinking or triggers.
+>>
+>> Basically the idea is that the user_brightness file
+>> will have the semantics which IMHO the brightness file
+>> itself should have had from the beginning, but which
+>> we can't change now due to ABI reasons.
+>
+> And in fact introducing user_brightness file would indeed
+> fix that shortcoming. However without providing notifications
+> of hw brightness changes on it.
+
+See above, I believe such a file should report any
+changes in brightness, except those caused by triggers,
+so it would report hw brightness changes.
+
+Anyways if you're not interested in fixing the
+shortcomings of the current read behavior on the
+brightness file (I'm fine with that, I can live
+with the shortcomings) I suggest that we simply go
+with v2 of my poll() patch.
+
+>>> Having no difference in this area between the two approaches
+>>> I'm still in favour of the read-only file for notifying
+>>> brightness changes procured by hardware.
+>>
+>> That brings back the needing 2 fds problem; and does
+>> not solve userspace not being able to reliably read
+>> the led on brightness when blinking or using triggers.
+>>
+>> And this also has the issue that one is doing poll() on
+>> one fd to detect changes on another fd,
+>
+> It is not necessarily true. We can treat the polling on
+> hw_brightness_change file as a means to detect brightness
+> changes procured by hardware and we can read that brightness
+> by executing read on this same fd. It could return -ENODATA
+> if no such an event has occurred so far.
+
+That would still require 2 fds as userspace also wants to
+be able to set the keyboard backlight, but allowing read()
+on the hw_brightness_change file at least fixes the weirdness
+where userspace gets woken from poll() without being able to
+read. So if you insist on going the hw_brightness_change file
+route, then I can live with that (and upower will simply
+need to open 2 fds, that is doable).
+
+But, BUT, I would greatly prefer to just go for v4 of my
+patch, which fixes the only real problem we've seen with
+my patch as original merged without adding a new, somewhat
+convoluted sysfs attribute.
+
+Regards,
+
+Hans
