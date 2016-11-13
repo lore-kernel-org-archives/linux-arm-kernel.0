@@ -1,113 +1,68 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sun, 13 Nov 2016 22:23:51 +0100
-Subject: [PATCH v2 08/19] ARM: dts: armada-370-xp: Fixup bm-bppi DT warning
-In-Reply-To: <20161113212402.3060-1-gregory.clement@free-electrons.com>
-References: <20161113212402.3060-1-gregory.clement@free-electrons.com>
-Message-ID: <20161113212402.3060-9-gregory.clement@free-electrons.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sun, 13 Nov 2016 14:03:00 -0500
+Subject: [PATCH 1/3] soc: sunxi: make sunxi_sram explicitly non-modular
+In-Reply-To: <20161113190302.18099-1-paul.gortmaker@windriver.com>
+References: <20161113190302.18099-1-paul.gortmaker@windriver.com>
+Message-ID: <20161113190302.18099-2-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-bm-bppi has a reg property so the unit name should contain an address.
-Take the opportunity to use the node label instead of the full name.
+The Kconfig currently controlling compilation of this code is:
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+drivers/soc/sunxi/Kconfig:config SUNXI_SRAM
+drivers/soc/sunxi/Kconfig:      bool
+
+...meaning that it currently is not being built as a module by anyone.
+
+Lets remove the modular code that is essentially orphaned, so that
+when reading the driver there is no doubt it is builtin-only.
+
+Since module_platform_driver() uses the same init level priority as
+builtin_platform_driver() the init ordering remains unchanged with
+this commit.
+
+Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
+
+We also delete the MODULE_LICENSE tag etc. since all that information
+is already contained at the top of the file in the comments.
+
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 ---
- arch/arm/boot/dts/armada-xp-db.dts               | 8 ++++----
- arch/arm/boot/dts/armada-xp-gp.dts               | 8 ++++----
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 8 ++++----
- arch/arm/boot/dts/armada-xp.dtsi                 | 2 +-
- 4 files changed, 13 insertions(+), 13 deletions(-)
+ drivers/soc/sunxi/sunxi_sram.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index 9e3bb3d7b4dc..486caf887da4 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -213,10 +213,6 @@
- 				};
- 			};
- 		};
+diff --git a/drivers/soc/sunxi/sunxi_sram.c b/drivers/soc/sunxi/sunxi_sram.c
+index 99e354c8f53f..5e10408a2aef 100644
+--- a/drivers/soc/sunxi/sunxi_sram.c
++++ b/drivers/soc/sunxi/sunxi_sram.c
+@@ -12,7 +12,7 @@
+ 
+ #include <linux/debugfs.h>
+ #include <linux/io.h>
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_device.h>
+@@ -269,7 +269,6 @@ static const struct of_device_id sunxi_sram_dt_match[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-sram-controller" },
+ 	{ },
+ };
+-MODULE_DEVICE_TABLE(of, sunxi_sram_dt_match);
+ 
+ static struct platform_driver sunxi_sram_driver = {
+ 	.driver = {
+@@ -278,8 +277,4 @@ static struct platform_driver sunxi_sram_driver = {
+ 	},
+ 	.probe	= sunxi_sram_probe,
+ };
+-module_platform_driver(sunxi_sram_driver);
 -
--		bm-bppi {
--			status = "okay";
--		};
- 	};
- };
- 
-@@ -248,6 +244,10 @@
- 	};
- };
- 
-+&bm_bppi {
-+	status = "okay";
-+};
-+
- &mdio {
- 	phy0: ethernet-phy at 0 {
- 		reg = <0>;
-diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
-index 9918c7883a36..65d960defff3 100644
---- a/arch/arm/boot/dts/armada-xp-gp.dts
-+++ b/arch/arm/boot/dts/armada-xp-gp.dts
-@@ -198,10 +198,6 @@
- 				nand-on-flash-bbt;
- 			};
- 		};
--
--		bm-bppi {
--			status = "okay";
--		};
- 	};
- };
- 
-@@ -233,6 +229,10 @@
- 	};
- };
- 
-+&bm_bppi {
-+	status = "okay";
-+};
-+
- &mdio {
- 	phy0: ethernet-phy at 0 {
- 		reg = <16>;
-diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-index c8dd5a3bccb6..7cd2d74e0161 100644
---- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-+++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-@@ -187,10 +187,6 @@
- 				status = "okay";
- 			};
- 		};
--
--		bm-bppi {
--			status = "okay";
--		};
- 	};
- };
- 
-@@ -222,6 +218,10 @@
- 	};
- };
- 
-+&bm_bppi {
-+	status = "okay";
-+};
-+
- &mdio {
- 	phy0: ethernet-phy at 0 {
- 		reg = <0>;
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 5e596b64f48e..e4aa0018047c 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -248,7 +248,7 @@
- 			ranges = <0 MBUS_ID(0x09, 0x05) 0 0x800>;
- 		};
- 
--		bm_bppi: bm-bppi {
-+		bm_bppi: bm-bppi at 0c_04_0 {
- 			compatible = "mmio-sram";
- 			reg = <MBUS_ID(0x0c, 0x04) 0 0x100000>;
- 			ranges = <0 MBUS_ID(0x0c, 0x04) 0 0x100000>;
+-MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
+-MODULE_DESCRIPTION("Allwinner sunXi SRAM Controller Driver");
+-MODULE_LICENSE("GPL");
++builtin_platform_driver(sunxi_sram_driver);
 -- 
-2.10.2
+2.10.1
