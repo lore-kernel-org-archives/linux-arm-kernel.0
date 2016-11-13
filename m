@@ -1,146 +1,66 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 13 Nov 2016 10:10:54 +0100
-Subject: Three different LED brightnesses (was Re: PM regression with LED
- changes in next-20161109)
-In-Reply-To: <3ca04742-6376-5a88-8d10-5b88fcd8f5e5@redhat.com>
-References: <5bd5333e-0dbb-6333-0a48-ca4d3a990f9c@samsung.com>
- <20161110162925.GA28832@amd> <20161110175537.GF27724@atomide.com>
- <20161110202910.GE28832@amd>
- <80b645e7-c3fa-8001-d9b1-c3c8c40394fd@gmail.com>
- <20161111120114.GA1076@amd>
- <f7c9b2be-0003-f342-a4c7-802532faa424@gmail.com>
- <d7ddbbb0-b99c-14a3-f462-3534b5ec67e6@redhat.com>
- <20161111221224.GB10983@amd>
- <3ca04742-6376-5a88-8d10-5b88fcd8f5e5@redhat.com>
-Message-ID: <20161113091054.GA17790@amd>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 13 Nov 2016 09:27:00 +0000
+Subject: Applied "ASoC: mioa701_wm9713: add missing white space in dev_err
+ message" to the regulator tree
+In-Reply-To: <20161112163025.4801-1-colin.king@canonical.com>
+Message-ID: <E1c5r40-0006gC-2d@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat 2016-11-12 09:03:42, Hans de Goede wrote:
-> Hi,
-> 
-> On 11-11-16 23:12, Pavel Machek wrote:
-> >Hi!
-> >
-> >Reason #1:
-> >
-> >>>>Hmm. So userland can read the LED state, and it can get _some_ value
-> >>>>back, but it can not know if it is current state or not.
-> 
-> That is not correct, the current behavior for eading the brightness
-> atrribute is to always return the current state.
+The patch
 
-No. (Because some hardware can't get back current state of
-hardware-controlled leds, and because of blinking).
+   ASoC: mioa701_wm9713: add missing white space in dev_err message
 
-> >>Why a dedicated file? Are we going to mirror brightness here
-> >>wrt r/w (show/store) behavior ? If not userspace now needs
-> >>2 open fds which is not really nice. If we are and we are
-> >>not going to use poll for something else on brightness itself
-> >>then why not just poll directly on brightness ?
-> >
-> >Reason #1 is above.
-> 
-> See my reply above.
-> 
-> >Reason #2 is "if userspace sees brightness file, it can not know if
-> >the notifications on change actually work or not".
-> 
-> If it needs to know that it can simply check the kernel version.
+has been applied to the regulator tree at
 
-No. Because in case of hardware blinking we can't provide poll()
-functionality.
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
 
-Plus, saying "simply check the kernel version" simply means you should
-not be submitting patches to kernel... at all. (Hint... it also does
-not work.)
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-> >Reason #3 is that you broke Tony's system. Polling does not make sense
-> >when trigger such as "CPU in use" is active.
-> 
-> Have you seen v4 of my patch? It fixes this while keeping the
-> polling on the brightness attribute itself, it basically goes
-> back (more or less) to v1 of my patch which did not have this
-> problem. I never wanted notification of trigger / blinking
-> changes because I already feared Tony's problem would happen.
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-Have you seen v67123 of my latest facebook post? It explains why you
-are completely wrong.
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
-> >Reason #4 is that there are really two brightnesses:
-> >
-> >1) maximum brightness trigger is going to use
-> >
-> >2) current brightness
-> >
-> >Currently writing to "brightness" file changes 1), but reading returns
-> >2) when available.
-> 
-> Right and Jacek has already said that we cannot change the
-> reading behavior on the brightness file because of ABI concerns.
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
-Until there's user that actually reads that, ABI can be fixed. Given
-that it basically returns random value,
+Thanks,
+Mark
 
-> >So, feel free to propose better interface. One that solves #1..#4
-> >above.
-> 
-> Proposal 1:
-> 
-> v4 of my patch, see the list. It solves all but #4, which
-> is out of scope for my patch, feel free to submit a patch to
-> solve #4 (with a new sysfs attr).
+>From 28cbed38973cd458e4cdba1df9a240ce739da841 Mon Sep 17 00:00:00 2001
+From: Colin Ian King <colin.king@canonical.com>
+Date: Sat, 12 Nov 2016 16:30:25 +0000
+Subject: [PATCH] ASoC: mioa701_wm9713: add missing white space in dev_err
+ message
 
-NAK on that. (And it does not solve #1 and #2 at least.)
+There is a missing whitespace in the dev_err message between
+"will" and "lead".  Add the whitespace.
 
-> Proposal 2:
-> 
-> Add a new "user_brightness" file, which shows the last brightness
-> as set by the user, this would show the read behavior we really
-> want of brightness: show the real brightness when not blinking /
-> triggers are active, show the brightness used when on when
-> blinking / triggers are active.
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/pxa/mioa701_wm9713.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-No, that's just adding more mess on the system.
-
-Here's better proposal:
-
-brightness (write): what we do today. (Mess, but too late to change it)
-	   (read): -Esomething or what we do today (if someone
-	   	   	       	       	  	   acutally uses it)
-           (poll): -Esomething
-
-current_brightness (write): -Esomething, or maybe change brightness
-		   for triggers that can work with that
-              (read, poll): if the current trigger can get current
-	             state of led, do it, otherwise -Esomething...
-		     or maybe file should be simply hidden from sysfs.
-
-trigger_max_brightness (read,write): change the maximum brightness for
-		       a trigger.
-	       (poll): -Esomething
-
-If you have hardware changing the brightness behind kernel's back,
-that should be modelled as a trigger. Userspace should know
-there's hardware changing it autonomously ... there should be
-"hardware-keylight-brightness" trigger, probably impossible to change
-(depends on hardware behaviour).
-
-On thinkpad, for example, for many LEDs kernel can select either
-"hardware drives the LED", but then current_brightness is unavailable,
-or "kernel drives the LED", but then hardware does not touch the led
-at all.
-
-Best regards,
-
-									Pavel
+diff --git a/sound/soc/pxa/mioa701_wm9713.c b/sound/soc/pxa/mioa701_wm9713.c
+index d1661fa6ee08..0fe0abec8fc4 100644
+--- a/sound/soc/pxa/mioa701_wm9713.c
++++ b/sound/soc/pxa/mioa701_wm9713.c
+@@ -187,7 +187,7 @@ static int mioa701_wm9713_probe(struct platform_device *pdev)
+ 	mioa701.dev = &pdev->dev;
+ 	rc = devm_snd_soc_register_card(&pdev->dev, &mioa701);
+ 	if (!rc)
+-		dev_warn(&pdev->dev, "Be warned that incorrect mixers/muxes setup will"
++		dev_warn(&pdev->dev, "Be warned that incorrect mixers/muxes setup will "
+ 			 "lead to overheating and possible destruction of your device."
+ 			 " Do not use without a good knowledge of mio's board design!\n");
+ 	return rc;
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161113/0eefaee1/attachment-0001.sig>
+2.10.2
