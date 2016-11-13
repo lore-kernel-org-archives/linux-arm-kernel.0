@@ -1,139 +1,82 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 13 Nov 2016 20:22:02 +0100
-Subject: [PATCH 1/2] ARM: dts: sun5i: Add touchscreen node to
- reference-design-tablet.dtsi
-Message-ID: <20161113192203.7101-1-hdegoede@redhat.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 13 Nov 2016 21:45:25 +0100
+Subject: Three different LED brightnesses (was Re: PM regression with LED
+ changes in next-20161109)
+In-Reply-To: <3a3bb3f8-e54a-e7d0-da30-7f90b00c29b3@redhat.com>
+References: <20161110175537.GF27724@atomide.com> <20161110202910.GE28832@amd>
+ <80b645e7-c3fa-8001-d9b1-c3c8c40394fd@gmail.com>
+ <20161111120114.GA1076@amd>
+ <f7c9b2be-0003-f342-a4c7-802532faa424@gmail.com>
+ <d7ddbbb0-b99c-14a3-f462-3534b5ec67e6@redhat.com>
+ <20161111221224.GB10983@amd>
+ <3ca04742-6376-5a88-8d10-5b88fcd8f5e5@redhat.com>
+ <20161113091054.GA17790@amd>
+ <3a3bb3f8-e54a-e7d0-da30-7f90b00c29b3@redhat.com>
+Message-ID: <20161113204525.GA15072@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just like on sun8i all sun5i tablets use the same interrupt and power
-gpios for their touchscreens. I've checked all known a13 fex files and
-only the UTOO P66 uses a different gpio for the interrupt.
+Hi!
 
-Add a touchscreen node to sun5i-reference-design-tablet.dtsi, which
-fills in the necessary gpios to avoid duplication in the tablet dts files,
-just like we do in sun8i-reference-design-tablet.dtsi.
+> >No, that's just adding more mess on the system.
+> >
+> >Here's better proposal:
+> >
+> >brightness (write): what we do today. (Mess, but too late to change it)
+> >	   (read): -Esomething or what we do today (if someone
+> >	   	   	       	       	  	   acutally uses it)
+> 
+> As said Jacek has already nacked any changes to read behavior.
+> 
+> >           (poll): -Esomething
+> 
+> Making poll() on sysfs attributes return -Esomething is not possible,
+> the internal sysfs API does not allow this.
+> 
+> >current_brightness (write): -Esomething, or maybe change brightness
+> >		   for triggers that can work with that
+> >              (read, poll): if the current trigger can get current
+> >	             state of led, do it, otherwise -Esomething...
+> >		     or maybe file should be simply hidden from sysfs.
+> 
+> So write is -EINVAL and read is the same as what brightness currently does,
+> so I see no use in introducing this new file.
 
-This will make future patches adding touchscreen nodes to a13 tablets
-simpler.
+No, read is not same as current brightness file. Currently, reading
+brightness file returns either current brightness or maximum
+brightness, and userspace can't tell which is which.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun5i-a13-utoo-p66.dts           | 38 ++++++++--------------
- .../boot/dts/sun5i-reference-design-tablet.dtsi    | 25 ++++++++++++++
- 2 files changed, 39 insertions(+), 24 deletions(-)
+> >trigger_max_brightness (read,write): change the maximum brightness for
+> >		       a trigger.
+> >	       (poll): -Esomething
+> 
+> The write behavior here is the same as what brightness currently does
+> and the read behavior is that of what I suggested for
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
-index a8b0bcc..3d7ff10 100644
---- a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
-@@ -83,22 +83,6 @@
- 	allwinner,pins = "PG3";
- };
- 
--&i2c1 {
--	icn8318: touchscreen at 40 {
--		compatible = "chipone,icn8318";
--		reg = <0x40>;
--		interrupt-parent = <&pio>;
--		interrupts = <6 9 IRQ_TYPE_EDGE_FALLING>; /* EINT9 (PG9) */
--		pinctrl-names = "default";
--		pinctrl-0 = <&ts_wake_pin_p66>;
--		wake-gpios = <&pio 1 3 GPIO_ACTIVE_HIGH>; /* PB3 */
--		touchscreen-size-x = <800>;
--		touchscreen-size-y = <480>;
--		touchscreen-inverted-x;
--		touchscreen-swapped-x-y;
--	};
--};
--
- &mmc2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc2_pins_a>;
-@@ -121,20 +105,26 @@
- 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 	};
--
--	ts_wake_pin_p66: ts_wake_pin at 0 {
--		allwinner,pins = "PB3";
--		allwinner,function = "gpio_out";
--		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--	};
--
- };
- 
- &reg_usb0_vbus {
- 	gpio = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
- };
- 
-+&touchscreen {
-+	compatible = "chipone,icn8318";
-+	reg = <0x40>;
-+	/* The P66 uses a different EINT then the reference design */
-+	interrupts = <6 9 IRQ_TYPE_EDGE_FALLING>; /* EINT9 (PG9) */
-+	/* The icn8318 binding expects wake-gpios instead of power-gpios */
-+	wake-gpios = <&pio 1 3 GPIO_ACTIVE_HIGH>; /* PB3 */
-+	touchscreen-size-x = <800>;
-+	touchscreen-size-y = <480>;
-+	touchscreen-inverted-x;
-+	touchscreen-swapped-x-y;
-+	status = "okay";
-+};
-+
- &uart1 {
- 	/* The P66 uses the uart pins as gpios */
- 	status = "disabled";
-diff --git a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
-index 20cc940..7af488a 100644
---- a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
-+++ b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
-@@ -41,6 +41,7 @@
-  */
- #include "sunxi-reference-design-tablet.dtsi"
- 
-+#include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/pwm/pwm.h>
- 
- / {
-@@ -84,6 +85,23 @@
- };
- 
- &i2c1 {
-+	/*
-+	 * The gsl1680 is rated at 400KHz and it will not work reliable at
-+	 * 100KHz, this has been confirmed on multiple different q8 tablets.
-+	 * All other devices on this bus are also rated for 400KHz.
-+	 */
-+	clock-frequency = <400000>;
-+
-+	touchscreen: touchscreen {
-+		interrupt-parent = <&pio>;
-+		interrupts = <6 11 IRQ_TYPE_EDGE_FALLING>; /* EINT11 (PG11) */
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&ts_power_pin>;
-+		power-gpios = <&pio 1 3 GPIO_ACTIVE_HIGH>; /* PB3 */
-+		/* Tablet dts must provide reg and compatible */
-+		status = "disabled";
-+	};
-+
- 	pcf8563: rtc at 51 {
- 		compatible = "nxp,pcf8563";
- 		reg = <0x51>;
-@@ -125,6 +143,13 @@
- 		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 	};
- 
-+	ts_power_pin: ts_power_pin {
-+		allwinner,pins = "PB3";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
- 	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
- 		allwinner,pins = "PG1";
- 		allwinner,function = "gpio_in";
+No, it is not. "brightness" behaviour is currently broken, as it sets
+either current brightness or maximum trigger brightness.
+
+> We've 2 sorts of brightness really:
+> 
+> 1) transient brightness, aka current brightness, when blinking or
+> triggers are used this will switch many times a second
+> between off and some on level.
+> 
+> 2) non-transient brightness, for non blinking leds this is the
+> actual brightness, for blinking leds this is the brightness
+> level used when the led is on.
+
+Yes, and we want reasonable interface where userspace sees those two
+brightnesses.
+
+									Pavel
 -- 
-2.9.3
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161113/f90abee5/attachment.sig>
