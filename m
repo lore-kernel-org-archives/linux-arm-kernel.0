@@ -1,42 +1,153 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 13 Nov 2016 17:55:21 +0800
-Subject: [PATCH 7/10] clk: sunxi-ng: Add A13 CCU driver
-In-Reply-To: <1fe10e9ca64dce0a06a2d83693cbaf6ee3a76bde.1478625788.git-series.maxime.ripard@free-electrons.com>
-References: <cover.326f50aecc25fbe292184527b52a1e3172aba9cf.1478625788.git-series.maxime.ripard@free-electrons.com>
- <1fe10e9ca64dce0a06a2d83693cbaf6ee3a76bde.1478625788.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v66JfjmfZUwPxgft+xgDgfb+Y0Se5qadGiPXqG5HYok72g@mail.gmail.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Sun, 13 Nov 2016 11:12:09 +0100
+Subject: [PATCH devicetree/next] ARM: BCM5301X: Add DT for TP-LINK Archer C9 V1
+Message-ID: <20161113101209.22185-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 9, 2016 at 1:23 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clk/sunxi-ng/Kconfig         |  10 +-
->  drivers/clk/sunxi-ng/Makefile        |   1 +-
->  drivers/clk/sunxi-ng/ccu-sun5i-a13.c | 681 ++++++++++++++++++++++++++++-
->  3 files changed, 692 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/clk/sunxi-ng/ccu-sun5i-a13.c
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-I'm not sure what to make of this one. Presumably this is the same as the A10s,
-with some bits (TS, HDMI, I2S, GPS) removed. BTW you kept the GPS reset control
-in this one.
+It's BCM4709A0 based device with 16 MiB flash, 128 MiB of RAM and two
+PCIe based on-PCB BCM4360 chipsets.
 
-Hans and others have said and IIRC proven that the sun5i is the same die, with
-some exposing more peripherals than others. Wouldn't it make sense to use the
-same CCU driver for all of them? It's not like Allwinner actually disabled the
-clock control or hardware block.
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+---
+ arch/arm/boot/dts/Makefile                        |   1 +
+ arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts | 114 ++++++++++++++++++++++
+ 2 files changed, 115 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
 
-If you don't like it, perhaps you can share the same set of definitions, but
-have separate lists of what clocks are registered, for each SoC variant. That
-would at least cut down on code size and the effort to maintain 3 copies of
-almost the exact same thing.
-
-I guess the same applies to the GR8 CCU driver patch. And the comments from
-the previous (A10s CCU driver) patch applies to both.
-
-Let me know what you think.
-
-
-Regards
-ChenYu
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 837703a..7a52a9f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -87,6 +87,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm4709-buffalo-wxr-1900dhp.dtb \
+ 	bcm4709-netgear-r7000.dtb \
+ 	bcm4709-netgear-r8000.dtb \
++	bcm4709-tplink-archer-c9-v1.dtb \
+ 	bcm47094-dlink-dir-885l.dtb \
+ 	bcm47094-luxul-xwr-3100.dtb \
+ 	bcm47094-netgear-r8500.dtb \
+diff --git a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
+new file mode 100644
+index 0000000..9a92c24
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
+@@ -0,0 +1,114 @@
++/*
++ * Copyright (C) 2016 Rafa? Mi?ecki <rafal@milecki.pl>
++ *
++ * Licensed under the ISC license.
++ */
++
++/dts-v1/;
++
++#include "bcm4709.dtsi"
++
++/ {
++	compatible = "tplink,archer-c9-v1", "brcm,bcm4709", "brcm,bcm4708";
++	model = "TP-LINK Archer C9 V1";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 earlycon";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		lan {
++			label = "bcm53xx:blue:lan";
++			gpios = <&chipcommon 1 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		wps {
++			label = "bcm53xx:blue:wps";
++			gpios = <&chipcommon 2 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		2ghz {
++			label = "bcm53xx:blue:2ghz";
++			gpios = <&chipcommon 4 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		5ghz {
++			label = "bcm53xx:blue:5ghz";
++			gpios = <&chipcommon 5 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		usb3 {
++			label = "bcm53xx:blue:usb3";
++			gpios = <&chipcommon 6 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		usb2 {
++			label = "bcm53xx:blue:usb2";
++			gpios = <&chipcommon 7 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		wan-blue {
++			label = "bcm53xx:blue:wan";
++			gpios = <&chipcommon 14 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		wan-amber {
++			label = "bcm53xx:amber:wan";
++			gpios = <&chipcommon 15 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		power {
++			label = "bcm53xx:blue:power";
++			gpios = <&chipcommon 18 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-on";
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		wps {
++			label = "WPS";
++			linux,code = <KEY_WPS_BUTTON>;
++			gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
++		};
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&usb2 {
++	vcc-gpio = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
++};
++
++&usb3 {
++	vcc-gpio = <&chipcommon 12 GPIO_ACTIVE_HIGH>;
++};
++
++&spi_nor {
++	status = "okay";
++};
+-- 
+2.10.1
