@@ -1,91 +1,149 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 14 Nov 2016 10:31:55 +0530
-Subject: [PATCH 00/16] Provide support of generic function for SCU enable
-Message-ID: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
+Date: Mon, 14 Nov 2016 10:31:57 +0530
+Subject: [PATCH 02/16] ARM: EXYNOS: use generic API to enable SCU
+In-Reply-To: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1479099731-28108-3-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During consolidation work on Exynos platform for SCU, it has been found
-that across many ARM platforms Cortex-A9 boards, SCU enabling code is
-duplicated. 
+Now as we have of_scu_enable which takes care of mapping
+scu base from DT, lets use it.
 
-Subsequently it felt that [1] by introducing generic API support in arm/smp_scu.c
-file will help in removing all these duplicate work from all such platforms. 
-This patch series introduces support for parsting SCU device node to enable SCU
-and get SCU base address. If a platform does not support SCU device node in DT, the
-API will fallback to scu_a9_get_base to obtain SCU base address.
+This patch also fixes build failure in case !SMP caused
+by commit SHA ID: 94210b1abb2 which is already merged in
+krzk/for-next branch
 
-[1]: https://www.spinics.net/lists/arm-kernel/msg541830.html
+CC: Krzysztof Kozlowski <krzk@kernel.org>
+CC: linux-samsung-soc at vger.kernel.org
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
+ arch/arm/mach-exynos/common.h  |  1 -
+ arch/arm/mach-exynos/platsmp.c | 30 ++++--------------------------
+ arch/arm/mach-exynos/pm.c      |  4 ++--
+ arch/arm/mach-exynos/suspend.c | 14 ++++----------
+ 4 files changed, 10 insertions(+), 39 deletions(-)
 
-Arnd helped in consolidating various ARM platforms duplicating SCU code as below:
-
-a) of_iomap: berlin, exynos, mvebu, realview, rockchip, socfpga, sti, ux500, vexpress
-b) ioremap(scu_a9_get_base()): bcm63xx, bcm, hisi, zx
-c) iotable_init, scu_a9_get_base(): imx, omap4, tegra, zynq
-d) ioremap(constant): shmobile, spear13xx
-
-Based on his suggestion on how to move all these platform to use generic API
-I have modified EXYNOS, berlin, realview, socfpga, STi, ux500, vexpress, BCM,
-tegra, rockchip, imx, zynq, hisi, mvebu and ZX platform files to adopt generic API for
-SCU enabling to obtaining SCU base address.
-
-Only fourth case shmobile and spear13xx will be left to adopt to this new API after this,
-which I felt some details information about these platforms and I leave it to the maintainers
-of these platforms.
-
-NOTE: This patch series has been tested on EXYNOS platform using Exynos4210 based Origen board
-for SMP boot.
-
-Rest platforms are *ONLY* Compiled Tested.
-
-I request maintainers/developers having h/w of these platforms to test this series on their
-platforms.
-
-Pankaj Dubey (16):
-  ARM: scu: Provide support for parsing SCU device node to enable SCU
-  ARM: EXYNOS: use generic API to enable SCU
-  ARM: berlin: use generic API for enabling SCU
-  ARM: realview: use generic API for enabling SCU
-  ARM: socfpga: use generic API for enabling SCU
-  ARM: STi: use generic API for enabling SCU
-  ARM: ux500: use generic API for enabling SCU
-  ARM: vexpress: use generic API for enabling SCU
-  ARM: BCM: use generic API for enabling SCU
-  ARM: tegra: use generic API for enabling SCU
-  ARM: rockchip: use generic API for enabling SCU
-  ARM: imx: use generic API for enabling SCU
-  ARM: zynq: use generic API for enabling SCU
-  ARM: hisi: use generic API for enabling SCU
-  ARM: mvebu: use generic API for enabling SCU
-  ARM: zx: use generic API for enabling SCU
-
- arch/arm/include/asm/smp_scu.h      |  4 +++
- arch/arm/kernel/smp_scu.c           | 56 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-bcm/bcm63xx_smp.c     | 18 ++----------
- arch/arm/mach-bcm/platsmp.c         | 46 +-----------------------------
- arch/arm/mach-berlin/platsmp.c      | 17 ++++-------
- arch/arm/mach-exynos/common.h       |  1 -
- arch/arm/mach-exynos/platsmp.c      | 30 +++-----------------
- arch/arm/mach-exynos/pm.c           |  4 +--
- arch/arm/mach-exynos/suspend.c      | 14 +++-------
- arch/arm/mach-hisi/platsmp.c        | 24 ++++------------
- arch/arm/mach-imx/common.h          |  5 ----
- arch/arm/mach-imx/mach-imx6q.c      |  8 +-----
- arch/arm/mach-imx/platsmp.c         | 32 ++++-----------------
- arch/arm/mach-imx/pm-imx6.c         |  3 +-
- arch/arm/mach-mvebu/board-v7.c      |  8 ++----
- arch/arm/mach-realview/platsmp-dt.c | 29 ++++++-------------
- arch/arm/mach-rockchip/platsmp.c    | 12 ++------
- arch/arm/mach-socfpga/platsmp.c     | 11 +-------
- arch/arm/mach-sti/platsmp.c         |  9 +-----
- arch/arm/mach-tegra/platsmp.c       |  2 +-
- arch/arm/mach-ux500/platsmp.c       | 20 +------------
- arch/arm/mach-vexpress/platsmp.c    | 13 +--------
- arch/arm/mach-zx/platsmp.c          |  6 ++--
- arch/arm/mach-zynq/common.c         | 32 +--------------------
- arch/arm/mach-zynq/common.h         |  2 --
- arch/arm/mach-zynq/platsmp.c        |  2 ++
- 26 files changed, 115 insertions(+), 293 deletions(-)
-
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index fb12d11..d19064b 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -156,7 +156,6 @@ extern void exynos_cpu_restore_register(void);
+ extern void exynos_pm_central_suspend(void);
+ extern int exynos_pm_central_resume(void);
+ extern void exynos_enter_aftr(void);
+-extern int exynos_scu_enable(void);
+ 
+ extern struct cpuidle_exynos_data cpuidle_coupled_exynos_data;
+ 
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 94405c7..2e5ecc1 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -168,27 +168,6 @@ int exynos_cluster_power_state(int cluster)
+ 		S5P_CORE_LOCAL_PWR_EN);
+ }
+ 
+-/**
+- * exynos_scu_enable : enables SCU for Cortex-A9 based system
+- * returns 0 on success else non-zero error code
+- */
+-int exynos_scu_enable(void)
+-{
+-	struct device_node *np;
+-	void __iomem *scu_base;
+-
+-	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
+-	scu_base = of_iomap(np, 0);
+-	of_node_put(np);
+-	if (!scu_base) {
+-		pr_err("%s failed to map scu_base\n", __func__);
+-		return -ENOMEM;
+-	}
+-	scu_enable(scu_base);
+-	iounmap(scu_base);
+-	return 0;
+-}
+-
+ static void __iomem *cpu_boot_reg_base(void)
+ {
+ 	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
+@@ -409,11 +388,10 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+ 
+ 	exynos_set_delayed_reset_assertion(true);
+ 
+-	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9) {
+-		/* if exynos_scu_enable fails, return */
+-		if (exynos_scu_enable())
+-			return;
+-	}
++	/* if of_scu_enable fails, return */
++	if (scu_a9_has_base() && of_scu_enable())
++		return;
++
+ 	/*
+ 	 * Write the address of secondary startup into the
+ 	 * system-wide flags register. The boot monitor waits
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index c0b46c3..9678438 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -174,8 +174,8 @@ void exynos_enter_aftr(void)
+ 
+ 	cpu_suspend(0, exynos_aftr_finisher);
+ 
+-	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9) {
+-		exynos_scu_enable();
++	if (scu_a9_has_base()) {
++		of_scu_enable();
+ 		if (call_firmware_op(resume) == -ENOSYS)
+ 			exynos_cpu_restore_register();
+ 	}
+diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+index 73df9f3..5414282 100644
+--- a/arch/arm/mach-exynos/suspend.c
++++ b/arch/arm/mach-exynos/suspend.c
+@@ -451,19 +451,16 @@ static void exynos_pm_release_retention(void)
+ 
+ static void exynos_pm_resume(void)
+ {
+-	u32 cpuid = read_cpuid_part();
+-
+ 	if (exynos_pm_central_resume())
+ 		goto early_wakeup;
+ 
+ 	/* For release retention */
+ 	exynos_pm_release_retention();
+ 
+-	if (cpuid == ARM_CPU_PART_CORTEX_A9)
+-		exynos_scu_enable();
++	if (scu_a9_has_base())
++		of_scu_enable();
+ 
+-	if (call_firmware_op(resume) == -ENOSYS
+-	    && cpuid == ARM_CPU_PART_CORTEX_A9)
++	if (call_firmware_op(resume) == -ENOSYS && scu_a9_has_base())
+ 		exynos_cpu_restore_register();
+ 
+ early_wakeup:
+@@ -475,8 +472,6 @@ static void exynos_pm_resume(void)
+ 
+ static void exynos3250_pm_resume(void)
+ {
+-	u32 cpuid = read_cpuid_part();
+-
+ 	if (exynos_pm_central_resume())
+ 		goto early_wakeup;
+ 
+@@ -485,8 +480,7 @@ static void exynos3250_pm_resume(void)
+ 
+ 	pmu_raw_writel(S5P_USE_STANDBY_WFI_ALL, S5P_CENTRAL_SEQ_OPTION);
+ 
+-	if (call_firmware_op(resume) == -ENOSYS
+-	    && cpuid == ARM_CPU_PART_CORTEX_A9)
++	if (call_firmware_op(resume) == -ENOSYS && scu_a9_has_base())
+ 		exynos_cpu_restore_register();
+ 
+ early_wakeup:
 -- 
 2.7.4
