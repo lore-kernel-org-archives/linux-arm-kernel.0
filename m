@@ -1,48 +1,31 @@
-From: wulf@rock-chips.com (William Wu)
-Date: Mon, 14 Nov 2016 17:27:11 +0800
-Subject: [PATCH v3 2/2] phy: rockchip-inno-usb2: correct 480MHz output clock
- stable time
-In-Reply-To: <1479115631-20137-1-git-send-email-wulf@rock-chips.com>
-References: <1479115631-20137-1-git-send-email-wulf@rock-chips.com>
-Message-ID: <1479115631-20137-3-git-send-email-wulf@rock-chips.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 14 Nov 2016 10:42:50 +0100
+Subject: [PATCH] ARM64: configs: Activate Internal PHY for Meson GXL
+In-Reply-To: <20161107104357.24428-1-narmstrong@baylibre.com>
+References: <20161107104357.24428-1-narmstrong@baylibre.com>
+Message-ID: <20161114094250.25059-1-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We found that the system crashed due to 480MHz output clock of
-USB2 PHY was unstable after clock had been enabled by gpu module.
-
-Theoretically, 1 millisecond is a critical value for 480MHz
-output clock stable time, so we try to change the delay time
-to 1.2 millisecond to avoid this issue.
-
-And the commit ed907fb1d7c3 ("phy: rockchip-inno-usb2: correct
-clk_ops callback") used prepare callbacks instead of enable
-callbacks to support gate a clk if the operation may sleep. So
-we can switch from delay to sleep functions.
-
-Signed-off-by: William Wu <wulf@rock-chips.com>
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
-Changes in v3:
-- fix kbuild test error: too few arguments to function 'usleep_range'
+ arch/arm64/configs/defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Changes in v2:
-- use usleep_range() function instead of mdelay()
-
- drivers/phy/phy-rockchip-inno-usb2.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
-index 365e077..0e52b25 100644
---- a/drivers/phy/phy-rockchip-inno-usb2.c
-+++ b/drivers/phy/phy-rockchip-inno-usb2.c
-@@ -166,7 +166,7 @@ static int rockchip_usb2phy_clk480m_prepare(struct clk_hw *hw)
- 			return ret;
- 
- 		/* waitting for the clk become stable */
--		mdelay(1);
-+		usleep_range(1200, 1300);
- 	}
- 
- 	return 0;
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index dab2cb0..3890321 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -183,7 +183,10 @@ CONFIG_SMC91X=y
+ CONFIG_SMSC911X=y
+ CONFIG_STMMAC_ETH=m
+ CONFIG_REALTEK_PHY=m
++CONFIG_MESON_GXL_PHY=m
+ CONFIG_MICREL_PHY=y
++CONFIG_MDIO_BUS_MUX=y
++CONFIG_MDIO_BUS_MUX_MMIOREG=y
+ CONFIG_USB_PEGASUS=m
+ CONFIG_USB_RTL8150=m
+ CONFIG_USB_RTL8152=m
 -- 
-2.0.0
+1.9.1
