@@ -1,59 +1,328 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Mon, 14 Nov 2016 11:35:29 -0800
-Subject: [PATCH v5 00/23] Support qcom's HSIC USB and rewrite USB2 HS
- support
-In-Reply-To: <20161111074017.GA21045@b29397-desktop>
-References: <20161018015636.11701-1-stephen.boyd@linaro.org>
- <20161018093139.GB6294@b29397-desktop>
- <147682389932.20076.4186408979552866325@sboyd-linaro>
- <20161111074017.GA21045@b29397-desktop>
-Message-ID: <147915212935.7365.13445257183391192782@sboyd-linaro>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 14 Nov 2016 19:36:46 +0000
+Subject: [PATCH v2 1/2] mfd: pm8xxx: add support to pm8821
+In-Reply-To: <20161114185621.GC27931@tuxbot>
+References: <1479145933-9849-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20161114185621.GC27931@tuxbot>
+Message-ID: <26a22b4a-261c-ef8b-8979-8e6628965c39@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter Chen (2016-11-10 23:40:17)
-> On Tue, Oct 18, 2016 at 01:51:39PM -0700, Stephen Boyd wrote:
-> > Quoting Peter Chen (2016-10-18 02:31:40)
-> > > On Mon, Oct 17, 2016 at 06:56:13PM -0700, Stephen Boyd wrote:
-> > > > I've also sent separate patches for other minor pieces to make this
-> > > > all work. The full tree can be found here[2], hacks and all to get
-> > > > things working. I've tested this on the db410c, apq8074 dragonboard,
-> > > > and ifc6410 with configfs gadgets and otg cables.
-> > > > 
-> > > > Patches based on v4.8-rc1
-> > 
-> > Oops should be v4.9-rc1 here.
-> > 
-> > > > 
-> > > > Changes from v4:
-> > > >  * Picked up Acks from Rob
-> > > >  * Updated HS phy init sequence DT property to restrict it to offsets
-> > > 
-> > > I remembered that you got all my acks for chipidea patches, right? I did
-> > > not check for this series.
-> > 
-> > Sorry I've added in one more patch
-> > 
-> >    usb: chipidea: Emulate OTGSC interrupt enable path
-> > 
-> > to fix extcon interrupt emulation even further.
-> > 
-> > > 
-> > > Besides, the patch "gpu: Remove depends on RESET_CONTROLLER when not a
-> > > provider" [1]  still not be accepted, I need this patch to be merged
-> > > first, then apply your chipidea part, otherwise, there is a building
-> > > warning.
-> > > 
-> > > [1] https://patchwork.kernel.org/patch/9322583/
-> > 
-> > Yes, I'm going to resend that patch now. I hope that David will apply it
-> > for -rc2.
-> 
-> Stephen, just a mind. I have rebased Greg's usb-next tree (v4.9-rc3 on
-> it), your GPU fix is still not there.
-> 
 
-It looks like the patch is in drm-misc. I think they're going to hold
-off on merging it until the next merge window though. fb80016af071 is
-the commit in drm-misc tree and in linux-next. I'm not sure anything can
-be done here besides a cross tree merge or ignore the warning?
+
+On 14/11/16 18:56, Bjorn Andersson wrote:
+> On Mon 14 Nov 09:52 PST 2016, Srinivas Kandagatla wrote:
+>
+>> This patch adds support to PM8821 PMIC and interrupt support.
+>> PM8821 is companion device that supplements primary PMIC PM8921 IC.
+>>
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> ---
+>> Changes from v1:
+>> 	- Removed unnessary locking spotted by Bjorn
+>> 	- updated register naming to reflect PM8821
+>> 	- lot of cleanups suggested by Bjorn
+>> 	- rebased on top of Linus Walleij's pm8xxx namespace
+>> 	 cleanup patch.
+>
+> Looks good, just some minor style nits below.
+Thanks, I will address all the comments in next version.
+>
+>>
+>>  .../devicetree/bindings/mfd/qcom-pm8xxx.txt        |   1 +
+>>  drivers/mfd/qcom-pm8xxx.c                          | 247 ++++++++++++++++++++-
+>>  2 files changed, 238 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/qcom-pm8xxx.txt b/Documentation/devicetree/bindings/mfd/qcom-pm8xxx.txt
+>> index 37a088f..8f1b4ec 100644
+>> --- a/Documentation/devicetree/bindings/mfd/qcom-pm8xxx.txt
+>> +++ b/Documentation/devicetree/bindings/mfd/qcom-pm8xxx.txt
+>> @@ -11,6 +11,7 @@ voltages and other various functionality to Qualcomm SoCs.
+>>  	Definition: must be one of:
+>>  		    "qcom,pm8058"
+>>  		    "qcom,pm8921"
+>> +		    "qcom,pm8821"
+>
+> 8 < 9, so move it one step up please.
+sure.. makes sense.
+>
+>>
+>>  - #address-cells:
+>>  	Usage: required
+>> diff --git a/drivers/mfd/qcom-pm8xxx.c b/drivers/mfd/qcom-pm8xxx.c
+> [..]
+>> +#define	PM8821_SSBI_REG_ADDR_IRQ_BASE	0x100
+>> +#define	PM8821_SSBI_REG_ADDR_IRQ_MASTER0 (PM8821_SSBI_REG_ADDR_IRQ_BASE + 0x30)
+>> +#define	PM8821_SSBI_REG_ADDR_IRQ_MASTER1 (PM8821_SSBI_REG_ADDR_IRQ_BASE + 0xb0)
+>> +#define	PM8821_SSBI_REG(m, b, offset) \
+>> +			((m == 0) ? \
+>> +			(PM8821_SSBI_REG_ADDR_IRQ_MASTER0 + b + offset) : \
+>> +			(PM8821_SSBI_REG_ADDR_IRQ_MASTER1 + b + offset))
+>> +#define	PM8821_SSBI_ADDR_IRQ_ROOT(m, b)		PM8821_SSBI_REG(m, b, 0x0)
+>> +#define	PM8821_SSBI_ADDR_IRQ_CLEAR(m, b)	PM8821_SSBI_REG(m, b, 0x01)
+>> +#define	PM8821_SSBI_ADDR_IRQ_MASK(m, b)		PM8821_SSBI_REG(m, b, 0x08)
+>> +#define	PM8821_SSBI_ADDR_IRQ_RT_STATUS(m, b)	PM8821_SSBI_REG(m, b, 0x0f)
+>
+> I like how this cleaned up the rest of the implementation.
+>
+> [..]
+>
+>> +static void pm8821_irq_block_handler(struct pm_irq_chip *chip,
+>> +				     int master, int block)
+>> +{
+>> +	int pmirq, irq, i, ret;
+>> +	unsigned int bits;
+>> +
+>> +	ret = regmap_read(chip->regmap,
+>> +			  PM8821_SSBI_ADDR_IRQ_ROOT(master, block), &bits);
+>> +	if (ret) {
+>> +		pr_err("Failed reading %d block ret=%d", block, ret);
+>
+> "Reading block %d failed ret=%d"
+yep.
+>
+>> +		return;
+>> +	}
+>> +	if (!bits) {
+>> +		pr_err("block bit set in master but no irqs: %d", block);
+>
+> This seems more like a debug thing, either showing missbehaving hardware
+> or something odd in the driver. I think you should drop the print or
+> make it pr_debug().
+okay.
+>
+>> +		return;
+>> +	}
+>
+> I would prefer that you just drop the entire if statement, it's just an
+> corner case optimization with a info print.
+>
+i will have a closer look at this part once again.
+>> +
+>> +	/* Convert block offset to global block number */
+>> +	block += (master * PM8821_BLOCKS_PER_MASTER) - 1;
+>> +
+>> +	/* Check IRQ bits */
+>> +	for (i = 0; i < 8; i++) {
+>> +		if (bits & BIT(i)) {
+>> +			pmirq = block * 8 + i;
+>> +			irq = irq_find_mapping(chip->irqdomain, pmirq);
+>> +			generic_handle_irq(irq);
+>> +		}
+>> +	}
+>> +
+>
+> Empty line
+will fix all the empty lines in next version.
+>
+>> +}
+>> +
+>> +static inline void pm8821_irq_master_handler(struct pm_irq_chip *chip,
+>> +					     int master, u8 master_val)
+>> +{
+>> +	int block;
+>> +
+>> +	for (block = 1; block < 8; block++)
+>> +		if (master_val & BIT(block))
+>> +			pm8821_irq_block_handler(chip, master, block);
+>> +
+>
+> Empty line
+>
+>> +}
+>> +
+>> +static void pm8821_irq_handler(struct irq_desc *desc)
+>> +{
+>> +	struct pm_irq_chip *chip = irq_desc_get_handler_data(desc);
+>> +	struct irq_chip *irq_chip = irq_desc_get_chip(desc);
+>> +	unsigned int master;
+>> +	int ret;
+>> +
+>> +	chained_irq_enter(irq_chip, desc);
+>> +	ret = regmap_read(chip->regmap,
+>> +			  PM8821_SSBI_REG_ADDR_IRQ_MASTER0, &master);
+>> +	if (ret) {
+>> +		pr_err("Failed to re:Qad master 0 ret=%d\n", ret);
+>                                       ^
+> 				      |
+> 			  I see you're using vim :)
+>
+>> +		return;
+>> +	}
+>> +
+>> +	 /* bits 1 through 7 marks the first 7 blocks in master 0*/
+>
+> Indentation
+>
+>> +	if (master & GENMASK(7, 1))
+>> +		pm8821_irq_master_handler(chip, 0, master);
+>> +
+>> +	 /* bit 0 marks if master 1 contains any bits */
+>
+> Dito
+yep.
+>
+>> +	if (!(master & BIT(0)))
+>> +		goto done;
+>> +
+>> +	ret = regmap_read(chip->regmap,
+>> +			  PM8821_SSBI_REG_ADDR_IRQ_MASTER1, &master);
+>> +	if (ret) {
+>> +		pr_err("Failed to read master 1 ret=%d\n", ret);
+>> +		return;
+>
+> "goto done;" so that we pass chained_irq_exit()
+yes,
+>
+>> +	}
+>> +
+>> +	pm8821_irq_master_handler(chip, 1, master);
+>> +
+>> +done:
+>> +	chained_irq_exit(irq_chip, desc);
+>> +}
+>> +
+>
+> [..]
+>
+>> +static void pm8821_irq_mask_ack(struct irq_data *d)
+>> +{
+>> +	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
+>> +	unsigned int pmirq = irqd_to_hwirq(d);
+>> +	u8 block, master;
+>> +	int irq_bit, rc;
+>> +
+>> +	block = pmirq / 8;
+>> +	master = block / PM8821_BLOCKS_PER_MASTER;
+>> +	irq_bit = pmirq % 8;
+>> +	block %= PM8821_BLOCKS_PER_MASTER;
+>> +
+>> +	rc = regmap_update_bits(chip->regmap,
+>> +				PM8821_SSBI_ADDR_IRQ_MASK(master, block),
+>> +				BIT(irq_bit), BIT(irq_bit));
+>> +
+>
+> Empty line
+>
+>> +	if (rc) {
+>> +		pr_err("Failed to read/write mask IRQ:%d rc=%d\n", pmirq, rc);
+>
+> "Failed to mask IRQ %d rc=%d\n"
+>
+>> +		return;
+>> +	}
+>> +
+>> +	rc = regmap_update_bits(chip->regmap,
+>> +				PM8821_SSBI_ADDR_IRQ_CLEAR(master, block),
+>> +				BIT(irq_bit), BIT(irq_bit));
+>> +
+>
+> Empty line
+>
+>> +	if (rc) {
+>> +		pr_err("Failed to read/write IT_CLEAR IRQ:%d rc=%d\n",
+>> +								pmirq, rc);
+>
+> "Failed to clear IRQ %d rc=%d\n"
+>
+>> +	}
+>> +
+>
+> Empty line
+>
+>> +}
+>> +
+>> +static void pm8821_irq_unmask(struct irq_data *d)
+>> +{
+>> +	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
+>> +	unsigned int pmirq = irqd_to_hwirq(d);
+>> +	int irq_bit, rc;
+>> +	u8 block, master;
+>> +
+>> +	block = pmirq / 8;
+>> +	master = block / PM8821_BLOCKS_PER_MASTER;
+>> +	irq_bit = pmirq % 8;
+>> +	block %= PM8821_BLOCKS_PER_MASTER;
+>> +
+>> +	rc = regmap_update_bits(chip->regmap,
+>> +				PM8821_SSBI_ADDR_IRQ_MASK(master, block),
+>> +				BIT(irq_bit), ~BIT(irq_bit));
+>> +
+>
+> Empty line
+>
+>> +	if (rc)
+>> +		pr_err("Failed to read/write unmask IRQ:%d rc=%d\n", pmirq, rc);
+>
+> "Failed to unmask IRQ %d rc=%d\n"
+will update it in next version.
+>
+>> +
+>
+> Empty line
+>
+>> +}
+>> +
+>> +static int pm8821_irq_get_irqchip_state(struct irq_data *d,
+>> +					enum irqchip_irq_state which,
+>> +					bool *state)
+>> +{
+>> +	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
+>> +	int rc, pmirq = irqd_to_hwirq(d);
+>> +	u8 block, irq_bit, master;
+>> +	unsigned int bits;
+>> +
+>> +	block = pmirq / 8;
+>> +	master = block / PM8821_BLOCKS_PER_MASTER;
+>> +	irq_bit = pmirq % 8;
+>> +	block %= PM8821_BLOCKS_PER_MASTER;
+>> +
+>> +	rc = regmap_read(chip->regmap,
+>> +		PM8821_SSBI_ADDR_IRQ_RT_STATUS(master, block), &bits);
+>> +	if (rc) {
+>> +		pr_err("Failed Reading Status rc=%d\n", rc);
+>
+> Odd capitalization, I suggest that you match it to the other functions
+> by:
+>
+> "Reading status of IRQ %d failed rc=%d\n"
+>
+Okay
+>> +		return rc;
+>> +	}
+>> +
+>> +	*state = !!(bits & BIT(irq_bit));
+>> +
+>> +	return rc;
+>> +}
+>> +
+>
+> [..]
+>
+>>
+>>  static int pm8xxx_probe(struct platform_device *pdev)
+>>  {
+>> +	const struct of_device_id *match;
+>> +	const struct pm_irq_data *data;
+>>  	struct regmap *regmap;
+>>  	int irq, rc;
+>>  	unsigned int val;
+>>  	u32 rev;
+>>  	struct pm_irq_chip *chip;
+>> -	unsigned int nirqs = PM8XXX_NR_IRQS;
+>> +
+>> +	match = of_match_node(pm8xxx_id_table, pdev->dev.of_node);
+>> +	if (!match) {
+>> +		dev_err(&pdev->dev, "No matching driver data found\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	data = match->data;
+>
+> data = of_device_get_match_data(&pdev->dev); (from of_device.h)
+This is good one.. I will use it in next version.
+
+> Regards,
+> Bjorn
+>
