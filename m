@@ -1,28 +1,32 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 14 Nov 2016 16:04:00 -0700
-Subject: [PATCH fpga 5/9] fpga zynq: Remove priv->dev
-In-Reply-To: <CAAtXAHe60QjyitDxkEzc9+Zr99mj0SeWFUOW0SOexGnBvuqGjw@mail.gmail.com>
-References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <1478732303-13718-6-git-send-email-jgunthorpe@obsidianresearch.com>
- <alpine.DEB.2.10.1611140913280.3739@atull-VirtualBox>
- <CAAtXAHe60QjyitDxkEzc9+Zr99mj0SeWFUOW0SOexGnBvuqGjw@mail.gmail.com>
-Message-ID: <20161114230400.GB4874@obsidianresearch.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 14 Nov 2016 15:04:39 -0800
+Subject: [PATCH 0/2] ARM: davinci: cleanup and rework PM initializaion
+Message-ID: <20161114230441.356-1-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 14, 2016 at 09:20:38AM -0800, Moritz Fischer wrote:
-> this one could be independent of the other patches, this is cleanup and
-> could be merged before the rest (that's still in discussion) if you pull it out.
+This series removes the fake platform_device used to initialize PM on
+legacy davinci platforms, and adds PM support for DT platforms.
 
-As I said in the cover letter, several of the patches are just fixes
-and can be applied, but they are all linked by patch context so are
-presented as a series.
+Sekhar: the 2nd patch should probably be squashed into the first upon
+approval, but was kept separated in order to make the functional
+changes in the first patch more readable.
 
-Lets get as many reviewed as possible and then I can repost them in a
-different order if necessary.
+Tested with legacy boot on da850-evm, and DT boot on da850-lcdk.  Used
+RTC to wake from suspend-to-RAM: e.g. rtcwake -m mem -s 4 -d /dev/rtc0
 
-The first 5 are all straigtfoward and should be no problem to get
-ackd. We've talked about the sanity check patch enough, lets just go
-ahead with it now.
+Kevin Hilman (2):
+  ARM: davinci: PM: rework init, support DT platforms
+  ARM: davinci: PM: rework init: cleanup
 
-Jason
+ arch/arm/mach-davinci/board-da850-evm.c    | 17 +----
+ arch/arm/mach-davinci/board-mityomapl138.c | 16 +----
+ arch/arm/mach-davinci/common.c             |  1 -
+ arch/arm/mach-davinci/da850.c              | 38 ------------
+ arch/arm/mach-davinci/da8xx-dt.c           |  1 +
+ arch/arm/mach-davinci/include/mach/da8xx.h |  1 -
+ arch/arm/mach-davinci/pm.c                 | 99 +++++++++++++++++-------------
+ 7 files changed, 58 insertions(+), 115 deletions(-)
+
+-- 
+2.9.3
