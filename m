@@ -1,81 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Nov 2016 11:48:58 +0000
-Subject: [PATCH v3 2/2] arm64: Support systems without FP/ASIMD
-In-Reply-To: <1478613381-5718-3-git-send-email-suzuki.poulose@arm.com>
-References: <1478613381-5718-1-git-send-email-suzuki.poulose@arm.com>
- <1478613381-5718-3-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20161114114858.GB3096@e104818-lin.cambridge.arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 14 Nov 2016 12:51:26 +0100
+Subject: [PATCH RFC 1/7] dma: pl08x: Add support for the DMA slave map
+In-Reply-To: <3693046.Gh6DJsekH3@wuerfel>
+References: <1478276094-19135-1-git-send-email-s.nawrocki@samsung.com>
+ <201611050026.49560.arnd@arndb.de>
+ <3d10d013-b18c-e10e-b596-d4d0f8b6e973@samsung.com>
+ <CGME20161107195651epcas4p4e5e949a772ce329b064ce9d791aeb5bd@epcas4p4.samsung.com>
+ <3693046.Gh6DJsekH3@wuerfel>
+Message-ID: <d6245c8d-d7a3-8f52-a32a-259e3791e513@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+On 11/07/2016 08:55 PM, Arnd Bergmann wrote:
+>> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+>> > index d5c75c8..0d1eb2e 100644
+>> > --- a/drivers/dma/amba-pl08x.c
+>> > +++ b/drivers/dma/amba-pl08x.c
+>> > @@ -1793,6 +1793,23 @@ bool pl08x_filter_id(struct dma_chan *chan, void *chan_id)
+>> >  }
+[...]
+>> > +static bool pl08x_filter_fn(struct dma_chan *chan, void *chan_id)
+>> > +{
+>> > +       struct pl08x_dma_chan *plchan;
+[...]
+>> > +       plchan = to_pl08x_chan(chan);
+>> > +
+>> > +       /* Check that the channel is not taken! */
+>> > +       if (plchan->cd == chan_id)
+>> > +               return true;
+> 
+> What I had in mind was a bit different: Instead of comparing the
+> channel, I was thinking of modifying the channel itself, something
+> like:
+> 
+> 	plchan->signal = chan_id->signal;
+> 	plchan->periph_buses = chan_id->periph_buses;
+> 
+> after that, remove the plchan->cd data. Unfortunately, the muxing in
+> arch/arm/mach-spear/ makes this a bit harder. I'd have to think
+> about it some more. It may be easier to do this after moving
+> spear and lpc32xx over to use dma_slave_map.
 
-On Tue, Nov 08, 2016 at 01:56:21PM +0000, Suzuki K. Poulose wrote:
-> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-> index 87b4465..4174f09 100644
-> --- a/arch/arm64/include/asm/cpucaps.h
-> +++ b/arch/arm64/include/asm/cpucaps.h
-> @@ -34,7 +34,8 @@
->  #define ARM64_HAS_32BIT_EL0			13
->  #define ARM64_HYP_OFFSET_LOW			14
->  #define ARM64_MISMATCHED_CACHE_LINE_SIZE	15
-> +#define ARM64_HAS_NO_FPSIMD			16
->  
-> -#define ARM64_NCAPS				16
-> +#define ARM64_NCAPS				17
->  
->  #endif /* __ASM_CPUCAPS_H */
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index 9890d20..ce45770 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -213,6 +213,11 @@ static inline bool system_supports_mixed_endian_el0(void)
->  	return id_aa64mmfr0_mixed_endian_el0(read_system_reg(SYS_ID_AA64MMFR0_EL1));
->  }
->  
-> +static inline bool system_supports_fpsimd(void)
-> +{
-> +	return !cpus_have_const_cap(ARM64_HAS_NO_FPSIMD);
-> +}
-
-Any particular reason why using negation instead of a ARM64_HAS_FPSIMD?
-A potential problem would be the default cpus_have_const_cap()
-implementation and the default static key having a slight performance
-impact.
-
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index fc2bd19..f89385d 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -746,6 +746,14 @@ static bool hyp_offset_low(const struct arm64_cpu_capabilities *entry,
->  	return idmap_addr > GENMASK(VA_BITS - 2, 0) && !is_kernel_in_hyp_mode();
->  }
->  
-> +static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unused)
-> +{
-> +	u64 pfr0 = read_system_reg(SYS_ID_AA64PFR0_EL1);
-> +
-> +	return cpuid_feature_extract_signed_field(pfr0,
-> +					ID_AA64PFR0_FP_SHIFT) < 0;
-> +}
-> +
->  static const struct arm64_cpu_capabilities arm64_features[] = {
->  	{
->  		.desc = "GIC system register CPU interface",
-> @@ -829,6 +837,13 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
->  		.def_scope = SCOPE_SYSTEM,
->  		.matches = hyp_offset_low,
->  	},
-> +	{
-> +		/* FP/SIMD is not implemented */
-> +		.capability = ARM64_HAS_NO_FPSIMD,
-> +		.def_scope = SCOPE_SYSTEM,
-> +		.min_field_value = 0,
-> +		.matches = has_no_fpsimd,
-> +	},
-
-If we go for negation, I don't think we need a min_field_value at all,
-the matching is done by the has_no_fpsimd() function.
+I've posted updated version of this patch, please let me know
+if you have any further comments.
 
 -- 
-Catalin
+Thanks,
+Sylwester
