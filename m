@@ -1,77 +1,77 @@
 From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 14 Nov 2016 16:22:43 +0100
-Subject: [RFCv2 PATCH 0/5] CEC drivers for iMX6 and TDA9950
-Message-ID: <1479136968-24477-1-git-send-email-hverkuil@xs4all.nl>
+Date: Mon, 14 Nov 2016 16:22:45 +0100
+Subject: [RFCv2 PATCH 2/5] drm/bridge: dw_hdmi: remove CEC engine register
+ definitions
+In-Reply-To: <1479136968-24477-1-git-send-email-hverkuil@xs4all.nl>
+References: <1479136968-24477-1-git-send-email-hverkuil@xs4all.nl>
+Message-ID: <1479136968-24477-3-git-send-email-hverkuil@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hans Verkuil <hans.verkuil@cisco.com>
+From: Russell King <rmk+kernel@arm.linux.org.uk>
 
-This patch series is an update to this RFC series from Russell:
+We don't need the CEC engine register definitions, so let's remove them.
 
-https://lists.freedesktop.org/archives/dri-devel/2016-August/115733.html
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/gpu/drm/bridge/dw-hdmi.h | 45 ----------------------------------------
+ 1 file changed, 45 deletions(-)
 
-I have not seen any updates to this, so I hope that that series is still
-the latest version.
-
-The main problem with that original series was that the notifier didn't
-store the state, so if a CEC driver registered with the notifier, then
-it wouldn't be informed of the current state.
-
-The hdmi-notifier code has been changed to a per-HDMI-device and refcounted
-block_notifier that stores the state and will report the current state
-upon registration.
-
-The other four patches have been adapted to the new notifier code, but
-no other changes were made.
-
-It has *only* been compile-tested. I might be able to verify it next week
-with an actual i.MX6 device, but it will take time to set that up.
-
-If someone has a ready-to-test setup, then I would very much appreciate
-it if this series can be tested.
-
-The patches are also available in my branch:
-
-https://git.linuxtv.org/hverkuil/media_tree.git/log/?h=cec-notifiers
-
-It is on top of my patch series that moves CEC out of staging. This
-is planned for 4.10.
-
-Regards,
-
-	Hans
-
-Hans Verkuil (1):
-  video: add HDMI state notifier support
-
-Russell King (4):
-  drm/bridge: dw_hdmi: remove CEC engine register definitions
-  drm/bridge: dw_hdmi: add HDMI notifier support
-  drm/bridge: add dw-hdmi cec driver using Hans Verkuil's CEC code
-  drm/i2c: add tda998x/tda9950 CEC driver
-
- drivers/gpu/drm/bridge/Kconfig            |   8 +
- drivers/gpu/drm/bridge/Makefile           |   1 +
- drivers/gpu/drm/bridge/dw-hdmi-cec.c      | 346 ++++++++++++++++++++
- drivers/gpu/drm/bridge/dw-hdmi.c          |  89 +++++-
- drivers/gpu/drm/bridge/dw-hdmi.h          |  45 ---
- drivers/gpu/drm/i2c/Kconfig               |   5 +
- drivers/gpu/drm/i2c/Makefile              |   1 +
- drivers/gpu/drm/i2c/tda9950.c             | 516 ++++++++++++++++++++++++++++++
- drivers/video/Kconfig                     |   3 +
- drivers/video/Makefile                    |   1 +
- drivers/video/hdmi-notifier.c             | 136 ++++++++
- include/linux/hdmi-notifier.h             |  43 +++
- include/linux/platform_data/dw_hdmi-cec.h |  16 +
- include/linux/platform_data/tda9950.h     |  15 +
- 14 files changed, 1168 insertions(+), 57 deletions(-)
- create mode 100644 drivers/gpu/drm/bridge/dw-hdmi-cec.c
- create mode 100644 drivers/gpu/drm/i2c/tda9950.c
- create mode 100644 drivers/video/hdmi-notifier.c
- create mode 100644 include/linux/hdmi-notifier.h
- create mode 100644 include/linux/platform_data/dw_hdmi-cec.h
- create mode 100644 include/linux/platform_data/tda9950.h
-
+diff --git a/drivers/gpu/drm/bridge/dw-hdmi.h b/drivers/gpu/drm/bridge/dw-hdmi.h
+index fc9a560..26d6845 100644
+--- a/drivers/gpu/drm/bridge/dw-hdmi.h
++++ b/drivers/gpu/drm/bridge/dw-hdmi.h
+@@ -478,51 +478,6 @@
+ #define HDMI_A_PRESETUP                         0x501A
+ #define HDMI_A_SRM_BASE                         0x5020
+ 
+-/* CEC Engine Registers */
+-#define HDMI_CEC_CTRL                           0x7D00
+-#define HDMI_CEC_STAT                           0x7D01
+-#define HDMI_CEC_MASK                           0x7D02
+-#define HDMI_CEC_POLARITY                       0x7D03
+-#define HDMI_CEC_INT                            0x7D04
+-#define HDMI_CEC_ADDR_L                         0x7D05
+-#define HDMI_CEC_ADDR_H                         0x7D06
+-#define HDMI_CEC_TX_CNT                         0x7D07
+-#define HDMI_CEC_RX_CNT                         0x7D08
+-#define HDMI_CEC_TX_DATA0                       0x7D10
+-#define HDMI_CEC_TX_DATA1                       0x7D11
+-#define HDMI_CEC_TX_DATA2                       0x7D12
+-#define HDMI_CEC_TX_DATA3                       0x7D13
+-#define HDMI_CEC_TX_DATA4                       0x7D14
+-#define HDMI_CEC_TX_DATA5                       0x7D15
+-#define HDMI_CEC_TX_DATA6                       0x7D16
+-#define HDMI_CEC_TX_DATA7                       0x7D17
+-#define HDMI_CEC_TX_DATA8                       0x7D18
+-#define HDMI_CEC_TX_DATA9                       0x7D19
+-#define HDMI_CEC_TX_DATA10                      0x7D1a
+-#define HDMI_CEC_TX_DATA11                      0x7D1b
+-#define HDMI_CEC_TX_DATA12                      0x7D1c
+-#define HDMI_CEC_TX_DATA13                      0x7D1d
+-#define HDMI_CEC_TX_DATA14                      0x7D1e
+-#define HDMI_CEC_TX_DATA15                      0x7D1f
+-#define HDMI_CEC_RX_DATA0                       0x7D20
+-#define HDMI_CEC_RX_DATA1                       0x7D21
+-#define HDMI_CEC_RX_DATA2                       0x7D22
+-#define HDMI_CEC_RX_DATA3                       0x7D23
+-#define HDMI_CEC_RX_DATA4                       0x7D24
+-#define HDMI_CEC_RX_DATA5                       0x7D25
+-#define HDMI_CEC_RX_DATA6                       0x7D26
+-#define HDMI_CEC_RX_DATA7                       0x7D27
+-#define HDMI_CEC_RX_DATA8                       0x7D28
+-#define HDMI_CEC_RX_DATA9                       0x7D29
+-#define HDMI_CEC_RX_DATA10                      0x7D2a
+-#define HDMI_CEC_RX_DATA11                      0x7D2b
+-#define HDMI_CEC_RX_DATA12                      0x7D2c
+-#define HDMI_CEC_RX_DATA13                      0x7D2d
+-#define HDMI_CEC_RX_DATA14                      0x7D2e
+-#define HDMI_CEC_RX_DATA15                      0x7D2f
+-#define HDMI_CEC_LOCK                           0x7D30
+-#define HDMI_CEC_WKUPCTRL                       0x7D31
+-
+ /* I2C Master Registers (E-DDC) */
+ #define HDMI_I2CM_SLAVE                         0x7E00
+ #define HDMI_I2CM_ADDRESS                       0x7E01
 -- 
 2.8.1
