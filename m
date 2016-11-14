@@ -1,66 +1,129 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 14 Nov 2016 10:31:58 +0530
-Subject: [PATCH 03/16] ARM: berlin: use generic API for enabling SCU
+Date: Mon, 14 Nov 2016 10:31:56 +0530
+Subject: [PATCH 01/16] ARM: scu: Provide support for parsing SCU device node to
+ enable SCU
 In-Reply-To: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1479099731-28108-4-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1479099731-28108-2-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now as we have of_scu_enable which takes care of mapping
-scu base from DT, lets use it.
+Many platforms are duplicating code for enabling SCU, lets add
+common code to enable SCU by parsing SCU device node so the duplication
+in each platform can be avoided.
 
+CC: Krzysztof Kozlowski <krzk@kernel.org>
 CC: Jisheng Zhang <jszhang@marvell.com>
-CC: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+CC: Russell King <linux@armlinux.org.uk>
+CC: Dinh Nguyen <dinguyen@opensource.altera.com>
+CC: Patrice Chotard <patrice.chotard@st.com>
+CC: Linus Walleij <linus.walleij@linaro.org>
+CC: Liviu Dudau <liviu.dudau@arm.com>
+CC: Ray Jui <rjui@broadcom.com>
+CC: Stephen Warren <swarren@wwwdotorg.org>
+CC: Heiko Stuebner <heiko@sntech.de>
+CC: Shawn Guo <shawnguo@kernel.org>
+CC: Michal Simek <michal.simek@xilinx.com>
+CC: Wei Xu <xuwei5@hisilicon.com>
+CC: Andrew Lunn <andrew@lunn.ch>
+CC: Jun Nie <jun.nie@linaro.org> 
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 ---
- arch/arm/mach-berlin/platsmp.c | 17 +++++------------
- 1 file changed, 5 insertions(+), 12 deletions(-)
+ arch/arm/include/asm/smp_scu.h |  4 +++
+ arch/arm/kernel/smp_scu.c      | 56 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+)
 
-diff --git a/arch/arm/mach-berlin/platsmp.c b/arch/arm/mach-berlin/platsmp.c
-index 93f9068..25a6ca5 100644
---- a/arch/arm/mach-berlin/platsmp.c
-+++ b/arch/arm/mach-berlin/platsmp.c
-@@ -60,26 +60,21 @@ static int berlin_boot_secondary(unsigned int cpu, struct task_struct *idle)
- static void __init berlin_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	struct device_node *np;
--	void __iomem *scu_base;
- 	void __iomem *vectors_base;
+diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
+index bfe163c..fdeec07 100644
+--- a/arch/arm/include/asm/smp_scu.h
++++ b/arch/arm/include/asm/smp_scu.h
+@@ -39,8 +39,12 @@ static inline int scu_power_mode(void __iomem *scu_base, unsigned int mode)
  
--	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
--	scu_base = of_iomap(np, 0);
--	of_node_put(np);
--	if (!scu_base)
--		return;
--
- 	np = of_find_compatible_node(NULL, NULL, "marvell,berlin-cpu-ctrl");
- 	cpu_ctrl = of_iomap(np, 0);
- 	of_node_put(np);
- 	if (!cpu_ctrl)
--		goto unmap_scu;
-+		return;
+ #if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
+ void scu_enable(void __iomem *scu_base);
++void __iomem *of_scu_get_base(void);
++int of_scu_enable(void);
+ #else
+ static inline void scu_enable(void __iomem *scu_base) {}
++static inline void __iomem *of_scu_get_base(void) {return NULL; }
++static inline int of_scu_enable(void) {return 0; }
+ #endif
  
- 	vectors_base = ioremap(CONFIG_VECTORS_BASE, SZ_32K);
- 	if (!vectors_base)
--		goto unmap_scu;
-+		return;
-+
-+	if (of_scu_enable())
-+		return;
+ #endif
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 72f9241..d0ac3ed 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -10,6 +10,7 @@
+  */
+ #include <linux/init.h>
+ #include <linux/io.h>
++#include <linux/of_address.h>
  
--	scu_enable(scu_base);
+ #include <asm/smp_plat.h>
+ #include <asm/smp_scu.h>
+@@ -70,6 +71,61 @@ void scu_enable(void __iomem *scu_base)
+ 	 */
  	flush_cache_all();
- 
- 	/*
-@@ -95,8 +90,6 @@ static void __init berlin_smp_prepare_cpus(unsigned int max_cpus)
- 	writel(virt_to_phys(secondary_startup), vectors_base + SW_RESET_ADDR);
- 
- 	iounmap(vectors_base);
--unmap_scu:
--	iounmap(scu_base);
  }
++
++static const struct of_device_id scu_match[] = {
++	{ .compatible = "arm,cortex-a9-scu", },
++	{ .compatible = "arm,cortex-a5-scu", },
++	{ }
++};
++
++/*
++ * Helper API to get SCU base address
++ * In case platform DT do not have SCU node, or iomap fails
++ * this call will fallback and will try to map via call to
++ * scu_a9_get_base.
++ * This will return ownership of scu_base to the caller
++ */
++void __iomem *of_scu_get_base(void)
++{
++	unsigned long base = 0;
++	struct device_node *np;
++	void __iomem *scu_base;
++
++	np = of_find_matching_node(NULL, scu_match);
++	scu_base = of_iomap(np, 0);
++	of_node_put(np);
++	if (!scu_base) {
++		pr_err("%s failed to map scu_base via DT\n", __func__);
++		if (scu_a9_has_base()) {
++			base = scu_a9_get_base();
++			scu_base = ioremap(base, SZ_4K);
++		}
++		if (!scu_base) {
++			pr_err("%s failed to map scu_base\n", __func__);
++			return IOMEM_ERR_PTR(-ENOMEM);
++		}
++	}
++	return scu_base;
++}
++
++/*
++ * Enable SCU via mapping scu_base DT
++ * If scu_base mapped successfully scu will be enabled and in case of
++ * failure if will return non-zero error code
++ */
++int of_scu_enable(void)
++{
++	void __iomem *scu_base;
++
++	scu_base = of_scu_get_base();
++	if (!IS_ERR(scu_base)) {
++		scu_enable(scu_base);
++		iounmap(scu_base);
++		return 0;
++	}
++	return PTR_ERR(scu_base);
++}
++
+ #endif
  
- #ifdef CONFIG_HOTPLUG_CPU
+ /*
 -- 
 2.7.4
