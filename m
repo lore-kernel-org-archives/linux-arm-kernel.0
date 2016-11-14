@@ -1,33 +1,39 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 14 Nov 2016 10:40:45 -0800
-Subject: [PATCH v2 1/2] mfd: pm8xxx: add support to pm8821
-In-Reply-To: <1479145933-9849-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1479145933-9849-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <a1116e3f-32d2-aa2d-9404-1d8147bd8500@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Nov 2016 18:41:07 +0000
+Subject: [PATCH/RESEND] recordmcount: arm: Implement make_nop
+In-Reply-To: <20161114133641.09b1abfb@gandalf.local.home>
+References: <20161018234200.5804-1-sboyd@codeaurora.org>
+ <20161018200707.36e549ee@gandalf.local.home>
+ <20161114133641.09b1abfb@gandalf.local.home>
+Message-ID: <20161114184106.GR1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2016 09:52 AM, Srinivas Kandagatla wrote:
-> diff --git a/drivers/mfd/qcom-pm8xxx.c b/drivers/mfd/qcom-pm8xxx.c
-> index 7f9620e..dc347d3 100644
-> --- a/drivers/mfd/qcom-pm8xxx.c
-> +++ b/drivers/mfd/qcom-pm8xxx.c
-> +
-> +static void pm8821_irq_handler(struct irq_desc *desc)
-> +{
-> +	struct pm_irq_chip *chip = irq_desc_get_handler_data(desc);
-> +	struct irq_chip *irq_chip = irq_desc_get_chip(desc);
-> +	unsigned int master;
-> +	int ret;
-> +
-> +	chained_irq_enter(irq_chip, desc);
-> +	ret = regmap_read(chip->regmap,
-> +			  PM8821_SSBI_REG_ADDR_IRQ_MASTER0, &master);
-> +	if (ret) {
-> +		pr_err("Failed to re:Qad master 0 ret=%d\n", ret);
+On Mon, Nov 14, 2016 at 01:36:41PM -0500, Steven Rostedt wrote:
+> On Tue, 18 Oct 2016 20:07:07 -0400
+> Steven Rostedt <rostedt@goodmis.org> wrote:
+> 
+> > On Tue, 18 Oct 2016 16:42:00 -0700
+> > Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > 
+> > > In similar spirit to x86 and arm64 support, add a make_nop_arm()
+> > > to replace calls to mcount with a nop in sections that aren't
+> > > traced.
+> > > 
+> > > Cc: Russell King <linux@arm.linux.org.uk>
+> > > Acked-by: Rabin Vincent <rabin@rab.in>
+> > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>  
+> > 
+> > I can take this if I can get an ack from the ARM maintainers.
+> 
+> Any ARM maintainer want to ack this, or take it in their tree if they
+> haven't already?
 
-Hm? vi?
+Assuming it's been tested:
+
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
