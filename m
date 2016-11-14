@@ -1,149 +1,191 @@
-From: atull@opensource.altera.com (atull)
-Date: Sun, 13 Nov 2016 17:19:34 -0600
-Subject: [PATCH fpga 8/9] fpga socfpga: Use the scatterlist interface
-In-Reply-To: <1478732303-13718-9-git-send-email-jgunthorpe@obsidianresearch.com>
-References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <1478732303-13718-9-git-send-email-jgunthorpe@obsidianresearch.com>
-Message-ID: <alpine.DEB.2.10.1611131712210.2735@atull-VirtualBox>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Mon, 14 Nov 2016 05:36:44 +0530
+Subject: [RESEND PATCH v1 05/11] dt-bindings: perf: hisi: Add Devicetree
+ bindings for Hisilicon SoC PMU
+In-Reply-To: <20161110183040.GD10137@leverpostej>
+References: <1478151727-20250-1-git-send-email-anurup.m@huawei.com>
+ <1478151727-20250-6-git-send-email-anurup.m@huawei.com>
+ <20161110183040.GD10137@leverpostej>
+Message-ID: <58290014.2020401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 Nov 2016, Jason Gunthorpe wrote:
 
-> socfpga just uses the CPU to memory copy the bitstream, so there is
-> no reason it needs contiguous kernel memory. Switch to use the sg
-> interface.
-> 
-> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> ---
->  drivers/fpga/socfpga.c | 56 +++++++++++++++++++++++++++++++++-----------------
->  1 file changed, 37 insertions(+), 19 deletions(-)
-> 
-> diff --git a/drivers/fpga/socfpga.c b/drivers/fpga/socfpga.c
-> index 27d2ff28132c..f3f390b2eecf 100644
-> --- a/drivers/fpga/socfpga.c
-> +++ b/drivers/fpga/socfpga.c
-> @@ -24,6 +24,7 @@
->  #include <linux/of_address.h>
->  #include <linux/of_irq.h>
->  #include <linux/pm.h>
-> +#include <linux/scatterlist.h>
->  
->  /* Register offsets */
->  #define SOCFPGA_FPGMGR_STAT_OFST				0x0
-> @@ -408,10 +409,22 @@ static int socfpga_fpga_reset(struct fpga_manager *mgr)
->   * Prepare the FPGA to receive the configuration data.
->   */
->  static int socfpga_fpga_ops_configure_init(struct fpga_manager *mgr, u32 flags,
-> -					   const char *buf, size_t count)
-> +					   struct sg_table *sgt)
->  {
->  	struct socfpga_fpga_priv *priv = mgr->priv;
-> -	int ret;
-> +	struct scatterlist *sg;
-> +	int ret, i;
-> +
-> +	/* We use the CPU to read the bitstream 32 bits at a time, and thus
-> +	 * require alignment.
-> +	 */
-> +	for_each_sg(sgt->sgl, sg, sgt->nents, i) {
-> +		if ((sg->offset % 4) != 0) {
-> +			dev_err(&mgr->dev,
-> +				"Invalid bitstream, chunks must be aligned\n");
-> +			return -EINVAL;
-> +		}
-> +	}
->  
->  	if (flags & FPGA_MGR_PARTIAL_RECONFIG) {
->  		dev_err(&mgr->dev, "Partial reconfiguration not supported.\n");
-> @@ -440,40 +453,45 @@ static int socfpga_fpga_ops_configure_init(struct fpga_manager *mgr, u32 flags,
->  /*
->   * Step 9: write data to the FPGA data register
->   */
-> -static int socfpga_fpga_ops_configure_write(struct fpga_manager *mgr,
-> -					    const char *buf, size_t count)
-> +static void socfpga_write_buf(struct socfpga_fpga_priv *priv, const u32 *buf,
-> +			      size_t count)
->  {
-> -	struct socfpga_fpga_priv *priv = mgr->priv;
-> -	u32 *buffer_32 = (u32 *)buf;
->  	size_t i = 0;
->  
-> -	if (count <= 0)
-> -		return -EINVAL;
-> -
->  	/* Write out the complete 32-bit chunks. */
->  	while (count >= sizeof(u32)) {
-> -		socfpga_fpga_data_writel(priv, buffer_32[i++]);
-> +		socfpga_fpga_data_writel(priv, buf[i++]);
->  		count -= sizeof(u32);
->  	}
->  
->  	/* Write out remaining non 32-bit chunks. */
->  	switch (count) {
->  	case 3:
-> -		socfpga_fpga_data_writel(priv, buffer_32[i++] & 0x00ffffff);
-> +		socfpga_fpga_data_writel(priv, buf[i++] & 0x00ffffff);
->  		break;
->  	case 2:
-> -		socfpga_fpga_data_writel(priv, buffer_32[i++] & 0x0000ffff);
-> +		socfpga_fpga_data_writel(priv, buf[i++] & 0x0000ffff);
->  		break;
->  	case 1:
-> -		socfpga_fpga_data_writel(priv, buffer_32[i++] & 0x000000ff);
-> -		break;
-> -	case 0:
-> +		socfpga_fpga_data_writel(priv, buf[i++] & 0x000000ff);
->  		break;
->  	default:
-> -		/* This will never happen. */
-> -		return -EFAULT;
-> +		break;
->  	}
-> +}
-> +
-> +static int socfpga_fpga_ops_configure_write(struct fpga_manager *mgr,
-> +					    struct sg_table *sgt)
-> +{
-> +	struct socfpga_fpga_priv *priv = mgr->priv;
-> +	struct sg_mapping_iter miter;
-> +
-> +	sg_miter_start(&miter, sgt->sgl, sgt->nents, SG_MITER_FROM_SG);
-> +
-> +	while (sg_miter_next(&miter))
-> +		socfpga_write_buf(priv, miter.addr, miter.length);
->  
-> +	sg_miter_stop(&miter);
->  	return 0;
->  }
 
-Hi Jason,
+On Friday 11 November 2016 12:00 AM, Mark Rutland wrote:
+> Hi,
+>
+> On Thu, Nov 03, 2016 at 01:42:01AM -0400, Anurup M wrote:
+>> 	1) Device tree bindings for Hisilicon SoC PMU.
+>> 	2) Add example for Hisilicon L3 cache, MN and DDRC PMU.
+>>
+>> Signed-off-by: Anurup M<anurup.m@huawei.com>
+>> Signed-off-by: Shaokun Zhang<zhangshaokun@hisilicon.com>
+>> ---
+>>   .../devicetree/bindings/arm/hisilicon/pmu.txt      | 127 +++++++++++++++++++++
+>>   1 file changed, 127 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt b/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
+>> new file mode 100644
+>> index 0000000..e7b35e0
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
+>> @@ -0,0 +1,127 @@
+>> +Hisilicon SoC hip05/06/07 ARMv8 PMU
+>> +===================================
+>> +
+>> +The Hisilicon SoC chips like hip05/06/07 etc. consist of varous independent
+>> +system device PMU's such as L3 cache (L3C), Miscellaneous Nodes(MN) and DDR
+> s/PMU's/PMUs/
+OK.
+>> +comtroller. These PMU devices are independent and have hardware logic to
+> s/comtroller/controller/
+>
+>> +gather statistics and performance information.
+>> +
+>> +HiSilicon SoC chip is encapsulated by multiple CPU and IO die's. The CPU die
+> s/die's/dies/
+OK.
+>> +is called as Super CPU cluster (SCCL) which includes 16 cpu-cores. Every SCCL
+>> +is further grouped as CPU clusters (CCL) which includes 4 cpu-cores each.
+>> +e.g. In the case of hip05/06/07, each SCCL has 1 L3 cache and 1 MN PMU device.
+>> +
+>> +The Hisilicon SoC PMU DT node bindigs for uncore PMU devices are as below.
+> s/bindigs/bindings/
+OK. Thanks. I shall make sure with spell checker before sending v2.
+>> +For PMU devices like L3 cache. MN etc. which are accessed using the djtag,
+>> +the parent node will be the djtag node of the corresponding CPU die(SCCL).
+>> +
+>> +For uncore PMU devices there are some common required properties as detailed
+>> +below.
+>> +
+>> +Required properties:
+>> +	- compatible : This field contain two values. The first value is
+>> +		always "hisilicon" and second value is the Module type as shown
+>> +		in below examples:
+> Just say:
+>
+>   - Compatible: should contain one of:
+OK.
+>> +		(a) "hisilicon,hisi-pmu-l3c-v1" for Hisilicon SoC L3C PMU
+>> +			device (Version 1)
+>> +		(b) "hisilicon,hisi-pmu-mn-v1" for Hisilicon SoC MN PMU
+>> +			device (Version 1)
+>> +		(c) "hisilicon,hisi-pmu-ddrc-v1" for Hisilicon SoC DDRC PMU
+>> +			device (Version 1)
+>> +		The hip05/06/07 chips have v1 hardware for L3C, MN and DDRC.
+>> +
+>> +	- scl-id : The Super Cluster ID. This can be the ID of the CPU die
+>> +		   or IO die in the chip.
+> What's this needed for?
+This is used as suffix to the PMU name. hisi_l3c<scl-id>. (hisi_l3c2 - 
+for scl-id = 2).
+This is to identify the pmu correspond to which CPU die in the socket.
+>> +	- num-events : No of events supported by this PMU device.
+>> +
+>> +	- num-counters : No of hardware counters available for counting.
+> This isn't probeable or well-known?
+My idea is to have the common properties of SoC PMU added here.
+The num-events, num-counters etc. So that handling can be made common in 
+the driver.
+Is it not recommended? Please share your comments.
+>> +
+>> +L3 cache
+>> +--------
+>> +The L3 cache is dedicated for each SCCL and hence there are separate DT nodes
+>> +for L3 cache for each SCCL. For L3 cache PMU the additional required properties
+>> +are
+>> +	- counter-reg : Counter register offset.
+>> +
+>> +	- evtype-reg : Event select register offset.
+>> +
+>> +	- evctrl-reg : Event counting control(LAUCTRL) register offset.
+> Surely for a given revision of the chip these offsets are known? i.e.
+> surely the compatible string implies specific offsets?
+>
+>> +	- event-en : Event enable value.
+> Huh?
+As for the hip05/06 and 07 chips, the above four properties are same, I 
+shall
+move them to the driver.
 
-Currently or soon we have 3 drivers that don't really use the sg
-interface natively.  So this workaround ends up in each of them?
-That's a lot of duplicated code.  Why can't this code be in the
-fpga-mgr.c core for drivers that aren't using sg (to minimizing
-duplication).
+The below two properties (module-id, cfgen-map) differs between chips 
+hip05/06 and hip07.
+There were moved here so as to have minimal changes in driver across 
+chips hip05/06/07.
 
-I will test this when I get time, may not be this week.  I just
-moved to a new building and lab and am in a course all week and
-so forth.
+OR whether it is more recommended to have the of_device_id .data set 
+accordingly for handling
+different chip versions?
 
-Alan
+Please suggest.
+>> +	- module-id : Module ID to input for djtag. This property is an array of
+>> +		      module_id for each L3 cache banks.
+>> +
+>> +	- num-banks : Number of banks or instances of the device.
+> What's a bank? Surely they have separate instances of the PMU?
+Yes each bank is a separate instance of PMU.
+If it is recommended to have each L3 cache bank registered as separate 
+PMU with perf, then this property will be removed.
+> What order are these in?
+The bank number will start from "1" till "4" for L3 cache as there are 
+four banks in hip05/06/07 chips.
+>> +	- cfgen-map : Config enable array to select the bank.
+> Huh?
+>
+>> +Miscellaneous Node
+>> +-------------------
+>> +The MN is dedicated for each SCCL and hence there are separate DT nodes for MN
+>> +for each SCCL. For MN PMU the additional required properties are
+>> +	- counter-reg : Counter register offset.
+>> +
+>> +	- evtype-reg : Event select register offset.
+>> +
+>> +	- evctrl-reg : Event counting control register offset.
+> Likewise, surely this is well-known for a given revision of the chip?
+>
+>> +
+>> +	- module-id : Module ID to input for djtag. As MN doesnot have multiple banks
+>> +		      this property is a single value.
+>> +
+>> +	- cfgen-map : Config enable to select the bank. For MN it is a single value
+>> +
+>> +	- event-en : Event enable value.
+> Same comments as for the L3 cache nodes
+>
+>
+> [...]
+>
+>> +DDR controller
+>> +--------------
+>> +Each SCCL in Hip05/06/07 chips have 2 DDR channels and hence 2 DDR controllers.
+>> +There are separate DT nodes for each DDR channel.
+>> +For DDRC PMU the additional required properties are
+>> +
+>> +	- ch-id : DDRC Channel ID.
+> Why is this necessary?
+This is used as suffix to the PMU name. hisi_ddrc<scl-id>_<ch-id>. 
+(hisi_ddrc2_0 - for scl-id = 2, ddrc channel = 0).
+This is to identify the pmu correspond to which DDRC channel.
 
->  
-> @@ -545,8 +563,8 @@ static enum fpga_mgr_states socfpga_fpga_ops_state(struct fpga_manager *mgr)
->  
->  static const struct fpga_manager_ops socfpga_fpga_ops = {
->  	.state = socfpga_fpga_ops_state,
-> -	.write_init = socfpga_fpga_ops_configure_init,
-> -	.write = socfpga_fpga_ops_configure_write,
-> +	.write_init_sg = socfpga_fpga_ops_configure_init,
-> +	.write_sg = socfpga_fpga_ops_configure_write,
->  	.write_complete = socfpga_fpga_ops_configure_complete,
->  };
->  
-> -- 
-> 2.1.4
-> 
-> 
+Thanks,
+Anurup
+> Thanks,
+> Mark.
+>
+>> +	- reg : Register base address and range for the DDRC channel.
+>> +
+>> +Example:
+>> +	/* DDRC for CPU die scl #2 Channel #1 for hip05 */
+>> +	pmu_sccl0_ddrc1: pmu_ddrc1 at 80358000 {
+>> +		 compatible = "hisilicon,hisi-pmu-ddrc-v1";
+>> +		 scl-id = <0x02>;
+>> +		 ch-id = <0x1>;
+>> +		 num-events = <0x0D>;
+>> +		 num-counters = <0x04>;
+>> +		 reg = <0x80358000 0x10000>; /* TOTEMC DDRC1 */
+>> +	 };
+>> -- 
+>> 2.1.4
+>>
