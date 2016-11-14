@@ -1,45 +1,32 @@
-From: mbrugger@suse.com (Matthias Brugger)
-Date: Mon, 14 Nov 2016 13:01:25 +0100
-Subject: [PATCH 0/5] net: thunderx: Miscellaneous fixes
-In-Reply-To: <1479120886-13425-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1479120886-13425-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <2948c47d-0f15-8153-440b-7a2c753b7251@suse.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Nov 2016 13:03:09 +0100
+Subject: [PATCH 01/16] ARM: scu: Provide support for parsing SCU device
+ node to enable SCU
+In-Reply-To: <71596b86-7653-5c02-fc46-59409a91243f@samsung.com>
+References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
+ <20161114141251.7ea86e7a@xhacker>
+ <71596b86-7653-5c02-fc46-59409a91243f@samsung.com>
+Message-ID: <2479429.Js1FDSdQzs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday, November 14, 2016 2:10:16 PM CET pankaj.dubey wrote:
+> >> +    scu_base = of_iomap(np, 0);
+> >> +    of_node_put(np);
+> >> +    if (!scu_base) {
+> >> +            pr_err("%s failed to map scu_base via DT\n", __func__);
+> > 
+> > For non-ca5, non-ca9 based SoCs, we'll see this error msg. We understand
+> > what does it mean, but it may confuse normal users. In current version,
+> > berlin doesn't complain like this for non-ca9 SoCs
+> > 
+> 
+> OK, let me see other reviewer's comment on this. Then we will decide if
+> this error message is required or can be omitted.
 
+We need to look at all callers here, to see if the function ever gets
+called for a CPU that doesn't have an SCU. I'd say we should warn if
+we know there is an SCU but we cannot map it, but never warn on
+any of the CPU cores that don't support an SCU.
 
-On 14/11/16 11:54, sunil.kovvuri at gmail.com wrote:
-> From: Sunil Goutham <sgoutham@cavium.com>
->
-> This patchset includes fixes for incorrect LMAC credits,
-> unreliable driver statistics, memory leak upon interface
-> down e.t.c
->
-
-Are these fixes relevant to for older kernels as well?
-If so, please add "Cc: stable at vger.kernel.org" to the Sigend-off list.
-
-Thanks,
-Matthias
-
-> Radha Mohan Chintakuntla (1):
->   net: thunderx: Introduce BGX_ID_MASK macro to extract bgx_id
->
-> Sunil Goutham (4):
->   net: thunderx: Program LMAC credits based on MTU
->   net: thunderx: Fix configuration of L3/L4 length checking
->   net: thunderx: Fix VF driver's interface statistics
->   net: thunderx: Fix memory leak and other issues upon interface toggle
->
->  drivers/net/ethernet/cavium/thunder/nic.h          |  64 +++++----
->  drivers/net/ethernet/cavium/thunder/nic_main.c     |  37 +++--
->  drivers/net/ethernet/cavium/thunder/nic_reg.h      |   1 +
->  .../net/ethernet/cavium/thunder/nicvf_ethtool.c    | 105 +++++++-------
->  drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 153 +++++++++++----------
->  drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 118 +++++++++-------
->  drivers/net/ethernet/cavium/thunder/nicvf_queues.h |  24 +---
->  drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |   4 +-
->  drivers/net/ethernet/cavium/thunder/thunder_bgx.h  |   2 +
->  9 files changed, 274 insertions(+), 234 deletions(-)
->
+	Arnd
