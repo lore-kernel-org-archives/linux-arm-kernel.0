@@ -1,54 +1,66 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 14 Nov 2016 10:14:23 -0600
-Subject: [PATCH 2/3] devicetree: bindings: nvmem: Add compatible string
- for imx6ul
-In-Reply-To: <1478497281-5477-2-git-send-email-ping.bai@nxp.com>
-References: <1478497281-5477-1-git-send-email-ping.bai@nxp.com>
- <1478497281-5477-2-git-send-email-ping.bai@nxp.com>
-Message-ID: <20161114161423.fs7dlt5firmj4q3s@rob-hp-laptop>
+Date: Mon, 14 Nov 2016 10:15:46 -0600
+Subject: [PATCH 2/6] dt-bindings: clk: max8997: Add DT binding
+ documentation
+In-Reply-To: <1478513376-14307-3-git-send-email-pankaj.dubey@samsung.com>
+References: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
+ <1478513376-14307-3-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <20161114161546.oitvons6tvlazgsb@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 07, 2016 at 01:41:20PM +0800, Bai Ping wrote:
-> Add new compatible string for i.MX6UL SOC.
+On Mon, Nov 07, 2016 at 03:39:32PM +0530, Pankaj Dubey wrote:
+> Add Device Tree binding documentation for the clocks
+> outputs in the Maxim-8997 Power Management IC.
 > 
-> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> CC: Michael Turquette <mturquette@baylibre.com>
+> CC: Rob Herring <robh+dt@kernel.org>
+> CC: devicetree at vger.kernel.org
+> CC: linux-clk at vger.kernel.org
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 > ---
->  Documentation/devicetree/bindings/nvmem/imx-ocotp.txt | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
+>  .../devicetree/bindings/clock/maxim,max8997.txt    | 44 ++++++++++++++++++++++
+>  .../bindings/regulator/max8997-regulator.txt       |  3 ++
+>  2 files changed, 47 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/maxim,max8997.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt b/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
-> index 383d588..a7ff65d 100644
-> --- a/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
-> +++ b/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
-> @@ -1,13 +1,14 @@
->  Freescale i.MX6 On-Chip OTP Controller (OCOTP) device tree bindings
->  
->  This binding represents the on-chip eFuse OTP controller found on
-> -i.MX6Q/D, i.MX6DL/S, i.MX6SL, and i.MX6SX SoCs.
-> +i.MX6Q/D, i.MX6DL/S, i.MX6SL, i.MX6SX and i.MX6UL SoCs.
->  
->  Required properties:
->  - compatible: should be one of
->  	"fsl,imx6q-ocotp" (i.MX6Q/D/DL/S),
-> -	"fsl,imx6sl-ocotp" (i.MX6SL), or
-> -	"fsl,imx6sx-ocotp" (i.MX6SX), followed by "syscon".
-> +	"fsl,imx6sl-ocotp" (i.MX6SL),
-> +	"fsl,imx6sx-ocotp" (i.MX6SX), or
-> +	"fsl,imx6ul-ocotp" (i.MX6UL), followed by "syscon".
+> diff --git a/Documentation/devicetree/bindings/clock/maxim,max8997.txt b/Documentation/devicetree/bindings/clock/maxim,max8997.txt
+> new file mode 100644
+> index 0000000..d2e2a74
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/maxim,max8997.txt
+> @@ -0,0 +1,44 @@
+> +Binding for Maxim MAX8997 32k clock generator block
+> +
+> +This is a part of device tree bindings of MAX8997 multi-function device.
+> +More information can be found in bindings/regulator/max8997-regulator.txt file.
+> +
+> +The MAX8997 contains two 32.768khz clock outputs that can be controlled
+> +(gated/ungated) over I2C.
+> +
+> +Following properties should be presend in main device node of the MFD chip.
+> +
+> +Required properties:
+> +
+> +- #clock-cells: from common clock binding; shall be set to 1.
+> +
+> +Optional properties:
+> +- clock-output-names: From common clock binding.
+> +
+> +Each clock is assigned an identifier and client nodes can use this identifier
+> +to specify the clock which they consume. Following indices are allowed:
+> +    - 0: 32khz_ap clock,
+> +    - 1: 32khz_cp clock,
+> +
+> +Clocks are defined as preprocessor macros in dt-bindings/clock/maxim,max8997.h
+> +header and can be used in device tree sources.
+> +
+> +Example: Node of the MFD chip
+> +
+> +	max8997: max8997_pmic at 66 {
 
-This should be reformatted such that it's not a 5 line change to add a 
-compatible. "one of" defines this is an OR relationship, so drop that. 
-Move 'followed by "syscon"' to below the list of compatibles.
+pmic at 66 {
 
->  - reg: Should contain the register base and length.
->  - clocks: Should contain a phandle pointing to the gated peripheral clock.
->  
-> -- 
-> 2.8.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+With that:
+
+Acked-by: Rob Herring <robh@kernel.org>
