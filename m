@@ -1,153 +1,101 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 14 Nov 2016 15:04:41 -0800
-Subject: [PATCH 2/2] ARM: davinci: PM: rework init: cleanup
-In-Reply-To: <20161114230441.356-1-khilman@baylibre.com>
-References: <20161114230441.356-1-khilman@baylibre.com>
-Message-ID: <20161114230441.356-3-khilman@baylibre.com>
+From: atull@opensource.altera.com (atull)
+Date: Mon, 14 Nov 2016 17:23:08 -0600
+Subject: [PATCH 1/4] fpga mgr: Introduce FPGA capabilities
+In-Reply-To: <CAAtXAHeX08ZxGceXvqkdNwsVHdOpczxx5fvFapLy74n1_4R-CA@mail.gmail.com>
+References: <20161107001326.7395-1-moritz.fischer@ettus.com>
+ <20161107001326.7395-2-moritz.fischer@ettus.com>
+ <alpine.DEB.2.10.1611140801480.2786@atull-VirtualBox>
+ <CAAtXAHeX08ZxGceXvqkdNwsVHdOpczxx5fvFapLy74n1_4R-CA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.10.1611141720200.6488@atull-730U3E-740U3E>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A follow-on cleanup renaming 'pdata' since it is no longer
-platform_data.
+On Mon, 14 Nov 2016, Moritz Fischer wrote:
 
-Signed-off-by: Kevin Hilman <khilman@baylibre.com>
----
- arch/arm/mach-davinci/pm.c | 61 +++++++++++++++++++++++-----------------------
- 1 file changed, 30 insertions(+), 31 deletions(-)
+Hi Moritz,
 
-diff --git a/arch/arm/mach-davinci/pm.c b/arch/arm/mach-davinci/pm.c
-index fc6a5710b3fa..1f2ac36efe11 100644
---- a/arch/arm/mach-davinci/pm.c
-+++ b/arch/arm/mach-davinci/pm.c
-@@ -34,7 +34,6 @@
- 
- static void (*davinci_sram_suspend) (struct davinci_pm_config *);
- static struct davinci_pm_config pm_config;
--static struct davinci_pm_config *pdata = &pm_config;
- 
- static void davinci_sram_push(void *dest, void *src, unsigned int size)
- {
-@@ -46,58 +45,58 @@ static void davinci_pm_suspend(void)
- {
- 	unsigned val;
- 
--	if (pdata->cpupll_reg_base != pdata->ddrpll_reg_base) {
-+	if (pm_config.cpupll_reg_base != pm_config.ddrpll_reg_base) {
- 
- 		/* Switch CPU PLL to bypass mode */
--		val = __raw_readl(pdata->cpupll_reg_base + PLLCTL);
-+		val = __raw_readl(pm_config.cpupll_reg_base + PLLCTL);
- 		val &= ~(PLLCTL_PLLENSRC | PLLCTL_PLLEN);
--		__raw_writel(val, pdata->cpupll_reg_base + PLLCTL);
-+		__raw_writel(val, pm_config.cpupll_reg_base + PLLCTL);
- 
- 		udelay(PLL_BYPASS_TIME);
- 
- 		/* Powerdown CPU PLL */
--		val = __raw_readl(pdata->cpupll_reg_base + PLLCTL);
-+		val = __raw_readl(pm_config.cpupll_reg_base + PLLCTL);
- 		val |= PLLCTL_PLLPWRDN;
--		__raw_writel(val, pdata->cpupll_reg_base + PLLCTL);
-+		__raw_writel(val, pm_config.cpupll_reg_base + PLLCTL);
- 	}
- 
- 	/* Configure sleep count in deep sleep register */
--	val = __raw_readl(pdata->deepsleep_reg);
-+	val = __raw_readl(pm_config.deepsleep_reg);
- 	val &= ~DEEPSLEEP_SLEEPCOUNT_MASK,
--	val |= pdata->sleepcount;
--	__raw_writel(val, pdata->deepsleep_reg);
-+	val |= pm_config.sleepcount;
-+	__raw_writel(val, pm_config.deepsleep_reg);
- 
- 	/* System goes to sleep in this call */
--	davinci_sram_suspend(pdata);
-+	davinci_sram_suspend(&pm_config);
- 
--	if (pdata->cpupll_reg_base != pdata->ddrpll_reg_base) {
-+	if (pm_config.cpupll_reg_base != pm_config.ddrpll_reg_base) {
- 
- 		/* put CPU PLL in reset */
--		val = __raw_readl(pdata->cpupll_reg_base + PLLCTL);
-+		val = __raw_readl(pm_config.cpupll_reg_base + PLLCTL);
- 		val &= ~PLLCTL_PLLRST;
--		__raw_writel(val, pdata->cpupll_reg_base + PLLCTL);
-+		__raw_writel(val, pm_config.cpupll_reg_base + PLLCTL);
- 
- 		/* put CPU PLL in power down */
--		val = __raw_readl(pdata->cpupll_reg_base + PLLCTL);
-+		val = __raw_readl(pm_config.cpupll_reg_base + PLLCTL);
- 		val &= ~PLLCTL_PLLPWRDN;
--		__raw_writel(val, pdata->cpupll_reg_base + PLLCTL);
-+		__raw_writel(val, pm_config.cpupll_reg_base + PLLCTL);
- 
- 		/* wait for CPU PLL reset */
- 		udelay(PLL_RESET_TIME);
- 
- 		/* bring CPU PLL out of reset */
--		val = __raw_readl(pdata->cpupll_reg_base + PLLCTL);
-+		val = __raw_readl(pm_config.cpupll_reg_base + PLLCTL);
- 		val |= PLLCTL_PLLRST;
--		__raw_writel(val, pdata->cpupll_reg_base + PLLCTL);
-+		__raw_writel(val, pm_config.cpupll_reg_base + PLLCTL);
- 
- 		/* Wait for CPU PLL to lock */
- 		udelay(PLL_LOCK_TIME);
- 
- 		/* Remove CPU PLL from bypass mode */
--		val = __raw_readl(pdata->cpupll_reg_base + PLLCTL);
-+		val = __raw_readl(pm_config.cpupll_reg_base + PLLCTL);
- 		val &= ~PLLCTL_PLLENSRC;
- 		val |= PLLCTL_PLLEN;
--		__raw_writel(val, pdata->cpupll_reg_base + PLLCTL);
-+		__raw_writel(val, pm_config.cpupll_reg_base + PLLCTL);
- 	}
- }
- 
-@@ -130,23 +129,23 @@ int __init davinci_pm_init(void)
- 	if (ret)
- 		return ret;
- 
--	pdata->sleepcount = DEEPSLEEP_SLEEPCOUNT;
--	pdata->ddr2_ctlr_base = da8xx_get_mem_ctlr();
--	pdata->deepsleep_reg = DA8XX_SYSCFG1_VIRT(DA8XX_DEEPSLEEP_REG);
--	pdata->ddrpsc_num = DA8XX_LPSC1_EMIF3C;
-+	pm_config.sleepcount = DEEPSLEEP_SLEEPCOUNT;
-+	pm_config.ddr2_ctlr_base = da8xx_get_mem_ctlr();
-+	pm_config.deepsleep_reg = DA8XX_SYSCFG1_VIRT(DA8XX_DEEPSLEEP_REG);
-+	pm_config.ddrpsc_num = DA8XX_LPSC1_EMIF3C;
- 
--	pdata->cpupll_reg_base = ioremap(DA8XX_PLL0_BASE, SZ_4K);
--	if (!pdata->cpupll_reg_base)
-+	pm_config.cpupll_reg_base = ioremap(DA8XX_PLL0_BASE, SZ_4K);
-+	if (!pm_config.cpupll_reg_base)
- 		return -ENOMEM;
- 
--	pdata->ddrpll_reg_base = ioremap(DA850_PLL1_BASE, SZ_4K);
--	if (!pdata->ddrpll_reg_base) {
-+	pm_config.ddrpll_reg_base = ioremap(DA850_PLL1_BASE, SZ_4K);
-+	if (!pm_config.ddrpll_reg_base) {
- 		ret = -ENOMEM;
- 		goto no_ddrpll_mem;
- 	}
- 
--	pdata->ddrpsc_reg_base = ioremap(DA8XX_PSC1_BASE, SZ_4K);
--	if (!pdata->ddrpsc_reg_base) {
-+	pm_config.ddrpsc_reg_base = ioremap(DA8XX_PSC1_BASE, SZ_4K);
-+	if (!pm_config.ddrpsc_reg_base) {
- 		ret = -ENOMEM;
- 		goto no_ddrpsc_mem;
- 	}
-@@ -163,8 +162,8 @@ int __init davinci_pm_init(void)
- 	suspend_set_ops(&davinci_pm_ops);
- 
- no_ddrpsc_mem:
--	iounmap(pdata->ddrpll_reg_base);
-+	iounmap(pm_config.ddrpll_reg_base);
- no_ddrpll_mem:
--	iounmap(pdata->cpupll_reg_base);
-+	iounmap(pm_config.cpupll_reg_base);
- 	return ret;
- }
--- 
-2.9.3
+> Hi Alan,
+> 
+> On Mon, Nov 14, 2016 at 6:06 AM, atull <atull@opensource.altera.com> wrote:
+> > On Mon, 7 Nov 2016, Moritz Fischer wrote:
+> >
+> >> Add FPGA capabilities as a way to express the capabilities
+> >> of a given FPGA manager.
+> >>
+> >> Removes code duplication by comparing the low-level driver's
+> >> capabilities at the framework level rather than having each driver
+> >> check for supported operations in the write_init() callback.
+> >>
+> >> This allows for extending with additional capabilities, similar
+> >> to the the dmaengine framework's implementation.
+> >>
+> >> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> >> Cc: Alan Tull <atull@opensource.altera.com>
+> >> Cc: Michal Simek <michal.simek@xilinx.com>
+> >> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> >> Cc: linux-kernel at vger.kernel.org
+> >> Cc: linux-arm-kernel at lists.infradead.org
+> >> ---
+> >>
+> >> Changes from RFC:
+> >> * in the RFC the caps weren't actually stored into the struct fpga_mgr
+> >>
+> >> Note:
+> >>
+> >> If people disagree on the typedef being a 'false positive' I can fix
+> >> that in a future rev of the patchset.
+> >>
+> >> Thanks,
+> >>
+> >>     Moritz
+> >>
+> >> ---
+> >>  drivers/fpga/fpga-mgr.c       | 15 ++++++++++++++
+> >>  drivers/fpga/socfpga.c        | 10 +++++-----
+> >>  drivers/fpga/zynq-fpga.c      |  7 ++++++-
+> >>  include/linux/fpga/fpga-mgr.h | 46 ++++++++++++++++++++++++++++++++++++++++++-
+> >>  4 files changed, 71 insertions(+), 7 deletions(-)
+> >>
+> >> diff --git a/drivers/fpga/fpga-mgr.c b/drivers/fpga/fpga-mgr.c
+> >> index 953dc91..ed57c17 100644
+> >> --- a/drivers/fpga/fpga-mgr.c
+> >> +++ b/drivers/fpga/fpga-mgr.c
+> >> @@ -49,6 +49,18 @@ int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags, const char *buf,
+> >>       struct device *dev = &mgr->dev;
+> >>       int ret;
+> >>
+> >> +     if (flags & FPGA_MGR_PARTIAL_RECONFIG &&
+> >> +         !fpga_mgr_has_cap(FPGA_MGR_CAP_PARTIAL_RECONF, mgr->caps)) {
+> >> +             dev_err(dev, "Partial reconfiguration not supported\n");
+> >> +             return -ENOTSUPP;
+> >> +     }
+> >> +
+> >> +     if (flags & FPGA_MGR_FULL_RECONFIG &&
+> >> +         !fpga_mgr_has_cap(FPGA_MGR_CAP_FULL_RECONF, mgr->caps)) {
+> >> +             dev_err(dev, "Full reconfiguration not supported\n");
+> >> +             return -ENOTSUPP;
+> >> +     }
+> >> +
+> >
+> > Could you move the checks to their own function like
+> > 'fpga_mgr_check_caps()' or something?  I really like it if we can keep
+> > the functions short, like a screen or so where it's practicle to do
+> > so and I could see the number of caps growing here.
+> 
+> Absolutely. Great suggestion.
+> 
+> > The only counter argument I could think of is if a cap affects the sequence
+> > in this function.  Hmmm...
+> 
+> Oh you mean the cap being there affecting the sequence in *this* function?
+> I'd suggest we address that when we run into a cap that requires this.
+
+Yes, I agree.
+
+Alan
+
+> 
+> Cheers,
+> 
+> Moritz
+> 
