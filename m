@@ -1,68 +1,112 @@
 From: shijie.huang@arm.com (Huang Shijie)
-Date: Mon, 14 Nov 2016 15:07:36 +0800
-Subject: [PATCH v2 3/6] mm: hugetlb: change the return type for
- alloc_fresh_gigantic_page
+Date: Mon, 14 Nov 2016 15:07:38 +0800
+Subject: [PATCH v2 5/6] mm: hugetlb: add a new function to allocate a new
+ gigantic page
 In-Reply-To: <1479107259-2011-1-git-send-email-shijie.huang@arm.com>
 References: <1479107259-2011-1-git-send-email-shijie.huang@arm.com>
-Message-ID: <1479107259-2011-4-git-send-email-shijie.huang@arm.com>
+Message-ID: <1479107259-2011-6-git-send-email-shijie.huang@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes the return type to "struct page*" for
-alloc_fresh_gigantic_page().
+There are three ways we can allocate a new gigantic page:
 
-This patch makes preparation for later patch.
+1. When the NUMA is not enabled, use alloc_gigantic_page() to get
+   the gigantic page.
+
+2. The NUMA is enabled, but the vma is NULL.
+   There is no memory policy we can refer to.
+   So create a @nodes_allowed, initialize it with init_nodemask_of_mempolicy()
+   or init_nodemask_of_node(). Then use alloc_fresh_gigantic_page() to get
+   the gigantic page.
+
+3. The NUMA is enabled, and the vma is valid.
+   We can follow the memory policy of the @vma.
+
+   Get @nodes_mask by huge_nodemask(), and use alloc_fresh_gigantic_page()
+   to get the gigantic page.
 
 Signed-off-by: Huang Shijie <shijie.huang@arm.com>
 ---
- mm/hugetlb.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ mm/hugetlb.c | 67 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 67 insertions(+)
 
 diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-index db0177b..6995087 100644
+index 6995087..58a59f0 100644
 --- a/mm/hugetlb.c
 +++ b/mm/hugetlb.c
-@@ -1142,7 +1142,7 @@ static struct page *alloc_fresh_gigantic_page_node(struct hstate *h,
- 	return page;
- }
+@@ -1502,6 +1502,73 @@ int dissolve_free_huge_pages(unsigned long start_pfn, unsigned long end_pfn)
  
--static int alloc_fresh_gigantic_page(struct hstate *h,
-+static struct page *alloc_fresh_gigantic_page(struct hstate *h,
- 				nodemask_t *nodes_allowed, bool no_init)
- {
- 	struct page *page = NULL;
-@@ -1151,10 +1151,10 @@ static int alloc_fresh_gigantic_page(struct hstate *h,
- 	for_each_node_mask_to_alloc(h, nr_nodes, node, nodes_allowed) {
- 		page = alloc_fresh_gigantic_page_node(h, node, no_init);
- 		if (page)
--			return 1;
+ /*
+  * There are 3 ways this can get called:
++ *
++ * 1. When the NUMA is not enabled, use alloc_gigantic_page() to get
++ *    the gigantic page.
++ *
++ * 2. The NUMA is enabled, but the vma is NULL.
++ *    Create a @nodes_allowed, use alloc_fresh_gigantic_page() to get
++ *    the gigantic page.
++ *
++ * 3. The NUMA is enabled, and the vma is valid.
++ *    Use the @vma's memory policy.
++ *    Get @nodes_mask by huge_nodemask(), and use alloc_fresh_gigantic_page()
++ *    to get the gigantic page.
++ */
++static struct page *__hugetlb_alloc_gigantic_page(struct hstate *h,
++		struct vm_area_struct *vma, unsigned long addr, int nid)
++{
++	struct page *page;
++	nodemask_t *nodes_mask;
++
++	/* Not NUMA */
++	if (!IS_ENABLED(CONFIG_NUMA)) {
++		if (nid == NUMA_NO_NODE)
++			nid = numa_mem_id();
++
++		page = alloc_gigantic_page(nid, huge_page_order(h));
++		if (page)
++			prep_compound_gigantic_page(page, huge_page_order(h));
++
++		return page;
++	}
++
++	/* NUMA && !vma */
++	if (!vma) {
++		NODEMASK_ALLOC(nodemask_t, nodes_allowed,
++				GFP_KERNEL | __GFP_NORETRY);
++
++		if (nid == NUMA_NO_NODE) {
++			if (!init_nodemask_of_mempolicy(nodes_allowed)) {
++				NODEMASK_FREE(nodes_allowed);
++				nodes_allowed = &node_states[N_MEMORY];
++			}
++		} else if (nodes_allowed) {
++			init_nodemask_of_node(nodes_allowed, nid);
++		} else {
++			nodes_allowed = &node_states[N_MEMORY];
++		}
++
++		page = alloc_fresh_gigantic_page(h, nodes_allowed, true);
++
++		if (nodes_allowed != &node_states[N_MEMORY])
++			NODEMASK_FREE(nodes_allowed);
++
++		return page;
++	}
++
++	/* NUMA && vma */
++	nodes_mask = huge_nodemask(vma, addr);
++	if (nodes_mask) {
++		page = alloc_fresh_gigantic_page(h, nodes_mask, true);
++		if (page)
 +			return page;
- 	}
- 
--	return 0;
++	}
 +	return NULL;
- }
- 
- static inline bool gigantic_page_supported(void) { return true; }
-@@ -1167,8 +1167,8 @@ static inline bool gigantic_page_supported(void) { return false; }
- static inline void free_gigantic_page(struct page *page, unsigned int order) { }
- static inline void destroy_compound_gigantic_page(struct page *page,
- 						unsigned int order) { }
--static inline int alloc_fresh_gigantic_page(struct hstate *h,
--		nodemask_t *nodes_allowed, bool no_init) { return 0; }
-+static inline struct page *alloc_fresh_gigantic_page(struct hstate *h,
-+		nodemask_t *nodes_allowed, bool no_init) { return NULL; }
- #endif
- 
- static void update_and_free_page(struct hstate *h, struct page *page)
-@@ -2315,7 +2315,7 @@ static unsigned long set_max_huge_pages(struct hstate *h, unsigned long count,
- 		cond_resched();
- 
- 		if (hstate_is_gigantic(h))
--			ret = alloc_fresh_gigantic_page(h, nodes_allowed,
-+			ret = !!alloc_fresh_gigantic_page(h, nodes_allowed,
- 							false);
- 		else
- 			ret = alloc_fresh_huge_page(h, nodes_allowed);
++}
++
++/*
++ * There are 3 ways this can get called:
+  * 1. With vma+addr: we use the VMA's memory policy
+  * 2. With !vma, but nid=NUMA_NO_NODE:  We try to allocate a huge
+  *    page from any node, and let the buddy allocator itself figure
 -- 
 2.5.5
