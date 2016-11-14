@@ -1,74 +1,23 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 14 Nov 2016 18:10:34 +0100
-Subject: [PATCH 2/2] ARM: dts: vf610-zii-dev: Add .dts file for rev. C
-In-Reply-To: <1479141306-15141-2-git-send-email-andrew.smirnov@gmail.com>
-References: <1479141306-15141-1-git-send-email-andrew.smirnov@gmail.com>
- <1479141306-15141-2-git-send-email-andrew.smirnov@gmail.com>
-Message-ID: <20161114171034.GC24546@lunn.ch>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 14 Nov 2016 11:11:08 -0600
+Subject: [PATCH v5 1/3] dt-bindings: mediatek: Add a binding for Mediatek
+ JPEG Decoder
+In-Reply-To: <1478586880-3923-2-git-send-email-rick.chang@mediatek.com>
+References: <1478586880-3923-1-git-send-email-rick.chang@mediatek.com>
+ <1478586880-3923-2-git-send-email-rick.chang@mediatek.com>
+Message-ID: <20161114171108.vmihebue2pocm6jt@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +		mdio_mux_1: mdio at 1 {
-> +			reg = <1>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			switch0: switch0 at 0 {
-> +				compatible = "marvell,mv88e6390";
+On Tue, Nov 08, 2016 at 02:34:38PM +0800, Rick Chang wrote:
+> Add a DT binding documentation for Mediatek JPEG Decoder of
+> MT2701 SoC.
+> 
+> Signed-off-by: Rick Chang <rick.chang@mediatek.com>
+> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+> ---
+>  .../bindings/media/mediatek-jpeg-decoder.txt       | 37 ++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/mediatek-jpeg-decoder.txt
 
-Hi Andrey
-
-The driver for this is not in net-next yet. And when it is, it will
-probably be called "marvell,mv88e6190", keeping to the pattern of the
-lowest product ID which supports these features.
-
-> +					port at 4 {
-> +						reg = <4>;
-> +						label = "lan4";
-> +					};
-> +
-> +					port at 9 {
-> +						reg = <9>;
-> +						label = "lan4";
-> +						phy-handle = <&switch0phy0>;
-> +					};
-> +
-
-You have two "lan4". I would also suggest leaving port 9 out for the
-moment. It needs clause 45 MDIO to talk to the PHY, which we don't
-have yet. Hence it cannot find it, and so give an error.
-
-> +
-> +					switch0port10: port at 10 {
-> +						reg = <10>;
-> +						label = "dsa";
-> +						phy-mode = "xgmii";
-> +						link = <&switch1port10>;
-> +						fixed-link {
-> +							speed = <10000>;
-> +							full-duplex;
-> +						};
-
-This fixed-link node is wrong, and invalid. 10000 is not supported by
-the fixed link driver, only 10, 100, and 1000. Also, it is not
-required. The DSA driver should configure the link to the fastest
-possible speed the port supports. You only need a fixed-link property
-when you need to configure it at a lower speed. Rev B also gets this
-wrong.
-
-> +					};
-> +				};
-> +
-> +				mdio {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					switch0phy0: switch0phy0 at 0 {
-> +						reg = <0>;
-> +					};
-
-I think the strapping for the PHY is such that it is at address 9.
-Also, it is on the external mdio bus, not the internal mdio bus. The
-6390 family has two MDIO busses. I have patches to support this, which
-will appear eventually.
-
-  Andrew
+Acked-by: Rob Herring <robh@kernel.org>
