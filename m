@@ -1,69 +1,45 @@
 From: wulf@rock-chips.com (William Wu)
-Date: Mon, 14 Nov 2016 15:01:50 +0800
-Subject: [PATCH v2 1/2] phy: rockchip-inno-usb2: correct clk_ops callback
+Date: Mon, 14 Nov 2016 15:01:51 +0800
+Subject: [PATCH v2 2/2] phy: rockchip-inno-usb2: correct 480MHz output clock
+ stable time
 In-Reply-To: <1479106911-16049-1-git-send-email-wulf@rock-chips.com>
 References: <1479106911-16049-1-git-send-email-wulf@rock-chips.com>
-Message-ID: <1479106911-16049-2-git-send-email-wulf@rock-chips.com>
+Message-ID: <1479106911-16049-3-git-send-email-wulf@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we needs to delay ~1ms to wait for 480MHz output clock
-of USB2 PHY to become stable after turn on it, the delay time
-is pretty long for something that's supposed to be "atomic"
-like a clk_enable(). Consider that clk_enable() will disable
-interrupt and that a 1ms interrupt latency is not sensible.
+We found that the system crashed due to 480MHz output clock of
+USB2 PHY was unstable after clock had been enabled by gpu module.
 
-The 480MHz output clock should be handled in prepare callbacks
-which support gate a clk if the operation may sleep.
+Theoretically, 1 millisecond is a critical value for 480MHz
+output clock stable time, so we try to change the delay time
+to 1.2 millisecond to avoid this issue.
+
+And the commit ed907fb1d7c3 ("phy: rockchip-inno-usb2: correct
+clk_ops callback") used prepare callbacks instead of enable
+callbacks to support gate a clk if the operation may sleep. So
+we can switch from delay to sleep functions.
 
 Signed-off-by: William Wu <wulf@rock-chips.com>
 ---
- drivers/phy/phy-rockchip-inno-usb2.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+Changes in v2:
+- use usleep_range() function instead of mdelay()
+
+ drivers/phy/phy-rockchip-inno-usb2.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
-index ac20310..365e077 100644
+index 365e077..578290b 100644
 --- a/drivers/phy/phy-rockchip-inno-usb2.c
 +++ b/drivers/phy/phy-rockchip-inno-usb2.c
-@@ -153,7 +153,7 @@ static inline bool property_enabled(struct rockchip_usb2phy *rphy,
- 	return tmp == reg->enable;
- }
+@@ -166,7 +166,7 @@ static int rockchip_usb2phy_clk480m_prepare(struct clk_hw *hw)
+ 			return ret;
  
--static int rockchip_usb2phy_clk480m_enable(struct clk_hw *hw)
-+static int rockchip_usb2phy_clk480m_prepare(struct clk_hw *hw)
- {
- 	struct rockchip_usb2phy *rphy =
- 		container_of(hw, struct rockchip_usb2phy, clk480m_hw);
-@@ -172,7 +172,7 @@ static int rockchip_usb2phy_clk480m_enable(struct clk_hw *hw)
+ 		/* waitting for the clk become stable */
+-		mdelay(1);
++		usleep_range(1200);
+ 	}
+ 
  	return 0;
- }
- 
--static void rockchip_usb2phy_clk480m_disable(struct clk_hw *hw)
-+static void rockchip_usb2phy_clk480m_unprepare(struct clk_hw *hw)
- {
- 	struct rockchip_usb2phy *rphy =
- 		container_of(hw, struct rockchip_usb2phy, clk480m_hw);
-@@ -181,7 +181,7 @@ static void rockchip_usb2phy_clk480m_disable(struct clk_hw *hw)
- 	property_enable(rphy, &rphy->phy_cfg->clkout_ctl, false);
- }
- 
--static int rockchip_usb2phy_clk480m_enabled(struct clk_hw *hw)
-+static int rockchip_usb2phy_clk480m_prepared(struct clk_hw *hw)
- {
- 	struct rockchip_usb2phy *rphy =
- 		container_of(hw, struct rockchip_usb2phy, clk480m_hw);
-@@ -197,9 +197,9 @@ rockchip_usb2phy_clk480m_recalc_rate(struct clk_hw *hw,
- }
- 
- static const struct clk_ops rockchip_usb2phy_clkout_ops = {
--	.enable = rockchip_usb2phy_clk480m_enable,
--	.disable = rockchip_usb2phy_clk480m_disable,
--	.is_enabled = rockchip_usb2phy_clk480m_enabled,
-+	.prepare = rockchip_usb2phy_clk480m_prepare,
-+	.unprepare = rockchip_usb2phy_clk480m_unprepare,
-+	.is_prepared = rockchip_usb2phy_clk480m_prepared,
- 	.recalc_rate = rockchip_usb2phy_clk480m_recalc_rate,
- };
- 
 -- 
 2.0.0
