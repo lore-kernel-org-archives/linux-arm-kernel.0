@@ -1,68 +1,52 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 14 Nov 2016 16:31:24 +0100
-Subject: [PATCH RESEND] spi: atmel: Fix scheduling while atomic
-In-Reply-To: <1479136400-10285-1-git-send-email-ben.whitten@lairdtech.com>
-References: <1479136400-10285-1-git-send-email-ben.whitten@lairdtech.com>
-Message-ID: <20161114153124.tjbtmsoyh32zd3pr@piout.net>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 14 Nov 2016 16:31:50 +0100
+Subject: [RFC v2 8/8] iommu/arm-smmu: implement add_reserved_regions
+ callback
+In-Reply-To: <634ac375-3507-6926-164f-e67f7c798c98@redhat.com>
+References: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
+ <1478258646-3117-9-git-send-email-eric.auger@redhat.com>
+ <20161110154606.GH2078@8bytes.org>
+ <04ed9694-707d-260b-70c6-f367d292ceca@redhat.com>
+ <20161110161331.GJ2078@8bytes.org>
+ <f4537e43-0237-e478-eacd-b107458628b8@redhat.com>
+ <20161111114223.GP2078@8bytes.org>
+ <79da09b8-ac1e-cebf-5393-7d67f002b3e3@redhat.com>
+ <20161111162211.GU2078@8bytes.org>
+ <634ac375-3507-6926-164f-e67f7c798c98@redhat.com>
+Message-ID: <20161114153149.GY2078@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/11/2016 at 15:13:20 +0000, Ben Whitten wrote :
-> A call to clk_get_rate appears to be called in the context of an interrupt,
-> cache the bus clock for the frequency calculations in transmission.
-> 
-> This fixes a 'BUG: scheduling while atomic' and
-> 'WARNING: CPU: 0 PID: 777 at kernel/sched/core.c:2960 atmel_spi_unlock'
-> 
-> Signed-off-by: Ben Whitten <ben.whitten@lairdtech.com>
-> Signed-off-by: Steve deRosier <steve.derosier@lairdtech.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Hi Eric,
 
-> ---
-> 
-> Resending due to missing off the subsystem maintainer in initial submission,
-> pointed out by Alexandre Belloni, thanks.
-> 
-> ---
->  drivers/spi/spi-atmel.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 8feac59..c281d1a 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -295,6 +295,7 @@ struct atmel_spi {
->  	int			irq;
->  	struct clk		*clk;
->  	struct platform_device	*pdev;
-> +	unsigned long		spi_clk;
->  
->  	struct spi_transfer	*current_transfer;
->  	int			current_remaining_bytes;
-> @@ -864,7 +865,7 @@ static int atmel_spi_set_xfer_speed(struct atmel_spi *as,
->  	unsigned long		bus_hz;
->  
->  	/* v1 chips start out at half the peripheral bus speed. */
-> -	bus_hz = clk_get_rate(as->clk);
-> +	bus_hz = as->spi_clk;
->  	if (!atmel_spi_is_v2(as))
->  		bus_hz /= 2;
->  
-> @@ -1606,6 +1607,9 @@ static int atmel_spi_probe(struct platform_device *pdev)
->  	ret = clk_prepare_enable(clk);
->  	if (ret)
->  		goto out_free_irq;
-> +
-> +	as->spi_clk = clk_get_rate(clk);
-> +
->  	spi_writel(as, CR, SPI_BIT(SWRST));
->  	spi_writel(as, CR, SPI_BIT(SWRST)); /* AT91SAM9263 Rev B workaround */
->  	if (as->caps.has_wdrbt) {
-> -- 
-> 2.7.4
-> 
+On Fri, Nov 11, 2016 at 05:45:19PM +0100, Auger Eric wrote:
+> On 11/11/2016 17:22, Joerg Roedel wrote:
+> > So I think we need a way to tell userspace about the reserved regions
+> > (per iommu-group) so that userspace knows where it can not map anything,
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> Current plan is to expose that info through an iommu-group sysfs
+> attribute, as you and Robin advised.
+
+Great.
+
+> > and VFIO can enforce that. But the right struct here is not an
+> > iova-allocator rb-tree, a ordered linked list should be sufficient.
+> I plan a linked list to store the reserved regions (P2P regions, MSI
+> region, ...). get_dma_regions is called with a list local to a function
+> for that. Might be needed to move that list head in the iommu_group to
+> avoid calling the get_dm_regions again in the attribute show function?
+
+You can re-use the get_dm_regions() call-back available in the iommu-ops
+already. Just rename it and add a flag to it which tells the iommu-core
+whether that region needs to be mapped or not.
+
+> But to allocate the IOVAs within the MSI reserved region, I understand
+> you don't want us to use the iova.c allocator, is that correct? We need
+> an allocator though, even a very basic one based on bitmap or whatever.
+> There potentially have several different physical MSI frame pages to map.
+
+I don't get this, what do you need and address-allocator for?
+
+
+
+	Joerg
