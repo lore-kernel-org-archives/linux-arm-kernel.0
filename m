@@ -1,93 +1,105 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Nov 2016 15:39:26 +0000
-Subject: [RFCv2 PATCH 2/5] drm/bridge: dw_hdmi: remove CEC engine
- register definitions
-In-Reply-To: <1479136968-24477-3-git-send-email-hverkuil@xs4all.nl>
-References: <1479136968-24477-1-git-send-email-hverkuil@xs4all.nl>
- <1479136968-24477-3-git-send-email-hverkuil@xs4all.nl>
-Message-ID: <20161114153926.GO1041@n2100.armlinux.org.uk>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 14 Nov 2016 10:40:08 -0500
+Subject: [PATCH] ARM: ftrace: fix syscall name matching
+In-Reply-To: <20161114134017.GJ1041@n2100.armlinux.org.uk>
+References: <1479128625-20948-1-git-send-email-rabin.vincent@axis.com>
+ <20161114134017.GJ1041@n2100.armlinux.org.uk>
+Message-ID: <20161114104008.36e9c40d@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I can't comment on these, you've not included me in patch 1 nor the
-covering message.
+On Mon, 14 Nov 2016 13:40:17 +0000
+Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 
-On Mon, Nov 14, 2016 at 04:22:45PM +0100, Hans Verkuil wrote:
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
+> On Mon, Nov 14, 2016 at 02:03:45PM +0100, Rabin Vincent wrote:
+> > From: Rabin Vincent <rabinv@axis.com>
+> > 
+> > ARM has a few system calls (most notably mmap) for which the names of
+> > the functions which are referenced in the syscall table do not match the
+> > names of the syscall tracepoints.  As a consequence of this, these
+> > tracepoints are not made available.  Implement
+> > arch_syscall_match_sym_name to fix this and allow tracing even these
+> > system calls.
+> > 
+> > Signed-off-by: Rabin Vincent <rabinv@axis.com>
+> > ---
+> >  arch/arm/include/asm/ftrace.h | 21 +++++++++++++++++++++
+> >  1 file changed, 21 insertions(+)
+> > 
+> > diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+> > index bfe2a2f..8467909 100644
+> > --- a/arch/arm/include/asm/ftrace.h
+> > +++ b/arch/arm/include/asm/ftrace.h
+> > @@ -54,6 +54,27 @@ static inline void *return_address(unsigned int level)
+> >  
+> >  #define ftrace_return_address(n) return_address(n)
+> >  
+> > +#define ARCH_HAS_SYSCALL_MATCH_SYM_NAME
+> > +
+> > +static inline bool arch_syscall_match_sym_name(const char *sym,
+> > +					       const char *name)
+> > +{
+> > +	/* Skip sys_ */
+> > +	sym += 4;
+> > +	name += 4;  
 > 
-> We don't need the CEC engine register definitions, so let's remove them.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  drivers/gpu/drm/bridge/dw-hdmi.h | 45 ----------------------------------------
->  1 file changed, 45 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/bridge/dw-hdmi.h b/drivers/gpu/drm/bridge/dw-hdmi.h
-> index fc9a560..26d6845 100644
-> --- a/drivers/gpu/drm/bridge/dw-hdmi.h
-> +++ b/drivers/gpu/drm/bridge/dw-hdmi.h
-> @@ -478,51 +478,6 @@
->  #define HDMI_A_PRESETUP                         0x501A
->  #define HDMI_A_SRM_BASE                         0x5020
->  
-> -/* CEC Engine Registers */
-> -#define HDMI_CEC_CTRL                           0x7D00
-> -#define HDMI_CEC_STAT                           0x7D01
-> -#define HDMI_CEC_MASK                           0x7D02
-> -#define HDMI_CEC_POLARITY                       0x7D03
-> -#define HDMI_CEC_INT                            0x7D04
-> -#define HDMI_CEC_ADDR_L                         0x7D05
-> -#define HDMI_CEC_ADDR_H                         0x7D06
-> -#define HDMI_CEC_TX_CNT                         0x7D07
-> -#define HDMI_CEC_RX_CNT                         0x7D08
-> -#define HDMI_CEC_TX_DATA0                       0x7D10
-> -#define HDMI_CEC_TX_DATA1                       0x7D11
-> -#define HDMI_CEC_TX_DATA2                       0x7D12
-> -#define HDMI_CEC_TX_DATA3                       0x7D13
-> -#define HDMI_CEC_TX_DATA4                       0x7D14
-> -#define HDMI_CEC_TX_DATA5                       0x7D15
-> -#define HDMI_CEC_TX_DATA6                       0x7D16
-> -#define HDMI_CEC_TX_DATA7                       0x7D17
-> -#define HDMI_CEC_TX_DATA8                       0x7D18
-> -#define HDMI_CEC_TX_DATA9                       0x7D19
-> -#define HDMI_CEC_TX_DATA10                      0x7D1a
-> -#define HDMI_CEC_TX_DATA11                      0x7D1b
-> -#define HDMI_CEC_TX_DATA12                      0x7D1c
-> -#define HDMI_CEC_TX_DATA13                      0x7D1d
-> -#define HDMI_CEC_TX_DATA14                      0x7D1e
-> -#define HDMI_CEC_TX_DATA15                      0x7D1f
-> -#define HDMI_CEC_RX_DATA0                       0x7D20
-> -#define HDMI_CEC_RX_DATA1                       0x7D21
-> -#define HDMI_CEC_RX_DATA2                       0x7D22
-> -#define HDMI_CEC_RX_DATA3                       0x7D23
-> -#define HDMI_CEC_RX_DATA4                       0x7D24
-> -#define HDMI_CEC_RX_DATA5                       0x7D25
-> -#define HDMI_CEC_RX_DATA6                       0x7D26
-> -#define HDMI_CEC_RX_DATA7                       0x7D27
-> -#define HDMI_CEC_RX_DATA8                       0x7D28
-> -#define HDMI_CEC_RX_DATA9                       0x7D29
-> -#define HDMI_CEC_RX_DATA10                      0x7D2a
-> -#define HDMI_CEC_RX_DATA11                      0x7D2b
-> -#define HDMI_CEC_RX_DATA12                      0x7D2c
-> -#define HDMI_CEC_RX_DATA13                      0x7D2d
-> -#define HDMI_CEC_RX_DATA14                      0x7D2e
-> -#define HDMI_CEC_RX_DATA15                      0x7D2f
-> -#define HDMI_CEC_LOCK                           0x7D30
-> -#define HDMI_CEC_WKUPCTRL                       0x7D31
-> -
->  /* I2C Master Registers (E-DDC) */
->  #define HDMI_I2CM_SLAVE                         0x7E00
->  #define HDMI_I2CM_ADDRESS                       0x7E01
-> -- 
-> 2.8.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Is this really safe?  What guarantees that we can wind forward four
+> bytes here?  If it's always safe, it needs a better comment than just
+> two words.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+I believe it is, but a comment would do well.
+
+The "sym" comes from kallsyms_lookup(syscall-address...)
+
+Which it becomes the syscall function. Mostly defined by:
+
+ include/linux/syscalls.h:
+
+#define SYSCALL_DEFINEx(x, name)
+	asmlinkage long sys_##name(...)
+
+But there are cases that archs can define their own system calls
+outside of this method. But then again, those system calls wont have
+tracepoints attached to them, and they wont be called with this
+function.
+
+The "name" part comes from the system call tracepoint.
+
+#define SYSCALL_METADATA(sname, ...)
+	static struct syscall_metadata
+	  __syscall_meta_##sname = {
+		.name		= "sys"#sname,
+
+
+It too appends the "sys" to the name. Note, sname here is called with
+appending "_" to name, so the .name will start with "sys_" as well.
+
+I'm guessing that there's an issue if more than one function name is
+used for the same function, that is, the symbol maps to the same IP.
+Then kallsyms_lookup() can return different function names for the same
+function being called, and I'm guessing that's what this is trying to
+fix.
+
+-- Steve
+
+> 
+> > +
+> > +	if (!strcmp(sym, "mmap2"))
+> > +		sym = "mmap_pgoff";
+> > +	else if (!strcmp(sym, "statfs64_wrapper"))
+> > +		sym = "statfs64";
+> > +	else if (!strcmp(sym, "fstatfs64_wrapper"))
+> > +		sym = "fstatfs64";
+> > +	else if (!strcmp(sym, "arm_fadvise64_64"))
+> > +		sym = "fadvise64_64";
+> > +
+> > +	return !strcmp(sym, name);
+> > +}
+> > +
+> >  #endif /* ifndef __ASSEMBLY__ */
+> >  
+> >  #endif /* _ASM_ARM_FTRACE */
+> > -- 
+> > 2.1.4
+> >   
+> 
