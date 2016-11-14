@@ -1,48 +1,66 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 14 Nov 2016 14:10:46 +0100
-Subject: [linux-sunxi] Re: [PATCH 3/3] ARM: dts: sunxi: add support for
- Orange Pi Zero board
-In-Reply-To: <cbbf8ae1-ff29-2a83-265b-a9ff5bacf97b@redhat.com>
-References: <20161111164654.15273-1-icenowy@aosc.xyz>
- <20161111164654.15273-3-icenowy@aosc.xyz>
- <20161114085839.qzu7ebeghoqlqygn@lukather>
- <CAGb2v677zQGihbz1o2izM-y5GJ4VDApf6-WDJAk3UyZdsK-vWQ@mail.gmail.com>
- <cbbf8ae1-ff29-2a83-265b-a9ff5bacf97b@redhat.com>
-Message-ID: <20161114131046.t2iy3imx5ozcgrp6@lukather>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 14 Nov 2016 14:11:14 +0100
+Subject: [PATCH v2] input: bma150: Only claim to support the bma180 if the
+ separate iio bma180 driver is not build
+Message-ID: <20161114131114.6053-1-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 14, 2016 at 11:00:32AM +0100, Hans de Goede wrote:
-> > > > +&usbphy {
-> > > > +     /* USB VBUS is always on */
-> > > 
-> > > You can put the always on regulators (I'm guessing reg_vcc5v0 ?) here.
-> > 
-> > AFAIK the regulator properties are optional the the USB PHY.
-> > So we probably don't need to add it. Hans (CC-ed) could explain
-> > his original intent?
-> 
-> I've made the regulators optional exactly for boards like these,
-> where there is no regulator. Likely the Vbus is simply wired
-> directly to the 5V DC-in jack. So IMHO adding something like
-> the fixed reg_vcc5v0 a supply here just makes the dt
-> harder to read.
+commit ef3714fdbc8d ("Input: bma150 - extend chip detection for bma180"),
+adds bma180 chip-ids to the input bma150 driver, assuming that they are
+100% compatible, but the bma180 is not compatible with the bma150 at all,
+it has 14 bits resolution instead of 10, and it has quite different
+control registers too.
 
-It also makes the regulator tree more complete and accurate because
-you'd list all the devices that are needing those regulators. That
-would also make it easier to deal with in the future.
+Treating the bma180 as a bma150 wrt its data registers will just result
+in throwing away the lowest 4 bits, which is not too bad. But the ctrl
+registers are a different story. Things happen to just work but supporting
+that certainly does not make treating the bma180 the same as the bma150
+right.
 
-But fair enough.
-Maxime
+Since some setups depend on the evdev interface the bma150 driver offers
+on top of the bma180, we cannot simply remove the bma180 ids.
 
+So this commit only removes the bma180 id when the bma180 iio driver,
+which does treat the bma180 properly, is enabled.
+
+Cc: Dr. H. Nikolaus Schaller <hns@goldelico.com>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+-Use IS_ENABLED(CONFIG_BMA180) instead of #ifdef CONFIG_BMA180
+---
+ drivers/input/misc/bma150.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/input/misc/bma150.c b/drivers/input/misc/bma150.c
+index b0d4453..2124390 100644
+--- a/drivers/input/misc/bma150.c
++++ b/drivers/input/misc/bma150.c
+@@ -538,8 +538,13 @@ static int bma150_probe(struct i2c_client *client,
+ 		return -EIO;
+ 	}
+ 
++	/*
++	 * Note if the IIO CONFIG_BMA180 driver is enabled we want to fail
++	 * the probe for the bma180 as the iio driver is preferred.
++	 */
+ 	chip_id = i2c_smbus_read_byte_data(client, BMA150_CHIP_ID_REG);
+-	if (chip_id != BMA150_CHIP_ID && chip_id != BMA180_CHIP_ID) {
++	if (chip_id != BMA150_CHIP_ID &&
++	    (IS_ENABLED(CONFIG_BMA180) || chip_id != BMA180_CHIP_ID)) {
+ 		dev_err(&client->dev, "BMA150 chip id error: %d\n", chip_id);
+ 		return -EINVAL;
+ 	}
+@@ -643,7 +648,9 @@ static UNIVERSAL_DEV_PM_OPS(bma150_pm, bma150_suspend, bma150_resume, NULL);
+ 
+ static const struct i2c_device_id bma150_id[] = {
+ 	{ "bma150", 0 },
++#if !IS_ENABLED(CONFIG_BMA180)
+ 	{ "bma180", 0 },
++#endif
+ 	{ "smb380", 0 },
+ 	{ "bma023", 0 },
+ 	{ }
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161114/4cfb2c48/attachment.sig>
+2.9.3
