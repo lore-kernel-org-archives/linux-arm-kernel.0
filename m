@@ -1,76 +1,39 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 14 Nov 2016 14:08:47 +0100
-Subject: [PATCH] spi: atmel: Fix scheduling while atomic
-In-Reply-To: <1478792090-6376-1-git-send-email-ben.whitten@gmail.com>
-References: <1478792090-6376-1-git-send-email-ben.whitten@gmail.com>
-Message-ID: <20161114130847.bjc7h43qk3kqojep@piout.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 14 Nov 2016 14:10:10 +0100
+Subject: [PATCH RFC] ARM: dts: add support for Turris Omnia
+In-Reply-To: <1479126185.15557.5@smtp.gmail.com>
+References: <20161105203841.9661-1-uwe@kleine-koenig.org>
+ <1479126185.15557.5@smtp.gmail.com>
+Message-ID: <20161114131010.GC26710@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+> Actually SFP is connected to SGMII interface of eth1, which is
+> routed through SERDES 5.
 
-On 10/11/2016 at 15:34:50 +0000, ben.whitten at gmail.com wrote :
-> From: Ben Whitten <ben.whitten@lairdtech.com>
-> 
-> A call to clk_get_rate appears to be called in the context of an interrupt,
-> cache the bus clock for the frequency calculations in transmission.
-> 
-> This fixes a 'BUG: scheduling while atomic' and
-> 'WARNING: CPU: 0 PID: 777 at kernel/sched/core.c:2960 atmel_spi_unlock'
-> 
-> Signed-off-by: Ben Whitten <ben.whitten@lairdtech.com>
-> Signed-off-by: Steve deRosier <steve.derosier@lairdtech.com>
+You say eth1 here. Yet lower down you say got eth0 and eth1 are
+connected to the switch?
 
-The spi subsystem maintainer is not copied so this fix will not be
-applied.
+> We have our proprietary support hacked onto mvneta driver for
+> disconnecting PHY on the fly. It is a bit nasty, so I suggest to
+> ignore SFP in this DTS altogether and let's wait till "phylink based
+> SFP module support" or something alike hits upstream, so we can base
+> the SFP support on solid code;
 
-Else, it seems ok to me.
+It would be great if you could work on getting the phylink patches
+into mainline. It is something i have wanted to do for a long time,
+but it is too low down on my priority list to get to. The code is high
+quality, so i don't think there will be too many issues. It probably
+just needs splitting up into smaller batches, submitting, and working
+on any comments.
 
-> ---
->  drivers/spi/spi-atmel.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 8feac59..c281d1a 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -295,6 +295,7 @@ struct atmel_spi {
->  	int			irq;
->  	struct clk		*clk;
->  	struct platform_device	*pdev;
-> +	unsigned long		spi_clk;
->  
->  	struct spi_transfer	*current_transfer;
->  	int			current_remaining_bytes;
-> @@ -864,7 +865,7 @@ static int atmel_spi_set_xfer_speed(struct atmel_spi *as,
->  	unsigned long		bus_hz;
->  
->  	/* v1 chips start out at half the peripheral bus speed. */
-> -	bus_hz = clk_get_rate(as->clk);
-> +	bus_hz = as->spi_clk;
->  	if (!atmel_spi_is_v2(as))
->  		bus_hz /= 2;
->  
-> @@ -1606,6 +1607,9 @@ static int atmel_spi_probe(struct platform_device *pdev)
->  	ret = clk_prepare_enable(clk);
->  	if (ret)
->  		goto out_free_irq;
-> +
-> +	as->spi_clk = clk_get_rate(clk);
-> +
->  	spi_writel(as, CR, SPI_BIT(SWRST));
->  	spi_writel(as, CR, SPI_BIT(SWRST)); /* AT91SAM9263 Rev B workaround */
->  	if (as->caps.has_wdrbt) {
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Actually eth0 and eth1 (both are RGMII) are connected to the 88E6176
+> switch. The problem is that from what I have read so far the switch
+> can not operate in DSA mode with two CPU ports.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Again, this is something i wanted to do, and i did have a prototype at
+one point. But again, not enough time. If you have resources to work
+on this, i can find my code, explain my ideas, and let you complete
+it.
+
+	Andrew
