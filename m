@@ -1,36 +1,45 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 14 Nov 2016 12:52:01 +0100
-Subject: [PATCH 0/8] DMA: s3c64xx: Conversion to the new channel request
- API
-In-Reply-To: <20161110184210.GA11835@kozik-lap>
-References: <1478791076-19528-1-git-send-email-s.nawrocki@samsung.com>
- <CGME20161110184227epcas3p4831c8f0d0fb85cb0fd223a4887ed9398@epcas3p4.samsung.com>
- <20161110184210.GA11835@kozik-lap>
-Message-ID: <b70c6454-9e42-26bf-4d09-98b087642014@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Nov 2016 12:56:24 +0100
+Subject: [PATCH 04/16] ARM: realview: use generic API for enabling SCU
+In-Reply-To: <1479099731-28108-5-git-send-email-pankaj.dubey@samsung.com>
+References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
+ <1479099731-28108-5-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <3587281.4kOCcW9Ryd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2016 07:42 PM, Krzysztof Kozlowski wrote:
-> On Thu, Nov 10, 2016 at 04:17:48PM +0100, Sylwester Nawrocki wrote:
->> > This patch series aims to convert the s3c64xx platform to use
->> > the new DMA channel request API, i.e. this is only meaningful 
->> > for non-dt systems using s3c64xx SoCs.
->> > 
->> > Presumably the first 2 or 4 patches in this series could be queued 
->> > for v4.10-rc1 and the remaining patches could be left for subsequent
->> > release, to avoid non-trivial conflict with patches already applied 
->> > in the ASoC tree.
->
-> Sounds good to me. Should I put the ARM/s3c64xx commits on separate
-> branch in case someone would like to pull a tag with it?
+On Monday, November 14, 2016 10:31:59 AM CET Pankaj Dubey wrote:
+>  static const struct of_device_id realview_scu_match[] = {
+>         { .compatible = "arm,arm11mp-scu", },
+> -       { .compatible = "arm,cortex-a9-scu", },
+> -       { .compatible = "arm,cortex-a5-scu", },
+>         { }
+>  };
+>  
+> @@ -41,27 +39,18 @@ static void __init realview_smp_prepare_cpus(unsigned int max_cpus)
+>         struct device_node *np;
+>         void __iomem *scu_base;
+>         struct regmap *map;
+> -       unsigned int ncores;
+>         int i;
+>  
+> -       np = of_find_matching_node(NULL, realview_scu_match);
+> -       if (!np) {
+> -               pr_err("PLATSMP: No SCU base address\n");
+> -               return;
+> +       if (of_scu_enable()) {
+> +               np = of_find_matching_node(NULL, realview_scu_match);
+> +               scu_base = of_iomap(np, 0);
+> +               of_node_put(np);
+> +               if (!scu_base) {
+> +                       pr_err("PLATSMP: No SCU remap\n");
+> +                       return;
+> +               }
+> +               scu_enable(scu_base);
+>         }
+> 
 
-I think it makes sense to put first 4 patches from the series onto
-a separate branch, and the remaining ones would need to wait for
-next development cycle.
+The only difference here seems to be that realview also needs to handle
+"arm,arm11mp-scu". Why not move that into the generic implementation?
 
-But of course firstly we need some feedback and Ack on the first
-(DMA controller driver) patch.
-
--- 
-Thanks,
-Sylwester
+	Arnd
