@@ -1,66 +1,77 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Nov 2016 14:51:43 +0000
-Subject: [PATCH 01/16] ARM: scu: Provide support for parsing SCU device
- node to enable SCU
-In-Reply-To: <6787744.7DRFf7p3US@wuerfel>
-References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
- <2479429.Js1FDSdQzs@wuerfel>
- <20161114135018.GL1041@n2100.armlinux.org.uk>
- <6787744.7DRFf7p3US@wuerfel>
-Message-ID: <20161114145143.GM1041@n2100.armlinux.org.uk>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 14 Nov 2016 15:52:36 +0100
+Subject: [GIT PULL] ARM: OXNAS SoC updates for 4.10
+In-Reply-To: <0b12c093-4be4-8f1c-2b46-ffaa54c5520b@baylibre.com>
+References: <1305c61f-b1ef-7caf-7788-67e2b907e873@baylibre.com>
+ <20161107212648.GC2106@localhost>
+ <0b12c093-4be4-8f1c-2b46-ffaa54c5520b@baylibre.com>
+Message-ID: <1718bee2-8fe3-5d8b-a17e-3e25180d0c50@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 14, 2016 at 03:37:44PM +0100, Arnd Bergmann wrote:
-> On Monday, November 14, 2016 1:50:18 PM CET Russell King - ARM Linux wrote:
-> > On Mon, Nov 14, 2016 at 01:03:09PM +0100, Arnd Bergmann wrote:
-> > > On Monday, November 14, 2016 2:10:16 PM CET pankaj.dubey wrote:
-> > > > >> +    scu_base = of_iomap(np, 0);
-> > > > >> +    of_node_put(np);
-> > > > >> +    if (!scu_base) {
-> > > > >> +            pr_err("%s failed to map scu_base via DT\n", __func__);
-> > > > > 
-> > > > > For non-ca5, non-ca9 based SoCs, we'll see this error msg. We understand
-> > > > > what does it mean, but it may confuse normal users. In current version,
-> > > > > berlin doesn't complain like this for non-ca9 SoCs
-> > > > > 
-> > > > 
-> > > > OK, let me see other reviewer's comment on this. Then we will decide if
-> > > > this error message is required or can be omitted.
-> > > 
-> > > We need to look at all callers here, to see if the function ever gets
-> > > called for a CPU that doesn't have an SCU. I'd say we should warn if
-> > > we know there is an SCU but we cannot map it, but never warn on
-> > > any of the CPU cores that don't support an SCU.
-> > 
-> > Maybe there should be two helpers:
-> > 
-> > of_scu_enable() which _only_ looks up the SCU address in DT and enables
-> > it if it finds it, otherwise returning failure.
-> > 
-> > a9_scu_enable() which tries to use the A9 provided SCU address and
-> > enables it if it finds it, otherwise returning failure.
-> > 
-> > Then callers can decide which of these to call, and what error messages
-> > to print on their failures.
+On 11/08/2016 12:21 PM, Neil Armstrong wrote:
+> On 11/07/2016 10:26 PM, Olof Johansson wrote:
+>> On Mon, Oct 31, 2016 at 10:52:53AM +0100, Neil Armstrong wrote:
+[...]
+>> Hi Neil,
+> Hi Olof,
 > 
-> Splitting the function in two is probably simpler overall, but
-> we may still have to look at all the callers: Any platform that
-> currently tries to map it on any CPU and doesn't warn about the
-> absence of the device node (or about scu_a9_has_base() == false)
-> should really continue not to warn about that.
+>>
+>> Sorry for being picky here, please be patient with us. :-)
+> Seems legit !
+> 
+>>
+>> Overall comments on this patch set:
+>>
+>> 1) Copyrights seem to be a bit varied. All 3 new source files have
+>>    different copyright holders. Only one has yours, one is from 2003, one
+>>    is also from 2013. Is this expected? Seems like it's worth mentioning
+>>    in commit messages at least.
+> 
+> Yes, the files comes from various places :
+> - hotplug.c was taken from versatile by Ma Haijun and left verbatim, so I left the original header
+> - headsmp.S was taken from the versatile code and adapted by Ma Haijun
+> - platsmp.c is a mix from versatile code, Ma Haijun code and my code for DT
+> 
+> The two first file were only modified in order to build and pass checkpatch actually.
+> 
+> I tried to find the *real* copyright holders, but it was not easy...
+> 
+>>
+>> 2) Please remove the linux/arch/... lines from the top of the files. It's
+>>    something we've been trying to remove for a while and don't want to
+>>    introduce more occurrances of.
+>>
+>> I'd say (2) is fine to do incremental, but please provide clarification on (1).
+>> I could just add that to the merge commit message so don't respin the branch
+>> yet, depending on what we hear back!
+>>
+> 
+> Ok, please tell me if/when I need to send a new pull for the (2) fix.
+> 
+>>>  arch/arm/Makefile             |   1 +
+>>>  arch/arm/mach-oxnas/Kconfig   |  30 +++++++++++++++++++---------
+>>>  arch/arm/mach-oxnas/Makefile  |   2 ++
+>>>  arch/arm/mach-oxnas/headsmp.S |  28 ++++++++++++++++++++++++++
+>>>  arch/arm/mach-oxnas/hotplug.c | 111 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>>>  arch/arm/mach-oxnas/platsmp.c | 104 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>>
+>> Git tip: If you redirect the output to a file (or pipe through cat), the
+>> diffstat will be limited to 80 characters and look better in email.
+>>
+>>
+>> Thanks,
+>>
+>> -Olof
+>>
+> 
+> Thanks,
+> Neil
+> 
 
-Did you miss the bit where none of of_scu_enable() or a9_scu_enable()
-should produce any warnings or errors to be printed.  It's up to the
-caller to report the failure, otherwise doing this doesn't make sense:
+Hi Olof,
 
-	if (of_scu_enable() < 0 && a9_scu_enable() < 0)
-		pr_err("Failed to map and enable the SCU\n");
+Is a new pull request needed finally ?
 
-because if of_scu_enable() prints a warning/error, then it's patently
-misleading.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
-according to speedtest.net.
+Best regards,
+Neil
