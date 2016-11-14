@@ -1,48 +1,35 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 14 Nov 2016 12:51:26 +0100
-Subject: [PATCH RFC 1/7] dma: pl08x: Add support for the DMA slave map
-In-Reply-To: <3693046.Gh6DJsekH3@wuerfel>
-References: <1478276094-19135-1-git-send-email-s.nawrocki@samsung.com>
- <201611050026.49560.arnd@arndb.de>
- <3d10d013-b18c-e10e-b596-d4d0f8b6e973@samsung.com>
- <CGME20161107195651epcas4p4e5e949a772ce329b064ce9d791aeb5bd@epcas4p4.samsung.com>
- <3693046.Gh6DJsekH3@wuerfel>
-Message-ID: <d6245c8d-d7a3-8f52-a32a-259e3791e513@samsung.com>
+Date: Mon, 14 Nov 2016 12:52:01 +0100
+Subject: [PATCH 0/8] DMA: s3c64xx: Conversion to the new channel request
+ API
+In-Reply-To: <20161110184210.GA11835@kozik-lap>
+References: <1478791076-19528-1-git-send-email-s.nawrocki@samsung.com>
+ <CGME20161110184227epcas3p4831c8f0d0fb85cb0fd223a4887ed9398@epcas3p4.samsung.com>
+ <20161110184210.GA11835@kozik-lap>
+Message-ID: <b70c6454-9e42-26bf-4d09-98b087642014@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2016 08:55 PM, Arnd Bergmann wrote:
->> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
->> > index d5c75c8..0d1eb2e 100644
->> > --- a/drivers/dma/amba-pl08x.c
->> > +++ b/drivers/dma/amba-pl08x.c
->> > @@ -1793,6 +1793,23 @@ bool pl08x_filter_id(struct dma_chan *chan, void *chan_id)
->> >  }
-[...]
->> > +static bool pl08x_filter_fn(struct dma_chan *chan, void *chan_id)
->> > +{
->> > +       struct pl08x_dma_chan *plchan;
-[...]
->> > +       plchan = to_pl08x_chan(chan);
->> > +
->> > +       /* Check that the channel is not taken! */
->> > +       if (plchan->cd == chan_id)
->> > +               return true;
-> 
-> What I had in mind was a bit different: Instead of comparing the
-> channel, I was thinking of modifying the channel itself, something
-> like:
-> 
-> 	plchan->signal = chan_id->signal;
-> 	plchan->periph_buses = chan_id->periph_buses;
-> 
-> after that, remove the plchan->cd data. Unfortunately, the muxing in
-> arch/arm/mach-spear/ makes this a bit harder. I'd have to think
-> about it some more. It may be easier to do this after moving
-> spear and lpc32xx over to use dma_slave_map.
+On 11/10/2016 07:42 PM, Krzysztof Kozlowski wrote:
+> On Thu, Nov 10, 2016 at 04:17:48PM +0100, Sylwester Nawrocki wrote:
+>> > This patch series aims to convert the s3c64xx platform to use
+>> > the new DMA channel request API, i.e. this is only meaningful 
+>> > for non-dt systems using s3c64xx SoCs.
+>> > 
+>> > Presumably the first 2 or 4 patches in this series could be queued 
+>> > for v4.10-rc1 and the remaining patches could be left for subsequent
+>> > release, to avoid non-trivial conflict with patches already applied 
+>> > in the ASoC tree.
+>
+> Sounds good to me. Should I put the ARM/s3c64xx commits on separate
+> branch in case someone would like to pull a tag with it?
 
-I've posted updated version of this patch, please let me know
-if you have any further comments.
+I think it makes sense to put first 4 patches from the series onto
+a separate branch, and the remaining ones would need to wait for
+next development cycle.
+
+But of course firstly we need some feedback and Ack on the first
+(DMA controller driver) patch.
 
 -- 
 Thanks,
