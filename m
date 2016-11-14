@@ -1,51 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 14 Nov 2016 10:06:23 +0000
-Subject: [RESEND PATCH v1 0/6] Support GICv3 ITS in 32-bit mode
-In-Reply-To: <1478510482-15471-1-git-send-email-vladimir.murzin@arm.com>
-References: <1478510482-15471-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <e1a51dec-cf8c-eb4e-e29a-8845bb8cd1d9@arm.com>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Mon, 14 Nov 2016 10:11:01 +0000
+Subject: [PATCH 0/8] DMA: s3c64xx: Conversion to the new channel request
+ API
+In-Reply-To: <1478791076-19528-1-git-send-email-s.nawrocki@samsung.com>
+References: <1478791076-19528-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <20161114101101.GK1575@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+On Thu, Nov 10, 2016 at 04:17:48PM +0100, Sylwester Nawrocki wrote:
+> This patch series aims to convert the s3c64xx platform to use
+> the new DMA channel request API, i.e. this is only meaningful 
+> for non-dt systems using s3c64xx SoCs.
+> 
+> Presumably the first 2 or 4 patches in this series could be queued 
+> for v4.10-rc1 and the remaining patches could be left for subsequent
+> release, to avoid non-trivial conflict with patches already applied 
+> in the ASoC tree.
+> 
+> The whole series can be pulled from git repository:
+>  git://linuxtv.org/snawrocki/samsung.git 
+>  branch: for-v4.10/dma/pl080-s3c64xx-v2
 
-On 07/11/16 09:21, Vladimir Murzin wrote:
-> Hi,
-> 
-> This series introduces GICv3 ITS to 32-bit world. Since I'm limited
-> with real world 32-bit platforms which uses ITS it was tested with
-> help of vITS on 64-bit host running 32-bit guest.
-> 
-> I used Andrea's its/v8 branch at [1] with following option passed to
-> kvmtool: --aarch32 --irqchip=gicv3-its --force-pci
-> 
-> [1] git://www.linux-arm.org/kvmtool.git
-> 
-> Changelog:
-> 
->     RFC -> v1
->         - rebased on 4.9-rc2,  gits_read_typer() has been dropped
-> 	- spilt ITS and vITS in separate patch sets
-> 	
-> Vladimir Murzin (6):
->   irqchip/gic-v3-its: Change unsigned types for AArch32 compatibility
->   irqchip/gic-v3-its: Narrow down Entry Size when used as a divider
->   irqchip/gicv3-its: Specialise flush_dcache operation
->   irqchip/gicv3-its: Specialise readq and writeq accesses
->   ARM: gic-v3-its: Add 32bit support to GICv3 ITS
->   ARM: virt: Select ARM_GIC_V3_ITS
-> 
->  arch/arm/Kconfig                    |    1 +
->  arch/arm/include/asm/arch_gicv3.h   |   54 +++++++++++++++++++++----
->  arch/arm64/include/asm/arch_gicv3.h |   17 ++++++++
->  drivers/irqchip/irq-gic-v3-its.c    |   75 +++++++++++++++++------------------
->  include/linux/irqchip/arm-gic-v3.h  |    4 +-
->  5 files changed, 104 insertions(+), 47 deletions(-)
+Tested this series again still looks good to me. The code on that
+branch does differ from the code on the list by the following
+diff however:
 
-I've queued all of this in my irq/gic-4.10 branch.
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -2317,7 +2317,7 @@ static int pl08x_probe(struct amba_device
+*adev, const struct amba_id *id)
+       } else {
+            pl08x->slave.filter.map = pl08x->pd->slave_map;
+            pl08x->slave.filter.mapcnt = pl08x->pd->slave_map_len;
+-           pl08x->slave.filter.fn = pl08x_filter_id;
++           pl08x->slave.filter.fn = pl08x_filter_fn;
+       }
+
+I tested the code from the list, rather than the branch.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Charles
