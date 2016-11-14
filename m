@@ -1,91 +1,63 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Mon, 14 Nov 2016 09:11:01 +0530
-Subject: [PATCH V3 0/8] IOMMU probe deferral support
-References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
- <60ee8066-f167-e9df-ae3e-4138f1133bad@arm.com>
- <003a01d22f97$82534c70$86f9e550$@codeaurora.org>
- <421e2b14-0231-d376-02a0-097423120b3d@arm.com>
- <006f01d236ae$61751c40$245f54c0$@codeaurora.org>
- <9f36244f-62d4-08e3-d64a-2b04ad4dc2e0@arm.com>
-Message-ID: <01bb01d23e28$f0612d00$d1238700$@codeaurora.org>
+From: atull@opensource.altera.com (atull)
+Date: Sun, 13 Nov 2016 22:02:00 -0600
+Subject: [PATCH fpga 8/9] fpga socfpga: Use the scatterlist interface
+In-Reply-To: <20161114001854.GA27248@obsidianresearch.com>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-9-git-send-email-jgunthorpe@obsidianresearch.com>
+ <alpine.DEB.2.10.1611131712210.2735@atull-VirtualBox>
+ <20161114001854.GA27248@obsidianresearch.com>
+Message-ID: <alpine.DEB.2.10.1611132149140.2908@atull-VirtualBox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Mon, 14 Nov 2016, Jason Gunthorpe wrote:
 
->Hi Robin,
->
->>On 04/11/16 15:16, Sricharan wrote:
->>> Hi Robin,
->>>
->>>>>> Yikes, on second look, that definitely shouldn't be happening.
->>>>>> Everything below is probably the resulting fallout.
->>>>>
->>>>> [   40.206703] vfio-pci 0000:08:00.0: Failed to setup iommu ops
->>>>>
->>>>> I think the above print which says "failed to setup iommu_ops"
->>>>> because the call ops->add_device failed in of_pci_iommu_configure
->>>>> is the reason for the failure, in my case i simply do not get this even with
->>>>> your scripts. ops->add_device succeeds in the rebind as well. So still
->>>>> checking what could be happening in your case.
->>>>
->>>> I was looking at your code base from [1].The ops->add_device
->>>> callback from of_pci_iommu_configure on the rebind is the
->>>> one which is causing the failure. But not able to spot out
->>>>from code which point is causing the failure. It would be very helpful
->>>> if i can know which is the return value from the add_device callback
->>>> or point inside add_device callback which fails in your setup.
->>>>
->>>>
->>>> [1] git://linux-arm.org/linux-rm iommu/misc
->>>
->>> With little more try, i saw an issue where i had an failure
->>> similar to what you reported. The issue happens when multiple
->>> devices fall in to same group due to matching sids. I ended up
->>> doing a fix like below and it would be nice to verify if it is the same
->>> that we are seeing in your setup and if the fix makes a difference ?
->>>
->>> From: Sricharan R <sricharan@codeaurora.org>
->>> Date: Fri, 4 Nov 2016 20:28:49 +0530
->>> Subject: [PATCH] iommu/arm-smmu: Fix group's reference counting
->>>
->>> iommu_group_get_for_dev which gets called in the add_device
->>> callback, increases the reference count of the iommu_group,
->>> so we do an iommu_group_put after that. iommu_group_get_for_dev
->>> inturn calls device_group callback and in the case of arm-smmu
->>> we call generic_device_group/pci_device_group which takes
->>> care of increasing the group's reference. But when we return
->>> an already existing group(when multiple devices have same group)
->>> the reference is not incremented, resulting in issues when the
->>> remove_device callback for the devices is invoked.
->>> Fixing the same here.
->>
->>Bah, yes, this does look like my fault - after flip-flopping between
->>about 3 different ways to keep refcounts for the S2CR entries, none of
->>which would quite work, I ripped it all out but apparently still got
->>things wrong, oh well. Thanks for figuring it out.
-> >
->>On the probe-deferral angle, whilst it's useful to have uncovered this
->>bug, I don't think we should actually be calling remove_device() from
->>DMA teardown. I think it's preferable from a user perspective if group
->>numbering remains stable, rather than changing depending on the order in
->>which they unbind/rebind VFIO drivers. I'm really keen to try and get
->>this in shape for 4.10, so I've taken the liberty of hacking up my own
->>branch (iommu/defer) based on v3 - would you mind taking a look at the
->>two "iommu/of:" commits to see what you think? (Ignore the PCI changes
->>to your later patches - that was an experiment which didn't really work out)
->
->Ok, will take a look at this now and respond more on this.
->
-Sorry for the delayed response on this. I was OOO for the last few days.
-So i tested this branch and it worked fine. I tested it with a pci device
-for both normal and deferred probe cases.  The of/iommu patches
-are the cleanup/preparation patches and it looks fine. One thing is without
-calling the remove_device callback, the resources like (smes for exmaple)
-and the group association of the device all remain allocated. That does not
-feel correct, given that the associated device does not exist. So to
-understand that, what happens with VFIO in this case which makes the
-group renumbering/rebinding a problem ?
+> On Sun, Nov 13, 2016 at 05:19:34PM -0600, atull wrote:
+> 
+> > Currently or soon we have 3 drivers that don't really use the sg
+> > interface natively.  So this workaround ends up in each of them?
+> 
+> Thinking of the SG list as a workaround is not really right - the SG
+> list is a way to pass memory stored in non-contiguous pages around,
+> and the miter is a way to access them from the CPU.
 
-Regards,
- Sricharan
+No, I ment the other way.  The changes to socfpga.c are a workaround
+to the sg-centric interface.  And other drivers will need the same
+workaround.  But below I see you understand...
+
+> 
+> socfpga *does* use sg natively because it is happy to process the data
+> from the CPU page-at-time. It just doesn't use DMA.
+> 
+> > That's a lot of duplicated code.  Why can't this code be in the
+> > fpga-mgr.c core for drivers that aren't using sg (to minimizing
+> > duplication).
+> 
+> Sure, if it is a common pattern it is a good idea to lift it.
+> 
+> I'd add a newop 'write_fragment' and a driver must define write_sg
+> write_fragment, if write_fragment is used then the core supplies
+> that loop.
+
+Sure, but isn't that just the old op? :)
+There may also be common code that you added to configure_init
+that should go in the core unless it's fpga-specific.
+
+> 
+> Is there a tree with these new drivers someplace?
+
+The arria10 driver is on linux-next master branch.  There are two
+others on the mailing list now.  linux-next also contains other
+changes to the FPGA mgr API that will affect your patches in minor
+ways, so you should rebase you patches.
+
+> 
+> > I will test this when I get time, may not be this week.  I just
+> > moved to a new building and lab and am in a course all week and
+> > so forth.
+> 
+> Sure, I don't expect any problems, Zynq uses the same loop and it
+> seems fine.
+> 
+> Jason
+> 
