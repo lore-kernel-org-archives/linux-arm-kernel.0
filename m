@@ -1,89 +1,42 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 14 Nov 2016 21:50:04 +0530
-Subject: [PATCH 03/16] ARM: berlin: use generic API for enabling SCU
-In-Reply-To: <20161114165134.411ae04b@xhacker>
-References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
- <1479099731-28108-4-git-send-email-pankaj.dubey@samsung.com>
- <20161114165134.411ae04b@xhacker>
-Message-ID: <CAGcde9EeV15V6_0fqD3U8tg0ERMAWhn3AjhvbYB4M5QeKLFn6w@mail.gmail.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 14 Nov 2016 17:20:37 +0100
+Subject: [RFC v2 8/8] iommu/arm-smmu: implement add_reserved_regions
+ callback
+In-Reply-To: <295feefe-014b-5669-7f5a-e04b09ba3454@redhat.com>
+References: <20161110154606.GH2078@8bytes.org>
+ <04ed9694-707d-260b-70c6-f367d292ceca@redhat.com>
+ <20161110161331.GJ2078@8bytes.org>
+ <f4537e43-0237-e478-eacd-b107458628b8@redhat.com>
+ <20161111114223.GP2078@8bytes.org>
+ <79da09b8-ac1e-cebf-5393-7d67f002b3e3@redhat.com>
+ <20161111162211.GU2078@8bytes.org>
+ <634ac375-3507-6926-164f-e67f7c798c98@redhat.com>
+ <20161114153149.GY2078@8bytes.org>
+ <295feefe-014b-5669-7f5a-e04b09ba3454@redhat.com>
+Message-ID: <20161114162037.GC14829@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
+On Mon, Nov 14, 2016 at 05:08:16PM +0100, Auger Eric wrote:
+> There are potentially several MSI doorbell physical pages in the SOC
+> that are accessed through the IOMMU (translated). Each of those must
+> have a corresponding IOVA and IOVA/PA mapping programmed in the IOMMU.
+> Else MSI will fault.
+> 
+> - step 1 was to define a usable IOVA range for MSI mapping. So now we
+> decided the base address and size would be hardcoded for ARM. The
+> get_dm_region can be used to retrieve that hardcoded region.
+> - Step2 is to allocate IOVAs within that range and map then for each of
+> those MSI doorbells. This is done in the MSI controller compose() callback.
+> 
+> I hope I succeeded in clarifying this time.
+> 
+> Robin sent today a new version of its cookie think using a dummy
+> allocator. I am currently integrating it.
 
-On 14 November 2016 at 14:21, Jisheng Zhang <jszhang@marvell.com> wrote:
-> Hi Pankaj,
->
-> On Mon, 14 Nov 2016 10:31:58 +0530 Pankaj Dubey wrote:
->
->> Now as we have of_scu_enable which takes care of mapping
->> scu base from DT, lets use it.
->>
->> CC: Jisheng Zhang <jszhang@marvell.com>
->> CC: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>  arch/arm/mach-berlin/platsmp.c | 17 +++++------------
->>  1 file changed, 5 insertions(+), 12 deletions(-)
->>
->> diff --git a/arch/arm/mach-berlin/platsmp.c b/arch/arm/mach-berlin/platsmp.c
->> index 93f9068..25a6ca5 100644
->> --- a/arch/arm/mach-berlin/platsmp.c
->> +++ b/arch/arm/mach-berlin/platsmp.c
->> @@ -60,26 +60,21 @@ static int berlin_boot_secondary(unsigned int cpu, struct task_struct *idle)
->>  static void __init berlin_smp_prepare_cpus(unsigned int max_cpus)
->>  {
->>       struct device_node *np;
->> -     void __iomem *scu_base;
->>       void __iomem *vectors_base;
->>
->> -     np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
->> -     scu_base = of_iomap(np, 0);
->> -     of_node_put(np);
->> -     if (!scu_base)
->> -             return;
->> -
->>       np = of_find_compatible_node(NULL, NULL, "marvell,berlin-cpu-ctrl");
->>       cpu_ctrl = of_iomap(np, 0);
->>       of_node_put(np);
->>       if (!cpu_ctrl)
->> -             goto unmap_scu;
->> +             return;
->>
->>       vectors_base = ioremap(CONFIG_VECTORS_BASE, SZ_32K);
->>       if (!vectors_base)
->> -             goto unmap_scu;
->> +             return;
->> +
->> +     if (of_scu_enable())
->
-> In err code path, we need to unmap vectors_base before return
->
+Okay, I understand. A simple bitmap-allocator would probably be
+sufficient, and doesn't have the overhead the iova allocator has. About
+how many pages are we talking here?
 
-You are correct. I missed this, Will update in v2.
 
-Thanks for review.
-
-Pankaj Dubey
-
->> +             return;
->>
->> -     scu_enable(scu_base);
->>       flush_cache_all();
->>
->>       /*
->> @@ -95,8 +90,6 @@ static void __init berlin_smp_prepare_cpus(unsigned int max_cpus)
->>       writel(virt_to_phys(secondary_startup), vectors_base + SW_RESET_ADDR);
->>
->>       iounmap(vectors_base);
->> -unmap_scu:
->> -     iounmap(scu_base);
->>  }
->>
->>  #ifdef CONFIG_HOTPLUG_CPU
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	Joerg
