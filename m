@@ -1,122 +1,65 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 14 Nov 2016 16:47:06 +0800
-Subject: [PATCH 01/16] ARM: scu: Provide support for parsing SCU device
- node to enable SCU
-In-Reply-To: <20161114145459.63c23391@xhacker>
-References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
- <1479099731-28108-2-git-send-email-pankaj.dubey@samsung.com>
- <20161114141251.7ea86e7a@xhacker>	<20161114145459.63c23391@xhacker>
-Message-ID: <20161114164706.02545789@xhacker>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 14 Nov 2016 09:54:05 +0100
+Subject: [PATCH 1/3] ARM: sunxi: add support for H2+ SoC
+In-Reply-To: <20161111164654.15273-1-icenowy@aosc.xyz>
+References: <20161111164654.15273-1-icenowy@aosc.xyz>
+Message-ID: <20161114085405.sa6f6pwvqdiubmkh@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
+Hi,
 
-On Mon, 14 Nov 2016 14:54:59 +0800 Jisheng Zhang wrote:
-
-> On Mon, 14 Nov 2016 14:12:51 +0800 Jisheng Zhang wrote:
+On Sat, Nov 12, 2016 at 12:46:52AM +0800, Icenowy Zheng wrote:
+> Allwinner H2+ is a quad-core Cortex-A7 SoC.
 > 
-> > Hi Pankaj,
-> > 
-> > On Mon, 14 Nov 2016 10:31:56 +0530 Pankaj Dubey wrote:
-> >   
-> > > Many platforms are duplicating code for enabling SCU, lets add
-> > > common code to enable SCU by parsing SCU device node so the duplication
-> > > in each platform can be avoided.
-> > > 
-> > > CC: Krzysztof Kozlowski <krzk@kernel.org>
-> > > CC: Jisheng Zhang <jszhang@marvell.com>
-> > > CC: Russell King <linux@armlinux.org.uk>
-> > > CC: Dinh Nguyen <dinguyen@opensource.altera.com>
-> > > CC: Patrice Chotard <patrice.chotard@st.com>
-> > > CC: Linus Walleij <linus.walleij@linaro.org>
-> > > CC: Liviu Dudau <liviu.dudau@arm.com>
-> > > CC: Ray Jui <rjui@broadcom.com>
-> > > CC: Stephen Warren <swarren@wwwdotorg.org>
-> > > CC: Heiko Stuebner <heiko@sntech.de>
-> > > CC: Shawn Guo <shawnguo@kernel.org>
-> > > CC: Michal Simek <michal.simek@xilinx.com>
-> > > CC: Wei Xu <xuwei5@hisilicon.com>
-> > > CC: Andrew Lunn <andrew@lunn.ch>
-> > > CC: Jun Nie <jun.nie@linaro.org> 
-> > > Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> > > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> > > ---
-> > >  arch/arm/include/asm/smp_scu.h |  4 +++
-> > >  arch/arm/kernel/smp_scu.c      | 56 ++++++++++++++++++++++++++++++++++++++++++
-> > >  2 files changed, 60 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
-> > > index bfe163c..fdeec07 100644
-> > > --- a/arch/arm/include/asm/smp_scu.h
-> > > +++ b/arch/arm/include/asm/smp_scu.h
-> > > @@ -39,8 +39,12 @@ static inline int scu_power_mode(void __iomem *scu_base, unsigned int mode)
-> > >  
-> > >  #if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
-> > >  void scu_enable(void __iomem *scu_base);
-> > > +void __iomem *of_scu_get_base(void);
-> > > +int of_scu_enable(void);
-> > >  #else
-> > >  static inline void scu_enable(void __iomem *scu_base) {}
-> > > +static inline void __iomem *of_scu_get_base(void) {return NULL; }
-> > > +static inline int of_scu_enable(void) {return 0; }
-> > >  #endif
-> > >  
-> > >  #endif
-> > > diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-> > > index 72f9241..d0ac3ed 100644
-> > > --- a/arch/arm/kernel/smp_scu.c
-> > > +++ b/arch/arm/kernel/smp_scu.c
-> > > @@ -10,6 +10,7 @@
-> > >   */
-> > >  #include <linux/init.h>
-> > >  #include <linux/io.h>
-> > > +#include <linux/of_address.h>
-> > >  
-> > >  #include <asm/smp_plat.h>
-> > >  #include <asm/smp_scu.h>
-> > > @@ -70,6 +71,61 @@ void scu_enable(void __iomem *scu_base)
-> > >  	 */
-> > >  	flush_cache_all();
-> > >  }
-> > > +
-> > > +static const struct of_device_id scu_match[] = {
-> > > +	{ .compatible = "arm,cortex-a9-scu", },
-> > > +	{ .compatible = "arm,cortex-a5-scu", },
-> > > +	{ }
-> > > +};
-> > > +
-> > > +/*
-> > > + * Helper API to get SCU base address
-> > > + * In case platform DT do not have SCU node, or iomap fails
-> > > + * this call will fallback and will try to map via call to
-> > > + * scu_a9_get_base.
-> > > + * This will return ownership of scu_base to the caller
-> > > + */
-> > > +void __iomem *of_scu_get_base(void)
-> > > +{
-> > > +	unsigned long base = 0;
-> > > +	struct device_node *np;
-> > > +	void __iomem *scu_base;
-> > > +
-> > > +	np = of_find_matching_node(NULL, scu_match);    
-> > 
-> > could we check np before calling of_iomap()?
-> >   
-> > > +	scu_base = of_iomap(np, 0);
-> > > +	of_node_put(np);
-> > > +	if (!scu_base) {
-> > > +		pr_err("%s failed to map scu_base via DT\n", __func__);    
-> > 
-> > For non-ca5, non-ca9 based SoCs, we'll see this error msg. We understand
-> > what does it mean, but it may confuse normal users. In current version,
-> > berlin doesn't complain like this for non-ca9 SoCs  
+> It is very like H3, that they share the same SoC ID (0x1680), and H3
+> memory maps as well as drivers works well on the SoC.
 > 
-> oops, I just realized that the non-ca9 berlin arm SoC version isn't upstreamed.
-> Below is the draft version I planed. Basically speaking, the code tries to
-> find "arm,cortex-a9-scu" node from DT, if can't, we think we don't need to
-> worry about SCU. Is there any elegant solution for my situation?
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+>  Documentation/arm/sunxi/README                  | 4 ++++
+>  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+>  arch/arm/mach-sunxi/sunxi.c                     | 1 +
+>  3 files changed, 6 insertions(+)
+> 
+> diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+> index cd02433..1fe4d99c 100644
+> --- a/Documentation/arm/sunxi/README
+> +++ b/Documentation/arm/sunxi/README
+> @@ -63,6 +63,10 @@ SunXi family
+>          + User Manual
+>            http://dl.linux-sunxi.org/A33/A33%20user%20manual%20release%201.1.pdf
+>  
+> +      - Allwinner H2+ (sun8i)
+> +        + No document available now, but is known to be working properly with
+> +          H3 drivers and memory map.
+> +
+>        - Allwinner H3 (sun8i)
+>          + Datasheet
+>            http://dl.linux-sunxi.org/H3/Allwinner_H3_Datasheet_V1.0.pdf
+> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+> index 3975d0a..0c0f277 100644
+> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+> @@ -13,5 +13,6 @@ using one of the following compatible strings:
+>    allwinner,sun8i-a33
+>    allwinner,sun8i-a83t
+>    allwinner,sun8i-h3
+> +  allwinner,sun8i-h2plus
 
-I just realized that (another realized :D) we uses PSCI enable method for
-non-ca9 base SoCs, so "marvell,berlin-smp" enable method is only for the SoCs
-which have CA9 compatible SCU. Sorry for the noise, your patch looks good to me.
+That's a nitpick, but I'd prefer to have sun8i-h2-plus.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161114/085010ba/attachment.sig>
