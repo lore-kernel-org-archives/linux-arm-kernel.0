@@ -1,151 +1,158 @@
-From: tomas.hlavacek@nic.cz (tomas.hlavacek at nic.cz)
-Date: Mon, 14 Nov 2016 13:23:05 +0100
-Subject: [PATCH RFC] ARM: dts: add support for Turris Omnia
-In-Reply-To: <20161105203841.9661-1-uwe@kleine-koenig.org>
-References: <20161105203841.9661-1-uwe@kleine-koenig.org>
-Message-ID: <1479126185.15557.5@smtp.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 14 Nov 2016 13:23:26 +0100
+Subject: [PATCH 1/2] pinctrl: bcm2835: Fix ints for GPIOs 28-31 & 46-53
+Message-ID: <1479126206-20482-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Uwe and all!
+From: Phil Elwell <phil@raspberrypi.org>
 
-On Sat, Nov 5, 2016 at 9:38 PM, Uwe Kleine-K?nig 
-<uwe@kleine-koenig.org> wrote:
-> This machine is an open hardware router by cz.nic driven by a
-> Marvell Armada 385.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
-> ---
-> 
-> Hello,
-> 
-> the following components are working:
-> 
->  - WAN port
->  - eMMC
+Contrary to the documentation, the BCM2835 GPIO controller actually
+has four interrupt lines - one each for the three IRQ groups and one
+common. Confusingly, the GPIO interrupt groups don't correspond
+directly with the GPIO control banks. Instead, GPIOs 0-27 generate IRQ
+GPIO0, 28-45 IRQ GPIO1 and 46-53 IRQ GPIO2.
 
-But I not not sure about DDR50 mode. At least with kernel 4.4, that we 
-use in production, we had to limit to SDR50 to overcome I/O errors and 
-communication instability, if I can remember it correctly. So it might 
-need more testing with the current kernel.
+Awkwardly, the GPIOs for IRQ GPIO1 straddle two 32-entry GPIO banks,
+so split out a function to process the interrupts for a single GPIO
+bank.
 
-> 
->  - UART0
->  - USB
+Cc: Stefan Wahren <stefan.wahren@i2se.com>
+Cc: Eric Anholt <eric@anholt.net>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Signed-off-by: Phil Elwell <phil@raspberrypi.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+I want to apply this to cater for my GPIOLIB_IRQCHIP
+refactorings.
+---
+ drivers/pinctrl/bcm/pinctrl-bcm2835.c | 51 ++++++++++++++++++++++++++---------
+ 1 file changed, 39 insertions(+), 12 deletions(-)
 
-It is worth noting that the USB 2.0 interface of Armada 385 is wired to 
-USB pinout of the last (right-most) PCIe connector. The two USB3 
-interfaces routed through SERDES 1 and 3 go directly to the external 
-USB connectors.
-
-> 
-> Still missing is support for the switch. Wireless fails to probe, 
-> didn't
-> debug this up to now. SFP is untested as is UART1.
-
-Actually SFP is connected to SGMII interface of eth1, which is routed 
-through SERDES 5. The SGMII line is shared between the SFP and metallic 
-PHY 88E1514. There is a autonomous high-speed switch connected to the 
-SFPDET signal from SFP cage. It disconnects the metallic SFP and 
-connects SGMII to SFP once the module is connected.
-
-The SFP is also connected to the I2C mux port 4 and to GPIO expander 
-for reading/driving SFPDET, LOS, TXFLT, TXDIS signals:
-
-&i2c0 {
-        pinctrl-names = "default";
-        pinctrl-0 = <&i2c0_pins>;
-        status = "okay";
-        clock-frequency = <100000>;
-
-        i2cmux at 70 {
-                compatible = "nxp,pca9547";
-                #address-cells = <1>;
-                #size-cells = <0>;
-                reg = <0x70>;
-                status = "okay";
-
-...
-
-                i2c at 7 {
-                        /* SFP+ GPIO expander */
-                        #address-cells = <1>;
-                        #size-cells = <0>;
-                        reg = <7>;
-
-                        sfpgpio: gpio at 71 {
-                                compatible = "nxp,pca9538";
-                                reg = <0x71>;
-                                interrupt-parent = <&gpio1>;
-                                interrupts = <14 IRQ_TYPE_LEVEL_LOW>;
-                                gpio-controller;
-                                #gpio-cells = <2>;
-                        };
-                };
-	};
-};
-
-We have our proprietary support hacked onto mvneta driver for 
-disconnecting PHY on the fly. It is a bit nasty, so I suggest to ignore 
-SFP in this DTS altogether and let's wait till "phylink based SFP 
-module support" or something alike hits upstream, so we can base the 
-SFP support on solid code; unless somebody has a better idea, of course.
-
-> 
-> 
-> diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts 
-> b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-> new file mode 100644
-> index 000000000000..d3cd8a4d713d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-> @@ -0,0 +1,246 @@
-...
-> +
-> +			/* USB part of the eSATA/USB 2.0 port */
-
-This comment is perhaps some error inherited from my development DTS. 
-We do not have any eSATA, perhaps PCIe/USB 2.0 slot.
-
-> 
-> +			usb at 58000 {
-> +				status = "okay";
-> +			};
-> +
-> +
-> +&eth0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&ge0_rgmii_pins>;
-> +	status = "okay";
-> +	phy-mode = "rgmii-id";
-> +
-> +	fixed-link {
-> +		speed = <1000>;
-> +		full-duplex;
-> +	};
-> +};
-> +
-> +&eth1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&ge1_rgmii_pins>;
-> +	status = "okay";
-> +	phy-mode = "rgmii-id";
-> +
-> +	fixed-link {
-> +		speed = <1000>;
-> +		full-duplex;
-> +	};
-> +};
-> +
-
-Actually eth0 and eth1 (both are RGMII) are connected to the 88E6176 
-switch. The problem is that from what I have read so far the switch can 
-not operate in DSA mode with two CPU ports. We currently operate the 
-switch in "normal mode" with the eth0 and eth1 set to fixed-link 
-1000/full and with proprietary driver (derived from OpenWRT switch 
-drivers). I would say that these records for eth0 and eth1 are 
-therefore redundant, because it does nothing without the switch support 
-and it would most likely change once we have DSA driver (using only 
-eth0).
-
-Tomas
+diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+index b2dd278f18b1..1d8fc104e26b 100644
+--- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
++++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+@@ -47,6 +47,7 @@
+ #define MODULE_NAME "pinctrl-bcm2835"
+ #define BCM2835_NUM_GPIOS 54
+ #define BCM2835_NUM_BANKS 2
++#define BCM2835_NUM_IRQS  3
+ 
+ #define BCM2835_PIN_BITMAP_SZ \
+ 	DIV_ROUND_UP(BCM2835_NUM_GPIOS, sizeof(unsigned long) * 8)
+@@ -88,13 +89,13 @@ enum bcm2835_pinconf_pull {
+ 
+ struct bcm2835_gpio_irqdata {
+ 	struct bcm2835_pinctrl *pc;
+-	int bank;
++	int irqgroup;
+ };
+ 
+ struct bcm2835_pinctrl {
+ 	struct device *dev;
+ 	void __iomem *base;
+-	int irq[BCM2835_NUM_BANKS];
++	int irq[BCM2835_NUM_IRQS];
+ 
+ 	/* note: locking assumes each bank will have its own unsigned long */
+ 	unsigned long enabled_irq_map[BCM2835_NUM_BANKS];
+@@ -105,7 +106,7 @@ struct bcm2835_pinctrl {
+ 	struct gpio_chip gpio_chip;
+ 	struct pinctrl_gpio_range gpio_range;
+ 
+-	struct bcm2835_gpio_irqdata irq_data[BCM2835_NUM_BANKS];
++	struct bcm2835_gpio_irqdata irq_data[BCM2835_NUM_IRQS];
+ 	spinlock_t irq_lock[BCM2835_NUM_BANKS];
+ };
+ 
+@@ -391,17 +392,16 @@ static struct gpio_chip bcm2835_gpio_chip = {
+ 	.can_sleep = false,
+ };
+ 
+-static irqreturn_t bcm2835_gpio_irq_handler(int irq, void *dev_id)
++static int bcm2835_gpio_irq_handle_bank(struct bcm2835_pinctrl *pc,
++					unsigned int bank, u32 mask)
+ {
+-	struct bcm2835_gpio_irqdata *irqdata = dev_id;
+-	struct bcm2835_pinctrl *pc = irqdata->pc;
+-	int bank = irqdata->bank;
+ 	unsigned long events;
+ 	unsigned offset;
+ 	unsigned gpio;
+ 	unsigned int type;
+ 
+ 	events = bcm2835_gpio_rd(pc, GPEDS0 + bank * 4);
++	events &= mask;
+ 	events &= pc->enabled_irq_map[bank];
+ 	for_each_set_bit(offset, &events, 32) {
+ 		gpio = (32 * bank) + offset;
+@@ -409,7 +409,30 @@ static irqreturn_t bcm2835_gpio_irq_handler(int irq, void *dev_id)
+ 
+ 		generic_handle_irq(irq_linear_revmap(pc->irq_domain, gpio));
+ 	}
+-	return events ? IRQ_HANDLED : IRQ_NONE;
++
++	return (events != 0);
++}
++
++static irqreturn_t bcm2835_gpio_irq_handler(int irq, void *dev_id)
++{
++	struct bcm2835_gpio_irqdata *irqdata = dev_id;
++	struct bcm2835_pinctrl *pc = irqdata->pc;
++	int handled = 0;
++
++	switch (irqdata->irqgroup) {
++	case 0: /* IRQ0 covers GPIOs 0-27 */
++		handled = bcm2835_gpio_irq_handle_bank(pc, 0, 0x0fffffff);
++		break;
++	case 1: /* IRQ1 covers GPIOs 28-45 */
++		handled = bcm2835_gpio_irq_handle_bank(pc, 0, 0xf0000000) |
++			  bcm2835_gpio_irq_handle_bank(pc, 1, 0x00003fff);
++		break;
++	case 2: /* IRQ2 covers GPIOs 46-53 */
++		handled = bcm2835_gpio_irq_handle_bank(pc, 1, 0x003fc000);
++		break;
++	}
++
++	return handled ? IRQ_HANDLED : IRQ_NONE;
+ }
+ 
+ static inline void __bcm2835_gpio_irq_config(struct bcm2835_pinctrl *pc,
+@@ -1000,8 +1023,6 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
+ 	for (i = 0; i < BCM2835_NUM_BANKS; i++) {
+ 		unsigned long events;
+ 		unsigned offset;
+-		int len;
+-		char *name;
+ 
+ 		/* clear event detection flags */
+ 		bcm2835_gpio_wr(pc, GPREN0 + i * 4, 0);
+@@ -1016,10 +1037,15 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
+ 		for_each_set_bit(offset, &events, 32)
+ 			bcm2835_gpio_wr(pc, GPEDS0 + i * 4, BIT(offset));
+ 
++		spin_lock_init(&pc->irq_lock[i]);
++	}
++
++	for (i = 0; i < BCM2835_NUM_IRQS; i++) {
++		int len;
++		char *name;
+ 		pc->irq[i] = irq_of_parse_and_map(np, i);
+ 		pc->irq_data[i].pc = pc;
+-		pc->irq_data[i].bank = i;
+-		spin_lock_init(&pc->irq_lock[i]);
++		pc->irq_data[i].irqgroup = i;
+ 
+ 		len = strlen(dev_name(pc->dev)) + 16;
+ 		name = devm_kzalloc(pc->dev, len, GFP_KERNEL);
+@@ -1076,6 +1102,7 @@ static struct platform_driver bcm2835_pinctrl_driver = {
+ 	.remove = bcm2835_pinctrl_remove,
+ 	.driver = {
+ 		.name = MODULE_NAME,
++		.owner = THIS_MODULE,
+ 		.of_match_table = bcm2835_pinctrl_match,
+ 	},
+ };
+-- 
+2.7.4
