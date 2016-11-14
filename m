@@ -1,39 +1,48 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 14 Nov 2016 14:10:10 +0100
-Subject: [PATCH RFC] ARM: dts: add support for Turris Omnia
-In-Reply-To: <1479126185.15557.5@smtp.gmail.com>
-References: <20161105203841.9661-1-uwe@kleine-koenig.org>
- <1479126185.15557.5@smtp.gmail.com>
-Message-ID: <20161114131010.GC26710@lunn.ch>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 14 Nov 2016 14:10:46 +0100
+Subject: [linux-sunxi] Re: [PATCH 3/3] ARM: dts: sunxi: add support for
+ Orange Pi Zero board
+In-Reply-To: <cbbf8ae1-ff29-2a83-265b-a9ff5bacf97b@redhat.com>
+References: <20161111164654.15273-1-icenowy@aosc.xyz>
+ <20161111164654.15273-3-icenowy@aosc.xyz>
+ <20161114085839.qzu7ebeghoqlqygn@lukather>
+ <CAGb2v677zQGihbz1o2izM-y5GJ4VDApf6-WDJAk3UyZdsK-vWQ@mail.gmail.com>
+ <cbbf8ae1-ff29-2a83-265b-a9ff5bacf97b@redhat.com>
+Message-ID: <20161114131046.t2iy3imx5ozcgrp6@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Actually SFP is connected to SGMII interface of eth1, which is
-> routed through SERDES 5.
+On Mon, Nov 14, 2016 at 11:00:32AM +0100, Hans de Goede wrote:
+> > > > +&usbphy {
+> > > > +     /* USB VBUS is always on */
+> > > 
+> > > You can put the always on regulators (I'm guessing reg_vcc5v0 ?) here.
+> > 
+> > AFAIK the regulator properties are optional the the USB PHY.
+> > So we probably don't need to add it. Hans (CC-ed) could explain
+> > his original intent?
+> 
+> I've made the regulators optional exactly for boards like these,
+> where there is no regulator. Likely the Vbus is simply wired
+> directly to the 5V DC-in jack. So IMHO adding something like
+> the fixed reg_vcc5v0 a supply here just makes the dt
+> harder to read.
 
-You say eth1 here. Yet lower down you say got eth0 and eth1 are
-connected to the switch?
+It also makes the regulator tree more complete and accurate because
+you'd list all the devices that are needing those regulators. That
+would also make it easier to deal with in the future.
 
-> We have our proprietary support hacked onto mvneta driver for
-> disconnecting PHY on the fly. It is a bit nasty, so I suggest to
-> ignore SFP in this DTS altogether and let's wait till "phylink based
-> SFP module support" or something alike hits upstream, so we can base
-> the SFP support on solid code;
+But fair enough.
+Maxime
 
-It would be great if you could work on getting the phylink patches
-into mainline. It is something i have wanted to do for a long time,
-but it is too low down on my priority list to get to. The code is high
-quality, so i don't think there will be too many issues. It probably
-just needs splitting up into smaller batches, submitting, and working
-on any comments.
-
-> Actually eth0 and eth1 (both are RGMII) are connected to the 88E6176
-> switch. The problem is that from what I have read so far the switch
-> can not operate in DSA mode with two CPU ports.
-
-Again, this is something i wanted to do, and i did have a prototype at
-one point. But again, not enough time. If you have resources to work
-on this, i can find my code, explain my ideas, and let you complete
-it.
-
-	Andrew
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161114/4cfb2c48/attachment.sig>
