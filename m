@@ -1,464 +1,124 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 14 Nov 2016 15:13:10 +0800
-Subject: [PATCH] arm64: Add DTS support for FSL's LS1012A SoC
-In-Reply-To: <1478715118-12848-1-git-send-email-harninder.rai@nxp.com>
-References: <1478715118-12848-1-git-send-email-harninder.rai@nxp.com>
-Message-ID: <20161114071308.GL3310@dragon>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Mon, 14 Nov 2016 15:14:11 +0800
+Subject: [PATCH v9 00/10] MT2701 DRM support
+In-Reply-To: <1478865346-19043-1-git-send-email-yt.shen@mediatek.com>
+References: <1478865346-19043-1-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1479107651.2963.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2016 at 11:41:58PM +0530, Harninder Rai wrote:
-> Add the device tree support for FSL LS1012A SoC.
+Hi, YT:
 
-Can we have a brief introduction of this SoC in commit log?
-
->     Following levels of DTSI/DTS files have been created for the LS1012A
->     SoC family:
+On Fri, 2016-11-11 at 19:55 +0800, YT Shen wrote:
+> This is MT2701 DRM support PATCH v9, based on 4.9-rc1.
+> We add DSI interrupt control, transfer function for MIPI DSI panel support.
+> Most codes are the same, except some register changed.
 > 
->             - fsl-ls1012a.dtsi:
->                     DTS-Include file for FSL LS1012A SoC.
+> For example:
+>  - DISP_OVL address offset changed, color format definition changed.
+>  - DISP_RDMA fifo size changed.
+>  - DISP_COLOR offset changed.
+>  - MIPI_TX setting changed.
 > 
->             - fsl-ls1012a-frdm.dts:
->                     DTS file for FSL LS1012A FRDM board.
+> We add a new component DDP_COMPONENT_BLS, and the connections are updated.
+> OVL -> RDMA -> COLOR -> BLS -> DSI
+> RDMA -> DPI
+> And we have shadow register support in MT2701.
 > 
->             - fsl-ls1012a-qds.dts:
->                     DTS file for FSL LS1012A QDS board.
+> We remove dts patch from the patch series, which depends on MT2701 CCF and scpsys.
+
+For this series, it looks good to me.
+Acked-by: CK Hu <ck.hu@mediatek.com>
+
 > 
->             - fsl-ls1012a-rdb.dts:
->                     DTS file for FSL LS1012A RDB board.
+> Changes since v8:
+> - enable 3 DSI interrupts only
+> - move mtk_dsi_wait_for_irq_done() to the patch of irq control
+> - use the name BLS in DRM driver part
+> - move BLS declaration to a separate patch
+> - update mtk_dsi_switch_to_cmd_mode()
+> - update mtk_output_dsi_enable() and mtk_output_dsi_disable()
 > 
-> Signed-off-by: Harninder Rai <harninder.rai@nxp.com>
-> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
-> ---
->  arch/arm64/boot/dts/freescale/Makefile             |   3 +
->  arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts | 115 ++++++++++
->  arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts  | 128 +++++++++++
->  arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts  |  59 +++++
->  arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     | 248 +++++++++++++++++++++
->  5 files changed, 553 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
->  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
->  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
->  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+> Changes since v7:
+> - Remove redundant codes
+> - Move the definition of DDP_COMPONENT_BLS to patch of "drm/mediatek: update display module connections"
+> - Move _dsi_irq_wait_queue into platform driver data
+> - Move mtk_dsi_irq_data_clear() to patch of "drm/mediatek: add dsi interrupt control"
+> - Add more descriptions in the commit messages
 > 
-> diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-> index 6602718..39db645 100644
-> --- a/arch/arm64/boot/dts/freescale/Makefile
-> +++ b/arch/arm64/boot/dts/freescale/Makefile
-> @@ -1,3 +1,6 @@
-> +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-frdm.dtb
-> +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-qds.dtb
-> +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-rdb.dtb
->  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-qds.dtb
->  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-rdb.dtb
->  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1046a-qds.dtb
-
-It seems that the patch is not generated against mainline kernel.  We do
-not have fsl-ls1046a-qds.dtb target in mainline kernel.
-
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
-> new file mode 100644
-> index 0000000..1f2da79
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
-> @@ -0,0 +1,115 @@
-> +/*
-> + * Device Tree file for Freescale LS1012A Freedom Board.
-> + *
-> + * Copyright 2016, Freescale Semiconductor
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPLv2 or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +/dts-v1/;
-> +
-> +#include "fsl-ls1012a.dtsi"
-> +
-> +/ {
-> +	model = "LS1012A Freedom Board";
-> +	compatible = "fsl,ls1012a-frdm", "fsl,ls1012a";
-> +
-> +	sys_mclk: clock-mclk {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <25000000>;
-> +	};
-> +
-> +	reg_1p8v: regulator at 0 {
-
-Drop the unit-address from node name, and name it like regulator-1p8v.
-
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "1P8V";
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <1800000>;
-> +		regulator-always-on;
-> +	};
-> +
-> +	sound {
-> +		compatible = "simple-audio-card";
-> +		simple-audio-card,format = "i2s";
-> +		simple-audio-card,widgets =
-> +			"Microphone", "Microphone Jack",
-> +			"Headphone", "Headphone Jack",
-> +			"Speaker", "Speaker Ext",
-> +			"Line", "Line In Jack";
-> +		simple-audio-card,routing =
-> +			"MIC_IN", "Microphone Jack",
-> +			"Microphone Jack", "Mic Bias",
-> +			"LINE_IN", "Line In Jack",
-> +			"Headphone Jack", "HP_OUT",
-> +			"Speaker Ext", "LINE_OUT";
-> +
-> +		simple-audio-card,cpu {
-> +			sound-dai = <&sai2>;
-> +			frame-master;
-> +			bitclock-master;
-> +		};
-> +
-> +		simple-audio-card,codec {
-> +			sound-dai = <&codec>;
-> +			frame-master;
-> +			bitclock-master;
-> +			system-clock-frequency = <25000000>;
-> +		};
-> +	};
-> +};
-> +
-> +&i2c0 {
-> +	status = "okay";
-> +
-> +	codec: sgtl5000 at a {
-> +		#sound-dai-cells = <0>;
-> +		compatible = "fsl,sgtl5000";
-> +		reg = <0xa>;
-> +		VDDA-supply = <&reg_1p8v>;
-> +		VDDIO-supply = <&reg_1p8v>;
-> +		clocks = <&sys_mclk>;
-> +	};
-> +};
-> +
-> +&duart0 {
-
-Please sort labeled nodes alphabetically.
-
-> +	status = "okay";
-> +};
-> +
-> +&sai2 {
-> +	status = "okay";
-> +};
-
-<snip>
-
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> new file mode 100644
-> index 0000000..0bf5b64
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> @@ -0,0 +1,248 @@
-> +/*
-> + * Device Tree Include file for Freescale Layerscape-1012A family SoC.
-> + *
-> + * Copyright 2016, Freescale Semiconductor
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPLv2 or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +
-> +/ {
-> +	compatible = "fsl,ls1012a";
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu0: cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53";
-> +			reg = <0x0>;
-> +			clocks = <&clockgen 1 0>;
-> +			#cooling-cells = <2>;
-> +		};
-> +	};
-> +
-> +	sysclk: sysclk {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <100000000>;
-> +		clock-output-names = "sysclk";
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +			     /* Physical Secure PPI */
-> +		interrupts = <1 13 IRQ_TYPE_LEVEL_LOW>,
-> +			     /* Physical Non-Secure PPI */
-> +			     <1 14 IRQ_TYPE_LEVEL_LOW>,
-> +			     /* Virtual PPI */
-> +			     <1 11 IRQ_TYPE_LEVEL_LOW>,
-> +			     /* Hypervisor PPI */
-> +			     <1 10 IRQ_TYPE_LEVEL_LOW>;
-
-The following form should be easier for read.
-
-		interrupts = <1 13 IRQ_TYPE_LEVEL_LOW>, /* Physical Secure PPI */
-			     <1 14 IRQ_TYPE_LEVEL_LOW>, /* Physical Non-Secure PPI */
-			     <1 11 IRQ_TYPE_LEVEL_LOW>, /* Virtual PPI */
-			     <1 10 IRQ_TYPE_LEVEL_LOW>; /* Hypervisor PPI */
-
-
-> +	};
-> +
-> +	pmu {
-> +		compatible = "arm,armv8-pmuv3";
-> +		interrupts = <0 106 IRQ_TYPE_LEVEL_LOW>;
-> +	};
-> +
-> +	gic: interrupt-controller at 1400000 {
-> +		compatible = "arm,gic-400";
-> +		#interrupt-cells = <3>;
-> +		interrupt-controller;
-> +		reg = <0x0 0x1401000 0 0x1000>, /* GICD */
-> +		      <0x0 0x1402000 0 0x2000>, /* GICC */
-> +		      <0x0 0x1404000 0 0x2000>, /* GICH */
-> +		      <0x0 0x1406000 0 0x2000>; /* GICV */
-> +		interrupts = <1 9 IRQ_TYPE_LEVEL_LOW>;
-> +	};
-> +
-> +	reboot {
-> +		compatible = "syscon-reboot";
-> +		regmap = <&dcfg>;
-> +		offset = <0xb0>;
-> +		mask = <0x02>;
-> +	};
-> +
-> +	soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +
-> +		clockgen: clocking at 1ee1000 {
-> +			compatible = "fsl,ls1012a-clockgen";
-> +			reg = <0x0 0x1ee1000 0x0 0x1000>;
-> +			#clock-cells = <2>;
-> +			clocks = <&sysclk>;
-> +		};
-> +
-> +		scfg: scfg at 1570000 {
-> +			compatible = "fsl,ls1012a-scfg", "syscon";
-> +			reg = <0x0 0x1570000 0x0 0x10000>;
-> +			big-endian;
-> +		};
-
-Please sort these nodes with unit-address in order of the address.
-
-Shawn
-
-> +
-> +		dcfg: dcfg at 1ee0000 {
-> +			compatible = "fsl,ls1012a-dcfg",
-> +				     "syscon";
-> +			reg = <0x0 0x1ee0000 0x0 0x10000>;
-> +			big-endian;
-> +		};
-> +
-> +		i2c0: i2c at 2180000 {
-> +			compatible = "fsl,vf610-i2c";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0x0 0x2180000 0x0 0x10000>;
-> +			interrupts = <0 56 IRQ_TYPE_LEVEL_LOW>;
-> +			clocks = <&clockgen 4 0>;
-> +			status = "disabled";
-> +		};
-> +
-> +		i2c1: i2c at 2190000 {
-> +			compatible = "fsl,vf610-i2c";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0x0 0x2190000 0x0 0x10000>;
-> +			interrupts = <0 57 IRQ_TYPE_LEVEL_LOW>;
-> +			clocks = <&clockgen 4 0>;
-> +			status = "disabled";
-> +		};
-> +
-> +		duart0: serial at 21c0500 {
-> +			compatible = "fsl,ns16550", "ns16550a";
-> +			reg = <0x00 0x21c0500 0x0 0x100>;
-> +			interrupts = <0 54 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&clockgen 4 0>;
-> +		};
-> +
-> +		duart1: serial at 21c0600 {
-> +			compatible = "fsl,ns16550", "ns16550a";
-> +			reg = <0x00 0x21c0600 0x0 0x100>;
-> +			interrupts = <0 54 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&clockgen 4 0>;
-> +		};
-> +
-> +		gpio0: gpio at 2300000 {
-> +			compatible = "fsl,qoriq-gpio";
-> +			reg = <0x0 0x2300000 0x0 0x10000>;
-> +			interrupts = <0 66 IRQ_TYPE_LEVEL_LOW>;
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +		};
-> +
-> +		gpio1: gpio at 2310000 {
-> +			compatible = "fsl,qoriq-gpio";
-> +			reg = <0x0 0x2310000 0x0 0x10000>;
-> +			interrupts = <0 67 IRQ_TYPE_LEVEL_LOW>;
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +		};
-> +
-> +		wdog0: wdog at 2ad0000 {
-> +			compatible = "fsl,ls1012a-wdt",
-> +				     "fsl,imx21-wdt";
-> +			reg = <0x0 0x2ad0000 0x0 0x10000>;
-> +			interrupts = <0 83 IRQ_TYPE_LEVEL_LOW>;
-> +			clocks = <&clockgen 4 0>;
-> +			big-endian;
-> +		};
-> +
-> +		sai1: sai at 2b50000 {
-> +			#sound-dai-cells = <0>;
-> +			compatible = "fsl,vf610-sai";
-> +			reg = <0x0 0x2b50000 0x0 0x10000>;
-> +			interrupts = <0 148 IRQ_TYPE_LEVEL_LOW>;
-> +			clocks = <&clockgen 4 3>, <&clockgen 4 3>,
-> +				 <&clockgen 4 3>, <&clockgen 4 3>;
-> +			clock-names = "bus", "mclk1", "mclk2", "mclk3";
-> +			dma-names = "tx", "rx";
-> +			dmas = <&edma0 1 47>,
-> +			       <&edma0 1 46>;
-> +			status = "disabled";
-> +		};
-> +
-> +		sai2: sai at 2b60000 {
-> +			#sound-dai-cells = <0>;
-> +			compatible = "fsl,vf610-sai";
-> +			reg = <0x0 0x2b60000 0x0 0x10000>;
-> +			interrupts = <0 149 IRQ_TYPE_LEVEL_LOW>;
-> +			clocks = <&clockgen 4 3>, <&clockgen 4 3>,
-> +				 <&clockgen 4 3>, <&clockgen 4 3>;
-> +			clock-names = "bus", "mclk1", "mclk2", "mclk3";
-> +			dma-names = "tx", "rx";
-> +			dmas = <&edma0 1 45>,
-> +			       <&edma0 1 44>;
-> +			status = "disabled";
-> +		};
-> +
-> +		edma0: edma at 2c00000 {
-> +			#dma-cells = <2>;
-> +			compatible = "fsl,vf610-edma";
-> +			reg = <0x0 0x2c00000 0x0 0x10000>,
-> +			      <0x0 0x2c10000 0x0 0x10000>,
-> +			      <0x0 0x2c20000 0x0 0x10000>;
-> +			interrupts = <0 103 IRQ_TYPE_LEVEL_LOW>,
-> +				     <0 103 IRQ_TYPE_LEVEL_LOW>;
-> +			interrupt-names = "edma-tx", "edma-err";
-> +			dma-channels = <32>;
-> +			big-endian;
-> +			clock-names = "dmamux0", "dmamux1";
-> +			clocks = <&clockgen 4 3>,
-> +				 <&clockgen 4 3>;
-> +		};
-> +
-> +		sata: sata at 3200000 {
-> +			compatible = "fsl,ls1012a-ahci";
-> +			reg = <0x0 0x3200000 0x0 0x10000>;
-> +			interrupts = <0 69 IRQ_TYPE_LEVEL_LOW>;
-> +			clocks = <&clockgen 4 0>;
-> +		};
-> +	};
-> +};
-> -- 
-> 2.7.4
+> Changes since v6:
+> - Change data type of irq_data to u32
+> - Rewrite mtk_dsi_host_transfer() for simplify
+> - Move some MIPI_TX config to patch of "drm/mediatek: add *driver_data for different hardware settings".
+> - Remove device tree from this patch series
 > 
+> Changes since v5:
+> - Remove DPI device tree and compatible string
+> - Use one wait queue to handle interrupt status
+> - Update the interrupt check flow and DSI_INT_ALL_BITS
+> - Use same function for host read/write command
+> - various fixes
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Changes since v4:
+> - Add messages when timeout in mtk_disp_mutex_acquire()
+> - Add descriptions for DISP_REG_MUTEX registers
+> - Move connection settings for display modules to a separate patch
+> - Remove 'mt2701-disp-wdma' because it is unused
+> - Move cleaning up and renaming to a separate patch
+> - Use wait_event_interruptible_timeout() to replace polling
+> - Remove irq_num from mtk_dsi structure
+> - Remove redundant and debug codes
+> 
+> Changes since v3:
+> - Add DSI support for MIPI DSI panels
+> - Update BLS binding to PWM nodes
+> - Remove ufoe device nodes
+> - Remove redundant parentheses
+> - Remove global variable initialization
+> 
+> Changes since v2:
+> - Rename mtk_ddp_mux_sel to mtk_ddp_sout_sel
+> - Update mt2701_mtk_ddp_ext components
+> - Changed to prefix naming
+> - Reorder the patch series
+> - Use of_device_get_match_data() to get driver private data
+> - Use iopoll macros to implement mtk_disp_mutex_acquire()
+> - Removed empty device tree nodes
+> 
+> Changes since v1:
+> - Removed BLS bindings and codes, which belong to pwm driver
+> - Moved mtk_disp_mutex_acquire() just before mtk_crtc_ddp_config()
+> - Split patch into smaller parts
+> - Added const keyword to constant structure
+> - Removed codes for special memory align
+> 
+> Thanks,
+> yt.shen
+> 
+> YT Shen (8):
+>   drm/mediatek: rename macros, add chip prefix
+>   drm/mediatek: add *driver_data for different hardware settings
+>   drm/mediatek: add shadow register support
+>   drm/mediatek: add BLS component
+>   drm/mediatek: update display module connections
+>   drm/mediatek: cleaning up and refine
+>   drm/mediatek: update DSI sub driver flow for sending commands to panel
+>   drm/mediatek: add support for Mediatek SoC MT2701
+> 
+> shaoming chen (2):
+>   drm/mediatek: add dsi interrupt control
+>   drm/mediatek: add dsi transfer function
+> 
+>  drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |  33 ++-
+>  drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |  17 +-
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.c     |  76 +++--
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c      | 138 ++++++---
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.h      |   2 +
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |  38 ++-
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |  15 +
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.c      |  54 +++-
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.h      |   9 +
+>  drivers/gpu/drm/mediatek/mtk_dsi.c          | 429 ++++++++++++++++++++++++----
+>  drivers/gpu/drm/mediatek/mtk_mipi_tx.c      |  70 +++--
+>  11 files changed, 715 insertions(+), 166 deletions(-)
+> 
