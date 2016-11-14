@@ -1,55 +1,62 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 14 Nov 2016 10:41:29 -0800
-Subject: [PATCHv2 5/6] arm64: Use __pa_symbol for _end
-In-Reply-To: <20161114181937.GG3096@e104818-lin.cambridge.arm.com>
-References: <20161102210054.16621-1-labbott@redhat.com>
- <20161102210054.16621-6-labbott@redhat.com>
- <20161102225241.GA19591@remoulade>
- <3724ea58-3c04-1248-8359-e2927da03aaf@redhat.com>
- <20161103155106.GF25852@remoulade>
- <20161114181937.GG3096@e104818-lin.cambridge.arm.com>
-Message-ID: <06569a6b-3846-5e18-28c1-7c16a9697663@redhat.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 14 Nov 2016 19:44:38 +0100
+Subject: [GIT PULL] ARM: at91: drivers for 4.10
+Message-ID: <20161114184438.k5ysd6pgcadlo5vw@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2016 10:19 AM, Catalin Marinas wrote:
-> On Thu, Nov 03, 2016 at 03:51:07PM +0000, Mark Rutland wrote:
->> On Wed, Nov 02, 2016 at 05:56:42PM -0600, Laura Abbott wrote:
->>> On 11/02/2016 04:52 PM, Mark Rutland wrote:
->>>> On Wed, Nov 02, 2016 at 03:00:53PM -0600, Laura Abbott wrote:
->>>>>
->>>>> __pa_symbol is technically the marco that should be used for kernel
->>>>> symbols. Switch to this as a pre-requisite for DEBUG_VIRTUAL.
->>>>
->>>> Nit: s/marco/macro/
->>>>
->>>> I see there are some other uses of __pa() that look like they could/should be
->>>> __pa_symbol(), e.g. in mark_rodata_ro().
->>>>
->>>> I guess strictly speaking those need to be updated to? Or is there a reason
->>>> that we should not?
->>>
->>> If the concept of __pa_symbol is okay then yes I think all uses of __pa
->>> should eventually be converted for consistency and debugging.
->>
->> I have no strong feelings either way about __pa_symbol(); I'm not clear on what
->> the purpose of __pa_symbol() is specifically, but I'm happy even if it's just
->> for consistency with other architectures.
-> 
-> At a quick grep, it seems to only be used by mips and x86 and a single
-> place in mm/memblock.c.
-> 
-> Since we haven't seen any issues on arm/arm64 without this macro, can we
-> not just continue to use __pa()?
+Hi Arnd, Olof
 
-Technically yes but if it's introduced it may be confusing why it's being
-used some places but not others. Maybe the bounds in the debug virtual check
-should just be adjusted so we don't need __pa_symbol along with a nice fat
-comment explaining why. 
+A few fixes for the memory drivers and the support for the Secure SRAM
+found on sama5d2.
 
-> 
-> Thanks.
-> 
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
-Thanks,
-Laura
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.10-drivers
+
+for you to fetch changes up to 2ae2e28852f21ec9efc527c1f3ecc5f7c7e27e42:
+
+  misc: sram: add Atmel securam support (2016-11-07 23:43:28 +0100)
+
+----------------------------------------------------------------
+Drivers for 4.10:
+
+ - few fixes for the memory drivers
+ - minimal security module driver
+ - support for the Secure SRAM
+
+----------------------------------------------------------------
+Alexandre Belloni (4):
+      Documentation: dt: atmel-at91: Document secumod bindings
+      ARM: at91: add secumod register definitions
+      misc: sram: document new compatible
+      misc: sram: add Atmel securam support
+
+Wei Yongjun (2):
+      memory: atmel-ebi: fix return value check in at91_ebi_dev_disable()
+      memory: atmel-sdramc: use builtin_platform_driver to simplify the code
+
+ .../devicetree/bindings/arm/atmel-at91.txt         | 16 +++++++++
+ Documentation/devicetree/bindings/sram/sram.txt    |  2 +-
+ drivers/memory/atmel-ebi.c                         |  2 +-
+ drivers/memory/atmel-sdramc.c                      |  6 +---
+ drivers/misc/sram.c                                | 42 ++++++++++++++++++----
+ include/soc/at91/atmel-secumod.h                   | 19 ++++++++++
+ 6 files changed, 73 insertions(+), 14 deletions(-)
+ create mode 100644 include/soc/at91/atmel-secumod.h
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161114/287d05f1/attachment-0001.sig>
