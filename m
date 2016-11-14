@@ -1,8 +1,8 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 14 Nov 2016 15:44:09 +0000
-Subject: [PATCH] ARM: dts: imx6q: replace gpio-key,
- wakeup with wakeup-source for Utilite Pro
-Message-ID: <1479138250-17780-3-git-send-email-sudeep.holla@arm.com>
+Date: Mon, 14 Nov 2016 15:44:08 +0000
+Subject: [PATCH] ARM: dts: at91: replace gpio-key,
+ wakeup with wakeup-source for sam9260ek
+Message-ID: <1479138250-17780-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,13 +15,13 @@ This patch replaces the legacy "gpio-key,wakeup" with the unified
 "wakeup-source" property in order to avoid any further copy-paste
 duplication.
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm/boot/dts/imx6q-utilite-pro.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/at91sam9260ek.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 Hi,
 
@@ -32,18 +32,26 @@ now found again in few places. Just get rid of them *again*
 Regards,
 Sudeep
 
-diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
-index 61990630a748..104bbe710927 100644
---- a/arch/arm/boot/dts/imx6q-utilite-pro.dts
-+++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
-@@ -68,7 +68,7 @@
- 			label = "Power Button";
- 			gpios = <&gpio1 29 GPIO_ACTIVE_LOW>;
- 			linux,code = <KEY_POWER>;
+diff --git a/arch/arm/boot/dts/at91sam9260ek.dts b/arch/arm/boot/dts/at91sam9260ek.dts
+index 2c87f58448e7..b2578feceb08 100644
+--- a/arch/arm/boot/dts/at91sam9260ek.dts
++++ b/arch/arm/boot/dts/at91sam9260ek.dts
+@@ -174,14 +174,14 @@
+ 			label = "Button 3";
+ 			gpios = <&pioA 30 GPIO_ACTIVE_LOW>;
+ 			linux,code = <0x103>;
+-			gpio-key,wakeup;
++			wakeup-source;
+ 		};
+
+ 		btn4 {
+ 			label = "Button 4";
+ 			gpios = <&pioA 31 GPIO_ACTIVE_LOW>;
+ 			linux,code = <0x104>;
 -			gpio-key,wakeup;
 +			wakeup-source;
  		};
  	};
- };
+
 --
 2.7.4
