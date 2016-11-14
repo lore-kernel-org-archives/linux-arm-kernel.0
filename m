@@ -1,27 +1,68 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 14 Nov 2016 16:27:36 +0100
-Subject: [PATCH v2 2/9] arm64: dts: rockchip: add pd_sd power node for
- rk3399
-In-Reply-To: <1478697721-2323-3-git-send-email-wxt@rock-chips.com>
-References: <1478697721-2323-1-git-send-email-wxt@rock-chips.com>
- <1478697721-2323-3-git-send-email-wxt@rock-chips.com>
-Message-ID: <2695010.6OLKZbY9jg@phil>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 14 Nov 2016 16:31:24 +0100
+Subject: [PATCH RESEND] spi: atmel: Fix scheduling while atomic
+In-Reply-To: <1479136400-10285-1-git-send-email-ben.whitten@lairdtech.com>
+References: <1479136400-10285-1-git-send-email-ben.whitten@lairdtech.com>
+Message-ID: <20161114153124.tjbtmsoyh32zd3pr@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 9. November 2016, 21:21:54 CET schrieb Caesar Wang:
-> From: zhangqing <zhangqing@rock-chips.com>
+On 14/11/2016 at 15:13:20 +0000, Ben Whitten wrote :
+> A call to clk_get_rate appears to be called in the context of an interrupt,
+> cache the bus clock for the frequency calculations in transmission.
 > 
-> 1.add pd node for RK3399 Soc
-> 2.create power domain tree
-> 3.add qos node for domain
-> 4.add the pd_sd consumers node
+> This fixes a 'BUG: scheduling while atomic' and
+> 'WARNING: CPU: 0 PID: 777 at kernel/sched/core.c:2960 atmel_spi_unlock'
 > 
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Signed-off-by: Ben Whitten <ben.whitten@lairdtech.com>
+> Signed-off-by: Steve deRosier <steve.derosier@lairdtech.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Applied to my dts64 branch after some tweaks to patch subject and commit 
-message.
+> ---
+> 
+> Resending due to missing off the subsystem maintainer in initial submission,
+> pointed out by Alexandre Belloni, thanks.
+> 
+> ---
+>  drivers/spi/spi-atmel.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index 8feac59..c281d1a 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+> @@ -295,6 +295,7 @@ struct atmel_spi {
+>  	int			irq;
+>  	struct clk		*clk;
+>  	struct platform_device	*pdev;
+> +	unsigned long		spi_clk;
+>  
+>  	struct spi_transfer	*current_transfer;
+>  	int			current_remaining_bytes;
+> @@ -864,7 +865,7 @@ static int atmel_spi_set_xfer_speed(struct atmel_spi *as,
+>  	unsigned long		bus_hz;
+>  
+>  	/* v1 chips start out at half the peripheral bus speed. */
+> -	bus_hz = clk_get_rate(as->clk);
+> +	bus_hz = as->spi_clk;
+>  	if (!atmel_spi_is_v2(as))
+>  		bus_hz /= 2;
+>  
+> @@ -1606,6 +1607,9 @@ static int atmel_spi_probe(struct platform_device *pdev)
+>  	ret = clk_prepare_enable(clk);
+>  	if (ret)
+>  		goto out_free_irq;
+> +
+> +	as->spi_clk = clk_get_rate(clk);
+> +
+>  	spi_writel(as, CR, SPI_BIT(SWRST));
+>  	spi_writel(as, CR, SPI_BIT(SWRST)); /* AT91SAM9263 Rev B workaround */
+>  	if (as->caps.has_wdrbt) {
+> -- 
+> 2.7.4
+> 
 
-Thanks
-Heiko
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
