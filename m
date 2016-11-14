@@ -1,62 +1,117 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 14 Nov 2016 19:44:38 +0100
-Subject: [GIT PULL] ARM: at91: drivers for 4.10
-Message-ID: <20161114184438.k5ysd6pgcadlo5vw@piout.net>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 14 Nov 2016 10:45:29 -0800
+Subject: [PATCH RFC] mm: Add debug_virt_to_phys()
+In-Reply-To: <20161112004449.30566-1-f.fainelli@gmail.com>
+References: <20161112004449.30566-1-f.fainelli@gmail.com>
+Message-ID: <aee5072c-4e09-547e-2f58-7b2106bced3c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof
+On 11/11/2016 04:44 PM, Florian Fainelli wrote:
+> When CONFIG_DEBUG_VM is turned on, virt_to_phys() maps to
+> debug_virt_to_phys() which helps catch vmalloc space addresses being
+> passed. This is helpful in debugging bogus drivers that just assume
+> linear mappings all over the place.
+> 
+> For ARM, ARM64, Unicore32 and Microblaze, the architectures define
+> __virt_to_phys() as being the functional implementation of the address
+> translation, so we special case the debug stub to call into
+> __virt_to_phys directly.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  arch/arm/include/asm/memory.h      |  4 ++++
+>  arch/arm64/include/asm/memory.h    |  4 ++++
+>  include/asm-generic/memory_model.h |  4 ++++
+>  mm/debug.c                         | 15 +++++++++++++++
+>  4 files changed, 27 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index 76cbd9c674df..448dec9b8b00 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -260,11 +260,15 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+>   * translation for translating DMA addresses.  Use the driver
+>   * DMA support - see dma-mapping.h.
+>   */
+> +#ifndef CONFIG_DEBUG_VM
+>  #define virt_to_phys virt_to_phys
+>  static inline phys_addr_t virt_to_phys(const volatile void *x)
+>  {
+>  	return __virt_to_phys((unsigned long)(x));
+>  }
+> +#else
+> +#define virt_to_phys debug_virt_to_phys
+> +#endif
+>  
+>  #define phys_to_virt phys_to_virt
+>  static inline void *phys_to_virt(phys_addr_t x)
+> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> index b71086d25195..c9e436b28523 100644
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -186,11 +186,15 @@ extern u64			kimage_voffset;
+>   * translation for translating DMA addresses.  Use the driver
+>   * DMA support - see dma-mapping.h.
+>   */
+> +#ifndef CONFIG_DEBUG_VM
+>  #define virt_to_phys virt_to_phys
+>  static inline phys_addr_t virt_to_phys(const volatile void *x)
+>  {
+>  	return __virt_to_phys((unsigned long)(x));
+>  }
+> +#else
+> +#define virt_to_phys debug_virt_to_phys
+> +#endif
+>  
+>  #define phys_to_virt phys_to_virt
+>  static inline void *phys_to_virt(phys_addr_t x)
+> diff --git a/include/asm-generic/memory_model.h b/include/asm-generic/memory_model.h
+> index 5148150cc80b..426085757258 100644
+> --- a/include/asm-generic/memory_model.h
+> +++ b/include/asm-generic/memory_model.h
+> @@ -80,6 +80,10 @@
+>  #define page_to_pfn __page_to_pfn
+>  #define pfn_to_page __pfn_to_page
+>  
+> +#ifdef CONFIG_DEBUG_VM
+> +unsigned long debug_virt_to_phys(volatile void *address);
+> +#endif /* CONFIG_DEBUG_VM */
+> +
+>  #endif /* __ASSEMBLY__ */
+>  
+>  #endif
+> diff --git a/mm/debug.c b/mm/debug.c
+> index 9feb699c5d25..72b2ca9b11f4 100644
+> --- a/mm/debug.c
+> +++ b/mm/debug.c
+> @@ -161,4 +161,19 @@ void dump_mm(const struct mm_struct *mm)
+>  	);
+>  }
+>  
+> +#include <asm/memory.h>
+> +#include <linux/mm.h>
+> +
+> +unsigned long debug_virt_to_phys(volatile void *address)
+> +{
+> +	BUG_ON(is_vmalloc_addr((const void *)address));
+> +#if defined(CONFIG_ARM) || defined(CONFIG_ARM64) || defined(CONFIG_UNICORE32) || \
+> +	defined(CONFIG_MICROBLAZE)
+> +	return __virt_to_phys(address);
+> +#else
+> +	return virt_to_phys(address);
+> +#endif
+> +}
+> +EXPORT_SYMBOL(debug_virt_to_phys);
+> +
+>  #endif		/* CONFIG_DEBUG_VM */
+> 
 
-A few fixes for the memory drivers and the support for the Secure SRAM
-found on sama5d2.
+is_vmalloc_addr is necessary but not sufficient. This misses
+cases like module addresses. The x86 version (CONFIG_DEBUG_VIRTUAL)
+bounds checks against the known linear map to catch all cases.
+I'm for a generic approach to this if it can catch all cases
+that an architecture specific version would catch.
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.10-drivers
-
-for you to fetch changes up to 2ae2e28852f21ec9efc527c1f3ecc5f7c7e27e42:
-
-  misc: sram: add Atmel securam support (2016-11-07 23:43:28 +0100)
-
-----------------------------------------------------------------
-Drivers for 4.10:
-
- - few fixes for the memory drivers
- - minimal security module driver
- - support for the Secure SRAM
-
-----------------------------------------------------------------
-Alexandre Belloni (4):
-      Documentation: dt: atmel-at91: Document secumod bindings
-      ARM: at91: add secumod register definitions
-      misc: sram: document new compatible
-      misc: sram: add Atmel securam support
-
-Wei Yongjun (2):
-      memory: atmel-ebi: fix return value check in at91_ebi_dev_disable()
-      memory: atmel-sdramc: use builtin_platform_driver to simplify the code
-
- .../devicetree/bindings/arm/atmel-at91.txt         | 16 +++++++++
- Documentation/devicetree/bindings/sram/sram.txt    |  2 +-
- drivers/memory/atmel-ebi.c                         |  2 +-
- drivers/memory/atmel-sdramc.c                      |  6 +---
- drivers/misc/sram.c                                | 42 ++++++++++++++++++----
- include/soc/at91/atmel-secumod.h                   | 19 ++++++++++
- 6 files changed, 73 insertions(+), 14 deletions(-)
- create mode 100644 include/soc/at91/atmel-secumod.h
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161114/287d05f1/attachment-0001.sig>
+Thanks,
+Laura
