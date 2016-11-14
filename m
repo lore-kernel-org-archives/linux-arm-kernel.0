@@ -1,72 +1,49 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Mon, 14 Nov 2016 05:59:01 +0000
-Subject: [PATCH v2 1/3] ARM: imx6ull: add imx6ull support
-In-Reply-To: <20161114054833.GG3310@dragon>
-References: <1478584614-12054-1-git-send-email-peter.chen@nxp.com>
- <1478584614-12054-2-git-send-email-peter.chen@nxp.com>
- <20161114054833.GG3310@dragon>
-Message-ID: <HE1PR04MB14509BFD0CBA838BC1EA7D598BBC0@HE1PR04MB1450.eurprd04.prod.outlook.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Mon, 14 Nov 2016 11:28:34 +0530
+Subject: [PATCH v2 1/2] arm64: dts: Add level for cpu dt node for exynos7
+In-Reply-To: <CAJKOXPc5aJi9nVv4rd3pB_dkkoJWUjmkEyXF2Kxtp+6Y7VZdWg@mail.gmail.com>
+References: <1478945832-1826-1-git-send-email-alim.akhtar@samsung.com>
+ <8a63bfe0-b23c-3583-6e5e-c17fe412e34d@osg.samsung.com>
+ <CAGOxZ50Ttd1hP0x+Z527wc7mLLpz+Dom0TXFk08+mL0vnaxWwA@mail.gmail.com>
+ <CGME20161112191322epcas2p2a32e062f978b5a59b5ba22aa920ccd0c@epcas2p2.samsung.com>
+ <CAJKOXPc5aJi9nVv4rd3pB_dkkoJWUjmkEyXF2Kxtp+6Y7VZdWg@mail.gmail.com>
+Message-ID: <5829528A.5070307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Krzysztof,
 
-
-Best regards,
-Peter Chen
-
-
->-----Original Message-----
->From: Shawn Guo [mailto:shawnguo at kernel.org]
->Sent: Monday, November 14, 2016 1:49 PM
->To: Peter Chen <peter.chen@nxp.com>
->Cc: sboyd at codeaurora.org; mturquette at baylibre.com; linux-arm-
->kernel at lists.infradead.org; kernel at pengutronix.de; devicetree at vger.kernel.org;
->robh+dt at kernel.org; Fabio Estevam <fabio.estevam@nxp.com>;
->mark.rutland at arm.com; linux-clk at vger.kernel.org
->Subject: Re: [PATCH v2 1/3] ARM: imx6ull: add imx6ull support
->
->On Tue, Nov 08, 2016 at 01:56:52PM +0800, Peter Chen wrote:
->> It is the 10th processor in the well-known imx6 series, and derived
->> from imx6ul but cost optimized. The more information about imx6ull can
->> be found at:
+On 11/13/2016 12:43 AM, Krzysztof Kozlowski wrote:
+> On Sat, Nov 12, 2016 at 6:00 PM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
+>> Hi Javier,
 >>
->> http://www.nxp.com/products/microcontrollers-and-processors/
->> arm-processors/i.mx-applications-processors/i.mx-6-processors
->> /i.mx6qp/i.mx-6ull-single-core-processor-with-arm-cortex-a7-core
->> :i.MX6ULL
+>> On Sat, Nov 12, 2016 at 7:54 PM, Javier Martinez Canillas
+>> <javier@osg.samsung.com> wrote:
+>>> Hello Alim,
+>>>
+>>> On 11/12/2016 07:17 AM, Alim Akhtar wrote:
+>>>> This patch adds level for cpu dt node, so that these levels can be used
+>>>
+>>> Do you mean s/level/label here? I'm asking because you are using level
+>>> consistently in the subject line and commit message but I'm not sure
+>>> what it means in this context.
+>>>
 >>
->> In this patch, for SoC part, the imx6ull.dtsi includes imx6ul.dtsi;
->> for board part (imx6ul/imx6ull 14x14 evk), it has a common board file
->> imx6u-14x14-evk.dtsi, and this file is included by both
->> imx6ul-14x14-evk.dts and imx6ull-14x14-evk.dts.
->>
->> Signed-off-by: Peter Chen <peter.chen@nxp.com>
->> ---
->>  arch/arm/boot/dts/Makefile              |   3 +-
->>  arch/arm/boot/dts/imx6u-14x14-evk.dtsi  | 487
->> ++++++++++++++++++++++++++++++++
->> arch/arm/boot/dts/imx6ul-14x14-evk.dts  | 479
->> +------------------------------
+>> Ah!! my bad. Its __label__. If required, will respin.
+>> Thanks for review.
 >
->What's the real change between imx6u-14x14-evk.dtsi and imx6ul-14x14-evk.dts?
->Instead of renaming the file, I would like to have imx6ull-14x14-evk.dts include
->imx6ul-14x14-evk.dts directly, if we can work out the difference within imx6ull-
->14x14-evk.dts.
+> I think there is no need of respin because this should be squashed
+> with previous patch. This is quite small and there are no functional
+> changes here (labels are transparent, except of course conflict
+> cases). Without the 2/2,  this patch does not have much sense yet.
 >
+The reason why I kept the _label_ changes are separate patch is to keep 
+git bisect happy. If you think there won't be a case for that, then lets 
+merge the two in single patch.
+Let me know if you want me to respin or you will take care.
 
-The main difference is compatible string, I can't include two compatible strings in one dts file,
-the dts build will fail for that.
-
-imx6ull-14x14-evk.dts 
-/ {
-        model = "Freescale i.MX6 UlltraLite 14x14 EVK Board";
-        compatible = "fsl,imx6ull-14x14-evk", "fsl,imx6ull";
-};
-
-imx6ul-14x14-evk.dts 
-/ {
-        model = "Freescale i.MX6 UltraLite 14x14 EVK Board";
-        compatible = "fsl,imx6ul-14x14-evk", "fsl,imx6ul";
-};
-
-Peter
+> Best regards,
+> Krzysztof
+>
+>
+>
