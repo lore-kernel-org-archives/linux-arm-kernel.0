@@ -1,170 +1,35 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 14 Nov 2016 11:51:15 +0100
-Subject: [PATCH v2 7/7] soc: renesas: Identify SoC and register with the
- SoC bus
-In-Reply-To: <25057157.YlGi2v6RrE@wuerfel>
-References: <1477913455-5314-1-git-send-email-geert+renesas@glider.be>
- <3693445.TSdZGaiT9S@wuerfel>
- <CAMuHMdX+T=Y--F6KXZwFmZwWFdfP5mL5Tar-wKwRM2p6Hh2-sg@mail.gmail.com>
- <25057157.YlGi2v6RrE@wuerfel>
-Message-ID: <CAMuHMdWavRFnYFmiL2jy3KWZnHG_F8qaxK29zHx6fsLmqXEwiA@mail.gmail.com>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Mon, 14 Nov 2016 16:24:41 +0530
+Subject: [PATCH 0/5] net: thunderx: Miscellaneous fixes 
+Message-ID: <1479120886-13425-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+From: Sunil Goutham <sgoutham@cavium.com>
 
-On Thu, Nov 10, 2016 at 12:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday, November 10, 2016 11:19:20 AM CET Geert Uytterhoeven wrote:
->> On Wed, Nov 9, 2016 at 5:55 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Monday, October 31, 2016 12:30:55 PM CET Geert Uytterhoeven wrote:
->> >> v2:
->> >>   - Drop SoC families and family names; use fixed "Renesas" instead,
->> >
->> > I think I'd rather have seen the family names left in there, but it's
->> > not important, so up to you.
->>
->> They're not useful for matching, as family names may change anytime, and don't
->> always say much about the hardware capabilities.
->> E.g. SH-Mobile -> R-Mobile -> R-Car | RZ/A | RZ/G
->> Some SH-Mobile (even some R-Car) parts are SuperH only, others have ARM and
->> SuperH.
->>
->> At least the SoC part numbers are stable (hmm, sh73a0 == r8a73a0).
->
-> I think the marketing names are much more useful for humans looking
-> at the sysfs files than the kernel doing matching on, but both use
-> cases are important.
+This patchset includes fixes for incorrect LMAC credits,
+unreliable driver statistics, memory leak upon interface
+down e.t.c
 
-OK, I'll re-add the family names for humans reading sysfs.
+Radha Mohan Chintakuntla (1):
+  net: thunderx: Introduce BGX_ID_MASK macro to extract bgx_id
 
->> >>   - Use "renesas,prr" and "renesas,cccr" device nodes in DT if
->> >>     available, else fall back to hardcoded addresses for compatibility
->> >>     with existing DTBs,
+Sunil Goutham (4):
+  net: thunderx: Program LMAC credits based on MTU
+  net: thunderx: Fix configuration of L3/L4 length checking
+  net: thunderx: Fix VF driver's interface statistics
+  net: thunderx: Fix memory leak and other issues upon interface toggle
 
->> > It does seem wrong to have a device node for a specific register though.
->> > Shouldn't the node be for the block of registers that these are inside
->> > of?
->>
->> On R-Mobile APE6, R-Car Gen2 and Gen3, PRR is a lone register.
->> On R-Car Gen1, it's not even documented (and doesn't exist on all parts).
->
-> It just seems odd to have it at address 0xff000044 when all the other
-> devices are at page-aligned addresses. Do you mean that accessing
-> 0xff000040 or 0xff000048 will result in a bus-level exception for a
-> missing register and just 0xff000044 is actually valid for access,
-> or is it just the only thing that is documented?
+ drivers/net/ethernet/cavium/thunder/nic.h          |  64 +++++----
+ drivers/net/ethernet/cavium/thunder/nic_main.c     |  37 +++--
+ drivers/net/ethernet/cavium/thunder/nic_reg.h      |   1 +
+ .../net/ethernet/cavium/thunder/nicvf_ethtool.c    | 105 +++++++-------
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 153 +++++++++++----------
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 118 +++++++++-------
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.h |  24 +---
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |   4 +-
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h  |   2 +
+ 9 files changed, 274 insertions(+), 234 deletions(-)
 
-For PRR, all other registers in the page read as all zeroes on all SoCs that
-have it. So it really is a lone register.
-
->> On SH-Mobile/R-Mobile, CCCR may be part of the HPB/APB register block, which
->> we further don't touch at all.
->> On R-Car Gen2, it's not documented, but does exist.
->
-> This is where the family names would come in handy ;-) I now have
-> no idea which chip(s) you are referring to.
-
-SH/R-Mobile are r8a7740, r8a73a4, sh73a0.
-R-Car Gen2 are r8a779[0-4].
-
-> If you know the name of the register block, just put it into DT with
-> that name. The driver can trivially add the right offset.
-
-CCCR is different. The amount of registers that read as non-zero depends a lot
-on the actual SoC.
-
-HPB/APB is gonna need real DT bindings, which needs some more investigation.
-Hence if you don't mind, I'd like to postpone that part, which only affects
-the older SoCs. And I'll drop the "renesas,cccr" binding.
-
-For now, having revision detection for R-Car Gen3 (r8a779[56]) using PRR is
-most urgent, as several drivers (e.g. HDMI, Ethernet, clocks, pinctrl) are
-waiting for this support. So I'd like to have that dependency in v4.10.
-
->> >>   - Don't register the SoC bus if the chip ID register is missing,
->> >
->> > Why? My objection was to hardcoding the register, not to registering
->> > the device? I think I'd rather see the device registered with an
->> > empty revision string.
->>
->> If there's no chip ID register, there's no reason to use soc_device_match(),
->> as we can always look at a compatible value. All SoCs listed in this driver
->> have a chip ID register.
->
-> But you may still have user space tools looking into sysfs, e.g. to
-> figure out how to install a kernel that the boot loader can find,
-> or which hardware specific distro packages to install.
->
->> if you want me to register the soc_bus for  those SoCs regardless, I want to
->> re-add r7s72100 (RZ/A) and r8a7778 (R-Car M1A), who don't have chip ID
->> registers ;-)
->
-> Right. Just don't encode too much knowledge about the SoCs into the
-> driver, so we are prepared for adding new ones: We should still look
-> for the registers in DT on all chips.
-
-OK, will re-add.
-
->> >> +static int __init renesas_soc_init(void)
->> >> +{
->> >> +       struct soc_device_attribute *soc_dev_attr;
->> >> +       const struct of_device_id *match;
->> >> +       void __iomem *chipid = NULL;
->> >> +       struct soc_device *soc_dev;
->> >> +       struct device_node *np;
->> >> +       unsigned int product;
->> >> +
->> >> +       np = of_find_matching_node_and_match(NULL, renesas_socs, &match);
->> >> +       if (!np)
->> >> +               return -ENODEV;
->> >> +
->> >> +       of_node_put(np);
->> >> +
->> >> +       /* Try PRR first, then CCCR, then hardcoded fallback */
->> >> +       np = of_find_compatible_node(NULL, NULL, "renesas,prr");
->> >> +       if (!np)
->> >> +               np = of_find_compatible_node(NULL, NULL, "renesas,cccr");
->> >> +       if (np) {
->> >> +               chipid = of_iomap(np, 0);
->> >> +               of_node_put(np);
->> >> +       } else if (match->data) {
->> >> +               chipid = ioremap((uintptr_t)match->data, 4);
->> >> +       }
->> >> +       if (!chipid)
->> >>
->> >
->> > Here, I'd turn the order around and look for the DT nodes of the
->> > devices first. Only if they are not found, look at the compatible
->> > string of the root node. No need to search for a node though,
->> > you know which one it is when you look for a compatible =
->> > "renesas,r8a73a4".
->>
->> "renesas,r8a73a4" is the root node, not the device, so it does not have the
->> "reg" property for reading the chip ID?
->
-> I mean replace of_find_matching_node_and_match() with
-> of_match_node(renesas_socs, of_root).
->
-> It does the same thing, just more efficiently.
-
-OK (didn't know "of_root" was available for public use ;-)
-
->> There is no SoC part number in the "renesas,prr" and "renesas,cccr" nodes.
->> Hence I always need to look at the root nodes.
->
-> Not sure what that would protect you from. Could you have a renesas,cccr
-
-Looks like you forgot to finish your sentence?
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+2.7.4
