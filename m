@@ -1,57 +1,120 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 14 Nov 2016 16:32:45 +0100
-Subject: [PATCH 1/2] pinctrl: bcm2835: Fix ints for GPIOs 28-31 & 46-53
-In-Reply-To: <1479126206-20482-1-git-send-email-linus.walleij@linaro.org>
-References: <1479126206-20482-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <427a3d44-16aa-258c-8722-48d9c7ffb593@i2se.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Nov 2016 15:36:30 +0000
+Subject: [PATCH RFC 3/2] ARM: improve arch_irq_work_has_interrupt()
+In-Reply-To: <E1c6GpW-0008DO-BD@rmk-PC.armlinux.org.uk>
+References: <E1c6GpW-0008DO-BD@rmk-PC.armlinux.org.uk>
+Message-ID: <20161114153630.GN1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Following on from the previous patch, I think this makes more sense to
+determine whether we can support IRQ work interrupts.
 
-Am 14.11.2016 um 13:23 schrieb Linus Walleij:
-> From: Phil Elwell <phil@raspberrypi.org>
->
-> Contrary to the documentation, the BCM2835 GPIO controller actually
-> has four interrupt lines - one each for the three IRQ groups and one
-> common. Confusingly, the GPIO interrupt groups don't correspond
-> directly with the GPIO control banks. Instead, GPIOs 0-27 generate IRQ
-> GPIO0, 28-45 IRQ GPIO1 and 46-53 IRQ GPIO2.
->
-> Awkwardly, the GPIOs for IRQ GPIO1 straddle two 32-entry GPIO banks,
-> so split out a function to process the interrupts for a single GPIO
-> bank.
->
-> Cc: Stefan Wahren <stefan.wahren@i2se.com>
-> Cc: Eric Anholt <eric@anholt.net>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> I want to apply this to cater for my GPIOLIB_IRQCHIP
-> refactorings.
-> ---
->  drivers/pinctrl/bcm/pinctrl-bcm2835.c | 51 ++++++++++++++++++++++++++---------
->  1 file changed, 39 insertions(+), 12 deletions(-)
->
-> diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-> index b2dd278f18b1..1d8fc104e26b 100644
-> --- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-> +++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
->
-...
-> @@ -1076,6 +1102,7 @@ static struct platform_driver bcm2835_pinctrl_driver = {
->  	.remove = bcm2835_pinctrl_remove,
->  	.driver = {
->  		.name = MODULE_NAME,
-> +		.owner = THIS_MODULE,
+Whether we can support them or not depends on two things:
 
-this is unnecessary. Please remove it.
+(a) whether the kernel has support for receiving IPIs
+(b) whether it's possible to send an IPI to CPUs including the raising CPU.
 
-Thanks for submitting these patches
+(a) is a function of how the kernel is built - and in the case of ARM, it
+depends whether the kernel is built with SMP enabled or not.
+(b) is a property of the interrupt controller.
 
-Stefan
+It hasn't ever been a function of the CPU or architecture.
 
->  		.of_match_table = bcm2835_pinctrl_match,
->  	},
->  };
+Commit 059e232089e4 ("irqchip/gic: Allow self-SGIs for SMP on UP
+configurations") changes the GIC IPI code such that we can raise
+SGIs on uniprocessor systems running on a SMP kernel, which means
+we can support IRQ work interrupts here as well.
+
+So, we shouldn't be using cpu_smp() (or its previous is_smp() here
+at all.  Use a flag to indicate whether we can IPI and use that to
+indicate whether we support irq work interrupts.
+
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+--- 
+ arch/arm/include/asm/irq_work.h | 11 +++++++++--
+ arch/arm/kernel/irq.c           |  0
+ arch/arm/kernel/smp.c           |  3 +++
+ drivers/irqchip/irq-gic.c       | 17 +++++++++++++----
+ 4 files changed, 25 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/include/asm/irq_work.h b/arch/arm/include/asm/irq_work.h
+index 2dc8d7995b48..d7262a3c2f2e 100644
+--- a/arch/arm/include/asm/irq_work.h
++++ b/arch/arm/include/asm/irq_work.h
+@@ -1,11 +1,18 @@
+ #ifndef __ASM_ARM_IRQ_WORK_H
+ #define __ASM_ARM_IRQ_WORK_H
+ 
+-#include <asm/smp_plat.h>
++extern bool irq_controller_can_ipi;
++#define irq_controller_can_ipi irq_controller_can_ipi
+ 
+ static inline bool arch_irq_work_has_interrupt(void)
+ {
+-	return cpu_smp();
++#ifdef CONFIG_SMP
++	/* This depends on the IRQ controller */
++	return irq_controller_can_ipi;
++#else
++	/* The kernel is not built to support IPIs */
++	return false;
++#endif
+ }
+ 
+ #endif /* _ASM_ARM_IRQ_WORK_H */
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 7dd14e8395e6..1fa9412cc4aa 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -473,6 +473,9 @@ void __init set_smp_cross_call(void (*fn)(const struct cpumask *, unsigned int))
+ 		__smp_cross_call = fn;
+ }
+ 
++/* This indicates whether the IRQ controller can IPI (including self-IPI) */
++bool irq_controller_can_ipi;
++
+ static const char *ipi_types[NR_IPI] __tracepoint_string = {
+ #define S(x,s)	[x] = s
+ 	S(IPI_WAKEUP, "CPU wakeup interrupts"),
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index d6c404b3584d..abe8d5807c0f 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -1187,9 +1187,6 @@ static int __init __gic_init_bases(struct gic_chip_data *gic,
+ 		 */
+ 		for (i = 0; i < NR_GIC_CPU_IF; i++)
+ 			gic_cpu_map[i] = 0xff;
+-#ifdef CONFIG_SMP
+-		set_smp_cross_call(gic_raise_softirq);
+-#endif
+ 		cpuhp_setup_state_nocalls(CPUHP_AP_IRQ_GIC_STARTING,
+ 					  "AP_IRQ_GIC_STARTING",
+ 					  gic_starting_cpu, NULL);
+@@ -1207,8 +1204,20 @@ static int __init __gic_init_bases(struct gic_chip_data *gic,
+ 	}
+ 
+ 	ret = gic_init_bases(gic, irq_start, handle);
+-	if (ret)
++	if (ret) {
+ 		kfree(name);
++		return ret;
++	}
++
++	if (gic == &gic_data[0]) {
++#ifdef CONFIG_SMP
++		set_smp_cross_call(gic_raise_softirq);
++#ifdef irq_controller_can_ipi
++		if (nr_cpu_ids == 1 || hweight8(gic_cpu_map[0]) == 1)
++			irq_controller_can_ipi = true;
++#endif
++#endif
++	}
+ 
+ 	return ret;
+ }
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
+according to speedtest.net.
