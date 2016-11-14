@@ -1,34 +1,119 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 14 Nov 2016 17:04:56 +0100
-Subject: [PATCH] ARM: dts: at91: replace gpio-key,wakeup with
- wakeup-source for sam9260ek
-In-Reply-To: <1479138250-17780-2-git-send-email-sudeep.holla@arm.com>
-References: <1479138250-17780-2-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20161114160456.xzp3sxwkvl6vmu7l@piout.net>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 14 Nov 2016 17:05:54 +0100
+Subject: [PATCH v2 3/9] arm64: dts: rockchip: add VOP and VOP iommu node
+ for rk3399
+In-Reply-To: <1478697721-2323-4-git-send-email-wxt@rock-chips.com>
+References: <1478697721-2323-1-git-send-email-wxt@rock-chips.com>
+ <1478697721-2323-4-git-send-email-wxt@rock-chips.com>
+Message-ID: <10151352.zSDKCnp23A@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/11/2016 at 15:44:08 +0000, Sudeep Holla wrote :
-> Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
-> check for/support the legacy "gpio-key,wakeup" boolean property to
-> enable gpio buttons as wakeup source, "wakeup-source" is the new
-> standard binding.
+Am Mittwoch, 9. November 2016, 21:21:55 CET schrieb Caesar Wang:
+> From: Mark Yao <mark.yao@rock-chips.com>
 > 
-> This patch replaces the legacy "gpio-key,wakeup" with the unified
-> "wakeup-source" property in order to avoid any further copy-paste
-> duplication.
+> Add the core display-subsystem node and the two display controllers
+> available on the rk3399.
 > 
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 > ---
->  arch/arm/boot/dts/at91sam9260ek.dts | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-Applied, thanks.
+> Changes in v2: None
+> 
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 58
+> ++++++++++++++++++++++++++++++++ 1 file changed, 58 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index e5b5b3d..f1d289a 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -1290,6 +1290,64 @@
+>  		status = "disabled";
+>  	};
+> 
+> +	vopl: vop at ff8f0000 {
+> +		compatible = "rockchip,rk3399-vop-lit";
+> +		reg = <0x0 0xff8f0000 0x0 0x3efc>;
+> +		interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>;
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+we're usig 4 irq elements nowadays to accomodate the pmus for separate
+clusters, see 
+
+https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?id=210bbd38bb88989ce19208f98e530ff0468f38bd
+
+Same for the edp node.
+
+Also, sadly the rockchip drm seems to need some tweaks still, as I wasn't
+able to get any display output yet.
+
+To make the vop at least compile I needed to forward-port
+https://github.com/mmind/linux-rockchip/commit/05ad856e54fc1aa1939ad1057897036cedc7fb0b
+https://github.com/mmind/linux-rockchip/commit/0edb1f7e1ac77437a17d7966121ee6e10ab5db67
+
+[full branch is https://github.com/mmind/linux-rockchip/commits/tmp/testing_20161109 ]
+
+but I'm not sure if I did that correctly yet and am also still seeing
+nothing on the display and get iommu errors when starting X11
+
+
+Heiko
+
+> +		clocks = <&cru ACLK_VOP1>, <&cru DCLK_VOP1>, <&cru HCLK_VOP1>;
+> +		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
+> +		resets = <&cru SRST_A_VOP1>, <&cru SRST_H_VOP1>, <&cru SRST_D_VOP1>;
+> +		reset-names = "axi", "ahb", "dclk";
+> +		iommus = <&vopl_mmu>;
+> +		status = "disabled";
+> +
+> +		vopl_out: port {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +		};
+> +	};
+> +
+> +	vopl_mmu: iommu at ff8f3f00 {
+> +		compatible = "rockchip,iommu";
+> +		reg = <0x0 0xff8f3f00 0x0 0x100>;
+> +		interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-names = "vopl_mmu";
+> +		#iommu-cells = <0>;
+> +		status = "disabled";
+> +	};
+> +
+> +	vopb: vop at ff900000 {
+> +		compatible = "rockchip,rk3399-vop-big";
+> +		reg = <0x0 0xff900000 0x0 0x3efc>;
+> +		interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cru ACLK_VOP0>, <&cru DCLK_VOP0>, <&cru HCLK_VOP0>;
+> +		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
+> +		resets = <&cru SRST_A_VOP0>, <&cru SRST_H_VOP0>, <&cru SRST_D_VOP0>;
+> +		reset-names = "axi", "ahb", "dclk";
+> +		iommus = <&vopb_mmu>;
+> +		status = "disabled";
+> +
+> +		vopb_out: port {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +		};
+> +	};
+> +
+> +	vopb_mmu: iommu at ff903f00 {
+> +		compatible = "rockchip,iommu";
+> +		reg = <0x0 0xff903f00 0x0 0x100>;
+> +		interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-names = "vopb_mmu";
+> +		#iommu-cells = <0>;
+> +		status = "disabled";
+> +	};
+> +
+> +	display_subsystem: display-subsystem {
+> +		compatible = "rockchip,display-subsystem";
+> +		ports = <&vopl_out>, <&vopb_out>;
+> +		status = "disabled";
+> +	};
+> +
+>  	pinctrl: pinctrl {
+>  		compatible = "rockchip,rk3399-pinctrl";
+>  		rockchip,grf = <&grf>;
