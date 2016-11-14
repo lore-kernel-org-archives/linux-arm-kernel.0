@@ -1,35 +1,59 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 14 Nov 2016 19:33:03 +0000
-Subject: [PATCH v2 1/2] mfd: pm8xxx: add support to pm8821
-In-Reply-To: <a1116e3f-32d2-aa2d-9404-1d8147bd8500@codeaurora.org>
-References: <1479145933-9849-1-git-send-email-srinivas.kandagatla@linaro.org>
- <a1116e3f-32d2-aa2d-9404-1d8147bd8500@codeaurora.org>
-Message-ID: <0a94fa12-5587-9c89-fc33-1a6f0b20e3a2@linaro.org>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Mon, 14 Nov 2016 11:35:29 -0800
+Subject: [PATCH v5 00/23] Support qcom's HSIC USB and rewrite USB2 HS
+ support
+In-Reply-To: <20161111074017.GA21045@b29397-desktop>
+References: <20161018015636.11701-1-stephen.boyd@linaro.org>
+ <20161018093139.GB6294@b29397-desktop>
+ <147682389932.20076.4186408979552866325@sboyd-linaro>
+ <20161111074017.GA21045@b29397-desktop>
+Message-ID: <147915212935.7365.13445257183391192782@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Quoting Peter Chen (2016-11-10 23:40:17)
+> On Tue, Oct 18, 2016 at 01:51:39PM -0700, Stephen Boyd wrote:
+> > Quoting Peter Chen (2016-10-18 02:31:40)
+> > > On Mon, Oct 17, 2016 at 06:56:13PM -0700, Stephen Boyd wrote:
+> > > > I've also sent separate patches for other minor pieces to make this
+> > > > all work. The full tree can be found here[2], hacks and all to get
+> > > > things working. I've tested this on the db410c, apq8074 dragonboard,
+> > > > and ifc6410 with configfs gadgets and otg cables.
+> > > > 
+> > > > Patches based on v4.8-rc1
+> > 
+> > Oops should be v4.9-rc1 here.
+> > 
+> > > > 
+> > > > Changes from v4:
+> > > >  * Picked up Acks from Rob
+> > > >  * Updated HS phy init sequence DT property to restrict it to offsets
+> > > 
+> > > I remembered that you got all my acks for chipidea patches, right? I did
+> > > not check for this series.
+> > 
+> > Sorry I've added in one more patch
+> > 
+> >    usb: chipidea: Emulate OTGSC interrupt enable path
+> > 
+> > to fix extcon interrupt emulation even further.
+> > 
+> > > 
+> > > Besides, the patch "gpu: Remove depends on RESET_CONTROLLER when not a
+> > > provider" [1]  still not be accepted, I need this patch to be merged
+> > > first, then apply your chipidea part, otherwise, there is a building
+> > > warning.
+> > > 
+> > > [1] https://patchwork.kernel.org/patch/9322583/
+> > 
+> > Yes, I'm going to resend that patch now. I hope that David will apply it
+> > for -rc2.
+> 
+> Stephen, just a mind. I have rebased Greg's usb-next tree (v4.9-rc3 on
+> it), your GPU fix is still not there.
+> 
 
-
-On 14/11/16 18:40, Stephen Boyd wrote:
-> On 11/14/2016 09:52 AM, Srinivas Kandagatla wrote:
->> diff --git a/drivers/mfd/qcom-pm8xxx.c b/drivers/mfd/qcom-pm8xxx.c
->> index 7f9620e..dc347d3 100644
->> --- a/drivers/mfd/qcom-pm8xxx.c
->> +++ b/drivers/mfd/qcom-pm8xxx.c
->> +
->> +static void pm8821_irq_handler(struct irq_desc *desc)
->> +{
->> +	struct pm_irq_chip *chip = irq_desc_get_handler_data(desc);
->> +	struct irq_chip *irq_chip = irq_desc_get_chip(desc);
->> +	unsigned int master;
->> +	int ret;
->> +
->> +	chained_irq_enter(irq_chip, desc);
->> +	ret = regmap_read(chip->regmap,
->> +			  PM8821_SSBI_REG_ADDR_IRQ_MASTER0, &master);
->> +	if (ret) {
->> +		pr_err("Failed to re:Qad master 0 ret=%d\n", ret);
->
-> Hm? vi?
-yes..  That was good catch!! will fix it in next version...
->
+It looks like the patch is in drm-misc. I think they're going to hold
+off on merging it until the next merge window though. fb80016af071 is
+the commit in drm-misc tree and in linux-next. I'm not sure anything can
+be done here besides a cross tree merge or ignore the warning?
