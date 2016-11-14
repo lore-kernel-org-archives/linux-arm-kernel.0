@@ -1,124 +1,21 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Mon, 14 Nov 2016 15:14:11 +0800
-Subject: [PATCH v9 00/10] MT2701 DRM support
-In-Reply-To: <1478865346-19043-1-git-send-email-yt.shen@mediatek.com>
-References: <1478865346-19043-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1479107651.2963.2.camel@mtksdaap41>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 14 Nov 2016 15:34:02 +0800
+Subject: [PATCH 1/2] ARM: dts: imx6q-cm-fx6: fix fec pinctrl
+In-Reply-To: <6cd823201b9f4cde8de8eddc910f39ce@rwthex-s1-b.rwth-ad.de>
+References: <6cd823201b9f4cde8de8eddc910f39ce@rwthex-s1-b.rwth-ad.de>
+Message-ID: <20161114073401.GM3310@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, YT:
+On Fri, Nov 11, 2016 at 04:59:38PM +0100, christopher.spinrath at rwth-aachen.de wrote:
+> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+> 
+> According to the schematics of CompuLab's sbc-fx6 baseboard and the
+> vendor devicetree GPIO_16 is *not* muxed to ENET_REF_CLK but to SPDIF_IN.
+> 
+> Remove the wrong pinctrl setting.
+> 
+> Fixes: 682d055e6ac5 ("ARM: dts: Add initial support for cm-fx6.")
+> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 
-On Fri, 2016-11-11 at 19:55 +0800, YT Shen wrote:
-> This is MT2701 DRM support PATCH v9, based on 4.9-rc1.
-> We add DSI interrupt control, transfer function for MIPI DSI panel support.
-> Most codes are the same, except some register changed.
-> 
-> For example:
->  - DISP_OVL address offset changed, color format definition changed.
->  - DISP_RDMA fifo size changed.
->  - DISP_COLOR offset changed.
->  - MIPI_TX setting changed.
-> 
-> We add a new component DDP_COMPONENT_BLS, and the connections are updated.
-> OVL -> RDMA -> COLOR -> BLS -> DSI
-> RDMA -> DPI
-> And we have shadow register support in MT2701.
-> 
-> We remove dts patch from the patch series, which depends on MT2701 CCF and scpsys.
-
-For this series, it looks good to me.
-Acked-by: CK Hu <ck.hu@mediatek.com>
-
-> 
-> Changes since v8:
-> - enable 3 DSI interrupts only
-> - move mtk_dsi_wait_for_irq_done() to the patch of irq control
-> - use the name BLS in DRM driver part
-> - move BLS declaration to a separate patch
-> - update mtk_dsi_switch_to_cmd_mode()
-> - update mtk_output_dsi_enable() and mtk_output_dsi_disable()
-> 
-> Changes since v7:
-> - Remove redundant codes
-> - Move the definition of DDP_COMPONENT_BLS to patch of "drm/mediatek: update display module connections"
-> - Move _dsi_irq_wait_queue into platform driver data
-> - Move mtk_dsi_irq_data_clear() to patch of "drm/mediatek: add dsi interrupt control"
-> - Add more descriptions in the commit messages
-> 
-> Changes since v6:
-> - Change data type of irq_data to u32
-> - Rewrite mtk_dsi_host_transfer() for simplify
-> - Move some MIPI_TX config to patch of "drm/mediatek: add *driver_data for different hardware settings".
-> - Remove device tree from this patch series
-> 
-> Changes since v5:
-> - Remove DPI device tree and compatible string
-> - Use one wait queue to handle interrupt status
-> - Update the interrupt check flow and DSI_INT_ALL_BITS
-> - Use same function for host read/write command
-> - various fixes
-> 
-> Changes since v4:
-> - Add messages when timeout in mtk_disp_mutex_acquire()
-> - Add descriptions for DISP_REG_MUTEX registers
-> - Move connection settings for display modules to a separate patch
-> - Remove 'mt2701-disp-wdma' because it is unused
-> - Move cleaning up and renaming to a separate patch
-> - Use wait_event_interruptible_timeout() to replace polling
-> - Remove irq_num from mtk_dsi structure
-> - Remove redundant and debug codes
-> 
-> Changes since v3:
-> - Add DSI support for MIPI DSI panels
-> - Update BLS binding to PWM nodes
-> - Remove ufoe device nodes
-> - Remove redundant parentheses
-> - Remove global variable initialization
-> 
-> Changes since v2:
-> - Rename mtk_ddp_mux_sel to mtk_ddp_sout_sel
-> - Update mt2701_mtk_ddp_ext components
-> - Changed to prefix naming
-> - Reorder the patch series
-> - Use of_device_get_match_data() to get driver private data
-> - Use iopoll macros to implement mtk_disp_mutex_acquire()
-> - Removed empty device tree nodes
-> 
-> Changes since v1:
-> - Removed BLS bindings and codes, which belong to pwm driver
-> - Moved mtk_disp_mutex_acquire() just before mtk_crtc_ddp_config()
-> - Split patch into smaller parts
-> - Added const keyword to constant structure
-> - Removed codes for special memory align
-> 
-> Thanks,
-> yt.shen
-> 
-> YT Shen (8):
->   drm/mediatek: rename macros, add chip prefix
->   drm/mediatek: add *driver_data for different hardware settings
->   drm/mediatek: add shadow register support
->   drm/mediatek: add BLS component
->   drm/mediatek: update display module connections
->   drm/mediatek: cleaning up and refine
->   drm/mediatek: update DSI sub driver flow for sending commands to panel
->   drm/mediatek: add support for Mediatek SoC MT2701
-> 
-> shaoming chen (2):
->   drm/mediatek: add dsi interrupt control
->   drm/mediatek: add dsi transfer function
-> 
->  drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |  33 ++-
->  drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |  17 +-
->  drivers/gpu/drm/mediatek/mtk_drm_crtc.c     |  76 +++--
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c      | 138 ++++++---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.h      |   2 +
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |  38 ++-
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |  15 +
->  drivers/gpu/drm/mediatek/mtk_drm_drv.c      |  54 +++-
->  drivers/gpu/drm/mediatek/mtk_drm_drv.h      |   9 +
->  drivers/gpu/drm/mediatek/mtk_dsi.c          | 429 ++++++++++++++++++++++++----
->  drivers/gpu/drm/mediatek/mtk_mipi_tx.c      |  70 +++--
->  11 files changed, 715 insertions(+), 166 deletions(-)
-> 
+Applied both, thanks.
