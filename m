@@ -1,36 +1,91 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 13 Nov 2016 22:10:40 -0500
-Subject: [PATCH V2] dmaengine: qcom_hidma: cleanup sysfs entries during
- remove
-In-Reply-To: <20161114030452.GH3000@localhost>
-References: <1476902566-26676-1-git-send-email-okaya@codeaurora.org>
- <20161114030452.GH3000@localhost>
-Message-ID: <457a0a58-fcb5-26d6-99e6-7192dd071e1c@codeaurora.org>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Mon, 14 Nov 2016 09:11:01 +0530
+Subject: [PATCH V3 0/8] IOMMU probe deferral support
+References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
+ <60ee8066-f167-e9df-ae3e-4138f1133bad@arm.com>
+ <003a01d22f97$82534c70$86f9e550$@codeaurora.org>
+ <421e2b14-0231-d376-02a0-097423120b3d@arm.com>
+ <006f01d236ae$61751c40$245f54c0$@codeaurora.org>
+ <9f36244f-62d4-08e3-d64a-2b04ad4dc2e0@arm.com>
+Message-ID: <01bb01d23e28$f0612d00$d1238700$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/13/2016 10:04 PM, Vinod Koul wrote:
-> On Wed, Oct 19, 2016 at 02:42:46PM -0400, Sinan Kaya wrote:
->> The 4.8-rc8 kernel is printing duplicate file entry warnings while removing
->> the HIDMA object. This is caused by stale sysfs entries remaining from the
->> previous execution.
->>
->> _sysfs_warn_dup+0x5c/0x78
->>  sysfs_add_file_mode_ns+0x13c/0x1c0
->>  sysfs_create_file_ns+0x2c/0x40
->>  device_create_file+0x54/0xa0
->>  hidma_probe+0x7c8/0x808
->>
->> Create hidma_sysfs_init and hidma_sysfs_uninit functions and call them from
->> the probe and remove path. To do proper clean up, adding the attrs object
->> to the device data structure to keep it around until remove call is made.
-> 
-> This doesnt apply for me, I think due to other patches applied..
-> 
+Hi Robin,
 
-OK. Let me rebase.
+>Hi Robin,
+>
+>>On 04/11/16 15:16, Sricharan wrote:
+>>> Hi Robin,
+>>>
+>>>>>> Yikes, on second look, that definitely shouldn't be happening.
+>>>>>> Everything below is probably the resulting fallout.
+>>>>>
+>>>>> [   40.206703] vfio-pci 0000:08:00.0: Failed to setup iommu ops
+>>>>>
+>>>>> I think the above print which says "failed to setup iommu_ops"
+>>>>> because the call ops->add_device failed in of_pci_iommu_configure
+>>>>> is the reason for the failure, in my case i simply do not get this even with
+>>>>> your scripts. ops->add_device succeeds in the rebind as well. So still
+>>>>> checking what could be happening in your case.
+>>>>
+>>>> I was looking at your code base from [1].The ops->add_device
+>>>> callback from of_pci_iommu_configure on the rebind is the
+>>>> one which is causing the failure. But not able to spot out
+>>>>from code which point is causing the failure. It would be very helpful
+>>>> if i can know which is the return value from the add_device callback
+>>>> or point inside add_device callback which fails in your setup.
+>>>>
+>>>>
+>>>> [1] git://linux-arm.org/linux-rm iommu/misc
+>>>
+>>> With little more try, i saw an issue where i had an failure
+>>> similar to what you reported. The issue happens when multiple
+>>> devices fall in to same group due to matching sids. I ended up
+>>> doing a fix like below and it would be nice to verify if it is the same
+>>> that we are seeing in your setup and if the fix makes a difference ?
+>>>
+>>> From: Sricharan R <sricharan@codeaurora.org>
+>>> Date: Fri, 4 Nov 2016 20:28:49 +0530
+>>> Subject: [PATCH] iommu/arm-smmu: Fix group's reference counting
+>>>
+>>> iommu_group_get_for_dev which gets called in the add_device
+>>> callback, increases the reference count of the iommu_group,
+>>> so we do an iommu_group_put after that. iommu_group_get_for_dev
+>>> inturn calls device_group callback and in the case of arm-smmu
+>>> we call generic_device_group/pci_device_group which takes
+>>> care of increasing the group's reference. But when we return
+>>> an already existing group(when multiple devices have same group)
+>>> the reference is not incremented, resulting in issues when the
+>>> remove_device callback for the devices is invoked.
+>>> Fixing the same here.
+>>
+>>Bah, yes, this does look like my fault - after flip-flopping between
+>>about 3 different ways to keep refcounts for the S2CR entries, none of
+>>which would quite work, I ripped it all out but apparently still got
+>>things wrong, oh well. Thanks for figuring it out.
+> >
+>>On the probe-deferral angle, whilst it's useful to have uncovered this
+>>bug, I don't think we should actually be calling remove_device() from
+>>DMA teardown. I think it's preferable from a user perspective if group
+>>numbering remains stable, rather than changing depending on the order in
+>>which they unbind/rebind VFIO drivers. I'm really keen to try and get
+>>this in shape for 4.10, so I've taken the liberty of hacking up my own
+>>branch (iommu/defer) based on v3 - would you mind taking a look at the
+>>two "iommu/of:" commits to see what you think? (Ignore the PCI changes
+>>to your later patches - that was an experiment which didn't really work out)
+>
+>Ok, will take a look at this now and respond more on this.
+>
+Sorry for the delayed response on this. I was OOO for the last few days.
+So i tested this branch and it worked fine. I tested it with a pci device
+for both normal and deferred probe cases.  The of/iommu patches
+are the cleanup/preparation patches and it looks fine. One thing is without
+calling the remove_device callback, the resources like (smes for exmaple)
+and the group association of the device all remain allocated. That does not
+feel correct, given that the associated device does not exist. So to
+understand that, what happens with VFIO in this case which makes the
+group renumbering/rebinding a problem ?
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Regards,
+ Sricharan
