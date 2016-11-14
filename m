@@ -1,56 +1,42 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 14 Nov 2016 10:42:16 +0530
-Subject: [PATCH v10 03/11] remoteproc: Update Kconfig setup to 'depends
- on REMOTEPROC'
-In-Reply-To: <20161103212439.GS25787@tuxbot>
-References: <1475931154-1021-1-git-send-email-peter.griffin@linaro.org>
- <1475931154-1021-4-git-send-email-peter.griffin@linaro.org>
- <20161103212439.GS25787@tuxbot>
-Message-ID: <20161114051215.GV3000@localhost>
+Date: Mon, 14 Nov 2016 10:48:54 +0530
+Subject: [PATCH v10 01/11] remoteproc: st_slim_rproc: add a slimcore
+ rproc driver
+In-Reply-To: <20161107135735.GA27280@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1476783556-2501-1-git-send-email-peter.griffin@linaro.org>
+ <1476783556-2501-2-git-send-email-peter.griffin@linaro.org>
+ <20161103213703.GA15449@tuxbot>
+ <20161107135735.GA27280@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20161114051854.GW3000@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2016 at 02:24:39PM -0700, Bjorn Andersson wrote:
-> On Sat 08 Oct 05:52 PDT 2016, Peter Griffin wrote:
-> 
-> > Make REMOTEPROC core a selectable kconfig option, and update
-> > remoteproc client drivers to 'depends on' the core. This avoids
-> > some nasty Kconfig recursive dependency issues. Also when using
-> > menuconfig client drivers will be hidden until the core has been
-> > enabled.
+On Mon, Nov 07, 2016 at 01:57:35PM +0000, Peter Griffin wrote:
 > > 
-> > Documentation/kbuild/kconfig-language.txt:
+> > As you now make changes to the entire remoteproc Kconfig file, rather
+> > than simply add a Kconfig symbol we can't bring this in via Vinod's tree
+> > without providing Linus with a messy merge conflict.
 > > 
-> >   Note:
-> >         select should be used with care. select will force
-> >         a symbol to a value without visiting the dependencies.
-> >         By abusing select you are able to select a symbol FOO even
-> >         if FOO depends on BAR that is not set.
-> >         In general use select only for non-visible symbols
-> >         (no prompts anywhere) and for symbols with no dependencies.
-> >         That will limit the usefulness but on the other hand avoid
-> >         the illegal configurations all over.
-> > 
-> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > So the remoteproc parts now has to go through my tree.
 > 
-> Sorry, I missed this patch in the set - but spotted it in linux-next.
-> 
-> I still don't like the change, but remoteproc has dependencies so I
-> guess I have to pick it until we fix that.
-> 
-> It's however not okay to take this patch through the DMA tree, as it
-> effectively stops me from introducing any changes in the rproc tree.
-> Further more, it's not based on v4.9, so it currently introduces another
-> Kconfig dependency problem - that I can't fix in my tree without
-> conflicting with Vinod's.
-> 
-> 
-> So, Vinod, can you please drop this patch from your tree? I'll pick it
-> up for now.
+> OK, I think the best approach is for Vinod to create an immutable
+> branch with the entire fdma series on, and then both of you merge that branch into
+> your respective trees.
 
-Sorry for the delay, b/w KS/LPC and travel, was slow on email.
+my topic/st_fdma is immutable branch. You cna merge it, if you need a signed
+tag, please do let me know
 
-I have dropped this one now..
+> 
+> That way there won't be any conflicts and you can both accept further changes
+> for v4.9 release. Trying to take half the series via rproc, and half via dma trees won't work
+> because they have dependencies on each other.
+> 
+> I will send a v11 series in a moment which includes the feedback in this email
+> and also include the additional fixes which Vinod has applied since the driver
+> has been in linux-next.
+
+WHY.. Stuff is already merged twice! Please send updated on top of already
+merged code! This is how kernel developement is done...
 
 -- 
 ~Vinod
