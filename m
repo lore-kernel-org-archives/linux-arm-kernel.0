@@ -1,45 +1,23 @@
 From: wulf@rock-chips.com (William Wu)
-Date: Mon, 14 Nov 2016 15:01:51 +0800
-Subject: [PATCH v2 2/2] phy: rockchip-inno-usb2: correct 480MHz output clock
- stable time
-In-Reply-To: <1479106911-16049-1-git-send-email-wulf@rock-chips.com>
-References: <1479106911-16049-1-git-send-email-wulf@rock-chips.com>
-Message-ID: <1479106911-16049-3-git-send-email-wulf@rock-chips.com>
+Date: Mon, 14 Nov 2016 15:01:49 +0800
+Subject: [PATCH v2 0/2] phy: rockchip-inno-usb2: correct 480MHz clk_ops
+ callbacks and stable time
+Message-ID: <1479106911-16049-1-git-send-email-wulf@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We found that the system crashed due to 480MHz output clock of
-USB2 PHY was unstable after clock had been enabled by gpu module.
+This series try to correct the 480MHz output clock of USB2 PHY
+clk_ops callback and fix the delay time. It aims to make the
+480MHz clock more sensible and stable.
 
-Theoretically, 1 millisecond is a critical value for 480MHz
-output clock stable time, so we try to change the delay time
-to 1.2 millisecond to avoid this issue.
+Tested on rk3366/rk3399 EVB board.
 
-And the commit ed907fb1d7c3 ("phy: rockchip-inno-usb2: correct
-clk_ops callback") used prepare callbacks instead of enable
-callbacks to support gate a clk if the operation may sleep. So
-we can switch from delay to sleep functions.
+William Wu (2):
+  phy: rockchip-inno-usb2: correct clk_ops callback
+  phy: rockchip-inno-usb2: correct 480MHz output clock stable time
 
-Signed-off-by: William Wu <wulf@rock-chips.com>
----
-Changes in v2:
-- use usleep_range() function instead of mdelay()
+ drivers/phy/phy-rockchip-inno-usb2.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
- drivers/phy/phy-rockchip-inno-usb2.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
-index 365e077..578290b 100644
---- a/drivers/phy/phy-rockchip-inno-usb2.c
-+++ b/drivers/phy/phy-rockchip-inno-usb2.c
-@@ -166,7 +166,7 @@ static int rockchip_usb2phy_clk480m_prepare(struct clk_hw *hw)
- 			return ret;
- 
- 		/* waitting for the clk become stable */
--		mdelay(1);
-+		usleep_range(1200);
- 	}
- 
- 	return 0;
 -- 
 2.0.0
