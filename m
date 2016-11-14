@@ -1,257 +1,129 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 14 Nov 2016 13:20:36 -0600
-Subject: [PATCH v2 2/4] dt-bindings: Add TI SCI PM Domains
-In-Reply-To: <CAPDyKFofZdFfGA8gbS9FJxAX5Ub-s8yZWDcNVOgwiEBpho4oyw@mail.gmail.com>
-References: <20161019203347.17893-1-d-gerlach@ti.com>
- <20161019203347.17893-3-d-gerlach@ti.com> <7heg39pmgb.fsf@baylibre.com>
- <7f4754bb-7ded-6ce3-9558-a45b0d2b3888@ti.com> <7h1sz51y3p.fsf@baylibre.com>
- <CAL_JsqJvm8+L0-pFQRQGYhvSzvqubWsBp8Q5kU-BPSiDmMau0A@mail.gmail.com>
- <5811FE09.8000006@ti.com> <90e91588-d2fc-19be-5a28-63c801a8d061@ti.com>
- <CAPDyKFofZdFfGA8gbS9FJxAX5Ub-s8yZWDcNVOgwiEBpho4oyw@mail.gmail.com>
-Message-ID: <0168d113-20b3-0b2b-048b-a4e613786245@ti.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 14 Nov 2016 11:23:27 -0800
+Subject: [PATCH RFC] mm: Add debug_virt_to_phys()
+In-Reply-To: <aee5072c-4e09-547e-2f58-7b2106bced3c@redhat.com>
+References: <20161112004449.30566-1-f.fainelli@gmail.com>
+ <aee5072c-4e09-547e-2f58-7b2106bced3c@redhat.com>
+Message-ID: <40e2260c-9b09-0c0e-5b0f-0d61fdb8ba1e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On 11/11/2016 06:34 AM, Ulf Hansson wrote:
-> On 10 November 2016 at 20:56, Dave Gerlach <d-gerlach@ti.com> wrote:
->> Rob, Ulf, Jon,
+On 11/14/2016 10:45 AM, Laura Abbott wrote:
+> On 11/11/2016 04:44 PM, Florian Fainelli wrote:
+>> When CONFIG_DEBUG_VM is turned on, virt_to_phys() maps to
+>> debug_virt_to_phys() which helps catch vmalloc space addresses being
+>> passed. This is helpful in debugging bogus drivers that just assume
+>> linear mappings all over the place.
 >>
->> On 10/27/2016 08:15 AM, Dave Gerlach wrote:
->>>
->>> +Jon
->>> On 10/26/2016 04:59 PM, Rob Herring wrote:
->>>>
->>>> On Mon, Oct 24, 2016 at 12:00 PM, Kevin Hilman <khilman@baylibre.com>
->>>> wrote:
->>>>>
->>>>> Dave Gerlach <d-gerlach@ti.com> writes:
->>>>>
->>>>>> Hi,
->>>>>> On 10/21/2016 01:48 PM, Kevin Hilman wrote:
->>>>>>>
->>>>>>> Dave Gerlach <d-gerlach@ti.com> writes:
->>>>>>>
->>>>>>>> Add a generic power domain implementation, TI SCI PM Domains, that
->>>>>>>> will hook into the genpd framework and allow the TI SCI protocol to
->>>>>>>> control device power states.
->>>>>>>>
->>>>>>>> Also, provide macros representing each device index as understood
->>>>>>>> by TI SCI to be used in the device node power-domain references.
->>>>>>>> These are identifiers for the K2G devices managed by the PMMC.
->>>>>>>>
->>>>>>>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>>>>>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->>>>>>>> ---
->>>>>>>>  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   | 54
->>>>>>>> +++++++++++++
->>>>>>>>  MAINTAINERS                                        |  2 +
->>>>>>>>  include/dt-bindings/genpd/k2g.h                    | 90
->>>>>>>> ++++++++++++++++++++++
->>>>>>>>  3 files changed, 146 insertions(+)
->>>>>>>>  create mode 100644
->>>>>>>> Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>>>>>>>  create mode 100644 include/dt-bindings/genpd/k2g.h
->>>>>>>>
->>>>>>>> diff --git
->>>>>>>> a/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>>>>>>> b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>>>>>>> new file mode 100644
->>>>>>>> index 000000000000..32f38a349656
->>>>>>>> --- /dev/null
->>>>>>>> +++ b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>>>>>>> @@ -0,0 +1,54 @@
->>>>>>>> +Texas Instruments TI-SCI Generic Power Domain
->>>>>>>> +---------------------------------------------
->>>>>>>> +
->>>>>>>> +Some TI SoCs contain a system controller (like the PMMC, etc...)
->>>>>>>> that is
->>>>>>>> +responsible for controlling the state of the IPs that are present.
->>>>>>>> +Communication between the host processor running an OS and the
->>>>>>>> system
->>>>>>>> +controller happens through a protocol known as TI-SCI [1]. This pm
->>>>>>>> domain
->>>>>>>> +implementation plugs into the generic pm domain framework and makes
->>>>>>>> use of
->>>>>>>> +the TI SCI protocol power on and off each device when needed.
->>>>>>>> +
->>>>>>>> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
->>>>>>>> +
->>>>>>>> +PM Domain Node
->>>>>>>> +==============
->>>>>>>> +The PM domain node represents the global PM domain managed by the
->>>>>>>> PMMC,
->>>>>>>> +which in this case is the single implementation as documented by the
->>>>>>>> generic
->>>>>>>> +PM domain bindings in
->>>>>>>> Documentation/devicetree/bindings/power/power_domain.txt.
->>>>>>>> +
->>>>>>>> +Required Properties:
->>>>>>>> +--------------------
->>>>>>>> +- compatible: should be "ti,sci-pm-domain"
->>>>>>>> +- #power-domain-cells: Must be 0.
->>>>>>>> +- ti,sci: Phandle to the TI SCI device to use for managing the
->>>>>>>> devices.
->>>>>>>>
->>>>>>>> +Example:
->>>>>>>> +--------------------
->>>>>>>> +k2g_pds: k2g_pds {
->>>>>>>
->>>>>>>
->>>>>>> should use generic name like "power-contoller", e.g. k2g_pds:
->>>>>>> power-controller
->>>>>>
->>>>>>
->>>>>> Ok, that makes more sense.
->>>>>>
->>>>>>>
->>>>>>>> +        compatible = "ti,sci-pm-domain";
->>>>>>>> +        #power-domain-cells = <0>;
->>>>>>>> +        ti,sci = <&pmmc>;
->>>>>>>> +};
->>>>>>>> +
->>>>>>>> +PM Domain Consumers
->>>>>>>> +===================
->>>>>>>> +Hardware blocks that require SCI control over their state must
->>>>>>>> provide
->>>>>>>> +a reference to the sci-pm-domain they are part of and a unique
->>>>>>>> device
->>>>>>>> +specific ID that identifies the device.
->>>>>>>> +
->>>>>>>> +Required Properties:
->>>>>>>> +--------------------
->>>>>>>> +- power-domains: phandle pointing to the corresponding PM domain
->>>>>>>> node.
->>>>>>>> +- ti,sci-id: index representing the device id to be passed oevr SCI
->>>>>>>> to
->>>>>>>> +        be used for device control.
->>>>>>>
->>>>>>>
->>>>>>> This ID doesn't look right.
->>>>>>>
->>>>>>> Why not use #power-domain-cells = <1> and pass the index in the DT?
->>>>>>> ...
->>>>
->>>>
->>>> Exactly. ti,sci-id is a NAK for me.
->>>
->>>
->>> I was told not to use the onecell during v1 discussion. I agree this would
->>> be
->>> ideal but I cannot due to what the bindings represent, the phandle
->>> parameter is
->>> an index into a list of genpds, whereas we need an actual ID number we can
->>> use
->>> and I do not have the ability to get that from the phandle.
->>>
->>> @Ulf/Jon, is there any hope of bringing back custom xlate functions for
->>> genpd
->>> providers? I don't have a good background on why it was even removed. I
->>> can
->>> maintain a single genpd for all devices but I need a way to parse this ID,
->>> whether it's from a separate property or a phandle. It is locked now to
->>> indexing
->>> into a list of genpds but I need additional per device information for
->>> devices
->>> bound to a genpd and I need either a custom parameter or the ability to
->>> parse
->>> the phandle myself.
->>>
+>> For ARM, ARM64, Unicore32 and Microblaze, the architectures define
+>> __virt_to_phys() as being the functional implementation of the address
+>> translation, so we special case the debug stub to call into
+>> __virt_to_phys directly.
 >>
->> Any comments here? The meaning of the phandle onecell is fixed in the genpd
->> framework so I'm not sure how we want to move forward with this, I need to
->> pass a power domain ID to the genpd driver, and if this shouldn't be a new
->> property I'm not sure what direction we should take.
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>> ---
+>>  arch/arm/include/asm/memory.h      |  4 ++++
+>>  arch/arm64/include/asm/memory.h    |  4 ++++
+>>  include/asm-generic/memory_model.h |  4 ++++
+>>  mm/debug.c                         | 15 +++++++++++++++
+>>  4 files changed, 27 insertions(+)
 >>
->> Regards,
->> Dave
+>> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+>> index 76cbd9c674df..448dec9b8b00 100644
+>> --- a/arch/arm/include/asm/memory.h
+>> +++ b/arch/arm/include/asm/memory.h
+>> @@ -260,11 +260,15 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+>>   * translation for translating DMA addresses.  Use the driver
+>>   * DMA support - see dma-mapping.h.
+>>   */
+>> +#ifndef CONFIG_DEBUG_VM
+>>  #define virt_to_phys virt_to_phys
+>>  static inline phys_addr_t virt_to_phys(const volatile void *x)
+>>  {
+>>  	return __virt_to_phys((unsigned long)(x));
+>>  }
+>> +#else
+>> +#define virt_to_phys debug_virt_to_phys
+>> +#endif
+>>  
+>>  #define phys_to_virt phys_to_virt
+>>  static inline void *phys_to_virt(phys_addr_t x)
+>> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+>> index b71086d25195..c9e436b28523 100644
+>> --- a/arch/arm64/include/asm/memory.h
+>> +++ b/arch/arm64/include/asm/memory.h
+>> @@ -186,11 +186,15 @@ extern u64			kimage_voffset;
+>>   * translation for translating DMA addresses.  Use the driver
+>>   * DMA support - see dma-mapping.h.
+>>   */
+>> +#ifndef CONFIG_DEBUG_VM
+>>  #define virt_to_phys virt_to_phys
+>>  static inline phys_addr_t virt_to_phys(const volatile void *x)
+>>  {
+>>  	return __virt_to_phys((unsigned long)(x));
+>>  }
+>> +#else
+>> +#define virt_to_phys debug_virt_to_phys
+>> +#endif
+>>  
+>>  #define phys_to_virt phys_to_virt
+>>  static inline void *phys_to_virt(phys_addr_t x)
+>> diff --git a/include/asm-generic/memory_model.h b/include/asm-generic/memory_model.h
+>> index 5148150cc80b..426085757258 100644
+>> --- a/include/asm-generic/memory_model.h
+>> +++ b/include/asm-generic/memory_model.h
+>> @@ -80,6 +80,10 @@
+>>  #define page_to_pfn __page_to_pfn
+>>  #define pfn_to_page __pfn_to_page
+>>  
+>> +#ifdef CONFIG_DEBUG_VM
+>> +unsigned long debug_virt_to_phys(volatile void *address);
+>> +#endif /* CONFIG_DEBUG_VM */
+>> +
+>>  #endif /* __ASSEMBLY__ */
+>>  
+>>  #endif
+>> diff --git a/mm/debug.c b/mm/debug.c
+>> index 9feb699c5d25..72b2ca9b11f4 100644
+>> --- a/mm/debug.c
+>> +++ b/mm/debug.c
+>> @@ -161,4 +161,19 @@ void dump_mm(const struct mm_struct *mm)
+>>  	);
+>>  }
+>>  
+>> +#include <asm/memory.h>
+>> +#include <linux/mm.h>
+>> +
+>> +unsigned long debug_virt_to_phys(volatile void *address)
+>> +{
+>> +	BUG_ON(is_vmalloc_addr((const void *)address));
+>> +#if defined(CONFIG_ARM) || defined(CONFIG_ARM64) || defined(CONFIG_UNICORE32) || \
+>> +	defined(CONFIG_MICROBLAZE)
+>> +	return __virt_to_phys(address);
+>> +#else
+>> +	return virt_to_phys(address);
+>> +#endif
+>> +}
+>> +EXPORT_SYMBOL(debug_virt_to_phys);
+>> +
+>>  #endif		/* CONFIG_DEBUG_VM */
 >>
->>
->>>>
->>>>>>>
->>>>>>>> +See dt-bindings/genpd/k2g.h for the list of valid identifiers for
->>>>>>>> k2g.
->>>>>>>> +
->>>>>>>> +Example:
->>>>>>>> +--------------------
->>>>>>>> +uart0: serial at 02530c00 {
->>>>>>>> +   compatible = "ns16550a";
->>>>>>>> +   ...
->>>>>>>> +   power-domains = <&k2g_pds>;
->>>>>>>> +   ti,sci-id = <K2G_DEV_UART0>;
->>>>>>>
->>>>>>>
->>>>>>> ... like this:
->>>>>>>
->>>>>>>      power-domains = <&k2g_pds K2G_DEV_UART0>;
->>>>>>
->>>>>>
->>>>>> That's how I did it in version one actually. I was able to define my
->>>>>> own xlate function to parse the phandle and get that index, but Ulf
->>>>>> pointed me to this series by Jon Hunter [1] that simplified genpd
->>>>>> providers and dropped the concept of adding your own xlate. This locks
->>>>>> the onecell approach to using a fixed static array of genpds that get
->>>>>> indexed into (without passing the index to the provider, just the
->>>>>> genpd that's looked up), which doesn't fit our usecase, as we don't
->>>>>> want a 1 to 1 genpd to device mapping based on the comments provided
->>>>>> in v1. Now we just use the genpd device attach/detach hooks to parse
->>>>>> the sci-id and then use it in the genpd device start/stop hooks.
->>>>
->>>>
->>>> I have no idea what any of this means. All sounds like driver
->>>> architecture, not anything to do with bindings.
->>>
->>>
->>> This was a response to Kevin, not part of binding description.
->>>
->>>>
->>>>>
->>>>> Ah, right.  I remember now.  This approach allows you to use a single
->>>>> genpd as discussed earlier.
->>>>>
->>>>> Makes sense now, suggestion retracted.
->>>>
->>>>
->>>> IIRC, the bindings in Jon's case had a node for each domain and didn't
->>>> need any additional property.
->>>
->>>
->>> Yes but we only have one domain and index into it, not into a list of
->>> domains,
->
-> Exactly. And this my main point as well. We are not talking about a
-> domain property but a device property.
->
->>> so the additional property is solving a different problem.
->
-> Yes.
->
-> Perhaps you could try to elaborate about what the TI SCI ID really
-> represents for the device, as to help Rob understand the bigger
-> picture?
->
-> To me, the TI SCI ID, is similar to a "conid" for any another "device
-> resource" (like clock, pinctrl, regulator etc) which we can describe
-> in DT and assign to a device node. The only difference here, is that
-> we don't have common API to fetch the resource (like clk_get(),
-> regulator_get()), but instead we fetches the device's resource from
-> SoC specific code, via genpd's device ->attach() callback.
+> 
+> is_vmalloc_addr is necessary but not sufficient. This misses
+> cases like module addresses.
 
-Thanks for the response. Yes, you've pretty much hit it on the head. It 
-is not an index into a list of genpds but rather identifies the device 
-*within* a single genpd. It is a property specific to each device that 
-resides in a ti-sci-genpd, not a mapping describing which genpd the 
-device belongs to. The generic power domain binding is concerned with 
-mapping the device to a specific genpd, which is does fine for us, but 
-we have a sub mapping for devices that exist inside a genpd which, we 
-must describe as well, hence the ti,sci-id.
+Indeed, thanks.
 
-Regards,
-Dave
+> The x86 version (CONFIG_DEBUG_VIRTUAL)
+> bounds checks against the known linear map to catch all cases.
+> I'm for a generic approach to this if it can catch all cases
+> that an architecture specific version would catch.
 
->
-> Hope that helps.
->
-> Kind regards
-> Uffe
->
+For one, my patch causes an early BUG to occur on ARM64 during
+arch/arm64/kernel/setup.c::setup_arch when we call
+cpu_uninstall_idmap(). I suspect there could be a bunch of little checks
+like these where we'd have to have an architecture specific "is this
+physical/virtual address valid" that may make a generic implementation
+hard to come up with.
+-- 
+Florian
