@@ -1,61 +1,41 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Mon, 14 Nov 2016 19:55:50 +0800
-Subject: [PATCH v2 00/10] Add basic support for Rockchip RK1108 SOC
-Message-ID: <1479124550-24037-1-git-send-email-andy.yan@rock-chips.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 14 Nov 2016 12:59:23 +0100
+Subject: [PATCH 0/8] DMA: s3c64xx: Conversion to the new channel request
+ API
+In-Reply-To: <20161114101101.GK1575@localhost.localdomain>
+References: <1478791076-19528-1-git-send-email-s.nawrocki@samsung.com>
+ <CGME20161114101259epcas1p2ad701e7b99590a5e9f835a9fab44e409@epcas1p2.samsung.com>
+ <20161114101101.GK1575@localhost.localdomain>
+Message-ID: <31f2ed35-2838-8a9d-695c-df3d89ad4b18@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 11/14/2016 11:11 AM, Charles Keepax wrote:
+>> The whole series can be pulled from git repository:
+>> >  git://linuxtv.org/snawrocki/samsung.git 
+>> >  branch: for-v4.10/dma/pl080-s3c64xx-v2
+>
+> Tested this series again still looks good to me. The code on that
+> branch does differ from the code on the list by the following
+> diff however:
+> 
+> --- a/drivers/dma/amba-pl08x.c
+> +++ b/drivers/dma/amba-pl08x.c
+> @@ -2317,7 +2317,7 @@ static int pl08x_probe(struct amba_device
+> *adev, const struct amba_id *id)
+>        } else {
+>             pl08x->slave.filter.map = pl08x->pd->slave_map;
+>             pl08x->slave.filter.mapcnt = pl08x->pd->slave_map_len;
+> -           pl08x->slave.filter.fn = pl08x_filter_id;
+> +           pl08x->slave.filter.fn = pl08x_filter_fn;
+>        }
+> 
+> I tested the code from the list, rather than the branch.
 
-RK1108 is embedded with an ARM Cortex-A7 single core and a DSP core.
-It is designed for varies application scenario such as car DVR, sports
-DV, secure camera and UAV camera.
-This patch series add basic support for it, which can boot a board with
-initramfs into shell.
-More new feathers will come soon.
-
-Changes in v2:
-- split dt-binding header from clk driver
-- fix some CodingStyle issues
-- add dt-binding documentation for pinctrl
-- add pull and drive-strength functionality for pinctrl
-- fix timer and gic dt description
-- ordering devices by register address
-- move the board in the rockchip.txt to the block of Rockchip boards
-
-Andy Yan (6):
-  dt-bindings: add documentation for rk1108 pinctrl
-  pinctrl: rockchip: add support for rk1108
-  ARM: add low level debug uart for rk1108
-  ARM: dts: add basic support for Rockchip RK1108 SOC
-  ARM: rockchip: enable support for RK1108 SoC
-  ARM: dts: rockchip: add rockchip RK1108 Evaluation board
-
-Shawn Lin (4):
-  dt-bindings: rockchip-dw-mshc: add RK1108 dw-mshc description
-  dt-bindings: add documentation for rk1108 cru
-  clk: rockchip: add dt-binding header for rk1108
-  clk: rockchip: add clock controller for rk1108
-
- Documentation/devicetree/bindings/arm/rockchip.txt |   5 +-
- .../bindings/clock/rockchip,rk1108-cru.txt         |  60 +++
- .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |   1 +
- .../bindings/pinctrl/rockchip,pinctrl.txt          |   9 +-
- arch/arm/Kconfig.debug                             |  30 ++
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/rk1108-evb.dts                   |  69 ++++
- arch/arm/boot/dts/rk1108.dtsi                      | 428 +++++++++++++++++++
- arch/arm/mach-rockchip/rockchip.c                  |   1 +
- drivers/clk/rockchip/Makefile                      |   1 +
- drivers/clk/rockchip/clk-rk1108.c                  | 451 +++++++++++++++++++++
- drivers/clk/rockchip/clk.h                         |  14 +
- drivers/pinctrl/pinctrl-rockchip.c                 |  87 +++-
- include/dt-bindings/clock/rk1108-cru.h             | 270 ++++++++++++
- 14 files changed, 1421 insertions(+), 6 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk1108-cru.txt
- create mode 100644 arch/arm/boot/dts/rk1108-evb.dts
- create mode 100644 arch/arm/boot/dts/rk1108.dtsi
- create mode 100644 drivers/clk/rockchip/clk-rk1108.c
- create mode 100644 include/dt-bindings/clock/rk1108-cru.h
+Oops, I forgot to push the final branch again, it's corrected
+now.  Thanks for your time, hopefully there is no need to bother
+you with this series any more.
 
 -- 
-2.7.4
+Regards,
+Sylwester
