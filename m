@@ -1,57 +1,134 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 14 Nov 2016 16:10:22 +0100
-Subject: [PATCH] ARM: zynq: Reserve correct amount of non-DMA RAM
-In-Reply-To: <CA+aJhH2yZqrwR=U2pgWZfxuF63FF75-NVwGHbDU=fFs7cmcg9w@mail.gmail.com>
-References: <20161031162617.10565-1-kyle.roeschley@ni.com>
- <CAHTX3d+8kBYQwcUUcL1Z71Geij4EU3pjcv29=r8ndqSLW8iZDw@mail.gmail.com>
- <CA+aJhH11ty3xWQ5-CLCrPA5xH-dr_nVb8JCKZEvgJcm6Ha3xaA@mail.gmail.com>
- <CA+aJhH2yZqrwR=U2pgWZfxuF63FF75-NVwGHbDU=fFs7cmcg9w@mail.gmail.com>
-Message-ID: <8db45834-ddda-ea44-567c-71ddac67e1bf@monstr.eu>
+From: atull@opensource.altera.com (atull)
+Date: Mon, 14 Nov 2016 09:13:49 -0600
+Subject: [PATCH fpga 5/9] fpga zynq: Remove priv->dev
+In-Reply-To: <1478732303-13718-6-git-send-email-jgunthorpe@obsidianresearch.com>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-6-git-send-email-jgunthorpe@obsidianresearch.com>
+Message-ID: <alpine.DEB.2.10.1611140913280.3739@atull-VirtualBox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.11.2016 10:57, Nathan Rossi wrote:
-> On 10 November 2016 at 19:33, Nathan Rossi <nathan@nathanrossi.com> wrote:
->> On 10 November 2016 at 18:41, Michal Simek <monstr@monstr.eu> wrote:
->>> + Nathan
->>>
->>> 2016-10-31 17:26 GMT+01:00 Kyle Roeschley <kyle.roeschley@ni.com>:
->>>>
->>>> On Zynq, we haven't been reserving the correct amount of DMA-incapable
->>>> RAM to keep DMA away from it (per the Zynq TRM Section 4.1, it should be
->>>> the first 512k). In older kernels, this was masked by the
->>>> memblock_reserve call in arm_memblock_init(). Now, reserve the correct
->>>> amount excplicitly rather than relying on swapper_pg_dir, which is an
->>>> address and not a size anyway.
->>>>
->>>> Fixes: 46f5b96 ("ARM: zynq: Reserve not DMAable space in front of the
->>>> kernel")
->>>>
->>>> Signed-off-by: Kyle Roeschley <kyle.roeschley@ni.com>
->>
->> Tested-by: Nathan Rossi <nathan@nathanrossi.com>
->>
->> For reference this causes problems with DEBUG_RODATA (which changed to
-> 
-> Sorry typo -> s/causes/caused/, as in "... this [incorrect reserving
-> of the lower 512K] caused ...".
-> 
-> Regards,
-> Nathan
-> 
->> default yes for CPU_V7 in v4.6) due to padding memory between
->> .head.text and .text, allowing memory below 0x80000 to be available
->> for allocation as non-reserved memory.
-Applied to zynq/soc
-https://github.com/Xilinx/linux-xlnx/commits/zynq/soc
+On Wed, 9 Nov 2016, Jason Gunthorpe wrote:
 
-Thanks,
-Michal
+Hi Jason,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161114/08ba1daa/attachment.sig>
+    Acked-by: Alan Tull <atull@opensource.altera.com>
+
+Alan
+
+> socfpga uses mgr->dev for debug prints, there should be consistency
+> here, so standardize on that. The only other use was for dma
+> which can be replaced with mgr->dev.parent.
+> 
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> ---
+>  drivers/fpga/zynq-fpga.c | 22 ++++++++++------------
+>  1 file changed, 10 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+> index 3ffc5fcc3072..ac2deae92dbd 100644
+> --- a/drivers/fpga/zynq-fpga.c
+> +++ b/drivers/fpga/zynq-fpga.c
+> @@ -118,7 +118,6 @@
+>  #define FPGA_RST_NONE_MASK		0x0
+>  
+>  struct zynq_fpga_priv {
+> -	struct device *dev;
+>  	int irq;
+>  	struct clk *clk;
+>  
+> @@ -188,7 +187,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+>  	 * least the sync word and something else to do anything.
+>  	 */
+>  	if (count <= 4 || (count % 4) != 0) {
+> -		dev_err(priv->dev,
+> +		dev_err(&mgr->dev,
+>  			"Invalid bitstream size, must be multiples of 4 bytes\n");
+>  		return -EINVAL;
+>  	}
+> @@ -200,7 +199,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+>  	/* don't globally reset PL if we're doing partial reconfig */
+>  	if (!(flags & FPGA_MGR_PARTIAL_RECONFIG)) {
+>  		if (!zynq_fpga_has_sync(buf, count)) {
+> -			dev_err(priv->dev,
+> +			dev_err(&mgr->dev,
+>  				"Invalid bitstream, could not find a sync word. Bitstream must be a byte swaped .bin file\n");
+>  			err = -EINVAL;
+>  			goto out_err;
+> @@ -233,7 +232,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+>  					     INIT_POLL_DELAY,
+>  					     INIT_POLL_TIMEOUT);
+>  		if (err) {
+> -			dev_err(priv->dev, "Timeout waiting for PCFG_INIT\n");
+> +			dev_err(&mgr->dev, "Timeout waiting for PCFG_INIT\n");
+>  			goto out_err;
+>  		}
+>  
+> @@ -247,7 +246,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+>  					     INIT_POLL_DELAY,
+>  					     INIT_POLL_TIMEOUT);
+>  		if (err) {
+> -			dev_err(priv->dev, "Timeout waiting for !PCFG_INIT\n");
+> +			dev_err(&mgr->dev, "Timeout waiting for !PCFG_INIT\n");
+>  			goto out_err;
+>  		}
+>  
+> @@ -261,7 +260,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+>  					     INIT_POLL_DELAY,
+>  					     INIT_POLL_TIMEOUT);
+>  		if (err) {
+> -			dev_err(priv->dev, "Timeout waiting for PCFG_INIT\n");
+> +			dev_err(&mgr->dev, "Timeout waiting for PCFG_INIT\n");
+>  			goto out_err;
+>  		}
+>  	}
+> @@ -278,7 +277,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+>  	/* check that we have room in the command queue */
+>  	status = zynq_fpga_read(priv, STATUS_OFFSET);
+>  	if (status & STATUS_DMA_Q_F) {
+> -		dev_err(priv->dev, "DMA command queue full\n");
+> +		dev_err(&mgr->dev, "DMA command queue full\n");
+>  		err = -EBUSY;
+>  		goto out_err;
+>  	}
+> @@ -309,7 +308,8 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+>  
+>  	priv = mgr->priv;
+>  
+> -	kbuf = dma_alloc_coherent(priv->dev, count, &dma_addr, GFP_KERNEL);
+> +	kbuf =
+> +	    dma_alloc_coherent(mgr->dev.parent, count, &dma_addr, GFP_KERNEL);
+>  	if (!kbuf)
+>  		return -ENOMEM;
+>  
+> @@ -356,7 +356,7 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+>  	goto out_clk;
+>  
+>  out_report:
+> -	dev_err(priv->dev,
+> +	dev_err(&mgr->dev,
+>  		"%s: INT_STS:0x%x CTRL:0x%x LOCK:0x%x INT_MASK:0x%x STATUS:0x%x MCTRL:0x%x\n",
+>  		why,
+>  		intr_status,
+> @@ -368,7 +368,7 @@ out_report:
+>  out_clk:
+>  	clk_disable(priv->clk);
+>  out_free:
+> -	dma_free_coherent(priv->dev, count, kbuf, dma_addr);
+> +	dma_free_coherent(mgr->dev.parent, count, kbuf, dma_addr);
+>  	return err;
+>  }
+>  
+> @@ -445,8 +445,6 @@ static int zynq_fpga_probe(struct platform_device *pdev)
+>  	if (!priv)
+>  		return -ENOMEM;
+>  
+> -	priv->dev = dev;
+> -
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	priv->io_base = devm_ioremap_resource(dev, res);
+>  	if (IS_ERR(priv->io_base))
+> -- 
+> 2.1.4
+> 
+> 
