@@ -1,60 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Nov 2016 11:08:19 +0000
-Subject: [PATCH v3 0/2] arm64: Support systems without FP/ASIMD
-In-Reply-To: <d9b41cca-9a9c-ab92-d3e5-ee1870bb70d4@arm.com>
-References: <1478613381-5718-1-git-send-email-suzuki.poulose@arm.com>
- <d9b41cca-9a9c-ab92-d3e5-ee1870bb70d4@arm.com>
-Message-ID: <20161114110819.GA3096@e104818-lin.cambridge.arm.com>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Mon, 14 Nov 2016 11:11:11 +0000
+Subject: [PATCH V5 2/3] ARM64 LPC: Add missing range exception for
+ special ISA
+In-Reply-To: <5900275.i4NZvtxTcC@wuerfel>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+ <2368890.jTbyGqYR0M@wuerfel>
+ <20161109135453.2e5402bd@lxorguk.ukuu.org.uk>
+ <5900275.i4NZvtxTcC@wuerfel>
+Message-ID: <20161114111111.1b753dc3@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2016 at 01:41:37PM +0000, Marc Zyngier wrote:
-> On 08/11/16 13:56, Suzuki K Poulose wrote:
-> > This series adds supports to the kernel and KVM hyp to handle
-> > systems without FP/ASIMD properly. At the moment the kernel
-> > doesn't check if the FP unit is available before accessing
-> > the registers (e.g during context switch). Also for KVM,
-> > we trap the FP/ASIMD accesses and handle it by injecting an
-> > undefined instruction into the VM on systems without FP.
-> > 
-> > Tested on a FVP_Base-AEM-v8A model by disabling VFP on at
-> > least one CPU ( -C clusterX.cpuY.vfp-present=0 ).
-> > 
-> > Changes since V2:
-> >  - Dropped cleanup patch for arm64/crypto/aes-ce-ccm-glue.c
-> >  - Removed static_key check from cpus_have_cap. All users with
-> >    constant caps should use the new API to make use of static_keys.
-> >  - Removed a dedicated static_key used in irqchip-gic-v3.c for
-> >    Cavium errata with the new API.
-> > 
-> > Applies on v4.9-rc4 + [1] (which is pushed for rc5)
-> > 
-> > [1] http://marc.info/?l=linux-arm-kernel&m=147819889813214&w=2
-> > 
-> > 
-> > Suzuki K Poulose (2):
-> >   arm64: Add hypervisor safe helper for checking constant capabilities
-> >   arm64: Support systems without FP/ASIMD
-> > 
-> >  arch/arm64/include/asm/cpucaps.h    |  3 ++-
-> >  arch/arm64/include/asm/cpufeature.h | 24 +++++++++++++++++-------
-> >  arch/arm64/include/asm/neon.h       |  3 ++-
-> >  arch/arm64/kernel/cpufeature.c      | 17 ++++++++++++++++-
-> >  arch/arm64/kernel/fpsimd.c          | 14 ++++++++++++++
-> >  arch/arm64/kernel/process.c         |  2 +-
-> >  arch/arm64/kvm/handle_exit.c        | 11 +++++++++++
-> >  arch/arm64/kvm/hyp/hyp-entry.S      |  9 ++++++++-
-> >  arch/arm64/kvm/hyp/switch.c         |  5 ++++-
-> >  drivers/irqchip/irq-gic-v3.c        | 13 +------------
-> >  10 files changed, 76 insertions(+), 25 deletions(-)
+> > It's not a safe assumption for x86 at least. There are a few systems with
+> > multiple ISA busses particularly older laptops with a docking station.  
 > 
-> For the series:
-> 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> How do we plan on merging this? Catalin, are you willing to take it all?
+> But do they have multiple ISA domains? There is no real harm in supporting
+> it, the (small) downsides I can think of are:
 
-Happy to take it all through the arm64 tree. Thanks for the review.
+I don't believe they x86 class ones have multiple ISA domains. But as
+I've said I don't know how the electronics in the older ThinkPad worked
+when it used two PIIX4s with some LPC or ISA stuff on each.
 
--- 
-Catalin
+It works in DOS and unmodified Linux so I'm pretty sure there are no
+additional domains. Likewise the various x86 schemes that route some bits
+of ISA bus off into strange places work in DOS and don't have any
+overlaps.
+
+yenta_socket handles PCI/PCMCIA bridging and routes a range of that flat
+ISA space appropriately to the card.
+
+Alan
