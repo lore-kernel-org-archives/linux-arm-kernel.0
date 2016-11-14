@@ -1,93 +1,57 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Mon, 14 Nov 2016 23:05:55 +0800
-Subject: [PATCH v2 1/9] arm64: dts: rockchip: add eMMC's power domain
- support for rk3399
-In-Reply-To: <bce1a5eb-fbb3-9ed9-46b9-72a95eefed3e@rock-chips.com>
-References: <1478697721-2323-1-git-send-email-wxt@rock-chips.com>
- <1478697721-2323-2-git-send-email-wxt@rock-chips.com>
- <bce1a5eb-fbb3-9ed9-46b9-72a95eefed3e@rock-chips.com>
-Message-ID: <5829D2D3.2050808@rock-chips.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 14 Nov 2016 16:10:22 +0100
+Subject: [PATCH] ARM: zynq: Reserve correct amount of non-DMA RAM
+In-Reply-To: <CA+aJhH2yZqrwR=U2pgWZfxuF63FF75-NVwGHbDU=fFs7cmcg9w@mail.gmail.com>
+References: <20161031162617.10565-1-kyle.roeschley@ni.com>
+ <CAHTX3d+8kBYQwcUUcL1Z71Geij4EU3pjcv29=r8ndqSLW8iZDw@mail.gmail.com>
+ <CA+aJhH11ty3xWQ5-CLCrPA5xH-dr_nVb8JCKZEvgJcm6Ha3xaA@mail.gmail.com>
+ <CA+aJhH2yZqrwR=U2pgWZfxuF63FF75-NVwGHbDU=fFs7cmcg9w@mail.gmail.com>
+Message-ID: <8db45834-ddda-ea44-567c-71ddac67e1bf@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10.11.2016 10:57, Nathan Rossi wrote:
+> On 10 November 2016 at 19:33, Nathan Rossi <nathan@nathanrossi.com> wrote:
+>> On 10 November 2016 at 18:41, Michal Simek <monstr@monstr.eu> wrote:
+>>> + Nathan
+>>>
+>>> 2016-10-31 17:26 GMT+01:00 Kyle Roeschley <kyle.roeschley@ni.com>:
+>>>>
+>>>> On Zynq, we haven't been reserving the correct amount of DMA-incapable
+>>>> RAM to keep DMA away from it (per the Zynq TRM Section 4.1, it should be
+>>>> the first 512k). In older kernels, this was masked by the
+>>>> memblock_reserve call in arm_memblock_init(). Now, reserve the correct
+>>>> amount excplicitly rather than relying on swapper_pg_dir, which is an
+>>>> address and not a size anyway.
+>>>>
+>>>> Fixes: 46f5b96 ("ARM: zynq: Reserve not DMAable space in front of the
+>>>> kernel")
+>>>>
+>>>> Signed-off-by: Kyle Roeschley <kyle.roeschley@ni.com>
+>>
+>> Tested-by: Nathan Rossi <nathan@nathanrossi.com>
+>>
+>> For reference this causes problems with DEBUG_RODATA (which changed to
+> 
+> Sorry typo -> s/causes/caused/, as in "... this [incorrect reserving
+> of the lower 512K] caused ...".
+> 
+> Regards,
+> Nathan
+> 
+>> default yes for CPU_V7 in v4.6) due to padding memory between
+>> .head.text and .text, allowing memory below 0x80000 to be available
+>> for allocation as non-reserved memory.
+Applied to zynq/soc
+https://github.com/Xilinx/linux-xlnx/commits/zynq/soc
 
-On 2016?11?12? 12:22, Shawn Lin wrote:
-> On 2016/11/9 21:21, Caesar Wang wrote:
->> From: Ziyuan Xu <xzy.xu@rock-chips.com>
->>
->> Control power domain for eMMC via genpd to reduce power consumption.
->>
->> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
->> Signed-off-by: Ziyuan Xu <xzy.xu@rock-chips.com>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->
-> It was verified on my rk3399 evb with kernel4.4, so
-> free feel to add my tag,
->
-> Tested-by: Shawn Lin <shawn.lin@rock-chips.com>
->
+Thanks,
+Michal
 
-Thanks the tests.
-
-> BTW, it seems my reply is bounced form Yakir's address, so please
-> remove him from CC list if he changed his mail address.
-
-Right, Yakir's (ykk at rock-chips.com) address had left this world.;-)
-But the patman tool is auto sending with the Cc people.
-
--
-Caesar
->
->> ---
->>
->> Changes in v2:
->> - Reviewed-on: https://chromium-review.googlesource.com/376558
->> - Verified on ChromeOS kernel4.4
->>
->> arch/arm64/boot/dts/rockchip/rk3399.dtsi | 11 +++++++++++
->> 1 file changed, 11 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi 
->> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> index cbb7f8b..b401176 100644
->> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> @@ -269,6 +269,7 @@
->> #clock-cells = <0>;
->> phys = <&emmc_phy>;
->> phy-names = "phy_arasan";
->> + power-domains = <&power RK3399_PD_EMMC>;
->> status = "disabled";
->> };
->>
->> @@ -690,6 +691,11 @@
->> status = "disabled";
->> };
->>
->> + qos_emmc: qos at ffa58000 {
->> + compatible = "syscon";
->> + reg = <0x0 0xffa58000 0x0 0x20>;
->> + };
->> +
->> qos_gmac: qos at ffa5c000 {
->> compatible = "syscon";
->> reg = <0x0 0xffa5c000 0x0 0x20>;
->> @@ -823,6 +829,11 @@
->> };
->>
->> /* These power domains are grouped by VD_LOGIC */
->> + pd_emmc at RK3399_PD_EMMC {
->> + reg = <RK3399_PD_EMMC>;
->> + clocks = <&cru ACLK_EMMC>;
->> + pm_qos = <&qos_emmc>;
->> + };
->> pd_gmac at RK3399_PD_GMAC {
->> reg = <RK3399_PD_GMAC>;
->> clocks = <&cru ACLK_GMAC>;
->>
->
->
-
-
--- 
-caesar wang | software engineer | wxt at rock-chip.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161114/08ba1daa/attachment.sig>
