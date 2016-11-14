@@ -1,28 +1,21 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 14 Nov 2016 01:33:21 +0100
-Subject: [PATCH -next] cpufreq: brcmstb-avs-cpufreq: make symbol
- brcm_avs_cpufreq_attr static
-In-Reply-To: <CAGt4E5sQvRXdS+wh2jqa9jF4jxS9TxnULXwg1vJm1fwU-Gja4g@mail.gmail.com>
-References: <1478791145-21137-1-git-send-email-weiyj.lk@gmail.com>
- <CAGt4E5sQvRXdS+wh2jqa9jF4jxS9TxnULXwg1vJm1fwU-Gja4g@mail.gmail.com>
-Message-ID: <5120029.lrhJXGVADr@vostro.rjw.lan>
+Date: Mon, 14 Nov 2016 01:37:34 +0100
+Subject: [PATCH v3 0/4] PXA cpufreq conversion to clock API
+In-Reply-To: <20161103021624.GG10786@vireshk-i7>
+References: <1477943696-23477-1-git-send-email-robert.jarzmik@free.fr>
+ <87d1idzh56.fsf@belgarion.home> <20161103021624.GG10786@vireshk-i7>
+Message-ID: <1654700.yP1fyhXj2I@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 10, 2016 02:06:16 PM Markus Mayer wrote:
-> On 10 November 2016 at 07:19, Wei Yongjun <weiyj.lk@gmail.com> wrote:
-> > From: Wei Yongjun <weiyongjun1@huawei.com>
-> >
-> > Fixes the following sparse warning:
-> >
-> > drivers/cpufreq/brcmstb-avs-cpufreq.c:982:18: warning:
-> >  symbol 'brcm_avs_cpufreq_attr' was not declared. Should it be static?
+On Thursday, November 03, 2016 07:46:24 AM Viresh Kumar wrote:
+> On 02-11-16, 22:49, Robert Jarzmik wrote:
+> > Would you or Rafael take patch 1/4 "cpufreq: pxa: use generic platdev driver for
+> > device-tree" through your tree please ?
 > 
-> Yes, thanks for the fix.
-> 
-> Acked-by: Markus Mayer <mmayer@broadcom.com>
+> Rafael is the one who applies the patches.
 
-Applied.
+The [1/4] has been applied.
 
 Thanks,
 Rafael
