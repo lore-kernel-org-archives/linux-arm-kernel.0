@@ -1,64 +1,60 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Mon, 14 Nov 2016 11:06:45 +0000
-Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <2825537.ADCNsGqGxn@wuerfel>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <1555494.4IFvGxvsfe@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F8F1A7A@lhreml507-mbx>
- <2825537.ADCNsGqGxn@wuerfel>
-Message-ID: <20161114110645.0763092b@lxorguk.ukuu.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 14 Nov 2016 11:08:19 +0000
+Subject: [PATCH v3 0/2] arm64: Support systems without FP/ASIMD
+In-Reply-To: <d9b41cca-9a9c-ab92-d3e5-ee1870bb70d4@arm.com>
+References: <1478613381-5718-1-git-send-email-suzuki.poulose@arm.com>
+ <d9b41cca-9a9c-ab92-d3e5-ee1870bb70d4@arm.com>
+Message-ID: <20161114110819.GA3096@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 09 Nov 2016 22:34:38 +0100
-Arnd Bergmann <arnd@arndb.de> wrote:
-
-> On Wednesday, November 9, 2016 12:10:43 PM CET Gabriele Paoloni wrote:
-> > > On Tuesday, November 8, 2016 11:47:09 AM CET zhichang.yuan wrote:  
-> > > > +       /*
-> > > > +        * The first PCIBIOS_MIN_IO is reserved specifically for  
-> > > indirectIO.  
-> > > > +        * It will separate indirectIO range from pci host bridge to
-> > > > +        * avoid the possible PIO conflict.
-> > > > +        * Set the indirectIO range directly here.
-> > > > +        */
-> > > > +       lpcdev->io_ops.start = 0;
-> > > > +       lpcdev->io_ops.end = PCIBIOS_MIN_IO - 1;
-> > > > +       lpcdev->io_ops.devpara = lpcdev;
-> > > > +       lpcdev->io_ops.pfin = hisilpc_comm_in;
-> > > > +       lpcdev->io_ops.pfout = hisilpc_comm_out;
-> > > > +       lpcdev->io_ops.pfins = hisilpc_comm_ins;
-> > > > +       lpcdev->io_ops.pfouts = hisilpc_comm_outs;  
-> > > 
-> > > I have to look at patch 2 in more detail again, after missing a few
-> > > review
-> > > rounds. I'm still a bit skeptical about hardcoding a logical I/O port
-> > > range here, and would hope that we can just go through the same
-> > > assignment of logical port ranges that we have for PCI buses,
-> > > decoupling
-> > > the bus addresses from the linux-internal ones.  
+On Fri, Nov 11, 2016 at 01:41:37PM +0000, Marc Zyngier wrote:
+> On 08/11/16 13:56, Suzuki K Poulose wrote:
+> > This series adds supports to the kernel and KVM hyp to handle
+> > systems without FP/ASIMD properly. At the moment the kernel
+> > doesn't check if the FP unit is available before accessing
+> > the registers (e.g during context switch). Also for KVM,
+> > we trap the FP/ASIMD accesses and handle it by injecting an
+> > undefined instruction into the VM on systems without FP.
 > > 
-> > The point here is that we want to avoid any conflict/overlap between
-> > the LPC I/O space and the PCI I/O space. With the assignment above
-> > we make sure that LPC never interfere with PCI I/O space.  
+> > Tested on a FVP_Base-AEM-v8A model by disabling VFP on at
+> > least one CPU ( -C clusterX.cpuY.vfp-present=0 ).
+> > 
+> > Changes since V2:
+> >  - Dropped cleanup patch for arm64/crypto/aes-ce-ccm-glue.c
+> >  - Removed static_key check from cpus_have_cap. All users with
+> >    constant caps should use the new API to make use of static_keys.
+> >  - Removed a dedicated static_key used in irqchip-gic-v3.c for
+> >    Cavium errata with the new API.
+> > 
+> > Applies on v4.9-rc4 + [1] (which is pushed for rc5)
+> > 
+> > [1] http://marc.info/?l=linux-arm-kernel&m=147819889813214&w=2
+> > 
+> > 
+> > Suzuki K Poulose (2):
+> >   arm64: Add hypervisor safe helper for checking constant capabilities
+> >   arm64: Support systems without FP/ASIMD
+> > 
+> >  arch/arm64/include/asm/cpucaps.h    |  3 ++-
+> >  arch/arm64/include/asm/cpufeature.h | 24 +++++++++++++++++-------
+> >  arch/arm64/include/asm/neon.h       |  3 ++-
+> >  arch/arm64/kernel/cpufeature.c      | 17 ++++++++++++++++-
+> >  arch/arm64/kernel/fpsimd.c          | 14 ++++++++++++++
+> >  arch/arm64/kernel/process.c         |  2 +-
+> >  arch/arm64/kvm/handle_exit.c        | 11 +++++++++++
+> >  arch/arm64/kvm/hyp/hyp-entry.S      |  9 ++++++++-
+> >  arch/arm64/kvm/hyp/switch.c         |  5 ++++-
+> >  drivers/irqchip/irq-gic-v3.c        | 13 +------------
+> >  10 files changed, 76 insertions(+), 25 deletions(-)
 > 
-> But we already abstract the PCI I/O space using dynamic registration.
-> There is no need to hardcode the logical address for ISA, though
-> I think we can hardcode the bus address to start at zero here.
+> For the series:
+> 
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> How do we plan on merging this? Catalin, are you willing to take it all?
 
-Pedantically ISA starts at 0x100. The LPC may start at 0x00 as it also
-covers motherboard devices (0x00-0xFF). It is also possible that the
-'LPC' space is only partially routed to the PCI bridges because some if
-it magially disappears on CPU die (at least on x86) and has done since
-the era of socket 7 (eg the Cyrix 6x86 doesn't route 0x22/0x23 out of the
-CPU).
+Happy to take it all through the arm64 tree. Thanks for the review.
 
-Assuming LPC starts at 0 ought to be ok given the PCI root bridge
-shouldn't see the transactions.
-
-The LPC or it's equivalent may also not be routed via the PCI bridges at
-all, so you could have an LPC mapping that is unused or partially used
-with another bus actually getting some classes of LPC traffic - on x86 at
-least.
-
-Alan
+-- 
+Catalin
