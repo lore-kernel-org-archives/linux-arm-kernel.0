@@ -1,129 +1,35 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 14 Nov 2016 11:23:27 -0800
-Subject: [PATCH RFC] mm: Add debug_virt_to_phys()
-In-Reply-To: <aee5072c-4e09-547e-2f58-7b2106bced3c@redhat.com>
-References: <20161112004449.30566-1-f.fainelli@gmail.com>
- <aee5072c-4e09-547e-2f58-7b2106bced3c@redhat.com>
-Message-ID: <40e2260c-9b09-0c0e-5b0f-0d61fdb8ba1e@gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 14 Nov 2016 19:33:03 +0000
+Subject: [PATCH v2 1/2] mfd: pm8xxx: add support to pm8821
+In-Reply-To: <a1116e3f-32d2-aa2d-9404-1d8147bd8500@codeaurora.org>
+References: <1479145933-9849-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <a1116e3f-32d2-aa2d-9404-1d8147bd8500@codeaurora.org>
+Message-ID: <0a94fa12-5587-9c89-fc33-1a6f0b20e3a2@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2016 10:45 AM, Laura Abbott wrote:
-> On 11/11/2016 04:44 PM, Florian Fainelli wrote:
->> When CONFIG_DEBUG_VM is turned on, virt_to_phys() maps to
->> debug_virt_to_phys() which helps catch vmalloc space addresses being
->> passed. This is helpful in debugging bogus drivers that just assume
->> linear mappings all over the place.
->>
->> For ARM, ARM64, Unicore32 and Microblaze, the architectures define
->> __virt_to_phys() as being the functional implementation of the address
->> translation, so we special case the debug stub to call into
->> __virt_to_phys directly.
->>
->> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->> ---
->>  arch/arm/include/asm/memory.h      |  4 ++++
->>  arch/arm64/include/asm/memory.h    |  4 ++++
->>  include/asm-generic/memory_model.h |  4 ++++
->>  mm/debug.c                         | 15 +++++++++++++++
->>  4 files changed, 27 insertions(+)
->>
->> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
->> index 76cbd9c674df..448dec9b8b00 100644
->> --- a/arch/arm/include/asm/memory.h
->> +++ b/arch/arm/include/asm/memory.h
->> @@ -260,11 +260,15 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
->>   * translation for translating DMA addresses.  Use the driver
->>   * DMA support - see dma-mapping.h.
->>   */
->> +#ifndef CONFIG_DEBUG_VM
->>  #define virt_to_phys virt_to_phys
->>  static inline phys_addr_t virt_to_phys(const volatile void *x)
->>  {
->>  	return __virt_to_phys((unsigned long)(x));
->>  }
->> +#else
->> +#define virt_to_phys debug_virt_to_phys
->> +#endif
->>  
->>  #define phys_to_virt phys_to_virt
->>  static inline void *phys_to_virt(phys_addr_t x)
->> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
->> index b71086d25195..c9e436b28523 100644
->> --- a/arch/arm64/include/asm/memory.h
->> +++ b/arch/arm64/include/asm/memory.h
->> @@ -186,11 +186,15 @@ extern u64			kimage_voffset;
->>   * translation for translating DMA addresses.  Use the driver
->>   * DMA support - see dma-mapping.h.
->>   */
->> +#ifndef CONFIG_DEBUG_VM
->>  #define virt_to_phys virt_to_phys
->>  static inline phys_addr_t virt_to_phys(const volatile void *x)
->>  {
->>  	return __virt_to_phys((unsigned long)(x));
->>  }
->> +#else
->> +#define virt_to_phys debug_virt_to_phys
->> +#endif
->>  
->>  #define phys_to_virt phys_to_virt
->>  static inline void *phys_to_virt(phys_addr_t x)
->> diff --git a/include/asm-generic/memory_model.h b/include/asm-generic/memory_model.h
->> index 5148150cc80b..426085757258 100644
->> --- a/include/asm-generic/memory_model.h
->> +++ b/include/asm-generic/memory_model.h
->> @@ -80,6 +80,10 @@
->>  #define page_to_pfn __page_to_pfn
->>  #define pfn_to_page __pfn_to_page
->>  
->> +#ifdef CONFIG_DEBUG_VM
->> +unsigned long debug_virt_to_phys(volatile void *address);
->> +#endif /* CONFIG_DEBUG_VM */
+
+
+On 14/11/16 18:40, Stephen Boyd wrote:
+> On 11/14/2016 09:52 AM, Srinivas Kandagatla wrote:
+>> diff --git a/drivers/mfd/qcom-pm8xxx.c b/drivers/mfd/qcom-pm8xxx.c
+>> index 7f9620e..dc347d3 100644
+>> --- a/drivers/mfd/qcom-pm8xxx.c
+>> +++ b/drivers/mfd/qcom-pm8xxx.c
 >> +
->>  #endif /* __ASSEMBLY__ */
->>  
->>  #endif
->> diff --git a/mm/debug.c b/mm/debug.c
->> index 9feb699c5d25..72b2ca9b11f4 100644
->> --- a/mm/debug.c
->> +++ b/mm/debug.c
->> @@ -161,4 +161,19 @@ void dump_mm(const struct mm_struct *mm)
->>  	);
->>  }
->>  
->> +#include <asm/memory.h>
->> +#include <linux/mm.h>
->> +
->> +unsigned long debug_virt_to_phys(volatile void *address)
+>> +static void pm8821_irq_handler(struct irq_desc *desc)
 >> +{
->> +	BUG_ON(is_vmalloc_addr((const void *)address));
->> +#if defined(CONFIG_ARM) || defined(CONFIG_ARM64) || defined(CONFIG_UNICORE32) || \
->> +	defined(CONFIG_MICROBLAZE)
->> +	return __virt_to_phys(address);
->> +#else
->> +	return virt_to_phys(address);
->> +#endif
->> +}
->> +EXPORT_SYMBOL(debug_virt_to_phys);
+>> +	struct pm_irq_chip *chip = irq_desc_get_handler_data(desc);
+>> +	struct irq_chip *irq_chip = irq_desc_get_chip(desc);
+>> +	unsigned int master;
+>> +	int ret;
 >> +
->>  #endif		/* CONFIG_DEBUG_VM */
->>
-> 
-> is_vmalloc_addr is necessary but not sufficient. This misses
-> cases like module addresses.
-
-Indeed, thanks.
-
-> The x86 version (CONFIG_DEBUG_VIRTUAL)
-> bounds checks against the known linear map to catch all cases.
-> I'm for a generic approach to this if it can catch all cases
-> that an architecture specific version would catch.
-
-For one, my patch causes an early BUG to occur on ARM64 during
-arch/arm64/kernel/setup.c::setup_arch when we call
-cpu_uninstall_idmap(). I suspect there could be a bunch of little checks
-like these where we'd have to have an architecture specific "is this
-physical/virtual address valid" that may make a generic implementation
-hard to come up with.
--- 
-Florian
+>> +	chained_irq_enter(irq_chip, desc);
+>> +	ret = regmap_read(chip->regmap,
+>> +			  PM8821_SSBI_REG_ADDR_IRQ_MASTER0, &master);
+>> +	if (ret) {
+>> +		pr_err("Failed to re:Qad master 0 ret=%d\n", ret);
+>
+> Hm? vi?
+yes..  That was good catch!! will fix it in next version...
+>
