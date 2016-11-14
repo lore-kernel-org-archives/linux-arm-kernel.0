@@ -1,21 +1,22 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 14 Nov 2016 15:34:02 +0800
-Subject: [PATCH 1/2] ARM: dts: imx6q-cm-fx6: fix fec pinctrl
-In-Reply-To: <6cd823201b9f4cde8de8eddc910f39ce@rwthex-s1-b.rwth-ad.de>
-References: <6cd823201b9f4cde8de8eddc910f39ce@rwthex-s1-b.rwth-ad.de>
-Message-ID: <20161114073401.GM3310@dragon>
+Date: Mon, 14 Nov 2016 15:36:36 +0800
+Subject: [PATCH] ARM: dts: imx: Remove skeleton.dtsi
+In-Reply-To: <1478964635-12298-1-git-send-email-festevam@gmail.com>
+References: <1478964635-12298-1-git-send-email-festevam@gmail.com>
+Message-ID: <20161114073634.GN3310@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2016 at 04:59:38PM +0100, christopher.spinrath at rwth-aachen.de wrote:
-> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+On Sat, Nov 12, 2016 at 01:30:35PM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> According to the schematics of CompuLab's sbc-fx6 baseboard and the
-> vendor devicetree GPIO_16 is *not* muxed to ENET_REF_CLK but to SPDIF_IN.
+> As explained by commit 9c0da3cc61f1233c ("ARM: dts: explicitly mark
+> skeleton.dtsi as deprecated"), including skeleton.dtsi is deprecated.
 > 
-> Remove the wrong pinctrl setting.
+> This fixes the following warning with W=1:
 > 
-> Fixes: 682d055e6ac5 ("ARM: dts: Add initial support for cm-fx6.")
-> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+> Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Applied both, thanks.
+Applied, thanks.
