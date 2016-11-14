@@ -1,46 +1,34 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 14 Nov 2016 21:28:32 +0100
-Subject: [PATCH RFC] ARM: dts: add support for Turris Omnia
-In-Reply-To: <20161114201640.rr32iyjf5a53v33t@perseus.defre.kleine-koenig.org>
-References: <20161105203841.9661-1-uwe@kleine-koenig.org>
- <1479126185.15557.5@smtp.gmail.com>
- <20161114201640.rr32iyjf5a53v33t@perseus.defre.kleine-koenig.org>
-Message-ID: <20161114202832.GG24546@lunn.ch>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 14 Nov 2016 21:53:56 +0100
+Subject: [PATCH] ARM: sun8i: sina33: Enable USB gadget
+In-Reply-To: <20161104144439.4469-1-maxime.ripard@free-electrons.com>
+References: <20161104144439.4469-1-maxime.ripard@free-electrons.com>
+Message-ID: <20161114205356.h5aaeg7gwqlrx5du@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Nov 04, 2016 at 03:44:39PM +0100, Maxime Ripard wrote:
+> The micro-USB on the SinA33 has a somewhat interesting design in the sense
+> that it has a micro USB connector, but the VBUS is (supposed to be)
+> controlled through an (unpopulated) jumper.
 > 
-> +               i2c at 7 {
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       reg = <7>;
-> +
-> +                       pcawan: gpio at 71 {
-> +                               compatible = "nxp,pca9538";
-> +                               reg = <0x71>;
-> +
-> +                               pinctrl-names = "default";
-> +                               pinctrl-0 = <&pcawan_pins>;
-> +
-> +                               interrupt-parent = <&gpio1>;
-> +                               interrupts = <14 IRQ_TYPE_LEVEL_LOW>;
-> +
-> +                               gpio-controller;
-> +                               #gpio-cells = <2>;
-> +
-> +                               interrupt-controller;
-> +                               #interrupt-cells = <2>;
-> +                       };
-> +               };
+> Obviously, that doesn't work really well, and only the peripheral mode
+> really works. Still enable it.
 > 
-> The interrupt-controller part doesn't seem to work though, at least
-> 
-> +               interrupt-parent = <&pcawan>;
-> +               interrupts = <7 IRQ_TYPE_LEVEL_LOW>;
-> 
-> in the phy node gives an error.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Interrupts don't seem to work very well with the nxp,pca9538. Which
-is probably why it is disabled by default.
+Applied.
 
-   Andrew
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161114/9b9d417b/attachment-0001.sig>
