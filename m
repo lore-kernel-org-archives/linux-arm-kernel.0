@@ -1,20 +1,19 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 14 Nov 2016 14:36:10 +0800
-Subject: [PATCH] arm: imx6qp: correct LDB clock inputs
-In-Reply-To: <20161108165536.19656-1-l.stach@pengutronix.de>
-References: <20161108165536.19656-1-l.stach@pengutronix.de>
-Message-ID: <20161114063608.GI3310@dragon>
+Date: Mon, 14 Nov 2016 14:38:29 +0800
+Subject: [PATCH] ARM: dts: imx7d-pinfunc: fix UART pinmux defines
+In-Reply-To: <20161109024456.1832-1-stefan@agner.ch>
+References: <20161109024456.1832-1-stefan@agner.ch>
+Message-ID: <20161114063827.GJ3310@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2016 at 05:55:36PM +0100, Lucas Stach wrote:
-> On i.MX6QP the LDB clock tree has changed to move the clk gate
-> before the divider, to prevent clock glitches propagating downstream.
+On Tue, Nov 08, 2016 at 06:44:56PM -0800, Stefan Agner wrote:
+> The UART pinmux defines for the pins which are part of the LPSR
+> pinmux controller are wrong: Output signals configure the input
+> sel value and the pinmux defines allow not to distinguish between
+> DCE/DTE mode. Follow the usual pattern using DTE/DCE as part of
+> the define to denote the two UART configuration options.
 > 
-> A consequence of this change is that the clk divider is now the
-> parent of the LDB inputs. Reflect this change in the devicetree
-> to allow the LDB driver to properly configure the display clocks.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
 Applied, thanks.
