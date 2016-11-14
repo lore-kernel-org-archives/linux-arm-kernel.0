@@ -1,62 +1,43 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 14 Nov 2016 01:19:37 +0100
-Subject: [PATCH] PM / AVS: rockchip-io: make the log more consistent
-In-Reply-To: <1883054.D2Rm2X9N2G@phil>
-References: <1476103462-7559-1-git-send-email-shawn.lin@rock-chips.com>
- <1883054.D2Rm2X9N2G@phil>
-Message-ID: <1828121.EAG4WFMlqn@vostro.rjw.lan>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Sun, 13 Nov 2016 17:18:54 -0700
+Subject: [PATCH fpga 8/9] fpga socfpga: Use the scatterlist interface
+In-Reply-To: <alpine.DEB.2.10.1611131712210.2735@atull-VirtualBox>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-9-git-send-email-jgunthorpe@obsidianresearch.com>
+ <alpine.DEB.2.10.1611131712210.2735@atull-VirtualBox>
+Message-ID: <20161114001854.GA27248@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, October 10, 2016 10:15:50 PM Heiko Stuebner wrote:
-> Am Montag, 10. Oktober 2016, 20:44:22 CEST schrieb Shawn Lin:
-> > When testing SD hotplug automatically, I got bunch of
-> > useless log like this:
-> > 
-> > [  588.357838] mmc0: card 0007 removed
-> > [  589.492664] rockchip-iodomain ff770000.syscon:io-domains: Setting to
-> > 3300000 done [  589.500698] vccio_sd: ramp_delay not set
-> > [  589.504817] rockchip-iodomain ff770000.syscon:io-domains: Setting to
-> > 3300000 done [  589.669705] rockchip-iodomain ff770000.syscon:io-domains:
-> > Setting to 3300000 done [  589.677593] vccio_sd: ramp_delay not set
-> > [  589.681581] rockchip-iodomain ff770000.syscon:io-domains: Setting to
-> > 1800000 done [  590.032820] dwmmc_rockchip ff0c0000.dwmmc: Successfully
-> > tuned phase to 140 [  590.039725] mmc0: new ultra high speed SDR50 SDHC
-> > card at address 0007 [  590.046641] mmcblk0: mmc0:0007 SD32G 29.3 GiB
-> > [  590.052163]  mmcblk0: p1
-> > 
-> > Moreover the code is intent to print the 'uV' for debug but
-> > later print it using dev_info. It looks more like to me that
-> > it should be the real intention of the code. Anyway, let's
-> > mark this verbose log as debug message.
-> > 
-> > Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> 
-> reducing the amount of logs, especially for information not generally needed 
-> looks sane
-> 
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> 
-> > ---
-> > 
-> >  drivers/power/avs/rockchip-io-domain.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/power/avs/rockchip-io-domain.c
-> > b/drivers/power/avs/rockchip-io-domain.c index 01b6d3f..56bce19 100644
-> > --- a/drivers/power/avs/rockchip-io-domain.c
-> > +++ b/drivers/power/avs/rockchip-io-domain.c
-> > @@ -143,7 +143,7 @@ static int rockchip_iodomain_notify(struct
-> > notifier_block *nb, if (ret && event == REGULATOR_EVENT_PRE_VOLTAGE_CHANGE)
-> >  		return NOTIFY_BAD;
-> > 
-> > -	dev_info(supply->iod->dev, "Setting to %d done\n", uV);
-> > +	dev_dbg(supply->iod->dev, "Setting to %d done\n", uV);
-> >  	return NOTIFY_OK;
-> >  }
-> 
+On Sun, Nov 13, 2016 at 05:19:34PM -0600, atull wrote:
 
-Applied (for v4.10).
+> Currently or soon we have 3 drivers that don't really use the sg
+> interface natively.  So this workaround ends up in each of them?
 
-Thanks,
-Rafael
+Thinking of the SG list as a workaround is not really right - the SG
+list is a way to pass memory stored in non-contiguous pages around,
+and the miter is a way to access them from the CPU.
+
+socfpga *does* use sg natively because it is happy to process the data
+from the CPU page-at-time. It just doesn't use DMA.
+
+> That's a lot of duplicated code.  Why can't this code be in the
+> fpga-mgr.c core for drivers that aren't using sg (to minimizing
+> duplication).
+
+Sure, if it is a common pattern it is a good idea to lift it.
+
+I'd add a newop 'write_fragment' and a driver must define write_sg
+write_fragment, if write_fragment is used then the core supplies
+that loop.
+
+Is there a tree with these new drivers someplace?
+
+> I will test this when I get time, may not be this week.  I just
+> moved to a new building and lab and am in a course all week and
+> so forth.
+
+Sure, I don't expect any problems, Zynq uses the same loop and it
+seems fine.
+
+Jason
