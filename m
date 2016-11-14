@@ -1,117 +1,159 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 14 Nov 2016 10:45:29 -0800
-Subject: [PATCH RFC] mm: Add debug_virt_to_phys()
-In-Reply-To: <20161112004449.30566-1-f.fainelli@gmail.com>
-References: <20161112004449.30566-1-f.fainelli@gmail.com>
-Message-ID: <aee5072c-4e09-547e-2f58-7b2106bced3c@redhat.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 14 Nov 2016 10:50:57 -0800
+Subject: [PATCH resend] input: touchscreen: silead: Add regulator support
+In-Reply-To: <20161114144502.10595-2-hdegoede@redhat.com>
+References: <20161114144502.10595-1-hdegoede@redhat.com>
+ <20161114144502.10595-2-hdegoede@redhat.com>
+Message-ID: <20161114185057.GA7694@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2016 04:44 PM, Florian Fainelli wrote:
-> When CONFIG_DEBUG_VM is turned on, virt_to_phys() maps to
-> debug_virt_to_phys() which helps catch vmalloc space addresses being
-> passed. This is helpful in debugging bogus drivers that just assume
-> linear mappings all over the place.
+Hi Hans,
+
+On Mon, Nov 14, 2016 at 03:45:02PM +0100, Hans de Goede wrote:
+> On some tablets the touchscreen controller is powered by seperate
+> regulators, add support for this.
 > 
-> For ARM, ARM64, Unicore32 and Microblaze, the architectures define
-> __virt_to_phys() as being the functional implementation of the address
-> translation, so we special case the debug stub to call into
-> __virt_to_phys directly.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 > ---
->  arch/arm/include/asm/memory.h      |  4 ++++
->  arch/arm64/include/asm/memory.h    |  4 ++++
->  include/asm-generic/memory_model.h |  4 ++++
->  mm/debug.c                         | 15 +++++++++++++++
->  4 files changed, 27 insertions(+)
+>  .../bindings/input/touchscreen/silead_gsl1680.txt  |  2 +
+>  drivers/input/touchscreen/silead.c                 | 51 ++++++++++++++++++++--
+>  2 files changed, 49 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 76cbd9c674df..448dec9b8b00 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -260,11 +260,15 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
->   * translation for translating DMA addresses.  Use the driver
->   * DMA support - see dma-mapping.h.
->   */
-> +#ifndef CONFIG_DEBUG_VM
->  #define virt_to_phys virt_to_phys
->  static inline phys_addr_t virt_to_phys(const volatile void *x)
->  {
->  	return __virt_to_phys((unsigned long)(x));
->  }
-> +#else
-> +#define virt_to_phys debug_virt_to_phys
-> +#endif
+> diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+> index e844c3f..b726823 100644
+> --- a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+> +++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+> @@ -22,6 +22,8 @@ Optional properties:
+>  - touchscreen-inverted-y  : See touchscreen.txt
+>  - touchscreen-swapped-x-y : See touchscreen.txt
+>  - silead,max-fingers	  : maximum number of fingers the touchscreen can detect
+> +- vddio-supply		  : regulator phandle for controller VDDIO
+> +- avdd-supply		  : regulator phandle for controller AVDD
 >  
->  #define phys_to_virt phys_to_virt
->  static inline void *phys_to_virt(phys_addr_t x)
-> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> index b71086d25195..c9e436b28523 100644
-> --- a/arch/arm64/include/asm/memory.h
-> +++ b/arch/arm64/include/asm/memory.h
-> @@ -186,11 +186,15 @@ extern u64			kimage_voffset;
->   * translation for translating DMA addresses.  Use the driver
->   * DMA support - see dma-mapping.h.
->   */
-> +#ifndef CONFIG_DEBUG_VM
->  #define virt_to_phys virt_to_phys
->  static inline phys_addr_t virt_to_phys(const volatile void *x)
->  {
->  	return __virt_to_phys((unsigned long)(x));
->  }
-> +#else
-> +#define virt_to_phys debug_virt_to_phys
-> +#endif
+>  Example:
 >  
->  #define phys_to_virt phys_to_virt
->  static inline void *phys_to_virt(phys_addr_t x)
-> diff --git a/include/asm-generic/memory_model.h b/include/asm-generic/memory_model.h
-> index 5148150cc80b..426085757258 100644
-> --- a/include/asm-generic/memory_model.h
-> +++ b/include/asm-generic/memory_model.h
-> @@ -80,6 +80,10 @@
->  #define page_to_pfn __page_to_pfn
->  #define pfn_to_page __pfn_to_page
+> diff --git a/drivers/input/touchscreen/silead.c b/drivers/input/touchscreen/silead.c
+> index f502c84..c6a1ae9 100644
+> --- a/drivers/input/touchscreen/silead.c
+> +++ b/drivers/input/touchscreen/silead.c
+> @@ -29,6 +29,7 @@
+>  #include <linux/input/touchscreen.h>
+>  #include <linux/pm.h>
+>  #include <linux/irq.h>
+> +#include <linux/regulator/consumer.h>
 >  
-> +#ifdef CONFIG_DEBUG_VM
-> +unsigned long debug_virt_to_phys(volatile void *address);
-> +#endif /* CONFIG_DEBUG_VM */
+>  #include <asm/unaligned.h>
+>  
+> @@ -72,6 +73,8 @@ enum silead_ts_power {
+>  struct silead_ts_data {
+>  	struct i2c_client *client;
+>  	struct gpio_desc *gpio_power;
+> +	struct regulator *vddio;
+> +	struct regulator *avdd;
+>  	struct input_dev *input;
+>  	char fw_name[64];
+>  	struct touchscreen_properties prop;
+> @@ -465,21 +468,52 @@ static int silead_ts_probe(struct i2c_client *client,
+>  	if (client->irq <= 0)
+>  		return -ENODEV;
+>  
+> +	data->vddio = devm_regulator_get_optional(dev, "vddio");
+> +	if (IS_ERR(data->vddio)) {
+> +		if (PTR_ERR(data->vddio) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
+> +		data->vddio = NULL;
+
+Why do we ignore other errors? If there is an issue reported by
+regulator framework we should net be ignoring it.
+
+Unless regulator is truly optional (i.e. chip can work with some
+functionality powered off) and not simply hidden (firmware takes care of
+powering up system), we should not be using regulator_get_optional():
+if regulator is absent from ACPI/DT/etc, regulator framework will supply
+dummy regulator that you can enable/disable and not bothering checking
+whether it is NULL or not.
+
+Also, please consider using devm_regulator_bulk_get().
+
+> +	}
 > +
->  #endif /* __ASSEMBLY__ */
+> +	data->avdd = devm_regulator_get_optional(dev, "avdd");
+> +	if (IS_ERR(data->avdd)) {
+> +		if (PTR_ERR(data->avdd) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
+> +		data->avdd = NULL;
+> +	}
+> +
+> +	/*
+> +	 * Enable regulators at probe and disable them at remove, we need
+> +	 * to keep the chip powered otherwise it forgets its firmware.
+> +	 */
+> +	if (data->vddio) {
+> +		error = regulator_enable(data->vddio);
+> +		if (error)
+> +			return error;
+> +	}
+> +
+> +	if (data->avdd) {
+> +		error = regulator_enable(data->avdd);
+> +		if (error)
+> +			goto disable_vddio;
+> +	}
+
+Use devm_add_action_or_reset() to work regulator_bulk_disable call into
+devm stream. As it is you are leaving regulators on on unbind/remove.
+
+> +
+>  	/* Power GPIO pin */
+>  	data->gpio_power = devm_gpiod_get_optional(dev, "power", GPIOD_OUT_LOW);
+>  	if (IS_ERR(data->gpio_power)) {
+>  		if (PTR_ERR(data->gpio_power) != -EPROBE_DEFER)
+>  			dev_err(dev, "Shutdown GPIO request failed\n");
+> -		return PTR_ERR(data->gpio_power);
+> +		error = PTR_ERR(data->gpio_power);
+> +		goto disable_avdd;
+>  	}
 >  
->  #endif
-> diff --git a/mm/debug.c b/mm/debug.c
-> index 9feb699c5d25..72b2ca9b11f4 100644
-> --- a/mm/debug.c
-> +++ b/mm/debug.c
-> @@ -161,4 +161,19 @@ void dump_mm(const struct mm_struct *mm)
->  	);
+>  	error = silead_ts_setup(client);
+>  	if (error)
+> -		return error;
+> +		goto disable_avdd;
+>  
+>  	error = silead_ts_request_input_dev(data);
+>  	if (error)
+> -		return error;
+> +		goto disable_avdd;
+>  
+>  	error = devm_request_threaded_irq(dev, client->irq,
+>  					  NULL, silead_ts_threaded_irq_handler,
+> @@ -487,10 +521,19 @@ static int silead_ts_probe(struct i2c_client *client,
+>  	if (error) {
+>  		if (error != -EPROBE_DEFER)
+>  			dev_err(dev, "IRQ request failed %d\n", error);
+> -		return error;
+> +		goto disable_avdd;
+>  	}
+>  
+>  	return 0;
+> +
+> +disable_avdd:
+> +	if (data->avdd)
+> +		regulator_disable(data->avdd);
+> +disable_vddio:
+> +	if (data->vddio)
+> +		regulator_disable(data->vddio);
+> +
+> +	return error;
 >  }
 >  
-> +#include <asm/memory.h>
-> +#include <linux/mm.h>
-> +
-> +unsigned long debug_virt_to_phys(volatile void *address)
-> +{
-> +	BUG_ON(is_vmalloc_addr((const void *)address));
-> +#if defined(CONFIG_ARM) || defined(CONFIG_ARM64) || defined(CONFIG_UNICORE32) || \
-> +	defined(CONFIG_MICROBLAZE)
-> +	return __virt_to_phys(address);
-> +#else
-> +	return virt_to_phys(address);
-> +#endif
-> +}
-> +EXPORT_SYMBOL(debug_virt_to_phys);
-> +
->  #endif		/* CONFIG_DEBUG_VM */
+>  static int __maybe_unused silead_ts_suspend(struct device *dev)
+> -- 
+> 2.9.3
 > 
 
-is_vmalloc_addr is necessary but not sufficient. This misses
-cases like module addresses. The x86 version (CONFIG_DEBUG_VIRTUAL)
-bounds checks against the known linear map to catch all cases.
-I'm for a generic approach to this if it can catch all cases
-that an architecture specific version would catch.
+Thanks.
 
-Thanks,
-Laura
+-- 
+Dmitry
