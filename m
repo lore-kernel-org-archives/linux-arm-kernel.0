@@ -1,24 +1,148 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 14 Nov 2016 11:18:04 -0600
-Subject: [PATCH 1/2] mfd: pm8921: add support to pm8821
-In-Reply-To: <1478622577-20699-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1478622577-20699-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20161114171804.qsad624oa3ms6epj@rob-hp-laptop>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Mon, 14 Nov 2016 09:20:38 -0800
+Subject: [PATCH fpga 5/9] fpga zynq: Remove priv->dev
+In-Reply-To: <alpine.DEB.2.10.1611140913280.3739@atull-VirtualBox>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-6-git-send-email-jgunthorpe@obsidianresearch.com>
+ <alpine.DEB.2.10.1611140913280.3739@atull-VirtualBox>
+Message-ID: <CAAtXAHe60QjyitDxkEzc9+Zr99mj0SeWFUOW0SOexGnBvuqGjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2016 at 04:29:36PM +0000, Srinivas Kandagatla wrote:
-> This patch adds support to PM8821 PMIC and interrupt support.
-> PM8821 is companion device that supplements primary PMIC PM8921 IC.
-> 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
-> Tested this patch for MPP and IRQ functionality on IFC6410 and SD600 EVAL
-> board with mpps PM8821 and PM8921.
-> 
->  .../devicetree/bindings/mfd/qcom-pm8xxx.txt        |   1 +
+Hi Jason,
 
-Acked-by: Rob Herring <robh@kernel.org>
+this one could be independent of the other patches, this is cleanup and
+could be merged before the rest (that's still in discussion) if you pull it out.
 
->  drivers/mfd/pm8921-core.c                          | 368 +++++++++++++++++++--
->  2 files changed, 340 insertions(+), 29 deletions(-)
+On Mon, Nov 14, 2016 at 7:13 AM, atull <atull@opensource.altera.com> wrote:
+> On Wed, 9 Nov 2016, Jason Gunthorpe wrote:
+>
+> Hi Jason,
+>
+>     Acked-by: Alan Tull <atull@opensource.altera.com>
+>
+> Alan
+>
+>> socfpga uses mgr->dev for debug prints, there should be consistency
+>> here, so standardize on that. The only other use was for dma
+>> which can be replaced with mgr->dev.parent.
+>>
+>> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+
+Modulo the comments above:
+
+Acked-by: Moritz Fischer <moritz.fischer@ettus.com>
+>> ---
+>>  drivers/fpga/zynq-fpga.c | 22 ++++++++++------------
+>>  1 file changed, 10 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+>> index 3ffc5fcc3072..ac2deae92dbd 100644
+>> --- a/drivers/fpga/zynq-fpga.c
+>> +++ b/drivers/fpga/zynq-fpga.c
+>> @@ -118,7 +118,6 @@
+>>  #define FPGA_RST_NONE_MASK           0x0
+>>
+>>  struct zynq_fpga_priv {
+>> -     struct device *dev;
+>>       int irq;
+>>       struct clk *clk;
+>>
+>> @@ -188,7 +187,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+>>        * least the sync word and something else to do anything.
+>>        */
+>>       if (count <= 4 || (count % 4) != 0) {
+>> -             dev_err(priv->dev,
+>> +             dev_err(&mgr->dev,
+>>                       "Invalid bitstream size, must be multiples of 4 bytes\n");
+>>               return -EINVAL;
+>>       }
+>> @@ -200,7 +199,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+>>       /* don't globally reset PL if we're doing partial reconfig */
+>>       if (!(flags & FPGA_MGR_PARTIAL_RECONFIG)) {
+>>               if (!zynq_fpga_has_sync(buf, count)) {
+>> -                     dev_err(priv->dev,
+>> +                     dev_err(&mgr->dev,
+>>                               "Invalid bitstream, could not find a sync word. Bitstream must be a byte swaped .bin file\n");
+>>                       err = -EINVAL;
+>>                       goto out_err;
+>> @@ -233,7 +232,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+>>                                            INIT_POLL_DELAY,
+>>                                            INIT_POLL_TIMEOUT);
+>>               if (err) {
+>> -                     dev_err(priv->dev, "Timeout waiting for PCFG_INIT\n");
+>> +                     dev_err(&mgr->dev, "Timeout waiting for PCFG_INIT\n");
+>>                       goto out_err;
+>>               }
+>>
+>> @@ -247,7 +246,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+>>                                            INIT_POLL_DELAY,
+>>                                            INIT_POLL_TIMEOUT);
+>>               if (err) {
+>> -                     dev_err(priv->dev, "Timeout waiting for !PCFG_INIT\n");
+>> +                     dev_err(&mgr->dev, "Timeout waiting for !PCFG_INIT\n");
+>>                       goto out_err;
+>>               }
+>>
+>> @@ -261,7 +260,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+>>                                            INIT_POLL_DELAY,
+>>                                            INIT_POLL_TIMEOUT);
+>>               if (err) {
+>> -                     dev_err(priv->dev, "Timeout waiting for PCFG_INIT\n");
+>> +                     dev_err(&mgr->dev, "Timeout waiting for PCFG_INIT\n");
+>>                       goto out_err;
+>>               }
+>>       }
+>> @@ -278,7 +277,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+>>       /* check that we have room in the command queue */
+>>       status = zynq_fpga_read(priv, STATUS_OFFSET);
+>>       if (status & STATUS_DMA_Q_F) {
+>> -             dev_err(priv->dev, "DMA command queue full\n");
+>> +             dev_err(&mgr->dev, "DMA command queue full\n");
+>>               err = -EBUSY;
+>>               goto out_err;
+>>       }
+>> @@ -309,7 +308,8 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+>>
+>>       priv = mgr->priv;
+>>
+>> -     kbuf = dma_alloc_coherent(priv->dev, count, &dma_addr, GFP_KERNEL);
+>> +     kbuf =
+>> +         dma_alloc_coherent(mgr->dev.parent, count, &dma_addr, GFP_KERNEL);
+>>       if (!kbuf)
+>>               return -ENOMEM;
+>>
+>> @@ -356,7 +356,7 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+>>       goto out_clk;
+>>
+>>  out_report:
+>> -     dev_err(priv->dev,
+>> +     dev_err(&mgr->dev,
+>>               "%s: INT_STS:0x%x CTRL:0x%x LOCK:0x%x INT_MASK:0x%x STATUS:0x%x MCTRL:0x%x\n",
+>>               why,
+>>               intr_status,
+>> @@ -368,7 +368,7 @@ out_report:
+>>  out_clk:
+>>       clk_disable(priv->clk);
+>>  out_free:
+>> -     dma_free_coherent(priv->dev, count, kbuf, dma_addr);
+>> +     dma_free_coherent(mgr->dev.parent, count, kbuf, dma_addr);
+>>       return err;
+>>  }
+>>
+>> @@ -445,8 +445,6 @@ static int zynq_fpga_probe(struct platform_device *pdev)
+>>       if (!priv)
+>>               return -ENOMEM;
+>>
+>> -     priv->dev = dev;
+>> -
+>>       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>       priv->io_base = devm_ioremap_resource(dev, res);
+>>       if (IS_ERR(priv->io_base))
+>> --
+>> 2.1.4
+>>
+>>
+Cheers,
+
+Moritz
