@@ -1,68 +1,90 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 14 Nov 2016 09:26:28 -0800
-Subject: [PATCH v2 7/9] arm64: dts: rockchip: add pd_edp node for rk3399
-In-Reply-To: <1478697721-2323-8-git-send-email-wxt@rock-chips.com>
-References: <1478697721-2323-1-git-send-email-wxt@rock-chips.com>
- <1478697721-2323-8-git-send-email-wxt@rock-chips.com>
-Message-ID: <CAD=FV=WDsPF1dHgZePKq20tQjguHm7yyBEA9-+sNoDm7HdspXg@mail.gmail.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Mon, 14 Nov 2016 09:26:59 -0800
+Subject: [PATCH 1/4] fpga mgr: Introduce FPGA capabilities
+In-Reply-To: <alpine.DEB.2.10.1611140801480.2786@atull-VirtualBox>
+References: <20161107001326.7395-1-moritz.fischer@ettus.com>
+ <20161107001326.7395-2-moritz.fischer@ettus.com>
+ <alpine.DEB.2.10.1611140801480.2786@atull-VirtualBox>
+Message-ID: <CAAtXAHeX08ZxGceXvqkdNwsVHdOpczxx5fvFapLy74n1_4R-CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Caesar,
+Hi Alan,
 
-On Wed, Nov 9, 2016 at 5:21 AM, Caesar Wang <wxt@rock-chips.com> wrote:
-> From: zhangqing <zhangqing@rock-chips.com>
+On Mon, Nov 14, 2016 at 6:06 AM, atull <atull@opensource.altera.com> wrote:
+> On Mon, 7 Nov 2016, Moritz Fischer wrote:
 >
-> 1. add pd node for RK3399 Soc
-> 2. create power domain tree
-> 3. add qos node for domain
-
-No step #3 since there doesn't appear to be a qos node for eDP.  Your
-patch doesn't add one and I can't find one in the TRM.
-
-> 4. add the pd support for edp
+>> Add FPGA capabilities as a way to express the capabilities
+>> of a given FPGA manager.
+>>
+>> Removes code duplication by comparing the low-level driver's
+>> capabilities at the framework level rather than having each driver
+>> check for supported operations in the write_init() callback.
+>>
+>> This allows for extending with additional capabilities, similar
+>> to the the dmaengine framework's implementation.
+>>
+>> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+>> Cc: Alan Tull <atull@opensource.altera.com>
+>> Cc: Michal Simek <michal.simek@xilinx.com>
+>> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+>> Cc: linux-kernel at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> ---
+>>
+>> Changes from RFC:
+>> * in the RFC the caps weren't actually stored into the struct fpga_mgr
+>>
+>> Note:
+>>
+>> If people disagree on the typedef being a 'false positive' I can fix
+>> that in a future rev of the patchset.
+>>
+>> Thanks,
+>>
+>>     Moritz
+>>
+>> ---
+>>  drivers/fpga/fpga-mgr.c       | 15 ++++++++++++++
+>>  drivers/fpga/socfpga.c        | 10 +++++-----
+>>  drivers/fpga/zynq-fpga.c      |  7 ++++++-
+>>  include/linux/fpga/fpga-mgr.h | 46 ++++++++++++++++++++++++++++++++++++++++++-
+>>  4 files changed, 71 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/fpga/fpga-mgr.c b/drivers/fpga/fpga-mgr.c
+>> index 953dc91..ed57c17 100644
+>> --- a/drivers/fpga/fpga-mgr.c
+>> +++ b/drivers/fpga/fpga-mgr.c
+>> @@ -49,6 +49,18 @@ int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags, const char *buf,
+>>       struct device *dev = &mgr->dev;
+>>       int ret;
+>>
+>> +     if (flags & FPGA_MGR_PARTIAL_RECONFIG &&
+>> +         !fpga_mgr_has_cap(FPGA_MGR_CAP_PARTIAL_RECONF, mgr->caps)) {
+>> +             dev_err(dev, "Partial reconfiguration not supported\n");
+>> +             return -ENOTSUPP;
+>> +     }
+>> +
+>> +     if (flags & FPGA_MGR_FULL_RECONFIG &&
+>> +         !fpga_mgr_has_cap(FPGA_MGR_CAP_FULL_RECONF, mgr->caps)) {
+>> +             dev_err(dev, "Full reconfiguration not supported\n");
+>> +             return -ENOTSUPP;
+>> +     }
+>> +
 >
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> ---
->
-> Changes in v2: None
->
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> index 74deb44..09ebf4e 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> @@ -835,6 +835,10 @@
->                         };
->
->                         /* These power domains are grouped by VD_LOGIC */
-> +                       pd_edp at RK3399_PD_EDP {
-> +                               reg = <RK3399_PD_EDP>;
-> +                               clocks = <&cru PCLK_EDP_CTRL>;
+> Could you move the checks to their own function like
+> 'fpga_mgr_check_caps()' or something?  I really like it if we can keep
+> the functions short, like a screen or so where it's practicle to do
+> so and I could see the number of caps growing here.
 
-Are you sure that PCLK_EDP isn't needed as well?  After the super
-hard-to-debug problems we just faced with the missing GMAC clock in
-the power domains, I figure it's at least worth a check.  ;)
+Absolutely. Great suggestion.
 
-> +                       };
->                         pd_emmc at RK3399_PD_EMMC {
->                                 reg = <RK3399_PD_EMMC>;
->                                 clocks = <&cru ACLK_EMMC>;
-> @@ -1364,6 +1368,7 @@
->                 status = "disabled";
->                 pinctrl-names = "default";
->                 pinctrl-0 = <&edp_hpd>;
-> +               power-domains = <&power RK3399_PD_EDP>;
->
->                 ports {
->                         #address-cells = <1>;
+> The only counter argument I could think of is if a cap affects the sequence
+> in this function.  Hmmm...
 
-Other than the question about the clock and the nits about the commit
-message, this all looks fine to me.  Feel free to add my Reviewed-by
-if you fix those things.
+Oh you mean the cap being there affecting the sequence in *this* function?
+I'd suggest we address that when we run into a cap that requires this.
 
+Cheers,
 
--Doug
+Moritz
