@@ -1,24 +1,67 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Nov 2016 13:38:07 +0000
-Subject: [PATCH 2/2] ARM: rename is_smp()
-In-Reply-To: <878tsmchyc.fsf@free-electrons.com>
-References: <E1c6GpW-0008DO-BD@rmk-PC.armlinux.org.uk>
- <878tsmchyc.fsf@free-electrons.com>
-Message-ID: <20161114133806.GI1041@n2100.armlinux.org.uk>
+Date: Mon, 14 Nov 2016 13:40:17 +0000
+Subject: [PATCH] ARM: ftrace: fix syscall name matching
+In-Reply-To: <1479128625-20948-1-git-send-email-rabin.vincent@axis.com>
+References: <1479128625-20948-1-git-send-email-rabin.vincent@axis.com>
+Message-ID: <20161114134017.GJ1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 14, 2016 at 02:24:43PM +0100, Gregory CLEMENT wrote:
-> Hi Russell,
+On Mon, Nov 14, 2016 at 02:03:45PM +0100, Rabin Vincent wrote:
+> From: Rabin Vincent <rabinv@axis.com>
 > 
-> Unless I am wrong I don't see any modification of the code behavior:
-> just renaming the function and adding more comments. So it won't affect
-> our platform and I am OK with the new name which also match our
-> comments.
+> ARM has a few system calls (most notably mmap) for which the names of
+> the functions which are referenced in the syscall table do not match the
+> names of the syscall tracepoints.  As a consequence of this, these
+> tracepoints are not made available.  Implement
+> arch_syscall_match_sym_name to fix this and allow tracing even these
+> system calls.
+> 
+> Signed-off-by: Rabin Vincent <rabinv@axis.com>
+> ---
+>  arch/arm/include/asm/ftrace.h | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+> index bfe2a2f..8467909 100644
+> --- a/arch/arm/include/asm/ftrace.h
+> +++ b/arch/arm/include/asm/ftrace.h
+> @@ -54,6 +54,27 @@ static inline void *return_address(unsigned int level)
+>  
+>  #define ftrace_return_address(n) return_address(n)
+>  
+> +#define ARCH_HAS_SYSCALL_MATCH_SYM_NAME
+> +
+> +static inline bool arch_syscall_match_sym_name(const char *sym,
+> +					       const char *name)
+> +{
+> +	/* Skip sys_ */
+> +	sym += 4;
+> +	name += 4;
 
-That's correct - it's an exercise in renaming to a clearer name.
+Is this really safe?  What guarantees that we can wind forward four
+bytes here?  If it's always safe, it needs a better comment than just
+two words.
 
-Thanks for the ack.
+> +
+> +	if (!strcmp(sym, "mmap2"))
+> +		sym = "mmap_pgoff";
+> +	else if (!strcmp(sym, "statfs64_wrapper"))
+> +		sym = "statfs64";
+> +	else if (!strcmp(sym, "fstatfs64_wrapper"))
+> +		sym = "fstatfs64";
+> +	else if (!strcmp(sym, "arm_fadvise64_64"))
+> +		sym = "fadvise64_64";
+> +
+> +	return !strcmp(sym, name);
+> +}
+> +
+>  #endif /* ifndef __ASSEMBLY__ */
+>  
+>  #endif /* _ASM_ARM_FTRACE */
+> -- 
+> 2.1.4
+> 
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
