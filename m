@@ -1,93 +1,139 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 14 Nov 2016 12:16:26 +0000
-Subject: [PATCH v4 1/2] iommu/dma: Implement dma_{map,unmap}_resource()
-Message-ID: <d1cbd5ce714ce3c978aa8bfcb31def87d7919198.1479125555.git.robin.murphy@arm.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Mon, 14 Nov 2016 20:17:43 +0800
+Subject: [PATCH v2 10/10] ARM: dts: rockchip: add rockchip RK1108 Evaluation
+ board
+In-Reply-To: <1479124550-24037-1-git-send-email-andy.yan@rock-chips.com>
+References: <1479124550-24037-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1479125863-24646-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the new dma_{map,unmap}_resource() functions added to the DMA API
-for the benefit of cases like slave DMA, add suitable implementations to
-the arsenal of our generic layer. Since cache maintenance should not be
-a concern, these can both be standalone callback implementations without
-the need for arch code wrappers.
+RK1108 EVB is designed by Rockchip for CVR field.
+This patch add basic support for it, which can boot with
+initramfs into shell.
 
-CC: Joerg Roedel <joro@8bytes.org>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+Acked-by: Rob Herring <robh@kernel.org>
+
 ---
 
-v4: Add the missed static qualifier (thanks Catalin)
+Changes in v2:
+- move the board in the rockchip.txt to the block of Rockchip boards
 
- drivers/iommu/dma-iommu.c | 24 +++++++++++++++++++++---
- include/linux/dma-iommu.h |  4 ++++
- 2 files changed, 25 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/arm/rockchip.txt |  5 +-
+ arch/arm/boot/dts/Makefile                         |  1 +
+ arch/arm/boot/dts/rk1108-evb.dts                   | 69 ++++++++++++++++++++++
+ 3 files changed, 74 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/rk1108-evb.dts
 
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index c5ab8667e6f2..2db0d641cf45 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -432,13 +432,12 @@ int iommu_dma_mmap(struct page **pages, size_t size, struct vm_area_struct *vma)
- 	return ret;
- }
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index 10b92b5..e658b62 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -1,6 +1,5 @@
+ Rockchip platforms device tree bindings
+ ---------------------------------------
+-
+ - Kylin RK3036 board:
+     Required root node properties:
+       - compatible = "rockchip,kylin-rk3036", "rockchip,rk3036";
+@@ -111,6 +110,10 @@ Rockchip platforms device tree bindings
+     Required root node properties:
+       - compatible = "rockchip,px5-evb", "rockchip,px5", "rockchip,rk3368";
  
--dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
--		unsigned long offset, size_t size, int prot)
-+static dma_addr_t __iommu_dma_map(struct device *dev, phys_addr_t phys,
-+		size_t size, int prot)
- {
- 	dma_addr_t dma_addr;
- 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
- 	struct iova_domain *iovad = cookie_iovad(domain);
--	phys_addr_t phys = page_to_phys(page) + offset;
- 	size_t iova_off = iova_offset(iovad, phys);
- 	size_t len = iova_align(iovad, size + iova_off);
- 	struct iova *iova = __alloc_iova(domain, len, dma_get_mask(dev));
-@@ -454,6 +453,12 @@ dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
- 	return dma_addr + iova_off;
- }
- 
-+dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
-+		unsigned long offset, size_t size, int prot)
-+{
-+	return __iommu_dma_map(dev, page_to_phys(page) + offset, size, prot);
-+}
++- Rockchip RK1108 Evaluation board
++    Required root node properties:
++      - compatible = "rockchip,rk1108-evb", "rockchip,rk1108";
 +
- void iommu_dma_unmap_page(struct device *dev, dma_addr_t handle, size_t size,
- 		enum dma_data_direction dir, unsigned long attrs)
- {
-@@ -624,6 +629,19 @@ void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
- 	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), sg_dma_address(sg));
- }
- 
-+dma_addr_t iommu_dma_map_resource(struct device *dev, phys_addr_t phys,
-+		size_t size, enum dma_data_direction dir, unsigned long attrs)
-+{
-+	return __iommu_dma_map(dev, phys, size,
-+			dma_direction_to_prot(dir, false) | IOMMU_MMIO);
-+}
+ - Rockchip RK3368 evb:
+     Required root node properties:
+       - compatible = "rockchip,rk3368-evb-act8846", "rockchip,rk3368";
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index e49476a..249dca9 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -635,6 +635,7 @@ dtb-$(CONFIG_ARCH_REALVIEW) += \
+ 	arm-realview-pba8.dtb \
+ 	arm-realview-pbx-a9.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
++	rk1108-evb.dtb \
+ 	rk3036-evb.dtb \
+ 	rk3036-kylin.dtb \
+ 	rk3066a-bqcurie2.dtb \
+diff --git a/arch/arm/boot/dts/rk1108-evb.dts b/arch/arm/boot/dts/rk1108-evb.dts
+new file mode 100644
+index 0000000..3956cff
+--- /dev/null
++++ b/arch/arm/boot/dts/rk1108-evb.dts
+@@ -0,0 +1,69 @@
++/*
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *  Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
-+		size_t size, enum dma_data_direction dir, unsigned long attrs)
-+{
-+	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), handle);
-+}
++/dts-v1/;
 +
- int iommu_dma_supported(struct device *dev, u64 mask)
- {
- 	/*
-diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
-index 32c589062bd9..7f7e9a7e3839 100644
---- a/include/linux/dma-iommu.h
-+++ b/include/linux/dma-iommu.h
-@@ -61,6 +61,10 @@ void iommu_dma_unmap_page(struct device *dev, dma_addr_t handle, size_t size,
- 		enum dma_data_direction dir, unsigned long attrs);
- void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
- 		enum dma_data_direction dir, unsigned long attrs);
-+dma_addr_t iommu_dma_map_resource(struct device *dev, phys_addr_t phys,
-+		size_t size, enum dma_data_direction dir, unsigned long attrs);
-+void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
-+		size_t size, enum dma_data_direction dir, unsigned long attrs);
- int iommu_dma_supported(struct device *dev, u64 mask);
- int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr);
- 
++#include "rk1108.dtsi"
++
++/ {
++	model = "Rockchip RK1108 Evaluation board";
++	compatible = "rockchip,rk1108-evb", "rockchip,rk1108";
++
++	memory at 60000000 {
++		device_type = "memory";
++		reg = <0x60000000 0x08000000>;
++	};
++
++	chosen {
++		stdout-path = "serial2:1500000n8";
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
++};
++
++&uart2 {
++	status = "okay";
++};
 -- 
-2.10.2.dirty
+2.7.4
