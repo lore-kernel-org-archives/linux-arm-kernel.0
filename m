@@ -1,46 +1,65 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Nov 2016 18:19:38 +0000
-Subject: [PATCHv2 5/6] arm64: Use __pa_symbol for _end
-In-Reply-To: <20161103155106.GF25852@remoulade>
-References: <20161102210054.16621-1-labbott@redhat.com>
- <20161102210054.16621-6-labbott@redhat.com>
- <20161102225241.GA19591@remoulade>
- <3724ea58-3c04-1248-8359-e2927da03aaf@redhat.com>
- <20161103155106.GF25852@remoulade>
-Message-ID: <20161114181937.GG3096@e104818-lin.cambridge.arm.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 14 Nov 2016 10:24:03 -0800
+Subject: [PATCH 1/2] pinctrl: bcm2835: Fix ints for GPIOs 28-31 & 46-53
+In-Reply-To: <427a3d44-16aa-258c-8722-48d9c7ffb593@i2se.com>
+References: <1479126206-20482-1-git-send-email-linus.walleij@linaro.org>
+ <427a3d44-16aa-258c-8722-48d9c7ffb593@i2se.com>
+Message-ID: <877f85vs1o.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2016 at 03:51:07PM +0000, Mark Rutland wrote:
-> On Wed, Nov 02, 2016 at 05:56:42PM -0600, Laura Abbott wrote:
-> > On 11/02/2016 04:52 PM, Mark Rutland wrote:
-> > >On Wed, Nov 02, 2016 at 03:00:53PM -0600, Laura Abbott wrote:
-> > >>
-> > >>__pa_symbol is technically the marco that should be used for kernel
-> > >>symbols. Switch to this as a pre-requisite for DEBUG_VIRTUAL.
-> > >
-> > >Nit: s/marco/macro/
-> > >
-> > >I see there are some other uses of __pa() that look like they could/should be
-> > >__pa_symbol(), e.g. in mark_rodata_ro().
-> > >
-> > >I guess strictly speaking those need to be updated to? Or is there a reason
-> > >that we should not?
-> > 
-> > If the concept of __pa_symbol is okay then yes I think all uses of __pa
-> > should eventually be converted for consistency and debugging.
-> 
-> I have no strong feelings either way about __pa_symbol(); I'm not clear on what
-> the purpose of __pa_symbol() is specifically, but I'm happy even if it's just
-> for consistency with other architectures.
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-At a quick grep, it seems to only be used by mips and x86 and a single
-place in mm/memblock.c.
+> Hi Linus,
+>
+> Am 14.11.2016 um 13:23 schrieb Linus Walleij:
+>> From: Phil Elwell <phil@raspberrypi.org>
+>>
+>> Contrary to the documentation, the BCM2835 GPIO controller actually
+>> has four interrupt lines - one each for the three IRQ groups and one
+>> common. Confusingly, the GPIO interrupt groups don't correspond
+>> directly with the GPIO control banks. Instead, GPIOs 0-27 generate IRQ
+>> GPIO0, 28-45 IRQ GPIO1 and 46-53 IRQ GPIO2.
+>>
+>> Awkwardly, the GPIOs for IRQ GPIO1 straddle two 32-entry GPIO banks,
+>> so split out a function to process the interrupts for a single GPIO
+>> bank.
+>>
+>> Cc: Stefan Wahren <stefan.wahren@i2se.com>
+>> Cc: Eric Anholt <eric@anholt.net>
+>> Cc: Stephen Warren <swarren@wwwdotorg.org>
+>> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> I want to apply this to cater for my GPIOLIB_IRQCHIP
+>> refactorings.
+>> ---
+>>  drivers/pinctrl/bcm/pinctrl-bcm2835.c | 51 ++++++++++++++++++++++++++---------
+>>  1 file changed, 39 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+>> index b2dd278f18b1..1d8fc104e26b 100644
+>> --- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+>> +++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+>>
+> ...
+>> @@ -1076,6 +1102,7 @@ static struct platform_driver bcm2835_pinctrl_driver = {
+>>  	.remove = bcm2835_pinctrl_remove,
+>>  	.driver = {
+>>  		.name = MODULE_NAME,
+>> +		.owner = THIS_MODULE,
+>
+> this is unnecessary. Please remove it.
+>
+> Thanks for submitting these patches
 
-Since we haven't seen any issues on arm/arm64 without this macro, can we
-not just continue to use __pa()?
+With that dropped,
 
-Thanks.
-
--- 
-Catalin
+Acked-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161114/2938bc95/attachment.sig>
