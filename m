@@ -1,78 +1,57 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Mon, 14 Nov 2016 16:12:16 +0800
-Subject: [PATCH v3 5/6] arm64: arch_timer: apci: Introduce a generic
- aquirk framework for erratum
-In-Reply-To: <1478264794-14652-5-git-send-email-dingtianhong@huawei.com>
-References: <1478264794-14652-1-git-send-email-dingtianhong@huawei.com>
- <1478264794-14652-5-git-send-email-dingtianhong@huawei.com>
-Message-ID: <582971E0.4070403@huawei.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 14 Nov 2016 16:15:56 +0800
+Subject: [PATCH v2 2/2] phy: rockchip-inno-usb2: correct 480MHz output
+ clock stable time
+In-Reply-To: <1479106911-16049-3-git-send-email-wulf@rock-chips.com>
+Message-ID: <201611141523.W3QwkU4E%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/11/4 21:06, Ding Tianhong wrote:
-> From: Hanjun Guo <hanjun.guo@linaro.org>
->
-> Introduce a general quirk framework for each timer erratum in ACPI,
-> which use the oem information in GTDT table for platform specific erratums.
-> The struct gtdt_arch_timer_fixup is introduced to record the oem
-> information to match the quirk and handle the erratum.
->
-> v3: Introduce a generic aquick framework for erratum in ACPI mode.
->
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> ---
->  drivers/clocksource/arm_arch_timer.c | 37 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
->
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 3d59af1..9bc93e5 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -1068,6 +1068,40 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
->  		       arch_timer_mem_init);
->  
->  #ifdef CONFIG_ACPI
-> +struct gtdt_arch_timer_fixup {
-> +	char oem_id[ACPI_OEM_ID_SIZE];
-> +	char oem_table_id[ACPI_OEM_TABLE_ID_SIZE];
-> +	u32 oem_revision;
-> +
-> +	/* quirk handler for arch timer erratum */
-> +	void (*handler)(u32 erratum);
-> +	u32 erratum;
+Hi William,
 
-Hmm, I think we just use
+[auto build test ERROR on rockchip/for-next]
+[also build test ERROR on v4.9-rc5 next-20161114]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-void *context;
+url:    https://github.com/0day-ci/linux/commits/William-Wu/phy-rockchip-inno-usb2-correct-clk_ops-callback/20161114-150723
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-and we convert it in the platform specific handler, then this struct
-can be reused for other type of quirks.
+All errors (new ones prefixed by >>):
 
-> +};
-> +
-> +/* note: this needs to be updated according to the doc of OEM ID
-> + * and TABLE ID for different board.
-> + */
-> +struct gtdt_arch_timer_fixup arch_timer_quirks[] __initdata = {
-> +};
-> +
-> +void __init arch_timer_acpi_quirks_handler(char *oem_id,
-> +						  char *oem_table_id,
-> +						  u32 oem_revision)
-> +{
-> +	struct gtdt_arch_timer_fixup *quirks = arch_timer_quirks;
-> +	int i;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(arch_timer_quirks); i++, quirks++) {
-> +		if (!memcmp(quirks->oem_id, oem_id, ACPI_OEM_ID_SIZE) &&
-> +		    !memcmp(quirks->oem_table_id, oem_table_id, ACPI_OEM_TABLE_ID_SIZE) &&
-> +		    quirks->oem_revision == oem_revision) {
-> +			if (quirks->handler && quirks->erratum)
-> +				quirks->handler(quirks->erratum);
-> +			break;
+   drivers/phy/phy-rockchip-inno-usb2.c: In function 'rockchip_usb2phy_clk480m_prepare':
+>> drivers/phy/phy-rockchip-inno-usb2.c:169:3: error: too few arguments to function 'usleep_range'
+      usleep_range(1200);
+      ^~~~~~~~~~~~
+   In file included from drivers/phy/phy-rockchip-inno-usb2.c:19:0:
+   include/linux/delay.h:48:6: note: declared here
+    void usleep_range(unsigned long min, unsigned long max);
+         ^~~~~~~~~~~~
 
-we can't just break because we have multi quirks for different handlers.
+vim +/usleep_range +169 drivers/phy/phy-rockchip-inno-usb2.c
 
-Thanks
-Hanjun
+   163		if (!property_enabled(rphy, &rphy->phy_cfg->clkout_ctl)) {
+   164			ret = property_enable(rphy, &rphy->phy_cfg->clkout_ctl, true);
+   165			if (ret)
+   166				return ret;
+   167	
+   168			/* waitting for the clk become stable */
+ > 169			usleep_range(1200);
+   170		}
+   171	
+   172		return 0;
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 56817 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161114/7b23a10b/attachment-0001.gz>
