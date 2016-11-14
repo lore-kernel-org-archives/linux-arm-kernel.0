@@ -1,43 +1,28 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Sun, 13 Nov 2016 17:18:54 -0700
-Subject: [PATCH fpga 8/9] fpga socfpga: Use the scatterlist interface
-In-Reply-To: <alpine.DEB.2.10.1611131712210.2735@atull-VirtualBox>
-References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <1478732303-13718-9-git-send-email-jgunthorpe@obsidianresearch.com>
- <alpine.DEB.2.10.1611131712210.2735@atull-VirtualBox>
-Message-ID: <20161114001854.GA27248@obsidianresearch.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 14 Nov 2016 01:33:21 +0100
+Subject: [PATCH -next] cpufreq: brcmstb-avs-cpufreq: make symbol
+ brcm_avs_cpufreq_attr static
+In-Reply-To: <CAGt4E5sQvRXdS+wh2jqa9jF4jxS9TxnULXwg1vJm1fwU-Gja4g@mail.gmail.com>
+References: <1478791145-21137-1-git-send-email-weiyj.lk@gmail.com>
+ <CAGt4E5sQvRXdS+wh2jqa9jF4jxS9TxnULXwg1vJm1fwU-Gja4g@mail.gmail.com>
+Message-ID: <5120029.lrhJXGVADr@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 13, 2016 at 05:19:34PM -0600, atull wrote:
+On Thursday, November 10, 2016 02:06:16 PM Markus Mayer wrote:
+> On 10 November 2016 at 07:19, Wei Yongjun <weiyj.lk@gmail.com> wrote:
+> > From: Wei Yongjun <weiyongjun1@huawei.com>
+> >
+> > Fixes the following sparse warning:
+> >
+> > drivers/cpufreq/brcmstb-avs-cpufreq.c:982:18: warning:
+> >  symbol 'brcm_avs_cpufreq_attr' was not declared. Should it be static?
+> 
+> Yes, thanks for the fix.
+> 
+> Acked-by: Markus Mayer <mmayer@broadcom.com>
 
-> Currently or soon we have 3 drivers that don't really use the sg
-> interface natively.  So this workaround ends up in each of them?
+Applied.
 
-Thinking of the SG list as a workaround is not really right - the SG
-list is a way to pass memory stored in non-contiguous pages around,
-and the miter is a way to access them from the CPU.
-
-socfpga *does* use sg natively because it is happy to process the data
-from the CPU page-at-time. It just doesn't use DMA.
-
-> That's a lot of duplicated code.  Why can't this code be in the
-> fpga-mgr.c core for drivers that aren't using sg (to minimizing
-> duplication).
-
-Sure, if it is a common pattern it is a good idea to lift it.
-
-I'd add a newop 'write_fragment' and a driver must define write_sg
-write_fragment, if write_fragment is used then the core supplies
-that loop.
-
-Is there a tree with these new drivers someplace?
-
-> I will test this when I get time, may not be this week.  I just
-> moved to a new building and lab and am in a course all week and
-> so forth.
-
-Sure, I don't expect any problems, Zynq uses the same loop and it
-seems fine.
-
-Jason
+Thanks,
+Rafael
