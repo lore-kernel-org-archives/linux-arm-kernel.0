@@ -1,32 +1,28 @@
-From: colin.king@canonical.com (Colin King)
-Date: Mon, 14 Nov 2016 23:04:00 +0000
-Subject: [PATCH] ARM: socfpga: fix spelling mistake in error message
-Message-ID: <20161114230400.5352-1-colin.king@canonical.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 14 Nov 2016 16:04:00 -0700
+Subject: [PATCH fpga 5/9] fpga zynq: Remove priv->dev
+In-Reply-To: <CAAtXAHe60QjyitDxkEzc9+Zr99mj0SeWFUOW0SOexGnBvuqGjw@mail.gmail.com>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-6-git-send-email-jgunthorpe@obsidianresearch.com>
+ <alpine.DEB.2.10.1611140913280.3739@atull-VirtualBox>
+ <CAAtXAHe60QjyitDxkEzc9+Zr99mj0SeWFUOW0SOexGnBvuqGjw@mail.gmail.com>
+Message-ID: <20161114230400.GB4874@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+On Mon, Nov 14, 2016 at 09:20:38AM -0800, Moritz Fischer wrote:
+> this one could be independent of the other patches, this is cleanup and
+> could be merged before the rest (that's still in discussion) if you pull it out.
 
-Trivial fix to spelling mistake "Mananger" to "Manager"
-in error message
+As I said in the cover letter, several of the patches are just fixes
+and can be applied, but they are all linked by patch context so are
+presented as a series.
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- arch/arm/mach-socfpga/l2_cache.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Lets get as many reviewed as possible and then I can repost them in a
+different order if necessary.
 
-diff --git a/arch/arm/mach-socfpga/l2_cache.c b/arch/arm/mach-socfpga/l2_cache.c
-index 4267c95f..bb359d7 100644
---- a/arch/arm/mach-socfpga/l2_cache.c
-+++ b/arch/arm/mach-socfpga/l2_cache.c
-@@ -74,7 +74,7 @@ void socfpga_init_arria10_l2_ecc(void)
- 	}
- 
- 	if (!sys_manager_base_addr) {
--		pr_err("System Mananger not mapped for L2 ECC\n");
-+		pr_err("System Manager not mapped for L2 ECC\n");
- 		goto exit;
- 	}
- 	/* Clear any pending IRQs */
--- 
-2.10.2
+The first 5 are all straigtfoward and should be no problem to get
+ackd. We've talked about the sanity check patch enough, lets just go
+ahead with it now.
+
+Jason
