@@ -1,30 +1,37 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 14 Nov 2016 13:36:41 -0500
-Subject: [PATCH/RESEND] recordmcount: arm: Implement make_nop
-In-Reply-To: <20161018200707.36e549ee@gandalf.local.home>
-References: <20161018234200.5804-1-sboyd@codeaurora.org>
- <20161018200707.36e549ee@gandalf.local.home>
-Message-ID: <20161114133641.09b1abfb@gandalf.local.home>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 14 Nov 2016 19:37:51 +0100
+Subject: [GIT PULL] arm: mediatek: kconfig changes for v4.10
+Message-ID: <b9bf2483-533d-ffd1-b23f-d89d20b8a73a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Oct 2016 20:07:07 -0400
-Steven Rostedt <rostedt@goodmis.org> wrote:
+Hi Arnd and Olof,
 
-> On Tue, 18 Oct 2016 16:42:00 -0700
-> Stephen Boyd <sboyd@codeaurora.org> wrote:
-> 
-> > In similar spirit to x86 and arm64 support, add a make_nop_arm()
-> > to replace calls to mcount with a nop in sections that aren't
-> > traced.
-> > 
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Acked-by: Rabin Vincent <rabin@rab.in>
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>  
-> 
-> I can take this if I can get an ack from the ARM maintainers.
+although late, please pull the following changes.
 
-Any ARM maintainer want to ack this, or take it in their tree if they
-haven't already?
+Thanks,
+Matthias
+---
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
--- Steve
+   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+
+are available in the git repository at:
+
+   https://github.com/mbgg/linux-mediatek.git tags/v4.9-next-kconfig
+
+for you to fetch changes up to 494975c9cc00f69bf71de0991dcebda9b2911aa0:
+
+   ARM: mediatek: clean up mach-mediatek/Makefile (2016-10-31 15:26:23 
+-0600)
+
+----------------------------------------------------------------
+- clean up mach-mediatek Makefile as kbuild only descends into the folder if
+   ARCH_MEDIATEK is enabled
+
+----------------------------------------------------------------
+Masahiro Yamada (1):
+       ARM: mediatek: clean up mach-mediatek/Makefile
+
+  arch/arm/mach-mediatek/Makefile | 6 ++----
+  1 file changed, 2 insertions(+), 4 deletions(-)
