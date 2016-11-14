@@ -1,58 +1,48 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 14 Nov 2016 09:53:28 -0800
-Subject: [PATCH 1/2] mfd: pm8921: add support to pm8821
-In-Reply-To: <852fbb95-852e-0612-77a8-b0b072a68c51@linaro.org>
-References: <1478622577-20699-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20161108190751.GO25787@tuxbot>
- <852fbb95-852e-0612-77a8-b0b072a68c51@linaro.org>
-Message-ID: <20161114175328.GB27931@tuxbot>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Nov 2016 18:07:34 +0000
+Subject: [PATCH RFC 3/2] ARM: improve arch_irq_work_has_interrupt()
+In-Reply-To: <2e14b943-e3a5-6993-48c7-68200c8b08a2@arm.com>
+References: <E1c6GpW-0008DO-BD@rmk-PC.armlinux.org.uk>
+ <20161114153630.GN1041@n2100.armlinux.org.uk>
+ <2e14b943-e3a5-6993-48c7-68200c8b08a2@arm.com>
+Message-ID: <20161114180734.GQ1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 14 Nov 09:33 PST 2016, Srinivas Kandagatla wrote:
-
-[..]
-> >>+static int pm8821_irq_block_handler(struct pm_irq_chip *chip,
-> >>+				    int master_number, int block)
-> >>+{
-> >>+	int pmirq, irq, i, ret;
-> >>+	unsigned int bits;
-> >>+
-> >>+	ret = pm8821_read_block_irq(chip, master_number, block, &bits);
-> >>+	if (ret) {
-> >>+		pr_err("Failed reading %d block ret=%d", block, ret);
-> >>+		return ret;
-> >>+	}
-> >>+	if (!bits) {
-> >>+		pr_err("block bit set in master but no irqs: %d", block);
-> >>+		return 0;
-> >>+	}
-> >>+
-> >>+	/* Convert block offset to global block number */
-> >>+	block += (master_number * PM8821_BLOCKS_PER_MASTER) - 1;
-> >
-> >So this is block -= 1 for master 0 and block += 6 for master 1, is the
-> >latter correct?
-> >
-> Yes, both of them are correct.
+On Mon, Nov 14, 2016 at 04:30:57PM +0000, Marc Zyngier wrote:
+> diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+> index 3d6dc8b..45612d2 100644
+> --- a/arch/arm/include/asm/smp.h
+> +++ b/arch/arm/include/asm/smp.h
+> @@ -48,6 +48,16 @@ extern void smp_init_cpus(void);
+>   */
+>  extern void set_smp_cross_call(void (*)(const struct cpumask *, unsigned int));
+>  
+> +#ifdef CONFIG_SMP
+> +#define setup_smp_ipi(f,i)			\
+> +	do {					\
+> +		set_smp_cross_call(f);		\
+> +		irq_controller_can_ipi = (i);	\
+> +	} while(0)
+> +#else
+> +#define setup_smp_ipi(f,i)	do { } while (0)
+> +#endif
+> +
+>  /*
+>   * Called from platform specific assembly code, this is the
+>   * secondary CPU entry point.
 > 
-> for master 0 which has block numbers from 1-7 should translate to 0-6 in
-> linear space.
-> for master 1 which has block numbers from 1-7 should translate to 7-13 in
-> linear space.
-> 
-> so for master0 it is -=1 and and for master1 it is +=6 seems correct.
-> 
+> with the similar entry point for arm64?
 
-Ahh, because block is 1-indexed when we enter, so have to switch base
-and then calculate the global number, like:
+Note that asm/smp.h is not included if CONFIG_SMP is not set, so it's
+not that easy.
 
-  block = block - 1 + (master * PER_MASTER) + 7
+Both ARM64 and ARM have asm/smp_plat.h which contains the platform
+specifics of SMP, which is where set_smp_cross_call() really should
+be anyway, and the GIC code already includes this.  So I'm moving
+set_smp_cross_call() there for both arches.
 
-but we cancel out the subtraction. I agree that this looks correct then.
-
-I would prefer less of a mixture between 0-indexing and 1-indexing, but
-I don't have any good ideas on how to restructure it to make it better.
-
-Regards,
-Bjorn
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
