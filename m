@@ -1,26 +1,38 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sun, 13 Nov 2016 22:10:55 -0800
-Subject: [PATCH 09/16] ARM: BCM: use generic API for enabling SCU
-In-Reply-To: <1479099731-28108-10-git-send-email-pankaj.dubey@samsung.com>
-References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
- <1479099731-28108-10-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <7cdf4e03-98c8-430c-b5cb-3a5c4c13d7d3@gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 14 Nov 2016 14:13:12 +0800
+Subject: [PATCH v2 1/3] ARM: imx6ull: add imx6ull support
+In-Reply-To: <HE1PR04MB14509BFD0CBA838BC1EA7D598BBC0@HE1PR04MB1450.eurprd04.prod.outlook.com>
+References: <1478584614-12054-1-git-send-email-peter.chen@nxp.com>
+ <1478584614-12054-2-git-send-email-peter.chen@nxp.com>
+ <20161114054833.GG3310@dragon>
+ <HE1PR04MB14509BFD0CBA838BC1EA7D598BBC0@HE1PR04MB1450.eurprd04.prod.outlook.com>
+Message-ID: <20161114061311.GA14956@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 13/11/2016 ? 21:02, Pankaj Dubey a ?crit :
-> Now as we have of_scu_enable which takes care of mapping
-> scu base from DT, lets use it.
+On Mon, Nov 14, 2016 at 05:59:01AM +0000, Peter Chen wrote:
+> The main difference is compatible string, I can't include two compatible strings in one dts file,
+> the dts build will fail for that.
 > 
-> CC: Florian Fainelli <f.fainelli@gmail.com>
-> CC: Ray Jui <rjui@broadcom.com>
-> CC: Scott Branden <sbranden@broadcom.com>
-> CC: bcm-kernel-feedback-list at broadcom.com
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> imx6ull-14x14-evk.dts 
+> / {
+>         model = "Freescale i.MX6 UlltraLite 14x14 EVK Board";
+>         compatible = "fsl,imx6ull-14x14-evk", "fsl,imx6ull";
+> };
+> 
+> imx6ul-14x14-evk.dts 
+> / {
+>         model = "Freescale i.MX6 UltraLite 14x14 EVK Board";
+>         compatible = "fsl,imx6ul-14x14-evk", "fsl,imx6ul";
+> };
 
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+I created imx6ull-14x14-evk.dts like below, and DTC seems happy with it.
 
-Let me know if I need to pick this and submit via ARM SoC pull requests,
-thanks!
--- 
-Florian
+#include "imx6ul-14x14-evk.dts"
+
+/ {
+        model = "Freescale i.MX6 UlltraLite 14x14 EVK Board";
+        compatible = "fsl,imx6ull-14x14-evk", "fsl,imx6ull";
+};
+
+Shawn
