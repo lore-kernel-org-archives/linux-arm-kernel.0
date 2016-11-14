@@ -1,83 +1,54 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Mon, 14 Nov 2016 17:08:16 +0100
-Subject: [RFC v2 8/8] iommu/arm-smmu: implement add_reserved_regions
- callback
-In-Reply-To: <20161114153149.GY2078@8bytes.org>
-References: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
- <1478258646-3117-9-git-send-email-eric.auger@redhat.com>
- <20161110154606.GH2078@8bytes.org>
- <04ed9694-707d-260b-70c6-f367d292ceca@redhat.com>
- <20161110161331.GJ2078@8bytes.org>
- <f4537e43-0237-e478-eacd-b107458628b8@redhat.com>
- <20161111114223.GP2078@8bytes.org>
- <79da09b8-ac1e-cebf-5393-7d67f002b3e3@redhat.com>
- <20161111162211.GU2078@8bytes.org>
- <634ac375-3507-6926-164f-e67f7c798c98@redhat.com>
- <20161114153149.GY2078@8bytes.org>
-Message-ID: <295feefe-014b-5669-7f5a-e04b09ba3454@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 14 Nov 2016 10:14:23 -0600
+Subject: [PATCH 2/3] devicetree: bindings: nvmem: Add compatible string
+ for imx6ul
+In-Reply-To: <1478497281-5477-2-git-send-email-ping.bai@nxp.com>
+References: <1478497281-5477-1-git-send-email-ping.bai@nxp.com>
+ <1478497281-5477-2-git-send-email-ping.bai@nxp.com>
+Message-ID: <20161114161423.fs7dlt5firmj4q3s@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On Mon, Nov 07, 2016 at 01:41:20PM +0800, Bai Ping wrote:
+> Add new compatible string for i.MX6UL SOC.
+> 
+> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> ---
+>  Documentation/devicetree/bindings/nvmem/imx-ocotp.txt | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt b/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
+> index 383d588..a7ff65d 100644
+> --- a/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
+> +++ b/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
+> @@ -1,13 +1,14 @@
+>  Freescale i.MX6 On-Chip OTP Controller (OCOTP) device tree bindings
+>  
+>  This binding represents the on-chip eFuse OTP controller found on
+> -i.MX6Q/D, i.MX6DL/S, i.MX6SL, and i.MX6SX SoCs.
+> +i.MX6Q/D, i.MX6DL/S, i.MX6SL, i.MX6SX and i.MX6UL SoCs.
+>  
+>  Required properties:
+>  - compatible: should be one of
+>  	"fsl,imx6q-ocotp" (i.MX6Q/D/DL/S),
+> -	"fsl,imx6sl-ocotp" (i.MX6SL), or
+> -	"fsl,imx6sx-ocotp" (i.MX6SX), followed by "syscon".
+> +	"fsl,imx6sl-ocotp" (i.MX6SL),
+> +	"fsl,imx6sx-ocotp" (i.MX6SX), or
+> +	"fsl,imx6ul-ocotp" (i.MX6UL), followed by "syscon".
 
-On 14/11/2016 16:31, Joerg Roedel wrote:
-> Hi Eric,
-> 
-> On Fri, Nov 11, 2016 at 05:45:19PM +0100, Auger Eric wrote:
->> On 11/11/2016 17:22, Joerg Roedel wrote:
->>> So I think we need a way to tell userspace about the reserved regions
->>> (per iommu-group) so that userspace knows where it can not map anything,
-> 
->> Current plan is to expose that info through an iommu-group sysfs
->> attribute, as you and Robin advised.
-> 
-> Great.
-> 
->>> and VFIO can enforce that. But the right struct here is not an
->>> iova-allocator rb-tree, a ordered linked list should be sufficient.
->> I plan a linked list to store the reserved regions (P2P regions, MSI
->> region, ...). get_dma_regions is called with a list local to a function
->> for that. Might be needed to move that list head in the iommu_group to
->> avoid calling the get_dm_regions again in the attribute show function?
-> 
-> You can re-use the get_dm_regions() call-back available in the iommu-ops
-> already. Just rename it and add a flag to it which tells the iommu-core
-> whether that region needs to be mapped or not.
-> 
->> But to allocate the IOVAs within the MSI reserved region, I understand
->> you don't want us to use the iova.c allocator, is that correct? We need
->> an allocator though, even a very basic one based on bitmap or whatever.
->> There potentially have several different physical MSI frame pages to map.
-> 
-> I don't get this, what do you need and address-allocator for?
+This should be reformatted such that it's not a 5 line change to add a 
+compatible. "one of" defines this is an OR relationship, so drop that. 
+Move 'followed by "syscon"' to below the list of compatibles.
 
-There are potentially several MSI doorbell physical pages in the SOC
-that are accessed through the IOMMU (translated). Each of those must
-have a corresponding IOVA and IOVA/PA mapping programmed in the IOMMU.
-Else MSI will fault.
-
-- step 1 was to define a usable IOVA range for MSI mapping. So now we
-decided the base address and size would be hardcoded for ARM. The
-get_dm_region can be used to retrieve that hardcoded region.
-- Step2 is to allocate IOVAs within that range and map then for each of
-those MSI doorbells. This is done in the MSI controller compose() callback.
-
-I hope I succeeded in clarifying this time.
-
-Robin sent today a new version of its cookie think using a dummy
-allocator. I am currently integrating it.
-
-Thanks
-
-Eric
-> 
-> 
-> 
-> 	Joerg
+>  - reg: Should contain the register base and length.
+>  - clocks: Should contain a phandle pointing to the gated peripheral clock.
+>  
+> -- 
+> 2.8.2
 > 
 > 
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
