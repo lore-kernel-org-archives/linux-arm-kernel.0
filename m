@@ -1,57 +1,31 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 14 Nov 2016 15:44:08 +0000
-Subject: [PATCH] ARM: dts: at91: replace gpio-key,
- wakeup with wakeup-source for sam9260ek
-Message-ID: <1479138250-17780-2-git-send-email-sudeep.holla@arm.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 14 Nov 2016 10:44:32 -0500
+Subject: [PATCH] ARM: ftrace: fix syscall name matching
+In-Reply-To: <20161114104008.36e9c40d@gandalf.local.home>
+References: <1479128625-20948-1-git-send-email-rabin.vincent@axis.com>
+ <20161114134017.GJ1041@n2100.armlinux.org.uk>
+ <20161114104008.36e9c40d@gandalf.local.home>
+Message-ID: <20161114104432.3bd2fb2c@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
-check for/support the legacy "gpio-key,wakeup" boolean property to
-enable gpio buttons as wakeup source, "wakeup-source" is the new
-standard binding.
+On Mon, 14 Nov 2016 10:40:08 -0500
+Steven Rostedt <rostedt@goodmis.org> wrote:
 
-This patch replaces the legacy "gpio-key,wakeup" with the unified
-"wakeup-source" property in order to avoid any further copy-paste
-duplication.
 
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm/boot/dts/at91sam9260ek.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> > Is this really safe?  What guarantees that we can wind forward four
+> > bytes here?  If it's always safe, it needs a better comment than just
+> > two words.  
+> 
+> I believe it is, but a comment would do well.
 
-Hi,
+Also, the generic function that is called if the arch does not define
+ARCH_HAS_SYSCALL_MATCH_SYM_NAME does this too.
 
-Inspite of getting rid of most of the legacy property almost a year ago,
-addition of new platforms have brought this back and over time it's
-now found again in few places. Just get rid of them *again*
+	return !strcmp(sym + 3, name + 3);
 
-Regards,
-Sudeep
+And looking at this, it really should be + 4 and not + 3, because it
+doesn't match the comment above, where it says it can handle both
+".SyS" and "SyS", but it doesn't handle ".SyS" compared to ".sys".
 
-diff --git a/arch/arm/boot/dts/at91sam9260ek.dts b/arch/arm/boot/dts/at91sam9260ek.dts
-index 2c87f58448e7..b2578feceb08 100644
---- a/arch/arm/boot/dts/at91sam9260ek.dts
-+++ b/arch/arm/boot/dts/at91sam9260ek.dts
-@@ -174,14 +174,14 @@
- 			label = "Button 3";
- 			gpios = <&pioA 30 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x103>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
-
- 		btn4 {
- 			label = "Button 4";
- 			gpios = <&pioA 31 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x104>;
--			gpio-key,wakeup;
-+			wakeup-source;
- 		};
- 	};
-
---
-2.7.4
+-- Steve
