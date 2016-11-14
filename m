@@ -1,42 +1,37 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 14 Nov 2016 10:48:54 +0530
-Subject: [PATCH v10 01/11] remoteproc: st_slim_rproc: add a slimcore
- rproc driver
-In-Reply-To: <20161107135735.GA27280@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1476783556-2501-1-git-send-email-peter.griffin@linaro.org>
- <1476783556-2501-2-git-send-email-peter.griffin@linaro.org>
- <20161103213703.GA15449@tuxbot>
- <20161107135735.GA27280@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20161114051854.GW3000@localhost>
+Date: Mon, 14 Nov 2016 10:49:51 +0530
+Subject: [PATCH v11 00/14] Add support for FDMA DMA controller and slim
+ core rproc found on STi chipsets
+In-Reply-To: <1478542665-17089-1-git-send-email-peter.griffin@linaro.org>
+References: <1478542665-17089-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20161114051951.GX3000@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 07, 2016 at 01:57:35PM +0000, Peter Griffin wrote:
-> > 
-> > As you now make changes to the entire remoteproc Kconfig file, rather
-> > than simply add a Kconfig symbol we can't bring this in via Vinod's tree
-> > without providing Linus with a messy merge conflict.
-> > 
-> > So the remoteproc parts now has to go through my tree.
+On Mon, Nov 07, 2016 at 06:17:31PM +0000, Peter Griffin wrote:
+> Hi Vinod and Bjorn,
 > 
-> OK, I think the best approach is for Vinod to create an immutable
-> branch with the entire fdma series on, and then both of you merge that branch into
-> your respective trees.
-
-my topic/st_fdma is immutable branch. You cna merge it, if you need a signed
-tag, please do let me know
-
+> This patchset adds support for the Flexible Direct Memory Access (FDMA) core
+> found on STi chipsets from STMicroelectronics. The FDMA is a slim core CPU
+> with a dedicated firmware. It is a general purpose DMA controller supporting
+> 16 independent channels and data can be moved from memory to memory or between
+> memory and paced latency critical real time targets.
 > 
-> That way there won't be any conflicts and you can both accept further changes
-> for v4.9 release. Trying to take half the series via rproc, and half via dma trees won't work
-> because they have dependencies on each other.
+> In reponse to Bjorn latest mail here https://lkml.org/lkml/2016/11/7/425 and
+> here https://patchwork.kernel.org/patch/9368157/ I have created a v11
+> incorporating the minor API update, and removed the unrelated change.
 > 
-> I will send a v11 series in a moment which includes the feedback in this email
-> and also include the additional fixes which Vinod has applied since the driver
-> has been in linux-next.
+> As tthis series has been in linux-next for a while, some additional fixes
+> have been submitted and applied by Vinod. I have included these as part of
+> the v11 series as well.
+> 
+> I believe the best route as described here
+> https://www.spinics.net/lists/arm-kernel/msg541026.htmlforward is for Vinod
+> to apply the whole series on an immutable branch which is then merged into
+> both the dma and remoteproc trees.
 
-WHY.. Stuff is already merged twice! Please send updated on top of already
-merged code! This is how kernel developement is done...
+As I said earlier and just to make it clear, am not taking this one. Please
+send updates on top of already applied stuff
 
 -- 
 ~Vinod
