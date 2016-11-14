@@ -1,54 +1,161 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Mon, 14 Nov 2016 17:57:35 +0100
-Subject: [RFC v2 8/8] iommu/arm-smmu: implement add_reserved_regions
- callback
-In-Reply-To: <20161114162037.GC14829@8bytes.org>
-References: <20161110154606.GH2078@8bytes.org>
- <04ed9694-707d-260b-70c6-f367d292ceca@redhat.com>
- <20161110161331.GJ2078@8bytes.org>
- <f4537e43-0237-e478-eacd-b107458628b8@redhat.com>
- <20161111114223.GP2078@8bytes.org>
- <79da09b8-ac1e-cebf-5393-7d67f002b3e3@redhat.com>
- <20161111162211.GU2078@8bytes.org>
- <634ac375-3507-6926-164f-e67f7c798c98@redhat.com>
- <20161114153149.GY2078@8bytes.org>
- <295feefe-014b-5669-7f5a-e04b09ba3454@redhat.com>
- <20161114162037.GC14829@8bytes.org>
-Message-ID: <1846cf2b-b988-be6d-368d-7991c0bdbe5e@redhat.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Nov 2016 16:57:44 +0000
+Subject: [PATCH RFC 3/2] ARM: improve arch_irq_work_has_interrupt()
+In-Reply-To: <2e14b943-e3a5-6993-48c7-68200c8b08a2@arm.com>
+References: <E1c6GpW-0008DO-BD@rmk-PC.armlinux.org.uk>
+ <20161114153630.GN1041@n2100.armlinux.org.uk>
+ <2e14b943-e3a5-6993-48c7-68200c8b08a2@arm.com>
+Message-ID: <20161114165744.GP1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On Mon, Nov 14, 2016 at 04:30:57PM +0000, Marc Zyngier wrote:
+> Hi Russell,
+> 
+> On 14/11/16 15:36, Russell King - ARM Linux wrote:
+> > Following on from the previous patch, I think this makes more sense to
+> > determine whether we can support IRQ work interrupts.
+> > 
+> > Whether we can support them or not depends on two things:
+> > 
+> > (a) whether the kernel has support for receiving IPIs
+> > (b) whether it's possible to send an IPI to CPUs including the raising CPU.
+> > 
+> > (a) is a function of how the kernel is built - and in the case of ARM, it
+> > depends whether the kernel is built with SMP enabled or not.
+> > (b) is a property of the interrupt controller.
+> > 
+> > It hasn't ever been a function of the CPU or architecture.
+> > 
+> > Commit 059e232089e4 ("irqchip/gic: Allow self-SGIs for SMP on UP
+> > configurations") changes the GIC IPI code such that we can raise
+> > SGIs on uniprocessor systems running on a SMP kernel, which means
+> > we can support IRQ work interrupts here as well.
+> > 
+> > So, we shouldn't be using cpu_smp() (or its previous is_smp() here
+> > at all.  Use a flag to indicate whether we can IPI and use that to
+> > indicate whether we support irq work interrupts.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > --- 
+> >  arch/arm/include/asm/irq_work.h | 11 +++++++++--
+> >  arch/arm/kernel/irq.c           |  0
+> >  arch/arm/kernel/smp.c           |  3 +++
+> >  drivers/irqchip/irq-gic.c       | 17 +++++++++++++----
+> >  4 files changed, 25 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/arch/arm/include/asm/irq_work.h b/arch/arm/include/asm/irq_work.h
+> > index 2dc8d7995b48..d7262a3c2f2e 100644
+> > --- a/arch/arm/include/asm/irq_work.h
+> > +++ b/arch/arm/include/asm/irq_work.h
+> > @@ -1,11 +1,18 @@
+> >  #ifndef __ASM_ARM_IRQ_WORK_H
+> >  #define __ASM_ARM_IRQ_WORK_H
+> >  
+> > -#include <asm/smp_plat.h>
+> > +extern bool irq_controller_can_ipi;
+> > +#define irq_controller_can_ipi irq_controller_can_ipi
+> >  
+> >  static inline bool arch_irq_work_has_interrupt(void)
+> >  {
+> > -	return cpu_smp();
+> > +#ifdef CONFIG_SMP
+> > +	/* This depends on the IRQ controller */
+> > +	return irq_controller_can_ipi;
+> > +#else
+> > +	/* The kernel is not built to support IPIs */
+> > +	return false;
+> > +#endif
+> >  }
+> >  
+> >  #endif /* _ASM_ARM_IRQ_WORK_H */
+> > diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> > index 7dd14e8395e6..1fa9412cc4aa 100644
+> > --- a/arch/arm/kernel/smp.c
+> > +++ b/arch/arm/kernel/smp.c
+> > @@ -473,6 +473,9 @@ void __init set_smp_cross_call(void (*fn)(const struct cpumask *, unsigned int))
+> >  		__smp_cross_call = fn;
+> >  }
+> >  
+> > +/* This indicates whether the IRQ controller can IPI (including self-IPI) */
+> > +bool irq_controller_can_ipi;
+> 
+> We probably need to initialize this to false, since we have at least 4
+> other users of set_smp_cross_call() in the tree.
 
-On 14/11/2016 17:20, Joerg Roedel wrote:
-> On Mon, Nov 14, 2016 at 05:08:16PM +0100, Auger Eric wrote:
->> There are potentially several MSI doorbell physical pages in the SOC
->> that are accessed through the IOMMU (translated). Each of those must
->> have a corresponding IOVA and IOVA/PA mapping programmed in the IOMMU.
->> Else MSI will fault.
->>
->> - step 1 was to define a usable IOVA range for MSI mapping. So now we
->> decided the base address and size would be hardcoded for ARM. The
->> get_dm_region can be used to retrieve that hardcoded region.
->> - Step2 is to allocate IOVAs within that range and map then for each of
->> those MSI doorbells. This is done in the MSI controller compose() callback.
->>
->> I hope I succeeded in clarifying this time.
->>
->> Robin sent today a new version of its cookie think using a dummy
->> allocator. I am currently integrating it.
-> 
-> Okay, I understand. A simple bitmap-allocator would probably be
-> sufficient, and doesn't have the overhead the iova allocator has. About
-> how many pages are we talking here?
-Very few actually. In the systems I have access to I only have a single
-page. In most advanced systems we could imagine per-cpu doorbells but
-this does not exist yet as far as I know.
+C programming 101: BSS variables are initialised to zero at the start
+of the program.
 
-Thanks
+> > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> > index d6c404b3584d..abe8d5807c0f 100644
+> > --- a/drivers/irqchip/irq-gic.c
+> > +++ b/drivers/irqchip/irq-gic.c
+> > @@ -1187,9 +1187,6 @@ static int __init __gic_init_bases(struct gic_chip_data *gic,
+> >  		 */
+> >  		for (i = 0; i < NR_GIC_CPU_IF; i++)
+> >  			gic_cpu_map[i] = 0xff;
+> > -#ifdef CONFIG_SMP
+> > -		set_smp_cross_call(gic_raise_softirq);
+> > -#endif
+> >  		cpuhp_setup_state_nocalls(CPUHP_AP_IRQ_GIC_STARTING,
+> >  					  "AP_IRQ_GIC_STARTING",
+> >  					  gic_starting_cpu, NULL);
+> > @@ -1207,8 +1204,20 @@ static int __init __gic_init_bases(struct gic_chip_data *gic,
+> >  	}
+> >  
+> >  	ret = gic_init_bases(gic, irq_start, handle);
+> > -	if (ret)
+> > +	if (ret) {
+> >  		kfree(name);
+> > +		return ret;
+> > +	}
+> > +
+> > +	if (gic == &gic_data[0]) {
+> > +#ifdef CONFIG_SMP
+> > +		set_smp_cross_call(gic_raise_softirq);
+> > +#ifdef irq_controller_can_ipi
+> > +		if (nr_cpu_ids == 1 || hweight8(gic_cpu_map[0]) == 1)
+> > +			irq_controller_can_ipi = true;
+> 
+> Am I missing something, or is there any sane configuration where this 
+> isn't true?
 
-Eric
+I hope not, but I want to duplicate here the conditions where
+gic_raise_softirq() actually _works_ so we stop running into corner
+cases where we get "irq work fails" etc.
+
+> Also, maybe it would make some sense to have a more 
+> streamlined interface to the architecture code. Something along the 
+> lines of:
 > 
+> diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+> index 3d6dc8b..45612d2 100644
+> --- a/arch/arm/include/asm/smp.h
+> +++ b/arch/arm/include/asm/smp.h
+> @@ -48,6 +48,16 @@ extern void smp_init_cpus(void);
+>   */
+>  extern void set_smp_cross_call(void (*)(const struct cpumask *, unsigned int));
+>  
+> +#ifdef CONFIG_SMP
+> +#define setup_smp_ipi(f,i)			\
+> +	do {					\
+> +		set_smp_cross_call(f);		\
+> +		irq_controller_can_ipi = (i);	\
+> +	} while(0)
+> +#else
+> +#define setup_smp_ipi(f,i)	do { } while (0)
+> +#endif
+> +
+>  /*
+>   * Called from platform specific assembly code, this is the
+>   * secondary CPU entry point.
 > 
-> 	Joerg
-> 
+> with the similar entry point for arm64?
+
+I'd prefer to keep the two things separate, but we should definitely
+provide a stub for set_smp_cross_call() for when SMP is disabled.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
