@@ -1,14 +1,23 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Mon, 14 Nov 2016 22:57:31 +0530
-Subject: [PATCH 0/5] net: thunderx: Miscellaneous fixes
-In-Reply-To: <2948c47d-0f15-8153-440b-7a2c753b7251@suse.com>
-References: <1479120886-13425-1-git-send-email-sunil.kovvuri@gmail.com>
- <2948c47d-0f15-8153-440b-7a2c753b7251@suse.com>
-Message-ID: <CA+sq2Cd-HZtu-sMpfVwSMgDass9xepTj_QA-8WSeH0YZvdkOSw@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 14 Nov 2016 09:28:13 -0800
+Subject: [PATCH 0/3] ARM64: dts: meson-gxl: Enable Ethernet
+In-Reply-To: <20161107104357.24428-1-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Mon, 7 Nov 2016 11:43:54 +0100")
+References: <20161107104357.24428-1-narmstrong@baylibre.com>
+Message-ID: <7h60nq7yz6.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>If so, please add "Cc: stable at vger.kernel.org" to the Sigend-off list.
-Yes they are, thanks, will do that along with resubmission.
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-Sunil.
+> The Amlogic Meson GXL SoCs have an internal RMII PHY that is muxed with the
+> external RGMII pins.
+>
+> The internal PHY is added in the GXL dtsi and support for each
+> board is added in intermediate board family dtsi or final dts.
+
+Tested external phy and internal phy (using p231 DT) on my p230 board.
+
+Applied to v4.10/dt64
+
+Kevin
