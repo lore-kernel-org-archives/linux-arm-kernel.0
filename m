@@ -1,118 +1,252 @@
 From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 14 Nov 2016 16:22:46 +0100
-Subject: [RFCv2 PATCH 3/5] drm/bridge: dw_hdmi: add HDMI notifier support
+Date: Mon, 14 Nov 2016 16:22:44 +0100
+Subject: [RFCv2 PATCH 1/5] video: add HDMI state notifier support
 In-Reply-To: <1479136968-24477-1-git-send-email-hverkuil@xs4all.nl>
 References: <1479136968-24477-1-git-send-email-hverkuil@xs4all.nl>
-Message-ID: <1479136968-24477-4-git-send-email-hverkuil@xs4all.nl>
+Message-ID: <1479136968-24477-2-git-send-email-hverkuil@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@arm.linux.org.uk>
+From: Hans Verkuil <hans.verkuil@cisco.com>
 
-Add HDMI notifiers to the HDMI bridge driver.
+Add support for HDMI hotplug and EDID notifiers, which is used to convey
+information from HDMI drivers to their CEC and audio counterparts.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Based on an earlier version from Russell King:
+
+https://patchwork.kernel.org/patch/9277043/
+
+The hdmi_notifier is a reference counted object containing the HDMI state
+of an HDMI device.
+
+When a new notifier is registered the current state will be reported to
+that notifier at registration time.
+
+Signed-off-by: Hans Verkuil <hans.verkuil@cisco.com>
 ---
- drivers/gpu/drm/bridge/Kconfig   |  1 +
- drivers/gpu/drm/bridge/dw-hdmi.c | 25 ++++++++++++++++++++++++-
- 2 files changed, 25 insertions(+), 1 deletion(-)
+ drivers/video/Kconfig         |   3 +
+ drivers/video/Makefile        |   1 +
+ drivers/video/hdmi-notifier.c | 136 ++++++++++++++++++++++++++++++++++++++++++
+ include/linux/hdmi-notifier.h |  43 +++++++++++++
+ 4 files changed, 183 insertions(+)
+ create mode 100644 drivers/video/hdmi-notifier.c
+ create mode 100644 include/linux/hdmi-notifier.h
 
-diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
-index 10e12e7..5f4ebe9 100644
---- a/drivers/gpu/drm/bridge/Kconfig
-+++ b/drivers/gpu/drm/bridge/Kconfig
-@@ -27,6 +27,7 @@ config DRM_DUMB_VGA_DAC
- config DRM_DW_HDMI
- 	tristate
- 	select DRM_KMS_HELPER
-+	select HDMI_NOTIFIERS
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 3c20af9..1ee7b9f 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -36,6 +36,9 @@ config VIDEOMODE_HELPERS
+ config HDMI
+ 	bool
  
- config DRM_DW_HDMI_AHB_AUDIO
- 	tristate "Synopsis Designware AHB Audio interface"
-diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
-index ab7023e..bd02da5 100644
---- a/drivers/gpu/drm/bridge/dw-hdmi.c
-+++ b/drivers/gpu/drm/bridge/dw-hdmi.c
-@@ -16,6 +16,7 @@
- #include <linux/err.h>
- #include <linux/clk.h>
- #include <linux/hdmi.h>
++config HDMI_NOTIFIERS
++	bool
++
+ if VT
+ 	source "drivers/video/console/Kconfig"
+ endif
+diff --git a/drivers/video/Makefile b/drivers/video/Makefile
+index 9ad3c17..65f5649 100644
+--- a/drivers/video/Makefile
++++ b/drivers/video/Makefile
+@@ -1,5 +1,6 @@
+ obj-$(CONFIG_VGASTATE)            += vgastate.o
+ obj-$(CONFIG_HDMI)                += hdmi.o
++obj-$(CONFIG_HDMI_NOTIFIERS)      += hdmi-notifier.o
+ 
+ obj-$(CONFIG_VT)		  += console/
+ obj-$(CONFIG_LOGO)		  += logo/
+diff --git a/drivers/video/hdmi-notifier.c b/drivers/video/hdmi-notifier.c
+new file mode 100644
+index 0000000..c2a4f1b
+--- /dev/null
++++ b/drivers/video/hdmi-notifier.c
+@@ -0,0 +1,136 @@
++#include <linux/export.h>
 +#include <linux/hdmi-notifier.h>
- #include <linux/mutex.h>
- #include <linux/of_device.h>
- #include <linux/spinlock.h>
-@@ -114,6 +115,7 @@ struct dw_hdmi {
- 
- 	struct hdmi_data_info hdmi_data;
- 	const struct dw_hdmi_plat_data *plat_data;
++#include <linux/string.h>
++#include <linux/slab.h>
++#include <linux/list.h>
++
++struct hdmi_notifiers {
++	struct list_head head;
++	struct device *dev;
 +	struct hdmi_notifier *n;
- 
- 	int vic;
- 
-@@ -1448,9 +1450,11 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
- 		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
- 		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
- 		drm_mode_connector_update_edid_property(connector, edid);
-+		hdmi_event_new_edid(hdmi->n, edid, 0);
- 		ret = drm_add_edid_modes(connector, edid);
- 		/* Store the ELD */
- 		drm_edid_to_eld(connector, edid);
-+		hdmi_event_new_eld(hdmi->n, connector->eld);
- 		kfree(edid);
- 	} else {
- 		dev_dbg(hdmi->dev, "failed to get edid\n");
-@@ -1579,6 +1583,12 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
- 			dw_hdmi_update_phy_mask(hdmi);
- 		}
- 		mutex_unlock(&hdmi->mutex);
++};
 +
-+		if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) == 0)
-+			hdmi_event_disconnect(hdmi->n);
-+		else if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) ==
-+			 (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_PHY_HPD))
-+			hdmi_event_connect(hdmi->n);
- 	}
- 
- 	if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
-@@ -1732,11 +1742,17 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
- 
- 	initialize_hdmi_ih_mutes(hdmi);
- 
-+	hdmi->n = hdmi_notifier_get(dev);
-+	if (!hdmi->n) {
-+		ret = -ENOMEM;
-+		goto err_iahb;
++static LIST_HEAD(hdmi_notifiers);
++static DEFINE_MUTEX(hdmi_notifiers_lock);
++
++struct hdmi_notifier *hdmi_notifier_get(struct device *dev)
++{
++	struct hdmi_notifier *n;
++
++	mutex_lock(&hdmi_notifiers_lock);
++	list_for_each_entry(n, &hdmi_notifiers, head) {
++		if (n->dev == dev) {
++			mutex_unlock(&hdmi_notifiers_lock);
++			kref_get(&n->kref);
++			return n;
++		}
 +	}
++	n = kzalloc(sizeof(*n), GFP_KERNEL);
++	if (!n)
++		goto unlock;
++	mutex_init(&n->lock);
++	BLOCKING_INIT_NOTIFIER_HEAD(&n->notifiers);
++	kref_init(&n->kref);
++	list_add_tail(&n->head, &hdmi_notifiers);
++unlock:
++	mutex_unlock(&hdmi_notifiers_lock);
++	return n;
++}
++EXPORT_SYMBOL_GPL(hdmi_notifier_get);
 +
- 	ret = devm_request_threaded_irq(dev, irq, dw_hdmi_hardirq,
- 					dw_hdmi_irq, IRQF_SHARED,
- 					dev_name(dev), hdmi);
- 	if (ret)
--		goto err_iahb;
-+		goto err_hdmi_not;
- 
- 	/*
- 	 * To prevent overflows in HDMI_IH_FC_STAT2, set the clk regenerator
-@@ -1788,6 +1804,8 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
- 
- 	return 0;
- 
-+err_hdmi_not:
-+	hdmi_notifier_put(hdmi->n);
- err_iahb:
- 	clk_disable_unprepare(hdmi->iahb_clk);
- err_isfr:
-@@ -1804,6 +1822,11 @@ void dw_hdmi_unbind(struct device *dev, struct device *master, void *data)
- 	if (hdmi->audio && !IS_ERR(hdmi->audio))
- 		platform_device_unregister(hdmi->audio);
- 
-+	hdmi_notifier_put(hdmi->n);
++static void hdmi_notifier_release(struct kref *kref)
++{
++	struct hdmi_notifier *n =
++		container_of(kref, struct hdmi_notifier, kref);
 +
-+	if (!IS_ERR(hdmi->cec))
-+		platform_device_unregister(hdmi->cec);
++	kfree(n->edid);
++	kfree(n);
++}
 +
- 	/* Disable all interrupts */
- 	hdmi_writeb(hdmi, ~0, HDMI_IH_MUTE_PHY_STAT0);
- 
++void hdmi_notifier_put(struct hdmi_notifier *n)
++{
++	kref_put(&n->kref, hdmi_notifier_release);
++}
++EXPORT_SYMBOL_GPL(hdmi_notifier_put);
++
++int hdmi_notifier_register(struct hdmi_notifier *n, struct notifier_block *nb)
++{
++	int ret = blocking_notifier_chain_register(&n->notifiers, nb);
++
++	if (ret)
++		return ret;
++	kref_get(&n->kref);
++	mutex_lock(&n->lock);
++	if (n->connected) {
++		blocking_notifier_call_chain(&n->notifiers, HDMI_CONNECTED, n);
++		if (n->edid_size)
++			blocking_notifier_call_chain(&n->notifiers, HDMI_NEW_EDID, n);
++		if (n->has_eld)
++			blocking_notifier_call_chain(&n->notifiers, HDMI_NEW_ELD, n);
++	}
++	mutex_unlock(&n->lock);
++	return 0;
++}
++EXPORT_SYMBOL_GPL(hdmi_notifier_register);
++
++int hdmi_notifier_unregister(struct hdmi_notifier *n, struct notifier_block *nb)
++{
++	int ret = blocking_notifier_chain_unregister(&n->notifiers, nb);
++
++	if (ret == 0)
++		hdmi_notifier_put(n);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(hdmi_notifier_unregister);
++
++void hdmi_event_connect(struct hdmi_notifier *n)
++{
++	mutex_lock(&n->lock);
++	n->connected = true;
++	blocking_notifier_call_chain(&n->notifiers, HDMI_CONNECTED, n);
++	mutex_unlock(&n->lock);
++}
++EXPORT_SYMBOL_GPL(hdmi_event_connect);
++
++void hdmi_event_disconnect(struct hdmi_notifier *n)
++{
++	mutex_lock(&n->lock);
++	n->connected = false;
++	n->has_eld = false;
++	n->edid_size = 0;
++	blocking_notifier_call_chain(&n->notifiers, HDMI_DISCONNECTED, n);
++	mutex_unlock(&n->lock);
++}
++EXPORT_SYMBOL_GPL(hdmi_event_disconnect);
++
++int hdmi_event_new_edid(struct hdmi_notifier *n, const void *edid, size_t size)
++{
++	mutex_lock(&n->lock);
++	if (n->edid_allocated_size < size) {
++		void *p = kmalloc(size, GFP_KERNEL);
++
++		if (p == NULL) {
++			mutex_unlock(&n->lock);
++			return -ENOMEM;
++		}
++		kfree(n->edid);
++		n->edid = p;
++		n->edid_allocated_size = size;
++	}
++	memcpy(n->edid, edid, size);
++	n->edid_size = size;
++	blocking_notifier_call_chain(&n->notifiers, HDMI_NEW_EDID, n);
++	mutex_unlock(&n->lock);
++	return 0;
++}
++EXPORT_SYMBOL_GPL(hdmi_event_new_edid);
++
++void hdmi_event_new_eld(struct hdmi_notifier *n, const u8 eld[128])
++{
++	mutex_lock(&n->lock);
++	memcpy(n->eld, eld, sizeof(n->eld));
++	n->has_eld = true;
++	blocking_notifier_call_chain(&n->notifiers, HDMI_NEW_ELD, n);
++	mutex_unlock(&n->lock);
++}
++EXPORT_SYMBOL_GPL(hdmi_event_new_eld);
+diff --git a/include/linux/hdmi-notifier.h b/include/linux/hdmi-notifier.h
+new file mode 100644
+index 0000000..f7fc405
+--- /dev/null
++++ b/include/linux/hdmi-notifier.h
+@@ -0,0 +1,43 @@
++#ifndef LINUX_HDMI_NOTIFIER_H
++#define LINUX_HDMI_NOTIFIER_H
++
++#include <linux/types.h>
++#include <linux/notifier.h>
++#include <linux/kref.h>
++
++enum {
++	HDMI_CONNECTED,
++	HDMI_DISCONNECTED,
++	HDMI_NEW_EDID,
++	HDMI_NEW_ELD,
++};
++
++struct device;
++
++struct hdmi_notifier {
++	struct mutex lock;
++	struct list_head head;
++	struct kref kref;
++	struct blocking_notifier_head notifiers;
++	struct device *dev;
++
++	/* Current state */
++	bool connected;
++	bool has_eld;
++	unsigned char eld[128];
++	void *edid;
++	size_t edid_size;
++	size_t edid_allocated_size;
++};
++
++struct hdmi_notifier *hdmi_notifier_get(struct device *dev);
++void hdmi_notifier_put(struct hdmi_notifier *n);
++int hdmi_notifier_register(struct hdmi_notifier *n, struct notifier_block *nb);
++int hdmi_notifier_unregister(struct hdmi_notifier *n, struct notifier_block *nb);
++
++void hdmi_event_connect(struct hdmi_notifier *n);
++void hdmi_event_disconnect(struct hdmi_notifier *n);
++int hdmi_event_new_edid(struct hdmi_notifier *n, const void *edid, size_t size);
++void hdmi_event_new_eld(struct hdmi_notifier *n, const u8 eld[128]);
++
++#endif
 -- 
 2.8.1
