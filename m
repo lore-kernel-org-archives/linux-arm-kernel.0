@@ -1,69 +1,83 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Nov 2016 13:40:17 +0000
-Subject: [PATCH] ARM: ftrace: fix syscall name matching
-In-Reply-To: <1479128625-20948-1-git-send-email-rabin.vincent@axis.com>
-References: <1479128625-20948-1-git-send-email-rabin.vincent@axis.com>
-Message-ID: <20161114134017.GJ1041@n2100.armlinux.org.uk>
+From: jitao.shi@mediatek.com (Jitao Shi)
+Date: Mon, 14 Nov 2016 21:41:47 +0800
+Subject: [PATCH v18 1/2] Documentation: bridge: Add documentation for ps8640
+ DT properties
+Message-ID: <1479130908-17593-1-git-send-email-jitao.shi@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 14, 2016 at 02:03:45PM +0100, Rabin Vincent wrote:
-> From: Rabin Vincent <rabinv@axis.com>
-> 
-> ARM has a few system calls (most notably mmap) for which the names of
-> the functions which are referenced in the syscall table do not match the
-> names of the syscall tracepoints.  As a consequence of this, these
-> tracepoints are not made available.  Implement
-> arch_syscall_match_sym_name to fix this and allow tracing even these
-> system calls.
-> 
-> Signed-off-by: Rabin Vincent <rabinv@axis.com>
-> ---
->  arch/arm/include/asm/ftrace.h | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
-> index bfe2a2f..8467909 100644
-> --- a/arch/arm/include/asm/ftrace.h
-> +++ b/arch/arm/include/asm/ftrace.h
-> @@ -54,6 +54,27 @@ static inline void *return_address(unsigned int level)
->  
->  #define ftrace_return_address(n) return_address(n)
->  
-> +#define ARCH_HAS_SYSCALL_MATCH_SYM_NAME
-> +
-> +static inline bool arch_syscall_match_sym_name(const char *sym,
-> +					       const char *name)
-> +{
-> +	/* Skip sys_ */
-> +	sym += 4;
-> +	name += 4;
+Add documentation for DT properties supported by
+ps8640 DSI-eDP converter.
 
-Is this really safe?  What guarantees that we can wind forward four
-bytes here?  If it's always safe, it needs a better comment than just
-two words.
+Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+Changes since v17:
+ - No change.
 
-> +
-> +	if (!strcmp(sym, "mmap2"))
-> +		sym = "mmap_pgoff";
-> +	else if (!strcmp(sym, "statfs64_wrapper"))
-> +		sym = "statfs64";
-> +	else if (!strcmp(sym, "fstatfs64_wrapper"))
-> +		sym = "fstatfs64";
-> +	else if (!strcmp(sym, "arm_fadvise64_64"))
-> +		sym = "fadvise64_64";
-> +
-> +	return !strcmp(sym, name);
-> +}
-> +
->  #endif /* ifndef __ASSEMBLY__ */
->  
->  #endif /* _ASM_ARM_FTRACE */
-> -- 
-> 2.1.4
-> 
+Changes since v16:
+ - No change.
 
+Changes since v15:
+ - No change.
+
+Changes since v14:
+ - change mode-sel-gpios as optional.
+---
+ .../devicetree/bindings/display/bridge/ps8640.txt  |   44 ++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/ps8640.txt
+
+diff --git a/Documentation/devicetree/bindings/display/bridge/ps8640.txt b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+new file mode 100644
+index 0000000..7b13f92
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+@@ -0,0 +1,44 @@
++ps8640-bridge bindings
++
++Required properties:
++	- compatible: "parade,ps8640"
++	- reg: first page address of the bridge.
++	- sleep-gpios: OF device-tree gpio specification for PD pin.
++	- reset-gpios: OF device-tree gpio specification for reset pin.
++	- vdd12-supply: OF device-tree regulator specification for 1.2V power.
++	- vdd33-supply: OF device-tree regulator specification for 3.3V power.
++	- ports: The device node can contain video interface port nodes per
++		 the video-interfaces bind[1]. For port at 0,set the reg = <0> as
++		 ps8640 dsi in and port at 1,set the reg = <1> as ps8640 eDP out.
++
++Optional properties:
++	- mode-sel-gpios: OF device-tree gpio specification for mode-sel pin.
++[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
++
++Example:
++	edp-bridge at 18 {
++		compatible = "parade,ps8640";
++		reg = <0x18>;
++		sleep-gpios = <&pio 116 GPIO_ACTIVE_LOW>;
++		reset-gpios = <&pio 115 GPIO_ACTIVE_LOW>;
++		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
++		vdd12-supply = <&ps8640_fixed_1v2>;
++		vdd33-supply = <&mt6397_vgp2_reg>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			port at 0 {
++				reg = <0>;
++				ps8640_in: endpoint {
++					remote-endpoint = <&dsi0_out>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				ps8640_out: endpoint {
++					remote-endpoint = <&panel_in>;
++				};
++			};
++		};
++	};
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.7.9.5
