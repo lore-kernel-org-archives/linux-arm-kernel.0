@@ -1,30 +1,54 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Nov 2016 17:50:42 +0000
-Subject: [PATCHv2 00/11] arm64: move thread_info off of the task stack
-In-Reply-To: <1478204593-29145-1-git-send-email-mark.rutland@arm.com>
-References: <1478204593-29145-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20161114175042.GF3096@e104818-lin.cambridge.arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 14 Nov 2016 17:52:13 +0000
+Subject: [PATCH v2 2/2] ARM: dts: apq8064: add support to pm8821
+In-Reply-To: <1479145933-9849-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1479145933-9849-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1479145933-9849-2-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2016 at 08:23:02PM +0000, Mark Rutland wrote:
-> Mark Rutland (11):
->   arm64: thread_info remove stale items
->   arm64: asm-offsets: remove unused definitions
->   arm64: factor out current_stack_pointer
->   arm64: traps: simplify die() and __die()
->   arm64: unexport walk_stackframe
->   arm64: prep stack walkers for THREAD_INFO_IN_TASK
->   arm64: move sp_el0 and tpidr_el1 into cpu_suspend_ctx
->   arm64: smp: prepare for smp_processor_id() rework
->   arm64: make cpu number a percpu variable
->   arm64: assembler: introduce ldr_this_cpu
->   arm64: split thread_info from task stack
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ arch/arm/boot/dts/qcom-apq8064.dtsi | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-I queued these patches for 4.10, together with the two on
-core-ti-stack-split (subject to more testing).
-
-Thanks.
-
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index 268bd47..c61ba32 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -627,6 +627,33 @@
+ 			clock-names = "core";
+ 		};
+ 
++		ssbi at c00000 {
++			compatible = "qcom,ssbi";
++			reg = <0x00c00000 0x1000>;
++			qcom,controller-type = "pmic-arbiter";
++
++			pm8821: pmic at 1 {
++				compatible = "qcom,pm8821";
++				interrupt-parent = <&tlmm_pinmux>;
++				interrupts = <76 IRQ_TYPE_LEVEL_LOW>;
++				#interrupt-cells = <2>;
++				interrupt-controller;
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				pm8821_mpps: mpps at 50 {
++					compatible = "qcom,pm8821-mpp", "qcom,ssbi-mpp";
++					reg = <0x50>;
++					interrupts = <24 IRQ_TYPE_NONE>,
++						     <25 IRQ_TYPE_NONE>,
++						     <26 IRQ_TYPE_NONE>,
++						     <27 IRQ_TYPE_NONE>;
++					gpio-controller;
++					#gpio-cells = <2>;
++		                };
++			};
++		};
++
+ 		qcom,ssbi at 500000 {
+ 			compatible = "qcom,ssbi";
+ 			reg = <0x00500000 0x1000>;
 -- 
-Catalin
+2.10.1
