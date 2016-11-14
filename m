@@ -1,30 +1,220 @@
 From: peter.chen@nxp.com (Peter Chen)
-Date: Mon, 14 Nov 2016 15:04:21 +0800
-Subject: [PATCH v3 2/3] ARM: imx: mach-imx6ul: add imx6ull support
+Date: Mon, 14 Nov 2016 15:04:20 +0800
+Subject: [PATCH v3 1/3] ARM: imx6ull: add imx6ull support
 In-Reply-To: <1479107062-15365-1-git-send-email-peter.chen@nxp.com>
 References: <1479107062-15365-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1479107062-15365-3-git-send-email-peter.chen@nxp.com>
+Message-ID: <1479107062-15365-2-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx6ull is derived SoC from imx6ul.
+It is the 10th processor in the well-known imx6 series, and derived
+from imx6ul but cost optimized. The more information about imx6ull
+can be found at:
+
+http://www.nxp.com/products/microcontrollers-and-processors/
+arm-processors/i.mx-applications-processors/i.mx-6-processors
+/i.mx6qp/i.mx-6ull-single-core-processor-with-arm-cortex-a7-core
+:i.MX6ULL
+
+imx6ul.dtsi is the SoC common stuff for both imx6ul and imx6ull;
+imx6ul-14x14-evk.dts is the board common stuff for both imx6ul
+and imx6ull 14x14 evk. In this patch, for SoC part, the
+imx6ull.dtsi includes imx6ul.dtsi; for board part, imx6ull-14x14-evk.dts
+includes imx6ul-14x14-evk.dts.
 
 Signed-off-by: Peter Chen <peter.chen@nxp.com>
 ---
- arch/arm/mach-imx/mach-imx6ul.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/Makefile              |  3 +-
+ arch/arm/boot/dts/imx6ull-14x14-evk.dts | 52 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6ull-pinfunc.h     | 56 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6ull.dtsi          | 43 +++++++++++++++++++++++++
+ 4 files changed, 153 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/imx6ull-14x14-evk.dts
+ create mode 100644 arch/arm/boot/dts/imx6ull-pinfunc.h
+ create mode 100644 arch/arm/boot/dts/imx6ull.dtsi
 
-diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
-index 58a2b88..6cb8a22 100644
---- a/arch/arm/mach-imx/mach-imx6ul.c
-+++ b/arch/arm/mach-imx/mach-imx6ul.c
-@@ -89,6 +89,7 @@ static void __init imx6ul_init_late(void)
- 
- static const char * const imx6ul_dt_compat[] __initconst = {
- 	"fsl,imx6ul",
-+	"fsl,imx6ull",
- 	NULL,
- };
- 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index befcd26..3d6e199 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -423,7 +423,8 @@ dtb-$(CONFIG_SOC_IMX6UL) += \
+ 	imx6ul-pico-hobbit.dtb \
+ 	imx6ul-tx6ul-0010.dtb \
+ 	imx6ul-tx6ul-0011.dtb \
+-	imx6ul-tx6ul-mainboard.dtb
++	imx6ul-tx6ul-mainboard.dtb \
++	imx6ull-14x14-evk.dtb
+ dtb-$(CONFIG_SOC_IMX7D) += \
+ 	imx7d-cl-som-imx7.dtb \
+ 	imx7d-colibri-eval-v3.dtb \
+diff --git a/arch/arm/boot/dts/imx6ull-14x14-evk.dts b/arch/arm/boot/dts/imx6ull-14x14-evk.dts
+new file mode 100644
+index 0000000..db5bc07
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6ull-14x14-evk.dts
+@@ -0,0 +1,52 @@
++/*
++ * Copyright (C) 2016 Freescale Semiconductor, Inc.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "imx6ul-14x14-evk.dts"
++
++/ {
++	model = "Freescale i.MX6 UlltraLite 14x14 EVK Board";
++	compatible = "fsl,imx6ull-14x14-evk", "fsl,imx6ull";
++};
++
++&clks {
++	assigned-clocks = <&clks IMX6UL_CLK_PLL3_PFD2>;
++	assigned-clock-rates = <320000000>;
++};
+diff --git a/arch/arm/boot/dts/imx6ull-pinfunc.h b/arch/arm/boot/dts/imx6ull-pinfunc.h
+new file mode 100644
+index 0000000..580b5c3
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6ull-pinfunc.h
+@@ -0,0 +1,56 @@
++/*
++ * Copyright (C) 2016 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __DTS_IMX6ULL_PINFUNC_H
++#define __DTS_IMX6ULL_PINFUNC_H
++
++#include "imx6ul-pinfunc.h"
++/*
++ * The pin function ID is a tuple of
++ * <mux_reg conf_reg input_reg mux_mode input_val>
++ */
++#define MX6ULL_PAD_ENET2_RX_DATA0__EPDC_SDDO08                    0x00E4 0x0370 0x0000 0x9 0x0
++#define MX6ULL_PAD_ENET2_RX_DATA1__EPDC_SDDO09                    0x00E8 0x0374 0x0000 0x9 0x0
++#define MX6ULL_PAD_ENET2_RX_EN__EPDC_SDDO10                       0x00EC 0x0378 0x0000 0x9 0x0
++#define MX6ULL_PAD_ENET2_TX_DATA0__EPDC_SDDO11                    0x00F0 0x037C 0x0000 0x9 0x0
++#define MX6ULL_PAD_ENET2_TX_DATA1__EPDC_SDDO12                    0x00F4 0x0380 0x0000 0x9 0x0
++#define MX6ULL_PAD_ENET2_TX_EN__EPDC_SDDO13                       0x00F8 0x0384 0x0000 0x9 0x0
++#define MX6ULL_PAD_ENET2_TX_CLK__EPDC_SDDO14                      0x00FC 0x0388 0x0000 0x9 0x0
++#define MX6ULL_PAD_ENET2_RX_ER__EPDC_SDDO15                       0x0100 0x038C 0x0000 0x9 0x0
++#define MX6ULL_PAD_LCD_CLK__EPDC_SDCLK                            0x0104 0x0390 0x0000 0x9 0x0
++#define MX6ULL_PAD_LCD_ENABLE__EPDC_SDLE                          0x0108 0x0394 0x0000 0x9 0x0
++#define MX6ULL_PAD_LCD_HSYNC__EPDC_SDOE                           0x010C 0x0398 0x0000 0x9 0x0
++#define MX6ULL_PAD_LCD_VSYNC__EPDC_SDCE0                          0x0110 0x039C 0x0000 0x9 0x0
++#define MX6ULL_PAD_LCD_RESET__EPDC_GDOE                           0x0114 0x03A0 0x0000 0x9 0x0
++#define MX6ULL_PAD_LCD_DATA00__EPDC_SDDO00                        0x0118 0x03A4 0x0000 0x9 0x0
++#define MX6ULL_PAD_LCD_DATA01__EPDC_SDDO01                        0x011C 0x03A8 0x0000 0x9 0x0
++#define MX6ULL_PAD_LCD_DATA02__EPDC_SDDO02                        0x0120 0x03AC 0x0000 0x9 0x0
++#define MX6ULL_PAD_LCD_DATA03__EPDC_SDDO03                        0x0124 0x03B0 0x0000 0x9 0x0
++#define MX6ULL_PAD_LCD_DATA04__EPDC_SDDO04                        0x0128 0x03B4 0x0000 0x9 0x0
++#define MX6ULL_PAD_LCD_DATA05__EPDC_SDDO05                        0x012C 0x03B8 0x0000 0x9 0x0
++#define MX6ULL_PAD_LCD_DATA06__EPDC_SDDO06                        0x0130 0x03BC 0x0000 0x9 0x0
++#define MX6ULL_PAD_LCD_DATA07__EPDC_SDDO07                        0x0134 0x03C0 0x0000 0x9 0x0
++#define MX6ULL_PAD_LCD_DATA14__EPDC_SDSHR                         0x0150 0x03DC 0x0000 0x9 0x0
++#define MX6ULL_PAD_LCD_DATA15__EPDC_GDRL                          0x0154 0x03E0 0x0000 0x9 0x0
++#define MX6ULL_PAD_LCD_DATA16__EPDC_GDCLK                         0x0158 0x03E4 0x0000 0x9 0x0
++#define MX6ULL_PAD_LCD_DATA17__EPDC_GDSP                          0x015C 0x03E8 0x0000 0x9 0x0
++#define MX6ULL_PAD_LCD_DATA21__EPDC_SDCE1                         0x016C 0x03F8 0x0000 0x9 0x0
++#define MX6ULL_PAD_CSI_MCLK__ESAI_TX3_RX2                          0x01D4 0x0460 0x0000 0x9 0x0
++#define MX6ULL_PAD_CSI_PIXCLK__ESAI_TX2_RX3                        0x01D8 0x0464 0x0000 0x9 0x0
++#define MX6ULL_PAD_CSI_VSYNC__ESAI_TX4_RX1                         0x01DC 0x0468 0x0000 0x9 0x0
++#define MX6ULL_PAD_CSI_HSYNC__ESAI_TX1                             0x01E0 0x046C 0x0000 0x9 0x0
++#define MX6ULL_PAD_CSI_DATA00__ESAI_TX_HF_CLK                      0x01E4 0x0470 0x0000 0x9 0x0
++#define MX6ULL_PAD_CSI_DATA01__ESAI_RX_HF_CLK                      0x01E8 0x0474 0x0000 0x9 0x0
++#define MX6ULL_PAD_CSI_DATA02__ESAI_RX_FS                          0x01EC 0x0478 0x0000 0x9 0x0
++#define MX6ULL_PAD_CSI_DATA03__ESAI_RX_CLK                         0x01F0 0x047C 0x0000 0x9 0x0
++#define MX6ULL_PAD_CSI_DATA04__ESAI_TX_FS                          0x01F4 0x0480 0x0000 0x9 0x0
++#define MX6ULL_PAD_CSI_DATA05__ESAI_TX_CLK                         0x01F8 0x0484 0x0000 0x9 0x0
++#define MX6ULL_PAD_CSI_DATA06__ESAI_TX5_RX0                        0x01FC 0x0488 0x0000 0x9 0x0
++#define MX6ULL_PAD_CSI_DATA07__ESAI_T0                             0x0200 0x048C 0x0000 0x9 0x0
++
++#endif /* __DTS_IMX6ULL_PINFUNC_H */
+diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
+new file mode 100644
+index 0000000..dee8ab8
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6ull.dtsi
+@@ -0,0 +1,43 @@
++/*
++ * Copyright 2016 Freescale Semiconductor, Inc.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "imx6ul.dtsi"
++#include "imx6ull-pinfunc.h"
 -- 
 2.7.4
