@@ -1,21 +1,15 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 14 Nov 2016 13:23:26 +0100
-Subject: [PATCH 1/2] pinctrl: bcm2835: Fix ints for GPIOs 28-31 & 46-53
-Message-ID: <1479126206-20482-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon, 14 Nov 2016 13:23:34 +0100
+Subject: [PATCH 2/2] pinctrl: bcm2835: Return pins to inputs when freed
+Message-ID: <1479126214-20529-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Phil Elwell <phil@raspberrypi.org>
 
-Contrary to the documentation, the BCM2835 GPIO controller actually
-has four interrupt lines - one each for the three IRQ groups and one
-common. Confusingly, the GPIO interrupt groups don't correspond
-directly with the GPIO control banks. Instead, GPIOs 0-27 generate IRQ
-GPIO0, 28-45 IRQ GPIO1 and 46-53 IRQ GPIO2.
-
-Awkwardly, the GPIOs for IRQ GPIO1 straddle two 32-entry GPIO banks,
-so split out a function to process the interrupts for a single GPIO
-bank.
+When dynamically unloading overlays, it is important that freed pins are
+restored to being inputs to prevent functions from being enabled in
+multiple places at once.
 
 Cc: Stefan Wahren <stefan.wahren@i2se.com>
 Cc: Eric Anholt <eric@anholt.net>
@@ -26,133 +20,37 @@ Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 I want to apply this to cater for my GPIOLIB_IRQCHIP
 refactorings.
 ---
- drivers/pinctrl/bcm/pinctrl-bcm2835.c | 51 ++++++++++++++++++++++++++---------
- 1 file changed, 39 insertions(+), 12 deletions(-)
+ drivers/pinctrl/bcm/pinctrl-bcm2835.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-index b2dd278f18b1..1d8fc104e26b 100644
+index 1d8fc104e26b..2df59d9964a2 100644
 --- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
 +++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-@@ -47,6 +47,7 @@
- #define MODULE_NAME "pinctrl-bcm2835"
- #define BCM2835_NUM_GPIOS 54
- #define BCM2835_NUM_BANKS 2
-+#define BCM2835_NUM_IRQS  3
- 
- #define BCM2835_PIN_BITMAP_SZ \
- 	DIV_ROUND_UP(BCM2835_NUM_GPIOS, sizeof(unsigned long) * 8)
-@@ -88,13 +89,13 @@ enum bcm2835_pinconf_pull {
- 
- struct bcm2835_gpio_irqdata {
- 	struct bcm2835_pinctrl *pc;
--	int bank;
-+	int irqgroup;
+@@ -844,6 +844,16 @@ static const struct pinctrl_ops bcm2835_pctl_ops = {
+ 	.dt_free_map = bcm2835_pctl_dt_free_map,
  };
  
- struct bcm2835_pinctrl {
- 	struct device *dev;
- 	void __iomem *base;
--	int irq[BCM2835_NUM_BANKS];
-+	int irq[BCM2835_NUM_IRQS];
- 
- 	/* note: locking assumes each bank will have its own unsigned long */
- 	unsigned long enabled_irq_map[BCM2835_NUM_BANKS];
-@@ -105,7 +106,7 @@ struct bcm2835_pinctrl {
- 	struct gpio_chip gpio_chip;
- 	struct pinctrl_gpio_range gpio_range;
- 
--	struct bcm2835_gpio_irqdata irq_data[BCM2835_NUM_BANKS];
-+	struct bcm2835_gpio_irqdata irq_data[BCM2835_NUM_IRQS];
- 	spinlock_t irq_lock[BCM2835_NUM_BANKS];
- };
- 
-@@ -391,17 +392,16 @@ static struct gpio_chip bcm2835_gpio_chip = {
- 	.can_sleep = false,
- };
- 
--static irqreturn_t bcm2835_gpio_irq_handler(int irq, void *dev_id)
-+static int bcm2835_gpio_irq_handle_bank(struct bcm2835_pinctrl *pc,
-+					unsigned int bank, u32 mask)
- {
--	struct bcm2835_gpio_irqdata *irqdata = dev_id;
--	struct bcm2835_pinctrl *pc = irqdata->pc;
--	int bank = irqdata->bank;
- 	unsigned long events;
- 	unsigned offset;
- 	unsigned gpio;
- 	unsigned int type;
- 
- 	events = bcm2835_gpio_rd(pc, GPEDS0 + bank * 4);
-+	events &= mask;
- 	events &= pc->enabled_irq_map[bank];
- 	for_each_set_bit(offset, &events, 32) {
- 		gpio = (32 * bank) + offset;
-@@ -409,7 +409,30 @@ static irqreturn_t bcm2835_gpio_irq_handler(int irq, void *dev_id)
- 
- 		generic_handle_irq(irq_linear_revmap(pc->irq_domain, gpio));
- 	}
--	return events ? IRQ_HANDLED : IRQ_NONE;
++static int bcm2835_pmx_free(struct pinctrl_dev *pctldev,
++		unsigned offset)
++{
++	struct bcm2835_pinctrl *pc = pinctrl_dev_get_drvdata(pctldev);
 +
-+	return (events != 0);
++	/* disable by setting to GPIO_IN */
++	bcm2835_pinctrl_fsel_set(pc, offset, BCM2835_FSEL_GPIO_IN);
++	return 0;
 +}
 +
-+static irqreturn_t bcm2835_gpio_irq_handler(int irq, void *dev_id)
-+{
-+	struct bcm2835_gpio_irqdata *irqdata = dev_id;
-+	struct bcm2835_pinctrl *pc = irqdata->pc;
-+	int handled = 0;
-+
-+	switch (irqdata->irqgroup) {
-+	case 0: /* IRQ0 covers GPIOs 0-27 */
-+		handled = bcm2835_gpio_irq_handle_bank(pc, 0, 0x0fffffff);
-+		break;
-+	case 1: /* IRQ1 covers GPIOs 28-45 */
-+		handled = bcm2835_gpio_irq_handle_bank(pc, 0, 0xf0000000) |
-+			  bcm2835_gpio_irq_handle_bank(pc, 1, 0x00003fff);
-+		break;
-+	case 2: /* IRQ2 covers GPIOs 46-53 */
-+		handled = bcm2835_gpio_irq_handle_bank(pc, 1, 0x003fc000);
-+		break;
-+	}
-+
-+	return handled ? IRQ_HANDLED : IRQ_NONE;
+ static int bcm2835_pmx_get_functions_count(struct pinctrl_dev *pctldev)
+ {
+ 	return BCM2835_FSEL_COUNT;
+@@ -903,6 +913,7 @@ static int bcm2835_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
  }
  
- static inline void __bcm2835_gpio_irq_config(struct bcm2835_pinctrl *pc,
-@@ -1000,8 +1023,6 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
- 	for (i = 0; i < BCM2835_NUM_BANKS; i++) {
- 		unsigned long events;
- 		unsigned offset;
--		int len;
--		char *name;
- 
- 		/* clear event detection flags */
- 		bcm2835_gpio_wr(pc, GPREN0 + i * 4, 0);
-@@ -1016,10 +1037,15 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
- 		for_each_set_bit(offset, &events, 32)
- 			bcm2835_gpio_wr(pc, GPEDS0 + i * 4, BIT(offset));
- 
-+		spin_lock_init(&pc->irq_lock[i]);
-+	}
-+
-+	for (i = 0; i < BCM2835_NUM_IRQS; i++) {
-+		int len;
-+		char *name;
- 		pc->irq[i] = irq_of_parse_and_map(np, i);
- 		pc->irq_data[i].pc = pc;
--		pc->irq_data[i].bank = i;
--		spin_lock_init(&pc->irq_lock[i]);
-+		pc->irq_data[i].irqgroup = i;
- 
- 		len = strlen(dev_name(pc->dev)) + 16;
- 		name = devm_kzalloc(pc->dev, len, GFP_KERNEL);
-@@ -1076,6 +1102,7 @@ static struct platform_driver bcm2835_pinctrl_driver = {
- 	.remove = bcm2835_pinctrl_remove,
- 	.driver = {
- 		.name = MODULE_NAME,
-+		.owner = THIS_MODULE,
- 		.of_match_table = bcm2835_pinctrl_match,
- 	},
- };
+ static const struct pinmux_ops bcm2835_pmx_ops = {
++	.free = bcm2835_pmx_free,
+ 	.get_functions_count = bcm2835_pmx_get_functions_count,
+ 	.get_function_name = bcm2835_pmx_get_function_name,
+ 	.get_function_groups = bcm2835_pmx_get_function_groups,
 -- 
 2.7.4
