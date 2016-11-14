@@ -1,139 +1,151 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Mon, 14 Nov 2016 20:17:43 +0800
-Subject: [PATCH v2 10/10] ARM: dts: rockchip: add rockchip RK1108 Evaluation
- board
-In-Reply-To: <1479124550-24037-1-git-send-email-andy.yan@rock-chips.com>
-References: <1479124550-24037-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1479125863-24646-1-git-send-email-andy.yan@rock-chips.com>
+From: tomas.hlavacek@nic.cz (tomas.hlavacek at nic.cz)
+Date: Mon, 14 Nov 2016 13:23:05 +0100
+Subject: [PATCH RFC] ARM: dts: add support for Turris Omnia
+In-Reply-To: <20161105203841.9661-1-uwe@kleine-koenig.org>
+References: <20161105203841.9661-1-uwe@kleine-koenig.org>
+Message-ID: <1479126185.15557.5@smtp.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RK1108 EVB is designed by Rockchip for CVR field.
-This patch add basic support for it, which can boot with
-initramfs into shell.
+Hello Uwe and all!
 
-Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
+On Sat, Nov 5, 2016 at 9:38 PM, Uwe Kleine-K?nig 
+<uwe@kleine-koenig.org> wrote:
+> This machine is an open hardware router by cz.nic driven by a
+> Marvell Armada 385.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+> ---
+> 
+> Hello,
+> 
+> the following components are working:
+> 
+>  - WAN port
+>  - eMMC
 
----
+But I not not sure about DDR50 mode. At least with kernel 4.4, that we 
+use in production, we had to limit to SDR50 to overcome I/O errors and 
+communication instability, if I can remember it correctly. So it might 
+need more testing with the current kernel.
 
-Changes in v2:
-- move the board in the rockchip.txt to the block of Rockchip boards
+> 
+>  - UART0
+>  - USB
 
- Documentation/devicetree/bindings/arm/rockchip.txt |  5 +-
- arch/arm/boot/dts/Makefile                         |  1 +
- arch/arm/boot/dts/rk1108-evb.dts                   | 69 ++++++++++++++++++++++
- 3 files changed, 74 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/rk1108-evb.dts
+It is worth noting that the USB 2.0 interface of Armada 385 is wired to 
+USB pinout of the last (right-most) PCIe connector. The two USB3 
+interfaces routed through SERDES 1 and 3 go directly to the external 
+USB connectors.
 
-diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-index 10b92b5..e658b62 100644
---- a/Documentation/devicetree/bindings/arm/rockchip.txt
-+++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-@@ -1,6 +1,5 @@
- Rockchip platforms device tree bindings
- ---------------------------------------
--
- - Kylin RK3036 board:
-     Required root node properties:
-       - compatible = "rockchip,kylin-rk3036", "rockchip,rk3036";
-@@ -111,6 +110,10 @@ Rockchip platforms device tree bindings
-     Required root node properties:
-       - compatible = "rockchip,px5-evb", "rockchip,px5", "rockchip,rk3368";
- 
-+- Rockchip RK1108 Evaluation board
-+    Required root node properties:
-+      - compatible = "rockchip,rk1108-evb", "rockchip,rk1108";
-+
- - Rockchip RK3368 evb:
-     Required root node properties:
-       - compatible = "rockchip,rk3368-evb-act8846", "rockchip,rk3368";
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index e49476a..249dca9 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -635,6 +635,7 @@ dtb-$(CONFIG_ARCH_REALVIEW) += \
- 	arm-realview-pba8.dtb \
- 	arm-realview-pbx-a9.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += \
-+	rk1108-evb.dtb \
- 	rk3036-evb.dtb \
- 	rk3036-kylin.dtb \
- 	rk3066a-bqcurie2.dtb \
-diff --git a/arch/arm/boot/dts/rk1108-evb.dts b/arch/arm/boot/dts/rk1108-evb.dts
-new file mode 100644
-index 0000000..3956cff
---- /dev/null
-+++ b/arch/arm/boot/dts/rk1108-evb.dts
-@@ -0,0 +1,69 @@
-+/*
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *  Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "rk1108.dtsi"
-+
-+/ {
-+	model = "Rockchip RK1108 Evaluation board";
-+	compatible = "rockchip,rk1108-evb", "rockchip,rk1108";
-+
-+	memory at 60000000 {
-+		device_type = "memory";
-+		reg = <0x60000000 0x08000000>;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial2:1500000n8";
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
--- 
-2.7.4
+> 
+> Still missing is support for the switch. Wireless fails to probe, 
+> didn't
+> debug this up to now. SFP is untested as is UART1.
+
+Actually SFP is connected to SGMII interface of eth1, which is routed 
+through SERDES 5. The SGMII line is shared between the SFP and metallic 
+PHY 88E1514. There is a autonomous high-speed switch connected to the 
+SFPDET signal from SFP cage. It disconnects the metallic SFP and 
+connects SGMII to SFP once the module is connected.
+
+The SFP is also connected to the I2C mux port 4 and to GPIO expander 
+for reading/driving SFPDET, LOS, TXFLT, TXDIS signals:
+
+&i2c0 {
+        pinctrl-names = "default";
+        pinctrl-0 = <&i2c0_pins>;
+        status = "okay";
+        clock-frequency = <100000>;
+
+        i2cmux at 70 {
+                compatible = "nxp,pca9547";
+                #address-cells = <1>;
+                #size-cells = <0>;
+                reg = <0x70>;
+                status = "okay";
+
+...
+
+                i2c at 7 {
+                        /* SFP+ GPIO expander */
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+                        reg = <7>;
+
+                        sfpgpio: gpio at 71 {
+                                compatible = "nxp,pca9538";
+                                reg = <0x71>;
+                                interrupt-parent = <&gpio1>;
+                                interrupts = <14 IRQ_TYPE_LEVEL_LOW>;
+                                gpio-controller;
+                                #gpio-cells = <2>;
+                        };
+                };
+	};
+};
+
+We have our proprietary support hacked onto mvneta driver for 
+disconnecting PHY on the fly. It is a bit nasty, so I suggest to ignore 
+SFP in this DTS altogether and let's wait till "phylink based SFP 
+module support" or something alike hits upstream, so we can base the 
+SFP support on solid code; unless somebody has a better idea, of course.
+
+> 
+> 
+> diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts 
+> b/arch/arm/boot/dts/armada-385-turris-omnia.dts
+> new file mode 100644
+> index 000000000000..d3cd8a4d713d
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
+> @@ -0,0 +1,246 @@
+...
+> +
+> +			/* USB part of the eSATA/USB 2.0 port */
+
+This comment is perhaps some error inherited from my development DTS. 
+We do not have any eSATA, perhaps PCIe/USB 2.0 slot.
+
+> 
+> +			usb at 58000 {
+> +				status = "okay";
+> +			};
+> +
+> +
+> +&eth0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&ge0_rgmii_pins>;
+> +	status = "okay";
+> +	phy-mode = "rgmii-id";
+> +
+> +	fixed-link {
+> +		speed = <1000>;
+> +		full-duplex;
+> +	};
+> +};
+> +
+> +&eth1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&ge1_rgmii_pins>;
+> +	status = "okay";
+> +	phy-mode = "rgmii-id";
+> +
+> +	fixed-link {
+> +		speed = <1000>;
+> +		full-duplex;
+> +	};
+> +};
+> +
+
+Actually eth0 and eth1 (both are RGMII) are connected to the 88E6176 
+switch. The problem is that from what I have read so far the switch can 
+not operate in DSA mode with two CPU ports. We currently operate the 
+switch in "normal mode" with the eth0 and eth1 set to fixed-link 
+1000/full and with proprietary driver (derived from OpenWRT switch 
+drivers). I would say that these records for eth0 and eth1 are 
+therefore redundant, because it does nothing without the switch support 
+and it would most likely change once we have DSA driver (using only 
+eth0).
+
+Tomas
