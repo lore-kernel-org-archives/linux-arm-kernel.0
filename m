@@ -1,70 +1,45 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 14 Nov 2016 12:00:47 +0000
-Subject: [PATCH v7 04/16] drivers: iommu: make of_iommu_set/get_ops() DT
- agnostic
-In-Reply-To: <20161114102654.GA1677@red-moon>
-References: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
- <20161109141948.19244-5-lorenzo.pieralisi@arm.com>
- <20161111152248.GS2078@8bytes.org>
- <552e674a-f434-f08f-8e16-a94544ce8e6e@arm.com>
- <20161111162736.GV2078@8bytes.org>
- <33769e3c-265f-6e89-adf9-6d35b1e03579@arm.com>
- <20161114102654.GA1677@red-moon>
-Message-ID: <41e3eff1-9ce6-bcfb-5716-c65ef38add63@arm.com>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Mon, 14 Nov 2016 13:01:25 +0100
+Subject: [PATCH 0/5] net: thunderx: Miscellaneous fixes
+In-Reply-To: <1479120886-13425-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1479120886-13425-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <2948c47d-0f15-8153-440b-7a2c753b7251@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/11/16 10:26, Lorenzo Pieralisi wrote:
-> Hi Robin, Joerg,
-> 
-> On Fri, Nov 11, 2016 at 05:43:39PM +0000, Robin Murphy wrote:
->> On 11/11/16 16:27, Joerg Roedel wrote:
->>> On Fri, Nov 11, 2016 at 04:17:37PM +0000, Robin Murphy wrote:
->>>> In the original of_iommu_configure design, the thought was that an ops
->>>> structure could be IOMMU-instance-specific (hence the later-removed
->>>> "priv" member), so I suppose right now it is mostly a hangover from
->>>> that. However, it's also what we initialise a device's fwspec with, so
->>>> becomes important again if we're ever going to get past the limitations
->>>> of buses-which-are-not-actually-buses[1].
->>>
->>> Yeah, I discussed this with a few others at LPC. My current idea is to
->>> tell the iommu-core which hardware-iommus exist in the system and a
->>> seperate iommu_ops ptr for each of them. Then every struct device can
->>> link to the iommu-instance it is translated by.
->>
->> Er, that sounds very much like a description of what we already have in
->> 4.9-rc. Every struct device now has an iommu_fwspec which encapsulates
->> both an iommu_ops pointer (which can perfectly well be per-instance if
->> the IOMMU driver wants) and a place for the IOMMU-private data to
->> replace the mess of archdata.iommu and driver-internal globals.
->>
->>> We are not there yet, but this will give you the same per-device
->>> iommu-ops as implemented here.
->>
->> With those two patches I linked to, which make the bulk of the IOMMU
->> core code per-device-ops-aware off the bat, I'd say we *are* already
->> pretty much there. It's only iommu_domain_alloc() which needs a
->> device-based alternative, and the non-of_xlate-based IOMMU drivers to
->> either call iommu_fwspec_init() for themselves, or perhaps for x86
->> plumbing in DMAR/IVRS equivalents of the IORT parsing to the
->> infrastructure provided by this series.
-> 
-> I think it all boils down to how we end up implementing the per-device
-> iommu_ops look-up/binding, question is what do you want me to do with
-> this patch, it should be fine to drop it and use dev->bus->iommu_ops
-> for the look-up but I should know sooner rather than later to make
-> sure the series get another good round of testing.
 
-If we've already made the decision to move away from bus ops, I don't
-see that it makes sense to deliberately introduce new dependencies on
-them. Besides, as it stands, this patch literally implements "tell the
-iommu-core which hardware-iommus exist in the system and a seperate
-iommu_ops ptr for each of them" straight off.
 
-Robin.
+On 14/11/16 11:54, sunil.kovvuri at gmail.com wrote:
+> From: Sunil Goutham <sgoutham@cavium.com>
+>
+> This patchset includes fixes for incorrect LMAC credits,
+> unreliable driver statistics, memory leak upon interface
+> down e.t.c
+>
 
-> 
-> Please let me know, thank you very much.
-> 
-> Lorenzo
-> 
+Are these fixes relevant to for older kernels as well?
+If so, please add "Cc: stable at vger.kernel.org" to the Sigend-off list.
+
+Thanks,
+Matthias
+
+> Radha Mohan Chintakuntla (1):
+>   net: thunderx: Introduce BGX_ID_MASK macro to extract bgx_id
+>
+> Sunil Goutham (4):
+>   net: thunderx: Program LMAC credits based on MTU
+>   net: thunderx: Fix configuration of L3/L4 length checking
+>   net: thunderx: Fix VF driver's interface statistics
+>   net: thunderx: Fix memory leak and other issues upon interface toggle
+>
+>  drivers/net/ethernet/cavium/thunder/nic.h          |  64 +++++----
+>  drivers/net/ethernet/cavium/thunder/nic_main.c     |  37 +++--
+>  drivers/net/ethernet/cavium/thunder/nic_reg.h      |   1 +
+>  .../net/ethernet/cavium/thunder/nicvf_ethtool.c    | 105 +++++++-------
+>  drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 153 +++++++++++----------
+>  drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 118 +++++++++-------
+>  drivers/net/ethernet/cavium/thunder/nicvf_queues.h |  24 +---
+>  drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |   4 +-
+>  drivers/net/ethernet/cavium/thunder/thunder_bgx.h  |   2 +
+>  9 files changed, 274 insertions(+), 234 deletions(-)
+>
