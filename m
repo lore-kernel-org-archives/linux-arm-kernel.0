@@ -1,55 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 Nov 2016 15:37:44 +0100
-Subject: [PATCH 01/16] ARM: scu: Provide support for parsing SCU device
- node to enable SCU
-In-Reply-To: <20161114135018.GL1041@n2100.armlinux.org.uk>
-References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
- <2479429.Js1FDSdQzs@wuerfel> <20161114135018.GL1041@n2100.armlinux.org.uk>
-Message-ID: <6787744.7DRFf7p3US@wuerfel>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 14 Nov 2016 15:42:07 +0100
+Subject: [PATCH] staging: vc04_services: Remove explicit NULL pointer
+In-Reply-To: <1478866605-1561-1-git-send-email-maninder.s2@samsung.com>
+References: <1478866605-1561-1-git-send-email-maninder.s2@samsung.com>
+Message-ID: <20161114144207.GA24686@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 14, 2016 1:50:18 PM CET Russell King - ARM Linux wrote:
-> On Mon, Nov 14, 2016 at 01:03:09PM +0100, Arnd Bergmann wrote:
-> > On Monday, November 14, 2016 2:10:16 PM CET pankaj.dubey wrote:
-> > > >> +    scu_base = of_iomap(np, 0);
-> > > >> +    of_node_put(np);
-> > > >> +    if (!scu_base) {
-> > > >> +            pr_err("%s failed to map scu_base via DT\n", __func__);
-> > > > 
-> > > > For non-ca5, non-ca9 based SoCs, we'll see this error msg. We understand
-> > > > what does it mean, but it may confuse normal users. In current version,
-> > > > berlin doesn't complain like this for non-ca9 SoCs
-> > > > 
-> > > 
-> > > OK, let me see other reviewer's comment on this. Then we will decide if
-> > > this error message is required or can be omitted.
-> > 
-> > We need to look at all callers here, to see if the function ever gets
-> > called for a CPU that doesn't have an SCU. I'd say we should warn if
-> > we know there is an SCU but we cannot map it, but never warn on
-> > any of the CPU cores that don't support an SCU.
+On Fri, Nov 11, 2016 at 05:46:45PM +0530, Maninder Singh wrote:
+> Replace direct comparisons to NULL i.e.
+> 'x == NULL' with '!x'
+> 'x != NULL' with 'x'
 > 
-> Maybe there should be two helpers:
-> 
-> of_scu_enable() which _only_ looks up the SCU address in DT and enables
-> it if it finds it, otherwise returning failure.
-> 
-> a9_scu_enable() which tries to use the A9 provided SCU address and
-> enables it if it finds it, otherwise returning failure.
-> 
-> Then callers can decide which of these to call, and what error messages
-> to print on their failures.
+> Signed-off-by: Maninder Singh <maninder.s2@samsung.com>
 
-Splitting the function in two is probably simpler overall, but
-we may still have to look at all the callers: Any platform that
-currently tries to map it on any CPU and doesn't warn about the
-absence of the device node (or about scu_a9_has_base() == false)
-should really continue not to warn about that.
+A patch that was sent right before yours causes this patch to now have
+conflicts.  Can you refresh it against my staging-testing branch and
+resend?
 
-If all platforms only call these on SMP machines with an
-ARM11MPcore, Cortex-A5 or Cortex-A9, everything should be
-fine here, otherwise we can leave the warning in the caller
-after checking the return code of the new APIs.
+thanks,
 
-	Arnd
+greg k-h
