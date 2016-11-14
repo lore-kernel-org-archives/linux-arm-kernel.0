@@ -1,89 +1,76 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Mon, 14 Nov 2016 19:15:36 +0800
-Subject: [PATCH v3 5/6] arm64: arch_timer: apci: Introduce a generic
- aquirk framework for erratum
-In-Reply-To: <582971E0.4070403@huawei.com>
-References: <1478264794-14652-1-git-send-email-dingtianhong@huawei.com>
- <1478264794-14652-5-git-send-email-dingtianhong@huawei.com>
- <582971E0.4070403@huawei.com>
-Message-ID: <f796cd8f-1d96-ab3b-ca53-5d746c51eec2@huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Nov 2016 12:22:52 +0100
+Subject: [PATCH v2 7/7] soc: renesas: Identify SoC and register with the
+ SoC bus
+In-Reply-To: <CAMuHMdWavRFnYFmiL2jy3KWZnHG_F8qaxK29zHx6fsLmqXEwiA@mail.gmail.com>
+References: <1477913455-5314-1-git-send-email-geert+renesas@glider.be>
+ <25057157.YlGi2v6RrE@wuerfel>
+ <CAMuHMdWavRFnYFmiL2jy3KWZnHG_F8qaxK29zHx6fsLmqXEwiA@mail.gmail.com>
+Message-ID: <3061300.3PHW8Uxca3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OK, will wait more feedback and fix them together in the next version.
+On Monday, November 14, 2016 11:51:15 AM CET Geert Uytterhoeven wrote:
+> On Thu, Nov 10, 2016 at 12:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday, November 10, 2016 11:19:20 AM CET Geert Uytterhoeven wrote:
+> >> On Wed, Nov 9, 2016 at 5:55 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> > On Monday, October 31, 2016 12:30:55 PM CET Geert Uytterhoeven wrote:
+> >> >>   - Use "renesas,prr" and "renesas,cccr" device nodes in DT if
+> >> >>     available, else fall back to hardcoded addresses for compatibility
+> >> >>     with existing DTBs,
+> 
+> >> > It does seem wrong to have a device node for a specific register though.
+> >> > Shouldn't the node be for the block of registers that these are inside
+> >> > of?
+> >>
+> >> On R-Mobile APE6, R-Car Gen2 and Gen3, PRR is a lone register.
+> >> On R-Car Gen1, it's not even documented (and doesn't exist on all parts).
+> >
+> > It just seems odd to have it at address 0xff000044 when all the other
+> > devices are at page-aligned addresses. Do you mean that accessing
+> > 0xff000040 or 0xff000048 will result in a bus-level exception for a
+> > missing register and just 0xff000044 is actually valid for access,
+> > or is it just the only thing that is documented?
+> 
+> For PRR, all other registers in the page read as all zeroes on all SoCs that
+> have it. So it really is a lone register.
 
-Thanks.
-Ding
+Ok.
 
-On 2016/11/14 16:12, Hanjun Guo wrote:
-> On 2016/11/4 21:06, Ding Tianhong wrote:
->> From: Hanjun Guo <hanjun.guo@linaro.org>
->>
->> Introduce a general quirk framework for each timer erratum in ACPI,
->> which use the oem information in GTDT table for platform specific erratums.
->> The struct gtdt_arch_timer_fixup is introduced to record the oem
->> information to match the quirk and handle the erratum.
->>
->> v3: Introduce a generic aquick framework for erratum in ACPI mode.
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->> ---
->>  drivers/clocksource/arm_arch_timer.c | 37 ++++++++++++++++++++++++++++++++++++
->>  1 file changed, 37 insertions(+)
->>
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index 3d59af1..9bc93e5 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -1068,6 +1068,40 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
->>  		       arch_timer_mem_init);
->>  
->>  #ifdef CONFIG_ACPI
->> +struct gtdt_arch_timer_fixup {
->> +	char oem_id[ACPI_OEM_ID_SIZE];
->> +	char oem_table_id[ACPI_OEM_TABLE_ID_SIZE];
->> +	u32 oem_revision;
->> +
->> +	/* quirk handler for arch timer erratum */
->> +	void (*handler)(u32 erratum);
->> +	u32 erratum;
+> >> On SH-Mobile/R-Mobile, CCCR may be part of the HPB/APB register block, which
+> >> we further don't touch at all.
+> >> On R-Car Gen2, it's not documented, but does exist.
+> >
+> > This is where the family names would come in handy ;-) I now have
+> > no idea which chip(s) you are referring to.
 > 
-> Hmm, I think we just use
+> SH/R-Mobile are r8a7740, r8a73a4, sh73a0.
+> R-Car Gen2 are r8a779[0-4].
 > 
-> void *context;
+> > If you know the name of the register block, just put it into DT with
+> > that name. The driver can trivially add the right offset.
 > 
-> and we convert it in the platform specific handler, then this struct
-> can be reused for other type of quirks.
+> CCCR is different. The amount of registers that read as non-zero depends a lot
+> on the actual SoC.
 > 
->> +};
->> +
->> +/* note: this needs to be updated according to the doc of OEM ID
->> + * and TABLE ID for different board.
->> + */
->> +struct gtdt_arch_timer_fixup arch_timer_quirks[] __initdata = {
->> +};
->> +
->> +void __init arch_timer_acpi_quirks_handler(char *oem_id,
->> +						  char *oem_table_id,
->> +						  u32 oem_revision)
->> +{
->> +	struct gtdt_arch_timer_fixup *quirks = arch_timer_quirks;
->> +	int i;
->> +
->> +	for (i = 0; i < ARRAY_SIZE(arch_timer_quirks); i++, quirks++) {
->> +		if (!memcmp(quirks->oem_id, oem_id, ACPI_OEM_ID_SIZE) &&
->> +		    !memcmp(quirks->oem_table_id, oem_table_id, ACPI_OEM_TABLE_ID_SIZE) &&
->> +		    quirks->oem_revision == oem_revision) {
->> +			if (quirks->handler && quirks->erratum)
->> +				quirks->handler(quirks->erratum);
->> +			break;
+> HPB/APB is gonna need real DT bindings, which needs some more investigation.
+> Hence if you don't mind, I'd like to postpone that part, which only affects
+> the older SoCs. And I'll drop the "renesas,cccr" binding.
 > 
-> we can't just break because we have multi quirks for different handlers.
+> For now, having revision detection for R-Car Gen3 (r8a779[56]) using PRR is
+> most urgent, as several drivers (e.g. HDMI, Ethernet, clocks, pinctrl) are
+> waiting for this support. So I'd like to have that dependency in v4.10.
+
+Ok, sounds good.
+
+> >> There is no SoC part number in the "renesas,prr" and "renesas,cccr" nodes.
+> >> Hence I always need to look at the root nodes.
+> >
+> > Not sure what that would protect you from. Could you have a renesas,cccr
 > 
-> Thanks
-> Hanjun
-> 
-> 
-> .
-> 
+> Looks like you forgot to finish your sentence?
+
+Yes, and I forgot what I was going to say there now. It's probably covered
+by what we discussed above.
+
+	Arnd
