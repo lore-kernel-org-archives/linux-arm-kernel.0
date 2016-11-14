@@ -1,86 +1,97 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 14 Nov 2016 17:32:51 +0000
-Subject: [PATCH 2/2] ARM: dts: apq8064: add support to pm8821
-In-Reply-To: <20161108191343.GP25787@tuxbot>
-References: <1478622577-20699-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1478622577-20699-2-git-send-email-srinivas.kandagatla@linaro.org>
- <20161108191343.GP25787@tuxbot>
-Message-ID: <10ef1c9d-60d5-f719-11a5-81135ba0bec3@linaro.org>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Mon, 14 Nov 2016 17:32:52 +0000
+Subject: [PATCH] arm64: dts: juno: fix cluster sleep state entry latency
+ on all SoC versions
+In-Reply-To: <1479137189-15378-1-git-send-email-sudeep.holla@arm.com>
+References: <1479137189-15378-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20161114173252.GP10219@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Bjorn for review comments.
+On Mon, Nov 14, 2016 at 03:26:29PM +0000, Sudeep Holla wrote:
+> The core and the cluster sleep state entry latencies can't be same as
+> cluster sleep involves more work compared to core level e.g. shared
+> cache maintenance.
+> 
+> Experiments have shown on an average about 100us more latency for the
+> cluster sleep state compared to the core level sleep. This patch fixes
+> the entry latency for the cluster sleep state.
+> 
+> Fixes: 28e10a8f3a03 ("arm64: dts: juno: Add idle-states to device tree")
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: "Jon Medhurst (Tixy)" <tixy@linaro.org>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
+Looks sensible to me.
 
-On 08/11/16 19:13, Bjorn Andersson wrote:
-> On Tue 08 Nov 08:29 PST 2016, Srinivas Kandagatla wrote:
->
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->>  arch/arm/boot/dts/qcom-apq8064.dtsi | 28 ++++++++++++++++++++++++++++
->>  1 file changed, 28 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
->> index 1dbe697..fde006c 100644
->> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
->> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
->> @@ -627,6 +627,34 @@
->>  			clock-names = "core";
->>  		};
->>
->> +		qcom,ssbi at c00000 {
->
-> No "qcom," in the node name.
-Will fix it in next version,  I agree with rest of the comments too.
-All of them will be fixed in next version.
->
->> +			compatible = "qcom,ssbi";
->> +			reg = <0x00c00000 0x1000>;
->> +			qcom,controller-type = "pmic-arbiter";
->> +
->> +			pmicintc2: pmic at 1 {
->
-> I think we should follow Linus' lead and label this "pm8821".
->
->> +				compatible = "qcom,pm8821";
->> +				interrupt-parent = <&tlmm_pinmux>;
->> +				interrupts = <76 8>;
->
-> Please spell out IRQ_TYPE_LEVEL_LOW.
->
-> And interrupts-extended = <&tlmm_pinmux 76 IRQ_TYPE_LEVEL_LOW> combines
-> the two lines nicely.
->
->> +				#interrupt-cells = <2>;
->> +				interrupt-controller;
->> +				#address-cells = <1>;
->> +				#size-cells = <0>;
->> +
->> +				pm8821_mpps: mpps at 50 {
->> +
->
-> Extra newline.
->
->> +					compatible = "qcom,pm8821-mpp", "qcom,ssbi-mpp";
->> +					reg = <0x50>;
->> +
->> +					interrupts = <24 1>, <25 1>, <26 1>,
->> +						     <27 1>;
->
-> I think these should be IRQ_TYPE_NONE per the discussion on how to share
-> interrupts between the gpio/mpp driver and other clients.
->
-> On the other hand, per the pm8821 driver we only support LEVEL_LOW
-> (high?).
->
->> +
->> +					gpio-controller;
->> +					#gpio-cells = <2>;
->> +		                };
->> +			};
->> +		};
->> +
->
+Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
+
+> ---
+>  arch/arm64/boot/dts/arm/juno-r1.dts | 2 +-
+>  arch/arm64/boot/dts/arm/juno-r2.dts | 2 +-
+>  arch/arm64/boot/dts/arm/juno.dts    | 2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> Hi,
+> 
+> This was found recently when I found that core sleep was chosen when
+> entering suspend-to-idle state on Juno. Since the wakeup(entry+exit)
+> latency matched for the both states, cpu sleep state was chosen to enter
+> in suspend-to-idle.
+> 
 > Regards,
-> Bjorn
->
+> Sudeep
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+> index 3be8a3ef671c..eec37feee8fc 100644
+> --- a/arch/arm64/boot/dts/arm/juno-r1.dts
+> +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+> @@ -76,7 +76,7 @@
+>  				compatible = "arm,idle-state";
+>  				arm,psci-suspend-param = <0x1010000>;
+>  				local-timer-stop;
+> -				entry-latency-us = <300>;
+> +				entry-latency-us = <400>;
+>  				exit-latency-us = <1200>;
+>  				min-residency-us = <2500>;
+>  			};
+> diff --git a/arch/arm64/boot/dts/arm/juno-r2.dts b/arch/arm64/boot/dts/arm/juno-r2.dts
+> index 614fc9227943..28f40ec44090 100644
+> --- a/arch/arm64/boot/dts/arm/juno-r2.dts
+> +++ b/arch/arm64/boot/dts/arm/juno-r2.dts
+> @@ -76,7 +76,7 @@
+>  				compatible = "arm,idle-state";
+>  				arm,psci-suspend-param = <0x1010000>;
+>  				local-timer-stop;
+> -				entry-latency-us = <300>;
+> +				entry-latency-us = <400>;
+>  				exit-latency-us = <1200>;
+>  				min-residency-us = <2500>;
+>  			};
+> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> index 6b4135e9cfe5..ac5ceb73f45f 100644
+> --- a/arch/arm64/boot/dts/arm/juno.dts
+> +++ b/arch/arm64/boot/dts/arm/juno.dts
+> @@ -76,7 +76,7 @@
+>  				compatible = "arm,idle-state";
+>  				arm,psci-suspend-param = <0x1010000>;
+>  				local-timer-stop;
+> -				entry-latency-us = <300>;
+> +				entry-latency-us = <400>;
+>  				exit-latency-us = <1200>;
+>  				min-residency-us = <2500>;
+>  			};
+> --
+> 2.7.4
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
