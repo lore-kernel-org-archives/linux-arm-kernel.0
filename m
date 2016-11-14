@@ -1,66 +1,72 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 14 Nov 2016 14:11:14 +0100
-Subject: [PATCH v2] input: bma150: Only claim to support the bma180 if the
- separate iio bma180 driver is not build
-Message-ID: <20161114131114.6053-1-hdegoede@redhat.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 14 Nov 2016 13:19:04 +0000
+Subject: Tegra baseline test results for v4.9-rc5
+Message-ID: <0dd5f644-6e3f-8d89-caf7-b841b24736ff@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit ef3714fdbc8d ("Input: bma150 - extend chip detection for bma180"),
-adds bma180 chip-ids to the input bma150 driver, assuming that they are
-100% compatible, but the bma180 is not compatible with the bma150 at all,
-it has 14 bits resolution instead of 10, and it has quite different
-control registers too.
+Here are some basic Tegra test results for Linux v4.9-rc5.
+Logs and other details at:
 
-Treating the bma180 as a bma150 wrt its data registers will just result
-in throwing away the lowest 4 bits, which is not too bad. But the ctrl
-registers are a different story. Things happen to just work but supporting
-that certainly does not make treating the bma180 the same as the bma150
-right.
+    https://nvtb.github.io//linux/test_v4.9-rc5/20161114020102/
 
-Since some setups depend on the evdev interface the bma150 driver offers
-on top of the bma180, we cannot simply remove the bma180 ids.
 
-So this commit only removes the bma180 id when the bma180 iio driver,
-which does treat the bma180 properly, is enabled.
+Test summary
+------------
 
-Cc: Dr. H. Nikolaus Schaller <hns@goldelico.com>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--Use IS_ENABLED(CONFIG_BMA180) instead of #ifdef CONFIG_BMA180
----
- drivers/input/misc/bma150.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
-diff --git a/drivers/input/misc/bma150.c b/drivers/input/misc/bma150.c
-index b0d4453..2124390 100644
---- a/drivers/input/misc/bma150.c
-+++ b/drivers/input/misc/bma150.c
-@@ -538,8 +538,13 @@ static int bma150_probe(struct i2c_client *client,
- 		return -EIO;
- 	}
- 
-+	/*
-+	 * Note if the IIO CONFIG_BMA180 driver is enabled we want to fail
-+	 * the probe for the bma180 as the iio driver is preferred.
-+	 */
- 	chip_id = i2c_smbus_read_byte_data(client, BMA150_CHIP_ID_REG);
--	if (chip_id != BMA150_CHIP_ID && chip_id != BMA180_CHIP_ID) {
-+	if (chip_id != BMA150_CHIP_ID &&
-+	    (IS_ENABLED(CONFIG_BMA180) || chip_id != BMA180_CHIP_ID)) {
- 		dev_err(&client->dev, "BMA150 chip id error: %d\n", chip_id);
- 		return -EINVAL;
- 	}
-@@ -643,7 +648,9 @@ static UNIVERSAL_DEV_PM_OPS(bma150_pm, bma150_suspend, bma150_resume, NULL);
- 
- static const struct i2c_device_id bma150_id[] = {
- 	{ "bma150", 0 },
-+#if !IS_ENABLED(CONFIG_BMA180)
- 	{ "bma180", 0 },
-+#endif
- 	{ "smb380", 0 },
- 	{ "bma023", 0 },
- 	{ }
--- 
-2.9.3
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.9-rc4 (bc33b0ca11e3df467777a4fa7639ba488c9d4911)):
+   text     data      bss    total  kernel
+  -1032    -2736        0    -3768  defconfig
+  +1056       -8        0    +1048  multi_v7_defconfig
+   +688    -4104        0    -3416  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.9-rc4 (bc33b0ca11e3df467777a4fa7639ba488c9d4911))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+
+--
+nvpublic
