@@ -1,132 +1,72 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 14 Nov 2016 15:45:02 +0100
-Subject: [PATCH resend] input: touchscreen: silead: Add regulator support
-In-Reply-To: <20161114144502.10595-1-hdegoede@redhat.com>
-References: <20161114144502.10595-1-hdegoede@redhat.com>
-Message-ID: <20161114144502.10595-2-hdegoede@redhat.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 14 Nov 2016 15:45:20 +0100
+Subject: [PATCH v2 1/9] arm64: dts: rockchip: add eMMC's power domain
+ support for rk3399
+In-Reply-To: <1478697721-2323-2-git-send-email-wxt@rock-chips.com>
+References: <1478697721-2323-1-git-send-email-wxt@rock-chips.com>
+ <1478697721-2323-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <2342292.tK2jqRKrXH@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some tablets the touchscreen controller is powered by seperate
-regulators, add support for this.
+Am Mittwoch, 9. November 2016, 21:21:53 CET schrieb Caesar Wang:
+> From: Ziyuan Xu <xzy.xu@rock-chips.com>
+> 
+> Control power domain for eMMC via genpd to reduce power consumption.
+> 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> Signed-off-by: Ziyuan Xu <xzy.xu@rock-chips.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../bindings/input/touchscreen/silead_gsl1680.txt  |  2 +
- drivers/input/touchscreen/silead.c                 | 51 ++++++++++++++++++++--
- 2 files changed, 49 insertions(+), 4 deletions(-)
+Authorship / Signed-off mismatch. From above suggest Ziyuan is the author 
+while first Signed-off-by indicates Elaine as author. Please clarify.
 
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
-index e844c3f..b726823 100644
---- a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
-+++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
-@@ -22,6 +22,8 @@ Optional properties:
- - touchscreen-inverted-y  : See touchscreen.txt
- - touchscreen-swapped-x-y : See touchscreen.txt
- - silead,max-fingers	  : maximum number of fingers the touchscreen can detect
-+- vddio-supply		  : regulator phandle for controller VDDIO
-+- avdd-supply		  : regulator phandle for controller AVDD
- 
- Example:
- 
-diff --git a/drivers/input/touchscreen/silead.c b/drivers/input/touchscreen/silead.c
-index f502c84..c6a1ae9 100644
---- a/drivers/input/touchscreen/silead.c
-+++ b/drivers/input/touchscreen/silead.c
-@@ -29,6 +29,7 @@
- #include <linux/input/touchscreen.h>
- #include <linux/pm.h>
- #include <linux/irq.h>
-+#include <linux/regulator/consumer.h>
- 
- #include <asm/unaligned.h>
- 
-@@ -72,6 +73,8 @@ enum silead_ts_power {
- struct silead_ts_data {
- 	struct i2c_client *client;
- 	struct gpio_desc *gpio_power;
-+	struct regulator *vddio;
-+	struct regulator *avdd;
- 	struct input_dev *input;
- 	char fw_name[64];
- 	struct touchscreen_properties prop;
-@@ -465,21 +468,52 @@ static int silead_ts_probe(struct i2c_client *client,
- 	if (client->irq <= 0)
- 		return -ENODEV;
- 
-+	data->vddio = devm_regulator_get_optional(dev, "vddio");
-+	if (IS_ERR(data->vddio)) {
-+		if (PTR_ERR(data->vddio) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+		data->vddio = NULL;
-+	}
-+
-+	data->avdd = devm_regulator_get_optional(dev, "avdd");
-+	if (IS_ERR(data->avdd)) {
-+		if (PTR_ERR(data->avdd) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+		data->avdd = NULL;
-+	}
-+
-+	/*
-+	 * Enable regulators at probe and disable them at remove, we need
-+	 * to keep the chip powered otherwise it forgets its firmware.
-+	 */
-+	if (data->vddio) {
-+		error = regulator_enable(data->vddio);
-+		if (error)
-+			return error;
-+	}
-+
-+	if (data->avdd) {
-+		error = regulator_enable(data->avdd);
-+		if (error)
-+			goto disable_vddio;
-+	}
-+
- 	/* Power GPIO pin */
- 	data->gpio_power = devm_gpiod_get_optional(dev, "power", GPIOD_OUT_LOW);
- 	if (IS_ERR(data->gpio_power)) {
- 		if (PTR_ERR(data->gpio_power) != -EPROBE_DEFER)
- 			dev_err(dev, "Shutdown GPIO request failed\n");
--		return PTR_ERR(data->gpio_power);
-+		error = PTR_ERR(data->gpio_power);
-+		goto disable_avdd;
- 	}
- 
- 	error = silead_ts_setup(client);
- 	if (error)
--		return error;
-+		goto disable_avdd;
- 
- 	error = silead_ts_request_input_dev(data);
- 	if (error)
--		return error;
-+		goto disable_avdd;
- 
- 	error = devm_request_threaded_irq(dev, client->irq,
- 					  NULL, silead_ts_threaded_irq_handler,
-@@ -487,10 +521,19 @@ static int silead_ts_probe(struct i2c_client *client,
- 	if (error) {
- 		if (error != -EPROBE_DEFER)
- 			dev_err(dev, "IRQ request failed %d\n", error);
--		return error;
-+		goto disable_avdd;
- 	}
- 
- 	return 0;
-+
-+disable_avdd:
-+	if (data->avdd)
-+		regulator_disable(data->avdd);
-+disable_vddio:
-+	if (data->vddio)
-+		regulator_disable(data->vddio);
-+
-+	return error;
- }
- 
- static int __maybe_unused silead_ts_suspend(struct device *dev)
--- 
-2.9.3
+
+Thanks
+Heiko
+
+> ---
+> 
+> Changes in v2:
+> - Reviewed-on: https://chromium-review.googlesource.com/376558
+> - Verified on ChromeOS kernel4.4
+> 
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index cbb7f8b..b401176 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -269,6 +269,7 @@
+>  		#clock-cells = <0>;
+>  		phys = <&emmc_phy>;
+>  		phy-names = "phy_arasan";
+> +		power-domains = <&power RK3399_PD_EMMC>;
+>  		status = "disabled";
+>  	};
+> 
+> @@ -690,6 +691,11 @@
+>  		status = "disabled";
+>  	};
+> 
+> +	qos_emmc: qos at ffa58000 {
+> +		compatible = "syscon";
+> +		reg = <0x0 0xffa58000 0x0 0x20>;
+> +	};
+> +
+>  	qos_gmac: qos at ffa5c000 {
+>  		compatible = "syscon";
+>  		reg = <0x0 0xffa5c000 0x0 0x20>;
+> @@ -823,6 +829,11 @@
+>  			};
+> 
+>  			/* These power domains are grouped by VD_LOGIC */
+> +			pd_emmc at RK3399_PD_EMMC {
+> +				reg = <RK3399_PD_EMMC>;
+> +				clocks = <&cru ACLK_EMMC>;
+> +				pm_qos = <&qos_emmc>;
+> +			};
+>  			pd_gmac at RK3399_PD_GMAC {
+>  				reg = <RK3399_PD_GMAC>;
+>  				clocks = <&cru ACLK_GMAC>;
