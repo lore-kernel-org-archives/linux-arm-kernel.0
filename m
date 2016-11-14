@@ -1,125 +1,55 @@
-From: atull@opensource.altera.com (atull)
-Date: Mon, 14 Nov 2016 08:33:31 -0600
-Subject: [PATCH 2/4] fpga mgr: Expose FPGA capabilities to userland via
- sysfs
-In-Reply-To: <20161107001326.7395-3-moritz.fischer@ettus.com>
-References: <20161107001326.7395-1-moritz.fischer@ettus.com>
- <20161107001326.7395-3-moritz.fischer@ettus.com>
-Message-ID: <alpine.DEB.2.10.1611140829380.2786@atull-VirtualBox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Nov 2016 15:37:44 +0100
+Subject: [PATCH 01/16] ARM: scu: Provide support for parsing SCU device
+ node to enable SCU
+In-Reply-To: <20161114135018.GL1041@n2100.armlinux.org.uk>
+References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
+ <2479429.Js1FDSdQzs@wuerfel> <20161114135018.GL1041@n2100.armlinux.org.uk>
+Message-ID: <6787744.7DRFf7p3US@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Nov 2016, Moritz Fischer wrote:
-
-Hi Moritz,
-
-One nit below.  Otherwise,
-
-    Acked-by: Alan Tull <atull@opensource.altera.com>
-
-Alan
-
-
-> Expose FPGA capabilities to userland via sysfs.
+On Monday, November 14, 2016 1:50:18 PM CET Russell King - ARM Linux wrote:
+> On Mon, Nov 14, 2016 at 01:03:09PM +0100, Arnd Bergmann wrote:
+> > On Monday, November 14, 2016 2:10:16 PM CET pankaj.dubey wrote:
+> > > >> +    scu_base = of_iomap(np, 0);
+> > > >> +    of_node_put(np);
+> > > >> +    if (!scu_base) {
+> > > >> +            pr_err("%s failed to map scu_base via DT\n", __func__);
+> > > > 
+> > > > For non-ca5, non-ca9 based SoCs, we'll see this error msg. We understand
+> > > > what does it mean, but it may confuse normal users. In current version,
+> > > > berlin doesn't complain like this for non-ca9 SoCs
+> > > > 
+> > > 
+> > > OK, let me see other reviewer's comment on this. Then we will decide if
+> > > this error message is required or can be omitted.
+> > 
+> > We need to look at all callers here, to see if the function ever gets
+> > called for a CPU that doesn't have an SCU. I'd say we should warn if
+> > we know there is an SCU but we cannot map it, but never warn on
+> > any of the CPU cores that don't support an SCU.
 > 
-> Add Documentation for currently supported capabilities
-> that get exported via sysfs.
+> Maybe there should be two helpers:
 > 
-> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> Cc: Alan Tull <atull@opensource.altera.com>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  Documentation/ABI/testing/sysfs-class-fpga-manager | 16 ++++++++++++++++
->  drivers/fpga/fpga-mgr.c                            | 20 ++++++++++++++++++++
->  include/linux/fpga/fpga-mgr.h                      |  2 ++
->  3 files changed, 38 insertions(+)
+> of_scu_enable() which _only_ looks up the SCU address in DT and enables
+> it if it finds it, otherwise returning failure.
 > 
-> diff --git a/Documentation/ABI/testing/sysfs-class-fpga-manager b/Documentation/ABI/testing/sysfs-class-fpga-manager
-> index 23056c5..d9aee21 100644
-> --- a/Documentation/ABI/testing/sysfs-class-fpga-manager
-> +++ b/Documentation/ABI/testing/sysfs-class-fpga-manager
-> @@ -35,3 +35,19 @@ Description:	Read fpga manager state as a string.
->  		* write complete	= Doing post programming steps
->  		* write complete error	= Error while doing post programming
->  		* operating		= FPGA is programmed and operating
-> +
-> +What: 		/sys/class/fpga_manager/fpga/capabilities
-> +Date:		November 2016
-> +KernelVersion:	4.9
-> +Contact:	Moritz Fischer <moritz.fischer@ettus.com>
-> +Description:	Read fpga manager capabilities as a string.
-> +		The intent is to provide userspace with information on what
-> +		operations the particular instance can execute.
-> +
-> +		Each line expresses a capability that is available on the
-> +		particular instance of an fpga manager.
-> +		Supported so far:
-> +
-> +		* Full reconfiguration
-> +		* Partial reconfiguration
-> +		* Decrypt bitstream on the fly
+> a9_scu_enable() which tries to use the A9 provided SCU address and
+> enables it if it finds it, otherwise returning failure.
+> 
+> Then callers can decide which of these to call, and what error messages
+> to print on their failures.
 
-Decrypt gets added in a later patch.
+Splitting the function in two is probably simpler overall, but
+we may still have to look at all the callers: Any platform that
+currently tries to map it on any CPU and doesn't warn about the
+absence of the device node (or about scu_a9_has_base() == false)
+should really continue not to warn about that.
 
-> diff --git a/drivers/fpga/fpga-mgr.c b/drivers/fpga/fpga-mgr.c
-> index ed57c17..98230b7 100644
-> --- a/drivers/fpga/fpga-mgr.c
-> +++ b/drivers/fpga/fpga-mgr.c
-> @@ -167,6 +167,11 @@ static const char * const state_str[] = {
->  	[FPGA_MGR_STATE_OPERATING] =		"operating",
->  };
->  
-> +static const char * const cap_str[] = {
-> +	[FPGA_MGR_CAP_FULL_RECONF] = "Full reconfiguration",
-> +	[FPGA_MGR_CAP_PARTIAL_RECONF] = "Partial reconfiguration",
-> +};
-> +
->  static ssize_t name_show(struct device *dev,
->  			 struct device_attribute *attr, char *buf)
->  {
-> @@ -183,10 +188,25 @@ static ssize_t state_show(struct device *dev,
->  	return sprintf(buf, "%s\n", state_str[mgr->state]);
->  }
->  
-> +static ssize_t capabilities_show(struct device *dev,
-> +				 struct device_attribute *attr, char *buf)
-> +{
-> +	struct fpga_manager *mgr = to_fpga_manager(dev);
-> +	char *start = buf;
-> +	enum fpga_mgr_capability cap;
-> +
-> +	for_each_fpga_mgr_cap_mask(cap, mgr->caps)
-> +		buf += sprintf(buf, "%s\n", cap_str[cap]);
-> +
-> +	return buf - start;
-> +}
-> +
-> +static DEVICE_ATTR_RO(capabilities);
->  static DEVICE_ATTR_RO(name);
->  static DEVICE_ATTR_RO(state);
->  
->  static struct attribute *fpga_mgr_attrs[] = {
-> +	&dev_attr_capabilities.attr,
->  	&dev_attr_name.attr,
->  	&dev_attr_state.attr,
->  	NULL,
-> diff --git a/include/linux/fpga/fpga-mgr.h b/include/linux/fpga/fpga-mgr.h
-> index e73429c..9bb96a5 100644
-> --- a/include/linux/fpga/fpga-mgr.h
-> +++ b/include/linux/fpga/fpga-mgr.h
-> @@ -108,6 +108,8 @@ static inline void __fpga_mgr_cap_set(enum fpga_mgr_capability cap,
->  	set_bit(cap, mask->bits);
->  }
->  
-> +#define for_each_fpga_mgr_cap_mask(cap, mask) \
-> +	for_each_set_bit(cap, mask.bits, FPGA_MGR_CAP_END)
->  
->  /**
->   * struct fpga_manager_ops - ops for low level fpga manager drivers
-> -- 
-> 2.10.0
-> 
-> 
+If all platforms only call these on SMP machines with an
+ARM11MPcore, Cortex-A5 or Cortex-A9, everything should be
+fine here, otherwise we can leave the warning in the caller
+after checking the return code of the new APIs.
+
+	Arnd
