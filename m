@@ -1,59 +1,55 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 14 Nov 2016 12:57:41 +0000
-Subject: [PATCH 1/2] ARM: always store CPU ID early into percpu data
-Message-ID: <E1c6GpR-0008DI-5B@rmk-PC.armlinux.org.uk>
+From: rabin.vincent@axis.com (Rabin Vincent)
+Date: Mon, 14 Nov 2016 14:03:45 +0100
+Subject: [PATCH] ARM: ftrace: fix syscall name matching
+Message-ID: <1479128625-20948-1-git-send-email-rabin.vincent@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Always store the CPU ID into the percpu data so that it is available
-early on.  This allows us to eliminate various is_smp() tests that
-select between reading the hardware CPU ID directly and reading from
-the percpu data.
+From: Rabin Vincent <rabinv@axis.com>
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+ARM has a few system calls (most notably mmap) for which the names of
+the functions which are referenced in the syscall table do not match the
+names of the syscall tracepoints.  As a consequence of this, these
+tracepoints are not made available.  Implement
+arch_syscall_match_sym_name to fix this and allow tracing even these
+system calls.
+
+Signed-off-by: Rabin Vincent <rabinv@axis.com>
 ---
- arch/arm/include/asm/smp_plat.h | 5 +----
- arch/arm/kernel/setup.c         | 5 ++++-
- 2 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/include/asm/ftrace.h | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-index f9080717fc88..43f246b73ce7 100644
---- a/arch/arm/include/asm/smp_plat.h
-+++ b/arch/arm/include/asm/smp_plat.h
-@@ -34,10 +34,7 @@ static inline bool is_smp(void)
-  */
- static inline unsigned int smp_cpuid_part(int cpu)
- {
--	struct cpuinfo_arm *cpu_info = &per_cpu(cpu_data, cpu);
--
--	return is_smp() ? cpu_info->cpuid & ARM_CPU_PART_MASK :
--			  read_cpuid_part();
-+	return per_cpu(cpu_data, cpu).cpuid;
- }
+diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+index bfe2a2f..8467909 100644
+--- a/arch/arm/include/asm/ftrace.h
++++ b/arch/arm/include/asm/ftrace.h
+@@ -54,6 +54,27 @@ static inline void *return_address(unsigned int level)
  
- /* all SMP configurations have the extended CPUID registers */
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 34e3f3c45634..80f45b01fbaa 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -724,6 +724,9 @@ static void __init setup_processor(void)
+ #define ftrace_return_address(n) return_address(n)
  
- 	cacheid_init();
- 	cpu_init();
++#define ARCH_HAS_SYSCALL_MATCH_SYM_NAME
 +
-+	/* Always setup the boot CPU ID in the per-cpu data */
-+	per_cpu(cpu_data, smp_processor_id()).cpuid = read_cpuid_id();
- }
++static inline bool arch_syscall_match_sym_name(const char *sym,
++					       const char *name)
++{
++	/* Skip sys_ */
++	sym += 4;
++	name += 4;
++
++	if (!strcmp(sym, "mmap2"))
++		sym = "mmap_pgoff";
++	else if (!strcmp(sym, "statfs64_wrapper"))
++		sym = "statfs64";
++	else if (!strcmp(sym, "fstatfs64_wrapper"))
++		sym = "fstatfs64";
++	else if (!strcmp(sym, "arm_fadvise64_64"))
++		sym = "fadvise64_64";
++
++	return !strcmp(sym, name);
++}
++
+ #endif /* ifndef __ASSEMBLY__ */
  
- void __init dump_machine_table(void)
-@@ -1217,7 +1220,7 @@ static int c_show(struct seq_file *m, void *v)
- 		 * "processor".  Give glibc what it expects.
- 		 */
- 		seq_printf(m, "processor\t: %d\n", i);
--		cpuid = is_smp() ? per_cpu(cpu_data, i).cpuid : read_cpuid_id();
-+		cpuid = per_cpu(cpu_data, i).cpuid;
- 		seq_printf(m, "model name\t: %s rev %d (%s)\n",
- 			   cpu_name, cpuid & 15, elf_platform);
- 
+ #endif /* _ASM_ARM_FTRACE */
 -- 
-2.7.4
+2.1.4
