@@ -1,56 +1,107 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 15 Nov 2016 20:22:14 +0200
-Subject: [PATCH v2 2/2] arm64: dts: Add ARM PMU node for exynos7
-In-Reply-To: <9327f863-7fa3-a967-892c-67158b2471a9@osg.samsung.com>
-References: <1478945832-1826-1-git-send-email-alim.akhtar@samsung.com>
- <1478945832-1826-2-git-send-email-alim.akhtar@samsung.com>
- <9327f863-7fa3-a967-892c-67158b2471a9@osg.samsung.com>
-Message-ID: <20161115182214.GA8374@kozik-lap>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Tue, 15 Nov 2016 10:24:22 -0800
+Subject: [PATCH v2] arm64: SMMU-v2: Workaround for Cavium ThunderX erratum
+ 28168
+In-Reply-To: <0414d797-7134-8192-d373-b14b26edd023@arm.com>
+References: <1479193220-6693-1-git-send-email-gakula@caviumnetworks.com>
+ <0414d797-7134-8192-d373-b14b26edd023@arm.com>
+Message-ID: <582B52D6.6060907@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 12, 2016 at 11:33:18AM -0300, Javier Martinez Canillas wrote:
-> Hello Alim,
-> 
-> On 11/12/2016 07:17 AM, Alim Akhtar wrote:
-> > This patch adds ARM Performance Monitor Unit dt node for exynos7.
-> > PMU provides various statistics on the operation of the CPU and
-> > memory system at runtime, which are very useful when debugging or
-> > profiling code. This enables the same.
-> > 
-> > Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> > ---
-> >  arch/arm64/boot/dts/exynos/exynos7.dtsi |   10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> > 
-> > Changes since v1:
-> > * Added "interrupt-affinity" property as per Robin Murphy review comment.
-> > 
-> > diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> > index 396ffb9..09e7a05b 100644
-> > --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> > +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-> > @@ -472,6 +472,16 @@
-> >  			status = "disabled";
-> >  		};
-> >  
-> > +		arm-pmu {
-> > +			compatible = "arm,cortex-a57-pmu", "arm,armv8-pmuv3";
-> > +			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
-> > +				     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
-> > +				     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
-> > +				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
-> > +			interrupt-affinity = <&cpu_atlas0>, <&cpu_atlas1>,
-> > +					     <&cpu_atlas2>, <&cpu_atlas3>;
-> > +		};
-> > +
-> 
-> I didn't double check if these are the correct IRQs because I don't have
-> an Exynos7 user manual, but the change looks good to me.
-> 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+On 11/15/2016 01:26 AM, Marc Zyngier wrote:
+> On 15/11/16 07:00, Geetha sowjanya wrote:
+>> From: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
+>>
+>>    This patch implements Cavium ThunderX erratum 28168.
+>>
+>>    PCI requires stores complete in order. Due to erratum #28168
+>>    PCI-inbound MSI-X store to the interrupt controller are delivered
+>>    to the interrupt controller before older PCI-inbound memory stores
+>>    are committed.
+>>    Doing a sync on SMMU will make sure all prior data transfers are
+>>    completed before invoking ISR.
+>>
+>> Signed-off-by: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
+>> Signed-off-by: Geetha sowjanya <gakula@caviumnetworks.com>
+[...]
+>> --- a/drivers/irqchip/irq-gic-v3.c
+>> +++ b/drivers/irqchip/irq-gic-v3.c
+>> @@ -28,6 +28,8 @@
+>>   #include <linux/of_irq.h>
+>>   #include <linux/percpu.h>
+>>   #include <linux/slab.h>
+>> +#include <linux/msi.h>
+>> +#include <linux/pci.h>
+>>
+>>   #include <linux/irqchip.h>
+>>   #include <linux/irqchip/arm-gic-common.h>
+>> @@ -736,6 +738,20 @@ static inline void gic_cpu_pm_init(void) { }
+>>
+>>   #define GIC_ID_NR		(1U << gic_data.rdists.id_bits)
+>>
+>> +/*
+>> + * Due to #28168 erratum in ThunderX,
+>> + * we need to make sure DMA data transfer is done before MSIX.
+>> + */
+>> +static void cavium_irq_perflow_handler(struct irq_data *data)
+>> +{
+>> +	struct pci_dev *pdev;
+>> +
+>> +	pdev = msi_desc_to_pci_dev(irq_data_get_msi_desc(data));
+>
+> What happens if this is not a PCI device?
+>
+>> +	if ((pdev->vendor != 0x177d) &&
+>> +			((pdev->device & 0xA000) != 0xA000))
+>> +		cavium_arm_smmu_tlb_sync(&pdev->dev);
+>
+> I've asked that before. What makes Cavium devices so special that they
+> are not sensitive to this bug?
 
-Squashed 1/2 with this and applied. Thanks!
 
-Best regards,
-Krzysztof
+This is a heuristic for devices connected to external PCIe buses as 
+opposed to on-SoC devices (which don't suffer from the erratum).
+
+In any event what would happen if we got rid of this check and ...
+
+
+>
+>> +}
+>> +
+>>   static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+>>   			      irq_hw_number_t hw)
+>>   {
+>> @@ -773,6 +789,9 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+>>   			return -EPERM;
+>>   		irq_domain_set_info(d, irq, hw, chip, d->host_data,
+>>   				    handle_fasteoi_irq, NULL, NULL);
+>> +		if (cpus_have_cap(ARM64_WORKAROUND_CAVIUM_28168))
+>> +			__irq_set_preflow_handler(irq,
+>> +						  cavium_irq_perflow_handler);
+>
+
+... move the registration of the preflow_handler into a 
+msi_domain_ops.msi_finish() handler in irq-git-v3-its-pic-msi.c?
+
+There we will know that it is a pci device, and can walk up the bus 
+hierarchy to see if there is a Cavium PCIe root port present.  If such a 
+port is found, we know we are on an external Cavium PCIe bus, and can 
+register the preflow_handler without having to check the device identifiers.
+
+
+
+> What happens if SMMUv2 is not compiled in? Also, since this only affects
+> LPI signaling, why is this in the core GICv3 code and not in the ITS.
+> And more specifically, in the PCI part of the ITS, since you seem to
+> exclusively consider PCI?
+>
+>>   	}
+>>
+>>   	return 0;
+>>
+>
+> Thanks,
+>
+> 	M.
+>
