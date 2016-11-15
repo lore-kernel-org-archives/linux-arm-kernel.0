@@ -1,56 +1,47 @@
-From: rabin.vincent@axis.com (Rabin Vincent)
-Date: Tue, 15 Nov 2016 11:17:09 +0100
-Subject: [PATCHv2] ARM: ftrace: fix syscall name matching
-In-Reply-To: <1479128625-20948-1-git-send-email-rabin.vincent@axis.com>
-References: <1479128625-20948-1-git-send-email-rabin.vincent@axis.com>
-Message-ID: <1479205029-14498-1-git-send-email-rabin.vincent@axis.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Tue, 15 Nov 2016 11:20:58 +0100
+Subject: wdt, gpio: move arch_initcall into subsys_initcall ?
+Message-ID: <582AE18A.2060405@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rabin Vincent <rabinv@axis.com>
+Hello,
 
-ARM has a few system calls (most notably mmap) for which the names of
-the functions which are referenced in the syscall table do not match the
-names of the syscall tracepoints.  As a consequence of this, these
-tracepoints are not made available.  Implement
-arch_syscall_match_sym_name to fix this and allow tracing even these
-system calls.
+commit e188cbf7564f: "gpio: mxc: shift gpio_mxc_init() to subsys_initcall level"
+moves the gpio initialization of the mxc gpio driver
+from the arch_initcall level into subsys_initcall level.
 
-Signed-off-by: Rabin Vincent <rabinv@axis.com>
----
-v2: get rid of unsafe-looking pointer adjustment
+This leads now on mxc boards, which use a gpio wdt driver
+and the CONFIG_GPIO_WATCHDOG_ARCH_INITCALL option enabled,
+to unwanted driver probe deferrals during kernel boot.
 
- arch/arm/include/asm/ftrace.h | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+I see this currently on an imx6 based board (which has unfortunately
+3 WDT: imx6 internal (disabled), gpio wdt and da9063 WDT ...).
 
-diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
-index bfe2a2f..22b7311 100644
---- a/arch/arm/include/asm/ftrace.h
-+++ b/arch/arm/include/asm/ftrace.h
-@@ -54,6 +54,24 @@ static inline void *return_address(unsigned int level)
- 
- #define ftrace_return_address(n) return_address(n)
- 
-+#define ARCH_HAS_SYSCALL_MATCH_SYM_NAME
-+
-+static inline bool arch_syscall_match_sym_name(const char *sym,
-+					       const char *name)
-+{
-+	if (!strcmp(sym, "sys_mmap2"))
-+		sym = "sys_mmap_pgoff";
-+	else if (!strcmp(sym, "sys_statfs64_wrapper"))
-+		sym = "sys_statfs64";
-+	else if (!strcmp(sym, "sys_fstatfs64_wrapper"))
-+		sym = "sys_fstatfs64";
-+	else if (!strcmp(sym, "sys_arm_fadvise64_64"))
-+		sym = "sys_fadvise64_64";
-+
-+	/* Ignore case since sym may start with "SyS" instead of "sys" */
-+	return !strcasecmp(sym, name);
-+}
-+
- #endif /* ifndef __ASSEMBLY__ */
- 
- #endif /* _ASM_ARM_FTRACE */
+Also a side effect from above commit is, that the da9063 WDT driver
+is now probed before the gpio WDT driver ... so /dev/watchdog now
+does not point to the gpio_wdt, instead it points to the da9063 WDT.
+
+So there are 2 solutions possible:
+
+- add a CONFIG_GPIO_MCX_ARCH_INITCALL option
+   in drivers/gpio/gpio-mxc.c like for the gpio_wdt.c driver?
+
+   But how can we guarantee, that first the gpio driver and then
+   the gpio_wdt driver gets probed?
+
+- move the arch_initcall in gpio_wdt.c into a subsys_initcall
+   (Tested this, and the probe dereferral messages are gone ...)
+
+   But this may results in problems on boards, which needs an early
+   trigger on an gpio wdt ...
+
+Other ideas?
+
+Thanks for all suggestions!
+
+bye,
+Heiko
 -- 
-2.1.4
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
