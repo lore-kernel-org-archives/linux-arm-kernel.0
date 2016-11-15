@@ -1,70 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 15 Nov 2016 11:02:56 -0800
-Subject: [PATCH] ARM: omap2plus_defconfig: Run make savedefconfig to save some
- space
-Message-ID: <20161115190256.31938-1-tony@atomide.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 15 Nov 2016 11:18:07 -0800
+Subject: [PATCH/RESEND] recordmcount: arm: Implement make_nop
+In-Reply-To: <CAKv+Gu-Cp775gbLxPcJQ4G2nEnwm9G_gxh5B1Sf2LGkkov_OZA@mail.gmail.com>
+References: <20161018234200.5804-1-sboyd@codeaurora.org>
+ <CAKv+Gu-Cp775gbLxPcJQ4G2nEnwm9G_gxh5B1Sf2LGkkov_OZA@mail.gmail.com>
+Message-ID: <20161115191807.GC25626@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This shrinks down omap2plus_defconfig a bit and makes it easier for
-people to generate minimal patches against it.
+On 11/15, Ard Biesheuvel wrote:
+> On 19 October 2016 at 00:42, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > In similar spirit to x86 and arm64 support, add a make_nop_arm()
+> > to replace calls to mcount with a nop in sections that aren't
+> > traced.
+> >
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Acked-by: Rabin Vincent <rabin@rab.in>
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > ---
+> >  scripts/recordmcount.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 65 insertions(+)
+> >
+> > diff --git a/scripts/recordmcount.c b/scripts/recordmcount.c
+> > index 5423a58d1b06..aeb34223167c 100644
+> > --- a/scripts/recordmcount.c
+> > +++ b/scripts/recordmcount.c
+> > @@ -213,6 +213,59 @@ static int make_nop_x86(void *map, size_t const offset)
+> >         return 0;
+> >  }
+> >
+> > +static unsigned char ideal_nop4_arm_le[4] = { 0x00, 0x00, 0xa0, 0xe1 }; /* mov r0, r0 */
+> > +static unsigned char ideal_nop4_arm_be[4] = { 0xe1, 0xa0, 0x00, 0x00 }; /* mov r0, r0 */
+> 
+> Shouldn't you be taking the difference between BE8 and BE32 into
+> account here? IIRC, BE8 uses little endian encoding for instructions.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/configs/omap2plus_defconfig | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+I admit I haven't tested on a pre-armv6 CPU so I haven't come
+across the case of a BE32 CPU. But from what I can tell that
+doesn't matter.
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -1,7 +1,6 @@
- CONFIG_KERNEL_LZMA=y
- CONFIG_SYSVIPC=y
- CONFIG_POSIX_MQUEUE=y
--CONFIG_FHANDLE=y
- CONFIG_AUDIT=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
-@@ -40,7 +39,6 @@ CONFIG_ARCH_MULTI_V6=y
- CONFIG_POWER_AVS_OMAP=y
- CONFIG_POWER_AVS_OMAP_CLASS3=y
- CONFIG_OMAP_RESET_CLOCKS=y
--CONFIG_OMAP_MUX_DEBUG=y
- CONFIG_ARCH_OMAP2=y
- CONFIG_ARCH_OMAP3=y
- CONFIG_ARCH_OMAP4=y
-@@ -50,7 +48,6 @@ CONFIG_SOC_AM43XX=y
- CONFIG_SOC_DRA7XX=y
- CONFIG_ARM_THUMBEE=y
- CONFIG_ARM_ERRATA_411920=y
--CONFIG_ARM_ERRATA_430973=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=2
- CONFIG_CMA=y
-@@ -62,7 +59,6 @@ CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_CMDLINE="root=/dev/mmcblk0p2 rootwait console=ttyO2,115200"
- CONFIG_KEXEC=y
- CONFIG_CPU_FREQ=y
--CONFIG_CPU_FREQ_STAT_DETAILS=y
- CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
- CONFIG_CPU_FREQ_GOV_POWERSAVE=y
- CONFIG_CPU_FREQ_GOV_USERSPACE=y
-@@ -241,14 +237,14 @@ CONFIG_GPIO_PALMAS=y
- CONFIG_GPIO_TWL4030=y
- CONFIG_W1=m
- CONFIG_HDQ_MASTER_OMAP=m
-+CONFIG_POWER_AVS=y
-+CONFIG_POWER_RESET=y
- CONFIG_BATTERY_BQ27XXX=m
- CONFIG_CHARGER_ISP1704=m
- CONFIG_CHARGER_TWL4030=m
- CONFIG_CHARGER_BQ2415X=m
- CONFIG_CHARGER_BQ24190=m
- CONFIG_CHARGER_BQ24735=m
--CONFIG_POWER_RESET=y
--CONFIG_POWER_AVS=y
- CONFIG_HWMON=m
- CONFIG_SENSORS_GPIO_FAN=m
- CONFIG_SENSORS_LM75=m
+According to scripts/Makefile.build, cmd_record_mcount only runs
+the recordmcount program if CONFIG_FTRACE_MCOUNT_RECORD=y. That
+config is defined as:
+
+	config FTRACE_MCOUNT_RECORD
+		def_bool y
+		depends on DYNAMIC_FTRACE
+		depends on HAVE_FTRACE_MCOUNT_RECORD
+
+
+And in arch/arm/Kconfig we see that DYNAMIC_FTRACE is selected:
+
+	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
+
+which means that FTRACE_MCOUNT_RECORD can't be set when
+CPU_ENDIAN_BE32 is set.
+
+Do you agree that BE32 is not a concern here?
+
 -- 
-2.10.2
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
