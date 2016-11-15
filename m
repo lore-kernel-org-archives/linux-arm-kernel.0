@@ -1,106 +1,40 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 15 Nov 2016 12:17:00 +0100
-Subject: LEDs that change brightness "itself" -- that's a trigger. Re: PM
- regression with LED changes in next-20161109
-In-Reply-To: <4e392d5d-eb10-f285-517e-976a55c3e318@samsung.com>
-References: <f7c9b2be-0003-f342-a4c7-802532faa424@gmail.com>
- <d7ddbbb0-b99c-14a3-f462-3534b5ec67e6@redhat.com>
- <4c31faef-144d-289c-0e32-83e76aff6178@gmail.com>
- <3eb60c78-d891-27e5-6b7b-a54a5b547a1c@redhat.com>
- <c01cac8b-a921-56d1-7e57-8071d4b9faf6@gmail.com>
- <cb0aa3ce-ee48-66b8-510c-bd70917afec9@redhat.com>
- <b5ae20d7-8394-7ad5-1830-13173e9105c4@gmail.com>
- <9b476f85-d45e-deb6-335d-fc56f6d90350@redhat.com>
- <127cdd42-6fd8-c671-60b7-3826b351577f@samsung.com>
- <15cafbf5-d842-e184-2fd4-65f8272f505a@redhat.com>
- <CGME20161115103141epcas2p251f2521354a8cd7b9dfcfe55bfa482f0@epcas2p2.samsung.com>
- <20161115103133.GA22860@amd>
- <4e392d5d-eb10-f285-517e-976a55c3e318@samsung.com>
-Message-ID: <2f04d861-d2b9-8f53-6ebf-fe39bf73463a@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Nov 2016 12:18:05 +0100
+Subject: [PATCH] ARM: dma-mapping: preallocate DMA-debug hash tables in
+ pure_initcall
+In-Reply-To: <9470b8cc-daaf-0edc-da33-0872d9919311@samsung.com>
+References: <CGME20161115100459eucas1p152b644d5d329192a0902c836b13f35ba@eucas1p1.samsung.com>
+ <3289056.5bg7xtivbS@wuerfel>
+ <9470b8cc-daaf-0edc-da33-0872d9919311@samsung.com>
+Message-ID: <6476437.ygKkNgMBPR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI,
+On Tuesday, November 15, 2016 11:39:17 AM CET Marek Szyprowski wrote:
+> On 2016-11-15 11:31, Arnd Bergmann wrote:
+> > On Tuesday, November 15, 2016 11:04:55 AM CET Marek Szyprowski wrote:
+> >> fs_initcall is definitely too late to initialize DMA-debug hash tables,
+> >> because some drivers might get probed and use DMA mapping framework
+> >> already in core_initcall. Late initialization of DMA-debug results in
+> >> false warning about accessing memory, that was not allocated, like this
+> >> one:
+> > To ask the obvious question: what driver does DMA allocations in a
+> > core_initcall, and have you tried to change that first?
+> 
+> See the attached stack trace.
+> 
+> Exynos IOMMU driver does that in its domain_alloc implementation (to 
+> allocate
+> first level of PTE) and I see no easy way to avoid that, as iommu 
+> domains are
+> allocated very early (as well as the whole IOMMU initialization and 
+> attaching
+> to the devices). Exynos IOMMU driver has to use DMA-mapping API for PTE
+> management, because the IOMMU controllers are not coherent with system 
+> CPU and
+> there is no other way to ensure proper CPU cache management.
 
-On 15-11-16 11:58, Jacek Anaszewski wrote:
-> On 11/15/2016 11:31 AM, Pavel Machek wrote:
->> Hi!
->>
->>>> Hmm, v4 still calls led_notify_brightness_change(led_cdev)
->>> >from both __led_set_brightness() and __led_set_brightness_blocking().
->>>
->>> Ugh, I see I accidentally send a v4 twice, instead of
->>> calling the version which dropped those called v5 as
->>> I should have, sorry.
->>>
->>> The v4 which I would like to see merged, the one with
->>> those calls dropped, is here:
->>>
->>> https://patchwork.kernel.org/patch/9423093/
->>
->> Please, lets fix this properly.
->>
->> The LED you are talking about _has_ a trigger, implemented in
->> hardware. That trigger can change LED brightness behind kernel's (and
->> userspace's) back. Don't pretend the trigger does not exist, it does.
->>
->> And when you do that, you'll have nice place to report changes to
->> userspace -- trigger can now export that information, and offer poll()
->> interface.
->
-> Well, that sounds interesting. It is logically justifiable.
-> I initially proposed exactly this solution, with recently
-> added userspace LED being a trigger listener. It seems a bit
-> awkward though. How would you listen to the trigger events?
+Could the allocation be deferred until the first user of the IOMMU
+comes up?
 
-We could make the trigger sysfs attribute poll()-able, but only
-for select triggers, e.g.:
-
-Documentation/ABI/testing/sysfs-class-led
-
-What:           /sys/class/leds/<led>/trigger
-Date:           March 2006
-KernelVersion:  2.6.17
-Contact:        Richard Purdie <rpurdie@rpsys.net>
-Description:
-                 Set the trigger for this LED. A trigger is a kernel based source
-                 of led events.
-                 You can change triggers in a similar manner to the way an IO
-                 scheduler is chosen. Trigger specific parameters can appear in
-                 /sys/class/leds/<led> once a given trigger is selected. For
-                 their documentation see sysfs-class-led-trigger-*.
-+
-+		For some triggers userspace my poll() this file, watching for
-+		POLL_PRI to detect when the trigger triggers. This is only
-+		supported if this is explicitly mentioned as supported in
-+		sysfs-class-led-trigger-* for the selected trigger.
-
-The reason for making this only supported for select triggers is to
-avoid getting the whole power-consumption issue from triggers which fire
-frequently again.
-
-And then we could add a new:
-
-Documentation/ABI/testing/sysfs-class-led-trigger-kbd-backlight-change
-
-File which documents that the new to be added kbd-backlight-change
-trigger is poll-able.
-
-We would also need:
-
---- a/include/linux/leds.h
-+++ b/include/linux/leds.h
-@@ -47,6 +47,7 @@ struct led_classdev {
-  #define LED_DEV_CAP_FLASH      (1 << 18)
-  #define LED_HW_PLUGGABLE       (1 << 19)
-  #define LED_PANIC_INDICATOR    (1 << 20)
-+#define LED_TRIGGER_READ_ONLY   (1 << 21)
-
-         /* set_brightness_work / blink_timer flags, atomic, private. */
-         unsigned long           work_flags;
-
-To allow led drivers to indicate that there trigger is hardwired.
-
-Regards,
-
-Hans
+	Arnd
