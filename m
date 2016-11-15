@@ -1,105 +1,38 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Nov 2016 22:10:02 +0000
-Subject: specifying order of /dev/mmcblk devices via device-tree?
-In-Reply-To: <CAJ+vNU2t5f=HQ94_GW-cry7DV3FsR9Vx-ck_E-eNuDk5vd-eaw@mail.gmail.com>
-References: <CAJ+vNU1g8nQedd06LeaD10YWUQ_UmdRToUMFKaTNT1aNY56b0g@mail.gmail.com>
- <20161028153755.GL5806@leverpostej>
- <CAJ+vNU26tx-1bLKNpzYJ0UCeFJ-SczZOca1dYdt5mCGDxAuKTQ@mail.gmail.com>
- <20161114190839.GS1041@n2100.armlinux.org.uk>
- <CAJ+vNU38XQBHt709S_z6Quvce6wcqLzRHFuN_bVZ_0eARa3=fw@mail.gmail.com>
- <20161115213510.GY1041@n2100.armlinux.org.uk>
- <CAJ+vNU2t5f=HQ94_GW-cry7DV3FsR9Vx-ck_E-eNuDk5vd-eaw@mail.gmail.com>
-Message-ID: <20161115221002.GA1041@n2100.armlinux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 15 Nov 2016 16:22:19 -0600
+Subject: [PATCH 01/10] ASoC: sunxi: Add bindings for A23/A33/H3 codec's
+ analog path controls
+In-Reply-To: <20161112064648.26779-2-wens@csie.org>
+References: <20161112064648.26779-1-wens@csie.org>
+ <20161112064648.26779-2-wens@csie.org>
+Message-ID: <20161115222219.aw6clwnadx6cy6ox@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 15, 2016 at 01:39:42PM -0800, Tim Harvey wrote:
-> On Tue, Nov 15, 2016 at 1:35 PM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > On Tue, Nov 15, 2016 at 12:27:53PM -0800, Tim Harvey wrote:
-> >> On Mon, Nov 14, 2016 at 11:08 AM, Russell King - ARM Linux
-> >> <linux@armlinux.org.uk> wrote:
-> >> > So, someone merged a patch which makes mmcblk devices follow the
-> >> > host controller numbering.
-> >> >
-> >> > Now my cubox-i fails to boot correctly because the SD card in the
-> >> > _only_ SD card slot now gets called "mmcblk1" and not "mmcblk0".
-> >> >
-> >> > USDHC1 is wired to the on-microsom WiFi, and never has anything
-> >> > remotely near a SD card or eMMC present.  So, this change is
-> >> > confusing on these platforms.
-> >> >
-> >> > Moreover, this is _going_ to break SolidRun distros if people upgrade
-> >> > their kernels.
-> >> >
-> >> > It may be appropriate for eMMC, but it's not appropriate everywhere.
-> >> >
-> >> > This is a user visible _regression_ in 4.9-rc.  Whoever did this,
-> >> > please revert whatever change caused this, and next time limit it
-> >> > to only eMMC.
-> >> >
-> >> > Thanks.
-> >>
-> >> I see the same thing on newer kernels, which is why I asked the
-> >> question. I didn't expect (or even want honestly) a non mmcblk0 boot
-> >> device and was looking for a way to control that via dt. Now I'm
-> >> understanding that to avoid this kind of bootloader/kernel dependence
-> >> issue I should be using UUID's to identify the boot device.
-> >>
-> >> >From my testing it looks like the change your looking for occurred
-> >> some time ago and is somewhere between 4.5 and 4.6 and not a 4.9
-> >> regression specifically.
-> >
-> > That depends how you look at it.  Yes, there's a change in 4.5 to 4.6
-> > which ties the block device number to the host device index, but that's
-> > really only part of the story here.
-> >
-> > 4.8 definitely identifies the SD card in iMX6 usdhc2 as "mmcblk0".
-> > 4.9-rc identifies the SD card as "mmcblk1".  This makes it a 4.9 change
-> > of behaviour - there can be no argument about that.
-> >
-> > Now, digging further into this today, it appears that:
-> >
-> > v4.8: usdhc2 was probed first, and is given mmc0.
-> >       usdhc1 is probed second, and is given mmc1.
-> >
-> > v4.9-rc: usdhc1 is probed first, and is given mmc0.
-> >          usdhc2 is probed second, and is given mmc1.
-> >
-> > I haven't yet been able to figure out why there's been this change
-> > of probe order.  There's no change that I can see in the iMX6 DT
-> > files that would account for this.
-> >
+On Sat, Nov 12, 2016 at 02:46:39PM +0800, Chen-Yu Tsai wrote:
+> The internal codec on A23/A33/H3 is split into 2 parts. The
+> analog path controls are routed through an embedded custom register
+> bus accessed through the PRCM block.
 > 
-> I bisected it and the commit your looking for is
-> 9aaf3437aa72ed5370bf32c99580a3fa2c330e3d
+> The SoCs share a common set of inputs, outputs, and audio paths.
+> The following table lists the differences.
+> 
+>     ----------------------------------------
+>     | Feature \ SoC |  A23  |  A33  |  H3  |
+>     ----------------------------------------
+>     | Headphone     |   v   |   v   |      |
+>     ----------------------------------------
+>     | Line Out      |       |       |  v   |
+>     ----------------------------------------
+>     | Phone In/Out  |   v   |   v   |      |
+>     ----------------------------------------
+> 
+> Add a binding for this hardware.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  .../devicetree/bindings/sound/sun8i-codec-analog.txt     | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
 
-No it's not.
-
-Let me try and put it plainer:
-
-* Commit 9aaf3437aa72ed5370bf32c99580a3fa2c330e3d ties the mmc block
-  device number (mmcblkN) to the mmc host interface number (mmcN).
-  This change happened between 4.5 and 4.6.
-
-* The change I'm seeing happened between 4.8 and 4.9-rc.  I'm not
-  seeing a change of behaviour between 4.5 and 4.6.
-
-* The change I'm seeing changes the order of the physical device
-  associated with the hosts named mmc0 and mmc1 in the kernel.
-
-* Because physical devices associated with the mmc0 and mmc1 hosts
-  swap over, the mmcblkN number changes due to the commit you point
-  out.
-
-* So, the change that I'm seeing between 4.8 and 4.9-rc is not caused
-  by commit 9aaf3437aa72ed5370bf32c99580a3fa2c330e3d, but by something
-  else changing the order in which the two usdhc physical hardware
-  blocks get probed.
-
-Does this make it clearer?
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Acked-by: Rob Herring <robh@kernel.org> 
