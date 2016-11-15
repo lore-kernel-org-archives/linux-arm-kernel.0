@@ -1,40 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Nov 2016 16:11:03 +0100
-Subject: [PATCH v2 2/3] efi/libstub: add random.c to ARM build
-In-Reply-To: <CAKv+Gu_=et=2zHBTYOr9thz2kS0cXHHYg96oWGRdD3D10fqXtw@mail.gmail.com>
-References: <1476962486-18368-1-git-send-email-ard.biesheuvel@linaro.org>
- <1476962486-18368-3-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_=et=2zHBTYOr9thz2kS0cXHHYg96oWGRdD3D10fqXtw@mail.gmail.com>
-Message-ID: <2189664.D28O3TYR8x@wuerfel>
+From: rabin.vincent@axis.com (Rabin Vincent)
+Date: Tue, 15 Nov 2016 16:18:27 +0100
+Subject: [PATCH] ARM: ftrace: fix syscall name matching
+In-Reply-To: <20161114104008.36e9c40d@gandalf.local.home>
+References: <1479128625-20948-1-git-send-email-rabin.vincent@axis.com>
+ <20161114134017.GJ1041@n2100.armlinux.org.uk>
+ <20161114104008.36e9c40d@gandalf.local.home>
+Message-ID: <20161115151826.GA14085@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 2, 2016 9:37:13 AM CET Ard Biesheuvel wrote:
-> @@ -98,7 +100,7 @@
->                 efi_memory_desc_t *md = (void *)memory_map + map_offset;
->                 unsigned long slots;
+On Mon, Nov 14, 2016 at 10:40:08AM -0500, Steven Rostedt wrote:
+> On Mon, 14 Nov 2016 13:40:17 +0000
+> Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+> > On Mon, Nov 14, 2016 at 02:03:45PM +0100, Rabin Vincent wrote:
+> > > +static inline bool arch_syscall_match_sym_name(const char *sym,
+> > > +					       const char *name)
+> > > +{
+> > > +	/* Skip sys_ */
+> > > +	sym += 4;
+> > > +	name += 4;  
+> > 
+> > Is this really safe?  What guarantees that we can wind forward four
+> > bytes here?  If it's always safe, it needs a better comment than just
+> > two words.
 > 
-> -               slots = get_entry_num_slots(md, size, align);
-> +               slots = get_entry_num_slots(md, size, ilog2(align));
->                 MD_NUM_SLOTS(md) = slots;
->                 total_slots += slots;
->         }
-> """
-> 
-> This is because ARM does not have a division routine in the
-> decompressor, and the fact that the division by 'align' should always
-> involve a power of 2 is not visible to the compiler.
-> 
-> If nobody objects, I will fold this in when applying
-> 
-> 
+> I believe it is, but a comment would do well.
 
-I'm getting a link error here when building with -Os:
-
-drivers/firmware/efi/libstub/random.stub.o: In function `efi_random_alloc':
-random.c:(.text.efi_random_alloc+0x264): undefined reference to `__aeabi_llsr'
-
-If I compile this with -O2, the ilog2 gets inlined and everything
-works.
-
-	Arnd
+I ended up just getting rid of the skip and comparing the whole name
+instead.  I've sent a v2.
