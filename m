@@ -1,52 +1,46 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 15 Nov 2016 16:17:09 +0000
-Subject: [PATCH 1/5] arm64: dts: hip06: Correct hardware pin number of usb
- node
-In-Reply-To: <1474708465-38958-2-git-send-email-wangkefeng.wang@huawei.com>
-References: <1474708465-38958-1-git-send-email-wangkefeng.wang@huawei.com>
- <1474708465-38958-2-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <582B3505.5060708@hisilicon.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 15 Nov 2016 11:21:18 -0500
+Subject: [PATCH] ata: xgene: Enable NCQ support for APM X-Gene SATA
+ controller hardware v1.1
+In-Reply-To: <CAFd313ycmpdp7wHCVRJrigJV31hLwBGOo=FNENwgFnNKyVkQBA@mail.gmail.com>
+References: <1469524857-3720-1-git-send-email-rsahu@apm.com>
+ <CAFd313x-mXpy0N3aKx2rfoag1FNOrN-LzKb5UHkY2L+GGc0B-A@mail.gmail.com>
+ <20161109164531.GA14630@htj.duckdns.org>
+ <CAFd313ycmpdp7wHCVRJrigJV31hLwBGOo=FNENwgFnNKyVkQBA@mail.gmail.com>
+Message-ID: <20161115162118.GA30547@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kefeng,
+Hello, Rameshwar.
 
-On 2016/9/24 10:14, Kefeng Wang wrote:
-> The ohci/ehci hardware pin number should be 640/641, correct them.
+On Fri, Nov 11, 2016 at 01:36:28PM +0530, Rameshwar Sahu wrote:
+> Hi Tejun,
 > 
-> Fixes: commit aa8d3e74f54d ("arm64: dts: Add initial dts for Hisilicon Hip06 D03 board")
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> ---
+> On Wed, Nov 9, 2016 at 10:15 PM, Tejun Heo <tj@kernel.org> wrote:
+> > Hello,
+> >
+> > On Wed, Sep 14, 2016 at 04:15:00PM +0530, Rameshwar Sahu wrote:
+> >> > @@ -821,8 +823,6 @@ static int xgene_ahci_probe(struct platform_device
+> >> > *pdev)
+> >> >                                 dev_warn(&pdev->dev, "%s: Error reading
+> >> > device info. Assume version1\n",
+> >> >                                         __func__);
+> >> >                                 version = XGENE_AHCI_V1;
+> >> > -                       } else if (info->valid & ACPI_VALID_CID) {
+> >> > -                               version = XGENE_AHCI_V2;
+> >
+> > Can you please explain this part a bit?  Everything else looks good to
+> > me.
+> 
+> Here we should not assume XGENE_AHCI_V2 always in case of having valid
+> _CID in ACPI table.
+> I need to remove this assumption because V1_1 has also valid _CID for
+> backward compatibly with v1.
 
-Applied to the hisilicon soc tree.
+Can you please repost with the above explanation added to the commit
+message?
+
 Thanks!
 
-Best Regards,
-Wei
-
->  arch/arm64/boot/dts/hisilicon/hip06.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hip06.dtsi b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-> index 66b1bbf..be76f7d 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-> @@ -322,7 +322,7 @@
->  			compatible = "generic-ohci";
->  			reg = <0x0 0xa7030000 0x0 0x10000>;
->  			interrupt-parent = <&mbigen_usb>;
-> -			interrupts = <64 4>;
-> +			interrupts = <640 4>;
->  			dma-coherent;
->  			status = "disabled";
->  		};
-> @@ -331,7 +331,7 @@
->  			compatible = "generic-ehci";
->  			reg = <0x0 0xa7020000 0x0 0x10000>;
->  			interrupt-parent = <&mbigen_usb>;
-> -			interrupts = <65 4>;
-> +			interrupts = <641 4>;
->  			dma-coherent;
->  			status = "disabled";
->  		};
-> 
+-- 
+tejun
