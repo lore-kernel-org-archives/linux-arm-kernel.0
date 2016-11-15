@@ -1,52 +1,19 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 15 Nov 2016 16:43:16 +0100
-Subject: [PATCH v3 2/2] arm64: dts: rockchip: add usb2-phy otg-port
- support for rk3399
-In-Reply-To: <1478520529-8869-3-git-send-email-wulf@rock-chips.com>
-References: <1478520529-8869-1-git-send-email-wulf@rock-chips.com>
- <1478520529-8869-3-git-send-email-wulf@rock-chips.com>
-Message-ID: <3322090.Jd0z3Op9pV@phil>
+From: julia@ni.com (Julia Cartwright)
+Date: Tue, 15 Nov 2016 09:43:52 -0600
+Subject: [PATCH 1/2] ARM: zynq: Remove skeleton.dtsi
+In-Reply-To: <2d42e25d7dd03e562e12e71fd037837737115940.1479218844.git.michal.simek@xilinx.com>
+References: <2d42e25d7dd03e562e12e71fd037837737115940.1479218844.git.michal.simek@xilinx.com>
+Message-ID: <20161115154352.GG30999@jcartwri.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 7. November 2016, 20:08:49 CET schrieb William Wu:
-> Add otg-port nodes for both u2phy0 and u2phy1. The otg-port can
-> be used for USB2.0 part of USB3.0 OTG controller.
+On Tue, Nov 15, 2016 at 03:07:26PM +0100, Michal Simek wrote:
+> Based on
+> "ARM: dts: explicitly mark skeleton.dtsi as deprecated"
+> (sha1: 9c0da3cc61f1233c2782e2d3d91e3d0707dd4ba5)
+> skeleton.dtsi is deprecated.
+> Move address and size-cells directly to zynq-7000.dtsi.
 > 
-> Signed-off-by: William Wu <wulf@rock-chips.com>
-> ---
-> Changes in v3:
-> - None
-> 
-> Changes in v2:
-> - None
-> 
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index b65c193..ea2df51 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> @@ -1095,6 +1095,17 @@
->  			clock-output-names = "clk_usbphy0_480m";
->  			status = "disabled";
-> 
-> +			u2phy0_otg: otg-port {
-> +				#phy-cells = <0>;
-> +				interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH 0>,
-> +					     <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH 0>,
-> +					     <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH 0>;
-> +				interrupt-names = "otg-bvalid", "otg-id",
-> +						  "linestate";
-> +				status = "disabled";
-> +			};
-> +
-> +
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
-applied to my dts64 branch after removing that double empty line and also 
-switching host and otg sub nodes to get alphabetical sorting.
-
-
-Thanks
-Heiko
+Reviewed-by: Julia Cartwright <julia@ni.com>
