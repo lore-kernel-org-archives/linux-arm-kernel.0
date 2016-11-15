@@ -1,39 +1,57 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 15 Nov 2016 16:46:07 +0100
-Subject: [PATCH 3/3] dt-bindings: add Tegra186 BPMP I2C binding
-In-Reply-To: <20160719191442.15439-3-swarren@wwwdotorg.org>
-References: <20160719191442.15439-1-swarren@wwwdotorg.org>
- <20160719191442.15439-3-swarren@wwwdotorg.org>
-Message-ID: <20161115154607.GC22611@ulmo.ba.sec>
+From: julia@ni.com (Julia Cartwright)
+Date: Tue, 15 Nov 2016 09:46:08 -0600
+Subject: [PATCH 2/2] ARM: zynq: Fix W=1 dtc 1.4 warnings
+In-Reply-To: <90eca8dfcdcef68ce5fe39f2329c4b61d2662598.1479218844.git.michal.simek@xilinx.com>
+References: <2d42e25d7dd03e562e12e71fd037837737115940.1479218844.git.michal.simek@xilinx.com>
+ <90eca8dfcdcef68ce5fe39f2329c4b61d2662598.1479218844.git.michal.simek@xilinx.com>
+Message-ID: <20161115154608.GH30999@jcartwri.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2016 at 01:14:42PM -0600, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Tue, Nov 15, 2016 at 03:07:27PM +0100, Michal Simek wrote:
+> The patch removes these warnings reported by dtc 1.4:
+> Warning (unit_address_vs_reg): Node /pmu has a reg or ranges property,
+> but no unit name
+> Warning (unit_address_vs_reg): Node /fixedregulator at 0 has a unit name,
+> but no reg property
+> Warning (unit_address_vs_reg): Node /memory has a reg or ranges
+> property, but no unit name
 > 
-> In Tegra186, the BPMP (Boot and Power Management Processor) owns certain
-> HW devices, such as the I2C controller for the power management I2C bus.
-> Software running on other CPUs must perform IPC to the BPMP in order to
-> execute transactions on that I2C bus. This binding describes an I2C bus
-> that is accessed in such a fashion.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  .../bindings/i2c/nvidia,tegra186-bpmp-i2c.txt      | 42 ++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/i2c/nvidia,tegra186-bpmp-i2c.txt
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
-I ended up cherry-picking this commit from U-Boot, which already had
-both of the comments addressed that were discussed here. I also took the
-liberty of adding Jon's Acked-by from this thread since it's effectively
-the same commit.
+Reviewed-by: Julia Cartwright <julia@ni.com>
+>
+> ---
+> 
+>  arch/arm/boot/dts/zynq-7000.dtsi      | 4 ++--
+>  arch/arm/boot/dts/zynq-parallella.dts | 2 +-
+>  arch/arm/boot/dts/zynq-zc702.dts      | 2 +-
+>  arch/arm/boot/dts/zynq-zc706.dts      | 2 +-
+>  arch/arm/boot/dts/zynq-zed.dts        | 2 +-
+>  arch/arm/boot/dts/zynq-zybo.dts       | 2 +-
+>  6 files changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> index f47a6c1cc752..402b5bbe3b5b 100644
+> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> @@ -42,14 +42,14 @@
+>  		};
+>  	};
+>  
+> -	pmu {
+> +	pmu at f8891000 {
+>  		compatible = "arm,cortex-a9-pmu";
+>  		interrupts = <0 5 4>, <0 6 4>;
+>  		interrupt-parent = <&intc>;
+>  		reg = < 0xf8891000 0x1000 0xf8893000 0x1000 >;
+
+Style nit: we should drop the space before/after '<' and '>'; and,
+perhaps separate the entries to be a bit more readable:
+
+   reg = <0xf8891000 0x1000>,
+         <0xf8893000 0x1000>;
 
 Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161115/27395f3b/attachment.sig>
+
+   Julia
