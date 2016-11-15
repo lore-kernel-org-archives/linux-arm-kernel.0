@@ -1,116 +1,131 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 15 Nov 2016 15:07:27 +0100
-Subject: [PATCH 2/2] ARM: zynq: Fix W=1 dtc 1.4 warnings
-In-Reply-To: <2d42e25d7dd03e562e12e71fd037837737115940.1479218844.git.michal.simek@xilinx.com>
-References: <2d42e25d7dd03e562e12e71fd037837737115940.1479218844.git.michal.simek@xilinx.com>
-Message-ID: <90eca8dfcdcef68ce5fe39f2329c4b61d2662598.1479218844.git.michal.simek@xilinx.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 15 Nov 2016 14:19:44 +0000
+Subject: [PATCH/RESEND] recordmcount: arm: Implement make_nop
+In-Reply-To: <20161018234200.5804-1-sboyd@codeaurora.org>
+References: <20161018234200.5804-1-sboyd@codeaurora.org>
+Message-ID: <CAKv+Gu-Cp775gbLxPcJQ4G2nEnwm9G_gxh5B1Sf2LGkkov_OZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch removes these warnings reported by dtc 1.4:
-Warning (unit_address_vs_reg): Node /pmu has a reg or ranges property,
-but no unit name
-Warning (unit_address_vs_reg): Node /fixedregulator at 0 has a unit name,
-but no reg property
-Warning (unit_address_vs_reg): Node /memory has a reg or ranges
-property, but no unit name
+On 19 October 2016 at 00:42, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> In similar spirit to x86 and arm64 support, add a make_nop_arm()
+> to replace calls to mcount with a nop in sections that aren't
+> traced.
+>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Acked-by: Rabin Vincent <rabin@rab.in>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  scripts/recordmcount.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 65 insertions(+)
+>
+> diff --git a/scripts/recordmcount.c b/scripts/recordmcount.c
+> index 5423a58d1b06..aeb34223167c 100644
+> --- a/scripts/recordmcount.c
+> +++ b/scripts/recordmcount.c
+> @@ -213,6 +213,59 @@ static int make_nop_x86(void *map, size_t const offset)
+>         return 0;
+>  }
+>
+> +static unsigned char ideal_nop4_arm_le[4] = { 0x00, 0x00, 0xa0, 0xe1 }; /* mov r0, r0 */
+> +static unsigned char ideal_nop4_arm_be[4] = { 0xe1, 0xa0, 0x00, 0x00 }; /* mov r0, r0 */
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+Shouldn't you be taking the difference between BE8 and BE32 into
+account here? IIRC, BE8 uses little endian encoding for instructions.
 
- arch/arm/boot/dts/zynq-7000.dtsi      | 4 ++--
- arch/arm/boot/dts/zynq-parallella.dts | 2 +-
- arch/arm/boot/dts/zynq-zc702.dts      | 2 +-
- arch/arm/boot/dts/zynq-zc706.dts      | 2 +-
- arch/arm/boot/dts/zynq-zed.dts        | 2 +-
- arch/arm/boot/dts/zynq-zybo.dts       | 2 +-
- 6 files changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index f47a6c1cc752..402b5bbe3b5b 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -42,14 +42,14 @@
- 		};
- 	};
- 
--	pmu {
-+	pmu at f8891000 {
- 		compatible = "arm,cortex-a9-pmu";
- 		interrupts = <0 5 4>, <0 6 4>;
- 		interrupt-parent = <&intc>;
- 		reg = < 0xf8891000 0x1000 0xf8893000 0x1000 >;
- 	};
- 
--	regulator_vccpint: fixedregulator at 0 {
-+	regulator_vccpint: fixedregulator {
- 		compatible = "regulator-fixed";
- 		regulator-name = "VCCPINT";
- 		regulator-min-microvolt = <1000000>;
-diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
-index 307ed201d658..64a6390fc501 100644
---- a/arch/arm/boot/dts/zynq-parallella.dts
-+++ b/arch/arm/boot/dts/zynq-parallella.dts
-@@ -28,7 +28,7 @@
- 		serial0 = &uart1;
- 	};
- 
--	memory {
-+	memory at 0 {
- 		device_type = "memory";
- 		reg = <0x0 0x40000000>;
- 	};
-diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-index e96959b2e67a..0cdad2cc8b78 100644
---- a/arch/arm/boot/dts/zynq-zc702.dts
-+++ b/arch/arm/boot/dts/zynq-zc702.dts
-@@ -24,7 +24,7 @@
- 		serial0 = &uart1;
- 	};
- 
--	memory {
-+	memory at 0 {
- 		device_type = "memory";
- 		reg = <0x0 0x40000000>;
- 	};
-diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
-index be6a986bbbd8..ad4bb06dba25 100644
---- a/arch/arm/boot/dts/zynq-zc706.dts
-+++ b/arch/arm/boot/dts/zynq-zc706.dts
-@@ -24,7 +24,7 @@
- 		serial0 = &uart1;
- 	};
- 
--	memory {
-+	memory at 0 {
- 		device_type = "memory";
- 		reg = <0x0 0x40000000>;
- 	};
-diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
-index 7250c1eac7f9..325379f7983c 100644
---- a/arch/arm/boot/dts/zynq-zed.dts
-+++ b/arch/arm/boot/dts/zynq-zed.dts
-@@ -23,7 +23,7 @@
- 		serial0 = &uart1;
- 	};
- 
--	memory {
-+	memory at 0 {
- 		device_type = "memory";
- 		reg = <0x0 0x20000000>;
- 	};
-diff --git a/arch/arm/boot/dts/zynq-zybo.dts b/arch/arm/boot/dts/zynq-zybo.dts
-index d9e0f3e70671..590ec24b8749 100644
---- a/arch/arm/boot/dts/zynq-zybo.dts
-+++ b/arch/arm/boot/dts/zynq-zybo.dts
-@@ -23,7 +23,7 @@
- 		serial0 = &uart1;
- 	};
- 
--	memory {
-+	memory at 0 {
- 		device_type = "memory";
- 		reg = <0x0 0x20000000>;
- 	};
--- 
-1.9.1
+> +static unsigned char *ideal_nop4_arm;
+> +
+> +static unsigned char bl_mcount_arm_le[4] = { 0xfe, 0xff, 0xff, 0xeb }; /* bl */
+> +static unsigned char bl_mcount_arm_be[4] = { 0xeb, 0xff, 0xff, 0xfe }; /* bl */
+> +static unsigned char *bl_mcount_arm;
+> +
+> +static unsigned char push_arm_le[4] = { 0x04, 0xe0, 0x2d, 0xe5 }; /* push {lr} */
+> +static unsigned char push_arm_be[4] = { 0xe5, 0x2d, 0xe0, 0x04 }; /* push {lr} */
+> +static unsigned char *push_arm;
+> +
+> +static unsigned char ideal_nop2_thumb_le[2] = { 0x00, 0xbf }; /* nop */
+> +static unsigned char ideal_nop2_thumb_be[2] = { 0xbf, 0x00 }; /* nop */
+> +static unsigned char *ideal_nop2_thumb;
+> +
+> +static unsigned char push_bl_mcount_thumb_le[6] = { 0x00, 0xb5, 0xff, 0xf7, 0xfe, 0xff }; /* push {lr}, bl */
+> +static unsigned char push_bl_mcount_thumb_be[6] = { 0xb5, 0x00, 0xf7, 0xff, 0xff, 0xfe }; /* push {lr}, bl */
+> +static unsigned char *push_bl_mcount_thumb;
+> +
+> +static int make_nop_arm(void *map, size_t const offset)
+> +{
+> +       char *ptr;
+> +       int cnt = 1;
+> +       int nop_size;
+> +       size_t off = offset;
+> +
+> +       ptr = map + offset;
+> +       if (memcmp(ptr, bl_mcount_arm, 4) == 0) {
+> +               if (memcmp(ptr - 4, push_arm, 4) == 0) {
+> +                       off -= 4;
+> +                       cnt = 2;
+> +               }
+> +               ideal_nop = ideal_nop4_arm;
+> +               nop_size = 4;
+> +       } else if (memcmp(ptr - 2, push_bl_mcount_thumb, 6) == 0) {
+> +               cnt = 3;
+> +               nop_size = 2;
+> +               off -= 2;
+> +               ideal_nop = ideal_nop2_thumb;
+> +       } else
+> +               return -1;
+> +
+> +       /* Convert to nop */
+> +       ulseek(fd_map, off, SEEK_SET);
+> +
+> +       do {
+> +               uwrite(fd_map, ideal_nop, nop_size);
+> +       } while (--cnt > 0);
+> +
+> +       return 0;
+> +}
+> +
+>  static unsigned char ideal_nop4_arm64[4] = {0x1f, 0x20, 0x03, 0xd5};
+>  static int make_nop_arm64(void *map, size_t const offset)
+>  {
+> @@ -430,6 +483,11 @@ do_file(char const *const fname)
+>                         w2 = w2rev;
+>                         w8 = w8rev;
+>                 }
+> +               ideal_nop4_arm = ideal_nop4_arm_le;
+> +               bl_mcount_arm = bl_mcount_arm_le;
+> +               push_arm = push_arm_le;
+> +               ideal_nop2_thumb = ideal_nop2_thumb_le;
+> +               push_bl_mcount_thumb = push_bl_mcount_thumb_le;
+>                 break;
+>         case ELFDATA2MSB:
+>                 if (*(unsigned char const *)&endian != 0) {
+> @@ -438,6 +496,11 @@ do_file(char const *const fname)
+>                         w2 = w2rev;
+>                         w8 = w8rev;
+>                 }
+> +               ideal_nop4_arm = ideal_nop4_arm_be;
+> +               bl_mcount_arm = bl_mcount_arm_be;
+> +               push_arm = push_arm_be;
+> +               ideal_nop2_thumb = ideal_nop2_thumb_be;
+> +               push_bl_mcount_thumb = push_bl_mcount_thumb_be;
+>                 break;
+>         }  /* end switch */
+>         if (memcmp(ELFMAG, ehdr->e_ident, SELFMAG) != 0
+> @@ -463,6 +526,8 @@ do_file(char const *const fname)
+>                 break;
+>         case EM_ARM:     reltype = R_ARM_ABS32;
+>                          altmcount = "__gnu_mcount_nc";
+> +                        make_nop = make_nop_arm;
+> +                        rel_type_nop = R_ARM_NONE;
+>                          break;
+>         case EM_AARCH64:
+>                         reltype = R_AARCH64_ABS64;
+> --
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
