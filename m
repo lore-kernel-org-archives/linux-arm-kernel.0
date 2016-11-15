@@ -1,85 +1,72 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 15 Nov 2016 16:31:00 +0100
-Subject: [PATCH v3 5/6] ARM: dts: stm32f429: Add adc support
-In-Reply-To: <1479223861-21747-1-git-send-email-fabrice.gasnier@st.com>
-References: <1479223861-21747-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1479223861-21747-6-git-send-email-fabrice.gasnier@st.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 15 Nov 2016 15:34:37 +0000
+Subject: [PATCH] arm/arm64: KVM: VGIC: limit ITARGETSR bits to number of
+ VCPUs
+In-Reply-To: <061bf473-4597-22fe-664a-b83dbe6b39e1@arm.com>
+References: <20161115142749.19955-1-andre.przywara@arm.com>
+ <061bf473-4597-22fe-664a-b83dbe6b39e1@arm.com>
+Message-ID: <06bef5c6-1a12-ed13-3bc6-3e9d98a71bee@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add adc support & pinctrl analog phandle (adc3_in8) to stm32f429.
+Hi Marc,
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- arch/arm/boot/dts/stm32f429.dtsi | 49 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+On 15/11/16 14:41, Marc Zyngier wrote:
+> Hi Andre,
+> 
+> On 15/11/16 14:27, Andre Przywara wrote:
+>> The GICv2 spec says in section 4.3.12 that a "CPU targets field bit that
+>> corresponds to an unimplemented CPU interface is RAZ/WI."
+>> Currently we allow the guest to write any value in there and it can
+>> read that back.
+>> Mask the written value with the proper CPU mask to be spec compliant.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  virt/kvm/arm/vgic/vgic-mmio-v2.c | 3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>> index b44b359..e59d4c7 100644
+>> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>> @@ -129,6 +129,7 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
+>>  				   unsigned long val)
+>>  {
+>>  	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
+>> +	u8 cpu_mask = (1 << atomic_read(&vcpu->kvm->online_vcpus)) - 1;
+> 
+> For the sake of avoiding open-coding things, how about using GENMASK?
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index 336ee4f..f198132 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -172,6 +172,49 @@
- 			status = "disabled";
- 		};
- 
-+		adc: adc at 40012000 {
-+			compatible = "st,stm32f4-adc-core";
-+			reg = <0x40012000 0x400>;
-+			interrupts = <18>;
-+			clocks = <&rcc 0 168>;
-+			clock-names = "adc";
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+
-+			adc1: adc at 0 {
-+				compatible = "st,stm32f4-adc";
-+				#io-channel-cells = <1>;
-+				reg = <0x0>;
-+				clocks = <&rcc 0 168>;
-+				interrupt-parent = <&adc>;
-+				interrupts = <0>;
-+				status = "disabled";
-+			};
-+
-+			adc2: adc at 100 {
-+				compatible = "st,stm32f4-adc";
-+				#io-channel-cells = <1>;
-+				reg = <0x100>;
-+				clocks = <&rcc 0 169>;
-+				interrupt-parent = <&adc>;
-+				interrupts = <1>;
-+				status = "disabled";
-+			};
-+
-+			adc3: adc at 200 {
-+				compatible = "st,stm32f4-adc";
-+				#io-channel-cells = <1>;
-+				reg = <0x200>;
-+				clocks = <&rcc 0 170>;
-+				interrupt-parent = <&adc>;
-+				interrupts = <2>;
-+				status = "disabled";
-+			};
-+		};
-+
- 		syscfg: system-config at 40013800 {
- 			compatible = "syscon";
- 			reg = <0x40013800 0x400>;
-@@ -332,6 +375,12 @@
- 					slew-rate = <2>;
- 				};
- 			};
-+
-+			adc3_in8_pin: adc at 200 {
-+				pins {
-+					pinmux = <STM32F429_PF10_FUNC_ANALOG>;
-+				};
-+			};
- 		};
- 
- 		rcc: rcc at 40023810 {
--- 
-1.9.1
+Yes.
+
+> 
+>>  	int i;
+>>  
+>>  	/* GICD_ITARGETSR[0-7] are read-only */
+>> @@ -141,7 +142,7 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
+>>  
+>>  		spin_lock(&irq->irq_lock);
+>>  
+>> -		irq->targets = (val >> (i * 8)) & 0xff;
+>> +		irq->targets = ((val >> (i * 8)) & 0xff) & cpu_mask;
+> 
+> Can't you just drop the '& 0xff' part, since cpu_mask is guaranteed to
+> be more restrictive?
+
+Well, and also irq->targets is an u8 ...
+
+Fixed both.
+
+Thanks!
+Andre.
+
+>>  		target = irq->targets ? __ffs(irq->targets) : 0;
+>>  		irq->target_vcpu = kvm_get_vcpu(vcpu->kvm, target);
+>>  
+>>
+> 
+> Thanks,
+> 
+> 	M.
+> 
