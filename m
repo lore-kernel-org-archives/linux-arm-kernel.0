@@ -1,72 +1,90 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 15 Nov 2016 15:34:37 +0000
-Subject: [PATCH] arm/arm64: KVM: VGIC: limit ITARGETSR bits to number of
- VCPUs
-In-Reply-To: <061bf473-4597-22fe-664a-b83dbe6b39e1@arm.com>
-References: <20161115142749.19955-1-andre.przywara@arm.com>
- <061bf473-4597-22fe-664a-b83dbe6b39e1@arm.com>
-Message-ID: <06bef5c6-1a12-ed13-3bc6-3e9d98a71bee@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 15 Nov 2016 16:39:14 +0100
+Subject: [PATCH 1/3] dt-bindings: add power domains to Tegra BPMP firmware
+In-Reply-To: <20160719191442.15439-1-swarren@wwwdotorg.org>
+References: <20160719191442.15439-1-swarren@wwwdotorg.org>
+Message-ID: <20161115153914.GA22611@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On 15/11/16 14:41, Marc Zyngier wrote:
-> Hi Andre,
+On Tue, Jul 19, 2016 at 01:14:40PM -0600, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> On 15/11/16 14:27, Andre Przywara wrote:
->> The GICv2 spec says in section 4.3.12 that a "CPU targets field bit that
->> corresponds to an unimplemented CPU interface is RAZ/WI."
->> Currently we allow the guest to write any value in there and it can
->> read that back.
->> Mask the written value with the proper CPU mask to be spec compliant.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  virt/kvm/arm/vgic/vgic-mmio-v2.c | 3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->> index b44b359..e59d4c7 100644
->> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
->> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->> @@ -129,6 +129,7 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
->>  				   unsigned long val)
->>  {
->>  	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
->> +	u8 cpu_mask = (1 << atomic_read(&vcpu->kvm->online_vcpus)) - 1;
+> The Tegra186 BPMP is also a provider of power domains. Enhance the device
+> tree binding to describe this.
 > 
-> For the sake of avoiding open-coding things, how about using GENMASK?
-
-Yes.
-
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> These patches all build on top of Joseph Lo's baseline BPMP binding patches[1]
+> and enhance them to represent a few more features of the firmware.
 > 
->>  	int i;
->>  
->>  	/* GICD_ITARGETSR[0-7] are read-only */
->> @@ -141,7 +142,7 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
->>  
->>  		spin_lock(&irq->irq_lock);
->>  
->> -		irq->targets = (val >> (i * 8)) & 0xff;
->> +		irq->targets = ((val >> (i * 8)) & 0xff) & cpu_mask;
+> [1] https://lkml.org/lkml/2016/7/19/280
+> "[PATCH V3 01/10] Documentation: dt-bindings: mailbox: tegra: Add binding for HSP mailbox"
 > 
-> Can't you just drop the '& 0xff' part, since cpu_mask is guaranteed to
-> be more restrictive?
+>  .../bindings/firmware/nvidia,tegra186-bpmp.txt     | 10 ++++--
+>  include/dt-bindings/power/tegra186-powergate.h     | 39 ++++++++++++++++++++++
+>  2 files changed, 46 insertions(+), 3 deletions(-)
+>  create mode 100644 include/dt-bindings/power/tegra186-powergate.h
 
-Well, and also irq->targets is an u8 ...
+Applied, thanks.
 
-Fixed both.
+One small comment below...
 
-Thanks!
-Andre.
+> diff --git a/include/dt-bindings/power/tegra186-powergate.h b/include/dt-bindings/power/tegra186-powergate.h
+> new file mode 100644
+> index 000000000000..388d6e228dc8
+> --- /dev/null
+> +++ b/include/dt-bindings/power/tegra186-powergate.h
+> @@ -0,0 +1,39 @@
+> +/*
+> + * Copyright (c) 2015-2016, NVIDIA CORPORATION.  All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef _DT_BINDINGS_POWER_TEGRA186_POWERGATE_H
+> +#define _DT_BINDINGS_POWER_TEGRA186_POWERGATE_H
+> +
+> +#define TEGRA186_POWER_DOMAIN_AUD	0
+> +#define TEGRA186_POWER_DOMAIN_DFD	1
+> +#define TEGRA186_POWER_DOMAIN_DISP	2
+> +#define TEGRA186_POWER_DOMAIN_DISPB	3
+> +#define TEGRA186_POWER_DOMAIN_DISPC	4
+> +#define TEGRA186_POWER_DOMAIN_ISPA	5
+> +#define TEGRA186_POWER_DOMAIN_NVDEC	6
+> +#define TEGRA186_POWER_DOMAIN_NVJPG	7
+> +#define TEGRA186_POWER_DOMAIN_MPE	8
+> +#define TEGRA186_POWER_DOMAIN_PCX	9
+> +#define TEGRA186_POWER_DOMAIN_SAX	10
+> +#define TEGRA186_POWER_DOMAIN_VE	11
+> +#define TEGRA186_POWER_DOMAIN_VIC	12
+> +#define TEGRA186_POWER_DOMAIN_XUSBA	13
+> +#define TEGRA186_POWER_DOMAIN_XUSBB	14
+> +#define TEGRA186_POWER_DOMAIN_XUSBC	15
+> +#define TEGRA186_POWER_DOMAIN_GPU	43
+> +#define TEGRA186_POWER_DOMAIN_MAX	44
 
->>  		target = irq->targets ? __ffs(irq->targets) : 0;
->>  		irq->target_vcpu = kvm_get_vcpu(vcpu->kvm, target);
->>  
->>
-> 
-> Thanks,
-> 
-> 	M.
-> 
+It's slightly odd that these are named TEGRA186_POWER_DOMAIN_* since
+power domain is a Linuxism. All documentation that I've seen calls these
+powergates.
+
+I guess since this is now ABI there is not much we can do to rectify it.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161115/23dffb84/attachment.sig>
