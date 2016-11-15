@@ -1,41 +1,67 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 15 Nov 2016 15:29:09 -0800
-Subject: [GIT PULL] Amlogic defconfig changes for v4.10
-Message-ID: <7hk2c42ugq.fsf@baylibre.com>
+From: phh@phh.me (Pierre-Hugues Husson)
+Date: Wed, 16 Nov 2016 00:35:03 +0100
+Subject: [RFCv2 PATCH 2/5] drm/bridge: dw_hdmi: remove CEC engine register
+ definitions
+In-Reply-To: <20161115232754.GB1041@n2100.armlinux.org.uk>
+References: <1479136968-24477-1-git-send-email-hverkuil@xs4all.nl>
+ <1479136968-24477-3-git-send-email-hverkuil@xs4all.nl>
+ <CAJ-oXjS-VVkBuYh0inTGAvJbsKzvEqKYrgoSeG6UBQtW_1BEyQ@mail.gmail.com>
+ <20161115232754.GB1041@n2100.armlinux.org.uk>
+Message-ID: <CAJ-oXjTgYmnNhGh8dW4Ke=zFDN5wwHNoJ40bFUKp0T5dTGLrbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+2016-11-16 0:27 GMT+01:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
+> On Wed, Nov 16, 2016 at 12:23:50AM +0100, Pierre-Hugues Husson wrote:
+>> Hi,
+>>
+>>
+>> 2016-11-14 16:22 GMT+01:00 Hans Verkuil <hverkuil@xs4all.nl>:
+>> > From: Russell King <rmk+kernel@arm.linux.org.uk>
+>> >
+>> > We don't need the CEC engine register definitions, so let's remove them.
+>> >
+>> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> > ---
+>> >  drivers/gpu/drm/bridge/dw-hdmi.h | 45 ----------------------------------------
+>> >  1 file changed, 45 deletions(-)
+>> >
+>> > diff --git a/drivers/gpu/drm/bridge/dw-hdmi.h b/drivers/gpu/drm/bridge/dw-hdmi.h
+>> > index fc9a560..26d6845 100644
+>> > --- a/drivers/gpu/drm/bridge/dw-hdmi.h
+>> > +++ b/drivers/gpu/drm/bridge/dw-hdmi.h
+>> > @@ -478,51 +478,6 @@
+>> >  #define HDMI_A_PRESETUP                         0x501A
+>> >  #define HDMI_A_SRM_BASE                         0x5020
+>> >
+>> > -/* CEC Engine Registers */
+>> > -#define HDMI_CEC_CTRL                           0x7D00
+>> > -#define HDMI_CEC_STAT                           0x7D01
+>> > -#define HDMI_CEC_MASK                           0x7D02
+>> I don't know if this is relevant for a submission, but the build stops
+>> working here because of a missing definition HDMI_CEC_MASK
+>> Perhaps this should be inverted with 3/5 to make bissecting easier?
+>> I was trying to bissect a kernel panic, and I had to fix this by hand
+>
+> Doesn't make sense - patch 3 doesn't reference HDMI_CEC_MASK.
+>
+> Please show the build error in full.
+The build is actually fixed with patch 4.
 
-Here are some defconfig change for Amlogic family SoCs for 4.10.  Please
-pull.
+Building after patch 2 fails with:
+drivers/gpu/drm/bridge/dw-hdmi.c: In function ?initialize_hdmi_ih_mutes?:
+drivers/gpu/drm/bridge/dw-hdmi.c:1300:26: error: ?HDMI_CEC_MASK?
+undeclared (first use in this function)
+  hdmi_writeb(hdmi, 0xff, HDMI_CEC_MASK);
 
-Thanks,
+The point of switching patch 3 and patch 2, is that the build works
+with patch 1,3 applied.
+Applying patch 2 breaks the build, but doesn't change any active code,
+so it's ok.
 
-Kevin
+So with the order 1,3,2,4,5, the build is broken only after 2, while
+with 1,2,3,4,5, it is broken after 2 and 3.
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+I hope this makes my remark more explicit.
 
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-defconfig
-
-for you to fetch changes up to 88c9cb7c109e8867fd6ac3a11e5cead37a6a6f1d:
-
-  ARM64: configs: Activate Internal PHY for Meson GXL (2016-11-14 08:40:47 -0800)
-
-----------------------------------------------------------------
-Amlogic defconfig updates for v4.10
-- enable I2C driver
-- enable SPI, watchdog and HW random as modules
-
-----------------------------------------------------------------
-Neil Armstrong (3):
-      ARM64: defconfig: Enable MMC related configs
-      ARM64: configs: Add Platform MHU in defconfig
-      ARM64: configs: Activate Internal PHY for Meson GXL
-
- arch/arm64/configs/defconfig | 7 +++++++
- 1 file changed, 7 insertions(+)
+If it doesn't, I think it is quite safe to just ignore it
