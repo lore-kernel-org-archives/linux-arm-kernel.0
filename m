@@ -1,35 +1,27 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 15 Nov 2016 09:03:43 -0800
-Subject: [PATCH net 1/3] net: phy: realtek: add eee advertisement disable
- options
-In-Reply-To: <20161115163036.GB23231@lunn.ch>
-References: <1479220154-25851-1-git-send-email-jbrunet@baylibre.com>
- <1479220154-25851-2-git-send-email-jbrunet@baylibre.com>
- <20161115163036.GB23231@lunn.ch>
-Message-ID: <476b72f3-5efe-3551-6c24-0e378d655a0f@gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 15 Nov 2016 09:23:31 -0800
+Subject: [PATCH 2/2] ARM: bcm2835: Add names for the Raspberry Pi Zero
+ GPIO lines
+In-Reply-To: <1479060729-25769-3-git-send-email-stefan.wahren@i2se.com>
+References: <1479060729-25769-1-git-send-email-stefan.wahren@i2se.com>
+ <1479060729-25769-3-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <87zil0r71o.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2016 08:30 AM, Andrew Lunn wrote:
-> On Tue, Nov 15, 2016 at 03:29:12PM +0100, Jerome Brunet wrote:
->> On some platforms, energy efficient ethernet with rtl8211 devices is
->> causing issue, like throughput drop or broken link.
->>
->> This was reported on the OdroidC2 (DWMAC + RTL8211F). While the issue root
->> cause is not fully understood yet, disabling EEE advertisement prevent auto
->> negotiation from enabling EEE.
->>
->> This patch provides options to disable 1000T and 100TX EEE advertisement
->> individually for the realtek phys supporting this feature.
-> 
-> Looking at the code, i don't see anything specific to RealTek
-> here. This all seems generic. So should it be in phy.c and made a
-> generic OF property which can be applied to any PHY which supports
-> EEE.
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-Agreed. Just to be sure, Jerome, you did verify that with EEE no longer
-advertised, ethtool --set-eee fails, right? The point is that you may be
-able to disable EEE on boot, but if there is a way to re-enable it later
-on, we would want to disable that too.
--- 
-Florian
+> This adds the GPIO names for the Raspberry Pi Zero. Since there are no
+> schematics for the RPi Zero use the same as the Model A+.
+
+These look good to me. I don't have a Zero schematic, but I compared to
+dt-blob.
+
+I've pulled these two to -next.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161115/e97dda27/attachment.sig>
