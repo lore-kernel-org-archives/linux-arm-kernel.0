@@ -1,50 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Nov 2016 16:34:19 -0800
-Subject: [GIT PULL] add #pinctrl-cells for v4.10
-Message-ID: <pull-1479170035-580465>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 14 Nov 2016 16:39:41 -0800
+Subject: [PATCH] ARM64: dts: bcm2837-rpi-3-b: remove incorrect pwr LED
+In-Reply-To: <741880731.428971.a2c5fd60-1b30-481e-b728-fc62c8d1c81a.open-xchange@email.1und1.de>
+References: <20161111173821.21491-1-eric@anholt.net>
+ <741880731.428971.a2c5fd60-1b30-481e-b728-fc62c8d1c81a.open-xchange@email.1und1.de>
+Message-ID: <871sydfueq.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+> Hi Eric,
+>
+> [add Gerd to CC]
+>
+>> Eric Anholt <eric@anholt.net> hat am 11. November 2016 um 18:38 geschrieben:
+>> 
+>> 
+>> From: Andrea Merello <andrea.merello@gmail.com>
+>> 
+>> We are incorrectly defining the pwr LED, attaching it to a gpio line
+>> that is wired to the Wi-Fi SDIO module (which fails due to this).
+>
+> i agree with the intention of this patch, but is the upstream kernel really
+> affected? I can't see any compatible for the Wifi interface.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.10/pinctrl-cells-signed
-
-for you to fetch changes up to be76fd3197df608e1b010bf5ab90377205f54344:
-
-  ARM: dts: Add #pinctrl-cells for pinctrl-single instances (2016-11-07 08:27:49 -0700)
-
-----------------------------------------------------------------
-Add #pinctrl-cells for pinctrl-single using dts files. This allows
-us to use generic parser later on. Note that the driver supports
-handling the legacy binding also with no #pinctrl-cells so these
-changes can be queued separately from the driver changes.
-
-----------------------------------------------------------------
-Tony Lindgren (1):
-      ARM: dts: Add #pinctrl-cells for pinctrl-single instances
-
- Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt | 3 +++
- arch/arm/boot/dts/am33xx.dtsi                                | 2 ++
- arch/arm/boot/dts/am3517.dtsi                                | 1 +
- arch/arm/boot/dts/am4372.dtsi                                | 1 +
- arch/arm/boot/dts/da850.dtsi                                 | 1 +
- arch/arm/boot/dts/dm814x.dtsi                                | 1 +
- arch/arm/boot/dts/dm816x.dtsi                                | 2 ++
- arch/arm/boot/dts/dra7.dtsi                                  | 1 +
- arch/arm/boot/dts/hi3620.dtsi                                | 2 ++
- arch/arm/boot/dts/keystone-k2g.dtsi                          | 1 +
- arch/arm/boot/dts/keystone-k2l.dtsi                          | 1 +
- arch/arm/boot/dts/omap2420.dtsi                              | 2 ++
- arch/arm/boot/dts/omap2430.dtsi                              | 2 ++
- arch/arm/boot/dts/omap3.dtsi                                 | 2 ++
- arch/arm/boot/dts/omap34xx.dtsi                              | 1 +
- arch/arm/boot/dts/omap36xx.dtsi                              | 1 +
- arch/arm/boot/dts/omap4.dtsi                                 | 2 ++
- arch/arm/boot/dts/omap5.dtsi                                 | 2 ++
- arch/arm/boot/dts/pxa3xx.dtsi                                | 1 +
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi                    | 3 +++
- 20 files changed, 32 insertions(+)
+The wifi isn't in the DT yet because the driver isn't merged.  Some
+progress was made on that a while ago, but people asked for more
+cleanups so it's still living out of tree.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161114/aeaf51d8/attachment.sig>
