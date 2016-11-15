@@ -1,27 +1,39 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 15 Nov 2016 09:23:31 -0800
-Subject: [PATCH 2/2] ARM: bcm2835: Add names for the Raspberry Pi Zero
- GPIO lines
-In-Reply-To: <1479060729-25769-3-git-send-email-stefan.wahren@i2se.com>
-References: <1479060729-25769-1-git-send-email-stefan.wahren@i2se.com>
- <1479060729-25769-3-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <87zil0r71o.fsf@eliezer.anholt.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 15 Nov 2016 18:42:37 +0100
+Subject: [PATCH v2 0/3] ARM: dts: sun7i: BPI-M1+ USB support
+In-Reply-To: <20161115135106.438-1-wens@csie.org>
+References: <20161115135106.438-1-wens@csie.org>
+Message-ID: <20161115174237.ootkbvtfumt6mqy7@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+On Tue, Nov 15, 2016 at 09:51:03PM +0800, Chen-Yu Tsai wrote:
+> Hi Maxime,
+> 
+> These are the remaining patches of my BPI-M1+ fixes series from July.
+> 
+> Changes since v1:
+> 
+>   - Split out USB PHY enable patch.
+> 
+>   - Dropped custom OPP table. Tested the A20 default one with
+>     cpufreq-ljt-stress-test and it seemed stable.
+> 
+>   - Dropped voltage range for cpu supply regulator to normal 1.0V ~ 1.4V.
+> 
+>   - Dropped pinmux setting for OTG ID pin.
 
-> This adds the GPIO names for the Raspberry Pi Zero. Since there are no
-> schematics for the RPi Zero use the same as the Model A+.
+Applied all three, thanks!
+Maxime
 
-These look good to me. I don't have a Zero schematic, but I compared to
-dt-blob.
-
-I've pulled these two to -next.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 800 bytes
+Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161115/e97dda27/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161115/a949c517/attachment.sig>
