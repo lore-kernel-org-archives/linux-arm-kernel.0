@@ -1,84 +1,121 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 15 Nov 2016 20:23:35 +0100
-Subject: [GIT PULL] Reset controller changes for v4.10
-Message-ID: <1479237815.2456.59.camel@pengutronix.de>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 16 Nov 2016 03:23:21 +0800
+Subject: [PATCH v15 01/13] clocksource/drivers/arm_arch_timer: Move enums
+ and defines to header file
+In-Reply-To: <1479215615-26950-2-git-send-email-fu.wei@linaro.org>
+Message-ID: <201611160359.fuY2etTU%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear arm-soc maintainers,
+Hi Fu,
 
-Please consider merging this tag which adds OX820 support, removes
-unused modular code and obsolete STiH41[56] support, and adds support
-for multiple devices sharing a pulsed reset, as long as their
-requirement is just being reset once, some time before use.
+[auto build test ERROR on tip/timers/core]
+[also build test ERROR on v4.9-rc5 next-20161115]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-regards
-Philipp
+url:    https://github.com/0day-ci/linux/commits/fu-wei-linaro-org/acpi-clocksource-add-GTDT-driver-and-GTDT-support-in-arm_arch_timer/20161116-004444
+config: arm-hisi_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+Note: the linux-review/fu-wei-linaro-org/acpi-clocksource-add-GTDT-driver-and-GTDT-support-in-arm_arch_timer/20161116-004444 HEAD 47004b0566d2fd65c05836078319b02c5af2a1fc builds fine.
+      It only hurts bisectibility.
 
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+All error/warnings (new ones prefixed by >>):
 
-are available in the git repository at:
+>> drivers/clocksource/arm_arch_timer.c:70:13: error: variable 'arch_timer_uses_ppi' has initializer but incomplete type
+    static enum ppi_nr arch_timer_uses_ppi = VIRT_PPI;
+                ^~~~~~
+   drivers/clocksource/arm_arch_timer.c: In function '__arch_timer_setup':
+>> drivers/clocksource/arm_arch_timer.c:358:3: error: 'arch_timer_uses_ppi' has an incomplete type 'enum ppi_nr'
+      clk->irq = arch_timer_ppi[arch_timer_uses_ppi];
+      ^~~
+   drivers/clocksource/arm_arch_timer.c:359:3: error: 'arch_timer_uses_ppi' has an incomplete type 'enum ppi_nr'
+      switch (arch_timer_uses_ppi) {
+      ^~~~~~
+   drivers/clocksource/arm_arch_timer.c: In function 'arch_timer_has_nonsecure_ppi':
+   drivers/clocksource/arm_arch_timer.c:447:2: error: 'arch_timer_uses_ppi' has an incomplete type 'enum ppi_nr'
+     return (arch_timer_uses_ppi == PHYS_SECURE_PPI &&
+     ^~~~~~
+   drivers/clocksource/arm_arch_timer.c: In function 'arch_timer_starting_cpu':
+   drivers/clocksource/arm_arch_timer.c:471:2: error: 'arch_timer_uses_ppi' has an incomplete type 'enum ppi_nr'
+     flags = check_ppi_trigger(arch_timer_ppi[arch_timer_uses_ppi]);
+     ^~~~~
+   drivers/clocksource/arm_arch_timer.c:472:2: error: 'arch_timer_uses_ppi' has an incomplete type 'enum ppi_nr'
+     enable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], flags);
+     ^~~~~~~~~~~~~~~~~
+   drivers/clocksource/arm_arch_timer.c: In function 'arch_timer_banner':
+   drivers/clocksource/arm_arch_timer.c:512:2: error: 'arch_timer_uses_ppi' has an incomplete type 'enum ppi_nr'
+     pr_info("Architected %s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
+     ^~~~~~~
+   drivers/clocksource/arm_arch_timer.c: In function 'arch_counter_register':
+   drivers/clocksource/arm_arch_timer.c:589:3: error: 'arch_timer_uses_ppi' has an incomplete type 'enum ppi_nr'
+      if (IS_ENABLED(CONFIG_ARM64) || arch_timer_uses_ppi == VIRT_PPI)
+      ^~
+   drivers/clocksource/arm_arch_timer.c: In function 'arch_timer_stop':
+   drivers/clocksource/arm_arch_timer.c:624:2: error: 'arch_timer_uses_ppi' has an incomplete type 'enum ppi_nr'
+     disable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi]);
+     ^~~~~~~~~~~~~~~~~~
+   drivers/clocksource/arm_arch_timer.c: In function 'arch_timer_register':
+   drivers/clocksource/arm_arch_timer.c:687:2: error: 'arch_timer_uses_ppi' has an incomplete type 'enum ppi_nr'
+     ppi = arch_timer_ppi[arch_timer_uses_ppi];
+     ^~~
+   drivers/clocksource/arm_arch_timer.c:688:2: error: 'arch_timer_uses_ppi' has an incomplete type 'enum ppi_nr'
+     switch (arch_timer_uses_ppi) {
+     ^~~~~~
+   drivers/clocksource/arm_arch_timer.c:737:2: error: 'arch_timer_uses_ppi' has an incomplete type 'enum ppi_nr'
+     free_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], arch_timer_evt);
+     ^~~~~~~~~~~~~~~
+   drivers/clocksource/arm_arch_timer.c: In function 'arch_timer_init':
+   drivers/clocksource/arm_arch_timer.c:838:4: error: 'arch_timer_uses_ppi' has an incomplete type 'enum ppi_nr'
+       arch_timer_uses_ppi = HYP_PPI;
+       ^~~~~~~~~~~~~~~~~~~
+   drivers/clocksource/arm_arch_timer.c:841:4: error: 'arch_timer_uses_ppi' has an incomplete type 'enum ppi_nr'
+       arch_timer_uses_ppi = PHYS_SECURE_PPI;
+       ^~~~~~~~~~~~~~~~~~~
+   drivers/clocksource/arm_arch_timer.c: In function 'arch_timer_of_init':
+   drivers/clocksource/arm_arch_timer.c:897:3: error: 'arch_timer_uses_ppi' has an incomplete type 'enum ppi_nr'
+      arch_timer_uses_ppi = PHYS_SECURE_PPI;
+      ^~~~~~~~~~~~~~~~~~~
+   drivers/clocksource/arm_arch_timer.c: At top level:
+>> drivers/clocksource/arm_arch_timer.c:70:20: error: storage size of 'arch_timer_uses_ppi' isn't known
+    static enum ppi_nr arch_timer_uses_ppi = VIRT_PPI;
+                       ^~~~~~~~~~~~~~~~~~~
+   drivers/clocksource/arm_arch_timer.c: In function 'arch_timer_has_nonsecure_ppi':
+>> drivers/clocksource/arm_arch_timer.c:449:1: warning: control reaches end of non-void function [-Wreturn-type]
+    }
+    ^
 
-  git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.10
+vim +/arch_timer_uses_ppi +70 drivers/clocksource/arm_arch_timer.c
 
-for you to fetch changes up to 7da33a37b48f11ffcb4a718f29a3d4552423fea1:
+220069945 Stephen Boyd      2013-07-18  64  
+8a4da6e36 Mark Rutland      2012-11-12  65  static u32 arch_timer_rate;
+8a4da6e36 Mark Rutland      2012-11-12  66  static int arch_timer_ppi[MAX_TIMER_PPI];
+8a4da6e36 Mark Rutland      2012-11-12  67  
+8a4da6e36 Mark Rutland      2012-11-12  68  static struct clock_event_device __percpu *arch_timer_evt;
+8a4da6e36 Mark Rutland      2012-11-12  69  
+f81f03fa2 Marc Zyngier      2014-02-20 @70  static enum ppi_nr arch_timer_uses_ppi = VIRT_PPI;
+82a561941 Lorenzo Pieralisi 2014-04-08  71  static bool arch_timer_c3stop;
+220069945 Stephen Boyd      2013-07-18  72  static bool arch_timer_mem_use_virtual;
+8a4da6e36 Mark Rutland      2012-11-12  73  
 
-  reset: allow using reset_control_reset with shared reset (2016-11-14 09:58:28 +0100)
+:::::: The code at line 70 was first introduced by commit
+:::::: f81f03fa231a8c3aacd580759e73b9238b92ba29 arm64: Allow the arch timer to use the HYP timer
 
-----------------------------------------------------------------
-Reset controller changes for v4.10
+:::::: TO: Marc Zyngier <marc.zyngier@arm.com>
+:::::: CC: Marc Zyngier <marc.zyngier@arm.com>
 
-- remove obsolete STiH41[56] platform support
-- add Oxford Semiconductor OX820 support
-- add reset index include files for OX810SE and OX820
-- make drivers with boolean Kconfig options explicitly
-  non-modular
-- allow shared pulsed resets via reset_control_reset, which
-  in this case means that the reset must have been triggered
-  once, but possibly earlier, after the function returns, and
-  is never triggered again for the lifetime of the reset
-  control
-
-----------------------------------------------------------------
-Martin Blumenstingl (1):
-      reset: allow using reset_control_reset with shared resetany 
-
-Neil Armstrong (3):
-      reset: oxnas: Add OX820 support
-      dt-bindings: reset: oxnas: Add include file with reset indexes
-      dt-bindings: reset: oxnas: Update for OX820
-
-Paul Gortmaker (5):
-      reset: berlin: make it explicitly non-modular
-      reset: socfpga: make it explicitly non-modular
-      reset: sunxi: make it explicitly non-modular
-      reset: zynq: make it explicitly non-modular
-      reset: lpc18xx: make it explicitly non-modular
-
-Peter Griffin (2):
-      reset: sti: Remove STiH415/6 reset support
-      reset: sti: softreset: Remove obsolete platforms from dt binding doc.
-
- .../devicetree/bindings/reset/oxnas,reset.txt      |  44 ++-----
- .../devicetree/bindings/reset/st,sti-softreset.txt |   8 +-
- arch/arm/mach-sti/Kconfig                          |   2 -
- drivers/reset/core.c                               |  43 ++++++-
- drivers/reset/reset-berlin.c                       |  12 +-
- drivers/reset/reset-lpc18xx.c                      |  32 +----
- drivers/reset/reset-oxnas.c                        |   1 +
- drivers/reset/reset-socfpga.c                      |  10 +-
- drivers/reset/reset-sunxi.c                        |   9 +-
- drivers/reset/reset-zynq.c                         |  10 +-
- drivers/reset/sti/Kconfig                          |   8 --
- drivers/reset/sti/Makefile                         |   2 -
- drivers/reset/sti/reset-stih415.c                  | 112 ----------------
- drivers/reset/sti/reset-stih416.c                  | 143 ---------------------
- include/dt-bindings/reset/oxsemi,ox810se.h         |  53 ++++++++
- include/dt-bindings/reset/oxsemi,ox820.h           |  53 ++++++++
- 16 files changed, 175 insertions(+), 367 deletions(-)
- delete mode 100644 drivers/reset/sti/reset-stih415.c
- delete mode 100644 drivers/reset/sti/reset-stih416.c
- create mode 100644 include/dt-bindings/reset/oxsemi,ox810se.h
- create mode 100644 include/dt-bindings/reset/oxsemi,ox820.h
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 17771 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161116/2bc04733/attachment-0001.gz>
