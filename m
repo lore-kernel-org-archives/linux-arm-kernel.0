@@ -1,79 +1,102 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 15 Nov 2016 14:26:03 +0100
-Subject: [PATCH v2 3/6] iio: adc: Add support for STM32 ADC
-In-Reply-To: <535ffb14-a92f-1556-a4cb-f2be0508289a@metafoo.de>
-References: <1478794738-28933-1-git-send-email-fabrice.gasnier@st.com>
- <1478794738-28933-4-git-send-email-fabrice.gasnier@st.com>
- <535ffb14-a92f-1556-a4cb-f2be0508289a@metafoo.de>
-Message-ID: <954472c6-2ec8-48af-de7f-b5171eee692f@st.com>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Tue, 15 Nov 2016 14:28:39 +0100
+Subject: LEDs that change brightness "itself" -- that's a trigger. Re: PM
+ regression with LED changes in next-20161109
+In-Reply-To: <aeccbb02-6e33-390c-d72d-2a580dd67ed8@redhat.com>
+References: <cb0aa3ce-ee48-66b8-510c-bd70917afec9@redhat.com>
+ <b5ae20d7-8394-7ad5-1830-13173e9105c4@gmail.com>
+ <9b476f85-d45e-deb6-335d-fc56f6d90350@redhat.com>
+ <127cdd42-6fd8-c671-60b7-3826b351577f@samsung.com>
+ <15cafbf5-d842-e184-2fd4-65f8272f505a@redhat.com>
+ <CGME20161115103141epcas2p251f2521354a8cd7b9dfcfe55bfa482f0@epcas2p2.samsung.com>
+ <20161115103133.GA22860@amd>
+ <4e392d5d-eb10-f285-517e-976a55c3e318@samsung.com> <20161115111154.GA5482@amd>
+ <128aae59-b790-42f1-7d66-81391c9330c3@redhat.com> <20161115114859.GA7018@amd>
+ <aeccbb02-6e33-390c-d72d-2a580dd67ed8@redhat.com>
+Message-ID: <9e7d5e0f-c4ca-6930-63b9-83dc28517f33@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2016 01:11 PM, Lars-Peter Clausen wrote:
-> On 11/10/2016 05:18 PM, Fabrice Gasnier wrote:
-> [...]
->> + static int stm32_adc_single_conv(struct iio_dev *indio_dev,
->> +				 const struct iio_chan_spec *chan,
->> +				 int *res)
->> +{
->> +	struct stm32_adc *adc = iio_priv(indio_dev);
->> +	long timeout;
->> +	u32 val;
->> +	u16 result;
->> +	int ret;
->> +
->> +	reinit_completion(&adc->completion);
->> +
->> +	adc->buffer = &result;
->> +
->> +	/* Program chan number in regular sequence */
->> +	val = stm32_adc_readl(adc, STM32F4_ADCX_SQR3);
->> +	val &= ~STM32F4_SQ1_MASK;
->> +	val |= chan->channel << STM32F4_SQ1_SHIFT;
->> +	stm32_adc_writel(adc, STM32F4_ADCX_SQR3, val);
->> +
->> +	/* Set regular sequence len (0 for 1 conversion) */
->> +	stm32_adc_clr_bits(adc, STM32F4_ADCX_SQR1, STM32F4_L_MASK);
->> +
->> +	/* Trigger detection disabled (conversion can be launched in SW) */
->> +	stm32_adc_clr_bits(adc, STM32F4_ADCX_CR2, STM32F4_EXTEN_MASK);
->> +
->> +	stm32_adc_conv_irq_enable(adc);
->> +
->> +	stm32_adc_start_conv(adc);
->> +
->> +	timeout = wait_for_completion_interruptible_timeout(
->> +					&adc->completion, STM32_ADC_TIMEOUT);
->> +	if (timeout == 0) {
->> +		dev_warn(&indio_dev->dev, "Conversion timed out!\n");
-> This should be dev_dbg() at most. This out of band reporting is not
-> particular useful for applications as it is impossible to match the error to
-> the action that triggered it. And you also report the error through the
-> error code, so the applications knows what is going on.
+On 11/15/2016 01:06 PM, Hans de Goede wrote:
+> Hi,
 >
->> +		ret = -ETIMEDOUT;
->> +	} else if (timeout < 0) {
->> +		dev_warn(&indio_dev->dev, "Interrupted conversion!\n");
->> +		ret = -EINTR;
-> This should just propagate the error returned by wait_for_completion...().
-> This will make sure that the right behavior occurs based on the SA_RESTART
-> policy.
-Hi Lars,
-
-Thanks for reviewing.
-I'll update this in next revision.
-
-Regards,
-Fabrice
-
+> On 15-11-16 12:48, Pavel Machek wrote:
+>> Hi!
+>>
+>>>>>> The LED you are talking about _has_ a trigger, implemented in
+>>>>>> hardware. That trigger can change LED brightness behind kernel's (and
+>>>>>> userspace's) back. Don't pretend the trigger does not exist, it does.
+>>>>>>
+>>>>>> And when you do that, you'll have nice place to report changes to
+>>>>>> userspace -- trigger can now export that information, and offer
+>>>>>> poll()
+>>>>>> interface.
+>>>>>
+>>>>> Well, that sounds interesting. It is logically justifiable.
+>>>>
+>>>> Thanks.
+>>>>
+>>>>> I initially proposed exactly this solution, with recently
+>>>>> added userspace LED being a trigger listener. It seems a bit
+>>>>> awkward though. How would you listen to the trigger events?
+>>>>
+>>>> Trigger exposes a file in sysfs, with poll() working on that file
+>>>
+>>> Hmm, a new file would give the advantage of making it easy for
+>>> userspace to see if the trigger is poll-able, this is likely
+>>> better then my own proposal I just send.
+>>
+>> Good.
+>>
+>>>> (and
+>>>> probably read exposing the current brightness).
+>>>
+>>> If we do this, can we please make it mirror brightness, iow
+>>> also make it writable, that will make it easier for userspace
+>>> to deal with it. We can simply re-use the existing show / store
+>>> methods for brightness for this.
+>>
+>> Actually, echo 0 > brightness disables the trigger, IIRC. I'd avoid
+>> that here, you want to be able to turn off the backlight but still
+>> keep the trigger (and be notified of future changes).
 >
->> +	} else {
->> +		*res = result;
->> +		ret = IIO_VAL_INT;
->> +	}
->> +
->> +	stm32_adc_stop_conv(adc);
->> +
->> +	stm32_adc_conv_irq_disable(adc);
->> +
->> +	return ret;
+> True, that is easy to do the store method will just need to call
+> led_set_brightness_nosleep instead of led_set_brightness, this
+> will skip the checks to stop blinking in led_set_brightness and
+> otherwise is equivalent.
+>
+>>> I suggest we call it:
+>>>
+>>> trigger_brightness
+>>>
+>>> And only register it when a poll-able trigger is present.
+>>
+>> I'd call it 'current_brightness', but that's no big deal. Yes, only
+>> registering it for poll-able triggers makes sense.
+>
+> current_brightness works for me. I will take a shot a patch-set
+> implementing this.
+
+Word "current" is not precise here.
+
+It can be thought of as either last brightness set by the
+user or the brightness currently written to the device
+(returned by brightness file).
+
+There is a semantic discrepancy in our requirements -
+we want the file representing both permanent brightness
+set by the user and brightness set by the hardware.
+
+The two stand in contradiction to each other since
+brightness set by the user can be adjusted by the hardware.
+
+Reading the file shouldn't update brightness property of
+struct led_classdev, so it shouldn't call led_update_brightness()
+but it still should allow reading brightness set by the
+hardware, as a result of each POLLPRI event. So in fact in
+the same time it should report both according to our requirements
+which is impossible. Do we need three brightness files ?
+
+-- 
+Best regards,
+Jacek Anaszewski
