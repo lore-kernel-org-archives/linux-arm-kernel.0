@@ -1,33 +1,80 @@
-From: weo@reccoware.de (Wolfgang Ocker)
-Date: Tue, 15 Nov 2016 12:05:29 +0100
-Subject: [PATCH] mxs-auart: count FIFO overrun errors
-Message-ID: <1479207929.4985.25.camel@reccoware.de>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Tue, 15 Nov 2016 13:10:32 +0200
+Subject: wdt, gpio: move arch_initcall into subsys_initcall ?
+In-Reply-To: <582AE18A.2060405@denx.de>
+References: <582AE18A.2060405@denx.de>
+Message-ID: <afbf394e-e411-5c43-e2b0-667b3fbc2edf@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mxs-auart driver does not count FIFO overrun errors. These errors never
-appear in /proc/tty/driver/ttyAPP. This is because the OERR status bit is
-masked by read_status_mask in the rx interrupt function, but the
-AUART_STAT_OERR bit is never set in read_status_mask. The patch enables the
-counting of overrun errors.
+Hello Heiko,
 
-Signed-off-by: Wolfgang Ocker <weo@reccoware.de>
----
-?drivers/tty/serial/mxs-auart.c | 2 +-
-?1 file changed, 1 insertion(+), 1 deletion(-)
+On 11/15/2016 12:20 PM, Heiko Schocher wrote:
+> Hello,
+>
+> commit e188cbf7564f: "gpio: mxc: shift gpio_mxc_init() to subsys_initcall level"
+> moves the gpio initialization of the mxc gpio driver
+> from the arch_initcall level into subsys_initcall level.
+>
+> This leads now on mxc boards, which use a gpio wdt driver
+> and the CONFIG_GPIO_WATCHDOG_ARCH_INITCALL option enabled,
+> to unwanted driver probe deferrals during kernel boot.
+>
+> I see this currently on an imx6 based board (which has unfortunately
+> 3 WDT: imx6 internal (disabled), gpio wdt and da9063 WDT ...).
+>
+> Also a side effect from above commit is, that the da9063 WDT driver
+> is now probed before the gpio WDT driver ... so /dev/watchdog now
+> does not point to the gpio_wdt, instead it points to the da9063 WDT.
+>
+> So there are 2 solutions possible:
+>
+> - add a CONFIG_GPIO_MCX_ARCH_INITCALL option
+>   in drivers/gpio/gpio-mxc.c like for the gpio_wdt.c driver?
 
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 770454e0dfa3..8c1c9112b3fd 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -1016,7 +1016,7 @@ static void mxs_auart_settermios(struct uart_port *u,
-?			ctrl |= AUART_LINECTRL_EPS;
-?	}
-?
--	u->read_status_mask = 0;
-+	u->read_status_mask = AUART_STAT_OERR;
-?
-?	if (termios->c_iflag & INPCK)
-?		u->read_status_mask |= AUART_STAT_PERR;
---?
-2.10.0
+in my opinion this is overly heavy solution and it might be
+better to avoid it if possible.
+
+I would rather prefer to reconsider GPIO_WATCHDOG_ARCH_INITCALL
+usage in the watchdog driver.
+
+Moreover adding this proposed GPIO_MCX_ARCH_INITCALL to call
+the driver on arch level will result in deferring the GPIO driver.
+
+>   But how can we guarantee, that first the gpio driver and then
+>   the gpio_wdt driver gets probed?
+>
+> - move the arch_initcall in gpio_wdt.c into a subsys_initcall
+>   (Tested this, and the probe dereferral messages are gone ...)
+>
+>   But this may results in problems on boards, which needs an early
+>   trigger on an gpio wdt ...
+
+The level of "earliness" can not be defined in absolute time value
+in any case, why decreasing the init level of the watchdog driver
+to subsys level can cause problems? For that there should exist
+some kind of a dependency on IC or PCB hardware level, can you
+name it please?
+
+Also please note that more than a half of all GPIO drivers settle
+on subsys or later initcall level, this means that there is
+an expected GPIO watchdog driver deferral for all of them.
+
+I propose to send two patches for review:
+
+1. remove GPIO_WATCHDOG_ARCH_INITCALL option completely and decouple
+    module_platform_driver() into arch_initcall() and module_exit()
+    unconditionally.
+
+2. change arch_initcall() in the watchdog driver to subsys_initcall().
+    This change removes probe deferrals on boot, when the driver is
+    used with the most of the GPIO controllers.
+
+> Other ideas?
+>
+> Thanks for all suggestions!
+>
+
+--
+With best wishes,
+Vladimir
