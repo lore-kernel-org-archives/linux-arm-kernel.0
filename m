@@ -1,89 +1,42 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 15 Nov 2016 19:18:19 +0530
-Subject: [PATCH v3 1/3] phy_sun4i_usb: set_mode: Allow using set_mode to
- force end the current session
-In-Reply-To: <20160923134058.26828-1-hdegoede@redhat.com>
-References: <20160923134058.26828-1-hdegoede@redhat.com>
-Message-ID: <582B1223.2090003@ti.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Tue, 15 Nov 2016 14:48:45 +0100
+Subject: [PATCH] ASoC: mioa701_wm9713: add missing white space in
+ dev_err message
+In-Reply-To: <20161112163025.4801-1-colin.king@canonical.com>
+References: <20161112163025.4801-1-colin.king@canonical.com>
+Message-ID: <20161115144845.0aafbcc9@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On Friday 23 September 2016 07:10 PM, Hans de Goede wrote:
-> The sunxi musb has a bug where sometimes it will generate a babble
-> error on device disconnect instead of a disconnect irq. When this
-> happens the musb-controller switches from host mode to device mode
-> (it clears MUSB_DEVCTL_SESSION and sets MUSB_DEVCTL_BDEVICE) and
-> gets stuck in this state.
+On Sat, 12 Nov 2016 16:30:25 +0000 Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
 > 
-> Clearing this requires reporting Vbus low for 200 or more ms, but
-> on some devices Vbus is simply always high (host-only mode, no Vbus
-> control).
+> There is a missing whitespace in the dev_err message between
+> "will" and "lead".  Add the whitespace.
 > 
-> This commit modifies sun4i_usb_phy_set_mode so that it will force
-> end the current session when called with the current mode, before this
-> commit calling set_mode with the current mode was a nop since id_det
-> would stay the same resulting in the detect_work not doing anything.
-> 
-> This allows the sunxi-musb glue to use sun4i_usb_phy_set_mode to force
-> end the current session without changing the mode, to fixup the stuck
-> state after a babble error.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-
-merged, thanks.
-
--Kishon
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
 > ---
-> Changes in v2:
-> -New patch in v2 of this series replacing the
->  "phy-sun4i-usb: Add sun4i_usb_phy_force_session_end() function"
->  from v1
-> Changes in v3:
-> -Fix dev_info so that it prints the new-mode instead of the old one
-> ---
->  drivers/phy/phy-sun4i-usb.c | 14 ++++++++++----
->  1 file changed, 10 insertions(+), 4 deletions(-)
+>  sound/soc/pxa/mioa701_wm9713.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index 43c0d98..cbd338d 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -437,25 +437,31 @@ static int sun4i_usb_phy_set_mode(struct phy *_phy, enum phy_mode mode)
->  {
->  	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
->  	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
-> +	int new_mode;
->  
->  	if (phy->index != 0)
->  		return -EINVAL;
->  
->  	switch (mode) {
->  	case PHY_MODE_USB_HOST:
-> -		data->dr_mode = USB_DR_MODE_HOST;
-> +		new_mode = USB_DR_MODE_HOST;
->  		break;
->  	case PHY_MODE_USB_DEVICE:
-> -		data->dr_mode = USB_DR_MODE_PERIPHERAL;
-> +		new_mode = USB_DR_MODE_PERIPHERAL;
->  		break;
->  	case PHY_MODE_USB_OTG:
-> -		data->dr_mode = USB_DR_MODE_OTG;
-> +		new_mode = USB_DR_MODE_OTG;
->  		break;
->  	default:
->  		return -EINVAL;
->  	}
->  
-> -	dev_info(&_phy->dev, "Changing dr_mode to %d\n", (int)data->dr_mode);
-> +	if (new_mode != data->dr_mode) {
-> +		dev_info(&_phy->dev, "Changing dr_mode to %d\n", new_mode);
-> +		data->dr_mode = new_mode;
-> +	}
-> +
-> +	data->id_det = -1; /* Force reprocessing of id */
->  	data->force_session_end = true;
->  	queue_delayed_work(system_wq, &data->detect, 0);
->  
-> 
+> diff --git a/sound/soc/pxa/mioa701_wm9713.c b/sound/soc/pxa/mioa701_wm9713.c
+> index d1661fa..0fe0abe 100644
+> --- a/sound/soc/pxa/mioa701_wm9713.c
+> +++ b/sound/soc/pxa/mioa701_wm9713.c
+> @@ -187,7 +187,7 @@ static int mioa701_wm9713_probe(struct platform_device *pdev)
+>  	mioa701.dev = &pdev->dev;
+>  	rc = devm_snd_soc_register_card(&pdev->dev, &mioa701);
+>  	if (!rc)
+> -		dev_warn(&pdev->dev, "Be warned that incorrect mixers/muxes setup will"
+> +		dev_warn(&pdev->dev, "Be warned that incorrect mixers/muxes setup will "
+>  			 "lead to overheating and possible destruction of your device."
+>  			 " Do not use without a good knowledge of mio's board design!\n");
+>
+There is already a continuation line that has a whitespace in front. It
+would be nice to be consistent and also add the missing whitespace in
+front of the succeeding line...
+
+
+Lothar Wa?mann
