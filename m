@@ -1,54 +1,45 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Tue, 15 Nov 2016 11:58:06 +0100
-Subject: LEDs that change brightness "itself" -- that's a trigger. Re: PM
- regression with LED changes in next-20161109
-In-Reply-To: <20161115103133.GA22860@amd>
-References: <f7c9b2be-0003-f342-a4c7-802532faa424@gmail.com>
- <d7ddbbb0-b99c-14a3-f462-3534b5ec67e6@redhat.com>
- <4c31faef-144d-289c-0e32-83e76aff6178@gmail.com>
- <3eb60c78-d891-27e5-6b7b-a54a5b547a1c@redhat.com>
- <c01cac8b-a921-56d1-7e57-8071d4b9faf6@gmail.com>
- <cb0aa3ce-ee48-66b8-510c-bd70917afec9@redhat.com>
- <b5ae20d7-8394-7ad5-1830-13173e9105c4@gmail.com>
- <9b476f85-d45e-deb6-335d-fc56f6d90350@redhat.com>
- <127cdd42-6fd8-c671-60b7-3826b351577f@samsung.com>
- <15cafbf5-d842-e184-2fd4-65f8272f505a@redhat.com>
- <CGME20161115103141epcas2p251f2521354a8cd7b9dfcfe55bfa482f0@epcas2p2.samsung.com>
- <20161115103133.GA22860@amd>
-Message-ID: <4e392d5d-eb10-f285-517e-976a55c3e318@samsung.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Tue, 15 Nov 2016 12:00:11 +0100
+Subject: [PATCH v2] ARM: dts: da850: add the mstpri and ddrctl nodes
+Message-ID: <1479207611-18028-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2016 11:31 AM, Pavel Machek wrote:
-> Hi!
->
->>> Hmm, v4 still calls led_notify_brightness_change(led_cdev)
->> >from both __led_set_brightness() and __led_set_brightness_blocking().
->>
->> Ugh, I see I accidentally send a v4 twice, instead of
->> calling the version which dropped those called v5 as
->> I should have, sorry.
->>
->> The v4 which I would like to see merged, the one with
->> those calls dropped, is here:
->>
->> https://patchwork.kernel.org/patch/9423093/
->
-> Please, lets fix this properly.
->
-> The LED you are talking about _has_ a trigger, implemented in
-> hardware. That trigger can change LED brightness behind kernel's (and
-> userspace's) back. Don't pretend the trigger does not exist, it does.
->
-> And when you do that, you'll have nice place to report changes to
-> userspace -- trigger can now export that information, and offer poll()
-> interface.
+Add the nodes for the MSTPRI configuration and DDR2/mDDR memory
+controller drivers to da850.dtsi.
 
-Well, that sounds interesting. It is logically justifiable.
-I initially proposed exactly this solution, with recently
-added userspace LED being a trigger listener. It seems a bit
-awkward though. How would you listen to the trigger events?
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+v1 -> v2:
+- moved the priority controller node above the cfgchip node
+- renamed added nodes to better reflect their purpose
 
+ arch/arm/boot/dts/da850.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 1bb1f6d..412eec6 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -210,6 +210,10 @@
+ 			};
+ 
+ 		};
++		prictrl: priority-controller at 14110 {
++			compatible = "ti,da850-mstpri";
++			reg = <0x14110 0x0c>;
++		};
+ 		cfgchip: chip-controller at 1417c {
+ 			compatible = "ti,da830-cfgchip", "syscon", "simple-mfd";
+ 			reg = <0x1417c 0x14>;
+@@ -451,4 +455,8 @@
+ 			  1 0 0x68000000 0x00008000>;
+ 		status = "disabled";
+ 	};
++	memctrl: memory-controller at b0000000 {
++		compatible = "ti,da850-ddr-controller";
++		reg = <0xb0000000 0xe8>;
++	};
+ };
 -- 
-Best regards,
-Jacek Anaszewski
+2.9.3
