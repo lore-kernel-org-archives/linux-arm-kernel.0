@@ -1,102 +1,35 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Tue, 15 Nov 2016 14:28:39 +0100
-Subject: LEDs that change brightness "itself" -- that's a trigger. Re: PM
- regression with LED changes in next-20161109
-In-Reply-To: <aeccbb02-6e33-390c-d72d-2a580dd67ed8@redhat.com>
-References: <cb0aa3ce-ee48-66b8-510c-bd70917afec9@redhat.com>
- <b5ae20d7-8394-7ad5-1830-13173e9105c4@gmail.com>
- <9b476f85-d45e-deb6-335d-fc56f6d90350@redhat.com>
- <127cdd42-6fd8-c671-60b7-3826b351577f@samsung.com>
- <15cafbf5-d842-e184-2fd4-65f8272f505a@redhat.com>
- <CGME20161115103141epcas2p251f2521354a8cd7b9dfcfe55bfa482f0@epcas2p2.samsung.com>
- <20161115103133.GA22860@amd>
- <4e392d5d-eb10-f285-517e-976a55c3e318@samsung.com> <20161115111154.GA5482@amd>
- <128aae59-b790-42f1-7d66-81391c9330c3@redhat.com> <20161115114859.GA7018@amd>
- <aeccbb02-6e33-390c-d72d-2a580dd67ed8@redhat.com>
-Message-ID: <9e7d5e0f-c4ca-6930-63b9-83dc28517f33@samsung.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 15 Nov 2016 14:36:33 +0100
+Subject: [PATCH] arm: spin one more cycle in timer-based delays
+Message-ID: <582B0F61.6030903@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2016 01:06 PM, Hans de Goede wrote:
-> Hi,
->
-> On 15-11-16 12:48, Pavel Machek wrote:
->> Hi!
->>
->>>>>> The LED you are talking about _has_ a trigger, implemented in
->>>>>> hardware. That trigger can change LED brightness behind kernel's (and
->>>>>> userspace's) back. Don't pretend the trigger does not exist, it does.
->>>>>>
->>>>>> And when you do that, you'll have nice place to report changes to
->>>>>> userspace -- trigger can now export that information, and offer
->>>>>> poll()
->>>>>> interface.
->>>>>
->>>>> Well, that sounds interesting. It is logically justifiable.
->>>>
->>>> Thanks.
->>>>
->>>>> I initially proposed exactly this solution, with recently
->>>>> added userspace LED being a trigger listener. It seems a bit
->>>>> awkward though. How would you listen to the trigger events?
->>>>
->>>> Trigger exposes a file in sysfs, with poll() working on that file
->>>
->>> Hmm, a new file would give the advantage of making it easy for
->>> userspace to see if the trigger is poll-able, this is likely
->>> better then my own proposal I just send.
->>
->> Good.
->>
->>>> (and
->>>> probably read exposing the current brightness).
->>>
->>> If we do this, can we please make it mirror brightness, iow
->>> also make it writable, that will make it easier for userspace
->>> to deal with it. We can simply re-use the existing show / store
->>> methods for brightness for this.
->>
->> Actually, echo 0 > brightness disables the trigger, IIRC. I'd avoid
->> that here, you want to be able to turn off the backlight but still
->> keep the trigger (and be notified of future changes).
->
-> True, that is easy to do the store method will just need to call
-> led_set_brightness_nosleep instead of led_set_brightness, this
-> will skip the checks to stop blinking in led_set_brightness and
-> otherwise is equivalent.
->
->>> I suggest we call it:
->>>
->>> trigger_brightness
->>>
->>> And only register it when a poll-able trigger is present.
->>
->> I'd call it 'current_brightness', but that's no big deal. Yes, only
->> registering it for poll-able triggers makes sense.
->
-> current_brightness works for me. I will take a shot a patch-set
-> implementing this.
+When polling a tick counter in a busy loop, one might sample the
+counter just *before* it is updated, and then again just *after*
+it is updated. In that case, while mathematically v2-v1 equals 1,
+only epsilon has really passed.
 
-Word "current" is not precise here.
+So, if a caller requests an N-cycle delay, we spin until v2-v1
+is strictly greater than N to avoid these random corner cases.
 
-It can be thought of as either last brightness set by the
-user or the brightness currently written to the device
-(returned by brightness file).
+Signed-off-by: Mason <slash.tmp@free.fr>
+---
+ arch/arm/lib/delay.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-There is a semantic discrepancy in our requirements -
-we want the file representing both permanent brightness
-set by the user and brightness set by the hardware.
-
-The two stand in contradiction to each other since
-brightness set by the user can be adjusted by the hardware.
-
-Reading the file shouldn't update brightness property of
-struct led_classdev, so it shouldn't call led_update_brightness()
-but it still should allow reading brightness set by the
-hardware, as a result of each POLLPRI event. So in fact in
-the same time it should report both according to our requirements
-which is impossible. Do we need three brightness files ?
-
+diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
+index 69aad80a3af4..3f1cd15ca102 100644
+--- a/arch/arm/lib/delay.c
++++ b/arch/arm/lib/delay.c
+@@ -60,7 +60,7 @@ static void __timer_delay(unsigned long cycles)
+ {
+ 	cycles_t start = get_cycles();
+ 
+-	while ((get_cycles() - start) < cycles)
++	while ((get_cycles() - start) <= cycles)
+ 		cpu_relax();
+ }
+ 
 -- 
-Best regards,
-Jacek Anaszewski
+2.9.0
