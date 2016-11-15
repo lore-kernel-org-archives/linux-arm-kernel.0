@@ -1,120 +1,92 @@
 From: phh@phh.me (Pierre-Hugues Husson)
-Date: Wed, 16 Nov 2016 00:21:28 +0100
-Subject: [RFCv2 PATCH 3/5] drm/bridge: dw_hdmi: add HDMI notifier support
-In-Reply-To: <1479136968-24477-4-git-send-email-hverkuil@xs4all.nl>
+Date: Wed, 16 Nov 2016 00:23:50 +0100
+Subject: [RFCv2 PATCH 2/5] drm/bridge: dw_hdmi: remove CEC engine register
+ definitions
+In-Reply-To: <1479136968-24477-3-git-send-email-hverkuil@xs4all.nl>
 References: <1479136968-24477-1-git-send-email-hverkuil@xs4all.nl>
- <1479136968-24477-4-git-send-email-hverkuil@xs4all.nl>
-Message-ID: <CAJ-oXjSzet5R9d=zJEVxg5EjjUfc1=PM5R2fjc9FgMtJFnx6Uw@mail.gmail.com>
+ <1479136968-24477-3-git-send-email-hverkuil@xs4all.nl>
+Message-ID: <CAJ-oXjS-VVkBuYh0inTGAvJbsKzvEqKYrgoSeG6UBQtW_1BEyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+Hi,
+
 
 2016-11-14 16:22 GMT+01:00 Hans Verkuil <hverkuil@xs4all.nl>:
 > From: Russell King <rmk+kernel@arm.linux.org.uk>
 >
-> Add HDMI notifiers to the HDMI bridge driver.
+> We don't need the CEC engine register definitions, so let's remove them.
 >
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > ---
->  drivers/gpu/drm/bridge/Kconfig   |  1 +
->  drivers/gpu/drm/bridge/dw-hdmi.c | 25 ++++++++++++++++++++++++-
->  2 files changed, 25 insertions(+), 1 deletion(-)
+>  drivers/gpu/drm/bridge/dw-hdmi.h | 45 ----------------------------------------
+>  1 file changed, 45 deletions(-)
 >
-> diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
-> index 10e12e7..5f4ebe9 100644
-> --- a/drivers/gpu/drm/bridge/Kconfig
-> +++ b/drivers/gpu/drm/bridge/Kconfig
-> @@ -27,6 +27,7 @@ config DRM_DUMB_VGA_DAC
->  config DRM_DW_HDMI
->         tristate
->         select DRM_KMS_HELPER
-> +       select HDMI_NOTIFIERS
+> diff --git a/drivers/gpu/drm/bridge/dw-hdmi.h b/drivers/gpu/drm/bridge/dw-hdmi.h
+> index fc9a560..26d6845 100644
+> --- a/drivers/gpu/drm/bridge/dw-hdmi.h
+> +++ b/drivers/gpu/drm/bridge/dw-hdmi.h
+> @@ -478,51 +478,6 @@
+>  #define HDMI_A_PRESETUP                         0x501A
+>  #define HDMI_A_SRM_BASE                         0x5020
 >
->  config DRM_DW_HDMI_AHB_AUDIO
->         tristate "Synopsis Designware AHB Audio interface"
-> diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
-> index ab7023e..bd02da5 100644
-> --- a/drivers/gpu/drm/bridge/dw-hdmi.c
-> +++ b/drivers/gpu/drm/bridge/dw-hdmi.c
-> @@ -16,6 +16,7 @@
->  #include <linux/err.h>
->  #include <linux/clk.h>
->  #include <linux/hdmi.h>
-> +#include <linux/hdmi-notifier.h>
->  #include <linux/mutex.h>
->  #include <linux/of_device.h>
->  #include <linux/spinlock.h>
-> @@ -114,6 +115,7 @@ struct dw_hdmi {
+> -/* CEC Engine Registers */
+> -#define HDMI_CEC_CTRL                           0x7D00
+> -#define HDMI_CEC_STAT                           0x7D01
+> -#define HDMI_CEC_MASK                           0x7D02
+I don't know if this is relevant for a submission, but the build stops
+working here because of a missing definition HDMI_CEC_MASK
+Perhaps this should be inverted with 3/5 to make bissecting easier?
+I was trying to bissect a kernel panic, and I had to fix this by hand
+> -#define HDMI_CEC_POLARITY                       0x7D03
+> -#define HDMI_CEC_INT                            0x7D04
+> -#define HDMI_CEC_ADDR_L                         0x7D05
+> -#define HDMI_CEC_ADDR_H                         0x7D06
+> -#define HDMI_CEC_TX_CNT                         0x7D07
+> -#define HDMI_CEC_RX_CNT                         0x7D08
+> -#define HDMI_CEC_TX_DATA0                       0x7D10
+> -#define HDMI_CEC_TX_DATA1                       0x7D11
+> -#define HDMI_CEC_TX_DATA2                       0x7D12
+> -#define HDMI_CEC_TX_DATA3                       0x7D13
+> -#define HDMI_CEC_TX_DATA4                       0x7D14
+> -#define HDMI_CEC_TX_DATA5                       0x7D15
+> -#define HDMI_CEC_TX_DATA6                       0x7D16
+> -#define HDMI_CEC_TX_DATA7                       0x7D17
+> -#define HDMI_CEC_TX_DATA8                       0x7D18
+> -#define HDMI_CEC_TX_DATA9                       0x7D19
+> -#define HDMI_CEC_TX_DATA10                      0x7D1a
+> -#define HDMI_CEC_TX_DATA11                      0x7D1b
+> -#define HDMI_CEC_TX_DATA12                      0x7D1c
+> -#define HDMI_CEC_TX_DATA13                      0x7D1d
+> -#define HDMI_CEC_TX_DATA14                      0x7D1e
+> -#define HDMI_CEC_TX_DATA15                      0x7D1f
+> -#define HDMI_CEC_RX_DATA0                       0x7D20
+> -#define HDMI_CEC_RX_DATA1                       0x7D21
+> -#define HDMI_CEC_RX_DATA2                       0x7D22
+> -#define HDMI_CEC_RX_DATA3                       0x7D23
+> -#define HDMI_CEC_RX_DATA4                       0x7D24
+> -#define HDMI_CEC_RX_DATA5                       0x7D25
+> -#define HDMI_CEC_RX_DATA6                       0x7D26
+> -#define HDMI_CEC_RX_DATA7                       0x7D27
+> -#define HDMI_CEC_RX_DATA8                       0x7D28
+> -#define HDMI_CEC_RX_DATA9                       0x7D29
+> -#define HDMI_CEC_RX_DATA10                      0x7D2a
+> -#define HDMI_CEC_RX_DATA11                      0x7D2b
+> -#define HDMI_CEC_RX_DATA12                      0x7D2c
+> -#define HDMI_CEC_RX_DATA13                      0x7D2d
+> -#define HDMI_CEC_RX_DATA14                      0x7D2e
+> -#define HDMI_CEC_RX_DATA15                      0x7D2f
+> -#define HDMI_CEC_LOCK                           0x7D30
+> -#define HDMI_CEC_WKUPCTRL                       0x7D31
+> -
+>  /* I2C Master Registers (E-DDC) */
+>  #define HDMI_I2CM_SLAVE                         0x7E00
+>  #define HDMI_I2CM_ADDRESS                       0x7E01
+> --
+> 2.8.1
 >
->         struct hdmi_data_info hdmi_data;
->         const struct dw_hdmi_plat_data *plat_data;
-> +       struct hdmi_notifier *n;
 >
->         int vic;
->
-> @@ -1448,9 +1450,11 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
->                 hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
->                 hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
->                 drm_mode_connector_update_edid_property(connector, edid);
-> +               hdmi_event_new_edid(hdmi->n, edid, 0);
->                 ret = drm_add_edid_modes(connector, edid);
->                 /* Store the ELD */
->                 drm_edid_to_eld(connector, edid);
-> +               hdmi_event_new_eld(hdmi->n, connector->eld);
->                 kfree(edid);
->         } else {
->                 dev_dbg(hdmi->dev, "failed to get edid\n");
-> @@ -1579,6 +1583,12 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
->                         dw_hdmi_update_phy_mask(hdmi);
->                 }
->                 mutex_unlock(&hdmi->mutex);
-> +
-> +               if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) == 0)
-> +                       hdmi_event_disconnect(hdmi->n);
-> +               else if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) ==
-> +                        (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_PHY_HPD))
-> +                       hdmi_event_connect(hdmi->n);
->         }
->
->         if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
-> @@ -1732,11 +1742,17 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
->
->         initialize_hdmi_ih_mutes(hdmi);
->
-> +       hdmi->n = hdmi_notifier_get(dev);
-> +       if (!hdmi->n) {
-> +               ret = -ENOMEM;
-> +               goto err_iahb;
-> +       }
-> +
->         ret = devm_request_threaded_irq(dev, irq, dw_hdmi_hardirq,
->                                         dw_hdmi_irq, IRQF_SHARED,
->                                         dev_name(dev), hdmi);
->         if (ret)
-> -               goto err_iahb;
-> +               goto err_hdmi_not;
->
->         /*
->          * To prevent overflows in HDMI_IH_FC_STAT2, set the clk regenerator
-> @@ -1788,6 +1804,8 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
->
->         return 0;
->
-> +err_hdmi_not:
-> +       hdmi_notifier_put(hdmi->n);
->  err_iahb:
->         clk_disable_unprepare(hdmi->iahb_clk);
->  err_isfr:
-> @@ -1804,6 +1822,11 @@ void dw_hdmi_unbind(struct device *dev, struct device *master, void *data)
->         if (hdmi->audio && !IS_ERR(hdmi->audio))
->                 platform_device_unregister(hdmi->audio);
->
-> +       hdmi_notifier_put(hdmi->n);
-> +
-> +       if (!IS_ERR(hdmi->cec))
-> +               platform_device_unregister(hdmi->cec);
-Those two lines should be in your 4/5
-> +
->         /* Disable all interrupts */
->         hdmi_writeb(hdmi, ~0, HDMI_IH_MUTE_PHY_STAT0);
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
