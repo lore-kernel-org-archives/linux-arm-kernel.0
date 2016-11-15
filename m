@@ -1,67 +1,61 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 15 Nov 2016 17:04:52 +0100
-Subject: [PATCH v4 5/5] dt-bindings: firmware: Allow child nodes inside the
- Tegra BPMP
-In-Reply-To: <20161115160452.27183-1-thierry.reding@gmail.com>
-References: <20161115160452.27183-1-thierry.reding@gmail.com>
-Message-ID: <20161115160452.27183-6-thierry.reding@gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Tue, 15 Nov 2016 16:04:31 +0000
+Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.10
+Message-ID: <582B320F.7030206@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+Hi Arnd, Hi Olof, Hi Kevin,
 
-The BPMP implements some services which must be represented by separate
-nodes. For example, it can provide access to certain I2C controllers,
-and the I2C bindings represent each I2C controller as a device tree
-node. Update the binding to describe how the BPMP supports this.
+Please help to pull the following changes.
+Thanks!
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
-[treding at nvidia.com: renamed bpmp-i2c to i2c as per Rob]
-Signed-off-by: Thierry Reding <treding@nvidia.com>
+Best Regards,
+Wei
+
 ---
- .../bindings/firmware/nvidia,tegra186-bpmp.txt     | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
-index 0d3fef423c48..e821e16ad65b 100644
---- a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
-+++ b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
-@@ -38,6 +38,24 @@ implemented by this node:
- - .../reset/reset.txt
- - <dt-bindings/reset/tegra186-reset.h>
- 
-+The BPMP implements some services which must be represented by separate nodes.
-+For example, it can provide access to certain I2C controllers, and the I2C
-+bindings represent each I2C controller as a device tree node. Such nodes should
-+be nested directly inside the main BPMP node.
-+
-+Software can determine whether a child node of the BPMP node represents a device
-+by checking for a compatible property. Any node with a compatible property
-+represents a device that can be instantiated. Nodes without a compatible
-+property may be used to provide configuration information regarding the BPMP
-+itself, although no such configuration nodes are currently defined by this
-+binding.
-+
-+The BPMP firmware defines no single global name-/numbering-space for such
-+services. Put another way, the numbering scheme for I2C buses is distinct from
-+the numbering scheme for any other service the BPMP may provide (e.g. a future
-+hypothetical SPI bus service). As such, child device nodes will have no reg
-+property, and the BPMP node will have no #address-cells or #size-cells property.
-+
- The shared memory bindings for BPMP
- -----------------------------------
- 
-@@ -82,4 +100,9 @@ bpmp {
- 	#clock-cells = <1>;
- 	#power-domain-cells = <1>;
- 	#reset-cells = <1>;
-+
-+	i2c {
-+		compatible = "...";
-+		...
-+	};
- };
--- 
-2.10.2
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+
+are available in the git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-4.10
+
+for you to fetch changes up to 85f5bd9e771349833602ccdd39b65613ecd11fd1:
+
+  arm64: dts: hisi: add refclk node to hip06 dts files for SAS (2016-11-15 10:58:41 +0000)
+
+----------------------------------------------------------------
+ARM64: DT: Hisilicon SoC DT updates for 4.10
+
+- Correct the hardware pin number of the usb node on the Hip06
+- Add the Hisilicon Hip07 D05 board dts binding
+- Add the initial dts for the Hip07 D05 board
+- Fix the warning for the node without reg propery on the Hip06
+- Fix the sas am max transmissions quirk property on the Hip06
+- Disable the sas0 and sas2 on D03 board
+- Add refclk node for SAS on the Hip06
+
+----------------------------------------------------------------
+John Garry (3):
+      arm64: dts: hisi: fix hip06 sas am-max-trans quirk
+      arm64: dts: hisi: disable sas0 and sas2 for d03
+      arm64: dts: hisi: add refclk node to hip06 dts files for SAS
+
+Kefeng Wang (4):
+      arm64: dts: hip06: Correct hardware pin number of usb node
+      Documentation: arm64: Add Hisilicon Hip07 D05 dts binding
+      arm64: dts: hisilicon: Add initial dts for Hip07 D05 board
+      arm64: dts: hip06: Fix no reg property warning
+
+ .../bindings/arm/hisilicon/hisilicon.txt           |    4 +
+ arch/arm64/boot/dts/hisilicon/Makefile             |    1 +
+ arch/arm64/boot/dts/hisilicon/hip06-d03.dts        |    8 -
+ arch/arm64/boot/dts/hisilicon/hip06.dtsi           |   23 +-
+ arch/arm64/boot/dts/hisilicon/hip07-d05.dts        |   66 ++
+ arch/arm64/boot/dts/hisilicon/hip07.dtsi           | 1059 ++++++++++++++++++++
+ 6 files changed, 1146 insertions(+), 15 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hip07-d05.dts
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hip07.dtsi
