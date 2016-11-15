@@ -1,70 +1,80 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 15 Nov 2016 11:04:55 +0100
-Subject: [PATCH] ARM: dma-mapping: preallocate DMA-debug hash tables in
- pure_initcall
-References: <CGME20161115100459eucas1p152b644d5d329192a0902c836b13f35ba@eucas1p1.samsung.com>
-Message-ID: <1479204295-29773-1-git-send-email-m.szyprowski@samsung.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 15 Nov 2016 10:07:01 +0000
+Subject: [PATCH v7 04/16] drivers: iommu: make of_iommu_set/get_ops() DT
+ agnostic
+In-Reply-To: <313844ca-d948-1297-84b2-669f3a7d57d2@arm.com>
+References: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
+ <20161109141948.19244-5-lorenzo.pieralisi@arm.com>
+ <20161111152248.GS2078@8bytes.org>
+ <552e674a-f434-f08f-8e16-a94544ce8e6e@arm.com>
+ <20161111162736.GV2078@8bytes.org>
+ <33769e3c-265f-6e89-adf9-6d35b1e03579@arm.com>
+ <20161114102654.GA1677@red-moon>
+ <41e3eff1-9ce6-bcfb-5716-c65ef38add63@arm.com>
+ <20161114155222.GZ2078@8bytes.org>
+ <313844ca-d948-1297-84b2-669f3a7d57d2@arm.com>
+Message-ID: <20161115100701.GA16261@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fs_initcall is definitely too late to initialize DMA-debug hash tables,
-because some drivers might get probed and use DMA mapping framework
-already in core_initcall. Late initialization of DMA-debug results in
-false warning about accessing memory, that was not allocated, like this
-one:
-------------[ cut here ]------------
-WARNING: CPU: 5 PID: 1 at lib/dma-debug.c:1104 check_unmap+0xa1c/0xe50
-exynos-sysmmu 10a60000.sysmmu: DMA-API: device driver tries to free DMA memory it has not allocated [device
-address=0x000000006ebd0000] [size=16384 bytes]
-Modules linked in:
-CPU: 5 PID: 1 Comm: swapper/0 Not tainted 4.9.0-rc5-00028-g39dde3d-dirty #44
-Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-[<c0119dd4>] (unwind_backtrace) from [<c01122bc>] (show_stack+0x20/0x24)
-[<c01122bc>] (show_stack) from [<c062714c>] (dump_stack+0x84/0xa0)
-[<c062714c>] (dump_stack) from [<c0132560>] (__warn+0x14c/0x180)
-[<c0132560>] (__warn) from [<c01325dc>] (warn_slowpath_fmt+0x48/0x50)
-[<c01325dc>] (warn_slowpath_fmt) from [<c06814f8>] (check_unmap+0xa1c/0xe50)
-[<c06814f8>] (check_unmap) from [<c06819c4>] (debug_dma_unmap_page+0x98/0xc8)
-[<c06819c4>] (debug_dma_unmap_page) from [<c076c3e8>] (exynos_iommu_domain_free+0x158/0x380)
-[<c076c3e8>] (exynos_iommu_domain_free) from [<c0764a30>] (iommu_domain_free+0x34/0x60)
-[<c0764a30>] (iommu_domain_free) from [<c011f168>] (release_iommu_mapping+0x30/0xb8)
-[<c011f168>] (release_iommu_mapping) from [<c011f23c>] (arm_iommu_release_mapping+0x4c/0x50)
-[<c011f23c>] (arm_iommu_release_mapping) from [<c0b061ac>] (s5p_mfc_probe+0x640/0x80c)
-[<c0b061ac>] (s5p_mfc_probe) from [<c07e6750>] (platform_drv_probe+0x70/0x148)
-[<c07e6750>] (platform_drv_probe) from [<c07e25c0>] (driver_probe_device+0x12c/0x6b0)
-[<c07e25c0>] (driver_probe_device) from [<c07e2c6c>] (__driver_attach+0x128/0x17c)
-[<c07e2c6c>] (__driver_attach) from [<c07df74c>] (bus_for_each_dev+0x88/0xc8)
-[<c07df74c>] (bus_for_each_dev) from [<c07e1b6c>] (driver_attach+0x34/0x58)
-[<c07e1b6c>] (driver_attach) from [<c07e1350>] (bus_add_driver+0x18c/0x32c)
-[<c07e1350>] (bus_add_driver) from [<c07e4198>] (driver_register+0x98/0x148)
-[<c07e4198>] (driver_register) from [<c07e5cb0>] (__platform_driver_register+0x58/0x74)
-[<c07e5cb0>] (__platform_driver_register) from [<c174cb30>] (s5p_mfc_driver_init+0x1c/0x20)
-[<c174cb30>] (s5p_mfc_driver_init) from [<c0102690>] (do_one_initcall+0x64/0x258)
-[<c0102690>] (do_one_initcall) from [<c17014c0>] (kernel_init_freeable+0x3d0/0x4d0)
-[<c17014c0>] (kernel_init_freeable) from [<c116eeb4>] (kernel_init+0x18/0x134)
-[<c116eeb4>] (kernel_init) from [<c010bbd8>] (ret_from_fork+0x14/0x3c)
----[ end trace dc54c54bd3581296 ]---
+On Mon, Nov 14, 2016 at 06:25:16PM +0000, Robin Murphy wrote:
+> On 14/11/16 15:52, Joerg Roedel wrote:
+> > On Mon, Nov 14, 2016 at 12:00:47PM +0000, Robin Murphy wrote:
+> >> If we've already made the decision to move away from bus ops, I don't
+> >> see that it makes sense to deliberately introduce new dependencies on
+> >> them. Besides, as it stands, this patch literally implements "tell the
+> >> iommu-core which hardware-iommus exist in the system and a seperate
+> >> iommu_ops ptr for each of them" straight off.
+> > 
+> > Not sure which code you are looking at, but as I see it we have only
+> > per-device iommu-ops now (with this patch). That is different from
+> > having core-visible hardware-iommu instances where devices could link
+> > to.
+> 
+> The per-device IOMMU ops are already there since 57f98d2f61e1. This
+> patch generalises the other end, moving the "registering an IOMMU
+> instance" (i.e. iommu_fwentry) bit into the IOMMU core, from being
+> OF-specific. I'd be perfectly happy if we rename iommu_fwentry to
+> iommu_instance, fwnode_iommu_set_ops() to iommu_register_instance(), and
+> such if that makes the design intent clearer.
 
-This patch moves initialization of DMA-debug to pure_initcall.
+I second that and I need to know what to do with this patch sooner
+rather than later so it is time we make a decision please.
 
-Reported-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/mm/dma-mapping.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Joerg, what's your opinion ?
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index ab4f745..d1abbcf 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1167,7 +1167,7 @@ static int __init dma_debug_do_init(void)
- 	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
- 	return 0;
- }
--fs_initcall(dma_debug_do_init);
-+pure_initcall(dma_debug_do_init);
- 
- #ifdef CONFIG_ARM_DMA_USE_IOMMU
- 
--- 
-1.9.1
+Thanks,
+Lorenzo
+
+> If you'd also prefer to replace iommu_fwspec::ops with an opaque
+> iommu_fwspec::iommu_instance pointer so that things are a bit more
+> centralised (and users are forced to go through the API rather then call
+> ops directly), I'd have no major objection either. My main point is that
+> we've been deliberately putting the relevant building blocks in place -
+> the of_iommu_{get,set}_ops stuff was designed from the start to
+> accommodate per-instance ops, via the ops pointer *being* the instance
+> token; the iommu_fwspec stuff is deliberately intended to provide
+> per-device ops on top of that. The raw functionality is either there in
+> iommu.c already, or moving there in patches already written, so if it
+> doesn't look right all we need to focus on is making it look right.
+> 
+> > Also the rest of iommu-core code still makes use of the per-bus ops. The
+> > per-device ops are only used for the of_xlate fn-ptr.
+> 
+> Hence my aforementioned patches intended for 4.10, directly following on
+> from introducing iommu_fwspec in 4.9:
+> 
+> http://www.mail-archive.com/iommu at lists.linux-foundation.org/msg14576.html
+> 
+> ...the purpose being to provide a smooth transition from per-bus ops to
+> per-device, per-instance ops. Apply those and we're 90% of the way there
+> for OF-based IOMMU drivers (not that any of those actually need
+> per-instance ops, admittedly; I did prototype it for the ARM SMMU ages
+> ago, but it didn't seem worth the bother). Lorenzo's series broadens the
+> scope to ACPI-based systems and moves the generically-useful parts into
+> the core where we can easily build on them further if necessary. The
+> major remaining work is to convert external callers of the current
+> bus-dependent functions like iommu_domain_alloc(), iommu_present(), etc.
+> to device-based alternatives.
+> 
+> Robin.
