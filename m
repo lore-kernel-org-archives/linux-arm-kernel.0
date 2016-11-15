@@ -1,43 +1,59 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 15 Nov 2016 10:23:42 -0500
-Subject: [PATCH V7 1/3] tracing: add a possibility of exporting function
- trace to other places instead of ring buffer only
-In-Reply-To: <CAG2=9p-2ZU3Zk0musHcwAEk4nM6RR0U7JhgyjZ+zjLaVLwz1ig@mail.gmail.com>
-References: <1476778140-10319-1-git-send-email-zhang.chunyan@linaro.org>
- <1476778140-10319-2-git-send-email-zhang.chunyan@linaro.org>
- <20161018114418.3445c390@gandalf.local.home>
- <CAG2=9p_SKF4TAbbqF6L4u=y9-_m73vZJ3tOAbRKHCT0MOsLwGQ@mail.gmail.com>
- <20161114105926.7bc7844b@gandalf.local.home>
- <CAG2=9p-2ZU3Zk0musHcwAEk4nM6RR0U7JhgyjZ+zjLaVLwz1ig@mail.gmail.com>
-Message-ID: <20161115102342.7ad27130@gandalf.local.home>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Tue, 15 Nov 2016 16:30:55 +0100
+Subject: [PATCH v3 0/6] Add support for STM32 ADC
+Message-ID: <1479223861-21747-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Nov 2016 16:14:29 +0800
-Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
+This series adds support for STM32F4 ADC into IIO framework.
+STM32F4 ADC is a 12-bit successive approximation analog-to-digital
+converter with multiplexed input channels. Conversions can
+be performed in single, continuous, scan or discontinuous mode.
+Conversions can be launched in software or using hardware triggers.
 
->
-> > Then why have a
-> >
-> >         if (export->write)
-> >
-> >
-> > Is there every going to be a case where export will not have a write
-> > function?  
-> 
-> There shouldn't be.
-> 
-> I can move this if statement to the register_ftrace_export() to ensure
-> users won't wrongly use it, that's saying the write() of trace_export
-> has been set before being registered to 'ftrace_exports_list'.
-> 
+This driver has been developed and tested on STM32F429 eval board.
+It consist of a core driver, to manage common resources shared
+between up to 3 ADC instances and an ADC driver to manage each adc
+instance.
 
-Looks like it's already there:
+Changes in v3:
+- Core driver moved to iio/adc.
+- Build fix.
+- Updates following Jonathan's and Lars's remarks.
+- Binding: adc child clock is mandatory.
 
-+int register_ftrace_export(struct trace_export *export)
-+{
-+	if (WARN_ON_ONCE(!export->write))
-+		return -1;
+Changes in v2:
+- Replace single driver model by MFD approach, to handle up to 3 ADCs
+  as separate devices. Each ADC device then registers a unique IIO
+  device.
+- Make driver as simple as possible for the first instance, to ease
+  review. For now, I dropped complexity by removing injected support,
+  triggered buffer mode, dmas.
+- Removed abstraction layer (indirection routines, ops) as only stm32f4
+  is supported.
 
+Fabrice Gasnier (6):
+  Documentation: dt-bindings: Document STM32 ADC DT bindings
+  iio: adc: Add support for STM32 ADC core
+  iio: adc: Add support for STM32 ADC
+  ARM: configs: stm32: enable ADC driver
+  ARM: dts: stm32f429: Add adc support
+  ARM: dts: stm32f429: enable adc on eval board
 
--- Steve
+ .../devicetree/bindings/iio/adc/st,stm32-adc.txt   |  83 ++++
+ arch/arm/boot/dts/stm32429i-eval.dts               |  25 +
+ arch/arm/boot/dts/stm32f429.dtsi                   |  49 ++
+ arch/arm/configs/stm32_defconfig                   |   3 +
+ drivers/iio/adc/Kconfig                            |  23 +
+ drivers/iio/adc/Makefile                           |   2 +
+ drivers/iio/adc/stm32-adc-core.c                   | 303 ++++++++++++
+ drivers/iio/adc/stm32-adc-core.h                   |  52 +++
+ drivers/iio/adc/stm32-adc.c                        | 518 +++++++++++++++++++++
+ 9 files changed, 1058 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+ create mode 100644 drivers/iio/adc/stm32-adc-core.c
+ create mode 100644 drivers/iio/adc/stm32-adc-core.h
+ create mode 100644 drivers/iio/adc/stm32-adc.c
+
+-- 
+1.9.1
