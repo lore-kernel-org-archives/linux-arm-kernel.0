@@ -1,89 +1,66 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 15 Nov 2016 22:26:15 +0100
-Subject: [GIT PULL] Allwinner clock changes for 4.10
-Message-ID: <20161115212615.lm3guceyfmdjnhfp@lukather>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Tue, 15 Nov 2016 13:27:14 -0800
+Subject: [PATCH v2] staging: vc04_services: rework ioctl code path
+In-Reply-To: <20161115095520.GA18059@kroah.com>
+References: <20161111061531.23507-1-mzoran@crowfest.net>
+ <20161115095520.GA18059@kroah.com>
+Message-ID: <1479245234.28223.1.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Stephen,
+On Tue, 2016-11-15 at 10:55 +0100, Greg KH wrote:
+> On Thu, Nov 10, 2016 at 10:15:31PM -0800, Michael Zoran wrote:
+> > VCHIQ/vc04_services has a userland device interface
+> > that includes ioctls. The current ioctl implementation
+> > is a single monolithic function over 1,000+ lines
+> > that handles 17 different ioctls through a complex
+> > maze of switch and if statements.
+> > 
+> > The change reimplements that code path by breaking
+> > up the code into smaller, easier to maintain functions
+> > and uses a dispatch table to invoke the correct function.
+> > 
+> > Testing:
+> > 
+> > 1. vchiq_test -f 10 and vchiq_test -p 1 were run from a native
+> > 64-bit OS(debian sid).
+> > 
+> > 2. vchiq_test -f 10 and vchiq_test -p 1 where run from a 32-bit
+> > chroot install from the same OS.
+> > 
+> > Both test cases pass.
+> > 
+> > This is V2 of this patch.??Changes include:
+> > 
+> > 1. More code has been moved to the dispatch routine.
+> > The dispatch routine is now responsible for copying the top-level
+> > data into and out of kernel space by using the data encoded in
+> > the ioctl command number.
+> > 
+> > 2. The number of parameters have been reduced for the handling
+> > functions by giving a different prototype to ioctls that pass
+> > no arguments.
+> > 
+> > 3. Macros in linux/compat.h are now used for compatibility data
+> > structures.
+> > 
+> > Signed-off-by: Michael Zoran <mzoran@crowfest.net>
+> > ---
+> > ?.../vc04_services/interface/vchiq_arm/vchiq_arm.c??| 1733
+> > +++++++++++++-------
+> > ?.../interface/vchiq_arm/vchiq_ioctl.h??????????????|???96 ++
+> > ?2 files changed, 1200 insertions(+), 629 deletions(-)
+> 
+> This is a rough patch to review, can you break this up into a patch
+> series that moves each ioctl to a separate function as needed?
+> 
+> thanks,
+> 
+> greg k-h
 
-Please pull the following patches for the next merge window.
+I'll see what I can do, but since this is getting closer to the
+holidays I'm planing to spend less time on this. Perhaps someone else
+may be interested in cleaning up the ioctl path?
 
-Thanks!
-Maxime
-
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git sunxi-clk-for-4.10
-
-for you to fetch changes up to 0f6f9302b819ca352cfd4f42c18ec08d521f9cae:
-
-  clk: sunxi-ng: sun8i-h3: Set CLK_SET_RATE_PARENT for audio module clocks (2016-11-11 21:47:41 +0100)
-
-----------------------------------------------------------------
-Allwinner clock changes for 4.10
-
-The usual patches from us, but most notably the introduction of the A64
-clocks unit.
-
-----------------------------------------------------------------
-Chen-Yu Tsai (2):
-      clk: sunxi-ng: sun8i-a23: Set CLK_SET_RATE_PARENT for audio module clocks
-      clk: sunxi-ng: sun8i-h3: Set CLK_SET_RATE_PARENT for audio module clocks
-
-Julia Lawall (1):
-      clk: sunxi: mod0: improve function-level documentation
-
-Maxime Ripard (6):
-      clk: sunxi-ng: Rename the internal structures
-      clk: sunxi-ng: Remove the use of rational computations
-      clk: sunxi-ng: Finish to convert to structures for arguments
-      clk: sunxi-ng: Add minimums for all the relevant structures and clocks
-      clk: sunxi-ng: Implement minimum for multipliers
-      clk: sunxi-ng: Add A64 clocks
-
- .../devicetree/bindings/clock/sunxi-ccu.txt        |   1 +
- drivers/clk/sunxi-ng/Kconfig                       |  14 +-
- drivers/clk/sunxi-ng/Makefile                      |   1 +
- drivers/clk/sunxi-ng/ccu-sun50i-a64.c              | 915 +++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu-sun50i-a64.h              |  72 ++
- drivers/clk/sunxi-ng/ccu-sun8i-a23.c               |   6 +-
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c                |  10 +-
- drivers/clk/sunxi-ng/ccu_div.h                     |   6 +-
- drivers/clk/sunxi-ng/ccu_frac.c                    |  12 +-
- drivers/clk/sunxi-ng/ccu_frac.h                    |  14 +-
- drivers/clk/sunxi-ng/ccu_mp.h                      |   4 +-
- drivers/clk/sunxi-ng/ccu_mult.c                    |  33 +-
- drivers/clk/sunxi-ng/ccu_mult.h                    |  17 +-
- drivers/clk/sunxi-ng/ccu_nk.c                      |  43 +-
- drivers/clk/sunxi-ng/ccu_nk.h                      |   4 +-
- drivers/clk/sunxi-ng/ccu_nkm.c                     |  45 +-
- drivers/clk/sunxi-ng/ccu_nkm.h                     |   6 +-
- drivers/clk/sunxi-ng/ccu_nkmp.c                    |  55 +-
- drivers/clk/sunxi-ng/ccu_nkmp.h                    |   8 +-
- drivers/clk/sunxi-ng/ccu_nm.c                      |  58 +-
- drivers/clk/sunxi-ng/ccu_nm.h                      |   6 +-
- drivers/clk/sunxi/clk-mod0.c                       |   2 +-
- include/dt-bindings/clock/sun50i-a64-ccu.h         | 134 +++
- include/dt-bindings/reset/sun50i-a64-ccu.h         |  98 +++
- 24 files changed, 1434 insertions(+), 130 deletions(-)
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-a64.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-a64.h
- create mode 100644 include/dt-bindings/clock/sun50i-a64-ccu.h
- create mode 100644 include/dt-bindings/reset/sun50i-a64-ccu.h
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161115/2e76f92b/attachment-0001.sig>
+Since the old code uses obsolete kernel features, it's going to take
+some work to fix without adding any checkpatch.pl warnings.
