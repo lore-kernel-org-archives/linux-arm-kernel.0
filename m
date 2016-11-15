@@ -1,62 +1,52 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 15 Nov 2016 22:13:33 +0100
-Subject: [GIT PULL] Allwinner arm64 DT changes for 4.9
-Message-ID: <20161115211333.oqvxfjxxudfkdq7j@lukather>
+From: b-liu@ti.com (Bin Liu)
+Date: Tue, 15 Nov 2016 15:14:06 -0600
+Subject: [PATCH v3 2/3] musb: sunxi: Remove custom babble handling
+In-Reply-To: <20160923134058.26828-2-hdegoede@redhat.com>
+References: <20160923134058.26828-1-hdegoede@redhat.com>
+ <20160923134058.26828-2-hdegoede@redhat.com>
+Message-ID: <20161115211406.GE11011@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Fri, Sep 23, 2016 at 04:40:57PM +0300, Hans de Goede wrote:
+> The musb core already handles babble interrupts, so the sunxi glue
+> having its own custom handling is redundant.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Here are our changes for arm64 DT for the next merge window.
+Applied. Thanks.
+-Bin.
 
-Thanks!
-Maxime
-
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt64-for-4.10
-
-for you to fetch changes up to 4e3886081848b7ea16452a92c4324acaab644d49:
-
-  arm64: dts: add Pine64 support (2016-11-03 09:08:24 +0100)
-
-----------------------------------------------------------------
-Allwinner arm64 DT changes for 4.10
-
-Support for the Allwinner A64, their first armv8 SoC.
-
-----------------------------------------------------------------
-Andre Przywara (3):
-      arm64: dts: add Allwinner A64 SoC .dtsi
-      Documentation: devicetree: add vendor prefix for Pine64
-      arm64: dts: add Pine64 support
-
- Documentation/devicetree/bindings/arm/sunxi.txt    |   1 +
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- MAINTAINERS                                        |   1 +
- arch/arm64/boot/dts/Makefile                       |   1 +
- arch/arm64/boot/dts/allwinner/Makefile             |   5 +
- .../boot/dts/allwinner/sun50i-a64-pine64-plus.dts  |  50 ++++
- .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts |  74 ++++++
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 263 +++++++++++++++++++++
- 8 files changed, 396 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/Makefile
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161115/0327c43c/attachment.sig>
+> ---
+> Changes in v2:
+> -This is a new patch in v2 of this patch series
+> Changes in v3:
+> -Improve commit msg
+> ---
+>  drivers/usb/musb/sunxi.c | 10 ----------
+>  1 file changed, 10 deletions(-)
+> 
+> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+> index 1408245..82eba92 100644
+> --- a/drivers/usb/musb/sunxi.c
+> +++ b/drivers/usb/musb/sunxi.c
+> @@ -186,16 +186,6 @@ static irqreturn_t sunxi_musb_interrupt(int irq, void *__hci)
+>  	if (musb->int_usb)
+>  		writeb(musb->int_usb, musb->mregs + SUNXI_MUSB_INTRUSB);
+>  
+> -	/*
+> -	 * sunxi musb often signals babble on low / full speed device
+> -	 * disconnect, without ever raising MUSB_INTR_DISCONNECT, since
+> -	 * normally babble never happens treat it as disconnect.
+> -	 */
+> -	if ((musb->int_usb & MUSB_INTR_BABBLE) && is_host_active(musb)) {
+> -		musb->int_usb &= ~MUSB_INTR_BABBLE;
+> -		musb->int_usb |= MUSB_INTR_DISCONNECT;
+> -	}
+> -
+>  	if ((musb->int_usb & MUSB_INTR_RESET) && !is_host_active(musb)) {
+>  		/* ep0 FADDR must be 0 when (re)entering peripheral mode */
+>  		musb_ep_select(musb->mregs, 0);
+> -- 
+> 2.9.3
+> 
