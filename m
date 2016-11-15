@@ -1,276 +1,226 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 15 Nov 2016 12:36:12 +0000
-Subject: [PATCH v2] arm64: SMMU-v2: Workaround for Cavium ThunderX erratum
- 28168
-In-Reply-To: <0414d797-7134-8192-d373-b14b26edd023@arm.com>
-References: <1479193220-6693-1-git-send-email-gakula@caviumnetworks.com>
- <0414d797-7134-8192-d373-b14b26edd023@arm.com>
-Message-ID: <bef0dde3-9bef-0dbc-8c61-8ad0dc74c2a7@arm.com>
+From: sriram.dash@nxp.com (Sriram Dash)
+Date: Tue, 15 Nov 2016 12:39:26 +0000
+Subject: [upstream-release] [PATCH 1/2] drivers: usb: phy: Add qoriq usb
+ 3.0	phy driver support
+In-Reply-To: <DB5PR0401MB1928CA058CC01243457F124791BC0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
+References: <1479101215-26954-1-git-send-email-sriram.dash@nxp.com>
+ <1479101215-26954-2-git-send-email-sriram.dash@nxp.com>
+ <DB5PR0401MB1928CA058CC01243457F124791BC0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
+Message-ID: <DB5PR0401MB1925FB1FE45C15B0671E46D1F5BF0@DB5PR0401MB1925.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/11/16 09:26, Marc Zyngier wrote:
-> On 15/11/16 07:00, Geetha sowjanya wrote:
->> From: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
->>
->>   This patch implements Cavium ThunderX erratum 28168.
->>
->>   PCI requires stores complete in order. Due to erratum #28168
->>   PCI-inbound MSI-X store to the interrupt controller are delivered
->>   to the interrupt controller before older PCI-inbound memory stores
->>   are committed.
->>   Doing a sync on SMMU will make sure all prior data transfers are
->>   completed before invoking ISR.
->>
->> Signed-off-by: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
->> Signed-off-by: Geetha sowjanya <gakula@caviumnetworks.com>
->> ---
->>  arch/arm64/Kconfig                  |   11 +++++++++++
->>  arch/arm64/Kconfig.platforms        |    1 +
->>  arch/arm64/include/asm/cpufeature.h |    3 ++-
->>  arch/arm64/kernel/cpu_errata.c      |   16 ++++++++++++++++
->>  drivers/iommu/arm-smmu.c            |   24 ++++++++++++++++++++++++
->>  drivers/irqchip/irq-gic-common.h    |    1 +
->>  drivers/irqchip/irq-gic-v3.c        |   19 +++++++++++++++++++
->>  7 files changed, 74 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 30398db..751972c 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -474,6 +474,17 @@ config CAVIUM_ERRATUM_27456
->>  
->>  	  If unsure, say Y.
->>  
->> +config CAVIUM_ERRATUM_28168
->> +       bool "Cavium erratum 28168: Make sure DMA data transfer is done before MSIX"
->> +       depends on ARCH_THUNDER && ARM64
->> +       default y
->> +       help
->> +        Due to erratum #28168 PCI-inbound MSI-X store to the interrupt
->> +        controller are delivered to the interrupt controller before older
->> +        PCI-inbound memory stores are committed. Doing a sync on SMMU
->> +        will make sure all prior data transfers are done before invoking ISR.
+>From: Scott Wood
+>On 11/13/2016 11:27 PM, Sriram Dash wrote:
+>> diff --git a/Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
+>> b/Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
+>> new file mode 100644
+>> index 0000000..d934c80
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
+>> @@ -0,0 +1,36 @@
+>> +Driver for Freescale USB 3.0 PHY
 >> +
->> +        If unsure, say Y.
-> 
-> Where is the entry in Documentation/arm64/silicon-errata.txt?
-> 
->>  endmenu
->>  
->>  
->> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
->> index cfbdf02..2ac4ac6 100644
->> --- a/arch/arm64/Kconfig.platforms
->> +++ b/arch/arm64/Kconfig.platforms
->> @@ -185,6 +185,7 @@ config ARCH_SPRD
->>  
->>  config ARCH_THUNDER
->>  	bool "Cavium Inc. Thunder SoC Family"
->> +	select IRQ_PREFLOW_FASTEOI
->>  	help
->>  	  This enables support for Cavium's Thunder Family of SoCs.
->>  
->> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
->> index 758d74f..821fc3c 100644
->> --- a/arch/arm64/include/asm/cpufeature.h
->> +++ b/arch/arm64/include/asm/cpufeature.h
->> @@ -40,8 +40,9 @@
->>  #define ARM64_HAS_32BIT_EL0			13
->>  #define ARM64_HYP_OFFSET_LOW			14
->>  #define ARM64_MISMATCHED_CACHE_LINE_SIZE	15
->> +#define ARM64_WORKAROUND_CAVIUM_28168		16
->>  
->> -#define ARM64_NCAPS				16
->> +#define ARM64_NCAPS				17
->>  
->>  #ifndef __ASSEMBLY__
->>  
->> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
->> index 0150394..0841a12 100644
->> --- a/arch/arm64/kernel/cpu_errata.c
->> +++ b/arch/arm64/kernel/cpu_errata.c
->> @@ -122,6 +122,22 @@ static void cpu_enable_trap_ctr_access(void *__unused)
->>  		MIDR_RANGE(MIDR_THUNDERX_81XX, 0x00, 0x00),
->>  	},
->>  #endif
->> +#ifdef CONFIG_CAVIUM_ERRATUM_28168
->> +	{
->> +	/* Cavium ThunderX, T88 pass 1.x - 2.1 */
->> +		.desc = "Cavium erratum 28168",
->> +		.capability = ARM64_WORKAROUND_CAVIUM_28168,
->> +		MIDR_RANGE(MIDR_THUNDERX, 0x00,
->> +			   (1 << MIDR_VARIANT_SHIFT) | 1),
->> +	},
->> +	{
->> +	/* Cavium ThunderX, T81 pass 1.0 */
->> +		.desc = "Cavium erratum 28168",
->> +		.capability = ARM64_WORKAROUND_CAVIUM_28168,
->> +		MIDR_RANGE(MIDR_THUNDERX_81XX, 0x00, 0x00),
->> +	},
->> +#endif
-> 
-> How is that a CPU bug? Shouldn't that be keyed on the SMMU version or
-> the ITs version?
-
-Seconded. I assume the actual component at fault is the PCI RC, SMMU, or
-interconnect in between - are there no ID registers in those parts that
-will indicate a fixed version (or ECO) in future?
-
+>> +Required properties:
 >> +
->>  	{
->>  		.desc = "Mismatched cache line size",
->>  		.capability = ARM64_MISMATCHED_CACHE_LINE_SIZE,
->> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> index c841eb7..1b4555c 100644
->> --- a/drivers/iommu/arm-smmu.c
->> +++ b/drivers/iommu/arm-smmu.c
->> @@ -570,6 +570,30 @@ static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
->>  	}
->>  }
->>  
+>> +- compatible :	fsl,qoriq-usb3-phy
+>
+
+Hi Scott,
+
+>This is a very vague compatible.  Are there versioning registers within this register
+>block?
+>
+
+There are versioning registers for the phy (1.0 and 1.1). But the current erratum
+A008751 does not require the mentioning of the version numbers. Was planning
+to take care of the versioning when there is code diversity on the basis of the
+version number.
+Shall I include the versioning in the documentation now for 1.0 and 1.1?
+
+>> +/* Parameter control */
+>> +#define USB3PRM1CR		0x000
+>> +#define USB3PRM1CR_VAL		0x27672b2a
+>> +
 >> +/*
->> + * Cavium ThunderX erratum 28168
->> + *
->> + * Due to erratum #28168 PCI-inbound MSI-X store to the interrupt
->> + * controller are delivered to the interrupt controller before older
->> + * PCI-inbound memory stores are committed. Doing a sync on SMMU
->> + * will make sure all prior data transfers are completed before
->> + * invoking ISR.
->> + *
->> + */
->> +void cavium_arm_smmu_tlb_sync(struct device *dev)
->> +{
->> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
->> +	struct arm_smmu_device *smmu;
+>> + * struct qoriq_usb3_phy - driver data for USB 3.0 PHY
+>> + * @dev: pointer to device instance of this platform device
+>> + * @param_ctrl: usb3 phy parameter control register base
+>> + * @phy_base: usb3 phy register memory base
+>> + * @has_erratum_flag: keeps track of erratum applicable on device  */
+>> +struct qoriq_usb3_phy {
+>> +	struct device *dev;
+>> +	void __iomem *param_ctrl;
+>> +	void __iomem *phy_base;
+>> +	u32 has_erratum_flag;
+>> +};
 >> +
->> +	smmu = fwspec_smmu(fwspec);
->> +	if (!smmu)
->> +		return;
->> +	__arm_smmu_tlb_sync(smmu);
-
-Further to my questions on the last posting, is TLBGSYNC alone
-guaranteed to always do something, even if there are no outstanding
-invalidation requests? Will this workaround still apply if
-__arm_smmu_tlb_sync() were to use CBn_TLBSYNC instead?
-
->> +
->> +}
->> +EXPORT_SYMBOL(cavium_arm_smmu_tlb_sync);
-> 
-> Why does this need to be exported? The only user can only be built-in.
-> 
->> +
->> +
->>  static void arm_smmu_tlb_sync(void *cookie)
->>  {
->>  	struct arm_smmu_domain *smmu_domain = cookie;
->> diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
->> index 205e5fd..4e88f55 100644
->> --- a/drivers/irqchip/irq-gic-common.h
->> +++ b/drivers/irqchip/irq-gic-common.h
->> @@ -38,4 +38,5 @@ void gic_enable_quirks(u32 iidr, const struct gic_quirk *quirks,
->>  
->>  void gic_set_kvm_info(const struct gic_kvm_info *info);
->>  
->> +void cavium_arm_smmu_tlb_sync(struct device *dev);
-> 
-> Why should this be visible to GICv2 as well? I have the ugly feeling
-> this should stay private to the SMMU code and that a more standard
-> mechanism should be used... Robin, is there anything else we could
-> piggy-back on?
-
-I'm not sure it's actually any less horrible, but technically, one
-*could* externally force a sync like so:
-
-struct iommu_domain *dom = iommu_get_domain_for_dev(dev);
-iommu_map(dom, <some reserved IOVA>, <some safe PA>, PAGE_SIZE, IOMMU_READ;
-iommu_unmap(dom, <IOVA>, PAGE_SIZE);
-
-(needs also to be error-safe and race-safe, obviously)
-
-although there's rather a lot of extra overhead involved, and it also
-relies on the driver not doing any Intel-style lazy unmapping.
-
-The other 'generic' way which comes to mind would be some magic domain
-attribute which has a sync side-effect on read (or write), but that's
-utterly vile. And I'm not even going to entertain the thought of having
-the SMMU driver implement a fake irqchip stacked on top of the ITS for
-the sake of keeping all the code in one place...
-
->>  #endif /* _IRQ_GIC_COMMON_H */
->> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->> index 19d642e..723cebe 100644
->> --- a/drivers/irqchip/irq-gic-v3.c
->> +++ b/drivers/irqchip/irq-gic-v3.c
->> @@ -28,6 +28,8 @@
->>  #include <linux/of_irq.h>
->>  #include <linux/percpu.h>
->>  #include <linux/slab.h>
->> +#include <linux/msi.h>
->> +#include <linux/pci.h>
->>  
->>  #include <linux/irqchip.h>
->>  #include <linux/irqchip/arm-gic-common.h>
->> @@ -736,6 +738,20 @@ static inline void gic_cpu_pm_init(void) { }
->>  
->>  #define GIC_ID_NR		(1U << gic_data.rdists.id_bits)
->>  
->> +/*
->> + * Due to #28168 erratum in ThunderX,
->> + * we need to make sure DMA data transfer is done before MSIX.
->> + */
->> +static void cavium_irq_perflow_handler(struct irq_data *data)
-
-perflow?
-
->> +{
->> +	struct pci_dev *pdev;
->> +
->> +	pdev = msi_desc_to_pci_dev(irq_data_get_msi_desc(data));
-> 
-> What happens if this is not a PCI device?
-> 
->> +	if ((pdev->vendor != 0x177d) &&
->> +			((pdev->device & 0xA000) != 0xA000))
->> +		cavium_arm_smmu_tlb_sync(&pdev->dev);
-> 
-> I've asked that before. What makes Cavium devices so special that they
-> are not sensitive to this bug?
-> 
+>> +static inline u32 qoriq_usb3_phy_readl(void __iomem *addr, u32
+>> +offset) {
+>> +	return __raw_readl(addr + offset);
 >> +}
 >> +
->>  static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
->>  			      irq_hw_number_t hw)
->>  {
->> @@ -773,6 +789,9 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
->>  			return -EPERM;
->>  		irq_domain_set_info(d, irq, hw, chip, d->host_data,
->>  				    handle_fasteoi_irq, NULL, NULL);
->> +		if (cpus_have_cap(ARM64_WORKAROUND_CAVIUM_28168))
->> +			__irq_set_preflow_handler(irq,
->> +						  cavium_irq_perflow_handler);
-> 
-> What happens if SMMUv2 is not compiled in?
+>> +static inline void qoriq_usb3_phy_writel(void __iomem *addr, u32 offset,
+>> +	u32 data)
+>> +{
+>> +	__raw_writel(data, addr + offset);
+>> +}
+>
+>Why raw?  Besides missing barriers, this will cause the accesses to be native-endian
+>which is not correct.
+>
 
-drivers/built-in.o: In function `cavium_irq_perflow_handler':
-/work/src/linux/drivers/irqchip/irq-gic-v3.c:752: undefined reference to
-`cavium_arm_smmu_tlb_sync'
-make: *** [vmlinux] Error 1
+The only reason for __raw_writel is to make the code faster. However, shall I use
+writel(with both barriers and byte swap) instead and then make appropriate changes
+in the value 32'h27672B2A?
 
-Robin
+>> +/*
+>> + * Erratum A008751
+>> + * SCFG USB3PRM1CR has incorrect default value
+>> + * SCFG USB3PRM1CR reset value should be 32'h27672B2A instead of
+>32'h25E72B2A.
+>
+>When documenting C code, can you stick with C-style numeric constants?
+>
+>For that matter, just put the constant in the code instead of hiding it in an overly-
+>generically-named USB3PRM1CR_VAL and then you won't need to redundantly
+>state the value in a comment.  Normally putting magic numbers in symbolic
+>constants is a good thing, but in this case it's not actually describing anything and
+>the number is of no meaning outside of this one erratum workaround (it might even
+>be a different value if another chip has a similar erratum).
+>
 
-> Also, since this only affects
-> LPI signaling, why is this in the core GICv3 code and not in the ITS.
-> And more specifically, in the PCI part of the ITS, since you seem to
-> exclusively consider PCI?
-> 
->>  	}
->>  
->>  	return 0;
->>
-> 
-> Thanks,
-> 
-> 	M.
-> 
+The POR value of the USB3PRM1CR  should be 32'h27672B2A. So, I had named it as
+such. Thanks for the info. Will remove the USB3PRM1CR_VAL and during writel,
+will use 0x27672b2a directly. I will take care the next time.
+
+>> + */
+>> +static void erratum_a008751(struct qoriq_usb3_phy *phy) {
+>> +	qoriq_usb3_phy_writel(phy->param_ctrl, USB3PRM1CR,
+>> +				USB3PRM1CR_VAL);
+>> +}
+>> +
+>> +/*
+>> + * qoriq_usb3_phy_erratum - List of phy erratum
+>> + * @qoriq_phy_erratum - erratum application
+>> + * @compat - comapt string for erratum  */
+>> +
+>> +struct qoriq_usb3_phy_erratum {
+>> +	void (*qoriq_phy_erratum)(struct qoriq_usb3_phy *phy);
+>> +	char *compat;
+>> +};
+>> +
+>> +/* Erratum list */
+>> +struct qoriq_usb3_phy_erratum  phy_erratum_tbl[] = {
+>> +	{&erratum_a008751, "fsl,usb-erratum-a008751"},
+>> +	/* Add init time erratum here */
+>> +};
+>
+>This needs to be static.
+>
+
+Ok. Will take care next time.
+
+>Unnecessary & on the function pointer.
+>
+
+Ok. Will change in next version.
+
+>> +static int qoriq_usb3_phy_init(struct phy *x) {
+>> +	struct qoriq_usb3_phy *phy = phy_get_drvdata(x);
+>> +	int i;
+>> +
+>> +	for (i = 0; i < ARRAY_SIZE(phy_erratum_tbl); i++)
+>> +		if (phy->has_erratum_flag & 1 << i)
+>> +			phy_erratum_tbl[i].qoriq_phy_erratum(phy);
+>> +	return 0;
+>> +}
+>> +
+>> +static const struct phy_ops ops = {
+>> +	.init		= qoriq_usb3_phy_init,
+>> +	.owner		= THIS_MODULE,
+>> +};
+>> +
+>> +static int qoriq_usb3_phy_probe(struct platform_device *pdev) {
+>> +	struct qoriq_usb3_phy *phy;
+>> +	struct phy *generic_phy;
+>> +	struct phy_provider *phy_provider;
+>> +	const struct of_device_id *of_id;
+>> +	struct device *dev = &pdev->dev;
+>> +	struct resource *res;
+>> +	int i, ret;
+>> +
+>> +	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
+>> +	if (!phy)
+>> +		return -ENOMEM;
+>> +	phy->dev = dev;
+>> +
+>> +	of_id = of_match_device(dev->driver->of_match_table, dev);
+>> +	if (!of_id) {
+>> +		dev_err(dev, "failed to get device match\n");
+>> +		ret = -EINVAL;
+>> +		goto err_out;
+>> +	}
+>> +
+>> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+>"param_ctrl");
+>> +	if (!res) {
+>> +		dev_err(dev, "failed to get param_ctrl memory\n");
+>> +		ret = -ENOENT;
+>> +		goto err_out;
+>> +	}
+>> +
+>> +	phy->param_ctrl = devm_ioremap_resource(dev, res);
+>> +	if (!phy->param_ctrl) {
+>> +		dev_err(dev, "failed to remap param_ctrl memory\n");
+>> +		ret = -ENOMEM;
+>> +		goto err_out;
+>> +	}
+>> +
+>> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+>"phy_base");
+>> +	if (!res) {
+>> +		dev_err(dev, "failed to get phy_base memory\n");
+>> +		ret = -ENOENT;
+>> +		goto err_out;
+>> +	}
+>> +
+>> +	phy->phy_base = devm_ioremap_resource(dev, res);
+>> +	if (!phy->phy_base) {
+>> +		dev_err(dev, "failed to remap phy_base memory\n");
+>> +		ret = -ENOMEM;
+>> +		goto err_out;
+>> +	}
+>> +
+>> +	phy->has_erratum_flag = 0;
+>> +	for (i = 0; i < ARRAY_SIZE(phy_erratum_tbl); i++)
+>> +		phy->has_erratum_flag |= device_property_read_bool(dev,
+>> +						phy_erratum_tbl[i].compat) << i;
+>
+>I don't see the erratum property in either the binding or the device tree.  Also, a
+>property name is not a "compat".
+>
+
+Ok. Will rename "char *compat" into "char *prop".
+
+>Is there a reason why this flag and array mechanism is needed, rather than just
+>checking the erratum properties from the init function -- or, if you have a good
+>reason to not want to do device tree accesses from init, just using a bool per
+>erratum?  How many errata are you expecting?
+>
+
+The erratum prop will be specified via the dt and parsed in the init. The idea
+behind the table is that it will accommodate more errata and every time we
+are adding a new erratum, and the code changes would be minimal(with this
+approach, we don't have to add new variable in qoriq_usb3_phy struct
+corresponding to every new erratum being added).
+
+In my knowledge, there are more than 5 errata in pipeline, and all of them
+have to be applied in the init time. So, this table will make the code more
+readable and less cumbersome. 
+
+However, in future, if any other erratum comes up, and it has to be applied
+at any point other than during init, then the variable has to be added in
+qoriq_usb3_phy struct and the property has to be read separately.
+
+>-Scott
