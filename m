@@ -1,31 +1,87 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 15 Nov 2016 12:26:09 +0100
-Subject: [PATCH v2 1/5] iommu: Allow taking a reference on a group directly
-In-Reply-To: <37029eb869380edb0d5ce8cc6601ce7e69c80458.1478886974.git.robin.murphy@arm.com>
-References: <37029eb869380edb0d5ce8cc6601ce7e69c80458.1478886974.git.robin.murphy@arm.com>
-Message-ID: <20161115112609.GA24857@8bytes.org>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Tue, 15 Nov 2016 13:32:27 +0200
+Subject: wdt, gpio: move arch_initcall into subsys_initcall ?
+In-Reply-To: <afbf394e-e411-5c43-e2b0-667b3fbc2edf@mentor.com>
+References: <582AE18A.2060405@denx.de>
+ <afbf394e-e411-5c43-e2b0-667b3fbc2edf@mentor.com>
+Message-ID: <e4472c2d-effa-9583-aded-8dcdfdd57ee6@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2016 at 05:59:21PM +0000, Robin Murphy wrote:
-> iommu_group_get_for_dev() expects that the IOMMU driver's device_group
-> callback return a group with a reference held for the given device.
-> Whilst allocating a new group is fine, and pci_device_group() correctly
-> handles reusing an existing group, there is no general means for IOMMU
-> drivers doing their own group lookup to take additional references on an
-> existing group pointer without having to also store device pointers or
-> resort to elaborate trickery.
-> 
-> Add an IOMMU-driver-specific function to fill the hole.
-> 
-> Acked-by: Sricharan R <sricharan@codeaurora.org>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-> 
-> v2: Fix the function name; clarify what exactly its callers are fixing.
-> 
->  drivers/iommu/iommu.c | 13 +++++++++++++
->  include/linux/iommu.h |  1 +
->  2 files changed, 14 insertions(+)
+On 11/15/2016 01:10 PM, Vladimir Zapolskiy wrote:
+> Hello Heiko,
+>
+> On 11/15/2016 12:20 PM, Heiko Schocher wrote:
+>> Hello,
+>>
+>> commit e188cbf7564f: "gpio: mxc: shift gpio_mxc_init() to subsys_initcall level"
+>> moves the gpio initialization of the mxc gpio driver
+>> from the arch_initcall level into subsys_initcall level.
+>>
+>> This leads now on mxc boards, which use a gpio wdt driver
+>> and the CONFIG_GPIO_WATCHDOG_ARCH_INITCALL option enabled,
+>> to unwanted driver probe deferrals during kernel boot.
+>>
+>> I see this currently on an imx6 based board (which has unfortunately
+>> 3 WDT: imx6 internal (disabled), gpio wdt and da9063 WDT ...).
+>>
+>> Also a side effect from above commit is, that the da9063 WDT driver
+>> is now probed before the gpio WDT driver ... so /dev/watchdog now
+>> does not point to the gpio_wdt, instead it points to the da9063 WDT.
+>>
+>> So there are 2 solutions possible:
+>>
+>> - add a CONFIG_GPIO_MCX_ARCH_INITCALL option
+>>   in drivers/gpio/gpio-mxc.c like for the gpio_wdt.c driver?
+>
+> in my opinion this is overly heavy solution and it might be
+> better to avoid it if possible.
+>
+> I would rather prefer to reconsider GPIO_WATCHDOG_ARCH_INITCALL
+> usage in the watchdog driver.
+>
+> Moreover adding this proposed GPIO_MCX_ARCH_INITCALL to call
+> the driver on arch level will result in deferring the GPIO driver.
+>
+>>   But how can we guarantee, that first the gpio driver and then
+>>   the gpio_wdt driver gets probed?
+>>
+>> - move the arch_initcall in gpio_wdt.c into a subsys_initcall
+>>   (Tested this, and the probe dereferral messages are gone ...)
+>>
+>>   But this may results in problems on boards, which needs an early
+>>   trigger on an gpio wdt ...
+>
+> The level of "earliness" can not be defined in absolute time value
+> in any case, why decreasing the init level of the watchdog driver
+> to subsys level can cause problems? For that there should exist
+> some kind of a dependency on IC or PCB hardware level, can you
+> name it please?
+>
+> Also please note that more than a half of all GPIO drivers settle
+> on subsys or later initcall level, this means that there is
+> an expected GPIO watchdog driver deferral for all of them.
 
-Applied the series, thanks Robin.
+Please find two more late notes though.
+
+> I propose to send two patches for review:
+>
+> 1. remove GPIO_WATCHDOG_ARCH_INITCALL option completely and decouple
+>    module_platform_driver() into arch_initcall() and module_exit()
+>    unconditionally.
+>
+> 2. change arch_initcall() in the watchdog driver to subsys_initcall().
+>    This change removes probe deferrals on boot, when the driver is
+>    used with the most of the GPIO controllers.
+
+Alternatively commit 5e53c8ed813d ("watchdog: gpio_wdt: Add option for
+early registration") can be reverted and then module_platform_driver()
+is decoupled into subsys_initcall() and module_exit() as its replacement.
+
+And also please note that since quite many GPIO controller drivers
+live on initcall levels after subsys_initcall(), the solution won't
+let to avoid watchdog driver deferrals totally, this should be accepted.
+
+-- 
+With best wishes,
+Vladimir
