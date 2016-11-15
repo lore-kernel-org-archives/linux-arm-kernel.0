@@ -1,42 +1,64 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Tue, 15 Nov 2016 14:48:45 +0100
-Subject: [PATCH] ASoC: mioa701_wm9713: add missing white space in
- dev_err message
-In-Reply-To: <20161112163025.4801-1-colin.king@canonical.com>
-References: <20161112163025.4801-1-colin.king@canonical.com>
-Message-ID: <20161115144845.0aafbcc9@ipc1.ka-ro>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 15 Nov 2016 21:51:06 +0800
+Subject: [PATCH v2 3/3] ARM: dts: sun7i: bananapi-m1-plus: Enable USB OTG
+In-Reply-To: <20161115135106.438-1-wens@csie.org>
+References: <20161115135106.438-1-wens@csie.org>
+Message-ID: <20161115135106.438-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The Bananapi M1+ supports USB OTG, with the PMIC doing VBUS sensing.
+Enable the USB OTG related functions.
 
-On Sat, 12 Nov 2016 16:30:25 +0000 Colin King wrote:
-> From: Colin Ian King <colin.king@canonical.com>
-> 
-> There is a missing whitespace in the dev_err message between
-> "will" and "lead".  Add the whitespace.
-> 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> ---
->  sound/soc/pxa/mioa701_wm9713.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/sound/soc/pxa/mioa701_wm9713.c b/sound/soc/pxa/mioa701_wm9713.c
-> index d1661fa..0fe0abe 100644
-> --- a/sound/soc/pxa/mioa701_wm9713.c
-> +++ b/sound/soc/pxa/mioa701_wm9713.c
-> @@ -187,7 +187,7 @@ static int mioa701_wm9713_probe(struct platform_device *pdev)
->  	mioa701.dev = &pdev->dev;
->  	rc = devm_snd_soc_register_card(&pdev->dev, &mioa701);
->  	if (!rc)
-> -		dev_warn(&pdev->dev, "Be warned that incorrect mixers/muxes setup will"
-> +		dev_warn(&pdev->dev, "Be warned that incorrect mixers/muxes setup will "
->  			 "lead to overheating and possible destruction of your device."
->  			 " Do not use without a good knowledge of mio's board design!\n");
->
-There is already a continuation line that has a whitespace in front. It
-would be nice to be consistent and also add the missing whitespace in
-front of the succeeding line...
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-
-Lothar Wa?mann
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
+index ac19630c1c23..5f7114e13850 100644
+--- a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
++++ b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
+@@ -194,6 +194,10 @@
+ 	status = "okay";
+ };
+ 
++&otg_sram {
++	status = "okay";
++};
++
+ &pio {
+ 	gmac_power_pin_bpi_m1p: gmac_power_pin at 0 {
+ 		allwinner,pins = "PH23";
+@@ -249,13 +253,29 @@
+ 	regulator-name = "avcc";
+ };
+ 
++&reg_usb0_vbus {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+ 	status = "okay";
+ };
+ 
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
++&usb_power_supply {
++	status = "okay";
++};
++
+ &usbphy {
++	usb0_id_det-gpios = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
++	usb0_vbus_power-supply = <&usb_power_supply>;
++	usb0_vbus-supply = <&reg_usb0_vbus>;
+ 	/* VBUS on usb host ports are tied to DC5V and therefore always on */
+ 	status = "okay";
+ };
+-- 
+2.10.2
