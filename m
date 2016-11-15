@@ -1,7 +1,7 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 15 Nov 2016 16:04:31 +0000
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.10
-Message-ID: <582B320F.7030206@hisilicon.com>
+Date: Tue, 15 Nov 2016 16:09:34 +0000
+Subject: [GIT PULL] arm: dts: hisilicon dts updates for v4.10
+Message-ID: <582B333E.2060205@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,41 +21,24 @@ The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
 are available in the git repository at:
 
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-4.10
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-dt-for-4.10
 
-for you to fetch changes up to 85f5bd9e771349833602ccdd39b65613ecd11fd1:
+for you to fetch changes up to 3b23aabfcd48988179f7c6c2dde01f3356f68213:
 
-  arm64: dts: hisi: add refclk node to hip06 dts files for SAS (2016-11-15 10:58:41 +0000)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon SoC DT updates for 4.10
-
-- Correct the hardware pin number of the usb node on the Hip06
-- Add the Hisilicon Hip07 D05 board dts binding
-- Add the initial dts for the Hip07 D05 board
-- Fix the warning for the node without reg propery on the Hip06
-- Fix the sas am max transmissions quirk property on the Hip06
-- Disable the sas0 and sas2 on D03 board
-- Add refclk node for SAS on the Hip06
+  ARM: dts: hisi-x5hd2: Remove skeleton.dtsi inclusion (2016-11-15 11:30:55 +0000)
 
 ----------------------------------------------------------------
-John Garry (3):
-      arm64: dts: hisi: fix hip06 sas am-max-trans quirk
-      arm64: dts: hisi: disable sas0 and sas2 for d03
-      arm64: dts: hisi: add refclk node to hip06 dts files for SAS
+ARM: DT: Hisilicon ARMv7 SoC DT updates for 4.10
 
-Kefeng Wang (4):
-      arm64: dts: hip06: Correct hardware pin number of usb node
-      Documentation: arm64: Add Hisilicon Hip07 D05 dts binding
-      arm64: dts: hisilicon: Add initial dts for Hip07 D05 board
-      arm64: dts: hip06: Fix no reg property warning
+- Remove skeleton.dtsi inclusion for the Hip01, Hi3620 and Hix5hd2
 
- .../bindings/arm/hisilicon/hisilicon.txt           |    4 +
- arch/arm64/boot/dts/hisilicon/Makefile             |    1 +
- arch/arm64/boot/dts/hisilicon/hip06-d03.dts        |    8 -
- arch/arm64/boot/dts/hisilicon/hip06.dtsi           |   23 +-
- arch/arm64/boot/dts/hisilicon/hip07-d05.dts        |   66 ++
- arch/arm64/boot/dts/hisilicon/hip07.dtsi           | 1059 ++++++++++++++++++++
- 6 files changed, 1146 insertions(+), 15 deletions(-)
- create mode 100644 arch/arm64/boot/dts/hisilicon/hip07-d05.dts
- create mode 100644 arch/arm64/boot/dts/hisilicon/hip07.dtsi
+----------------------------------------------------------------
+Kefeng Wang (3):
+      ARM: dts: hip01: Remove skeleton.dtsi inclusion
+      ARM: dts: hi3620: Remove skeleton.dtsi inclusion
+      ARM: dts: hisi-x5hd2: Remove skeleton.dtsi inclusion
+
+ arch/arm/boot/dts/hi3620.dtsi     | 4 +++-
+ arch/arm/boot/dts/hip01.dtsi      | 2 --
+ arch/arm/boot/dts/hisi-x5hd2.dtsi | 4 +++-
+ 3 files changed, 6 insertions(+), 4 deletions(-)
