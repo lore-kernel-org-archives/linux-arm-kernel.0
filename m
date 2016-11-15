@@ -1,44 +1,75 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 15 Nov 2016 16:09:34 +0000
-Subject: [GIT PULL] arm: dts: hisilicon dts updates for v4.10
-Message-ID: <582B333E.2060205@hisilicon.com>
+Date: Tue, 15 Nov 2016 16:13:40 +0000
+Subject: [PATCH] arm64: dts: hip06: Fix no reg property warning
+In-Reply-To: <1477280428-30558-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1474708465-38958-2-git-send-email-wangkefeng.wang@huawei.com>
+ <1477280428-30558-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <582B3434.5090604@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+Hi Kefeng,
 
-Please help to pull the following changes.
+On 2016/10/24 4:40, Kefeng Wang wrote:
+> Warning (unit_address_vs_reg): Node /soc/ethernet at 4 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /soc/ethernet at 5 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /soc/ethernet at 0 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /soc/ethernet at 1 has a unit name, but no reg property
+> 
+> Fix warning when build with W=1.
+> 
+> Cc: Kejian Yan <yankejian@huawei.com>
+> Cc: Yisen Zhuang <yisen.zhuang@huawei.com>
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
+
+Applied to the hisilicon soc tree.
 Thanks!
 
 Best Regards,
 Wei
 
----
-
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-dt-for-4.10
-
-for you to fetch changes up to 3b23aabfcd48988179f7c6c2dde01f3356f68213:
-
-  ARM: dts: hisi-x5hd2: Remove skeleton.dtsi inclusion (2016-11-15 11:30:55 +0000)
-
-----------------------------------------------------------------
-ARM: DT: Hisilicon ARMv7 SoC DT updates for 4.10
-
-- Remove skeleton.dtsi inclusion for the Hip01, Hi3620 and Hix5hd2
-
-----------------------------------------------------------------
-Kefeng Wang (3):
-      ARM: dts: hip01: Remove skeleton.dtsi inclusion
-      ARM: dts: hi3620: Remove skeleton.dtsi inclusion
-      ARM: dts: hisi-x5hd2: Remove skeleton.dtsi inclusion
-
- arch/arm/boot/dts/hi3620.dtsi     | 4 +++-
- arch/arm/boot/dts/hip01.dtsi      | 2 --
- arch/arm/boot/dts/hisi-x5hd2.dtsi | 4 +++-
- 3 files changed, 6 insertions(+), 4 deletions(-)
+>  arch/arm64/boot/dts/hisilicon/hip06.dtsi | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/hisilicon/hip06.dtsi b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+> index b548763..f66c51b 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+> @@ -508,7 +508,7 @@
+>  			};
+>  		};
+>  
+> -		eth0: ethernet at 4{
+> +		eth0: ethernet-4{
+>  			compatible = "hisilicon,hns-nic-v2";
+>  			ae-handle = <&dsaf0>;
+>  			port-idx-in-ae = <4>;
+> @@ -517,7 +517,7 @@
+>  			dma-coherent;
+>  		};
+>  
+> -		eth1: ethernet at 5{
+> +		eth1: ethernet-5{
+>  			compatible = "hisilicon,hns-nic-v2";
+>  			ae-handle = <&dsaf0>;
+>  			port-idx-in-ae = <5>;
+> @@ -526,7 +526,7 @@
+>  			dma-coherent;
+>  		};
+>  
+> -		eth2: ethernet at 0{
+> +		eth2: ethernet-0{
+>  			compatible = "hisilicon,hns-nic-v2";
+>  			ae-handle = <&dsaf0>;
+>  			port-idx-in-ae = <0>;
+> @@ -535,7 +535,7 @@
+>  			dma-coherent;
+>  		};
+>  
+> -		eth3: ethernet at 1{
+> +		eth3: ethernet-1{
+>  			compatible = "hisilicon,hns-nic-v2";
+>  			ae-handle = <&dsaf0>;
+>  			port-idx-in-ae = <1>;
+> 
