@@ -1,43 +1,41 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Tue, 15 Nov 2016 15:22:30 +0100
-Subject: [GIT PULL] STM32 SOC changes for v4.10 #1
-Message-ID: <7e258e38-5ac9-60e8-4bc7-03acedd5e11d@st.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 15 Nov 2016 14:27:49 +0000
+Subject: [PATCH] arm/arm64: KVM: VGIC: limit ITARGETSR bits to number of VCPUs
+Message-ID: <20161115142749.19955-1-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+The GICv2 spec says in section 4.3.12 that a "CPU targets field bit that
+corresponds to an unimplemented CPU interface is RAZ/WI."
+Currently we allow the guest to write any value in there and it can
+read that back.
+Mask the written value with the proper CPU mask to be spec compliant.
 
-Please consider this first round of STM32 SOC updates for v4.10:
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-
-   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git 
-tags/soc-for-4.10-1
-
-for you to fetch changes up to 6bc18b83c0c3b5d56137a31ce98ca2802036e7a9:
-
-   ARM: Kconfig: Introduce MACH_STM32F746 flag (2016-11-15 12:02:59 +0100)
-
-----------------------------------------------------------------
-STM32 SOC updates for v4.10, round 1.
-
-Highlights:
-----------
-  - Add new MCU SOC STM32F746
-
-----------------------------------------------------------------
-Alexandre TORGUE (2):
-       ARM: mach-stm32: Add a new SOC - STM32F746
-       ARM: Kconfig: Introduce MACH_STM32F746 flag
-
-  Documentation/arm/stm32/overview.txt           |  3 ++-
-  Documentation/arm/stm32/stm32f746-overview.txt | 34 
-++++++++++++++++++++++++++
-  arch/arm/Kconfig                               |  5 ++++
-  arch/arm/mach-stm32/board-dt.c                 |  1 +
-  4 files changed, 42 insertions(+), 1 deletion(-)
-  create mode 100644 Documentation/arm/stm32/stm32f746-overview.txt
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index b44b359..e59d4c7 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -129,6 +129,7 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
+ 				   unsigned long val)
+ {
+ 	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
++	u8 cpu_mask = (1 << atomic_read(&vcpu->kvm->online_vcpus)) - 1;
+ 	int i;
+ 
+ 	/* GICD_ITARGETSR[0-7] are read-only */
+@@ -141,7 +142,7 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
+ 
+ 		spin_lock(&irq->irq_lock);
+ 
+-		irq->targets = (val >> (i * 8)) & 0xff;
++		irq->targets = ((val >> (i * 8)) & 0xff) & cpu_mask;
+ 		target = irq->targets ? __ffs(irq->targets) : 0;
+ 		irq->target_vcpu = kvm_get_vcpu(vcpu->kvm, target);
+ 
+-- 
+2.9.0
