@@ -1,80 +1,72 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Tue, 15 Nov 2016 13:10:32 +0200
-Subject: wdt, gpio: move arch_initcall into subsys_initcall ?
-In-Reply-To: <582AE18A.2060405@denx.de>
-References: <582AE18A.2060405@denx.de>
-Message-ID: <afbf394e-e411-5c43-e2b0-667b3fbc2edf@mentor.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 15 Nov 2016 12:11:54 +0100
+Subject: LEDs that change brightness "itself" -- that's a trigger. Re: PM
+ regression with LED changes in next-20161109
+In-Reply-To: <4e392d5d-eb10-f285-517e-976a55c3e318@samsung.com>
+References: <3eb60c78-d891-27e5-6b7b-a54a5b547a1c@redhat.com>
+ <c01cac8b-a921-56d1-7e57-8071d4b9faf6@gmail.com>
+ <cb0aa3ce-ee48-66b8-510c-bd70917afec9@redhat.com>
+ <b5ae20d7-8394-7ad5-1830-13173e9105c4@gmail.com>
+ <9b476f85-d45e-deb6-335d-fc56f6d90350@redhat.com>
+ <127cdd42-6fd8-c671-60b7-3826b351577f@samsung.com>
+ <15cafbf5-d842-e184-2fd4-65f8272f505a@redhat.com>
+ <CGME20161115103141epcas2p251f2521354a8cd7b9dfcfe55bfa482f0@epcas2p2.samsung.com>
+ <20161115103133.GA22860@amd>
+ <4e392d5d-eb10-f285-517e-976a55c3e318@samsung.com>
+Message-ID: <20161115111154.GA5482@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Heiko,
+On Tue 2016-11-15 11:58:06, Jacek Anaszewski wrote:
+> On 11/15/2016 11:31 AM, Pavel Machek wrote:
+> >Hi!
+> >
+> >>>Hmm, v4 still calls led_notify_brightness_change(led_cdev)
+> >>>from both __led_set_brightness() and __led_set_brightness_blocking().
+> >>
+> >>Ugh, I see I accidentally send a v4 twice, instead of
+> >>calling the version which dropped those called v5 as
+> >>I should have, sorry.
+> >>
+> >>The v4 which I would like to see merged, the one with
+> >>those calls dropped, is here:
+> >>
+> >>https://patchwork.kernel.org/patch/9423093/
+> >
+> >Please, lets fix this properly.
+> >
+> >The LED you are talking about _has_ a trigger, implemented in
+> >hardware. That trigger can change LED brightness behind kernel's (and
+> >userspace's) back. Don't pretend the trigger does not exist, it does.
+> >
+> >And when you do that, you'll have nice place to report changes to
+> >userspace -- trigger can now export that information, and offer poll()
+> >interface.
+> 
+> Well, that sounds interesting. It is logically justifiable.
 
-On 11/15/2016 12:20 PM, Heiko Schocher wrote:
-> Hello,
->
-> commit e188cbf7564f: "gpio: mxc: shift gpio_mxc_init() to subsys_initcall level"
-> moves the gpio initialization of the mxc gpio driver
-> from the arch_initcall level into subsys_initcall level.
->
-> This leads now on mxc boards, which use a gpio wdt driver
-> and the CONFIG_GPIO_WATCHDOG_ARCH_INITCALL option enabled,
-> to unwanted driver probe deferrals during kernel boot.
->
-> I see this currently on an imx6 based board (which has unfortunately
-> 3 WDT: imx6 internal (disabled), gpio wdt and da9063 WDT ...).
->
-> Also a side effect from above commit is, that the da9063 WDT driver
-> is now probed before the gpio WDT driver ... so /dev/watchdog now
-> does not point to the gpio_wdt, instead it points to the da9063 WDT.
->
-> So there are 2 solutions possible:
->
-> - add a CONFIG_GPIO_MCX_ARCH_INITCALL option
->   in drivers/gpio/gpio-mxc.c like for the gpio_wdt.c driver?
+Thanks.
 
-in my opinion this is overly heavy solution and it might be
-better to avoid it if possible.
+> I initially proposed exactly this solution, with recently
+> added userspace LED being a trigger listener. It seems a bit
+> awkward though. How would you listen to the trigger events?
 
-I would rather prefer to reconsider GPIO_WATCHDOG_ARCH_INITCALL
-usage in the watchdog driver.
+Trigger exposes a file in sysfs, with poll() working on that file (and
+probably read exposing the current brightness).
 
-Moreover adding this proposed GPIO_MCX_ARCH_INITCALL to call
-the driver on arch level will result in deferring the GPIO driver.
+Key difference is that only triggers where this makes sense (keyboard
+backlight) expose it and carry the overhead. CPU trigger would
+definitely not do this.
 
->   But how can we guarantee, that first the gpio driver and then
->   the gpio_wdt driver gets probed?
->
-> - move the arch_initcall in gpio_wdt.c into a subsys_initcall
->   (Tested this, and the probe dereferral messages are gone ...)
->
->   But this may results in problems on boards, which needs an early
->   trigger on an gpio wdt ...
-
-The level of "earliness" can not be defined in absolute time value
-in any case, why decreasing the init level of the watchdog driver
-to subsys level can cause problems? For that there should exist
-some kind of a dependency on IC or PCB hardware level, can you
-name it please?
-
-Also please note that more than a half of all GPIO drivers settle
-on subsys or later initcall level, this means that there is
-an expected GPIO watchdog driver deferral for all of them.
-
-I propose to send two patches for review:
-
-1. remove GPIO_WATCHDOG_ARCH_INITCALL option completely and decouple
-    module_platform_driver() into arch_initcall() and module_exit()
-    unconditionally.
-
-2. change arch_initcall() in the watchdog driver to subsys_initcall().
-    This change removes probe deferrals on boot, when the driver is
-    used with the most of the GPIO controllers.
-
-> Other ideas?
->
-> Thanks for all suggestions!
->
-
---
-With best wishes,
-Vladimir
+Best regards,
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161115/51071177/attachment.sig>
