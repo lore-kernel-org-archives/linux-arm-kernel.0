@@ -1,59 +1,30 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 15 Nov 2016 16:30:55 +0100
-Subject: [PATCH v3 0/6] Add support for STM32 ADC
-Message-ID: <1479223861-21747-1-git-send-email-fabrice.gasnier@st.com>
+Date: Tue, 15 Nov 2016 16:30:59 +0100
+Subject: [PATCH v3 4/6] ARM: configs: stm32: enable ADC driver
+In-Reply-To: <1479223861-21747-1-git-send-email-fabrice.gasnier@st.com>
+References: <1479223861-21747-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1479223861-21747-5-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for STM32F4 ADC into IIO framework.
-STM32F4 ADC is a 12-bit successive approximation analog-to-digital
-converter with multiplexed input channels. Conversions can
-be performed in single, continuous, scan or discontinuous mode.
-Conversions can be launched in software or using hardware triggers.
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ arch/arm/configs/stm32_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-This driver has been developed and tested on STM32F429 eval board.
-It consist of a core driver, to manage common resources shared
-between up to 3 ADC instances and an ADC driver to manage each adc
-instance.
-
-Changes in v3:
-- Core driver moved to iio/adc.
-- Build fix.
-- Updates following Jonathan's and Lars's remarks.
-- Binding: adc child clock is mandatory.
-
-Changes in v2:
-- Replace single driver model by MFD approach, to handle up to 3 ADCs
-  as separate devices. Each ADC device then registers a unique IIO
-  device.
-- Make driver as simple as possible for the first instance, to ease
-  review. For now, I dropped complexity by removing injected support,
-  triggered buffer mode, dmas.
-- Removed abstraction layer (indirection routines, ops) as only stm32f4
-  is supported.
-
-Fabrice Gasnier (6):
-  Documentation: dt-bindings: Document STM32 ADC DT bindings
-  iio: adc: Add support for STM32 ADC core
-  iio: adc: Add support for STM32 ADC
-  ARM: configs: stm32: enable ADC driver
-  ARM: dts: stm32f429: Add adc support
-  ARM: dts: stm32f429: enable adc on eval board
-
- .../devicetree/bindings/iio/adc/st,stm32-adc.txt   |  83 ++++
- arch/arm/boot/dts/stm32429i-eval.dts               |  25 +
- arch/arm/boot/dts/stm32f429.dtsi                   |  49 ++
- arch/arm/configs/stm32_defconfig                   |   3 +
- drivers/iio/adc/Kconfig                            |  23 +
- drivers/iio/adc/Makefile                           |   2 +
- drivers/iio/adc/stm32-adc-core.c                   | 303 ++++++++++++
- drivers/iio/adc/stm32-adc-core.h                   |  52 +++
- drivers/iio/adc/stm32-adc.c                        | 518 +++++++++++++++++++++
- 9 files changed, 1058 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
- create mode 100644 drivers/iio/adc/stm32-adc-core.c
- create mode 100644 drivers/iio/adc/stm32-adc-core.h
- create mode 100644 drivers/iio/adc/stm32-adc.c
-
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index 1e5ec2a..5d241e0 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -57,6 +57,9 @@ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_DMADEVICES=y
+ CONFIG_STM32_DMA=y
++CONFIG_IIO=y
++CONFIG_STM32_ADC_CORE=y
++CONFIG_STM32_ADC=y
+ # CONFIG_FILE_LOCKING is not set
+ # CONFIG_DNOTIFY is not set
+ # CONFIG_INOTIFY_USER is not set
 -- 
 1.9.1
