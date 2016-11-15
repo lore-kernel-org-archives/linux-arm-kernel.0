@@ -1,58 +1,85 @@
 From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Tue, 15 Nov 2016 20:16:07 +0800
-Subject: [PATCH v4 6/6] arm64: arch_timer: acpi: add hisi timer errata data
+Date: Tue, 15 Nov 2016 20:16:06 +0800
+Subject: [PATCH v4 5/6] arm64: arch_timer: apci: Introduce a generic aquirk
+ framework for erratum
 In-Reply-To: <1479212167-5812-1-git-send-email-dingtianhong@huawei.com>
 References: <1479212167-5812-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <1479212167-5812-6-git-send-email-dingtianhong@huawei.com>
+Message-ID: <1479212167-5812-5-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-Add hisi timer specific erratum fixes.
+Introduce a general quirk framework for each timer erratum in ACPI,
+which use the oem information in GTDT table for platform specific erratums.
+The struct gtdt_arch_timer_fixup is introduced to record the oem
+information to match the quirk and handle the erratum.
 
-v3: add hisilicon erratum 161601 for ACPI mode.
+v3: Introduce a generic aquick framework for erratum in ACPI mode.
 
-v4: update some data structures.
+v4: rename the quirk handler parameter to make it more generic, and
+    avoid break loop when handling the quirk becasue it need to
+    support multi quirks handler.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ drivers/clocksource/arm_arch_timer.c | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index d4f4a0d..649f7fe 100644
+index 3d59af1..d4f4a0d 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -1078,10 +1078,28 @@ struct gtdt_arch_timer_fixup {
- 	void *context;
- };
+@@ -1068,6 +1068,39 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
+ 		       arch_timer_mem_init);
  
-+#ifdef CONFIG_HISILICON_ERRATUM_161601
-+static void __init erratum_workaround_enable(void *context)
-+{
-+	u64 erratum = (u64) context;
+ #ifdef CONFIG_ACPI
++struct gtdt_arch_timer_fixup {
++	char oem_id[ACPI_OEM_ID_SIZE];
++	char oem_table_id[ACPI_OEM_TABLE_ID_SIZE];
++	u32 oem_revision;
 +
-+	if (erratum & HISILICON_161601) {
-+		timer_unstable_counter_workaround = &arch_timer_hisi_161601;
-+		static_branch_enable(&arch_timer_read_ool_enabled);
-+		pr_info("Enabling workaround for HISILICON ERRATUM 161601\n");
++	/* quirk handler for arch timer erratum */
++	void (*handler)(void *context);
++	void *context;
++};
++
++/* note: this needs to be updated according to the doc of OEM ID
++ * and TABLE ID for different board.
++ */
++struct gtdt_arch_timer_fixup arch_timer_quirks[] __initdata = {
++};
++
++void __init arch_timer_acpi_quirks_handler(char *oem_id,
++					   char *oem_table_id,
++					   u32 oem_revision)
++{
++	struct gtdt_arch_timer_fixup *quirks = arch_timer_quirks;
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(arch_timer_quirks); i++, quirks++) {
++		if (!memcmp(quirks->oem_id, oem_id, ACPI_OEM_ID_SIZE) &&
++		    !memcmp(quirks->oem_table_id, oem_table_id, ACPI_OEM_TABLE_ID_SIZE) &&
++		    quirks->oem_revision == oem_revision) {
++			if (quirks->handler && quirks->context)
++				quirks->handler(quirks->context);
++		}
 +	}
 +}
-+#endif
 +
- /* note: this needs to be updated according to the doc of OEM ID
-  * and TABLE ID for different board.
-  */
- struct gtdt_arch_timer_fixup arch_timer_quirks[] __initdata = {
-+#ifdef CONFIG_HISILICON_ERRATUM_161601
-+	{"HISI", "hip05", 0, &erratum_workaround_enable, (void *) HISILICON_161601},
-+	{"HISI", "hip06", 0, &erratum_workaround_enable, (void *) HISILICON_161601},
-+	{"HISI", "hip07", 0, &erratum_workaround_enable, (void *) HISILICON_161601},
-+#endif
- };
+ static int __init map_generic_timer_interrupt(u32 interrupt, u32 flags)
+ {
+ 	int trigger, polarity;
+@@ -1094,6 +1127,9 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ 		return -EINVAL;
+ 	}
  
- void __init arch_timer_acpi_quirks_handler(char *oem_id,
++	arch_timer_acpi_quirks_handler(table->oem_id, table->oem_table_id,
++				       table->oem_revision);
++
+ 	gtdt = container_of(table, struct acpi_table_gtdt, header);
+ 
+ 	arch_timers_present |= ARCH_CP15_TIMER;
 -- 
 1.9.0
