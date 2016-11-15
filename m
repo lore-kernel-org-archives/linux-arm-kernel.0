@@ -1,75 +1,44 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 15 Nov 2016 16:16:02 +0530
-Subject: [PATCH v4 4/4] ARM: dts: da850: Add the usb otg device node
-In-Reply-To: <1478188752-22447-5-git-send-email-abailon@baylibre.com>
-References: <1478188752-22447-1-git-send-email-abailon@baylibre.com>
- <1478188752-22447-5-git-send-email-abailon@baylibre.com>
-Message-ID: <0c94c5e0-9d2c-fff5-1213-2fb2adb20ab0@ti.com>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Tue, 15 Nov 2016 11:46:50 +0100
+Subject: [PATCH] ARM64: dts: bcm2837-rpi-3-b: remove incorrect pwr LED
+In-Reply-To: <871sydfueq.fsf@eliezer.anholt.net>
+References: <20161111173821.21491-1-eric@anholt.net>
+ <741880731.428971.a2c5fd60-1b30-481e-b728-fc62c8d1c81a.open-xchange@email.1und1.de>
+ <871sydfueq.fsf@eliezer.anholt.net>
+Message-ID: <1479206810.32639.31.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 November 2016 09:29 PM, Alexandre Bailon wrote:
-> This adds the device tree node for the usb otg
-> controller present in the da850 family of SoC's.
-> This also enables the otg usb controller for the lcdk board.
+On Mo, 2016-11-14 at 16:39 -0800, Eric Anholt wrote:
+> Stefan Wahren <stefan.wahren@i2se.com> writes:
 > 
-> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
-> ---
->  arch/arm/boot/dts/da850-lcdk.dts |  8 ++++++++
->  arch/arm/boot/dts/da850.dtsi     | 15 +++++++++++++++
->  2 files changed, 23 insertions(+)
+> > Hi Eric,
+> >
+> > [add Gerd to CC]
+> >
+> >> Eric Anholt <eric@anholt.net> hat am 11. November 2016 um 18:38 geschrieben:
+> >> 
+> >> 
+> >> From: Andrea Merello <andrea.merello@gmail.com>
+> >> 
+> >> We are incorrectly defining the pwr LED, attaching it to a gpio line
+> >> that is wired to the Wi-Fi SDIO module (which fails due to this).
+> >
+> > i agree with the intention of this patch, but is the upstream kernel really
+> > affected? I can't see any compatible for the Wifi interface.
 > 
-> diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-> index 7b8ab21..9f5040c 100644
-> --- a/arch/arm/boot/dts/da850-lcdk.dts
-> +++ b/arch/arm/boot/dts/da850-lcdk.dts
-> @@ -158,6 +158,14 @@
->  	rx-num-evt = <32>;
->  };
->  
-> +&usb_phy {
-> +	status = "okay";
-> +	};
+> The wifi isn't in the DT yet because the driver isn't merged.  Some
+> progress was made on that a while ago, but people asked for more
+> cleanups so it's still living out of tree.
 
-As mentioned by David already, this node needs to be removed. Please
-rebase this on top of latest linux-davinci/master when ready for merging
-(driver changes accepted).
+some low-hanging fruits (codestyle mostly) are done, but more work is
+needed (fix messy timeout handling, make dma work).  Didn't happed yet
+due to -ENOTIME.  My current state is here:
 
-> +
-> +&usb0 {
-> +	status = "okay";
-> +};
-> +
->  &aemif {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&nand_pins>;
-> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> index f79e1b9..322a31a 100644
-> --- a/arch/arm/boot/dts/da850.dtsi
-> +++ b/arch/arm/boot/dts/da850.dtsi
-> @@ -372,6 +372,21 @@
->  					>;
->  			status = "disabled";
->  		};
-> +		usb_phy: usb-phy {
-> +			compatible = "ti,da830-usb-phy";
-> +			#phy-cells = <1>;
-> +			status = "disabled";
-> +		};
-> +		usb0: usb at 200000 {
-> +			compatible = "ti,da830-musb";
-> +			reg = <0x200000 0x10000>;
-> +			interrupts = <58>;
-> +			interrupt-names = "mc";
-> +			dr_mode = "otg";
-> +			phys = <&usb_phy 0>;
-> +			phy-names = "usb-phy";
-> +			status = "disabled";
-> +		};
+https://www.kraxel.org/cgit/linux/log/?h=bcm2837-wifi
 
-Can you separate out the soc specific changes from board changes? Please
-place the usb0 node above the mdio node. I am trying to get to a rough
-ordering based on reg property.
+In case anyone wants pick it up feel free to do so (but please tell me
+so we avoid duplicating work).
 
-Thanks,
-Sekhar
+cheers,
+  Gerd
