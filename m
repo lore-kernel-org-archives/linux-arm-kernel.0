@@ -1,57 +1,158 @@
-From: julia@ni.com (Julia Cartwright)
-Date: Tue, 15 Nov 2016 09:46:08 -0600
-Subject: [PATCH 2/2] ARM: zynq: Fix W=1 dtc 1.4 warnings
-In-Reply-To: <90eca8dfcdcef68ce5fe39f2329c4b61d2662598.1479218844.git.michal.simek@xilinx.com>
-References: <2d42e25d7dd03e562e12e71fd037837737115940.1479218844.git.michal.simek@xilinx.com>
- <90eca8dfcdcef68ce5fe39f2329c4b61d2662598.1479218844.git.michal.simek@xilinx.com>
-Message-ID: <20161115154608.GH30999@jcartwri.amer.corp.natinst.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 15 Nov 2016 15:48:33 +0000
+Subject: [PATCH V7 1/3] ACPI: Retry IRQ conversion if it failed previously
+In-Reply-To: <1479074375-2629-2-git-send-email-agustinv@codeaurora.org>
+References: <1479074375-2629-1-git-send-email-agustinv@codeaurora.org>
+ <1479074375-2629-2-git-send-email-agustinv@codeaurora.org>
+Message-ID: <20161115154833.GA16906@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 15, 2016 at 03:07:27PM +0100, Michal Simek wrote:
-> The patch removes these warnings reported by dtc 1.4:
-> Warning (unit_address_vs_reg): Node /pmu has a reg or ranges property,
-> but no unit name
-> Warning (unit_address_vs_reg): Node /fixedregulator at 0 has a unit name,
-> but no reg property
-> Warning (unit_address_vs_reg): Node /memory has a reg or ranges
-> property, but no unit name
+On Sun, Nov 13, 2016 at 04:59:33PM -0500, Agustin Vega-Frias wrote:
+> This allows probe deferral to work properly when a dependent device
+> fails to get a valid IRQ because the IRQ domain was not registered
+> at the time the resources were added to the platform_device.
 > 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-
-Reviewed-by: Julia Cartwright <julia@ni.com>
->
+> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
 > ---
+>  drivers/acpi/resource.c | 59 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/base/platform.c |  9 +++++++-
+>  include/linux/acpi.h    |  7 ++++++
+>  3 files changed, 74 insertions(+), 1 deletion(-)
 > 
->  arch/arm/boot/dts/zynq-7000.dtsi      | 4 ++--
->  arch/arm/boot/dts/zynq-parallella.dts | 2 +-
->  arch/arm/boot/dts/zynq-zc702.dts      | 2 +-
->  arch/arm/boot/dts/zynq-zc706.dts      | 2 +-
->  arch/arm/boot/dts/zynq-zed.dts        | 2 +-
->  arch/arm/boot/dts/zynq-zybo.dts       | 2 +-
->  6 files changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> index f47a6c1cc752..402b5bbe3b5b 100644
-> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> @@ -42,14 +42,14 @@
->  		};
->  	};
->  
-> -	pmu {
-> +	pmu at f8891000 {
->  		compatible = "arm,cortex-a9-pmu";
->  		interrupts = <0 5 4>, <0 6 4>;
->  		interrupt-parent = <&intc>;
->  		reg = < 0xf8891000 0x1000 0xf8893000 0x1000 >;
+> diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
+> index 56241eb..4beda15 100644
+> --- a/drivers/acpi/resource.c
+> +++ b/drivers/acpi/resource.c
+> @@ -664,3 +664,62 @@ int acpi_dev_filter_resource_type(struct acpi_resource *ares,
+>  	return (type & types) ? 0 : 1;
+>  }
+>  EXPORT_SYMBOL_GPL(acpi_dev_filter_resource_type);
+> +
+> +struct acpi_irq_get_ctx {
+> +	unsigned int index;
+> +	struct resource *res;
+> +};
+> +
+> +static acpi_status acpi_irq_get_cb(struct acpi_resource *ares, void *context)
+> +{
+> +	struct acpi_irq_get_ctx *ctx = context;
+> +	struct acpi_resource_irq *irq;
+> +	struct acpi_resource_extended_irq *ext_irq;
+> +
+> +	switch (ares->type) {
+> +	case ACPI_RESOURCE_TYPE_IRQ:
+> +		irq = &ares->data.irq;
+> +		if (ctx->index < irq->interrupt_count) {
+> +			acpi_dev_resource_interrupt(ares, ctx->index, ctx->res);
+> +			return AE_CTRL_TERMINATE;
+> +		}
+> +		ctx->index -= irq->interrupt_count;
 
-Style nit: we should drop the space before/after '<' and '>'; and,
-perhaps separate the entries to be a bit more readable:
+I do not understand this code, mind explaining what it is meant to do ?
 
-   reg = <0xf8891000 0x1000>,
-         <0xf8893000 0x1000>;
+In particular I do not understand the logic behind the index decrement,
+I think I am missing something here.
+
+> +		break;
+> +	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
+> +		ext_irq = &ares->data.extended_irq;
+> +		if (ctx->index < ext_irq->interrupt_count) {
+> +			acpi_dev_resource_interrupt(ares, ctx->index, ctx->res);
+> +			return AE_CTRL_TERMINATE;
+> +		}
+> +		ctx->index -= ext_irq->interrupt_count;
+
+Ditto.
 
 Thanks,
+Lorenzo
 
-   Julia
+> +		break;
+> +	}
+> +
+> +	return AE_OK;
+> +}
+> +
+> +/**
+> + * acpi_irq_get - Look for the ACPI IRQ resource with the given index and
+> + *                use it to initialize the given Linux IRQ resource.
+> + * @handle ACPI device handle
+> + * @index  ACPI IRQ resource index to lookup
+> + * @res    Linux IRQ resource to initialize
+> + *
+> + * Return: 0 on success
+> + *         -EINVAL if an error occurs
+> + *         -EPROBE_DEFER if the IRQ lookup/conversion failed
+> + */
+> +int acpi_irq_get(acpi_handle handle, unsigned int index, struct resource *res)
+> +{
+> +	struct acpi_irq_get_ctx ctx = { index, res };
+> +	acpi_status status;
+> +
+> +	status = acpi_walk_resources(handle, METHOD_NAME__CRS,
+> +				     acpi_irq_get_cb, &ctx);
+> +	if (ACPI_FAILURE(status))
+> +		return -EINVAL;
+> +	if (res->flags & IORESOURCE_DISABLED)
+> +		return -EPROBE_DEFER;
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(acpi_irq_get);
+> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+> index c4af003..61423d2 100644
+> --- a/drivers/base/platform.c
+> +++ b/drivers/base/platform.c
+> @@ -102,6 +102,14 @@ int platform_get_irq(struct platform_device *dev, unsigned int num)
+>  	}
+>  
+>  	r = platform_get_resource(dev, IORESOURCE_IRQ, num);
+> +	if (r && r->flags & IORESOURCE_DISABLED && ACPI_COMPANION(&dev->dev)) {
+> +		int ret;
+> +
+> +		ret = acpi_irq_get(ACPI_HANDLE(&dev->dev), num, r);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+>  	/*
+>  	 * The resources may pass trigger flags to the irqs that need
+>  	 * to be set up. It so happens that the trigger flags for
+> @@ -1450,4 +1458,3 @@ void __init early_platform_cleanup(void)
+>  		memset(&pd->dev.devres_head, 0, sizeof(pd->dev.devres_head));
+>  	}
+>  }
+> -
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index 689a8b9..325bdb9 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -406,6 +406,7 @@ bool acpi_dev_resource_ext_address_space(struct acpi_resource *ares,
+>  unsigned int acpi_dev_get_irq_type(int triggering, int polarity);
+>  bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
+>  				 struct resource *res);
+> +int acpi_irq_get(acpi_handle handle, unsigned int index, struct resource *res);
+>  
+>  void acpi_dev_free_resource_list(struct list_head *list);
+>  int acpi_dev_get_resources(struct acpi_device *adev, struct list_head *list,
+> @@ -763,6 +764,12 @@ static inline int acpi_reconfig_notifier_unregister(struct notifier_block *nb)
+>  	return -EINVAL;
+>  }
+>  
+> +static inline int acpi_irq_get(acpi_handle handle, unsigned int index,
+> +			       struct resource *res)
+> +{
+> +	return -EINVAL;
+> +}
+> +
+>  #endif	/* !CONFIG_ACPI */
+>  
+>  #ifdef CONFIG_ACPI_HOTPLUG_IOAPIC
+> -- 
+> Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
