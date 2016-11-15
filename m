@@ -1,129 +1,192 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 15 Nov 2016 15:53:31 -0800
-Subject: [PATCH/RESEND] recordmcount: arm: Implement make_nop
-In-Reply-To: <CAKv+Gu9GVNqXwya8hrjmBcK2L0ud-qr7iE54WUPuMNyFtAy80w@mail.gmail.com>
-References: <20161018234200.5804-1-sboyd@codeaurora.org>
- <CAKv+Gu-Cp775gbLxPcJQ4G2nEnwm9G_gxh5B1Sf2LGkkov_OZA@mail.gmail.com>
- <20161115191807.GC25626@codeaurora.org>
- <CAKv+Gu9GVNqXwya8hrjmBcK2L0ud-qr7iE54WUPuMNyFtAy80w@mail.gmail.com>
-Message-ID: <20161115235331.GE25626@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 Nov 2016 23:55:04 +0000
+Subject: specifying order of /dev/mmcblk devices via device-tree?
+In-Reply-To: <20161115221002.GA1041@n2100.armlinux.org.uk>
+References: <CAJ+vNU1g8nQedd06LeaD10YWUQ_UmdRToUMFKaTNT1aNY56b0g@mail.gmail.com>
+ <20161028153755.GL5806@leverpostej>
+ <CAJ+vNU26tx-1bLKNpzYJ0UCeFJ-SczZOca1dYdt5mCGDxAuKTQ@mail.gmail.com>
+ <20161114190839.GS1041@n2100.armlinux.org.uk>
+ <CAJ+vNU38XQBHt709S_z6Quvce6wcqLzRHFuN_bVZ_0eARa3=fw@mail.gmail.com>
+ <20161115213510.GY1041@n2100.armlinux.org.uk>
+ <CAJ+vNU2t5f=HQ94_GW-cry7DV3FsR9Vx-ck_E-eNuDk5vd-eaw@mail.gmail.com>
+ <20161115221002.GA1041@n2100.armlinux.org.uk>
+Message-ID: <20161115235503.GC1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15, Ard Biesheuvel wrote:
-> On 15 November 2016 at 19:18, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > On 11/15, Ard Biesheuvel wrote:
-> >> On 19 October 2016 at 00:42, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> >> >
-> >> > +static unsigned char ideal_nop4_arm_le[4] = { 0x00, 0x00, 0xa0, 0xe1 }; /* mov r0, r0 */
-> >> > +static unsigned char ideal_nop4_arm_be[4] = { 0xe1, 0xa0, 0x00, 0x00 }; /* mov r0, r0 */
-> >>
-> >> Shouldn't you be taking the difference between BE8 and BE32 into
-> >> account here? IIRC, BE8 uses little endian encoding for instructions.
-> >
-> > I admit I haven't tested on a pre-armv6 CPU so I haven't come
-> > across the case of a BE32 CPU. But from what I can tell that
-> > doesn't matter.
-> >
-> > According to scripts/Makefile.build, cmd_record_mcount only runs
-> > the recordmcount program if CONFIG_FTRACE_MCOUNT_RECORD=y. That
-> > config is defined as:
-> >
-> >         config FTRACE_MCOUNT_RECORD
-> >                 def_bool y
-> >                 depends on DYNAMIC_FTRACE
-> >                 depends on HAVE_FTRACE_MCOUNT_RECORD
-> >
-> >
-> > And in arch/arm/Kconfig we see that DYNAMIC_FTRACE is selected:
-> >
-> >         select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
-> >
-> > which means that FTRACE_MCOUNT_RECORD can't be set when
-> > CPU_ENDIAN_BE32 is set.
-> >
-> > Do you agree that BE32 is not a concern here?
-> >
+On Tue, Nov 15, 2016 at 10:10:02PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Nov 15, 2016 at 01:39:42PM -0800, Tim Harvey wrote:
+> > On Tue, Nov 15, 2016 at 1:35 PM, Russell King - ARM Linux
+> > <linux@armlinux.org.uk> wrote:
+> > > On Tue, Nov 15, 2016 at 12:27:53PM -0800, Tim Harvey wrote:
+> > >> On Mon, Nov 14, 2016 at 11:08 AM, Russell King - ARM Linux
+> > >> <linux@armlinux.org.uk> wrote:
+> > >> > So, someone merged a patch which makes mmcblk devices follow the
+> > >> > host controller numbering.
+> > >> >
+> > >> > Now my cubox-i fails to boot correctly because the SD card in the
+> > >> > _only_ SD card slot now gets called "mmcblk1" and not "mmcblk0".
+> > >> >
+> > >> > USDHC1 is wired to the on-microsom WiFi, and never has anything
+> > >> > remotely near a SD card or eMMC present.  So, this change is
+> > >> > confusing on these platforms.
+> > >> >
+> > >> > Moreover, this is _going_ to break SolidRun distros if people upgrade
+> > >> > their kernels.
+> > >> >
+> > >> > It may be appropriate for eMMC, but it's not appropriate everywhere.
+> > >> >
+> > >> > This is a user visible _regression_ in 4.9-rc.  Whoever did this,
+> > >> > please revert whatever change caused this, and next time limit it
+> > >> > to only eMMC.
+> > >> >
+> > >> > Thanks.
+> > >>
+> > >> I see the same thing on newer kernels, which is why I asked the
+> > >> question. I didn't expect (or even want honestly) a non mmcblk0 boot
+> > >> device and was looking for a way to control that via dt. Now I'm
+> > >> understanding that to avoid this kind of bootloader/kernel dependence
+> > >> issue I should be using UUID's to identify the boot device.
+> > >>
+> > >> >From my testing it looks like the change your looking for occurred
+> > >> some time ago and is somewhere between 4.5 and 4.6 and not a 4.9
+> > >> regression specifically.
+> > >
+> > > That depends how you look at it.  Yes, there's a change in 4.5 to 4.6
+> > > which ties the block device number to the host device index, but that's
+> > > really only part of the story here.
+> > >
+> > > 4.8 definitely identifies the SD card in iMX6 usdhc2 as "mmcblk0".
+> > > 4.9-rc identifies the SD card as "mmcblk1".  This makes it a 4.9 change
+> > > of behaviour - there can be no argument about that.
+> > >
+> > > Now, digging further into this today, it appears that:
+> > >
+> > > v4.8: usdhc2 was probed first, and is given mmc0.
+> > >       usdhc1 is probed second, and is given mmc1.
+> > >
+> > > v4.9-rc: usdhc1 is probed first, and is given mmc0.
+> > >          usdhc2 is probed second, and is given mmc1.
+> > >
+> > > I haven't yet been able to figure out why there's been this change
+> > > of probe order.  There's no change that I can see in the iMX6 DT
+> > > files that would account for this.
+> > >
+> > 
+> > I bisected it and the commit your looking for is
+> > 9aaf3437aa72ed5370bf32c99580a3fa2c330e3d
 > 
-> Yes. But that implies then that you should not be using big-endian
-> instruction encodings at all, and simply use the _le variants for both
-> LE and BE8
+> No it's not.
+> 
+> Let me try and put it plainer:
+> 
+> * Commit 9aaf3437aa72ed5370bf32c99580a3fa2c330e3d ties the mmc block
+>   device number (mmcblkN) to the mmc host interface number (mmcN).
+>   This change happened between 4.5 and 4.6.
+> 
+> * The change I'm seeing happened between 4.8 and 4.9-rc.  I'm not
+>   seeing a change of behaviour between 4.5 and 4.6.
+> 
+> * The change I'm seeing changes the order of the physical device
+>   associated with the hosts named mmc0 and mmc1 in the kernel.
+> 
+> * Because physical devices associated with the mmc0 and mmc1 hosts
+>   swap over, the mmcblkN number changes due to the commit you point
+>   out.
+> 
+> * So, the change that I'm seeing between 4.8 and 4.9-rc is not caused
+>   by commit 9aaf3437aa72ed5370bf32c99580a3fa2c330e3d, but by something
+>   else changing the order in which the two usdhc physical hardware
+>   blocks get probed.
+> 
+> Does this make it clearer?
 
-Ok. I understand what you're getting at now.
+It turns out to be this commit:
 
-I believe the linker is the one that does the instruction endian
-swap to little endian. So everything is built as big-endian data
-and instructions in the assembler phase and then when the linker
-runs to generate the final vmlinux elf file it does the swaps to
-make instructions little endian. recordmcount runs on the object
-files and not the vmlinux file.
+commit 6eb1c9496b81680f2cd2e0eda06c531317e2e28d
+Author: Masahiro Yamada <yamada.masahiro@socionext.com>
+Date:   Mon Sep 19 01:16:44 2016 +0900
 
-For example, the do_undefinstr() function in
-arch/arm/kernel/traps.c is one place we nop out. On an le host
-and an le build without this patch I see:
+    clk: probe common clock drivers earlier
 
-(This is all ARM, not thumb)
+    Several SoCs implement platform drivers for clocks rather than
+    CLK_OF_DECLARE().  Clocks should come earlier because they are
+    prerequisites for many of other drivers.  It will help to mitigate
+    EPROBE_DEFER issues.
 
-00000000 <do_undefinstr>:
-   0:   e1a0c00d        mov     ip, sp
-   4:   e92dd9f0        push    {r4, r5, r6, r7, r8, fp, ip, lr, pc}
-   8:   e24cb004        sub     fp, ip, #4
-   c:   e24dd08c        sub     sp, sp, #140    ; 0x8c
-  10:   e52de004        push    {lr}            ; (str lr, [sp, #-4]!)
-  14:   ebfffffe        bl      0 <__gnu_mcount_nc>
+    Also, drop the comment since it does not carry much value.
 
-After this patch on an le host and le build I see:
+    Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+    Acked-by: Michael Turquette <mturquette@baylibre.com>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-00000000 <do_undefinstr>:
-   0:   e1a0c00d        mov     ip, sp
-   4:   e92dd9f0        push    {r4, r5, r6, r7, r8, fp, ip, lr, pc}
-   8:   e24cb004        sub     fp, ip, #4
-   c:   e24dd08c        sub     sp, sp, #140    ; 0x8c
-  10:   e1a00000        nop                     ; (mov r0, r0)
-  14:   e1a00000        nop                     ; (mov r0, r0)
+which changes the init order.  In 4.8, we get:
 
-So far so good. Similarly, with this patch and an le host and be
-build I see:
+calling  mmc_pwrseq_simple_driver_init+0x0/0x20 @ 1
+bus: 'platform': driver_probe_device: matched device usdhc1_pwrseq with driver pwrseq_simple
+bus: 'platform': really_probe: probing driver pwrseq_simple with device usdhc1_pwrseq
+platform usdhc1_pwrseq: Driver pwrseq_simple requests probe deferral
+platform usdhc1_pwrseq: Added to deferred list
+initcall mmc_pwrseq_simple_driver_init+0x0/0x20 returned 0 after 737 usecs
 
-00000000 <do_undefinstr>:
-   0:   e1a0c00d        mov     ip, sp
-   4:   e92dd9f0        push    {r4, r5, r6, r7, r8, fp, ip, lr, pc}
-   8:   e24cb004        sub     fp, ip, #4
-   c:   e24dd08c        sub     sp, sp, #140    ; 0x8c
-  10:   e1a00000        nop                     ; (mov r0, r0)
-  14:   e1a00000        nop                     ; (mov r0, r0)
+which then goes on to cause:
 
-but with *_le instead of *_be used a be build I see:
+calling  sdhci_esdhc_imx_driver_init+0x0/0x20 @ 1
+bus: 'platform': driver_probe_device: matched device 2190000.usdhc with driver sdhci-esdhc-imx
+bus: 'platform': really_probe: probing driver sdhci-esdhc-imx with device 2190000.usdhc
+platform 2190000.usdhc: Driver sdhci-esdhc-imx requests probe deferral
+platform 2190000.usdhc: Added to deferred list
 
-00000000 <do_undefinstr>:
-   0:   e1a0c00d        mov     ip, sp
-   4:   e92dd9f0        push    {r4, r5, r6, r7, r8, fp, ip, lr, pc}
-   8:   e24cb004        sub     fp, ip, #4
-   c:   e24dd08c        sub     sp, sp, #140    ; 0x8c
-  10:   0000a0e1        andeq   sl, r0, r1, ror #1
-  14:   0000a0e1        andeq   sl, r0, r1, ror #1
+followed by:
 
-I confirmed this by looking at the hexdump of the .exception.text
-section for the traps.o object file and the .text section of the
-vmlinux file. Basically objcopy the .exception.text of traps.o to
-get the first few instructions of the do_undefinstr() function:
+bus: 'platform': driver_probe_device: matched device 2194000.usdhc with driver sdhci-esdhc-imx
+bus: 'platform': really_probe: probing driver sdhci-esdhc-imx with device 2194000.usdhc
+sdhci-esdhc-imx 2194000.usdhc: Got CD GPIO
+driver: 'sdhci-esdhc-imx': driver_bound: bound to device '2194000.usdhc'
+bus: 'platform': really_probe: bound device 2194000.usdhc to driver sdhci-esdhc-imx
+initcall sdhci_esdhc_imx_driver_init+0x0/0x20 returned 0 after 58205 usecs
 
-$ hexdump -C traps.o 
-00000000  e1 a0 c0 0d e9 2d d9 f0  e2 4c b0 04 e2 4d d0 8c
+and eventually:
 
-And then objcopy the .text section in vmlinux and seek to the
-same function offset (there are a bunch of zeroes in front of it
-for padding):
+mmc0: host does not support reading read-only switch, assuming write-enable
+mmc0: new ultra high speed SDR104 SDHC card at address 0001
+mmcblk0: mmc0:0001 00000 14.9 GiB
+ mmcblk0: p1 p2
 
-$ hexdump -C vmlinux
+In 4.9-rc5, we instead get:
+
+calling  gpio_clk_driver_init+0x0/0x20 @ 1
+bus: 'platform': driver_probe_device: matched device sdio-clock with driver gpio-clk
+bus: 'platform': really_probe: probing driver gpio-clk with device sdio-clock
+driver: 'gpio-clk': driver_bound: bound to device 'sdio-clock'
+bus: 'platform': really_probe: bound device sdio-clock to driver gpio-clk
 ...
-00001000  0d c0 a0 e1 f0 d9 2d e9  04 b0 4c e2 8c d0 4d e2
+calling  mmc_pwrseq_simple_driver_init+0x0/0x20 @ 1
+bus: 'platform': driver_probe_device: matched device usdhc1_pwrseq with driver pwrseq_simple
+bus: 'platform': really_probe: probing driver pwrseq_simple with device usdhc1_pwrseq
+driver: 'pwrseq_simple': driver_bound: bound to device 'usdhc1_pwrseq'
+bus: 'platform': really_probe: bound device usdhc1_pwrseq to driver pwrseq_simple
+initcall mmc_pwrseq_simple_driver_init+0x0/0x20 returned 0 after 876 usecs
+...
+calling  sdhci_esdhc_imx_driver_init+0x0/0x20 @ 1
+bus: 'platform': driver_probe_device: matched device 2190000.usdhc with driver sdhci-esdhc-imx
+bus: 'platform': really_probe: probing driver sdhci-esdhc-imx with device 2190000.usdhc
+sdhci-esdhc-imx 2190000.usdhc: allocated mmc-pwrseq
+driver: 'sdhci-esdhc-imx': driver_bound: bound to device '2190000.usdhc'
+bus: 'platform': really_probe: bound device 2190000.usdhc to driver sdhci-esdhc-imx
+bus: 'platform': driver_probe_device: matched device 2194000.usdhc with driver sdhci-esdhc-imx
+bus: 'platform': really_probe: probing driver sdhci-esdhc-imx with device 2194000.usdhc
+driver: 'sdhci-esdhc-imx': driver_bound: bound to device '2194000.usdhc'
+bus: 'platform': really_probe: bound device 2194000.usdhc to driver sdhci-esdhc-imx
+initcall sdhci_esdhc_imx_driver_init+0x0/0x20 returned 0 after 384864 usecs
+...
+mmc1: host does not support reading read-only switch, assuming write-enable
+mmc1: new ultra high speed SDR104 SDHC card at address 0001
+mmcblk1: mmc1:0001 00000 14.9 GiB
+ mmcblk1: p1 p2
 
-As can be seen everything is swapped from the original object
-file in big-endian to be in little endian.
-
-Does that allay your concerns?
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
