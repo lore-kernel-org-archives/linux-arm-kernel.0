@@ -1,66 +1,164 @@
 From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Tue, 15 Nov 2016 21:13:34 +0800
-Subject: [PATCH v15 12/13] clocksource/drivers/arm_arch_timer: Add GTDT
- support for memory-mapped timer
+Date: Tue, 15 Nov 2016 21:13:35 +0800
+Subject: [PATCH v15 13/13] acpi/arm64: Add SBSA Generic Watchdog support in
+ GTDT driver
 In-Reply-To: <1479215615-26950-1-git-send-email-fu.wei@linaro.org>
 References: <1479215615-26950-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1479215615-26950-13-git-send-email-fu.wei@linaro.org>
+Message-ID: <1479215615-26950-14-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fu Wei <fu.wei@linaro.org>
 
-The patch add memory-mapped timer register support by using the
-information provided by the new GTDT driver of ACPI.
+This driver adds support for parsing SBSA Generic Watchdog timer
+in GTDT, parse all info in SBSA Generic Watchdog Structure in GTDT,
+and creating a platform device with that information.
+
+This allows the operating system to obtain device data from the
+resource of platform device. The platform device named "sbsa-gwdt"
+can be used by the ARM SBSA Generic Watchdog driver.
 
 Signed-off-by: Fu Wei <fu.wei@linaro.org>
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 26 +++++++++++++++++++++++++-
- 1 file changed, 25 insertions(+), 1 deletion(-)
+ drivers/acpi/arm64/gtdt.c | 100 ++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/watchdog/Kconfig  |   1 +
+ 2 files changed, 101 insertions(+)
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 653374c..350d0b9 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -1053,7 +1053,28 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
- 		       arch_timer_mem_of_init);
+diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
+index 08d9506..69483f6 100644
+--- a/drivers/acpi/arm64/gtdt.c
++++ b/drivers/acpi/arm64/gtdt.c
+@@ -14,6 +14,7 @@
+ #include <linux/acpi.h>
+ #include <linux/init.h>
+ #include <linux/kernel.h>
++#include <linux/platform_device.h>
  
- #ifdef CONFIG_ACPI_GTDT
--/* Initialize per-processor generic timer */
-+static int __init arch_timer_mem_acpi_init(void)
+ #include <clocksource/arm_arch_timer.h>
+ 
+@@ -66,6 +67,14 @@ static inline bool is_watchdog(void *platform_timer)
+ 	return gh->type == ACPI_GTDT_TYPE_WATCHDOG;
+ }
+ 
++static inline struct acpi_gtdt_watchdog *get_watchdog(unsigned int index)
 +{
-+	struct arch_timer_mem *timer_mem;
-+	int ret = 0;
-+	int i = 0;
++	if (index >= acpi_gtdt_desc.watchdog_count || !watchdog)
++		return NULL;
 +
-+	timer_mem = kzalloc(sizeof(*timer_mem), GFP_KERNEL);
-+	if (!timer_mem)
-+		return -ENOMEM;
++	return watchdog[index];
++}
 +
-+	while (!gtdt_arch_timer_mem_init(timer_mem, i)) {
-+		ret = arch_timer_mem_init(timer_mem);
-+		if (ret)
-+			break;
-+		i++;
+ static int __init map_gt_gsi(u32 interrupt, u32 flags)
+ {
+ 	int trigger, polarity;
+@@ -309,3 +318,94 @@ int __init gtdt_arch_timer_mem_init(struct arch_timer_mem *data,
+ 
+ 	return 0;
+ }
++
++/*
++ * Initialize a SBSA generic Watchdog platform device info from GTDT
++ */
++static int __init gtdt_import_sbsa_gwdt(struct acpi_gtdt_watchdog *wd,
++					int index)
++{
++	struct platform_device *pdev;
++	int irq = map_gt_gsi(wd->timer_interrupt, wd->timer_flags);
++	int no_irq = 1;
++
++	/*
++	 * According to SBSA specification the size of refresh and control
++	 * frames of SBSA Generic Watchdog is SZ_4K(Offset 0x000 ? 0xFFF).
++	 */
++	struct resource res[] = {
++		DEFINE_RES_MEM(wd->control_frame_address, SZ_4K),
++		DEFINE_RES_MEM(wd->refresh_frame_address, SZ_4K),
++		DEFINE_RES_IRQ(irq),
++	};
++
++	pr_debug("found a Watchdog (0x%llx/0x%llx gsi:%u flags:0x%x).\n",
++		 wd->refresh_frame_address, wd->control_frame_address,
++		 wd->timer_interrupt, wd->timer_flags);
++
++	if (!(wd->refresh_frame_address && wd->control_frame_address)) {
++		pr_err(FW_BUG "failed to get the Watchdog base address.\n");
++		return -EINVAL;
 +	}
 +
-+	kfree(timer_mem);
++	if (!wd->timer_interrupt)
++		pr_warn(FW_BUG "failed to get the Watchdog interrupt.\n");
++	else if (irq <= 0)
++		pr_warn("failed to map the Watchdog interrupt.\n");
++	else
++		no_irq = 0;
++
++	/*
++	 * Add a platform device named "sbsa-gwdt" to match the platform driver.
++	 * "sbsa-gwdt": SBSA(Server Base System Architecture) Generic Watchdog
++	 * The platform driver (like drivers/watchdog/sbsa_gwdt.c)can get device
++	 * info below by matching this name.
++	 */
++	pdev = platform_device_register_simple("sbsa-gwdt", index, res,
++					       ARRAY_SIZE(res) - no_irq);
++	if (IS_ERR(pdev)) {
++		acpi_unregister_gsi(wd->timer_interrupt);
++		return PTR_ERR(pdev);
++	}
++
++	return 0;
++}
++
++static int __init gtdt_sbsa_gwdt_init(void)
++{
++	int i, ret;
++	struct acpi_table_header *table;
++	struct acpi_gtdt_watchdog *watchdog;
++
++	if (acpi_disabled)
++		return 0;
++
++	if (ACPI_FAILURE(acpi_get_table(ACPI_SIG_GTDT, 0, &table)))
++		return -EINVAL;
++
++	ret = acpi_gtdt_init(table);
++	if (ret)
++		return ret;
++
++	if (!acpi_gtdt_desc.watchdog_count)
++		return 0;
++
++	for (i = 0; i < acpi_gtdt_desc.watchdog_count; i++) {
++		watchdog = get_watchdog(i);
++		if (!watchdog) {
++			ret = -ENODEV;
++			break;
++		}
++		ret = gtdt_import_sbsa_gwdt(watchdog, i);
++		if (ret)
++			break;
++	}
++
++	pr_info("found %d SBSA generic Watchdog(s), %d imported.\n",
++		acpi_gtdt_desc.watchdog_count, i);
++
++	acpi_gtdt_release();
 +	return ret;
 +}
 +
-+/* Initialize per-processor generic timer and memory-mapped timer(if present) */
- static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- {
- 	int ret;
-@@ -1090,6 +1111,9 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 	/* Get the frequency from CNTFRQ */
- 	arch_timer_detect_rate(NULL, NULL);
- 
-+	if (arch_timer_mem_acpi_init())
-+		pr_err("Failed to initialize memory-mapped timer.\n");
-+
- 	ret = arch_timer_init();
- 
- error:
++device_initcall(gtdt_sbsa_gwdt_init);
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index fdd3228..e5ba1f0 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -218,6 +218,7 @@ config ARM_SBSA_WATCHDOG
+ 	tristate "ARM SBSA Generic Watchdog"
+ 	depends on ARM64
+ 	depends on ARM_ARCH_TIMER
++	depends on ACPI_GTDT || !ACPI
+ 	select WATCHDOG_CORE
+ 	help
+ 	  ARM SBSA Generic Watchdog has two stage timeouts:
 -- 
 2.7.4
