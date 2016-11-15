@@ -1,81 +1,75 @@
-From: honghui.zhang@mediatek.com (Honghui Zhang)
-Date: Tue, 15 Nov 2016 18:45:08 +0800
-Subject: [PATCH v9 2/4] soc: mediatek: Init MT8173 scpsys driver earlier
-In-Reply-To: <1477879702.6649.4.camel@mtksdaap41>
-References: <1476953798-23263-1-git-send-email-jamesjj.liao@mediatek.com>
- <1476953798-23263-3-git-send-email-jamesjj.liao@mediatek.com>
- <14a1ebb2-fda2-278b-b2f0-8f9c6ff6a83d@gmail.com>
- <1477879702.6649.4.camel@mtksdaap41>
-Message-ID: <1479206708.28796.9.camel@mtksdaap41>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 15 Nov 2016 16:16:02 +0530
+Subject: [PATCH v4 4/4] ARM: dts: da850: Add the usb otg device node
+In-Reply-To: <1478188752-22447-5-git-send-email-abailon@baylibre.com>
+References: <1478188752-22447-1-git-send-email-abailon@baylibre.com>
+ <1478188752-22447-5-git-send-email-abailon@baylibre.com>
+Message-ID: <0c94c5e0-9d2c-fff5-1213-2fb2adb20ab0@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-10-31 at 10:08 +0800, James Liao wrote:
-> On Mon, 2016-10-31 at 01:08 +0100, Matthias Brugger wrote:
-> > Hi James,
-> > 
-> > On 10/20/2016 10:56 AM, James Liao wrote:
-> > > Some power domain comsumers may init before module_init.
-> > > So the power domain provider (scpsys) need to be initialized
-> > > earlier too.
-> > >
-> > > Take an example for our IOMMU (M4U) and SMI. SMI is a bridge
-> > > between IOMMU and multimedia HW. SMI is responsible to
-> > > enable/disable iommu and help transfer data for each multimedia
-> > > HW. Both of them have to wait until the power and clocks are
-> > > enabled.
-> > >
-> > > So scpsys driver should be initialized before SMI, and SMI should
-> > > be initialized before IOMMU, and then init IOMMU consumers
-> > > (display/vdec/venc/camera etc.).
-> > >
-> > > IOMMU is subsys_init by default. So we need to init scpsys driver
-> > > before subsys_init.
-> > >
-> > > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> > > Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-> > > ---
-> > 
-> > I didn't applied this patch for now.
-> > I answered you in v7 of this series [1]. I would prefer to see if we can 
-> > fix that otherwise.
-> > 
-> > Would be great if you or Yong could provide some feedback.
-> > 
+On Thursday 03 November 2016 09:29 PM, Alexandre Bailon wrote:
+> This adds the device tree node for the usb otg
+> controller present in the da850 family of SoC's.
+> This also enables the otg usb controller for the lcdk board.
+> 
+> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+> ---
+>  arch/arm/boot/dts/da850-lcdk.dts |  8 ++++++++
+>  arch/arm/boot/dts/da850.dtsi     | 15 +++++++++++++++
+>  2 files changed, 23 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+> index 7b8ab21..9f5040c 100644
+> --- a/arch/arm/boot/dts/da850-lcdk.dts
+> +++ b/arch/arm/boot/dts/da850-lcdk.dts
+> @@ -158,6 +158,14 @@
+>  	rx-num-evt = <32>;
+>  };
+>  
+> +&usb_phy {
+> +	status = "okay";
+> +	};
 
-Hi, Matthias,
-  Yong had verified your propose and it seems didn't work[1].
-But I'm looking at the recently merged device link patches[2], it maybe
-could help with the probe sequence issue.
+As mentioned by David already, this node needs to be removed. Please
+rebase this on top of latest linux-davinci/master when ready for merging
+(driver changes accepted).
 
-If we set the iommu client as the smi larb's device consumer of
-device_link with the DL_DEV_PROBING flags, it will be wait for smi
-larb's probe done. But I'm not test that solution yet, need to do a bit
-more test to verify this.
+> +
+> +&usb0 {
+> +	status = "okay";
+> +};
+> +
+>  &aemif {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&nand_pins>;
+> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> index f79e1b9..322a31a 100644
+> --- a/arch/arm/boot/dts/da850.dtsi
+> +++ b/arch/arm/boot/dts/da850.dtsi
+> @@ -372,6 +372,21 @@
+>  					>;
+>  			status = "disabled";
+>  		};
+> +		usb_phy: usb-phy {
+> +			compatible = "ti,da830-usb-phy";
+> +			#phy-cells = <1>;
+> +			status = "disabled";
+> +		};
+> +		usb0: usb at 200000 {
+> +			compatible = "ti,da830-musb";
+> +			reg = <0x200000 0x10000>;
+> +			interrupts = <58>;
+> +			interrupt-names = "mc";
+> +			dr_mode = "otg";
+> +			phys = <&usb_phy 0>;
+> +			phy-names = "usb-phy";
+> +			status = "disabled";
+> +		};
 
-thanks.
+Can you separate out the soc specific changes from board changes? Please
+place the usb0 node above the mdio node. I am trying to get to a rough
+ordering based on reg property.
 
-[1]
-https://lists.linuxfoundation.org/pipermail/iommu/2016-July/018034.html
-[2]https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1261311.html
-
-> > Thanks,
-> > Matthias
-> > 
-> > [1] https://patchwork.kernel.org/patch/9397405/
-> > 
-> > >  drivers/soc/mediatek/mtk-scpsys.c | 19 ++++++++++++++++++-
-> > >  1 file changed, 18 insertions(+), 1 deletion(-)
-> > >
-> > > diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> > > index fa9ee69..dd7a07d 100644
-> > > --- a/drivers/soc/mediatek/mtk-scpsys.c
-> > > +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> > > @@ -613,4 +613,21 @@ static int scpsys_probe(struct platform_device *pdev)
-> > >  		.of_match_table = of_match_ptr(of_scpsys_match_tbl),
-> > >  	},
-
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+Thanks,
+Sekhar
