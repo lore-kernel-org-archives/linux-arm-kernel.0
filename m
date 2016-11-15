@@ -1,286 +1,155 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Tue, 15 Nov 2016 21:41:39 +0100
-Subject: [RFCv2 PATCH 1/5] video: add HDMI state notifier support
-In-Reply-To: <1479234278.2456.49.camel@pengutronix.de>
-References: <1479136968-24477-1-git-send-email-hverkuil@xs4all.nl>
- <1479136968-24477-2-git-send-email-hverkuil@xs4all.nl>
- <1479234278.2456.49.camel@pengutronix.de>
-Message-ID: <00ad0ddf-3e52-62e6-f863-cae6eefd08c9@xs4all.nl>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 15 Nov 2016 22:00:34 +0100
+Subject: [GIT PULL] Allwinner late DT changes for 4.10
+Message-ID: <20161115210034.mwqnsggmmbzoav77@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+Hi Arnd, Olof,
 
-On 11/15/2016 07:24 PM, Philipp Zabel wrote:
-> Hi Hans,
-> 
-> Am Montag, den 14.11.2016, 16:22 +0100 schrieb Hans Verkuil:
->> From: Hans Verkuil <hans.verkuil@cisco.com>
->>
->> Add support for HDMI hotplug and EDID notifiers, which is used to convey
->> information from HDMI drivers to their CEC and audio counterparts.
->>
->> Based on an earlier version from Russell King:
->>
->> https://patchwork.kernel.org/patch/9277043/
->>
->> The hdmi_notifier is a reference counted object containing the HDMI state
->> of an HDMI device.
->>
->> When a new notifier is registered the current state will be reported to
->> that notifier at registration time.
->>
->> Signed-off-by: Hans Verkuil <hans.verkuil@cisco.com>
->> ---
->>  drivers/video/Kconfig         |   3 +
->>  drivers/video/Makefile        |   1 +
->>  drivers/video/hdmi-notifier.c | 136 ++++++++++++++++++++++++++++++++++++++++++
->>  include/linux/hdmi-notifier.h |  43 +++++++++++++
->>  4 files changed, 183 insertions(+)
->>  create mode 100644 drivers/video/hdmi-notifier.c
->>  create mode 100644 include/linux/hdmi-notifier.h
->>
->> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
->> index 3c20af9..1ee7b9f 100644
->> --- a/drivers/video/Kconfig
->> +++ b/drivers/video/Kconfig
->> @@ -36,6 +36,9 @@ config VIDEOMODE_HELPERS
->>  config HDMI
->>  	bool
->>  
->> +config HDMI_NOTIFIERS
->> +	bool
->> +
->>  if VT
->>  	source "drivers/video/console/Kconfig"
->>  endif
->> diff --git a/drivers/video/Makefile b/drivers/video/Makefile
->> index 9ad3c17..65f5649 100644
->> --- a/drivers/video/Makefile
->> +++ b/drivers/video/Makefile
->> @@ -1,5 +1,6 @@
->>  obj-$(CONFIG_VGASTATE)            += vgastate.o
->>  obj-$(CONFIG_HDMI)                += hdmi.o
->> +obj-$(CONFIG_HDMI_NOTIFIERS)      += hdmi-notifier.o
->>  
->>  obj-$(CONFIG_VT)		  += console/
->>  obj-$(CONFIG_LOGO)		  += logo/
->> diff --git a/drivers/video/hdmi-notifier.c b/drivers/video/hdmi-notifier.c
->> new file mode 100644
->> index 0000000..c2a4f1b
->> --- /dev/null
->> +++ b/drivers/video/hdmi-notifier.c
->> @@ -0,0 +1,136 @@
->> +#include <linux/export.h>
->> +#include <linux/hdmi-notifier.h>
->> +#include <linux/string.h>
->> +#include <linux/slab.h>
->> +#include <linux/list.h>
->> +
->> +struct hdmi_notifiers {
->> +	struct list_head head;
->> +	struct device *dev;
->> +	struct hdmi_notifier *n;
->> +};
-> 
-> This struct is not used, can be removed.
+Here is a pull request that should be merged after the pinctrl PR,
+hence probably in your late PR.
 
-Indeed.
+This is just a mechanic conversion to the generic pinconf bindings and
+removal of the useless pinmux properties we had.
 
-> 
->> +static LIST_HEAD(hdmi_notifiers);
->> +static DEFINE_MUTEX(hdmi_notifiers_lock);
->> +
->> +struct hdmi_notifier *hdmi_notifier_get(struct device *dev)
->> +{
->> +	struct hdmi_notifier *n;
->> +
->> +	mutex_lock(&hdmi_notifiers_lock);
->> +	list_for_each_entry(n, &hdmi_notifiers, head) {
->> +		if (n->dev == dev) {
->> +			mutex_unlock(&hdmi_notifiers_lock);
->> +			kref_get(&n->kref);
->> +			return n;
->> +		}
->> +	}
->> +	n = kzalloc(sizeof(*n), GFP_KERNEL);
->> +	if (!n)
->> +		goto unlock;
->> +	mutex_init(&n->lock);
->> +	BLOCKING_INIT_NOTIFIER_HEAD(&n->notifiers);
->> +	kref_init(&n->kref);
-> 
-> +	n->dev = dev;
-> 
-> Currently n->dev is never set, so every caller of this function gets its
-> own hdmi_notifier.
+This is based on the previous DT PR I just sent.
 
-Oops! Well, I did say it was compile-tested only :-)
+Thanks!
+Maxime
 
-> 
->> +	list_add_tail(&n->head, &hdmi_notifiers);
->> +unlock:
->> +	mutex_unlock(&hdmi_notifiers_lock);
->> +	return n;
->> +}
->> +EXPORT_SYMBOL_GPL(hdmi_notifier_get);
->> +
->> +static void hdmi_notifier_release(struct kref *kref)
->> +{
->> +	struct hdmi_notifier *n =
->> +		container_of(kref, struct hdmi_notifier, kref);
->> +
->> +	kfree(n->edid);
->> +	kfree(n);
->> +}
->> +
->> +void hdmi_notifier_put(struct hdmi_notifier *n)
->> +{
->> +	kref_put(&n->kref, hdmi_notifier_release);
->> +}
->> +EXPORT_SYMBOL_GPL(hdmi_notifier_put);
->> +
->> +int hdmi_notifier_register(struct hdmi_notifier *n, struct notifier_block *nb)
->> +{
->> +	int ret = blocking_notifier_chain_register(&n->notifiers, nb);
->> +
->> +	if (ret)
->> +		return ret;
->> +	kref_get(&n->kref);
->> +	mutex_lock(&n->lock);
->> +	if (n->connected) {
->> +		blocking_notifier_call_chain(&n->notifiers, HDMI_CONNECTED, n);
->> +		if (n->edid_size)
->> +			blocking_notifier_call_chain(&n->notifiers, HDMI_NEW_EDID, n);
->> +		if (n->has_eld)
->> +			blocking_notifier_call_chain(&n->notifiers, HDMI_NEW_ELD, n);
->> +	}
->> +	mutex_unlock(&n->lock);
->> +	return 0;
->> +}
->> +EXPORT_SYMBOL_GPL(hdmi_notifier_register);
->> +
->> +int hdmi_notifier_unregister(struct hdmi_notifier *n, struct notifier_block *nb)
->> +{
->> +	int ret = blocking_notifier_chain_unregister(&n->notifiers, nb);
->> +
->> +	if (ret == 0)
->> +		hdmi_notifier_put(n);
->> +	return ret;
->> +}
->> +EXPORT_SYMBOL_GPL(hdmi_notifier_unregister);
->> +
->> +void hdmi_event_connect(struct hdmi_notifier *n)
->> +{
->> +	mutex_lock(&n->lock);
->> +	n->connected = true;
->> +	blocking_notifier_call_chain(&n->notifiers, HDMI_CONNECTED, n);
->> +	mutex_unlock(&n->lock);
->> +}
->> +EXPORT_SYMBOL_GPL(hdmi_event_connect);
->> +
->> +void hdmi_event_disconnect(struct hdmi_notifier *n)
->> +{
->> +	mutex_lock(&n->lock);
->> +	n->connected = false;
->> +	n->has_eld = false;
->> +	n->edid_size = 0;
->> +	blocking_notifier_call_chain(&n->notifiers, HDMI_DISCONNECTED, n);
->> +	mutex_unlock(&n->lock);
->> +}
->> +EXPORT_SYMBOL_GPL(hdmi_event_disconnect);
->> +
->> +int hdmi_event_new_edid(struct hdmi_notifier *n, const void *edid, size_t size)
->> +{
->> +	mutex_lock(&n->lock);
->> +	if (n->edid_allocated_size < size) {
->> +		void *p = kmalloc(size, GFP_KERNEL);
->> +
->> +		if (p == NULL) {
->> +			mutex_unlock(&n->lock);
->> +			return -ENOMEM;
->> +		}
->> +		kfree(n->edid);
->> +		n->edid = p;
->> +		n->edid_allocated_size = size;
->> +	}
->> +	memcpy(n->edid, edid, size);
->> +	n->edid_size = size;
->> +	blocking_notifier_call_chain(&n->notifiers, HDMI_NEW_EDID, n);
->> +	mutex_unlock(&n->lock);
->> +	return 0;
->> +}
->> +EXPORT_SYMBOL_GPL(hdmi_event_new_edid);
->> +
->> +void hdmi_event_new_eld(struct hdmi_notifier *n, const u8 eld[128])
->> +{
->> +	mutex_lock(&n->lock);
->> +	memcpy(n->eld, eld, sizeof(n->eld));
->> +	n->has_eld = true;
->> +	blocking_notifier_call_chain(&n->notifiers, HDMI_NEW_ELD, n);
->> +	mutex_unlock(&n->lock);
->> +}
->> +EXPORT_SYMBOL_GPL(hdmi_event_new_eld);
->> diff --git a/include/linux/hdmi-notifier.h b/include/linux/hdmi-notifier.h
->> new file mode 100644
->> index 0000000..f7fc405
->> --- /dev/null
->> +++ b/include/linux/hdmi-notifier.h
->> @@ -0,0 +1,43 @@
->> +#ifndef LINUX_HDMI_NOTIFIER_H
->> +#define LINUX_HDMI_NOTIFIER_H
->> +
->> +#include <linux/types.h>
->> +#include <linux/notifier.h>
->> +#include <linux/kref.h>
->> +
->> +enum {
->> +	HDMI_CONNECTED,
->> +	HDMI_DISCONNECTED,
->> +	HDMI_NEW_EDID,
->> +	HDMI_NEW_ELD,
->> +};
->> +
->> +struct device;
->> +
->> +struct hdmi_notifier {
->> +	struct mutex lock;
->> +	struct list_head head;
->> +	struct kref kref;
->> +	struct blocking_notifier_head notifiers;
->> +	struct device *dev;
->> +
->> +	/* Current state */
->> +	bool connected;
->> +	bool has_eld;
->> +	unsigned char eld[128];
->> +	void *edid;
->> +	size_t edid_size;
->> +	size_t edid_allocated_size;
->> +};
->> +
->> +struct hdmi_notifier *hdmi_notifier_get(struct device *dev);
->> +void hdmi_notifier_put(struct hdmi_notifier *n);
->> +int hdmi_notifier_register(struct hdmi_notifier *n, struct notifier_block *nb);
->> +int hdmi_notifier_unregister(struct hdmi_notifier *n, struct notifier_block *nb);
->> +
->> +void hdmi_event_connect(struct hdmi_notifier *n);
->> +void hdmi_event_disconnect(struct hdmi_notifier *n);
->> +int hdmi_event_new_edid(struct hdmi_notifier *n, const void *edid, size_t size);
->> +void hdmi_event_new_eld(struct hdmi_notifier *n, const u8 eld[128]);
->> +
->> +#endif
-> 
-> With the above change,
-> 
-> Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Tested-by: Philipp Zabel <p.zabel@pengutronix.de> (on MT8173)
-> 
-> I'll send the patches for mediatek-drm and hdmi-codec that I used for
-> testing in a bit.
+The following changes since commit e39a30cf736144814b0bddb3fff28fbbc2a8be0f:
 
-Thanks for testing this so quickly! Much appreciated!
+  ARM: sunxi: Add the missing clocks to the pinctrl nodes (2016-11-15 18:49:47 +0100)
 
-Regards,
+are available in the git repository at:
 
-	Hans
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-late-for-4.10
+
+for you to fetch changes up to 1d20ba07ea57ae227a925302b42221df5b830f2b:
+
+  ARM: sunxi: Convert pinctrl nodes to generic bindings (2016-11-15 21:56:30 +0100)
+
+----------------------------------------------------------------
+Allwinner late DT additions for 4.10
+
+Conversion to the generic pin conf bindings for our device trees
+
+----------------------------------------------------------------
+Maxime Ripard (3):
+      ARM: sunxi: Remove useless allwinner,drive property
+      ARM: sunxi: Remove useless allwinner,pull property
+      ARM: sunxi: Convert pinctrl nodes to generic bindings
+
+ arch/arm/boot/dts/ntc-gr8-chip-pro.dts             |  12 +-
+ arch/arm/boot/dts/ntc-gr8-evb.dts                  |  24 +-
+ arch/arm/boot/dts/ntc-gr8.dtsi                     | 122 ++++-----
+ arch/arm/boot/dts/sun4i-a10-a1000.dts              |  12 +-
+ arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts         |   2 +-
+ arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts    |  14 +-
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts         |  14 +-
+ arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts   |  38 ++-
+ arch/arm/boot/dts/sun4i-a10-gemei-g9.dts           |   6 +-
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts          |  12 +-
+ arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts       |  16 +-
+ arch/arm/boot/dts/sun4i-a10-inet1.dts              |  26 +-
+ arch/arm/boot/dts/sun4i-a10-inet97fv2.dts          |  14 +-
+ arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts       |  29 +--
+ arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts         |  12 +-
+ arch/arm/boot/dts/sun4i-a10-marsboard.dts          |  13 +-
+ arch/arm/boot/dts/sun4i-a10-mini-xplus.dts         |   2 +-
+ arch/arm/boot/dts/sun4i-a10-mk802.dts              |  18 +-
+ arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts     |  27 +-
+ arch/arm/boot/dts/sun4i-a10-pcduino.dts            |  19 +-
+ arch/arm/boot/dts/sun4i-a10-pcduino2.dts           |   6 +-
+ arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts   |  32 +--
+ arch/arm/boot/dts/sun4i-a10.dtsi                   | 169 +++++--------
+ arch/arm/boot/dts/sun5i-a10s-auxtek-t003.dts       |  18 +-
+ arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts       |  29 +--
+ arch/arm/boot/dts/sun5i-a10s-mk802.dts             |  19 +-
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts   |  36 ++-
+ arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts      |  20 +-
+ arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts           |  21 +-
+ arch/arm/boot/dts/sun5i-a10s.dtsi                  |  43 ++--
+ .../boot/dts/sun5i-a13-empire-electronix-d709.dts  |  23 +-
+ arch/arm/boot/dts/sun5i-a13-hsg-h702.dts           |  22 +-
+ arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts    |  40 ++-
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts          |  36 ++-
+ arch/arm/boot/dts/sun5i-a13-utoo-p66.dts           |  17 +-
+ arch/arm/boot/dts/sun5i-a13.dtsi                   |  24 +-
+ arch/arm/boot/dts/sun5i-r8-chip.dts                |  27 +-
+ .../boot/dts/sun5i-reference-design-tablet.dtsi    |  33 +--
+ arch/arm/boot/dts/sun5i.dtsi                       |  75 +++---
+ arch/arm/boot/dts/sun6i-a31-app4-evb1.dts          |   6 +-
+ arch/arm/boot/dts/sun6i-a31-colombus.dts           |  22 +-
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts        |  23 +-
+ arch/arm/boot/dts/sun6i-a31-i7.dts                 |  19 +-
+ arch/arm/boot/dts/sun6i-a31-m9.dts                 |  19 +-
+ arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts   |  19 +-
+ arch/arm/boot/dts/sun6i-a31.dtsi                   |  98 +++-----
+ arch/arm/boot/dts/sun6i-a31s-primo81.dts           |  20 +-
+ arch/arm/boot/dts/sun6i-a31s-sina31s.dts           |  13 +-
+ arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts   |  29 +--
+ .../dts/sun6i-a31s-yones-toptech-bs1078-v2.dts     |   9 +-
+ .../boot/dts/sun6i-reference-design-tablet.dtsi    |  14 +-
+ arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts   |  27 +-
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts           |  26 +-
+ arch/arm/boot/dts/sun7i-a20-bananapro.dts          |  37 +--
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        |  13 +-
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |  38 +--
+ arch/arm/boot/dts/sun7i-a20-hummingbird.dts        |  24 +-
+ arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts          |  26 +-
+ arch/arm/boot/dts/sun7i-a20-itead-ibox.dts         |   7 +-
+ arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts          |  30 +--
+ arch/arm/boot/dts/sun7i-a20-m3.dts                 |   6 +-
+ arch/arm/boot/dts/sun7i-a20-mk808c.dts             |  12 +-
+ arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts     |  32 +--
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts     |  27 +-
+ .../boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts    |   6 +-
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts    |  33 +--
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts    |  28 +--
+ arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts      |  45 ++--
+ arch/arm/boot/dts/sun7i-a20-orangepi.dts           |  38 ++-
+ arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts      |  25 +-
+ arch/arm/boot/dts/sun7i-a20-pcduino3.dts           |  21 +-
+ arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts     |  25 +-
+ arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts   |  13 +-
+ arch/arm/boot/dts/sun7i-a20.dtsi                   | 277 ++++++++-------------
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi               |  95 +++----
+ arch/arm/boot/dts/sun8i-a23-evb.dts                |   7 +-
+ .../boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts   |   8 +-
+ .../boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts   |   8 +-
+ arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts     |   9 +-
+ arch/arm/boot/dts/sun8i-a33-olinuxino.dts          |  18 +-
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts     |  11 +-
+ arch/arm/boot/dts/sun8i-a33.dtsi                   |   6 +-
+ arch/arm/boot/dts/sun8i-a83t.dtsi                  |  21 +-
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    |  18 +-
+ arch/arm/boot/dts/sun8i-h3-nanopi.dtsi             |  18 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          |  26 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts       |  18 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        |  18 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts    |   4 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  18 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts       |  10 +-
+ arch/arm/boot/dts/sun8i-h3.dtsi                    | 104 +++-----
+ arch/arm/boot/dts/sun8i-q8-common.dtsi             |   9 +-
+ arch/arm/boot/dts/sun8i-r16-parrot.dts             |  36 ++-
+ .../boot/dts/sun8i-reference-design-tablet.dtsi    |  26 +-
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts        |  23 +-
+ arch/arm/boot/dts/sun9i-a80-optimus.dts            |  41 ++-
+ arch/arm/boot/dts/sun9i-a80.dtsi                   |  61 ++---
+ arch/arm/boot/dts/sunxi-common-regulators.dtsi     |  24 +-
+ 99 files changed, 1083 insertions(+), 1783 deletions(-)
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161115/d965478b/attachment.sig>
