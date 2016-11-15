@@ -1,221 +1,120 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 15 Nov 2016 23:38:59 +0100
-Subject: [PATCH v2 2/3] soc: rockchip: add driver handling grf setup
-In-Reply-To: <20161115223900.30728-1-heiko@sntech.de>
-References: <20161115223900.30728-1-heiko@sntech.de>
-Message-ID: <20161115223900.30728-3-heiko@sntech.de>
+From: phh@phh.me (Pierre-Hugues Husson)
+Date: Wed, 16 Nov 2016 00:21:28 +0100
+Subject: [RFCv2 PATCH 3/5] drm/bridge: dw_hdmi: add HDMI notifier support
+In-Reply-To: <1479136968-24477-4-git-send-email-hverkuil@xs4all.nl>
+References: <1479136968-24477-1-git-send-email-hverkuil@xs4all.nl>
+ <1479136968-24477-4-git-send-email-hverkuil@xs4all.nl>
+Message-ID: <CAJ-oXjSzet5R9d=zJEVxg5EjjUfc1=PM5R2fjc9FgMtJFnx6Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The General Register Files are an area of registers containing a lot
-of single-bit settings for numerous components as well full components
-like usbphy control. Therefore all used components are accessed
-via the syscon provided by the grf nodes or from the sub-devices
-created through the simple-mfd created from the grf node.
+Hi Hans,
 
-Some settings are not used by anything but will need to be set up
-according to expectations on the kernel side.
-
-Best example is the force_jtag setting, which defaults to on and
-results in the soc switching the pin-outputs between jtag and sdmmc
-automatically depending on the card-detect status. This conflicts
-heavily with how the dw_mmc driver expects to do its work and also
-with the clock-controller, which has most likely deactivated the
-jtag clock due to it being unused.
-
-So far the handling of this setting was living in the mach-rockchip
-code for the arm32-based rk3288 but that of course doesn't work
-for arm64 socs and would also look ugly for further arm32 socs.
-
-Also always disabling this setting is quite specific to linux and
-its subsystems, other operating systems might prefer other settings,
-so that the bootloader cannot really set a sane default for all.
-
-So introduce a top-level driver for the grf that handles these
-settings that need to be a certain way but nobody cares about.
-
-Other needed settings might surface in the future and can then
-be added here, but only as a last option. Ideally general GRF
-settings should be handled in the driver needing them.
-
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/soc/rockchip/Kconfig  |  10 ++++
- drivers/soc/rockchip/Makefile |   1 +
- drivers/soc/rockchip/grf.c    | 134 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 145 insertions(+)
- create mode 100644 drivers/soc/rockchip/grf.c
-
-diff --git a/drivers/soc/rockchip/Kconfig b/drivers/soc/rockchip/Kconfig
-index 7140ff8..20da55d 100644
---- a/drivers/soc/rockchip/Kconfig
-+++ b/drivers/soc/rockchip/Kconfig
-@@ -3,6 +3,16 @@ if ARCH_ROCKCHIP || COMPILE_TEST
- #
- # Rockchip Soc drivers
- #
-+
-+config ROCKCHIP_GRF
-+	bool
-+	default y
-+	help
-+	  The General Register Files are a central component providing
-+	  special additional settings registers for a lot of soc-components.
-+	  In a lot of cases there also need to be default settings initialized
-+	  to make some of them conform to expectations of the kernel.
-+
- config ROCKCHIP_PM_DOMAINS
-         bool "Rockchip generic power domain"
-         depends on PM
-diff --git a/drivers/soc/rockchip/Makefile b/drivers/soc/rockchip/Makefile
-index 3d73d06..c851fa0 100644
---- a/drivers/soc/rockchip/Makefile
-+++ b/drivers/soc/rockchip/Makefile
-@@ -1,4 +1,5 @@
- #
- # Rockchip Soc drivers
- #
-+obj-$(CONFIG_ROCKCHIP_GRF) += grf.o
- obj-$(CONFIG_ROCKCHIP_PM_DOMAINS) += pm_domains.o
-diff --git a/drivers/soc/rockchip/grf.c b/drivers/soc/rockchip/grf.c
-new file mode 100644
-index 0000000..0c85476a
---- /dev/null
-+++ b/drivers/soc/rockchip/grf.c
-@@ -0,0 +1,134 @@
-+/*
-+ * Rockchip Generic Register Files setup
-+ *
-+ * Copyright (c) 2016 Heiko Stuebner <heiko@sntech.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+
-+#define HIWORD_UPDATE(val, mask, shift) \
-+		((val) << (shift) | (mask) << ((shift) + 16))
-+
-+struct rockchip_grf_value {
-+	const char *desc;
-+	u32 reg;
-+	u32 val;
-+};
-+
-+struct rockchip_grf_info {
-+	const struct rockchip_grf_value *values;
-+	int num_values;
-+};
-+
-+#define RK3036_GRF_SOC_CON0		0x140
-+
-+static const struct rockchip_grf_value rk3036_defaults[] __initconst = {
-+	/*
-+	 * Disable auto jtag/sdmmc switching that causes issues with the
-+	 * clock-framework and the mmc controllers making them unreliable.
-+	 */
-+	{ "jtag switching", RK3036_GRF_SOC_CON0, HIWORD_UPDATE(0, 1, 11) },
-+};
-+
-+static const struct rockchip_grf_info rk3036_grf __initconst = {
-+	.values = rk3036_defaults,
-+	.num_values = ARRAY_SIZE(rk3036_defaults),
-+};
-+
-+#define RK3288_GRF_SOC_CON0		0x244
-+
-+static const struct rockchip_grf_value rk3288_defaults[] __initconst = {
-+	{ "jtag switching", RK3288_GRF_SOC_CON0, HIWORD_UPDATE(0, 1, 12) },
-+};
-+
-+static const struct rockchip_grf_info rk3288_grf __initconst = {
-+	.values = rk3288_defaults,
-+	.num_values = ARRAY_SIZE(rk3288_defaults),
-+};
-+
-+#define RK3368_GRF_SOC_CON15		0x43c
-+
-+static const struct rockchip_grf_value rk3368_defaults[] __initconst = {
-+	{ "jtag switching", RK3368_GRF_SOC_CON15, HIWORD_UPDATE(0, 1, 13) },
-+};
-+
-+static const struct rockchip_grf_info rk3368_grf __initconst = {
-+	.values = rk3368_defaults,
-+	.num_values = ARRAY_SIZE(rk3368_defaults),
-+};
-+
-+#define RK3399_GRF_SOC_CON7		0xe21c
-+
-+static const struct rockchip_grf_value rk3399_defaults[] __initconst = {
-+	{ "jtag switching", RK3399_GRF_SOC_CON7, HIWORD_UPDATE(0, 1, 12) },
-+};
-+
-+static const struct rockchip_grf_info rk3399_grf __initconst = {
-+	.values = rk3399_defaults,
-+	.num_values = ARRAY_SIZE(rk3399_defaults),
-+};
-+
-+static const struct of_device_id rockchip_grf_dt_match[] __initconst = {
-+	{
-+		.compatible = "rockchip,rk3036-grf",
-+		.data = (void *)&rk3036_grf,
-+	}, {
-+		.compatible = "rockchip,rk3288-grf",
-+		.data = (void *)&rk3288_grf,
-+	}, {
-+		.compatible = "rockchip,rk3368-grf",
-+		.data = (void *)&rk3368_grf,
-+	}, {
-+		.compatible = "rockchip,rk3399-grf",
-+		.data = (void *)&rk3399_grf,
-+	},
-+	{ /* sentinel */ },
-+};
-+
-+static int __init rockchip_grf_init(void)
-+{
-+	const struct rockchip_grf_info *grf_info;
-+	const struct of_device_id *match;
-+	struct device_node *np;
-+	struct regmap *grf;
-+	int ret, i;
-+
-+	np = of_find_matching_node_and_match(NULL, rockchip_grf_dt_match, &match);
-+	if (!np)
-+		return -ENODEV;
-+	if (!match || !match->data) {
-+		pr_err("%s: missing grf data\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	grf_info = match->data;
-+
-+	grf = syscon_node_to_regmap(np);
-+	if (IS_ERR(grf)) {
-+		pr_err("%s: could not get grf syscon\n", __func__);
-+		return PTR_ERR(grf);
-+	}
-+
-+	for (i = 0; i < grf_info->num_values; i++) {
-+		const struct rockchip_grf_value *val = &grf_info->values[i];
-+
-+		pr_debug("%s: adjusting %s in %#6x to %#10x\n", __func__,
-+			val->desc, val->reg, val->val);
-+		ret = regmap_write(grf, val->reg, val->val);
-+		if (ret < 0)
-+			pr_err("%s: write to %#6x failed with %d\n",
-+			       __func__, val->reg, ret);
-+	}
-+
-+	return 0;
-+}
-+postcore_initcall(rockchip_grf_init);
--- 
-2.10.2
+2016-11-14 16:22 GMT+01:00 Hans Verkuil <hverkuil@xs4all.nl>:
+> From: Russell King <rmk+kernel@arm.linux.org.uk>
+>
+> Add HDMI notifiers to the HDMI bridge driver.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  drivers/gpu/drm/bridge/Kconfig   |  1 +
+>  drivers/gpu/drm/bridge/dw-hdmi.c | 25 ++++++++++++++++++++++++-
+>  2 files changed, 25 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+> index 10e12e7..5f4ebe9 100644
+> --- a/drivers/gpu/drm/bridge/Kconfig
+> +++ b/drivers/gpu/drm/bridge/Kconfig
+> @@ -27,6 +27,7 @@ config DRM_DUMB_VGA_DAC
+>  config DRM_DW_HDMI
+>         tristate
+>         select DRM_KMS_HELPER
+> +       select HDMI_NOTIFIERS
+>
+>  config DRM_DW_HDMI_AHB_AUDIO
+>         tristate "Synopsis Designware AHB Audio interface"
+> diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
+> index ab7023e..bd02da5 100644
+> --- a/drivers/gpu/drm/bridge/dw-hdmi.c
+> +++ b/drivers/gpu/drm/bridge/dw-hdmi.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/err.h>
+>  #include <linux/clk.h>
+>  #include <linux/hdmi.h>
+> +#include <linux/hdmi-notifier.h>
+>  #include <linux/mutex.h>
+>  #include <linux/of_device.h>
+>  #include <linux/spinlock.h>
+> @@ -114,6 +115,7 @@ struct dw_hdmi {
+>
+>         struct hdmi_data_info hdmi_data;
+>         const struct dw_hdmi_plat_data *plat_data;
+> +       struct hdmi_notifier *n;
+>
+>         int vic;
+>
+> @@ -1448,9 +1450,11 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
+>                 hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
+>                 hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
+>                 drm_mode_connector_update_edid_property(connector, edid);
+> +               hdmi_event_new_edid(hdmi->n, edid, 0);
+>                 ret = drm_add_edid_modes(connector, edid);
+>                 /* Store the ELD */
+>                 drm_edid_to_eld(connector, edid);
+> +               hdmi_event_new_eld(hdmi->n, connector->eld);
+>                 kfree(edid);
+>         } else {
+>                 dev_dbg(hdmi->dev, "failed to get edid\n");
+> @@ -1579,6 +1583,12 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
+>                         dw_hdmi_update_phy_mask(hdmi);
+>                 }
+>                 mutex_unlock(&hdmi->mutex);
+> +
+> +               if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) == 0)
+> +                       hdmi_event_disconnect(hdmi->n);
+> +               else if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) ==
+> +                        (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_PHY_HPD))
+> +                       hdmi_event_connect(hdmi->n);
+>         }
+>
+>         if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
+> @@ -1732,11 +1742,17 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
+>
+>         initialize_hdmi_ih_mutes(hdmi);
+>
+> +       hdmi->n = hdmi_notifier_get(dev);
+> +       if (!hdmi->n) {
+> +               ret = -ENOMEM;
+> +               goto err_iahb;
+> +       }
+> +
+>         ret = devm_request_threaded_irq(dev, irq, dw_hdmi_hardirq,
+>                                         dw_hdmi_irq, IRQF_SHARED,
+>                                         dev_name(dev), hdmi);
+>         if (ret)
+> -               goto err_iahb;
+> +               goto err_hdmi_not;
+>
+>         /*
+>          * To prevent overflows in HDMI_IH_FC_STAT2, set the clk regenerator
+> @@ -1788,6 +1804,8 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
+>
+>         return 0;
+>
+> +err_hdmi_not:
+> +       hdmi_notifier_put(hdmi->n);
+>  err_iahb:
+>         clk_disable_unprepare(hdmi->iahb_clk);
+>  err_isfr:
+> @@ -1804,6 +1822,11 @@ void dw_hdmi_unbind(struct device *dev, struct device *master, void *data)
+>         if (hdmi->audio && !IS_ERR(hdmi->audio))
+>                 platform_device_unregister(hdmi->audio);
+>
+> +       hdmi_notifier_put(hdmi->n);
+> +
+> +       if (!IS_ERR(hdmi->cec))
+> +               platform_device_unregister(hdmi->cec);
+Those two lines should be in your 4/5
+> +
+>         /* Disable all interrupts */
+>         hdmi_writeb(hdmi, ~0, HDMI_IH_MUTE_PHY_STAT0);
