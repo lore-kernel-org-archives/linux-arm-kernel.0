@@ -1,23 +1,28 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 15 Nov 2016 18:53:37 +0100
-Subject: [PATCH v3 00/11] soc: renesas: Identify SoC and register with
- the SoC bus
-In-Reply-To: <1479148637-5399-1-git-send-email-geert+renesas@glider.be>
-References: <1479148637-5399-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20161115175336.GA4065@verge.net.au>
+Date: Tue, 15 Nov 2016 18:54:33 +0100
+Subject: [PATCH v6 0/7] Add R8A7743/SK-RZG1M board support
+In-Reply-To: <1746536.qobnGdHRfV@wasted.cogentembedded.com>
+References: <1746536.qobnGdHRfV@wasted.cogentembedded.com>
+Message-ID: <20161115175433.GB4065@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 14, 2016 at 07:37:06PM +0100, Geert Uytterhoeven wrote:
-> 	Hi Simon, Magnus,
+On Mon, Oct 31, 2016 at 10:52:25PM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Some Renesas SoCs may exist in different revisions, providing slightly
-> different functionalities (e.g. R-Car H3 ES1.x and ES2.0), and behavior
-> (errate and quirks).  This needs to be catered for by drivers and/or
-> platform code.  The recently proposed soc_device_match() API is a good
-> fit to handle this.
+>    Here's the set of 7 patches against Simon Horman's 'renesas.git' repo's
+> 'renesas-devel-20161031-v4.9-rc3' tag. I'm adding the device tree support for
+> the R8A7743-based SK-RZG1M board. The SoC is close to R8A7791 and the board
+> seems identical to the R8A7791/Porter board. The device tree patches depend on
+> the R8A7743 CPG/MSSR driver series in order to compile and work. Already merged
+> patches from this series won't be re-posted.
 > 
-> This patch series implements the core infrastructure to provide SoC and
-> revision information through the SoC bus for Renesas ARM SoCs.
+> [1/7] ARM: dts: r8a7743: initial SoC device tree
+> [2/7] ARM: dts: r8a7743: add SYS-DMAC support
+> [3/7] ARM: dts: r8a7743: add [H]SCIF{A|B} support
+> [4/7] ARM: dts: r8a7743: add Ether support
+> [5/7] ARM: dts: r8a7743: add IRQC support
+> [6/7] ARM: dts: sk-rzg1m: initial device tree
+> [7/7] ARM: dts: sk-rzg1m: add Ether support
 
-For the record I have queued this up.
+Thanks, I have queued this up.
