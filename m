@@ -1,73 +1,154 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Tue, 15 Nov 2016 13:09:13 +0000
-Subject: [RFC v3 00/10] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
- reserved regions
-Message-ID: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Tue, 15 Nov 2016 21:13:22 +0800
+Subject: [PATCH v15 00/13] acpi,
+ clocksource: add GTDT driver and GTDT support in arm_arch_timer
+Message-ID: <1479215615-26950-1-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following LPC discussions, we now report reserved regions through
-iommu-group sysfs reserved_regions attribute file.
+From: Fu Wei <fu.wei@linaro.org>
 
-Reserved regions are populated through the IOMMU get_resv_region callback
-(former get_dm_regions), now implemented by amd-iommu, intel-iommu and
-arm-smmu.
+This patchset:
+    (1)Preparation for adding GTDT support in arm_arch_timer:
+        1. Move some enums and marcos to header file;
+        2. Add a new enum for spi type;
+        3. Improve printk relevant code.
+        4. rename some  enums and defines, and some cleanups.
+        5. separate out arch_timer_uses_ppi init code and fix a potential bug
+        6. Introduce some new structs and refactor the timer init code
 
-The intel-iommu reports the [FEE0_0000h - FEF0_000h] MSI window as an
-IOMMU_RESV_NOMAP reserved region.
+    (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
+    Parse all kinds of timer in GTDT table of ACPI:arch timer,
+    memory-mapped timer and SBSA Generic Watchdog timer.
+    This driver can help to simplify all the relevant timer drivers,
+    and separate all the ACPI GTDT knowledge from them.
 
-arm-smmu reports the MSI window (arbitrarily located at 0x8000000 and
-1MB large) and the PCI host bridge windows.
+    (3)Simplify ACPI code for arm_arch_timer
 
-The series integrates a not officially posted patch from Robin:
-"iommu/dma: Allow MSI-only cookies".
+    (4)Add GTDT support for ARM memory-mapped timer, also refactor
+    original memory-mapped timer dt support for reusing some common
+    code.
 
-This series currently does not address IRQ safety assessment.
+This patchset has been tested on the following platforms with ACPI enabled:
+    (1)ARM Foundation v8 model
 
-Best Regards
+Changelog:
+v15: https://lkml.org/lkml/2016/11/15/
+     Re-order patches
+     Add arm_arch_timer refactoring patches to prepare for GTDT:
+         1. rename some  enums and defines, and some cleanups
+         2. separate out arch_timer_uses_ppi init code and fix a potential bug
+         3. Improve some new structs, refactor the timer init code.
+     Since the some structs have been changed, GTDT parser for memory-mapped
+     timer and SBSA Generic Watchdog timer have been update.
 
-Eric
+v14: https://lkml.org/lkml/2016/9/28/573
+     Separate memory-mapped timer GTDT support into two patches
+         1. Refactor the timer init code to prepare for GTDT
+         2. Add GTDT support for memory-mapped timer
 
-Git: complete series available at
-https://github.com/eauger/linux/tree/v4.9-rc5-reserved-rfc-v3
+v13: http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1231717.html
+     Improve arm_arch_timer code for memory-mapped
+     timer GTDT support, refactor original memory-mapped timer
+     dt support for reusing some common code.
 
-History:
-RFC v2 -> v3:
-- switch to an iommu-group sysfs API
-- use new dummy allocator provided by Robin
-- dummy allocator initialized by vfio-iommu-type1 after enumerating
-  the reserved regions
-- at the moment ARM MSI base address/size is left unchanged compared
-  to v2
-- we currently report reserved regions and not usable IOVA regions as
-  requested by Alex
+v12: https://lkml.org/lkml/2016/9/13/250
+     Rebase to latest Linux 4.8-rc6
+     Delete the confusing "skipping" in the error message.
 
-RFC v1 -> v2:
-- fix intel_add_reserved_regions
-- add mutex lock/unlock in vfio_iommu_type1
+V11: https://lkml.org/lkml/2016/9/6/354
+     Rebase to latest Linux 4.8-rc5
+     Delete typedef (suggested by checkpatch.pl)
 
+V10: https://lkml.org/lkml/2016/7/26/215
+     Drop the "readq" patch.
+     Rebase to latest Linux 4.7.
 
-Eric Auger (10):
-  iommu/dma: Allow MSI-only cookies
-  iommu: Rename iommu_dm_regions into iommu_resv_regions
-  iommu: Add new reserved IOMMU attributes
-  iommu: iommu_alloc_resv_region
-  iommu: Do not map reserved regions
-  iommu: iommu_get_group_resv_regions
-  iommu: Implement reserved_regions iommu-group sysfs file
-  iommu/vt-d: Implement reserved region get/put callbacks
-  iommu/arm-smmu: Implement reserved region get/put callbacks
-  vfio/type1: Get MSI cookie
+V9: https://lkml.org/lkml/2016/7/25/345
+    Improve pr_err message in acpi gtdt driver.
+    Update Commit message for 7/9
+    shorten the irq mapping function name
+    Improve GTDT driver for memory-mapped timer
 
- drivers/iommu/amd_iommu.c       |  20 +++---
- drivers/iommu/arm-smmu.c        |  52 +++++++++++++++
- drivers/iommu/dma-iommu.c       | 116 ++++++++++++++++++++++++++-------
- drivers/iommu/intel-iommu.c     |  50 ++++++++++----
- drivers/iommu/iommu.c           | 141 ++++++++++++++++++++++++++++++++++++----
- drivers/vfio/vfio_iommu_type1.c |  26 ++++++++
- include/linux/dma-iommu.h       |   7 ++
- include/linux/iommu.h           |  49 ++++++++++----
- 8 files changed, 391 insertions(+), 70 deletions(-)
+v8: https://lkml.org/lkml/2016/7/19/660
+    Improve "pr_fmt(fmt)" definition: add "ACPI" in front of "GTDT",
+    and also improve printk message.
+    Simplify is_timer_block and is_watchdog.
+    Merge acpi_gtdt_desc_init and gtdt_arch_timer_init into acpi_gtdt_init();
+    Delete __init in include/linux/acpi.h for GTDT API
+    Make ARM64 select GTDT.
+    Delete "#include <linux/module.h>" from acpi_gtdt.c
+    Simplify GT block parse code.
+
+v7: https://lkml.org/lkml/2016/7/13/769
+    Move the GTDT driver to drivers/acpi/arm64
+    Add add the ARM64-specific ACPI Support maintainers in MAINTAINERS
+    Merge 3 patches of GTDT parser driver.
+    Fix the for_each_platform_timer bug.
+
+v6: https://lkml.org/lkml/2016/6/29/580
+    split the GTDT driver to 4 parts: basic, arch_timer, memory-mapped timer,
+    and SBSA Generic Watchdog timer
+    Improve driver by suggestions and example code from Daniel Lezcano
+
+v5: https://lkml.org/lkml/2016/5/24/356
+    Sorting out all patches, simplify the API of GTDT driver:
+    GTDT driver just fills the data struct for arm_arch_timer driver.
+
+v4: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006667.html
+    Delete the kvm relevant patches
+    Separate two patches for sorting out the code for arm_arch_timer.
+    Improve irq info export code to allow missing irq info in GTDT table.
+
+v3: https://lkml.org/lkml/2016/2/1/658
+    Improve GTDT driver code:
+      (1)improve pr_* by defining pr_fmt(fmt)
+      (2)simplify gtdt_sbsa_gwdt_init
+      (3)improve gtdt_arch_timer_data_init, if table is NULL, it will try
+      to get GTDT table.
+    Move enum ppi_nr to arm_arch_timer.h, and add enum spi_nr.
+    Add arm_arch_timer get ppi from DT and GTDT support for kvm.
+
+v2: https://lkml.org/lkml/2015/12/2/10
+    Rebase to latest kernel version(4.4-rc3).
+    Fix the bug about the config problem,
+    use CONFIG_ACPI_GTDT instead of CONFIG_ACPI in arm_arch_timer.c
+
+v1: The first upstreaming version: https://lkml.org/lkml/2015/10/28/553
+
+Fu Wei (13):
+  clocksource/drivers/arm_arch_timer: Move enums and defines to header
+    file
+  clocksource/drivers/arm_arch_timer: Add a new enum for spi type
+  clocksource/drivers/arm_arch_timer: Improve printk relevant code
+  clocksource/drivers/arm_arch_timer: rename some enums and defines, and
+    some cleanups.
+  clocksource/drivers/arm_arch_timer: fix a bug in arch_timer_register
+    about arch_timer_uses_ppi
+  clocksource/drivers/arm_arch_timer: separate out arch_timer_uses_ppi
+    init code to prepare for GTDT.
+  clocksource/drivers/arm_arch_timer: Introduce some new structs to
+    prepare for GTDT
+  clocksource/drivers/arm_arch_timer: Refactor the timer init code to
+    prepare for GTDT
+  acpi/arm64: Add GTDT table parse driver
+  clocksource/drivers/arm_arch_timer: Simplify ACPI support code.
+  acpi/arm64: Add memory-mapped timer support in GTDT driver
+  clocksource/drivers/arm_arch_timer: Add GTDT support for memory-mapped
+    timer
+  acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver
+
+ arch/arm64/Kconfig                   |   1 +
+ drivers/acpi/arm64/Kconfig           |   3 +
+ drivers/acpi/arm64/Makefile          |   1 +
+ drivers/acpi/arm64/gtdt.c            | 411 ++++++++++++++++++++++++++++++++++
+ drivers/clocksource/arm_arch_timer.c | 420 ++++++++++++++++++++---------------
+ drivers/watchdog/Kconfig             |   1 +
+ include/clocksource/arm_arch_timer.h |  61 +++--
+ include/linux/acpi.h                 |   8 +
+ virt/kvm/arm/hyp/timer-sr.c          |   6 +-
+ 9 files changed, 720 insertions(+), 192 deletions(-)
+ create mode 100644 drivers/acpi/arm64/gtdt.c
 
 -- 
-1.9.1
+2.7.4
