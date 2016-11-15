@@ -1,35 +1,24 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 15 Nov 2016 10:06:36 -0800
-Subject: [PATCH 07/15] net: ethernet: ll_temac: Utilize phy_ethtool_nway_reset
-In-Reply-To: <20161115180644.3941-1-f.fainelli@gmail.com>
-References: <20161115180644.3941-1-f.fainelli@gmail.com>
-Message-ID: <20161115180644.3941-8-f.fainelli@gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 15 Nov 2016 11:08:13 -0700
+Subject: [PATCH fpga 1/9] fpga zynq: Add missing \n to messages
+In-Reply-To: <0aebdb59-86d7-2569-c49d-de5d45b5cac0@suse.com>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-2-git-send-email-jgunthorpe@obsidianresearch.com>
+ <0aebdb59-86d7-2569-c49d-de5d45b5cac0@suse.com>
+Message-ID: <20161115180813.GB1852@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- drivers/net/ethernet/xilinx/ll_temac_main.c | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
 
-diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
-index a9bd665fd122..bcd7b76dde9f 100644
---- a/drivers/net/ethernet/xilinx/ll_temac_main.c
-+++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
-@@ -967,13 +967,8 @@ static const struct attribute_group temac_attr_group = {
- };
- 
- /* ethtool support */
--static int temac_nway_reset(struct net_device *ndev)
--{
--	return phy_start_aneg(ndev->phydev);
--}
--
- static const struct ethtool_ops temac_ethtool_ops = {
--	.nway_reset = temac_nway_reset,
-+	.nway_reset = phy_ethtool_nway_reset,
- 	.get_link = ethtool_op_get_link,
- 	.get_ts_info = ethtool_op_get_ts_info,
- 	.get_link_ksettings = phy_ethtool_get_link_ksettings,
--- 
-2.9.3
+On Tue, Nov 15, 2016 at 12:05:15PM +0100, Matthias Brugger wrote:
+> On 09/11/16 23:58, Jason Gunthorpe wrote:
+> >Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> 
+> Please add a commit message, although it is cristal clear what this patch
+> does :)
+
+As you say, it is crystal clear already, and this is an acceptable commit
+message.. Please suggest a text if you want to see something
+different.
+
+Jason
