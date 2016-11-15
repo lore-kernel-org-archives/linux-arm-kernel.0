@@ -1,41 +1,36 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 15 Nov 2016 14:27:49 +0000
-Subject: [PATCH] arm/arm64: KVM: VGIC: limit ITARGETSR bits to number of VCPUs
-Message-ID: <20161115142749.19955-1-andre.przywara@arm.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Tue, 15 Nov 2016 15:29:11 +0100
+Subject: [PATCH net 0/3] Fix OdroidC2 Gigabit Tx link issue
+Message-ID: <1479220154-25851-1-git-send-email-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GICv2 spec says in section 4.3.12 that a "CPU targets field bit that
-corresponds to an unimplemented CPU interface is RAZ/WI."
-Currently we allow the guest to write any value in there and it can
-read that back.
-Mask the written value with the proper CPU mask to be spec compliant.
+This patchset fixes an issue with the OdroidC2 board (DWMAC + RTL8211F).
+Initially reported as a low Tx throughput issue at gigabit speed, the
+platform enters LPI too often. This eventually break the link (both Tx
+and Rx), and require to bring the interface down and up again to get the
+Rx path working again.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+The root cause of this issue is not fully understood yet but disabling EEE
+advertisement on the PHY prevent this feature to be negotiated.
+With this change, the link is stable and reliable, with the expected
+throughput performance.
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index b44b359..e59d4c7 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -129,6 +129,7 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
- 				   unsigned long val)
- {
- 	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
-+	u8 cpu_mask = (1 << atomic_read(&vcpu->kvm->online_vcpus)) - 1;
- 	int i;
- 
- 	/* GICD_ITARGETSR[0-7] are read-only */
-@@ -141,7 +142,7 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
- 
- 		spin_lock(&irq->irq_lock);
- 
--		irq->targets = (val >> (i * 8)) & 0xff;
-+		irq->targets = ((val >> (i * 8)) & 0xff) & cpu_mask;
- 		target = irq->targets ? __ffs(irq->targets) : 0;
- 		irq->target_vcpu = kvm_get_vcpu(vcpu->kvm, target);
- 
+The patchset adds options in the realtek phy driver to disable EEE
+advertisement, through device tree, for the phy version supporting EEE.
+Then EEE is disabled in the OdroidC2 device tree for Gigabit speed.
+100M is not affected by this issue.
+
+Jerome Brunet (3):
+  net: phy: realtek: add eee advertisement disable options
+  dt-bindings: net: add DT bindings for realtek phys
+  ARM64: dts: meson: odroidc2: disable 1000t-eee advertisement
+
+ .../devicetree/bindings/net/realtek-phy.txt        | 20 +++++++
+ .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 15 +++++
+ drivers/net/phy/realtek.c                          | 65 +++++++++++++++++++++-
+ 3 files changed, 99 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/net/realtek-phy.txt
+
 -- 
-2.9.0
+2.7.4
