@@ -1,30 +1,41 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 14 Nov 2016 21:35:37 -0700
-Subject: [PATCH fpga 8/9] fpga socfpga: Use the scatterlist interface
-In-Reply-To: <alpine.DEB.2.10.1611132149140.2908@atull-VirtualBox>
-References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <1478732303-13718-9-git-send-email-jgunthorpe@obsidianresearch.com>
- <alpine.DEB.2.10.1611131712210.2735@atull-VirtualBox>
- <20161114001854.GA27248@obsidianresearch.com>
- <alpine.DEB.2.10.1611132149140.2908@atull-VirtualBox>
-Message-ID: <20161115043537.GA23253@obsidianresearch.com>
+From: oss@buserror.net (Scott Wood)
+Date: Mon, 14 Nov 2016 23:10:24 -0600
+Subject: [PATCH 3/3] soc: fsl: make guts driver explicitly non-modular
+In-Reply-To: <20161113190302.18099-4-paul.gortmaker@windriver.com>
+References: <20161113190302.18099-1-paul.gortmaker@windriver.com>
+ <20161113190302.18099-4-paul.gortmaker@windriver.com>
+Message-ID: <1479186624.21746.15.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 13, 2016 at 10:02:00PM -0600, atull wrote:
-> > I'd add a newop 'write_fragment' and a driver must define write_sg
-> > write_fragment, if write_fragment is used then the core supplies
-> > that loop.
+On Sun, 2016-11-13 at 14:03 -0500, Paul Gortmaker wrote:
+> The Kconfig currently controlling compilation of this code is:
 > 
-> Sure, but isn't that just the old op? :)
+> drivers/soc/fsl/Kconfig:config FSL_GUTS
+> drivers/soc/fsl/Kconfig:????????bool
+> 
+> ...meaning that it currently is not being built as a module by anyone.
+> 
+> Lets remove the modular code that is essentially orphaned, so that
+> when reading the driver there is no doubt it is builtin-only.
+> 
+> We explicitly disallow a driver unbind, since that doesn't have a
+> sensible use case anyway, and it allows us to drop the ".remove"
+> code for non-modular drivers.
+> 
+> Since the code was already not using module_init, the init ordering
+> remains unchanged with this commit.
+> 
+> Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
+> 
+> Cc: Scott Wood <oss@buserror.net>
+> Cc: Yangbo Lu <yangbo.lu@nxp.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
-I'm fine with that too, but it is semantically different since write
-is called multiple times in this new world.. All the drivers seem fine
-with that today so it is probably OK ..
+Acked-by: Scott Wood <oss@buserror.net>
 
-> There may also be common code that you added to configure_init
-> that should go in the core unless it's fpga-specific.
-
-Sure, the alignment test is easy enough to pull out..
-
-Jason
+-Scott
