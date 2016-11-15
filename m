@@ -1,9 +1,7 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 15 Nov 2016 13:22:23 -0800
-Subject: [GIT PULL 5/5] omap defconfig changes for v4.10
-In-Reply-To: <pull-1479236877-351747>
-References: <pull-1479236877-351747>
-Message-ID: <pull-1479236877-351747-5>
+Date: Tue, 15 Nov 2016 13:22:19 -0800
+Subject: [GIT PULL 1/5] non-urgent omap fixes for v4.10
+Message-ID: <pull-1479236877-351747>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,34 +11,35 @@ The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.10/defconfig-signed
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.10/fixes-not-urgent-signed
 
-for you to fetch changes up to 9c106e4efab2ec96daebb7bdd0bb61602fd52e7a:
+for you to fetch changes up to 5c02b01d234f8410010c952069d3fb9ec5d9124a:
 
-  ARM: omap2plus_defconfig: Run make savedefconfig to save some space (2016-11-15 11:01:24 -0800)
-
-----------------------------------------------------------------
-Defconfig changes for omaps for v4.10 merge window:
-
-- Enable tsc2004 touchscreen as a loadable module
-
-- Enable REGULATOR_GPIO, dra71-evm needs this for MMC voltage
-
-- Enable LP873x PMICs for dra71x-evm
-
-- Run make savedefconfig to save some space and make it
-  easier to generate minimal patches against it
+  ARM: OMAP2+: pm-debug: Use seq_putc() in two functions (2016-11-09 15:33:33 -0700)
 
 ----------------------------------------------------------------
-Adam Ford (1):
-      ARM: omap2plus_defconfig: Enable TOUCHSCREEN_TSC2004
+Non-urgent fixes for omaps for v4.10 merge window:
 
-Lokesh Vutla (2):
-      ARM: omap2plus_defconfig: Enable REGULATOR_GPIO
-      ARM: omap2plus_defconfig: Enable LP873X support
+- Fix mismatched interrupt numbers for tps65217, these are not yet
+  used
 
-Tony Lindgren (1):
-      ARM: omap2plus_defconfig: Run make savedefconfig to save some space
+- Remove unused omapdss_early_init_of()
 
- arch/arm/configs/omap2plus_defconfig | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+- Use seq_putc() for pm-debug.c
+
+----------------------------------------------------------------
+Laurent Pinchart (1):
+      ARM: OMAP2+: Remove the omapdss_early_init_of() function
+
+Markus Elfring (1):
+      ARM: OMAP2+: pm-debug: Use seq_putc() in two functions
+
+Milo Kim (1):
+      mfd: tps65217: Fix mismatched interrupt number
+
+ arch/arm/mach-omap2/board-generic.c |  2 --
+ arch/arm/mach-omap2/common.h        |  1 -
+ arch/arm/mach-omap2/display.c       |  5 -----
+ arch/arm/mach-omap2/pm-debug.c      |  5 ++---
+ include/linux/mfd/tps65217.h        | 11 +++++------
+ 5 files changed, 7 insertions(+), 17 deletions(-)
