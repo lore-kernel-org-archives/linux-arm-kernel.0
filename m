@@ -1,27 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 15 Nov 2016 10:16:52 +0100
-Subject: [PATCH v2 1/3] pinctrl: sunxi: Fix PIN_CONFIG_BIAS_PULL_{DOWN,
- UP} argument
-In-Reply-To: <20161111024455.16883-2-wens@csie.org>
-References: <20161111024455.16883-1-wens@csie.org>
- <20161111024455.16883-2-wens@csie.org>
-Message-ID: <CACRpkdb0dqxzQOnChj_SG1-8Hi4ezt+vWaMQ6kr5+YReDop3vw@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 15 Nov 2016 10:14:56 +0100
+Subject: [PATCH V1 0/2] Add support for ThunderX SoCs ACPI Host Controllers
+Message-ID: <1479201298-25494-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2016 at 3:44 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+These patches were part of https://lkml.org/lkml/2016/9/9/666 series,
+however, only core part (first two patches) was approved. ThunderX quirk
+example had some comments which are address in this series (resetting version
+numbering).
 
-> According to pinconf-generic.h, the argument for
-> PIN_CONFIG_BIAS_PULL_{DOWN,UP} is non-zero if the bias is enabled
-> with a pull up/down resistor, zero if it is directly connected
-> to VDD or ground.
->
-> Since Allwinner hardware uses a weak pull resistor internally,
-> the argument should be 1.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Add ACPI PCI host controler support for ThunderX SoCs pass1.x & pass2.x using
+ACPI quirk mechanism [1]. Patches rework ThunderX ECAM and PEM driver to work
+with ACPI & DT boot method.
 
-Patch applied with Maxime's ACK.
+Patch set can be found here:
+git at github.com:semihalf-nowicki-tomasz/linux.git (pci-quirks-thunderx-v1)
+It is based on branch pci/ecam-v6 which can be found here:
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git (pci/ecam-v6)
 
-Yours,
-Linus Walleij
+Tomasz Nowicki (2):
+  PCI: thunder: Enable ACPI PCI controller for ThunderX pass2.x silicon
+    version
+  PCI: thunder: Enable ACPI PCI controller for ThunderX pass1.x silicon
+    version
+
+ drivers/acpi/pci_mcfg.c             |  35 ++++++++++++
+ drivers/pci/host/pci-thunder-ecam.c |   2 +-
+ drivers/pci/host/pci-thunder-pem.c  | 107 +++++++++++++++++++++++++++++++-----
+ include/linux/pci-ecam.h            |   7 +++
+ 4 files changed, 136 insertions(+), 15 deletions(-)
+
+-- 
+2.7.4
