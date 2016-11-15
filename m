@@ -1,16 +1,32 @@
 From: b-liu@ti.com (Bin Liu)
-Date: Tue, 15 Nov 2016 15:14:06 -0600
-Subject: [PATCH v3 2/3] musb: sunxi: Remove custom babble handling
-In-Reply-To: <20160923134058.26828-2-hdegoede@redhat.com>
+Date: Tue, 15 Nov 2016 15:14:21 -0600
+Subject: [PATCH v3 3/3] musb: sunxi: Force session end on babble errors
+ in host-mode
+In-Reply-To: <20160923134058.26828-3-hdegoede@redhat.com>
 References: <20160923134058.26828-1-hdegoede@redhat.com>
- <20160923134058.26828-2-hdegoede@redhat.com>
-Message-ID: <20161115211406.GE11011@uda0271908>
+ <20160923134058.26828-3-hdegoede@redhat.com>
+Message-ID: <20161115211421.GF11011@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 04:40:57PM +0300, Hans de Goede wrote:
-> The musb core already handles babble interrupts, so the sunxi glue
-> having its own custom handling is redundant.
+On Fri, Sep 23, 2016 at 04:40:58PM +0300, Hans de Goede wrote:
+> The sunxi musb has a bug where sometimes it will generate a babble
+> error on device disconnect instead of a disconnect irq. When this
+> happens the musb-controller switches from host mode to device mode
+> (it clears MUSB_DEVCTL_SESSION and sets MUSB_DEVCTL_BDEVICE) and
+> gets stuck in this state.
+> 
+> Clearing this requires reporting Vbus low for 200 or more ms, but
+> on some devices Vbus is simply always high (host-only mode, no Vbus
+> control).
+> 
+> This commit adds a sunxi_musb_recover() callback which makes
+> sunxi_musb_work call phy_set_mode with the current mode, which
+> will force end the current session.
+> 
+> This fixes the musb controller getting stuck in this state on systems
+> without Vbus control; and also fixes the need to unplug the usb-b ->
+> usb-a cable to get out of this state on systems with Vbus control.
 > 
 > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
@@ -19,34 +35,47 @@ Applied. Thanks.
 
 > ---
 > Changes in v2:
-> -This is a new patch in v2 of this patch series
-> Changes in v3:
-> -Improve commit msg
+> -Use musb_platform_recover callback instead of using DYI code in the
+>  interrupt handler
+> -Call phy_set_mode with the current mode instead of adding a new custom
+>  sunxi phy callback
 > ---
->  drivers/usb/musb/sunxi.c | 10 ----------
->  1 file changed, 10 deletions(-)
+>  drivers/usb/musb/sunxi.c | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
 > 
 > diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-> index 1408245..82eba92 100644
+> index 82eba92..d0be0ea 100644
 > --- a/drivers/usb/musb/sunxi.c
 > +++ b/drivers/usb/musb/sunxi.c
-> @@ -186,16 +186,6 @@ static irqreturn_t sunxi_musb_interrupt(int irq, void *__hci)
->  	if (musb->int_usb)
->  		writeb(musb->int_usb, musb->mregs + SUNXI_MUSB_INTRUSB);
+> @@ -380,6 +380,20 @@ static int sunxi_musb_set_mode(struct musb *musb, u8 mode)
+>  	return 0;
+>  }
 >  
-> -	/*
-> -	 * sunxi musb often signals babble on low / full speed device
-> -	 * disconnect, without ever raising MUSB_INTR_DISCONNECT, since
-> -	 * normally babble never happens treat it as disconnect.
-> -	 */
-> -	if ((musb->int_usb & MUSB_INTR_BABBLE) && is_host_active(musb)) {
-> -		musb->int_usb &= ~MUSB_INTR_BABBLE;
-> -		musb->int_usb |= MUSB_INTR_DISCONNECT;
-> -	}
-> -
->  	if ((musb->int_usb & MUSB_INTR_RESET) && !is_host_active(musb)) {
->  		/* ep0 FADDR must be 0 when (re)entering peripheral mode */
->  		musb_ep_select(musb->mregs, 0);
+> +static int sunxi_musb_recover(struct musb *musb)
+> +{
+> +	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+> +
+> +	/*
+> +	 * Schedule a phy_set_mode with the current glue->phy_mode value,
+> +	 * this will force end the current session.
+> +	 */
+> +	set_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags);
+> +	schedule_work(&glue->work);
+> +
+> +	return 0;
+> +}
+> +
+>  /*
+>   * sunxi musb register layout
+>   * 0x00 - 0x17	fifo regs, 1 long per fifo
+> @@ -608,6 +622,7 @@ static const struct musb_platform_ops sunxi_musb_ops = {
+>  	.dma_init	= sunxi_musb_dma_controller_create,
+>  	.dma_exit	= sunxi_musb_dma_controller_destroy,
+>  	.set_mode	= sunxi_musb_set_mode,
+> +	.recover	= sunxi_musb_recover,
+>  	.set_vbus	= sunxi_musb_set_vbus,
+>  	.pre_root_reset_end = sunxi_musb_pre_root_reset_end,
+>  	.post_root_reset_end = sunxi_musb_post_root_reset_end,
 > -- 
 > 2.9.3
 > 
