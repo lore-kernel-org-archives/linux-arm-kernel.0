@@ -1,209 +1,54 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 15 Nov 2016 11:56:16 +0100
-Subject: [PATCH resend] input: touchscreen: silead: Add regulator support
-In-Reply-To: <20161114185057.GA7694@dtor-ws>
-References: <20161114144502.10595-1-hdegoede@redhat.com>
- <20161114144502.10595-2-hdegoede@redhat.com> <20161114185057.GA7694@dtor-ws>
-Message-ID: <cbd0f3f5-7794-7fa8-d578-d3f0f8759672@redhat.com>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Tue, 15 Nov 2016 11:58:06 +0100
+Subject: LEDs that change brightness "itself" -- that's a trigger. Re: PM
+ regression with LED changes in next-20161109
+In-Reply-To: <20161115103133.GA22860@amd>
+References: <f7c9b2be-0003-f342-a4c7-802532faa424@gmail.com>
+ <d7ddbbb0-b99c-14a3-f462-3534b5ec67e6@redhat.com>
+ <4c31faef-144d-289c-0e32-83e76aff6178@gmail.com>
+ <3eb60c78-d891-27e5-6b7b-a54a5b547a1c@redhat.com>
+ <c01cac8b-a921-56d1-7e57-8071d4b9faf6@gmail.com>
+ <cb0aa3ce-ee48-66b8-510c-bd70917afec9@redhat.com>
+ <b5ae20d7-8394-7ad5-1830-13173e9105c4@gmail.com>
+ <9b476f85-d45e-deb6-335d-fc56f6d90350@redhat.com>
+ <127cdd42-6fd8-c671-60b7-3826b351577f@samsung.com>
+ <15cafbf5-d842-e184-2fd4-65f8272f505a@redhat.com>
+ <CGME20161115103141epcas2p251f2521354a8cd7b9dfcfe55bfa482f0@epcas2p2.samsung.com>
+ <20161115103133.GA22860@amd>
+Message-ID: <4e392d5d-eb10-f285-517e-976a55c3e318@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 14-11-16 19:50, Dmitry Torokhov wrote:
-> Hi Hans,
+On 11/15/2016 11:31 AM, Pavel Machek wrote:
+> Hi!
 >
-> On Mon, Nov 14, 2016 at 03:45:02PM +0100, Hans de Goede wrote:
->> On some tablets the touchscreen controller is powered by seperate
->> regulators, add support for this.
+>>> Hmm, v4 still calls led_notify_brightness_change(led_cdev)
+>> >from both __led_set_brightness() and __led_set_brightness_blocking().
 >>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> Acked-by: Rob Herring <robh@kernel.org>
->> ---
->>  .../bindings/input/touchscreen/silead_gsl1680.txt  |  2 +
->>  drivers/input/touchscreen/silead.c                 | 51 ++++++++++++++++++++--
->>  2 files changed, 49 insertions(+), 4 deletions(-)
+>> Ugh, I see I accidentally send a v4 twice, instead of
+>> calling the version which dropped those called v5 as
+>> I should have, sorry.
 >>
->> diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
->> index e844c3f..b726823 100644
->> --- a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
->> +++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
->> @@ -22,6 +22,8 @@ Optional properties:
->>  - touchscreen-inverted-y  : See touchscreen.txt
->>  - touchscreen-swapped-x-y : See touchscreen.txt
->>  - silead,max-fingers	  : maximum number of fingers the touchscreen can detect
->> +- vddio-supply		  : regulator phandle for controller VDDIO
->> +- avdd-supply		  : regulator phandle for controller AVDD
+>> The v4 which I would like to see merged, the one with
+>> those calls dropped, is here:
 >>
->>  Example:
->>
->> diff --git a/drivers/input/touchscreen/silead.c b/drivers/input/touchscreen/silead.c
->> index f502c84..c6a1ae9 100644
->> --- a/drivers/input/touchscreen/silead.c
->> +++ b/drivers/input/touchscreen/silead.c
->> @@ -29,6 +29,7 @@
->>  #include <linux/input/touchscreen.h>
->>  #include <linux/pm.h>
->>  #include <linux/irq.h>
->> +#include <linux/regulator/consumer.h>
->>
->>  #include <asm/unaligned.h>
->>
->> @@ -72,6 +73,8 @@ enum silead_ts_power {
->>  struct silead_ts_data {
->>  	struct i2c_client *client;
->>  	struct gpio_desc *gpio_power;
->> +	struct regulator *vddio;
->> +	struct regulator *avdd;
->>  	struct input_dev *input;
->>  	char fw_name[64];
->>  	struct touchscreen_properties prop;
->> @@ -465,21 +468,52 @@ static int silead_ts_probe(struct i2c_client *client,
->>  	if (client->irq <= 0)
->>  		return -ENODEV;
->>
->> +	data->vddio = devm_regulator_get_optional(dev, "vddio");
->> +	if (IS_ERR(data->vddio)) {
->> +		if (PTR_ERR(data->vddio) == -EPROBE_DEFER)
->> +			return -EPROBE_DEFER;
->> +		data->vddio = NULL;
+>> https://patchwork.kernel.org/patch/9423093/
 >
-> Why do we ignore other errors?
-
-Other errors indicate that the regulator is not there
-specifically I think regulator_get_optional will return -ENOENT
-in that case.
-
-
-> If there is an issue reported by
-> regulator framework we should net be ignoring it.
+> Please, lets fix this properly.
 >
-> Unless regulator is truly optional (i.e. chip can work with some
-> functionality powered off) and not simply hidden (firmware takes care of
-> powering up system),
-
-In most systems the vddio is simply hardwired to the always-on
-vcc-3.3V
-
-> we should not be using regulator_get_optional():
-> if regulator is absent from ACPI/DT/etc, regulator framework will supply
-> dummy regulator that you can enable/disable and not bothering checking
-> whether it is NULL or not.
-
-Right, the downside of that is that it prints a msg about this
-in dmesg which typically will lead to user questions.
-
-Anyways if you prefer the non _optional variant I can do a v3
-with that ...
-
-> Also, please consider using devm_regulator_bulk_get().
-
-Hmm, so I would get:
-
-In struct silead_ts_data:
-
-	struct regulator_bulk_data regulators[2];
-
-And then in probe() do:
-
-	data->regulators[0].supply = "vddio";
-	data->regulators[1].supply = "avdd";
-
-	ret = devm_regulator_bulk_get(dev, ARRAY_SIZE(data->regulators),
-				      data->regulators);
-	if (ret)
-		return ret;
-
-And modify the enable / disable code to match.
-
-Yes I can see how that is better / cleaner and it also
-answers the question whether or not to use get_optional.
-
-Ok, I'll do a v2 switching to regulator_bulk_get.
-
-Regards,
-
-Hans
-
-
-
-
+> The LED you are talking about _has_ a trigger, implemented in
+> hardware. That trigger can change LED brightness behind kernel's (and
+> userspace's) back. Don't pretend the trigger does not exist, it does.
 >
->> +	}
->> +
->> +	data->avdd = devm_regulator_get_optional(dev, "avdd");
->> +	if (IS_ERR(data->avdd)) {
->> +		if (PTR_ERR(data->avdd) == -EPROBE_DEFER)
->> +			return -EPROBE_DEFER;
->> +		data->avdd = NULL;
->> +	}
->> +
->> +	/*
->> +	 * Enable regulators at probe and disable them at remove, we need
->> +	 * to keep the chip powered otherwise it forgets its firmware.
->> +	 */
->> +	if (data->vddio) {
->> +		error = regulator_enable(data->vddio);
->> +		if (error)
->> +			return error;
->> +	}
->> +
->> +	if (data->avdd) {
->> +		error = regulator_enable(data->avdd);
->> +		if (error)
->> +			goto disable_vddio;
->> +	}
->
-> Use devm_add_action_or_reset() to work regulator_bulk_disable call into
-> devm stream. As it is you are leaving regulators on on unbind/remove.
->
->> +
->>  	/* Power GPIO pin */
->>  	data->gpio_power = devm_gpiod_get_optional(dev, "power", GPIOD_OUT_LOW);
->>  	if (IS_ERR(data->gpio_power)) {
->>  		if (PTR_ERR(data->gpio_power) != -EPROBE_DEFER)
->>  			dev_err(dev, "Shutdown GPIO request failed\n");
->> -		return PTR_ERR(data->gpio_power);
->> +		error = PTR_ERR(data->gpio_power);
->> +		goto disable_avdd;
->>  	}
->>
->>  	error = silead_ts_setup(client);
->>  	if (error)
->> -		return error;
->> +		goto disable_avdd;
->>
->>  	error = silead_ts_request_input_dev(data);
->>  	if (error)
->> -		return error;
->> +		goto disable_avdd;
->>
->>  	error = devm_request_threaded_irq(dev, client->irq,
->>  					  NULL, silead_ts_threaded_irq_handler,
->> @@ -487,10 +521,19 @@ static int silead_ts_probe(struct i2c_client *client,
->>  	if (error) {
->>  		if (error != -EPROBE_DEFER)
->>  			dev_err(dev, "IRQ request failed %d\n", error);
->> -		return error;
->> +		goto disable_avdd;
->>  	}
->>
->>  	return 0;
->> +
->> +disable_avdd:
->> +	if (data->avdd)
->> +		regulator_disable(data->avdd);
->> +disable_vddio:
->> +	if (data->vddio)
->> +		regulator_disable(data->vddio);
->> +
->> +	return error;
->>  }
->>
->>  static int __maybe_unused silead_ts_suspend(struct device *dev)
->> --
->> 2.9.3
->>
->
-> Thanks.
->
+> And when you do that, you'll have nice place to report changes to
+> userspace -- trigger can now export that information, and offer poll()
+> interface.
+
+Well, that sounds interesting. It is logically justifiable.
+I initially proposed exactly this solution, with recently
+added userspace LED being a trigger listener. It seems a bit
+awkward though. How would you listen to the trigger events?
+
+-- 
+Best regards,
+Jacek Anaszewski
