@@ -1,62 +1,66 @@
 From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Tue, 15 Nov 2016 21:13:29 +0800
-Subject: [PATCH v15 07/13] clocksource/drivers/arm_arch_timer: Introduce some
- new structs to prepare for GTDT
+Date: Tue, 15 Nov 2016 21:13:34 +0800
+Subject: [PATCH v15 12/13] clocksource/drivers/arm_arch_timer: Add GTDT
+ support for memory-mapped timer
 In-Reply-To: <1479215615-26950-1-git-send-email-fu.wei@linaro.org>
 References: <1479215615-26950-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1479215615-26950-8-git-send-email-fu.wei@linaro.org>
+Message-ID: <1479215615-26950-13-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fu Wei <fu.wei@linaro.org>
 
-The patch introduce two new structs:
-        arch_timer_mem,
-        arch_timer_mem_frame.
-And also introduce a new define: ARCH_TIMER_MEM_MAX_FRAMES
-
-These will be used for refactoring the memory-mapped timer init code to
-prepare for GTDT
+The patch add memory-mapped timer register support by using the
+information provided by the new GTDT driver of ACPI.
 
 Signed-off-by: Fu Wei <fu.wei@linaro.org>
 ---
- include/clocksource/arm_arch_timer.h | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ drivers/clocksource/arm_arch_timer.c | 26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
 
-diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index 2625ff1..cc986a3 100644
---- a/include/clocksource/arm_arch_timer.h
-+++ b/include/clocksource/arm_arch_timer.h
-@@ -57,6 +57,8 @@ enum arch_timer_spi_nr {
- #define ARCH_TIMER_MEM_PHYS_ACCESS	2
- #define ARCH_TIMER_MEM_VIRT_ACCESS	3
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 653374c..350d0b9 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -1053,7 +1053,28 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
+ 		       arch_timer_mem_of_init);
  
-+#define ARCH_TIMER_MEM_MAX_FRAMES	8
+ #ifdef CONFIG_ACPI_GTDT
+-/* Initialize per-processor generic timer */
++static int __init arch_timer_mem_acpi_init(void)
++{
++	struct arch_timer_mem *timer_mem;
++	int ret = 0;
++	int i = 0;
 +
- #define ARCH_TIMER_USR_PCT_ACCESS_EN	BIT(0) /* physical counter */
- #define ARCH_TIMER_USR_VCT_ACCESS_EN	BIT(1) /* virtual counter */
- #define ARCH_TIMER_VIRT_EVT_EN		BIT(2)
-@@ -72,6 +74,21 @@ struct arch_timer_kvm_info {
- 	int virtual_irq;
- };
++	timer_mem = kzalloc(sizeof(*timer_mem), GFP_KERNEL);
++	if (!timer_mem)
++		return -ENOMEM;
++
++	while (!gtdt_arch_timer_mem_init(timer_mem, i)) {
++		ret = arch_timer_mem_init(timer_mem);
++		if (ret)
++			break;
++		i++;
++	}
++
++	kfree(timer_mem);
++	return ret;
++}
++
++/* Initialize per-processor generic timer and memory-mapped timer(if present) */
+ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ {
+ 	int ret;
+@@ -1090,6 +1111,9 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ 	/* Get the frequency from CNTFRQ */
+ 	arch_timer_detect_rate(NULL, NULL);
  
-+struct arch_timer_mem_frame {
-+	int frame_nr;
-+	phys_addr_t cntbase;
-+	size_t size;
-+	int phys_irq;
-+	int virt_irq;
-+};
++	if (arch_timer_mem_acpi_init())
++		pr_err("Failed to initialize memory-mapped timer.\n");
 +
-+struct arch_timer_mem {
-+	phys_addr_t cntctlbase;
-+	size_t size;
-+	int num_frames;
-+	struct arch_timer_mem_frame frame[ARCH_TIMER_MEM_MAX_FRAMES];
-+};
-+
- #ifdef CONFIG_ARM_ARCH_TIMER
+ 	ret = arch_timer_init();
  
- extern u32 arch_timer_get_rate(void);
+ error:
 -- 
 2.7.4
