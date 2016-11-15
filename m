@@ -1,53 +1,47 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 15 Nov 2016 15:19:58 +0000
-Subject: [PATCH v2 2/3] efi/libstub: add random.c to ARM build
-In-Reply-To: <2189664.D28O3TYR8x@wuerfel>
-References: <1476962486-18368-1-git-send-email-ard.biesheuvel@linaro.org>
- <1476962486-18368-3-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_=et=2zHBTYOr9thz2kS0cXHHYg96oWGRdD3D10fqXtw@mail.gmail.com>
- <2189664.D28O3TYR8x@wuerfel>
-Message-ID: <CAKv+Gu-=sdp6Mz75NpeAxmBnnHVtgT3waDTm7R=MdmKyqMr94g@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 15 Nov 2016 10:20:15 -0500
+Subject: [PATCH/RESEND] recordmcount: arm: Implement make_nop
+In-Reply-To: <CAKv+Gu-Cp775gbLxPcJQ4G2nEnwm9G_gxh5B1Sf2LGkkov_OZA@mail.gmail.com>
+References: <20161018234200.5804-1-sboyd@codeaurora.org>
+ <CAKv+Gu-Cp775gbLxPcJQ4G2nEnwm9G_gxh5B1Sf2LGkkov_OZA@mail.gmail.com>
+Message-ID: <20161115102015.3392420e@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 November 2016 at 15:11, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday, November 2, 2016 9:37:13 AM CET Ard Biesheuvel wrote:
->> @@ -98,7 +100,7 @@
->>                 efi_memory_desc_t *md = (void *)memory_map + map_offset;
->>                 unsigned long slots;
->>
->> -               slots = get_entry_num_slots(md, size, align);
->> +               slots = get_entry_num_slots(md, size, ilog2(align));
->>                 MD_NUM_SLOTS(md) = slots;
->>                 total_slots += slots;
->>         }
->> """
->>
->> This is because ARM does not have a division routine in the
->> decompressor, and the fact that the division by 'align' should always
->> involve a power of 2 is not visible to the compiler.
->>
->> If nobody objects, I will fold this in when applying
->>
->>
->
-> I'm getting a link error here when building with -Os:
->
-> drivers/firmware/efi/libstub/random.stub.o: In function `efi_random_alloc':
-> random.c:(.text.efi_random_alloc+0x264): undefined reference to `__aeabi_llsr'
->
-> If I compile this with -O2, the ilog2 gets inlined and everything
-> works.
->
+On Tue, 15 Nov 2016 14:19:44 +0000
+Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 
-This is caused by the fact that 'start' and 'end are u64 rather than
-unsigned long, and the stub does not have the u64 logical shift right
-routines.
-But interestingly, it does cover another issue with this code, i.e.,
-that you cannot do allocations over 4 GB in the ARM stub, even on LPAE
-capable hardware.
+> On 19 October 2016 at 00:42, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > In similar spirit to x86 and arm64 support, add a make_nop_arm()
+> > to replace calls to mcount with a nop in sections that aren't
+> > traced.
+> >
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Acked-by: Rabin Vincent <rabin@rab.in>
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > ---
+> >  scripts/recordmcount.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 65 insertions(+)
+> >
+> > diff --git a/scripts/recordmcount.c b/scripts/recordmcount.c
+> > index 5423a58d1b06..aeb34223167c 100644
+> > --- a/scripts/recordmcount.c
+> > +++ b/scripts/recordmcount.c
+> > @@ -213,6 +213,59 @@ static int make_nop_x86(void *map, size_t const offset)
+> >         return 0;
+> >  }
+> >
+> > +static unsigned char ideal_nop4_arm_le[4] = { 0x00, 0x00, 0xa0, 0xe1 }; /* mov r0, r0 */
+> > +static unsigned char ideal_nop4_arm_be[4] = { 0xe1, 0xa0, 0x00, 0x00 }; /* mov r0, r0 */  
+> 
+> Shouldn't you be taking the difference between BE8 and BE32 into
+> account here? IIRC, BE8 uses little endian encoding for instructions.
+> 
 
-I will send out a patch to fix this.
+I was just about to push this to linux-next (where I don't rebase). I'm
+guessing I should hold off then.
 
-Thanks,
-Ard.
+Luckily, this was the last patch of my tree that I tested, and I can
+just remove that one.
+
+-- Steve
