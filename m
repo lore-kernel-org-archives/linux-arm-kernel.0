@@ -1,42 +1,59 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Tue, 15 Nov 2016 20:16:02 +0800
-Subject: [PATCH v4 1/6] arm64: arch_timer: Add device tree binding for
- hisilicon-161601 erratum
-Message-ID: <1479212167-5812-1-git-send-email-dingtianhong@huawei.com>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Tue, 15 Nov 2016 20:24:55 +0800
+Subject: [PATCH 2/3] thermal: hisilicon: fix for dependency
+In-Reply-To: <20161112120534.GC23848@leoy-linaro>
+References: <1472633417-9330-1-git-send-email-leo.yan@linaro.org>
+ <1472633417-9330-3-git-send-email-leo.yan@linaro.org>
+ <20161112120534.GC23848@leoy-linaro>
+Message-ID: <1479212695.2224.12.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This erratum describes a bug in logic outside the core, so MIDR can't be
-used to identify its presence, and reading an SoC-specific revision
-register from common arch timer code would be awkward.  So, describe it
-in the device tree.
+On Sat, 2016-11-12 at 20:05 +0800, Leo Yan wrote:
+> Hi Rui, Eduardo,
+> 
+> On Wed, Aug 31, 2016 at 04:50:16PM +0800, Leo Yan wrote:
+> > 
+> > The thermal driver is standalone driver which is used to enable
+> > thermal sensors, so it can be used with any cooling device and
+> > should not bind with CPU cooling device driver.
+> > 
+> > This original patch is suggested by Amit Kucheria; so it's to
+> > polish the dependency in Kconfig, and remove the dependency with
+> > CPU_THERMAL.
+> Could you help review this patch? Or need me resend this patch? Sorry
+> I have not tracked this patches well before, this is one missed
+> patch for 96board Hikey.
+> 
+as it still applies cleanly, the patch is queued for 4.10.
 
-v2: Use the new erratum name and update the description.
-
-Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
-index ef5fbe9..c27b2c4 100644
---- a/Documentation/devicetree/bindings/arm/arch_timer.txt
-+++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
-@@ -31,6 +31,14 @@ to deliver its interrupts via SPIs.
-   This also affects writes to the tval register, due to the implicit
-   counter read.
- 
-+- hisilicon,erratum-161601 : A boolean property. Indicates the presence of
-+  erratum 161601, which says that reading the counter is unreliable unless
-+  reading twice on the register and the value of the second read is larger
-+  than the first by less than 32. If the verification is unsuccessful, then
-+  discard the value of this read and repeat this procedure until the verification
-+  is successful.  This also affects writes to the tval register, due to the
-+  implicit counter read.
-+
- ** Optional properties:
- 
- - arm,cpu-registers-not-fw-configured : Firmware does not initialize
--- 
-1.9.0
+thanks,
+rui
+> Thanks,
+> Leo Yan
+> 
+> > 
+> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > ---
+> > ?drivers/thermal/Kconfig | 4 +++-
+> > ?1 file changed, 3 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+> > index 2d702ca..91ebab3 100644
+> > --- a/drivers/thermal/Kconfig
+> > +++ b/drivers/thermal/Kconfig
+> > @@ -177,8 +177,10 @@ config THERMAL_EMULATION
+> > ?
+> > ?config HISI_THERMAL
+> > ?	tristate "Hisilicon thermal driver"
+> > -	depends on (ARCH_HISI && CPU_THERMAL && OF) ||
+> > COMPILE_TEST
+> > +	depends on ARCH_HISI || COMPILE_TEST
+> > ?	depends on HAS_IOMEM
+> > +	depends on OF
+> > +	default y
+> > ?	help
+> > ?	??Enable this to plug hisilicon's thermal sensor driver
+> > into the Linux
+> > ?	??thermal framework. cpufreq is used as the cooling device
+> > to throttle
