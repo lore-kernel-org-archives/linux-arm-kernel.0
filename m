@@ -1,41 +1,57 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Tue, 15 Nov 2016 22:15:51 +0100
-Subject: Default atomic_pool_size value & changing it
-Message-ID: <CACna6ryHrkhxF-HKDB-+if=7XC9D=89oTEVyR9PJWpYAWnoVzw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 15 Nov 2016 22:18:44 +0100
+Subject: [GIT PULL] sun4i-drm fixes for 4.9
+Message-ID: <20161115211844.73rypzsalmubd6hf@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi David,
 
-I've hit problem with allocating enough coherent DMA memory. Obviously
-there is a limit of this memory as pointed by:
-[ 0.283667] DMA: preallocated 256 KiB pool for atomic coherent allocations
+Please pull the following fixes for the 4.9 cycle.
 
-In my case I was experimenting with a coherent memory used for DMA
-descriptors. They are some small structs addressing SKBs and
-controlling them:
-struct bgmac_dma_desc {
-        __le32 ctl0;
-        __le32 ctl1;
-        __le32 addr_low;
-        __le32 addr_high;
-} __packed;
-Having 5-6 rings 512 entries each requires 48 KiB. There are devices
-with 3 Ethernet bgmac devices and 2 wireless devices, 48 KiB * 5 gets
-me dangerously close to the limit. I don't see this problem with
-upstream default drivers yet, but it may become an issue at some
-point.
+Thanks!
+Maxime
 
-Raspberry Pi was dealing a similar problem:
-https://github.com/raspberrypi/linux/issues/170
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
-Does it make any sense to increase default atomic_pool_size value?
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
 
-I see there is init_dma_coherent_pool_size function but it seems to be
-dead code (can we drop it?).
-I can change that value using coherent_pool param, but is that sane to
-put it in bootargs of upstream DTS files?
-Any advise on this?
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-drm-fixes-for-4.9
+
+for you to fetch changes up to 4db069a2bf990e278ea57ff615dcaa89b85376bd:
+
+  drm/sun4i: Propagate error to the caller (2016-11-07 16:09:35 +0100)
+
+----------------------------------------------------------------
+sun4i-drm fixes for 4.9
+
+A few patches to fix our error handling and our panel / bridge calls.
+
+----------------------------------------------------------------
+Christophe JAILLET (2):
+      drm/sun4i: Fix error handling
+      drm/sun4i: Propagate error to the caller
+
+Jonathan Liu (1):
+      drm/sun4i: rgb: Enable panel after controller
+
+Maxime Ripard (1):
+      drm/sun4i: rgb: Remove the bridge enable/disable functions
+
+ drivers/gpu/drm/sun4i/sun4i_drv.c |  4 ++--
+ drivers/gpu/drm/sun4i/sun4i_rgb.c | 20 ++++++++------------
+ 2 files changed, 10 insertions(+), 14 deletions(-)
 
 -- 
-Rafa?
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161115/d1cebdf5/attachment.sig>
