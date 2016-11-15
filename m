@@ -1,11 +1,16 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 15 Nov 2016 13:22:21 -0800
-Subject: [GIT PULL 3/5] omap device tree changes for v4.10
-In-Reply-To: <pull-1479236877-351747>
-References: <pull-1479236877-351747>
-Message-ID: <pull-1479236877-351747-3>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 15 Nov 2016 22:23:32 +0100
+Subject: [GIT PULL] Allwinner clock fixes for 4.9
+Message-ID: <20161115212332.w5amyhohmauqzpe5@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hi Mike, Stephen,
+
+Please pull the following fixes for the 4.9 cycle
+
+Thanks!
+Maxime
 
 The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
@@ -13,93 +18,36 @@ The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.10/dt-signed
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clk-fixes-for-4.9
 
-for you to fetch changes up to 7e2f8c0ae670327cbe0348ad2f3df7d9a55a8e5d:
+for you to fetch changes up to ac95330b96376550ae7a533d1396272d675adfa2:
 
-  ARM: dts: Add minimal support for motorola droid 4 xt894 (2016-11-15 10:28:49 -0800)
-
-----------------------------------------------------------------
-Device tree changes for omaps for v4.10 merge window:
-
-- A series of patches to configure tps65217 PMIC interrupts for
-  power button, charger and usb and use them on am335x
-
-- Configure EEPROM, LEDs and USR1 button for omap5 boards
-
-- Add tscadc DMA properites for am33xx and am4372
-
-- Configure baltos-ir5221 both musb channels to host mode
-
-- Configure internal and external RTC clocks for am335x boards
-
-- Don't reset gpio3 block on baltos
-
-- Remove pinmux for dra72-evm for erratum i869, fix the regulators
-  and seprate out tps65917 support
-
-- Add dra718-evm support
-
-- Add minimal droid 4 xt894 support
+  clk: sunxi: Fix M factor computation for APB1 (2016-11-04 08:49:46 +0100)
 
 ----------------------------------------------------------------
-H. Nikolaus Schaller (3):
-      ARM: dts: omap5 uevm: add EEPROM
-      ARM: dts: omap5 uevm: add LEDs
-      ARM: dts: omap5 uevm: add USR1 button
+Allwinner clock fixes for 4.9
 
-Keerthy (3):
-      ARM: dts: AM335X-bone-common: Add the internal and external clock nodes for rtc
-      ARM: dts: AM335X-evm: Add the internal and external clock nodes for rtc
-      ARM: dts: AM335X-evmsk: Add the internal and external clock nodes for rtc
+Two fixes, one for the old clock code, one for the new implementation.
 
-Lokesh Vutla (3):
-      ARM: dts: dra72-evm: Remove pinmux configurations for erratum i869
-      ARM: dts: dra72-evm: Fix modelling of regulators
-      ARM: dts: dra72: Add separate dtsi for tps65917
+----------------------------------------------------------------
+Chen-Yu Tsai (1):
+      clk: sunxi-ng: sun6i-a31: Force AHB1 clock to use PLL6 as parent
 
-Milo Kim (7):
-      ARM: dts: tps65217: Specify the interrupt controller
-      ARM: dts: tps65217: Add the charger device
-      ARM: dts: tps65217: Add the power button device
-      ARM: dts: am335x: Support the PMIC interrupt
-      dt-bindings: mfd: Provide human readable defines for TPS65217 interrupts
-      ARM: dts: am335x: Add the charger interrupt
-      ARM: dts: am335x: Add the power button interrupt
+St?phan Rafin (1):
+      clk: sunxi: Fix M factor computation for APB1
 
-Mugunthan V N (2):
-      ARM: dts: am33xx: add DMA properties for tscadc
-      ARM: dts: am4372: add DMA properties for tscadc
+ drivers/clk/sunxi-ng/ccu-sun6i-a31.c | 12 ++++++++++++
+ drivers/clk/sunxi/clk-sunxi.c        |  2 +-
+ 2 files changed, 13 insertions(+), 1 deletion(-)
 
-Nishanth Menon (1):
-      ARM: dts: Add support for dra718-evm
-
-Tony Lindgren (1):
-      ARM: dts: Add minimal support for motorola droid 4 xt894
-
-Yegor Yefremov (2):
-      ARM: dts: am335x-baltos-ir5221: use both musb channels in host mode
-      ARM: dts: am335x-baltos: don't reset gpio3 block
-
- arch/arm/boot/dts/Makefile                 |   4 +-
- arch/arm/boot/dts/am335x-baltos-ir5221.dts |   2 +-
- arch/arm/boot/dts/am335x-baltos.dtsi       |   4 +
- arch/arm/boot/dts/am335x-bone-common.dtsi  |  22 ++
- arch/arm/boot/dts/am335x-evm.dts           |   5 +
- arch/arm/boot/dts/am335x-evmsk.dts         |   5 +
- arch/arm/boot/dts/am33xx.dtsi              |   4 +
- arch/arm/boot/dts/am4372.dtsi              |   2 +
- arch/arm/boot/dts/dra71-evm.dts            | 230 +++++++++++++++++++
- arch/arm/boot/dts/dra72-evm-common.dtsi    | 348 ++++-------------------------
- arch/arm/boot/dts/dra72-evm-revc.dts       |  21 +-
- arch/arm/boot/dts/dra72-evm-tps65917.dtsi  | 134 +++++++++++
- arch/arm/boot/dts/dra72-evm.dts            |  14 +-
- arch/arm/boot/dts/omap4-droid4-xt894.dts   | 188 ++++++++++++++++
- arch/arm/boot/dts/omap5-uevm.dts           |  92 ++++++++
- arch/arm/boot/dts/tps65217.dtsi            |  12 +
- include/dt-bindings/mfd/tps65217.h         |  26 +++
- 17 files changed, 787 insertions(+), 326 deletions(-)
- create mode 100644 arch/arm/boot/dts/dra71-evm.dts
- create mode 100644 arch/arm/boot/dts/dra72-evm-tps65917.dtsi
- create mode 100644 arch/arm/boot/dts/omap4-droid4-xt894.dts
- create mode 100644 include/dt-bindings/mfd/tps65217.h
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161115/edb7507a/attachment.sig>
