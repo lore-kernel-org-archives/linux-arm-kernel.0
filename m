@@ -1,27 +1,56 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 15 Nov 2016 16:23:45 -0600
-Subject: [PATCH 08/10] ASoC: sun4i-codec: Add support for H3 codec
-In-Reply-To: <20161112064648.26779-9-wens@csie.org>
-References: <20161112064648.26779-1-wens@csie.org>
- <20161112064648.26779-9-wens@csie.org>
-Message-ID: <20161115222345.44b25usz2i6qeact@rob-hp-laptop>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 15 Nov 2016 23:39:00 +0100
+Subject: [PATCH v2 3/3] ARM: rockchip: drop rk3288 jtag/mmc switch handling
+In-Reply-To: <20161115223900.30728-1-heiko@sntech.de>
+References: <20161115223900.30728-1-heiko@sntech.de>
+Message-ID: <20161115223900.30728-4-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 12, 2016 at 02:46:46PM +0800, Chen-Yu Tsai wrote:
-> The codec on the H3 is similar to the one found on the A31. One key
-> difference is the analog path controls are routed through the PRCM
-> block. This is supported by the sun8i-codec-analog driver, and tied
-> into this codec driver with the audio card's aux_dev.
-> 
-> In addition, the H3 has no HP (headphone) and HBIAS support, and no
-> MIC3 input. The FIFO related registers are slightly rearranged.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  .../devicetree/bindings/sound/sun4i-codec.txt      |  3 +
+We moved that functionality to a more generic place where it can also
+be used for other socs, so drop it from architecture code.
 
-Acked-by: Rob Herring <robh@kernel.org> 
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
+---
+ arch/arm/mach-rockchip/rockchip.c | 12 ------------
+ 1 file changed, 12 deletions(-)
 
->  sound/soc/sunxi/sun4i-codec.c                      | 71 ++++++++++++++++++++++
->  2 files changed, 74 insertions(+)
+diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
+index e7fdf06..0008783 100644
+--- a/arch/arm/mach-rockchip/rockchip.c
++++ b/arch/arm/mach-rockchip/rockchip.c
+@@ -29,13 +29,11 @@
+ #include "core.h"
+ #include "pm.h"
+ 
+-#define RK3288_GRF_SOC_CON0 0x244
+ #define RK3288_TIMER6_7_PHYS 0xff810000
+ 
+ static void __init rockchip_timer_init(void)
+ {
+ 	if (of_machine_is_compatible("rockchip,rk3288")) {
+-		struct regmap *grf;
+ 		void __iomem *reg_base;
+ 
+ 		/*
+@@ -54,16 +52,6 @@ static void __init rockchip_timer_init(void)
+ 		} else {
+ 			pr_err("rockchip: could not map timer7 registers\n");
+ 		}
+-
+-		/*
+-		 * Disable auto jtag/sdmmc switching that causes issues
+-		 * with the mmc controllers making them unreliable
+-		 */
+-		grf = syscon_regmap_lookup_by_compatible("rockchip,rk3288-grf");
+-		if (!IS_ERR(grf))
+-			regmap_write(grf, RK3288_GRF_SOC_CON0, 0x10000000);
+-		else
+-			pr_err("rockchip: could not get grf syscon\n");
+ 	}
+ 
+ 	of_clk_init(NULL);
+-- 
+2.10.2
