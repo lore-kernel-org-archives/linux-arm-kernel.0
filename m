@@ -1,98 +1,119 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 15 Nov 2016 05:46:53 -0800
-Subject: wdt, gpio: move arch_initcall into subsys_initcall ?
-In-Reply-To: <e4472c2d-effa-9583-aded-8dcdfdd57ee6@mentor.com>
-References: <582AE18A.2060405@denx.de>
- <afbf394e-e411-5c43-e2b0-667b3fbc2edf@mentor.com>
- <e4472c2d-effa-9583-aded-8dcdfdd57ee6@mentor.com>
-Message-ID: <ee9824b8-f09f-3817-8893-8121c9fb9eb1@roeck-us.net>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 15 Nov 2016 14:48:14 +0100
+Subject: LEDs that change brightness "itself" -- that's a trigger. Re: PM
+ regression with LED changes in next-20161109
+In-Reply-To: <9e7d5e0f-c4ca-6930-63b9-83dc28517f33@samsung.com>
+References: <cb0aa3ce-ee48-66b8-510c-bd70917afec9@redhat.com>
+ <b5ae20d7-8394-7ad5-1830-13173e9105c4@gmail.com>
+ <9b476f85-d45e-deb6-335d-fc56f6d90350@redhat.com>
+ <127cdd42-6fd8-c671-60b7-3826b351577f@samsung.com>
+ <15cafbf5-d842-e184-2fd4-65f8272f505a@redhat.com>
+ <CGME20161115103141epcas2p251f2521354a8cd7b9dfcfe55bfa482f0@epcas2p2.samsung.com>
+ <20161115103133.GA22860@amd>
+ <4e392d5d-eb10-f285-517e-976a55c3e318@samsung.com>
+ <20161115111154.GA5482@amd> <128aae59-b790-42f1-7d66-81391c9330c3@redhat.com>
+ <20161115114859.GA7018@amd> <aeccbb02-6e33-390c-d72d-2a580dd67ed8@redhat.com>
+ <9e7d5e0f-c4ca-6930-63b9-83dc28517f33@samsung.com>
+Message-ID: <9d42546d-5917-891c-2b18-ccf7f7328624@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2016 03:32 AM, Vladimir Zapolskiy wrote:
-> On 11/15/2016 01:10 PM, Vladimir Zapolskiy wrote:
->> Hello Heiko,
->>
->> On 11/15/2016 12:20 PM, Heiko Schocher wrote:
->>> Hello,
->>>
->>> commit e188cbf7564f: "gpio: mxc: shift gpio_mxc_init() to subsys_initcall level"
->>> moves the gpio initialization of the mxc gpio driver
->>> from the arch_initcall level into subsys_initcall level.
->>>
->>> This leads now on mxc boards, which use a gpio wdt driver
->>> and the CONFIG_GPIO_WATCHDOG_ARCH_INITCALL option enabled,
->>> to unwanted driver probe deferrals during kernel boot.
->>>
->>> I see this currently on an imx6 based board (which has unfortunately
->>> 3 WDT: imx6 internal (disabled), gpio wdt and da9063 WDT ...).
->>>
->>> Also a side effect from above commit is, that the da9063 WDT driver
->>> is now probed before the gpio WDT driver ... so /dev/watchdog now
->>> does not point to the gpio_wdt, instead it points to the da9063 WDT.
->>>
->>> So there are 2 solutions possible:
->>>
->>> - add a CONFIG_GPIO_MCX_ARCH_INITCALL option
->>>   in drivers/gpio/gpio-mxc.c like for the gpio_wdt.c driver?
->>
->> in my opinion this is overly heavy solution and it might be
->> better to avoid it if possible.
->>
->> I would rather prefer to reconsider GPIO_WATCHDOG_ARCH_INITCALL
->> usage in the watchdog driver.
->>
->> Moreover adding this proposed GPIO_MCX_ARCH_INITCALL to call
->> the driver on arch level will result in deferring the GPIO driver.
->>
->>>   But how can we guarantee, that first the gpio driver and then
->>>   the gpio_wdt driver gets probed?
->>>
->>> - move the arch_initcall in gpio_wdt.c into a subsys_initcall
->>>   (Tested this, and the probe dereferral messages are gone ...)
->>>
->>>   But this may results in problems on boards, which needs an early
->>>   trigger on an gpio wdt ...
->>
->> The level of "earliness" can not be defined in absolute time value
->> in any case, why decreasing the init level of the watchdog driver
->> to subsys level can cause problems? For that there should exist
->> some kind of a dependency on IC or PCB hardware level, can you
->> name it please?
->>
->> Also please note that more than a half of all GPIO drivers settle
->> on subsys or later initcall level, this means that there is
->> an expected GPIO watchdog driver deferral for all of them.
->
-> Please find two more late notes though.
->
->> I propose to send two patches for review:
->>
->> 1. remove GPIO_WATCHDOG_ARCH_INITCALL option completely and decouple
->>    module_platform_driver() into arch_initcall() and module_exit()
->>    unconditionally.
->>
->> 2. change arch_initcall() in the watchdog driver to subsys_initcall().
->>    This change removes probe deferrals on boot, when the driver is
->>    used with the most of the GPIO controllers.
->
-> Alternatively commit 5e53c8ed813d ("watchdog: gpio_wdt: Add option for
-> early registration") can be reverted and then module_platform_driver()
-> is decoupled into subsys_initcall() and module_exit() as its replacement.
->
-Sure, only the reason for that was that there are situations where
-subsys_initcall() was too late. Also, when using arch_initcall() only,
-we get deferrals again, which is apparently hated by many and a reason
-for all those "avoid probe deferrals" patches.
+Hi,
 
-> And also please note that since quite many GPIO controller drivers
-> live on initcall levels after subsys_initcall(), the solution won't
-> let to avoid watchdog driver deferrals totally, this should be accepted.
+On 15-11-16 14:28, Jacek Anaszewski wrote:
+> On 11/15/2016 01:06 PM, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 15-11-16 12:48, Pavel Machek wrote:
+>>> Hi!
+>>>
+>>>>>>> The LED you are talking about _has_ a trigger, implemented in
+>>>>>>> hardware. That trigger can change LED brightness behind kernel's (and
+>>>>>>> userspace's) back. Don't pretend the trigger does not exist, it does.
+>>>>>>>
+>>>>>>> And when you do that, you'll have nice place to report changes to
+>>>>>>> userspace -- trigger can now export that information, and offer
+>>>>>>> poll()
+>>>>>>> interface.
+>>>>>>
+>>>>>> Well, that sounds interesting. It is logically justifiable.
+>>>>>
+>>>>> Thanks.
+>>>>>
+>>>>>> I initially proposed exactly this solution, with recently
+>>>>>> added userspace LED being a trigger listener. It seems a bit
+>>>>>> awkward though. How would you listen to the trigger events?
+>>>>>
+>>>>> Trigger exposes a file in sysfs, with poll() working on that file
+>>>>
+>>>> Hmm, a new file would give the advantage of making it easy for
+>>>> userspace to see if the trigger is poll-able, this is likely
+>>>> better then my own proposal I just send.
+>>>
+>>> Good.
+>>>
+>>>>> (and
+>>>>> probably read exposing the current brightness).
+>>>>
+>>>> If we do this, can we please make it mirror brightness, iow
+>>>> also make it writable, that will make it easier for userspace
+>>>> to deal with it. We can simply re-use the existing show / store
+>>>> methods for brightness for this.
+>>>
+>>> Actually, echo 0 > brightness disables the trigger, IIRC. I'd avoid
+>>> that here, you want to be able to turn off the backlight but still
+>>> keep the trigger (and be notified of future changes).
+>>
+>> True, that is easy to do the store method will just need to call
+>> led_set_brightness_nosleep instead of led_set_brightness, this
+>> will skip the checks to stop blinking in led_set_brightness and
+>> otherwise is equivalent.
+>>
+>>>> I suggest we call it:
+>>>>
+>>>> trigger_brightness
+>>>>
+>>>> And only register it when a poll-able trigger is present.
+>>>
+>>> I'd call it 'current_brightness', but that's no big deal. Yes, only
+>>> registering it for poll-able triggers makes sense.
+>>
+>> current_brightness works for me. I will take a shot a patch-set
+>> implementing this.
 >
-... except for others it isn't, and we are back to square one.
+> Word "current" is not precise here.
+>
+> It can be thought of as either last brightness set by the
+> user or the brightness currently written to the device
+> (returned by brightness file).
+>
+> There is a semantic discrepancy in our requirements -
+> we want the file representing both permanent brightness
+> set by the user and brightness set by the hardware.
+>
+> The two stand in contradiction to each other since
+> brightness set by the user can be adjusted by the hardware.
+>
+> Reading the file shouldn't update brightness property of
+> struct led_classdev, so it shouldn't call led_update_brightness()
+> but it still should allow reading brightness set by the
+> hardware, as a result of each POLLPRI event. So in fact in
+> the same time it should report both according to our requirements
+> which is impossible. Do we need three brightness files ?
 
-GPIO_WATCHDOG_ARCH_INITCALL was intended to be only used in situations
-where needed. Why is it used here in the first place if that is not
-the case ?
+I don't think so, current_brightness actually is an accurate
+name, if the brightness was last changed by writing from
+sysfs, the keyboard backlight will honor that and the current_brightness
+attribute will show the brightness last set through writing it,
+which matches the actual current brightness of the keyboard backlight.
 
-Guenter
+Likewise if it was changed with the hotkey last then the keyboard
+backlight brightness will be changed and reading from current_brightness
+will return the new actual brightness. Basically reading from this
+file will be no different then reading from the normal "brightness"
+file the difference will be in that it is poll-able and that
+writing 0 turns off the LED without stopping blinking.
+
+Regards,
+
+Hans
