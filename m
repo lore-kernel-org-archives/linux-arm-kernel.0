@@ -1,38 +1,70 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 15 Nov 2016 20:59:39 +0200
-Subject: [PATCH 02/16] ARM: EXYNOS: use generic API to enable SCU
-In-Reply-To: <1479099731-28108-3-git-send-email-pankaj.dubey@samsung.com>
-References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
- <1479099731-28108-3-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <20161115185939.GA14626@kozik-lap>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 15 Nov 2016 11:02:56 -0800
+Subject: [PATCH] ARM: omap2plus_defconfig: Run make savedefconfig to save some
+ space
+Message-ID: <20161115190256.31938-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 14, 2016 at 10:31:57AM +0530, Pankaj Dubey wrote:
-> Now as we have of_scu_enable which takes care of mapping
-> scu base from DT, lets use it.
-> 
-> This patch also fixes build failure in case !SMP caused
-> by commit SHA ID: 94210b1abb2 which is already merged in
-> krzk/for-next branch
-> 
-> CC: Krzysztof Kozlowski <krzk@kernel.org>
-> CC: linux-samsung-soc at vger.kernel.org
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm/mach-exynos/common.h  |  1 -
->  arch/arm/mach-exynos/platsmp.c | 30 ++++--------------------------
->  arch/arm/mach-exynos/pm.c      |  4 ++--
->  arch/arm/mach-exynos/suspend.c | 14 ++++----------
->  4 files changed, 10 insertions(+), 39 deletions(-)
-> 
+This shrinks down omap2plus_defconfig a bit and makes it easier for
+people to generate minimal patches against it.
 
-Looks correct, for reference:
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/configs/omap2plus_defconfig | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-However this depends on changes in my next/soc branch (and these changes
-were the trigger for this patchset). I can either provide a tag with
-Exynos commits or accept one with common SCU code.
-
-Best regards,
-Krzysztof
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -1,7 +1,6 @@
+ CONFIG_KERNEL_LZMA=y
+ CONFIG_SYSVIPC=y
+ CONFIG_POSIX_MQUEUE=y
+-CONFIG_FHANDLE=y
+ CONFIG_AUDIT=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+@@ -40,7 +39,6 @@ CONFIG_ARCH_MULTI_V6=y
+ CONFIG_POWER_AVS_OMAP=y
+ CONFIG_POWER_AVS_OMAP_CLASS3=y
+ CONFIG_OMAP_RESET_CLOCKS=y
+-CONFIG_OMAP_MUX_DEBUG=y
+ CONFIG_ARCH_OMAP2=y
+ CONFIG_ARCH_OMAP3=y
+ CONFIG_ARCH_OMAP4=y
+@@ -50,7 +48,6 @@ CONFIG_SOC_AM43XX=y
+ CONFIG_SOC_DRA7XX=y
+ CONFIG_ARM_THUMBEE=y
+ CONFIG_ARM_ERRATA_411920=y
+-CONFIG_ARM_ERRATA_430973=y
+ CONFIG_SMP=y
+ CONFIG_NR_CPUS=2
+ CONFIG_CMA=y
+@@ -62,7 +59,6 @@ CONFIG_ARM_ATAG_DTB_COMPAT=y
+ CONFIG_CMDLINE="root=/dev/mmcblk0p2 rootwait console=ttyO2,115200"
+ CONFIG_KEXEC=y
+ CONFIG_CPU_FREQ=y
+-CONFIG_CPU_FREQ_STAT_DETAILS=y
+ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+ CONFIG_CPU_FREQ_GOV_POWERSAVE=y
+ CONFIG_CPU_FREQ_GOV_USERSPACE=y
+@@ -241,14 +237,14 @@ CONFIG_GPIO_PALMAS=y
+ CONFIG_GPIO_TWL4030=y
+ CONFIG_W1=m
+ CONFIG_HDQ_MASTER_OMAP=m
++CONFIG_POWER_AVS=y
++CONFIG_POWER_RESET=y
+ CONFIG_BATTERY_BQ27XXX=m
+ CONFIG_CHARGER_ISP1704=m
+ CONFIG_CHARGER_TWL4030=m
+ CONFIG_CHARGER_BQ2415X=m
+ CONFIG_CHARGER_BQ24190=m
+ CONFIG_CHARGER_BQ24735=m
+-CONFIG_POWER_RESET=y
+-CONFIG_POWER_AVS=y
+ CONFIG_HWMON=m
+ CONFIG_SENSORS_GPIO_FAN=m
+ CONFIG_SENSORS_LM75=m
+-- 
+2.10.2
