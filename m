@@ -1,67 +1,129 @@
-From: phh@phh.me (Pierre-Hugues Husson)
-Date: Wed, 16 Nov 2016 00:35:03 +0100
-Subject: [RFCv2 PATCH 2/5] drm/bridge: dw_hdmi: remove CEC engine register
- definitions
-In-Reply-To: <20161115232754.GB1041@n2100.armlinux.org.uk>
-References: <1479136968-24477-1-git-send-email-hverkuil@xs4all.nl>
- <1479136968-24477-3-git-send-email-hverkuil@xs4all.nl>
- <CAJ-oXjS-VVkBuYh0inTGAvJbsKzvEqKYrgoSeG6UBQtW_1BEyQ@mail.gmail.com>
- <20161115232754.GB1041@n2100.armlinux.org.uk>
-Message-ID: <CAJ-oXjTgYmnNhGh8dW4Ke=zFDN5wwHNoJ40bFUKp0T5dTGLrbw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 15 Nov 2016 15:53:31 -0800
+Subject: [PATCH/RESEND] recordmcount: arm: Implement make_nop
+In-Reply-To: <CAKv+Gu9GVNqXwya8hrjmBcK2L0ud-qr7iE54WUPuMNyFtAy80w@mail.gmail.com>
+References: <20161018234200.5804-1-sboyd@codeaurora.org>
+ <CAKv+Gu-Cp775gbLxPcJQ4G2nEnwm9G_gxh5B1Sf2LGkkov_OZA@mail.gmail.com>
+ <20161115191807.GC25626@codeaurora.org>
+ <CAKv+Gu9GVNqXwya8hrjmBcK2L0ud-qr7iE54WUPuMNyFtAy80w@mail.gmail.com>
+Message-ID: <20161115235331.GE25626@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-11-16 0:27 GMT+01:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
-> On Wed, Nov 16, 2016 at 12:23:50AM +0100, Pierre-Hugues Husson wrote:
->> Hi,
->>
->>
->> 2016-11-14 16:22 GMT+01:00 Hans Verkuil <hverkuil@xs4all.nl>:
->> > From: Russell King <rmk+kernel@arm.linux.org.uk>
->> >
->> > We don't need the CEC engine register definitions, so let's remove them.
->> >
->> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> > ---
->> >  drivers/gpu/drm/bridge/dw-hdmi.h | 45 ----------------------------------------
->> >  1 file changed, 45 deletions(-)
->> >
->> > diff --git a/drivers/gpu/drm/bridge/dw-hdmi.h b/drivers/gpu/drm/bridge/dw-hdmi.h
->> > index fc9a560..26d6845 100644
->> > --- a/drivers/gpu/drm/bridge/dw-hdmi.h
->> > +++ b/drivers/gpu/drm/bridge/dw-hdmi.h
->> > @@ -478,51 +478,6 @@
->> >  #define HDMI_A_PRESETUP                         0x501A
->> >  #define HDMI_A_SRM_BASE                         0x5020
->> >
->> > -/* CEC Engine Registers */
->> > -#define HDMI_CEC_CTRL                           0x7D00
->> > -#define HDMI_CEC_STAT                           0x7D01
->> > -#define HDMI_CEC_MASK                           0x7D02
->> I don't know if this is relevant for a submission, but the build stops
->> working here because of a missing definition HDMI_CEC_MASK
->> Perhaps this should be inverted with 3/5 to make bissecting easier?
->> I was trying to bissect a kernel panic, and I had to fix this by hand
->
-> Doesn't make sense - patch 3 doesn't reference HDMI_CEC_MASK.
->
-> Please show the build error in full.
-The build is actually fixed with patch 4.
+On 11/15, Ard Biesheuvel wrote:
+> On 15 November 2016 at 19:18, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > On 11/15, Ard Biesheuvel wrote:
+> >> On 19 October 2016 at 00:42, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> >> >
+> >> > +static unsigned char ideal_nop4_arm_le[4] = { 0x00, 0x00, 0xa0, 0xe1 }; /* mov r0, r0 */
+> >> > +static unsigned char ideal_nop4_arm_be[4] = { 0xe1, 0xa0, 0x00, 0x00 }; /* mov r0, r0 */
+> >>
+> >> Shouldn't you be taking the difference between BE8 and BE32 into
+> >> account here? IIRC, BE8 uses little endian encoding for instructions.
+> >
+> > I admit I haven't tested on a pre-armv6 CPU so I haven't come
+> > across the case of a BE32 CPU. But from what I can tell that
+> > doesn't matter.
+> >
+> > According to scripts/Makefile.build, cmd_record_mcount only runs
+> > the recordmcount program if CONFIG_FTRACE_MCOUNT_RECORD=y. That
+> > config is defined as:
+> >
+> >         config FTRACE_MCOUNT_RECORD
+> >                 def_bool y
+> >                 depends on DYNAMIC_FTRACE
+> >                 depends on HAVE_FTRACE_MCOUNT_RECORD
+> >
+> >
+> > And in arch/arm/Kconfig we see that DYNAMIC_FTRACE is selected:
+> >
+> >         select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
+> >
+> > which means that FTRACE_MCOUNT_RECORD can't be set when
+> > CPU_ENDIAN_BE32 is set.
+> >
+> > Do you agree that BE32 is not a concern here?
+> >
+> 
+> Yes. But that implies then that you should not be using big-endian
+> instruction encodings at all, and simply use the _le variants for both
+> LE and BE8
 
-Building after patch 2 fails with:
-drivers/gpu/drm/bridge/dw-hdmi.c: In function ?initialize_hdmi_ih_mutes?:
-drivers/gpu/drm/bridge/dw-hdmi.c:1300:26: error: ?HDMI_CEC_MASK?
-undeclared (first use in this function)
-  hdmi_writeb(hdmi, 0xff, HDMI_CEC_MASK);
+Ok. I understand what you're getting at now.
 
-The point of switching patch 3 and patch 2, is that the build works
-with patch 1,3 applied.
-Applying patch 2 breaks the build, but doesn't change any active code,
-so it's ok.
+I believe the linker is the one that does the instruction endian
+swap to little endian. So everything is built as big-endian data
+and instructions in the assembler phase and then when the linker
+runs to generate the final vmlinux elf file it does the swaps to
+make instructions little endian. recordmcount runs on the object
+files and not the vmlinux file.
 
-So with the order 1,3,2,4,5, the build is broken only after 2, while
-with 1,2,3,4,5, it is broken after 2 and 3.
+For example, the do_undefinstr() function in
+arch/arm/kernel/traps.c is one place we nop out. On an le host
+and an le build without this patch I see:
 
-I hope this makes my remark more explicit.
+(This is all ARM, not thumb)
 
-If it doesn't, I think it is quite safe to just ignore it
+00000000 <do_undefinstr>:
+   0:   e1a0c00d        mov     ip, sp
+   4:   e92dd9f0        push    {r4, r5, r6, r7, r8, fp, ip, lr, pc}
+   8:   e24cb004        sub     fp, ip, #4
+   c:   e24dd08c        sub     sp, sp, #140    ; 0x8c
+  10:   e52de004        push    {lr}            ; (str lr, [sp, #-4]!)
+  14:   ebfffffe        bl      0 <__gnu_mcount_nc>
+
+After this patch on an le host and le build I see:
+
+00000000 <do_undefinstr>:
+   0:   e1a0c00d        mov     ip, sp
+   4:   e92dd9f0        push    {r4, r5, r6, r7, r8, fp, ip, lr, pc}
+   8:   e24cb004        sub     fp, ip, #4
+   c:   e24dd08c        sub     sp, sp, #140    ; 0x8c
+  10:   e1a00000        nop                     ; (mov r0, r0)
+  14:   e1a00000        nop                     ; (mov r0, r0)
+
+So far so good. Similarly, with this patch and an le host and be
+build I see:
+
+00000000 <do_undefinstr>:
+   0:   e1a0c00d        mov     ip, sp
+   4:   e92dd9f0        push    {r4, r5, r6, r7, r8, fp, ip, lr, pc}
+   8:   e24cb004        sub     fp, ip, #4
+   c:   e24dd08c        sub     sp, sp, #140    ; 0x8c
+  10:   e1a00000        nop                     ; (mov r0, r0)
+  14:   e1a00000        nop                     ; (mov r0, r0)
+
+but with *_le instead of *_be used a be build I see:
+
+00000000 <do_undefinstr>:
+   0:   e1a0c00d        mov     ip, sp
+   4:   e92dd9f0        push    {r4, r5, r6, r7, r8, fp, ip, lr, pc}
+   8:   e24cb004        sub     fp, ip, #4
+   c:   e24dd08c        sub     sp, sp, #140    ; 0x8c
+  10:   0000a0e1        andeq   sl, r0, r1, ror #1
+  14:   0000a0e1        andeq   sl, r0, r1, ror #1
+
+I confirmed this by looking at the hexdump of the .exception.text
+section for the traps.o object file and the .text section of the
+vmlinux file. Basically objcopy the .exception.text of traps.o to
+get the first few instructions of the do_undefinstr() function:
+
+$ hexdump -C traps.o 
+00000000  e1 a0 c0 0d e9 2d d9 f0  e2 4c b0 04 e2 4d d0 8c
+
+And then objcopy the .text section in vmlinux and seek to the
+same function offset (there are a bunch of zeroes in front of it
+for padding):
+
+$ hexdump -C vmlinux
+...
+00001000  0d c0 a0 e1 f0 d9 2d e9  04 b0 4c e2 8c d0 4d e2
+
+As can be seen everything is swapped from the original object
+file in big-endian to be in little endian.
+
+Does that allay your concerns?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
