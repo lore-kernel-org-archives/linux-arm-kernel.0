@@ -1,110 +1,91 @@
-From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Tue, 15 Nov 2016 17:38:29 +0530
-Subject: [PATCH v2 5/5] net: thunderx: Fix memory leak and other issues upon
- interface toggle
-Message-ID: <1479211709-14547-1-git-send-email-sunil.kovvuri@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 15 Nov 2016 13:11:01 +0100
+Subject: LEDs that change brightness "itself" -- that's a trigger. Re: PM
+ regression with LED changes in next-20161109
+In-Reply-To: <aeccbb02-6e33-390c-d72d-2a580dd67ed8@redhat.com>
+References: <9b476f85-d45e-deb6-335d-fc56f6d90350@redhat.com>
+ <127cdd42-6fd8-c671-60b7-3826b351577f@samsung.com>
+ <15cafbf5-d842-e184-2fd4-65f8272f505a@redhat.com>
+ <CGME20161115103141epcas2p251f2521354a8cd7b9dfcfe55bfa482f0@epcas2p2.samsung.com>
+ <20161115103133.GA22860@amd>
+ <4e392d5d-eb10-f285-517e-976a55c3e318@samsung.com>
+ <20161115111154.GA5482@amd>
+ <128aae59-b790-42f1-7d66-81391c9330c3@redhat.com>
+ <20161115114859.GA7018@amd>
+ <aeccbb02-6e33-390c-d72d-2a580dd67ed8@redhat.com>
+Message-ID: <20161115121100.GC7018@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
+On Tue 2016-11-15 13:06:14, Hans de Goede wrote:
+> Hi,
+> 
+> On 15-11-16 12:48, Pavel Machek wrote:
+> >Hi!
+> >
+> >>>>>The LED you are talking about _has_ a trigger, implemented in
+> >>>>>hardware. That trigger can change LED brightness behind kernel's (and
+> >>>>>userspace's) back. Don't pretend the trigger does not exist, it does.
+> >>>>>
+> >>>>>And when you do that, you'll have nice place to report changes to
+> >>>>>userspace -- trigger can now export that information, and offer poll()
+> >>>>>interface.
+> >>>>
+> >>>>Well, that sounds interesting. It is logically justifiable.
+> >>>
+> >>>Thanks.
+> >>>
+> >>>>I initially proposed exactly this solution, with recently
+> >>>>added userspace LED being a trigger listener. It seems a bit
+> >>>>awkward though. How would you listen to the trigger events?
+> >>>
+> >>>Trigger exposes a file in sysfs, with poll() working on that file
+> >>
+> >>Hmm, a new file would give the advantage of making it easy for
+> >>userspace to see if the trigger is poll-able, this is likely
+> >>better then my own proposal I just send.
+> >
+> >Good.
+> >
+> >>>(and
+> >>>probably read exposing the current brightness).
+> >>
+> >>If we do this, can we please make it mirror brightness, iow
+> >>also make it writable, that will make it easier for userspace
+> >>to deal with it. We can simply re-use the existing show / store
+> >>methods for brightness for this.
+> >
+> >Actually, echo 0 > brightness disables the trigger, IIRC. I'd avoid
+> >that here, you want to be able to turn off the backlight but still
+> >keep the trigger (and be notified of future changes).
+> 
+> True, that is easy to do the store method will just need to call
+> led_set_brightness_nosleep instead of led_set_brightness, this
+> will skip the checks to stop blinking in led_set_brightness and
+> otherwise is equivalent.
+> 
+> >>I suggest we call it:
+> >>
+> >>trigger_brightness
+> >>
+> >>And only register it when a poll-able trigger is present.
+> >
+> >I'd call it 'current_brightness', but that's no big deal. Yes, only
+> >registering it for poll-able triggers makes sense.
+> 
+> current_brightness works for me. I will take a shot a patch-set
+> implementing this.
 
-This patch fixes the following
-1. When interface is being teardown and queues are being cleaned up,
-   free pending SKBs that are in SQ which are either not transmitted
-   or freed as NAPI is disabled by that time.
-2. While interface initialization, delay CFG_DONE notification till
-   the end to avoid corner cases where TXQs are enabled but CQ
-   interrupts are not which results blocking transmission and kicking
-   off watchdog.
-3. Check for IFF_UP while re-enabling RBDR interrupts from tasklet.
-
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 11 +++++------
- drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 14 +++++++++++++-
- 2 files changed, 18 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index 9dc79c05..8a37012 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -473,9 +473,6 @@ int nicvf_set_real_num_queues(struct net_device *netdev,
- static int nicvf_init_resources(struct nicvf *nic)
- {
- 	int err;
--	union nic_mbx mbx = {};
--
--	mbx.msg.msg = NIC_MBOX_MSG_CFG_DONE;
- 
- 	/* Enable Qset */
- 	nicvf_qset_config(nic, true);
-@@ -488,9 +485,6 @@ static int nicvf_init_resources(struct nicvf *nic)
- 		return err;
- 	}
- 
--	/* Send VF config done msg to PF */
--	nicvf_write_to_mbx(nic, &mbx);
--
- 	return 0;
- }
- 
-@@ -1184,6 +1178,7 @@ int nicvf_open(struct net_device *netdev)
- 	struct nicvf *nic = netdev_priv(netdev);
- 	struct queue_set *qs = nic->qs;
- 	struct nicvf_cq_poll *cq_poll = NULL;
-+	union nic_mbx mbx = {};
- 
- 	netif_carrier_off(netdev);
- 
-@@ -1271,6 +1266,10 @@ int nicvf_open(struct net_device *netdev)
- 	for (qidx = 0; qidx < qs->rbdr_cnt; qidx++)
- 		nicvf_enable_intr(nic, NICVF_INTR_RBDR, qidx);
- 
-+	/* Send VF config done msg to PF */
-+	mbx.msg.msg = NIC_MBOX_MSG_CFG_DONE;
-+	nicvf_write_to_mbx(nic, &mbx);
-+
- 	return 0;
- cleanup:
- 	nicvf_disable_intr(nic, NICVF_INTR_MBOX, 0);
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-index bdce591..747ef08 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-@@ -271,7 +271,8 @@ static void nicvf_refill_rbdr(struct nicvf *nic, gfp_t gfp)
- 			      rbdr_idx, new_rb);
- next_rbdr:
- 	/* Re-enable RBDR interrupts only if buffer allocation is success */
--	if (!nic->rb_alloc_fail && rbdr->enable)
-+	if (!nic->rb_alloc_fail && rbdr->enable &&
-+	    netif_running(nic->pnicvf->netdev))
- 		nicvf_enable_intr(nic, NICVF_INTR_RBDR, rbdr_idx);
- 
- 	if (rbdr_idx)
-@@ -362,6 +363,8 @@ static int nicvf_init_snd_queue(struct nicvf *nic,
- 
- static void nicvf_free_snd_queue(struct nicvf *nic, struct snd_queue *sq)
- {
-+	struct sk_buff *skb;
-+
- 	if (!sq)
- 		return;
- 	if (!sq->dmem.base)
-@@ -372,6 +375,15 @@ static void nicvf_free_snd_queue(struct nicvf *nic, struct snd_queue *sq)
- 				  sq->dmem.q_len * TSO_HEADER_SIZE,
- 				  sq->tso_hdrs, sq->tso_hdrs_phys);
- 
-+	/* Free pending skbs in the queue */
-+	smp_rmb();
-+	while (sq->head != sq->tail) {
-+		skb = (struct sk_buff *)sq->skbuff[sq->head];
-+		if (skb)
-+			dev_kfree_skb_any(skb);
-+		sq->head++;
-+		sq->head &= (sq->dmem.q_len - 1);
-+	}
- 	kfree(sq->skbuff);
- 	nicvf_free_q_desc_mem(nic, &sq->dmem);
- }
+Thanks!
+								Pavel
+								
 -- 
-2.7.4
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161115/21006631/attachment.sig>
