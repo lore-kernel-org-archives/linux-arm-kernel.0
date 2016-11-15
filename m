@@ -1,57 +1,84 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 15 Nov 2016 22:18:44 +0100
-Subject: [GIT PULL] sun4i-drm fixes for 4.9
-Message-ID: <20161115211844.73rypzsalmubd6hf@lukather>
+From: b-liu@ti.com (Bin Liu)
+Date: Tue, 15 Nov 2016 15:19:51 -0600
+Subject: [PATCH v4 4/4] ARM: dts: da850: Add the usb otg device nodeg
+In-Reply-To: <0c94c5e0-9d2c-fff5-1213-2fb2adb20ab0@ti.com>
+References: <1478188752-22447-1-git-send-email-abailon@baylibre.com>
+ <1478188752-22447-5-git-send-email-abailon@baylibre.com>
+ <0c94c5e0-9d2c-fff5-1213-2fb2adb20ab0@ti.com>
+Message-ID: <20161115211951.GH11011@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Tue, Nov 15, 2016 at 04:16:02PM +0530, Sekhar Nori wrote:
+> On Thursday 03 November 2016 09:29 PM, Alexandre Bailon wrote:
+> > This adds the device tree node for the usb otg
+> > controller present in the da850 family of SoC's.
+> > This also enables the otg usb controller for the lcdk board.
+> > 
+> > Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+> > ---
+> >  arch/arm/boot/dts/da850-lcdk.dts |  8 ++++++++
+> >  arch/arm/boot/dts/da850.dtsi     | 15 +++++++++++++++
+> >  2 files changed, 23 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+> > index 7b8ab21..9f5040c 100644
+> > --- a/arch/arm/boot/dts/da850-lcdk.dts
+> > +++ b/arch/arm/boot/dts/da850-lcdk.dts
+> > @@ -158,6 +158,14 @@
+> >  	rx-num-evt = <32>;
+> >  };
+> >  
+> > +&usb_phy {
+> > +	status = "okay";
+> > +	};
+> 
+> As mentioned by David already, this node needs to be removed. Please
+> rebase this on top of latest linux-davinci/master when ready for merging
+> (driver changes accepted).
 
-Please pull the following fixes for the 4.9 cycle.
+Dropped this patch due to this comment.
 
-Thanks!
-Maxime
+Regards,
+-Bin.
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-drm-fixes-for-4.9
-
-for you to fetch changes up to 4db069a2bf990e278ea57ff615dcaa89b85376bd:
-
-  drm/sun4i: Propagate error to the caller (2016-11-07 16:09:35 +0100)
-
-----------------------------------------------------------------
-sun4i-drm fixes for 4.9
-
-A few patches to fix our error handling and our panel / bridge calls.
-
-----------------------------------------------------------------
-Christophe JAILLET (2):
-      drm/sun4i: Fix error handling
-      drm/sun4i: Propagate error to the caller
-
-Jonathan Liu (1):
-      drm/sun4i: rgb: Enable panel after controller
-
-Maxime Ripard (1):
-      drm/sun4i: rgb: Remove the bridge enable/disable functions
-
- drivers/gpu/drm/sun4i/sun4i_drv.c |  4 ++--
- drivers/gpu/drm/sun4i/sun4i_rgb.c | 20 ++++++++------------
- 2 files changed, 10 insertions(+), 14 deletions(-)
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161115/d1cebdf5/attachment.sig>
+> 
+> > +
+> > +&usb0 {
+> > +	status = "okay";
+> > +};
+> > +
+> >  &aemif {
+> >  	pinctrl-names = "default";
+> >  	pinctrl-0 = <&nand_pins>;
+> > diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> > index f79e1b9..322a31a 100644
+> > --- a/arch/arm/boot/dts/da850.dtsi
+> > +++ b/arch/arm/boot/dts/da850.dtsi
+> > @@ -372,6 +372,21 @@
+> >  					>;
+> >  			status = "disabled";
+> >  		};
+> > +		usb_phy: usb-phy {
+> > +			compatible = "ti,da830-usb-phy";
+> > +			#phy-cells = <1>;
+> > +			status = "disabled";
+> > +		};
+> > +		usb0: usb at 200000 {
+> > +			compatible = "ti,da830-musb";
+> > +			reg = <0x200000 0x10000>;
+> > +			interrupts = <58>;
+> > +			interrupt-names = "mc";
+> > +			dr_mode = "otg";
+> > +			phys = <&usb_phy 0>;
+> > +			phy-names = "usb-phy";
+> > +			status = "disabled";
+> > +		};
+> 
+> Can you separate out the soc specific changes from board changes? Please
+> place the usb0 node above the mdio node. I am trying to get to a rough
+> ordering based on reg property.
+> 
+> Thanks,
+> Sekhar
+> 
