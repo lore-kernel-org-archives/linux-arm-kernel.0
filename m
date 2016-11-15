@@ -1,20 +1,20 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 15 Nov 2016 18:55:23 +0100
-Subject: [PATCH v2 0/11] Add R8A7745/SK-RZG1E board support
-In-Reply-To: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
-References: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
-Message-ID: <20161115175522.GC3979@verge.net.au>
+Date: Tue, 15 Nov 2016 18:55:28 +0100
+Subject: [PATCH 06/11] ARM: dts: r8a7745: add [H]SCIF{A|B} support
+In-Reply-To: <2366203.iKt2DUneo7@wasted.cogentembedded.com>
+References: <4121805.SRTmqJtRfv@wasted.cogentembedded.com>
+ <2366203.iKt2DUneo7@wasted.cogentembedded.com>
+Message-ID: <20161115175527.GD3979@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 05, 2016 at 12:42:33AM +0300, Sergei Shtylyov wrote:
-> Hello.
+On Sat, Oct 29, 2016 at 01:19:40AM +0300, Sergei Shtylyov wrote:
+> Describe [H]SCIF{|A|B} ports in the R8A7745 device tree.
 > 
->    Here's the set of 11 patches against Simon Horman's 'renesas.git' repo's
-> 'renesas-devel-201611104-v4.9-rc3' tag plus the R8A7743/SK-RZG1M patch series
-> posted earlier. I'm adding the device tree support for the R8A7745-based
-> SK-RZG1E board. The SoC is close to R8A7794 and the board seems identical to the
-> R8A7794/SILK board. The device tree patches depend on the R8A7745 CPG/MSSR
-> driver series in order to compile and work.
+> Based on the original (and large) patch by Dmitry Shifrin
+> <dmitry.shifrin@cogentembedded.com>.
+> 
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Thanks, I have queued this up.
+I have queued this up after updating the indentation to use
+tabs where possible.
