@@ -1,56 +1,30 @@
-From: wulf@rock-chips.com (William Wu)
-Date: Tue, 15 Nov 2016 11:54:07 +0800
-Subject: [PATCH v4 2/2] phy: rockchip-inno-usb2: correct 480MHz output clock
- stable time
-In-Reply-To: <1479182047-3399-1-git-send-email-wulf@rock-chips.com>
-References: <1479182047-3399-1-git-send-email-wulf@rock-chips.com>
-Message-ID: <1479182047-3399-3-git-send-email-wulf@rock-chips.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 14 Nov 2016 21:35:37 -0700
+Subject: [PATCH fpga 8/9] fpga socfpga: Use the scatterlist interface
+In-Reply-To: <alpine.DEB.2.10.1611132149140.2908@atull-VirtualBox>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-9-git-send-email-jgunthorpe@obsidianresearch.com>
+ <alpine.DEB.2.10.1611131712210.2735@atull-VirtualBox>
+ <20161114001854.GA27248@obsidianresearch.com>
+ <alpine.DEB.2.10.1611132149140.2908@atull-VirtualBox>
+Message-ID: <20161115043537.GA23253@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We found that the system crashed due to 480MHz output clock of
-USB2 PHY was unstable after clock had been enabled by gpu module.
+On Sun, Nov 13, 2016 at 10:02:00PM -0600, atull wrote:
+> > I'd add a newop 'write_fragment' and a driver must define write_sg
+> > write_fragment, if write_fragment is used then the core supplies
+> > that loop.
+> 
+> Sure, but isn't that just the old op? :)
 
-Theoretically, 1 millisecond is a critical value for 480MHz
-output clock stable time, so we try to change the delay time
-to 1.2 millisecond to avoid this issue.
+I'm fine with that too, but it is semantically different since write
+is called multiple times in this new world.. All the drivers seem fine
+with that today so it is probably OK ..
 
-And the commit ed907fb1d7c3 ("phy: rockchip-inno-usb2: correct
-clk_ops callback") used prepare callbacks instead of enable
-callbacks to support gate a clk if the operation may sleep. So
-we can switch from delay to sleep functions.
+> There may also be common code that you added to configure_init
+> that should go in the core unless it's fpga-specific.
 
-Also fix a spelling error from "waitting" to "waiting".
+Sure, the alignment test is easy enough to pull out..
 
-Signed-off-by: William Wu <wulf@rock-chips.com>
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
----
-Changes in v4:
-- add Reviewed-by and fix a spelling error
-
-Changes in v3:
-- None
-
-Changes in v2:
-- None
-
- drivers/phy/phy-rockchip-inno-usb2.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
-index 365e077..5d922fc 100644
---- a/drivers/phy/phy-rockchip-inno-usb2.c
-+++ b/drivers/phy/phy-rockchip-inno-usb2.c
-@@ -165,8 +165,8 @@ static int rockchip_usb2phy_clk480m_prepare(struct clk_hw *hw)
- 		if (ret)
- 			return ret;
- 
--		/* waitting for the clk become stable */
--		mdelay(1);
-+		/* waiting for the clk become stable */
-+		usleep_range(1200, 1300);
- 	}
- 
- 	return 0;
--- 
-2.0.0
+Jason
