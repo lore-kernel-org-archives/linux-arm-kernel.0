@@ -1,30 +1,32 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 15 Nov 2016 10:43:02 +0800
-Subject: [PATCH 1/3] clk: Hi6220: enable stub clock driver for ARCH_HISI
-In-Reply-To: <20161115024100.GW5177@codeaurora.org>
-References: <1472633417-9330-1-git-send-email-leo.yan@linaro.org>
- <1472633417-9330-2-git-send-email-leo.yan@linaro.org>
- <20161115024100.GW5177@codeaurora.org>
-Message-ID: <20161115024302.GB24408@leoy-linaro>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 15 Nov 2016 10:43:55 +0800
+Subject: [GIT PULL] i.MX fixes for 4.9, 2nd round
+Message-ID: <20161115024353.GT3310@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 14, 2016 at 06:41:00PM -0800, Stephen Boyd wrote:
-> On 08/31, Leo Yan wrote:
-> > In current kernel config 'CONFIG_STUB_CLK_HI6220' is disabled by
-> > default, as result stub clock driver has not been registered and
-> > CPUFreq driver cannot work.
-> > 
-> > This patch is to enable stub clock driver in config for ARCH_HISI.
-> > 
-> > Reported-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > ---
-> 
-> Applied to clk-next
+The following changes since commit 4edd601c5a9c5094daa714e65063e623826f3bcc:
 
-Thanks :)
+  ARM: imx: mach-imx6q: Fix the PHY ID mask for AR8031 (2016-10-24 21:26:01 +0800)
 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.9-2
+
+for you to fetch changes up to e3c9d9d6ebfeeeee29c6240e1b5978d40d31d21f:
+
+  ARM: dts: imx53-qsb: Fix regulator constraints (2016-11-05 16:18:16 +0800)
+
+----------------------------------------------------------------
+i.MX fixes for 4.9, 2nd round:
+
+It fixes a boot failure on imx53-qsb board with a DA9053 PMIC, which is
+caused by the regulator core change, commit fa93fd4ecc9c ("regulator:
+core: Ensure we are at least in bounds for our constraints").
+
+----------------------------------------------------------------
+Fabio Estevam (1):
+      ARM: dts: imx53-qsb: Fix regulator constraints
+
+ arch/arm/boot/dts/imx53-qsb.dts | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
