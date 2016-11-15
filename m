@@ -1,29 +1,33 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 15 Nov 2016 11:39:09 -0800
-Subject: [PATCH 2/2] ARM: davinci: PM: rework init: cleanup
-In-Reply-To: <c8be7b69-551e-dd70-40d1-a36aa74aeb55@ti.com> (Sekhar Nori's
- message of "Tue, 15 Nov 2016 15:09:41 +0530")
-References: <20161114230441.356-1-khilman@baylibre.com>
- <20161114230441.356-3-khilman@baylibre.com>
- <c8be7b69-551e-dd70-40d1-a36aa74aeb55@ti.com>
-Message-ID: <m2oa1gy1lu.fsf@baylibre.com>
+Date: Tue, 15 Nov 2016 11:54:18 -0800
+Subject: [PATCH v2 0/3] ARM: davinci: PM: cleanup init, add DT support
+Message-ID: <20161115195421.19983-1-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar Nori <nsekhar@ti.com> writes:
+This series removes the fake platform_device used to initialize PM on
+legacy davinci platforms, and also adds PM support for DT platforms.
 
-> On Tuesday 15 November 2016 04:34 AM, Kevin Hilman wrote:
->> A follow-on cleanup renaming 'pdata' since it is no longer
->> platform_data.
->> 
->> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
->
-> Looks good to me. Thanks for separating this out. Makes it much easier
-> to review.
->
-> In the subject line though, instead of just calling it cleanup, how
-> about a bit more descriptive statement like "remove references to pdata".
+Tested with legacy boot on da850-evm, and DT boot on da850-lcdk.  Used
+RTC to wake from suspend-to-RAM: e.g. rtcwake -m mem -s 4 -d /dev/rtc0
 
-Sure.  respin coming right up.
+Changes since v1:
+- separated support for DT platfroms into separate patch
+- misc. cleanup, re-structuring
 
-Kevin
+Kevin Hilman (3):
+  ARM: davinci: PM: rework init, support DT platforms
+  ARM: davinci: PM: cleanup: remove references to pdata
+  ARM: davinci: PM: support da8xx DT platforms
+
+ arch/arm/mach-davinci/board-da850-evm.c    |  17 +----
+ arch/arm/mach-davinci/board-mityomapl138.c |  16 +----
+ arch/arm/mach-davinci/common.c             |   1 -
+ arch/arm/mach-davinci/da850.c              |  38 -----------
+ arch/arm/mach-davinci/da8xx-dt.c           |   1 +
+ arch/arm/mach-davinci/include/mach/da8xx.h |   1 -
+ arch/arm/mach-davinci/pm.c                 | 102 ++++++++++++++++-------------
+ 7 files changed, 60 insertions(+), 116 deletions(-)
+
+-- 
+2.9.3
