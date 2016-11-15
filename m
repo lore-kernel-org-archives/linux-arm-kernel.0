@@ -1,81 +1,41 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Tue, 15 Nov 2016 15:14:21 -0600
-Subject: [PATCH v3 3/3] musb: sunxi: Force session end on babble errors
- in host-mode
-In-Reply-To: <20160923134058.26828-3-hdegoede@redhat.com>
-References: <20160923134058.26828-1-hdegoede@redhat.com>
- <20160923134058.26828-3-hdegoede@redhat.com>
-Message-ID: <20161115211421.GF11011@uda0271908>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Tue, 15 Nov 2016 22:15:51 +0100
+Subject: Default atomic_pool_size value & changing it
+Message-ID: <CACna6ryHrkhxF-HKDB-+if=7XC9D=89oTEVyR9PJWpYAWnoVzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 04:40:58PM +0300, Hans de Goede wrote:
-> The sunxi musb has a bug where sometimes it will generate a babble
-> error on device disconnect instead of a disconnect irq. When this
-> happens the musb-controller switches from host mode to device mode
-> (it clears MUSB_DEVCTL_SESSION and sets MUSB_DEVCTL_BDEVICE) and
-> gets stuck in this state.
-> 
-> Clearing this requires reporting Vbus low for 200 or more ms, but
-> on some devices Vbus is simply always high (host-only mode, no Vbus
-> control).
-> 
-> This commit adds a sunxi_musb_recover() callback which makes
-> sunxi_musb_work call phy_set_mode with the current mode, which
-> will force end the current session.
-> 
-> This fixes the musb controller getting stuck in this state on systems
-> without Vbus control; and also fixes the need to unplug the usb-b ->
-> usb-a cable to get out of this state on systems with Vbus control.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Hi,
 
-Applied. Thanks.
--Bin.
+I've hit problem with allocating enough coherent DMA memory. Obviously
+there is a limit of this memory as pointed by:
+[ 0.283667] DMA: preallocated 256 KiB pool for atomic coherent allocations
 
-> ---
-> Changes in v2:
-> -Use musb_platform_recover callback instead of using DYI code in the
->  interrupt handler
-> -Call phy_set_mode with the current mode instead of adding a new custom
->  sunxi phy callback
-> ---
->  drivers/usb/musb/sunxi.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-> index 82eba92..d0be0ea 100644
-> --- a/drivers/usb/musb/sunxi.c
-> +++ b/drivers/usb/musb/sunxi.c
-> @@ -380,6 +380,20 @@ static int sunxi_musb_set_mode(struct musb *musb, u8 mode)
->  	return 0;
->  }
->  
-> +static int sunxi_musb_recover(struct musb *musb)
-> +{
-> +	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
-> +
-> +	/*
-> +	 * Schedule a phy_set_mode with the current glue->phy_mode value,
-> +	 * this will force end the current session.
-> +	 */
-> +	set_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags);
-> +	schedule_work(&glue->work);
-> +
-> +	return 0;
-> +}
-> +
->  /*
->   * sunxi musb register layout
->   * 0x00 - 0x17	fifo regs, 1 long per fifo
-> @@ -608,6 +622,7 @@ static const struct musb_platform_ops sunxi_musb_ops = {
->  	.dma_init	= sunxi_musb_dma_controller_create,
->  	.dma_exit	= sunxi_musb_dma_controller_destroy,
->  	.set_mode	= sunxi_musb_set_mode,
-> +	.recover	= sunxi_musb_recover,
->  	.set_vbus	= sunxi_musb_set_vbus,
->  	.pre_root_reset_end = sunxi_musb_pre_root_reset_end,
->  	.post_root_reset_end = sunxi_musb_post_root_reset_end,
-> -- 
-> 2.9.3
-> 
+In my case I was experimenting with a coherent memory used for DMA
+descriptors. They are some small structs addressing SKBs and
+controlling them:
+struct bgmac_dma_desc {
+        __le32 ctl0;
+        __le32 ctl1;
+        __le32 addr_low;
+        __le32 addr_high;
+} __packed;
+Having 5-6 rings 512 entries each requires 48 KiB. There are devices
+with 3 Ethernet bgmac devices and 2 wireless devices, 48 KiB * 5 gets
+me dangerously close to the limit. I don't see this problem with
+upstream default drivers yet, but it may become an issue at some
+point.
+
+Raspberry Pi was dealing a similar problem:
+https://github.com/raspberrypi/linux/issues/170
+
+Does it make any sense to increase default atomic_pool_size value?
+
+I see there is init_dma_coherent_pool_size function but it seems to be
+dead code (can we drop it?).
+I can change that value using coherent_pool param, but is that sane to
+put it in bootargs of upstream DTS files?
+Any advise on this?
+
+-- 
+Rafa?
