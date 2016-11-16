@@ -1,52 +1,25 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 16 Nov 2016 12:06:51 +0530
-Subject: [PATCH v4 4/4] ARM: dts: da850: Add the usb otg device nodeg
-In-Reply-To: <20161115211951.GH11011@uda0271908>
-References: <1478188752-22447-1-git-send-email-abailon@baylibre.com>
- <1478188752-22447-5-git-send-email-abailon@baylibre.com>
- <0c94c5e0-9d2c-fff5-1213-2fb2adb20ab0@ti.com>
- <20161115211951.GH11011@uda0271908>
-Message-ID: <9a73c416-fe4c-57c3-af53-87146dae2206@ti.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 16 Nov 2016 07:53:13 +0100
+Subject: [PATCH v2] staging: vc04_services: rework ioctl code path
+In-Reply-To: <1479245234.28223.1.camel@crowfest.net>
+References: <20161111061531.23507-1-mzoran@crowfest.net>
+ <20161115095520.GA18059@kroah.com>
+ <1479245234.28223.1.camel@crowfest.net>
+Message-ID: <20161116065313.GA10278@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 November 2016 02:49 AM, Bin Liu wrote:
-> On Tue, Nov 15, 2016 at 04:16:02PM +0530, Sekhar Nori wrote:
->> On Thursday 03 November 2016 09:29 PM, Alexandre Bailon wrote:
->>> This adds the device tree node for the usb otg
->>> controller present in the da850 family of SoC's.
->>> This also enables the otg usb controller for the lcdk board.
->>>
->>> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
->>> ---
->>>  arch/arm/boot/dts/da850-lcdk.dts |  8 ++++++++
->>>  arch/arm/boot/dts/da850.dtsi     | 15 +++++++++++++++
->>>  2 files changed, 23 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
->>> index 7b8ab21..9f5040c 100644
->>> --- a/arch/arm/boot/dts/da850-lcdk.dts
->>> +++ b/arch/arm/boot/dts/da850-lcdk.dts
->>> @@ -158,6 +158,14 @@
->>>  	rx-num-evt = <32>;
->>>  };
->>>  
->>> +&usb_phy {
->>> +	status = "okay";
->>> +	};
->>
->> As mentioned by David already, this node needs to be removed. Please
->> rebase this on top of latest linux-davinci/master when ready for merging
->> (driver changes accepted).
+On Tue, Nov 15, 2016 at 01:27:14PM -0800, Michael Zoran wrote:
+> I'll see what I can do, but since this is getting closer to the
+> holidays I'm planing to spend less time on this. Perhaps someone else
+> may be interested in cleaning up the ioctl path?
 > 
-> Dropped this patch due to this comment.
+> Since the old code uses obsolete kernel features, it's going to take
+> some work to fix without adding any checkpatch.pl warnings.
 
-Bin, Please do not apply dts or arch/arm/mach-davinci patches. I have a
-bunch queued through my tree and more in pipeline and it will cause
-unnecessary merge conflicts in linux-next or at Linus.
+When just moving code around, it's ok to keep the same warnings, they
+can be fixed up correctly later on.
 
-For future, I have asked Alexandre to send driver and dts patches as
-separate series so there is no confusion on who should apply.
+thanks,
 
-Thanks,
-Sekhar
+greg k-h
