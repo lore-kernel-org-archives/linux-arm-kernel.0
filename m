@@ -1,164 +1,426 @@
 From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Wed, 16 Nov 2016 21:49:08 +0800
-Subject: [PATCH v16 15/15] acpi/arm64: Add SBSA Generic Watchdog support in
- GTDT driver
+Date: Wed, 16 Nov 2016 21:48:57 +0800
+Subject: [PATCH v16 04/15] clocksource/drivers/arm_arch_timer: rename some
+ enums and defines, and some cleanups.
 In-Reply-To: <1479304148-2965-1-git-send-email-fu.wei@linaro.org>
 References: <1479304148-2965-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1479304148-2965-16-git-send-email-fu.wei@linaro.org>
+Message-ID: <1479304148-2965-5-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fu Wei <fu.wei@linaro.org>
 
-This driver adds support for parsing SBSA Generic Watchdog timer
-in GTDT, parse all info in SBSA Generic Watchdog Structure in GTDT,
-and creating a platform device with that information.
+Rename some enums and defines, to unify the format of enums and defines
+in arm_arch_timer.h, also update all the users of these enums and defines:
+    drivers/clocksource/arm_arch_timer.c
+    virt/kvm/arm/hyp/timer-sr.c
+And do some cleanups, according to the suggestion from checkpatch.pl:
+(1) using BIT(nr) instead of (1 << nr)
+(2) using 'unsigned int' instead of 'unsigned'
 
-This allows the operating system to obtain device data from the
-resource of platform device. The platform device named "sbsa-gwdt"
-can be used by the ARM SBSA Generic Watchdog driver.
+No functional change.
 
 Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
 ---
- drivers/acpi/arm64/gtdt.c | 100 ++++++++++++++++++++++++++++++++++++++++++++++
- drivers/watchdog/Kconfig  |   1 +
- 2 files changed, 101 insertions(+)
+ drivers/clocksource/arm_arch_timer.c | 111 ++++++++++++++++++-----------------
+ include/clocksource/arm_arch_timer.h |  40 ++++++-------
+ virt/kvm/arm/hyp/timer-sr.c          |   6 +-
+ 3 files changed, 81 insertions(+), 76 deletions(-)
 
-diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
-index 08d9506..69483f6 100644
---- a/drivers/acpi/arm64/gtdt.c
-+++ b/drivers/acpi/arm64/gtdt.c
-@@ -14,6 +14,7 @@
- #include <linux/acpi.h>
- #include <linux/init.h>
- #include <linux/kernel.h>
-+#include <linux/platform_device.h>
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 15341cf..dd1040d 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -66,11 +66,11 @@ struct arch_timer {
+ #define to_arch_timer(e) container_of(e, struct arch_timer, evt)
  
- #include <clocksource/arm_arch_timer.h>
+ static u32 arch_timer_rate;
+-static int arch_timer_ppi[MAX_TIMER_PPI];
++static int arch_timer_ppi[ARCH_TIMER_MAX_TIMER_PPI];
  
-@@ -66,6 +67,14 @@ static inline bool is_watchdog(void *platform_timer)
- 	return gh->type == ACPI_GTDT_TYPE_WATCHDOG;
+ static struct clock_event_device __percpu *arch_timer_evt;
+ 
+-static enum arch_timer_ppi_nr arch_timer_uses_ppi = VIRT_PPI;
++static enum arch_timer_ppi_nr arch_timer_uses_ppi = ARCH_TIMER_VIRT_PPI;
+ static bool arch_timer_c3stop;
+ static bool arch_timer_mem_use_virtual;
+ 
+@@ -340,7 +340,7 @@ static void fsl_a008585_set_sne(struct clock_event_device *clk)
+ 	if (!static_branch_unlikely(&arch_timer_read_ool_enabled))
+ 		return;
+ 
+-	if (arch_timer_uses_ppi == VIRT_PPI)
++	if (arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI)
+ 		clk->set_next_event = fsl_a008585_set_next_event_virt;
+ 	else
+ 		clk->set_next_event = fsl_a008585_set_next_event_phys;
+@@ -352,7 +352,7 @@ static void __arch_timer_setup(unsigned type,
+ {
+ 	clk->features = CLOCK_EVT_FEAT_ONESHOT;
+ 
+-	if (type == ARCH_CP15_TIMER) {
++	if (type == ARCH_TIMER_TYPE_CP15) {
+ 		if (arch_timer_c3stop)
+ 			clk->features |= CLOCK_EVT_FEAT_C3STOP;
+ 		clk->name = "arch_sys_timer";
+@@ -360,14 +360,14 @@ static void __arch_timer_setup(unsigned type,
+ 		clk->cpumask = cpumask_of(smp_processor_id());
+ 		clk->irq = arch_timer_ppi[arch_timer_uses_ppi];
+ 		switch (arch_timer_uses_ppi) {
+-		case VIRT_PPI:
++		case ARCH_TIMER_VIRT_PPI:
+ 			clk->set_state_shutdown = arch_timer_shutdown_virt;
+ 			clk->set_state_oneshot_stopped = arch_timer_shutdown_virt;
+ 			clk->set_next_event = arch_timer_set_next_event_virt;
+ 			break;
+-		case PHYS_SECURE_PPI:
+-		case PHYS_NONSECURE_PPI:
+-		case HYP_PPI:
++		case ARCH_TIMER_PHYS_SECURE_PPI:
++		case ARCH_TIMER_PHYS_NONSECURE_PPI:
++		case ARCH_TIMER_HYP_PPI:
+ 			clk->set_state_shutdown = arch_timer_shutdown_phys;
+ 			clk->set_state_oneshot_stopped = arch_timer_shutdown_phys;
+ 			clk->set_next_event = arch_timer_set_next_event_phys;
+@@ -447,8 +447,8 @@ static void arch_counter_set_user_access(void)
+ 
+ static bool arch_timer_has_nonsecure_ppi(void)
+ {
+-	return (arch_timer_uses_ppi == PHYS_SECURE_PPI &&
+-		arch_timer_ppi[PHYS_NONSECURE_PPI]);
++	return (arch_timer_uses_ppi == ARCH_TIMER_PHYS_SECURE_PPI &&
++		arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI]);
  }
  
-+static inline struct acpi_gtdt_watchdog *get_watchdog(unsigned int index)
-+{
-+	if (index >= acpi_gtdt_desc.watchdog_count || !watchdog)
-+		return NULL;
-+
-+	return watchdog[index];
-+}
-+
- static int __init map_gt_gsi(u32 interrupt, u32 flags)
+ static u32 check_ppi_trigger(int irq)
+@@ -469,14 +469,15 @@ static int arch_timer_starting_cpu(unsigned int cpu)
+ 	struct clock_event_device *clk = this_cpu_ptr(arch_timer_evt);
+ 	u32 flags;
+ 
+-	__arch_timer_setup(ARCH_CP15_TIMER, clk);
++	__arch_timer_setup(ARCH_TIMER_TYPE_CP15, clk);
+ 
+ 	flags = check_ppi_trigger(arch_timer_ppi[arch_timer_uses_ppi]);
+ 	enable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], flags);
+ 
+ 	if (arch_timer_has_nonsecure_ppi()) {
+-		flags = check_ppi_trigger(arch_timer_ppi[PHYS_NONSECURE_PPI]);
+-		enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], flags);
++		flags = check_ppi_trigger(arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI]);
++		enable_percpu_irq(arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI],
++				  flags);
+ 	}
+ 
+ 	arch_counter_set_user_access();
+@@ -513,16 +514,17 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
+ static void arch_timer_banner(unsigned type)
  {
- 	int trigger, polarity;
-@@ -309,3 +318,94 @@ int __init gtdt_arch_timer_mem_init(struct arch_timer_mem *data,
+ 	pr_info("%s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
+-		type & ARCH_CP15_TIMER ? "cp15" : "",
+-		type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  " and " : "",
+-		type & ARCH_MEM_TIMER ? "mmio" : "",
++		type & ARCH_TIMER_TYPE_CP15 ? "cp15" : "",
++		type == (ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM) ?
++			" and " : "",
++		type & ARCH_TIMER_TYPE_MEM ? "mmio" : "",
+ 		(unsigned long)arch_timer_rate / 1000000,
+ 		(unsigned long)(arch_timer_rate / 10000) % 100,
+-		type & ARCH_CP15_TIMER ?
+-			(arch_timer_uses_ppi == VIRT_PPI) ? "virt" : "phys" :
++		type & ARCH_TIMER_TYPE_CP15 ?
++			(arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI) ? "virt" : "phys" :
+ 			"",
+-		type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  "/" : "",
+-		type & ARCH_MEM_TIMER ?
++		type == (ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM) ? "/" : "",
++		type & ARCH_TIMER_TYPE_MEM ?
+ 			arch_timer_mem_use_virtual ? "virt" : "phys" :
+ 			"");
+ }
+@@ -588,8 +590,9 @@ static void __init arch_counter_register(unsigned type)
+ 	u64 start_count;
+ 
+ 	/* Register the CP15 based counter if we have one */
+-	if (type & ARCH_CP15_TIMER) {
+-		if (IS_ENABLED(CONFIG_ARM64) || arch_timer_uses_ppi == VIRT_PPI)
++	if (type & ARCH_TIMER_TYPE_CP15) {
++		if (IS_ENABLED(CONFIG_ARM64) ||
++		    arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI)
+ 			arch_timer_read_counter = arch_counter_get_cntvct;
+ 		else
+ 			arch_timer_read_counter = arch_counter_get_cntpct;
+@@ -625,7 +628,7 @@ static void arch_timer_stop(struct clock_event_device *clk)
+ 
+ 	disable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi]);
+ 	if (arch_timer_has_nonsecure_ppi())
+-		disable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI]);
++		disable_percpu_irq(arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI]);
+ 
+ 	clk->set_state_shutdown(clk);
+ }
+@@ -688,24 +691,24 @@ static int __init arch_timer_register(void)
+ 
+ 	ppi = arch_timer_ppi[arch_timer_uses_ppi];
+ 	switch (arch_timer_uses_ppi) {
+-	case VIRT_PPI:
++	case ARCH_TIMER_VIRT_PPI:
+ 		err = request_percpu_irq(ppi, arch_timer_handler_virt,
+ 					 "arch_timer", arch_timer_evt);
+ 		break;
+-	case PHYS_SECURE_PPI:
+-	case PHYS_NONSECURE_PPI:
++	case ARCH_TIMER_PHYS_SECURE_PPI:
++	case ARCH_TIMER_PHYS_NONSECURE_PPI:
+ 		err = request_percpu_irq(ppi, arch_timer_handler_phys,
+ 					 "arch_timer", arch_timer_evt);
+-		if (!err && arch_timer_ppi[PHYS_NONSECURE_PPI]) {
+-			ppi = arch_timer_ppi[PHYS_NONSECURE_PPI];
++		if (!err && arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI]) {
++			ppi = arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI];
+ 			err = request_percpu_irq(ppi, arch_timer_handler_phys,
+ 						 "arch_timer", arch_timer_evt);
+ 			if (err)
+-				free_percpu_irq(arch_timer_ppi[PHYS_SECURE_PPI],
++				free_percpu_irq(arch_timer_ppi[ARCH_TIMER_PHYS_SECURE_PPI],
+ 						arch_timer_evt);
+ 		}
+ 		break;
+-	case HYP_PPI:
++	case ARCH_TIMER_HYP_PPI:
+ 		err = request_percpu_irq(ppi, arch_timer_handler_phys,
+ 					 "arch_timer", arch_timer_evt);
+ 		break;
+@@ -737,7 +740,7 @@ static int __init arch_timer_register(void)
+ out_unreg_notify:
+ 	free_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], arch_timer_evt);
+ 	if (arch_timer_has_nonsecure_ppi())
+-		free_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI],
++		free_percpu_irq(arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI],
+ 				arch_timer_evt);
+ 
+ out_free:
+@@ -758,7 +761,7 @@ static int __init arch_timer_mem_register(void __iomem *base, unsigned int irq)
+ 
+ 	t->base = base;
+ 	t->evt.irq = irq;
+-	__arch_timer_setup(ARCH_MEM_TIMER, &t->evt);
++	__arch_timer_setup(ARCH_TIMER_TYPE_MEM, &t->evt);
+ 
+ 	if (arch_timer_mem_use_virtual)
+ 		func = arch_timer_handler_virt_mem;
+@@ -801,13 +804,15 @@ arch_timer_needs_probing(int type, const struct of_device_id *matches)
+ 
+ static int __init arch_timer_common_init(void)
+ {
+-	unsigned mask = ARCH_CP15_TIMER | ARCH_MEM_TIMER;
++	unsigned int mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
+ 
+ 	/* Wait until both nodes are probed if we have two timers */
+ 	if ((arch_timers_present & mask) != mask) {
+-		if (arch_timer_needs_probing(ARCH_MEM_TIMER, arch_timer_mem_of_match))
++		if (arch_timer_needs_probing(ARCH_TIMER_TYPE_MEM,
++					     arch_timer_mem_of_match))
+ 			return 0;
+-		if (arch_timer_needs_probing(ARCH_CP15_TIMER, arch_timer_of_match))
++		if (arch_timer_needs_probing(ARCH_TIMER_TYPE_CP15,
++					     arch_timer_of_match))
+ 			return 0;
+ 	}
+ 
+@@ -832,16 +837,16 @@ static int __init arch_timer_init(void)
+ 	 * their CNTHP_*_EL2 counterparts, and use a different PPI
+ 	 * number.
+ 	 */
+-	if (is_hyp_mode_available() || !arch_timer_ppi[VIRT_PPI]) {
++	if (is_hyp_mode_available() || !arch_timer_ppi[ARCH_TIMER_VIRT_PPI]) {
+ 		bool has_ppi;
+ 
+ 		if (is_kernel_in_hyp_mode()) {
+-			arch_timer_uses_ppi = HYP_PPI;
+-			has_ppi = !!arch_timer_ppi[HYP_PPI];
++			arch_timer_uses_ppi = ARCH_TIMER_HYP_PPI;
++			has_ppi = !!arch_timer_ppi[ARCH_TIMER_HYP_PPI];
+ 		} else {
+-			arch_timer_uses_ppi = PHYS_SECURE_PPI;
+-			has_ppi = (!!arch_timer_ppi[PHYS_SECURE_PPI] ||
+-				   !!arch_timer_ppi[PHYS_NONSECURE_PPI]);
++			arch_timer_uses_ppi = ARCH_TIMER_PHYS_SECURE_PPI;
++			has_ppi = (!!arch_timer_ppi[ARCH_TIMER_PHYS_SECURE_PPI] ||
++				   !!arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI]);
+ 		}
+ 
+ 		if (!has_ppi) {
+@@ -858,7 +863,7 @@ static int __init arch_timer_init(void)
+ 	if (ret)
+ 		return ret;
+ 
+-	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[VIRT_PPI];
++	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[ARCH_TIMER_VIRT_PPI];
  
  	return 0;
  }
-+
-+/*
-+ * Initialize a SBSA generic Watchdog platform device info from GTDT
-+ */
-+static int __init gtdt_import_sbsa_gwdt(struct acpi_gtdt_watchdog *wd,
-+					int index)
-+{
-+	struct platform_device *pdev;
-+	int irq = map_gt_gsi(wd->timer_interrupt, wd->timer_flags);
-+	int no_irq = 1;
-+
-+	/*
-+	 * According to SBSA specification the size of refresh and control
-+	 * frames of SBSA Generic Watchdog is SZ_4K(Offset 0x000 ? 0xFFF).
-+	 */
-+	struct resource res[] = {
-+		DEFINE_RES_MEM(wd->control_frame_address, SZ_4K),
-+		DEFINE_RES_MEM(wd->refresh_frame_address, SZ_4K),
-+		DEFINE_RES_IRQ(irq),
-+	};
-+
-+	pr_debug("found a Watchdog (0x%llx/0x%llx gsi:%u flags:0x%x).\n",
-+		 wd->refresh_frame_address, wd->control_frame_address,
-+		 wd->timer_interrupt, wd->timer_flags);
-+
-+	if (!(wd->refresh_frame_address && wd->control_frame_address)) {
-+		pr_err(FW_BUG "failed to get the Watchdog base address.\n");
-+		return -EINVAL;
-+	}
-+
-+	if (!wd->timer_interrupt)
-+		pr_warn(FW_BUG "failed to get the Watchdog interrupt.\n");
-+	else if (irq <= 0)
-+		pr_warn("failed to map the Watchdog interrupt.\n");
-+	else
-+		no_irq = 0;
-+
-+	/*
-+	 * Add a platform device named "sbsa-gwdt" to match the platform driver.
-+	 * "sbsa-gwdt": SBSA(Server Base System Architecture) Generic Watchdog
-+	 * The platform driver (like drivers/watchdog/sbsa_gwdt.c)can get device
-+	 * info below by matching this name.
-+	 */
-+	pdev = platform_device_register_simple("sbsa-gwdt", index, res,
-+					       ARRAY_SIZE(res) - no_irq);
-+	if (IS_ERR(pdev)) {
-+		acpi_unregister_gsi(wd->timer_interrupt);
-+		return PTR_ERR(pdev);
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init gtdt_sbsa_gwdt_init(void)
-+{
-+	int i, ret;
-+	struct acpi_table_header *table;
-+	struct acpi_gtdt_watchdog *watchdog;
-+
-+	if (acpi_disabled)
-+		return 0;
-+
-+	if (ACPI_FAILURE(acpi_get_table(ACPI_SIG_GTDT, 0, &table)))
-+		return -EINVAL;
-+
-+	ret = acpi_gtdt_init(table);
-+	if (ret)
-+		return ret;
-+
-+	if (!acpi_gtdt_desc.watchdog_count)
-+		return 0;
-+
-+	for (i = 0; i < acpi_gtdt_desc.watchdog_count; i++) {
-+		watchdog = get_watchdog(i);
-+		if (!watchdog) {
-+			ret = -ENODEV;
-+			break;
-+		}
-+		ret = gtdt_import_sbsa_gwdt(watchdog, i);
-+		if (ret)
-+			break;
-+	}
-+
-+	pr_info("found %d SBSA generic Watchdog(s), %d imported.\n",
-+		acpi_gtdt_desc.watchdog_count, i);
-+
-+	acpi_gtdt_release();
-+	return ret;
-+}
-+
-+device_initcall(gtdt_sbsa_gwdt_init);
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index fdd3228..e5ba1f0 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -218,6 +218,7 @@ config ARM_SBSA_WATCHDOG
- 	tristate "ARM SBSA Generic Watchdog"
- 	depends on ARM64
- 	depends on ARM_ARCH_TIMER
-+	depends on ACPI_GTDT || !ACPI
- 	select WATCHDOG_CORE
- 	help
- 	  ARM SBSA Generic Watchdog has two stage timeouts:
+@@ -867,13 +872,13 @@ static int __init arch_timer_of_init(struct device_node *np)
+ {
+ 	int i;
+ 
+-	if (arch_timers_present & ARCH_CP15_TIMER) {
++	if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
+ 		pr_warn("multiple nodes in dt, skipping\n");
+ 		return 0;
+ 	}
+ 
+-	arch_timers_present |= ARCH_CP15_TIMER;
+-	for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++)
++	arch_timers_present |= ARCH_TIMER_TYPE_CP15;
++	for (i = ARCH_TIMER_PHYS_SECURE_PPI; i < ARCH_TIMER_MAX_TIMER_PPI; i++)
+ 		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
+ 
+ 	arch_timer_detect_rate(NULL, np);
+@@ -895,7 +900,7 @@ static int __init arch_timer_of_init(struct device_node *np)
+ 	 */
+ 	if (IS_ENABLED(CONFIG_ARM) &&
+ 	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
+-		arch_timer_uses_ppi = PHYS_SECURE_PPI;
++		arch_timer_uses_ppi = ARCH_TIMER_PHYS_SECURE_PPI;
+ 
+ 	return arch_timer_init();
+ }
+@@ -909,7 +914,7 @@ static int __init arch_timer_mem_init(struct device_node *np)
+ 	unsigned int irq, ret = -EINVAL;
+ 	u32 cnttidr;
+ 
+-	arch_timers_present |= ARCH_MEM_TIMER;
++	arch_timers_present |= ARCH_TIMER_TYPE_MEM;
+ 	cntctlbase = of_iomap(np, 0);
+ 	if (!cntctlbase) {
+ 		pr_err("Can't find CNTCTLBase\n");
+@@ -1008,28 +1013,28 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ {
+ 	struct acpi_table_gtdt *gtdt;
+ 
+-	if (arch_timers_present & ARCH_CP15_TIMER) {
++	if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
+ 		pr_warn("already initialized, skipping\n");
+ 		return -EINVAL;
+ 	}
+ 
+ 	gtdt = container_of(table, struct acpi_table_gtdt, header);
+ 
+-	arch_timers_present |= ARCH_CP15_TIMER;
++	arch_timers_present |= ARCH_TIMER_TYPE_CP15;
+ 
+-	arch_timer_ppi[PHYS_SECURE_PPI] =
++	arch_timer_ppi[ARCH_TIMER_PHYS_SECURE_PPI] =
+ 		map_generic_timer_interrupt(gtdt->secure_el1_interrupt,
+ 		gtdt->secure_el1_flags);
+ 
+-	arch_timer_ppi[PHYS_NONSECURE_PPI] =
++	arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI] =
+ 		map_generic_timer_interrupt(gtdt->non_secure_el1_interrupt,
+ 		gtdt->non_secure_el1_flags);
+ 
+-	arch_timer_ppi[VIRT_PPI] =
++	arch_timer_ppi[ARCH_TIMER_VIRT_PPI] =
+ 		map_generic_timer_interrupt(gtdt->virtual_timer_interrupt,
+ 		gtdt->virtual_timer_flags);
+ 
+-	arch_timer_ppi[HYP_PPI] =
++	arch_timer_ppi[ARCH_TIMER_HYP_PPI] =
+ 		map_generic_timer_interrupt(gtdt->non_secure_el2_interrupt,
+ 		gtdt->non_secure_el2_flags);
+ 
+diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+index d23c381..2625ff1 100644
+--- a/include/clocksource/arm_arch_timer.h
++++ b/include/clocksource/arm_arch_timer.h
+@@ -20,18 +20,18 @@
+ #include <linux/timecounter.h>
+ #include <linux/types.h>
+ 
+-#define ARCH_CP15_TIMER			BIT(0)
+-#define ARCH_MEM_TIMER			BIT(1)
++#define ARCH_TIMER_TYPE_CP15		BIT(0)
++#define ARCH_TIMER_TYPE_MEM		BIT(1)
+ 
+-#define ARCH_TIMER_CTRL_ENABLE		(1 << 0)
+-#define ARCH_TIMER_CTRL_IT_MASK		(1 << 1)
+-#define ARCH_TIMER_CTRL_IT_STAT		(1 << 2)
++#define ARCH_TIMER_CTRL_ENABLE		BIT(0)
++#define ARCH_TIMER_CTRL_IT_MASK		BIT(1)
++#define ARCH_TIMER_CTRL_IT_STAT		BIT(2)
+ 
+-#define CNTHCTL_EL1PCTEN		(1 << 0)
+-#define CNTHCTL_EL1PCEN			(1 << 1)
+-#define CNTHCTL_EVNTEN			(1 << 2)
+-#define CNTHCTL_EVNTDIR			(1 << 3)
+-#define CNTHCTL_EVNTI			(0xF << 4)
++#define ARCH_TIMER_CNTHCTL_EL1PCTEN	BIT(0)
++#define ARCH_TIMER_CNTHCTL_EL1PCEN	BIT(1)
++#define ARCH_TIMER_CNTHCTL_EVNTEN	BIT(2)
++#define ARCH_TIMER_CNTHCTL_EVNTDIR	BIT(3)
++#define ARCH_TIMER_CNTHCTL_EVNTI	(0xF << 4)
+ 
+ enum arch_timer_reg {
+ 	ARCH_TIMER_REG_CTRL,
+@@ -39,11 +39,11 @@ enum arch_timer_reg {
+ };
+ 
+ enum arch_timer_ppi_nr {
+-	PHYS_SECURE_PPI,
+-	PHYS_NONSECURE_PPI,
+-	VIRT_PPI,
+-	HYP_PPI,
+-	MAX_TIMER_PPI
++	ARCH_TIMER_PHYS_SECURE_PPI,
++	ARCH_TIMER_PHYS_NONSECURE_PPI,
++	ARCH_TIMER_VIRT_PPI,
++	ARCH_TIMER_HYP_PPI,
++	ARCH_TIMER_MAX_TIMER_PPI
+ };
+ 
+ enum arch_timer_spi_nr {
+@@ -57,13 +57,13 @@ enum arch_timer_spi_nr {
+ #define ARCH_TIMER_MEM_PHYS_ACCESS	2
+ #define ARCH_TIMER_MEM_VIRT_ACCESS	3
+ 
+-#define ARCH_TIMER_USR_PCT_ACCESS_EN	(1 << 0) /* physical counter */
+-#define ARCH_TIMER_USR_VCT_ACCESS_EN	(1 << 1) /* virtual counter */
+-#define ARCH_TIMER_VIRT_EVT_EN		(1 << 2)
++#define ARCH_TIMER_USR_PCT_ACCESS_EN	BIT(0) /* physical counter */
++#define ARCH_TIMER_USR_VCT_ACCESS_EN	BIT(1) /* virtual counter */
++#define ARCH_TIMER_VIRT_EVT_EN		BIT(2)
+ #define ARCH_TIMER_EVT_TRIGGER_SHIFT	(4)
+ #define ARCH_TIMER_EVT_TRIGGER_MASK	(0xF << ARCH_TIMER_EVT_TRIGGER_SHIFT)
+-#define ARCH_TIMER_USR_VT_ACCESS_EN	(1 << 8) /* virtual timer registers */
+-#define ARCH_TIMER_USR_PT_ACCESS_EN	(1 << 9) /* physical timer registers */
++#define ARCH_TIMER_USR_VT_ACCESS_EN	BIT(8) /* virtual timer registers */
++#define ARCH_TIMER_USR_PT_ACCESS_EN	BIT(9) /* physical timer registers */
+ 
+ #define ARCH_TIMER_EVT_STREAM_FREQ	10000	/* 100us */
+ 
+diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
+index 798866a..695b9d9 100644
+--- a/virt/kvm/arm/hyp/timer-sr.c
++++ b/virt/kvm/arm/hyp/timer-sr.c
+@@ -37,7 +37,7 @@ void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
+ 
+ 	/* Allow physical timer/counter access for the host */
+ 	val = read_sysreg(cnthctl_el2);
+-	val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
++	val |= ARCH_TIMER_CNTHCTL_EL1PCTEN | ARCH_TIMER_CNTHCTL_EL1PCEN;
+ 	write_sysreg(val, cnthctl_el2);
+ 
+ 	/* Clear cntvoff for the host */
+@@ -55,8 +55,8 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
+ 	 * Physical counter access is allowed
+ 	 */
+ 	val = read_sysreg(cnthctl_el2);
+-	val &= ~CNTHCTL_EL1PCEN;
+-	val |= CNTHCTL_EL1PCTEN;
++	val &= ~ARCH_TIMER_CNTHCTL_EL1PCEN;
++	val |= ARCH_TIMER_CNTHCTL_EL1PCTEN;
+ 	write_sysreg(val, cnthctl_el2);
+ 
+ 	if (timer->enabled) {
 -- 
 2.7.4
