@@ -1,140 +1,105 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Wed, 16 Nov 2016 10:43:58 +0100
-Subject: [RFCv2 PATCH 1/5] video: add HDMI state notifier support
-In-Reply-To: <00ad0ddf-3e52-62e6-f863-cae6eefd08c9@xs4all.nl>
-References: <1479136968-24477-1-git-send-email-hverkuil@xs4all.nl>
- <1479136968-24477-2-git-send-email-hverkuil@xs4all.nl>
- <1479234278.2456.49.camel@pengutronix.de>
- <00ad0ddf-3e52-62e6-f863-cae6eefd08c9@xs4all.nl>
-Message-ID: <87cc4a9c-bc1b-173e-693c-17a270fbed6b@xs4all.nl>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 16 Nov 2016 09:54:35 +0000
+Subject: [PATCH v2] arm64: SMMU-v2: Workaround for Cavium ThunderX erratum
+ 28168
+In-Reply-To: <582B52D6.6060907@caviumnetworks.com>
+References: <1479193220-6693-1-git-send-email-gakula@caviumnetworks.com>
+ <0414d797-7134-8192-d373-b14b26edd023@arm.com>
+ <582B52D6.6060907@caviumnetworks.com>
+Message-ID: <288765fe-f10b-135b-2011-642a0e4828fe@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/16 21:41, Hans Verkuil wrote:
-> Hi Philipp,
->
-> On 11/15/2016 07:24 PM, Philipp Zabel wrote:
->> Hi Hans,
->>
->> Am Montag, den 14.11.2016, 16:22 +0100 schrieb Hans Verkuil:
->>> From: Hans Verkuil <hans.verkuil@cisco.com>
+On 15/11/16 18:24, David Daney wrote:
+> On 11/15/2016 01:26 AM, Marc Zyngier wrote:
+>> On 15/11/16 07:00, Geetha sowjanya wrote:
+>>> From: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
 >>>
->>> Add support for HDMI hotplug and EDID notifiers, which is used to convey
->>> information from HDMI drivers to their CEC and audio counterparts.
+>>>    This patch implements Cavium ThunderX erratum 28168.
 >>>
->>> Based on an earlier version from Russell King:
+>>>    PCI requires stores complete in order. Due to erratum #28168
+>>>    PCI-inbound MSI-X store to the interrupt controller are delivered
+>>>    to the interrupt controller before older PCI-inbound memory stores
+>>>    are committed.
+>>>    Doing a sync on SMMU will make sure all prior data transfers are
+>>>    completed before invoking ISR.
 >>>
->>> https://patchwork.kernel.org/patch/9277043/
+>>> Signed-off-by: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
+>>> Signed-off-by: Geetha sowjanya <gakula@caviumnetworks.com>
+> [...]
+>>> --- a/drivers/irqchip/irq-gic-v3.c
+>>> +++ b/drivers/irqchip/irq-gic-v3.c
+>>> @@ -28,6 +28,8 @@
+>>>   #include <linux/of_irq.h>
+>>>   #include <linux/percpu.h>
+>>>   #include <linux/slab.h>
+>>> +#include <linux/msi.h>
+>>> +#include <linux/pci.h>
 >>>
->>> The hdmi_notifier is a reference counted object containing the HDMI state
->>> of an HDMI device.
+>>>   #include <linux/irqchip.h>
+>>>   #include <linux/irqchip/arm-gic-common.h>
+>>> @@ -736,6 +738,20 @@ static inline void gic_cpu_pm_init(void) { }
 >>>
->>> When a new notifier is registered the current state will be reported to
->>> that notifier at registration time.
+>>>   #define GIC_ID_NR		(1U << gic_data.rdists.id_bits)
 >>>
->>> Signed-off-by: Hans Verkuil <hans.verkuil@cisco.com>
->>> ---
->>>  drivers/video/Kconfig         |   3 +
->>>  drivers/video/Makefile        |   1 +
->>>  drivers/video/hdmi-notifier.c | 136 ++++++++++++++++++++++++++++++++++++++++++
->>>  include/linux/hdmi-notifier.h |  43 +++++++++++++
->>>  4 files changed, 183 insertions(+)
->>>  create mode 100644 drivers/video/hdmi-notifier.c
->>>  create mode 100644 include/linux/hdmi-notifier.h
->>>
->>> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
->>> index 3c20af9..1ee7b9f 100644
->>> --- a/drivers/video/Kconfig
->>> +++ b/drivers/video/Kconfig
->>> @@ -36,6 +36,9 @@ config VIDEOMODE_HELPERS
->>>  config HDMI
->>>  	bool
->>>
->>> +config HDMI_NOTIFIERS
->>> +	bool
->>> +
->>>  if VT
->>>  	source "drivers/video/console/Kconfig"
->>>  endif
->>> diff --git a/drivers/video/Makefile b/drivers/video/Makefile
->>> index 9ad3c17..65f5649 100644
->>> --- a/drivers/video/Makefile
->>> +++ b/drivers/video/Makefile
->>> @@ -1,5 +1,6 @@
->>>  obj-$(CONFIG_VGASTATE)            += vgastate.o
->>>  obj-$(CONFIG_HDMI)                += hdmi.o
->>> +obj-$(CONFIG_HDMI_NOTIFIERS)      += hdmi-notifier.o
->>>
->>>  obj-$(CONFIG_VT)		  += console/
->>>  obj-$(CONFIG_LOGO)		  += logo/
->>> diff --git a/drivers/video/hdmi-notifier.c b/drivers/video/hdmi-notifier.c
->>> new file mode 100644
->>> index 0000000..c2a4f1b
->>> --- /dev/null
->>> +++ b/drivers/video/hdmi-notifier.c
->>> @@ -0,0 +1,136 @@
->>> +#include <linux/export.h>
->>> +#include <linux/hdmi-notifier.h>
->>> +#include <linux/string.h>
->>> +#include <linux/slab.h>
->>> +#include <linux/list.h>
->>> +
->>> +struct hdmi_notifiers {
->>> +	struct list_head head;
->>> +	struct device *dev;
->>> +	struct hdmi_notifier *n;
->>> +};
->>
->> This struct is not used, can be removed.
->
-> Indeed.
->
->>
->>> +static LIST_HEAD(hdmi_notifiers);
->>> +static DEFINE_MUTEX(hdmi_notifiers_lock);
->>> +
->>> +struct hdmi_notifier *hdmi_notifier_get(struct device *dev)
+>>> +/*
+>>> + * Due to #28168 erratum in ThunderX,
+>>> + * we need to make sure DMA data transfer is done before MSIX.
+>>> + */
+>>> +static void cavium_irq_perflow_handler(struct irq_data *data)
 >>> +{
->>> +	struct hdmi_notifier *n;
+>>> +	struct pci_dev *pdev;
 >>> +
->>> +	mutex_lock(&hdmi_notifiers_lock);
->>> +	list_for_each_entry(n, &hdmi_notifiers, head) {
->>> +		if (n->dev == dev) {
->>> +			mutex_unlock(&hdmi_notifiers_lock);
->>> +			kref_get(&n->kref);
->>> +			return n;
->>> +		}
->>> +	}
->>> +	n = kzalloc(sizeof(*n), GFP_KERNEL);
->>> +	if (!n)
->>> +		goto unlock;
->>> +	mutex_init(&n->lock);
->>> +	BLOCKING_INIT_NOTIFIER_HEAD(&n->notifiers);
->>> +	kref_init(&n->kref);
+>>> +	pdev = msi_desc_to_pci_dev(irq_data_get_msi_desc(data));
 >>
->> +	n->dev = dev;
+>> What happens if this is not a PCI device?
 >>
->> Currently n->dev is never set, so every caller of this function gets its
->> own hdmi_notifier.
->
-> Oops! Well, I did say it was compile-tested only :-)
->
+>>> +	if ((pdev->vendor != 0x177d) &&
+>>> +			((pdev->device & 0xA000) != 0xA000))
+>>> +		cavium_arm_smmu_tlb_sync(&pdev->dev);
 >>
->>> +	list_add_tail(&n->head, &hdmi_notifiers);
->>> +unlock:
->>> +	mutex_unlock(&hdmi_notifiers_lock);
->>> +	return n;
+>> I've asked that before. What makes Cavium devices so special that they
+>> are not sensitive to this bug?
+> 
+> 
+> This is a heuristic for devices connected to external PCIe buses as 
+> opposed to on-SoC devices (which don't suffer from the erratum).
+> 
+> In any event what would happen if we got rid of this check and ...
+> 
+> 
+>>
 >>> +}
->>> +EXPORT_SYMBOL_GPL(hdmi_notifier_get);
 >>> +
->>> +static void hdmi_notifier_release(struct kref *kref)
->>> +{
->>> +	struct hdmi_notifier *n =
->>> +		container_of(kref, struct hdmi_notifier, kref);
->>> +
+>>>   static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+>>>   			      irq_hw_number_t hw)
+>>>   {
+>>> @@ -773,6 +789,9 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+>>>   			return -EPERM;
+>>>   		irq_domain_set_info(d, irq, hw, chip, d->host_data,
+>>>   				    handle_fasteoi_irq, NULL, NULL);
+>>> +		if (cpus_have_cap(ARM64_WORKAROUND_CAVIUM_28168))
+>>> +			__irq_set_preflow_handler(irq,
+>>> +						  cavium_irq_perflow_handler);
+>>
+> 
+> ... move the registration of the preflow_handler into a 
+> msi_domain_ops.msi_finish() handler in irq-git-v3-its-pic-msi.c?
 
-I also forgot to remove this notifier from the global list.
+That's the kind of thing I was angling for. You'll have to store the
+device pointer into the scratchpad (we still have plenty of space there)
+so that msi_finish() can have a peek.
 
-I've updated my git branch to fix this.
+> There we will know that it is a pci device, and can walk up the bus 
+> hierarchy to see if there is a Cavium PCIe root port present.  If such a 
+> port is found, we know we are on an external Cavium PCIe bus, and can 
+> register the preflow_handler without having to check the device identifiers.
 
-	Hans
+Something like that (though I'm unclear why other devices wouldn't see a
+root port, but that's probably me lacking some PCIe foo).
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
