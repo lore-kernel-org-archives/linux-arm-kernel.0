@@ -1,108 +1,54 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 16 Nov 2016 23:42:32 +0800
-Subject: [PATCH v4 2/2] ARM: dts: sun6i: hummingbird-a31: Enable display
- output through VGA bridge
-In-Reply-To: <20161116154232.872-1-wens@csie.org>
-References: <20161116154232.872-1-wens@csie.org>
-Message-ID: <20161116154232.872-3-wens@csie.org>
+From: atull@opensource.altera.com (atull)
+Date: Wed, 16 Nov 2016 09:45:23 -0600
+Subject: [PATCH fpga 8/9] fpga socfpga: Use the scatterlist interface
+In-Reply-To: <20161116052033.GA6044@obsidianresearch.com>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-9-git-send-email-jgunthorpe@obsidianresearch.com>
+ <alpine.DEB.2.10.1611131712210.2735@atull-VirtualBox>
+ <20161114001854.GA27248@obsidianresearch.com>
+ <alpine.DEB.2.10.1611132149140.2908@atull-VirtualBox>
+ <20161115043537.GA23253@obsidianresearch.com>
+ <alpine.DEB.2.20.1611150940270.3634@atull-VirtualBox2>
+ <20161116052033.GA6044@obsidianresearch.com>
+Message-ID: <alpine.DEB.2.20.1611160939140.3364@atull-VirtualBox2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Hummingbird A31 board has a VGA DAC which converts RGB output
-from the LCD interface to VGA analog signals.
+On Wed, 16 Nov 2016, Jason Gunthorpe wrote:
 
-Add nodes for the VGA DAC, its power supply, and enable this part
-of the display pipeline.
+> On Tue, Nov 15, 2016 at 09:47:05AM -0600, atull wrote:
+> > Not different.
+> > 
+> > From 'fpga-mgr.txt':
+> >   The programming sequence is:
+> >    1. .write_init
+> >    2. .write (may be called once or multiple times)
+> >    3. .write_complete
+> > 
+> > The old write was be separate from write_init and write_complete
+> > because I figured that in the future someone may be streaming in
+> > the bitstream and not have the whole bitstream in memory.
+> 
+> What is the point of this if write_init gets a copy of the buffer -
+> what is that supposed to be?
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 67 +++++++++++++++++++++++++++++
- 1 file changed, 67 insertions(+)
+Sometimes write_init needs to look at the header of the image.
+You can see that in the socfpga-a10.c (on linux-next/master)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-index 62287bd2aeb5..b168d6df2b30 100644
---- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-@@ -63,6 +63,60 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-+	vga-connector {
-+		compatible = "vga-connector";
-+
-+		port {
-+			vga_con_in: endpoint {
-+				remote-endpoint = <&vga_dac_out>;
-+			};
-+		};
-+	};
-+
-+	vga-dac {
-+		compatible = "dumb-vga-dac";
-+		vdd-supply = <&reg_vga_3v3>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0>;
-+
-+				vga_dac_in: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&tcon0_out_vga>;
-+				};
-+			};
-+
-+			port at 1 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <1>;
-+
-+				vga_dac_out: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vga_con_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	reg_vga_3v3: vga_3v3_regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vga-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		enable-active-high;
-+		gpio = <&pio 7 25 GPIO_ACTIVE_HIGH>; /* PH25 */
-+	};
-+
- 	wifi_pwrseq: wifi_pwrseq {
- 		compatible = "mmc-pwrseq-simple";
- 		reset-gpios = <&pio 6 10 GPIO_ACTIVE_LOW>; /* PG10 */
-@@ -253,6 +307,19 @@
- 	status = "okay";
- };
- 
-+&tcon0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&lcd0_rgb888_pins>;
-+	status = "okay";
-+};
-+
-+&tcon0_out {
-+	tcon0_out_vga: endpoint at 0 {
-+		reg = <0>;
-+		remote-endpoint = <&vga_dac_in>;
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
--- 
-2.10.2
+> 
+> If you see things this way why are you opposed to patch 9? I'll change
+> things around to call write multiple times and force the sg list into
+> write_init, which seems like what you intended anyhow..
+
+Not against it (and I do need to spend some more time looking
+at this stuff, this is coming at a busy time).  My point there
+was that there was code that needed to go into the core so that
+the ICE40 and the cyclone spi driver that are on the mailing
+list won't have to have the same workaround that you were
+adding to the socfpga.c driver.
+
+Alan
+
+> 
+> Jason
+> 
