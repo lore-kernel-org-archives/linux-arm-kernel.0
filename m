@@ -1,74 +1,51 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 16 Nov 2016 16:38:51 +0100
-Subject: [PATCH net 1/3] net: phy: realtek: add eee advertisement
- disable options
-In-Reply-To: <20161116150628.GI23231@lunn.ch>
-References: <1479220154-25851-1-git-send-email-jbrunet@baylibre.com>
- <1479220154-25851-2-git-send-email-jbrunet@baylibre.com>
- <20161115163036.GB23231@lunn.ch>
- <476b72f3-5efe-3551-6c24-0e378d655a0f@gmail.com>
- <1479290189.17538.25.camel@baylibre.com> <20161116132337.GD19962@lunn.ch>
- <1479307890.17538.40.camel@baylibre.com> <20161116150628.GI23231@lunn.ch>
-Message-ID: <1479310731.17538.53.camel@baylibre.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 16 Nov 2016 23:42:30 +0800
+Subject: [PATCH v4 0/2] ARM: dts: sun6i: hummingbird-a31: Enable display
+ output through VGA bridge
+Message-ID: <20161116154232.872-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-11-16 at 16:06 +0100, Andrew Lunn wrote:
-> On Wed, Nov 16, 2016 at 03:51:30PM +0100, Jerome Brunet wrote:
-> > 
-> > On Wed, 2016-11-16 at 14:23 +0100, Andrew Lunn wrote:
-> > > 
-> > > > 
-> > > > 
-> > > > There two kind of PHYs supporting eee, the one advertising eee
-> > > > by
-> > > > default (like realtek) and the one not advertising it (like
-> > > > micrel).
-> > 
-> > This is just the default register value.
-> > 
-> > > 
-> > > 
-> > > I don't know too much about EEE. So maybe a dumb question. Does
-> > > the
-> > > MAC need to be involved? Or is it just the PHY?
-> > > 
-> > > If the MAC needs to be involved, the PHY should not be
-> > > advertising
-> > > EEE
-> > > unless the MAC asks for it by calling phy_init_eee(). If this is
-> > > true,
-> > > maybe we need to change the realtek driver, and others in that
-> > > class.
-> > 
-> > As far I understand, the advertised capabilities are exchanged
-> > during
-> > the auto-negotiation.
-> > 
-> > At this stage, if the advertisement is disabled (regarless of the
-> > actual support) on either side of the link, there will be no low
-> > power
-> > idle state on the Tx nor the Rx path.
-> > 
-> > If the advertisement is enabled on both side but we don't call
-> > phy_init_eee, I suppose Tx won't enter LPI, but Rx could.
-> 
-> What i was trying to find out is, if the MAC needs to support EEE as
-> well as the PHY, what happens when the MAC does not support EEE, but
-> the PHYs do negotiate EEE? Does it break?
+Hi,
 
-Interesting question. In a regular case, I suppose it should be fine.
-As you would have LPI only on the Rx path this should be transparent to
-the MAC. That's my understanding. Maybe people knowing EEE better than
-me could confirm (or not) ? Peppe? Alexandre?
+This is v4 of my sun6i DRM/KMS display enablement series. It adds
+regulator support to the dumb-vga-dac bridge and enables the VGA
+output on the A31 Hummingbird.
 
-I just checked with the OdroidC2, I disabled eee support by forcing
-"dma_cap.eee = 0" in?stmmac_get_hw_features. As expected, no tx_LPI
-interrupts but plenty of rx_LPI interrupts.
 
-What was not expected is test failing like before.
-So in our case, having LPI on the Rx path is fine for receiving data,
-but not for sending.
+Changes since v3:
 
-> 
-> ????Andrew
+  - Add Rob's Ack.
+
+  - Fix up enable/disable callbacks as Archit suggested.
+
+  - Dropped pinmux settings for GPIO pin.
+
+Changes since v2:
+
+  - Changed the enable-gpio of dumb-vga-dac to vdd-supply regulator.
+    This better matches the hardware that I have: the DAC has a fixed
+    regulator dropping the voltage from the board-wide 5V to 3.3V the
+    DAC uses. The regulator is controlled through a GPIO pin.
+
+  - Renamed the node of the VGA connector from "vga" to "vga-connector".
+
+  - Renamed the node of the VGA DAC from "bridge" to "vga-dac".
+
+
+Regards
+ChenYu
+
+
+Chen-Yu Tsai (2):
+  drm/bridge: dumb-vga-dac: Support a VDD regulator supply
+  ARM: dts: sun6i: hummingbird-a31: Enable display output through VGA
+    bridge
+
+ .../bindings/display/bridge/dumb-vga-dac.txt       |  2 +
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts        | 67 ++++++++++++++++++++++
+ drivers/gpu/drm/bridge/dumb-vga-dac.c              | 35 +++++++++++
+ 3 files changed, 104 insertions(+)
+
+-- 
+2.10.2
