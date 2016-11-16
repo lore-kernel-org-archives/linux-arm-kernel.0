@@ -1,49 +1,27 @@
-From: colin.king@canonical.com (Colin King)
-Date: Wed, 16 Nov 2016 19:16:50 +0000
-Subject: [PATCH] [media] VPU: mediatek: fix dereference of pdev before
- checking it is null
-Message-ID: <20161116191650.11486-1-colin.king@canonical.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 16 Nov 2016 11:17:33 -0800
+Subject: [GIT PULL] i.MX clock updates for 4.10
+In-Reply-To: <20161115025711.GU3310@dragon>
+References: <20161115025711.GU3310@dragon>
+Message-ID: <20161116191733.GI25626@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+On 11/15, Shawn Guo wrote:
+> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+> 
+>   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-clk-4.10
+> 
+> for you to fetch changes up to 73cd5e53caba2425f5b73ad0950544d1168ad27b:
+> 
+>   clk: imx: clk-imx6ul: add clk support for imx6ull (2016-11-15 08:55:36 +0800)
 
-pdev is dereferenced using platform_get_drvdata before a check to
-see if it is null, hence there could be a potential null pointer
-dereference issue. Instead, first check if pdev is null and only then
-deference pdev when initializing vpu.
+Thanks. Pulled into clk-next.
 
-Found with static analysis by CoverityScan, CID 1357797
-
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/media/platform/mtk-vpu/mtk_vpu.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/media/platform/mtk-vpu/mtk_vpu.c b/drivers/media/platform/mtk-vpu/mtk_vpu.c
-index c9bf58c..41f31b2 100644
---- a/drivers/media/platform/mtk-vpu/mtk_vpu.c
-+++ b/drivers/media/platform/mtk-vpu/mtk_vpu.c
-@@ -523,9 +523,9 @@ static int load_requested_vpu(struct mtk_vpu *vpu,
- 
- int vpu_load_firmware(struct platform_device *pdev)
- {
--	struct mtk_vpu *vpu = platform_get_drvdata(pdev);
-+	struct mtk_vpu *vpu;
- 	struct device *dev = &pdev->dev;
--	struct vpu_run *run = &vpu->run;
-+	struct vpu_run *run;
- 	const struct firmware *vpu_fw = NULL;
- 	int ret;
- 
-@@ -533,6 +533,8 @@ int vpu_load_firmware(struct platform_device *pdev)
- 		dev_err(dev, "VPU platform device is invalid\n");
- 		return -EINVAL;
- 	}
-+	vpu = platform_get_drvdata(pdev);
-+	run = &vpu->run;
- 
- 	mutex_lock(&vpu->vpu_mutex);
- 	if (vpu->fw_loaded) {
 -- 
-2.10.2
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
