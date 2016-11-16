@@ -1,49 +1,45 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 16 Nov 2016 15:45:35 +0100
-Subject: specifying order of /dev/mmcblk devices via device-tree?
-In-Reply-To: <20161028153755.GL5806@leverpostej>
-References: <CAJ+vNU1g8nQedd06LeaD10YWUQ_UmdRToUMFKaTNT1aNY56b0g@mail.gmail.com>
- <20161028153755.GL5806@leverpostej>
-Message-ID: <CAPDyKFrpqmvVAKsfQBP1m7vdOjPRx7puVkmmCe3yxe1gVFwgzw@mail.gmail.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed, 16 Nov 2016 15:51:30 +0100
+Subject: [PATCH net 1/3] net: phy: realtek: add eee advertisement
+ disable options
+In-Reply-To: <20161116132337.GD19962@lunn.ch>
+References: <1479220154-25851-1-git-send-email-jbrunet@baylibre.com>
+ <1479220154-25851-2-git-send-email-jbrunet@baylibre.com>
+ <20161115163036.GB23231@lunn.ch>
+ <476b72f3-5efe-3551-6c24-0e378d655a0f@gmail.com>
+ <1479290189.17538.25.camel@baylibre.com> <20161116132337.GD19962@lunn.ch>
+Message-ID: <1479307890.17538.40.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 October 2016 at 17:37, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Oct 28, 2016 at 08:23:04AM -0700, Tim Harvey wrote:
->> Greetings,
->>
->> I have an IMX6 board that has the following:
->> sdhc1: mmc0: sdio radio
->> sdhc2: mmc1: /dev/mmcblk1: microSD connector
->> sdhc3: mmc2: /dev/mmcblk2: on-board eMMC
->>
->> I would like to have sdhc3 registered as /dev/mmcblk0 and sdhc2
->> registered as /dev/mmcblk1 so that permanent storage is the first
->> mmcblk device as I think this is more intuitive however currently
->> these get instanced in the order they appear in the imx6qdl.dtsi
->> device-tree configuration and are not able to be mapped the way I want
->> them in my dts file.
->>
->> Is there a way, or if not is there a desire for a way, to specify the
->> order of /dev/mmcblk devices via device-tree?
->
-> As with many other devices, there is no standard way of controlling the
-> Linux enumeration (and given the ID space is shared with other dynamic
-> devices it's not something that could generally work).
->
-> These should be refererd to by UUID if possible.
->
-> If not, we could cosider adding a by-dt-path or something like that.
+On Wed, 2016-11-16 at 14:23 +0100, Andrew Lunn wrote:
+> > 
+> > There two kind of PHYs supporting eee, the one advertising eee by
+> > default (like realtek) and the one not advertising it (like
+> > micrel).
 
-So does that mean you think using "DT aliases" would be okay? As
-Javier pointed out, there have been some attempts [1] for that, but
-they didn't make it.
-Perhaps we need to re-consider, and if so please re-review the DT
-bindings patch from that series.
+This is just the default register value.
 
-Kind regards
-Uffe
+> 
+> I don't know too much about EEE. So maybe a dumb question. Does the
+> MAC need to be involved? Or is it just the PHY?
+> 
+> If the MAC needs to be involved, the PHY should not be advertising
+> EEE
+> unless the MAC asks for it by calling phy_init_eee(). If this is
+> true,
+> maybe we need to change the realtek driver, and others in that class.
 
-[1]
-https://lkml.org/lkml/2016/4/29/610 or
-http://www.spinics.net/lists/linux-mmc/msg36701.html
+As far I understand, the advertised capabilities are exchanged during
+the auto-negotiation.
+
+At this stage, if the advertisement is disabled (regarless of the
+actual support) on either side of the link, there will be no low power
+idle state on the Tx nor the Rx path.
+
+If the advertisement is enabled on both side but we don't call
+phy_init_eee, I suppose Tx won't enter LPI, but Rx could.
+
+
+> 
+> ??????Andrew
