@@ -1,134 +1,90 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 16 Nov 2016 15:29:30 +0000
-Subject: [PATCH v8 10/16] drivers: iommu: arm-smmu-v3: split probe functions
- into DT/generic portions
+Date: Wed, 16 Nov 2016 15:29:35 +0000
+Subject: [PATCH v8 15/16] drivers: acpi: iort: add single mapping function
 In-Reply-To: <20161116152936.22955-1-lorenzo.pieralisi@arm.com>
 References: <20161116152936.22955-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20161116152936.22955-11-lorenzo.pieralisi@arm.com>
+Message-ID: <20161116152936.22955-16-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current ARM SMMUv3 probe functions intermingle HW and DT probing in the
-initialization functions to detect and programme the ARM SMMU v3 driver
-features. In order to allow probing the ARM SMMUv3 with other firmwares
-than DT, this patch splits the ARM SMMUv3 init functions into DT and HW
-specific portions so that other FW interfaces (ie ACPI) can reuse the HW
-probing functions and skip the DT portion accordingly.
+The current IORT id mapping API requires components to provide
+an input requester ID (a Bus-Device-Function (BDF) identifier for
+PCI devices) to translate an input identifier to an output
+identifier through an IORT range mapping.
 
-This patch implements no functional change, only code reshuffling.
+Named components do not have an identifiable source ID therefore
+their respective input/output mapping can only be defined in
+IORT tables through single mappings, that provide a translation
+that does not require any input identifier.
+
+Current IORT interface for requester id mappings (iort_node_map_rid())
+is not suitable for components that do not provide a requester id,
+so it cannot be used for IORT named components.
+
+Add an interface to the IORT API to enable retrieval of id
+by allowing an indexed walk of the single mappings array for
+a given component, therefore completing the IORT mapping API.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
 Reviewed-by: Tomasz Nowicki <tn@semihalf.com>
 Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 Tested-by: Tomasz Nowicki <tn@semihalf.com>
-Cc: Will Deacon <will.deacon@arm.com>
 Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Tomasz Nowicki <tn@semihalf.com>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 ---
- drivers/iommu/arm-smmu-v3.c | 46 +++++++++++++++++++++++++++++----------------
- 1 file changed, 30 insertions(+), 16 deletions(-)
+ drivers/acpi/arm64/iort.c | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index e6e1c87..ed563307 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -2381,10 +2381,10 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 62057c6..7d30605 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -318,6 +318,45 @@ static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
  	return 0;
  }
  
--static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
-+static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
- {
- 	u32 reg;
--	bool coherent;
-+	bool coherent = smmu->features & ARM_SMMU_FEAT_COHERENCY;
- 
- 	/* IDR0 */
- 	reg = readl_relaxed(smmu->base + ARM_SMMU_IDR0);
-@@ -2436,13 +2436,9 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
- 		smmu->features |= ARM_SMMU_FEAT_HYP;
- 
- 	/*
--	 * The dma-coherent property is used in preference to the ID
-+	 * The coherency feature as set by FW is used in preference to the ID
- 	 * register, but warn on mismatch.
- 	 */
--	coherent = of_dma_is_coherent(smmu->dev->of_node);
--	if (coherent)
--		smmu->features |= ARM_SMMU_FEAT_COHERENCY;
--
- 	if (!!(reg & IDR0_COHACC) != coherent)
- 		dev_warn(smmu->dev, "IDR0.COHACC overridden by dma-coherent property (%s)\n",
- 			 coherent ? "true" : "false");
-@@ -2563,21 +2559,37 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
- 	return 0;
- }
- 
--static int arm_smmu_device_dt_probe(struct platform_device *pdev)
-+static int arm_smmu_device_dt_probe(struct platform_device *pdev,
-+				    struct arm_smmu_device *smmu,
-+				    bool *bypass)
- {
--	int irq, ret;
--	struct resource *res;
--	struct arm_smmu_device *smmu;
- 	struct device *dev = &pdev->dev;
--	bool bypass = true;
- 	u32 cells;
- 
-+	*bypass = true;
++static
++struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
++					u32 *id_out, u8 type_mask,
++					int index)
++{
++	struct acpi_iort_node *parent;
++	struct acpi_iort_id_mapping *map;
 +
- 	if (of_property_read_u32(dev->of_node, "#iommu-cells", &cells))
- 		dev_err(dev, "missing #iommu-cells property\n");
- 	else if (cells != 1)
- 		dev_err(dev, "invalid #iommu-cells value (%d)\n", cells);
- 	else
--		bypass = false;
-+		*bypass = false;
++	if (!node->mapping_offset || !node->mapping_count ||
++				     index >= node->mapping_count)
++		return NULL;
 +
-+	parse_driver_options(smmu);
++	map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
++			   node->mapping_offset);
 +
-+	if (of_dma_is_coherent(dev->of_node))
-+		smmu->features |= ARM_SMMU_FEAT_COHERENCY;
++	/* Firmware bug! */
++	if (!map->output_reference) {
++		pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
++		       node, node->type);
++		return NULL;
++	}
 +
-+	return 0;
++	parent = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
++			       map->output_reference);
++
++	if (!(IORT_TYPE_MASK(parent->type) & type_mask))
++		return NULL;
++
++	if (map[index].flags & ACPI_IORT_ID_SINGLE_MAPPING) {
++		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
++		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
++			*id_out = map[index].output_base;
++			return parent;
++		}
++	}
++
++	return NULL;
 +}
 +
-+static int arm_smmu_device_probe(struct platform_device *pdev)
-+{
-+	int irq, ret;
-+	struct resource *res;
-+	struct arm_smmu_device *smmu;
-+	struct device *dev = &pdev->dev;
-+	bool bypass;
- 
- 	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
- 	if (!smmu) {
-@@ -2614,10 +2626,12 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 	if (irq > 0)
- 		smmu->gerr_irq = irq;
- 
--	parse_driver_options(smmu);
-+	ret = arm_smmu_device_dt_probe(pdev, smmu, &bypass);
-+	if (ret)
-+		return ret;
- 
- 	/* Probe the h/w */
--	ret = arm_smmu_device_probe(smmu);
-+	ret = arm_smmu_device_hw_probe(smmu);
- 	if (ret)
- 		return ret;
- 
-@@ -2679,7 +2693,7 @@ static struct platform_driver arm_smmu_driver = {
- 		.name		= "arm-smmu-v3",
- 		.of_match_table	= of_match_ptr(arm_smmu_of_match),
- 	},
--	.probe	= arm_smmu_device_dt_probe,
-+	.probe	= arm_smmu_device_probe,
- 	.remove	= arm_smmu_device_remove,
- };
- 
+ static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
+ 						u32 rid_in, u32 *rid_out,
+ 						u8 type_mask)
 -- 
 2.10.0
