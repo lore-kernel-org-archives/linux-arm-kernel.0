@@ -1,400 +1,253 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 16 Nov 2016 12:12:53 -0500
-Subject: [PATCH 1/5] drm/modes: Rewrite the command line parser
-In-Reply-To: <cf494b4e9585e720b2640705e3b2102c19d193c2.1476779323.git-series.maxime.ripard@free-electrons.com>
-References: <cover.bb9be34c7fd7767e31823f78a15ae1c127293c34.1476779323.git-series.maxime.ripard@free-electrons.com>
- <cf494b4e9585e720b2640705e3b2102c19d193c2.1476779323.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAOw6vbKf3B2DYJA-kpmxa7vLzRcv5LhyVtToPyB2d6-thdt4Ng@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 16 Nov 2016 17:18:17 +0000
+Subject: [PATCH V7 1/3] ACPI: Retry IRQ conversion if it failed previously
+In-Reply-To: <0b6358b4c723bb08623c322051bb4c77@codeaurora.org>
+References: <1479074375-2629-1-git-send-email-agustinv@codeaurora.org>
+ <1479074375-2629-2-git-send-email-agustinv@codeaurora.org>
+ <20161115154833.GA16906@red-moon>
+ <0b6358b4c723bb08623c322051bb4c77@codeaurora.org>
+Message-ID: <20161116171817.GA23055@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2016 at 4:29 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Rewrite the command line parser in order to get away from the state machine
-> parsing the video mode lines.
->
-> Hopefully, this will allow to extend it more easily to support named modes
-> and / or properties set directly on the command line.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/gpu/drm/drm_modes.c | 305 +++++++++++++++++++++++--------------
->  1 file changed, 190 insertions(+), 115 deletions(-)
->
-> diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
-> index 53f07ac7c174..7d5bdca276f2 100644
-> --- a/drivers/gpu/drm/drm_modes.c
-> +++ b/drivers/gpu/drm/drm_modes.c
-> @@ -30,6 +30,7 @@
->   * authorization from the copyright holder(s) and author(s).
->   */
->
-> +#include <linux/ctype.h>
->  #include <linux/list.h>
->  #include <linux/list_sort.h>
->  #include <linux/export.h>
-> @@ -1261,6 +1262,131 @@ void drm_mode_connector_list_update(struct drm_connector *connector)
->  }
->  EXPORT_SYMBOL(drm_mode_connector_list_update);
->
-> +static int drm_mode_parse_cmdline_bpp(const char *str, char **end_ptr,
-> +                                     struct drm_cmdline_mode *mode)
-> +{
-> +       if (str[0] != '-')
-> +               return -EINVAL;
-> +
-> +       mode->bpp = simple_strtol(str + 1, end_ptr, 10);
-> +       mode->bpp_specified = true;
-> +
-> +       return 0;
-> +}
-> +
-> +static int drm_mode_parse_cmdline_refresh(const char *str, char **end_ptr,
-> +                                         struct drm_cmdline_mode *mode)
-> +{
-> +       if (str[0] != '@')
-> +               return -EINVAL;
-> +
-> +       mode->refresh = simple_strtol(str + 1, end_ptr, 10);
-> +       mode->refresh_specified = true;
-> +
-> +       return 0;
-> +}
-> +
-> +static int drm_mode_parse_cmdline_extra(const char *str, int length,
-> +                                       struct drm_connector *connector,
-> +                                       struct drm_cmdline_mode *mode)
-> +{
-> +       int i;
-> +
-> +       for (i = 0; i < length; i++) {
-> +               switch (str[i]) {
-> +               case 'i':
-> +                       mode->interlace = true;
-> +                       break;
-> +               case 'm':
-> +                       mode->margins = true;
-> +                       break;
-> +               case 'D':
-> +                       if (mode->force != DRM_FORCE_UNSPECIFIED)
-> +                               return -EINVAL;
-> +
-> +                       if ((connector->connector_type != DRM_MODE_CONNECTOR_DVII) &&
-> +                           (connector->connector_type != DRM_MODE_CONNECTOR_HDMIB))
-> +                               mode->force = DRM_FORCE_ON;
-> +                       else
-> +                               mode->force = DRM_FORCE_ON_DIGITAL;
-> +                       break;
-> +               case 'd':
-> +                       if (mode->force != DRM_FORCE_UNSPECIFIED)
-> +                               return -EINVAL;
-> +
-> +                       mode->force = DRM_FORCE_OFF;
-> +                       break;
-> +               case 'e':
-> +                       if (mode->force != DRM_FORCE_UNSPECIFIED)
-> +                               return -EINVAL;
-> +
-> +                       mode->force = DRM_FORCE_ON;
-> +                       break;
-> +               default:
-> +                       return -EINVAL;
-> +               }
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static int drm_mode_parse_cmdline_res_mode(const char *str, unsigned int length,
-> +                                          bool extras,
-> +                                          struct drm_connector *connector,
-> +                                          struct drm_cmdline_mode *mode)
-> +{
-> +       bool rb = false, cvt = false;
-> +       int xres = 0, yres = 0;
-> +       int remaining, i;
-> +       char *end_ptr;
-> +
-> +       xres = simple_strtol(str, &end_ptr, 10);
-> +
+On Tue, Nov 15, 2016 at 12:43:38PM -0500, Agustin Vega-Frias wrote:
+> Hi Lorenzo,
+> 
+> On 2016-11-15 10:48, Lorenzo Pieralisi wrote:
+> >On Sun, Nov 13, 2016 at 04:59:33PM -0500, Agustin Vega-Frias wrote:
+> >>This allows probe deferral to work properly when a dependent device
+> >>fails to get a valid IRQ because the IRQ domain was not registered
+> >>at the time the resources were added to the platform_device.
+> >>
+> >>Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
+> >>---
+> >> drivers/acpi/resource.c | 59
+> >>+++++++++++++++++++++++++++++++++++++++++++++++++
+> >> drivers/base/platform.c |  9 +++++++-
+> >> include/linux/acpi.h    |  7 ++++++
+> >> 3 files changed, 74 insertions(+), 1 deletion(-)
+> >>
+> >>diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
+> >>index 56241eb..4beda15 100644
+> >>--- a/drivers/acpi/resource.c
+> >>+++ b/drivers/acpi/resource.c
+> >>@@ -664,3 +664,62 @@ int acpi_dev_filter_resource_type(struct
+> >>acpi_resource *ares,
+> >> 	return (type & types) ? 0 : 1;
+> >> }
+> >> EXPORT_SYMBOL_GPL(acpi_dev_filter_resource_type);
+> >>+
+> >>+struct acpi_irq_get_ctx {
+> >>+	unsigned int index;
+> >>+	struct resource *res;
+> >>+};
+> >>+
+> >>+static acpi_status acpi_irq_get_cb(struct acpi_resource *ares,
+> >>void *context)
+> >>+{
+> >>+	struct acpi_irq_get_ctx *ctx = context;
+> >>+	struct acpi_resource_irq *irq;
+> >>+	struct acpi_resource_extended_irq *ext_irq;
+> >>+
+> >>+	switch (ares->type) {
+> >>+	case ACPI_RESOURCE_TYPE_IRQ:
+> >>+		irq = &ares->data.irq;
+> >>+		if (ctx->index < irq->interrupt_count) {
+> >>+			acpi_dev_resource_interrupt(ares, ctx->index, ctx->res);
+> >>+			return AE_CTRL_TERMINATE;
+> >>+		}
+> >>+		ctx->index -= irq->interrupt_count;
+> >
+> >I do not understand this code, mind explaining what it is meant to do ?
+> >
+> >In particular I do not understand the logic behind the index decrement,
+> >I think I am missing something here.
+> >
+> 
+> ACPI IRQ resources can be encoded into two types of structures:
+> 
+>    struct acpi_resource_irq,
+>    struct acpi_resource_extended_irq.
+> 
+> In theory only the extended version can contain multiple IRQs, but
+> the Linux
+> ACPI core accommodates non-compliant DSDT tables that have regular
+> IRQ resources
+> contain multiple IRQs.
+> 
+> To better explain, suppose you have a device that handles two GSIs
+> and one
+> other IRQ form a separate device:
+> 
+>    Interrupt (ResourceConsumer, Level, ActiveHigh, Exclusive, 0x00, )
+>    { 130, 131 }
+> 
+>    Interrupt (ResourceConsumer, Level, ActiveHigh, Exclusive, 0x00,
+> "\\_SB.TCS0.QIC0", )
+>    { 4 }
+> 
+> These are encoded into two separate structures with their own
+> interrupts array:
+> 
+>   res0.interrupts[] = { 130, 131 }
+>   res1.interrupts[] = { 4 }
+> 
+> However, from the perspective of a client driver these are indexed
+> into a flat space:
+> 
+>   [0] -> 130
+>   [1] -> 131
+>   [2] -> 4
+> 
+> Now say mapping of IRQ 4 failed during bus scan. When acpi_irq_get
+> retries to map it, the client code will pass index 2.
+> acpi_walk_resources will call acpi_irq_get_cb with the first IRQ
+> resource. If the index is less than the number of IRQs, we know this
+> IRQ resource contains the IRQ we want so we call
+> acpi_dev_resource_interrupt to do the actual mapping and return
+> AE_CTRL_TERMINATE so acpi_walk_resources does not continue walking the
+> resource buffer. On the other hand if the index is equal or larger it
+> means we need to skip this IRQ resource and look at the next one, but
+> we need to adjust the lookup index to that of the next IRQ resource.
+> 
+> Makes sense?
 
-checkpatch is telling me to use kstrtol instead, as simple_strtol is deprecated
+Yes, basically it is to create a linear index out of multiple resources,
+the DT case is simpler since you get the interrupt out of a single
+property that we can easily index (ie we have to know which firmware
+entry corresponds to the resource that we are retrying). That deserves
+a comment.
 
-> +       if (end_ptr[0] != 'x')
+Thanks for explaining.
 
-check that end_ptr != NULL? you should probably also check that xres
-isn't an error (ie: -ERANGE or -EINVAL)
+Lorenzo
 
-> +               return -EINVAL;
-> +       end_ptr++;
-> +
-> +       yres = simple_strtol(end_ptr, &end_ptr, 10);
-
-check end_ptr != NULL and yres sane
-
-> +
-> +       remaining = length - (end_ptr - str);
-> +       if (remaining < 0)
-
-right, so if end_ptr is NULL here, we'll end up with a huge positive
-value for remaining :)
-
-> +               return -EINVAL;
-> +
-> +       for (i = 0; i < remaining; i++) {
-> +               switch (end_ptr[i]) {
-> +               case 'M':
-> +                       cvt = true;
-
-the previous code ensured proper ordering as well as parsing, whereas
-yours will take these in any order (and accepts duplicates). i don't
-think this should cause any issues, but perhaps something to verify.
-
-> +                       break;
-> +               case 'R':
-> +                       rb = true;
-> +                       break;
-> +               default:
-> +                       /*
-> +                        * Try to pass that to our extras parsing
-> +                        * function to handle the case where the
-> +                        * extras are directly after the resolution
-> +                        */
-> +                       if (extras) {
-> +                               int ret = drm_mode_parse_cmdline_extra(end_ptr + i,
-> +                                                                      1,
-> +                                                                      connector,
-> +                                                                      mode);
-> +                               if (ret)
-> +                                       return ret;
-> +                       } else {
-> +                               return -EINVAL;
-> +                       }
-> +               }
-> +       }
-> +
-> +       mode->xres = xres;
-> +       mode->yres = yres;
-> +       mode->cvt = cvt;
-> +       mode->rb = rb;
-> +
-> +       return 0;
-> +}
-> +
->  /**
->   * drm_mode_parse_command_line_for_connector - parse command line modeline for connector
->   * @mode_option: optional per connector mode option
-> @@ -1287,13 +1413,12 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
->                                                struct drm_cmdline_mode *mode)
->  {
->         const char *name;
-> -       unsigned int namelen;
-> -       bool res_specified = false, bpp_specified = false, refresh_specified = false;
-> -       unsigned int xres = 0, yres = 0, bpp = 32, refresh = 0;
-> -       bool yres_specified = false, cvt = false, rb = false;
-> -       bool interlace = false, margins = false, was_digit = false;
-> -       int i;
-> -       enum drm_connector_force force = DRM_FORCE_UNSPECIFIED;
-> +       bool parse_extras = false;
-> +       unsigned int bpp_off = 0, refresh_off = 0;
-> +       unsigned int mode_end = 0;
-> +       char *bpp_ptr = NULL, *refresh_ptr = NULL, *extra_ptr = NULL;
-> +       char *bpp_end_ptr = NULL, *refresh_end_ptr = NULL;
-> +       int ret;
->
->  #ifdef CONFIG_FB
->         if (!mode_option)
-> @@ -1306,127 +1431,77 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
->         }
->
->         name = mode_option;
-> -       namelen = strlen(name);
-> -       for (i = namelen-1; i >= 0; i--) {
-> -               switch (name[i]) {
-> -               case '@':
-> -                       if (!refresh_specified && !bpp_specified &&
-> -                           !yres_specified && !cvt && !rb && was_digit) {
-> -                               refresh = simple_strtol(&name[i+1], NULL, 10);
-> -                               refresh_specified = true;
-> -                               was_digit = false;
-> -                       } else
-> -                               goto done;
-> -                       break;
-> -               case '-':
-> -                       if (!bpp_specified && !yres_specified && !cvt &&
-> -                           !rb && was_digit) {
-> -                               bpp = simple_strtol(&name[i+1], NULL, 10);
-> -                               bpp_specified = true;
-> -                               was_digit = false;
-> -                       } else
-> -                               goto done;
-> -                       break;
-> -               case 'x':
-> -                       if (!yres_specified && was_digit) {
-> -                               yres = simple_strtol(&name[i+1], NULL, 10);
-> -                               yres_specified = true;
-> -                               was_digit = false;
-> -                       } else
-> -                               goto done;
-> -                       break;
-> -               case '0' ... '9':
-> -                       was_digit = true;
-> -                       break;
-> -               case 'M':
-> -                       if (yres_specified || cvt || was_digit)
-> -                               goto done;
-> -                       cvt = true;
-> -                       break;
-> -               case 'R':
-> -                       if (yres_specified || cvt || rb || was_digit)
-> -                               goto done;
-> -                       rb = true;
-> -                       break;
-> -               case 'm':
-> -                       if (cvt || yres_specified || was_digit)
-> -                               goto done;
-> -                       margins = true;
-> -                       break;
-> -               case 'i':
-> -                       if (cvt || yres_specified || was_digit)
-> -                               goto done;
-> -                       interlace = true;
-> -                       break;
-> -               case 'e':
-> -                       if (yres_specified || bpp_specified || refresh_specified ||
-> -                           was_digit || (force != DRM_FORCE_UNSPECIFIED))
-> -                               goto done;
->
-> -                       force = DRM_FORCE_ON;
-> -                       break;
-> -               case 'D':
-> -                       if (yres_specified || bpp_specified || refresh_specified ||
-> -                           was_digit || (force != DRM_FORCE_UNSPECIFIED))
-> -                               goto done;
-> +       if (!isdigit(name[0]))
-> +               return false;
->
-> -                       if ((connector->connector_type != DRM_MODE_CONNECTOR_DVII) &&
-> -                           (connector->connector_type != DRM_MODE_CONNECTOR_HDMIB))
-> -                               force = DRM_FORCE_ON;
-> -                       else
-> -                               force = DRM_FORCE_ON_DIGITAL;
-> -                       break;
-> -               case 'd':
-> -                       if (yres_specified || bpp_specified || refresh_specified ||
-> -                           was_digit || (force != DRM_FORCE_UNSPECIFIED))
-> -                               goto done;
-> +       /* Try to locate the bpp and refresh specifiers, if any */
-> +       bpp_ptr = strchr(name, '-');
-> +       if (bpp_ptr) {
-> +               bpp_off = bpp_ptr - name;
-> +               mode->bpp_specified = true;
-> +       }
->
-> -                       force = DRM_FORCE_OFF;
-> -                       break;
-> -               default:
-> -                       goto done;
-> -               }
-> +       refresh_ptr = strchr(name, '@');
-> +       if (refresh_ptr) {
-> +               refresh_off = refresh_ptr - name;
-> +               mode->refresh_specified = true;
->         }
->
-> -       if (i < 0 && yres_specified) {
-> -               char *ch;
-> -               xres = simple_strtol(name, &ch, 10);
-> -               if ((ch != NULL) && (*ch == 'x'))
-> -                       res_specified = true;
-> -               else
-> -                       i = ch - name;
-> -       } else if (!yres_specified && was_digit) {
-> -               /* catch mode that begins with digits but has no 'x' */
-> -               i = 0;
-> +       /* Locate the end of the name / resolution, and parse it */
-> +       if (bpp_ptr && refresh_ptr) {
-> +               mode_end = min(bpp_off, refresh_off);
-> +       } else if (bpp_ptr) {
-> +               mode_end = bpp_off;
-> +       } else if (refresh_ptr) {
-> +               mode_end = refresh_off;
-> +       } else {
-> +               mode_end = strlen(name);
-> +               parse_extras = true;
->         }
-> -done:
-> -       if (i >= 0) {
-> -               pr_warn("[drm] parse error at position %i in video mode '%s'\n",
-> -                       i, name);
-> -               mode->specified = false;
-> +
-> +       ret = drm_mode_parse_cmdline_res_mode(name, mode_end,
-> +                                             parse_extras,
-> +                                             connector,
-> +                                             mode);
-> +       if (ret)
->                 return false;
-> -       }
-> +       mode->specified = true;
->
-> -       if (res_specified) {
-> -               mode->specified = true;
-> -               mode->xres = xres;
-> -               mode->yres = yres;
-> +       if (bpp_ptr) {
-> +               ret = drm_mode_parse_cmdline_bpp(bpp_ptr, &bpp_end_ptr, mode);
-> +               if (ret)
-> +                       return false;
->         }
->
-> -       if (refresh_specified) {
-> -               mode->refresh_specified = true;
-> -               mode->refresh = refresh;
-> +       if (refresh_ptr) {
-> +               ret = drm_mode_parse_cmdline_refresh(refresh_ptr,
-> +                                                    &refresh_end_ptr, mode);
-> +               if (ret)
-> +                       return false;
->         }
->
-> -       if (bpp_specified) {
-> -               mode->bpp_specified = true;
-> -               mode->bpp = bpp;
-> +       /*
-> +        * Locate the end of the bpp / refresh, and parse the extras
-> +        * if relevant
-> +        */
-> +       if (bpp_ptr && refresh_ptr)
-
-Perhaps I'm paranoid, but I think it'd be better to check bpp_end_ptr
-&& refresh_end_ptr in this conditional.
-
-Sean
-
-> +               extra_ptr = max(bpp_end_ptr, refresh_end_ptr);
-> +       else if (bpp_ptr)
-> +               extra_ptr = bpp_end_ptr;
-> +       else if (refresh_ptr)
-> +               extra_ptr = refresh_end_ptr;
-> +
-> +       if (extra_ptr) {
-> +               int remaining = strlen(name) - (extra_ptr - name);
-> +
-> +               /*
-> +                * We still have characters to process, while
-> +                * we shouldn't have any
-> +                */
-> +               if (remaining > 0)
-> +                       return false;
->         }
-> -       mode->rb = rb;
-> -       mode->cvt = cvt;
-> -       mode->interlace = interlace;
-> -       mode->margins = margins;
-> -       mode->force = force;
->
->         return true;
->  }
-> --
-> git-series 0.8.10
+> >>+		break;
+> >>+	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
+> >>+		ext_irq = &ares->data.extended_irq;
+> >>+		if (ctx->index < ext_irq->interrupt_count) {
+> >>+			acpi_dev_resource_interrupt(ares, ctx->index, ctx->res);
+> >>+			return AE_CTRL_TERMINATE;
+> >>+		}
+> >>+		ctx->index -= ext_irq->interrupt_count;
+> >
+> >Ditto.
+> 
+> The same logic is used for both types of resources because they are
+> handled in
+> the same way by the ACPI core when it comes to indexing.
+> 
+> Thanks,
+> Agustin
+> 
+> >
+> >Thanks,
+> >Lorenzo
+> >
+> >>+		break;
+> >>+	}
+> >>+
+> >>+	return AE_OK;
+> >>+}
+> >>+
+> >>+/**
+> >>+ * acpi_irq_get - Look for the ACPI IRQ resource with the given
+> >>index and
+> >>+ *                use it to initialize the given Linux IRQ resource.
+> >>+ * @handle ACPI device handle
+> >>+ * @index  ACPI IRQ resource index to lookup
+> >>+ * @res    Linux IRQ resource to initialize
+> >>+ *
+> >>+ * Return: 0 on success
+> >>+ *         -EINVAL if an error occurs
+> >>+ *         -EPROBE_DEFER if the IRQ lookup/conversion failed
+> >>+ */
+> >>+int acpi_irq_get(acpi_handle handle, unsigned int index, struct
+> >>resource *res)
+> >>+{
+> >>+	struct acpi_irq_get_ctx ctx = { index, res };
+> >>+	acpi_status status;
+> >>+
+> >>+	status = acpi_walk_resources(handle, METHOD_NAME__CRS,
+> >>+				     acpi_irq_get_cb, &ctx);
+> >>+	if (ACPI_FAILURE(status))
+> >>+		return -EINVAL;
+> >>+	if (res->flags & IORESOURCE_DISABLED)
+> >>+		return -EPROBE_DEFER;
+> >>+	return 0;
+> >>+}
+> >>+EXPORT_SYMBOL_GPL(acpi_irq_get);
+> >>diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+> >>index c4af003..61423d2 100644
+> >>--- a/drivers/base/platform.c
+> >>+++ b/drivers/base/platform.c
+> >>@@ -102,6 +102,14 @@ int platform_get_irq(struct platform_device
+> >>*dev, unsigned int num)
+> >> 	}
+> >>
+> >> 	r = platform_get_resource(dev, IORESOURCE_IRQ, num);
+> >>+	if (r && r->flags & IORESOURCE_DISABLED &&
+> >>ACPI_COMPANION(&dev->dev)) {
+> >>+		int ret;
+> >>+
+> >>+		ret = acpi_irq_get(ACPI_HANDLE(&dev->dev), num, r);
+> >>+		if (ret)
+> >>+			return ret;
+> >>+	}
+> >>+
+> >> 	/*
+> >> 	 * The resources may pass trigger flags to the irqs that need
+> >> 	 * to be set up. It so happens that the trigger flags for
+> >>@@ -1450,4 +1458,3 @@ void __init early_platform_cleanup(void)
+> >> 		memset(&pd->dev.devres_head, 0, sizeof(pd->dev.devres_head));
+> >> 	}
+> >> }
+> >>-
+> >>diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> >>index 689a8b9..325bdb9 100644
+> >>--- a/include/linux/acpi.h
+> >>+++ b/include/linux/acpi.h
+> >>@@ -406,6 +406,7 @@ bool
+> >>acpi_dev_resource_ext_address_space(struct acpi_resource *ares,
+> >> unsigned int acpi_dev_get_irq_type(int triggering, int polarity);
+> >> bool acpi_dev_resource_interrupt(struct acpi_resource *ares,
+> >>int index,
+> >> 				 struct resource *res);
+> >>+int acpi_irq_get(acpi_handle handle, unsigned int index, struct
+> >>resource *res);
+> >>
+> >> void acpi_dev_free_resource_list(struct list_head *list);
+> >> int acpi_dev_get_resources(struct acpi_device *adev, struct
+> >>list_head *list,
+> >>@@ -763,6 +764,12 @@ static inline int
+> >>acpi_reconfig_notifier_unregister(struct notifier_block *nb)
+> >> 	return -EINVAL;
+> >> }
+> >>
+> >>+static inline int acpi_irq_get(acpi_handle handle, unsigned int
+> >>index,
+> >>+			       struct resource *res)
+> >>+{
+> >>+	return -EINVAL;
+> >>+}
+> >>+
+> >> #endif	/* !CONFIG_ACPI */
+> >>
+> >> #ifdef CONFIG_ACPI_HOTPLUG_IOAPIC
+> >>--
+> >>Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm
+> >>Technologies, Inc.
+> >>Qualcomm Technologies, Inc. is a member of the Code Aurora
+> >>Forum, a Linux Foundation Collaborative Project.
+> >>
+> >>--
+> >>To unsubscribe from this list: send the line "unsubscribe
+> >>linux-acpi" in
+> >>the body of a message to majordomo at vger.kernel.org
+> >>More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> -- 
+> Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm
+> Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a
+> Linux Foundation Collaborative Project.
