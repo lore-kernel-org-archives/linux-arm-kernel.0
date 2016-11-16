@@ -1,215 +1,128 @@
 From: zourongrong@gmail.com (Rongrong Zou)
-Date: Wed, 16 Nov 2016 21:43:49 +0800
-Subject: [PATCH v7 5/7] drm/hisilicon/hibmc: Add support for VDAC
+Date: Wed, 16 Nov 2016 21:43:50 +0800
+Subject: [PATCH v7 6/7] drm/hisilicon/hibmc: Add support for vblank interrupt
 In-Reply-To: <1479303831-74134-1-git-send-email-zourongrong@gmail.com>
 References: <1479303831-74134-1-git-send-email-zourongrong@gmail.com>
-Message-ID: <1479303831-74134-6-git-send-email-zourongrong@gmail.com>
+Message-ID: <1479303831-74134-7-git-send-email-zourongrong@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VDAC(Video Digital-to-Analog converter) converts the RGB diaital data
-stream from DE to VGA analog signals.
+Add vblank interrupt.
 
 Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
 ---
- drivers/gpu/drm/hisilicon/hibmc/Makefile         |   2 +-
- drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c  |   6 +
- drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h  |   1 +
- drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c | 147 +++++++++++++++++++++++
- 4 files changed, 155 insertions(+), 1 deletion(-)
- create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c | 56 ++++++++++++++++++++++++-
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h |  1 +
+ 2 files changed, 56 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/hisilicon/hibmc/Makefile b/drivers/gpu/drm/hisilicon/hibmc/Makefile
-index 8e0cf72..f2e04c0 100644
---- a/drivers/gpu/drm/hisilicon/hibmc/Makefile
-+++ b/drivers/gpu/drm/hisilicon/hibmc/Makefile
-@@ -1,4 +1,4 @@
- ccflags-y := -Iinclude/drm
--hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_de.o hibmc_drm_fbdev.o hibmc_ttm.o
-+hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_de.o hibmc_drm_vdac.o hibmc_drm_fbdev.o hibmc_ttm.o
- 
- obj-$(CONFIG_DRM_HISI_HIBMC) += hibmc-drm.o
 diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-index 9de3564..c133644 100644
+index c133644..73ba8b0 100644
 --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
 +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-@@ -123,6 +123,12 @@ static int hibmc_kms_init(struct hibmc_drm_private *priv)
- 		return ret;
- 	}
+@@ -39,16 +39,45 @@
  
-+	ret = hibmc_vdac_init(priv);
-+	if (ret) {
-+		DRM_ERROR("failed to init vdac: %d\n", ret);
-+		return ret;
-+	}
+ static int hibmc_enable_vblank(struct drm_device *dev, unsigned int pipe)
+ {
++	struct hibmc_drm_private *priv =
++		(struct hibmc_drm_private *)dev->dev_private;
++
++	writel(HIBMC_RAW_INTERRUPT_EN_VBLANK(1),
++	       priv->mmio + HIBMC_RAW_INTERRUPT_EN);
 +
  	return 0;
  }
  
+ static void hibmc_disable_vblank(struct drm_device *dev, unsigned int pipe)
+ {
++	struct hibmc_drm_private *priv =
++		(struct hibmc_drm_private *)dev->dev_private;
++
++	writel(HIBMC_RAW_INTERRUPT_EN_VBLANK(0),
++	       priv->mmio + HIBMC_RAW_INTERRUPT_EN);
++}
++
++irqreturn_t hibmc_drm_interrupt(int irq, void *arg)
++{
++	struct drm_device *dev = (struct drm_device *)arg;
++	struct hibmc_drm_private *priv =
++		(struct hibmc_drm_private *)dev->dev_private;
++	u32 status;
++
++	status = readl(priv->mmio + HIBMC_RAW_INTERRUPT);
++
++	if (status & HIBMC_RAW_INTERRUPT_VBLANK(1)) {
++		writel(HIBMC_RAW_INTERRUPT_VBLANK(1),
++		       priv->mmio + HIBMC_RAW_INTERRUPT);
++		drm_handle_vblank(dev, 0);
++	}
++
++	return IRQ_HANDLED;
+ }
+ 
+ static struct drm_driver hibmc_driver = {
+ 	.driver_features	= DRIVER_GEM | DRIVER_MODESET |
+-				  DRIVER_ATOMIC,
++				  DRIVER_ATOMIC | DRIVER_HAVE_IRQ,
+ 	.fops			= &hibmc_fops,
+ 	.name			= "hibmc",
+ 	.date			= "20160828",
+@@ -62,6 +91,7 @@ static void hibmc_disable_vblank(struct drm_device *dev, unsigned int pipe)
+ 	.dumb_create            = hibmc_dumb_create,
+ 	.dumb_map_offset        = hibmc_dumb_mmap_offset,
+ 	.dumb_destroy           = drm_gem_dumb_destroy,
++	.irq_handler		= hibmc_drm_interrupt,
+ };
+ 
+ static int hibmc_pm_suspend(struct device *dev)
+@@ -268,6 +298,13 @@ static int hibmc_unload(struct drm_device *dev)
+ 	struct hibmc_drm_private *priv = dev->dev_private;
+ 
+ 	hibmc_fbdev_fini(priv);
++
++	if (dev->irq_enabled)
++		drm_irq_uninstall(dev);
++	if (priv->msi_enabled)
++		pci_disable_msi(dev->pdev);
++	drm_vblank_cleanup(dev);
++
+ 	hibmc_kms_fini(priv);
+ 	hibmc_mm_fini(priv);
+ 	dev->dev_private = NULL;
+@@ -299,6 +336,23 @@ static int hibmc_load(struct drm_device *dev)
+ 	if (ret)
+ 		goto err;
+ 
++	ret = drm_vblank_init(dev, dev->mode_config.num_crtc);
++	if (ret) {
++		DRM_ERROR("failed to initialize vblank: %d\n", ret);
++		goto err;
++	}
++
++	priv->msi_enabled = 0;
++	ret = pci_enable_msi(dev->pdev);
++	if (ret) {
++		DRM_WARN("enabling MSI failed: %d\n", ret);
++	} else {
++		priv->msi_enabled = 1;
++		ret = drm_irq_install(dev, dev->pdev->irq);
++		if (ret)
++			DRM_WARN("install irq failed: %d\n", ret);
++	}
++
+ 	/* reset all the states of crtc/plane/encoder/connector */
+ 	drm_mode_config_reset(dev);
+ 
 diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-index 87af1eb..b626caf 100644
+index b626caf..e195521 100644
 --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
 +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-@@ -86,6 +86,7 @@ void hibmc_set_current_gate(struct hibmc_drm_private *priv,
- 			    unsigned int gate);
+@@ -42,6 +42,7 @@ struct hibmc_drm_private {
+ 	void __iomem   *fb_map;
+ 	unsigned long  fb_base;
+ 	unsigned long  fb_size;
++	bool msi_enabled;
  
- int hibmc_de_init(struct hibmc_drm_private *priv);
-+int hibmc_vdac_init(struct hibmc_drm_private *priv);
- int hibmc_fbdev_init(struct hibmc_drm_private *priv);
- void hibmc_fbdev_fini(struct hibmc_drm_private *priv);
- 
-diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
-new file mode 100644
-index 0000000..d1f67a9
---- /dev/null
-+++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
-@@ -0,0 +1,147 @@
-+/* Hisilicon Hibmc SoC drm driver
-+ *
-+ * Based on the bochs drm driver.
-+ *
-+ * Copyright (c) 2016 Huawei Limited.
-+ *
-+ * Author:
-+ *	Rongrong Zou <zourongrong@huawei.com>
-+ *	Rongrong Zou <zourongrong@gmail.com>
-+ *	Jianhua Li <lijianhua@huawei.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
-+
-+#include <drm/drm_atomic_helper.h>
-+#include <drm/drm_crtc_helper.h>
-+
-+#include "hibmc_drm_drv.h"
-+#include "hibmc_drm_regs.h"
-+
-+static int hibmc_connector_get_modes(struct drm_connector *connector)
-+{
-+	return drm_add_modes_noedid(connector, 800, 600);
-+}
-+
-+static int hibmc_connector_mode_valid(struct drm_connector *connector,
-+				      struct drm_display_mode *mode)
-+{
-+	return MODE_OK;
-+}
-+
-+static struct drm_encoder *
-+hibmc_connector_best_encoder(struct drm_connector *connector)
-+{
-+	return drm_encoder_find(connector->dev, connector->encoder_ids[0]);
-+}
-+
-+static enum drm_connector_status hibmc_connector_detect(struct drm_connector
-+						 *connector, bool force)
-+{
-+	return connector_status_connected;
-+}
-+
-+static const struct drm_connector_helper_funcs
-+	hibmc_connector_helper_funcs = {
-+	.get_modes = hibmc_connector_get_modes,
-+	.mode_valid = hibmc_connector_mode_valid,
-+	.best_encoder = hibmc_connector_best_encoder,
-+};
-+
-+static const struct drm_connector_funcs hibmc_connector_funcs = {
-+	.dpms = drm_atomic_helper_connector_dpms,
-+	.detect = hibmc_connector_detect,
-+	.fill_modes = drm_helper_probe_single_connector_modes,
-+	.destroy = drm_connector_cleanup,
-+	.reset = drm_atomic_helper_connector_reset,
-+	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
-+	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
-+};
-+
-+static struct drm_connector *
-+hibmc_connector_init(struct hibmc_drm_private *priv)
-+{
-+	struct drm_device *dev = priv->dev;
-+	struct drm_connector *connector;
-+	int ret;
-+
-+	connector = devm_kzalloc(dev->dev, sizeof(*connector), GFP_KERNEL);
-+	if (!connector) {
-+		DRM_ERROR("failed to alloc memory when init connector\n");
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	ret = drm_connector_init(dev, connector,
-+				 &hibmc_connector_funcs,
-+				 DRM_MODE_CONNECTOR_VGA);
-+	if (ret) {
-+		DRM_ERROR("failed to init connector: %d\n", ret);
-+		return ERR_PTR(ret);
-+	}
-+	drm_connector_helper_add(connector,
-+				 &hibmc_connector_helper_funcs);
-+
-+	return connector;
-+}
-+
-+static void hibmc_encoder_mode_set(struct drm_encoder *encoder,
-+				   struct drm_display_mode *mode,
-+				   struct drm_display_mode *adj_mode)
-+{
-+	u32 reg;
-+	struct drm_device *dev = encoder->dev;
-+	struct hibmc_drm_private *priv = dev->dev_private;
-+
-+	reg = readl(priv->mmio + HIBMC_DISPLAY_CONTROL_HISILE);
-+	reg |= HIBMC_DISPLAY_CONTROL_FPVDDEN(1);
-+	reg |= HIBMC_DISPLAY_CONTROL_PANELDATE(1);
-+	reg |= HIBMC_DISPLAY_CONTROL_FPEN(1);
-+	reg |= HIBMC_DISPLAY_CONTROL_VBIASEN(1);
-+	writel(reg, priv->mmio + HIBMC_DISPLAY_CONTROL_HISILE);
-+}
-+
-+static const struct drm_encoder_helper_funcs hibmc_encoder_helper_funcs = {
-+	.mode_set = hibmc_encoder_mode_set,
-+};
-+
-+static const struct drm_encoder_funcs hibmc_encoder_funcs = {
-+	.destroy = drm_encoder_cleanup,
-+};
-+
-+int hibmc_vdac_init(struct hibmc_drm_private *priv)
-+{
-+	struct drm_device *dev = priv->dev;
-+	struct drm_encoder *encoder;
-+	struct drm_connector *connector;
-+	int ret;
-+
-+	connector = hibmc_connector_init(priv);
-+	if (IS_ERR(connector)) {
-+		DRM_ERROR("failed to create connector: %ld\n",
-+			  PTR_ERR(connector));
-+		return PTR_ERR(connector);
-+	}
-+
-+	encoder = devm_kzalloc(dev->dev, sizeof(*encoder), GFP_KERNEL);
-+	if (!encoder) {
-+		DRM_ERROR("failed to alloc memory when init encoder\n");
-+		return -ENOMEM;
-+	}
-+
-+	encoder->possible_crtcs = 0x1;
-+	ret = drm_encoder_init(dev, encoder, &hibmc_encoder_funcs,
-+			       DRM_MODE_ENCODER_DAC, NULL);
-+	if (ret) {
-+		DRM_ERROR("failed to init encoder: %d\n", ret);
-+		return ret;
-+	}
-+
-+	drm_encoder_helper_add(encoder, &hibmc_encoder_helper_funcs);
-+	drm_mode_connector_attach_encoder(connector, encoder);
-+
-+	return 0;
-+}
+ 	/* drm */
+ 	struct drm_device  *dev;
 -- 
 1.9.1
