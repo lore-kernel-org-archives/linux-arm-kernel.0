@@ -1,38 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Nov 2016 15:22:38 +0100
-Subject: [PATCH 1/2] phy: rockchip-inno-usb2: fix uninitialized tmout variable
-Message-ID: <20161116142259.2123506-1-arnd@arndb.de>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 16 Nov 2016 14:34:28 +0000
+Subject: [PATCH 08/16] ARM: vexpress: use generic API for enabling SCU
+In-Reply-To: <1479099731-28108-9-git-send-email-pankaj.dubey@samsung.com>
+References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
+ <1479099731-28108-9-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <c6cb4dbd-847e-832a-894b-bf8718248538@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added OTG support has an obvious uninitialized variable
-access that gcc warns about:
 
-drivers/phy/phy-rockchip-inno-usb2.c: In function 'rockchip_chg_detect_work':
-drivers/phy/phy-rockchip-inno-usb2.c:717:7: error: 'tmout' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 
-This replaces the use of the uninitialized variable with what
-the value was in the previous USB_CHG_STATE_WAIT_FOR_DCD
-state.
+On 14/11/16 05:02, Pankaj Dubey wrote:
+> Now as we have of_scu_enable which takes care of mapping
+> scu base from DT, lets use it.
+>
+> CC: Liviu Dudau <liviu.dudau@arm.com>
+> CC: Sudeep Holla <sudeep.holla@arm.com>
 
-Fixes: 0c42fe48fd23 ("phy: rockchip-inno-usb2: support otg-port for rk3399")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/phy/phy-rockchip-inno-usb2.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I assume you will take this series through a single tree. Also I assume
+you may make changes around a9 SCU. I will try to test if I can get my
+setup back working. But if this patch is not changed, then
 
-diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
-index eb89de59b68f..2f99ec95079c 100644
---- a/drivers/phy/phy-rockchip-inno-usb2.c
-+++ b/drivers/phy/phy-rockchip-inno-usb2.c
-@@ -714,7 +714,7 @@ static void rockchip_chg_detect_work(struct work_struct *work)
- 			delay = CHG_SECONDARY_DET_TIME;
- 			rphy->chg_state = USB_CHG_STATE_PRIMARY_DONE;
- 		} else {
--			if (tmout) {
-+			if (rphy->dcd_retries == CHG_DCD_MAX_RETRIES) {
- 				/* floating charger found */
- 				rphy->chg_type = POWER_SUPPLY_TYPE_USB_DCP;
- 				rphy->chg_state = USB_CHG_STATE_DETECTED;
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+
 -- 
-2.9.0
+Regards,
+Sudeep
