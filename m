@@ -1,69 +1,140 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 16 Nov 2016 17:37:31 +0800
-Subject: [PATCH] drm/sun4i: Only count TCON endpoints as valid outputs
-Message-ID: <20161116093732.12828-1-wens@csie.org>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Wed, 16 Nov 2016 10:43:58 +0100
+Subject: [RFCv2 PATCH 1/5] video: add HDMI state notifier support
+In-Reply-To: <00ad0ddf-3e52-62e6-f863-cae6eefd08c9@xs4all.nl>
+References: <1479136968-24477-1-git-send-email-hverkuil@xs4all.nl>
+ <1479136968-24477-2-git-send-email-hverkuil@xs4all.nl>
+ <1479234278.2456.49.camel@pengutronix.de>
+ <00ad0ddf-3e52-62e6-f863-cae6eefd08c9@xs4all.nl>
+Message-ID: <87cc4a9c-bc1b-173e-693c-17a270fbed6b@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sun4i DRM driver counts the number of endpoints it found and
-registers the whole DRM pipeline if any endpoints are found.
+On 11/15/16 21:41, Hans Verkuil wrote:
+> Hi Philipp,
+>
+> On 11/15/2016 07:24 PM, Philipp Zabel wrote:
+>> Hi Hans,
+>>
+>> Am Montag, den 14.11.2016, 16:22 +0100 schrieb Hans Verkuil:
+>>> From: Hans Verkuil <hans.verkuil@cisco.com>
+>>>
+>>> Add support for HDMI hotplug and EDID notifiers, which is used to convey
+>>> information from HDMI drivers to their CEC and audio counterparts.
+>>>
+>>> Based on an earlier version from Russell King:
+>>>
+>>> https://patchwork.kernel.org/patch/9277043/
+>>>
+>>> The hdmi_notifier is a reference counted object containing the HDMI state
+>>> of an HDMI device.
+>>>
+>>> When a new notifier is registered the current state will be reported to
+>>> that notifier at registration time.
+>>>
+>>> Signed-off-by: Hans Verkuil <hans.verkuil@cisco.com>
+>>> ---
+>>>  drivers/video/Kconfig         |   3 +
+>>>  drivers/video/Makefile        |   1 +
+>>>  drivers/video/hdmi-notifier.c | 136 ++++++++++++++++++++++++++++++++++++++++++
+>>>  include/linux/hdmi-notifier.h |  43 +++++++++++++
+>>>  4 files changed, 183 insertions(+)
+>>>  create mode 100644 drivers/video/hdmi-notifier.c
+>>>  create mode 100644 include/linux/hdmi-notifier.h
+>>>
+>>> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+>>> index 3c20af9..1ee7b9f 100644
+>>> --- a/drivers/video/Kconfig
+>>> +++ b/drivers/video/Kconfig
+>>> @@ -36,6 +36,9 @@ config VIDEOMODE_HELPERS
+>>>  config HDMI
+>>>  	bool
+>>>
+>>> +config HDMI_NOTIFIERS
+>>> +	bool
+>>> +
+>>>  if VT
+>>>  	source "drivers/video/console/Kconfig"
+>>>  endif
+>>> diff --git a/drivers/video/Makefile b/drivers/video/Makefile
+>>> index 9ad3c17..65f5649 100644
+>>> --- a/drivers/video/Makefile
+>>> +++ b/drivers/video/Makefile
+>>> @@ -1,5 +1,6 @@
+>>>  obj-$(CONFIG_VGASTATE)            += vgastate.o
+>>>  obj-$(CONFIG_HDMI)                += hdmi.o
+>>> +obj-$(CONFIG_HDMI_NOTIFIERS)      += hdmi-notifier.o
+>>>
+>>>  obj-$(CONFIG_VT)		  += console/
+>>>  obj-$(CONFIG_LOGO)		  += logo/
+>>> diff --git a/drivers/video/hdmi-notifier.c b/drivers/video/hdmi-notifier.c
+>>> new file mode 100644
+>>> index 0000000..c2a4f1b
+>>> --- /dev/null
+>>> +++ b/drivers/video/hdmi-notifier.c
+>>> @@ -0,0 +1,136 @@
+>>> +#include <linux/export.h>
+>>> +#include <linux/hdmi-notifier.h>
+>>> +#include <linux/string.h>
+>>> +#include <linux/slab.h>
+>>> +#include <linux/list.h>
+>>> +
+>>> +struct hdmi_notifiers {
+>>> +	struct list_head head;
+>>> +	struct device *dev;
+>>> +	struct hdmi_notifier *n;
+>>> +};
+>>
+>> This struct is not used, can be removed.
+>
+> Indeed.
+>
+>>
+>>> +static LIST_HEAD(hdmi_notifiers);
+>>> +static DEFINE_MUTEX(hdmi_notifiers_lock);
+>>> +
+>>> +struct hdmi_notifier *hdmi_notifier_get(struct device *dev)
+>>> +{
+>>> +	struct hdmi_notifier *n;
+>>> +
+>>> +	mutex_lock(&hdmi_notifiers_lock);
+>>> +	list_for_each_entry(n, &hdmi_notifiers, head) {
+>>> +		if (n->dev == dev) {
+>>> +			mutex_unlock(&hdmi_notifiers_lock);
+>>> +			kref_get(&n->kref);
+>>> +			return n;
+>>> +		}
+>>> +	}
+>>> +	n = kzalloc(sizeof(*n), GFP_KERNEL);
+>>> +	if (!n)
+>>> +		goto unlock;
+>>> +	mutex_init(&n->lock);
+>>> +	BLOCKING_INIT_NOTIFIER_HEAD(&n->notifiers);
+>>> +	kref_init(&n->kref);
+>>
+>> +	n->dev = dev;
+>>
+>> Currently n->dev is never set, so every caller of this function gets its
+>> own hdmi_notifier.
+>
+> Oops! Well, I did say it was compile-tested only :-)
+>
+>>
+>>> +	list_add_tail(&n->head, &hdmi_notifiers);
+>>> +unlock:
+>>> +	mutex_unlock(&hdmi_notifiers_lock);
+>>> +	return n;
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(hdmi_notifier_get);
+>>> +
+>>> +static void hdmi_notifier_release(struct kref *kref)
+>>> +{
+>>> +	struct hdmi_notifier *n =
+>>> +		container_of(kref, struct hdmi_notifier, kref);
+>>> +
 
-However, if the TCON and its child endpoints (LCD panels, TV encoder,
-HDMI encoder, MIPI DSI encoder, etc.) aren't found, that means we
-don't have any usable CRTCs, and the display pipeline is incomplete
-and useless. The whole DRM display pipeline should only be registered
-and enabled if there are proper outputs available.
+I also forgot to remove this notifier from the global list.
 
-The debug message "Queued %d outputs on pipeline %d\n" is also telling.
+I've updated my git branch to fix this.
 
-This patch makes the driver only count enabled TCON endpoints. If
-none are found, the DRM pipeline is not used. This avoids screwing
-up the simple framebuffer provided by the bootloader in cases where
-we aren't able to support the display with the DRM subsystem, due
-to lack of panel or bridge drivers, or just lack of progress.
-
-Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
-
-Hi Maxime,
-
-This avoids DRM screwing up simplefb on my SinA31s, which does not
-have the display pipeline enabled in its dts file. But the display
-engine and backend are already enabled in the dtsi.
-
-I think this is a better and proper (for the driver) fix. The
-alternative would be to disable the display-engine node in the dts
-by default. Last time I asked you wanted to have them enabled by
-default?
-
-It may also be possible to push the check further down, and check
-against panel and encoder endpoints, but I think that complicates
-things. The TCON is a necessary part of the output.
-
-ChenYu
-
----
- drivers/gpu/drm/sun4i/sun4i_drv.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index c3b21865443e..3603f34901b6 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -243,9 +243,12 @@ static int sun4i_drv_add_endpoints(struct device *dev,
- 		DRM_DEBUG_DRIVER("Adding component %s\n",
- 				 of_node_full_name(node));
- 		component_match_add(dev, match, compare_of, node);
--		count++;
- 	}
- 
-+	/* Only count the tcon as an output */
-+	if (sun4i_drv_node_is_tcon(node))
-+		count++;
-+
- 	/* Inputs are listed first, then outputs */
- 	port = of_graph_get_port_by_id(node, 1);
- 	if (!port) {
--- 
-2.10.2
+	Hans
