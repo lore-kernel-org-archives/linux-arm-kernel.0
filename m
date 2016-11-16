@@ -1,173 +1,65 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 16 Nov 2016 12:21:42 -0500
-Subject: [PATCH 2/5] drm/modes: Support modes names on the command line
-In-Reply-To: <853193fdf9ec1af94056d9fa2c276079c779aaf4.1476779323.git-series.maxime.ripard@free-electrons.com>
-References: <cover.bb9be34c7fd7767e31823f78a15ae1c127293c34.1476779323.git-series.maxime.ripard@free-electrons.com>
- <853193fdf9ec1af94056d9fa2c276079c779aaf4.1476779323.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAOw6vb+bpf_JoPR8To0Q5Sfidxs=FTif0d3gpgCtFTOKnGCqfA@mail.gmail.com>
+From: b-liu@ti.com (Bin Liu)
+Date: Wed, 16 Nov 2016 11:24:24 -0600
+Subject: [PATCH v4 4/4] ARM: dts: da850: Add the usb otg device nodeg
+In-Reply-To: <9a73c416-fe4c-57c3-af53-87146dae2206@ti.com>
+References: <1478188752-22447-1-git-send-email-abailon@baylibre.com>
+ <1478188752-22447-5-git-send-email-abailon@baylibre.com>
+ <0c94c5e0-9d2c-fff5-1213-2fb2adb20ab0@ti.com>
+ <20161115211951.GH11011@uda0271908>
+ <9a73c416-fe4c-57c3-af53-87146dae2206@ti.com>
+Message-ID: <20161116172424.GA9487@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2016 at 4:29 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The drm subsystem also uses the video= kernel parameter, and in the
-> documentation refers to the fbdev documentation for that parameter.
->
-> However, that documentation also says that instead of giving the mode using
-> its resolution we can also give a name. However, DRM doesn't handle that
-> case at the moment. Even though in most case it shouldn't make any
-> difference, it might be useful for analog modes, where different standards
-> might have the same resolution, but still have a few different parameters
-> that are not encoded in the modes (NTSC vs NTSC-J vs PAL-M for example).
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/gpu/drm/drm_connector.c |  3 +-
->  drivers/gpu/drm/drm_fb_helper.c |  4 +++-
->  drivers/gpu/drm/drm_modes.c     | 49 +++++++++++++++++++++++-----------
->  include/drm/drm_connector.h     |  1 +-
->  4 files changed, 41 insertions(+), 16 deletions(-)
->
-> diff --git a/drivers/gpu/drm/drm_connector.c b/drivers/gpu/drm/drm_connector.c
-> index 2db7fb510b6c..27a8a511257c 100644
-> --- a/drivers/gpu/drm/drm_connector.c
-> +++ b/drivers/gpu/drm/drm_connector.c
-> @@ -147,8 +147,9 @@ static void drm_connector_get_cmdline_mode(struct drm_connector *connector)
->                 connector->force = mode->force;
->         }
->
-> -       DRM_DEBUG_KMS("cmdline mode for connector %s %dx%d@%dHz%s%s%s\n",
-> +       DRM_DEBUG_KMS("cmdline mode for connector %s %s %dx%d@%dHz%s%s%s\n",
->                       connector->name,
-> +                     mode->name ? mode->name : "",
->                       mode->xres, mode->yres,
->                       mode->refresh_specified ? mode->refresh : 60,
->                       mode->rb ? " reduced blanking" : "",
-> diff --git a/drivers/gpu/drm/drm_fb_helper.c b/drivers/gpu/drm/drm_fb_helper.c
-> index 03414bde1f15..20a68305fb45 100644
-> --- a/drivers/gpu/drm/drm_fb_helper.c
-> +++ b/drivers/gpu/drm/drm_fb_helper.c
-> @@ -1748,6 +1748,10 @@ struct drm_display_mode *drm_pick_cmdline_mode(struct drm_fb_helper_connector *f
->         prefer_non_interlace = !cmdline_mode->interlace;
->  again:
->         list_for_each_entry(mode, &fb_helper_conn->connector->modes, head) {
-> +               /* Check (optional) mode name first */
-> +               if (!strcmp(mode->name, cmdline_mode->name))
-> +                       return mode;
-> +
->                 /* check width/height */
->                 if (mode->hdisplay != cmdline_mode->xres ||
->                     mode->vdisplay != cmdline_mode->yres)
-> diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
-> index 7d5bdca276f2..fdbf541a5978 100644
-> --- a/drivers/gpu/drm/drm_modes.c
-> +++ b/drivers/gpu/drm/drm_modes.c
-> @@ -1413,7 +1413,7 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
->                                                struct drm_cmdline_mode *mode)
->  {
->         const char *name;
-> -       bool parse_extras = false;
-> +       bool named_mode = false, parse_extras = false;
->         unsigned int bpp_off = 0, refresh_off = 0;
->         unsigned int mode_end = 0;
->         char *bpp_ptr = NULL, *refresh_ptr = NULL, *extra_ptr = NULL;
-> @@ -1432,8 +1432,14 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
->
->         name = mode_option;
->
-> +       /*
-> +        * If the first character is not a digit, then it means that
-> +        * we have a named mode.
-> +        */
->         if (!isdigit(name[0]))
-> -               return false;
-> +               named_mode = true;
-> +       else
-> +               named_mode = false;
+On Wed, Nov 16, 2016 at 12:06:51PM +0530, Sekhar Nori wrote:
+> On Wednesday 16 November 2016 02:49 AM, Bin Liu wrote:
+> > On Tue, Nov 15, 2016 at 04:16:02PM +0530, Sekhar Nori wrote:
+> >> On Thursday 03 November 2016 09:29 PM, Alexandre Bailon wrote:
+> >>> This adds the device tree node for the usb otg
+> >>> controller present in the da850 family of SoC's.
+> >>> This also enables the otg usb controller for the lcdk board.
+> >>>
+> >>> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+> >>> ---
+> >>>  arch/arm/boot/dts/da850-lcdk.dts |  8 ++++++++
+> >>>  arch/arm/boot/dts/da850.dtsi     | 15 +++++++++++++++
+> >>>  2 files changed, 23 insertions(+)
+> >>>
+> >>> diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+> >>> index 7b8ab21..9f5040c 100644
+> >>> --- a/arch/arm/boot/dts/da850-lcdk.dts
+> >>> +++ b/arch/arm/boot/dts/da850-lcdk.dts
+> >>> @@ -158,6 +158,14 @@
+> >>>  	rx-num-evt = <32>;
+> >>>  };
+> >>>  
+> >>> +&usb_phy {
+> >>> +	status = "okay";
+> >>> +	};
+> >>
+> >> As mentioned by David already, this node needs to be removed. Please
+> >> rebase this on top of latest linux-davinci/master when ready for merging
+> >> (driver changes accepted).
+> > 
+> > Dropped this patch due to this comment.
+> 
+> Bin, Please do not apply dts or arch/arm/mach-davinci patches. I have a
+> bunch queued through my tree and more in pipeline and it will cause
+> unnecessary merge conflicts in linux-next or at Linus.
 
-named_mode = isalpha(name[0]); might be more succinct (and covers
-special characters).
+Sure, I will drop this whole set, and only apply the musb patches in the
+new v5.
 
->
->         /* Try to locate the bpp and refresh specifiers, if any */
->         bpp_ptr = strchr(name, '-');
-> @@ -1460,12 +1466,16 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
->                 parse_extras = true;
->         }
->
-> -       ret = drm_mode_parse_cmdline_res_mode(name, mode_end,
-> -                                             parse_extras,
-> -                                             connector,
-> -                                             mode);
-> -       if (ret)
-> -               return false;
-> +       if (named_mode) {
-> +               strncpy(mode->name, name, mode_end);
-> +       } else {
-> +               ret = drm_mode_parse_cmdline_res_mode(name, mode_end,
-> +                                                     parse_extras,
-> +                                                     connector,
-> +                                                     mode);
-> +               if (ret)
-> +                       return false;
-> +       }
->         mode->specified = true;
->
->         if (bpp_ptr) {
-> @@ -1493,14 +1503,23 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
->                 extra_ptr = refresh_end_ptr;
->
->         if (extra_ptr) {
-> -               int remaining = strlen(name) - (extra_ptr - name);
-> +               if (!named_mode) {
-> +                       int len = strlen(name) - (extra_ptr - name);
->
-> -               /*
-> -                * We still have characters to process, while
-> -                * we shouldn't have any
-> -                */
-> -               if (remaining > 0)
-> -                       return false;
-> +                       ret = drm_mode_parse_cmdline_extra(extra_ptr, len,
-> +                                                          connector, mode);
-> +                       if (ret)
-> +                               return false;
-> +               } else {
-> +                       int remaining = strlen(name) - (extra_ptr - name);
-> +
-> +                       /*
-> +                        * We still have characters to process, while
-> +                        * we shouldn't have any
-> +                        */
-> +                       if (remaining > 0)
-> +                               return false;
+> 
+> For future, I have asked Alexandre to send driver and dts patches as
+> separate series so there is no confusion on who should apply.
 
-Correct me if I'm wrong, but this shouldn't ever happen. AFAICT, the
-only way it could would be if we parsed bpp or refresh in the named
-mode (since those are the only cases where we don't copy the whole
-string over). Shouldn't that be invalid anyways?
+I will keep in mind to ping other domain maintainers before applying
+non-musb patches in future.
 
-Perhaps you can just avoid all of this code and just do a
-strcpy/return when you first detect a named mode.
+> 
+> Thanks,
+> Sekhar
 
-Sean
-
-
-> +               }
->         }
->
->         return true;
-> diff --git a/include/drm/drm_connector.h b/include/drm/drm_connector.h
-> index ac9d7d8e0e43..dce3d4b2fd33 100644
-> --- a/include/drm/drm_connector.h
-> +++ b/include/drm/drm_connector.h
-> @@ -485,6 +485,7 @@ struct drm_connector_funcs {
->
->  /* mode specified on the command line */
->  struct drm_cmdline_mode {
-> +       char name[DRM_DISPLAY_MODE_LEN];
->         bool specified;
->         bool refresh_specified;
->         bool bpp_specified;
-> --
-> git-series 0.8.10
+Regards,
+-Bin.
