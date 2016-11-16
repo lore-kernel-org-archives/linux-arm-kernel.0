@@ -1,35 +1,26 @@
-From: weo@reccoware.de (Wolfgang Ocker)
-Date: Wed, 16 Nov 2016 12:37:45 +0100
-Subject: [PATCH v2] mxs-auart: count FIFO overrun errors
-Message-ID: <20161116113745.12026-1-weo@reccoware.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 16 Nov 2016 12:47:22 +0100
+Subject: [PATCH v8 0/7] arm/arm64: vgic: Implement API for vGICv3 live
+ migration
+In-Reply-To: <1478258013-6669-1-git-send-email-vijay.kilari@gmail.com>
+References: <1478258013-6669-1-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <20161116114722.GB3811@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mxs-auart driver does not count FIFO overrun errors. These errors never
-appear in /proc/tty/driver/ttyAPP. This is because the OERR status bit is
-masked by read_status_mask in the rx interrupt function, but the
-AUART_STAT_OERR bit is never set in read_status_mask. The patch enables the
-counting of overrun errors.
+On Fri, Nov 04, 2016 at 04:43:26PM +0530, vijay.kilari at gmail.com wrote:
+> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> 
+> This patchset adds API for saving and restoring
+> of VGICv3 registers to support live migration with new vgic feature.
+> This API definition is as per version of VGICv3 specification
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
+> 
+> The patch 3 & 4 are picked from the Pavel's previous implementation.
+> http://www.spinics.net/lists/kvm/msg122040.html
 
-Signed-off-by: Wolfgang Ocker <weo@reccoware.de>
----
- v2: sent with git-send-email. Evolution changes a leading space to 0xa0 :(
+Do we have QEMU/kvmtool patches somewhere at this point so that I can
+test this?
 
- drivers/tty/serial/mxs-auart.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 770454e0dfa3..8c1c9112b3fd 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -1016,7 +1016,7 @@ static void mxs_auart_settermios(struct uart_port *u,
- 			ctrl |= AUART_LINECTRL_EPS;
- 	}
- 
--	u->read_status_mask = 0;
-+	u->read_status_mask = AUART_STAT_OERR;
- 
- 	if (termios->c_iflag & INPCK)
- 		u->read_status_mask |= AUART_STAT_PERR;
--- 
-2.10.0
+Thanks,
+-Christoffer
