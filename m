@@ -1,66 +1,38 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 16 Nov 2016 16:20:11 +0100
-Subject: [PATCH net 2/3] dt-bindings: net: add DT bindings for realtek phys
-In-Reply-To: <20161116151104.5sfcqjyvrzre5pkn@rob-hp-laptop>
-References: <1479220154-25851-1-git-send-email-jbrunet@baylibre.com>
- <1479220154-25851-3-git-send-email-jbrunet@baylibre.com>
- <20161116151104.5sfcqjyvrzre5pkn@rob-hp-laptop>
-Message-ID: <1479309611.17538.41.camel@baylibre.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Nov 2016 16:20:37 +0100
+Subject: [PATCH] ARM: ux500: fix prcmu_is_cpu_in_wfi() calculation
+Message-ID: <20161116152047.3336967-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-11-16 at 09:11 -0600, Rob Herring wrote:
-> On Tue, Nov 15, 2016 at 03:29:13PM +0100, Jerome Brunet wrote:
-> > 
-> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> > ---
-> > ?.../devicetree/bindings/net/realtek-phy.txt??????????| 20
-> > ++++++++++++++++++++
-> > ?1 file changed, 20 insertions(+)
-> > ?create mode 100644 Documentation/devicetree/bindings/net/realtek-
-> > phy.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/net/realtek-phy.txt
-> > b/Documentation/devicetree/bindings/net/realtek-phy.txt
-> > new file mode 100644
-> > index 000000000000..dc2845a6b387
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/net/realtek-phy.txt
-> > @@ -0,0 +1,20 @@
-> > +Realtek Ethernet PHY
-> > +
-> > +Some boards require special tuning values of the phy.
-> > +
-> > +Optional properties:
-> > +
-> > +realtek,disable-eee-1000t:
-> > +realtek,disable-eee-100tx:
-> 
-> Make these generic/common.
-Same feedback from the net folks. Will do.
-Thx Rob
-> 
-> > 
-> > +??If set, respectively disable 1000-BaseT and 100-BaseTx energy
-> > efficient
-> > +??ethernet capabilty advertisement
-> > +??default: Leave the phy default settings unchanged (capabilities
-> > advertised)
-> > +
-> > +Example:
-> > +
-> > +&mdio0 {
-> > +	ethernetphy0: ethernet-phy at 0 {
-> > +		reg = <0>;
-> > +		realtek,disable-eee-1000t;
-> > +	};
-> > +};
-> > --?
-> > 2.7.4
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe
-> > devicetree" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at??http://vger.kernel.org/majordomo-info.html
+This function clearly never worked and always returns true,
+as pointed out by gcc-7:
+
+arch/arm/mach-ux500/pm.c: In function 'prcmu_is_cpu_in_wfi':
+arch/arm/mach-ux500/pm.c:137:212: error: ?: using integer constants in boolean context, the expression will always evaluate to 'true' [-Werror=int-in-bool-context]
+
+With the added braces, the condition actually makes sense.
+
+Fixes: 34fe6f107eab ("mfd : Check if the other db8500 core is in WFI")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-ux500/pm.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-ux500/pm.c b/arch/arm/mach-ux500/pm.c
+index 8538910db202..a970e7fcba9e 100644
+--- a/arch/arm/mach-ux500/pm.c
++++ b/arch/arm/mach-ux500/pm.c
+@@ -134,8 +134,8 @@ bool prcmu_pending_irq(void)
+  */
+ bool prcmu_is_cpu_in_wfi(int cpu)
+ {
+-	return readl(PRCM_ARM_WFI_STANDBY) & cpu ? PRCM_ARM_WFI_STANDBY_WFI1 :
+-		     PRCM_ARM_WFI_STANDBY_WFI0;
++	return readl(PRCM_ARM_WFI_STANDBY) &
++		(cpu ? PRCM_ARM_WFI_STANDBY_WFI1 : PRCM_ARM_WFI_STANDBY_WFI0);
+ }
+ 
+ /*
+-- 
+2.9.0
