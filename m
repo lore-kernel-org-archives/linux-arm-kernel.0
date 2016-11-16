@@ -1,133 +1,97 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 16 Nov 2016 11:48:38 +0000
-Subject: [PATCH/RESEND] recordmcount: arm: Implement make_nop
-In-Reply-To: <20161115235331.GE25626@codeaurora.org>
-References: <20161018234200.5804-1-sboyd@codeaurora.org>
- <CAKv+Gu-Cp775gbLxPcJQ4G2nEnwm9G_gxh5B1Sf2LGkkov_OZA@mail.gmail.com>
- <20161115191807.GC25626@codeaurora.org>
- <CAKv+Gu9GVNqXwya8hrjmBcK2L0ud-qr7iE54WUPuMNyFtAy80w@mail.gmail.com>
- <20161115235331.GE25626@codeaurora.org>
-Message-ID: <CAKv+Gu_8hhp1J1BwWE6m=mtYYCixajJLj1GJGRuNPtO328qQGg@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 16 Nov 2016 12:55:07 +0100
+Subject: [PATCH v2] input: touchscreen: silead: Add regulator support
+Message-ID: <20161116115507.24220-1-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 November 2016 at 23:53, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 11/15, Ard Biesheuvel wrote:
->> On 15 November 2016 at 19:18, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> > On 11/15, Ard Biesheuvel wrote:
->> >> On 19 October 2016 at 00:42, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> >> >
->> >> > +static unsigned char ideal_nop4_arm_le[4] = { 0x00, 0x00, 0xa0, 0xe1 }; /* mov r0, r0 */
->> >> > +static unsigned char ideal_nop4_arm_be[4] = { 0xe1, 0xa0, 0x00, 0x00 }; /* mov r0, r0 */
->> >>
->> >> Shouldn't you be taking the difference between BE8 and BE32 into
->> >> account here? IIRC, BE8 uses little endian encoding for instructions.
->> >
->> > I admit I haven't tested on a pre-armv6 CPU so I haven't come
->> > across the case of a BE32 CPU. But from what I can tell that
->> > doesn't matter.
->> >
->> > According to scripts/Makefile.build, cmd_record_mcount only runs
->> > the recordmcount program if CONFIG_FTRACE_MCOUNT_RECORD=y. That
->> > config is defined as:
->> >
->> >         config FTRACE_MCOUNT_RECORD
->> >                 def_bool y
->> >                 depends on DYNAMIC_FTRACE
->> >                 depends on HAVE_FTRACE_MCOUNT_RECORD
->> >
->> >
->> > And in arch/arm/Kconfig we see that DYNAMIC_FTRACE is selected:
->> >
->> >         select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
->> >
->> > which means that FTRACE_MCOUNT_RECORD can't be set when
->> > CPU_ENDIAN_BE32 is set.
->> >
->> > Do you agree that BE32 is not a concern here?
->> >
->>
->> Yes. But that implies then that you should not be using big-endian
->> instruction encodings at all, and simply use the _le variants for both
->> LE and BE8
->
-> Ok. I understand what you're getting at now.
->
-> I believe the linker is the one that does the instruction endian
-> swap to little endian. So everything is built as big-endian data
-> and instructions in the assembler phase and then when the linker
-> runs to generate the final vmlinux elf file it does the swaps to
-> make instructions little endian. recordmcount runs on the object
-> files and not the vmlinux file.
->
+On some tablets the touchscreen controller is powered by separate
+regulators, add support for this.
 
-Very interesting, I did not know that.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+Changes in v2:
+-Use devm_regulator_bulk_get() and friends
+-Use devm_add_action_or_reset() to disable the regulator
+---
+ .../bindings/input/touchscreen/silead_gsl1680.txt  |  2 ++
+ drivers/input/touchscreen/silead.c                 | 29 ++++++++++++++++++++++
+ 2 files changed, 31 insertions(+)
 
-> For example, the do_undefinstr() function in
-> arch/arm/kernel/traps.c is one place we nop out. On an le host
-> and an le build without this patch I see:
->
-> (This is all ARM, not thumb)
->
-> 00000000 <do_undefinstr>:
->    0:   e1a0c00d        mov     ip, sp
->    4:   e92dd9f0        push    {r4, r5, r6, r7, r8, fp, ip, lr, pc}
->    8:   e24cb004        sub     fp, ip, #4
->    c:   e24dd08c        sub     sp, sp, #140    ; 0x8c
->   10:   e52de004        push    {lr}            ; (str lr, [sp, #-4]!)
->   14:   ebfffffe        bl      0 <__gnu_mcount_nc>
->
-> After this patch on an le host and le build I see:
->
-> 00000000 <do_undefinstr>:
->    0:   e1a0c00d        mov     ip, sp
->    4:   e92dd9f0        push    {r4, r5, r6, r7, r8, fp, ip, lr, pc}
->    8:   e24cb004        sub     fp, ip, #4
->    c:   e24dd08c        sub     sp, sp, #140    ; 0x8c
->   10:   e1a00000        nop                     ; (mov r0, r0)
->   14:   e1a00000        nop                     ; (mov r0, r0)
->
-> So far so good. Similarly, with this patch and an le host and be
-> build I see:
->
-> 00000000 <do_undefinstr>:
->    0:   e1a0c00d        mov     ip, sp
->    4:   e92dd9f0        push    {r4, r5, r6, r7, r8, fp, ip, lr, pc}
->    8:   e24cb004        sub     fp, ip, #4
->    c:   e24dd08c        sub     sp, sp, #140    ; 0x8c
->   10:   e1a00000        nop                     ; (mov r0, r0)
->   14:   e1a00000        nop                     ; (mov r0, r0)
->
-> but with *_le instead of *_be used a be build I see:
->
-> 00000000 <do_undefinstr>:
->    0:   e1a0c00d        mov     ip, sp
->    4:   e92dd9f0        push    {r4, r5, r6, r7, r8, fp, ip, lr, pc}
->    8:   e24cb004        sub     fp, ip, #4
->    c:   e24dd08c        sub     sp, sp, #140    ; 0x8c
->   10:   0000a0e1        andeq   sl, r0, r1, ror #1
->   14:   0000a0e1        andeq   sl, r0, r1, ror #1
->
-> I confirmed this by looking at the hexdump of the .exception.text
-> section for the traps.o object file and the .text section of the
-> vmlinux file. Basically objcopy the .exception.text of traps.o to
-> get the first few instructions of the do_undefinstr() function:
->
-> $ hexdump -C traps.o
-> 00000000  e1 a0 c0 0d e9 2d d9 f0  e2 4c b0 04 e2 4d d0 8c
->
-> And then objcopy the .text section in vmlinux and seek to the
-> same function offset (there are a bunch of zeroes in front of it
-> for padding):
->
-> $ hexdump -C vmlinux
-> ...
-> 00001000  0d c0 a0 e1 f0 d9 2d e9  04 b0 4c e2 8c d0 4d e2
->
-> As can be seen everything is swapped from the original object
-> file in big-endian to be in little endian.
->
-> Does that allay your concerns?
->
-
-Yes, it does. Thanks
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+index e844c3f..b726823 100644
+--- a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
++++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+@@ -22,6 +22,8 @@ Optional properties:
+ - touchscreen-inverted-y  : See touchscreen.txt
+ - touchscreen-swapped-x-y : See touchscreen.txt
+ - silead,max-fingers	  : maximum number of fingers the touchscreen can detect
++- vddio-supply		  : regulator phandle for controller VDDIO
++- avdd-supply		  : regulator phandle for controller AVDD
+ 
+ Example:
+ 
+diff --git a/drivers/input/touchscreen/silead.c b/drivers/input/touchscreen/silead.c
+index f502c84..404830a 100644
+--- a/drivers/input/touchscreen/silead.c
++++ b/drivers/input/touchscreen/silead.c
+@@ -29,6 +29,7 @@
+ #include <linux/input/touchscreen.h>
+ #include <linux/pm.h>
+ #include <linux/irq.h>
++#include <linux/regulator/consumer.h>
+ 
+ #include <asm/unaligned.h>
+ 
+@@ -73,6 +74,7 @@ struct silead_ts_data {
+ 	struct i2c_client *client;
+ 	struct gpio_desc *gpio_power;
+ 	struct input_dev *input;
++	struct regulator_bulk_data regulators[2];
+ 	char fw_name[64];
+ 	struct touchscreen_properties prop;
+ 	u32 max_fingers;
+@@ -433,6 +435,13 @@ static int silead_ts_set_default_fw_name(struct silead_ts_data *data,
+ }
+ #endif
+ 
++static void silead_disable_regulator(void *arg)
++{
++	struct silead_ts_data *data = arg;
++
++	regulator_bulk_disable(ARRAY_SIZE(data->regulators), data->regulators);
++}
++
+ static int silead_ts_probe(struct i2c_client *client,
+ 			   const struct i2c_device_id *id)
+ {
+@@ -465,6 +474,26 @@ static int silead_ts_probe(struct i2c_client *client,
+ 	if (client->irq <= 0)
+ 		return -ENODEV;
+ 
++	data->regulators[0].supply = "vddio";
++	data->regulators[1].supply = "avdd";
++	error = devm_regulator_bulk_get(dev, ARRAY_SIZE(data->regulators),
++					data->regulators);
++	if (error)
++		return error;
++
++	/*
++	 * Enable regulators at probe and disable them at remove, we need
++	 * to keep the chip powered otherwise it forgets its firmware.
++	 */
++	error = regulator_bulk_enable(ARRAY_SIZE(data->regulators),
++				      data->regulators);
++	if (error)
++		return error;
++
++	error = devm_add_action_or_reset(dev, silead_disable_regulator, data);
++	if (error)
++		return error;
++
+ 	/* Power GPIO pin */
+ 	data->gpio_power = devm_gpiod_get_optional(dev, "power", GPIOD_OUT_LOW);
+ 	if (IS_ERR(data->gpio_power)) {
+-- 
+2.9.3
