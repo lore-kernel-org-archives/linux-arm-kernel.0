@@ -1,106 +1,46 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 16 Nov 2016 17:52:06 +0000
-Subject: [PATCH V2 1/2] ARM: bcm2835: Fix names for the Raspberry Pi GPIO lines
-In-Reply-To: <1479318727-9425-1-git-send-email-stefan.wahren@i2se.com>
-References: <1479318727-9425-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1479318727-9425-2-git-send-email-stefan.wahren@i2se.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 16 Nov 2016 17:57:16 +0000
+Subject: [PATCH v2] arm/arm64: KVM: VGIC: limit ITARGETSR bits to number of
+ VCPUs
+Message-ID: <20161116175716.31578-1-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are some differences between the schematics and the official firmware
-DTS [1]. So based on these additional information the following has been
-changed:
+The GICv2 spec says in section 4.3.12 that a "CPU targets field bit that
+corresponds to an unimplemented CPU interface is RAZ/WI."
+Currently we allow the guest to write any value in there and it can
+read that back.
+Mask the written value with the proper CPU mask to be spec compliant.
 
-* use consistent "CAM_GPIO1" for camera LED
-* use consistent "CAM_GPIO0" for camera shutdown
-* add "USB_LIMIT" for USB current limit (0=600mA, 1=1200mA)
-
-[1] - https://github.com/raspberrypi/firmware/blob/master/extra/dt-blob.dts
-
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm/boot/dts/bcm2835-rpi-a-plus.dts |    4 ++--
- arch/arm/boot/dts/bcm2835-rpi-a.dts      |    4 ++--
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts |    2 +-
- arch/arm/boot/dts/bcm2835-rpi-b.dts      |    4 ++--
- 4 files changed, 7 insertions(+), 7 deletions(-)
+Changes v1 .. v2:
+- use GENMASK() instead of open-coding mask
+- drop explicit 0xff masking, since cpu_mask is stronger anyway
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-index 5a22c79..d070454 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-@@ -63,13 +63,13 @@
- 			  "SCL0",
- 			  "NC", /* GPIO30 */
- 			  "NC", /* GPIO31 */
--			  "NC", /* GPIO32 */
-+			  "CAM_GPIO1", /* GPIO32 */
- 			  "NC", /* GPIO33 */
- 			  "NC", /* GPIO34 */
- 			  "PWR_LOW_N", /* GPIO35 */
- 			  "NC", /* GPIO36 */
- 			  "NC", /* GPIO37 */
--			  "NC", /* GPIO38 */
-+			  "USB_LIMIT", /* GPIO38 */
- 			  "NC", /* GPIO39 */
- 			  "PWM0_OUT", /* GPIO40 */
- 			  "CAM_GPIO0", /* GPIO41 */
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-a.dts b/arch/arm/boot/dts/bcm2835-rpi-a.dts
-index 54f98c5..46d078e 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-a.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-a.dts
-@@ -29,7 +29,7 @@
- 			  "SDA1",
- 			  "SCL1",
- 			  "GPIO_GCLK",
--			  "CAM_CLK",
-+			  "CAM_GPIO1",
- 			  "LAN_RUN",
- 			  "SPI_CE1_N",
- 			  "SPI_CE0_N",
-@@ -52,7 +52,7 @@
- 			  "GPIO24",
- 			  "GPIO25",
- 			  "NC", /* GPIO26 */
--			  "CAM_GPIO",
-+			  "CAM_GPIO0",
- 			  /* Binary number representing build/revision */
- 			  "CONFIG0",
- 			  "CONFIG1",
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-index b67587e..432088e 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-@@ -71,7 +71,7 @@
- 			  "PWR_LOW_N", /* GPIO35 */
- 			  "NC", /* GPIO36 */
- 			  "NC", /* GPIO37 */
--			  "NC", /* GPIO38 */
-+			  "USB_LIMIT", /* GPIO38 */
- 			  "NC", /* GPIO39 */
- 			  "PWM0_OUT", /* GPIO40 */
- 			  "CAM_GPIO0", /* GPIO41 */
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-index 71f50e1..4d56fe3 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-@@ -30,7 +30,7 @@
- 			  "SDA1",
- 			  "SCL1",
- 			  "GPIO_GCLK",
--			  "CAM_CLK",
-+			  "CAM_GPIO1",
- 			  "LAN_RUN",
- 			  "SPI_CE1_N",
- 			  "SPI_CE0_N",
-@@ -53,7 +53,7 @@
- 			  "GPIO24",
- 			  "GPIO25",
- 			  "NC", /* GPIO26 */
--			  "CAM_GPIO",
-+			  "CAM_GPIO0",
- 			  /* Binary number representing build/revision */
- 			  "CONFIG0",
- 			  "CONFIG1",
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index b44b359..78e34bc 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -129,6 +129,7 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
+ 				   unsigned long val)
+ {
+ 	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
++	u8 cpu_mask = GENMASK(atomic_read(&vcpu->kvm->online_vcpus) - 1, 0);
+ 	int i;
+ 
+ 	/* GICD_ITARGETSR[0-7] are read-only */
+@@ -141,7 +142,7 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
+ 
+ 		spin_lock(&irq->irq_lock);
+ 
+-		irq->targets = (val >> (i * 8)) & 0xff;
++		irq->targets = (val >> (i * 8)) & cpu_mask;
+ 		target = irq->targets ? __ffs(irq->targets) : 0;
+ 		irq->target_vcpu = kvm_get_vcpu(vcpu->kvm, target);
+ 
 -- 
-1.7.9.5
+2.9.0
