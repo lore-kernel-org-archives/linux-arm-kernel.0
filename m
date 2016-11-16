@@ -1,84 +1,40 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Wed, 16 Nov 2016 11:35:59 +0100
-Subject: [PATCH v4 4/4] ARM: dts: da850: Add the usb otg device node
-In-Reply-To: <0c94c5e0-9d2c-fff5-1213-2fb2adb20ab0@ti.com>
-References: <1478188752-22447-1-git-send-email-abailon@baylibre.com>
- <1478188752-22447-5-git-send-email-abailon@baylibre.com>
- <0c94c5e0-9d2c-fff5-1213-2fb2adb20ab0@ti.com>
-Message-ID: <d2050c80-255e-25d6-99ba-7634f2c7e39a@baylibre.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 16 Nov 2016 10:37:29 +0000
+Subject: [PATCH v7] soc: qcom: add l2 cache perf events driver
+In-Reply-To: <e917b871-d6ee-d52b-aedc-b3ee75aed05f@codeaurora.org>
+References: <1477687813-11412-1-git-send-email-nleeder@codeaurora.org>
+ <20161109175413.GE17020@leverpostej>
+ <20161109181652.GK17771@arm.com>
+ <e917b871-d6ee-d52b-aedc-b3ee75aed05f@codeaurora.org>
+Message-ID: <20161116103729.GB11228@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2016 11:46 AM, Sekhar Nori wrote:
-> On Thursday 03 November 2016 09:29 PM, Alexandre Bailon wrote:
->> This adds the device tree node for the usb otg
->> controller present in the da850 family of SoC's.
->> This also enables the otg usb controller for the lcdk board.
->>
->> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
->> ---
->>  arch/arm/boot/dts/da850-lcdk.dts |  8 ++++++++
->>  arch/arm/boot/dts/da850.dtsi     | 15 +++++++++++++++
->>  2 files changed, 23 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
->> index 7b8ab21..9f5040c 100644
->> --- a/arch/arm/boot/dts/da850-lcdk.dts
->> +++ b/arch/arm/boot/dts/da850-lcdk.dts
->> @@ -158,6 +158,14 @@
->>  	rx-num-evt = <32>;
->>  };
->>  
->> +&usb_phy {
->> +	status = "okay";
->> +	};
+On Fri, Nov 11, 2016 at 04:52:35PM -0500, Leeder, Neil wrote:
+> So is there a use-case for individual uncore PMUs when they can't be
+> used in task mode or per-cpu?
 > 
-> As mentioned by David already, this node needs to be removed. Please
-I have missed it. But why should I remove it?
-Without it, usb otg won't work.
-> rebase this on top of latest linux-davinci/master when ready for merging
-> (driver changes accepted).
-> 
->> +
->> +&usb0 {
->> +	status = "okay";
->> +};
->> +
->>  &aemif {
->>  	pinctrl-names = "default";
->>  	pinctrl-0 = <&nand_pins>;
->> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
->> index f79e1b9..322a31a 100644
->> --- a/arch/arm/boot/dts/da850.dtsi
->> +++ b/arch/arm/boot/dts/da850.dtsi
->> @@ -372,6 +372,21 @@
->>  					>;
->>  			status = "disabled";
->>  		};
->> +		usb_phy: usb-phy {
->> +			compatible = "ti,da830-usb-phy";
->> +			#phy-cells = <1>;
->> +			status = "disabled";
->> +		};
->> +		usb0: usb at 200000 {
->> +			compatible = "ti,da830-musb";
->> +			reg = <0x200000 0x10000>;
->> +			interrupts = <58>;
->> +			interrupt-names = "mc";
->> +			dr_mode = "otg";
->> +			phys = <&usb_phy 0>;
->> +			phy-names = "usb-phy";
->> +			status = "disabled";
->> +		};
-> 
-> Can you separate out the soc specific changes from board changes? Please
-> place the usb0 node above the mdio node. I am trying to get to a rough
-> ordering based on reg property.
-I will do.
-> 
-> Thanks,
-> Sekhar
-> 
+> The main (only?) use will be in system mode, in which case surely it
+> makes sense to provide a single aggregated count?
+
+If you are aware of the system topology, the numbers may be more useful
+than the summed count. If you aren't, it's still possible to sum them in
+userspace.
+
+Having them summed by the kernel means that the kernel is implying it
+supports group semantics that it cannot, since it cannot start/stop all
+counters in a group atomically if they're split across several units.
+
+> With individual PMUs exposed there will be potentially dozens of
+> nodes for userspace to collect from which would make perf
+> command-line usage unwieldy at best.
+
+FWIW, for uncore/system PMUs, even on x86 there are a number of
+independent units.
+
+Some PMUs (those which are symmetric across the topology) get hidden
+behind the same struct PMU, but instances are still isolated (and their
+values not summed).
 
 Thanks,
-Alexandre
+Mark.
