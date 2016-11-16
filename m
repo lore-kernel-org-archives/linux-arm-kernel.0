@@ -1,58 +1,123 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 16 Nov 2016 17:31:30 +0000
-Subject: [PATCH 1/2] bus: vexpress-config: fix device reference leak
-Message-ID: <1479317491-7435-1-git-send-email-sudeep.holla@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 16 Nov 2016 17:32:17 +0000
+Subject: [PATCHv2 5/6] arm64: Use __pa_symbol for _end
+In-Reply-To: <95d1f7bb-d451-3b0a-1a32-957a24023a49@redhat.com>
+References: <20161102210054.16621-1-labbott@redhat.com>
+ <20161102210054.16621-6-labbott@redhat.com>
+ <20161102225241.GA19591@remoulade>
+ <3724ea58-3c04-1248-8359-e2927da03aaf@redhat.com>
+ <20161103155106.GF25852@remoulade>
+ <20161114181937.GG3096@e104818-lin.cambridge.arm.com>
+ <06569a6b-3846-5e18-28c1-7c16a9697663@redhat.com>
+ <20161115183508.GJ3096@e104818-lin.cambridge.arm.com>
+ <95d1f7bb-d451-3b0a-1a32-957a24023a49@redhat.com>
+Message-ID: <20161116173217.GB3224@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Johan Hovold <johan@kernel.org>
+On Tue, Nov 15, 2016 at 04:09:07PM -0800, Laura Abbott wrote:
+> On 11/15/2016 10:35 AM, Catalin Marinas wrote:
+> > I'm fine with __pa_symbol use entirely from under arch/arm64. But if you
+> > want to use __pa_symbol, I tried to change most (all?) places where
+> > necessary, together with making virt_to_phys() only deal with the kernel
+> > linear mapping. Not sure it looks cleaner, especially the
+> > __va(__pa_symbol()) cases (we could replace the latter with another
+> > macro and proper comment):
+> 
+> I agree everything should be converted over, I was considering doing
+> that in a separate patch but this covers everything nicely. Are you
+> okay with me folding this in? (Few comments below)
 
-Make sure to drop the reference to the parent device taken by
-class_find_device() after populating the bus.
+Yes. I would also like Ard to review it since he introduced the current
+__virt_to_phys() macro.
 
-Fixes: 3b9334ac835b ("mfd: vexpress: Convert custom func API to regmap")
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-Signed-off-by: Johan Hovold <johan@kernel.org>
----
- drivers/bus/vexpress-config.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+> > diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> > index eac3dbb7e313..e02f45e5ee1b 100644
+> > --- a/arch/arm64/include/asm/memory.h
+> > +++ b/arch/arm64/include/asm/memory.h
+> > @@ -169,15 +169,22 @@ extern u64			kimage_voffset;
+> >   */
+> >  #define __virt_to_phys_nodebug(x) ({					\
+> >  	phys_addr_t __x = (phys_addr_t)(x);				\
+> > -	__x & BIT(VA_BITS - 1) ? (__x & ~PAGE_OFFSET) + PHYS_OFFSET :	\
+> > -				 (__x - kimage_voffset); })
+> > +	VM_BUG_ON(!(__x & BIT(VA_BITS - 1)));				\
+> > +	((__x & ~PAGE_OFFSET) + PHYS_OFFSET);				\
+> > +})
+> 
+> I do think this is easier to understand vs the ternary operator.
+> I'll add a comment detailing the use of __pa vs __pa_symbol somewhere
+> as well.
 
-Hi ARM-SoC team,
+Of course, a comment is welcome (I just did a quick hack to check that
+it works).
 
-I am not sure if these couple of patches can be considered as fixes for
-v4.9. I will leave that to you guys.
+> > --- a/arch/arm64/include/asm/mmu_context.h
+> > +++ b/arch/arm64/include/asm/mmu_context.h
+> > @@ -44,7 +44,7 @@ static inline void contextidr_thread_switch(struct task_struct *next)
+> >   */
+> >  static inline void cpu_set_reserved_ttbr0(void)
+> >  {
+> > -	unsigned long ttbr = virt_to_phys(empty_zero_page);
+> > +	unsigned long ttbr = __pa_symbol(empty_zero_page);
+> >  
+> >  	write_sysreg(ttbr, ttbr0_el1);
+> >  	isb();
+> > @@ -113,7 +113,7 @@ static inline void cpu_install_idmap(void)
+> >  	local_flush_tlb_all();
+> >  	cpu_set_idmap_tcr_t0sz();
+> >  
+> > -	cpu_switch_mm(idmap_pg_dir, &init_mm);
+> > +	cpu_switch_mm(__va(__pa_symbol(idmap_pg_dir)), &init_mm);
+> 
+> Yes, the __va(__pa_symbol(..)) idiom needs to be macroized and commented...
 
-Can you pick these couple of patches directly either for v4.9 or v4.10 ?
-I am trying to avoid single patch pull requests here. Let me know if
-you prefer PR instead.
+Indeed. At the same time we should also replace the LMADDR macro in
+hibernate.c with whatever you come up with.
 
-Regards,
-Sudeep
+> > diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+> > index d55a7b09959b..81c03c74e5fe 100644
+> > --- a/arch/arm64/kernel/hibernate.c
+> > +++ b/arch/arm64/kernel/hibernate.c
+> > @@ -51,7 +51,7 @@
+> >  extern int in_suspend;
+> >  
+> >  /* Find a symbols alias in the linear map */
+> > -#define LMADDR(x)	phys_to_virt(virt_to_phys(x))
+> > +#define LMADDR(x)	__va(__pa_symbol(x))
+> 
+> ...Perhaps just borrowing this macro?
 
-diff --git a/drivers/bus/vexpress-config.c b/drivers/bus/vexpress-config.c
-index 9efdf1de4035..493e7b9fc813 100644
---- a/drivers/bus/vexpress-config.c
-+++ b/drivers/bus/vexpress-config.c
-@@ -171,6 +171,7 @@ static int vexpress_config_populate(struct device_node *node)
- {
- 	struct device_node *bridge;
- 	struct device *parent;
-+	int ret;
+Yes but I don't particularly like the name, especially since it goes
+into a .h file. Maybe __lm_sym_addr() or something else if you have a
+better idea.
 
- 	bridge = of_parse_phandle(node, "arm,vexpress,config-bridge", 0);
- 	if (!bridge)
-@@ -182,7 +183,11 @@ static int vexpress_config_populate(struct device_node *node)
- 	if (WARN_ON(!parent))
- 		return -ENODEV;
+> > diff --git a/arch/arm64/mm/physaddr.c b/arch/arm64/mm/physaddr.c
+> > index 874c78201a2b..98dae943e496 100644
+> > --- a/arch/arm64/mm/physaddr.c
+> > +++ b/arch/arm64/mm/physaddr.c
+> > @@ -14,8 +14,8 @@ unsigned long __virt_to_phys(unsigned long x)
+> >  		 */
+> >  		return (__x & ~PAGE_OFFSET) + PHYS_OFFSET;
+> >  	} else {
+> > -		VIRTUAL_BUG_ON(x < kimage_vaddr || x >= (unsigned long)_end);
+> > -		return (__x - kimage_voffset);
+> > +		WARN_ON(1);
+> 
+> Was the deletion of the BUG_ON here intentional? VIRTUAL_BUG_ON
+> is the check enabled by CONFIG_DEBUG_VIRTUAL vs just CONFIG_DEBUG_VM.
+> I intentionally kept CONFIG_DEBUG_VIRTUAL separate since the checks
+> are expensive.
 
--	return of_platform_populate(node, NULL, NULL, parent);
-+	ret = of_platform_populate(node, NULL, NULL, parent);
-+
-+	put_device(parent);
-+
-+	return ret;
- }
+I wanted to always get a warning but fall back to __phys_addr_symbol()
+so that I can track down other uses of __virt_to_phys() on kernel
+symbols without killing the kernel. A better option would have been
+VIRTUAL_WARN_ON (or *_ONCE) but we don't have it. VM_WARN_ON, as you
+said, is independent of CONFIG_DEBUG_VIRTUAL.
 
- static int __init vexpress_config_init(void)
---
-2.7.4
+We could as well kill the system with VIRTUAL_BUG_ON in this case but I
+thought we should be more gentle until all the __virt_to_phys use-cases
+are sorted out.
+
+-- 
+Catalin
