@@ -1,33 +1,28 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 16 Nov 2016 09:32:42 +0100
-Subject: [PATCH] ARM: zynq: Fix pmu register description coding style
-Message-ID: <995966ccde55b52646b929a98180d68322cb6bea.1479285154.git.michal.simek@xilinx.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 16 Nov 2016 09:32:52 +0100
+Subject: [2/2] dmaengine: at_xdmac: fix spurious flag status for mem2mem
+ transfers
+In-Reply-To: <7fbfd098-31d8-d184-37a9-8865fdb7fb8d@denx.de>
+References: <7fbfd098-31d8-d184-37a9-8865fdb7fb8d@denx.de>
+Message-ID: <2633a3a8-3d2f-7f89-e940-a998e82aadce@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop the space before/after '<' and '>'; and
-separate the entries to be a bit more readable.
+Le 28/10/2016 ? 23:57, Marek Vasut a ?crit :
+> Hi,
+> 
+> this patch [1] should also CC stable, since it fixes MMC operation in at
+> least linux 4.4 .
+> 
+> Thanks!
+> 
+> [1] https://patchwork.kernel.org/patch/7681201/
 
-Reported-by: Julia Cartwright <julia@ni.com>
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+I did that (without putting you in copy: sorry).
+https://www.spinics.net/lists/stable/msg151272.html
 
- arch/arm/boot/dts/zynq-7000.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Thanks a lot for the heads-up Marek!
 
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index 402b5bbe3b5b..f3ac9bfe580e 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -46,7 +46,8 @@
- 		compatible = "arm,cortex-a9-pmu";
- 		interrupts = <0 5 4>, <0 6 4>;
- 		interrupt-parent = <&intc>;
--		reg = < 0xf8891000 0x1000 0xf8893000 0x1000 >;
-+		reg = <0xf8891000 0x1000>,
-+		      <0xf8893000 0x1000>;
- 	};
- 
- 	regulator_vccpint: fixedregulator {
+Best regards,
 -- 
-1.9.1
+Nicolas Ferre
