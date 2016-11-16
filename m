@@ -1,178 +1,112 @@
 From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Wed, 16 Nov 2016 21:48:56 +0800
-Subject: [PATCH v16 03/15] clocksource/drivers/arm_arch_timer: Improve printk
- relevant code
+Date: Wed, 16 Nov 2016 21:49:00 +0800
+Subject: [PATCH v16 07/15] clocksource/drivers/arm_arch_timer: Refactor
+ arch_timer_detect_rate to keep dt code in *_of_init
 In-Reply-To: <1479304148-2965-1-git-send-email-fu.wei@linaro.org>
 References: <1479304148-2965-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1479304148-2965-4-git-send-email-fu.wei@linaro.org>
+Message-ID: <1479304148-2965-8-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fu Wei <fu.wei@linaro.org>
 
-This patch defines pr_fmt(fmt) for all pr_* functions,
-then the pr_* doesn't need to add "arch_timer:" everytime.
-
-According to the suggestion from checkpatch.pl:
-(1) delete some Blank Spaces in arch_timer_banner;
-(2) delete a redundant Tab in a bland line of arch_timer_init(void)
-
-No functional change.
+The patch refactor original arch_timer_detect_rate function:
+    (1) Separate out device-tree code, keep them in device-tree init
+    function:
+        arch_timer_of_init,
+        arch_timer_mem_init;
+    (2) Improve original mechanism, if getting from memory-mapped timer
+    fail, try arch_timer_get_cntfrq() again.
 
 Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 49 ++++++++++++++++++------------------
- 1 file changed, 25 insertions(+), 24 deletions(-)
+ drivers/clocksource/arm_arch_timer.c | 45 +++++++++++++++++++++++-------------
+ 1 file changed, 29 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 63bb532..15341cf 100644
+index af22953..fe4e812 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -32,6 +32,9 @@
- 
- #include <clocksource/arm_arch_timer.h>
- 
-+#undef pr_fmt
-+#define pr_fmt(fmt) "arch_timer: " fmt
-+
- #define CNTTIDR		0x08
- #define CNTTIDR_VIRT(n)	(BIT(1) << ((n) * 4))
- 
-@@ -504,22 +507,22 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
- 
- 	/* Check the timer frequency. */
- 	if (arch_timer_rate == 0)
--		pr_warn("Architected timer frequency not available\n");
-+		pr_warn("frequency not available\n");
- }
- 
- static void arch_timer_banner(unsigned type)
- {
--	pr_info("Architected %s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
--		     type & ARCH_CP15_TIMER ? "cp15" : "",
--		     type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  " and " : "",
--		     type & ARCH_MEM_TIMER ? "mmio" : "",
--		     (unsigned long)arch_timer_rate / 1000000,
--		     (unsigned long)(arch_timer_rate / 10000) % 100,
--		     type & ARCH_CP15_TIMER ?
--		     (arch_timer_uses_ppi == VIRT_PPI) ? "virt" : "phys" :
-+	pr_info("%s%s%s timer(s) running@%lu.%02luMHz (%s%s%s).\n",
-+		type & ARCH_CP15_TIMER ? "cp15" : "",
-+		type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  " and " : "",
-+		type & ARCH_MEM_TIMER ? "mmio" : "",
-+		(unsigned long)arch_timer_rate / 1000000,
-+		(unsigned long)(arch_timer_rate / 10000) % 100,
-+		type & ARCH_CP15_TIMER ?
-+			(arch_timer_uses_ppi == VIRT_PPI) ? "virt" : "phys" :
- 			"",
--		     type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  "/" : "",
--		     type & ARCH_MEM_TIMER ?
-+		type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  "/" : "",
-+		type & ARCH_MEM_TIMER ?
- 			arch_timer_mem_use_virtual ? "virt" : "phys" :
- 			"");
- }
-@@ -618,8 +621,7 @@ static void __init arch_counter_register(unsigned type)
- 
- static void arch_timer_stop(struct clock_event_device *clk)
- {
--	pr_debug("arch_timer_teardown disable IRQ%d cpu #%d\n",
--		 clk->irq, smp_processor_id());
-+	pr_debug("disable IRQ%d cpu #%d\n", clk->irq, smp_processor_id());
- 
- 	disable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi]);
- 	if (arch_timer_has_nonsecure_ppi())
-@@ -712,8 +714,7 @@ static int __init arch_timer_register(void)
- 	}
- 
- 	if (err) {
--		pr_err("arch_timer: can't register interrupt %d (%d)\n",
--		       ppi, err);
-+		pr_err("can't register interrupt %d (%d)\n", ppi, err);
- 		goto out_free;
- 	}
- 
-@@ -766,7 +767,7 @@ static int __init arch_timer_mem_register(void __iomem *base, unsigned int irq)
- 
- 	ret = request_irq(irq, func, IRQF_TIMER, "arch_mem_timer", &t->evt);
- 	if (ret) {
--		pr_err("arch_timer: Failed to request mem timer irq\n");
-+		pr_err("Failed to request mem timer irq\n");
- 		kfree(t);
- 	}
- 
-@@ -844,7 +845,7 @@ static int __init arch_timer_init(void)
- 		}
- 
- 		if (!has_ppi) {
--			pr_warn("arch_timer: No interrupt available, giving up\n");
-+			pr_warn("No interrupt available, giving up\n");
- 			return -EINVAL;
- 		}
- 	}
-@@ -858,7 +859,7 @@ static int __init arch_timer_init(void)
- 		return ret;
- 
- 	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[VIRT_PPI];
--	
-+
+@@ -487,27 +487,31 @@ static int arch_timer_starting_cpu(unsigned int cpu)
  	return 0;
  }
  
-@@ -867,7 +868,7 @@ static int __init arch_timer_of_init(struct device_node *np)
- 	int i;
+-static void
+-arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
++static void arch_timer_detect_rate(void __iomem *cntbase)
+ {
+ 	/* Who has more than one independent system counter? */
+ 	if (arch_timer_rate)
+ 		return;
+-
+ 	/*
+-	 * Try to determine the frequency from the device tree or CNTFRQ,
+-	 * if ACPI is enabled, get the frequency from CNTFRQ ONLY.
++	 * If we got memory-mapped timer(cntbase != NULL),
++	 * try to determine the frequency from CNTFRQ in memory-mapped timer.
+ 	 */
+-	if (!acpi_disabled ||
+-	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
+-		if (cntbase)
+-			arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
+-		else
+-			arch_timer_rate = arch_timer_get_cntfrq();
+-	}
++	if (cntbase)
++		arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
++	/*
++	 * Because in a system that implements both Secure and
++	 * Non-secure states, CNTFRQ is only accessible in Secure state.
++	 * So the operation above may fail, even if (cntbase != NULL),
++	 * especially on ARM64.
++	 * In this case, we can try cntfrq_el0(system coprocessor register).
++	 */
++	if (!arch_timer_rate)
++		arch_timer_rate = arch_timer_get_cntfrq();
++	else
++		return;
  
- 	if (arch_timers_present & ARCH_CP15_TIMER) {
--		pr_warn("arch_timer: multiple nodes in dt, skipping\n");
-+		pr_warn("multiple nodes in dt, skipping\n");
- 		return 0;
- 	}
+ 	/* Check the timer frequency. */
+-	if (arch_timer_rate == 0)
++	if (!arch_timer_rate)
+ 		pr_warn("frequency not available\n");
+ }
  
-@@ -911,7 +912,7 @@ static int __init arch_timer_mem_init(struct device_node *np)
- 	arch_timers_present |= ARCH_MEM_TIMER;
- 	cntctlbase = of_iomap(np, 0);
- 	if (!cntctlbase) {
--		pr_err("arch_timer: Can't find CNTCTLBase\n");
-+		pr_err("Can't find CNTCTLBase\n");
- 		return -ENXIO;
- 	}
+@@ -883,7 +887,9 @@ static int __init arch_timer_of_init(struct device_node *np)
+ 	for (i = ARCH_TIMER_PHYS_SECURE_PPI; i < ARCH_TIMER_MAX_TIMER_PPI; i++)
+ 		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
  
-@@ -926,7 +927,7 @@ static int __init arch_timer_mem_init(struct device_node *np)
- 		u32 cntacr;
+-	arch_timer_detect_rate(NULL, np);
++	if (!arch_timer_rate &&
++	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
++		arch_timer_detect_rate(NULL);
  
- 		if (of_property_read_u32(frame, "frame-number", &n)) {
--			pr_err("arch_timer: Missing frame-number\n");
-+			pr_err("Missing frame-number\n");
- 			of_node_put(frame);
- 			goto out;
- 		}
-@@ -955,7 +956,7 @@ static int __init arch_timer_mem_init(struct device_node *np)
- 	ret= -ENXIO;
- 	base = arch_counter_base = of_iomap(best_frame, 0);
- 	if (!base) {
--		pr_err("arch_timer: Can't map frame's registers\n");
-+		pr_err("Can't map frame's registers\n");
+ 	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
+ 
+@@ -983,7 +989,14 @@ static int __init arch_timer_mem_init(struct device_node *np)
  		goto out;
  	}
  
-@@ -966,7 +967,7 @@ static int __init arch_timer_mem_init(struct device_node *np)
- 
- 	ret = -EINVAL;
- 	if (!irq) {
--		pr_err("arch_timer: Frame missing %s irq",
-+		pr_err("Frame missing %s irq",
- 		       arch_timer_mem_use_virtual ? "virt" : "phys");
+-	arch_timer_detect_rate(base, np);
++	/*
++	 * Try to determine the frequency from the device tree,
++	 * if fail, get the frequency from CNTFRQ.
++	 */
++	if (!arch_timer_rate &&
++	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
++		arch_timer_detect_rate(base);
++
+ 	ret = arch_timer_mem_register(base, irq);
+ 	if (ret)
  		goto out;
- 	}
-@@ -1008,7 +1009,7 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 	struct acpi_table_gtdt *gtdt;
+@@ -1046,7 +1059,7 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ 		gtdt->non_secure_el2_flags);
  
- 	if (arch_timers_present & ARCH_CP15_TIMER) {
--		pr_warn("arch_timer: already initialized, skipping\n");
-+		pr_warn("already initialized, skipping\n");
- 		return -EINVAL;
- 	}
+ 	/* Get the frequency from CNTFRQ */
+-	arch_timer_detect_rate(NULL, NULL);
++	arch_timer_detect_rate(NULL);
  
+ 	ret = arch_timer_uses_ppi_init();
+ 	if (ret)
 -- 
 2.7.4
