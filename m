@@ -1,24 +1,70 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 16 Nov 2016 18:31:13 +0100
-Subject: [PATCH 0/8] DMA: s3c64xx: Conversion to the new channel request
- API
-In-Reply-To: <20161116170337.GA4124@kozik-lap>
-References: <1478791076-19528-1-git-send-email-s.nawrocki@samsung.com>
- <20161116032620.GV3000@localhost>
- <CGME20161116170345epcas4p4615ed113ee5031ad4b6778996d69fb20@epcas4p4.samsung.com>
- <20161116170337.GA4124@kozik-lap>
-Message-ID: <2b33d23d-b7c5-6e6d-454f-755c86ddd5eb@samsung.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 16 Nov 2016 17:31:31 +0000
+Subject: [PATCH 2/2] arm64: dts: juno: fix cluster sleep state entry latency
+ on all SoC versions
+In-Reply-To: <1479317491-7435-1-git-send-email-sudeep.holla@arm.com>
+References: <1479317491-7435-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1479317491-7435-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2016 06:03 PM, Krzysztof Kozlowski wrote:
-> As I understood, everything won't be applied because ASoC tree already
-> contains some work around this?
+The core and the cluster sleep state entry latencies can't be same as
+cluster sleep involves more work compared to core level e.g. shared
+cache maintenance.
 
-Yes, sorry, I didn't coordinate this work very well, there are some patches
-for the pcm and the i2s driver already in the ASoC tree which would conflict
-with this series. I'd suggest to ignore patches 5/8...8/8 for now.
+Experiments have shown on an average about 100us more latency for the
+cluster sleep state compared to the core level sleep. This patch fixes
+the entry latency for the cluster sleep state.
 
--- 
-Thanks,
-Sylwester
+Fixes: 28e10a8f3a03 ("arm64: dts: juno: Add idle-states to device tree")
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: "Jon Medhurst (Tixy)" <tixy@linaro.org>
+Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ arch/arm64/boot/dts/arm/juno-r1.dts | 2 +-
+ arch/arm64/boot/dts/arm/juno-r2.dts | 2 +-
+ arch/arm64/boot/dts/arm/juno.dts    | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+index 123a58b29cbd..f0b857d6d73c 100644
+--- a/arch/arm64/boot/dts/arm/juno-r1.dts
++++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+@@ -76,7 +76,7 @@
+ 				compatible = "arm,idle-state";
+ 				arm,psci-suspend-param = <0x1010000>;
+ 				local-timer-stop;
+-				entry-latency-us = <300>;
++				entry-latency-us = <400>;
+ 				exit-latency-us = <1200>;
+ 				min-residency-us = <2500>;
+ 			};
+diff --git a/arch/arm64/boot/dts/arm/juno-r2.dts b/arch/arm64/boot/dts/arm/juno-r2.dts
+index 007be826efce..26aaa6a7670f 100644
+--- a/arch/arm64/boot/dts/arm/juno-r2.dts
++++ b/arch/arm64/boot/dts/arm/juno-r2.dts
+@@ -76,7 +76,7 @@
+ 				compatible = "arm,idle-state";
+ 				arm,psci-suspend-param = <0x1010000>;
+ 				local-timer-stop;
+-				entry-latency-us = <300>;
++				entry-latency-us = <400>;
+ 				exit-latency-us = <1200>;
+ 				min-residency-us = <2500>;
+ 			};
+diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+index a7270eff6939..6e154d948a80 100644
+--- a/arch/arm64/boot/dts/arm/juno.dts
++++ b/arch/arm64/boot/dts/arm/juno.dts
+@@ -76,7 +76,7 @@
+ 				compatible = "arm,idle-state";
+ 				arm,psci-suspend-param = <0x1010000>;
+ 				local-timer-stop;
+-				entry-latency-us = <300>;
++				entry-latency-us = <400>;
+ 				exit-latency-us = <1200>;
+ 				min-residency-us = <2500>;
+ 			};
+--
+2.7.4
