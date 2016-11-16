@@ -1,70 +1,58 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 16 Nov 2016 17:31:31 +0000
-Subject: [PATCH 2/2] arm64: dts: juno: fix cluster sleep state entry latency
- on all SoC versions
-In-Reply-To: <1479317491-7435-1-git-send-email-sudeep.holla@arm.com>
-References: <1479317491-7435-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1479317491-7435-2-git-send-email-sudeep.holla@arm.com>
+Date: Wed, 16 Nov 2016 17:31:30 +0000
+Subject: [PATCH 1/2] bus: vexpress-config: fix device reference leak
+Message-ID: <1479317491-7435-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The core and the cluster sleep state entry latencies can't be same as
-cluster sleep involves more work compared to core level e.g. shared
-cache maintenance.
+From: Johan Hovold <johan@kernel.org>
 
-Experiments have shown on an average about 100us more latency for the
-cluster sleep state compared to the core level sleep. This patch fixes
-the entry latency for the cluster sleep state.
+Make sure to drop the reference to the parent device taken by
+class_find_device() after populating the bus.
 
-Fixes: 28e10a8f3a03 ("arm64: dts: juno: Add idle-states to device tree")
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: "Jon Medhurst (Tixy)" <tixy@linaro.org>
-Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Fixes: 3b9334ac835b ("mfd: vexpress: Convert custom func API to regmap")
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Johan Hovold <johan@kernel.org>
 ---
- arch/arm64/boot/dts/arm/juno-r1.dts | 2 +-
- arch/arm64/boot/dts/arm/juno-r2.dts | 2 +-
- arch/arm64/boot/dts/arm/juno.dts    | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/bus/vexpress-config.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
-index 123a58b29cbd..f0b857d6d73c 100644
---- a/arch/arm64/boot/dts/arm/juno-r1.dts
-+++ b/arch/arm64/boot/dts/arm/juno-r1.dts
-@@ -76,7 +76,7 @@
- 				compatible = "arm,idle-state";
- 				arm,psci-suspend-param = <0x1010000>;
- 				local-timer-stop;
--				entry-latency-us = <300>;
-+				entry-latency-us = <400>;
- 				exit-latency-us = <1200>;
- 				min-residency-us = <2500>;
- 			};
-diff --git a/arch/arm64/boot/dts/arm/juno-r2.dts b/arch/arm64/boot/dts/arm/juno-r2.dts
-index 007be826efce..26aaa6a7670f 100644
---- a/arch/arm64/boot/dts/arm/juno-r2.dts
-+++ b/arch/arm64/boot/dts/arm/juno-r2.dts
-@@ -76,7 +76,7 @@
- 				compatible = "arm,idle-state";
- 				arm,psci-suspend-param = <0x1010000>;
- 				local-timer-stop;
--				entry-latency-us = <300>;
-+				entry-latency-us = <400>;
- 				exit-latency-us = <1200>;
- 				min-residency-us = <2500>;
- 			};
-diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-index a7270eff6939..6e154d948a80 100644
---- a/arch/arm64/boot/dts/arm/juno.dts
-+++ b/arch/arm64/boot/dts/arm/juno.dts
-@@ -76,7 +76,7 @@
- 				compatible = "arm,idle-state";
- 				arm,psci-suspend-param = <0x1010000>;
- 				local-timer-stop;
--				entry-latency-us = <300>;
-+				entry-latency-us = <400>;
- 				exit-latency-us = <1200>;
- 				min-residency-us = <2500>;
- 			};
+Hi ARM-SoC team,
+
+I am not sure if these couple of patches can be considered as fixes for
+v4.9. I will leave that to you guys.
+
+Can you pick these couple of patches directly either for v4.9 or v4.10 ?
+I am trying to avoid single patch pull requests here. Let me know if
+you prefer PR instead.
+
+Regards,
+Sudeep
+
+diff --git a/drivers/bus/vexpress-config.c b/drivers/bus/vexpress-config.c
+index 9efdf1de4035..493e7b9fc813 100644
+--- a/drivers/bus/vexpress-config.c
++++ b/drivers/bus/vexpress-config.c
+@@ -171,6 +171,7 @@ static int vexpress_config_populate(struct device_node *node)
+ {
+ 	struct device_node *bridge;
+ 	struct device *parent;
++	int ret;
+
+ 	bridge = of_parse_phandle(node, "arm,vexpress,config-bridge", 0);
+ 	if (!bridge)
+@@ -182,7 +183,11 @@ static int vexpress_config_populate(struct device_node *node)
+ 	if (WARN_ON(!parent))
+ 		return -ENODEV;
+
+-	return of_platform_populate(node, NULL, NULL, parent);
++	ret = of_platform_populate(node, NULL, NULL, parent);
++
++	put_device(parent);
++
++	return ret;
+ }
+
+ static int __init vexpress_config_init(void)
 --
 2.7.4
