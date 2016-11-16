@@ -1,136 +1,41 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 16 Nov 2016 11:02:11 -0500
-Subject: [PATCH v7 0/7] Add DRM driver for Hisilicon Hibmc
-In-Reply-To: <CAOw6vbLgDwiVs8zC5bEhdhJUvVZh2toG_d+FgkzV7vUJjU=3RQ@mail.gmail.com>
-References: <1479303831-74134-1-git-send-email-zourongrong@gmail.com>
- <CAOw6vbLgDwiVs8zC5bEhdhJUvVZh2toG_d+FgkzV7vUJjU=3RQ@mail.gmail.com>
-Message-ID: <CAOw6vbJHoELLTLpVjrfOZ8aEGzuDMFX5vWX8AxqNO35CT1iRxg@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 16 Nov 2016 08:24:59 -0800
+Subject: [PATCH v2 0/3] ARM: davinci: PM: cleanup init, add DT support
+In-Reply-To: <c0f1cfa2-4086-72fc-783b-d0d8c837cb08@ti.com> (Sekhar Nori's
+ message of "Wed, 16 Nov 2016 16:50:09 +0530")
+References: <20161115195421.19983-1-khilman@baylibre.com>
+ <c0f1cfa2-4086-72fc-783b-d0d8c837cb08@ti.com>
+Message-ID: <m260nnxuhw.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2016 at 11:01 AM, Sean Paul <seanpaul@chromium.org> wrote:
-> On Wed, Nov 16, 2016 at 8:43 AM, Rongrong Zou <zourongrong@gmail.com> wrote:
->> This patch set adds a new drm driver for Hisilicon Hibmc. Hibmc is a
->> BMC SoC with a display controller intergrated, usually it is used on
->> server for Out-of-band management purpose. In this patch set, we just
->> support basic function for Hibmc display subsystem. Hibmc display
->> subsystem is connected to host CPU by PCIe as blow:
->>
->> +----------+       +----------+
->> |          | PCIe  |  Hibmc   |
->> |host CPU( |<----->| display  |
->> |arm64,x86)|       |subsystem |
->> +----------+       +----------+
->>
->> Hardware Detail for Hibmc display subsystem
->> -----------
->>
->>   The display subsystem of Hibmc is show as bellow:
->>   +----+      +----+      +----+     +--------+
->>   |    |      |    |      |    |     |        |
->>   | FB |----->| DE |----->|VDAC|---->|external|
->>   |    |      |    |      |    |     | VGA    |
->>   +----+      +----+      +----+     +--------+
->>
->>   -DE(Display Engine) is the display controller.
->>   -VDAC(Video Digital-to-Analog converter) converts the RGB diaital data
->>   stream from DE to VGA analog signals.
->>
->
-> For the whole series/driver:
->
-> Acked-by: Sean Paul <seanpaul@chromium.org>
->
->
+Sekhar Nori <nsekhar@ti.com> writes:
 
-Also, please send those fixups for the other ttm drivers ;)
-
+> Hi Kevin,
 >
->> Change History
->> ------------
->> Changes in v7:
->>   -remove hibmc_drm_power.c/hibmc_drm_power.h, move the functions to
->>    hibmc_drm_drv.c.
->>   -remove hibmc_drm_de.h and move the struct defined in head file to
->>    hibmc_drm_de.c.
->>   -plane is initialized inside crtc, not in hibmc_kms_init().
->>   -connector is initialized inside encoder, not in hibmc_kms_init().
->>   -remove plane/crtc/encoder/connector from hibmc_drm_private struct.
->>   -call drm_atomic_helper_suspend/resume in hibmc_pm_suspend/resume.
->>   -remove these empty stubs because caller will do NULL check.
->>     hibmc_plane_atomic_disable
->>     hibmc_crtc_atomic_check
->>     hibmc_encoder_disable
->>     hibmc_encoder_enable
->>     hibmc_encoder_atomic_check
->>   -clean up in all error paths of creating driver-private framebuffer.
->>
->> Changes in v6:
->>   -remove the embedded framebuffer and use a pointer of hibmc_framebuffer
->>    instead.
->>   -remove the deprecated drm_framebuffer_unregister_private(),
->>    drm_framebuffer_unreference() will be called in hibmc_fbdev_destroy().
->>   -uninstall irq in hibmc_unload().
->>
->> Changes in v5:
->>   -rebase on v4.9-rc2.
->>   -replace drm_fb_helper_set_suspend with drm_fb_helper_set_suspend_unlocked.
->>    and remove redundant console_lock and console_unlock.
->>
->> Changes in v4:
->>   -remove unused include files, and include header file when it is needed.
->>   -remove unused FLAG in Kconfig: DRM_GEM_CMA_HELPER/DRM_KMS_CMA_HELPER.
->>   -remove drm_helper_disable_unused_functions, since we use DRIVER_ATOMIC.
->>
->> Changes in v3:
->>   -enable KMS, in v2, only fbdev is enabled.
->>   -management video memory with ttm.
->>   -add vblank interrupt.
->>   -remove drm_connector_register_all() and drm_connector_unregister_all().
->>   -I have a basic test with igt.
->>
->> Changes in v2:
->>   -Remove self-defined macros for bit operations.
->>   -Remove unused register.
->>   -Replace those deprecated functions with new version of them.
->>   -use drm_connector_register_all() to register connector after
->>    drm_dev_register().
->>
->> The patch v2 is at
->> https://lists.freedesktop.org/archives/dri-devel/2016-May/108661.html
->>
->> Rongrong Zou (7):
->>   drm/hisilicon/hibmc: Add hisilicon hibmc drm master driver
->>   drm/hisilicon/hibmc: Add video memory management
->>   drm/hisilicon/hibmc: Add support for frame buffer
->>   drm/hisilicon/hibmc: Add support for display engine
->>   drm/hisilicon/hibmc: Add support for VDAC
->>   drm/hisilicon/hibmc: Add support for vblank interrupt
->>   MAINTAINERS: Update HISILICON DRM entries
->>
->>  MAINTAINERS                                       |   1 +
->>  drivers/gpu/drm/hisilicon/Kconfig                 |   1 +
->>  drivers/gpu/drm/hisilicon/Makefile                |   1 +
->>  drivers/gpu/drm/hisilicon/hibmc/Kconfig           |   9 +
->>  drivers/gpu/drm/hisilicon/hibmc/Makefile          |   4 +
->>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c    | 477 ++++++++++++++++++
->>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c   | 456 ++++++++++++++++++
->>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h   | 114 +++++
->>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c | 267 +++++++++++
->>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h  | 196 ++++++++
->>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c  | 147 ++++++
->>  drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c       | 558 ++++++++++++++++++++++
->>  12 files changed, 2231 insertions(+)
->>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/Kconfig
->>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/Makefile
->>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
->>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
->>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
->>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c
->>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h
->>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
->>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c
->>
->> --
->> 1.9.1
->>
+> On Wednesday 16 November 2016 01:24 AM, Kevin Hilman wrote:
+>> This series removes the fake platform_device used to initialize PM on
+>> legacy davinci platforms, and also adds PM support for DT platforms.
+>> 
+>> Tested with legacy boot on da850-evm, and DT boot on da850-lcdk.  Used
+>> RTC to wake from suspend-to-RAM: e.g. rtcwake -m mem -s 4 -d /dev/rtc0
+>
+> With these patches applied, I saw the following randconfig build error.
+>
+> arch/arm/mach-davinci/built-in.o: In function `davinci_pm_init':
+> pm_domain.c:(.init.text+0x13d8): undefined reference to `da8xx_get_mem_ctlr'
+> pm_domain.c:(.init.text+0x14bc): undefined reference to `da8xx_syscfg1_base'
+> make: *** [vmlinux] Error 1
+>
+> Attached is the defconfig. I did not check to see if your patches 
+> introduced it or if this is something that always existed and never 
+> caught.
+
+It looks like a new problem caused by moving those calls into pm.c.
+
+The problem is that currently pm.o can be built even when da850 support
+is not enabled, which is the case in your defconfig.
+
+I'll hae a look at how to cleanup that dependency.
+
+Kevin
