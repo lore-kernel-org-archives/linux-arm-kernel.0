@@ -1,32 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Nov 2016 16:54:52 +0100
-Subject: [PATCH 0/8] DMA: s3c64xx: Conversion to the new channel request
- API
-In-Reply-To: <20161116032620.GV3000@localhost>
-References: <1478791076-19528-1-git-send-email-s.nawrocki@samsung.com>
- <20161116032620.GV3000@localhost>
-Message-ID: <3234981.WX0CC50HXp@wuerfel>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 16 Nov 2016 08:56:13 -0700
+Subject: [PATCH 2/2] ahci: qoriq: report warning when ecc register is
+ missing
+In-Reply-To: <1479265879-48840-2-git-send-email-yuantian.tang@nxp.com>
+References: <1479265879-48840-1-git-send-email-yuantian.tang@nxp.com>
+ <1479265879-48840-2-git-send-email-yuantian.tang@nxp.com>
+Message-ID: <20161116155613.GA1228@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 16, 2016 8:56:20 AM CET Vinod Koul wrote:
-> On Thu, Nov 10, 2016 at 04:17:48PM +0100, Sylwester Nawrocki wrote:
-> > This patch series aims to convert the s3c64xx platform to use
-> > the new DMA channel request API, i.e. this is only meaningful 
-> > for non-dt systems using s3c64xx SoCs.
-> > 
-> > Presumably the first 2 or 4 patches in this series could be queued 
-> > for v4.10-rc1 and the remaining patches could be left for subsequent
-> > release, to avoid non-trivial conflict with patches already applied 
-> > in the ASoC tree.
+On Wed, Nov 16, 2016 at 11:11:19AM +0800, yuantian.tang at nxp.com wrote:
+> From: Tang Yuantian <Yuantian.Tang@nxp.com>
 > 
-> I am fine with dma patch (expect the subsystem tag) and others except arm
-> ones have acks, so I think we can merge this for v4.10-rc1. I cna create a
-> immutable tag and people can merge into their tree in case they have
-> dependencies.
+> For ls1021a and ls1046a socs, sata ecc must be disabled.
+> If ecc register is not found in sata node in dts, report
+> a warning.
+
+Hi Yuantian,
+
+What happens if sata ecc is _not_ disaled on those socs?  Can the driver still
+work?  If not then it is probably a better idea to return an error code that can
+prevent the driver from initialising.
+
+Thanks,
+Mathieu
+
 > 
-> Btw need acks on ARM patches before I can apply
-
-Whole series
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
+> ---
+>  drivers/ata/ahci_qoriq.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/ata/ahci_qoriq.c b/drivers/ata/ahci_qoriq.c
+> index 45c88de..66eb4b5 100644
+> --- a/drivers/ata/ahci_qoriq.c
+> +++ b/drivers/ata/ahci_qoriq.c
+> @@ -158,6 +158,7 @@ static int ahci_qoriq_phy_init(struct ahci_host_priv *hpriv)
+>  
+>  	switch (qpriv->type) {
+>  	case AHCI_LS1021A:
+> +		WARN_ON(!qpriv->ecc_addr);
+>  		writel(SATA_ECC_DISABLE, qpriv->ecc_addr);
+>  		writel(AHCI_PORT_PHY_1_CFG, reg_base + PORT_PHY1);
+>  		writel(LS1021A_PORT_PHY2, reg_base + PORT_PHY2);
+> @@ -185,6 +186,7 @@ static int ahci_qoriq_phy_init(struct ahci_host_priv *hpriv)
+>  		break;
+>  
+>  	case AHCI_LS1046A:
+> +		WARN_ON(!qpriv->ecc_addr);
+>  		writel(LS1046A_SATA_ECC_DIS, qpriv->ecc_addr);
+>  		writel(AHCI_PORT_PHY_1_CFG, reg_base + PORT_PHY1);
+>  		writel(AHCI_PORT_TRANS_CFG, reg_base + PORT_TRANS);
+> -- 
+> 2.1.0.27.g96db324
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
