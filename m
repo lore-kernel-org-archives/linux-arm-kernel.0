@@ -1,72 +1,110 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 16 Nov 2016 09:45:35 -0800
-Subject: Boot failures in -next due to 'ARM: dts: imx: Remove skeleton.dtsi'
-Message-ID: <cda2df55-f2f3-00d6-c6b1-816ed47bbf56@roeck-us.net>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 16 Nov 2016 09:51:59 -0800
+Subject: [PATCH v2] input: touchscreen: silead: Add regulator support
+In-Reply-To: <20161116115507.24220-1-hdegoede@redhat.com>
+References: <20161116115507.24220-1-hdegoede@redhat.com>
+Message-ID: <20161116175159.GB335@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Nov 16, 2016 at 12:55:07PM +0100, Hans de Goede wrote:
+> On some tablets the touchscreen controller is powered by separate
+> regulators, add support for this.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+> Changes in v2:
+> -Use devm_regulator_bulk_get() and friends
+> -Use devm_add_action_or_reset() to disable the regulator
+> ---
+>  .../bindings/input/touchscreen/silead_gsl1680.txt  |  2 ++
+>  drivers/input/touchscreen/silead.c                 | 29 ++++++++++++++++++++++
+>  2 files changed, 31 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+> index e844c3f..b726823 100644
+> --- a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+> +++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+> @@ -22,6 +22,8 @@ Optional properties:
+>  - touchscreen-inverted-y  : See touchscreen.txt
+>  - touchscreen-swapped-x-y : See touchscreen.txt
+>  - silead,max-fingers	  : maximum number of fingers the touchscreen can detect
+> +- vddio-supply		  : regulator phandle for controller VDDIO
+> +- avdd-supply		  : regulator phandle for controller AVDD
+>  
+>  Example:
+>  
+> diff --git a/drivers/input/touchscreen/silead.c b/drivers/input/touchscreen/silead.c
+> index f502c84..404830a 100644
+> --- a/drivers/input/touchscreen/silead.c
+> +++ b/drivers/input/touchscreen/silead.c
+> @@ -29,6 +29,7 @@
+>  #include <linux/input/touchscreen.h>
+>  #include <linux/pm.h>
+>  #include <linux/irq.h>
+> +#include <linux/regulator/consumer.h>
+>  
+>  #include <asm/unaligned.h>
+>  
+> @@ -73,6 +74,7 @@ struct silead_ts_data {
+>  	struct i2c_client *client;
+>  	struct gpio_desc *gpio_power;
+>  	struct input_dev *input;
+> +	struct regulator_bulk_data regulators[2];
+>  	char fw_name[64];
+>  	struct touchscreen_properties prop;
+>  	u32 max_fingers;
+> @@ -433,6 +435,13 @@ static int silead_ts_set_default_fw_name(struct silead_ts_data *data,
+>  }
+>  #endif
+>  
+> +static void silead_disable_regulator(void *arg)
+> +{
+> +	struct silead_ts_data *data = arg;
+> +
+> +	regulator_bulk_disable(ARRAY_SIZE(data->regulators), data->regulators);
+> +}
+> +
+>  static int silead_ts_probe(struct i2c_client *client,
+>  			   const struct i2c_device_id *id)
+>  {
+> @@ -465,6 +474,26 @@ static int silead_ts_probe(struct i2c_client *client,
+>  	if (client->irq <= 0)
+>  		return -ENODEV;
+>  
+> +	data->regulators[0].supply = "vddio";
+> +	data->regulators[1].supply = "avdd";
+> +	error = devm_regulator_bulk_get(dev, ARRAY_SIZE(data->regulators),
+> +					data->regulators);
+> +	if (error)
+> +		return error;
+> +
+> +	/*
+> +	 * Enable regulators at probe and disable them at remove, we need
+> +	 * to keep the chip powered otherwise it forgets its firmware.
+> +	 */
 
-my 'sabrelite' and 'imx25-pdk' qemu boot tests are failing in linux-next.
+Hmm, this burns power though. Why can't we reload firmware on resume (it
+should be already cached)? Does it take too long?
 
-Bisect for the sabrelite failure points to commit 'ARM: dts: imx: Remove skeleton.dtsi'.
+Thanks.
 
-Bisect log is attached. Complete test logs are at
-http://kerneltests.org/builders/qemu-arm-next/builds/571/steps/qemubuildcommand/logs/stdio
+> +	error = regulator_bulk_enable(ARRAY_SIZE(data->regulators),
+> +				      data->regulators);
+> +	if (error)
+> +		return error;
+> +
+> +	error = devm_add_action_or_reset(dev, silead_disable_regulator, data);
+> +	if (error)
+> +		return error;
+> +
+>  	/* Power GPIO pin */
+>  	data->gpio_power = devm_gpiod_get_optional(dev, "power", GPIOD_OUT_LOW);
+>  	if (IS_ERR(data->gpio_power)) {
+> -- 
+> 2.9.3
+> 
 
-Boot log for imx25-pdk:
-
-qemu-system-arm: findnode_nofail Couldn't find node /chosen: FDT_ERR_NOTFOUND
-
-Boot log for sabrelite:
-
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 4.9.0-rc5-next-20161116 (groeck at jupiter.roeck-us.net) (gcc version 4.9.2 (GCC) ) #1 SMP Tue Nov 15 22:34:35 PST 2016
-[    0.000000] CPU: ARMv7 Processor [410fc090] revision 0 (ARMv7), cr=10c5387d
-[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT nonaliasing instruction cache
-[    0.000000] OF: fdt:Machine model: Freescale i.MX6 DualLite SABRE Lite Board
-[    0.000000] earlycon: ec_imx21 at MMIO 0x021e8000 (options '')
-[    0.000000] bootconsole [ec_imx21] enabled
-[    0.000000] INITRD: 0x14000000+0x00501600 is not a memory region - disabling initrd
-[    0.000000] cma: Failed to reserve 64 MiB
-[    0.000000] Memory policy: Data cache writeback
-
-[ stuck here until aborted ]
-
-Build is imx_v6_v7_defconfig and multi_v7_defconfig with imx6dl-sabrelite.dtb,
-and imx_v4_v5_defconfig with imx25-pdk.dtb.
-
-Any idea what might be wrong ?
-
-Thanks,
-Guenter
-
--------
-# bad: [56c0dbc6eced261af328afd3335d62234bc56513] Add linux-next specific files for 20161116
-# good: [a25f0944ba9b1d8a6813fd6f1a86f1bd59ac25a6] Linux 4.9-rc5
-git bisect start 'HEAD' 'v4.9-rc5'
-# bad: [56abc46730bb1c5ffd960c71ae089cb713e85e47] Merge remote-tracking branch 'drm/drm-next'
-git bisect bad 56abc46730bb1c5ffd960c71ae089cb713e85e47
-# bad: [c0d79c892333b32ddae50bbadd885413b51f7252] Merge remote-tracking branch 'dlm/next'
-git bisect bad c0d79c892333b32ddae50bbadd885413b51f7252
-# bad: [4763d380325df1d74bf3891b00fd318d4a44feee] Merge remote-tracking branch 'renesas/next'
-git bisect bad 4763d380325df1d74bf3891b00fd318d4a44feee
-# good: [19be51760fbe79fc5926c455546971bd1412b9cf] Merge remote-tracking branch 'pinctrl/for-next'
-git bisect good 19be51760fbe79fc5926c455546971bd1412b9cf
-# bad: [c07b71c4ddd300095d39b74da58f0e70b7931f1d] Merge remote-tracking branch 'mvebu/for-next'
-git bisect bad c07b71c4ddd300095d39b74da58f0e70b7931f1d
-# bad: [242a001e48b78f190d18242132cab73527ca06a4] Merge branch 'zte/dt64' into for-next
-git bisect bad 242a001e48b78f190d18242132cab73527ca06a4
-# bad: [c201369d4aa5f05b8a37d6d1eeabf248c7086454] ARM: dts: imx6ull: add imx6ull support
-git bisect bad c201369d4aa5f05b8a37d6d1eeabf248c7086454
-# good: [9daee307694027eac4b10baa9cd3f2070f7459ba] ARM: dts: imx6q: Add Engicam i.CoreM6 DualLite/Solo initial support
-git bisect good 9daee307694027eac4b10baa9cd3f2070f7459ba
-# good: [67cb5d52ea2c3ae35d637ab79a46cd452d1c7d41] ARM: dts: imx6sx-sdb: update TX D_CAL for USBPHY
-git bisect good 67cb5d52ea2c3ae35d637ab79a46cd452d1c7d41
-# good: [c4479f6f57a0821aae4f6ab6a91a23625d6b35a0] ARM: dts: add new compatible string for i.MX6QP mmdc
-git bisect good c4479f6f57a0821aae4f6ab6a91a23625d6b35a0
-# bad: [7f107887d1995c819389f292828097cac4ec4396] ARM: dts: imx: Remove skeleton.dtsi
-git bisect bad 7f107887d1995c819389f292828097cac4ec4396
-# good: [425dd2773ed07d1ba21d4ada0f9a9abc85b75151] ARM: dts: imx6q-utilite-pro: i2c1 is muxed
-git bisect good 425dd2773ed07d1ba21d4ada0f9a9abc85b75151
-# first bad commit: [7f107887d1995c819389f292828097cac4ec4396] ARM: dts: imx: Remove skeleton.dtsi
+-- 
+Dmitry
