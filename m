@@ -1,68 +1,40 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 16 Nov 2016 17:40:17 +0100 (CET)
-Subject: [PATCH RFT] irqchip: mxs: Enable SKIP_SET_WAKE and MASK_ON_SUSPEND
-In-Reply-To: <40c3be7e-08c3-955c-746a-6906160e1e0a@rempel-privat.de>
-References: <1478885208-18821-1-git-send-email-stefan.wahren@i2se.com>
- <40c3be7e-08c3-955c-746a-6906160e1e0a@rempel-privat.de>
-Message-ID: <385549534.180928.e7d7379f-2688-45de-8e73-a2f866d7cd9c.open-xchange@email.1und1.de>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 16 Nov 2016 08:44:38 -0800
+Subject: [PATCH] ARM: davinci: PM: fix build when da850 not compiled in
+Message-ID: <20161116164438.9881-1-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Currently, suspend/resume support is only available on da850 platforms,
+and the platform PM code has dependencies on da850 functions.  However,
+CONFIG_SUSPEND might be enabled even when da850 support is not, causing
+build failure:
 
-> Oleksij Rempel <linux@rempel-privat.de> hat am 12. November 2016 um 20:24
-> geschrieben:
-> 
-> 
-> Am 11.11.2016 um 18:26 schrieb Stefan Wahren:
-> > The ICOLL controller doesn't provide any facility to configure the
-> > wakeup sources. That's the reason why this implementation lacks
-> > the irq_set_wake implementation. But this prevent us from properly
-> > entering power management states like "suspend to idle".
-> > 
-> > So enable the flags IRQCHIP_SKIP_SET_WAKE and IRQCHIP_MASK_ON_SUSPEND
-> > to let the irqchip core allows and handles the power management.
-> > 
-> > This patch has been tested with a MX23 and a MX28 board. Any further
-> > tests especially with ASM9260 would be appreciated.
-> 
-> Hi, I wont be able to test this patch on ASM9260 until March.
-> Please roll it out, so far it looks ok for me.
+arch/arm/mach-davinci/built-in.o: In function `davinci_pm_init':
+pm_domain.c:(.init.text+0x1fb8): undefined reference to `da8xx_get_mem_ctlr'
+pm_domain.c:(.init.text+0x20b0): undefined reference to `da8xx_syscfg1_base'
 
-Is this an "Acked-by" ?
+Fix this by only building the PM core when da850 is enabled.
 
-> 
-> 
-> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> > ---
-> >  drivers/irqchip/irq-mxs.c |    4 ++++
-> >  1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/drivers/irqchip/irq-mxs.c b/drivers/irqchip/irq-mxs.c
-> > index 1730470..05fa9f7 100644
-> > --- a/drivers/irqchip/irq-mxs.c
-> > +++ b/drivers/irqchip/irq-mxs.c
-> > @@ -131,12 +131,16 @@ static void asm9260_unmask_irq(struct irq_data *d)
-> >  	.irq_ack = icoll_ack_irq,
-> >  	.irq_mask = icoll_mask_irq,
-> >  	.irq_unmask = icoll_unmask_irq,
-> > +	.flags = IRQCHIP_MASK_ON_SUSPEND |
-> > +		 IRQCHIP_SKIP_SET_WAKE,
-> >  };
-> >  
-> >  static struct irq_chip asm9260_icoll_chip = {
-> >  	.irq_ack = icoll_ack_irq,
-> >  	.irq_mask = asm9260_mask_irq,
-> >  	.irq_unmask = asm9260_unmask_irq,
-> > +	.flags = IRQCHIP_MASK_ON_SUSPEND |
-> > +		 IRQCHIP_SKIP_SET_WAKE,
-> >  };
-> >  
-> >  asmlinkage void __exception_irq_entry icoll_handle_irq(struct pt_regs
-> > *regs)
-> > 
-> 
-> 
-> -- 
-> Regards,
-> Oleksij
->
+Reported-by: Sekhar Nori <nsekhar@ti.com>
+Fixes: aa9aa1ec2df6 ARM: davinci: PM: rework init, remove platform device
+Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+---
+ arch/arm/mach-davinci/Makefile | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
+index da4c336b4637..0a2e6da45f28 100644
+--- a/arch/arm/mach-davinci/Makefile
++++ b/arch/arm/mach-davinci/Makefile
+@@ -36,5 +36,7 @@ obj-$(CONFIG_MACH_OMAPL138_HAWKBOARD)	+= board-omapl138-hawk.o
+ 
+ # Power Management
+ obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
+-obj-$(CONFIG_SUSPEND)			+= pm.o sleep.o
+ obj-$(CONFIG_HAVE_CLK)			+= pm_domain.o
++ifeq ($(CONFIG_SUSPEND),y)
++obj-$(CONFIG_ARCH_DAVINCI_DA850)	+= pm.o sleep.o
++endif
+-- 
+2.9.3
