@@ -1,248 +1,129 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 16 Nov 2016 19:52:38 +0100
-Subject: [PATCH v8 7/7] arm/arm64: vgic: Implement
- KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
-In-Reply-To: <1478258013-6669-8-git-send-email-vijay.kilari@gmail.com>
-References: <1478258013-6669-1-git-send-email-vijay.kilari@gmail.com>
- <1478258013-6669-8-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <20161116185238.GG3811@cbox>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 16 Nov 2016 19:58:26 +0100
+Subject: [PATCH v2] input: touchscreen: silead: Add regulator support
+In-Reply-To: <20161116175159.GB335@dtor-ws>
+References: <20161116115507.24220-1-hdegoede@redhat.com>
+ <20161116175159.GB335@dtor-ws>
+Message-ID: <cdc827c1-f5ba-27b8-b7d0-4489fbd6da28@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2016 at 04:43:33PM +0530, vijay.kilari at gmail.com wrote:
-> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-> 
-> Userspace requires to store and restore of line_level for
-> level triggered interrupts using ioctl KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO.
-> 
-> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-> ---
->  arch/arm64/include/uapi/asm/kvm.h   |  6 +++++
->  virt/kvm/arm/vgic/vgic-kvm-device.c | 50 ++++++++++++++++++++++++++++++++++++-
->  virt/kvm/arm/vgic/vgic-mmio-v3.c    | 11 ++++++++
->  virt/kvm/arm/vgic/vgic-mmio.c       | 33 ++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic-mmio.h       |  5 ++++
->  virt/kvm/arm/vgic/vgic.h            |  3 +++
->  6 files changed, 107 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index 91c7137..4100f8c 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -211,6 +211,12 @@ struct kvm_arch_memory_slot {
->  #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
->  #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
->  #define KVM_DEV_ARM_VGIC_CPU_SYSREGS    6
-> +#define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO 7
-> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
-> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
-> +			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
-> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK	0x3ff
-> +#define VGIC_LEVEL_INFO_LINE_LEVEL	0
->  
->  #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
->  
-> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> index da532d1..0f82a91 100644
-> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> @@ -512,6 +512,25 @@ static int vgic_v3_attr_regs_access(struct kvm_device *dev,
->  						  regid, reg);
->  		break;
->  	}
-> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-> +		unsigned int info, intid;
-> +
-> +		info = (attr->attr & KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK) >>
-> +			KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT;
-> +		if (info == VGIC_LEVEL_INFO_LINE_LEVEL) {
-> +			if (is_write)
-> +				tmp32 = *reg;
-> +			intid = attr->attr &
-> +				KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK;
-> +			ret = vgic_v3_line_level_info_uaccess(vcpu, is_write,
-> +							      intid, &tmp32);
-> +			if (!is_write)
-> +				*reg = tmp32;
+HI,
 
-I think you can avoid the indirection with tmp32 here by just making the
-line level interface use an unsigned long.
+On 16-11-16 18:51, Dmitry Torokhov wrote:
+> On Wed, Nov 16, 2016 at 12:55:07PM +0100, Hans de Goede wrote:
+>> On some tablets the touchscreen controller is powered by separate
+>> regulators, add support for this.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> ---
+>> Changes in v2:
+>> -Use devm_regulator_bulk_get() and friends
+>> -Use devm_add_action_or_reset() to disable the regulator
+>> ---
+>>  .../bindings/input/touchscreen/silead_gsl1680.txt  |  2 ++
+>>  drivers/input/touchscreen/silead.c                 | 29 ++++++++++++++++++++++
+>>  2 files changed, 31 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+>> index e844c3f..b726823 100644
+>> --- a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+>> +++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+>> @@ -22,6 +22,8 @@ Optional properties:
+>>  - touchscreen-inverted-y  : See touchscreen.txt
+>>  - touchscreen-swapped-x-y : See touchscreen.txt
+>>  - silead,max-fingers	  : maximum number of fingers the touchscreen can detect
+>> +- vddio-supply		  : regulator phandle for controller VDDIO
+>> +- avdd-supply		  : regulator phandle for controller AVDD
+>>
+>>  Example:
+>>
+>> diff --git a/drivers/input/touchscreen/silead.c b/drivers/input/touchscreen/silead.c
+>> index f502c84..404830a 100644
+>> --- a/drivers/input/touchscreen/silead.c
+>> +++ b/drivers/input/touchscreen/silead.c
+>> @@ -29,6 +29,7 @@
+>>  #include <linux/input/touchscreen.h>
+>>  #include <linux/pm.h>
+>>  #include <linux/irq.h>
+>> +#include <linux/regulator/consumer.h>
+>>
+>>  #include <asm/unaligned.h>
+>>
+>> @@ -73,6 +74,7 @@ struct silead_ts_data {
+>>  	struct i2c_client *client;
+>>  	struct gpio_desc *gpio_power;
+>>  	struct input_dev *input;
+>> +	struct regulator_bulk_data regulators[2];
+>>  	char fw_name[64];
+>>  	struct touchscreen_properties prop;
+>>  	u32 max_fingers;
+>> @@ -433,6 +435,13 @@ static int silead_ts_set_default_fw_name(struct silead_ts_data *data,
+>>  }
+>>  #endif
+>>
+>> +static void silead_disable_regulator(void *arg)
+>> +{
+>> +	struct silead_ts_data *data = arg;
+>> +
+>> +	regulator_bulk_disable(ARRAY_SIZE(data->regulators), data->regulators);
+>> +}
+>> +
+>>  static int silead_ts_probe(struct i2c_client *client,
+>>  			   const struct i2c_device_id *id)
+>>  {
+>> @@ -465,6 +474,26 @@ static int silead_ts_probe(struct i2c_client *client,
+>>  	if (client->irq <= 0)
+>>  		return -ENODEV;
+>>
+>> +	data->regulators[0].supply = "vddio";
+>> +	data->regulators[1].supply = "avdd";
+>> +	error = devm_regulator_bulk_get(dev, ARRAY_SIZE(data->regulators),
+>> +					data->regulators);
+>> +	if (error)
+>> +		return error;
+>> +
+>> +	/*
+>> +	 * Enable regulators at probe and disable them at remove, we need
+>> +	 * to keep the chip powered otherwise it forgets its firmware.
+>> +	 */
+>
+> Hmm, this burns power though. Why can't we reload firmware on resume (it
+> should be already cached)?
 
-> +		} else {
-> +			ret = -EINVAL;
-> +		}
-> +		break;
-> +	}
->  	default:
->  		ret = -EINVAL;
->  		break;
-> @@ -554,6 +573,17 @@ static int vgic_v3_set_attr(struct kvm_device *dev,
->  
->  		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
->  	}
-> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-> +		u64 reg;
-> +		u32 tmp32;
-> +
-> +		if (get_user(tmp32, uaddr))
-> +			return -EFAULT;
-> +
-> +		reg = tmp32;
-> +		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
-> +	}
->  	}
->  	return -ENXIO;
->  }
-> @@ -589,8 +619,18 @@ static int vgic_v3_get_attr(struct kvm_device *dev,
->  			return ret;
->  		return put_user(reg, uaddr);
->  	}
-> -	}
-> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-> +		u64 reg;
-> +		u32 tmp32;
->  
-> +		ret = vgic_v3_attr_regs_access(dev, attr, &reg, false);
-> +		if (ret)
-> +			return ret;
-> +		tmp32 = reg;
-> +		return put_user(tmp32, uaddr);
-> +	}
-> +	}
->  	return -ENXIO;
->  }
->  
-> @@ -611,11 +651,19 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
->  		return vgic_v3_has_attr_regs(dev, attr);
->  	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
->  		return 0;
-> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-> +		if (((attr->attr & KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK) >>
-> +		      KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT) ==
-> +		      VGIC_LEVEL_INFO_LINE_LEVEL)
-> +			return 0;
-> +		break;
-> +	}
->  	case KVM_DEV_ARM_VGIC_GRP_CTRL:
->  		switch (attr->attr) {
->  		case KVM_DEV_ARM_VGIC_CTRL_INIT:
->  			return 0;
->  		}
-> +		break;
+We already put the device in low-power mode using the power pin. Of the
+20 or so different tablets I've with this touchscreen controller only
+2 actually have a separate regulator for the controller, so I do not
+believe that powering down the regulator will be a big win, otherwise
+all tablets would have had this.
 
-spurious change?
+ > Does it take too long?
 
->  	}
->  	return -ENXIO;
->  }
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index 519b919..38b481c 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -807,3 +807,14 @@ int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
->  		return vgic_uaccess(vcpu, &rd_dev, is_write,
->  				    offset, val);
->  }
-> +
-> +int vgic_v3_line_level_info_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-> +				    u32 intid, u32 *val)
-> +{
-> +	if (is_write)
-> +		vgic_write_irq_line_level_info(vcpu, intid, *val);
-> +	else
-> +		*val = vgic_read_irq_line_level_info(vcpu, intid);
-> +
-> +	return 0;
-> +}
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> index 173d6f0..fb018eb 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> @@ -371,6 +371,39 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
->  	}
->  }
->  
-> +unsigned long vgic_read_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid)
-> +{
-> +	int i;
-> +	unsigned long val = 0;
-> +
-> +	for (i = 0; i < 32; i++) {
-> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> +
-> +		if (irq->line_level)
-> +			val |= (1U << i);
-> +
-> +		vgic_put_irq(vcpu->kvm, irq);
-> +	}
-> +
-> +	return val;
-> +}
-> +
-> +void vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
-> +				    const unsigned long val)
-> +{
-> +	int i;
-> +
-> +	for_each_set_bit(i, &val, 32) {
+It is a couple of kB written one 32-bit word at a time over i2c, so
+it's not fast.
 
-I think you misunderstood this part of the API.  Userspace should be
-able to both set an asserted and deasserted line level, regardless of
-what the value was before.  So you need to loop through all of them and
-set the level as nneded.
+Regards,
 
-> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> +
-> +		spin_lock(&irq->irq_lock);
-> +		irq->line_level = true;
-
-why don't you have to set pending as well and potentially queue the interrupt?
-
-> +		spin_unlock(&irq->irq_lock);
-> +
-> +		vgic_put_irq(vcpu->kvm, irq);
-> +	}
-> +}
-> +
->  static int match_region(const void *key, const void *elt)
->  {
->  	const unsigned int offset = (unsigned long)key;
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-> index acbf99e..938702c 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.h
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
-> @@ -181,6 +181,11 @@ int vgic_validate_mmio_region_addr(struct kvm_device *dev,
->  				   const struct vgic_register_region *regions,
->  				   int nr_regions, gpa_t addr);
->  
-> +unsigned long vgic_read_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid);
-> +
-> +void vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
-> +				    const unsigned long val);
-> +
->  unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
->  
->  unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev);
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 0e632d0..77d3d84 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -130,6 +130,9 @@ int vgic_v3_cpu_sysregs_uaccess(struct kvm_vcpu *vcpu, bool is_write,
->  			 u64 id, u64 *val);
->  int vgic_v3_has_cpu_sysregs_attr(struct kvm_vcpu *vcpu, bool is_write, u64 id,
->  				u64 *reg);
-> +int vgic_v3_line_level_info_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-> +				    u32 intid, u32 *val);
-> +
->  #else
->  static inline int vgic_register_its_iodevs(struct kvm *kvm)
->  {
-> -- 
-> 1.9.1
-> 
+Hans
 
 
-Thanks,
--Christoffer
+>
+> Thanks.
+>
+>> +	error = regulator_bulk_enable(ARRAY_SIZE(data->regulators),
+>> +				      data->regulators);
+>> +	if (error)
+>> +		return error;
+>> +
+>> +	error = devm_add_action_or_reset(dev, silead_disable_regulator, data);
+>> +	if (error)
+>> +		return error;
+>> +
+>>  	/* Power GPIO pin */
+>>  	data->gpio_power = devm_gpiod_get_optional(dev, "power", GPIOD_OUT_LOW);
+>>  	if (IS_ERR(data->gpio_power)) {
+>> --
+>> 2.9.3
+>>
+>
