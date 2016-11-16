@@ -1,27 +1,106 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 16 Nov 2016 17:52:05 +0000
-Subject: [PATCH V2 0/2] ARM: bcm2835: Fix names for the Raspberry Pi GPIO lines
-Message-ID: <1479318727-9425-1-git-send-email-stefan.wahren@i2se.com>
+Date: Wed, 16 Nov 2016 17:52:06 +0000
+Subject: [PATCH V2 1/2] ARM: bcm2835: Fix names for the Raspberry Pi GPIO lines
+In-Reply-To: <1479318727-9425-1-git-send-email-stefan.wahren@i2se.com>
+References: <1479318727-9425-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1479318727-9425-2-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series should fix and extend the patch V4 "ARM: bcm2835: Add names
-for the Raspberry Pi GPIO lines" from Linus Walleij and Eric Anholt.
+There are some differences between the schematics and the official firmware
+DTS [1]. So based on these additional information the following has been
+changed:
 
-Changes in V2:
-  - fix URL to firmware DT blob
-  - drop dtsi file since Model A+ and Zero aren't identical
+* use consistent "CAM_GPIO1" for camera LED
+* use consistent "CAM_GPIO0" for camera shutdown
+* add "USB_LIMIT" for USB current limit (0=600mA, 1=1200mA)
 
-Stefan Wahren (2):
-  ARM: bcm2835: Fix names for the Raspberry Pi GPIO lines
-  ARM: bcm2835: Add names for the RPi Zero GPIO lines
+[1] - https://github.com/raspberrypi/firmware/blob/master/extra/dt-blob.dts
 
- arch/arm/boot/dts/bcm2835-rpi-a-plus.dts |    4 +-
- arch/arm/boot/dts/bcm2835-rpi-a.dts      |    4 +-
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ arch/arm/boot/dts/bcm2835-rpi-a-plus.dts |    4 ++--
+ arch/arm/boot/dts/bcm2835-rpi-a.dts      |    4 ++--
  arch/arm/boot/dts/bcm2835-rpi-b-plus.dts |    2 +-
- arch/arm/boot/dts/bcm2835-rpi-b.dts      |    4 +-
- arch/arm/boot/dts/bcm2835-rpi-zero.dts   |   65 ++++++++++++++++++++++++++++++
- 5 files changed, 72 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/bcm2835-rpi-b.dts      |    4 ++--
+ 4 files changed, 7 insertions(+), 7 deletions(-)
 
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
+index 5a22c79..d070454 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
+@@ -63,13 +63,13 @@
+ 			  "SCL0",
+ 			  "NC", /* GPIO30 */
+ 			  "NC", /* GPIO31 */
+-			  "NC", /* GPIO32 */
++			  "CAM_GPIO1", /* GPIO32 */
+ 			  "NC", /* GPIO33 */
+ 			  "NC", /* GPIO34 */
+ 			  "PWR_LOW_N", /* GPIO35 */
+ 			  "NC", /* GPIO36 */
+ 			  "NC", /* GPIO37 */
+-			  "NC", /* GPIO38 */
++			  "USB_LIMIT", /* GPIO38 */
+ 			  "NC", /* GPIO39 */
+ 			  "PWM0_OUT", /* GPIO40 */
+ 			  "CAM_GPIO0", /* GPIO41 */
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-a.dts b/arch/arm/boot/dts/bcm2835-rpi-a.dts
+index 54f98c5..46d078e 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-a.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-a.dts
+@@ -29,7 +29,7 @@
+ 			  "SDA1",
+ 			  "SCL1",
+ 			  "GPIO_GCLK",
+-			  "CAM_CLK",
++			  "CAM_GPIO1",
+ 			  "LAN_RUN",
+ 			  "SPI_CE1_N",
+ 			  "SPI_CE0_N",
+@@ -52,7 +52,7 @@
+ 			  "GPIO24",
+ 			  "GPIO25",
+ 			  "NC", /* GPIO26 */
+-			  "CAM_GPIO",
++			  "CAM_GPIO0",
+ 			  /* Binary number representing build/revision */
+ 			  "CONFIG0",
+ 			  "CONFIG1",
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+index b67587e..432088e 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+@@ -71,7 +71,7 @@
+ 			  "PWR_LOW_N", /* GPIO35 */
+ 			  "NC", /* GPIO36 */
+ 			  "NC", /* GPIO37 */
+-			  "NC", /* GPIO38 */
++			  "USB_LIMIT", /* GPIO38 */
+ 			  "NC", /* GPIO39 */
+ 			  "PWM0_OUT", /* GPIO40 */
+ 			  "CAM_GPIO0", /* GPIO41 */
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+index 71f50e1..4d56fe3 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+@@ -30,7 +30,7 @@
+ 			  "SDA1",
+ 			  "SCL1",
+ 			  "GPIO_GCLK",
+-			  "CAM_CLK",
++			  "CAM_GPIO1",
+ 			  "LAN_RUN",
+ 			  "SPI_CE1_N",
+ 			  "SPI_CE0_N",
+@@ -53,7 +53,7 @@
+ 			  "GPIO24",
+ 			  "GPIO25",
+ 			  "NC", /* GPIO26 */
+-			  "CAM_GPIO",
++			  "CAM_GPIO0",
+ 			  /* Binary number representing build/revision */
+ 			  "CONFIG0",
+ 			  "CONFIG1",
 -- 
 1.7.9.5
