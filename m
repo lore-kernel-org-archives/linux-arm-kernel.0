@@ -1,222 +1,120 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 17 Nov 2016 00:03:03 +0100
-Subject: [PATCH v3 2/3] soc: rockchip: add driver handling grf setup
-In-Reply-To: <20161116230304.8432-1-heiko@sntech.de>
-References: <20161116230304.8432-1-heiko@sntech.de>
-Message-ID: <20161116230304.8432-3-heiko@sntech.de>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Nov 2016 23:47:41 +0000
+Subject: [PATCH] Replacement for Arm initrd memblock reserve and free
+ inconsistency.
+In-Reply-To: <592F4D3D062D79449F140027567F70E8FE0810D3@exchmbx03>
+References: <592F4D3D062D79449F140027567F70E8FE080A79@exchmbx03>
+ <20161110174645.GB1041@n2100.armlinux.org.uk>
+ <592F4D3D062D79449F140027567F70E8FE0810D3@exchmbx03>
+Message-ID: <20161116234741.GE1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The General Register Files are an area of registers containing a lot
-of single-bit settings for numerous components as well full components
-like usbphy control. Therefore all used components are accessed
-via the syscon provided by the grf nodes or from the sub-devices
-created through the simple-mfd created from the grf node.
+On Tue, Nov 15, 2016 at 03:45:55PM +0000, william.helsby at stfc.ac.uk wrote:
+> The option of moving the initrd code later (after
+> 	early_init_fdt_reserve_self();
+> 	early_init_fdt_scan_reserved_mem() ) 
+> was tested.
 
-Some settings are not used by anything but will need to be set up
-according to expectations on the kernel side.
+Moving stuff around tends to break...
 
-Best example is the force_jtag setting, which defaults to on and
-results in the soc switching the pin-outputs between jtag and sdmmc
-automatically depending on the card-detect status. This conflicts
-heavily with how the dw_mmc driver expects to do its work and also
-with the clock-controller, which has most likely deactivated the
-jtag clock due to it being unused.
+I'd prefer to do it this way, as it's much more readable (and we prize
+readability... see Documentation/CodingStyle.)
 
-So far the handling of this setting was living in the mach-rockchip
-code for the arm32-based rk3288 but that of course doesn't work
-for arm64 socs and would also look ugly for further arm32 socs.
+ arch/arm/mm/init.c | 71 +++++++++++++++++++++++++++++++++---------------------
+ 1 file changed, 43 insertions(+), 28 deletions(-)
 
-Also always disabling this setting is quite specific to linux and
-its subsystems, other operating systems might prefer other settings,
-so that the bootloader cannot really set a sane default for all.
-
-So introduce a top-level driver for the grf that handles these
-settings that need to be a certain way but nobody cares about.
-
-Other needed settings might surface in the future and can then
-be added here, but only as a last option. Ideally general GRF
-settings should be handled in the driver needing them.
-
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
----
- drivers/soc/rockchip/Kconfig  |  10 ++++
- drivers/soc/rockchip/Makefile |   1 +
- drivers/soc/rockchip/grf.c    | 133 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 144 insertions(+)
- create mode 100644 drivers/soc/rockchip/grf.c
-
-diff --git a/drivers/soc/rockchip/Kconfig b/drivers/soc/rockchip/Kconfig
-index 7140ff8..20da55d 100644
---- a/drivers/soc/rockchip/Kconfig
-+++ b/drivers/soc/rockchip/Kconfig
-@@ -3,6 +3,16 @@ if ARCH_ROCKCHIP || COMPILE_TEST
- #
- # Rockchip Soc drivers
- #
-+
-+config ROCKCHIP_GRF
-+	bool
-+	default y
-+	help
-+	  The General Register Files are a central component providing
-+	  special additional settings registers for a lot of soc-components.
-+	  In a lot of cases there also need to be default settings initialized
-+	  to make some of them conform to expectations of the kernel.
-+
- config ROCKCHIP_PM_DOMAINS
-         bool "Rockchip generic power domain"
-         depends on PM
-diff --git a/drivers/soc/rockchip/Makefile b/drivers/soc/rockchip/Makefile
-index 3d73d06..c851fa0 100644
---- a/drivers/soc/rockchip/Makefile
-+++ b/drivers/soc/rockchip/Makefile
-@@ -1,4 +1,5 @@
- #
- # Rockchip Soc drivers
- #
-+obj-$(CONFIG_ROCKCHIP_GRF) += grf.o
- obj-$(CONFIG_ROCKCHIP_PM_DOMAINS) += pm_domains.o
-diff --git a/drivers/soc/rockchip/grf.c b/drivers/soc/rockchip/grf.c
-new file mode 100644
-index 0000000..190b0ed
---- /dev/null
-+++ b/drivers/soc/rockchip/grf.c
-@@ -0,0 +1,134 @@
-+/*
-+ * Rockchip Generic Register Files setup
-+ *
-+ * Copyright (c) 2016 Heiko Stuebner <heiko@sntech.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+
-+#define HIWORD_UPDATE(val, mask, shift) \
-+		((val) << (shift) | (mask) << ((shift) + 16))
-+
-+struct rockchip_grf_value {
-+	const char *desc;
-+	u32 reg;
-+	u32 val;
-+};
-+
-+struct rockchip_grf_info {
-+	const struct rockchip_grf_value *values;
-+	int num_values;
-+};
-+
-+#define RK3036_GRF_SOC_CON0		0x140
-+
-+static const struct rockchip_grf_value rk3036_defaults[] __initconst = {
-+	/*
-+	 * Disable auto jtag/sdmmc switching that causes issues with the
-+	 * clock-framework and the mmc controllers making them unreliable.
-+	 */
-+	{ "jtag switching", RK3036_GRF_SOC_CON0, HIWORD_UPDATE(0, 1, 11) },
-+};
-+
-+static const struct rockchip_grf_info rk3036_grf __initconst = {
-+	.values = rk3036_defaults,
-+	.num_values = ARRAY_SIZE(rk3036_defaults),
-+};
-+
-+#define RK3288_GRF_SOC_CON0		0x244
-+
-+static const struct rockchip_grf_value rk3288_defaults[] __initconst = {
-+	{ "jtag switching", RK3288_GRF_SOC_CON0, HIWORD_UPDATE(0, 1, 12) },
-+};
-+
-+static const struct rockchip_grf_info rk3288_grf __initconst = {
-+	.values = rk3288_defaults,
-+	.num_values = ARRAY_SIZE(rk3288_defaults),
-+};
-+
-+#define RK3368_GRF_SOC_CON15		0x43c
-+
-+static const struct rockchip_grf_value rk3368_defaults[] __initconst = {
-+	{ "jtag switching", RK3368_GRF_SOC_CON15, HIWORD_UPDATE(0, 1, 13) },
-+};
-+
-+static const struct rockchip_grf_info rk3368_grf __initconst = {
-+	.values = rk3368_defaults,
-+	.num_values = ARRAY_SIZE(rk3368_defaults),
-+};
-+
-+#define RK3399_GRF_SOC_CON7		0xe21c
-+
-+static const struct rockchip_grf_value rk3399_defaults[] __initconst = {
-+	{ "jtag switching", RK3399_GRF_SOC_CON7, HIWORD_UPDATE(0, 1, 12) },
-+};
-+
-+static const struct rockchip_grf_info rk3399_grf __initconst = {
-+	.values = rk3399_defaults,
-+	.num_values = ARRAY_SIZE(rk3399_defaults),
-+};
-+
-+static const struct of_device_id rockchip_grf_dt_match[] __initconst = {
-+	{
-+		.compatible = "rockchip,rk3036-grf",
-+		.data = (void *)&rk3036_grf,
-+	}, {
-+		.compatible = "rockchip,rk3288-grf",
-+		.data = (void *)&rk3288_grf,
-+	}, {
-+		.compatible = "rockchip,rk3368-grf",
-+		.data = (void *)&rk3368_grf,
-+	}, {
-+		.compatible = "rockchip,rk3399-grf",
-+		.data = (void *)&rk3399_grf,
-+	},
-+	{ /* sentinel */ },
-+};
-+
-+static int __init rockchip_grf_init(void)
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 370581aeb871..ffae20b25929 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -227,6 +227,48 @@ phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
+ 	return phys;
+ }
+ 
++static void __init arm_initrd_init(void)
 +{
-+	const struct rockchip_grf_info *grf_info;
-+	const struct of_device_id *match;
-+	struct device_node *np;
-+	struct regmap *grf;
-+	int ret, i;
++#ifdef CONFIG_BLK_DEV_INITRD
++	unsigned long size;
++	phys_addr_t start;
 +
-+	np = of_find_matching_node_and_match(NULL, rockchip_grf_dt_match,
-+					     &match);
-+	if (!np)
-+		return -ENODEV;
-+	if (!match || !match->data) {
-+		pr_err("%s: missing grf data\n", __func__);
-+		return -EINVAL;
++	/* FDT scan will populate initrd_start */
++	if (initrd_start && !phys_initrd_size) {
++		phys_initrd_start = __virt_to_phys(initrd_start);
++		phys_initrd_size = initrd_end - initrd_start;
 +	}
 +
-+	grf_info = match->data;
++	initrd_start = initrd_end = 0;
 +
-+	grf = syscon_node_to_regmap(np);
-+	if (IS_ERR(grf)) {
-+		pr_err("%s: could not get grf syscon\n", __func__);
-+		return PTR_ERR(grf);
++	if (!phys_initrd_size)
++		return;
++
++	start = phys_initrd_start & PAGE_MASK;
++	size = PAGE_ALIGN(phys_initrd_size + phys_initrd_start - start);
++
++	if (!memblock_is_region_memory(start, size)) {
++		pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
++		       (u64)start, size);
++		phys_initrd_start = phys_initrd_size = 0;
++		return;
 +	}
 +
-+	for (i = 0; i < grf_info->num_values; i++) {
-+		const struct rockchip_grf_value *val = &grf_info->values[i];
-+
-+		pr_debug("%s: adjusting %s in %#6x to %#10x\n", __func__,
-+			val->desc, val->reg, val->val);
-+		ret = regmap_write(grf, val->reg, val->val);
-+		if (ret < 0)
-+			pr_err("%s: write to %#6x failed with %d\n",
-+			       __func__, val->reg, ret);
++	if (memblock_is_region_reserved(start, size)) {
++		pr_err("INITRD: 0x%08llx+0x%08lx overlaps in-use memory region - disabling initrd\n",
++		       (u64)start, size);
++		phys_initrd_start = phys_initrd_size = 0;
++		return;
 +	}
 +
-+	return 0;
++	memblock_reserve(start, size);
++
++	/* Now convert initrd to virtual addresses */
++	initrd_start = __phys_to_virt(phys_initrd_start);
++	initrd_end = initrd_start + phys_initrd_size;
++#endif
 +}
-+postcore_initcall(rockchip_grf_init);
++
+ void __init arm_memblock_init(const struct machine_desc *mdesc)
+ {
+ 	/* Register the kernel text, kernel data and initrd with memblock. */
+@@ -235,34 +277,7 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
+ #else
+ 	memblock_reserve(__pa(_stext), _end - _stext);
+ #endif
+-#ifdef CONFIG_BLK_DEV_INITRD
+-	/* FDT scan will populate initrd_start */
+-	if (initrd_start && !phys_initrd_size) {
+-		phys_initrd_start = __virt_to_phys(initrd_start);
+-		phys_initrd_size = initrd_end - initrd_start;
+-	}
+-	initrd_start = initrd_end = 0;
+-	if (phys_initrd_size &&
+-	    !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
+-		pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
+-		       (u64)phys_initrd_start, phys_initrd_size);
+-		phys_initrd_start = phys_initrd_size = 0;
+-	}
+-	if (phys_initrd_size &&
+-	    memblock_is_region_reserved(phys_initrd_start, phys_initrd_size)) {
+-		pr_err("INITRD: 0x%08llx+0x%08lx overlaps in-use memory region - disabling initrd\n",
+-		       (u64)phys_initrd_start, phys_initrd_size);
+-		phys_initrd_start = phys_initrd_size = 0;
+-	}
+-	if (phys_initrd_size) {
+-		memblock_reserve(phys_initrd_start, phys_initrd_size);
+-
+-		/* Now convert initrd to virtual addresses */
+-		initrd_start = __phys_to_virt(phys_initrd_start);
+-		initrd_end = initrd_start + phys_initrd_size;
+-	}
+-#endif
+-
++	arm_initrd_init();
+ 	arm_mm_memblock_reserve();
+ 
+ 	/* reserve any platform specific memblock areas */
+
 -- 
-2.10.2
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
