@@ -1,111 +1,95 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Wed, 16 Nov 2016 14:55:04 +0800
-Subject: [PATCH V2 fix 5/6] mm: hugetlb: add a new function to allocate a new
- gigantic page
-In-Reply-To: <1479107259-2011-6-git-send-email-shijie.huang@arm.com>
-References: <1479107259-2011-6-git-send-email-shijie.huang@arm.com>
-Message-ID: <1479279304-31379-1-git-send-email-shijie.huang@arm.com>
+From: scott.wood@nxp.com (Scott Wood)
+Date: Wed, 16 Nov 2016 07:22:09 +0000
+Subject: [upstream-release] [PATCH 1/2] drivers: usb: phy: Add qoriq usb
+ 3.0	phy driver support
+References: <1479101215-26954-1-git-send-email-sriram.dash@nxp.com>
+ <1479101215-26954-2-git-send-email-sriram.dash@nxp.com>
+ <DB5PR0401MB1928CA058CC01243457F124791BC0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
+ <DB5PR0401MB1925FB1FE45C15B0671E46D1F5BF0@DB5PR0401MB1925.eurprd04.prod.outlook.com>
+Message-ID: <HE1PR0401MB1931C92287A8E92BC6B52B1991BE0@HE1PR0401MB1931.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are three ways we can allocate a new gigantic page:
+On 11/15/2016 06:39 AM, Sriram Dash wrote:
+>> From: Scott Wood
+>> On 11/13/2016 11:27 PM, Sriram Dash wrote:
+>>> diff --git a/Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
+>>> b/Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
+>>> new file mode 100644
+>>> index 0000000..d934c80
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
+>>> @@ -0,0 +1,36 @@
+>>> +Driver for Freescale USB 3.0 PHY
+>>> +
+>>> +Required properties:
+>>> +
+>>> +- compatible :	fsl,qoriq-usb3-phy
+>>
+> 
+> Hi Scott,
+> 
+>> This is a very vague compatible.  Are there versioning registers within this register
+>> block?
+>>
+> 
+> There are versioning registers for the phy (1.0 and 1.1). But the current erratum
+> A008751 does not require the mentioning of the version numbers. Was planning
+> to take care of the versioning when there is code diversity on the basis of the
+> version number.
 
-1. When the NUMA is not enabled, use alloc_gigantic_page() to get
-   the gigantic page.
+That is not how device tree bindings work.  The describe the hardware,
+not the driver.
 
-2. The NUMA is enabled, but the vma is NULL.
-   There is no memory policy we can refer to.
-   So create a @nodes_allowed, initialize it with init_nodemask_of_mempolicy()
-   or init_nodemask_of_node(). Then use alloc_fresh_gigantic_page() to get
-   the gigantic page.
+That said, is the block version sufficient to tell whether a given chip
+has this erratum?  If so, you don't need a special property for the
+erratum.  If not, what is different about the PHY that is not described
+by the versioning?
 
-3. The NUMA is enabled, and the vma is valid.
-   We can follow the memory policy of the @vma.
+In any case, it would be nice to mention the version register and its
+offset in the binding, just so that it becomes part of the definition of
+this compatible string, and if we come out with some QorIQ chip with a
+USB3 PHY that is totally different and doesn't have that version
+register, it'll be clear that it needs a different compatible.
 
-   Get @nodes_allowed by huge_nodemask(), and use alloc_fresh_gigantic_page()
-   to get the gigantic page.
+>>> +static inline u32 qoriq_usb3_phy_readl(void __iomem *addr, u32
+>>> +offset) {
+>>> +	return __raw_readl(addr + offset);
+>>> +}
+>>> +
+>>> +static inline void qoriq_usb3_phy_writel(void __iomem *addr, u32 offset,
+>>> +	u32 data)
+>>> +{
+>>> +	__raw_writel(data, addr + offset);
+>>> +}
+>>
+>> Why raw?  Besides missing barriers, this will cause the accesses to be native-endian
+>> which is not correct.
+>>
+> 
+> The only reason for __raw_writel is to make the code faster.
 
-Signed-off-by: Huang Shijie <shijie.huang@arm.com>
----
-Since the huge_nodemask() is changed, we have to change this function a little.
+Does that really matter here?
 
----
- mm/hugetlb.c | 63 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+> However, shall I use writel(with both barriers and byte swap) instead 
 
-diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-index 6995087..c33bddc 100644
---- a/mm/hugetlb.c
-+++ b/mm/hugetlb.c
-@@ -1502,6 +1502,69 @@ int dissolve_free_huge_pages(unsigned long start_pfn, unsigned long end_pfn)
- 
- /*
-  * There are 3 ways this can get called:
-+ *
-+ * 1. When the NUMA is not enabled, use alloc_gigantic_page() to get
-+ *    the gigantic page.
-+ *
-+ * 2. The NUMA is enabled, but the vma is NULL.
-+ *    Create a @nodes_allowed, and use alloc_fresh_gigantic_page() to get
-+ *    the gigantic page.
-+ *
-+ * 3. The NUMA is enabled, and the vma is valid.
-+ *    Use the @vma's memory policy.
-+ *    Get @nodes_allowed by huge_nodemask(), and use alloc_fresh_gigantic_page()
-+ *    to get the gigantic page.
-+ */
-+static struct page *__hugetlb_alloc_gigantic_page(struct hstate *h,
-+		struct vm_area_struct *vma, unsigned long addr, int nid)
-+{
-+	NODEMASK_ALLOC(nodemask_t, nodes_allowed, GFP_KERNEL | __GFP_NORETRY);
-+	struct page *page = NULL;
-+
-+	/* Not NUMA */
-+	if (!IS_ENABLED(CONFIG_NUMA)) {
-+		if (nid == NUMA_NO_NODE)
-+			nid = numa_mem_id();
-+
-+		page = alloc_gigantic_page(nid, huge_page_order(h));
-+		if (page)
-+			prep_compound_gigantic_page(page, huge_page_order(h));
-+
-+		NODEMASK_FREE(nodes_allowed);
-+		return page;
-+	}
-+
-+	/* NUMA && !vma */
-+	if (!vma) {
-+		if (nid == NUMA_NO_NODE) {
-+			if (!init_nodemask_of_mempolicy(nodes_allowed)) {
-+				NODEMASK_FREE(nodes_allowed);
-+				nodes_allowed = &node_states[N_MEMORY];
-+			}
-+		} else if (nodes_allowed) {
-+			init_nodemask_of_node(nodes_allowed, nid);
-+		} else {
-+			nodes_allowed = &node_states[N_MEMORY];
-+		}
-+
-+		page = alloc_fresh_gigantic_page(h, nodes_allowed, true);
-+
-+		if (nodes_allowed != &node_states[N_MEMORY])
-+			NODEMASK_FREE(nodes_allowed);
-+
-+		return page;
-+	}
-+
-+	/* NUMA && vma */
-+	if (huge_nodemask(vma, addr, nodes_allowed))
-+		page = alloc_fresh_gigantic_page(h, nodes_allowed, true);
-+
-+	NODEMASK_FREE(nodes_allowed);
-+	return page;
-+}
-+
-+/*
-+ * There are 3 ways this can get called:
-  * 1. With vma+addr: we use the VMA's memory policy
-  * 2. With !vma, but nid=NUMA_NO_NODE:  We try to allocate a huge
-  *    page from any node, and let the buddy allocator itself figure
--- 
-2.5.5
+Yes, if the registers are little-endian on all chips.
+
+> and then make appropriate changes in the value 32'h27672B2A?
+
+Not sure what you mean here.
+
+> In my knowledge, there are more than 5 errata in pipeline,
+
+Then please get all of these errata described in the device tree ASAP
+(unless their presence can be reliably inferred from the block version,
+as discussed above).
+
+> However, in future, if any other erratum comes up, and it has to be applied
+> at any point other than during init, then the variable has to be added in
+> qoriq_usb3_phy struct and the property has to be read separately.
+
+Or if the erratum is detected by some means other than a device tree
+property...
+
+-Scott
