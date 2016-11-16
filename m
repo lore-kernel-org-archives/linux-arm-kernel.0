@@ -1,40 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 16 Nov 2016 10:37:29 +0000
-Subject: [PATCH v7] soc: qcom: add l2 cache perf events driver
-In-Reply-To: <e917b871-d6ee-d52b-aedc-b3ee75aed05f@codeaurora.org>
-References: <1477687813-11412-1-git-send-email-nleeder@codeaurora.org>
- <20161109175413.GE17020@leverpostej>
- <20161109181652.GK17771@arm.com>
- <e917b871-d6ee-d52b-aedc-b3ee75aed05f@codeaurora.org>
-Message-ID: <20161116103729.GB11228@leverpostej>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 16 Nov 2016 16:11:46 +0530
+Subject: [PATCH v4 4/4] ARM: dts: da850: Add the usb otg device node
+In-Reply-To: <d2050c80-255e-25d6-99ba-7634f2c7e39a@baylibre.com>
+References: <1478188752-22447-1-git-send-email-abailon@baylibre.com>
+ <1478188752-22447-5-git-send-email-abailon@baylibre.com>
+ <0c94c5e0-9d2c-fff5-1213-2fb2adb20ab0@ti.com>
+ <d2050c80-255e-25d6-99ba-7634f2c7e39a@baylibre.com>
+Message-ID: <d4c8da0e-d66d-1268-78e5-d994399c9166@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2016 at 04:52:35PM -0500, Leeder, Neil wrote:
-> So is there a use-case for individual uncore PMUs when they can't be
-> used in task mode or per-cpu?
-> 
-> The main (only?) use will be in system mode, in which case surely it
-> makes sense to provide a single aggregated count?
+On Wednesday 16 November 2016 04:05 PM, Alexandre Bailon wrote:
+> On 11/15/2016 11:46 AM, Sekhar Nori wrote:
+>> On Thursday 03 November 2016 09:29 PM, Alexandre Bailon wrote:
+>>> This adds the device tree node for the usb otg
+>>> controller present in the da850 family of SoC's.
+>>> This also enables the otg usb controller for the lcdk board.
+>>>
+>>> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+>>> ---
+>>>  arch/arm/boot/dts/da850-lcdk.dts |  8 ++++++++
+>>>  arch/arm/boot/dts/da850.dtsi     | 15 +++++++++++++++
+>>>  2 files changed, 23 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+>>> index 7b8ab21..9f5040c 100644
+>>> --- a/arch/arm/boot/dts/da850-lcdk.dts
+>>> +++ b/arch/arm/boot/dts/da850-lcdk.dts
+>>> @@ -158,6 +158,14 @@
+>>>  	rx-num-evt = <32>;
+>>>  };
+>>>  
+>>> +&usb_phy {
+>>> +	status = "okay";
+>>> +	};
+>>
+>> As mentioned by David already, this node needs to be removed. Please
 
-If you are aware of the system topology, the numbers may be more useful
-than the summed count. If you aren't, it's still possible to sum them in
-userspace.
+> I have missed it. But why should I remove it?
+> Without it, usb otg won't work.
 
-Having them summed by the kernel means that the kernel is implying it
-supports group semantics that it cannot, since it cannot start/stop all
-counters in a group atomically if they're split across several units.
+Grr, I replied to the wrong hunk. The part in da850-lcdk.dts needs to be
+preserved (but please fix the indentation on the closing brace).
 
-> With individual PMUs exposed there will be potentially dozens of
-> nodes for userspace to collect from which would make perf
-> command-line usage unwieldy at best.
-
-FWIW, for uncore/system PMUs, even on x86 there are a number of
-independent units.
-
-Some PMUs (those which are symmetric across the topology) get hidden
-behind the same struct PMU, but instances are still isolated (and their
-values not summed).
+The part in da850.dtsi needs to be removed as it is already merged.
 
 Thanks,
-Mark.
+Sekhar
