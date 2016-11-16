@@ -1,39 +1,45 @@
-From: mikko.rapeli@iki.fi (Mikko Rapeli)
-Date: Wed, 16 Nov 2016 16:11:59 +0200
-Subject: [PATCH v05 60/72] arch/arm/include/uapi/asm/signal.h: use
- __kernel_size_t instead of size_t
-In-Reply-To: <1898059.B1P75dnZ5Q@wuerfel>
-References: <1471890809-4383-1-git-send-email-mikko.rapeli@iki.fi>
- <1471890809-4383-61-git-send-email-mikko.rapeli@iki.fi>
- <1898059.B1P75dnZ5Q@wuerfel>
-Message-ID: <20161116141159.GK8342@lakka.kapsi.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Nov 2016 15:18:18 +0100
+Subject: [PATCH] pinctrl: sunxi: fix theoretical uninitialized variable access
+Message-ID: <20161116141841.2030776-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2016 at 05:02:56PM +0200, Arnd Bergmann wrote:
-> On Monday, August 22, 2016 8:33:17 PM CEST Mikko Rapeli wrote:
-> > diff --git a/arch/arm/include/uapi/asm/signal.h b/arch/arm/include/uapi/asm/signal.h
-> > index 33073bd..859f2de 100644
-> > --- a/arch/arm/include/uapi/asm/signal.h
-> > +++ b/arch/arm/include/uapi/asm/signal.h
-> > @@ -113,7 +113,7 @@ struct sigaction {
-> >  typedef struct sigaltstack {
-> >         void __user *ss_sp;
-> >         int ss_flags;
-> > -       size_t ss_size;
-> > +       __kernel_size_t ss_size;
-> >  } stack_t;
-> 
-> I was going to reply with an Ack, but on further consideration,
-> I'm not sure if we can't do this in general: size_t may be either
-> 'unsigned int' or 'unsigned long' (depending on the architecture
-> and toolchain), and if kernel and glibc disagree on this, we
-> have a problem with any user space code that expects sigaltstack->ss_size
-> to be the same type as size_t (as mandated by the man page).
-> 
-> I wonder if there is another way to address this.
+gcc warns about a  way that it could use an uninitialized variable:
 
-I presume that kernel headers need to follow libc in this case and include
-<stddef.h>?
+drivers/pinctrl/sunxi/pinctrl-sunxi.c: In function 'sunxi_pinctrl_init':
+drivers/pinctrl/sunxi/pinctrl-sunxi.c:1191:8: error: 'best_div' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 
--Mikko
+This cannot really happen except if 'freq' is UINT_MAX and 'clock' is
+zero, and both of these are forbidden. To shut up the warning anyway,
+this changes the logic to initialize the return code to the first
+divider value before looking at the others.
+
+Fixes: 7c926492d38a ("pinctrl: sunxi: Add support for interrupt debouncing")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index 2339d4718b4d..6b7953da4228 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -1125,10 +1125,13 @@ static int sunxi_pinctrl_build_state(struct platform_device *pdev)
+ static int sunxi_pinctrl_get_debounce_div(struct clk *clk, int freq, int *diff)
+ {
+ 	unsigned long clock = clk_get_rate(clk);
+-	unsigned int best_diff = ~0, best_div;
++	unsigned int best_diff, best_div;
+ 	int i;
+ 
+-	for (i = 0; i < 8; i++) {
++	best_diff = abs(freq - clock);
++	best_div = 0;
++
++	for (i = 1; i < 8; i++) {
+ 		int cur_diff = abs(freq - (clock >> i));
+ 
+ 		if (cur_diff < best_diff) {
+-- 
+2.9.0
