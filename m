@@ -1,51 +1,44 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 16 Nov 2016 20:29:13 +0000
-Subject: [PATCH v3 0/3] modversions: Fix CRC mangling under
- CONFIG_RELOCATABLE=y
-In-Reply-To: <20161116192331.2jwpewu33dwji3fa@pengutronix.de>
-References: <1477585631-18574-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161116192331.2jwpewu33dwji3fa@pengutronix.de>
-Message-ID: <CAKv+Gu-cjwOaNuQ-BJdcmr_0w3pfr7etN=T5CG_Sbj_tsomZhg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 16 Nov 2016 21:33:58 +0100
+Subject: [PATCH] pinctrl: sunxi: fix theoretical uninitialized variable
+ access
+In-Reply-To: <20161116141841.2030776-1-arnd@arndb.de>
+References: <20161116141841.2030776-1-arnd@arndb.de>
+Message-ID: <20161116203358.midi7vmaqirpywtt@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 November 2016 at 19:23, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> On Thu, Oct 27, 2016 at 05:27:08PM +0100, Ard Biesheuvel wrote:
->> This series is a followup to the single patch 'modversions: treat symbol
->> CRCs as 32 bit quantities on 64 bit archs', of which two versions have
->> been sent out so far [0][1]
->>
->> As pointed out by Michael, GNU ld behaves a bit differently between arm64
->> and PowerPC64, and where the former gets rid of all runtime relocations
->> related to CRCs, the latter is not as easily convinced.
->>
->> Patch #1 fixes the issue where CRCs are corrupted by the runtime relocation
->> routines for 32-bit PowerPC, for which the original fix was effectively
->> reverted by commit 0e0ed6406e61 ("powerpc/modules: Module CRC relocation fix
->> causes perf issues")
->>
->> Patch #2 adds handling of R_PPC64_ADDR32 relocations against the NULL .dynsym
->> symbol entry to the PPC64 runtime relocation routines, so it is prepared to
->> deal with CRCs being emitted as 32-bit quantities.
->>
->> Patch #3 is the original patch from the v1 and v2 submissions.
->
-> Is this related to me seeing
->
-> [    2.111424] mvneta: module verification failed: signature and/or required key missing - tainting kernel
-> [    2.126061] scsi_mod: no symbol version for _clear_bit
-> [    2.131257] scsi_mod: Unknown symbol _clear_bit (err -22)
-> [    2.138093] mvneta: no symbol version for _clear_bit
-> [    2.143117] mvneta: Unknown symbol _clear_bit (err -22)
-> [    2.144135] mvmdio: no symbol version for __gnu_mcount_nc
-> [    2.144138] mvmdio: Unknown symbol __gnu_mcount_nc (err -22)
-> ...
->
-> ? If so, this would be great to mention it in the commit log to make
-> people searching for this issue actually find this patch set.
->
+Hi Arnd,
 
-No, I don't think it is. My guess would be that it is caused by
+On Wed, Nov 16, 2016 at 03:18:18PM +0100, Arnd Bergmann wrote:
+> gcc warns about a  way that it could use an uninitialized variable:
+> 
+> drivers/pinctrl/sunxi/pinctrl-sunxi.c: In function 'sunxi_pinctrl_init':
+> drivers/pinctrl/sunxi/pinctrl-sunxi.c:1191:8: error: 'best_div' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> 
+> This cannot really happen except if 'freq' is UINT_MAX and 'clock' is
+> zero, and both of these are forbidden. To shut up the warning anyway,
+> this changes the logic to initialize the return code to the first
+> divider value before looking at the others.
+> 
+> Fixes: 7c926492d38a ("pinctrl: sunxi: Add support for interrupt debouncing")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4dd1837d75
+Thanks for that patch.
+
+Just out of curiosity, which gcc gives those warnings? I have 6.2 and
+it didn't output anything..
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161116/1ea0fcf3/attachment-0001.sig>
