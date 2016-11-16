@@ -1,113 +1,78 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Wed, 16 Nov 2016 14:53:02 +0800
-Subject: [PATCH V2 fix 4/6] mm: mempolicy: intruduce a helper huge_nodemask()
-In-Reply-To: <1479107259-2011-5-git-send-email-shijie.huang@arm.com>
-References: <1479107259-2011-5-git-send-email-shijie.huang@arm.com>
-Message-ID: <1479279182-31294-1-git-send-email-shijie.huang@arm.com>
+From: oss@buserror.net (Scott Wood)
+Date: Wed, 16 Nov 2016 00:54:22 -0600
+Subject: [PATCH] clk: qoriq: added ls1012a clock configuration
+In-Reply-To: <1479275900-42365-1-git-send-email-yuantian.tang@nxp.com>
+References: <1479275900-42365-1-git-send-email-yuantian.tang@nxp.com>
+Message-ID: <1479279262.21746.40.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch intruduces a new helper huge_nodemask(),
-we can use it to get the node mask.
+On Wed, 2016-11-16 at 13:58 +0800, yuantian.tang at nxp.com wrote:
+> From: Tang Yuantian <Yuantian.Tang@nxp.com>
+> 
+> Added ls1012a clock configuation information.
 
-This idea of the function is from the init_nodemask_of_mempolicy():
-   Return true if we can succeed in extracting the node_mask
-for 'bind' or 'interleave' policy or initializing the node_mask
-to contain the single node for 'preferred' or 'local' policy.
+Do we really need the same line in the changelog twice?
 
-Signed-off-by: Huang Shijie <shijie.huang@arm.com>
----
-The previous version does not treat the MPOL_PREFERRED/MPOL_INTERLEAVE cases.
-This patch adds the code to set proper node mask for
-MPOL_PREFERRED/MPOL_INTERLEAVE.
----
- include/linux/mempolicy.h |  8 ++++++++
- mm/mempolicy.c            | 47 +++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 55 insertions(+)
+> 
+> Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
+> ---
+> ?drivers/clk/clk-qoriq.c | 19 +++++++++++++++++++
+> ?1 file changed, 19 insertions(+)
+> 
+> diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c
+> index 1bece0f..563d874 100644
+> --- a/drivers/clk/clk-qoriq.c
+> +++ b/drivers/clk/clk-qoriq.c
+> @@ -202,6 +202,14 @@ static const struct clockgen_muxinfo ls1021a_cmux = {
+> ?	}
+> ?};
+> ?
+> +static const struct clockgen_muxinfo ls1012a_cmux = {
+> +	{
+> +		[0] = { CLKSEL_VALID, CGA_PLL1, PLL_DIV1 },
+> +		{},
+> +		[2] = { CLKSEL_VALID, CGA_PLL1, PLL_DIV2 },
+> +	}
+> +};
+> +
 
-diff --git a/include/linux/mempolicy.h b/include/linux/mempolicy.h
-index 5e5b296..7796a40 100644
---- a/include/linux/mempolicy.h
-+++ b/include/linux/mempolicy.h
-@@ -145,6 +145,8 @@ extern void mpol_rebind_task(struct task_struct *tsk, const nodemask_t *new,
- 				enum mpol_rebind_step step);
- extern void mpol_rebind_mm(struct mm_struct *mm, nodemask_t *new);
- 
-+extern bool huge_nodemask(struct vm_area_struct *vma,
-+				unsigned long addr, nodemask_t *mask);
- extern struct zonelist *huge_zonelist(struct vm_area_struct *vma,
- 				unsigned long addr, gfp_t gfp_flags,
- 				struct mempolicy **mpol, nodemask_t **nodemask);
-@@ -261,6 +263,12 @@ static inline void mpol_rebind_mm(struct mm_struct *mm, nodemask_t *new)
- {
- }
- 
-+static inline bool huge_nodemask(struct vm_area_struct *vma,
-+				unsigned long addr, nodemask_t *mask)
-+{
-+	return false;
-+}
-+
- static inline struct zonelist *huge_zonelist(struct vm_area_struct *vma,
- 				unsigned long addr, gfp_t gfp_flags,
- 				struct mempolicy **mpol, nodemask_t **nodemask)
-diff --git a/mm/mempolicy.c b/mm/mempolicy.c
-index 6d3639e..5063a69 100644
---- a/mm/mempolicy.c
-+++ b/mm/mempolicy.c
-@@ -1800,6 +1800,53 @@ static inline unsigned interleave_nid(struct mempolicy *pol,
- 
- #ifdef CONFIG_HUGETLBFS
- /*
-+ * huge_nodemask(@vma, @addr, @mask)
-+ * @vma: virtual memory area whose policy is sought
-+ * @addr: address in @vma
-+ * @mask: a nodemask pointer
-+ *
-+ * Return true if we can succeed in extracting the policy nodemask
-+ * for 'bind' or 'interleave' policy into the argument @mask, or
-+ * initializing the argument @mask to contain the single node for
-+ * 'preferred' or 'local' policy.
-+ */
-+bool huge_nodemask(struct vm_area_struct *vma, unsigned long addr,
-+			nodemask_t *mask)
-+{
-+	struct mempolicy *mpol;
-+	bool ret = true;
-+	int nid;
-+
-+	if (!mask)
-+		return false;
-+
-+	mpol = get_vma_policy(vma, addr);
-+
-+	switch (mpol->mode) {
-+	case MPOL_PREFERRED:
-+		if (mpol->flags & MPOL_F_LOCAL)
-+			nid = numa_node_id();
-+		else
-+			nid = mpol->v.preferred_node;
-+		init_nodemask_of_node(mask, nid);
-+		break;
-+
-+	case MPOL_BIND:
-+		/* Fall through */
-+	case MPOL_INTERLEAVE:
-+		*mask = mpol->v.nodes;
-+		break;
-+
-+	default:
-+		ret = false;
-+		break;
-+	}
-+	mpol_cond_put(mpol);
-+
-+	return ret;
-+}
-+
-+/*
-  * huge_zonelist(@vma, @addr, @gfp_flags, @mpol)
-  * @vma: virtual memory area whose policy is sought
-  * @addr: address in @vma for shared policy lookup and interleave policy
--- 
-2.5.5
+Based on the "ls1021a_cmux" in the context it looks like this patch is
+intended to apply on top of?https://patchwork.kernel.org/patch/8923541/?but I
+don't see any mention of that.
+
+> ?static const struct clockgen_muxinfo t1040_cmux = {
+> ?	{
+> ?		[0] = { CLKSEL_VALID, CGA_PLL1, PLL_DIV1 },
+> @@ -482,6 +490,16 @@ static const struct clockgen_chipinfo chipinfo[] = {
+> ?		.pll_mask = 0x03,
+> ?	},
+> ?	{
+> +		.compat = "fsl,ls1012a-clockgen",
+> +		.cmux_groups = {
+> +			&ls1012a_cmux
+> +		},
+> +		.cmux_to_group = {
+> +			0, -1
+> +		},
+> +		.pll_mask = 0x03,
+> +	},
+> +	{
+> ?		.compat = "fsl,ls1043a-clockgen",
+> ?		.init_periph = t2080_init_periph,
+> ?		.cmux_groups = {
+> @@ -1284,6 +1302,7 @@ CLK_OF_DECLARE(qoriq_clockgen_2, "fsl,qoriq-clockgen-
+> 2.0", clockgen_init);
+> ?CLK_OF_DECLARE(qoriq_clockgen_ls1021a, "fsl,ls1021a-clockgen",
+> clockgen_init);
+> ?CLK_OF_DECLARE(qoriq_clockgen_ls1043a, "fsl,ls1043a-clockgen",
+> clockgen_init);
+> ?CLK_OF_DECLARE(qoriq_clockgen_ls2080a, "fsl,ls2080a-clockgen",
+> clockgen_init);
+> +CLK_OF_DECLARE(qoriq_clockgen_ls1012a, "fsl,ls1012a-clockgen",
+> clockgen_init);
+
+Please keep these lists of chips sorted (or as close as you can in the case of
+the cmux structs which already have some sorting issues).
+
+-Scott
