@@ -1,135 +1,34 @@
 From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 16 Nov 2016 11:00:27 -0500
-Subject: [PATCH v7 6/7] drm/hisilicon/hibmc: Add support for vblank
- interrupt
-In-Reply-To: <1479303831-74134-7-git-send-email-zourongrong@gmail.com>
+Date: Wed, 16 Nov 2016 11:00:48 -0500
+Subject: [PATCH v7 7/7] MAINTAINERS: Update HISILICON DRM entries
+In-Reply-To: <1479303831-74134-8-git-send-email-zourongrong@gmail.com>
 References: <1479303831-74134-1-git-send-email-zourongrong@gmail.com>
- <1479303831-74134-7-git-send-email-zourongrong@gmail.com>
-Message-ID: <CAOw6vbJFVEAWm5SmjmJbyRjyyc8Boh5gEkMFdsWu=D1+iad=AQ@mail.gmail.com>
+ <1479303831-74134-8-git-send-email-zourongrong@gmail.com>
+Message-ID: <CAOw6vbJwPJnSN9ZOfhqvaLsbPAALdPEoyuBTSJBcme0JC6jebQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Nov 16, 2016 at 8:43 AM, Rongrong Zou <zourongrong@gmail.com> wrote:
-> Add vblank interrupt.
->
 > Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
 
 Reviewed-by: Sean Paul <seanpaul@chromium.org>
 
 > ---
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c | 56 ++++++++++++++++++++++++-
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h |  1 +
->  2 files changed, 56 insertions(+), 1 deletion(-)
+>  MAINTAINERS | 1 +
+>  1 file changed, 1 insertion(+)
 >
-> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-> index c133644..73ba8b0 100644
-> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-> @@ -39,16 +39,45 @@
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 2a58eea..84a7296 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -4123,6 +4123,7 @@ F:        drivers/gpu/drm/gma500/
 >
->  static int hibmc_enable_vblank(struct drm_device *dev, unsigned int pipe)
->  {
-> +       struct hibmc_drm_private *priv =
-> +               (struct hibmc_drm_private *)dev->dev_private;
-> +
-> +       writel(HIBMC_RAW_INTERRUPT_EN_VBLANK(1),
-> +              priv->mmio + HIBMC_RAW_INTERRUPT_EN);
-> +
->         return 0;
->  }
->
->  static void hibmc_disable_vblank(struct drm_device *dev, unsigned int pipe)
->  {
-> +       struct hibmc_drm_private *priv =
-> +               (struct hibmc_drm_private *)dev->dev_private;
-> +
-> +       writel(HIBMC_RAW_INTERRUPT_EN_VBLANK(0),
-> +              priv->mmio + HIBMC_RAW_INTERRUPT_EN);
-> +}
-> +
-> +irqreturn_t hibmc_drm_interrupt(int irq, void *arg)
-> +{
-> +       struct drm_device *dev = (struct drm_device *)arg;
-> +       struct hibmc_drm_private *priv =
-> +               (struct hibmc_drm_private *)dev->dev_private;
-> +       u32 status;
-> +
-> +       status = readl(priv->mmio + HIBMC_RAW_INTERRUPT);
-> +
-> +       if (status & HIBMC_RAW_INTERRUPT_VBLANK(1)) {
-> +               writel(HIBMC_RAW_INTERRUPT_VBLANK(1),
-> +                      priv->mmio + HIBMC_RAW_INTERRUPT);
-> +               drm_handle_vblank(dev, 0);
-> +       }
-> +
-> +       return IRQ_HANDLED;
->  }
->
->  static struct drm_driver hibmc_driver = {
->         .driver_features        = DRIVER_GEM | DRIVER_MODESET |
-> -                                 DRIVER_ATOMIC,
-> +                                 DRIVER_ATOMIC | DRIVER_HAVE_IRQ,
->         .fops                   = &hibmc_fops,
->         .name                   = "hibmc",
->         .date                   = "20160828",
-> @@ -62,6 +91,7 @@ static void hibmc_disable_vblank(struct drm_device *dev, unsigned int pipe)
->         .dumb_create            = hibmc_dumb_create,
->         .dumb_map_offset        = hibmc_dumb_mmap_offset,
->         .dumb_destroy           = drm_gem_dumb_destroy,
-> +       .irq_handler            = hibmc_drm_interrupt,
->  };
->
->  static int hibmc_pm_suspend(struct device *dev)
-> @@ -268,6 +298,13 @@ static int hibmc_unload(struct drm_device *dev)
->         struct hibmc_drm_private *priv = dev->dev_private;
->
->         hibmc_fbdev_fini(priv);
-> +
-> +       if (dev->irq_enabled)
-> +               drm_irq_uninstall(dev);
-> +       if (priv->msi_enabled)
-> +               pci_disable_msi(dev->pdev);
-> +       drm_vblank_cleanup(dev);
-> +
->         hibmc_kms_fini(priv);
->         hibmc_mm_fini(priv);
->         dev->dev_private = NULL;
-> @@ -299,6 +336,23 @@ static int hibmc_load(struct drm_device *dev)
->         if (ret)
->                 goto err;
->
-> +       ret = drm_vblank_init(dev, dev->mode_config.num_crtc);
-> +       if (ret) {
-> +               DRM_ERROR("failed to initialize vblank: %d\n", ret);
-> +               goto err;
-> +       }
-> +
-> +       priv->msi_enabled = 0;
-> +       ret = pci_enable_msi(dev->pdev);
-> +       if (ret) {
-> +               DRM_WARN("enabling MSI failed: %d\n", ret);
-> +       } else {
-> +               priv->msi_enabled = 1;
-> +               ret = drm_irq_install(dev, dev->pdev->irq);
-> +               if (ret)
-> +                       DRM_WARN("install irq failed: %d\n", ret);
-> +       }
-> +
->         /* reset all the states of crtc/plane/encoder/connector */
->         drm_mode_config_reset(dev);
->
-> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-> index b626caf..e195521 100644
-> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-> @@ -42,6 +42,7 @@ struct hibmc_drm_private {
->         void __iomem   *fb_map;
->         unsigned long  fb_base;
->         unsigned long  fb_size;
-> +       bool msi_enabled;
->
->         /* drm */
->         struct drm_device  *dev;
+>  DRM DRIVERS FOR HISILICON
+>  M:     Xinliang Liu <z.liuxinliang@hisilicon.com>
+> +M:     Rongrong Zou <zourongrong@gmail.com>
+>  R:     Xinwei Kong <kong.kongxinwei@hisilicon.com>
+>  R:     Chen Feng <puck.chen@hisilicon.com>
+>  L:     dri-devel at lists.freedesktop.org
 > --
 > 1.9.1
 >
