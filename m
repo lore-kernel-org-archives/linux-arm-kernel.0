@@ -1,108 +1,75 @@
-From: sriram.dash@nxp.com (Sriram Dash)
-Date: Wed, 16 Nov 2016 11:33:11 +0000
-Subject: [upstream-release] [PATCH 1/2] drivers: usb: phy: Add qoriq usb
- 3.0	phy driver support
-In-Reply-To: <HE1PR0401MB1931C92287A8E92BC6B52B1991BE0@HE1PR0401MB1931.eurprd04.prod.outlook.com>
-References: <1479101215-26954-1-git-send-email-sriram.dash@nxp.com>
- <1479101215-26954-2-git-send-email-sriram.dash@nxp.com>
- <DB5PR0401MB1928CA058CC01243457F124791BC0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
- <DB5PR0401MB1925FB1FE45C15B0671E46D1F5BF0@DB5PR0401MB1925.eurprd04.prod.outlook.com>
- <HE1PR0401MB1931C92287A8E92BC6B52B1991BE0@HE1PR0401MB1931.eurprd04.prod.outlook.com>
-Message-ID: <DB5PR0401MB1925E935B4E7F5D1D1E521D5F5BE0@DB5PR0401MB1925.eurprd04.prod.outlook.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Wed, 16 Nov 2016 12:34:18 +0100
+Subject: [PATCH v5 1/2] drm: tilcdc: implement palette loading for rev1
+In-Reply-To: <3fc032e5-cc23-ae7b-9f59-9c71c0a909b8@ti.com>
+References: <1477923567-1610-1-git-send-email-bgolaszewski@baylibre.com>
+ <1477923567-1610-2-git-send-email-bgolaszewski@baylibre.com>
+ <3fc032e5-cc23-ae7b-9f59-9c71c0a909b8@ti.com>
+Message-ID: <CAMpxmJUh8KypU_-HtGa+ieCpO46FBME8_VQCJvYkCjFhmuVWgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From: Scott Wood
->On 11/15/2016 06:39 AM, Sriram Dash wrote:
->>> From: Scott Wood
->>> On 11/13/2016 11:27 PM, Sriram Dash wrote:
->>>> diff --git
->>>> a/Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
->>>> b/Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
->>>> new file mode 100644
->>>> index 0000000..d934c80
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
->>>> @@ -0,0 +1,36 @@
->>>> +Driver for Freescale USB 3.0 PHY
->>>> +
->>>> +Required properties:
->>>> +
->>>> +- compatible :	fsl,qoriq-usb3-phy
->>>
+2016-10-31 17:05 GMT+01:00 Jyri Sarha <jsarha@ti.com>:
+> On 10/31/16 16:19, Bartosz Golaszewski wrote:
+>> Revision 1 of the IP doesn't work if we don't load the palette (even
+>> if it's not used, which is the case for the RGB565 format).
 >>
->> Hi Scott,
+>> Add a function called from tilcdc_crtc_enable() which performs all
+>> required actions if we're dealing with a rev1 chip.
 >>
->>> This is a very vague compatible.  Are there versioning registers
->>> within this register block?
->>>
->>
->> There are versioning registers for the phy (1.0 and 1.1). But the
->> current erratum
->> A008751 does not require the mentioning of the version numbers. Was
->> planning to take care of the versioning when there is code diversity
->> on the basis of the version number.
 >
->That is not how device tree bindings work.  The describe the hardware, not the
->driver.
+> There is only one thing I do not like about this patch. The palette
+> loading is done so late that the frame buffer address are already placed
+> into DMA base and ceiling registers, and we need to read them from the
+> registers and restore them back after the palette loading.
 >
->That said, is the block version sufficient to tell whether a given chip has this
->erratum?  If so, you don't need a special property for the erratum.  If not, what is
->different about the PHY that is not described by the versioning?
+> Could you try if the palette loading function works without trouble when
+> called from tilcdc_pm_resume() before drm_atomic_helper_resume() call?
+> If it does it would be cleaner in the sense that you could get rid off
+> the old dma address restore code. You could reinit the completion always
+> there right before the palette loading.
 >
->In any case, it would be nice to mention the version register and its offset in the
->binding, just so that it becomes part of the definition of this compatible string, and
->if we come out with some QorIQ chip with a
->USB3 PHY that is totally different and doesn't have that version register, it'll be
->clear that it needs a different compatible.
+> If you can not get the above suggestion to work, then I can take this
+> patch.
 >
 
-Okay. Will include version number in the next rev for Documentation and dt.
+Hi Jyri,
 
->>>> +static inline u32 qoriq_usb3_phy_readl(void __iomem *addr, u32
->>>> +offset) {
->>>> +	return __raw_readl(addr + offset); }
->>>> +
->>>> +static inline void qoriq_usb3_phy_writel(void __iomem *addr, u32 offset,
->>>> +	u32 data)
->>>> +{
->>>> +	__raw_writel(data, addr + offset); }
->>>
->>> Why raw?  Besides missing barriers, this will cause the accesses to
->>> be native-endian which is not correct.
->>>
->>
->> The only reason for __raw_writel is to make the code faster.
->
->Does that really matter here?
->
->> However, shall I use writel(with both barriers and byte swap) instead
->
->Yes, if the registers are little-endian on all chips.
->
+the problem is that tilcdc_pm_resume() is not called when tilcdc is
+initialized. We would have to have two calls in different places for
+that to work.
 
-The endianness is not same for all Socs. But for most Socs, it is big-endian.
-Is "iowrite32be" better instead? 
+>> +static void tilcdc_crtc_load_palette(struct drm_crtc *crtc)
+>> +{
+>> +     u32 dma_fb_base, dma_fb_ceiling, raster_ctl;
+>> +     struct tilcdc_crtc *tilcdc_crtc;
+>> +     struct drm_device *dev;
+>> +     u16 *first_entry;
+>> +
+>> +     dev = crtc->dev;
+>> +     tilcdc_crtc = to_tilcdc_crtc(crtc);
+>> +     first_entry = tilcdc_crtc->palette_base;
+>> +
+>> +     *first_entry = TILCDC_REV1_PALETTE_FIRST_ENTRY;
+>> +
+>> +     dma_fb_base = tilcdc_read(dev, LCDC_DMA_FB_BASE_ADDR_0_REG);
+>> +     dma_fb_ceiling = tilcdc_read(dev, LCDC_DMA_FB_CEILING_ADDR_0_REG);
+>> +     raster_ctl = tilcdc_read(dev, LCDC_RASTER_CTRL_REG);
+>> +
+>> +     /* Tell the LCDC where the palette is located. */
+>> +     tilcdc_write(dev, LCDC_DMA_FB_BASE_ADDR_0_REG,
+>> +                  tilcdc_crtc->palette_dma_handle);
+>> +     tilcdc_write(dev, LCDC_DMA_FB_CEILING_ADDR_0_REG,
+>> +                  (u32)tilcdc_crtc->palette_dma_handle
+>
+> Just a nit pick, but I would put the plus sign to the end of the line
+> above instead of the beginning of the line bellow. However,
+> check_patch.pl does not complain about this so I guess I can accept it too.
+>
+>> +                             + TILCDC_REV1_PALETTE_SIZE - 1);
+>> +
 
->> and then make appropriate changes in the value 32'h27672B2A?
->
->Not sure what you mean here.
->
->> In my knowledge, there are more than 5 errata in pipeline,
->
->Then please get all of these errata described in the device tree ASAP (unless their
->presence can be reliably inferred from the block version, as discussed above).
->
+I'll fix that in v6.
 
-Yes. We will push the errata asap.
-
->> However, in future, if any other erratum comes up, and it has to be
->> applied at any point other than during init, then the variable has to
->> be added in qoriq_usb3_phy struct and the property has to be read separately.
->
->Or if the erratum is detected by some means other than a device tree property...
->
-
-Yes. For any other case also, it will be handled differently.
-
->-Scott
+Thanks,
+Bartosz Golaszewski
