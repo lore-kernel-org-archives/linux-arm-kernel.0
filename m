@@ -1,109 +1,178 @@
-From: wei@redhat.com (Wei Huang)
-Date: Wed, 16 Nov 2016 11:09:20 -0600
-Subject: [PATCH v3 1/1] KVM: ARM64: Fix the issues when guest PMCCFILTR is
- configured
-Message-ID: <1479316160-8567-1-git-send-email-wei@redhat.com>
+From: xhnjupt@gmail.com (Han Xu)
+Date: Wed, 16 Nov 2016 11:10:58 -0600
+Subject: [PATCH v3 6/9] mtd: spi-nor: Support R/W for S25FS-S family flash
+In-Reply-To: <AM4PR0701MB21308B262DB7B94E0F7FC34EFEF00@AM4PR0701MB2130.eurprd07.prod.outlook.com>
+References: <1471505884-33996-1-git-send-email-B56489@freescale.com>
+ <1471505884-33996-6-git-send-email-B56489@freescale.com>
+ <CA+EcR20NkBzFjMJ_ArWw9ALZY-x1SqwS1nUyGYAnjsygTk8K-Q@mail.gmail.com>
+ <AM4PR0701MB21308B262DB7B94E0F7FC34EFEF00@AM4PR0701MB2130.eurprd07.prod.outlook.com>
+Message-ID: <20161116171058.GA21300@Cayman.am.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM calls kvm_pmu_set_counter_event_type() when PMCCFILTR is configured.
-But this function can't deals with PMCCFILTR correctly because the evtCount
-bits of PMCCFILTR, which is reserved 0, conflits with the SW_INCR event
-type of other PMXEVTYPER<n> registers. To fix it, when eventsel == 0, this
-function shouldn't return immediately; instead it needs to check further
-if select_idx is ARMV8_PMU_CYCLE_IDX.
+On Thu, Sep 15, 2016 at 06:50:55AM +0000, Krzeminski, Marcin (Nokia - PL/Wroclaw) wrote:
+> Hello,
+> 
+> > -----Original Message-----
+> > From: linux-mtd [mailto:linux-mtd-bounces at lists.infradead.org] On Behalf
+> > Of Han Xu
+> > Sent: Wednesday, September 14, 2016 9:49 PM
+> > To: Yunhui Cui <B56489@freescale.com>
+> > Cc: Yunhui Cui <yunhui.cui@nxp.com>; David Woodhouse
+> > <dwmw2@infradead.org>; linux-kernel at vger.kernel.org; linux-
+> > mtd at lists.infradead.org; han.xu at freescale.com; Brian Norris
+> > <computersforpeace@gmail.com>; jagannadh.teki at gmail.com; linux-arm-
+> > kernel at lists.infradead.org; Yao Yuan <yao.yuan@nxp.com>
+> > Subject: Re: [PATCH v3 6/9] mtd: spi-nor: Support R/W for S25FS-S family
+> > flash
+> > 
+> > On Thu, Aug 18, 2016 at 2:38 AM, Yunhui Cui <B56489@freescale.com>
+> > wrote:
+> > > From: Yunhui Cui <yunhui.cui@nxp.com>
+> > >
+> > > With the physical sectors combination, S25FS-S family flash requires
+> > > some special operations for read/write functions.
+> > >
+> > > Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
+> > > ---
+> > >  drivers/mtd/spi-nor/spi-nor.c | 56
+> > > +++++++++++++++++++++++++++++++++++++++++++
+> > >  1 file changed, 56 insertions(+)
+> > >
+> > > diff --git a/drivers/mtd/spi-nor/spi-nor.c
+> > > b/drivers/mtd/spi-nor/spi-nor.c index d0fc165..495d0bb 100644
+> > > --- a/drivers/mtd/spi-nor/spi-nor.c
+> > > +++ b/drivers/mtd/spi-nor/spi-nor.c
+> > > @@ -39,6 +39,10 @@
+> > >
+> > >  #define SPI_NOR_MAX_ID_LEN     6
+> > >  #define SPI_NOR_MAX_ADDR_WIDTH 4
+> > > +/* Added for S25FS-S family flash */
+> > > +#define SPINOR_CONFIG_REG3_OFFSET      0x800004
+> > > +#define CR3V_4KB_ERASE_UNABLE  0x8
+> > > +#define SPINOR_S25FS_FAMILY_EXT_JEDEC  0x81
+> > >
+> > >  struct flash_info {
+> > >         char            *name;
+> > > @@ -78,6 +82,7 @@ struct flash_info {
+> > >  };
+> > >
+> > >  #define JEDEC_MFR(info)        ((info)->id[0])
+> > > +#define EXT_JEDEC(info)        ((info)->id[5])
+> > >
+> > >  static const struct flash_info *spi_nor_match_id(const char *name);
+> > >
+> > > @@ -899,6 +904,7 @@ static const struct flash_info spi_nor_ids[] = {
+> > >          */
+> > >         { "s25sl032p",  INFO(0x010215, 0x4d00,  64 * 1024,  64,
+> > SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+> > >         { "s25sl064p",  INFO(0x010216, 0x4d00,  64 * 1024, 128,
+> > > SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+> > > +       { "s25fs256s1", INFO6(0x010219, 0x4d0181, 64 * 1024, 512, 0)},
+> > >         { "s25fl256s0", INFO(0x010219, 0x4d00, 256 * 1024, 128, 0) },
+> > >         { "s25fl256s1", INFO(0x010219, 0x4d01,  64 * 1024, 512,
+> > SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+> > >         { "s25fl512s",  INFO(0x010220, 0x4d00, 256 * 1024, 256,
+> > > SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) }, @@ -1036,6 +1042,50
+> > @@ static const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
+> > >         return ERR_PTR(-ENODEV);
+> > >  }
+> > >
+> > > +/*
+> > > + * The S25FS-S family physical sectors may be configured as a
+> > > + * hybrid combination of eight 4-kB parameter sectors
+> > > + * at the top or bottom of the address space with all
+> > > + * but one of the remaining sectors being uniform size.
+> > > + * The Parameter Sector Erase commands (20h or 21h) must
+> > > + * be used to erase the 4-kB parameter sectors individually.
+> > > + * The Sector (uniform sector) Erase commands (D8h or DCh)
+> > > + * must be used to erase any of the remaining
+> > > + * sectors, including the portion of highest or lowest address
+> > > + * sector that is not overlaid by the parameter sectors.
+> > > + * The uniform sector erase command has no effect on parameter
+> > sectors.
+> > > + */
+> > > +static int spansion_s25fs_disable_4kb_erase(struct spi_nor *nor) {
+> > > +       u32 cr3v_addr  = SPINOR_CONFIG_REG3_OFFSET;
+> > > +       u8 cr3v = 0x0;
+> > > +       int ret = 0x0;
+> > > +
+> > > +       nor->cmd_buf[2] = cr3v_addr >> 16;
+> > > +       nor->cmd_buf[1] = cr3v_addr >> 8;
+> > > +       nor->cmd_buf[0] = cr3v_addr >> 0;
+> > > +
+> > > +       ret = nor->read_reg(nor, SPINOR_OP_SPANSION_RDAR, &cr3v, 1);
+> > > +       if (ret)
+> > > +               return ret;
+> > > +       if (cr3v & CR3V_4KB_ERASE_UNABLE)
+> > > +               return 0;
+> > > +       ret = nor->write_reg(nor, SPINOR_OP_WREN, NULL, 0);
+> > > +       if (ret)
+> > > +               return ret;
+> > > +       cr3v = CR3V_4KB_ERASE_UNABLE;
+> > > +       nor->program_opcode = SPINOR_OP_SPANSION_WRAR;
+> > > +       nor->write(nor, cr3v_addr, 1, &cr3v);
+> > > +
+> > > +       ret = nor->read_reg(nor, SPINOR_OP_SPANSION_RDAR, &cr3v, 1);
+> > > +       if (ret)
+> > > +               return ret;
+> > > +       if (!(cr3v & CR3V_4KB_ERASE_UNABLE))
+> > > +               return -EPERM;
+> > > +
+> > > +       return 0;
+> > > +}
+> > > +
+> > >  static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
+> > >                         size_t *retlen, u_char *buf)  { @@ -1361,6
+> > > +1411,12 @@ int spi_nor_scan(struct spi_nor *nor, const char *name,
+> > enum read_mode mode)
+> > >                 spi_nor_wait_till_ready(nor);
+> > >         }
+> > >
+> > > +       if (EXT_JEDEC(info) == SPINOR_S25FS_FAMILY_EXT_JEDEC) {
+> > > +               ret = spansion_s25fs_disable_4kb_erase(nor);
+> > > +               if (ret)
+> > > +                       return ret;
+> > > +       }
+> > > +
+> > >         if (!mtd->name)
+> > >                 mtd->name = dev_name(dev);
+> > >         mtd->priv = nor;
+> > > --
+> > > 2.1.0.27.g96db324
+> > >
+> > >
+> > Hi Brian, I will ack this change but still feel it's kind of hacking code.
+> > 
+> > Acked-by: Han xu <han.xu@nxp.com>
+> 
+> I am new on the list so I am not sure if this topic has been discussed.
+> Generally our product functionality relay on those 4KiB sectors.
+> I know that this hack is already in u-boot, but if you mainstream this
+> you will force users of those 4KiB sectors to do hack the hack...
+> I believe the proper solution here is to use erase regions functionality,
+> I send and RFS about that some time ago.
 
-Another issue is that KVM shouldn't copy the eventsel bits of PMCCFILTER
-blindly to attr.config. Instead it ought to convert the request to the
-"cpu cycle" event type (i.e. 0x11).
+Do you mind to send me a link for reference?
 
-To support this patch and to prevent duplicated definitions, a limited
-set of ARMv8 perf event types were relocated from perf_event.c to
-asm/perf_event.h.
+Sincerely,
+Han XU
 
-Signed-off-by: Wei Huang <wei@redhat.com>
----
- arch/arm64/include/asm/perf_event.h | 10 +++++++++-
- arch/arm64/kernel/perf_event.c      | 10 +---------
- virt/kvm/arm/pmu.c                  |  8 +++++---
- 3 files changed, 15 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
-index 2065f46..38b6a2b 100644
---- a/arch/arm64/include/asm/perf_event.h
-+++ b/arch/arm64/include/asm/perf_event.h
-@@ -46,7 +46,15 @@
- #define	ARMV8_PMU_EVTYPE_MASK	0xc800ffff	/* Mask for writable bits */
- #define	ARMV8_PMU_EVTYPE_EVENT	0xffff		/* Mask for EVENT bits */
- 
--#define ARMV8_PMU_EVTYPE_EVENT_SW_INCR	0	/* Software increment event */
-+/*
-+ * PMUv3 event types: required events
-+ */
-+#define ARMV8_PMUV3_PERFCTR_SW_INCR				0x00
-+#define ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL			0x03
-+#define ARMV8_PMUV3_PERFCTR_L1D_CACHE				0x04
-+#define ARMV8_PMUV3_PERFCTR_BR_MIS_PRED				0x10
-+#define ARMV8_PMUV3_PERFCTR_CPU_CYCLES				0x11
-+#define ARMV8_PMUV3_PERFCTR_BR_PRED				0x12
- 
- /*
-  * Event filters for PMUv3
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index a9310a6..57ae9d9 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -31,17 +31,9 @@
- 
- /*
-  * ARMv8 PMUv3 Performance Events handling code.
-- * Common event types.
-+ * Common event types (some are defined in asm/perf_event.h).
-  */
- 
--/* Required events. */
--#define ARMV8_PMUV3_PERFCTR_SW_INCR				0x00
--#define ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL			0x03
--#define ARMV8_PMUV3_PERFCTR_L1D_CACHE				0x04
--#define ARMV8_PMUV3_PERFCTR_BR_MIS_PRED				0x10
--#define ARMV8_PMUV3_PERFCTR_CPU_CYCLES				0x11
--#define ARMV8_PMUV3_PERFCTR_BR_PRED				0x12
--
- /* At least one of the following is required. */
- #define ARMV8_PMUV3_PERFCTR_INST_RETIRED			0x08
- #define ARMV8_PMUV3_PERFCTR_INST_SPEC				0x1B
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 6e9c40e..69ccce3 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -305,7 +305,7 @@ void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val)
- 			continue;
- 		type = vcpu_sys_reg(vcpu, PMEVTYPER0_EL0 + i)
- 		       & ARMV8_PMU_EVTYPE_EVENT;
--		if ((type == ARMV8_PMU_EVTYPE_EVENT_SW_INCR)
-+		if ((type == ARMV8_PMUV3_PERFCTR_SW_INCR)
- 		    && (enable & BIT(i))) {
- 			reg = vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + i) + 1;
- 			reg = lower_32_bits(reg);
-@@ -379,7 +379,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
- 	eventsel = data & ARMV8_PMU_EVTYPE_EVENT;
- 
- 	/* Software increment event does't need to be backed by a perf event */
--	if (eventsel == ARMV8_PMU_EVTYPE_EVENT_SW_INCR)
-+	if (eventsel == ARMV8_PMUV3_PERFCTR_SW_INCR &&
-+	    select_idx != ARMV8_PMU_CYCLE_IDX)
- 		return;
- 
- 	memset(&attr, 0, sizeof(struct perf_event_attr));
-@@ -391,7 +392,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
- 	attr.exclude_kernel = data & ARMV8_PMU_EXCLUDE_EL1 ? 1 : 0;
- 	attr.exclude_hv = 1; /* Don't count EL2 events */
- 	attr.exclude_host = 1; /* Don't count host events */
--	attr.config = eventsel;
-+	attr.config = (select_idx == ARMV8_PMU_CYCLE_IDX) ?
-+		ARMV8_PMUV3_PERFCTR_CPU_CYCLES : eventsel;
- 
- 	counter = kvm_pmu_get_counter_value(vcpu, select_idx);
- 	/* The initial sample period (overflow count) of an event. */
--- 
-2.7.4
+> 
+> Thanks,
+> Marcin
+> 
+> > > ______________________________________________________
+> > > Linux MTD discussion mailing list
+> > > http://lists.infradead.org/mailman/listinfo/linux-mtd/
+> > 
+> > 
+> > 
+> > --
+> > Sincerely,
+> > 
+> > Han XU
+> > 
+> > ______________________________________________________
+> > Linux MTD discussion mailing list
+> > http://lists.infradead.org/mailman/listinfo/linux-mtd/
