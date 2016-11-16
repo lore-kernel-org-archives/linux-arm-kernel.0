@@ -1,23 +1,19 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 16 Nov 2016 14:39:17 +0530
-Subject: [PATCH v2 2/3] ARM: davinci: PM: cleanup: remove references to
- pdata
-In-Reply-To: <20161115195421.19983-3-khilman@baylibre.com>
+Date: Wed, 16 Nov 2016 14:46:12 +0530
+Subject: [PATCH v2 3/3] ARM: davinci: PM: support da8xx DT platforms
+In-Reply-To: <20161115195421.19983-4-khilman@baylibre.com>
 References: <20161115195421.19983-1-khilman@baylibre.com>
- <20161115195421.19983-3-khilman@baylibre.com>
-Message-ID: <b0066bd3-a4e2-36dc-cabb-1ac21bbe9e84@ti.com>
+ <20161115195421.19983-4-khilman@baylibre.com>
+Message-ID: <89d4c57d-6762-d98f-4c82-eb4403fd56f4@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wednesday 16 November 2016 01:24 AM, Kevin Hilman wrote:
-> Since the PM core code is no longer using a fake platform_device or
-> platform_data, remove references to 'pdata'.
-> 
-> No functional changes.
-> 
 > Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 
-Applied to v4.10/cleanup
+Added a one line description which is essentially a copy of subject line.
+
+Applied to v4.10/soc
 
 Thanks,
 Sekhar
