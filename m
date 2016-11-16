@@ -1,209 +1,104 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Nov 2016 16:39:05 +0100
-Subject: [PATCH 1/2] staging: vc04_services: remove duplicate
- mutex_lock_interruptible
-Message-ID: <20161116154139.3703209-1-arnd@arndb.de>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 16 Nov 2016 23:42:31 +0800
+Subject: [PATCH v4 1/2] drm/bridge: dumb-vga-dac: Support a VDD regulator
+ supply
+In-Reply-To: <20161116154232.872-1-wens@csie.org>
+References: <20161116154232.872-1-wens@csie.org>
+Message-ID: <20161116154232.872-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver tries to redefine mutex_lock_interruptible as an open-coded
-mutex_lock_killable, but that definition clashes with the normal
-mutex_lock_interruptible definition when CONFIG_DEBUG_LOCK_ALLOC
-is set:
+Some dumb VGA DACs are active components which require external power.
+Add support for specifying a regulator as its power supply.
 
-staging/vc04_services/interface/vchiq_arm/vchiq_killable.h:67:0: error: "mutex_lock_interruptible" redefined [-Werror]
- #define mutex_lock_interruptible mutex_lock_interruptible_killable
-include/linux/mutex.h:161:0: note: this is the location of the previous definition
-
-This simply removes the private implementation and uses the
-normal mutex_lock_killable directly.
-
-We could do the same for the down_interruptible_killable here, but
-it's better to just remove the semaphores entirely from the driver,
-which also takes care of that.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../vc04_services/interface/vchiq_arm/vchiq_arm.c    |  2 +-
- .../interface/vchiq_arm/vchiq_connected.c            |  4 ++--
- .../vc04_services/interface/vchiq_arm/vchiq_core.c   | 20 ++++++++++----------
- .../interface/vchiq_arm/vchiq_kern_lib.c             |  4 ++--
- .../interface/vchiq_arm/vchiq_killable.h             | 14 --------------
- 5 files changed, 15 insertions(+), 29 deletions(-)
+ .../bindings/display/bridge/dumb-vga-dac.txt       |  2 ++
+ drivers/gpu/drm/bridge/dumb-vga-dac.c              | 35 ++++++++++++++++++++++
+ 2 files changed, 37 insertions(+)
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-index d0435a05ea35..0d987898b4f8 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-@@ -554,7 +554,7 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 			ret = -EINVAL;
- 			break;
- 		}
--		rc = mutex_lock_interruptible(&instance->state->mutex);
-+		rc = mutex_lock_killable(&instance->state->mutex);
- 		if (rc != 0) {
- 			vchiq_log_error(vchiq_arm_log_level,
- 				"vchiq: connect: could not lock mutex for "
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_connected.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_connected.c
-index 5efc62ffb2f5..7ea29665bd0c 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_connected.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_connected.c
-@@ -72,7 +72,7 @@ void vchiq_add_connected_callback(VCHIQ_CONNECTED_CALLBACK_T callback)
- {
- 	connected_init();
+diff --git a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
+index 003bc246a270..164cbb15f04c 100644
+--- a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
++++ b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
+@@ -16,6 +16,8 @@ graph bindings specified in Documentation/devicetree/bindings/graph.txt.
+ - Video port 0 for RGB input
+ - Video port 1 for VGA output
  
--	if (mutex_lock_interruptible(&g_connected_mutex) != 0)
-+	if (mutex_lock_killable(&g_connected_mutex) != 0)
- 		return;
++Optional properties:
++- vdd-supply: Power supply for DAC
  
- 	if (g_connected)
-@@ -107,7 +107,7 @@ void vchiq_call_connected_callbacks(void)
+ Example
+ -------
+diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c b/drivers/gpu/drm/bridge/dumb-vga-dac.c
+index afec232185a7..15b549f94307 100644
+--- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
++++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
+@@ -12,6 +12,7 @@
  
- 	connected_init();
+ #include <linux/module.h>
+ #include <linux/of_graph.h>
++#include <linux/regulator/consumer.h>
  
--	if (mutex_lock_interruptible(&g_connected_mutex) != 0)
-+	if (mutex_lock_killable(&g_connected_mutex) != 0)
- 		return;
+ #include <drm/drmP.h>
+ #include <drm/drm_atomic_helper.h>
+@@ -23,6 +24,7 @@ struct dumb_vga {
+ 	struct drm_connector	connector;
  
- 	for (i = 0; i <  g_num_deferred_callbacks; i++)
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-index 7440db2ce40b..028e90bc1cdc 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-@@ -794,7 +794,7 @@ queue_message(VCHIQ_STATE_T *state, VCHIQ_SERVICE_T *service,
- 	WARN_ON(!(stride <= VCHIQ_SLOT_SIZE));
+ 	struct i2c_adapter	*ddc;
++	struct regulator	*vdd;
+ };
  
- 	if (!(flags & QMFLAGS_NO_MUTEX_LOCK) &&
--		(mutex_lock_interruptible(&state->slot_mutex) != 0))
-+		(mutex_lock_killable(&state->slot_mutex) != 0))
- 		return VCHIQ_RETRY;
- 
- 	if (type == VCHIQ_MSG_DATA) {
-@@ -863,7 +863,7 @@ queue_message(VCHIQ_STATE_T *state, VCHIQ_SERVICE_T *service,
- 				return VCHIQ_RETRY;
- 			if (service->closing)
- 				return VCHIQ_ERROR;
--			if (mutex_lock_interruptible(&state->slot_mutex) != 0)
-+			if (mutex_lock_killable(&state->slot_mutex) != 0)
- 				return VCHIQ_RETRY;
- 			if (service->srvstate != VCHIQ_SRVSTATE_OPEN) {
- 				/* The service has been closed */
-@@ -1033,7 +1033,7 @@ queue_message_sync(VCHIQ_STATE_T *state, VCHIQ_SERVICE_T *service,
- 	local = state->local;
- 
- 	if ((VCHIQ_MSG_TYPE(msgid) != VCHIQ_MSG_RESUME) &&
--		(mutex_lock_interruptible(&state->sync_mutex) != 0))
-+		(mutex_lock_killable(&state->sync_mutex) != 0))
- 		return VCHIQ_RETRY;
- 
- 	remote_event_wait(state, &local->sync_release);
-@@ -1365,7 +1365,7 @@ resolve_bulks(VCHIQ_SERVICE_T *service, VCHIQ_BULK_QUEUE_T *queue)
- 		WARN_ON(!((int)(queue->local_insert - queue->process) > 0));
- 		WARN_ON(!((int)(queue->remote_insert - queue->process) > 0));
- 
--		rc = mutex_lock_interruptible(&state->bulk_transfer_mutex);
-+		rc = mutex_lock_killable(&state->bulk_transfer_mutex);
- 		if (rc != 0)
- 			break;
- 
-@@ -1839,7 +1839,7 @@ parse_rx_slots(VCHIQ_STATE_T *state)
- 				int resolved = 0;
- 
- 				DEBUG_TRACE(PARSE_LINE);
--				if (mutex_lock_interruptible(
-+				if (mutex_lock_killable(
- 					&service->bulk_mutex) != 0) {
- 					DEBUG_TRACE(PARSE_LINE);
- 					goto bail_not_ready;
-@@ -1903,7 +1903,7 @@ parse_rx_slots(VCHIQ_STATE_T *state)
- 					&service->bulk_rx : &service->bulk_tx;
- 
- 				DEBUG_TRACE(PARSE_LINE);
--				if (mutex_lock_interruptible(
-+				if (mutex_lock_killable(
- 					&service->bulk_mutex) != 0) {
- 					DEBUG_TRACE(PARSE_LINE);
- 					goto bail_not_ready;
-@@ -2780,7 +2780,7 @@ do_abort_bulks(VCHIQ_SERVICE_T *service)
- 	VCHIQ_STATUS_T status;
- 
- 	/* Abort any outstanding bulk transfers */
--	if (mutex_lock_interruptible(&service->bulk_mutex) != 0)
-+	if (mutex_lock_killable(&service->bulk_mutex) != 0)
- 		return 0;
- 	abort_outstanding_bulks(service, &service->bulk_tx);
- 	abort_outstanding_bulks(service, &service->bulk_rx);
-@@ -3300,7 +3300,7 @@ vchiq_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle,
- 	queue = (dir == VCHIQ_BULK_TRANSMIT) ?
- 		&service->bulk_tx : &service->bulk_rx;
- 
--	if (mutex_lock_interruptible(&service->bulk_mutex) != 0) {
-+	if (mutex_lock_killable(&service->bulk_mutex) != 0) {
- 		status = VCHIQ_RETRY;
- 		goto error_exit;
- 	}
-@@ -3314,7 +3314,7 @@ vchiq_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle,
- 				status = VCHIQ_RETRY;
- 				goto error_exit;
- 			}
--			if (mutex_lock_interruptible(&service->bulk_mutex)
-+			if (mutex_lock_killable(&service->bulk_mutex)
- 				!= 0) {
- 				status = VCHIQ_RETRY;
- 				goto error_exit;
-@@ -3344,7 +3344,7 @@ vchiq_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle,
- 
- 	/* The slot mutex must be held when the service is being closed, so
- 	   claim it here to ensure that isn't happening */
--	if (mutex_lock_interruptible(&state->slot_mutex) != 0) {
-+	if (mutex_lock_killable(&state->slot_mutex) != 0) {
- 		status = VCHIQ_RETRY;
- 		goto cancel_bulk_error_exit;
- 	}
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
-index 14bd2857e462..e93922a87263 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
-@@ -134,7 +134,7 @@ VCHIQ_STATUS_T vchiq_shutdown(VCHIQ_INSTANCE_T instance)
- 	vchiq_log_trace(vchiq_core_log_level,
- 		"%s(%p) called", __func__, instance);
- 
--	if (mutex_lock_interruptible(&state->mutex) != 0)
-+	if (mutex_lock_killable(&state->mutex) != 0)
- 		return VCHIQ_RETRY;
- 
- 	/* Remove all services */
-@@ -191,7 +191,7 @@ VCHIQ_STATUS_T vchiq_connect(VCHIQ_INSTANCE_T instance)
- 	vchiq_log_trace(vchiq_core_log_level,
- 		"%s(%p) called", __func__, instance);
- 
--	if (mutex_lock_interruptible(&state->mutex) != 0) {
-+	if (mutex_lock_killable(&state->mutex) != 0) {
- 		vchiq_log_trace(vchiq_core_log_level,
- 			"%s: call to mutex_lock failed", __func__);
- 		status = VCHIQ_RETRY;
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_killable.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_killable.h
-index 335446e05476..778063ba312a 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_killable.h
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_killable.h
-@@ -52,18 +52,4 @@ static inline int __must_check down_interruptible_killable(struct semaphore *sem
+ static inline struct dumb_vga *
+@@ -124,8 +126,32 @@ static int dumb_vga_attach(struct drm_bridge *bridge)
+ 	return 0;
  }
- #define down_interruptible down_interruptible_killable
  
--
--static inline int __must_check mutex_lock_interruptible_killable(struct mutex *lock)
--{
--	/* Allow interception of killable signals only. We don't want to be interrupted by harmless signals like SIGALRM */
--	int ret;
--	sigset_t blocked, oldset;
--	siginitsetinv(&blocked, SHUTDOWN_SIGS);
--	sigprocmask(SIG_SETMASK, &blocked, &oldset);
--	ret = mutex_lock_interruptible(lock);
--	sigprocmask(SIG_SETMASK, &oldset, NULL);
--	return ret;
--}
--#define mutex_lock_interruptible mutex_lock_interruptible_killable
--
- #endif
++static void dumb_vga_enable(struct drm_bridge *bridge)
++{
++	struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
++	int ret = 0;
++
++	if (vga->vdd)
++		ret = regulator_enable(vga->vdd);
++
++	if (ret) {
++		DRM_ERROR("Failed to enable vdd regulator: %d\n", ret);
++		return;
++	}
++}
++
++static void dumb_vga_disable(struct drm_bridge *bridge)
++{
++	struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
++
++	if (vga->vdd)
++		regulator_disable(vga->vdd);
++}
++
+ static const struct drm_bridge_funcs dumb_vga_bridge_funcs = {
+ 	.attach		= dumb_vga_attach,
++	.enable		= dumb_vga_enable,
++	.disable	= dumb_vga_disable,
+ };
+ 
+ static struct i2c_adapter *dumb_vga_retrieve_ddc(struct device *dev)
+@@ -169,6 +195,15 @@ static int dumb_vga_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	platform_set_drvdata(pdev, vga);
+ 
++	vga->vdd = devm_regulator_get_optional(&pdev->dev, "vdd");
++	if (IS_ERR(vga->vdd)) {
++		ret = PTR_ERR(vga->vdd);
++		if (ret == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++		vga->vdd = NULL;
++		dev_dbg(&pdev->dev, "No vdd regulator found: %d\n", ret);
++	}
++
+ 	vga->ddc = dumb_vga_retrieve_ddc(&pdev->dev);
+ 	if (IS_ERR(vga->ddc)) {
+ 		if (PTR_ERR(vga->ddc) == -ENODEV) {
 -- 
-2.9.0
+2.10.2
