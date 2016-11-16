@@ -1,54 +1,34 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 16 Nov 2016 09:11:04 -0600
-Subject: [PATCH net 2/3] dt-bindings: net: add DT bindings for realtek phys
-In-Reply-To: <1479220154-25851-3-git-send-email-jbrunet@baylibre.com>
-References: <1479220154-25851-1-git-send-email-jbrunet@baylibre.com>
- <1479220154-25851-3-git-send-email-jbrunet@baylibre.com>
-Message-ID: <20161116151104.5sfcqjyvrzre5pkn@rob-hp-laptop>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 16 Nov 2016 16:11:31 +0100
+Subject: [PATCH v8 0/7] arm/arm64: vgic: Implement API for vGICv3 live
+ migration
+In-Reply-To: <CALicx6t=0sRYG1jn_=hqod+Kca9-8fWbtwL_-HXE3HvrA_h7PQ@mail.gmail.com>
+References: <1478258013-6669-1-git-send-email-vijay.kilari@gmail.com>
+ <20161116114722.GB3811@cbox>
+ <CALicx6t=0sRYG1jn_=hqod+Kca9-8fWbtwL_-HXE3HvrA_h7PQ@mail.gmail.com>
+Message-ID: <20161116151131.GA19439@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 15, 2016 at 03:29:13PM +0100, Jerome Brunet wrote:
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  .../devicetree/bindings/net/realtek-phy.txt          | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/realtek-phy.txt
+On Wed, Nov 16, 2016 at 08:24:16PM +0530, Vijay Kilari wrote:
+> On Wed, Nov 16, 2016 at 5:17 PM, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+> > On Fri, Nov 04, 2016 at 04:43:26PM +0530, vijay.kilari at gmail.com wrote:
+> >> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> >>
+> >> This patchset adds API for saving and restoring
+> >> of VGICv3 registers to support live migration with new vgic feature.
+> >> This API definition is as per version of VGICv3 specification
+> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
+> >>
+> >> The patch 3 & 4 are picked from the Pavel's previous implementation.
+> >> http://www.spinics.net/lists/kvm/msg122040.html
+> >
+> > Do we have QEMU/kvmtool patches somewhere at this point so that I can
+> > test this?
 > 
-> diff --git a/Documentation/devicetree/bindings/net/realtek-phy.txt b/Documentation/devicetree/bindings/net/realtek-phy.txt
-> new file mode 100644
-> index 000000000000..dc2845a6b387
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/realtek-phy.txt
-> @@ -0,0 +1,20 @@
-> +Realtek Ethernet PHY
-> +
-> +Some boards require special tuning values of the phy.
-> +
-> +Optional properties:
-> +
-> +realtek,disable-eee-1000t:
-> +realtek,disable-eee-100tx:
-
-Make these generic/common.
-
-> +  If set, respectively disable 1000-BaseT and 100-BaseTx energy efficient
-> +  ethernet capabilty advertisement
-> +  default: Leave the phy default settings unchanged (capabilities advertised)
-> +
-> +Example:
-> +
-> +&mdio0 {
-> +	ethernetphy0: ethernet-phy at 0 {
-> +		reg = <0>;
-> +		realtek,disable-eee-1000t;
-> +	};
-> +};
-> -- 
-> 2.7.4
+> I will send you next revision of QEMU patches tomorrow.
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Sounds good, thanks.
+
+-Christoffer
