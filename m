@@ -1,50 +1,42 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 17 Nov 2016 00:03:02 +0100
-Subject: [PATCH v3 1/3] dt-bindings: add used but undocumented rockchip grf
- compatible values
-In-Reply-To: <20161116230304.8432-1-heiko@sntech.de>
-References: <20161116230304.8432-1-heiko@sntech.de>
-Message-ID: <20161116230304.8432-2-heiko@sntech.de>
+Date: Thu, 17 Nov 2016 00:03:01 +0100
+Subject: [PATCH v3 0/3] Rockchip: generalize GRF setup
+Message-ID: <20161116230304.8432-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are some more General Register Files used in devicetree files
-already, but as of now undocumented in the binding document, fix that.
+The General register files contain a big bunch of settings for various
+components. Things like the automatic sdmmc/jtag switch may even affect
+us in a bad way, while that property (and possibly others) are not even
+part of the dw_mmc controller itself.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
-Acked-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
----
- Documentation/devicetree/bindings/soc/rockchip/grf.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+And while the rk3288 could still carry adaptions to these defaults
+in its mach files, this is no longer possible on the arm64 socs, while
+things like the jtag-switch from above still can affect us there.
 
-diff --git a/Documentation/devicetree/bindings/soc/rockchip/grf.txt b/Documentation/devicetree/bindings/soc/rockchip/grf.txt
-index 013e71a..c6e62cb 100644
---- a/Documentation/devicetree/bindings/soc/rockchip/grf.txt
-+++ b/Documentation/devicetree/bindings/soc/rockchip/grf.txt
-@@ -5,11 +5,13 @@ is composed of many registers for system control.
- 
- From RK3368 SoCs, the GRF is divided into two sections,
- - GRF, used for general non-secure system,
-+- SGRF, used for general secure system,
- - PMUGRF, used for always on system
- 
- Required Properties:
- 
- - compatible: GRF should be one of the followings
-+   - "rockchip,rk3036-grf", "syscon": for rk3036
-    - "rockchip,rk3066-grf", "syscon": for rk3066
-    - "rockchip,rk3188-grf", "syscon": for rk3188
-    - "rockchip,rk3228-grf", "syscon": for rk3228
-@@ -19,6 +21,8 @@ Required Properties:
- - compatible: PMUGRF should be one of the followings
-    - "rockchip,rk3368-pmugrf", "syscon": for rk3368
-    - "rockchip,rk3399-pmugrf", "syscon": for rk3399
-+- compatible: SGRF should be one of the following
-+   - "rockchip,rk3288-sgrf", "syscon": for rk3288
- - reg: physical base address of the controller and length of memory mapped
-   region.
- 
+changes in v3:
+- remove duplicate regmap header (now they're even sorted alphabetically)
+- add Dougs Review-tag from v2
+- fix the of_find_matching_node_and_match being over 80 chars
+
+changes in v2:
+- address comments from Doug Anderson
+- drop platform device, as we actual probing may happen at some
+  unspecified later time during boot
+- add reviews / acks received in v1
+
+Heiko Stuebner (3):
+  dt-bindings: add used but undocumented rockchip grf compatible values
+  soc: rockchip: add driver handling grf setup
+  ARM: rockchip: drop rk3288 jtag/mmc switch handling
+
+ .../devicetree/bindings/soc/rockchip/grf.txt       |   4 +
+ arch/arm/mach-rockchip/rockchip.c                  |  12 --
+ drivers/soc/rockchip/Kconfig                       |  10 ++
+ drivers/soc/rockchip/Makefile                      |   1 +
+ drivers/soc/rockchip/grf.c                         | 133 +++++++++++++++++++++
+ 5 files changed, 148 insertions(+), 12 deletions(-)
+ create mode 100644 drivers/soc/rockchip/grf.c
+
 -- 
 2.10.2
