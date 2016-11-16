@@ -1,78 +1,111 @@
-From: oss@buserror.net (Scott Wood)
-Date: Wed, 16 Nov 2016 00:54:22 -0600
-Subject: [PATCH] clk: qoriq: added ls1012a clock configuration
-In-Reply-To: <1479275900-42365-1-git-send-email-yuantian.tang@nxp.com>
-References: <1479275900-42365-1-git-send-email-yuantian.tang@nxp.com>
-Message-ID: <1479279262.21746.40.camel@buserror.net>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Wed, 16 Nov 2016 14:55:04 +0800
+Subject: [PATCH V2 fix 5/6] mm: hugetlb: add a new function to allocate a new
+ gigantic page
+In-Reply-To: <1479107259-2011-6-git-send-email-shijie.huang@arm.com>
+References: <1479107259-2011-6-git-send-email-shijie.huang@arm.com>
+Message-ID: <1479279304-31379-1-git-send-email-shijie.huang@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-11-16 at 13:58 +0800, yuantian.tang at nxp.com wrote:
-> From: Tang Yuantian <Yuantian.Tang@nxp.com>
-> 
-> Added ls1012a clock configuation information.
+There are three ways we can allocate a new gigantic page:
 
-Do we really need the same line in the changelog twice?
+1. When the NUMA is not enabled, use alloc_gigantic_page() to get
+   the gigantic page.
 
-> 
-> Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
-> ---
-> ?drivers/clk/clk-qoriq.c | 19 +++++++++++++++++++
-> ?1 file changed, 19 insertions(+)
-> 
-> diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c
-> index 1bece0f..563d874 100644
-> --- a/drivers/clk/clk-qoriq.c
-> +++ b/drivers/clk/clk-qoriq.c
-> @@ -202,6 +202,14 @@ static const struct clockgen_muxinfo ls1021a_cmux = {
-> ?	}
-> ?};
-> ?
-> +static const struct clockgen_muxinfo ls1012a_cmux = {
-> +	{
-> +		[0] = { CLKSEL_VALID, CGA_PLL1, PLL_DIV1 },
-> +		{},
-> +		[2] = { CLKSEL_VALID, CGA_PLL1, PLL_DIV2 },
-> +	}
-> +};
-> +
+2. The NUMA is enabled, but the vma is NULL.
+   There is no memory policy we can refer to.
+   So create a @nodes_allowed, initialize it with init_nodemask_of_mempolicy()
+   or init_nodemask_of_node(). Then use alloc_fresh_gigantic_page() to get
+   the gigantic page.
 
-Based on the "ls1021a_cmux" in the context it looks like this patch is
-intended to apply on top of?https://patchwork.kernel.org/patch/8923541/?but I
-don't see any mention of that.
+3. The NUMA is enabled, and the vma is valid.
+   We can follow the memory policy of the @vma.
 
-> ?static const struct clockgen_muxinfo t1040_cmux = {
-> ?	{
-> ?		[0] = { CLKSEL_VALID, CGA_PLL1, PLL_DIV1 },
-> @@ -482,6 +490,16 @@ static const struct clockgen_chipinfo chipinfo[] = {
-> ?		.pll_mask = 0x03,
-> ?	},
-> ?	{
-> +		.compat = "fsl,ls1012a-clockgen",
-> +		.cmux_groups = {
-> +			&ls1012a_cmux
-> +		},
-> +		.cmux_to_group = {
-> +			0, -1
-> +		},
-> +		.pll_mask = 0x03,
-> +	},
-> +	{
-> ?		.compat = "fsl,ls1043a-clockgen",
-> ?		.init_periph = t2080_init_periph,
-> ?		.cmux_groups = {
-> @@ -1284,6 +1302,7 @@ CLK_OF_DECLARE(qoriq_clockgen_2, "fsl,qoriq-clockgen-
-> 2.0", clockgen_init);
-> ?CLK_OF_DECLARE(qoriq_clockgen_ls1021a, "fsl,ls1021a-clockgen",
-> clockgen_init);
-> ?CLK_OF_DECLARE(qoriq_clockgen_ls1043a, "fsl,ls1043a-clockgen",
-> clockgen_init);
-> ?CLK_OF_DECLARE(qoriq_clockgen_ls2080a, "fsl,ls2080a-clockgen",
-> clockgen_init);
-> +CLK_OF_DECLARE(qoriq_clockgen_ls1012a, "fsl,ls1012a-clockgen",
-> clockgen_init);
+   Get @nodes_allowed by huge_nodemask(), and use alloc_fresh_gigantic_page()
+   to get the gigantic page.
 
-Please keep these lists of chips sorted (or as close as you can in the case of
-the cmux structs which already have some sorting issues).
+Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+---
+Since the huge_nodemask() is changed, we have to change this function a little.
 
--Scott
+---
+ mm/hugetlb.c | 63 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
+
+diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+index 6995087..c33bddc 100644
+--- a/mm/hugetlb.c
++++ b/mm/hugetlb.c
+@@ -1502,6 +1502,69 @@ int dissolve_free_huge_pages(unsigned long start_pfn, unsigned long end_pfn)
+ 
+ /*
+  * There are 3 ways this can get called:
++ *
++ * 1. When the NUMA is not enabled, use alloc_gigantic_page() to get
++ *    the gigantic page.
++ *
++ * 2. The NUMA is enabled, but the vma is NULL.
++ *    Create a @nodes_allowed, and use alloc_fresh_gigantic_page() to get
++ *    the gigantic page.
++ *
++ * 3. The NUMA is enabled, and the vma is valid.
++ *    Use the @vma's memory policy.
++ *    Get @nodes_allowed by huge_nodemask(), and use alloc_fresh_gigantic_page()
++ *    to get the gigantic page.
++ */
++static struct page *__hugetlb_alloc_gigantic_page(struct hstate *h,
++		struct vm_area_struct *vma, unsigned long addr, int nid)
++{
++	NODEMASK_ALLOC(nodemask_t, nodes_allowed, GFP_KERNEL | __GFP_NORETRY);
++	struct page *page = NULL;
++
++	/* Not NUMA */
++	if (!IS_ENABLED(CONFIG_NUMA)) {
++		if (nid == NUMA_NO_NODE)
++			nid = numa_mem_id();
++
++		page = alloc_gigantic_page(nid, huge_page_order(h));
++		if (page)
++			prep_compound_gigantic_page(page, huge_page_order(h));
++
++		NODEMASK_FREE(nodes_allowed);
++		return page;
++	}
++
++	/* NUMA && !vma */
++	if (!vma) {
++		if (nid == NUMA_NO_NODE) {
++			if (!init_nodemask_of_mempolicy(nodes_allowed)) {
++				NODEMASK_FREE(nodes_allowed);
++				nodes_allowed = &node_states[N_MEMORY];
++			}
++		} else if (nodes_allowed) {
++			init_nodemask_of_node(nodes_allowed, nid);
++		} else {
++			nodes_allowed = &node_states[N_MEMORY];
++		}
++
++		page = alloc_fresh_gigantic_page(h, nodes_allowed, true);
++
++		if (nodes_allowed != &node_states[N_MEMORY])
++			NODEMASK_FREE(nodes_allowed);
++
++		return page;
++	}
++
++	/* NUMA && vma */
++	if (huge_nodemask(vma, addr, nodes_allowed))
++		page = alloc_fresh_gigantic_page(h, nodes_allowed, true);
++
++	NODEMASK_FREE(nodes_allowed);
++	return page;
++}
++
++/*
++ * There are 3 ways this can get called:
+  * 1. With vma+addr: we use the VMA's memory policy
+  * 2. With !vma, but nid=NUMA_NO_NODE:  We try to allocate a huge
+  *    page from any node, and let the buddy allocator itself figure
+-- 
+2.5.5
