@@ -1,52 +1,38 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Wed, 16 Nov 2016 11:43:34 +0100
-Subject: [PATCH 2/2] soc: ti: knav_qmss_queue: replace IS_ERR_OR_NULL by IS_ERR
-In-Reply-To: <1479293014-18811-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1479293014-18811-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1479293014-18811-3-git-send-email-Julia.Lawall@lip6.fr>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Wed, 16 Nov 2016 12:07:34 +0100
+Subject: [PATCH v5 0/2]  platform: Add DT support for DA8xx
+Message-ID: <1479294456-7942-1-git-send-email-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-knav_queue_open always returns an ERR_PTR value, never NULL.  This can be
-confirmed by unfolding the function calls and conforms to the function's
-documentation.  Thus, replace IS_ERR_OR_NULL by IS_ERR in error checks.
+This add and enable the usb otg for da850 and da850-lcdk.
+This series depends on "driver: dd DT support for DA8xx" patch set.
 
-The change is made using the following semantic patch:
-(http://coccinelle.lip6.fr/)
+If this series is applied before the "usb: musb: da8xx: Fix few issues" patch
+set then the usb driver will always retrun -ENODEV.
 
-// <smpl>
-@@
-expression x;
-statement S;
-@@
+Changes in v2:
+* Remove unrelated changes in patch 3
+* Rename the device node in patch 4
 
-x = knav_queue_open(...);
-if (
--   IS_ERR_OR_NULL
-+   IS_ERR
-    (x)) S
-// </smpl>
+Changes in v3:
+* Fix few mistakes in DT binding sample
+* Only build the device table if DT is enabled
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Change in v4:
+* Fix a nit
 
----
+Changes in v5:
+* Remove usb_phy node from d850.dtsi because it has already been merged.
+* Separated the patch in two: one for the board and one for the SoC.
 
-The patches in this series are completely independent of each other, except
-for having been made from the same specification.
+Alexandre Bailon (2):
+  ARM: dts: da850: Add the usb otg device node
+  ARM: dts: da850-lcdk: Enable the usb otg device node
 
- drivers/soc/ti/knav_qmss_queue.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/da850-lcdk.dts |  8 ++++++++
+ arch/arm/boot/dts/da850.dtsi     | 10 ++++++++++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
-index b73e353..d90df84 100644
---- a/drivers/soc/ti/knav_qmss_queue.c
-+++ b/drivers/soc/ti/knav_qmss_queue.c
-@@ -777,7 +777,7 @@ void *knav_pool_create(const char *name,
- 	}
- 
- 	pool->queue = knav_queue_open(name, KNAV_QUEUE_GP, 0);
--	if (IS_ERR_OR_NULL(pool->queue)) {
-+	if (IS_ERR(pool->queue)) {
- 		dev_err(kdev->dev,
- 			"failed to open queue for pool(%s), error %ld\n",
- 			name, PTR_ERR(pool->queue));
+-- 
+2.7.3
