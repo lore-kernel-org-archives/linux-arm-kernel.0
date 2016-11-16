@@ -1,177 +1,108 @@
-From: maxim.kuvyrkov@linaro.org (Maxim Kuvyrkov)
-Date: Wed, 16 Nov 2016 15:22:26 +0400
-Subject: ILP32 for ARM64: testing with glibc testsuite
-In-Reply-To: <20161109095650.GA22804@yury-N73SV>
-References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
- <20161107082359.GA19666@yury-N73SV> <20161109095650.GA22804@yury-N73SV>
-Message-ID: <CC4F99A7-1FD2-486A-BD66-ED06F1B8BF50@linaro.org>
+From: sriram.dash@nxp.com (Sriram Dash)
+Date: Wed, 16 Nov 2016 11:33:11 +0000
+Subject: [upstream-release] [PATCH 1/2] drivers: usb: phy: Add qoriq usb
+ 3.0	phy driver support
+In-Reply-To: <HE1PR0401MB1931C92287A8E92BC6B52B1991BE0@HE1PR0401MB1931.eurprd04.prod.outlook.com>
+References: <1479101215-26954-1-git-send-email-sriram.dash@nxp.com>
+ <1479101215-26954-2-git-send-email-sriram.dash@nxp.com>
+ <DB5PR0401MB1928CA058CC01243457F124791BC0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
+ <DB5PR0401MB1925FB1FE45C15B0671E46D1F5BF0@DB5PR0401MB1925.eurprd04.prod.outlook.com>
+ <HE1PR0401MB1931C92287A8E92BC6B52B1991BE0@HE1PR0401MB1931.eurprd04.prod.outlook.com>
+Message-ID: <DB5PR0401MB1925E935B4E7F5D1D1E521D5F5BE0@DB5PR0401MB1925.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Nov 9, 2016, at 1:56 PM, Yury Norov <ynorov@caviumnetworks.com> wrote:
-> 
-> On Mon, Nov 07, 2016 at 01:53:59PM +0530, Yury Norov wrote:
->> Hi all,
->> 
->> [add libc-alpha mail list]
->> 
->> For libc-alpha: this is the part of LKML submission with latest
->> patches for aarch64/ilp32.
->> https://www.spinics.net/lists/arm-kernel/msg537846.html
->> 
->> Glibc that I use has also included consolidation patches from Adhemerval
->> Zanella and me that are still not in the glibc master. The full series is:
->> https://github.com/norov/glibc/tree/ilp32-2.24-dev2
->> 
->> Below is the results of glibc testsuite run for aarch64/lp64
->> in different configurations. Column names meaning:
->> kvgv: kernel is vanilla, glibc is vanilla;
->> kdgv: kernel has ilp32 patches applied, but ilp32 is disabled in config; 
->>      glibc is vanilla;
->> kegv: kernel has ilp32 patches applied and ilp32 is enabled, glibc is vanilla;
->> kege: kernel patches are applied and enabled, glibc patches are applied.
->> 
->> Only different lines are shown. Full results are in attached archive. 
+>From: Scott Wood
+>On 11/15/2016 06:39 AM, Sriram Dash wrote:
+>>> From: Scott Wood
+>>> On 11/13/2016 11:27 PM, Sriram Dash wrote:
+>>>> diff --git
+>>>> a/Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
+>>>> b/Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
+>>>> new file mode 100644
+>>>> index 0000000..d934c80
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
+>>>> @@ -0,0 +1,36 @@
+>>>> +Driver for Freescale USB 3.0 PHY
+>>>> +
+>>>> +Required properties:
+>>>> +
+>>>> +- compatible :	fsl,qoriq-usb3-phy
+>>>
+>>
+>> Hi Scott,
+>>
+>>> This is a very vague compatible.  Are there versioning registers
+>>> within this register block?
+>>>
+>>
+>> There are versioning registers for the phy (1.0 and 1.1). But the
+>> current erratum
+>> A008751 does not require the mentioning of the version numbers. Was
+>> planning to take care of the versioning when there is code diversity
+>> on the basis of the version number.
+>
+>That is not how device tree bindings work.  The describe the hardware, not the
+>driver.
+>
+>That said, is the block version sufficient to tell whether a given chip has this
+>erratum?  If so, you don't need a special property for the erratum.  If not, what is
+>different about the PHY that is not described by the versioning?
+>
+>In any case, it would be nice to mention the version register and its offset in the
+>binding, just so that it becomes part of the definition of this compatible string, and
+>if we come out with some QorIQ chip with a
+>USB3 PHY that is totally different and doesn't have that version register, it'll be
+>clear that it needs a different compatible.
+>
 
-Hi Yury,
+Okay. Will include version number in the next rev for Documentation and dt.
 
-The general requirement merging ILP32 glibc patches is that LP64 does not regress in any reasonable configuration.  This means that there should be 0 regressions between kvgv and kvge -- i.e., glibc in LP64 mode with and without ILP32 patches does not regress on the vanilla kernel.  The kvge configuration is not in your testing matrix, and I suggest you make sure it has no regressions before fixing the more "advanced" configuration of kege.
+>>>> +static inline u32 qoriq_usb3_phy_readl(void __iomem *addr, u32
+>>>> +offset) {
+>>>> +	return __raw_readl(addr + offset); }
+>>>> +
+>>>> +static inline void qoriq_usb3_phy_writel(void __iomem *addr, u32 offset,
+>>>> +	u32 data)
+>>>> +{
+>>>> +	__raw_writel(data, addr + offset); }
+>>>
+>>> Why raw?  Besides missing barriers, this will cause the accesses to
+>>> be native-endian which is not correct.
+>>>
+>>
+>> The only reason for __raw_writel is to make the code faster.
+>
+>Does that really matter here?
+>
+>> However, shall I use writel(with both barriers and byte swap) instead
+>
+>Yes, if the registers are little-endian on all chips.
+>
 
-Ideally, there should be no regressions between kvgv and kege configurations, but I don't consider this to a requirement for glibc acceptance of ILP32 patches, since any regressions between kvge and kege configurations are likely to be on the kernel side.
+The endianness is not same for all Socs. But for most Socs, it is big-endian.
+Is "iowrite32be" better instead? 
 
-Speculating on the kernel requirements for ILP32 kernel patchset, I think there should be 0 regressions between kvgv and kdgv configurations, where you have only 3 tests to investigate and fix.
+>> and then make appropriate changes in the value 32'h27672B2A?
+>
+>Not sure what you mean here.
+>
+>> In my knowledge, there are more than 5 errata in pipeline,
+>
+>Then please get all of these errata described in the device tree ASAP (unless their
+>presence can be reliably inferred from the block version, as discussed above).
+>
 
-[I do appreciate that there are progressions in your results as well, but the glibc policy is that they do not offset regressions.]
+Yes. We will push the errata asap.
 
-The above only concerns LP64 support in kernel and glibc.
+>> However, in future, if any other erratum comes up, and it has to be
+>> applied at any point other than during init, then the variable has to
+>> be added in qoriq_usb3_phy struct and the property has to be read separately.
+>
+>Or if the erratum is detected by some means other than a device tree property...
+>
 
-Regarding ILP32 runtime, my opinion is that it is acceptable for ILP32 to have extra failures compared to LP64, since these are not regressions, but, rather, failures of a new configuration.  From a superficial glance is seems that ILP32 linknamespace support requires attention, as well as stack unwinding (judging from NPTL failures).
+Yes. For any other case also, it will be handled differently.
 
-
---
-Maxim Kuvyrkov
-www.linaro.org
-
-
-
-> 
-> The same, plus ILP32 regressions:
-> 
-> Test					kvgv	kdgv	kegv	kege	ilp32
-> conform/ISO/stdio.h/linknamespace	PASS 	PASS 	PASS	FAIL	FAIL
-> conform/ISO11/stdio.h/linknamespace	PASS 	PASS 	PASS	FAIL	FAIL
-> conform/ISO99/stdio.h/linknamespace	PASS 	PASS 	PASS	FAIL	FAIL
-> conform/POSIX/stdio.h/linknamespace	PASS 	PASS 	PASS	FAIL	FAIL
-> conform/POSIX/sys/stat.h/linknamespace	PASS 	PASS 	PASS	FAIL	FAIL
-> conform/UNIX98/stdio.h/linknamespace	PASS 	PASS 	PASS	FAIL	FAIL
-> conform/XOPEN2K/stdio.h/linknamespace	PASS 	PASS 	PASS	FAIL	FAIL
-> conform/XPG3/stdio.h/linknamespace	PASS 	PASS 	PASS	FAIL	FAIL
-> conform/XPG4/stdio.h/linknamespace	PASS 	PASS 	PASS	FAIL	FAIL
-> csu/tst-atomic				PASS 	PASS 	PASS	FAIL	PASS
-> elf/check-localplt			PASS 	PASS 	PASS	FAIL	FAIL
-> iconvdata/mtrace-tst-loading		PASS	FAIL	PASS 	PASS	FAIL
-> iconvdata/tst-loading			PASS	FAIL	PASS 	PASS	PASS
-> io/check-installed-headers-c		PASS 	PASS 	PASS	FAIL	FAIL
-> io/check-installed-headers-cxx		PASS 	PASS 	PASS	FAIL	FAIL
-> malloc/tst-malloc-backtrace		FAIL	PASS	PASS	PASS	PASS
-> malloc/tst-malloc-thread-exit		FAIL	PASS	PASS	PASS	PASS
-> malloc/tst-malloc-usable		FAIL	PASS	PASS	PASS	PASS
-> malloc/tst-mallocfork			FAIL	PASS	PASS	PASS	PASS
-> malloc/tst-mallocstate			FAIL	PASS	PASS	PASS	PASS
-> malloc/tst-mallopt			FAIL	PASS	PASS	PASS	PASS
-> malloc/tst-mcheck			FAIL	PASS	PASS	PASS	PASS
-> malloc/tst-memalign			FAIL	PASS	PASS	PASS	PASS
-> malloc/tst-obstack			FAIL	PASS	PASS	PASS	PASS
-> malloc/tst-posix_memalign		FAIL	PASS	PASS	PASS	PASS
-> malloc/tst-pvalloc			FAIL	PASS	PASS	PASS	PASS
-> malloc/tst-realloc			FAIL	PASS	PASS	PASS	PASS
-> malloc/tst-scratch_buffer		FAIL	PASS	PASS	PASS	PASS
-> malloc/tst-trim1			FAIL	PASS	PASS	PASS	PASS
-> nptl/tst-eintr4				PASS 	PASS 	PASS	NA	NA
-> posix/tst-regex2			PASS	FAIL	FAIL	FAIL	FAIL
-> posix/tst-getaddrinfo4			PASS	PASS	FAIL	FAIL	PASS
-> posix/tst-getaddrinfo5			PASS	PASS	FAIL	FAIL	PASS
-> sysvipc/test-sysvmsg			NA	NA	NA	FAIL	PASS
-> sysvipc/test-sysvsem			NA	NA	NA	FAIL	PASS
-> sysvipc/test-sysvshm			NA	NA	NA	FAIL	PASS
-> 
-> c++-types-check				PASS	PASS	PASS	PASS	FAIL
-> debug/tst-backtrace4			PASS	PASS	PASS	PASS	FAIL
-> elf/check-abi-libc			PASS	PASS	PASS	PASS	FAIL
-> elf/tst-tls1				PASS	PASS	PASS	PASS	FAIL
-> elf/tst-tls1-static			PASS	PASS	PASS	PASS	FAIL
-> elf/tst-tls2				PASS	PASS	PASS	PASS	FAIL
-> elf/tst-tls2-static			PASS	PASS	PASS	PASS	FAIL
-> elf/tst-tls3				PASS	PASS	PASS	PASS	FAIL
-> math/check-abi-libm			PASS	PASS	PASS	PASS	FAIL
-> misc/tst-writev				PASS	PASS	PASS	PASS   	NA  
-> nptl/tst-cancel-self-canceltype		PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel1			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel10			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel11			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel13			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel15			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel16			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel17			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel18			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel2			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel20			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel21			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel24			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel25			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel26			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel27			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel3			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel4			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel5			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel6			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancel7			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancelx10			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancelx11			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancelx13			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancelx15			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancelx16			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancelx17			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancelx18			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancelx2			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancelx20			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancelx21			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancelx3			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancelx4			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancelx5			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancelx6			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cancelx7			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cleanup4			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cleanupx4			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cond-except			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cond7				PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-cond8				PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-fini1				PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-initializers1			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-initializers1-c11		PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-initializers1-c89		PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-initializers1-c99		PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-initializers1-gnu11		PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-initializers1-gnu89		PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-initializers1-gnu99		PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-join5				PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-key3				PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-mutex8				PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-mutexpi8			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-once3				PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-once4				PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-oncex3				PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-oncex4				PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-rwlock15			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-rwlock8			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-rwlock9			PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-sem11				PASS	PASS	PASS	PASS	FAIL
-> nptl/tst-sem12				PASS	PASS	PASS	PASS	FAIL
-> posix/bug-regex24			PASS	PASS	PASS	PASS	FAIL
-> rt/tst-mqueue1				PASS	PASS	PASS	PASS	FAIL
-> rt/tst-mqueue2				PASS	PASS	PASS	PASS	FAIL
-> rt/tst-mqueue4				PASS	PASS	PASS	PASS	FAIL
-> rt/tst-mqueue7				PASS	PASS	PASS	PASS	FAIL
-> rt/tst-mqueue8				PASS	PASS	PASS	PASS	FAIL
-> rt/tst-mqueue8x				PASS	PASS	PASS	PASS	FAIL
-> stdlib/tst-makecontext3			PASS	PASS	PASS	PASS	FAIL
+>-Scott
