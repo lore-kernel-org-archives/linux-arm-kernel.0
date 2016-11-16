@@ -1,48 +1,120 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 16 Nov 2016 14:28:02 +0100
-Subject: [PATCH v7 00/16] ACPI IORT ARM SMMU support
-In-Reply-To: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
-References: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
-Message-ID: <cd630404-3e75-f49f-9027-f2a79293aa7d@semihalf.com>
+From: zourongrong@gmail.com (Rongrong Zou)
+Date: Wed, 16 Nov 2016 21:43:44 +0800
+Subject: [PATCH v7 0/7] Add DRM driver for Hisilicon Hibmc
+Message-ID: <1479303831-74134-1-git-send-email-zourongrong@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.11.2016 15:19, Lorenzo Pieralisi wrote:
-> This patch series is v7 of a previous posting:
->
-> https://lkml.org/lkml/2016/10/18/506
->
+This patch set adds a new drm driver for Hisilicon Hibmc. Hibmc is a
+BMC SoC with a display controller intergrated, usually it is used on
+server for Out-of-band management purpose. In this patch set, we just
+support basic function for Hibmc display subsystem. Hibmc display
+subsystem is connected to host CPU by PCIe as blow:
 
-[...]
++----------+       +----------+
+|          | PCIe  |  Hibmc   |
+|host CPU( |<----->| display  |
+|arm64,x86)|       |subsystem |
++----------+       +----------+
 
->
-> The ACPI IORT table provides information that allows instantiating
-> ARM SMMU devices and carrying out id mappings between components on
-> ARM based systems (devices, IOMMUs, interrupt controllers).
->
-> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
->
-> Building on basic IORT support, this patchset enables ARM SMMUs support
-> on ACPI systems.
->
-> Most of the code is aimed at building the required generic ACPI
-> infrastructure to create and enable IOMMU components and to bring
-> the IOMMU infrastructure for ACPI on par with DT, which is going to
-> make future ARM SMMU components easier to integrate.
->
+Hardware Detail for Hibmc display subsystem
+-----------
 
-[...]
+  The display subsystem of Hibmc is show as bellow:
+  +----+      +----+      +----+     +--------+
+  |    |      |    |      |    |     |        |
+  | FB |----->| DE |----->|VDAC|---->|external|
+  |    |      |    |      |    |     | VGA    |
+  +----+      +----+      +----+     +--------+
 
->
-> This patchset is provided for review/testing purposes here:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git acpi/iort-smmu-v7
->
-> Tested on Juno and FVP models for ARM SMMU v1 and v3 probing path.
->
+  -DE(Display Engine) is the display controller.
+  -VDAC(Video Digital-to-Analog converter) converts the RGB diaital data
+  stream from DE to VGA analog signals.
 
-For all series:
-Reviewed-by: Tomasz Nowicki <tn@semihalf.com>
+Change History
+------------
+Changes in v7:
+  -remove hibmc_drm_power.c/hibmc_drm_power.h, move the functions to
+   hibmc_drm_drv.c.
+  -remove hibmc_drm_de.h and move the struct defined in head file to
+   hibmc_drm_de.c.
+  -plane is initialized inside crtc, not in hibmc_kms_init().
+  -connector is initialized inside encoder, not in hibmc_kms_init().
+  -remove plane/crtc/encoder/connector from hibmc_drm_private struct.
+  -call drm_atomic_helper_suspend/resume in hibmc_pm_suspend/resume.
+  -remove these empty stubs because caller will do NULL check.
+    hibmc_plane_atomic_disable
+    hibmc_crtc_atomic_check
+    hibmc_encoder_disable
+    hibmc_encoder_enable
+    hibmc_encoder_atomic_check
+  -clean up in all error paths of creating driver-private framebuffer. 
 
-Thanks,
-Tomasz
+Changes in v6:
+  -remove the embedded framebuffer and use a pointer of hibmc_framebuffer
+   instead.
+  -remove the deprecated drm_framebuffer_unregister_private(),
+   drm_framebuffer_unreference() will be called in hibmc_fbdev_destroy().
+  -uninstall irq in hibmc_unload().
+
+Changes in v5:
+  -rebase on v4.9-rc2.
+  -replace drm_fb_helper_set_suspend with drm_fb_helper_set_suspend_unlocked.
+   and remove redundant console_lock and console_unlock.
+
+Changes in v4:
+  -remove unused include files, and include header file when it is needed.
+  -remove unused FLAG in Kconfig: DRM_GEM_CMA_HELPER/DRM_KMS_CMA_HELPER.
+  -remove drm_helper_disable_unused_functions, since we use DRIVER_ATOMIC.
+
+Changes in v3:
+  -enable KMS, in v2, only fbdev is enabled.
+  -management video memory with ttm.
+  -add vblank interrupt.
+  -remove drm_connector_register_all() and drm_connector_unregister_all().
+  -I have a basic test with igt.
+
+Changes in v2:
+  -Remove self-defined macros for bit operations.
+  -Remove unused register.
+  -Replace those deprecated functions with new version of them.
+  -use drm_connector_register_all() to register connector after
+   drm_dev_register().
+
+The patch v2 is at
+https://lists.freedesktop.org/archives/dri-devel/2016-May/108661.html
+
+Rongrong Zou (7):
+  drm/hisilicon/hibmc: Add hisilicon hibmc drm master driver
+  drm/hisilicon/hibmc: Add video memory management
+  drm/hisilicon/hibmc: Add support for frame buffer
+  drm/hisilicon/hibmc: Add support for display engine
+  drm/hisilicon/hibmc: Add support for VDAC
+  drm/hisilicon/hibmc: Add support for vblank interrupt
+  MAINTAINERS: Update HISILICON DRM entries
+
+ MAINTAINERS                                       |   1 +
+ drivers/gpu/drm/hisilicon/Kconfig                 |   1 +
+ drivers/gpu/drm/hisilicon/Makefile                |   1 +
+ drivers/gpu/drm/hisilicon/hibmc/Kconfig           |   9 +
+ drivers/gpu/drm/hisilicon/hibmc/Makefile          |   4 +
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c    | 477 ++++++++++++++++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c   | 456 ++++++++++++++++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h   | 114 +++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c | 267 +++++++++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h  | 196 ++++++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c  | 147 ++++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c       | 558 ++++++++++++++++++++++
+ 12 files changed, 2231 insertions(+)
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/Kconfig
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/Makefile
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c
+
+-- 
+1.9.1
