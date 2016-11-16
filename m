@@ -1,26 +1,85 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 16 Nov 2016 18:58:37 +0200
-Subject: [PATCH 4/8] ARM: s3c64xx: Drop unused DMA fields from struct
- s3c64xx_spi_csinfo
-In-Reply-To: <1478791076-19528-5-git-send-email-s.nawrocki@samsung.com>
-References: <1478791076-19528-1-git-send-email-s.nawrocki@samsung.com>
- <1478791076-19528-5-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20161116165837.GC3727@kozik-lap>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 16 Nov 2016 09:01:13 -0800
+Subject: [PATCH net 1/3] net: phy: realtek: add eee advertisement disable
+ options
+In-Reply-To: <1479310731.17538.53.camel@baylibre.com>
+References: <1479220154-25851-1-git-send-email-jbrunet@baylibre.com>
+ <1479220154-25851-2-git-send-email-jbrunet@baylibre.com>
+ <20161115163036.GB23231@lunn.ch>
+ <476b72f3-5efe-3551-6c24-0e378d655a0f@gmail.com>
+ <1479290189.17538.25.camel@baylibre.com> <20161116132337.GD19962@lunn.ch>
+ <1479307890.17538.40.camel@baylibre.com> <20161116150628.GI23231@lunn.ch>
+ <1479310731.17538.53.camel@baylibre.com>
+Message-ID: <d4e04f8a-77c5-f43e-5c24-d1238925543a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2016 at 04:17:52PM +0100, Sylwester Nawrocki wrote:
-> There is no drivers using those fields so remove them and
-> the remaining initializations.
+On 11/16/2016 07:38 AM, Jerome Brunet wrote:
+> On Wed, 2016-11-16 at 16:06 +0100, Andrew Lunn wrote:
+>> On Wed, Nov 16, 2016 at 03:51:30PM +0100, Jerome Brunet wrote:
+>>>
+>>> On Wed, 2016-11-16 at 14:23 +0100, Andrew Lunn wrote:
+>>>>
+>>>>>
+>>>>>
+>>>>> There two kind of PHYs supporting eee, the one advertising eee
+>>>>> by
+>>>>> default (like realtek) and the one not advertising it (like
+>>>>> micrel).
+>>>
+>>> This is just the default register value.
+>>>
+>>>>
+>>>>
+>>>> I don't know too much about EEE. So maybe a dumb question. Does
+>>>> the
+>>>> MAC need to be involved? Or is it just the PHY?
+>>>>
+>>>> If the MAC needs to be involved, the PHY should not be
+>>>> advertising
+>>>> EEE
+>>>> unless the MAC asks for it by calling phy_init_eee(). If this is
+>>>> true,
+>>>> maybe we need to change the realtek driver, and others in that
+>>>> class.
+>>>
+>>> As far I understand, the advertised capabilities are exchanged
+>>> during
+>>> the auto-negotiation.
+>>>
+>>> At this stage, if the advertisement is disabled (regarless of the
+>>> actual support) on either side of the link, there will be no low
+>>> power
+>>> idle state on the Tx nor the Rx path.
+>>>
+>>> If the advertisement is enabled on both side but we don't call
+>>> phy_init_eee, I suppose Tx won't enter LPI, but Rx could.
+>>
+>> What i was trying to find out is, if the MAC needs to support EEE as
+>> well as the PHY, what happens when the MAC does not support EEE, but
+>> the PHYs do negotiate EEE? Does it break?
 > 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Tested-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/plat-samsung/devs.c              | 24 ------------------------
->  include/linux/platform_data/spi-s3c64xx.h |  3 ---
->  2 files changed, 27 deletions(-)
+> Interesting question. In a regular case, I suppose it should be fine.
+> As you would have LPI only on the Rx path this should be transparent to
+> the MAC. That's my understanding. Maybe people knowing EEE better than
+> me could confirm (or not) ? Peppe? Alexandre?
 
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+EEE is a MAC and PHY feature, and both need to agree on what is enabled,
+especially in the transmit path because the way packets may be
+transmitted with or without EEE can be done differently at the HW level
+(faster/slower return to idle, different clock source).
 
-Best regards,
-Krzysztof
+> 
+> I just checked with the OdroidC2, I disabled eee support by forcing
+> "dma_cap.eee = 0" in stmmac_get_hw_features. As expected, no tx_LPI
+> interrupts but plenty of rx_LPI interrupts.
+> 
+> What was not expected is test failing like before.
+> So in our case, having LPI on the Rx path is fine for receiving data,
+> but not for sending.
+
+OK, which really sounds like a potential interoperability problem, or
+just the Realtek PHY with EEE enabled acting funky (irrespective of
+being attached to stmmac).
+-- 
+Florian
