@@ -1,91 +1,77 @@
-From: sriram.dash@nxp.com (Sriram Dash)
-Date: Wed, 16 Nov 2016 05:48:47 +0000
-Subject: [PATCH 1/2] drivers: usb: phy: Add qoriq usb 3.0 phy driver
- support
-In-Reply-To: <20161116000740.iq6ffcjanrrvrdnq@rob-hp-laptop>
-References: <1479101215-26954-1-git-send-email-sriram.dash@nxp.com>
- <1479101215-26954-2-git-send-email-sriram.dash@nxp.com>
- <20161116000740.iq6ffcjanrrvrdnq@rob-hp-laptop>
-Message-ID: <DB5PR0401MB192560CE0F5244475B1CBF8DF5BE0@DB5PR0401MB1925.eurprd04.prod.outlook.com>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Wed, 16 Nov 2016 11:24:17 +0530
+Subject: [RESEND PATCH v1 05/11] dt-bindings: perf: hisi: Add Devicetree
+ bindings for Hisilicon SoC PMU
+In-Reply-To: <20161115095148.GA29104@leverpostej>
+References: <1478151727-20250-1-git-send-email-anurup.m@huawei.com>
+ <1478151727-20250-6-git-send-email-anurup.m@huawei.com>
+ <20161110183040.GD10137@leverpostej> <58290014.2020401@gmail.com>
+ <20161115095148.GA29104@leverpostej>
+Message-ID: <582BF489.6040506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From: Rob Herring [mailto:robh at kernel.org]
->On Mon, Nov 14, 2016 at 10:56:54AM +0530, Sriram Dash wrote:
->> Adds qoriq usb 3.0 phy driver support for LS1043A platform.
->> Describes the qoriq usb 2.0 phy driver binding, currently used for
->> LS1043A platform.
->>
->> Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
->> ---
->>  .../devicetree/bindings/phy/phy-qoriq-usb3.txt     |  36 ++++
->>  drivers/phy/Kconfig                                |   8 +
->>  drivers/phy/Makefile                               |   1 +
->>  drivers/phy/phy-qoriq-usb3.c                       | 202 +++++++++++++++++++++
->>  4 files changed, 247 insertions(+)
->>  create mode 100644
->> Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
->>  create mode 100644 drivers/phy/phy-qoriq-usb3.c
->>
->> diff --git a/Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
->> b/Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
->> new file mode 100644
->> index 0000000..d934c80
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
->> @@ -0,0 +1,36 @@
->> +Driver for Freescale USB 3.0 PHY
->> +
->> +Required properties:
->> +
->> +- compatible :	fsl,qoriq-usb3-phy
->> +- reg :		register mappings for Parameter Configuration Register
->> +		and Phy base offset.
->> +- reg-names :	"param_ctrl" and "phy_base"
->> +- phy_type :	For multi port host USB controllers, should be one of
->> +		"ulpi", or "serial". For dual role USB controllers,
->> +		should be one of "ulpi", "utmi", "utmi_wide", or "serial".
 
-Hi Rob,
 
+On Tuesday 15 November 2016 03:21 PM, Mark Rutland wrote:
+> On Mon, Nov 14, 2016 at 05:36:44AM +0530, Anurup M wrote:
+>> On Friday 11 November 2016 12:00 AM, Mark Rutland wrote:
+>>> On Thu, Nov 03, 2016 at 01:42:01AM -0400, Anurup M wrote:
+>>>> +	- scl-id : The Super Cluster ID. This can be the ID of the CPU die
+>>>> +		   or IO die in the chip.
+>>> What's this needed for?
+>> This is used as suffix to the PMU name. hisi_l3c<scl-id>. (hisi_l3c2
+>> - for scl-id = 2).
+>> This is to identify the pmu correspond to which CPU die in the socket.
+>>>> +	- num-events : No of events supported by this PMU device.
+>>>> +
+>>>> +	- num-counters : No of hardware counters available for counting.
+>>> This isn't probeable or well-known?
+>> My idea is to have the common properties of SoC PMU added here.
+>> The num-events, num-counters etc. So that handling can be made
+>> common in the driver.
+>> Is it not recommended? Please share your comments.
+> This feels like something that should be well-known for the programming
+> model of the device. If the number of events and/or counters shange, I'd
+> expect other things to also change such that the device is no longer
+> compatible with previous versions.
 >
->Do any of these really apply to a USB3 PHY?
+> [...]
 >
+Agreed, it is possible that the versions can be still incompatible. 
+Shall move it to
+driver in v2.
 
-The concerned USB3 phy used is UTMI. I agree to your point somewhat that
-all the types are not required now. Anyway, shall I make it an optional
-property, with the mention of only UTMI and ULPI?
-
->Rob
+>> The below two properties (module-id, cfgen-map) differs between
+>> chips hip05/06 and hip07.
+> The module-id property sounds like a HW description, but it's not
+> entirely clear to me what cfgen-map is; more comments on that below.
 >
->> +
->> +Example:
->> +		usbphy0: usb3-phy at 084F0000 {
+>> Please suggest.
+>>>> +	- module-id : Module ID to input for djtag. This property is an array of
+>>>> +		      module_id for each L3 cache banks.
+>>>> +
+>>>> +	- num-banks : Number of banks or instances of the device.
+>>> What's a bank? Surely they have separate instances of the PMU?
+>> Yes each bank is a separate instance of PMU.
+>> If it is recommended to have each L3 cache bank registered as
+>> separate PMU with perf, then this property will be removed.
+> Generally, I think that separate instances are preferable.
 >
->usb-phy at ...
+>>> What order are these in?
+>> The bank number will start from "1" till "4" for L3 cache as there
+>> are four banks in hip05/06/07 chips.
+>>>> +	- cfgen-map : Config enable array to select the bank.
+>>> Huh?
+> As above, it's not clear to me what this property represents. Could you
+> please clarify?
+This property is used to select the bank. The naming lead to confusion.
+I shall change it to bank_select.
+If it is recommended to register each L3 cache bank as separate PMU then
+this property will be moved to driver.
+
+Thanks
+Anurup
 >
-
-Ok. Will change in the next rev for Documentation and dts (patch 2/2)
-
->> +                        compatible = "fsl,qoriq-usb3-phy";
->> +                        reg = <0x0 0x01570070 0x0 0xC>, <0x0 0x084F0000 0x0 0x5000>;
->> +                        reg-names = "param_ctrl", "phy_base";
->> +                        #phy-cells = <0>;
->> +                        phy_type = "utmi";
->> +                };
->> +
->> +                usbphy1: usb3-phy at 08500000 {
->> +                        compatible = "fsl,qoriq-usb3-phy";
->> +                        reg = <0x0 0x0157007C 0x0 0xC>, <0x0 0x08500000 0x0 0x5000>;
->> +                        reg-names = "param_ctrl", "phy_base";
->> +                        #phy-cells = <0>;
->> +                        phy_type = "utmi";
->> +                };
->> +
->> +                usbphy2: usb3-phy at 08510000 {
->> +                        compatible = "fsl,qoriq-usb3-phy";
->> +                        reg = <0x0 0x01570088 0x0 0xC>, <0x0 0x08510000 0x0 0x5000>;
->> +                        reg-names = "param_ctrl", "phy_base";
->> +                        #phy-cells = <0>;
->> +                        phy_type = "utmi";
->> +                };
+> Thanks,
+> Mark.
