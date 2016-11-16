@@ -1,48 +1,33 @@
 From: jay.xu@rock-chips.com (Jianqun Xu)
-Date: Wed, 16 Nov 2016 08:13:39 +0800
-Subject: [PATCH] drm/bridge: analogix_dp: return error if transfer none byte
-Message-ID: <1479255219-7243-1-git-send-email-jay.xu@rock-chips.com>
+Date: Wed, 16 Nov 2016 08:19:41 +0800
+Subject: [PATCH] clk: rockchip: rk3399: fix copy-paste error
+In-Reply-To: <1479254835-6858-1-git-send-email-jay.xu@rock-chips.com>
+References: <1479254835-6858-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1479255581-7489-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reference from drm_dp_aux description (about transfer):
-Upon success, the implementation should return the number of payload bytes
-that were transferred, or a negative error-code on failure. Helpers
-propagate errors from the .transfer() function, with the exception of
-the -EBUSY error, which causes a transaction to be retried. On a short,
-helpers will return -EPROTO to make it simpler to check for failure.
+Fix RK3368_* to RK3399_* for rk3399 clk_test clock.
 
-The analogix_dp_transfer will return num_transferred, but if there is none
-byte been transferred, the return value will be 0, which means success, we
-should return error-code if transfer none byte.
-
-for (retry = 0; retry < 32; retry++) {
-	err = aux->transfer(aux, &msg);
-	if (err < 0) {
-		if (err == -EBUSY)
-			continue;
-
-		goto unlock;
-	}
-}
-
-Cc: zain wang <wzz@rock-chips.com>
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
 ---
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/rockchip/clk-rk3399.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-index cd37ac0..303083a 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-@@ -1162,5 +1162,5 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
- 		 (msg->request & ~DP_AUX_I2C_MOT) == DP_AUX_NATIVE_READ)
- 		msg->reply = DP_AUX_NATIVE_REPLY_ACK;
+diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+index 2c7cba7..ccbf558b 100644
+--- a/drivers/clk/rockchip/clk-rk3399.c
++++ b/drivers/clk/rockchip/clk-rk3399.c
+@@ -1382,8 +1382,8 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+ 	/* clk_test */
+ 	/* clk_test_pre is controlled by CRU_MISC_CON[3] */
+ 	COMPOSITE_NOMUX(0, "clk_test", "clk_test_pre", CLK_IGNORE_UNUSED,
+-			RK3368_CLKSEL_CON(58), 0, 5, DFLAGS,
+-			RK3368_CLKGATE_CON(13), 11, GFLAGS),
++			RK3399_CLKSEL_CON(58), 0, 5, DFLAGS,
++			RK3399_CLKGATE_CON(13), 11, GFLAGS),
  
--	return num_transferred;
-+	return num_transferred > 0 ? num_transferred : -EBUSY;
- }
+ 	/* ddrc */
+ 	GATE(0, "clk_ddrc_lpll_src", "lpll", 0, RK3399_CLKGATE_CON(3),
 -- 
 1.9.1
