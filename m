@@ -1,46 +1,51 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 16 Nov 2016 13:23:29 -0700
-Subject: [PATCH fpga 8/9] fpga socfpga: Use the scatterlist interface
-In-Reply-To: <alpine.DEB.2.20.1611160939140.3364@atull-VirtualBox2>
-References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <1478732303-13718-9-git-send-email-jgunthorpe@obsidianresearch.com>
- <alpine.DEB.2.10.1611131712210.2735@atull-VirtualBox>
- <20161114001854.GA27248@obsidianresearch.com>
- <alpine.DEB.2.10.1611132149140.2908@atull-VirtualBox>
- <20161115043537.GA23253@obsidianresearch.com>
- <alpine.DEB.2.20.1611150940270.3634@atull-VirtualBox2>
- <20161116052033.GA6044@obsidianresearch.com>
- <alpine.DEB.2.20.1611160939140.3364@atull-VirtualBox2>
-Message-ID: <20161116202329.GD19593@obsidianresearch.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 16 Nov 2016 20:29:13 +0000
+Subject: [PATCH v3 0/3] modversions: Fix CRC mangling under
+ CONFIG_RELOCATABLE=y
+In-Reply-To: <20161116192331.2jwpewu33dwji3fa@pengutronix.de>
+References: <1477585631-18574-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20161116192331.2jwpewu33dwji3fa@pengutronix.de>
+Message-ID: <CAKv+Gu-cjwOaNuQ-BJdcmr_0w3pfr7etN=T5CG_Sbj_tsomZhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2016 at 09:45:23AM -0600, atull wrote:
-> > What is the point of this if write_init gets a copy of the buffer -
-> > what is that supposed to be?
-> 
-> Sometimes write_init needs to look at the header of the image.
-> You can see that in the socfpga-a10.c (on linux-next/master)
+On 16 November 2016 at 19:23, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> On Thu, Oct 27, 2016 at 05:27:08PM +0100, Ard Biesheuvel wrote:
+>> This series is a followup to the single patch 'modversions: treat symbol
+>> CRCs as 32 bit quantities on 64 bit archs', of which two versions have
+>> been sent out so far [0][1]
+>>
+>> As pointed out by Michael, GNU ld behaves a bit differently between arm64
+>> and PowerPC64, and where the former gets rid of all runtime relocations
+>> related to CRCs, the latter is not as easily convinced.
+>>
+>> Patch #1 fixes the issue where CRCs are corrupted by the runtime relocation
+>> routines for 32-bit PowerPC, for which the original fix was effectively
+>> reverted by commit 0e0ed6406e61 ("powerpc/modules: Module CRC relocation fix
+>> causes perf issues")
+>>
+>> Patch #2 adds handling of R_PPC64_ADDR32 relocations against the NULL .dynsym
+>> symbol entry to the PPC64 runtime relocation routines, so it is prepared to
+>> deal with CRCs being emitted as 32-bit quantities.
+>>
+>> Patch #3 is the original patch from the v1 and v2 submissions.
+>
+> Is this related to me seeing
+>
+> [    2.111424] mvneta: module verification failed: signature and/or required key missing - tainting kernel
+> [    2.126061] scsi_mod: no symbol version for _clear_bit
+> [    2.131257] scsi_mod: Unknown symbol _clear_bit (err -22)
+> [    2.138093] mvneta: no symbol version for _clear_bit
+> [    2.143117] mvneta: Unknown symbol _clear_bit (err -22)
+> [    2.144135] mvmdio: no symbol version for __gnu_mcount_nc
+> [    2.144138] mvmdio: Unknown symbol __gnu_mcount_nc (err -22)
+> ...
+>
+> ? If so, this would be great to mention it in the commit log to make
+> people searching for this issue actually find this patch set.
+>
 
-I know what it is for, I'm asking what should it be if we are calling
-write_init multiple times.
+No, I don't think it is. My guess would be that it is caused by
 
-It feels like the driver needs to indicate the header length it wants
-to inspect and the core core needs to make that much of the bitstream
-available to write_init() before calling write().
-
-Is that what you were thinking?
-
-> at this stuff, this is coming at a busy time).  My point there
-> was that there was code that needed to go into the core so that
-> the ICE40 and the cyclone spi driver that are on the mailing
-> list won't have to have the same workaround that you were
-> adding to the socfpga.c driver.
-
-Sure, that is easy for write() - not clear on write_init sematics?
-I will send a revised series.
-
-I'd also like to close on the zynq bitfile verification patch, did you
-have any comments on that?
-
-Jason
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=4dd1837d75
