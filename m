@@ -1,21 +1,17 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 16 Nov 2016 12:52:08 -0800
-Subject: [PATCH devicetree/next] ARM: BCM5301X: Add DT for TP-LINK Archer
- C9 V1
-In-Reply-To: <20161113101209.22185-1-zajec5@gmail.com>
-References: <20161113101209.22185-1-zajec5@gmail.com>
-Message-ID: <538881af-c39a-3f1f-852b-f85508b8e9c0@gmail.com>
+Date: Wed, 16 Nov 2016 12:52:38 -0800
+Subject: [PATCH 1/1] ARM: dts: enable GPIO-b for Broadcom NSP
+In-Reply-To: <1479130219-25639-1-git-send-email-yendapally.reddy@broadcom.com>
+References: <1479130219-25639-1-git-send-email-yendapally.reddy@broadcom.com>
+Message-ID: <0c553fa0-1db9-df71-6241-5cc4346c554d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/13/2016 02:12 AM, Rafa? Mi?ecki wrote:
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
+On 11/14/2016 05:30 AM, Yendapally Reddy Dhananjaya Reddy wrote:
+> This enables the GPIO-b support for Broadcom NSP SoC
 > 
-> It's BCM4709A0 based device with 16 MiB flash, 128 MiB of RAM and two
-> PCIe based on-PCB BCM4360 chipsets.
-> 
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
 
-Applied, thanks!
+Applied, thanks
 -- 
 Florian
