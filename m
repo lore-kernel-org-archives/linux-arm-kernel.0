@@ -1,34 +1,82 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 16 Nov 2016 11:00:48 -0500
-Subject: [PATCH v7 7/7] MAINTAINERS: Update HISILICON DRM entries
-In-Reply-To: <1479303831-74134-8-git-send-email-zourongrong@gmail.com>
-References: <1479303831-74134-1-git-send-email-zourongrong@gmail.com>
- <1479303831-74134-8-git-send-email-zourongrong@gmail.com>
-Message-ID: <CAOw6vbJwPJnSN9ZOfhqvaLsbPAALdPEoyuBTSJBcme0JC6jebQ@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 16 Nov 2016 16:02:35 +0000
+Subject: [PATCH 1/2] ahci: qoriq: added a condition to enable dma coherence
+In-Reply-To: <1479265879-48840-1-git-send-email-yuantian.tang@nxp.com>
+References: <1479265879-48840-1-git-send-email-yuantian.tang@nxp.com>
+Message-ID: <aa049243-0a42-34d8-172b-ab2df88e2313@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2016 at 8:43 AM, Rongrong Zou <zourongrong@gmail.com> wrote:
-> Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
-
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
-
+On 16/11/16 03:11, yuantian.tang at nxp.com wrote:
+> From: Tang Yuantian <Yuantian.Tang@nxp.com>
+> 
+> Enable DMA coherence in SATA controller on condition that
+> dma-coherent property exists in sata node in DTS.
+> 
+> Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
 > ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 2a58eea..84a7296 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -4123,6 +4123,7 @@ F:        drivers/gpu/drm/gma500/
->
->  DRM DRIVERS FOR HISILICON
->  M:     Xinliang Liu <z.liuxinliang@hisilicon.com>
-> +M:     Rongrong Zou <zourongrong@gmail.com>
->  R:     Xinwei Kong <kong.kongxinwei@hisilicon.com>
->  R:     Chen Feng <puck.chen@hisilicon.com>
->  L:     dri-devel at lists.freedesktop.org
-> --
-> 1.9.1
->
+>  drivers/ata/ahci_qoriq.c | 15 +++++++++++----
+>  1 file changed, 11 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/ata/ahci_qoriq.c b/drivers/ata/ahci_qoriq.c
+> index 9884c8c..45c88de 100644
+> --- a/drivers/ata/ahci_qoriq.c
+> +++ b/drivers/ata/ahci_qoriq.c
+> @@ -59,6 +59,7 @@ struct ahci_qoriq_priv {
+>  	struct ccsr_ahci *reg_base;
+>  	enum ahci_qoriq_type type;
+>  	void __iomem *ecc_addr;
+> +	bool is_dmacoherent;
+>  };
+>  
+>  static const struct of_device_id ahci_qoriq_of_match[] = {
+> @@ -164,26 +165,31 @@ static int ahci_qoriq_phy_init(struct ahci_host_priv *hpriv)
+>  		writel(LS1021A_PORT_PHY4, reg_base + PORT_PHY4);
+>  		writel(LS1021A_PORT_PHY5, reg_base + PORT_PHY5);
+>  		writel(AHCI_PORT_TRANS_CFG, reg_base + PORT_TRANS);
+> -		writel(AHCI_PORT_AXICC_CFG, reg_base + LS1021A_AXICC_ADDR);
+> +		if (qpriv->is_dmacoherent)
+> +			writel(AHCI_PORT_AXICC_CFG,
+> +					reg_base + LS1021A_AXICC_ADDR);
+>  		break;
+>  
+>  	case AHCI_LS1043A:
+>  		writel(AHCI_PORT_PHY_1_CFG, reg_base + PORT_PHY1);
+>  		writel(AHCI_PORT_TRANS_CFG, reg_base + PORT_TRANS);
+> -		writel(AHCI_PORT_AXICC_CFG, reg_base + PORT_AXICC);
+> +		if (qpriv->is_dmacoherent)
+> +			writel(AHCI_PORT_AXICC_CFG, reg_base + PORT_AXICC);
+>  		break;
+>  
+>  	case AHCI_LS2080A:
+>  		writel(AHCI_PORT_PHY_1_CFG, reg_base + PORT_PHY1);
+>  		writel(AHCI_PORT_TRANS_CFG, reg_base + PORT_TRANS);
+> -		writel(AHCI_PORT_AXICC_CFG, reg_base + PORT_AXICC);
+> +		if (qpriv->is_dmacoherent)
+> +			writel(AHCI_PORT_AXICC_CFG, reg_base + PORT_AXICC);
+>  		break;
+>  
+>  	case AHCI_LS1046A:
+>  		writel(LS1046A_SATA_ECC_DIS, qpriv->ecc_addr);
+>  		writel(AHCI_PORT_PHY_1_CFG, reg_base + PORT_PHY1);
+>  		writel(AHCI_PORT_TRANS_CFG, reg_base + PORT_TRANS);
+> -		writel(AHCI_PORT_AXICC_CFG, reg_base + PORT_AXICC);
+> +		if (qpriv->is_dmacoherent)
+> +			writel(AHCI_PORT_AXICC_CFG, reg_base + PORT_AXICC);
+>  		break;
+>  	}
+>  
+> @@ -221,6 +227,7 @@ static int ahci_qoriq_probe(struct platform_device *pdev)
+>  		if (IS_ERR(qoriq_priv->ecc_addr))
+>  			return PTR_ERR(qoriq_priv->ecc_addr);
+>  	}
+> +	qoriq_priv->is_dmacoherent = of_property_read_bool(np, "dma-coherent");
+
+Better to use of_dma_is_coherent(np) rather than open-coding it.
+
+Robin.
+
+>  
+>  	rc = ahci_platform_enable_resources(hpriv);
+>  	if (rc)
+> 
