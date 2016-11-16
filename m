@@ -1,53 +1,115 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Wed, 16 Nov 2016 11:47:19 +0100
-Subject: [PATCH v4 4/4] ARM: dts: da850: Add the usb otg device node
-In-Reply-To: <d4c8da0e-d66d-1268-78e5-d994399c9166@ti.com>
-References: <1478188752-22447-1-git-send-email-abailon@baylibre.com>
- <1478188752-22447-5-git-send-email-abailon@baylibre.com>
- <0c94c5e0-9d2c-fff5-1213-2fb2adb20ab0@ti.com>
- <d2050c80-255e-25d6-99ba-7634f2c7e39a@baylibre.com>
- <d4c8da0e-d66d-1268-78e5-d994399c9166@ti.com>
-Message-ID: <70fbd003-18f0-8ceb-650e-c8fcd29531a9@baylibre.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Wed, 16 Nov 2016 10:48:52 +0000
+Subject: [PATCH 1/2] drm/i2c: tda998x: allow interrupt to be shared
+Message-ID: <E1c6xls-0006wf-Jg@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2016 11:41 AM, Sekhar Nori wrote:
-> On Wednesday 16 November 2016 04:05 PM, Alexandre Bailon wrote:
->> On 11/15/2016 11:46 AM, Sekhar Nori wrote:
->>> On Thursday 03 November 2016 09:29 PM, Alexandre Bailon wrote:
->>>> This adds the device tree node for the usb otg
->>>> controller present in the da850 family of SoC's.
->>>> This also enables the otg usb controller for the lcdk board.
->>>>
->>>> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
->>>> ---
->>>>  arch/arm/boot/dts/da850-lcdk.dts |  8 ++++++++
->>>>  arch/arm/boot/dts/da850.dtsi     | 15 +++++++++++++++
->>>>  2 files changed, 23 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
->>>> index 7b8ab21..9f5040c 100644
->>>> --- a/arch/arm/boot/dts/da850-lcdk.dts
->>>> +++ b/arch/arm/boot/dts/da850-lcdk.dts
->>>> @@ -158,6 +158,14 @@
->>>>  	rx-num-evt = <32>;
->>>>  };
->>>>  
->>>> +&usb_phy {
->>>> +	status = "okay";
->>>> +	};
->>>
->>> As mentioned by David already, this node needs to be removed. Please
-> 
->> I have missed it. But why should I remove it?
->> Without it, usb otg won't work.
-> 
-> Grr, I replied to the wrong hunk. The part in da850-lcdk.dts needs to be
-> preserved (but please fix the indentation on the closing brace).
-OK. Thanks for the confirmation.
-> 
-> The part in da850.dtsi needs to be removed as it is already merged.
-> 
-> Thanks,
-> Sekhar
-> 
+The TDA998x contains two different I2C devices - there is the HDMI
+encoder, and the TDA9950 CEC engine.  These two share the same interrupt
+signal.
+
+In order to allow a driver for the CEC engine to work, we need to be
+able to share the interrupt with the CEC driver, so convert the handler
+and registration to allow this to happen.
+
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+This patch follows on from:
+   "drm/i2c: tda998x: power down pre-filter and color conversion"
+which is now part of my drm-tda998x-devel branch, a branch which will
+shortly be part of linux-next.  This patch and the following patch are
+not part of that branch yet.
+
+I don't believe I received any testing for the power-down patch above
+either, so if I can have some tested-bys/reviewed-bys for it and these
+two patches, that'd be great.  Thanks.
+
+As my Juno has now been fixed, I've been able to test these two patches
+on the HDLCD on Juno and Dove Cubox.
+
+ drivers/gpu/drm/i2c/tda998x_drv.c | 52 ++++++++++++++++++++-------------------
+ 1 file changed, 27 insertions(+), 25 deletions(-)
+
+diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+index bf5eec0c1b4f..74fb59a35269 100644
+--- a/drivers/gpu/drm/i2c/tda998x_drv.c
++++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+@@ -634,28 +634,30 @@ static irqreturn_t tda998x_irq_thread(int irq, void *data)
+ 	bool handled = false;
+ 
+ 	sta = cec_read(priv, REG_CEC_INTSTATUS);
+-	cec = cec_read(priv, REG_CEC_RXSHPDINT);
+-	lvl = cec_read(priv, REG_CEC_RXSHPDLEV);
+-	flag0 = reg_read(priv, REG_INT_FLAGS_0);
+-	flag1 = reg_read(priv, REG_INT_FLAGS_1);
+-	flag2 = reg_read(priv, REG_INT_FLAGS_2);
+-	DRM_DEBUG_DRIVER(
+-		"tda irq sta %02x cec %02x lvl %02x f0 %02x f1 %02x f2 %02x\n",
+-		sta, cec, lvl, flag0, flag1, flag2);
+-
+-	if (cec & CEC_RXSHPDINT_HPD) {
+-		if (lvl & CEC_RXSHPDLEV_HPD)
+-			tda998x_edid_delay_start(priv);
+-		else
+-			schedule_work(&priv->detect_work);
+-
+-		handled = true;
+-	}
++	if (sta & CEC_INTSTATUS_HDMI) {
++		cec = cec_read(priv, REG_CEC_RXSHPDINT);
++		lvl = cec_read(priv, REG_CEC_RXSHPDLEV);
++		flag0 = reg_read(priv, REG_INT_FLAGS_0);
++		flag1 = reg_read(priv, REG_INT_FLAGS_1);
++		flag2 = reg_read(priv, REG_INT_FLAGS_2);
++		DRM_DEBUG_DRIVER(
++			"tda irq sta %02x cec %02x lvl %02x f0 %02x f1 %02x f2 %02x\n",
++			sta, cec, lvl, flag0, flag1, flag2);
++
++		if (cec & CEC_RXSHPDINT_HPD) {
++			if (lvl & CEC_RXSHPDLEV_HPD)
++				tda998x_edid_delay_start(priv);
++			else
++				schedule_work(&priv->detect_work);
++
++			handled = true;
++		}
+ 
+-	if ((flag2 & INT_FLAGS_2_EDID_BLK_RD) && priv->wq_edid_wait) {
+-		priv->wq_edid_wait = 0;
+-		wake_up(&priv->wq_edid);
+-		handled = true;
++		if ((flag2 & INT_FLAGS_2_EDID_BLK_RD) && priv->wq_edid_wait) {
++			priv->wq_edid_wait = 0;
++			wake_up(&priv->wq_edid);
++			handled = true;
++		}
+ 	}
+ 
+ 	return IRQ_RETVAL(handled);
+@@ -1542,7 +1544,7 @@ static int tda998x_create(struct i2c_client *client, struct tda998x_priv *priv)
+ 
+ 	/* initialize the optional IRQ */
+ 	if (client->irq) {
+-		int irqf_trigger;
++		unsigned long irq_flags;
+ 
+ 		/* init read EDID waitqueue and HDP work */
+ 		init_waitqueue_head(&priv->wq_edid);
+@@ -1552,11 +1554,11 @@ static int tda998x_create(struct i2c_client *client, struct tda998x_priv *priv)
+ 		reg_read(priv, REG_INT_FLAGS_1);
+ 		reg_read(priv, REG_INT_FLAGS_2);
+ 
+-		irqf_trigger =
++		irq_flags =
+ 			irqd_get_trigger_type(irq_get_irq_data(client->irq));
++		irq_flags |= IRQF_SHARED | IRQF_ONESHOT;
+ 		ret = request_threaded_irq(client->irq, NULL,
+-					   tda998x_irq_thread,
+-					   irqf_trigger | IRQF_ONESHOT,
++					   tda998x_irq_thread, irq_flags,
+ 					   "tda998x", priv);
+ 		if (ret) {
+ 			dev_err(&client->dev,
+-- 
+2.7.4
