@@ -1,36 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Nov 2016 16:28:13 +0100
-Subject: [PATCH] iommu: mtk: add common-clk dependency
-Message-ID: <20161116152837.3508723-1-arnd@arndb.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 16 Nov 2016 15:29:25 +0000
+Subject: [PATCH v8 05/16] drivers: iommu: arm-smmu: convert struct device
+ of_node to fwnode usage
+In-Reply-To: <20161116152936.22955-1-lorenzo.pieralisi@arm.com>
+References: <20161116152936.22955-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20161116152936.22955-6-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the MT2701 clock driver was added, we get a harmless warning for
-the iommu driver that selects it, when compile-testing without
-COMMON_CLK.
+Current ARM SMMU driver rely on the struct device.of_node pointer for
+device look-up and iommu_ops retrieval.
 
-warning: (MTK_IOMMU_V1) selects COMMON_CLK_MT2701_IMGSYS which has unmet direct dependencies (COMMON_CLK)
+In preparation for ACPI probing enablement, convert the driver to use
+the struct device.fwnode member for device and iommu_ops look-up so that
+the driver infrastructure can be used also on systems that do not
+associate an of_node pointer to a struct device (eg ACPI), making the
+device look-up and iommu_ops retrieval firmware agnostic.
 
-Adding a dependency on COMMON_CLK avoids the warning.
-
-Fixes: e9862118272a ("clk: mediatek: Add MT2701 clock support")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Reviewed-by: Tomasz Nowicki <tn@semihalf.com>
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+Tested-by: Tomasz Nowicki <tn@semihalf.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/iommu/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/iommu/arm-smmu.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index 8ee54d71c7eb..bb537d06d319 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -346,7 +346,7 @@ config MTK_IOMMU
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 8f72814..339a8d3 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1379,13 +1379,14 @@ static bool arm_smmu_capable(enum iommu_cap cap)
  
- config MTK_IOMMU_V1
- 	bool "MTK IOMMU Version 1 (M4U gen1) Support"
--	depends on ARM
-+	depends on ARM && COMMON_CLK
- 	depends on ARCH_MEDIATEK || COMPILE_TEST
- 	select ARM_DMA_USE_IOMMU
- 	select IOMMU_API
+ static int arm_smmu_match_node(struct device *dev, void *data)
+ {
+-	return dev->of_node == data;
++	return dev->fwnode == data;
+ }
+ 
+-static struct arm_smmu_device *arm_smmu_get_by_node(struct device_node *np)
++static
++struct arm_smmu_device *arm_smmu_get_by_fwnode(struct fwnode_handle *fwnode)
+ {
+ 	struct device *dev = driver_find_device(&arm_smmu_driver.driver, NULL,
+-						np, arm_smmu_match_node);
++						fwnode, arm_smmu_match_node);
+ 	put_device(dev);
+ 	return dev ? dev_get_drvdata(dev) : NULL;
+ }
+@@ -1403,7 +1404,7 @@ static int arm_smmu_add_device(struct device *dev)
+ 		if (ret)
+ 			goto out_free;
+ 	} else if (fwspec && fwspec->ops == &arm_smmu_ops) {
+-		smmu = arm_smmu_get_by_node(to_of_node(fwspec->iommu_fwnode));
++		smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
+ 	} else {
+ 		return -ENODEV;
+ 	}
+@@ -2007,7 +2008,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	of_iommu_set_ops(dev->of_node, &arm_smmu_ops);
++	iommu_register_instance(dev->fwnode, &arm_smmu_ops);
+ 	platform_set_drvdata(pdev, smmu);
+ 	arm_smmu_device_reset(smmu);
+ 
 -- 
-2.9.0
+2.10.0
