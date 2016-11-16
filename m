@@ -1,127 +1,162 @@
 From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 16 Nov 2016 10:56:09 -0500
-Subject: [PATCH v7 3/7] drm/hisilicon/hibmc: Add support for frame buffer
-In-Reply-To: <1479303831-74134-4-git-send-email-zourongrong@gmail.com>
+Date: Wed, 16 Nov 2016 10:52:43 -0500
+Subject: [PATCH v7 2/7] drm/hisilicon/hibmc: Add video memory management
+In-Reply-To: <1479303831-74134-3-git-send-email-zourongrong@gmail.com>
 References: <1479303831-74134-1-git-send-email-zourongrong@gmail.com>
- <1479303831-74134-4-git-send-email-zourongrong@gmail.com>
-Message-ID: <CAOw6vb+snaDf3mHte7tCmNhh-Eajj1t0Tg8iescFnxkT13_Ogw@mail.gmail.com>
+ <1479303831-74134-3-git-send-email-zourongrong@gmail.com>
+Message-ID: <CAOw6vbJqt5CAgpTtm8Xjbz5isKVq4PL6BigE85JpHp4SqfUb9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Nov 16, 2016 at 8:43 AM, Rongrong Zou <zourongrong@gmail.com> wrote:
-> Add support for fbdev and kms fb management.
+> Hibmc have 32m video memory which can be accessed through PCIe by host,
+> we use ttm to manage these memory.
 >
 > Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
 
 Reviewed-by: Sean Paul <seanpaul@chromium.org>
 
 > ---
->  drivers/gpu/drm/hisilicon/hibmc/Makefile          |   2 +-
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c   |   7 +
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h   |  24 ++
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c | 267 ++++++++++++++++++++++
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c       |  67 ++++++
->  5 files changed, 366 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c
+>  drivers/gpu/drm/hisilicon/hibmc/Makefile        |   2 +-
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c |  14 +
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h |  41 ++
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c     | 485 ++++++++++++++++++++++++
+>  4 files changed, 541 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c
 >
 > diff --git a/drivers/gpu/drm/hisilicon/hibmc/Makefile b/drivers/gpu/drm/hisilicon/hibmc/Makefile
-> index 19ed0ef..ff77a7e 100644
+> index 47962a0..19ed0ef 100644
 > --- a/drivers/gpu/drm/hisilicon/hibmc/Makefile
 > +++ b/drivers/gpu/drm/hisilicon/hibmc/Makefile
 > @@ -1,4 +1,4 @@
 >  ccflags-y := -Iinclude/drm
-> -hibmc-drm-y := hibmc_drm_drv.o hibmc_ttm.o
-> +hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_fbdev.o hibmc_ttm.o
+> -hibmc-drm-y := hibmc_drm_drv.o
+> +hibmc-drm-y := hibmc_drm_drv.o hibmc_ttm.o
 >
 >  obj-$(CONFIG_DRM_HISI_HIBMC) += hibmc-drm.o
 > diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-> index 521f69f..4b52b29 100644
+> index 6d20580..521f69f 100644
 > --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
 > +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-> @@ -202,6 +202,7 @@ static int hibmc_unload(struct drm_device *dev)
->  {
->         struct hibmc_drm_private *priv = dev->dev_private;
+> @@ -28,6 +28,7 @@
+>         .release        = drm_release,
+>         .unlocked_ioctl = drm_ioctl,
+>         .compat_ioctl   = drm_compat_ioctl,
+> +       .mmap           = hibmc_mmap,
+>         .poll           = drm_poll,
+>         .read           = drm_read,
+>         .llseek         = no_llseek,
+> @@ -43,6 +44,7 @@ static void hibmc_disable_vblank(struct drm_device *dev, unsigned int pipe)
+>  }
 >
-> +       hibmc_fbdev_fini(priv);
->         hibmc_mm_fini(priv);
->         dev->dev_private = NULL;
+>  static struct drm_driver hibmc_driver = {
+> +       .driver_features        = DRIVER_GEM,
+>         .fops                   = &hibmc_fops,
+>         .name                   = "hibmc",
+>         .date                   = "20160828",
+> @@ -52,6 +54,10 @@ static void hibmc_disable_vblank(struct drm_device *dev, unsigned int pipe)
+>         .get_vblank_counter     = drm_vblank_no_hw_counter,
+>         .enable_vblank          = hibmc_enable_vblank,
+>         .disable_vblank         = hibmc_disable_vblank,
+> +       .gem_free_object_unlocked = hibmc_gem_free_object,
+> +       .dumb_create            = hibmc_dumb_create,
+> +       .dumb_map_offset        = hibmc_dumb_mmap_offset,
+> +       .dumb_destroy           = drm_gem_dumb_destroy,
+>  };
+>
+>  static int hibmc_pm_suspend(struct device *dev)
+> @@ -194,6 +200,10 @@ static int hibmc_hw_init(struct hibmc_drm_private *priv)
+>
+>  static int hibmc_unload(struct drm_device *dev)
+>  {
+> +       struct hibmc_drm_private *priv = dev->dev_private;
+> +
+> +       hibmc_mm_fini(priv);
+> +       dev->dev_private = NULL;
 >         return 0;
-> @@ -228,6 +229,12 @@ static int hibmc_load(struct drm_device *dev)
+>  }
+>
+> @@ -214,6 +224,10 @@ static int hibmc_load(struct drm_device *dev)
 >         if (ret)
 >                 goto err;
 >
-> +       ret = hibmc_fbdev_init(priv);
-> +       if (ret) {
-> +               DRM_ERROR("failed to initialize fbdev: %d\n", ret);
+> +       ret = hibmc_mm_init(priv);
+> +       if (ret)
 > +               goto err;
-> +       }
 > +
 >         return 0;
 >
 >  err:
 > diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-> index dcd304d..d283d66 100644
+> index 840cd5a..dcd304d 100644
 > --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
 > +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-> @@ -20,9 +20,21 @@
+> @@ -20,6 +20,8 @@
 >  #define HIBMC_DRM_DRV_H
 >
 >  #include <drm/drmP.h>
-> +#include <drm/drm_fb_helper.h>
->  #include <drm/drm_gem.h>
->  #include <drm/ttm/ttm_bo_driver.h>
+> +#include <drm/drm_gem.h>
+> +#include <drm/ttm/ttm_bo_driver.h>
 >
-> +struct hibmc_framebuffer {
-> +       struct drm_framebuffer fb;
-> +       struct drm_gem_object *obj;
-> +};
-> +
-> +struct hibmc_fbdev {
-> +       struct drm_fb_helper helper;
-> +       struct hibmc_framebuffer *fb;
-> +       int size;
-> +};
-> +
 >  struct hibmc_drm_private {
 >         /* hw */
->         void __iomem   *mmio;
-> @@ -39,9 +51,13 @@ struct hibmc_drm_private {
->         struct ttm_bo_device bdev;
->         bool initialized;
+> @@ -31,11 +33,50 @@ struct hibmc_drm_private {
+>         /* drm */
+>         struct drm_device  *dev;
 >
-> +       /* fbdev */
-> +       struct hibmc_fbdev *fbdev;
->         bool mm_inited;
+> +       /* ttm */
+> +       struct drm_global_reference mem_global_ref;
+> +       struct ttm_bo_global_ref bo_global_ref;
+> +       struct ttm_bo_device bdev;
+> +       bool initialized;
+> +
+> +       bool mm_inited;
+> +};
+> +
+> +struct hibmc_bo {
+> +       struct ttm_buffer_object bo;
+> +       struct ttm_placement placement;
+> +       struct ttm_bo_kmap_obj kmap;
+> +       struct drm_gem_object gem;
+> +       struct ttm_place placements[3];
+> +       int pin_count;
 >  };
 >
-> +#define to_hibmc_framebuffer(x) container_of(x, struct hibmc_framebuffer, fb)
+> +static inline struct hibmc_bo *hibmc_bo(struct ttm_buffer_object *bo)
+> +{
+> +       return container_of(bo, struct hibmc_bo, bo);
+> +}
 > +
->  struct hibmc_bo {
->         struct ttm_buffer_object bo;
->         struct ttm_placement placement;
-> @@ -66,8 +82,16 @@ void hibmc_set_power_mode(struct hibmc_drm_private *priv,
+> +static inline struct hibmc_bo *gem_to_hibmc_bo(struct drm_gem_object *gem)
+> +{
+> +       return container_of(gem, struct hibmc_bo, gem);
+> +}
+> +
+>  void hibmc_set_power_mode(struct hibmc_drm_private *priv,
+>                           unsigned int power_mode);
 >  void hibmc_set_current_gate(struct hibmc_drm_private *priv,
 >                             unsigned int gate);
 >
-> +int hibmc_fbdev_init(struct hibmc_drm_private *priv);
-> +void hibmc_fbdev_fini(struct hibmc_drm_private *priv);
+> +int hibmc_gem_create(struct drm_device *dev, u32 size, bool iskernel,
+> +                    struct drm_gem_object **obj);
+> +int hibmc_mm_init(struct hibmc_drm_private *hibmc);
+> +void hibmc_mm_fini(struct hibmc_drm_private *hibmc);
+> +int hibmc_bo_pin(struct hibmc_bo *bo, u32 pl_flag, u64 *gpu_addr);
+> +int hibmc_bo_unpin(struct hibmc_bo *bo);
+> +void hibmc_gem_free_object(struct drm_gem_object *obj);
+> +int hibmc_dumb_create(struct drm_file *file, struct drm_device *dev,
+> +                     struct drm_mode_create_dumb *args);
+> +int hibmc_dumb_mmap_offset(struct drm_file *file, struct drm_device *dev,
+> +                          u32 handle, u64 *offset);
+> +int hibmc_mmap(struct file *filp, struct vm_area_struct *vma);
 > +
->  int hibmc_gem_create(struct drm_device *dev, u32 size, bool iskernel,
->                      struct drm_gem_object **obj);
-> +struct hibmc_framebuffer *
-> +hibmc_framebuffer_init(struct drm_device *dev,
-> +                      const struct drm_mode_fb_cmd2 *mode_cmd,
-> +                      struct drm_gem_object *obj);
-> +
->  int hibmc_mm_init(struct hibmc_drm_private *hibmc);
->  void hibmc_mm_fini(struct hibmc_drm_private *hibmc);
->  int hibmc_bo_pin(struct hibmc_bo *bo, u32 pl_flag, u64 *gpu_addr);
-> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c
+>  #endif
+> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c
 > new file mode 100644
-> index 0000000..9b06967
+> index 0000000..036d3ac
 > --- /dev/null
-> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c
-> @@ -0,0 +1,267 @@
+> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c
+> @@ -0,0 +1,485 @@
 > +/* Hisilicon Hibmc SoC drm driver
 > + *
 > + * Based on the bochs drm driver.
@@ -140,336 +175,472 @@ Reviewed-by: Sean Paul <seanpaul@chromium.org>
 > + *
 > + */
 > +
-> +#include <drm/drm_crtc.h>
-> +#include <drm/drm_crtc_helper.h>
-> +#include <drm/drm_fb_helper.h>
+> +#include <ttm/ttm_page_alloc.h>
 > +
 > +#include "hibmc_drm_drv.h"
 > +
-> +static int hibmcfb_create_object(
-> +                               struct hibmc_drm_private *priv,
-> +                               const struct drm_mode_fb_cmd2 *mode_cmd,
-> +                               struct drm_gem_object **gobj_p)
-> +{
-> +       struct drm_gem_object *gobj;
-> +       struct drm_device *dev = priv->dev;
-> +       u32 size;
-> +       int ret = 0;
+> +#define DRM_FILE_PAGE_OFFSET (0x100000000ULL >> PAGE_SHIFT)
 > +
-> +       size = mode_cmd->pitches[0] * mode_cmd->height;
-> +       ret = hibmc_gem_create(dev, size, true, &gobj);
+> +static inline struct hibmc_drm_private *
+> +hibmc_bdev(struct ttm_bo_device *bd)
+> +{
+> +       return container_of(bd, struct hibmc_drm_private, bdev);
+> +}
+> +
+> +static int
+> +hibmc_ttm_mem_global_init(struct drm_global_reference *ref)
+> +{
+> +       return ttm_mem_global_init(ref->object);
+> +}
+> +
+> +static void
+> +hibmc_ttm_mem_global_release(struct drm_global_reference *ref)
+> +{
+> +       ttm_mem_global_release(ref->object);
+> +}
+> +
+> +static int hibmc_ttm_global_init(struct hibmc_drm_private *hibmc)
+> +{
+> +       int ret;
+> +
+> +       hibmc->mem_global_ref.global_type = DRM_GLOBAL_TTM_MEM;
+> +       hibmc->mem_global_ref.size = sizeof(struct ttm_mem_global);
+> +       hibmc->mem_global_ref.init = &hibmc_ttm_mem_global_init;
+> +       hibmc->mem_global_ref.release = &hibmc_ttm_mem_global_release;
+> +       ret = drm_global_item_ref(&hibmc->mem_global_ref);
+> +       if (ret) {
+> +               DRM_ERROR("could not get ref on ttm global: %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       hibmc->bo_global_ref.mem_glob =
+> +               hibmc->mem_global_ref.object;
+> +       hibmc->bo_global_ref.ref.global_type = DRM_GLOBAL_TTM_BO;
+> +       hibmc->bo_global_ref.ref.size = sizeof(struct ttm_bo_global);
+> +       hibmc->bo_global_ref.ref.init = &ttm_bo_global_init;
+> +       hibmc->bo_global_ref.ref.release = &ttm_bo_global_release;
+> +       ret = drm_global_item_ref(&hibmc->bo_global_ref.ref);
+> +       if (ret) {
+> +               DRM_ERROR("failed setting up TTM BO subsystem: %d\n", ret);
+> +               drm_global_item_unref(&hibmc->mem_global_ref);
+> +               return ret;
+> +       }
+> +       return 0;
+> +}
+> +
+> +static void
+> +hibmc_ttm_global_release(struct hibmc_drm_private *hibmc)
+> +{
+> +       drm_global_item_unref(&hibmc->bo_global_ref.ref);
+> +       drm_global_item_unref(&hibmc->mem_global_ref);
+> +       hibmc->mem_global_ref.release = NULL;
+> +}
+> +
+> +static void hibmc_bo_ttm_destroy(struct ttm_buffer_object *tbo)
+> +{
+> +       struct hibmc_bo *bo = container_of(tbo, struct hibmc_bo, bo);
+> +
+> +       drm_gem_object_release(&bo->gem);
+> +       kfree(bo);
+> +}
+> +
+> +static bool hibmc_ttm_bo_is_hibmc_bo(struct ttm_buffer_object *bo)
+> +{
+> +       return bo->destroy == &hibmc_bo_ttm_destroy;
+> +}
+> +
+> +static int
+> +hibmc_bo_init_mem_type(struct ttm_bo_device *bdev, u32 type,
+> +                      struct ttm_mem_type_manager *man)
+> +{
+> +       switch (type) {
+> +       case TTM_PL_SYSTEM:
+> +               man->flags = TTM_MEMTYPE_FLAG_MAPPABLE;
+> +               man->available_caching = TTM_PL_MASK_CACHING;
+> +               man->default_caching = TTM_PL_FLAG_CACHED;
+> +               break;
+> +       case TTM_PL_VRAM:
+> +               man->func = &ttm_bo_manager_func;
+> +               man->flags = TTM_MEMTYPE_FLAG_FIXED |
+> +                       TTM_MEMTYPE_FLAG_MAPPABLE;
+> +               man->available_caching = TTM_PL_FLAG_UNCACHED |
+> +                       TTM_PL_FLAG_WC;
+> +               man->default_caching = TTM_PL_FLAG_WC;
+> +               break;
+> +       default:
+> +               DRM_ERROR("unsupported memory type %u\n", type);
+> +               return -EINVAL;
+> +       }
+> +       return 0;
+> +}
+> +
+> +void hibmc_ttm_placement(struct hibmc_bo *bo, int domain)
+> +{
+> +       u32 count = 0;
+> +       u32 i;
+> +
+> +       bo->placement.placement = bo->placements;
+> +       bo->placement.busy_placement = bo->placements;
+> +       if (domain & TTM_PL_FLAG_VRAM)
+> +               bo->placements[count++].flags = TTM_PL_FLAG_WC |
+> +                       TTM_PL_FLAG_UNCACHED | TTM_PL_FLAG_VRAM;
+> +       if (domain & TTM_PL_FLAG_SYSTEM)
+> +               bo->placements[count++].flags = TTM_PL_MASK_CACHING |
+> +                       TTM_PL_FLAG_SYSTEM;
+> +       if (!count)
+> +               bo->placements[count++].flags = TTM_PL_MASK_CACHING |
+> +                       TTM_PL_FLAG_SYSTEM;
+> +
+> +       bo->placement.num_placement = count;
+> +       bo->placement.num_busy_placement = count;
+> +       for (i = 0; i < count; i++) {
+> +               bo->placements[i].fpfn = 0;
+> +               bo->placements[i].lpfn = 0;
+> +       }
+> +}
+> +
+> +static void
+> +hibmc_bo_evict_flags(struct ttm_buffer_object *bo, struct ttm_placement *pl)
+> +{
+> +       struct hibmc_bo *hibmcbo = hibmc_bo(bo);
+> +
+> +       if (!hibmc_ttm_bo_is_hibmc_bo(bo))
+> +               return;
+> +
+> +       hibmc_ttm_placement(hibmcbo, TTM_PL_FLAG_SYSTEM);
+> +       *pl = hibmcbo->placement;
+> +}
+> +
+> +static int hibmc_bo_verify_access(struct ttm_buffer_object *bo,
+> +                                 struct file *filp)
+> +{
+> +       struct hibmc_bo *hibmcbo = hibmc_bo(bo);
+> +
+> +       return drm_vma_node_verify_access(&hibmcbo->gem.vma_node,
+> +                                         filp->private_data);
+> +}
+> +
+> +static int hibmc_ttm_io_mem_reserve(struct ttm_bo_device *bdev,
+> +                                   struct ttm_mem_reg *mem)
+> +{
+> +       struct ttm_mem_type_manager *man = &bdev->man[mem->mem_type];
+> +       struct hibmc_drm_private *hibmc = hibmc_bdev(bdev);
+> +
+> +       mem->bus.addr = NULL;
+> +       mem->bus.offset = 0;
+> +       mem->bus.size = mem->num_pages << PAGE_SHIFT;
+> +       mem->bus.base = 0;
+> +       mem->bus.is_iomem = false;
+> +       if (!(man->flags & TTM_MEMTYPE_FLAG_MAPPABLE))
+> +               return -EINVAL;
+> +       switch (mem->mem_type) {
+> +       case TTM_PL_SYSTEM:
+> +               /* system memory */
+> +               return 0;
+> +       case TTM_PL_VRAM:
+> +               mem->bus.offset = mem->start << PAGE_SHIFT;
+> +               mem->bus.base = pci_resource_start(hibmc->dev->pdev, 0);
+> +               mem->bus.is_iomem = true;
+> +               break;
+> +       default:
+> +               return -EINVAL;
+> +       }
+> +       return 0;
+> +}
+> +
+> +static void hibmc_ttm_backend_destroy(struct ttm_tt *tt)
+> +{
+> +       ttm_tt_fini(tt);
+> +       kfree(tt);
+> +}
+> +
+> +static struct ttm_backend_func hibmc_tt_backend_func = {
+> +       .destroy = &hibmc_ttm_backend_destroy,
+> +};
+> +
+> +static struct ttm_tt *hibmc_ttm_tt_create(struct ttm_bo_device *bdev,
+> +                                         unsigned long size,
+> +                                         u32 page_flags,
+> +                                         struct page *dummy_read_page)
+> +{
+> +       struct ttm_tt *tt;
+> +       int ret;
+> +
+> +       tt = kzalloc(sizeof(*tt), GFP_KERNEL);
+> +       if (!tt) {
+> +               DRM_ERROR("failed to allocate ttm_tt\n");
+> +               return NULL;
+> +       }
+> +       tt->func = &hibmc_tt_backend_func;
+> +       ret = ttm_tt_init(tt, bdev, size, page_flags, dummy_read_page);
+> +       if (ret) {
+> +               DRM_ERROR("failed to initialize ttm_tt: %d\n", ret);
+> +               kfree(tt);
+> +               return NULL;
+> +       }
+> +       return tt;
+> +}
+> +
+> +static int hibmc_ttm_tt_populate(struct ttm_tt *ttm)
+> +{
+> +       return ttm_pool_populate(ttm);
+> +}
+> +
+> +static void hibmc_ttm_tt_unpopulate(struct ttm_tt *ttm)
+> +{
+> +       ttm_pool_unpopulate(ttm);
+> +}
+> +
+> +struct ttm_bo_driver hibmc_bo_driver = {
+> +       .ttm_tt_create          = hibmc_ttm_tt_create,
+> +       .ttm_tt_populate        = hibmc_ttm_tt_populate,
+> +       .ttm_tt_unpopulate      = hibmc_ttm_tt_unpopulate,
+> +       .init_mem_type          = hibmc_bo_init_mem_type,
+> +       .evict_flags            = hibmc_bo_evict_flags,
+> +       .move                   = NULL,
+> +       .verify_access          = hibmc_bo_verify_access,
+> +       .io_mem_reserve         = &hibmc_ttm_io_mem_reserve,
+> +       .io_mem_free            = NULL,
+> +       .lru_tail               = &ttm_bo_default_lru_tail,
+> +       .swap_lru_tail          = &ttm_bo_default_swap_lru_tail,
+> +};
+> +
+> +int hibmc_mm_init(struct hibmc_drm_private *hibmc)
+> +{
+> +       int ret;
+> +       struct drm_device *dev = hibmc->dev;
+> +       struct ttm_bo_device *bdev = &hibmc->bdev;
+> +
+> +       ret = hibmc_ttm_global_init(hibmc);
 > +       if (ret)
 > +               return ret;
 > +
-> +       *gobj_p = gobj;
-> +       return ret;
-> +}
-> +
-> +static struct fb_ops hibmc_drm_fb_ops = {
-> +       .owner = THIS_MODULE,
-> +       .fb_check_var = drm_fb_helper_check_var,
-> +       .fb_set_par = drm_fb_helper_set_par,
-> +       .fb_fillrect = drm_fb_helper_sys_fillrect,
-> +       .fb_copyarea = drm_fb_helper_sys_copyarea,
-> +       .fb_imageblit = drm_fb_helper_sys_imageblit,
-> +       .fb_pan_display = drm_fb_helper_pan_display,
-> +       .fb_blank = drm_fb_helper_blank,
-> +       .fb_setcmap = drm_fb_helper_setcmap,
-> +};
-> +
-> +static int hibmc_drm_fb_create(struct drm_fb_helper *helper,
-> +                              struct drm_fb_helper_surface_size *sizes)
-> +{
-> +       struct hibmc_fbdev *hi_fbdev =
-> +               container_of(helper, struct hibmc_fbdev, helper);
-> +       struct hibmc_drm_private *priv = helper->dev->dev_private;
-> +       struct fb_info *info;
-> +       struct drm_mode_fb_cmd2 mode_cmd;
-> +       struct drm_gem_object *gobj = NULL;
-> +       int ret = 0;
-> +       int ret1;
-> +       size_t size;
-> +       unsigned int bytes_per_pixel;
-> +       struct hibmc_bo *bo = NULL;
-> +
-> +       DRM_DEBUG_DRIVER("surface width(%d), height(%d) and bpp(%d)\n",
-> +                        sizes->surface_width, sizes->surface_height,
-> +                        sizes->surface_bpp);
-> +       sizes->surface_depth = 32;
-> +
-> +       bytes_per_pixel = DIV_ROUND_UP(sizes->surface_bpp, 8);
-> +
-> +       mode_cmd.width = sizes->surface_width;
-> +       mode_cmd.height = sizes->surface_height;
-> +       mode_cmd.pitches[0] = mode_cmd.width * bytes_per_pixel;
-> +       mode_cmd.pixel_format = drm_mode_legacy_fb_format(sizes->surface_bpp,
-> +                                                         sizes->surface_depth);
-> +
-> +       size = PAGE_ALIGN(mode_cmd.pitches[0] * mode_cmd.height);
-> +
-> +       ret = hibmcfb_create_object(priv, &mode_cmd, &gobj);
+> +       ret = ttm_bo_device_init(&hibmc->bdev,
+> +                                hibmc->bo_global_ref.ref.object,
+> +                                &hibmc_bo_driver,
+> +                                dev->anon_inode->i_mapping,
+> +                                DRM_FILE_PAGE_OFFSET,
+> +                                true);
 > +       if (ret) {
-> +               DRM_ERROR("failed to create fbcon backing object: %d\n", ret);
-> +               return -ENOMEM;
-> +       }
-> +
-> +       bo = gem_to_hibmc_bo(gobj);
-> +
-> +       ret = ttm_bo_reserve(&bo->bo, true, false, NULL);
-> +       if (ret) {
-> +               DRM_ERROR("failed to reserve ttm_bo: %d\n", ret);
-> +               goto out_unref_gem;
-> +       }
-> +
-> +       ret = hibmc_bo_pin(bo, TTM_PL_FLAG_VRAM, NULL);
-> +       if (ret) {
-> +               DRM_ERROR("failed to pin fbcon: %d\n", ret);
-> +               goto out_unreserve_ttm_bo;
-> +       }
-> +
-> +       ret = ttm_bo_kmap(&bo->bo, 0, bo->bo.num_pages, &bo->kmap);
-> +       if (ret) {
-> +               DRM_ERROR("failed to kmap fbcon: %d\n", ret);
-> +               goto out_unpin_bo;
-> +       }
-> +       ttm_bo_unreserve(&bo->bo);
-> +
-> +       info = drm_fb_helper_alloc_fbi(helper);
-> +       if (IS_ERR(info)) {
-> +               ret = PTR_ERR(info);
-> +               DRM_ERROR("failed to allocate fbi: %d\n", ret);
-> +               goto out_release_fbi;
-> +       }
-> +
-> +       info->par = hi_fbdev;
-> +
-> +       hi_fbdev->fb = hibmc_framebuffer_init(priv->dev, &mode_cmd, gobj);
-> +       if (IS_ERR(hi_fbdev->fb)) {
-> +               ret = PTR_ERR(info);
-> +               DRM_ERROR("failed to initialize framebuffer: %d\n", ret);
-> +               goto out_release_fbi;
-> +       }
-> +
-> +       priv->fbdev->size = size;
-> +       hi_fbdev->helper.fb = &hi_fbdev->fb->fb;
-> +
-> +       strcpy(info->fix.id, "hibmcdrmfb");
-> +
-> +       info->flags = FBINFO_DEFAULT;
-> +       info->fbops = &hibmc_drm_fb_ops;
-> +
-> +       drm_fb_helper_fill_fix(info, hi_fbdev->fb->fb.pitches[0],
-> +                              hi_fbdev->fb->fb.depth);
-> +       drm_fb_helper_fill_var(info, &priv->fbdev->helper, sizes->fb_width,
-> +                              sizes->fb_height);
-> +
-> +       info->screen_base = bo->kmap.virtual;
-> +       info->screen_size = size;
-> +
-> +       info->fix.smem_start = bo->bo.mem.bus.offset + bo->bo.mem.bus.base;
-> +       info->fix.smem_len = size;
-> +       return 0;
-> +
-> +out_release_fbi:
-> +       drm_fb_helper_release_fbi(helper);
-> +       ret1 = ttm_bo_reserve(&bo->bo, true, false, NULL);
-> +       if (ret1) {
-> +               DRM_ERROR("failed to rsv ttm_bo when release fbi: %d\n", ret1);
-> +               goto out_unref_gem;
-> +       }
-> +       ttm_bo_kunmap(&bo->kmap);
-> +out_unpin_bo:
-> +       hibmc_bo_unpin(bo);
-> +out_unreserve_ttm_bo:
-> +       ttm_bo_unreserve(&bo->bo);
-> +out_unref_gem:
-> +       drm_gem_object_unreference_unlocked(gobj);
-> +
-> +       return ret;
-> +}
-> +
-> +static void hibmc_fbdev_destroy(struct hibmc_fbdev *fbdev)
-> +{
-> +       struct hibmc_framebuffer *gfb = fbdev->fb;
-> +       struct drm_fb_helper *fbh = &fbdev->helper;
-> +
-> +       drm_fb_helper_unregister_fbi(fbh);
-> +       drm_fb_helper_release_fbi(fbh);
-> +
-> +       drm_fb_helper_fini(fbh);
-> +
-> +       if (gfb)
-> +               drm_framebuffer_unreference(&gfb->fb);
-> +}
-> +
-> +static const struct drm_fb_helper_funcs hibmc_fbdev_helper_funcs = {
-> +       .fb_probe = hibmc_drm_fb_create,
-> +};
-> +
-> +int hibmc_fbdev_init(struct hibmc_drm_private *priv)
-> +{
-> +       int ret;
-> +       struct fb_var_screeninfo *var;
-> +       struct fb_fix_screeninfo *fix;
-> +       struct hibmc_fbdev *hifbdev;
-> +
-> +       hifbdev = devm_kzalloc(priv->dev->dev, sizeof(*hifbdev), GFP_KERNEL);
-> +       if (!hifbdev) {
-> +               DRM_ERROR("failed to allocate hibmc_fbdev\n");
-> +               return -ENOMEM;
-> +       }
-> +
-> +       priv->fbdev = hifbdev;
-> +       drm_fb_helper_prepare(priv->dev, &hifbdev->helper,
-> +                             &hibmc_fbdev_helper_funcs);
-> +
-> +       /* Now just one crtc and one channel */
-> +       ret = drm_fb_helper_init(priv->dev,
-> +                                &hifbdev->helper, 1, 1);
-> +       if (ret) {
-> +               DRM_ERROR("failed to initialize fb helper: %d\n", ret);
+> +               hibmc_ttm_global_release(hibmc);
+> +               DRM_ERROR("error initializing bo driver: %d\n", ret);
 > +               return ret;
 > +       }
 > +
-> +       ret = drm_fb_helper_single_add_all_connectors(&hifbdev->helper);
+> +       ret = ttm_bo_init_mm(bdev, TTM_PL_VRAM,
+> +                            hibmc->fb_size >> PAGE_SHIFT);
 > +       if (ret) {
-> +               DRM_ERROR("failed to add all connectors: %d\n", ret);
-> +               goto fini;
+> +               hibmc_ttm_global_release(hibmc);
+> +               DRM_ERROR("failed ttm VRAM init: %d\n", ret);
+> +               return ret;
 > +       }
 > +
-> +       ret = drm_fb_helper_initial_config(&hifbdev->helper, 16);
-> +       if (ret) {
-> +               DRM_ERROR("failed to setup initial conn config: %d\n", ret);
-> +               goto fini;
-> +       }
-> +
-> +       var = &hifbdev->helper.fbdev->var;
-> +       fix = &hifbdev->helper.fbdev->fix;
-> +
-> +       DRM_DEBUG_DRIVER("Member of info->var is :\n"
-> +                        "xres=%d\n"
-> +                        "yres=%d\n"
-> +                        "xres_virtual=%d\n"
-> +                        "yres_virtual=%d\n"
-> +                        "xoffset=%d\n"
-> +                        "yoffset=%d\n"
-> +                        "bits_per_pixel=%d\n"
-> +                        "...\n", var->xres, var->yres, var->xres_virtual,
-> +                        var->yres_virtual, var->xoffset, var->yoffset,
-> +                        var->bits_per_pixel);
-> +       DRM_DEBUG_DRIVER("Member of info->fix is :\n"
-> +                        "smem_start=%lx\n"
-> +                        "smem_len=%d\n"
-> +                        "type=%d\n"
-> +                        "type_aux=%d\n"
-> +                        "visual=%d\n"
-> +                        "xpanstep=%d\n"
-> +                        "ypanstep=%d\n"
-> +                        "ywrapstep=%d\n"
-> +                        "line_length=%d\n"
-> +                        "accel=%d\n"
-> +                        "capabilities=%d\n"
-> +                        "...\n", fix->smem_start, fix->smem_len, fix->type,
-> +                        fix->type_aux, fix->visual, fix->xpanstep,
-> +                        fix->ypanstep, fix->ywrapstep, fix->line_length,
-> +                        fix->accel, fix->capabilities);
-> +
+> +       hibmc->mm_inited = true;
 > +       return 0;
-> +
-> +fini:
-> +       drm_fb_helper_fini(&hifbdev->helper);
-> +       return ret;
 > +}
 > +
-> +void hibmc_fbdev_fini(struct hibmc_drm_private *priv)
+> +void hibmc_mm_fini(struct hibmc_drm_private *hibmc)
 > +{
-> +       if (!priv->fbdev)
+> +       if (!hibmc->mm_inited)
 > +               return;
 > +
-> +       hibmc_fbdev_destroy(priv->fbdev);
-> +       priv->fbdev = NULL;
-> +}
-> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c
-> index 036d3ac..3ff65f4 100644
-> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c
-> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c
-> @@ -16,6 +16,7 @@
->   *
->   */
->
-> +#include <drm/drm_atomic_helper.h>
->  #include <ttm/ttm_page_alloc.h>
->
->  #include "hibmc_drm_drv.h"
-> @@ -483,3 +484,69 @@ int hibmc_dumb_mmap_offset(struct drm_file *file, struct drm_device *dev,
->         drm_gem_object_unreference_unlocked(obj);
->         return 0;
->  }
-> +
-> +static void hibmc_user_framebuffer_destroy(struct drm_framebuffer *fb)
-> +{
-> +       struct hibmc_framebuffer *hibmc_fb = to_hibmc_framebuffer(fb);
-> +
-> +       drm_gem_object_unreference_unlocked(hibmc_fb->obj);
-> +       drm_framebuffer_cleanup(fb);
-> +       kfree(hibmc_fb);
+> +       ttm_bo_device_release(&hibmc->bdev);
+> +       hibmc_ttm_global_release(hibmc);
+> +       hibmc->mm_inited = false;
 > +}
 > +
-> +static const struct drm_framebuffer_funcs hibmc_fb_funcs = {
-> +       .destroy = hibmc_user_framebuffer_destroy,
-> +};
-> +
-> +struct hibmc_framebuffer *
-> +hibmc_framebuffer_init(struct drm_device *dev,
-> +                      const struct drm_mode_fb_cmd2 *mode_cmd,
-> +                      struct drm_gem_object *obj)
+> +static void hibmc_bo_unref(struct hibmc_bo **bo)
 > +{
-> +       struct hibmc_framebuffer *hibmc_fb;
+> +       struct ttm_buffer_object *tbo;
+> +
+> +       if ((*bo) == NULL)
+> +               return;
+> +
+> +       tbo = &((*bo)->bo);
+> +       ttm_bo_unref(&tbo);
+> +       *bo = NULL;
+> +}
+> +
+> +int hibmc_bo_create(struct drm_device *dev, int size, int align,
+> +                   u32 flags, struct hibmc_bo **phibmcbo)
+> +{
+> +       struct hibmc_drm_private *hibmc = dev->dev_private;
+> +       struct hibmc_bo *hibmcbo;
+> +       size_t acc_size;
 > +       int ret;
 > +
-> +       hibmc_fb = kzalloc(sizeof(*hibmc_fb), GFP_KERNEL);
-> +       if (!hibmc_fb) {
-> +               DRM_ERROR("failed to allocate hibmc_fb\n");
-> +               return ERR_PTR(-ENOMEM);
+> +       hibmcbo = kzalloc(sizeof(*hibmcbo), GFP_KERNEL);
+> +       if (!hibmcbo) {
+> +               DRM_ERROR("failed to allocate hibmcbo\n");
+> +               return -ENOMEM;
 > +       }
-> +
-> +       drm_helper_mode_fill_fb_struct(&hibmc_fb->fb, mode_cmd);
-> +       hibmc_fb->obj = obj;
-> +       ret = drm_framebuffer_init(dev, &hibmc_fb->fb, &hibmc_fb_funcs);
+> +       ret = drm_gem_object_init(dev, &hibmcbo->gem, size);
 > +       if (ret) {
-> +               DRM_ERROR("drm_framebuffer_init failed: %d\n", ret);
-> +               kfree(hibmc_fb);
-> +               return ERR_PTR(ret);
+> +               DRM_ERROR("failed to initialize drm gem object: %d\n", ret);
+> +               kfree(hibmcbo);
+> +               return ret;
 > +       }
 > +
-> +       return hibmc_fb;
+> +       hibmcbo->bo.bdev = &hibmc->bdev;
+> +
+> +       hibmc_ttm_placement(hibmcbo, TTM_PL_FLAG_VRAM | TTM_PL_FLAG_SYSTEM);
+> +
+> +       acc_size = ttm_bo_dma_acc_size(&hibmc->bdev, size,
+> +                                      sizeof(struct hibmc_bo));
+> +
+> +       ret = ttm_bo_init(&hibmc->bdev, &hibmcbo->bo, size,
+> +                         ttm_bo_type_device, &hibmcbo->placement,
+> +                         align >> PAGE_SHIFT, false, NULL, acc_size,
+> +                         NULL, NULL, hibmc_bo_ttm_destroy);
+> +       if (ret) {
+> +               hibmc_bo_unref(&hibmcbo);
+> +               DRM_ERROR("failed to initialize ttm_bo: %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       *phibmcbo = hibmcbo;
+> +       return 0;
 > +}
 > +
-> +static struct drm_framebuffer *
-> +hibmc_user_framebuffer_create(struct drm_device *dev,
-> +                             struct drm_file *filp,
-> +                             const struct drm_mode_fb_cmd2 *mode_cmd)
+> +int hibmc_bo_pin(struct hibmc_bo *bo, u32 pl_flag, u64 *gpu_addr)
+> +{
+> +       int i, ret;
+> +
+> +       if (bo->pin_count) {
+> +               bo->pin_count++;
+> +               if (gpu_addr)
+> +                       *gpu_addr = bo->bo.offset;
+> +               return 0;
+> +       }
+> +
+> +       hibmc_ttm_placement(bo, pl_flag);
+> +       for (i = 0; i < bo->placement.num_placement; i++)
+> +               bo->placements[i].flags |= TTM_PL_FLAG_NO_EVICT;
+> +       ret = ttm_bo_validate(&bo->bo, &bo->placement, false, false);
+> +       if (ret)
+> +               return ret;
+> +
+> +       bo->pin_count = 1;
+> +       if (gpu_addr)
+> +               *gpu_addr = bo->bo.offset;
+> +       return 0;
+> +}
+> +
+> +int hibmc_bo_unpin(struct hibmc_bo *bo)
+> +{
+> +       int i, ret;
+> +
+> +       if (!bo->pin_count) {
+> +               DRM_ERROR("unpin bad %p\n", bo);
+> +               return 0;
+> +       }
+> +       bo->pin_count--;
+> +       if (bo->pin_count)
+> +               return 0;
+> +
+> +       for (i = 0; i < bo->placement.num_placement ; i++)
+> +               bo->placements[i].flags &= ~TTM_PL_FLAG_NO_EVICT;
+> +       ret = ttm_bo_validate(&bo->bo, &bo->placement, false, false);
+> +       if (ret) {
+> +               DRM_ERROR("validate failed for unpin: %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +int hibmc_mmap(struct file *filp, struct vm_area_struct *vma)
+> +{
+> +       struct drm_file *file_priv;
+> +       struct hibmc_drm_private *hibmc;
+> +
+> +       if (unlikely(vma->vm_pgoff < DRM_FILE_PAGE_OFFSET))
+> +               return -EINVAL;
+> +
+> +       file_priv = filp->private_data;
+> +       hibmc = file_priv->minor->dev->dev_private;
+> +       return ttm_bo_mmap(filp, vma, &hibmc->bdev);
+> +}
+> +
+> +int hibmc_gem_create(struct drm_device *dev, u32 size, bool iskernel,
+> +                    struct drm_gem_object **obj)
+> +{
+> +       struct hibmc_bo *hibmcbo;
+> +       int ret;
+> +
+> +       *obj = NULL;
+> +
+> +       size = PAGE_ALIGN(size);
+> +       if (size == 0) {
+> +               DRM_ERROR("error: zero size\n");
+> +               return -EINVAL;
+> +       }
+> +
+> +       ret = hibmc_bo_create(dev, size, 0, 0, &hibmcbo);
+> +       if (ret) {
+> +               if (ret != -ERESTARTSYS)
+> +                       DRM_ERROR("failed to allocate GEM object: %d\n", ret);
+> +               return ret;
+> +       }
+> +       *obj = &hibmcbo->gem;
+> +       return 0;
+> +}
+> +
+> +int hibmc_dumb_create(struct drm_file *file, struct drm_device *dev,
+> +                     struct drm_mode_create_dumb *args)
+> +{
+> +       struct drm_gem_object *gobj;
+> +       u32 handle;
+> +       int ret;
+> +
+> +       args->pitch = ALIGN(args->width * DIV_ROUND_UP(args->bpp, 8), 16);
+> +       args->size = args->pitch * args->height;
+> +
+> +       ret = hibmc_gem_create(dev, args->size, false,
+> +                              &gobj);
+> +       if (ret) {
+> +               DRM_ERROR("failed to create GEM object: %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       ret = drm_gem_handle_create(file, gobj, &handle);
+> +       drm_gem_object_unreference_unlocked(gobj);
+> +       if (ret) {
+> +               DRM_ERROR("failed to unreference GEM object: %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       args->handle = handle;
+> +       return 0;
+> +}
+> +
+> +void hibmc_gem_free_object(struct drm_gem_object *obj)
+> +{
+> +       struct hibmc_bo *hibmcbo = gem_to_hibmc_bo(obj);
+> +
+> +       hibmc_bo_unref(&hibmcbo);
+> +}
+> +
+> +static u64 hibmc_bo_mmap_offset(struct hibmc_bo *bo)
+> +{
+> +       return drm_vma_node_offset_addr(&bo->bo.vma_node);
+> +}
+> +
+> +int hibmc_dumb_mmap_offset(struct drm_file *file, struct drm_device *dev,
+> +                          u32 handle, u64 *offset)
 > +{
 > +       struct drm_gem_object *obj;
-> +       struct hibmc_framebuffer *hibmc_fb;
+> +       struct hibmc_bo *bo;
 > +
-> +       DRM_DEBUG_DRIVER("%dx%d, format %c%c%c%c\n",
-> +                        mode_cmd->width, mode_cmd->height,
-> +                        (mode_cmd->pixel_format) & 0xff,
-> +                        (mode_cmd->pixel_format >> 8)  & 0xff,
-> +                        (mode_cmd->pixel_format >> 16) & 0xff,
-> +                        (mode_cmd->pixel_format >> 24) & 0xff);
-> +
-> +       obj = drm_gem_object_lookup(filp, mode_cmd->handles[0]);
+> +       obj = drm_gem_object_lookup(file, handle);
 > +       if (!obj)
-> +               return ERR_PTR(-ENOENT);
+> +               return -ENOENT;
 > +
-> +       hibmc_fb = hibmc_framebuffer_init(dev, mode_cmd, obj);
-> +       if (IS_ERR(hibmc_fb)) {
-> +               drm_gem_object_unreference_unlocked(obj);
-> +               return ERR_PTR((long)hibmc_fb);
-> +       }
-> +       return &hibmc_fb->fb;
+> +       bo = gem_to_hibmc_bo(obj);
+> +       *offset = hibmc_bo_mmap_offset(bo);
+> +
+> +       drm_gem_object_unreference_unlocked(obj);
+> +       return 0;
 > +}
 > --
 > 1.9.1
