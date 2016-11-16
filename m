@@ -1,32 +1,56 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 16 Nov 2016 20:59:51 -0200
-Subject: Boot failures in -next due to 'ARM: dts: imx: Remove
- skeleton.dtsi'
-In-Reply-To: <20161116224024.GA11821@roeck-us.net>
-References: <cda2df55-f2f3-00d6-c6b1-816ed47bbf56@roeck-us.net>
- <20161116184649.GF11228@leverpostej> <20161116221002.GA19925@roeck-us.net>
- <CAOMZO5Bd2X3pVqExBtBw_uHReDDkf6J2VdMXnAXynCAHxoX60A@mail.gmail.com>
- <20161116224024.GA11821@roeck-us.net>
-Message-ID: <CAOMZO5AXP8hi6t9-rfdG7daiFFsa8oJ70cF9fbZuoWnx8t+vLA@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 17 Nov 2016 00:03:04 +0100
+Subject: [PATCH v3 3/3] ARM: rockchip: drop rk3288 jtag/mmc switch handling
+In-Reply-To: <20161116230304.8432-1-heiko@sntech.de>
+References: <20161116230304.8432-1-heiko@sntech.de>
+Message-ID: <20161116230304.8432-4-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2016 at 8:40 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+We moved that functionality to a more generic place where it can also
+be used for other socs, so drop it from architecture code.
 
-> Yes, but not the 'device_type' property, which the kernel seems to expect.
-> The qemu patch below fixes the problem for sabrelite, I just don't know
-> if that is really the way to go. You tell me; I'll be happy to submit
-> the necessary patch(es) into qemu.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
+---
+ arch/arm/mach-rockchip/rockchip.c | 12 ------------
+ 1 file changed, 12 deletions(-)
 
-I can send the patch adding device_type for the i.MX dts files, but in
-the meantime, it would be nice if you could send your proposal patch
-to qemu as it will make qemu to work closer to the real hardware.
-
-Thanks
-
-> The same is true for 'chosen'. Right now qemu expects this node to exist.
-> It does exist for sabrelite, but apparently not for imx25-pdk.
-
-We can fix this too in the dts.
-
-Thanks
+diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
+index e7fdf06..0008783 100644
+--- a/arch/arm/mach-rockchip/rockchip.c
++++ b/arch/arm/mach-rockchip/rockchip.c
+@@ -29,13 +29,11 @@
+ #include "core.h"
+ #include "pm.h"
+ 
+-#define RK3288_GRF_SOC_CON0 0x244
+ #define RK3288_TIMER6_7_PHYS 0xff810000
+ 
+ static void __init rockchip_timer_init(void)
+ {
+ 	if (of_machine_is_compatible("rockchip,rk3288")) {
+-		struct regmap *grf;
+ 		void __iomem *reg_base;
+ 
+ 		/*
+@@ -54,16 +52,6 @@ static void __init rockchip_timer_init(void)
+ 		} else {
+ 			pr_err("rockchip: could not map timer7 registers\n");
+ 		}
+-
+-		/*
+-		 * Disable auto jtag/sdmmc switching that causes issues
+-		 * with the mmc controllers making them unreliable
+-		 */
+-		grf = syscon_regmap_lookup_by_compatible("rockchip,rk3288-grf");
+-		if (!IS_ERR(grf))
+-			regmap_write(grf, RK3288_GRF_SOC_CON0, 0x10000000);
+-		else
+-			pr_err("rockchip: could not get grf syscon\n");
+ 	}
+ 
+ 	of_clk_init(NULL);
+-- 
+2.10.2
