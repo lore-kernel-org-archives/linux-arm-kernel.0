@@ -1,19 +1,19 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 16 Nov 2016 14:46:12 +0530
-Subject: [PATCH v2 3/3] ARM: davinci: PM: support da8xx DT platforms
-In-Reply-To: <20161115195421.19983-4-khilman@baylibre.com>
-References: <20161115195421.19983-1-khilman@baylibre.com>
- <20161115195421.19983-4-khilman@baylibre.com>
-Message-ID: <89d4c57d-6762-d98f-4c82-eb4403fd56f4@ti.com>
+Date: Wed, 16 Nov 2016 14:47:22 +0530
+Subject: [PATCH v2] ARM: dts: da850: add the mstpri and ddrctl nodes
+In-Reply-To: <1479207611-18028-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1479207611-18028-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <67bcfc1a-90fb-a387-c2dc-df7dac8c1c90@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 November 2016 01:24 AM, Kevin Hilman wrote:
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+On Tuesday 15 November 2016 04:30 PM, Bartosz Golaszewski wrote:
+> Add the nodes for the MSTPRI configuration and DDR2/mDDR memory
+> controller drivers to da850.dtsi.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Added a one line description which is essentially a copy of subject line.
-
-Applied to v4.10/soc
+Applied to v4.10/dt
 
 Thanks,
 Sekhar
