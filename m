@@ -1,68 +1,52 @@
-From: jason.hui.liu@nxp.com (Jason Liu)
-Date: Wed, 16 Nov 2016 22:19:35 +0800
-Subject: [PATCH 1/1] drivers: dma-contiguous: Ensure cma reserve region never
- cross the low/high mem boundary
-Message-ID: <1479305975-21670-1-git-send-email-jason.hui.liu@nxp.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 16 Nov 2016 12:06:51 +0530
+Subject: [PATCH v4 4/4] ARM: dts: da850: Add the usb otg device nodeg
+In-Reply-To: <20161115211951.GH11011@uda0271908>
+References: <1478188752-22447-1-git-send-email-abailon@baylibre.com>
+ <1478188752-22447-5-git-send-email-abailon@baylibre.com>
+ <0c94c5e0-9d2c-fff5-1213-2fb2adb20ab0@ti.com>
+ <20161115211951.GH11011@uda0271908>
+Message-ID: <9a73c416-fe4c-57c3-af53-87146dae2206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the cma reserve region goes through the device-tree method,
-also need ensure the cma reserved region not cross the low/high
-mem boundary. This patch did the similar fix as commit:16195dd
-("mm: cma: Ensure that reservations never cross the low/high mem boundary")
+On Wednesday 16 November 2016 02:49 AM, Bin Liu wrote:
+> On Tue, Nov 15, 2016 at 04:16:02PM +0530, Sekhar Nori wrote:
+>> On Thursday 03 November 2016 09:29 PM, Alexandre Bailon wrote:
+>>> This adds the device tree node for the usb otg
+>>> controller present in the da850 family of SoC's.
+>>> This also enables the otg usb controller for the lcdk board.
+>>>
+>>> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+>>> ---
+>>>  arch/arm/boot/dts/da850-lcdk.dts |  8 ++++++++
+>>>  arch/arm/boot/dts/da850.dtsi     | 15 +++++++++++++++
+>>>  2 files changed, 23 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+>>> index 7b8ab21..9f5040c 100644
+>>> --- a/arch/arm/boot/dts/da850-lcdk.dts
+>>> +++ b/arch/arm/boot/dts/da850-lcdk.dts
+>>> @@ -158,6 +158,14 @@
+>>>  	rx-num-evt = <32>;
+>>>  };
+>>>  
+>>> +&usb_phy {
+>>> +	status = "okay";
+>>> +	};
+>>
+>> As mentioned by David already, this node needs to be removed. Please
+>> rebase this on top of latest linux-davinci/master when ready for merging
+>> (driver changes accepted).
+> 
+> Dropped this patch due to this comment.
 
-Signed-off-by: Jason Liu <jason.hui.liu@nxp.com>
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Cc: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
----
- drivers/base/dma-contiguous.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+Bin, Please do not apply dts or arch/arm/mach-davinci patches. I have a
+bunch queued through my tree and more in pipeline and it will cause
+unnecessary merge conflicts in linux-next or at Linus.
 
-diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-index e167a1e1..2bc093c 100644
---- a/drivers/base/dma-contiguous.c
-+++ b/drivers/base/dma-contiguous.c
-@@ -244,6 +244,7 @@ static int __init rmem_cma_setup(struct reserved_mem *rmem)
- {
- 	phys_addr_t align = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
- 	phys_addr_t mask = align - 1;
-+	phys_addr_t highmem_start;
- 	unsigned long node = rmem->fdt_node;
- 	struct cma *cma;
- 	int err;
-@@ -256,6 +257,32 @@ static int __init rmem_cma_setup(struct reserved_mem *rmem)
- 		pr_err("Reserved memory: incorrect alignment of CMA region\n");
- 		return -EINVAL;
- 	}
-+#ifdef CONFIG_X86
-+	/*
-+	 * high_memory isn't direct mapped memory so retrieving its physical
-+	 * address isn't appropriate.  But it would be useful to check the
-+	 * physical address of the highmem boundary so it's justfiable to get
-+	 * the physical address from it.  On x86 there is a validation check for
-+	 * this case, so the following workaround is needed to avoid it.
-+	 */
-+	highmem_start = __pa_nodebug(high_memory);
-+#else
-+	highmem_start = __pa(high_memory);
-+#endif
-+
-+	/*
-+	 * All pages in the reserved area must come from the same zone.
-+	 * If the reserved region crosses the low/high memory boundary,
-+	 * try to fix it up and then fall back to allocate from the low mem
-+	 */
-+	if (rmem->base < highmem_start &&
-+		(rmem->base + rmem->size) > highmem_start) {
-+		memblock_free(rmem->base, rmem->size);
-+		rmem->base = memblock_alloc_range(rmem->size, align, 0,
-+						highmem_start, MEMBLOCK_NONE);
-+		if (!rmem->base)
-+			return -ENOMEM;
-+	}
- 
- 	err = cma_init_reserved_mem(rmem->base, rmem->size, 0, &cma);
- 	if (err) {
--- 
-1.9.1
+For future, I have asked Alexandre to send driver and dts patches as
+separate series so there is no confusion on who should apply.
+
+Thanks,
+Sekhar
