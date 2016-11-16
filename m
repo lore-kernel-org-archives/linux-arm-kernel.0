@@ -1,44 +1,52 @@
-From: atull@opensource.altera.com (atull)
-Date: Wed, 16 Nov 2016 16:28:27 -0600
-Subject: [PATCH fpga 1/9] fpga zynq: Add missing \n to messages
-In-Reply-To: <20161116201720.GC19593@obsidianresearch.com>
-References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <1478732303-13718-2-git-send-email-jgunthorpe@obsidianresearch.com>
- <0aebdb59-86d7-2569-c49d-de5d45b5cac0@suse.com>
- <20161115180813.GB1852@obsidianresearch.com>
- <20161116183926.GA14341@live.com>
- <20161116201720.GC19593@obsidianresearch.com>
-Message-ID: <alpine.DEB.2.20.1611161621260.20443@atull-VirtualBox2>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 16 Nov 2016 14:40:24 -0800
+Subject: Boot failures in -next due to 'ARM: dts: imx: Remove
+ skeleton.dtsi'
+In-Reply-To: <CAOMZO5Bd2X3pVqExBtBw_uHReDDkf6J2VdMXnAXynCAHxoX60A@mail.gmail.com>
+References: <cda2df55-f2f3-00d6-c6b1-816ed47bbf56@roeck-us.net>
+ <20161116184649.GF11228@leverpostej>
+ <20161116221002.GA19925@roeck-us.net>
+ <CAOMZO5Bd2X3pVqExBtBw_uHReDDkf6J2VdMXnAXynCAHxoX60A@mail.gmail.com>
+Message-ID: <20161116224024.GA11821@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Nov 2016, Jason Gunthorpe wrote:
-
-> On Wed, Nov 16, 2016 at 10:39:26AM -0800, Moritz Fischer wrote:
-> > > As you say, it is crystal clear already, and this is an acceptable commit
-> > > message.. Please suggest a text if you want to see something
-> > > different.
-> > > 
-> > 
-> > It still needs a long message. Just do it.
+On Wed, Nov 16, 2016 at 08:27:09PM -0200, Fabio Estevam wrote:
+> Hi Guenter,
 > 
-> Can I put your reviewed-by on this when I resend the series?
+> On Wed, Nov 16, 2016 at 8:10 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> >
+> > Anyway, I guess the problem is that the "official" dtb files no longer provide
+> > the skeleton /chosen and /memory nodes (and maybe others), and qemu seems to
+> > expect that they are provided. Is that correct ?
 > 
-> Will you have time to review the other patches this week?
-> 
-> Jason
-> 
+> imx6qdl-sabrelite.dtsi provides chosen and memory nodes.
 
-Hi Jason,
+Yes, but not the 'device_type' property, which the kernel seems to expect.
+The qemu patch below fixes the problem for sabrelite, I just don't know
+if that is really the way to go. You tell me; I'll be happy to submit
+the necessary patch(es) into qemu.
 
-I agree that this needs a long description and I'm not sure
-why you're pushing back on that.
+The same is true for 'chosen'. Right now qemu expects this node to exist.
+It does exist for sabrelite, but apparently not for imx25-pdk.
 
-You will need to rebase this series on linux-next.  I won't
-have much time this week to look at this, sorry.  Not sure
-what the hurry is.  I see the value of this, but things are
-busy right now.  I'll be getting up to speed on how the
-kernel does sg and this is kind of a fundamental change to
-the API so I appreciate your patience.
+Guenter
 
-Alan
+---
+diff --git a/hw/arm/boot.c b/hw/arm/boot.c
+index 1b913a4..080d1e5 100644
+--- a/hw/arm/boot.c
++++ b/hw/arm/boot.c
+@@ -486,6 +486,12 @@ static int load_dtb(hwaddr addr, const struct arm_boot_info *binfo,
+             g_free(nodename);
+         }
+     } else {
++        Error *err = NULL;
++
++        if (!qemu_fdt_getprop(fdt, "/memory", "device_type", NULL, &err)) {
++            qemu_fdt_setprop_string(fdt, "/memory", "device_type", "memory");
++        }
++
+         rc = qemu_fdt_setprop_sized_cells(fdt, "/memory", "reg",
+                                           acells, binfo->loader_start,
+                                           scells, binfo->ram_size);
