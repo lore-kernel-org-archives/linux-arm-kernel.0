@@ -1,38 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Nov 2016 16:20:37 +0100
-Subject: [PATCH] ARM: ux500: fix prcmu_is_cpu_in_wfi() calculation
-Message-ID: <20161116152047.3336967-1-arnd@arndb.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 16 Nov 2016 15:22:09 +0000
+Subject: [PATCH/RESEND] recordmcount: arm: Implement make_nop
+In-Reply-To: <20161116090838.6c540230@gandalf.local.home>
+References: <20161018234200.5804-1-sboyd@codeaurora.org>
+ <CAKv+Gu-Cp775gbLxPcJQ4G2nEnwm9G_gxh5B1Sf2LGkkov_OZA@mail.gmail.com>
+ <20161115191807.GC25626@codeaurora.org>
+ <CAKv+Gu9GVNqXwya8hrjmBcK2L0ud-qr7iE54WUPuMNyFtAy80w@mail.gmail.com>
+ <20161115235331.GE25626@codeaurora.org>
+ <CAKv+Gu_8hhp1J1BwWE6m=mtYYCixajJLj1GJGRuNPtO328qQGg@mail.gmail.com>
+ <20161116090838.6c540230@gandalf.local.home>
+Message-ID: <CAKv+Gu_LfKXSCsx2MFg-nq5XtWHQV1gtWMXhP3wsVGoq_seRiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function clearly never worked and always returns true,
-as pointed out by gcc-7:
+On 16 November 2016 at 14:08, Steven Rostedt <rostedt@goodmis.org> wrote:
+> On Wed, 16 Nov 2016 11:48:38 +0000
+> Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>
+>> >
+>> > Does that allay your concerns?
+>> >
+>>
+>> Yes, it does. Thanks
+>
+> Does this mean I can pull this patch into my queue then?
+>
 
-arch/arm/mach-ux500/pm.c: In function 'prcmu_is_cpu_in_wfi':
-arch/arm/mach-ux500/pm.c:137:212: error: ?: using integer constants in boolean context, the expression will always evaluate to 'true' [-Werror=int-in-bool-context]
+Fine by me
 
-With the added braces, the condition actually makes sense.
-
-Fixes: 34fe6f107eab ("mfd : Check if the other db8500 core is in WFI")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-ux500/pm.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-ux500/pm.c b/arch/arm/mach-ux500/pm.c
-index 8538910db202..a970e7fcba9e 100644
---- a/arch/arm/mach-ux500/pm.c
-+++ b/arch/arm/mach-ux500/pm.c
-@@ -134,8 +134,8 @@ bool prcmu_pending_irq(void)
-  */
- bool prcmu_is_cpu_in_wfi(int cpu)
- {
--	return readl(PRCM_ARM_WFI_STANDBY) & cpu ? PRCM_ARM_WFI_STANDBY_WFI1 :
--		     PRCM_ARM_WFI_STANDBY_WFI0;
-+	return readl(PRCM_ARM_WFI_STANDBY) &
-+		(cpu ? PRCM_ARM_WFI_STANDBY_WFI1 : PRCM_ARM_WFI_STANDBY_WFI0);
- }
- 
- /*
--- 
-2.9.0
+Thanks,
+Ard.
