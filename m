@@ -1,28 +1,35 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 16 Nov 2016 09:32:52 +0100
-Subject: [2/2] dmaengine: at_xdmac: fix spurious flag status for mem2mem
- transfers
-In-Reply-To: <7fbfd098-31d8-d184-37a9-8865fdb7fb8d@denx.de>
-References: <7fbfd098-31d8-d184-37a9-8865fdb7fb8d@denx.de>
-Message-ID: <2633a3a8-3d2f-7f89-e940-a998e82aadce@atmel.com>
+From: wenpan@hisilicon.com (wenpan)
+Date: Wed, 16 Nov 2016 16:56:44 +0800
+Subject: [PATCH 1/3] arm: hisi: add ARCH_MULTI_V5 support
+In-Reply-To: <5893354.6MrIxqzRoI@wuerfel>
+References: <20161017120705.3726-1-wenpan@hisilicon.com>
+ <20161017120705.3726-2-wenpan@hisilicon.com> <5893354.6MrIxqzRoI@wuerfel>
+Message-ID: <e78a288b-8bab-9441-2edb-6ec08e5103d7@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 28/10/2016 ? 23:57, Marek Vasut a ?crit :
-> Hi,
-> 
-> this patch [1] should also CC stable, since it fixes MMC operation in at
-> least linux 4.4 .
-> 
-> Thanks!
-> 
-> [1] https://patchwork.kernel.org/patch/7681201/
+Hi Martyo<
 
-I did that (without putting you in copy: sorry).
-https://www.spinics.net/lists/stable/msg151272.html
+Does this confict with your patcho< If noto<
+I hope this could be merged first.  Besides could you tell me the link to your related patch?
 
-Thanks a lot for the heads-up Marek!
+Thanks,
+Pan
 
-Best regards,
--- 
-Nicolas Ferre
+On 2016/10/17 21:48, Arnd Bergmann wrote:
+> On Monday, October 17, 2016 8:07:03 PM CEST Pan Wen wrote:
+>> Add support for some HiSilicon SoCs which depend on ARCH_MULTI_V5.
+>>
+>> Signed-off-by: Pan Wen <wenpan@hisilicon.com>
+>>
+> 
+> Looks ok. I've added Marty Plummer to Cc, he was recently proposing
+> patches for Hi3520, which I think is closely related to this one.
+> Please try to work together so the patches don't conflict. It should
+> be fairly straightforward since you are basically doing the same
+> change here.
+> 
+> 	Arnd
+> 
+> .
+> 
