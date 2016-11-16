@@ -1,45 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Nov 2016 15:18:18 +0100
-Subject: [PATCH] pinctrl: sunxi: fix theoretical uninitialized variable access
-Message-ID: <20161116141841.2030776-1-arnd@arndb.de>
+Date: Wed, 16 Nov 2016 15:22:38 +0100
+Subject: [PATCH 1/2] phy: rockchip-inno-usb2: fix uninitialized tmout variable
+Message-ID: <20161116142259.2123506-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc warns about a  way that it could use an uninitialized variable:
+The newly added OTG support has an obvious uninitialized variable
+access that gcc warns about:
 
-drivers/pinctrl/sunxi/pinctrl-sunxi.c: In function 'sunxi_pinctrl_init':
-drivers/pinctrl/sunxi/pinctrl-sunxi.c:1191:8: error: 'best_div' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+drivers/phy/phy-rockchip-inno-usb2.c: In function 'rockchip_chg_detect_work':
+drivers/phy/phy-rockchip-inno-usb2.c:717:7: error: 'tmout' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 
-This cannot really happen except if 'freq' is UINT_MAX and 'clock' is
-zero, and both of these are forbidden. To shut up the warning anyway,
-this changes the logic to initialize the return code to the first
-divider value before looking at the others.
+This replaces the use of the uninitialized variable with what
+the value was in the previous USB_CHG_STATE_WAIT_FOR_DCD
+state.
 
-Fixes: 7c926492d38a ("pinctrl: sunxi: Add support for interrupt debouncing")
+Fixes: 0c42fe48fd23 ("phy: rockchip-inno-usb2: support otg-port for rk3399")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/pinctrl/sunxi/pinctrl-sunxi.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ drivers/phy/phy-rockchip-inno-usb2.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-index 2339d4718b4d..6b7953da4228 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-@@ -1125,10 +1125,13 @@ static int sunxi_pinctrl_build_state(struct platform_device *pdev)
- static int sunxi_pinctrl_get_debounce_div(struct clk *clk, int freq, int *diff)
- {
- 	unsigned long clock = clk_get_rate(clk);
--	unsigned int best_diff = ~0, best_div;
-+	unsigned int best_diff, best_div;
- 	int i;
- 
--	for (i = 0; i < 8; i++) {
-+	best_diff = abs(freq - clock);
-+	best_div = 0;
-+
-+	for (i = 1; i < 8; i++) {
- 		int cur_diff = abs(freq - (clock >> i));
- 
- 		if (cur_diff < best_diff) {
+diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
+index eb89de59b68f..2f99ec95079c 100644
+--- a/drivers/phy/phy-rockchip-inno-usb2.c
++++ b/drivers/phy/phy-rockchip-inno-usb2.c
+@@ -714,7 +714,7 @@ static void rockchip_chg_detect_work(struct work_struct *work)
+ 			delay = CHG_SECONDARY_DET_TIME;
+ 			rphy->chg_state = USB_CHG_STATE_PRIMARY_DONE;
+ 		} else {
+-			if (tmout) {
++			if (rphy->dcd_retries == CHG_DCD_MAX_RETRIES) {
+ 				/* floating charger found */
+ 				rphy->chg_type = POWER_SUPPLY_TYPE_USB_DCP;
+ 				rphy->chg_state = USB_CHG_STATE_DETECTED;
 -- 
 2.9.0
