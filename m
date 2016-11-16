@@ -1,78 +1,36 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 16 Nov 2016 05:17:11 +0000
-Subject: [alsa-devel] [PATCH v2] clkdev: add devm_of_clk_get()
-In-Reply-To: <878twndi54.wl%kuninori.morimoto.gx@renesas.com>
-References: <87wpl2yyuw.wl%kuninori.morimoto.gx@renesas.com>
- <146785219147.73491.2827268663638530377@resonance>
- <87ziptixv7.wl%kuninori.morimoto.gx@renesas.com>
- <20160707122636.GP1041@n2100.armlinux.org.uk>
- <8760shgfzu.wl%kuninori.morimoto.gx@renesas.com>
- <146794140875.73491.7115209079607438738@resonance>
- <871t34hlin.wl%kuninori.morimoto.gx@renesas.com>
- <878twndi54.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <8737isvwc6.wl%kuninori.morimoto.gx@renesas.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 15 Nov 2016 22:20:33 -0700
+Subject: [PATCH fpga 8/9] fpga socfpga: Use the scatterlist interface
+In-Reply-To: <alpine.DEB.2.20.1611150940270.3634@atull-VirtualBox2>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-9-git-send-email-jgunthorpe@obsidianresearch.com>
+ <alpine.DEB.2.10.1611131712210.2735@atull-VirtualBox>
+ <20161114001854.GA27248@obsidianresearch.com>
+ <alpine.DEB.2.10.1611132149140.2908@atull-VirtualBox>
+ <20161115043537.GA23253@obsidianresearch.com>
+ <alpine.DEB.2.20.1611150940270.3634@atull-VirtualBox2>
+Message-ID: <20161116052033.GA6044@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 15, 2016 at 09:47:05AM -0600, atull wrote:
+> Not different.
+> 
+> From 'fpga-mgr.txt':
+>   The programming sequence is:
+>    1. .write_init
+>    2. .write (may be called once or multiple times)
+>    3. .write_complete
+> 
+> The old write was be separate from write_init and write_complete
+> because I figured that in the future someone may be streaming in
+> the bitstream and not have the whole bitstream in memory.
 
-Hi Rob, Michael, Russell
+What is the point of this if write_init gets a copy of the buffer -
+what is that supposed to be?
 
+If you see things this way why are you opposed to patch 9? I'll change
+things around to call write multiple times and force the sg list into
+write_init, which seems like what you intended anyhow..
 
-What is the conclusion of this patch ?
-We shouldn't add devm_of_clk_get() ? or can I continue ?
-
-The problem of current [devm_]clk_get() handles *dev only,
-but I need to get clocks from DT node, not dev
-
-	sound_soc {
-		...
-		cpu {
-			...
-=>			clocks = <&xxx>;
-		};
-		codec {
-			...
-=>			clocks = <&xxx>;
-		};
-	};
-
-> > Thank you for your feedback
-> > 
-> > > > struct clk *clk_get(struct device *dev, const char *con_id)
-> > > > {
-> > > >         ...
-> > > >         if (dev) {
-> > > >                 clk = __of_clk_get_by_name(dev->of_node, dev_id, con_id);
-> > > >                                            ~~~~~~~~~~~~
-> > > >                 ...
-> > > >         }
-> > > > }
-> > > > 
-> > > > I would like to select specific device_node.
-> > > 
-> > > Do you have access to the struct device that you want to target? Can you
-> > > pass that device into either clk_get or devm_clk_get?
-> > 
-> > If my understanding was correct, I think I can't.
-> > In below case, "sound_soc" has its *dev, but "cpu" and "codec" doesn't
-> > have *dev, it has node only. Thus, we are using of_clk_get() for these now.
-> > 
-> > 	clk = of_clk_get(cpu, xxx);
-> > 	clk = of_clk_get(codec, xxx);
-> > 
-> > 	sound_soc {
-> > 		...
-> > 		cpu {
-> > 			...
-> > =>			clocks = <&xxx>;
-> > 		};
-> > 		codec {
-> > 			...
-> > =>			clocks = <&xxx>;
-> > 		};
-> > 	};
-
-
-Best regards
----
-Kuninori Morimoto
+Jason
