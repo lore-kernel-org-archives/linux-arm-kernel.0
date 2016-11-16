@@ -1,50 +1,54 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 16 Nov 2016 16:06:28 +0100
-Subject: [PATCH net 1/3] net: phy: realtek: add eee advertisement disable
- options
-In-Reply-To: <1479307890.17538.40.camel@baylibre.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 16 Nov 2016 09:11:04 -0600
+Subject: [PATCH net 2/3] dt-bindings: net: add DT bindings for realtek phys
+In-Reply-To: <1479220154-25851-3-git-send-email-jbrunet@baylibre.com>
 References: <1479220154-25851-1-git-send-email-jbrunet@baylibre.com>
- <1479220154-25851-2-git-send-email-jbrunet@baylibre.com>
- <20161115163036.GB23231@lunn.ch>
- <476b72f3-5efe-3551-6c24-0e378d655a0f@gmail.com>
- <1479290189.17538.25.camel@baylibre.com>
- <20161116132337.GD19962@lunn.ch>
- <1479307890.17538.40.camel@baylibre.com>
-Message-ID: <20161116150628.GI23231@lunn.ch>
+ <1479220154-25851-3-git-send-email-jbrunet@baylibre.com>
+Message-ID: <20161116151104.5sfcqjyvrzre5pkn@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2016 at 03:51:30PM +0100, Jerome Brunet wrote:
-> On Wed, 2016-11-16 at 14:23 +0100, Andrew Lunn wrote:
-> > > 
-> > > There two kind of PHYs supporting eee, the one advertising eee by
-> > > default (like realtek) and the one not advertising it (like
-> > > micrel).
+On Tue, Nov 15, 2016 at 03:29:13PM +0100, Jerome Brunet wrote:
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  .../devicetree/bindings/net/realtek-phy.txt          | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/realtek-phy.txt
 > 
-> This is just the default register value.
-> 
-> > 
-> > I don't know too much about EEE. So maybe a dumb question. Does the
-> > MAC need to be involved? Or is it just the PHY?
-> > 
-> > If the MAC needs to be involved, the PHY should not be advertising
-> > EEE
-> > unless the MAC asks for it by calling phy_init_eee(). If this is
-> > true,
-> > maybe we need to change the realtek driver, and others in that class.
-> 
-> As far I understand, the advertised capabilities are exchanged during
-> the auto-negotiation.
-> 
-> At this stage, if the advertisement is disabled (regarless of the
-> actual support) on either side of the link, there will be no low power
-> idle state on the Tx nor the Rx path.
-> 
-> If the advertisement is enabled on both side but we don't call
-> phy_init_eee, I suppose Tx won't enter LPI, but Rx could.
+> diff --git a/Documentation/devicetree/bindings/net/realtek-phy.txt b/Documentation/devicetree/bindings/net/realtek-phy.txt
+> new file mode 100644
+> index 000000000000..dc2845a6b387
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/realtek-phy.txt
+> @@ -0,0 +1,20 @@
+> +Realtek Ethernet PHY
+> +
+> +Some boards require special tuning values of the phy.
+> +
+> +Optional properties:
+> +
+> +realtek,disable-eee-1000t:
+> +realtek,disable-eee-100tx:
 
-What i was trying to find out is, if the MAC needs to support EEE as
-well as the PHY, what happens when the MAC does not support EEE, but
-the PHYs do negotiate EEE? Does it break?
+Make these generic/common.
 
-    Andrew
+> +  If set, respectively disable 1000-BaseT and 100-BaseTx energy efficient
+> +  ethernet capabilty advertisement
+> +  default: Leave the phy default settings unchanged (capabilities advertised)
+> +
+> +Example:
+> +
+> +&mdio0 {
+> +	ethernetphy0: ethernet-phy at 0 {
+> +		reg = <0>;
+> +		realtek,disable-eee-1000t;
+> +	};
+> +};
+> -- 
+> 2.7.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
