@@ -1,63 +1,91 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 16 Nov 2016 13:32:32 +0800
-Subject: [PATCH 2/3] thermal: hisilicon: fix for dependency
-In-Reply-To: <1479212695.2224.12.camel@intel.com>
-References: <1472633417-9330-1-git-send-email-leo.yan@linaro.org>
- <1472633417-9330-3-git-send-email-leo.yan@linaro.org>
- <20161112120534.GC23848@leoy-linaro>
- <1479212695.2224.12.camel@intel.com>
-Message-ID: <20161116053232.GA7240@leoy-linaro>
+From: sriram.dash@nxp.com (Sriram Dash)
+Date: Wed, 16 Nov 2016 05:48:47 +0000
+Subject: [PATCH 1/2] drivers: usb: phy: Add qoriq usb 3.0 phy driver
+ support
+In-Reply-To: <20161116000740.iq6ffcjanrrvrdnq@rob-hp-laptop>
+References: <1479101215-26954-1-git-send-email-sriram.dash@nxp.com>
+ <1479101215-26954-2-git-send-email-sriram.dash@nxp.com>
+ <20161116000740.iq6ffcjanrrvrdnq@rob-hp-laptop>
+Message-ID: <DB5PR0401MB192560CE0F5244475B1CBF8DF5BE0@DB5PR0401MB1925.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 15, 2016 at 08:24:55PM +0800, Zhang Rui wrote:
-> On Sat, 2016-11-12 at 20:05 +0800, Leo Yan wrote:
-> > Hi Rui, Eduardo,
-> > 
-> > On Wed, Aug 31, 2016 at 04:50:16PM +0800, Leo Yan wrote:
-> > > 
-> > > The thermal driver is standalone driver which is used to enable
-> > > thermal sensors, so it can be used with any cooling device and
-> > > should not bind with CPU cooling device driver.
-> > > 
-> > > This original patch is suggested by Amit Kucheria; so it's to
-> > > polish the dependency in Kconfig, and remove the dependency with
-> > > CPU_THERMAL.
-> > Could you help review this patch? Or need me resend this patch? Sorry
-> > I have not tracked this patches well before, this is one missed
-> > patch for 96board Hikey.
-> > 
-> as it still applies cleanly, the patch is queued for 4.10.
+>From: Rob Herring [mailto:robh at kernel.org]
+>On Mon, Nov 14, 2016 at 10:56:54AM +0530, Sriram Dash wrote:
+>> Adds qoriq usb 3.0 phy driver support for LS1043A platform.
+>> Describes the qoriq usb 2.0 phy driver binding, currently used for
+>> LS1043A platform.
+>>
+>> Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
+>> ---
+>>  .../devicetree/bindings/phy/phy-qoriq-usb3.txt     |  36 ++++
+>>  drivers/phy/Kconfig                                |   8 +
+>>  drivers/phy/Makefile                               |   1 +
+>>  drivers/phy/phy-qoriq-usb3.c                       | 202 +++++++++++++++++++++
+>>  4 files changed, 247 insertions(+)
+>>  create mode 100644
+>> Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
+>>  create mode 100644 drivers/phy/phy-qoriq-usb3.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
+>> b/Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
+>> new file mode 100644
+>> index 0000000..d934c80
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/phy/phy-qoriq-usb3.txt
+>> @@ -0,0 +1,36 @@
+>> +Driver for Freescale USB 3.0 PHY
+>> +
+>> +Required properties:
+>> +
+>> +- compatible :	fsl,qoriq-usb3-phy
+>> +- reg :		register mappings for Parameter Configuration Register
+>> +		and Phy base offset.
+>> +- reg-names :	"param_ctrl" and "phy_base"
+>> +- phy_type :	For multi port host USB controllers, should be one of
+>> +		"ulpi", or "serial". For dual role USB controllers,
+>> +		should be one of "ulpi", "utmi", "utmi_wide", or "serial".
 
-Thanks a lot.
+Hi Rob,
 
-> thanks,
-> rui
-> > Thanks,
-> > Leo Yan
-> > 
-> > > 
-> > > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > > ---
-> > > ?drivers/thermal/Kconfig | 4 +++-
-> > > ?1 file changed, 3 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> > > index 2d702ca..91ebab3 100644
-> > > --- a/drivers/thermal/Kconfig
-> > > +++ b/drivers/thermal/Kconfig
-> > > @@ -177,8 +177,10 @@ config THERMAL_EMULATION
-> > > ?
-> > > ?config HISI_THERMAL
-> > > ?	tristate "Hisilicon thermal driver"
-> > > -	depends on (ARCH_HISI && CPU_THERMAL && OF) ||
-> > > COMPILE_TEST
-> > > +	depends on ARCH_HISI || COMPILE_TEST
-> > > ?	depends on HAS_IOMEM
-> > > +	depends on OF
-> > > +	default y
-> > > ?	help
-> > > ?	??Enable this to plug hisilicon's thermal sensor driver
-> > > into the Linux
-> > > ?	??thermal framework. cpufreq is used as the cooling device
-> > > to throttle
+>
+>Do any of these really apply to a USB3 PHY?
+>
+
+The concerned USB3 phy used is UTMI. I agree to your point somewhat that
+all the types are not required now. Anyway, shall I make it an optional
+property, with the mention of only UTMI and ULPI?
+
+>Rob
+>
+>> +
+>> +Example:
+>> +		usbphy0: usb3-phy at 084F0000 {
+>
+>usb-phy at ...
+>
+
+Ok. Will change in the next rev for Documentation and dts (patch 2/2)
+
+>> +                        compatible = "fsl,qoriq-usb3-phy";
+>> +                        reg = <0x0 0x01570070 0x0 0xC>, <0x0 0x084F0000 0x0 0x5000>;
+>> +                        reg-names = "param_ctrl", "phy_base";
+>> +                        #phy-cells = <0>;
+>> +                        phy_type = "utmi";
+>> +                };
+>> +
+>> +                usbphy1: usb3-phy at 08500000 {
+>> +                        compatible = "fsl,qoriq-usb3-phy";
+>> +                        reg = <0x0 0x0157007C 0x0 0xC>, <0x0 0x08500000 0x0 0x5000>;
+>> +                        reg-names = "param_ctrl", "phy_base";
+>> +                        #phy-cells = <0>;
+>> +                        phy_type = "utmi";
+>> +                };
+>> +
+>> +                usbphy2: usb3-phy at 08510000 {
+>> +                        compatible = "fsl,qoriq-usb3-phy";
+>> +                        reg = <0x0 0x01570088 0x0 0xC>, <0x0 0x08510000 0x0 0x5000>;
+>> +                        reg-names = "param_ctrl", "phy_base";
+>> +                        #phy-cells = <0>;
+>> +                        phy_type = "utmi";
+>> +                };
