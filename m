@@ -1,168 +1,109 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Wed, 16 Nov 2016 22:36:09 +0530
-Subject: [PATCH net 1/3] net: phy: realtek: add eee advertisement disable
- options
-In-Reply-To: <1479220154-25851-2-git-send-email-jbrunet@baylibre.com>
-References: <1479220154-25851-1-git-send-email-jbrunet@baylibre.com>
- <1479220154-25851-2-git-send-email-jbrunet@baylibre.com>
-Message-ID: <CANAwSgTjG8G0U+A1p7hOKND9rjY4BzZfPgyWWHAEryYkHj_UOw@mail.gmail.com>
+From: wei@redhat.com (Wei Huang)
+Date: Wed, 16 Nov 2016 11:09:20 -0600
+Subject: [PATCH v3 1/1] KVM: ARM64: Fix the issues when guest PMCCFILTR is
+ configured
+Message-ID: <1479316160-8567-1-git-send-email-wei@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hi Jerome.
+KVM calls kvm_pmu_set_counter_event_type() when PMCCFILTR is configured.
+But this function can't deals with PMCCFILTR correctly because the evtCount
+bits of PMCCFILTR, which is reserved 0, conflits with the SW_INCR event
+type of other PMXEVTYPER<n> registers. To fix it, when eventsel == 0, this
+function shouldn't return immediately; instead it needs to check further
+if select_idx is ARMV8_PMU_CYCLE_IDX.
 
-On 15 November 2016 at 19:59, Jerome Brunet <jbrunet@baylibre.com> wrote:
-> On some platforms, energy efficient ethernet with rtl8211 devices is
-> causing issue, like throughput drop or broken link.
->
-> This was reported on the OdroidC2 (DWMAC + RTL8211F). While the issue root
-> cause is not fully understood yet, disabling EEE advertisement prevent auto
-> negotiation from enabling EEE.
->
-> This patch provides options to disable 1000T and 100TX EEE advertisement
-> individually for the realtek phys supporting this feature.
->
-> Reported-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> Cc: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> Cc: Alexandre TORGUE <alexandre.torgue@st.com>
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> Tested-by: Andre Roth <neolynx@gmail.com>
-> ---
->  drivers/net/phy/realtek.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 64 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/net/phy/realtek.c b/drivers/net/phy/realtek.c
-> index aadd6e9f54ad..77235fd5faaf 100644
-> --- a/drivers/net/phy/realtek.c
-> +++ b/drivers/net/phy/realtek.c
-> @@ -15,6 +15,12 @@
->   */
->  #include <linux/phy.h>
->  #include <linux/module.h>
-> +#include <linux/of.h>
-> +
-> +struct rtl8211x_phy_priv {
-> +       bool eee_1000t_disable;
-> +       bool eee_100tx_disable;
-> +};
->
->  #define RTL821x_PHYSR          0x11
->  #define RTL821x_PHYSR_DUPLEX   0x2000
-> @@ -93,12 +99,44 @@ static int rtl8211f_config_intr(struct phy_device *phydev)
->         return err;
->  }
->
-> +static void rtl8211x_clear_eee_adv(struct phy_device *phydev)
-> +{
-> +       struct rtl8211x_phy_priv *priv = phydev->priv;
-> +       u16 val;
-> +
-> +       if (priv->eee_1000t_disable || priv->eee_100tx_disable) {
-> +               val = phy_read_mmd_indirect(phydev, MDIO_AN_EEE_ADV,
-> +                                           MDIO_MMD_AN);
-> +
-> +               if (priv->eee_1000t_disable)
-> +                       val &= ~MDIO_AN_EEE_ADV_1000T;
-> +               if (priv->eee_100tx_disable)
-> +                       val &= ~MDIO_AN_EEE_ADV_100TX;
-> +
-> +               phy_write_mmd_indirect(phydev, MDIO_AN_EEE_ADV,
-> +                                      MDIO_MMD_AN, val);
-> +       }
-> +}
-> +
-> +static int rtl8211x_config_init(struct phy_device *phydev)
-> +{
-> +       int ret;
-> +
-> +       ret = genphy_config_init(phydev);
-> +       if (ret < 0)
-> +               return ret;
-> +
-> +       rtl8211x_clear_eee_adv(phydev);
-> +
-> +       return 0;
-> +}
-> +
->  static int rtl8211f_config_init(struct phy_device *phydev)
->  {
->         int ret;
->         u16 reg;
->
-> -       ret = genphy_config_init(phydev);
-> +       ret = rtl8211x_config_init(phydev);
->         if (ret < 0)
->                 return ret;
->
-> @@ -115,6 +153,26 @@ static int rtl8211f_config_init(struct phy_device *phydev)
->         return 0;
->  }
->
-> +static int rtl8211x_phy_probe(struct phy_device *phydev)
-> +{
-> +       struct device *dev = &phydev->mdio.dev;
-> +       struct device_node *of_node = dev->of_node;
-> +       struct rtl8211x_phy_priv *priv;
-> +
-> +       priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +       if (!priv)
-> +               return -ENOMEM;
-> +
-> +       priv->eee_1000t_disable =
-> +               of_property_read_bool(of_node, "realtek,disable-eee-1000t");
-> +       priv->eee_100tx_disable =
-> +               of_property_read_bool(of_node, "realtek,disable-eee-100tx");
-> +
-> +       phydev->priv = priv;
-> +
-> +       return 0;
-> +}
-> +
->  static struct phy_driver realtek_drvs[] = {
->         {
->                 .phy_id         = 0x00008201,
-> @@ -140,7 +198,9 @@ static struct phy_driver realtek_drvs[] = {
->                 .phy_id_mask    = 0x001fffff,
->                 .features       = PHY_GBIT_FEATURES,
->                 .flags          = PHY_HAS_INTERRUPT,
-> +               .probe          = &rtl8211x_phy_probe,
->                 .config_aneg    = genphy_config_aneg,
-> +               .config_init    = &rtl8211x_config_init,
->                 .read_status    = genphy_read_status,
->                 .ack_interrupt  = rtl821x_ack_interrupt,
->                 .config_intr    = rtl8211e_config_intr,
-> @@ -152,7 +212,9 @@ static struct phy_driver realtek_drvs[] = {
->                 .phy_id_mask    = 0x001fffff,
->                 .features       = PHY_GBIT_FEATURES,
->                 .flags          = PHY_HAS_INTERRUPT,
-> +               .probe          = &rtl8211x_phy_probe,
->                 .config_aneg    = &genphy_config_aneg,
-> +               .config_init    = &rtl8211x_config_init,
->                 .read_status    = &genphy_read_status,
->                 .ack_interrupt  = &rtl821x_ack_interrupt,
->                 .config_intr    = &rtl8211e_config_intr,
-> @@ -164,6 +226,7 @@ static struct phy_driver realtek_drvs[] = {
->                 .phy_id_mask    = 0x001fffff,
->                 .features       = PHY_GBIT_FEATURES,
->                 .flags          = PHY_HAS_INTERRUPT,
-> +               .probe          = &rtl8211x_phy_probe,
->                 .config_aneg    = &genphy_config_aneg,
->                 .config_init    = &rtl8211f_config_init,
->                 .read_status    = &genphy_read_status,
-> --
-> 2.7.4
->
+Another issue is that KVM shouldn't copy the eventsel bits of PMCCFILTER
+blindly to attr.config. Instead it ought to convert the request to the
+"cpu cycle" event type (i.e. 0x11).
 
-How about adding callback functionality for .soft_reset to handle BMCR
-where we update the Auto-Negotiation for the phy,
-as per the datasheet of the rtl8211f.
+To support this patch and to prevent duplicated definitions, a limited
+set of ARMv8 perf event types were relocated from perf_event.c to
+asm/perf_event.h.
 
--Best Regard
-Anand Moon
+Signed-off-by: Wei Huang <wei@redhat.com>
+---
+ arch/arm64/include/asm/perf_event.h | 10 +++++++++-
+ arch/arm64/kernel/perf_event.c      | 10 +---------
+ virt/kvm/arm/pmu.c                  |  8 +++++---
+ 3 files changed, 15 insertions(+), 13 deletions(-)
 
->
-> _______________________________________________
-> linux-amlogic mailing list
-> linux-amlogic at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
+index 2065f46..38b6a2b 100644
+--- a/arch/arm64/include/asm/perf_event.h
++++ b/arch/arm64/include/asm/perf_event.h
+@@ -46,7 +46,15 @@
+ #define	ARMV8_PMU_EVTYPE_MASK	0xc800ffff	/* Mask for writable bits */
+ #define	ARMV8_PMU_EVTYPE_EVENT	0xffff		/* Mask for EVENT bits */
+ 
+-#define ARMV8_PMU_EVTYPE_EVENT_SW_INCR	0	/* Software increment event */
++/*
++ * PMUv3 event types: required events
++ */
++#define ARMV8_PMUV3_PERFCTR_SW_INCR				0x00
++#define ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL			0x03
++#define ARMV8_PMUV3_PERFCTR_L1D_CACHE				0x04
++#define ARMV8_PMUV3_PERFCTR_BR_MIS_PRED				0x10
++#define ARMV8_PMUV3_PERFCTR_CPU_CYCLES				0x11
++#define ARMV8_PMUV3_PERFCTR_BR_PRED				0x12
+ 
+ /*
+  * Event filters for PMUv3
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index a9310a6..57ae9d9 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -31,17 +31,9 @@
+ 
+ /*
+  * ARMv8 PMUv3 Performance Events handling code.
+- * Common event types.
++ * Common event types (some are defined in asm/perf_event.h).
+  */
+ 
+-/* Required events. */
+-#define ARMV8_PMUV3_PERFCTR_SW_INCR				0x00
+-#define ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL			0x03
+-#define ARMV8_PMUV3_PERFCTR_L1D_CACHE				0x04
+-#define ARMV8_PMUV3_PERFCTR_BR_MIS_PRED				0x10
+-#define ARMV8_PMUV3_PERFCTR_CPU_CYCLES				0x11
+-#define ARMV8_PMUV3_PERFCTR_BR_PRED				0x12
+-
+ /* At least one of the following is required. */
+ #define ARMV8_PMUV3_PERFCTR_INST_RETIRED			0x08
+ #define ARMV8_PMUV3_PERFCTR_INST_SPEC				0x1B
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 6e9c40e..69ccce3 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -305,7 +305,7 @@ void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val)
+ 			continue;
+ 		type = vcpu_sys_reg(vcpu, PMEVTYPER0_EL0 + i)
+ 		       & ARMV8_PMU_EVTYPE_EVENT;
+-		if ((type == ARMV8_PMU_EVTYPE_EVENT_SW_INCR)
++		if ((type == ARMV8_PMUV3_PERFCTR_SW_INCR)
+ 		    && (enable & BIT(i))) {
+ 			reg = vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + i) + 1;
+ 			reg = lower_32_bits(reg);
+@@ -379,7 +379,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+ 	eventsel = data & ARMV8_PMU_EVTYPE_EVENT;
+ 
+ 	/* Software increment event does't need to be backed by a perf event */
+-	if (eventsel == ARMV8_PMU_EVTYPE_EVENT_SW_INCR)
++	if (eventsel == ARMV8_PMUV3_PERFCTR_SW_INCR &&
++	    select_idx != ARMV8_PMU_CYCLE_IDX)
+ 		return;
+ 
+ 	memset(&attr, 0, sizeof(struct perf_event_attr));
+@@ -391,7 +392,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+ 	attr.exclude_kernel = data & ARMV8_PMU_EXCLUDE_EL1 ? 1 : 0;
+ 	attr.exclude_hv = 1; /* Don't count EL2 events */
+ 	attr.exclude_host = 1; /* Don't count host events */
+-	attr.config = eventsel;
++	attr.config = (select_idx == ARMV8_PMU_CYCLE_IDX) ?
++		ARMV8_PMUV3_PERFCTR_CPU_CYCLES : eventsel;
+ 
+ 	counter = kvm_pmu_get_counter_value(vcpu, select_idx);
+ 	/* The initial sample period (overflow count) of an event. */
+-- 
+2.7.4
