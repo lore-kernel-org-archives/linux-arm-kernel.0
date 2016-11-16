@@ -1,34 +1,49 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 16 Nov 2016 11:12:12 -0800
-Subject: [GIT PULL] Allwinner clock fixes for 4.9
-In-Reply-To: <20161115212332.w5amyhohmauqzpe5@lukather>
-References: <20161115212332.w5amyhohmauqzpe5@lukather>
-Message-ID: <20161116191212.GG25626@codeaurora.org>
+From: colin.king@canonical.com (Colin King)
+Date: Wed, 16 Nov 2016 19:16:50 +0000
+Subject: [PATCH] [media] VPU: mediatek: fix dereference of pdev before
+ checking it is null
+Message-ID: <20161116191650.11486-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15, Maxime Ripard wrote:
-> Hi Mike, Stephen,
-> 
-> Please pull the following fixes for the 4.9 cycle
-> 
-> Thanks!
-> Maxime
-> 
-> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-> 
->   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clk-fixes-for-4.9
-> 
-> for you to fetch changes up to ac95330b96376550ae7a533d1396272d675adfa2:
-> 
->   clk: sunxi: Fix M factor computation for APB1 (2016-11-04 08:49:46 +0100)
+From: Colin Ian King <colin.king@canonical.com>
 
-Thanks. Pulled into clk-fixes.
+pdev is dereferenced using platform_get_drvdata before a check to
+see if it is null, hence there could be a potential null pointer
+dereference issue. Instead, first check if pdev is null and only then
+deference pdev when initializing vpu.
 
+Found with static analysis by CoverityScan, CID 1357797
+
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/media/platform/mtk-vpu/mtk_vpu.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/media/platform/mtk-vpu/mtk_vpu.c b/drivers/media/platform/mtk-vpu/mtk_vpu.c
+index c9bf58c..41f31b2 100644
+--- a/drivers/media/platform/mtk-vpu/mtk_vpu.c
++++ b/drivers/media/platform/mtk-vpu/mtk_vpu.c
+@@ -523,9 +523,9 @@ static int load_requested_vpu(struct mtk_vpu *vpu,
+ 
+ int vpu_load_firmware(struct platform_device *pdev)
+ {
+-	struct mtk_vpu *vpu = platform_get_drvdata(pdev);
++	struct mtk_vpu *vpu;
+ 	struct device *dev = &pdev->dev;
+-	struct vpu_run *run = &vpu->run;
++	struct vpu_run *run;
+ 	const struct firmware *vpu_fw = NULL;
+ 	int ret;
+ 
+@@ -533,6 +533,8 @@ int vpu_load_firmware(struct platform_device *pdev)
+ 		dev_err(dev, "VPU platform device is invalid\n");
+ 		return -EINVAL;
+ 	}
++	vpu = platform_get_drvdata(pdev);
++	run = &vpu->run;
+ 
+ 	mutex_lock(&vpu->vpu_mutex);
+ 	if (vpu->fw_loaded) {
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.10.2
