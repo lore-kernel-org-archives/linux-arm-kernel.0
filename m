@@ -1,83 +1,49 @@
-From: jsarha@ti.com (Jyri Sarha)
-Date: Wed, 16 Nov 2016 16:40:32 +0200
-Subject: [PATCH v5 1/2] drm: tilcdc: implement palette loading for rev1
-In-Reply-To: <CAMpxmJUh8KypU_-HtGa+ieCpO46FBME8_VQCJvYkCjFhmuVWgg@mail.gmail.com>
-References: <1477923567-1610-1-git-send-email-bgolaszewski@baylibre.com>
- <1477923567-1610-2-git-send-email-bgolaszewski@baylibre.com>
- <3fc032e5-cc23-ae7b-9f59-9c71c0a909b8@ti.com>
- <CAMpxmJUh8KypU_-HtGa+ieCpO46FBME8_VQCJvYkCjFhmuVWgg@mail.gmail.com>
-Message-ID: <e4027eb5-0d04-2536-49d3-77dd419ec81e@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 16 Nov 2016 15:45:35 +0100
+Subject: specifying order of /dev/mmcblk devices via device-tree?
+In-Reply-To: <20161028153755.GL5806@leverpostej>
+References: <CAJ+vNU1g8nQedd06LeaD10YWUQ_UmdRToUMFKaTNT1aNY56b0g@mail.gmail.com>
+ <20161028153755.GL5806@leverpostej>
+Message-ID: <CAPDyKFrpqmvVAKsfQBP1m7vdOjPRx7puVkmmCe3yxe1gVFwgzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/16 13:34, Bartosz Golaszewski wrote:
-> 2016-10-31 17:05 GMT+01:00 Jyri Sarha <jsarha@ti.com>:
->> On 10/31/16 16:19, Bartosz Golaszewski wrote:
->>> Revision 1 of the IP doesn't work if we don't load the palette (even
->>> if it's not used, which is the case for the RGB565 format).
->>>
->>> Add a function called from tilcdc_crtc_enable() which performs all
->>> required actions if we're dealing with a rev1 chip.
->>>
+On 28 October 2016 at 17:37, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Oct 28, 2016 at 08:23:04AM -0700, Tim Harvey wrote:
+>> Greetings,
 >>
->> There is only one thing I do not like about this patch. The palette
->> loading is done so late that the frame buffer address are already placed
->> into DMA base and ceiling registers, and we need to read them from the
->> registers and restore them back after the palette loading.
+>> I have an IMX6 board that has the following:
+>> sdhc1: mmc0: sdio radio
+>> sdhc2: mmc1: /dev/mmcblk1: microSD connector
+>> sdhc3: mmc2: /dev/mmcblk2: on-board eMMC
 >>
->> Could you try if the palette loading function works without trouble when
->> called from tilcdc_pm_resume() before drm_atomic_helper_resume() call?
->> If it does it would be cleaner in the sense that you could get rid off
->> the old dma address restore code. You could reinit the completion always
->> there right before the palette loading.
+>> I would like to have sdhc3 registered as /dev/mmcblk0 and sdhc2
+>> registered as /dev/mmcblk1 so that permanent storage is the first
+>> mmcblk device as I think this is more intuitive however currently
+>> these get instanced in the order they appear in the imx6qdl.dtsi
+>> device-tree configuration and are not able to be mapped the way I want
+>> them in my dts file.
 >>
->> If you can not get the above suggestion to work, then I can take this
->> patch.
->>
-> 
-> Hi Jyri,
-> 
-> the problem is that tilcdc_pm_resume() is not called when tilcdc is
-> initialized. We would have to have two calls in different places for
-> that to work.
-> 
+>> Is there a way, or if not is there a desire for a way, to specify the
+>> order of /dev/mmcblk devices via device-tree?
+>
+> As with many other devices, there is no standard way of controlling the
+> Linux enumeration (and given the ID space is shared with other dynamic
+> devices it's not something that could generally work).
+>
+> These should be refererd to by UUID if possible.
+>
+> If not, we could cosider adding a by-dt-path or something like that.
 
-Yep, I know now. I worked on the issue while you were on vacation.
-Please review my latest patch series (including this patch) and more
-importantly test if the palette loading still works on rev 1 LCDC.
+So does that mean you think using "DT aliases" would be okay? As
+Javier pointed out, there have been some attempts [1] for that, but
+they didn't make it.
+Perhaps we need to re-consider, and if so please re-review the DT
+bindings patch from that series.
 
->>> +static void tilcdc_crtc_load_palette(struct drm_crtc *crtc)
->>> +{
->>> +     u32 dma_fb_base, dma_fb_ceiling, raster_ctl;
->>> +     struct tilcdc_crtc *tilcdc_crtc;
->>> +     struct drm_device *dev;
->>> +     u16 *first_entry;
->>> +
->>> +     dev = crtc->dev;
->>> +     tilcdc_crtc = to_tilcdc_crtc(crtc);
->>> +     first_entry = tilcdc_crtc->palette_base;
->>> +
->>> +     *first_entry = TILCDC_REV1_PALETTE_FIRST_ENTRY;
->>> +
->>> +     dma_fb_base = tilcdc_read(dev, LCDC_DMA_FB_BASE_ADDR_0_REG);
->>> +     dma_fb_ceiling = tilcdc_read(dev, LCDC_DMA_FB_CEILING_ADDR_0_REG);
->>> +     raster_ctl = tilcdc_read(dev, LCDC_RASTER_CTRL_REG);
->>> +
->>> +     /* Tell the LCDC where the palette is located. */
->>> +     tilcdc_write(dev, LCDC_DMA_FB_BASE_ADDR_0_REG,
->>> +                  tilcdc_crtc->palette_dma_handle);
->>> +     tilcdc_write(dev, LCDC_DMA_FB_CEILING_ADDR_0_REG,
->>> +                  (u32)tilcdc_crtc->palette_dma_handle
->>
->> Just a nit pick, but I would put the plus sign to the end of the line
->> above instead of the beginning of the line bellow. However,
->> check_patch.pl does not complain about this so I guess I can accept it too.
->>
->>> +                             + TILCDC_REV1_PALETTE_SIZE - 1);
->>> +
-> 
-> I'll fix that in v6.
-> 
-> Thanks,
-> Bartosz Golaszewski
-> 
+Kind regards
+Uffe
+
+[1]
+https://lkml.org/lkml/2016/4/29/610 or
+http://www.spinics.net/lists/linux-mmc/msg36701.html
