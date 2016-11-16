@@ -1,97 +1,59 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 16 Nov 2016 12:55:07 +0100
-Subject: [PATCH v2] input: touchscreen: silead: Add regulator support
-Message-ID: <20161116115507.24220-1-hdegoede@redhat.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 16 Nov 2016 11:56:17 +0000
+Subject: [PATCH] ARM64: dma-mapping: preallocate DMA-debug hash tables in
+ core_initcall
+In-Reply-To: <1479288013-30945-1-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20161116092025eucas1p2ebaf3ead7de79130ca2656d532284e5b@eucas1p2.samsung.com>
+ <1479288013-30945-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <a4467198-a930-a271-f446-f7b1b6c3f394@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some tablets the touchscreen controller is powered by separate
-regulators, add support for this.
+On 16/11/16 09:20, Marek Szyprowski wrote:
+> fs_initcall is definitely too late to initialize DMA-debug hash tables,
+> because some drivers might get probed and use DMA mapping framework
+> already in core_initcall. Late initialization of DMA-debug results in
+> false warning about accessing memory, that was not allocated. This issue
+> has been observed on ARM 32bit, but the same driver can be used also on
+> ARM64.
+> 
+> This patch moves initialization of DMA-debug to core_initcall. This is
+> safe from the initialization perspective. dma_debug_do_init() internally
+> calls debugfs functions and debugfs also gets initialised at
+> core_initcall(), and that is earlier than arch code in the link order,
+> so it will get initialized just before the DMA-debug.
+> 
+> Reported-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
-Changes in v2:
--Use devm_regulator_bulk_get() and friends
--Use devm_add_action_or_reset() to disable the regulator
----
- .../bindings/input/touchscreen/silead_gsl1680.txt  |  2 ++
- drivers/input/touchscreen/silead.c                 | 29 ++++++++++++++++++++++
- 2 files changed, 31 insertions(+)
+Acked-by: Robin Murphy <robin.murphy@arm.com>
 
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
-index e844c3f..b726823 100644
---- a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
-+++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
-@@ -22,6 +22,8 @@ Optional properties:
- - touchscreen-inverted-y  : See touchscreen.txt
- - touchscreen-swapped-x-y : See touchscreen.txt
- - silead,max-fingers	  : maximum number of fingers the touchscreen can detect
-+- vddio-supply		  : regulator phandle for controller VDDIO
-+- avdd-supply		  : regulator phandle for controller AVDD
- 
- Example:
- 
-diff --git a/drivers/input/touchscreen/silead.c b/drivers/input/touchscreen/silead.c
-index f502c84..404830a 100644
---- a/drivers/input/touchscreen/silead.c
-+++ b/drivers/input/touchscreen/silead.c
-@@ -29,6 +29,7 @@
- #include <linux/input/touchscreen.h>
- #include <linux/pm.h>
- #include <linux/irq.h>
-+#include <linux/regulator/consumer.h>
- 
- #include <asm/unaligned.h>
- 
-@@ -73,6 +74,7 @@ struct silead_ts_data {
- 	struct i2c_client *client;
- 	struct gpio_desc *gpio_power;
- 	struct input_dev *input;
-+	struct regulator_bulk_data regulators[2];
- 	char fw_name[64];
- 	struct touchscreen_properties prop;
- 	u32 max_fingers;
-@@ -433,6 +435,13 @@ static int silead_ts_set_default_fw_name(struct silead_ts_data *data,
- }
- #endif
- 
-+static void silead_disable_regulator(void *arg)
-+{
-+	struct silead_ts_data *data = arg;
-+
-+	regulator_bulk_disable(ARRAY_SIZE(data->regulators), data->regulators);
-+}
-+
- static int silead_ts_probe(struct i2c_client *client,
- 			   const struct i2c_device_id *id)
- {
-@@ -465,6 +474,26 @@ static int silead_ts_probe(struct i2c_client *client,
- 	if (client->irq <= 0)
- 		return -ENODEV;
- 
-+	data->regulators[0].supply = "vddio";
-+	data->regulators[1].supply = "avdd";
-+	error = devm_regulator_bulk_get(dev, ARRAY_SIZE(data->regulators),
-+					data->regulators);
-+	if (error)
-+		return error;
-+
-+	/*
-+	 * Enable regulators at probe and disable them at remove, we need
-+	 * to keep the chip powered otherwise it forgets its firmware.
-+	 */
-+	error = regulator_bulk_enable(ARRAY_SIZE(data->regulators),
-+				      data->regulators);
-+	if (error)
-+		return error;
-+
-+	error = devm_add_action_or_reset(dev, silead_disable_regulator, data);
-+	if (error)
-+		return error;
-+
- 	/* Power GPIO pin */
- 	data->gpio_power = devm_gpiod_get_optional(dev, "power", GPIOD_OUT_LOW);
- 	if (IS_ERR(data->gpio_power)) {
--- 
-2.9.3
+Cheers Marek - as it happens, the ARM SMMU drivers (and presumably the
+Mediatek one) do hit this on arm64 since I added the DMA API support to
+the io-pgtable code, I've just been quietly ignoring it in the hope we'd
+get the probe-deferral stuff done before anyone else noticed.
+
+Robin.
+
+> ---
+> For more details on this issue, see the patch for ARM 32bit arch:
+> https://www.spinics.net/lists/arm-kernel/msg542721.html
+> https://www.spinics.net/lists/arm-kernel/msg542782.html
+> ---
+>  arch/arm64/mm/dma-mapping.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index 3f74d0d..8653426 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -538,7 +538,7 @@ static int __init dma_debug_do_init(void)
+>  	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+>  	return 0;
+>  }
+> -fs_initcall(dma_debug_do_init);
+> +core_initcall(dma_debug_do_init);
+>  
+>  
+>  #ifdef CONFIG_IOMMU_DMA
+> 
