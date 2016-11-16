@@ -1,35 +1,47 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 16 Nov 2016 14:48:47 +0530
-Subject: [PATCH] ARM: davinci_all_defconfig: add missing options for
- systemd
-In-Reply-To: <7hshqt6fyo.fsf@baylibre.com>
-References: <20161114160146.20679-1-nsekhar@ti.com>
- <7hshqt6fyo.fsf@baylibre.com>
-Message-ID: <2bdfcd2f-12db-6cb3-fb60-ffbf5b535f28@ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 16 Nov 2016 10:20:13 +0100
+Subject: [PATCH] ARM64: dma-mapping: preallocate DMA-debug hash tables in
+ core_initcall
+References: <CGME20161116092025eucas1p2ebaf3ead7de79130ca2656d532284e5b@eucas1p2.samsung.com>
+Message-ID: <1479288013-30945-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 November 2016 12:34 AM, Kevin Hilman wrote:
-> Sekhar Nori <nsekhar@ti.com> writes:
-> 
->> Some kernel configuration options required for systemd
->> support are missing in davinci_all_defconfig. Add them.
->>
->> This is based on recommendations in:
->>
->>     http://cgit.freedesktop.org/systemd/systemd/tree/README
->>
->> Options which kernel enables by default (and will thus be removed
->> upon next savedefconfig update) are not included.
->>
->> Tested on OMAP-L138 LCDK board with fully up to date armv5
->> archlinux filesystem.
->>
->> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> 
-> Acked-by: Kevin Hilman <khilman@baylibre.com>
+fs_initcall is definitely too late to initialize DMA-debug hash tables,
+because some drivers might get probed and use DMA mapping framework
+already in core_initcall. Late initialization of DMA-debug results in
+false warning about accessing memory, that was not allocated. This issue
+has been observed on ARM 32bit, but the same driver can be used also on
+ARM64.
 
-Applied to v4.10/defconfig
+This patch moves initialization of DMA-debug to core_initcall. This is
+safe from the initialization perspective. dma_debug_do_init() internally
+calls debugfs functions and debugfs also gets initialised at
+core_initcall(), and that is earlier than arch code in the link order,
+so it will get initialized just before the DMA-debug.
 
-Thanks,
-Sekhar
+Reported-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+For more details on this issue, see the patch for ARM 32bit arch:
+https://www.spinics.net/lists/arm-kernel/msg542721.html
+https://www.spinics.net/lists/arm-kernel/msg542782.html
+---
+ arch/arm64/mm/dma-mapping.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 3f74d0d..8653426 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -538,7 +538,7 @@ static int __init dma_debug_do_init(void)
+ 	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+ 	return 0;
+ }
+-fs_initcall(dma_debug_do_init);
++core_initcall(dma_debug_do_init);
+ 
+ 
+ #ifdef CONFIG_IOMMU_DMA
+-- 
+1.9.1
