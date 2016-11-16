@@ -1,33 +1,34 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Wed, 16 Nov 2016 10:39:26 -0800
-Subject: [PATCH fpga 1/9] fpga zynq: Add missing \n to messages
-In-Reply-To: <20161115180813.GB1852@obsidianresearch.com>
-References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <1478732303-13718-2-git-send-email-jgunthorpe@obsidianresearch.com>
- <0aebdb59-86d7-2569-c49d-de5d45b5cac0@suse.com>
- <20161115180813.GB1852@obsidianresearch.com>
-Message-ID: <20161116183926.GA14341@live.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 16 Nov 2016 16:43:41 -0200
+Subject: Boot failures in -next due to 'ARM: dts: imx: Remove
+ skeleton.dtsi'
+In-Reply-To: <cda2df55-f2f3-00d6-c6b1-816ed47bbf56@roeck-us.net>
+References: <cda2df55-f2f3-00d6-c6b1-816ed47bbf56@roeck-us.net>
+Message-ID: <CAOMZO5BqEsojFpzwtO74hrmH6nh7CRckwmasDYOV0GBdk4bqMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 15, 2016 at 11:08:13AM -0700, Jason Gunthorpe wrote:
-> 
-> On Tue, Nov 15, 2016 at 12:05:15PM +0100, Matthias Brugger wrote:
-> > On 09/11/16 23:58, Jason Gunthorpe wrote:
-> > >Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> > 
-> > Please add a commit message, although it is cristal clear what this patch
-> > does :)
+Hi Guenter,
 
-That.
-> 
-> As you say, it is crystal clear already, and this is an acceptable commit
-> message.. Please suggest a text if you want to see something
-> different.
-> 
+On Wed, Nov 16, 2016 at 3:45 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> Hi,
+>
+> my 'sabrelite' and 'imx25-pdk' qemu boot tests are failing in linux-next.
+>
+> Bisect for the sabrelite failure points to commit 'ARM: dts: imx: Remove
+> skeleton.dtsi'.
 
-It still needs a long message. Just do it.
+Interesting. I am not able to reproduce the boot failure and also do
+not see it reported at kernelci.org:
 
-Thanks,
+https://kernelci.org/soc/imx/job/next/kernel/next-20161115/
 
-Moritz
+nor at Olof's autobooter:
+http://arm-soc.lixom.net/bootlogs/next/next-20161116/wandboard-arm-multi_v7_defconfig.html
+
+Not sure why the boot fails with qemu. I will try to install qemu here
+and take a look.
+
+Regards,
+
+Fabio Estevam
