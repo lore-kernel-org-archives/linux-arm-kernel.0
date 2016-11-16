@@ -1,120 +1,39 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Nov 2016 23:47:41 +0000
-Subject: [PATCH] Replacement for Arm initrd memblock reserve and free
- inconsistency.
-In-Reply-To: <592F4D3D062D79449F140027567F70E8FE0810D3@exchmbx03>
-References: <592F4D3D062D79449F140027567F70E8FE080A79@exchmbx03>
- <20161110174645.GB1041@n2100.armlinux.org.uk>
- <592F4D3D062D79449F140027567F70E8FE0810D3@exchmbx03>
-Message-ID: <20161116234741.GE1041@n2100.armlinux.org.uk>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 16 Nov 2016 16:55:37 -0700
+Subject: [PATCH fpga 1/9] fpga zynq: Add missing \n to messages
+In-Reply-To: <alpine.DEB.2.20.1611161621260.20443@atull-VirtualBox2>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-2-git-send-email-jgunthorpe@obsidianresearch.com>
+ <0aebdb59-86d7-2569-c49d-de5d45b5cac0@suse.com>
+ <20161115180813.GB1852@obsidianresearch.com>
+ <20161116183926.GA14341@live.com>
+ <20161116201720.GC19593@obsidianresearch.com>
+ <alpine.DEB.2.20.1611161621260.20443@atull-VirtualBox2>
+Message-ID: <20161116235537.GA31885@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 15, 2016 at 03:45:55PM +0000, william.helsby at stfc.ac.uk wrote:
-> The option of moving the initrd code later (after
-> 	early_init_fdt_reserve_self();
-> 	early_init_fdt_scan_reserved_mem() ) 
-> was tested.
+On Wed, Nov 16, 2016 at 04:28:27PM -0600, atull wrote:
+> I agree that this needs a long description and I'm not sure
+> why you're pushing back on that.
 
-Moving stuff around tends to break...
+*shurg* it is just an unusual thing to ask for, but it is OK for a
+subsystem to have a particular style like this. Other subsystems
+do not.
 
-I'd prefer to do it this way, as it's much more readable (and we prize
-readability... see Documentation/CodingStyle.)
+I will add "This makes the driver prints display properly."
 
- arch/arm/mm/init.c | 71 +++++++++++++++++++++++++++++++++---------------------
- 1 file changed, 43 insertions(+), 28 deletions(-)
+> You will need to rebase this series on linux-next.  I won't
+> have much time this week to look at this, sorry.  Not sure
+> what the hurry is.  I see the value of this, but things are
+> busy right now.  I'll be getting up to speed on how the
+> kernel does sg and this is kind of a fundamental change to
+> the API so I appreciate your patience.
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 370581aeb871..ffae20b25929 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -227,6 +227,48 @@ phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
- 	return phys;
- }
- 
-+static void __init arm_initrd_init(void)
-+{
-+#ifdef CONFIG_BLK_DEV_INITRD
-+	unsigned long size;
-+	phys_addr_t start;
-+
-+	/* FDT scan will populate initrd_start */
-+	if (initrd_start && !phys_initrd_size) {
-+		phys_initrd_start = __virt_to_phys(initrd_start);
-+		phys_initrd_size = initrd_end - initrd_start;
-+	}
-+
-+	initrd_start = initrd_end = 0;
-+
-+	if (!phys_initrd_size)
-+		return;
-+
-+	start = phys_initrd_start & PAGE_MASK;
-+	size = PAGE_ALIGN(phys_initrd_size + phys_initrd_start - start);
-+
-+	if (!memblock_is_region_memory(start, size)) {
-+		pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
-+		       (u64)start, size);
-+		phys_initrd_start = phys_initrd_size = 0;
-+		return;
-+	}
-+
-+	if (memblock_is_region_reserved(start, size)) {
-+		pr_err("INITRD: 0x%08llx+0x%08lx overlaps in-use memory region - disabling initrd\n",
-+		       (u64)start, size);
-+		phys_initrd_start = phys_initrd_size = 0;
-+		return;
-+	}
-+
-+	memblock_reserve(start, size);
-+
-+	/* Now convert initrd to virtual addresses */
-+	initrd_start = __phys_to_virt(phys_initrd_start);
-+	initrd_end = initrd_start + phys_initrd_size;
-+#endif
-+}
-+
- void __init arm_memblock_init(const struct machine_desc *mdesc)
- {
- 	/* Register the kernel text, kernel data and initrd with memblock. */
-@@ -235,34 +277,7 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
- #else
- 	memblock_reserve(__pa(_stext), _end - _stext);
- #endif
--#ifdef CONFIG_BLK_DEV_INITRD
--	/* FDT scan will populate initrd_start */
--	if (initrd_start && !phys_initrd_size) {
--		phys_initrd_start = __virt_to_phys(initrd_start);
--		phys_initrd_size = initrd_end - initrd_start;
--	}
--	initrd_start = initrd_end = 0;
--	if (phys_initrd_size &&
--	    !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
--		pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
--		       (u64)phys_initrd_start, phys_initrd_size);
--		phys_initrd_start = phys_initrd_size = 0;
--	}
--	if (phys_initrd_size &&
--	    memblock_is_region_reserved(phys_initrd_start, phys_initrd_size)) {
--		pr_err("INITRD: 0x%08llx+0x%08lx overlaps in-use memory region - disabling initrd\n",
--		       (u64)phys_initrd_start, phys_initrd_size);
--		phys_initrd_start = phys_initrd_size = 0;
--	}
--	if (phys_initrd_size) {
--		memblock_reserve(phys_initrd_start, phys_initrd_size);
--
--		/* Now convert initrd to virtual addresses */
--		initrd_start = __phys_to_virt(phys_initrd_start);
--		initrd_end = initrd_start + phys_initrd_size;
--	}
--#endif
--
-+	arm_initrd_init();
- 	arm_mm_memblock_reserve();
- 
- 	/* reserve any platform specific memblock areas */
+The merge window is opening soon so it would be nice to land some of
+this in 4.10.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Since I have to rebase and restructure a chunk of it, I'd like to get
+the bulk of the broad feedback collected before doing that..
+
+Jason
