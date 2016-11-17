@@ -1,34 +1,32 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 17 Nov 2016 21:27:49 +0100
-Subject: [PATCH v4 2/2] ARM: dts: sun6i: hummingbird-a31: Enable display
- output through VGA bridge
-In-Reply-To: <20161116154232.872-3-wens@csie.org>
-References: <20161116154232.872-1-wens@csie.org>
- <20161116154232.872-3-wens@csie.org>
-Message-ID: <20161117202749.kotctovy5cquaxfp@lukather>
+From: p.wassi@gmx.at (p.wassi at gmx.at)
+Date: Thu, 17 Nov 2016 21:29:47 +0100
+Subject: [PATCH] kirkwood: fix spelling mistake
+Message-ID: <trinity-6911950b-e19a-4b44-aeed-adaccbc33164-1479414587776@3capp-gmx-bs50>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2016 at 11:42:32PM +0800, Chen-Yu Tsai wrote:
-> The Hummingbird A31 board has a VGA DAC which converts RGB output
-> from the LCD interface to VGA analog signals.
-> 
-> Add nodes for the VGA DAC, its power supply, and enable this part
-> of the display pipeline.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+From: Paul Wassi <p.wassi@gmx.at>
 
-Applied, thanks!
-Maxime
+Fix a spelling mistake in arch/arm/boot/dts/kirkwood-topkick.dts
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161117/14fb64a4/attachment.sig>
+Signed-off-by: Paul Wassi <p.wassi@gmx.at>
+---
+The manufacturer's name is Univer*s*al Scientific Industrial...
+Compare with footer of page here:
+http://www.usish.com/english/products_topkick1281p2.php
+
+ arch/arm/boot/dts/kirkwood-topkick.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff -rupN a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
+--- a/arch/arm/boot/dts/kirkwood-topkick.dts
++++ b/arch/arm/boot/dts/kirkwood-topkick.dts
+@@ -4,7 +4,7 @@
+ #include "kirkwood-6282.dtsi"
+ 
+ / {
+-	model = "Univeral Scientific Industrial Co. Topkick-1281P2";
++	model = "Universal Scientific Industrial Co. Topkick-1281P2";
+ 	compatible = "usi,topkick-1281P2", "usi,topkick", "marvell,kirkwood-88f6282", "marvell,kirkwood";
+ 
+ 	memory {
