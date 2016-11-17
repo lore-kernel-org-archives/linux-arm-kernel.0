@@ -1,579 +1,169 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Thu, 17 Nov 2016 11:28:48 +0800
-Subject: ILP32 for ARM64 - testing with lmbench
-In-Reply-To: <20161028124659.GA24131@yury-N73SV>
-References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
- <20161028124659.GA24131@yury-N73SV>
-Message-ID: <cdf5cdf2-43af-6d7f-9e0c-72675fb83224@huawei.com>
+From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
+Date: Thu, 17 Nov 2016 11:34:28 +0800
+Subject: [PATCH v16 00/15] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <1479304148-2965-1-git-send-email-fu.wei@linaro.org>
+References: <1479304148-2965-1-git-send-email-fu.wei@linaro.org>
+Message-ID: <944d11ac-3c0d-72c0-6888-df8e474e21bb@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, all
+Tested-by:  wangxiongfeng2 at huawei.com on D05 board.
 
-I test specint of aarch64 LP64 when aarch32 el0 disable/enabled respectively
-and compare with ILP32 unmerged kernel(4.8-rc6) in our arm64 board. I found
-that difference(ILP32 disabled/ILP32 unmerged) is bigger when aarch32 el0 is
-enabled, compare with aarch32 el0 disabled kernel. And bzip2, mcg, hmmer,
-libquantum are the top four differences[1]. Note that bigger is better in
-specint test.
 
-In order to make sure the above results, I retest these four testcases in
-reportable way(reference the command in the end). The result[2] show that
-libquantum decrease -2.09% after ILP32 enabled and aarch32 on. I think it is in
-significant.
-
-The result of lmbench is not stable in my board. I plan to dig it later.
-
-[1] The following test result is tested through --size=ref --iterations=3.
-1.1 Test when aarch32_el0 is enabled.
-                         ILP32 disabled        base line
-       400.perlbench            100.00%             100%
-       401.bzip2                 99.35%             100%
-       403.gcc                  100.26%             100%
-       429.mcf                  102.75%             100%
-       445.gobmk                100.00%             100%
-       456.hmmer                 95.66%             100%
-       458.sjeng                100.00%             100%
-       462.libquantum           100.00%             100%
-       471.omnetpp              100.59%             100%
-       473.astar                 99.66%             100%
-       483.xalancbmk             99.10%             100%
-
-1.2 Test when aarch32_el0 is disabled
-                         ILP32 disabled         base line
-       400.perlbench            100.22%              100%
-       401.bzip2                100.95%              100%
-       403.gcc                  100.20%              100%
-       429.mcf                  100.76%              100%
-       445.gobmk                100.36%              100%
-       456.hmmer                 97.94%              100%
-       458.sjeng                 99.73%              100%
-       462.libquantum            98.72%              100%
-       471.omnetpp              100.86%              100%
-       473.astar                 99.15%              100%
-       483.xalancbmk            100.08%              100%
-
-[2] The following test result is tested through: runspec --config=my.cfg --size=test,train,ref --noreportable --tune=base,peak --iterations=3 bzip2 mcf hmmer libquantum
-2.1 Test when aarch32_el0 is enabled.
-                          ILP32_enabled         base line
-       401.bzip2                100.82%              100%
-       429.mcf                  100.18%              100%
-       456.hmmer                 99.64%              100%
-       462.libquantum            97.91%              100%
-
-Regards
-
-Bamvor
-
-On 2016/10/28 20:46, Yury Norov wrote:
-> [Add Steve Ellcey, thanks for testing on ThunderX]
->
-> Lmbench-3.0-a9 testing is performed on ThunderX machine to check that
-> ILP32 series does not add performance regressions for LP64. Test
-> summary is in the table below. Our measurements doesn't show
-> significant performance regression of LP64 if ILP32 code is merged,
-> both enabled or disabled.
->
->                ILP32 enabled   ILP32  disabled   Standard Kernel
-> null syscall   0.1066          0.1121            0.1121
->                95.09%          100.00%
->
-> stat           1.3947          1.3814            1.3864
->                100.60%         99.64%
->
-> fstat          0.4459          0.4344            0.4524
->                98.56%          96.02%
->
-> open/close     4.0606          4.0411            4.0453
->                100.38%         99.90%
->
-> read           0.4819          0.5014            0.5014
->                96.11%          100.00%
->
-> Tested with linux 4.8 because 4.9-rc1 is not fixed yet for ThunderX.
-> Other system details below.
->
-> Yury.
->
-> ubuntu at crb6:~$ uname -a
-> Linux crb6 4.8.0+ #3 SMP Thu Oct 27 11:01:32 PDT 2016 aarch64 aarch64 aarch64 GNU/Linux
->
-> ubuntu at crb6:~$ cat /proc/meminfo
-> MemTotal:       132011948 kB
-> MemFree:        131442672 kB
-> MemAvailable:   130695764 kB
-> Buffers:           15696 kB
-> Cached:            88088 kB
-> SwapCached:            0 kB
-> Active:            82760 kB
-> Inactive:          41336 kB
-> Active(anon):      20880 kB
-> Inactive(anon):     8576 kB
-> Active(file):      61880 kB
-> Inactive(file):    32760 kB
-> Unevictable:           0 kB
-> Mlocked:               0 kB
-> SwapTotal:      128920572 kB
-> SwapFree:       128920572 kB
-> Dirty:                 0 kB
-> Writeback:             0 kB
-> AnonPages:         20544 kB
-> Mapped:            19780 kB
-> Shmem:              9060 kB
-> Slab:              78804 kB
-> SReclaimable:      27372 kB
-> SUnreclaim:        51432 kB
-> KernelStack:        8336 kB
-> PageTables:          820 kB
-> NFS_Unstable:          0 kB
-> Bounce:                0 kB
-> WritebackTmp:          0 kB
-> CommitLimit:    194926544 kB
-> Committed_AS:     256324 kB
-> VmallocTotal:   135290290112 kB
-> VmallocUsed:           0 kB
-> VmallocChunk:          0 kB
-> AnonHugePages:         0 kB
-> ShmemHugePages:        0 kB
-> ShmemPmdMapped:        0 kB
-> CmaTotal:              0 kB
-> CmaFree:               0 kB
-> HugePages_Total:       0
-> HugePages_Free:        0
-> HugePages_Rsvd:        0
-> HugePages_Surp:        0
-> Hugepagesize:       2048 kB
->
-> ubuntu at crb6:~$ cat /proc/cpuinfo
-> processor	: 0
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 1
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 2
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 3
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 4
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 5
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 6
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 7
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 8
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 9
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 10
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 11
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 12
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 13
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 14
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 15
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 16
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 17
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 18
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 19
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 20
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 21
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 22
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 23
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 24
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 25
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 26
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 27
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 28
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 29
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 30
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 31
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 32
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 33
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 34
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 35
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 36
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 37
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 38
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 39
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 40
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 41
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 42
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 43
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 44
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 45
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 46
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
-> processor	: 47
-> BogoMIPS	: 200.00
-> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
-> CPU implementer	: 0x43
-> CPU architecture: 8
-> CPU variant	: 0x1
-> CPU part	: 0x0a1
-> CPU revision	: 0
->
+On 2016/11/16 21:48, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
+> 
+> This patchset:
+>     (1)Preparation for adding GTDT support in arm_arch_timer:
+>         1. Move some enums and marcos to header file;
+>         2. Add a new enum for spi type;
+>         3. Improve printk relevant code.
+>         4. rename some  enums and defines, and some cleanups.
+>         5. separate out arch_timer_uses_ppi init code and fix a potential bug
+>         6. Refactor arch_timer_detect_rate to keep dt code only in *_of_init
+>         7. Refactor arch_timer_needs_probing, and call it only if acpi disabled.
+>         8. Introduce some new structs and refactor the timer init code
+> 
+>     (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
+>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
+>     memory-mapped timer and SBSA Generic Watchdog timer.
+>     This driver can help to simplify all the relevant timer drivers,
+>     and separate all the ACPI GTDT knowledge from them.
+> 
+>     (3)Simplify ACPI code for arm_arch_timer
+> 
+>     (4)Add GTDT support for ARM memory-mapped timer, also refactor
+>     original memory-mapped timer dt support for reusing some common
+>     code.
+> 
+> This patchset has been tested on the following platforms with ACPI enabled:
+>     (1)ARM Foundation v8 model
+> 
+> Changelog:
+> v16: https://lkml.org/lkml/2016/
+>      Fix patchset problem about static enum ppi_nr of 01/13 in v15.
+>      Refactor arch_timer_detect_rate.
+>      Refactor arch_timer_needs_probing.
+> 
+> v15: https://lkml.org/lkml/2016/11/15/366
+>      Re-order patches
+>      Add arm_arch_timer refactoring patches to prepare for GTDT:
+>          1. rename some  enums and defines, and some cleanups
+>          2. separate out arch_timer_uses_ppi init code and fix a potential bug
+>          3. Improve some new structs, refactor the timer init code.
+>      Since the some structs have been changed, GTDT parser for memory-mapped
+>      timer and SBSA Generic Watchdog timer have been update.
+> 
+> v14: https://lkml.org/lkml/2016/9/28/573
+>      Separate memory-mapped timer GTDT support into two patches
+>          1. Refactor the timer init code to prepare for GTDT
+>          2. Add GTDT support for memory-mapped timer
+> 
+> v13: http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1231717.html
+>      Improve arm_arch_timer code for memory-mapped
+>      timer GTDT support, refactor original memory-mapped timer
+>      dt support for reusing some common code.
+> 
+> v12: https://lkml.org/lkml/2016/9/13/250
+>      Rebase to latest Linux 4.8-rc6
+>      Delete the confusing "skipping" in the error message.
+> 
+> V11: https://lkml.org/lkml/2016/9/6/354
+>      Rebase to latest Linux 4.8-rc5
+>      Delete typedef (suggested by checkpatch.pl)
+> 
+> V10: https://lkml.org/lkml/2016/7/26/215
+>      Drop the "readq" patch.
+>      Rebase to latest Linux 4.7.
+> 
+> V9: https://lkml.org/lkml/2016/7/25/345
+>     Improve pr_err message in acpi gtdt driver.
+>     Update Commit message for 7/9
+>     shorten the irq mapping function name
+>     Improve GTDT driver for memory-mapped timer
+> 
+> v8: https://lkml.org/lkml/2016/7/19/660
+>     Improve "pr_fmt(fmt)" definition: add "ACPI" in front of "GTDT",
+>     and also improve printk message.
+>     Simplify is_timer_block and is_watchdog.
+>     Merge acpi_gtdt_desc_init and gtdt_arch_timer_init into acpi_gtdt_init();
+>     Delete __init in include/linux/acpi.h for GTDT API
+>     Make ARM64 select GTDT.
+>     Delete "#include <linux/module.h>" from acpi_gtdt.c
+>     Simplify GT block parse code.
+> 
+> v7: https://lkml.org/lkml/2016/7/13/769
+>     Move the GTDT driver to drivers/acpi/arm64
+>     Add add the ARM64-specific ACPI Support maintainers in MAINTAINERS
+>     Merge 3 patches of GTDT parser driver.
+>     Fix the for_each_platform_timer bug.
+> 
+> v6: https://lkml.org/lkml/2016/6/29/580
+>     split the GTDT driver to 4 parts: basic, arch_timer, memory-mapped timer,
+>     and SBSA Generic Watchdog timer
+>     Improve driver by suggestions and example code from Daniel Lezcano
+> 
+> v5: https://lkml.org/lkml/2016/5/24/356
+>     Sorting out all patches, simplify the API of GTDT driver:
+>     GTDT driver just fills the data struct for arm_arch_timer driver.
+> 
+> v4: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006667.html
+>     Delete the kvm relevant patches
+>     Separate two patches for sorting out the code for arm_arch_timer.
+>     Improve irq info export code to allow missing irq info in GTDT table.
+> 
+> v3: https://lkml.org/lkml/2016/2/1/658
+>     Improve GTDT driver code:
+>       (1)improve pr_* by defining pr_fmt(fmt)
+>       (2)simplify gtdt_sbsa_gwdt_init
+>       (3)improve gtdt_arch_timer_data_init, if table is NULL, it will try
+>       to get GTDT table.
+>     Move enum ppi_nr to arm_arch_timer.h, and add enum spi_nr.
+>     Add arm_arch_timer get ppi from DT and GTDT support for kvm.
+> 
+> v2: https://lkml.org/lkml/2015/12/2/10
+>     Rebase to latest kernel version(4.4-rc3).
+>     Fix the bug about the config problem,
+>     use CONFIG_ACPI_GTDT instead of CONFIG_ACPI in arm_arch_timer.c
+> 
+> v1: The first upstreaming version: https://lkml.org/lkml/2015/10/28/553
+> 
+> Fu Wei (15):
+>   clocksource/drivers/arm_arch_timer: Move enums and defines to header
+>     file
+>   clocksource/drivers/arm_arch_timer: Add a new enum for spi type
+>   clocksource/drivers/arm_arch_timer: Improve printk relevant code
+>   clocksource/drivers/arm_arch_timer: rename some enums and defines, and
+>     some cleanups.
+>   clocksource/drivers/arm_arch_timer: fix a bug in arch_timer_register
+>     about arch_timer_uses_ppi
+>   clocksource/drivers/arm_arch_timer: separate out arch_timer_uses_ppi
+>     init code to prepare for GTDT.
+>   clocksource/drivers/arm_arch_timer: Refactor arch_timer_detect_rate to
+>     keep dt code in *_of_init
+>   clocksource/drivers/arm_arch_timer: Refactor arch_timer_needs_probing,
+>     and call it only if acpi disabled.
+>   clocksource/drivers/arm_arch_timer: Introduce some new structs to
+>     prepare for GTDT
+>   clocksource/drivers/arm_arch_timer: Refactor the timer init code to
+>     prepare for GTDT
+>   acpi/arm64: Add GTDT table parse driver
+>   clocksource/drivers/arm_arch_timer: Simplify ACPI support code.
+>   acpi/arm64: Add memory-mapped timer support in GTDT driver
+>   clocksource/drivers/arm_arch_timer: Add GTDT support for memory-mapped
+>     timer
+>   acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver
+> 
+>  arch/arm64/Kconfig                   |   1 +
+>  drivers/acpi/arm64/Kconfig           |   3 +
+>  drivers/acpi/arm64/Makefile          |   1 +
+>  drivers/acpi/arm64/gtdt.c            | 411 +++++++++++++++++++++++++++++
+>  drivers/clocksource/arm_arch_timer.c | 484 ++++++++++++++++++++---------------
+>  drivers/watchdog/Kconfig             |   1 +
+>  include/clocksource/arm_arch_timer.h |  61 ++++-
+>  include/linux/acpi.h                 |   8 +
+>  virt/kvm/arm/hyp/timer-sr.c          |   6 +-
+>  9 files changed, 759 insertions(+), 217 deletions(-)
+>  create mode 100644 drivers/acpi/arm64/gtdt.c
+> 
