@@ -1,85 +1,59 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Thu, 17 Nov 2016 10:51:33 +0100
-Subject: [PATCH V8 2/6] thermal: bcm2835: add thermal driver for bcm2835
- soc
-In-Reply-To: <20161117021107.GA2647@localhost.localdomain>
-References: <1478081906-12009-1-git-send-email-kernel@martin.sperl.org>
- <1478081906-12009-3-git-send-email-kernel@martin.sperl.org>
- <20161117021107.GA2647@localhost.localdomain>
-Message-ID: <766e1b70-d83a-eb52-fa2b-aec435e85673@martin.sperl.org>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 17 Nov 2016 20:33:27 +1030
+Subject: [RFC PATCH] mfd: dt: Add Aspeed LPC binding
+In-Reply-To: <4751029.AudB7s5avo@wuerfel>
+References: <20161117060633.3837-1-andrew@aj.id.au>
+ <4751029.AudB7s5avo@wuerfel>
+Message-ID: <CACPK8Xf=f=9Zw=jf0K+RemSdmUiCMgvFuGgKGtB=v8_4b1r6iw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 17.11.2016 03:11, Eduardo Valentin wrote:
-> Hey Martin,
->
-> Very sorry for the late feedback. Not so sure if this one got queued
-> already or not. Anyways, just minor questions as follows:
->
-> On Wed, Nov 02, 2016 at 10:18:22AM +0000, kernel at martin.sperl.org wrote:
->> From: Martin Sperl <kernel@martin.sperl.org>
+On Thu, Nov 17, 2016 at 7:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday, November 17, 2016 4:36:33 PM CET Andrew Jeffery wrote:
+>> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+>> ---
 >>
->> Add basic thermal driver for bcm2835 SOC.
+>> I'd like to start a discussion about how to handle the LPC register space in
+>> the Aspeed SoC. There are a number of issues, largely concerned with the layout
+>> of the registers but also with the fact that LPC register state is used by the
+>> pinmux to determine some pin functionality.
+> ...
 >>
->> This driver currently relies on the firmware setting up the
->> tsense HW block and does not set it up itself.
->>
->> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
->> Acked-by: Eric Anholt <eric@anholt.net>
->> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
->>
-...
->> +static int bcm2835_thermal_adc2temp(
->> +	const struct bcm2835_thermal_info *info, u32 adc)
->> +{
->> +	return info->offset + (adc * info->slope);
+>> What is the recommended approach to managing such hardware?
 >
-> Any specific reason we cannot use thermal_zone_params->slope and
-> thermal_zone_params->offset?
+> Can you clarify which side of the LPC bus this is? We are currently having
+> a discussion for how to integrate the LPC master on an ARM64 server that
+> uses LPC to access an Aspeed LPC slave. For this one we want to use the
+> traditional ISA DT binding.
 
-You could - the patch was just rebased to 4.9 and those slope and
-offset just got merged during this cycle.
+This is from the perspective of the BMC.
 
-Do we really need to modify it - the patch has been around since 4.6.
+On the machines we are talking to, most (all?) access is performed
+through the system firmware (skiboot).
 
->> +
->> +static int bcm2835_thermal_get_trip_temp(
->> +	struct thermal_zone_device *tz, int trip, int *temp)
->> +{
->> +	struct bcm2835_thermal_data *data = tz->devdata;
->> +	u32 val = readl(data->regs + BCM2835_TS_TSENSCTL);
->> +
->> +	/* get the THOLD bits */
->> +	val &= BCM2835_TS_TSENSCTL_THOLD_MASK;
->> +	val >>= BCM2835_TS_TSENSCTL_THOLD_SHIFT;
->> +
->> +	/* if it is zero then use the info value */
->> +	if (val)
->
-> Is this a read only register or is this driver supposed to program it?
-> In which scenario it would be 0? Can this be added as comments?
+> I'm guessing that you are interesting in the other side here, for mapping
+> the registers of the LPC slave on the Aspeed BMC, but that's not clear from
+> your email, as I'm assuming that the same chip has both master and slave
+> interfaces.
 
-It is RW, but the Firmware typically sets up the thermal device with the 
-correct values already - this is just a fallback.
+Yep, we come from the "other side".
 
->> +static int bcm2835_thermal_get_temp(struct thermal_zone_device *tz,
->> +				    int *temp)
->> +{
->> +	struct bcm2835_thermal_data *data = tz->devdata;
->> +	u32 val = readl(data->regs + BCM2835_TS_TSENSSTAT);
->> +
->> +	if (!(val & BCM2835_TS_TSENSSTAT_VALID))
->
-> What cases you would get the valid bit not set? Do you need to wait for
-> the conversion to finish?
+The BMC itself can operate the bus in Master or Slave mode. We are
+interested in the slave case, for when the host is requesting access
+to its system firmware at boot time.  This happens by mapping a region
+of the BMC's AHB memory space into the LPC address space. After we
+deal with pinmux, Andrew or I will be hacking on a driver to configure
+that space, as the BMC needs to configure the window before the host
+can boot. It's a pile of bits spread out over different parts of the
+chip, and doesn't map nicely into any existing driver model we have in
+the kernel.
 
-I guess: if you have just enabled the HW-block (which the FW does much
-in advance) and start to read the value immediately (before the first 
-sample period has finished), then this will not be valid.
+Other functions include IPMI communication between the BMC and the
+host via the LPC bus via the iBT interface. We have a driver for that
+staged for 4.10. Then there's a mailbox, some "scratch" registers that
+can be used by the firmware for whatever they see fit, and all kinds
+of crazy legacy x86 stuff like POST code registers.
 
-So do you need another version of the patchset that uses that new API?
+Cheers,
 
-Thanks,
-	Martin
+Joel
