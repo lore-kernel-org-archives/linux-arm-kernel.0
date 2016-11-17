@@ -1,61 +1,89 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Nov 2016 15:05:09 +0100
-Subject: [PATCH] ravb: Support 1Gbps on R-Car H3 ES1.1+ and R-Car M3-W
-In-Reply-To: <cover.1479390880.git.horms+renesas@verge.net.au>
-References: <cover.1479390880.git.horms+renesas@verge.net.au>
-Message-ID: <735ea633e42060546cabe8430efbc00d4be1790a.1479390880.git.horms+renesas@verge.net.au>
+Date: Thu, 17 Nov 2016 15:04:53 +0100
+Subject: [PATCH 14/18] arm64: dts: m3ulcb: enable SDHI2
+In-Reply-To: <cover.1479388193.git.horms+renesas@verge.net.au>
+References: <cover.1479388193.git.horms+renesas@verge.net.au>
+Message-ID: <c65d4b6484c79eefcbb10c9bf1db7f8c81537f5a.1479388193.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 
-The limitation to 10/100Mbit speeds on R-Car Gen3 is valid for R-Car H3
-ES1.0 only. Check for the exact SoC model to allow 1Gbps on newer
-revisions of R-Car H3, and on R-Car M3-W.
+This supports SDHI2 for M3ULCB onboard eMMC
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: David S. Miller <davem@davemloft.net>
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/net/ethernet/renesas/ravb_main.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts | 43 ++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-diff --git a/drivers/net/ethernet/renesas/ravb_main.c b/drivers/net/ethernet/renesas/ravb_main.c
-index 630536bc72f9..83c45edba6ef 100644
---- a/drivers/net/ethernet/renesas/ravb_main.c
-+++ b/drivers/net/ethernet/renesas/ravb_main.c
-@@ -31,6 +31,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/slab.h>
- #include <linux/spinlock.h>
-+#include <linux/sys_soc.h>
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
+index d209e5480ff6..c3f064ac2cb4 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
+@@ -55,6 +55,24 @@
+ 		};
+ 	};
  
- #include <asm/div64.h>
++	reg_1p8v: regulator0 {
++		compatible = "regulator-fixed";
++		regulator-name = "fixed-1.8V";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	reg_3p3v: regulator1 {
++		compatible = "regulator-fixed";
++		regulator-name = "fixed-3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
+ 	vcc_sdhi0: regulator-vcc-sdhi0 {
+ 		compatible = "regulator-fixed";
  
-@@ -977,6 +978,11 @@ static void ravb_adjust_link(struct net_device *ndev)
- 		phy_print_status(phydev);
- }
+@@ -113,6 +131,18 @@
+ 		function = "sdhi0";
+ 		power-source = <1800>;
+ 	};
++
++	sdhi2_pins: sd2 {
++		groups = "sdhi2_data8", "sdhi2_ctrl";
++		function = "sdhi2";
++		power-source = <3300>;
++	};
++
++	sdhi2_pins_uhs: sd2_uhs {
++		groups = "sdhi2_data8", "sdhi2_ctrl";
++		function = "sdhi2";
++		power-source = <1800>;
++	};
+ };
  
-+static const struct soc_device_attribute r8a7795es10[] = {
-+	{ .soc_id = "r8a7795", .revision = "ES1.0", },
-+	{ /* sentinel */ }
+ &sdhi0 {
+@@ -128,6 +158,19 @@
+ 	status = "okay";
+ };
+ 
++&sdhi2 {
++	/* used for on-board 8bit eMMC */
++	pinctrl-0 = <&sdhi2_pins>;
++	pinctrl-1 = <&sdhi2_pins_uhs>;
++	pinctrl-names = "default", "state_uhs";
++
++	vmmc-supply = <&reg_3p3v>;
++	vqmmc-supply = <&reg_1p8v>;
++	bus-width = <8>;
++	non-removable;
++	status = "okay";
 +};
 +
- /* PHY init function */
- static int ravb_phy_init(struct net_device *ndev)
- {
-@@ -1011,10 +1017,10 @@ static int ravb_phy_init(struct net_device *ndev)
- 		return -ENOENT;
- 	}
- 
--	/* This driver only support 10/100Mbit speeds on Gen3
-+	/* This driver only support 10/100Mbit speeds on R-Car H3 ES1.0
- 	 * at this time.
- 	 */
--	if (priv->chip_id == RCAR_GEN3) {
-+	if (soc_device_match(r8a7795es10)) {
- 		int err;
- 
- 		err = phy_set_max_speed(phydev, SPEED_100);
+ &scif2 {
+ 	pinctrl-0 = <&scif2_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.7.0.rc3.207.g0ac5344
