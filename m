@@ -1,190 +1,108 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 17 Nov 2016 11:20:55 +0100
-Subject: [PATCH net 1/3] net: phy: realtek: add eee advertisement
- disable options
-In-Reply-To: <CANAwSgTjG8G0U+A1p7hOKND9rjY4BzZfPgyWWHAEryYkHj_UOw@mail.gmail.com>
-References: <1479220154-25851-1-git-send-email-jbrunet@baylibre.com>
- <1479220154-25851-2-git-send-email-jbrunet@baylibre.com>
- <CANAwSgTjG8G0U+A1p7hOKND9rjY4BzZfPgyWWHAEryYkHj_UOw@mail.gmail.com>
-Message-ID: <1479378055.17538.57.camel@baylibre.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 17 Nov 2016 20:52:43 +1030
+Subject: [RFC PATCH] mfd: dt: Add Aspeed LPC binding
+In-Reply-To: <CACRpkdazPEbU2gmDyke=GTYtjVp8aeauS+PVkp-zuiVoVz7kbw@mail.gmail.com>
+References: <20161117060633.3837-1-andrew@aj.id.au>
+ <CACRpkdazPEbU2gmDyke=GTYtjVp8aeauS+PVkp-zuiVoVz7kbw@mail.gmail.com>
+Message-ID: <CACPK8XfuKQErSpncXmY04h10PNj5KDhhNGXqa6ZmfPhZj7p8bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-11-16 at 22:36 +0530, Anand Moon wrote:
-> ?Hi Jerome.
-> 
-> On 15 November 2016 at 19:59, Jerome Brunet <jbrunet@baylibre.com>
-> wrote:
-> > 
-> > On some platforms, energy efficient ethernet with rtl8211 devices
-> > is
-> > causing issue, like throughput drop or broken link.
-> > 
-> > This was reported on the OdroidC2 (DWMAC + RTL8211F). While the
-> > issue root
-> > cause is not fully understood yet, disabling EEE advertisement
-> > prevent auto
-> > negotiation from enabling EEE.
-> > 
-> > This patch provides options to disable 1000T and 100TX EEE
-> > advertisement
-> > individually for the realtek phys supporting this feature.
-> > 
-> > Reported-by: Martin Blumenstingl <martin.blumenstingl@googlemail.co
-> > m>
-> > Cc: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> > Cc: Alexandre TORGUE <alexandre.torgue@st.com>
-> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> > Tested-by: Andre Roth <neolynx@gmail.com>
-> > ---
-> > ?drivers/net/phy/realtek.c | 65
-> > ++++++++++++++++++++++++++++++++++++++++++++++-
-> > ?1 file changed, 64 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/net/phy/realtek.c b/drivers/net/phy/realtek.c
-> > index aadd6e9f54ad..77235fd5faaf 100644
-> > --- a/drivers/net/phy/realtek.c
-> > +++ b/drivers/net/phy/realtek.c
-> > @@ -15,6 +15,12 @@
-> > ? */
-> > ?#include <linux/phy.h>
-> > ?#include <linux/module.h>
-> > +#include <linux/of.h>
-> > +
-> > +struct rtl8211x_phy_priv {
-> > +???????bool eee_1000t_disable;
-> > +???????bool eee_100tx_disable;
-> > +};
-> > 
-> > ?#define RTL821x_PHYSR??????????0x11
-> > ?#define RTL821x_PHYSR_DUPLEX???0x2000
-> > @@ -93,12 +99,44 @@ static int rtl8211f_config_intr(struct
-> > phy_device *phydev)
-> > ????????return err;
-> > ?}
-> > 
-> > +static void rtl8211x_clear_eee_adv(struct phy_device *phydev)
-> > +{
-> > +???????struct rtl8211x_phy_priv *priv = phydev->priv;
-> > +???????u16 val;
-> > +
-> > +???????if (priv->eee_1000t_disable || priv->eee_100tx_disable) {
-> > +???????????????val = phy_read_mmd_indirect(phydev,
-> > MDIO_AN_EEE_ADV,
-> > +???????????????????????????????????????????MDIO_MMD_AN);
-> > +
-> > +???????????????if (priv->eee_1000t_disable)
-> > +???????????????????????val &= ~MDIO_AN_EEE_ADV_1000T;
-> > +???????????????if (priv->eee_100tx_disable)
-> > +???????????????????????val &= ~MDIO_AN_EEE_ADV_100TX;
-> > +
-> > +???????????????phy_write_mmd_indirect(phydev, MDIO_AN_EEE_ADV,
-> > +??????????????????????????????????????MDIO_MMD_AN, val);
-> > +???????}
-> > +}
-> > +
-> > +static int rtl8211x_config_init(struct phy_device *phydev)
-> > +{
-> > +???????int ret;
-> > +
-> > +???????ret = genphy_config_init(phydev);
-> > +???????if (ret < 0)
-> > +???????????????return ret;
-> > +
-> > +???????rtl8211x_clear_eee_adv(phydev);
-> > +
-> > +???????return 0;
-> > +}
-> > +
-> > ?static int rtl8211f_config_init(struct phy_device *phydev)
-> > ?{
-> > ????????int ret;
-> > ????????u16 reg;
-> > 
-> > -???????ret = genphy_config_init(phydev);
-> > +???????ret = rtl8211x_config_init(phydev);
-> > ????????if (ret < 0)
-> > ????????????????return ret;
-> > 
-> > @@ -115,6 +153,26 @@ static int rtl8211f_config_init(struct
-> > phy_device *phydev)
-> > ????????return 0;
-> > ?}
-> > 
-> > +static int rtl8211x_phy_probe(struct phy_device *phydev)
-> > +{
-> > +???????struct device *dev = &phydev->mdio.dev;
-> > +???????struct device_node *of_node = dev->of_node;
-> > +???????struct rtl8211x_phy_priv *priv;
-> > +
-> > +???????priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> > +???????if (!priv)
-> > +???????????????return -ENOMEM;
-> > +
-> > +???????priv->eee_1000t_disable =
-> > +???????????????of_property_read_bool(of_node, "realtek,disable-
-> > eee-1000t");
-> > +???????priv->eee_100tx_disable =
-> > +???????????????of_property_read_bool(of_node, "realtek,disable-
-> > eee-100tx");
-> > +
-> > +???????phydev->priv = priv;
-> > +
-> > +???????return 0;
-> > +}
-> > +
-> > ?static struct phy_driver realtek_drvs[] = {
-> > ????????{
-> > ????????????????.phy_id?????????= 0x00008201,
-> > @@ -140,7 +198,9 @@ static struct phy_driver realtek_drvs[] = {
-> > ????????????????.phy_id_mask????= 0x001fffff,
-> > ????????????????.features???????= PHY_GBIT_FEATURES,
-> > ????????????????.flags??????????= PHY_HAS_INTERRUPT,
-> > +???????????????.probe??????????= &rtl8211x_phy_probe,
-> > ????????????????.config_aneg????= genphy_config_aneg,
-> > +???????????????.config_init????= &rtl8211x_config_init,
-> > ????????????????.read_status????= genphy_read_status,
-> > ????????????????.ack_interrupt??= rtl821x_ack_interrupt,
-> > ????????????????.config_intr????= rtl8211e_config_intr,
-> > @@ -152,7 +212,9 @@ static struct phy_driver realtek_drvs[] = {
-> > ????????????????.phy_id_mask????= 0x001fffff,
-> > ????????????????.features???????= PHY_GBIT_FEATURES,
-> > ????????????????.flags??????????= PHY_HAS_INTERRUPT,
-> > +???????????????.probe??????????= &rtl8211x_phy_probe,
-> > ????????????????.config_aneg????= &genphy_config_aneg,
-> > +???????????????.config_init????= &rtl8211x_config_init,
-> > ????????????????.read_status????= &genphy_read_status,
-> > ????????????????.ack_interrupt??= &rtl821x_ack_interrupt,
-> > ????????????????.config_intr????= &rtl8211e_config_intr,
-> > @@ -164,6 +226,7 @@ static struct phy_driver realtek_drvs[] = {
-> > ????????????????.phy_id_mask????= 0x001fffff,
-> > ????????????????.features???????= PHY_GBIT_FEATURES,
-> > ????????????????.flags??????????= PHY_HAS_INTERRUPT,
-> > +???????????????.probe??????????= &rtl8211x_phy_probe,
-> > ????????????????.config_aneg????= &genphy_config_aneg,
-> > ????????????????.config_init????= &rtl8211f_config_init,
-> > ????????????????.read_status????= &genphy_read_status,
-> > --
-> > 2.7.4
-> > 
-> 
-> How about adding callback functionality for .soft_reset to handle
-> BMCR
-> where we update the Auto-Negotiation for the phy,
-> as per the datasheet of the rtl8211f.
+Hey Linus,
 
-I'm not sure I understand how this would help with our issue (and EEE).
-Am I missing something or is it something unrelated that you would like
-to see happening on this driver ??
+On Thu, Nov 17, 2016 at 8:00 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Nov 17, 2016 at 7:06 AM, Andrew Jeffery <andrew@aj.id.au> wrote:
+>
+>> +* Device tree bindings for the Aspeed LPC Controller
+>
+> We are going overboard with the lingo sometimes, to the point that we do not
+> understand how terse things become.
+>
+> LPC = Low Pin Count, right?
+> Explain that right here: it is a slow external bus, right?
 
-> 
-> -Best Regard
-> Anand Moon
-> 
-> > 
-> > 
-> > _______________________________________________
-> > linux-amlogic mailing list
-> > linux-amlogic at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-amlogic
+Yep. 33MHz bus that generally connects a host CPU to other devices on
+the same motherboard, such as management controllers.
+
+https://en.wikipedia.org/wiki/Low_Pin_Count
+
+Systems with Aspeed BMCs use the LPC to load the firmware from the BMC
+into the host at boot, and send IPMI messages between the host and the
+BMC.
+
+BMC stands for Baseboard Management Controller. Back in the day it was
+simple keyboard controller microcontroller, these days we use a 800MHz
+ARM11 with half a gigabyte of RAM. It provides access to the boot
+firmware for the host CPU, monitors the health of the system (fans,
+temperature, error logging), and provides remote access for power
+cycling and installation.
+
+https://en.wikipedia.org/wiki/Intelligent_Platform_Management_Interface#Baseboard_management_controller
+
+Andrew and I work on an open source project that is creating a new BMC
+software stack called OpenBMC. You've been merging the wonderful
+Aspeed pinmux patches that Andrew wrote recently, which was a major
+bit of kernel work required for that project.
+
+>> +The Aspeed LPC controller contains registers for a variety of functions. Not
+>> +all registers for a function are contiguous, and some registers are referenced
+>> +by functions outside the LPC controller.
+>> +
+>> +Note that this is separate from the H8S/2168 compatible register set occupying
+>> +the start of the LPC controller address space.
+>> +
+>> +Some significant functions in the LPC controller:
+>> +
+>> +* LPC Host Controller
+>> +* Host Interface Controller
+>
+> Host interface to what?
+
+Host in this case is the CPU on the motherboard to do the heavy
+lifting. x86, ARM64, PowerPC. So this is the BMC's interface to the
+host.
+
+>
+>> +* iBT Controller
+>
+> What is iBT?
+
+IPMI Byte Transfer? Something like that. It's the transport that the
+host uses to send IPMI messages to the BMC and back.
+
+The host side has been upstream for a while. The BMC side has a driver
+staged for v4.10:
+
+https://patchwork.ozlabs.org/patch/674973/
+
+If you're really bored you can read up on IPMI from the specificaiton:
+
+ http://www.intel.com/content/www/us/en/servers/ipmi/ipmi-second-gen-interface-spec-v2-rev1-1.html
+
+tl;dr is it's a protocol for communication to the BMC. There is
+in-band IPMI, which is between the host and the BMC over the eg. the
+BT interface. Or out of band IPMI, which is where you use ipmitool
+from your laptop to talk to the BMC over the network.
+
+>
+>> +* SuperIO Scratch registers
+>
+> Again more context please.
+
+The SuperIO name is legacy x86 terminology. These are a few bytes
+worth of data that can be set from one side and read by the other in
+order to convey firmware-specific information. In OpenPower systems,
+we use them to tell the host where to send it's console output when it
+is booting.
+
+> With standards documents, either explain everything or provide
+> pointers for the information.
+
+If only we could give you the pleasure of reading the Aspeed reference
+manual. It's only available from Aspeed under NDA at this point in
+time though. If you want further details on anything else then Andrew,
+Ben or myself can explain.
+
+Cheers,
+
+Joel
