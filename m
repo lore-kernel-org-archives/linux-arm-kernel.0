@@ -1,71 +1,66 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Wed, 16 Nov 2016 18:21:56 -0800
-Subject: [PATCH V8 0/6] thermal: bcm2835: add thermal driver
-In-Reply-To: <1478081906-12009-1-git-send-email-kernel@martin.sperl.org>
-References: <1478081906-12009-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <20161117022154.GA3184@localhost.localdomain>
+From: xuejiancheng@hisilicon.com (Jiancheng Xue)
+Date: Thu, 17 Nov 2016 11:03:42 +0800
+Subject: [PATCH 1/3] arm: hisi: add ARCH_MULTI_V5 support
+In-Reply-To: <582C2785.2010804@hisilicon.com>
+References: <20161017120705.3726-1-wenpan@hisilicon.com>
+ <20161017120705.3726-2-wenpan@hisilicon.com> <5893354.6MrIxqzRoI@wuerfel>
+ <e78a288b-8bab-9441-2edb-6ec08e5103d7@hisilicon.com>
+ <582C2785.2010804@hisilicon.com>
+Message-ID: <114569cb-79ab-a46d-8582-6169f182a32c@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-On Wed, Nov 02, 2016 at 10:18:20AM +0000, kernel at martin.sperl.org wrote:
-> From: Martin Sperl <kernel@martin.sperl.org>
+Hi Wei?
+
+On 2016/11/16 17:31, Wei Xu wrote:
+> Hi Pan,
 > 
-> Add a thermal driver for the TSENSE device of the bcm2835/6/7 SOC.
+> On 2016/11/16 8:56, wenpan wrote:
+>> Hi Marty?
+>> Does this confict with your patch? If not?I hope this could be merged first.  Besides could you tell me the link to your related patch?
 > 
-> If the firmware enables the HW, then the configuration is not touched.
-> In case the firmware has not enabled the device, then we try to set
-> it up correctly (which unfortunately can not get tested).
-> 
-> It exposes temperature and a critical trip point
-> (using a hardcoded default of 80C or the temperature configured
-> in the control register by the firmware, which reads as
-> 407C currently)
-> 
-> The calibrations are (potentially) different for bcm2835, bcm2836
-> and bcm2837 and can get selected by the compatible property
-> in the device tree.
-> 
-> The driver also exposes the registers via debugfs.
-> 
-> Possible future enhancements:
-> * the device has the ability to trigger interrupts on reaching
->   the programmed critical temperature.
->   I have no knowledge which interrupt could be responsible
->   for this on the ARM side, so if we get to know which irq
->   it is we can implement that.
->   Instead the driver right now implements polling in 1 second intervals
-> * the device can also reset the HW after the trip point
->   has been reached (also with some delay, so that corrective
->   actions can get taken) - this is currently not enabled by the
->   firmware, but could.
-> * we could define more trip points for THERMAL_TRIP_HOT
-> * make the trip point limits modifiable (ops.set_trip_temp)
-> 
-> Note:
->   No support for 32-bit arm bcm2837, as there is no
->   arch/arm/boot/dts/bcm2836.dtsi upstream as of now.
->   64-bit arm support is not tested
-> 
-> Changelog:
->  V1 -> V2: renamed dt-binding documentation file
->        	   added specific settings depending on compatible
-> 	   added trip point based on register
-> 	   setting up ctrl-register if HW is not enabled by firmware
-> 	     as per recommendation of Eric (untested)
-> 	   check that clock frequency is in range
-> 	     (1.9 - 5MHz - as per comment in clk-bcm2835.c)
->  	   added driver to multi_v7_defconfig
->  V2 -> V3: made a module in multi_v7_defconfig
->            fixed typo in dt-binding document
->  V3 -> V4: moved driver back to thermal (not using bcm sub-directory)
->        	   set polling interval to 1second (was 0ms, so interrupt driven)
->  V4 -> V5: use correct compatiblity for different soc versions in dt
->        	   support ARM64 for bcm2837 in devicetree and defconfig
->  V5 -> V6: incorporated changes recommended by Stefan Wahren
->  V6 -> V7: removed depends on ARCH_BCM2836 || ARCH_BCM2837 in Kconfig
->  V7 -> V8: rebased
+> This is the link: https://patchwork.kernel.org/patch/9334743/
 > 
 
-Despite the minor questions on patch 2, specially on the request to use
-existing slope and offset properties, I am ok with the other DT changes.
+Thank you for offering this.If I want to give some comments on Marty's patch,
+what should I do?
+
+For Marty's patch, I think there's no need to add specific config item ARCH_HIxxxx
+for every chipset. Some existing chipsets depend on ARCH_HISI directly like Hi3519
+and Hi3798CV200. If some options like ARM_GIC is removed from ARCH_HISI, this kind
+of chipsets will must choose other place to select it. I suggest we should keep selecting
+ARM_GIC under ARCH_HISI as Pan's patch do.
+
+The code may be like this:
+
+config ARCH_HISI
+ 	bool "Hisilicon SoC Support"
+-	depends on ARCH_MULTI_V7
++	depends on ARCH_MULTI_V5 || ARCH_MULTI_V6 || ARCH_MULTI_V7
+ 	select ARM_AMBA
+-	select ARM_GIC
++	select ARM_GIC if ARCH_MULTI_V7
++	select ARM_VIC if ARCH_MULTI_V5 || depends on ARCH_MULTI_V6
+ 	select ARM_TIMER_SP804
+ 	select POWER_RESET
+ 	select POWER_RESET_HISI
+ 	select POWER_SUPPLY
+
+What's your opinion?
+
+Best Regards,
+Jiancheng
+
+>> On 2016/10/17 21:48, Arnd Bergmann wrote:
+>>> On Monday, October 17, 2016 8:07:03 PM CEST Pan Wen wrote:
+>>>> Add support for some HiSilicon SoCs which depend on ARCH_MULTI_V5.
+>>>>
+>>>> Signed-off-by: Pan Wen <wenpan@hisilicon.com>
+>>>>
+>>>
+>>> Looks ok. I've added Marty Plummer to Cc, he was recently proposing
+>>> patches for Hi3520, which I think is closely related to this one.
+>>> Please try to work together so the patches don't conflict. It should
+>>> be fairly straightforward since you are basically doing the same
+>>> change here.
+>>>
