@@ -1,54 +1,28 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Thu, 17 Nov 2016 16:18:05 +0100
-Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire
- section
-In-Reply-To: <20161117142528.GJ22855@arm.com>
-References: <1475747527-32387-1-git-send-email-rrichter@cavium.com>
- <CAKv+Gu-oYzSn_eeqaX3QVFeQjBGkaX-Wh7+oPcQFcXv7J6GOFQ@mail.gmail.com>
- <20161006161114.GH22012@rric.localdomain>
- <20161017185801.GT25086@rric.localdomain>
- <20161027160136.GD24290@arm.com>
- <20161028091905.GM22012@rric.localdomain>
- <20161107210514.GP20591@arm.com>
- <20161109195132.GZ22012@rric.localdomain>
- <20161117142528.GJ22855@arm.com>
-Message-ID: <20161117151805.GJ2151@rric.localdomain>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Thu, 17 Nov 2016 17:20:26 +0200
+Subject: [PATCH] ARM: qcom_defconfig: Enable RPM/RPM-SMD clocks
+Message-ID: <20161117152026.10491-1-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for your answer.
+Enable support for clocks, controlled by the RPM processor on
+Qualcomm platforms.
 
-On 17.11.16 14:25:29, Will Deacon wrote:
-> On Wed, Nov 09, 2016 at 08:51:32PM +0100, Robert Richter wrote:
-> > Thus, I don't see where my patch breaks code. Even acpi_os_ioremap()
-> > keeps the same behaviour as before since it still uses memblock_is_
-> > memory(). Could you more describe your concerns why do you think this
-> > patch breaks the kernel and moves the problem somewhere else? I
-> > believe it fixes the problem at all.
-> 
-> acpi_os_ioremap always ends up in __ioremap_caller, regardless of
-> memblock_is_memory(). __ioremap_caller then fails if pfn_valid is true.
+Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+---
+ arch/arm/configs/qcom_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-But that's the reason my patch changed the code to use memblock_is_
-map_memory() instead. I was looking into the users of pfn_valid() esp.
-in arm64 code and changed it where required.
-
-This week I looked into the kernel again for code that might break by
-a pfn_valid() change. I found try_ram_remap() in memremap.c that has
-changed behaviour now, but this is explicit for MEMREMAP_WB, so it
-should be fine.
-
-Maybe it might be better to use page_is_ram() in addition to
-pfn_valid() where necessary. This should work now after commit:
-
- e7cd190385d1 arm64: mark reserved memblock regions explicitly in iomem
-
-I still think pfn_valid() is not the correct use to determine the mem
-attributes for mappings, there are further checks required.
-
-The risk of breaking something with my patch is small and limited only
-to the mapping of efi reserved regions (which is the state of 4.4). If
-something breaks anyway it can easily be fixed by adding more checks
-to pfn_valid() as suggested above.
-
--Robert
+diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
+index 9f6d2a69a6f7..553d0a5827f2 100644
+--- a/arch/arm/configs/qcom_defconfig
++++ b/arch/arm/configs/qcom_defconfig
+@@ -158,6 +158,8 @@ CONFIG_DMADEVICES=y
+ CONFIG_QCOM_BAM_DMA=y
+ CONFIG_STAGING=y
+ CONFIG_COMMON_CLK_QCOM=y
++CONFIG_QCOM_CLK_RPM=y
++CONFIG_QCOM_CLK_SMD_RPM=y
+ CONFIG_APQ_MMCC_8084=y
+ CONFIG_IPQ_LCC_806X=y
+ CONFIG_MSM_GCC_8660=y
