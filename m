@@ -1,48 +1,90 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Nov 2016 15:11:31 +0100
-Subject: [PATCH 14/31] ARM: dts: r8a7743: add Ether support
+Date: Thu, 17 Nov 2016 15:11:24 +0100
+Subject: [PATCH 07/31] ARM: dts: alt: use demuxer for I2C4
 In-Reply-To: <cover.1479391750.git.horms+renesas@verge.net.au>
 References: <cover.1479391750.git.horms+renesas@verge.net.au>
-Message-ID: <9fb52ea98a8d4bfa73a89a15de736eb1a84a5d7e.1479391750.git.horms+renesas@verge.net.au>
+Message-ID: <490aafde3cb3a7c183481e0fc9b38cba109691bf.1479391750.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Make it possible to fallback to GPIO for I2C4 on the EXIO-B connector.
 
-Define the generic R8A7743 part of the Ether device node.
+This is based on reference work for the I2C0 core of the lager/r8a7790
+by Wolfram Sang.
 
-Based on the original (and large) patch by Dmitry Shifrin
-<dmitry.shifrin@cogentembedded.com>.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+[wsa: rebased and fixed aliases]
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- arch/arm/boot/dts/r8a7743.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/r8a7794-alt.dts | 35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index 874bcf2b4da6..87563a5379b5 100644
---- a/arch/arm/boot/dts/r8a7743.dtsi
-+++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -418,6 +418,18 @@
- 			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
- 			status = "disabled";
- 		};
-+
-+		ether: ethernet at ee700000 {
-+			compatible = "renesas,ether-r8a7743";
-+			reg = <0 0xee700000 0 0x400>;
-+			interrupts = <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 813>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			phy-mode = "rmii";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
+diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
+index a3e74684289b..7270d4224b1a 100644
+--- a/arch/arm/boot/dts/r8a7794-alt.dts
++++ b/arch/arm/boot/dts/r8a7794-alt.dts
+@@ -18,6 +18,8 @@
+ 
+ 	aliases {
+ 		serial0 = &scif2;
++		i2c10 = &gpioi2c4;
++		i2c12 = &i2cexio4;
  	};
  
- 	/* External root clock */
+ 	chosen {
+@@ -135,6 +137,29 @@
+ 		#clock-cells = <0>;
+ 		clock-frequency = <148500000>;
+ 	};
++
++	gpioi2c4: i2c-10 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "i2c-gpio";
++		status = "disabled";
++		gpios = <&gpio4 9 GPIO_ACTIVE_HIGH /* sda */
++			 &gpio4 8 GPIO_ACTIVE_HIGH /* scl */
++			>;
++		i2c-gpio,delay-us = <5>;
++	};
++
++	/*
++	 * I2C4 is routed to EXIO connector B, pins 73 (SCL) + 74 (SDA).
++	 * A fallback to GPIO is provided.
++	 */
++	i2cexio4: i2c-14 {
++		compatible = "i2c-demux-pinctrl";
++		i2c-parent = <&i2c4>, <&gpioi2c4>;
++		i2c-bus-name = "i2c-exio4";
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
+ };
+ 
+ &du {
+@@ -194,6 +219,11 @@
+ 		function = "i2c1";
+ 	};
+ 
++	i2c4_pins: i2c4 {
++		groups = "i2c4";
++		function = "i2c4";
++	};
++
+ 	vin0_pins: vin0 {
+ 		groups = "vin0_data8", "vin0_clk";
+ 		function = "vin0";
+@@ -314,6 +344,11 @@
+ 	};
+ };
+ 
++&i2c4 {
++	pinctrl-0 = <&i2c4_pins>;
++	pinctrl-names = "i2c-exio4";
++};
++
+ &vin0 {
+ 	status = "okay";
+ 	pinctrl-0 = <&vin0_pins>;
 -- 
 2.7.0.rc3.207.g0ac5344
