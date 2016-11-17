@@ -1,120 +1,182 @@
-From: jason.hui.liu@nxp.com (Jason Liu)
-Date: Thu, 17 Nov 2016 05:21:37 +0000
-Subject: [PATCH 1/1] drivers: dma-contiguous: Ensure cma reserve region
- never cross the low/high mem boundary
-In-Reply-To: <6bd1a1a9-2bc0-f5f4-0957-1826af15f4dd@redhat.com>
-References: <1479305975-21670-1-git-send-email-jason.hui.liu@nxp.com>
- <6bd1a1a9-2bc0-f5f4-0957-1826af15f4dd@redhat.com>
-Message-ID: <VI1PR04MB1136F319039F61FECA4DCD11AEB10@VI1PR04MB1136.eurprd04.prod.outlook.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 17 Nov 2016 14:34:24 +0900
+Subject: [PATCH v27 1/9] memblock: add memblock_cap_memory_range()
+In-Reply-To: <20161116163015.GM7928@arm.com>
+References: <20161102044959.11954-1-takahiro.akashi@linaro.org>
+ <20161102045153.12008-1-takahiro.akashi@linaro.org>
+ <20161110172720.GB17134@arm.com> <20161111025049.GG381@linaro.org>
+ <20161111031903.GB15997@arm.com> <20161114055515.GH381@linaro.org>
+ <20161116163015.GM7928@arm.com>
+Message-ID: <20161117022023.GA5704@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Will,
 
-
-> -----Original Message-----
-> From: Laura Abbott [mailto:labbott at redhat.com]
-> Sent: Thursday, November 17, 2016 4:00 AM
-> To: Jason Liu <jason.hui.liu@nxp.com>; linux-arm-kernel at lists.infradead.org
-> Cc: gregkh at linuxfoundation.org; iamjoonsoo.kim at lge.com; linux-
-> kernel at vger.kernel.org; m.szyprowski at samsung.com
-> Subject: Re: [PATCH 1/1] drivers: dma-contiguous: Ensure cma reserve region
-> never cross the low/high mem boundary
+On Wed, Nov 16, 2016 at 04:30:15PM +0000, Will Deacon wrote:
+> Hi Akashi,
 > 
-> On 11/16/2016 06:19 AM, Jason Liu wrote:
-> > If the cma reserve region goes through the device-tree method, also
-> > need ensure the cma reserved region not cross the low/high mem
-> > boundary. This patch did the similar fix as commit:16195dd
-> > ("mm: cma: Ensure that reservations never cross the low/high mem
-> > boundary")
-> >
-> > Signed-off-by: Jason Liu <jason.hui.liu@nxp.com>
-> > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Cc: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > ---
-> >  drivers/base/dma-contiguous.c | 27 +++++++++++++++++++++++++++
-> >  1 file changed, 27 insertions(+)
-> >
-> > diff --git a/drivers/base/dma-contiguous.c
-> > b/drivers/base/dma-contiguous.c index e167a1e1..2bc093c 100644
-> > --- a/drivers/base/dma-contiguous.c
-> > +++ b/drivers/base/dma-contiguous.c
-> > @@ -244,6 +244,7 @@ static int __init rmem_cma_setup(struct
-> > reserved_mem *rmem)  {
-> >  	phys_addr_t align = PAGE_SIZE << max(MAX_ORDER - 1,
-> pageblock_order);
-> >  	phys_addr_t mask = align - 1;
-> > +	phys_addr_t highmem_start;
-> >  	unsigned long node = rmem->fdt_node;
-> >  	struct cma *cma;
-> >  	int err;
-> > @@ -256,6 +257,32 @@ static int __init rmem_cma_setup(struct
-> reserved_mem *rmem)
-> >  		pr_err("Reserved memory: incorrect alignment of CMA
-> region\n");
-> >  		return -EINVAL;
-> >  	}
-> > +#ifdef CONFIG_X86
-> > +	/*
-> > +	 * high_memory isn't direct mapped memory so retrieving its physical
-> > +	 * address isn't appropriate.  But it would be useful to check the
-> > +	 * physical address of the highmem boundary so it's justfiable to get
-> > +	 * the physical address from it.  On x86 there is a validation check for
-> > +	 * this case, so the following workaround is needed to avoid it.
-> > +	 */
-> > +	highmem_start = __pa_nodebug(high_memory); #else
-> > +	highmem_start = __pa(high_memory);
-> > +#endif
+> On Mon, Nov 14, 2016 at 02:55:16PM +0900, AKASHI Takahiro wrote:
+> > On Fri, Nov 11, 2016 at 11:19:04AM +0800, Dennis Chen wrote:
+> > > On Fri, Nov 11, 2016 at 11:50:50AM +0900, AKASHI Takahiro wrote:
+> > > > On Thu, Nov 10, 2016 at 05:27:20PM +0000, Will Deacon wrote:
+> > > > > On Wed, Nov 02, 2016 at 01:51:53PM +0900, AKASHI Takahiro wrote:
+> > > > > > +void __init memblock_cap_memory_range(phys_addr_t base, phys_addr_t size)
+> > > > > > +{
+> > > > > > +	int start_rgn, end_rgn;
+> > > > > > +	int i, ret;
+> > > > > > +
+> > > > > > +	if (!size)
+> > > > > > +		return;
+> > > > > > +
+> > > > > > +	ret = memblock_isolate_range(&memblock.memory, base, size,
+> > > > > > +						&start_rgn, &end_rgn);
+> > > > > > +	if (ret)
+> > > > > > +		return;
+> > > > > > +
+> > > > > > +	/* remove all the MAP regions */
+> > > > > > +	for (i = memblock.memory.cnt - 1; i >= end_rgn; i--)
+> > > > > > +		if (!memblock_is_nomap(&memblock.memory.regions[i]))
+> > > > > > +			memblock_remove_region(&memblock.memory, i);
+> > > > > > +
+> > > > > > +	for (i = start_rgn - 1; i >= 0; i--)
+> > > > > > +		if (!memblock_is_nomap(&memblock.memory.regions[i]))
+> > > > > > +			memblock_remove_region(&memblock.memory, i);
+> > > > > > +
+> > > > > > +	/* truncate the reserved regions */
+> > > > > > +	memblock_remove_range(&memblock.reserved, 0, base);
+> > > > > > +	memblock_remove_range(&memblock.reserved,
+> > > > > > +			base + size, (phys_addr_t)ULLONG_MAX);
+> > > > > > +}
+> > > > > 
+> > > > > This duplicates a bunch of the logic in memblock_mem_limit_remove_map. Can
+> > > > > you not implement that in terms of your new, more general, function? e.g.
+> > > > > by passing base == 0, and size == limit?
+> > > > 
+> > > > Obviously it's possible.
+> > > > I actually talked to Dennis before about merging them,
+> > > > but he was against my idea.
+> > > >
+> > > Oops! I thought we have reached agreement in the thread:http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/442817.html
+> > > So feel free to do that as Will'll do
+> > 
+> > OK, but I found that the two functions have a bit different semantics
+> > in clipping memory range, in particular, when the range [base,base+size)
+> > goes across several regions with a gap.
+> > (This does not happen in my arm64 kdump, though.)
+> > That is, 'limit' in memblock_mem_limit_remove_map() means total size of
+> > available memory, while 'size' in memblock_cap_memory_range() indicates
+> > the size of _continuous_ memory range.
 > 
-> The inline #ifdef is not great style, we shouldn't be spreading it around.
+> I thought limit was just a physical address, and then
 
-This is the similar fix in the 16195dd ("mm: cma: Ensure that reservations never cross
-the low/high mem boundary". Do you have a better idea for this? 
+No, it's not.
 
+> memblock_mem_limit_remove_map operated on the end of the nearest memblock?
+
+No, but "max_addr" returned by __find_max_addr() is a physical address
+and the end address of memory of "limit" size in total.
+
+> You could leave the __find_max_addr call in memblock_mem_limit_remove_map,
+> given that I don't think you need/want it for memblock_cap_memory_range.
 > 
-> > +
-> > +	/*
-> > +	 * All pages in the reserved area must come from the same zone.
-> > +	 * If the reserved region crosses the low/high memory boundary,
-> > +	 * try to fix it up and then fall back to allocate from the low mem
-> > +	 */
-> > +	if (rmem->base < highmem_start &&
-> > +		(rmem->base + rmem->size) > highmem_start) {
-> > +		memblock_free(rmem->base, rmem->size);
-> > +		rmem->base = memblock_alloc_range(rmem->size, align, 0,
-> > +						highmem_start,
-> MEMBLOCK_NONE);
-> > +		if (!rmem->base)
-> > +			return -ENOMEM;
-> > +	}
+> > So I added an extra argument, exact, to a common function to specify
+> > distinct behaviors. Confusing? Please see the patch below.
 > 
-> Given the alloc happened in the of code, it seems bad form to be bringing the
-> free and re-alloc here. Perhaps we should be doing the limiting and checking in
-> the reserved mem code?
-
-I original though to fix it into the drivers/of/of_reserved_mem.c, but hesitate to
-do it due to this of_reserved_mem is common code to do the reservation, which
-is something not related with CMA requirement. 
-
-Appreciated that anyone can provide comments to improve this solution. Without this,
-the Linux kernel will not boot up when do the CMA reservation from the DTS method,
-since the dma_alloc_coherent will fail when do the dma memory allocation. 
-
-> 
-> If there is no other solution, at the least this deserves a pr_warn so users know
-> why a reason specified may not be getting requested.
-
-Yes, it deserves a pr_warn here. I will add it. 
-
-Thanks Laura for the review. 
-
-Jason Liu
-> 
-> >
-> >  	err = cma_init_reserved_mem(rmem->base, rmem->size, 0, &cma);
-> >  	if (err) {
-> >
+> Oh yikes, this certainly wasn't what I had in mind! My observation was
+> just that memblock_mem_limit_remove_map(limit) does:
 > 
 > 
-> Thanks,
-> Laura
+>   1. memblock_isolate_range(limit - limit+ULLONG_MAX)
+>   2. memblock_remove_region(all non-nomap regions in the isolated region)
+>   3. truncate reserved regions to limit
+> 
+> and your memblock_cap_memory_range(base, size) does:
+> 
+>   1. memblock_isolate_range(base - base+size)
+>   2, memblock_remove_region(all non-nomap regions above and below the
+>      isolated region)
+>   3. truncate reserved regions around the isolated region
+> 
+> so, assuming we can invert the isolation in one of the cases, then they
+> could share the same underlying implementation.
+
+Please see my simplified patch below which would explain what I meant.
+(Note that the size is calculated by 'max_addr - 0'.)
+
+> I'm probably just missing something here, because the patch you've ended
+> up with is far more involved than I anticipated...
+
+I hope that it will meet almost your anticipation.
+
+Thanks,
+-Takahiro AKASHI
+
+> 
+> Will
+===8<===
+diff --git a/mm/memblock.c b/mm/memblock.c
+index 7608bc3..fea1688 100644
+--- a/mm/memblock.c
++++ b/mm/memblock.c
+@@ -1514,11 +1514,37 @@ void __init memblock_enforce_memory_limit(phys_addr_t limit)
+ 			      (phys_addr_t)ULLONG_MAX);
+ }
+ 
++void __init memblock_cap_memory_range(phys_addr_t base, phys_addr_t size)
++{
++	int start_rgn, end_rgn;
++	int i, ret;
++
++	if (!size)
++		return;
++
++	ret = memblock_isolate_range(&memblock.memory, base, size,
++						&start_rgn, &end_rgn);
++	if (ret)
++		return;
++
++	/* remove all the MAP regions */
++	for (i = memblock.memory.cnt - 1; i >= end_rgn; i--)
++		if (!memblock_is_nomap(&memblock.memory.regions[i]))
++			memblock_remove_region(&memblock.memory, i);
++
++	for (i = start_rgn - 1; i >= 0; i--)
++		if (!memblock_is_nomap(&memblock.memory.regions[i]))
++			memblock_remove_region(&memblock.memory, i);
++
++	/* truncate the reserved regions */
++	memblock_remove_range(&memblock.reserved, 0, base);
++	memblock_remove_range(&memblock.reserved,
++			base + size, (phys_addr_t)ULLONG_MAX);
++}
++
+ void __init memblock_mem_limit_remove_map(phys_addr_t limit)
+ {
+-	struct memblock_type *type = &memblock.memory;
+ 	phys_addr_t max_addr;
+-	int i, ret, start_rgn, end_rgn;
+ 
+ 	if (!limit)
+ 		return;
+@@ -1529,19 +1555,7 @@ void __init memblock_mem_limit_remove_map(phys_addr_t limit)
+ 	if (max_addr == (phys_addr_t)ULLONG_MAX)
+ 		return;
+ 
+-	ret = memblock_isolate_range(type, max_addr, (phys_addr_t)ULLONG_MAX,
+-				&start_rgn, &end_rgn);
+-	if (ret)
+-		return;
+-
+-	/* remove all the MAP regions above the limit */
+-	for (i = end_rgn - 1; i >= start_rgn; i--) {
+-		if (!memblock_is_nomap(&type->regions[i]))
+-			memblock_remove_region(type, i);
+-	}
+-	/* truncate the reserved regions */
+-	memblock_remove_range(&memblock.reserved, max_addr,
+-			      (phys_addr_t)ULLONG_MAX);
++	memblock_cap_memory_range(0, max_addr);
+ }
+ 
+ static int __init_memblock memblock_search(struct memblock_type *type, phys_addr_t addr)
