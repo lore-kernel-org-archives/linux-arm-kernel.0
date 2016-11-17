@@ -1,117 +1,338 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Nov 2016 15:04:35 +0100
-Subject: [PATCH 2/4] soc: renesas: rcar-sysc: add R8A7745 support
+Date: Thu, 17 Nov 2016 15:04:37 +0100
+Subject: [PATCH 4/4] soc: renesas: Identify SoC and register with the SoC bus
 In-Reply-To: <cover.1479389981.git.horms+renesas@verge.net.au>
 References: <cover.1479389981.git.horms+renesas@verge.net.au>
-Message-ID: <c1006fc763279138e963b5a182170b8633a3746e.1479389981.git.horms+renesas@verge.net.au>
+Message-ID: <63ee9e2ba47dbdb42156c9b940515cfd49e78c91.1479389981.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Add support for RZ/G1E (R8A7745) SoC power areas to the R-Car SYSC driver.
+Identify the SoC type and revision, and register this information with
+the SoC bus, so it is available under /sys/devices/soc0/, and can be
+checked where needed using soc_device_match().
 
-Based on the original (and large) patch by Dmitry Shifrin
-<dmitry.shifrin@cogentembedded.com>.
+Identification is done using the Product Register or Common Chip Code
+Register, as declared in DT (PRR only for now), or using a hardcoded
+fallback if missing.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Rob Herring <robh@kernel.org>
+Example:
+
+    Detected Renesas R-Car Gen2 r8a7791 ES1.0
+    ...
+    # cat /sys/devices/soc0/{machine,family,soc_id,revision}
+    Koelsch
+    R-Car Gen2
+    r8a7791
+    ES1.0
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- .../bindings/power/renesas,rcar-sysc.txt           |  1 +
- drivers/soc/renesas/Makefile                       |  1 +
- drivers/soc/renesas/r8a7745-sysc.c                 | 32 ++++++++++++++++++++++
- drivers/soc/renesas/rcar-sysc.c                    |  3 ++
- drivers/soc/renesas/rcar-sysc.h                    |  1 +
- 5 files changed, 38 insertions(+)
- create mode 100644 drivers/soc/renesas/r8a7745-sysc.c
+ arch/arm/mach-shmobile/Kconfig    |   1 +
+ arch/arm64/Kconfig.platforms      |   1 +
+ drivers/soc/renesas/Makefile      |   2 +
+ drivers/soc/renesas/renesas-soc.c | 257 ++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 261 insertions(+)
+ create mode 100644 drivers/soc/renesas/renesas-soc.c
 
-diff --git a/Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt b/Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt
-index c16ec1866ac4..d91715bc8d52 100644
---- a/Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt
-+++ b/Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt
-@@ -8,6 +8,7 @@ and various coprocessors.
- Required properties:
-   - compatible: Must contain exactly one of the following:
-       - "renesas,r8a7743-sysc" (RZ/G1M)
-+      - "renesas,r8a7745-sysc" (RZ/G1E)
-       - "renesas,r8a7779-sysc" (R-Car H1)
-       - "renesas,r8a7790-sysc" (R-Car H2)
-       - "renesas,r8a7791-sysc" (R-Car M2-W)
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 09817bae4558..ebab13e8afa1 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -40,6 +40,7 @@ menuconfig ARCH_RENESAS
+ 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+ 	select NO_IOPORT_MAP
+ 	select PINCTRL
++	select SOC_BUS
+ 	select GPIOLIB
+ 	select ZONE_DMA if ARM_LPAE
+ 
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index cfbdf02ef566..72f4eac5cbbc 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -143,6 +143,7 @@ config ARCH_RENESAS
+ 	select PM
+ 	select PM_GENERIC_DOMAINS
+ 	select RENESAS_IRQC
++	select SOC_BUS
+ 	help
+ 	  This enables support for the ARMv8 based Renesas SoCs.
+ 
 diff --git a/drivers/soc/renesas/Makefile b/drivers/soc/renesas/Makefile
-index 9e0bb329594c..e2249f01b2de 100644
+index e2249f01b2de..91c42b34705f 100644
 --- a/drivers/soc/renesas/Makefile
 +++ b/drivers/soc/renesas/Makefile
-@@ -1,4 +1,5 @@
+@@ -1,3 +1,5 @@
++obj-$(CONFIG_SOC_BUS)		+= renesas-soc.o
++
  obj-$(CONFIG_ARCH_R8A7743)	+= rcar-sysc.o r8a7743-sysc.o
-+obj-$(CONFIG_ARCH_R8A7745)	+= rcar-sysc.o r8a7745-sysc.o
+ obj-$(CONFIG_ARCH_R8A7745)	+= rcar-sysc.o r8a7745-sysc.o
  obj-$(CONFIG_ARCH_R8A7779)	+= rcar-sysc.o r8a7779-sysc.o
- obj-$(CONFIG_ARCH_R8A7790)	+= rcar-sysc.o r8a7790-sysc.o
- obj-$(CONFIG_ARCH_R8A7791)	+= rcar-sysc.o r8a7791-sysc.o
-diff --git a/drivers/soc/renesas/r8a7745-sysc.c b/drivers/soc/renesas/r8a7745-sysc.c
+diff --git a/drivers/soc/renesas/renesas-soc.c b/drivers/soc/renesas/renesas-soc.c
 new file mode 100644
-index 000000000000..d17887c08aa1
+index 000000000000..330960312296
 --- /dev/null
-+++ b/drivers/soc/renesas/r8a7745-sysc.c
-@@ -0,0 +1,32 @@
++++ b/drivers/soc/renesas/renesas-soc.c
+@@ -0,0 +1,257 @@
 +/*
-+ * Renesas RZ/G1E System Controller
++ * Renesas SoC Identification
 + *
-+ * Copyright (C) 2016 Cogent Embedded Inc.
++ * Copyright (C) 2014-2016 Glider bvba
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation; of the License.
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
 +
-+#include <linux/bug.h>
-+#include <linux/kernel.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++#include <linux/string.h>
++#include <linux/sys_soc.h>
 +
-+#include <dt-bindings/power/r8a7745-sysc.h>
 +
-+#include "rcar-sysc.h"
-+
-+static const struct rcar_sysc_area r8a7745_areas[] __initconst = {
-+	{ "always-on",	    0, 0, R8A7745_PD_ALWAYS_ON,	-1, PD_ALWAYS_ON },
-+	{ "ca7-scu",	0x100, 0, R8A7745_PD_CA7_SCU,	R8A7745_PD_ALWAYS_ON,
-+	  PD_SCU },
-+	{ "ca7-cpu0",	0x1c0, 0, R8A7745_PD_CA7_CPU0,	R8A7745_PD_CA7_SCU,
-+	  PD_CPU_NOCR },
-+	{ "ca7-cpu1",	0x1c0, 1, R8A7745_PD_CA7_CPU1,	R8A7745_PD_CA7_SCU,
-+	  PD_CPU_NOCR },
-+	{ "sgx",	 0xc0, 0, R8A7745_PD_SGX,	R8A7745_PD_ALWAYS_ON },
++struct renesas_family {
++	const char name[16];
++	u32 reg;			/* CCCR or PRR, if not in DT */
 +};
 +
-+const struct rcar_sysc_info r8a7745_sysc_info __initconst = {
-+	.areas = r8a7745_areas,
-+	.num_areas = ARRAY_SIZE(r8a7745_areas),
++static const struct renesas_family fam_rcar_gen1 __initconst __maybe_unused = {
++	.name	= "R-Car Gen1",
++	.reg	= 0xff000044,		/* PRR (Product Register) */
 +};
-diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
-index 71acd45b13f0..225c35c79d9a 100644
---- a/drivers/soc/renesas/rcar-sysc.c
-+++ b/drivers/soc/renesas/rcar-sysc.c
-@@ -278,6 +278,9 @@ static const struct of_device_id rcar_sysc_matches[] = {
- #ifdef CONFIG_ARCH_R8A7743
- 	{ .compatible = "renesas,r8a7743-sysc", .data = &r8a7743_sysc_info },
- #endif
-+#ifdef CONFIG_ARCH_R8A7745
-+	{ .compatible = "renesas,r8a7745-sysc", .data = &r8a7745_sysc_info },
++
++static const struct renesas_family fam_rcar_gen2 __initconst __maybe_unused = {
++	.name	= "R-Car Gen2",
++	.reg	= 0xff000044,		/* PRR (Product Register) */
++};
++
++static const struct renesas_family fam_rcar_gen3 __initconst __maybe_unused = {
++	.name	= "R-Car Gen3",
++	.reg	= 0xfff00044,		/* PRR (Product Register) */
++};
++
++static const struct renesas_family fam_rmobile __initconst __maybe_unused = {
++	.name	= "R-Mobile",
++	.reg	= 0xe600101c,		/* CCCR (Common Chip Code Register) */
++};
++
++static const struct renesas_family fam_rza __initconst __maybe_unused = {
++	.name	= "RZ/A",
++};
++
++static const struct renesas_family fam_rzg __initconst __maybe_unused = {
++	.name	= "RZ/G",
++	.reg	= 0xff000044,		/* PRR (Product Register) */
++};
++
++static const struct renesas_family fam_shmobile __initconst __maybe_unused = {
++	.name	= "SH-Mobile",
++	.reg	= 0xe600101c,		/* CCCR (Common Chip Code Register) */
++};
++
++
++struct renesas_soc {
++	const struct renesas_family *family;
++	u8 id;
++};
++
++static const struct renesas_soc soc_rz_a1h __initconst __maybe_unused = {
++	.family	= &fam_rza,
++};
++
++static const struct renesas_soc soc_rmobile_ape6 __initconst __maybe_unused = {
++	.family	= &fam_rmobile,
++	.id	= 0x3f,
++};
++
++static const struct renesas_soc soc_rmobile_a1 __initconst __maybe_unused = {
++	.family	= &fam_rmobile,
++	.id	= 0x40,
++};
++
++static const struct renesas_soc soc_rz_g1m __initconst __maybe_unused = {
++	.family	= &fam_rzg,
++	.id	= 0x47,
++};
++
++static const struct renesas_soc soc_rz_g1e __initconst __maybe_unused = {
++	.family	= &fam_rzg,
++	.id	= 0x4c,
++};
++
++static const struct renesas_soc soc_rcar_m1a __initconst __maybe_unused = {
++	.family	= &fam_rcar_gen1,
++};
++
++static const struct renesas_soc soc_rcar_h1 __initconst __maybe_unused = {
++	.family	= &fam_rcar_gen1,
++	.id	= 0x3b,
++};
++
++static const struct renesas_soc soc_rcar_h2 __initconst __maybe_unused = {
++	.family	= &fam_rcar_gen2,
++	.id	= 0x45,
++};
++
++static const struct renesas_soc soc_rcar_m2_w __initconst __maybe_unused = {
++	.family	= &fam_rcar_gen2,
++	.id	= 0x47,
++};
++
++static const struct renesas_soc soc_rcar_v2h __initconst __maybe_unused = {
++	.family	= &fam_rcar_gen2,
++	.id	= 0x4a,
++};
++
++static const struct renesas_soc soc_rcar_m2_n __initconst __maybe_unused = {
++	.family	= &fam_rcar_gen2,
++	.id	= 0x4b,
++};
++
++static const struct renesas_soc soc_rcar_e2 __initconst __maybe_unused = {
++	.family	= &fam_rcar_gen2,
++	.id	= 0x4c,
++};
++
++static const struct renesas_soc soc_rcar_h3 __initconst __maybe_unused = {
++	.family	= &fam_rcar_gen3,
++	.id	= 0x4f,
++};
++
++static const struct renesas_soc soc_rcar_m3_w __initconst __maybe_unused = {
++	.family	= &fam_rcar_gen3,
++	.id	= 0x52,
++};
++
++static const struct renesas_soc soc_shmobile_ag5 __initconst __maybe_unused = {
++	.family	= &fam_shmobile,
++	.id	= 0x37,
++};
++
++
++static const struct of_device_id renesas_socs[] __initconst = {
++#ifdef CONFIG_ARCH_R7S72100
++	{ .compatible = "renesas,r7s72100",	.data = &soc_rz_a1h },
 +#endif
- #ifdef CONFIG_ARCH_R8A7779
- 	{ .compatible = "renesas,r8a7779-sysc", .data = &r8a7779_sysc_info },
- #endif
-diff --git a/drivers/soc/renesas/rcar-sysc.h b/drivers/soc/renesas/rcar-sysc.h
-index 8ab9ca8a825a..f6e842e2976e 100644
---- a/drivers/soc/renesas/rcar-sysc.h
-+++ b/drivers/soc/renesas/rcar-sysc.h
-@@ -51,6 +51,7 @@ struct rcar_sysc_info {
- };
- 
- extern const struct rcar_sysc_info r8a7743_sysc_info;
-+extern const struct rcar_sysc_info r8a7745_sysc_info;
- extern const struct rcar_sysc_info r8a7779_sysc_info;
- extern const struct rcar_sysc_info r8a7790_sysc_info;
- extern const struct rcar_sysc_info r8a7791_sysc_info;
++#ifdef CONFIG_ARCH_R8A73A4
++	{ .compatible = "renesas,r8a73a4",	.data = &soc_rmobile_ape6 },
++#endif
++#ifdef CONFIG_ARCH_R8A7740
++	{ .compatible = "renesas,r8a7740",	.data = &soc_rmobile_a1 },
++#endif
++#ifdef CONFIG_ARCH_R8A7743
++	{ .compatible = "renesas,r8a7743",	.data = &soc_rz_g1m },
++#endif
++#ifdef CONFIG_ARCH_R8A7745
++	{ .compatible = "renesas,r8a7745",	.data = &soc_rz_g1e },
++#endif
++#ifdef CONFIG_ARCH_R8A7778
++	{ .compatible = "renesas,r8a7778",	.data = &soc_rcar_m1a },
++#endif
++#ifdef CONFIG_ARCH_R8A7779
++	{ .compatible = "renesas,r8a7779",	.data = &soc_rcar_h1 },
++#endif
++#ifdef CONFIG_ARCH_R8A7790
++	{ .compatible = "renesas,r8a7790",	.data = &soc_rcar_h2 },
++#endif
++#ifdef CONFIG_ARCH_R8A7791
++	{ .compatible = "renesas,r8a7791",	.data = &soc_rcar_m2_w },
++#endif
++#ifdef CONFIG_ARCH_R8A7792
++	{ .compatible = "renesas,r8a7792",	.data = &soc_rcar_v2h },
++#endif
++#ifdef CONFIG_ARCH_R8A7793
++	{ .compatible = "renesas,r8a7793",	.data = &soc_rcar_m2_n },
++#endif
++#ifdef CONFIG_ARCH_R8A7794
++	{ .compatible = "renesas,r8a7794",	.data = &soc_rcar_e2 },
++#endif
++#ifdef CONFIG_ARCH_R8A7795
++	{ .compatible = "renesas,r8a7795",	.data = &soc_rcar_h3 },
++#endif
++#ifdef CONFIG_ARCH_R8A7796
++	{ .compatible = "renesas,r8a7796",	.data = &soc_rcar_m3_w },
++#endif
++#ifdef CONFIG_ARCH_SH73A0
++	{ .compatible = "renesas,sh73a0",	.data = &soc_shmobile_ag5 },
++#endif
++	{ /* sentinel */ }
++};
++
++static int __init renesas_soc_init(void)
++{
++	struct soc_device_attribute *soc_dev_attr;
++	const struct renesas_family *family;
++	const struct of_device_id *match;
++	const struct renesas_soc *soc;
++	void __iomem *chipid = NULL;
++	struct soc_device *soc_dev;
++	struct device_node *np;
++	unsigned int product;
++
++	match = of_match_node(renesas_socs, of_root);
++	if (!match)
++		return -ENODEV;
++
++	soc = match->data;
++	family = soc->family;
++
++	/* Try PRR first, then hardcoded fallback */
++	np = of_find_compatible_node(NULL, NULL, "renesas,prr");
++	if (np) {
++		chipid = of_iomap(np, 0);
++		of_node_put(np);
++	} else if (soc->id) {
++		chipid = ioremap(family->reg, 4);
++	}
++	if (chipid) {
++		product = readl(chipid);
++		iounmap(chipid);
++		if (soc->id && ((product >> 8) & 0xff) != soc->id) {
++			pr_warn("SoC mismatch (product = 0x%x)\n", product);
++			return -ENODEV;
++		}
++	}
++
++	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
++	if (!soc_dev_attr)
++		return -ENOMEM;
++
++	np = of_find_node_by_path("/");
++	of_property_read_string(np, "model", &soc_dev_attr->machine);
++	of_node_put(np);
++
++	soc_dev_attr->family = kstrdup_const(family->name, GFP_KERNEL);
++	soc_dev_attr->soc_id = kstrdup_const(strchr(match->compatible, ',') + 1,
++					     GFP_KERNEL);
++	if (chipid)
++		soc_dev_attr->revision = kasprintf(GFP_KERNEL, "ES%u.%u",
++						   ((product >> 4) & 0x0f) + 1,
++						   product & 0xf);
++
++	pr_info("Detected Renesas %s %s %s\n", soc_dev_attr->family,
++		soc_dev_attr->soc_id, soc_dev_attr->revision ?: "");
++
++	soc_dev = soc_device_register(soc_dev_attr);
++	if (IS_ERR(soc_dev)) {
++		kfree(soc_dev_attr->revision);
++		kfree_const(soc_dev_attr->soc_id);
++		kfree_const(soc_dev_attr->family);
++		kfree(soc_dev_attr);
++		return PTR_ERR(soc_dev);
++	}
++
++	return 0;
++}
++core_initcall(renesas_soc_init);
 -- 
 2.7.0.rc3.207.g0ac5344
