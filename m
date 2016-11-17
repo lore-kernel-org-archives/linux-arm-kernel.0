@@ -1,108 +1,85 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 17 Nov 2016 20:52:43 +1030
-Subject: [RFC PATCH] mfd: dt: Add Aspeed LPC binding
-In-Reply-To: <CACRpkdazPEbU2gmDyke=GTYtjVp8aeauS+PVkp-zuiVoVz7kbw@mail.gmail.com>
-References: <20161117060633.3837-1-andrew@aj.id.au>
- <CACRpkdazPEbU2gmDyke=GTYtjVp8aeauS+PVkp-zuiVoVz7kbw@mail.gmail.com>
-Message-ID: <CACPK8XfuKQErSpncXmY04h10PNj5KDhhNGXqa6ZmfPhZj7p8bw@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 17 Nov 2016 11:32:38 +0100
+Subject: [PATCH 4.8 65/92] Revert "clocksource/drivers/timer_sun5i: Replace
+ code by clocksource_mmio_init"
+In-Reply-To: <20161117103224.218007793@linuxfoundation.org>
+References: <20161117103224.218007793@linuxfoundation.org>
+Message-ID: <20161117103227.073195108@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Linus,
+4.8-stable review patch.  If anyone has any objections, please let me know.
 
-On Thu, Nov 17, 2016 at 8:00 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Nov 17, 2016 at 7:06 AM, Andrew Jeffery <andrew@aj.id.au> wrote:
->
->> +* Device tree bindings for the Aspeed LPC Controller
->
-> We are going overboard with the lingo sometimes, to the point that we do not
-> understand how terse things become.
->
-> LPC = Low Pin Count, right?
-> Explain that right here: it is a slow external bus, right?
+------------------
 
-Yep. 33MHz bus that generally connects a host CPU to other devices on
-the same motherboard, such as management controllers.
+From: Chen-Yu Tsai <wens@csie.org>
 
-https://en.wikipedia.org/wiki/Low_Pin_Count
+commit 593876838826914a7e4e05fbbcb728be6fbc4d89 upstream.
 
-Systems with Aspeed BMCs use the LPC to load the firmware from the BMC
-into the host at boot, and send IPMI messages between the host and the
-BMC.
+struct clocksource is also used by the clk notifier callback, to
+unregister and re-register the clocksource with a different clock rate.
+clocksource_mmio_init does not pass back a pointer to the struct used,
+and the clk notifier callback assumes that the struct clocksource in
+struct sun5i_timer_clksrc is valid. This results in a kernel NULL
+pointer dereference when the hstimer clock is changed:
 
-BMC stands for Baseboard Management Controller. Back in the day it was
-simple keyboard controller microcontroller, these days we use a 800MHz
-ARM11 with half a gigabyte of RAM. It provides access to the boot
-firmware for the host CPU, monitors the health of the system (fans,
-temperature, error logging), and provides remote access for power
-cycling and installation.
+Unable to handle kernel NULL pointer dereference at virtual address 00000004
+[<c03a4678>] (clocksource_unbind) from [<c03a46d4>] (clocksource_unregister+0x2c/0x44)
+[<c03a46d4>] (clocksource_unregister) from [<c0a6f350>] (sun5i_rate_cb_clksrc+0x34/0x3c)
+[<c0a6f350>] (sun5i_rate_cb_clksrc) from [<c035ea50>] (notifier_call_chain+0x44/0x84)
+[<c035ea50>] (notifier_call_chain) from [<c035edc0>] (__srcu_notifier_call_chain+0x44/0x60)
+[<c035edc0>] (__srcu_notifier_call_chain) from [<c035edf4>] (srcu_notifier_call_chain+0x18/0x20)
+[<c035edf4>] (srcu_notifier_call_chain) from [<c0670174>] (__clk_notify+0x70/0x7c)
+[<c0670174>] (__clk_notify) from [<c06702c0>] (clk_propagate_rate_change+0xa4/0xc4)
+[<c06702c0>] (clk_propagate_rate_change) from [<c0670288>] (clk_propagate_rate_change+0x6c/0xc4)
 
-https://en.wikipedia.org/wiki/Intelligent_Platform_Management_Interface#Baseboard_management_controller
+Revert the commit for now. clocksource_mmio_init can be made to pass back
+a pointer, but the code churn and usage of an inner struct might not be
+worth it.
 
-Andrew and I work on an open source project that is creating a new BMC
-software stack called OpenBMC. You've been merging the wonderful
-Aspeed pinmux patches that Andrew wrote recently, which was a major
-bit of kernel work required for that project.
+Fixes: 157dfadef832 ("clocksource/drivers/timer_sun5i: Replace code by clocksource_mmio_init")
+Reported-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Cc: linux-sunxi at googlegroups.com
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Link: http://lkml.kernel.org/r/20161018054918.26855-1-wens at csie.org
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
->> +The Aspeed LPC controller contains registers for a variety of functions. Not
->> +all registers for a function are contiguous, and some registers are referenced
->> +by functions outside the LPC controller.
->> +
->> +Note that this is separate from the H8S/2168 compatible register set occupying
->> +the start of the LPC controller address space.
->> +
->> +Some significant functions in the LPC controller:
->> +
->> +* LPC Host Controller
->> +* Host Interface Controller
->
-> Host interface to what?
+---
+ drivers/clocksource/timer-sun5i.c |   16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
 
-Host in this case is the CPU on the motherboard to do the heavy
-lifting. x86, ARM64, PowerPC. So this is the BMC's interface to the
-host.
-
->
->> +* iBT Controller
->
-> What is iBT?
-
-IPMI Byte Transfer? Something like that. It's the transport that the
-host uses to send IPMI messages to the BMC and back.
-
-The host side has been upstream for a while. The BMC side has a driver
-staged for v4.10:
-
-https://patchwork.ozlabs.org/patch/674973/
-
-If you're really bored you can read up on IPMI from the specificaiton:
-
- http://www.intel.com/content/www/us/en/servers/ipmi/ipmi-second-gen-interface-spec-v2-rev1-1.html
-
-tl;dr is it's a protocol for communication to the BMC. There is
-in-band IPMI, which is between the host and the BMC over the eg. the
-BT interface. Or out of band IPMI, which is where you use ipmitool
-from your laptop to talk to the BMC over the network.
-
->
->> +* SuperIO Scratch registers
->
-> Again more context please.
-
-The SuperIO name is legacy x86 terminology. These are a few bytes
-worth of data that can be set from one side and read by the other in
-order to convey firmware-specific information. In OpenPower systems,
-we use them to tell the host where to send it's console output when it
-is booting.
-
-> With standards documents, either explain everything or provide
-> pointers for the information.
-
-If only we could give you the pleasure of reading the Aspeed reference
-manual. It's only available from Aspeed under NDA at this point in
-time though. If you want further details on anything else then Andrew,
-Ben or myself can explain.
-
-Cheers,
-
-Joel
+--- a/drivers/clocksource/timer-sun5i.c
++++ b/drivers/clocksource/timer-sun5i.c
+@@ -152,6 +152,13 @@ static irqreturn_t sun5i_timer_interrupt
+ 	return IRQ_HANDLED;
+ }
+ 
++static cycle_t sun5i_clksrc_read(struct clocksource *clksrc)
++{
++	struct sun5i_timer_clksrc *cs = to_sun5i_timer_clksrc(clksrc);
++
++	return ~readl(cs->timer.base + TIMER_CNTVAL_LO_REG(1));
++}
++
+ static int sun5i_rate_cb_clksrc(struct notifier_block *nb,
+ 				unsigned long event, void *data)
+ {
+@@ -210,8 +217,13 @@ static int __init sun5i_setup_clocksourc
+ 	writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
+ 	       base + TIMER_CTL_REG(1));
+ 
+-	ret = clocksource_mmio_init(base + TIMER_CNTVAL_LO_REG(1), node->name,
+-				    rate, 340, 32, clocksource_mmio_readl_down);
++	cs->clksrc.name = node->name;
++	cs->clksrc.rating = 340;
++	cs->clksrc.read = sun5i_clksrc_read;
++	cs->clksrc.mask = CLOCKSOURCE_MASK(32);
++	cs->clksrc.flags = CLOCK_SOURCE_IS_CONTINUOUS;
++
++	ret = clocksource_register_hz(&cs->clksrc, rate);
+ 	if (ret) {
+ 		pr_err("Couldn't register clock source.\n");
+ 		goto err_remove_notifier;
