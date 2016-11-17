@@ -1,169 +1,32 @@
-From: yao.yuan@nxp.com (Yao Yuan)
-Date: Thu, 17 Nov 2016 09:14:21 +0000
-Subject: [PATCH v3 6/9] mtd: spi-nor: Support R/W for S25FS-S family flash
-In-Reply-To: <AM4PR0701MB2130273C90BE0EE615382718FEB10@AM4PR0701MB2130.eurprd07.prod.outlook.com>
-References: <1471505884-33996-1-git-send-email-B56489@freescale.com>
- <1471505884-33996-6-git-send-email-B56489@freescale.com>
- <CA+EcR20NkBzFjMJ_ArWw9ALZY-x1SqwS1nUyGYAnjsygTk8K-Q@mail.gmail.com>
- <AM4PR0701MB21308B262DB7B94E0F7FC34EFEF00@AM4PR0701MB2130.eurprd07.prod.outlook.com>
- <20161116171058.GA21300@Cayman.am.freescale.net>
- <AM4PR0701MB2130273C90BE0EE615382718FEB10@AM4PR0701MB2130.eurprd07.prod.outlook.com>
-Message-ID: <DB6PR0401MB24077A46D3FC5147DC4C69D989B10@DB6PR0401MB2407.eurprd04.prod.outlook.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Nov 2016 10:16:15 +0100
+Subject: [RFC PATCH] mfd: dt: Add Aspeed LPC binding
+In-Reply-To: <20161117060633.3837-1-andrew@aj.id.au>
+References: <20161117060633.3837-1-andrew@aj.id.au>
+Message-ID: <4751029.AudB7s5avo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2016 at 06:50:55AM +0000, Krzeminski, Marcin (Nokia - PL/Wroclaw) wrote:
-> > > > On Thu, Aug 18, 2016 at 2:38 AM, Yunhui Cui <B56489@freescale.com>
-> > > > wrote:
-> > > > > From: Yunhui Cui <yunhui.cui@nxp.com>
-> > > > >
-> > > > > With the physical sectors combination, S25FS-S family flash
-> > > > > requires some special operations for read/write functions.
-> > > > >
-> > > > > Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
-> > > > > ---
-> > > > >  drivers/mtd/spi-nor/spi-nor.c | 56
-> > > > > +++++++++++++++++++++++++++++++++++++++++++
-> > > > >  1 file changed, 56 insertions(+)
-> > > > >
-> > > > > diff --git a/drivers/mtd/spi-nor/spi-nor.c
-> > > > > b/drivers/mtd/spi-nor/spi-nor.c index d0fc165..495d0bb 100644
-> > > > > --- a/drivers/mtd/spi-nor/spi-nor.c
-> > > > > +++ b/drivers/mtd/spi-nor/spi-nor.c
-> > > > > @@ -39,6 +39,10 @@
-> > > > >
-> > > > >  #define SPI_NOR_MAX_ID_LEN     6
-> > > > >  #define SPI_NOR_MAX_ADDR_WIDTH 4
-> > > > > +/* Added for S25FS-S family flash */
-> > > > > +#define SPINOR_CONFIG_REG3_OFFSET      0x800004
-> > > > > +#define CR3V_4KB_ERASE_UNABLE  0x8 #define
-> > > > > +SPINOR_S25FS_FAMILY_EXT_JEDEC  0x81
-> > > > >
-> > > > >  struct flash_info {
-> > > > >         char            *name;
-> > > > > @@ -78,6 +82,7 @@ struct flash_info {  };
-> > > > >
-> > > > >  #define JEDEC_MFR(info)        ((info)->id[0])
-> > > > > +#define EXT_JEDEC(info)        ((info)->id[5])
-> > > > >
-> > > > >  static const struct flash_info *spi_nor_match_id(const char
-> > > > > *name);
-> > > > >
-> > > > > @@ -899,6 +904,7 @@ static const struct flash_info spi_nor_ids[] = {
-> > > > >          */
-> > > > >         { "s25sl032p",  INFO(0x010215, 0x4d00,  64 * 1024,  64,
-> > > > SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
-> > > > >         { "s25sl064p",  INFO(0x010216, 0x4d00,  64 * 1024, 128,
-> > > > > SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
-> > > > > +       { "s25fs256s1", INFO6(0x010219, 0x4d0181, 64 * 1024,
-> > > > > + 512, 0)},
-> > > > >         { "s25fl256s0", INFO(0x010219, 0x4d00, 256 * 1024, 128, 0) },
-> > > > >         { "s25fl256s1", INFO(0x010219, 0x4d01,  64 * 1024, 512,
-> > > > SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
-> > > > >         { "s25fl512s",  INFO(0x010220, 0x4d00, 256 * 1024, 256,
-> > > > > SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) }, @@ -1036,6
-> > +1042,50
-> > > > @@ static const struct flash_info *spi_nor_read_id(struct spi_nor
-> > > > *nor)
-> > > > >         return ERR_PTR(-ENODEV);  }
-> > > > >
-> > > > > +/*
-> > > > > + * The S25FS-S family physical sectors may be configured as a
-> > > > > + * hybrid combination of eight 4-kB parameter sectors
-> > > > > + * at the top or bottom of the address space with all
-> > > > > + * but one of the remaining sectors being uniform size.
-> > > > > + * The Parameter Sector Erase commands (20h or 21h) must
-> > > > > + * be used to erase the 4-kB parameter sectors individually.
-> > > > > + * The Sector (uniform sector) Erase commands (D8h or DCh)
-> > > > > + * must be used to erase any of the remaining
-> > > > > + * sectors, including the portion of highest or lowest address
-> > > > > + * sector that is not overlaid by the parameter sectors.
-> > > > > + * The uniform sector erase command has no effect on parameter
-> > > > sectors.
-> > > > > + */
-> > > > > +static int spansion_s25fs_disable_4kb_erase(struct spi_nor *nor) {
-> > > > > +       u32 cr3v_addr  = SPINOR_CONFIG_REG3_OFFSET;
-> > > > > +       u8 cr3v = 0x0;
-> > > > > +       int ret = 0x0;
-> > > > > +
-> > > > > +       nor->cmd_buf[2] = cr3v_addr >> 16;
-> > > > > +       nor->cmd_buf[1] = cr3v_addr >> 8;
-> > > > > +       nor->cmd_buf[0] = cr3v_addr >> 0;
-> > > > > +
-> > > > > +       ret = nor->read_reg(nor, SPINOR_OP_SPANSION_RDAR, &cr3v, 1);
-> > > > > +       if (ret)
-> > > > > +               return ret;
-> > > > > +       if (cr3v & CR3V_4KB_ERASE_UNABLE)
-> > > > > +               return 0;
-> > > > > +       ret = nor->write_reg(nor, SPINOR_OP_WREN, NULL, 0);
-> > > > > +       if (ret)
-> > > > > +               return ret;
-> > > > > +       cr3v = CR3V_4KB_ERASE_UNABLE;
-> > > > > +       nor->program_opcode = SPINOR_OP_SPANSION_WRAR;
-> > > > > +       nor->write(nor, cr3v_addr, 1, &cr3v);
-> > > > > +
-> > > > > +       ret = nor->read_reg(nor, SPINOR_OP_SPANSION_RDAR, &cr3v, 1);
-> > > > > +       if (ret)
-> > > > > +               return ret;
-> > > > > +       if (!(cr3v & CR3V_4KB_ERASE_UNABLE))
-> > > > > +               return -EPERM;
-> > > > > +
-> > > > > +       return 0;
-> > > > > +}
-> > > > > +
-> > > > >  static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
-> > > > >                         size_t *retlen, u_char *buf)  { @@
-> > > > > -1361,6
-> > > > > +1411,12 @@ int spi_nor_scan(struct spi_nor *nor, const char
-> > > > > +*name,
-> > > > enum read_mode mode)
-> > > > >                 spi_nor_wait_till_ready(nor);
-> > > > >         }
-> > > > >
-> > > > > +       if (EXT_JEDEC(info) == SPINOR_S25FS_FAMILY_EXT_JEDEC) {
-> > > > > +               ret = spansion_s25fs_disable_4kb_erase(nor);
-> > > > > +               if (ret)
-> > > > > +                       return ret;
-> > > > > +       }
-> > > > > +
-> > > > >         if (!mtd->name)
-> > > > >                 mtd->name = dev_name(dev);
-> > > > >         mtd->priv = nor;
-> > > > > --
-> > > > > 2.1.0.27.g96db324
-> > > > >
-> > > > >
-> > > > Hi Brian, I will ack this change but still feel it's kind of hacking code.
-> > > >
-> > > > Acked-by: Han xu <han.xu@nxp.com>
-> > >
-> > > I am new on the list so I am not sure if this topic has been discussed.
-> > > Generally our product functionality relay on those 4KiB sectors.
-> > > I know that this hack is already in u-boot, but if you mainstream
-> > > this you will force users of those 4KiB sectors to do hack the hack...
-> > > I believe the proper solution here is to use erase regions
-> > > functionality, I send and RFS about that some time ago.
-> >
-> > Do you mind to send me a link for reference?
-> >
-> Han,
+On Thursday, November 17, 2016 4:36:33 PM CET Andrew Jeffery wrote:
+> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> ---
 > 
-> Sorry, It seem I have not posted erase region changes (only those regarding
-> DUAL/QUAD I/O).
-> Generally, in this flash you need to create 3 erase regions (because in FS-S
-> family support only  4KiB erase on parameters sector - eg. 1.2.2.4 in S25FS512S).
-> In my case regions are:
-> 1. 0-32KiB (8*4KiB) - 4K_ERASE (0x20/0x21) 2. 32 - 256 - SE_CMD (0xd8/0xdc) 3.
-> Rest of the flash SE_CMD (0xd8/0xdc)
+> I'd like to start a discussion about how to handle the LPC register space in
+> the Aspeed SoC. There are a number of issues, largely concerned with the layout
+> of the registers but also with the fact that LPC register state is used by the
+> pinmux to determine some pin functionality.
+...
 > 
-> To erase whole flash you can also use CHIP_ERASE_CMD (0x60/0xC7) command,
-> you just need to add one more mtd partition that will cover whole flash.
-> 
+> What is the recommended approach to managing such hardware?
 
-Hi Krzeminski,
+Can you clarify which side of the LPC bus this is? We are currently having
+a discussion for how to integrate the LPC master on an ARM64 server that
+uses LPC to access an Aspeed LPC slave. For this one we want to use the
+traditional ISA DT binding.
 
-Do you think is there any great advantages for enable 4KB?
-Because for NXP(Freescale) QSPI controller, there is only support max to 16 groups command.
+I'm guessing that you are interesting in the other side here, for mapping
+the registers of the LPC slave on the Aspeed BMC, but that's not clear from
+your email, as I'm assuming that the same chip has both master and slave
+interfaces.
 
-So It's hard to give 3 groups command just for erase (0x21,0xdc and 0xc7).
-So we have to disable the 4kb erase and only use 256kbytes in this patch.
+	Arnd
