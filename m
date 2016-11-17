@@ -1,36 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Nov 2016 15:13:53 +0100
-Subject: [RFC PATCH] of: base: add support to get machine model name
-In-Reply-To: <622ddcbc-69b9-98f2-51f3-e256764ecb93@arm.com>
-References: <1479383450-19183-1-git-send-email-sudeep.holla@arm.com>
- <3670336.mMHByOpDl4@wuerfel> <622ddcbc-69b9-98f2-51f3-e256764ecb93@arm.com>
-Message-ID: <2202339.ajrKjCY7Ro@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Nov 2016 14:22:13 +0000
+Subject: [PATCH next] arm64: remove "SMP: Total of %d processors
+ activated." message
+In-Reply-To: <1479367946-38771-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1479367946-38771-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <20161117142213.GI22855@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 17, 2016 2:08:30 PM CET Sudeep Holla wrote:
-> On 17/11/16 13:50, Arnd Bergmann wrote:
-> > On Thursday, November 17, 2016 11:50:50 AM CET Sudeep Holla wrote:
-> >> Currently platforms/drivers needing to get the machine model name are
-> >> replicating the same snippet of code. In some case, the OF reference
-> >> counting is either missing or incorrect.
-> >>
-> >> This patch adds support to read the machine model name either using
-> >> the "model" or the "compatible" property in the device tree root node.
-> >>
-> >> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> >
-> > I like the idea. One small comment:
-> >
+On Thu, Nov 17, 2016 at 03:32:26PM +0800, Kefeng Wang wrote:
+> There is a common SMP boot message in generic code on all arches,
+> kill "SMP: Total of %d processors activated." in smp_cpus_done()
+> on arm64.
 > 
-> Thanks. I prefer it as single patch but it can't be applied to any tree.
-> Any suggestions on handling this patch to fix the warning in -next ?
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
+> Boot message on qemu.
+> [    0.375116] smp: Brought up 1 node, 8 CPUs
+> [    0.383749] SMP: Total of 8 processors activated.
 > 
-The patch that causes the warning is currently in the mmc tree, and I
-don't think it would be good to have your entire patch in there too.
+>  arch/arm64/kernel/smp.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index cb87234..9db4a95 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -428,7 +428,6 @@ static void __init hyp_mode_check(void)
+>  
+>  void __init smp_cpus_done(unsigned int max_cpus)
+>  {
+> -	pr_info("SMP: Total of %d processors activated.\n", num_online_cpus());
+>  	setup_cpu_features();
+>  	hyp_mode_check();
+>  	apply_alternatives_all();
 
-It's probably best to just fix the warning there now by adding another
-open-coded copy of that function, and then apply your patch on top
-for v4.11.
+Why? Are you proposing the same change to other architectures? Are you paid
+per patch?
 
-	Arnd
+Will
