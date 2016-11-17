@@ -1,34 +1,53 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Thu, 17 Nov 2016 17:46:47 +0530
-Subject: [PATCH 0/4] Fixes for Vybrid SPI DMA implementation
-In-Reply-To: <20161111122036.fubv7b4jc5vkdxhc@sirena.org.uk>
+Date: Thu, 17 Nov 2016 17:46:48 +0530
+Subject: [PATCH 1/4] spi: spi-fsl-dspi: Fix SPI transfer issue when using
+ multiple SPI_IOC_MESSAGE
+In-Reply-To: <cover.1479384571.git.maitysanchayan@gmail.com>
 References: <20161111122036.fubv7b4jc5vkdxhc@sirena.org.uk>
-Message-ID: <cover.1479384571.git.maitysanchayan@gmail.com>
+ <cover.1479384571.git.maitysanchayan@gmail.com>
+Message-ID: <bbdbc8df434dd2af74eb351b799a2812a1c1967e.1479384571.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Current DMA implementation had a bug where the DMA transfer would
+exit the loop in dspi_transfer_one_message after the completion of
+a single transfer. This results in a multi message transfer submitted
+with SPI_IOC_MESSAGE to terminate incorrectly without an error.
 
-The following set of patches have fixes for Vybrid SPI DMA
-implementation along with some minor clean ups requested
-at time when v3 version of SPI DMA support patch was accepted. 
+Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+---
+ drivers/spi/spi-fsl-dspi.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-This series of patches is based on top of branch topic/fsl-dspi.
-http://git.kernel.org/cgit/linux/kernel/git/broonie/spi.git/log/?h=topic/fsl-dspi
-
-The patches have been tested on a Toradex Colibri Vybrid VF61 module.
-
-Thanks & Regards,
-Sanchayan.
-
-Sanchayan Maity (4):
-  spi: spi-fsl-dspi: Fix SPI transfer issue when using multiple SPI_IOC_MESSAGE
-  spi: spi-fsl-dspi: Fix incorrect DMA setup
-  spi: spi-fsl-dspi: Fix continuous selection format
-  spi: spi-fsl-dspi: Minor code cleanup and error path fixes
-
- drivers/spi/spi-fsl-dspi.c | 69 ++++++++++++++++++++++++++++++++++------------
- 1 file changed, 51 insertions(+), 18 deletions(-)
-
+diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
+index bc64700..b1ee1f5 100644
+--- a/drivers/spi/spi-fsl-dspi.c
++++ b/drivers/spi/spi-fsl-dspi.c
+@@ -714,7 +714,7 @@ static int dspi_transfer_one_message(struct spi_master *master,
+ 				SPI_RSER_TFFFE | SPI_RSER_TFFFD |
+ 				SPI_RSER_RFDFE | SPI_RSER_RFDFD);
+ 			status = dspi_dma_xfer(dspi);
+-			goto out;
++			break;
+ 		default:
+ 			dev_err(&dspi->pdev->dev, "unsupported trans_mode %u\n",
+ 				trans_mode);
+@@ -722,9 +722,13 @@ static int dspi_transfer_one_message(struct spi_master *master,
+ 			goto out;
+ 		}
+ 
+-		if (wait_event_interruptible(dspi->waitq, dspi->waitflags))
+-			dev_err(&dspi->pdev->dev, "wait transfer complete fail!\n");
+-		dspi->waitflags = 0;
++		if (trans_mode != DSPI_DMA_MODE) {
++			if (wait_event_interruptible(dspi->waitq,
++						dspi->waitflags))
++				dev_err(&dspi->pdev->dev,
++					"wait transfer complete fail!\n");
++			dspi->waitflags = 0;
++		}
+ 
+ 		if (transfer->delay_usecs)
+ 			udelay(transfer->delay_usecs);
 -- 
 2.10.2
