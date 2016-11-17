@@ -1,39 +1,70 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 17 Nov 2016 10:08:28 +0100
-Subject: [PATCH] pinctrl: sunxi: fix theoretical uninitialized variable
- access
-In-Reply-To: <20161116203358.midi7vmaqirpywtt@lukather>
-References: <20161116141841.2030776-1-arnd@arndb.de>
- <20161116203358.midi7vmaqirpywtt@lukather>
-Message-ID: <CACRpkdYk25q9P5sErnfHcH49BT43vCCDihsZNEsf-6Gvpq+Pww@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 17 Nov 2016 10:12:01 +0100
+Subject: [PATCH v2 2/3] soc: rockchip: add driver handling grf setup
+In-Reply-To: <a01a1a8c-b01b-4335-b69c-bb99dec9d6d6@rock-chips.com>
+References: <20161115223900.30728-1-heiko@sntech.de> <5037506.GEHFh4fruS@phil>
+ <a01a1a8c-b01b-4335-b69c-bb99dec9d6d6@rock-chips.com>
+Message-ID: <3512052.5NJHIQHqMY@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2016 at 9:33 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+Am Donnerstag, 17. November 2016, 09:38:11 CET schrieb Shawn Lin:
+> Hi Heiko,
+> 
+> ? 2016/11/16 17:58, Heiko Stuebner ??:
+> > Hi Shawn,
+> > 
+> > Am Mittwoch, 16. November 2016, 17:33:21 CET schrieb Shawn Lin:
+> >> ? 2016/11/16 6:38, Heiko Stuebner ??:
+> >>> The General Register Files are an area of registers containing a lot
+> >>> of single-bit settings for numerous components as well full components
+> >>> like usbphy control. Therefore all used components are accessed
+> >>> via the syscon provided by the grf nodes or from the sub-devices
+> >>> created through the simple-mfd created from the grf node.
+> 
+> ----8<----------------
+> [...]
+> 
+> >>> +	for (i = 0; i < grf_info->num_values; i++) {
+> >>> +		const struct rockchip_grf_value *val = &grf_info->values[i];
+> >>> +
+> >>> +		pr_debug("%s: adjusting %s in %#6x to %#10x\n", __func__,
+> >>> +			val->desc, val->reg, val->val);
+> >>> +		ret = regmap_write(grf, val->reg, val->val);
+> >>> +		if (ret < 0)
+> >>> +			pr_err("%s: write to %#6x failed with %d\n",
+> >>> +			       __func__, val->reg, ret);
+> >> 
+> >> So, when failing to do one of the settings, should we still let it goes?
+> >> Sometimes the log of postcore_initcall is easy to be neglected when
+> >> people finally find problems later but the very earlier log was missing
+> >> due to whatever reason like buffer limitation, etc.
+> > 
+> > I expect errors here to be very rare. I.e. Doug thought that regmap might
+> > return errors if we write outside the mapped region, which would mean
+> > someone really messed up in this core component or a core-element of the
+> > dts. But in general the GRF is always a mmio-regmap, so there won't be
+> > any i2c/spi/ whatever errors possible.
+> 
+> I was just thinking about the scalability that in the future some of the
+> GRF settings may depend on genpd or clock even if they are only a
+> mmio-regmap but they don't belong to the general pd/clock for GRF, for
+> instance, some of the PHYs' or controller's cap(like emmc) settings.
+> 
+> But, IIRC, you suggested this driver shouldn't be a catchall, and we
+> now ask the drivers of controllers and phys to take over this, so I
+> guess we won't put those settings here ever. :)
+> 
+> Thanks for explaining this.
 
-> On Wed, Nov 16, 2016 at 03:18:18PM +0100, Arnd Bergmann wrote:
->> gcc warns about a  way that it could use an uninitialized variable:
->>
->> drivers/pinctrl/sunxi/pinctrl-sunxi.c: In function 'sunxi_pinctrl_init':
->> drivers/pinctrl/sunxi/pinctrl-sunxi.c:1191:8: error: 'best_div' may be used uninitialized in this function [-Werror=maybe-uninitialized]
->>
->> This cannot really happen except if 'freq' is UINT_MAX and 'clock' is
->> zero, and both of these are forbidden. To shut up the warning anyway,
->> this changes the logic to initialize the return code to the first
->> divider value before looking at the others.
->>
->> Fixes: 7c926492d38a ("pinctrl: sunxi: Add support for interrupt debouncing")
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->
-> Thanks for that patch.
->
-> Just out of curiosity, which gcc gives those warnings? I have 6.2 and
-> it didn't output anything..
+correct, it should never become a catchall as things like those phy-subdevices 
+that need runtime handling should definitly be handled in their respective 
+drivers.
 
-Context: Arnd re-enabled -Werror=maybe-uninitialized
-in the kernel build and this kind of stuff started to appear so
-it needs to be fixed up.
+So far we're also always starting with all clocks and power-domains being on, 
+so settings should always succeed as we're only active during early boot here.
+We'll simply have to reevaluate if some new soc begins to boot with some 
+needed clocks/power-domains being off.
 
-Yours,
-Linus Walleij
+
+Heiko
