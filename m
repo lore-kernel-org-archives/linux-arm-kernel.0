@@ -1,22 +1,21 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 17 Nov 2016 15:12:29 -0800
-Subject: [PATCH v3 1/3] dt-bindings: firmware: scm: Add MSM8996 DT bindings
-In-Reply-To: <1479259165-1601-2-git-send-email-spjoshi@codeaurora.org>
-References: <1479259165-1601-1-git-send-email-spjoshi@codeaurora.org>
- <1479259165-1601-2-git-send-email-spjoshi@codeaurora.org>
-Message-ID: <20161117231229.GT25626@codeaurora.org>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Thu, 17 Nov 2016 18:25:01 -0500
+Subject: [PATCH 0/2] arm64: dts: NS2: Add sdio1, PCI phys
+Message-ID: <1479425103-2119-1-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15, Sarangdhar Joshi wrote:
-> Add SCM DT bindings for Qualcomm's MSM8996 platform.
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
-> ---
+The second SDIO seems to have been forgotten to be enabled in the
+Northstar2 SVK dts.  Also, the PCI PHY entries are missing from the PCI
+bus device tree entries.
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Jon Mason (2):
+  arm64: dts: NS2: enable sdio1
+  arm64: dts: NS2: Add PCI PHYs
+
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts | 4 ++++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi    | 6 ++++++
+ 2 files changed, 10 insertions(+)
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.7.4
