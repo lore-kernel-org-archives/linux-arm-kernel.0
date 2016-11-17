@@ -1,48 +1,35 @@
-From: abhimanyu.saini@nxp.com (Abhimanyu Saini)
-Date: Thu, 17 Nov 2016 12:31:03 +0000
-Subject: [RESEND][PATCH 6/6] arm64: Add DTS support for FSL's LS2088A SoC
-In-Reply-To: <20161114063346.GH3310@dragon>
-References: <1478597664-14799-1-git-send-email-abhimanyu.saini@nxp.com>
- <1478597664-14799-7-git-send-email-abhimanyu.saini@nxp.com>
- <20161114063346.GH3310@dragon>
-Message-ID: <AM2PR04MB059660B0CD1A643A1AB75C08EDB10@AM2PR04MB0596.eurprd04.prod.outlook.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Nov 2016 13:35:45 +0100
+Subject: [PATCH] ARM: Drop fixed 200 Hz timer requirement from Exynos
+ platforms
+In-Reply-To: <1479148025-469-1-git-send-email-krzk@kernel.org>
+References: <1479148025-469-1-git-send-email-krzk@kernel.org>
+Message-ID: <3145378.USf2WOPoV2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Following levels of DTSI/DTS files have been created for the LS2088A
-> > SoC family:
-> >
-> >      - fsl-ls2088a.dtsi:
-> >             DTS-Include file for FSL LS2088A SoC.
-> >
-> >      - fsl-ls2088a-qds.dts:
-> >             DTS file for FSL LS2088A QDS board.
-> >
-> >      - fsl-ls2088a-rdb.dts:
-> >             DTS file for FSL LS2088A RDB board.
-> 
-> I compared the following files.
-> 
->  fsl-ls2088a.dtsi vs. fsl-ls2080a.dtsi
->  fsl-ls2088a-qds.dtsi vs. fsl-ls2080a-qds.dtsi  fsl-ls2088a-rdb.dtsi vs.
-> fsl-ls2080a-rdb.dtsi
-> 
-> They are basically identical except a couple of small changes.  Can we do
-> something to have these SoCs share the dts files at some level to avoid
-> maintaining duplicated files?
+On Monday, November 14, 2016 8:27:05 PM CET Krzysztof Kozlowski wrote:
+> @@ -1497,7 +1497,7 @@ source kernel/Kconfig.preempt
+>  config HZ_FIXED
+>         int
+>         default 200 if ARCH_EBSA110 || ARCH_S3C24XX || \
+> -               ARCH_S5PV210 || ARCH_EXYNOS4
+> +               ARCH_S5PV210
+>         default 128 if SOC_AT91RM9200
+>         default 0
 
-Hi Shawn,
+After further research, I've concluded that we should also drop the
+settings for ARCH_S5PV210 and ARCH_S3C24XX here.
 
-Yes, we could reorganize DTSI and DTS file.
-I can create fsl-ls2080a-ls2088a.dtsi and move all the common nodes to this file,
+ARCH_S5PV210 behaves exactly like EXYNOS here, it has 32-bit timers
+so there won't be any overflow with 100Hz.
 
-Then fsl-ls2080a.dtsi and fsl-ls2088a.dtsi which will include
-the common file and add ls2080a and ls2088a specific nodes respectively.
+For ARCH_S3C24XX, it the requirement was that HZ_100 could not
+be used with the old arch/arm/plat-samsung/time.c code that would
+overflow its 16-bit counter.
+However, the new drivers/clocksource/samsung_pwm_timer.c configures
+the clock divider to '50' instead of '6', so there is no longer
+a 16-bit overflow before the 100Hz tick, it now overflows every
+3.7ms for the typical 12MHz clock.
 
-Same hierarchy can be created for fsl-ls2080a-qds.dts, fsl-ls2080a-rdb,
-fsl-ls2088a-qds.dts and fsl-ls2088a-rdb, wherein the common nodes will lie in
-fsl-ls2080a-ls2088a-qds.dts and fsl-ls2080a-ls2088a-rdb.dts
-
-What do you think?
-
-Abhimanyu
+	Arnd
