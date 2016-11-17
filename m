@@ -1,54 +1,33 @@
 From: rick.chang@mediatek.com (Rick Chang)
-Date: Thu, 17 Nov 2016 11:38:33 +0800
-Subject: [PATCH v6 1/3] dt-bindings: mediatek: Add a binding for Mediatek JPEG
- Decoder
+Date: Thu, 17 Nov 2016 11:38:35 +0800
+Subject: [PATCH v6 3/3] arm: dts: mt2701: Add node for Mediatek JPEG Decoder
 In-Reply-To: <1479353915-5043-1-git-send-email-rick.chang@mediatek.com>
 References: <1479353915-5043-1-git-send-email-rick.chang@mediatek.com>
-Message-ID: <1479353915-5043-2-git-send-email-rick.chang@mediatek.com>
+Message-ID: <1479353915-5043-4-git-send-email-rick.chang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a DT binding documentation for Mediatek JPEG Decoder of
-MT2701 SoC.
-
 Signed-off-by: Rick Chang <rick.chang@mediatek.com>
 Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../bindings/media/mediatek-jpeg-decoder.txt       | 37 ++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/mediatek-jpeg-decoder.txt
+This patch depends on: 
+  CCF "Add clock support for Mediatek MT2701"[1]
+  iommu and smi "Add the dtsi node of iommu and smi for mt2701"[2]
 
-diff --git a/Documentation/devicetree/bindings/media/mediatek-jpeg-decoder.txt b/Documentation/devicetree/bindings/media/mediatek-jpeg-decoder.txt
-new file mode 100644
-index 0000000..3813947
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/mediatek-jpeg-decoder.txt
-@@ -0,0 +1,37 @@
-+* Mediatek JPEG Decoder
-+
-+Mediatek JPEG Decoder is the JPEG decode hardware present in Mediatek SoCs
-+
-+Required properties:
-+- compatible : must be one of the following string:
-+	"mediatek,mt8173-jpgdec"
-+	"mediatek,mt2701-jpgdec"
-+- reg : physical base address of the jpeg decoder registers and length of
-+  memory mapped region.
-+- interrupts : interrupt number to the interrupt controller.
-+- clocks: device clocks, see
-+  Documentation/devicetree/bindings/clock/clock-bindings.txt for details.
-+- clock-names: must contain "jpgdec-smi" and "jpgdec".
-+- power-domains: a phandle to the power domain, see
-+  Documentation/devicetree/bindings/power/power_domain.txt for details.
-+- mediatek,larb: must contain the local arbiters in the current Socs, see
-+  Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
-+  for details.
-+- iommus: should point to the respective IOMMU block with master port as
-+  argument, see Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
-+  for details.
-+
-+Example:
+[1] http://lists.infradead.org/pipermail/linux-mediatek/2016-October/007271.html
+[2] https://patchwork.kernel.org/patch/9164013/
+---
+ arch/arm/boot/dts/mt2701.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+index 8f13c70..4dd5048 100644
+--- a/arch/arm/boot/dts/mt2701.dtsi
++++ b/arch/arm/boot/dts/mt2701.dtsi
+@@ -298,6 +298,20 @@
+ 		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
+ 	};
+ 
 +	jpegdec: jpegdec at 15004000 {
 +		compatible = "mediatek,mt2701-jpgdec";
 +		reg = <0 0x15004000 0 0x1000>;
@@ -62,5 +41,9 @@ index 0000000..3813947
 +		iommus = <&iommu MT2701_M4U_PORT_JPGDEC_WDMA>,
 +			 <&iommu MT2701_M4U_PORT_JPGDEC_BSDMA>;
 +	};
++
+ 	vdecsys: syscon at 16000000 {
+ 		compatible = "mediatek,mt2701-vdecsys", "syscon";
+ 		reg = <0 0x16000000 0 0x1000>;
 -- 
 1.9.1
