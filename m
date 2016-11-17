@@ -1,33 +1,43 @@
 From: jon.mason@broadcom.com (Jon Mason)
-Date: Thu, 17 Nov 2016 18:25:02 -0500
-Subject: [PATCH 1/2] arm64: dts: NS2: enable sdio1
+Date: Thu, 17 Nov 2016 18:25:03 -0500
+Subject: [PATCH 2/2] arm64: dts: NS2: Add PCI PHYs
 In-Reply-To: <1479425103-2119-1-git-send-email-jon.mason@broadcom.com>
 References: <1479425103-2119-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1479425103-2119-2-git-send-email-jon.mason@broadcom.com>
+Message-ID: <1479425103-2119-3-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable sdio1 in the Northstar2 SVK device tree file
+PCI PHYs are missing from the Northstar2 DT entries for the 2 PCI buses.
+Add them so that PCI devices can be discovered.
 
 Signed-off-by: Jon Mason <jon.mason@broadcom.com>
 ---
- arch/arm64/boot/dts/broadcom/ns2-svk.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/boot/dts/broadcom/ns2.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-index 07c69a3e..de8d379 100644
---- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-+++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-@@ -161,6 +161,10 @@
- 	status = "ok";
- };
+diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+index e4cd868..4fcdeca 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
++++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+@@ -133,6 +133,9 @@
  
-+&sdio1 {
-+	status = "ok";
-+};
+ 		status = "disabled";
+ 
++		phys = <&pci_phy0>;
++		phy-names = "pcie-phy";
 +
- &nand {
- 	nandcs at 0 {
- 		compatible = "brcm,nandcs";
+ 		msi-parent = <&msi0>;
+ 		msi0: msi at 20020000 {
+ 			compatible = "brcm,iproc-msi";
+@@ -171,6 +174,9 @@
+ 
+ 		status = "disabled";
+ 
++		phys = <&pci_phy1>;
++		phy-names = "pcie-phy";
++
+ 		msi-parent = <&msi4>;
+ 		msi4: msi at 50020000 {
+ 			compatible = "brcm,iproc-msi";
 -- 
 2.7.4
