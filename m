@@ -1,36 +1,56 @@
-From: mbrugger@suse.com (Matthias Brugger)
-Date: Thu, 17 Nov 2016 12:32:15 +0100
-Subject: [PATCH fpga 1/9] fpga zynq: Add missing \n to messages
-In-Reply-To: <20161115180813.GB1852@obsidianresearch.com>
-References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <1478732303-13718-2-git-send-email-jgunthorpe@obsidianresearch.com>
- <0aebdb59-86d7-2569-c49d-de5d45b5cac0@suse.com>
- <20161115180813.GB1852@obsidianresearch.com>
-Message-ID: <21fe76d9-f32a-9684-5853-4448eb6aac67@suse.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 17 Nov 2016 12:35:11 +0100
+Subject: [PATCH] ARM64: dma-mapping: preallocate DMA-debug hash tables in
+ core_initcall
+In-Reply-To: <20161116123918.qzaqczaqri2hab43@localhost>
+References: <CGME20161116092025eucas1p2ebaf3ead7de79130ca2656d532284e5b@eucas1p2.samsung.com>
+ <1479288013-30945-1-git-send-email-m.szyprowski@samsung.com>
+ <20161116123918.qzaqczaqri2hab43@localhost>
+Message-ID: <6d01cd35-99b2-432a-4c48-6c130cd69357@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Catalin,
 
 
-On 15/11/16 19:08, Jason Gunthorpe wrote:
->
-> On Tue, Nov 15, 2016 at 12:05:15PM +0100, Matthias Brugger wrote:
->> On 09/11/16 23:58, Jason Gunthorpe wrote:
->>> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+On 2016-11-16 13:39, Catalin Marinas wrote:
+> On Wed, Nov 16, 2016 at 10:20:13AM +0100, Marek Szyprowski wrote:
+>> fs_initcall is definitely too late to initialize DMA-debug hash tables,
+>> because some drivers might get probed and use DMA mapping framework
+>> already in core_initcall. Late initialization of DMA-debug results in
+>> false warning about accessing memory, that was not allocated. This issue
+>> has been observed on ARM 32bit, but the same driver can be used also on
+>> ARM64.
 >>
->> Please add a commit message, although it is cristal clear what this patch
->> does :)
->
-> As you say, it is crystal clear already, and this is an acceptable commit
-> message.. Please suggest a text if you want to see something
-> different.
->
+>> This patch moves initialization of DMA-debug to core_initcall. This is
+>> safe from the initialization perspective. dma_debug_do_init() internally
+>> calls debugfs functions and debugfs also gets initialised at
+>> core_initcall(), and that is earlier than arch code in the link order,
+>> so it will get initialized just before the DMA-debug.
+> Do we really want to rely on the link order within an initcall level?
+> What guarantees this?
 
-"Function dev_err doesn't add a newline at the end of the string. This 
-will lead to a hard to read kernel log. This patch fixes this."
+There are many places in the kernel which rely on link order and I'm 
+convinced
+that calling initcalls in link order is guaranteed.
 
-With this (or something similar added):
-Reviewed-by: Matthias Brugger <mbrugger@suse.com>
+> I hope someone sorts out the deferred probe or some other dependency
+> detection mechanism to address this issue. But in the meantime I
+> wouldn't merge a patch which relies on just the link order.
 
-Regards,
-Matthias
+This has nothing to deferred probe. This patch is related to initialization
+of dma-debug framework. In my initial submission for ARM arch I proposed
+pure_initcall to have this infrastructure available as early as possible,
+but Russell pointed that dma-debug depends on debugfs initialization, so
+it should be initialized after it. He also pointed that core_initcall will
+be fine for this.
+
+Please also note that dt devices are also populated from core_initcall and
+drivers can then bind to them and try to use dma-mapping api, what results
+in false warnings about using uninitialized memory as dma-debug framework
+is unable to track allocations done before its initialization.
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
