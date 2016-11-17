@@ -1,32 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Nov 2016 15:04:44 +0100
-Subject: [PATCH 05/18] arm64: dts: h3ulcb: update header
+Date: Thu, 17 Nov 2016 15:04:45 +0100
+Subject: [PATCH 06/18] arm64: dts: m3ulcb: add M3ULCB board DT bindings
 In-Reply-To: <cover.1479388193.git.horms+renesas@verge.net.au>
 References: <cover.1479388193.git.horms+renesas@verge.net.au>
-Message-ID: <3a1ba3a1d99ac997d4da30ec5ff053e4d787e99d.1479388193.git.horms+renesas@verge.net.au>
+Message-ID: <dced269484618df9619d9e2d169a441614bb7a5c.1479388193.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 
-This updates H3ULCB device tree header with official board name
+Add M3ULCB Device tree bindings Documentation, listing it as a supported
+board.
 
 Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-index bcb11a868343..f178fe1730de 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-@@ -1,5 +1,5 @@
- /*
-- * Device Tree Source for the H3ULCB board
-+ * Device Tree Source for the H3ULCB (R-Car Starter Kit Premier) board
-  *
-  * Copyright (C) 2016 Renesas Electronics Corp.
-  * Copyright (C) 2016 Cogent Embedded, Inc.
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index 968ae9a05440..9a3c2631d0d4 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -61,6 +61,8 @@ Boards:
+     compatible = "renesas,kzm9g", "renesas,sh73a0"
+   - Lager (RTP0RC7790SEB00010S)
+     compatible = "renesas,lager", "renesas,r8a7790"
++  - M3ULCB (R-Car Starter Kit Pro, RTP0RC7796SKB00010S)
++    compatible = "renesas,m3ulcb", "renesas,r8a7796";
+   - Marzen
+     compatible = "renesas,marzen", "renesas,r8a7779"
+   - Porter (M2-LCDP)
 -- 
 2.7.0.rc3.207.g0ac5344
