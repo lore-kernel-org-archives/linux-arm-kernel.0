@@ -1,18 +1,38 @@
-From: nicolae.rosia.oss@gmail.com (Nicolae Rosia)
-Date: Thu, 17 Nov 2016 14:56:32 +0200
-Subject: i.MX6UL: feature state of linux-fslc 4.1.x vs mainline
-Message-ID: <CAKP5S=2WAdCfONGQEAup7yUGXp615QUZ83oAYmyJ6kjGhAG_YQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Nov 2016 13:30:39 +0000
+Subject: [PATCH v3 1/1] KVM: ARM64: Fix the issues when guest PMCCFILTR
+ is configured
+In-Reply-To: <1479316160-8567-1-git-send-email-wei@redhat.com>
+References: <1479316160-8567-1-git-send-email-wei@redhat.com>
+Message-ID: <20161117133039.GH22855@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Nov 16, 2016 at 11:09:20AM -0600, Wei Huang wrote:
+> KVM calls kvm_pmu_set_counter_event_type() when PMCCFILTR is configured.
+> But this function can't deals with PMCCFILTR correctly because the evtCount
+> bits of PMCCFILTR, which is reserved 0, conflits with the SW_INCR event
+> type of other PMXEVTYPER<n> registers. To fix it, when eventsel == 0, this
+> function shouldn't return immediately; instead it needs to check further
+> if select_idx is ARMV8_PMU_CYCLE_IDX.
+> 
+> Another issue is that KVM shouldn't copy the eventsel bits of PMCCFILTER
+> blindly to attr.config. Instead it ought to convert the request to the
+> "cpu cycle" event type (i.e. 0x11).
+> 
+> To support this patch and to prevent duplicated definitions, a limited
+> set of ARMv8 perf event types were relocated from perf_event.c to
+> asm/perf_event.h.
+> 
+> Signed-off-by: Wei Huang <wei@redhat.com>
+> ---
+>  arch/arm64/include/asm/perf_event.h | 10 +++++++++-
+>  arch/arm64/kernel/perf_event.c      | 10 +---------
+>  virt/kvm/arm/pmu.c                  |  8 +++++---
+>  3 files changed, 15 insertions(+), 13 deletions(-)
 
-I'm wondering if there is a table of missing features that are present
-in Linux freescale 4.1.x [0] and are not present in latest mainline
-kernel with regards to NXP i.MX6UL SoC.
-Is there a reason why I should go with linux-fslc for this SoC ?
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Best regards,
-Nicolae
+I'm assuming this will go via kvm-arm.
 
-[0] https://github.com/Freescale/linux-fslc/tree/4.1-1.0.x-imx
+Will
