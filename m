@@ -1,57 +1,597 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Thu, 17 Nov 2016 09:59:40 +0530
-Subject: [PATCH 12/16] ARM: imx: use generic API for enabling SCU
-In-Reply-To: <20161114142631.GP3310@dragon>
-References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
- <1479099731-28108-13-git-send-email-pankaj.dubey@samsung.com>
- <CGME20161114142651epcas5p2ffdb722d348257c900d233fdb95885f3@epcas5p2.samsung.com>
- <20161114142631.GP3310@dragon>
-Message-ID: <65abb76e-2aff-4057-c1ac-7ed71563d426@samsung.com>
+From: maxim.kuvyrkov@linaro.org (Maxim Kuvyrkov)
+Date: Thu, 17 Nov 2016 09:02:29 +0400
+Subject: ILP32 for ARM64 - testing with lmbench
+In-Reply-To: <cdf5cdf2-43af-6d7f-9e0c-72675fb83224@huawei.com>
+References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+ <20161028124659.GA24131@yury-N73SV>
+ <cdf5cdf2-43af-6d7f-9e0c-72675fb83224@huawei.com>
+Message-ID: <266952F2-53F5-4D5E-83F0-6C8203092F67@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi Bamvor,
 
-On Monday 14 November 2016 07:56 PM, Shawn Guo wrote:
-> On Mon, Nov 14, 2016 at 10:32:07AM +0530, Pankaj Dubey wrote:
->> Now as we have of_scu_enable which takes care of mapping
->> scu base from DT, lets use it.
->>
->> At the same time this patch cleans up mach-imx platform files by
->> removing static mapping of SCU and dropping imx_scu_map_io function.
+I'm surprised that you see this much difference from ILP32 patches on SPEC CPU2006int at all.  The SPEC CPU2006 benchmarks spend almost no time in the kernel syscalls.  I can imagine memory, TLB, and cache handling in the kernel could affect CPU2006 benchmarks.  Do ILP32 patches touch code in those areas?
+
+Other than that, it would be interesting to check what the variance is between the 3 iterations of benchmark runs.  Could you check what relative standard deviation is between the 3 iterations -- (STDEV(RUN1, RUN2, RUN3) / RUNselected)?
+
+For reference, in my [non-ILP32] benchmarking I see 1.1% for 401.bzip2,  0.8% for 429.mcf, 0.2% for 456.hmmer, and 0.1% for 462.libquantum.
+
+--
+Maxim Kuvyrkov
+www.linaro.org
+
+
+
+> On Nov 17, 2016, at 7:28 AM, Zhangjian (Bamvor) <bamvor.zhangjian@huawei.com> wrote:
 > 
-> I remember that the static mapping of SCU is necessary because SCU is
-> being accessed at very early boot stage where dynamic mapping hasn't
-> been set up.
+> Hi, all
 > 
->> CC: Shawn Guo <shawnguo@kernel.org>
->> CC: Sascha Hauer <kernel@pengutronix.de>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>  arch/arm/mach-imx/common.h     |  5 -----
->>  arch/arm/mach-imx/mach-imx6q.c |  8 +-------
->>  arch/arm/mach-imx/platsmp.c    | 32 +++++---------------------------
->>  arch/arm/mach-imx/pm-imx6.c    |  3 ++-
->>  4 files changed, 8 insertions(+), 40 deletions(-)
+> I test specint of aarch64 LP64 when aarch32 el0 disable/enabled respectively
+> and compare with ILP32 unmerged kernel(4.8-rc6) in our arm64 board. I found
+> that difference(ILP32 disabled/ILP32 unmerged) is bigger when aarch32 el0 is
+> enabled, compare with aarch32 el0 disabled kernel. And bzip2, mcg, hmmer,
+> libquantum are the top four differences[1]. Note that bigger is better in
+> specint test.
 > 
-> I tested it and saw that the booting of imx6q is broken like below.
-
-Thanks for testing and letting me know about this.
-
-Currently only two platforms (IMX and ZYNQ) are using SCU address at
-very early stage of boot, for configuring possible cpus via
-set_cpu_possible().. rest platforms are either using DT method or they
-handle this in smp_prepare_cpus.
-
-Since I am not sure if all boards based on IMX has been moved to DT
-based boot, if it has moved to completely DT based then we do not need
-this set_cpu_possible in smp_init_cpus, it will be taken care via
-"arm_dt_init_cpu_maps" and this will avoid need of early mapping of SCU
-base as well.
-
-If not then, currently I can't see any other way to handle this and in
-that case I will drop-out IMX platform's patch of using generic SCU APIs
-in v2 version of series.
-
-Thanks,
-Pankaj Dubey
+> In order to make sure the above results, I retest these four testcases in
+> reportable way(reference the command in the end). The result[2] show that
+> libquantum decrease -2.09% after ILP32 enabled and aarch32 on. I think it is in
+> significant.
+> 
+> The result of lmbench is not stable in my board. I plan to dig it later.
+> 
+> [1] The following test result is tested through --size=ref --iterations=3.
+> 1.1 Test when aarch32_el0 is enabled.
+>                        ILP32 disabled        base line
+>      400.perlbench            100.00%             100%
+>      401.bzip2                 99.35%             100%
+>      403.gcc                  100.26%             100%
+>      429.mcf                  102.75%             100%
+>      445.gobmk                100.00%             100%
+>      456.hmmer                 95.66%             100%
+>      458.sjeng                100.00%             100%
+>      462.libquantum           100.00%             100%
+>      471.omnetpp              100.59%             100%
+>      473.astar                 99.66%             100%
+>      483.xalancbmk             99.10%             100%
+> 
+> 1.2 Test when aarch32_el0 is disabled
+>                        ILP32 disabled         base line
+>      400.perlbench            100.22%              100%
+>      401.bzip2                100.95%              100%
+>      403.gcc                  100.20%              100%
+>      429.mcf                  100.76%              100%
+>      445.gobmk                100.36%              100%
+>      456.hmmer                 97.94%              100%
+>      458.sjeng                 99.73%              100%
+>      462.libquantum            98.72%              100%
+>      471.omnetpp              100.86%              100%
+>      473.astar                 99.15%              100%
+>      483.xalancbmk            100.08%              100%
+> 
+> [2] The following test result is tested through: runspec --config=my.cfg --size=test,train,ref --noreportable --tune=base,peak --iterations=3 bzip2 mcf hmmer libquantum
+> 2.1 Test when aarch32_el0 is enabled.
+>                         ILP32_enabled         base line
+>      401.bzip2                100.82%              100%
+>      429.mcf                  100.18%              100%
+>      456.hmmer                 99.64%              100%
+>      462.libquantum            97.91%              100%
+> 
+> Regards
+> 
+> Bamvor
+> 
+> On 2016/10/28 20:46, Yury Norov wrote:
+>> [Add Steve Ellcey, thanks for testing on ThunderX]
+>> 
+>> Lmbench-3.0-a9 testing is performed on ThunderX machine to check that
+>> ILP32 series does not add performance regressions for LP64. Test
+>> summary is in the table below. Our measurements doesn't show
+>> significant performance regression of LP64 if ILP32 code is merged,
+>> both enabled or disabled.
+>> 
+>>               ILP32 enabled   ILP32  disabled   Standard Kernel
+>> null syscall   0.1066          0.1121            0.1121
+>>               95.09%          100.00%
+>> 
+>> stat           1.3947          1.3814            1.3864
+>>               100.60%         99.64%
+>> 
+>> fstat          0.4459          0.4344            0.4524
+>>               98.56%          96.02%
+>> 
+>> open/close     4.0606          4.0411            4.0453
+>>               100.38%         99.90%
+>> 
+>> read           0.4819          0.5014            0.5014
+>>               96.11%          100.00%
+>> 
+>> Tested with linux 4.8 because 4.9-rc1 is not fixed yet for ThunderX.
+>> Other system details below.
+>> 
+>> Yury.
+>> 
+>> ubuntu at crb6:~$ uname -a
+>> Linux crb6 4.8.0+ #3 SMP Thu Oct 27 11:01:32 PDT 2016 aarch64 aarch64 aarch64 GNU/Linux
+>> 
+>> ubuntu at crb6:~$ cat /proc/meminfo
+>> MemTotal:       132011948 kB
+>> MemFree:        131442672 kB
+>> MemAvailable:   130695764 kB
+>> Buffers:           15696 kB
+>> Cached:            88088 kB
+>> SwapCached:            0 kB
+>> Active:            82760 kB
+>> Inactive:          41336 kB
+>> Active(anon):      20880 kB
+>> Inactive(anon):     8576 kB
+>> Active(file):      61880 kB
+>> Inactive(file):    32760 kB
+>> Unevictable:           0 kB
+>> Mlocked:               0 kB
+>> SwapTotal:      128920572 kB
+>> SwapFree:       128920572 kB
+>> Dirty:                 0 kB
+>> Writeback:             0 kB
+>> AnonPages:         20544 kB
+>> Mapped:            19780 kB
+>> Shmem:              9060 kB
+>> Slab:              78804 kB
+>> SReclaimable:      27372 kB
+>> SUnreclaim:        51432 kB
+>> KernelStack:        8336 kB
+>> PageTables:          820 kB
+>> NFS_Unstable:          0 kB
+>> Bounce:                0 kB
+>> WritebackTmp:          0 kB
+>> CommitLimit:    194926544 kB
+>> Committed_AS:     256324 kB
+>> VmallocTotal:   135290290112 kB
+>> VmallocUsed:           0 kB
+>> VmallocChunk:          0 kB
+>> AnonHugePages:         0 kB
+>> ShmemHugePages:        0 kB
+>> ShmemPmdMapped:        0 kB
+>> CmaTotal:              0 kB
+>> CmaFree:               0 kB
+>> HugePages_Total:       0
+>> HugePages_Free:        0
+>> HugePages_Rsvd:        0
+>> HugePages_Surp:        0
+>> Hugepagesize:       2048 kB
+>> 
+>> ubuntu at crb6:~$ cat /proc/cpuinfo
+>> processor	: 0
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 1
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 2
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 3
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 4
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 5
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 6
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 7
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 8
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 9
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 10
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 11
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 12
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 13
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 14
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 15
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 16
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 17
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 18
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 19
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 20
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 21
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 22
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 23
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 24
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 25
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 26
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 27
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 28
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 29
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 30
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 31
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 32
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 33
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 34
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 35
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 36
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 37
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 38
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 39
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 40
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 41
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 42
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 43
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 44
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 45
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 46
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+>> processor	: 47
+>> BogoMIPS	: 200.00
+>> Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics
+>> CPU implementer	: 0x43
+>> CPU architecture: 8
+>> CPU variant	: 0x1
+>> CPU part	: 0x0a1
+>> CPU revision	: 0
+>> 
+> 
