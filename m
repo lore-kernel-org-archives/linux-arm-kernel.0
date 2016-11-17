@@ -1,32 +1,32 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 17 Nov 2016 12:41:16 +0100
-Subject: [PATCH v8 0/7] arm/arm64: vgic: Implement API for vGICv3 live
- migration
-In-Reply-To: <1478258013-6669-1-git-send-email-vijay.kilari@gmail.com>
-References: <1478258013-6669-1-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <20161117114116.GB22231@cbox>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 17 Nov 2016 08:50:11 -0300
+Subject: [PATCH 0/3] thermal: Fix module autoload for drivers
+In-Reply-To: <1476455702-21748-1-git-send-email-javier@osg.samsung.com>
+References: <1476455702-21748-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <CABxcv==keE6X5B1R+DSaZewVDdpCtuGF5j4S46YF3pncHT8q2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vijaya,
+Hello Eduardo,
 
-On Fri, Nov 04, 2016 at 04:43:26PM +0530, vijay.kilari at gmail.com wrote:
-> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-> 
-> This patchset adds API for saving and restoring
-> of VGICv3 registers to support live migration with new vgic feature.
-> This API definition is as per version of VGICv3 specification
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
-> 
-> The patch 3 & 4 are picked from the Pavel's previous implementation.
-> http://www.spinics.net/lists/kvm/msg122040.html
-> 
-> v7 => v8:
->  - Rebased to 4.9-rc3
+On Fri, Oct 14, 2016 at 11:34 AM, Javier Martinez Canillas
+<javier@osg.samsung.com> wrote:
+> Hello,
+>
+> This small series contains trivial fixes to allow modules to be autoloaded
+> when its correspoinding thermal device is registered.
+>
+> Best regards,
+> Javier
+>
+>
+> Javier Martinez Canillas (3):
+>   thermal: max77620: Fix module autoload
+>   thermal: tango: Fix module autoload
+>   thermal: db8500: Fix module autoload
+>
 
-I noticed when looking at this series that there are quite a few
-conflicts when applying to kvmarm/queue, so if you could rebase the next
-verson on kvmarm/queue, then you'll make Marc's life a bit easier.
+Any comments about these patches?
 
-Thanks,
--Christoffer
+Best regards,
+Javier
