@@ -1,112 +1,169 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Thu, 17 Nov 2016 16:36:33 +1030
-Subject: [RFC PATCH] mfd: dt: Add Aspeed LPC binding
-Message-ID: <20161117060633.3837-1-andrew@aj.id.au>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Wed, 16 Nov 2016 22:10:35 -0800
+Subject: [PATCH fpga 4/9] fpga zynq: Check for errors after completing DMA
+In-Reply-To: <1478732303-13718-5-git-send-email-jgunthorpe@obsidianresearch.com>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-5-git-send-email-jgunthorpe@obsidianresearch.com>
+Message-ID: <CAAtXAHeGJjQ22d=OP6cEt8Ssg1bhAEVQ5_GWFFd26xp-j8EUFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
----
+Hi Jason,
 
-I'd like to start a discussion about how to handle the LPC register space in
-the Aspeed SoC. There are a number of issues, largely concerned with the layout
-of the registers but also with the fact that LPC register state is used by the
-pinmux to determine some pin functionality.
+couple of minor things inline below:
 
-So the register layout is problematic. Registers for what I think are coherent
-pieces of functionality functionality are littered through the layout: Post
-Code Control registers (PCCR) are interleaved with LPC Host Controller
-registers (LHCR) which are interleaved with Host Interface Controller registers
-(HICR) which are segmented by LPC Snoop registers. It seems appropriate that
-the whole thing is represented as an MFD syscon, with the alternative being
-writing several distinct drivers that map some number of resources to access
-all of their registers.
+On Wed, Nov 9, 2016 at 2:58 PM, Jason Gunthorpe
+<jgunthorpe@obsidianresearch.com> wrote:
+> The completion did not check the interrupt status to see if any error
+> bits were asserted, check error bits and dump some registers if things
+> went wrong.
+>
+> A few fixes are needed to make this work, the IXR_ERROR_FLAGS_MASK was
+> wrong, it included the done bits, which shows a bug in mask/unmask_irqs
+> which were using the wrong bits, simplify all of this stuff.
+>
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> ---
+>  drivers/fpga/zynq-fpga.c | 55 +++++++++++++++++++++++++++---------------------
+>  1 file changed, 31 insertions(+), 24 deletions(-)
+>
+> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+> index 40cf0feaca7c..3ffc5fcc3072 100644
+> --- a/drivers/fpga/zynq-fpga.c
+> +++ b/drivers/fpga/zynq-fpga.c
+> @@ -89,7 +89,7 @@
+>  #define IXR_D_P_DONE_MASK              BIT(12)
+>   /* FPGA programmed */
+>  #define IXR_PCFG_DONE_MASK             BIT(2)
+> -#define IXR_ERROR_FLAGS_MASK           0x00F0F860
+> +#define IXR_ERROR_FLAGS_MASK           0x00F0C860
 
-The disadvantage of not representing the LPC space as a syscon is the LPC Host
-Controller driver will need to provide accessor functions for the pinmux
-driver. Pinmux also depends on bits in the Display Controller, and would need
-similar accessors provided there. The idea of using syscon regmaps removes the
-need to write these accessors. If the changes between the AST2400 and AST2500
-are anything to go by, the pinmux complexity of the SoCs will only increase
-which will likely lead to the spread of these accessor functions.
+True. Ouch.
 
-Yet another option would be to only expose the LPC Host Controller as a syscon
-instead of the whole LPC register space. I feel this is a little distasteful
-as the LHCRs are not in contiguous memory space; as mentioned above they are
-separated (seemingly randomly) by a PCCR. We could specify the LPC Host
-Controller as a syscon and provide multiple resources: The syscon
-implementation consumes the first resource which is what we desire here for use
-with pinmux, but the driver would be left to map any subsequent resources. That
-feels odd to me, but I'm interested in arguments for it.
+>  #define IXR_ALL_MASK                   0xF8F7F87F
+>
+>  /* Miscellaneous constant values */
+> @@ -144,23 +144,10 @@ static inline u32 zynq_fpga_read(const struct zynq_fpga_priv *priv,
+>         readl_poll_timeout(priv->io_base + addr, val, cond, sleep_us, \
+>                            timeout_us)
+>
+> -static void zynq_fpga_mask_irqs(struct zynq_fpga_priv *priv)
+> +static inline void zynq_fpga_set_irq_mask(struct zynq_fpga_priv *priv,
+> +                                         u32 enable)
+>  {
+> -       u32 intr_mask;
+> -
+> -       intr_mask = zynq_fpga_read(priv, INT_MASK_OFFSET);
+> -       zynq_fpga_write(priv, INT_MASK_OFFSET,
+> -                       intr_mask | IXR_DMA_DONE_MASK | IXR_ERROR_FLAGS_MASK);
+> -}
+> -
+> -static void zynq_fpga_unmask_irqs(struct zynq_fpga_priv *priv)
+> -{
+> -       u32 intr_mask;
+> -
+> -       intr_mask = zynq_fpga_read(priv, INT_MASK_OFFSET);
+> -       zynq_fpga_write(priv, INT_MASK_OFFSET,
+> -                       intr_mask
+> -                       & ~(IXR_D_P_DONE_MASK | IXR_ERROR_FLAGS_MASK));
+> +       zynq_fpga_write(priv, INT_MASK_OFFSET, ~enable);
 
-We could also map the LPC Host Controller syscon across the offending PCCR, but
-then any driver developed for the Post Code Controller would have to take a
-reference to the LPC Host Controller regmap. I feel like we might wind up with
-a syscon phandle spaghetti across the LPC controller if we use that approach.
+Not a fan of this ~enable here. Function name indicates you're doing
+the opposite
+(see below comment).
 
-Finally, the LPC registers can be divided in two: one set for H8S/2168
-compatible LPC functionality, and the rest for Aspeed-specific registers.
-Division in two is required if we are going to throw a regmap over the LPC
-space as the H8S/2168 registers are 1-byte wide, whilst the Aspeed LPC
-registers are 4-bytes. As far as I can tell we can treat them as separate
-functionality without any loss; if there is a cross-over in configuration we
-can have each phandle the other in the devicetree.
+>  }
+>
+>  static irqreturn_t zynq_fpga_isr(int irq, void *data)
+> @@ -168,7 +155,7 @@ static irqreturn_t zynq_fpga_isr(int irq, void *data)
+>         struct zynq_fpga_priv *priv = data;
+>
+>         /* disable DMA and error IRQs */
+> -       zynq_fpga_mask_irqs(priv);
+> +       zynq_fpga_set_irq_mask(priv, 0);
+>
+>         complete(&priv->dma_done);
+>
+> @@ -314,6 +301,7 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+>                                const char *buf, size_t count)
+>  {
+>         struct zynq_fpga_priv *priv;
+> +       const char *why;
+>         int err;
+>         char *kbuf;
+>         dma_addr_t dma_addr;
+> @@ -337,7 +325,7 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+>         reinit_completion(&priv->dma_done);
+>
+>         /* enable DMA and error IRQs */
+> -       zynq_fpga_unmask_irqs(priv);
+> +       zynq_fpga_set_irq_mask(priv, IXR_D_P_DONE_MASK | IXR_ERROR_FLAGS_MASK);
 
-The final complication is the iBT device sits in the Aspeed-specific part of
-the LPC controller and has an upstream driver that isn't regmap-capable.
-Describing the LPC controller as a syscon will require some changes there, but
-I think we can make it work without too much trouble.
+I find the naming here confusing. This sets ~(IXR_D_P_DONE_MASK |
+IXR_ERROR_FLAGS_MASK)
+as mask value, to enable the D_P_DONE and error IRQs yet the function
+name indicates the opposite.
+>
+>         /* the +1 in the src addr is used to hold off on DMA_DONE IRQ
+>          * until both AXI and PCAP are done ...
+> @@ -352,16 +340,35 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+>         intr_status = zynq_fpga_read(priv, INT_STS_OFFSET);
+>         zynq_fpga_write(priv, INT_STS_OFFSET, intr_status);
+>
+> +       if (intr_status & IXR_ERROR_FLAGS_MASK) {
+> +               why = "DMA reported error";
+> +               err = -EIO;
+> +               goto out_report;
+> +       }
+> +
+>         if (!((intr_status & IXR_D_P_DONE_MASK) == IXR_D_P_DONE_MASK)) {
+> -               dev_err(priv->dev, "Error configuring FPGA\n");
+> -               err = -EFAULT;
+> +               why = "DMA did not complete";
+> +               err = -EIO;
+> +               goto out_report;
+>         }
+>
+> +       err = 0;
+> +       goto out_clk;
+> +
+> +out_report:
+> +       dev_err(priv->dev,
+> +               "%s: INT_STS:0x%x CTRL:0x%x LOCK:0x%x INT_MASK:0x%x STATUS:0x%x MCTRL:0x%x\n",
+> +               why,
+> +               intr_status,
+> +               zynq_fpga_read(priv, CTRL_OFFSET),
+> +               zynq_fpga_read(priv, LOCK_OFFSET),
+> +               zynq_fpga_read(priv, INT_MASK_OFFSET),
+> +               zynq_fpga_read(priv, STATUS_OFFSET),
+> +               zynq_fpga_read(priv, MCTRL_OFFSET));
+> +out_clk:
+>         clk_disable(priv->clk);
+> -
 
-What is the recommended approach to managing such hardware?
+Personally found it more readable with newline.
 
-Cheers,
+>  out_free:
+>         dma_free_coherent(priv->dev, count, kbuf, dma_addr);
+> -
 
-Andrew
+Same here.
+>         return err;
+>  }
+>
+> @@ -475,7 +482,7 @@ static int zynq_fpga_probe(struct platform_device *pdev)
+>         /* unlock the device */
+>         zynq_fpga_write(priv, UNLOCK_OFFSET, UNLOCK_MASK);
+>
+> -       zynq_fpga_write(priv, INT_MASK_OFFSET, 0xFFFFFFFF);
+> +       zynq_fpga_set_irq_mask(priv, 0);
+>         zynq_fpga_write(priv, INT_STS_OFFSET, IXR_ALL_MASK);
+>         err = devm_request_irq(dev, priv->irq, zynq_fpga_isr, 0, dev_name(dev),
+>                                priv);
+> --
+> 2.1.4
+>
 
-PS: I sent a devicetree binding document out for the LPC Host Controller as
-part of a recent pinmux series[1]. As it stands the example in the document
-doesn't cover the all the registers relevant to the LPC Host Controller, which
-was a motivation for trying to sort the problem out properly.
+Thanks,
 
-[1] https://www.spinics.net/lists/arm-kernel/msg540084.html
-
- .../devicetree/bindings/mfd/aspeed-lpc.txt         | 28 ++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
-
-diff --git a/Documentation/devicetree/bindings/mfd/aspeed-lpc.txt b/Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
-new file mode 100644
-index 000000000000..36c8a9e08dc6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
-@@ -0,0 +1,28 @@
-+* Device tree bindings for the Aspeed LPC Controller
-+
-+The Aspeed LPC controller contains registers for a variety of functions. Not
-+all registers for a function are contiguous, and some registers are referenced
-+by functions outside the LPC controller.
-+
-+Note that this is separate from the H8S/2168 compatible register set occupying
-+the start of the LPC controller address space.
-+
-+Some significant functions in the LPC controller:
-+
-+* LPC Host Controller
-+* Host Interface Controller
-+* iBT Controller
-+* SuperIO Scratch registers
-+
-+Required properties:
-+- compatible:		"aspeed,ast2500-lpc", "syscon"
-+- reg:			contains offset/length value of the Aspeed-specific LPC
-+			memory region.
-+
-+Example:
-+
-+lpc: lpc at 1e7890a0 {
-+	compatible = "aspeed,ast2500-lpc", "syscon";
-+	reg = <0x1e789080 0x1e0>;
-+};
-+
--- 
-2.9.3
+Moritz
