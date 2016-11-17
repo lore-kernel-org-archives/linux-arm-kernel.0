@@ -1,171 +1,147 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 17 Nov 2016 11:59:38 -0600
-Subject: [PATCH] PCI: Add information about describing PCI in ACPI
-Message-ID: <20161117175938.17465.45820.stgit@bhelgaas-glaptop.roam.corp.google.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Thu, 17 Nov 2016 10:00:27 -0800
+Subject: [PATCH fpga 5/9] fpga zynq: Remove priv->dev
+In-Reply-To: <alpine.DEB.2.10.1611140913280.3739@atull-VirtualBox>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-6-git-send-email-jgunthorpe@obsidianresearch.com>
+ <alpine.DEB.2.10.1611140913280.3739@atull-VirtualBox>
+Message-ID: <20161117180027.GA17178@live.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a writeup about how PCI host bridges should be described in ACPI
-using PNP0A03/PNP0A08 devices, PNP0C02 devices, and the MCFG table.
+Hi Jason,
 
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
----
- Documentation/PCI/00-INDEX      |    2 +
- Documentation/PCI/acpi-info.txt |  136 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 138 insertions(+)
- create mode 100644 Documentation/PCI/acpi-info.txt
+On Mon, Nov 14, 2016 at 09:13:49AM -0600, atull wrote:
+> On Wed, 9 Nov 2016, Jason Gunthorpe wrote:
+> 
+> Hi Jason,
+> 
+>     Acked-by: Alan Tull <atull@opensource.altera.com>
+> 
+> Alan
+> 
+> > socfpga uses mgr->dev for debug prints, there should be consistency
+> > here, so standardize on that. The only other use was for dma
+> > which can be replaced with mgr->dev.parent.
+> > 
+> > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 
-diff --git a/Documentation/PCI/00-INDEX b/Documentation/PCI/00-INDEX
-index 147231f..0780280 100644
---- a/Documentation/PCI/00-INDEX
-+++ b/Documentation/PCI/00-INDEX
-@@ -1,5 +1,7 @@
- 00-INDEX
- 	- this file
-+acpi-info.txt
-+	- info on how PCI host bridges are represented in ACPI
- MSI-HOWTO.txt
- 	- the Message Signaled Interrupts (MSI) Driver Guide HOWTO and FAQ.
- PCIEBUS-HOWTO.txt
-diff --git a/Documentation/PCI/acpi-info.txt b/Documentation/PCI/acpi-info.txt
-new file mode 100644
-index 0000000..ccbcfda
---- /dev/null
-+++ b/Documentation/PCI/acpi-info.txt
-@@ -0,0 +1,136 @@
-+	    ACPI considerations for PCI host bridges
-+
-+The basic requirement is that the ACPI namespace should describe
-+*everything* that consumes address space unless there's another
-+standard way for the OS to find it [1, 2]. ?For example, windows that
-+are forwarded to PCI by a PCI host bridge should be described via ACPI
-+devices, since the OS can't locate the host bridge by itself. ?PCI
-+devices *below* the host bridge do not need to be described via ACPI,
-+because the resources they consume are inside the host bridge windows,
-+and the OS can discover them via the standard PCI enumeration
-+mechanism (using config accesses to read and size the BARs).
-+
-+This ACPI resource description is done via _CRS methods of devices in
-+the ACPI namespace [2]. ? _CRS methods are like generalized PCI BARs:
-+the OS can read _CRS and figure out what resource is being consumed
-+even if it doesn't have a driver for the device [3]. ?That's important
-+because it means an old OS can work correctly even on a system with
-+new devices unknown to the OS. ?The new devices won't do anything, but
-+the OS can at least make sure no resources conflict with them.
-+
-+Static tables like MCFG, HPET, ECDT, etc., are *not* mechanisms for
-+reserving address space!  The static tables are for things the OS
-+needs to know early in boot, before it can parse the ACPI namespace.
-+If a new table is defined, an old OS needs to operate correctly even
-+though it ignores the table.  _CRS allows that because it is generic
-+and understood by the old OS; a static table does not.
-+
-+If the OS is expected to manage an ACPI device, that device will have
-+a specific _HID/_CID that tells the OS what driver to bind to it, and
-+the _CRS tells the OS and the driver where the device's registers are.
-+
-+PNP0C02 "motherboard" devices are basically a catch-all. ?There's no
-+programming model for them other than "don't use these resources for
-+anything else." ?So any address space that is (1) not claimed by some
-+other ACPI device and (2) should not be assigned by the OS to
-+something else, should be claimed by a PNP0C02 _CRS method.
-+
-+PCI host bridges are PNP0A03 or PNP0A08 devices. ?Their _CRS should
-+describe all the address space they consume. ?In principle, this would
-+be all the windows they forward down to the PCI bus, as well as the
-+bridge registers themselves. ?The bridge registers include things like
-+secondary/subordinate bus registers that determine the bus range below
-+the bridge, window registers that describe the apertures, etc. ?These
-+are all device-specific, non-architected things, so the only way a
-+PNP0A03/PNP0A08 driver can manage them is via _PRS/_CRS/_SRS, which
-+contain the device-specific details. ?These bridge registers also
-+include ECAM space, since it is consumed by the bridge.
-+
-+ACPI defined a Producer/Consumer bit that was intended to distinguish
-+the bridge apertures from the bridge registers [4, 5]. ?However,
-+BIOSes didn't use that bit correctly, and the result is that OSes have
-+to assume that everything in a PCI host bridge _CRS is a window. ?That
-+leaves no way to describe the bridge registers in the PNP0A03/PNP0A08
-+device itself.
-+
-+The workaround is to describe the bridge registers (including ECAM
-+space) in PNP0C02 catch-all devices [6]. ?With the exception of ECAM,
-+the bridge register space is device-specific anyway, so the generic
-+PNP0A03/PNP0A08 driver (pci_root.c) has no need to know about it. ?For
-+ECAM, pci_root.c learns about the space from either MCFG or the _CBA
-+method.
-+
-+Note that the PCIe spec actually does require ECAM unless there's a
-+standard firmware interface for config access, e.g., the ia64 SAL
-+interface [7].  One reason is that we want a generic host bridge
-+driver (pci_root.c), and a generic driver requires a generic way to
-+access config space.
-+
-+
-+[1] ACPI 6.0, sec 6.1:
-+    For any device that is on a non-enumerable type of bus (for
-+    example, an ISA bus), OSPM enumerates the devices' identifier(s)
-+    and the ACPI system firmware must supply an _HID object ... for
-+    each device to enable OSPM to do that.
-+
-+[2] ACPI 6.0, sec 3.7:
-+    The OS enumerates motherboard devices simply by reading through
-+    the ACPI Namespace looking for devices with hardware IDs.
-+
-+    Each device enumerated by ACPI includes ACPI-defined objects in
-+    the ACPI Namespace that report the hardware resources the device
-+    could occupy [_PRS], an object that reports the resources that are
-+    currently used by the device [_CRS], and objects for configuring
-+    those resources [_SRS].  The information is used by the Plug and
-+    Play OS (OSPM) to configure the devices.
-+
-+[3] ACPI 6.0, sec 6.2:
-+    OSPM uses device configuration objects to configure hardware
-+    resources for devices enumerated via ACPI.  Device configuration
-+    objects provide information about current and possible resource
-+    requirements, the relationship between shared resources, and
-+    methods for configuring hardware resources.
-+
-+    When OSPM enumerates a device, it calls _PRS to determine the
-+    resource requirements of the device.  It may also call _CRS to
-+    find the current resource settings for the device.  Using this
-+    information, the Plug and Play system determines what resources
-+    the device should consume and sets those resources by calling the
-+    device?s _SRS control method.
-+
-+    In ACPI, devices can consume resources (for example, legacy
-+    keyboards), provide resources (for example, a proprietary PCI
-+    bridge), or do both.  Unless otherwise specified, resources for a
-+    device are assumed to be taken from the nearest matching resource
-+    above the device in the device hierarchy.
-+
-+[4] ACPI 6.0, sec 6.4.3.5.4:
-+    Extended Address Space Descriptor
-+    General Flags: Bit [0] Consumer/Producer:
-+	1?This device consumes this resource
-+	0?This device produces and consumes this resource
-+
-+[5] ACPI 6.0, sec 19.6.43:
-+    ResourceUsage specifies whether the Memory range is consumed by
-+    this device (ResourceConsumer) or passed on to child devices
-+    (ResourceProducer).  If nothing is specified, then
-+    ResourceConsumer is assumed.
-+
-+[6] PCI Firmware 3.0, sec 4.1.2:
-+    If the operating system does not natively comprehend reserving the
-+    MMCFG region, the MMCFG region must be reserved by firmware.  The
-+    address range reported in the MCFG table or by _CBA method (see
-+    Section 4.1.3) must be reserved by declaring a motherboard
-+    resource.  For most systems, the motherboard resource would appear
-+    at the root of the ACPI namespace (under \_SB) in a node with a
-+    _HID of EISAID (PNP0C02), and the resources in this case should
-+    not be claimed in the root PCI bus?s _CRS.  The resources can
-+    optionally be returned in Int15 E820 or EFIGetMemoryMap as
-+    reserved memory but must always be reported through ACPI as a
-+    motherboard resource.
-+
-+[7] PCI Express 3.0, sec 7.2.2:
-+    For systems that are PC-compatible, or that do not implement a
-+    processor-architecture-specific firmware interface standard that
-+    allows access to the Configuration Space, the ECAM is required as
-+    defined in this section.
+For the priv->dev removal part.
+
+Acked-by: Moritz Fischer <moritz.fischer@ettus.com>
+
+> > ---
+> >  drivers/fpga/zynq-fpga.c | 22 ++++++++++------------
+> >  1 file changed, 10 insertions(+), 12 deletions(-)
+> > 
+> > diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+> > index 3ffc5fcc3072..ac2deae92dbd 100644
+> > --- a/drivers/fpga/zynq-fpga.c
+> > +++ b/drivers/fpga/zynq-fpga.c
+> > @@ -118,7 +118,6 @@
+> >  #define FPGA_RST_NONE_MASK		0x0
+> >  
+> >  struct zynq_fpga_priv {
+> > -	struct device *dev;
+> >  	int irq;
+> >  	struct clk *clk;
+> >  
+> > @@ -188,7 +187,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+> >  	 * least the sync word and something else to do anything.
+> >  	 */
+> >  	if (count <= 4 || (count % 4) != 0) {
+> > -		dev_err(priv->dev,
+> > +		dev_err(&mgr->dev,
+> >  			"Invalid bitstream size, must be multiples of 4 bytes\n");
+> >  		return -EINVAL;
+> >  	}
+> > @@ -200,7 +199,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+> >  	/* don't globally reset PL if we're doing partial reconfig */
+> >  	if (!(flags & FPGA_MGR_PARTIAL_RECONFIG)) {
+> >  		if (!zynq_fpga_has_sync(buf, count)) {
+> > -			dev_err(priv->dev,
+> > +			dev_err(&mgr->dev,
+> >  				"Invalid bitstream, could not find a sync word. Bitstream must be a byte swaped .bin file\n");
+> >  			err = -EINVAL;
+> >  			goto out_err;
+> > @@ -233,7 +232,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+> >  					     INIT_POLL_DELAY,
+> >  					     INIT_POLL_TIMEOUT);
+> >  		if (err) {
+> > -			dev_err(priv->dev, "Timeout waiting for PCFG_INIT\n");
+> > +			dev_err(&mgr->dev, "Timeout waiting for PCFG_INIT\n");
+> >  			goto out_err;
+> >  		}
+> >  
+> > @@ -247,7 +246,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+> >  					     INIT_POLL_DELAY,
+> >  					     INIT_POLL_TIMEOUT);
+> >  		if (err) {
+> > -			dev_err(priv->dev, "Timeout waiting for !PCFG_INIT\n");
+> > +			dev_err(&mgr->dev, "Timeout waiting for !PCFG_INIT\n");
+> >  			goto out_err;
+> >  		}
+> >  
+> > @@ -261,7 +260,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+> >  					     INIT_POLL_DELAY,
+> >  					     INIT_POLL_TIMEOUT);
+> >  		if (err) {
+> > -			dev_err(priv->dev, "Timeout waiting for PCFG_INIT\n");
+> > +			dev_err(&mgr->dev, "Timeout waiting for PCFG_INIT\n");
+> >  			goto out_err;
+> >  		}
+> >  	}
+> > @@ -278,7 +277,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+> >  	/* check that we have room in the command queue */
+> >  	status = zynq_fpga_read(priv, STATUS_OFFSET);
+> >  	if (status & STATUS_DMA_Q_F) {
+> > -		dev_err(priv->dev, "DMA command queue full\n");
+> > +		dev_err(&mgr->dev, "DMA command queue full\n");
+> >  		err = -EBUSY;
+> >  		goto out_err;
+> >  	}
+> > @@ -309,7 +308,8 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+> >  
+> >  	priv = mgr->priv;
+> >  
+> > -	kbuf = dma_alloc_coherent(priv->dev, count, &dma_addr, GFP_KERNEL);
+> > +	kbuf =
+> > +	    dma_alloc_coherent(mgr->dev.parent, count, &dma_addr, GFP_KERNEL);
+> >  	if (!kbuf)
+> >  		return -ENOMEM;
+> >  
+> > @@ -356,7 +356,7 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+> >  	goto out_clk;
+> >  
+> >  out_report:
+> > -	dev_err(priv->dev,
+> > +	dev_err(&mgr->dev,
+> >  		"%s: INT_STS:0x%x CTRL:0x%x LOCK:0x%x INT_MASK:0x%x STATUS:0x%x MCTRL:0x%x\n",
+> >  		why,
+> >  		intr_status,
+> > @@ -368,7 +368,7 @@ out_report:
+> >  out_clk:
+> >  	clk_disable(priv->clk);
+> >  out_free:
+> > -	dma_free_coherent(priv->dev, count, kbuf, dma_addr);
+> > +	dma_free_coherent(mgr->dev.parent, count, kbuf, dma_addr);
+> >  	return err;
+> >  }
+> >  
+> > @@ -445,8 +445,6 @@ static int zynq_fpga_probe(struct platform_device *pdev)
+> >  	if (!priv)
+> >  		return -ENOMEM;
+> >  
+> > -	priv->dev = dev;
+> > -
+> >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >  	priv->io_base = devm_ioremap_resource(dev, res);
+> >  	if (IS_ERR(priv->io_base))
+> > -- 
+> > 2.1.4
+> > 
+> > 
+
+Thanks,
+
+Moritz
