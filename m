@@ -1,38 +1,32 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Nov 2016 15:04:57 +0100
-Subject: [PATCH 18/18] arm64: dts: r8a7796: Add device node for PRR
+Date: Thu, 17 Nov 2016 15:04:44 +0100
+Subject: [PATCH 05/18] arm64: dts: h3ulcb: update header
 In-Reply-To: <cover.1479388193.git.horms+renesas@verge.net.au>
 References: <cover.1479388193.git.horms+renesas@verge.net.au>
-Message-ID: <1e7b5e4ee3f1b2c9cb607801a3f0adfa05a0818a.1479388193.git.horms+renesas@verge.net.au>
+Message-ID: <3a1ba3a1d99ac997d4da30ec5ff053e4d787e99d.1479388193.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 
-Add a device node for the Product Register, which provides SoC product
-and revision information.
+This updates H3ULCB device tree header with official board name
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 9599f5691099..41a050d2f192 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -243,6 +243,11 @@
- 			#power-domain-cells = <0>;
- 		};
- 
-+		prr: chipid at fff00044 {
-+			compatible = "renesas,prr";
-+			reg = <0 0xfff00044 0 4>;
-+		};
-+
- 		sysc: system-controller at e6180000 {
- 			compatible = "renesas,r8a7796-sysc";
- 			reg = <0 0xe6180000 0 0x0400>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+index bcb11a868343..f178fe1730de 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+@@ -1,5 +1,5 @@
+ /*
+- * Device Tree Source for the H3ULCB board
++ * Device Tree Source for the H3ULCB (R-Car Starter Kit Premier) board
+  *
+  * Copyright (C) 2016 Renesas Electronics Corp.
+  * Copyright (C) 2016 Cogent Embedded, Inc.
 -- 
 2.7.0.rc3.207.g0ac5344
