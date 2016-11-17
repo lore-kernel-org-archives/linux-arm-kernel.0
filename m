@@ -1,184 +1,321 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 17 Nov 2016 19:52:38 +0100
-Subject: [PATCH 1/2] ARM: dts: sun5i: Add touchscreen node to
- reference-design-tablet.dtsi
-In-Reply-To: <20161117183520.vpyw72mchynpqx7d@lukather>
-References: <20161113192203.7101-1-hdegoede@redhat.com>
- <20161114200802.vdduhyxnkgmpsyd5@lukather>
- <0c3a9e9c-d310-c6c3-ae10-1ae9e520963e@redhat.com>
- <20161117183520.vpyw72mchynpqx7d@lukather>
-Message-ID: <7db6926e-a490-21c7-851b-1bc34ae97a6a@redhat.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 17 Nov 2016 11:59:18 -0700
+Subject: [PATCH v4] arm64: dts: qcom: Add msm8916 CoreSight components
+In-Reply-To: <20161117153522.11630-1-georgi.djakov@linaro.org>
+References: <20161117153522.11630-1-georgi.djakov@linaro.org>
+Message-ID: <20161117185918.GA7884@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Nov 17, 2016 at 05:35:22PM +0200, Georgi Djakov wrote:
+> From: "Ivan T. Ivanov" <ivan.ivanov@linaro.org>
+> 
+> Add initial set of CoreSight components found on Qualcomm's 8x16 chipset.
 
-On 17-11-16 19:35, Maxime Ripard wrote:
-> Hi Hans,
->
-> On Tue, Nov 15, 2016 at 11:12:35AM +0100, Hans de Goede wrote:
->> Hi,
->>
->> On 14-11-16 21:08, Maxime Ripard wrote:
->>> Hi,
->>>
->>> On Sun, Nov 13, 2016 at 08:22:02PM +0100, Hans de Goede wrote:
->>>> Just like on sun8i all sun5i tablets use the same interrupt and power
->>>> gpios for their touchscreens. I've checked all known a13 fex files and
->>>> only the UTOO P66 uses a different gpio for the interrupt.
->>>>
->>>> Add a touchscreen node to sun5i-reference-design-tablet.dtsi, which
->>>> fills in the necessary gpios to avoid duplication in the tablet dts files,
->>>> just like we do in sun8i-reference-design-tablet.dtsi.
->>>>
->>>> This will make future patches adding touchscreen nodes to a13 tablets
->>>> simpler.
->>>>
->>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>> ---
->>>>  arch/arm/boot/dts/sun5i-a13-utoo-p66.dts           | 38 ++++++++--------------
->>>>  .../boot/dts/sun5i-reference-design-tablet.dtsi    | 25 ++++++++++++++
->>>>  2 files changed, 39 insertions(+), 24 deletions(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
->>>> index a8b0bcc..3d7ff10 100644
->>>> --- a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
->>>> +++ b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
->>>> @@ -83,22 +83,6 @@
->>>>  	allwinner,pins = "PG3";
->>>>  };
->>>>
->>>> -&i2c1 {
->>>> -	icn8318: touchscreen at 40 {
->>>> -		compatible = "chipone,icn8318";
->>>> -		reg = <0x40>;
->>>> -		interrupt-parent = <&pio>;
->>>> -		interrupts = <6 9 IRQ_TYPE_EDGE_FALLING>; /* EINT9 (PG9) */
->>>> -		pinctrl-names = "default";
->>>> -		pinctrl-0 = <&ts_wake_pin_p66>;
->>>> -		wake-gpios = <&pio 1 3 GPIO_ACTIVE_HIGH>; /* PB3 */
->>>> -		touchscreen-size-x = <800>;
->>>> -		touchscreen-size-y = <480>;
->>>> -		touchscreen-inverted-x;
->>>> -		touchscreen-swapped-x-y;
->>>> -	};
->>>> -};
->>>> -
->>>>  &mmc2 {
->>>>  	pinctrl-names = "default";
->>>>  	pinctrl-0 = <&mmc2_pins_a>;
->>>> @@ -121,20 +105,26 @@
->>>>  		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->>>>  		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
->>>>  	};
->>>> -
->>>> -	ts_wake_pin_p66: ts_wake_pin at 0 {
->>>> -		allwinner,pins = "PB3";
->>>> -		allwinner,function = "gpio_out";
->>>> -		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->>>> -		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->>>> -	};
->>>> -
->>>>  };
->>>>
->>>>  &reg_usb0_vbus {
->>>>  	gpio = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
->>>>  };
->>>>
->>>> +&touchscreen {
->>>> +	compatible = "chipone,icn8318";
->>>> +	reg = <0x40>;
->>>> +	/* The P66 uses a different EINT then the reference design */
->>>> +	interrupts = <6 9 IRQ_TYPE_EDGE_FALLING>; /* EINT9 (PG9) */
->>>> +	/* The icn8318 binding expects wake-gpios instead of power-gpios */
->>>> +	wake-gpios = <&pio 1 3 GPIO_ACTIVE_HIGH>; /* PB3 */
->>>> +	touchscreen-size-x = <800>;
->>>> +	touchscreen-size-y = <480>;
->>>> +	touchscreen-inverted-x;
->>>> +	touchscreen-swapped-x-y;
->>>> +	status = "okay";
->>>> +};
->>>> +
->>>>  &uart1 {
->>>>  	/* The P66 uses the uart pins as gpios */
->>>>  	status = "disabled";
->>>> diff --git a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
->>>> index 20cc940..7af488a 100644
->>>> --- a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
->>>> +++ b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
->>>> @@ -41,6 +41,7 @@
->>>>   */
->>>>  #include "sunxi-reference-design-tablet.dtsi"
->>>>
->>>> +#include <dt-bindings/interrupt-controller/irq.h>
->>>>  #include <dt-bindings/pwm/pwm.h>
->>>>
->>>>  / {
->>>> @@ -84,6 +85,23 @@
->>>>  };
->>>>
->>>>  &i2c1 {
->>>> +	/*
->>>> +	 * The gsl1680 is rated at 400KHz and it will not work reliable at
->>>> +	 * 100KHz, this has been confirmed on multiple different q8 tablets.
->>>> +	 * All other devices on this bus are also rated for 400KHz.
->>>> +	 */
->>>> +	clock-frequency = <400000>;
->>>> +
->>>> +	touchscreen: touchscreen {
->>>> +		interrupt-parent = <&pio>;
->>>> +		interrupts = <6 11 IRQ_TYPE_EDGE_FALLING>; /* EINT11 (PG11) */
->>>> +		pinctrl-names = "default";
->>>> +		pinctrl-0 = <&ts_power_pin>;
->>>> +		power-gpios = <&pio 1 3 GPIO_ACTIVE_HIGH>; /* PB3 */
->>>> +		/* Tablet dts must provide reg and compatible */
->>>> +		status = "disabled";
->>>> +	};
->>>> +
->>>>  	pcf8563: rtc at 51 {
->>>>  		compatible = "nxp,pcf8563";
->>>>  		reg = <0x51>;
->>>> @@ -125,6 +143,13 @@
->>>>  		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
->>>>  	};
->>>>
->>>> +	ts_power_pin: ts_power_pin {
->>>> +		allwinner,pins = "PB3";
->>>> +		allwinner,function = "gpio_out";
->>>> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->>>> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->>>> +	};
->>>> +
->>>
->>> For the next release, we'll switch to the generic pin mux properties
->>> ("pins" and "function"), and we actually implemented the fact that the
->>> drive and pull properties are optional, so you can drop them both.
->>>
->>> You'll need next + http://lists.infradead.org/pipermail/linux-arm-kernel/2016-November/467123.html
->>
->> Ok, before I send a v2 first a question about this, for the touchscreen
->> case I actually need:
->>
->> 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->> 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->>
->> Because otherwise when the touchscreen controller is powered by a separate
->> regulator and that regulator is off, then it may draw just enough current
->> from its enable pin to be sort-of listening to the i2c bus and mess up
->> that bus.
->>
->> So is this the default, or do we get the power-on default when not
->> specifying these? If it is the power-on default then we do need to
->> specify these, because AFAICT the power-on drive strength typically
->> is 20 mA.
->
-> Leaving them out will keep whatever state has been programmed. Putting
-> them in the DT will force them to whatever value has been set.
+Hello Georgi,
 
-Thanks for the answer, in the mean time I've send a v2 which leaves
-them in using the new names (which according to your answer seems to
-be the right thing to do).
+Could you add a better desccription for the SoC?  To me "8x16" doesn't
+say much.
 
-Regards,
+With that change:
+Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-Hans
+> 
+> Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+> ---
+> 
+> This patch was on hold for some time, as it has a dependency on RPM clocks,
+> which is now merged into clk-next.
+> 
+> Changes since v3: (https://lkml.org/lkml/2015/5/11/134)
+>  * Include msm8916-coresight.dtsi into msm8916.dtsi
+> 
+> Changes since v2: (https://lkml.org/lkml/2015/4/29/242)
+>  * Added "1x" to "qcom,coresight-replicator" compatible string, to match what
+>    devicetree bindings documentations says.
+> 
+> 
+>  arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi | 254 ++++++++++++++++++++++++
+>  arch/arm64/boot/dts/qcom/msm8916.dtsi           |   2 +
+>  2 files changed, 256 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
+> 
+> diff --git a/arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi b/arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
+> new file mode 100644
+> index 000000000000..900f1f484a0a
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
+> @@ -0,0 +1,254 @@
+> +/*
+> + * Copyright (c) 2013 - 2015, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +&soc {
+> +
+> +	tpiu at 820000 {
+> +		compatible = "arm,coresight-tpiu", "arm,primecell";
+> +		reg = <0x820000 0x1000>;
+> +
+> +		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +		clock-names = "apb_pclk", "atclk";
+> +
+> +		port {
+> +			tpiu_in: endpoint {
+> +				slave-mode;
+> +				remote-endpoint = <&replicator_out1>;
+> +			};
+> +		};
+> +	};
+> +
+> +	funnel at 821000 {
+> +		compatible = "arm,coresight-funnel", "arm,primecell";
+> +		reg = <0x821000 0x1000>;
+> +
+> +		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +		clock-names = "apb_pclk", "atclk";
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			/*
+> +			 * Not described input ports:
+> +			 * 0 - connected to Resource and Power Manger CPU ETM
+> +			 * 1 - not-connected
+> +			 * 2 - connected to Modem CPU ETM
+> +			 * 3 - not-connected
+> +			 * 5 - not-connected
+> +			 * 6 - connected trought funnel to Wireless CPU ETM
+> +			 * 7 - connected to STM component
+> +			 */
+> +			port at 4 {
+> +				reg = <4>;
+> +				funnel0_in4: endpoint {
+> +					slave-mode;
+> +					remote-endpoint = <&funnel1_out>;
+> +				};
+> +			};
+> +			port at 8 {
+> +				reg = <0>;
+> +				funnel0_out: endpoint {
+> +					remote-endpoint = <&etf_in>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+> +	replicator at 824000 {
+> +		compatible = "qcom,coresight-replicator1x", "arm,primecell";
+> +		reg = <0x824000 0x1000>;
+> +
+> +		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +		clock-names = "apb_pclk", "atclk";
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			port at 0 {
+> +				reg = <0>;
+> +				replicator_out0: endpoint {
+> +					remote-endpoint = <&etr_in>;
+> +				};
+> +			};
+> +			port at 1 {
+> +				reg = <1>;
+> +				replicator_out1: endpoint {
+> +					remote-endpoint = <&tpiu_in>;
+> +				};
+> +			};
+> +			port at 2 {
+> +				reg = <0>;
+> +				replicator_in: endpoint {
+> +					slave-mode;
+> +					remote-endpoint = <&etf_out>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+> +	etf at 825000 {
+> +		compatible = "arm,coresight-tmc", "arm,primecell";
+> +		reg = <0x825000 0x1000>;
+> +
+> +		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +		clock-names = "apb_pclk", "atclk";
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			port at 0 {
+> +				reg = <0>;
+> +				etf_out: endpoint {
+> +					slave-mode;
+> +					remote-endpoint = <&funnel0_out>;
+> +				};
+> +			};
+> +			port at 1 {
+> +				reg = <0>;
+> +				etf_in: endpoint {
+> +					remote-endpoint = <&replicator_in>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+> +	etr at 826000 {
+> +		compatible = "arm,coresight-tmc", "arm,primecell";
+> +		reg = <0x826000 0x1000>;
+> +
+> +		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +		clock-names = "apb_pclk", "atclk";
+> +
+> +		port {
+> +			etr_in: endpoint {
+> +				slave-mode;
+> +				remote-endpoint = <&replicator_out0>;
+> +			};
+> +		};
+> +	};
+> +
+> +	funnel at 841000 {	/* APSS funnel only 4 inputs are used */
+> +		compatible = "arm,coresight-funnel", "arm,primecell";
+> +		reg = <0x841000 0x1000>;
+> +
+> +		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +		clock-names = "apb_pclk", "atclk";
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			port at 0 {
+> +				reg = <0>;
+> +				funnel1_in0: endpoint {
+> +					slave-mode;
+> +					remote-endpoint = <&etm0_out>;
+> +				};
+> +			};
+> +			port at 1 {
+> +				reg = <1>;
+> +				funnel1_in1: endpoint {
+> +					slave-mode;
+> +					remote-endpoint = <&etm1_out>;
+> +				};
+> +			};
+> +			port at 2 {
+> +				reg = <2>;
+> +				funnel1_in2: endpoint {
+> +					slave-mode;
+> +					remote-endpoint = <&etm2_out>;
+> +				};
+> +			};
+> +			port at 3 {
+> +				reg = <3>;
+> +				funnel1_in3: endpoint {
+> +					slave-mode;
+> +					remote-endpoint = <&etm3_out>;
+> +				};
+> +			};
+> +			port at 4 {
+> +				reg = <0>;
+> +				funnel1_out: endpoint {
+> +					remote-endpoint = <&funnel0_in4>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+> +	etm at 85c000 {
+> +		compatible = "arm,coresight-etm4x", "arm,primecell";
+> +		reg = <0x85c000 0x1000>;
+> +
+> +		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +		clock-names = "apb_pclk", "atclk";
+> +
+> +		cpu = <&CPU0>;
+> +
+> +		port {
+> +			etm0_out: endpoint {
+> +				remote-endpoint = <&funnel1_in0>;
+> +			};
+> +		};
+> +	};
+> +
+> +	etm at 85d000 {
+> +		compatible = "arm,coresight-etm4x", "arm,primecell";
+> +		reg = <0x85d000 0x1000>;
+> +
+> +		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +		clock-names = "apb_pclk", "atclk";
+> +
+> +		cpu = <&CPU1>;
+> +
+> +		port {
+> +			etm1_out: endpoint {
+> +				remote-endpoint = <&funnel1_in1>;
+> +			};
+> +		};
+> +	};
+> +
+> +	etm at 85e000 {
+> +		compatible = "arm,coresight-etm4x", "arm,primecell";
+> +		reg = <0x85e000 0x1000>;
+> +
+> +		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +		clock-names = "apb_pclk", "atclk";
+> +
+> +		cpu = <&CPU2>;
+> +
+> +		port {
+> +			etm2_out: endpoint {
+> +				remote-endpoint = <&funnel1_in2>;
+> +			};
+> +		};
+> +	};
+> +
+> +	etm at 85f000 {
+> +		compatible = "arm,coresight-etm4x", "arm,primecell";
+> +		reg = <0x85f000 0x1000>;
+> +
+> +		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+> +		clock-names = "apb_pclk", "atclk";
+> +
+> +		cpu = <&CPU3>;
+> +
+> +		port {
+> +			etm3_out: endpoint {
+> +				remote-endpoint = <&funnel1_in3>;
+> +			};
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> index 4221b7d2c0ce..bfaeb9364190 100644
+> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> @@ -14,6 +14,7 @@
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/clock/qcom,gcc-msm8916.h>
+>  #include <dt-bindings/reset/qcom,gcc-msm8916.h>
+> +#include <dt-bindings/clock/qcom,rpmcc.h>
+>  
+>  / {
+>  	model = "Qualcomm Technologies, Inc. MSM8916";
+> @@ -993,4 +994,5 @@
+>  	};
+>  };
+>  
+> +#include "msm8916-coresight.dtsi"
+>  #include "msm8916-pins.dtsi"
