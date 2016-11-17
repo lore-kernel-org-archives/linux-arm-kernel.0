@@ -1,23 +1,34 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 17 Nov 2016 11:44:10 -0200
-Subject: [PATCH] ARM: dt: imx31: fix AVIC base address
-In-Reply-To: <20161117013051.29381-1-vz@mleia.com>
-References: <20161117013051.29381-1-vz@mleia.com>
-Message-ID: <CAOMZO5CfqBaHaOKEgEFU5a4D8ekJX2Mpoon_3eNAOveKj+=-wA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Nov 2016 14:50:13 +0100
+Subject: [RFC PATCH] of: base: add support to get machine model name
+In-Reply-To: <1479383450-19183-1-git-send-email-sudeep.holla@arm.com>
+References: <1479383450-19183-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <3670336.mMHByOpDl4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2016 at 11:30 PM, Vladimir Zapolskiy <vz@mleia.com> wrote:
-> From: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
->
-> On i.MX31 AVIC interrupt controller base address is at 0x68000000.
->
-> The problem was shadowed by the AVIC driver, which takes the correct
-> base address from a SoC specific header file.
->
-> Fixes: d2a37b3d91f4 ("ARM i.MX31: Add devicetree support")
-> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+On Thursday, November 17, 2016 11:50:50 AM CET Sudeep Holla wrote:
+> Currently platforms/drivers needing to get the machine model name are
+> replicating the same snippet of code. In some case, the OF reference
+> counting is either missing or incorrect.
+> 
+> This patch adds support to read the machine model name either using
+> the "model" or the "compatible" property in the device tree root node.
+> 
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
-Yes, this is what the Reference Manual states, thanks.
+I like the idea. One small comment:
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+> +int of_machine_get_model_name(const char **model)
+> +{
+> +	int error;
+> +	struct device_node *root;
+> +
+> +	root = of_find_node_by_path("/");
+> +	if (!root)
+> +		return -EINVAL;
+
+The global of_root variable points ot this already, and is defined
+in the same file, so I think we can just skip the lookup.
+
+	Arnd
