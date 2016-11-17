@@ -1,138 +1,154 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 17 Nov 2016 15:55:47 +0800
-Subject: [PATCH v4 1/2] drm/bridge: dumb-vga-dac: Support a VDD regulator
- supply
-In-Reply-To: <31b8b5b9-9621-286a-7649-cc999ab020da@codeaurora.org>
-References: <20161116154232.872-1-wens@csie.org>
- <20161116154232.872-2-wens@csie.org>
- <31b8b5b9-9621-286a-7649-cc999ab020da@codeaurora.org>
-Message-ID: <CAGb2v668A-hFnWy22_DarSSZ6TkvH5=WH-UvaXOFQJBqyKzPXw@mail.gmail.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Thu, 17 Nov 2016 09:05:16 +0100
+Subject: [PATCH] crypto: sun4i-ss: support the Security System PRNG
+In-Reply-To: <CANc+2y63p1b5ATDY0oU4nLckk9CJhSs3CXGHy=NwoXn_awP9aA@mail.gmail.com>
+References: <1476794067-28563-1-git-send-email-clabbe.montjoie@gmail.com>
+ <CANc+2y63p1b5ATDY0oU4nLckk9CJhSs3CXGHy=NwoXn_awP9aA@mail.gmail.com>
+Message-ID: <20161117080516.GA25394@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2016 at 3:48 PM, Archit Taneja <architt@codeaurora.org> wrote:
-> Hi,
->
-> Thanks for the patch.
->
->
-> On 11/16/2016 09:12 PM, Chen-Yu Tsai wrote:
->>
->> Some dumb VGA DACs are active components which require external power.
->> Add support for specifying a regulator as its power supply.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> Acked-by: Rob Herring <robh@kernel.org>
->> ---
->>  .../bindings/display/bridge/dumb-vga-dac.txt       |  2 ++
->>  drivers/gpu/drm/bridge/dumb-vga-dac.c              | 35
->> ++++++++++++++++++++++
->>  2 files changed, 37 insertions(+)
->>
->> diff --git
->> a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
->> b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
->> index 003bc246a270..164cbb15f04c 100644
->> --- a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
->> +++ b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
->> @@ -16,6 +16,8 @@ graph bindings specified in
->> Documentation/devicetree/bindings/graph.txt.
->>  - Video port 0 for RGB input
->>  - Video port 1 for VGA output
->>
->> +Optional properties:
->> +- vdd-supply: Power supply for DAC
->>
->>  Example
->>  -------
->> diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c
->> b/drivers/gpu/drm/bridge/dumb-vga-dac.c
->> index afec232185a7..15b549f94307 100644
->> --- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
->> +++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
->> @@ -12,6 +12,7 @@
->>
->>  #include <linux/module.h>
->>  #include <linux/of_graph.h>
->> +#include <linux/regulator/consumer.h>
->>
->>  #include <drm/drmP.h>
->>  #include <drm/drm_atomic_helper.h>
->> @@ -23,6 +24,7 @@ struct dumb_vga {
->>         struct drm_connector    connector;
->>
->>         struct i2c_adapter      *ddc;
->> +       struct regulator        *vdd;
->>  };
->>
->>  static inline struct dumb_vga *
->> @@ -124,8 +126,32 @@ static int dumb_vga_attach(struct drm_bridge *bridge)
->>         return 0;
->>  }
->>
->> +static void dumb_vga_enable(struct drm_bridge *bridge)
->> +{
->> +       struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
->> +       int ret = 0;
->> +
->> +       if (vga->vdd)
->> +               ret = regulator_enable(vga->vdd);
->> +
->> +       if (ret) {
->> +               DRM_ERROR("Failed to enable vdd regulator: %d\n", ret);
->> +               return;
->
->
-> We don't need this return for now. If you're okay with it, can I fix this
-> and queue to misc?
+On Tue, Oct 18, 2016 at 09:39:17PM +0530, PrasannaKumar Muralidharan wrote:
+> Hi Corentin,
+> 
+> I have a few minor comments.
+> 
+> On 18 October 2016 at 18:04, Corentin Labbe <clabbe.montjoie@gmail.com> wrote:
+> > From: LABBE Corentin <clabbe.montjoie@gmail.com>
+> >
+> > The Security System have a PRNG.
+> > This patch add support for it as an hwrng.
+> >
+> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > ---
+> >  drivers/crypto/Kconfig                   |  8 ++++
+> >  drivers/crypto/sunxi-ss/Makefile         |  1 +
+> >  drivers/crypto/sunxi-ss/sun4i-ss-core.c  | 14 +++++++
+> >  drivers/crypto/sunxi-ss/sun4i-ss-hwrng.c | 70 ++++++++++++++++++++++++++++++++
+> >  drivers/crypto/sunxi-ss/sun4i-ss.h       |  8 ++++
+> >  5 files changed, 101 insertions(+)
+> >  create mode 100644 drivers/crypto/sunxi-ss/sun4i-ss-hwrng.c
+> >
+> > diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+> > index 4d2b81f..38f7aca 100644
+> > --- a/drivers/crypto/Kconfig
+> > +++ b/drivers/crypto/Kconfig
+> > @@ -538,6 +538,14 @@ config CRYPTO_DEV_SUN4I_SS
+> >           To compile this driver as a module, choose M here: the module
+> >           will be called sun4i-ss.
+> >
+> > +config CRYPTO_DEV_SUN4I_SS_PRNG
+> > +       bool "Support for Allwinner Security System PRNG"
+> > +       depends on CRYPTO_DEV_SUN4I_SS
+> > +       select HW_RANDOM
+> > +       help
+> > +         This driver provides kernel-side support for the Pseudo-Random
+> > +         Number Generator found in the Security System.
+> > +
+> >  config CRYPTO_DEV_ROCKCHIP
+> >         tristate "Rockchip's Cryptographic Engine driver"
+> >         depends on OF && ARCH_ROCKCHIP
+> > diff --git a/drivers/crypto/sunxi-ss/Makefile b/drivers/crypto/sunxi-ss/Makefile
+> > index 8f4c7a2..ca049ee 100644
+> > --- a/drivers/crypto/sunxi-ss/Makefile
+> > +++ b/drivers/crypto/sunxi-ss/Makefile
+> > @@ -1,2 +1,3 @@
+> >  obj-$(CONFIG_CRYPTO_DEV_SUN4I_SS) += sun4i-ss.o
+> >  sun4i-ss-y += sun4i-ss-core.o sun4i-ss-hash.o sun4i-ss-cipher.o
+> > +sun4i-ss-$(CONFIG_CRYPTO_DEV_SUN4I_SS_PRNG) += sun4i-ss-hwrng.o
+> > diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-core.c b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+> > index 3ac6c6c..fa739de 100644
+> > --- a/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+> > +++ b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+> > @@ -359,6 +359,16 @@ static int sun4i_ss_probe(struct platform_device *pdev)
+> >                 }
+> >         }
+> >         platform_set_drvdata(pdev, ss);
+> > +
+> > +#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_PRNG
+> > +       /* Voluntarily made the PRNG optional */
+> > +       err = sun4i_ss_hwrng_register(&ss->hwrng);
+> > +       if (!err)
+> > +               dev_info(ss->dev, "sun4i-ss PRNG loaded");
+> > +       else
+> > +               dev_err(ss->dev, "sun4i-ss PRNG failed");
+> > +#endif
+> > +
+> >         return 0;
+> >  error_alg:
+> >         i--;
+> > @@ -386,6 +396,10 @@ static int sun4i_ss_remove(struct platform_device *pdev)
+> >         int i;
+> >         struct sun4i_ss_ctx *ss = platform_get_drvdata(pdev);
+> >
+> > +#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_PRNG
+> > +       sun4i_ss_hwrng_remove(&ss->hwrng);
+> > +#endif
+> > +
+> >         for (i = 0; i < ARRAY_SIZE(ss_algs); i++) {
+> >                 switch (ss_algs[i].type) {
+> >                 case CRYPTO_ALG_TYPE_ABLKCIPHER:
+> > diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hwrng.c b/drivers/crypto/sunxi-ss/sun4i-ss-hwrng.c
+> > new file mode 100644
+> > index 0000000..95fadb7
+> > --- /dev/null
+> > +++ b/drivers/crypto/sunxi-ss/sun4i-ss-hwrng.c
+> > @@ -0,0 +1,70 @@
+> > +#include "sun4i-ss.h"
+> > +
+> > +static int sun4i_ss_hwrng_init(struct hwrng *hwrng)
+> > +{
+> > +       struct sun4i_ss_ctx *ss;
+> > +
+> > +       ss = container_of(hwrng, struct sun4i_ss_ctx, hwrng);
+> > +       get_random_bytes(ss->seed, SS_SEED_LEN);
+> > +
+> > +       return 0;
+> > +}
+> > +
+> > +static int sun4i_ss_hwrng_read(struct hwrng *hwrng, void *buf,
+> > +                              size_t max, bool wait)
+> > +{
+> > +       int i;
+> > +       u32 v;
+> > +       u32 *data = buf;
+> > +       const u32 mode = SS_OP_PRNG | SS_PRNG_CONTINUE | SS_ENABLED;
+> > +       size_t len;
+> > +       struct sun4i_ss_ctx *ss;
+> > +
+> > +       ss = container_of(hwrng, struct sun4i_ss_ctx, hwrng);
+> > +       len = min_t(size_t, SS_DATA_LEN, max);
+> > +
+> > +       spin_lock_bh(&ss->slock);
+> 
+> Is spin_lock_bh really required here? I could see it is being used in
+> sun4i-ss-hash.c but could not find any comment/info about the need.
+> 
 
-Yes, please!
+No for sun4i-ss-hwrng it seems not required and work perfecly without _bh
+
+> > +       writel(mode, ss->base + SS_CTL);
+> > +
+> > +       /* write the seed */
+> > +       for (i = 0; i < SS_SEED_LEN / 4; i++)
+> > +               writel(ss->seed[i], ss->base + SS_KEY0 + i * 4);
+> > +       writel(mode | SS_PRNG_START, ss->base + SS_CTL);
+> > +
+> > +       /* Read the random data */
+> > +       readsl(ss->base + SS_TXFIFO, data, len / 4);
+> > +
+> > +       if (len % 4 > 0) {
+> > +               v = readl(ss->base + SS_TXFIFO);
+> > +               memcpy(data + len / 4, &v, len % 4);
+> > +       }
+> 
+> hwrng core asks for "rng_buffer_size()" of data which is a multiple of
+> 4. So len % 4 will be 0. I think the above check is not required. Feel
+> free to correct if I am wrong.
+> 
+
+Agree, I removed that in v2
 
 Thanks
-ChenYu
 
->
-> Thanks,
-> Archit
->
->
->> +       }
->> +}
->> +
->> +static void dumb_vga_disable(struct drm_bridge *bridge)
->> +{
->> +       struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
->> +
->> +       if (vga->vdd)
->> +               regulator_disable(vga->vdd);
->> +}
->> +
->>  static const struct drm_bridge_funcs dumb_vga_bridge_funcs = {
->>         .attach         = dumb_vga_attach,
->> +       .enable         = dumb_vga_enable,
->> +       .disable        = dumb_vga_disable,
->>  };
->>
->>  static struct i2c_adapter *dumb_vga_retrieve_ddc(struct device *dev)
->> @@ -169,6 +195,15 @@ static int dumb_vga_probe(struct platform_device
->> *pdev)
->>                 return -ENOMEM;
->>         platform_set_drvdata(pdev, vga);
->>
->> +       vga->vdd = devm_regulator_get_optional(&pdev->dev, "vdd");
->> +       if (IS_ERR(vga->vdd)) {
->> +               ret = PTR_ERR(vga->vdd);
->> +               if (ret == -EPROBE_DEFER)
->> +                       return -EPROBE_DEFER;
->> +               vga->vdd = NULL;
->> +               dev_dbg(&pdev->dev, "No vdd regulator found: %d\n", ret);
->> +       }
->> +
->>         vga->ddc = dumb_vga_retrieve_ddc(&pdev->dev);
->>         if (IS_ERR(vga->ddc)) {
->>                 if (PTR_ERR(vga->ddc) == -ENODEV) {
->>
->
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+Corentin Labbe
