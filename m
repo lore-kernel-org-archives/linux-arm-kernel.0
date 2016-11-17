@@ -1,41 +1,28 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Nov 2016 14:22:13 +0000
-Subject: [PATCH next] arm64: remove "SMP: Total of %d processors
- activated." message
-In-Reply-To: <1479367946-38771-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1479367946-38771-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <20161117142213.GI22855@arm.com>
+Date: Thu, 17 Nov 2016 14:25:29 +0000
+Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire
+ section
+In-Reply-To: <20161109195132.GZ22012@rric.localdomain>
+References: <1475747527-32387-1-git-send-email-rrichter@cavium.com>
+ <CAKv+Gu-oYzSn_eeqaX3QVFeQjBGkaX-Wh7+oPcQFcXv7J6GOFQ@mail.gmail.com>
+ <20161006161114.GH22012@rric.localdomain>
+ <20161017185801.GT25086@rric.localdomain>
+ <20161027160136.GD24290@arm.com>
+ <20161028091905.GM22012@rric.localdomain>
+ <20161107210514.GP20591@arm.com>
+ <20161109195132.GZ22012@rric.localdomain>
+Message-ID: <20161117142528.GJ22855@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2016 at 03:32:26PM +0800, Kefeng Wang wrote:
-> There is a common SMP boot message in generic code on all arches,
-> kill "SMP: Total of %d processors activated." in smp_cpus_done()
-> on arm64.
-> 
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> ---
-> Boot message on qemu.
-> [    0.375116] smp: Brought up 1 node, 8 CPUs
-> [    0.383749] SMP: Total of 8 processors activated.
-> 
->  arch/arm64/kernel/smp.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index cb87234..9db4a95 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -428,7 +428,6 @@ static void __init hyp_mode_check(void)
->  
->  void __init smp_cpus_done(unsigned int max_cpus)
->  {
-> -	pr_info("SMP: Total of %d processors activated.\n", num_online_cpus());
->  	setup_cpu_features();
->  	hyp_mode_check();
->  	apply_alternatives_all();
+On Wed, Nov 09, 2016 at 08:51:32PM +0100, Robert Richter wrote:
+> Thus, I don't see where my patch breaks code. Even acpi_os_ioremap()
+> keeps the same behaviour as before since it still uses memblock_is_
+> memory(). Could you more describe your concerns why do you think this
+> patch breaks the kernel and moves the problem somewhere else? I
+> believe it fixes the problem at all.
 
-Why? Are you proposing the same change to other architectures? Are you paid
-per patch?
+acpi_os_ioremap always ends up in __ioremap_caller, regardless of
+memblock_is_memory(). __ioremap_caller then fails if pfn_valid is true.
 
 Will
