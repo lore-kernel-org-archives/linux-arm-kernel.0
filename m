@@ -1,72 +1,63 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 17 Nov 2016 20:05:01 +0100
-Subject: [PATCH] drm/sun4i: tcon: Initialize regmap after enabling bus
- clocks
-In-Reply-To: <20161116093732.12828-2-wens@csie.org>
-References: <20161116093732.12828-1-wens@csie.org>
- <20161116093732.12828-2-wens@csie.org>
-Message-ID: <20161117190501.hjpwposqzidwhwdc@lukather>
+From: atull@opensource.altera.com (atull)
+Date: Thu, 17 Nov 2016 13:54:47 -0600
+Subject: [PATCH fpga 8/9] fpga socfpga: Use the scatterlist interface
+In-Reply-To: <20161116202329.GD19593@obsidianresearch.com>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-9-git-send-email-jgunthorpe@obsidianresearch.com>
+ <alpine.DEB.2.10.1611131712210.2735@atull-VirtualBox>
+ <20161114001854.GA27248@obsidianresearch.com>
+ <alpine.DEB.2.10.1611132149140.2908@atull-VirtualBox>
+ <20161115043537.GA23253@obsidianresearch.com>
+ <alpine.DEB.2.20.1611150940270.3634@atull-VirtualBox2>
+ <20161116052033.GA6044@obsidianresearch.com>
+ <alpine.DEB.2.20.1611160939140.3364@atull-VirtualBox2>
+ <20161116202329.GD19593@obsidianresearch.com>
+Message-ID: <alpine.DEB.2.20.1611171350590.4425@atull-VirtualBox2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2016 at 05:37:32PM +0800, Chen-Yu Tsai wrote:
-> If we attempt to read/write the TCON registers before the bus clock
-> is enabled, those accesses get ignored.
-> 
-> In practice this almost never occurs because U-boot had already enabled
-> the bus clock as part of its firmware provided framebuffer (simplefb).
-> 
-> Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> 
-> I was looking around the DRM driver and noticed this sequence was off.
-> 
-> ---
->  drivers/gpu/drm/sun4i/sun4i_tcon.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> index c6afb2448655..8c2db65ea229 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -506,16 +506,16 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
->  		return ret;
->  	}
->  
-> -	ret = sun4i_tcon_init_regmap(dev, tcon);
-> +	ret = sun4i_tcon_init_clocks(dev, tcon);
->  	if (ret) {
-> -		dev_err(dev, "Couldn't init our TCON regmap\n");
-> +		dev_err(dev, "Couldn't init our TCON clocks\n");
->  		goto err_assert_reset;
->  	}
->  
-> -	ret = sun4i_tcon_init_clocks(dev, tcon);
-> +	ret = sun4i_tcon_init_regmap(dev, tcon);
->  	if (ret) {
-> -		dev_err(dev, "Couldn't init our TCON clocks\n");
-> -		goto err_assert_reset;
-> +		dev_err(dev, "Couldn't init our TCON regmap\n");
-> +		goto err_free_clocks;
->  	}
+On Wed, 16 Nov 2016, Jason Gunthorpe wrote:
 
-That won't work either. sun4i_tcon_init_clocks requires the regmap to
-be enabled before it calls sun4i_dclk_create.
+> On Wed, Nov 16, 2016 at 09:45:23AM -0600, atull wrote:
+> > > What is the point of this if write_init gets a copy of the buffer -
+> > > what is that supposed to be?
+> > 
+> > Sometimes write_init needs to look at the header of the image.
+> > You can see that in the socfpga-a10.c (on linux-next/master)
+> 
+> I know what it is for, I'm asking what should it be if we are calling
+> write_init multiple times.
+> 
+> It feels like the driver needs to indicate the header length it wants
+> to inspect and the core core needs to make that much of the bitstream
+> available to write_init() before calling write().
+> 
+> Is that what you were thinking?
 
-Maybe we should just move that call outside of sun4i_tcon_init_clocks
-and put it directly into the bind then.
+That would make sense.  socfpga-a10.c requires a certain amount
+of header in write_init, but the current API didn't have a way
+for socfgpa-a10.c to specify that to fpga-mgr.c core.  Should
+probably happen during registration.  If you have an idea about
+that, that's good, otherwise we'll get back to that separately.
 
-Maxime
+> 
+> > at this stuff, this is coming at a busy time).  My point there
+> > was that there was code that needed to go into the core so that
+> > the ICE40 and the cyclone spi driver that are on the mailing
+> > list won't have to have the same workaround that you were
+> > adding to the socfpga.c driver.
+> 
+> Sure, that is easy for write() - not clear on write_init sematics?
+> I will send a revised series.
+> 
+> I'd also like to close on the zynq bitfile verification patch, did you
+> have any comments on that?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161117/ac4950fb/attachment.sig>
+I think Joshua had some comments.  Besides that, I'm ok with that
+patch.
+
+Alan
+
+> 
+> Jason
+> 
