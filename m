@@ -1,140 +1,36 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Thu, 17 Nov 2016 16:56:53 +0530
-Subject: [PATCH v8 1/7] arm/arm64: vgic: Implement support for userspace
- access
-In-Reply-To: <20161116185215.GC3811@cbox>
-References: <1478258013-6669-1-git-send-email-vijay.kilari@gmail.com>
- <1478258013-6669-2-git-send-email-vijay.kilari@gmail.com>
- <20161116185215.GC3811@cbox>
-Message-ID: <CALicx6vbFj3aoSiqc4n_92rZgONeQVhp-GtTkEhW3=pt9P1hGQ@mail.gmail.com>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Thu, 17 Nov 2016 12:32:15 +0100
+Subject: [PATCH fpga 1/9] fpga zynq: Add missing \n to messages
+In-Reply-To: <20161115180813.GB1852@obsidianresearch.com>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-2-git-send-email-jgunthorpe@obsidianresearch.com>
+ <0aebdb59-86d7-2569-c49d-de5d45b5cac0@suse.com>
+ <20161115180813.GB1852@obsidianresearch.com>
+Message-ID: <21fe76d9-f32a-9684-5853-4448eb6aac67@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2016 at 12:22 AM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Fri, Nov 04, 2016 at 04:43:27PM +0530, vijay.kilari at gmail.com wrote:
->> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
->>
->> Read and write of some registers like ISPENDR and ICPENDR
->> from userspace requires special handling when compared to
->> guest access for these registers.
->>
->> Refer to Documentation/virtual/kvm/devices/arm-vgic-v3.txt
->> for handling of ISPENDR, ICPENDR registers handling.
->>
->> Add infrastructure to support guest and userspace read
->> and write for the required registers
->> Also moved vgic_uaccess from vgic-mmio-v2.c to vgic-mmio.c
->>
->> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
->> ---
->>  virt/kvm/arm/vgic/vgic-mmio-v2.c | 25 ----------
->>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 98 ++++++++++++++++++++++++++++++++--------
->>  virt/kvm/arm/vgic/vgic-mmio.c    | 78 ++++++++++++++++++++++++++++----
->>  virt/kvm/arm/vgic/vgic-mmio.h    | 19 ++++++++
->>  4 files changed, 169 insertions(+), 51 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->> index b44b359..0b32f40 100644
->> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
->> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->> @@ -406,31 +406,6 @@ int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
->>       return -ENXIO;
->>  }
->>
->> -/*
->> - * When userland tries to access the VGIC register handlers, we need to
->> - * create a usable struct vgic_io_device to be passed to the handlers and we
->> - * have to set up a buffer similar to what would have happened if a guest MMIO
->> - * access occurred, including doing endian conversions on BE systems.
->> - */
->> -static int vgic_uaccess(struct kvm_vcpu *vcpu, struct vgic_io_device *dev,
->> -                     bool is_write, int offset, u32 *val)
->> -{
->> -     unsigned int len = 4;
->> -     u8 buf[4];
->> -     int ret;
->> -
->> -     if (is_write) {
->> -             vgic_data_host_to_mmio_bus(buf, len, *val);
->> -             ret = kvm_io_gic_ops.write(vcpu, &dev->dev, offset, len, buf);
->> -     } else {
->> -             ret = kvm_io_gic_ops.read(vcpu, &dev->dev, offset, len, buf);
->> -             if (!ret)
->> -                     *val = vgic_data_mmio_bus_to_host(buf, len);
->> -     }
->> -
->> -     return ret;
->> -}
->> -
->>  int vgic_v2_cpuif_uaccess(struct kvm_vcpu *vcpu, bool is_write,
->>                         int offset, u32 *val)
->>  {
->> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
->> index 0d3c76a..ce2708d 100644
->> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
->> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
->> @@ -209,6 +209,62 @@ static unsigned long vgic_mmio_read_v3_idregs(struct kvm_vcpu *vcpu,
->>       return 0;
->>  }
->>
->> +static unsigned long vgic_v3_uaccess_read_pending(struct kvm_vcpu *vcpu,
->> +                                               gpa_t addr, unsigned int len)
->> +{
->> +     u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
->> +     u32 value = 0;
->> +     int i;
->> +
->> +     /*
->> +      * A level triggerred interrupt pending state is latched in both
->> +      * "soft_pending" and "line_level" variables. Userspace will save
->> +      * and restore soft_pending and line_level separately.
->> +      * Refer to Documentation/virtual/kvm/devices/arm-vgic-v3.txt
->> +      * handling of ISPENDR and ICPENDR.
->> +      */
->> +     for (i = 0; i < len * 8; i++) {
->> +             struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->> +
->> +             if (irq->config == VGIC_CONFIG_LEVEL && irq->soft_pending)
->> +                     value |= (1U << i);
->> +             if (irq->config == VGIC_CONFIG_EDGE && irq->pending)
->> +                     value |= (1U << i);
->> +
->> +             vgic_put_irq(vcpu->kvm, irq);
->> +     }
->> +
->> +     return value;
->> +}
->> +
->> +static void vgic_v3_uaccess_write_pending(struct kvm_vcpu *vcpu,
->> +                                       gpa_t addr, unsigned int len,
->> +                                       unsigned long val)
->> +{
->> +     u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
->> +     int i;
->> +
->> +     for (i = 0; i < len * 8; i++) {
->> +             struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->> +
->> +             spin_lock(&irq->irq_lock);
->> +             if (test_bit(i, &val)) {
->> +                     irq->pending = true;
->> +                     irq->soft_pending = true;
->
-> In the vgic_mmio_write_spending function we only set the soft_pending
-> state to true if the interrupt is a level-triggered interrupt.
->
-> Should we check if that's the case here as well before setting the
-> soft_pending state?
 
-Yes, can be done. But it puts hard requirement that irq config should
-be restored
-before updating pending state.
-In any case, the soft_pending is used only if interrupt is level-triggered.
 
+On 15/11/16 19:08, Jason Gunthorpe wrote:
 >
-> Otherwise, this patch looks good.
+> On Tue, Nov 15, 2016 at 12:05:15PM +0100, Matthias Brugger wrote:
+>> On 09/11/16 23:58, Jason Gunthorpe wrote:
+>>> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+>>
+>> Please add a commit message, although it is cristal clear what this patch
+>> does :)
 >
-> Thanks,
-> -Christoffer
+> As you say, it is crystal clear already, and this is an acceptable commit
+> message.. Please suggest a text if you want to see something
+> different.
 >
+
+"Function dev_err doesn't add a newline at the end of the string. This 
+will lead to a hard to read kernel log. This patch fixes this."
+
+With this (or something similar added):
+Reviewed-by: Matthias Brugger <mbrugger@suse.com>
+
+Regards,
+Matthias
