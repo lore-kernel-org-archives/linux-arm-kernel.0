@@ -1,160 +1,64 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 17 Nov 2016 18:11:26 +0100
-Subject: [PATCH 4/9] arm64: tegra: Add I2C controllers on Tegra186
+Date: Thu, 17 Nov 2016 18:11:29 +0100
+Subject: [PATCH 7/9] arm64: tegra: Add NVIDIA P3310 processor module support
 In-Reply-To: <20161117171131.20062-1-thierry.reding@gmail.com>
 References: <20161117171131.20062-1-thierry.reding@gmail.com>
-Message-ID: <20161117171131.20062-4-thierry.reding@gmail.com>
+Message-ID: <20161117171131.20062-7-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+From: Joseph Lo <josephl@nvidia.com>
 
-Tegra186 has a total of nine I2C controllers that are compatible with
-the I2C controllers introduced in Tegra114. Two of these controllers
-share pads with two DPAUX controllers (for AUX transactions).
+The NVIDIA P3310 is a processor module used in several reference designs
+that features a Tegra186 SoC, 8 GiB of LPDDR4 RAM, 32 GiB eMMC and other
+essentials such as ethernet, WiFi and a PMIC. It is typically connected
+to an I/O board (such as the P2597) that provides the connecters needed
+to hook it up to the outside world.
 
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm64/boot/dts/nvidia/tegra186.dtsi | 120 +++++++++++++++++++++++++++++++
- 1 file changed, 120 insertions(+)
+ arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 32 ++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-index 911f288966ba..b1a77d78d202 100644
---- a/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-@@ -69,6 +69,100 @@
- 		status = "disabled";
- 	};
- 
-+	gen1_i2c: i2c at 3160000 {
-+		compatible = "nvidia,tegra186-i2c", "nvidia,tegra114-i2c";
-+		reg = <0x0 0x03160000 0x0 0x10000>;
-+		interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&bpmp TEGRA186_CLK_I2C1>;
-+		clock-names = "div-clk";
-+		resets = <&bpmp TEGRA186_RESET_I2C1>;
-+		reset-names = "i2c";
-+		status = "disabled";
+diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
+new file mode 100644
+index 000000000000..807af7b68761
+--- /dev/null
++++ b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
+@@ -0,0 +1,32 @@
++#include "tegra186.dtsi"
++
++/ {
++	model = "NVIDIA Tegra186 P3310 Processor Module";
++	compatible = "nvidia,p3310", "nvidia,tegra186";
++
++	aliases {
++		serial0 = &uarta;
 +	};
 +
-+	cam_i2c: i2c at 3180000 {
-+		compatible = "nvidia,tegra186-i2c", "nvidia,tegra114-i2c";
-+		reg = <0x0 0x03180000 0x0 0x10000>;
-+		interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&bpmp TEGRA186_CLK_I2C3>;
-+		clock-names = "div-clk";
-+		resets = <&bpmp TEGRA186_RESET_I2C3>;
-+		reset-names = "i2c";
-+		status = "disabled";
++	chosen {
++		bootargs = "earlycon console=ttyS0,115200n8";
++		stdout-path = "serial0:115200n8";
 +	};
 +
-+	/* shares pads with dpaux1 */
-+	dp_aux_ch1_i2c: i2c at 3190000 {
-+		compatible = "nvidia,tegra186-i2c", "nvidia,tegra114-i2c";
-+		reg = <0x0 0x03190000 0x0 0x10000>;
-+		interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&bpmp TEGRA186_CLK_I2C4>;
-+		clock-names = "div-clk";
-+		resets = <&bpmp TEGRA186_RESET_I2C4>;
-+		reset-names = "i2c";
-+		status = "disabled";
++	memory {
++		device_type = "memory";
++		reg = <0x0 0x80000000 0x2 0x00000000>;
 +	};
 +
-+	/* controlled by BPMP, should not be enabled */
-+	pwr_i2c: i2c at 31a0000 {
-+		compatible = "nvidia,tegra186-i2c", "nvidia,tegra114-i2c";
-+		reg = <0x0 0x031a0000 0x0 0x10000>;
-+		interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&bpmp TEGRA186_CLK_I2C5>;
-+		clock-names = "div-clk";
-+		resets = <&bpmp TEGRA186_RESET_I2C5>;
-+		reset-names = "i2c";
-+		status = "disabled";
++	serial at 3100000 {
++		status = "okay";
 +	};
 +
-+	/* shares pads with dpaux0 */
-+	dp_aux_ch0_i2c: i2c at 31b0000 {
-+		compatible = "nvidia,tegra186-i2c", "nvidia,tegra114-i2c";
-+		reg = <0x0 0x031b0000 0x0 0x10000>;
-+		interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&bpmp TEGRA186_CLK_I2C6>;
-+		clock-names = "div-clk";
-+		resets = <&bpmp TEGRA186_RESET_I2C6>;
-+		reset-names = "i2c";
-+		status = "disabled";
++	hsp at 3c00000 {
++		status = "okay";
 +	};
 +
-+	gen7_i2c: i2c at 31c0000 {
-+		compatible = "nvidia,tegra186-i2c", "nvidia,tegra114-i2c";
-+		reg = <0x0 0x031c0000 0x0 0x10000>;
-+		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&bpmp TEGRA186_CLK_I2C7>;
-+		clock-names = "div-clk";
-+		resets = <&bpmp TEGRA186_RESET_I2C7>;
-+		reset-names = "i2c";
-+		status = "disabled";
++	bpmp {
++		status = "okay";
 +	};
-+
-+	gen9_i2c: i2c at 31e0000 {
-+		compatible = "nvidia,tegra186-i2c", "nvidia,tegra114-i2c";
-+		reg = <0x0 0x031e0000 0x0 0x10000>;
-+		interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&bpmp TEGRA186_CLK_I2C9>;
-+		clock-names = "div-clk";
-+		resets = <&bpmp TEGRA186_RESET_I2C9>;
-+		reset-names = "i2c";
-+		status = "disabled";
-+	};
-+
- 	gic: interrupt-controller at 3881000 {
- 		compatible = "arm,gic-400";
- 		#interrupt-cells = <3>;
-@@ -89,6 +183,32 @@
- 		status = "disabled";
- 	};
- 
-+	gen2_i2c: i2c at c240000 {
-+		compatible = "nvidia,tegra186-i2c", "nvidia,tegra114-i2c";
-+		reg = <0x0 0x0c240000 0x0 0x10000>;
-+		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&bpmp TEGRA186_CLK_I2C2>;
-+		clock-names = "div-clk";
-+		resets = <&bpmp TEGRA186_RESET_I2C2>;
-+		reset-names = "i2c";
-+		status = "disabled";
-+	};
-+
-+	gen8_i2c: i2c at c250000 {
-+		compatible = "nvidia,tegra186-i2c", "nvidia,tegra114-i2c";
-+		reg = <0x0 0x0c250000 0x0 0x10000>;
-+		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&bpmp TEGRA186_CLK_I2C8>;
-+		clock-names = "div-clk";
-+		resets = <&bpmp TEGRA186_RESET_I2C8>;
-+		reset-names = "i2c";
-+		status = "disabled";
-+	};
-+
- 	uartc: serial at c280000 {
- 		compatible = "nvidia,tegra186-uart", "nvidia,tegra20-uart";
- 		reg = <0x0 0x0c280000 0x0 0x40>;
++};
 -- 
 2.10.2
