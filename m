@@ -1,79 +1,146 @@
 From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Thu, 17 Nov 2016 07:47:18 +0530
-Subject: [PATCH 2/6] dt-bindings: clk: max8997: Add DT binding
- documentation
-In-Reply-To: <20161114161546.oitvons6tvlazgsb@rob-hp-laptop>
-References: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
- <1478513376-14307-3-git-send-email-pankaj.dubey@samsung.com>
- <CGME20161114161550epcas1p3a06490b915cff2dffc5af8df54cd6561@epcas1p3.samsung.com>
- <20161114161546.oitvons6tvlazgsb@rob-hp-laptop>
-Message-ID: <873e0495-cc2f-6bef-4a37-a8b9999846d6@samsung.com>
+Date: Thu, 17 Nov 2016 07:52:03 +0530
+Subject: [PATCH 01/16] ARM: scu: Provide support for parsing SCU device
+ node to enable SCU
+In-Reply-To: <20161114134813.GK1041@n2100.armlinux.org.uk>
+References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
+ <1479099731-28108-2-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20161114134843epcas2p2d52a44bae703d52a9e9646e73ed5b41d@epcas2p2.samsung.com>
+ <20161114134813.GK1041@n2100.armlinux.org.uk>
+Message-ID: <8b3f2f77-d883-519e-db65-a0bfca254c22@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Russell,
 
-On Monday 14 November 2016 09:45 PM, Rob Herring wrote:
-> On Mon, Nov 07, 2016 at 03:39:32PM +0530, Pankaj Dubey wrote:
->> Add Device Tree binding documentation for the clocks
->> outputs in the Maxim-8997 Power Management IC.
+On Monday 14 November 2016 07:18 PM, Russell King - ARM Linux wrote:
+> This should be sent _to_ me because it's touching generic ARM code.
+> Thanks.
+> 
+
+Sorry for this.
+
+I had included your email in CC for this patch, but looks like my email
+client had some issue and this patch could not reach to your mailbox. I
+will take care in future.
+
+> On Mon, Nov 14, 2016 at 10:31:56AM +0530, Pankaj Dubey wrote:
+>> Many platforms are duplicating code for enabling SCU, lets add
+>> common code to enable SCU by parsing SCU device node so the duplication
+>> in each platform can be avoided.
 >>
->> CC: Michael Turquette <mturquette@baylibre.com>
->> CC: Rob Herring <robh+dt@kernel.org>
->> CC: devicetree at vger.kernel.org
->> CC: linux-clk at vger.kernel.org
+>> CC: Krzysztof Kozlowski <krzk@kernel.org>
+>> CC: Jisheng Zhang <jszhang@marvell.com>
+>> CC: Russell King <linux@armlinux.org.uk>
+>> CC: Dinh Nguyen <dinguyen@opensource.altera.com>
+>> CC: Patrice Chotard <patrice.chotard@st.com>
+>> CC: Linus Walleij <linus.walleij@linaro.org>
+>> CC: Liviu Dudau <liviu.dudau@arm.com>
+>> CC: Ray Jui <rjui@broadcom.com>
+>> CC: Stephen Warren <swarren@wwwdotorg.org>
+>> CC: Heiko Stuebner <heiko@sntech.de>
+>> CC: Shawn Guo <shawnguo@kernel.org>
+>> CC: Michal Simek <michal.simek@xilinx.com>
+>> CC: Wei Xu <xuwei5@hisilicon.com>
+>> CC: Andrew Lunn <andrew@lunn.ch>
+>> CC: Jun Nie <jun.nie@linaro.org> 
+>> Suggested-by: Arnd Bergmann <arnd@arndb.de>
 >> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 >> ---
->>  .../devicetree/bindings/clock/maxim,max8997.txt    | 44 ++++++++++++++++++++++
->>  .../bindings/regulator/max8997-regulator.txt       |  3 ++
->>  2 files changed, 47 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/clock/maxim,max8997.txt
+>>  arch/arm/include/asm/smp_scu.h |  4 +++
+>>  arch/arm/kernel/smp_scu.c      | 56 ++++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 60 insertions(+)
 >>
->> diff --git a/Documentation/devicetree/bindings/clock/maxim,max8997.txt b/Documentation/devicetree/bindings/clock/maxim,max8997.txt
->> new file mode 100644
->> index 0000000..d2e2a74
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/maxim,max8997.txt
->> @@ -0,0 +1,44 @@
->> +Binding for Maxim MAX8997 32k clock generator block
+>> diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
+>> index bfe163c..fdeec07 100644
+>> --- a/arch/arm/include/asm/smp_scu.h
+>> +++ b/arch/arm/include/asm/smp_scu.h
+>> @@ -39,8 +39,12 @@ static inline int scu_power_mode(void __iomem *scu_base, unsigned int mode)
+>>  
+>>  #if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
+>>  void scu_enable(void __iomem *scu_base);
+>> +void __iomem *of_scu_get_base(void);
+>> +int of_scu_enable(void);
+>>  #else
+>>  static inline void scu_enable(void __iomem *scu_base) {}
+>> +static inline void __iomem *of_scu_get_base(void) {return NULL; }
+>> +static inline int of_scu_enable(void) {return 0; }
+>>  #endif
+>>  
+>>  #endif
+>> diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+>> index 72f9241..d0ac3ed 100644
+>> --- a/arch/arm/kernel/smp_scu.c
+>> +++ b/arch/arm/kernel/smp_scu.c
+>> @@ -10,6 +10,7 @@
+>>   */
+>>  #include <linux/init.h>
+>>  #include <linux/io.h>
+>> +#include <linux/of_address.h>
+>>  
+>>  #include <asm/smp_plat.h>
+>>  #include <asm/smp_scu.h>
+>> @@ -70,6 +71,61 @@ void scu_enable(void __iomem *scu_base)
+>>  	 */
+>>  	flush_cache_all();
+>>  }
 >> +
->> +This is a part of device tree bindings of MAX8997 multi-function device.
->> +More information can be found in bindings/regulator/max8997-regulator.txt file.
+>> +static const struct of_device_id scu_match[] = {
+>> +	{ .compatible = "arm,cortex-a9-scu", },
+>> +	{ .compatible = "arm,cortex-a5-scu", },
+>> +	{ }
+>> +};
 >> +
->> +The MAX8997 contains two 32.768khz clock outputs that can be controlled
->> +(gated/ungated) over I2C.
+>> +/*
+>> + * Helper API to get SCU base address
+>> + * In case platform DT do not have SCU node, or iomap fails
+>> + * this call will fallback and will try to map via call to
+>> + * scu_a9_get_base.
+>> + * This will return ownership of scu_base to the caller
+>> + */
+>> +void __iomem *of_scu_get_base(void)
+>> +{
+>> +	unsigned long base = 0;
+>> +	struct device_node *np;
+>> +	void __iomem *scu_base;
 >> +
->> +Following properties should be presend in main device node of the MFD chip.
->> +
->> +Required properties:
->> +
->> +- #clock-cells: from common clock binding; shall be set to 1.
->> +
->> +Optional properties:
->> +- clock-output-names: From common clock binding.
->> +
->> +Each clock is assigned an identifier and client nodes can use this identifier
->> +to specify the clock which they consume. Following indices are allowed:
->> +    - 0: 32khz_ap clock,
->> +    - 1: 32khz_cp clock,
->> +
->> +Clocks are defined as preprocessor macros in dt-bindings/clock/maxim,max8997.h
->> +header and can be used in device tree sources.
->> +
->> +Example: Node of the MFD chip
->> +
->> +	max8997: max8997_pmic at 66 {
+>> +	np = of_find_matching_node(NULL, scu_match);
+>> +	scu_base = of_iomap(np, 0);
+>> +	of_node_put(np);
+>> +	if (!scu_base) {
+>> +		pr_err("%s failed to map scu_base via DT\n", __func__);
+>> +		if (scu_a9_has_base()) {
+>> +			base = scu_a9_get_base();
+>> +			scu_base = ioremap(base, SZ_4K);
+>> +		}
+>> +		if (!scu_base) {
+>> +			pr_err("%s failed to map scu_base\n", __func__);
+>> +			return IOMEM_ERR_PTR(-ENOMEM);
 > 
-> pmic at 66 {
+> I can't see the point of using error-pointers here - it's not like we
+> really know why we're failing, so just return NULL.
 > 
-> With that:
+>> +		}
+>> +	}
+>> +	return scu_base;
+>> +}
+>> +
+>> +/*
+>> + * Enable SCU via mapping scu_base DT
+>> + * If scu_base mapped successfully scu will be enabled and in case of
+>> + * failure if will return non-zero error code
+>> + */
+>> +int of_scu_enable(void)
+>> +{
+>> +	void __iomem *scu_base;
+>> +
+>> +	scu_base = of_scu_get_base();
+>> +	if (!IS_ERR(scu_base)) {
+>> +		scu_enable(scu_base);
+>> +		iounmap(scu_base);
+>> +		return 0;
+>> +	}
+>> +	return PTR_ERR(scu_base);
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
+> and just return your -ENOMEM here.
 > 
-> 
-
-Thanks for review and ack.
-With above mentioned change I will post v2 soon.
-
-Thanks,
-Pankaj Dubey
