@@ -1,62 +1,58 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Nov 2016 15:04:35 +0100
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Drivers Updates for
- v4.10
-Message-ID: <cover.1479389981.git.horms+renesas@verge.net.au>
+Date: Thu, 17 Nov 2016 15:04:34 +0100
+Subject: [PATCH 1/4] ARM: shmobile: r8a7745: add power domain index macros
+In-Reply-To: <cover.1479389981.git.horms+renesas@verge.net.au>
+References: <cover.1479389981.git.horms+renesas@verge.net.au>
+Message-ID: <46f62e7c654d2a16ef2f977c7088934bfaf8a132.1479389981.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Please consider these second round of Renesas ARM based SoC drivers updates for v4.10.
+Add macros usable by the device tree sources to reference R8A7745 SYSC power
+domains by index.
 
-This pull request is based on a merge of:
+Based on the original (and large) patch by Dmitry Shifrin
+<dmitry.shifrin@cogentembedded.com>.
 
-* The previous round of such requests, tagged as renesas-drivers-for-v4.10,
-  which you have already pulled.
-* The soc-device-match-tag1 tag of Geert Uytterhoeven's renesas-driver's tree.
-  This is included to provide core soc_device_match() infrastructure which
-  is a dependency of identifying SoC and registering with SoC bus.
-
-
-The following changes since commit 437c4eeb0bd4c1d68817be997716f52b8c22a9c3:
-
-  Merge tag 'soc-device-match-tag1' of https://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers into HEAD (2016-11-15 14:12:57 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-drivers2-for-v4.10
-
-for you to fetch changes up to 63ee9e2ba47dbdb42156c9b940515cfd49e78c91:
-
-  soc: renesas: Identify SoC and register with the SoC bus (2016-11-17 14:37:20 +0100)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC Drivers Updates for v4.10
-
-* Identify SoC and register with the SoC bus
-* Add support for the r8a7745 SoC to rcar-sysc
-
-----------------------------------------------------------------
-Geert Uytterhoeven (2):
-      ARM: shmobile: Document DT bindings for Product Register
-      soc: renesas: Identify SoC and register with the SoC bus
-
-Sergei Shtylyov (2):
-      ARM: shmobile: r8a7745: add power domain index macros
-      soc: renesas: rcar-sysc: add R8A7745 support
-
- Documentation/devicetree/bindings/arm/shmobile.txt |  18 ++
- .../bindings/power/renesas,rcar-sysc.txt           |   1 +
- arch/arm/mach-shmobile/Kconfig                     |   1 +
- arch/arm64/Kconfig.platforms                       |   1 +
- drivers/soc/renesas/Makefile                       |   3 +
- drivers/soc/renesas/r8a7745-sysc.c                 |  32 +++
- drivers/soc/renesas/rcar-sysc.c                    |   3 +
- drivers/soc/renesas/rcar-sysc.h                    |   1 +
- drivers/soc/renesas/renesas-soc.c                  | 257 +++++++++++++++++++++
- include/dt-bindings/power/r8a7745-sysc.h           |  25 ++
- 10 files changed, 342 insertions(+)
- create mode 100644 drivers/soc/renesas/r8a7745-sysc.c
- create mode 100644 drivers/soc/renesas/renesas-soc.c
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ include/dt-bindings/power/r8a7745-sysc.h | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
  create mode 100644 include/dt-bindings/power/r8a7745-sysc.h
+
+diff --git a/include/dt-bindings/power/r8a7745-sysc.h b/include/dt-bindings/power/r8a7745-sysc.h
+new file mode 100644
+index 000000000000..1844c1171c04
+--- /dev/null
++++ b/include/dt-bindings/power/r8a7745-sysc.h
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (C) 2016 Cogent Embedded Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#ifndef __DT_BINDINGS_POWER_R8A7745_SYSC_H__
++#define __DT_BINDINGS_POWER_R8A7745_SYSC_H__
++
++/*
++ * These power domain indices match the numbers of the interrupt bits
++ * representing the power areas in the various Interrupt Registers
++ * (e.g. SYSCISR, Interrupt Status Register)
++ */
++
++#define R8A7745_PD_CA7_CPU0		 5
++#define R8A7745_PD_CA7_CPU1		 6
++#define R8A7745_PD_SGX			20
++#define R8A7745_PD_CA7_SCU		21
++
++/* Always-on power area */
++#define R8A7745_PD_ALWAYS_ON		32
++
++#endif /* __DT_BINDINGS_POWER_R8A7745_SYSC_H__ */
+-- 
+2.7.0.rc3.207.g0ac5344
