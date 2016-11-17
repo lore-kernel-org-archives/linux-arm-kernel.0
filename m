@@ -1,56 +1,146 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 17 Nov 2016 12:35:11 +0100
-Subject: [PATCH] ARM64: dma-mapping: preallocate DMA-debug hash tables in
- core_initcall
-In-Reply-To: <20161116123918.qzaqczaqri2hab43@localhost>
-References: <CGME20161116092025eucas1p2ebaf3ead7de79130ca2656d532284e5b@eucas1p2.samsung.com>
- <1479288013-30945-1-git-send-email-m.szyprowski@samsung.com>
- <20161116123918.qzaqczaqri2hab43@localhost>
-Message-ID: <6d01cd35-99b2-432a-4c48-6c130cd69357@samsung.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 17 Nov 2016 12:40:16 +0100
+Subject: [PATCH v8 1/7] arm/arm64: vgic: Implement support for userspace
+ access
+In-Reply-To: <CALicx6vbFj3aoSiqc4n_92rZgONeQVhp-GtTkEhW3=pt9P1hGQ@mail.gmail.com>
+References: <1478258013-6669-1-git-send-email-vijay.kilari@gmail.com>
+ <1478258013-6669-2-git-send-email-vijay.kilari@gmail.com>
+ <20161116185215.GC3811@cbox>
+ <CALicx6vbFj3aoSiqc4n_92rZgONeQVhp-GtTkEhW3=pt9P1hGQ@mail.gmail.com>
+Message-ID: <20161117114016.GA22231@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+On Thu, Nov 17, 2016 at 04:56:53PM +0530, Vijay Kilari wrote:
+> On Thu, Nov 17, 2016 at 12:22 AM, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+> > On Fri, Nov 04, 2016 at 04:43:27PM +0530, vijay.kilari at gmail.com wrote:
+> >> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> >>
+> >> Read and write of some registers like ISPENDR and ICPENDR
+> >> from userspace requires special handling when compared to
+> >> guest access for these registers.
+> >>
+> >> Refer to Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+> >> for handling of ISPENDR, ICPENDR registers handling.
+> >>
+> >> Add infrastructure to support guest and userspace read
+> >> and write for the required registers
+> >> Also moved vgic_uaccess from vgic-mmio-v2.c to vgic-mmio.c
+> >>
+> >> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> >> ---
+> >>  virt/kvm/arm/vgic/vgic-mmio-v2.c | 25 ----------
+> >>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 98 ++++++++++++++++++++++++++++++++--------
+> >>  virt/kvm/arm/vgic/vgic-mmio.c    | 78 ++++++++++++++++++++++++++++----
+> >>  virt/kvm/arm/vgic/vgic-mmio.h    | 19 ++++++++
+> >>  4 files changed, 169 insertions(+), 51 deletions(-)
+> >>
+> >> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> >> index b44b359..0b32f40 100644
+> >> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> >> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> >> @@ -406,31 +406,6 @@ int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
+> >>       return -ENXIO;
+> >>  }
+> >>
+> >> -/*
+> >> - * When userland tries to access the VGIC register handlers, we need to
+> >> - * create a usable struct vgic_io_device to be passed to the handlers and we
+> >> - * have to set up a buffer similar to what would have happened if a guest MMIO
+> >> - * access occurred, including doing endian conversions on BE systems.
+> >> - */
+> >> -static int vgic_uaccess(struct kvm_vcpu *vcpu, struct vgic_io_device *dev,
+> >> -                     bool is_write, int offset, u32 *val)
+> >> -{
+> >> -     unsigned int len = 4;
+> >> -     u8 buf[4];
+> >> -     int ret;
+> >> -
+> >> -     if (is_write) {
+> >> -             vgic_data_host_to_mmio_bus(buf, len, *val);
+> >> -             ret = kvm_io_gic_ops.write(vcpu, &dev->dev, offset, len, buf);
+> >> -     } else {
+> >> -             ret = kvm_io_gic_ops.read(vcpu, &dev->dev, offset, len, buf);
+> >> -             if (!ret)
+> >> -                     *val = vgic_data_mmio_bus_to_host(buf, len);
+> >> -     }
+> >> -
+> >> -     return ret;
+> >> -}
+> >> -
+> >>  int vgic_v2_cpuif_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+> >>                         int offset, u32 *val)
+> >>  {
+> >> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> >> index 0d3c76a..ce2708d 100644
+> >> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> >> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> >> @@ -209,6 +209,62 @@ static unsigned long vgic_mmio_read_v3_idregs(struct kvm_vcpu *vcpu,
+> >>       return 0;
+> >>  }
+> >>
+> >> +static unsigned long vgic_v3_uaccess_read_pending(struct kvm_vcpu *vcpu,
+> >> +                                               gpa_t addr, unsigned int len)
+> >> +{
+> >> +     u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+> >> +     u32 value = 0;
+> >> +     int i;
+> >> +
+> >> +     /*
+> >> +      * A level triggerred interrupt pending state is latched in both
+> >> +      * "soft_pending" and "line_level" variables. Userspace will save
+> >> +      * and restore soft_pending and line_level separately.
+> >> +      * Refer to Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+> >> +      * handling of ISPENDR and ICPENDR.
+> >> +      */
+> >> +     for (i = 0; i < len * 8; i++) {
+> >> +             struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> >> +
+> >> +             if (irq->config == VGIC_CONFIG_LEVEL && irq->soft_pending)
+> >> +                     value |= (1U << i);
+> >> +             if (irq->config == VGIC_CONFIG_EDGE && irq->pending)
+> >> +                     value |= (1U << i);
+> >> +
+> >> +             vgic_put_irq(vcpu->kvm, irq);
+> >> +     }
+> >> +
+> >> +     return value;
+> >> +}
+> >> +
+> >> +static void vgic_v3_uaccess_write_pending(struct kvm_vcpu *vcpu,
+> >> +                                       gpa_t addr, unsigned int len,
+> >> +                                       unsigned long val)
+> >> +{
+> >> +     u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+> >> +     int i;
+> >> +
+> >> +     for (i = 0; i < len * 8; i++) {
+> >> +             struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> >> +
+> >> +             spin_lock(&irq->irq_lock);
+> >> +             if (test_bit(i, &val)) {
+> >> +                     irq->pending = true;
+> >> +                     irq->soft_pending = true;
+> >
+> > In the vgic_mmio_write_spending function we only set the soft_pending
+> > state to true if the interrupt is a level-triggered interrupt.
+> >
+> > Should we check if that's the case here as well before setting the
+> > soft_pending state?
+> 
+> Yes, can be done. But it puts hard requirement that irq config should
+> be restored
+> before updating pending state.
 
+Ah, I see.
 
-On 2016-11-16 13:39, Catalin Marinas wrote:
-> On Wed, Nov 16, 2016 at 10:20:13AM +0100, Marek Szyprowski wrote:
->> fs_initcall is definitely too late to initialize DMA-debug hash tables,
->> because some drivers might get probed and use DMA mapping framework
->> already in core_initcall. Late initialization of DMA-debug results in
->> false warning about accessing memory, that was not allocated. This issue
->> has been observed on ARM 32bit, but the same driver can be used also on
->> ARM64.
->>
->> This patch moves initialization of DMA-debug to core_initcall. This is
->> safe from the initialization perspective. dma_debug_do_init() internally
->> calls debugfs functions and debugfs also gets initialised at
->> core_initcall(), and that is earlier than arch code in the link order,
->> so it will get initialized just before the DMA-debug.
-> Do we really want to rely on the link order within an initcall level?
-> What guarantees this?
+ok, I think you should keep it the way it is then, but please add a
+comment to that effect.
 
-There are many places in the kernel which rely on link order and I'm 
-convinced
-that calling initcalls in link order is guaranteed.
+> In any case, the soft_pending is used only if interrupt is level-triggered.
+> 
+Yes, indeed.
 
-> I hope someone sorts out the deferred probe or some other dependency
-> detection mechanism to address this issue. But in the meantime I
-> wouldn't merge a patch which relies on just the link order.
-
-This has nothing to deferred probe. This patch is related to initialization
-of dma-debug framework. In my initial submission for ARM arch I proposed
-pure_initcall to have this infrastructure available as early as possible,
-but Russell pointed that dma-debug depends on debugfs initialization, so
-it should be initialized after it. He also pointed that core_initcall will
-be fine for this.
-
-Please also note that dt devices are also populated from core_initcall and
-drivers can then bind to them and try to use dma-mapping api, what results
-in false warnings about using uninitialized memory as dma-debug framework
-is unable to track allocations done before its initialization.
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Thanks,
+-Christoffer
