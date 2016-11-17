@@ -1,32 +1,91 @@
-From: p.wassi@gmx.at (p.wassi at gmx.at)
-Date: Thu, 17 Nov 2016 21:29:47 +0100
-Subject: [PATCH] kirkwood: fix spelling mistake
-Message-ID: <trinity-6911950b-e19a-4b44-aeed-adaccbc33164-1479414587776@3capp-gmx-bs50>
+From: atull@opensource.altera.com (atull)
+Date: Thu, 17 Nov 2016 14:35:38 -0600
+Subject: [PATCH fpga 8/9] fpga socfpga: Use the scatterlist interface
+In-Reply-To: <alpine.DEB.2.20.1611171350590.4425@atull-VirtualBox2>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-9-git-send-email-jgunthorpe@obsidianresearch.com>
+ <alpine.DEB.2.10.1611131712210.2735@atull-VirtualBox>
+ <20161114001854.GA27248@obsidianresearch.com>
+ <alpine.DEB.2.10.1611132149140.2908@atull-VirtualBox>
+ <20161115043537.GA23253@obsidianresearch.com>
+ <alpine.DEB.2.20.1611150940270.3634@atull-VirtualBox2>
+ <20161116052033.GA6044@obsidianresearch.com>
+ <alpine.DEB.2.20.1611160939140.3364@atull-VirtualBox2>
+ <20161116202329.GD19593@obsidianresearch.com>
+ <alpine.DEB.2.20.1611171350590.4425@atull-VirtualBox2>
+Message-ID: <alpine.DEB.2.20.1611171414310.4425@atull-VirtualBox2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Paul Wassi <p.wassi@gmx.at>
+On Thu, 17 Nov 2016, atull wrote:
 
-Fix a spelling mistake in arch/arm/boot/dts/kirkwood-topkick.dts
+> On Wed, 16 Nov 2016, Jason Gunthorpe wrote:
+> 
+> > On Wed, Nov 16, 2016 at 09:45:23AM -0600, atull wrote:
+> > > > What is the point of this if write_init gets a copy of the buffer -
+> > > > what is that supposed to be?
+> > > 
+> > > Sometimes write_init needs to look at the header of the image.
+> > > You can see that in the socfpga-a10.c (on linux-next/master)
+> > 
+> > I know what it is for, I'm asking what should it be if we are calling
+> > write_init multiple times.
+> > 
+> > It feels like the driver needs to indicate the header length it wants
+> > to inspect and the core core needs to make that much of the bitstream
+> > available to write_init() before calling write().
+> > 
+> > Is that what you were thinking?
+> 
+> That would make sense.  socfpga-a10.c requires a certain amount
+> of header in write_init, but the current API didn't have a way
+> for socfgpa-a10.c to specify that to fpga-mgr.c core.  Should
+> probably happen during registration.  If you have an idea about
+> that, that's good, otherwise we'll get back to that separately.
+> 
+> > 
+> > > at this stuff, this is coming at a busy time).  My point there
+> > > was that there was code that needed to go into the core so that
+> > > the ICE40 and the cyclone spi driver that are on the mailing
+> > > list won't have to have the same workaround that you were
+> > > adding to the socfpga.c driver.
+> > 
+> > Sure, that is easy for write() - not clear on write_init sematics?
+> > I will send a revised series.
+> > 
+> > I'd also like to close on the zynq bitfile verification patch, did you
+> > have any comments on that?
+> 
+> I think Joshua had some comments.  Besides that, I'm ok with that
+> patch.
+> 
+> Alan
 
-Signed-off-by: Paul Wassi <p.wassi@gmx.at>
----
-The manufacturer's name is Univer*s*al Scientific Industrial...
-Compare with footer of page here:
-http://www.usish.com/english/products_topkick1281p2.php
+I didn't have any other specific issues with on the other
+zynq patches.
 
- arch/arm/boot/dts/kirkwood-topkick.dts |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+For the sg patches, I don't have anything more to say
+that I haven't already said.
 
-diff -rupN a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
---- a/arch/arm/boot/dts/kirkwood-topkick.dts
-+++ b/arch/arm/boot/dts/kirkwood-topkick.dts
-@@ -4,7 +4,7 @@
- #include "kirkwood-6282.dtsi"
- 
- / {
--	model = "Univeral Scientific Industrial Co. Topkick-1281P2";
-+	model = "Universal Scientific Industrial Co. Topkick-1281P2";
- 	compatible = "usi,topkick-1281P2", "usi,topkick", "marvell,kirkwood-88f6282", "marvell,kirkwood";
- 
- 	memory {
+I want to keep open the possibility of streaming an FPGA image
+in.  In this case the FPGA image is not complete in memory
+and write() will be called multiple times.  One case is where
+maybe hopefully the firmware layer can be extended to not
+allocate a large buffer (scattered or contiguous) and can
+stream in the image.
+
+If you have a nice way to move the workarounds that you had
+to add to socfpga.c into the core so they don't replicated
+in socfpga-a10.c, ICE40, cyclone5 spi and other new drivers
+that aren't using sg natively, that would be good.
+
+I think I've already said all this before so please figure
+that into he your v2 when you rebase onto linux-next.
+
+Alan
+
+> 
+> > 
+> > Jason
+> > 
+> 
