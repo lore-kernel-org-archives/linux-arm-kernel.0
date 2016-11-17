@@ -1,75 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Nov 2016 18:17:08 +0000
-Subject: System/uncore PMUs and unit aggregation
-Message-ID: <20161117181708.GT22855@arm.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 17 Nov 2016 11:28:12 -0700
+Subject: [PATCH fpga 4/9] fpga zynq: Check for errors after completing DMA
+In-Reply-To: <CAAtXAHeGJjQ22d=OP6cEt8Ssg1bhAEVQ5_GWFFd26xp-j8EUFg@mail.gmail.com>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-5-git-send-email-jgunthorpe@obsidianresearch.com>
+ <CAAtXAHeGJjQ22d=OP6cEt8Ssg1bhAEVQ5_GWFFd26xp-j8EUFg@mail.gmail.com>
+Message-ID: <20161117182812.GB26039@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Wed, Nov 16, 2016 at 10:10:35PM -0800, Moritz Fischer wrote:
+> >   /* FPGA programmed */
+> >  #define IXR_PCFG_DONE_MASK             BIT(2)
+> > -#define IXR_ERROR_FLAGS_MASK           0x00F0F860
+> > +#define IXR_ERROR_FLAGS_MASK           0x00F0C860
+> 
+> True. Ouch.
 
-We currently have support for three arm64 system PMUs in flight:
+Yeah, this only works at all by accident..
 
- [Cavium ThunderX] http://lkml.kernel.org/r/cover.1477741719.git.jglauber at cavium.com
- [Hisilicon Hip0x] http://lkml.kernel.org/r/1478151727-20250-1-git-send-email-anurup.m at huawei.com
- [Qualcomm L2] http://lkml.kernel.org/r/1477687813-11412-1-git-send-email-nleeder at codeaurora.org
 
-Each of which have to deal with multiple underlying hardware units in one
-way or another. Mark and I recently expressed a desire to expose these
-units to userspace as individual PMU instances, since this can allow:
+> > -static void zynq_fpga_mask_irqs(struct zynq_fpga_priv *priv)
+> > +static inline void zynq_fpga_set_irq_mask(struct zynq_fpga_priv *priv,
+> > +                                         u32 enable)
+> >  {
+> > -       u32 intr_mask;
+> > -
+> > -       intr_mask = zynq_fpga_read(priv, INT_MASK_OFFSET);
+> > -       zynq_fpga_write(priv, INT_MASK_OFFSET,
+> > -                       intr_mask | IXR_DMA_DONE_MASK | IXR_ERROR_FLAGS_MASK);
+> > -}
+> > +       zynq_fpga_write(priv, INT_MASK_OFFSET, ~enable);
+> 
+> Not a fan of this ~enable here. Function name indicates you're doing
+> the opposite
 
-  * Fine-grained control of events from userspace, when you want to see
-    individual numbers as opposed to a summed total
+Lets call it zynq_fpga_set_irq then
 
-  * Potentially ease migration to new SoC revisions, where the units
-    are laid out slightly differently
+The ~ is best placed here because it is after the compiler has coerced
+the argument into u32 so the ~ will always do the right
+thing
 
-  * Easier handling of cases where the units aren't quite identical
+I've been reading the IXR_*_MASK as indicating it is a bit pattern for
+the INT_MASK register not as actually meaning literal masking.
 
-however, this received pushback from all of the patch authors, so there's
-clearly a problem with this approach. I'm hoping we can try to resolve
-this here.
+> > +out_clk:
+> >         clk_disable(priv->clk);
+> > -
+> 
+> Personally found it more readable with newline.
 
-Speaking to Mark earlier today, we came up with the following rough rules
-for drivers that present multiple hardware units as a single PMU:
+sure
 
-  1. If the units share some part of the programming interface (e.g. control
-     registers or interrupts), then they must be handled by the same PMU.
-     Otherwise, they should be treated independently as separate PMU
-     instances.
-
-  2. If the units are handled by the same PMU, then care must be taken to
-     handle event groups correctly. That is, if the units cannot be started
-     and stopped atomically, cross-unit groups must be rejected by the
-     driver. Furthermore, any cross-unit scheduling constraints must be
-     honoured so that all the units targetted by a group can schedule the
-     group concurrently.
-
-  3. Summing the counters across units is only permitted if the units
-     can all be started and stopped atomically. Otherwise, the counters
-     should be exposed individually. It's up to the driver author to
-     decide what makes sense to sum.
-
-  4. Unit topology can optionally be described in sysfs (we should pick
-     some standard directory naming here), and then events targetting
-     specific units can have the unit identifier extracted from the topology
-     encoded in some configN fields.
-
-The million dollar question is: how does that fit in with the drivers I
-mentioned at the top? Is this overly restrictive, or have we missed stuff?
-
-We certainly want to allow flexibility in the way in which the drivers
-talk to the hardware, but given that these decisions directly affect the
-user ABI, some consistent ground rules are required.
-
-For Cavium ThunderX, it's not clear whether or not the individual units
-could be expressed as separate PMUs, or whether they're caught by one of
-the rules above. The Qualcomm L2 looks like it's doing the right thing
-and we can't quite work out what the Hisilicon Hip0x topology looks like,
-since the interaction with djtag is confusing.
-
-If the driver authors (on To:) could shed some light on this, then that
-would be much appreciated!
-
-Thanks,
-
-Will
+Jason
