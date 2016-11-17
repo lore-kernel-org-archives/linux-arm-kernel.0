@@ -1,134 +1,144 @@
-From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Thu, 17 Nov 2016 15:01:42 +0800
-Subject: [PATCH v7 0/7] Add DRM driver for Hisilicon Hibmc
-In-Reply-To: <1479303831-74134-1-git-send-email-zourongrong@gmail.com>
-References: <1479303831-74134-1-git-send-email-zourongrong@gmail.com>
-Message-ID: <CAGd==05O_M7XO66w=sKB9HM5rHCQtwQK+dg2aM5i7bwf4LHSzw@mail.gmail.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Thu, 17 Nov 2016 08:08:00 +0100
+Subject: wdt, gpio: move arch_initcall into subsys_initcall ?
+In-Reply-To: <ee9824b8-f09f-3817-8893-8121c9fb9eb1@roeck-us.net>
+References: <582AE18A.2060405@denx.de>
+ <afbf394e-e411-5c43-e2b0-667b3fbc2edf@mentor.com>
+ <e4472c2d-effa-9583-aded-8dcdfdd57ee6@mentor.com>
+ <ee9824b8-f09f-3817-8893-8121c9fb9eb1@roeck-us.net>
+Message-ID: <582D5750.4000408@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rongrong,
+Hello Guenter, Vladimir,
 
-Thanks for your hard work.
+Sorry for the late response, but I was "on the road" ...
 
-For this whole series patches:
-Reviewed-by: Xinliang Liu <xinliang.liu@linaro.org>
+Am 15.11.2016 um 14:46 schrieb Guenter Roeck:
+> On 11/15/2016 03:32 AM, Vladimir Zapolskiy wrote:
+>> On 11/15/2016 01:10 PM, Vladimir Zapolskiy wrote:
+>>> Hello Heiko,
+>>>
+>>> On 11/15/2016 12:20 PM, Heiko Schocher wrote:
+>>>> Hello,
+>>>>
+>>>> commit e188cbf7564f: "gpio: mxc: shift gpio_mxc_init() to subsys_initcall level"
+>>>> moves the gpio initialization of the mxc gpio driver
+>>>> from the arch_initcall level into subsys_initcall level.
+>>>>
+>>>> This leads now on mxc boards, which use a gpio wdt driver
+>>>> and the CONFIG_GPIO_WATCHDOG_ARCH_INITCALL option enabled,
+>>>> to unwanted driver probe deferrals during kernel boot.
+>>>>
+>>>> I see this currently on an imx6 based board (which has unfortunately
+>>>> 3 WDT: imx6 internal (disabled), gpio wdt and da9063 WDT ...).
+>>>>
+>>>> Also a side effect from above commit is, that the da9063 WDT driver
+>>>> is now probed before the gpio WDT driver ... so /dev/watchdog now
+>>>> does not point to the gpio_wdt, instead it points to the da9063 WDT.
+>>>>
+>>>> So there are 2 solutions possible:
+>>>>
+>>>> - add a CONFIG_GPIO_MCX_ARCH_INITCALL option
+>>>>   in drivers/gpio/gpio-mxc.c like for the gpio_wdt.c driver?
+>>>
+>>> in my opinion this is overly heavy solution and it might be
+>>> better to avoid it if possible.
+>>>
+>>> I would rather prefer to reconsider GPIO_WATCHDOG_ARCH_INITCALL
+>>> usage in the watchdog driver.
+>>>
+>>> Moreover adding this proposed GPIO_MCX_ARCH_INITCALL to call
+>>> the driver on arch level will result in deferring the GPIO driver.
+>>>
+>>>>   But how can we guarantee, that first the gpio driver and then
+>>>>   the gpio_wdt driver gets probed?
+>>>>
+>>>> - move the arch_initcall in gpio_wdt.c into a subsys_initcall
+>>>>   (Tested this, and the probe dereferral messages are gone ...)
+>>>>
+>>>>   But this may results in problems on boards, which needs an early
+>>>>   trigger on an gpio wdt ...
+>>>
+>>> The level of "earliness" can not be defined in absolute time value
+>>> in any case, why decreasing the init level of the watchdog driver
+>>> to subsys level can cause problems? For that there should exist
+>>> some kind of a dependency on IC or PCB hardware level, can you
+>>> name it please?
 
-Thanks,
--xinliang
+On the current problem, there is no dependency on PCB, but I know
+of watchdogs triggered through a gpio pin, which must triggered < 1 second
+and subsys_initcall is too late for this. I think, this was the reason
+for introducing the CONFIG_GPIO_WATCHDOG_ARCH_INITCALL option ...
 
-On 16 November 2016 at 21:43, Rongrong Zou <zourongrong@gmail.com> wrote:
-> This patch set adds a new drm driver for Hisilicon Hibmc. Hibmc is a
-> BMC SoC with a display controller intergrated, usually it is used on
-> server for Out-of-band management purpose. In this patch set, we just
-> support basic function for Hibmc display subsystem. Hibmc display
-> subsystem is connected to host CPU by PCIe as blow:
+>>> Also please note that more than a half of all GPIO drivers settle
+>>> on subsys or later initcall level, this means that there is
+>>> an expected GPIO watchdog driver deferral for all of them.
+>>
+>> Please find two more late notes though.
+>>
+>>> I propose to send two patches for review:
+>>>
+>>> 1. remove GPIO_WATCHDOG_ARCH_INITCALL option completely and decouple
+>>>    module_platform_driver() into arch_initcall() and module_exit()
+>>>    unconditionally.
+>>>
+>>> 2. change arch_initcall() in the watchdog driver to subsys_initcall().
+>>>    This change removes probe deferrals on boot, when the driver is
+>>>    used with the most of the GPIO controllers.
+>>
+>> Alternatively commit 5e53c8ed813d ("watchdog: gpio_wdt: Add option for
+>> early registration") can be reverted and then module_platform_driver()
+>> is decoupled into subsys_initcall() and module_exit() as its replacement.
+>>
+> Sure, only the reason for that was that there are situations where
+> subsys_initcall() was too late. Also, when using arch_initcall() only,
+> we get deferrals again, which is apparently hated by many and a reason
+> for all those "avoid probe deferrals" patches.
+
+Exactly. And I wonder, if this boards, who need this early trigger,
+work with current kernel ? (Or this boards use a gpio driver, which is
+not in subsys_initcall level ...)
+
+>> And also please note that since quite many GPIO controller drivers
+>> live on initcall levels after subsys_initcall(), the solution won't
+>> let to avoid watchdog driver deferrals totally, this should be accepted.
+>>
+> ... except for others it isn't, and we are back to square one.
 >
-> +----------+       +----------+
-> |          | PCIe  |  Hibmc   |
-> |host CPU( |<----->| display  |
-> |arm64,x86)|       |subsystem |
-> +----------+       +----------+
->
-> Hardware Detail for Hibmc display subsystem
-> -----------
->
->   The display subsystem of Hibmc is show as bellow:
->   +----+      +----+      +----+     +--------+
->   |    |      |    |      |    |     |        |
->   | FB |----->| DE |----->|VDAC|---->|external|
->   |    |      |    |      |    |     | VGA    |
->   +----+      +----+      +----+     +--------+
->
->   -DE(Display Engine) is the display controller.
->   -VDAC(Video Digital-to-Analog converter) converts the RGB diaital data
->   stream from DE to VGA analog signals.
->
-> Change History
-> ------------
-> Changes in v7:
->   -remove hibmc_drm_power.c/hibmc_drm_power.h, move the functions to
->    hibmc_drm_drv.c.
->   -remove hibmc_drm_de.h and move the struct defined in head file to
->    hibmc_drm_de.c.
->   -plane is initialized inside crtc, not in hibmc_kms_init().
->   -connector is initialized inside encoder, not in hibmc_kms_init().
->   -remove plane/crtc/encoder/connector from hibmc_drm_private struct.
->   -call drm_atomic_helper_suspend/resume in hibmc_pm_suspend/resume.
->   -remove these empty stubs because caller will do NULL check.
->     hibmc_plane_atomic_disable
->     hibmc_crtc_atomic_check
->     hibmc_encoder_disable
->     hibmc_encoder_enable
->     hibmc_encoder_atomic_check
->   -clean up in all error paths of creating driver-private framebuffer.
->
-> Changes in v6:
->   -remove the embedded framebuffer and use a pointer of hibmc_framebuffer
->    instead.
->   -remove the deprecated drm_framebuffer_unregister_private(),
->    drm_framebuffer_unreference() will be called in hibmc_fbdev_destroy().
->   -uninstall irq in hibmc_unload().
->
-> Changes in v5:
->   -rebase on v4.9-rc2.
->   -replace drm_fb_helper_set_suspend with drm_fb_helper_set_suspend_unlocked.
->    and remove redundant console_lock and console_unlock.
->
-> Changes in v4:
->   -remove unused include files, and include header file when it is needed.
->   -remove unused FLAG in Kconfig: DRM_GEM_CMA_HELPER/DRM_KMS_CMA_HELPER.
->   -remove drm_helper_disable_unused_functions, since we use DRIVER_ATOMIC.
->
-> Changes in v3:
->   -enable KMS, in v2, only fbdev is enabled.
->   -management video memory with ttm.
->   -add vblank interrupt.
->   -remove drm_connector_register_all() and drm_connector_unregister_all().
->   -I have a basic test with igt.
->
-> Changes in v2:
->   -Remove self-defined macros for bit operations.
->   -Remove unused register.
->   -Replace those deprecated functions with new version of them.
->   -use drm_connector_register_all() to register connector after
->    drm_dev_register().
->
-> The patch v2 is at
-> https://lists.freedesktop.org/archives/dri-devel/2016-May/108661.html
->
-> Rongrong Zou (7):
->   drm/hisilicon/hibmc: Add hisilicon hibmc drm master driver
->   drm/hisilicon/hibmc: Add video memory management
->   drm/hisilicon/hibmc: Add support for frame buffer
->   drm/hisilicon/hibmc: Add support for display engine
->   drm/hisilicon/hibmc: Add support for VDAC
->   drm/hisilicon/hibmc: Add support for vblank interrupt
->   MAINTAINERS: Update HISILICON DRM entries
->
->  MAINTAINERS                                       |   1 +
->  drivers/gpu/drm/hisilicon/Kconfig                 |   1 +
->  drivers/gpu/drm/hisilicon/Makefile                |   1 +
->  drivers/gpu/drm/hisilicon/hibmc/Kconfig           |   9 +
->  drivers/gpu/drm/hisilicon/hibmc/Makefile          |   4 +
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c    | 477 ++++++++++++++++++
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c   | 456 ++++++++++++++++++
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h   | 114 +++++
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c | 267 +++++++++++
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h  | 196 ++++++++
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c  | 147 ++++++
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c       | 558 ++++++++++++++++++++++
->  12 files changed, 2231 insertions(+)
->  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/Kconfig
->  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/Makefile
->  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
->  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
->  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
->  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c
->  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h
->  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
->  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c
->
-> --
-> 1.9.1
->
+> GPIO_WATCHDOG_ARCH_INITCALL was intended to be only used in situations
+> where needed. Why is it used here in the first place if that is not
+> the case ?
+
+Heh, good question ...
+
+"/dev/watchdog" is in systemd hard-coded, see:
+https://github.com/systemd/systemd/blob/dd8352659c9428b196706d04399eec106a8917ed/src/shared/watchdog.c#L86
+http://0pointer.de/blog/projects/watchdog.html
+https://www.freedesktop.org/software/systemd/man/systemd-system.conf.html
+
+We have 2 WDT driver enabled on the board (GPIO WDT and the DA9063 WDT).
+
+If both WDTs are in the subsys_initall level, first the da9063 wdt
+gets probed, and so "/dev/watchdog" points to the da9063 wdt, but
+we want to use the GPIO wdt as "/dev/watchdog" device.
+
+Now, why not simple disabling the da9063 wdt ?
+
+We could not disable the da9063 wdt functionallity, because we need
+for a clean reboot that the da9063_wdt_restart() is called in the
+restart sequence ... which is registered in the wdt driver:
+
+static const struct watchdog_ops da9063_watchdog_ops = {
+[...]
+         .restart = da9063_wdt_restart,
+};
+
+Is there a possbility to register this restart function may somewhere
+else? It seems, that this is not a WDT functionallity ...
+
+bye,
+Heiko
+-- 
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
