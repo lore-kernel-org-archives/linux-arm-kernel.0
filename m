@@ -1,155 +1,106 @@
-From: zourongrong@huawei.com (Rongrong Zou)
-Date: Thu, 17 Nov 2016 12:09:31 +0800
-Subject: [PATCH v7 0/7] Add DRM driver for Hisilicon Hibmc
-In-Reply-To: <CAOw6vbJHoELLTLpVjrfOZ8aEGzuDMFX5vWX8AxqNO35CT1iRxg@mail.gmail.com>
-References: <1479303831-74134-1-git-send-email-zourongrong@gmail.com>
- <CAOw6vbLgDwiVs8zC5bEhdhJUvVZh2toG_d+FgkzV7vUJjU=3RQ@mail.gmail.com>
- <CAOw6vbJHoELLTLpVjrfOZ8aEGzuDMFX5vWX8AxqNO35CT1iRxg@mail.gmail.com>
-Message-ID: <582D2D7B.30107@huawei.com>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Thu, 17 Nov 2016 09:50:27 +0530
+Subject: [PATCH 01/16] ARM: scu: Provide support for parsing SCU device
+ node to enable SCU
+In-Reply-To: <20161114145143.GM1041@n2100.armlinux.org.uk>
+References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
+ <2479429.Js1FDSdQzs@wuerfel> <20161114135018.GL1041@n2100.armlinux.org.uk>
+ <6787744.7DRFf7p3US@wuerfel>
+ <CGME20161114145228epcas3p136b117d2b99a31efc59a973262173295@epcas3p1.samsung.com>
+ <20161114145143.GM1041@n2100.armlinux.org.uk>
+Message-ID: <fe90b6cc-81b1-772e-ab78-f2199957ec96@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/11/17 0:02, Sean Paul ??:
-> On Wed, Nov 16, 2016 at 11:01 AM, Sean Paul <seanpaul@chromium.org> wrote:
->> On Wed, Nov 16, 2016 at 8:43 AM, Rongrong Zou <zourongrong@gmail.com> wrote:
->>> This patch set adds a new drm driver for Hisilicon Hibmc. Hibmc is a
->>> BMC SoC with a display controller intergrated, usually it is used on
->>> server for Out-of-band management purpose. In this patch set, we just
->>> support basic function for Hibmc display subsystem. Hibmc display
->>> subsystem is connected to host CPU by PCIe as blow:
->>>
->>> +----------+       +----------+
->>> |          | PCIe  |  Hibmc   |
->>> |host CPU( |<----->| display  |
->>> |arm64,x86)|       |subsystem |
->>> +----------+       +----------+
->>>
->>> Hardware Detail for Hibmc display subsystem
->>> -----------
->>>
->>>    The display subsystem of Hibmc is show as bellow:
->>>    +----+      +----+      +----+     +--------+
->>>    |    |      |    |      |    |     |        |
->>>    | FB |----->| DE |----->|VDAC|---->|external|
->>>    |    |      |    |      |    |     | VGA    |
->>>    +----+      +----+      +----+     +--------+
->>>
->>>    -DE(Display Engine) is the display controller.
->>>    -VDAC(Video Digital-to-Analog converter) converts the RGB diaital data
->>>    stream from DE to VGA analog signals.
->>>
->>
->> For the whole series/driver:
->>
->> Acked-by: Sean Paul <seanpaul@chromium.org>
->>
->>
->
-> Also, please send those fixups for the other ttm drivers ;)
+Hi Russell,
 
-with pleasure :)
+On Monday 14 November 2016 08:21 PM, Russell King - ARM Linux wrote:
+> On Mon, Nov 14, 2016 at 03:37:44PM +0100, Arnd Bergmann wrote:
+>> On Monday, November 14, 2016 1:50:18 PM CET Russell King - ARM Linux wrote:
+>>> On Mon, Nov 14, 2016 at 01:03:09PM +0100, Arnd Bergmann wrote:
+>>>> On Monday, November 14, 2016 2:10:16 PM CET pankaj.dubey wrote:
+>>>>>>> +    scu_base = of_iomap(np, 0);
+>>>>>>> +    of_node_put(np);
+>>>>>>> +    if (!scu_base) {
+>>>>>>> +            pr_err("%s failed to map scu_base via DT\n", __func__);
+>>>>>>
+>>>>>> For non-ca5, non-ca9 based SoCs, we'll see this error msg. We understand
+>>>>>> what does it mean, but it may confuse normal users. In current version,
+>>>>>> berlin doesn't complain like this for non-ca9 SoCs
+>>>>>>
+>>>>>
+>>>>> OK, let me see other reviewer's comment on this. Then we will decide if
+>>>>> this error message is required or can be omitted.
+>>>>
+>>>> We need to look at all callers here, to see if the function ever gets
+>>>> called for a CPU that doesn't have an SCU. I'd say we should warn if
+>>>> we know there is an SCU but we cannot map it, but never warn on
+>>>> any of the CPU cores that don't support an SCU.
+>>>
+>>> Maybe there should be two helpers:
+>>>
+>>> of_scu_enable() which _only_ looks up the SCU address in DT and enables
+>>> it if it finds it, otherwise returning failure.
+>>>
+>>> a9_scu_enable() which tries to use the A9 provided SCU address and
+>>> enables it if it finds it, otherwise returning failure.
+>>>
 
-Regards,
-Rongrong.
+OK, In that case I can see need for following four helpers as:
 
->
->>
->>> Change History
->>> ------------
->>> Changes in v7:
->>>    -remove hibmc_drm_power.c/hibmc_drm_power.h, move the functions to
->>>     hibmc_drm_drv.c.
->>>    -remove hibmc_drm_de.h and move the struct defined in head file to
->>>     hibmc_drm_de.c.
->>>    -plane is initialized inside crtc, not in hibmc_kms_init().
->>>    -connector is initialized inside encoder, not in hibmc_kms_init().
->>>    -remove plane/crtc/encoder/connector from hibmc_drm_private struct.
->>>    -call drm_atomic_helper_suspend/resume in hibmc_pm_suspend/resume.
->>>    -remove these empty stubs because caller will do NULL check.
->>>      hibmc_plane_atomic_disable
->>>      hibmc_crtc_atomic_check
->>>      hibmc_encoder_disable
->>>      hibmc_encoder_enable
->>>      hibmc_encoder_atomic_check
->>>    -clean up in all error paths of creating driver-private framebuffer.
->>>
->>> Changes in v6:
->>>    -remove the embedded framebuffer and use a pointer of hibmc_framebuffer
->>>     instead.
->>>    -remove the deprecated drm_framebuffer_unregister_private(),
->>>     drm_framebuffer_unreference() will be called in hibmc_fbdev_destroy().
->>>    -uninstall irq in hibmc_unload().
->>>
->>> Changes in v5:
->>>    -rebase on v4.9-rc2.
->>>    -replace drm_fb_helper_set_suspend with drm_fb_helper_set_suspend_unlocked.
->>>     and remove redundant console_lock and console_unlock.
->>>
->>> Changes in v4:
->>>    -remove unused include files, and include header file when it is needed.
->>>    -remove unused FLAG in Kconfig: DRM_GEM_CMA_HELPER/DRM_KMS_CMA_HELPER.
->>>    -remove drm_helper_disable_unused_functions, since we use DRIVER_ATOMIC.
->>>
->>> Changes in v3:
->>>    -enable KMS, in v2, only fbdev is enabled.
->>>    -management video memory with ttm.
->>>    -add vblank interrupt.
->>>    -remove drm_connector_register_all() and drm_connector_unregister_all().
->>>    -I have a basic test with igt.
->>>
->>> Changes in v2:
->>>    -Remove self-defined macros for bit operations.
->>>    -Remove unused register.
->>>    -Replace those deprecated functions with new version of them.
->>>    -use drm_connector_register_all() to register connector after
->>>     drm_dev_register().
->>>
->>> The patch v2 is at
->>> https://lists.freedesktop.org/archives/dri-devel/2016-May/108661.html
->>>
->>> Rongrong Zou (7):
->>>    drm/hisilicon/hibmc: Add hisilicon hibmc drm master driver
->>>    drm/hisilicon/hibmc: Add video memory management
->>>    drm/hisilicon/hibmc: Add support for frame buffer
->>>    drm/hisilicon/hibmc: Add support for display engine
->>>    drm/hisilicon/hibmc: Add support for VDAC
->>>    drm/hisilicon/hibmc: Add support for vblank interrupt
->>>    MAINTAINERS: Update HISILICON DRM entries
->>>
->>>   MAINTAINERS                                       |   1 +
->>>   drivers/gpu/drm/hisilicon/Kconfig                 |   1 +
->>>   drivers/gpu/drm/hisilicon/Makefile                |   1 +
->>>   drivers/gpu/drm/hisilicon/hibmc/Kconfig           |   9 +
->>>   drivers/gpu/drm/hisilicon/hibmc/Makefile          |   4 +
->>>   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c    | 477 ++++++++++++++++++
->>>   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c   | 456 ++++++++++++++++++
->>>   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h   | 114 +++++
->>>   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c | 267 +++++++++++
->>>   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h  | 196 ++++++++
->>>   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c  | 147 ++++++
->>>   drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c       | 558 ++++++++++++++++++++++
->>>   12 files changed, 2231 insertions(+)
->>>   create mode 100644 drivers/gpu/drm/hisilicon/hibmc/Kconfig
->>>   create mode 100644 drivers/gpu/drm/hisilicon/hibmc/Makefile
->>>   create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
->>>   create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
->>>   create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
->>>   create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c
->>>   create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h
->>>   create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
->>>   create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c
->>>
->>> --
->>> 1.9.1
->>>
-> _______________________________________________
-> linuxarm mailing list
-> linuxarm at huawei.com
-> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
->
-> .
->
+1: of_scu_enable() which will __only__ lookup the SCU address in DT and
+enables it if it finds, otherwise return -ENOMEM failure.
+This helper APIs is required and sufficient for most of platforms such
+as exynos, berlin, realview, socfpga, STi, ux500, vexpress, rockchip and
+mvebu
+
+2: a9_scu_enable(), which will __only__ use A9 provided SCU address and
+enables it, if address mapped successfully, otherwise returning failure.
+This helper APIs is required and sufficient for two ARM platforms as of
+now tegra and hisi.
+
+3: of_scu_get_base() which will lookup the SCU address in DT and if node
+found maps address and returns ioremapped address to caller.
+This helper APIs is required for three ARM plaforms rockchip, mvebu and
+ux500, along with scu_enable() API to enable and find number_of_cores.
+
+4: s9_scu_iomap_base() which will internally use s9_scu_get_base() and
+do ioremap of scu address and returns ioremapped address to the caller
+along with ownership (caller has responsibility to unmap it).
+This helper APIs is required to simplify SCU enable and related code in
+two ARM plaforms BCM ans ZX.
+
+For remaining two ARM platforms (IMX and ZYNQ), none of these helpers
+are useful for the time-being, as they need SCU mapping very early of
+boot, where we can't use iomap APIs. So I will drop patches related to
+these platforms in v2 version.
+
+Please let me know if any concern in this approach.
 
 
--- 
-Regards, Rongrong
+>>> Then callers can decide which of these to call, and what error messages
+>>> to print on their failures.
+>>
+>> Splitting the function in two is probably simpler overall, but
+>> we may still have to look at all the callers: Any platform that
+>> currently tries to map it on any CPU and doesn't warn about the
+>> absence of the device node (or about scu_a9_has_base() == false)
+>> should really continue not to warn about that.
+> 
+> Did you miss the bit where none of of_scu_enable() or a9_scu_enable()
+> should produce any warnings or errors to be printed.  It's up to the
+> caller to report the failure, otherwise doing this doesn't make sense:
+> 
+> 	if (of_scu_enable() < 0 && a9_scu_enable() < 0)
+> 		pr_err("Failed to map and enable the SCU\n");
+> 
+> because if of_scu_enable() prints a warning/error, then it's patently
+> misleading.
+> 
+
+I will move out error message out of these helpers and let caller
+(platform specific code) handle and print error if required.
+
+
+Thanks,
+Pankaj Dubey
