@@ -1,130 +1,184 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 17 Nov 2016 19:35:36 +0100
-Subject: [PATCH 15/20] ARM/hw_breakpoint: Convert to hotplug state machine
-In-Reply-To: <20161117183541.8588-1-bigeasy@linutronix.de>
-References: <20161117183541.8588-1-bigeasy@linutronix.de>
-Message-ID: <20161117183541.8588-16-bigeasy@linutronix.de>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 17 Nov 2016 19:52:38 +0100
+Subject: [PATCH 1/2] ARM: dts: sun5i: Add touchscreen node to
+ reference-design-tablet.dtsi
+In-Reply-To: <20161117183520.vpyw72mchynpqx7d@lukather>
+References: <20161113192203.7101-1-hdegoede@redhat.com>
+ <20161114200802.vdduhyxnkgmpsyd5@lukather>
+ <0c3a9e9c-d310-c6c3-ae10-1ae9e520963e@redhat.com>
+ <20161117183520.vpyw72mchynpqx7d@lukather>
+Message-ID: <7db6926e-a490-21c7-851b-1bc34ae97a6a@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Install the callbacks via the state machine and let the core invoke
-the callbacks on the already online CPUs.
+Hi,
 
-smp_call_function_single() has been removed because the function is already
-invoked on the target CPU.
+On 17-11-16 19:35, Maxime Ripard wrote:
+> Hi Hans,
+>
+> On Tue, Nov 15, 2016 at 11:12:35AM +0100, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 14-11-16 21:08, Maxime Ripard wrote:
+>>> Hi,
+>>>
+>>> On Sun, Nov 13, 2016 at 08:22:02PM +0100, Hans de Goede wrote:
+>>>> Just like on sun8i all sun5i tablets use the same interrupt and power
+>>>> gpios for their touchscreens. I've checked all known a13 fex files and
+>>>> only the UTOO P66 uses a different gpio for the interrupt.
+>>>>
+>>>> Add a touchscreen node to sun5i-reference-design-tablet.dtsi, which
+>>>> fills in the necessary gpios to avoid duplication in the tablet dts files,
+>>>> just like we do in sun8i-reference-design-tablet.dtsi.
+>>>>
+>>>> This will make future patches adding touchscreen nodes to a13 tablets
+>>>> simpler.
+>>>>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>> ---
+>>>>  arch/arm/boot/dts/sun5i-a13-utoo-p66.dts           | 38 ++++++++--------------
+>>>>  .../boot/dts/sun5i-reference-design-tablet.dtsi    | 25 ++++++++++++++
+>>>>  2 files changed, 39 insertions(+), 24 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
+>>>> index a8b0bcc..3d7ff10 100644
+>>>> --- a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
+>>>> +++ b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
+>>>> @@ -83,22 +83,6 @@
+>>>>  	allwinner,pins = "PG3";
+>>>>  };
+>>>>
+>>>> -&i2c1 {
+>>>> -	icn8318: touchscreen at 40 {
+>>>> -		compatible = "chipone,icn8318";
+>>>> -		reg = <0x40>;
+>>>> -		interrupt-parent = <&pio>;
+>>>> -		interrupts = <6 9 IRQ_TYPE_EDGE_FALLING>; /* EINT9 (PG9) */
+>>>> -		pinctrl-names = "default";
+>>>> -		pinctrl-0 = <&ts_wake_pin_p66>;
+>>>> -		wake-gpios = <&pio 1 3 GPIO_ACTIVE_HIGH>; /* PB3 */
+>>>> -		touchscreen-size-x = <800>;
+>>>> -		touchscreen-size-y = <480>;
+>>>> -		touchscreen-inverted-x;
+>>>> -		touchscreen-swapped-x-y;
+>>>> -	};
+>>>> -};
+>>>> -
+>>>>  &mmc2 {
+>>>>  	pinctrl-names = "default";
+>>>>  	pinctrl-0 = <&mmc2_pins_a>;
+>>>> @@ -121,20 +105,26 @@
+>>>>  		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>>>>  		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>>>>  	};
+>>>> -
+>>>> -	ts_wake_pin_p66: ts_wake_pin at 0 {
+>>>> -		allwinner,pins = "PB3";
+>>>> -		allwinner,function = "gpio_out";
+>>>> -		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>>>> -		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>>>> -	};
+>>>> -
+>>>>  };
+>>>>
+>>>>  &reg_usb0_vbus {
+>>>>  	gpio = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
+>>>>  };
+>>>>
+>>>> +&touchscreen {
+>>>> +	compatible = "chipone,icn8318";
+>>>> +	reg = <0x40>;
+>>>> +	/* The P66 uses a different EINT then the reference design */
+>>>> +	interrupts = <6 9 IRQ_TYPE_EDGE_FALLING>; /* EINT9 (PG9) */
+>>>> +	/* The icn8318 binding expects wake-gpios instead of power-gpios */
+>>>> +	wake-gpios = <&pio 1 3 GPIO_ACTIVE_HIGH>; /* PB3 */
+>>>> +	touchscreen-size-x = <800>;
+>>>> +	touchscreen-size-y = <480>;
+>>>> +	touchscreen-inverted-x;
+>>>> +	touchscreen-swapped-x-y;
+>>>> +	status = "okay";
+>>>> +};
+>>>> +
+>>>>  &uart1 {
+>>>>  	/* The P66 uses the uart pins as gpios */
+>>>>  	status = "disabled";
+>>>> diff --git a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
+>>>> index 20cc940..7af488a 100644
+>>>> --- a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
+>>>> +++ b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
+>>>> @@ -41,6 +41,7 @@
+>>>>   */
+>>>>  #include "sunxi-reference-design-tablet.dtsi"
+>>>>
+>>>> +#include <dt-bindings/interrupt-controller/irq.h>
+>>>>  #include <dt-bindings/pwm/pwm.h>
+>>>>
+>>>>  / {
+>>>> @@ -84,6 +85,23 @@
+>>>>  };
+>>>>
+>>>>  &i2c1 {
+>>>> +	/*
+>>>> +	 * The gsl1680 is rated at 400KHz and it will not work reliable at
+>>>> +	 * 100KHz, this has been confirmed on multiple different q8 tablets.
+>>>> +	 * All other devices on this bus are also rated for 400KHz.
+>>>> +	 */
+>>>> +	clock-frequency = <400000>;
+>>>> +
+>>>> +	touchscreen: touchscreen {
+>>>> +		interrupt-parent = <&pio>;
+>>>> +		interrupts = <6 11 IRQ_TYPE_EDGE_FALLING>; /* EINT11 (PG11) */
+>>>> +		pinctrl-names = "default";
+>>>> +		pinctrl-0 = <&ts_power_pin>;
+>>>> +		power-gpios = <&pio 1 3 GPIO_ACTIVE_HIGH>; /* PB3 */
+>>>> +		/* Tablet dts must provide reg and compatible */
+>>>> +		status = "disabled";
+>>>> +	};
+>>>> +
+>>>>  	pcf8563: rtc at 51 {
+>>>>  		compatible = "nxp,pcf8563";
+>>>>  		reg = <0x51>;
+>>>> @@ -125,6 +143,13 @@
+>>>>  		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>>>>  	};
+>>>>
+>>>> +	ts_power_pin: ts_power_pin {
+>>>> +		allwinner,pins = "PB3";
+>>>> +		allwinner,function = "gpio_out";
+>>>> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>>>> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>>>> +	};
+>>>> +
+>>>
+>>> For the next release, we'll switch to the generic pin mux properties
+>>> ("pins" and "function"), and we actually implemented the fact that the
+>>> drive and pull properties are optional, so you can drop them both.
+>>>
+>>> You'll need next + http://lists.infradead.org/pipermail/linux-arm-kernel/2016-November/467123.html
+>>
+>> Ok, before I send a v2 first a question about this, for the touchscreen
+>> case I actually need:
+>>
+>> 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>>
+>> Because otherwise when the touchscreen controller is powered by a separate
+>> regulator and that regulator is off, then it may draw just enough current
+>> from its enable pin to be sort-of listening to the i2c bus and mess up
+>> that bus.
+>>
+>> So is this the default, or do we get the power-on default when not
+>> specifying these? If it is the power-on default then we do need to
+>> specify these, because AFAICT the power-on drive strength typically
+>> is 20 mA.
+>
+> Leaving them out will keep whatever state has been programmed. Putting
+> them in the DT will force them to whatever value has been set.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
----
- arch/arm/kernel/hw_breakpoint.c | 44 ++++++++++++++++++-----------------------
- 1 file changed, 19 insertions(+), 25 deletions(-)
+Thanks for the answer, in the mean time I've send a v2 which leaves
+them in using the new names (which according to your answer seems to
+be the right thing to do).
 
-diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index b8df45883cf7..51cff5a8feff 100644
---- a/arch/arm/kernel/hw_breakpoint.c
-+++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -925,9 +925,9 @@ static bool core_has_os_save_restore(void)
- 	}
- }
- 
--static void reset_ctrl_regs(void *unused)
-+static void reset_ctrl_regs(unsigned int cpu)
- {
--	int i, raw_num_brps, err = 0, cpu = smp_processor_id();
-+	int i, raw_num_brps, err = 0;
- 	u32 val;
- 
- 	/*
-@@ -1020,25 +1020,20 @@ static void reset_ctrl_regs(void *unused)
- 		cpumask_or(&debug_err_mask, &debug_err_mask, cpumask_of(cpu));
- }
- 
--static int dbg_reset_notify(struct notifier_block *self,
--				      unsigned long action, void *cpu)
-+static int dbg_reset_online(unsigned int cpu)
- {
--	if ((action & ~CPU_TASKS_FROZEN) == CPU_ONLINE)
--		smp_call_function_single((int)cpu, reset_ctrl_regs, NULL, 1);
--
--	return NOTIFY_OK;
-+	local_irq_disable();
-+	reset_ctrl_regs(cpu);
-+	local_irq_enable();
-+	return 0;
- }
- 
--static struct notifier_block dbg_reset_nb = {
--	.notifier_call = dbg_reset_notify,
--};
--
- #ifdef CONFIG_CPU_PM
- static int dbg_cpu_pm_notify(struct notifier_block *self, unsigned long action,
- 			     void *v)
- {
- 	if (action == CPU_PM_EXIT)
--		reset_ctrl_regs(NULL);
-+		reset_ctrl_regs(smp_processor_id());
- 
- 	return NOTIFY_OK;
- }
-@@ -1059,6 +1054,8 @@ static inline void pm_init(void)
- 
- static int __init arch_hw_breakpoint_init(void)
- {
-+	int ret;
-+
- 	debug_arch = get_debug_arch();
- 
- 	if (!debug_arch_supported()) {
-@@ -1072,8 +1069,6 @@ static int __init arch_hw_breakpoint_init(void)
- 	core_num_brps = get_num_brps();
- 	core_num_wrps = get_num_wrps();
- 
--	cpu_notifier_register_begin();
--
- 	/*
- 	 * We need to tread carefully here because DBGSWENABLE may be
- 	 * driven low on this core and there isn't an architected way to
-@@ -1082,15 +1077,18 @@ static int __init arch_hw_breakpoint_init(void)
- 	register_undef_hook(&debug_reg_hook);
- 
- 	/*
--	 * Reset the breakpoint resources. We assume that a halting
--	 * debugger will leave the world in a nice state for us.
-+	 * Register CPU notifier which resets the breakpoint resources. We
-+	 * assume that a halting debugger will leave the world in a nice state
-+	 * for us.
- 	 */
--	on_each_cpu(reset_ctrl_regs, NULL, 1);
-+	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "arm/hw_breakpoint:online",
-+				dbg_reset_online, NULL);
- 	unregister_undef_hook(&debug_reg_hook);
--	if (!cpumask_empty(&debug_err_mask)) {
-+	if (WARN_ON(ret < 0) || !cpumask_empty(&debug_err_mask)) {
- 		core_num_brps = 0;
- 		core_num_wrps = 0;
--		cpu_notifier_register_done();
-+		if (ret > 0)
-+			cpuhp_remove_state_nocalls(ret);
- 		return 0;
- 	}
- 
-@@ -1109,11 +1107,7 @@ static int __init arch_hw_breakpoint_init(void)
- 	hook_ifault_code(FAULT_CODE_DEBUG, hw_breakpoint_pending, SIGTRAP,
- 			TRAP_HWBKPT, "breakpoint debug exception");
- 
--	/* Register hotplug and PM notifiers. */
--	__register_cpu_notifier(&dbg_reset_nb);
--
--	cpu_notifier_register_done();
--
-+	/* Register PM notifiers. */
- 	pm_init();
- 	return 0;
- }
--- 
-2.10.2
+Regards,
+
+Hans
