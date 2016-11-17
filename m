@@ -1,100 +1,78 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Nov 2016 15:11:36 +0100
-Subject: [PATCH 19/31] ARM: dts: r8a7745: add SYS-DMAC support
-In-Reply-To: <cover.1479391750.git.horms+renesas@verge.net.au>
-References: <cover.1479391750.git.horms+renesas@verge.net.au>
-Message-ID: <8a3b6ab1e3c7ca020ef54a784f0df24b5d0cc0b4.1479391750.git.horms+renesas@verge.net.au>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 17 Nov 2016 06:44:55 -0800
+Subject: Boot failures in -next due to 'ARM: dts: imx: Remove
+ skeleton.dtsi'
+In-Reply-To: <20161117105513.GA12273@leverpostej>
+References: <cda2df55-f2f3-00d6-c6b1-816ed47bbf56@roeck-us.net>
+ <20161116184649.GF11228@leverpostej> <20161116221002.GA19925@roeck-us.net>
+ <CAOMZO5Bd2X3pVqExBtBw_uHReDDkf6J2VdMXnAXynCAHxoX60A@mail.gmail.com>
+ <20161116224024.GA11821@roeck-us.net> <20161117105513.GA12273@leverpostej>
+Message-ID: <198d764e-1612-81b4-5f4e-0c221a23c8e0@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On 11/17/2016 02:55 AM, Mark Rutland wrote:
+> On Wed, Nov 16, 2016 at 02:40:24PM -0800, Guenter Roeck wrote:
+>> On Wed, Nov 16, 2016 at 08:27:09PM -0200, Fabio Estevam wrote:
+>>> Hi Guenter,
+>>>
+>>> On Wed, Nov 16, 2016 at 8:10 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+>>>>
+>>>> Anyway, I guess the problem is that the "official" dtb files no longer provide
+>>>> the skeleton /chosen and /memory nodes (and maybe others), and qemu seems to
+>>>> expect that they are provided. Is that correct ?
+>>>
+>>> imx6qdl-sabrelite.dtsi provides chosen and memory nodes.
+>>
+>> Yes, but not the 'device_type' property, which the kernel seems to expect.
+>
+> Memory nodes require this property per ePAPR and the devicetree.org
+> spec, so the bug is that we didn't add those when removing the
+> skeleton.dtsi include.
+>
 
-Describe SYS-DMAC0/1 in the R8A7745 device tree.
+The downside from qemu perspective is that the real hardware seems
+to add the property unconditionally, or the boot failure would have
+been seen there as well.
 
-Based on the original (and large) patch by Dmitry Shifrin
-<dmitry.shifrin@cogentembedded.com>.
+I submitted https://patchwork.ozlabs.org/patch/695951/; we'll see how it goes.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7745.dtsi | 64 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+Guenter
 
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index fbf72ddd82b7..437c5ad933d1 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -93,6 +93,70 @@
- 			compatible = "renesas,r8a7745-rst";
- 			reg = <0 0xe6160000 0 0x100>;
- 		};
-+
-+		dmac0: dma-controller at e6700000 {
-+			compatible = "renesas,dmac-r8a7745",
-+				     "renesas,rcar-dmac";
-+			reg = <0 0xe6700000 0 0x20000>;
-+			interrupts = <GIC_SPI 197 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 200 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 201 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 202 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 203 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 204 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 205 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 207 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 210 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 211 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 212 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 213 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 214 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "error",
-+					"ch0", "ch1", "ch2", "ch3",
-+					"ch4", "ch5", "ch6", "ch7",
-+					"ch8", "ch9", "ch10", "ch11",
-+					"ch12", "ch13", "ch14";
-+			clocks = <&cpg CPG_MOD 219>;
-+			clock-names = "fck";
-+			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			#dma-cells = <1>;
-+			dma-channels = <15>;
-+		};
-+
-+		dmac1: dma-controller at e6720000 {
-+			compatible = "renesas,dmac-r8a7745",
-+				     "renesas,rcar-dmac";
-+			reg = <0 0xe6720000 0 0x20000>;
-+			interrupts = <GIC_SPI 220 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 216 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 218 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 219 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 308 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 309 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 310 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 311 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 312 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 313 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 314 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 315 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 316 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 317 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 318 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "error",
-+					"ch0", "ch1", "ch2", "ch3",
-+					"ch4", "ch5", "ch6", "ch7",
-+					"ch8", "ch9", "ch10", "ch11",
-+					"ch12", "ch13", "ch14";
-+			clocks = <&cpg CPG_MOD 218>;
-+			clock-names = "fck";
-+			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			#dma-cells = <1>;
-+			dma-channels = <15>;
-+		};
- 	};
- 
- 	/* External root clock */
--- 
-2.7.0.rc3.207.g0ac5344
+>> The qemu patch below fixes the problem for sabrelite, I just don't know
+>> if that is really the way to go. You tell me; I'll be happy to submit
+>> the necessary patch(es) into qemu.
+>
+> As above, I don't think the below patch is necessary. The dt should have
+> this property to begin with.
+>
+>> The same is true for 'chosen'. Right now qemu expects this node to exist.
+>> It does exist for sabrelite, but apparently not for imx25-pdk.
+>
+> Having QEMU create a /chosen node if one does not exist already sounds
+> sensible to me.
+>
+> Thanks,
+> Mark.
+>
+>> Guenter
+>>
+>> ---
+>> diff --git a/hw/arm/boot.c b/hw/arm/boot.c
+>> index 1b913a4..080d1e5 100644
+>> --- a/hw/arm/boot.c
+>> +++ b/hw/arm/boot.c
+>> @@ -486,6 +486,12 @@ static int load_dtb(hwaddr addr, const struct arm_boot_info *binfo,
+>>              g_free(nodename);
+>>          }
+>>      } else {
+>> +        Error *err = NULL;
+>> +
+>> +        if (!qemu_fdt_getprop(fdt, "/memory", "device_type", NULL, &err)) {
+>> +            qemu_fdt_setprop_string(fdt, "/memory", "device_type", "memory");
+>> +        }
+>> +
+>>          rc = qemu_fdt_setprop_sized_cells(fdt, "/memory", "reg",
+>>                                            acells, binfo->loader_start,
+>>                                            scells, binfo->ram_size);
+>
