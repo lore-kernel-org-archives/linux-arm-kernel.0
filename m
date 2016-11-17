@@ -1,38 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 17 Nov 2016 13:30:39 +0000
-Subject: [PATCH v3 1/1] KVM: ARM64: Fix the issues when guest PMCCFILTR
- is configured
-In-Reply-To: <1479316160-8567-1-git-send-email-wei@redhat.com>
-References: <1479316160-8567-1-git-send-email-wei@redhat.com>
-Message-ID: <20161117133039.GH22855@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 17 Nov 2016 14:34:25 +0100
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.10
+Message-ID: <cover.1479387356.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2016 at 11:09:20AM -0600, Wei Huang wrote:
-> KVM calls kvm_pmu_set_counter_event_type() when PMCCFILTR is configured.
-> But this function can't deals with PMCCFILTR correctly because the evtCount
-> bits of PMCCFILTR, which is reserved 0, conflits with the SW_INCR event
-> type of other PMXEVTYPER<n> registers. To fix it, when eventsel == 0, this
-> function shouldn't return immediately; instead it needs to check further
-> if select_idx is ARMV8_PMU_CYCLE_IDX.
-> 
-> Another issue is that KVM shouldn't copy the eventsel bits of PMCCFILTER
-> blindly to attr.config. Instead it ought to convert the request to the
-> "cpu cycle" event type (i.e. 0x11).
-> 
-> To support this patch and to prevent duplicated definitions, a limited
-> set of ARMv8 perf event types were relocated from perf_event.c to
-> asm/perf_event.h.
-> 
-> Signed-off-by: Wei Huang <wei@redhat.com>
-> ---
->  arch/arm64/include/asm/perf_event.h | 10 +++++++++-
->  arch/arm64/kernel/perf_event.c      | 10 +---------
->  virt/kvm/arm/pmu.c                  |  8 +++++---
->  3 files changed, 15 insertions(+), 13 deletions(-)
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Please consider these second round of Renesas ARM based SoC updates for v4.10.
 
-I'm assuming this will go via kvm-arm.
+This pull request is based on the previous round of
+such requests, tagged as renesas-soc-for-v4.10,
+which I have already sent a pull-request for.
 
-Will
+
+The following changes since commit 9652623f8f019edc93a7a934a10b7d0b90421d5a:
+
+  ARM: shmobile: r8a7779/marzen: Add board part number to DT bindings (2016-11-04 10:25:45 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v4.10
+
+for you to fetch changes up to 4af239175d00c1866cc6b41f3eabcf93c45dcc40:
+
+  ARM: shmobile: document SK-RZG1E board (2016-11-15 10:59:35 +0100)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Updates for v4.10
+
+* Basic support for r8a7745 SoC
+
+----------------------------------------------------------------
+Sergei Shtylyov (2):
+      ARM: shmobile: r8a7745: basic SoC support
+      ARM: shmobile: document SK-RZG1E board
+
+ Documentation/devicetree/bindings/arm/shmobile.txt | 4 ++++
+ arch/arm/mach-shmobile/Kconfig                     | 4 ++++
+ arch/arm/mach-shmobile/setup-rcar-gen2.c           | 1 +
+ 3 files changed, 9 insertions(+)
