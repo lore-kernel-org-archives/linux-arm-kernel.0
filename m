@@ -1,199 +1,103 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Thu, 17 Nov 2016 19:13:11 +0800
-Subject: [PATCH v16 00/15] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <d8b5ca3f-d756-ae2e-012c-3cabc38dd39a@huawei.com>
-References: <1479304148-2965-1-git-send-email-fu.wei@linaro.org>
- <944d11ac-3c0d-72c0-6888-df8e474e21bb@huawei.com>
- <d8b5ca3f-d756-ae2e-012c-3cabc38dd39a@huawei.com>
-Message-ID: <CADyBb7vZ99p4dmqh94F=LnDXrv-K6sm=fsvOWL9OWuaZmVw+-g@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Nov 2016 11:19:18 +0000
+Subject: [PATCH v27 1/9] memblock: add memblock_cap_memory_range()
+In-Reply-To: <20161117022023.GA5704@linaro.org>
+References: <20161102044959.11954-1-takahiro.akashi@linaro.org>
+ <20161102045153.12008-1-takahiro.akashi@linaro.org>
+ <20161110172720.GB17134@arm.com> <20161111025049.GG381@linaro.org>
+ <20161111031903.GB15997@arm.com> <20161114055515.GH381@linaro.org>
+ <20161116163015.GM7928@arm.com> <20161117022023.GA5704@linaro.org>
+Message-ID: <20161117111917.GA22855@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xiongfeng
+Hi Akashi,
 
-On 17 November 2016 at 17:25, Xiongfeng Wang <wangxiongfeng2@huawei.com> wrote:
->
-> Sorry for not describing specifically in the last mail.
-> I have applied all the patches of this patchset on Linux 4.9, and tested
-> the per-cpu timer and sbsa watchdog part, which function well on D05 board.
+On Thu, Nov 17, 2016 at 02:34:24PM +0900, AKASHI Takahiro wrote:
+> On Wed, Nov 16, 2016 at 04:30:15PM +0000, Will Deacon wrote:
+> > I thought limit was just a physical address, and then
+> 
+> No, it's not.
 
-Thanks for your testing,
+Quite right, it's a size. Sorry about that.
 
-So I will apply your Tested-by in 1~8, 11, 12, 15 in my next patchset.
+> > memblock_mem_limit_remove_map operated on the end of the nearest memblock?
+> 
+> No, but "max_addr" returned by __find_max_addr() is a physical address
+> and the end address of memory of "limit" size in total.
+> 
+> > You could leave the __find_max_addr call in memblock_mem_limit_remove_map,
+> > given that I don't think you need/want it for memblock_cap_memory_range.
+> > 
+> > > So I added an extra argument, exact, to a common function to specify
+> > > distinct behaviors. Confusing? Please see the patch below.
+> > 
+> > Oh yikes, this certainly wasn't what I had in mind! My observation was
+> > just that memblock_mem_limit_remove_map(limit) does:
+> > 
+> > 
+> >   1. memblock_isolate_range(limit - limit+ULLONG_MAX)
+> >   2. memblock_remove_region(all non-nomap regions in the isolated region)
+> >   3. truncate reserved regions to limit
+> > 
+> > and your memblock_cap_memory_range(base, size) does:
+> > 
+> >   1. memblock_isolate_range(base - base+size)
+> >   2, memblock_remove_region(all non-nomap regions above and below the
+> >      isolated region)
+> >   3. truncate reserved regions around the isolated region
+> > 
+> > so, assuming we can invert the isolation in one of the cases, then they
+> > could share the same underlying implementation.
+> 
+> Please see my simplified patch below which would explain what I meant.
+> (Note that the size is calculated by 'max_addr - 0'.)
+> 
+> > I'm probably just missing something here, because the patch you've ended
+> > up with is far more involved than I anticipated...
+> 
+> I hope that it will meet almost your anticipation.
 
->
-> On 2016/11/17 11:34, Xiongfeng Wang wrote:
->> Tested-by:  wangxiongfeng2 at huawei.com on D05 board.
->>
->>
->> On 2016/11/16 21:48, fu.wei at linaro.org wrote:
->>> From: Fu Wei <fu.wei@linaro.org>
->>>
->>> This patchset:
->>>     (1)Preparation for adding GTDT support in arm_arch_timer:
->>>         1. Move some enums and marcos to header file;
->>>         2. Add a new enum for spi type;
->>>         3. Improve printk relevant code.
->>>         4. rename some  enums and defines, and some cleanups.
->>>         5. separate out arch_timer_uses_ppi init code and fix a potential bug
->>>         6. Refactor arch_timer_detect_rate to keep dt code only in *_of_init
->>>         7. Refactor arch_timer_needs_probing, and call it only if acpi disabled.
->>>         8. Introduce some new structs and refactor the timer init code
->>>
->>>     (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
->>>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
->>>     memory-mapped timer and SBSA Generic Watchdog timer.
->>>     This driver can help to simplify all the relevant timer drivers,
->>>     and separate all the ACPI GTDT knowledge from them.
->>>
->>>     (3)Simplify ACPI code for arm_arch_timer
->>>
->>>     (4)Add GTDT support for ARM memory-mapped timer, also refactor
->>>     original memory-mapped timer dt support for reusing some common
->>>     code.
->>>
->>> This patchset has been tested on the following platforms with ACPI enabled:
->>>     (1)ARM Foundation v8 model
->>>
->>> Changelog:
->>> v16: https://lkml.org/lkml/2016/
->>>      Fix patchset problem about static enum ppi_nr of 01/13 in v15.
->>>      Refactor arch_timer_detect_rate.
->>>      Refactor arch_timer_needs_probing.
->>>
->>> v15: https://lkml.org/lkml/2016/11/15/366
->>>      Re-order patches
->>>      Add arm_arch_timer refactoring patches to prepare for GTDT:
->>>          1. rename some  enums and defines, and some cleanups
->>>          2. separate out arch_timer_uses_ppi init code and fix a potential bug
->>>          3. Improve some new structs, refactor the timer init code.
->>>      Since the some structs have been changed, GTDT parser for memory-mapped
->>>      timer and SBSA Generic Watchdog timer have been update.
->>>
->>> v14: https://lkml.org/lkml/2016/9/28/573
->>>      Separate memory-mapped timer GTDT support into two patches
->>>          1. Refactor the timer init code to prepare for GTDT
->>>          2. Add GTDT support for memory-mapped timer
->>>
->>> v13: http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1231717.html
->>>      Improve arm_arch_timer code for memory-mapped
->>>      timer GTDT support, refactor original memory-mapped timer
->>>      dt support for reusing some common code.
->>>
->>> v12: https://lkml.org/lkml/2016/9/13/250
->>>      Rebase to latest Linux 4.8-rc6
->>>      Delete the confusing "skipping" in the error message.
->>>
->>> V11: https://lkml.org/lkml/2016/9/6/354
->>>      Rebase to latest Linux 4.8-rc5
->>>      Delete typedef (suggested by checkpatch.pl)
->>>
->>> V10: https://lkml.org/lkml/2016/7/26/215
->>>      Drop the "readq" patch.
->>>      Rebase to latest Linux 4.7.
->>>
->>> V9: https://lkml.org/lkml/2016/7/25/345
->>>     Improve pr_err message in acpi gtdt driver.
->>>     Update Commit message for 7/9
->>>     shorten the irq mapping function name
->>>     Improve GTDT driver for memory-mapped timer
->>>
->>> v8: https://lkml.org/lkml/2016/7/19/660
->>>     Improve "pr_fmt(fmt)" definition: add "ACPI" in front of "GTDT",
->>>     and also improve printk message.
->>>     Simplify is_timer_block and is_watchdog.
->>>     Merge acpi_gtdt_desc_init and gtdt_arch_timer_init into acpi_gtdt_init();
->>>     Delete __init in include/linux/acpi.h for GTDT API
->>>     Make ARM64 select GTDT.
->>>     Delete "#include <linux/module.h>" from acpi_gtdt.c
->>>     Simplify GT block parse code.
->>>
->>> v7: https://lkml.org/lkml/2016/7/13/769
->>>     Move the GTDT driver to drivers/acpi/arm64
->>>     Add add the ARM64-specific ACPI Support maintainers in MAINTAINERS
->>>     Merge 3 patches of GTDT parser driver.
->>>     Fix the for_each_platform_timer bug.
->>>
->>> v6: https://lkml.org/lkml/2016/6/29/580
->>>     split the GTDT driver to 4 parts: basic, arch_timer, memory-mapped timer,
->>>     and SBSA Generic Watchdog timer
->>>     Improve driver by suggestions and example code from Daniel Lezcano
->>>
->>> v5: https://lkml.org/lkml/2016/5/24/356
->>>     Sorting out all patches, simplify the API of GTDT driver:
->>>     GTDT driver just fills the data struct for arm_arch_timer driver.
->>>
->>> v4: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006667.html
->>>     Delete the kvm relevant patches
->>>     Separate two patches for sorting out the code for arm_arch_timer.
->>>     Improve irq info export code to allow missing irq info in GTDT table.
->>>
->>> v3: https://lkml.org/lkml/2016/2/1/658
->>>     Improve GTDT driver code:
->>>       (1)improve pr_* by defining pr_fmt(fmt)
->>>       (2)simplify gtdt_sbsa_gwdt_init
->>>       (3)improve gtdt_arch_timer_data_init, if table is NULL, it will try
->>>       to get GTDT table.
->>>     Move enum ppi_nr to arm_arch_timer.h, and add enum spi_nr.
->>>     Add arm_arch_timer get ppi from DT and GTDT support for kvm.
->>>
->>> v2: https://lkml.org/lkml/2015/12/2/10
->>>     Rebase to latest kernel version(4.4-rc3).
->>>     Fix the bug about the config problem,
->>>     use CONFIG_ACPI_GTDT instead of CONFIG_ACPI in arm_arch_timer.c
->>>
->>> v1: The first upstreaming version: https://lkml.org/lkml/2015/10/28/553
->>>
->>> Fu Wei (15):
->>>   clocksource/drivers/arm_arch_timer: Move enums and defines to header
->>>     file
->>>   clocksource/drivers/arm_arch_timer: Add a new enum for spi type
->>>   clocksource/drivers/arm_arch_timer: Improve printk relevant code
->>>   clocksource/drivers/arm_arch_timer: rename some enums and defines, and
->>>     some cleanups.
->>>   clocksource/drivers/arm_arch_timer: fix a bug in arch_timer_register
->>>     about arch_timer_uses_ppi
->>>   clocksource/drivers/arm_arch_timer: separate out arch_timer_uses_ppi
->>>     init code to prepare for GTDT.
->>>   clocksource/drivers/arm_arch_timer: Refactor arch_timer_detect_rate to
->>>     keep dt code in *_of_init
->>>   clocksource/drivers/arm_arch_timer: Refactor arch_timer_needs_probing,
->>>     and call it only if acpi disabled.
->>>   clocksource/drivers/arm_arch_timer: Introduce some new structs to
->>>     prepare for GTDT
->>>   clocksource/drivers/arm_arch_timer: Refactor the timer init code to
->>>     prepare for GTDT
->>>   acpi/arm64: Add GTDT table parse driver
->>>   clocksource/drivers/arm_arch_timer: Simplify ACPI support code.
->>>   acpi/arm64: Add memory-mapped timer support in GTDT driver
->>>   clocksource/drivers/arm_arch_timer: Add GTDT support for memory-mapped
->>>     timer
->>>   acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver
->>>
->>>  arch/arm64/Kconfig                   |   1 +
->>>  drivers/acpi/arm64/Kconfig           |   3 +
->>>  drivers/acpi/arm64/Makefile          |   1 +
->>>  drivers/acpi/arm64/gtdt.c            | 411 +++++++++++++++++++++++++++++
->>>  drivers/clocksource/arm_arch_timer.c | 484 ++++++++++++++++++++---------------
->>>  drivers/watchdog/Kconfig             |   1 +
->>>  include/clocksource/arm_arch_timer.h |  61 ++++-
->>>  include/linux/acpi.h                 |   8 +
->>>  virt/kvm/arm/hyp/timer-sr.c          |   6 +-
->>>  9 files changed, 759 insertions(+), 217 deletions(-)
->>>  create mode 100644 drivers/acpi/arm64/gtdt.c
->>>
->>
->>
->> .
->>
->
+It looks much better, thanks! Just one question below.
 
+> diff --git a/mm/memblock.c b/mm/memblock.c
+> index 7608bc3..fea1688 100644
+> --- a/mm/memblock.c
+> +++ b/mm/memblock.c
+> @@ -1514,11 +1514,37 @@ void __init memblock_enforce_memory_limit(phys_addr_t limit)
+>  			      (phys_addr_t)ULLONG_MAX);
+>  }
+>  
+> +void __init memblock_cap_memory_range(phys_addr_t base, phys_addr_t size)
+> +{
+> +	int start_rgn, end_rgn;
+> +	int i, ret;
+> +
+> +	if (!size)
+> +		return;
+> +
+> +	ret = memblock_isolate_range(&memblock.memory, base, size,
+> +						&start_rgn, &end_rgn);
+> +	if (ret)
+> +		return;
+> +
+> +	/* remove all the MAP regions */
+> +	for (i = memblock.memory.cnt - 1; i >= end_rgn; i--)
+> +		if (!memblock_is_nomap(&memblock.memory.regions[i]))
+> +			memblock_remove_region(&memblock.memory, i);
 
+In the case that we have only one, giant memblock that covers base all
+of base + size, can't we end up with start_rgn = end_rgn = 0? In which
+case, we'd end up accidentally removing the map regions here.
 
--- 
-Best regards,
+The existing code:
 
-Fu Wei
-Software Engineer
-Red Hat
+> -	/* remove all the MAP regions above the limit */
+> -	for (i = end_rgn - 1; i >= start_rgn; i--) {
+> -		if (!memblock_is_nomap(&type->regions[i]))
+> -			memblock_remove_region(type, i);
+> -	}
+
+seems to handle this.
+
+Will
