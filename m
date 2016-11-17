@@ -1,52 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Nov 2016 15:11:32 +0100
-Subject: [PATCH 15/31] ARM: dts: r8a7743: add IRQC support
+Date: Thu, 17 Nov 2016 15:11:34 +0100
+Subject: [PATCH 17/31] ARM: dts: sk-rzg1m: add Ether support
 In-Reply-To: <cover.1479391750.git.horms+renesas@verge.net.au>
 References: <cover.1479391750.git.horms+renesas@verge.net.au>
-Message-ID: <108b6793b20ecadacc98e06ef8f1f6a793faa6c2.1479391750.git.horms+renesas@verge.net.au>
+Message-ID: <bc5e4967e9e98c48495780e25b0555dea8cbd21d.1479391750.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Describe the IRQC interrupt controller in the R8A7743 device tree.
+Define the SK-RZG1M board dependent part of the Ether device node.
+Enable DHCP and NFS root  for the kernel booting.
+
+Based on the original (and large) patch by Dmitry Shifrin
+<dmitry.shifrin@cogentembedded.com>.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7743.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/boot/dts/r8a7743-sk-rzg1m.dts | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index 87563a5379b5..216cb1f37f87 100644
---- a/arch/arm/boot/dts/r8a7743.dtsi
-+++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -62,6 +62,25 @@
- 						 IRQ_TYPE_LEVEL_HIGH)>;
- 		};
+diff --git a/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts b/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
+index ed26961c9434..3a22538208f2 100644
+--- a/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
++++ b/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
+@@ -20,7 +20,7 @@
+ 	};
  
-+		irqc: interrupt-controller at e61c0000 {
-+			compatible = "renesas,irqc-r8a7743", "renesas,irqc";
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			reg = <0 0xe61c0000 0 0x200>;
-+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 407>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+		};
+ 	chosen {
+-		bootargs = "ignore_loglevel";
++		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
+@@ -42,3 +42,16 @@
+ &scif0 {
+ 	status = "okay";
+ };
 +
- 		timer {
- 			compatible = "arm,armv7-timer";
- 			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
++&ether {
++	phy-handle = <&phy1>;
++	renesas,ether-link-active-low;
++	status = "okay";
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++		interrupt-parent = <&irqc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++		micrel,led-mode = <1>;
++	};
++};
 -- 
 2.7.0.rc3.207.g0ac5344
