@@ -1,50 +1,116 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 17 Nov 2016 15:05:51 +0000
-Subject: Boot failures in -next due to 'ARM: dts: imx: Remove
- skeleton.dtsi'
-In-Reply-To: <198d764e-1612-81b4-5f4e-0c221a23c8e0@roeck-us.net>
-References: <cda2df55-f2f3-00d6-c6b1-816ed47bbf56@roeck-us.net>
- <20161116184649.GF11228@leverpostej>
- <20161116221002.GA19925@roeck-us.net>
- <CAOMZO5Bd2X3pVqExBtBw_uHReDDkf6J2VdMXnAXynCAHxoX60A@mail.gmail.com>
- <20161116224024.GA11821@roeck-us.net>
- <20161117105513.GA12273@leverpostej>
- <198d764e-1612-81b4-5f4e-0c221a23c8e0@roeck-us.net>
-Message-ID: <20161117150551.GA21742@leverpostej>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Thu, 17 Nov 2016 07:10:22 -0800
+Subject: [PATCH V8 2/6] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <766e1b70-d83a-eb52-fa2b-aec435e85673@martin.sperl.org>
+References: <1478081906-12009-1-git-send-email-kernel@martin.sperl.org>
+ <1478081906-12009-3-git-send-email-kernel@martin.sperl.org>
+ <20161117021107.GA2647@localhost.localdomain>
+ <766e1b70-d83a-eb52-fa2b-aec435e85673@martin.sperl.org>
+Message-ID: <20161117151019.GA3115@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2016 at 06:44:55AM -0800, Guenter Roeck wrote:
-> On 11/17/2016 02:55 AM, Mark Rutland wrote:
-> >On Wed, Nov 16, 2016 at 02:40:24PM -0800, Guenter Roeck wrote:
-> >>On Wed, Nov 16, 2016 at 08:27:09PM -0200, Fabio Estevam wrote:
-> >>>Hi Guenter,
-> >>>
-> >>>On Wed, Nov 16, 2016 at 8:10 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> >>>>
-> >>>>Anyway, I guess the problem is that the "official" dtb files no longer provide
-> >>>>the skeleton /chosen and /memory nodes (and maybe others), and qemu seems to
-> >>>>expect that they are provided. Is that correct ?
-> >>>
-> >>>imx6qdl-sabrelite.dtsi provides chosen and memory nodes.
-> >>
-> >>Yes, but not the 'device_type' property, which the kernel seems to expect.
+Hello Martin,
+
+On Thu, Nov 17, 2016 at 10:51:33AM +0100, Martin Sperl wrote:
+> 
+> 
+> On 17.11.2016 03:11, Eduardo Valentin wrote:
+> >Hey Martin,
 > >
-> >Memory nodes require this property per ePAPR and the devicetree.org
-> >spec, so the bug is that we didn't add those when removing the
-> >skeleton.dtsi include.
+> >Very sorry for the late feedback. Not so sure if this one got queued
+> >already or not. Anyways, just minor questions as follows:
+> >
+> >On Wed, Nov 02, 2016 at 10:18:22AM +0000, kernel at martin.sperl.org wrote:
+> >>From: Martin Sperl <kernel@martin.sperl.org>
+> >>
+> >>Add basic thermal driver for bcm2835 SOC.
+> >>
+> >>This driver currently relies on the firmware setting up the
+> >>tsense HW block and does not set it up itself.
+> >>
+> >>Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+> >>Acked-by: Eric Anholt <eric@anholt.net>
+> >>Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+> >>
+> ...
+> >>+static int bcm2835_thermal_adc2temp(
+> >>+	const struct bcm2835_thermal_info *info, u32 adc)
+> >>+{
+> >>+	return info->offset + (adc * info->slope);
+> >
+> >Any specific reason we cannot use thermal_zone_params->slope and
+> >thermal_zone_params->offset?
 > 
-> The downside from qemu perspective is that the real hardware seems
-> to add the property unconditionally, or the boot failure would have
-> been seen there as well.
+> You could - the patch was just rebased to 4.9 and those slope and
+> offset just got merged during this cycle.
 > 
-> I submitted https://patchwork.ozlabs.org/patch/695951/; we'll see how it goes.
+> Do we really need to modify it - the patch has been around since 4.6.
+> 
+> >>+
+> >>+static int bcm2835_thermal_get_trip_temp(
+> >>+	struct thermal_zone_device *tz, int trip, int *temp)
+> >>+{
+> >>+	struct bcm2835_thermal_data *data = tz->devdata;
+> >>+	u32 val = readl(data->regs + BCM2835_TS_TSENSCTL);
+> >>+
+> >>+	/* get the THOLD bits */
+> >>+	val &= BCM2835_TS_TSENSCTL_THOLD_MASK;
+> >>+	val >>= BCM2835_TS_TSENSCTL_THOLD_SHIFT;
+> >>+
+> >>+	/* if it is zero then use the info value */
+> >>+	if (val)
+> >
+> >Is this a read only register or is this driver supposed to program it?
+> >In which scenario it would be 0? Can this be added as comments?
+> 
+> It is RW, but the Firmware typically sets up the thermal device with the
+> correct values already - this is just a fallback.
 
-Sure, the firmare/bootlaoder you're using may add this automatically.
+OK, but how do you differentiate from a buggy firmware or misconfigured
+hardware? How do you know if the firmware is supposed to be loaded and
+ready? There is no firmware loading in this driver. Also, there is no
+dependency with a driver that loads firmware, or at least, I missed it.
 
-My worry is that adding this to a generic file in QEMU only serves to
-mask this class of bug for other boards (i.e. they'll work fine in QEMU,
-but not on real HW using whatever bootlaoder happens ot be there).
+> 
+> >>+static int bcm2835_thermal_get_temp(struct thermal_zone_device *tz,
+> >>+				    int *temp)
+> >>+{
+> >>+	struct bcm2835_thermal_data *data = tz->devdata;
+> >>+	u32 val = readl(data->regs + BCM2835_TS_TSENSSTAT);
+> >>+
+> >>+	if (!(val & BCM2835_TS_TSENSSTAT_VALID))
+> >
+> >What cases you would get the valid bit not set? Do you need to wait for
+> >the conversion to finish?
+> 
+> I guess: if you have just enabled the HW-block (which the FW does much
+> in advance) and start to read the value immediately (before the first sample
+> period has finished), then this will not be valid.
+> 
 
-Thanks,
-Mark.
+Then again, how does this driver make sure the initialization procedure
+is correct, and that by the time it is using the hardware, the hardware
+is in a sane state?
+
+Back to the original question, does it mean the hardware is in
+some sort of continuous ADC conversion mode or reading the temperature
+requires specific steps to get the conversion done, and therefore you
+are checking the valid bit here?
+
+
+
+> So do you need another version of the patchset that uses that new API?
+
+I think the API usage is change that can be done together with
+clarification for the above questions too: on hardware state,
+firmware loading, maybe a master driver dependency, and the ADC
+conversion sequence, which are not well clear to me on this driver. As long as
+this is clarified and documented in the code (can be simple comments so
+it is clear to whoever reads in the future), then I would be OK with
+this driver. 
+
+> 
+> Thanks,
+> 	Martin
