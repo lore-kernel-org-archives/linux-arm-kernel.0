@@ -1,106 +1,57 @@
 From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Thu, 17 Nov 2016 09:50:27 +0530
-Subject: [PATCH 01/16] ARM: scu: Provide support for parsing SCU device
- node to enable SCU
-In-Reply-To: <20161114145143.GM1041@n2100.armlinux.org.uk>
+Date: Thu, 17 Nov 2016 09:59:40 +0530
+Subject: [PATCH 12/16] ARM: imx: use generic API for enabling SCU
+In-Reply-To: <20161114142631.GP3310@dragon>
 References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
- <2479429.Js1FDSdQzs@wuerfel> <20161114135018.GL1041@n2100.armlinux.org.uk>
- <6787744.7DRFf7p3US@wuerfel>
- <CGME20161114145228epcas3p136b117d2b99a31efc59a973262173295@epcas3p1.samsung.com>
- <20161114145143.GM1041@n2100.armlinux.org.uk>
-Message-ID: <fe90b6cc-81b1-772e-ab78-f2199957ec96@samsung.com>
+ <1479099731-28108-13-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20161114142651epcas5p2ffdb722d348257c900d233fdb95885f3@epcas5p2.samsung.com>
+ <20161114142631.GP3310@dragon>
+Message-ID: <65abb76e-2aff-4057-c1ac-7ed71563d426@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Shawn,
 
-On Monday 14 November 2016 08:21 PM, Russell King - ARM Linux wrote:
-> On Mon, Nov 14, 2016 at 03:37:44PM +0100, Arnd Bergmann wrote:
->> On Monday, November 14, 2016 1:50:18 PM CET Russell King - ARM Linux wrote:
->>> On Mon, Nov 14, 2016 at 01:03:09PM +0100, Arnd Bergmann wrote:
->>>> On Monday, November 14, 2016 2:10:16 PM CET pankaj.dubey wrote:
->>>>>>> +    scu_base = of_iomap(np, 0);
->>>>>>> +    of_node_put(np);
->>>>>>> +    if (!scu_base) {
->>>>>>> +            pr_err("%s failed to map scu_base via DT\n", __func__);
->>>>>>
->>>>>> For non-ca5, non-ca9 based SoCs, we'll see this error msg. We understand
->>>>>> what does it mean, but it may confuse normal users. In current version,
->>>>>> berlin doesn't complain like this for non-ca9 SoCs
->>>>>>
->>>>>
->>>>> OK, let me see other reviewer's comment on this. Then we will decide if
->>>>> this error message is required or can be omitted.
->>>>
->>>> We need to look at all callers here, to see if the function ever gets
->>>> called for a CPU that doesn't have an SCU. I'd say we should warn if
->>>> we know there is an SCU but we cannot map it, but never warn on
->>>> any of the CPU cores that don't support an SCU.
->>>
->>> Maybe there should be two helpers:
->>>
->>> of_scu_enable() which _only_ looks up the SCU address in DT and enables
->>> it if it finds it, otherwise returning failure.
->>>
->>> a9_scu_enable() which tries to use the A9 provided SCU address and
->>> enables it if it finds it, otherwise returning failure.
->>>
-
-OK, In that case I can see need for following four helpers as:
-
-1: of_scu_enable() which will __only__ lookup the SCU address in DT and
-enables it if it finds, otherwise return -ENOMEM failure.
-This helper APIs is required and sufficient for most of platforms such
-as exynos, berlin, realview, socfpga, STi, ux500, vexpress, rockchip and
-mvebu
-
-2: a9_scu_enable(), which will __only__ use A9 provided SCU address and
-enables it, if address mapped successfully, otherwise returning failure.
-This helper APIs is required and sufficient for two ARM platforms as of
-now tegra and hisi.
-
-3: of_scu_get_base() which will lookup the SCU address in DT and if node
-found maps address and returns ioremapped address to caller.
-This helper APIs is required for three ARM plaforms rockchip, mvebu and
-ux500, along with scu_enable() API to enable and find number_of_cores.
-
-4: s9_scu_iomap_base() which will internally use s9_scu_get_base() and
-do ioremap of scu address and returns ioremapped address to the caller
-along with ownership (caller has responsibility to unmap it).
-This helper APIs is required to simplify SCU enable and related code in
-two ARM plaforms BCM ans ZX.
-
-For remaining two ARM platforms (IMX and ZYNQ), none of these helpers
-are useful for the time-being, as they need SCU mapping very early of
-boot, where we can't use iomap APIs. So I will drop patches related to
-these platforms in v2 version.
-
-Please let me know if any concern in this approach.
-
-
->>> Then callers can decide which of these to call, and what error messages
->>> to print on their failures.
+On Monday 14 November 2016 07:56 PM, Shawn Guo wrote:
+> On Mon, Nov 14, 2016 at 10:32:07AM +0530, Pankaj Dubey wrote:
+>> Now as we have of_scu_enable which takes care of mapping
+>> scu base from DT, lets use it.
 >>
->> Splitting the function in two is probably simpler overall, but
->> we may still have to look at all the callers: Any platform that
->> currently tries to map it on any CPU and doesn't warn about the
->> absence of the device node (or about scu_a9_has_base() == false)
->> should really continue not to warn about that.
+>> At the same time this patch cleans up mach-imx platform files by
+>> removing static mapping of SCU and dropping imx_scu_map_io function.
 > 
-> Did you miss the bit where none of of_scu_enable() or a9_scu_enable()
-> should produce any warnings or errors to be printed.  It's up to the
-> caller to report the failure, otherwise doing this doesn't make sense:
+> I remember that the static mapping of SCU is necessary because SCU is
+> being accessed at very early boot stage where dynamic mapping hasn't
+> been set up.
 > 
-> 	if (of_scu_enable() < 0 && a9_scu_enable() < 0)
-> 		pr_err("Failed to map and enable the SCU\n");
+>> CC: Shawn Guo <shawnguo@kernel.org>
+>> CC: Sascha Hauer <kernel@pengutronix.de>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> ---
+>>  arch/arm/mach-imx/common.h     |  5 -----
+>>  arch/arm/mach-imx/mach-imx6q.c |  8 +-------
+>>  arch/arm/mach-imx/platsmp.c    | 32 +++++---------------------------
+>>  arch/arm/mach-imx/pm-imx6.c    |  3 ++-
+>>  4 files changed, 8 insertions(+), 40 deletions(-)
 > 
-> because if of_scu_enable() prints a warning/error, then it's patently
-> misleading.
-> 
+> I tested it and saw that the booting of imx6q is broken like below.
 
-I will move out error message out of these helpers and let caller
-(platform specific code) handle and print error if required.
+Thanks for testing and letting me know about this.
 
+Currently only two platforms (IMX and ZYNQ) are using SCU address at
+very early stage of boot, for configuring possible cpus via
+set_cpu_possible().. rest platforms are either using DT method or they
+handle this in smp_prepare_cpus.
+
+Since I am not sure if all boards based on IMX has been moved to DT
+based boot, if it has moved to completely DT based then we do not need
+this set_cpu_possible in smp_init_cpus, it will be taken care via
+"arm_dt_init_cpu_maps" and this will avoid need of early mapping of SCU
+base as well.
+
+If not then, currently I can't see any other way to handle this and in
+that case I will drop-out IMX platform's patch of using generic SCU APIs
+in v2 version of series.
 
 Thanks,
 Pankaj Dubey
