@@ -1,36 +1,30 @@
-From: yuantian.tang@nxp.com (yuantian.tang at nxp.com)
-Date: Thu, 17 Nov 2016 15:59:20 +0800
-Subject: [PATCH 2/2] arm64: dts: updated sata node on ls1046a dts
-In-Reply-To: <1479369560-9188-1-git-send-email-yuantian.tang@nxp.com>
-References: <1479369560-9188-1-git-send-email-yuantian.tang@nxp.com>
-Message-ID: <1479369560-9188-2-git-send-email-yuantian.tang@nxp.com>
+From: smueller@chronox.de (Stephan Mueller)
+Date: Thu, 17 Nov 2016 09:18:46 +0100
+Subject: [PATCH] crypto: sun4i-ss: support the Security System PRNG
+In-Reply-To: <20161117080748.GB25394@Red>
+References: <1476794067-28563-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1722218.eZlGktOxfL@tauon.atsec.com> <20161117080748.GB25394@Red>
+Message-ID: <2474504.KOMlLBWsmD@tauon.atsec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tang Yuantian <Yuantian.Tang@nxp.com>
+Am Donnerstag, 17. November 2016, 09:07:48 CET schrieb Corentin Labbe:
 
-On ls1046a soc, sata ecc should be disabled. So added sata ecc
-register address so that driver can get this information.
+Hi Corentin,
+> 
+> Seed again, or just do not seed (and so return -EAGAIN for read() function)
+> until ready_callback ?
 
-Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+This is your choice. But for the start sequence, you should not simply rely on 
+get_random_bytes.
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index 38806ca..88aaaf1 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -507,7 +507,9 @@
- 
- 		sata: sata at 3200000 {
- 			compatible = "fsl,ls1046a-ahci";
--			reg = <0x0 0x3200000 0x0 0x10000>;
-+			reg = <0x0 0x3200000 0x0 0x10000>,
-+			    <0x0 0x20140520 0x0 0x4>;
-+			reg-names = "ahci", "sata-ecc";
- 			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&clockgen 4 1>;
- 		};
--- 
-2.1.0.27.g96db324
+For the DRBG in crypto/drbg.c we seed with get_random_bytes and the Jitter RNG 
+in case the input_pool is not fully seeded. The reseed trigger is reduced to 
+50 DRBG requests, i.e. after 50 requests, the DRBG again reseeds from 
+get_random_bytes / Jitter RNG. This is continued until the input_pool has been 
+sufficiently seeded (i.e. the registered callback is triggered). At that 
+point, another get_random_bytes call is made, the Jitter RNG is deactivated 
+and the reseed threshold is set to the common value.
+
+Ciao
+Stephan
