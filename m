@@ -1,45 +1,32 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Thu, 17 Nov 2016 09:07:48 +0100
-Subject: [PATCH] crypto: sun4i-ss: support the Security System PRNG
-In-Reply-To: <1722218.eZlGktOxfL@tauon.atsec.com>
-References: <1476794067-28563-1-git-send-email-clabbe.montjoie@gmail.com>
- <1722218.eZlGktOxfL@tauon.atsec.com>
-Message-ID: <20161117080748.GB25394@Red>
+From: yuantian.tang@nxp.com (yuantian.tang at nxp.com)
+Date: Thu, 17 Nov 2016 15:59:19 +0800
+Subject: [PATCH 1/2] dt-bindings: ahci-fsl-qoriq: added explanation for
+ reg-names
+Message-ID: <1479369560-9188-1-git-send-email-yuantian.tang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2016 at 04:24:22PM +0200, Stephan Mueller wrote:
-> Am Dienstag, 18. Oktober 2016, 14:34:27 CEST schrieb Corentin Labbe:
-> 
-> Hi Corentin,
-> 
-> > diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hwrng.c
-> > b/drivers/crypto/sunxi-ss/sun4i-ss-hwrng.c new file mode 100644
-> > index 0000000..95fadb7
-> > --- /dev/null
-> > +++ b/drivers/crypto/sunxi-ss/sun4i-ss-hwrng.c
-> > @@ -0,0 +1,70 @@
-> > +#include "sun4i-ss.h"
-> > +
-> > +static int sun4i_ss_hwrng_init(struct hwrng *hwrng)
-> > +{
-> > +	struct sun4i_ss_ctx *ss;
-> > +
-> > +	ss = container_of(hwrng, struct sun4i_ss_ctx, hwrng);
-> > +	get_random_bytes(ss->seed, SS_SEED_LEN);
-> 
-> Is it wise to call get_random_bytes once in the init function and never 
-> thereafter?
-> 
-> This init function may be called during boot time of the kernel at which the 
-> input_pool may not yet have received sufficient amounts of entropy.
-> 
-> What about registering a callback with add_random_ready_callback and seed 
-> again when sufficient entropy was collected?
-> 
+From: Tang Yuantian <Yuantian.Tang@nxp.com>
 
-Seed again, or just do not seed (and so return -EAGAIN for read() function) until ready_callback ?
+Added explanation for reg-names to make it more clear.
 
-Thanks
+Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
+---
+ Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Corentin Labbe
+diff --git a/Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt b/Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt
+index fc33ca0..80cf10c 100644
+--- a/Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt
++++ b/Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt
+@@ -10,6 +10,8 @@ Required properties:
+ Optional properties:
+   - dma-coherent: Enable AHCI coherent DMA operation.
+   - reg-names: register area names when there are more than 1 register area.
++		example: 'ahci' is for sata controller register.
++			 'sata-ecc' is for sata ecc register.
+ 
+ Examples:
+ 	sata at 3200000 {
+-- 
+2.1.0.27.g96db324
