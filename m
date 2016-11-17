@@ -1,105 +1,30 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 17 Nov 2016 23:12:57 +0100
-Subject: LEDs that change brightness "itself" -- that's a trigger. Re: PM
- regression with LED changes in next-20161109
-In-Reply-To: <aeccbb02-6e33-390c-d72d-2a580dd67ed8@redhat.com>
-References: <cb0aa3ce-ee48-66b8-510c-bd70917afec9@redhat.com>
- <b5ae20d7-8394-7ad5-1830-13173e9105c4@gmail.com>
- <9b476f85-d45e-deb6-335d-fc56f6d90350@redhat.com>
- <127cdd42-6fd8-c671-60b7-3826b351577f@samsung.com>
- <15cafbf5-d842-e184-2fd4-65f8272f505a@redhat.com>
- <CGME20161115103141epcas2p251f2521354a8cd7b9dfcfe55bfa482f0@epcas2p2.samsung.com>
- <20161115103133.GA22860@amd>
- <4e392d5d-eb10-f285-517e-976a55c3e318@samsung.com>
- <20161115111154.GA5482@amd> <128aae59-b790-42f1-7d66-81391c9330c3@redhat.com>
- <20161115114859.GA7018@amd> <aeccbb02-6e33-390c-d72d-2a580dd67ed8@redhat.com>
-Message-ID: <94321807-31e5-c1e3-1e79-5abf3bf2e554@redhat.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 17 Nov 2016 14:16:06 -0800
+Subject: [PATCH] ARM: dts: qcom: Add apq8064 CoreSight components
+In-Reply-To: <20161117153609.11705-1-georgi.djakov@linaro.org>
+References: <20161117153609.11705-1-georgi.djakov@linaro.org>
+Message-ID: <d466f591-baac-c734-a49b-8aab763c1876@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 15-11-16 13:06, Hans de Goede wrote:
-> Hi,
+On 11/17/2016 07:36 AM, Georgi Djakov wrote:
+> From: "Ivan T. Ivanov" <ivan.ivanov@linaro.org>
 >
-> On 15-11-16 12:48, Pavel Machek wrote:
->> Hi!
->>
->>>>>> The LED you are talking about _has_ a trigger, implemented in
->>>>>> hardware. That trigger can change LED brightness behind kernel's (and
->>>>>> userspace's) back. Don't pretend the trigger does not exist, it does.
->>>>>>
->>>>>> And when you do that, you'll have nice place to report changes to
->>>>>> userspace -- trigger can now export that information, and offer poll()
->>>>>> interface.
->>>>>
->>>>> Well, that sounds interesting. It is logically justifiable.
->>>>
->>>> Thanks.
->>>>
->>>>> I initially proposed exactly this solution, with recently
->>>>> added userspace LED being a trigger listener. It seems a bit
->>>>> awkward though. How would you listen to the trigger events?
->>>>
->>>> Trigger exposes a file in sysfs, with poll() working on that file
->>>
->>> Hmm, a new file would give the advantage of making it easy for
->>> userspace to see if the trigger is poll-able, this is likely
->>> better then my own proposal I just send.
->>
->> Good.
->>
->>>> (and
->>>> probably read exposing the current brightness).
->>>
->>> If we do this, can we please make it mirror brightness, iow
->>> also make it writable, that will make it easier for userspace
->>> to deal with it. We can simply re-use the existing show / store
->>> methods for brightness for this.
->>
->> Actually, echo 0 > brightness disables the trigger, IIRC. I'd avoid
->> that here, you want to be able to turn off the backlight but still
->> keep the trigger (and be notified of future changes).
+> Add initial set of CoreSight components found on Qualcomm's
+> 8064 chipset.
 >
-> True, that is easy to do the store method will just need to call
-> led_set_brightness_nosleep instead of led_set_brightness, this
-> will skip the checks to stop blinking in led_set_brightness and
-> otherwise is equivalent.
->
->>> I suggest we call it:
->>>
->>> trigger_brightness
->>>
->>> And only register it when a poll-able trigger is present.
->>
->> I'd call it 'current_brightness', but that's no big deal. Yes, only
->> registering it for poll-able triggers makes sense.
->
-> current_brightness works for me. I will take a shot a patch-set
-> implementing this.
+> Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+> ---
+>  arch/arm/boot/dts/qcom-apq8064-coresight.dtsi | 196 ++++++++++++++++++++++++++
 
-Done, this actually turned out pretty nice, the trigger also helps
-in propagating the change events from dell-wmi to the led-classdev
-in dell-laptop without needing the ugly hacks I needed before.
+Why not put this inside the soc file? This would be the first time we
+add a new file for something that's inside the SoC node that probably
+won't change thereafter. At least for pins I slightly agree with having
+a different file, we're adding more and more things there so it's nice
+to have a consolidated place of all possible configurations to choose
+from. But here it's mostly a static device description so what's the gain?
 
-v5 coming up.
-
-Regards,
-
-Hans
-
-
-
->
->
->
->>
->>>> Key difference is that only triggers where this makes sense (keyboard
->>>> backlight) expose it and carry the overhead. CPU trigger would
->>>> definitely not do this.
->>>
->>> Ack only having some triggers pollable is important.
->>
->> Thanks,
->>                                     Pavel
->>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
