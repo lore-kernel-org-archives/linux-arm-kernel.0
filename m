@@ -1,46 +1,53 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 18 Nov 2016 00:08:23 +0100
-Subject: [PATCH v3 06/13] ARM: dts: armada-375: Fixup sa-ram DT warning
+Date: Fri, 18 Nov 2016 00:08:26 +0100
+Subject: [PATCH v3 09/13] ARM: dts: armada-375: Fixup soc DT warning
 In-Reply-To: <20161117230830.31047-1-gregory.clement@free-electrons.com>
 References: <20161117230830.31047-1-gregory.clement@free-electrons.com>
-Message-ID: <20161117230830.31047-7-gregory.clement@free-electrons.com>
+Message-ID: <20161117230830.31047-10-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sa-sram which is a mmio-sram has a reg property so the unit name should
-contain an address.
+soc has a ranges property so the unit name should contain an address.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-375.dtsi | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/armada-375-db.dts | 6 +++++-
+ arch/arm/boot/dts/armada-375.dtsi   | 6 +++++-
+ 2 files changed, 10 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
+index b33a674088ed..5ed226236398 100644
+--- a/arch/arm/boot/dts/armada-375-db.dts
++++ b/arch/arm/boot/dts/armada-375-db.dts
+@@ -63,7 +63,11 @@
+ 		reg = <0x00000000 0x40000000>; /* 1 GB */
+ 	};
+ 
+-	soc {
++	/* The following unit address is composed of the target
++	 * value (bit [40-47]), attributes value (bits [32-39],
++	 * and the address value in the window memory: [0-31].
++	 */
++	soc at f00100000000 {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
+ 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
+ 			  MBUS_ID(0x09, 0x09) 0 0xf1100000 0x10000
 diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index 9791a61f076b..80e1a4915d1d 100644
+index f213b6786e10..120dd7ac40cb 100644
 --- a/arch/arm/boot/dts/armada-375.dtsi
 +++ b/arch/arm/boot/dts/armada-375.dtsi
-@@ -644,7 +644,12 @@
+@@ -101,7 +101,11 @@
+ 		interrupts-extended = <&mpic 3>;
+ 	};
  
- 		};
- 
--		crypto_sram0: sa-sram0 {
-+		/* The following unit addresses (for sa-sram) are composed of
-+		 * the target value (bit [40-47]), attributes value (bits
-+		 * [32-39], and the address value in the window memory: [0-31].
-+		 */
-+
-+		crypto_sram0: sa-sram at 90900000000 {
- 			compatible = "mmio-sram";
- 			reg = <MBUS_ID(0x09, 0x09) 0 0x800>;
- 			clocks = <&gateclk 30>;
-@@ -653,7 +658,7 @@
- 			ranges = <0 MBUS_ID(0x09, 0x09) 0 0x800>;
- 		};
- 
--		crypto_sram1: sa-sram1 {
-+		crypto_sram1: sa-sram at 90500000000 {
- 			compatible = "mmio-sram";
- 			reg = <MBUS_ID(0x09, 0x05) 0 0x800>;
- 			clocks = <&gateclk 31>;
+-	soc {
++	/* The following unit address is composed of the target
++	 * value (bit [40-47]), attributes value (bits [32-39],
++	 * and the address value in the window memory: [0-31].
++	 */
++	soc at f00100000000 {
+ 		compatible = "marvell,armada375-mbus", "simple-bus";
+ 		#address-cells = <2>;
+ 		#size-cells = <1>;
 -- 
 2.10.2
