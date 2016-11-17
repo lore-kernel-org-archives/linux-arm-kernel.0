@@ -1,51 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Nov 2016 15:11:18 +0100
-Subject: [PATCH 01/31] ARM: dts: alt: Fix PFC names for DU
+Date: Thu, 17 Nov 2016 15:11:20 +0100
+Subject: [PATCH 03/31] ARM: dts: r8a7794: Use SYSC "always-on" PM Domain for
+ sound
 In-Reply-To: <cover.1479391750.git.horms+renesas@verge.net.au>
 References: <cover.1479391750.git.horms+renesas@verge.net.au>
-Message-ID: <238ad287956e37a38e8cc01facbdea931e76f0ce.1479391750.git.horms+renesas@verge.net.au>
+Message-ID: <d5ac75dfb3858a443bc69e0ff06ec360755b7421.1479391750.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jacopo Mondi <jacopo@jmondi.org>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Update the PFC pin groups and function names of DU interface for
-r8a7794 ALT board.
+Hook up the Audio-DMAC and sound device nodes to the SYSC "always-on" PM
+Domain, for a more consistent device-power-area description in DT.
 
-The currently specified pin groups and function names prevented PFC and
-DU interfaces from being correctly configured:
+Cfr. commit 0761ff2ad0c581f3 ("ARM: dts: r8a7794: Add SYSC PM Domains").
 
-sh-pfc e6060000.pin-controller: function 'du' not supported
-sh-pfc e6060000.pin-controller: invalid function du in map table
-sh-pfc e6060000.pin-controller: function 'du' not supported
-sh-pfc e6060000.pin-controller: invalid function du in map table
-sh-pfc e6060000.pin-controller: function 'du' not supported
-sh-pfc e6060000.pin-controller: invalid function du in map table
-sh-pfc e6060000.pin-controller: function 'du' not supported
-sh-pfc e6060000.pin-controller: invalid function du in map table
-rcar-du: probe of feb00000.display failed with error -22
-
-Signed-off-by: Jacopo Mondi <jacopo@jmondi.org>
-Acked-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Fixes: 320d6c5a08a4abd3 ("ARM: dts: r8a7794: add sound support")
+Fixes: 298e4ee3d213a076 ("ARM: dts: r8a7794: add Audio-DMAC support")
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794-alt.dts | 4 ++--
+ arch/arm/boot/dts/r8a7794.dtsi | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
-index 325d3f972c57..a3e74684289b 100644
---- a/arch/arm/boot/dts/r8a7794-alt.dts
-+++ b/arch/arm/boot/dts/r8a7794-alt.dts
-@@ -165,8 +165,8 @@
- 	pinctrl-names = "default";
- 
- 	du_pins: du {
--		groups = "du1_rgb666", "du1_sync", "du1_disp", "du1_dotclkout0";
--		function = "du";
-+		groups = "du1_rgb666", "du1_sync", "du1_disp", "du1_clk0_out";
-+		function = "du1";
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 7d9f0601d3ca..364b4aa8d1c1 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -319,7 +319,7 @@
+ 				  "ch12";
+ 		clocks = <&mstp5_clks R8A7794_CLK_AUDIO_DMAC0>;
+ 		clock-names = "fck";
+-		power-domains = <&cpg_clocks>;
++		power-domains = <&sysc R8A7794_PD_ALWAYS_ON>;
+ 		#dma-cells = <1>;
+ 		dma-channels = <13>;
  	};
+@@ -1485,7 +1485,7 @@
+ 			      "mix.0", "mix.1",
+ 			      "dvc.0", "dvc.1",
+ 			      "clk_a", "clk_b", "clk_c", "clk_i";
+-		power-domains = <&cpg_clocks>;
++		power-domains = <&sysc R8A7794_PD_ALWAYS_ON>;
  
- 	scif2_pins: scif2 {
+ 		status = "disabled";
+ 
 -- 
 2.7.0.rc3.207.g0ac5344
