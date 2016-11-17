@@ -1,41 +1,47 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 17 Nov 2016 22:51:19 +0100
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.10 (#1)
-Message-ID: <87oa1dbwrs.fsf@free-electrons.com>
+From: wsa-dev@sang-engineering.com (Wolfram Sang)
+Date: Thu, 17 Nov 2016 22:54:40 +0100
+Subject: [v4, 1/3] i2c: pxa: Add support for the I2C units found in
+ Armada 3700
+In-Reply-To: <20161109115715.2557-2-romain.perier@free-electrons.com>
+References: <20161109115715.2557-2-romain.perier@free-electrons.com>
+Message-ID: <20161117215440.GA10851@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-Here is the first pull request for dt64 for mvebu for v4.10.
+> +	[REGS_A3700] = {
+> +		.ibmr = 0x00,
+> +		.idbr = 0x04,
+> +		.icr =	0x08,
+> +		.isr =	0x0c,
+> +		.isar = 0x10,
+> +	},
 
-Here again, I hope being able to send a second part very soon with the
-series removing all the remaining DT warning.
+Can't you reuse REGS_PXA3XX?
 
-Gregory
+>  static const struct platform_device_id i2c_pxa_id_table[] = {
+> @@ -98,6 +106,7 @@ static const struct platform_device_id i2c_pxa_id_table[] = {
+>  	{ "pxa3xx-pwri2c",	REGS_PXA3XX },
+>  	{ "ce4100-i2c",		REGS_CE4100 },
+>  	{ "pxa910-i2c",		REGS_PXA910 },
+> +	{ "armada-3700-i2c",	REGS_A3700  },
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+So, you declare a platform_device_id here...
 
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+> +	if (of_device_is_compatible(np, "marvell,armada-3700-i2c")) {
+> +		i2c->fm_mask = ICR_BUSMODE_FM;
+> +		i2c->hs_mask = ICR_BUSMODE_HS;
+> +	} else {
+> +		i2c->fm_mask = ICR_FM;
+> +		i2c->hs_mask = ICR_HS;
+> +	}
 
-are available in the git repository at:
+... but don't consider this case here?
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.10-1
-
-for you to fetch changes up to e735aaf8fc4ac84dbdb3642a135da8dcdb84587b:
-
-  arm64: dts: marvell: Add definition for the Globalscale Marvell ESPRESSOBin Board (2016-10-17 17:19:56 +0200)
-
-----------------------------------------------------------------
-mvebu dt64 for 4.10 (part 1)
-
-Adding the new "community" board for Armada 3700
-
-----------------------------------------------------------------
-Romain Perier (1):
-      arm64: dts: marvell: Add definition for the Globalscale Marvell ESPRESSOBin Board
-
- arch/arm64/boot/dts/marvell/Makefile               |  1 +
- .../boot/dts/marvell/armada-3720-espressobin.dts   | 82 ++++++++++++++++++++++
- 2 files changed, 83 insertions(+)
- create mode 100644 arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161117/93262221/attachment.sig>
