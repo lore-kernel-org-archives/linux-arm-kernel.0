@@ -1,16 +1,17 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Nov 2016 15:11:28 +0100
-Subject: [PATCH 11/31] ARM: dts: r8a7743: initial SoC device tree
+Date: Thu, 17 Nov 2016 15:11:33 +0100
+Subject: [PATCH 16/31] ARM: dts: sk-rzg1m: initial device tree
 In-Reply-To: <cover.1479391750.git.horms+renesas@verge.net.au>
 References: <cover.1479391750.git.horms+renesas@verge.net.au>
-Message-ID: <a2e0104b39688e9bcd20ce441056955767ed7066.1479391750.git.horms+renesas@verge.net.au>
+Message-ID: <c9a2ce89b536a2186d1f534fc5110c5b1fbd98f1.1479391750.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-The  initial R8A7743 SoC device tree including CPU0, GIC, timer, SYSC, RST,
-CPG, and the required clock descriptions.
+Add the initial device  tree for the R8A7743 SoC based SK-RZG1M board.
+The board has one debug serial port (SCIF0); include support for it, so
+that  the serial  console  can work.
 
 Based on the original (and large) patch by Dmitry Shifrin
 <dmitry.shifrin@cogentembedded.com>.
@@ -19,135 +20,72 @@ Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7743.dtsi | 120 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 120 insertions(+)
- create mode 100644 arch/arm/boot/dts/r8a7743.dtsi
+ arch/arm/boot/dts/Makefile             |  1 +
+ arch/arm/boot/dts/r8a7743-sk-rzg1m.dts | 44 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 45 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
 
-diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index befcd2619902..f83ea57c97f9 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -677,6 +677,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
+ 	r7s72100-rskrza1.dtb \
+ 	r8a73a4-ape6evm.dtb \
+ 	r8a7740-armadillo800eva.dtb \
++	r8a7743-sk-rzg1m.dtb \
+ 	r8a7778-bockw.dtb \
+ 	r8a7779-marzen.dtb \
+ 	r8a7790-lager.dtb \
+diff --git a/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts b/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
 new file mode 100644
-index 000000000000..db9cb41be79b
+index 000000000000..ed26961c9434
 --- /dev/null
-+++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -0,0 +1,120 @@
++++ b/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
+@@ -0,0 +1,44 @@
 +/*
-+ * Device Tree Source for the r8a7743 SoC
++ * Device Tree Source for the SK-RZG1M board
 + *
-+ * Copyright (C) 2016 Cogent Embedded Inc.
++ * Copyright (C) 2016 Cogent Embedded, Inc.
 + *
 + * This file is licensed under the terms of the GNU General Public License
 + * version 2. This program is licensed "as is" without any warranty of any
 + * kind, whether express or implied.
 + */
 +
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/r8a7743-cpg-mssr.h>
-+#include <dt-bindings/power/r8a7743-sysc.h>
++/dts-v1/;
++#include "r8a7743.dtsi"
 +
 +/ {
-+	compatible = "renesas,r8a7743";
-+	#address-cells = <2>;
-+	#size-cells = <2>;
++	model = "SK-RZG1M";
++	compatible = "renesas,sk-rzg1m", "renesas,r8a7743";
 +
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0>;
-+			clock-frequency = <1500000000>;
-+			clocks = <&cpg CPG_CORE R8A7743_CLK_Z>;
-+			power-domains = <&sysc R8A7743_PD_CA15_CPU0>;
-+			next-level-cache = <&L2_CA15>;
-+		};
-+
-+		L2_CA15: cache-controller at 0 {
-+			compatible = "cache";
-+			reg = <0>;
-+			cache-unified;
-+			cache-level = <2>;
-+			power-domains = <&sysc R8A7743_PD_CA15_SCU>;
-+		};
++	aliases {
++		serial0 = &scif0;
 +	};
 +
-+	soc {
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		gic: interrupt-controller at f1001000 {
-+			compatible = "arm,gic-400";
-+			#interrupt-cells = <3>;
-+			#address-cells = <0>;
-+			interrupt-controller;
-+			reg = <0 0xf1001000 0 0x1000>,
-+			      <0 0xf1002000 0 0x1000>,
-+			      <0 0xf1004000 0 0x2000>,
-+			      <0 0xf1006000 0 0x2000>;
-+			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) |
-+						 IRQ_TYPE_LEVEL_HIGH)>;
-+		};
-+
-+		timer {
-+			compatible = "arm,armv7-timer";
-+			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
-+						  IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
-+						  IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
-+						  IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
-+						  IRQ_TYPE_LEVEL_LOW)>;
-+		};
-+
-+		cpg: clock-controller at e6150000 {
-+			compatible = "renesas,r8a7743-cpg-mssr";
-+			reg = <0 0xe6150000 0 0x1000>;
-+			clocks = <&extal_clk>, <&usb_extal_clk>;
-+			clock-names = "extal", "usb_extal";
-+			#clock-cells = <2>;
-+			#power-domain-cells = <0>;
-+		};
-+
-+		sysc: system-controller at e6180000 {
-+			compatible = "renesas,r8a7743-sysc";
-+			reg = <0 0xe6180000 0 0x200>;
-+			#power-domain-cells = <1>;
-+		};
-+
-+		rst: reset-controller at e6160000 {
-+			compatible = "renesas,r8a7743-rst";
-+			reg = <0 0xe6160000 0 0x100>;
-+		};
++	chosen {
++		bootargs = "ignore_loglevel";
++		stdout-path = "serial0:115200n8";
 +	};
 +
-+	/* External root clock */
-+	extal_clk: extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x40000000>;
 +	};
 +
-+	/* External USB clock - can be overridden by the board */
-+	usb_extal_clk: usb_extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <48000000>;
++	memory at 200000000 {
++		device_type = "memory";
++		reg = <2 0x00000000 0 0x40000000>;
 +	};
++};
 +
-+	/* External SCIF clock */
-+	scif_clk: scif {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
++&extal_clk {
++	clock-frequency = <20000000>;
++};
++
++&scif0 {
++	status = "okay";
 +};
 -- 
 2.7.0.rc3.207.g0ac5344
