@@ -1,38 +1,47 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Nov 2016 15:04:56 +0100
-Subject: [PATCH 17/18] arm64: dts: r8a7795: Add device node for PRR
-In-Reply-To: <cover.1479388193.git.horms+renesas@verge.net.au>
-References: <cover.1479388193.git.horms+renesas@verge.net.au>
-Message-ID: <8fbe42aad578700896934bcde4b3cc3db050f59d.1479388193.git.horms+renesas@verge.net.au>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 17 Nov 2016 14:08:30 +0000
+Subject: [RFC PATCH] of: base: add support to get machine model name
+In-Reply-To: <3670336.mMHByOpDl4@wuerfel>
+References: <1479383450-19183-1-git-send-email-sudeep.holla@arm.com>
+ <3670336.mMHByOpDl4@wuerfel>
+Message-ID: <622ddcbc-69b9-98f2-51f3-e256764ecb93@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Add a device node for the Product Register, which provides SoC product
-and revision information.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+On 17/11/16 13:50, Arnd Bergmann wrote:
+> On Thursday, November 17, 2016 11:50:50 AM CET Sudeep Holla wrote:
+>> Currently platforms/drivers needing to get the machine model name are
+>> replicating the same snippet of code. In some case, the OF reference
+>> counting is either missing or incorrect.
+>>
+>> This patch adds support to read the machine model name either using
+>> the "model" or the "compatible" property in the device tree root node.
+>>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>
+> I like the idea. One small comment:
+>
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 681f54422375..a39a702b904d 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -321,6 +321,11 @@
- 			#power-domain-cells = <0>;
- 		};
- 
-+		prr: chipid at fff00044 {
-+			compatible = "renesas,prr";
-+			reg = <0 0xfff00044 0 4>;
-+		};
-+
- 		sysc: system-controller at e6180000 {
- 			compatible = "renesas,r8a7795-sysc";
- 			reg = <0 0xe6180000 0 0x0400>;
+Thanks. I prefer it as single patch but it can't be applied to any tree.
+Any suggestions on handling this patch to fix the warning in -next ?
+
+>> +int of_machine_get_model_name(const char **model)
+>> +{
+>> +	int error;
+>> +	struct device_node *root;
+>> +
+>> +	root = of_find_node_by_path("/");
+>> +	if (!root)
+>> +		return -EINVAL;
+>
+> The global of_root variable points ot this already, and is defined
+> in the same file, so I think we can just skip the lookup.
+>
+
+Ah right, will fix it.
+
 -- 
-2.7.0.rc3.207.g0ac5344
+Regards,
+Sudeep
