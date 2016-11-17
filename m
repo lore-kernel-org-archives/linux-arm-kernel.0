@@ -1,90 +1,210 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Thu, 17 Nov 2016 11:31:14 +0200
-Subject: wdt, gpio: move arch_initcall into subsys_initcall ?
-In-Reply-To: <582D5750.4000408@denx.de>
-References: <582AE18A.2060405@denx.de>
- <afbf394e-e411-5c43-e2b0-667b3fbc2edf@mentor.com>
- <e4472c2d-effa-9583-aded-8dcdfdd57ee6@mentor.com>
- <ee9824b8-f09f-3817-8893-8121c9fb9eb1@roeck-us.net>
- <582D5750.4000408@denx.de>
-Message-ID: <6231eccc-62f0-041f-1aed-59e85abcc6c6@mentor.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 17 Nov 2016 17:34:38 +0800
+Subject: [PATCH] ARM: dts: sunxi: Explicitly enable pull-ups for MMC pins
+Message-ID: <20161117093438.17988-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Heiko,
+In the past, all the MMC pins had
 
-On 11/17/2016 09:08 AM, Heiko Schocher wrote:
-> Hello Guenter, Vladimir,
->
-> Sorry for the late response, but I was "on the road" ...
->
-> Am 15.11.2016 um 14:46 schrieb Guenter Roeck:
->> On 11/15/2016 03:32 AM, Vladimir Zapolskiy wrote:
->>> On 11/15/2016 01:10 PM, Vladimir Zapolskiy wrote:
->>>> Hello Heiko,
->>>>
->>>> On 11/15/2016 12:20 PM, Heiko Schocher wrote:
->>>>> Hello,
->>>>>
->>>>> commit e188cbf7564f: "gpio: mxc: shift gpio_mxc_init() to
->>>>> subsys_initcall level"
->>>>> moves the gpio initialization of the mxc gpio driver
->>>>> from the arch_initcall level into subsys_initcall level.
->>>>>
->>>>> This leads now on mxc boards, which use a gpio wdt driver
->>>>> and the CONFIG_GPIO_WATCHDOG_ARCH_INITCALL option enabled,
->>>>> to unwanted driver probe deferrals during kernel boot.
->>>>>
->>>>> I see this currently on an imx6 based board (which has unfortunately
->>>>> 3 WDT: imx6 internal (disabled), gpio wdt and da9063 WDT ...).
->>>>>
->>>>> Also a side effect from above commit is, that the da9063 WDT driver
->>>>> is now probed before the gpio WDT driver ... so /dev/watchdog now
->>>>> does not point to the gpio_wdt, instead it points to the da9063 WDT.
->>>>>
->>>>> So there are 2 solutions possible:
->>>>>
->>>>> - add a CONFIG_GPIO_MCX_ARCH_INITCALL option
->>>>>   in drivers/gpio/gpio-mxc.c like for the gpio_wdt.c driver?
->>>>
->>>> in my opinion this is overly heavy solution and it might be
->>>> better to avoid it if possible.
->>>>
->>>> I would rather prefer to reconsider GPIO_WATCHDOG_ARCH_INITCALL
->>>> usage in the watchdog driver.
->>>>
->>>> Moreover adding this proposed GPIO_MCX_ARCH_INITCALL to call
->>>> the driver on arch level will result in deferring the GPIO driver.
->>>>
->>>>>   But how can we guarantee, that first the gpio driver and then
->>>>>   the gpio_wdt driver gets probed?
->>>>>
->>>>> - move the arch_initcall in gpio_wdt.c into a subsys_initcall
->>>>>   (Tested this, and the probe dereferral messages are gone ...)
->>>>>
->>>>>   But this may results in problems on boards, which needs an early
->>>>>   trigger on an gpio wdt ...
->>>>
->>>> The level of "earliness" can not be defined in absolute time value
->>>> in any case, why decreasing the init level of the watchdog driver
->>>> to subsys level can cause problems? For that there should exist
->>>> some kind of a dependency on IC or PCB hardware level, can you
->>>> name it please?
->
-> On the current problem, there is no dependency on PCB, but I know
-> of watchdogs triggered through a gpio pin, which must triggered < 1 second
-> and subsys_initcall is too late for this. I think, this was the reason
+	allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 
-This is not a valid reason, nobody guarantees that arch_initcall()
-code is run in < 1 second time interval.
+which was actually a no-op. We were relying on U-boot to set the bias
+pull up for us. These properties were removed as part of the fix up to
+actually support no bias on the pins. During the transition some boards
+experienced regular MMC time-outs during normal operation, while others
+completely failed to initialize the SD card.
 
-> for introducing the CONFIG_GPIO_WATCHDOG_ARCH_INITCALL option ...
->
+Given that MMC starts in open-drain mode and the pull-ups are required,
+it's best to enable it for all the pin settings.
 
-Putting GPIO driver on arch_initcall() level results in deferring
-of the GPIO driver. Because you desire to avoid probe deferring, you
-should not consider putting GPIO driver on arch_initcall() level.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun4i-a10.dtsi     | 1 +
+ arch/arm/boot/dts/sun5i.dtsi         | 1 +
+ arch/arm/boot/dts/sun6i-a31.dtsi     | 4 ++++
+ arch/arm/boot/dts/sun7i-a20.dtsi     | 2 ++
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi | 3 +++
+ arch/arm/boot/dts/sun8i-a83t.dtsi    | 1 +
+ arch/arm/boot/dts/sun8i-h3.dtsi      | 3 +++
+ arch/arm/boot/dts/sun9i-a80.dtsi     | 3 +++
+ 8 files changed, 18 insertions(+)
 
---
-With best wishes,
-Vladimir
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index dae838e4dd9e..ba20b48c0702 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -1023,6 +1023,7 @@
+ 				       "PF3", "PF4", "PF5";
+ 				function = "mmc0";
+ 				drive-strength = <30>;
++				bias-pull-up;
+ 			};
+ 
+ 			mmc0_cd_pin_reference_design: mmc0_cd_pin at 0 {
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index 7ab6b336533e..54170147040f 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -582,6 +582,7 @@
+ 				       "PF4", "PF5";
+ 				function = "mmc0";
+ 				drive-strength = <30>;
++				bias-pull-up;
+ 			};
+ 
+ 			mmc2_pins_a: mmc2 at 0 {
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 7ea1116c7c88..20a0331ddfb5 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -547,6 +547,7 @@
+ 						 "PF3", "PF4", "PF5";
+ 				function = "mmc0";
+ 				drive-strength = <30>;
++				bias-pull-up;
+ 			};
+ 
+ 			mmc1_pins_a: mmc1 at 0 {
+@@ -554,6 +555,7 @@
+ 						 "PG4", "PG5";
+ 				function = "mmc1";
+ 				drive-strength = <30>;
++				bias-pull-up;
+ 			};
+ 
+ 			mmc2_pins_a: mmc2 at 0 {
+@@ -571,6 +573,7 @@
+ 						 "PC24";
+ 				function = "mmc2";
+ 				drive-strength = <30>;
++				bias-pull-up;
+ 			};
+ 
+ 			mmc3_8bit_emmc_pins: mmc3 at 1 {
+@@ -580,6 +583,7 @@
+ 						 "PC24";
+ 				function = "mmc3";
+ 				drive-strength = <40>;
++				bias-pull-up;
+ 			};
+ 
+ 			uart0_pins_a: uart0 at 0 {
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 34d613b0dd73..a1ee4197129a 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -1179,6 +1179,7 @@
+ 				       "PF3", "PF4", "PF5";
+ 				function = "mmc0";
+ 				drive-strength = <30>;
++				bias-pull-up;
+ 			};
+ 
+ 			mmc0_cd_pin_reference_design: mmc0_cd_pin at 0 {
+@@ -1200,6 +1201,7 @@
+ 				       "PI7", "PI8", "PI9";
+ 				function = "mmc3";
+ 				drive-strength = <30>;
++				bias-pull-up;
+ 			};
+ 
+ 			ps20_pins_a: ps20 at 0 {
+diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+index ecb49a5a7615..bc3e936edfcf 100644
+--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+@@ -293,6 +293,7 @@
+ 				       "PF3", "PF4", "PF5";
+ 				function = "mmc0";
+ 				drive-strength = <30>;
++				bias-pull-up;
+ 			};
+ 
+ 			mmc1_pins_a: mmc1 at 0 {
+@@ -300,6 +301,7 @@
+ 				       "PG3", "PG4", "PG5";
+ 				function = "mmc1";
+ 				drive-strength = <30>;
++				bias-pull-up;
+ 			};
+ 
+ 			mmc2_8bit_pins: mmc2_8bit {
+@@ -309,6 +311,7 @@
+ 				       "PC15", "PC16";
+ 				function = "mmc2";
+ 				drive-strength = <30>;
++				bias-pull-up;
+ 			};
+ 
+ 			pwm0_pins: pwm0 {
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index 656cdb5f7a88..79eaa7139f43 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -171,6 +171,7 @@
+ 				       "PF3", "PF4", "PF5";
+ 				function = "mmc0";
+ 				drive-strength = <30>;
++				bias-pull-up;
+ 			};
+ 
+ 			uart0_pins_a: uart0 at 0 {
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index 416b825ddb9f..fca66bf2dec5 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -348,6 +348,7 @@
+ 				       "PF4", "PF5";
+ 				function = "mmc0";
+ 				drive-strength = <30>;
++				bias-pull-up;
+ 			};
+ 
+ 			mmc0_cd_pin: mmc0_cd_pin at 0 {
+@@ -361,6 +362,7 @@
+ 				       "PG4", "PG5";
+ 				function = "mmc1";
+ 				drive-strength = <30>;
++				bias-pull-up;
+ 			};
+ 
+ 			mmc2_8bit_pins: mmc2_8bit {
+@@ -370,6 +372,7 @@
+ 				       "PC15", "PC16";
+ 				function = "mmc2";
+ 				drive-strength = <30>;
++				bias-pull-up;
+ 			};
+ 
+ 			spi0_pins: spi0 {
+diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+index b97db1df0803..7231d2c90dde 100644
+--- a/arch/arm/boot/dts/sun9i-a80.dtsi
++++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+@@ -696,6 +696,7 @@
+ 				       "PF4", "PF5";
+ 				function = "mmc0";
+ 				drive-strength = <30>;
++				bias-pull-up;
+ 			};
+ 
+ 			mmc1_pins: mmc1 {
+@@ -703,6 +704,7 @@
+ 						 "PG4", "PG5";
+ 				function = "mmc1";
+ 				drive-strength = <30>;
++				bias-pull-up;
+ 			};
+ 
+ 			mmc2_8bit_pins: mmc2_8bit {
+@@ -712,6 +714,7 @@
+ 				       "PC16";
+ 				function = "mmc2";
+ 				drive-strength = <30>;
++				bias-pull-up;
+ 			};
+ 
+ 			uart0_pins_a: uart0 at 0 {
+-- 
+2.10.2
