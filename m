@@ -1,51 +1,97 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Thu, 17 Nov 2016 17:46:49 +0530
-Subject: [PATCH 2/4] spi: spi-fsl-dspi: Fix incorrect DMA setup
+Date: Thu, 17 Nov 2016 17:46:51 +0530
+Subject: [PATCH 4/4] spi: spi-fsl-dspi: Minor code cleanup and error path fixes
 In-Reply-To: <cover.1479384571.git.maitysanchayan@gmail.com>
 References: <20161111122036.fubv7b4jc5vkdxhc@sirena.org.uk>
  <cover.1479384571.git.maitysanchayan@gmail.com>
-Message-ID: <d83f4896d77f577ca92fd70534f6198bb3288d8a.1479384571.git.maitysanchayan@gmail.com>
+Message-ID: <f6511e066bb3ab069923c7962071355e5be0e7a3.1479384571.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently dmaengine_prep_slave_single was being called with length
-set to the complete DMA buffer size. This resulted in unwanted bytes
-being transferred to the SPI register leading to clock and MOSI lines
-having unwanted data even after chip select got deasserted and the
-required bytes having been transferred.
+Code cleanup for improving code readability and error path fixes
+and cleanup removing use of devm_kfree.
 
 Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 ---
- drivers/spi/spi-fsl-dspi.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ drivers/spi/spi-fsl-dspi.c | 34 +++++++++++++++++++++++++---------
+ 1 file changed, 25 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
-index b1ee1f5..aee8c88 100644
+index 164e2e1..382a7f9 100644
 --- a/drivers/spi/spi-fsl-dspi.c
 +++ b/drivers/spi/spi-fsl-dspi.c
-@@ -265,7 +265,10 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
+@@ -222,13 +222,18 @@ static void dspi_rx_dma_callback(void *arg)
  
- 	dma->tx_desc = dmaengine_prep_slave_single(dma->chan_tx,
- 					dma->tx_dma_phys,
--					DSPI_DMA_BUFSIZE, DMA_MEM_TO_DEV,
-+					dma->curr_xfer_len *
-+					DMA_SLAVE_BUSWIDTH_4_BYTES /
-+					(tx_word ? 2 : 1),
-+					DMA_MEM_TO_DEV,
- 					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
- 	if (!dma->tx_desc) {
- 		dev_err(dev, "Not able to get desc for DMA xfer\n");
-@@ -281,7 +284,10 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
+ 	rx_word = is_double_byte_mode(dspi);
  
- 	dma->rx_desc = dmaengine_prep_slave_single(dma->chan_rx,
- 					dma->rx_dma_phys,
--					DSPI_DMA_BUFSIZE, DMA_DEV_TO_MEM,
-+					dma->curr_xfer_len *
-+					DMA_SLAVE_BUSWIDTH_4_BYTES /
-+					(tx_word ? 2 : 1),
-+					DMA_DEV_TO_MEM,
- 					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
- 	if (!dma->rx_desc) {
- 		dev_err(dev, "Not able to get desc for DMA xfer\n");
+-	len = rx_word ? (dma->curr_xfer_len / 2) : dma->curr_xfer_len;
++	if (rx_word)
++		len = dma->curr_xfer_len / 2;
++	else
++		len = dma->curr_xfer_len;
+ 
+ 	if (!(dspi->dataflags & TRAN_STATE_RX_VOID)) {
+ 		for (i = 0; i < len; i++) {
+ 			d = dspi->dma->rx_dma_buf[i];
+-			rx_word ? (*(u16 *)dspi->rx = d) :
+-						(*(u8 *)dspi->rx = d);
++			if (rx_word)
++				*(u16 *)dspi->rx = d;
++			else
++				*(u8 *)dspi->rx = d;
+ 			dspi->rx += rx_word + 1;
+ 		}
+ 	}
+@@ -247,17 +252,27 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
+ 
+ 	tx_word = is_double_byte_mode(dspi);
+ 
+-	len = tx_word ? (dma->curr_xfer_len / 2) : dma->curr_xfer_len;
++	if (tx_word)
++		len = dma->curr_xfer_len / 2;
++	else
++		len = dma->curr_xfer_len;
+ 
+ 	for (i = 0; i < len - 1; i++) {
+-		val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
++		if (tx_word)
++			val = *(u16 *) dspi->tx;
++		else
++			val = *(u8 *) dspi->tx;
+ 		dspi->dma->tx_dma_buf[i] =
+ 			SPI_PUSHR_TXDATA(val) | SPI_PUSHR_PCS(dspi->cs) |
+ 			SPI_PUSHR_CTAS(0) | SPI_PUSHR_CONT;
+ 		dspi->tx += tx_word + 1;
+ 	}
+ 
+-	val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
++	if (tx_word)
++		val = *(u16 *) dspi->tx;
++	else
++		val = *(u8 *) dspi->tx;
++
+ 	if (dspi->cs_change) {
+ 		dspi->dma->tx_dma_buf[i] = SPI_PUSHR_TXDATA(val) |
+ 						SPI_PUSHR_PCS(dspi->cs) |
+@@ -440,15 +455,16 @@ static int dspi_request_dma(struct fsl_dspi *dspi, phys_addr_t phy_addr)
+ 	return 0;
+ 
+ err_slave_config:
+-	devm_kfree(dev, dma->rx_dma_buf);
++	dma_free_coherent(dev, DSPI_DMA_BUFSIZE,
++			dma->rx_dma_buf, dma->rx_dma_phys);
+ err_rx_dma_buf:
+-	devm_kfree(dev, dma->tx_dma_buf);
++	dma_free_coherent(dev, DSPI_DMA_BUFSIZE,
++			dma->tx_dma_buf, dma->tx_dma_phys);
+ err_tx_dma_buf:
+ 	dma_release_channel(dma->chan_tx);
+ err_tx_channel:
+ 	dma_release_channel(dma->chan_rx);
+ 
+-	devm_kfree(dev, dma);
+ 	dspi->dma = NULL;
+ 
+ 	return ret;
 -- 
 2.10.2
