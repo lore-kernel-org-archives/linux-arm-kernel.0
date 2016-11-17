@@ -1,49 +1,52 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 17 Nov 2016 12:40:41 -0300
-Subject: [PATCH] ARM: Drop fixed 200 Hz timer requirement from Exynos
- platforms
-In-Reply-To: <1479148025-469-1-git-send-email-krzk@kernel.org>
-References: <1479148025-469-1-git-send-email-krzk@kernel.org>
-Message-ID: <6f15ef88-aa9e-4a3c-4a75-1d3216d734d5@osg.samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 17 Nov 2016 07:47:01 -0800
+Subject: [PATCH -next] ARM: dts: omap5: replace gpio-key,wakeup with
+ wakeup-source property
+In-Reply-To: <8d06724a-98af-05ab-f5a8-07c552722fca@arm.com>
+References: <1479138250-17780-1-git-send-email-sudeep.holla@arm.com>
+ <20161117152717.GS4082@atomide.com>
+ <8d06724a-98af-05ab-f5a8-07c552722fca@arm.com>
+Message-ID: <20161117154700.GT4082@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+* Sudeep Holla <sudeep.holla@arm.com> [161117 07:32]:
+> 
+> 
+> On 17/11/16 15:27, Tony Lindgren wrote:
+> > * Sudeep Holla <sudeep.holla@arm.com> [161114 07:44]:
+> > > Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
+> > > check for/support the legacy "gpio-key,wakeup" boolean property to
+> > > enable gpio buttons as wakeup source, "wakeup-source" is the new
+> > > standard binding.
+> > > 
+> > > This patch replaces the legacy "gpio-key,wakeup" with the unified
+> > > "wakeup-source" property in order to avoid any further copy-paste
+> > > duplication.
+> > > 
+> > > Cc: "Beno?t Cousson" <bcousson@baylibre.com>
+> > > Cc: Tony Lindgren <tony@atomide.com>
+> > > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> > > ---
+> > >  arch/arm/boot/dts/omap5-uevm.dts | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > Hi,
+> > > 
+> > > Inspite of getting rid of most of the legacy property almost a year ago,
+> > > addition of new platforms have brought this back and over time it's
+> > > now found again in few places. Just get rid of them *again*
+> > 
+> > Thanks for the annual check up :)
+> > 
+> > Acked-by: Tony Lindgren <tony@atomide.com>
+> > 
+> > Please let me know if you want me to pick this up instead.
+> 
+> Yes that would be better. Also it's present only in your -next,
+> looks like something newly added via commit 2d46c0c60725 ("ARM:
+> dts: omap5 uevm: add USR1 button")
 
-On 11/14/2016 03:27 PM, Krzysztof Kozlowski wrote:
-> All Samsung platforms, including the Exynos, are selecting HZ_FIXED with
-> 200 Hz.  Unfortunately in case of multiplatform image this affects also
-> other platforms when Exynos is selected.
-> 
-> This looks like an very old legacy code, dating back to initial
-> upstreaming of S3C24xx.  Probably it was required for s3c24xx timer
-> driver, which was removed in commit ad38bdd15d5b ("ARM: SAMSUNG: Remove
-> unused plat-samsung/time.c").
-> 
-> Since then, this fixed 200 Hz spread everywhere, including out-of-tree
-> Samsung kernels (SoC vendor's and Tizen's).  I believe this choice
-> was rather an effect of coincidence instead of conscious choice.  In
-> fact Exynos can work with different timers.
-> 
-> Few perf mem and sched tests on Odroid XU3 board (Exynos5422, 4x Cortex
-> A7, 4x Cortex A15) show no regressions when switching from 200 Hz to
-> other values.
-> 
-> Reported-by: Lee Jones <lee.jones@linaro.org>
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> 
-> ---
-> 
-> Testing on other Exynos platforms would be appreciated.
+OK applied into omap-for-v4.10/dt:omap-for-v4.10/dt thanks.
 
-I tested this patch on an Exynos5800 Peach Pi Chromebook with different
-HZ values (100/200/250/300/500/1000), and found no issues.
-
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Tony
