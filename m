@@ -1,55 +1,102 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Fri, 18 Nov 2016 00:49:54 +0800
-Subject: [PATCH] clk: sunxi-ng: enable so-said LDOs for A33 SoC's pll-mipi
- clock
-Message-ID: <20161117164954.62658-1-icenowy@aosc.xyz>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Nov 2016 18:03:05 +0100
+Subject: [PATCH 01/16] ARM: scu: Provide support for parsing SCU device
+ node to enable SCU
+In-Reply-To: <fe90b6cc-81b1-772e-ab78-f2199957ec96@samsung.com>
+References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
+ <20161114145143.GM1041@n2100.armlinux.org.uk>
+ <fe90b6cc-81b1-772e-ab78-f2199957ec96@samsung.com>
+Message-ID: <3360559.T0zQaY0FJ3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the user manual of A33 SoC, the bit 22 and 23 of pll-mipi control
-register is called "LDO{1,2}_EN", and according to the BSP source code
-from Allwinner [1], the LDOs are enabled during the clock's enabling
-process.
+On Thursday, November 17, 2016 9:50:27 AM CET pankaj.dubey wrote:
+> 
+> >>> of_scu_enable() which _only_ looks up the SCU address in DT and enables
+> >>> it if it finds it, otherwise returning failure.
+> >>>
+> >>> a9_scu_enable() which tries to use the A9 provided SCU address and
+> >>> enables it if it finds it, otherwise returning failure.
+> >>>
+> 
+> OK, In that case I can see need for following four helpers as:
+> 
+> 1: of_scu_enable() which will __only__ lookup the SCU address in DT and
+> enables it if it finds, otherwise return -ENOMEM failure.
+> This helper APIs is required and sufficient for most of platforms such
+> as exynos, berlin, realview, socfpga, STi, ux500, vexpress, rockchip and
+> mvebu
+> 
+> 2: a9_scu_enable(), which will __only__ use A9 provided SCU address and
+> enables it, if address mapped successfully, otherwise returning failure.
+> This helper APIs is required and sufficient for two ARM platforms as of
+> now tegra and hisi.
+> 
+> 3: of_scu_get_base() which will lookup the SCU address in DT and if node
+> found maps address and returns ioremapped address to caller.
+> This helper APIs is required for three ARM plaforms rockchip, mvebu and
+> ux500, along with scu_enable() API to enable and find number_of_cores.
+> 
+> 4: s9_scu_iomap_base() which will internally use s9_scu_get_base() and
+> do ioremap of scu address and returns ioremapped address to the caller
+> along with ownership (caller has responsibility to unmap it).
+> This helper APIs is required to simplify SCU enable and related code in
+> two ARM plaforms BCM ans ZX.
+>
+> For remaining two ARM platforms (IMX and ZYNQ), none of these helpers
+> are useful for the time-being, as they need SCU mapping very early of
+> boot, where we can't use iomap APIs. So I will drop patches related to
+> these platforms in v2 version.
+> 
+> Please let me know if any concern in this approach.
 
-The clock failed to generate output if the two LDOs are not enabled.
+I think ideally we wouldn't even need to know the virtual address
+outside of smp_scu.c. If we can move all users of the address
+into that file directly, it could become a local variable and
+we change scu_power_mode() and scu_get_core_count() instead to
+not require the address argument.
 
-Add the two bits to the clock's gate bits, so that the LDOs are enabled
-when the PLL is enabled.
+The only user I could find outside of that file is
 
-[1] https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun8iw5.c#L429
+static int shmobile_smp_scu_psr_core_disabled(int cpu)
+{
+        unsigned long mask = SCU_PM_POWEROFF << (cpu * 8);
 
-Fixes: d05c748bd730 ("clk: sunxi-ng: Add A33 CCU support")
+        if ((__raw_readl(shmobile_scu_base + 8) & mask) == mask)
+                return 1;
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
-Dear Chen-Yu:
-As you said, the two bits are also present in the CCU of A23 and A31.
-Could you please check whether the PLL works on the two SoCs?
-I remembered you mentioned you failed to make TCON enabled on A23.
-On A31, you may hack the parent of tcon-ch0 to force the tcon clock to
-use pll-mipi as parent, in order to check whether the pll works.
+        return 0;
+}
 
-However, I didn't found the code that enables the LDOs in the BSP A23/31
-sources, so you must test them to ensure whether the code is needed for
-these SoCs.
+which can be done in the same file as well.
 
-Regards,
-Icenowy
- drivers/clk/sunxi-ng/ccu-sun8i-a33.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> >>> Then callers can decide which of these to call, and what error messages
+> >>> to print on their failures.
+> >>
+> >> Splitting the function in two is probably simpler overall, but
+> >> we may still have to look at all the callers: Any platform that
+> >> currently tries to map it on any CPU and doesn't warn about the
+> >> absence of the device node (or about scu_a9_has_base() == false)
+> >> should really continue not to warn about that.
+> > 
+> > Did you miss the bit where none of of_scu_enable() or a9_scu_enable()
+> > should produce any warnings or errors to be printed.  It's up to the
+> > caller to report the failure, otherwise doing this doesn't make sense:
+> > 
+> >       if (of_scu_enable() < 0 && a9_scu_enable() < 0)
+> >               pr_err("Failed to map and enable the SCU\n");
+> > 
+> > because if of_scu_enable() prints a warning/error, then it's patently
+> > misleading.
+> > 
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a33.c b/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
-index 96b40ca..9bd1f78 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
-@@ -131,7 +131,7 @@ static SUNXI_CCU_NKM_WITH_GATE_LOCK(pll_mipi_clk, "pll-mipi",
- 				    8, 4,		/* N */
- 				    4, 2,		/* K */
- 				    0, 4,		/* M */
--				    BIT(31),		/* gate */
-+				    BIT(31) | BIT(23) | BIT(22), /* gate */
- 				    BIT(28),		/* lock */
- 				    CLK_SET_RATE_UNGATE);
- 
--- 
-2.10.1
+That's why I said "otherwise we can leave the warning in the caller
+after checking the return code of the new APIs." for the case where
+we actually need it.
+
+> I will move out error message out of these helpers and let caller
+> (platform specific code) handle and print error if required.
+
+Ok.
+
+	Arnd
