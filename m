@@ -1,49 +1,90 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Nov 2016 15:11:20 +0100
-Subject: [PATCH 03/31] ARM: dts: r8a7794: Use SYSC "always-on" PM Domain for
- sound
+Date: Thu, 17 Nov 2016 15:11:23 +0100
+Subject: [PATCH 06/31] ARM: dts: koelsch: use demuxer for I2C1
 In-Reply-To: <cover.1479391750.git.horms+renesas@verge.net.au>
 References: <cover.1479391750.git.horms+renesas@verge.net.au>
-Message-ID: <d5ac75dfb3858a443bc69e0ff06ec360755b7421.1479391750.git.horms+renesas@verge.net.au>
+Message-ID: <b32287069f272876349ac4cbde9e9ba4087220ea.1479391750.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Make it possible to fallback to GPIO for I2C1 on the EXIO-C connector.
 
-Hook up the Audio-DMAC and sound device nodes to the SYSC "always-on" PM
-Domain, for a more consistent device-power-area description in DT.
+This is based on reference work for the I2C0 core of the lager/r8a7790
+by Wolfram Sang.
 
-Cfr. commit 0761ff2ad0c581f3 ("ARM: dts: r8a7794: Add SYSC PM Domains").
-
-Fixes: 320d6c5a08a4abd3 ("ARM: dts: r8a7794: add sound support")
-Fixes: 298e4ee3d213a076 ("ARM: dts: r8a7794: add Audio-DMAC support")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+[wsa: rebased and fixed aliases]
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- arch/arm/boot/dts/r8a7794.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 7d9f0601d3ca..364b4aa8d1c1 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -319,7 +319,7 @@
- 				  "ch12";
- 		clocks = <&mstp5_clks R8A7794_CLK_AUDIO_DMAC0>;
- 		clock-names = "fck";
--		power-domains = <&cpg_clocks>;
-+		power-domains = <&sysc R8A7794_PD_ALWAYS_ON>;
- 		#dma-cells = <1>;
- 		dma-channels = <13>;
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index c457b43deb7d..d5c80e6bff22 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -50,6 +50,8 @@
+ 	aliases {
+ 		serial0 = &scif0;
+ 		serial1 = &scif1;
++		i2c9 = &gpioi2c1;
++		i2c12 = &i2cexio1;
  	};
-@@ -1485,7 +1485,7 @@
- 			      "mix.0", "mix.1",
- 			      "dvc.0", "dvc.1",
- 			      "clk_a", "clk_b", "clk_c", "clk_i";
--		power-domains = <&cpg_clocks>;
-+		power-domains = <&sysc R8A7794_PD_ALWAYS_ON>;
  
- 		status = "disabled";
+ 	chosen {
+@@ -298,6 +300,29 @@
+ 		#clock-cells = <0>;
+ 		clock-frequency = <148500000>;
+ 	};
++
++	gpioi2c1: i2c-9 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "i2c-gpio";
++		status = "disabled";
++		gpios = <&gpio7 16 GPIO_ACTIVE_HIGH /* sda */
++			 &gpio7 15 GPIO_ACTIVE_HIGH /* scl */
++			>;
++		i2c-gpio,delay-us = <5>;
++	};
++
++	/*
++	 * I2C1 is routed to EXIO connector B, pins 64 (SCL) + 66 (SDA).
++	 * A fallback to GPIO is provided.
++	 */
++	i2cexio1: i2c-12 {
++		compatible = "i2c-demux-pinctrl";
++		i2c-parent = <&i2c1>, <&gpioi2c1>;
++		i2c-bus-name = "i2c-exio1";
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
+ };
  
+ &du {
+@@ -333,6 +358,11 @@
+ 	pinctrl-0 = <&scif_clk_pins>;
+ 	pinctrl-names = "default";
+ 
++	i2c1_pins: i2c1 {
++		groups = "i2c1";
++		function = "i2c1";
++	};
++
+ 	i2c2_pins: i2c2 {
+ 		groups = "i2c2";
+ 		function = "i2c2";
+@@ -581,6 +611,11 @@
+ 	};
+ };
+ 
++&i2c1 {
++	pinctrl-0 = <&i2c1_pins>;
++	pinctrl-names = "i2c-exio1";
++};
++
+ &i2c2 {
+ 	pinctrl-0 = <&i2c2_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.7.0.rc3.207.g0ac5344
