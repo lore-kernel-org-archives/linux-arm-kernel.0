@@ -1,58 +1,50 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 17 Nov 2016 11:58:59 -0300
-Subject: [PATCH 0/3] thermal: Fix module autoload for drivers
-In-Reply-To: <20161117145327.GA2781@localhost.localdomain>
-References: <1476455702-21748-1-git-send-email-javier@osg.samsung.com>
- <CABxcv==keE6X5B1R+DSaZewVDdpCtuGF5j4S46YF3pncHT8q2Q@mail.gmail.com>
- <20161117145327.GA2781@localhost.localdomain>
-Message-ID: <3053ae9d-569f-9691-8f6d-d7e5e551b522@osg.samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 17 Nov 2016 15:05:51 +0000
+Subject: Boot failures in -next due to 'ARM: dts: imx: Remove
+ skeleton.dtsi'
+In-Reply-To: <198d764e-1612-81b4-5f4e-0c221a23c8e0@roeck-us.net>
+References: <cda2df55-f2f3-00d6-c6b1-816ed47bbf56@roeck-us.net>
+ <20161116184649.GF11228@leverpostej>
+ <20161116221002.GA19925@roeck-us.net>
+ <CAOMZO5Bd2X3pVqExBtBw_uHReDDkf6J2VdMXnAXynCAHxoX60A@mail.gmail.com>
+ <20161116224024.GA11821@roeck-us.net>
+ <20161117105513.GA12273@leverpostej>
+ <198d764e-1612-81b4-5f4e-0c221a23c8e0@roeck-us.net>
+Message-ID: <20161117150551.GA21742@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Eduardo,
-
-On 11/17/2016 11:53 AM, Eduardo Valentin wrote:
-> On Thu, Nov 17, 2016 at 08:50:11AM -0300, Javier Martinez Canillas wrote:
->> Hello Eduardo,
->>
->> On Fri, Oct 14, 2016 at 11:34 AM, Javier Martinez Canillas
->> <javier@osg.samsung.com> wrote:
->>> Hello,
->>>
->>> This small series contains trivial fixes to allow modules to be autoloaded
->>> when its correspoinding thermal device is registered.
->>>
->>> Best regards,
->>> Javier
->>>
->>>
->>> Javier Martinez Canillas (3):
->>>   thermal: max77620: Fix module autoload
->>>   thermal: tango: Fix module autoload
->>>   thermal: db8500: Fix module autoload
->>>
->>
->> Any comments about these patches?
+On Thu, Nov 17, 2016 at 06:44:55AM -0800, Guenter Roeck wrote:
+> On 11/17/2016 02:55 AM, Mark Rutland wrote:
+> >On Wed, Nov 16, 2016 at 02:40:24PM -0800, Guenter Roeck wrote:
+> >>On Wed, Nov 16, 2016 at 08:27:09PM -0200, Fabio Estevam wrote:
+> >>>Hi Guenter,
+> >>>
+> >>>On Wed, Nov 16, 2016 at 8:10 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> >>>>
+> >>>>Anyway, I guess the problem is that the "official" dtb files no longer provide
+> >>>>the skeleton /chosen and /memory nodes (and maybe others), and qemu seems to
+> >>>>expect that they are provided. Is that correct ?
+> >>>
+> >>>imx6qdl-sabrelite.dtsi provides chosen and memory nodes.
+> >>
+> >>Yes, but not the 'device_type' property, which the kernel seems to expect.
+> >
+> >Memory nodes require this property per ePAPR and the devicetree.org
+> >spec, so the bug is that we didn't add those when removing the
+> >skeleton.dtsi include.
 > 
-> So far no. I am finalizing a couple of automated testing, but they are
-> in my queue.
->
-
-Ok, I also got your automated emails about them being applied.
- 
-> Thanks for the fixes.
->
-
-Thanks.
- 
-> BR,
+> The downside from qemu perspective is that the real hardware seems
+> to add the property unconditionally, or the boot failure would have
+> been seen there as well.
 > 
->>
->> Best regards,
->> Javier
+> I submitted https://patchwork.ozlabs.org/patch/695951/; we'll see how it goes.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Sure, the firmare/bootlaoder you're using may add this automatically.
+
+My worry is that adding this to a generic file in QEMU only serves to
+mask this class of bug for other boards (i.e. they'll work fine in QEMU,
+but not on real HW using whatever bootlaoder happens ot be there).
+
+Thanks,
+Mark.
