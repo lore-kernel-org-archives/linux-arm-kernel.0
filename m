@@ -1,38 +1,44 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 17 Nov 2016 14:34:46 +0100
-Subject: [PATCH 2/2] ARM: shmobile: document SK-RZG1E board
-In-Reply-To: <cover.1479387356.git.horms+renesas@verge.net.au>
-References: <cover.1479387356.git.horms+renesas@verge.net.au>
-Message-ID: <4af239175d00c1866cc6b41f3eabcf93c45dcc40.1479387356.git.horms+renesas@verge.net.au>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 17 Nov 2016 13:38:30 +0000
+Subject: [PATCH v3 1/1] KVM: ARM64: Fix the issues when guest PMCCFILTR is
+ configured
+In-Reply-To: <20161117133039.GH22855@arm.com>
+References: <1479316160-8567-1-git-send-email-wei@redhat.com>
+ <20161117133039.GH22855@arm.com>
+Message-ID: <e52dd592-b762-2da0-a7b4-ea7bd4de2e60@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On 17/11/16 13:30, Will Deacon wrote:
+> On Wed, Nov 16, 2016 at 11:09:20AM -0600, Wei Huang wrote:
+>> KVM calls kvm_pmu_set_counter_event_type() when PMCCFILTR is configured.
+>> But this function can't deals with PMCCFILTR correctly because the evtCount
+>> bits of PMCCFILTR, which is reserved 0, conflits with the SW_INCR event
+>> type of other PMXEVTYPER<n> registers. To fix it, when eventsel == 0, this
+>> function shouldn't return immediately; instead it needs to check further
+>> if select_idx is ARMV8_PMU_CYCLE_IDX.
+>>
+>> Another issue is that KVM shouldn't copy the eventsel bits of PMCCFILTER
+>> blindly to attr.config. Instead it ought to convert the request to the
+>> "cpu cycle" event type (i.e. 0x11).
+>>
+>> To support this patch and to prevent duplicated definitions, a limited
+>> set of ARMv8 perf event types were relocated from perf_event.c to
+>> asm/perf_event.h.
+>>
+>> Signed-off-by: Wei Huang <wei@redhat.com>
+>> ---
+>>  arch/arm64/include/asm/perf_event.h | 10 +++++++++-
+>>  arch/arm64/kernel/perf_event.c      | 10 +---------
+>>  virt/kvm/arm/pmu.c                  |  8 +++++---
+>>  3 files changed, 15 insertions(+), 13 deletions(-)
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> I'm assuming this will go via kvm-arm.
 
-Document the SK-RZG1E device tree bindings, listing it as a supported board.
+Yup, I'll take it. Thanks.
 
-This allows to use checkpatch.pl to validate .dts files referring to the
-SK-RZG1E board.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index 0af01f9a01f4..3c7acf22957a 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -77,6 +77,8 @@ Boards:
-     compatible = "renesas,salvator-x", "renesas,r8a7796";
-   - SILK (RTP0RC7794LCB00011S)
-     compatible = "renesas,silk", "renesas,r8a7794"
-+  - SK-RZG1E (YR8A77450S000BE)
-+    compatible = "renesas,sk-rzg1e", "renesas,r8a7745"
-   - SK-RZG1M (YR8A77430S000BE)
-     compatible = "renesas,sk-rzg1m", "renesas,r8a7743"
-   - Wheat
+	M.
 -- 
-2.7.0.rc3.207.g0ac5344
+Jazz is not dead. It just smells funny...
