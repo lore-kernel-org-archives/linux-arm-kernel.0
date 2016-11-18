@@ -1,104 +1,163 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 18 Nov 2016 17:17:18 +0100
-Subject: [GIT PULL 9/10] arm64: tegra: Device tree changes for v4.10-rc1
-In-Reply-To: <20161118161719.24153-1-thierry.reding@gmail.com>
-References: <20161118161719.24153-1-thierry.reding@gmail.com>
-Message-ID: <20161118161719.24153-9-thierry.reding@gmail.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Fri, 18 Nov 2016 16:18:07 +0000
+Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <2271602.GoSoby0zHK@wuerfel>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+ <2822893.F0LqNAm9bT@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F921283@lhreml507-mbx>
+ <2271602.GoSoby0zHK@wuerfel>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F921858@lhreml507-mbx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: 18 November 2016 13:43
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Gabriele Paoloni; mark.rutland at arm.com; benh at kernel.crashing.org;
+> catalin.marinas at arm.com; liviu.dudau at arm.com; Linuxarm;
+> lorenzo.pieralisi at arm.com; xuwei (O); Jason Gunthorpe; linux-
+> serial at vger.kernel.org; linux-pci at vger.kernel.org;
+> devicetree at vger.kernel.org; minyard at acm.org; will.deacon at arm.com; John
+> Garry; zourongrong at gmail.com; robh+dt at kernel.org; bhelgaas at go og
+> le.com; kantyzc at 163.com; zhichang.yuan02 at gmail.com; Thomas Petazzoni;
+> linux-kernel at vger.kernel.org; Yuanzhichang; olof at lixom.net
+> Subject: Re: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on
+> Hip06
+> 
+> On Friday, November 18, 2016 12:53:08 PM CET Gabriele Paoloni wrote:
+> > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > > On Friday, November 18, 2016 12:07:28 PM CET Gabriele Paoloni
+> wrote:
+> > > > > I think there is no need to change a) here, we have
+> PCIBIOS_MIN_IO
+> > > > > today and even if we don't need it, there is no obvious
+> downside.
+> > > > > I would also argue that we can ignore b) for the discussion of
+> > > > > the HiSilicon LPC driver, we just need to assign some range
+> > > > > of logical addresses to each domain.
+> > > > >
+> > > > > That means solving c) is the important problem here, and it
+> > > > > shouldn't be so hard.  We can do this either with a single
+> > > > > special domain as in the v5 patch series, or by generalizing it
+> > > > > so that any I/O space mapping gets looked up through the device
+> > > > > pointer of the bus master.
+> > > >
+> > > > I am not very on the "generalized" multi-domain solution...
+> > > > Currently the IO accessors prototypes have an unsigned long addr
+> > > > as input parameter. If we live in a multi-domain IO system
+> > > > how can we distinguish inside the accessor which domain addr
+> > > > belongs to?
+> > >
+> > > The easiest change compared to the v5 code would be to walk
+> > > a linked list of 'struct extio_ops' structures rather than
+> > > assuming there is only ever one of them. I think one of the
+> > > earlier versions actually did this.
+> >
+> > Right but if my understanding is correct if we live in a multi-
+> > domain I/O space world when you have an input addr in the I/O
+> > accessors this addr can be duplicated (for example for the standard
+> > PCI IO domain and for our special LPC domain).
+> > So effectively even if you walk a linked list there is a problem
+> > of disambiguation...am I right?
+> 
+> No, unlike the PCI memory space, the PIO addresses are not
+> usually distinct, i.e. every PCI bus has its own 64K I/O
+> addresses starting at zero. We linearize them into the
+> Linux I/O space using the per-domain io_offset value.
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+I am going to summarize my understanding here below:
 
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+It seems to me that what is linearized is the virtual address
+space associated to the IO address space. This address space
+goes from PCI_IOBASE to (PCI_IOBASE + IO_SPACE_LIMIT).
 
-are available in the git repository at:
+The I/O accessors perform rd/wr operation on this address
+space using a port IO token.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.10-arm64-dt
+Each token map into a cpu physical address range
+Each cpu physical address range maps to a bus address range
+if the bus controller specifies a range property.
 
-for you to fetch changes up to cc13b4fa4ac780cec6c21b64a39ab2950e95e8f6:
+Devices under a bus controller specify the bus addresses that
+they operate on in their reg property.
 
-  arm64: tegra: Add NVIDIA P2771 board support (2016-11-18 14:35:53 +0100)
+So each device can use the same bus addresses under two
+separate bus controllers as long as the bus controller
+use the range properties to map the same bus range to different
+cpu address range. 
 
-Thanks,
-Thierry
+> 
+> For the ISA/LPC spaces there are only 4k of addresses, they
+> the bus addresses always overlap, but we can trivially
+> figure out the bus address from Linux I/O port number
+> by subtracting the start of the range.
 
-----------------------------------------------------------------
-arm64: tegra: Device tree changes for v4.10-rc1
+Are you saying that our LPC controller should specify a
+range property to map bus addresses into a cpu address range? 
 
-This adds initial support for Tegra186, the P3310 processor module as
-well as the P2771 development board. Not much is functional, but there
-is enough to boot to an initial ramdisk with debug serial output.
+> 
+> > > Another option the IA64 approach mentioned in another subthread
+> > > today, looking up the operations based on an index from the
+> > > upper bits of the port number. If we do this, we probably
+> > > want to do that for all PIO access and replace the entire
+> > > virtual address remapping logic with that. I think Bjorn
+> > > in the past argued in favor of such an approach, while I
+> > > advocated the current scheme for simplicity based on how
+> > > every I/O space these days is just memory mapped (which now
+> > > turned out to be false, both on powerpc and arm64).
+> >
+> > This seems really complex...I am a bit worried that possibly
+> > we end up in having the maintainers saying that it is not worth
+> > to re-invent the world just for this special LPC device...
+> 
+> It would clearly be a rather invasive change, but the
+> end-result isn't necessarily more complex than what we
+> have today, as we'd kill off the crazy pci_pio_to_address()
+> and pci_address_to_pio() hacks in address translation.
 
-----------------------------------------------------------------
-Dan Carpenter (1):
-      mailbox: tegra-hsp: Use after free in tegra_hsp_remove_doorbells()
+I have to look better into this...can you provide me a reference
+to the Bjorn argument in favor of this approach?
 
-Joseph Lo (6):
-      soc/tegra: Add Tegra186 support
-      dt-bindings: mailbox: Add Tegra HSP binding
-      dt-bindings: firmware: Add bindings for Tegra BPMP
-      arm64: tegra: Add Tegra186 support
-      arm64: tegra: Add NVIDIA P3310 processor module support
-      arm64: tegra: Add NVIDIA P2771 board support
+> 
+> > To be honest with you I would keep things simple for this
+> > LPC and introduce more complex reworks later if more devices
+> > need to be introduced.
+> >
+> > What if we stick on a single domain now where we introduce a
+> > reserved threshold for the IO space (say INDIRECT_MAX_IO).
+> 
+> I said having a single domain is fine, but I still don't
+> like the idea of reserving low port numbers for this hack,
+> it would mean that the numbers change for everyone else.
 
-Stephen Warren (2):
-      dt-bindings: Add power domains to Tegra BPMP firmware
-      dt-bindings: firmware: Allow child nodes inside the Tegra BPMP
+I don't get this much...I/O tokens that are passed to the I/O
+accessors are not fixed anyway and they vary depending on the order
+of adding ranges to io_range_list...so I don't see a big issue
+with this...
 
-Thierry Reding (12):
-      Merge branch 'for-4.10/soc' into for-4.10/mailbox
-      mailbox: Add Tegra HSP driver
-      Merge branch 'for-4.10/mailbox' into for-4.10/firmware
-      firmware: tegra: Add IVC library
-      firmware: tegra: Add BPMP support
-      Merge branch 'for-4.10/firmware' into for-4.10/arm64/dt
-      arm64: tegra: Add CPU nodes for Tegra186
-      arm64: tegra: Add serial ports on Tegra186
-      arm64: tegra: Add I2C controllers on Tegra186
-      arm64: tegra: Add SDHCI controllers on Tegra186
-      arm64: tegra: Add GPIO controllers on Tegra186
-      arm64: tegra: Enable PSCI on P3310
+> 
+> > We define INDIRECT_MAX_IO as 0 in "include/linux/extio.h" and
+> > we define INDIRECT_MAX_IO as 0x1000 in "arch/arm64/include/asm/io.h"
+> >
+> > So effectively this threshold can change according to the
+> > architecture and so far we only define it for ARM64 as we need
+> > it for ARM64...
+> 
+> I liked the idea of having it done in asm-generic/io.h (in an ifdef)
+> and lib/*.c under an as someone suggested earlier. There is nothing
+> ARM64 specific in the implementation.
 
- .../bindings/firmware/nvidia,tegra186-bpmp.txt     |  108 ++
- .../bindings/mailbox/nvidia,tegra186-hsp.txt       |   52 +
- arch/arm64/boot/dts/nvidia/Makefile                |    1 +
- arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts |    8 +
- arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi     |   64 +
- arch/arm64/boot/dts/nvidia/tegra186.dtsi           |  402 +++++
- drivers/firmware/Kconfig                           |    1 +
- drivers/firmware/Makefile                          |    1 +
- drivers/firmware/tegra/Kconfig                     |   25 +
- drivers/firmware/tegra/Makefile                    |    2 +
- drivers/firmware/tegra/bpmp.c                      |  868 +++++++++++
- drivers/firmware/tegra/ivc.c                       |  695 +++++++++
- drivers/mailbox/Kconfig                            |    9 +
- drivers/mailbox/Makefile                           |    2 +
- drivers/mailbox/tegra-hsp.c                        |  479 ++++++
- drivers/soc/tegra/Kconfig                          |   14 +
- include/dt-bindings/clock/tegra186-clock.h         |  940 ++++++++++++
- include/dt-bindings/mailbox/tegra186-hsp.h         |   24 +
- include/dt-bindings/power/tegra186-powergate.h     |   39 +
- include/dt-bindings/reset/tegra186-reset.h         |  217 +++
- include/soc/tegra/bpmp-abi.h                       | 1601 ++++++++++++++++++++
- include/soc/tegra/bpmp.h                           |  141 ++
- include/soc/tegra/ivc.h                            |  109 ++
- 23 files changed, 5802 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
- create mode 100644 Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra186.dtsi
- create mode 100644 drivers/firmware/tegra/Kconfig
- create mode 100644 drivers/firmware/tegra/Makefile
- create mode 100644 drivers/firmware/tegra/bpmp.c
- create mode 100644 drivers/firmware/tegra/ivc.c
- create mode 100644 drivers/mailbox/tegra-hsp.c
- create mode 100644 include/dt-bindings/clock/tegra186-clock.h
- create mode 100644 include/dt-bindings/mailbox/tegra186-hsp.h
- create mode 100644 include/dt-bindings/power/tegra186-powergate.h
- create mode 100644 include/dt-bindings/reset/tegra186-reset.h
- create mode 100644 include/soc/tegra/bpmp-abi.h
- create mode 100644 include/soc/tegra/bpmp.h
- create mode 100644 include/soc/tegra/ivc.h
+Correct and ideally if the INDIRECT_MAX_IO approach was taken then we
+should define INDIRECT_MAX_IO for any architecture that can support the
+special LPC devices. We would define it for ARM64 just because LPC
+is used in our case under ARM64; the idea was to leave other architecture
+to define their own ones as needed...but probably this is wrong and
+we should have defined this for all the architectures.
+
+Many thanks
+
+Gab
+
+> 
+> 	Arnd
