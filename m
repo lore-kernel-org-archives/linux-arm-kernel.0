@@ -1,41 +1,44 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 18 Nov 2016 08:47:49 +0200
-Subject: [PATCH] ARM: Drop fixed 200 Hz timer requirement from Exynos
- platforms
-In-Reply-To: <3145378.USf2WOPoV2@wuerfel>
-References: <1479148025-469-1-git-send-email-krzk@kernel.org>
- <3145378.USf2WOPoV2@wuerfel>
-Message-ID: <20161118064749.GA2122@kozik-lap>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 18 Nov 2016 15:15:57 +0800
+Subject: [PATCH] clk: sunxi-ng: sun6i-a31: Enable PLL-MIPI LDOs when ungating
+ it
+Message-ID: <20161118071557.30195-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2016 at 01:35:45PM +0100, Arnd Bergmann wrote:
-> On Monday, November 14, 2016 8:27:05 PM CET Krzysztof Kozlowski wrote:
-> > @@ -1497,7 +1497,7 @@ source kernel/Kconfig.preempt
-> >  config HZ_FIXED
-> >         int
-> >         default 200 if ARCH_EBSA110 || ARCH_S3C24XX || \
-> > -               ARCH_S5PV210 || ARCH_EXYNOS4
-> > +               ARCH_S5PV210
-> >         default 128 if SOC_AT91RM9200
-> >         default 0
-> 
-> After further research, I've concluded that we should also drop the
-> settings for ARCH_S5PV210 and ARCH_S3C24XX here.
-> 
-> ARCH_S5PV210 behaves exactly like EXYNOS here, it has 32-bit timers
-> so there won't be any overflow with 100Hz.
-> 
-> For ARCH_S3C24XX, it the requirement was that HZ_100 could not
-> be used with the old arch/arm/plat-samsung/time.c code that would
-> overflow its 16-bit counter.
-> However, the new drivers/clocksource/samsung_pwm_timer.c configures
-> the clock divider to '50' instead of '6', so there is no longer
-> a 16-bit overflow before the 100Hz tick, it now overflows every
-> 3.7ms for the typical 12MHz clock.
+The PLL-MIPI clock is somewhat special as it has its own LDOs which
+need to be turned on for this PLL to actually work and output a clock
+signal.
 
-I can send an updated version however testing would be nice... I know
-Sylwester has a S3C6410 platform running, maybe S3C24xx as well.
+Add the 2 LDO enable bits to the gate bits. This fixes issues with
+the TCON not sending vblank interrupts when the tcon and dot clock are
+indirectly clocked from the PLL-MIPI clock.
 
-Best regards,
-Krzysztof
+Fixes: c6e6c96d8fa6 ("clk: sunxi-ng: Add A31/A31s clocks")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+
+This can be queued for either 4.9 or 4.10.
+
+The clock driver was introduced in 4.9,
+but the users won't appear until 4.10.
+
+---
+ drivers/clk/sunxi-ng/ccu-sun6i-a31.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/sunxi-ng/ccu-sun6i-a31.c b/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
+index 4a82a49cff5e..fc75a335a7ce 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
++++ b/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
+@@ -143,7 +143,7 @@ static SUNXI_CCU_NKM_WITH_MUX_GATE_LOCK(pll_mipi_clk, "pll-mipi",
+ 					4, 2,	/* K */
+ 					0, 4,	/* M */
+ 					21, 0,	/* mux */
+-					BIT(31),	/* gate */
++					BIT(31) | BIT(23) | BIT(22), /* gate */
+ 					BIT(28),	/* lock */
+ 					CLK_SET_RATE_UNGATE);
+ 
+-- 
+2.10.2
