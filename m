@@ -1,68 +1,75 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 18 Nov 2016 12:04:54 +0000
-Subject: [PATCH 15/20] ARM/hw_breakpoint: Convert to hotplug state machine
-In-Reply-To: <20161117183541.8588-16-bigeasy@linutronix.de>
-References: <20161117183541.8588-1-bigeasy@linutronix.de>
- <20161117183541.8588-16-bigeasy@linutronix.de>
-Message-ID: <20161118120453.GI13470@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 18 Nov 2016 13:06:17 +0100
+Subject: [PATCH v3 06/13] ARM: dts: armada-375: Fixup sa-ram DT warning
+In-Reply-To: <20161118095925.770496c3@free-electrons.com> (Thomas Petazzoni's
+ message of "Fri, 18 Nov 2016 09:59:25 +0100")
+References: <20161117230830.31047-1-gregory.clement@free-electrons.com>
+ <20161117230830.31047-7-gregory.clement@free-electrons.com>
+ <20161118095925.770496c3@free-electrons.com>
+Message-ID: <8737ipat6u.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2016 at 07:35:36PM +0100, Sebastian Andrzej Siewior wrote:
-> Install the callbacks via the state machine and let the core invoke
-> the callbacks on the already online CPUs.
-> 
-> smp_call_function_single() has been removed because the function is already
-> invoked on the target CPU.
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> ---
->  arch/arm/kernel/hw_breakpoint.c | 44 ++++++++++++++++++-----------------------
->  1 file changed, 19 insertions(+), 25 deletions(-)
+Hi Thomas,
+ 
+ On ven., nov. 18 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-[...]
+> Hello,
+>
+> On Fri, 18 Nov 2016 00:08:23 +0100, Gregory CLEMENT wrote:
+>
+>> -		crypto_sram0: sa-sram0 {
+>> +		/* The following unit addresses (for sa-sram) are composed of
+>> +		 * the target value (bit [40-47]), attributes value (bits
+>> +		 * [32-39], and the address value in the window memory: [0-31].
+>> +		 */
+>
+> The "address value in the window memory" part doesn't make a lot of
+> sense. Maybe:
+>
+> "The following unit addresses are composed of the window target ID
+> (bits 40-47), the window target attributes (bits 32-39) and the offset
+> inside the window."
 
->  static int __init arch_hw_breakpoint_init(void)
->  {
-> +	int ret;
-> +
->  	debug_arch = get_debug_arch();
->  
->  	if (!debug_arch_supported()) {
-> @@ -1072,8 +1069,6 @@ static int __init arch_hw_breakpoint_init(void)
->  	core_num_brps = get_num_brps();
->  	core_num_wrps = get_num_wrps();
->  
-> -	cpu_notifier_register_begin();
-> -
->  	/*
->  	 * We need to tread carefully here because DBGSWENABLE may be
->  	 * driven low on this core and there isn't an architected way to
-> @@ -1082,15 +1077,18 @@ static int __init arch_hw_breakpoint_init(void)
->  	register_undef_hook(&debug_reg_hook);
->  
->  	/*
-> -	 * Reset the breakpoint resources. We assume that a halting
-> -	 * debugger will leave the world in a nice state for us.
-> +	 * Register CPU notifier which resets the breakpoint resources. We
-> +	 * assume that a halting debugger will leave the world in a nice state
-> +	 * for us.
->  	 */
-> -	on_each_cpu(reset_ctrl_regs, NULL, 1);
-> +	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "arm/hw_breakpoint:online",
-> +				dbg_reset_online, NULL);
+I'm fine with it
 
-I'm slightly unsure about this. The dbg_reset_online callback can execute
-undefined instructions (unfortunately, there's no way to probe the presence
-of some of the debug registers), so it absolutely has to run within the 
-register_undef_hook/unregister_undef_hook calls that are in this function.
+>
+> Also, the comment formatting is not compliant with the coding style,
+> should be:
+>
+>  /*
+>   * ...
+>   * ...
+>   */
+>
 
-With this patch, I worry that the callback can be postponed to ONLINE time
-for other CPUs, and then the kernel will panic.
+Hum yes I need to teach emacs how to properly format the comments.
 
-Will
+> But do we really want this comment above each node? Couldn't we instead
+> add this explanation in the mvebu-mbus.txt DT binding?
+
+We could but I fear that nobody will read it.
+
+Indeed if you know that in order to understand the unit address, you will
+have to have a look an the binding of the mvebu-mbus, then it means that
+you already are an expert and actually you barely need to read it!
+
+In order to have less change we could at least put it near the MBUS_ID
+macro and if the mvebu-mbus.txt DT binding too.
+
+
+Gregory
+>
+> Best regards,
+>
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
