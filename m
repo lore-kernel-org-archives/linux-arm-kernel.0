@@ -1,20 +1,25 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 17 Nov 2016 23:30:50 -0800
-Subject: [GIT PULL 2/2] SoCFPGA defconfig updates for v4.10
-In-Reply-To: <20161111205915.22173-2-dinguyen@kernel.org>
-References: <20161111205915.22173-1-dinguyen@kernel.org>
- <20161111205915.22173-2-dinguyen@kernel.org>
-Message-ID: <20161118073050.GH1785@localhost>
+Date: Thu, 17 Nov 2016 23:31:41 -0800
+Subject: [GIT PULL 1/3] Rockchip driver changes for 4.10
+In-Reply-To: <1698724.ZQnZMjf8xY@phil>
+References: <1698724.ZQnZMjf8xY@phil>
+Message-ID: <20161118073141.GI1785@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2016 at 02:59:15PM -0600, Dinh Nguyen wrote:
-> Hi Arnd, Kevin, and Olof:
+On Sat, Nov 12, 2016 at 04:34:17PM +0100, Heiko Stuebner wrote:
+> Hi Arnd, Kevin, Olof,
 > 
-> Please pull these defconfig updates for v4.10.
+> please find below and in the following two mails, Rockchip power-domain as
+> well as dts32 and dts64 changes for 4.10.
 > 
-> Thanks,
-> Dinh
+> I don't think anything big stands out, just the usual mix of incremental
+> improvements, so if stuff looks ok please pull.
+> 
+> 
+> Thanks
+> Heiko
+> 
 > 
 > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 > 
@@ -22,29 +27,20 @@ On Fri, Nov 11, 2016 at 02:59:15PM -0600, Dinh Nguyen wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_defconfig_updates_for_v4.10
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.10-rockchip-drivers1
 > 
-> for you to fetch changes up to cab004fa972f06b236ba6b592bbb0512d5c6c158:
+> for you to fetch changes up to dabc0259db63338f0e64107cc92b2241f98a3284:
 > 
->   ARM: socfpga_defconfig: enable FS configs to support Angstrom filesystem (2016-11-09 08:11:31 -0600)
-> 
-> ----------------------------------------------------------------
-> SoCFPGA defconfig updates for v4.10
-> - enable QSPI, HIGHMEM, FPGA bridge and device-tree overlays
-> - enable AUTOFS4 and NFS file system support
+>   soc: rockchip: power-domain: Handle errors from of_genpd_add_provider_onecell (2016-11-11 02:14:59 +0100)
 > 
 > ----------------------------------------------------------------
-> Alan Tull (1):
->       ARM: socfpga: updates for socfpga_defconfig
-> 
-> Dinh Nguyen (2):
->       ARM: socfpga_defconfig: Enable HIGHMEM
->       ARM: socfpga_defconfig: enable FS configs to support Angstrom filesystem
-> 
-> Steffen Trumtrar (1):
->       ARM: socfpga: defconfig: enable qspi
+> Changes to the power-domain driver including counter presets now being set
+> by firmware on the rk3399, avoiding infite loops when powering on/off a
+> domain and actually returning an error if power-domain addition fails.
+> The last part requires usage of the (new in 4.9-rc1) pm_genpd_remove
+> functionality as well.
 
-Merged, thanks.
+Merged, thanks!
 
 
 -Olof
