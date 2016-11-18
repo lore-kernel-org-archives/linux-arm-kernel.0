@@ -1,50 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 17 Nov 2016 16:36:31 -0800
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.9 (#1)
-In-Reply-To: <87twbfc8fh.fsf@free-electrons.com>
-References: <87twbfc8fh.fsf@free-electrons.com>
-Message-ID: <20161118003631.GB8578@localhost>
+Date: Thu, 17 Nov 2016 16:43:00 -0800
+Subject: [GIT PULL] STi DT fix for v4.9-rcs
+In-Reply-To: <3973615b-e1cb-25b3-fff0-201b56162f1a@st.com>
+References: <3973615b-e1cb-25b3-fff0-201b56162f1a@st.com>
+Message-ID: <20161118004300.GE8578@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2016 at 10:49:06PM +0100, Gregory CLEMENT wrote:
-> Hi,
+On Tue, Nov 15, 2016 at 11:38:03AM +0100, Patrice Chotard wrote:
+> Hi Arnd, Olof, Kevin
 > 
-> Here is the first pull request for fixes for mvebu for v4.9.
+> Please consider this set for inclusion into the v4.9-rc.
 > 
-> Gregory
+> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 > 
-> The following changes since commit bc33b0ca11e3df467777a4fa7639ba488c9d4911:
-> 
->   Linux 4.9-rc4 (2016-11-05 16:23:36 -0700)
+>   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.9-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git tags/sti-dt-for-v4.9-rc
 > 
-> for you to fetch changes up to 8d897006fe9206d64cbe353310be26d7c911e69d:
+> for you to fetch changes up to 5bf7b6e86f29f064979d7b3e6dd21c5dd1feb855:
 > 
->   arm64: dts: marvell: add unique identifiers for Armada A8k SPI controllers (2016-11-09 09:44:08 +0100)
+>   ARM: dts: STiH410-b2260: Fix typo in spi0 chipselect definition (2016-11-15 11:29:25 +0100)
 > 
 > ----------------------------------------------------------------
-> mvebu fixes for 4.9 (part 1)
 > 
-> All of them are fixes for arm64 device tree
+> STi DT fix:
 > 
-> - 2 for the SPI node on the Armada 7K/8K
-> - 1 for the clock node on the Armada 37xx
+> Fix typo cs-gpio to cs-gpios
 > 
 
-Hi, merged. But please be a bit more descriptive in the pull request of _why_
-we should pick it up in the future.
+Hi Patrice,
 
-The patches themselves are well described in this case, so looking at those
-helped tell that it made sense to include.
+Merged. Tiny nit for the future: It's nice to see a few words of why a
+change is needed/what's broken.  In this case it's pretty obvious from
+the code (SPI is broken without it) but it's good habit to motivate
+fixes branches in particular.
 
-No need for a full essay, just a few words about "why" instead of necessarily
-just "what" in the tag description!
-
-
-Thanks,
 
 -Olof
