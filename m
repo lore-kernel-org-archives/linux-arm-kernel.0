@@ -1,51 +1,135 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 18 Nov 2016 12:06:30 +0000
-Subject: [PATCH] arm: spin one more cycle in timer-based delays
-In-Reply-To: <582B0F61.6030903@free.fr>
-References: <582B0F61.6030903@free.fr>
-Message-ID: <20161118120630.GJ13470@arm.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Fri, 18 Nov 2016 12:07:28 +0000
+Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <2281986.miqFuFkAbO@wuerfel>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F90EA45@lhreml507-mbx>
+ <20161114112625.GO10219@e106497-lin.cambridge.arm.com>
+ <2281986.miqFuFkAbO@wuerfel>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F921146@lhreml507-mbx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 15, 2016 at 02:36:33PM +0100, Mason wrote:
-> When polling a tick counter in a busy loop, one might sample the
-> counter just *before* it is updated, and then again just *after*
-> it is updated. In that case, while mathematically v2-v1 equals 1,
-> only epsilon has really passed.
-> 
-> So, if a caller requests an N-cycle delay, we spin until v2-v1
-> is strictly greater than N to avoid these random corner cases.
-> 
-> Signed-off-by: Mason <slash.tmp@free.fr>
-> ---
->  arch/arm/lib/delay.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
-> index 69aad80a3af4..3f1cd15ca102 100644
-> --- a/arch/arm/lib/delay.c
-> +++ b/arch/arm/lib/delay.c
-> @@ -60,7 +60,7 @@ static void __timer_delay(unsigned long cycles)
->  {
->  	cycles_t start = get_cycles();
->  
-> -	while ((get_cycles() - start) < cycles)
-> +	while ((get_cycles() - start) <= cycles)
->  		cpu_relax();
->  }
+Hi Arnd many thanks for your help here
 
-I thought a bit about this last night. It is well known that the delay
-routines are not guaranteed to be accurate, and I don't *think* that's
-limited to over-spinning, so arguably this isn't a bug. However, taking
-the approach that "drivers should figure it out" is also unhelpful,
-because the frequency of the underlying counter isn't generally known
-and so drivers can't simply adjust the delay parameter.
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: 18 November 2016 10:18
+> To: liviu.dudau at arm.com
+> Cc: Gabriele Paoloni; linux-arm-kernel at lists.infradead.org;
+> Yuanzhichang; mark.rutland at arm.com; devicetree at vger.kernel.org;
+> lorenzo.pieralisi at arm.com; minyard at acm.org; linux-pci at vger.kernel.org;
+> benh at kernel.crashing.org; John Garry; will.deacon at arm.com; linux-
+> kernel at vger.kernel.org; xuwei (O); Linuxarm; zourongrong at gmail.com;
+> robh+dt at kernel.org; kantyzc at 163.com; linux-serial at vger.kernel.org;
+> catalin.marinas at arm.com; olof at lixom.net; bhelgaas at go ogle.com;
+> zhichang.yuan02 at gmail.com; Jason Gunthorpe; Thomas Petazzoni
+> Subject: Re: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on
+> Hip06
+> 
+> On Monday, November 14, 2016 11:26:25 AM CET liviu.dudau at arm.com wrote:
+> > On Mon, Nov 14, 2016 at 08:26:42AM +0000, Gabriele Paoloni wrote:
+> > > > Nope, that is not what it means. It means that PCI devices can
+> see I/O
+> > > > addresses
+> > > > on the bus that start from 0. There never was any usage for non-
+> PCI
+> > > > controllers
+> > >
+> > > So I am a bit confused...
+> > > From http://www.firmware.org/1275/bindings/isa/isa0_4d.ps
+> > > It seems that ISA buses operate on cpu I/O address range [0,
+> 0xFFF].
+> > > I thought that was the reason why for most architectures we have
+> > > PCIBIOS_MIN_IO equal to 0x1000 (so I thought that ISA controllers
+> > > usually use [0, PCIBIOS_MIN_IO - 1] )
+> >
+> > First of all, cpu I/O addresses is an x86-ism. ARM architectures and
+> others
+> >  have no separate address space for I/O, it is all merged into one
+> unified
+> > address space. So, on arm/arm64 for example, PCIBIOS_MIN_IO = 0 could
+> mean
+> > that we don't care about ISA I/O because the platform does not
+> support having
+> > an ISA bus (e.g.).
+> 
+> I think to be more specific, PCIBIOS_MIN_IO=0 would indicate that you
+> cannot
+> have a PCI-to-ISA or PCI-to-LPC bridge in any PCI domain. This is
+> different
+> from having an LPC master outside of PCI, as that lives in its own
+> domain
+> and has a separately addressable I/O space.
 
-If you want to go ahead with this change, I do think that you should fix
-the other architectures for consistency (particularly arm64, which is
-likely to share drivers with arch/arm/). However, given that I don't
-think you've seen a failure in practice, it might be a hard sell to get
-the patches picked up, especially given the deliberately vague guarantees
-offered by the delay loop.
+Yes correct so if we go for the single domain solution arch that
+have PCIBIOS_MIN_IO=0 cannot support special devices such as LPC
+unless we also redefine PCIBIOS_MIN_IO, right?
 
-Will
+> 
+> > > As said before this series forbid IO tokens to be in [0,
+> PCIBIOS_MIN_IO)
+> > > to allow special ISA controllers to use that range with special
+> > > accessors.
+> > > Having a variable threshold would make life much more difficult
+> > > as there would be a probe dependency between the PCI controller and
+> > > the special ISA one (PCI to wait for the special ISA device to be
+> > > probed and set the right threshold value from DT or ACPI table).
+> > >
+> > > Instead using PCIBIOS_MIN_IO is easier and should not impose much
+> > > constraint as [PCIBIOS_MIN_IO, IO_SPACE_LIMIT] is available to
+> > > the PCI controller for I/O tokens...
+> >
+> > What I am suggesting is to leave PCIBIOS_MIN_IO alone which still
+> reserves
+> > space for ISA controller and add a PCIBIOS_MIN_DIRECT_IO that will
+> reserve
+> > space for your direct address I/O on top of PCIBIOS_MIN_IO.
+> 
+> The PCIBIOS_MIN_DIRECT_IO name still suggests having something related
+> to
+> PCIBIOS_MIN_IO, but it really isn't. We are talking about multiple
+> concepts here that are not the same but that are somewhat related:
+> 
+> a) keeping PCI devices from allocating low I/O ports on the PCI bus
+>    that would conflict with ISA devices behind a bridge of the
+>    same bus.
+> 
+> b) reserving the low 0x0-0xfff range of the Linux-internal I/O
+>    space abstraction to a particular LPC or PCI domain to make
+>    legacy device drivers work that hardcode a particular port
+>    number.
+> 
+> c) Redirecting inb/outb to call a domain-specific accessor function
+>    rather than doing the normal MMIO window for an LPC master or
+>    more generally any arbitrary LPC or PCI domain that has a
+>    nonstandard I/O space.
+>    [side note: actually if we generalized this, we could avoid
+>     assigning an MMIO range for the I/O space on the pci-mvebu
+>     driver, and that would help free up some other remapping
+>     windows]
+> 
+> I think there is no need to change a) here, we have PCIBIOS_MIN_IO
+> today and even if we don't need it, there is no obvious downside.
+> I would also argue that we can ignore b) for the discussion of
+> the HiSilicon LPC driver, we just need to assign some range
+> of logical addresses to each domain.
+> 
+> That means solving c) is the important problem here, and it
+> shouldn't be so hard.  We can do this either with a single
+> special domain as in the v5 patch series, or by generalizing it
+> so that any I/O space mapping gets looked up through the device
+> pointer of the bus master.
+
+I am not very on the "generalized" multi-domain solution...
+Currently the IO accessors prototypes have an unsigned long addr
+as input parameter. If we live in a multi-domain IO system
+how can we distinguish inside the accessor which domain addr
+belongs to?
+
+Thanks
+
+Gab
+
+> 
+> 	Arnd
