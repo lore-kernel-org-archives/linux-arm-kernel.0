@@ -1,36 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 18 Nov 2016 14:50:41 +0000
-Subject: [PATCH v8 06/16] drivers: iommu: arm-smmu-v3: convert struct
- device of_node to fwnode usage
-In-Reply-To: <20161116152936.22955-7-lorenzo.pieralisi@arm.com>
-References: <20161116152936.22955-1-lorenzo.pieralisi@arm.com>
- <20161116152936.22955-7-lorenzo.pieralisi@arm.com>
-Message-ID: <20161118145040.GS13470@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 18 Nov 2016 14:53:53 +0000
+Subject: [PATCH v2 5/8] dt-bindings: mfd: Provide human readable defines
+ for TPS65217 interrupts
+In-Reply-To: <20161028123702.21849-6-woogyom.kim@gmail.com>
+References: <20161028123702.21849-1-woogyom.kim@gmail.com>
+ <20161028123702.21849-6-woogyom.kim@gmail.com>
+Message-ID: <20161118145353.GE2301@dell.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2016 at 03:29:26PM +0000, Lorenzo Pieralisi wrote:
-> Current ARM SMMU v3 driver rely on the struct device.of_node pointer for
-> device look-up and iommu_ops retrieval.
+On Fri, 28 Oct 2016, Milo Kim wrote:
+
+> TPS65217 supports three interrupt sources. This patch enables assigning
+> each IRQ number in the charger and power button node. Then corresponding
+> IRQ will be requested by each driver.
 > 
-> In preparation for ACPI probing enablement, convert the driver to use
-> the struct device.fwnode member for device and iommu_ops look-up so that
-> the driver infrastructure can be used also on systems that do not
-> associate an of_node pointer to a struct device (eg ACPI), making the
-> device look-up and iommu_ops retrieval firmware agnostic.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-> Reviewed-by: Tomasz Nowicki <tn@semihalf.com>
-> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Tomasz Nowicki <tn@semihalf.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
 > ---
->  drivers/iommu/arm-smmu-v3.c | 12 +++++++-----
->  1 file changed, 7 insertions(+), 5 deletions(-)
+>  include/dt-bindings/mfd/tps65217.h | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 include/dt-bindings/mfd/tps65217.h
+> 
+> diff --git a/include/dt-bindings/mfd/tps65217.h b/include/dt-bindings/mfd/tps65217.h
+> new file mode 100644
+> index 0000000..cafb9e6
+> --- /dev/null
+> +++ b/include/dt-bindings/mfd/tps65217.h
+> @@ -0,0 +1,26 @@
+> +/*
+> + * This header provides macros for TI TPS65217 DT bindings.
+> + *
+> + * Copyright (C) 2016 Texas Instruments
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful, but
+> + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef __DT_BINDINGS_TPS65217_H__
+> +#define __DT_BINDINGS_TPS65217_H__
+> +
+> +#define TPS65217_IRQ_USB	0
+> +#define TPS65217_IRQ_AC		1
+> +#define TPS65217_IRQ_PB		2
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+What are "AC" and "PB".  Seeing as these are meant to be "human
+readable", let's make them more human friendly.
 
-Will
+> +#endif
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
