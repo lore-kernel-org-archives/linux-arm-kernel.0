@@ -1,67 +1,70 @@
-From: markivx@codeaurora.org (Vikram Mulukutla)
-Date: Thu, 17 Nov 2016 18:22:25 -0800
-Subject: spin_lock behavior with ARM64 big.Little/HMP
-Message-ID: <400ab4b8b2354c5b9283f6ed657363a0@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 18 Nov 2016 10:22:40 +0800
+Subject: [PATCH] drm/sun4i: Only count TCON endpoints as valid outputs
+In-Reply-To: <20161117190254.d4doghspvz6ma6x2@lukather>
+References: <20161116093732.12828-1-wens@csie.org>
+ <20161117190254.d4doghspvz6ma6x2@lukather>
+Message-ID: <CAGb2v65sorc-Q5c39ZURTAAorvF4ETVW=qj_ue9mUzLei2scJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Nov 18, 2016 at 3:02 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Wed, Nov 16, 2016 at 05:37:31PM +0800, Chen-Yu Tsai wrote:
+>> The sun4i DRM driver counts the number of endpoints it found and
+>> registers the whole DRM pipeline if any endpoints are found.
+>>
+>> However, if the TCON and its child endpoints (LCD panels, TV encoder,
+>> HDMI encoder, MIPI DSI encoder, etc.) aren't found, that means we
+>> don't have any usable CRTCs, and the display pipeline is incomplete
+>> and useless.
+>
+> If some node set as available is not probed, then yes, it does, but
+> I'm not really sure how it's a problem. Quite the opposite actually.
 
-This isn't really a bug report, but just a description of a 
-frequency/IPC
-dependent behavior that I'm curious if we should worry about. The 
-behavior
-is exposed by questionable design so I'm leaning towards don't-care.
+Actually the problem occurs when the TCON is _not_ available, but
+the other endpoints preceding it are.
 
-Consider these threads running in parallel on two ARM64 CPUs running 
-mainline
-Linux:
+>> The whole DRM display pipeline should only be registered and enabled
+>> if there are proper outputs available.
+>
+> Unless I've misunderstood what you're saying, we could have the
+> writeback for example that would just need the display engine.
 
-(Ordering of lines between the two columns does not indicate a sequence 
-of
-execution. Assume flag=0 initially.)
+Yeah, I guess that complicates things...
 
-LittleARM64_CPU @ 300MHz (e.g.A53)   |  BigARM64_CPU @ 1.5GHz (e.g. A57)
--------------------------------------+----------------------------------
-spin_lock_irqsave(s)                 |  local_irq_save()
-/* critical section */
-flag = 1                             |  spin_lock(s)
-spin_unlock_irqrestore(s)            |  while (!flag) {
-                                      |      spin_unlock(s)
-                                      |      cpu_relax();
-                                      |      spin_lock(s)
-                                      |  }
-                                      |  spin_unlock(s)
-                                      |  local_irq_restore()
+>> The debug message "Queued %d outputs on pipeline %d\n" is also telling.
+>>
+>> This patch makes the driver only count enabled TCON endpoints. If
+>> none are found, the DRM pipeline is not used. This avoids screwing
+>> up the simple framebuffer provided by the bootloader in cases where
+>> we aren't able to support the display with the DRM subsystem, due
+>> to lack of panel or bridge drivers, or just lack of progress.
+>
+> The framebuffer is removed only at bind time, which means that all the
+> drivers have probed already. Lack of progress isn't an issue here,
+> since the node simply won't be there, and we wouldn't have it in the
+> component lists. And lack of drivers shouldn't be an issue either,
+> since in order for bind to be called, all the drivers would have
+> gone through their probe.
+>
+> So I'm not really sure what it fixes.
 
-I see a livelock occurring where the LittleCPU is never able to acquire 
-the
-lock, and the BigCPU is stuck forever waiting on 'flag' to be set.
+To recap, on sun6i I had enabled the display engine node by default
+in the dtsi, along with the backend and drc. The tcon is disabled
+by default, so it doesn't get added to the list of components.
+The available components get probed, binded, and simplefb gets
+pushed out.
 
-Even with ticket spinlocks, this bit of code can cause a livelock (or 
-very
-long delays) if BigCPU runs fast enough. Afaics this can only happen if 
-the
-LittleCPU is unable to put its ticket in the queue (i.e, increment the 
-next
-field) since the store-exclusive keeps failing.
+I suppose disabling the display engine by default would be better?
+At least simplefb still works.
 
-The problem is not present on SMP, and is mitigated by adding enough
-additional clock cycles between the unlock and lock in the loop running
-on the BigCPU. On big.Little, if both threads are scheduled on the same
-cluster within the same clock domain, the problem is avoided.
+Regards
+ChenYu
 
-Now the infinite loop may seem like questionable design but the problem
-isn't entirely hypothetical; if BigCPU calls hrtimer_cancel with
-interrupts disabled, this scenario can result if the hrtimer is about
-to run on a littleCPU. It's of course possible that there's just enough
-intervening code for the problem to not occur. At the very least it 
-seems
-that loops like the one running in the BigCPU above should come with a
-WARN_ON(irqs_disabled) or with a sufficient udelay() instead of the 
-cpu_relax.
-
-Thoughts?
-
-Thanks,
-Vikram
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
