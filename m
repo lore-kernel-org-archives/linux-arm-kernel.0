@@ -1,45 +1,93 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 18 Nov 2016 11:55:30 -0800
-Subject: [PATCH v3 1/3] dt-bindings: firmware: scm: Add MSM8996 DT bindings
-In-Reply-To: <1479259165-1601-2-git-send-email-spjoshi@codeaurora.org>
-References: <1479259165-1601-1-git-send-email-spjoshi@codeaurora.org>
- <1479259165-1601-2-git-send-email-spjoshi@codeaurora.org>
-Message-ID: <20161118195530.GM28340@tuxbot>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 18 Nov 2016 19:56:57 +0000
+Subject: [PATCH v16 08/15] clocksource/drivers/arm_arch_timer: Refactor
+ arch_timer_needs_probing, and call it only if acpi disabled.
+In-Reply-To: <1479304148-2965-9-git-send-email-fu.wei@linaro.org>
+References: <1479304148-2965-1-git-send-email-fu.wei@linaro.org>
+ <1479304148-2965-9-git-send-email-fu.wei@linaro.org>
+Message-ID: <20161118195657.GM1197@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 15 Nov 17:19 PST 2016, Sarangdhar Joshi wrote:
-
-> Add SCM DT bindings for Qualcomm's MSM8996 platform.
+On Wed, Nov 16, 2016 at 09:49:01PM +0800, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
+> The patch refactor original arch_timer_needs_probing function:
+>     (1) Separate out arch_timer_needs_probing from arch_timer_common_init,
+>     and call it only if acpi disabled.
+>     (2) Rename arch_timer_needs_probing to arch_timer_needs_of_probing.
 
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Please write a real commit message.
 
-Regards,
-Bjorn
-
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
 > ---
->  Documentation/devicetree/bindings/firmware/qcom,scm.txt | 2 ++
->  1 file changed, 2 insertions(+)
+>  drivers/clocksource/arm_arch_timer.c | 34 +++++++++++++++++++---------------
+>  1 file changed, 19 insertions(+), 15 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-> index 3b4436e..20f26fb 100644
-> --- a/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-> +++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-> @@ -10,8 +10,10 @@ Required properties:
->   * "qcom,scm-apq8064" for APQ8064 platforms
->   * "qcom,scm-msm8660" for MSM8660 platforms
->   * "qcom,scm-msm8690" for MSM8690 platforms
-> + * "qcom,scm-msm8996" for MSM8996 platforms
->   * "qcom,scm" for later processors (MSM8916, APQ8084, MSM8974, etc)
->  - clocks: One to three clocks may be required based on compatible.
-> + * No clock required for "qcom,scm-msm8996"
->   * Only core clock required for "qcom,scm-apq8064", "qcom,scm-msm8660", and "qcom,scm-msm8960"
->   * Core, iface, and bus clocks required for "qcom,scm"
->  - clock-names: Must contain "core" for the core clock, "iface" for the interface
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index fe4e812..9ddc091 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -792,15 +792,28 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
+>  	{},
+>  };
+>  
+> -static bool __init
+> -arch_timer_needs_probing(int type, const struct of_device_id *matches)
+> +static bool __init arch_timer_needs_of_probing(void)
+>  {
+>  	struct device_node *dn;
+>  	bool needs_probing = false;
+> +	unsigned int mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
+> +
+> +	/* We have two timers, and both device-tree nodes are probed. */
+> +	if ((arch_timers_present & mask) == mask)
+> +		return false;
+> +
+> +	/*
+> +	 * Only one type of timer is probed,
+> +	 * check if we have another type of timer node in device-tree.
+> +	 */
+> +	if (arch_timers_present & ARCH_TIMER_TYPE_CP15)
+> +		dn = of_find_matching_node(NULL, arch_timer_mem_of_match);
+> +	else
+> +		dn = of_find_matching_node(NULL, arch_timer_of_match);
+>  
+> -	dn = of_find_matching_node(NULL, matches);
+> -	if (dn && of_device_is_available(dn) && !(arch_timers_present & type))
+> +	if (dn && of_device_is_available(dn))
+>  		needs_probing = true;
+> +
+>  	of_node_put(dn);
+>  
+>  	return needs_probing;
+> @@ -808,17 +821,8 @@ arch_timer_needs_probing(int type, const struct of_device_id *matches)
+>  
+>  static int __init arch_timer_common_init(void)
+>  {
+> -	unsigned int mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
+> -
+> -	/* Wait until both nodes are probed if we have two timers */
+> -	if ((arch_timers_present & mask) != mask) {
+> -		if (arch_timer_needs_probing(ARCH_TIMER_TYPE_MEM,
+> -					     arch_timer_mem_of_match))
+> -			return 0;
+> -		if (arch_timer_needs_probing(ARCH_TIMER_TYPE_CP15,
+> -					     arch_timer_of_match))
+> -			return 0;
+> -	}
+
+Why can't we just move this into the DT-specific caller of
+arch_timer_common_init()?
+
+Thanks
+Mark.
+
+> +	if (acpi_disabled && arch_timer_needs_of_probing())
+> +		return 0;
+>  
+>  	arch_timer_banner(arch_timers_present);
+>  	arch_counter_register(arch_timers_present);
 > -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+> 2.7.4
 > 
