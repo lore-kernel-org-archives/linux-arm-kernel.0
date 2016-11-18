@@ -1,79 +1,66 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 18 Nov 2016 10:58:33 -0800
-Subject: [GIT PULL 2/4] bcm2835-dt-64-next-2016-11-18
-In-Reply-To: <20161118185835.14452-1-eric@anholt.net>
-References: <20161118185835.14452-1-eric@anholt.net>
-Message-ID: <20161118185835.14452-2-eric@anholt.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 18 Nov 2016 19:05:31 +0000
+Subject: [PATCHv3 6/6] arm64: Add support for CONFIG_DEBUG_VIRTUAL
+In-Reply-To: <16e4b3da-c552-252d-108a-0681b71b12ef@redhat.com>
+References: <1479431816-5028-1-git-send-email-labbott@redhat.com>
+ <1479431816-5028-7-git-send-email-labbott@redhat.com>
+ <20161118175327.GE1197@leverpostej>
+ <16e4b3da-c552-252d-108a-0681b71b12ef@redhat.com>
+Message-ID: <20161118190531.GJ1197@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+On Fri, Nov 18, 2016 at 10:42:56AM -0800, Laura Abbott wrote:
+> On 11/18/2016 09:53 AM, Mark Rutland wrote:
+> > On Thu, Nov 17, 2016 at 05:16:56PM -0800, Laura Abbott wrote:
 
-are available in the git repository at:
+> >> +#define __virt_to_phys_nodebug(x) ({					\
+> >>  	phys_addr_t __x = (phys_addr_t)(x);				\
+> >> -	__x & BIT(VA_BITS - 1) ? (__x & ~PAGE_OFFSET) + PHYS_OFFSET :	\
+> >> -				 (__x - kimage_voffset); })
+> >> +	((__x & ~PAGE_OFFSET) + PHYS_OFFSET);				\
+> >> +})
+> > 
+> > Given the KASAN failure, and the strong possibility that there's even
+> > more stuff lurking in common code, I think we should retain the logic to
+> > handle kernel image addresses for the timebeing (as x86 does). Once
+> > we've merged DEBUG_VIRTUAL, it will be easier to track those down.
+> 
+> Agreed. I might see about adding another option DEBUG_STRICT_VIRTUAL
+> for catching bad __pa vs __pa_symbol usage and keep DEBUG_VIRTUAL for
+> catching addresses that will work in neither case.
 
-  https://github.com/anholt/linux tags/bcm2835-dt-64-next-2016-11-18
+I think it makes sense for DEBUG_VIRTUAL to do both, so long as the
+default behaviour (and fallback after a WARN for virt_to_phys()) matches
+what we currently do. We'll get useful diagnostics, but a graceful
+fallback.
 
-for you to fetch changes up to a44e87b47148c6ee6b78509f47e6a15c0fae890a:
+I think the helpers I suggested below do that?  Or have I misunderstood,
+and you mean something stricter (e.g. checking whether a lm address is
+is backed by something)?
 
-  ARM64: dts: bcm2837-rpi-3-b: remove incorrect pwr LED (2016-11-16 13:49:38 -0800)
+> > phys_addr_t __virt_to_phys(unsigned long x)
+> > {
+> > 	WARN(!__is_lm_address(x),
+> > 	     "virt_to_phys() used for non-linear address: %pK\n",
+> > 	     (void*)x);
+> > 	
+> > 	return __virt_to_phys_nodebug(x);
+> > }
+> > EXPORT_SYMBOL(__virt_to_phys);
 
-----------------------------------------------------------------
-This pull request brings thermal support to the BCM2837 DT, and a few
-other fixes.
+> > phys_addr_t __phys_addr_symbol(unsigned long x)
+> > {
+> > 	/*
+> > 	 * This is bounds checking against the kernel image only.
+> > 	 * __pa_symbol should only be used on kernel symbol addresses.
+> > 	 */
+> > 	VIRTUAL_BUG_ON(x < (unsigned long) KERNEL_START ||
+> > 		       x > (unsigned long) KERNEL_END);
+> > 
+> > 	return __pa_symbol_nodebug(x);
+> > }
+> > EXPORT_SYMBOL(__phys_addr_symbol);
 
-In order to get the thermal node that we're adjusting the compatible
-string on, we have to merge in the bcm2835-dt-next branch.
-
-----------------------------------------------------------------
-Andrea Merello (1):
-      ARM64: dts: bcm2837-rpi-3-b: remove incorrect pwr LED
-
-Andreas F?rber (1):
-      ARM64: dts: bcm2835: Fix bcm2837 compatible string
-
-Eric Anholt (2):
-      ARM: dts: bcm283x: Define standard pinctrl groups in the gpio node.
-      Merge branch 'bcm2835-dt-next' into bcm2835-dt-64-next
-
-Gerd Hoffmann (6):
-      pinctrl: bcm2835: add pull defines to dt bindings
-      ARM: dts: bcm283x: add pinctrl group to &pwm, drop pins from &gpio
-      ARM: dts: bcm283x: add pinctrl group to &i2c0, drop pins from &gpio
-      ARM: dts: bcm283x: add pinctrl group to &i2c1, drop pins from &gpio
-      ARM: dts: bcm283x: add pinctrl group to &sdhci, drop pins from &gpio
-      ARM: dts: bcm283x: drop alt3 from &gpio
-
-Linus Walleij (1):
-      ARM: bcm2835: Add names for the Raspberry Pi GPIO lines
-
-Martin Sperl (3):
-      dt: bindings: add thermal device driver for bcm2835
-      ARM: bcm2835: dts: add thermal node to device-tree of bcm283x
-      ARM64: bcm2835: dts: add thermal node to device-tree of bcm2837
-
-Stefan Wahren (3):
-      ARM64: dts: bcm283x: Use dtsi for USB host mode
-      DT: binding: bcm2835-mbox: fix address typo in example
-      ARM: dts: bcm283x: fix typo in mailbox address
-
- .../bindings/mailbox/brcm,bcm2835-mbox.txt         |   2 +-
- .../bindings/thermal/brcm,bcm2835-thermal.txt      |  17 ++
- arch/arm/boot/dts/bcm2835-rpi-a-plus.dts           |  67 ++++++-
- arch/arm/boot/dts/bcm2835-rpi-a.dts                |  69 ++++++-
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts           |  68 ++++++-
- arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts           |  68 ++++++-
- arch/arm/boot/dts/bcm2835-rpi-b.dts                |  69 ++++++-
- arch/arm/boot/dts/bcm2835-rpi-zero.dts             |   2 +-
- arch/arm/boot/dts/bcm2835-rpi.dtsi                 |  15 +-
- arch/arm/boot/dts/bcm2835.dtsi                     |   6 +
- arch/arm/boot/dts/bcm2836-rpi-2-b.dts              |   2 +-
- arch/arm/boot/dts/bcm2836.dtsi                     |   6 +
- arch/arm/boot/dts/bcm283x.dtsi                     | 212 ++++++++++++++++++++-
- arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts   |   8 +-
- arch/arm64/boot/dts/broadcom/bcm2837.dtsi          |   8 +-
- .../boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi    |   1 +
- drivers/pinctrl/bcm/pinctrl-bcm2835.c              |   6 -
- include/dt-bindings/pinctrl/bcm2835.h              |   5 +
- 18 files changed, 602 insertions(+), 29 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/thermal/brcm,bcm2835-thermal.txt
- create mode 120000 arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi
+Thanks,
+Mark.
