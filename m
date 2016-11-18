@@ -1,35 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 17 Nov 2016 17:46:34 -0800
-Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for v4.10
-In-Reply-To: <CAK7LNAQ5_Sc99WbTWR9u3_J0FqG8KUSGNQzggdQC91Cngxi+Cw@mail.gmail.com>
-References: <CAK7LNAQ5_Sc99WbTWR9u3_J0FqG8KUSGNQzggdQC91Cngxi+Cw@mail.gmail.com>
-Message-ID: <20161118014634.GK8578@localhost>
+Date: Thu, 17 Nov 2016 23:32:31 -0800
+Subject: [GIT PULL 2/3] Rockchip dts32 changes for 4.10
+In-Reply-To: <2517910.T56YgEDzxC@phil>
+References: <1698724.ZQnZMjf8xY@phil>
+ <2517910.T56YgEDzxC@phil>
+Message-ID: <20161118073231.GJ1785@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Nov 06, 2016 at 12:18:11AM +0900, Masahiro Yamada wrote:
-> Hi Arnd, Olof,
+On Sat, Nov 12, 2016 at 04:35:49PM +0100, Heiko Stuebner wrote:
+> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 > 
-> Here are UniPhier DT (32bit) updates for the v4.10 merge window.
-> Please pull!
+>   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
 > 
-> (This time, I based this pull-request on -rc3 instead of -rc1
-> because I want to make sure to have no conflict
-> between fixes that had already been pulled-in and
-> new development commits in this series.)
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.10-rockchip-dts32-1
+> 
+> for you to fetch changes up to 6a8883d614c7bede1075a4850139daa9723c291e:
+> 
+>   ARM: dts: rockchip: replace to "max-frequency" instead of "clock-freq-min-max" (2016-11-09 14:46:04 +0100)
+> 
+> ----------------------------------------------------------------
+> 32bit devicetree changes for Rockchip including removal of skeleton.dtsi
+> inclusion, missing unit names for memory nodes, various frequency
+> optimizations allowing for better performance on rk3066, the usage of
+> pin constants to bridge between the two numbering schemes used (gpio
+> controllers using 0-31 and pins being labeled A0-A7,..., D0-D7)
+> and UHS/HS modes for the mmc controllers on the popmetal board.
+> 
+> Two new boards, the PX3-based evaluation board, with the PX3 being an
+> industrial variant of the rk3188 soc and the Rikomagic MK808 board
+> based around the rk3066 are also added.
 
-What you can do is instad use your fixes branch as base, since in this
-case we had -rc2 as our base for next/dt. Since you based on -rc3, we need
-to bring in a newer upstream revision (a backmerge), and that's something we
-try to avoid.
-
-I've merged your branch in this case anyway, but next time try basing on top
-of your fixes if you need to.
-
-
-Thanks!
+Merged, thanks!
 
 
 -Olof
