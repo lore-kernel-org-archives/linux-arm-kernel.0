@@ -1,65 +1,107 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Nov 2016 07:10:52 -0800
-Subject: [PATCH v2 5/8] dt-bindings: mfd: Provide human readable defines
- for TPS65217 interrupts
-In-Reply-To: <20161118145353.GE2301@dell.home>
-References: <20161028123702.21849-1-woogyom.kim@gmail.com>
- <20161028123702.21849-6-woogyom.kim@gmail.com>
- <20161118145353.GE2301@dell.home>
-Message-ID: <20161118151051.GV4082@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 18 Nov 2016 15:44:13 +0000
+Subject: [PATCH v8 10/16] drivers: iommu: arm-smmu-v3: split probe
+ functions into DT/generic portions
+In-Reply-To: <20161116152936.22955-11-lorenzo.pieralisi@arm.com>
+References: <20161116152936.22955-1-lorenzo.pieralisi@arm.com>
+ <20161116152936.22955-11-lorenzo.pieralisi@arm.com>
+Message-ID: <20161118154413.GU13470@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lee Jones <lee.jones@linaro.org> [161118 06:51]:
-> On Fri, 28 Oct 2016, Milo Kim wrote:
+On Wed, Nov 16, 2016 at 03:29:30PM +0000, Lorenzo Pieralisi wrote:
+> Current ARM SMMUv3 probe functions intermingle HW and DT probing in the
+> initialization functions to detect and programme the ARM SMMU v3 driver
+> features. In order to allow probing the ARM SMMUv3 with other firmwares
+> than DT, this patch splits the ARM SMMUv3 init functions into DT and HW
+> specific portions so that other FW interfaces (ie ACPI) can reuse the HW
+> probing functions and skip the DT portion accordingly.
 > 
-> > TPS65217 supports three interrupt sources. This patch enables assigning
-> > each IRQ number in the charger and power button node. Then corresponding
-> > IRQ will be requested by each driver.
-> > 
-> > Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
-> > ---
-> >  include/dt-bindings/mfd/tps65217.h | 26 ++++++++++++++++++++++++++
-> >  1 file changed, 26 insertions(+)
-> >  create mode 100644 include/dt-bindings/mfd/tps65217.h
-> > 
-> > diff --git a/include/dt-bindings/mfd/tps65217.h b/include/dt-bindings/mfd/tps65217.h
-> > new file mode 100644
-> > index 0000000..cafb9e6
-> > --- /dev/null
-> > +++ b/include/dt-bindings/mfd/tps65217.h
-> > @@ -0,0 +1,26 @@
-> > +/*
-> > + * This header provides macros for TI TPS65217 DT bindings.
-> > + *
-> > + * Copyright (C) 2016 Texas Instruments
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful, but
-> > + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> > + * General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License along with
-> > + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> > + */
-> > +
-> > +#ifndef __DT_BINDINGS_TPS65217_H__
-> > +#define __DT_BINDINGS_TPS65217_H__
-> > +
-> > +#define TPS65217_IRQ_USB	0
-> > +#define TPS65217_IRQ_AC		1
-> > +#define TPS65217_IRQ_PB		2
+> This patch implements no functional change, only code reshuffling.
 > 
-> What are "AC" and "PB".  Seeing as these are meant to be "human
-> readable", let's make them more human friendly.
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Reviewed-by: Tomasz Nowicki <tn@semihalf.com>
+> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Tested-by: Tomasz Nowicki <tn@semihalf.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 46 +++++++++++++++++++++++++++++----------------
+>  1 file changed, 30 insertions(+), 16 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index e6e1c87..ed563307 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -2381,10 +2381,10 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
+>  	return 0;
+>  }
+>  
+> -static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
+> +static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
+>  {
+>  	u32 reg;
+> -	bool coherent;
+> +	bool coherent = smmu->features & ARM_SMMU_FEAT_COHERENCY;
+>  
+>  	/* IDR0 */
+>  	reg = readl_relaxed(smmu->base + ARM_SMMU_IDR0);
+> @@ -2436,13 +2436,9 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
+>  		smmu->features |= ARM_SMMU_FEAT_HYP;
+>  
+>  	/*
+> -	 * The dma-coherent property is used in preference to the ID
+> +	 * The coherency feature as set by FW is used in preference to the ID
+>  	 * register, but warn on mismatch.
+>  	 */
+> -	coherent = of_dma_is_coherent(smmu->dev->of_node);
+> -	if (coherent)
+> -		smmu->features |= ARM_SMMU_FEAT_COHERENCY;
+> -
+>  	if (!!(reg & IDR0_COHACC) != coherent)
+>  		dev_warn(smmu->dev, "IDR0.COHACC overridden by dma-coherent property (%s)\n",
+>  			 coherent ? "true" : "false");
+> @@ -2563,21 +2559,37 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
+>  	return 0;
+>  }
+>  
+> -static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+> +static int arm_smmu_device_dt_probe(struct platform_device *pdev,
+> +				    struct arm_smmu_device *smmu,
+> +				    bool *bypass)
+>  {
+> -	int irq, ret;
+> -	struct resource *res;
+> -	struct arm_smmu_device *smmu;
+>  	struct device *dev = &pdev->dev;
+> -	bool bypass = true;
+>  	u32 cells;
+>  
+> +	*bypass = true;
+> +
+>  	if (of_property_read_u32(dev->of_node, "#iommu-cells", &cells))
+>  		dev_err(dev, "missing #iommu-cells property\n");
+>  	else if (cells != 1)
+>  		dev_err(dev, "invalid #iommu-cells value (%d)\n", cells);
+>  	else
+> -		bypass = false;
+> +		*bypass = false;
+> +
+> +	parse_driver_options(smmu);
+> +
+> +	if (of_dma_is_coherent(dev->of_node))
+> +		smmu->features |= ARM_SMMU_FEAT_COHERENCY;
+> +
+> +	return 0;
 
-Good idea. Milo, please do an incremental single follow-up patch as
-I already have applied this and the dts changes using it.
+I know you're only moving code here, but the *bypass output parameter
+now seems to be redundant with the unconditional return 0. Given that
+we only set bypass to true if something went wrong, why don't we return
+-ENODEV in those cases, kill the bypass parameter and rework the return
+value check in the caller so that, rather than fail the probe, we pass
+bypass=true to the reset function?
 
-Regards,
-
-Tony
+Will
