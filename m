@@ -1,65 +1,67 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 18 Nov 2016 10:09:32 +0800
-Subject: [PATCH] drm/sun4i: tcon: Initialize regmap after enabling bus
- clocks
-In-Reply-To: <20161117190501.hjpwposqzidwhwdc@lukather>
-References: <20161116093732.12828-1-wens@csie.org>
- <20161116093732.12828-2-wens@csie.org>
- <20161117190501.hjpwposqzidwhwdc@lukather>
-Message-ID: <CAGb2v64JW1ZAvSJUZDjS0djwkSO9Se33Adrm-waXstC1bdkVnQ@mail.gmail.com>
+From: markivx@codeaurora.org (Vikram Mulukutla)
+Date: Thu, 17 Nov 2016 18:22:25 -0800
+Subject: spin_lock behavior with ARM64 big.Little/HMP
+Message-ID: <400ab4b8b2354c5b9283f6ed657363a0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 3:05 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Wed, Nov 16, 2016 at 05:37:32PM +0800, Chen-Yu Tsai wrote:
->> If we attempt to read/write the TCON registers before the bus clock
->> is enabled, those accesses get ignored.
->>
->> In practice this almost never occurs because U-boot had already enabled
->> the bus clock as part of its firmware provided framebuffer (simplefb).
->>
->> Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>
->> I was looking around the DRM driver and noticed this sequence was off.
->>
->> ---
->>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 10 +++++-----
->>  1 file changed, 5 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> index c6afb2448655..8c2db65ea229 100644
->> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> @@ -506,16 +506,16 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
->>               return ret;
->>       }
->>
->> -     ret = sun4i_tcon_init_regmap(dev, tcon);
->> +     ret = sun4i_tcon_init_clocks(dev, tcon);
->>       if (ret) {
->> -             dev_err(dev, "Couldn't init our TCON regmap\n");
->> +             dev_err(dev, "Couldn't init our TCON clocks\n");
->>               goto err_assert_reset;
->>       }
->>
->> -     ret = sun4i_tcon_init_clocks(dev, tcon);
->> +     ret = sun4i_tcon_init_regmap(dev, tcon);
->>       if (ret) {
->> -             dev_err(dev, "Couldn't init our TCON clocks\n");
->> -             goto err_assert_reset;
->> +             dev_err(dev, "Couldn't init our TCON regmap\n");
->> +             goto err_free_clocks;
->>       }
->
-> That won't work either. sun4i_tcon_init_clocks requires the regmap to
-> be enabled before it calls sun4i_dclk_create.
->
-> Maybe we should just move that call outside of sun4i_tcon_init_clocks
-> and put it directly into the bind then.
+Hello,
 
-That makes sense. I'll send a v2.
+This isn't really a bug report, but just a description of a 
+frequency/IPC
+dependent behavior that I'm curious if we should worry about. The 
+behavior
+is exposed by questionable design so I'm leaning towards don't-care.
 
-ChenYu
+Consider these threads running in parallel on two ARM64 CPUs running 
+mainline
+Linux:
+
+(Ordering of lines between the two columns does not indicate a sequence 
+of
+execution. Assume flag=0 initially.)
+
+LittleARM64_CPU @ 300MHz (e.g.A53)   |  BigARM64_CPU @ 1.5GHz (e.g. A57)
+-------------------------------------+----------------------------------
+spin_lock_irqsave(s)                 |  local_irq_save()
+/* critical section */
+flag = 1                             |  spin_lock(s)
+spin_unlock_irqrestore(s)            |  while (!flag) {
+                                      |      spin_unlock(s)
+                                      |      cpu_relax();
+                                      |      spin_lock(s)
+                                      |  }
+                                      |  spin_unlock(s)
+                                      |  local_irq_restore()
+
+I see a livelock occurring where the LittleCPU is never able to acquire 
+the
+lock, and the BigCPU is stuck forever waiting on 'flag' to be set.
+
+Even with ticket spinlocks, this bit of code can cause a livelock (or 
+very
+long delays) if BigCPU runs fast enough. Afaics this can only happen if 
+the
+LittleCPU is unable to put its ticket in the queue (i.e, increment the 
+next
+field) since the store-exclusive keeps failing.
+
+The problem is not present on SMP, and is mitigated by adding enough
+additional clock cycles between the unlock and lock in the loop running
+on the BigCPU. On big.Little, if both threads are scheduled on the same
+cluster within the same clock domain, the problem is avoided.
+
+Now the infinite loop may seem like questionable design but the problem
+isn't entirely hypothetical; if BigCPU calls hrtimer_cancel with
+interrupts disabled, this scenario can result if the hrtimer is about
+to run on a littleCPU. It's of course possible that there's just enough
+intervening code for the problem to not occur. At the very least it 
+seems
+that loops like the one running in the BigCPU above should come with a
+WARN_ON(irqs_disabled) or with a sufficient udelay() instead of the 
+cpu_relax.
+
+Thoughts?
+
+Thanks,
+Vikram
