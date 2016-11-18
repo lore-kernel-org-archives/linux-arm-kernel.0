@@ -1,52 +1,94 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 Nov 2016 09:39:25 +0000
-Subject: [PATCH 1/2] arm64: KVM: pmu: Fix AArch32 cycle counter access
-In-Reply-To: <1479461966-20136-1-git-send-email-marc.zyngier@arm.com>
-References: <1479461966-20136-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1479461966-20136-2-git-send-email-marc.zyngier@arm.com>
+From: rsahu@apm.com (Rameshwar Prasad Sahu)
+Date: Fri, 18 Nov 2016 15:15:45 +0530
+Subject: [PATCH v2] ata: xgene: Enable NCQ support for APM X-Gene SATA
+ controller hardware v1.1
+Message-ID: <1479462345-13942-1-git-send-email-rsahu@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Huang <wei@redhat.com>
+This patch enables NCQ support for APM X-Gene SATA controller hardware v1.1
+that was broken with hardware v1.0. Second thing, here we should not assume
+XGENE_AHCI_V2 always in case of having valid _CID in ACPI table. I need to
+remove this assumption because V1_1 also has a valid _CID for backward
+compatibly with v1.
 
-We're missing the handling code for the cycle counter accessed
-from a 32bit guest, leading to unexpected results.
+v2 changes:
+	1. Changed patch description
 
-Cc: stable at vger.kernel.org # 4.6+
-Signed-off-by: Wei Huang <wei@redhat.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
 ---
- arch/arm64/kvm/sys_regs.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ drivers/ata/ahci_xgene.c |   14 ++++++++------
+ 1 files changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index f302fdb..87e7e66 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -597,8 +597,14 @@ static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
- 
- 			idx = ARMV8_PMU_CYCLE_IDX;
- 		} else {
--			BUG();
-+			return false;
+diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
+index 73b19b2..8b88be9 100644
+--- a/drivers/ata/ahci_xgene.c
++++ b/drivers/ata/ahci_xgene.c
+@@ -87,6 +87,7 @@
+
+ enum xgene_ahci_version {
+ 	XGENE_AHCI_V1 = 1,
++	XGENE_AHCI_V1_1,
+ 	XGENE_AHCI_V2,
+ };
+
+@@ -734,6 +735,7 @@ static struct scsi_host_template ahci_platform_sht = {
+ #ifdef CONFIG_ACPI
+ static const struct acpi_device_id xgene_ahci_acpi_match[] = {
+ 	{ "APMC0D0D", XGENE_AHCI_V1},
++	{ "APMC0D67", XGENE_AHCI_V1_1},
+ 	{ "APMC0D32", XGENE_AHCI_V2},
+ 	{},
+ };
+@@ -742,6 +744,7 @@ MODULE_DEVICE_TABLE(acpi, xgene_ahci_acpi_match);
+
+ static const struct of_device_id xgene_ahci_of_match[] = {
+ 	{.compatible = "apm,xgene-ahci", .data = (void *) XGENE_AHCI_V1},
++	{.compatible = "apm,xgene-ahci-v1-1", .data = (void *) XGENE_AHCI_V1_1},
+ 	{.compatible = "apm,xgene-ahci-v2", .data = (void *) XGENE_AHCI_V2},
+ 	{},
+ };
+@@ -755,8 +758,7 @@ static int xgene_ahci_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	const struct of_device_id *of_devid;
+ 	enum xgene_ahci_version version = XGENE_AHCI_V1;
+-	const struct ata_port_info *ppi[] = { &xgene_ahci_v1_port_info,
+-					      &xgene_ahci_v2_port_info };
++	const struct ata_port_info *ppi;
+ 	int rc;
+
+ 	hpriv = ahci_platform_get_resources(pdev);
+@@ -821,8 +823,6 @@ static int xgene_ahci_probe(struct platform_device *pdev)
+ 				dev_warn(&pdev->dev, "%s: Error reading device info. Assume version1\n",
+ 					__func__);
+ 				version = XGENE_AHCI_V1;
+-			} else if (info->valid & ACPI_VALID_CID) {
+-				version = XGENE_AHCI_V2;
+ 			}
  		}
-+	} else if (r->CRn == 0 && r->CRm == 9) {
-+		/* PMCCNTR */
-+		if (pmu_access_event_counter_el0_disabled(vcpu))
-+			return false;
-+
-+		idx = ARMV8_PMU_CYCLE_IDX;
- 	} else if (r->CRn == 14 && (r->CRm & 12) == 8) {
- 		/* PMEVCNTRn_EL0 */
- 		if (pmu_access_event_counter_el0_disabled(vcpu))
-@@ -606,7 +612,7 @@ static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
- 
- 		idx = ((r->CRm & 3) << 3) | (r->Op2 & 7);
- 	} else {
--		BUG();
-+		return false;
  	}
- 
- 	if (!pmu_counter_idx_valid(vcpu, idx))
--- 
-2.1.4
+@@ -858,18 +858,20 @@ skip_clk_phy:
+
+ 	switch (version) {
+ 	case XGENE_AHCI_V1:
++		ppi = &xgene_ahci_v1_port_info;
+ 		hpriv->flags = AHCI_HFLAG_NO_NCQ;
+ 		break;
+ 	case XGENE_AHCI_V2:
++		ppi = &xgene_ahci_v2_port_info;
+ 		hpriv->flags |= AHCI_HFLAG_YES_FBS;
+ 		hpriv->irq_handler = xgene_ahci_irq_intr;
+ 		break;
+ 	default:
++		ppi = &xgene_ahci_v1_port_info;
+ 		break;
+ 	}
+
+-	rc = ahci_platform_init_host(pdev, hpriv, ppi[version - 1],
+-				     &ahci_platform_sht);
++	rc = ahci_platform_init_host(pdev, hpriv, ppi, &ahci_platform_sht);
+ 	if (rc)
+ 		goto disable_resources;
+
+--
+1.7.1
