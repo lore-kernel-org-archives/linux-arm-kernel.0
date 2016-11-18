@@ -1,52 +1,87 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 18 Nov 2016 19:30:07 +0800
-Subject: [arm-soc:qcom/arm64 11/13]
- arch/arm64/boot/dts/qcom/msm8992.dtsi:14:48: fatal error:
- dt-bindings/clock/qcom,gcc-msm8994.h: No such file or directory
-Message-ID: <201611181905.d4hFQa7z%fengguang.wu@intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Nov 2016 12:38:49 +0100
+Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
+In-Reply-To: <582EE223.4090605@hisilicon.com>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+ <2436881.9RqUVYxmDf@wuerfel> <582EE223.4090605@hisilicon.com>
+Message-ID: <6279668.zEh0VO1Gaf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git qcom/arm64
-head:   feeaf56ac78d283efe65ea60ec999d4bf3cf395e
-commit: 6a6d1978f9c0d818b4370903e1f3eecf1681c932 [11/13] arm64: dts: msm8992 SoC and LG Bullhead (Nexus 5X) support
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 6a6d1978f9c0d818b4370903e1f3eecf1681c932
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+On Friday, November 18, 2016 7:12:35 PM CET zhichang.yuan wrote:
+> Hi, Arnd,
+> 
+> 
+> On 2016/11/18 17:20, Arnd Bergmann wrote:
+> > On Friday, November 11, 2016 6:07:07 PM CET zhichang.yuan wrote:
+> >>
+> >> I have similar idea as your PPC MMIO.
+> >>
+> >> We notice the prototype of {in/out()} is something like that:
+> >>
+> >> static inline u8 inb(unsigned long addr)
+> >> static inline void outb(u8 value, unsigned long addr)
+> >>
+> >> The type of parameter 'addr' is unsigned long. For I/O space, it is big enough.
+> >> So, could you divide this 'addr' into several bit segments? The top 8 bits is
+> >> defined as bus index. For normal direct IO, the bus index is 0. For those bus
+> >> device which need indirectIO or some special I/O accessors, when these devices
+> >> are initializing, can request to allocate an unique ID to them, and register
+> >> their own accessors to the entry which is corresponding to the ID.
+> > 
+> > Ah, have you looked at the IA64 code? It does exactly this.
+> > For ARM64 we decided to use the same basic approach as powerpc with
+> > a single range of virtual memory for mapping it as that somewhat
+> > simplified all cases we knew about at the time.
+> 
+> Yes. I spent some time to trace how to work on PPC. But the code is a bit long,
+> I am not clear on how the indirectIO there was supported.
+> 
+> I noticed there are CONFIG_PPC_INDIRECT_PIO and CONFIG_PPC_INDIRECT_MMIO on PPC.
+> It seems that only CONFIG_PPC_INDIRECT_MMIO applied some MSB to store the bus
+> tokens which are used to get iowa_busses[] for specific operation helpers.
+> I can not find how CONFIG_PPC_INDIRECT_PIO support multiple ISA domains. It
+> seems only Opal-lpc.c adopt this INDIRECT_PIO method.
+> 
+> Although CONFIG_PPC_INDIRECT_MMIO is for MMIO, seems not suitable for ISA/LPC
+> I/O. But this idea is helpful.
+> 
+> what else did I miss??
 
-All errors (new ones prefixed by >>):
+I mentioned two different things here: ia64 IIRC uses some bits of the
+port number to look up the domain, while powerpc traditionally had no
+support for any such lookup, it did the same thing as ARM64 with
+virtual remapping of MMIO ranges into an address range starting at
+a fixed virtual address.
 
-   In file included from arch/arm64/boot/dts/qcom/msm8992-bullhead-rev-101.dts:16:0:
->> arch/arm64/boot/dts/qcom/msm8992.dtsi:14:48: fatal error: dt-bindings/clock/qcom,gcc-msm8994.h: No such file or directory
-    #include <dt-bindings/clock/qcom,gcc-msm8994.h>
-                                                   ^
-   compilation terminated.
+CONFIG_PPC_INDIRECT_PIO is a fairly recent addition, I was not thinking
+of that.
 
-vim +14 arch/arm64/boot/dts/qcom/msm8992.dtsi
+> >> In this way, we can support multiple domains, I think.
+> >> But I am not sure whether it is feasible, for example, are there some
+> >> architectures/platforms had populated the top 8 bits? Do we need to request IO
+> >> region from ioport_resource for those devices?  etc...
+> > 
+> > On a 64-bit architecture, the top 32 bits of the port number are
+> > definitely free to use for this, and 8 bits are probably sufficient.
+> > 
+> > Even on 32 bit architectures, I can't see why we'd ever need more than
+> > 16 bits worth of addressing within a domain, so using 8 bit domain
+> > and 16 bit address leaves 8 or 40 unused bits.
+> 
+> Yes. 8 bits are enough.
+> But the maximal PIO on some architectures are defined as ~0 or -1. There is no
+> any bare space left. Probably we can not ensure the upper 8 bits available.
 
-     8	 * but WITHOUT ANY WARRANTY; without even the implied warranty of
-     9	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    10	 * GNU General Public License for more details.
-    11	 */
-    12	
-    13	#include <dt-bindings/interrupt-controller/arm-gic.h>
-  > 14	#include <dt-bindings/clock/qcom,gcc-msm8994.h>
-    15	
-    16	/ {
-    17		model = "Qualcomm Technologies, Inc. MSM 8992";
+Right, we clearly can't use it across all architectures. The trick with
+architectures using ULONG_MAX as the limit for port numbers is that they
+treat it as a 1:1 mapping between port numbers and virtual addresses,
+which is yet another way to handle the MMIO-based devices, but that has
+a number of downsides we don't need to get into now.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 31923 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161118/3411caec/attachment-0001.gz>
+What I think the code should do is a generic workaround handling that
+architectures can opt-in to. We'd start doing this on ARM64 only,
+and can then decide whether to change ARM or PowerPC over to use
+that as well.
+
+	Arnd
