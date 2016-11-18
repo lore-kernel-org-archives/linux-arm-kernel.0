@@ -1,165 +1,46 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Fri, 18 Nov 2016 13:34:03 +0530
-Subject: [PATCH 2/4] spi: spi-fsl-dspi: Fix incorrect DMA setup
-In-Reply-To: <bc8d9b808b99d3b217361df6fa8853ea@agner.ch>
-References: <cover.1479384571.git.maitysanchayan@gmail.com>
- <d83f4896d77f577ca92fd70534f6198bb3288d8a.1479384571.git.maitysanchayan@gmail.com>
- <bc8d9b808b99d3b217361df6fa8853ea@agner.ch>
-Message-ID: <20161118080403.GB1572@Sanchayan-Arch.localdomain>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Fri, 18 Nov 2016 09:25:22 +0100
+Subject: [PATCHv3 1/6] lib/Kconfig.debug: Add ARCH_HAS_DEBUG_VIRTUAL
+In-Reply-To: <1479431816-5028-2-git-send-email-labbott@redhat.com>
+References: <1479431816-5028-1-git-send-email-labbott@redhat.com>
+ <1479431816-5028-2-git-send-email-labbott@redhat.com>
+Message-ID: <20161118082521.GA7250@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16-11-17 17:03:19, Stefan Agner wrote:
-> On 2016-11-17 04:16, Sanchayan Maity wrote:
-> > Currently dmaengine_prep_slave_single was being called with length
-> > set to the complete DMA buffer size. This resulted in unwanted bytes
-> > being transferred to the SPI register leading to clock and MOSI lines
-> > having unwanted data even after chip select got deasserted and the
-> > required bytes having been transferred.
-> > 
-> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> > ---
-> >  drivers/spi/spi-fsl-dspi.c | 10 ++++++++--
-> >  1 file changed, 8 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
-> > index b1ee1f5..aee8c88 100644
-> > --- a/drivers/spi/spi-fsl-dspi.c
-> > +++ b/drivers/spi/spi-fsl-dspi.c
-> > @@ -265,7 +265,10 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
-> >  
-> >  	dma->tx_desc = dmaengine_prep_slave_single(dma->chan_tx,
-> >  					dma->tx_dma_phys,
-> > -					DSPI_DMA_BUFSIZE, DMA_MEM_TO_DEV,
-> > +					dma->curr_xfer_len *
-> > +					DMA_SLAVE_BUSWIDTH_4_BYTES /
-> > +					(tx_word ? 2 : 1),
-> > +					DMA_MEM_TO_DEV,
-> 
-> Hm, this is getting ridiculous, I think we convert curr_xfer_len from
-> bytes to DMA transfers in almost every use.
-> 
-> Can we make it be transfer length in actual 4 byte transfers? We then
-> probably have to convert it to bytes once to subtract from
-> curr_remaining_bytes, but I think it would simplify code overall...
 
-Will the below be acceptable fix?
+* Laura Abbott <labbott@redhat.com> wrote:
 
-diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
-index 41422cd..db7f091 100644
---- a/drivers/spi/spi-fsl-dspi.c
-+++ b/drivers/spi/spi-fsl-dspi.c
-@@ -217,15 +217,13 @@ static void dspi_rx_dma_callback(void *arg)
-        struct fsl_dspi *dspi = arg;
-        struct fsl_dspi_dma *dma = dspi->dma;
-        int rx_word;
--       int i, len;
-+       int i;
-        u16 d;
- 
-        rx_word = is_double_byte_mode(dspi);
- 
--       len = rx_word ? (dma->curr_xfer_len / 2) : dma->curr_xfer_len;
--
-        if (!(dspi->dataflags & TRAN_STATE_RX_VOID)) {
--               for (i = 0; i < len; i++) {
-+               for (i = 0; i < dma->curr_xfer_len; i++) {
-                        d = dspi->dma->rx_dma_buf[i];
-                        rx_word ? (*(u16 *)dspi->rx = d) :
-                                                (*(u8 *)dspi->rx = d);
-@@ -242,14 +240,12 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
-        struct device *dev = &dspi->pdev->dev;
-        int time_left;
-        int tx_word;
--       int i, len;
-+       int i;
-        u16 val;
- 
-        tx_word = is_double_byte_mode(dspi);
- 
--       len = tx_word ? (dma->curr_xfer_len / 2) : dma->curr_xfer_len;
--
--       for (i = 0; i < len - 1; i++) {
-+       for (i = 0; i < dma->curr_xfer_len - 1; i++) {
-                val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
-                dspi->dma->tx_dma_buf[i] =
-                        SPI_PUSHR_TXDATA(val) | SPI_PUSHR_PCS(dspi->cs) |
-@@ -267,7 +263,9 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
- 
-        dma->tx_desc = dmaengine_prep_slave_single(dma->chan_tx,
-                                        dma->tx_dma_phys,
--                                       DSPI_DMA_BUFSIZE, DMA_MEM_TO_DEV,
-+                                       dma->curr_xfer_len *
-+                                       DMA_SLAVE_BUSWIDTH_4_BYTES,
-+                                       DMA_MEM_TO_DEV,
-                                        DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-        if (!dma->tx_desc) {
-                dev_err(dev, "Not able to get desc for DMA xfer\n");
-@@ -283,7 +281,9 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
- 
-        dma->rx_desc = dmaengine_prep_slave_single(dma->chan_rx,
-                                        dma->rx_dma_phys,
--                                       DSPI_DMA_BUFSIZE, DMA_DEV_TO_MEM,
-+                                       dma->curr_xfer_len *
-+                                       DMA_SLAVE_BUSWIDTH_4_BYTES,
-+                                       DMA_DEV_TO_MEM,
-                                        DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-        if (!dma->rx_desc) {
-                dev_err(dev, "Not able to get desc for DMA xfer\n");
-@@ -330,17 +330,17 @@ static int dspi_dma_xfer(struct fsl_dspi *dspi)
-        struct device *dev = &dspi->pdev->dev;
-        int curr_remaining_bytes;
-        int bytes_per_buffer;
--       int tx_word;
-+       int tx_word = 1;
-        int ret = 0;
- 
--       tx_word = is_double_byte_mode(dspi);
-+       if (is_double_byte_mode(dspi))
-+               tx_word = 2;
-        curr_remaining_bytes = dspi->len;
-+       bytes_per_buffer = DSPI_DMA_BUFSIZE / DSPI_FIFO_SIZE;
-        while (curr_remaining_bytes) {
-                /* Check if current transfer fits the DMA buffer */
--               dma->curr_xfer_len = curr_remaining_bytes;
--               bytes_per_buffer = DSPI_DMA_BUFSIZE /
--                               (DSPI_FIFO_SIZE / (tx_word ? 2 : 1));
--               if (curr_remaining_bytes > bytes_per_buffer)
-+               dma->curr_xfer_len = curr_remaining_bytes / tx_word;
-+               if (dma->curr_xfer_len > bytes_per_buffer)
-                        dma->curr_xfer_len = bytes_per_buffer;
- 
-                ret = dspi_next_xfer_dma_submit(dspi);
-@@ -349,7 +349,7 @@ static int dspi_dma_xfer(struct fsl_dspi *dspi)
-                        goto exit;
- 
-                } else {
--                       curr_remaining_bytes -= dma->curr_xfer_len;
-+                       curr_remaining_bytes -= dma->curr_xfer_len * tx_word;
-                        if (curr_remaining_bytes < 0)
-                                curr_remaining_bytes = 0;
-                        dspi->len = curr_remaining_bytes;
+> 
+> DEBUG_VIRTUAL currently depends on DEBUG_KERNEL && X86. arm64 is getting
+> the same support. Rather than add a list of architectures, switch this
+> to ARCH_HAS_DEBUG_VIRTUAL and let architectures select it as
+> appropriate.
+> 
+> Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> v3: No change, x86 maintainers please ack if you are okay with this.
+> ---
+>  arch/x86/Kconfig  | 1 +
+>  lib/Kconfig.debug | 5 ++++-
+>  2 files changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> index bada636..f533321 100644
+> --- a/arch/x86/Kconfig
+> +++ b/arch/x86/Kconfig
+> @@ -23,6 +23,7 @@ config X86
+>  	select ARCH_CLOCKSOURCE_DATA
+>  	select ARCH_DISCARD_MEMBLOCK
+>  	select ARCH_HAS_ACPI_TABLE_UPGRADE if ACPI
+> +	select ARCH_HAS_DEBUG_VIRTUAL
+>  	select ARCH_HAS_DEVMEM_IS_ALLOWED
+>  	select ARCH_HAS_ELF_RANDOMIZE
+>  	select ARCH_HAS_FAST_MULTIPLIER
 
+Acked-by: Ingo Molnar <mingo@kernel.org>
 
-Regards,
-Sanchayan.
-> 
-> --
-> Stefan
-> 
-> 
-> >  					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> >  	if (!dma->tx_desc) {
-> >  		dev_err(dev, "Not able to get desc for DMA xfer\n");
-> > @@ -281,7 +284,10 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
-> >  
-> >  	dma->rx_desc = dmaengine_prep_slave_single(dma->chan_rx,
-> >  					dma->rx_dma_phys,
-> > -					DSPI_DMA_BUFSIZE, DMA_DEV_TO_MEM,
-> > +					dma->curr_xfer_len *
-> > +					DMA_SLAVE_BUSWIDTH_4_BYTES /
-> > +					(tx_word ? 2 : 1),
-> > +					DMA_DEV_TO_MEM,
-> >  					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> >  	if (!dma->rx_desc) {
-> >  		dev_err(dev, "Not able to get desc for DMA xfer\n");
+Thanks,
+
+	Ingo
