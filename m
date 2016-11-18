@@ -1,47 +1,65 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 18 Nov 2016 14:04:57 +0100
-Subject: [PATCH] kirkwood: fix spelling mistake
-In-Reply-To: <trinity-8590509b-8acc-44c0-86dc-8cf16ea8ad8a-1479448964051@3capp-gmx-bs34>
- (p. wassi's message of "Fri, 18 Nov 2016 07:02:44 +0100")
-References: <trinity-6911950b-e19a-4b44-aeed-adaccbc33164-1479414587776@3capp-gmx-bs50>
- <20161117210227.GL5574@lunn.ch>
- <trinity-8590509b-8acc-44c0-86dc-8cf16ea8ad8a-1479448964051@3capp-gmx-bs34>
-Message-ID: <87lgwh9bwm.fsf@free-electrons.com>
+From: bruherrera@gmail.com (Bruno Herrera)
+Date: Fri, 18 Nov 2016 11:13:29 -0200
+Subject: [RESEND PATCH] ARM: dts: stm32f429: Add missing USART3 pin config to
+ STM32F469I-DISCO board
+Message-ID: <CAF3+Tqer616rqU6rKeSKF5vusTdNSAQ_okCgRtx8ZnhOjjK78g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
- 
- On ven., nov. 18 2016, p.wassi at gmx.at wrote:
+Including new STM32 maintainer. Rebased at stm32-dt-for-v4.10-1 and
+stm32-dt-for-v4.10-2 branches. It fix the port/pin initialization in
+case boot-loader does not configure/initialize the pins.
 
-> Hi Andrew,
->
->> You should also send the patch to the Marvell MVEBU
->> maintainers.
->
-> how do I find Marvell mvebu maintainers?
-> The list in
-> https://www.kernel.org/doc/linux/MAINTAINERS
-> (line 1429) references mvebu/kirkwood and gave me the
-> mailing list's address. Should the other two maintainers
-> be addressed directly?
+This patch adds USART3 pin configuration on PB10/PA11 pins
+for STM32F469I-DISCO board.
 
-About putting the maintainer in Cc. Using ./scripts/get_maintainer.pl
-coudl help you to find the people to put in CC. For example for your
-patch:
-Jason Cooper <jason@lakedaemon.net> (maintainer:ARM/Marvell Kirkwood and Armada 370, 375, 38x,...)
-Andrew Lunn <andrew@lunn.ch> (maintainer:ARM/Marvell Kirkwood and Armada 370, 375, 38x,...)
-Gregory Clement <gregory.clement@free-electrons.com> (maintainer:ARM/Marvell Kirkwood and Armada 370, 375, 38x,...)
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> (maintainer:ARM/Marvell Kirkwood and Armada 370, 375, 38x,...)
+Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
+---
+ arch/arm/boot/dts/stm32f429.dtsi      | 13 +++++++++++++
+ arch/arm/boot/dts/stm32f469-disco.dts |  2 ++
+ 2 files changed, 15 insertions(+)
 
-So indeed you should put the 4 co-maintainers in Cc.
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index 35df462..1d94eba 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -284,6 +284,19 @@
+                                };
+                        };
 
-Thanks,
++                       usart3_pins_a: usart3 at 0 {
++                               pins1 {
++                                       pinmux =
+<STM32F429_PB10_FUNC_USART3_TX>;
++                                       bias-disable;
++                                       drive-push-pull;
++                                       slew-rate = <0>;
++                               };
++                               pins2 {
++                                       pinmux =
+<STM32F429_PB11_FUNC_USART3_RX>;
++                                       bias-disable;
++                               };
++                       };
++
+                        usbotg_hs_pins_a: usbotg_hs at 0 {
+                                pins {
+                                        pinmux =
+<STM32F429_PH4_FUNC_OTG_HS_ULPI_NXT>,
+diff --git a/arch/arm/boot/dts/stm32f469-disco.dts
+b/arch/arm/boot/dts/stm32f469-disco.dts
+index e911af8..eb3e638 100644
+--- a/arch/arm/boot/dts/stm32f469-disco.dts
++++ b/arch/arm/boot/dts/stm32f469-disco.dts
+@@ -71,5 +71,7 @@
+ };
 
-Gregory
+ &usart3 {
++       pinctrl-0 = <&usart3_pins_a>;
++       pinctrl-names = "default";
+        status = "okay";
+ };
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+
+--
+2.7.4 (Apple Git-66)
