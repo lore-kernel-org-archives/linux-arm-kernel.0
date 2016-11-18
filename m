@@ -1,63 +1,82 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Fri, 18 Nov 2016 10:11:41 +1030
-Subject: [RFC PATCH] mfd: dt: Add Aspeed LPC binding
-In-Reply-To: <CACRpkdazPEbU2gmDyke=GTYtjVp8aeauS+PVkp-zuiVoVz7kbw@mail.gmail.com>
-References: <20161117060633.3837-1-andrew@aj.id.au>
- <CACRpkdazPEbU2gmDyke=GTYtjVp8aeauS+PVkp-zuiVoVz7kbw@mail.gmail.com>
-Message-ID: <1479426101.5215.13.camel@aj.id.au>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Nov 2016 00:01:15 +0000
+Subject: [PATCH RFC 01/12] drm/i2c: tda998x: avoid race in
+ tda998x_encoder_mode_set()
+In-Reply-To: <E1c45SW-0005jL-52@rmk-PC.armlinux.org.uk>
+References: <20161108122420.GP1041@n2100.armlinux.org.uk>
+ <E1c45SW-0005jL-52@rmk-PC.armlinux.org.uk>
+Message-ID: <20161118000115.GI1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-11-17 at 10:30 +0100, Linus Walleij wrote:
-> > On Thu, Nov 17, 2016 at 7:06 AM, Andrew Jeffery <andrew@aj.id.au> wrote:
+On Tue, Nov 08, 2016 at 12:25:00PM +0000, Russell King wrote:
+> As priv->audio_params can now be changed at run time, we need to be more
+> careful about how we deal with a mode set.  We must take the audio lock
+> while checking if there's a valid audio configuration.
 > 
-> > +* Device tree bindings for the Aspeed LPC Controller
+> However, it's slightly worse than that - during mode set, we mute the
+> audio, and it must not be unmuted until we have finished the mode set.
+> It is possible that the audio side may start while a mode set is in
+> progress, so take the audio_mutex lock around the whole mode setting
+> procedure.
 > 
-> We are going overboard with the lingo sometimes, to the point that we do not
-> understand how terse things become.
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  drivers/gpu/drm/i2c/tda998x_drv.c | 7 +++----
+>  1 file changed, 3 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+> index 088900d78ceb..1cc0433ce9d5 100644
+> --- a/drivers/gpu/drm/i2c/tda998x_drv.c
+> +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+> @@ -1074,13 +1074,12 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
+>  
+>  		tda998x_write_avi(priv, adjusted_mode);
+>  
+> -		if (priv->audio_params.format != AFMT_UNUSED) {
+> -			mutex_lock(&priv->audio_mutex);
+> +		mutex_lock(&priv->audio_mutex);
+> +		if (priv->audio_params.format != AFMT_UNUSED)
+>  			tda998x_configure_audio(priv,
+>  						&priv->audio_params,
+>  						adjusted_mode->clock);
+> -			mutex_unlock(&priv->audio_mutex);
+> -		}
+> +		mutex_unlock(&priv->audio_mutex);
+>  	}
+>  }
+>  
 
-Sorry for that, it is a bit terse. Sometimes I struggle to gauge how
-much context I should provide.
+I've just realised that this (and the following few changes) require this
+mutex to be always initialised.  Currently, we only initialise the audio
+mutex when in DT mode, which is bad.  So, I'm going to add this patch in
+front of this patch set:
 
-Joel's reply covers the details of your queries below, but I'll make
-sure to add the information to the bindings as well.
+diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+index 088900d78ceb..168c0b4b8f47 100644
+--- a/drivers/gpu/drm/i2c/tda998x_drv.c
++++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+@@ -1405,6 +1405,8 @@ static int tda998x_create(struct i2c_client *client, struct tda998x_priv *priv)
+ 	int rev_lo, rev_hi, ret;
+ 	unsigned short cec_addr;
+ 
++	mutex_init(&priv->audio_mutex); /* Protect access from audio thread */
++
+ 	priv->vip_cntrl_0 = VIP_CNTRL_0_SWAP_A(2) | VIP_CNTRL_0_SWAP_B(3);
+ 	priv->vip_cntrl_1 = VIP_CNTRL_1_SWAP_C(0) | VIP_CNTRL_1_SWAP_D(1);
+ 	priv->vip_cntrl_2 = VIP_CNTRL_2_SWAP_E(4) | VIP_CNTRL_2_SWAP_F(5);
+@@ -1519,8 +1521,6 @@ static int tda998x_create(struct i2c_client *client, struct tda998x_priv *priv)
+ 		priv->vip_cntrl_2 = video;
+ 	}
+ 
+-	mutex_init(&priv->audio_mutex); /* Protect access from audio thread */
+-
+ 	ret = tda998x_get_audio_ports(priv, np);
+ 	if (ret)
+ 		goto fail;
 
-> 
-> LPC = Low Pin Count, right?
-> Explain that right here: it is a slow external bus, right?
 
-> > +The Aspeed LPC controller contains registers for a variety of functions. Not
-> > +all registers for a function are contiguous, and some registers are referenced
-> > +by functions outside the LPC controller.
-> > +
-> > +Note that this is separate from the H8S/2168 compatible register set occupying
-> > +the start of the LPC controller address space.
-> > +
-> > +Some significant functions in the LPC controller:
-> > +
-> > +* LPC Host Controller
-> > +* Host Interface Controller
-> 
-> Host interface to what?
-> 
-> > +* iBT Controller
-> 
-> What is iBT?
-> 
-> > +* SuperIO Scratch registers
-> 
-> Again more context please.
-> 
-> With standards documents, either explain everything or provide
-> pointers for the information.
-
-ACK!
-
-Andrew
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161118/4fa39301/attachment-0001.sig>
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
