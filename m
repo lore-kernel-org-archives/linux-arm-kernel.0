@@ -1,85 +1,211 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 18 Nov 2016 09:13:18 -0800
-Subject: [PATCH] arm: spin one more cycle in timer-based delays
-In-Reply-To: <20161118125409.GK1041@n2100.armlinux.org.uk>
-References: <582B0F61.6030903@free.fr> <20161118120630.GJ13470@arm.com>
- <20161118125409.GK1041@n2100.armlinux.org.uk>
-Message-ID: <CAD=FV=VoycW9btkdKubq_Uxh52PYK5R1X2GD10DcxRQj2K-_UQ@mail.gmail.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Fri, 18 Nov 2016 17:17:34 +0000
+Subject: [PATCH] PCI: Add information about describing PCI in ACPI
+In-Reply-To: <20161117175938.17465.45820.stgit@bhelgaas-glaptop.roam.corp.google.com>
+References: <20161117175938.17465.45820.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F921A88@lhreml507-mbx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Bjorn
 
-On Fri, Nov 18, 2016 at 4:54 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Fri, Nov 18, 2016 at 12:06:30PM +0000, Will Deacon wrote:
->> On Tue, Nov 15, 2016 at 02:36:33PM +0100, Mason wrote:
->> > When polling a tick counter in a busy loop, one might sample the
->> > counter just *before* it is updated, and then again just *after*
->> > it is updated. In that case, while mathematically v2-v1 equals 1,
->> > only epsilon has really passed.
->> >
->> > So, if a caller requests an N-cycle delay, we spin until v2-v1
->> > is strictly greater than N to avoid these random corner cases.
->> >
->> > Signed-off-by: Mason <slash.tmp@free.fr>
->> > ---
->> >  arch/arm/lib/delay.c | 2 +-
->> >  1 file changed, 1 insertion(+), 1 deletion(-)
->> >
->> > diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
->> > index 69aad80a3af4..3f1cd15ca102 100644
->> > --- a/arch/arm/lib/delay.c
->> > +++ b/arch/arm/lib/delay.c
->> > @@ -60,7 +60,7 @@ static void __timer_delay(unsigned long cycles)
->> >  {
->> >     cycles_t start = get_cycles();
->> >
->> > -   while ((get_cycles() - start) < cycles)
->> > +   while ((get_cycles() - start) <= cycles)
->> >             cpu_relax();
->> >  }
->>
->> I thought a bit about this last night. It is well known that the delay
->> routines are not guaranteed to be accurate, and I don't *think* that's
->> limited to over-spinning, so arguably this isn't a bug. However, taking
->> the approach that "drivers should figure it out" is also unhelpful,
->> because the frequency of the underlying counter isn't generally known
->> and so drivers can't simply adjust the delay parameter.
->
-> I don't think this change makes any sense whatsoever.  udelay() is
-> inaccurate, period.  It _will_ give delays shorter than requested
-> for many reasons, many of which can't be fixed.
->
-> Having a super-accurate version just encourages people to write broken
-> drivers which assume (eg) that udelay(10) will give _at least_ a 10us
-> delay.  However, there is no such guarantee.
->
-> So, having udelay() for timers return slightly short is actually a good
-> thing - it causes people not to make the mistake to be soo accurate
-> with their delay specifications.
->
-> So, NAK on this change.  udelay is not super-accurate.
->
-> Reference (and this is the most important one):
->
->   http://lists.openwall.net/linux-kernel/2011/01/12/372
+Many thanks for putting this together, it really helps!
 
-Mason's change adds no complexity to the code and seems like a
-generally good idea.
+One thing below..
 
-As per John Stultz [1] there is agreement that udelay() really
-shouldn't delay less than the requested amount.  In fact, we even have
-a test committed to the tree: "kernel/time/test_udelay.c".  As your
-reference says, maybe 1% isn't enough to throw a hissyfit about, but
-when the change is so simple and adds no complexity then it seems like
-a worthwhile thing to do.  Why make things inaccurate for no reason?
+> -----Original Message-----
+> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+> owner at vger.kernel.org] On Behalf Of Bjorn Helgaas
+> Sent: 17 November 2016 18:00
+> To: linux-pci at vger.kernel.org
+> Cc: linux-acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
+> arm-kernel at lists.infradead.org; linaro-acpi at lists.linaro.org
+> Subject: [PATCH] PCI: Add information about describing PCI in ACPI
+> 
+> Add a writeup about how PCI host bridges should be described in ACPI
+> using PNP0A03/PNP0A08 devices, PNP0C02 devices, and the MCFG table.
+> 
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> ---
+>  Documentation/PCI/00-INDEX      |    2 +
+>  Documentation/PCI/acpi-info.txt |  136
+> +++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 138 insertions(+)
+>  create mode 100644 Documentation/PCI/acpi-info.txt
+> 
+> diff --git a/Documentation/PCI/00-INDEX b/Documentation/PCI/00-INDEX
+> index 147231f..0780280 100644
+> --- a/Documentation/PCI/00-INDEX
+> +++ b/Documentation/PCI/00-INDEX
+> @@ -1,5 +1,7 @@
+>  00-INDEX
+>  	- this file
+> +acpi-info.txt
+> +	- info on how PCI host bridges are represented in ACPI
+>  MSI-HOWTO.txt
+>  	- the Message Signaled Interrupts (MSI) Driver Guide HOWTO and
+> FAQ.
+>  PCIEBUS-HOWTO.txt
+> diff --git a/Documentation/PCI/acpi-info.txt b/Documentation/PCI/acpi-
+> info.txt
+> new file mode 100644
+> index 0000000..ccbcfda
+> --- /dev/null
+> +++ b/Documentation/PCI/acpi-info.txt
+> @@ -0,0 +1,136 @@
+> +	    ACPI considerations for PCI host bridges
+> +
+> +The basic requirement is that the ACPI namespace should describe
+> +*everything* that consumes address space unless there's another
+> +standard way for the OS to find it [1, 2]. ?For example, windows that
+> +are forwarded to PCI by a PCI host bridge should be described via ACPI
+> +devices, since the OS can't locate the host bridge by itself. ?PCI
+> +devices *below* the host bridge do not need to be described via ACPI,
+> +because the resources they consume are inside the host bridge windows,
+> +and the OS can discover them via the standard PCI enumeration
+> +mechanism (using config accesses to read and size the BARs).
+> +
+> +This ACPI resource description is done via _CRS methods of devices in
+> +the ACPI namespace [2]. ? _CRS methods are like generalized PCI BARs:
+> +the OS can read _CRS and figure out what resource is being consumed
+> +even if it doesn't have a driver for the device [3]. ?That's important
+> +because it means an old OS can work correctly even on a system with
+> +new devices unknown to the OS. ?The new devices won't do anything, but
+> +the OS can at least make sure no resources conflict with them.
+> +
+> +Static tables like MCFG, HPET, ECDT, etc., are *not* mechanisms for
+> +reserving address space!  The static tables are for things the OS
+> +needs to know early in boot, before it can parse the ACPI namespace.
+> +If a new table is defined, an old OS needs to operate correctly even
+> +though it ignores the table.  _CRS allows that because it is generic
+> +and understood by the old OS; a static table does not.
 
-[1] http://www.gossamer-threads.com/lists/linux/kernel/1918249
+Right so if my understanding is correct you are saying that resources
+described in the MCFG table should also be declared in PNP0C02 devices
+so that the PNP driver can reserve these resources.
 
+On the other side the PCI Root bridge driver should not reserve such
+resources.
 
-For what it's worth, Mason's change is:
+Well if my understanding is correct I think we have a problem here:
+http://lxr.free-electrons.com/source/drivers/pci/ecam.c#L74
 
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+As you can see pci_ecam_create() will conflict with the pnp driver
+as it will try to reserve the resources from the MCFG table...
 
--Doug
+Maybe we need to rework pci_ecam_create() ?
+
+Thanks
+
+Gab
+
+> +
+> +If the OS is expected to manage an ACPI device, that device will have
+> +a specific _HID/_CID that tells the OS what driver to bind to it, and
+> +the _CRS tells the OS and the driver where the device's registers are.
+> +
+> +PNP0C02 "motherboard" devices are basically a catch-all. ?There's no
+> +programming model for them other than "don't use these resources for
+> +anything else." ?So any address space that is (1) not claimed by some
+> +other ACPI device and (2) should not be assigned by the OS to
+> +something else, should be claimed by a PNP0C02 _CRS method.
+> +
+> +PCI host bridges are PNP0A03 or PNP0A08 devices. ?Their _CRS should
+> +describe all the address space they consume. ?In principle, this would
+> +be all the windows they forward down to the PCI bus, as well as the
+> +bridge registers themselves. ?The bridge registers include things like
+> +secondary/subordinate bus registers that determine the bus range below
+> +the bridge, window registers that describe the apertures, etc. ?These
+> +are all device-specific, non-architected things, so the only way a
+> +PNP0A03/PNP0A08 driver can manage them is via _PRS/_CRS/_SRS, which
+> +contain the device-specific details. ?These bridge registers also
+> +include ECAM space, since it is consumed by the bridge.
+> +
+> +ACPI defined a Producer/Consumer bit that was intended to distinguish
+> +the bridge apertures from the bridge registers [4, 5]. ?However,
+> +BIOSes didn't use that bit correctly, and the result is that OSes have
+> +to assume that everything in a PCI host bridge _CRS is a window. ?That
+> +leaves no way to describe the bridge registers in the PNP0A03/PNP0A08
+> +device itself.
+> +
+> +The workaround is to describe the bridge registers (including ECAM
+> +space) in PNP0C02 catch-all devices [6]. ?With the exception of ECAM,
+> +the bridge register space is device-specific anyway, so the generic
+> +PNP0A03/PNP0A08 driver (pci_root.c) has no need to know about it. ?For
+> +ECAM, pci_root.c learns about the space from either MCFG or the _CBA
+> +method.
+> +
+> +Note that the PCIe spec actually does require ECAM unless there's a
+> +standard firmware interface for config access, e.g., the ia64 SAL
+> +interface [7].  One reason is that we want a generic host bridge
+> +driver (pci_root.c), and a generic driver requires a generic way to
+> +access config space.
+> +
+> +
+> +[1] ACPI 6.0, sec 6.1:
+> +    For any device that is on a non-enumerable type of bus (for
+> +    example, an ISA bus), OSPM enumerates the devices' identifier(s)
+> +    and the ACPI system firmware must supply an _HID object ... for
+> +    each device to enable OSPM to do that.
+> +
+> +[2] ACPI 6.0, sec 3.7:
+> +    The OS enumerates motherboard devices simply by reading through
+> +    the ACPI Namespace looking for devices with hardware IDs.
+> +
+> +    Each device enumerated by ACPI includes ACPI-defined objects in
+> +    the ACPI Namespace that report the hardware resources the device
+> +    could occupy [_PRS], an object that reports the resources that are
+> +    currently used by the device [_CRS], and objects for configuring
+> +    those resources [_SRS].  The information is used by the Plug and
+> +    Play OS (OSPM) to configure the devices.
+> +
+> +[3] ACPI 6.0, sec 6.2:
+> +    OSPM uses device configuration objects to configure hardware
+> +    resources for devices enumerated via ACPI.  Device configuration
+> +    objects provide information about current and possible resource
+> +    requirements, the relationship between shared resources, and
+> +    methods for configuring hardware resources.
+> +
+> +    When OSPM enumerates a device, it calls _PRS to determine the
+> +    resource requirements of the device.  It may also call _CRS to
+> +    find the current resource settings for the device.  Using this
+> +    information, the Plug and Play system determines what resources
+> +    the device should consume and sets those resources by calling the
+> +    device?s _SRS control method.
+> +
+> +    In ACPI, devices can consume resources (for example, legacy
+> +    keyboards), provide resources (for example, a proprietary PCI
+> +    bridge), or do both.  Unless otherwise specified, resources for a
+> +    device are assumed to be taken from the nearest matching resource
+> +    above the device in the device hierarchy.
+> +
+> +[4] ACPI 6.0, sec 6.4.3.5.4:
+> +    Extended Address Space Descriptor
+> +    General Flags: Bit [0] Consumer/Producer:
+> +	1?This device consumes this resource
+> +	0?This device produces and consumes this resource
+> +
+> +[5] ACPI 6.0, sec 19.6.43:
+> +    ResourceUsage specifies whether the Memory range is consumed by
+> +    this device (ResourceConsumer) or passed on to child devices
+> +    (ResourceProducer).  If nothing is specified, then
+> +    ResourceConsumer is assumed.
+> +
+> +[6] PCI Firmware 3.0, sec 4.1.2:
+> +    If the operating system does not natively comprehend reserving the
+> +    MMCFG region, the MMCFG region must be reserved by firmware.  The
+> +    address range reported in the MCFG table or by _CBA method (see
+> +    Section 4.1.3) must be reserved by declaring a motherboard
+> +    resource.  For most systems, the motherboard resource would appear
+> +    at the root of the ACPI namespace (under \_SB) in a node with a
+> +    _HID of EISAID (PNP0C02), and the resources in this case should
+> +    not be claimed in the root PCI bus?s _CRS.  The resources can
+> +    optionally be returned in Int15 E820 or EFIGetMemoryMap as
+> +    reserved memory but must always be reported through ACPI as a
+> +    motherboard resource.
+> +
+> +[7] PCI Express 3.0, sec 7.2.2:
+> +    For systems that are PC-compatible, or that do not implement a
+> +    processor-architecture-specific firmware interface standard that
+> +    allows access to the Configuration Space, the ECAM is required as
+> +    defined in this section.
