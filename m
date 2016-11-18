@@ -1,61 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 18 Nov 2016 16:08:09 +0000
-Subject: [PATCH v8 13/16] drivers: iommu: arm-smmu: add IORT configuration
-In-Reply-To: <20161116152936.22955-14-lorenzo.pieralisi@arm.com>
-References: <20161116152936.22955-1-lorenzo.pieralisi@arm.com>
- <20161116152936.22955-14-lorenzo.pieralisi@arm.com>
-Message-ID: <20161118160808.GX13470@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 18 Nov 2016 17:17:10 +0100
+Subject: [GIT PULL 1/10] mailbox: Add Tegra HSP driver
+Message-ID: <20161118161719.24153-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2016 at 03:29:33PM +0000, Lorenzo Pieralisi wrote:
-> In ACPI bases systems, in order to be able to create platform
-> devices and initialize them for ARM SMMU components, the IORT
-> kernel implementation requires a set of static functions to be
-> used by the IORT kernel layer to configure platform devices for
-> ARM SMMU components.
-> 
-> Add static configuration functions to the IORT kernel layer for
-> the ARM SMMU components, so that the ARM SMMU driver can
-> initialize its respective platform device by relying on the IORT
-> kernel infrastructure and by adding a corresponding ACPI device
-> early probe section entry.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Reviewed-by: Tomasz Nowicki <tn@semihalf.com>
-> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Tomasz Nowicki <tn@semihalf.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> ---
->  drivers/acpi/arm64/iort.c | 81 +++++++++++++++++++++++++++++++++++++++++++++
->  drivers/iommu/arm-smmu.c  | 83 ++++++++++++++++++++++++++++++++++++++++++++++-
->  include/linux/acpi_iort.h |  3 ++
->  3 files changed, 166 insertions(+), 1 deletion(-)
+Hi ARM SoC maintainers,
 
-[...]
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 573b2b6..21d1892 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -28,6 +28,8 @@
->  
->  #define pr_fmt(fmt) "arm-smmu: " fmt
->  
-> +#include <linux/acpi.h>
-> +#include <linux/acpi_iort.h>
->  #include <linux/atomic.h>
->  #include <linux/delay.h>
->  #include <linux/dma-iommu.h>
-> @@ -1904,6 +1906,70 @@ static const struct of_device_id arm_smmu_of_match[] = {
->  };
->  MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
->  
-> +#ifdef CONFIG_ACPI
-> +static int acpi_smmu_get_data(u32 model, u32 *version, u32 *impl)
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
 
-You should use the enum type for the version, rather than a u32.
+are available in the git repository at:
 
-Will
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.10-mailbox
+
+for you to fetch changes up to 68050eb6c611527232fe5574c7306e97e47499ef:
+
+  mailbox: tegra-hsp: Use after free in tegra_hsp_remove_doorbells() (2016-11-18 14:32:13 +0100)
+
+Thanks,
+Thierry
+
+----------------------------------------------------------------
+mailbox: Add Tegra HSP driver
+
+This contains the device tree bindings and a driver for the Tegra HSP, a
+hardware block that provides hardware synchronization primitives and is
+the foundation for inter-processor communication between CPU and BPMP.
+
+----------------------------------------------------------------
+Dan Carpenter (1):
+      mailbox: tegra-hsp: Use after free in tegra_hsp_remove_doorbells()
+
+Joseph Lo (2):
+      soc/tegra: Add Tegra186 support
+      dt-bindings: mailbox: Add Tegra HSP binding
+
+Thierry Reding (2):
+      Merge branch 'for-4.10/soc' into for-4.10/mailbox
+      mailbox: Add Tegra HSP driver
+
+ .../bindings/mailbox/nvidia,tegra186-hsp.txt       |  52 +++
+ drivers/mailbox/Kconfig                            |   9 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/tegra-hsp.c                        | 479 +++++++++++++++++++++
+ drivers/soc/tegra/Kconfig                          |  14 +
+ include/dt-bindings/mailbox/tegra186-hsp.h         |  24 ++
+ 6 files changed, 580 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
+ create mode 100644 drivers/mailbox/tegra-hsp.c
+ create mode 100644 include/dt-bindings/mailbox/tegra186-hsp.h
