@@ -1,111 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 18 Nov 2016 14:35:44 +0000
-Subject: [PATCHv3 5/6] arm64: Use __pa_symbol for kernel symbols
-In-Reply-To: <1479431816-5028-6-git-send-email-labbott@redhat.com>
-References: <1479431816-5028-1-git-send-email-labbott@redhat.com>
- <1479431816-5028-6-git-send-email-labbott@redhat.com>
-Message-ID: <20161118143543.GC1197@leverpostej>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 18 Nov 2016 15:42:10 +0100
+Subject: [PATCH] arm: spin one more cycle in timer-based delays
+In-Reply-To: <582F0DD2.3030805@free.fr>
+References: <582B0F61.6030903@free.fr> <20161118120630.GJ13470@arm.com>
+ <20161118125409.GK1041@n2100.armlinux.org.uk>
+ <582F0DD2.3030805@free.fr>
+Message-ID: <20161118144210.GS3117@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
-
-On Thu, Nov 17, 2016 at 05:16:55PM -0800, Laura Abbott wrote:
+On Fri, Nov 18, 2016 at 03:18:58PM +0100, Mason wrote:
+> If I understand correctly, udelay is, in fact, a wrapper around
+> several possible implementations. (Run-time decision on arch/arm)
 > 
-> __pa_symbol is technically the marco that should be used for kernel
-> symbols. Switch to this as a pre-requisite for DEBUG_VIRTUAL which
-> will do bounds checking.
+> 1) The "historical" software loop-based method, which is calibrated
+> during init.
 > 
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> v3: Conversion of more sites besides just _end. Addition of __lm_sym_addr
-> macro to take care of the _va(__pa_symbol(..)) idiom.
-> 
-> Note that a copy of __pa_symbol was added to avoid a mess of headers
-> since the #ifndef __pa_symbol case is defined in linux/mm.h
+> 2) A hardware solution, based on an actual timer, ticking away
+> at a constant frequency.
 
-I think we also need to fix up virt_to_phys(__cpu_soft_restart) in
-arch/arm64/kernel/cpu-reset.h. Otherwise, this looks complete for uses
-falling under arch/arm64/.
+I'd say clock, a timer would imply interrupts or somesuch, which is of
+course not useful for udelay.
 
-I also think it's worth mentioning in the commit message that this patch
-adds and __lm_sym_addr() and uses it in some places so that low-level
-helpers can use virt_to_phys() or __pa() consistently.
+x86 with TSC uses this, although recent chips have grown an timed-mwait
+instruction and that too can be used.
 
-The PSCI change doesn't conflict with patches [1] that'll go via
-arm-soc, so I'm happy for that PSCI change to go via the arm64 tree,
-though it may be worth splitting into its own patch just in case
-something unexpected crops up.
+The TSC based ones (including the mwait) try very hard to not return
+early.
 
-With those fixed up:
+> 3) others?
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-November/466522.html
-
-Otherwise, I just have a few nits below.
-
-> @@ -271,7 +271,7 @@ static inline void __kvm_flush_dcache_pud(pud_t pud)
->  	kvm_flush_dcache_to_poc(page_address(page), PUD_SIZE);
->  }
->  
-> -#define kvm_virt_to_phys(x)		__virt_to_phys((unsigned long)(x))
-> +#define kvm_virt_to_phys(x)		__pa_symbol((unsigned long)(x))
-
-Nit: we can drop the unsigned long cast given __pa_symbol() contains
-one.
-
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index ffbb9a5..c2041a3 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -52,7 +52,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
->   * for zero-mapped memory areas etc..
->   */
->  extern unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)];
-> -#define ZERO_PAGE(vaddr)	pfn_to_page(PHYS_PFN(__pa(empty_zero_page)))
-> +#define ZERO_PAGE(vaddr)	pfn_to_page(PHYS_PFN(__pa_symbol(empty_zero_page)))
-
-Nit: I think we can also simplify this to:
-
-	phys_to_page(__pa_symbol(empty_zero_page))
-
-... since phys_to_page(p) is (pfn_to_page(__phys_to_pfn(p)))
-... and __phys_to_pfn(p) is PHYS_PFN(p)
-
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index 6f2ac4f..af8967a 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -97,7 +97,7 @@ static void __kprobes *patch_map(void *addr, int fixmap)
->  	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
->  		page = vmalloc_to_page(addr);
->  	else if (!module)
-> -		page = pfn_to_page(PHYS_PFN(__pa(addr)));
-> +		page = pfn_to_page(PHYS_PFN(__pa_symbol(addr)));
-
-Nit: likewise, we can use phys_to_page() here.
-
-> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-> index a2c2478..791e87a 100644
-> --- a/arch/arm64/kernel/vdso.c
-> +++ b/arch/arm64/kernel/vdso.c
-> @@ -140,11 +140,11 @@ static int __init vdso_init(void)
->  		return -ENOMEM;
->  
->  	/* Grab the vDSO data page. */
-> -	vdso_pagelist[0] = pfn_to_page(PHYS_PFN(__pa(vdso_data)));
-> +	vdso_pagelist[0] = pfn_to_page(PHYS_PFN(__pa_symbol(vdso_data)));
-
-Nit: phys_to_page() again.
-
->  
->  	/* Grab the vDSO code pages. */
->  	for (i = 0; i < vdso_pages; i++)
-> -		vdso_pagelist[i + 1] = pfn_to_page(PHYS_PFN(__pa(&vdso_start)) + i);
-> +		vdso_pagelist[i + 1] = pfn_to_page(PHYS_PFN(__pa_symbol(&vdso_start)) + i);
-
-Nit: phys_to_page() again.
-
-Thanks,
-Mark.
+On x86 there's a variant that times itself based on io port accesses
+which have a 'known' slowness.
