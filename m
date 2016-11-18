@@ -1,62 +1,57 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Thu, 17 Nov 2016 20:54:15 -0600
-Subject: [RFC 3/6] Documentation: dt: add bindings for ti bb2d
-In-Reply-To: <20161118024436.13447-3-robertcnelson@gmail.com>
+Date: Thu, 17 Nov 2016 20:56:18 -0600
+Subject: [RFC 6/6] ARM: dts: am57xx-beagle-x15-common: enable etnaviv
+In-Reply-To: <20161118024436.13447-6-robertcnelson@gmail.com>
 References: <20161118024436.13447-1-robertcnelson@gmail.com>
- <20161118024436.13447-3-robertcnelson@gmail.com>
-Message-ID: <3e993bed-c818-bfdd-52d3-774fdca85cda@ti.com>
+ <20161118024436.13447-6-robertcnelson@gmail.com>
+Message-ID: <e69a797c-bec3-2243-5c19-9d7633092369@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 11/17/2016 08:44 PM, Robert Nelson wrote:
-> From: Gowtham Tammana <g-tammana@ti.com>
->
-> Add documentation for device tree bindings description for
-> 2D GPU blitter module present in Texas Instruments family of SoCs.
->
-> Signed-off-by: Gowtham Tammana <g-tammana@ti.com>
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> ---
+again.. a short commit message at least please? :)
 
-Might want to point at the source of the patch -> just for the record, 
-this came from TI vendor kernel..
->  Documentation/devicetree/bindings/gpu/ti-bb2d.txt | 27 +++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpu/ti-bb2d.txt
+> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+> CC: Julien <jboulnois@gmail.com>
+> CC: Nishanth Menon <nm@ti.com>
+> CC: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> CC: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
 >
-> diff --git a/Documentation/devicetree/bindings/gpu/ti-bb2d.txt b/Documentation/devicetree/bindings/gpu/ti-bb2d.txt
-> new file mode 100644
-> index 0000000..af47488
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpu/ti-bb2d.txt
-> @@ -0,0 +1,27 @@
-> +* Texas Instruments BB2D blitter module
+> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi b/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
+> index 6df7829..3bc47be 100644
+> --- a/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
+> +++ b/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
+> @@ -97,6 +97,12 @@
+>  		#cooling-cells = <2>;
+>  	};
+>
+> +	gpu-subsystem {
+A) do we want to make things clear that this is gpu subsystem for gc320?
+B) How about other platforms that could equally reuse?
+
+> +		compatible = "ti,gc320-gpu-subsystem";
+> +		cores = <&bb2d>;
+> +		status = "okay";
+> +	};
 > +
-> +This binding describes the 2D BitBlit (BB2D) graphics accelerator
-> +subsystem based on the GC320 core from Vivante Corporation available
-> +in Texas Instruments SoCs.
+>  	hdmi0: connector {
+>  		compatible = "hdmi-connector";
+>  		label = "hdmi";
+> @@ -190,6 +196,11 @@
+>  		>;
+>  	};
+>  };
 > +
-> +Required properties:
-> +  - compatible: value should take the following format:
-> +        "ti,<soc>-bb2d", "vivante,<gpuversion>"
-> +    accepted values:
-> +     (a) "ti,dra7-bb2d", "vivante,gc320" for TI DRA7xx / AM57x
+> +&bb2d {
+> +	status = "okay";
+> +};
 > +
-> +  - reg : base address and length of BB2D IP registers
-> +  - interrupts : BB2D interrupt line number
-> +  - ti,hwmods : name of the hwmod associated with BB2D module
-> +  - clocks : handle to BB2D functional clock
-> +  - clock-names : fclk
-> +
-> +Example for DRA7x SoC:
-> +        bb2d: bb2d at 59000000 {
-> +            compatible = "ti,dra7-bb2d", "vivante,gc320";
-> +            reg = <0x59000000 0x0700>;
-> +            interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
-> +            ti,hwmods = "bb2d";
-> +            clocks = <&dpll_core_h24x2_ck>;
-> +            clock-names = "fclk";
-> +        };
+>  &i2c1 {
+>  	status = "okay";
+>  	clock-frequency = <400000>;
 >
 
 
