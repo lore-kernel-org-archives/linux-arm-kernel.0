@@ -1,76 +1,70 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 18 Nov 2016 13:17:41 +0000
-Subject: [PATCH v2] ARM: Drop fixed 200 Hz timer requirement from Samsung
- platforms
-In-Reply-To: <1479453418-25314-1-git-send-email-krzk@kernel.org>
-References: <1479453418-25314-1-git-send-email-krzk@kernel.org>
-Message-ID: <20161118131741.GB2301@dell.home>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 18 Nov 2016 21:19:41 +0800
+Subject: [PATCH] clk: sunxi-ng: enable so-said LDOs for A33 SoC's pll-mipi
+ clock
+In-Reply-To: <20161117164954.62658-1-icenowy@aosc.xyz>
+References: <20161117164954.62658-1-icenowy@aosc.xyz>
+Message-ID: <CAGb2v67R5=4JAcvzxrYK5YR5cWpwhTJMpviVNQtriYjHScrYNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Nov 2016, Krzysztof Kozlowski wrote:
+On Fri, Nov 18, 2016 at 12:49 AM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+> In the user manual of A33 SoC, the bit 22 and 23 of pll-mipi control
+> register is called "LDO{1,2}_EN", and according to the BSP source code
+> from Allwinner [1], the LDOs are enabled during the clock's enabling
+> process.
+>
+> The clock failed to generate output if the two LDOs are not enabled.
+>
+> Add the two bits to the clock's gate bits, so that the LDOs are enabled
+> when the PLL is enabled.
+>
+> [1] https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun8iw5.c#L429
+>
+> Fixes: d05c748bd730 ("clk: sunxi-ng: Add A33 CCU support")
+>
 
-> All Samsung platforms, including the Exynos, are selecting HZ_FIXED with
-> 200 Hz.  Unfortunately in case of multiplatform image this affects also
-> other platforms when Exynos is enabled.
-> 
-> This looks like an very old legacy code, dating back to initial
-> upstreaming of S3C24xx.  Probably it was required for s3c24xx timer
-> driver, which was removed in commit ad38bdd15d5b ("ARM: SAMSUNG: Remove
-> unused plat-samsung/time.c").
-> 
-> Since then, this fixed 200 Hz spread everywhere, including out-of-tree
-> Samsung kernels (SoC vendor's and Tizen's).  I believe this choice
-> was rather an effect of coincidence instead of conscious choice.
-> 
-> Exynos uses its own MCT or arch timer and can work with all HZ values.
-> Older platforms use newer Samsung PWM timer driver which should handle
-> down to 100 Hz.
-> 
-> Few perf mem and sched tests on Odroid XU3 board (Exynos5422, 4x Cortex
-> A7, 4x Cortex A15) show no regressions when switching from 200 Hz to
-> other values.
-> 
-> Reported-by: Lee Jones <lee.jones@linaro.org>
+You don't need the extra line.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-> [Dropping 200_HZ from S3C/S5P suggested by Arnd]
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+
 > ---
-> 
-> Tested on Exynos5422 and Exynos5800 (by Javier). It would be
-> appreciated if anyone could test it on S3C24xx or S5PV210.
-> 
-> Changes since v1:
-> 1. Add Javier's tested-by.
-> 2. Drop HZ_FIXED also from ARCH_S5PV210 and ARCH_S3C24XX after Arnd
->    suggestions and analysis.
-> ---
->  arch/arm/Kconfig | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index b5d529fdffab..ced2e08a9d08 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1496,8 +1496,7 @@ source kernel/Kconfig.preempt
->  
->  config HZ_FIXED
->  	int
-> -	default 200 if ARCH_EBSA110 || ARCH_S3C24XX || \
-> -		ARCH_S5PV210 || ARCH_EXYNOS4
-> +	default 200 if ARCH_EBSA110
->  	default 128 if SOC_AT91RM9200
->  	default 0
->  
+> Dear Chen-Yu:
+> As you said, the two bits are also present in the CCU of A23 and A31.
+> Could you please check whether the PLL works on the two SoCs?
+> I remembered you mentioned you failed to make TCON enabled on A23.
+> On A31, you may hack the parent of tcon-ch0 to force the tcon clock to
+> use pll-mipi as parent, in order to check whether the pll works.
+>
+> However, I didn't found the code that enables the LDOs in the BSP A23/31
+> sources, so you must test them to ensure whether the code is needed for
+> these SoCs.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I tested out this for both the A31 and the A23. It fixes issues I've
+had with DRM. I'll send patches for them.
+
+ChenYu
+
+> Regards,
+> Icenowy
+>  drivers/clk/sunxi-ng/ccu-sun8i-a33.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a33.c b/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
+> index 96b40ca..9bd1f78 100644
+> --- a/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
+> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
+> @@ -131,7 +131,7 @@ static SUNXI_CCU_NKM_WITH_GATE_LOCK(pll_mipi_clk, "pll-mipi",
+>                                     8, 4,               /* N */
+>                                     4, 2,               /* K */
+>                                     0, 4,               /* M */
+> -                                   BIT(31),            /* gate */
+> +                                   BIT(31) | BIT(23) | BIT(22), /* gate */
+>                                     BIT(28),            /* lock */
+>                                     CLK_SET_RATE_UNGATE);
+>
+> --
+> 2.10.1
+>
