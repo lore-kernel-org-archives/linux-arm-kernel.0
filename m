@@ -1,34 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Nov 2016 09:53:01 -0800
-Subject: [GIT PULL] Integrator DTS and defconfig changes
-In-Reply-To: <CACRpkdYoornJx1fTN1C5OiR16w9DbTcr9ze4gc9PLkt7LCqqCQ@mail.gmail.com>
-References: <CACRpkdara5D=kvGVYu-WRh_JYK6Z9NKmQ-eniXsauxdzx-QJbA@mail.gmail.com>
- <20161118072506.GC1785@localhost>
- <CACRpkdYoornJx1fTN1C5OiR16w9DbTcr9ze4gc9PLkt7LCqqCQ@mail.gmail.com>
-Message-ID: <20161118175301.GA8882@localhost>
+Date: Fri, 18 Nov 2016 09:53:44 -0800
+Subject: [GIT PULL] ARM: at91: dt for 4.10
+In-Reply-To: <20161114183923.k5eki5fzzdfsx2j6@piout.net>
+References: <20161114183923.k5eki5fzzdfsx2j6@piout.net>
+Message-ID: <20161118175344.GB8882@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 09:26:56AM +0100, Linus Walleij wrote:
-> On Fri, Nov 18, 2016 at 8:25 AM, Olof Johansson <olof@lixom.net> wrote:
+On Mon, Nov 14, 2016 at 07:39:23PM +0100, Alexandre Belloni wrote:
+> Hi Arnd, Olof
 > 
-> > I also sympathize that it's extra annoying having to split just three
-> > patches across two branches. So, if it's easier we can just cherry-pick
-> > apart the patches here across the branches (your comment about next
-> > coverage makes me suspect you have no direct downstream users of this
-> > branch). If that's OK, let me know and I'll do that tomorrow.
+> at91 DT changes for 4.10, I don't expect much more this cycle.
 > 
-> It's fine to cherry-pick, I can also send two separate branches (or
-> just 2+1 stand-alone patches).
+> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 > 
-> Any way you like it :) just tell me what to do, all I want is to get this
-> in for v4.10.
+>   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.10-dt1
+> 
+> for you to fetch changes up to b662a9dd8a1a03e6e2d61e74d3e7a08400edefb7:
+> 
+>   ARM: dts: at91: replace gpio-key,wakeup with wakeup-source for sam9260ek (2016-11-14 17:04:24 +0100)
+> 
+> ----------------------------------------------------------------
+> DT changes for 4.10:
+> 
+>  - Many additions for sama5d2
+>  - few non urgent fixes for sam9260ek, sama5d4 and sama5d2
 
-Cherry-picking is actually faster on our side than merging, so I've done that
-now. Queued into next/dt and next/defconfig for 4.10.
-
-
-Thanks!
+Merged, thanks.
 
 
 -Olof
