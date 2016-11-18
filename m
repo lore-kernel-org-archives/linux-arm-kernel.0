@@ -1,38 +1,51 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 18 Nov 2016 16:45:13 +0200
-Subject: [PATCH V8 3/3] stm: Mark the functions of writing buffer with
- notrace
-In-Reply-To: <1479438454-28650-4-git-send-email-zhang.chunyan@linaro.org>
-References: <1479438454-28650-1-git-send-email-zhang.chunyan@linaro.org>
- <1479438454-28650-4-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <871sy8g83q.fsf@ashishki-desk.ger.corp.intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 18 Nov 2016 14:49:02 +0000
+Subject: [PATCH v8 04/16] drivers: iommu: make of_iommu_set/get_ops() DT
+ agnostic
+In-Reply-To: <20161116152936.22955-5-lorenzo.pieralisi@arm.com>
+References: <20161116152936.22955-1-lorenzo.pieralisi@arm.com>
+ <20161116152936.22955-5-lorenzo.pieralisi@arm.com>
+Message-ID: <20161118144902.GQ13470@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chunyan Zhang <zhang.chunyan@linaro.org> writes:
-
-> If CONFIG_STM_SOURCE_FTRACE is selected, Function trace data can be writen
-> to sink via STM, all functions that related to writing data packets to
-> STM should be marked 'notrace' to avoid being traced by Ftrace, otherwise
-> the program would stall into an endless loop.
->
-> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-> Acked-by: Steven Rostedt <rostedt@goodmis.org>
+On Wed, Nov 16, 2016 at 03:29:24PM +0000, Lorenzo Pieralisi wrote:
+> The of_iommu_{set/get}_ops() API is used to associate a device
+> tree node with a specific set of IOMMU operations. The same
+> kernel interface is required on systems booting with ACPI, where
+> devices are not associated with a device tree node, therefore
+> the interface requires generalization.
+> 
+> The struct device fwnode member represents the fwnode token associated
+> with the device and the struct it points at is firmware specific;
+> regardless, it is initialized on both ACPI and DT systems and makes an
+> ideal candidate to use it to associate a set of IOMMU operations to a
+> given device, through its struct device.fwnode member pointer, paving
+> the way for representing per-device iommu_ops (ie an iommu instance
+> associated with a device).
+> 
+> Convert the DT specific of_iommu_{set/get}_ops() interface to
+> use struct device.fwnode as a look-up token, making the interface
+> usable on ACPI systems and rename the data structures and the
+> registration API so that they are made to represent their usage
+> more clearly.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+> Reviewed-by: Tomasz Nowicki <tn@semihalf.com>
+> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Tested-by: Tomasz Nowicki <tn@semihalf.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
 > ---
->  drivers/hwtracing/coresight/coresight-stm.c |  2 +-
->  drivers/hwtracing/intel_th/sth.c            | 11 +++++++----
->  drivers/hwtracing/stm/core.c                |  7 ++++---
->  drivers/hwtracing/stm/dummy_stm.c           |  2 +-
->  include/linux/stm.h                         |  4 ++--
->  5 files changed, 15 insertions(+), 11 deletions(-)
+>  drivers/iommu/iommu.c    | 40 ++++++++++++++++++++++++++++++++++++++++
+>  drivers/iommu/of_iommu.c | 39 ---------------------------------------
+>  include/linux/iommu.h    | 14 ++++++++++++++
+>  include/linux/of_iommu.h | 12 ++++++++++--
+>  4 files changed, 64 insertions(+), 41 deletions(-)
 
-Quick nit: can you please split this one in 4: one for Coresight, one
-for Intel TH, one for stm/dummy and one for stm/core?
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-I'd like to keep the bisectability. Otherwise, this is fine by me:
-
-Acked-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-
-Regards,
---
-Alex
+Will
