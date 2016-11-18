@@ -1,58 +1,62 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 18 Nov 2016 19:52:18 +0100
-Subject: [PATCH] ARM: dts: socfpga: fine-tune L2 cache configuration
-Message-ID: <20161118185218.16653-1-marex@denx.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 18 Nov 2016 18:55:48 +0000
+Subject: [PATCH] mfd: twl-core: export twl_get_regmap
+In-Reply-To: <1478950693-13959-1-git-send-email-Nicolae_Rosia@mentor.com>
+References: <1478950693-13959-1-git-send-email-Nicolae_Rosia@mentor.com>
+Message-ID: <20161118185548.GA23246@dell.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable double-linefill and increase prefetch offset, which gives
-considerable read performance boost. The following numbers were
-obtained using lmbench 3.0 bw_mem tool, for easier comparison, the
-numbers are pasted in two columns. The test machine has Cyclone V
-SoC running at 800MHz MPU clock and 512MiB 333MHz 16bit DDR3 DRAM.
+On Sat, 12 Nov 2016, Nicolae Rosia wrote:
 
-Without patch	| With patch
-$ for i in rd wr rdwr cp fwr frd fcp bzero bcopy ; do echo $i ; bw_mem 64M $i ; done
-rd		| rd
-64.00 526.46	| 64.00 1151.06
-wr		| wr
-64.00 329.95	| 64.00 346.14
-rdwr		| rdwr
-64.00 342.07	| 64.00 367.24
-cp		| cp
-64.00 239.79	| 64.00 322.47
-fwr		| fwr
-64.00 1027.90	| 64.00 1025.38
-frd		| frd
-64.00 322.36	| 64.00 641.89
-fcp		| fcp
-64.00 256.99	| 64.00 408.41
-bzero		| bzero
-64.00 1028.43	| 64.00 1025.07
-bcopy		| bcopy
-64.00 294.73	| 64.00 357.19
+> We want to get rid of global twl_i2c_{write/read}.
+> As a first step, allow clients to get the regmap and write directly
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/boot/dts/socfpga.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+What's stopping you from passing it through device data?
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index f2f74b5..d645bef 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -694,6 +694,11 @@
- 			prefetch-data = <1>;
- 			prefetch-instr = <1>;
- 			arm,shared-override;
-+			arm,double-linefill = <1>;
-+			arm,double-linefill-incr = <0>;
-+			arm,double-linefill-wrap = <1>;
-+			arm,prefetch-drop = <0>;
-+			arm,prefetch-offset = <7>;
- 		};
- 
- 		mmc: dwmmc0 at ff704000 {
+> Signed-off-by: Nicolae Rosia <Nicolae_Rosia@mentor.com>
+> ---
+>  drivers/mfd/twl-core.c  | 3 ++-
+>  include/linux/i2c/twl.h | 2 ++
+>  2 files changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
+> index c64615d..49e6a4b 100644
+> --- a/drivers/mfd/twl-core.c
+> +++ b/drivers/mfd/twl-core.c
+> @@ -421,7 +421,7 @@ EXPORT_SYMBOL(twl_rev);
+>   *
+>   * Returns the regmap pointer or NULL in case of failure.
+>   */
+> -static struct regmap *twl_get_regmap(u8 mod_no)
+> +struct regmap *twl_get_regmap(u8 mod_no)
+>  {
+>  	int sid;
+>  	struct twl_client *twl;
+> @@ -440,6 +440,7 @@ static struct regmap *twl_get_regmap(u8 mod_no)
+>  
+>  	return twl->regmap;
+>  }
+> +EXPORT_SYMBOL(twl_get_regmap);
+>  
+>  /**
+>   * twl_i2c_write - Writes a n bit register in TWL4030/TWL5030/TWL60X0
+> diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
+> index 9ad7828..4c43cdb3 100644
+> --- a/include/linux/i2c/twl.h
+> +++ b/include/linux/i2c/twl.h
+> @@ -174,6 +174,8 @@ static inline int twl_class_is_ ##class(void)	\
+>  TWL_CLASS_IS(4030, TWL4030_CLASS_ID)
+>  TWL_CLASS_IS(6030, TWL6030_CLASS_ID)
+>  
+> +struct regmap *twl_get_regmap(u8 mod_no);
+> +
+>  /* Set the regcache bypass for the regmap associated with the nodule */
+>  int twl_set_regcache_bypass(u8 mod_no, bool enable);
+>  
+
 -- 
-2.10.2
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
