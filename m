@@ -1,56 +1,62 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Thu, 17 Nov 2016 20:53:38 -0600
-Subject: [RFC 1/6] drm/etnaviv: add binding for the gc320 found in ti socs
-In-Reply-To: <20161118024436.13447-1-robertcnelson@gmail.com>
+Date: Thu, 17 Nov 2016 20:54:15 -0600
+Subject: [RFC 3/6] Documentation: dt: add bindings for ti bb2d
+In-Reply-To: <20161118024436.13447-3-robertcnelson@gmail.com>
 References: <20161118024436.13447-1-robertcnelson@gmail.com>
-Message-ID: <0bf288ee-33bc-c3b5-389f-08d9bb89ccb5@ti.com>
+ <20161118024436.13447-3-robertcnelson@gmail.com>
+Message-ID: <3e993bed-c818-bfdd-52d3-774fdca85cda@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 11/17/2016 08:44 PM, Robert Nelson wrote:
-
-Could we write at least a oneline commit message? :)
-
-Might want to state that since the TI gpu systems are a mixed bunch 
-and  certain SoCs may have more than 1 GPU integrated, we indicate 
-clearly the rev here?
-> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
-> CC: Julien <jboulnois@gmail.com>
-> CC: Christian Gmeiner <christian.gmeiner@gmail.com>
-> CC: Russell King <rmk+kernel@arm.linux.org.uk>
-> CC: Lucas Stach <l.stach@pengutronix.de>
-> CC: Nishanth Menon <nm@ti.com>
-> CC: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> CC: Tony Lindgren <tony@atomide.com>
+> From: Gowtham Tammana <g-tammana@ti.com>
+>
+> Add documentation for device tree bindings description for
+> 2D GPU blitter module present in Texas Instruments family of SoCs.
+>
+> Signed-off-by: Gowtham Tammana <g-tammana@ti.com>
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 > ---
->  Documentation/devicetree/bindings/display/etnaviv/etnaviv-drm.txt | 1 +
->  drivers/gpu/drm/etnaviv/etnaviv_drv.c                             | 1 +
->  2 files changed, 2 insertions(+)
+
+Might want to point at the source of the patch -> just for the record, 
+this came from TI vendor kernel..
+>  Documentation/devicetree/bindings/gpu/ti-bb2d.txt | 27 +++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpu/ti-bb2d.txt
 >
-> diff --git a/Documentation/devicetree/bindings/display/etnaviv/etnaviv-drm.txt b/Documentation/devicetree/bindings/display/etnaviv/etnaviv-drm.txt
-> index ed5e0a7..9fa259d 100644
-> --- a/Documentation/devicetree/bindings/display/etnaviv/etnaviv-drm.txt
-> +++ b/Documentation/devicetree/bindings/display/etnaviv/etnaviv-drm.txt
-> @@ -8,6 +8,7 @@ Required properties:
->  - compatible: Should be one of
->      "fsl,imx-gpu-subsystem"
->      "marvell,dove-gpu-subsystem"
-> +    "ti,gc320-gpu-subsystem"
->  - cores: Should contain a list of phandles pointing to Vivante GPU devices
->
->  example:
-> diff --git a/drivers/gpu/drm/etnaviv/etnaviv_drv.c b/drivers/gpu/drm/etnaviv/etnaviv_drv.c
-> index a6799b0..ce51270 100644
-> --- a/drivers/gpu/drm/etnaviv/etnaviv_drv.c
-> +++ b/drivers/gpu/drm/etnaviv/etnaviv_drv.c
-> @@ -653,6 +653,7 @@ static int etnaviv_pdev_remove(struct platform_device *pdev)
->  static const struct of_device_id dt_match[] = {
->  	{ .compatible = "fsl,imx-gpu-subsystem" },
->  	{ .compatible = "marvell,dove-gpu-subsystem" },
-> +	{ .compatible = "ti,gc320-gpu-subsystem" },
->  	{}
->  };
->  MODULE_DEVICE_TABLE(of, dt_match);
+> diff --git a/Documentation/devicetree/bindings/gpu/ti-bb2d.txt b/Documentation/devicetree/bindings/gpu/ti-bb2d.txt
+> new file mode 100644
+> index 0000000..af47488
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpu/ti-bb2d.txt
+> @@ -0,0 +1,27 @@
+> +* Texas Instruments BB2D blitter module
+> +
+> +This binding describes the 2D BitBlit (BB2D) graphics accelerator
+> +subsystem based on the GC320 core from Vivante Corporation available
+> +in Texas Instruments SoCs.
+> +
+> +Required properties:
+> +  - compatible: value should take the following format:
+> +        "ti,<soc>-bb2d", "vivante,<gpuversion>"
+> +    accepted values:
+> +     (a) "ti,dra7-bb2d", "vivante,gc320" for TI DRA7xx / AM57x
+> +
+> +  - reg : base address and length of BB2D IP registers
+> +  - interrupts : BB2D interrupt line number
+> +  - ti,hwmods : name of the hwmod associated with BB2D module
+> +  - clocks : handle to BB2D functional clock
+> +  - clock-names : fclk
+> +
+> +Example for DRA7x SoC:
+> +        bb2d: bb2d at 59000000 {
+> +            compatible = "ti,dra7-bb2d", "vivante,gc320";
+> +            reg = <0x59000000 0x0700>;
+> +            interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+> +            ti,hwmods = "bb2d";
+> +            clocks = <&dpll_core_h24x2_ck>;
+> +            clock-names = "fclk";
+> +        };
 >
 
 
