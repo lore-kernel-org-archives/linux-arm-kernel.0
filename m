@@ -1,77 +1,52 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 18 Nov 2016 13:15:12 +0200
-Subject: [PATCH v3] ARM: Drop fixed 200 Hz timer requirement from Samsung
- platforms
-Message-ID: <1479467712-5218-1-git-send-email-krzk@kernel.org>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 18 Nov 2016 19:30:07 +0800
+Subject: [arm-soc:qcom/arm64 11/13]
+ arch/arm64/boot/dts/qcom/msm8992.dtsi:14:48: fatal error:
+ dt-bindings/clock/qcom,gcc-msm8994.h: No such file or directory
+Message-ID: <201611181905.d4hFQa7z%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All Samsung platforms, including the Exynos, are selecting HZ_FIXED with
-200 Hz.  Unfortunately in case of multiplatform image this affects also
-other platforms when Exynos is enabled.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git qcom/arm64
+head:   feeaf56ac78d283efe65ea60ec999d4bf3cf395e
+commit: 6a6d1978f9c0d818b4370903e1f3eecf1681c932 [11/13] arm64: dts: msm8992 SoC and LG Bullhead (Nexus 5X) support
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 6a6d1978f9c0d818b4370903e1f3eecf1681c932
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-This looks like an very old legacy code, dating back to initial
-upstreaming of S3C24xx.  Probably it was required for s3c24xx timer
-driver, which was removed in commit ad38bdd15d5b ("ARM: SAMSUNG: Remove
-unused plat-samsung/time.c").
+All errors (new ones prefixed by >>):
 
-Since then, this fixed 200 Hz spread everywhere, including out-of-tree
-Samsung kernels (SoC vendor's and Tizen's).  I believe this choice
-was rather an effect of coincidence instead of conscious choice.
+   In file included from arch/arm64/boot/dts/qcom/msm8992-bullhead-rev-101.dts:16:0:
+>> arch/arm64/boot/dts/qcom/msm8992.dtsi:14:48: fatal error: dt-bindings/clock/qcom,gcc-msm8994.h: No such file or directory
+    #include <dt-bindings/clock/qcom,gcc-msm8994.h>
+                                                   ^
+   compilation terminated.
 
-On S3C24xx, the PWM counter is only 16 bit wide, and with the
-typical 12MHz input clock that overflows every 5.5ms.  This works
-with HZ=200 or higher but not with HZ=100 which needs a 10ms
-interval between ticks.  On Later chips (S3C64xx, S5P and EXYNOS),
-the counter is 32 bits and does not have this problem.
+vim +14 arch/arm64/boot/dts/qcom/msm8992.dtsi
 
-The new samsung_pwm_timer driver solves the problem by scaling the input
-clock by a factor of 50 on S3C24xx, which makes it less accurate but
-allows HZ=100 as well as CONFIG_NO_HZ with fewer wakeups.
-
-Few perf mem and sched tests on Odroid XU3 board (Exynos5422, 4x Cortex
-A7, 4x Cortex A15) show no regressions when switching from 200 Hz to
-other values.
-
-Reported-by: Lee Jones <lee.jones@linaro.org>
-[Dropping of 200_HZ from S3C/S5P was suggested by Arnd]
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-Cc: Kukjin Kim <kgene@kernel.org>
-[Tested on Exynos5800]
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Acked-by: Kukjin Kim <kgene@kernel.org>
-[Tested on S3C2440]
-Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+     8	 * but WITHOUT ANY WARRANTY; without even the implied warranty of
+     9	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    10	 * GNU General Public License for more details.
+    11	 */
+    12	
+    13	#include <dt-bindings/interrupt-controller/arm-gic.h>
+  > 14	#include <dt-bindings/clock/qcom,gcc-msm8994.h>
+    15	
+    16	/ {
+    17		model = "Qualcomm Technologies, Inc. MSM 8992";
 
 ---
-
-Changes since v2:
-1. Extend message.
-2. Add Kukjin's ack.
-3. Add Sylwester's tested-by.
-
-Changes since v1:
-1. Add Javier's tested-by.
-2. Drop HZ_FIXED also from ARCH_S5PV210 and ARCH_S3C24XX after Arnd
-   suggestions and analysis.
----
- arch/arm/Kconfig | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b5d529fdffab..ced2e08a9d08 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1496,8 +1496,7 @@ source kernel/Kconfig.preempt
- 
- config HZ_FIXED
- 	int
--	default 200 if ARCH_EBSA110 || ARCH_S3C24XX || \
--		ARCH_S5PV210 || ARCH_EXYNOS4
-+	default 200 if ARCH_EBSA110
- 	default 128 if SOC_AT91RM9200
- 	default 0
- 
--- 
-2.7.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 31923 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161118/3411caec/attachment-0001.gz>
