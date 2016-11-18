@@ -1,34 +1,42 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Fri, 18 Nov 2016 14:36:44 +0200
-Subject: [PATCH] ARM: dts: qcom: Add apq8064 CoreSight components
-In-Reply-To: <d466f591-baac-c734-a49b-8aab763c1876@codeaurora.org>
-References: <20161117153609.11705-1-georgi.djakov@linaro.org>
- <d466f591-baac-c734-a49b-8aab763c1876@codeaurora.org>
-Message-ID: <fda017e4-2902-359e-dad4-b0efd9ebeeb9@linaro.org>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 18 Nov 2016 13:42:44 +0100
+Subject: arasan,sdhci.txt "compatibility" DT binding
+In-Reply-To: <CAFd313x6MJeO90_+rxditdPn762g7TqZc0_D6ojGTKmtGJKjPA@mail.gmail.com>
+References: <56B07BA5.4060407@free.fr> <56B166F1.5080605@rock-chips.com>
+ <56B1AA44.1010108@xilinx.com> <56B1BAF8.2050907@free.fr>
+ <56B1CF40.1030203@xilinx.com> <20160203152104.GP4215@xsjsorenbubuntu>
+ <56B21DDB.6050708@free.fr> <582ED9E0.5090506@free.fr>
+ <CAFd313x6MJeO90_+rxditdPn762g7TqZc0_D6ojGTKmtGJKjPA@mail.gmail.com>
+Message-ID: <582EF744.8090307@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2016 12:16 AM, Stephen Boyd wrote:
-> On 11/17/2016 07:36 AM, Georgi Djakov wrote:
->> From: "Ivan T. Ivanov" <ivan.ivanov@linaro.org>
->>
->> Add initial set of CoreSight components found on Qualcomm's
->> 8064 chipset.
->>
->> Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
->> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
->> ---
->>  arch/arm/boot/dts/qcom-apq8064-coresight.dtsi | 196 ++++++++++++++++++++++++++
+On 18/11/2016 11:49, Rameshwar Sahu wrote:
+
+> Mason wrote:
 >
-> Why not put this inside the soc file? This would be the first time we
-> add a new file for something that's inside the SoC node that probably
-> won't change thereafter. At least for pins I slightly agree with having
-> a different file, we're adding more and more things there so it's nice
-> to have a consolidated place of all possible configurations to choose
-> from. But here it's mostly a static device description so what's the gain?
+>> Suman/APM added "arasan,sdhci-4.9a" in 308f3f8d8112
+>> @Suman, @Rameshwar: what specific IP block does your SoC embed?
+>> What does 4.9a refer to? The documentation revision number?
+> 
+> We have Arasan SD3.0/ SDIO3.0/ eMMC4.41 AHB Host Controller IP
+> embedded in our SoC and 4.9a is documentation revision number which
+> was given by Arasan.
+> FYI this documentation date was May, 2012.
 
-Ok, after thinking more about this and looking at other soc dtsi files i 
-agree with you. Will update!
+Hello Ram,
 
-Thanks!
-Georgi
+Thanks for the information.
+
+  Xilinx is using "SD2.0/SDIO2.0/MMC3.31 AHB Host Controller"
+     APM is using "SD3.0/SDIO3.0/eMMC4.41 AHB Host Controller"
+   Sigma is using "SD3.0/SDIO3.0/eMMC4.4 AHB Host Controller"
+Rockchip is using ? (Shawn could you specify exactly which IP you use?)
+
+And it looks like Arasan is using different revision numbers for
+every documentation they have.
+
+The "SD3.0/SDIO3.0/eMMC4.4 AHB Host Controller" doc I have is
+at rev number 6.0, dated 2010-02-19.
+
+Regards.
