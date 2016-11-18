@@ -1,60 +1,185 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 18 Nov 2016 11:54:04 -0600
-Subject: [PATCH] PCI: Add information about describing PCI in ACPI
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F921A88@lhreml507-mbx>
-References: <20161117175938.17465.45820.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F921A88@lhreml507-mbx>
-Message-ID: <20161118175404.GI25762@bhelgaas-glaptop.roam.corp.google.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 18 Nov 2016 17:53:28 +0000
+Subject: [PATCHv3 6/6] arm64: Add support for CONFIG_DEBUG_VIRTUAL
+In-Reply-To: <1479431816-5028-7-git-send-email-labbott@redhat.com>
+References: <1479431816-5028-1-git-send-email-labbott@redhat.com>
+ <1479431816-5028-7-git-send-email-labbott@redhat.com>
+Message-ID: <20161118175327.GE1197@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 05:17:34PM +0000, Gabriele Paoloni wrote:
-> > -----Original Message-----
-> > From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
-> > owner at vger.kernel.org] On Behalf Of Bjorn Helgaas
-> > Sent: 17 November 2016 18:00
+Hi,
 
-> > +Static tables like MCFG, HPET, ECDT, etc., are *not* mechanisms for
-> > +reserving address space!  The static tables are for things the OS
-> > +needs to know early in boot, before it can parse the ACPI namespace.
-> > +If a new table is defined, an old OS needs to operate correctly even
-> > +though it ignores the table.  _CRS allows that because it is generic
-> > +and understood by the old OS; a static table does not.
+On Thu, Nov 17, 2016 at 05:16:56PM -0800, Laura Abbott wrote:
 > 
-> Right so if my understanding is correct you are saying that resources
-> described in the MCFG table should also be declared in PNP0C02 devices
-> so that the PNP driver can reserve these resources.
-
-Yes.
-
-> On the other side the PCI Root bridge driver should not reserve such
-> resources.
+> x86 has an option CONFIG_DEBUG_VIRTUAL to do additional checks
+> on virt_to_phys calls. The goal is to catch users who are calling
+> virt_to_phys on non-linear addresses immediately. This inclues callers
+> using virt_to_phys on image addresses instead of __pa_symbol. As features
+> such as CONFIG_VMAP_STACK get enabled for arm64, this becomes increasingly
+> important. Add checks to catch bad virt_to_phys usage.
 > 
-> Well if my understanding is correct I think we have a problem here:
-> http://lxr.free-electrons.com/source/drivers/pci/ecam.c#L74
-> 
-> As you can see pci_ecam_create() will conflict with the pnp driver
-> as it will try to reserve the resources from the MCFG table...
-> 
-> Maybe we need to rework pci_ecam_create() ?
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> v3: Make use of __pa_symbol required via debug checks. It's a WARN for now but
+> it can become a BUG after wider testing. __virt_to_phys is
+> now for linear addresses only. Dropped the VM_BUG_ON from Catalin's suggested
+> version from the nodebug version since having that in the nodebug version
+> essentially made them the debug version. Changed to KERNEL_START/KERNEL_END
+> for bounds checking. More comments.
 
-I think it's OK as it is.
+I gave this a go with DEBUG_VIRTUAL && KASAN_INLINE selected, and the
+kernel dies somewhere before bringing up earlycon. :(
 
-The pnp/system.c driver does try to reserve PNP0C02 resources, and it
-marks them as "not busy".  That way they appear in /proc/iomem and
-won't be allocated for anything else, but they can still be requested
-by drivers, e.g., pci/ecam.c, which will mark them "busy".
+I mentioned some possible reasons in a reply to pastch 5, and I have
+some more comments below.
 
-This is analogous to what the PCI core does in pci_claim_resource().
-This is really a function of the ACPI/PNP *core*, which should reserve
-all _CRS resources for all devices (not just PNP0C02 devices).  But
-it's done by pnp/system.c, and only for PNP0C02, because there's a
-bunch of historical baggage there.
+[...]
 
-You'll also notice that in this case, things are out of order:
-logically the pnp/system.c reservation should happen first, but in
-fact the pci/ecam.c request happens *before* the pnp/system.c one.
-That means the pnp/system.c one might fail and complain "[mem ...]
-could not be reserved".
+> -#define __virt_to_phys(x) ({						\
+> +
+> +
+> +/*
+> + * This is for translation from the standard linear map to physical addresses.
+> + * It is not to be used for kernel symbols.
+> + */
+> +#define __virt_to_phys_nodebug(x) ({					\
+>  	phys_addr_t __x = (phys_addr_t)(x);				\
+> -	__x & BIT(VA_BITS - 1) ? (__x & ~PAGE_OFFSET) + PHYS_OFFSET :	\
+> -				 (__x - kimage_voffset); })
+> +	((__x & ~PAGE_OFFSET) + PHYS_OFFSET);				\
+> +})
 
-Bjorn
+Given the KASAN failure, and the strong possibility that there's even
+more stuff lurking in common code, I think we should retain the logic to
+handle kernel image addresses for the timebeing (as x86 does). Once
+we've merged DEBUG_VIRTUAL, it will be easier to track those down.
+
+Catalin, I think you suggested removing that logic; are you happy for it
+to be restored?
+
+See below for a refactoring that retains this logic.
+
+[...]
+
+> +/*
+> + * This is for translation from a kernel image/symbol address to a
+> + * physical address.
+> + */
+> +#define __pa_symbol_nodebug(x) ({					\
+> +	phys_addr_t __x = (phys_addr_t)(x);				\
+> +	(__x - kimage_voffset);						\
+> +})
+
+We can avoid duplication here (and in physaddr.c) if we factor the logic
+into helpers, e.g.
+
+/*
+ * The linear kernel range starts in the middle of the virtual adddress
+ * space. Testing the top bit for the start of the region is a
+ * sufficient check.
+ */
+#define __is_lm_address(addr)	(!!((addr) & BIT(VA_BITS - 1)))
+
+#define __lm_to_phys(addr)	(((addr) & ~PAGE_OFFSET) + PHYS_OFFSET)
+#define __kimg_to_phys(addr)	((addr) - kimage_voffset)
+
+#define __virt_to_phys_nodebug(x) ({					\
+	phys_addr_t __x = (phys_addr_t)(x);				\
+	__is_lm_address(__x) ? __lm_to_phys(__x) :			\
+			       __kimg_to_phys(__x);			\
+})
+
+#define __pa_symbol_nodebug(x)	__kimg_to_phys((phys_addr_t)(x))
+
+> +#ifdef CONFIG_DEBUG_VIRTUAL
+> +extern unsigned long __virt_to_phys(unsigned long x);
+> +extern unsigned long __phys_addr_symbol(unsigned long x);
+
+It would be better for both of these to return phys_addr_t.
+
+[...]
+
+> diff --git a/arch/arm64/mm/physaddr.c b/arch/arm64/mm/physaddr.c
+> new file mode 100644
+> index 0000000..f8eb781
+> --- /dev/null
+> +++ b/arch/arm64/mm/physaddr.c
+> @@ -0,0 +1,39 @@
+> +#include <linux/mm.h>
+> +
+> +#include <asm/memory.h>
+
+We also need:
+
+#include <linux/bug.h>
+#include <linux/export.h>
+#include <linux/types.h>
+#include <linux/mmdebug.h>
+
+> +unsigned long __virt_to_phys(unsigned long x)
+> +{
+> +	phys_addr_t __x = (phys_addr_t)x;
+> +
+> +	if (__x & BIT(VA_BITS - 1)) {
+> +		/*
+> +		 * The linear kernel range starts in the middle of the virtual
+> +		 * adddress space. Testing the top bit for the start of the
+> +		 * region is a sufficient check.
+> +		 */
+> +		return (__x & ~PAGE_OFFSET) + PHYS_OFFSET;
+> +	} else {
+> +		/*
+> +		 * __virt_to_phys should not be used on symbol addresses.
+> +		 * This should be changed to a BUG once all basic bad uses have
+> +		 * been cleaned up.
+> +		 */
+> +		WARN(1, "Do not use virt_to_phys on symbol addresses");
+> +		return __phys_addr_symbol(x);
+> +	}
+> +}
+> +EXPORT_SYMBOL(__virt_to_phys);
+
+I think this would be better something like:
+
+phys_addr_t __virt_to_phys(unsigned long x)
+{
+	WARN(!__is_lm_address(x),
+	     "virt_to_phys() used for non-linear address: %pK\n",
+	     (void*)x);
+	
+	return __virt_to_phys_nodebug(x);
+}
+EXPORT_SYMBOL(__virt_to_phys);
+
+> +
+> +unsigned long __phys_addr_symbol(unsigned long x)
+> +{
+> +	phys_addr_t __x = (phys_addr_t)x;
+> +
+> +	/*
+> +	 * This is bounds checking against the kernel image only.
+> +	 * __pa_symbol should only be used on kernel symbol addresses.
+> +	 */
+> +	VIRTUAL_BUG_ON(x < (unsigned long) KERNEL_START || x > (unsigned long) KERNEL_END);
+> +	return (__x - kimage_voffset);
+> +}
+> +EXPORT_SYMBOL(__phys_addr_symbol);
+
+Similarly:
+
+phys_addr_t __phys_addr_symbol(unsigned long x)
+{
+	/*
+	 * This is bounds checking against the kernel image only.
+	 * __pa_symbol should only be used on kernel symbol addresses.
+	 */
+	VIRTUAL_BUG_ON(x < (unsigned long) KERNEL_START ||
+		       x > (unsigned long) KERNEL_END);
+
+	return __pa_symbol_nodebug(x);
+}
+EXPORT_SYMBOL(__phys_addr_symbol);
+
+Thanks,
+Mark.
