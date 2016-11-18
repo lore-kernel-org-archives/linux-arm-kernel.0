@@ -1,87 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 18 Nov 2016 10:18:43 +0100
-Subject: [PATCH] ARM: dts: sunxi: Explicitly enable pull-ups for MMC pins
-In-Reply-To: <ea02ec937a12d6ca2a2e0d8bbea5c484@theobroma-systems.com>
-References: <20161117093438.17988-1-wens@csie.org>
- <ea02ec937a12d6ca2a2e0d8bbea5c484@theobroma-systems.com>
-Message-ID: <CACRpkdY-cO7f8Ad9=OiCfW4fy3oMFEF4ojhGxspijH5XWMSJnQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Nov 2016 10:20:49 +0100
+Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
+In-Reply-To: <5825984B.3030303@hisilicon.com>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1478806353.7430.137.camel@kernel.crashing.org>
+ <5825984B.3030303@hisilicon.com>
+Message-ID: <2436881.9RqUVYxmDf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Notice this reply has little to do with the patch in question: I think
-it should be applied. I just want to involve some MMC/SD people here]
+On Friday, November 11, 2016 6:07:07 PM CET zhichang.yuan wrote:
+> 
+> I have similar idea as your PPC MMIO.
+> 
+> We notice the prototype of {in/out()} is something like that:
+> 
+> static inline u8 inb(unsigned long addr)
+> static inline void outb(u8 value, unsigned long addr)
+> 
+> The type of parameter 'addr' is unsigned long. For I/O space, it is big enough.
+> So, could you divide this 'addr' into several bit segments? The top 8 bits is
+> defined as bus index. For normal direct IO, the bus index is 0. For those bus
+> device which need indirectIO or some special I/O accessors, when these devices
+> are initializing, can request to allocate an unique ID to them, and register
+> their own accessors to the entry which is corresponding to the ID.
 
-On Thu, Nov 17, 2016 at 9:57 PM,  <klaus.goger@theobroma-systems.com> wrote:
-> On 2016-11-17 10:34, Chen-Yu Tsai wrote:
->>
->> Given that MMC starts in open-drain mode and the pull-ups are required,
->> it's best to enable it for all the pin settings.
->
-> It's even more complicated than that with MMC. It starts in open-drain mode
-> for
-> CMD during initialization but changes to push-pull afterwards. The card has
-> internal pull-ups to prevent bus floating during setup and will disable them
-> after switching to 4bit mode (or 8bit for eMMC when available).
-> But even after switching to push-pull drivers there are states the bus would
-> float and pull ups have to ensure a high level on the bus.
->
-> See JESD84-A441 chapter 7.15 ff as reference.
->
->   The difference between the P-bit and Z-bit is that a P-bit is actively
-> driven
->   to HIGH by the card respectively host output driver, while Z-bit is driven
-> to
->  (respectively kept) HIGH by the pull-up resistors Rcmd respectively Rdat.
->
-> Enabling the pull ups on the CPU would be the right choice considering that
-> most boards will not have external pull-ups. Even if they would have one,
-> adding the internal in parallel would work in almost all cases and the
-> increase in power consumption would be negligible.
+Ah, have you looked at the IA64 code? It does exactly this.
+For ARM64 we decided to use the same basic approach as powerpc with
+a single range of virtual memory for mapping it as that somewhat
+simplified all cases we knew about at the time.
 
-I guess you are referring to software-controlled pull up on the pad ring of
-the SoC. Nominally that should be handled by pin control like in this
-patch.
+> In this way, we can support multiple domains, I think.
+> But I am not sure whether it is feasible, for example, are there some
+> architectures/platforms had populated the top 8 bits? Do we need to request IO
+> region from ioport_resource for those devices?  etc...
 
-It is not clear from context to me which of the lines need to be handled
-like this? Just the data lines? DAT0 would be the critical line to pull up
-in that case, since the others will not be used until bus switch anyways
-right?
+On a 64-bit architecture, the top 32 bits of the port number are
+definitely free to use for this, and 8 bits are probably sufficient.
 
-But what about CMD?
+Even on 32 bit architectures, I can't see why we'd ever need more than
+16 bits worth of addressing within a domain, so using 8 bit domain
+and 16 bit address leaves 8 or 40 unused bits.
 
-I assume CLK should always be push-pull?
-
-Also: if the pins have an explicit Open Drain setting, should that
-be used? I guess so?
-
-Overall I think this construction is pretty common.
-
-We essentially have two classes of connections:
-
-- Those connecting the eMMC or even MMC/SD card directly to
-  the SoC. No pull-ups on the board. Here it makes sense to have:
-
-  1. A pin control default state with open drain and pull-ups
-     enabled for those lines
-
-  and it then needs
-
-  2. A second "4/8bit mode" that will switch these
-     pins to push-pull mode and turn off the pull-ups.
-
-  If the OD+pull-up state is the default we should probably
-  standardize a default name for the state when we kick in 4/8bit
-  mode from the IOS operation.
-
-- Those connection the MMC/SD on an external slot through a
-  levelshifter/EMI filter. In that case I guess it is pretty much
-  dependent on the levelshifter or EMI thing how the lines out
-  of the SoC should be configured, and usually it is static so
-  you do not need to worry about it after boot configuration
-  of pins. (Mostly no bias, push-pull I think.)
-
-I highly suspect a whole bunch of SoC drivers are not getting
-this business right today. Not even in out-of-tree vendor kernels.
-
-Yours,
-Linus Walleij
+	Arnd
