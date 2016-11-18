@@ -1,45 +1,50 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 18 Nov 2016 09:59:25 +0100
-Subject: [PATCH v3 06/13] ARM: dts: armada-375: Fixup sa-ram DT warning
-In-Reply-To: <20161117230830.31047-7-gregory.clement@free-electrons.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 18 Nov 2016 10:01:32 +0100
+Subject: [PATCH v3 09/13] ARM: dts: armada-375: Fixup soc DT warning
+In-Reply-To: <20161118095455.00bfe007@free-electrons.com> (Thomas Petazzoni's
+ message of "Fri, 18 Nov 2016 09:54:55 +0100")
 References: <20161117230830.31047-1-gregory.clement@free-electrons.com>
- <20161117230830.31047-7-gregory.clement@free-electrons.com>
-Message-ID: <20161118095925.770496c3@free-electrons.com>
+ <20161117230830.31047-10-gregory.clement@free-electrons.com>
+ <20161118095455.00bfe007@free-electrons.com>
+Message-ID: <87d1htb1qr.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Thomas,
+ 
+ On ven., nov. 18 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-On Fri, 18 Nov 2016 00:08:23 +0100, Gregory CLEMENT wrote:
+> Hello,
+>
+> On Fri, 18 Nov 2016 00:08:26 +0100, Gregory CLEMENT wrote:
+>
+>> -	soc {
+>> +	/* The following unit address is composed of the target
+>> +	 * value (bit [40-47]), attributes value (bits [32-39],
+>> +	 * and the address value in the window memory: [0-31].
+>> +	 */
+>> +	soc at f00100000000 {
+>
+> Where is this value coming from? Why does the soc node needs to have a
 
-> -		crypto_sram0: sa-sram0 {
-> +		/* The following unit addresses (for sa-sram) are composed of
-> +		 * the target value (bit [40-47]), attributes value (bits
-> +		 * [32-39], and the address value in the window memory: [0-31].
-> +		 */
+It cames from the dts files.
 
-The "address value in the window memory" part doesn't make a lot of
-sense. Maybe:
+> unit address? It doesn't have a 'reg' property if I remember
+> correctly.
 
-"The following unit addresses are composed of the window target ID
-(bits 40-47), the window target attributes (bits 32-39) and the offset
-inside the window."
+But it has a range property.
 
-Also, the comment formatting is not compliant with the coding style,
-should be:
+Gregory
 
- /*
-  * ...
-  * ...
-  */
+>
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
 
-But do we really want this comment above each node? Couldn't we instead
-add this explanation in the mvebu-mbus.txt DT binding?
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
