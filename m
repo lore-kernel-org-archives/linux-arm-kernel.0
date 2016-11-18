@@ -1,37 +1,95 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Nov 2016 09:59:37 -0800
-Subject: [GIT PULL 2/5] i.MX soc updates for 4.10
-In-Reply-To: <1479200431-1765-2-git-send-email-shawnguo@kernel.org>
-References: <1479200431-1765-1-git-send-email-shawnguo@kernel.org>
- <1479200431-1765-2-git-send-email-shawnguo@kernel.org>
-Message-ID: <20161118175937.GE8882@localhost>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Sat, 19 Nov 2016 00:18:53 +0530
+Subject: [PATCH v8 6/7] arm/arm64: vgic: Implement VGICv3 CPU interface
+ access
+In-Reply-To: <20161117160951.GB23588@cbox>
+References: <1478258013-6669-1-git-send-email-vijay.kilari@gmail.com>
+ <1478258013-6669-7-git-send-email-vijay.kilari@gmail.com>
+ <20161116185232.GF3811@cbox>
+ <CALicx6t5D5n3dDQzeKZNUWdS-q5LNiSq-UrP4HdmbdUCj1tF1g@mail.gmail.com>
+ <20161117160951.GB23588@cbox>
+Message-ID: <CALicx6uxU8nC+gayWAxf_BX7JrZ9twsFr4YfMr64bNUSneqZow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 15, 2016 at 05:00:28PM +0800, Shawn Guo wrote:
-> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-> 
->   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-4.10
-> 
-> for you to fetch changes up to 75b832fea2564c547dfd0a2377a5893f41aefec6:
-> 
->   ARM: imx: mach-imx6ul: add imx6ull support (2016-11-15 08:58:43 +0800)
-> 
-> ----------------------------------------------------------------
-> i.MX SoC changes for 4.10:
->  - Drop PL310_ERRATA_769419 for Vybrid, as it turns out that the SoC
->    integrates revision r3p2 of the L2C-310, which is not affected by
->    errata 769419.
->  - Support perf for i.MX6 Multi-Mode DDR Controller (MMDC), so that we
->    can profile memory access performance.
->  - Support i.MX6ULL SoC using i.MX6UL base, since it's a derivative of
->    i.MX6UL and pin-to-pin compatible with i.MX6UL.
+On Thu, Nov 17, 2016 at 9:39 PM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Thu, Nov 17, 2016 at 09:25:59PM +0530, Vijay Kilari wrote:
+>> On Thu, Nov 17, 2016 at 12:22 AM, Christoffer Dall
+>> <christoffer.dall@linaro.org> wrote:
+>> > On Fri, Nov 04, 2016 at 04:43:32PM +0530, vijay.kilari at gmail.com wrote:
+>> >> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>> >>
+>> >> VGICv3 CPU interface registers are accessed using
+>> >> KVM_DEV_ARM_VGIC_CPU_SYSREGS ioctl. These registers are accessed
+>> >> as 64-bit. The cpu MPIDR value is passed along with register id.
+>> >> is used to identify the cpu for registers access.
+>> >>
+>> >> The version of VGIC v3 specification is define here
+>> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
+>> >>
+>> >> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+>> >> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>> >> ---
+>> >>  arch/arm64/include/uapi/asm/kvm.h   |   3 +
+>> >>  arch/arm64/kvm/Makefile             |   1 +
+>> >>  include/kvm/arm_vgic.h              |   9 +
+>> >>  virt/kvm/arm/vgic/vgic-kvm-device.c |  27 +++
+>> >>  virt/kvm/arm/vgic/vgic-mmio-v3.c    |  19 +++
+>> >>  virt/kvm/arm/vgic/vgic-sys-reg-v3.c | 324 ++++++++++++++++++++++++++++++++++++
+>> >>  virt/kvm/arm/vgic/vgic-v3.c         |   8 +
+>> >>  virt/kvm/arm/vgic/vgic.h            |   4 +
+>> >>  8 files changed, 395 insertions(+)
+>> >>
+>> >> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+>> >> index 56dc08d..91c7137 100644
+>> >> --- a/arch/arm64/include/uapi/asm/kvm.h
+>> >> +++ b/arch/arm64/include/uapi/asm/kvm.h
+>> >> @@ -206,9 +206,12 @@ struct kvm_arch_memory_slot {
+>> >>                       (0xffffffffULL << KVM_DEV_ARM_VGIC_V3_MPIDR_SHIFT)
+>> >>  #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT      0
+>> >>  #define   KVM_DEV_ARM_VGIC_OFFSET_MASK       (0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
+>> >> +#define   KVM_DEV_ARM_VGIC_SYSREG_INSTR_MASK (0xffff)
+>> >>  #define KVM_DEV_ARM_VGIC_GRP_NR_IRQS 3
+>> >>  #define KVM_DEV_ARM_VGIC_GRP_CTRL    4
+>> >>  #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
+>> >> +#define KVM_DEV_ARM_VGIC_CPU_SYSREGS    6
+>> >> +
+>> >>  #define   KVM_DEV_ARM_VGIC_CTRL_INIT 0
+>> >>
+>> >>  /* Device Control API on vcpu fd */
+>> >> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+>> >> index d50a82a..1a14e29 100644
+>> >> --- a/arch/arm64/kvm/Makefile
+>> >> +++ b/arch/arm64/kvm/Makefile
+>> >> @@ -32,5 +32,6 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v3.o
+>> >>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-kvm-device.o
+>> >>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-its.o
+>> >>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/irqchip.o
+>> >> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-sys-reg-v3.o
+>> >
+>> > Thi is making me wonder:  Are we properly handling GICv3 save/restore
+>> > for AArch32 now that we have GICv3 support for AArch32?  By properly I
+>> > mean that either it is clearly only supported on AArch64 systems or it's
+>> > supported on both AArch64 and AArch32, but it shouldn't break randomly
+>> > on AArch32.
+>>
+>> It supports both AArch64 and AArch64 in handling of system registers
+>> save/restore.
+>> All system registers that we save/restore are 32-bit for both aarch64
+>> and aarch32.
+>> Though opcode op0 should be zero for aarch32, the remaining Op and CRn codes
+>> are same. However the codes sent by qemu is matched and register
+>> are handled properly irrespective of AArch32 or AArch64.
+>>
+>> I don't have platform which support AArch32 guests to verify.
+>
+> Actually this is not about the guest, it's about an ARMv8 AArch32 host
+> that has a GICv3.
+>
+> I just tried to do a v7 compile with your patches, and it results in an
+> epic failure, so there's something for you to look at.
+>
 
-Merged, thanks.
-
-
--Olof
+Could you please share you config file?. I tried with multi_v7 defconfig with
+CONFIG KVM and CONFIG_KVM_ARM_HOST enabled. it compiled for me.
