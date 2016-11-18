@@ -1,42 +1,47 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 18 Nov 2016 13:42:44 +0100
-Subject: arasan,sdhci.txt "compatibility" DT binding
-In-Reply-To: <CAFd313x6MJeO90_+rxditdPn762g7TqZc0_D6ojGTKmtGJKjPA@mail.gmail.com>
-References: <56B07BA5.4060407@free.fr> <56B166F1.5080605@rock-chips.com>
- <56B1AA44.1010108@xilinx.com> <56B1BAF8.2050907@free.fr>
- <56B1CF40.1030203@xilinx.com> <20160203152104.GP4215@xsjsorenbubuntu>
- <56B21DDB.6050708@free.fr> <582ED9E0.5090506@free.fr>
- <CAFd313x6MJeO90_+rxditdPn762g7TqZc0_D6ojGTKmtGJKjPA@mail.gmail.com>
-Message-ID: <582EF744.8090307@free.fr>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 18 Nov 2016 14:44:34 +0200
+Subject: [GIT PULL 1/2] arm64: dts: exynos: Topic dts arm64 for v4.10
+Message-ID: <1479473075-9787-1-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/11/2016 11:49, Rameshwar Sahu wrote:
+Hi,
 
-> Mason wrote:
->
->> Suman/APM added "arasan,sdhci-4.9a" in 308f3f8d8112
->> @Suman, @Rameshwar: what specific IP block does your SoC embed?
->> What does 4.9a refer to? The documentation revision number?
-> 
-> We have Arasan SD3.0/ SDIO3.0/ eMMC4.41 AHB Host Controller IP
-> embedded in our SoC and 4.9a is documentation revision number which
-> was given by Arasan.
-> FYI this documentation date was May, 2012.
+Topic branch with a GIC interrupt fix and cleanup. No conflicts expected.
+No dependencies.
 
-Hello Ram,
+Best regards,
+Krzysztof
 
-Thanks for the information.
 
-  Xilinx is using "SD2.0/SDIO2.0/MMC3.31 AHB Host Controller"
-     APM is using "SD3.0/SDIO3.0/eMMC4.41 AHB Host Controller"
-   Sigma is using "SD3.0/SDIO3.0/eMMC4.4 AHB Host Controller"
-Rockchip is using ? (Shawn could you specify exactly which IP you use?)
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
-And it looks like Arasan is using different revision numbers for
-every documentation they have.
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
 
-The "SD3.0/SDIO3.0/eMMC4.4 AHB Host Controller" doc I have is
-at rev number 6.0, dated 2010-02-19.
+are available in the git repository at:
 
-Regards.
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-gic-flags-4.10
+
+for you to fetch changes up to 86bb573d0b2a8e876a12d1348bd0b6e377c1043e:
+
+  arm64: dts: exynos: Use human-friendly symbols for interrupt properties in exynos7 (2016-11-03 22:40:39 +0200)
+
+----------------------------------------------------------------
+Topic branch with DT arm64 changes for v4.10.
+
+Fix invalid GIC interrupt flags - type IRQ_TYPE_NONE is not allowed for GIC
+interrupts.  Although this was working but with error messages like:
+        genirq: Setting trigger mode 0 for irq 16 failed
+
+Use level high interrupt instead of type none.  The choice of level high was
+rather an arbitrary decision hoping it will work on each platform.  Tests shown
+no issues so far.
+
+----------------------------------------------------------------
+Krzysztof Kozlowski (2):
+      arm64: dts: exynos: Fix invalid GIC interrupt flags in exynos7
+      arm64: dts: exynos: Use human-friendly symbols for interrupt properties in exynos7
+
+ arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi | 20 +++++--
+ arch/arm64/boot/dts/exynos/exynos7.dtsi         | 69 +++++++++++++------------
+ 2 files changed, 51 insertions(+), 38 deletions(-)
