@@ -1,22 +1,18 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Nov 2016 10:38:33 -0800
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.10
-In-Reply-To: <582B320F.7030206@hisilicon.com>
-References: <582B320F.7030206@hisilicon.com>
-Message-ID: <20161118183833.GK8882@localhost>
+Date: Fri, 18 Nov 2016 10:36:31 -0800
+Subject: [GIT PULL] STM32 SOC changes for v4.10 #1
+In-Reply-To: <7e258e38-5ac9-60e8-4bc7-03acedd5e11d@st.com>
+References: <7e258e38-5ac9-60e8-4bc7-03acedd5e11d@st.com>
+Message-ID: <20161118183631.GI8882@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 15, 2016 at 04:04:31PM +0000, Wei Xu wrote:
-> Hi Arnd, Hi Olof, Hi Kevin,
+Hi,
+
+On Tue, Nov 15, 2016 at 03:22:30PM +0100, Alexandre Torgue wrote:
+> Hi Olof, Arnd and Kevin,
 > 
-> Please help to pull the following changes.
-> Thanks!
-> 
-> Best Regards,
-> Wei
-> 
-> ---
+> Please consider this first round of STM32 SOC updates for v4.10:
 > 
 > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 > 
@@ -24,24 +20,40 @@ On Tue, Nov 15, 2016 at 04:04:31PM +0000, Wei Xu wrote:
 > 
 > are available in the git repository at:
 > 
->   git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-4.10
+>   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
+> tags/soc-for-4.10-1
 > 
-> for you to fetch changes up to 85f5bd9e771349833602ccdd39b65613ecd11fd1:
+> for you to fetch changes up to 6bc18b83c0c3b5d56137a31ce98ca2802036e7a9:
 > 
->   arm64: dts: hisi: add refclk node to hip06 dts files for SAS (2016-11-15 10:58:41 +0000)
+>   ARM: Kconfig: Introduce MACH_STM32F746 flag (2016-11-15 12:02:59 +0100)
 > 
 > ----------------------------------------------------------------
-> ARM64: DT: Hisilicon SoC DT updates for 4.10
+> STM32 SOC updates for v4.10, round 1.
 > 
-> - Correct the hardware pin number of the usb node on the Hip06
-> - Add the Hisilicon Hip07 D05 board dts binding
-> - Add the initial dts for the Hip07 D05 board
-> - Fix the warning for the node without reg propery on the Hip06
-> - Fix the sas am max transmissions quirk property on the Hip06
-> - Disable the sas0 and sas2 on D03 board
-> - Add refclk node for SAS on the Hip06
+> Highlights:
+> ----------
+>  - Add new MCU SOC STM32F746
+> 
+> ----------------------------------------------------------------
+> Alexandre TORGUE (2):
+>       ARM: mach-stm32: Add a new SOC - STM32F746
+>       ARM: Kconfig: Introduce MACH_STM32F746 flag
 
-Merged, thanks.
+Merged. For future patches, please use the same format as other platforms,
+in your case it would be:
+
+ARM: stm32: <..>
+
+I.e. others are leaving out the mach- part.
+
+Also, on the Kconfig change, please consider adding a Kconfig under your
+mach directory and include it. We ask most platforms that have suboptions
+to do this to avoid conflicts and provide a bit more structure. Feel
+free to send a new pull request build on top of this one for that,
+since we're merging this one now.
+
+
+Thanks!
 
 
 -Olof
