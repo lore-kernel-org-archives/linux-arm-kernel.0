@@ -1,120 +1,55 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Fri, 18 Nov 2016 09:33:44 +0100
-Subject: [RFC v3 00/10] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
- reserved regions
-In-Reply-To: <HE1PR0401MB2556607F41972B84F8A48E869AB00@HE1PR0401MB2556.eurprd04.prod.outlook.com>
-References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
- <HE1PR0401MB2556607F41972B84F8A48E869AB00@HE1PR0401MB2556.eurprd04.prod.outlook.com>
-Message-ID: <40ae2d41-c744-49e6-d51d-8cba41a4b069@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Nov 2016 09:46:47 +0100
+Subject: [PATCH v2] ARM: Drop fixed 200 Hz timer requirement from Samsung
+ platforms
+In-Reply-To: <1479453418-25314-1-git-send-email-krzk@kernel.org>
+References: <1479453418-25314-1-git-send-email-krzk@kernel.org>
+Message-ID: <22757093.ejshJp9T7L@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bharat,
+On Friday, November 18, 2016 9:16:58 AM CET Krzysztof Kozlowski wrote:
+> All Samsung platforms, including the Exynos, are selecting HZ_FIXED with
+> 200 Hz.  Unfortunately in case of multiplatform image this affects also
+> other platforms when Exynos is enabled.
+> 
+> This looks like an very old legacy code, dating back to initial
+> upstreaming of S3C24xx.  Probably it was required for s3c24xx timer
+> driver, which was removed in commit ad38bdd15d5b ("ARM: SAMSUNG: Remove
+> unused plat-samsung/time.c").
+> 
+> Since then, this fixed 200 Hz spread everywhere, including out-of-tree
+> Samsung kernels (SoC vendor's and Tizen's).  I believe this choice
+> was rather an effect of coincidence instead of conscious choice.
+> 
+> Exynos uses its own MCT or arch timer and can work with all HZ values.
+> Older platforms use newer Samsung PWM timer driver which should handle
+> down to 100 Hz.
+> 
+> Few perf mem and sched tests on Odroid XU3 board (Exynos5422, 4x Cortex
+> A7, 4x Cortex A15) show no regressions when switching from 200 Hz to
+> other values.
+> 
+> Reported-by: Lee Jones <lee.jones@linaro.org>
+> [Dropping 200_HZ from S3C/S5P suggested by Arnd]
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
 
-On 18/11/2016 06:34, Bharat Bhushan wrote:
-> Hi Eric,
-> 
-> Have you sent out QEMU side patches based on this new approach? In case I missed please point me the patches? 
-Upstream QEMU works fine for PCIe/MSI passthrough on ARM since mach virt
-address space does not collide with fixed MSI region.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Thanks
+Maybe add a paragraph about the specific problem:
 
-Eric
-> 
-> Thanks
-> -Bharat
-> 
->> -----Original Message-----
->> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
->> bounces at lists.linux-foundation.org] On Behalf Of Eric Auger
->> Sent: Tuesday, November 15, 2016 6:39 PM
->> To: eric.auger at redhat.com; eric.auger.pro at gmail.com;
->> christoffer.dall at linaro.org; marc.zyngier at arm.com;
->> robin.murphy at arm.com; alex.williamson at redhat.com;
->> will.deacon at arm.com; joro at 8bytes.org; tglx at linutronix.de;
->> jason at lakedaemon.net; linux-arm-kernel at lists.infradead.org
->> Cc: drjones at redhat.com; kvm at vger.kernel.org; punit.agrawal at arm.com;
->> linux-kernel at vger.kernel.org; iommu at lists.linux-foundation.org;
->> pranav.sawargaonkar at gmail.com
->> Subject: [RFC v3 00/10] KVM PCIe/MSI passthrough on ARM/ARM64 and
->> IOVA reserved regions
->>
->> Following LPC discussions, we now report reserved regions through iommu-
->> group sysfs reserved_regions attribute file.
->>
->> Reserved regions are populated through the IOMMU get_resv_region
->> callback (former get_dm_regions), now implemented by amd-iommu, intel-
->> iommu and arm-smmu.
->>
->> The intel-iommu reports the [FEE0_0000h - FEF0_000h] MSI window as an
->> IOMMU_RESV_NOMAP reserved region.
->>
->> arm-smmu reports the MSI window (arbitrarily located at 0x8000000 and 1MB
->> large) and the PCI host bridge windows.
->>
->> The series integrates a not officially posted patch from Robin:
->> "iommu/dma: Allow MSI-only cookies".
->>
->> This series currently does not address IRQ safety assessment.
->>
->> Best Regards
->>
->> Eric
->>
->> Git: complete series available at
->> https://github.com/eauger/linux/tree/v4.9-rc5-reserved-rfc-v3
->>
->> History:
->> RFC v2 -> v3:
->> - switch to an iommu-group sysfs API
->> - use new dummy allocator provided by Robin
->> - dummy allocator initialized by vfio-iommu-type1 after enumerating
->>   the reserved regions
->> - at the moment ARM MSI base address/size is left unchanged compared
->>   to v2
->> - we currently report reserved regions and not usable IOVA regions as
->>   requested by Alex
->>
->> RFC v1 -> v2:
->> - fix intel_add_reserved_regions
->> - add mutex lock/unlock in vfio_iommu_type1
->>
->>
->> Eric Auger (10):
->>   iommu/dma: Allow MSI-only cookies
->>   iommu: Rename iommu_dm_regions into iommu_resv_regions
->>   iommu: Add new reserved IOMMU attributes
->>   iommu: iommu_alloc_resv_region
->>   iommu: Do not map reserved regions
->>   iommu: iommu_get_group_resv_regions
->>   iommu: Implement reserved_regions iommu-group sysfs file
->>   iommu/vt-d: Implement reserved region get/put callbacks
->>   iommu/arm-smmu: Implement reserved region get/put callbacks
->>   vfio/type1: Get MSI cookie
->>
->>  drivers/iommu/amd_iommu.c       |  20 +++---
->>  drivers/iommu/arm-smmu.c        |  52 +++++++++++++++
->>  drivers/iommu/dma-iommu.c       | 116 ++++++++++++++++++++++++++----
->> ---
->>  drivers/iommu/intel-iommu.c     |  50 ++++++++++----
->>  drivers/iommu/iommu.c           | 141
->> ++++++++++++++++++++++++++++++++++++----
->>  drivers/vfio/vfio_iommu_type1.c |  26 ++++++++
->>  include/linux/dma-iommu.h       |   7 ++
->>  include/linux/iommu.h           |  49 ++++++++++----
->>  8 files changed, 391 insertions(+), 70 deletions(-)
->>
->> --
->> 1.9.1
->>
->> _______________________________________________
->> iommu mailing list
->> iommu at lists.linux-foundation.org
->> https://lists.linuxfoundation.org/mailman/listinfo/iommu
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+"On s3c24xx, the PWM counter is only 16 bit wide, and with the
+typical 12MHz input clock that overflows every 5.5ms. This works
+with HZ=200 or higher but not with HZ=100 which needs a 10ms
+interval between ticks. On Later chips (S3C64xx, S5P and EXYNOS),
+the counter is 32 bits and does not have this problem.
+The new samsung_pwm_timer driver solves the problem by scaling
+the input clock by a factor of 50 on s3c24xx, which makes it
+less accurate but allows HZ=100 as well as CONFIG_NO_HZ with
+fewer wakeups".
+
+	Arnd
