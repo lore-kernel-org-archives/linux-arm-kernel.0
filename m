@@ -1,112 +1,42 @@
-From: kan.liang@intel.com (Liang, Kan)
-Date: Fri, 18 Nov 2016 16:25:36 +0000
-Subject: System/uncore PMUs and unit aggregation
-In-Reply-To: <20161118092629.GK3117@twins.programming.kicks-ass.net>
-References: <20161117181708.GT22855@arm.com>
- <20161118092629.GK3117@twins.programming.kicks-ass.net>
-Message-ID: <37D7C6CF3E00A74B8858931C1DB2F07750CA132D@SHSMSX103.ccr.corp.intel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 18 Nov 2016 10:33:42 -0600
+Subject: [RFC 2/6] drm/etnaviv: allow building etnaviv on omap devices
+In-Reply-To: <20161118024436.13447-2-robertcnelson@gmail.com>
+References: <20161118024436.13447-1-robertcnelson@gmail.com>
+ <20161118024436.13447-2-robertcnelson@gmail.com>
+Message-ID: <20161118163342.5t2tbsw54k2gmqe3@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> On Thu, Nov 17, 2016 at 06:17:08PM +0000, Will Deacon wrote:
-> > Hi all,
-> >
-> > We currently have support for three arm64 system PMUs in flight:
-> >
-> >  [Cavium ThunderX]
-> > http://lkml.kernel.org/r/cover.1477741719.git.jglauber at cavium.com
-> >  [Hisilicon Hip0x]
-> > http://lkml.kernel.org/r/1478151727-20250-1-git-send-email-
-> anurup.m at hu
-> > awei.com  [Qualcomm L2]
-> > http://lkml.kernel.org/r/1477687813-11412-1-git-send-email-nleeder at cod
-> > eaurora.org
-> >
-> > Each of which have to deal with multiple underlying hardware units in
-> > one way or another. Mark and I recently expressed a desire to expose
-> > these units to userspace as individual PMU instances, since this can allow:
-> >
-> >   * Fine-grained control of events from userspace, when you want to see
-> >     individual numbers as opposed to a summed total
-> >
-> >   * Potentially ease migration to new SoC revisions, where the units
-> >     are laid out slightly differently
-> >
-> >   * Easier handling of cases where the units aren't quite identical
+On Thu, Nov 17, 2016 at 08:44:32PM -0600, Robert Nelson wrote:
+> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+> CC: Christian Gmeiner <christian.gmeiner@gmail.com>
+> CC: Russell King <rmk+kernel@arm.linux.org.uk>
+> CC: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  drivers/gpu/drm/etnaviv/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> This is I think similar to the Intel Uncore situation. We expose every single
-> individual PMU independently. The Intel uncore is wide and varied between
-> parts.
+> diff --git a/drivers/gpu/drm/etnaviv/Kconfig b/drivers/gpu/drm/etnaviv/Kconfig
+> index 2cde7a5..b776f41 100644
+> --- a/drivers/gpu/drm/etnaviv/Kconfig
+> +++ b/drivers/gpu/drm/etnaviv/Kconfig
+> @@ -2,7 +2,7 @@
+>  config DRM_ETNAVIV
+>  	tristate "ETNAVIV (DRM support for Vivante GPU IP cores)"
+>  	depends on DRM
+> -	depends on ARCH_MXC || ARCH_DOVE
+> +	depends on ARCH_MXC || ARCH_DOVE || ARCH_OMAP2PLUS
+
+Why not just drop this line. Then it will get better build testing, too.
+
+>  	select SHMEM
+>  	select TMPFS
+>  	select IOMMU_API
+> -- 
+> 2.10.2
 > 
-> Leaving the rest for Kan, who's doing the Intel uncore bits.
-> 
->  ~ Peter
-> 
-> > however, this received pushback from all of the patch authors, so
-> > there's clearly a problem with this approach. I'm hoping we can try to
-> > resolve this here.
-> >
-> > Speaking to Mark earlier today, we came up with the following rough
-> > rules for drivers that present multiple hardware units as a single PMU:
-> >
-> >   1. If the units share some part of the programming interface (e.g. control
-> >      registers or interrupts), then they must be handled by the same PMU.
-> >      Otherwise, they should be treated independently as separate PMU
-> >      instances.
-> >
-> >   2. If the units are handled by the same PMU, then care must be taken to
-> >      handle event groups correctly. That is, if the units cannot be started
-> >      and stopped atomically, cross-unit groups must be rejected by the
-> >      driver. Furthermore, any cross-unit scheduling constraints must be
-> >      honoured so that all the units targetted by a group can schedule the
-> >      group concurrently.
-> >
-> >   3. Summing the counters across units is only permitted if the units
-> >      can all be started and stopped atomically. Otherwise, the counters
-> >      should be exposed individually. It's up to the driver author to
-> >      decide what makes sense to sum.
-> >
-> >   4. Unit topology can optionally be described in sysfs (we should pick
-> >      some standard directory naming here), and then events targetting
-> >      specific units can have the unit identifier extracted from the topology
-> >      encoded in some configN fields.
-> >
-> > The million dollar question is: how does that fit in with the drivers
-> > I mentioned at the top? Is this overly restrictive, or have we missed stuff?
-> >
-> > We certainly want to allow flexibility in the way in which the drivers
-> > talk to the hardware, but given that these decisions directly affect
-> > the user ABI, some consistent ground rules are required.
-> >
-> > For Cavium ThunderX, it's not clear whether or not the individual
-> > units could be expressed as separate PMUs, or whether they're caught
-> > by one of the rules above.
-
-The individual unit should be a separate PMU. They are standalone system,
-although they share the same PCI ID.
-I think you can use bus:dev:fun to distinguish among them. That is what
-we did for Skylake and KNL.
-
-I noticed that you pick up random CPU for your uncore PMU.
-In our implementation, we usually pick up the first available CPU.  
-
->> The Qualcomm L2 looks like it's doing the
-> > right thing and
-
-If there is only one device, it should be OK.
-But the variable "num_pmus" make me very confuse.
-
-> > we can't quite work out what the Hisilicon Hip0x
-> > topology looks like, since the interaction with djtag is confusing.
-
-Each djtag device has its own PMU. They name them by scl_id. hisi_l3c*.
-
-> >
-> > If the driver authors (on To:) could shed some light on this, then
-> > that would be much appreciated!
-> >
-> > Thanks,
-> >
-> > Will
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
