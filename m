@@ -1,46 +1,26 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Fri, 18 Nov 2016 09:25:22 +0100
-Subject: [PATCHv3 1/6] lib/Kconfig.debug: Add ARCH_HAS_DEBUG_VIRTUAL
-In-Reply-To: <1479431816-5028-2-git-send-email-labbott@redhat.com>
-References: <1479431816-5028-1-git-send-email-labbott@redhat.com>
- <1479431816-5028-2-git-send-email-labbott@redhat.com>
-Message-ID: <20161118082521.GA7250@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 18 Nov 2016 09:26:56 +0100
+Subject: [GIT PULL] Integrator DTS and defconfig changes
+In-Reply-To: <20161118072506.GC1785@localhost>
+References: <CACRpkdara5D=kvGVYu-WRh_JYK6Z9NKmQ-eniXsauxdzx-QJbA@mail.gmail.com>
+ <20161118072506.GC1785@localhost>
+Message-ID: <CACRpkdYoornJx1fTN1C5OiR16w9DbTcr9ze4gc9PLkt7LCqqCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Nov 18, 2016 at 8:25 AM, Olof Johansson <olof@lixom.net> wrote:
 
-* Laura Abbott <labbott@redhat.com> wrote:
+> I also sympathize that it's extra annoying having to split just three
+> patches across two branches. So, if it's easier we can just cherry-pick
+> apart the patches here across the branches (your comment about next
+> coverage makes me suspect you have no direct downstream users of this
+> branch). If that's OK, let me know and I'll do that tomorrow.
 
-> 
-> DEBUG_VIRTUAL currently depends on DEBUG_KERNEL && X86. arm64 is getting
-> the same support. Rather than add a list of architectures, switch this
-> to ARCH_HAS_DEBUG_VIRTUAL and let architectures select it as
-> appropriate.
-> 
-> Suggested-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> v3: No change, x86 maintainers please ack if you are okay with this.
-> ---
->  arch/x86/Kconfig  | 1 +
->  lib/Kconfig.debug | 5 ++++-
->  2 files changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> index bada636..f533321 100644
-> --- a/arch/x86/Kconfig
-> +++ b/arch/x86/Kconfig
-> @@ -23,6 +23,7 @@ config X86
->  	select ARCH_CLOCKSOURCE_DATA
->  	select ARCH_DISCARD_MEMBLOCK
->  	select ARCH_HAS_ACPI_TABLE_UPGRADE if ACPI
-> +	select ARCH_HAS_DEBUG_VIRTUAL
->  	select ARCH_HAS_DEVMEM_IS_ALLOWED
->  	select ARCH_HAS_ELF_RANDOMIZE
->  	select ARCH_HAS_FAST_MULTIPLIER
+It's fine to cherry-pick, I can also send two separate branches (or
+just 2+1 stand-alone patches).
 
-Acked-by: Ingo Molnar <mingo@kernel.org>
+Any way you like it :) just tell me what to do, all I want is to get this
+in for v4.10.
 
-Thanks,
-
-	Ingo
+Yours,
+Linus Walleij
