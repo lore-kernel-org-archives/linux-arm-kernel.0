@@ -1,53 +1,43 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 17 Nov 2016 23:19:32 -0800
-Subject: [GIT PULL] pxa-dt for v4.10
-In-Reply-To: <8760nxwqs0.fsf@belgarion.home>
-References: <8760nxwqs0.fsf@belgarion.home>
-Message-ID: <20161118071932.GB1785@localhost>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri, 18 Nov 2016 08:55:04 +0100
+Subject: [PATCH] crypto: sun4i-ss: support the Security System PRNG
+In-Reply-To: <CACXcFmmMc7U1Qz6A+mvMXVnfSmOmssydcmSugo21jrX3u-95Qg@mail.gmail.com>
+References: <1476794067-28563-1-git-send-email-clabbe.montjoie@gmail.com>
+ <CACXcFmmMc7U1Qz6A+mvMXVnfSmOmssydcmSugo21jrX3u-95Qg@mail.gmail.com>
+Message-ID: <20161118075504.GA21827@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Nov 17, 2016 at 08:07:09PM -0500, Sandy Harris wrote:
+> Add Ted T'so to cc list. Shouldn't he be included on anything affecting
+> the random(4) driver?
+> 
 
-On Tue, Nov 08, 2016 at 11:27:59PM +0100, Robert Jarzmik wrote:
-> Hi Arnd, Kevin, and Olof,
-> 
-> This is the pxa pull request for 4.10 device-tree, can you please consider
-> pulling ?
-> 
-> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-> 
->   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/rjarzmik/linux.git tags/pxa-dt-4.10
-> 
-> for you to fetch changes up to f409d2f134d499354dca0613693f27d8efd75c74:
-> 
->   ARM: dts: pxa: add pxa27x cpu operating points (2016-11-02 22:52:45 +0100)
-> 
-> ----------------------------------------------------------------
-> This device-tree pxa update brings :
->  - pxa25x support
->  - cpu operating points in preparation for cpufreq-dt
->  - small fixes
-> 
-> ----------------------------------------------------------------
-> Robert Jarzmik (4):
->       ARM: dts: add pxa25x .dtsi file
->       ARM: dts: pxa: fix gpio0 and gpio1 interrupts
->       ARM: dts: pxa: add pxa25x cpu operating points
->       ARM: dts: pxa: add pxa27x cpu operating points
-> 
-> Vijay Kumar (1):
->       Fix no. of gpio cells in the pxa gpio binding doucmentation
+Blindy used get_maintainer.pl, and since the file is in crypto, hw_random people were not set.
+Note that get_maintainer.pl on drivers/char/hw_random/, does not give his address also.
+My V2 patch will have them in CC/TO.
 
-This isn't the right patch subject. Please use standard prefix format
-here (ARM: dts: pxa: ...).
+> On Tue, Oct 18, 2016 at 8:34 AM, Corentin Labbe
+> <clabbe.montjoie@gmail.com> wrote:
+> 
+> > From: LABBE Corentin <clabbe.montjoie@gmail.com>
+> >
+> > The Security System have a PRNG.
+> > This patch add support for it as an hwrng.
+> 
+> Which is it? A PRNG & a HW RNG are quite different things.
+> It would, in general, be a fairly serious error to treat a PRNG
+> as a HWRNG.
+> 
+> If it is just a prng (which it appears to be from a quick look
+> at your code) then it is not clear it is useful since the
+> random(4) driver already has two PRNGs. It might be
+> but I cannot tell.
 
+For me hwrng is a way to give user space an another way to get "random" data via /dev/hwrng.
+The only impact of hwrng with random is that just after init some data of hwrng is used for having more entropy.
 
-Please respin this branch and post a fresh pull request. Thanks!
+Grepping prng in drivers/char/hw_random/ and drivers/crypto show me some other PRNG used with hwrng.
 
-
--Olof
+Regards
+Corentin Labbe
