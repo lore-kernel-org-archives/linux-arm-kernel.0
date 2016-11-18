@@ -1,115 +1,145 @@
-From: anurupvasu@gmail.com (Anurup M)
-Date: Fri, 18 Nov 2016 13:45:23 +0530
-Subject: System/uncore PMUs and unit aggregation
-In-Reply-To: <20161117181708.GT22855@arm.com>
-References: <20161117181708.GT22855@arm.com>
-Message-ID: <582EB89B.5050708@gmail.com>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Fri, 18 Nov 2016 09:32:47 +0100
+Subject: [PATCH V8 2/6] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <20161117151019.GA3115@localhost.localdomain>
+References: <1478081906-12009-1-git-send-email-kernel@martin.sperl.org>
+ <1478081906-12009-3-git-send-email-kernel@martin.sperl.org>
+ <20161117021107.GA2647@localhost.localdomain>
+ <766e1b70-d83a-eb52-fa2b-aec435e85673@martin.sperl.org>
+ <20161117151019.GA3115@localhost.localdomain>
+Message-ID: <7957B3CC-0E18-4B27-82EB-EF88B7695E28@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks you Mark and Will to initiate this discussion.
 
-On Thursday 17 November 2016 11:47 PM, Will Deacon wrote:
-> Hi all,
->
-> We currently have support for three arm64 system PMUs in flight:
->
->   [Cavium ThunderX] http://lkml.kernel.org/r/cover.1477741719.git.jglauber at cavium.com
->   [Hisilicon Hip0x] http://lkml.kernel.org/r/1478151727-20250-1-git-send-email-anurup.m at huawei.com
->   [Qualcomm L2] http://lkml.kernel.org/r/1477687813-11412-1-git-send-email-nleeder at codeaurora.org
->
-> Each of which have to deal with multiple underlying hardware units in one
-> way or another. Mark and I recently expressed a desire to expose these
-> units to userspace as individual PMU instances, since this can allow:
->
->    * Fine-grained control of events from userspace, when you want to see
->      individual numbers as opposed to a summed total
->
->    * Potentially ease migration to new SoC revisions, where the units
->      are laid out slightly differently
->
->    * Easier handling of cases where the units aren't quite identical
->
-> however, this received pushback from all of the patch authors, so there's
-> clearly a problem with this approach. I'm hoping we can try to resolve
-> this here.
->
-> Speaking to Mark earlier today, we came up with the following rough rules
-> for drivers that present multiple hardware units as a single PMU:
->
->    1. If the units share some part of the programming interface (e.g. control
->       registers or interrupts), then they must be handled by the same PMU.
->       Otherwise, they should be treated independently as separate PMU
->       instances.
-The Hisilicon Hip0x chip has units like L3 cache, Miscellaneous nodes, 
-DDR controller etc.
-There are such units in multiple CPU die's in the chip.
+> On 17.11.2016, at 16:10, Eduardo Valentin <edubezval@gmail.com> wrote:
+> 
+> Hello Martin,
+> 
+> On Thu, Nov 17, 2016 at 10:51:33AM +0100, Martin Sperl wrote:
+>> 
+>> 
+>> On 17.11.2016 03:11, Eduardo Valentin wrote:
+>>> Hey Martin,
+>>> 
+>>> Very sorry for the late feedback. Not so sure if this one got queued
+>>> already or not. Anyways, just minor questions as follows:
+>>> 
+>>> On Wed, Nov 02, 2016 at 10:18:22AM +0000, kernel at martin.sperl.org wrote:
+>>>> From: Martin Sperl <kernel@martin.sperl.org>
+>>>> 
+>>>> Add basic thermal driver for bcm2835 SOC.
+>>>> 
+>>>> This driver currently relies on the firmware setting up the
+>>>> tsense HW block and does not set it up itself.
+>>>> 
+>>>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>>>> Acked-by: Eric Anholt <eric@anholt.net>
+>>>> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+>>>> 
+>> ...
+>>>> +static int bcm2835_thermal_adc2temp(
+>>>> +	const struct bcm2835_thermal_info *info, u32 adc)
+>>>> +{
+>>>> +	return info->offset + (adc * info->slope);
+>>> 
+>>> Any specific reason we cannot use thermal_zone_params->slope and
+>>> thermal_zone_params->offset?
+>> 
+>> You could - the patch was just rebased to 4.9 and those slope and
+>> offset just got merged during this cycle.
+>> 
+>> Do we really need to modify it - the patch has been around since 4.6.
+>> 
+>>>> +
+>>>> +static int bcm2835_thermal_get_trip_temp(
+>>>> +	struct thermal_zone_device *tz, int trip, int *temp)
+>>>> +{
+>>>> +	struct bcm2835_thermal_data *data = tz->devdata;
+>>>> +	u32 val = readl(data->regs + BCM2835_TS_TSENSCTL);
+>>>> +
+>>>> +	/* get the THOLD bits */
+>>>> +	val &= BCM2835_TS_TSENSCTL_THOLD_MASK;
+>>>> +	val >>= BCM2835_TS_TSENSCTL_THOLD_SHIFT;
+>>>> +
+>>>> +	/* if it is zero then use the info value */
+>>>> +	if (val)
+>>> 
+>>> Is this a read only register or is this driver supposed to program it?
+>>> In which scenario it would be 0? Can this be added as comments?
+>> 
+>> It is RW, but the Firmware typically sets up the thermal device with the
+>> correct values already - this is just a fallback.
+> 
+> OK, but how do you differentiate from a buggy firmware or misconfigured
+> hardware? How do you know if the firmware is supposed to be loaded and
+> ready? There is no firmware loading in this driver. Also, there is no
+> dependency with a driver that loads firmware, or at least, I missed it.
+> 
+The way that firmware works on the RPI is quite different from most others I guess.
+in principle you got 2 different CPUs on the bcm2835:
+* ARM, which runs the linux instance
+* VideoCore 4, which runs the firmware (loading from SD initially) and
+  then booting the ARM.
 
-The L3 cache is further divided as banks which have separate set of 
-interface (control registers, interrupts etc..).
-As per the suggestion, each L3 cache banks will be exposed as a 
-individual PMU instance.
-So for e.g. in a board using Hip0x chip with 2 sockets and each socket 
-consists of 2 CPU die,
-There will be a total of 16 L3 cache PMU's which will be exposed.
+So this Firmware on VC4 is the one that I am talking about.
+Without the working firmware linux can not boot on arm.
+As of now he firmware is also checking temperature of the SOC itself and
+if it finds ?critical? temperatures it will clock down ARM and the GPU.
 
-My doubt here is
-Each L3 cache PMU has total 22 statistics events. So if registered as a 
-separate PMU, will it not
-create multiple entries (with same event names) in event listing for 
-multiple L3 cache PMU's.
-Is there a way to avoid this? or this is acceptable?
+Hope that this explains the ?firmware? on bcm2835.
 
-Just a thought, If we can group them as single PMU and add a config 
-parameter in the event listing to
-identify the L3 cache bank(sub unit). e.g:  event name will appear as 
-"hisi_l3c2/read_allocate,bank=?/".
-And user can choose count from bank 0x01 as -e 
-"hisi_l3c2/read_allocate,bank=0x01/".
-And for aggregate count, bank=0xff.
-Does it over complicate? Please share your comments.
+>> 
+>>>> +static int bcm2835_thermal_get_temp(struct thermal_zone_device *tz,
+>>>> +				    int *temp)
+>>>> +{
+>>>> +	struct bcm2835_thermal_data *data = tz->devdata;
+>>>> +	u32 val = readl(data->regs + BCM2835_TS_TSENSSTAT);
+>>>> +
+>>>> +	if (!(val & BCM2835_TS_TSENSSTAT_VALID))
+>>> 
+>>> What cases you would get the valid bit not set? Do you need to wait for
+>>> the conversion to finish?
+>> 
+>> I guess: if you have just enabled the HW-block (which the FW does much
+>> in advance) and start to read the value immediately (before the first sample
+>> period has finished), then this will not be valid.
+>> 
+> 
+> Then again, how does this driver make sure the initialization procedure
+> is correct, and that by the time it is using the hardware, the hardware
+> is in a sane state?
+> 
+> Back to the original question, does it mean the hardware is in
+> some sort of continuous ADC conversion mode or reading the temperature
+> requires specific steps to get the conversion done, and therefore you
+> are checking the valid bit here?
 
->    2. If the units are handled by the same PMU, then care must be taken to
->       handle event groups correctly. That is, if the units cannot be started
->       and stopped atomically, cross-unit groups must be rejected by the
->       driver. Furthermore, any cross-unit scheduling constraints must be
->       honoured so that all the units targetted by a group can schedule the
->       group concurrently.
->
->    3. Summing the counters across units is only permitted if the units
->       can all be started and stopped atomically. Otherwise, the counters
->       should be exposed individually. It's up to the driver author to
->       decide what makes sense to sum.
->
->    4. Unit topology can optionally be described in sysfs (we should pick
->       some standard directory naming here), and then events targetting
->       specific units can have the unit identifier extracted from the topology
->       encoded in some configN fields.
-Does this unit topology and configN method can solve the duplicate event 
-listing issue? Please clarify.
-> The million dollar question is: how does that fit in with the drivers I
-> mentioned at the top? Is this overly restrictive, or have we missed stuff?
->
-> We certainly want to allow flexibility in the way in which the drivers
-> talk to the hardware, but given that these decisions directly affect the
-> user ABI, some consistent ground rules are required.
->
-> For Cavium ThunderX, it's not clear whether or not the individual units
-> could be expressed as separate PMUs, or whether they're caught by one of
-> the rules above. The Qualcomm L2 looks like it's doing the right thing
-> and we can't quite work out what the Hisilicon Hip0x topology looks like,
-> since the interaction with djtag is confusing.
-The djtag is a component which connects with some other components in 
-the SoC by Debug Bus.
-The registers in components like L3 cache, MN etc are accessed only via 
-djtag.
-Please share comments about the confusion. We can discuss to clear them.
+As far as I understand the conversion is continuous (as soon as the HW is
+configured). This case is there primarily to handle the situation where
+we initialize the HW ourselves (see line 226 and below), and we immediately
+want to read the ADC value before the first conversion is finished.
+
+The above mentioned ?configuration if not running? reflect the values that
+the FW is currently setting. We should not change those values as long as the
+Firmware is also reading the temperature on its own.
+
+> 
+>> So do you need another version of the patchset that uses that new API?
+> 
+> I think the API usage is change that can be done together with
+> clarification for the above questions too: on hardware state,
+> firmware loading, maybe a master driver dependency, and the ADC
+> conversion sequence, which are not well clear to me on this driver. As long as
+> this is clarified and documented in the code (can be simple comments so
+> it is clear to whoever reads in the future), then I would be OK with
+> this driver. 
+
+So how do you want this to get ?documented? in the driver?
+The setup and Firmware is a generic feature of the SOC, so if we would put
+some clarifications in this driver, then we would need to put it in every
+bcm283X driver (which seems unreasonable).
 
 Thanks,
-Anurup
-> If the driver authors (on To:) could shed some light on this, then that
-> would be much appreciated!
->
-> Thanks,
->
-> Will
+	Martin
