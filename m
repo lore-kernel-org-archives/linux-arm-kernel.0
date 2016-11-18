@@ -1,91 +1,37 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 18 Nov 2016 15:55:43 +0000
-Subject: [PATCH v8 11/16] drivers: iommu: arm-smmu-v3: add IORT
- configuration
-In-Reply-To: <20161116152936.22955-12-lorenzo.pieralisi@arm.com>
+Date: Fri, 18 Nov 2016 16:00:06 +0000
+Subject: [PATCH v8 12/16] drivers: iommu: arm-smmu: split probe functions
+ into DT/generic portions
+In-Reply-To: <20161116152936.22955-13-lorenzo.pieralisi@arm.com>
 References: <20161116152936.22955-1-lorenzo.pieralisi@arm.com>
- <20161116152936.22955-12-lorenzo.pieralisi@arm.com>
-Message-ID: <20161118155543.GV13470@arm.com>
+ <20161116152936.22955-13-lorenzo.pieralisi@arm.com>
+Message-ID: <20161118160006.GW13470@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2016 at 03:29:31PM +0000, Lorenzo Pieralisi wrote:
-> In ACPI bases systems, in order to be able to create platform
-> devices and initialize them for ARM SMMU v3 components, the IORT
-> kernel implementation requires a set of static functions to be
-> used by the IORT kernel layer to configure platform devices for
-> ARM SMMU v3 components.
+On Wed, Nov 16, 2016 at 03:29:32PM +0000, Lorenzo Pieralisi wrote:
+> Current ARM SMMU probe functions intermingle HW and DT probing
+> in the initialization functions to detect and programme the ARM SMMU
+> driver features. In order to allow probing the ARM SMMU with other
+> firmwares than DT, this patch splits the ARM SMMU init functions into
+> DT and HW specific portions so that other FW interfaces (ie ACPI) can
+> reuse the HW probing functions and skip the DT portion accordingly.
 > 
-> Add static configuration functions to the IORT kernel layer for
-> the ARM SMMU v3 components, so that the ARM SMMU v3 driver can
-> initialize its respective platform device by relying on the IORT
-> kernel infrastructure and by adding a corresponding ACPI device
-> early probe section entry.
+> This patch implements no functional change, only code reshuffling.
 > 
 > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > Reviewed-by: Tomasz Nowicki <tn@semihalf.com>
 > Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 > Tested-by: Tomasz Nowicki <tn@semihalf.com>
 > Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
 > Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Joerg Roedel <joro@8bytes.org>
 > ---
->  drivers/acpi/arm64/iort.c   | 103 +++++++++++++++++++++++++++++++++++++++++++-
->  drivers/iommu/arm-smmu-v3.c |  49 ++++++++++++++++++++-
->  2 files changed, 150 insertions(+), 2 deletions(-)
+>  drivers/iommu/arm-smmu.c | 62 +++++++++++++++++++++++++++++-------------------
+>  1 file changed, 37 insertions(+), 25 deletions(-)
 
-[...]
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index ed563307..9315bf3 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -20,6 +20,8 @@
->   * This driver is powered by bad coffee and bombay mix.
->   */
->  
-> +#include <linux/acpi.h>
-> +#include <linux/acpi_iort.h>
->  #include <linux/delay.h>
->  #include <linux/dma-iommu.h>
->  #include <linux/err.h>
-> @@ -2559,6 +2561,36 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_ACPI
-> +static int arm_smmu_device_acpi_probe(struct platform_device *pdev,
-> +				      struct arm_smmu_device *smmu,
-> +				      bool *bypass)
-> +{
-> +	struct acpi_iort_smmu_v3 *iort_smmu;
-> +	struct device *dev = smmu->dev;
-> +	struct acpi_iort_node *node;
-> +
-> +	node = *(struct acpi_iort_node **)dev_get_platdata(dev);
-> +
-> +	/* Retrieve SMMUv3 specific data */
-> +	iort_smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
-> +
-> +	if (iort_smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE)
-> +		smmu->features |= ARM_SMMU_FEAT_COHERENCY;
-> +
-> +	*bypass = false;
-> +
-> +	return 0;
-> +}
-> +#else
-> +static inline int arm_smmu_device_acpi_probe(struct platform_device *pdev,
-> +					     struct arm_smmu_device *smmu,
-> +					     bool *bypass)
-> +{
-> +	return -ENODEV;
-> +}
-> +#endif
-
-Same bypass comments as before, but you'll probably need to do something
-so that you *can* abort the probe if !ACPI, perhaps by allocating two
-error codes to distinguish the "I no nothing about this SMMU" from "I know
-enough to put it into bypass, but nothing more".
+Although I'd also like Robin to have a look at this.
 
 Will
