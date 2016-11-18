@@ -1,62 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 18 Nov 2016 18:55:48 +0000
-Subject: [PATCH] mfd: twl-core: export twl_get_regmap
-In-Reply-To: <1478950693-13959-1-git-send-email-Nicolae_Rosia@mentor.com>
-References: <1478950693-13959-1-git-send-email-Nicolae_Rosia@mentor.com>
-Message-ID: <20161118185548.GA23246@dell.home>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 18 Nov 2016 18:52:52 +0000
+Subject: [PATCH v16 05/15] clocksource/drivers/arm_arch_timer: fix a bug
+ in arch_timer_register about arch_timer_uses_ppi
+In-Reply-To: <1479304148-2965-6-git-send-email-fu.wei@linaro.org>
+References: <1479304148-2965-1-git-send-email-fu.wei@linaro.org>
+ <1479304148-2965-6-git-send-email-fu.wei@linaro.org>
+Message-ID: <20161118185252.GI1197@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 12 Nov 2016, Nicolae Rosia wrote:
-
-> We want to get rid of global twl_i2c_{write/read}.
-> As a first step, allow clients to get the regmap and write directly
-
-What's stopping you from passing it through device data?
-
-> Signed-off-by: Nicolae Rosia <Nicolae_Rosia@mentor.com>
-> ---
->  drivers/mfd/twl-core.c  | 3 ++-
->  include/linux/i2c/twl.h | 2 ++
->  2 files changed, 4 insertions(+), 1 deletion(-)
+On Wed, Nov 16, 2016 at 09:48:58PM +0800, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
 > 
-> diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
-> index c64615d..49e6a4b 100644
-> --- a/drivers/mfd/twl-core.c
-> +++ b/drivers/mfd/twl-core.c
-> @@ -421,7 +421,7 @@ EXPORT_SYMBOL(twl_rev);
->   *
->   * Returns the regmap pointer or NULL in case of failure.
->   */
-> -static struct regmap *twl_get_regmap(u8 mod_no)
-> +struct regmap *twl_get_regmap(u8 mod_no)
->  {
->  	int sid;
->  	struct twl_client *twl;
-> @@ -440,6 +440,7 @@ static struct regmap *twl_get_regmap(u8 mod_no)
->  
->  	return twl->regmap;
->  }
-> +EXPORT_SYMBOL(twl_get_regmap);
->  
->  /**
->   * twl_i2c_write - Writes a n bit register in TWL4030/TWL5030/TWL60X0
-> diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
-> index 9ad7828..4c43cdb3 100644
-> --- a/include/linux/i2c/twl.h
-> +++ b/include/linux/i2c/twl.h
-> @@ -174,6 +174,8 @@ static inline int twl_class_is_ ##class(void)	\
->  TWL_CLASS_IS(4030, TWL4030_CLASS_ID)
->  TWL_CLASS_IS(6030, TWL6030_CLASS_ID)
->  
-> +struct regmap *twl_get_regmap(u8 mod_no);
-> +
->  /* Set the regcache bypass for the regmap associated with the nodule */
->  int twl_set_regcache_bypass(u8 mod_no, bool enable);
->  
+> The patch fix a potential bug about arch_timer_uses_ppi in
+> arch_timer_register.
+> On ARM64, we don't use ARCH_TIMER_PHYS_SECURE_PPI in Linux, so we will
+> just igorne it in init code. 
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+That's not currently the case. I assume you mean we will in later
+patches? If so, please make that clear in the commit message.
+
+> If arch_timer_uses_ppi is ARCH_TIMER_PHYS_NONSECURE_PPI, the orignal
+> code of arch_timer_uses_ppi may go wrong.
+
+How? What specifically happens?
+
+We don't currently assign ARCH_TIMER_PHYS_NONSECURE_PPI to
+arch_timer_uses_ppi, so I assume a later patch changes this. This change
+should be folded into said patch; it doesn't make sense in isolation.
+
+Thanks,
+Mark.
+
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> ---
+>  drivers/clocksource/arm_arch_timer.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index dd1040d..6de164f 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -699,7 +699,7 @@ static int __init arch_timer_register(void)
+>  	case ARCH_TIMER_PHYS_NONSECURE_PPI:
+>  		err = request_percpu_irq(ppi, arch_timer_handler_phys,
+>  					 "arch_timer", arch_timer_evt);
+> -		if (!err && arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI]) {
+> +		if (!err && arch_timer_has_nonsecure_ppi()) {
+>  			ppi = arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI];
+>  			err = request_percpu_irq(ppi, arch_timer_handler_phys,
+>  						 "arch_timer", arch_timer_evt);
+> -- 
+> 2.7.4
+> 
