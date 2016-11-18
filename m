@@ -1,30 +1,37 @@
-From: geliangtang@gmail.com (Geliang Tang)
-Date: Fri, 18 Nov 2016 22:21:11 +0800
-Subject: [PATCH] ARM: lpc32xx: drop duplicate header device.h
-In-Reply-To: <319a5803aac795e175306d4978134f0247cf87bc.1479457751.git.geliangtang@gmail.com>
-References: <319a5803aac795e175306d4978134f0247cf87bc.1479457751.git.geliangtang@gmail.com>
-Message-ID: <31c0875cedae8fe20211b209c85b6e012fa9f6a5.1479457940.git.geliangtang@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 18 Nov 2016 08:21:38 -0600
+Subject: [PATCH 1/2] dt-bindings: ahci-fsl-qoriq: added explanation for
+ reg-names
+In-Reply-To: <1479369560-9188-1-git-send-email-yuantian.tang@nxp.com>
+References: <1479369560-9188-1-git-send-email-yuantian.tang@nxp.com>
+Message-ID: <20161118142138.jwehwhevgkhi6hww@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop duplicate header device.h from phy3250.c.
+On Thu, Nov 17, 2016 at 03:59:19PM +0800, yuantian.tang at nxp.com wrote:
+> From: Tang Yuantian <Yuantian.Tang@nxp.com>
+> 
+> Added explanation for reg-names to make it more clear.
+> 
+> Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
+> ---
+>  Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt b/Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt
+> index fc33ca0..80cf10c 100644
+> --- a/Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt
+> +++ b/Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt
+> @@ -10,6 +10,8 @@ Required properties:
+>  Optional properties:
+>    - dma-coherent: Enable AHCI coherent DMA operation.
+>    - reg-names: register area names when there are more than 1 register area.
+> +		example: 'ahci' is for sata controller register.
+> +			 'sata-ecc' is for sata ecc register.
 
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
----
- arch/arm/mach-lpc32xx/phy3250.c | 1 -
- 1 file changed, 1 deletion(-)
+This is not an example, but should be exactly what names are used.
 
-diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
-index 0e4cbbe..6c52bd3 100644
---- a/arch/arm/mach-lpc32xx/phy3250.c
-+++ b/arch/arm/mach-lpc32xx/phy3250.c
-@@ -23,7 +23,6 @@
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/dma-mapping.h>
--#include <linux/device.h>
- #include <linux/gpio.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/clcd.h>
--- 
-2.9.3
+When is there more than one area? That should be defined by the 
+compatible string and spelled out here.
+
+Rob
