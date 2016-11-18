@@ -1,86 +1,83 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 18 Nov 2016 20:20:00 +0000
-Subject: [PATCH v16 14/15] clocksource/drivers/arm_arch_timer: Add GTDT
- support for memory-mapped timer
-In-Reply-To: <1479304148-2965-15-git-send-email-fu.wei@linaro.org>
-References: <1479304148-2965-1-git-send-email-fu.wei@linaro.org>
- <1479304148-2965-15-git-send-email-fu.wei@linaro.org>
-Message-ID: <20161118202000.GP1197@leverpostej>
+From: markivx@codeaurora.org (Vikram Mulukutla)
+Date: Fri, 18 Nov 2016 12:22:23 -0800
+Subject: spin_lock behavior with ARM64 big.Little/HMP
+In-Reply-To: <8d9d6333-0ebe-65c4-c6f1-3e3475e3e535@arm.com>
+References: <400ab4b8b2354c5b9283f6ed657363a0@codeaurora.org>
+ <8d9d6333-0ebe-65c4-c6f1-3e3475e3e535@arm.com>
+Message-ID: <f9fc9549d801fece7422d97d5d89df8b@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2016 at 09:49:07PM +0800, fu.wei at linaro.org wrote:
-> From: Fu Wei <fu.wei@linaro.org>
+
+Hi Sudeep,
+
+Thanks for taking a look!
+
+On 2016-11-18 02:30, Sudeep Holla wrote:
+> Hi Vikram,
 > 
-> The patch add memory-mapped timer register support by using the
-> information provided by the new GTDT driver of ACPI.
+> On 18/11/16 02:22, Vikram Mulukutla wrote:
+>> Hello,
+>> 
+>> This isn't really a bug report, but just a description of a 
+>> frequency/IPC
+>> dependent behavior that I'm curious if we should worry about. The 
+>> behavior
+>> is exposed by questionable design so I'm leaning towards don't-care.
+>> 
+>> Consider these threads running in parallel on two ARM64 CPUs running
+>> mainline
+>> Linux:
+>> 
 > 
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> ---
->  drivers/clocksource/arm_arch_timer.c | 26 +++++++++++++++++++++++++-
->  1 file changed, 25 insertions(+), 1 deletion(-)
+> Are you seeing this behavior with the mainline kernel on any platforms
+> as we have a sort of workaround for this ?
 > 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index c494ca8..0aad60a 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -1067,7 +1067,28 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
->  		       arch_timer_mem_of_init);
->  
->  #ifdef CONFIG_ACPI_GTDT
-> -/* Initialize per-processor generic timer */
-> +static int __init arch_timer_mem_acpi_init(void)
-> +{
-> +	struct arch_timer_mem *timer_mem;
-> +	int ret = 0;
-> +	int i = 0;
-> +
-> +	timer_mem = kzalloc(sizeof(*timer_mem), GFP_KERNEL);
 
-Why do you need it zeroed? You don't clear it between iterations, so
-either you don't need this, or you have a bug in the loop.
+If I understand that workaround correctly, the ARM timer event stream is 
+used
+to periodically wake up CPUs that are waiting in WFE, is that right? I 
+think
+my scenario below may be different because LittleCPU doesn't actually 
+wait
+on a WFE event in the loop that is trying to increment lock->next, i.e. 
+it's
+stuck in the following loop:
 
-> +	if (!timer_mem)
-> +		return -ENOMEM;
-> +
-> +	while (!gtdt_arch_timer_mem_init(timer_mem, i)) {
-
-Huh?
-
-Why doesn't GTDT expose a function to fill in the entire arch_timer_mem
-in one go?
-
-There shouldn't be multiple instances, as far as I am aware. Am I
-mistaken?
-
-> +		ret = arch_timer_mem_init(timer_mem);
-> +		if (ret)
-> +			break;
-> +		i++;
-> +	}
-> +
-> +	kfree(timer_mem);
-> +	return ret;
-> +}
+         ARM64_LSE_ATOMIC_INSN(
+         /* LL/SC */
+"       prfm    pstl1strm, %3\n"
+"1:     ldaxr   %w0, %3\n"
+"       add     %w1, %w0, %w5\n"
+"       stxr    %w2, %w1, %3\n"
+"       cbnz    %w2, 1b\n",
 
 
-Regardless, arch_timer_mem is small enough that you don't need dynamic
-allocaiton. Just put it on the stack, e.g.
+I have been testing internal platforms; I'll try to test on something
+available publicly that's b.L. In any case, the timer event stream was 
+enabled
+when I tried this out.
 
-static int __init arch_timer_mem_acpi_init(void)
-{
-	int i = 0;
-	struct arch_timer_mem timer_mem;
+>> (Ordering of lines between the two columns does not indicate a 
+>> sequence of
+>> execution. Assume flag=0 initially.)
+>> 
+>> LittleARM64_CPU @ 300MHz (e.g.A53)   |  BigARM64_CPU @ 1.5GHz (e.g. 
+>> A57)
+>> -------------------------------------+----------------------------------
+>> spin_lock_irqsave(s)                 |  local_irq_save()
+>> /* critical section */
+>> flag = 1                             |  spin_lock(s)
+>> spin_unlock_irqrestore(s)            |  while (!flag) {
+>>                                      |      spin_unlock(s)
+>>                                      |      cpu_relax();
+>>                                      |      spin_lock(s)
+>>                                      |  }
+>>                                      |  spin_unlock(s)
+>>                                      |  local_irq_restore()
+>> 
 
-	while (!gtdt_arch_timer_mem_init(timer_mem, i)) {
-		int ret = arch_timer_mem_init();
-		if (ret)
-			return ret;
-		i++
-	}
-
-	return 0;
-}
+[...]
 
 Thanks,
-Mark.
+Vikram
