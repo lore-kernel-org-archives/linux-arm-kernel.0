@@ -1,71 +1,126 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 18 Nov 2016 10:30:47 +0000
-Subject: spin_lock behavior with ARM64 big.Little/HMP
-In-Reply-To: <400ab4b8b2354c5b9283f6ed657363a0@codeaurora.org>
-References: <400ab4b8b2354c5b9283f6ed657363a0@codeaurora.org>
-Message-ID: <8d9d6333-0ebe-65c4-c6f1-3e3475e3e535@arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 18 Nov 2016 11:37:20 +0100
+Subject: arasan,sdhci.txt "compatibility" DT binding
+In-Reply-To: <56B21DDB.6050708@free.fr>
+References: <56B07BA5.4060407@free.fr> <56B166F1.5080605@rock-chips.com>
+ <56B1AA44.1010108@xilinx.com> <56B1BAF8.2050907@free.fr>
+ <56B1CF40.1030203@xilinx.com> <20160203152104.GP4215@xsjsorenbubuntu>
+ <56B21DDB.6050708@free.fr>
+Message-ID: <582ED9E0.5090506@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vikram,
+On 03/02/2016 16:33, Mason wrote:
+> On 03/02/2016 16:21, S?ren Brinkmann wrote:
+>> On Wed, 2016-02-03 at 10:58:24 +0100, Michal Simek wrote:
+>>> On 3.2.2016 09:31, Mason wrote:
+>>>> On 03/02/2016 08:20, Michal Simek wrote:
+>>>>
+>>>>> On 3.2.2016 03:33, Shawn Lin wrote:
+>>>>>> + Michal, S?ren Brinkmann
+>>>>>>
+>>>>>> On 2016/2/2 17:49, Mason wrote:
+>>>>>>> Hello everyone,
+>>>>>>>
+>>>>>>> Documentation/devicetree/bindings/mmc/arasan,sdhci.txt states:
+>>>>>>>
+>>>>>>> Required Properties:
+>>>>>>>    - compatible: Compatibility string. Must be 'arasan,sdhci-8.9a' or
+>>>>>>>                  'arasan,sdhci-4.9a' or 'arasan,sdhci-5.1'
+>>>>>>>
+>>>>>>> What do 8.9a, 4.9a, and 5.1 refer to?
+>>>>>>>
+>>>>>>
+>>>>>> Good question.
+>>>>>>
+>>>>>> Michal told me that 8.9a and 4.9a came from Xilinx
+>>>>>> databook which define their available arasan controller to be version
+>>>>>> 4.9a and 8.9a.
+>>>>>
+>>>>> Our version is coming from here.
+>>>>> http://www.xilinx.com/support/documentation/user_guides/ug585-Zynq-7000-TRM.pdf
+>>>>> page 28
+>>>>>
+>>>>> Datasheets from 2012 and 2010 doesn't look too recent and I expect that
+>>>>> Arasan did a lot of work from that time that's why I am not surprised
+>>>>> that you are not able to see that versions.
+>>>>
+>>>> Hello Michal,
+>>>>
+>>>> I'm even more confused.
+>>>>
+>>>> Arasan's 2010-02-19 data sheet is titled
+>>>> SD3.0 / SDIO3.0 / eMMC4.4 AHB Host Controller
+>>>>
+>>>> Page 28 of the Xilinx data sheet mentions
+>>>> SD2.0 / SDIO2.0 / MMC3.31 AHB Host Controller
+>>>> Version 8.9A_apr02nd_2010
+>>>>
+>>>> It does not make sense that Arasan would support SD3.0 in February,
+>>>> then go back to SD 2.0 in April.
+>>>>
+>>>> I do note eMMC4.4 vs MMC3.31 => perhaps these are two *different*
+>>>> IP blocks?
+>>>>
+>>>> Do your data sheets come with revision history?
+>>>
+>>> I don't have datasheet for this IP in my hand that's why I can't check it.
+>>> But I can't see any problem with it. Our zynq SoC supports SD2.0 and it
+>>> was requirement at that time. Bugs can happen. Arasan fixed it and
+>>> create new version.
+>>> At the same time can have 3.0 versions but vendor is just decide not to
+>>> use it for whatever reason.
+>>>
+>>> That's why timing of features and versions can upgrade any time and
+>>> unfortunately bugs happen.
+>>
+>> We have several Arasan data sheets here. The document names are:
+>> "SD2.0 / SDIO2.0 / MMC3.31 AHB Userguide" and the revisions are 9.2a,
+>> 4.4a and 5.4a. I have the feeling that the document revisions have
+>> been mistaken as the IP revision. I cannot find any other indicator
+>> for the IP revision though. Does the IP have a way to discover its
+>> revision?
+> 
+> To summarize, it looks to me like
+> 4.9a and 8.9a are documentation revision numbers for this IP:
+> "SD2.0 / SDIO2.0 / MMC3.31 AHB Host Controller"
+> 
+> and 5.1 seems to be the eMMC standard, so one of these IP:
+> http://arasan.com/products/emmc51/sd3-emmc-5-1-host/
+> http://arasan.com/products/emmc51/emmc-5-1-sd-4-1-host/
+> 
+> Whereas my board is using still another IP:
+> "SD3.0 / SDIO3.0 / eMMC4.4 AHB Host Controller"
+> 
+> 
+> If that is correct, then I should be able to use the 8.9a
+> compatible string, and perhaps my hardware will work in
+> slightly degraded performance mode, from not using the
+> newest protocol gizmos available.
 
-On 18/11/16 02:22, Vikram Mulukutla wrote:
-> Hello,
->
-> This isn't really a bug report, but just a description of a frequency/IPC
-> dependent behavior that I'm curious if we should worry about. The behavior
-> is exposed by questionable design so I'm leaning towards don't-care.
->
-> Consider these threads running in parallel on two ARM64 CPUs running
-> mainline
-> Linux:
->
+Resurrecting this thread after a chat with Michal on IRC.
 
-Are you seeing this behavior with the mainline kernel on any platforms
-as we have a sort of workaround for this ?
+The driver now supports a few more compatible strings.
+Tracing the history...
 
-> (Ordering of lines between the two columns does not indicate a sequence of
-> execution. Assume flag=0 initially.)
->
-> LittleARM64_CPU @ 300MHz (e.g.A53)   |  BigARM64_CPU @ 1.5GHz (e.g. A57)
-> -------------------------------------+----------------------------------
-> spin_lock_irqsave(s)                 |  local_irq_save()
-> /* critical section */
-> flag = 1                             |  spin_lock(s)
-> spin_unlock_irqrestore(s)            |  while (!flag) {
->                                      |      spin_unlock(s)
->                                      |      cpu_relax();
->                                      |      spin_lock(s)
->                                      |  }
->                                      |  spin_unlock(s)
->                                      |  local_irq_restore()
->
-> I see a livelock occurring where the LittleCPU is never able to acquire the
-> lock, and the BigCPU is stuck forever waiting on 'flag' to be set.
->
+Soren/Xilinx defined "arasan,sdhci-8.9a" in e3ec3a3d11ad
+They have the "SD2.0/SDIO2.0/MMC3.31 AHB Host Controller" version
+(8.9a might be a document revision number, dated 2010-04-02)
 
-Yes we saw this issue 3 years back on TC2 which has A7(with lowest
-frequency of 300MHz IIRC) and A15(with 1.2 GHz). We were observing that
-inter-cluster events are missed since the two clusters are operating at
-different frequencies (details below).
+Suman/APM added "arasan,sdhci-4.9a" in 308f3f8d8112
+@Suman, @Rameshwar: what specific IP block does your SoC embed?
+What does 4.9a refer to? The documentation revision number?
 
-The hardware recommendation is that there should be glue logic between
-the two clusters which captures events from one cluster and replays then
-on the other if its operating at a different frequency.
+Shawn/Rockchip added "arasan,sdhci-5.1" in da795ec26e25
+This seems to be for an *actual* eMMC 5.1 version
+(instead of a documentation version) as mentioned in
+the commit message.
 
-Generally EVENTO from cluster 1 is connected to the EVENTI of the
-cluster 2 and vice versa. The only extra logic required is the double
-synchronizer in the receiving clock domain.
+Douglas added "rockchip,rk3399-sdhci-5.1"
+and made several other improvements.
 
-This issue arise in reality if the synchronizer is missing and different
-CPUs hold EVENTO for different clock cycles.
+I have reached out to Arasan support. Hopefully they can also
+help clear up the confusion, assuming they care about the
+Linux driver.
 
-However there was a different requirement to implement timer event
-stream in Linux for some user-space locking and that indirectly help to
-resolve the issue on TC2. That event stream feature is enabled by
-default in Linux and should fix the issue and hence I asked you if you
-still see that issue.
-
--- 
-Regards,
-Sudeep
+Regards.
