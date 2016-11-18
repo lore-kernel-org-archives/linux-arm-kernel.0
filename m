@@ -1,29 +1,49 @@
-From: geliangtang@gmail.com (Geliang Tang)
-Date: Fri, 18 Nov 2016 22:03:29 +0800
-Subject: [PATCH] drm: mediatek: use ERR_CAST inlined function
-Message-ID: <6ead9aa2438aa8ce5ba8b9a1f1c661b9d4e53c26.1479460645.git.geliangtang@gmail.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Fri, 18 Nov 2016 15:08:12 +0100
+Subject: [PATCH v2 0/2] Support for Axentia TSE-850
+Message-ID: <1479478094-20288-1-git-send-email-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use ERR_CAST inlined function instead of ERR_PTR(PTR_ERR(...)).
+Hi!
 
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
----
- drivers/gpu/drm/mediatek/mtk_drm_gem.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+changes v1 -> v2
+- squash the fixup into the correct patch, sorry for the noise.
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_gem.c b/drivers/gpu/drm/mediatek/mtk_drm_gem.c
-index 7abc550..8d25ff0 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_gem.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_gem.c
-@@ -245,7 +245,7 @@ struct drm_gem_object *mtk_gem_prime_import_sg_table(struct drm_device *dev,
- 	mtk_gem = mtk_drm_gem_init(dev, attach->dmabuf->size);
- 
- 	if (IS_ERR(mtk_gem))
--		return ERR_PTR(PTR_ERR(mtk_gem));
-+		return ERR_CAST(mtk_gem);
- 
- 	expected = sg_dma_address(sg->sgl);
- 	for_each_sg(sg->sgl, s, sg->nents, i) {
+After finally having all essintial drivers upstreamed (the
+last ones are currently in -next) I would like to have the
+dts and the defconfig also upstreamed.
+
+checkpatch complains about missing docs for some compatible
+strings:
+
+axentia,tse850v3   (v3 is the hw version that we currently use)
+axentia,tse850     (in case we have future versions with commonality)
+axentia,linea      (the cpu module, reused in other products as well)
+nxp,se97b          (temp sensor in the below eeprom module)
+nxp,24c02          (eeprom on the main board)
+st,24c64           (eeprom on the cpu module)
+
+I don't know where I should document those, or if it's even
+needed? I get the feeling that the last three are not "my fault".
+Anyway, please advice. Or, even better, apply as-is... :-)
+
+Cheers,
+Peter
+
+Peter Rosin (2):
+  ARM: dts: add devicetree for the Axentia TSE-850
+  ARM: tse850_defconfig: add Axentia TSE-850
+
+ MAINTAINERS                            |   7 +
+ arch/arm/boot/dts/Makefile             |   1 +
+ arch/arm/boot/dts/axentia-linea.dtsi   |  52 +++++++
+ arch/arm/boot/dts/axentia-tse850-3.dts | 275 +++++++++++++++++++++++++++++++++
+ arch/arm/configs/tse850_defconfig      | 223 ++++++++++++++++++++++++++
+ 5 files changed, 558 insertions(+)
+ create mode 100644 arch/arm/boot/dts/axentia-linea.dtsi
+ create mode 100644 arch/arm/boot/dts/axentia-tse850-3.dts
+ create mode 100644 arch/arm/configs/tse850_defconfig
+
 -- 
-2.9.3
+2.1.4
