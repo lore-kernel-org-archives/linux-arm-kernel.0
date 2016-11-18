@@ -1,36 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Nov 2016 10:22:46 +0100
-Subject: [PATCH V5 2/3] ARM64 LPC: Add missing range exception for special
- ISA
-In-Reply-To: <20161114111111.1b753dc3@lxorguk.ukuu.org.uk>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <5900275.i4NZvtxTcC@wuerfel> <20161114111111.1b753dc3@lxorguk.ukuu.org.uk>
-Message-ID: <11716372.n451O5j8Vs@wuerfel>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 18 Nov 2016 10:26:29 +0100
+Subject: System/uncore PMUs and unit aggregation
+In-Reply-To: <20161117181708.GT22855@arm.com>
+References: <20161117181708.GT22855@arm.com>
+Message-ID: <20161118092629.GK3117@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 14, 2016 11:11:11 AM CET One Thousand Gnomes wrote:
-> > > It's not a safe assumption for x86 at least. There are a few systems with
-> > > multiple ISA busses particularly older laptops with a docking station.  
-> > 
-> > But do they have multiple ISA domains? There is no real harm in supporting
-> > it, the (small) downsides I can think of are:
+On Thu, Nov 17, 2016 at 06:17:08PM +0000, Will Deacon wrote:
+> Hi all,
 > 
-> I don't believe they x86 class ones have multiple ISA domains. But as
-> I've said I don't know how the electronics in the older ThinkPad worked
-> when it used two PIIX4s with some LPC or ISA stuff on each.
+> We currently have support for three arm64 system PMUs in flight:
 > 
-> It works in DOS and unmodified Linux so I'm pretty sure there are no
-> additional domains. Likewise the various x86 schemes that route some bits
-> of ISA bus off into strange places work in DOS and don't have any
-> overlaps.
+>  [Cavium ThunderX] http://lkml.kernel.org/r/cover.1477741719.git.jglauber at cavium.com
+>  [Hisilicon Hip0x] http://lkml.kernel.org/r/1478151727-20250-1-git-send-email-anurup.m at huawei.com
+>  [Qualcomm L2] http://lkml.kernel.org/r/1477687813-11412-1-git-send-email-nleeder at codeaurora.org
 > 
-> yenta_socket handles PCI/PCMCIA bridging and routes a range of that flat
-> ISA space appropriately to the card.
+> Each of which have to deal with multiple underlying hardware units in one
+> way or another. Mark and I recently expressed a desire to expose these
+> units to userspace as individual PMU instances, since this can allow:
+> 
+>   * Fine-grained control of events from userspace, when you want to see
+>     individual numbers as opposed to a summed total
+> 
+>   * Potentially ease migration to new SoC revisions, where the units
+>     are laid out slightly differently
+> 
+>   * Easier handling of cases where the units aren't quite identical
 
-Right, that's what I had expected, so we still don't even
-need to handle multiple ISA I/O address spaces for the
-only known case of multiple ISA buses, though we may decide
-to generalize the code like that anyway.
+This is I think similar to the Intel Uncore situation. We expose every
+single individual PMU independently. The Intel uncore is wide and varied
+between parts.
 
-	Arnd
+Leaving the rest for Kan, who's doing the Intel uncore bits.
+
+ ~ Peter
+
+> however, this received pushback from all of the patch authors, so there's
+> clearly a problem with this approach. I'm hoping we can try to resolve
+> this here.
+> 
+> Speaking to Mark earlier today, we came up with the following rough rules
+> for drivers that present multiple hardware units as a single PMU:
+> 
+>   1. If the units share some part of the programming interface (e.g. control
+>      registers or interrupts), then they must be handled by the same PMU.
+>      Otherwise, they should be treated independently as separate PMU
+>      instances.
+> 
+>   2. If the units are handled by the same PMU, then care must be taken to
+>      handle event groups correctly. That is, if the units cannot be started
+>      and stopped atomically, cross-unit groups must be rejected by the
+>      driver. Furthermore, any cross-unit scheduling constraints must be
+>      honoured so that all the units targetted by a group can schedule the
+>      group concurrently.
+> 
+>   3. Summing the counters across units is only permitted if the units
+>      can all be started and stopped atomically. Otherwise, the counters
+>      should be exposed individually. It's up to the driver author to
+>      decide what makes sense to sum.
+> 
+>   4. Unit topology can optionally be described in sysfs (we should pick
+>      some standard directory naming here), and then events targetting
+>      specific units can have the unit identifier extracted from the topology
+>      encoded in some configN fields.
+> 
+> The million dollar question is: how does that fit in with the drivers I
+> mentioned at the top? Is this overly restrictive, or have we missed stuff?
+> 
+> We certainly want to allow flexibility in the way in which the drivers
+> talk to the hardware, but given that these decisions directly affect the
+> user ABI, some consistent ground rules are required.
+> 
+> For Cavium ThunderX, it's not clear whether or not the individual units
+> could be expressed as separate PMUs, or whether they're caught by one of
+> the rules above. The Qualcomm L2 looks like it's doing the right thing
+> and we can't quite work out what the Hisilicon Hip0x topology looks like,
+> since the interaction with djtag is confusing.
+> 
+> If the driver authors (on To:) could shed some light on this, then that
+> would be much appreciated!
+> 
+> Thanks,
+> 
+> Will
