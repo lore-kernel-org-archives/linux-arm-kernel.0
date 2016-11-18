@@ -1,168 +1,85 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Fri, 18 Nov 2016 17:03:11 +0000
-Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <2364530.A9QSbaqvfm@wuerfel>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <2271602.GoSoby0zHK@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F921858@lhreml507-mbx>
- <2364530.A9QSbaqvfm@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F921A0F@lhreml507-mbx>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 18 Nov 2016 09:13:18 -0800
+Subject: [PATCH] arm: spin one more cycle in timer-based delays
+In-Reply-To: <20161118125409.GK1041@n2100.armlinux.org.uk>
+References: <582B0F61.6030903@free.fr> <20161118120630.GJ13470@arm.com>
+ <20161118125409.GK1041@n2100.armlinux.org.uk>
+Message-ID: <CAD=FV=VoycW9btkdKubq_Uxh52PYK5R1X2GD10DcxRQj2K-_UQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 18 November 2016 16:35
-> To: Gabriele Paoloni
-> Cc: linux-arm-kernel at lists.infradead.org; mark.rutland at arm.com;
-> benh at kernel.crashing.org; catalin.marinas at arm.com; liviu.dudau at arm.com;
-> Linuxarm; lorenzo.pieralisi at arm.com; xuwei (O); Jason Gunthorpe; linux-
-> serial at vger.kernel.org; linux-pci at vger.kernel.org;
-> devicetree at vger.kernel.org; minyard at acm.org; will.deacon at arm.com; John
-> Garry; zourongrong at gmail.com; robh+dt at kernel.org; bhelgaas at go og
-> le.com; kantyzc at 163.com; zhichang.yuan02 at gmail.com; T homas Petazzoni;
-> linux-kernel at vger.kernel.org; Yuanzhichang; olof at lixom.net
-> Subject: Re: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on
-> Hip06
-> 
-> On Friday, November 18, 2016 4:18:07 PM CET Gabriele Paoloni wrote:
-> > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > > On Friday, November 18, 2016 12:53:08 PM CET Gabriele Paoloni
-> wrote:
-> > > > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > > > > On Friday, November 18, 2016 12:07:28 PM CET Gabriele Paoloni
-> > > > > The easiest change compared to the v5 code would be to walk
-> > > > > a linked list of 'struct extio_ops' structures rather than
-> > > > > assuming there is only ever one of them. I think one of the
-> > > > > earlier versions actually did this.
-> > > >
-> > > > Right but if my understanding is correct if we live in a multi-
-> > > > domain I/O space world when you have an input addr in the I/O
-> > > > accessors this addr can be duplicated (for example for the
-> standard
-> > > > PCI IO domain and for our special LPC domain).
-> > > > So effectively even if you walk a linked list there is a problem
-> > > > of disambiguation...am I right?
-> > >
-> > > No, unlike the PCI memory space, the PIO addresses are not
-> > > usually distinct, i.e. every PCI bus has its own 64K I/O
-> > > addresses starting at zero. We linearize them into the
-> > > Linux I/O space using the per-domain io_offset value.
-> >
-> > I am going to summarize my understanding here below:
-> >
-> > It seems to me that what is linearized is the virtual address
-> > space associated to the IO address space. This address space
-> > goes from PCI_IOBASE to (PCI_IOBASE + IO_SPACE_LIMIT).
-> >
-> > The I/O accessors perform rd/wr operation on this address
-> > space using a port IO token.
-> >
-> > Each token map into a cpu physical address range
-> > Each cpu physical address range maps to a bus address range
-> > if the bus controller specifies a range property.
-> >
-> > Devices under a bus controller specify the bus addresses that
-> > they operate on in their reg property.
-> >
-> > So each device can use the same bus addresses under two
-> > separate bus controllers as long as the bus controller
-> > use the range properties to map the same bus range to different
-> > cpu address range.
-> 
-> Sounds all correct to me so far, yes.
-> 
-> > > For the ISA/LPC spaces there are only 4k of addresses, they
-> > > the bus addresses always overlap, but we can trivially
-> > > figure out the bus address from Linux I/O port number
-> > > by subtracting the start of the range.
-> >
-> > Are you saying that our LPC controller should specify a
-> > range property to map bus addresses into a cpu address range?
-> 
-> No. There is not CPU address associated with it, because it's
-> not memory mapped.
-> 
-> Instead, we need to associate a bus address with a logical
-> Linux port number, both in of_address_to_resource and
-> in inb()/outb().
+Hi,
 
-I think this is effectively what we are doing so far with patch 2/3.
-The problem with this patch is that we are carving out a "forbidden"
-IO tokens range that goes from 0 to PCIBIOS_MIN_IO.
+On Fri, Nov 18, 2016 at 4:54 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Fri, Nov 18, 2016 at 12:06:30PM +0000, Will Deacon wrote:
+>> On Tue, Nov 15, 2016 at 02:36:33PM +0100, Mason wrote:
+>> > When polling a tick counter in a busy loop, one might sample the
+>> > counter just *before* it is updated, and then again just *after*
+>> > it is updated. In that case, while mathematically v2-v1 equals 1,
+>> > only epsilon has really passed.
+>> >
+>> > So, if a caller requests an N-cycle delay, we spin until v2-v1
+>> > is strictly greater than N to avoid these random corner cases.
+>> >
+>> > Signed-off-by: Mason <slash.tmp@free.fr>
+>> > ---
+>> >  arch/arm/lib/delay.c | 2 +-
+>> >  1 file changed, 1 insertion(+), 1 deletion(-)
+>> >
+>> > diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
+>> > index 69aad80a3af4..3f1cd15ca102 100644
+>> > --- a/arch/arm/lib/delay.c
+>> > +++ b/arch/arm/lib/delay.c
+>> > @@ -60,7 +60,7 @@ static void __timer_delay(unsigned long cycles)
+>> >  {
+>> >     cycles_t start = get_cycles();
+>> >
+>> > -   while ((get_cycles() - start) < cycles)
+>> > +   while ((get_cycles() - start) <= cycles)
+>> >             cpu_relax();
+>> >  }
+>>
+>> I thought a bit about this last night. It is well known that the delay
+>> routines are not guaranteed to be accurate, and I don't *think* that's
+>> limited to over-spinning, so arguably this isn't a bug. However, taking
+>> the approach that "drivers should figure it out" is also unhelpful,
+>> because the frequency of the underlying counter isn't generally known
+>> and so drivers can't simply adjust the delay parameter.
+>
+> I don't think this change makes any sense whatsoever.  udelay() is
+> inaccurate, period.  It _will_ give delays shorter than requested
+> for many reasons, many of which can't be fixed.
+>
+> Having a super-accurate version just encourages people to write broken
+> drivers which assume (eg) that udelay(10) will give _at least_ a 10us
+> delay.  However, there is no such guarantee.
+>
+> So, having udelay() for timers return slightly short is actually a good
+> thing - it causes people not to make the mistake to be soo accurate
+> with their delay specifications.
+>
+> So, NAK on this change.  udelay is not super-accurate.
+>
+> Reference (and this is the most important one):
+>
+>   http://lists.openwall.net/linux-kernel/2011/01/12/372
 
-I think that the proper solution would be to have the LPC driver to
-set the carveout threshold used in pci_register_io_range(), 
-pci_pio_to_address(), pci_address_to_pio(), but this would impose
-a probe dependency on the LPC itself that should be probed before
-the PCI controller (or before any other devices calling these
-functions...) 
+Mason's change adds no complexity to the code and seems like a
+generally good idea.
 
-> 
-> > > > > Another option the IA64 approach mentioned in another subthread
-> > > > > today, looking up the operations based on an index from the
-> > > > > upper bits of the port number. If we do this, we probably
-> > > > > want to do that for all PIO access and replace the entire
-> > > > > virtual address remapping logic with that. I think Bjorn
-> > > > > in the past argued in favor of such an approach, while I
-> > > > > advocated the current scheme for simplicity based on how
-> > > > > every I/O space these days is just memory mapped (which now
-> > > > > turned out to be false, both on powerpc and arm64).
-> > > >
-> > > > This seems really complex...I am a bit worried that possibly
-> > > > we end up in having the maintainers saying that it is not worth
-> > > > to re-invent the world just for this special LPC device...
-> > >
-> > > It would clearly be a rather invasive change, but the
-> > > end-result isn't necessarily more complex than what we
-> > > have today, as we'd kill off the crazy pci_pio_to_address()
-> > > and pci_address_to_pio() hacks in address translation.
-> >
-> > I have to look better into this...can you provide me a reference
-> > to the Bjorn argument in favor of this approach?
-> 
-> The thread seems to have been pci: Introduce pci_register_io_range()
-> helper function, e.g. in https://lkml.org/lkml/2014/7/8/969
+As per John Stultz [1] there is agreement that udelay() really
+shouldn't delay less than the requested amount.  In fact, we even have
+a test committed to the tree: "kernel/time/test_udelay.c".  As your
+reference says, maybe 1% isn't enough to throw a hissyfit about, but
+when the change is so simple and adds no complexity then it seems like
+a worthwhile thing to do.  Why make things inaccurate for no reason?
 
-Ok many thanks I am going to look at it
+[1] http://www.gossamer-threads.com/lists/linux/kernel/1918249
 
-> 
-> > > > To be honest with you I would keep things simple for this
-> > > > LPC and introduce more complex reworks later if more devices
-> > > > need to be introduced.
-> > > >
-> > > > What if we stick on a single domain now where we introduce a
-> > > > reserved threshold for the IO space (say INDIRECT_MAX_IO).
-> > >
-> > > I said having a single domain is fine, but I still don't
-> > > like the idea of reserving low port numbers for this hack,
-> > > it would mean that the numbers change for everyone else.
-> >
-> > I don't get this much...I/O tokens that are passed to the I/O
-> > accessors are not fixed anyway and they vary depending on the order
-> > of adding ranges to io_range_list...so I don't see a big issue
-> > with this...
-> 
-> On machines with a legacy devices behind the PCI bridge,
-> there may still be a reason to have the low I/O port range
-> reserved for the primary bus, e.g. to get a VGA text console
-> to work.
-> 
-> On powerpc, this is called the "primary" PCI host, i.e. the
-> only one that is allowed to have an ISA bridge.
 
-Yes but
-1) isn't the PCI controller range property that defines how IO bus address
-   map into physical CPU addresses?
-2) How can you guarantee that the cpu range associated with this
-   IO bus range is the first to be registered in pci_register_io_range()?
-   ( i.e. are you saying that they are just relying on the fact that it is the
-     only IO range in the system and by chance the IO tokens and corresponding
-     bus addresses are the same? )
+For what it's worth, Mason's change is:
 
-Thanks
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
 
-Gab
-
-> 
-> 	Arnd
+-Doug
