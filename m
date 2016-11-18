@@ -1,36 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 17 Nov 2016 23:44:03 -0800
-Subject: [GIT PULL] Qualcomm SoC Updates for v4.10
-In-Reply-To: <1479017736-13564-6-git-send-email-andy.gross@linaro.org>
-References: <1479017736-13564-1-git-send-email-andy.gross@linaro.org>
- <1479017736-13564-6-git-send-email-andy.gross@linaro.org>
-Message-ID: <20161118074403.GQ1785@localhost>
+Date: Thu, 17 Nov 2016 23:45:06 -0800
+Subject: [GIT PULL] DaVinci additional driver support for v4.10
+In-Reply-To: <fc11bfc7-e218-cd11-8e4e-c48e899d1cb5@ti.com>
+References: <fc11bfc7-e218-cd11-8e4e-c48e899d1cb5@ti.com>
+Message-ID: <20161118074506.GR1785@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 13, 2016 at 12:15:36AM -0600, Andy Gross wrote:
+On Mon, Nov 14, 2016 at 06:28:22PM +0530, Sekhar Nori wrote:
 > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 > 
 >   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-soc-for-4.10
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.10/drivers
 > 
-> for you to fetch changes up to e19811a89d0f566bb781959e151f244bd3bcde8a:
+> for you to fetch changes up to 8e7223fc8626db7c302136747bb68213100d290c:
 > 
->   arm64: qcom: enable GPIOLIB in Kconfig (2016-11-12 23:24:26 -0600)
-> 
-> ----------------------------------------------------------------
-> Qualcomm ARM Based SoC Updates for v4.10
-> 
-> * Enable GPIOLIB for QCOM ARM64 platforms
+>   bus: davinci: add support for da8xx bus master priority control (2016-11-14 17:20:29 +0530)
 > 
 > ----------------------------------------------------------------
-> Michael Scott (1):
->       arm64: qcom: enable GPIOLIB in Kconfig
+> This pull request adds two new drivers for better
+> support for LCD found on DaVinci DA8xx devices.
+> 
+> They allow configuration of memory interface and
+> bus priorities on the SoC to allow sufficient
+> bandwidth for the LCD and prevent underruns.
+> 
+> The DT bindings have been reviewed by Rob and
+> patches have been reviewed by Kevin.
+> 
+> ----------------------------------------------------------------
+> Bartosz Golaszewski (2):
+>       memory: davinci: add support for da8xx DDR2/mDDR controller
+>       bus: davinci: add support for da8xx bus master priority control
 
-Merged, thanks.
+Merged, thanks!
 
 
 -Olof
