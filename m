@@ -1,70 +1,42 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 18 Nov 2016 21:19:41 +0800
-Subject: [PATCH] clk: sunxi-ng: enable so-said LDOs for A33 SoC's pll-mipi
- clock
-In-Reply-To: <20161117164954.62658-1-icenowy@aosc.xyz>
-References: <20161117164954.62658-1-icenowy@aosc.xyz>
-Message-ID: <CAGb2v67R5=4JAcvzxrYK5YR5cWpwhTJMpviVNQtriYjHScrYNg@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 18 Nov 2016 14:22:34 +0100
+Subject: arasan,sdhci.txt "compatibility" DT binding
+In-Reply-To: <582EF744.8090307@free.fr>
+References: <56B07BA5.4060407@free.fr> <56B166F1.5080605@rock-chips.com>
+ <56B1AA44.1010108@xilinx.com> <56B1BAF8.2050907@free.fr>
+ <56B1CF40.1030203@xilinx.com> <20160203152104.GP4215@xsjsorenbubuntu>
+ <56B21DDB.6050708@free.fr> <582ED9E0.5090506@free.fr>
+ <CAFd313x6MJeO90_+rxditdPn762g7TqZc0_D6ojGTKmtGJKjPA@mail.gmail.com>
+ <582EF744.8090307@free.fr>
+Message-ID: <a20b2b4f-15d4-3c29-324c-1ced5dbcc67f@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 12:49 AM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
-> In the user manual of A33 SoC, the bit 22 and 23 of pll-mipi control
-> register is called "LDO{1,2}_EN", and according to the BSP source code
-> from Allwinner [1], the LDOs are enabled during the clock's enabling
-> process.
->
-> The clock failed to generate output if the two LDOs are not enabled.
->
-> Add the two bits to the clock's gate bits, so that the LDOs are enabled
-> when the PLL is enabled.
->
-> [1] https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun8iw5.c#L429
->
-> Fixes: d05c748bd730 ("clk: sunxi-ng: Add A33 CCU support")
->
+On 18.11.2016 13:42, Mason wrote:
+> On 18/11/2016 11:49, Rameshwar Sahu wrote:
+> 
+>> Mason wrote:
+>>
+>>> Suman/APM added "arasan,sdhci-4.9a" in 308f3f8d8112
+>>> @Suman, @Rameshwar: what specific IP block does your SoC embed?
+>>> What does 4.9a refer to? The documentation revision number?
+>>
+>> We have Arasan SD3.0/ SDIO3.0/ eMMC4.41 AHB Host Controller IP
+>> embedded in our SoC and 4.9a is documentation revision number which
+>> was given by Arasan.
+>> FYI this documentation date was May, 2012.
+> 
+> Hello Ram,
+> 
+> Thanks for the information.
+> 
+>   Xilinx is using "SD2.0/SDIO2.0/MMC3.31 AHB Host Controller"
 
-You don't need the extra line.
+in Xilinx Zynq device
 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+and
+Xilinx ZynqMP device is using
+"SD3.0/SDIO3.0/eMMC4.51 AHB Host Controller"
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-
-> ---
-> Dear Chen-Yu:
-> As you said, the two bits are also present in the CCU of A23 and A31.
-> Could you please check whether the PLL works on the two SoCs?
-> I remembered you mentioned you failed to make TCON enabled on A23.
-> On A31, you may hack the parent of tcon-ch0 to force the tcon clock to
-> use pll-mipi as parent, in order to check whether the pll works.
->
-> However, I didn't found the code that enables the LDOs in the BSP A23/31
-> sources, so you must test them to ensure whether the code is needed for
-> these SoCs.
-
-I tested out this for both the A31 and the A23. It fixes issues I've
-had with DRM. I'll send patches for them.
-
-ChenYu
-
-> Regards,
-> Icenowy
->  drivers/clk/sunxi-ng/ccu-sun8i-a33.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a33.c b/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
-> index 96b40ca..9bd1f78 100644
-> --- a/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
-> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
-> @@ -131,7 +131,7 @@ static SUNXI_CCU_NKM_WITH_GATE_LOCK(pll_mipi_clk, "pll-mipi",
->                                     8, 4,               /* N */
->                                     4, 2,               /* K */
->                                     0, 4,               /* M */
-> -                                   BIT(31),            /* gate */
-> +                                   BIT(31) | BIT(23) | BIT(22), /* gate */
->                                     BIT(28),            /* lock */
->                                     CLK_SET_RATE_UNGATE);
->
-> --
-> 2.10.1
->
+Thanks,
+Michal
