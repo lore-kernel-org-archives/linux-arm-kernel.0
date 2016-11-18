@@ -1,70 +1,103 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 18 Nov 2016 10:22:40 +0800
-Subject: [PATCH] drm/sun4i: Only count TCON endpoints as valid outputs
-In-Reply-To: <20161117190254.d4doghspvz6ma6x2@lukather>
-References: <20161116093732.12828-1-wens@csie.org>
- <20161117190254.d4doghspvz6ma6x2@lukather>
-Message-ID: <CAGb2v65sorc-Q5c39ZURTAAorvF4ETVW=qj_ue9mUzLei2scJQ@mail.gmail.com>
+From: honghui.zhang@mediatek.com (Honghui Zhang)
+Date: Fri, 18 Nov 2016 10:32:37 +0800
+Subject: [PATCH] iommu: mtk: add common-clk dependency
+In-Reply-To: <20161117233502.GW25626@codeaurora.org>
+References: <20161116152837.3508723-1-arnd@arndb.de>
+ <20161116193850.GK25626@codeaurora.org>
+ <1479345958.17679.11.camel@mtksdaap41>
+ <20161117233502.GW25626@codeaurora.org>
+Message-ID: <1479436357.21280.17.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 3:02 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Wed, Nov 16, 2016 at 05:37:31PM +0800, Chen-Yu Tsai wrote:
->> The sun4i DRM driver counts the number of endpoints it found and
->> registers the whole DRM pipeline if any endpoints are found.
->>
->> However, if the TCON and its child endpoints (LCD panels, TV encoder,
->> HDMI encoder, MIPI DSI encoder, etc.) aren't found, that means we
->> don't have any usable CRTCs, and the display pipeline is incomplete
->> and useless.
->
-> If some node set as available is not probed, then yes, it does, but
-> I'm not really sure how it's a problem. Quite the opposite actually.
+On Thu, 2016-11-17 at 15:35 -0800, Stephen Boyd wrote:
+> On 11/17, Honghui Zhang wrote:
+> > On Wed, 2016-11-16 at 11:38 -0800, Stephen Boyd wrote:
+> > > On 11/16, Arnd Bergmann wrote:
+> > > > After the MT2701 clock driver was added, we get a harmless warning for
+> > > > the iommu driver that selects it, when compile-testing without
+> > > > COMMON_CLK.
+> > > > 
+> > > > warning: (MTK_IOMMU_V1) selects COMMON_CLK_MT2701_IMGSYS which has unmet direct dependencies (COMMON_CLK)
+> > > > 
+> > > > Adding a dependency on COMMON_CLK avoids the warning.
+> > > > 
+> > > > Fixes: e9862118272a ("clk: mediatek: Add MT2701 clock support")
+> > > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > 
+> > > Hm.. why is an iommu driver selecting a clk driver? They should
+> > > be using standard clk APIs so it's not like they need it for
+> > > build time correctness. Shouldn't we drop the selects instead?
+> > > Those look to have been introduced a few kernel versions ago, but
+> > > they were selecting options that didn't exist until a few days
+> > > ago when I merged the mediatek clk driver. The clk options are
+> > > user-visible, so it should be possible to select them in the
+> > > configuration phase.
+> > > 
+> > 
+> > Hi, Stephen,
+> >   I'm a bit out of date of the current clock code. Mediatek IOMMU v1
+> > driver will need smi driver to enable iommu clients. And smi driver is
+> > also respond to enable/disable the susbsys clocks for multi-media HW.
+> > The relationship between iommu and smi is like the graphics below[1].
+> > 
+> >               EMI (External Memory Interface)
+> >                |
+> >               m4u (Multimedia Memory Management Unit)
+> >                |
+> >            SMI Common(Smart Multimedia Interface Common)
+> >                |
+> >        +----------------+-------
+> >        |                |
+> >        |                |
+> >    SMI larb0        SMI larb1   ... SoCs have several SMI local
+> > arbiter(larb).
+> >    (display)         (vdec)
+> >        |                |
+> >        |                |
+> >  +-----+-----+     +----+----+
+> >  |     |     |     |    |    |
+> >  |     |     |...  |    |    |  ... There are different ports in each
+> > larb.
+> >  |     |     |     |    |    |
+> > OVL0 RDMA0 WDMA0  MC   PP   VLD
+> > 
+> > 
+> > When enable SMI driver it will need those subsys clock provider.
+> > But those clocks providers are disabled in default. Since it's needed by
+> > smi driver, and smi was select by MTK_IOMMU_V1, I figure it should be
+> > select by MTK_IOMMU_V1 too.
+> 
+> Ok I understand all that, but I don't understand why that means
+> we need to have select statements for clk drivers still. If
+> anything, that logic would mean the SMI driver should select clk
+> drivers. I hope it isn't doing that.
+> 
 
-Actually the problem occurs when the TCON is _not_ available, but
-the other endpoints preceding it are.
+OK, I guess the only reason of "SMI driver select clk driver" is to
+avoid runtime error. Maybe this is not necessary since runtime errors
+should be guaranteed by defconfig.
+Your propose of just remove the select statements is good enough for
+this problem, thanks.
 
->> The whole DRM display pipeline should only be registered and enabled
->> if there are proper outputs available.
->
-> Unless I've misunderstood what you're saying, we could have the
-> writeback for example that would just need the display engine.
+>  BTW, I don't understand the mtk_smi_larb_get() API. It looks like
+> we expect the SMI driver to probe and succeed before the
+> mtk_smi_larb_get() function is called. That seems fairly brittle
+> in the face of probe defer or device ordering changes.
+> 
+Sharp eyes.
+As a matter of fact, we are struggling on this problem for the
+moment[1], I guess the recently merged device link's patch may help with
+this, but I didn't have a change to try that yet.
 
-Yeah, I guess that complicates things...
+> The SMI driver actually looks like a bus driver for an
+> interconnect as well, but drivers/memory is for memory
+> controllers? Odd but I can get over that.
+> 
 
->> The debug message "Queued %d outputs on pipeline %d\n" is also telling.
->>
->> This patch makes the driver only count enabled TCON endpoints. If
->> none are found, the DRM pipeline is not used. This avoids screwing
->> up the simple framebuffer provided by the bootloader in cases where
->> we aren't able to support the display with the DRM subsystem, due
->> to lack of panel or bridge drivers, or just lack of progress.
->
-> The framebuffer is removed only at bind time, which means that all the
-> drivers have probed already. Lack of progress isn't an issue here,
-> since the node simply won't be there, and we wouldn't have it in the
-> component lists. And lack of drivers shouldn't be an issue either,
-> since in order for bind to be called, all the drivers would have
-> gone through their probe.
->
-> So I'm not really sure what it fixes.
+This have been discussed long times ago, seems the current folder is
+where no one object[2][3]. 
 
-To recap, on sun6i I had enabled the display engine node by default
-in the dtsi, along with the backend and drc. The tcon is disabled
-by default, so it doesn't get added to the list of components.
-The available components get probed, binded, and simplefb gets
-pushed out.
-
-I suppose disabling the display engine by default would be better?
-At least simplefb still works.
-
-Regards
-ChenYu
-
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+[1]https://lkml.org/lkml/2016/11/15/232
+[2]https://lists.linuxfoundation.org/pipermail/iommu/2015-March/012497.html
+[3]https://lists.linuxfoundation.org/pipermail/iommu/2015-March/012498.html
