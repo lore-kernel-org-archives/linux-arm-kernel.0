@@ -1,69 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 18 Nov 2016 13:29:13 +0000
-Subject: [PATCH 15/20] ARM/hw_breakpoint: Convert to hotplug state machine
-In-Reply-To: <alpine.DEB.2.20.1611181401180.3615@nanos>
-References: <20161117183541.8588-1-bigeasy@linutronix.de>
- <20161117183541.8588-16-bigeasy@linutronix.de>
- <20161118120453.GI13470@arm.com>
- <alpine.DEB.2.20.1611181401180.3615@nanos>
-Message-ID: <20161118132912.GM13470@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Nov 2016 14:32:30 +0100
+Subject: [PATCH 01/16] ARM: scu: Provide support for parsing SCU device
+ node to enable SCU
+In-Reply-To: <20161118124805.GJ1041@n2100.armlinux.org.uk>
+References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
+ <9481995.AMBiYg893F@wuerfel> <20161118124805.GJ1041@n2100.armlinux.org.uk>
+Message-ID: <2339821.zs8sl71mMv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 02:11:58PM +0100, Thomas Gleixner wrote:
-> On Fri, 18 Nov 2016, Will Deacon wrote:
-> > On Thu, Nov 17, 2016 at 07:35:36PM +0100, Sebastian Andrzej Siewior wrote:
-> > > @@ -1082,15 +1077,18 @@ static int __init arch_hw_breakpoint_init(void)
-> > >  	register_undef_hook(&debug_reg_hook);
-> > >  
-> > >  	/*
-> > > -	 * Reset the breakpoint resources. We assume that a halting
-> > > -	 * debugger will leave the world in a nice state for us.
-> > > +	 * Register CPU notifier which resets the breakpoint resources. We
-> > > +	 * assume that a halting debugger will leave the world in a nice state
-> > > +	 * for us.
-> > >  	 */
-> > > -	on_each_cpu(reset_ctrl_regs, NULL, 1);
-> > > +	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "arm/hw_breakpoint:online",
-> > > +				dbg_reset_online, NULL);
-> > 
-> > I'm slightly unsure about this. The dbg_reset_online callback can execute
-> > undefined instructions (unfortunately, there's no way to probe the presence
-> > of some of the debug registers), so it absolutely has to run within the 
-> > register_undef_hook/unregister_undef_hook calls that are in this function.
-> > 
-> > With this patch, I worry that the callback can be postponed to ONLINE time
-> > for other CPUs, and then the kernel will panic.
+On Friday, November 18, 2016 12:48:07 PM CET Russell King - ARM Linux wrote:
+> On Fri, Nov 18, 2016 at 01:14:35PM +0100, Arnd Bergmann wrote:
+> > @@ -41,6 +43,9 @@ void scu_enable(void __iomem *scu_base)
+> >  {
+> >       u32 scu_ctrl;
+> >  
+> > +     if (scu_base)
+> > +             scu_base = scu_base_addr;
+> > +
 > 
-> No. The flow is the following:
+> This looks to me like nonsense.
 > 
->   	register_undef_hook(&debug_reg_hook);
+> >  #ifdef CONFIG_ARM_ERRATA_764369
+> >       /* Cortex-A9 only */
+> >       if ((read_cpuid_id() & 0xff0ffff0) == 0x410fc090) {
+> > @@ -85,6 +90,9 @@ int scu_power_mode(void __iomem *scu_base, unsigned int mode)
+> >       unsigned int val;
+> >       int cpu = MPIDR_AFFINITY_LEVEL(cpu_logical_map(smp_processor_id()), 0);
+> >  
+> > +     if (scu_base)
+> > +             scu_base = scu_base_addr;
+> > +
 > 
-> 	ret = cpuhp_setup_state(.., dbg_reset_online, NULL);
-> 	      {
-> 		for_each_online_cpu(cpu) {
-> 			ret = call_on_cpu(cpu, dbg_reset_online);
-> 			if (ret)
-> 			      return ret:
-> 		}
-> 	      }
+> Ditto.
 > 
->   	unregister_undef_hook(&debug_reg_hook);
-> 	
-> The only difference to the current code is that the call is not invoked via
-> a smp function call (on_each_cpu), it's pushed to the hotplug thread
-> context of each cpu and executed there.
-> 
-> But it's guaranteed that cpuhp_setup_state() will not return before the
-> callback has been invoked on each online cpu.
+> Rather than doing this, I'd much prefer to always store the SCU base in
+> the SCU code, and remove the "void __iomem *scu_base" argment from all
+> these functions.
 
-Ok, that's good.
+Ok, then we just need one scu_probe_*() variant for each of the
+four methods of initializing it (iotable, of_iomap,
+ioremap(scu_a9_get_base) and hardcoded.
 
-> If cpus are not yet online when that code is invoked, then it's the same
-> behaviour as before. It will be invoked when the cpu comes online.
+The intention of doing the fallback for the NULL argument was
+to avoid having to add lots of new API while also allowing
+the change to be done one platform at a time.
 
-Just to check, but what stops a CPU from coming online between the call
-to cpuhp_setup_state and the call to cpuhp_remove_state_nocalls in the
-case of failure (debug_err_mask isn't empty)?
+If we remove the argument from the other functions, they either
+need to get a new name, or we change them all to the new prototype
+at once. Either way works fine, do you have a preference between
+them?
 
-Will
+	Arnd
