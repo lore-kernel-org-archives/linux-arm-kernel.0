@@ -1,86 +1,100 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 18 Nov 2016 10:26:29 +0100
-Subject: System/uncore PMUs and unit aggregation
-In-Reply-To: <20161117181708.GT22855@arm.com>
-References: <20161117181708.GT22855@arm.com>
-Message-ID: <20161118092629.GK3117@twins.programming.kicks-ass.net>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 18 Nov 2016 10:38:32 +0100
+Subject: [PATCH v3 09/13] ARM: dts: armada-375: Fixup soc DT warning
+In-Reply-To: <20161118101248.784eff2b@free-electrons.com> (Thomas Petazzoni's
+ message of "Fri, 18 Nov 2016 10:12:48 +0100")
+References: <20161117230830.31047-1-gregory.clement@free-electrons.com>
+ <20161117230830.31047-10-gregory.clement@free-electrons.com>
+ <20161118095455.00bfe007@free-electrons.com>
+ <87d1htb1qr.fsf@free-electrons.com>
+ <20161118101248.784eff2b@free-electrons.com>
+Message-ID: <877f81b013.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2016 at 06:17:08PM +0000, Will Deacon wrote:
-> Hi all,
-> 
-> We currently have support for three arm64 system PMUs in flight:
-> 
->  [Cavium ThunderX] http://lkml.kernel.org/r/cover.1477741719.git.jglauber at cavium.com
->  [Hisilicon Hip0x] http://lkml.kernel.org/r/1478151727-20250-1-git-send-email-anurup.m at huawei.com
->  [Qualcomm L2] http://lkml.kernel.org/r/1477687813-11412-1-git-send-email-nleeder at codeaurora.org
-> 
-> Each of which have to deal with multiple underlying hardware units in one
-> way or another. Mark and I recently expressed a desire to expose these
-> units to userspace as individual PMU instances, since this can allow:
-> 
->   * Fine-grained control of events from userspace, when you want to see
->     individual numbers as opposed to a summed total
-> 
->   * Potentially ease migration to new SoC revisions, where the units
->     are laid out slightly differently
-> 
->   * Easier handling of cases where the units aren't quite identical
+Hi Thomas,
+ 
+ On ven., nov. 18 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-This is I think similar to the Intel Uncore situation. We expose every
-single individual PMU independently. The Intel uncore is wide and varied
-between parts.
+> Hello,
+>
+> On Fri, 18 Nov 2016 10:01:32 +0100, Gregory CLEMENT wrote:
+>
+>> >> +	soc at f00100000000 {  
+>> >
+>> > Where is this value coming from? Why does the soc node needs to have a  
+>> 
+>> It cames from the dts files.
+>
+> Where?
 
-Leaving the rest for Kan, who's doing the Intel uncore bits.
+--- a/arch/arm/boot/dts/armada-375-db.dts
++++ b/arch/arm/boot/dts/armada-375-db.dts
+@@ -63,7 +63,11 @@
+ 		reg = <0x00000000 0x40000000>; /* 1 GB */
+ 	};
+ 
+-	soc {
++	/* The following unit address is composed of the target
++	 * value (bit [40-47]), attributes value (bits [32-39],
++	 * and the address value in the window memory: [0-31].
++	 */
++	soc at f00100000000 {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
 
- ~ Peter
+just here ---------^
 
-> however, this received pushback from all of the patch authors, so there's
-> clearly a problem with this approach. I'm hoping we can try to resolve
-> this here.
-> 
-> Speaking to Mark earlier today, we came up with the following rough rules
-> for drivers that present multiple hardware units as a single PMU:
-> 
->   1. If the units share some part of the programming interface (e.g. control
->      registers or interrupts), then they must be handled by the same PMU.
->      Otherwise, they should be treated independently as separate PMU
->      instances.
-> 
->   2. If the units are handled by the same PMU, then care must be taken to
->      handle event groups correctly. That is, if the units cannot be started
->      and stopped atomically, cross-unit groups must be rejected by the
->      driver. Furthermore, any cross-unit scheduling constraints must be
->      honoured so that all the units targetted by a group can schedule the
->      group concurrently.
-> 
->   3. Summing the counters across units is only permitted if the units
->      can all be started and stopped atomically. Otherwise, the counters
->      should be exposed individually. It's up to the driver author to
->      decide what makes sense to sum.
-> 
->   4. Unit topology can optionally be described in sysfs (we should pick
->      some standard directory naming here), and then events targetting
->      specific units can have the unit identifier extracted from the topology
->      encoded in some configN fields.
-> 
-> The million dollar question is: how does that fit in with the drivers I
-> mentioned at the top? Is this overly restrictive, or have we missed stuff?
-> 
-> We certainly want to allow flexibility in the way in which the drivers
-> talk to the hardware, but given that these decisions directly affect the
-> user ABI, some consistent ground rules are required.
-> 
-> For Cavium ThunderX, it's not clear whether or not the individual units
-> could be expressed as separate PMUs, or whether they're caught by one of
-> the rules above. The Qualcomm L2 looks like it's doing the right thing
-> and we can't quite work out what the Hisilicon Hip0x topology looks like,
-> since the interaction with djtag is confusing.
-> 
-> If the driver authors (on To:) could shed some light on this, then that
-> would be much appreciated!
-> 
-> Thanks,
-> 
-> Will
+ 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
+ 			  MBUS_ID(0x09, 0x09) 0 0xf1100000 0x10000
+
+
+
+
+>
+>> > unit address? It doesn't have a 'reg' property if I remember
+>> > correctly.  
+>> 
+>> But it has a range property.
+>
+> And? There are multiple ranges, and you randomly took the first one for
+> the unit address of the soc node?
+
+Not randomly I followed the same rules that for the regs mentioned in
+the ePAPR paragraph 2.2.1.1:
+
+"The unit-address should match the first address specified in the reg
+property of the node."
+
+>
+> You realize that the ranges property is a list of ranges, and they
+> could be in any order? Why would you pick the base address of one of
+> the ranges rather than any of the others?
+
+It is the same for the regs so as explained I followed the same rules.
+
+>
+> I believe there is simply no unit address for the soc {} node. There is
+> definitely one for the internal-regs {} node, but not for the soc {}
+> node.
+
+It is not the interpretation of the DTC:
+
+"Warning (unit_address_vs_reg): Node /soc has a reg or ranges property,
+but no unit name"
+
+Gregory
+
+>
+> Best regards,
+>
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
