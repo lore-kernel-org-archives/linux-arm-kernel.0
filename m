@@ -1,77 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Nov 2016 17:16:06 +0100
-Subject: [PATCH 3/3] [media] mtk-mdp: mark PM functions as __maybe_unused
-In-Reply-To: <20161118161621.798004-1-arnd@arndb.de>
-References: <20161118161621.798004-1-arnd@arndb.de>
-Message-ID: <20161118161621.798004-3-arnd@arndb.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 18 Nov 2016 17:17:19 +0100
+Subject: [GIT PULL 10/10] arm64: tegra: Default configuration updates for
+ v4.10-rc1
+In-Reply-To: <20161118161719.24153-1-thierry.reding@gmail.com>
+References: <20161118161719.24153-1-thierry.reding@gmail.com>
+Message-ID: <20161118161719.24153-10-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver still produces a warning when CONFIG_PM is disabled, an
-earlier fix only partially solved this:
+Hi ARM SoC maintainers,
 
-media/platform/mtk-mdp/mtk_mdp_core.c:72:13: error: 'mtk_mdp_clock_off' defined but not used [-Werror=unused-function]
-media/platform/mtk-mdp/mtk_mdp_core.c:63:13: error: 'mtk_mdp_clock_on' defined but not used [-Werror=unused-function]
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
-This removes the incorrect #ifdef again and instead marks the PM
-functions as __maybe_unused, which reliably shuts up the warning.
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
 
-Fixes: 1b06fcf56aa6 ("[media] media: mtk-mdp: fix build error")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/media/platform/mtk-mdp/mtk_mdp_core.c | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+are available in the git repository at:
 
-diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-index 51f2b50e406f..9e4eb7dcc424 100644
---- a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-+++ b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-@@ -234,8 +234,7 @@ static int mtk_mdp_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--#ifdef CONFIG_PM
--static int mtk_mdp_pm_suspend(struct device *dev)
-+static int __maybe_unused mtk_mdp_pm_suspend(struct device *dev)
- {
- 	struct mtk_mdp_dev *mdp = dev_get_drvdata(dev);
- 
-@@ -244,7 +243,7 @@ static int mtk_mdp_pm_suspend(struct device *dev)
- 	return 0;
- }
- 
--static int mtk_mdp_pm_resume(struct device *dev)
-+static int __maybe_unused mtk_mdp_pm_resume(struct device *dev)
- {
- 	struct mtk_mdp_dev *mdp = dev_get_drvdata(dev);
- 
-@@ -252,10 +251,8 @@ static int mtk_mdp_pm_resume(struct device *dev)
- 
- 	return 0;
- }
--#endif /* CONFIG_PM */
- 
--#ifdef CONFIG_PM_SLEEP
--static int mtk_mdp_suspend(struct device *dev)
-+static int __maybe_unused mtk_mdp_suspend(struct device *dev)
- {
- 	if (pm_runtime_suspended(dev))
- 		return 0;
-@@ -263,14 +260,13 @@ static int mtk_mdp_suspend(struct device *dev)
- 	return mtk_mdp_pm_suspend(dev);
- }
- 
--static int mtk_mdp_resume(struct device *dev)
-+static int __maybe_unused mtk_mdp_resume(struct device *dev)
- {
- 	if (pm_runtime_suspended(dev))
- 		return 0;
- 
- 	return mtk_mdp_pm_resume(dev);
- }
--#endif /* CONFIG_PM_SLEEP */
- 
- static const struct dev_pm_ops mtk_mdp_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(mtk_mdp_suspend, mtk_mdp_resume)
--- 
-2.9.0
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.10-arm64-defconfig
+
+for you to fetch changes up to c6299451bb45bf3370cc3aa53891fb9d48bed774:
+
+  arm64: defconfig: Enable Tegra186 SoC (2016-11-15 16:26:03 +0100)
+
+Thanks,
+Thierry
+
+----------------------------------------------------------------
+arm64: tegra: Default configuration updates for v4.10-rc1
+
+Enable Tegra186 support.
+
+----------------------------------------------------------------
+Joseph Lo (1):
+      arm64: defconfig: Enable Tegra186 SoC
+
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
