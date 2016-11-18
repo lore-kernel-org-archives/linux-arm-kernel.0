@@ -1,97 +1,76 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 18 Nov 2016 14:11:58 +0100 (CET)
-Subject: [PATCH 15/20] ARM/hw_breakpoint: Convert to hotplug state machine
-In-Reply-To: <20161118120453.GI13470@arm.com>
-References: <20161117183541.8588-1-bigeasy@linutronix.de>
- <20161117183541.8588-16-bigeasy@linutronix.de>
- <20161118120453.GI13470@arm.com>
-Message-ID: <alpine.DEB.2.20.1611181401180.3615@nanos>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 18 Nov 2016 13:17:41 +0000
+Subject: [PATCH v2] ARM: Drop fixed 200 Hz timer requirement from Samsung
+ platforms
+In-Reply-To: <1479453418-25314-1-git-send-email-krzk@kernel.org>
+References: <1479453418-25314-1-git-send-email-krzk@kernel.org>
+Message-ID: <20161118131741.GB2301@dell.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Nov 2016, Will Deacon wrote:
-> On Thu, Nov 17, 2016 at 07:35:36PM +0100, Sebastian Andrzej Siewior wrote:
-> > Install the callbacks via the state machine and let the core invoke
-> > the callbacks on the already online CPUs.
-> > 
-> > smp_call_function_single() has been removed because the function is already
-> > invoked on the target CPU.
-> > 
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Russell King <linux@armlinux.org.uk>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> > ---
-> >  arch/arm/kernel/hw_breakpoint.c | 44 ++++++++++++++++++-----------------------
-> >  1 file changed, 19 insertions(+), 25 deletions(-)
+On Fri, 18 Nov 2016, Krzysztof Kozlowski wrote:
+
+> All Samsung platforms, including the Exynos, are selecting HZ_FIXED with
+> 200 Hz.  Unfortunately in case of multiplatform image this affects also
+> other platforms when Exynos is enabled.
 > 
-> [...]
+> This looks like an very old legacy code, dating back to initial
+> upstreaming of S3C24xx.  Probably it was required for s3c24xx timer
+> driver, which was removed in commit ad38bdd15d5b ("ARM: SAMSUNG: Remove
+> unused plat-samsung/time.c").
 > 
-> >  static int __init arch_hw_breakpoint_init(void)
-> >  {
-> > +	int ret;
-> > +
-> >  	debug_arch = get_debug_arch();
-> >  
-> >  	if (!debug_arch_supported()) {
-> > @@ -1072,8 +1069,6 @@ static int __init arch_hw_breakpoint_init(void)
-> >  	core_num_brps = get_num_brps();
-> >  	core_num_wrps = get_num_wrps();
-> >  
-> > -	cpu_notifier_register_begin();
-> > -
-> >  	/*
-> >  	 * We need to tread carefully here because DBGSWENABLE may be
-> >  	 * driven low on this core and there isn't an architected way to
-> > @@ -1082,15 +1077,18 @@ static int __init arch_hw_breakpoint_init(void)
-> >  	register_undef_hook(&debug_reg_hook);
-> >  
-> >  	/*
-> > -	 * Reset the breakpoint resources. We assume that a halting
-> > -	 * debugger will leave the world in a nice state for us.
-> > +	 * Register CPU notifier which resets the breakpoint resources. We
-> > +	 * assume that a halting debugger will leave the world in a nice state
-> > +	 * for us.
-> >  	 */
-> > -	on_each_cpu(reset_ctrl_regs, NULL, 1);
-> > +	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "arm/hw_breakpoint:online",
-> > +				dbg_reset_online, NULL);
+> Since then, this fixed 200 Hz spread everywhere, including out-of-tree
+> Samsung kernels (SoC vendor's and Tizen's).  I believe this choice
+> was rather an effect of coincidence instead of conscious choice.
 > 
-> I'm slightly unsure about this. The dbg_reset_online callback can execute
-> undefined instructions (unfortunately, there's no way to probe the presence
-> of some of the debug registers), so it absolutely has to run within the 
-> register_undef_hook/unregister_undef_hook calls that are in this function.
+> Exynos uses its own MCT or arch timer and can work with all HZ values.
+> Older platforms use newer Samsung PWM timer driver which should handle
+> down to 100 Hz.
 > 
-> With this patch, I worry that the callback can be postponed to ONLINE time
-> for other CPUs, and then the kernel will panic.
+> Few perf mem and sched tests on Odroid XU3 board (Exynos5422, 4x Cortex
+> A7, 4x Cortex A15) show no regressions when switching from 200 Hz to
+> other values.
+> 
+> Reported-by: Lee Jones <lee.jones@linaro.org>
 
-No. The flow is the following:
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-  	register_undef_hook(&debug_reg_hook);
+> [Dropping 200_HZ from S3C/S5P suggested by Arnd]
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> ---
+> 
+> Tested on Exynos5422 and Exynos5800 (by Javier). It would be
+> appreciated if anyone could test it on S3C24xx or S5PV210.
+> 
+> Changes since v1:
+> 1. Add Javier's tested-by.
+> 2. Drop HZ_FIXED also from ARCH_S5PV210 and ARCH_S3C24XX after Arnd
+>    suggestions and analysis.
+> ---
+>  arch/arm/Kconfig | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index b5d529fdffab..ced2e08a9d08 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1496,8 +1496,7 @@ source kernel/Kconfig.preempt
+>  
+>  config HZ_FIXED
+>  	int
+> -	default 200 if ARCH_EBSA110 || ARCH_S3C24XX || \
+> -		ARCH_S5PV210 || ARCH_EXYNOS4
+> +	default 200 if ARCH_EBSA110
+>  	default 128 if SOC_AT91RM9200
+>  	default 0
+>  
 
-	ret = cpuhp_setup_state(.., dbg_reset_online, NULL);
-	      {
-		for_each_online_cpu(cpu) {
-			ret = call_on_cpu(cpu, dbg_reset_online);
-			if (ret)
-			      return ret:
-		}
-	      }
-
-  	unregister_undef_hook(&debug_reg_hook);
-	
-The only difference to the current code is that the call is not invoked via
-a smp function call (on_each_cpu), it's pushed to the hotplug thread
-context of each cpu and executed there.
-
-But it's guaranteed that cpuhp_setup_state() will not return before the
-callback has been invoked on each online cpu.
-
-If cpus are not yet online when that code is invoked, then it's the same
-behaviour as before. It will be invoked when the cpu comes online.
-
-Thanks,
-
-	tglx
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
