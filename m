@@ -1,54 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Nov 2016 14:32:30 +0100
-Subject: [PATCH 01/16] ARM: scu: Provide support for parsing SCU device
- node to enable SCU
-In-Reply-To: <20161118124805.GJ1041@n2100.armlinux.org.uk>
-References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
- <9481995.AMBiYg893F@wuerfel> <20161118124805.GJ1041@n2100.armlinux.org.uk>
-Message-ID: <2339821.zs8sl71mMv@wuerfel>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 18 Nov 2016 14:34:28 +0100
+Subject: [RFC 1/6] drm/etnaviv: add binding for the gc320 found in ti socs
+In-Reply-To: <20161118121340.GC23750@n2100.armlinux.org.uk>
+References: <20161118024436.13447-1-robertcnelson@gmail.com>
+ <0bf288ee-33bc-c3b5-389f-08d9bb89ccb5@ti.com>
+ <20161118121340.GC23750@n2100.armlinux.org.uk>
+Message-ID: <1479476068.20533.19.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, November 18, 2016 12:48:07 PM CET Russell King - ARM Linux wrote:
-> On Fri, Nov 18, 2016 at 01:14:35PM +0100, Arnd Bergmann wrote:
-> > @@ -41,6 +43,9 @@ void scu_enable(void __iomem *scu_base)
-> >  {
-> >       u32 scu_ctrl;
-> >  
-> > +     if (scu_base)
-> > +             scu_base = scu_base_addr;
-> > +
+Am Freitag, den 18.11.2016, 12:13 +0000 schrieb Russell King - ARM
+Linux:
+> On Thu, Nov 17, 2016 at 08:53:38PM -0600, Nishanth Menon wrote:
+> > >diff --git a/drivers/gpu/drm/etnaviv/etnaviv_drv.c b/drivers/gpu/drm/etnaviv/etnaviv_drv.c
+> > >index a6799b0..ce51270 100644
+> > >--- a/drivers/gpu/drm/etnaviv/etnaviv_drv.c
+> > >+++ b/drivers/gpu/drm/etnaviv/etnaviv_drv.c
+> > >@@ -653,6 +653,7 @@ static int etnaviv_pdev_remove(struct platform_device *pdev)
+> > > static const struct of_device_id dt_match[] = {
+> > > 	{ .compatible = "fsl,imx-gpu-subsystem" },
+> > > 	{ .compatible = "marvell,dove-gpu-subsystem" },
+> > >+	{ .compatible = "ti,gc320-gpu-subsystem" },
 > 
-> This looks to me like nonsense.
+> We need to get away from this ever-increasing set of compatible
+> strings here, as this is not long-term maintainable.
 > 
-> >  #ifdef CONFIG_ARM_ERRATA_764369
-> >       /* Cortex-A9 only */
-> >       if ((read_cpuid_id() & 0xff0ffff0) == 0x410fc090) {
-> > @@ -85,6 +90,9 @@ int scu_power_mode(void __iomem *scu_base, unsigned int mode)
-> >       unsigned int val;
-> >       int cpu = MPIDR_AFFINITY_LEVEL(cpu_logical_map(smp_processor_id()), 0);
-> >  
-> > +     if (scu_base)
-> > +             scu_base = scu_base_addr;
-> > +
+> What we should have is a common compatible which describes that
+> the node is compatible with this driver, and then use SoC specific
+> compatible strings later if we need to (eg, because of some GPU
+> subsystem SoC specifics.)
 > 
-> Ditto.
+> So, I'd suggest that we update the documentation and add:
 > 
-> Rather than doing this, I'd much prefer to always store the SCU base in
-> the SCU code, and remove the "void __iomem *scu_base" argment from all
-> these functions.
+> 	"vivante,gc-gpu-subsystem"
+> 
+> as a common compatible now, and if necessary move on to more specific
+> compatibles if we need to later.
+> 
+> Also, I'd strongly suggest that no compatibles should contain the ID
+> number of the GPU core for exactly the same reason - Vivante GPU cores
+> vary according to features, and we don't want to end up with a long
+> list of specific compatibles (eg)
+> 	"ti,gc2000-and-gc320-and-gc355-gpu-subsystem" because TI
+> decides to integrate a 3d, 2d and VG core.
+> 
+All of the above sounds sensible and I would prefer if the patches are
+reworked to take those things into account.
 
-Ok, then we just need one scu_probe_*() variant for each of the
-four methods of initializing it (iotable, of_iomap,
-ioremap(scu_a9_get_base) and hardcoded.
-
-The intention of doing the fallback for the NULL argument was
-to avoid having to add lots of new API while also allowing
-the change to be done one platform at a time.
-
-If we remove the argument from the other functions, they either
-need to get a new name, or we change them all to the new prototype
-at once. Either way works fine, do you have a preference between
-them?
-
-	Arnd
+Regards,
+Lucas
