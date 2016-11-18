@@ -1,61 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Nov 2016 12:46:21 +0100
-Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <582469C8.9090609@hisilicon.com>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <17821285.aIcTyCGn5n@wuerfel> <582469C8.9090609@hisilicon.com>
-Message-ID: <2565107.vdSUAxpRt4@wuerfel>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 18 Nov 2016 13:50:09 +0200
+Subject: [GIT PULL 2/3] ARM64: dts: exynos: DT for v4.10
+In-Reply-To: <20161118015954.GP8578@localhost>
+References: <1478629589-7520-1-git-send-email-krzk@kernel.org>
+ <1478629589-7520-4-git-send-email-krzk@kernel.org>
+ <20161118015954.GP8578@localhost>
+Message-ID: <20161118115009.GA17239@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[found this old mail in my drafts folder, might as well send it now]
-
-On Thursday, November 10, 2016 8:36:24 PM CET zhichang.yuan wrote:
-> Sorry! I can't catch your idea yet:(
+On Thu, Nov 17, 2016 at 05:59:54PM -0800, Olof Johansson wrote:
+> On Tue, Nov 08, 2016 at 08:26:29PM +0200, Krzysztof Kozlowski wrote:
+> > Hi,
+> > 
+> > Exynos5433 + two boards using it. Mobile boards! :)
+> > 
+> > I am really happy to push it. I know that it has been a lot of effort
+> > in Samsung to mainline this.
+> > 
+> > Best regards,
+> > Krzysztof
+> > 
+> > 
+> > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+> > 
+> >   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.10
+> > 
+> > for you to fetch changes up to 8ac46fc57df82efbc19194dddd335b6c7a960c31:
+> > 
+> >   arm64: dts: exynos: Add dts file for Exynos5433-based TM2E board (2016-11-03 22:19:57 +0200)
+> > 
+> > ----------------------------------------------------------------
+> > Finally, I am really pleased to announce adding support for Exynos5433 ARMv8
+> > SoC along with two boards.  A lot of Samsung people contributed into this
+> > but the final work and commits were done by Chanwoo Choi.
+> > 
+> > This means that for v4.10 we got:
+> > 1. Exynos5433 DTSI.
+> > 2. Two boards: TM2 and TM2E.  These are (almost fully) working mobile phones.
 > 
-> When to register the I/O range? Is it done just after the successfully
-> of_translate_address() during the children scanning?
+> Awesome! Looks like TM2 is a Tizen reference board? Great to see the support,
+> even if it's taken a while.
 
-No, you do it when first finding the bus itself, just like we do for
-PCI host bridges.
+Yes, I think these were planned to be reference devices. Userspace
+packages and snapshots are published for some quite long time
+(http://download.tizen.org/snapshots/tizen/3.0-mobile/latest/images/arm64-wayland/).
 
-> If yes, when a child is scanning, there is no range data in arm64_extio_ops. The
-> addr_is_indirect_io() calling in of_get_isa_indirect_io() don't need. All we can
-> check is just whether the address to be translated is IO and is under a parent
-> device which has no 'ranges' property.
-
-The children should only be scanned after the I/O range has been
-registered for the parent.
-
-> > Your current version has
-> > 
-> >         if (arm64_extio_ops->pfout)                             \
-> >                 arm64_extio_ops->pfout(arm64_extio_ops->devpara,\
-> >                        addr, value, sizeof(type));             \
-> > 
-> > Instead, just subtract the start of the range from the logical
-> > port number to transform it back into a bus-local port number:
-> > 
-> >         if (arm64_extio_ops->pfout)                             \
-> >                 arm64_extio_ops->pfout(arm64_extio_ops->devpara,\
-> >                        addr - arm64_extio_ops->start, value, sizeof(type)); \
-> > 
-> I think there is some information needed sync.
-> In the old patch-set, we don't bypass the pci_address_to_pio() after
-> successfully of_translate_address(). In this way, we don't need to reserve any
-> PIO space for our LPC since the logical port are from the same mapping
-> algorithm. Based on this way, the port number in the device resource is logical
-> one, then we need to subtract the start of the resource to get back the
-> bus-local port.
-> 
-> From V3, we don't apply the mapping based on pci_address_to_pio(), the
-> of_translate_address() return the bus-local port directly and store into
-> relevant device resource. So, in the current arm64_extio_ops->pfout(), the
-> reverse translation don't need anymore. The input "addr" is bus-local port now.
-
-Ok, so this would have to be changed again: If we want to support multiple
-bus domains, of_translate_address() must translate between the bus specific
-address and the general Linux I/O port number. Even without doing that,
-it seems nicer to not overlap the range of the first PCI host bridge.
-
-	Arnd
+Best regards,
+Krzysztof
