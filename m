@@ -1,44 +1,77 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 18 Nov 2016 17:17:13 +0100
-Subject: [GIT PULL 4/10] bus: Add Tegra GMI support
-In-Reply-To: <20161118161719.24153-1-thierry.reding@gmail.com>
-References: <20161118161719.24153-1-thierry.reding@gmail.com>
-Message-ID: <20161118161719.24153-4-thierry.reding@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Nov 2016 17:16:06 +0100
+Subject: [PATCH 3/3] [media] mtk-mdp: mark PM functions as __maybe_unused
+In-Reply-To: <20161118161621.798004-1-arnd@arndb.de>
+References: <20161118161621.798004-1-arnd@arndb.de>
+Message-ID: <20161118161621.798004-3-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+The driver still produces a warning when CONFIG_PM is disabled, an
+earlier fix only partially solved this:
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+media/platform/mtk-mdp/mtk_mdp_core.c:72:13: error: 'mtk_mdp_clock_off' defined but not used [-Werror=unused-function]
+media/platform/mtk-mdp/mtk_mdp_core.c:63:13: error: 'mtk_mdp_clock_on' defined but not used [-Werror=unused-function]
 
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+This removes the incorrect #ifdef again and instead marks the PM
+functions as __maybe_unused, which reliably shuts up the warning.
 
-are available in the git repository at:
+Fixes: 1b06fcf56aa6 ("[media] media: mtk-mdp: fix build error")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/media/platform/mtk-mdp/mtk_mdp_core.c | 12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.10-bus
-
-for you to fetch changes up to 40eb47767852a9122ef99a48f8d208ec6327e07f:
-
-  bus: Add support for Tegra Generic Memory Interface (2016-11-15 17:27:53 +0100)
-
-Thanks,
-Thierry
-
-----------------------------------------------------------------
-bus: Add Tegra GMI support
-
-This provides a driver to enable the use of the Generic Memory Interface
-found on Tegra SoCs that can host various types of high-speed devices.
-
-----------------------------------------------------------------
-Mirza Krak (2):
-      dt/bindings: Add bindings for Tegra GMI controller
-      bus: Add support for Tegra Generic Memory Interface
-
- .../devicetree/bindings/bus/nvidia,tegra20-gmi.txt | 132 ++++++++++
- drivers/bus/Kconfig                                |   7 +
- drivers/bus/Makefile                               |   1 +
- drivers/bus/tegra-gmi.c                            | 284 +++++++++++++++++++++
- 4 files changed, 424 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt
- create mode 100644 drivers/bus/tegra-gmi.c
+diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
+index 51f2b50e406f..9e4eb7dcc424 100644
+--- a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
++++ b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
+@@ -234,8 +234,7 @@ static int mtk_mdp_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM
+-static int mtk_mdp_pm_suspend(struct device *dev)
++static int __maybe_unused mtk_mdp_pm_suspend(struct device *dev)
+ {
+ 	struct mtk_mdp_dev *mdp = dev_get_drvdata(dev);
+ 
+@@ -244,7 +243,7 @@ static int mtk_mdp_pm_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int mtk_mdp_pm_resume(struct device *dev)
++static int __maybe_unused mtk_mdp_pm_resume(struct device *dev)
+ {
+ 	struct mtk_mdp_dev *mdp = dev_get_drvdata(dev);
+ 
+@@ -252,10 +251,8 @@ static int mtk_mdp_pm_resume(struct device *dev)
+ 
+ 	return 0;
+ }
+-#endif /* CONFIG_PM */
+ 
+-#ifdef CONFIG_PM_SLEEP
+-static int mtk_mdp_suspend(struct device *dev)
++static int __maybe_unused mtk_mdp_suspend(struct device *dev)
+ {
+ 	if (pm_runtime_suspended(dev))
+ 		return 0;
+@@ -263,14 +260,13 @@ static int mtk_mdp_suspend(struct device *dev)
+ 	return mtk_mdp_pm_suspend(dev);
+ }
+ 
+-static int mtk_mdp_resume(struct device *dev)
++static int __maybe_unused mtk_mdp_resume(struct device *dev)
+ {
+ 	if (pm_runtime_suspended(dev))
+ 		return 0;
+ 
+ 	return mtk_mdp_pm_resume(dev);
+ }
+-#endif /* CONFIG_PM_SLEEP */
+ 
+ static const struct dev_pm_ops mtk_mdp_pm_ops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(mtk_mdp_suspend, mtk_mdp_resume)
+-- 
+2.9.0
