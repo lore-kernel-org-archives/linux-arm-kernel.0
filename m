@@ -1,67 +1,41 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Nov 2016 12:54:10 +0000
-Subject: [PATCH] arm: spin one more cycle in timer-based delays
-In-Reply-To: <20161118120630.GJ13470@arm.com>
-References: <582B0F61.6030903@free.fr>
- <20161118120630.GJ13470@arm.com>
-Message-ID: <20161118125409.GK1041@n2100.armlinux.org.uk>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 18 Nov 2016 14:59:24 +0200
+Subject: [RFT] ARM: dts: exynos: Fix invalid GIC interrupt flags in audio
+ block of Exynos5410
+Message-ID: <1479473964-9085-1-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 12:06:30PM +0000, Will Deacon wrote:
-> On Tue, Nov 15, 2016 at 02:36:33PM +0100, Mason wrote:
-> > When polling a tick counter in a busy loop, one might sample the
-> > counter just *before* it is updated, and then again just *after*
-> > it is updated. In that case, while mathematically v2-v1 equals 1,
-> > only epsilon has really passed.
-> > 
-> > So, if a caller requests an N-cycle delay, we spin until v2-v1
-> > is strictly greater than N to avoid these random corner cases.
-> > 
-> > Signed-off-by: Mason <slash.tmp@free.fr>
-> > ---
-> >  arch/arm/lib/delay.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
-> > index 69aad80a3af4..3f1cd15ca102 100644
-> > --- a/arch/arm/lib/delay.c
-> > +++ b/arch/arm/lib/delay.c
-> > @@ -60,7 +60,7 @@ static void __timer_delay(unsigned long cycles)
-> >  {
-> >  	cycles_t start = get_cycles();
-> >  
-> > -	while ((get_cycles() - start) < cycles)
-> > +	while ((get_cycles() - start) <= cycles)
-> >  		cpu_relax();
-> >  }
-> 
-> I thought a bit about this last night. It is well known that the delay
-> routines are not guaranteed to be accurate, and I don't *think* that's
-> limited to over-spinning, so arguably this isn't a bug. However, taking
-> the approach that "drivers should figure it out" is also unhelpful,
-> because the frequency of the underlying counter isn't generally known
-> and so drivers can't simply adjust the delay parameter.
+Recently added audio block of Exynos5410 missed global fixup of GIC
+interrupt flags.  Interrupt of type IRQ_TYPE_NONE is not allowed for GIC
+interrupts so use level high.
 
-I don't think this change makes any sense whatsoever.  udelay() is
-inaccurate, period.  It _will_ give delays shorter than requested
-for many reasons, many of which can't be fixed.
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ arch/arm/boot/dts/exynos5410.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Having a super-accurate version just encourages people to write broken
-drivers which assume (eg) that udelay(10) will give _at least_ a 10us
-delay.  However, there is no such guarantee.
-
-So, having udelay() for timers return slightly short is actually a good
-thing - it causes people not to make the mistake to be soo accurate
-with their delay specifications.
-
-So, NAK on this change.  udelay is not super-accurate.
-
-Reference (and this is the most important one):
-
-  http://lists.openwall.net/linux-kernel/2011/01/12/372
-
+diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+index bb90bbdbe2d9..2b6adafe18e2 100644
+--- a/arch/arm/boot/dts/exynos5410.dtsi
++++ b/arch/arm/boot/dts/exynos5410.dtsi
+@@ -203,7 +203,7 @@
+ 			pdma0: pdma at 12680000 {
+ 				compatible = "arm,pl330", "arm,primecell";
+ 				reg = <0x121A0000 0x1000>;
+-				interrupts = <GIC_SPI 34 IRQ_TYPE_NONE>;
++				interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clock CLK_PDMA0>;
+ 				clock-names = "apb_pclk";
+ 				#dma-cells = <1>;
+@@ -214,7 +214,7 @@
+ 			pdma1: pdma at 12690000 {
+ 				compatible = "arm,pl330", "arm,primecell";
+ 				reg = <0x121B0000 0x1000>;
+-				interrupts = <GIC_SPI 35 IRQ_TYPE_NONE>;
++				interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clock CLK_PDMA1>;
+ 				clock-names = "apb_pclk";
+ 				#dma-cells = <1>;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.4
