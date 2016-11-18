@@ -1,56 +1,47 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Nov 2016 10:36:31 -0800
-Subject: [GIT PULL] STM32 SOC changes for v4.10 #1
-In-Reply-To: <7e258e38-5ac9-60e8-4bc7-03acedd5e11d@st.com>
-References: <7e258e38-5ac9-60e8-4bc7-03acedd5e11d@st.com>
-Message-ID: <20161118183631.GI8882@localhost>
+Date: Fri, 18 Nov 2016 10:37:36 -0800
+Subject: [GIT PULL] STM32 DT changes for v4.10 #2
+In-Reply-To: <2f793efd-01c6-fa28-0332-9e292341c064@st.com>
+References: <2f793efd-01c6-fa28-0332-9e292341c064@st.com>
+Message-ID: <20161118183736.GJ8882@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Nov 15, 2016 at 03:22:30PM +0100, Alexandre Torgue wrote:
+On Tue, Nov 15, 2016 at 03:40:24PM +0100, Alexandre Torgue wrote:
 > Hi Olof, Arnd and Kevin,
 > 
-> Please consider this first round of STM32 SOC updates for v4.10:
+> Please consider this second round of STM32 DT updates for v4.10:
 > 
-> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+> The following changes since commit f6dbbff4f0af1a5c0d6eaf414572b5eff7a73a8b:
 > 
->   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+>   ARM: dts: stm32f429: add LSI and LSE clocks (2016-11-04 15:08:08 +0100)
 > 
 > are available in the git repository at:
 > 
 >   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
-> tags/soc-for-4.10-1
+> tags/stm32-dt-for-v4.10-2
 > 
-> for you to fetch changes up to 6bc18b83c0c3b5d56137a31ce98ca2802036e7a9:
+> for you to fetch changes up to 2ecaa477b404d707bac93c56f09a0a6162e04ed7:
 > 
->   ARM: Kconfig: Introduce MACH_STM32F746 flag (2016-11-15 12:02:59 +0100)
+>   ARM: dts: stm32f429: Add QSPI clock (2016-11-15 13:59:11 +0100)
 > 
 > ----------------------------------------------------------------
-> STM32 SOC updates for v4.10, round 1.
+> STM32 DT updates for v4.10, round 2.
 > 
 > Highlights:
 > ----------
->  - Add new MCU SOC STM32F746
+>  - Add support of STM32F746 MCU and STM32746G-Eval board
+>  - Add QSPI support for STM32F469-Disco board
 > 
 > ----------------------------------------------------------------
-> Alexandre TORGUE (2):
->       ARM: mach-stm32: Add a new SOC - STM32F746
->       ARM: Kconfig: Introduce MACH_STM32F746 flag
+> Alexandre TORGUE (1):
+>       ARM: dts: Add STM32F746 MCU and STM32746g-EVAL board
+> 
+> Gabriel Fernandez (1):
+>       ARM: dts: stm32f429: Add QSPI clock
 
-Merged. For future patches, please use the same format as other platforms,
-in your case it would be:
-
-ARM: stm32: <..>
-
-I.e. others are leaving out the mach- part.
-
-Also, on the Kconfig change, please consider adding a Kconfig under your
-mach directory and include it. We ask most platforms that have suboptions
-to do this to avoid conflicts and provide a bit more structure. Feel
-free to send a new pull request build on top of this one for that,
-since we're merging this one now.
+Hi, merged. But here too, please use common prefixes in the future,
+please. I'd recommend 'ARM: dts: stm32: <...>'.
 
 
 Thanks!
