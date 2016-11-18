@@ -1,54 +1,48 @@
-From: nleeder@codeaurora.org (Leeder, Neil)
-Date: Thu, 17 Nov 2016 22:16:46 -0500
-Subject: System/uncore PMUs and unit aggregation
-In-Reply-To: <20161117181708.GT22855@arm.com>
-References: <20161117181708.GT22855@arm.com>
-Message-ID: <2cb0eb12-979c-7eff-7c51-ce9e06b3740c@codeaurora.org>
+From: wulf@rock-chips.com (wlf)
+Date: Fri, 18 Nov 2016 11:17:14 +0800
+Subject: [PATCH 1/2] phy: rockchip-inno-usb2: fix uninitialized tmout
+ variable
+In-Reply-To: <20161116142259.2123506-1-arnd@arndb.de>
+References: <20161116142259.2123506-1-arnd@arndb.de>
+Message-ID: <4f75b364-c79a-2d03-00e1-42e941b75b2e@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for opening up the discussion on this Will.
+Hi Arnd,
 
-For the Qualcomm L2 driver, one objection I had to exposing each unit is 
-that there are so many of them - the minimum starting point is a dozen, 
-so trying to start 9 counters on each means a perf command line 
-specifying 100+ events. Future chips are only likely to increase that.
+? 2016?11?16? 22:22, Arnd Bergmann ??:
+> The newly added OTG support has an obvious uninitialized variable
+> access that gcc warns about:
+>
+> drivers/phy/phy-rockchip-inno-usb2.c: In function 'rockchip_chg_detect_work':
+> drivers/phy/phy-rockchip-inno-usb2.c:717:7: error: 'tmout' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+>
+> This replaces the use of the uninitialized variable with what
+> the value was in the previous USB_CHG_STATE_WAIT_FOR_DCD
+> state.
+>
+> Fixes: 0c42fe48fd23 ("phy: rockchip-inno-usb2: support otg-port for rk3399")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>   drivers/phy/phy-rockchip-inno-usb2.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
+> index eb89de59b68f..2f99ec95079c 100644
+> --- a/drivers/phy/phy-rockchip-inno-usb2.c
+> +++ b/drivers/phy/phy-rockchip-inno-usb2.c
+> @@ -714,7 +714,7 @@ static void rockchip_chg_detect_work(struct work_struct *work)
+>   			delay = CHG_SECONDARY_DET_TIME;
+>   			rphy->chg_state = USB_CHG_STATE_PRIMARY_DONE;
+>   		} else {
+> -			if (tmout) {
+> +			if (rphy->dcd_retries == CHG_DCD_MAX_RETRIES) {
+>   				/* floating charger found */
+>   				rphy->chg_type = POWER_SUPPLY_TYPE_USB_DCP;
+>   				rphy->chg_state = USB_CHG_STATE_DETECTED;
+Thanks very much for your help.
 
-There is a single CPU node so from an end-user perspective it would 
-seems to make sense to also have a single L2 node. perf already has the 
-ability to create events on multiple units using cpumask, aggregate the 
-results, and split them out per unit with perf stat -a -A, so the user 
-can get that granularity. Exposing separate units would make userspace 
-duplicate a lot of that functionality. This may rely on each uncore unit 
-being associated with a CPU, which is the case with L2.
+Reviewed-by: William Wu <wulf@rock-chips.com>
 
-I agree with your comments regarding groups and I can see that a 
-standard way of representing topology could be useful - in this case, 
-which CPUs are within the same L2 cluster. Perhaps a list of cpumasks, 
-one per L2 unit.
-
-On 11/17/2016 1:17 PM, Will Deacon wrote:
-[...]
->   3. Summing the counters across units is only permitted if the units
->      can all be started and stopped atomically. Otherwise, the counters
->      should be exposed individually. It's up to the driver author to
->      decide what makes sense to sum.
-
-If I understand your your point 3 correctly, I'm not sure about the need 
-to start and stop them all atomically. That seems to be a tighter 
-requirement than we require for CPU PMUs. For them, perf stat -a creates 
-events/groups on each CPU, then starts and stops them sequentially and 
-sums the results. If that model is acceptable for the CPU to collect and 
-aggregate counts, that should be the same bar that uncore PMUs need to 
-reach. In the L2 case, the driver isn't summing the results, it's still 
-perf doing it, so I may be misinterpreting your comment about where the 
-summation is permitted.
-
-Thanks,
-
-Neil
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm 
-Technologies Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Best Regards,
+           wulf
