@@ -1,29 +1,32 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 18 Nov 2016 16:57:53 +0200
-Subject: [PATCH V8 1/3] tracing: add a possibility of exporting function
- trace to other places instead of ring buffer only
-In-Reply-To: <20161118092905.769044bf@gandalf.local.home>
-References: <1479438454-28650-1-git-send-email-zhang.chunyan@linaro.org>
- <1479438454-28650-2-git-send-email-zhang.chunyan@linaro.org>
- <20161118092905.769044bf@gandalf.local.home>
-Message-ID: <87vavkesy6.fsf@ashishki-desk.ger.corp.intel.com>
+From: bruherrera@gmail.com (Bruno Meirelles Herrera)
+Date: Fri, 18 Nov 2016 12:58:45 -0200
+Subject: [RESEND PATCH] ARM: dts: stm32f469-disco: Fix memory size from 8MB to
+ 16MB
+Message-ID: <20161118145845.30455-1-bmh@certi.org.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Steven Rostedt <rostedt@goodmis.org> writes:
+From: Bruno Herrera <bruherrera@gmail.com>
 
-> This looks good to me, although I would like this to go through my tree
-> (to make sure it gets all my testing). I understand the next two
-> patches depend on this, how would you want to go about that?
->
-> One is that I can pull it in the next merge window, and the rest go in
-> after that. Or I can take the other two patches with the proper acks as
-> well.
+This patch fix memory size to support 16MB of external SDRAM.
 
-I just asked for the last patch be split 4 ways, but otherwise, they
-have my acks. If Chunyan can do that, you can take all of them into your
-tree.
+Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
+---
+ arch/arm/boot/dts/stm32f469-disco.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
---
-Alex
+diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
+index 75f4303..fda12a4 100644
+--- a/arch/arm/boot/dts/stm32f469-disco.dts
++++ b/arch/arm/boot/dts/stm32f469-disco.dts
+@@ -58,7 +58,7 @@
+ 	};
+ 
+ 	memory {
+-		reg = <0x00000000 0x800000>;
++		reg = <0x00000000 0x1000000>;
+ 	};
+ 
+ 	aliases {
+-- 
+2.9.3 (Apple Git-75)
