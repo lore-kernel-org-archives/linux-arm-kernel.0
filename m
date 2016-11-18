@@ -1,43 +1,35 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 18 Nov 2016 08:55:04 +0100
-Subject: [PATCH] crypto: sun4i-ss: support the Security System PRNG
-In-Reply-To: <CACXcFmmMc7U1Qz6A+mvMXVnfSmOmssydcmSugo21jrX3u-95Qg@mail.gmail.com>
-References: <1476794067-28563-1-git-send-email-clabbe.montjoie@gmail.com>
- <CACXcFmmMc7U1Qz6A+mvMXVnfSmOmssydcmSugo21jrX3u-95Qg@mail.gmail.com>
-Message-ID: <20161118075504.GA21827@Red>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 17 Nov 2016 17:46:34 -0800
+Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for v4.10
+In-Reply-To: <CAK7LNAQ5_Sc99WbTWR9u3_J0FqG8KUSGNQzggdQC91Cngxi+Cw@mail.gmail.com>
+References: <CAK7LNAQ5_Sc99WbTWR9u3_J0FqG8KUSGNQzggdQC91Cngxi+Cw@mail.gmail.com>
+Message-ID: <20161118014634.GK8578@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2016 at 08:07:09PM -0500, Sandy Harris wrote:
-> Add Ted T'so to cc list. Shouldn't he be included on anything affecting
-> the random(4) driver?
+Hi,
+
+On Sun, Nov 06, 2016 at 12:18:11AM +0900, Masahiro Yamada wrote:
+> Hi Arnd, Olof,
 > 
-
-Blindy used get_maintainer.pl, and since the file is in crypto, hw_random people were not set.
-Note that get_maintainer.pl on drivers/char/hw_random/, does not give his address also.
-My V2 patch will have them in CC/TO.
-
-> On Tue, Oct 18, 2016 at 8:34 AM, Corentin Labbe
-> <clabbe.montjoie@gmail.com> wrote:
+> Here are UniPhier DT (32bit) updates for the v4.10 merge window.
+> Please pull!
 > 
-> > From: LABBE Corentin <clabbe.montjoie@gmail.com>
-> >
-> > The Security System have a PRNG.
-> > This patch add support for it as an hwrng.
-> 
-> Which is it? A PRNG & a HW RNG are quite different things.
-> It would, in general, be a fairly serious error to treat a PRNG
-> as a HWRNG.
-> 
-> If it is just a prng (which it appears to be from a quick look
-> at your code) then it is not clear it is useful since the
-> random(4) driver already has two PRNGs. It might be
-> but I cannot tell.
+> (This time, I based this pull-request on -rc3 instead of -rc1
+> because I want to make sure to have no conflict
+> between fixes that had already been pulled-in and
+> new development commits in this series.)
 
-For me hwrng is a way to give user space an another way to get "random" data via /dev/hwrng.
-The only impact of hwrng with random is that just after init some data of hwrng is used for having more entropy.
+What you can do is instad use your fixes branch as base, since in this
+case we had -rc2 as our base for next/dt. Since you based on -rc3, we need
+to bring in a newer upstream revision (a backmerge), and that's something we
+try to avoid.
 
-Grepping prng in drivers/char/hw_random/ and drivers/crypto show me some other PRNG used with hwrng.
+I've merged your branch in this case anyway, but next time try basing on top
+of your fixes if you need to.
 
-Regards
-Corentin Labbe
+
+Thanks!
+
+
+-Olof
