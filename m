@@ -1,65 +1,45 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 18 Nov 2016 09:16:58 +0200
-Subject: [PATCH v2] ARM: Drop fixed 200 Hz timer requirement from Samsung
- platforms
-Message-ID: <1479453418-25314-1-git-send-email-krzk@kernel.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 17 Nov 2016 17:40:14 -0800
+Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.10
+In-Reply-To: <cover.1478251192.git.horms+renesas@verge.net.au>
+References: <cover.1478251192.git.horms+renesas@verge.net.au>
+Message-ID: <20161118014014.GG8578@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All Samsung platforms, including the Exynos, are selecting HZ_FIXED with
-200 Hz.  Unfortunately in case of multiplatform image this affects also
-other platforms when Exynos is enabled.
+On Fri, Nov 04, 2016 at 10:44:04AM +0100, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these Renesas ARM64 based SoC DT updates for v4.10.
+> 
+> 
+> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+> 
+>   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.10
+> 
+> for you to fetch changes up to 935085209343a0c507e3d9a3e01883b25c8f743e:
+> 
+>   arm64: renesas: r8a7796: add SYS-DMAC controller nodes (2016-11-04 10:18:07 +0100)
+> 
+> ----------------------------------------------------------------
+> Renesas ARM64 Based SoC DT Updates for v4.10
+> 
+> Enablement:
+> * Enable On-board eMMC
+> * Enable SDHI 0 & 3 with UHS
+> * Add SYS-DMAC controller nodes to r8a7796 SoC
+> * Populate EXTALR on r8a7796/salvator-x board; used by watchdog
+> * Add DU LVDS output endpoint on r8a7795/salvator-x board
+> * Add bias setting for USB1 pins on r8a7795/salvator-x board
+> 
+> Clean-Up:
+> * Remove FCP SoC-specific compatible strings
 
-This looks like an very old legacy code, dating back to initial
-upstreaming of S3C24xx.  Probably it was required for s3c24xx timer
-driver, which was removed in commit ad38bdd15d5b ("ARM: SAMSUNG: Remove
-unused plat-samsung/time.c").
+Thanks, merged.
 
-Since then, this fixed 200 Hz spread everywhere, including out-of-tree
-Samsung kernels (SoC vendor's and Tizen's).  I believe this choice
-was rather an effect of coincidence instead of conscious choice.
 
-Exynos uses its own MCT or arch timer and can work with all HZ values.
-Older platforms use newer Samsung PWM timer driver which should handle
-down to 100 Hz.
-
-Few perf mem and sched tests on Odroid XU3 board (Exynos5422, 4x Cortex
-A7, 4x Cortex A15) show no regressions when switching from 200 Hz to
-other values.
-
-Reported-by: Lee Jones <lee.jones@linaro.org>
-[Dropping 200_HZ from S3C/S5P suggested by Arnd]
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-Cc: Kukjin Kim <kgene@kernel.org>
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
----
-
-Tested on Exynos5422 and Exynos5800 (by Javier). It would be
-appreciated if anyone could test it on S3C24xx or S5PV210.
-
-Changes since v1:
-1. Add Javier's tested-by.
-2. Drop HZ_FIXED also from ARCH_S5PV210 and ARCH_S3C24XX after Arnd
-   suggestions and analysis.
----
- arch/arm/Kconfig | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b5d529fdffab..ced2e08a9d08 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1496,8 +1496,7 @@ source kernel/Kconfig.preempt
- 
- config HZ_FIXED
- 	int
--	default 200 if ARCH_EBSA110 || ARCH_S3C24XX || \
--		ARCH_S5PV210 || ARCH_EXYNOS4
-+	default 200 if ARCH_EBSA110
- 	default 128 if SOC_AT91RM9200
- 	default 0
- 
--- 
-2.7.4
+-Olof
