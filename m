@@ -1,75 +1,51 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 18 Nov 2016 13:06:17 +0100
-Subject: [PATCH v3 06/13] ARM: dts: armada-375: Fixup sa-ram DT warning
-In-Reply-To: <20161118095925.770496c3@free-electrons.com> (Thomas Petazzoni's
- message of "Fri, 18 Nov 2016 09:59:25 +0100")
-References: <20161117230830.31047-1-gregory.clement@free-electrons.com>
- <20161117230830.31047-7-gregory.clement@free-electrons.com>
- <20161118095925.770496c3@free-electrons.com>
-Message-ID: <8737ipat6u.fsf@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 18 Nov 2016 12:06:30 +0000
+Subject: [PATCH] arm: spin one more cycle in timer-based delays
+In-Reply-To: <582B0F61.6030903@free.fr>
+References: <582B0F61.6030903@free.fr>
+Message-ID: <20161118120630.GJ13470@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On ven., nov. 18 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+On Tue, Nov 15, 2016 at 02:36:33PM +0100, Mason wrote:
+> When polling a tick counter in a busy loop, one might sample the
+> counter just *before* it is updated, and then again just *after*
+> it is updated. In that case, while mathematically v2-v1 equals 1,
+> only epsilon has really passed.
+> 
+> So, if a caller requests an N-cycle delay, we spin until v2-v1
+> is strictly greater than N to avoid these random corner cases.
+> 
+> Signed-off-by: Mason <slash.tmp@free.fr>
+> ---
+>  arch/arm/lib/delay.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
+> index 69aad80a3af4..3f1cd15ca102 100644
+> --- a/arch/arm/lib/delay.c
+> +++ b/arch/arm/lib/delay.c
+> @@ -60,7 +60,7 @@ static void __timer_delay(unsigned long cycles)
+>  {
+>  	cycles_t start = get_cycles();
+>  
+> -	while ((get_cycles() - start) < cycles)
+> +	while ((get_cycles() - start) <= cycles)
+>  		cpu_relax();
+>  }
 
-> Hello,
->
-> On Fri, 18 Nov 2016 00:08:23 +0100, Gregory CLEMENT wrote:
->
->> -		crypto_sram0: sa-sram0 {
->> +		/* The following unit addresses (for sa-sram) are composed of
->> +		 * the target value (bit [40-47]), attributes value (bits
->> +		 * [32-39], and the address value in the window memory: [0-31].
->> +		 */
->
-> The "address value in the window memory" part doesn't make a lot of
-> sense. Maybe:
->
-> "The following unit addresses are composed of the window target ID
-> (bits 40-47), the window target attributes (bits 32-39) and the offset
-> inside the window."
+I thought a bit about this last night. It is well known that the delay
+routines are not guaranteed to be accurate, and I don't *think* that's
+limited to over-spinning, so arguably this isn't a bug. However, taking
+the approach that "drivers should figure it out" is also unhelpful,
+because the frequency of the underlying counter isn't generally known
+and so drivers can't simply adjust the delay parameter.
 
-I'm fine with it
+If you want to go ahead with this change, I do think that you should fix
+the other architectures for consistency (particularly arm64, which is
+likely to share drivers with arch/arm/). However, given that I don't
+think you've seen a failure in practice, it might be a hard sell to get
+the patches picked up, especially given the deliberately vague guarantees
+offered by the delay loop.
 
->
-> Also, the comment formatting is not compliant with the coding style,
-> should be:
->
->  /*
->   * ...
->   * ...
->   */
->
-
-Hum yes I need to teach emacs how to properly format the comments.
-
-> But do we really want this comment above each node? Couldn't we instead
-> add this explanation in the mvebu-mbus.txt DT binding?
-
-We could but I fear that nobody will read it.
-
-Indeed if you know that in order to understand the unit address, you will
-have to have a look an the binding of the mvebu-mbus, then it means that
-you already are an expert and actually you barely need to read it!
-
-In order to have less change we could at least put it near the MBUS_ID
-macro and if the mvebu-mbus.txt DT binding too.
-
-
-Gregory
->
-> Best regards,
->
-> Thomas
-> -- 
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Will
