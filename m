@@ -1,52 +1,114 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 18 Nov 2016 20:20:07 +0800
-Subject: [arm-soc:qcom/arm64 13/13]
- arch/arm64/boot/dts/qcom/msm8994.dtsi:14:48: fatal error:
- dt-bindings/clock/qcom,gcc-msm8994.h: No such file or directory
-Message-ID: <201611182005.RuBSvaJ7%fengguang.wu@intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Nov 2016 13:24:28 +0100
+Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F921146@lhreml507-mbx>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+ <2281986.miqFuFkAbO@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F921146@lhreml507-mbx>
+Message-ID: <2822893.F0LqNAm9bT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git qcom/arm64
-head:   feeaf56ac78d283efe65ea60ec999d4bf3cf395e
-commit: feeaf56ac78d283efe65ea60ec999d4bf3cf395e [13/13] arm64: dts: msm8994 SoC and Huawei Angler (Nexus 6P) support
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout feeaf56ac78d283efe65ea60ec999d4bf3cf395e
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+On Friday, November 18, 2016 12:07:28 PM CET Gabriele Paoloni wrote:
+> > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > On Monday, November 14, 2016 11:26:25 AM CET liviu.dudau at arm.com wrote:
+> > > On Mon, Nov 14, 2016 at 08:26:42AM +0000, Gabriele Paoloni wrote:
+> > > > > Nope, that is not what it means. It means that PCI devices can
+> > see I/O
+> > > > > addresses
+> > > > > on the bus that start from 0. There never was any usage for non-
+> > PCI
+> > > > > controllers
+> > > >
+> > > > So I am a bit confused...
+> > > > From http://www.firmware.org/1275/bindings/isa/isa0_4d.ps
+> > > > It seems that ISA buses operate on cpu I/O address range [0,
+> > 0xFFF].
+> > > > I thought that was the reason why for most architectures we have
+> > > > PCIBIOS_MIN_IO equal to 0x1000 (so I thought that ISA controllers
+> > > > usually use [0, PCIBIOS_MIN_IO - 1] )
+> > >
+> > > First of all, cpu I/O addresses is an x86-ism. ARM architectures and
+> > others
+> > >  have no separate address space for I/O, it is all merged into one
+> > unified
+> > > address space. So, on arm/arm64 for example, PCIBIOS_MIN_IO = 0 could
+> > mean
+> > > that we don't care about ISA I/O because the platform does not
+> > support having
+> > > an ISA bus (e.g.).
+> > 
+> > I think to be more specific, PCIBIOS_MIN_IO=0 would indicate that you
+> > cannot
+> > have a PCI-to-ISA or PCI-to-LPC bridge in any PCI domain. This is
+> > different
+> > from having an LPC master outside of PCI, as that lives in its own
+> > domain
+> > and has a separately addressable I/O space.
+> 
+> Yes correct so if we go for the single domain solution arch that
+> have PCIBIOS_MIN_IO=0 cannot support special devices such as LPC
+> unless we also redefine PCIBIOS_MIN_IO, right?
 
-All errors (new ones prefixed by >>):
+This is what I was referring to below as the difference between
+a) and b): Setting PCIBIOS_MIN_IO=0 means you cannot have LPC
+behind PCI, but it shouldn't stop you from having a separate
+LPC bridge.
 
-   In file included from arch/arm64/boot/dts/qcom/msm8994-angler-rev-101.dts:16:0:
->> arch/arm64/boot/dts/qcom/msm8994.dtsi:14:48: fatal error: dt-bindings/clock/qcom,gcc-msm8994.h: No such file or directory
-    #include <dt-bindings/clock/qcom,gcc-msm8994.h>
-                                                   ^
-   compilation terminated.
+> > The PCIBIOS_MIN_DIRECT_IO name still suggests having something related
+> > to
+> > PCIBIOS_MIN_IO, but it really isn't. We are talking about multiple
+> > concepts here that are not the same but that are somewhat related:
+> > 
+> > a) keeping PCI devices from allocating low I/O ports on the PCI bus
+> >    that would conflict with ISA devices behind a bridge of the
+> >    same bus.
+> > 
+> > b) reserving the low 0x0-0xfff range of the Linux-internal I/O
+> >    space abstraction to a particular LPC or PCI domain to make
+> >    legacy device drivers work that hardcode a particular port
+> >    number.
+> > 
+> > c) Redirecting inb/outb to call a domain-specific accessor function
+> >    rather than doing the normal MMIO window for an LPC master or
+> >    more generally any arbitrary LPC or PCI domain that has a
+> >    nonstandard I/O space.
+> >    [side note: actually if we generalized this, we could avoid
+> >     assigning an MMIO range for the I/O space on the pci-mvebu
+> >     driver, and that would help free up some other remapping
+> >     windows]
+> > 
+> > I think there is no need to change a) here, we have PCIBIOS_MIN_IO
+> > today and even if we don't need it, there is no obvious downside.
+> > I would also argue that we can ignore b) for the discussion of
+> > the HiSilicon LPC driver, we just need to assign some range
+> > of logical addresses to each domain.
+> > 
+> > That means solving c) is the important problem here, and it
+> > shouldn't be so hard.  We can do this either with a single
+> > special domain as in the v5 patch series, or by generalizing it
+> > so that any I/O space mapping gets looked up through the device
+> > pointer of the bus master.
+> 
+> I am not very on the "generalized" multi-domain solution...
+> Currently the IO accessors prototypes have an unsigned long addr
+> as input parameter. If we live in a multi-domain IO system
+> how can we distinguish inside the accessor which domain addr
+> belongs to?
 
-vim +14 arch/arm64/boot/dts/qcom/msm8994.dtsi
+The easiest change compared to the v5 code would be to walk
+a linked list of 'struct extio_ops' structures rather than
+assuming there is only ever one of them. I think one of the
+earlier versions actually did this.
 
-     8	 * but WITHOUT ANY WARRANTY; without even the implied warranty of
-     9	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    10	 * GNU General Public License for more details.
-    11	 */
-    12	
-    13	#include <dt-bindings/interrupt-controller/arm-gic.h>
-  > 14	#include <dt-bindings/clock/qcom,gcc-msm8994.h>
-    15	
-    16	/ {
-    17		model = "Qualcomm Technologies, Inc. MSM 8994";
+Another option the IA64 approach mentioned in another subthread
+today, looking up the operations based on an index from the
+upper bits of the port number. If we do this, we probably
+want to do that for all PIO access and replace the entire
+virtual address remapping logic with that. I think Bjorn
+in the past argued in favor of such an approach, while I
+advocated the current scheme for simplicity based on how
+every I/O space these days is just memory mapped (which now
+turned out to be false, both on powerpc and arm64).
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 31923 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161118/0ec2fd4b/attachment-0001.gz>
+	Arnd
