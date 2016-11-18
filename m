@@ -1,26 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 18 Nov 2016 09:26:56 +0100
-Subject: [GIT PULL] Integrator DTS and defconfig changes
-In-Reply-To: <20161118072506.GC1785@localhost>
-References: <CACRpkdara5D=kvGVYu-WRh_JYK6Z9NKmQ-eniXsauxdzx-QJbA@mail.gmail.com>
- <20161118072506.GC1785@localhost>
-Message-ID: <CACRpkdYoornJx1fTN1C5OiR16w9DbTcr9ze4gc9PLkt7LCqqCQ@mail.gmail.com>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Fri, 18 Nov 2016 08:27:24 +0000
+Subject: [PATCH v7 REPOST 8/9] arm: add sysfs cpu_capacity attribute
+In-Reply-To: <20161103052842.GA16920@e106622-lin>
+References: <20161017154650.18779-1-juri.lelli@arm.com>
+ <20161017154650.18779-9-juri.lelli@arm.com>
+ <20161030204551.GM1041@n2100.armlinux.org.uk>
+ <20161103052842.GA16920@e106622-lin>
+Message-ID: <20161118082724.GC24383@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 8:25 AM, Olof Johansson <olof@lixom.net> wrote:
+Hi Russell,
 
-> I also sympathize that it's extra annoying having to split just three
-> patches across two branches. So, if it's easier we can just cherry-pick
-> apart the patches here across the branches (your comment about next
-> coverage makes me suspect you have no direct downstream users of this
-> branch). If that's OK, let me know and I'll do that tomorrow.
+On 03/11/16 05:28, Juri Lelli wrote:
+> Hi,
+> 
+> apologies for the delay in replying, but I'm attending Linux Plumbers
+> this week.
+> 
+> On 30/10/16 20:45, Russell King - ARM Linux wrote:
+> > On Mon, Oct 17, 2016 at 04:46:49PM +0100, Juri Lelli wrote:
 
-It's fine to cherry-pick, I can also send two separate branches (or
-just 2+1 stand-alone patches).
+[...]
 
-Any way you like it :) just tell me what to do, all I want is to get this
-in for v4.10.
+> 
+> I should have addressed your comments with the updated version below. If
+> it looks good to you I'll superseed the old version with this new one.
+> 
 
-Yours,
-Linus Walleij
+The two updated patches are still listed as incoming in your system.
+Do you think we will be able to queue them for 4.10? IMHO, it would be
+good to have all pieces in together at once (Catalin and Sudeep already
+queued their respective bits).
+
+Thanks a lot.
+
+Best,
+
+- Juri
