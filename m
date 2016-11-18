@@ -1,51 +1,41 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 18 Nov 2016 14:34:28 +0100
-Subject: [RFC 1/6] drm/etnaviv: add binding for the gc320 found in ti socs
-In-Reply-To: <20161118121340.GC23750@n2100.armlinux.org.uk>
-References: <20161118024436.13447-1-robertcnelson@gmail.com>
- <0bf288ee-33bc-c3b5-389f-08d9bb89ccb5@ti.com>
- <20161118121340.GC23750@n2100.armlinux.org.uk>
-Message-ID: <1479476068.20533.19.camel@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 18 Nov 2016 14:35:51 +0100
+Subject: [PATCH v3 06/13] ARM: dts: armada-375: Fixup sa-ram DT warning
+In-Reply-To: <8737ipat6u.fsf@free-electrons.com>
+References: <20161117230830.31047-1-gregory.clement@free-electrons.com>
+ <20161117230830.31047-7-gregory.clement@free-electrons.com>
+ <20161118095925.770496c3@free-electrons.com>
+ <8737ipat6u.fsf@free-electrons.com>
+Message-ID: <20161118143551.3a067bd0@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 18.11.2016, 12:13 +0000 schrieb Russell King - ARM
-Linux:
-> On Thu, Nov 17, 2016 at 08:53:38PM -0600, Nishanth Menon wrote:
-> > >diff --git a/drivers/gpu/drm/etnaviv/etnaviv_drv.c b/drivers/gpu/drm/etnaviv/etnaviv_drv.c
-> > >index a6799b0..ce51270 100644
-> > >--- a/drivers/gpu/drm/etnaviv/etnaviv_drv.c
-> > >+++ b/drivers/gpu/drm/etnaviv/etnaviv_drv.c
-> > >@@ -653,6 +653,7 @@ static int etnaviv_pdev_remove(struct platform_device *pdev)
-> > > static const struct of_device_id dt_match[] = {
-> > > 	{ .compatible = "fsl,imx-gpu-subsystem" },
-> > > 	{ .compatible = "marvell,dove-gpu-subsystem" },
-> > >+	{ .compatible = "ti,gc320-gpu-subsystem" },
-> 
-> We need to get away from this ever-increasing set of compatible
-> strings here, as this is not long-term maintainable.
-> 
-> What we should have is a common compatible which describes that
-> the node is compatible with this driver, and then use SoC specific
-> compatible strings later if we need to (eg, because of some GPU
-> subsystem SoC specifics.)
-> 
-> So, I'd suggest that we update the documentation and add:
-> 
-> 	"vivante,gc-gpu-subsystem"
-> 
-> as a common compatible now, and if necessary move on to more specific
-> compatibles if we need to later.
-> 
-> Also, I'd strongly suggest that no compatibles should contain the ID
-> number of the GPU core for exactly the same reason - Vivante GPU cores
-> vary according to features, and we don't want to end up with a long
-> list of specific compatibles (eg)
-> 	"ti,gc2000-and-gc320-and-gc355-gpu-subsystem" because TI
-> decides to integrate a 3d, 2d and VG core.
-> 
-All of the above sounds sensible and I would prefer if the patches are
-reworked to take those things into account.
+Hello,
 
-Regards,
-Lucas
+On Fri, 18 Nov 2016 13:06:17 +0100, Gregory CLEMENT wrote:
+
+> > But do we really want this comment above each node? Couldn't we instead
+> > add this explanation in the mvebu-mbus.txt DT binding?  
+> 
+> We could but I fear that nobody will read it.
+> 
+> Indeed if you know that in order to understand the unit address, you will
+> have to have a look an the binding of the mvebu-mbus, then it means that
+> you already are an expert and actually you barely need to read it!
+
+Well, you anyway need to read the DT binding if you want to add more
+nodes that use this magic MBUS_ID() thing, so I believe it makes sense
+to have this comment in the binding documentation.
+
+> In order to have less change we could at least put it near the MBUS_ID
+> macro and if the mvebu-mbus.txt DT binding too.
+
+Fine with that.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
