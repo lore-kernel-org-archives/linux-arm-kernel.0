@@ -1,48 +1,47 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 18 Nov 2016 10:42:10 -0600
-Subject: [RFC 6/6] ARM: dts: am57xx-beagle-x15-common: enable etnaviv
-In-Reply-To: <e69a797c-bec3-2243-5c19-9d7633092369@ti.com>
-References: <20161118024436.13447-1-robertcnelson@gmail.com>
- <20161118024436.13447-6-robertcnelson@gmail.com>
- <e69a797c-bec3-2243-5c19-9d7633092369@ti.com>
-Message-ID: <20161118164210.xumqsn3gfd54vv5g@rob-hp-laptop>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 18 Nov 2016 16:43:30 +0000
+Subject: [PATCH v8 12/16] drivers: iommu: arm-smmu: split probe functions
+ into DT/generic portions
+In-Reply-To: <20161118160006.GW13470@arm.com>
+References: <20161116152936.22955-1-lorenzo.pieralisi@arm.com>
+ <20161116152936.22955-13-lorenzo.pieralisi@arm.com>
+ <20161118160006.GW13470@arm.com>
+Message-ID: <28abb42b-4a93-fbb0-d8bb-e6b82b2b992f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2016 at 08:56:18PM -0600, Nishanth Menon wrote:
-> On 11/17/2016 08:44 PM, Robert Nelson wrote:
-> again.. a short commit message at least please? :)
+On 18/11/16 16:00, Will Deacon wrote:
+> On Wed, Nov 16, 2016 at 03:29:32PM +0000, Lorenzo Pieralisi wrote:
+>> Current ARM SMMU probe functions intermingle HW and DT probing
+>> in the initialization functions to detect and programme the ARM SMMU
+>> driver features. In order to allow probing the ARM SMMU with other
+>> firmwares than DT, this patch splits the ARM SMMU init functions into
+>> DT and HW specific portions so that other FW interfaces (ie ACPI) can
+>> reuse the HW probing functions and skip the DT portion accordingly.
+>>
+>> This patch implements no functional change, only code reshuffling.
+>>
+>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Reviewed-by: Tomasz Nowicki <tn@semihalf.com>
+>> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Tested-by: Tomasz Nowicki <tn@semihalf.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+>> Cc: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>  drivers/iommu/arm-smmu.c | 62 +++++++++++++++++++++++++++++-------------------
+>>  1 file changed, 37 insertions(+), 25 deletions(-)
 > 
-> > Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
-> > CC: Julien <jboulnois@gmail.com>
-> > CC: Nishanth Menon <nm@ti.com>
-> > CC: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> > CC: Tony Lindgren <tony@atomide.com>
-> > ---
-> >  arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi | 11 +++++++++++
-> >  1 file changed, 11 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi b/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
-> > index 6df7829..3bc47be 100644
-> > --- a/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
-> > +++ b/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
-> > @@ -97,6 +97,12 @@
-> >  		#cooling-cells = <2>;
-> >  	};
-> > 
-> > +	gpu-subsystem {
-> A) do we want to make things clear that this is gpu subsystem for gc320?
+> Reviewed-by: Will Deacon <will.deacon@arm.com>
+> 
+> Although I'd also like Robin to have a look at this.
 
-No.
+Sorry, I've been slow this week. Having finally got round to taking a
+proper look, I swear this seems even tidier than the last version I
+looked at closely. It doesn't break DT boot on my Juno, either.
 
-> B) How about other platforms that could equally reuse?
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-Better yet, get rid of this nonsense. You are defining a wrapper to 
-group 1 nodes. Yes, I know this is what the driver wants, but you should 
-be able to make it deal with this situation and only have a gc320 node.
-
-> > +		compatible = "ti,gc320-gpu-subsystem";
-> > +		cores = <&bb2d>;
-> > +		status = "okay";
-> > +	};
-> > +
+> 
+> Will
+> 
