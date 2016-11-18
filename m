@@ -1,28 +1,59 @@
-From: wsa-dev@sang-engineering.com (Wolfram Sang)
-Date: Fri, 18 Nov 2016 01:48:47 +0100
-Subject: [-next] i2c: digicolor: use clk_disable_unprepare instead of
- clk_unprepare
-In-Reply-To: <1477758677-7831-1-git-send-email-weiyj.lk@gmail.com>
-References: <1477758677-7831-1-git-send-email-weiyj.lk@gmail.com>
-Message-ID: <20161118004847.GA9905@katana>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 17 Nov 2016 16:52:43 -0800
+Subject: [PATCH 1/4] spi: spi-fsl-dspi: Fix SPI transfer issue when using
+ multiple SPI_IOC_MESSAGE
+In-Reply-To: <bbdbc8df434dd2af74eb351b799a2812a1c1967e.1479384571.git.maitysanchayan@gmail.com>
+References: <cover.1479384571.git.maitysanchayan@gmail.com>
+ <bbdbc8df434dd2af74eb351b799a2812a1c1967e.1479384571.git.maitysanchayan@gmail.com>
+Message-ID: <b92d7535f6c34a2b011a1c7c75c7f6fe@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 29, 2016 at 04:31:17PM +0000, Wei Yongjun wrote:
-> From: Wei Yongjun <weiyongjun1@huawei.com>
-> 
-> since clk_prepare_enable() is used to get i2c->clk, we should
-> use clk_disable_unprepare() to release it for the error path.
-> 
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-> Acked-by: Baruch Siach <baruch@tkos.co.il>
+On 2016-11-17 04:16, Sanchayan Maity wrote:
+> Current DMA implementation had a bug where the DMA transfer would
+> exit the loop in dspi_transfer_one_message after the completion of
+> a single transfer. This results in a multi message transfer submitted
+> with SPI_IOC_MESSAGE to terminate incorrectly without an error.
 
-Applied to for-current, thanks!
+Looks good to me:
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161118/4c311fbd/attachment.sig>
+Reviewed-by: Stefan Agner <stefan@agner.ch>
+
+> 
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> ---
+>  drivers/spi/spi-fsl-dspi.c | 12 ++++++++----
+>  1 file changed, 8 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
+> index bc64700..b1ee1f5 100644
+> --- a/drivers/spi/spi-fsl-dspi.c
+> +++ b/drivers/spi/spi-fsl-dspi.c
+> @@ -714,7 +714,7 @@ static int dspi_transfer_one_message(struct
+> spi_master *master,
+>  				SPI_RSER_TFFFE | SPI_RSER_TFFFD |
+>  				SPI_RSER_RFDFE | SPI_RSER_RFDFD);
+>  			status = dspi_dma_xfer(dspi);
+> -			goto out;
+> +			break;
+>  		default:
+>  			dev_err(&dspi->pdev->dev, "unsupported trans_mode %u\n",
+>  				trans_mode);
+> @@ -722,9 +722,13 @@ static int dspi_transfer_one_message(struct
+> spi_master *master,
+>  			goto out;
+>  		}
+>  
+> -		if (wait_event_interruptible(dspi->waitq, dspi->waitflags))
+> -			dev_err(&dspi->pdev->dev, "wait transfer complete fail!\n");
+> -		dspi->waitflags = 0;
+> +		if (trans_mode != DSPI_DMA_MODE) {
+> +			if (wait_event_interruptible(dspi->waitq,
+> +						dspi->waitflags))
+> +				dev_err(&dspi->pdev->dev,
+> +					"wait transfer complete fail!\n");
+> +			dspi->waitflags = 0;
+> +		}
+>  
+>  		if (transfer->delay_usecs)
+>  			udelay(transfer->delay_usecs);
