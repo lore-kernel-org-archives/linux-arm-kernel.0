@@ -1,163 +1,39 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Fri, 18 Nov 2016 16:18:07 +0000
-Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <2271602.GoSoby0zHK@wuerfel>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <2822893.F0LqNAm9bT@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F921283@lhreml507-mbx>
- <2271602.GoSoby0zHK@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F921858@lhreml507-mbx>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Fri, 18 Nov 2016 10:25:17 -0600
+Subject: [PATCH 1/3] dt-bindings: Add Macnica Americas vendor prefix
+In-Reply-To: <20161101153632.6844-1-dinguyen@kernel.org>
+References: <20161101153632.6844-1-dinguyen@kernel.org>
+Message-ID: <CADhT+wcesJRSf0q+_BDEmtsMTAO2LcAPkqjsRW2mNc1znMp4qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 18 November 2016 13:43
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Gabriele Paoloni; mark.rutland at arm.com; benh at kernel.crashing.org;
-> catalin.marinas at arm.com; liviu.dudau at arm.com; Linuxarm;
-> lorenzo.pieralisi at arm.com; xuwei (O); Jason Gunthorpe; linux-
-> serial at vger.kernel.org; linux-pci at vger.kernel.org;
-> devicetree at vger.kernel.org; minyard at acm.org; will.deacon at arm.com; John
-> Garry; zourongrong at gmail.com; robh+dt at kernel.org; bhelgaas at go og
-> le.com; kantyzc at 163.com; zhichang.yuan02 at gmail.com; Thomas Petazzoni;
-> linux-kernel at vger.kernel.org; Yuanzhichang; olof at lixom.net
-> Subject: Re: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on
-> Hip06
-> 
-> On Friday, November 18, 2016 12:53:08 PM CET Gabriele Paoloni wrote:
-> > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > > On Friday, November 18, 2016 12:07:28 PM CET Gabriele Paoloni
-> wrote:
-> > > > > I think there is no need to change a) here, we have
-> PCIBIOS_MIN_IO
-> > > > > today and even if we don't need it, there is no obvious
-> downside.
-> > > > > I would also argue that we can ignore b) for the discussion of
-> > > > > the HiSilicon LPC driver, we just need to assign some range
-> > > > > of logical addresses to each domain.
-> > > > >
-> > > > > That means solving c) is the important problem here, and it
-> > > > > shouldn't be so hard.  We can do this either with a single
-> > > > > special domain as in the v5 patch series, or by generalizing it
-> > > > > so that any I/O space mapping gets looked up through the device
-> > > > > pointer of the bus master.
-> > > >
-> > > > I am not very on the "generalized" multi-domain solution...
-> > > > Currently the IO accessors prototypes have an unsigned long addr
-> > > > as input parameter. If we live in a multi-domain IO system
-> > > > how can we distinguish inside the accessor which domain addr
-> > > > belongs to?
-> > >
-> > > The easiest change compared to the v5 code would be to walk
-> > > a linked list of 'struct extio_ops' structures rather than
-> > > assuming there is only ever one of them. I think one of the
-> > > earlier versions actually did this.
-> >
-> > Right but if my understanding is correct if we live in a multi-
-> > domain I/O space world when you have an input addr in the I/O
-> > accessors this addr can be duplicated (for example for the standard
-> > PCI IO domain and for our special LPC domain).
-> > So effectively even if you walk a linked list there is a problem
-> > of disambiguation...am I right?
-> 
-> No, unlike the PCI memory space, the PIO addresses are not
-> usually distinct, i.e. every PCI bus has its own 64K I/O
-> addresses starting at zero. We linearize them into the
-> Linux I/O space using the per-domain io_offset value.
+Hi Rob,
 
-I am going to summarize my understanding here below:
+On Tue, Nov 1, 2016 at 10:36 AM, Dinh Nguyen <dinguyen@kernel.org> wrote:
+> Add a vendor prefix for the Macnica company.
+> http://http://www.macnica.com
+>
+> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index f0a48ea..81674f2 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -158,6 +158,7 @@ lg  LG Corporation
+>  linux  Linux-specific binding
+>  lltc   Linear Technology Corporation
+>  lsi    LSI Corp. (LSI Logic)
+> +macnica        Macnica Americas
+>  marvell        Marvell Technology Group Ltd.
+>  maxim  Maxim Integrated Products
+>  meas   Measurement Specialties
+> --
+> 2.8.3
 
-It seems to me that what is linearized is the virtual address
-space associated to the IO address space. This address space
-goes from PCI_IOBASE to (PCI_IOBASE + IO_SPACE_LIMIT).
+Just a gentle ping.
 
-The I/O accessors perform rd/wr operation on this address
-space using a port IO token.
-
-Each token map into a cpu physical address range
-Each cpu physical address range maps to a bus address range
-if the bus controller specifies a range property.
-
-Devices under a bus controller specify the bus addresses that
-they operate on in their reg property.
-
-So each device can use the same bus addresses under two
-separate bus controllers as long as the bus controller
-use the range properties to map the same bus range to different
-cpu address range. 
-
-> 
-> For the ISA/LPC spaces there are only 4k of addresses, they
-> the bus addresses always overlap, but we can trivially
-> figure out the bus address from Linux I/O port number
-> by subtracting the start of the range.
-
-Are you saying that our LPC controller should specify a
-range property to map bus addresses into a cpu address range? 
-
-> 
-> > > Another option the IA64 approach mentioned in another subthread
-> > > today, looking up the operations based on an index from the
-> > > upper bits of the port number. If we do this, we probably
-> > > want to do that for all PIO access and replace the entire
-> > > virtual address remapping logic with that. I think Bjorn
-> > > in the past argued in favor of such an approach, while I
-> > > advocated the current scheme for simplicity based on how
-> > > every I/O space these days is just memory mapped (which now
-> > > turned out to be false, both on powerpc and arm64).
-> >
-> > This seems really complex...I am a bit worried that possibly
-> > we end up in having the maintainers saying that it is not worth
-> > to re-invent the world just for this special LPC device...
-> 
-> It would clearly be a rather invasive change, but the
-> end-result isn't necessarily more complex than what we
-> have today, as we'd kill off the crazy pci_pio_to_address()
-> and pci_address_to_pio() hacks in address translation.
-
-I have to look better into this...can you provide me a reference
-to the Bjorn argument in favor of this approach?
-
-> 
-> > To be honest with you I would keep things simple for this
-> > LPC and introduce more complex reworks later if more devices
-> > need to be introduced.
-> >
-> > What if we stick on a single domain now where we introduce a
-> > reserved threshold for the IO space (say INDIRECT_MAX_IO).
-> 
-> I said having a single domain is fine, but I still don't
-> like the idea of reserving low port numbers for this hack,
-> it would mean that the numbers change for everyone else.
-
-I don't get this much...I/O tokens that are passed to the I/O
-accessors are not fixed anyway and they vary depending on the order
-of adding ranges to io_range_list...so I don't see a big issue
-with this...
-
-> 
-> > We define INDIRECT_MAX_IO as 0 in "include/linux/extio.h" and
-> > we define INDIRECT_MAX_IO as 0x1000 in "arch/arm64/include/asm/io.h"
-> >
-> > So effectively this threshold can change according to the
-> > architecture and so far we only define it for ARM64 as we need
-> > it for ARM64...
-> 
-> I liked the idea of having it done in asm-generic/io.h (in an ifdef)
-> and lib/*.c under an as someone suggested earlier. There is nothing
-> ARM64 specific in the implementation.
-
-Correct and ideally if the INDIRECT_MAX_IO approach was taken then we
-should define INDIRECT_MAX_IO for any architecture that can support the
-special LPC devices. We would define it for ARM64 just because LPC
-is used in our case under ARM64; the idea was to leave other architecture
-to define their own ones as needed...but probably this is wrong and
-we should have defined this for all the architectures.
-
-Many thanks
-
-Gab
-
-> 
-> 	Arnd
+Thanks,
+Dinh
