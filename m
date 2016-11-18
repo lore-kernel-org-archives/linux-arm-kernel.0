@@ -1,88 +1,144 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 18 Nov 2016 11:43:14 +0100
-Subject: [PATCH v2] ARM: Drop fixed 200 Hz timer requirement from Samsung
- platforms
-In-Reply-To: <22757093.ejshJp9T7L@wuerfel>
-References: <1479453418-25314-1-git-send-email-krzk@kernel.org>
- <CGME20161118084812epcas4p496b847251f6919e5edc4801a247e0857@epcas4p4.samsung.com>
- <22757093.ejshJp9T7L@wuerfel>
-Message-ID: <8dfbb04f-d377-b51a-3010-481a5f977507@samsung.com>
+From: rsahu@apm.com (Rameshwar Sahu)
+Date: Fri, 18 Nov 2016 16:19:49 +0530
+Subject: arasan,sdhci.txt "compatibility" DT binding
+In-Reply-To: <582ED9E0.5090506@free.fr>
+References: <56B07BA5.4060407@free.fr> <56B166F1.5080605@rock-chips.com>
+ <56B1AA44.1010108@xilinx.com> <56B1BAF8.2050907@free.fr>
+ <56B1CF40.1030203@xilinx.com>
+ <20160203152104.GP4215@xsjsorenbubuntu> <56B21DDB.6050708@free.fr>
+ <582ED9E0.5090506@free.fr>
+Message-ID: <CAFd313x6MJeO90_+rxditdPn762g7TqZc0_D6ojGTKmtGJKjPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2016 09:46 AM, Arnd Bergmann wrote:
-> On Friday, November 18, 2016 9:16:58 AM CET Krzysztof Kozlowski wrote:
->> > All Samsung platforms, including the Exynos, are selecting HZ_FIXED with
->> > 200 Hz.  Unfortunately in case of multiplatform image this affects also
->> > other platforms when Exynos is enabled.
->> > 
->> > This looks like an very old legacy code, dating back to initial
->> > upstreaming of S3C24xx.  Probably it was required for s3c24xx timer
->> > driver, which was removed in commit ad38bdd15d5b ("ARM: SAMSUNG: Remove
->> > unused plat-samsung/time.c").
->> > 
->> > Since then, this fixed 200 Hz spread everywhere, including out-of-tree
->> > Samsung kernels (SoC vendor's and Tizen's).  I believe this choice
->> > was rather an effect of coincidence instead of conscious choice.
->> > 
->> > Exynos uses its own MCT or arch timer and can work with all HZ values.
->> > Older platforms use newer Samsung PWM timer driver which should handle
->> > down to 100 Hz.
->> > 
->> > Few perf mem and sched tests on Odroid XU3 board (Exynos5422, 4x Cortex
->> > A7, 4x Cortex A15) show no regressions when switching from 200 Hz to
->> > other values.
->> > 
->> > Reported-by: Lee Jones <lee.jones@linaro.org>
->> > [Dropping 200_HZ from S3C/S5P suggested by Arnd]
->> > Reported-by: Arnd Bergmann <arnd@arndb.de>
->> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->> > Cc: Kukjin Kim <kgene@kernel.org>
->> > Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
->> > 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Maybe add a paragraph about the specific problem:
-> 
-> "On s3c24xx, the PWM counter is only 16 bit wide, and with the
-> typical 12MHz input clock that overflows every 5.5ms. This works
-> with HZ=200 or higher but not with HZ=100 which needs a 10ms
-> interval between ticks. On Later chips (S3C64xx, S5P and EXYNOS),
-> the counter is 32 bits and does not have this problem.
-> The new samsung_pwm_timer driver solves the problem by scaling
-> the input clock by a factor of 50 on s3c24xx, which makes it
-> less accurate but allows HZ=100 as well as CONFIG_NO_HZ with
-> fewer wakeups".
+Hi Mason,
 
-I've tested on S3C2440 SoC based board and I didn't notice any
-issues with HZ=100.
 
-Clock frequencies look a bit different because AFAIU MPLL
-clock is mostly used as a root clock. The 12 MHz oscillator clock
-is used a root clock for the MPLL.
+Suman/APM added "arasan,sdhci-4.9a" in 308f3f8d8112
+@Suman, @Rameshwar: what specific IP block does your SoC embed?
+What does 4.9a refer to? The documentation revision number?
 
-refclk:    12000 kHz
-mpll:     405000 kHz
-upll:      48000 kHz
-fclk:     405000 kHz
-hclk:     101250 kHz
-pclk:      50625 kHz
+We have Arasan SD3.0/ SDIO3.0/ eMMC4.41 AHB Host Controller IP
+embedded in our SoC and 4.9a is documentation revision number which
+was given by arasan.
+FYI this documentation date was May, 2012.
 
-So frequency of the timer block's source clock (PCLK) is 50.625 MHz.
-This is further divided by 50 in the prescaler as you pointed out.
-
-So the 16-bit is clocked with 1012500 Hz clock. I added some printks
-to verify this.
-
-Here is boot log for HZ=200: http://pastebin.com/JuWZdYwh
-and HZ=100 http://pastebin.com/HnDnBfhc
-
-samsung_clocksource_init:351 pclk: 50625000, timer clock_rate: 1012500
-sched_clock: 16 bits at 1012kHz, resolution 987ns, wraps every 32362962ns
-
-I just don't understand why the log says timer overflow is every 32.362 ms
-and not twice this value (65536 * 1/1012500).
-
---
 Thanks,
-Sylwester
+Ram
+
+On Fri, Nov 18, 2016 at 4:07 PM, Mason <slash.tmp@free.fr> wrote:
+> On 03/02/2016 16:33, Mason wrote:
+>> On 03/02/2016 16:21, S?ren Brinkmann wrote:
+>>> On Wed, 2016-02-03 at 10:58:24 +0100, Michal Simek wrote:
+>>>> On 3.2.2016 09:31, Mason wrote:
+>>>>> On 03/02/2016 08:20, Michal Simek wrote:
+>>>>>
+>>>>>> On 3.2.2016 03:33, Shawn Lin wrote:
+>>>>>>> + Michal, S?ren Brinkmann
+>>>>>>>
+>>>>>>> On 2016/2/2 17:49, Mason wrote:
+>>>>>>>> Hello everyone,
+>>>>>>>>
+>>>>>>>> Documentation/devicetree/bindings/mmc/arasan,sdhci.txt states:
+>>>>>>>>
+>>>>>>>> Required Properties:
+>>>>>>>>    - compatible: Compatibility string. Must be 'arasan,sdhci-8.9a' or
+>>>>>>>>                  'arasan,sdhci-4.9a' or 'arasan,sdhci-5.1'
+>>>>>>>>
+>>>>>>>> What do 8.9a, 4.9a, and 5.1 refer to?
+>>>>>>>>
+>>>>>>>
+>>>>>>> Good question.
+>>>>>>>
+>>>>>>> Michal told me that 8.9a and 4.9a came from Xilinx
+>>>>>>> databook which define their available arasan controller to be version
+>>>>>>> 4.9a and 8.9a.
+>>>>>>
+>>>>>> Our version is coming from here.
+>>>>>> http://www.xilinx.com/support/documentation/user_guides/ug585-Zynq-7000-TRM.pdf
+>>>>>> page 28
+>>>>>>
+>>>>>> Datasheets from 2012 and 2010 doesn't look too recent and I expect that
+>>>>>> Arasan did a lot of work from that time that's why I am not surprised
+>>>>>> that you are not able to see that versions.
+>>>>>
+>>>>> Hello Michal,
+>>>>>
+>>>>> I'm even more confused.
+>>>>>
+>>>>> Arasan's 2010-02-19 data sheet is titled
+>>>>> SD3.0 / SDIO3.0 / eMMC4.4 AHB Host Controller
+>>>>>
+>>>>> Page 28 of the Xilinx data sheet mentions
+>>>>> SD2.0 / SDIO2.0 / MMC3.31 AHB Host Controller
+>>>>> Version 8.9A_apr02nd_2010
+>>>>>
+>>>>> It does not make sense that Arasan would support SD3.0 in February,
+>>>>> then go back to SD 2.0 in April.
+>>>>>
+>>>>> I do note eMMC4.4 vs MMC3.31 => perhaps these are two *different*
+>>>>> IP blocks?
+>>>>>
+>>>>> Do your data sheets come with revision history?
+>>>>
+>>>> I don't have datasheet for this IP in my hand that's why I can't check it.
+>>>> But I can't see any problem with it. Our zynq SoC supports SD2.0 and it
+>>>> was requirement at that time. Bugs can happen. Arasan fixed it and
+>>>> create new version.
+>>>> At the same time can have 3.0 versions but vendor is just decide not to
+>>>> use it for whatever reason.
+>>>>
+>>>> That's why timing of features and versions can upgrade any time and
+>>>> unfortunately bugs happen.
+>>>
+>>> We have several Arasan data sheets here. The document names are:
+>>> "SD2.0 / SDIO2.0 / MMC3.31 AHB Userguide" and the revisions are 9.2a,
+>>> 4.4a and 5.4a. I have the feeling that the document revisions have
+>>> been mistaken as the IP revision. I cannot find any other indicator
+>>> for the IP revision though. Does the IP have a way to discover its
+>>> revision?
+>>
+>> To summarize, it looks to me like
+>> 4.9a and 8.9a are documentation revision numbers for this IP:
+>> "SD2.0 / SDIO2.0 / MMC3.31 AHB Host Controller"
+>>
+>> and 5.1 seems to be the eMMC standard, so one of these IP:
+>> http://arasan.com/products/emmc51/sd3-emmc-5-1-host/
+>> http://arasan.com/products/emmc51/emmc-5-1-sd-4-1-host/
+>>
+>> Whereas my board is using still another IP:
+>> "SD3.0 / SDIO3.0 / eMMC4.4 AHB Host Controller"
+>>
+>>
+>> If that is correct, then I should be able to use the 8.9a
+>> compatible string, and perhaps my hardware will work in
+>> slightly degraded performance mode, from not using the
+>> newest protocol gizmos available.
+>
+> Resurrecting this thread after a chat with Michal on IRC.
+>
+> The driver now supports a few more compatible strings.
+> Tracing the history...
+>
+> Soren/Xilinx defined "arasan,sdhci-8.9a" in e3ec3a3d11ad
+> They have the "SD2.0/SDIO2.0/MMC3.31 AHB Host Controller" version
+> (8.9a might be a document revision number, dated 2010-04-02)
+>
+> Suman/APM added "arasan,sdhci-4.9a" in 308f3f8d8112
+> @Suman, @Rameshwar: what specific IP block does your SoC embed?
+> What does 4.9a refer to? The documentation revision number?
+>
+> Shawn/Rockchip added "arasan,sdhci-5.1" in da795ec26e25
+> This seems to be for an *actual* eMMC 5.1 version
+> (instead of a documentation version) as mentioned in
+> the commit message.
+>
+> Douglas added "rockchip,rk3399-sdhci-5.1"
+> and made several other improvements.
+>
+> I have reached out to Arasan support. Hopefully they can also
+> help clear up the confusion, assuming they care about the
+> Linux driver.
+>
+> Regards.
+>
