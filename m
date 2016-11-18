@@ -1,113 +1,54 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Fri, 18 Nov 2016 11:07:34 +0800
-Subject: [PATCH V8 3/3] stm: Mark the functions of writing buffer with notrace
-In-Reply-To: <1479438454-28650-1-git-send-email-zhang.chunyan@linaro.org>
-References: <1479438454-28650-1-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <1479438454-28650-4-git-send-email-zhang.chunyan@linaro.org>
+From: nleeder@codeaurora.org (Leeder, Neil)
+Date: Thu, 17 Nov 2016 22:16:46 -0500
+Subject: System/uncore PMUs and unit aggregation
+In-Reply-To: <20161117181708.GT22855@arm.com>
+References: <20161117181708.GT22855@arm.com>
+Message-ID: <2cb0eb12-979c-7eff-7c51-ce9e06b3740c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_STM_SOURCE_FTRACE is selected, Function trace data can be writen
-to sink via STM, all functions that related to writing data packets to
-STM should be marked 'notrace' to avoid being traced by Ftrace, otherwise
-the program would stall into an endless loop.
+Thanks for opening up the discussion on this Will.
 
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
----
- drivers/hwtracing/coresight/coresight-stm.c |  2 +-
- drivers/hwtracing/intel_th/sth.c            | 11 +++++++----
- drivers/hwtracing/stm/core.c                |  7 ++++---
- drivers/hwtracing/stm/dummy_stm.c           |  2 +-
- include/linux/stm.h                         |  4 ++--
- 5 files changed, 15 insertions(+), 11 deletions(-)
+For the Qualcomm L2 driver, one objection I had to exposing each unit is 
+that there are so many of them - the minimum starting point is a dozen, 
+so trying to start 9 counters on each means a perf command line 
+specifying 100+ events. Future chips are only likely to increase that.
 
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index 49e0f1b..b7543bd 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -406,7 +406,7 @@ static long stm_generic_set_options(struct stm_data *stm_data,
- 	return 0;
- }
- 
--static ssize_t stm_generic_packet(struct stm_data *stm_data,
-+static ssize_t notrace stm_generic_packet(struct stm_data *stm_data,
- 				  unsigned int master,
- 				  unsigned int channel,
- 				  unsigned int packet,
-diff --git a/drivers/hwtracing/intel_th/sth.c b/drivers/hwtracing/intel_th/sth.c
-index e1aee61..b034446 100644
---- a/drivers/hwtracing/intel_th/sth.c
-+++ b/drivers/hwtracing/intel_th/sth.c
-@@ -67,10 +67,13 @@ static void sth_iowrite(void __iomem *dest, const unsigned char *payload,
- 	}
- }
- 
--static ssize_t sth_stm_packet(struct stm_data *stm_data, unsigned int master,
--			      unsigned int channel, unsigned int packet,
--			      unsigned int flags, unsigned int size,
--			      const unsigned char *payload)
-+static ssize_t notrace sth_stm_packet(struct stm_data *stm_data,
-+				      unsigned int master,
-+				      unsigned int channel,
-+				      unsigned int packet,
-+				      unsigned int flags,
-+				      unsigned int size,
-+				      const unsigned char *payload)
- {
- 	struct sth_device *sth = container_of(stm_data, struct sth_device, stm);
- 	struct intel_th_channel __iomem *out =
-diff --git a/drivers/hwtracing/stm/core.c b/drivers/hwtracing/stm/core.c
-index 51f81d6..37d3bcb 100644
---- a/drivers/hwtracing/stm/core.c
-+++ b/drivers/hwtracing/stm/core.c
-@@ -425,7 +425,7 @@ static int stm_file_assign(struct stm_file *stmf, char *id, unsigned int width)
- 	return ret;
- }
- 
--static ssize_t stm_write(struct stm_data *data, unsigned int master,
-+static ssize_t notrace stm_write(struct stm_data *data, unsigned int master,
- 			  unsigned int channel, const char *buf, size_t count)
- {
- 	unsigned int flags = STP_PACKET_TIMESTAMPED;
-@@ -1121,8 +1121,9 @@ void stm_source_unregister_device(struct stm_source_data *data)
- }
- EXPORT_SYMBOL_GPL(stm_source_unregister_device);
- 
--int stm_source_write(struct stm_source_data *data, unsigned int chan,
--		     const char *buf, size_t count)
-+int notrace stm_source_write(struct stm_source_data *data,
-+			     unsigned int chan,
-+			     const char *buf, size_t count)
- {
- 	struct stm_source_device *src = data->src;
- 	struct stm_device *stm;
-diff --git a/drivers/hwtracing/stm/dummy_stm.c b/drivers/hwtracing/stm/dummy_stm.c
-index a86612d..c5f94ca 100644
---- a/drivers/hwtracing/stm/dummy_stm.c
-+++ b/drivers/hwtracing/stm/dummy_stm.c
-@@ -21,7 +21,7 @@
- #include <linux/slab.h>
- #include <linux/stm.h>
- 
--static ssize_t
-+static ssize_t notrace
- dummy_stm_packet(struct stm_data *stm_data, unsigned int master,
- 		 unsigned int channel, unsigned int packet, unsigned int flags,
- 		 unsigned int size, const unsigned char *payload)
-diff --git a/include/linux/stm.h b/include/linux/stm.h
-index 8369d8a..210ff22 100644
---- a/include/linux/stm.h
-+++ b/include/linux/stm.h
-@@ -133,7 +133,7 @@ int stm_source_register_device(struct device *parent,
- 			       struct stm_source_data *data);
- void stm_source_unregister_device(struct stm_source_data *data);
- 
--int stm_source_write(struct stm_source_data *data, unsigned int chan,
--		     const char *buf, size_t count);
-+int notrace stm_source_write(struct stm_source_data *data, unsigned int chan,
-+			     const char *buf, size_t count);
- 
- #endif /* _STM_H_ */
+There is a single CPU node so from an end-user perspective it would 
+seems to make sense to also have a single L2 node. perf already has the 
+ability to create events on multiple units using cpumask, aggregate the 
+results, and split them out per unit with perf stat -a -A, so the user 
+can get that granularity. Exposing separate units would make userspace 
+duplicate a lot of that functionality. This may rely on each uncore unit 
+being associated with a CPU, which is the case with L2.
+
+I agree with your comments regarding groups and I can see that a 
+standard way of representing topology could be useful - in this case, 
+which CPUs are within the same L2 cluster. Perhaps a list of cpumasks, 
+one per L2 unit.
+
+On 11/17/2016 1:17 PM, Will Deacon wrote:
+[...]
+>   3. Summing the counters across units is only permitted if the units
+>      can all be started and stopped atomically. Otherwise, the counters
+>      should be exposed individually. It's up to the driver author to
+>      decide what makes sense to sum.
+
+If I understand your your point 3 correctly, I'm not sure about the need 
+to start and stop them all atomically. That seems to be a tighter 
+requirement than we require for CPU PMUs. For them, perf stat -a creates 
+events/groups on each CPU, then starts and stops them sequentially and 
+sums the results. If that model is acceptable for the CPU to collect and 
+aggregate counts, that should be the same bar that uncore PMUs need to 
+reach. In the L2 case, the driver isn't summing the results, it's still 
+perf doing it, so I may be misinterpreting your comment about where the 
+summation is permitted.
+
+Thanks,
+
+Neil
 -- 
-2.7.4
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm 
+Technologies Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
