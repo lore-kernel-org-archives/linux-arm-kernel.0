@@ -1,10 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 18 Nov 2016 17:17:17 +0100
-Subject: [GIT PULL 8/10] ARM: tegra: Default configuration updates for
- v4.10-rc1
+Date: Fri, 18 Nov 2016 17:17:18 +0100
+Subject: [GIT PULL 9/10] arm64: tegra: Device tree changes for v4.10-rc1
 In-Reply-To: <20161118161719.24153-1-thierry.reding@gmail.com>
 References: <20161118161719.24153-1-thierry.reding@gmail.com>
-Message-ID: <20161118161719.24153-8-thierry.reding@gmail.com>
+Message-ID: <20161118161719.24153-9-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,27 +15,90 @@ The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.10-arm-defconfig
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.10-arm64-dt
 
-for you to fetch changes up to dafba3f6fb8614a114f939e5626447d71db864af:
+for you to fetch changes up to cc13b4fa4ac780cec6c21b64a39ab2950e95e8f6:
 
-  ARM: tegra: Enable GMI driver in default configuration (2016-11-08 11:49:41 +0100)
+  arm64: tegra: Add NVIDIA P2771 board support (2016-11-18 14:35:53 +0100)
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-ARM: tegra: Default configuration updates for v4.10-rc1
+arm64: tegra: Device tree changes for v4.10-rc1
 
-Enable audio support for various Toradex devices as well as the GMI.
+This adds initial support for Tegra186, the P3310 processor module as
+well as the P2771 development board. Not much is functional, but there
+is enough to boot to an initial ramdisk with debug serial output.
 
 ----------------------------------------------------------------
-Marcel Ziswiler (1):
-      ARM: tegra: Enable SGTL5000 audio
+Dan Carpenter (1):
+      mailbox: tegra-hsp: Use after free in tegra_hsp_remove_doorbells()
 
-Thierry Reding (2):
-      ARM: tegra: Update default configuration for v4.9-rc1
-      ARM: tegra: Enable GMI driver in default configuration
+Joseph Lo (6):
+      soc/tegra: Add Tegra186 support
+      dt-bindings: mailbox: Add Tegra HSP binding
+      dt-bindings: firmware: Add bindings for Tegra BPMP
+      arm64: tegra: Add Tegra186 support
+      arm64: tegra: Add NVIDIA P3310 processor module support
+      arm64: tegra: Add NVIDIA P2771 board support
 
- arch/arm/configs/tegra_defconfig | 27 +++++++++++++--------------
- 1 file changed, 13 insertions(+), 14 deletions(-)
+Stephen Warren (2):
+      dt-bindings: Add power domains to Tegra BPMP firmware
+      dt-bindings: firmware: Allow child nodes inside the Tegra BPMP
+
+Thierry Reding (12):
+      Merge branch 'for-4.10/soc' into for-4.10/mailbox
+      mailbox: Add Tegra HSP driver
+      Merge branch 'for-4.10/mailbox' into for-4.10/firmware
+      firmware: tegra: Add IVC library
+      firmware: tegra: Add BPMP support
+      Merge branch 'for-4.10/firmware' into for-4.10/arm64/dt
+      arm64: tegra: Add CPU nodes for Tegra186
+      arm64: tegra: Add serial ports on Tegra186
+      arm64: tegra: Add I2C controllers on Tegra186
+      arm64: tegra: Add SDHCI controllers on Tegra186
+      arm64: tegra: Add GPIO controllers on Tegra186
+      arm64: tegra: Enable PSCI on P3310
+
+ .../bindings/firmware/nvidia,tegra186-bpmp.txt     |  108 ++
+ .../bindings/mailbox/nvidia,tegra186-hsp.txt       |   52 +
+ arch/arm64/boot/dts/nvidia/Makefile                |    1 +
+ arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts |    8 +
+ arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi     |   64 +
+ arch/arm64/boot/dts/nvidia/tegra186.dtsi           |  402 +++++
+ drivers/firmware/Kconfig                           |    1 +
+ drivers/firmware/Makefile                          |    1 +
+ drivers/firmware/tegra/Kconfig                     |   25 +
+ drivers/firmware/tegra/Makefile                    |    2 +
+ drivers/firmware/tegra/bpmp.c                      |  868 +++++++++++
+ drivers/firmware/tegra/ivc.c                       |  695 +++++++++
+ drivers/mailbox/Kconfig                            |    9 +
+ drivers/mailbox/Makefile                           |    2 +
+ drivers/mailbox/tegra-hsp.c                        |  479 ++++++
+ drivers/soc/tegra/Kconfig                          |   14 +
+ include/dt-bindings/clock/tegra186-clock.h         |  940 ++++++++++++
+ include/dt-bindings/mailbox/tegra186-hsp.h         |   24 +
+ include/dt-bindings/power/tegra186-powergate.h     |   39 +
+ include/dt-bindings/reset/tegra186-reset.h         |  217 +++
+ include/soc/tegra/bpmp-abi.h                       | 1601 ++++++++++++++++++++
+ include/soc/tegra/bpmp.h                           |  141 ++
+ include/soc/tegra/ivc.h                            |  109 ++
+ 23 files changed, 5802 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+ create mode 100644 Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
+ create mode 100644 arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
+ create mode 100644 arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
+ create mode 100644 arch/arm64/boot/dts/nvidia/tegra186.dtsi
+ create mode 100644 drivers/firmware/tegra/Kconfig
+ create mode 100644 drivers/firmware/tegra/Makefile
+ create mode 100644 drivers/firmware/tegra/bpmp.c
+ create mode 100644 drivers/firmware/tegra/ivc.c
+ create mode 100644 drivers/mailbox/tegra-hsp.c
+ create mode 100644 include/dt-bindings/clock/tegra186-clock.h
+ create mode 100644 include/dt-bindings/mailbox/tegra186-hsp.h
+ create mode 100644 include/dt-bindings/power/tegra186-powergate.h
+ create mode 100644 include/dt-bindings/reset/tegra186-reset.h
+ create mode 100644 include/soc/tegra/bpmp-abi.h
+ create mode 100644 include/soc/tegra/bpmp.h
+ create mode 100644 include/soc/tegra/ivc.h
