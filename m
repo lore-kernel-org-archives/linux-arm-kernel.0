@@ -1,47 +1,36 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 18 Nov 2016 16:43:30 +0000
-Subject: [PATCH v8 12/16] drivers: iommu: arm-smmu: split probe functions
- into DT/generic portions
-In-Reply-To: <20161118160006.GW13470@arm.com>
-References: <20161116152936.22955-1-lorenzo.pieralisi@arm.com>
- <20161116152936.22955-13-lorenzo.pieralisi@arm.com>
- <20161118160006.GW13470@arm.com>
-Message-ID: <28abb42b-4a93-fbb0-d8bb-e6b82b2b992f@arm.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 18 Nov 2016 11:45:23 -0500
+Subject: [PATCH V8 1/3] tracing: add a possibility of exporting function
+ trace to other places instead of ring buffer only
+In-Reply-To: <87vavkesy6.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1479438454-28650-1-git-send-email-zhang.chunyan@linaro.org>
+ <1479438454-28650-2-git-send-email-zhang.chunyan@linaro.org>
+ <20161118092905.769044bf@gandalf.local.home>
+ <87vavkesy6.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20161118114523.70b9583f@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/11/16 16:00, Will Deacon wrote:
-> On Wed, Nov 16, 2016 at 03:29:32PM +0000, Lorenzo Pieralisi wrote:
->> Current ARM SMMU probe functions intermingle HW and DT probing
->> in the initialization functions to detect and programme the ARM SMMU
->> driver features. In order to allow probing the ARM SMMU with other
->> firmwares than DT, this patch splits the ARM SMMU init functions into
->> DT and HW specific portions so that other FW interfaces (ie ACPI) can
->> reuse the HW probing functions and skip the DT portion accordingly.
->>
->> This patch implements no functional change, only code reshuffling.
->>
->> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Reviewed-by: Tomasz Nowicki <tn@semihalf.com>
->> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Tested-by: Tomasz Nowicki <tn@semihalf.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Hanjun Guo <hanjun.guo@linaro.org>
->> Cc: Robin Murphy <robin.murphy@arm.com>
->> ---
->>  drivers/iommu/arm-smmu.c | 62 +++++++++++++++++++++++++++++-------------------
->>  1 file changed, 37 insertions(+), 25 deletions(-)
-> 
-> Reviewed-by: Will Deacon <will.deacon@arm.com>
-> 
-> Although I'd also like Robin to have a look at this.
+On Fri, 18 Nov 2016 16:57:53 +0200
+Alexander Shishkin <alexander.shishkin@linux.intel.com> wrote:
 
-Sorry, I've been slow this week. Having finally got round to taking a
-proper look, I swear this seems even tidier than the last version I
-looked at closely. It doesn't break DT boot on my Juno, either.
-
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
+> Steven Rostedt <rostedt@goodmis.org> writes:
 > 
-> Will
+> > This looks good to me, although I would like this to go through my tree
+> > (to make sure it gets all my testing). I understand the next two
+> > patches depend on this, how would you want to go about that?
+> >
+> > One is that I can pull it in the next merge window, and the rest go in
+> > after that. Or I can take the other two patches with the proper acks as
+> > well.  
 > 
+> I just asked for the last patch be split 4 ways, but otherwise, they
+> have my acks. If Chunyan can do that, you can take all of them into your
+> tree.
+> 
+
+OK, I'll wait for the split then.
+
+Thanks,
+
+-- Steve
