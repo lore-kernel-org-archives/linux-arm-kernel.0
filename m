@@ -1,36 +1,46 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 18 Nov 2016 11:45:23 -0500
-Subject: [PATCH V8 1/3] tracing: add a possibility of exporting function
- trace to other places instead of ring buffer only
-In-Reply-To: <87vavkesy6.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1479438454-28650-1-git-send-email-zhang.chunyan@linaro.org>
- <1479438454-28650-2-git-send-email-zhang.chunyan@linaro.org>
- <20161118092905.769044bf@gandalf.local.home>
- <87vavkesy6.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20161118114523.70b9583f@gandalf.local.home>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 18 Nov 2016 16:46:02 +0000
+Subject: [PATCHv3 5/6] arm64: Use __pa_symbol for kernel symbols
+In-Reply-To: <20161118143543.GC1197@leverpostej>
+References: <1479431816-5028-1-git-send-email-labbott@redhat.com>
+ <1479431816-5028-6-git-send-email-labbott@redhat.com>
+ <20161118143543.GC1197@leverpostej>
+Message-ID: <20161118164602.GD1197@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Nov 2016 16:57:53 +0200
-Alexander Shishkin <alexander.shishkin@linux.intel.com> wrote:
+On Fri, Nov 18, 2016 at 02:35:44PM +0000, Mark Rutland wrote:
+> Hi Laura,
+> 
+> On Thu, Nov 17, 2016 at 05:16:55PM -0800, Laura Abbott wrote:
+> > 
+> > __pa_symbol is technically the marco that should be used for kernel
+> > symbols. Switch to this as a pre-requisite for DEBUG_VIRTUAL which
+> > will do bounds checking.
+> > 
+> > Signed-off-by: Laura Abbott <labbott@redhat.com>
+> > ---
+> > v3: Conversion of more sites besides just _end. Addition of __lm_sym_addr
+> > macro to take care of the _va(__pa_symbol(..)) idiom.
+> > 
+> > Note that a copy of __pa_symbol was added to avoid a mess of headers
+> > since the #ifndef __pa_symbol case is defined in linux/mm.h
+> 
+> I think we also need to fix up virt_to_phys(__cpu_soft_restart) in
+> arch/arm64/kernel/cpu-reset.h. Otherwise, this looks complete for uses
+> falling under arch/arm64/.
 
-> Steven Rostedt <rostedt@goodmis.org> writes:
-> 
-> > This looks good to me, although I would like this to go through my tree
-> > (to make sure it gets all my testing). I understand the next two
-> > patches depend on this, how would you want to go about that?
-> >
-> > One is that I can pull it in the next merge window, and the rest go in
-> > after that. Or I can take the other two patches with the proper acks as
-> > well.  
-> 
-> I just asked for the last patch be split 4 ways, but otherwise, they
-> have my acks. If Chunyan can do that, you can take all of them into your
-> tree.
-> 
+I think I spoke too soon. :(
 
-OK, I'll wait for the split then.
+In the kasan code, use of tmp_pg_dir, kasan_zero_{page,pte,pmd,pud} all
+need to be vetted, as those are in the image, but get passed directly to
+functions which will end up doing a virt_to_phys behind the scenes (e.g.
+cpu_replace_ttbr1(), pmd_populate_kernel()).
+
+There's also some virt_to_pfn(<symbol>) usage that needs to be fixed up
+in arch/arm64/kernel/hibernate.c.
+
+... there's also more of that in common kernel code. :(
 
 Thanks,
-
--- Steve
+Mark.
