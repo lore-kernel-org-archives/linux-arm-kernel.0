@@ -1,77 +1,187 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Nov 2016 23:37:33 +0000
-Subject: [BUG] hdlcd gets confused about base address
-Message-ID: <20161118233733.GP1041@n2100.armlinux.org.uk>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 18 Nov 2016 15:39:34 -0800
+Subject: [PATCH 2/4] spi: spi-fsl-dspi: Fix incorrect DMA setup
+In-Reply-To: <20161118080403.GB1572@Sanchayan-Arch.localdomain>
+References: <cover.1479384571.git.maitysanchayan@gmail.com>
+ <d83f4896d77f577ca92fd70534f6198bb3288d8a.1479384571.git.maitysanchayan@gmail.com>
+ <bc8d9b808b99d3b217361df6fa8853ea@agner.ch>
+ <20161118080403.GB1572@Sanchayan-Arch.localdomain>
+Message-ID: <ace57f15ff4e6d1bfa9cc1957451799b@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2016-11-18 00:04, maitysanchayan at gmail.com wrote:
+> On 16-11-17 17:03:19, Stefan Agner wrote:
+>> On 2016-11-17 04:16, Sanchayan Maity wrote:
+>> > Currently dmaengine_prep_slave_single was being called with length
+>> > set to the complete DMA buffer size. This resulted in unwanted bytes
+>> > being transferred to the SPI register leading to clock and MOSI lines
+>> > having unwanted data even after chip select got deasserted and the
+>> > required bytes having been transferred.
+>> >
+>> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+>> > ---
+>> >  drivers/spi/spi-fsl-dspi.c | 10 ++++++++--
+>> >  1 file changed, 8 insertions(+), 2 deletions(-)
+>> >
+>> > diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
+>> > index b1ee1f5..aee8c88 100644
+>> > --- a/drivers/spi/spi-fsl-dspi.c
+>> > +++ b/drivers/spi/spi-fsl-dspi.c
+>> > @@ -265,7 +265,10 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
+>> >
+>> >  	dma->tx_desc = dmaengine_prep_slave_single(dma->chan_tx,
+>> >  					dma->tx_dma_phys,
+>> > -					DSPI_DMA_BUFSIZE, DMA_MEM_TO_DEV,
+>> > +					dma->curr_xfer_len *
+>> > +					DMA_SLAVE_BUSWIDTH_4_BYTES /
+>> > +					(tx_word ? 2 : 1),
+>> > +					DMA_MEM_TO_DEV,
+>>
+>> Hm, this is getting ridiculous, I think we convert curr_xfer_len from
+>> bytes to DMA transfers in almost every use.
+>>
+>> Can we make it be transfer length in actual 4 byte transfers? We then
+>> probably have to convert it to bytes once to subtract from
+>> curr_remaining_bytes, but I think it would simplify code overall...
+> 
+> Will the below be acceptable fix?
+> 
+> diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
+> index 41422cd..db7f091 100644
+> --- a/drivers/spi/spi-fsl-dspi.c
+> +++ b/drivers/spi/spi-fsl-dspi.c
+> @@ -217,15 +217,13 @@ static void dspi_rx_dma_callback(void *arg)
+>         struct fsl_dspi *dspi = arg;
+>         struct fsl_dspi_dma *dma = dspi->dma;
+>         int rx_word;
+> -       int i, len;
+> +       int i;
+>         u16 d;
+>  
+>         rx_word = is_double_byte_mode(dspi);
+>  
+> -       len = rx_word ? (dma->curr_xfer_len / 2) : dma->curr_xfer_len;
+> -
+>         if (!(dspi->dataflags & TRAN_STATE_RX_VOID)) {
+> -               for (i = 0; i < len; i++) {
+> +               for (i = 0; i < dma->curr_xfer_len; i++) {
+>                         d = dspi->dma->rx_dma_buf[i];
+>                         rx_word ? (*(u16 *)dspi->rx = d) :
+>                                                 (*(u8 *)dspi->rx = d);
+> @@ -242,14 +240,12 @@ static int /(struct
+> fsl_dspi *dspi)
+>         struct device *dev = &dspi->pdev->dev;
+>         int time_left;
+>         int tx_word;
+> -       int i, len;
+> +       int i;
+>         u16 val;
+>  
+>         tx_word = is_double_byte_mode(dspi);
+>  
+> -       len = tx_word ? (dma->curr_xfer_len / 2) : dma->curr_xfer_len;
+> -
+> -       for (i = 0; i < len - 1; i++) {
+> +       for (i = 0; i < dma->curr_xfer_len - 1; i++) {
+>                 val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
+>                 dspi->dma->tx_dma_buf[i] =
+>                         SPI_PUSHR_TXDATA(val) | SPI_PUSHR_PCS(dspi->cs) |
+> @@ -267,7 +263,9 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
+>  
+>         dma->tx_desc = dmaengine_prep_slave_single(dma->chan_tx,
+>                                         dma->tx_dma_phys,
+> -                                       DSPI_DMA_BUFSIZE, DMA_MEM_TO_DEV,
+> +                                       dma->curr_xfer_len *
+> +                                       DMA_SLAVE_BUSWIDTH_4_BYTES,
+> +                                       DMA_MEM_TO_DEV,
+>                                         DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+>         if (!dma->tx_desc) {
+>                 dev_err(dev, "Not able to get desc for DMA xfer\n");
+> @@ -283,7 +281,9 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
+>  
+>         dma->rx_desc = dmaengine_prep_slave_single(dma->chan_rx,
+>                                         dma->rx_dma_phys,
+> -                                       DSPI_DMA_BUFSIZE, DMA_DEV_TO_MEM,
+> +                                       dma->curr_xfer_len *
+> +                                       DMA_SLAVE_BUSWIDTH_4_BYTES,
+> +                                       DMA_DEV_TO_MEM,
+>                                         DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+>         if (!dma->rx_desc) {
+>                 dev_err(dev, "Not able to get desc for DMA xfer\n");
+> @@ -330,17 +330,17 @@ static int dspi_dma_xfer(struct fsl_dspi *dspi)
+>         struct device *dev = &dspi->pdev->dev;
+>         int curr_remaining_bytes;
+>         int bytes_per_buffer;
+> -       int tx_word;
+> +       int tx_word = 1;
+>         int ret = 0;
+>  
+> -       tx_word = is_double_byte_mode(dspi);
+> +       if (is_double_byte_mode(dspi))
+> +               tx_word = 2;
 
-While testing HDMI with Xorg on the Juno board, I find that when Xorg
-starts up or shuts down, the display is shifted significantly to the
-right and wrapped in the active region.  (No sync bars are visible.)
-The timings are correct, it behaves as if the start address has been
-shifted many pixels _into_ the framebuffer.
+I would try to be consistent with tx_word. In most other cases it is
+used as boolean, whether this is a 2 byte word or not.
 
-This occurs whenever the display mode size is changed - using xrandr
-in Xorg shows that changing the resolution triggers the problem
-almost every time, but changing the refresh rate does not.
-
-Using devmem2 to disable and re-enable the HDLCD resolves the issue,
-and repeated disable/enable cycles do not make the issue re-appear.
-
-So, I patched the HDLCD to do this, and testing it with Xorg after
-several repetitions seems to work.
-
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
-What I think is going on is that the FIFO or address generator for
-reading data from the AXI bus is not properly reset when changing the
-resolution, and the enable-disable-enable cycle causes the HDLCD
-hardware to sort itself out.  It's (eg) significantly out - for example,
-to properly align the display, I have to program an address of
-0xf4ff0200 into the hardware rather than 0xf5000000 - that's 896 pixels
-before the real start of the frame buffer.
-
-With this patch, a patch to TDA998x to avoid the i2c-designware issue,
-and xf86-video-armada, I have LXDE running on the Juno.
-
-Something I also noticed is this:
-
-        scanout_start = gem->paddr + plane->state->fb->offsets[0] +
-                plane->state->crtc_y * plane->state->fb->pitches[0] +
-                plane->state->crtc_x * bpp / 8;
-
-Surely this should be using src_[xy] (which are the position in the
-source - iow, memory, and not crtc_[xy] which is the position on the
-CRTC displayed window.  To put it another way, the src_* define the
-region of the source material that is mapped onto a rectangular area
-on the display defined by crtc_*.
-
-Another note is that since the CRTC can't place the plane in arbitary
-positions and sizes within the active area, should the atomic_check
-ensure that crtc_x = crtc_y = 0, and the crtc width/height are the
-size of the active area?
-
- drivers/gpu/drm/arm/hdlcd_crtc.c |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-index 48019ae22ddb..3e97acf6e2a7 100644
---- a/drivers/gpu/drm/arm/hdlcd_crtc.c
-+++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
-@@ -150,6 +150,8 @@ static void hdlcd_crtc_enable(struct drm_crtc *crtc)
- 	clk_prepare_enable(hdlcd->clk);
- 	hdlcd_crtc_mode_set_nofb(crtc);
- 	hdlcd_write(hdlcd, HDLCD_REG_COMMAND, 1);
-+	hdlcd_write(hdlcd, HDLCD_REG_COMMAND, 0);
-+	hdlcd_write(hdlcd, HDLCD_REG_COMMAND, 1);
- }
- 
- static void hdlcd_crtc_disable(struct drm_crtc *crtc)
+Here you change it to represent the length of a single transfer/frame.
+Nothing wrong with that, just if you do such changes, also change the
+name of the variable so the reader does not get miss lead from other
+uses of "tx_word"...
 
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+But otherwise looks good, like this variant much better!
+
+Maybe we should add a comment in struct fsl_dspi_dma:
+/* Length of transfer in words of DSPI_FIFO_SIZE */
+
+--
+Stefan
+
+
+>         curr_remaining_bytes = dspi->len;
+> +       bytes_per_buffer = DSPI_DMA_BUFSIZE / DSPI_FIFO_SIZE;
+>         while (curr_remaining_bytes) {
+>                 /* Check if current transfer fits the DMA buffer */
+> -               dma->curr_xfer_len = curr_remaining_bytes;
+> -               bytes_per_buffer = DSPI_DMA_BUFSIZE /
+> -                               (DSPI_FIFO_SIZE / (tx_word ? 2 : 1));
+> -               if (curr_remaining_bytes > bytes_per_buffer)
+> +               dma->curr_xfer_len = curr_remaining_bytes / tx_word;
+> +               if (dma->curr_xfer_len > bytes_per_buffer)
+>                         dma->curr_xfer_len = bytes_per_buffer;
+>  
+>                 ret = dspi_next_xfer_dma_submit(dspi);
+> @@ -349,7 +349,7 @@ static int dspi_dma_xfer(struct fsl_dspi *dspi)
+>                         goto exit;
+>  
+>                 } else {
+> -                       curr_remaining_bytes -= dma->curr_xfer_len;
+> +                       curr_remaining_bytes -= dma->curr_xfer_len * tx_word;
+>                         if (curr_remaining_bytes < 0)
+>                                 curr_remaining_bytes = 0;
+>                         dspi->len = curr_remaining_bytes;
+> 
+> 
+> Regards,
+> Sanchayan.
+>>
+>> --
+>> Stefan
+>>
+>>
+>> >  					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+>> >  	if (!dma->tx_desc) {
+>> >  		dev_err(dev, "Not able to get desc for DMA xfer\n");
+>> > @@ -281,7 +284,10 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
+>> >
+>> >  	dma->rx_desc = dmaengine_prep_slave_single(dma->chan_rx,
+>> >  					dma->rx_dma_phys,
+>> > -					DSPI_DMA_BUFSIZE, DMA_DEV_TO_MEM,
+>> > +					dma->curr_xfer_len *
+>> > +					DMA_SLAVE_BUSWIDTH_4_BYTES /
+>> > +					(tx_word ? 2 : 1),
+>> > +					DMA_DEV_TO_MEM,
+>> >  					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+>> >  	if (!dma->rx_desc) {
+>> >  		dev_err(dev, "Not able to get desc for DMA xfer\n");
