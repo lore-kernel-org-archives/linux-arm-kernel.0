@@ -1,40 +1,115 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Fri, 18 Nov 2016 08:27:24 +0000
-Subject: [PATCH v7 REPOST 8/9] arm: add sysfs cpu_capacity attribute
-In-Reply-To: <20161103052842.GA16920@e106622-lin>
-References: <20161017154650.18779-1-juri.lelli@arm.com>
- <20161017154650.18779-9-juri.lelli@arm.com>
- <20161030204551.GM1041@n2100.armlinux.org.uk>
- <20161103052842.GA16920@e106622-lin>
-Message-ID: <20161118082724.GC24383@e106622-lin>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Fri, 18 Nov 2016 13:45:23 +0530
+Subject: System/uncore PMUs and unit aggregation
+In-Reply-To: <20161117181708.GT22855@arm.com>
+References: <20161117181708.GT22855@arm.com>
+Message-ID: <582EB89B.5050708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Thanks you Mark and Will to initiate this discussion.
 
-On 03/11/16 05:28, Juri Lelli wrote:
-> Hi,
-> 
-> apologies for the delay in replying, but I'm attending Linux Plumbers
-> this week.
-> 
-> On 30/10/16 20:45, Russell King - ARM Linux wrote:
-> > On Mon, Oct 17, 2016 at 04:46:49PM +0100, Juri Lelli wrote:
+On Thursday 17 November 2016 11:47 PM, Will Deacon wrote:
+> Hi all,
+>
+> We currently have support for three arm64 system PMUs in flight:
+>
+>   [Cavium ThunderX] http://lkml.kernel.org/r/cover.1477741719.git.jglauber at cavium.com
+>   [Hisilicon Hip0x] http://lkml.kernel.org/r/1478151727-20250-1-git-send-email-anurup.m at huawei.com
+>   [Qualcomm L2] http://lkml.kernel.org/r/1477687813-11412-1-git-send-email-nleeder at codeaurora.org
+>
+> Each of which have to deal with multiple underlying hardware units in one
+> way or another. Mark and I recently expressed a desire to expose these
+> units to userspace as individual PMU instances, since this can allow:
+>
+>    * Fine-grained control of events from userspace, when you want to see
+>      individual numbers as opposed to a summed total
+>
+>    * Potentially ease migration to new SoC revisions, where the units
+>      are laid out slightly differently
+>
+>    * Easier handling of cases where the units aren't quite identical
+>
+> however, this received pushback from all of the patch authors, so there's
+> clearly a problem with this approach. I'm hoping we can try to resolve
+> this here.
+>
+> Speaking to Mark earlier today, we came up with the following rough rules
+> for drivers that present multiple hardware units as a single PMU:
+>
+>    1. If the units share some part of the programming interface (e.g. control
+>       registers or interrupts), then they must be handled by the same PMU.
+>       Otherwise, they should be treated independently as separate PMU
+>       instances.
+The Hisilicon Hip0x chip has units like L3 cache, Miscellaneous nodes, 
+DDR controller etc.
+There are such units in multiple CPU die's in the chip.
 
-[...]
+The L3 cache is further divided as banks which have separate set of 
+interface (control registers, interrupts etc..).
+As per the suggestion, each L3 cache banks will be exposed as a 
+individual PMU instance.
+So for e.g. in a board using Hip0x chip with 2 sockets and each socket 
+consists of 2 CPU die,
+There will be a total of 16 L3 cache PMU's which will be exposed.
 
-> 
-> I should have addressed your comments with the updated version below. If
-> it looks good to you I'll superseed the old version with this new one.
-> 
+My doubt here is
+Each L3 cache PMU has total 22 statistics events. So if registered as a 
+separate PMU, will it not
+create multiple entries (with same event names) in event listing for 
+multiple L3 cache PMU's.
+Is there a way to avoid this? or this is acceptable?
 
-The two updated patches are still listed as incoming in your system.
-Do you think we will be able to queue them for 4.10? IMHO, it would be
-good to have all pieces in together at once (Catalin and Sudeep already
-queued their respective bits).
+Just a thought, If we can group them as single PMU and add a config 
+parameter in the event listing to
+identify the L3 cache bank(sub unit). e.g:  event name will appear as 
+"hisi_l3c2/read_allocate,bank=?/".
+And user can choose count from bank 0x01 as -e 
+"hisi_l3c2/read_allocate,bank=0x01/".
+And for aggregate count, bank=0xff.
+Does it over complicate? Please share your comments.
 
-Thanks a lot.
+>    2. If the units are handled by the same PMU, then care must be taken to
+>       handle event groups correctly. That is, if the units cannot be started
+>       and stopped atomically, cross-unit groups must be rejected by the
+>       driver. Furthermore, any cross-unit scheduling constraints must be
+>       honoured so that all the units targetted by a group can schedule the
+>       group concurrently.
+>
+>    3. Summing the counters across units is only permitted if the units
+>       can all be started and stopped atomically. Otherwise, the counters
+>       should be exposed individually. It's up to the driver author to
+>       decide what makes sense to sum.
+>
+>    4. Unit topology can optionally be described in sysfs (we should pick
+>       some standard directory naming here), and then events targetting
+>       specific units can have the unit identifier extracted from the topology
+>       encoded in some configN fields.
+Does this unit topology and configN method can solve the duplicate event 
+listing issue? Please clarify.
+> The million dollar question is: how does that fit in with the drivers I
+> mentioned at the top? Is this overly restrictive, or have we missed stuff?
+>
+> We certainly want to allow flexibility in the way in which the drivers
+> talk to the hardware, but given that these decisions directly affect the
+> user ABI, some consistent ground rules are required.
+>
+> For Cavium ThunderX, it's not clear whether or not the individual units
+> could be expressed as separate PMUs, or whether they're caught by one of
+> the rules above. The Qualcomm L2 looks like it's doing the right thing
+> and we can't quite work out what the Hisilicon Hip0x topology looks like,
+> since the interaction with djtag is confusing.
+The djtag is a component which connects with some other components in 
+the SoC by Debug Bus.
+The registers in components like L3 cache, MN etc are accessed only via 
+djtag.
+Please share comments about the confusion. We can discuss to clear them.
 
-Best,
-
-- Juri
+Thanks,
+Anurup
+> If the driver authors (on To:) could shed some light on this, then that
+> would be much appreciated!
+>
+> Thanks,
+>
+> Will
