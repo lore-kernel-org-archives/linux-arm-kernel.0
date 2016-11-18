@@ -1,50 +1,47 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 18 Nov 2016 10:01:32 +0100
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 18 Nov 2016 10:12:48 +0100
 Subject: [PATCH v3 09/13] ARM: dts: armada-375: Fixup soc DT warning
-In-Reply-To: <20161118095455.00bfe007@free-electrons.com> (Thomas Petazzoni's
- message of "Fri, 18 Nov 2016 09:54:55 +0100")
+In-Reply-To: <87d1htb1qr.fsf@free-electrons.com>
 References: <20161117230830.31047-1-gregory.clement@free-electrons.com>
  <20161117230830.31047-10-gregory.clement@free-electrons.com>
  <20161118095455.00bfe007@free-electrons.com>
-Message-ID: <87d1htb1qr.fsf@free-electrons.com>
+ <87d1htb1qr.fsf@free-electrons.com>
+Message-ID: <20161118101248.784eff2b@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On ven., nov. 18 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+Hello,
 
-> Hello,
->
-> On Fri, 18 Nov 2016 00:08:26 +0100, Gregory CLEMENT wrote:
->
->> -	soc {
->> +	/* The following unit address is composed of the target
->> +	 * value (bit [40-47]), attributes value (bits [32-39],
->> +	 * and the address value in the window memory: [0-31].
->> +	 */
->> +	soc at f00100000000 {
->
-> Where is this value coming from? Why does the soc node needs to have a
+On Fri, 18 Nov 2016 10:01:32 +0100, Gregory CLEMENT wrote:
 
-It cames from the dts files.
+> >> +	soc at f00100000000 {  
+> >
+> > Where is this value coming from? Why does the soc node needs to have a  
+> 
+> It cames from the dts files.
 
-> unit address? It doesn't have a 'reg' property if I remember
-> correctly.
+Where?
 
-But it has a range property.
+> > unit address? It doesn't have a 'reg' property if I remember
+> > correctly.  
+> 
+> But it has a range property.
 
-Gregory
+And? There are multiple ranges, and you randomly took the first one for
+the unit address of the soc node?
 
->
-> Thomas
-> -- 
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+You realize that the ranges property is a list of ranges, and they
+could be in any order? Why would you pick the base address of one of
+the ranges rather than any of the others?
 
+I believe there is simply no unit address for the soc {} node. There is
+definitely one for the internal-regs {} node, but not for the soc {}
+node.
+
+Best regards,
+
+Thomas
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
