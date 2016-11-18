@@ -1,66 +1,204 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 18 Nov 2016 18:45:35 +0000
-Subject: [PATCH v2 3/6] mfd: dt: Add bindings for the Aspeed LPC Host
- Controller (LPCHC)
-In-Reply-To: <20161118184437.GD19884@dell.home>
-References: <1478097481-14895-1-git-send-email-andrew@aj.id.au>
- <1478097481-14895-4-git-send-email-andrew@aj.id.au>
- <20161118184437.GD19884@dell.home>
-Message-ID: <20161118184535.GE19884@dell.home>
+From: labbott@redhat.com (Laura Abbott)
+Date: Fri, 18 Nov 2016 10:42:56 -0800
+Subject: [PATCHv3 6/6] arm64: Add support for CONFIG_DEBUG_VIRTUAL
+In-Reply-To: <20161118175327.GE1197@leverpostej>
+References: <1479431816-5028-1-git-send-email-labbott@redhat.com>
+ <1479431816-5028-7-git-send-email-labbott@redhat.com>
+ <20161118175327.GE1197@leverpostej>
+Message-ID: <16e4b3da-c552-252d-108a-0681b71b12ef@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Sending Arnd this time!]
+On 11/18/2016 09:53 AM, Mark Rutland wrote:
+> Hi,
+> 
+> On Thu, Nov 17, 2016 at 05:16:56PM -0800, Laura Abbott wrote:
+>>
+>> x86 has an option CONFIG_DEBUG_VIRTUAL to do additional checks
+>> on virt_to_phys calls. The goal is to catch users who are calling
+>> virt_to_phys on non-linear addresses immediately. This inclues callers
+>> using virt_to_phys on image addresses instead of __pa_symbol. As features
+>> such as CONFIG_VMAP_STACK get enabled for arm64, this becomes increasingly
+>> important. Add checks to catch bad virt_to_phys usage.
+>>
+>> Signed-off-by: Laura Abbott <labbott@redhat.com>
+>> ---
+>> v3: Make use of __pa_symbol required via debug checks. It's a WARN for now but
+>> it can become a BUG after wider testing. __virt_to_phys is
+>> now for linear addresses only. Dropped the VM_BUG_ON from Catalin's suggested
+>> version from the nodebug version since having that in the nodebug version
+>> essentially made them the debug version. Changed to KERNEL_START/KERNEL_END
+>> for bounds checking. More comments.
+> 
+> I gave this a go with DEBUG_VIRTUAL && KASAN_INLINE selected, and the
+> kernel dies somewhere before bringing up earlycon. :(
+> 
+> I mentioned some possible reasons in a reply to pastch 5, and I have
+> some more comments below.
+> 
+> [...]
+> 
+>> -#define __virt_to_phys(x) ({						\
+>> +
+>> +
+>> +/*
+>> + * This is for translation from the standard linear map to physical addresses.
+>> + * It is not to be used for kernel symbols.
+>> + */
+>> +#define __virt_to_phys_nodebug(x) ({					\
+>>  	phys_addr_t __x = (phys_addr_t)(x);				\
+>> -	__x & BIT(VA_BITS - 1) ? (__x & ~PAGE_OFFSET) + PHYS_OFFSET :	\
+>> -				 (__x - kimage_voffset); })
+>> +	((__x & ~PAGE_OFFSET) + PHYS_OFFSET);				\
+>> +})
+> 
+> Given the KASAN failure, and the strong possibility that there's even
+> more stuff lurking in common code, I think we should retain the logic to
+> handle kernel image addresses for the timebeing (as x86 does). Once
+> we've merged DEBUG_VIRTUAL, it will be easier to track those down.
+> 
 
-> Arnd,
+Agreed. I might see about adding another option DEBUG_STRICT_VIRTUAL
+for catching bad __pa vs __pa_symbol usage and keep DEBUG_VIRTUAL for
+catching addresses that will work in neither case.
+
+> Catalin, I think you suggested removing that logic; are you happy for it
+> to be restored?
 > 
-> Do you have a preference?
+> See below for a refactoring that retains this logic.
 > 
-> > The Aspeed LPC Host Controller is presented as a syscon device to
-> > arbitrate access by LPC and pinmux drivers. LPC pinmux configuration on
-> > fifth generation SoCs depends on bits in both the System Control Unit
-> > and the LPC Host Controller.
-> > 
-> > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-> > ---
-> >  Documentation/devicetree/bindings/mfd/aspeed-lpchc.txt | 17 +++++++++++++++++
+> [...]
 > 
-> Create a new directory in bindings/mfd called 'syscon'.
+>> +/*
+>> + * This is for translation from a kernel image/symbol address to a
+>> + * physical address.
+>> + */
+>> +#define __pa_symbol_nodebug(x) ({					\
+>> +	phys_addr_t __x = (phys_addr_t)(x);				\
+>> +	(__x - kimage_voffset);						\
+>> +})
 > 
-> Or perhaps 'bindings/syscon'.
+> We can avoid duplication here (and in physaddr.c) if we factor the logic
+> into helpers, e.g.
 > 
-> >  1 file changed, 17 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/mfd/aspeed-lpchc.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mfd/aspeed-lpchc.txt b/Documentation/devicetree/bindings/mfd/aspeed-lpchc.txt
-> > new file mode 100644
-> > index 000000000000..792651488c3d
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mfd/aspeed-lpchc.txt
-> > @@ -0,0 +1,17 @@
-> > +* Device tree bindings for the Aspeed LPC Host Controller (LPCHC)
-> > +
-> > +The LPCHC registers configure LPC behaviour between the BMC and the host
-> > +system. The LPCHC also participates in pinmux requests on g5 SoCs and is
-> > +therefore considered a syscon device.
-> > +
-> > +Required properties:
-> > +- compatible:		"aspeed,ast2500-lpchc", "syscon"
-> > +- reg:			contains offset/length value of the LPCHC memory
-> > +			region.
+> /*
+>  * The linear kernel range starts in the middle of the virtual adddress
+>  * space. Testing the top bit for the start of the region is a
+>  * sufficient check.
+>  */
+> #define __is_lm_address(addr)	(!!((addr) & BIT(VA_BITS - 1)))
 > 
-> Why not just use a single tab, then you don't have to linewrap?
+> #define __lm_to_phys(addr)	(((addr) & ~PAGE_OFFSET) + PHYS_OFFSET)
+> #define __kimg_to_phys(addr)	((addr) - kimage_voffset)
 > 
-> > +Example:
-> > +
-> > +lpchc: lpchc at 1e7890a0 {
-> > +	compatible = "aspeed,ast2500-lpchc", "syscon";
-> > +	reg = <0x1e7890a0 0xc4>;
-> > +};
+> #define __virt_to_phys_nodebug(x) ({					\
+> 	phys_addr_t __x = (phys_addr_t)(x);				\
+> 	__is_lm_address(__x) ? __lm_to_phys(__x) :			\
+> 			       __kimg_to_phys(__x);			\
+> })
+> 
+> #define __pa_symbol_nodebug(x)	__kimg_to_phys((phys_addr_t)(x))
 > 
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Yes, this is much cleaner
+
+>> +#ifdef CONFIG_DEBUG_VIRTUAL
+>> +extern unsigned long __virt_to_phys(unsigned long x);
+>> +extern unsigned long __phys_addr_symbol(unsigned long x);
+> 
+> It would be better for both of these to return phys_addr_t.
+> 
+> [...]
+> 
+
+I was worried this would turn into another warning project but
+at first pass this works fine and the type will hopefully catch
+some bad uses elsewhere.
+
+>> diff --git a/arch/arm64/mm/physaddr.c b/arch/arm64/mm/physaddr.c
+>> new file mode 100644
+>> index 0000000..f8eb781
+>> --- /dev/null
+>> +++ b/arch/arm64/mm/physaddr.c
+>> @@ -0,0 +1,39 @@
+>> +#include <linux/mm.h>
+>> +
+>> +#include <asm/memory.h>
+> 
+> We also need:
+> 
+> #include <linux/bug.h>
+> #include <linux/export.h>
+> #include <linux/types.h>
+> #include <linux/mmdebug.h>
+> 
+>> +unsigned long __virt_to_phys(unsigned long x)
+>> +{
+>> +	phys_addr_t __x = (phys_addr_t)x;
+>> +
+>> +	if (__x & BIT(VA_BITS - 1)) {
+>> +		/*
+>> +		 * The linear kernel range starts in the middle of the virtual
+>> +		 * adddress space. Testing the top bit for the start of the
+>> +		 * region is a sufficient check.
+>> +		 */
+>> +		return (__x & ~PAGE_OFFSET) + PHYS_OFFSET;
+>> +	} else {
+>> +		/*
+>> +		 * __virt_to_phys should not be used on symbol addresses.
+>> +		 * This should be changed to a BUG once all basic bad uses have
+>> +		 * been cleaned up.
+>> +		 */
+>> +		WARN(1, "Do not use virt_to_phys on symbol addresses");
+>> +		return __phys_addr_symbol(x);
+>> +	}
+>> +}
+>> +EXPORT_SYMBOL(__virt_to_phys);
+> 
+> I think this would be better something like:
+> 
+> phys_addr_t __virt_to_phys(unsigned long x)
+> {
+> 	WARN(!__is_lm_address(x),
+> 	     "virt_to_phys() used for non-linear address: %pK\n",
+> 	     (void*)x);
+> 	
+> 	return __virt_to_phys_nodebug(x);
+> }
+> EXPORT_SYMBOL(__virt_to_phys);
+> 
+>> +
+>> +unsigned long __phys_addr_symbol(unsigned long x)
+>> +{
+>> +	phys_addr_t __x = (phys_addr_t)x;
+>> +
+>> +	/*
+>> +	 * This is bounds checking against the kernel image only.
+>> +	 * __pa_symbol should only be used on kernel symbol addresses.
+>> +	 */
+>> +	VIRTUAL_BUG_ON(x < (unsigned long) KERNEL_START || x > (unsigned long) KERNEL_END);
+>> +	return (__x - kimage_voffset);
+>> +}
+>> +EXPORT_SYMBOL(__phys_addr_symbol);
+> 
+> Similarly:
+> 
+> phys_addr_t __phys_addr_symbol(unsigned long x)
+> {
+> 	/*
+> 	 * This is bounds checking against the kernel image only.
+> 	 * __pa_symbol should only be used on kernel symbol addresses.
+> 	 */
+> 	VIRTUAL_BUG_ON(x < (unsigned long) KERNEL_START ||
+> 		       x > (unsigned long) KERNEL_END);
+> 
+> 	return __pa_symbol_nodebug(x);
+> }
+> EXPORT_SYMBOL(__phys_addr_symbol);
+> 
+> Thanks,
+> Mark.
+> 
+
+Thanks,
+Laura
