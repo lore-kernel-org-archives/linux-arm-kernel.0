@@ -1,16 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 17 Nov 2016 17:49:16 -0800
-Subject: [GIT PULL] NXP LPC32xx ARM SoC cleanup for v4.10
-In-Reply-To: <1478620925.12841.25.camel@localhost>
-References: <1478620925.12841.25.camel@localhost>
-Message-ID: <20161118014916.GL8578@localhost>
+Date: Thu, 17 Nov 2016 17:49:47 -0800
+Subject: [GIT PULL] NXP LPC32xx ARM SoC DT updates for v4.10
+In-Reply-To: <1478620968.12841.26.camel@localhost>
+References: <1478620968.12841.26.camel@localhost>
+Message-ID: <20161118014947.GM8578@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2016 at 11:02:05AM -0500, Sylvain Lemieux wrote:
+On Tue, Nov 08, 2016 at 11:02:48AM -0500, Sylvain Lemieux wrote:
 > Hi Arnd, Olof, Kevin,
 > 
-> please consider to include NXP LPC32xx cleanup for v4.10.
+> please consider to include NXP LPC32xx device tree updates for v4.10.
 > 
 > Thank you in advance.
 > 
@@ -21,18 +21,17 @@ On Tue, Nov 08, 2016 at 11:02:05AM -0500, Sylvain Lemieux wrote:
 > 
 > are available in the git repository at:
 > 
->   https://github.com/sylemieux/linux-lpc32xx.git tags/lpc32xx-cleanup-v4.10
+>   https://github.com/sylemieux/linux-lpc32xx.git tags/lpc32xx-dt-v4.10
 > 
-> for you to fetch changes up to d1193df9c3cbce699d07c352bb3c055cd827db4d:
+> for you to fetch changes up to 1754906fffcabdd166f6aec85eb9a3a28de531b8:
 > 
->   ARM: lpc32xx: remove unused header file clock.h (2016-10-25 13:33:01 -0400)
+>   ARM: dts: lpc32xx: set default parent clock for pwm1 & pwm2 (2016-10-25 13:29:31 -0400)
 > 
 > ----------------------------------------------------------------
-> NXP LPC32xx ARM SoC cleanup for v4.10
+> NXP LPC32xx ARM SoC device tree updates for v4.10
 > 
-> This includes a few cleanup changes:
-> * remove unused header file mach/irqs.h;
-> * remove unused header file clock.h.
+> This includes a single functional change:
+> * set default parent clock for PWM1 & PWM2.
 
 Merged, thanks!
 
