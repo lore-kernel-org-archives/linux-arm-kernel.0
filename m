@@ -1,77 +1,77 @@
-From: yuanzhichang@hisilicon.com (zhichang.yuan)
-Date: Fri, 18 Nov 2016 19:12:35 +0800
-Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
-In-Reply-To: <2436881.9RqUVYxmDf@wuerfel>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <1478806353.7430.137.camel@kernel.crashing.org>
- <5825984B.3030303@hisilicon.com> <2436881.9RqUVYxmDf@wuerfel>
-Message-ID: <582EE223.4090605@hisilicon.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 18 Nov 2016 13:15:12 +0200
+Subject: [PATCH v3] ARM: Drop fixed 200 Hz timer requirement from Samsung
+ platforms
+Message-ID: <1479467712-5218-1-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Arnd,
+All Samsung platforms, including the Exynos, are selecting HZ_FIXED with
+200 Hz.  Unfortunately in case of multiplatform image this affects also
+other platforms when Exynos is enabled.
 
+This looks like an very old legacy code, dating back to initial
+upstreaming of S3C24xx.  Probably it was required for s3c24xx timer
+driver, which was removed in commit ad38bdd15d5b ("ARM: SAMSUNG: Remove
+unused plat-samsung/time.c").
 
-On 2016/11/18 17:20, Arnd Bergmann wrote:
-> On Friday, November 11, 2016 6:07:07 PM CET zhichang.yuan wrote:
->>
->> I have similar idea as your PPC MMIO.
->>
->> We notice the prototype of {in/out()} is something like that:
->>
->> static inline u8 inb(unsigned long addr)
->> static inline void outb(u8 value, unsigned long addr)
->>
->> The type of parameter 'addr' is unsigned long. For I/O space, it is big enough.
->> So, could you divide this 'addr' into several bit segments? The top 8 bits is
->> defined as bus index. For normal direct IO, the bus index is 0. For those bus
->> device which need indirectIO or some special I/O accessors, when these devices
->> are initializing, can request to allocate an unique ID to them, and register
->> their own accessors to the entry which is corresponding to the ID.
-> 
-> Ah, have you looked at the IA64 code? It does exactly this.
-> For ARM64 we decided to use the same basic approach as powerpc with
-> a single range of virtual memory for mapping it as that somewhat
-> simplified all cases we knew about at the time.
+Since then, this fixed 200 Hz spread everywhere, including out-of-tree
+Samsung kernels (SoC vendor's and Tizen's).  I believe this choice
+was rather an effect of coincidence instead of conscious choice.
 
-Yes. I spent some time to trace how to work on PPC. But the code is a bit long,
-I am not clear on how the indirectIO there was supported.
+On S3C24xx, the PWM counter is only 16 bit wide, and with the
+typical 12MHz input clock that overflows every 5.5ms.  This works
+with HZ=200 or higher but not with HZ=100 which needs a 10ms
+interval between ticks.  On Later chips (S3C64xx, S5P and EXYNOS),
+the counter is 32 bits and does not have this problem.
 
-I noticed there are CONFIG_PPC_INDIRECT_PIO and CONFIG_PPC_INDIRECT_MMIO on PPC.
-It seems that only CONFIG_PPC_INDIRECT_MMIO applied some MSB to store the bus
-tokens which are used to get iowa_busses[] for specific operation helpers.
-I can not find how CONFIG_PPC_INDIRECT_PIO support multiple ISA domains. It
-seems only Opal-lpc.c adopt this INDIRECT_PIO method.
+The new samsung_pwm_timer driver solves the problem by scaling the input
+clock by a factor of 50 on S3C24xx, which makes it less accurate but
+allows HZ=100 as well as CONFIG_NO_HZ with fewer wakeups.
 
-Although CONFIG_PPC_INDIRECT_MMIO is for MMIO, seems not suitable for ISA/LPC
-I/O. But this idea is helpful.
+Few perf mem and sched tests on Odroid XU3 board (Exynos5422, 4x Cortex
+A7, 4x Cortex A15) show no regressions when switching from 200 Hz to
+other values.
 
-what else did I miss??
+Reported-by: Lee Jones <lee.jones@linaro.org>
+[Dropping of 200_HZ from S3C/S5P was suggested by Arnd]
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+Cc: Kukjin Kim <kgene@kernel.org>
+[Tested on Exynos5800]
+Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Acked-by: Kukjin Kim <kgene@kernel.org>
+[Tested on S3C2440]
+Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-> 
->> In this way, we can support multiple domains, I think.
->> But I am not sure whether it is feasible, for example, are there some
->> architectures/platforms had populated the top 8 bits? Do we need to request IO
->> region from ioport_resource for those devices?  etc...
-> 
-> On a 64-bit architecture, the top 32 bits of the port number are
-> definitely free to use for this, and 8 bits are probably sufficient.
-> 
-> Even on 32 bit architectures, I can't see why we'd ever need more than
-> 16 bits worth of addressing within a domain, so using 8 bit domain
-> and 16 bit address leaves 8 or 40 unused bits.
+---
 
-Yes. 8 bits are enough.
-But the maximal PIO on some architectures are defined as ~0 or -1. There is no
-any bare space left. Probably we can not ensure the upper 8 bits available.
+Changes since v2:
+1. Extend message.
+2. Add Kukjin's ack.
+3. Add Sylwester's tested-by.
 
+Changes since v1:
+1. Add Javier's tested-by.
+2. Drop HZ_FIXED also from ARCH_S5PV210 and ARCH_S3C24XX after Arnd
+   suggestions and analysis.
+---
+ arch/arm/Kconfig | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Thanks,
-Zhichang
-
-
-> 
-> 	Arnd
-> 
-> .
-> 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index b5d529fdffab..ced2e08a9d08 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1496,8 +1496,7 @@ source kernel/Kconfig.preempt
+ 
+ config HZ_FIXED
+ 	int
+-	default 200 if ARCH_EBSA110 || ARCH_S3C24XX || \
+-		ARCH_S5PV210 || ARCH_EXYNOS4
++	default 200 if ARCH_EBSA110
+ 	default 128 if SOC_AT91RM9200
+ 	default 0
+ 
+-- 
+2.7.4
