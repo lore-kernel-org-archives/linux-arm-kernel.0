@@ -1,18 +1,18 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 17 Nov 2016 23:46:33 -0800
-Subject: [GIT PULL] arm: mediatek: kconfig changes for v4.10
-In-Reply-To: <b9bf2483-533d-ffd1-b23f-d89d20b8a73a@gmail.com>
-References: <b9bf2483-533d-ffd1-b23f-d89d20b8a73a@gmail.com>
-Message-ID: <20161118074633.GT1785@localhost>
+Date: Thu, 17 Nov 2016 23:47:11 -0800
+Subject: [GIT PULL] arm: mediatek: soc changes for v4.10
+In-Reply-To: <002ed210-0f74-e938-b69f-c91ae98d37e4@gmail.com>
+References: <002ed210-0f74-e938-b69f-c91ae98d37e4@gmail.com>
+Message-ID: <20161118074711.GU1785@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 14, 2016 at 07:37:51PM +0100, Matthias Brugger wrote:
+On Mon, Nov 14, 2016 at 07:39:10PM +0100, Matthias Brugger wrote:
 > Hi Arnd and Olof,
 > 
-> although late, please pull the following changes.
+> Although a bit late, please take the following changes into account.
 > 
-> Thanks,
+> Thanks a lot,
 > Matthias
 > ---
 > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
@@ -21,17 +21,17 @@ On Mon, Nov 14, 2016 at 07:37:51PM +0100, Matthias Brugger wrote:
 > 
 > are available in the git repository at:
 > 
->   https://github.com/mbgg/linux-mediatek.git tags/v4.9-next-kconfig
+>   https://github.com/mbgg/linux-mediatek.git tags/v4.9-next-soc
 > 
-> for you to fetch changes up to 494975c9cc00f69bf71de0991dcebda9b2911aa0:
+> for you to fetch changes up to 112ef1882e12094c823937f9d72f2f598db02df7:
 > 
->   ARM: mediatek: clean up mach-mediatek/Makefile (2016-10-31 15:26:23 -0600)
+>   soc: mediatek: Add MT2701 scpsys driver (2016-10-31 00:58:58 +0100)
 > 
 > ----------------------------------------------------------------
-> - clean up mach-mediatek Makefile as kbuild only descends into the folder if
->   ARCH_MEDIATEK is enabled
+> - prepare mtk-scpsys to for multi soc support
+> - add support for mt2701 to mtk-scpsys
 
-Merged, thanks.
+Merged, thanks!
 
 
 -Olof
