@@ -1,100 +1,116 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 18 Nov 2016 10:38:32 +0100
-Subject: [PATCH v3 09/13] ARM: dts: armada-375: Fixup soc DT warning
-In-Reply-To: <20161118101248.784eff2b@free-electrons.com> (Thomas Petazzoni's
- message of "Fri, 18 Nov 2016 10:12:48 +0100")
-References: <20161117230830.31047-1-gregory.clement@free-electrons.com>
- <20161117230830.31047-10-gregory.clement@free-electrons.com>
- <20161118095455.00bfe007@free-electrons.com>
- <87d1htb1qr.fsf@free-electrons.com>
- <20161118101248.784eff2b@free-electrons.com>
-Message-ID: <877f81b013.fsf@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 18 Nov 2016 09:39:26 +0000
+Subject: [PATCH 2/2] KVM: arm64: Fix the issues when guest PMCCFILTR is
+ configured
+In-Reply-To: <1479461966-20136-1-git-send-email-marc.zyngier@arm.com>
+References: <1479461966-20136-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1479461966-20136-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+From: Wei Huang <wei@redhat.com>
+
+KVM calls kvm_pmu_set_counter_event_type() when PMCCFILTR is configured.
+But this function can't deals with PMCCFILTR correctly because the evtCount
+bits of PMCCFILTR, which is reserved 0, conflits with the SW_INCR event
+type of other PMXEVTYPER<n> registers. To fix it, when eventsel == 0, this
+function shouldn't return immediately; instead it needs to check further
+if select_idx is ARMV8_PMU_CYCLE_IDX.
+
+Another issue is that KVM shouldn't copy the eventsel bits of PMCCFILTER
+blindly to attr.config. Instead it ought to convert the request to the
+"cpu cycle" event type (i.e. 0x11).
+
+To support this patch and to prevent duplicated definitions, a limited
+set of ARMv8 perf event types were relocated from perf_event.c to
+asm/perf_event.h.
+
+Cc: stable at vger.kernel.org # 4.6+
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Wei Huang <wei@redhat.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/perf_event.h | 10 +++++++++-
+ arch/arm64/kernel/perf_event.c      | 10 +---------
+ virt/kvm/arm/pmu.c                  |  8 +++++---
+ 3 files changed, 15 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
+index 2065f46..38b6a2b 100644
+--- a/arch/arm64/include/asm/perf_event.h
++++ b/arch/arm64/include/asm/perf_event.h
+@@ -46,7 +46,15 @@
+ #define	ARMV8_PMU_EVTYPE_MASK	0xc800ffff	/* Mask for writable bits */
+ #define	ARMV8_PMU_EVTYPE_EVENT	0xffff		/* Mask for EVENT bits */
  
- On ven., nov. 18 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
-
-> Hello,
->
-> On Fri, 18 Nov 2016 10:01:32 +0100, Gregory CLEMENT wrote:
->
->> >> +	soc at f00100000000 {  
->> >
->> > Where is this value coming from? Why does the soc node needs to have a  
->> 
->> It cames from the dts files.
->
-> Where?
-
---- a/arch/arm/boot/dts/armada-375-db.dts
-+++ b/arch/arm/boot/dts/armada-375-db.dts
-@@ -63,7 +63,11 @@
- 		reg = <0x00000000 0x40000000>; /* 1 GB */
- 	};
+-#define ARMV8_PMU_EVTYPE_EVENT_SW_INCR	0	/* Software increment event */
++/*
++ * PMUv3 event types: required events
++ */
++#define ARMV8_PMUV3_PERFCTR_SW_INCR				0x00
++#define ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL			0x03
++#define ARMV8_PMUV3_PERFCTR_L1D_CACHE				0x04
++#define ARMV8_PMUV3_PERFCTR_BR_MIS_PRED				0x10
++#define ARMV8_PMUV3_PERFCTR_CPU_CYCLES				0x11
++#define ARMV8_PMUV3_PERFCTR_BR_PRED				0x12
  
--	soc {
-+	/* The following unit address is composed of the target
-+	 * value (bit [40-47]), attributes value (bits [32-39],
-+	 * and the address value in the window memory: [0-31].
-+	 */
-+	soc at f00100000000 {
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
-
-just here ---------^
-
- 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
- 			  MBUS_ID(0x09, 0x09) 0 0xf1100000 0x10000
-
-
-
-
->
->> > unit address? It doesn't have a 'reg' property if I remember
->> > correctly.  
->> 
->> But it has a range property.
->
-> And? There are multiple ranges, and you randomly took the first one for
-> the unit address of the soc node?
-
-Not randomly I followed the same rules that for the regs mentioned in
-the ePAPR paragraph 2.2.1.1:
-
-"The unit-address should match the first address specified in the reg
-property of the node."
-
->
-> You realize that the ranges property is a list of ranges, and they
-> could be in any order? Why would you pick the base address of one of
-> the ranges rather than any of the others?
-
-It is the same for the regs so as explained I followed the same rules.
-
->
-> I believe there is simply no unit address for the soc {} node. There is
-> definitely one for the internal-regs {} node, but not for the soc {}
-> node.
-
-It is not the interpretation of the DTC:
-
-"Warning (unit_address_vs_reg): Node /soc has a reg or ranges property,
-but no unit name"
-
-Gregory
-
->
-> Best regards,
->
-> Thomas
-> -- 
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
-
+ /*
+  * Event filters for PMUv3
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index a9310a6..57ae9d9 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -31,17 +31,9 @@
+ 
+ /*
+  * ARMv8 PMUv3 Performance Events handling code.
+- * Common event types.
++ * Common event types (some are defined in asm/perf_event.h).
+  */
+ 
+-/* Required events. */
+-#define ARMV8_PMUV3_PERFCTR_SW_INCR				0x00
+-#define ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL			0x03
+-#define ARMV8_PMUV3_PERFCTR_L1D_CACHE				0x04
+-#define ARMV8_PMUV3_PERFCTR_BR_MIS_PRED				0x10
+-#define ARMV8_PMUV3_PERFCTR_CPU_CYCLES				0x11
+-#define ARMV8_PMUV3_PERFCTR_BR_PRED				0x12
+-
+ /* At least one of the following is required. */
+ #define ARMV8_PMUV3_PERFCTR_INST_RETIRED			0x08
+ #define ARMV8_PMUV3_PERFCTR_INST_SPEC				0x1B
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 6e9c40e..69ccce3 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -305,7 +305,7 @@ void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val)
+ 			continue;
+ 		type = vcpu_sys_reg(vcpu, PMEVTYPER0_EL0 + i)
+ 		       & ARMV8_PMU_EVTYPE_EVENT;
+-		if ((type == ARMV8_PMU_EVTYPE_EVENT_SW_INCR)
++		if ((type == ARMV8_PMUV3_PERFCTR_SW_INCR)
+ 		    && (enable & BIT(i))) {
+ 			reg = vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + i) + 1;
+ 			reg = lower_32_bits(reg);
+@@ -379,7 +379,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+ 	eventsel = data & ARMV8_PMU_EVTYPE_EVENT;
+ 
+ 	/* Software increment event does't need to be backed by a perf event */
+-	if (eventsel == ARMV8_PMU_EVTYPE_EVENT_SW_INCR)
++	if (eventsel == ARMV8_PMUV3_PERFCTR_SW_INCR &&
++	    select_idx != ARMV8_PMU_CYCLE_IDX)
+ 		return;
+ 
+ 	memset(&attr, 0, sizeof(struct perf_event_attr));
+@@ -391,7 +392,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+ 	attr.exclude_kernel = data & ARMV8_PMU_EXCLUDE_EL1 ? 1 : 0;
+ 	attr.exclude_hv = 1; /* Don't count EL2 events */
+ 	attr.exclude_host = 1; /* Don't count host events */
+-	attr.config = eventsel;
++	attr.config = (select_idx == ARMV8_PMU_CYCLE_IDX) ?
++		ARMV8_PMUV3_PERFCTR_CPU_CYCLES : eventsel;
+ 
+ 	counter = kvm_pmu_get_counter_value(vcpu, select_idx);
+ 	/* The initial sample period (overflow count) of an event. */
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.1.4
