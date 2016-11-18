@@ -1,38 +1,64 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 17 Nov 2016 23:28:29 -0800
-Subject: [GIT PULL] STi defconfig updates for v4.10 round 2
-In-Reply-To: <919f7b55-a2cd-fc20-a1cd-4d3f309fd60d@st.com>
-References: <919f7b55-a2cd-fc20-a1cd-4d3f309fd60d@st.com>
-Message-ID: <20161118072829.GE1785@localhost>
+Date: Thu, 17 Nov 2016 23:29:01 -0800
+Subject: [GIT PULL] STi DT update for v4.10 round 2
+In-Reply-To: <828ebfb1-7ed0-8e6b-116d-9ef74d804db6@st.com>
+References: <828ebfb1-7ed0-8e6b-116d-9ef74d804db6@st.com>
+Message-ID: <20161118072901.GF1785@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2016 at 10:00:32AM +0100, Patrice Chotard wrote:
-> Hi Olof, Arnd and Kevin,
+On Thu, Nov 10, 2016 at 10:00:48AM +0100, Patrice Chotard wrote:
+> Hi Arnd, Kevin, Olof
 > 
-> Please consider the second round of multi_v7_defconfig updates for v4.10 :
+> PLease consider this second round of STi dts update for v4.10 :
 > 
+> The following changes since commit 97a0b97f9e8197429eee5f87ce14373f73dbd9d3:
 > 
-> The following changes since commit 620c52f4db4d47e1f33c64e641392fe575d5397f:
-> 
->   ARM: multi_v7_defconfig: Remove stih41x phy Kconfig symbol. (2016-10-20 17:05:08 +0200)
+>   ARM: dts: stih410-clocks: Add PROC_STFE as a critical clock (2016-10-20 16:20:26 +0200)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git sti-defconfig-for-4.10-round2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git tags/sti-dt-for-4.10-round2
 > 
-> for you to fetch changes up to 57dae748959d0abae2b382ccee68621a82f827c8:
+> for you to fetch changes up to 64783ea7de0bff3de77cfdff1ed76428c288faac:
 > 
->   ARM: multi_v7_defconfig: Remove ST_THERMAL_SYSCFG Kconfig symbol (2016-10-21 17:05:54 +0200)
+>   ARM: dts: STiHxxx-b2120: change sound card name (2016-11-10 09:52:49 +0100)
 > 
 > ----------------------------------------------------------------
+> STi dts update:
 > 
-> Remove STiH415/416 specific IPs
+> Change sound card name for B2120
+> Enable sound card for B2260
+> Remove stih415-clks.h
+> Identify critical clocks for STiH407
+> Fix typo in stih407-pinctrl.dtsi
 > 
-> As STiH415/416 have been removed from kernel, remove IPs only
-> found on these socs, remove ST_THERMAL_SYSCFG.
+> ----------------------------------------------------------------
+> Arnaud Pouliquen (2):
+>       ARM: dts: STiH410-B2260: enable sound card
+>       ARM: dts: STiHxxx-b2120: change sound card name
+> 
+> Geert Uytterhoeven (1):
+>       ARM: dts: STiH407: DT fix s/interrupts-names/interrupt-names/
+> 
+> Patrice Chotard (1):
+>       ARM: dts: remove stih415-clks.h
+> 
+> Peter Griffin (1):
+>       ARM: dts: stih407-clocks: Identify critical clocks
+> 
+>  arch/arm/boot/dts/stih407-clock.dtsi     | 10 ++++++++++
+>  arch/arm/boot/dts/stih407-pinctrl.dtsi   |  2 +-
+>  arch/arm/boot/dts/stih410-b2260.dts      | 22 ++++++++++++++++++++++
+>  arch/arm/boot/dts/stihxxx-b2120.dtsi     |  2 +-
+>  include/dt-bindings/clock/stih415-clks.h | 16 ----------------
+>  5 files changed, 34 insertions(+), 18 deletions(-)
+>  delete mode 100644 include/dt-bindings/clock/stih415-clks.h
+> 
+> 
+> 
 
-Merged, thanks.
+Merged, thanks!
 
 
 -Olof
