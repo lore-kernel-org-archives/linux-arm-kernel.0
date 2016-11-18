@@ -1,156 +1,60 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 18 Nov 2016 18:51:19 +0100
-Subject: [PATCH] arm: spin one more cycle in timer-based delays
-In-Reply-To: <582F0DD2.3030805@free.fr>
-References: <582B0F61.6030903@free.fr> <20161118120630.GJ13470@arm.com>
- <20161118125409.GK1041@n2100.armlinux.org.uk> <582F0DD2.3030805@free.fr>
-Message-ID: <582F3F97.2010701@free.fr>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 18 Nov 2016 11:54:04 -0600
+Subject: [PATCH] PCI: Add information about describing PCI in ACPI
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F921A88@lhreml507-mbx>
+References: <20161117175938.17465.45820.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F921A88@lhreml507-mbx>
+Message-ID: <20161118175404.GI25762@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/11/2016 15:18, Mason wrote:
-> On 18/11/2016 13:54, Russell King - ARM Linux wrote:
->> On Fri, Nov 18, 2016 at 12:06:30PM +0000, Will Deacon wrote:
->>> On Tue, Nov 15, 2016 at 02:36:33PM +0100, Mason wrote:
->>>> When polling a tick counter in a busy loop, one might sample the
->>>> counter just *before* it is updated, and then again just *after*
->>>> it is updated. In that case, while mathematically v2-v1 equals 1,
->>>> only epsilon has really passed.
->>>>
->>>> So, if a caller requests an N-cycle delay, we spin until v2-v1
->>>> is strictly greater than N to avoid these random corner cases.
->>>>
->>>> Signed-off-by: Mason <slash.tmp@free.fr>
->>>> ---
->>>>  arch/arm/lib/delay.c | 2 +-
->>>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm/lib/delay.c b/arch/arm/lib/delay.c
->>>> index 69aad80a3af4..3f1cd15ca102 100644
->>>> --- a/arch/arm/lib/delay.c
->>>> +++ b/arch/arm/lib/delay.c
->>>> @@ -60,7 +60,7 @@ static void __timer_delay(unsigned long cycles)
->>>>  {
->>>>  	cycles_t start = get_cycles();
->>>>  
->>>> -	while ((get_cycles() - start) < cycles)
->>>> +	while ((get_cycles() - start) <= cycles)
->>>>  		cpu_relax();
->>>>  }
->>>
->>> I thought a bit about this last night. It is well known that the delay
->>> routines are not guaranteed to be accurate, and I don't *think* that's
->>> limited to over-spinning, so arguably this isn't a bug. However, taking
->>> the approach that "drivers should figure it out" is also unhelpful,
->>> because the frequency of the underlying counter isn't generally known
->>> and so drivers can't simply adjust the delay parameter.
->>
->> I don't think this change makes any sense whatsoever.  udelay() is
->> inaccurate, period.  It _will_ give delays shorter than requested
->> for many reasons, many of which can't be fixed.
-> 
-> If I understand correctly, udelay is, in fact, a wrapper around
-> several possible implementations. (Run-time decision on arch/arm)
-> 
-> 1) The "historical" software loop-based method, which is calibrated
-> during init.
-> 
-> 2) A hardware solution, based on an actual timer, ticking away
-> at a constant frequency.
-> 
-> 3) others?
-> 
-> Solution 1 (which probably dates back to Linux 0.1) suffers from
-> the inaccuracies you point out, because of interrupt latency
-> during calibration, DVFS, etc.
-> 
-> On the other hand, it is simple enough to implement solution 2
-> in a way that guarantees that spin_for_n_cycles(n) spins
-> /at least/ for n cycles.
-> 
-> On platforms using timer-based delays, there can indeed exist
-> a function guaranteeing a minimal delay.
-> 
-> 
->> Having a super-accurate version just encourages people to write broken
->> drivers which assume (eg) that udelay(10) will give _at least_ a 10us
->> delay.  However, there is no such guarantee.
-> 
-> You say that calling udelay(10) expecting at least 10 ?s is broken.
-> This fails the principle of least astonishment in a pretty big way.
-> (If it returns after 9.9 ?s, I suppose it could be OK. But for
-> shorter delays, the relative error grows.)
-> 
-> A lot of drivers implement a spec that says
-> "do this, wait 1 ?s, do that".
-> 
-> Driver writers would typically write
-> do_this(); udelay(1); do_that();
-> 
-> Do you suggest they should write udelay(2); ?
-> But then, it's not so easy to follow the spec because everything
-> has been translated to a different number.
-> Hide everything behind a macro?
-> 
-> Note that people have been using ndelay too.
-> (I count 182 in drivers, 288 overall.)
-> 
-> drivers/cpufreq/s3c2440-cpufreq.c:      ndelay(20);
-> 
-> I don't think the author expects this to return immediately.
-> 
-> 
->> So, having udelay() for timers return slightly short is actually a good
->> thing - it causes people not to make the mistake to be soo accurate
->> with their delay specifications.
-> 
-> I disagree that having an implementation which introduces
-> hard-to-track-down random heisenbugs is a good thing.
-> 
-> 
->> So, NAK on this change.  udelay is not super-accurate.
-> 
-> usleep_range() fixed this issue recently.
-> 6c5e9059692567740a4ee51530dffe51a4b9584d
-> https://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?h=timers/core&id=6c5e9059692567740a4ee51530dffe51a4b9584d
-> 
-> Do you suggest driver writers should use usleep_range()
-> instead of udelay?
-> (When does usleep_range start making sense? Around 50/100 ?s
-> and above?)
-> 
->> Reference (and this is the most important one):
->>
->>   http://lists.openwall.net/linux-kernel/2011/01/12/372
+On Fri, Nov 18, 2016 at 05:17:34PM +0000, Gabriele Paoloni wrote:
+> > -----Original Message-----
+> > From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+> > owner at vger.kernel.org] On Behalf Of Bjorn Helgaas
+> > Sent: 17 November 2016 18:00
 
-I forgot to explain how I came to work in this area of the code.
+> > +Static tables like MCFG, HPET, ECDT, etc., are *not* mechanisms for
+> > +reserving address space!  The static tables are for things the OS
+> > +needs to know early in boot, before it can parse the ACPI namespace.
+> > +If a new table is defined, an old OS needs to operate correctly even
+> > +though it ignores the table.  _CRS allows that because it is generic
+> > +and understood by the old OS; a static table does not.
+> 
+> Right so if my understanding is correct you are saying that resources
+> described in the MCFG table should also be declared in PNP0C02 devices
+> so that the PNP driver can reserve these resources.
 
-When my NAND controller's driver probes, it scans the chips
-for bad blocks, which generates 65000 calls to ndelay(100);
-(for 1 GB of NAND). For larger sizes of NAND, the number can
-climb to 500k calls.
+Yes.
 
-Currently, on arch/arm, ndelay is rounded *up* to the
-nearest microsecond. So this might generate a total
-delay of up to 500 ms, when 50 ms would be sufficient.
+> On the other side the PCI Root bridge driver should not reserve such
+> resources.
+> 
+> Well if my understanding is correct I think we have a problem here:
+> http://lxr.free-electrons.com/source/drivers/pci/ecam.c#L74
+> 
+> As you can see pci_ecam_create() will conflict with the pnp driver
+> as it will try to reserve the resources from the MCFG table...
+> 
+> Maybe we need to rework pci_ecam_create() ?
 
-So I locally defined ndelay as
-#define NDELAY_MULT	((UL(2199)    * HZ) >> 11)
-#define ndelay(n)	__const_udelay((n) * NDELAY_MULT)
+I think it's OK as it is.
 
-I use a 27 MHz tick counter (37 ns period).
-ndelay() was resolving to __timer_delay(2)
-which might delay only a single tick, so 37 ns.
+The pnp/system.c driver does try to reserve PNP0C02 resources, and it
+marks them as "not busy".  That way they appear in /proc/iomem and
+won't be allocated for anything else, but they can still be requested
+by drivers, e.g., pci/ecam.c, which will mark them "busy".
 
-So the NAND framework occasionally (falsely) flags a block
-as bad (random).
+This is analogous to what the PCI core does in pci_claim_resource().
+This is really a function of the ACPI/PNP *core*, which should reserve
+all _CRS resources for all devices (not just PNP0C02 devices).  But
+it's done by pnp/system.c, and only for PNP0C02, because there's a
+bunch of historical baggage there.
 
-There are two sources of error in the timer-based code:
-1) rounding down in __timer_const_udelay => loses 1 cycle
-2) spinning one cycle too few => loses 1 cycle
+You'll also notice that in this case, things are out of order:
+logically the pnp/system.c reservation should happen first, but in
+fact the pci/ecam.c request happens *before* the pnp/system.c one.
+That means the pnp/system.c one might fail and complain "[mem ...]
+could not be reserved".
 
-With these two errors corrected, I am able to init the
-NAND driver faster, with no blocks incorrectly marked
-as bad.
-
-Regards.
+Bjorn
