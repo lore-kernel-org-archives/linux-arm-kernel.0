@@ -1,18 +1,23 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 17 Nov 2016 17:43:26 -0800
-Subject: [GIT PULL] STM32 DT changes for v4.10 #1
-In-Reply-To: <3e65d3ae-6509-6057-64e1-dfc256e535b5@st.com>
-References: <3e65d3ae-6509-6057-64e1-dfc256e535b5@st.com>
-Message-ID: <20161118014326.GJ8578@localhost>
+Date: Thu, 17 Nov 2016 17:53:14 -0800
+Subject: [GIT PULL 1/3] ARM: dts: exynos: DT for v4.10
+In-Reply-To: <1478629589-7520-3-git-send-email-krzk@kernel.org>
+References: <1478629589-7520-1-git-send-email-krzk@kernel.org>
+ <1478629589-7520-3-git-send-email-krzk@kernel.org>
+Message-ID: <20161118015314.GO8578@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, Nov 04, 2016 at 03:31:55PM +0100, Alexandre Torgue wrote:
-> Hi Olof, Arnd and Kevin,
+On Tue, Nov 08, 2016 at 08:26:28PM +0200, Krzysztof Kozlowski wrote:
+> Hi,
 > 
-> Please consider this first round of STM32 DT updates for v4.10:
+> Hurray! New board! ... Exynos4415 slowly is going away.
+> 
+> Best regards,
+> Krzysztof
+> 
 > 
 > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 > 
@@ -20,48 +25,21 @@ On Fri, Nov 04, 2016 at 03:31:55PM +0100, Alexandre Torgue wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
-> tags/stm32-dt-for-v4.10-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.10
 > 
-> for you to fetch changes up to f6dbbff4f0af1a5c0d6eaf414572b5eff7a73a8b:
+> for you to fetch changes up to 05a3589f46f913fbe91704f12fdca46a0eb0a27b:
 > 
->   ARM: dts: stm32f429: add LSI and LSE clocks (2016-11-04 15:08:08 +0100)
-> 
-> ----------------------------------------------------------------
-> STM32 DT updates for v4.10, round 1.
-> 
-> Highlights:
-> ----------
->  - Add LSI and LSE clocks support for STM32F429
->  - Add GPIO IRQ support for STM32F429
->  - Declare push button as GPIO keys on STM32F429 boards
->  - Add DMA supports on USART1 & USART3 on STM32F429
->  - Add Ethernet fixes
+>   ARM: dts: exynos: Add SCU device node to exynos4.dtsi (2016-11-05 17:39:50 +0200)
 > 
 > ----------------------------------------------------------------
-> Alexandre TORGUE (5):
->       ARM: DT: STM32: add dma for usart3 on F429
->       ARM: DT: stm32: move dma translation to board files
->       ARM: dts: stm32f429: Align Ethernet node with new bindings properties
->       ARM: dts: stm32f429: Fix Ethernet node on Eval Board
->       ARM: dts: stm32f429: remove Ethernet wake on Lan support
-> 
-> Gabriel Fernandez (1):
->       ARM: dts: stm32f429: add LSI and LSE clocks
-> 
-> Gerald Baeza (1):
->       ARM: DT: STM32: add dma for usart1 on F429
-> 
-> Maxime Coquelin (2):
->       ARM: dts: Add GPIO irq support to STM32F429
->       ARM: dts: Declare push button as GPIO key on stm32f429 boards
+> Samsung DeviceTree update for v4.10:
+> 1. Add TOPEET itop core and Elite boards, based on Exynos4412.
+> 2. Remove the Exynos4415 DTSI. We did not have any mainlined boards
+>    using it. I am also not aware of any popular out-of-tree boards using it.
+> 3. Add Snoop Control Unit node for Exynos4.
+> 4. Minor cleanups.
 
-I merged this but please get your contributors to use consistent prefixes
-in the future (or fix them up when you apply the patchest).
+Merged, thanks.
 
-It should be: ARM: dts: stm32: <...> in your case.
-
-
-Thanks!
 
 -Olof
