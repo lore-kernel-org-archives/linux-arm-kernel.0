@@ -1,50 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Nov 2016 10:37:36 -0800
-Subject: [GIT PULL] STM32 DT changes for v4.10 #2
-In-Reply-To: <2f793efd-01c6-fa28-0332-9e292341c064@st.com>
-References: <2f793efd-01c6-fa28-0332-9e292341c064@st.com>
-Message-ID: <20161118183736.GJ8882@localhost>
+Date: Fri, 18 Nov 2016 10:38:59 -0800
+Subject: [GIT PULL] arm: dts: hisilicon dts updates for v4.10
+In-Reply-To: <582B333E.2060205@hisilicon.com>
+References: <582B333E.2060205@hisilicon.com>
+Message-ID: <20161118183859.GL8882@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 15, 2016 at 03:40:24PM +0100, Alexandre Torgue wrote:
-> Hi Olof, Arnd and Kevin,
+On Tue, Nov 15, 2016 at 04:09:34PM +0000, Wei Xu wrote:
+> Hi Arnd, Hi Olof, Hi Kevin,
 > 
-> Please consider this second round of STM32 DT updates for v4.10:
+> Please help to pull the following changes.
+> Thanks!
 > 
-> The following changes since commit f6dbbff4f0af1a5c0d6eaf414572b5eff7a73a8b:
+> Best Regards,
+> Wei
 > 
->   ARM: dts: stm32f429: add LSI and LSE clocks (2016-11-04 15:08:08 +0100)
+> ---
+> 
+> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+> 
+>   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
-> tags/stm32-dt-for-v4.10-2
+>   git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-dt-for-4.10
 > 
-> for you to fetch changes up to 2ecaa477b404d707bac93c56f09a0a6162e04ed7:
+> for you to fetch changes up to 3b23aabfcd48988179f7c6c2dde01f3356f68213:
 > 
->   ARM: dts: stm32f429: Add QSPI clock (2016-11-15 13:59:11 +0100)
-> 
-> ----------------------------------------------------------------
-> STM32 DT updates for v4.10, round 2.
-> 
-> Highlights:
-> ----------
->  - Add support of STM32F746 MCU and STM32746G-Eval board
->  - Add QSPI support for STM32F469-Disco board
+>   ARM: dts: hisi-x5hd2: Remove skeleton.dtsi inclusion (2016-11-15 11:30:55 +0000)
 > 
 > ----------------------------------------------------------------
-> Alexandre TORGUE (1):
->       ARM: dts: Add STM32F746 MCU and STM32746g-EVAL board
+> ARM: DT: Hisilicon ARMv7 SoC DT updates for 4.10
 > 
-> Gabriel Fernandez (1):
->       ARM: dts: stm32f429: Add QSPI clock
+> - Remove skeleton.dtsi inclusion for the Hip01, Hi3620 and Hix5hd2
 
-Hi, merged. But here too, please use common prefixes in the future,
-please. I'd recommend 'ARM: dts: stm32: <...>'.
-
-
-Thanks!
+Merged, thanks.
 
 
 -Olof
