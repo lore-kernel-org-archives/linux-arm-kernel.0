@@ -1,55 +1,87 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 18 Nov 2016 10:18:26 +0000
-Subject: [PATCH next] arm64: remove "SMP: Total of %d processors
- activated." message
-In-Reply-To: <6d867f8f-c7b9-42e9-1764-6f802d6b1e96@huawei.com>
-References: <1479367946-38771-1-git-send-email-wangkefeng.wang@huawei.com>
- <20161117142213.GI22855@arm.com>
- <6d867f8f-c7b9-42e9-1764-6f802d6b1e96@huawei.com>
-Message-ID: <20161118101826.GC13470@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Nov 2016 11:17:57 +0100
+Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <20161114112625.GO10219@e106497-lin.cambridge.arm.com>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F90EA45@lhreml507-mbx>
+ <20161114112625.GO10219@e106497-lin.cambridge.arm.com>
+Message-ID: <2281986.miqFuFkAbO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 11:37:10AM +0800, Kefeng Wang wrote:
-> 
-> 
-> On 2016/11/17 22:22, Will Deacon wrote:
-> > On Thu, Nov 17, 2016 at 03:32:26PM +0800, Kefeng Wang wrote:
-> >> There is a common SMP boot message in generic code on all arches,
-> >> kill "SMP: Total of %d processors activated." in smp_cpus_done()
-> >> on arm64.
-> >>
-> >> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> >> ---
-> >> Boot message on qemu.
-> >> [    0.375116] smp: Brought up 1 node, 8 CPUs
-> >> [    0.383749] SMP: Total of 8 processors activated.
-> >>
-> >>  arch/arm64/kernel/smp.c | 1 -
-> >>  1 file changed, 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> >> index cb87234..9db4a95 100644
-> >> --- a/arch/arm64/kernel/smp.c
-> >> +++ b/arch/arm64/kernel/smp.c
-> >> @@ -428,7 +428,6 @@ static void __init hyp_mode_check(void)
-> >>  
-> >>  void __init smp_cpus_done(unsigned int max_cpus)
-> >>  {
-> >> -	pr_info("SMP: Total of %d processors activated.\n", num_online_cpus());
-> >>  	setup_cpu_features();
-> >>  	hyp_mode_check();
-> >>  	apply_alternatives_all();
+On Monday, November 14, 2016 11:26:25 AM CET liviu.dudau at arm.com wrote:
+> On Mon, Nov 14, 2016 at 08:26:42AM +0000, Gabriele Paoloni wrote:
+> > > Nope, that is not what it means. It means that PCI devices can see I/O
+> > > addresses
+> > > on the bus that start from 0. There never was any usage for non-PCI
+> > > controllers
 > > 
-> > Why? Are you proposing the same change to other architectures? Are you paid
-> > per patch?
+> > So I am a bit confused...
+> > From http://www.firmware.org/1275/bindings/isa/isa0_4d.ps
+> > It seems that ISA buses operate on cpu I/O address range [0, 0xFFF].
+> > I thought that was the reason why for most architectures we have
+> > PCIBIOS_MIN_IO equal to 0x1000 (so I thought that ISA controllers
+> > usually use [0, PCIBIOS_MIN_IO - 1] )
 > 
-> The message provides no further information than the generic code, so kill it.
-> Or show BogoMIPS like arm32?
+> First of all, cpu I/O addresses is an x86-ism. ARM architectures and others
+>  have no separate address space for I/O, it is all merged into one unified
+> address space. So, on arm/arm64 for example, PCIBIOS_MIN_IO = 0 could mean
+> that we don't care about ISA I/O because the platform does not support having
+> an ISA bus (e.g.).
 
-Ha! No, I don't think printing the BogoMIPS is the right solution. I just
-think that, if you insist on removing the harmless print, then you should
-also consider doing the same thing for all the other architectures that
-print the same message.
+I think to be more specific, PCIBIOS_MIN_IO=0 would indicate that you cannot
+have a PCI-to-ISA or PCI-to-LPC bridge in any PCI domain. This is different
+from having an LPC master outside of PCI, as that lives in its own domain
+and has a separately addressable I/O space.
 
-Will
+> > As said before this series forbid IO tokens to be in [0, PCIBIOS_MIN_IO)
+> > to allow special ISA controllers to use that range with special
+> > accessors.
+> > Having a variable threshold would make life much more difficult
+> > as there would be a probe dependency between the PCI controller and
+> > the special ISA one (PCI to wait for the special ISA device to be
+> > probed and set the right threshold value from DT or ACPI table).
+> > 
+> > Instead using PCIBIOS_MIN_IO is easier and should not impose much
+> > constraint as [PCIBIOS_MIN_IO, IO_SPACE_LIMIT] is available to
+> > the PCI controller for I/O tokens...
+> 
+> What I am suggesting is to leave PCIBIOS_MIN_IO alone which still reserves
+> space for ISA controller and add a PCIBIOS_MIN_DIRECT_IO that will reserve
+> space for your direct address I/O on top of PCIBIOS_MIN_IO.
+
+The PCIBIOS_MIN_DIRECT_IO name still suggests having something related to
+PCIBIOS_MIN_IO, but it really isn't. We are talking about multiple
+concepts here that are not the same but that are somewhat related:
+
+a) keeping PCI devices from allocating low I/O ports on the PCI bus
+   that would conflict with ISA devices behind a bridge of the
+   same bus.
+
+b) reserving the low 0x0-0xfff range of the Linux-internal I/O
+   space abstraction to a particular LPC or PCI domain to make
+   legacy device drivers work that hardcode a particular port
+   number.
+
+c) Redirecting inb/outb to call a domain-specific accessor function
+   rather than doing the normal MMIO window for an LPC master or
+   more generally any arbitrary LPC or PCI domain that has a
+   nonstandard I/O space. 
+   [side note: actually if we generalized this, we could avoid
+    assigning an MMIO range for the I/O space on the pci-mvebu
+    driver, and that would help free up some other remapping
+    windows]
+
+I think there is no need to change a) here, we have PCIBIOS_MIN_IO
+today and even if we don't need it, there is no obvious downside.
+I would also argue that we can ignore b) for the discussion of
+the HiSilicon LPC driver, we just need to assign some range
+of logical addresses to each domain.
+
+That means solving c) is the important problem here, and it
+shouldn't be so hard.  We can do this either with a single
+special domain as in the v5 patch series, or by generalizing it
+so that any I/O space mapping gets looked up through the device
+pointer of the bus master.
+
+	Arnd
