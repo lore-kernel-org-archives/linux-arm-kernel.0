@@ -1,32 +1,23 @@
-From: geliangtang@gmail.com (Geliang Tang)
-Date: Fri, 18 Nov 2016 22:12:30 +0800
-Subject: [PATCH] pinctrl: stm32: use builtin_platform_driver
-In-Reply-To: <7746cfe83ca3e96ccdf503669db3ace0e3081b7f.1479455552.git.geliangtang@gmail.com>
-References: <7746cfe83ca3e96ccdf503669db3ace0e3081b7f.1479455552.git.geliangtang@gmail.com>
-Message-ID: <910c70b66426b79a3c045d17c9fea8dbf80b6ceb.1479457288.git.geliangtang@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 18 Nov 2016 08:17:36 -0600
+Subject: [PATCH v2 2/3] devicetree: bindings: nvmem: Add compatible
+ string for imx6ul
+In-Reply-To: <1479344899-3141-2-git-send-email-ping.bai@nxp.com>
+References: <1479344899-3141-1-git-send-email-ping.bai@nxp.com>
+ <1479344899-3141-2-git-send-email-ping.bai@nxp.com>
+Message-ID: <20161118141736.3wop5fokghvxg4z6@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use builtin_platform_driver() helper to simplify the code.
+On Thu, Nov 17, 2016 at 09:08:18AM +0800, Bai Ping wrote:
+> Add new compatible string for i.MX6UL SOC.
+> 
+> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> ---
+> Changes for V2:
+> - reformat the changes suggested by Rob Herring
+> 
+>  Documentation/devicetree/bindings/nvmem/imx-ocotp.txt | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
----
- drivers/pinctrl/stm32/pinctrl-stm32f429.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
-
-diff --git a/drivers/pinctrl/stm32/pinctrl-stm32f429.c b/drivers/pinctrl/stm32/pinctrl-stm32f429.c
-index e9b15dc..990b867 100644
---- a/drivers/pinctrl/stm32/pinctrl-stm32f429.c
-+++ b/drivers/pinctrl/stm32/pinctrl-stm32f429.c
-@@ -1584,8 +1584,4 @@ static struct platform_driver stm32f429_pinctrl_driver = {
- 	},
- };
- 
--static int __init stm32f429_pinctrl_init(void)
--{
--	return platform_driver_register(&stm32f429_pinctrl_driver);
--}
--device_initcall(stm32f429_pinctrl_init);
-+builtin_platform_driver(stm32f429_pinctrl_driver);
--- 
-2.9.3
+Acked-by: Rob Herring <robh@kernel.org>
