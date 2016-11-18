@@ -1,37 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 18 Nov 2016 16:00:06 +0000
-Subject: [PATCH v8 12/16] drivers: iommu: arm-smmu: split probe functions
- into DT/generic portions
-In-Reply-To: <20161116152936.22955-13-lorenzo.pieralisi@arm.com>
-References: <20161116152936.22955-1-lorenzo.pieralisi@arm.com>
- <20161116152936.22955-13-lorenzo.pieralisi@arm.com>
-Message-ID: <20161118160006.GW13470@arm.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 18 Nov 2016 17:07:32 +0100
+Subject: [GIT PULL] pxa-dt for v4.10
+In-Reply-To: <20161118071932.GB1785@localhost> (Olof Johansson's message of
+ "Thu, 17 Nov 2016 23:19:32 -0800")
+References: <8760nxwqs0.fsf@belgarion.home> <20161118071932.GB1785@localhost>
+Message-ID: <87vavksrej.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2016 at 03:29:32PM +0000, Lorenzo Pieralisi wrote:
-> Current ARM SMMU probe functions intermingle HW and DT probing
-> in the initialization functions to detect and programme the ARM SMMU
-> driver features. In order to allow probing the ARM SMMU with other
-> firmwares than DT, this patch splits the ARM SMMU init functions into
-> DT and HW specific portions so that other FW interfaces (ie ACPI) can
-> reuse the HW probing functions and skip the DT portion accordingly.
-> 
-> This patch implements no functional change, only code reshuffling.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Reviewed-by: Tomasz Nowicki <tn@semihalf.com>
-> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Tomasz Nowicki <tn@semihalf.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/iommu/arm-smmu.c | 62 +++++++++++++++++++++++++++++-------------------
->  1 file changed, 37 insertions(+), 25 deletions(-)
+Olof Johansson <olof@lixom.net> writes:
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+>> Vijay Kumar (1):
+>>       Fix no. of gpio cells in the pxa gpio binding doucmentation
+>
+> This isn't the right patch subject. Please use standard prefix format
+> here (ARM: dts: pxa: ...).
+>
+>
+> Please respin this branch and post a fresh pull request. Thanks!
+Ah sorry, wasn't careful enough, will respin.
 
-Although I'd also like Robin to have a look at this.
+Cheers.
 
-Will
+-- 
+Robert
