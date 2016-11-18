@@ -1,96 +1,77 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 18 Nov 2016 13:10:35 +0200
-Subject: [PATCH v2] ARM: Drop fixed 200 Hz timer requirement from Samsung
- platforms
-In-Reply-To: <8dfbb04f-d377-b51a-3010-481a5f977507@samsung.com>
-References: <1479453418-25314-1-git-send-email-krzk@kernel.org>
- <CGME20161118084812epcas4p496b847251f6919e5edc4801a247e0857@epcas4p4.samsung.com>
- <22757093.ejshJp9T7L@wuerfel>
- <8dfbb04f-d377-b51a-3010-481a5f977507@samsung.com>
-Message-ID: <20161118111035.GA2392@kozik-lap>
+From: yuanzhichang@hisilicon.com (zhichang.yuan)
+Date: Fri, 18 Nov 2016 19:12:35 +0800
+Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
+In-Reply-To: <2436881.9RqUVYxmDf@wuerfel>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1478806353.7430.137.camel@kernel.crashing.org>
+ <5825984B.3030303@hisilicon.com> <2436881.9RqUVYxmDf@wuerfel>
+Message-ID: <582EE223.4090605@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 11:43:14AM +0100, Sylwester Nawrocki wrote:
-> On 11/18/2016 09:46 AM, Arnd Bergmann wrote:
-> > On Friday, November 18, 2016 9:16:58 AM CET Krzysztof Kozlowski wrote:
-> >> > All Samsung platforms, including the Exynos, are selecting HZ_FIXED with
-> >> > 200 Hz.  Unfortunately in case of multiplatform image this affects also
-> >> > other platforms when Exynos is enabled.
-> >> > 
-> >> > This looks like an very old legacy code, dating back to initial
-> >> > upstreaming of S3C24xx.  Probably it was required for s3c24xx timer
-> >> > driver, which was removed in commit ad38bdd15d5b ("ARM: SAMSUNG: Remove
-> >> > unused plat-samsung/time.c").
-> >> > 
-> >> > Since then, this fixed 200 Hz spread everywhere, including out-of-tree
-> >> > Samsung kernels (SoC vendor's and Tizen's).  I believe this choice
-> >> > was rather an effect of coincidence instead of conscious choice.
-> >> > 
-> >> > Exynos uses its own MCT or arch timer and can work with all HZ values.
-> >> > Older platforms use newer Samsung PWM timer driver which should handle
-> >> > down to 100 Hz.
-> >> > 
-> >> > Few perf mem and sched tests on Odroid XU3 board (Exynos5422, 4x Cortex
-> >> > A7, 4x Cortex A15) show no regressions when switching from 200 Hz to
-> >> > other values.
-> >> > 
-> >> > Reported-by: Lee Jones <lee.jones@linaro.org>
-> >> > [Dropping 200_HZ from S3C/S5P suggested by Arnd]
-> >> > Reported-by: Arnd Bergmann <arnd@arndb.de>
-> >> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> >> > Cc: Kukjin Kim <kgene@kernel.org>
-> >> > Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> >> > 
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > 
-> > Maybe add a paragraph about the specific problem:
-> > 
-> > "On s3c24xx, the PWM counter is only 16 bit wide, and with the
-> > typical 12MHz input clock that overflows every 5.5ms. This works
-> > with HZ=200 or higher but not with HZ=100 which needs a 10ms
-> > interval between ticks. On Later chips (S3C64xx, S5P and EXYNOS),
-> > the counter is 32 bits and does not have this problem.
-> > The new samsung_pwm_timer driver solves the problem by scaling
-> > the input clock by a factor of 50 on s3c24xx, which makes it
-> > less accurate but allows HZ=100 as well as CONFIG_NO_HZ with
-> > fewer wakeups".
-> 
-> I've tested on S3C2440 SoC based board and I didn't notice any
-> issues with HZ=100.
-> 
-> Clock frequencies look a bit different because AFAIU MPLL
-> clock is mostly used as a root clock. The 12 MHz oscillator clock
-> is used a root clock for the MPLL.
-> 
-> refclk:    12000 kHz
-> mpll:     405000 kHz
-> upll:      48000 kHz
-> fclk:     405000 kHz
-> hclk:     101250 kHz
-> pclk:      50625 kHz
-> 
-> So frequency of the timer block's source clock (PCLK) is 50.625 MHz.
-> This is further divided by 50 in the prescaler as you pointed out.
-> 
-> So the 16-bit is clocked with 1012500 Hz clock. I added some printks
-> to verify this.
-> 
-> Here is boot log for HZ=200: http://pastebin.com/JuWZdYwh
-> and HZ=100 http://pastebin.com/HnDnBfhc
-> 
-> samsung_clocksource_init:351 pclk: 50625000, timer clock_rate: 1012500
-> sched_clock: 16 bits at 1012kHz, resolution 987ns, wraps every 32362962ns
+Hi, Arnd,
 
-Thanks for tests! I really appreciate it.
 
-> I just don't understand why the log says timer overflow is every 32.362 ms
-> and not twice this value (65536 * 1/1012500).
+On 2016/11/18 17:20, Arnd Bergmann wrote:
+> On Friday, November 11, 2016 6:07:07 PM CET zhichang.yuan wrote:
+>>
+>> I have similar idea as your PPC MMIO.
+>>
+>> We notice the prototype of {in/out()} is something like that:
+>>
+>> static inline u8 inb(unsigned long addr)
+>> static inline void outb(u8 value, unsigned long addr)
+>>
+>> The type of parameter 'addr' is unsigned long. For I/O space, it is big enough.
+>> So, could you divide this 'addr' into several bit segments? The top 8 bits is
+>> defined as bus index. For normal direct IO, the bus index is 0. For those bus
+>> device which need indirectIO or some special I/O accessors, when these devices
+>> are initializing, can request to allocate an unique ID to them, and register
+>> their own accessors to the entry which is corresponding to the ID.
+> 
+> Ah, have you looked at the IA64 code? It does exactly this.
+> For ARM64 we decided to use the same basic approach as powerpc with
+> a single range of virtual memory for mapping it as that somewhat
+> simplified all cases we knew about at the time.
 
-The answer could be at kernel/time/clocksource.c:
- * NOTE: This function includes a safety margin of 50%, in other words, we
- * return half the number of nanoseconds the hardware counter can technically
- * cover.
+Yes. I spent some time to trace how to work on PPC. But the code is a bit long,
+I am not clear on how the indirectIO there was supported.
 
-Best regards,
-Krzysztof
+I noticed there are CONFIG_PPC_INDIRECT_PIO and CONFIG_PPC_INDIRECT_MMIO on PPC.
+It seems that only CONFIG_PPC_INDIRECT_MMIO applied some MSB to store the bus
+tokens which are used to get iowa_busses[] for specific operation helpers.
+I can not find how CONFIG_PPC_INDIRECT_PIO support multiple ISA domains. It
+seems only Opal-lpc.c adopt this INDIRECT_PIO method.
+
+Although CONFIG_PPC_INDIRECT_MMIO is for MMIO, seems not suitable for ISA/LPC
+I/O. But this idea is helpful.
+
+what else did I miss??
+
+> 
+>> In this way, we can support multiple domains, I think.
+>> But I am not sure whether it is feasible, for example, are there some
+>> architectures/platforms had populated the top 8 bits? Do we need to request IO
+>> region from ioport_resource for those devices?  etc...
+> 
+> On a 64-bit architecture, the top 32 bits of the port number are
+> definitely free to use for this, and 8 bits are probably sufficient.
+> 
+> Even on 32 bit architectures, I can't see why we'd ever need more than
+> 16 bits worth of addressing within a domain, so using 8 bit domain
+> and 16 bit address leaves 8 or 40 unused bits.
+
+Yes. 8 bits are enough.
+But the maximal PIO on some architectures are defined as ~0 or -1. There is no
+any bare space left. Probably we can not ensure the upper 8 bits available.
+
+
+Thanks,
+Zhichang
+
+
+> 
+> 	Arnd
+> 
+> .
+> 
