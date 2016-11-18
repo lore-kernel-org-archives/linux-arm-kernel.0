@@ -1,87 +1,137 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Nov 2016 11:17:57 +0100
-Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <20161114112625.GO10219@e106497-lin.cambridge.arm.com>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F90EA45@lhreml507-mbx>
- <20161114112625.GO10219@e106497-lin.cambridge.arm.com>
-Message-ID: <2281986.miqFuFkAbO@wuerfel>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 18 Nov 2016 10:23:32 +0000
+Subject: [PATCHv2 5/6] arm64: Use __pa_symbol for _end
+In-Reply-To: <20161116173217.GB3224@e104818-lin.cambridge.arm.com>
+References: <20161102210054.16621-1-labbott@redhat.com>
+ <20161102210054.16621-6-labbott@redhat.com>
+ <20161102225241.GA19591@remoulade>
+ <3724ea58-3c04-1248-8359-e2927da03aaf@redhat.com>
+ <20161103155106.GF25852@remoulade>
+ <20161114181937.GG3096@e104818-lin.cambridge.arm.com>
+ <06569a6b-3846-5e18-28c1-7c16a9697663@redhat.com>
+ <20161115183508.GJ3096@e104818-lin.cambridge.arm.com>
+ <95d1f7bb-d451-3b0a-1a32-957a24023a49@redhat.com>
+ <20161116173217.GB3224@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu93ugEdruK4VrwL4ZxoDw1yJeZ=F34gZUC-WdNw2G=0Ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 14, 2016 11:26:25 AM CET liviu.dudau at arm.com wrote:
-> On Mon, Nov 14, 2016 at 08:26:42AM +0000, Gabriele Paoloni wrote:
-> > > Nope, that is not what it means. It means that PCI devices can see I/O
-> > > addresses
-> > > on the bus that start from 0. There never was any usage for non-PCI
-> > > controllers
-> > 
-> > So I am a bit confused...
-> > From http://www.firmware.org/1275/bindings/isa/isa0_4d.ps
-> > It seems that ISA buses operate on cpu I/O address range [0, 0xFFF].
-> > I thought that was the reason why for most architectures we have
-> > PCIBIOS_MIN_IO equal to 0x1000 (so I thought that ISA controllers
-> > usually use [0, PCIBIOS_MIN_IO - 1] )
-> 
-> First of all, cpu I/O addresses is an x86-ism. ARM architectures and others
->  have no separate address space for I/O, it is all merged into one unified
-> address space. So, on arm/arm64 for example, PCIBIOS_MIN_IO = 0 could mean
-> that we don't care about ISA I/O because the platform does not support having
-> an ISA bus (e.g.).
+On 16 November 2016 at 17:32, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, Nov 15, 2016 at 04:09:07PM -0800, Laura Abbott wrote:
+>> On 11/15/2016 10:35 AM, Catalin Marinas wrote:
+>> > I'm fine with __pa_symbol use entirely from under arch/arm64. But if you
+>> > want to use __pa_symbol, I tried to change most (all?) places where
+>> > necessary, together with making virt_to_phys() only deal with the kernel
+>> > linear mapping. Not sure it looks cleaner, especially the
+>> > __va(__pa_symbol()) cases (we could replace the latter with another
+>> > macro and proper comment):
+>>
+>> I agree everything should be converted over, I was considering doing
+>> that in a separate patch but this covers everything nicely. Are you
+>> okay with me folding this in? (Few comments below)
+>
+> Yes. I would also like Ard to review it since he introduced the current
+> __virt_to_phys() macro.
+>
 
-I think to be more specific, PCIBIOS_MIN_IO=0 would indicate that you cannot
-have a PCI-to-ISA or PCI-to-LPC bridge in any PCI domain. This is different
-from having an LPC master outside of PCI, as that lives in its own domain
-and has a separately addressable I/O space.
+I think this is a clear improvement. I didn't dare to propose it at
+the time, due to the fallout, but it is obviously much better to have
+separate accessors than to have runtime tests to decide something that
+is already known at compile time. My only concern is potential uses in
+generic code: I think there may be something in the handling of
+initramfs, or freeing the __init segment (I know it had 'init' in the
+name :-)) that refers to the physical address of symbols, but I don't
+remember exactly what it is.
 
-> > As said before this series forbid IO tokens to be in [0, PCIBIOS_MIN_IO)
-> > to allow special ISA controllers to use that range with special
-> > accessors.
-> > Having a variable threshold would make life much more difficult
-> > as there would be a probe dependency between the PCI controller and
-> > the special ISA one (PCI to wait for the special ISA device to be
-> > probed and set the right threshold value from DT or ACPI table).
-> > 
-> > Instead using PCIBIOS_MIN_IO is easier and should not impose much
-> > constraint as [PCIBIOS_MIN_IO, IO_SPACE_LIMIT] is available to
-> > the PCI controller for I/O tokens...
-> 
-> What I am suggesting is to leave PCIBIOS_MIN_IO alone which still reserves
-> space for ISA controller and add a PCIBIOS_MIN_DIRECT_IO that will reserve
-> space for your direct address I/O on top of PCIBIOS_MIN_IO.
+Did you test it with a initramfs?
 
-The PCIBIOS_MIN_DIRECT_IO name still suggests having something related to
-PCIBIOS_MIN_IO, but it really isn't. We are talking about multiple
-concepts here that are not the same but that are somewhat related:
-
-a) keeping PCI devices from allocating low I/O ports on the PCI bus
-   that would conflict with ISA devices behind a bridge of the
-   same bus.
-
-b) reserving the low 0x0-0xfff range of the Linux-internal I/O
-   space abstraction to a particular LPC or PCI domain to make
-   legacy device drivers work that hardcode a particular port
-   number.
-
-c) Redirecting inb/outb to call a domain-specific accessor function
-   rather than doing the normal MMIO window for an LPC master or
-   more generally any arbitrary LPC or PCI domain that has a
-   nonstandard I/O space. 
-   [side note: actually if we generalized this, we could avoid
-    assigning an MMIO range for the I/O space on the pci-mvebu
-    driver, and that would help free up some other remapping
-    windows]
-
-I think there is no need to change a) here, we have PCIBIOS_MIN_IO
-today and even if we don't need it, there is no obvious downside.
-I would also argue that we can ignore b) for the discussion of
-the HiSilicon LPC driver, we just need to assign some range
-of logical addresses to each domain.
-
-That means solving c) is the important problem here, and it
-shouldn't be so hard.  We can do this either with a single
-special domain as in the v5 patch series, or by generalizing it
-so that any I/O space mapping gets looked up through the device
-pointer of the bus master.
-
-	Arnd
+>> > diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+>> > index eac3dbb7e313..e02f45e5ee1b 100644
+>> > --- a/arch/arm64/include/asm/memory.h
+>> > +++ b/arch/arm64/include/asm/memory.h
+>> > @@ -169,15 +169,22 @@ extern u64                    kimage_voffset;
+>> >   */
+>> >  #define __virt_to_phys_nodebug(x) ({                                       \
+>> >     phys_addr_t __x = (phys_addr_t)(x);                             \
+>> > -   __x & BIT(VA_BITS - 1) ? (__x & ~PAGE_OFFSET) + PHYS_OFFSET :   \
+>> > -                            (__x - kimage_voffset); })
+>> > +   VM_BUG_ON(!(__x & BIT(VA_BITS - 1)));                           \
+>> > +   ((__x & ~PAGE_OFFSET) + PHYS_OFFSET);                           \
+>> > +})
+>>
+>> I do think this is easier to understand vs the ternary operator.
+>> I'll add a comment detailing the use of __pa vs __pa_symbol somewhere
+>> as well.
+>
+> Of course, a comment is welcome (I just did a quick hack to check that
+> it works).
+>
+>> > --- a/arch/arm64/include/asm/mmu_context.h
+>> > +++ b/arch/arm64/include/asm/mmu_context.h
+>> > @@ -44,7 +44,7 @@ static inline void contextidr_thread_switch(struct task_struct *next)
+>> >   */
+>> >  static inline void cpu_set_reserved_ttbr0(void)
+>> >  {
+>> > -   unsigned long ttbr = virt_to_phys(empty_zero_page);
+>> > +   unsigned long ttbr = __pa_symbol(empty_zero_page);
+>> >
+>> >     write_sysreg(ttbr, ttbr0_el1);
+>> >     isb();
+>> > @@ -113,7 +113,7 @@ static inline void cpu_install_idmap(void)
+>> >     local_flush_tlb_all();
+>> >     cpu_set_idmap_tcr_t0sz();
+>> >
+>> > -   cpu_switch_mm(idmap_pg_dir, &init_mm);
+>> > +   cpu_switch_mm(__va(__pa_symbol(idmap_pg_dir)), &init_mm);
+>>
+>> Yes, the __va(__pa_symbol(..)) idiom needs to be macroized and commented...
+>
+> Indeed. At the same time we should also replace the LMADDR macro in
+> hibernate.c with whatever you come up with.
+>
+>> > diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+>> > index d55a7b09959b..81c03c74e5fe 100644
+>> > --- a/arch/arm64/kernel/hibernate.c
+>> > +++ b/arch/arm64/kernel/hibernate.c
+>> > @@ -51,7 +51,7 @@
+>> >  extern int in_suspend;
+>> >
+>> >  /* Find a symbols alias in the linear map */
+>> > -#define LMADDR(x)  phys_to_virt(virt_to_phys(x))
+>> > +#define LMADDR(x)  __va(__pa_symbol(x))
+>>
+>> ...Perhaps just borrowing this macro?
+>
+> Yes but I don't particularly like the name, especially since it goes
+> into a .h file. Maybe __lm_sym_addr() or something else if you have a
+> better idea.
+>
+>> > diff --git a/arch/arm64/mm/physaddr.c b/arch/arm64/mm/physaddr.c
+>> > index 874c78201a2b..98dae943e496 100644
+>> > --- a/arch/arm64/mm/physaddr.c
+>> > +++ b/arch/arm64/mm/physaddr.c
+>> > @@ -14,8 +14,8 @@ unsigned long __virt_to_phys(unsigned long x)
+>> >              */
+>> >             return (__x & ~PAGE_OFFSET) + PHYS_OFFSET;
+>> >     } else {
+>> > -           VIRTUAL_BUG_ON(x < kimage_vaddr || x >= (unsigned long)_end);
+>> > -           return (__x - kimage_voffset);
+>> > +           WARN_ON(1);
+>>
+>> Was the deletion of the BUG_ON here intentional? VIRTUAL_BUG_ON
+>> is the check enabled by CONFIG_DEBUG_VIRTUAL vs just CONFIG_DEBUG_VM.
+>> I intentionally kept CONFIG_DEBUG_VIRTUAL separate since the checks
+>> are expensive.
+>
+> I wanted to always get a warning but fall back to __phys_addr_symbol()
+> so that I can track down other uses of __virt_to_phys() on kernel
+> symbols without killing the kernel. A better option would have been
+> VIRTUAL_WARN_ON (or *_ONCE) but we don't have it. VM_WARN_ON, as you
+> said, is independent of CONFIG_DEBUG_VIRTUAL.
+>
+> We could as well kill the system with VIRTUAL_BUG_ON in this case but I
+> thought we should be more gentle until all the __virt_to_phys use-cases
+> are sorted out.
+>
+> --
+> Catalin
