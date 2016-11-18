@@ -1,43 +1,36 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 18 Nov 2016 12:03:46 -0600
-Subject: [PATCH 1/3] dt-bindings: Add Macnica Americas vendor prefix
-In-Reply-To: <CADhT+wcesJRSf0q+_BDEmtsMTAO2LcAPkqjsRW2mNc1znMp4qg@mail.gmail.com>
-References: <20161101153632.6844-1-dinguyen@kernel.org>
- <CADhT+wcesJRSf0q+_BDEmtsMTAO2LcAPkqjsRW2mNc1znMp4qg@mail.gmail.com>
-Message-ID: <CAL_JsqJv7bBmkWUmd44Ln-=PLLKEch+hbjuD8v8ArhOCZ37jdA@mail.gmail.com>
+From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
+Date: Fri, 18 Nov 2016 19:18:47 +0100
+Subject: [PATCH] drm/sun4i: Fix a return value in case of error
+Message-ID: <20161118181847.8436-1-christophe.jaillet@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 10:25 AM, Dinh Nguyen <dinh.linux@gmail.com> wrote:
-> Hi Rob,
->
-> On Tue, Nov 1, 2016 at 10:36 AM, Dinh Nguyen <dinguyen@kernel.org> wrote:
->> Add a vendor prefix for the Macnica company.
->> http://http://www.macnica.com
->>
->> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
->> ---
->>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> index f0a48ea..81674f2 100644
->> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> @@ -158,6 +158,7 @@ lg  LG Corporation
->>  linux  Linux-specific binding
->>  lltc   Linear Technology Corporation
->>  lsi    LSI Corp. (LSI Logic)
->> +macnica        Macnica Americas
->>  marvell        Marvell Technology Group Ltd.
->>  maxim  Maxim Integrated Products
->>  meas   Measurement Specialties
->> --
->> 2.8.3
->
-> Just a gentle ping.
+If 'sun4i_backend_drm_format_to_layer()' does not return 0, then 'val' is
+left unmodified.
+As it is not initialized either, the return value can be anything.
 
-Sorry, didn't send anything out, but the series is already applied if
-you look at -next or PW.
+It is likely that returning the error code was expected here.
 
-Rob
+As the only caller of 'sun4i_backend_update_layer_formats()' does not check
+the return value, this fix is purely theorical.
+
+Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+---
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index 7eb2a965f83d..f724b8047bae 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -192,7 +192,7 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
+ 	ret = sun4i_backend_drm_format_to_layer(plane, fb->pixel_format, &val);
+ 	if (ret) {
+ 		DRM_DEBUG_DRIVER("Invalid format\n");
+-		return val;
++		return ret;
+ 	}
+ 
+ 	regmap_update_bits(backend->regs, SUN4I_BACKEND_ATTCTL_REG1(layer),
+-- 
+2.9.3
