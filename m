@@ -1,145 +1,120 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Fri, 18 Nov 2016 09:32:47 +0100
-Subject: [PATCH V8 2/6] thermal: bcm2835: add thermal driver for bcm2835
- soc
-In-Reply-To: <20161117151019.GA3115@localhost.localdomain>
-References: <1478081906-12009-1-git-send-email-kernel@martin.sperl.org>
- <1478081906-12009-3-git-send-email-kernel@martin.sperl.org>
- <20161117021107.GA2647@localhost.localdomain>
- <766e1b70-d83a-eb52-fa2b-aec435e85673@martin.sperl.org>
- <20161117151019.GA3115@localhost.localdomain>
-Message-ID: <7957B3CC-0E18-4B27-82EB-EF88B7695E28@martin.sperl.org>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Fri, 18 Nov 2016 09:33:44 +0100
+Subject: [RFC v3 00/10] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
+ reserved regions
+In-Reply-To: <HE1PR0401MB2556607F41972B84F8A48E869AB00@HE1PR0401MB2556.eurprd04.prod.outlook.com>
+References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
+ <HE1PR0401MB2556607F41972B84F8A48E869AB00@HE1PR0401MB2556.eurprd04.prod.outlook.com>
+Message-ID: <40ae2d41-c744-49e6-d51d-8cba41a4b069@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Bharat,
 
-> On 17.11.2016, at 16:10, Eduardo Valentin <edubezval@gmail.com> wrote:
+On 18/11/2016 06:34, Bharat Bhushan wrote:
+> Hi Eric,
 > 
-> Hello Martin,
+> Have you sent out QEMU side patches based on this new approach? In case I missed please point me the patches? 
+Upstream QEMU works fine for PCIe/MSI passthrough on ARM since mach virt
+address space does not collide with fixed MSI region.
+
+Thanks
+
+Eric
 > 
-> On Thu, Nov 17, 2016 at 10:51:33AM +0100, Martin Sperl wrote:
->> 
->> 
->> On 17.11.2016 03:11, Eduardo Valentin wrote:
->>> Hey Martin,
->>> 
->>> Very sorry for the late feedback. Not so sure if this one got queued
->>> already or not. Anyways, just minor questions as follows:
->>> 
->>> On Wed, Nov 02, 2016 at 10:18:22AM +0000, kernel at martin.sperl.org wrote:
->>>> From: Martin Sperl <kernel@martin.sperl.org>
->>>> 
->>>> Add basic thermal driver for bcm2835 SOC.
->>>> 
->>>> This driver currently relies on the firmware setting up the
->>>> tsense HW block and does not set it up itself.
->>>> 
->>>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
->>>> Acked-by: Eric Anholt <eric@anholt.net>
->>>> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
->>>> 
->> ...
->>>> +static int bcm2835_thermal_adc2temp(
->>>> +	const struct bcm2835_thermal_info *info, u32 adc)
->>>> +{
->>>> +	return info->offset + (adc * info->slope);
->>> 
->>> Any specific reason we cannot use thermal_zone_params->slope and
->>> thermal_zone_params->offset?
->> 
->> You could - the patch was just rebased to 4.9 and those slope and
->> offset just got merged during this cycle.
->> 
->> Do we really need to modify it - the patch has been around since 4.6.
->> 
->>>> +
->>>> +static int bcm2835_thermal_get_trip_temp(
->>>> +	struct thermal_zone_device *tz, int trip, int *temp)
->>>> +{
->>>> +	struct bcm2835_thermal_data *data = tz->devdata;
->>>> +	u32 val = readl(data->regs + BCM2835_TS_TSENSCTL);
->>>> +
->>>> +	/* get the THOLD bits */
->>>> +	val &= BCM2835_TS_TSENSCTL_THOLD_MASK;
->>>> +	val >>= BCM2835_TS_TSENSCTL_THOLD_SHIFT;
->>>> +
->>>> +	/* if it is zero then use the info value */
->>>> +	if (val)
->>> 
->>> Is this a read only register or is this driver supposed to program it?
->>> In which scenario it would be 0? Can this be added as comments?
->> 
->> It is RW, but the Firmware typically sets up the thermal device with the
->> correct values already - this is just a fallback.
+> Thanks
+> -Bharat
 > 
-> OK, but how do you differentiate from a buggy firmware or misconfigured
-> hardware? How do you know if the firmware is supposed to be loaded and
-> ready? There is no firmware loading in this driver. Also, there is no
-> dependency with a driver that loads firmware, or at least, I missed it.
+>> -----Original Message-----
+>> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+>> bounces at lists.linux-foundation.org] On Behalf Of Eric Auger
+>> Sent: Tuesday, November 15, 2016 6:39 PM
+>> To: eric.auger at redhat.com; eric.auger.pro at gmail.com;
+>> christoffer.dall at linaro.org; marc.zyngier at arm.com;
+>> robin.murphy at arm.com; alex.williamson at redhat.com;
+>> will.deacon at arm.com; joro at 8bytes.org; tglx at linutronix.de;
+>> jason at lakedaemon.net; linux-arm-kernel at lists.infradead.org
+>> Cc: drjones at redhat.com; kvm at vger.kernel.org; punit.agrawal at arm.com;
+>> linux-kernel at vger.kernel.org; iommu at lists.linux-foundation.org;
+>> pranav.sawargaonkar at gmail.com
+>> Subject: [RFC v3 00/10] KVM PCIe/MSI passthrough on ARM/ARM64 and
+>> IOVA reserved regions
+>>
+>> Following LPC discussions, we now report reserved regions through iommu-
+>> group sysfs reserved_regions attribute file.
+>>
+>> Reserved regions are populated through the IOMMU get_resv_region
+>> callback (former get_dm_regions), now implemented by amd-iommu, intel-
+>> iommu and arm-smmu.
+>>
+>> The intel-iommu reports the [FEE0_0000h - FEF0_000h] MSI window as an
+>> IOMMU_RESV_NOMAP reserved region.
+>>
+>> arm-smmu reports the MSI window (arbitrarily located at 0x8000000 and 1MB
+>> large) and the PCI host bridge windows.
+>>
+>> The series integrates a not officially posted patch from Robin:
+>> "iommu/dma: Allow MSI-only cookies".
+>>
+>> This series currently does not address IRQ safety assessment.
+>>
+>> Best Regards
+>>
+>> Eric
+>>
+>> Git: complete series available at
+>> https://github.com/eauger/linux/tree/v4.9-rc5-reserved-rfc-v3
+>>
+>> History:
+>> RFC v2 -> v3:
+>> - switch to an iommu-group sysfs API
+>> - use new dummy allocator provided by Robin
+>> - dummy allocator initialized by vfio-iommu-type1 after enumerating
+>>   the reserved regions
+>> - at the moment ARM MSI base address/size is left unchanged compared
+>>   to v2
+>> - we currently report reserved regions and not usable IOVA regions as
+>>   requested by Alex
+>>
+>> RFC v1 -> v2:
+>> - fix intel_add_reserved_regions
+>> - add mutex lock/unlock in vfio_iommu_type1
+>>
+>>
+>> Eric Auger (10):
+>>   iommu/dma: Allow MSI-only cookies
+>>   iommu: Rename iommu_dm_regions into iommu_resv_regions
+>>   iommu: Add new reserved IOMMU attributes
+>>   iommu: iommu_alloc_resv_region
+>>   iommu: Do not map reserved regions
+>>   iommu: iommu_get_group_resv_regions
+>>   iommu: Implement reserved_regions iommu-group sysfs file
+>>   iommu/vt-d: Implement reserved region get/put callbacks
+>>   iommu/arm-smmu: Implement reserved region get/put callbacks
+>>   vfio/type1: Get MSI cookie
+>>
+>>  drivers/iommu/amd_iommu.c       |  20 +++---
+>>  drivers/iommu/arm-smmu.c        |  52 +++++++++++++++
+>>  drivers/iommu/dma-iommu.c       | 116 ++++++++++++++++++++++++++----
+>> ---
+>>  drivers/iommu/intel-iommu.c     |  50 ++++++++++----
+>>  drivers/iommu/iommu.c           | 141
+>> ++++++++++++++++++++++++++++++++++++----
+>>  drivers/vfio/vfio_iommu_type1.c |  26 ++++++++
+>>  include/linux/dma-iommu.h       |   7 ++
+>>  include/linux/iommu.h           |  49 ++++++++++----
+>>  8 files changed, 391 insertions(+), 70 deletions(-)
+>>
+>> --
+>> 1.9.1
+>>
+>> _______________________________________________
+>> iommu mailing list
+>> iommu at lists.linux-foundation.org
+>> https://lists.linuxfoundation.org/mailman/listinfo/iommu
 > 
-The way that firmware works on the RPI is quite different from most others I guess.
-in principle you got 2 different CPUs on the bcm2835:
-* ARM, which runs the linux instance
-* VideoCore 4, which runs the firmware (loading from SD initially) and
-  then booting the ARM.
-
-So this Firmware on VC4 is the one that I am talking about.
-Without the working firmware linux can not boot on arm.
-As of now he firmware is also checking temperature of the SOC itself and
-if it finds ?critical? temperatures it will clock down ARM and the GPU.
-
-Hope that this explains the ?firmware? on bcm2835.
-
->> 
->>>> +static int bcm2835_thermal_get_temp(struct thermal_zone_device *tz,
->>>> +				    int *temp)
->>>> +{
->>>> +	struct bcm2835_thermal_data *data = tz->devdata;
->>>> +	u32 val = readl(data->regs + BCM2835_TS_TSENSSTAT);
->>>> +
->>>> +	if (!(val & BCM2835_TS_TSENSSTAT_VALID))
->>> 
->>> What cases you would get the valid bit not set? Do you need to wait for
->>> the conversion to finish?
->> 
->> I guess: if you have just enabled the HW-block (which the FW does much
->> in advance) and start to read the value immediately (before the first sample
->> period has finished), then this will not be valid.
->> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> Then again, how does this driver make sure the initialization procedure
-> is correct, and that by the time it is using the hardware, the hardware
-> is in a sane state?
-> 
-> Back to the original question, does it mean the hardware is in
-> some sort of continuous ADC conversion mode or reading the temperature
-> requires specific steps to get the conversion done, and therefore you
-> are checking the valid bit here?
-
-As far as I understand the conversion is continuous (as soon as the HW is
-configured). This case is there primarily to handle the situation where
-we initialize the HW ourselves (see line 226 and below), and we immediately
-want to read the ADC value before the first conversion is finished.
-
-The above mentioned ?configuration if not running? reflect the values that
-the FW is currently setting. We should not change those values as long as the
-Firmware is also reading the temperature on its own.
-
-> 
->> So do you need another version of the patchset that uses that new API?
-> 
-> I think the API usage is change that can be done together with
-> clarification for the above questions too: on hardware state,
-> firmware loading, maybe a master driver dependency, and the ADC
-> conversion sequence, which are not well clear to me on this driver. As long as
-> this is clarified and documented in the code (can be simple comments so
-> it is clear to whoever reads in the future), then I would be OK with
-> this driver. 
-
-So how do you want this to get ?documented? in the driver?
-The setup and Firmware is a generic feature of the SOC, so if we would put
-some clarifications in this driver, then we would need to put it in every
-bcm283X driver (which seems unreasonable).
-
-Thanks,
-	Martin
