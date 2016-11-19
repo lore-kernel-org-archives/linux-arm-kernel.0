@@ -1,10 +1,10 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Nov 2016 18:33:19 -0800
+Date: Fri, 18 Nov 2016 18:35:04 -0800
 Subject: [GIT PULL 4/10] bus: Add Tegra GMI support
 In-Reply-To: <20161118161719.24153-4-thierry.reding@gmail.com>
 References: <20161118161719.24153-1-thierry.reding@gmail.com>
  <20161118161719.24153-4-thierry.reding@gmail.com>
-Message-ID: <20161119023319.GN2543@localhost>
+Message-ID: <20161119023504.GO2543@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -32,7 +32,7 @@ On Fri, Nov 18, 2016 at 05:17:13PM +0100, Thierry Reding wrote:
 > This provides a driver to enable the use of the Generic Memory Interface
 > found on Tegra SoCs that can host various types of high-speed devices.
 
-Merged, thanks.
+Merged, thanks!
 
 
 -Olof
