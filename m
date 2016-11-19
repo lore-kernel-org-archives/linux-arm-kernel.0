@@ -1,43 +1,46 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 19 Nov 2016 09:38:29 +0100
-Subject: [GIT PULL] ARM: mvebu: soc for v4.10 (#1)
-Message-ID: <874m33ampm.fsf@free-electrons.com>
+Date: Sat, 19 Nov 2016 09:45:05 +0100
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.10 (#2)
+Message-ID: <8737inamem.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Here is the first pull request for soc for mvebu for v4.10.
+Here is the second pull request for dt64 for mvebu for v4.10.
 
-On this PR there is only the removal part of the orion5x platform whcih
-was initially part of the "ARM: dt: orion5x: convert ls-chl to FDT"
-patch.
+This series was posted 2 weeks ago and actually should have been part
+of the first PR.
 
 Gregory
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+The following changes since commit e735aaf8fc4ac84dbdb3642a135da8dcdb84587b:
 
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+  arm64: dts: marvell: Add definition for the Globalscale Marvell ESPRESSOBin Board (2016-10-17 17:19:56 +0200)
 
 are available in the git repository at:
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-4.10-1
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.10-2
 
-for you to fetch changes up to ecfe69639157b6f70f53a7bc250efb4614c0eb31:
+for you to fetch changes up to 3684534548d4cbba7d3724b3d79152eff38dc82f:
 
-  ARM: orion5x: remove legacy support of ls-chl (2016-11-19 09:14:28 +0100)
-
-----------------------------------------------------------------
-mvebu soc for 4.10 (part 1)
-
-remove legacy support of orion5x ls-chl
+  ARM64: dts: marvell: Fixup memory DT warning for Armada 37xx (2016-11-19 09:39:07 +0100)
 
 ----------------------------------------------------------------
-Ashley Hughes (1):
-      ARM: orion5x: remove legacy support of ls-chl
+mvebu dt64 for 4.10 (part 2)
 
- arch/arm/mach-orion5x/Kconfig        |   7 -
- arch/arm/mach-orion5x/Makefile       |   1 -
- arch/arm/mach-orion5x/ls-chl-setup.c | 331 -----------------------------------
- 3 files changed, 339 deletions(-)
- delete mode 100644 arch/arm/mach-orion5x/ls-chl-setup.c
+Fix DTC warning on Armada 37xx and 7K/8K
+
+----------------------------------------------------------------
+Gregory CLEMENT (3):
+      arm64: dts: marvell: Fixup internal-regs DT warning for Armada 37xx
+      arm64: dts: marvell: Fixup config-space DT warning For Armada 7K/8K
+      ARM64: dts: marvell: Fixup memory DT warning for Armada 37xx
+
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts          | 2 +-
+ arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 2 +-
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi            | 2 +-
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi           | 2 +-
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi    | 2 +-
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi     | 2 +-
+ 6 files changed, 6 insertions(+), 6 deletions(-)
