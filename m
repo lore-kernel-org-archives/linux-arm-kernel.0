@@ -1,222 +1,133 @@
 From: wei@redhat.com (Wei Huang)
-Date: Fri, 18 Nov 2016 22:15:41 -0600
-Subject: [kvm-unit-tests PATCH v9 2/3] arm: pmu: Check cycle count increases
+Date: Fri, 18 Nov 2016 22:15:40 -0600
+Subject: [kvm-unit-tests PATCH v9 1/3] arm: Add PMU test
 In-Reply-To: <1479528942-21866-1-git-send-email-wei@redhat.com>
 References: <1479528942-21866-1-git-send-email-wei@redhat.com>
-Message-ID: <1479528942-21866-3-git-send-email-wei@redhat.com>
+Message-ID: <1479528942-21866-2-git-send-email-wei@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christopher Covington <cov@codeaurora.org>
 
-Ensure that reads of the PMCCNTR_EL0 are monotonically increasing,
-even for the smallest delta of two subsequent reads.
+Beginning with a simple sanity check of the control register, add
+a unit test for the ARM Performance Monitors Unit (PMU).
 
 Signed-off-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Wei Huang <wei@redhat.com>
+Reviewed-by: Andrew Jones <drjones@redhat.com>
 ---
- arm/pmu.c | 156 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 156 insertions(+)
+ arm/Makefile.common |  3 ++-
+ arm/pmu.c           | 74 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arm/unittests.cfg   |  5 ++++
+ 3 files changed, 81 insertions(+), 1 deletion(-)
+ create mode 100644 arm/pmu.c
 
+diff --git a/arm/Makefile.common b/arm/Makefile.common
+index ccb554d..f98f422 100644
+--- a/arm/Makefile.common
++++ b/arm/Makefile.common
+@@ -11,7 +11,8 @@ endif
+ 
+ tests-common = \
+ 	$(TEST_DIR)/selftest.flat \
+-	$(TEST_DIR)/spinlock-test.flat
++	$(TEST_DIR)/spinlock-test.flat \
++	$(TEST_DIR)/pmu.flat
+ 
+ all: test_cases
+ 
 diff --git a/arm/pmu.c b/arm/pmu.c
-index 9d9c53b..fa87de4 100644
---- a/arm/pmu.c
+new file mode 100644
+index 0000000..9d9c53b
+--- /dev/null
 +++ b/arm/pmu.c
-@@ -15,6 +15,9 @@
- #include "libcflat.h"
- #include "asm/barrier.h"
- 
-+#define PMU_PMCR_E         (1 << 0)
-+#define PMU_PMCR_C         (1 << 2)
-+#define PMU_PMCR_LC        (1 << 6)
- #define PMU_PMCR_N_SHIFT   11
- #define PMU_PMCR_N_MASK    0x1f
- #define PMU_PMCR_ID_SHIFT  16
-@@ -22,6 +25,14 @@
- #define PMU_PMCR_IMP_SHIFT 24
- #define PMU_PMCR_IMP_MASK  0xff
- 
-+#define ID_DFR0_PERFMON_SHIFT 24
-+#define ID_DFR0_PERFMON_MASK  0xf
-+
-+#define PMU_CYCLE_IDX         31
-+
-+#define NR_SAMPLES 10
-+
-+static unsigned int pmu_version;
- #if defined(__arm__)
- static inline uint32_t pmcr_read(void)
- {
-@@ -30,6 +41,69 @@ static inline uint32_t pmcr_read(void)
- 	asm volatile("mrc p15, 0, %0, c9, c12, 0" : "=r" (ret));
- 	return ret;
- }
-+
-+static inline void pmcr_write(uint32_t value)
-+{
-+ 	asm volatile("mcr p15, 0, %0, c9, c12, 0" : : "r" (value));
-+	isb();
-+}
-+
-+static inline void pmselr_write(uint32_t value)
-+{
-+	asm volatile("mcr p15, 0, %0, c9, c12, 5" : : "r" (value));
-+	isb();
-+}
-+
-+static inline void pmxevtyper_write(uint32_t value)
-+{
-+	asm volatile("mcr p15, 0, %0, c9, c13, 1" : : "r" (value));
-+}
-+
-+static inline uint64_t pmccntr_read(void)
-+{
-+	uint32_t lo, hi = 0;
-+
-+	if (pmu_version == 0x3)
-+		asm volatile("mrrc p15, 0, %0, %1, c9" : "=r" (lo), "=r" (hi));
-+	else
-+		asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r" (lo));
-+
-+	return ((uint64_t)hi << 32) | lo;
-+}
-+
-+static inline void pmccntr_write(uint64_t value)
-+{
-+	uint32_t lo, hi;
-+
-+	lo = value & 0xffffffff;
-+	hi = (value >> 32) & 0xffffffff;
-+
-+	if (pmu_version == 0x3)
-+		asm volatile("mcrr p15, 0, %0, %1, c9" : : "r" (lo), "r" (hi));
-+	else
-+		asm volatile("mcr p15, 0, %0, c9, c13, 0" : : "r" (lo));
-+}
-+
-+static inline void pmcntenset_write(uint32_t value)
-+{
-+	asm volatile("mcr p15, 0, %0, c9, c12, 1" : : "r" (value));
-+}
-+
-+/* PMCCFILTR is an obsolete name for PMXEVTYPER31 in ARMv7 */
-+static inline void pmccfiltr_write(uint32_t value)
-+{
-+	pmselr_write(PMU_CYCLE_IDX);
-+	pmxevtyper_write(value);
-+	isb();
-+}
-+
-+static inline uint32_t id_dfr0_read(void)
-+{
-+	uint32_t val;
-+
-+	asm volatile("mrc p15, 0, %0, c0, c1, 2" : "=r" (val));
-+	return val;
-+}
- #elif defined(__aarch64__)
- static inline uint32_t pmcr_read(void)
- {
-@@ -38,6 +112,44 @@ static inline uint32_t pmcr_read(void)
- 	asm volatile("mrs %0, pmcr_el0" : "=r" (ret));
- 	return ret;
- }
-+
-+static inline void pmcr_write(uint32_t value)
-+{
-+	asm volatile("msr pmcr_el0, %0" : : "r" (value));
-+	isb();
-+}
-+
-+static inline uint64_t pmccntr_read(void)
-+{
-+	uint64_t cycles;
-+
-+	asm volatile("mrs %0, pmccntr_el0" : "=r" (cycles));
-+	return cycles;
-+}
-+
-+static inline void pmccntr_write(uint64_t value)
-+{
-+	asm volatile("msr pmccntr_el0, %0" : : "r" (value));
-+}
-+
-+static inline void pmcntenset_write(uint32_t value)
-+{
-+	asm volatile("msr pmcntenset_el0, %0" : : "r" (value));
-+}
-+
-+static inline void pmccfiltr_write(uint32_t value)
-+{
-+	asm volatile("msr pmccfiltr_el0, %0" : : "r" (value));
-+	isb();
-+}
-+
-+static inline uint32_t id_dfr0_read(void)
-+{
-+	uint32_t id;
-+
-+	asm volatile("mrs %0, id_dfr0_el1" : "=r" (id));
-+	return id;
-+}
- #endif
- 
- /*
-@@ -64,11 +176,55 @@ static bool check_pmcr(void)
- 	return ((pmcr >> PMU_PMCR_IMP_SHIFT) & PMU_PMCR_IMP_MASK) != 0;
- }
- 
+@@ -0,0 +1,74 @@
 +/*
-+ * Ensure that the cycle counter progresses between back-to-back reads.
++ * Test the ARM Performance Monitors Unit (PMU).
++ *
++ * Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License version 2.1 and
++ * only version 2.1 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License
++ * for more details.
 + */
-+static bool check_cycles_increase(void)
++#include "libcflat.h"
++#include "asm/barrier.h"
++
++#define PMU_PMCR_N_SHIFT   11
++#define PMU_PMCR_N_MASK    0x1f
++#define PMU_PMCR_ID_SHIFT  16
++#define PMU_PMCR_ID_MASK   0xff
++#define PMU_PMCR_IMP_SHIFT 24
++#define PMU_PMCR_IMP_MASK  0xff
++
++#if defined(__arm__)
++static inline uint32_t pmcr_read(void)
 +{
-+	bool success = true;
++	uint32_t ret;
 +
-+	pmccntr_write(0);
-+	pmcr_write(pmcr_read() | PMU_PMCR_LC | PMU_PMCR_C | PMU_PMCR_E);
++	asm volatile("mrc p15, 0, %0, c9, c12, 0" : "=r" (ret));
++	return ret;
++}
++#elif defined(__aarch64__)
++static inline uint32_t pmcr_read(void)
++{
++	uint32_t ret;
 +
-+	for (int i = 0; i < NR_SAMPLES; i++) {
-+		uint64_t a, b;
++	asm volatile("mrs %0, pmcr_el0" : "=r" (ret));
++	return ret;
++}
++#endif
 +
-+		a = pmccntr_read();
-+		b = pmccntr_read();
++/*
++ * As a simple sanity check on the PMCR_EL0, ensure the implementer field isn't
++ * null. Also print out a couple other interesting fields for diagnostic
++ * purposes. For example, as of fall 2016, QEMU TCG mode doesn't implement
++ * event counters and therefore reports zero event counters, but hopefully
++ * support for at least the instructions event will be added in the future and
++ * the reported number of event counters will become nonzero.
++ */
++static bool check_pmcr(void)
++{
++	uint32_t pmcr;
 +
-+		if (a >= b) {
-+			printf("Read %"PRId64" then %"PRId64".\n", a, b);
-+			success = false;
-+			break;
-+		}
-+	}
++	pmcr = pmcr_read();
 +
-+	pmcr_write(pmcr_read() & ~PMU_PMCR_E);
++	printf("PMU implementer:     %c\n",
++	       (pmcr >> PMU_PMCR_IMP_SHIFT) & PMU_PMCR_IMP_MASK);
++	printf("Identification code: 0x%x\n",
++	       (pmcr >> PMU_PMCR_ID_SHIFT) & PMU_PMCR_ID_MASK);
++	printf("Event counters:      %d\n",
++	       (pmcr >> PMU_PMCR_N_SHIFT) & PMU_PMCR_N_MASK);
 +
-+	return success;
++	return ((pmcr >> PMU_PMCR_IMP_SHIFT) & PMU_PMCR_IMP_MASK) != 0;
 +}
 +
-+void pmu_init(void)
++int main(void)
 +{
-+	uint32_t dfr0;
++	report_prefix_push("pmu");
 +
-+	/* probe pmu version */
-+	dfr0 = id_dfr0_read();
-+	pmu_version = (dfr0 >> ID_DFR0_PERFMON_SHIFT) & ID_DFR0_PERFMON_MASK;
-+	printf("PMU version: %d\n", pmu_version);
-+	
-+	/* init for PMU event access, right now only care about cycle count */
-+	pmcntenset_write(1 << PMU_CYCLE_IDX);
-+	pmccfiltr_write(0); /* count cycles in EL0, EL1, but not EL2 */
++	report("Control register", check_pmcr());
++
++	return report_summary();
 +}
+diff --git a/arm/unittests.cfg b/arm/unittests.cfg
+index 3f6fa45..7645180 100644
+--- a/arm/unittests.cfg
++++ b/arm/unittests.cfg
+@@ -54,3 +54,8 @@ file = selftest.flat
+ smp = $MAX_SMP
+ extra_params = -append 'smp'
+ groups = selftest
 +
- int main(void)
- {
- 	report_prefix_push("pmu");
- 
-+	pmu_init();
- 	report("Control register", check_pmcr());
-+	report("Monotonically increasing cycle count", check_cycles_increase());
- 
- 	return report_summary();
- }
++# Test PMU support
++[pmu]
++file = pmu.flat
++groups = pmu
 -- 
 1.8.3.1
