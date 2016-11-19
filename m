@@ -1,46 +1,52 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 19 Nov 2016 09:45:05 +0100
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.10 (#2)
-Message-ID: <8737inamem.fsf@free-electrons.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 19 Nov 2016 10:51:37 +0100
+Subject: [GIT PULL v2] pxa-dt for v4.10
+Message-ID: <87mvgvsspi.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-Here is the second pull request for dt64 for mvebu for v4.10.
+Hi Arnd, Kevin, and Olof,
 
-This series was posted 2 weeks ago and actually should have been part
-of the first PR.
+This is the second iteration of the pxa pull request for 4.10 device-tree, with
+the patch subjects fixed.
 
-Gregory
+Can you please consider pulling ?
 
-The following changes since commit e735aaf8fc4ac84dbdb3642a135da8dcdb84587b:
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
-  arm64: dts: marvell: Add definition for the Globalscale Marvell ESPRESSOBin Board (2016-10-17 17:19:56 +0200)
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
 
 are available in the git repository at:
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.10-2
+  https://github.com/rjarzmik/linux.git tags/pxa-dt-4.10
 
-for you to fetch changes up to 3684534548d4cbba7d3724b3d79152eff38dc82f:
+for you to fetch changes up to 74e382b870caf297f4e1a727010c9a26cce6b6af:
 
-  ARM64: dts: marvell: Fixup memory DT warning for Armada 37xx (2016-11-19 09:39:07 +0100)
-
-----------------------------------------------------------------
-mvebu dt64 for 4.10 (part 2)
-
-Fix DTC warning on Armada 37xx and 7K/8K
+  ARM: dts: pxa: add pxa27x cpu operating points (2016-11-18 17:09:45 +0100)
 
 ----------------------------------------------------------------
-Gregory CLEMENT (3):
-      arm64: dts: marvell: Fixup internal-regs DT warning for Armada 37xx
-      arm64: dts: marvell: Fixup config-space DT warning For Armada 7K/8K
-      ARM64: dts: marvell: Fixup memory DT warning for Armada 37xx
+This device-tree pxa update brings :
+ - pxa25x support
+ - cpu operating points in preparation for cpufreq-dt
+ - small fixes
 
- arch/arm64/boot/dts/marvell/armada-3720-db.dts          | 2 +-
- arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 2 +-
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi            | 2 +-
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi           | 2 +-
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi    | 2 +-
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi     | 2 +-
- 6 files changed, 6 insertions(+), 6 deletions(-)
+----------------------------------------------------------------
+Robert Jarzmik (4):
+      ARM: dts: pxa: add pxa25x .dtsi file
+      ARM: dts: pxa: fix gpio0 and gpio1 interrupts
+      ARM: dts: pxa: add pxa25x cpu operating points
+      ARM: dts: pxa: add pxa27x cpu operating points
+
+Vijay Kumar (1):
+      ARM: dts: pxa: fix no. of gpio cells in the pxa gpio binding documentation
+
+ .../devicetree/bindings/gpio/mrvl-gpio.txt         |   6 +-
+ arch/arm/boot/dts/pxa25x.dtsi                      | 117 +++++++++++++++++++++
+ arch/arm/boot/dts/pxa27x.dtsi                      |  40 +++++++
+ arch/arm/boot/dts/pxa2xx.dtsi                      |   4 +-
+ 4 files changed, 163 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/boot/dts/pxa25x.dtsi
+
+-- 
+Robert
