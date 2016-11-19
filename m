@@ -1,44 +1,61 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sat, 19 Nov 2016 14:28:37 -0500
-Subject: [PATCH] dmaengine: qcom_hidma: autoload while probing ACPI
-Message-ID: <1479583718-2716-1-git-send-email-okaya@codeaurora.org>
+From: tomas.hlavacek@nic.cz (tomas.hlavacek at nic.cz)
+Date: Sat, 19 Nov 2016 21:09:07 +0100
+Subject: [PATCH RFC] ARM: dts: add support for Turris Omnia
+In-Reply-To: <20161114202832.GG24546@lunn.ch>
+References: <20161105203841.9661-1-uwe@kleine-koenig.org>
+ <1479126185.15557.5@smtp.gmail.com>
+ <20161114201640.rr32iyjf5a53v33t@perseus.defre.kleine-koenig.org>
+ <20161114202832.GG24546@lunn.ch>
+Message-ID: <1479586147.10840.0@smtp.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MODULE_DEVICE_TABLE is used by the kernel to determine which device driver
-should be loaded for which platform device. MODULE_DEVICE_TABLE has been
-only defined for the device-tree based platforms in the current code.
-Defining it also for ACPI based platforms.
+Hello Uwe!
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/dma/qcom/hidma.c      | 1 +
- drivers/dma/qcom/hidma_mgmt.c | 1 +
- 2 files changed, 2 insertions(+)
+On Mon, Nov 14, 2016 at 9:28 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> 
+>>  +               i2c at 7 {
+>>  +                       #address-cells = <1>;
+>>  +                       #size-cells = <0>;
+>>  +                       reg = <7>;
+>>  +
+>>  +                       pcawan: gpio at 71 {
+>>  +                               compatible = "nxp,pca9538";
+>>  +                               reg = <0x71>;
+>>  +
+>>  +                               pinctrl-names = "default";
+>>  +                               pinctrl-0 = <&pcawan_pins>;
+>>  +
+>>  +                               interrupt-parent = <&gpio1>;
+>>  +                               interrupts = <14 
+>> IRQ_TYPE_LEVEL_LOW>;
+>>  +
+>>  +                               gpio-controller;
+>>  +                               #gpio-cells = <2>;
+>>  +
+>>  +                               interrupt-controller;
+>>  +                               #interrupt-cells = <2>;
+>>  +                       };
+>>  +               };
+>> 
+>>  The interrupt-controller part doesn't seem to work though, at least
+>> 
+>>  +               interrupt-parent = <&pcawan>;
+>>  +               interrupts = <7 IRQ_TYPE_LEVEL_LOW>;
+>> 
+>>  in the phy node gives an error.
+> 
+> Interrupts don't seem to work very well with the nxp,pca9538. Which
+> is probably why it is disabled by default.
 
-diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
-index 248e74b..3c982c9 100644
---- a/drivers/dma/qcom/hidma.c
-+++ b/drivers/dma/qcom/hidma.c
-@@ -895,6 +895,7 @@ static int hidma_remove(struct platform_device *pdev)
- 	{"QCOM8062"},
- 	{},
- };
-+MODULE_DEVICE_TABLE(acpi, hidma_acpi_ids);
- #endif
- 
- static const struct of_device_id hidma_match[] = {
-diff --git a/drivers/dma/qcom/hidma_mgmt.c b/drivers/dma/qcom/hidma_mgmt.c
-index 985f5ac..f847d32 100644
---- a/drivers/dma/qcom/hidma_mgmt.c
-+++ b/drivers/dma/qcom/hidma_mgmt.c
-@@ -282,6 +282,7 @@ static int hidma_mgmt_probe(struct platform_device *pdev)
- 	{"QCOM8060"},
- 	{},
- };
-+MODULE_DEVICE_TABLE(acpi, hidma_mgmt_acpi_ids);
- #endif
- 
- static const struct of_device_id hidma_mgmt_match[] = {
--- 
-1.9.1
+I was thinking about this issue and I can remember that there was an 
+earlier prototype that had a shared interrupt line from PHY (88E1514) 
+and from the PCA9538. In this case we needed to specifically disable 
+the interrupt of the PHY to release the interrupt line (which needed a 
+hack into PHY driver code). The IRQ from PHY is connected as an 
+ordinary input to PCA9538 in later board prototype. And the same holds 
+for the production version.
+
+Do you have CZ11NIC13 or older board revision?
+
+Tomas
