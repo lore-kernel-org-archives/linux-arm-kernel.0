@@ -1,62 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Nov 2016 18:02:48 -0800
-Subject: [GIT PULL 2/2] ARM: dts: exynos: Topic dts for v4.10
-In-Reply-To: <1479473075-9787-2-git-send-email-krzk@kernel.org>
-References: <1479473075-9787-1-git-send-email-krzk@kernel.org>
- <1479473075-9787-2-git-send-email-krzk@kernel.org>
-Message-ID: <20161119020248.GJ2543@localhost>
+Date: Fri, 18 Nov 2016 18:27:42 -0800
+Subject: [GIT PULL 1/10] mailbox: Add Tegra HSP driver
+In-Reply-To: <20161118161719.24153-1-thierry.reding@gmail.com>
+References: <20161118161719.24153-1-thierry.reding@gmail.com>
+Message-ID: <20161119022742.GK2543@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 02:44:35PM +0200, Krzysztof Kozlowski wrote:
-> Hi,
-> 
-> 
-> Topic branch with a GIC interrupt fixes and cleanup (human-friendly symbols).
-> 
-> Possible rather trivial conflicts:
-> 
-> diff --cc arch/arm/boot/dts/exynos4x12.dtsi
-> index 0074f566cd3b,505f047e81c6..85a7122658f1
-> --- a/arch/arm/boot/dts/exynos4x12.dtsi
-> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
-> @@@ -147,9 -147,10 +147,10 @@@
->                 };
->   
->                 fimc_is: fimc-is at 12000000 {
->  -                      compatible = "samsung,exynos4212-fimc-is", "simple-bus";
->  +                      compatible = "samsung,exynos4212-fimc-is";
->                         reg = <0x12000000 0x260000>;
-> -                       interrupts = <0 90 0>, <0 95 0>;
-> +                       interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>;
->                         power-domains = <&pd_isp>;
->                         clocks = <&clock CLK_FIMC_LITE0>,
->                                  <&clock CLK_FIMC_LITE1>, <&clock CLK_PPMUISPX>,
-> 
-> diff --cc arch/arm/boot/dts/exynos5410.dtsi
-> index 9a91685d8890,2501249d97aa..bb90bbdbe2d9
-> --- a/arch/arm/boot/dts/exynos5410.dtsi
-> +++ b/arch/arm/boot/dts/exynos5410.dtsi
-> @@@ -190,58 -181,8 +190,58 @@@
->                 pinctrl_3: pinctrl at 03860000 {
->                         compatible = "samsung,exynos5410-pinctrl";
->                         reg = <0x03860000 0x1000>;
-> -                       interrupts = <0 47 0>;
-> +                       interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
->                 };
->  +
->  +              amba {
->  +                      #address-cells = <1>;
->  +                      #size-cells = <1>;
->  +                      compatible = "simple-bus";
->  +                      interrupt-parent = <&gic>;
->  +                      ranges;
-> 
-> 
-> Best regards,
-> Krzysztof
-> 
+Hi,
+
+On Fri, Nov 18, 2016 at 05:17:10PM +0100, Thierry Reding wrote:
+> Hi ARM SoC maintainers,
 > 
 > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 > 
@@ -64,26 +18,37 @@ On Fri, Nov 18, 2016 at 02:44:35PM +0200, Krzysztof Kozlowski wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-gic-flags-4.10
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.10-mailbox
 > 
-> for you to fetch changes up to 04a886727ca7e841afa2fbc5d87aff81ae256dbf:
+> for you to fetch changes up to 68050eb6c611527232fe5574c7306e97e47499ef:
 > 
->   ARM: dts: exynos: Use human-friendly symbols for interrupt properties in exynos5440 (2016-11-03 22:44:56 +0200)
+>   mailbox: tegra-hsp: Use after free in tegra_hsp_remove_doorbells() (2016-11-18 14:32:13 +0100)
+> 
+> Thanks,
+> Thierry
 > 
 > ----------------------------------------------------------------
-> Topic branch with DT changes for v4.10.
+> mailbox: Add Tegra HSP driver
 > 
-> Fix invalid GIC interrupt flags - type IRQ_TYPE_NONE is not allowed for GIC
-> interrupts.  Although this was working but with error messages like:
-> 	genirq: Setting trigger mode 0 for irq 16 failed
+> This contains the device tree bindings and a driver for the Tegra HSP, a
+> hardware block that provides hardware synchronization primitives and is
+> the foundation for inter-processor communication between CPU and BPMP.
 > 
-> Use level high interrupt instead of type none.  The choice of level high was
-> rather an arbitrary decision hoping it will work on each platform.  Tests shown
-> no issues so far.
+> ----------------------------------------------------------------
+> Dan Carpenter (1):
+>       mailbox: tegra-hsp: Use after free in tegra_hsp_remove_doorbells()
+> 
+> Joseph Lo (2):
+>       soc/tegra: Add Tegra186 support
 
-Merged, thanks. FYI, you could have based this on the previous DT branch
-if you wanted to not expose the conflicts, but simple ones like these
-(in particular that we can resolve in our own tree) are OK to expose too.
+I don't think you really needed to merge this in here, since all you need it
+for is to fulfill the kconfig dependency and enable the driver, right? That'd
+happen when the driver and soc branch is merged at the toplevel anyway.
+
+
+Anyhow, no damage done, I've merged this in. I would say that it'd be a little
+more logical to send the SoC branch before the driver branch given this
+dependency though.
 
 
 -Olof
