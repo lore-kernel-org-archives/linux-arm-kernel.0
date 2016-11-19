@@ -1,42 +1,34 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 19 Nov 2016 16:48:29 +0200
-Subject: [PATCH 4/6] ASoC: samsung: Enable COMPILE_TEST for SmartQ and WM8580
+Date: Sat, 19 Nov 2016 16:48:30 +0200
+Subject: [PATCH 5/6] ASoC: samsung: Enable COMPILE_TEST for entire Samsung ASoc
 In-Reply-To: <1479566911-5580-1-git-send-email-krzk@kernel.org>
 References: <1479566911-5580-1-git-send-email-krzk@kernel.org>
-Message-ID: <1479566911-5580-5-git-send-email-krzk@kernel.org>
+Message-ID: <1479566911-5580-6-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The I2S sound drivers for SmartQ board and WM8580 codec can be compile
+Instead of build time, Samsung ASoC drivers have rather runtime
+dependency on Exynos or other Samsung platforms.  For building they
+require Common Clock Framework.  If it is provided they could be compile
 tested to increase build coverage.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- sound/soc/samsung/Kconfig | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ sound/soc/samsung/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index ea0fa9971a0c..426ef1c7b265 100644
+index 426ef1c7b265..a6cc6ca93fa7 100644
 --- a/sound/soc/samsung/Kconfig
 +++ b/sound/soc/samsung/Kconfig
-@@ -49,7 +49,7 @@ config SND_SOC_SAMSUNG_JIVE_WM8750
- 
- config SND_SOC_SAMSUNG_SMDK_WM8580
- 	tristate "SoC I2S Audio support for WM8580 on SMDK"
--	depends on MACH_SMDK6410
-+	depends on MACH_SMDK6410 || COMPILE_TEST
- 	depends on I2C
- 	select SND_SOC_WM8580
- 	select SND_SAMSUNG_I2S
-@@ -109,7 +109,8 @@ config SND_SOC_SAMSUNG_RX1950_UDA1380
- 
- config SND_SOC_SMARTQ
- 	tristate "SoC I2S Audio support for SmartQ board"
--	depends on MACH_SMARTQ && I2C
-+	depends on MACH_SMARTQ || COMPILE_TEST
-+	depends on I2C
- 	select SND_SAMSUNG_I2S
- 	select SND_SOC_WM8750
- 
+@@ -1,6 +1,7 @@
+ menuconfig SND_SOC_SAMSUNG
+ 	tristate "ASoC support for Samsung"
+-	depends on (PLAT_SAMSUNG || ARCH_EXYNOS)
++	depends on PLAT_SAMSUNG || ARCH_EXYNOS || COMPILE_TEST
++	depends on COMMON_CLK
+ 	select SND_SOC_GENERIC_DMAENGINE_PCM
+ 	---help---
+ 	  Say Y or M if you want to add support for codecs attached to
 -- 
 2.7.4
