@@ -1,133 +1,111 @@
-From: wei@redhat.com (Wei Huang)
-Date: Fri, 18 Nov 2016 22:15:40 -0600
-Subject: [kvm-unit-tests PATCH v9 1/3] arm: Add PMU test
-In-Reply-To: <1479528942-21866-1-git-send-email-wei@redhat.com>
-References: <1479528942-21866-1-git-send-email-wei@redhat.com>
-Message-ID: <1479528942-21866-2-git-send-email-wei@redhat.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Fri, 18 Nov 2016 20:22:25 -0800
+Subject: [PATCH V8 2/6] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <7957B3CC-0E18-4B27-82EB-EF88B7695E28@martin.sperl.org>
+References: <1478081906-12009-1-git-send-email-kernel@martin.sperl.org>
+ <1478081906-12009-3-git-send-email-kernel@martin.sperl.org>
+ <20161117021107.GA2647@localhost.localdomain>
+ <766e1b70-d83a-eb52-fa2b-aec435e85673@martin.sperl.org>
+ <20161117151019.GA3115@localhost.localdomain>
+ <7957B3CC-0E18-4B27-82EB-EF88B7695E28@martin.sperl.org>
+Message-ID: <20161119042224.GA25063@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christopher Covington <cov@codeaurora.org>
+Hello Martin,
 
-Beginning with a simple sanity check of the control register, add
-a unit test for the ARM Performance Monitors Unit (PMU).
+Thanks for your patience to take the time to explain to me how the
+firmware/linux split is done in your platform. Still, one thing is not
+clear to me.
 
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
-Signed-off-by: Wei Huang <wei@redhat.com>
-Reviewed-by: Andrew Jones <drjones@redhat.com>
----
- arm/Makefile.common |  3 ++-
- arm/pmu.c           | 74 +++++++++++++++++++++++++++++++++++++++++++++++++++++
- arm/unittests.cfg   |  5 ++++
- 3 files changed, 81 insertions(+), 1 deletion(-)
- create mode 100644 arm/pmu.c
+On Fri, Nov 18, 2016 at 09:32:47AM +0100, kernel at martin.sperl.org wrote:
+> 
 
-diff --git a/arm/Makefile.common b/arm/Makefile.common
-index ccb554d..f98f422 100644
---- a/arm/Makefile.common
-+++ b/arm/Makefile.common
-@@ -11,7 +11,8 @@ endif
- 
- tests-common = \
- 	$(TEST_DIR)/selftest.flat \
--	$(TEST_DIR)/spinlock-test.flat
-+	$(TEST_DIR)/spinlock-test.flat \
-+	$(TEST_DIR)/pmu.flat
- 
- all: test_cases
- 
-diff --git a/arm/pmu.c b/arm/pmu.c
-new file mode 100644
-index 0000000..9d9c53b
---- /dev/null
-+++ b/arm/pmu.c
-@@ -0,0 +1,74 @@
-+/*
-+ * Test the ARM Performance Monitors Unit (PMU).
-+ *
-+ * Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU Lesser General Public License version 2.1 and
-+ * only version 2.1 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License
-+ * for more details.
-+ */
-+#include "libcflat.h"
-+#include "asm/barrier.h"
-+
-+#define PMU_PMCR_N_SHIFT   11
-+#define PMU_PMCR_N_MASK    0x1f
-+#define PMU_PMCR_ID_SHIFT  16
-+#define PMU_PMCR_ID_MASK   0xff
-+#define PMU_PMCR_IMP_SHIFT 24
-+#define PMU_PMCR_IMP_MASK  0xff
-+
-+#if defined(__arm__)
-+static inline uint32_t pmcr_read(void)
-+{
-+	uint32_t ret;
-+
-+	asm volatile("mrc p15, 0, %0, c9, c12, 0" : "=r" (ret));
-+	return ret;
-+}
-+#elif defined(__aarch64__)
-+static inline uint32_t pmcr_read(void)
-+{
-+	uint32_t ret;
-+
-+	asm volatile("mrs %0, pmcr_el0" : "=r" (ret));
-+	return ret;
-+}
-+#endif
-+
-+/*
-+ * As a simple sanity check on the PMCR_EL0, ensure the implementer field isn't
-+ * null. Also print out a couple other interesting fields for diagnostic
-+ * purposes. For example, as of fall 2016, QEMU TCG mode doesn't implement
-+ * event counters and therefore reports zero event counters, but hopefully
-+ * support for at least the instructions event will be added in the future and
-+ * the reported number of event counters will become nonzero.
-+ */
-+static bool check_pmcr(void)
-+{
-+	uint32_t pmcr;
-+
-+	pmcr = pmcr_read();
-+
-+	printf("PMU implementer:     %c\n",
-+	       (pmcr >> PMU_PMCR_IMP_SHIFT) & PMU_PMCR_IMP_MASK);
-+	printf("Identification code: 0x%x\n",
-+	       (pmcr >> PMU_PMCR_ID_SHIFT) & PMU_PMCR_ID_MASK);
-+	printf("Event counters:      %d\n",
-+	       (pmcr >> PMU_PMCR_N_SHIFT) & PMU_PMCR_N_MASK);
-+
-+	return ((pmcr >> PMU_PMCR_IMP_SHIFT) & PMU_PMCR_IMP_MASK) != 0;
-+}
-+
-+int main(void)
-+{
-+	report_prefix_push("pmu");
-+
-+	report("Control register", check_pmcr());
-+
-+	return report_summary();
-+}
-diff --git a/arm/unittests.cfg b/arm/unittests.cfg
-index 3f6fa45..7645180 100644
---- a/arm/unittests.cfg
-+++ b/arm/unittests.cfg
-@@ -54,3 +54,8 @@ file = selftest.flat
- smp = $MAX_SMP
- extra_params = -append 'smp'
- groups = selftest
-+
-+# Test PMU support
-+[pmu]
-+file = pmu.flat
-+groups = pmu
--- 
-1.8.3.1
+> The way that firmware works on the RPI is quite different from most others I guess.
+> in principle you got 2 different CPUs on the bcm2835:
+> * ARM, which runs the linux instance
+> * VideoCore 4, which runs the firmware (loading from SD initially) and
+>   then booting the ARM.
+> 
+> So this Firmware on VC4 is the one that I am talking about.
+> Without the working firmware linux can not boot on arm.
+
+Given that "without the working firmware linux can not boot on arm",
+
+(...)
+
+> As far as I understand the conversion is continuous (as soon as the HW is
+> configured). This case is there primarily to handle the situation where
+> we initialize the HW ourselves (see line 226 and below), and we immediately
+
+and around line 226 we have the comment:
++       /*
++        * right now the FW does set up the HW-block, so we are not
++        * touching the configuration registers.
++        * But if the HW is not enabled, then set it up
++        * using "sane" values used by the firmware right now.
++        */
+
+
+> want to read the ADC value before the first conversion is finished.
+> 
+
+then, does the firmware initializes the device or not?
+
+What are the cases you would load this driver but still get an
+uninitialized device? That looks like some bug workaround hidden
+somewhere. Do system integrators/engineers need to be aware of this w/a?
+Would the driver work right aways when the subsystem is loaded during
+boot? How about module insertion?
+
+
+Who has the ownership of this device?
+
+> The above mentioned ?configuration if not running? reflect the values that
+> the FW is currently setting. We should not change those values as long as the
+> Firmware is also reading the temperature on its own.
+
+hmm.. that looks like racy to me. Again, How do you synchronize accesses to
+this device? What if you configure the device and right after the
+firmware updates the configs? How do you make sure the configs you are
+writing here are the same used by the firmware? What if the firmware
+version changes? What versions of the firmware does this driver support?
+
+Would it make sense to simply always initialize the device? Do you have
+a way to tell the firmware that it should not use the device?
+
+Or, if you want to keep the device driver simply being a dummy reader,
+would it make sense to simply avoid writing configurations to the
+device, and simply retry to check if the firmware gets the device
+initialized?
+
+> 
+> > 
+> >> So do you need another version of the patchset that uses that new API?
+> > 
+> > I think the API usage is change that can be done together with
+> > clarification for the above questions too: on hardware state,
+> > firmware loading, maybe a master driver dependency, and the ADC
+> > conversion sequence, which are not well clear to me on this driver. As long as
+> > this is clarified and documented in the code (can be simple comments so
+> > it is clear to whoever reads in the future), then I would be OK with
+> > this driver. 
+> 
+> So how do you want this to get ?documented? in the driver?
+> The setup and Firmware is a generic feature of the SOC, so if we would put
+> some clarifications in this driver, then we would need to put it in every
+> bcm283X driver (which seems unreasonable).
+> 
+
+I think a simple comment explaining the firmware dependency and the
+expected pre-conditions to get this driver working in a sane state would
+do it.
+
+A better device initialization would also be appreciated. Based on my
+limited understanding of this platform, and your explanations, this
+device seams to have a serious race condition with firmware while
+accessing this device.
+
+> Thanks,
+> 	Martin
