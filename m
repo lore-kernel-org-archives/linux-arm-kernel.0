@@ -1,33 +1,35 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 19 Nov 2016 16:48:31 +0200
-Subject: [PATCH 6/6] ARM: s5pv210_defconfig: Remove old MACHs
-In-Reply-To: <1479566911-5580-1-git-send-email-krzk@kernel.org>
-References: <1479566911-5580-1-git-send-email-krzk@kernel.org>
-Message-ID: <1479566911-5580-7-git-send-email-krzk@kernel.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 19 Nov 2016 16:19:08 +0100
+Subject: [GIT PULL] Integrator DTS and defconfig changes
+In-Reply-To: <20161118175301.GA8882@localhost>
+References: <CACRpkdara5D=kvGVYu-WRh_JYK6Z9NKmQ-eniXsauxdzx-QJbA@mail.gmail.com>
+ <20161118072506.GC1785@localhost>
+ <CACRpkdYoornJx1fTN1C5OiR16w9DbTcr9ze4gc9PLkt7LCqqCQ@mail.gmail.com>
+ <20161118175301.GA8882@localhost>
+Message-ID: <CACRpkdboZ-TwoHCUy5YFgzUoXbwWEYuSE8kdtAie51spPtZ1rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove non-existing MACH symbols from S5PV210 defconfig.
+On Fri, Nov 18, 2016 at 6:53 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Fri, Nov 18, 2016 at 09:26:56AM +0100, Linus Walleij wrote:
+>> On Fri, Nov 18, 2016 at 8:25 AM, Olof Johansson <olof@lixom.net> wrote:
+>>
+>> > I also sympathize that it's extra annoying having to split just three
+>> > patches across two branches. So, if it's easier we can just cherry-pick
+>> > apart the patches here across the branches (your comment about next
+>> > coverage makes me suspect you have no direct downstream users of this
+>> > branch). If that's OK, let me know and I'll do that tomorrow.
+>>
+>> It's fine to cherry-pick, I can also send two separate branches (or
+>> just 2+1 stand-alone patches).
+>>
+>> Any way you like it :) just tell me what to do, all I want is to get this
+>> in for v4.10.
+>
+> Cherry-picking is actually faster on our side than merging, so I've done that
+> now. Queued into next/dt and next/defconfig for 4.10.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- arch/arm/configs/s5pv210_defconfig | 4 ----
- 1 file changed, 4 deletions(-)
+Thanks Olof, much appreciated!
 
-diff --git a/arch/arm/configs/s5pv210_defconfig b/arch/arm/configs/s5pv210_defconfig
-index fa989902236d..c51f0f02012b 100644
---- a/arch/arm/configs/s5pv210_defconfig
-+++ b/arch/arm/configs/s5pv210_defconfig
-@@ -9,10 +9,6 @@ CONFIG_ARCH_S5PV210=y
- CONFIG_S3C_LOWLEVEL_UART_PORT=1
- CONFIG_S3C_DEV_FB=y
- CONFIG_S5PV210_SETUP_FB_24BPP=y
--CONFIG_MACH_AQUILA=y
--CONFIG_MACH_GONI=y
--CONFIG_MACH_SMDKC110=y
--CONFIG_MACH_SMDKV210=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_VMSPLIT_2G=y
--- 
-2.7.4
+Yours,
+Linus Walleij
