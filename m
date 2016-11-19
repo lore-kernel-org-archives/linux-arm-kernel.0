@@ -1,37 +1,37 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 19 Nov 2016 12:21:55 +0000
-Subject: [PATCH v3 4/6] ARM: configs: stm32: enable ADC driver
-In-Reply-To: <1479223861-21747-5-git-send-email-fabrice.gasnier@st.com>
-References: <1479223861-21747-1-git-send-email-fabrice.gasnier@st.com>
- <1479223861-21747-5-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <3f6d8fdd-31ed-06a1-22c0-ce6f06dead81@kernel.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sat, 19 Nov 2016 16:48:25 +0200
+Subject: [PATCH 0/6] ASoC: samsung: Minor cleanup for old machines
+Message-ID: <1479566911-5580-1-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/11/16 15:30, Fabrice Gasnier wrote:
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-The driver is now on it's way in.  I'm assuming this and the two device tree patches
-will go via the relevant route to arm-soc.
+Hi,
 
-Thanks,
+Few patches removing dead code (machines not supported).
 
-Jonathan
-> ---
->  arch/arm/configs/stm32_defconfig | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-> index 1e5ec2a..5d241e0 100644
-> --- a/arch/arm/configs/stm32_defconfig
-> +++ b/arch/arm/configs/stm32_defconfig
-> @@ -57,6 +57,9 @@ CONFIG_LEDS_TRIGGERS=y
->  CONFIG_LEDS_TRIGGER_HEARTBEAT=y
->  CONFIG_DMADEVICES=y
->  CONFIG_STM32_DMA=y
-> +CONFIG_IIO=y
-> +CONFIG_STM32_ADC_CORE=y
-> +CONFIG_STM32_ADC=y
->  # CONFIG_FILE_LOCKING is not set
->  # CONFIG_DNOTIFY is not set
->  # CONFIG_INOTIFY_USER is not set
-> 
+The third patch ([RFT 3/6] ASoC: samsung: smdk_wm8580: Remove machine
+specific quirks) requires testing. I hope I understood the code
+correctly.
+
+The last ARM patch is independent. I will take it through samsung-soc
+tree. I put it here for reference.
+
+Best regards,
+Krzysztof
+
+Krzysztof Kozlowski (6):
+  ASoC: samsung: Remove non-existing MACH dependencies
+  ASoC: samsung: smdk_wm8580: Remove old platforms and drop mach-types
+    usage
+  ASoC: samsung: smdk_wm8580: Remove machine specific quirks
+  ASoC: samsung: Enable COMPILE_TEST for SmartQ and WM8580
+  ASoC: samsung: Enable COMPILE_TEST for entire Samsung ASoc
+  ARM: s5pv210_defconfig: Remove old MACHs
+
+ arch/arm/configs/s5pv210_defconfig |  4 ----
+ sound/soc/samsung/Kconfig          |  8 +++++---
+ sound/soc/samsung/smdk_wm8580.c    | 17 ++---------------
+ 3 files changed, 7 insertions(+), 22 deletions(-)
+
+-- 
+2.7.4
