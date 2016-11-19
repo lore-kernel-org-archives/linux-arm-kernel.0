@@ -1,69 +1,158 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Fri, 18 Nov 2016 23:57:11 -0600
-Subject: [GIT PULL v2] Qualcomm Device Tree Changes for v4.10
-Message-ID: <1479535031-14817-1-git-send-email-andy.gross@linaro.org>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Fri, 18 Nov 2016 22:42:32 -0800
+Subject: [PATCH] ARM: dts: msm8916: Add and enable wcnss node
+Message-ID: <1479537752-28567-1-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+Add the wcnss remoteproc node the SMD edge and the wcnss ctrl, bluetooth
+and wifi nodes specified and enable this on db410c.
 
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
 
-are available in the git repository at:
+This still require the last wcn36xx and scm-interrupted patches to land, but as
+those won't affect the dts I'm posting this anyway.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-dts-for-4.10-1
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi  |  4 ++
+ arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 13 ++++++
+ arch/arm64/boot/dts/qcom/msm8916.dtsi      | 73 +++++++++++++++++++++++++++++-
+ 3 files changed, 89 insertions(+), 1 deletion(-)
 
-for you to fetch changes up to 4c52ffc708c90b2985f941db5490145530e4df69:
-
-  ARM: dts: add SMSC ethernet on the APQ8060 Dragonboard (2016-11-18 23:30:32 -0600)
-
-----------------------------------------------------------------
-Qualcomm Device Tree Changes for v4.10 - v2
-
-* Add EBI2 support to MSM8660
-* Add SMSC ethernet support to APQ8060
-* Add support for display, pstore, iommu, and hdmi to APQ8064
-* Add SDHCI node to MSM8974 Hammerhead
-* Add WP8548 MangOH board support (MDM9615)
-
-----------------------------------------------------------------
-Archit Taneja (2):
-      arm: dts: qcom: apq8064: Add display DT nodes
-      arm: dts: qcom: apq8064-ifc6410: Add HDMI support
-
-Bhushan Shah (1):
-      ARM: dts: qcom: msm8974-hammerhead: Add sdhci1 node
-
-John Stultz (3):
-      arm: dts: qcom: apq8064: Add dsi, gpu and iommu nodes
-      arm: dts: qcom: apq8064-nexus7: Add DSI and panel nodes
-      arm: dts: qcom: apq8064-nexus7: Add pstore support to nexus7
-
-Linus Walleij (2):
-      ARM: dts: add EBI2 to the Qualcomm MSM8660 DTSI
-      ARM: dts: add SMSC ethernet on the APQ8060 Dragonboard
-
-Neil Armstrong (5):
-      ARM: dts: Add MDM9615 dtsi
-      dt-bindings: qcom: Add MDM9615 bindings
-      ARM: dts: Add Sierra Wireless WP8548 dtsi
-      ARM: dts: Add WP8548 based MangOH Green board DTS
-      dt-bindings: arm: Add Sierra Wireless modules bindings
-
- Documentation/devicetree/bindings/arm/qcom.txt     |   1 +
- Documentation/devicetree/bindings/arm/swir.txt     |  12 +
- arch/arm/boot/dts/Makefile                         |   3 +-
- arch/arm/boot/dts/qcom-apq8060-dragonboard.dts     | 119 +++++
- arch/arm/boot/dts/qcom-apq8064-asus-nexus7-flo.dts |  77 ++-
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts         |  74 +++
- arch/arm/boot/dts/qcom-apq8064.dtsi                | 321 ++++++++++++
- .../boot/dts/qcom-mdm9615-wp8548-mangoh-green.dts  | 281 +++++++++++
- arch/arm/boot/dts/qcom-mdm9615-wp8548.dtsi         | 170 +++++++
- arch/arm/boot/dts/qcom-mdm9615.dtsi                | 557 +++++++++++++++++++++
- arch/arm/boot/dts/qcom-msm8660.dtsi                |  17 +
- .../dts/qcom-msm8974-lge-nexus5-hammerhead.dts     |  29 ++
- 12 files changed, 1658 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/swir.txt
- create mode 100644 arch/arm/boot/dts/qcom-mdm9615-wp8548-mangoh-green.dts
- create mode 100644 arch/arm/boot/dts/qcom-mdm9615-wp8548.dtsi
- create mode 100644 arch/arm/boot/dts/qcom-mdm9615.dtsi
+diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+index 08bd5ebafb4e..716d3ccbc309 100644
+--- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+@@ -306,6 +306,10 @@
+                                 };
+                         };
+                 };
++
++		wcnss at a21b000 {
++			status = "okay";
++		};
+ 	};
+ 
+ 	usb2513 {
+diff --git a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
+index 10c83e11c272..4cb0b5834143 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
+@@ -720,4 +720,17 @@
+ 			};
+ 		};
+ 	};
++
++	wcnss_pin_a: wcnss-active {
++		pinmux {
++			pins = "gpio40", "gpio41", "gpio42", "gpio43", "gpio44";
++			function = "wcss_wlan";
++		};
++
++		pinconf {
++			pins = "gpio40", "gpio41", "gpio42", "gpio43", "gpio44";
++			drive-strength = <6>;
++			bias-pull-up;
++		};
++	};
+ };
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 4221b7d2c0ce..2c692650ae43 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -14,6 +14,7 @@
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/clock/qcom,gcc-msm8916.h>
+ #include <dt-bindings/reset/qcom,gcc-msm8916.h>
++#include <dt-bindings/clock/qcom,rpmcc.h>
+ 
+ / {
+ 	model = "Qualcomm Technologies, Inc. MSM8916";
+@@ -82,7 +83,7 @@
+ 			no-map;
+ 		};
+ 
+-		wcnss at 89300000 {
++		wcnss_mem: wcnss at 89300000 {
+ 			reg = <0x0 0x89300000 0x0 0x600000>;
+ 			no-map;
+ 		};
+@@ -853,6 +854,76 @@
+ 				memory-region = <&mpss_mem>;
+ 			};
+ 		};
++
++		pronto: wcnss at a21b000 {
++			compatible = "qcom,pronto-v2-pil", "qcom,pronto";
++			reg = <0x0a204000 0x2000>, <0x0a202000 0x1000>, <0x0a21b000 0x3000>;
++			reg-names = "ccu", "dxe", "pmu";
++
++			memory-region = <&wcnss_mem>;
++
++			interrupts-extended = <&intc 0 149 IRQ_TYPE_EDGE_RISING>,
++					      <&wcnss_smp2p_in 0 IRQ_TYPE_EDGE_RISING>,
++					      <&wcnss_smp2p_in 1 IRQ_TYPE_EDGE_RISING>,
++					      <&wcnss_smp2p_in 2 IRQ_TYPE_EDGE_RISING>,
++					      <&wcnss_smp2p_in 3 IRQ_TYPE_EDGE_RISING>;
++			interrupt-names = "wdog", "fatal", "ready", "handover", "stop-ack";
++
++			vddmx-supply = <&pm8916_l3>;
++			vddpx-supply = <&pm8916_l7>;
++
++			qcom,state = <&wcnss_smp2p_out 0>;
++			qcom,state-names = "stop";
++
++			pinctrl-names = "default";
++			pinctrl-0 = <&wcnss_pin_a>;
++
++			status = "disabled";
++
++			iris {
++				compatible = "qcom,wcn3620";
++
++				clocks = <&rpmcc RPM_SMD_RF_CLK2>;
++				clock-names = "xo";
++
++				vddxo-supply = <&pm8916_l7>;
++				vddrfa-supply = <&pm8916_s3>;
++				vddpa-supply = <&pm8916_l9>;
++				vdddig-supply = <&pm8916_l5>;
++			};
++
++			smd-edge {
++				interrupts = <0 142 1>;
++
++				qcom,ipc = <&apcs 8 17>;
++				qcom,smd-edge = <6>;
++				qcom,remote-pid = <4>;
++
++				label = "pronto";
++
++				wcnss {
++					compatible = "qcom,wcnss";
++					qcom,smd-channels = "WCNSS_CTRL";
++
++					qcom,mmio = <&pronto>;
++
++					bt {
++						compatible = "qcom,wcnss-bt";
++					};
++
++					wifi {
++						compatible = "qcom,wcnss-wlan";
++
++						interrupts = <0 145 IRQ_TYPE_LEVEL_HIGH>,
++							     <0 146 IRQ_TYPE_LEVEL_HIGH>;
++						interrupt-names = "tx", "rx";
++
++						qcom,smem-states = <&apps_smsm 10>, <&apps_smsm 9>;
++						qcom,smem-state-names = "tx-enable", "tx-rings-empty";
++					};
++				};
++			};
++		};
+ 	};
+ 
+ 	smd {
+-- 
+2.5.0
