@@ -1,135 +1,61 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 18 Nov 2016 17:18:25 -0800
+Date: Fri, 18 Nov 2016 17:23:22 -0800
 Subject: specifying order of /dev/mmcblk devices via device-tree?
-In-Reply-To: <20161115235503.GC1041@n2100.armlinux.org.uk>
+In-Reply-To: <CAPDyKFrpqmvVAKsfQBP1m7vdOjPRx7puVkmmCe3yxe1gVFwgzw@mail.gmail.com>
 References: <CAJ+vNU1g8nQedd06LeaD10YWUQ_UmdRToUMFKaTNT1aNY56b0g@mail.gmail.com>
  <20161028153755.GL5806@leverpostej>
- <CAJ+vNU26tx-1bLKNpzYJ0UCeFJ-SczZOca1dYdt5mCGDxAuKTQ@mail.gmail.com>
- <20161114190839.GS1041@n2100.armlinux.org.uk>
- <CAJ+vNU38XQBHt709S_z6Quvce6wcqLzRHFuN_bVZ_0eARa3=fw@mail.gmail.com>
- <20161115213510.GY1041@n2100.armlinux.org.uk>
- <CAJ+vNU2t5f=HQ94_GW-cry7DV3FsR9Vx-ck_E-eNuDk5vd-eaw@mail.gmail.com>
- <20161115221002.GA1041@n2100.armlinux.org.uk>
- <20161115235503.GC1041@n2100.armlinux.org.uk>
-Message-ID: <7d140619eb66ccb727de00ed22cc5fc9@agner.ch>
+ <CAPDyKFrpqmvVAKsfQBP1m7vdOjPRx7puVkmmCe3yxe1gVFwgzw@mail.gmail.com>
+Message-ID: <f07a7474de83ed8185f898deb70ffab6@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-11-15 15:55, Russell King - ARM Linux wrote:
-> On Tue, Nov 15, 2016 at 10:10:02PM +0000, Russell King - ARM Linux wrote:
->> On Tue, Nov 15, 2016 at 01:39:42PM -0800, Tim Harvey wrote:
->> > On Tue, Nov 15, 2016 at 1:35 PM, Russell King - ARM Linux
->> > <linux@armlinux.org.uk> wrote:
->> > > On Tue, Nov 15, 2016 at 12:27:53PM -0800, Tim Harvey wrote:
->> > >> On Mon, Nov 14, 2016 at 11:08 AM, Russell King - ARM Linux
->> > >> <linux@armlinux.org.uk> wrote:
->> > >> > So, someone merged a patch which makes mmcblk devices follow the
->> > >> > host controller numbering.
->> > >> >
->> > >> > Now my cubox-i fails to boot correctly because the SD card in the
->> > >> > _only_ SD card slot now gets called "mmcblk1" and not "mmcblk0".
->> > >> >
->> > >> > USDHC1 is wired to the on-microsom WiFi, and never has anything
->> > >> > remotely near a SD card or eMMC present.  So, this change is
->> > >> > confusing on these platforms.
->> > >> >
->> > >> > Moreover, this is _going_ to break SolidRun distros if people upgrade
->> > >> > their kernels.
->> > >> >
->> > >> > It may be appropriate for eMMC, but it's not appropriate everywhere.
->> > >> >
->> > >> > This is a user visible _regression_ in 4.9-rc.  Whoever did this,
->> > >> > please revert whatever change caused this, and next time limit it
->> > >> > to only eMMC.
->> > >> >
->> > >> > Thanks.
->> > >>
->> > >> I see the same thing on newer kernels, which is why I asked the
->> > >> question. I didn't expect (or even want honestly) a non mmcblk0 boot
->> > >> device and was looking for a way to control that via dt. Now I'm
->> > >> understanding that to avoid this kind of bootloader/kernel dependence
->> > >> issue I should be using UUID's to identify the boot device.
->> > >>
->> > >> >From my testing it looks like the change your looking for occurred
->> > >> some time ago and is somewhere between 4.5 and 4.6 and not a 4.9
->> > >> regression specifically.
->> > >
->> > > That depends how you look at it.  Yes, there's a change in 4.5 to 4.6
->> > > which ties the block device number to the host device index, but that's
->> > > really only part of the story here.
->> > >
->> > > 4.8 definitely identifies the SD card in iMX6 usdhc2 as "mmcblk0".
->> > > 4.9-rc identifies the SD card as "mmcblk1".  This makes it a 4.9 change
->> > > of behaviour - there can be no argument about that.
->> > >
->> > > Now, digging further into this today, it appears that:
->> > >
->> > > v4.8: usdhc2 was probed first, and is given mmc0.
->> > >       usdhc1 is probed second, and is given mmc1.
->> > >
->> > > v4.9-rc: usdhc1 is probed first, and is given mmc0.
->> > >          usdhc2 is probed second, and is given mmc1.
->> > >
->> > > I haven't yet been able to figure out why there's been this change
->> > > of probe order.  There's no change that I can see in the iMX6 DT
->> > > files that would account for this.
->> > >
->> >
->> > I bisected it and the commit your looking for is
->> > 9aaf3437aa72ed5370bf32c99580a3fa2c330e3d
+On 2016-11-16 06:45, Ulf Hansson wrote:
+> On 28 October 2016 at 17:37, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Fri, Oct 28, 2016 at 08:23:04AM -0700, Tim Harvey wrote:
+>>> Greetings,
+>>>
+>>> I have an IMX6 board that has the following:
+>>> sdhc1: mmc0: sdio radio
+>>> sdhc2: mmc1: /dev/mmcblk1: microSD connector
+>>> sdhc3: mmc2: /dev/mmcblk2: on-board eMMC
+>>>
+>>> I would like to have sdhc3 registered as /dev/mmcblk0 and sdhc2
+>>> registered as /dev/mmcblk1 so that permanent storage is the first
+>>> mmcblk device as I think this is more intuitive however currently
+>>> these get instanced in the order they appear in the imx6qdl.dtsi
+>>> device-tree configuration and are not able to be mapped the way I want
+>>> them in my dts file.
+>>>
+>>> Is there a way, or if not is there a desire for a way, to specify the
+>>> order of /dev/mmcblk devices via device-tree?
 >>
->> No it's not.
+>> As with many other devices, there is no standard way of controlling the
+>> Linux enumeration (and given the ID space is shared with other dynamic
+>> devices it's not something that could generally work).
 >>
->> Let me try and put it plainer:
+>> These should be refererd to by UUID if possible.
 >>
->> * Commit 9aaf3437aa72ed5370bf32c99580a3fa2c330e3d ties the mmc block
->>   device number (mmcblkN) to the mmc host interface number (mmcN).
->>   This change happened between 4.5 and 4.6.
->>
->> * The change I'm seeing happened between 4.8 and 4.9-rc.  I'm not
->>   seeing a change of behaviour between 4.5 and 4.6.
->>
->> * The change I'm seeing changes the order of the physical device
->>   associated with the hosts named mmc0 and mmc1 in the kernel.
->>
->> * Because physical devices associated with the mmc0 and mmc1 hosts
->>   swap over, the mmcblkN number changes due to the commit you point
->>   out.
->>
->> * So, the change that I'm seeing between 4.8 and 4.9-rc is not caused
->>   by commit 9aaf3437aa72ed5370bf32c99580a3fa2c330e3d, but by something
->>   else changing the order in which the two usdhc physical hardware
->>   blocks get probed.
->>
->> Does this make it clearer?
+>> If not, we could cosider adding a by-dt-path or something like that.
 > 
-> It turns out to be this commit:
-> 
-> commit 6eb1c9496b81680f2cd2e0eda06c531317e2e28d
-> Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Date:   Mon Sep 19 01:16:44 2016 +0900
-> 
->     clk: probe common clock drivers earlier
-> 
->     Several SoCs implement platform drivers for clocks rather than
->     CLK_OF_DECLARE().  Clocks should come earlier because they are
->     prerequisites for many of other drivers.  It will help to mitigate
->     EPROBE_DEFER issues.
-> 
->     Also, drop the comment since it does not carry much value.
-> 
->     Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->     Acked-by: Michael Turquette <mturquette@baylibre.com>
->     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> 
-> which changes the init order.  In 4.8, we get:
+> So does that mean you think using "DT aliases" would be okay? As
+> Javier pointed out, there have been some attempts [1] for that, but
+> they didn't make it.
+> Perhaps we need to re-consider, and if so please re-review the DT
+> bindings patch from that series.
 
-Afaik, init order is not guaranteed, it never was. Usually the order
-ends up to be in some order of the device tree, but one could also parse
-the device tree in reverse order (which would be an interesting
-experiment).
+I really would like to see some sort of stable MMC block device
+ordering.
 
-If we want to rely on ordering, we need to add alias support.
+by-dt-path solutions requires initramfs, which adds complexity and boot
+time. Both not very welcome in simple embedded devices.
+
+PARTUUID is relying on a particular instance of a partition, which is
+not the same as to say boot from the second partition of device X.
+
+The main problem I see in my patchset is that it works around the fact
+MMC is a bus. Adding the mmc controller number to the block device name
+would avoid that issue (mmc0blk0...), not sure if a such a drastic
+change would be acceptable.
 
 --
 Stefan
