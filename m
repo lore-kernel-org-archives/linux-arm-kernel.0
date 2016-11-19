@@ -1,49 +1,37 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Sat, 19 Nov 2016 16:48:26 +0100
-Subject: [PATCH 2/6] ASoC: samsung: smdk_wm8580: Remove old platforms and
- drop mach-types usage
-In-Reply-To: <90e0f455-fa24-f643-fa07-67efe217188a@metafoo.de>
-References: <1479566911-5580-1-git-send-email-krzk@kernel.org>
- <1479566911-5580-3-git-send-email-krzk@kernel.org>
- <8248c49a-1108-7fce-ed99-01653e11c670@metafoo.de>
- <90e0f455-fa24-f643-fa07-67efe217188a@metafoo.de>
-Message-ID: <9ef6c39c-e7a2-4591-380f-07f92317313b@metafoo.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 19 Nov 2016 09:07:16 -0800
+Subject: [GIT PULL] Allwinner late DT changes for 4.10
+In-Reply-To: <CACRpkdbw3AUj510wPGFG55cKnOyEOX7Syz1BnJx-ygo1eAqzGg@mail.gmail.com>
+References: <20161115210034.mwqnsggmmbzoav77@lukather>
+ <20161119002733.GA15902@localhost>
+ <CACRpkdbw3AUj510wPGFG55cKnOyEOX7Syz1BnJx-ygo1eAqzGg@mail.gmail.com>
+Message-ID: <CAOesGMh_UXBQGtxbLHT7ABfp+V5xSJCjvj=N4vwRLuKFaujZ2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2016 04:45 PM, Lars-Peter Clausen wrote:
-> On 11/19/2016 04:42 PM, Lars-Peter Clausen wrote:
->> On 11/19/2016 03:48 PM, Krzysztof Kozlowski wrote:
->> [...]
->>> @@ -206,15 +204,10 @@ static int __init smdk_audio_init(void)
->>>  	int ret;
->>>  	char *str;
->>>  
->>> -	if (machine_is_smdkc100()
->>> -			|| machine_is_smdkv210() || machine_is_smdkc110()) {
->>> -		smdk.num_links = 3;
->>> -	} else if (machine_is_smdk6410()) {
->>> -		str = (char *)smdk_dai[PRI_PLAYBACK].cpu_dai_name;
->>> -		str[strlen(str) - 1] = '2';
->>> -		str = (char *)smdk_dai[PRI_CAPTURE].cpu_dai_name;
->>> -		str[strlen(str) - 1] = '2';
->>> -	}
->>> +	str = (char *)smdk_dai[PRI_PLAYBACK].cpu_dai_name;
->>> +	str[strlen(str) - 1] = '2';
->>> +	str = (char *)smdk_dai[PRI_CAPTURE].cpu_dai_name;
->>> +	str[strlen(str) - 1] = '2';
->>
->> This could be further simplified by just updating the initial cpu_dai_name
->> string in the dai_link struct.
->>
->> Especially considering that the cpu_dai_name is a string literal and the ARM
->> kernel now has rodata write protection enabled by default, so modifying it
->> will crash the kernel.
-> 
-> Spoke too soon, you fix this up in the next patch. But I'd just squash that
-> change into this patch. I think it is pretty safe to assume that it is correct.
-> 
+On Sat, Nov 19, 2016 at 7:28 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sat, Nov 19, 2016 at 1:27 AM, Olof Johansson <olof@lixom.net> wrote:
+>
+>> Also, this won't work since this branch does not contain the required
+>> pinctrl changes. If we merge this without basing it on those changes we lose
+>> bisectability.
+>
+> I usually operate on the assumption that arch/*/boot/dts/* and drivers/*
+> do not need to be boot-time bisectable sync:ed, because of the ambition
+> to maintaining DTS files outside of the kernel in the long run, and at that
+> point they would be versioned orthogonally anyways.
+>
+> On the other hand, that does look like a pipe dream, so maybe I should
+> just stop pretending.
 
-And another thing. Since num_links is always 2 now the last entry from the
-smdk_dai array can be removed and num_links can be initialized using
-ARRAY_SIZE().
+For new features/drivers/platforms that is definitely the case: Merge
+code through the suitable tree and it'll come together when the code
+is all merged.
+
+For a cleanup it's a bit different, since you shouldn't regress and
+break existing support on the individual branches. I.e. it's OK to not
+make things work for the first time until all comes together, but
+things that is already working shouldn't break.
+
+
+-Olof
