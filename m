@@ -1,80 +1,121 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 19 Nov 2016 09:25:33 +0100
+Date: Sat, 19 Nov 2016 09:33:04 +0100
 Subject: [GIT PULL] ARM: mvebu: dt for v4.10 (#1)
-In-Reply-To: <20161119015838.GG2543@localhost> (Olof Johansson's message of
- "Fri, 18 Nov 2016 17:58:38 -0800")
-References: <87poltbwt2.fsf@free-electrons.com>
- <20161119015838.GG2543@localhost>
-Message-ID: <877f7zanb6.fsf@free-electrons.com>
+Message-ID: <8760njamyn.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
- 
- On sam., nov. 19 2016, Olof Johansson <olof@lixom.net> wrote:
+Hi,
 
-> Hi,
->
-> On Thu, Nov 17, 2016 at 10:50:33PM +0100, Gregory CLEMENT wrote:
->> Hi,
->> 
->> Here is the first pull request for dt for mvebu for v4.10.
->> 
->> I hope being able to send a second part very soon with the series
->> removing all the DT warning.
->> 
->> Gregory
->> 
->> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
->> 
->>   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
->> 
->> are available in the git repository at:
->> 
->>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.10-1
->> 
->> for you to fetch changes up to cf20c489de6fcef88405d4febef7a078d2053b9e:
->> 
->>   ARM: dt: orion5x: convert ls-chl to FDT (2016-11-07 17:23:34 +0100)
->> 
->> ----------------------------------------------------------------
->> mvebu fixes for 4.10 (part 1)
->> 
->> Most of the commit are pinmux and i2c fix for netgear NASes
->> Fix on a wrong comment about PLL frequency
->> Bigger commit: conversion of on otion5x based board to the device tree
->> 
->> ----------------------------------------------------------------
->> Ashley Hughes (1):
->>       ARM: dt: orion5x: convert ls-chl to FDT
->
-> This is a great conversion, but I'd like to see the code handled a
-> little differently.
->
-> First of all, there's no longer a need to have a config option for 
-> MACH_LINKSTATION_LSCHL, as long as ARCH_ORION5X_DT is enabled you'll
-> be fine. So you can remove that Kconfig entry alltogether.
->
-> Also, there's no need to make the DT addition and the legacy platform
-> removal in one commit. It's common that we build up the DT support to the point
-> that it's at parity, and then remove the legacy board. That way we also don't
-> entangle DT commits with non-DT commits, which can sometimes be a bit of a pain
-> (in particular for those who maintain a copy of the DT subdir in another git
-> repo).
->
-> So, mind respinning with this fixed? Thanks!
+Here is the first pull request for dt for mvebu for v4.10. It repalces
+the previous one sent 2 days ago as requested by Olof.
 
-OK I am doing it.
+I take the opportunity to add new commits:
+"ARM: dts: kirkwood: fix spelling mistake" which as applied recently but
+which is harmless and trivial.
+
+I also add all the non controversial patches removing the DTC
+warning. They wre posted two weeks ago and was in linux-next since this
+day. As there is still some discussions about MBUS_ID and ranges, I will
+prepare a new series for them which I still hope mnage to be part of
+4.10.
 
 Gregory
 
->
->
-> -Olof
->
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.10-1
+
+for you to fetch changes up to 2f7132852038deb8e364bee155f51cb477c8d2f4:
+
+  ARM: dts: armada-375: Fixup ethernet child DT warning (2016-11-19 09:16:52 +0100)
+
+----------------------------------------------------------------
+mvebu dt for 4.10 (part 1)
+
+Add missing pinmux declaration for netgear NASes
+Fix i2c compatible string for netgear NASes
+Fix on a wrong comment about PLL frequency
+Fix spelling mistake of the manufacturer's name of the Topkick
+Add dt support for the orion5x ls-chl Linkstation device
+First step of fixing DTC warning for Armada 370, 375 and XP
+
+----------------------------------------------------------------
+Ashley Hughes (1):
+      ARM: dts: orion5x: convert ls-chl to FDT
+
+Chris Packham (1):
+      ARM: dts: mvebu: Update comment for main PLL frequency
+
+Gregory CLEMENT (21):
+      ARM: dts: armada-xp-matrix: Fix the location of the pcie-controller node
+      ARM: dts: armada-370-xp: move the cpurst node in the common file
+      ARM: dts: armada-370-xp: add node labels
+      ARM: dts: armada-370-xp: Use the node labels
+      ARM: dts: armada-370-xp: Fixup mdio DT warning
+      ARM: dts: armada-xp: Fixup pcie DT warnings
+      ARM: dts: armada-370: Fixup pcie DT warnings
+      ARM: dts: armada-370-xp: Remove skeleton.dtsi
+      ARM: dts: armada-370-xp: Fixup l2-cache DT warning
+      ARM: dts: armada-370-xp: Fixup memory DT warning
+      ARM: dts: armada-370-xp: Remove address from dsa unit name
+      ARM: dts: armada-370-xp: Remove button address and fixup names
+      ARM: dts: armada-370-xp: Fixup regulator DT warning
+      ARM: dts: armada-375: Add node labels
+      ARM: dts: armada-375: Use the node labels
+      ARM: dts: armada-375: Fixup mdio DT warning
+      ARM: dts: armada-375: Fixup pcie DT warnings
+      ARM: dts: armada-375: Fixup pinctrl DT warnings
+      ARM: dts: armada-375: Remove skeleton.dtsi
+      ARM: dts: armada-375: Fixup memory DT warning
+      ARM: dts: armada-375: Fixup ethernet child DT warning
+
+Paul Wassi (1):
+      ARM: dts: kirkwood: fix spelling mistake
+
+Uwe Kleine-K?nig (6):
+      ARM: dts: armada-370-rn104: add pinmuxing for i2c0
+      ARM: dts: armada-370-rn104: drop specification of compatible for i2c0
+      ARM: dts: armada-xp-rn2120: drop wrong compatible for i2c0
+      ARM: dts: armada-xp-rn2120: add pinmuxing for ethernet
+      ARM: dts: armada-370-rn102: drop specification of compatible for i2c0
+      ARM: dts: armada-370-rn102: add pinmuxing for i2c0
+
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/armada-370-db.dts                |  63 ++---
+ arch/arm/boot/dts/armada-370-dlink-dns327l.dts     |  30 +--
+ arch/arm/boot/dts/armada-370-mirabox.dts           |  57 ++---
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts     |  55 +++--
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts     |  63 ++---
+ arch/arm/boot/dts/armada-370-rd.dts                |  57 ++---
+ arch/arm/boot/dts/armada-370-seagate-nas-4bay.dts  |  27 +-
+ arch/arm/boot/dts/armada-370-seagate-nas-xbay.dtsi |  45 ++--
+ .../dts/armada-370-seagate-personal-cloud.dtsi     |  44 ++--
+ arch/arm/boot/dts/armada-370-synology-ds213j.dts   |  18 +-
+ arch/arm/boot/dts/armada-370-xp.dtsi               |  39 +--
+ arch/arm/boot/dts/armada-370.dtsi                  | 136 +++++------
+ arch/arm/boot/dts/armada-375-db.dts                | 271 +++++++++++----------
+ arch/arm/boot/dts/armada-375.dtsi                  |  72 +++---
+ arch/arm/boot/dts/armada-38x.dtsi                  |   2 +-
+ arch/arm/boot/dts/armada-39x.dtsi                  |   2 +-
+ arch/arm/boot/dts/armada-xp-axpwifiap.dts          |  68 +++---
+ arch/arm/boot/dts/armada-xp-db.dts                 | 104 ++++----
+ arch/arm/boot/dts/armada-xp-gp.dts                 |  80 +++---
+ arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts    |  53 ++--
+ arch/arm/boot/dts/armada-xp-linksys-mamba.dts      |  52 ++--
+ arch/arm/boot/dts/armada-xp-matrix.dts             |  20 +-
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi           |  12 +-
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi           |  20 +-
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi           |  22 +-
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts     |  74 +++---
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts   |  58 ++---
+ arch/arm/boot/dts/armada-xp-synology-ds414.dts     |  75 +++---
+ arch/arm/boot/dts/armada-xp.dtsi                   |  94 +++----
+ arch/arm/boot/dts/kirkwood-topkick.dts             |   2 +-
+ arch/arm/boot/dts/orion5x-lschl.dts                | 171 +++++++++++++
+ 32 files changed, 1042 insertions(+), 845 deletions(-)
+ create mode 100644 arch/arm/boot/dts/orion5x-lschl.dts
