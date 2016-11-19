@@ -1,21 +1,19 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Nov 2016 17:58:38 -0800
-Subject: [GIT PULL] ARM: mvebu: dt for v4.10 (#1)
-In-Reply-To: <87poltbwt2.fsf@free-electrons.com>
-References: <87poltbwt2.fsf@free-electrons.com>
-Message-ID: <20161119015838.GG2543@localhost>
+Date: Fri, 18 Nov 2016 17:59:09 -0800
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.10 (#1)
+In-Reply-To: <87oa1dbwrs.fsf@free-electrons.com>
+References: <87oa1dbwrs.fsf@free-electrons.com>
+Message-ID: <20161119015909.GH2543@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Nov 17, 2016 at 10:50:33PM +0100, Gregory CLEMENT wrote:
+On Thu, Nov 17, 2016 at 10:51:19PM +0100, Gregory CLEMENT wrote:
 > Hi,
 > 
-> Here is the first pull request for dt for mvebu for v4.10.
+> Here is the first pull request for dt64 for mvebu for v4.10.
 > 
-> I hope being able to send a second part very soon with the series
-> removing all the DT warning.
+> Here again, I hope being able to send a second part very soon with the
+> series removing all the remaining DT warning.
 > 
 > Gregory
 > 
@@ -25,38 +23,18 @@ On Thu, Nov 17, 2016 at 10:50:33PM +0100, Gregory CLEMENT wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.10-1
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.10-1
 > 
-> for you to fetch changes up to cf20c489de6fcef88405d4febef7a078d2053b9e:
+> for you to fetch changes up to e735aaf8fc4ac84dbdb3642a135da8dcdb84587b:
 > 
->   ARM: dt: orion5x: convert ls-chl to FDT (2016-11-07 17:23:34 +0100)
-> 
-> ----------------------------------------------------------------
-> mvebu fixes for 4.10 (part 1)
-> 
-> Most of the commit are pinmux and i2c fix for netgear NASes
-> Fix on a wrong comment about PLL frequency
-> Bigger commit: conversion of on otion5x based board to the device tree
+>   arm64: dts: marvell: Add definition for the Globalscale Marvell ESPRESSOBin Board (2016-10-17 17:19:56 +0200)
 > 
 > ----------------------------------------------------------------
-> Ashley Hughes (1):
->       ARM: dt: orion5x: convert ls-chl to FDT
+> mvebu dt64 for 4.10 (part 1)
+> 
+> Adding the new "community" board for Armada 3700
 
-This is a great conversion, but I'd like to see the code handled a
-little differently.
-
-First of all, there's no longer a need to have a config option for 
-MACH_LINKSTATION_LSCHL, as long as ARCH_ORION5X_DT is enabled you'll
-be fine. So you can remove that Kconfig entry alltogether.
-
-Also, there's no need to make the DT addition and the legacy platform
-removal in one commit. It's common that we build up the DT support to the point
-that it's at parity, and then remove the legacy board. That way we also don't
-entangle DT commits with non-DT commits, which can sometimes be a bit of a pain
-(in particular for those who maintain a copy of the DT subdir in another git
-repo).
-
-So, mind respinning with this fixed? Thanks!
+Merged, thanks!
 
 
 -Olof
