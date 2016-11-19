@@ -1,18 +1,21 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Nov 2016 17:51:36 -0800
-Subject: [GIT PULL] ARM: mvebu: drivers for v4.10 (#1)
-In-Reply-To: <87r369bwvn.fsf@free-electrons.com>
-References: <87r369bwvn.fsf@free-electrons.com>
-Message-ID: <20161119015136.GF2543@localhost>
+Date: Fri, 18 Nov 2016 17:58:38 -0800
+Subject: [GIT PULL] ARM: mvebu: dt for v4.10 (#1)
+In-Reply-To: <87poltbwt2.fsf@free-electrons.com>
+References: <87poltbwt2.fsf@free-electrons.com>
+Message-ID: <20161119015838.GG2543@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Nov 17, 2016 at 10:49:00PM +0100, Gregory CLEMENT wrote:
+On Thu, Nov 17, 2016 at 10:50:33PM +0100, Gregory CLEMENT wrote:
 > Hi,
 > 
-> Here is the first pull request for drivers for mvebu for v4.10.
+> Here is the first pull request for dt for mvebu for v4.10.
+> 
+> I hope being able to send a second part very soon with the series
+> removing all the DT warning.
 > 
 > Gregory
 > 
@@ -22,25 +25,38 @@ On Thu, Nov 17, 2016 at 10:49:00PM +0100, Gregory CLEMENT wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-drivers-4.10-1
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.10-1
 > 
-> for you to fetch changes up to d6ea689345ecc27b636a8bb62bf07080f21f110c:
+> for you to fetch changes up to cf20c489de6fcef88405d4febef7a078d2053b9e:
 > 
->   ARM/orion/gpio: Replace three seq_printf() calls by seq_puts() in orion_gpio_dbg_show() (2016-10-17 17:40:24 +0200)
-> 
-> ----------------------------------------------------------------
-> mvebu drivers for 4.10 (part 1)
-> 
-> Clean-up on thegpio driver for old SoCs(non DT)
+>   ARM: dt: orion5x: convert ls-chl to FDT (2016-11-07 17:23:34 +0100)
 > 
 > ----------------------------------------------------------------
-> Markus Elfring (1):
->       ARM/orion/gpio: Replace three seq_printf() calls by seq_puts() in orion_gpio_dbg_show()
+> mvebu fixes for 4.10 (part 1)
+> 
+> Most of the commit are pinmux and i2c fix for netgear NASes
+> Fix on a wrong comment about PLL frequency
+> Bigger commit: conversion of on otion5x based board to the device tree
+> 
+> ----------------------------------------------------------------
+> Ashley Hughes (1):
+>       ARM: dt: orion5x: convert ls-chl to FDT
 
-This is next/soc material, not driver. Merged there. Thanks.
+This is a great conversion, but I'd like to see the code handled a
+little differently.
 
-(Also, please be mindful of patch prefixes. This is again a nonstandard
-one).
+First of all, there's no longer a need to have a config option for 
+MACH_LINKSTATION_LSCHL, as long as ARCH_ORION5X_DT is enabled you'll
+be fine. So you can remove that Kconfig entry alltogether.
+
+Also, there's no need to make the DT addition and the legacy platform
+removal in one commit. It's common that we build up the DT support to the point
+that it's at parity, and then remove the legacy board. That way we also don't
+entangle DT commits with non-DT commits, which can sometimes be a bit of a pain
+(in particular for those who maintain a copy of the DT subdir in another git
+repo).
+
+So, mind respinning with this fixed? Thanks!
 
 
 -Olof
