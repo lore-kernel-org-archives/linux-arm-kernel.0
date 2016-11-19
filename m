@@ -1,47 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 18 Nov 2016 16:39:30 -0800
-Subject: [GIT PULL] Allwinner arm64 DT changes for 4.9
-In-Reply-To: <20161115211333.oqvxfjxxudfkdq7j@lukather>
-References: <20161115211333.oqvxfjxxudfkdq7j@lukather>
-Message-ID: <20161119003930.GC15902@localhost>
+Date: Fri, 18 Nov 2016 16:41:53 -0800
+Subject: [GIT PULL 1/5] non-urgent omap fixes for v4.10
+In-Reply-To: <582b7c99.5790620a.e95a2.d641SMTPIN_ADDED_BROKEN@mx.google.com>
+References: <582b7c99.5790620a.e95a2.d641SMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <20161119004153.GD15902@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 15, 2016 at 10:13:33PM +0100, Maxime Ripard wrote:
-> Hi Arnd, Olof,
-> 
-> Here are our changes for arm64 DT for the next merge window.
-> 
-> Thanks!
-> Maxime
-> 
+On Tue, Nov 15, 2016 at 01:22:19PM -0800, Tony Lindgren wrote:
 > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 > 
 >   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt64-for-4.10
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.10/fixes-not-urgent-signed
 > 
-> for you to fetch changes up to 4e3886081848b7ea16452a92c4324acaab644d49:
+> for you to fetch changes up to 5c02b01d234f8410010c952069d3fb9ec5d9124a:
 > 
->   arm64: dts: add Pine64 support (2016-11-03 09:08:24 +0100)
-> 
-> ----------------------------------------------------------------
-> Allwinner arm64 DT changes for 4.10
-> 
-> Support for the Allwinner A64, their first armv8 SoC.
+>   ARM: OMAP2+: pm-debug: Use seq_putc() in two functions (2016-11-09 15:33:33 -0700)
 > 
 > ----------------------------------------------------------------
-> Andre Przywara (3):
->       arm64: dts: add Allwinner A64 SoC .dtsi
->       Documentation: devicetree: add vendor prefix for Pine64
->       arm64: dts: add Pine64 support
+> Non-urgent fixes for omaps for v4.10 merge window:
+> 
+> - Fix mismatched interrupt numbers for tps65217, these are not yet
+>   used
+> 
+> - Remove unused omapdss_early_init_of()
+> 
+> - Use seq_putc() for pm-debug.c
 
-Hi,
-
-Merged the branch, but please use "arm64: dts: allwinner: <..>" as patch
-prefix in the future. Thanks!
+Merged, thanks.
 
 
 -Olof
