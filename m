@@ -1,43 +1,42 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 20 Nov 2016 21:24:53 +0200
-Subject: [PATCH v2 3/5] ASoC: samsung: Enable COMPILE_TEST for SmartQ and
- WM8580
-In-Reply-To: <1479669895-19124-1-git-send-email-krzk@kernel.org>
-References: <1479669895-19124-1-git-send-email-krzk@kernel.org>
-Message-ID: <1479669895-19124-4-git-send-email-krzk@kernel.org>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Sun, 20 Nov 2016 20:37:20 +0100
+Subject: [RFC PATCH v2 1/2] macb: Add 1588 support in Cadence GEM.
+In-Reply-To: <1479478912-14067-1-git-send-email-andrei.pistirica@microchip.com>
+References: <1479478912-14067-1-git-send-email-andrei.pistirica@microchip.com>
+Message-ID: <20161120193720.GA7874@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The I2S sound drivers for SmartQ board and WM8580 codec can be compile
-tested to increase build coverage.
+On Fri, Nov 18, 2016 at 03:21:51PM +0100, Andrei Pistirica wrote:
+> +#ifdef CONFIG_MACB_USE_HWSTAMP
+> +void macb_ptp_init(struct net_device *ndev);
+> +#else
+> +void macb_ptp_init(struct net_device *ndev) { }
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- sound/soc/samsung/Kconfig | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+static inline ^^^
 
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index ea0fa9971a0c..426ef1c7b265 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -49,7 +49,7 @@ config SND_SOC_SAMSUNG_JIVE_WM8750
- 
- config SND_SOC_SAMSUNG_SMDK_WM8580
- 	tristate "SoC I2S Audio support for WM8580 on SMDK"
--	depends on MACH_SMDK6410
-+	depends on MACH_SMDK6410 || COMPILE_TEST
- 	depends on I2C
- 	select SND_SOC_WM8580
- 	select SND_SAMSUNG_I2S
-@@ -109,7 +109,8 @@ config SND_SOC_SAMSUNG_RX1950_UDA1380
- 
- config SND_SOC_SMARTQ
- 	tristate "SoC I2S Audio support for SmartQ board"
--	depends on MACH_SMARTQ && I2C
-+	depends on MACH_SMARTQ || COMPILE_TEST
-+	depends on I2C
- 	select SND_SAMSUNG_I2S
- 	select SND_SOC_WM8750
- 
--- 
-2.7.4
+> +#endif
+
+
+> +void macb_ptp_init(struct net_device *ndev)
+> +{
+> +	struct macb *bp = netdev_priv(ndev);
+> +	struct timespec64 now;
+> +	u32 rem = 0;
+> +
+> +	if (!(bp->caps | MACB_CAPS_GEM_HAS_PTP)){
+> +		netdev_vdbg(bp->dev, "Platform does not support PTP!\n");
+> +		return;
+> +	}
+
+You would have needed '&' and not '|' here.
+
+Also, using a flag limits the code to your platform.  This works for
+you, but it is short sighted.  The other MACB PTP blocks have
+different register layouts, and this patch does not lay the ground
+work for the others.
+
+The driver needs to be designed to support the other platforms.
+
+Thanks,
+Richard
