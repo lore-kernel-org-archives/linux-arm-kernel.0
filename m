@@ -1,37 +1,31 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Sun, 20 Nov 2016 19:10:38 +0530
-Subject: [GIT PULL 4/4] DaVinci defconfig updates for v4.10 (part 2)
+Date: Sun, 20 Nov 2016 19:10:36 +0530
+Subject: [GIT PULL 2/4] DaVinci SoC updates for v4.10 (part 2)
 In-Reply-To: <20161120134038.14998-1-nsekhar@ti.com>
 References: <20161120134038.14998-1-nsekhar@ti.com>
-Message-ID: <20161120134038.14998-4-nsekhar@ti.com>
+Message-ID: <20161120134038.14998-2-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6e9be8608771192851a3adf59f0ba9240e3f802c:
+The following changes since commit ced95ac0815501f47a6041548d70d8900400912d:
 
-  ARM: davinci_all_defconfig: enable LED default-on trigger (2016-11-01 11:42:54 +0530)
+  ARM: davinci: da8xx: register USB PHY clocks in the DT file (2016-11-01 15:24:24 +0530)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git davinci-for-v4.10/defconfig-2
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git davinci-for-v4.10/soc-2
 
-for you to fetch changes up to a652baa06413a4beacc09425883e518c5f1ed100:
+for you to fetch changes up to 7e431af8fa0b9ed9d74378c99514856211cb9db8:
 
-  ARM: davinci_all_defconfig: add missing options for systemd (2016-11-15 15:44:52 +0530)
-
-----------------------------------------------------------------
-Enables newly introduced DDR controller and
-master priority setting drivers in kernel.
-
-Also, update defconfig to boot latest systemd
-based filesystems on DA850.
+  ARM: davinci: PM: support da8xx DT platforms (2016-11-16 14:45:07 +0530)
 
 ----------------------------------------------------------------
-Bartosz Golaszewski (1):
-      ARM: davinci_all_defconfig: enable the mstpri and ddrctl drivers
+Adds suspend-to-RAM support for DT boot mode
+on DA850.
 
-Sekhar Nori (1):
-      ARM: davinci_all_defconfig: add missing options for systemd
+----------------------------------------------------------------
+Kevin Hilman (1):
+      ARM: davinci: PM: support da8xx DT platforms
 
- arch/arm/configs/davinci_all_defconfig | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/mach-davinci/da8xx-dt.c | 1 +
+ 1 file changed, 1 insertion(+)
