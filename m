@@ -1,50 +1,37 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Sat, 19 Nov 2016 22:04:54 -0600
-Subject: [arm-soc:qcom/arm64 3/13] Error:
- arch/arm64/boot/dts/qcom/apq8096-db820c-pmic-pins.dtsi:12.20-21 syntax error
-In-Reply-To: <201611181938.YpOhQOad%fengguang.wu@intel.com>
-References: <201611181938.YpOhQOad%fengguang.wu@intel.com>
-Message-ID: <20161120040454.GC16531@hector.attlocal.net>
+From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
+Date: Sun, 20 Nov 2016 11:45:21 +0530
+Subject: [PATCH] arm: spin one more cycle in timer-based delays
+In-Reply-To: <20161119110301.GQ1041@n2100.armlinux.org.uk>
+References: <582B0F61.6030903@free.fr> <20161118120630.GJ13470@arm.com>
+ <20161118125409.GK1041@n2100.armlinux.org.uk>
+ <582F0DD2.3030805@free.fr> <20161119071702.GA25647@afzalpc>
+ <20161119110301.GQ1041@n2100.armlinux.org.uk>
+Message-ID: <20161120061521.GA4307@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 07:01:40PM +0800, kbuild test robot wrote:
-> Hi Srinivas,
-> 
-> FYI, the error/warning still remains.
+Hi Russell,
 
-Ok, I see what happened.  I included the dt-bindings file in the drivers pull
-erroneously.  This should have gone in the ARM64 DTS pull.  As such it will work
-when all pulls are together, but not when done as a single unit.  My apologies
-for mixing this up.
+On Sat, Nov 19, 2016 at 11:03:01AM +0000, Russell King - ARM Linux wrote:
 
+> > > 6c5e9059692567740a4ee51530dffe51a4b9584d
+> > > https://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?h=timers/core&id=6c5e9059692567740a4ee51530dffe51a4b9584d
+> > 
+> > But the above "timers: Fix usleep_range() in the context of
+> > wake_up_process()" is to avoid wakeup causing premature return than
+> > about being precise, no ?
 
-Andy
+> usleep*() is based on the scheduler, which has tighter requirements
+> laid down in POSIX amongst other standards, such as "not timing out
+> before this specified time"
 
-> 
-> tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git qcom/arm64
-> head:   feeaf56ac78d283efe65ea60ec999d4bf3cf395e
-> commit: 50784e61032d89cbbc46ed73a5fb15f27940b947 [3/13] dts: arm64: db820c: add pmic pins specific dts file
-> config: arm64-defconfig (attached as .config)
-> compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         git checkout 50784e61032d89cbbc46ed73a5fb15f27940b947
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm64 
-> 
-> All errors (new ones prefixed by >>):
-> 
-> >> Error: arch/arm64/boot/dts/qcom/apq8096-db820c-pmic-pins.dtsi:12.20-21 syntax error
->    FATAL ERROR: Unable to parse input tree
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Thanks for educating on the POSIX linkage.
 
+When the above mentioned patch was flying, tglx initially mentioned
+that there is no gurantee that usleep_range() will never return in less
+time than the specified minimum, but later he committed the change to
+tip-bot keeping the message saying otherwise. That was confusing, and
+me being a wayfarer, didn't have the courage to ask.
 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards
+afzal
