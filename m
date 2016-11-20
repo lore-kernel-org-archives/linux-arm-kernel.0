@@ -1,52 +1,170 @@
-From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
-Date: Sun, 20 Nov 2016 13:27:49 +0100
-Subject: mmc: core: complete/wait_for_completion performance
-Message-ID: <1479644869.2653.3.camel@embedded.rocks>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sun, 20 Nov 2016 12:34:22 +0000
+Subject: commit 4dd1837d7589f468ed109556513f476e7a7f9121 breaks build
+In-Reply-To: <58318C6A.50104@math.uni-bielefeld.de>
+References: <58310EC6.4020402@math.uni-bielefeld.de>
+ <20161120113007.GS1041@n2100.armlinux.org.uk>
+ <58318C6A.50104@math.uni-bielefeld.de>
+Message-ID: <20161120123422.GT1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Nov 20, 2016 at 12:43:38PM +0100, Tobias Jakobi wrote:
+> Hello Russell,
+> 
+> Russell King - ARM Linux wrote:
+> > None of the autobuilders are finding this problem, and they build a
+> > wide range of configurations.  Maybe it's something specific to how
+> > you're building the kernel - can you give step by step instructions
+> > how to reproduce this please?
+> Just using plain make here, no cross-compiler or anything involved. gcc
+> is version 4.9.4.
 
-I started the discussion on this mailing list in another thread [1],
-but I'd like to move it to a new thread, because it might be mmc
-specific.
+Hmm.  The commit you mention was merged during the merge window, so
+anyone building 4.9-rc1 or later should be seeing this problem, but
+they aren't.  I've built many kernels post -rc1, and I'm not seeing
+the problem with my 4.7.4 cross compiler.
 
-The issue is that I am noticed low wifi network throughput on an i.MX28
-board with the mainline kernel (v4.7.10, about 6 Mbps) compared to the
-vendor kernel (Freescale v2.6.35.3, about 20 Mbps). The wifi chip is
-attached using the SDIO interface.
+> Build platform is a Exynos4412 based ODROID-X2.
+> 
+> 
+> The complete log from the 'build modules' step:
+> >   Building modules, stage 2.
+> >   Kernel: arch/arm/boot/Image is ready
+> >   MODPOST 52 modules
+> >   XZKERN  arch/arm/boot/compressed/piggy_data
+> >   SHIPPED arch/arm/boot/compressed/lib1funcs.S
+> >   SHIPPED arch/arm/boot/compressed/ashldi3.S
+> >   SHIPPED arch/arm/boot/compressed/bswapsdi2.S
+> >   AS      arch/arm/boot/compressed/lib1funcs.o
+> >   AS      arch/arm/boot/compressed/ashldi3.o
+> >   AS      arch/arm/boot/compressed/bswapsdi2.o
+> > ERROR: "_set_bit" [sound/usb/snd-usbmidi-lib.ko] undefined!
+> > ERROR: "_test_and_set_bit" [sound/usb/snd-usbmidi-lib.ko] undefined!
+> > ERROR: "_clear_bit" [sound/usb/snd-usbmidi-lib.ko] undefined!
+> > ERROR: "_test_and_clear_bit" [sound/usb/snd-usb-audio.ko] undefined!
+> > ERROR: "_set_bit" [sound/usb/snd-usb-audio.ko] undefined!
+> > ERROR: "_test_and_set_bit" [sound/usb/snd-usb-audio.ko] undefined!
+> > ERROR: "_clear_bit" [sound/usb/snd-usb-audio.ko] undefined!
+> > ERROR: "_test_and_clear_bit" [sound/core/seq/snd-seq.ko] undefined!
+> > ERROR: "_test_and_set_bit" [sound/core/seq/snd-seq.ko] undefined!
+> > ERROR: "_set_bit" [net/bridge/bridge.ko] undefined!
+> > ERROR: "_clear_bit" [net/bridge/bridge.ko] undefined!
+> > ERROR: "_test_and_clear_bit" [net/bluetooth/hidp/hidp.ko] undefined!
+> > ERROR: "_set_bit" [net/bluetooth/hidp/hidp.ko] undefined!
+> > ERROR: "_clear_bit" [net/bluetooth/hidp/hidp.ko] undefined!
+> > ERROR: "_set_bit" [net/bluetooth/bnep/bnep.ko] undefined!
+> > ERROR: "_test_and_set_bit" [net/bluetooth/bnep/bnep.ko] undefined!
+> > ERROR: "_clear_bit" [net/bluetooth/bnep/bnep.ko] undefined!
+> > ERROR: "_test_and_clear_bit" [fs/fuse/fuse.ko] undefined!
+> > ERROR: "_set_bit" [fs/fuse/fuse.ko] undefined!
+> > ERROR: "_test_and_set_bit" [fs/fuse/fuse.ko] undefined!
+> > ERROR: "_clear_bit" [fs/fuse/fuse.ko] undefined!
+> > ERROR: "_test_and_clear_bit" [fs/cifs/cifs.ko] undefined!
+> > ERROR: "_set_bit" [fs/cifs/cifs.ko] undefined!
+> > ERROR: "_test_and_set_bit" [fs/cifs/cifs.ko] undefined!
+> > ERROR: "_clear_bit" [fs/cifs/cifs.ko] undefined!
+> > ERROR: "_test_and_clear_bit" [fs/btrfs/btrfs.ko] undefined!
+> > ERROR: "_set_bit" [fs/btrfs/btrfs.ko] undefined!
+> > ERROR: "_test_and_set_bit" [fs/btrfs/btrfs.ko] undefined!
+> > ERROR: "_clear_bit" [fs/btrfs/btrfs.ko] undefined!
+> > ERROR: "_test_and_clear_bit" [drivers/usb/storage/usb-storage.ko] undefined!
+> > ERROR: "_set_bit" [drivers/usb/storage/usb-storage.ko] undefined!
+> > ERROR: "_clear_bit" [drivers/usb/storage/usb-storage.ko] undefined!
+> > ERROR: "_set_bit" [drivers/usb/gadget/libcomposite.ko] undefined!
+> > ERROR: "_set_bit" [drivers/usb/gadget/function/usb_f_rndis.ko] undefined!
+> > ERROR: "_test_and_clear_bit" [drivers/usb/gadget/function/u_ether.ko] undefined!
+> > ERROR: "_test_and_set_bit" [drivers/usb/gadget/function/u_ether.ko] undefined!
+> > ERROR: "_clear_bit" [drivers/usb/gadget/function/u_ether.ko] undefined!
+> > ERROR: "_set_bit" [drivers/usb/gadget/function/u_ether.ko] undefined!
+> > ERROR: "_test_and_clear_bit" [drivers/media/platform/s5p-mfc/s5p-mfc.ko] undefined!
+> > ERROR: "_set_bit" [drivers/media/platform/s5p-mfc/s5p-mfc.ko] undefined!
+> > ERROR: "_test_and_set_bit" [drivers/media/platform/s5p-mfc/s5p-mfc.ko] undefined!
+> > ERROR: "_clear_bit" [drivers/media/platform/s5p-mfc/s5p-mfc.ko] undefined!
+> > ERROR: "_clear_bit" [drivers/md/dm-crypt.ko] undefined!
+> > ERROR: "_set_bit" [drivers/md/dm-crypt.ko] undefined!
+> > ERROR: "_set_bit" [drivers/gpu/arm/mali/maligpu.ko] undefined!
+> > ERROR: "_clear_bit" [drivers/gpu/arm/mali/maligpu.ko] undefined!
+> > ERROR: "_test_and_clear_bit" [drivers/bluetooth/btusb.ko] undefined!
+> > ERROR: "_test_and_set_bit" [drivers/bluetooth/btusb.ko] undefined!
+> > ERROR: "_set_bit" [drivers/bluetooth/btusb.ko] undefined!
+> > ERROR: "_clear_bit" [drivers/bluetooth/btusb.ko] undefined!
+> > ERROR: "_set_bit" [drivers/bluetooth/btintel.ko] undefined!
+> > ERROR: "_set_bit" [drivers/bluetooth/btbcm.ko] undefined!
+> > scripts/Makefile.modpost:91: recipe for target '__modpost' failed
+> > make[1]: *** [__modpost] Error 1
+> > Makefile:1191: recipe for target 'modules' failed
+> > make: *** [modules] Error 2
+> 
+> 
+> This is the config I'm using for the build:
+> https://github.com/tobiasjakobi/odroid-environment/blob/master/sourcecode/system/vanilla-4.9-debug.conf
 
-I started investigation where the bottleneck in the mainline
-kernel?might come from. Therefore I checked that the configs and
-settings for the interfaces and drivers are the same. They are.
+You have CONFIG_TRIM_UNUSED_KSYMS enabled - I wonder if that's the
+issue.  I've just enabled that here, and building I see:
 
-For comparing both kernel version I measured the latency for the
-different parts in the code flow by adding some GPIOs to toggle and
-useing an osci.
+  EXPORTS lib/lib-ksyms.o
+  LD      lib/built-in.o
+  CHK     include/generated/autoksyms.h
+  KSYMS   symbols: before=0, after=2413, changed=2413
+  UPD     include/generated/autoksyms.h
 
-It turns out, that the time needed do pass a mmc request from the wifi
-driver to the dma and waiting for the response of the dma is almost the
-same for both kernel versions. So the path from the wifi driver to the
-dma driver is not the issue.
+and then the build seems to restart from the very beginning, which seems
+rather fishy - it doubles the build time of the kernel.  The second
+build doesn't even hit any ccache entries from the first build.  Then we
+get through the rebuild, and I get:
 
-However, the major difference was the time needed to signal the
-completion of the request back to the mmc core driver.
+  EXPORTS lib/lib-ksyms.o
+  LD      lib/built-in.o
+  CHK     include/generated/autoksyms.h
+  LD      vmlinux.o
+...
+  LD      vmlinux
+  SORTEX  vmlinux
+  SYSMAP  System.map
+  Building modules, stage 2.
+  OBJCOPY arch/arm/boot/Image
+  Kernel: arch/arm/boot/Image is ready
+  AS      arch/arm/boot/compressed/head.o
+  LZO     arch/arm/boot/compressed/piggy_data
+  MODPOST 465 modules
+ERROR:   CC      arch/arm/boot/compressed/misc.o
+"_clear_bit" [net/sched/sch_teql.ko] undefined!
+ERROR: "_set_bit" [net/sched/sch_teql.ko] undefined!
+ERROR: "_set_bit" [net/sched/cls_u32.ko] undefined!
+ERROR: "_test_and_set_bit" [net/netfilter/nfnetlink_acct.ko] undefined!
+ERROR: "_clear_bit" [net/netfilter/nfnetlink_acct.ko] undefined!
+ERROR: "_test_and_clear_bit" [net/mac80211/mac80211.ko] undefined!
+ERROR: "_set_bit" [net/mac80211/mac80211.ko] undefined!
+ERROR: "_test_and_set_bit" [net/mac80211/mac80211.ko] undefined!
+ERROR: "_clear_bit" [net/mac80211/mac80211.ko] undefined!
 
-For mainline, the time elapsed?from calling complete() in
-mmc_wait_done() [2] in the mmc core driver until actually receiving the
-completion signal in mmc_wait_for_req_done() [3] is about 120 us. 
+So yes, it's caused by this ksyms trimming.
 
-Whereas, for the vendor kernel,?the elapsed time for this notifcation
-is about 100 us less!
+Now, the thing is that include/generated/autoksyms.h contains:
 
-I wonder why the notification takes so much longer in the mainline
-kernel than in the vendor kernel? Where should I start looking at to
-eliminate this bottleneck? Is it a scheduling issue?
+#define __KSYM__change_bit 1
+#define __KSYM__clear_bit 1
+#define __KSYM__set_bit 1
+#define __KSYM__test_and_change_bit 1
+#define __KSYM__test_and_clear_bit 1
+#define __KSYM__test_and_set_bit 1
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-October/
-461137.html
-[2] http://lxr.free-electrons.com/source/drivers/mmc/core/core.c#L386
-[3] http://lxr.free-electrons.com/source/drivers/mmc/core/core.c#L492
+amongst many other stuff - presumably this is a list of ksyms which
+should be included, rather than a list of what should be excluded.
 
-Best regards,
-J?rg Krause
+I'm afraid that I never saw the patches which changed the way the ksyms
+stuff worked for the assembly files, and these patches have caused
+several problems for ARM.  I'm not aware of what the changes were, or
+how the damn exports now work, so I'm currently at a loss what to
+suggest at the moment, other than to disable CONFIG_TRIM_UNUSED_KSYMS in
+your configuration until someone can work out wtf is going on.
+
+I guess I'm going to have to work out how this stuff now works - don't
+expect a solution quickly, especially as building with this option
+enabled is soo time consuming (like, half an hour per build.)
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
