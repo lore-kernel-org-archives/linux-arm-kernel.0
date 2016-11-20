@@ -1,69 +1,96 @@
-From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
-Date: Sun, 20 Nov 2016 15:42:09 +0100
-Subject: mmc: core: complete/wait_for_completion performance
-In-Reply-To: <585759233.283839.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
-References: <1479644869.2653.3.camel@embedded.rocks>
- <585759233.283839.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
-Message-ID: <1479652929.2841.1.camel@embedded.rocks>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Sun, 20 Nov 2016 20:41:19 +0530
+Subject: [PATCH V3 0/8] IOMMU probe deferral support
+References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
+ <60ee8066-f167-e9df-ae3e-4138f1133bad@arm.com>
+ <003a01d22f97$82534c70$86f9e550$@codeaurora.org>
+ <421e2b14-0231-d376-02a0-097423120b3d@arm.com>
+ <006f01d236ae$61751c40$245f54c0$@codeaurora.org>
+ <9f36244f-62d4-08e3-d64a-2b04ad4dc2e0@arm.com>
+Message-ID: <002b01d24340$5d56e730$1804b590$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+Hi Robin,
 
-On Sun, 2016-11-20 at 14:28 +0100, Stefan Wahren wrote:
-> Hi J?rg,
-> 
-> > J?rg Krause <joerg.krause@embedded.rocks> hat am 20. November 2016
-> > um 13:27
-> > geschrieben:
-> > 
-> > 
-> > Hi,
-> > 
-> > I started the discussion on this mailing list in another thread
-> > [1],
-> > but I'd like to move it to a new thread, because it might be mmc
-> > specific.
-> > 
-> > The issue is that I am noticed low wifi network throughput on an
-> > i.MX28
-> > board with the mainline kernel (v4.7.10, about 6 Mbps) compared to
-> > the
-> > vendor kernel (Freescale v2.6.35.3, about 20 Mbps). The wifi chip
-> > is
-> > attached using the SDIO interface.
-> > 
-> > I started investigation where the bottleneck in the mainline
-> > kernel?might come from. Therefore I checked that the configs and
-> > settings for the interfaces and drivers are the same. They are.
-> 
-> so you're not using the mxs_defconfig settings anymore?
+>Hi Robin,
+>
+>>Hi Robin,
+>>
+>>>On 04/11/16 15:16, Sricharan wrote:
+>>>> Hi Robin,
+>>>>
+>>>>>>> Yikes, on second look, that definitely shouldn't be happening.
+>>>>>>> Everything below is probably the resulting fallout.
+>>>>>>
+>>>>>> [   40.206703] vfio-pci 0000:08:00.0: Failed to setup iommu ops
+>>>>>>
+>>>>>> I think the above print which says "failed to setup iommu_ops"
+>>>>>> because the call ops->add_device failed in of_pci_iommu_configure
+>>>>>> is the reason for the failure, in my case i simply do not get this even with
+>>>>>> your scripts. ops->add_device succeeds in the rebind as well. So still
+>>>>>> checking what could be happening in your case.
+>>>>>
+>>>>> I was looking at your code base from [1].The ops->add_device
+>>>>> callback from of_pci_iommu_configure on the rebind is the
+>>>>> one which is causing the failure. But not able to spot out
+>>>>>from code which point is causing the failure. It would be very helpful
+>>>>> if i can know which is the return value from the add_device callback
+>>>>> or point inside add_device callback which fails in your setup.
+>>>>>
+>>>>>
+>>>>> [1] git://linux-arm.org/linux-rm iommu/misc
+>>>>
+>>>> With little more try, i saw an issue where i had an failure
+>>>> similar to what you reported. The issue happens when multiple
+>>>> devices fall in to same group due to matching sids. I ended up
+>>>> doing a fix like below and it would be nice to verify if it is the same
+>>>> that we are seeing in your setup and if the fix makes a difference ?
+>>>>
+>>>> From: Sricharan R <sricharan@codeaurora.org>
+>>>> Date: Fri, 4 Nov 2016 20:28:49 +0530
+>>>> Subject: [PATCH] iommu/arm-smmu: Fix group's reference counting
+>>>>
+>>>> iommu_group_get_for_dev which gets called in the add_device
+>>>> callback, increases the reference count of the iommu_group,
+>>>> so we do an iommu_group_put after that. iommu_group_get_for_dev
+>>>> inturn calls device_group callback and in the case of arm-smmu
+>>>> we call generic_device_group/pci_device_group which takes
+>>>> care of increasing the group's reference. But when we return
+>>>> an already existing group(when multiple devices have same group)
+>>>> the reference is not incremented, resulting in issues when the
+>>>> remove_device callback for the devices is invoked.
+>>>> Fixing the same here.
+>>>
+>>>Bah, yes, this does look like my fault - after flip-flopping between
+>>>about 3 different ways to keep refcounts for the S2CR entries, none of
+>>>which would quite work, I ripped it all out but apparently still got
+>>>things wrong, oh well. Thanks for figuring it out.
+>> >
+>>>On the probe-deferral angle, whilst it's useful to have uncovered this
+>>>bug, I don't think we should actually be calling remove_device() from
+>>>DMA teardown. I think it's preferable from a user perspective if group
+>>>numbering remains stable, rather than changing depending on the order in
+>>>which they unbind/rebind VFIO drivers. I'm really keen to try and get
+>>>this in shape for 4.10, so I've taken the liberty of hacking up my own
+>>>branch (iommu/defer) based on v3 - would you mind taking a look at the
+>>>two "iommu/of:" commits to see what you think? (Ignore the PCI changes
+>>>to your later patches - that was an experiment which didn't really work out)
+>>
+>>Ok, will take a look at this now and respond more on this.
+>>
+>Sorry for the delayed response on this. I was OOO for the last few days.
+>So i tested this branch and it worked fine. I tested it with a pci device
+>for both normal and deferred probe cases.  The of/iommu patches
+>are the cleanup/preparation patches and it looks fine. One thing is without
+>calling the remove_device callback, the resources like (smes for exmaple)
+>and the group association of the device all remain allocated. That does not
+>feel correct, given that the associated device does not exist. So to
+>understand that, what happens with VFIO in this case which makes the
+>group renumbering/rebinding a problem ?
+>
 
-No, I changed the settings.
+Would it be ok if i post a V4 based on your branch above ?
 
-> Better provide your settings because there are differences between
-> the vendor defconfig and mainline defconfig.
-
-The configs I have for the vendor and mainline kernel are pretty much
-the same for the parts you showed as an example:
-
-Vendor kernel config:
-
-CONFIG_TICK_ONESHOT=y
-CONFIG_NO_HZ=y
-CONFIG_HIGH_RES_TIMERS=y
-CONFIG_PREEMPT=y
-CONFIG_HZ=100
-CONFIG_DEFAULT_IOSCHED="cfq"
-
-Mainline kernel config:
-
-CONFIG_TICK_ONESHOT=y
-CONFIG_NO_HZ_COMMON=y
-CONFIG_NO_HZ_IDLE=y
-CONFIG_HIGH_RES_TIMERS=y
-CONFIG_PREEMPT=y
-CONFIG_HZ=100
-CONFIG_DEFAULT_IOSCHED="cfq"
-
-J?rg
+Regards,
+ Sricharan
