@@ -1,40 +1,69 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Sun, 20 Nov 2016 19:10:37 +0530
-Subject: [GIT PULL 3/4] DaVinci DT updates for v4.10 (part 2)
-In-Reply-To: <20161120134038.14998-1-nsekhar@ti.com>
-References: <20161120134038.14998-1-nsekhar@ti.com>
-Message-ID: <20161120134038.14998-3-nsekhar@ti.com>
+From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
+Date: Sun, 20 Nov 2016 15:42:09 +0100
+Subject: mmc: core: complete/wait_for_completion performance
+In-Reply-To: <585759233.283839.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
+References: <1479644869.2653.3.camel@embedded.rocks>
+ <585759233.283839.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
+Message-ID: <1479652929.2841.1.camel@embedded.rocks>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 1b499f255589204466d8f8ab26e6b577d7b5c88f:
+Hi Stefan,
 
-  ARM: dts: da850: Add cfgchip syscon node (2016-11-01 15:11:10 +0530)
+On Sun, 2016-11-20 at 14:28 +0100, Stefan Wahren wrote:
+> Hi J?rg,
+> 
+> > J?rg Krause <joerg.krause@embedded.rocks> hat am 20. November 2016
+> > um 13:27
+> > geschrieben:
+> > 
+> > 
+> > Hi,
+> > 
+> > I started the discussion on this mailing list in another thread
+> > [1],
+> > but I'd like to move it to a new thread, because it might be mmc
+> > specific.
+> > 
+> > The issue is that I am noticed low wifi network throughput on an
+> > i.MX28
+> > board with the mainline kernel (v4.7.10, about 6 Mbps) compared to
+> > the
+> > vendor kernel (Freescale v2.6.35.3, about 20 Mbps). The wifi chip
+> > is
+> > attached using the SDIO interface.
+> > 
+> > I started investigation where the bottleneck in the mainline
+> > kernel?might come from. Therefore I checked that the configs and
+> > settings for the interfaces and drivers are the same. They are.
+> 
+> so you're not using the mxs_defconfig settings anymore?
 
-are available in the git repository at:
+No, I changed the settings.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git davinci-for-v4.10/dt-2
+> Better provide your settings because there are differences between
+> the vendor defconfig and mainline defconfig.
 
-for you to fetch changes up to 83de086cc89410a8d4e0b6345e8a1116797ea703:
+The configs I have for the vendor and mainline kernel are pretty much
+the same for the parts you showed as an example:
 
-  ARM: dts: da850-lcdk: Enable the usb otg device node (2016-11-20 17:02:18 +0530)
+Vendor kernel config:
 
-----------------------------------------------------------------
-Adds device tree nodes enabling DDR controller
-and bus master priority settings needed for
-stable LCDC operation on DA850.
+CONFIG_TICK_ONESHOT=y
+CONFIG_NO_HZ=y
+CONFIG_HIGH_RES_TIMERS=y
+CONFIG_PREEMPT=y
+CONFIG_HZ=100
+CONFIG_DEFAULT_IOSCHED="cfq"
 
-Also adds support for MUSB device on DA850
-providing USB OTG support.
+Mainline kernel config:
 
-----------------------------------------------------------------
-Alexandre Bailon (2):
-      ARM: dts: da850: Add the usb otg device node
-      ARM: dts: da850-lcdk: Enable the usb otg device node
+CONFIG_TICK_ONESHOT=y
+CONFIG_NO_HZ_COMMON=y
+CONFIG_NO_HZ_IDLE=y
+CONFIG_HIGH_RES_TIMERS=y
+CONFIG_PREEMPT=y
+CONFIG_HZ=100
+CONFIG_DEFAULT_IOSCHED="cfq"
 
-Bartosz Golaszewski (1):
-      ARM: dts: da850: add the mstpri and ddrctl nodes
-
- arch/arm/boot/dts/da850-lcdk.dts |  8 ++++++++
- arch/arm/boot/dts/da850.dtsi     | 18 ++++++++++++++++++
- 2 files changed, 26 insertions(+)
+J?rg
