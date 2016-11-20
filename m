@@ -1,54 +1,60 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 20 Nov 2016 11:43:57 +0000
-Subject: [PATCH v4] crypto: arm64/sha2: integrate OpenSSL implementations
- of SHA256/SHA512
-In-Reply-To: <1479642121-17912-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1479642121-17912-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu9SG5s=zddQaw+444191JGqmXfCh+AKyv3nZNqggmh=Kw@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sun, 20 Nov 2016 12:23:19 +0100
+Subject: [PATCH v6 4/5] ARM: dts: sun8i-h3: Add HDMI video to the Banana Pi M2+
+In-Reply-To: <cover.1479641523.git.moinejf@free.fr>
+References: <cover.1479641523.git.moinejf@free.fr>
+Message-ID: <9dc91753796f8413f276ea62479bd767b549d8c2.1479641523.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 November 2016 at 11:42, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> This integrates both the accelerated scalar and the NEON implementations
-> of SHA-224/256 as well as SHA-384/512 from the OpenSSL project.
->
-> Relative performance compared to the respective generic C versions:
->
->                  |  SHA256-scalar  | SHA256-NEON* |  SHA512  |
->      ------------+-----------------+--------------+----------+
->      Cortex-A53  |      1.63x      |     1.63x    |   2.34x  |
->      Cortex-A57  |      1.43x      |     1.59x    |   1.95x  |
->      Cortex-A73  |      1.26x      |     1.56x    |     ?    |
->
-> The core crypto code was authored by Andy Polyakov of the OpenSSL
-> project, in collaboration with whom the upstream code was adapted so
-> that this module can be built from the same version of sha512-armv8.pl.
->
-> The version in this patch was taken from OpenSSL commit 32bbb62ea634
-> ("sha/asm/sha512-armv8.pl: fix big-endian support in __KERNEL__ case.")
->
-> * The core SHA algorithm is fundamentally sequential, but there is a
->   secondary transformation involved, called the schedule update, which
->   can be performed independently. The NEON version of SHA-224/SHA-256
->   only implements this part of the algorithm using NEON instructions,
->   the sequential part is always done using scalar instructions.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-Missing changelog:
-
-v4: fixed the big-endian build; this required an upstream change (even
-    though upstream was not actually broken, since it explicitly defines
-    __ARMEB__ on AArch64 big-endian builds), so this patch is now based
-    on a more recent upstream OpenSSL commit (the __ILP32__ #ifdefs are
-    still present but never active)
-
-v3: at Will's request, the generated assembly files are now included
-    as .S_shipped files, for which generic build rules are defined
-    already.
-
-Note that sizeable patches like this one have caused issues in the past with
-patchwork, so for Herbert's convenience, the patch can be pulled from
-http://git.kernel.org/cgit/linux/kernel/git/ardb/linux.git, branch
-arm64-sha256 (based on today's cryptodev)
+diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+index c0c49dd..4b5baae 100644
+--- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+@@ -55,6 +55,7 @@
+ 	aliases {
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
++		lcd0 = &lcd0;
+ 	};
+ 
+ 	chosen {
+@@ -93,6 +94,10 @@
+ 	};
+ };
+ 
++&de {
++	status = "okay";
++};
++
+ &ehci1 {
+ 	status = "okay";
+ };
+@@ -101,12 +106,20 @@
+ 	status = "okay";
+ };
+ 
++&hdmi {
++	status = "okay";
++};
++
+ &ir {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&ir_pins_a>;
+ 	status = "okay";
+ };
+ 
++&lcd0 {
++	status = "okay";
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+-- 
+2.10.2
