@@ -1,37 +1,37 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Sun, 20 Nov 2016 19:10:35 +0530
-Subject: [GIT PULL 1/4] DaVinci cleanups for v4.10 (part 2)
-Message-ID: <20161120134038.14998-1-nsekhar@ti.com>
+Date: Sun, 20 Nov 2016 19:10:38 +0530
+Subject: [GIT PULL 4/4] DaVinci defconfig updates for v4.10 (part 2)
+In-Reply-To: <20161120134038.14998-1-nsekhar@ti.com>
+References: <20161120134038.14998-1-nsekhar@ti.com>
+Message-ID: <20161120134038.14998-4-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 766763dbdc1dca11deabdb00077a1c19e2803f0a:
+The following changes since commit 6e9be8608771192851a3adf59f0ba9240e3f802c:
 
-  ARM: davinci: da8xx: Remove duplicated defines (2016-10-31 16:51:56 +0530)
+  ARM: davinci_all_defconfig: enable LED default-on trigger (2016-11-01 11:42:54 +0530)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git davinci-for-v4.10/cleanup-2
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git davinci-for-v4.10/defconfig-2
 
-for you to fetch changes up to f7715b299954b1f1644253682e50f38282eee611:
+for you to fetch changes up to a652baa06413a4beacc09425883e518c5f1ed100:
 
-  ARM: davinci: PM: fix build when da850 not compiled in (2016-11-20 16:52:00 +0530)
-
-----------------------------------------------------------------
-mach-davinci cleanup to make it easy to add PM support
-for DT-boot.
+  ARM: davinci_all_defconfig: add missing options for systemd (2016-11-15 15:44:52 +0530)
 
 ----------------------------------------------------------------
-Kevin Hilman (3):
-      ARM: davinci: PM: rework init, remove platform device
-      ARM: davinci: PM: cleanup: remove references to pdata
-      ARM: davinci: PM: fix build when da850 not compiled in
+Enables newly introduced DDR controller and
+master priority setting drivers in kernel.
 
- arch/arm/mach-davinci/Makefile             |   4 +-
- arch/arm/mach-davinci/board-da850-evm.c    |  17 +----
- arch/arm/mach-davinci/board-mityomapl138.c |  16 +----
- arch/arm/mach-davinci/common.c             |   1 -
- arch/arm/mach-davinci/da850.c              |  38 -----------
- arch/arm/mach-davinci/include/mach/da8xx.h |   1 -
- arch/arm/mach-davinci/pm.c                 | 102 ++++++++++++++++-------------
- 7 files changed, 62 insertions(+), 117 deletions(-)
+Also, update defconfig to boot latest systemd
+based filesystems on DA850.
+
+----------------------------------------------------------------
+Bartosz Golaszewski (1):
+      ARM: davinci_all_defconfig: enable the mstpri and ddrctl drivers
+
+Sekhar Nori (1):
+      ARM: davinci_all_defconfig: add missing options for systemd
+
+ arch/arm/configs/davinci_all_defconfig | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
