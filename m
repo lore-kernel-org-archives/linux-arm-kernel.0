@@ -1,95 +1,30 @@
-From: hao5781286@gmail.com (Hao Zhang)
-Date: Sun, 20 Nov 2016 18:45:40 +0800
-Subject: [PATCH v4 3/3] dmaengine: sun6i: share the dma driver with sun50i
-In-Reply-To: <1479638740-20520-1-git-send-email-hao5781286@gmail.com>
-References: <1479638740-20520-1-git-send-email-hao5781286@gmail.com>
-Message-ID: <1479638740-20520-4-git-send-email-hao5781286@gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sun, 20 Nov 2016 16:59:06 +0530
+Subject: [PATCH] ARM: davinci: PM: fix build when da850 not compiled in
+In-Reply-To: <20161116164438.9881-1-khilman@baylibre.com>
+References: <20161116164438.9881-1-khilman@baylibre.com>
+Message-ID: <b36c5d16-9d49-e4db-8992-c02e9244f04c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes the limited buswith to 8 bytes,and add
-the test in sun6i_dma_config function
+On Wednesday 16 November 2016 10:14 PM, Kevin Hilman wrote:
+> Currently, suspend/resume support is only available on da850 platforms,
+> and the platform PM code has dependencies on da850 functions.  However,
+> CONFIG_SUSPEND might be enabled even when da850 support is not, causing
+> build failure:
+> 
+> arch/arm/mach-davinci/built-in.o: In function `davinci_pm_init':
+> pm_domain.c:(.init.text+0x1fb8): undefined reference to `da8xx_get_mem_ctlr'
+> pm_domain.c:(.init.text+0x20b0): undefined reference to `da8xx_syscfg1_base'
+> 
+> Fix this by only building the PM core when da850 is enabled.
+> 
+> Reported-by: Sekhar Nori <nsekhar@ti.com>
+> Fixes: aa9aa1ec2df6 ARM: davinci: PM: rework init, remove platform device
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 
-Accroding to sun6i dma driver, i think ,if the client
-doesn't configure the address width with dmaengine_slave_config
-function, it would use the default width. So we can add the test
-in sun6i_dma_config function called by dmaengine_slave_config,
-and test the configuration whether is support for the device.
+Applied. Documentation asks for ("") around commit headline in Fixes:
+tag, so I added that.
 
-Signed-off-by: Hao Zhang <hao5781286@gmail.com>
----
- drivers/dma/sun6i-dma.c | 33 ++++++++++++++++++++++++++++++++-
- 1 file changed, 32 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index a235878..f7c90b6 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -250,7 +250,7 @@ static inline s8 convert_burst(u32 maxburst)
- static inline s8 convert_buswidth(enum dma_slave_buswidth addr_width)
- {
- 	if ((addr_width < DMA_SLAVE_BUSWIDTH_1_BYTE) ||
--	    (addr_width > DMA_SLAVE_BUSWIDTH_4_BYTES))
-+	    (addr_width > DMA_SLAVE_BUSWIDTH_8_BYTES))
- 		return -EINVAL;
- 
- 	return addr_width >> 1;
-@@ -758,6 +758,18 @@ static int sun6i_dma_config(struct dma_chan *chan,
- {
- 	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
- 
-+	if ((BIT(config->src_addr_width) | chan->device->src_addr_widths) !=
-+		chan->device->src_addr_widths) {
-+		dev_err(chan2dev(chan), "Invalid DMA configuration\n");
-+		return -EINVAL;
-+	}
-+
-+	if ((BIT(config->dst_addr_width) | chan->device->dst_addr_widths) !=
-+			chan->device->dst_addr_widths) {
-+		dev_err(chan2dev(chan), "Invalid DMA configuration\n");
-+		return -EINVAL;
-+	}
-+
- 	memcpy(&vchan->cfg, config, sizeof(*config));
- 
- 	return 0;
-@@ -1028,11 +1040,23 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
- 	.nr_max_vchans   = 34,
- };
- 
-+/*
-+ * The A64 has 8 physical channels, a maximum DRQ port id of 27,
-+ * and a total of 38 usable source and destination endpoints.
-+ */
-+
-+static struct sun6i_dma_config sun50i_a64_dma_cfg = {
-+	.nr_max_channels = 8,
-+	.nr_max_requests = 27,
-+	.nr_max_vchans   = 38,
-+};
-+
- static const struct of_device_id sun6i_dma_match[] = {
- 	{ .compatible = "allwinner,sun6i-a31-dma", .data = &sun6i_a31_dma_cfg },
- 	{ .compatible = "allwinner,sun8i-a23-dma", .data = &sun8i_a23_dma_cfg },
- 	{ .compatible = "allwinner,sun8i-a83t-dma", .data = &sun8i_a83t_dma_cfg },
- 	{ .compatible = "allwinner,sun8i-h3-dma", .data = &sun8i_h3_dma_cfg },
-+	{ .compatible = "allwinner,sun50i-a64-dma", .data = &sun50i_a64_dma_cfg },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, sun6i_dma_match);
-@@ -1112,6 +1136,13 @@ static int sun6i_dma_probe(struct platform_device *pdev)
- 						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
- 	sdc->slave.directions			= BIT(DMA_DEV_TO_MEM) |
- 						  BIT(DMA_MEM_TO_DEV);
-+
-+	if (of_device_is_compatible(pdev->dev.of_node,
-+				    "allwinner,sun50i-a64-dma")) {
-+		sdc->slave.src_addr_widths	|= BIT(DMA_SLAVE_BUSWIDTH_8_BYTES);
-+		sdc->slave.dst_addr_widths	|= BIT(DMA_SLAVE_BUSWIDTH_8_BYTES);
-+	}
-+
- 	sdc->slave.residue_granularity		= DMA_RESIDUE_GRANULARITY_BURST;
- 	sdc->slave.dev = &pdev->dev;
- 
--- 
-2.7.4
+Thanks
+Sekhar
