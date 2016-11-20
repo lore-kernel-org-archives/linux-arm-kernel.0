@@ -1,46 +1,203 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Sun, 20 Nov 2016 11:15:36 -0800
-Subject: [PATCH] arm: spin one more cycle in timer-based delays
-In-Reply-To: <20161119110301.GQ1041@n2100.armlinux.org.uk>
-References: <582B0F61.6030903@free.fr> <20161118120630.GJ13470@arm.com>
- <20161118125409.GK1041@n2100.armlinux.org.uk> <582F0DD2.3030805@free.fr>
- <20161119071702.GA25647@afzalpc> <20161119110301.GQ1041@n2100.armlinux.org.uk>
-Message-ID: <CAD=FV=VaTAtN94kySt+V5B8HGDEwFra91HaAyqNhpib2Mz=bww@mail.gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Sun, 20 Nov 2016 20:18:24 +0100
+Subject: [RFC PATCH v2 1/2] macb: Add 1588 support in Cadence GEM.
+In-Reply-To: <1479478912-14067-1-git-send-email-andrei.pistirica@microchip.com>
+References: <1479478912-14067-1-git-send-email-andrei.pistirica@microchip.com>
+Message-ID: <20161120191823.GA6950@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Nov 18, 2016 at 03:21:51PM +0100, Andrei Pistirica wrote:
+> - Frequency adjustment is not directly supported by this IP.
 
-On Sat, Nov 19, 2016 at 3:03 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> Linus, how about we add something like this to linux/delay.h to document
-> this fact?
->
->  include/linux/delay.h | 12 +++++++++++
->  1 file changed, 12 insertions(+)
->
-> diff --git a/include/linux/delay.h b/include/linux/delay.h
-> index a6ecb34cf547..2ecb3c46b20a 100644
-> --- a/include/linux/delay.h
-> +++ b/include/linux/delay.h
-> @@ -5,6 +5,18 @@
->   * Copyright (C) 1993 Linus Torvalds
->   *
->   * Delay routines, using a pre-computed "loops_per_jiffy" value.
-> + *
-> + * Please note that ndelay(), udelay() and mdelay() may return early for
-> + * several reasons:
-> + *  1. computed loops_per_jiffy too low (due to the time taken to
-> + *     execute the timer interrupt.)
-> + *  2. cache behaviour affecting the time it takes to execute the
-> + *     loop function.
-> + *  3. CPU clock rate changes.
-> + * As a result, delays should always be over-stated.
-> + *
-> + * Please see this thread:
-> + *   http://lists.openwall.net/linux-kernel/2011/01/09/56
->   */
+This statement still makes no sense.  Doesn't the following text...
 
-Any reason not to land Mason's patch _and_ land your comment change.
-They you eliminate the arbitrary/pointless inaccuracy but still
-reinforce that delays are not accurate.
+>   addend is the initial value ns increment and similarly addendesub.
+>   The ppb (parts per billion) provided is used as
+>   ns_incr = addend +/- (ppb/rate).
+>   Similarly the remainder of the above is used to populate subns increment.
+
+describe how frequency adjustment is in fact supported?
+
+> +config MACB_USE_HWSTAMP
+> +	bool "Use IEEE 1588 hwstamp"
+> +	depends on MACB
+> +	default y
+> +	select PTP_1588_CLOCK
+
+This "select" pattern is going to be replaced with "imply" soon.
+
+   http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1269181.html
+
+You should use the new "imply" key word and reference that series in
+your change log.
+
+> diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
+> index 3f385ab..2ee9af8 100644
+> --- a/drivers/net/ethernet/cadence/macb.h
+> +++ b/drivers/net/ethernet/cadence/macb.h
+> @@ -10,6 +10,10 @@
+>  #ifndef _MACB_H
+>  #define _MACB_H
+>  
+> +#include <linux/net_tstamp.h>
+> +#include <linux/ptp_clock.h>
+> +#include <linux/ptp_clock_kernel.h>
+
+Don't need net_tstamp.h here.  Move it into the .c file please.
+
+> @@ -840,8 +902,26 @@ struct macb {
+>  
+>  	unsigned int		rx_frm_len_mask;
+>  	unsigned int		jumbo_max_len;
+> +
+> +#ifdef CONFIG_MACB_USE_HWSTAMP
+> +	unsigned int		hwts_tx_en;
+> +	unsigned int		hwts_rx_en;
+
+These two can be bool'eans.
+
+> +	spinlock_t		tsu_clk_lock;
+> +	unsigned int		tsu_rate;
+> +
+> +	struct ptp_clock	*ptp_clock;
+> +	struct ptp_clock_info	ptp_caps;
+> +	unsigned int		ns_incr;
+> +	unsigned int		subns_incr;
+
+These two are 32 bit register values, right?  Then use the u32 type.
+
+> +#endif
+>  };
+
+> +static inline void macb_tsu_set_time(struct macb *bp,
+> +				     const struct timespec64 *ts)
+> +{
+> +	u32 ns, sech, secl;
+> +	s64 word_mask = 0xffffffff;
+> +
+> +	sech = (u32)ts->tv_sec;
+> +	secl = (u32)ts->tv_sec;
+> +	ns = ts->tv_nsec;
+> +	if (ts->tv_sec > word_mask)
+> +		sech = (ts->tv_sec >> 32);
+> +
+> +	spin_lock(&bp->tsu_clk_lock);
+> +
+> +	/* TSH doesn't latch the time and no atomicity! */
+> +	gem_writel(bp, TSH, sech);
+> +	gem_writel(bp, TSL, secl);
+
+If TN overflows here then the clock will be off by one whole second!
+Why not clear TN first?
+
+> +	gem_writel(bp, TN, ns);
+> +
+> +	spin_unlock(&bp->tsu_clk_lock);
+> +}
+> +
+> +static int macb_ptp_adjfreq(struct ptp_clock_info *ptp, s32 ppb)
+> +{
+> +	struct macb *bp = container_of(ptp, struct macb, ptp_caps);
+> +	u32 addend, addend_frac, rem;
+> +	u64 drift_tmr, diff, diff_frac = 0;
+> +	int neg_adj = 0;
+> +
+> +	if (ppb < 0) {
+> +		neg_adj = 1;
+> +		ppb = -ppb;
+> +	}
+> +
+> +	/* drift/period */
+> +	drift_tmr = (bp->ns_incr * ppb) +
+> +		    ((bp->subns_incr * ppb) >> 16);
+
+What?  Why the 16 bit shift?  Last time your said it was 24 bits.
+
+> +	/* drift/cycle */
+> +	diff = div_u64_rem(drift_tmr, 1000000000ULL, &rem);
+> +
+> +	/* drift fraction/cycle, if necessary */
+> +	if (rem) {
+> +		u64 fraction = rem;
+> +		fraction = fraction << 16;
+> +
+> +		diff_frac = div_u64(fraction, 1000000000ULL);
+
+If you use a combined tuning word like I explained last time, then you
+will not need a second division.
+
+Also, please use the new adjfine() PHC method, as adjfreq() is now deprecated.
+
+> +	}
+> +
+> +	/* adjustmets */
+> +	addend = neg_adj ? (bp->ns_incr - diff) : (bp->ns_incr + diff);
+> +	addend_frac = neg_adj ? (bp->subns_incr - diff_frac) :
+> +				(bp->subns_incr + diff_frac);
+> +
+> +	spin_lock(&bp->tsu_clk_lock);
+> +
+> +	gem_writel(bp, TISUBN, GEM_BF(SUBNSINCR, addend_frac));
+> +	gem_writel(bp, TI, GEM_BF(NSINCR, addend));
+> +
+> +	spin_unlock(&bp->tsu_clk_lock);
+> +	return 0;
+> +}
+
+> +void macb_ptp_init(struct net_device *ndev)
+> +{
+> +	struct macb *bp = netdev_priv(ndev);
+> +	struct timespec64 now;
+> +	u32 rem = 0;
+> +
+> +	if (!(bp->caps | MACB_CAPS_GEM_HAS_PTP)){
+> +		netdev_vdbg(bp->dev, "Platform does not support PTP!\n");
+> +		return;
+> +	}
+> +
+> +	spin_lock_init(&bp->tsu_clk_lock);
+> +
+> +	bp->ptp_caps = macb_ptp_caps;
+> +	bp->tsu_rate = clk_get_rate(bp->pclk);
+> +
+> +	getnstimeofday64(&now);
+> +	macb_tsu_set_time(bp, (const struct timespec64 *)&now);
+> +
+> +	bp->ns_incr = div_u64_rem(NSEC_PER_SEC, bp->tsu_rate, &rem);
+> +	if (rem) {
+> +		u64 adj = rem;
+> +		/* Multiply by 2^16 as subns register is 16 bits */
+
+Last time you said:
+> +		/* Multiple by 2^24 as subns field is 24 bits */
+
+> +		adj <<= 16;
+> +		bp->subns_incr = div_u64(adj, bp->tsu_rate);
+> +	} else {
+> +		bp->subns_incr = 0;
+> +	}
+> +
+> +	gem_writel(bp, TISUBN, GEM_BF(SUBNSINCR, bp->subns_incr));
+> +	gem_writel(bp, TI, GEM_BF(NSINCR, bp->ns_incr));
+> +	gem_writel(bp, TA, 0);
+> +
+> +	bp->ptp_clock = ptp_clock_register(&bp->ptp_caps, NULL);
+
+You call regsiter, but you never call unregister!
+
+> +	if (IS_ERR(&bp->ptp_clock)) {
+> +		bp->ptp_clock = NULL;
+> +		pr_err("ptp clock register failed\n");
+> +		return;
+> +	}
+> +
+> +	dev_info(&bp->pdev->dev, "%s ptp clock registered.\n", GMAC_TIMER_NAME);
+> +}
+> +
+> -- 
+> 1.9.1
+> 
+
+Thanks,
+Richard
