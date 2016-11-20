@@ -1,26 +1,27 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 20 Nov 2016 11:04:34 -0200
-Subject: i.MX6UL: feature state of linux-fslc 4.1.x vs mainline
-In-Reply-To: <CAKP5S=2WAdCfONGQEAup7yUGXp615QUZ83oAYmyJ6kjGhAG_YQ@mail.gmail.com>
-References: <CAKP5S=2WAdCfONGQEAup7yUGXp615QUZ83oAYmyJ6kjGhAG_YQ@mail.gmail.com>
-Message-ID: <CAOMZO5D5oKV6wQLuqUNhPBxa5-Y+xWOVoiRkC=it9dx1BseaNw@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sun, 20 Nov 2016 18:38:51 +0530
+Subject: [PATCH v5 0/2] platform: Add DT support for DA8xx
+In-Reply-To: <1479294456-7942-1-git-send-email-abailon@baylibre.com>
+References: <1479294456-7942-1-git-send-email-abailon@baylibre.com>
+Message-ID: <0186ccb1-c3ad-e720-a316-1cb33d779b8b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolae,
+On Wednesday 16 November 2016 04:37 PM, Alexandre Bailon wrote:
+> This add and enable the usb otg for da850 and da850-lcdk.
+> This series depends on "driver: dd DT support for DA8xx" patch set.
 
-On Thu, Nov 17, 2016 at 10:56 AM, Nicolae Rosia
-<nicolae.rosia.oss@gmail.com> wrote:
-> Hello,
->
-> I'm wondering if there is a table of missing features that are present
-> in Linux freescale 4.1.x [0] and are not present in latest mainline
-> kernel with regards to NXP i.MX6UL SoC.
+I see that Bin has already applied this.
 
-I don't think there is such table available.
+> If this series is applied before the "usb: musb: da8xx: Fix few issues" patch
+> set then the usb driver will always retrun -ENODEV.
 
-> Is there a reason why I should go with linux-fslc for this SoC ?
+And this seems to be applied too. So I am going ahead and applying this
+series.
 
-You can use mainline kernel with mx6ul.
+For future, please add some information on which device you are
+referring to in the subject line. Reading the subject line for the
+cover-letter, there is no way to know what exactly is being worked on here.
 
->From the top of my head it still misses PXP and camera support though.
+Thanks,
+Sekhar
