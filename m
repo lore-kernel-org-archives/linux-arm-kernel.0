@@ -1,81 +1,38 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Sun, 20 Nov 2016 20:54:13 +0100
-Subject: [RFC PATCH v2 2/2] macb: Enable 1588 support in SAMA5D2 platform.
-In-Reply-To: <1479478912-14067-2-git-send-email-andrei.pistirica@microchip.com>
-References: <1479478912-14067-1-git-send-email-andrei.pistirica@microchip.com>
- <1479478912-14067-2-git-send-email-andrei.pistirica@microchip.com>
-Message-ID: <20161120195413.GB7874@localhost.localdomain>
+From: slash.tmp@free.fr (Mason)
+Date: Sun, 20 Nov 2016 21:00:20 +0100
+Subject: [PATCH] arm: spin one more cycle in timer-based delays
+In-Reply-To: <20161120194439.GY1041@n2100.armlinux.org.uk>
+References: <582B0F61.6030903@free.fr> <20161118120630.GJ13470@arm.com>
+ <20161118125409.GK1041@n2100.armlinux.org.uk> <582F0DD2.3030805@free.fr>
+ <20161119071702.GA25647@afzalpc>
+ <20161119110301.GQ1041@n2100.armlinux.org.uk> <58309A02.4030804@free.fr>
+ <CAD=FV=WQCfpvVrn64LjxfeG2S7peU5ZWKVGsRyU83-zNCVZmxg@mail.gmail.com>
+ <20161120194439.GY1041@n2100.armlinux.org.uk>
+Message-ID: <3265ea26-767f-a509-07eb-2f8ce26b90e6@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 03:21:52PM +0100, Andrei Pistirica wrote:
-> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-> index d975882..eb66b76 100644
-> --- a/drivers/net/ethernet/cadence/macb.c
-> +++ b/drivers/net/ethernet/cadence/macb.c
-> @@ -697,6 +697,8 @@ static void macb_tx_interrupt(struct macb_queue *queue)
->  
->  			/* First, update TX stats if needed */
->  			if (skb) {
-> +				macb_ptp_do_txstamp(bp, skb);
+On 20/11/2016 20:44, Russell King - ARM Linux wrote:
 
-This is in the hot path, and so you should have an inline wrapper that
-tests (bp->hwts_tx_en) and THEN calls into macb_ptp.c
+> On Sun, Nov 20, 2016 at 11:18:48AM -0800, Doug Anderson wrote:
+>
+>> On Sat, Nov 19, 2016 at 10:29 AM, Mason <slash.tmp@free.fr> wrote:
+>>
+>>> OK, so loop-based delays are known to be short. Would you or Linus
+>>> accept a patch that adds a X% cushion *in the implementation* ?
+>>>
+>>> You are saying "people shouldn't expect udelay(10) to delay at least
+>>> 10 ?s, thus they should write udelay(10+N)".
+>>>
+>>> Why not hide that implementation detail inside the implementation,
+>>> so as not to force the pessimization on every other implementation
+>>> behind the udelay/ndelay wrapper?
+> 
+> Try sending Linus a patch for it.
 
-In case PTP isn't configured, then the inline wrapper should be empty.
+OK, I will.
 
->  				netdev_vdbg(bp->dev, "skb %u (data %p) TX complete\n",
->  					    macb_tx_ring_wrap(tail), skb->data);
->  				bp->stats.tx_packets++;
-> @@ -853,6 +855,8 @@ static int gem_rx(struct macb *bp, int budget)
->  		    GEM_BFEXT(RX_CSUM, ctrl) & GEM_RX_CSUM_CHECKED_MASK)
->  			skb->ip_summed = CHECKSUM_UNNECESSARY;
->  
-> +		macb_ptp_do_rxstamp(bp, skb);
+BTW, any reason why you replied to me via Doug's reply?
+Are my messages not reaching your server?
 
-Same here.
-
->  		bp->stats.rx_packets++;
->  		bp->stats.rx_bytes += skb->len;
->  
-> @@ -1946,6 +1950,8 @@ static int macb_open(struct net_device *dev)
->  
->  	netif_tx_start_all_queues(dev);
->  
-> +	macb_ptp_init(dev);
-
-This leaks PHC instances starting the second time that the interface goes up!
-
->  	return 0;
->  }
->  
-> @@ -2204,7 +2210,7 @@ static const struct ethtool_ops gem_ethtool_ops = {
->  	.get_regs_len		= macb_get_regs_len,
->  	.get_regs		= macb_get_regs,
->  	.get_link		= ethtool_op_get_link,
-> -	.get_ts_info		= ethtool_op_get_ts_info,
-> +	.get_ts_info		= macb_get_ts_info,
-
-You enable the time stamping logic unconditionally here ...
-
->  	.get_ethtool_stats	= gem_get_ethtool_stats,
->  	.get_strings		= gem_get_ethtool_strings,
->  	.get_sset_count		= gem_get_sset_count,
-> @@ -2221,7 +2227,14 @@ static int macb_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
->  	if (!phydev)
->  		return -ENODEV;
->  
-> -	return phy_mii_ioctl(phydev, rq, cmd);
-> +	switch (cmd) {
-> +	case SIOCSHWTSTAMP:
-> +		return macb_hwtst_set(dev, rq, cmd);
-> +	case SIOCGHWTSTAMP:
-> +		return macb_hwtst_get(dev, rq);
-
-and here.
-
-Is that logic always available on every MACB device?  If so, is the
-implementation also identical?
-
-Thanks,
-Richard
+Regards.
