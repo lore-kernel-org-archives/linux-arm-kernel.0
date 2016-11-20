@@ -1,42 +1,33 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Sun, 20 Nov 2016 11:18:48 -0800
-Subject: [PATCH] arm: spin one more cycle in timer-based delays
-In-Reply-To: <58309A02.4030804@free.fr>
-References: <582B0F61.6030903@free.fr> <20161118120630.GJ13470@arm.com>
- <20161118125409.GK1041@n2100.armlinux.org.uk> <582F0DD2.3030805@free.fr>
- <20161119071702.GA25647@afzalpc> <20161119110301.GQ1041@n2100.armlinux.org.uk>
- <58309A02.4030804@free.fr>
-Message-ID: <CAD=FV=WQCfpvVrn64LjxfeG2S7peU5ZWKVGsRyU83-zNCVZmxg@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sun, 20 Nov 2016 21:24:51 +0200
+Subject: [PATCH v2 1/5] ASoC: samsung: Remove non-existing MACH dependencies
+In-Reply-To: <1479669895-19124-1-git-send-email-krzk@kernel.org>
+References: <1479669895-19124-1-git-send-email-krzk@kernel.org>
+Message-ID: <1479669895-19124-2-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+MACH_SMDKC100 was removed in commit b8529ec1c1b0 ("ARM: S5PC100: no more
+support S5PC100 SoC"). MACH_SMDKV210 and MACH_SMDKC110 in commit
+28c8331d386 ("ARM: S5PV210: Remove support for board files").
 
-On Sat, Nov 19, 2016 at 10:29 AM, Mason <slash.tmp@free.fr> wrote:
->> Exactly - and the reason for that (as I've explained several times in
->> the past) the "standard" software delay loop calibrated against the
->> timer interrupt is _always_ going to be short.
->
-> OK, so loop-based delays are known to be short. Would you or Linus
-> accept a patch that adds a X% cushion *in the implementation* ?
->
-> You are saying "people shouldn't expect udelay(10) to delay at least
-> 10 ?s, thus they should write udelay(10+N)".
->
-> Why not hide that implementation detail inside the implementation,
-> so as not to force the pessimization on every other implementation
-> behind the udelay/ndelay wrapper?
->
-> void loop_based_udelay(long us) {
->   spin_for_some_us(us + us/8);
-> }
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ sound/soc/samsung/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-IMHO this would be an extremely sane thing to do.
-
-Then, if you happened to be on a platform where udelay _was_ accurate
-then you could eliminate the pointless overhead.  ...and also if you
-were writing code to a datasheet and it said "delay for 50 us between
-A and B" you could actually write udelay(50) instead of everyone
-needing to know that they should write "udelay(53)".
-
--Doug
+diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+index 79ae6a7c93ff..ea0fa9971a0c 100644
+--- a/sound/soc/samsung/Kconfig
++++ b/sound/soc/samsung/Kconfig
+@@ -49,7 +49,7 @@ config SND_SOC_SAMSUNG_JIVE_WM8750
+ 
+ config SND_SOC_SAMSUNG_SMDK_WM8580
+ 	tristate "SoC I2S Audio support for WM8580 on SMDK"
+-	depends on MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110
++	depends on MACH_SMDK6410
+ 	depends on I2C
+ 	select SND_SOC_WM8580
+ 	select SND_SAMSUNG_I2S
+-- 
+2.7.4
