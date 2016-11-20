@@ -1,31 +1,40 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Sun, 20 Nov 2016 19:10:36 +0530
-Subject: [GIT PULL 2/4] DaVinci SoC updates for v4.10 (part 2)
+Date: Sun, 20 Nov 2016 19:10:37 +0530
+Subject: [GIT PULL 3/4] DaVinci DT updates for v4.10 (part 2)
 In-Reply-To: <20161120134038.14998-1-nsekhar@ti.com>
 References: <20161120134038.14998-1-nsekhar@ti.com>
-Message-ID: <20161120134038.14998-2-nsekhar@ti.com>
+Message-ID: <20161120134038.14998-3-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit ced95ac0815501f47a6041548d70d8900400912d:
+The following changes since commit 1b499f255589204466d8f8ab26e6b577d7b5c88f:
 
-  ARM: davinci: da8xx: register USB PHY clocks in the DT file (2016-11-01 15:24:24 +0530)
+  ARM: dts: da850: Add cfgchip syscon node (2016-11-01 15:11:10 +0530)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git davinci-for-v4.10/soc-2
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git davinci-for-v4.10/dt-2
 
-for you to fetch changes up to 7e431af8fa0b9ed9d74378c99514856211cb9db8:
+for you to fetch changes up to 83de086cc89410a8d4e0b6345e8a1116797ea703:
 
-  ARM: davinci: PM: support da8xx DT platforms (2016-11-16 14:45:07 +0530)
-
-----------------------------------------------------------------
-Adds suspend-to-RAM support for DT boot mode
-on DA850.
+  ARM: dts: da850-lcdk: Enable the usb otg device node (2016-11-20 17:02:18 +0530)
 
 ----------------------------------------------------------------
-Kevin Hilman (1):
-      ARM: davinci: PM: support da8xx DT platforms
+Adds device tree nodes enabling DDR controller
+and bus master priority settings needed for
+stable LCDC operation on DA850.
 
- arch/arm/mach-davinci/da8xx-dt.c | 1 +
- 1 file changed, 1 insertion(+)
+Also adds support for MUSB device on DA850
+providing USB OTG support.
+
+----------------------------------------------------------------
+Alexandre Bailon (2):
+      ARM: dts: da850: Add the usb otg device node
+      ARM: dts: da850-lcdk: Enable the usb otg device node
+
+Bartosz Golaszewski (1):
+      ARM: dts: da850: add the mstpri and ddrctl nodes
+
+ arch/arm/boot/dts/da850-lcdk.dts |  8 ++++++++
+ arch/arm/boot/dts/da850.dtsi     | 18 ++++++++++++++++++
+ 2 files changed, 26 insertions(+)
