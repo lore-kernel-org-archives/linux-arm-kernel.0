@@ -1,78 +1,85 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sun, 20 Nov 2016 10:21:20 +0800
-Subject: [arm-soc:sunxi/dt64 3/3]
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi:45:46: fatal error:
- dt-bindings/clock/sun50i-a64-ccu.h: No such file or directory
-Message-ID: <201611201033.0KrzgfES%fengguang.wu@intel.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 19 Nov 2016 18:22:32 -0800
+Subject: [GIT PULL] ARM: SoC fixes
+Message-ID: <20161120022232.GA24427@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+Hi Linus,
 
-FYI, the error/warning still remains.
+The following changes since commit 4b3415c9363f828e7f1e45edecb57930849d5d5b:
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git sunxi/dt64
-head:   4e3886081848b7ea16452a92c4324acaab644d49
-commit: 4e3886081848b7ea16452a92c4324acaab644d49 [3/3] arm64: dts: add Pine64 support
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 4e3886081848b7ea16452a92c4324acaab644d49
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+  Merge tag 'imx-fixes-3.19-2' of git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux into fixes (2015-01-23 14:23:40 -0800)
 
-All errors (new ones prefixed by >>):
+are available in the git repository at:
 
-   In file included from arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts:45:0,
-                    from arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts:43:
->> arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi:45:46: fatal error: dt-bindings/clock/sun50i-a64-ccu.h: No such file or directory
-    #include <dt-bindings/clock/sun50i-a64-ccu.h>
-                                                 ^
-   compilation terminated.
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-for-linus
 
-vim +45 arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+for you to fetch changes up to 28111dda37e653781efc73c06229f006739b3982:
 
-6bc37fac Andre Przywara 2016-01-18  29   *     Software is furnished to do so, subject to the following
-6bc37fac Andre Przywara 2016-01-18  30   *     conditions:
-6bc37fac Andre Przywara 2016-01-18  31   *
-6bc37fac Andre Przywara 2016-01-18  32   *     The above copyright notice and this permission notice shall be
-6bc37fac Andre Przywara 2016-01-18  33   *     included in all copies or substantial portions of the Software.
-6bc37fac Andre Przywara 2016-01-18  34   *
-6bc37fac Andre Przywara 2016-01-18  35   *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-6bc37fac Andre Przywara 2016-01-18  36   *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-6bc37fac Andre Przywara 2016-01-18  37   *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-6bc37fac Andre Przywara 2016-01-18  38   *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-6bc37fac Andre Przywara 2016-01-18  39   *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-6bc37fac Andre Przywara 2016-01-18  40   *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-6bc37fac Andre Przywara 2016-01-18  41   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-6bc37fac Andre Przywara 2016-01-18  42   *     OTHER DEALINGS IN THE SOFTWARE.
-6bc37fac Andre Przywara 2016-01-18  43   */
-6bc37fac Andre Przywara 2016-01-18  44  
-6bc37fac Andre Przywara 2016-01-18 @45  #include <dt-bindings/clock/sun50i-a64-ccu.h>
-6bc37fac Andre Przywara 2016-01-18  46  #include <dt-bindings/interrupt-controller/arm-gic.h>
-6bc37fac Andre Przywara 2016-01-18  47  #include <dt-bindings/pinctrl/sun4i-a10.h>
-6bc37fac Andre Przywara 2016-01-18  48  #include <dt-bindings/reset/sun50i-a64-ccu.h>
-6bc37fac Andre Przywara 2016-01-18  49  
-6bc37fac Andre Przywara 2016-01-18  50  / {
-6bc37fac Andre Przywara 2016-01-18  51  	interrupt-parent = <&gic>;
-6bc37fac Andre Przywara 2016-01-18  52  	#address-cells = <1>;
-6bc37fac Andre Przywara 2016-01-18  53  	#size-cells = <1>;
+  Merge tag 'renesas-soc-fixes3-for-v3.19' of git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas into fixes (2015-02-01 08:51:12 -0800)
 
-:::::: The code at line 45 was first introduced by commit
-:::::: 6bc37fac30cf01c39feb17834090089304bd1d31 arm64: dts: add Allwinner A64 SoC .dtsi
+----------------------------------------------------------------
+ARM: SoC fixes
 
-:::::: TO: Andre Przywara <andre.przywara@arm.com>
-:::::: CC: Maxime Ripard <maxime.ripard@free-electrons.com>
+One more week's worth of fixes. Worth pointing out here are:
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 32759 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161120/3facb00b/attachment-0001.gz>
+- A patch fixing detaching of iommu registrations when a device is removed --
+  earlier the ops pointer wasn't managed properly
+- Another set of Renesas boards get the same GIC setup fixup as others have in
+  previous -rcs
+- Serial port aliases fixups for sunxi. We did the same to tegra but we
+  caught that in time before the merge window due to more machines being
+  affected. Here it took longer for anyone to notice.
+- A couple more DT tweaks on sunxi
+- A follow-up patch for the mvebu coherency disabling in last -rc batch
+
+----------------------------------------------------------------
+Chen-Yu Tsai (1):
+      ARM: dts: sunxi: Fix usb-phy support for sun4i/sun5i
+
+Hans de Goede (2):
+      ARM: dts: sun6i: ippo-q8h-v5: Fix serial0 alias
+      ARM: dts: sun4i: Add simplefb node with de_fe0-de_be0-lcd0-hdmi pipeline
+
+Laurent Pinchart (1):
+      arm: dma-mapping: Set DMA IOMMU ops in arm_iommu_attach_device()
+
+Magnus Damm (2):
+      ARM: shmobile: r8a73a4: Instantiate GIC from C board code in legacy builds
+      ARM: shmobile: r8a7790: Instantiate GIC from C board code in legacy builds
+
+Maxime Ripard (1):
+      ARM: sunxi: dt: Fix aliases
+
+Olof Johansson (3):
+      Merge tag 'sunxi-fixes-for-3.19' of https://git.kernel.org/.../mripard/linux into fixes
+      Merge tag 'mvebu-fixes-3.19-6' of git://git.infradead.org/linux-mvebu into fixes
+      Merge tag 'renesas-soc-fixes3-for-v3.19' of git://git.kernel.org/.../horms/renesas into fixes
+
+Thomas Petazzoni (1):
+      ARM: mvebu: don't set the PL310 in I/O coherency mode when I/O coherency is disabled
+
+ arch/arm/boot/dts/sun4i-a10.dtsi                 | 20 ++++-----
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |  6 +++
+ arch/arm/boot/dts/sun5i-a10s.dtsi                |  8 +---
+ arch/arm/boot/dts/sun5i-a13-hsg-h702.dts         |  4 ++
+ arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts  |  4 ++
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts        |  4 ++
+ arch/arm/boot/dts/sun5i-a13.dtsi                 |  9 +---
+ arch/arm/boot/dts/sun6i-a31.dtsi                 |  6 ---
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts         |  6 +++
+ arch/arm/boot/dts/sun7i-a20-hummingbird.dts      |  8 ++++
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts  |  3 ++
+ arch/arm/boot/dts/sun7i-a20.dtsi                 |  8 ----
+ arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts      |  4 ++
+ arch/arm/boot/dts/sun8i-a23.dtsi                 |  9 ----
+ arch/arm/boot/dts/sun9i-a80-optimus.dts          |  5 +++
+ arch/arm/boot/dts/sun9i-a80.dtsi                 | 10 -----
+ arch/arm/mach-mvebu/coherency.c                  |  7 ++++
+ arch/arm/mach-shmobile/board-ape6evm.c           | 20 +++++++++
+ arch/arm/mach-shmobile/board-lager.c             | 13 ++++++
+ arch/arm/mach-shmobile/setup-rcar-gen2.c         |  2 +
+ arch/arm/mach-shmobile/timer.c                   | 12 ++++++
+ arch/arm/mm/dma-mapping.c                        | 53 +++++++++++++++++-------
+ 22 files changed, 150 insertions(+), 71 deletions(-)
