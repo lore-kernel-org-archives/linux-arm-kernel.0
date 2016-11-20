@@ -1,60 +1,99 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sun, 20 Nov 2016 12:23:19 +0100
-Subject: [PATCH v6 4/5] ARM: dts: sun8i-h3: Add HDMI video to the Banana Pi M2+
+Date: Sun, 20 Nov 2016 12:20:21 +0100
+Subject: [PATCH v6 3/5] ARM: dts: sun8i-h3: add HDMI video nodes
 In-Reply-To: <cover.1479641523.git.moinejf@free.fr>
 References: <cover.1479641523.git.moinejf@free.fr>
-Message-ID: <9dc91753796f8413f276ea62479bd767b549d8c2.1479641523.git.moinejf@free.fr>
+Message-ID: <cdf50b8433e2d9a053e35f8788bfcd5d41504312.1479641523.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/sun8i-h3.dtsi | 51 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-index c0c49dd..4b5baae 100644
---- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-@@ -55,6 +55,7 @@
- 	aliases {
- 		serial0 = &uart0;
- 		serial1 = &uart1;
-+		lcd0 = &lcd0;
- 	};
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index 416b825..7c6b1d5 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -140,6 +140,16 @@
+ 		#size-cells = <1>;
+ 		ranges;
  
- 	chosen {
-@@ -93,6 +94,10 @@
- 	};
- };
- 
-+&de {
-+	status = "okay";
-+};
++		de: de-controller at 01000000 {
++			compatible = "allwinner,sun8i-h3-display-engine";
++			reg = <0x01000000 0x400000>;
++			clocks = <&ccu CLK_BUS_DE>, <&ccu CLK_DE>;
++			clock-names = "bus", "clock";
++			resets = <&ccu RST_BUS_DE>;
++			ports = <&lcd0_p>;
++			status = "disabled";
++		};
 +
- &ehci1 {
- 	status = "okay";
- };
-@@ -101,12 +106,20 @@
- 	status = "okay";
- };
+ 		dma: dma-controller at 01c02000 {
+ 			compatible = "allwinner,sun8i-h3-dma";
+ 			reg = <0x01c02000 0x1000>;
+@@ -149,6 +159,23 @@
+ 			#dma-cells = <1>;
+ 		};
  
-+&hdmi {
-+	status = "okay";
-+};
++		lcd0: lcd-controller at 01c0c000 {
++			compatible = "allwinner,sun8i-a83t-tcon";
++			reg = <0x01c0c000 0x400>;
++			clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_TCON0>;
++			clock-names = "bus", "clock";
++			resets = <&ccu RST_BUS_TCON0>;
++			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			lcd0_p: port {
++				lcd0_hdmi: endpoint {
++					remote-endpoint = <&hdmi_lcd0>;
++				};
++			};
++		};
 +
- &ir {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&ir_pins_a>;
- 	status = "okay";
- };
+ 		mmc0: mmc at 01c0f000 {
+ 			compatible = "allwinner,sun7i-a20-mmc";
+ 			reg = <0x01c0f000 0x1000>;
+@@ -314,6 +341,11 @@
+ 			clock-names = "hosc", "losc";
+ 			#clock-cells = <1>;
+ 			#reset-cells = <1>;
++
++			assigned-clocks = <&ccu CLK_PLL_DE>,
++					  <&ccu CLK_DE>;
++			assigned-clock-rates =  <864000000>,
++						<432000000>;
+ 		};
  
-+&lcd0 {
-+	status = "okay";
-+};
+ 		pio: pinctrl at 01c20800 {
+@@ -564,6 +596,25 @@
+ 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		};
+ 
++		hdmi: hdmi at 01ee0000 {
++			compatible = "allwinner,sun8i-h3-hdmi";
++			reg = <0x01ee0000 0x20000>;
++			clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI>,
++				 <&ccu CLK_HDMI_DDC>;
++			clock-names = "bus", "clock", "ddc-clock";
++			resets = <&ccu RST_BUS_HDMI0>, <&ccu RST_BUS_HDMI1>;
++			reset-names = "hdmi0", "hdmi1";
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			port at 0 {			/* video */
++				reg = <0>;
++				hdmi_lcd0: endpoint {
++					remote-endpoint = <&lcd0_hdmi>;
++				};
++			};
++		};
 +
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+ 		rtc: rtc at 01f00000 {
+ 			compatible = "allwinner,sun6i-a31-rtc";
+ 			reg = <0x01f00000 0x54>;
 -- 
 2.10.2
