@@ -1,68 +1,46 @@
-From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
-Date: Sun, 20 Nov 2016 20:10:34 +0100
-Subject: mmc: core: complete/wait_for_completion performance
-In-Reply-To: <187975187.249177.bccdc17e-e9c6-48c2-aeaf-3b81f1b61ec7.open-xchange@email.1und1.de>
-References: <1479644869.2653.3.camel@embedded.rocks>
- <585759233.283839.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
- <1479652929.2841.1.camel@embedded.rocks>
- <187975187.249177.bccdc17e-e9c6-48c2-aeaf-3b81f1b61ec7.open-xchange@email.1und1.de>
-Message-ID: <1479669034.1975.1.camel@embedded.rocks>
+From: dianders@chromium.org (Doug Anderson)
+Date: Sun, 20 Nov 2016 11:15:36 -0800
+Subject: [PATCH] arm: spin one more cycle in timer-based delays
+In-Reply-To: <20161119110301.GQ1041@n2100.armlinux.org.uk>
+References: <582B0F61.6030903@free.fr> <20161118120630.GJ13470@arm.com>
+ <20161118125409.GK1041@n2100.armlinux.org.uk> <582F0DD2.3030805@free.fr>
+ <20161119071702.GA25647@afzalpc> <20161119110301.GQ1041@n2100.armlinux.org.uk>
+Message-ID: <CAD=FV=VaTAtN94kySt+V5B8HGDEwFra91HaAyqNhpib2Mz=bww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2016-11-20 at 16:44 +0100, Stefan Wahren wrote:
-> > J?rg Krause <joerg.krause@embedded.rocks> hat am 20. November 2016
-> > um 15:42
-> > geschrieben:
-> > 
-> > 
-> > Hi Stefan,
-> > 
-> > On Sun, 2016-11-20 at 14:28 +0100, Stefan Wahren wrote:
-> > > Hi J?rg,
-> > > 
-> > > > J?rg Krause <joerg.krause@embedded.rocks> hat am 20. November
-> > > > 2016
-> > > > um 13:27
-> > > > geschrieben:
-> > > > 
-> > > > 
-> > > > Hi,
-> > > > 
-> > > > I started the discussion on this mailing list in another thread
-> > > > [1],
-> > > > but I'd like to move it to a new thread, because it might be
-> > > > mmc
-> > > > specific.
-> > > > 
-> > > > The issue is that I am noticed low wifi network throughput on
-> > > > an
-> > > > i.MX28
-> > > > board with the mainline kernel (v4.7.10, about 6 Mbps) compared
-> > > > to
-> > > > the
-> > > > vendor kernel (Freescale v2.6.35.3, about 20 Mbps). The wifi
-> > > > chip
-> > > > is
-> > > > attached using the SDIO interface.
-> > > > 
-> > > > I started investigation where the bottleneck in the mainline
-> > > > kernel?might come from. Therefore I checked that the configs
-> > > > and
-> > > > settings for the interfaces and drivers are the same. They are.
-> > > 
-> > > so you're not using the mxs_defconfig settings anymore?
-> > 
-> > No, I changed the settings.
-> > 
-> 
-> What happens to performance to if you change the following settings
-> to the same
-> like in mxs_defconfig?
-> 
-> CONFIG_PREEMPT_VOLUNTARY=y
-> CONFIG_DEFAULT_IOSCHED="noop"
+Hi,
 
-No much change at all. The time difference between complete() and
-wait_for_complete() decreases in best case to 110 us, but also varies
-to above 130 us.
+On Sat, Nov 19, 2016 at 3:03 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> Linus, how about we add something like this to linux/delay.h to document
+> this fact?
+>
+>  include/linux/delay.h | 12 +++++++++++
+>  1 file changed, 12 insertions(+)
+>
+> diff --git a/include/linux/delay.h b/include/linux/delay.h
+> index a6ecb34cf547..2ecb3c46b20a 100644
+> --- a/include/linux/delay.h
+> +++ b/include/linux/delay.h
+> @@ -5,6 +5,18 @@
+>   * Copyright (C) 1993 Linus Torvalds
+>   *
+>   * Delay routines, using a pre-computed "loops_per_jiffy" value.
+> + *
+> + * Please note that ndelay(), udelay() and mdelay() may return early for
+> + * several reasons:
+> + *  1. computed loops_per_jiffy too low (due to the time taken to
+> + *     execute the timer interrupt.)
+> + *  2. cache behaviour affecting the time it takes to execute the
+> + *     loop function.
+> + *  3. CPU clock rate changes.
+> + * As a result, delays should always be over-stated.
+> + *
+> + * Please see this thread:
+> + *   http://lists.openwall.net/linux-kernel/2011/01/09/56
+>   */
+
+Any reason not to land Mason's patch _and_ land your comment change.
+They you eliminate the arbitrary/pointless inaccuracy but still
+reinforce that delays are not accurate.
