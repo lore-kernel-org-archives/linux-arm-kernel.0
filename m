@@ -1,116 +1,35 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 20 Nov 2016 21:24:52 +0200
-Subject: [RFT v2 2/5] ASoC: samsung: smdk_wm8580: Remove old platforms and
- drop mach-types usage
+Date: Sun, 20 Nov 2016 21:24:54 +0200
+Subject: [PATCH v2 4/5] ASoC: samsung: Enable COMPILE_TEST for entire Samsung
+ ASoc
 In-Reply-To: <1479669895-19124-1-git-send-email-krzk@kernel.org>
 References: <1479669895-19124-1-git-send-email-krzk@kernel.org>
-Message-ID: <1479669895-19124-3-git-send-email-krzk@kernel.org>
+Message-ID: <1479669895-19124-5-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MACH_SMDKC100, MACH_SMDKV210 and MACH_SMDKC110 are no longer supported
-so we can drop the dead code.  After this the driver no longer
-differentiates between machines (S3C24xx machines are not supported by
-it) so there is no need to override I2S device id in cpu_dai_name and
-SEC_PLAYBACK dai_link can be removed as well.
+Instead of build time, Samsung ASoC drivers have rather runtime
+dependency on Exynos or other Samsung platforms.  For building they
+require Common Clock Framework.  If it is provided they could be compile
+tested to increase build coverage.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-
 ---
+ sound/soc/samsung/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Not tested. The driver did not override .platform_name which looks
-suspicious to me. However I did not want to add changes which could have
-some visible impact on output code.
-
-Changes since v1:
-1. Squash two smdk_wm8580 patches and use ARRAY_SIZE(smdk_dai), after
-   suggestion from Lars-Peter Clausen.
-2. Remove also SEC_PLAYBACK dai_link.
----
- sound/soc/samsung/smdk_wm8580.c | 30 +++---------------------------
- 1 file changed, 3 insertions(+), 27 deletions(-)
-
-diff --git a/sound/soc/samsung/smdk_wm8580.c b/sound/soc/samsung/smdk_wm8580.c
-index 548bfd993788..de724ce7b955 100644
---- a/sound/soc/samsung/smdk_wm8580.c
-+++ b/sound/soc/samsung/smdk_wm8580.c
-@@ -14,8 +14,6 @@
- #include <sound/soc.h>
- #include <sound/pcm_params.h>
- 
--#include <asm/mach-types.h>
--
- #include "../codecs/wm8580.h"
- #include "i2s.h"
- 
-@@ -147,7 +145,6 @@ static int smdk_wm8580_init_paiftx(struct snd_soc_pcm_runtime *rtd)
- enum {
- 	PRI_PLAYBACK = 0,
- 	PRI_CAPTURE,
--	SEC_PLAYBACK,
- };
- 
- #define SMDK_DAI_FMT (SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF | \
-@@ -157,7 +154,7 @@ static struct snd_soc_dai_link smdk_dai[] = {
- 	[PRI_PLAYBACK] = { /* Primary Playback i/f */
- 		.name = "WM8580 PAIF RX",
- 		.stream_name = "Playback",
--		.cpu_dai_name = "samsung-i2s.0",
-+		.cpu_dai_name = "samsung-i2s.2",
- 		.codec_dai_name = "wm8580-hifi-playback",
- 		.platform_name = "samsung-i2s.0",
- 		.codec_name = "wm8580.0-001b",
-@@ -167,7 +164,7 @@ static struct snd_soc_dai_link smdk_dai[] = {
- 	[PRI_CAPTURE] = { /* Primary Capture i/f */
- 		.name = "WM8580 PAIF TX",
- 		.stream_name = "Capture",
--		.cpu_dai_name = "samsung-i2s.0",
-+		.cpu_dai_name = "samsung-i2s.2",
- 		.codec_dai_name = "wm8580-hifi-capture",
- 		.platform_name = "samsung-i2s.0",
- 		.codec_name = "wm8580.0-001b",
-@@ -175,23 +172,13 @@ static struct snd_soc_dai_link smdk_dai[] = {
- 		.init = smdk_wm8580_init_paiftx,
- 		.ops = &smdk_ops,
- 	},
--	[SEC_PLAYBACK] = { /* Sec_Fifo Playback i/f */
--		.name = "Sec_FIFO TX",
--		.stream_name = "Playback",
--		.cpu_dai_name = "samsung-i2s-sec",
--		.codec_dai_name = "wm8580-hifi-playback",
--		.platform_name = "samsung-i2s-sec",
--		.codec_name = "wm8580.0-001b",
--		.dai_fmt = SMDK_DAI_FMT,
--		.ops = &smdk_ops,
--	},
- };
- 
- static struct snd_soc_card smdk = {
- 	.name = "SMDK-I2S",
- 	.owner = THIS_MODULE,
- 	.dai_link = smdk_dai,
--	.num_links = 2,
-+	.num_links = ARRAY_SIZE(smdk_dai),
- 
- 	.dapm_widgets = smdk_wm8580_dapm_widgets,
- 	.num_dapm_widgets = ARRAY_SIZE(smdk_wm8580_dapm_widgets),
-@@ -204,17 +191,6 @@ static struct platform_device *smdk_snd_device;
- static int __init smdk_audio_init(void)
- {
- 	int ret;
--	char *str;
--
--	if (machine_is_smdkc100()
--			|| machine_is_smdkv210() || machine_is_smdkc110()) {
--		smdk.num_links = 3;
--	} else if (machine_is_smdk6410()) {
--		str = (char *)smdk_dai[PRI_PLAYBACK].cpu_dai_name;
--		str[strlen(str) - 1] = '2';
--		str = (char *)smdk_dai[PRI_CAPTURE].cpu_dai_name;
--		str[strlen(str) - 1] = '2';
--	}
- 
- 	smdk_snd_device = platform_device_alloc("soc-audio", -1);
- 	if (!smdk_snd_device)
+diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+index 426ef1c7b265..a6cc6ca93fa7 100644
+--- a/sound/soc/samsung/Kconfig
++++ b/sound/soc/samsung/Kconfig
+@@ -1,6 +1,7 @@
+ menuconfig SND_SOC_SAMSUNG
+ 	tristate "ASoC support for Samsung"
+-	depends on (PLAT_SAMSUNG || ARCH_EXYNOS)
++	depends on PLAT_SAMSUNG || ARCH_EXYNOS || COMPILE_TEST
++	depends on COMMON_CLK
+ 	select SND_SOC_GENERIC_DMAENGINE_PCM
+ 	---help---
+ 	  Say Y or M if you want to add support for codecs attached to
 -- 
 2.7.4
