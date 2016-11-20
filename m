@@ -1,214 +1,68 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 20 Nov 2016 17:22:48 +0000
-Subject: commit 4dd1837d7589f468ed109556513f476e7a7f9121 breaks build
-In-Reply-To: <alpine.LFD.2.20.1611201131300.1814@knanqh.ubzr>
-References: <58310EC6.4020402@math.uni-bielefeld.de>
- <20161120113007.GS1041@n2100.armlinux.org.uk>
- <58318C6A.50104@math.uni-bielefeld.de>
- <20161120123422.GT1041@n2100.armlinux.org.uk>
- <58319D70.7030106@math.uni-bielefeld.de>
- <20161120132502.GV1041@n2100.armlinux.org.uk>
- <alpine.LFD.2.20.1611201131300.1814@knanqh.ubzr>
-Message-ID: <20161120172248.GW1041@n2100.armlinux.org.uk>
+From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
+Date: Sun, 20 Nov 2016 20:10:34 +0100
+Subject: mmc: core: complete/wait_for_completion performance
+In-Reply-To: <187975187.249177.bccdc17e-e9c6-48c2-aeaf-3b81f1b61ec7.open-xchange@email.1und1.de>
+References: <1479644869.2653.3.camel@embedded.rocks>
+ <585759233.283839.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
+ <1479652929.2841.1.camel@embedded.rocks>
+ <187975187.249177.bccdc17e-e9c6-48c2-aeaf-3b81f1b61ec7.open-xchange@email.1und1.de>
+Message-ID: <1479669034.1975.1.camel@embedded.rocks>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 20, 2016 at 12:03:50PM -0500, Nicolas Pitre wrote:
-> On Sun, 20 Nov 2016, Russell King - ARM Linux wrote:
-> 
-> > On Sun, Nov 20, 2016 at 01:56:16PM +0100, Tobias Jakobi wrote:
-> > > Hey Russell,
-> > > 
-> > > thanks for the quick reply and looking into this!
-> > > 
-> > > Added Nicolas Pitre to Cc since the ksym trim stuff came from him.
+On Sun, 2016-11-20 at 16:44 +0100, Stefan Wahren wrote:
+> > J?rg Krause <joerg.krause@embedded.rocks> hat am 20. November 2016
+> > um 15:42
+> > geschrieben:
 > > 
-> > Arnd's patch "kbuild: provide include/asm/asm-prototypes.h for ARM" fixes
-> > it, but I think it's a mixture of fixes, and partially dependent on some
-> > other patches.  I don't know what the status of his patch is, but my
-> > feeling is that it consists of more than a single fix, and needs
-> > splitting.  Certainly the asm-prototypes.h is not relevant to this
-> > problem, but the rest of it seems to be.
+> > 
+> > Hi Stefan,
+> > 
+> > On Sun, 2016-11-20 at 14:28 +0100, Stefan Wahren wrote:
+> > > Hi J?rg,
+> > > 
+> > > > J?rg Krause <joerg.krause@embedded.rocks> hat am 20. November
+> > > > 2016
+> > > > um 13:27
+> > > > geschrieben:
+> > > > 
+> > > > 
+> > > > Hi,
+> > > > 
+> > > > I started the discussion on this mailing list in another thread
+> > > > [1],
+> > > > but I'd like to move it to a new thread, because it might be
+> > > > mmc
+> > > > specific.
+> > > > 
+> > > > The issue is that I am noticed low wifi network throughput on
+> > > > an
+> > > > i.MX28
+> > > > board with the mainline kernel (v4.7.10, about 6 Mbps) compared
+> > > > to
+> > > > the
+> > > > vendor kernel (Freescale v2.6.35.3, about 20 Mbps). The wifi
+> > > > chip
+> > > > is
+> > > > attached using the SDIO interface.
+> > > > 
+> > > > I started investigation where the bottleneck in the mainline
+> > > > kernel?might come from. Therefore I checked that the configs
+> > > > and
+> > > > settings for the interfaces and drivers are the same. They are.
+> > > 
+> > > so you're not using the mxs_defconfig settings anymore?
+> > 
+> > No, I changed the settings.
+> > 
 > 
-> Well... the problem for the current breakage was identified a while ago:
+> What happens to performance to if you change the following settings
+> to the same
+> like in mxs_defconfig?
 > 
-> https://lkml.org/lkml/2016/2/10/686
-> 
-> I'm surprised that Al didn't fold my patch into his.  Now that this has 
-> hit mainline, CONFIG_TRIM_UNUSED_KSYMS is now broken on ARM.
-> 
-> And I don't see how the asm-prototypes.h is going to fix it either (if 
-> anything, at the moment it looks like it might be another source of 
-> breakage).
-> 
-> So I think the folowing patch should go into mainline:
+> CONFIG_PREEMPT_VOLUNTARY=y
+> CONFIG_DEFAULT_IOSCHED="noop"
 
-... which looks the same as Arnd's patch with the following changes:
-
-- no asm-prototypes.h
-- adding asm/export.h to each file using EXPORT_SYMBOL() instead of
-   bitops.h
-- not touching:
-	arch/arm/lib/csumpartialcopy.S
-	arch/arm/lib/csumpartialcopygeneric.S
-	arch/arm/lib/csumpartialcopyuser.S
-
-other than that, it's doing the same thing.
-
-I think Arnd's changes to the csumpartial code are unnecessary, and
-yours is, although larger, puts the asm/export.h include in the right
-place.  So please drop yours into the patch system so we can move
-forward fixing some of the problems created during the last merge
-window.
-
-> ----- >8
-> >From 3225f625c116a350c54f361df491bf3e1c6d32b3 Mon Sep 17 00:00:00 2001
-> From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Date: Wed, 10 Feb 2016 17:40:04 -0500
-> Subject: [PATCH] ARM: don't use assembler macro arguments with EXPORT_SYMBOL()
-> 
-> Committ 4dd1837d75 ("arm: move exports to definitions") added
-> EXPORT_SYMBOL(\name) to bitops.h. Here \name is an assembler macro
-> argument which is not subject to preprocessor substitutions. And the
-> assembler doesn't handle preprocessor macros either. That has the effect
-> of breaking CONFIG_TRIM_UNUSED_KSYMS=y.
-> 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> 
-> diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
-> index df06638b32..7d807cfd8e 100644
-> --- a/arch/arm/lib/bitops.h
-> +++ b/arch/arm/lib/bitops.h
-> @@ -1,6 +1,5 @@
->  #include <asm/assembler.h>
->  #include <asm/unwind.h>
-> -#include <asm/export.h>
->  
->  #if __LINUX_ARM_ARCH__ >= 6
->  	.macro	bitop, name, instr
-> @@ -26,7 +25,6 @@ UNWIND(	.fnstart	)
->  	bx	lr
->  UNWIND(	.fnend		)
->  ENDPROC(\name		)
-> -EXPORT_SYMBOL(\name	)
->  	.endm
->  
->  	.macro	testop, name, instr, store
-> @@ -57,7 +55,6 @@ UNWIND(	.fnstart	)
->  2:	bx	lr
->  UNWIND(	.fnend		)
->  ENDPROC(\name		)
-> -EXPORT_SYMBOL(\name	)
->  	.endm
->  #else
->  	.macro	bitop, name, instr
-> @@ -77,7 +74,6 @@ UNWIND(	.fnstart	)
->  	ret	lr
->  UNWIND(	.fnend		)
->  ENDPROC(\name		)
-> -EXPORT_SYMBOL(\name	)
->  	.endm
->  
->  /**
-> @@ -106,6 +102,5 @@ UNWIND(	.fnstart	)
->  	ret	lr
->  UNWIND(	.fnend		)
->  ENDPROC(\name		)
-> -EXPORT_SYMBOL(\name	)
->  	.endm
->  #endif
-> diff --git a/arch/arm/lib/changebit.S b/arch/arm/lib/changebit.S
-> index f402786217..1cfdb138d2 100644
-> --- a/arch/arm/lib/changebit.S
-> +++ b/arch/arm/lib/changebit.S
-> @@ -9,7 +9,10 @@
->   */
->  #include <linux/linkage.h>
->  #include <asm/assembler.h>
-> +#include <asm/export.h>
->  #include "bitops.h"
->                  .text
->  
->  bitop	_change_bit, eor
-> +
-> +EXPORT_SYMBOL(_change_bit)
-> diff --git a/arch/arm/lib/clearbit.S b/arch/arm/lib/clearbit.S
-> index f6b75fb64d..e901ca5af0 100644
-> --- a/arch/arm/lib/clearbit.S
-> +++ b/arch/arm/lib/clearbit.S
-> @@ -9,7 +9,10 @@
->   */
->  #include <linux/linkage.h>
->  #include <asm/assembler.h>
-> +#include <asm/export.h>
->  #include "bitops.h"
->                  .text
->  
->  bitop	_clear_bit, bic
-> +
-> +EXPORT_SYMBOL(_clear_bit)
-> diff --git a/arch/arm/lib/setbit.S b/arch/arm/lib/setbit.S
-> index 618fedae4b..3c8b11240f 100644
-> --- a/arch/arm/lib/setbit.S
-> +++ b/arch/arm/lib/setbit.S
-> @@ -9,7 +9,10 @@
->   */
->  #include <linux/linkage.h>
->  #include <asm/assembler.h>
-> +#include <asm/export.h>
->  #include "bitops.h"
->  		.text
->  
->  bitop	_set_bit, orr
-> +
-> +EXPORT_SYMBOL(_set_bit)
-> diff --git a/arch/arm/lib/testchangebit.S b/arch/arm/lib/testchangebit.S
-> index 4becdc3a59..e3d19b87fb 100644
-> --- a/arch/arm/lib/testchangebit.S
-> +++ b/arch/arm/lib/testchangebit.S
-> @@ -9,7 +9,10 @@
->   */
->  #include <linux/linkage.h>
->  #include <asm/assembler.h>
-> +#include <asm/export.h>
->  #include "bitops.h"
->                  .text
->  
->  testop	_test_and_change_bit, eor, str
-> +
-> +EXPORT_SYMBOL(_test_and_change_bit)
-> diff --git a/arch/arm/lib/testclearbit.S b/arch/arm/lib/testclearbit.S
-> index 918841dcce..d247e6f70f 100644
-> --- a/arch/arm/lib/testclearbit.S
-> +++ b/arch/arm/lib/testclearbit.S
-> @@ -9,7 +9,10 @@
->   */
->  #include <linux/linkage.h>
->  #include <asm/assembler.h>
-> +#include <asm/export.h>
->  #include "bitops.h"
->                  .text
->  
->  testop	_test_and_clear_bit, bicne, strne
-> +
-> +EXPORT_SYMBOL(_test_and_clear_bit)
-> diff --git a/arch/arm/lib/testsetbit.S b/arch/arm/lib/testsetbit.S
-> index 8d1b2fe9e4..76800ff601 100644
-> --- a/arch/arm/lib/testsetbit.S
-> +++ b/arch/arm/lib/testsetbit.S
-> @@ -9,7 +9,10 @@
->   */
->  #include <linux/linkage.h>
->  #include <asm/assembler.h>
-> +#include <asm/export.h>
->  #include "bitops.h"
->                  .text
->  
->  testop	_test_and_set_bit, orreq, streq
-> +
-> +EXPORT_SYMBOL(_test_and_set_bit)
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+No much change at all. The time difference between complete() and
+wait_for_complete() decreases in best case to 110 us, but also varies
+to above 130 us.
