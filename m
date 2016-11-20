@@ -1,46 +1,116 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 20 Nov 2016 21:24:50 +0200
-Subject: [RFT v2 0/5] ASoC: samsung: Minor cleanup for old machines
-Message-ID: <1479669895-19124-1-git-send-email-krzk@kernel.org>
+Date: Sun, 20 Nov 2016 21:24:52 +0200
+Subject: [RFT v2 2/5] ASoC: samsung: smdk_wm8580: Remove old platforms and
+ drop mach-types usage
+In-Reply-To: <1479669895-19124-1-git-send-email-krzk@kernel.org>
+References: <1479669895-19124-1-git-send-email-krzk@kernel.org>
+Message-ID: <1479669895-19124-3-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+MACH_SMDKC100, MACH_SMDKV210 and MACH_SMDKC110 are no longer supported
+so we can drop the dead code.  After this the driver no longer
+differentiates between machines (S3C24xx machines are not supported by
+it) so there is no need to override I2S device id in cpu_dai_name and
+SEC_PLAYBACK dai_link can be removed as well.
 
-Hi,
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
+---
 
-Few patches removing dead code (machines not supported).
-
+Not tested. The driver did not override .platform_name which looks
+suspicious to me. However I did not want to add changes which could have
+some visible impact on output code.
 
 Changes since v1:
-1. Squash two smdk_wm8580 changes into patch #2.  Now num_dai_links
-   is always equal to two, so remove also SEC_PLAYBACK dai_link.
-   (suggested by Lars-Peter Clausen).
+1. Squash two smdk_wm8580 patches and use ARRAY_SIZE(smdk_dai), after
+   suggestion from Lars-Peter Clausen.
+2. Remove also SEC_PLAYBACK dai_link.
+---
+ sound/soc/samsung/smdk_wm8580.c | 30 +++---------------------------
+ 1 file changed, 3 insertions(+), 27 deletions(-)
 
-
-The second patch ([RFT v2 2/5] ASoC: samsung: smdk_wm8580: Remove old platforms and
-drop mach-types usage) requires testing. I hope I understood the code
-correctly.
-
-The last ARM patch is independent. I will take it through samsung-soc
-tree. I put it here for reference.
-
-
-Best regards,
-Krzysztof
-
-Krzysztof Kozlowski (5):
-  ASoC: samsung: Remove non-existing MACH dependencies
-  ASoC: samsung: smdk_wm8580: Remove old platforms and drop mach-types
-    usage
-  ASoC: samsung: Enable COMPILE_TEST for SmartQ and WM8580
-  ASoC: samsung: Enable COMPILE_TEST for entire Samsung ASoc
-  ARM: s5pv210_defconfig: Remove old MACHs
-
- arch/arm/configs/s5pv210_defconfig |  4 ----
- sound/soc/samsung/Kconfig          |  8 +++++---
- sound/soc/samsung/smdk_wm8580.c    | 28 ++--------------------------
- 3 files changed, 7 insertions(+), 33 deletions(-)
-
+diff --git a/sound/soc/samsung/smdk_wm8580.c b/sound/soc/samsung/smdk_wm8580.c
+index 548bfd993788..de724ce7b955 100644
+--- a/sound/soc/samsung/smdk_wm8580.c
++++ b/sound/soc/samsung/smdk_wm8580.c
+@@ -14,8 +14,6 @@
+ #include <sound/soc.h>
+ #include <sound/pcm_params.h>
+ 
+-#include <asm/mach-types.h>
+-
+ #include "../codecs/wm8580.h"
+ #include "i2s.h"
+ 
+@@ -147,7 +145,6 @@ static int smdk_wm8580_init_paiftx(struct snd_soc_pcm_runtime *rtd)
+ enum {
+ 	PRI_PLAYBACK = 0,
+ 	PRI_CAPTURE,
+-	SEC_PLAYBACK,
+ };
+ 
+ #define SMDK_DAI_FMT (SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF | \
+@@ -157,7 +154,7 @@ static struct snd_soc_dai_link smdk_dai[] = {
+ 	[PRI_PLAYBACK] = { /* Primary Playback i/f */
+ 		.name = "WM8580 PAIF RX",
+ 		.stream_name = "Playback",
+-		.cpu_dai_name = "samsung-i2s.0",
++		.cpu_dai_name = "samsung-i2s.2",
+ 		.codec_dai_name = "wm8580-hifi-playback",
+ 		.platform_name = "samsung-i2s.0",
+ 		.codec_name = "wm8580.0-001b",
+@@ -167,7 +164,7 @@ static struct snd_soc_dai_link smdk_dai[] = {
+ 	[PRI_CAPTURE] = { /* Primary Capture i/f */
+ 		.name = "WM8580 PAIF TX",
+ 		.stream_name = "Capture",
+-		.cpu_dai_name = "samsung-i2s.0",
++		.cpu_dai_name = "samsung-i2s.2",
+ 		.codec_dai_name = "wm8580-hifi-capture",
+ 		.platform_name = "samsung-i2s.0",
+ 		.codec_name = "wm8580.0-001b",
+@@ -175,23 +172,13 @@ static struct snd_soc_dai_link smdk_dai[] = {
+ 		.init = smdk_wm8580_init_paiftx,
+ 		.ops = &smdk_ops,
+ 	},
+-	[SEC_PLAYBACK] = { /* Sec_Fifo Playback i/f */
+-		.name = "Sec_FIFO TX",
+-		.stream_name = "Playback",
+-		.cpu_dai_name = "samsung-i2s-sec",
+-		.codec_dai_name = "wm8580-hifi-playback",
+-		.platform_name = "samsung-i2s-sec",
+-		.codec_name = "wm8580.0-001b",
+-		.dai_fmt = SMDK_DAI_FMT,
+-		.ops = &smdk_ops,
+-	},
+ };
+ 
+ static struct snd_soc_card smdk = {
+ 	.name = "SMDK-I2S",
+ 	.owner = THIS_MODULE,
+ 	.dai_link = smdk_dai,
+-	.num_links = 2,
++	.num_links = ARRAY_SIZE(smdk_dai),
+ 
+ 	.dapm_widgets = smdk_wm8580_dapm_widgets,
+ 	.num_dapm_widgets = ARRAY_SIZE(smdk_wm8580_dapm_widgets),
+@@ -204,17 +191,6 @@ static struct platform_device *smdk_snd_device;
+ static int __init smdk_audio_init(void)
+ {
+ 	int ret;
+-	char *str;
+-
+-	if (machine_is_smdkc100()
+-			|| machine_is_smdkv210() || machine_is_smdkc110()) {
+-		smdk.num_links = 3;
+-	} else if (machine_is_smdk6410()) {
+-		str = (char *)smdk_dai[PRI_PLAYBACK].cpu_dai_name;
+-		str[strlen(str) - 1] = '2';
+-		str = (char *)smdk_dai[PRI_CAPTURE].cpu_dai_name;
+-		str[strlen(str) - 1] = '2';
+-	}
+ 
+ 	smdk_snd_device = platform_device_alloc("soc-audio", -1);
+ 	if (!smdk_snd_device)
 -- 
 2.7.4
