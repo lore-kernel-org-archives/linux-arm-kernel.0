@@ -1,134 +1,60 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Mon, 21 Nov 2016 22:38:51 +0800
-Subject: [PATCH v16 08/15] clocksource/drivers/arm_arch_timer: Refactor
- arch_timer_needs_probing, and call it only if acpi disabled.
-In-Reply-To: <20161118195657.GM1197@leverpostej>
-References: <1479304148-2965-1-git-send-email-fu.wei@linaro.org>
- <1479304148-2965-9-git-send-email-fu.wei@linaro.org>
- <20161118195657.GM1197@leverpostej>
-Message-ID: <CADyBb7uXaPVT1ppJav5=ckdvBcfv+6fSsMc3xbDjFEO2G_zjSQ@mail.gmail.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 21 Nov 2016 15:51:59 +0100
+Subject: [PATCH v6 3/3] arm: dts: mt2701: Add node for Mediatek JPEG
+ Decoder
+In-Reply-To: <1479353915-5043-4-git-send-email-rick.chang@mediatek.com>
+References: <1479353915-5043-1-git-send-email-rick.chang@mediatek.com>
+ <1479353915-5043-4-git-send-email-rick.chang@mediatek.com>
+Message-ID: <d602365a-e87b-5bae-8698-bd43063ef079@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On 19 November 2016 at 03:56, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Nov 16, 2016 at 09:49:01PM +0800, fu.wei at linaro.org wrote:
->> From: Fu Wei <fu.wei@linaro.org>
->>
->> The patch refactor original arch_timer_needs_probing function:
->>     (1) Separate out arch_timer_needs_probing from arch_timer_common_init,
->>     and call it only if acpi disabled.
->>     (2) Rename arch_timer_needs_probing to arch_timer_needs_of_probing.
+On 17/11/16 04:38, Rick Chang wrote:
+> Signed-off-by: Rick Chang <rick.chang@mediatek.com>
+> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+> ---
+> This patch depends on:
+>   CCF "Add clock support for Mediatek MT2701"[1]
+>   iommu and smi "Add the dtsi node of iommu and smi for mt2701"[2]
 >
-> Please write a real commit message.
+> [1] http://lists.infradead.org/pipermail/linux-mediatek/2016-October/007271.html
+> [2] https://patchwork.kernel.org/patch/9164013/
 
-OK, how about this:
+I assume that 1 & 2 will appear in 4.10? So this patch needs to go in 
+after the
+other two are merged in 4.10?
 
-clocksource/drivers/arm_arch_timer: Refactor
-arch_timer_needs_probing, only use it in the DT init code
+Regards,
 
-Currently, the arch_timer_common_init uses arch_timer_needs_probing call to
-wait for both timers been probed which is only for booting from DT.
+	Hans
 
-For booting from ACPI, we don't need these in arch_timer_common_init, these code
-should be only in the DT init code.
-
-This patch seperates arch_timer_needs_probing related code out into a
-new function
-named arch_timer_needs_of_probing, and then reworks arch_timer_of_init
-to use it,
-so that we can keep this only in the DT init code.
-
-
+> ---
+>  arch/arm/boot/dts/mt2701.dtsi | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
 >
->> Signed-off-by: Fu Wei <fu.wei@linaro.org>
->> ---
->>  drivers/clocksource/arm_arch_timer.c | 34 +++++++++++++++++++---------------
->>  1 file changed, 19 insertions(+), 15 deletions(-)
->>
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index fe4e812..9ddc091 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -792,15 +792,28 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
->>       {},
->>  };
->>
->> -static bool __init
->> -arch_timer_needs_probing(int type, const struct of_device_id *matches)
->> +static bool __init arch_timer_needs_of_probing(void)
->>  {
->>       struct device_node *dn;
->>       bool needs_probing = false;
->> +     unsigned int mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
->> +
->> +     /* We have two timers, and both device-tree nodes are probed. */
->> +     if ((arch_timers_present & mask) == mask)
->> +             return false;
->> +
->> +     /*
->> +      * Only one type of timer is probed,
->> +      * check if we have another type of timer node in device-tree.
->> +      */
->> +     if (arch_timers_present & ARCH_TIMER_TYPE_CP15)
->> +             dn = of_find_matching_node(NULL, arch_timer_mem_of_match);
->> +     else
->> +             dn = of_find_matching_node(NULL, arch_timer_of_match);
->>
->> -     dn = of_find_matching_node(NULL, matches);
->> -     if (dn && of_device_is_available(dn) && !(arch_timers_present & type))
->> +     if (dn && of_device_is_available(dn))
->>               needs_probing = true;
->> +
->>       of_node_put(dn);
->>
->>       return needs_probing;
->> @@ -808,17 +821,8 @@ arch_timer_needs_probing(int type, const struct of_device_id *matches)
->>
->>  static int __init arch_timer_common_init(void)
->>  {
->> -     unsigned int mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
->> -
->> -     /* Wait until both nodes are probed if we have two timers */
->> -     if ((arch_timers_present & mask) != mask) {
->> -             if (arch_timer_needs_probing(ARCH_TIMER_TYPE_MEM,
->> -                                          arch_timer_mem_of_match))
->> -                     return 0;
->> -             if (arch_timer_needs_probing(ARCH_TIMER_TYPE_CP15,
->> -                                          arch_timer_of_match))
->> -                     return 0;
->> -     }
+> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+> index 8f13c70..4dd5048 100644
+> --- a/arch/arm/boot/dts/mt2701.dtsi
+> +++ b/arch/arm/boot/dts/mt2701.dtsi
+> @@ -298,6 +298,20 @@
+>  		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
+>  	};
 >
-> Why can't we just move this into the DT-specific caller of
-> arch_timer_common_init()?
-
-yes, I have thought about this, but that means we have to split arch_timer_init,
-and use arch_timer_register and arch_timer_common_init directly in
-arch_timer_of_init.
-
-In another word, I also need to modify arch_timer_of_init, not only
-arch_timer_common_init,
-but let me have a try in v17, see if you like it.
-
+> +	jpegdec: jpegdec at 15004000 {
+> +		compatible = "mediatek,mt2701-jpgdec";
+> +		reg = <0 0x15004000 0 0x1000>;
+> +		interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks =  <&imgsys CLK_IMG_JPGDEC_SMI>,
+> +			  <&imgsys CLK_IMG_JPGDEC>;
+> +		clock-names = "jpgdec-smi",
+> +			      "jpgdec";
+> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
+> +		mediatek,larb = <&larb2>;
+> +		iommus = <&iommu MT2701_M4U_PORT_JPGDEC_WDMA>,
+> +			 <&iommu MT2701_M4U_PORT_JPGDEC_BSDMA>;
+> +	};
+> +
+>  	vdecsys: syscon at 16000000 {
+>  		compatible = "mediatek,mt2701-vdecsys", "syscon";
+>  		reg = <0 0x16000000 0 0x1000>;
 >
-> Thanks
-> Mark.
->
->> +     if (acpi_disabled && arch_timer_needs_of_probing())
->> +             return 0;
->>
->>       arch_timer_banner(arch_timers_present);
->>       arch_counter_register(arch_timers_present);
->> --
->> 2.7.4
->>
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
