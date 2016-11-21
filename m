@@ -1,120 +1,179 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Mon, 21 Nov 2016 17:32:32 +0000
-Subject: [BUG] hdlcd gets confused about base address
-In-Reply-To: <20161121140349.GG1041@n2100.armlinux.org.uk>
-References: <20161118233733.GP1041@n2100.armlinux.org.uk>
- <20161121110604.GC1005@e106497-lin.cambridge.arm.com>
- <20161121112030.GC1041@n2100.armlinux.org.uk>
- <20161121113212.GF1005@e106497-lin.cambridge.arm.com>
- <20161121122556.GE1041@n2100.armlinux.org.uk>
- <20161121125653.GJ1005@e106497-lin.cambridge.arm.com>
- <20161121132419.GF1041@n2100.armlinux.org.uk>
- <20161121135031.GK1005@e106497-lin.cambridge.arm.com>
- <20161121140349.GG1041@n2100.armlinux.org.uk>
-Message-ID: <20161121173231.GM1005@e106497-lin.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 21 Nov 2016 11:36:13 -0600
+Subject: [PATCH] ARM: dts: AM571x-IDK Initial Support
+In-Reply-To: <20161121055801.573-1-lokeshvutla@ti.com>
+References: <20161121055801.573-1-lokeshvutla@ti.com>
+Message-ID: <20161121173613.h2d2j4z2hqnioslx@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2016 at 02:03:49PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 21, 2016 at 01:50:31PM +0000, Liviu Dudau wrote:
-> > On Mon, Nov 21, 2016 at 01:24:19PM +0000, Russell King - ARM Linux wrote:
-> > > On Mon, Nov 21, 2016 at 12:56:53PM +0000, Liviu Dudau wrote:
-> > > > That is mostly due to the check in hdlcd_crtc_disable() which I should
-> > > > remove, I've added it because I was getting a ->disable() hook call
-> > > > before any ->enable() was called at startup time. I need to revisit
-> > > > this as I remember Daniel was commenting that this was not needed.
-> > > 
-> > > Removing that test results in:
-> > > 
-> > > [drm:drm_atomic_helper_commit_cleanup_done] *ERROR* [CRTC:24:crtc-0] flip_done timed out
-> > > 
-> > > and the kernel hanging, seemingly in an IRQs-off region.
-> > 
-> > Right, I need to sort this one out. Are you doing these tests out of
-> > some tagged branch that I can get in sync with?
-
-Hi Russell,
-
+On Mon, Nov 21, 2016 at 11:28:01AM +0530, Lokesh Vutla wrote:
+> From: Schuyler Patton <spatton@ti.com>
 > 
-> No, not yet, and some of the changes I have are rather hacky.
+> The AM571x-IDK board is a board based on TI's AM5718 SOC
+> which has a single core 1.5GHz A15 processor. This board is a
+> development platform for the Industrial market with:
+> - 1GB of DDR3L
+> - Dual 1Gbps Ethernet
+> - HDMI,
+> - PRU-ICSS
+> - uSD
+> - 16GB eMMC
+> - CAN
+> - RS-485
+> - PCIe
+> - USB3.0
+> - Video Input Port
+> - Industrial IO port and expansion connector
 > 
-> I do always build my full tree of patches (which is currently running at
-> around 320 patches at the moment) but I never share that entire patch
-> set.  However, none of those touch i2c (apart from the ones I've recently
-> posted) and the only patches touching hdlcd are those I've posted so far.
+> The link to the data sheet and TRM can be found here:
 > 
-> Most of the problems I'm finding are through trying basic stuff - I'm not
-> doing anything special or unusual to find them, at the moment quite
-> literally just starting Xorg up and shutting it down.  For example, the
-> above was caused by logging in on serial, running:
+> http://www.ti.com/product/AM5718
 > 
-> 	Xorg -terminate -verbose
+> Initial support is only for basic peripherals.
 > 
-> and then hitting ^C.  (I have lxdm disabled so systemd boots to VT login
-> prompts on both the "framebuffer" and serial - I don't want Xorg coming
-> up when the machine is booting for its nightly KVM boot tests.)
+> Signed-off-by: Schuyler Patton <spatton@ti.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
 > 
-> I'm afraid that when I try someone elses code, I have a tendency to find
-> loads of seemingly trivial bugs when I try putting it through some basic
-> tests.
-
-I'm not being able to reproduce your bug conditions. I'm running the following
-setup when testing:
-
-- mainline v4.9-rc6
-- edited the juno-base.dtsi file to disable the hdlcd at 7f600000 and
-  hdmi-transmitter at 70 nodes to remove the second HDMI output from the test.
-- patched tda998x_drv.c to set interlace_allowed = 0, see below why
-- modified the hdlcd_crtc.c file with the following patch:
-
--8<-----------------------------------------------------------------------
-diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-index 48019ae..656dc43 100644
---- a/drivers/gpu/drm/arm/hdlcd_crtc.c
-+++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
-@@ -156,9 +156,7 @@ static void hdlcd_crtc_disable(struct drm_crtc *crtc)
- {
- 	struct hdlcd_drm_private *hdlcd = crtc_to_hdlcd_priv(crtc);
- 
--	if (!crtc->state->active)
--		return;
--
-+	drm_crtc_vblank_off(crtc);
- 	hdlcd_write(hdlcd, HDLCD_REG_COMMAND, 0);
- 	clk_disable_unprepare(hdlcd->clk);
- }
-->8-----------------------------------------------------------------------
-
-That takes care of the pxlclk refcounting issue you were seeing. I've started
-Xorg several times (and yes, I do see EDID checksum error every now and then,
-specially when running xrandr). When closing down Xorg I get back the framebuffer
-console with the login prompt and no image shifting. My monitor is a TV that
-reports that preferred mode is 1080i, however HDLCD and TDA19988 don't talk
-propertly with each other to be able to set the interlaced mode correctly, so
-I've had to disable support for interlacing mode in tda998x_drv.c and now the
-preferred mode that gets picked up is 1920x1200 at 60Hz.
-
-Please advise on what other steps I can take to try to reproduce this.
-
-P.S: What revision of Juno do you have? Any chance you can capture the start
-of the boot process where the firmware component prints the version numbers?
-
-Best regards,
-Liviu
-
-
+> Logs: http://pastebin.ubuntu.com/23510390/
 > 
+>  .../devicetree/bindings/arm/omap/omap.txt          |  3 +
+>  arch/arm/boot/dts/Makefile                         |  1 +
+>  arch/arm/boot/dts/am571x-idk.dts                   | 82 ++++++++++++++++++++++
+>  3 files changed, 86 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/am571x-idk.dts
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> index f53e2ee..647ffd3 100644
+> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> @@ -175,6 +175,9 @@ Boards:
+>  - AM5728 IDK
+>    compatible = "ti,am5728-idk", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7"
+>  
+> +- AM5718 IDK
+> +  compatible = "ti,am5718-idk", "ti,am5728", "ti,dra722", "ti,dra72", "ti,dra7"
+
+I've said this before I think, but 5 compat string is a bit much. Some 
+of these genericish ones should be dropped. Doesn't really hurt though.
+
+A couple of nits below, otherwise:
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+> +
+>  - DRA742 EVM:  Software Development Board for DRA742
+>    compatible = "ti,dra7-evm", "ti,dra742", "ti,dra74", "ti,dra7"
+>  
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index befcd26..c298078 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -588,6 +588,7 @@ dtb-$(CONFIG_SOC_DRA7XX) += \
+>  	am57xx-cl-som-am57x.dtb \
+>  	am57xx-sbc-am57x.dtb \
+>  	am572x-idk.dtb \
+> +	am571x-idk.dtb \
+>  	dra7-evm.dtb \
+>  	dra72-evm.dtb \
+>  	dra72-evm-revc.dtb
+> diff --git a/arch/arm/boot/dts/am571x-idk.dts b/arch/arm/boot/dts/am571x-idk.dts
+> new file mode 100644
+> index 0000000..a6a743e
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/am571x-idk.dts
+> @@ -0,0 +1,82 @@
+> +/*
+> + * Copyright (C) 2015-2016 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +/dts-v1/;
+> +
+> +#include "dra72x.dtsi"
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include "am57xx-idk-common.dtsi"
+> +
+> +/ {
+> +	model = "TI AM5718 IDK";
+> +	compatible = "ti,am5718-idk", "ti,am5718", "ti,dra722",
+> +		     "ti,dra72", "ti,dra7";
+> +
+> +	memory at 0 {
+
+unit address is wrong.
+
+> +		device_type = "memory";
+> +		reg = <0x0 0x80000000 0x0 0x40000000>;
+> +	};
+> +
+> +	status-leds {
+
+Just "leds"
+
+> +		compatible = "gpio-leds";
+> +		cpu0-led {
+> +			label = "status0:red:cpu0";
+> +			gpios = <&gpio2 25 GPIO_ACTIVE_HIGH>;
+> +			default-state = "off";
+> +			linux,default-trigger = "cpu0";
+> +		};
+> +
+> +		usr0-led {
+> +			label = "status0:green:usr";
+> +			gpios = <&gpio2 26 GPIO_ACTIVE_HIGH>;
+> +			default-state = "off";
+> +		};
+> +
+> +		heartbeat-led {
+> +			label = "status0:blue:heartbeat";
+> +			gpios = <&gpio2 27 GPIO_ACTIVE_HIGH>;
+> +			default-state = "off";
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +
+> +		usr1-led {
+> +			label = "status1:red:usr";
+> +			gpios = <&gpio2 28 GPIO_ACTIVE_HIGH>;
+> +			default-state = "off";
+> +		};
+> +
+> +		usr2-led {
+> +			label = "status1:green:usr";
+> +			gpios = <&gpio2 21 GPIO_ACTIVE_HIGH>;
+> +			default-state = "off";
+> +		};
+> +
+> +		mmc0-led {
+> +			label = "status1:blue:mmc0";
+> +			gpios = <&gpio2 19 GPIO_ACTIVE_HIGH>;
+> +			default-state = "off";
+> +			linux,default-trigger = "mmc0";
+> +		};
+> +	};
+> +
+> +	extcon_usb2: extcon_usb2 {
+> +	     compatible = "linux,extcon-usb-gpio";
+> +	     id-gpio = <&gpio5 7 GPIO_ACTIVE_HIGH>;
+> +	};
+> +};
+> +
+> +&mmc1 {
+> +	status = "okay";
+> +	vmmc-supply = <&ldo1_reg>;
+> +	bus-width = <4>;
+> +	cd-gpios = <&gpio6 27 0>; /* gpio 219 */
+> +};
+> +
+> +&omap_dwc3_2 {
+> +	extcon = <&extcon_usb2>;
+> +};
 > -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+> 2.10.1
+> 
