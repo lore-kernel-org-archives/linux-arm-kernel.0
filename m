@@ -1,177 +1,122 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 21 Nov 2016 08:40:53 +0100
-Subject: [PATCH 2/5] drm/modes: Support modes names on the command line
-In-Reply-To: <CAOw6vb+bpf_JoPR8To0Q5Sfidxs=FTif0d3gpgCtFTOKnGCqfA@mail.gmail.com>
-References: <cover.bb9be34c7fd7767e31823f78a15ae1c127293c34.1476779323.git-series.maxime.ripard@free-electrons.com>
- <853193fdf9ec1af94056d9fa2c276079c779aaf4.1476779323.git-series.maxime.ripard@free-electrons.com>
- <CAOw6vb+bpf_JoPR8To0Q5Sfidxs=FTif0d3gpgCtFTOKnGCqfA@mail.gmail.com>
-Message-ID: <20161121074053.jguhh3kpgm7nyf2b@lukather>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Mon, 21 Nov 2016 15:57:17 +0800
+Subject: [PATCH V9 0/6] Integration of function trace with System Trace IP
+ blocks
+Message-ID: <1479715043-6534-1-git-send-email-zhang.chunyan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+IP blocks allowing a variety of trace sources to log debugging
+information to a pre-defined area have been introduced on a couple of
+architecture [1][2]. These system trace blocks (also known as STM)
+typically follow the MIPI STPv2 protocol [3] and provide a system wide
+logging facility to any device, running a kernel or not, with access
+to the block's log entry port(s).  Since each trace message has a
+timestamp, it is possible to correlate events happening in the entire
+system rather than being confined to the logging facility of a single
+entity.
 
-On Wed, Nov 16, 2016 at 12:21:42PM -0500, Sean Paul wrote:
-> On Tue, Oct 18, 2016 at 4:29 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The drm subsystem also uses the video= kernel parameter, and in the
-> > documentation refers to the fbdev documentation for that parameter.
-> >
-> > However, that documentation also says that instead of giving the mode using
-> > its resolution we can also give a name. However, DRM doesn't handle that
-> > case at the moment. Even though in most case it shouldn't make any
-> > difference, it might be useful for analog modes, where different standards
-> > might have the same resolution, but still have a few different parameters
-> > that are not encoded in the modes (NTSC vs NTSC-J vs PAL-M for example).
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/gpu/drm/drm_connector.c |  3 +-
-> >  drivers/gpu/drm/drm_fb_helper.c |  4 +++-
-> >  drivers/gpu/drm/drm_modes.c     | 49 +++++++++++++++++++++++-----------
-> >  include/drm/drm_connector.h     |  1 +-
-> >  4 files changed, 41 insertions(+), 16 deletions(-)
-> >
-> > diff --git a/drivers/gpu/drm/drm_connector.c b/drivers/gpu/drm/drm_connector.c
-> > index 2db7fb510b6c..27a8a511257c 100644
-> > --- a/drivers/gpu/drm/drm_connector.c
-> > +++ b/drivers/gpu/drm/drm_connector.c
-> > @@ -147,8 +147,9 @@ static void drm_connector_get_cmdline_mode(struct drm_connector *connector)
-> >                 connector->force = mode->force;
-> >         }
-> >
-> > -       DRM_DEBUG_KMS("cmdline mode for connector %s %dx%d@%dHz%s%s%s\n",
-> > +       DRM_DEBUG_KMS("cmdline mode for connector %s %s %dx%d@%dHz%s%s%s\n",
-> >                       connector->name,
-> > +                     mode->name ? mode->name : "",
-> >                       mode->xres, mode->yres,
-> >                       mode->refresh_specified ? mode->refresh : 60,
-> >                       mode->rb ? " reduced blanking" : "",
-> > diff --git a/drivers/gpu/drm/drm_fb_helper.c b/drivers/gpu/drm/drm_fb_helper.c
-> > index 03414bde1f15..20a68305fb45 100644
-> > --- a/drivers/gpu/drm/drm_fb_helper.c
-> > +++ b/drivers/gpu/drm/drm_fb_helper.c
-> > @@ -1748,6 +1748,10 @@ struct drm_display_mode *drm_pick_cmdline_mode(struct drm_fb_helper_connector *f
-> >         prefer_non_interlace = !cmdline_mode->interlace;
-> >  again:
-> >         list_for_each_entry(mode, &fb_helper_conn->connector->modes, head) {
-> > +               /* Check (optional) mode name first */
-> > +               if (!strcmp(mode->name, cmdline_mode->name))
-> > +                       return mode;
-> > +
-> >                 /* check width/height */
-> >                 if (mode->hdisplay != cmdline_mode->xres ||
-> >                     mode->vdisplay != cmdline_mode->yres)
-> > diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
-> > index 7d5bdca276f2..fdbf541a5978 100644
-> > --- a/drivers/gpu/drm/drm_modes.c
-> > +++ b/drivers/gpu/drm/drm_modes.c
-> > @@ -1413,7 +1413,7 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
-> >                                                struct drm_cmdline_mode *mode)
-> >  {
-> >         const char *name;
-> > -       bool parse_extras = false;
-> > +       bool named_mode = false, parse_extras = false;
-> >         unsigned int bpp_off = 0, refresh_off = 0;
-> >         unsigned int mode_end = 0;
-> >         char *bpp_ptr = NULL, *refresh_ptr = NULL, *extra_ptr = NULL;
-> > @@ -1432,8 +1432,14 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
-> >
-> >         name = mode_option;
-> >
-> > +       /*
-> > +        * If the first character is not a digit, then it means that
-> > +        * we have a named mode.
-> > +        */
-> >         if (!isdigit(name[0]))
-> > -               return false;
-> > +               named_mode = true;
-> > +       else
-> > +               named_mode = false;
-> 
-> named_mode = isalpha(name[0]); might be more succinct (and covers
-> special characters).
-> 
-> >
-> >         /* Try to locate the bpp and refresh specifiers, if any */
-> >         bpp_ptr = strchr(name, '-');
-> > @@ -1460,12 +1466,16 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
-> >                 parse_extras = true;
-> >         }
-> >
-> > -       ret = drm_mode_parse_cmdline_res_mode(name, mode_end,
-> > -                                             parse_extras,
-> > -                                             connector,
-> > -                                             mode);
-> > -       if (ret)
-> > -               return false;
-> > +       if (named_mode) {
-> > +               strncpy(mode->name, name, mode_end);
-> > +       } else {
-> > +               ret = drm_mode_parse_cmdline_res_mode(name, mode_end,
-> > +                                                     parse_extras,
-> > +                                                     connector,
-> > +                                                     mode);
-> > +               if (ret)
-> > +                       return false;
-> > +       }
-> >         mode->specified = true;
-> >
-> >         if (bpp_ptr) {
-> > @@ -1493,14 +1503,23 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
-> >                 extra_ptr = refresh_end_ptr;
-> >
-> >         if (extra_ptr) {
-> > -               int remaining = strlen(name) - (extra_ptr - name);
-> > +               if (!named_mode) {
-> > +                       int len = strlen(name) - (extra_ptr - name);
-> >
-> > -               /*
-> > -                * We still have characters to process, while
-> > -                * we shouldn't have any
-> > -                */
-> > -               if (remaining > 0)
-> > -                       return false;
-> > +                       ret = drm_mode_parse_cmdline_extra(extra_ptr, len,
-> > +                                                          connector, mode);
-> > +                       if (ret)
-> > +                               return false;
-> > +               } else {
-> > +                       int remaining = strlen(name) - (extra_ptr - name);
-> > +
-> > +                       /*
-> > +                        * We still have characters to process, while
-> > +                        * we shouldn't have any
-> > +                        */
-> > +                       if (remaining > 0)
-> > +                               return false;
-> 
-> Correct me if I'm wrong, but this shouldn't ever happen. AFAICT, the
-> only way it could would be if we parsed bpp or refresh in the named
-> mode (since those are the only cases where we don't copy the whole
-> string over). Shouldn't that be invalid anyways?
+This patchset is trying to use STM IP blocks to store function tracing
+information produced by Ftrace and I'm taking the Function trace
+(trace type is TRACE_FN) as the example in this patchset, but other
+types of traces also can be supported.
 
-It's supposed to be supported by the video
-string. Documentation/fb/modedb.txt defines:
+Logging information generated by the Ftrace subsystem to STM and gathered
+in the sink device can be used in conjunction with trace data from other
+board components, also collected in the same trace sink.  
 
-Valid mode specifiers (mode_option argument):
+This example is using ARM coresight STM but the same would apply to any
+other architecture wishing to do the same.
 
-    <xres>x<yres>[M][R][-<bpp>][@<refresh>][i][m][eDd]
-    <name>[-<bpp>][@<refresh>]
+[1]. https://lwn.net/Articles/674746/
+[2]. http://lxr.free-electrons.com/source/drivers/hwtracing/intel_th/
+[3]. http://mipi.org/specifications/debug#STP
 
-So we can't just copy the string over, and we need to parse it :/
+Changes from v8:
+* Split the last patch into 4 according to the suggestion from Alexander Shishkin;
+* Add Alexander Shishkin's Acked-by.
 
-Thanks!
-Maxime
+Changes from v7:
+* Addressed comments from Steven Rostedt:
+  - Removed unnessecery code;
+  - Shrinked the dependence of 'STM_SOURCE_FTRACE' from 'TRACING' to 'FUNCTION_TRACER';
+  - Changed the parameter type from char* to void*, that makes more sense.
+
+Changes from v6:
+* Rebased on v4.9-rc1;
+* Removed unused the declaration and header file including from trace.h
+  which was added in patch 1 of this series;
+* Revised a bit the comments in trace.h .
+
+Changes from v5:
+* Addressed comments from Steven Rostedt:
+  - Removed .commit() from trace_export;
+  - Changed to directly call trace_process_export() instead of trace_export::commit();
+  - Used 'ring_buffer_event_length(event)' instead to get the trace size;
+  - Removed trace_export pointer from trace_array structure.
+* Revised commit message a little to make the description more accurate.
+
+Changes from v4:
+* Addressed comments from Steven Rostedt:
+  - Removed 'inline' annotations from the function which is called via function pointer;
+  - Removed useless components from structure trace_export;
+  - Added '__rcu' annotation to the RCU variables;
+  - Used 'rcu_assign_pointer' to do every RCU assignment;
+  - Added WARN_ON_ONCE() when the .write() is not assigned;
+  - In order to reduce the overhead caused by adding this feature, this revision used an
+    global array instead of a big "if statement" to get the size of trace entry according
+    to the trace type.
+  - In order to keep the current logic unchanged, made ftrace_exports() only being called if
+    there's something have been added, i.e. if trace_export to stm_ftrace has been added in
+    this patchset.
+
+Changes from v3:
+* Addressed comments from Steven Rostedt:
+  - Added comments for the element 'name' and 'next' of trace_export;
+  - Changed to use RCU functions instead of mutex in function callback;
+  - Moved the check for name to register trace_export function;
+* Renamed 'trace_function_exports' to 'trace_exports' since its
+  implementation is not only for function_trace;  The similar changes on
+  'add_trace_export' and 'rm_trace_export'.
+
+Changes from v2:
+* Rebased on v4.8-rc1.
+* Added trace_export class, and make traces can be exported to not only
+ring buffer but also other area such as STM.
+* Made stm_ftrace as an trace_export.
+* More detailed changes are described in change log of each patch.
+
+Changes from v1:
+* Addressed comments from Alexander Shishkin:
+ - Modified some ambiguous change logs.
+ - Decoupled stm_ftrace and trace_output interface to STM.
+ - Changed the file name from stm_ftrace.c to stm/ftrace.c.
+ - Implemented link/unlink hooks for stm_ftrace.
+* Removed useless header file include from stm/ftrace.c
+* Added Acked-by from Steven Rostedt on 4/4.
+
+Chunyan Zhang (6):
+  tracing: add a possibility of exporting function trace to other places
+    instead of ring buffer only
+  stm class: ftrace: Add ftrace-export-over-stm driver
+  coresight: Mark stm_generic_packet() with notrace
+  intel_th: Mark sth_stm_packet() with notrace
+  stm dummy: Mark dummy_stm_packet() with notrace
+  stm: Mark the functions of writing STM with notrace
+
+ drivers/hwtracing/coresight/coresight-stm.c |   2 +-
+ drivers/hwtracing/intel_th/sth.c            |  11 ++-
+ drivers/hwtracing/stm/Kconfig               |  11 +++
+ drivers/hwtracing/stm/Makefile              |   2 +
+ drivers/hwtracing/stm/core.c                |   7 +-
+ drivers/hwtracing/stm/dummy_stm.c           |   2 +-
+ drivers/hwtracing/stm/ftrace.c              |  87 +++++++++++++++++++
+ include/linux/stm.h                         |   4 +-
+ include/linux/trace.h                       |  28 ++++++
+ kernel/trace/trace.c                        | 129 +++++++++++++++++++++++++++-
+ 10 files changed, 271 insertions(+), 12 deletions(-)
+ create mode 100644 drivers/hwtracing/stm/ftrace.c
+ create mode 100644 include/linux/trace.h
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161121/e27ca461/attachment.sig>
+2.7.4
