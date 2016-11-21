@@ -1,116 +1,56 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 21 Nov 2016 10:03:04 +0100
-Subject: [PATCH] mtd: nand: tango: Use nand_to_mtd() instead of directly
- accessing chip->mtd
-Message-ID: <1479718984-26491-1-git-send-email-boris.brezillon@free-electrons.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Nov 2016 09:07:14 +0000
+Subject: [PATCH v2] ARM: Drop fixed 200 Hz timer requirement from Samsung
+ platforms
+In-Reply-To: <d67d8100-c8bf-d353-2225-e3b869a1c90d@codethink.co.uk>
+References: <1479453418-25314-1-git-send-email-krzk@kernel.org>
+ <22757093.ejshJp9T7L@wuerfel>
+ <CA+Ln22GyRwywcxdO4Gp67d8TfpjfNzaE0z25=WW9GWibjGkDuQ@mail.gmail.com>
+ <d67d8100-c8bf-d353-2225-e3b869a1c90d@codethink.co.uk>
+Message-ID: <20161121090713.GZ1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The nand_to_mtd() helper is here to hide internal mtd_info <-> nand_chip
-association and ease future refactors.
+On Mon, Nov 21, 2016 at 08:59:06AM +0000, Ben Dooks wrote:
+> On 21/11/16 06:01, Tomasz Figa wrote:
+> >2016-11-18 17:46 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> >>Maybe add a paragraph about the specific problem:
+> >>
+> >>"On s3c24xx, the PWM counter is only 16 bit wide, and with the
+> >>typical 12MHz input clock that overflows every 5.5ms. This works
+> >>with HZ=200 or higher but not with HZ=100 which needs a 10ms
+> >>interval between ticks. On Later chips (S3C64xx, S5P and EXYNOS),
+> >>the counter is 32 bits and does not have this problem.
+> >>The new samsung_pwm_timer driver solves the problem by scaling
+> >>the input clock by a factor of 50 on s3c24xx, which makes it
+> >>less accurate but allows HZ=100 as well as CONFIG_NO_HZ with
+> >>fewer wakeups".
+> >
+> >One thing to correct here is that the typical clock is PCLK, which is
+> >derived from one of the PLLs and AFAIR is between 33-66 MHz on
+> >s3c24xx. Technically you can drive the PWM block from an external
+> >clock (12 MHz for some board-file based boards), but for simplicity
+> >this functionality was omitted in the new PWM timer driver used for DT
+> >boards (which worked fine with the PWM driven by PCLK).
+> 
+> Given it was a clock mux option, that would not have been difficult to
+> acheive. However these platforms are now so old people don't care, I
+> think all my pre-armv7 stuff is now in a box.
 
-Make use of this helper instead of directly accessing chip->mtd.
+However, there are still s3c2410 machines running out there... so we
+should do our best not to break them.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/mtd/nand/tango_nand.c | 25 ++++++++++++++++---------
- 1 file changed, 16 insertions(+), 9 deletions(-)
+> The use of the 12MHz input was to give something to run PWM timers from
+> that wasn't interrupted by cpu frequency scaling as PCLK generally is
+> half HCLK which is divided down from the core CPU clock.
+...
+> The original implementation was to go for the best accuracy from the
+> timer at the expense of 200 irqs per second instead of the usual 100.
 
-diff --git a/drivers/mtd/nand/tango_nand.c b/drivers/mtd/nand/tango_nand.c
-index 7ed35348993e..ec87516b87f5 100644
---- a/drivers/mtd/nand/tango_nand.c
-+++ b/drivers/mtd/nand/tango_nand.c
-@@ -171,6 +171,7 @@ static void tango_select_chip(struct mtd_info *mtd, int idx)
-  */
- static int check_erased_page(struct nand_chip *chip, u8 *buf)
- {
-+	struct mtd_info *mtd = nand_to_mtd(chip);
- 	u8 *meta = chip->oob_poi + BBM_SIZE;
- 	u8 *ecc = chip->oob_poi + BBM_SIZE + METADATA_SIZE;
- 	const int ecc_size = chip->ecc.bytes;
-@@ -183,7 +184,7 @@ static int check_erased_page(struct nand_chip *chip, u8 *buf)
- 						  meta, meta_len,
- 						  chip->ecc.strength);
- 		if (res < 0)
--			chip->mtd.ecc_stats.failed++;
-+			mtd->ecc_stats.failed++;
- 
- 		bitflips = max(res, bitflips);
- 		buf += pkt_size;
-@@ -300,26 +301,30 @@ static int tango_write_page(struct mtd_info *mtd, struct nand_chip *chip,
- 
- static void aux_read(struct nand_chip *chip, u8 **buf, int len, int *pos)
- {
-+	struct mtd_info *mtd = nand_to_mtd(chip);
-+
- 	*pos += len;
- 
- 	if (!*buf) {
- 		/* skip over "len" bytes */
--		chip->cmdfunc(&chip->mtd, NAND_CMD_RNDOUT, *pos, -1);
-+		chip->cmdfunc(mtd, NAND_CMD_RNDOUT, *pos, -1);
- 	} else {
--		tango_read_buf(&chip->mtd, *buf, len);
-+		tango_read_buf(mtd, *buf, len);
- 		*buf += len;
- 	}
- }
- 
- static void aux_write(struct nand_chip *chip, const u8 **buf, int len, int *pos)
- {
-+	struct mtd_info *mtd = nand_to_mtd(chip);
-+
- 	*pos += len;
- 
- 	if (!*buf) {
- 		/* skip over "len" bytes */
--		chip->cmdfunc(&chip->mtd, NAND_CMD_SEQIN, *pos, -1);
-+		chip->cmdfunc(mtd, NAND_CMD_SEQIN, *pos, -1);
- 	} else {
--		tango_write_buf(&chip->mtd, *buf, len);
-+		tango_write_buf(mtd, *buf, len);
- 		*buf += len;
- 	}
- }
-@@ -345,8 +350,9 @@ static void aux_write(struct nand_chip *chip, const u8 **buf, int len, int *pos)
-  */
- static void raw_read(struct nand_chip *chip, u8 *buf, u8 *oob)
- {
-+	struct mtd_info *mtd = nand_to_mtd(chip);
- 	u8 *oob_orig = oob;
--	const int page_size = chip->mtd.writesize;
-+	const int page_size = mtd->writesize;
- 	const int ecc_size = chip->ecc.bytes;
- 	const int pkt_size = chip->ecc.size;
- 	int pos = 0; /* position within physical page */
-@@ -371,8 +377,9 @@ static void raw_read(struct nand_chip *chip, u8 *buf, u8 *oob)
- 
- static void raw_write(struct nand_chip *chip, const u8 *buf, const u8 *oob)
- {
-+	struct mtd_info *mtd = nand_to_mtd(chip);
- 	const u8 *oob_orig = oob;
--	const int page_size = chip->mtd.writesize;
-+	const int page_size = mtd->writesize;
- 	const int ecc_size = chip->ecc.bytes;
- 	const int pkt_size = chip->ecc.size;
- 	int pos = 0; /* position within physical page */
-@@ -522,7 +529,7 @@ static int chip_init(struct device *dev, struct device_node *np)
- 
- 	chip = &tchip->nand_chip;
- 	ecc = &chip->ecc;
--	mtd = &chip->mtd;
-+	mtd = nand_to_mtd(chip);
- 
- 	chip->read_byte = tango_read_byte;
- 	chip->write_buf = tango_write_buf;
-@@ -584,7 +591,7 @@ static int tango_nand_remove(struct platform_device *pdev)
- 
- 	for (cs = 0; cs < MAX_CS; ++cs) {
- 		if (nfc->chips[cs])
--			nand_release(&nfc->chips[cs]->nand_chip.mtd);
-+			nand_release(nand_to_mtd(&nfc->chips[cs]->nand_chip));
- 	}
- 
- 	return 0;
+This sounds like a good enough reason not to switch away from using 200Hz
+and the 12MHz input.
+
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
