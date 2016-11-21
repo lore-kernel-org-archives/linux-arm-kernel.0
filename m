@@ -1,37 +1,29 @@
 From: ahaslam@baylibre.com (Axel Haslam)
-Date: Mon, 21 Nov 2016 17:59:20 +0100
-Subject: [PATCH 2/2] ARM: dts: da850-lcdk: Enable ohci for omapl138 lcdk
-In-Reply-To: <20161121165920.29809-1-ahaslam@baylibre.com>
-References: <20161121165920.29809-1-ahaslam@baylibre.com>
-Message-ID: <20161121165920.29809-3-ahaslam@baylibre.com>
+Date: Mon, 21 Nov 2016 18:01:31 +0100
+Subject: [PATCH] ARM: davinci_all_defconfig: Enable OHCI as module
+Message-ID: <20161121170131.30157-1-ahaslam@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the usb1 controller (ohci) and phy for the lcdk board
+Enable the davinci ohci driver as a module for usb
+tested with the omap138-lcdk hawk board.
 
 Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
 ---
- arch/arm/boot/dts/da850-lcdk.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/configs/davinci_all_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index 7b8ab21..a739603 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -86,6 +86,14 @@
- 	};
- };
- 
-+&usb_phy {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
-+
- &serial2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&serial2_rxtx_pins>;
+diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
+index b5e978f..b9bbbbd 100644
+--- a/arch/arm/configs/davinci_all_defconfig
++++ b/arch/arm/configs/davinci_all_defconfig
+@@ -157,6 +157,7 @@ CONFIG_HID_SONY=m
+ CONFIG_HID_SUNPLUS=m
+ CONFIG_USB=m
+ CONFIG_USB_MON=m
++CONFIG_USB_OHCI_HCD=m
+ CONFIG_USB_STORAGE=m
+ CONFIG_USB_MUSB_HDRC=m
+ CONFIG_MUSB_PIO_ONLY=y
 -- 
 2.9.3
