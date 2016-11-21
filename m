@@ -1,55 +1,42 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Mon, 21 Nov 2016 13:49:02 -0800
-Subject: [PATCH 2/2] MAINTAINERS: Add myself as co-maintainer to fpga mgr
- framework.
-In-Reply-To: <1479764942-14321-1-git-send-email-mdf@kernel.org>
-References: <1479764942-14321-1-git-send-email-mdf@kernel.org>
-Message-ID: <1479764942-14321-2-git-send-email-mdf@kernel.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 21 Nov 2016 23:04:14 +0100
+Subject: [PATCH 9/10] ARM: sun5i: Convert to CCU
+In-Reply-To: <CAGb2v64vOePTQ0a7cmSmimVrkYOxxRwRZnGbsC2ZQ4Su59oJaQ@mail.gmail.com>
+References: <cover.326f50aecc25fbe292184527b52a1e3172aba9cf.1478625788.git-series.maxime.ripard@free-electrons.com>
+ <4046893c1810045bac3eeb1ea3a35c5771d250e0.1478625788.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v64vOePTQ0a7cmSmimVrkYOxxRwRZnGbsC2ZQ4Su59oJaQ@mail.gmail.com>
+Message-ID: <20161121220414.bqsdjtpsjsq5tefs@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add myself as co-maintainer to fpga mgr framework.
+On Sun, Nov 13, 2016 at 11:01:27PM +0800, Chen-Yu Tsai wrote:
+> >                         compatible = "allwinner,sun5i-a13-tcon";
+> >                         reg = <0x01c0c000 0x1000>;
+> >                         interrupts = <44>;
+> > -                       resets = <&tcon_ch0_clk 1>;
+> > +                       resets = <&ccu RST_LCD>;
+> >                         reset-names = "lcd";
+> > -                       clocks = <&ahb_gates 36>,
+> > -                                <&tcon_ch0_clk>,
+> > -                                <&tcon_ch1_clk>;
+> > +                       clocks = <&ccu CLK_AHB_LCD>,
+> > +                                <&ccu CLK_TCON_CH0>,
+> > +                                <&ccu CLK_TCON_CH1>;
+> 
+> Just curious, is CLK_TCON_CH1_SCLK ever used?
 
-Signed-off-by: Moritz Fischer <mdf@kernel.org>
-Cc: Alan Tull <atull@opensource.altera.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-fpga at vger.kernel.org
----
-Hi all,
+Yes, this is an intermediate clock for the channel 1 clock.
 
-Lately we've fallen behind a bit on reviewing patches lately.
+Maxime
 
-'Behind the scenes', Alan has worked on getting a git tree setup
-for us on kernel.org and I've worked on getting the mailing list setup.
-The mailing list is up and running (see patch [1/2]) of this series.
-
-Greg said he'd be happy to take pull requests from now on, so I hope
-once we have figured out the exact workflow things will be much smoother
-getting your patches merged into the fpga mgr framework.
-
-Feel free to comment / speak up if you're not cool with this change.
-
-Thanks,
-
-Moritz
-
----
- MAINTAINERS | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 19527a0..1856594 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -5004,7 +5004,7 @@ K:	fmc_d.*register
- 
- FPGA MANAGER FRAMEWORK
- M:	Alan Tull <atull@opensource.altera.com>
--R:	Moritz Fischer <moritz.fischer@ettus.com>
-+M:	Moritz Fischer <moritz.fischer@ettus.com>
- L:	linux-fpga at vger.kernel.org
- S:	Maintained
- F:	drivers/fpga/
 -- 
-2.7.4
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161121/1222cbd5/attachment.sig>
