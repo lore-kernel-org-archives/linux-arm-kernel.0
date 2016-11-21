@@ -1,31 +1,55 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 21 Nov 2016 16:19:19 +0530
-Subject: [PATCH v3 10/10] ARM: dts: da850: add usb device node
-In-Reply-To: <c812d211-fff8-520f-cc1f-6fa69a765498@ti.com>
-References: <20161107203948.28324-1-ahaslam@baylibre.com>
- <20161107203948.28324-11-ahaslam@baylibre.com>
- <48d0c158-f7c8-0d1e-f06e-b7b28d6f2b93@lechnology.com>
- <CAKXjFTN_VvxJ+mk=ooUiGqZJnuJJJn33KsBF2n6SvZNjWpYm3Q@mail.gmail.com>
- <c812d211-fff8-520f-cc1f-6fa69a765498@ti.com>
-Message-ID: <e8bc1888-4936-7d8e-cf8a-a3f2b5644ef5@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 21 Nov 2016 11:53:18 +0100
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for
+ v4.10
+In-Reply-To: <20161119014929.GE2543@localhost>
+References: <cover.1479391750.git.horms+renesas@verge.net.au>
+ <20161119014929.GE2543@localhost>
+Message-ID: <20161121105315.GA19845@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 November 2016 04:16 PM, Sekhar Nori wrote:
->>> In commit 2957e36e76c836b167e5e0c1edb578d8a9bd7af6 in the linux-davinci
->>> >> tree, the alias for the musb device is usb0. So, I think we should use usb1
->>> >> here instead of ohci - or change the usb0 alias to musb.
->>> >>
->>> >> https://git.kernel.org/cgit/linux/kernel/git/nsekhar/linux-davinci.git/commit/?h=v4.10/dt&id=2957e36e76c836b167e5e0c1edb578d8a9bd7af6
->> > 
->> > ok, i will change to usb1, since i will be resubmiting this.
+On Fri, Nov 18, 2016 at 05:49:29PM -0800, Olof Johansson wrote:
+> On Thu, Nov 17, 2016 at 03:11:45PM +0100, Simon Horman wrote:
+> > Hi Olof, Hi Kevin, Hi Arnd,
+> > 
+> > Please consider these second round of Renesas ARM based SoC DT updates for v4.10.
+> > 
+> > This pull request is based on a merge of:
+> > 
+> > * The previous round of such requests, tagged as renesas-dt-for-v4.10,
+> >   which I have already sent a pull-request for.
+> > * The rzg-clock-defs tag of Geert Uytterhoeven's renesas-driver's tree.
+> >   This is to provide dependencies for adding the r8a7743 and r8a7745 SoCs.
+> > * The "Second Round of Renesas ARM Based SoC Drivers Updates for v4.10",
+> >   tagged as renesas-drivers2-for-v4.10, which I have also sent a pull
+> >   request for. This is included to provide dependencies for adding device
+> >   nodes for PRR, and adding the r8a7743 and r8a7745 SoCs.
+> 
+> Again, nack. And again, I don't understand why you create dependencies that
+> aren't needed. Please fix.
 
-> I have already applied a version of this patch. Please re-base against
-> linux-davinci/master and send a delta patch.
+Hi Olof,
 
-Hmm, no. scratch that. I mixed this up with the musb patch I applied.
-usb1 sounds good. Please also separate out the soc and board specific
-dts additions for your next version.
+I agree that calling out PRR above was incorrect. Please disregard that.
 
-Thanks,
-Sekhar
+However, there are dependencies for adding r8a7743 and r8a7745 SoCs
+in the form of header files:
+
+* The rzg-clock-defs tag provides dt-bindings/clock/r8a774[35]-cpg-mssr.h
+* The renesas-drivers2-for-v4.10 tag provides
+  dt-bindings/power/r8a774[35]-sysc.h
+
+The drivers branches are usually pretty light-weight. But this time it is a
+bit heavy and you rightly raised some questions about it. After some
+discussion with Geert we'd like to suggest that for future releases
+we provide a "driver-defs" branch which both driver code and DT can
+depend on. Thus avoiding pulling (non essential) driver changes into the DT
+branch.
+
+Unfortunately its a bit late to do that for v4.10 as the r8a7743 sysc
+driver and its defines were already accepted accepted together
+(renesas-drivers-for-v4.10 tag). So for this release we would be grateful
+if you could re-consider the renesas-drivers2-for-v4.10 tag given the
+feedback which Geert has provided. And in turn re-consider this pull
+request.
