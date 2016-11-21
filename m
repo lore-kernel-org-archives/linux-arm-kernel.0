@@ -1,56 +1,73 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Mon, 21 Nov 2016 22:15:15 +0900
-Subject: [PATCH] dt-bindings: mfd: Improve readability for TPS65217 interrupt
- sources
-Message-ID: <20161121131515.8040-1-woogyom.kim@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 21 Nov 2016 13:23:28 +0000
+Subject: [PATCH 03/10] mfd: sun6i-prcm: Add codec analog controls
+ sub-device for Allwinner A23
+In-Reply-To: <20161112064648.26779-4-wens@csie.org>
+References: <20161112064648.26779-1-wens@csie.org>
+ <20161112064648.26779-4-wens@csie.org>
+Message-ID: <20161121132328.GG3917@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AC and USB interrupts are related with external power input.
-PB interrupt means push button pressed or released event.
-Use better human readable definitions.
+On Sat, 12 Nov 2016, Chen-Yu Tsai wrote:
 
-Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
----
- arch/arm/boot/dts/am335x-bone-common.dtsi | 4 ++--
- include/dt-bindings/mfd/tps65217.h        | 6 +++---
- 2 files changed, 5 insertions(+), 5 deletions(-)
+> The PRCM block on the A23 contains a message box like interface to
+> the registers for the analog path controls of the internal codec.
+> 
+> Add a sub-device for it.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/mfd/sun6i-prcm.c | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
+> index 011fcc555945..4abbf2ede944 100644
+> --- a/drivers/mfd/sun6i-prcm.c
+> +++ b/drivers/mfd/sun6i-prcm.c
+> @@ -12,6 +12,9 @@
+>  #include <linux/init.h>
+>  #include <linux/of.h>
+>  
+> +#define SUN8I_CODEC_ANALOG_BASE	0x1c0
+> +#define SUN8I_CODEC_ANALOG_END	(SUN8I_CODEC_ANALOG_BASE + 0x4 - 1)
+> +
+>  struct prcm_data {
+>  	int nsubdevs;
+>  	const struct mfd_cell *subdevs;
+> @@ -57,6 +60,14 @@ static const struct resource sun6i_a31_apb0_rstc_res[] = {
+>  	},
+>  };
+>  
+> +static const struct resource sun8i_codec_analog_res[] = {
+> +	{
+> +		.start	= SUN8I_CODEC_ANALOG_BASE,
+> +		.end	= SUN8I_CODEC_ANALOG_END,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +};
 
-diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-index dc561d5..1848d58 100644
---- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-+++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-@@ -319,13 +319,13 @@
- 	ti,pmic-shutdown-controller;
- 
- 	charger {
--		interrupts = <TPS65217_IRQ_AC>, <TPS65217_IRQ_USB>;
-+		interrupts = <TPS65217_IRQ_AC_POWER>, <TPS65217_IRQ_USB_POWER>;
- 		interrupts-names = "AC", "USB";
- 		status = "okay";
- 	};
- 
- 	pwrbutton {
--		interrupts = <TPS65217_IRQ_PB>;
-+		interrupts = <TPS65217_IRQ_PUSHBUTTON>;
- 		status = "okay";
- 	};
- 
-diff --git a/include/dt-bindings/mfd/tps65217.h b/include/dt-bindings/mfd/tps65217.h
-index cafb9e6..0293fdd 100644
---- a/include/dt-bindings/mfd/tps65217.h
-+++ b/include/dt-bindings/mfd/tps65217.h
-@@ -19,8 +19,8 @@
- #ifndef __DT_BINDINGS_TPS65217_H__
- #define __DT_BINDINGS_TPS65217_H__
- 
--#define TPS65217_IRQ_USB	0
--#define TPS65217_IRQ_AC		1
--#define TPS65217_IRQ_PB		2
-+#define TPS65217_IRQ_USB_POWER		0	/* USB power state change */
-+#define TPS65217_IRQ_AC_POWER		1	/* AC power state change */
-+#define TPS65217_IRQ_PUSHBUTTON		2	/* Push button state change */
- 
- #endif
+Use the DEVICE_RES_* macros.
+
+>  static const struct mfd_cell sun6i_a31_prcm_subdevs[] = {
+>  	{
+>  		.name = "sun6i-a31-ar100-clk",
+> @@ -109,6 +120,12 @@ static const struct mfd_cell sun8i_a23_prcm_subdevs[] = {
+>  		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_rstc_res),
+>  		.resources = sun6i_a31_apb0_rstc_res,
+>  	},
+> +	{
+> +		.name		= "sun8i-codec-analog",
+> +		.of_compatible	= "allwinner,sun8i-a23-codec-analog",
+> +		.num_resources	= ARRAY_SIZE(sun8i_codec_analog_res),
+> +		.resources	= sun8i_codec_analog_res,
+> +	},
+>  };
+>  
+>  static const struct prcm_data sun6i_a31_prcm_data = {
+
 -- 
-2.9.3
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
