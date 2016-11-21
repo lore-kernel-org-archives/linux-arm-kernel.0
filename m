@@ -1,49 +1,129 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 21 Nov 2016 12:11:37 +0000
-Subject: [BUG] i2c-designware silently fails on long transfers
-In-Reply-To: <20161121104329.GB1041@n2100.armlinux.org.uk>
-References: <20161118193542.GO1041@n2100.armlinux.org.uk>
- <20161121102901.GF1446@lahna.fi.intel.com>
- <20161121104329.GB1041@n2100.armlinux.org.uk>
-Message-ID: <272dcf6f-ffa5-4ddd-7597-d9a18d210e7a@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Nov 2016 12:25:56 +0000
+Subject: [BUG] hdlcd gets confused about base address
+In-Reply-To: <20161121113212.GF1005@e106497-lin.cambridge.arm.com>
+References: <20161118233733.GP1041@n2100.armlinux.org.uk>
+ <20161121110604.GC1005@e106497-lin.cambridge.arm.com>
+ <20161121112030.GC1041@n2100.armlinux.org.uk>
+ <20161121113212.GF1005@e106497-lin.cambridge.arm.com>
+Message-ID: <20161121122556.GE1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/11/16 10:43, Russell King - ARM Linux wrote:
-> On Mon, Nov 21, 2016 at 12:29:01PM +0200, Mika Westerberg wrote:
->> On Fri, Nov 18, 2016 at 07:35:42PM +0000, Russell King - ARM Linux wrote:
->>> Another mitigation would be to lower the I2C bus frequency on Juno from
->>> 400kHz to 100kHz, so that there's 4x longer IRQ latency possible.
->>> However, even that isn't going to be reliable - even going to 100kHz
->>> isn't going to allow the above case to be solved - the interrupt is
->>> delayed by around 2ms, and it takes about 1.4ms to send/receive 16 bytes
->>> at 100kHz.  (9 * 16 / (100*10^3)).
->>>
->>> So, I think all hope is lost for i2c-designware on Juno to cope with
->>> reading the EDID from TDA998x reliably.
->>
->> :-(
->>
->> I wonder if we can get it work more reliably by using DMA (provided that
->> there are DMA channels available for I2C in Juno)? That would allow the
->> hardware to perform longer reads without relying on how fast the
->> interrupt handler is able to empty the Rx FIFO.
+On Mon, Nov 21, 2016 at 11:32:12AM +0000, Liviu Dudau wrote:
+> On Mon, Nov 21, 2016 at 11:20:30AM +0000, Russell King - ARM Linux wrote:
+> > I first noticed it when booting with the buggy I2C EDID reading, so
+> > DRM wasn't seeing a valid EDID.  Then when Xorg started up and shut
+> > down, I noticed that the framebuffer console was shifted.  It's actually
+> > shifted to the left because framebuffer pixel 0,0 is not displayed.
 > 
-> It would need to DMA to the Tx FIFO to keep it filled - it triggers the
-> stop condition when the Tx FIFO empties.  From what I can see in the
-> driver, the Tx FIFO not only takes the data but also a "command" to tell
-> the hardware what to do.
-> 
-> The Rx FIFO would also need DMA to avoid it overflowing due to high
-> interrupt latency.
-> 
-> I don't know what state DMA is in on the Juno, or even whether it has
-> DMA - it has a PL330 DMA controller, but I see nothing in the DT files
-> making use of it.
+> I see. So the reason why I did not notice this was the EDID transfers
+> mostly working for me.
 
-There's no DMA request wired up for I2C, unfortunately - only for the
-UARTs, I2S, FPFGA tile and trace unit. I recall Liviu did have a patch
-to lower the I2C clock as the mitigation you mention, which I thought
-had made it into mainline, but apparently not.
+It also happens when EDID transfers work too!
 
-Robin.
+> > > > Using devmem2 to disable and re-enable the HDLCD resolves the issue,
+> > > > and repeated disable/enable cycles do not make the issue re-appear.
+> > > 
+> > > Do you resize the display mode as well afer re-enabling HDLCD?
+> > 
+> > I quite literally just did:
+> > 
+> > ./devmem2 0x7ff60230 w 0; ./devmem2 0x7ff60230 w 1
+> 
+> Sorry, was not very clear. Under my assumption that you were resizing the
+> display with xrandr, I was wondering if the issue you were seeing disappeared
+> when using devmem2 plus the resizing.
+
+I think the problems are much deeper.  I've added this:
+
+static void hdlcd_crtc_enable(struct drm_crtc *crtc)
+{
+        struct hdlcd_drm_private *hdlcd = crtc_to_hdlcd_priv(crtc);
+printk("%s: active %d cmd %08x\n", __func__, crtc->state->active, hdlcd_read(hdlcd, HDLCD_REG_COMMAND));
+        clk_prepare_enable(hdlcd->clk);
+
+...
+static void hdlcd_crtc_disable(struct drm_crtc *crtc)
+{
+        struct hdlcd_drm_private *hdlcd = crtc_to_hdlcd_priv(crtc);
+printk("%s: active %d\n", __func__, crtc->state->active);
+        if (!crtc->state->active)
+                return;
+
+What I see in the kernel log each time I change the resolution is:
+
+[  221.409577] hdlcd_crtc_disable: active 0
+[  221.430206] hdlcd_crtc_enable: active 1 cmd 00000001
+[  239.264672] hdlcd_crtc_disable: active 0
+[  239.285180] hdlcd_crtc_enable: active 1 cmd 00000001
+[  278.712792] hdlcd_crtc_disable: active 0
+[  278.730361] hdlcd_crtc_enable: active 1 cmd 00000001
+[  281.633841] hdlcd_crtc_disable: active 0
+[  281.668578] hdlcd_crtc_enable: active 1 cmd 00000001
+
+So, when ->disable is called, active is always zero.  This
+leads to...
+
+$ head -n3 /sys/kernel/debug/clk/clk_summary
+   clock                         enable_cnt  prepare_cnt        rate   accuracy
+  phase
+----------------------------------------------------------------------------------------
+ pxlclk                                   6            6   148500000          0 0
+
+the enable and prepare counts for this clock incrementing by one each
+time I change the resolution.
+
+> > Maybe hdlcd shouldn't be implementing the ->enable callback but instead
+> > the ->commit callback then?
+> 
+> I believe we need ->enable for the initial setup (cold boot or module
+> reloading).
+
+Yes, I found a comment in DRM saying that ->commit is for legacy drivers
+only.
+
+I think the problem is that hdlcd is not really knowing what the true
+state of the CRTC is, as illustrated by the clock counts increasing
+and the state of crtc->state->active.
+
+I'm wondering if this is a core DRM bug though... the comments and
+code do not align:
+
+/**
+ * drm_atomic_helper_commit_tail - commit atomic update to hardware
+ * @state: new modeset state to be committed
+
+void drm_atomic_helper_commit_tail(struct drm_atomic_state *state)
+{
+        struct drm_device *dev = state->dev;
+
+        drm_atomic_helper_commit_modeset_disables(dev, state);
+
+/**
+ * drm_atomic_helper_commit_modeset_disables - modeset commit to disable outputs * @dev: DRM device
+ * @old_state: atomic state object with old state structures
+void drm_atomic_helper_commit_modeset_disables(struct drm_device *dev,
+                                               struct drm_atomic_state *old_state)
+
+So, is "state" in drm_atomic_helper_commit_tail the old state or the
+new state?  Should this state be passed to
+drm_atomic_helper_commit_modeset_disables(), which seems to expect
+the old state?
+
+It looks _really_ screwed up here - in any case, it really doesn't
+help when you're not experienced with atomic mode set to work out
+what the hell this code is doing... it seems to be a horrible mess.
+Maybe someone who understands this code ought to read through it
+from the point of view of someone who doesn't understand it and fix
+the comments, or get rid of the down-right misleading comments.
+
+Comments are worse than useless if they mislead.  Better to have no
+comments than misleading comments.
+
+Daniel?
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
