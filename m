@@ -1,102 +1,126 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 21 Nov 2016 14:27:12 +0100
-Subject: [GIT PULL] Allwinner DT changes for 4.10
-In-Reply-To: <20161119002316.GN8882@localhost>
-References: <20161115204122.x3vnb3bkny5esdya@lukather>
- <20161119002316.GN8882@localhost>
-Message-ID: <20161121132712.43b5eld2qthi6664@lukather>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 21 Nov 2016 14:27:13 +0100
+Subject: [PATCH] PM / Domains: Fix compatible for domain idle state
+In-Reply-To: <1478210075-92045-2-git-send-email-lina.iyer@linaro.org>
+References: <1478210075-92045-1-git-send-email-lina.iyer@linaro.org>
+ <1478210075-92045-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAPDyKFomCaT+dV+C7wzcqnMzwKOn6w7wPo3Gm94O2x3RRL_tLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On 3 November 2016 at 22:54, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Re-using idle state definition provided by arm,idle-state for domain
+> idle states creates a lot of confusion and limits further evolution of
+> the domain idle definition. To keep things clear and simple, define a
+> idle states for domain using a new compatible "domain-idle-state".
+>
+> Fix existing PM domains code to look for the newly defined compatible.
+>
+> Cc: <devicetree@vger.kernel.org>
+> Cc: Rob Herring <robh@kernel.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 
-On Fri, Nov 18, 2016 at 04:23:16PM -0800, Olof Johansson wrote:
-> Hi,
-> 
-> On Tue, Nov 15, 2016 at 09:41:22PM +0100, Maxime Ripard wrote:
-> > Hi Arnd, Olof,
-> > 
-> > Here is our pull request for the next merge window.
-> > 
-> > Thanks!
-> > Maxime
-> > 
-> > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-> > 
-> >   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.10
-> > 
-> > for you to fetch changes up to e39a30cf736144814b0bddb3fff28fbbc2a8be0f:
-> > 
-> >   ARM: sunxi: Add the missing clocks to the pinctrl nodes (2016-11-15 18:49:47 +0100)
-> > 
-> > ----------------------------------------------------------------
-> > Allwinner DT additions for 4.10
-> > 
-> > The usual bunch of DT additions, but most notably:
-> >   - A31 DRM driver
-> >   - A31 audio codec
-> >   - WiFi for the A80-Based boards and the CHIP
-> >   - Support for the NextThing Co CHIP Pro (the first board with NAND
-> >     enabled)
-> >   - New boards: NanoPi M1,
-> > 
-> [...]
-> 
-> > Maxime Ripard (16):
-> >       ARM: sun5i: a13-olinuxino: Enable VGA bridge
-> >       ARM: gr8: Add the UART3
-> >       ARM: gr8: Fix typo in the i2s mclk pin group
-> >       ARM: gr8: Add missing pwm channel 1 pin
-> >       ARM: gr8: Add UART2 pins
-> >       ARM: gr8: Add UART3 pins
-> >       ARM: gr8: Add CHIP Pro support
-> >       ARM: sun5i: chip: Enable Wi-Fi SDIO chip
-> >       ARM: sun5i: Rename A10s pins
-> >       ARM: sun5i: Add SPI2 pins
-> >       ARM: sun5i: Add RGB 565 LCD pins
-> >       ARM: sun5i: chip: Add optional buses
-> >       ARM: gr8: evb: Enable SPDIF
-> >       ARM: gr8: evb: Add i2s codec
-> >       ARM: sun8i: sina33: Enable USB gadget
-> >       ARM: sunxi: Add the missing clocks to the pinctrl nodes
-> > 
-> [...]
-> 
-> >  arch/arm/boot/dts/Makefile                         |   1 +
-> >  arch/arm/boot/dts/ntc-gr8-chip-pro.dts             | 266 +++++++++++++++++++++
-> >  arch/arm/boot/dts/ntc-gr8-evb.dts                  |  33 +++
-> >  arch/arm/boot/dts/ntc-gr8.dtsi                     |  47 +++-
-> >  arch/arm/boot/dts/sun4i-a10.dtsi                   |   3 +-
-> 
-> NTC isn't the SoC manufacturer, and we try to keep the prefixes down to
-> manufacturer to keep the namespace a little more manageable, even if
-> we never got subdirectories setup as on arm64.
-> 
-> I think this should probably be sun4i-a10-gr8 or sun4i-r8-gr8 as prefix?
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-The users really expect a SoC from Nextthing, it's always been
-marketed that way, the marking on the SoC also says so, etc. The fact
-that it's been a design in cooperation with Allwinner, and that the
-design is based on some earlier family is an implementation detail,
-and I'd really like not for it to have the sun5i prefix, it's just
-confusing.
+Kind regards
+Uffe
 
-And the ntc prefix has been asked for during the reviews...
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161121/93468ce6/attachment.sig>
+> ---
+>  .../bindings/power/domain-idle-state.txt           | 33 ++++++++++++++++++++++
+>  .../devicetree/bindings/power/power_domain.txt     |  8 +++---
+>  drivers/base/power/domain.c                        |  2 +-
+>  3 files changed, 38 insertions(+), 5 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/power/domain-idle-state.txt
+>
+> diff --git a/Documentation/devicetree/bindings/power/domain-idle-state.txt b/Documentation/devicetree/bindings/power/domain-idle-state.txt
+> new file mode 100644
+> index 0000000..eefc7ed
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/domain-idle-state.txt
+> @@ -0,0 +1,33 @@
+> +PM Domain Idle State Node:
+> +
+> +A domain idle state node represents the state parameters that will be used to
+> +select the state when there are no active components in the domain.
+> +
+> +The state node has the following parameters -
+> +
+> +- compatible:
+> +       Usage: Required
+> +       Value type: <string>
+> +       Definition: Must be "domain-idle-state".
+> +
+> +- entry-latency-us
+> +       Usage: Required
+> +       Value type: <prop-encoded-array>
+> +       Definition: u32 value representing worst case latency in
+> +                   microseconds required to enter the idle state.
+> +                   The exit-latency-us duration may be guaranteed
+> +                   only after entry-latency-us has passed.
+> +
+> +- exit-latency-us
+> +       Usage: Required
+> +       Value type: <prop-encoded-array>
+> +       Definition: u32 value representing worst case latency
+> +                   in microseconds required to exit the idle state.
+> +
+> +- min-residency-us
+> +       Usage: Required
+> +       Value type: <prop-encoded-array>
+> +       Definition: u32 value representing minimum residency duration
+> +                   in microseconds after which the idle state will yield
+> +                   power benefits after overcoming the overhead in entering
+> +i                  the idle state.
+> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+> index e165036..723e1ad 100644
+> --- a/Documentation/devicetree/bindings/power/power_domain.txt
+> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
+> @@ -31,7 +31,7 @@ Optional properties:
+>
+>  - domain-idle-states : A phandle of an idle-state that shall be soaked into a
+>                  generic domain power state. The idle state definitions are
+> -                compatible with arm,idle-state specified in [1].
+> +                compatible with domain-idle-state specified in [1].
+>    The domain-idle-state property reflects the idle state of this PM domain and
+>    not the idle states of the devices or sub-domains in the PM domain. Devices
+>    and sub-domains have their own idle-states independent of the parent
+> @@ -85,7 +85,7 @@ Example 3:
+>         };
+>
+>         DOMAIN_RET: state at 0 {
+> -               compatible = "arm,idle-state";
+> +               compatible = "domain-idle-state";
+>                 reg = <0x0>;
+>                 entry-latency-us = <1000>;
+>                 exit-latency-us = <2000>;
+> @@ -93,7 +93,7 @@ Example 3:
+>         };
+>
+>         DOMAIN_PWR_DN: state at 1 {
+> -               compatible = "arm,idle-state";
+> +               compatible = "domain-idle-state";
+>                 reg = <0x1>;
+>                 entry-latency-us = <5000>;
+>                 exit-latency-us = <8000>;
+> @@ -118,4 +118,4 @@ The node above defines a typical PM domain consumer device, which is located
+>  inside a PM domain with index 0 of a power controller represented by a node
+>  with the label "power".
+>
+> -[1]. Documentation/devicetree/bindings/arm/idle-states.txt
+> +[1]. Documentation/devicetree/bindings/power/domain-idle-state.txt
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 661737c..f0bc672 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -2048,7 +2048,7 @@ int genpd_dev_pm_attach(struct device *dev)
+>  EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
+>
+>  static const struct of_device_id idle_state_match[] = {
+> -       { .compatible = "arm,idle-state", },
+> +       { .compatible = "domain-idle-state", },
+>         { }
+>  };
+>
+> --
+> 2.7.4
+>
