@@ -1,48 +1,36 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 21 Nov 2016 10:31:00 +0100
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.10
-In-Reply-To: <20161119012836.GA2543@localhost>
-References: <cover.1479387356.git.horms+renesas@verge.net.au>
- <20161119012836.GA2543@localhost>
-Message-ID: <CAMuHMdXAuDcbr84phfPRpqZYRzAZf2j4vsv+i_Frz0G8ksd_Vg@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Nov 2016 09:31:45 +0000
+Subject: [PATCH] mfd: twl-core: export twl_get_regmap
+In-Reply-To: <20161121092339.GA32509@dell>
+References: <1478950693-13959-1-git-send-email-Nicolae_Rosia@mentor.com>
+ <20161118185548.GA23246@dell.home>
+ <CAKP5S=3quz8f1H0xnaffJ35L8qSOpSkBEGS8GsNhB5F=v3DoBg@mail.gmail.com>
+ <20161121092339.GA32509@dell>
+Message-ID: <20161121093144.GE23750@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Mon, Nov 21, 2016 at 09:23:39AM +0000, Lee Jones wrote:
+> It's common place to pass shared resources such as 'regmap' though
+> device data.  You can find many examples of *__set_drvdata throughout
+> the kernel.
 
-On Sat, Nov 19, 2016 at 2:28 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Thu, Nov 17, 2016 at 02:34:25PM +0100, Simon Horman wrote:
->> Please consider these second round of Renesas ARM based SoC updates for v4.10.
+Passing data between drivers using *_set_drvdata() is a layering
+violation:
 
->> * Basic support for r8a7745 SoC
->>
->> ----------------------------------------------------------------
->> Sergei Shtylyov (2):
->>       ARM: shmobile: r8a7745: basic SoC support
->>       ARM: shmobile: document SK-RZG1E board
->
-> Hi,
->
-> Is there a reason you're adding a config option per SoC?
->
-> I think you'd be better off not adding these config options, and just adding
-> support for the SoCs through compatibles (and adding the drivers to defconfigs,
-> etc).
+1. Driver data is supposed to be driver private data associated with
+   the currently bound driver.
+2. The driver data pointer is NULL'd when the driver unbinds from the
+   device.  See __device_release_driver() and the
+   dev_set_drvdata(dev, NULL).
+3. It will break with CONFIG_DEBUG_TEST_DRIVER_REMOVE enabled for a
+   similar reason to (2).
 
-Yes there is a reason: kernel size.
-The main offenders are the pinctrl tables, which add ca. 20-50 KiB per
-supported SoC.
+So, do not pass data between drivers using *_set_drvdata() - any
+examples in the kernel already are founded on bad practice, are
+fragile, and are already broken for some kernel configurations.
 
-Note that RZ/A1 (r7s72100) is used on some boards with its internal RAM
-(10 MiB) only.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
