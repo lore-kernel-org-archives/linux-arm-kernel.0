@@ -1,65 +1,28 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 22 Nov 2016 00:29:34 +0800
-Subject: [PATCH] clk: sunxi-ng: enable so-said LDOs for A33 SoC's pll-mipi
- clock
-In-Reply-To: <20161117164954.62658-1-icenowy@aosc.xyz>
-References: <20161117164954.62658-1-icenowy@aosc.xyz>
-Message-ID: <194651479745774@web24g.yandex.ru>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 21 Nov 2016 16:30:41 +0000
+Subject: [PATCH] PM / Domains: Fix compatible for domain idle state
+In-Reply-To: <1478210075-92045-2-git-send-email-lina.iyer@linaro.org>
+References: <1478210075-92045-1-git-send-email-lina.iyer@linaro.org>
+ <1478210075-92045-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <bb7451ec-6bc3-aa95-2334-fbaeb492e457@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Lina,
 
+On 03/11/16 21:54, Lina Iyer wrote:
+> Re-using idle state definition provided by arm,idle-state for domain
+> idle states creates a lot of confusion and limits further evolution of
+> the domain idle definition. To keep things clear and simple, define a
+> idle states for domain using a new compatible "domain-idle-state".
+>
+> Fix existing PM domains code to look for the newly defined compatible.
+>
 
-18.11.2016, 00:50, "Icenowy Zheng" <icenowy@aosc.xyz>:
-> In the user manual of A33 SoC, the bit 22 and 23 of pll-mipi control
-> register is called "LDO{1,2}_EN", and according to the BSP source code
-> from Allwinner [1], the LDOs are enabled during the clock's enabling
-> process.
->
-> The clock failed to generate output if the two LDOs are not enabled.
->
-> Add the two bits to the clock's gate bits, so that the LDOs are enabled
-> when the PLL is enabled.
->
-> [1] https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun8iw5.c#L429
->
-> Fixes: d05c748bd730 ("clk: sunxi-ng: Add A33 CCU support")
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Thanks for doing this(reluctantly? :-)). Looks good to me.
 
-I forgot to mention that this patch should also apply to 4.9.
+Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
 
-As A33 support is added, the problem will appear with some LCD panels.
-
-> ---
-> Dear Chen-Yu:
-> As you said, the two bits are also present in the CCU of A23 and A31.
-> Could you please check whether the PLL works on the two SoCs?
-> I remembered you mentioned you failed to make TCON enabled on A23.
-> On A31, you may hack the parent of tcon-ch0 to force the tcon clock to
-> use pll-mipi as parent, in order to check whether the pll works.
->
-> However, I didn't found the code that enables the LDOs in the BSP A23/31
-> sources, so you must test them to ensure whether the code is needed for
-> these SoCs.
->
-> Regards,
-> Icenowy
-> ?drivers/clk/sunxi-ng/ccu-sun8i-a33.c | 2 +-
-> ?1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a33.c b/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
-> index 96b40ca..9bd1f78 100644
-> --- a/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
-> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
-> @@ -131,7 +131,7 @@ static SUNXI_CCU_NKM_WITH_GATE_LOCK(pll_mipi_clk, "pll-mipi",
-> ?????????????????????????????????????8, 4, /* N */
-> ?????????????????????????????????????4, 2, /* K */
-> ?????????????????????????????????????0, 4, /* M */
-> - BIT(31), /* gate */
-> + BIT(31) | BIT(23) | BIT(22), /* gate */
-> ?????????????????????????????????????BIT(28), /* lock */
-> ?????????????????????????????????????CLK_SET_RATE_UNGATE);
->
-> --
-> 2.10.1
+-- 
+Regards,
+Sudeep
