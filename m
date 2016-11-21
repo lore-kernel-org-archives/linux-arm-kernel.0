@@ -1,95 +1,58 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 21 Nov 2016 09:29:59 +0100
-Subject: [GIT PULL 2/10] firmware: Add Tegra IVC and BPMP support
-In-Reply-To: <20161119023138.GL2543@localhost>
-References: <20161118161719.24153-1-thierry.reding@gmail.com>
- <20161118161719.24153-2-thierry.reding@gmail.com>
- <20161119023138.GL2543@localhost>
-Message-ID: <20161121082959.GE25171@ulmo.ba.sec>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 21 Nov 2016 14:07:53 +0530
+Subject: [PATCH] spi: davinci: Allow device tree devices to use DMA
+In-Reply-To: <946d60bc-ac14-7934-c1b3-e2de03831459@lechnology.com>
+References: <1479530464-12538-1-git-send-email-david@lechnology.com>
+ <79f186b5-ac71-189f-c19f-977670395043@ti.com>
+ <946d60bc-ac14-7934-c1b3-e2de03831459@lechnology.com>
+Message-ID: <fd697f3b-dba1-1e5f-c12c-45f71c0c07a1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 06:31:38PM -0800, Olof Johansson wrote:
-> On Fri, Nov 18, 2016 at 05:17:11PM +0100, Thierry Reding wrote:
-> > Hi ARM SoC maintainers,
-> > 
-> > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-> > 
-> >   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.10-firmware
-> > 
-> > for you to fetch changes up to b704ed8095ee91af5f3f7343bb3be23aae1cb26d:
-> > 
-> >   dt-bindings: firmware: Allow child nodes inside the Tegra BPMP (2016-11-18 14:33:44 +0100)
-> > 
-> > Thanks,
-> > Thierry
-> > 
-> > ----------------------------------------------------------------
-> > firmware: Add Tegra IVC and BPMP support
-> > 
-> > IVC is an inter-processor communication protocol that uses shared memory
-> > to exchange data between processors. The BPMP driver makes use of this
-> > to communicate with the Boot and Power Management Processor (BPMP) and
-> > uses an additional hardware synchronization primitive from the HSP block
-> > to signal availability of new data (doorbell).
-> > 
-> > Firmware running on the BPMP implements a number of services such as the
-> > control of clocks and resets within the system, or the ability to ungate
-> > or gate power partitions.
-> > 
-> > ----------------------------------------------------------------
-> > Dan Carpenter (1):
-> >       mailbox: tegra-hsp: Use after free in tegra_hsp_remove_doorbells()
-> > 
-> > Joseph Lo (3):
-> >       soc/tegra: Add Tegra186 support
-> >       dt-bindings: mailbox: Add Tegra HSP binding
-> >       dt-bindings: firmware: Add bindings for Tegra BPMP
-> > 
-> > Stephen Warren (2):
-> >       dt-bindings: Add power domains to Tegra BPMP firmware
-> >       dt-bindings: firmware: Allow child nodes inside the Tegra BPMP
-> > 
-> > Thierry Reding (5):
-> >       Merge branch 'for-4.10/soc' into for-4.10/mailbox
-> >       mailbox: Add Tegra HSP driver
-> >       Merge branch 'for-4.10/mailbox' into for-4.10/firmware
-> >       firmware: tegra: Add IVC library
-> >       firmware: tegra: Add BPMP support
+On Sunday 20 November 2016 10:31 PM, David Lechner wrote:
+
+> On 11/20/2016 06:59 AM, Sekhar Nori wrote:
+
+>> On Saturday 19 November 2016 10:11 AM, David Lechner wrote:
+
+>>> @@ -400,6 +401,9 @@ static int davinci_spi_of_setup(struct spi_device
+>>> *spi)
+>>>          if (!of_property_read_u32(np, "ti,spi-wdelay", &prop))
+>>>              spicfg->wdelay = (u8)prop;
+>>>          spi->controller_data = spicfg;
+>>> +        /* Use DMA for device if master supports it */
+>>> +        if (dspi->dma_rx)
+>>
+>> This should be
+>>
+>>         if (!(IS_ERR(dpsi->dma_rx) || IS_ERR(dspi->dma_tx))
 > 
-> Hi,
 > 
-> Again the format of the pull request here is a little confusing, since it's
-> a cumulative shotlog and diffstat, while you already sent the bulk of this
-> as part of the driver branch (1/10). It'd have been better to use that branch
-> as the base when you generate the pull request since that's the delta we see
-> when we merge it in.
+> There is the following code in davinci_spi_probe():
+> 
+>     ret = davinci_spi_request_dma(dspi);
+>     if (ret == -EPROBE_DEFER) {
+>         goto free_clk;
+>     } else if (ret) {
+>         dev_info(&pdev->dev, "DMA is not supported (%d)\n", ret);
+>         dspi->dma_rx = NULL;
+>         dspi->dma_tx = NULL;
+>     }
+> 
+> So, I does not look like it is possible to get anything other than NULL
+> or a valid pointer for dpsi->dma_rx and that checking dpsi->dma_tx is
+> not necessary.
+> 
+> So, I think if (dspi->dma_rx) is sufficient. In fact the same check is
+> used during unwinding if the probe function fails.
 
-In the past there had been occasions where it hadn't been clear what a
-given branch was going to pull in as additional dependencies, so adding
-the complete shortlog seemed like a good way to document this in a more
-explicit way.
+You are right, I see it now. Setting dma_rx to NULL overriding the error
+value is confusing since dma_request_chan() itself does not use NULL as
+an error value.
 
-If you prefer working things out yourself I can tweak the scripts to
-generate the pull requests on top of their respective dependencies.
+I think it is better to fix the existing code to remove the NULL
+overwrite and use IS_ERR() instead. You should probably wait for some
+feedback from the SPI maintainer though.
 
-> Also, I can't seem to find the key you use to sign these tags with, it isn't
-> uploaded on pgp.mit.edu. Can you remedy that please, and get it signed as
-> needed?
-
-Works for me:
-
-	http://pgp.mit.edu/pks/lookup?op=get&search=0xDD23ACD77F3EB3A1
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161121/a9fa1298/attachment.sig>
+Thanks,
+Sekhar
