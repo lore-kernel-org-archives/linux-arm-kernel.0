@@ -1,30 +1,102 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Nov 2016 13:24:19 +0000
-Subject: [BUG] hdlcd gets confused about base address
-In-Reply-To: <20161121125653.GJ1005@e106497-lin.cambridge.arm.com>
-References: <20161118233733.GP1041@n2100.armlinux.org.uk>
- <20161121110604.GC1005@e106497-lin.cambridge.arm.com>
- <20161121112030.GC1041@n2100.armlinux.org.uk>
- <20161121113212.GF1005@e106497-lin.cambridge.arm.com>
- <20161121122556.GE1041@n2100.armlinux.org.uk>
- <20161121125653.GJ1005@e106497-lin.cambridge.arm.com>
-Message-ID: <20161121132419.GF1041@n2100.armlinux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 21 Nov 2016 14:27:12 +0100
+Subject: [GIT PULL] Allwinner DT changes for 4.10
+In-Reply-To: <20161119002316.GN8882@localhost>
+References: <20161115204122.x3vnb3bkny5esdya@lukather>
+ <20161119002316.GN8882@localhost>
+Message-ID: <20161121132712.43b5eld2qthi6664@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2016 at 12:56:53PM +0000, Liviu Dudau wrote:
-> That is mostly due to the check in hdlcd_crtc_disable() which I should
-> remove, I've added it because I was getting a ->disable() hook call
-> before any ->enable() was called at startup time. I need to revisit
-> this as I remember Daniel was commenting that this was not needed.
+Hi Olof,
 
-Removing that test results in:
+On Fri, Nov 18, 2016 at 04:23:16PM -0800, Olof Johansson wrote:
+> Hi,
+> 
+> On Tue, Nov 15, 2016 at 09:41:22PM +0100, Maxime Ripard wrote:
+> > Hi Arnd, Olof,
+> > 
+> > Here is our pull request for the next merge window.
+> > 
+> > Thanks!
+> > Maxime
+> > 
+> > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+> > 
+> >   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.10
+> > 
+> > for you to fetch changes up to e39a30cf736144814b0bddb3fff28fbbc2a8be0f:
+> > 
+> >   ARM: sunxi: Add the missing clocks to the pinctrl nodes (2016-11-15 18:49:47 +0100)
+> > 
+> > ----------------------------------------------------------------
+> > Allwinner DT additions for 4.10
+> > 
+> > The usual bunch of DT additions, but most notably:
+> >   - A31 DRM driver
+> >   - A31 audio codec
+> >   - WiFi for the A80-Based boards and the CHIP
+> >   - Support for the NextThing Co CHIP Pro (the first board with NAND
+> >     enabled)
+> >   - New boards: NanoPi M1,
+> > 
+> [...]
+> 
+> > Maxime Ripard (16):
+> >       ARM: sun5i: a13-olinuxino: Enable VGA bridge
+> >       ARM: gr8: Add the UART3
+> >       ARM: gr8: Fix typo in the i2s mclk pin group
+> >       ARM: gr8: Add missing pwm channel 1 pin
+> >       ARM: gr8: Add UART2 pins
+> >       ARM: gr8: Add UART3 pins
+> >       ARM: gr8: Add CHIP Pro support
+> >       ARM: sun5i: chip: Enable Wi-Fi SDIO chip
+> >       ARM: sun5i: Rename A10s pins
+> >       ARM: sun5i: Add SPI2 pins
+> >       ARM: sun5i: Add RGB 565 LCD pins
+> >       ARM: sun5i: chip: Add optional buses
+> >       ARM: gr8: evb: Enable SPDIF
+> >       ARM: gr8: evb: Add i2s codec
+> >       ARM: sun8i: sina33: Enable USB gadget
+> >       ARM: sunxi: Add the missing clocks to the pinctrl nodes
+> > 
+> [...]
+> 
+> >  arch/arm/boot/dts/Makefile                         |   1 +
+> >  arch/arm/boot/dts/ntc-gr8-chip-pro.dts             | 266 +++++++++++++++++++++
+> >  arch/arm/boot/dts/ntc-gr8-evb.dts                  |  33 +++
+> >  arch/arm/boot/dts/ntc-gr8.dtsi                     |  47 +++-
+> >  arch/arm/boot/dts/sun4i-a10.dtsi                   |   3 +-
+> 
+> NTC isn't the SoC manufacturer, and we try to keep the prefixes down to
+> manufacturer to keep the namespace a little more manageable, even if
+> we never got subdirectories setup as on arm64.
+> 
+> I think this should probably be sun4i-a10-gr8 or sun4i-r8-gr8 as prefix?
 
-[drm:drm_atomic_helper_commit_cleanup_done] *ERROR* [CRTC:24:crtc-0] flip_done timed out
+The users really expect a SoC from Nextthing, it's always been
+marketed that way, the marking on the SoC also says so, etc. The fact
+that it's been a design in cooperation with Allwinner, and that the
+design is based on some earlier family is an implementation detail,
+and I'd really like not for it to have the sun5i prefix, it's just
+confusing.
 
-and the kernel hanging, seemingly in an IRQs-off region.
+And the ntc prefix has been asked for during the reviews...
+
+Maxime
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161121/93468ce6/attachment.sig>
