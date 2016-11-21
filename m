@@ -1,51 +1,36 @@
-From: john.garry@huawei.com (John Garry)
-Date: Mon, 21 Nov 2016 12:58:28 +0000
-Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
-In-Reply-To: <1478647002.7430.69.camel@kernel.crashing.org>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <1478576829-112707-2-git-send-email-yuanzhichang@hisilicon.com>
- <20161108120323.GC15297@leverpostej>
- <1478647002.7430.69.camel@kernel.crashing.org>
-Message-ID: <79d73f93-1cf8-19db-ca5c-8fb6257edd6c@huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 21 Nov 2016 14:06:29 +0100
+Subject: [PATCH] clk: sunxi-ng: sun6i-a31: Enable PLL-MIPI LDOs when
+ ungating it
+In-Reply-To: <20161118071557.30195-1-wens@csie.org>
+References: <20161118071557.30195-1-wens@csie.org>
+Message-ID: <20161121130629.2qp6tvdd5slvl5m6@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/2016 23:16, Benjamin Herrenschmidt wrote:
-> On Tue, 2016-11-08 at 12:03 +0000, Mark Rutland wrote:
->> On Tue, Nov 08, 2016 at 11:47:07AM +0800, zhichang.yuan wrote:
->>>
->>> For arm64, there is no I/O space as other architectural platforms, such as
->>> X86. Most I/O accesses are achieved based on MMIO. But for some arm64 SoCs,
->>> such as Hip06, when accessing some legacy ISA devices connected to LPC, those
->>> known port addresses are used to control the corresponding target devices, for
->>> example, 0x2f8 is for UART, 0xe4 is for ipmi-bt. It is different from the
->>> normal MMIO mode in using.
->>
->> This has nothing to do with arm64. Hardware with this kind of indirect
->> bus access could be integrated with a variety of CPU architectures. It
->> simply hasn't been, yet.
->
-> On some ppc's we also use similar indirect access methods for IOs. We
-> have a generic infrastructure for re-routing some memory or IO regions
-> to hooks.
->
-> On POWER8, our PCIe doesn't do IO at all, but we have an LPC bus behind
-> firmware calls ;-) We use that infrastructure to plumb in the LPC bus.
->
-Hi,
+On Fri, Nov 18, 2016 at 03:15:57PM +0800, Chen-Yu Tsai wrote:
+> The PLL-MIPI clock is somewhat special as it has its own LDOs which
+> need to be turned on for this PLL to actually work and output a clock
+> signal.
+> 
+> Add the 2 LDO enable bits to the gate bits. This fixes issues with
+> the TCON not sending vblank interrupts when the tcon and dot clock are
+> indirectly clocked from the PLL-MIPI clock.
+> 
+> Fixes: c6e6c96d8fa6 ("clk: sunxi-ng: Add A31/A31s clocks")
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-I would like to mention another topic on supporting LPC, and this is 
-regard to eSPI support.
-eSPI is seen as the successor for LPC, and some BMCs already support it.
+Applied, thanks!
+Maxime
 
-I had a chat with Arnd on this, and the idea to model LPC as a SPI bus 
-adpater (and also eSPI).
-
-However it seems to me that most platforms will/should support eSPI as a 
-transparent bridge, same as LPC on x86. So I don't think that this is 
-much point in modelling LPC/eSPI as a bus.
-
-So we shall continue with indriect-IO support...
-
-Thanks,
-John
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161121/9c40b2a4/attachment.sig>
