@@ -1,27 +1,48 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Nov 2016 09:24:45 +0000
-Subject: [PATCH v2] ARM: Drop fixed 200 Hz timer requirement from Samsung
- platforms
-In-Reply-To: <CA+Ln22GyRwywcxdO4Gp67d8TfpjfNzaE0z25=WW9GWibjGkDuQ@mail.gmail.com>
-References: <1479453418-25314-1-git-send-email-krzk@kernel.org>
- <22757093.ejshJp9T7L@wuerfel>
- <CA+Ln22GyRwywcxdO4Gp67d8TfpjfNzaE0z25=WW9GWibjGkDuQ@mail.gmail.com>
-Message-ID: <20161121092445.GA1041@n2100.armlinux.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 21 Nov 2016 10:31:00 +0100
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.10
+In-Reply-To: <20161119012836.GA2543@localhost>
+References: <cover.1479387356.git.horms+renesas@verge.net.au>
+ <20161119012836.GA2543@localhost>
+Message-ID: <CAMuHMdXAuDcbr84phfPRpqZYRzAZf2j4vsv+i_Frz0G8ksd_Vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2016 at 03:01:57PM +0900, Tomasz Figa wrote:
-> One thing to correct here is that the typical clock is PCLK, which is
-> derived from one of the PLLs and AFAIR is between 33-66 MHz on
-> s3c24xx. Technically you can drive the PWM block from an external
-> clock (12 MHz for some board-file based boards), but for simplicity
-> this functionality was omitted in the new PWM timer driver used for DT
-> boards (which worked fine with the PWM driven by PCLK).
+Hi Olof,
 
-So that's a knowingly-made regression for s3c24xx then.  Pretty
-disgusting developer behavior to do that, IMHO.
+On Sat, Nov 19, 2016 at 2:28 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Thu, Nov 17, 2016 at 02:34:25PM +0100, Simon Horman wrote:
+>> Please consider these second round of Renesas ARM based SoC updates for v4.10.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>> * Basic support for r8a7745 SoC
+>>
+>> ----------------------------------------------------------------
+>> Sergei Shtylyov (2):
+>>       ARM: shmobile: r8a7745: basic SoC support
+>>       ARM: shmobile: document SK-RZG1E board
+>
+> Hi,
+>
+> Is there a reason you're adding a config option per SoC?
+>
+> I think you'd be better off not adding these config options, and just adding
+> support for the SoCs through compatibles (and adding the drivers to defconfigs,
+> etc).
+
+Yes there is a reason: kernel size.
+The main offenders are the pinctrl tables, which add ca. 20-50 KiB per
+supported SoC.
+
+Note that RZ/A1 (r7s72100) is used on some boards with its internal RAM
+(10 MiB) only.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
