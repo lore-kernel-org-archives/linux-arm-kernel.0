@@ -1,50 +1,89 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 21 Nov 2016 17:47:33 +0100
-Subject: [RFC PATCH net v2 2/3] dt: bindings: add ethernet phy
- eee-disable-advert option documentation
-In-Reply-To: <1479744993.17538.85.camel@baylibre.com>
-References: <1479742524-30222-1-git-send-email-jbrunet@baylibre.com>
- <1479742524-30222-3-git-send-email-jbrunet@baylibre.com>
- <20161121160149.GF1922@lunn.ch>
- <1479744993.17538.85.camel@baylibre.com>
-Message-ID: <20161121164733.GG1922@lunn.ch>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 21 Nov 2016 17:48:28 +0100
+Subject: [PATCH v2 1/5] ARM: memory: da8xx-ddrctl: new driver
+In-Reply-To: <a309a738-7fa7-3aab-4457-f7d693e6b37f@ti.com>
+References: <1477925138-23457-1-git-send-email-bgolaszewski@baylibre.com>
+ <1477925138-23457-2-git-send-email-bgolaszewski@baylibre.com>
+ <a309a738-7fa7-3aab-4457-f7d693e6b37f@ti.com>
+Message-ID: <CAMpxmJUXJi6PDq0qc-0+r2mLPASLpJUt_njWtXr4Mx4k0Fa82g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> What I did not realize when doing this patch for the realtek driver is
-> that there is already 6 valid modes defined in the kernel
-> 
-> #define MDIO_EEE_100TX		MDIO_AN_EEE_ADV_100TX	/*
-> 100TX EEE cap */
-> #define MDIO_EEE_1000T		MDIO_AN_EEE_ADV_1000T	/*
-> 1000T EEE cap */
-> #define MDIO_EEE_10GT		0x0008	/* 10GT EEE cap */
-> #define MDIO_EEE_1000KX		0x0010	/* 1000KX EEE cap
-> */
-> #define MDIO_EEE_10GKX4		0x0020	/* 10G KX4 EEE cap
-> */
-> #define MDIO_EEE_10GKR		0x0040	/* 10G KR EEE cap
-> */
-> 
-> I took care of only 2 in the case of realtek.c since it only support
-> MDIO_EEE_100TX and MDIO_EEE_1000T.
-> 
-> Defining a property for each is certainly doable but it does not look
-> very nice either. If it extends in the future, it will get even more
-> messier, especially if you want to disable everything.
+2016-11-21 17:33 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+> On Monday 31 October 2016 08:15 PM, Bartosz Golaszewski wrote:
+>> +static int da8xx_ddrctl_probe(struct platform_device *pdev)
+>> +{
+>> +     const struct da8xx_ddrctl_config_knob *knob;
+>> +     const struct da8xx_ddrctl_setting *setting;
+>> +     struct device_node *node;
+>> +     struct resource *res;
+>> +     void __iomem *ddrctl;
+>> +     struct device *dev;
+>> +     u32 reg;
+>> +
+>> +     dev = &pdev->dev;
+>> +     node = dev->of_node;
+>> +
+>> +     setting = da8xx_ddrctl_get_board_settings();
+>> +     if (!setting) {
+>> +             dev_err(dev, "no settings for board '%s'\n",
+>> +                     of_flat_dt_get_machine_name());
+>> +             return -EINVAL;
+>> +     }
+>
+> This causes a section mismatch because of_flat_dt_get_machine_name()
+> has an __init annotation. I did not notice that before, sorry.
+>
+> It can be fixed with a patch like below:
+>
+> ---8<---
+> diff --git a/drivers/memory/da8xx-ddrctl.c b/drivers/memory/da8xx-ddrctl.c
+> index a20e7bbbcbe0..9ca5aab3ac54 100644
+> --- a/drivers/memory/da8xx-ddrctl.c
+> +++ b/drivers/memory/da8xx-ddrctl.c
+> @@ -102,6 +102,18 @@ static const struct da8xx_ddrctl_setting *da8xx_ddrctl_get_board_settings(void)
+>         return NULL;
+>  }
+>
+> +static const char* da8xx_ddrctl_get_machine_name(void)
+> +{
+> +       const char *str;
+> +       int ret;
+> +
+> +       ret = of_property_read_string(of_root, "model", &str);
+> +       if (ret)
+> +               ret = of_property_read_string(of_root, "compatible", &str);
+> +
+> +       return str;
+> +}
+> +
+>  static int da8xx_ddrctl_probe(struct platform_device *pdev)
+>  {
+>         const struct da8xx_ddrctl_config_knob *knob;
+> @@ -118,7 +130,7 @@ static int da8xx_ddrctl_probe(struct platform_device *pdev)
+>         setting = da8xx_ddrctl_get_board_settings();
+>         if (!setting) {
+>                 dev_err(dev, "no settings for board '%s'\n",
+> -                       of_flat_dt_get_machine_name());
+> +                       da8xx_ddrctl_get_machine_name());
+>                 return -EINVAL;
+>         }
+> ---8<---
+>
+> A similar fix is required for the other driver in this series (patch
+> 2/5). I need some advise on whether I should introduce a common
+> function to get the machine name post kernel boot-up (I cannot see an
+> existing one). If yes, any advise on which file it should go into?
+>
 
-Yes, agreed.
- 
-> What do you think about keeping a single mask value but use the define
-> above in the DT ? It would be more readable than hex and easy to
-> extend, don't you think ?
-> 
-> These defines are already part of the uapi so I guess we can use those
-> in the DT bindings ?
+Hi Sekhar,
 
-I don't think they are accessible from the dtc include path. You will
-need to make a copy, in include/dt-bindings/net/phy.h
+thanks for spotting that.
 
-But yes, using these defines is a good idea.
+I think we should introduce this function right away, rather than
+having two static functions doing the same thing. If you don't mind,
+I'll try to find a good spot for it and send a follow-up series fixing
+the issue.
 
-     Andrew
+Best regards,
+Bartosz Golaszewski
