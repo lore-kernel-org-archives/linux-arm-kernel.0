@@ -1,58 +1,97 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 21 Nov 2016 09:06:54 -0800
-Subject: [PATCH 1/2] ARM64: dts: Add support for Meson GXM
-In-Reply-To: <20161121162905.14285-2-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Mon, 21 Nov 2016 17:29:04 +0100")
-References: <20161121162905.14285-1-narmstrong@baylibre.com>
- <20161121162905.14285-2-narmstrong@baylibre.com>
-Message-ID: <m2wpfw3gpd.fsf@baylibre.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 21 Nov 2016 11:09:38 -0600
+Subject: [PATCH v6 2/5] drm: sun8i: add HDMI video support to A83T and H3
+In-Reply-To: <cea6a5397664213c6a917028ec2e429d25972490.1479641523.git.moinejf@free.fr>
+References: <cover.1479641523.git.moinejf@free.fr>
+ <cea6a5397664213c6a917028ec2e429d25972490.1479641523.git.moinejf@free.fr>
+Message-ID: <20161121170938.bmyb2f73gva7tgkj@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
-
-> Following the Amlogic Linux kernel, it seem the only differences
-> between the GXL and GXM SoCs are the CPU Clusters.
->
-> This commit renames the gxl-s905d-p23x DTSI in a common file for
-> S905D p20x and S912 q20x boards.
->
-> Then adds a meson-gxm dtsi and reproduce the P23x to Q20x boards
-> dts files since the S905D and S912 SoCs shares the same pinout
-> and the P23x and Q20x boards are identical.
->
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+On Sun, Nov 20, 2016 at 10:56:23AM +0100, Jean-Francois Moine wrote:
+> This patch adds a HDMI video driver to the Allwinner's SoCs A83T and H3.
+> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 > ---
->  Documentation/devicetree/bindings/arm/amlogic.txt  |   6 +
->  arch/arm64/boot/dts/amlogic/Makefile               |   2 +
->  .../arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi | 190 +++++++++++++++++++++
->  arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts    |  19 +++
->  arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts    |   7 +
->  .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      |   3 +-
->  .../boot/dts/amlogic/meson-gxl-s905d-p231.dts      |   3 +-
->  .../boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi     | 188 --------------------
->  .../arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts |  77 +++++++++
->  .../arm64/boot/dts/amlogic/meson-gxm-s912-q201.dts |  58 +++++++
->  arch/arm64/boot/dts/amlogic/meson-gxm.dtsi         | 114 +++++++++++++
->  11 files changed, 477 insertions(+), 190 deletions(-)
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
->  delete mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-s912-q201.dts
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
+>  .../devicetree/bindings/display/sunxi/hdmi.txt     |  53 ++
+>  drivers/gpu/drm/sun8i/Kconfig                      |   7 +
+>  drivers/gpu/drm/sun8i/Makefile                     |   2 +
+>  drivers/gpu/drm/sun8i/de2_hdmi.c                   | 394 ++++++++++
+>  drivers/gpu/drm/sun8i/de2_hdmi.h                   |  51 ++
+>  drivers/gpu/drm/sun8i/de2_hdmi_io.c                | 839 +++++++++++++++++++++
+>  6 files changed, 1346 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/sunxi/hdmi.txt
+>  create mode 100644 drivers/gpu/drm/sun8i/de2_hdmi.c
+>  create mode 100644 drivers/gpu/drm/sun8i/de2_hdmi.h
+>  create mode 100644 drivers/gpu/drm/sun8i/de2_hdmi_io.c
+> 
+> diff --git a/Documentation/devicetree/bindings/display/sunxi/hdmi.txt b/Documentation/devicetree/bindings/display/sunxi/hdmi.txt
+> new file mode 100644
+> index 0000000..85709ab
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/sunxi/hdmi.txt
+> @@ -0,0 +1,53 @@
+> +Allwinner HDMI Transmitter
+> +==========================
+> +
+> +The Allwinner HDMI transmitters are included in the SoCs.
+> +They support audio and video.
+> +
+> +Required properties:
+> + - #address-cells : should be <1>
+> + - #size-cells : should be <0>
+> + - compatible : should be one of
+> +		"allwinner,sun8i-a83t-hdmi"
+> +		"allwinner,sun8i-h3-hdmi"
+> + - clocks : phandles to the HDMI clocks as described in
+> +	Documentation/devicetree/bindings/clock/clock-bindings.txt
+> + - clock-names : must be
+> +		"gate" : bus gate
+> +		"clock" : streaming clock
+> +		"ddc-clock" : DDC clock
+> + - resets : One or two phandles to the HDMI resets
+> + - reset-names : when 2 phandles, must be
+> +		"hdmi0" and "hdmi1"
+> +
+> +Required nodes:
+> + - port: Audio and video input port nodes with endpoint definitions
+> +	as defined in Documentation/devicetree/bindings/graph.txt.
+> +	port at 0 is video and port at 1 is audio.
 
-Applied.
+This should probably also have an output port to the hdmi-connector 
+binding. It is not needed so much if this block handles DDC and HPD 
+itself, but if those are a separate I2C controller and GPIO, 
+respectively, then you need it for sure. There's also power on the 
+connector or other connectors like muxed on Type-C. 
 
-Git tip: for future reference, set 'git config diff.renames true' so and
-the diffstat shows a better summary when files are moved/renamed.
 
-e.g, rather than the large ++ and -- above, you'd see:
+> +
+> +Example:
+> +
+> +	hdmi: hdmi at 01ee0000 {
+> +		compatible = "allwinner,sun8i-a83t-hdmi";
+> +		reg = <0x01ee0000 0x20000>;
+> +		clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI>,
+> +			 <&ccu CLK_HDMI_DDC>;
+> +		clock-names = "gate", "clock", "ddc-clock";
+> +		resets = <&ccu RST_HDMI0>, <&ccu RST_HDMI1>;
+> +		reset-names = "hdmi0", "hdmi1";
+> +		...
 
- ...gxl-s905d-p23x.dtsi => meson-gx-p23x-q20x.dtsi} |   4 +-
- 
-Which is much more comforting to a maintainer than a bunch of
-(potentially unrelated) adds and removes.
+Please show all properties in example.
 
-Thanks,
-
-Kevin
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		port at 0 {			/* video */
+> +			reg = <0>;
+> +			hdmi_lcd1: endpoint {
+> +				remote-endpoint = <&lcd1_hdmi>;
+> +			};
+> +		};
+> +		port at 1 {			/* audio */
+> +			reg = <1>;
+> +			hdmi_i2s2: endpoint {
+> +				remote-endpoint = <&i2s2_hdmi>;
+> +			};
+> +		};
+> +	};
