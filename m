@@ -1,89 +1,88 @@
-From: wei@redhat.com (Wei Huang)
-Date: Mon, 21 Nov 2016 16:49:20 -0600
-Subject: [kvm-unit-tests PATCH v10 3/3] arm: pmu: Add CPI checking
-In-Reply-To: <13b86440-3b37-ff24-3080-f0deece175fa@codeaurora.org>
-References: <1479759895-10042-1-git-send-email-wei@redhat.com>
- <1479759895-10042-4-git-send-email-wei@redhat.com>
- <13b86440-3b37-ff24-3080-f0deece175fa@codeaurora.org>
-Message-ID: <5263e77a-b987-c955-c328-040a11543c94@redhat.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 22 Nov 2016 10:19:08 +1100
+Subject: linux-next: manual merge of the rockchip tree with the arm-soc tree
+Message-ID: <20161122101908.2e967e42@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Heiko,
 
+Today's linux-next merge of the rockchip tree got a conflict in:
 
-On 11/21/2016 03:40 PM, Christopher Covington wrote:
-> Hi Wei,
-> 
-> On 11/21/2016 03:24 PM, Wei Huang wrote:
->> From: Christopher Covington <cov@codeaurora.org>
-> 
-> I really appreciate your work on these patches. If for any or all of these
-> you have more lines added/modified than me (or using any other better
-> metric), please make sure to change the author to be you with
-> `git commit --amend --reset-author` or equivalent.
+  arch/arm64/configs/defconfig
 
-Sure, I will if needed. Regarding your comments below, I will fix the
-patch series after Drew's comments, if any.
+between commit:
 
-> 
->> Calculate the numbers of cycles per instruction (CPI) implied by ARM
->> PMU cycle counter values. The code includes a strict checking facility
->> intended for the -icount option in TCG mode in the configuration file.
->>
->> Signed-off-by: Christopher Covington <cov@codeaurora.org>
->> Signed-off-by: Wei Huang <wei@redhat.com>
->> ---
->>  arm/pmu.c         | 119 +++++++++++++++++++++++++++++++++++++++++++++++++++++-
->>  arm/unittests.cfg |  14 +++++++
->>  2 files changed, 132 insertions(+), 1 deletion(-)
->>
->> diff --git a/arm/pmu.c b/arm/pmu.c
->> index 176b070..129ef1e 100644
->> --- a/arm/pmu.c
->> +++ b/arm/pmu.c
->> @@ -104,6 +104,25 @@ static inline uint32_t id_dfr0_read(void)
->>  	asm volatile("mrc p15, 0, %0, c0, c1, 2" : "=r" (val));
->>  	return val;
->>  }
->> +
->> +/*
->> + * Extra instructions inserted by the compiler would be difficult to compensate
->> + * for, so hand assemble everything between, and including, the PMCR accesses
->> + * to start and stop counting. Total cycles = isb + mcr + 2*loop = 2 + 2*loop.
-                                   ^^^^^^^^^^^^
-I will change the comment above to "Total instrs".
+  a59294b2f7c7 ("ARM64: defconfig: Enable MMC related configs")
 
->> + */
->> +static inline void precise_cycles_loop(int loop, uint32_t pmcr)
-> 
-> Nit: I would call this precise_instrs_loop. How many cycles it takes is
-> IMPLEMENTATION DEFINED.
+from the arm-soc tree and commit:
 
-You are right. The cycle indeed depends on the design. Will fix.
+  5295a3157348 ("arm64: defconfig: enable RK808 components")
 
-> 
->> +{
->> +	asm volatile(
->> +	"	mcr	p15, 0, %[pmcr], c9, c12, 0\n"
->> +	"	isb\n"
->> +	"1:	subs	%[loop], %[loop], #1\n"
->> +	"	bgt	1b\n"
-> 
-> Is there any chance we might need an isb here, to prevent the stop from happening
-> before or during the loop? Where ISBs are required, the Linux best practice is to
+from the rockchip tree.
 
-In theory, I think this can happen when mcr is executed before all loop
-instructions completed, causing pmccntr_read() to miss some cycles. But
-QEMU TCG mode doesn't support out-order-execution. So the test
-condition, "cpi > 0 && cycles != i * cpi", will never be TRUE. Because
-cpi==0 in KVM, this same test condition won't be TRUE under KVM mode either.
+I fixed it up (see below) and can carry the fix as necessary. This
+is now fixed as far as linux-next is concerned, but any non trivial
+conflicts should be mentioned to your upstream maintainer when your tree
+is submitted for merging.  You may also want to consider cooperating
+with the maintainer of the conflicting tree to minimise any particularly
+complex conflicts.
 
-> diligently comment why they are needed. Perhaps it would be a good habit to
-> carry over into kvm-unit-tests.
+-- 
+Cheers,
+Stephen Rothwell
 
-Agreed. Most isb() instructions were added following CP15 writes (not
-all CP15 writes, but at limited locations). We tried to follow what
-Linux kernel does in perf_event.c. If you feel that any isb() place
-needs special comment, I will be more than happy to add it.
-
-<snip>
+diff --cc arch/arm64/configs/defconfig
+index 2640e193a8c4,731cc6ade789..000000000000
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@@ -297,23 -293,10 +299,24 @@@ CONFIG_REGULATOR_MAX77620=
+  CONFIG_REGULATOR_PWM=y
+  CONFIG_REGULATOR_QCOM_SMD_RPM=y
+  CONFIG_REGULATOR_QCOM_SPMI=y
++ CONFIG_REGULATOR_RK808=y
+  CONFIG_REGULATOR_S2MPS11=y
+ +CONFIG_MEDIA_SUPPORT=m
+ +CONFIG_MEDIA_CAMERA_SUPPORT=y
+ +CONFIG_MEDIA_ANALOG_TV_SUPPORT=y
+ +CONFIG_MEDIA_DIGITAL_TV_SUPPORT=y
+ +CONFIG_MEDIA_CONTROLLER=y
+ +CONFIG_VIDEO_V4L2_SUBDEV_API=y
+ +# CONFIG_DVB_NET is not set
+ +CONFIG_V4L_MEM2MEM_DRIVERS=y
+ +CONFIG_VIDEO_RENESAS_FCP=m
+ +CONFIG_VIDEO_RENESAS_VSP1=m
+  CONFIG_DRM=m
+  CONFIG_DRM_NOUVEAU=m
+ +CONFIG_DRM_RCAR_DU=m
+ +CONFIG_DRM_RCAR_HDMI=y
+ +CONFIG_DRM_RCAR_LVDS=y
+ +CONFIG_DRM_RCAR_VSP=y
+  CONFIG_DRM_TEGRA=m
+  CONFIG_DRM_PANEL_SIMPLE=m
+  CONFIG_DRM_I2C_ADV7511=m
+@@@ -408,7 -393,7 +414,8 @@@ CONFIG_XEN_GRANT_DEV_ALLOC=
+  CONFIG_COMMON_CLK_SCPI=y
+  CONFIG_COMMON_CLK_CS2000_CP=y
+  CONFIG_COMMON_CLK_S2MPS11=y
+ +CONFIG_COMMON_CLK_PWM=y
++ CONFIG_COMMON_CLK_RK808=y
+  CONFIG_CLK_QORIQ=y
+  CONFIG_COMMON_CLK_QCOM=y
+  CONFIG_MSM_GCC_8916=y
+@@@ -423,13 -406,13 +430,15 @@@ CONFIG_ARM_SMMU=
+  CONFIG_QCOM_SMEM=y
+  CONFIG_QCOM_SMD=y
+  CONFIG_QCOM_SMD_RPM=y
++ CONFIG_ROCKCHIP_PM_DOMAINS=y
+  CONFIG_ARCH_TEGRA_132_SOC=y
+  CONFIG_ARCH_TEGRA_210_SOC=y
+ +CONFIG_ARCH_TEGRA_186_SOC=y
+  CONFIG_EXTCON_USB_GPIO=y
+  CONFIG_PWM=y
++ CONFIG_PWM_ROCKCHIP=y
+  CONFIG_PWM_TEGRA=m
+ +CONFIG_PWM_MESON=m
+  CONFIG_COMMON_RESET_HI6220=y
+  CONFIG_PHY_RCAR_GEN3_USB2=y
+  CONFIG_PHY_HI6220_USB=y
