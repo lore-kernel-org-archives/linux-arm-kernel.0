@@ -1,35 +1,32 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 21 Nov 2016 13:05:35 +0100
-Subject: [PATCH 06/18] arm64: dts: m3ulcb: add M3ULCB board DT bindings
+Date: Mon, 21 Nov 2016 13:05:34 +0100
+Subject: [PATCH 05/18] arm64: dts: h3ulcb: update header
 In-Reply-To: <cover.1479726397.git.horms+renesas@verge.net.au>
 References: <cover.1479726397.git.horms+renesas@verge.net.au>
-Message-ID: <76b5bba9855e4cd572e3cb44cd7c95b2043f7aee.1479726397.git.horms+renesas@verge.net.au>
+Message-ID: <c77c97557614f07c72393eafa09ef826e0924293.1479726397.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 
-Add M3ULCB Device tree bindings Documentation, listing it as a supported
-board.
+This updates H3ULCB device tree header with official board name
 
 Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index 1c2499ca1bee..29bf24ca0b7b 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -61,6 +61,8 @@ Boards:
-     compatible = "renesas,kzm9g", "renesas,sh73a0"
-   - Lager (RTP0RC7790SEB00010S)
-     compatible = "renesas,lager", "renesas,r8a7790"
-+  - M3ULCB (R-Car Starter Kit Pro, RTP0RC7796SKB00010S)
-+    compatible = "renesas,m3ulcb", "renesas,r8a7796";
-   - Marzen
-     compatible = "renesas,marzen", "renesas,r8a7779"
-   - Porter (M2-LCDP)
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+index bcb11a868343..f178fe1730de 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+@@ -1,5 +1,5 @@
+ /*
+- * Device Tree Source for the H3ULCB board
++ * Device Tree Source for the H3ULCB (R-Car Starter Kit Premier) board
+  *
+  * Copyright (C) 2016 Renesas Electronics Corp.
+  * Copyright (C) 2016 Cogent Embedded, Inc.
 -- 
 2.7.0.rc3.207.g0ac5344
