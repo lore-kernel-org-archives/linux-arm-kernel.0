@@ -1,53 +1,49 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 21 Nov 2016 08:21:29 +0100
-Subject: [GIT PULL] Allwinner arm64 DT changes for 4.9
-In-Reply-To: <20161119003930.GC15902@localhost>
-References: <20161115211333.oqvxfjxxudfkdq7j@lukather>
- <20161119003930.GC15902@localhost>
-Message-ID: <20161121072129.uyttinjfvo2dkhsg@lukather>
+Date: Mon, 21 Nov 2016 08:30:47 +0100
+Subject: [PATCH 5/5] drm/sun4i: Add support for the overscan profiles
+In-Reply-To: <20161111091755.tfqizju5voazjrmm@phenom.ffwll.local>
+References: <cover.bb9be34c7fd7767e31823f78a15ae1c127293c34.1476779323.git-series.maxime.ripard@free-electrons.com>
+ <b980759ad766658d7bc3d67c18f505c5bf727ef5.1476779323.git-series.maxime.ripard@free-electrons.com>
+ <20161108085927.ibyett46cjgyfwu2@phenom.ffwll.local>
+ <20161110145630.wvzlh6rxusrufv2r@lukather>
+ <20161111091755.tfqizju5voazjrmm@phenom.ffwll.local>
+Message-ID: <20161121073047.zv5cfjd3ti4hh4gl@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 04:39:30PM -0800, Olof Johansson wrote:
-> On Tue, Nov 15, 2016 at 10:13:33PM +0100, Maxime Ripard wrote:
-> > Hi Arnd, Olof,
+On Fri, Nov 11, 2016 at 10:17:55AM +0100, Daniel Vetter wrote:
+> On Thu, Nov 10, 2016 at 03:56:30PM +0100, Maxime Ripard wrote:
+> > Hi Daniel,
 > > 
-> > Here are our changes for arm64 DT for the next merge window.
+> > On Tue, Nov 08, 2016 at 09:59:27AM +0100, Daniel Vetter wrote:
+> > > On Tue, Oct 18, 2016 at 10:29:38AM +0200, Maxime Ripard wrote:
+> > > > Create overscan profiles reducing the displayed zone.
+> > > > 
+> > > > For each TV standard (PAL and NTSC so far), we create 4 more reduced modes
+> > > > by steps of 5% that the user will be able to select.
+> > > > 
+> > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > 
+> > > tbh I think if we agree to do this (and that still seems an open question)
+> > > I think there should be a generic helper to add these overscan modes with
+> > > increased porches. Anything that only depends upon the sink (and
+> > > overscanning is something the sink does) should imo be put into a suitable
+> > > helper library for everyone to share.
+> > > 
+> > > Or maybe even stash it into the probe helpers and call it for all TV
+> > > connectors. Definitely not a driver-private thing.
 > > 
-> > Thanks!
-> > Maxime
+> > Last time we discussed it, my recollection was that you didn't want to
+> > have generic code for it, but I'd be happy to implement it.
 > > 
-> > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-> > 
-> >   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt64-for-4.10
-> > 
-> > for you to fetch changes up to 4e3886081848b7ea16452a92c4324acaab644d49:
-> > 
-> >   arm64: dts: add Pine64 support (2016-11-03 09:08:24 +0100)
-> > 
-> > ----------------------------------------------------------------
-> > Allwinner arm64 DT changes for 4.10
-> > 
-> > Support for the Allwinner A64, their first armv8 SoC.
-> > 
-> > ----------------------------------------------------------------
-> > Andre Przywara (3):
-> >       arm64: dts: add Allwinner A64 SoC .dtsi
-> >       Documentation: devicetree: add vendor prefix for Pine64
-> >       arm64: dts: add Pine64 support
+> > I'll come up with something like that.
 > 
-> Hi,
-> 
-> Merged the branch, but please use "arm64: dts: allwinner: <..>" as patch
-> prefix in the future. Thanks!
+> Well I can flip-flop around with the nonsense I'm sometimes emitting ;-)
+> Since you called me out, feel free to do whatever you want ...
 
-Ack.
+I also found the generic solution to be a much better solution, so
+I'll definitely implement it :)
 
-Thanks!
 Maxime
 
 -- 
@@ -60,4 +56,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161121/34f9fa8f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161121/7da26be6/attachment-0001.sig>
