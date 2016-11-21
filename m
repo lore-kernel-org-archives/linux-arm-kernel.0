@@ -1,321 +1,354 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 21 Nov 2016 14:43:11 +0100
-Subject: [PATCH v8 6/7] arm/arm64: vgic: Implement VGICv3 CPU interface
- access
-In-Reply-To: <CALicx6snqsSbaKYcj9kt0nt8y2wdTbrY1PKOq-SrGTepCfSZSg@mail.gmail.com>
-References: <1478258013-6669-1-git-send-email-vijay.kilari@gmail.com>
- <1478258013-6669-7-git-send-email-vijay.kilari@gmail.com>
- <20161116185232.GF3811@cbox>
- <CALicx6t5D5n3dDQzeKZNUWdS-q5LNiSq-UrP4HdmbdUCj1tF1g@mail.gmail.com>
- <20161117160951.GB23588@cbox>
- <CALicx6uia5_H5Zg_x6GP0nKgZi_513w97igCuDdezySOUNQtBw@mail.gmail.com>
- <20161121101930.GD23588@cbox>
- <CALicx6snqsSbaKYcj9kt0nt8y2wdTbrY1PKOq-SrGTepCfSZSg@mail.gmail.com>
-Message-ID: <20161121134311.GF23588@cbox>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 21 Nov 2016 13:48:09 +0000
+Subject: [PATCH v3 1/2] mfd: pm8xxx: add support to pm8821
+In-Reply-To: <1479211312-1431-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1479211312-1431-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20161121134809.GH3917@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2016 at 06:56:08PM +0530, Vijay Kilari wrote:
-> On Mon, Nov 21, 2016 at 3:49 PM, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
-> > On Fri, Nov 18, 2016 at 10:28:34PM +0530, Vijay Kilari wrote:
-> >> On Thu, Nov 17, 2016 at 9:39 PM, Christoffer Dall
-> >> <christoffer.dall@linaro.org> wrote:
-> >> > On Thu, Nov 17, 2016 at 09:25:59PM +0530, Vijay Kilari wrote:
-> >> >> On Thu, Nov 17, 2016 at 12:22 AM, Christoffer Dall
-> >> >> <christoffer.dall@linaro.org> wrote:
-> >> >> > On Fri, Nov 04, 2016 at 04:43:32PM +0530, vijay.kilari at gmail.com wrote:
-> >> >> >> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-> >> >> >>
-> >> >> >> VGICv3 CPU interface registers are accessed using
-> >> >> >> KVM_DEV_ARM_VGIC_CPU_SYSREGS ioctl. These registers are accessed
-> >> >> >> as 64-bit. The cpu MPIDR value is passed along with register id.
-> >> >> >> is used to identify the cpu for registers access.
-> >> >> >>
-> >> >> >> The version of VGIC v3 specification is define here
-> >> >> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
-> >> >> >>
-> >> >> >> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
-> >> >> >> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-> >> >> >> ---
-> >> >> >>  arch/arm64/include/uapi/asm/kvm.h   |   3 +
-> >> >> >>  arch/arm64/kvm/Makefile             |   1 +
-> >> >> >>  include/kvm/arm_vgic.h              |   9 +
-> >> >> >>  virt/kvm/arm/vgic/vgic-kvm-device.c |  27 +++
-> >> >> >>  virt/kvm/arm/vgic/vgic-mmio-v3.c    |  19 +++
-> >> >> >>  virt/kvm/arm/vgic/vgic-sys-reg-v3.c | 324 ++++++++++++++++++++++++++++++++++++
-> >> >> >>  virt/kvm/arm/vgic/vgic-v3.c         |   8 +
-> >> >> >>  virt/kvm/arm/vgic/vgic.h            |   4 +
-> >> >> >>  8 files changed, 395 insertions(+)
-> >> >> >>
-> >> >> >> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> >> >> >> index 56dc08d..91c7137 100644
-> >> >> >> --- a/arch/arm64/include/uapi/asm/kvm.h
-> >> >> >> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> >> >> >> @@ -206,9 +206,12 @@ struct kvm_arch_memory_slot {
-> >> >> >>                       (0xffffffffULL << KVM_DEV_ARM_VGIC_V3_MPIDR_SHIFT)
-> >> >> >>  #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT      0
-> >> >> >>  #define   KVM_DEV_ARM_VGIC_OFFSET_MASK       (0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
-> >> >> >> +#define   KVM_DEV_ARM_VGIC_SYSREG_INSTR_MASK (0xffff)
-> >> >> >>  #define KVM_DEV_ARM_VGIC_GRP_NR_IRQS 3
-> >> >> >>  #define KVM_DEV_ARM_VGIC_GRP_CTRL    4
-> >> >> >>  #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
-> >> >> >> +#define KVM_DEV_ARM_VGIC_CPU_SYSREGS    6
-> >> >> >> +
-> >> >> >>  #define   KVM_DEV_ARM_VGIC_CTRL_INIT 0
-> >> >> >>
-> >> >> >>  /* Device Control API on vcpu fd */
-> >> >> >> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-> >> >> >> index d50a82a..1a14e29 100644
-> >> >> >> --- a/arch/arm64/kvm/Makefile
-> >> >> >> +++ b/arch/arm64/kvm/Makefile
-> >> >> >> @@ -32,5 +32,6 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v3.o
-> >> >> >>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-kvm-device.o
-> >> >> >>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-its.o
-> >> >> >>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/irqchip.o
-> >> >> >> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-sys-reg-v3.o
-> >> >> >
-> >> >> > Thi is making me wonder:  Are we properly handling GICv3 save/restore
-> >> >> > for AArch32 now that we have GICv3 support for AArch32?  By properly I
-> >> >> > mean that either it is clearly only supported on AArch64 systems or it's
-> >> >> > supported on both AArch64 and AArch32, but it shouldn't break randomly
-> >> >> > on AArch32.
-> >> >>
-> >> >> It supports both AArch64 and AArch64 in handling of system registers
-> >> >> save/restore.
-> >> >> All system registers that we save/restore are 32-bit for both aarch64
-> >> >> and aarch32.
-> >> >> Though opcode op0 should be zero for aarch32, the remaining Op and CRn codes
-> >> >> are same. However the codes sent by qemu is matched and register
-> >> >> are handled properly irrespective of AArch32 or AArch64.
-> >> >>
-> >> >> I don't have platform which support AArch32 guests to verify.
-> >> >
-> >> > Actually this is not about the guest, it's about an ARMv8 AArch32 host
-> >> > that has a GICv3.
-> >> >
-> >> > I just tried to do a v7 compile with your patches, and it results in an
-> >> > epic failure, so there's something for you to look at.
-> >> >
-> >> >> >
-> >> >> >>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
-> >> >> >>  kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
-> >> >> >> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> >> >> >> index 002f092..730a18a 100644
-> >> >> >> --- a/include/kvm/arm_vgic.h
-> >> >> >> +++ b/include/kvm/arm_vgic.h
-> >> >> >> @@ -71,6 +71,9 @@ struct vgic_global {
-> >> >> >>
-> >> >> >>       /* GIC system register CPU interface */
-> >> >> >>       struct static_key_false gicv3_cpuif;
-> >> >> >> +
-> >> >> >> +     /* Cache ICH_VTR_EL2 reg value */
-> >> >> >> +     u32                     ich_vtr_el2;
-> >> >> >>  };
-> >> >> >>
-> >> >> >>  extern struct vgic_global kvm_vgic_global_state;
-> >> >> >> @@ -269,6 +272,12 @@ struct vgic_cpu {
-> >> >> >>       u64 pendbaser;
-> >> >> >>
-> >> >> >>       bool lpis_enabled;
-> >> >> >> +
-> >> >> >> +     /* Cache guest priority bits */
-> >> >> >> +     u32 num_pri_bits;
-> >> >> >> +
-> >> >> >> +     /* Cache guest interrupt ID bits */
-> >> >> >> +     u32 num_id_bits;
-> >> >> >>  };
-> >> >> >>
-> >> >> >>  extern struct static_key_false vgic_v2_cpuif_trap;
-> >> >> >> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> >> >> >> index 6c7d30c..da532d1 100644
-> >> >> >> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-> >> >> >> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> >> >> >> @@ -504,6 +504,14 @@ static int vgic_v3_attr_regs_access(struct kvm_device *dev,
-> >> >> >>               if (!is_write)
-> >> >> >>                       *reg = tmp32;
-> >> >> >>               break;
-> >> >> >> +     case KVM_DEV_ARM_VGIC_CPU_SYSREGS: {
-> >> >> >> +             u64 regid;
-> >> >> >> +
-> >> >> >> +             regid = (attr->attr & KVM_DEV_ARM_VGIC_SYSREG_INSTR_MASK);
-> >> >> >> +             ret = vgic_v3_cpu_sysregs_uaccess(vcpu, is_write,
-> >> >> >> +                                               regid, reg);
-> >> >> >> +             break;
-> >> >> >> +     }
-> >> >> >>       default:
-> >> >> >>               ret = -EINVAL;
-> >> >> >>               break;
-> >> >> >> @@ -537,6 +545,15 @@ static int vgic_v3_set_attr(struct kvm_device *dev,
-> >> >> >>               reg = tmp32;
-> >> >> >>               return vgic_v3_attr_regs_access(dev, attr, &reg, true);
-> >> >> >>       }
-> >> >> >> +     case KVM_DEV_ARM_VGIC_CPU_SYSREGS: {
-> >> >> >> +             u64 __user *uaddr = (u64 __user *)(long)attr->addr;
-> >> >> >> +             u64 reg;
-> >> >> >> +
-> >> >> >> +             if (get_user(reg, uaddr))
-> >> >> >> +                     return -EFAULT;
-> >> >> >> +
-> >> >> >> +             return vgic_v3_attr_regs_access(dev, attr, &reg, true);
-> >> >> >> +     }
-> >> >> >>       }
-> >> >> >>       return -ENXIO;
-> >> >> >>  }
-> >> >> >> @@ -563,6 +580,15 @@ static int vgic_v3_get_attr(struct kvm_device *dev,
-> >> >> >>               tmp32 = reg;
-> >> >> >>               return put_user(tmp32, uaddr);
-> >> >> >>       }
-> >> >> >> +     case KVM_DEV_ARM_VGIC_CPU_SYSREGS: {
-> >> >> >> +             u64 __user *uaddr = (u64 __user *)(long)attr->addr;
-> >> >> >> +             u64 reg;
-> >> >> >> +
-> >> >> >> +             ret = vgic_v3_attr_regs_access(dev, attr, &reg, false);
-> >> >> >> +             if (ret)
-> >> >> >> +                     return ret;
-> >> >> >> +             return put_user(reg, uaddr);
-> >> >> >> +     }
-> >> >> >>       }
-> >> >> >>
-> >> >> >>       return -ENXIO;
-> >> >> >> @@ -581,6 +607,7 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
-> >> >> >>               break;
-> >> >> >>       case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-> >> >> >>       case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS:
-> >> >> >> +     case KVM_DEV_ARM_VGIC_CPU_SYSREGS:
-> >> >> >>               return vgic_v3_has_attr_regs(dev, attr);
-> >> >> >>       case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
-> >> >> >>               return 0;
-> >> >> >> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> >> >> >> index b35fb83..519b919 100644
-> >> >> >> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> >> >> >> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> >> >> >> @@ -23,6 +23,7 @@
-> >> >> >>
-> >> >> >>  #include "vgic.h"
-> >> >> >>  #include "vgic-mmio.h"
-> >> >> >> +#include "sys_regs.h"
-> >> >> >>
-> >> >> >>  /* extract @num bytes at @offset bytes offset in data */
-> >> >> >>  unsigned long extract_bytes(u64 data, unsigned int offset,
-> >> >> >> @@ -639,6 +640,24 @@ int vgic_v3_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
-> >> >> >>               nr_regions = ARRAY_SIZE(vgic_v3_rdbase_registers);
-> >> >> >>               break;
-> >> >> >>       }
-> >> >> >> +     case KVM_DEV_ARM_VGIC_CPU_SYSREGS: {
-> >> >> >> +             u64 reg, id;
-> >> >> >> +             unsigned long vgic_mpidr, mpidr_reg;
-> >> >> >> +             struct kvm_vcpu *vcpu;
-> >> >> >> +
-> >> >> >> +             vgic_mpidr = (attr->attr & KVM_DEV_ARM_VGIC_V3_MPIDR_MASK) >>
-> >> >> >> +                           KVM_DEV_ARM_VGIC_V3_MPIDR_SHIFT;
-> >> >> >> +
-> >> >> >> +             /* Convert plain mpidr value to MPIDR reg format */
-> >> >> >> +             mpidr_reg = VGIC_TO_MPIDR(vgic_mpidr);
-> >> >> >> +
-> >> >> >> +             vcpu = kvm_mpidr_to_vcpu(dev->kvm, mpidr_reg);
-> >> >> >> +             if (!vcpu)
-> >> >> >> +                     return -EINVAL;
-> >> >> >> +
-> >> >> >> +             id = (attr->attr & KVM_DEV_ARM_VGIC_SYSREG_INSTR_MASK);
-> >> >> >> +             return vgic_v3_has_cpu_sysregs_attr(vcpu, 0, id, &reg);
-> >> >> >> +     }
-> >> >> >>       default:
-> >> >> >>               return -ENXIO;
-> >> >> >>       }
-> >> >> >> diff --git a/virt/kvm/arm/vgic/vgic-sys-reg-v3.c b/virt/kvm/arm/vgic/vgic-sys-reg-v3.c
-> >> >> >> new file mode 100644
-> >> >> >> index 0000000..69d8597
-> >> >> >> --- /dev/null
-> >> >> >> +++ b/virt/kvm/arm/vgic/vgic-sys-reg-v3.c
-> >> >> >
-> >> >> > Shouldn't we have a GPL header here?
-> >> >> >
-> >> >> >> @@ -0,0 +1,324 @@
-> >> >> >> +#include <linux/irqchip/arm-gic-v3.h>
-> >> >> >> +#include <linux/kvm.h>
-> >> >> >> +#include <linux/kvm_host.h>
-> >> >> >> +#include <kvm/iodev.h>
-> >> >> >> +#include <kvm/arm_vgic.h>
-> >> >> >> +#include <asm/kvm_emulate.h>
-> >> >> >> +#include <asm/kvm_arm.h>
-> >> >> >> +#include <asm/kvm_mmu.h>
-> >> >> >> +
-> >> >> >> +#include "vgic.h"
-> >> >> >> +#include "vgic-mmio.h"
-> >> >> >> +#include "sys_regs.h"
-> >> >> >> +
-> >> >> >> +static bool access_gic_ctlr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-> >> >> >> +                         const struct sys_reg_desc *r)
-> >> >> >> +{
-> >> >> >> +     struct vgic_cpu *vgic_v3_cpu = &vcpu->arch.vgic_cpu;
-> >> >> >> +     struct vgic_vmcr vmcr;
-> >> >> >> +     u64 val;
-> >> >> >> +     u32 num_pri_bits, num_id_bits;
-> >> >> >> +
-> >> >> >> +     vgic_get_vmcr(vcpu, &vmcr);
-> >> >> >> +     if (p->is_write) {
-> >> >> >> +             val = p->regval;
-> >> >> >> +
-> >> >> >> +             /*
-> >> >> >> +              * Does not allow update of ICC_CTLR_EL1 if HW does not support
-> >> >> >> +              * guest programmed ID and PRI bits
-> >> >> >> +              */
-> >> >> >
-> >> >> > I would suggest rewording this comment:
-> >> >> > Disallow restoring VM state not supported by this hardware.
-> >> >> >
-> >> >> >> +             num_pri_bits = ((val & ICC_CTLR_EL1_PRI_BITS_MASK) >>
-> >> >> >> +                             ICC_CTLR_EL1_PRI_BITS_SHIFT) + 1;
-> >> >> >> +             if (num_pri_bits > vgic_v3_cpu->num_pri_bits)
-> >> >> >> +                     return false;
-> >> >> >> +
-> >> >> >> +             vgic_v3_cpu->num_pri_bits = num_pri_bits;
-> >> >> >
-> >> >> > hmmm, this looks weird to me, because vgic_v3_cpu->num_pri_bits I don't
-> >> >> > understand which effect this is intended to have?
-> >> >> >
-> >> >> > Sure, it may limit what you do with other registers later, but since
-> >> >> > there's no ordering requirement that the ctlr be restored first, I'm not
-> >> >> > sure it makes sense.
-> >> >> >
-> >> >> > Also, since this field is RO in the ICH_VTR, we'll have a strange
-> >> >> > situation during runtime after a GICv3 restore where the
-> >> >> > vgic_v3_cpu->num_pri_its differs from the hardware's ICH_VTR_EL2 field,
-> >> >> > which is never the case if you didn't do a save/restore.
-> >> >>
-> >> >> Yes, but in any case, vgic_v3_cpu->num_pri_bits will be always less
-> >> >> than HW supported
-> >> >> value.
-> >> >>
-> >> >
-> >> > So answer my question:  What is the intended effect of writing this
-> >> > value?  Is it just so that if you migrate this platform back again, then
-> >> > you're checking compatibility with what the guest would potentially do,
-> >>
-> >> Yes
-> >
-> > Then add a comment explaining that
-> >
-> >> and also to limit the valid aprn registers access as you said above.
-> >> But that has ordering restriction. Which I think we should follow.
-> >>
-> >
-> > I'm sorry, now I'm confused.  Is there an ordering requirement in the
-> > API, or how should we follow this?
-> 
-> There is  no ordering requirement mentioned in the API doc.
-> However the APRn registers depends on num_pri_bits. Hence first
-> ICC_CTLR_EL1 should be restored  before APRn restore.
-> 
-> If ordering is not followed then APRn registers restore is allowed
-> as per hw supported num_pri_bits.
-> 
-> This should be mentioned in doc.
+On Tue, 15 Nov 2016, Srinivas Kandagatla wrote:
 
-How about just having a consistency check function that you call from
-uaccess updates to both functions, and in that way avoid requireing any
-ordering which is likely to not be followed etc.?
+> This patch adds support to PM8821 PMIC and interrupt support.
+> PM8821 is companion device that supplements primary PMIC PM8921 IC.
+> 
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+> Changes since v2:
+> 	- removed few empty lines spotted by Bjorn
+> 	- rephrased some debug prints suggested by Bjorn
+> 	
+>  .../devicetree/bindings/mfd/qcom-pm8xxx.txt        |   1 +
+>  drivers/mfd/qcom-pm8xxx.c                          | 231 ++++++++++++++++++++-
+>  2 files changed, 222 insertions(+), 10 deletions(-)
 
-Thanks,
--Christoffer
+Applied, thanks.
+
+> diff --git a/Documentation/devicetree/bindings/mfd/qcom-pm8xxx.txt b/Documentation/devicetree/bindings/mfd/qcom-pm8xxx.txt
+> index 37a088f..9e5eba4 100644
+> --- a/Documentation/devicetree/bindings/mfd/qcom-pm8xxx.txt
+> +++ b/Documentation/devicetree/bindings/mfd/qcom-pm8xxx.txt
+> @@ -10,6 +10,7 @@ voltages and other various functionality to Qualcomm SoCs.
+>  	Value type: <string>
+>  	Definition: must be one of:
+>  		    "qcom,pm8058"
+> +		    "qcom,pm8821"
+>  		    "qcom,pm8921"
+>  
+>  - #address-cells:
+> diff --git a/drivers/mfd/qcom-pm8xxx.c b/drivers/mfd/qcom-pm8xxx.c
+> index 7f9620e..f08758f 100644
+> --- a/drivers/mfd/qcom-pm8xxx.c
+> +++ b/drivers/mfd/qcom-pm8xxx.c
+> @@ -39,6 +39,20 @@
+>  #define	SSBI_REG_ADDR_IRQ_CONFIG	(SSBI_REG_ADDR_IRQ_BASE + 7)
+>  #define	SSBI_REG_ADDR_IRQ_RT_STATUS	(SSBI_REG_ADDR_IRQ_BASE + 8)
+>  
+> +#define	PM8821_SSBI_REG_ADDR_IRQ_BASE	0x100
+> +#define	PM8821_SSBI_REG_ADDR_IRQ_MASTER0 (PM8821_SSBI_REG_ADDR_IRQ_BASE + 0x30)
+> +#define	PM8821_SSBI_REG_ADDR_IRQ_MASTER1 (PM8821_SSBI_REG_ADDR_IRQ_BASE + 0xb0)
+> +#define	PM8821_SSBI_REG(m, b, offset) \
+> +			((m == 0) ? \
+> +			(PM8821_SSBI_REG_ADDR_IRQ_MASTER0 + b + offset) : \
+> +			(PM8821_SSBI_REG_ADDR_IRQ_MASTER1 + b + offset))
+> +#define	PM8821_SSBI_ADDR_IRQ_ROOT(m, b)		PM8821_SSBI_REG(m, b, 0x0)
+> +#define	PM8821_SSBI_ADDR_IRQ_CLEAR(m, b)	PM8821_SSBI_REG(m, b, 0x01)
+> +#define	PM8821_SSBI_ADDR_IRQ_MASK(m, b)		PM8821_SSBI_REG(m, b, 0x08)
+> +#define	PM8821_SSBI_ADDR_IRQ_RT_STATUS(m, b)	PM8821_SSBI_REG(m, b, 0x0f)
+> +
+> +#define	PM8821_BLOCKS_PER_MASTER	7
+> +
+>  #define	PM_IRQF_LVL_SEL			0x01	/* level select */
+>  #define	PM_IRQF_MASK_FE			0x02	/* mask falling edge */
+>  #define	PM_IRQF_MASK_RE			0x04	/* mask rising edge */
+> @@ -54,6 +68,7 @@
+>  #define REG_HWREV_2		0x0E8  /* PMIC4 revision 2 */
+>  
+>  #define PM8XXX_NR_IRQS		256
+> +#define PM8821_NR_IRQS		112
+>  
+>  struct pm_irq_chip {
+>  	struct regmap		*regmap;
+> @@ -65,6 +80,12 @@ struct pm_irq_chip {
+>  	u8			config[0];
+>  };
+>  
+> +struct pm_irq_data {
+> +	int num_irqs;
+> +	const struct irq_domain_ops  *irq_domain_ops;
+> +	void (*irq_handler)(struct irq_desc *desc);
+> +};
+> +
+>  static int pm8xxx_read_block_irq(struct pm_irq_chip *chip, unsigned int bp,
+>  				 unsigned int *ip)
+>  {
+> @@ -182,6 +203,78 @@ static void pm8xxx_irq_handler(struct irq_desc *desc)
+>  	chained_irq_exit(irq_chip, desc);
+>  }
+>  
+> +static void pm8821_irq_block_handler(struct pm_irq_chip *chip,
+> +				     int master, int block)
+> +{
+> +	int pmirq, irq, i, ret;
+> +	unsigned int bits;
+> +
+> +	ret = regmap_read(chip->regmap,
+> +			  PM8821_SSBI_ADDR_IRQ_ROOT(master, block), &bits);
+> +	if (ret) {
+> +		pr_err("Reading block %d failed ret=%d", block, ret);
+> +		return;
+> +	}
+> +
+> +	/* Convert block offset to global block number */
+> +	block += (master * PM8821_BLOCKS_PER_MASTER) - 1;
+> +
+> +	/* Check IRQ bits */
+> +	for (i = 0; i < 8; i++) {
+> +		if (bits & BIT(i)) {
+> +			pmirq = block * 8 + i;
+> +			irq = irq_find_mapping(chip->irqdomain, pmirq);
+> +			generic_handle_irq(irq);
+> +		}
+> +	}
+> +}
+> +
+> +static inline void pm8821_irq_master_handler(struct pm_irq_chip *chip,
+> +					     int master, u8 master_val)
+> +{
+> +	int block;
+> +
+> +	for (block = 1; block < 8; block++)
+> +		if (master_val & BIT(block))
+> +			pm8821_irq_block_handler(chip, master, block);
+> +}
+> +
+> +static void pm8821_irq_handler(struct irq_desc *desc)
+> +{
+> +	struct pm_irq_chip *chip = irq_desc_get_handler_data(desc);
+> +	struct irq_chip *irq_chip = irq_desc_get_chip(desc);
+> +	unsigned int master;
+> +	int ret;
+> +
+> +	chained_irq_enter(irq_chip, desc);
+> +	ret = regmap_read(chip->regmap,
+> +			  PM8821_SSBI_REG_ADDR_IRQ_MASTER0, &master);
+> +	if (ret) {
+> +		pr_err("Failed to read master 0 ret=%d\n", ret);
+> +		goto done;
+> +	}
+> +
+> +	/* bits 1 through 7 marks the first 7 blocks in master 0 */
+> +	if (master & GENMASK(7, 1))
+> +		pm8821_irq_master_handler(chip, 0, master);
+> +
+> +	/* bit 0 marks if master 1 contains any bits */
+> +	if (!(master & BIT(0)))
+> +		goto done;
+> +
+> +	ret = regmap_read(chip->regmap,
+> +			  PM8821_SSBI_REG_ADDR_IRQ_MASTER1, &master);
+> +	if (ret) {
+> +		pr_err("Failed to read master 1 ret=%d\n", ret);
+> +		goto done;
+> +	}
+> +
+> +	pm8821_irq_master_handler(chip, 1, master);
+> +
+> +done:
+> +	chained_irq_exit(irq_chip, desc);
+> +}
+> +
+>  static void pm8xxx_irq_mask_ack(struct irq_data *d)
+>  {
+>  	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
+> @@ -299,6 +392,104 @@ static const struct irq_domain_ops pm8xxx_irq_domain_ops = {
+>  	.map = pm8xxx_irq_domain_map,
+>  };
+>  
+> +static void pm8821_irq_mask_ack(struct irq_data *d)
+> +{
+> +	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
+> +	unsigned int pmirq = irqd_to_hwirq(d);
+> +	u8 block, master;
+> +	int irq_bit, rc;
+> +
+> +	block = pmirq / 8;
+> +	master = block / PM8821_BLOCKS_PER_MASTER;
+> +	irq_bit = pmirq % 8;
+> +	block %= PM8821_BLOCKS_PER_MASTER;
+> +
+> +	rc = regmap_update_bits(chip->regmap,
+> +				PM8821_SSBI_ADDR_IRQ_MASK(master, block),
+> +				BIT(irq_bit), BIT(irq_bit));
+> +	if (rc) {
+> +		pr_err("Failed to mask IRQ:%d rc=%d\n", pmirq, rc);
+> +		return;
+> +	}
+> +
+> +	rc = regmap_update_bits(chip->regmap,
+> +				PM8821_SSBI_ADDR_IRQ_CLEAR(master, block),
+> +				BIT(irq_bit), BIT(irq_bit));
+> +	if (rc)
+> +		pr_err("Failed to CLEAR IRQ:%d rc=%d\n", pmirq, rc);
+> +}
+> +
+> +static void pm8821_irq_unmask(struct irq_data *d)
+> +{
+> +	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
+> +	unsigned int pmirq = irqd_to_hwirq(d);
+> +	int irq_bit, rc;
+> +	u8 block, master;
+> +
+> +	block = pmirq / 8;
+> +	master = block / PM8821_BLOCKS_PER_MASTER;
+> +	irq_bit = pmirq % 8;
+> +	block %= PM8821_BLOCKS_PER_MASTER;
+> +
+> +	rc = regmap_update_bits(chip->regmap,
+> +				PM8821_SSBI_ADDR_IRQ_MASK(master, block),
+> +				BIT(irq_bit), ~BIT(irq_bit));
+> +	if (rc)
+> +		pr_err("Failed to read/write unmask IRQ:%d rc=%d\n", pmirq, rc);
+> +
+> +}
+> +
+> +static int pm8821_irq_get_irqchip_state(struct irq_data *d,
+> +					enum irqchip_irq_state which,
+> +					bool *state)
+> +{
+> +	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
+> +	int rc, pmirq = irqd_to_hwirq(d);
+> +	u8 block, irq_bit, master;
+> +	unsigned int bits;
+> +
+> +	block = pmirq / 8;
+> +	master = block / PM8821_BLOCKS_PER_MASTER;
+> +	irq_bit = pmirq % 8;
+> +	block %= PM8821_BLOCKS_PER_MASTER;
+> +
+> +	rc = regmap_read(chip->regmap,
+> +		PM8821_SSBI_ADDR_IRQ_RT_STATUS(master, block), &bits);
+> +	if (rc) {
+> +		pr_err("Reading Status of IRQ %d failed rc=%d\n", pmirq, rc);
+> +		return rc;
+> +	}
+> +
+> +	*state = !!(bits & BIT(irq_bit));
+> +
+> +	return rc;
+> +}
+> +
+> +static struct irq_chip pm8821_irq_chip = {
+> +	.name		= "pm8821",
+> +	.irq_mask_ack	= pm8821_irq_mask_ack,
+> +	.irq_unmask	= pm8821_irq_unmask,
+> +	.irq_get_irqchip_state = pm8821_irq_get_irqchip_state,
+> +	.flags		= IRQCHIP_MASK_ON_SUSPEND | IRQCHIP_SKIP_SET_WAKE,
+> +};
+> +
+> +static int pm8821_irq_domain_map(struct irq_domain *d, unsigned int irq,
+> +				   irq_hw_number_t hwirq)
+> +{
+> +	struct pm_irq_chip *chip = d->host_data;
+> +
+> +	irq_set_chip_and_handler(irq, &pm8821_irq_chip, handle_level_irq);
+> +	irq_set_chip_data(irq, chip);
+> +	irq_set_noprobe(irq);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct irq_domain_ops pm8821_irq_domain_ops = {
+> +	.xlate = irq_domain_xlate_twocell,
+> +	.map = pm8821_irq_domain_map,
+> +};
+> +
+>  static const struct regmap_config ssbi_regmap_config = {
+>  	.reg_bits = 16,
+>  	.val_bits = 8,
+> @@ -308,22 +499,41 @@ static const struct regmap_config ssbi_regmap_config = {
+>  	.reg_write = ssbi_reg_write
+>  };
+>  
+> +static const struct pm_irq_data pm8xxx_data = {
+> +	.num_irqs = PM8XXX_NR_IRQS,
+> +	.irq_domain_ops = &pm8xxx_irq_domain_ops,
+> +	.irq_handler = pm8xxx_irq_handler,
+> +};
+> +
+> +static const struct pm_irq_data pm8821_data = {
+> +	.num_irqs = PM8821_NR_IRQS,
+> +	.irq_domain_ops = &pm8821_irq_domain_ops,
+> +	.irq_handler = pm8821_irq_handler,
+> +};
+> +
+>  static const struct of_device_id pm8xxx_id_table[] = {
+> -	{ .compatible = "qcom,pm8018", },
+> -	{ .compatible = "qcom,pm8058", },
+> -	{ .compatible = "qcom,pm8921", },
+> +	{ .compatible = "qcom,pm8018", .data = &pm8xxx_data},
+> +	{ .compatible = "qcom,pm8058", .data = &pm8xxx_data},
+> +	{ .compatible = "qcom,pm8821", .data = &pm8821_data},
+> +	{ .compatible = "qcom,pm8921", .data = &pm8xxx_data},
+>  	{ }
+>  };
+>  MODULE_DEVICE_TABLE(of, pm8xxx_id_table);
+>  
+>  static int pm8xxx_probe(struct platform_device *pdev)
+>  {
+> +	const struct pm_irq_data *data;
+>  	struct regmap *regmap;
+>  	int irq, rc;
+>  	unsigned int val;
+>  	u32 rev;
+>  	struct pm_irq_chip *chip;
+> -	unsigned int nirqs = PM8XXX_NR_IRQS;
+> +
+> +	data = of_device_get_match_data(&pdev->dev);
+> +	if (!data) {
+> +		dev_err(&pdev->dev, "No matching driver data found\n");
+> +		return -EINVAL;
+> +	}
+>  
+>  	irq = platform_get_irq(pdev, 0);
+>  	if (irq < 0)
+> @@ -354,25 +564,26 @@ static int pm8xxx_probe(struct platform_device *pdev)
+>  	rev |= val << BITS_PER_BYTE;
+>  
+>  	chip = devm_kzalloc(&pdev->dev, sizeof(*chip) +
+> -					sizeof(chip->config[0]) * nirqs,
+> -					GFP_KERNEL);
+> +			    sizeof(chip->config[0]) * data->num_irqs,
+> +			    GFP_KERNEL);
+>  	if (!chip)
+>  		return -ENOMEM;
+>  
+>  	platform_set_drvdata(pdev, chip);
+>  	chip->regmap = regmap;
+> -	chip->num_irqs = nirqs;
+> +	chip->num_irqs = data->num_irqs;
+>  	chip->num_blocks = DIV_ROUND_UP(chip->num_irqs, 8);
+>  	chip->num_masters = DIV_ROUND_UP(chip->num_blocks, 8);
+>  	spin_lock_init(&chip->pm_irq_lock);
+>  
+> -	chip->irqdomain = irq_domain_add_linear(pdev->dev.of_node, nirqs,
+> -						&pm8xxx_irq_domain_ops,
+> +	chip->irqdomain = irq_domain_add_linear(pdev->dev.of_node,
+> +						data->num_irqs,
+> +						data->irq_domain_ops,
+>  						chip);
+>  	if (!chip->irqdomain)
+>  		return -ENODEV;
+>  
+> -	irq_set_chained_handler_and_data(irq, pm8xxx_irq_handler, chip);
+> +	irq_set_chained_handler_and_data(irq, data->irq_handler, chip);
+>  	irq_set_irq_wake(irq, 1);
+>  
+>  	rc = of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
