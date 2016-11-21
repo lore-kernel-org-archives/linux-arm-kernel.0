@@ -1,216 +1,65 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 21 Nov 2016 17:29:05 +0100
-Subject: [PATCH 2/2] Add support for the Nexbox A1 board based on the Amlogic
- S912 SoC.
-In-Reply-To: <20161121162905.14285-1-narmstrong@baylibre.com>
-References: <20161121162905.14285-1-narmstrong@baylibre.com>
-Message-ID: <20161121162905.14285-3-narmstrong@baylibre.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 22 Nov 2016 00:29:34 +0800
+Subject: [PATCH] clk: sunxi-ng: enable so-said LDOs for A33 SoC's pll-mipi
+ clock
+In-Reply-To: <20161117164954.62658-1-icenowy@aosc.xyz>
+References: <20161117164954.62658-1-icenowy@aosc.xyz>
+Message-ID: <194651479745774@web24g.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- Documentation/devicetree/bindings/arm/amlogic.txt  |   1 +
- arch/arm64/boot/dts/amlogic/Makefile               |   1 +
- .../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts | 169 +++++++++++++++++++++
- 3 files changed, 171 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
 
-diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
-index 1144214..6ef7c52 100644
---- a/Documentation/devicetree/bindings/arm/amlogic.txt
-+++ b/Documentation/devicetree/bindings/arm/amlogic.txt
-@@ -45,3 +45,4 @@ Board compatible values:
-   - "amlogic,p231" (Meson gxl s905d)
-   - "amlogic,q200" (Meson gxm s912)
-   - "amlogic,q201" (Meson gxm s912)
-+  - "nexbox,a1" (Meson gxm s912)
-diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-index 7752a16..2fbb8e3 100644
---- a/arch/arm64/boot/dts/amlogic/Makefile
-+++ b/arch/arm64/boot/dts/amlogic/Makefile
-@@ -10,6 +10,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxm-s912-q200.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxm-s912-q201.dtb
-+dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-new file mode 100644
-index 0000000..d320727
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-@@ -0,0 +1,169 @@
-+/*
-+ * Copyright (c) 2016 BayLibre, SAS.
-+ * Author: Neil Armstrong <narmstrong@baylibre.com>
-+ *
-+ * Copyright (c) 2016 Endless Computers, Inc.
-+ * Author: Carlo Caione <carlo@endlessm.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "meson-gxm.dtsi"
-+
-+/ {
-+	compatible = "nexbox,a1", "amlogic,s912", "amlogic,meson-gxm";
-+	model = "NEXBOX A1";
-+
-+	aliases {
-+		serial0 = &uart_AO;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x80000000>;
-+	};
-+
-+	vddio_boot: regulator-vddio_boot {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDDIO_BOOT";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+	};
-+
-+	vddao_3v3: regulator-vddao_3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDDAO_3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	vcc_3v3: regulator-vcc_3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VCC_3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	emmc_pwrseq: emmc-pwrseq {
-+		compatible = "mmc-pwrseq-emmc";
-+		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
-+	};
-+};
-+
-+/* This UART is brought out to the DB9 connector */
-+&uart_AO {
-+	status = "okay";
-+	pinctrl-0 = <&uart_ao_a_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&ir {
-+	status = "okay";
-+	pinctrl-0 = <&remote_input_ao_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+/* SD card */
-+&sd_emmc_b {
-+	status = "okay";
-+	pinctrl-0 = <&sdcard_pins>;
-+	pinctrl-names = "default";
-+
-+	bus-width = <4>;
-+	cap-sd-highspeed;
-+	max-frequency = <100000000>;
-+	disable-wp;
-+
-+	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
-+	cd-inverted;
-+
-+	vmmc-supply = <&vddao_3v3>;
-+	vqmmc-supply = <&vddio_boot>;
-+};
-+
-+/* eMMC */
-+&sd_emmc_c {
-+	status = "okay";
-+	pinctrl-0 = <&emmc_pins>;
-+	pinctrl-names = "default";
-+
-+	bus-width = <8>;
-+	cap-sd-highspeed;
-+	cap-mmc-highspeed;
-+	max-frequency = <200000000>;
-+	non-removable;
-+	disable-wp;
-+	mmc-ddr-1_8v;
-+	mmc-hs200-1_8v;
-+
-+	mmc-pwrseq = <&emmc_pwrseq>;
-+	vmmc-supply = <&vcc_3v3>;
-+	vqmmc-supply = <&vddio_boot>;
-+};
-+
-+&ethmac {
-+	status = "okay";
-+
-+	pinctrl-0 = <&eth_pins>;
-+	pinctrl-names = "default";
-+
-+	/* Select external PHY by default */
-+	phy-handle = <&external_phy>;
-+
-+	snps,reset-gpio = <&gpio GPIOZ_14 0>;
-+	snps,reset-delays-us = <0 10000 1000000>;
-+	snps,reset-active-low;
-+
-+	/* External PHY is in RGMII */
-+	phy-mode = "rgmii";
-+};
-+
-+&external_mdio {
-+	external_phy: ethernet-phy at 0 {
-+		compatible = "ethernet-phy-id001c.c916", "ethernet-phy-ieee802.3-c22";
-+		reg = <0>;
-+		max-speed = <1000>;
-+	};
-+};
--- 
-2.7.0
+
+18.11.2016, 00:50, "Icenowy Zheng" <icenowy@aosc.xyz>:
+> In the user manual of A33 SoC, the bit 22 and 23 of pll-mipi control
+> register is called "LDO{1,2}_EN", and according to the BSP source code
+> from Allwinner [1], the LDOs are enabled during the clock's enabling
+> process.
+>
+> The clock failed to generate output if the two LDOs are not enabled.
+>
+> Add the two bits to the clock's gate bits, so that the LDOs are enabled
+> when the PLL is enabled.
+>
+> [1] https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun8iw5.c#L429
+>
+> Fixes: d05c748bd730 ("clk: sunxi-ng: Add A33 CCU support")
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+
+I forgot to mention that this patch should also apply to 4.9.
+
+As A33 support is added, the problem will appear with some LCD panels.
+
+> ---
+> Dear Chen-Yu:
+> As you said, the two bits are also present in the CCU of A23 and A31.
+> Could you please check whether the PLL works on the two SoCs?
+> I remembered you mentioned you failed to make TCON enabled on A23.
+> On A31, you may hack the parent of tcon-ch0 to force the tcon clock to
+> use pll-mipi as parent, in order to check whether the pll works.
+>
+> However, I didn't found the code that enables the LDOs in the BSP A23/31
+> sources, so you must test them to ensure whether the code is needed for
+> these SoCs.
+>
+> Regards,
+> Icenowy
+> ?drivers/clk/sunxi-ng/ccu-sun8i-a33.c | 2 +-
+> ?1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a33.c b/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
+> index 96b40ca..9bd1f78 100644
+> --- a/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
+> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
+> @@ -131,7 +131,7 @@ static SUNXI_CCU_NKM_WITH_GATE_LOCK(pll_mipi_clk, "pll-mipi",
+> ?????????????????????????????????????8, 4, /* N */
+> ?????????????????????????????????????4, 2, /* K */
+> ?????????????????????????????????????0, 4, /* M */
+> - BIT(31), /* gate */
+> + BIT(31) | BIT(23) | BIT(22), /* gate */
+> ?????????????????????????????????????BIT(28), /* lock */
+> ?????????????????????????????????????CLK_SET_RATE_UNGATE);
+>
+> --
+> 2.10.1
