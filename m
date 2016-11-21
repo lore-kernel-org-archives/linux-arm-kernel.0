@@ -1,57 +1,75 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Nov 2016 11:36:14 +0000
-Subject: [BUG] i2c-designware silently fails on long transfers
-In-Reply-To: <20161121112135.GE1005@e106497-lin.cambridge.arm.com>
-References: <20161118193542.GO1041@n2100.armlinux.org.uk>
- <20161121102901.GF1446@lahna.fi.intel.com>
- <20161121104329.GB1041@n2100.armlinux.org.uk>
- <20161121112135.GE1005@e106497-lin.cambridge.arm.com>
-Message-ID: <20161121113614.GD1041@n2100.armlinux.org.uk>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 21 Nov 2016 13:05:10 +0100
+Subject: [GIT PULL v2] Second Round of Renesas ARM64 Based SoC DT Updates for
+ v4.10
+Message-ID: <cover.1479726397.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2016 at 11:21:35AM +0000, Liviu Dudau wrote:
-> On Mon, Nov 21, 2016 at 10:43:29AM +0000, Russell King - ARM Linux wrote:
-> > It would need to DMA to the Tx FIFO to keep it filled - it triggers the
-> > stop condition when the Tx FIFO empties.  From what I can see in the
-> > driver, the Tx FIFO not only takes the data but also a "command" to tell
-> > the hardware what to do.
-> > 
-> > The Rx FIFO would also need DMA to avoid it overflowing due to high
-> > interrupt latency.
-> > 
-> > I don't know what state DMA is in on the Juno, or even whether it has
-> > DMA - it has a PL330 DMA controller, but I see nothing in the DT files
-> > making use of it.
-> 
-> The only thing we have tested PL330 with was UART and I2S. I'm not sure we
-> can really use it with I2C given the above hardware configuration issue.
-> 
-> The other thing we have tried in our private branches was to repeat the EDID
-> transfer a number of times until the checksum was correct. Andrew Jackson
-> sent a patch a year or so back to have some ridiculously high number of
-> retries (30) and that has been rightfully shut down in the upstream.
-> 
-> The unfortunate thing is that the monitors and TVs that we use inside ARM
-> for testing don't seem to trigger this issue on a regular basis. We had one
-> or two small 7" TVs that did that, and the brute force retry of EDID transfer
-> sorted them out for the limited use that we had for them.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Due to the way the TDA998x works, it doesn't have much to do with the TV.
-The TDA998x is instructed to read up to 128 bytes of EDID data into its
-own internal buffer.  It then does so, and raises an interrupt (or we
-notice that the interrupt flag is set when there's no hardware interrupt
-line), and we then read the EDID data out of the TDA998x.
+Please consider these second round of Renesas ARM64 based SoC DT updates for v4.10.
 
-At the point we're reading from the TDA998x, it has loaded the data from
-the DDC bus and the DDC bus is idle... we don't have direct access to
-the DDC bus.
+This pull request is based on the previous round of
+such requests, tagged as renesas-arm64-dt-for-v4.10,
+which I have already sent a pull-request for.
 
-The only reason I can think that the checksum would pass is if you were
-somehow ending up with data in the buffer that did cause the basic
-checksum to pass, even though you had an incomplete read.
+Changes since v1:
+* No longer includes unnecessary dependencies in base
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+
+The following changes since commit 935085209343a0c507e3d9a3e01883b25c8f743e:
+
+  arm64: renesas: r8a7796: add SYS-DMAC controller nodes (2016-11-04 10:18:07 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt2-for-v4.10
+
+for you to fetch changes up to 5de68961cf5618c1ce5bb15848b36121247f23d5:
+
+  arm64: dts: r8a7796: Add device node for PRR (2016-11-21 10:18:53 +0100)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM64 Based SoC DT Updates for v4.10
+
+Enhancements:
+* Add device nodes for PRR
+* Add m3ulcb board
+* Enable I2C on r8a7796/salvator-x board
+* Enable SDHI0 on h3ulcb board
+
+----------------------------------------------------------------
+Geert Uytterhoeven (2):
+      arm64: dts: r8a7795: Add device node for PRR
+      arm64: dts: r8a7796: Add device node for PRR
+
+Ulrich Hecht (3):
+      arm64: dts: r8a7796: add I2C support
+      arm64: dts: r8a7796: Enable I2C DMA
+      arm64: dts: r8a7796: salvator-x: enable I2C
+
+Vladimir Barinov (13):
+      arm64: dts: h3ulcb: update documentation with official board name
+      arm64: dts: h3ulcb: update header
+      arm64: dts: m3ulcb: add M3ULCB board DT bindings
+      arm64: dts: m3ulcb: initial device tree
+      arm64: dts: m3ulcb: enable SCIF clk and pins
+      arm64: dts: m3ulcb: enable GPIO leds
+      arm64: dts: m3ulcb: enable GPIO keys
+      arm64: dts: m3ulcb: enable EXTALR clk
+      arm64: dts: m3ulcb: enable WDT
+      arm64: dts: m3ulcb: enable SDHI0
+      arm64: dts: m3ulcb: enable SDHI2
+      arm64: dts: h3ulcb: enable SDHI2
+      arm64: dts: h3ulcb: rename SDHI0 pins
+
+ Documentation/devicetree/bindings/arm/shmobile.txt |   4 +-
+ arch/arm64/boot/dts/renesas/Makefile               |   2 +-
+ arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts     |  53 +++++-
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi           |   5 +
+ arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts     | 189 +++++++++++++++++++++
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts |  12 ++
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 116 +++++++++++++
+ 7 files changed, 374 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
