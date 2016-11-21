@@ -1,30 +1,49 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 21 Nov 2016 09:10:53 -0800
-Subject: [PATCH 0/2] ARM64: dts: Add support for Meson GXM
-In-Reply-To: <20161121162905.14285-1-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Mon, 21 Nov 2016 17:29:03 +0100")
-References: <20161121162905.14285-1-narmstrong@baylibre.com>
-Message-ID: <m2shqk3giq.fsf@baylibre.com>
+From: ahaslam@baylibre.com (Axel Haslam)
+Date: Mon, 21 Nov 2016 18:10:50 +0100
+Subject: [PATCH v2 3/3] usb: ohci-da8xx: rename driver to ohci-da8xx
+In-Reply-To: <20161103160308.29588-4-ahaslam@baylibre.com>
+References: <20161103160308.29588-1-ahaslam@baylibre.com>
+ <20161103160308.29588-4-ahaslam@baylibre.com>
+Message-ID: <CAKXjFTME9Y+KEg21i05zP6+10tB4bW=cMbSftAbYhozEg1B8ZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+Hi Greg,
 
-> The new Amlogic GXM SoC (S912) is part of the Meson GX family and is nearly
-> identical to GXM but with a second Quad-A53 core cluster.
+On Thu, Nov 3, 2016 at 5:03 PM, Axel Haslam <ahaslam@baylibre.com> wrote:
+> The davinci ohci driver name (currently "ohci") is too generic.
+> To be consistent with other usb dirvers, append the "-da8xx" postfix
+> to the name.
 >
-> The GXM dtsi includes the GXL dtsi and the p20x dtsi is refactored in a
-> common p20x/q20x to support the GXM Q200 and Q201 board that uses the exact
-> same board layout since the S905D and S912 are pinout compatible.
+
+if there are no objections, would it be possible to pick up this patch?
+the corresponding phy patch was merged and the platform changes
+are ack'ed, and will we taken by the davinci maintainer once this patch
+gets in.
+
+i can resend stand-alone if its preferred.
+
+Regards
+Axel
+
+> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+> ---
+>  drivers/usb/host/ohci-da8xx.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> The last patch adds support for the Nexbox A1 Set-Top-Box based on the S912.
+> diff --git a/drivers/usb/host/ohci-da8xx.c b/drivers/usb/host/ohci-da8xx.c
+> index 30c4878..429d58b 100644
+> --- a/drivers/usb/host/ohci-da8xx.c
+> +++ b/drivers/usb/host/ohci-da8xx.c
+> @@ -27,7 +27,7 @@
+>  #include "ohci.h"
 >
-> Changes since RFC :
->  - Refactor the p20x/q20x dtsi into a single common file
->  - Add support for Nexbox A1
-
-Thanks for refactoring.  Looks great.
-
-Applied.
-
-Kevin
+>  #define DRIVER_DESC "DA8XX"
+> -#define DRV_NAME "ohci"
+> +#define DRV_NAME "ohci-da8xx"
+>
+>  static struct hc_driver __read_mostly ohci_da8xx_hc_driver;
+>
+> --
+> 2.10.1
+>
