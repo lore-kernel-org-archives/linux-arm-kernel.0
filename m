@@ -1,462 +1,282 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Mon, 21 Nov 2016 14:11:09 +0800
-Subject: [PATCH v16 04/15] clocksource/drivers/arm_arch_timer: rename some
- enums and defines, and some cleanups.
-In-Reply-To: <20161118184913.GH1197@leverpostej>
-References: <1479304148-2965-1-git-send-email-fu.wei@linaro.org>
- <1479304148-2965-5-git-send-email-fu.wei@linaro.org>
- <20161118184913.GH1197@leverpostej>
-Message-ID: <CADyBb7vNoE1PL3Ncy5s3Tg807ey9_FZ-p+DmEuA1_6=qT56SZQ@mail.gmail.com>
+From: yao.yuan@nxp.com (Yao Yuan)
+Date: Mon, 21 Nov 2016 06:27:39 +0000
+Subject: [PATCH v3 6/9] mtd: spi-nor: Support R/W for S25FS-S family flash
+In-Reply-To: <AM4PR0701MB21302592BE1B712D6E74C569FEB00@AM4PR0701MB2130.eurprd07.prod.outlook.com>
+References: <1471505884-33996-1-git-send-email-B56489@freescale.com>
+ <1471505884-33996-6-git-send-email-B56489@freescale.com>
+ <CA+EcR20NkBzFjMJ_ArWw9ALZY-x1SqwS1nUyGYAnjsygTk8K-Q@mail.gmail.com>
+ <AM4PR0701MB21308B262DB7B94E0F7FC34EFEF00@AM4PR0701MB2130.eurprd07.prod.outlook.com>
+ <20161116171058.GA21300@Cayman.am.freescale.net>
+ <AM4PR0701MB2130273C90BE0EE615382718FEB10@AM4PR0701MB2130.eurprd07.prod.outlook.com>
+ <DB6PR0401MB24077A46D3FC5147DC4C69D989B10@DB6PR0401MB2407.eurprd04.prod.outlook.com>
+ <AM4PR0701MB213027FC738E6E377A593B60FEB10@AM4PR0701MB2130.eurprd07.prod.outlook.com>
+ <DB6PR0401MB24074D231C8EBCC56E168CC989B00@DB6PR0401MB2407.eurprd04.prod.outlook.com>
+ <AM4PR0701MB21302592BE1B712D6E74C569FEB00@AM4PR0701MB2130.eurprd07.prod.outlook.com>
+Message-ID: <DB6PR0401MB24070BB49A1F5152A915AE3289B50@DB6PR0401MB2407.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Thu, Nov 18, 2016 at 07:00 PM +0000, Krzeminski, Marcin (Nokia - PL/Wroclaw) wrote:
+> > -----Original Message-----
+> > From: Yao Yuan [mailto:yao.yuan at nxp.com]
+> > Sent: Friday, November 18, 2016 5:20 AM
+> > To: Krzeminski, Marcin (Nokia - PL/Wroclaw)
+> > <marcin.krzeminski@nokia.com>; Han Xu <xhnjupt@gmail.com>
+> > Cc: David Woodhouse <dwmw2@infradead.org>; linux-
+> > kernel at vger.kernel.org; linux-mtd at lists.infradead.org;
+> > han.xu at freescale.com; Brian Norris <computersforpeace@gmail.com>;
+> > jagannadh.teki at gmail.com; linux-arm-kernel at lists.infradead.org
+> > Subject: RE: [PATCH v3 6/9] mtd: spi-nor: Support R/W for S25FS-S
+> > family flash
+> >
+> > On Thu, Nov 17, 2016 at 10:14:55AM +0000, Krzeminski, Marcin (Nokia -
+> > PL/Wroclaw) wrote:
+> > > > On Thu, Nov 17, 2016 at 06:50:55AM +0000, Krzeminski, Marcin
+> > > > (Nokia
+> > > > -
+> > > > PL/Wroclaw) wrote:
+> > > > > > > > On Thu, Aug 18, 2016 at 2:38 AM, Yunhui Cui
+> > > > > > > > <B56489@freescale.com>
+> > > > > > > > wrote:
+> > > > > > > > > From: Yunhui Cui <yunhui.cui@nxp.com>
+> > > > > > > > >
+> > > > > > > > > With the physical sectors combination, S25FS-S family
+> > > > > > > > > flash requires some special operations for read/write functions.
+> > > > > > > > >
+> > > > > > > > > Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
+> > > > > > > > > ---
+> > > > > > > > >  drivers/mtd/spi-nor/spi-nor.c | 56
+> > > > > > > > > +++++++++++++++++++++++++++++++++++++++++++
+> > > > > > > > >  1 file changed, 56 insertions(+)
+> > > > > > > > >
+> > > > > > > > > diff --git a/drivers/mtd/spi-nor/spi-nor.c
+> > > > > > > > > b/drivers/mtd/spi-nor/spi-nor.c index d0fc165..495d0bb
+> > > > > > > > > 100644
+> > > > > > > > > --- a/drivers/mtd/spi-nor/spi-nor.c
+> > > > > > > > > +++ b/drivers/mtd/spi-nor/spi-nor.c
+> > > > > > > > > @@ -39,6 +39,10 @@
+> > > > > > > > >
+> > > > > > > > >  #define SPI_NOR_MAX_ID_LEN     6
+> > > > > > > > >  #define SPI_NOR_MAX_ADDR_WIDTH 4
+> > > > > > > > > +/* Added for S25FS-S family flash */
+> > > > > > > > > +#define SPINOR_CONFIG_REG3_OFFSET      0x800004
+> > > > > > > > > +#define CR3V_4KB_ERASE_UNABLE  0x8 #define
+> > > > > > > > > +SPINOR_S25FS_FAMILY_EXT_JEDEC  0x81
+> > > > > > > > >
+> > > > > > > > >  struct flash_info {
+> > > > > > > > >         char            *name;
+> > > > > > > > > @@ -78,6 +82,7 @@ struct flash_info {  };
+> > > > > > > > >
+> > > > > > > > >  #define JEDEC_MFR(info)        ((info)->id[0])
+> > > > > > > > > +#define EXT_JEDEC(info)        ((info)->id[5])
+> > > > > > > > >
+> > > > > > > > >  static const struct flash_info *spi_nor_match_id(const
+> > > > > > > > > char *name);
+> > > > > > > > >
+> > > > > > > > > @@ -899,6 +904,7 @@ static const struct flash_info
+> > spi_nor_ids[] = {
+> > > > > > > > >          */
+> > > > > > > > >         { "s25sl032p",  INFO(0x010215, 0x4d00,  64 *
+> > > > > > > > > 1024, 64,
+> > > > > > > > SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+> > > > > > > > >         { "s25sl064p",  INFO(0x010216, 0x4d00,  64 *
+> > > > > > > > > 1024, 128, SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+> > > > > > > > > +       { "s25fs256s1", INFO6(0x010219, 0x4d0181, 64 *
+> > > > > > > > > + 1024, 512, 0)},
+> > > > > > > > >         { "s25fl256s0", INFO(0x010219, 0x4d00, 256 * 1024, 128, 0) },
+> > > > > > > > >         { "s25fl256s1", INFO(0x010219, 0x4d01,  64 *
+> > > > > > > > > 1024, 512,
+> > > > > > > > SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+> > > > > > > > >         { "s25fl512s",  INFO(0x010220, 0x4d00, 256 *
+> > > > > > > > > 1024, 256, SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+> @@
+> > > > > > > > > -
+> > 1036,6
+> > > > > > +1042,50
+> > > > > > > > @@ static const struct flash_info *spi_nor_read_id(struct
+> > > > > > > > spi_nor
+> > > > > > > > *nor)
+> > > > > > > > >         return ERR_PTR(-ENODEV);  }
+> > > > > > > > >
+> > > > > > > > > +/*
+> > > > > > > > > + * The S25FS-S family physical sectors may be
+> > > > > > > > > +configured as a
+> > > > > > > > > + * hybrid combination of eight 4-kB parameter sectors
+> > > > > > > > > + * at the top or bottom of the address space with all
+> > > > > > > > > + * but one of the remaining sectors being uniform size.
+> > > > > > > > > + * The Parameter Sector Erase commands (20h or 21h)
+> > > > > > > > > +must
+> > > > > > > > > + * be used to erase the 4-kB parameter sectors individually.
+> > > > > > > > > + * The Sector (uniform sector) Erase commands (D8h or
+> > > > > > > > > +DCh)
+> > > > > > > > > + * must be used to erase any of the remaining
+> > > > > > > > > + * sectors, including the portion of highest or lowest
+> > > > > > > > > +address
+> > > > > > > > > + * sector that is not overlaid by the parameter sectors.
+> > > > > > > > > + * The uniform sector erase command has no effect on
+> > > > > > > > > +parameter
+> > > > > > > > sectors.
+> > > > > > > > > + */
+> > > > > > > > > +static int spansion_s25fs_disable_4kb_erase(struct
+> > > > > > > > > +spi_nor
+> > *nor) {
+> > > > > > > > > +       u32 cr3v_addr  = SPINOR_CONFIG_REG3_OFFSET;
+> > > > > > > > > +       u8 cr3v = 0x0;
+> > > > > > > > > +       int ret = 0x0;
+> > > > > > > > > +
+> > > > > > > > > +       nor->cmd_buf[2] = cr3v_addr >> 16;
+> > > > > > > > > +       nor->cmd_buf[1] = cr3v_addr >> 8;
+> > > > > > > > > +       nor->cmd_buf[0] = cr3v_addr >> 0;
+> > > > > > > > > +
+> > > > > > > > > +       ret = nor->read_reg(nor,
+> > > > > > > > > + SPINOR_OP_SPANSION_RDAR,
+> > > > &cr3v, 1);
+> > > > > > > > > +       if (ret)
+> > > > > > > > > +               return ret;
+> > > > > > > > > +       if (cr3v & CR3V_4KB_ERASE_UNABLE)
+> > > > > > > > > +               return 0;
+> > > > > > > > > +       ret = nor->write_reg(nor, SPINOR_OP_WREN, NULL, 0);
+> > > > > > > > > +       if (ret)
+> > > > > > > > > +               return ret;
+> > > > > > > > > +       cr3v = CR3V_4KB_ERASE_UNABLE;
+> > > > > > > > > +       nor->program_opcode = SPINOR_OP_SPANSION_WRAR;
+> > > > > > > > > +       nor->write(nor, cr3v_addr, 1, &cr3v);
+> > > > > > > > > +
+> > > > > > > > > +       ret = nor->read_reg(nor,
+> > > > > > > > > + SPINOR_OP_SPANSION_RDAR,
+> > > > &cr3v, 1);
+> > > > > > > > > +       if (ret)
+> > > > > > > > > +               return ret;
+> > > > > > > > > +       if (!(cr3v & CR3V_4KB_ERASE_UNABLE))
+> > > > > > > > > +               return -EPERM;
+> > > > > > > > > +
+> > > > > > > > > +       return 0;
+> > > > > > > > > +}
+> > > > > > > > > +
+> > > > > > > > >  static int spi_nor_read(struct mtd_info *mtd, loff_t
+> > > > > > > > > from, size_t
+> > > > len,
+> > > > > > > > >                         size_t *retlen, u_char *buf)  {
+> > > > > > > > > @@
+> > > > > > > > > -1361,6
+> > > > > > > > > +1411,12 @@ int spi_nor_scan(struct spi_nor *nor, const
+> > > > > > > > > +char *name,
+> > > > > > > > enum read_mode mode)
+> > > > > > > > >                 spi_nor_wait_till_ready(nor);
+> > > > > > > > >         }
+> > > > > > > > >
+> > > > > > > > > +       if (EXT_JEDEC(info) ==
+> > > > > > > > > + SPINOR_S25FS_FAMILY_EXT_JEDEC)
+> > {
+> > > > > > > > > +               ret = spansion_s25fs_disable_4kb_erase(nor);
+> > > > > > > > > +               if (ret)
+> > > > > > > > > +                       return ret;
+> > > > > > > > > +       }
+> > > > > > > > > +
+> > > > > > > > >         if (!mtd->name)
+> > > > > > > > >                 mtd->name = dev_name(dev);
+> > > > > > > > >         mtd->priv = nor;
+> > > > > > > > > --
+> > > > > > > > > 2.1.0.27.g96db324
+> > > > > > > > >
+> > > > > > > > >
+> > > > > > > > Hi Brian, I will ack this change but still feel it's kind of hacking code.
+> > > > > > > >
+> > > > > > > > Acked-by: Han xu <han.xu@nxp.com>
+> > > > > > >
+> > > > > > > I am new on the list so I am not sure if this topic has been discussed.
+> > > > > > > Generally our product functionality relay on those 4KiB sectors.
+> > > > > > > I know that this hack is already in u-boot, but if you
+> > > > > > > mainstream this you will force users of those 4KiB sectors
+> > > > > > > to do hack the
+> > > hack...
+> > > > > > > I believe the proper solution here is to use erase regions
+> > > > > > > functionality, I send and RFS about that some time ago.
+> > > > > >
+> > > > > > Do you mind to send me a link for reference?
+> > > > > >
+> > > > > Han,
+> > > > >
+> > > > > Sorry, It seem I have not posted erase region changes (only
+> > > > > those regarding DUAL/QUAD I/O).
+> > > > > Generally, in this flash you need to create 3 erase regions
+> > > > > (because in FS-S family support only  4KiB erase on parameters
+> > > > > sector -
+> > eg.
+> > > > > 1.2.2.4 in
+> > > > S25FS512S).
+> > > > > In my case regions are:
+> > > > > 1. 0-32KiB (8*4KiB) - 4K_ERASE (0x20/0x21) 2. 32 - 256 - SE_CMD
+> > > > (0xd8/0xdc) 3.
+> > > > > Rest of the flash SE_CMD (0xd8/0xdc)
+> > > > >
+> > > > > To erase whole flash you can also use CHIP_ERASE_CMD (0x60/0xC7)
+> > > > > command, you just need to add one more mtd partition that will
+> > > > > cover
+> > > > whole flash.
+> > > > >
+> > > >
+> > > > Hi Krzeminski,
+> > > >
+> > > > Do you think is there any great advantages for enable 4KB?
+> > > > Because for NXP(Freescale) QSPI controller, there is only support
+> > > > max to 16 groups command.
+> > > >
+> > > > So It's hard to give 3 groups command just for erase (0x21,0xdc and 0xc7).
+> > > > So we have to disable the 4kb erase and only use 256kbytes in this patch.
+> > > >
+> > > Yes, if you disable parameters sector in spi-nor framework you will
+> > > disable it for all spi-nor clients not only for NXP QSPI controller.
+> > > There are users (at least me) that relay on parameters sector functionality.
+> > This patch will brake it.
+> > >
+> > > Thanks,
+> >
+> > Hi Krzeminski,
+> >
+> > Get it.
+> > So do you think how about that I add a flag in dts to select it?
+> > The user want's disable 4kb, he can add the flag.
+> >
+> > In spi-nor.c:
+> > if (of_property_read_bool(np, "spi-nor, disable-4kb")) {
+> > 	spansion_s25fs_disable_4kb_erase();
+> > }
+> >                 else
+> > ...
+> >
+> > In dts:
+> >
+> > &qspi {
+> >         num-cs = <2>;
+> >         bus-num = <0>;
+> >         status = "okay";
+> >
+> >         qflash0: s25fs512s at 0 {
+> >                 compatible = "spansion, s25fs512s";
+> > 	 spi-nor, disable-4kb
+> >                 #address-cells = <1>;
+> >                 #size-cells = <1>;
+> >                 spi-max-frequency = <20000000>;
+> >                 reg = <0>;
+> >         };
+> >
+> > I think it should be a better way.
+> >
+> > How about your think?
+> 
+> This looks much better - at least for me.
+> There are some parameters in JESD216 standard regarding parameters sector,
+> but unfortunately I have not investigated that. You can take a look at Cyrille
+> series, that adds support for JESD216  standard.
+> 
 
-On 19 November 2016 at 02:49, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Nov 16, 2016 at 09:48:57PM +0800, fu.wei at linaro.org wrote:
->> From: Fu Wei <fu.wei@linaro.org>
->>
->> Rename some enums and defines, to unify the format of enums and defines
->> in arm_arch_timer.h, also update all the users of these enums and defines:
->>     drivers/clocksource/arm_arch_timer.c
->>     virt/kvm/arm/hyp/timer-sr.c
->
-> I'm happy with making definitions use a consistent ARCH_TIMER_ prefix,
-> given they're exposed in headers...
->
->> And do some cleanups, according to the suggestion from checkpatch.pl:
->> (1) using BIT(nr) instead of (1 << nr)
->> (2) using 'unsigned int' instead of 'unsigned'
->
-> ... but these changes are pointless churn. They make the patch larger,
-> hardwer to review, and more painful to merge.
->
-> Please leave these as they are unless there is a functional problem. If
-> there will be a functional problem unless these are changed, describe
-> that in the commit message.
+Ok, I will resend v4 for add this.
 
-OK, Mark.
-I will take these out of patch, thanks :-)
+BTW, the 4-kytes block for S25FS is just only the first 8 blocks, the other block is 256kytes.
+Do out SPI-NOR support erase those specific combination?
 
+If not, do you have any plan for add it?
+It seems I can't fine the support in spi-nor.
 
->
-> Thanks,
-> Mark.
->
->>
->> No functional change.
->>
->> Signed-off-by: Fu Wei <fu.wei@linaro.org>
->> ---
->>  drivers/clocksource/arm_arch_timer.c | 111 ++++++++++++++++++-----------------
->>  include/clocksource/arm_arch_timer.h |  40 ++++++-------
->>  virt/kvm/arm/hyp/timer-sr.c          |   6 +-
->>  3 files changed, 81 insertions(+), 76 deletions(-)
->>
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index 15341cf..dd1040d 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -66,11 +66,11 @@ struct arch_timer {
->>  #define to_arch_timer(e) container_of(e, struct arch_timer, evt)
->>
->>  static u32 arch_timer_rate;
->> -static int arch_timer_ppi[MAX_TIMER_PPI];
->> +static int arch_timer_ppi[ARCH_TIMER_MAX_TIMER_PPI];
->>
->>  static struct clock_event_device __percpu *arch_timer_evt;
->>
->> -static enum arch_timer_ppi_nr arch_timer_uses_ppi = VIRT_PPI;
->> +static enum arch_timer_ppi_nr arch_timer_uses_ppi = ARCH_TIMER_VIRT_PPI;
->>  static bool arch_timer_c3stop;
->>  static bool arch_timer_mem_use_virtual;
->>
->> @@ -340,7 +340,7 @@ static void fsl_a008585_set_sne(struct clock_event_device *clk)
->>       if (!static_branch_unlikely(&arch_timer_read_ool_enabled))
->>               return;
->>
->> -     if (arch_timer_uses_ppi == VIRT_PPI)
->> +     if (arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI)
->>               clk->set_next_event = fsl_a008585_set_next_event_virt;
->>       else
->>               clk->set_next_event = fsl_a008585_set_next_event_phys;
->> @@ -352,7 +352,7 @@ static void __arch_timer_setup(unsigned type,
->>  {
->>       clk->features = CLOCK_EVT_FEAT_ONESHOT;
->>
->> -     if (type == ARCH_CP15_TIMER) {
->> +     if (type == ARCH_TIMER_TYPE_CP15) {
->>               if (arch_timer_c3stop)
->>                       clk->features |= CLOCK_EVT_FEAT_C3STOP;
->>               clk->name = "arch_sys_timer";
->> @@ -360,14 +360,14 @@ static void __arch_timer_setup(unsigned type,
->>               clk->cpumask = cpumask_of(smp_processor_id());
->>               clk->irq = arch_timer_ppi[arch_timer_uses_ppi];
->>               switch (arch_timer_uses_ppi) {
->> -             case VIRT_PPI:
->> +             case ARCH_TIMER_VIRT_PPI:
->>                       clk->set_state_shutdown = arch_timer_shutdown_virt;
->>                       clk->set_state_oneshot_stopped = arch_timer_shutdown_virt;
->>                       clk->set_next_event = arch_timer_set_next_event_virt;
->>                       break;
->> -             case PHYS_SECURE_PPI:
->> -             case PHYS_NONSECURE_PPI:
->> -             case HYP_PPI:
->> +             case ARCH_TIMER_PHYS_SECURE_PPI:
->> +             case ARCH_TIMER_PHYS_NONSECURE_PPI:
->> +             case ARCH_TIMER_HYP_PPI:
->>                       clk->set_state_shutdown = arch_timer_shutdown_phys;
->>                       clk->set_state_oneshot_stopped = arch_timer_shutdown_phys;
->>                       clk->set_next_event = arch_timer_set_next_event_phys;
->> @@ -447,8 +447,8 @@ static void arch_counter_set_user_access(void)
->>
->>  static bool arch_timer_has_nonsecure_ppi(void)
->>  {
->> -     return (arch_timer_uses_ppi == PHYS_SECURE_PPI &&
->> -             arch_timer_ppi[PHYS_NONSECURE_PPI]);
->> +     return (arch_timer_uses_ppi == ARCH_TIMER_PHYS_SECURE_PPI &&
->> +             arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI]);
->>  }
->>
->>  static u32 check_ppi_trigger(int irq)
->> @@ -469,14 +469,15 @@ static int arch_timer_starting_cpu(unsigned int cpu)
->>       struct clock_event_device *clk = this_cpu_ptr(arch_timer_evt);
->>       u32 flags;
->>
->> -     __arch_timer_setup(ARCH_CP15_TIMER, clk);
->> +     __arch_timer_setup(ARCH_TIMER_TYPE_CP15, clk);
->>
->>       flags = check_ppi_trigger(arch_timer_ppi[arch_timer_uses_ppi]);
->>       enable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], flags);
->>
->>       if (arch_timer_has_nonsecure_ppi()) {
->> -             flags = check_ppi_trigger(arch_timer_ppi[PHYS_NONSECURE_PPI]);
->> -             enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], flags);
->> +             flags = check_ppi_trigger(arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI]);
->> +             enable_percpu_irq(arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI],
->> +                               flags);
->>       }
->>
->>       arch_counter_set_user_access();
->> @@ -513,16 +514,17 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
->>  static void arch_timer_banner(unsigned type)
->>  {
->>       pr_info("%s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
->> -             type & ARCH_CP15_TIMER ? "cp15" : "",
->> -             type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  " and " : "",
->> -             type & ARCH_MEM_TIMER ? "mmio" : "",
->> +             type & ARCH_TIMER_TYPE_CP15 ? "cp15" : "",
->> +             type == (ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM) ?
->> +                     " and " : "",
->> +             type & ARCH_TIMER_TYPE_MEM ? "mmio" : "",
->>               (unsigned long)arch_timer_rate / 1000000,
->>               (unsigned long)(arch_timer_rate / 10000) % 100,
->> -             type & ARCH_CP15_TIMER ?
->> -                     (arch_timer_uses_ppi == VIRT_PPI) ? "virt" : "phys" :
->> +             type & ARCH_TIMER_TYPE_CP15 ?
->> +                     (arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI) ? "virt" : "phys" :
->>                       "",
->> -             type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  "/" : "",
->> -             type & ARCH_MEM_TIMER ?
->> +             type == (ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM) ? "/" : "",
->> +             type & ARCH_TIMER_TYPE_MEM ?
->>                       arch_timer_mem_use_virtual ? "virt" : "phys" :
->>                       "");
->>  }
->> @@ -588,8 +590,9 @@ static void __init arch_counter_register(unsigned type)
->>       u64 start_count;
->>
->>       /* Register the CP15 based counter if we have one */
->> -     if (type & ARCH_CP15_TIMER) {
->> -             if (IS_ENABLED(CONFIG_ARM64) || arch_timer_uses_ppi == VIRT_PPI)
->> +     if (type & ARCH_TIMER_TYPE_CP15) {
->> +             if (IS_ENABLED(CONFIG_ARM64) ||
->> +                 arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI)
->>                       arch_timer_read_counter = arch_counter_get_cntvct;
->>               else
->>                       arch_timer_read_counter = arch_counter_get_cntpct;
->> @@ -625,7 +628,7 @@ static void arch_timer_stop(struct clock_event_device *clk)
->>
->>       disable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi]);
->>       if (arch_timer_has_nonsecure_ppi())
->> -             disable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI]);
->> +             disable_percpu_irq(arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI]);
->>
->>       clk->set_state_shutdown(clk);
->>  }
->> @@ -688,24 +691,24 @@ static int __init arch_timer_register(void)
->>
->>       ppi = arch_timer_ppi[arch_timer_uses_ppi];
->>       switch (arch_timer_uses_ppi) {
->> -     case VIRT_PPI:
->> +     case ARCH_TIMER_VIRT_PPI:
->>               err = request_percpu_irq(ppi, arch_timer_handler_virt,
->>                                        "arch_timer", arch_timer_evt);
->>               break;
->> -     case PHYS_SECURE_PPI:
->> -     case PHYS_NONSECURE_PPI:
->> +     case ARCH_TIMER_PHYS_SECURE_PPI:
->> +     case ARCH_TIMER_PHYS_NONSECURE_PPI:
->>               err = request_percpu_irq(ppi, arch_timer_handler_phys,
->>                                        "arch_timer", arch_timer_evt);
->> -             if (!err && arch_timer_ppi[PHYS_NONSECURE_PPI]) {
->> -                     ppi = arch_timer_ppi[PHYS_NONSECURE_PPI];
->> +             if (!err && arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI]) {
->> +                     ppi = arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI];
->>                       err = request_percpu_irq(ppi, arch_timer_handler_phys,
->>                                                "arch_timer", arch_timer_evt);
->>                       if (err)
->> -                             free_percpu_irq(arch_timer_ppi[PHYS_SECURE_PPI],
->> +                             free_percpu_irq(arch_timer_ppi[ARCH_TIMER_PHYS_SECURE_PPI],
->>                                               arch_timer_evt);
->>               }
->>               break;
->> -     case HYP_PPI:
->> +     case ARCH_TIMER_HYP_PPI:
->>               err = request_percpu_irq(ppi, arch_timer_handler_phys,
->>                                        "arch_timer", arch_timer_evt);
->>               break;
->> @@ -737,7 +740,7 @@ static int __init arch_timer_register(void)
->>  out_unreg_notify:
->>       free_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], arch_timer_evt);
->>       if (arch_timer_has_nonsecure_ppi())
->> -             free_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI],
->> +             free_percpu_irq(arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI],
->>                               arch_timer_evt);
->>
->>  out_free:
->> @@ -758,7 +761,7 @@ static int __init arch_timer_mem_register(void __iomem *base, unsigned int irq)
->>
->>       t->base = base;
->>       t->evt.irq = irq;
->> -     __arch_timer_setup(ARCH_MEM_TIMER, &t->evt);
->> +     __arch_timer_setup(ARCH_TIMER_TYPE_MEM, &t->evt);
->>
->>       if (arch_timer_mem_use_virtual)
->>               func = arch_timer_handler_virt_mem;
->> @@ -801,13 +804,15 @@ arch_timer_needs_probing(int type, const struct of_device_id *matches)
->>
->>  static int __init arch_timer_common_init(void)
->>  {
->> -     unsigned mask = ARCH_CP15_TIMER | ARCH_MEM_TIMER;
->> +     unsigned int mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
->>
->>       /* Wait until both nodes are probed if we have two timers */
->>       if ((arch_timers_present & mask) != mask) {
->> -             if (arch_timer_needs_probing(ARCH_MEM_TIMER, arch_timer_mem_of_match))
->> +             if (arch_timer_needs_probing(ARCH_TIMER_TYPE_MEM,
->> +                                          arch_timer_mem_of_match))
->>                       return 0;
->> -             if (arch_timer_needs_probing(ARCH_CP15_TIMER, arch_timer_of_match))
->> +             if (arch_timer_needs_probing(ARCH_TIMER_TYPE_CP15,
->> +                                          arch_timer_of_match))
->>                       return 0;
->>       }
->>
->> @@ -832,16 +837,16 @@ static int __init arch_timer_init(void)
->>        * their CNTHP_*_EL2 counterparts, and use a different PPI
->>        * number.
->>        */
->> -     if (is_hyp_mode_available() || !arch_timer_ppi[VIRT_PPI]) {
->> +     if (is_hyp_mode_available() || !arch_timer_ppi[ARCH_TIMER_VIRT_PPI]) {
->>               bool has_ppi;
->>
->>               if (is_kernel_in_hyp_mode()) {
->> -                     arch_timer_uses_ppi = HYP_PPI;
->> -                     has_ppi = !!arch_timer_ppi[HYP_PPI];
->> +                     arch_timer_uses_ppi = ARCH_TIMER_HYP_PPI;
->> +                     has_ppi = !!arch_timer_ppi[ARCH_TIMER_HYP_PPI];
->>               } else {
->> -                     arch_timer_uses_ppi = PHYS_SECURE_PPI;
->> -                     has_ppi = (!!arch_timer_ppi[PHYS_SECURE_PPI] ||
->> -                                !!arch_timer_ppi[PHYS_NONSECURE_PPI]);
->> +                     arch_timer_uses_ppi = ARCH_TIMER_PHYS_SECURE_PPI;
->> +                     has_ppi = (!!arch_timer_ppi[ARCH_TIMER_PHYS_SECURE_PPI] ||
->> +                                !!arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI]);
->>               }
->>
->>               if (!has_ppi) {
->> @@ -858,7 +863,7 @@ static int __init arch_timer_init(void)
->>       if (ret)
->>               return ret;
->>
->> -     arch_timer_kvm_info.virtual_irq = arch_timer_ppi[VIRT_PPI];
->> +     arch_timer_kvm_info.virtual_irq = arch_timer_ppi[ARCH_TIMER_VIRT_PPI];
->>
->>       return 0;
->>  }
->> @@ -867,13 +872,13 @@ static int __init arch_timer_of_init(struct device_node *np)
->>  {
->>       int i;
->>
->> -     if (arch_timers_present & ARCH_CP15_TIMER) {
->> +     if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
->>               pr_warn("multiple nodes in dt, skipping\n");
->>               return 0;
->>       }
->>
->> -     arch_timers_present |= ARCH_CP15_TIMER;
->> -     for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++)
->> +     arch_timers_present |= ARCH_TIMER_TYPE_CP15;
->> +     for (i = ARCH_TIMER_PHYS_SECURE_PPI; i < ARCH_TIMER_MAX_TIMER_PPI; i++)
->>               arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
->>
->>       arch_timer_detect_rate(NULL, np);
->> @@ -895,7 +900,7 @@ static int __init arch_timer_of_init(struct device_node *np)
->>        */
->>       if (IS_ENABLED(CONFIG_ARM) &&
->>           of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
->> -             arch_timer_uses_ppi = PHYS_SECURE_PPI;
->> +             arch_timer_uses_ppi = ARCH_TIMER_PHYS_SECURE_PPI;
->>
->>       return arch_timer_init();
->>  }
->> @@ -909,7 +914,7 @@ static int __init arch_timer_mem_init(struct device_node *np)
->>       unsigned int irq, ret = -EINVAL;
->>       u32 cnttidr;
->>
->> -     arch_timers_present |= ARCH_MEM_TIMER;
->> +     arch_timers_present |= ARCH_TIMER_TYPE_MEM;
->>       cntctlbase = of_iomap(np, 0);
->>       if (!cntctlbase) {
->>               pr_err("Can't find CNTCTLBase\n");
->> @@ -1008,28 +1013,28 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
->>  {
->>       struct acpi_table_gtdt *gtdt;
->>
->> -     if (arch_timers_present & ARCH_CP15_TIMER) {
->> +     if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
->>               pr_warn("already initialized, skipping\n");
->>               return -EINVAL;
->>       }
->>
->>       gtdt = container_of(table, struct acpi_table_gtdt, header);
->>
->> -     arch_timers_present |= ARCH_CP15_TIMER;
->> +     arch_timers_present |= ARCH_TIMER_TYPE_CP15;
->>
->> -     arch_timer_ppi[PHYS_SECURE_PPI] =
->> +     arch_timer_ppi[ARCH_TIMER_PHYS_SECURE_PPI] =
->>               map_generic_timer_interrupt(gtdt->secure_el1_interrupt,
->>               gtdt->secure_el1_flags);
->>
->> -     arch_timer_ppi[PHYS_NONSECURE_PPI] =
->> +     arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI] =
->>               map_generic_timer_interrupt(gtdt->non_secure_el1_interrupt,
->>               gtdt->non_secure_el1_flags);
->>
->> -     arch_timer_ppi[VIRT_PPI] =
->> +     arch_timer_ppi[ARCH_TIMER_VIRT_PPI] =
->>               map_generic_timer_interrupt(gtdt->virtual_timer_interrupt,
->>               gtdt->virtual_timer_flags);
->>
->> -     arch_timer_ppi[HYP_PPI] =
->> +     arch_timer_ppi[ARCH_TIMER_HYP_PPI] =
->>               map_generic_timer_interrupt(gtdt->non_secure_el2_interrupt,
->>               gtdt->non_secure_el2_flags);
->>
->> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
->> index d23c381..2625ff1 100644
->> --- a/include/clocksource/arm_arch_timer.h
->> +++ b/include/clocksource/arm_arch_timer.h
->> @@ -20,18 +20,18 @@
->>  #include <linux/timecounter.h>
->>  #include <linux/types.h>
->>
->> -#define ARCH_CP15_TIMER                      BIT(0)
->> -#define ARCH_MEM_TIMER                       BIT(1)
->> +#define ARCH_TIMER_TYPE_CP15         BIT(0)
->> +#define ARCH_TIMER_TYPE_MEM          BIT(1)
->>
->> -#define ARCH_TIMER_CTRL_ENABLE               (1 << 0)
->> -#define ARCH_TIMER_CTRL_IT_MASK              (1 << 1)
->> -#define ARCH_TIMER_CTRL_IT_STAT              (1 << 2)
->> +#define ARCH_TIMER_CTRL_ENABLE               BIT(0)
->> +#define ARCH_TIMER_CTRL_IT_MASK              BIT(1)
->> +#define ARCH_TIMER_CTRL_IT_STAT              BIT(2)
->>
->> -#define CNTHCTL_EL1PCTEN             (1 << 0)
->> -#define CNTHCTL_EL1PCEN                      (1 << 1)
->> -#define CNTHCTL_EVNTEN                       (1 << 2)
->> -#define CNTHCTL_EVNTDIR                      (1 << 3)
->> -#define CNTHCTL_EVNTI                        (0xF << 4)
->> +#define ARCH_TIMER_CNTHCTL_EL1PCTEN  BIT(0)
->> +#define ARCH_TIMER_CNTHCTL_EL1PCEN   BIT(1)
->> +#define ARCH_TIMER_CNTHCTL_EVNTEN    BIT(2)
->> +#define ARCH_TIMER_CNTHCTL_EVNTDIR   BIT(3)
->> +#define ARCH_TIMER_CNTHCTL_EVNTI     (0xF << 4)
->>
->>  enum arch_timer_reg {
->>       ARCH_TIMER_REG_CTRL,
->> @@ -39,11 +39,11 @@ enum arch_timer_reg {
->>  };
->>
->>  enum arch_timer_ppi_nr {
->> -     PHYS_SECURE_PPI,
->> -     PHYS_NONSECURE_PPI,
->> -     VIRT_PPI,
->> -     HYP_PPI,
->> -     MAX_TIMER_PPI
->> +     ARCH_TIMER_PHYS_SECURE_PPI,
->> +     ARCH_TIMER_PHYS_NONSECURE_PPI,
->> +     ARCH_TIMER_VIRT_PPI,
->> +     ARCH_TIMER_HYP_PPI,
->> +     ARCH_TIMER_MAX_TIMER_PPI
->>  };
->>
->>  enum arch_timer_spi_nr {
->> @@ -57,13 +57,13 @@ enum arch_timer_spi_nr {
->>  #define ARCH_TIMER_MEM_PHYS_ACCESS   2
->>  #define ARCH_TIMER_MEM_VIRT_ACCESS   3
->>
->> -#define ARCH_TIMER_USR_PCT_ACCESS_EN (1 << 0) /* physical counter */
->> -#define ARCH_TIMER_USR_VCT_ACCESS_EN (1 << 1) /* virtual counter */
->> -#define ARCH_TIMER_VIRT_EVT_EN               (1 << 2)
->> +#define ARCH_TIMER_USR_PCT_ACCESS_EN BIT(0) /* physical counter */
->> +#define ARCH_TIMER_USR_VCT_ACCESS_EN BIT(1) /* virtual counter */
->> +#define ARCH_TIMER_VIRT_EVT_EN               BIT(2)
->>  #define ARCH_TIMER_EVT_TRIGGER_SHIFT (4)
->>  #define ARCH_TIMER_EVT_TRIGGER_MASK  (0xF << ARCH_TIMER_EVT_TRIGGER_SHIFT)
->> -#define ARCH_TIMER_USR_VT_ACCESS_EN  (1 << 8) /* virtual timer registers */
->> -#define ARCH_TIMER_USR_PT_ACCESS_EN  (1 << 9) /* physical timer registers */
->> +#define ARCH_TIMER_USR_VT_ACCESS_EN  BIT(8) /* virtual timer registers */
->> +#define ARCH_TIMER_USR_PT_ACCESS_EN  BIT(9) /* physical timer registers */
->>
->>  #define ARCH_TIMER_EVT_STREAM_FREQ   10000   /* 100us */
->>
->> diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
->> index 798866a..695b9d9 100644
->> --- a/virt/kvm/arm/hyp/timer-sr.c
->> +++ b/virt/kvm/arm/hyp/timer-sr.c
->> @@ -37,7 +37,7 @@ void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
->>
->>       /* Allow physical timer/counter access for the host */
->>       val = read_sysreg(cnthctl_el2);
->> -     val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
->> +     val |= ARCH_TIMER_CNTHCTL_EL1PCTEN | ARCH_TIMER_CNTHCTL_EL1PCEN;
->>       write_sysreg(val, cnthctl_el2);
->>
->>       /* Clear cntvoff for the host */
->> @@ -55,8 +55,8 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
->>        * Physical counter access is allowed
->>        */
->>       val = read_sysreg(cnthctl_el2);
->> -     val &= ~CNTHCTL_EL1PCEN;
->> -     val |= CNTHCTL_EL1PCTEN;
->> +     val &= ~ARCH_TIMER_CNTHCTL_EL1PCEN;
->> +     val |= ARCH_TIMER_CNTHCTL_EL1PCTEN;
->>       write_sysreg(val, cnthctl_el2);
->>
->>       if (timer->enabled) {
->> --
->> 2.7.4
->>
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+Thanks.
