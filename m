@@ -1,103 +1,63 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Mon, 21 Nov 2016 18:25:26 +0000
-Subject: [BUG] hdlcd gets confused about base address
-In-Reply-To: <20161121181616.GN1041@n2100.armlinux.org.uk>
-References: <20161121112030.GC1041@n2100.armlinux.org.uk>
- <20161121113212.GF1005@e106497-lin.cambridge.arm.com>
- <20161121122556.GE1041@n2100.armlinux.org.uk>
- <20161121125653.GJ1005@e106497-lin.cambridge.arm.com>
- <20161121132419.GF1041@n2100.armlinux.org.uk>
- <20161121135031.GK1005@e106497-lin.cambridge.arm.com>
- <20161121140349.GG1041@n2100.armlinux.org.uk>
- <20161121173231.GM1005@e106497-lin.cambridge.arm.com>
- <20161121175602.GM1041@n2100.armlinux.org.uk>
- <20161121181616.GN1041@n2100.armlinux.org.uk>
-Message-ID: <20161121182526.GQ1005@e106497-lin.cambridge.arm.com>
+From: megous@megous.com (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
+Date: Mon, 21 Nov 2016 19:42:26 +0100
+Subject: [linux-sunxi] [PATCH v6 0/5] drm: sun8i: Add DE2 HDMI video
+ support
+In-Reply-To: <20161121191416.706b80c25d476fa002a001b1@free.fr>
+References: <cover.1479641523.git.moinejf@free.fr>
+ <1c9a02ff-ce6c-7ad7-36fa-8a2ea0b7675e@megous.com>
+ <20161121191416.706b80c25d476fa002a001b1@free.fr>
+Message-ID: <900661e6-15cb-ec5a-2908-3fd802aca65d@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2016 at 06:16:16PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 21, 2016 at 05:56:02PM +0000, Russell King - ARM Linux wrote:
-> > For me, the image shift was 100% reproducable.  With the above patch
-> > and a call to drm_crtc_vblank_on() in the enable path, it seems to
-> > behave correctly - I can alternately switch between 1920x1080 and
-> > 1280x1024 and it behaves correctly.  Indeed, my debug prints show that
-> > the right thing is happening wrt disabling the controller:
+Dne 21.11.2016 v 19:14 Jean-Francois Moine napsal(a):
+> On Mon, 21 Nov 2016 01:54:53 +0100
+> Ond?ej Jirman <megous@megous.com> wrote:
 > 
-> Here's my version of your patch:
+>> Dne 20.11.2016 v 12:32 Jean-Francois Moine napsal(a):
+>>> This patchset series adds HDMI video support to the Allwinner
+>>> sun8i SoCs which include the display engine 2 (DE2).
+>>> The driver contains the code for the A83T and H3, but it could be
+>>> used/extended for other SoCs as the A64, H2 and H5.
+>>
+>> Hi,
+>>
+>> I'm trying to test your patches on Orange Pi PC, and I've run into a few
+>> issues: (I'm using sunxi-ng with the same patches as last time, to make
+>> it work with your driver)
+>>
+>> 1] I just get pink output on the monitor - there's some signal, but it's
+>> pink (or more like magenta).
+>>
+>> dmesg ouput indicates no error:
+>>
+>> [    1.887823] [drm] Initialized
+>> [    1.888503] sun8i-de2 1000000.de-controller: bound
+>> 1c0c000.lcd-controller (ops 0xc0a63894)
+>> [    2.057298] sun8i-de2 1000000.de-controller: bound 1ee0000.hdmi (ops
+>> 0xc0a63b54)
+>> [    2.057304] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+>> [    2.057307] [drm] No driver support for vblank timestamp query.
+>> [    2.690862] Console: switching to colour frame buffer device 240x67
+>> [    2.723059] sun8i-de2 1000000.de-controller: fb0:  frame buffer device
+> 	[snip]
+> 
+> My H3 boards work correctly, except the Orange PI 2 when it cannot read
+> the EDID (but it is OK after reboot).
+> 
+> Did you check if the EDID was correctly read?
 
-Thanks! I'll add it to my tree and see if David Airlie is happy to push it
-this late into the release cycle. Otherwise it is going to end up in linux-next
-quickly and then in drm-next before v4.10.
+EDID is correctly read (I verified that it is the same as with the v5
+version of the driver), but there's one difference I noted. v5 says dpms
+is Off, while v6 says dpms is On.
 
+> Which resolution do you expect?
 > 
-> 8<=============
-> From: Russell King <rmk+kernel@armlinux.org.uk>
-> Subject: [PATCH] drm/arm: hdlcd: fix plane base address update
-> 
-> While testing HDMI with Xorg on the Juno board, I find that when Xorg
-> starts up or shuts down, the display is shifted significantly to the
-> right and wrapped in the active region.  (No sync bars are visible.)
-> The timings are correct, it behaves as if the start address has been
-> shifted many pixels _into_ the framebuffer.
-> 
-> This occurs whenever the display mode size is changed - using xrandr
-> in Xorg shows that changing the resolution triggers the problem
-> almost every time, but changing the refresh rate does not.
-> 
-> Using devmem2 to disable and re-enable the HDLCD resolves the issue,
-> and repeated disable/enable cycles do not make the issue re-appear.
-> Further debugging shows that we try to update the controller
-> configuration while enabled.
-> 
-> Alwys ensure that the HDLCD is disabled prior to updating the
-> controller timings, and use drm_crtc_vblank_off()/drm_crtc_vblank_on()
-> so that DRM knows whether it can expect vblank interrupts.
-> 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
-
-> ---
->  drivers/gpu/drm/arm/hdlcd_crtc.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> index c239616f5334..9d683be2e5d3 100644
-> --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
-> +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> @@ -151,15 +151,14 @@ static void hdlcd_crtc_enable(struct drm_crtc *crtc)
->  	clk_prepare_enable(hdlcd->clk);
->  	hdlcd_crtc_mode_set_nofb(crtc);
->  	hdlcd_write(hdlcd, HDLCD_REG_COMMAND, 1);
-> +	drm_crtc_vblank_on(crtc);
->  }
->  
->  static void hdlcd_crtc_disable(struct drm_crtc *crtc)
->  {
->  	struct hdlcd_drm_private *hdlcd = crtc_to_hdlcd_priv(crtc);
->  
-> -	if (!crtc->state->active)
-> -		return;
-> -
-> +	drm_crtc_vblank_off(crtc);
->  	hdlcd_write(hdlcd, HDLCD_REG_COMMAND, 0);
->  	clk_disable_unprepare(hdlcd->clk);
->  }
-> -- 
-> 2.7.4
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161121/1453ca53/attachment.sig>
