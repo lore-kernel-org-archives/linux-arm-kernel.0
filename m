@@ -1,115 +1,53 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 21 Nov 2016 16:34:54 +0000
-Subject: [PATCH V10 0/6] Enable PMUs in ACPI Systems
-In-Reply-To: <1478734793-6341-1-git-send-email-jeremy.linton@arm.com> (Jeremy
- Linton's message of "Wed, 9 Nov 2016 17:39:47 -0600")
-References: <1478734793-6341-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <87wpfwkd01.fsf@e105922-lin.cambridge.arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 21 Nov 2016 08:35:40 -0800
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.10
+In-Reply-To: <CAMuHMdUhpeiOj6Mjhgt=9R3yuV-HwOAy5AAsDSTDjagRRDtYCw@mail.gmail.com>
+References: <cover.1479387356.git.horms+renesas@verge.net.au>
+ <20161119012836.GA2543@localhost>
+ <CAMuHMdXAuDcbr84phfPRpqZYRzAZf2j4vsv+i_Frz0G8ksd_Vg@mail.gmail.com>
+ <CAOesGMjk=KWifGT7sugpWVjNJSKhmgxg8gN9Cgi=emGrg66z0w@mail.gmail.com>
+ <CAMuHMdUhpeiOj6Mjhgt=9R3yuV-HwOAy5AAsDSTDjagRRDtYCw@mail.gmail.com>
+Message-ID: <CAOesGMj47EZ1Zjc41VV2D-cM5XUsK28PDF-jSHKUkkind32ZRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy,
+On Mon, Nov 21, 2016 at 8:27 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> Hi Olof,
+>
+> On Mon, Nov 21, 2016 at 5:19 PM, Olof Johansson <olof@lixom.net> wrote:
+>> On Mon, Nov 21, 2016 at 1:31 AM, Geert Uytterhoeven
+>> <geert@linux-m68k.org> wrote:
+>>> On Sat, Nov 19, 2016 at 2:28 AM, Olof Johansson <olof@lixom.net> wrote:
+>>>> On Thu, Nov 17, 2016 at 02:34:25PM +0100, Simon Horman wrote:
+>>>>> Please consider these second round of Renesas ARM based SoC updates for v4.10.
+>>>
+>>>>> * Basic support for r8a7745 SoC
+>>>>>
+>>>>> ----------------------------------------------------------------
+>>>>> Sergei Shtylyov (2):
+>>>>>       ARM: shmobile: r8a7745: basic SoC support
+>>>>>       ARM: shmobile: document SK-RZG1E board
+>>>>
+>>>> Is there a reason you're adding a config option per SoC?
+>>>>
+>>>> I think you'd be better off not adding these config options, and just adding
+>>>> support for the SoCs through compatibles (and adding the drivers to defconfigs,
+>>>> etc).
+>>>
+>>> Yes there is a reason: kernel size.
+>>> The main offenders are the pinctrl tables, which add ca. 20-50 KiB per
+>>> supported SoC.
+>>
+>> So don't turn on that pinctrl driver unless you have that SoC?
+>
+> The enablement of the pinctrl driver (and the clock driver, FWIW) is controlled
+> by the SoC Kconfig symbol. If you want support for the SoC, you want the
+> pinctrl driver, too.
+>
 
-Jeremy Linton <jeremy.linton@arm.com> writes:
+Oh, that's trivial to fix! Do as almost all other SoCs do, and don't
+use silent options.
 
-> This patch expands and reworks the patches published by Mark Salter
-> in order to clean up a few of the previous review comments, as well as
-> add support for newer CPUs and big/little configurations.
->
-> v10:
-> - Rebase to 4.9
-> - Rework the arm_perf_start_cpu changes to support the 4.9 hotplug
->   changes.
-> - Remove the call to acpi_register_gsi() from the cpu online code path.
->   Instead the GSI's are registered during the initcall. This changes
->   the error handling a bit because we now try to clean up the
->   previously registered GSIs in a couple important places. This
->   was also a result of the rebase.
-> - Dropped the MIDR partnumber usage, its no longer necessary to
->   differentiate by only the partnum, so this helps to clarify the code
->   a bit. 
-> - Shuffle some code around and rename a few variables.
-> - Added a few comments to hopefully clarify some questions people have
->   previously had about unused MADT entries, skipping processing cores
->   with MIDR=0, etc.
->
 
-I've had a look at the code and tested the patches on a Juno and a
-Seattle based system I have and the pmus seem to be behaving themselves.
-
-FWIW,
-
-Acked-by: Punit Agrawal <punit.agrawal@arm.com>
-
-Tested-by: Punit Agrawal <punit.agrawal@arm.com>
-
-> v9:
-> - Add/cleanup an additional hotplug patch I've had sitting around. This
->   patch brings the ACPI PMU mostly on par with the DT functionality with
->   respect to having CPUs offline during boot. This should help clarify
->   some of the code structuring.
-> - Cleanup the list of PMU types early if we fail to allocate memory for an
->   additional pmu type.
->
-> v8:
-> - Rebase to 4.8rc4
-> - Assorted minor comment/hunk placement/etc tweaks per Punit Agrawal
->
-> v7:
-> - Rebase to 4.8rc3
-> - Remove cpu affinity sysfs entry. While providing a CPU mask for
->   ARMv8 PMU's is really helpful in big/little environments, reworking
->   the PMU code to support the cpumask attribute for !arm64 PMUs is out
->   of the scope of this patch set.
-> - Fix CPU miscount problem where an alloc failure followed by successfully
->   allocating the structure can result in under counting the CPUs associated
->   with the PMU. This bug was created in v6 with the conversion to a linked
->   list.
-> -  Remove initial platform device creation code by Mark Salter, and re-squash
->    multiple platform device creation code together with helper routines.
->    Other minor tweakage.
->
-> v6:
-> - Added cpu affinity sysfs entry
-> - Converted pmu_types array, to linked list
-> - Restrict use of the armv8_pmu_probe_table to ACPI systems
-> - Rename MADT parsing routines in smp.c
-> - Convert sysfs PMU name to use index rather than partnum
-> - Remove pr_devel statements
-> - Other Minor cleanups
-> - Add Partial Ack-by Will Deacon
->
-> v5:
-> - Remove list of CPU types for ACPI systems. We now match a generic
->   event list, and use the PMCIED[01] to select events which exist on
->   the given PMU. This avoids the need to update the kernel every time
->   a new CPU is released.
-> - Update the maintainers list to include the new file.
->
-> v4:
-> - Correct build issues with ARM (!ARM64) kernels.
-> - Add ThunderX to list of PMU types.
->
-> v3:
-> - Enable ARM performance monitoring units on ACPI/arm64 machines.
->
-> Jeremy Linton (5):
->   arm64: Rename the common MADT parse routine
->   arm: arm64: Add routine to determine cpuid of other cpus
->   arm: arm64: pmu: Assign platform PMU CPU affinity
->   arm64: pmu: Detect and enable multiple PMUs in an ACPI system
->   arm: pmu: Add PMU definitions for cores not initially online
->
-> Mark Salter (1):
->   arm64: pmu: Cache PMU interrupt numbers from MADT parse
->
->  arch/arm/include/asm/cputype.h   |   2 +
->  arch/arm64/include/asm/cputype.h |   3 +
->  arch/arm64/kernel/smp.c          |  18 ++-
->  drivers/perf/Kconfig             |   4 +
->  drivers/perf/Makefile            |   1 +
->  drivers/perf/arm_pmu.c           | 107 +++++++++++++--
->  drivers/perf/arm_pmu_acpi.c      | 272 +++++++++++++++++++++++++++++++++++++++
->  include/linux/perf/arm_pmu.h     |  11 ++
->  8 files changed, 400 insertions(+), 18 deletions(-)
->  create mode 100644 drivers/perf/arm_pmu_acpi.c
+-Olof
