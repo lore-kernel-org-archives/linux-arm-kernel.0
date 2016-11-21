@@ -1,28 +1,28 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 21 Nov 2016 13:05:43 +0100
-Subject: [PATCH 14/18] arm64: dts: m3ulcb: enable SDHI2
+Date: Mon, 21 Nov 2016 13:05:44 +0100
+Subject: [PATCH 15/18] arm64: dts: h3ulcb: enable SDHI2
 In-Reply-To: <cover.1479726397.git.horms+renesas@verge.net.au>
 References: <cover.1479726397.git.horms+renesas@verge.net.au>
-Message-ID: <fd51baee7abc388916b3e3b58dc062ef9c534150.1479726397.git.horms+renesas@verge.net.au>
+Message-ID: <274dc8916d4b4b2f6a2636e670771c806a7e6a96.1479726397.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 
-This supports SDHI2 for M3ULCB onboard eMMC
+This supports SDHI2 for H3ULCB onboard eMMC
 
 Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts | 43 ++++++++++++++++++++++++++
+ arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 43 ++++++++++++++++++++++++++
  1 file changed, 43 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
-index d209e5480ff6..c3f064ac2cb4 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
-@@ -55,6 +55,24 @@
- 		};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+index f178fe1730de..8d0ac076d8e2 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+@@ -62,6 +62,24 @@
+ 		clock-frequency = <24576000>;
  	};
  
 +	reg_1p8v: regulator0 {
@@ -46,11 +46,10 @@ index d209e5480ff6..c3f064ac2cb4 100644
  	vcc_sdhi0: regulator-vcc-sdhi0 {
  		compatible = "regulator-fixed";
  
-@@ -113,6 +131,18 @@
- 		function = "sdhi0";
+@@ -157,6 +175,18 @@
  		power-source = <1800>;
  	};
-+
+ 
 +	sdhi2_pins: sd2 {
 +		groups = "sdhi2_data8", "sdhi2_ctrl";
 +		function = "sdhi2";
@@ -62,10 +61,11 @@ index d209e5480ff6..c3f064ac2cb4 100644
 +		function = "sdhi2";
 +		power-source = <1800>;
 +	};
- };
- 
- &sdhi0 {
-@@ -128,6 +158,19 @@
++
+ 	sound_pins: sound {
+ 		groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data_a";
+ 		function = "ssi";
+@@ -273,6 +303,19 @@
  	status = "okay";
  };
  
@@ -82,8 +82,8 @@ index d209e5480ff6..c3f064ac2cb4 100644
 +	status = "okay";
 +};
 +
- &scif2 {
- 	pinctrl-0 = <&scif2_pins>;
- 	pinctrl-names = "default";
+ &ssi1 {
+ 	shared-pin;
+ };
 -- 
 2.7.0.rc3.207.g0ac5344
