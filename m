@@ -1,92 +1,83 @@
-From: ahaslam@baylibre.com (Axel Haslam)
-Date: Mon, 21 Nov 2016 17:15:41 +0100
-Subject: [PATCH 3/3] ARM: davinci: hawk: use gpio descriptor for card detect
-In-Reply-To: <20161121161541.27048-1-ahaslam@baylibre.com>
-References: <20161121161541.27048-1-ahaslam@baylibre.com>
-Message-ID: <20161121161541.27048-4-ahaslam@baylibre.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 21 Nov 2016 17:16:33 +0100
+Subject: [RFC PATCH net v2 2/3] dt: bindings: add ethernet phy
+ eee-disable-advert option documentation
+In-Reply-To: <20161121160149.GF1922@lunn.ch>
+References: <1479742524-30222-1-git-send-email-jbrunet@baylibre.com>
+ <1479742524-30222-3-git-send-email-jbrunet@baylibre.com>
+ <20161121160149.GF1922@lunn.ch>
+Message-ID: <1479744993.17538.85.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the mmc driver is polling the gpio to know if the
-card was removed.
+On Mon, 2016-11-21 at 17:01 +0100, Andrew Lunn wrote:
+> On Mon, Nov 21, 2016 at 04:35:23PM +0100, Jerome Brunet wrote:
+> > 
+> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> > ---
+> > ?Documentation/devicetree/bindings/net/phy.txt | 5 +++++
+> > ?1 file changed, 5 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/net/phy.txt
+> > b/Documentation/devicetree/bindings/net/phy.txt
+> > index bc1c3c8bf8fa..7f066b7c1e2c 100644
+> > --- a/Documentation/devicetree/bindings/net/phy.txt
+> > +++ b/Documentation/devicetree/bindings/net/phy.txt
+> > @@ -35,6 +35,11 @@ Optional Properties:
+> > ?- broken-turn-around: If set, indicates the PHY device does not
+> > correctly
+> > ???release the turn around line low at the end of a MDIO
+> > transaction.
+> > ?
+> > +- eee-advert-disable: Bits to clear in the MDIO_AN_EEE_ADV
+> > register to
+> > +??disable EEE modes. Example
+> > +????* 0x4: disable EEE for 1000T,
+> > +????* 0x6: disable EEE for 100TX and 1000T
+> > +
+> 
+> Hi Jerome
+> 
+> I like the direction this patchset is taking. But hex values are
+> pretty unfriendly. 
 
-By using a gpio descriptor instead of the platform callbacks, the
-driver will be able to register the gpio with the mmc core with API's
-designed for this purpose.
+Agreed
 
-This has the advantage that an irq will be registered,
-and polling is no longer needed. Also, platform callbacks can be removed.
+> Please add a set of boolean properties, and do the
+> mapping to hex in the C code.
+> 
+> That would also make extending this API easier. e.g. say you have a
+> 10Gbps PHY with EEE, and you need to disable it. This hex value
+> quickly gets ugly, eee-advert-disable-10000 is nice and simple.
 
-Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
----
- arch/arm/mach-davinci/board-omapl138-hawk.c | 25 +++++++++++--------------
- 1 file changed, 11 insertions(+), 14 deletions(-)
+What I did not realize when doing this patch for the realtek driver is
+that there is already 6 valid modes defined in the kernel
 
-diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-index ddc312d..8e4f2102 100644
---- a/arch/arm/mach-davinci/board-omapl138-hawk.c
-+++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-@@ -15,6 +15,7 @@
- #include <linux/gpio.h>
- #include <linux/platform_data/gpio-davinci.h>
- #include <linux/regulator/machine.h>
-+#include <linux/gpio/machine.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -25,7 +26,6 @@
- #include <mach/mux.h>
- 
- #define HAWKBOARD_PHY_ID		"davinci_mdio-0:07"
--#define DA850_HAWK_MMCSD_CD_PIN		GPIO_TO_PIN(4, 0)
- 
- #define DA850_USB1_VBUS_PIN		GPIO_TO_PIN(2, 4)
- #define DA850_USB1_OC_PIN		GPIO_TO_PIN(6, 13)
-@@ -122,13 +122,16 @@ static const short hawk_mmcsd0_pins[] = {
- 	-1
- };
- 
--static int da850_hawk_mmc_get_cd(int index)
--{
--	return !gpio_get_value(DA850_HAWK_MMCSD_CD_PIN);
--}
-+static struct gpiod_lookup_table mmc_gpios_table = {
-+	.dev_id = "da830-mmc.0",
-+	.table = {
-+		/* gpio4_0: chip 2 contains gpio range 64-95 */
-+		GPIO_LOOKUP("davinci_gpio.2", 0, "cd",
-+				GPIO_ACTIVE_LOW),
-+	},
-+};
- 
- static struct davinci_mmc_config da850_mmc_config = {
--	.get_cd		= da850_hawk_mmc_get_cd,
- 	.wires		= 4,
- 	.max_freq	= 50000000,
- 	.caps		= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
-@@ -144,13 +147,7 @@ static __init void omapl138_hawk_mmc_init(void)
- 		return;
- 	}
- 
--	ret = gpio_request_one(DA850_HAWK_MMCSD_CD_PIN,
--			GPIOF_DIR_IN, "MMC CD");
--	if (ret < 0) {
--		pr_warn("%s: can not open GPIO %d\n",
--			__func__, DA850_HAWK_MMCSD_CD_PIN);
--		return;
--	}
-+	gpiod_add_lookup_table(&mmc_gpios_table);
- 
- 	ret = da8xx_register_mmcsd0(&da850_mmc_config);
- 	if (ret) {
-@@ -161,7 +158,7 @@ static __init void omapl138_hawk_mmc_init(void)
- 	return;
- 
- mmc_setup_mmcsd_fail:
--	gpio_free(DA850_HAWK_MMCSD_CD_PIN);
-+	gpiod_remove_lookup_table(&mmc_gpios_table);
- }
- 
- static irqreturn_t omapl138_hawk_usb_ocic_irq(int irq, void *dev_id);
--- 
-2.9.3
+#define MDIO_EEE_100TX		MDIO_AN_EEE_ADV_100TX	/*
+100TX EEE cap */
+#define MDIO_EEE_1000T		MDIO_AN_EEE_ADV_1000T	/*
+1000T EEE cap */
+#define MDIO_EEE_10GT		0x0008	/* 10GT EEE cap */
+#define MDIO_EEE_1000KX		0x0010	/* 1000KX EEE cap
+*/
+#define MDIO_EEE_10GKX4		0x0020	/* 10G KX4 EEE cap
+*/
+#define MDIO_EEE_10GKR		0x0040	/* 10G KR EEE cap
+*/
+
+I took care of only 2 in the case of realtek.c since it only support
+MDIO_EEE_100TX and MDIO_EEE_1000T.
+
+Defining a property for each is certainly doable but it does not look
+very nice either. If it extends in the future, it will get even more
+messier, especially if you want to disable everything.
+
+What do you think about keeping a single mask value but use the define
+above in the DT ? It would be more readable than hex and easy to
+extend, don't you think ?
+
+These defines are already part of the uapi so I guess we can use those
+in the DT bindings ?
+
+> 
+> 	Andrew
