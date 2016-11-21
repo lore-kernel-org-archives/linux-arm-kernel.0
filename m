@@ -1,83 +1,45 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 21 Nov 2016 17:16:33 +0100
-Subject: [RFC PATCH net v2 2/3] dt: bindings: add ethernet phy
- eee-disable-advert option documentation
-In-Reply-To: <20161121160149.GF1922@lunn.ch>
-References: <1479742524-30222-1-git-send-email-jbrunet@baylibre.com>
- <1479742524-30222-3-git-send-email-jbrunet@baylibre.com>
- <20161121160149.GF1922@lunn.ch>
-Message-ID: <1479744993.17538.85.camel@baylibre.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 21 Nov 2016 08:19:47 -0800
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.10
+In-Reply-To: <CAMuHMdXAuDcbr84phfPRpqZYRzAZf2j4vsv+i_Frz0G8ksd_Vg@mail.gmail.com>
+References: <cover.1479387356.git.horms+renesas@verge.net.au>
+ <20161119012836.GA2543@localhost>
+ <CAMuHMdXAuDcbr84phfPRpqZYRzAZf2j4vsv+i_Frz0G8ksd_Vg@mail.gmail.com>
+Message-ID: <CAOesGMjk=KWifGT7sugpWVjNJSKhmgxg8gN9Cgi=emGrg66z0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-11-21 at 17:01 +0100, Andrew Lunn wrote:
-> On Mon, Nov 21, 2016 at 04:35:23PM +0100, Jerome Brunet wrote:
-> > 
-> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> > ---
-> > ?Documentation/devicetree/bindings/net/phy.txt | 5 +++++
-> > ?1 file changed, 5 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/net/phy.txt
-> > b/Documentation/devicetree/bindings/net/phy.txt
-> > index bc1c3c8bf8fa..7f066b7c1e2c 100644
-> > --- a/Documentation/devicetree/bindings/net/phy.txt
-> > +++ b/Documentation/devicetree/bindings/net/phy.txt
-> > @@ -35,6 +35,11 @@ Optional Properties:
-> > ?- broken-turn-around: If set, indicates the PHY device does not
-> > correctly
-> > ???release the turn around line low at the end of a MDIO
-> > transaction.
-> > ?
-> > +- eee-advert-disable: Bits to clear in the MDIO_AN_EEE_ADV
-> > register to
-> > +??disable EEE modes. Example
-> > +????* 0x4: disable EEE for 1000T,
-> > +????* 0x6: disable EEE for 100TX and 1000T
-> > +
-> 
-> Hi Jerome
-> 
-> I like the direction this patchset is taking. But hex values are
-> pretty unfriendly. 
+On Mon, Nov 21, 2016 at 1:31 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> Hi Olof,
+>
+> On Sat, Nov 19, 2016 at 2:28 AM, Olof Johansson <olof@lixom.net> wrote:
+>> On Thu, Nov 17, 2016 at 02:34:25PM +0100, Simon Horman wrote:
+>>> Please consider these second round of Renesas ARM based SoC updates for v4.10.
+>
+>>> * Basic support for r8a7745 SoC
+>>>
+>>> ----------------------------------------------------------------
+>>> Sergei Shtylyov (2):
+>>>       ARM: shmobile: r8a7745: basic SoC support
+>>>       ARM: shmobile: document SK-RZG1E board
+>>
+>> Hi,
+>>
+>> Is there a reason you're adding a config option per SoC?
+>>
+>> I think you'd be better off not adding these config options, and just adding
+>> support for the SoCs through compatibles (and adding the drivers to defconfigs,
+>> etc).
+>
+> Yes there is a reason: kernel size.
+> The main offenders are the pinctrl tables, which add ca. 20-50 KiB per
+> supported SoC.
 
-Agreed
+So don't turn on that pinctrl driver unless you have that SoC?
 
-> Please add a set of boolean properties, and do the
-> mapping to hex in the C code.
-> 
-> That would also make extending this API easier. e.g. say you have a
-> 10Gbps PHY with EEE, and you need to disable it. This hex value
-> quickly gets ugly, eee-advert-disable-10000 is nice and simple.
+> Note that RZ/A1 (r7s72100) is used on some boards with its internal RAM
+> (10 MiB) only.
 
-What I did not realize when doing this patch for the realtek driver is
-that there is already 6 valid modes defined in the kernel
 
-#define MDIO_EEE_100TX		MDIO_AN_EEE_ADV_100TX	/*
-100TX EEE cap */
-#define MDIO_EEE_1000T		MDIO_AN_EEE_ADV_1000T	/*
-1000T EEE cap */
-#define MDIO_EEE_10GT		0x0008	/* 10GT EEE cap */
-#define MDIO_EEE_1000KX		0x0010	/* 1000KX EEE cap
-*/
-#define MDIO_EEE_10GKX4		0x0020	/* 10G KX4 EEE cap
-*/
-#define MDIO_EEE_10GKR		0x0040	/* 10G KR EEE cap
-*/
-
-I took care of only 2 in the case of realtek.c since it only support
-MDIO_EEE_100TX and MDIO_EEE_1000T.
-
-Defining a property for each is certainly doable but it does not look
-very nice either. If it extends in the future, it will get even more
-messier, especially if you want to disable everything.
-
-What do you think about keeping a single mask value but use the define
-above in the DT ? It would be more readable than hex and easy to
-extend, don't you think ?
-
-These defines are already part of the uapi so I guess we can use those
-in the DT bindings ?
-
-> 
-> 	Andrew
+-Olof
