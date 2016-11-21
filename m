@@ -1,39 +1,44 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 21 Nov 2016 15:01:57 +0900
-Subject: [PATCH v2] ARM: Drop fixed 200 Hz timer requirement from Samsung
- platforms
-In-Reply-To: <22757093.ejshJp9T7L@wuerfel>
-References: <1479453418-25314-1-git-send-email-krzk@kernel.org>
- <22757093.ejshJp9T7L@wuerfel>
-Message-ID: <CA+Ln22GyRwywcxdO4Gp67d8TfpjfNzaE0z25=WW9GWibjGkDuQ@mail.gmail.com>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Mon, 21 Nov 2016 11:24:00 +0530
+Subject: [PATCH v2 0/4] Fixes for Vybrid SPI DMA implementation
+Message-ID: <cover.1479706671.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-11-18 17:46 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> Maybe add a paragraph about the specific problem:
->
-> "On s3c24xx, the PWM counter is only 16 bit wide, and with the
-> typical 12MHz input clock that overflows every 5.5ms. This works
-> with HZ=200 or higher but not with HZ=100 which needs a 10ms
-> interval between ticks. On Later chips (S3C64xx, S5P and EXYNOS),
-> the counter is 32 bits and does not have this problem.
-> The new samsung_pwm_timer driver solves the problem by scaling
-> the input clock by a factor of 50 on s3c24xx, which makes it
-> less accurate but allows HZ=100 as well as CONFIG_NO_HZ with
-> fewer wakeups".
+Hello,
 
-One thing to correct here is that the typical clock is PCLK, which is
-derived from one of the PLLs and AFAIR is between 33-66 MHz on
-s3c24xx. Technically you can drive the PWM block from an external
-clock (12 MHz for some board-file based boards), but for simplicity
-this functionality was omitted in the new PWM timer driver used for DT
-boards (which worked fine with the PWM driven by PCLK).
+The following set of patches have fixes for Vybrid SPI DMA
+implementation along with some minor clean ups requested
+at time when v3 version of SPI DMA support patch was accepted.
 
-Also I'm wondering if the divisor we use right now for 16-bit timers
-isn't too small, since it gives us a really short wraparound time,
-which means getting more timer interrupts for longer intervals, kind
-of defeating the benefit of tickless mode. However, AFAICT it doesn't
-affect the HZ problem.
+This series of patches is based on top of branch topic/fsl-dspi.
+http://git.kernel.org/cgit/linux/kernel/git/broonie/spi.git/log/?h=topic/fsl-dspi
 
-Best regards.
-Tomasz
+The patches have been tested on a Toradex Colibri Vybrid VF61 module
+and now incoporate feedback from Stefan on version 1 of patchset.
+
+Changes since v1:
+1. Place the continuous selection format patch second in order and remove
+code duplication
+2. Improve the use of curr_xfer_len and instead of converting from bytes
+to DMA transfers in every use, do it at a single place. Accordingly change
+it's use at other places
+3. Code cleanup patch has less to clean with change above 
+
+v1:
+http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1274632.html
+
+Thanks & Regards,
+Sanchayan.
+
+Sanchayan Maity (4):
+  spi: spi-fsl-dspi: Fix SPI transfer issue when using multiple SPI_IOC_MESSAGE
+  spi: spi-fsl-dspi: Fix continuous selection format
+  spi: spi-fsl-dspi: Fix incorrect DMA setup
+  spi: spi-fsl-dspi: Minor code cleanup and error path fixes
+
+ drivers/spi/spi-fsl-dspi.c | 71 ++++++++++++++++++++++++++++------------------
+ 1 file changed, 44 insertions(+), 27 deletions(-)
+
+-- 
+2.10.2
