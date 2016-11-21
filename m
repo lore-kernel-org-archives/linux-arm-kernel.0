@@ -1,36 +1,60 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Mon, 21 Nov 2016 10:23:08 -0600
-Subject: [GIT PULL 1/2] SoCFPGA DTS update for v4.10, part 3
-Message-ID: <20161121162309.5408-1-dinguyen@kernel.org>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 22 Nov 2016 00:24:19 +0800
+Subject: [PATCH v2 1/3] ARM: sunxi: add support for H2+ SoC
+Message-ID: <20161121162421.800-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, and Olof:
+Allwinner H2+ is a quad-core Cortex-A7 SoC.
 
-Please pull in this DTS update for v4.10.
+It is very like H3, that they share the same SoC ID (0x1680), and H3
+memory maps as well as drivers works well on the SoC.
 
-Thanks,
-Dinh
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+ Documentation/arm/sunxi/README                  | 4 ++++
+ Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+ arch/arm/mach-sunxi/sunxi.c                     | 1 +
+ 3 files changed, 6 insertions(+)
 
-The following changes since commit d837a80d19505d74ee5941eebf9dd53fed6f36a6:
-
-  ARM: dts: socfpga: add nand controller nodes (2016-11-09 12:40:52 -0600)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_dts_for_v4.10_part_3
-
-for you to fetch changes up to 7c38dc624bc49d83d84c185e2ca14adf352c5eaa:
-
-  ARM: dts: socfpga: fine-tune L2 cache configuration (2016-11-21 09:23:31 -0600)
-
-----------------------------------------------------------------
-SoCFPGA DTS update for v4.10, part 3
-- Fine tune L2 cache configuration
-
-----------------------------------------------------------------
-Marek Vasut (1):
-      ARM: dts: socfpga: fine-tune L2 cache configuration
-
- arch/arm/boot/dts/socfpga.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+index cd02433..1fe4d99c 100644
+--- a/Documentation/arm/sunxi/README
++++ b/Documentation/arm/sunxi/README
+@@ -63,6 +63,10 @@ SunXi family
+         + User Manual
+           http://dl.linux-sunxi.org/A33/A33%20user%20manual%20release%201.1.pdf
+ 
++      - Allwinner H2+ (sun8i)
++        + No document available now, but is known to be working properly with
++          H3 drivers and memory map.
++
+       - Allwinner H3 (sun8i)
+         + Datasheet
+           http://dl.linux-sunxi.org/H3/Allwinner_H3_Datasheet_V1.0.pdf
+diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+index 4d6467c..26b35a7 100644
+--- a/Documentation/devicetree/bindings/arm/sunxi.txt
++++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+@@ -13,6 +13,7 @@ using one of the following compatible strings:
+   allwinner,sun8i-a33
+   allwinner,sun8i-a83t
+   allwinner,sun8i-h3
++  allwinner,sun8i-h2plus
+   allwinner,sun9i-a80
+   allwinner,sun50i-a64
+   nextthing,gr8
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 2e2bde2..3647ad7 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -63,6 +63,7 @@ static const char * const sun8i_board_dt_compat[] = {
+ 	"allwinner,sun8i-a23",
+ 	"allwinner,sun8i-a33",
+ 	"allwinner,sun8i-a83t",
++	"allwinner,sun8i-h2plus",
+ 	"allwinner,sun8i-h3",
+ 	NULL,
+ };
+-- 
+2.10.2
