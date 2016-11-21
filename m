@@ -1,54 +1,48 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Mon, 21 Nov 2016 10:17:46 +0800
-Subject: [PATCH v2.1 7/9] arm64: dts: rockchip: add pd_edp node for rk3399
-In-Reply-To: <1478697721-2323-1-git-send-email-wxt@rock-chips.com>
-References: <1478697721-2323-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1479694666-4384-1-git-send-email-wxt@rock-chips.com>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Mon, 21 Nov 2016 10:24:44 +0800
+Subject: [PATCH V8 3/3] stm: Mark the functions of writing buffer with
+ notrace
+In-Reply-To: <871sy8g83q.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1479438454-28650-1-git-send-email-zhang.chunyan@linaro.org>
+ <1479438454-28650-4-git-send-email-zhang.chunyan@linaro.org>
+ <871sy8g83q.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <CAG2=9p_X4GD7w4FdTK3M_3OZ1-KDSP__qOKoM5FGaxk07ERqbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: zhangqing <zhangqing@rock-chips.com>
+On 18 November 2016 at 22:45, Alexander Shishkin
+<alexander.shishkin@linux.intel.com> wrote:
+> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
+>
+>> If CONFIG_STM_SOURCE_FTRACE is selected, Function trace data can be writen
+>> to sink via STM, all functions that related to writing data packets to
+>> STM should be marked 'notrace' to avoid being traced by Ftrace, otherwise
+>> the program would stall into an endless loop.
+>>
+>> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+>> Acked-by: Steven Rostedt <rostedt@goodmis.org>
+>> ---
+>>  drivers/hwtracing/coresight/coresight-stm.c |  2 +-
+>>  drivers/hwtracing/intel_th/sth.c            | 11 +++++++----
+>>  drivers/hwtracing/stm/core.c                |  7 ++++---
+>>  drivers/hwtracing/stm/dummy_stm.c           |  2 +-
+>>  include/linux/stm.h                         |  4 ++--
+>>  5 files changed, 15 insertions(+), 11 deletions(-)
+>
+> Quick nit: can you please split this one in 4: one for Coresight, one
+> for Intel TH, one for stm/dummy and one for stm/core?
 
-This patch adds the below pd_edp information for rk3399.
-1. add pd_edp node for RK3399 SoC
-2. add the pd support for edp
+Sure, will do.
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Reviewed-by: Doug Anderson <dianders@chromium.org>
----
+>
+> I'd like to keep the bisectability. Otherwise, this is fine by me:
+>
+> Acked-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 
-Changes in v2.1: (Hope the v3 will fix the display stuff with upstream)
-- change the commit message as Doug comments on
-  https://patchwork.kernel.org/patch/9419241
+Thanks,
+Chunyan
 
-Changes in v2: None
-
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index db72033..7354c63 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -838,6 +838,10 @@
- 			};
- 
- 			/* These power domains are grouped by VD_LOGIC */
-+			pd_edp at RK3399_PD_EDP {
-+				reg = <RK3399_PD_EDP>;
-+				clocks = <&cru PCLK_EDP_CTRL>;
-+			};
- 			pd_emmc at RK3399_PD_EMMC {
- 				reg = <RK3399_PD_EMMC>;
- 				clocks = <&cru ACLK_EMMC>;
-@@ -1388,6 +1392,7 @@
- 		status = "disabled";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&edp_hpd>;
-+		power-domains = <&power RK3399_PD_EDP>;
- 
- 		ports {
- 			#address-cells = <1>;
--- 
-2.7.4
+>
+> Regards,
+> --
+> Alex
