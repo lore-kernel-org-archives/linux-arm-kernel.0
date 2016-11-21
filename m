@@ -1,74 +1,35 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Mon, 21 Nov 2016 11:24:04 +0530
-Subject: [PATCH v2 4/4] spi: spi-fsl-dspi: Minor code cleanup and error path
- fixes
+Date: Mon, 21 Nov 2016 11:24:02 +0530
+Subject: [PATCH v2 2/4] spi: spi-fsl-dspi: Fix continuous selection format
 In-Reply-To: <cover.1479706671.git.maitysanchayan@gmail.com>
 References: <cover.1479706671.git.maitysanchayan@gmail.com>
-Message-ID: <971874d8e662622c0cfe478adaa4c75b08388d0e.1479706671.git.maitysanchayan@gmail.com>
+Message-ID: <1317eff8a40789c47311c219d9cfb4105863bd9f.1479706671.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code cleanup for improving code readability and error path fixes
-and cleanup removing use of devm_kfree.
+Current DMA implementation was not handling the continuous selection
+format viz. SPI chip select would be deasserted even between sequential
+serial transfers. Use the cs_change variable and correctly set or
+reset the CONT bit accordingly for case where peripherals require
+the chip select to be asserted between sequential transfers.
 
 Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 ---
- drivers/spi/spi-fsl-dspi.c | 22 ++++++++++++++++------
- 1 file changed, 16 insertions(+), 6 deletions(-)
+ drivers/spi/spi-fsl-dspi.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
-index 08882f7..2987a16 100644
+index b1ee1f5..41422cd 100644
 --- a/drivers/spi/spi-fsl-dspi.c
 +++ b/drivers/spi/spi-fsl-dspi.c
-@@ -226,8 +226,10 @@ static void dspi_rx_dma_callback(void *arg)
- 	if (!(dspi->dataflags & TRAN_STATE_RX_VOID)) {
- 		for (i = 0; i < dma->curr_xfer_len; i++) {
- 			d = dspi->dma->rx_dma_buf[i];
--			rx_word ? (*(u16 *)dspi->rx = d) :
--						(*(u8 *)dspi->rx = d);
-+			if (rx_word)
-+				*(u16 *)dspi->rx = d;
-+			else
-+				*(u8 *)dspi->rx = d;
- 			dspi->rx += rx_word + 1;
- 		}
- 	}
-@@ -247,14 +249,20 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
- 	tx_word = is_double_byte_mode(dspi);
- 
- 	for (i = 0; i < dma->curr_xfer_len - 1; i++) {
--		val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
-+		if (tx_word)
-+			val = *(u16 *) dspi->tx;
-+		else
-+			val = *(u8 *) dspi->tx;
- 		dspi->dma->tx_dma_buf[i] =
- 			SPI_PUSHR_TXDATA(val) | SPI_PUSHR_PCS(dspi->cs) |
- 			SPI_PUSHR_CTAS(0) | SPI_PUSHR_CONT;
- 		dspi->tx += tx_word + 1;
- 	}
- 
--	val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
-+	if (tx_word)
-+		val = *(u16 *) dspi->tx;
-+	else
-+		val = *(u8 *) dspi->tx;
+@@ -261,6 +261,8 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
  	dspi->dma->tx_dma_buf[i] = SPI_PUSHR_TXDATA(val) |
  					SPI_PUSHR_PCS(dspi->cs) |
  					SPI_PUSHR_CTAS(0);
-@@ -430,9 +438,11 @@ static int dspi_request_dma(struct fsl_dspi *dspi, phys_addr_t phy_addr)
- 	return 0;
++	if (!dspi->cs_change)
++		dspi->dma->tx_dma_buf[i] |= SPI_PUSHR_CONT;
+ 	dspi->tx += tx_word + 1;
  
- err_slave_config:
--	devm_kfree(dev, dma->rx_dma_buf);
-+	dma_free_coherent(dev, DSPI_DMA_BUFSIZE,
-+			dma->rx_dma_buf, dma->rx_dma_phys);
- err_rx_dma_buf:
--	devm_kfree(dev, dma->tx_dma_buf);
-+	dma_free_coherent(dev, DSPI_DMA_BUFSIZE,
-+			dma->tx_dma_buf, dma->tx_dma_phys);
- err_tx_dma_buf:
- 	dma_release_channel(dma->chan_tx);
- err_tx_channel:
+ 	dma->tx_desc = dmaengine_prep_slave_single(dma->chan_tx,
 -- 
 2.10.2
