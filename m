@@ -1,203 +1,88 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 21 Nov 2016 10:12:19 +0000
-Subject: [PATCH 8/9] mfd: wm97xx-core: core support for wm97xx Codec
-In-Reply-To: <87twb3r94s.fsf@belgarion.home>
-References: <1477510907-23495-1-git-send-email-robert.jarzmik@free.fr>
- <1477510907-23495-9-git-send-email-robert.jarzmik@free.fr>
- <20161118165040.GB19884@dell.home> <87twb3r94s.fsf@belgarion.home>
-Message-ID: <20161121101219.GB32509@dell>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 21 Nov 2016 11:16:01 +0100
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Drivers Updates
+ for v4.10
+In-Reply-To: <20161119013551.GB2543@localhost>
+References: <cover.1479389981.git.horms+renesas@verge.net.au>
+ <20161119013551.GB2543@localhost>
+Message-ID: <CAMuHMdVVD2w-Hr8o5CzZYzJ74cDybwwTGmUGJzco_WgtbqKv2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark, please see below:
+Hi Olof,
 
-On Sat, 19 Nov 2016, Robert Jarzmik wrote:
-> Lee Jones <lee.jones@linaro.org> writes:
-> 
-> >> +#define WM9705_VENDOR_ID 0x574d4c05
-> >> +#define WM9712_VENDOR_ID 0x574d4c12
-> >> +#define WM9713_VENDOR_ID 0x574d4c13
-> >> +#define WM97xx_VENDOR_ID_MASK 0xffffffff
-> >
-> > These are probably better represented as enums.
-> These are ids, just as devicetree ids, or PCI ids, I don't think an enum will
-> fit.
+On Sat, Nov 19, 2016 at 2:35 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Thu, Nov 17, 2016 at 03:04:35PM +0100, Simon Horman wrote:
+>> Please consider these second round of Renesas ARM based SoC drivers updates for v4.10.
+>>
+>> This pull request is based on a merge of:
+>>
+>> * The previous round of such requests, tagged as renesas-drivers-for-v4.10,
+>>   which you have already pulled.
+>> * The soc-device-match-tag1 tag of Geert Uytterhoeven's renesas-driver's tree.
+>>   This is included to provide core soc_device_match() infrastructure which
+>>   is a dependency of identifying SoC and registering with SoC bus.
+>>
+>>
+>> The following changes since commit 437c4eeb0bd4c1d68817be997716f52b8c22a9c3:
+>>
+>>   Merge tag 'soc-device-match-tag1' of https://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers into HEAD (2016-11-15 14:12:57 +0100)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-drivers2-for-v4.10
+>>
+>> for you to fetch changes up to 63ee9e2ba47dbdb42156c9b940515cfd49e78c91:
+>>
+>>   soc: renesas: Identify SoC and register with the SoC bus (2016-11-17 14:37:20 +0100)
+>>
+>> ----------------------------------------------------------------
+>> Second Round of Renesas ARM Based SoC Drivers Updates for v4.10
+>>
+>> * Identify SoC and register with the SoC bus
+>> * Add support for the r8a7745 SoC to rcar-sysc
+>>
+>> ----------------------------------------------------------------
+>> Geert Uytterhoeven (2):
+>>       ARM: shmobile: Document DT bindings for Product Register
+>>       soc: renesas: Identify SoC and register with the SoC bus
+>>
+>> Sergei Shtylyov (2):
+>>       ARM: shmobile: r8a7745: add power domain index macros
+>>       soc: renesas: rcar-sysc: add R8A7745 support
+>>
+>
+> So, this pull request contains 8 patches, not 4. Seems like your pull
+> request doesn't show any of the code from Geert's branch, didn't mention
+> it in the tag and only in the email text above. Furthermore, Geert's
+> branch modifies driver core code, so it's extra important to make sure
+> it's clear that it's an unusual pull request.
 
-That's fine.  We can use enums to simply group items of a similar
-type.  Representing these as enums would only serve to benefit code
-cleanliness.  What makes you think they won't fit?
+Please accept our apologies for failing to make this clearer.
 
-> >> +struct wm97xx_priv {
-> >> +	struct regmap *regmap;
-> >> +	struct snd_ac97 *ac97;
-> >> +	struct device *dev;
-> >> +};
-> >
-> > Replace _priv with _ddata.
-> Ok, will do, would you care to explain if this is something specific to your mfd
-> tree, or is it a kernel overall recommendation ?
+> Given that this modifies driver core, please either merge that code
+> through Greg first, or get an ack from him. If you merge through him,
+> make sure it's on a standalone topic branch that we can share.
 
-It's personal preference.  But these aren't necessarily private, so
-priv doesn't really make a great deal of sense.  These types of saved
-pointers are better described as device data (ddata).
+I provided my soc-device-match branch (tag soc-device-match-tag1) as an
+immutable base, to be included by all interested parties that need the
+soc_device_match() infrastructure (Freescale/NXP, Samsung, Renesas).
+Its core parts have been acked by Greg, and the fixes by Arnd and/or Greg
+(the last fix only received an informal ack, that's why I hadn't added the
+ack).
+This branch has already been pulled by Ulf, and is present in mmc/next, as
+a dependency for a Freescale/NXP driver update.
 
+I hope my explanation helps. If anything is still unclear, please ask.
+Thanks for reconsidering!
 
-[...]
+Gr{oetje,eeting}s,
 
-> >> +static const struct reg_default wm97xx_reg_defaults[] = {
-> >> +};
-> >
-> > What's the point in this?
-> Ah, that's a reminder I have still more work on this patch ... Either I remove
-> support for wm9705 and wm9712 in the first version, or I complete it and add the
-> tables :
->  - wm9705_reg_defaults
->  - wm9712_reg_defaults
+                        Geert
 
-Please don't add redundant code.  I suggest you remove it for this
-submission.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-> >> +static int wm9705_register(struct wm97xx_priv *wm97xx)
-> >> +{
-> >> +	return 0;
-> >> +}
-> >> +
-> >> +static int wm9712_register(struct wm97xx_priv *wm97xx)
-> >> +{
-> >> +	return 0;
-> >> +}
-> >
-> > I don't get it?
-> >
-> > Either populate or don't provide.
-> Same story as above, either I complete wm9705 and wm9712 support or I remove it.
-
-Remove it please.
-
-> >> +static int wm9713_register(struct wm97xx_priv *wm97xx,
-> >> +			   struct wm97xx_pdata *pdata)
-> >> +{
-> >
-> > What are you lining this up with?
-> Emacs ... I don't see your point though, seeing it not aligned in the diff chunk
-> doesn't mean it's not properly aligned.
-
-That is true.  So the two "scruct"s are line up in the source file,
-right?
-
-[...]
-
-> >> +	codec_pdata.ac97 = wm97xx->ac97;
-> >> +	codec_pdata.regmap = devm_regmap_init_ac97(wm97xx->ac97,
-> >> +						   &wm9713_regmap_config);
-> >> +	codec_pdata.batt_pdata = pdata->batt_pdata;
-> >> +	if (IS_ERR(codec_pdata.regmap))
-> >> +		return PTR_ERR(codec_pdata.regmap);
-> >
-> > This doesn't look like pdata.  You can get rid of all of this hoop
-> > jumping if you add it to ddata and set it as such.
-> You mean I should pass ddata to mfd sub-cells, right ?
-
-Correct.
-
-[...]
-
-> >> +static int wm97xx_ac97_probe(struct ac97_codec_device *adev)
-> >
-> > This looks sound specific.
-> >
-> > Why isn't this a plane platform driver?
-> That's the whole purpose of the patch serie.
-> 
-> This serie transforms the wm97xx drivers from a platform driver model to an ac97
-> model, where the ac97 devices are automatically discovered. The long explanation
-> is in patch 0/9, on how it started and what is the global purpose.
-> 
-> The short story is : switch to the new AC97 bus driver model.
-> 
-> As for the "sound specific part", it's because AC97 bus is mainly used in sound
-> oriented drivers, but still the codec IPs provide more than just sound, as the
-> Wolfson codecs for instance.
-
-I'd like to get Mark Brown's opinion on this.
-
-> >> +{
-> >> +	struct wm97xx_priv *wm97xx;
-> >> +	int ret;
-> >> +	void *pdata = snd_ac97_codec_get_platdata(adev);
-> >> +
-> >> +	wm97xx = devm_kzalloc(ac97_codec_dev2dev(adev),
-> >> +			      sizeof(*wm97xx), GFP_KERNEL);
-> >> +	if (!wm97xx)
-> >> +		return -ENOMEM;
-> >> +
-> >> +	wm97xx->dev = ac97_codec_dev2dev(adev);
-> >> +	wm97xx->ac97 = snd_ac97_compat_alloc(adev);
-> >> +	if (IS_ERR(wm97xx->ac97))
-> >> +		return PTR_ERR(wm97xx->ac97);
-> >> +
-> >> +
-> >> +	ac97_set_drvdata(adev, wm97xx);
-> >> +	dev_info(wm97xx->dev, "wm97xx core found, id=0x%x\n",
-> >> +		 adev->vendor_id);
-> >
-> > All of this ac97/sound stuff should be done in the ac97/sound driver.
-> 
-> Nope, it's not sound adherence you're seeing here, it's ac97 bus and driver
-> model adherence you're seeing. Would the bus be in drivers/ac97 instead of
-> sound/ac97, the code would remain the same, would be bus be i2c you would see
-> the same kind of calls but with i2c_xxx and not ac97_xxx.
-> 
-> The wm97xx needs an ac97 bus to interact with the hardware, to provide sound,
-> gpio, adc, etc ... functions. That's what is expressed here, and the fact that
-> this ac97 access has to shared amongst the mfd sub-cells, and that these cells
-> require :
->  - wm97xx->ac97 : this one is for drivers/input/touchscreen/wm97xx-core.c
-> 
-> So the requirement in this case is not for ac97/sound but input/touchscreen.
-> 
-> >> diff --git a/include/linux/mfd/wm97xx.h b/include/linux/mfd/wm97xx.h
-> >> new file mode 100644
-> >> index 000000000000..627322f14d48
-> >> --- /dev/null
-> >> +++ b/include/linux/mfd/wm97xx.h
-> >> @@ -0,0 +1,31 @@
-> >> +/*
-> >> + * wm97xx client interface
-> >> + *
-> >> + * Copyright (C) 2016 Robert Jarzmik
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License as published by
-> >> + * the Free Software Foundation; either version 2 of the License, or
-> >> + * (at your option) any later version.
-> >> + *
-> >> + * This program is distributed in the hope that it will be useful,
-> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> + * GNU General Public License for more details.
-> >> + */
-> >> +
-> >> +#ifndef __LINUX_MFD_WM97XX_H
-> >> +#define __LINUX_MFD_WM97XX_H
-> >> +
-> >> +struct regmap;
-> >> +struct wm97xx_batt_pdata;
-> >> +struct snd_ac97;
-> >
-> > Why can't you just add the include files?
-> I could, but I don't need to, do I ?
-> Moreover, if a mfd sub-cell doesn't use regmap for example, I won't include a
-> useless define.
-> 
-> Thanks for the review, Lee. This will iterate, I'll split out mfd patch(es) to
-> follow up the review with you and Mark to lessen the burden on your mailbox.
-> 
-> Cheers.
-> 
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
