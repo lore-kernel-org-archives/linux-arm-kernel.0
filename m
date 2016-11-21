@@ -1,53 +1,163 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 Nov 2016 08:35:40 -0800
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.10
-In-Reply-To: <CAMuHMdUhpeiOj6Mjhgt=9R3yuV-HwOAy5AAsDSTDjagRRDtYCw@mail.gmail.com>
-References: <cover.1479387356.git.horms+renesas@verge.net.au>
- <20161119012836.GA2543@localhost>
- <CAMuHMdXAuDcbr84phfPRpqZYRzAZf2j4vsv+i_Frz0G8ksd_Vg@mail.gmail.com>
- <CAOesGMjk=KWifGT7sugpWVjNJSKhmgxg8gN9Cgi=emGrg66z0w@mail.gmail.com>
- <CAMuHMdUhpeiOj6Mjhgt=9R3yuV-HwOAy5AAsDSTDjagRRDtYCw@mail.gmail.com>
-Message-ID: <CAOesGMj47EZ1Zjc41VV2D-cM5XUsK28PDF-jSHKUkkind32ZRA@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 21 Nov 2016 10:47:01 -0600
+Subject: [PATCH] PCI: Add information about describing PCI in ACPI
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F927053@lhreml507-mbx>
+References: <20161117175938.17465.45820.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F921A88@lhreml507-mbx>
+ <20161118175404.GI25762@bhelgaas-glaptop.roam.corp.google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F927053@lhreml507-mbx>
+Message-ID: <20161121164700.GL25762@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2016 at 8:27 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Olof,
->
-> On Mon, Nov 21, 2016 at 5:19 PM, Olof Johansson <olof@lixom.net> wrote:
->> On Mon, Nov 21, 2016 at 1:31 AM, Geert Uytterhoeven
->> <geert@linux-m68k.org> wrote:
->>> On Sat, Nov 19, 2016 at 2:28 AM, Olof Johansson <olof@lixom.net> wrote:
->>>> On Thu, Nov 17, 2016 at 02:34:25PM +0100, Simon Horman wrote:
->>>>> Please consider these second round of Renesas ARM based SoC updates for v4.10.
->>>
->>>>> * Basic support for r8a7745 SoC
->>>>>
->>>>> ----------------------------------------------------------------
->>>>> Sergei Shtylyov (2):
->>>>>       ARM: shmobile: r8a7745: basic SoC support
->>>>>       ARM: shmobile: document SK-RZG1E board
->>>>
->>>> Is there a reason you're adding a config option per SoC?
->>>>
->>>> I think you'd be better off not adding these config options, and just adding
->>>> support for the SoCs through compatibles (and adding the drivers to defconfigs,
->>>> etc).
->>>
->>> Yes there is a reason: kernel size.
->>> The main offenders are the pinctrl tables, which add ca. 20-50 KiB per
->>> supported SoC.
->>
->> So don't turn on that pinctrl driver unless you have that SoC?
->
-> The enablement of the pinctrl driver (and the clock driver, FWIW) is controlled
-> by the SoC Kconfig symbol. If you want support for the SoC, you want the
-> pinctrl driver, too.
->
+On Mon, Nov 21, 2016 at 08:52:52AM +0000, Gabriele Paoloni wrote:
+> Hi Bjorn
+> 
+> > -----Original Message-----
+> > From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+> > Sent: 18 November 2016 17:54
+> > To: Gabriele Paoloni
+> > Cc: Bjorn Helgaas; linux-pci at vger.kernel.org; linux-
+> > acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> > kernel at lists.infradead.org; linaro-acpi at lists.linaro.org
+> > Subject: Re: [PATCH] PCI: Add information about describing PCI in ACPI
+> > 
+> > On Fri, Nov 18, 2016 at 05:17:34PM +0000, Gabriele Paoloni wrote:
+> > > > -----Original Message-----
+> > > > From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+> > > > owner at vger.kernel.org] On Behalf Of Bjorn Helgaas
+> > > > Sent: 17 November 2016 18:00
+> > 
+> > > > +Static tables like MCFG, HPET, ECDT, etc., are *not* mechanisms
+> > for
+> > > > +reserving address space!  The static tables are for things the OS
+> > > > +needs to know early in boot, before it can parse the ACPI
+> > namespace.
+> > > > +If a new table is defined, an old OS needs to operate correctly
+> > even
+> > > > +though it ignores the table.  _CRS allows that because it is
+> > generic
+> > > > +and understood by the old OS; a static table does not.
+> > >
+> > > Right so if my understanding is correct you are saying that resources
+> > > described in the MCFG table should also be declared in PNP0C02
+> > devices
+> > > so that the PNP driver can reserve these resources.
+> > 
+> > Yes.
+> > 
+> > > On the other side the PCI Root bridge driver should not reserve such
+> > > resources.
+> > >
+> > > Well if my understanding is correct I think we have a problem here:
+> > > http://lxr.free-electrons.com/source/drivers/pci/ecam.c#L74
+> > >
+> > > As you can see pci_ecam_create() will conflict with the pnp driver
+> > > as it will try to reserve the resources from the MCFG table...
+> > >
+> > > Maybe we need to rework pci_ecam_create() ?
+> > 
+> > I think it's OK as it is.
+> > 
+> > The pnp/system.c driver does try to reserve PNP0C02 resources, and it
+> > marks them as "not busy".  That way they appear in /proc/iomem and
+> > won't be allocated for anything else, but they can still be requested
+> > by drivers, e.g., pci/ecam.c, which will mark them "busy".
+> > 
+> > This is analogous to what the PCI core does in pci_claim_resource().
+> > This is really a function of the ACPI/PNP *core*, which should reserve
+> > all _CRS resources for all devices (not just PNP0C02 devices).  But
+> > it's done by pnp/system.c, and only for PNP0C02, because there's a
+> > bunch of historical baggage there.
+> > 
+> > You'll also notice that in this case, things are out of order:
+> > logically the pnp/system.c reservation should happen first, but in
+> > fact the pci/ecam.c request happens *before* the pnp/system.c one.
+> > That means the pnp/system.c one might fail and complain "[mem ...]
+> > could not be reserved".
+> 
+> Correct me if I am wrong...
+> 
+> So currently we are relying on the fact that pci_ecam_create() is called
+> before the pnp driver.
+> If the pnp driver came first we would end up in pci_ecam_create() failing
+> here:
+> http://lxr.free-electrons.com/source/drivers/pci/ecam.c#L76
+> 
+> I am not sure but it seems to me like a bit weak condition to rely on...
+> what about removing the error condition in pci_ecam_create() and logging
+> just a dev_info()?
 
-Oh, that's trivial to fix! Do as almost all other SoCs do, and don't
-use silent options.
+Huh.  I'm confused.  I *thought* it would be safe to reverse the
+order, which would effectively be this:
+
+  system_pnp_probe
+    reserve_resources_of_dev
+      reserve_range
+        request_mem_region([mem 0xb0000000-0xb1ffffff])
+  ...
+  pci_ecam_create
+    request_resource_conflict([mem 0xb0000000-0xb1ffffff])
 
 
--Olof
+but I experimented with the patch below on qemu, and it failed as you
+predicted:
+
+  ** res test **
+  requested [mem 0xa0000000-0xafffffff]
+  can't claim ECAM area [mem 0xa0000000-0xafffffff]: conflict with ECAM PNP [mem 0xa0000000-0xafffffff]
+
+I expected the request_resource_conflict() to succeed since it's
+completely contained in the "ECAM PNP" region.  But I guess I don't
+understand kernel/resource.c well enough.
+
+I'm not sure we need to fix anything yet, since we currently do the
+ecam.c request before the system.c one, and any change there would be
+a long ways off.  If/when that *does* change, I think the correct fix
+would be to change ecam.c so its request succeeds (by changing the way
+it does the request, fixing kernel/resource.c, or whatever) rather
+than to reduce the log level and ignore the failure.
+
+Bjorn
+
+
+diff --git a/arch/x86/pci/init.c b/arch/x86/pci/init.c
+index adb62aa..5a35638 100644
+--- a/arch/x86/pci/init.c
++++ b/arch/x86/pci/init.c
+@@ -7,6 +7,8 @@
+    in the right sequence from here. */
+ static __init int pci_arch_init(void)
+ {
++	struct resource *res, *conflict;
++	static struct resource cfg;
+ #ifdef CONFIG_PCI_DIRECT
+ 	int type = 0;
+ 
+@@ -39,6 +41,26 @@ static __init int pci_arch_init(void)
+ 
+ 	dmi_check_skip_isa_align();
+ 
++	printk("\n** res test **\n");
++
++	res = request_mem_region(0xa0000000, 0x10000000, "ECAM PNP");
++	printk("requested %pR\n", res);
++	if (!res)
++		return 0;
++	res->flags &= ~IORESOURCE_BUSY;
++
++	cfg.start = 0xa0000000;
++	cfg.end = 0xafffffff;
++	cfg.flags = IORESOURCE_MEM | IORESOURCE_BUSY;
++	cfg.name = "PCI ECAM";
++
++	conflict = request_resource_conflict(&iomem_resource, &cfg);
++	if (conflict)
++		printk("can't claim ECAM area %pR: conflict with %s %pR\n",
++		    &cfg, conflict->name, conflict);
++
++	printk("\n");
++
+ 	return 0;
+ }
+ arch_initcall(pci_arch_init);
