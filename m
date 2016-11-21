@@ -1,20 +1,29 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 21 Nov 2016 10:01:40 +0000
-Subject: [PATCH v9 08/16] drivers: acpi: iort: add node match function
+Date: Mon, 21 Nov 2016 10:01:46 +0000
+Subject: [PATCH v9 14/16] drivers: acpi: iort: replace rid map type with type
+ mask
 In-Reply-To: <20161121100148.24769-1-lorenzo.pieralisi@arm.com>
 References: <20161121100148.24769-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20161121100148.24769-9-lorenzo.pieralisi@arm.com>
+Message-ID: <20161121100148.24769-15-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device drivers (eg ARM SMMU) need to know if a specific component
-is part of the IORT table, so that kernel data structures are not
-initialized at initcalls time if the respective component is not
-part of the IORT table.
+IORT tables provide data that allow the kernel to carry out
+device ID mappings between endpoints and system components
+(eg interrupt controllers, IOMMUs). When the mapping for a
+given device ID is carried out, the translation mechanism
+is done on a per-subsystem basis rather than a component
+subtype (ie the IOMMU kernel layer will look for mappings
+from a device to all IORT node types corresponding to IOMMU
+components), therefore the corresponding mapping API should
+work on a range (ie mask) of IORT node types corresponding
+to a common set of components (eg IOMMUs) rather than a
+specific node type.
 
-To this end, this patch adds a trivial function that allows detecting
-if a given IORT node type is present or not in the ACPI table, providing
-an ACPI IORT equivalent for of_find_matching_node().
+Upgrade the IORT iort_node_map_rid() API to work with a
+type mask instead of a single node type so that it can
+be used for mappings that span multiple components types
+(ie IOMMUs).
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Reviewed-by: Tomasz Nowicki <tn@semihalf.com>
@@ -24,52 +33,58 @@ Cc: Hanjun Guo <hanjun.guo@linaro.org>
 Cc: Tomasz Nowicki <tn@semihalf.com>
 Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 ---
- drivers/acpi/arm64/iort.c | 15 +++++++++++++++
- include/linux/acpi_iort.h |  2 ++
- 2 files changed, 17 insertions(+)
+ drivers/acpi/arm64/iort.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 1ac2720..4bb6acb 100644
+index 8a8ae5e..f3bbef8 100644
 --- a/drivers/acpi/arm64/iort.c
 +++ b/drivers/acpi/arm64/iort.c
-@@ -227,6 +227,21 @@ static struct acpi_iort_node *iort_scan_node(enum acpi_iort_node_type type,
- 	return NULL;
+@@ -26,6 +26,9 @@
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ 
++#define IORT_TYPE_MASK(type)	(1 << (type))
++#define IORT_MSI_TYPE		(1 << ACPI_IORT_NODE_ITS_GROUP)
++
+ struct iort_its_msi_chip {
+ 	struct list_head	list;
+ 	struct fwnode_handle	*fw_node;
+@@ -317,7 +320,7 @@ static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
+ 
+ static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
+ 						u32 rid_in, u32 *rid_out,
+-						u8 type)
++						u8 type_mask)
+ {
+ 	u32 rid = rid_in;
+ 
+@@ -326,7 +329,7 @@ static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
+ 		struct acpi_iort_id_mapping *map;
+ 		int i;
+ 
+-		if (node->type == type) {
++		if (IORT_TYPE_MASK(node->type) & type_mask) {
+ 			if (rid_out)
+ 				*rid_out = rid;
+ 			return node;
+@@ -399,7 +402,7 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+ 	if (!node)
+ 		return req_id;
+ 
+-	iort_node_map_rid(node, req_id, &dev_id, ACPI_IORT_NODE_ITS_GROUP);
++	iort_node_map_rid(node, req_id, &dev_id, IORT_MSI_TYPE);
+ 	return dev_id;
  }
  
-+static acpi_status
-+iort_match_type_callback(struct acpi_iort_node *node, void *context)
-+{
-+	return AE_OK;
-+}
-+
-+bool iort_node_match(u8 type)
-+{
-+	struct acpi_iort_node *node;
-+
-+	node = iort_scan_node(type, iort_match_type_callback, NULL);
-+
-+	return node != NULL;
-+}
-+
- static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
- 					    void *context)
- {
-diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-index d16fdda..17bb078 100644
---- a/include/linux/acpi_iort.h
-+++ b/include/linux/acpi_iort.h
-@@ -28,10 +28,12 @@ void iort_deregister_domain_token(int trans_id);
- struct fwnode_handle *iort_find_domain_token(int trans_id);
- #ifdef CONFIG_ACPI_IORT
- void acpi_iort_init(void);
-+bool iort_node_match(u8 type);
- u32 iort_msi_map_rid(struct device *dev, u32 req_id);
- struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
- #else
- static inline void acpi_iort_init(void) { }
-+static inline bool iort_node_match(u8 type) { return false; }
- static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
- { return req_id; }
- static inline struct irq_domain *iort_get_device_domain(struct device *dev,
+@@ -421,7 +424,7 @@ static int iort_dev_find_its_id(struct device *dev, u32 req_id,
+ 	if (!node)
+ 		return -ENXIO;
+ 
+-	node = iort_node_map_rid(node, req_id, NULL, ACPI_IORT_NODE_ITS_GROUP);
++	node = iort_node_map_rid(node, req_id, NULL, IORT_MSI_TYPE);
+ 	if (!node)
+ 		return -ENXIO;
+ 
 -- 
 2.10.0
