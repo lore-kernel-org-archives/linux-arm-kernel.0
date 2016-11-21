@@ -1,64 +1,26 @@
-From: ahaslam@baylibre.com (Axel Haslam)
-Date: Mon, 21 Nov 2016 19:54:51 +0100
-Subject: [PATCH 0/2] ARM: davinvi: da850 add ohci DT nodes
-In-Reply-To: <4095b7bc-a6dd-144b-4a65-40d86c710087@lechnology.com>
-References: <20161121165920.29809-1-ahaslam@baylibre.com>
- <4d414c4d-3d08-f3d9-2bc5-aa90c8a631ce@lechnology.com>
- <CAKXjFTPxwxtE1xs1b6+sfwvRNKVLGKM-9Fjs3tVOSaBA+5Wnxg@mail.gmail.com>
- <4095b7bc-a6dd-144b-4a65-40d86c710087@lechnology.com>
-Message-ID: <CAKXjFTMrmVEr7G5pJ=Py0dZkASdPDuUbJVGG96N755Dd1WtUVQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 21 Nov 2016 19:18:47 +0000
+Subject: [PATCH v2 1/4] spi: spi-fsl-dspi: Fix SPI transfer issue when
+ using multiple SPI_IOC_MESSAGE
+In-Reply-To: <bbdbc8df434dd2af74eb351b799a2812a1c1967e.1479706671.git.maitysanchayan@gmail.com>
+References: <cover.1479706671.git.maitysanchayan@gmail.com>
+ <bbdbc8df434dd2af74eb351b799a2812a1c1967e.1479706671.git.maitysanchayan@gmail.com>
+Message-ID: <20161121191847.vg32cwople4qmini@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2016 at 6:45 PM, David Lechner <david@lechnology.com> wrote:
-> On 11/21/2016 11:29 AM, Axel Haslam wrote:
->>
->> On Mon, Nov 21, 2016 at 6:04 PM, David Lechner <david@lechnology.com>
->> wrote:
->>>
->>> On 11/21/2016 10:59 AM, Axel Haslam wrote:
->>>>
->>>>
->>>> This adds the DT node for the ohci controller and
->>>> enables it for the omapl138-lckd platform.
->>>>
->>>> DEPENDENCIES:
->>>>
->>>> 1. [PATCH v6 0/5] USB: ohci-da8xx: Add device tree support
->>>> https://lkml.org/lkml/2016/11/21/558
->>>>
->>>> 2. [PATCH v3 0/2] regulator: handling of error conditions for usb
->>>> drivers
->>>> https://lkml.org/lkml/2016/11/4/465
->>>>
->>>> Axel Haslam (2):
->>>>   ARM: dts: da850: Add usb device node
->>>>   ARM: dts: da850-lcdk: Enable ohci for omapl138 lcdk
->>>>
->>>>  arch/arm/boot/dts/da850-lcdk.dts | 8 ++++++++
->>>>  arch/arm/boot/dts/da850.dtsi     | 8 ++++++++
->>>>  2 files changed, 16 insertions(+)
->>>>
->>>
->>> It does not look like you rebased these patches. Sekhar pushed the musb
->>> counterpart to v4.10/dt yesterday, which will cause conflicts with this
->>> series.
->>>
->>>
->>> https://git.kernel.org/cgit/linux/kernel/git/nsekhar/linux-davinci.git/log/?h=v4.10/dt
->>
->>
->> Hi David,
->>
->> i verified that they apply to the current linux-davinci/master.
->> Anyways, i can rebase
->> and resend once the dependencies are met, and we are ready to merge it.
->>
->> Regards
->> Axel.
->>
->
-> OK. I think the first patch is fine, but you will have two &usb_phy {
-> status = "okay"; }; in da850-lcdk.dts now even if applies cleanly. ;-)
+On Mon, Nov 21, 2016 at 11:24:01AM +0530, Sanchayan Maity wrote:
+> Current DMA implementation had a bug where the DMA transfer would
+> exit the loop in dspi_transfer_one_message after the completion of
+> a single transfer. This results in a multi message transfer submitted
+> with SPI_IOC_MESSAGE to terminate incorrectly without an error.
 
-mmm, right! ill remove it when i resend.
+Please don't resend already applied patches.  If there are any changes
+needed please send incremental changes on top of what's already applied.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 455 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161121/59a1e93d/attachment.sig>
