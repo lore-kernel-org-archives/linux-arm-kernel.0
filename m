@@ -1,42 +1,51 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 21 Nov 2016 12:07:13 +0100
-Subject: serial: imx: regression triggered by newly introduced DSR irq
- handling
-In-Reply-To: <1479726011.2807.11.camel@googlemail.com>
-References: <1458825865-7434-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1458825865-7434-7-git-send-email-u.kleine-koenig@pengutronix.de>
- <1470350663.26773.41.camel@googlemail.com>
- <20160805065845.GI17874@pengutronix.de>
- <1479726011.2807.11.camel@googlemail.com>
-Message-ID: <20161121110713.prjwxrvh66bztvbe@pengutronix.de>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Mon, 21 Nov 2016 13:09:47 +0200
+Subject: [BUG] i2c-designware silently fails on long transfers
+In-Reply-To: <20161121104329.GB1041@n2100.armlinux.org.uk>
+References: <20161118193542.GO1041@n2100.armlinux.org.uk>
+ <20161121102901.GF1446@lahna.fi.intel.com>
+ <20161121104329.GB1041@n2100.armlinux.org.uk>
+Message-ID: <20161121110947.GI1446@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Christoph,
-
-On Mon, Nov 21, 2016 at 12:00:11PM +0100, Christoph Fritz wrote:
-> On Fri, 2016-08-05 at 08:58 +0200, Uwe Kleine-K?nig wrote:
-> > Once this is done (and still an issue)
-> 
-> Yes, patch b5ca028fe9ba2090a (ARM: dts: imx6sx: document SION necessity
-> of ENET1_REF_CLK1) is done and mainline and DSR irq handling is still an
-> issue.
-> 
-> >  I'd suggest to standardize a dt
-> > property
+On Mon, Nov 21, 2016 at 10:43:29AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 21, 2016 at 12:29:01PM +0200, Mika Westerberg wrote:
+> > On Fri, Nov 18, 2016 at 07:35:42PM +0000, Russell King - ARM Linux wrote:
+> > > Another mitigation would be to lower the I2C bus frequency on Juno from
+> > > 400kHz to 100kHz, so that there's 4x longer IRQ latency possible.
+> > > However, even that isn't going to be reliable - even going to 100kHz
+> > > isn't going to allow the above case to be solved - the interrupt is
+> > > delayed by around 2ms, and it takes about 1.4ms to send/receive 16 bytes
+> > > at 100kHz.  (9 * 16 / (100*10^3)).
+> > > 
+> > > So, I think all hope is lost for i2c-designware on Juno to cope with
+> > > reading the EDID from TDA998x reliably.
 > > 
-> > 	disable-dsr;
+> > :-(
+> > 
+> > I wonder if we can get it work more reliably by using DMA (provided that
+> > there are DMA channels available for I2C in Juno)? That would allow the
+> > hardware to perform longer reads without relying on how fast the
+> > interrupt handler is able to empty the Rx FIFO.
 > 
-> Would you go forward?
+> It would need to DMA to the Tx FIFO to keep it filled - it triggers the
+> stop condition when the Tx FIFO empties.  From what I can see in the
+> driver, the Tx FIFO not only takes the data but also a "command" to tell
+> the hardware what to do.
 
-Currently I don't have the need and time to do this myself. So if you
-want to propose a patch and send if for review to the dt and serial MLs
-that would be a good next step. If you add me to Cc (or To) I can take a
-look.
+Yes, the command is either "read" or "write" (meaning even for Rx a
+write to the Tx FIFO is needed).
 
-Best regards
-Uwe
+> The Rx FIFO would also need DMA to avoid it overflowing due to high
+> interrupt latency.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I guess for Rx we would need to supply a dummy buffer of "read" commands
+for the Tx FIFO in addition to reading bytes from Rx FIFO. But still
+that might help to improve reliability in case of Juno.
+
+> I don't know what state DMA is in on the Juno, or even whether it has
+> DMA - it has a PL330 DMA controller, but I see nothing in the DT files
+> making use of it.
+
+OK
