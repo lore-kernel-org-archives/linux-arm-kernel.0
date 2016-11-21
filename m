@@ -1,26 +1,51 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Mon, 21 Nov 2016 22:05:21 +0900
-Subject: [PATCH v2 5/8] dt-bindings: mfd: Provide human readable defines
- for TPS65217 interrupts
-In-Reply-To: <20161118151051.GV4082@atomide.com>
-References: <20161028123702.21849-1-woogyom.kim@gmail.com>
- <20161028123702.21849-6-woogyom.kim@gmail.com>
- <20161118145353.GE2301@dell.home> <20161118151051.GV4082@atomide.com>
-Message-ID: <c04af1ac-b692-f3df-47b0-72c5263374bf@gmail.com>
+From: john.garry@huawei.com (John Garry)
+Date: Mon, 21 Nov 2016 12:58:28 +0000
+Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
+In-Reply-To: <1478647002.7430.69.camel@kernel.crashing.org>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1478576829-112707-2-git-send-email-yuanzhichang@hisilicon.com>
+ <20161108120323.GC15297@leverpostej>
+ <1478647002.7430.69.camel@kernel.crashing.org>
+Message-ID: <79d73f93-1cf8-19db-ca5c-8fb6257edd6c@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2016 12:10 AM, Tony Lindgren wrote:
->>> +#define TPS65217_IRQ_USB	0
->>> > > +#define TPS65217_IRQ_AC		1
->>> > > +#define TPS65217_IRQ_PB		2
->> >
->> > What are "AC" and "PB".  Seeing as these are meant to be "human
->> > readable", let's make them more human friendly.
-> Good idea. Milo, please do an incremental single follow-up patch as
-> I already have applied this and the dts changes using it.
+On 08/11/2016 23:16, Benjamin Herrenschmidt wrote:
+> On Tue, 2016-11-08 at 12:03 +0000, Mark Rutland wrote:
+>> On Tue, Nov 08, 2016 at 11:47:07AM +0800, zhichang.yuan wrote:
+>>>
+>>> For arm64, there is no I/O space as other architectural platforms, such as
+>>> X86. Most I/O accesses are achieved based on MMIO. But for some arm64 SoCs,
+>>> such as Hip06, when accessing some legacy ISA devices connected to LPC, those
+>>> known port addresses are used to control the corresponding target devices, for
+>>> example, 0x2f8 is for UART, 0xe4 is for ipmi-bt. It is different from the
+>>> normal MMIO mode in using.
+>>
+>> This has nothing to do with arm64. Hardware with this kind of indirect
+>> bus access could be integrated with a variety of CPU architectures. It
+>> simply hasn't been, yet.
+>
+> On some ppc's we also use similar indirect access methods for IOs. We
+> have a generic infrastructure for re-routing some memory or IO regions
+> to hooks.
+>
+> On POWER8, our PCIe doesn't do IO at all, but we have an LPC bus behind
+> firmware calls ;-) We use that infrastructure to plumb in the LPC bus.
+>
+Hi,
 
-Thanks for catching this. Let me send a patch soon.
+I would like to mention another topic on supporting LPC, and this is 
+regard to eSPI support.
+eSPI is seen as the successor for LPC, and some BMCs already support it.
 
-Best regards,
-Milo
+I had a chat with Arnd on this, and the idea to model LPC as a SPI bus 
+adpater (and also eSPI).
+
+However it seems to me that most platforms will/should support eSPI as a 
+transparent bridge, same as LPC on x86. So I don't think that this is 
+much point in modelling LPC/eSPI as a bus.
+
+So we shall continue with indriect-IO support...
+
+Thanks,
+John
