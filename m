@@ -1,64 +1,136 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 21 Nov 2016 23:09:11 +0100
-Subject: [PATCH 2/2] MAINTAINERS: Add myself as co-maintainer to fpga mgr
- framework.
-In-Reply-To: <1479764942-14321-2-git-send-email-mdf@kernel.org>
-References: <1479764942-14321-1-git-send-email-mdf@kernel.org>
- <1479764942-14321-2-git-send-email-mdf@kernel.org>
-Message-ID: <b737d78e-34d5-3fb8-6ccd-34e8a10a0276@denx.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 21 Nov 2016 23:22:09 +0100
+Subject: [GIT PULL] Allwinner DT changes for 4.10
+In-Reply-To: <CAOesGMg=OQDtKkb4Mut4M1zAwM5CX3=YHxS7equO=Nx2a1tv1Q@mail.gmail.com>
+References: <20161115204122.x3vnb3bkny5esdya@lukather>
+ <20161119002316.GN8882@localhost>
+ <20161121132712.43b5eld2qthi6664@lukather>
+ <CAOesGMg=OQDtKkb4Mut4M1zAwM5CX3=YHxS7equO=Nx2a1tv1Q@mail.gmail.com>
+Message-ID: <20161121222209.ipqft65zcqsfsu2n@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2016 10:49 PM, Moritz Fischer wrote:
-> Add myself as co-maintainer to fpga mgr framework.
+On Mon, Nov 21, 2016 at 08:28:09AM -0800, Olof Johansson wrote:
+> HI,
 > 
-> Signed-off-by: Moritz Fischer <mdf@kernel.org>
-> Cc: Alan Tull <atull@opensource.altera.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-fpga at vger.kernel.org
+> On Mon, Nov 21, 2016 at 5:27 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi Olof,
+> >
+> > On Fri, Nov 18, 2016 at 04:23:16PM -0800, Olof Johansson wrote:
+> >> Hi,
+> >>
+> >> On Tue, Nov 15, 2016 at 09:41:22PM +0100, Maxime Ripard wrote:
+> >> > Hi Arnd, Olof,
+> >> >
+> >> > Here is our pull request for the next merge window.
+> >> >
+> >> > Thanks!
+> >> > Maxime
+> >> >
+> >> > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+> >> >
+> >> >   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+> >> >
+> >> > are available in the git repository at:
+> >> >
+> >> >   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.10
+> >> >
+> >> > for you to fetch changes up to e39a30cf736144814b0bddb3fff28fbbc2a8be0f:
+> >> >
+> >> >   ARM: sunxi: Add the missing clocks to the pinctrl nodes (2016-11-15 18:49:47 +0100)
+> >> >
+> >> > ----------------------------------------------------------------
+> >> > Allwinner DT additions for 4.10
+> >> >
+> >> > The usual bunch of DT additions, but most notably:
+> >> >   - A31 DRM driver
+> >> >   - A31 audio codec
+> >> >   - WiFi for the A80-Based boards and the CHIP
+> >> >   - Support for the NextThing Co CHIP Pro (the first board with NAND
+> >> >     enabled)
+> >> >   - New boards: NanoPi M1,
+> >> >
+> >> [...]
+> >>
+> >> > Maxime Ripard (16):
+> >> >       ARM: sun5i: a13-olinuxino: Enable VGA bridge
+> >> >       ARM: gr8: Add the UART3
+> >> >       ARM: gr8: Fix typo in the i2s mclk pin group
+> >> >       ARM: gr8: Add missing pwm channel 1 pin
+> >> >       ARM: gr8: Add UART2 pins
+> >> >       ARM: gr8: Add UART3 pins
+> >> >       ARM: gr8: Add CHIP Pro support
+> >> >       ARM: sun5i: chip: Enable Wi-Fi SDIO chip
+> >> >       ARM: sun5i: Rename A10s pins
+> >> >       ARM: sun5i: Add SPI2 pins
+> >> >       ARM: sun5i: Add RGB 565 LCD pins
+> >> >       ARM: sun5i: chip: Add optional buses
+> >> >       ARM: gr8: evb: Enable SPDIF
+> >> >       ARM: gr8: evb: Add i2s codec
+> >> >       ARM: sun8i: sina33: Enable USB gadget
+> >> >       ARM: sunxi: Add the missing clocks to the pinctrl nodes
+> >> >
+> >> [...]
+> >>
+> >> >  arch/arm/boot/dts/Makefile                         |   1 +
+> >> >  arch/arm/boot/dts/ntc-gr8-chip-pro.dts             | 266 +++++++++++++++++++++
+> >> >  arch/arm/boot/dts/ntc-gr8-evb.dts                  |  33 +++
+> >> >  arch/arm/boot/dts/ntc-gr8.dtsi                     |  47 +++-
+> >> >  arch/arm/boot/dts/sun4i-a10.dtsi                   |   3 +-
+> >>
+> >> NTC isn't the SoC manufacturer, and we try to keep the prefixes down to
+> >> manufacturer to keep the namespace a little more manageable, even if
+> >> we never got subdirectories setup as on arm64.
+> >>
+> >> I think this should probably be sun4i-a10-gr8 or sun4i-r8-gr8 as prefix?
+> >
+> > The users really expect a SoC from Nextthing, it's always been
+> > marketed that way, the marking on the SoC also says so, etc. The fact
+> > that it's been a design in cooperation with Allwinner, and that the
+> > design is based on some earlier family is an implementation detail,
+> > and I'd really like not for it to have the sun5i prefix, it's just
+> > confusing.
+> 
+> I don't care so much about what's printed on the top of the package, I
+> care a lot more about what's on the insides. We've got a long
+> tradition of not renaming things randomly when companies get acquired
+> or renames themselves, and I think that same spirit is applicable
+> here.
 
-Acked-by: Marek Vasut <marex@denx.de>
+Yet, we called the imx23 and imx28 that way while it was really a
+sigmatel design. And I'm pretty sure there's other examples too.
 
-> ---
-> Hi all,
+> Calling it an SoC is inaccurate as well, it's really a
+> system-in-package. It's just a new way to integrate an SoC into a
+> module to build boards out of. Compare to Octavo OSD335x, for example.
 > 
-> Lately we've fallen behind a bit on reviewing patches lately.
-> 
-> 'Behind the scenes', Alan has worked on getting a git tree setup
-> for us on kernel.org and I've worked on getting the mailing list setup.
-> The mailing list is up and running (see patch [1/2]) of this series.
-> 
-> Greg said he'd be happy to take pull requests from now on, so I hope
-> once we have figured out the exact workflow things will be much smoother
-> getting your patches merged into the fpga mgr framework.
-> 
-> Feel free to comment / speak up if you're not cool with this change.
-> 
-> Thanks,
-> 
-> Moritz
-> 
-> ---
->  MAINTAINERS | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 19527a0..1856594 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -5004,7 +5004,7 @@ K:	fmc_d.*register
->  
->  FPGA MANAGER FRAMEWORK
->  M:	Alan Tull <atull@opensource.altera.com>
-> -R:	Moritz Fischer <moritz.fischer@ettus.com>
-> +M:	Moritz Fischer <moritz.fischer@ettus.com>
->  L:	linux-fpga at vger.kernel.org
->  S:	Maintained
->  F:	drivers/fpga/
-> 
+> System-in-package solutions are going to get more and more common, and
+> it's going to become really chaotic if we expect to use the prefix of
+> the company custom-ordering the package for each and every one of
+> them.
 
+This is indeed a SIP, but one with a custom SoC (or whatever the !RAM
+part in a SIP is called) that was designed by Allwinner *and* Next
+Thing Co., unlike the OSD335x that has a standard AM335x SoC in it.
+
+> > And the ntc prefix has been asked for during the reviews...
+>
+> Having a link to that requeset/email would be helpful if you try to
+> use it as an argument.
+
+Yeah, it turns out it was off list... so it's a pretty weak one :)
+
+Maxime
 
 -- 
-Best regards,
-Marek Vasut
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161121/a2e39d2c/attachment.sig>
