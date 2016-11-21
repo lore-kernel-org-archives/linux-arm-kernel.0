@@ -1,50 +1,51 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 21 Nov 2016 17:56:51 +0000
-Subject: [PATCH v2 1/5] ARM: memory: da8xx-ddrctl: new driver
-In-Reply-To: <d0f3bc66-6dfd-dcdc-a15d-a8f9fdda6048@arm.com>
-References: <1477925138-23457-1-git-send-email-bgolaszewski@baylibre.com>
- <1477925138-23457-2-git-send-email-bgolaszewski@baylibre.com>
- <a309a738-7fa7-3aab-4457-f7d693e6b37f@ti.com>
- <CAMpxmJUXJi6PDq0qc-0+r2mLPASLpJUt_njWtXr4Mx4k0Fa82g@mail.gmail.com>
- <d0f3bc66-6dfd-dcdc-a15d-a8f9fdda6048@arm.com>
-Message-ID: <6576fc1d-cc16-8d7c-75e7-27c5fbc33101@arm.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 21 Nov 2016 19:14:16 +0100
+Subject: [linux-sunxi] [PATCH v6 0/5] drm: sun8i: Add DE2 HDMI video
+ support
+In-Reply-To: <1c9a02ff-ce6c-7ad7-36fa-8a2ea0b7675e@megous.com>
+References: <cover.1479641523.git.moinejf@free.fr>
+ <1c9a02ff-ce6c-7ad7-36fa-8a2ea0b7675e@megous.com>
+Message-ID: <20161121191416.706b80c25d476fa002a001b1@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Mon, 21 Nov 2016 01:54:53 +0100
+Ond?ej Jirman <megous@megous.com> wrote:
 
-On 21/11/16 17:47, Robin Murphy wrote:
-> Hi Bartosz, Sekhar,
->
-> On 21/11/16 16:48, Bartosz Golaszewski wrote:
+> Dne 20.11.2016 v 12:32 Jean-Francois Moine napsal(a):
+> > This patchset series adds HDMI video support to the Allwinner
+> > sun8i SoCs which include the display engine 2 (DE2).
+> > The driver contains the code for the A83T and H3, but it could be
+> > used/extended for other SoCs as the A64, H2 and H5.
+> 
+> Hi,
+> 
+> I'm trying to test your patches on Orange Pi PC, and I've run into a few
+> issues: (I'm using sunxi-ng with the same patches as last time, to make
+> it work with your driver)
+> 
+> 1] I just get pink output on the monitor - there's some signal, but it's
+> pink (or more like magenta).
+> 
+> dmesg ouput indicates no error:
+> 
+> [    1.887823] [drm] Initialized
+> [    1.888503] sun8i-de2 1000000.de-controller: bound
+> 1c0c000.lcd-controller (ops 0xc0a63894)
+> [    2.057298] sun8i-de2 1000000.de-controller: bound 1ee0000.hdmi (ops
+> 0xc0a63b54)
+> [    2.057304] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+> [    2.057307] [drm] No driver support for vblank timestamp query.
+> [    2.690862] Console: switching to colour frame buffer device 240x67
+> [    2.723059] sun8i-de2 1000000.de-controller: fb0:  frame buffer device
+	[snip]
 
-[...]
+My H3 boards work correctly, except the Orange PI 2 when it cannot read
+the EDID (but it is OK after reboot).
 
->> Hi Sekhar,
->>
->> thanks for spotting that.
->>
->> I think we should introduce this function right away, rather than
->> having two static functions doing the same thing. If you don't mind,
->> I'll try to find a good spot for it and send a follow-up series fixing
->> the issue.
->
-> As it happens, that was already proposed last week, for much the same
-> reason:
->
-> http://www.mail-archive.com/linuxppc-dev at lists.ozlabs.org/msg111395.html
->
-
-Thanks for pointing this out, yet another platform to move to the new
-API after v4.10.
-
-Hi Shekar, Bartosz,
-
-For v4.10, please continue with the open coding as proposed in this
-thread in order to avoid cross tree dependencies. I will rework on the
-above patch once v4.10 merge window closes to include all these
-occurrence and replace them.
+Did you check if the EDID was correctly read?
+Which resolution do you expect?
 
 -- 
-Regards,
-Sudeep
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
