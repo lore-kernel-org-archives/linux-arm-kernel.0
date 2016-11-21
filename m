@@ -1,90 +1,171 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 21 Nov 2016 10:01:46 +0000
-Subject: [PATCH v9 14/16] drivers: acpi: iort: replace rid map type with type
- mask
+Date: Mon, 21 Nov 2016 10:01:39 +0000
+Subject: [PATCH v9 07/16] drivers: acpi: implement acpi_dma_configure
 In-Reply-To: <20161121100148.24769-1-lorenzo.pieralisi@arm.com>
 References: <20161121100148.24769-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20161121100148.24769-15-lorenzo.pieralisi@arm.com>
+Message-ID: <20161121100148.24769-8-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IORT tables provide data that allow the kernel to carry out
-device ID mappings between endpoints and system components
-(eg interrupt controllers, IOMMUs). When the mapping for a
-given device ID is carried out, the translation mechanism
-is done on a per-subsystem basis rather than a component
-subtype (ie the IOMMU kernel layer will look for mappings
-from a device to all IORT node types corresponding to IOMMU
-components), therefore the corresponding mapping API should
-work on a range (ie mask) of IORT node types corresponding
-to a common set of components (eg IOMMUs) rather than a
-specific node type.
+On DT based systems, the of_dma_configure() API implements DMA
+configuration for a given device. On ACPI systems an API equivalent to
+of_dma_configure() is missing which implies that it is currently not
+possible to set-up DMA operations for devices through the ACPI generic
+kernel layer.
 
-Upgrade the IORT iort_node_map_rid() API to work with a
-type mask instead of a single node type so that it can
-be used for mappings that span multiple components types
-(ie IOMMUs).
+This patch fills the gap by introducing acpi_dma_configure/deconfigure()
+calls that for now are just wrappers around arch_setup_dma_ops() and
+arch_teardown_dma_ops() and also updates ACPI and PCI core code to use
+the newly introduced acpi_dma_configure/acpi_dma_deconfigure functions.
+
+Since acpi_dma_configure() is used to configure DMA operations, the
+function initializes the dma/coherent_dma masks to sane default values
+if the current masks are uninitialized (also to keep the default values
+consistent with DT systems) to make sure the device has a complete
+default DMA set-up.
+
+The DMA range size passed to arch_setup_dma_ops() is sized according
+to the device coherent_dma_mask (starting at address 0x0), mirroring the
+DT probing path behaviour when a dma-ranges property is not provided
+for the device being probed; this changes the current arch_setup_dma_ops()
+call parameters in the ACPI probing case, but since arch_setup_dma_ops()
+is a NOP on all architectures but ARM/ARM64 this patch does not change
+the current kernel behaviour on them.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Acked-by: Bjorn Helgaas <bhelgaas@google.com> [pci]
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 Reviewed-by: Tomasz Nowicki <tn@semihalf.com>
 Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 Tested-by: Tomasz Nowicki <tn@semihalf.com>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
 Cc: Tomasz Nowicki <tn@semihalf.com>
+Cc: Joerg Roedel <joro@8bytes.org>
 Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 ---
- drivers/acpi/arm64/iort.c | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+ drivers/acpi/glue.c     |  4 ++--
+ drivers/acpi/scan.c     | 40 ++++++++++++++++++++++++++++++++++++++++
+ drivers/pci/probe.c     |  3 +--
+ include/acpi/acpi_bus.h |  2 ++
+ include/linux/acpi.h    |  5 +++++
+ 5 files changed, 50 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 8a8ae5e..f3bbef8 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -26,6 +26,9 @@
- #include <linux/platform_device.h>
- #include <linux/slab.h>
+diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
+index 5ea5dc2..f8d6564 100644
+--- a/drivers/acpi/glue.c
++++ b/drivers/acpi/glue.c
+@@ -227,8 +227,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
  
-+#define IORT_TYPE_MASK(type)	(1 << (type))
-+#define IORT_MSI_TYPE		(1 << ACPI_IORT_NODE_ITS_GROUP)
-+
- struct iort_its_msi_chip {
- 	struct list_head	list;
- 	struct fwnode_handle	*fw_node;
-@@ -317,7 +320,7 @@ static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
+ 	attr = acpi_get_dma_attr(acpi_dev);
+ 	if (attr != DEV_DMA_NOT_SUPPORTED)
+-		arch_setup_dma_ops(dev, 0, 0, NULL,
+-				   attr == DEV_DMA_COHERENT);
++		acpi_dma_configure(dev, attr);
  
- static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
- 						u32 rid_in, u32 *rid_out,
--						u8 type)
-+						u8 type_mask)
- {
- 	u32 rid = rid_in;
+ 	acpi_physnode_link_name(physical_node_name, node_id);
+ 	retval = sysfs_create_link(&acpi_dev->dev.kobj, &dev->kobj,
+@@ -251,6 +250,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
+ 	return 0;
  
-@@ -326,7 +329,7 @@ static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
- 		struct acpi_iort_id_mapping *map;
- 		int i;
- 
--		if (node->type == type) {
-+		if (IORT_TYPE_MASK(node->type) & type_mask) {
- 			if (rid_out)
- 				*rid_out = rid;
- 			return node;
-@@ -399,7 +402,7 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
- 	if (!node)
- 		return req_id;
- 
--	iort_node_map_rid(node, req_id, &dev_id, ACPI_IORT_NODE_ITS_GROUP);
-+	iort_node_map_rid(node, req_id, &dev_id, IORT_MSI_TYPE);
- 	return dev_id;
+  err:
++	acpi_dma_deconfigure(dev);
+ 	ACPI_COMPANION_SET(dev, NULL);
+ 	put_device(dev);
+ 	put_device(&acpi_dev->dev);
+diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+index 3d1856f..45b5710 100644
+--- a/drivers/acpi/scan.c
++++ b/drivers/acpi/scan.c
+@@ -1370,6 +1370,46 @@ enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
+ 		return DEV_DMA_NON_COHERENT;
  }
  
-@@ -421,7 +424,7 @@ static int iort_dev_find_its_id(struct device *dev, u32 req_id,
- 	if (!node)
- 		return -ENXIO;
++/**
++ * acpi_dma_configure - Set-up DMA configuration for the device.
++ * @dev: The pointer to the device
++ * @attr: device dma attributes
++ */
++void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
++{
++	/*
++	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
++	 * setup the correct supported mask.
++	 */
++	if (!dev->coherent_dma_mask)
++		dev->coherent_dma_mask = DMA_BIT_MASK(32);
++
++	/*
++	 * Set it to coherent_dma_mask by default if the architecture
++	 * code has not set it.
++	 */
++	if (!dev->dma_mask)
++		dev->dma_mask = &dev->coherent_dma_mask;
++
++	/*
++	 * Assume dma valid range starts at 0 and covers the whole
++	 * coherent_dma_mask.
++	 */
++	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, NULL,
++			   attr == DEV_DMA_COHERENT);
++}
++EXPORT_SYMBOL_GPL(acpi_dma_configure);
++
++/**
++ * acpi_dma_deconfigure - Tear-down DMA configuration for the device.
++ * @dev: The pointer to the device
++ */
++void acpi_dma_deconfigure(struct device *dev)
++{
++	arch_teardown_dma_ops(dev);
++}
++EXPORT_SYMBOL_GPL(acpi_dma_deconfigure);
++
+ static void acpi_init_coherency(struct acpi_device *adev)
+ {
+ 	unsigned long long cca = 0;
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index ab00267..c29e07a 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1738,8 +1738,7 @@ static void pci_dma_configure(struct pci_dev *dev)
+ 		if (attr == DEV_DMA_NOT_SUPPORTED)
+ 			dev_warn(&dev->dev, "DMA not supported.\n");
+ 		else
+-			arch_setup_dma_ops(&dev->dev, 0, 0, NULL,
+-					   attr == DEV_DMA_COHERENT);
++			acpi_dma_configure(&dev->dev, attr);
+ 	}
  
--	node = iort_node_map_rid(node, req_id, NULL, ACPI_IORT_NODE_ITS_GROUP);
-+	node = iort_node_map_rid(node, req_id, NULL, IORT_MSI_TYPE);
- 	if (!node)
- 		return -ENXIO;
+ 	pci_put_host_bridge_device(bridge);
+diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+index c1a524d..4242c31 100644
+--- a/include/acpi/acpi_bus.h
++++ b/include/acpi/acpi_bus.h
+@@ -573,6 +573,8 @@ struct acpi_pci_root {
  
+ bool acpi_dma_supported(struct acpi_device *adev);
+ enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev);
++void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr);
++void acpi_dma_deconfigure(struct device *dev);
+ 
+ struct acpi_device *acpi_find_child_device(struct acpi_device *parent,
+ 					   u64 address, bool check_children);
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 996a29c..8d15fc5 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -765,6 +765,11 @@ static inline enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
+ 	return DEV_DMA_NOT_SUPPORTED;
+ }
+ 
++static inline void acpi_dma_configure(struct device *dev,
++				      enum dev_dma_attr attr) { }
++
++static inline void acpi_dma_deconfigure(struct device *dev) { }
++
+ #define ACPI_PTR(_ptr)	(NULL)
+ 
+ static inline void acpi_device_set_enumerated(struct acpi_device *adev)
 -- 
 2.10.0
