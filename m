@@ -1,51 +1,84 @@
-From: jsarha@ti.com (Jyri Sarha)
-Date: Mon, 21 Nov 2016 19:26:07 +0200
-Subject: [PATCH] drm: tilcdc: reduce max_width for revision 1
-In-Reply-To: <1479748590-3962-2-git-send-email-bgolaszewski@baylibre.com>
-References: <1479748590-3962-1-git-send-email-bgolaszewski@baylibre.com>
- <1479748590-3962-2-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <2013ba47-e7e4-045e-0232-4ebd7450c3ad@ti.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon, 21 Nov 2016 18:26:53 +0100
+Subject: [PATCH] arm64: dts: r8a7796: Add all MSIOF nodes
+Message-ID: <1479749213-13744-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/16 19:16, Bartosz Golaszewski wrote:
-> It has been determined that the highest resolution supported correctly
-> by LCDC rev1 is 800x600. Reduce the max_width value for rev1 to 800 in
-> crtc_max_width().
-> 
+Add the device nodes for all MSIOF SPI controllers.
 
-I don't think this is the right way to limit the supported video modes.
-There is technically there is no such limit, is there?
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+Tested with MSIOF2(B) on EXIO connector D of r8a7796/salvator-x, using
+spidev, gpio-74x164, and a logic analyzer.
 
-If memory bandwidth is limiting the functionality of higher resolutions,
-you should use "max-bandwidth" tilcdc device-tree property [1].
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 54 ++++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
 
-Cheers,
-Jyri
-
-[1] In "Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt":
-Optional properties:
- - max-bandwidth: The maximum pixels per second that the memory
-   interface / lcd controller combination can sustain
-
-
-
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  drivers/gpu/drm/tilcdc/tilcdc_crtc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/tilcdc/tilcdc_crtc.c b/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
-> index dfe3dd0..9081de5 100644
-> --- a/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
-> +++ b/drivers/gpu/drm/tilcdc/tilcdc_crtc.c
-> @@ -683,7 +683,7 @@ int tilcdc_crtc_max_width(struct drm_crtc *crtc)
->  	int max_width = 0;
->  
->  	if (priv->rev == 1)
-> -		max_width = 1024;
-> +		max_width = 800;
->  	else if (priv->rev == 2)
->  		max_width = 2048;
->  
-> 
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index 41a050d2f1925552..c34c684088542850 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -368,6 +368,60 @@
+ 			status = "disabled";
+ 		};
+ 
++		msiof0: spi at e6e90000 {
++			compatible = "renesas,msiof-r8a7796";
++			reg = <0 0xe6e90000 0 0x0064>;
++			interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 211>;
++			dmas = <&dmac1 0x41>, <&dmac1 0x40>,
++			       <&dmac2 0x41>, <&dmac2 0x40>;
++			dma-names = "tx", "rx";
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		msiof1: spi at e6ea0000 {
++			compatible = "renesas,msiof-r8a7796";
++			reg = <0 0xe6ea0000 0 0x0064>;
++			interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 210>;
++			dmas = <&dmac1 0x43>, <&dmac1 0x42>,
++			       <&dmac2 0x43>, <&dmac2 0x42>;
++			dma-names = "tx", "rx";
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		msiof2: spi at e6c00000 {
++			compatible = "renesas,msiof-r8a7796";
++			reg = <0 0xe6c00000 0 0x0064>;
++			interrupts = <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 209>;
++			dmas = <&dmac0 0x45>, <&dmac0 0x44>;
++			dma-names = "tx", "rx";
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		msiof3: spi at e6c10000 {
++			compatible = "renesas,msiof-r8a7796";
++			reg = <0 0xe6c10000 0 0x0064>;
++			interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 208>;
++			dmas = <&dmac0 0x47>, <&dmac0 0x46>;
++			dma-names = "tx", "rx";
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
+ 		dmac0: dma-controller at e6700000 {
+ 			compatible = "renesas,dmac-r8a7796",
+ 				     "renesas,rcar-dmac";
+-- 
+1.9.1
