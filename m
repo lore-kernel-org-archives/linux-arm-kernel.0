@@ -1,261 +1,71 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Mon, 21 Nov 2016 18:04:58 +0200
-Subject: [PATCH v2] ARM: dts: qcom: Add apq8064 CoreSight components
-Message-ID: <20161121160458.8328-1-georgi.djakov@linaro.org>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Mon, 21 Nov 2016 16:08:35 +0000
+Subject: [PATCH 1/2] ARM: mm: fix set_memory_*() bounds checks
+Message-ID: <E1c8r91-0007wL-Fl@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Ivan T. Ivanov" <ivan.ivanov@linaro.org>
+The set_memory_*() bounds checks are buggy on several fronts:
 
-Add initial set of CoreSight components found on Qualcomm apq8064 based
-platforms, including the IFC6410 board.
+1. They fail to round the region size up if the passed address is not
+   page aligned.
+2. The region check was incomplete, and didn't correspond with what
+   was being asked of apply_to_page_range()
 
-Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
-Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+So, rework change_memory_common() to fix these problems, adding an
+"in_region()" helper to determine whether the start & size fit within
+the provided region start and stop addresses.
+
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
+ arch/arm/mm/pageattr.c | 26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
 
-Changes since v1 (https://lkml.org/lkml/2016/11/17/474)
- * Moved everything into the SoC dtsi file as suggested by Stephen Boyd.
- * Updated commit message.
- * Got Ack from Mathieu.
-
- arch/arm/boot/dts/qcom-apq8064.dtsi | 191 +++++++++++++++++++++++++++++++++++-
- 1 file changed, 187 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 268bd470c865..2e8dd5d098f3 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -4,6 +4,7 @@
- #include <dt-bindings/clock/qcom,gcc-msm8960.h>
- #include <dt-bindings/reset/qcom,gcc-msm8960.h>
- #include <dt-bindings/clock/qcom,mmcc-msm8960.h>
-+#include <dt-bindings/clock/qcom,rpmcc.h>
- #include <dt-bindings/soc/qcom,gsbi.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-@@ -27,7 +28,7 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
+diff --git a/arch/arm/mm/pageattr.c b/arch/arm/mm/pageattr.c
+index d19b1ad29b07..db09f2e7efda 100644
+--- a/arch/arm/mm/pageattr.c
++++ b/arch/arm/mm/pageattr.c
+@@ -34,28 +34,28 @@ static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
+ 	return 0;
+ }
  
--		cpu at 0 {
-+		CPU0: cpu at 0 {
- 			compatible = "qcom,krait";
- 			enable-method = "qcom,kpss-acc-v1";
- 			device_type = "cpu";
-@@ -38,7 +39,7 @@
- 			cpu-idle-states = <&CPU_SPC>;
- 		};
++static bool in_range(unsigned long start, unsigned long size,
++	unsigned long range_start, unsigned long range_end)
++{
++	return start >= range_start && start < range_end &&
++		size <= range_end - start;
++}
++
+ static int change_memory_common(unsigned long addr, int numpages,
+ 				pgprot_t set_mask, pgprot_t clear_mask)
+ {
+-	unsigned long start = addr;
+-	unsigned long size = PAGE_SIZE*numpages;
+-	unsigned long end = start + size;
++	unsigned long start = addr & PAGE_SIZE;
++	unsigned long end = PAGE_ALIGN(addr) + numpages * PAGE_SIZE;
++	unsigned long size = end - start;
+ 	int ret;
+ 	struct page_change_data data;
  
--		cpu at 1 {
-+		CPU1: cpu at 1 {
- 			compatible = "qcom,krait";
- 			enable-method = "qcom,kpss-acc-v1";
- 			device_type = "cpu";
-@@ -49,7 +50,7 @@
- 			cpu-idle-states = <&CPU_SPC>;
- 		};
+-	if (!IS_ALIGNED(addr, PAGE_SIZE)) {
+-		start &= PAGE_MASK;
+-		end = start + size;
+-		WARN_ON_ONCE(1);
+-	}
++	WARN_ON_ONCE(start != addr);
  
--		cpu at 2 {
-+		CPU2: cpu at 2 {
- 			compatible = "qcom,krait";
- 			enable-method = "qcom,kpss-acc-v1";
- 			device_type = "cpu";
-@@ -60,7 +61,7 @@
- 			cpu-idle-states = <&CPU_SPC>;
- 		};
+-	if (!numpages)
++	if (!size)
+ 		return 0;
  
--		cpu at 3 {
-+		CPU3: cpu at 3 {
- 			compatible = "qcom,krait";
- 			enable-method = "qcom,kpss-acc-v1";
- 			device_type = "cpu";
-@@ -1416,6 +1417,187 @@
- 				};
- 			};
- 		};
-+
-+		etb at 1a01000 {
-+			compatible = "coresight-etb10", "arm,primecell";
-+			reg = <0x1a01000 0x1000>;
-+
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
-+			clock-names = "apb_pclk";
-+
-+			port {
-+				etb_in: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&replicator_out0>;
-+				};
-+			};
-+		};
-+
-+		tpiu at 1a03000 {
-+			compatible = "arm,coresight-tpiu", "arm,primecell";
-+			reg = <0x1a03000 0x1000>;
-+
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
-+			clock-names = "apb_pclk";
-+
-+			port {
-+				tpiu_in: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&replicator_out1>;
-+				};
-+			};
-+		};
-+
-+		replicator {
-+			compatible = "arm,coresight-replicator";
-+
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
-+			clock-names = "apb_pclk";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
-+					reg = <0>;
-+					replicator_out0: endpoint {
-+						remote-endpoint = <&etb_in>;
-+					};
-+				};
-+				port at 1 {
-+					reg = <1>;
-+					replicator_out1: endpoint {
-+						remote-endpoint = <&tpiu_in>;
-+					};
-+				};
-+				port at 2 {
-+					reg = <0>;
-+					replicator_in: endpoint {
-+						slave-mode;
-+						remote-endpoint = <&funnel_out>;
-+					};
-+				};
-+			};
-+		};
-+
-+		funnel at 1a04000 {
-+			compatible = "arm,coresight-funnel", "arm,primecell";
-+			reg = <0x1a04000 0x1000>;
-+
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
-+			clock-names = "apb_pclk";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				/*
-+				 * Not described input ports:
-+				 * 2 - connected to STM component
-+				 * 3 - not-connected
-+				 * 6 - not-connected
-+				 * 7 - not-connected
-+				 */
-+				port at 0 {
-+					reg = <0>;
-+					funnel_in0: endpoint {
-+						slave-mode;
-+						remote-endpoint = <&etm0_out>;
-+					};
-+				};
-+				port at 1 {
-+					reg = <1>;
-+					funnel_in1: endpoint {
-+						slave-mode;
-+						remote-endpoint = <&etm1_out>;
-+					};
-+				};
-+				port at 4 {
-+					reg = <4>;
-+					funnel_in4: endpoint {
-+						slave-mode;
-+						remote-endpoint = <&etm2_out>;
-+					};
-+				};
-+				port at 5 {
-+					reg = <5>;
-+					funnel_in5: endpoint {
-+						slave-mode;
-+						remote-endpoint = <&etm3_out>;
-+					};
-+				};
-+				port at 8 {
-+					reg = <0>;
-+					funnel_out: endpoint {
-+						remote-endpoint = <&replicator_in>;
-+					};
-+				};
-+			};
-+		};
-+
-+		etm at 1a1c000 {
-+			compatible = "arm,coresight-etm3x", "arm,primecell";
-+			reg = <0x1a1c000 0x1000>;
-+
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
-+			clock-names = "apb_pclk";
-+
-+			cpu = <&CPU0>;
-+
-+			port {
-+				etm0_out: endpoint {
-+					remote-endpoint = <&funnel_in0>;
-+				};
-+			};
-+		};
-+
-+		etm at 1a1d000 {
-+			compatible = "arm,coresight-etm3x", "arm,primecell";
-+			reg = <0x1a1d000 0x1000>;
-+
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
-+			clock-names = "apb_pclk";
-+
-+			cpu = <&CPU1>;
-+
-+			port {
-+				etm1_out: endpoint {
-+					remote-endpoint = <&funnel_in1>;
-+				};
-+			};
-+		};
-+
-+		etm at 1a1e000 {
-+			compatible = "arm,coresight-etm3x", "arm,primecell";
-+			reg = <0x1a1e000 0x1000>;
-+
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
-+			clock-names = "apb_pclk";
-+
-+			cpu = <&CPU2>;
-+
-+			port {
-+				etm2_out: endpoint {
-+					remote-endpoint = <&funnel_in4>;
-+				};
-+			};
-+		};
-+
-+		etm at 1a1f000 {
-+			compatible = "arm,coresight-etm3x", "arm,primecell";
-+			reg = <0x1a1f000 0x1000>;
-+
-+			clocks = <&rpmcc RPM_QDSS_CLK>;
-+			clock-names = "apb_pclk";
-+
-+			cpu = <&CPU3>;
-+
-+			port {
-+				etm3_out: endpoint {
-+					remote-endpoint = <&funnel_in5>;
-+				};
-+			};
-+		};
- 	};
- };
- #include "qcom-apq8064-pins.dtsi"
+-	if (start < MODULES_VADDR || start >= MODULES_END)
+-		return -EINVAL;
+-
+-	if (end < MODULES_VADDR || start >= MODULES_END)
++	if (!in_range(start, size, MODULES_VADDR, MODULES_END))
+ 		return -EINVAL;
+ 
+ 	data.set_mask = set_mask;
+-- 
+2.7.4
