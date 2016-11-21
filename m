@@ -1,115 +1,49 @@
-From: Joao.Pinto@synopsys.com (Joao Pinto)
-Date: Mon, 21 Nov 2016 13:48:53 +0000
-Subject: Synopsys Ethernet QoS Driver
-In-Reply-To: <87c8a24b-0812-7850-cb3f-7be691bab432@st.com>
-References: <CADvZ6ErjyVR5ShWTk0QesWLYR1m3p8yAMkK8v9gm2kN5xTv8zw@mail.gmail.com>
- <1dbb6047-2bbb-4d56-2a62-ab65a0254844@synopsys.com>
- <20161119135654.GA14079@lnxartpec.se.axis.com>
- <CAJ3bTp7PpUJcz=1JohX=A54UP6vVAafWnB0PGUBSxb5JJiO8Lg@mail.gmail.com>
- <1248f4ce-4859-10e6-fef9-342ea543f8d4@synopsys.com>
- <87c8a24b-0812-7850-cb3f-7be691bab432@st.com>
-Message-ID: <afc18eb0-4c11-9668-498d-982624c6de78@synopsys.com>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Mon, 21 Nov 2016 13:50:31 +0000
+Subject: [BUG] hdlcd gets confused about base address
+In-Reply-To: <20161121132419.GF1041@n2100.armlinux.org.uk>
+References: <20161118233733.GP1041@n2100.armlinux.org.uk>
+ <20161121110604.GC1005@e106497-lin.cambridge.arm.com>
+ <20161121112030.GC1041@n2100.armlinux.org.uk>
+ <20161121113212.GF1005@e106497-lin.cambridge.arm.com>
+ <20161121122556.GE1041@n2100.armlinux.org.uk>
+ <20161121125653.GJ1005@e106497-lin.cambridge.arm.com>
+ <20161121132419.GF1041@n2100.armlinux.org.uk>
+Message-ID: <20161121135031.GK1005@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Peppe,
-
-On 21-11-2016 12:52, Giuseppe CAVALLARO wrote:
-> Hello Joao
+On Mon, Nov 21, 2016 at 01:24:19PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 21, 2016 at 12:56:53PM +0000, Liviu Dudau wrote:
+> > That is mostly due to the check in hdlcd_crtc_disable() which I should
+> > remove, I've added it because I was getting a ->disable() hook call
+> > before any ->enable() was called at startup time. I need to revisit
+> > this as I remember Daniel was commenting that this was not needed.
 > 
-> On 11/21/2016 1:32 PM, Joao Pinto wrote:
->> Hello,
->>
->> On 21-11-2016 05:29, Rayagond Kokatanur wrote:
->>> On Sat, Nov 19, 2016 at 7:26 PM, Rabin Vincent <rabin@rab.in> wrote:
->>>> On Fri, Nov 18, 2016 at 02:20:27PM +0000, Joao Pinto wrote:
->>>>> For now we are interesting in improving the synopsys QoS driver under
->>>>> /nect/ethernet/synopsys. For now the driver structure consists of a single
->>>>> file
->>>>> called dwc_eth_qos.c, containing synopsys ethernet qos common ops and platform
->>>>> related stuff.
->>>>>
->>>>> Our strategy would be:
->>>>>
->>>>> a) Implement a platform glue driver (dwc_eth_qos_pltfm.c)
->>>>> b) Implement a pci glue driver (dwc_eth_qos_pci.c)
->>>>> c) Implement a "core driver" (dwc_eth_qos.c) that would only have Ethernet QoS
->>>>> related stuff to be reused by the platform / pci drivers
->>>>> d) Add a set of features to the "core driver" that we have available
->>>>> internally
->>>>
->>>> Note that there are actually two drivers in mainline for this hardware:
->>>>
->>>>  drivers/net/ethernet/synopsis/
->>>>  drivers/net/ethernet/stmicro/stmmac/
->>>
->>> Yes the later driver (drivers/net/ethernet/stmicro/stmmac/) supports
->>> both 3.x and 4.x. It has glue layer for pci, platform, core etc,
->>> please refer this driver once before you start.
->>>
->>> You can start adding missing feature of 4.x in stmmac driver.
->>
->> Thanks you all for all the info.
->> Well, I think we are in a good position to organize the ethernet drivers
->> concerning Synopsys IPs.
->>
->> First of all, in my opinion, it does not make sense to have a ethernet/synopsis
->> (typo :)) when ethernet/stmicro is also for a synopsys IP. If we have another
->> vendor using the same IP it should be able to reuse the commonn operations. But
->> I would put that discussion for later :)
->>
->> For now I suggest that for we create ethernet/qos and create there a folder
->> called dwc (designware controller) where all the synopsys qos IP specific code
->> in order to be reused for example by ethernet/stmicro/stmmac/. We just have to
->> figure out a clean interface for "client drivers" like stmmac to interact with
->> the new qos driver.
->>
->> What do you think about this approach?
+> Removing that test results in:
 > 
-> The stmmac drivers run since many years on several platforms
-> (sh4, stm32, arm, x86, mips ...) and it supports an huge of amount of
-> configurations starting from 3.1x to 3.7x databooks.
+> [drm:drm_atomic_helper_commit_cleanup_done] *ERROR* [CRTC:24:crtc-0] flip_done timed out
+> 
+> and the kernel hanging, seemingly in an IRQs-off region.
 
-Great!
+Right, I need to sort this one out. Are you doing these tests out of
+some tagged branch that I can get in sync with?
+
+Best regards,
+Liviu
 
 > 
-> It also supports QoS hardware; for example, 4.00a, 4.10a and 4.20a
-> are fully working.
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
 
-Synopsys QoS IP is a separated hardware component, so it should be reusable by
-all implementations using it and so have its own "core driver" and platform +
-pci glue drivers. This is necessary for example in hardware validation, where
-you prototype an IP and instantiate its drivers and test it.
-
-Was there a strong reason to integrate QoS features directly in stmmac and not
-in synopsys/dwc_eth_qos.*?
-
-> 
-> Also the stmmac has platform, device-tree and pcie supports and
-> a lot of maintained glue-logic files.
-> 
-> It is fully documented inside the kernel tree.
-
-Thanks for the information, I am going to check it out.
-
-> 
-> I am happy to have new enhancements from other developers.
-> So, on my side, if you want to spend your time on improving it on your
-> platforms please feel free to do it!
-> 
-> Concerning the stmicro/stmmac naming, these come from a really old
-> story and have no issue to adopt new folder/file names.
-
-Thank you for your availability!
-
-> 
-> I am also open to merge fixes and changes from ethernet/synopsis.
-> I want to point you on some benchmarks made by Alex some months ago
-> (IIRC) that showed an stmmac winner (due to the several optimizations
-> analyzed and reviewed in this mailing list).
-> 
-> Peppe
-> 
-
-Thanks
-Joao
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
