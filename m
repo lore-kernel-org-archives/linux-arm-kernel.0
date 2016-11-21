@@ -1,96 +1,128 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 21 Nov 2016 10:44:00 +0100
-Subject: [BUG] hdlcd gets confused about base address
-In-Reply-To: <20161118233733.GP1041@n2100.armlinux.org.uk>
-References: <20161118233733.GP1041@n2100.armlinux.org.uk>
-Message-ID: <20161121094400.2wiutldodoc5q3nf@phenom.ffwll.local>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Mon, 21 Nov 2016 17:45:56 +0800
+Subject: [PATCH v16 06/15] clocksource/drivers/arm_arch_timer: separate
+ out arch_timer_uses_ppi init code to prepare for GTDT.
+In-Reply-To: <20161118193054.GK1197@leverpostej>
+References: <1479304148-2965-1-git-send-email-fu.wei@linaro.org>
+ <1479304148-2965-7-git-send-email-fu.wei@linaro.org>
+ <20161118193054.GK1197@leverpostej>
+Message-ID: <CADyBb7uaDjkovJYmWC+kt7mKyiy7tEo3_KHXf0cDawHTp5dGPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 11:37:33PM +0000, Russell King - ARM Linux wrote:
-> Hi,
-> 
-> While testing HDMI with Xorg on the Juno board, I find that when Xorg
-> starts up or shuts down, the display is shifted significantly to the
-> right and wrapped in the active region.  (No sync bars are visible.)
-> The timings are correct, it behaves as if the start address has been
-> shifted many pixels _into_ the framebuffer.
-> 
-> This occurs whenever the display mode size is changed - using xrandr
-> in Xorg shows that changing the resolution triggers the problem
-> almost every time, but changing the refresh rate does not.
-> 
-> Using devmem2 to disable and re-enable the HDLCD resolves the issue,
-> and repeated disable/enable cycles do not make the issue re-appear.
-> 
-> So, I patched the HDLCD to do this, and testing it with Xorg after
-> several repetitions seems to work.
-> 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
-> What I think is going on is that the FIFO or address generator for
-> reading data from the AXI bus is not properly reset when changing the
-> resolution, and the enable-disable-enable cycle causes the HDLCD
-> hardware to sort itself out.  It's (eg) significantly out - for example,
-> to properly align the display, I have to program an address of
-> 0xf4ff0200 into the hardware rather than 0xf5000000 - that's 896 pixels
-> before the real start of the frame buffer.
-> 
-> With this patch, a patch to TDA998x to avoid the i2c-designware issue,
-> and xf86-video-armada, I have LXDE running on the Juno.
-> 
-> Something I also noticed is this:
-> 
->         scanout_start = gem->paddr + plane->state->fb->offsets[0] +
->                 plane->state->crtc_y * plane->state->fb->pitches[0] +
->                 plane->state->crtc_x * bpp / 8;
-> 
-> Surely this should be using src_[xy] (which are the position in the
-> source - iow, memory, and not crtc_[xy] which is the position on the
-> CRTC displayed window.  To put it another way, the src_* define the
-> region of the source material that is mapped onto a rectangular area
-> on the display defined by crtc_*.
-> 
-> Another note is that since the CRTC can't place the plane in arbitary
-> positions and sizes within the active area, should the atomic_check
-> ensure that crtc_x = crtc_y = 0, and the crtc width/height are the
-> size of the active area?
+Hi Mark,
 
-Yup, it should. See drm_plane_helper_check_state() and its caller for a
-helper to make this easier. Long-term computing this stuff by default and
-having a bunch of igts to regression-test it would be good I think, but
-that needs CRC support. And lots of work, since we have lots of drivers.
--Daniel
+On 19 November 2016 at 03:30, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, Nov 16, 2016 at 09:48:59PM +0800, fu.wei at linaro.org wrote:
+>> From: Fu Wei <fu.wei@linaro.org>
+>>
+>> The patch refactor original arch_timer_uses_ppi init code:
+>> (1) Extract a subfunction: arch_timer_uses_ppi_init
+>> (2) Use the new subfunction in arch_timer_of_init and
+>> arch_timer_acpi_init
+>
+> This isn't a strict refactoring, since this now assigns
+> ARCH_TIMER_PHYS_NONSECURE_PPI to arch_timer_uses_ppi, which we didn't do
+> previously.
+>
+> As a general note, please write your commit messages as prose rather
+> than a list of bullet points. Please also explain the rationale for the
+> change, rather than enumerating the changes. Call out things which are
+> important and/or likely to surprise reviewers, for example:
+>
+> * Can 32-bit ARM still use non-secure interrupts afer this change?
+>
+> * Does the "arm,cpu-registers-not-fw-configured"  proeprty still work?
+>
+> That will make it vastly easier to have this code reviewed, and it will
+> be far more helpful for anyone looking at this in future.
+>
+> For example:
+>
+>   arm_arch_timer: rework PPI determination
+>
+>   Currently, the arch timer driver uses ARCH_TIMER_PHYS_SECURE_PPI to
+>   mean the driver will use the secure PPI *and* potentialy also use the
+>   non-secure PPI. This is somewhat confusing.
+>
+>   For arm64, where it never makes sense to use the secure PPI, this
+>   means we must always request the useless secure PPI, adding to the
+>   confusion. For ACPI, where we may not even have a valid secure PPI
+>   number, this is additionally problematic. We need the driver to be
+>   able to use *only* the non-secure PPI.
+>
+>   The logic to choose which PPI to use is intertwined with other logic
+>   in arch_timer_init(). This patch factors the PPI determination out
+>   into a new function, and then reworks it so that we can handle having
+>   only a non-secure PPI.
 
-> 
->  drivers/gpu/drm/arm/hdlcd_crtc.c |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> index 48019ae22ddb..3e97acf6e2a7 100644
-> --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
-> +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> @@ -150,6 +150,8 @@ static void hdlcd_crtc_enable(struct drm_crtc *crtc)
->  	clk_prepare_enable(hdlcd->clk);
->  	hdlcd_crtc_mode_set_nofb(crtc);
->  	hdlcd_write(hdlcd, HDLCD_REG_COMMAND, 1);
-> +	hdlcd_write(hdlcd, HDLCD_REG_COMMAND, 0);
-> +	hdlcd_write(hdlcd, HDLCD_REG_COMMAND, 1);
->  }
->  
->  static void hdlcd_crtc_disable(struct drm_crtc *crtc)
-> 
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+Great thanks for your example, will use this,  :-)
+
+maybe add :
+For ARM32, it still can use non-secure interrupts after this change, and
+the "arm,cpu-registers-not-fw-configured"  property still works.
+
+>
+> [...]
+>
+>> +/*
+>> + * If HYP mode is available, we know that the physical timer
+>> + * has been configured to be accessible from PL1. Use it, so
+>> + * that a guest can use the virtual timer instead.
+>> + *
+>> + * If no interrupt provided for virtual timer, we'll have to
+>> + * stick to the physical timer. It'd better be accessible...
+>> + * On ARM64, we we only use ARCH_TIMER_PHYS_NONSECURE_PPI in Linux.
+>
+> It would be better to say that for arm64 we never use the secure
+> interrupt.
+
+For ARM64, we never use the secure interrupt, so it will be set to
+ARCH_TIMER_PHYS_NONSECURE_PPI instead.
+
+>
+>> + *
+>> + * On ARMv8.1 with VH extensions, the kernel runs in HYP. VHE
+>> + * accesses to CNTP_*_EL1 registers are silently redirected to
+>> + * their CNTHP_*_EL2 counterparts, and use a different PPI
+>> + * number.
+>> + */
+>> +static int __init arch_timer_uses_ppi_init(void)
+>
+> It would be better to call this something like arch_timer_select_ppi().
+> As it stands, the name is difficult to read.
+
+Yes, good idea, will do
+
+>
+>> @@ -902,6 +904,10 @@ static int __init arch_timer_of_init(struct device_node *np)
+>>           of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
+>>               arch_timer_uses_ppi = ARCH_TIMER_PHYS_SECURE_PPI;
+>>
+>> +     ret = arch_timer_uses_ppi_init();
+>> +     if (ret)
+>> +             return ret;
+>
+> This is clearly broken if you consider what the statement above is
+> doing.
+
+Maybe I misunderstand this, I tried to follow the original logic.
+
+Are you saying: we should use arch_timer_select_ppi() first,
+then (maybe) change arch_timer_uses_ppi according to
+"arm,cpu-registers-not-fw-configured"?
+
+Please correct me, if I misunderstand this.
+
+>
+> Thanks,
+> Mark.
+
+
 
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
