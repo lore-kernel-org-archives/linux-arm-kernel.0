@@ -1,167 +1,167 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 21 Nov 2016 08:36:39 +0100
-Subject: [PATCH 1/5] drm/modes: Rewrite the command line parser
-In-Reply-To: <CAOw6vbKf3B2DYJA-kpmxa7vLzRcv5LhyVtToPyB2d6-thdt4Ng@mail.gmail.com>
+Date: Mon, 21 Nov 2016 08:40:53 +0100
+Subject: [PATCH 2/5] drm/modes: Support modes names on the command line
+In-Reply-To: <CAOw6vb+bpf_JoPR8To0Q5Sfidxs=FTif0d3gpgCtFTOKnGCqfA@mail.gmail.com>
 References: <cover.bb9be34c7fd7767e31823f78a15ae1c127293c34.1476779323.git-series.maxime.ripard@free-electrons.com>
- <cf494b4e9585e720b2640705e3b2102c19d193c2.1476779323.git-series.maxime.ripard@free-electrons.com>
- <CAOw6vbKf3B2DYJA-kpmxa7vLzRcv5LhyVtToPyB2d6-thdt4Ng@mail.gmail.com>
-Message-ID: <20161121073639.pjikxfytzms6b6yk@lukather>
+ <853193fdf9ec1af94056d9fa2c276079c779aaf4.1476779323.git-series.maxime.ripard@free-electrons.com>
+ <CAOw6vb+bpf_JoPR8To0Q5Sfidxs=FTif0d3gpgCtFTOKnGCqfA@mail.gmail.com>
+Message-ID: <20161121074053.jguhh3kpgm7nyf2b@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Sean,
 
-Thanks for taking the time to review this.
-
-On Wed, Nov 16, 2016 at 12:12:53PM -0500, Sean Paul wrote:
+On Wed, Nov 16, 2016 at 12:21:42PM -0500, Sean Paul wrote:
 > On Tue, Oct 18, 2016 at 4:29 AM, Maxime Ripard
 > <maxime.ripard@free-electrons.com> wrote:
-> > Rewrite the command line parser in order to get away from the state machine
-> > parsing the video mode lines.
+> > The drm subsystem also uses the video= kernel parameter, and in the
+> > documentation refers to the fbdev documentation for that parameter.
 > >
-> > Hopefully, this will allow to extend it more easily to support named modes
-> > and / or properties set directly on the command line.
+> > However, that documentation also says that instead of giving the mode using
+> > its resolution we can also give a name. However, DRM doesn't handle that
+> > case at the moment. Even though in most case it shouldn't make any
+> > difference, it might be useful for analog modes, where different standards
+> > might have the same resolution, but still have a few different parameters
+> > that are not encoded in the modes (NTSC vs NTSC-J vs PAL-M for example).
 > >
 > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > > ---
-> >  drivers/gpu/drm/drm_modes.c | 305 +++++++++++++++++++++++--------------
-> >  1 file changed, 190 insertions(+), 115 deletions(-)
+> >  drivers/gpu/drm/drm_connector.c |  3 +-
+> >  drivers/gpu/drm/drm_fb_helper.c |  4 +++-
+> >  drivers/gpu/drm/drm_modes.c     | 49 +++++++++++++++++++++++-----------
+> >  include/drm/drm_connector.h     |  1 +-
+> >  4 files changed, 41 insertions(+), 16 deletions(-)
 > >
+> > diff --git a/drivers/gpu/drm/drm_connector.c b/drivers/gpu/drm/drm_connector.c
+> > index 2db7fb510b6c..27a8a511257c 100644
+> > --- a/drivers/gpu/drm/drm_connector.c
+> > +++ b/drivers/gpu/drm/drm_connector.c
+> > @@ -147,8 +147,9 @@ static void drm_connector_get_cmdline_mode(struct drm_connector *connector)
+> >                 connector->force = mode->force;
+> >         }
+> >
+> > -       DRM_DEBUG_KMS("cmdline mode for connector %s %dx%d@%dHz%s%s%s\n",
+> > +       DRM_DEBUG_KMS("cmdline mode for connector %s %s %dx%d@%dHz%s%s%s\n",
+> >                       connector->name,
+> > +                     mode->name ? mode->name : "",
+> >                       mode->xres, mode->yres,
+> >                       mode->refresh_specified ? mode->refresh : 60,
+> >                       mode->rb ? " reduced blanking" : "",
+> > diff --git a/drivers/gpu/drm/drm_fb_helper.c b/drivers/gpu/drm/drm_fb_helper.c
+> > index 03414bde1f15..20a68305fb45 100644
+> > --- a/drivers/gpu/drm/drm_fb_helper.c
+> > +++ b/drivers/gpu/drm/drm_fb_helper.c
+> > @@ -1748,6 +1748,10 @@ struct drm_display_mode *drm_pick_cmdline_mode(struct drm_fb_helper_connector *f
+> >         prefer_non_interlace = !cmdline_mode->interlace;
+> >  again:
+> >         list_for_each_entry(mode, &fb_helper_conn->connector->modes, head) {
+> > +               /* Check (optional) mode name first */
+> > +               if (!strcmp(mode->name, cmdline_mode->name))
+> > +                       return mode;
+> > +
+> >                 /* check width/height */
+> >                 if (mode->hdisplay != cmdline_mode->xres ||
+> >                     mode->vdisplay != cmdline_mode->yres)
 > > diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
-> > index 53f07ac7c174..7d5bdca276f2 100644
+> > index 7d5bdca276f2..fdbf541a5978 100644
 > > --- a/drivers/gpu/drm/drm_modes.c
 > > +++ b/drivers/gpu/drm/drm_modes.c
-> > @@ -30,6 +30,7 @@
-> >   * authorization from the copyright holder(s) and author(s).
-> >   */
+> > @@ -1413,7 +1413,7 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
+> >                                                struct drm_cmdline_mode *mode)
+> >  {
+> >         const char *name;
+> > -       bool parse_extras = false;
+> > +       bool named_mode = false, parse_extras = false;
+> >         unsigned int bpp_off = 0, refresh_off = 0;
+> >         unsigned int mode_end = 0;
+> >         char *bpp_ptr = NULL, *refresh_ptr = NULL, *extra_ptr = NULL;
+> > @@ -1432,8 +1432,14 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
 > >
-> > +#include <linux/ctype.h>
-> >  #include <linux/list.h>
-> >  #include <linux/list_sort.h>
-> >  #include <linux/export.h>
-> > @@ -1261,6 +1262,131 @@ void drm_mode_connector_list_update(struct drm_connector *connector)
-> >  }
-> >  EXPORT_SYMBOL(drm_mode_connector_list_update);
+> >         name = mode_option;
 > >
-> > +static int drm_mode_parse_cmdline_bpp(const char *str, char **end_ptr,
-> > +                                     struct drm_cmdline_mode *mode)
-> > +{
-> > +       if (str[0] != '-')
-> > +               return -EINVAL;
-> > +
-> > +       mode->bpp = simple_strtol(str + 1, end_ptr, 10);
-> > +       mode->bpp_specified = true;
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static int drm_mode_parse_cmdline_refresh(const char *str, char **end_ptr,
-> > +                                         struct drm_cmdline_mode *mode)
-> > +{
-> > +       if (str[0] != '@')
-> > +               return -EINVAL;
-> > +
-> > +       mode->refresh = simple_strtol(str + 1, end_ptr, 10);
-> > +       mode->refresh_specified = true;
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static int drm_mode_parse_cmdline_extra(const char *str, int length,
-> > +                                       struct drm_connector *connector,
-> > +                                       struct drm_cmdline_mode *mode)
-> > +{
-> > +       int i;
-> > +
-> > +       for (i = 0; i < length; i++) {
-> > +               switch (str[i]) {
-> > +               case 'i':
-> > +                       mode->interlace = true;
-> > +                       break;
-> > +               case 'm':
-> > +                       mode->margins = true;
-> > +                       break;
-> > +               case 'D':
-> > +                       if (mode->force != DRM_FORCE_UNSPECIFIED)
-> > +                               return -EINVAL;
-> > +
-> > +                       if ((connector->connector_type != DRM_MODE_CONNECTOR_DVII) &&
-> > +                           (connector->connector_type != DRM_MODE_CONNECTOR_HDMIB))
-> > +                               mode->force = DRM_FORCE_ON;
-> > +                       else
-> > +                               mode->force = DRM_FORCE_ON_DIGITAL;
-> > +                       break;
-> > +               case 'd':
-> > +                       if (mode->force != DRM_FORCE_UNSPECIFIED)
-> > +                               return -EINVAL;
-> > +
-> > +                       mode->force = DRM_FORCE_OFF;
-> > +                       break;
-> > +               case 'e':
-> > +                       if (mode->force != DRM_FORCE_UNSPECIFIED)
-> > +                               return -EINVAL;
-> > +
-> > +                       mode->force = DRM_FORCE_ON;
-> > +                       break;
-> > +               default:
-> > +                       return -EINVAL;
-> > +               }
+> > +       /*
+> > +        * If the first character is not a digit, then it means that
+> > +        * we have a named mode.
+> > +        */
+> >         if (!isdigit(name[0]))
+> > -               return false;
+> > +               named_mode = true;
+> > +       else
+> > +               named_mode = false;
+> 
+> named_mode = isalpha(name[0]); might be more succinct (and covers
+> special characters).
+> 
+> >
+> >         /* Try to locate the bpp and refresh specifiers, if any */
+> >         bpp_ptr = strchr(name, '-');
+> > @@ -1460,12 +1466,16 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
+> >                 parse_extras = true;
+> >         }
+> >
+> > -       ret = drm_mode_parse_cmdline_res_mode(name, mode_end,
+> > -                                             parse_extras,
+> > -                                             connector,
+> > -                                             mode);
+> > -       if (ret)
+> > -               return false;
+> > +       if (named_mode) {
+> > +               strncpy(mode->name, name, mode_end);
+> > +       } else {
+> > +               ret = drm_mode_parse_cmdline_res_mode(name, mode_end,
+> > +                                                     parse_extras,
+> > +                                                     connector,
+> > +                                                     mode);
+> > +               if (ret)
+> > +                       return false;
 > > +       }
+> >         mode->specified = true;
+> >
+> >         if (bpp_ptr) {
+> > @@ -1493,14 +1503,23 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
+> >                 extra_ptr = refresh_end_ptr;
+> >
+> >         if (extra_ptr) {
+> > -               int remaining = strlen(name) - (extra_ptr - name);
+> > +               if (!named_mode) {
+> > +                       int len = strlen(name) - (extra_ptr - name);
+> >
+> > -               /*
+> > -                * We still have characters to process, while
+> > -                * we shouldn't have any
+> > -                */
+> > -               if (remaining > 0)
+> > -                       return false;
+> > +                       ret = drm_mode_parse_cmdline_extra(extra_ptr, len,
+> > +                                                          connector, mode);
+> > +                       if (ret)
+> > +                               return false;
+> > +               } else {
+> > +                       int remaining = strlen(name) - (extra_ptr - name);
 > > +
-> > +       return 0;
-> > +}
-> > +
-> > +static int drm_mode_parse_cmdline_res_mode(const char *str, unsigned int length,
-> > +                                          bool extras,
-> > +                                          struct drm_connector *connector,
-> > +                                          struct drm_cmdline_mode *mode)
-> > +{
-> > +       bool rb = false, cvt = false;
-> > +       int xres = 0, yres = 0;
-> > +       int remaining, i;
-> > +       char *end_ptr;
-> > +
-> > +       xres = simple_strtol(str, &end_ptr, 10);
-> > +
+> > +                       /*
+> > +                        * We still have characters to process, while
+> > +                        * we shouldn't have any
+> > +                        */
+> > +                       if (remaining > 0)
+> > +                               return false;
 > 
-> checkpatch is telling me to use kstrtol instead, as simple_strtol is deprecated
-> 
-> > +       if (end_ptr[0] != 'x')
-> 
-> check that end_ptr != NULL? you should probably also check that xres
-> isn't an error (ie: -ERANGE or -EINVAL)
-> 
-> > +               return -EINVAL;
-> > +       end_ptr++;
-> > +
-> > +       yres = simple_strtol(end_ptr, &end_ptr, 10);
-> 
-> check end_ptr != NULL and yres sane
-> 
-> > +
-> > +       remaining = length - (end_ptr - str);
-> > +       if (remaining < 0)
-> 
-> right, so if end_ptr is NULL here, we'll end up with a huge positive
-> value for remaining :)
-> 
-> > +               return -EINVAL;
-> > +
-> > +       for (i = 0; i < remaining; i++) {
-> > +               switch (end_ptr[i]) {
-> > +               case 'M':
-> > +                       cvt = true;
-> 
-> the previous code ensured proper ordering as well as parsing, whereas
-> yours will take these in any order (and accepts duplicates). i don't
-> think this should cause any issues, but perhaps something to verify.
+> Correct me if I'm wrong, but this shouldn't ever happen. AFAICT, the
+> only way it could would be if we parsed bpp or refresh in the named
+> mode (since those are the only cases where we don't copy the whole
+> string over). Shouldn't that be invalid anyways?
 
-Yes, I definitely overlooked the order of the parameters (and now I
-get why the switch was so convoluted...)
+It's supposed to be supported by the video
+string. Documentation/fb/modedb.txt defines:
 
-I'll come up with a second version fixing that (and the other comments
-you had).
+Valid mode specifiers (mode_option argument):
 
+    <xres>x<yres>[M][R][-<bpp>][@<refresh>][i][m][eDd]
+    <name>[-<bpp>][@<refresh>]
+
+So we can't just copy the string over, and we need to parse it :/
+
+Thanks!
 Maxime
 
 -- 
@@ -174,4 +174,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161121/2a06cc04/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161121/e27ca461/attachment.sig>
