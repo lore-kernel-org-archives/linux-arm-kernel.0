@@ -1,20 +1,20 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 21 Nov 2016 11:12:05 -0600
-Subject: [PATCH v4 1/3] Documentation: DT: add dma compatible for sun50i
- A64 SOC
-In-Reply-To: <1479638740-20520-2-git-send-email-hao5781286@gmail.com>
-References: <1479638740-20520-1-git-send-email-hao5781286@gmail.com>
- <1479638740-20520-2-git-send-email-hao5781286@gmail.com>
-Message-ID: <20161121171205.g6v6dtdbeuehtqrp@rob-hp-laptop>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 21 Nov 2016 18:16:29 +0100
+Subject: [PATCH] drm: tilcdc: reduce max_width for revision 1
+Message-ID: <1479748590-3962-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 20, 2016 at 06:45:38PM +0800, Hao Zhang wrote:
-> This add the property of Allwinner sun50i A64 dma.
-> 
-> Signed-off-by: Hao Zhang <hao5781286@gmail.com>
-> ---
->  Documentation/devicetree/bindings/dma/sun6i-dma.txt | 1 +
->  1 file changed, 1 insertion(+)
+While debugging the drm_bridge support for revision 1 I noticed the
+driver was selecting the 1024x768 resolution as default from the set
+retrieved from EDID. The following patch reduces the max_width for
+rev1 in tilcdc.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Bartosz Golaszewski (1):
+  drm: tilcdc: reduce max_width for revision 1
+
+ drivers/gpu/drm/tilcdc/tilcdc_crtc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+-- 
+2.9.3
