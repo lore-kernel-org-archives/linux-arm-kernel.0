@@ -1,51 +1,56 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 21 Nov 2016 16:13:56 +0300
-Subject: [PATCH 16/18] arm64: dts: h3ulcb: rename SDHI0 pins
-In-Reply-To: <93373c309a703b57690216db4106a4a534929c15.1479726397.git.horms+renesas@verge.net.au>
-References: <cover.1479726397.git.horms+renesas@verge.net.au>
- <93373c309a703b57690216db4106a4a534929c15.1479726397.git.horms+renesas@verge.net.au>
-Message-ID: <45a251f6-ee0c-5eba-ffd1-3f61a1e7ccc7@cogentembedded.com>
+From: woogyom.kim@gmail.com (Milo Kim)
+Date: Mon, 21 Nov 2016 22:15:15 +0900
+Subject: [PATCH] dt-bindings: mfd: Improve readability for TPS65217 interrupt
+ sources
+Message-ID: <20161121131515.8040-1-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+AC and USB interrupts are related with external power input.
+PB interrupt means push button pressed or released event.
+Use better human readable definitions.
 
-On 11/21/2016 03:05 PM, Simon Horman wrote:
+Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+---
+ arch/arm/boot/dts/am335x-bone-common.dtsi | 4 ++--
+ include/dt-bindings/mfd/tps65217.h        | 6 +++---
+ 2 files changed, 5 insertions(+), 5 deletions(-)
 
-> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->
-> This changes SDHI0 pin names for H3ULCB board
->
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-> index 8d0ac076d8e2..6ffb0517421a 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-> @@ -163,13 +163,13 @@
->  		function = "avb";
->  	};
->
-> -	sdhi0_pins_3v3: sd0_3v3 {
-> +	sdhi0_pins: sd0 {
->  		groups = "sdhi0_data4", "sdhi0_ctrl";
->  		function = "sdhi0";
->  		power-source = <3300>;
->  	};
->
-> -	sdhi0_pins_1v8: sd0_1v8 {
-> +	sdhi0_pins_uhs: sd0 {
-
-    I'm afraid the following will just override the props of the node above 
-which is not what we ant.
-
->  		groups = "sdhi0_data4", "sdhi0_ctrl";
->  		function = "sdhi0";
->  		power-source = <1800>;
-[...]
-
-MBR, Sergei
+diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+index dc561d5..1848d58 100644
+--- a/arch/arm/boot/dts/am335x-bone-common.dtsi
++++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+@@ -319,13 +319,13 @@
+ 	ti,pmic-shutdown-controller;
+ 
+ 	charger {
+-		interrupts = <TPS65217_IRQ_AC>, <TPS65217_IRQ_USB>;
++		interrupts = <TPS65217_IRQ_AC_POWER>, <TPS65217_IRQ_USB_POWER>;
+ 		interrupts-names = "AC", "USB";
+ 		status = "okay";
+ 	};
+ 
+ 	pwrbutton {
+-		interrupts = <TPS65217_IRQ_PB>;
++		interrupts = <TPS65217_IRQ_PUSHBUTTON>;
+ 		status = "okay";
+ 	};
+ 
+diff --git a/include/dt-bindings/mfd/tps65217.h b/include/dt-bindings/mfd/tps65217.h
+index cafb9e6..0293fdd 100644
+--- a/include/dt-bindings/mfd/tps65217.h
++++ b/include/dt-bindings/mfd/tps65217.h
+@@ -19,8 +19,8 @@
+ #ifndef __DT_BINDINGS_TPS65217_H__
+ #define __DT_BINDINGS_TPS65217_H__
+ 
+-#define TPS65217_IRQ_USB	0
+-#define TPS65217_IRQ_AC		1
+-#define TPS65217_IRQ_PB		2
++#define TPS65217_IRQ_USB_POWER		0	/* USB power state change */
++#define TPS65217_IRQ_AC_POWER		1	/* AC power state change */
++#define TPS65217_IRQ_PUSHBUTTON		2	/* Push button state change */
+ 
+ #endif
+-- 
+2.9.3
