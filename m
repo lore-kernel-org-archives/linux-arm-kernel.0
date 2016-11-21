@@ -1,45 +1,46 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Nov 2016 10:43:29 +0000
-Subject: [BUG] i2c-designware silently fails on long transfers
-In-Reply-To: <20161121102901.GF1446@lahna.fi.intel.com>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Mon, 21 Nov 2016 12:40:32 +0200
+Subject: [PATCH 2/2] i2c: designware: fix rx fifo depth tracking
+In-Reply-To: <E1c7p18-0000R6-4w@rmk-PC.armlinux.org.uk>
 References: <20161118193542.GO1041@n2100.armlinux.org.uk>
- <20161121102901.GF1446@lahna.fi.intel.com>
-Message-ID: <20161121104329.GB1041@n2100.armlinux.org.uk>
+ <E1c7p18-0000R6-4w@rmk-PC.armlinux.org.uk>
+Message-ID: <20161121104032.GH1446@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2016 at 12:29:01PM +0200, Mika Westerberg wrote:
-> On Fri, Nov 18, 2016 at 07:35:42PM +0000, Russell King - ARM Linux wrote:
-> > Another mitigation would be to lower the I2C bus frequency on Juno from
-> > 400kHz to 100kHz, so that there's 4x longer IRQ latency possible.
-> > However, even that isn't going to be reliable - even going to 100kHz
-> > isn't going to allow the above case to be solved - the interrupt is
-> > delayed by around 2ms, and it takes about 1.4ms to send/receive 16 bytes
-> > at 100kHz.  (9 * 16 / (100*10^3)).
-> > 
-> > So, I think all hope is lost for i2c-designware on Juno to cope with
-> > reading the EDID from TDA998x reliably.
+On Fri, Nov 18, 2016 at 07:40:10PM +0000, Russell King wrote:
+> When loading the TX fifo to receive bytes on the I2C bus, we incorrectly
+> count the number of bytes:
 > 
-> :-(
+> 	rx_limit = dev->rx_fifo_depth - dw_readl(dev, DW_IC_RXFLR);
 > 
-> I wonder if we can get it work more reliably by using DMA (provided that
-> there are DMA channels available for I2C in Juno)? That would allow the
-> hardware to perform longer reads without relying on how fast the
-> interrupt handler is able to empty the Rx FIFO.
+> 	while (buf_len > 0 && tx_limit > 0 && rx_limit > 0) {
+> 		if (rx_limit - dev->rx_outstanding <= 0)
+> 			break;
+> 		rx_limit--;
+> 		dev->rx_outstanding++;
+> 	}
+> 
+> DW_IC_RXFLR indicates how many bytes are available to be read in the
+> FIFO, dev->rx_fifo_depth is the FIFO size, and dev->rx_outstanding is
+> the number of bytes that we've requested to be read so far, but which
+> have not been read.
+> 
+> Firstly, increasing dev->rx_outstanding and decreasing rx_limit and then
+> comparing them results in each byte consuming "two" bytes in this
+> tracking, so this is obviously wrong.
+> 
+> Secondly, the number of bytes that _could_ be received into the FIFO at
+> any time is the number of bytes we have so far requested but not yet
+> read from the FIFO - in other words dev->rx_outstanding.
+> 
+> So, in order to request enough bytes to fill the RX FIFO, we need to
+> request dev->rx_fifo_depth - dev->rx_outstanding bytes.
+> 
+> Modifying the code thusly results in us reaching the maximum number of
+> bytes outstanding each time we queue more "receive" operations, provided
+> the transfer allows that to happen.
+> 
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-It would need to DMA to the Tx FIFO to keep it filled - it triggers the
-stop condition when the Tx FIFO empties.  From what I can see in the
-driver, the Tx FIFO not only takes the data but also a "command" to tell
-the hardware what to do.
-
-The Rx FIFO would also need DMA to avoid it overflowing due to high
-interrupt latency.
-
-I don't know what state DMA is in on the Juno, or even whether it has
-DMA - it has a PL330 DMA controller, but I see nothing in the DT files
-making use of it.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Reviewed-by: Mika Westerberg <mika.westerberg@linux.intel.com>
