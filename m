@@ -1,14 +1,14 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 21 Nov 2016 10:01:37 +0000
-Subject: [PATCH v9 05/16] drivers: iommu: arm-smmu: convert struct device
+Date: Mon, 21 Nov 2016 10:01:38 +0000
+Subject: [PATCH v9 06/16] drivers: iommu: arm-smmu-v3: convert struct device
  of_node to fwnode usage
 In-Reply-To: <20161121100148.24769-1-lorenzo.pieralisi@arm.com>
 References: <20161121100148.24769-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20161121100148.24769-6-lorenzo.pieralisi@arm.com>
+Message-ID: <20161121100148.24769-7-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current ARM SMMU driver rely on the struct device.of_node pointer for
+Current ARM SMMU v3 driver rely on the struct device.of_node pointer for
 device look-up and iommu_ops retrieval.
 
 In preparation for ACPI probing enablement, convert the driver to use
@@ -27,14 +27,14 @@ Cc: Will Deacon <will.deacon@arm.com>
 Cc: Hanjun Guo <hanjun.guo@linaro.org>
 Cc: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/iommu/arm-smmu.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ drivers/iommu/arm-smmu-v3.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 8f72814..339a8d3 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1379,13 +1379,14 @@ static bool arm_smmu_capable(enum iommu_cap cap)
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index e6f9b2d..e6e1c87 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1723,13 +1723,14 @@ static struct platform_driver arm_smmu_driver;
  
  static int arm_smmu_match_node(struct device *dev, void *data)
  {
@@ -52,23 +52,24 @@ index 8f72814..339a8d3 100644
  	put_device(dev);
  	return dev ? dev_get_drvdata(dev) : NULL;
  }
-@@ -1403,7 +1404,7 @@ static int arm_smmu_add_device(struct device *dev)
- 		if (ret)
- 			goto out_free;
- 	} else if (fwspec && fwspec->ops == &arm_smmu_ops) {
+@@ -1765,7 +1766,7 @@ static int arm_smmu_add_device(struct device *dev)
+ 		master = fwspec->iommu_priv;
+ 		smmu = master->smmu;
+ 	} else {
 -		smmu = arm_smmu_get_by_node(to_of_node(fwspec->iommu_fwnode));
 +		smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
- 	} else {
- 		return -ENODEV;
- 	}
-@@ -2007,7 +2008,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 		}
- 	}
+ 		if (!smmu)
+ 			return -ENODEV;
+ 		master = kzalloc(sizeof(*master), GFP_KERNEL);
+@@ -2634,7 +2635,8 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 		return ret;
  
+ 	/* And we're up. Go go go! */
 -	of_iommu_set_ops(dev->of_node, &arm_smmu_ops);
 +	iommu_register_instance(dev->fwnode, &arm_smmu_ops);
- 	platform_set_drvdata(pdev, smmu);
- 	arm_smmu_device_reset(smmu);
- 
++
+ #ifdef CONFIG_PCI
+ 	if (pci_bus_type.iommu_ops != &arm_smmu_ops) {
+ 		pci_request_acs();
 -- 
 2.10.0
