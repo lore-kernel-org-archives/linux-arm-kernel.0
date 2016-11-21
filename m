@@ -1,81 +1,43 @@
-From: manu@bidouilliste.com (Emmanuel Vadot)
-Date: Mon, 21 Nov 2016 17:49:11 +0100
-Subject: [PATCH] ARM: dts: sunxi: Enable UEXT related nodes for Olimex A20 SOM
- EVB
-Message-ID: <20161121164911.76900-1-manu@bidouilliste.com>
+From: ahaslam@baylibre.com (Axel Haslam)
+Date: Mon, 21 Nov 2016 17:53:46 +0100
+Subject: [RESEND PATCH 0/3] ARM: davinci: OHCI: Use a regulator instead of
+ callbacks
+Message-ID: <20161121165349.29128-1-ahaslam@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-UEXT are Universal EXTension connector from Olimex. They embed i2c, spi
-and uart pins along power in one connector and are found on most,
-if not all, Olimex boards.
-The Olimex A20 SOM EVB have two UEXT connector so enable the nodes found on
-those two connectors.
+With the ultimate goal to able to probe the ohci driver form DT,
+convert users of OHCI pdata to use a regulator instead of
+passing platform function pointers. This will help to remove the
+platform callbacks in a future series.
 
-Signed-off-by: Emmanuel Vadot <manu@bidouilliste.com>
----
- arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 36 ++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+These patches were included in previous series[1], im sending them again
+to claify that it should go through the devinci tree, and to update
+the dependencies. 
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-index 23aacce..e879c119 100644
---- a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-@@ -116,6 +116,18 @@
- 	};
- };
- 
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+};
-+
- &lradc {
- 	vref-supply = <&reg_vcc3v0>;
- 	status = "okay";
-@@ -284,12 +296,36 @@
- 	status = "okay";
- };
- 
-+&spi1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi1_pins_a>,
-+		<&spi1_cs0_pins_a>;
-+};
-+
-+&spi2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi2_pins_a>,
-+		<&spi2_cs0_pins_a>;
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
- 	status = "okay";
- };
- 
-+&uart6 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart6_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart7 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart7_pins_a>;
-+	status = "okay";
-+};
-+
- &usb_otg {
- 	dr_mode = "otg";
- 	status = "okay";
+[1] https://www.spinics.net/lists/linux-usb/msg148884.html
+
+DEPENDENCIES:
+
+1. [PATCH v6 0/5] USB: ohci-da8xx: Add device tree support
+https://lkml.org/lkml/2016/11/21/558
+
+2. [PATCH v3 0/2] regulator: handling of error conditions for usb drivers
+https://lkml.org/lkml/2016/11/4/465
+
+3. [PATCH v2 0/3] davinci: ohci: fix usb ohci device name
+http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1263999.html
+
+Axel Haslam (3):
+  ARM: davinci: da830: Handle vbus with a regulator
+  ARM: davinci: hawk: Remove vbus and over current gpios
+  ARM: davinci: remove ohci platform usage
+
+ arch/arm/mach-davinci/board-da830-evm.c     | 108 ++++++++++------------------
+ arch/arm/mach-davinci/board-omapl138-hawk.c |  99 ++-----------------------
+ arch/arm/mach-davinci/include/mach/da8xx.h  |   2 +-
+ arch/arm/mach-davinci/usb-da8xx.c           |   3 +-
+ 4 files changed, 44 insertions(+), 168 deletions(-)
+
 -- 
-2.9.2
+2.9.3
