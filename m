@@ -1,45 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 Nov 2016 08:19:47 -0800
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.10
-In-Reply-To: <CAMuHMdXAuDcbr84phfPRpqZYRzAZf2j4vsv+i_Frz0G8ksd_Vg@mail.gmail.com>
-References: <cover.1479387356.git.horms+renesas@verge.net.au>
- <20161119012836.GA2543@localhost>
- <CAMuHMdXAuDcbr84phfPRpqZYRzAZf2j4vsv+i_Frz0G8ksd_Vg@mail.gmail.com>
-Message-ID: <CAOesGMjk=KWifGT7sugpWVjNJSKhmgxg8gN9Cgi=emGrg66z0w@mail.gmail.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Mon, 21 Nov 2016 10:23:09 -0600
+Subject: [GIT PULL 2/2] SoCFPGA update for v4.10
+In-Reply-To: <20161121162309.5408-1-dinguyen@kernel.org>
+References: <20161121162309.5408-1-dinguyen@kernel.org>
+Message-ID: <20161121162309.5408-2-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2016 at 1:31 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Olof,
->
-> On Sat, Nov 19, 2016 at 2:28 AM, Olof Johansson <olof@lixom.net> wrote:
->> On Thu, Nov 17, 2016 at 02:34:25PM +0100, Simon Horman wrote:
->>> Please consider these second round of Renesas ARM based SoC updates for v4.10.
->
->>> * Basic support for r8a7745 SoC
->>>
->>> ----------------------------------------------------------------
->>> Sergei Shtylyov (2):
->>>       ARM: shmobile: r8a7745: basic SoC support
->>>       ARM: shmobile: document SK-RZG1E board
->>
->> Hi,
->>
->> Is there a reason you're adding a config option per SoC?
->>
->> I think you'd be better off not adding these config options, and just adding
->> support for the SoCs through compatibles (and adding the drivers to defconfigs,
->> etc).
->
-> Yes there is a reason: kernel size.
-> The main offenders are the pinctrl tables, which add ca. 20-50 KiB per
-> supported SoC.
+Hi Arnd, Kevin, and Olof:
 
-So don't turn on that pinctrl driver unless you have that SoC?
+Please pull in this update for v4.10.
 
-> Note that RZ/A1 (r7s72100) is used on some boards with its internal RAM
-> (10 MiB) only.
+Thanks,
+Dinh
 
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
--Olof
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_updates_for_v4.10
+
+for you to fetch changes up to ed72af3a8ccf9b29ccb575d39fb997e5f12b03f8:
+
+  ARM: socfpga: fix spelling mistake in error message (2016-11-15 08:52:17 -0600)
+
+----------------------------------------------------------------
+SoCFPGA update for v4.10
+- Fixup spelling error
+
+----------------------------------------------------------------
+Colin King (1):
+      ARM: socfpga: fix spelling mistake in error message
+
+ arch/arm/mach-socfpga/l2_cache.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
