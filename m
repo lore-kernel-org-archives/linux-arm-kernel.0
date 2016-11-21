@@ -1,179 +1,57 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Mon, 21 Nov 2016 11:32:12 +0000
-Subject: [BUG] hdlcd gets confused about base address
-In-Reply-To: <20161121112030.GC1041@n2100.armlinux.org.uk>
-References: <20161118233733.GP1041@n2100.armlinux.org.uk>
- <20161121110604.GC1005@e106497-lin.cambridge.arm.com>
- <20161121112030.GC1041@n2100.armlinux.org.uk>
-Message-ID: <20161121113212.GF1005@e106497-lin.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Nov 2016 11:36:14 +0000
+Subject: [BUG] i2c-designware silently fails on long transfers
+In-Reply-To: <20161121112135.GE1005@e106497-lin.cambridge.arm.com>
+References: <20161118193542.GO1041@n2100.armlinux.org.uk>
+ <20161121102901.GF1446@lahna.fi.intel.com>
+ <20161121104329.GB1041@n2100.armlinux.org.uk>
+ <20161121112135.GE1005@e106497-lin.cambridge.arm.com>
+Message-ID: <20161121113614.GD1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2016 at 11:20:30AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 21, 2016 at 11:06:04AM +0000, Liviu Dudau wrote:
-> > On Fri, Nov 18, 2016 at 11:37:33PM +0000, Russell King - ARM Linux wrote:
-> > > Hi,
+On Mon, Nov 21, 2016 at 11:21:35AM +0000, Liviu Dudau wrote:
+> On Mon, Nov 21, 2016 at 10:43:29AM +0000, Russell King - ARM Linux wrote:
+> > It would need to DMA to the Tx FIFO to keep it filled - it triggers the
+> > stop condition when the Tx FIFO empties.  From what I can see in the
+> > driver, the Tx FIFO not only takes the data but also a "command" to tell
+> > the hardware what to do.
 > > 
-> > Hi Russell,
+> > The Rx FIFO would also need DMA to avoid it overflowing due to high
+> > interrupt latency.
 > > 
-> > > 
-> > > While testing HDMI with Xorg on the Juno board, I find that when Xorg
-> > > starts up or shuts down, the display is shifted significantly to the
-> > > right and wrapped in the active region.  (No sync bars are visible.)
-> > > The timings are correct, it behaves as if the start address has been
-> > > shifted many pixels _into_ the framebuffer.
-> > > 
-> > > This occurs whenever the display mode size is changed - using xrandr
-> > > in Xorg shows that changing the resolution triggers the problem
-> > > almost every time, but changing the refresh rate does not.
-> > 
-> > Thanks for reporting this. To double check your issue, you are booting
-> > with HDLCD using the native monitor resolution as detected via EDID
-> > and then using xrandr to change the display mode. When you do that you
-> > are seeing the image being shifted to the right. Is that a correct
-> > description? (I'm trying to reproduce it here and want to make sure 
-> > I've got the details right).
+> > I don't know what state DMA is in on the Juno, or even whether it has
+> > DMA - it has a PL330 DMA controller, but I see nothing in the DT files
+> > making use of it.
 > 
-> I first noticed it when booting with the buggy I2C EDID reading, so
-> DRM wasn't seeing a valid EDID.  Then when Xorg started up and shut
-> down, I noticed that the framebuffer console was shifted.  It's actually
-> shifted to the left because framebuffer pixel 0,0 is not displayed.
+> The only thing we have tested PL330 with was UART and I2S. I'm not sure we
+> can really use it with I2C given the above hardware configuration issue.
+> 
+> The other thing we have tried in our private branches was to repeat the EDID
+> transfer a number of times until the checksum was correct. Andrew Jackson
+> sent a patch a year or so back to have some ridiculously high number of
+> retries (30) and that has been rightfully shut down in the upstream.
+> 
+> The unfortunate thing is that the monitors and TVs that we use inside ARM
+> for testing don't seem to trigger this issue on a regular basis. We had one
+> or two small 7" TVs that did that, and the brute force retry of EDID transfer
+> sorted them out for the limited use that we had for them.
 
-I see. So the reason why I did not notice this was the EDID transfers
-mostly working for me.
+Due to the way the TDA998x works, it doesn't have much to do with the TV.
+The TDA998x is instructed to read up to 128 bytes of EDID data into its
+own internal buffer.  It then does so, and raises an interrupt (or we
+notice that the interrupt flag is set when there's no hardware interrupt
+line), and we then read the EDID data out of the TDA998x.
 
-> 
-> > > Using devmem2 to disable and re-enable the HDLCD resolves the issue,
-> > > and repeated disable/enable cycles do not make the issue re-appear.
-> > 
-> > Do you resize the display mode as well afer re-enabling HDLCD?
-> 
-> I quite literally just did:
-> 
-> ./devmem2 0x7ff60230 w 0; ./devmem2 0x7ff60230 w 1
+At the point we're reading from the TDA998x, it has loaded the data from
+the DDC bus and the DDC bus is idle... we don't have direct access to
+the DDC bus.
 
-Sorry, was not very clear. Under my assumption that you were resizing the
-display with xrandr, I was wondering if the issue you were seeing disappeared
-when using devmem2 plus the resizing.
-
-> 
-> (with a devmem2 fixed for ARM64) which immediately fixed the issue.
-> 
-> > > What I think is going on is that the FIFO or address generator for
-> > > reading data from the AXI bus is not properly reset when changing the
-> > > resolution, and the enable-disable-enable cycle causes the HDLCD
-> > > hardware to sort itself out.
-> > 
-> > That is likely what is happening. According to the datasheet, changing
-> > the resolution should be done while the HDLCD command mode is disabled,
-> > which is what writing 0 into HDLCD_REG_COMMAND does.
-> 
-> That does not appear to be sufficient.
-> 
-> > > It's (eg) significantly out - for example,
-> > > to properly align the display, I have to program an address of
-> > > 0xf4ff0200 into the hardware rather than 0xf5000000 - that's 896 pixels
-> > > before the real start of the frame buffer.
-> > 
-> > What is the resolution you are using?
-> 
-> In the case I detailed here, 1920x1080.
-> 
-> > > With this patch, a patch to TDA998x to avoid the i2c-designware issue,
-> > > and xf86-video-armada, I have LXDE running on the Juno.
-> > 
-> > Can you tell me more about the TDA998x and i2c-designware issue?
-> > Also, I don't think you need to use xf86-video-armada, the mode-setting
-> > driver built into Xorg should be working fine (that is what I've used
-> > in my testing).
-> 
-> See the i2c-designware thread on lakml.  It's a spontaneous high
-> interrupt latency causing the Tx FIFO not to be loaded before it
-> empties, and the i2c-designware crap decides at that point to
-> immediately generate an I2C stop.  The I2C controller in Juno can
-> only work reliably in a system which has guaranteed low interrupt
-> latencies.
-
-Sorry, my email setup had a hickup and it was slow fetching all my emails.
-I've seen the thread after replying in this thread.
-
-> 
-> > > Something I also noticed is this:
-> > > 
-> > >         scanout_start = gem->paddr + plane->state->fb->offsets[0] +
-> > >                 plane->state->crtc_y * plane->state->fb->pitches[0] +
-> > >                 plane->state->crtc_x * bpp / 8;
-> > > 
-> > > Surely this should be using src_[xy] (which are the position in the
-> > > source - iow, memory, and not crtc_[xy] which is the position on the
-> > > CRTC displayed window.  To put it another way, the src_* define the
-> > > region of the source material that is mapped onto a rectangular area
-> > > on the display defined by crtc_*.
-> > 
-> > Yes, that is a bug and most likely the source of the issue that you are
-> > seeing if my understanding of your testing is correct.
-> 
-> It isn't the source of this issue at all.  gem->paddr is 0xf5000000, and
-> the value programmed originally into the register is the same.  So, from
-> those two pieces of information, we can reasonably assume that crtc_y
-> and crtc_x were both zero here.
-
-Yes, they should be zero all the time, as we don't support plane positioning
-with HDLCD.
-
-> 
-> > > Another note is that since the CRTC can't place the plane in arbitary
-> > > positions and sizes within the active area, should the atomic_check
-> > > ensure that crtc_x = crtc_y = 0, and the crtc width/height are the
-> > > size of the active area?
-> > 
-> > That should be the case, indeed. I'm going prepare a patch to do that.
-> 
-> I've already a patch along the lines of Daniel Vetter's response to this
-> point which I'm just testing.
-
-OK, let me know how it goes and please Cc me on it.
-
-
-> 
-> > > diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> > > index 48019ae22ddb..3e97acf6e2a7 100644
-> > > --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
-> > > +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> > > @@ -150,6 +150,8 @@ static void hdlcd_crtc_enable(struct drm_crtc *crtc)
-> > >  	clk_prepare_enable(hdlcd->clk);
-> > >  	hdlcd_crtc_mode_set_nofb(crtc);
-> > >  	hdlcd_write(hdlcd, HDLCD_REG_COMMAND, 1);
-> > > +	hdlcd_write(hdlcd, HDLCD_REG_COMMAND, 0);
-> > > +	hdlcd_write(hdlcd, HDLCD_REG_COMMAND, 1);
-> > 
-> > I am not convinced that this is the right fix. If anything, I would put a
-> > hdlcd_write(hdlcd, HDLCD_REG_COMMAND, 0); line before hdlcd_crtc_mode_set_nofs(crtc);
-> > line to make sure the command mode is disabled before setting the mode, but
-> > again, I need to understand your use case to make sure that this indeed fixes it.
-> 
-> Maybe hdlcd shouldn't be implementing the ->enable callback but instead
-> the ->commit callback then?
-
-I believe we need ->enable for the initial setup (cold boot or module reloading).
-
-Best regards,
-Liviu
-
-> 
-> I'll give it a try.
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+The only reason I can think that the checksum would pass is if you were
+somehow ending up with data in the buffer that did cause the basic
+checksum to pass, even though you had an incomplete read.
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
