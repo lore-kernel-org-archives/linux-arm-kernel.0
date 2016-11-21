@@ -1,672 +1,179 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 21 Nov 2016 12:23:52 +0100
-Subject: [PATCH v3] ARM: at91/dt: add dts file for sama5d36ek CMP board
-In-Reply-To: <1479705283-3052-1-git-send-email-wenyou.yang@atmel.com>
-References: <1479705283-3052-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <98ed7834-b12d-91b7-fbc9-a59e3e355db9@atmel.com>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Mon, 21 Nov 2016 11:32:12 +0000
+Subject: [BUG] hdlcd gets confused about base address
+In-Reply-To: <20161121112030.GC1041@n2100.armlinux.org.uk>
+References: <20161118233733.GP1041@n2100.armlinux.org.uk>
+ <20161121110604.GC1005@e106497-lin.cambridge.arm.com>
+ <20161121112030.GC1041@n2100.armlinux.org.uk>
+Message-ID: <20161121113212.GF1005@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 21/11/2016 ? 06:14, Wenyou Yang a ?crit :
-> The sama5d36ek CMP board is the variant of sama5d3xek board.
-> It is equipped with the low-power DDR2 SDRAM, PMIC ACT8865 and
-> some power rail. Its main purpose is used to measure the power
-> consumption.
-> The difference of the sama5d36ek CMP dts from sama5d36ek dts is
-> listed as below.
->  1. The USB host nodes are removed, that is, the USB host is disabled.
->  2. The gpio_keys node is added to wake up from the sleep.
->  3. The LCD isn't supported due to the pins for LCD are conflicted
->     with gpio_keys.
->  4. The adc0 node support the pinctrl sleep state to fix the over
->     consumption on VDDANA.
+On Mon, Nov 21, 2016 at 11:20:30AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 21, 2016 at 11:06:04AM +0000, Liviu Dudau wrote:
+> > On Fri, Nov 18, 2016 at 11:37:33PM +0000, Russell King - ARM Linux wrote:
+> > > Hi,
+> > 
+> > Hi Russell,
+> > 
+> > > 
+> > > While testing HDMI with Xorg on the Juno board, I find that when Xorg
+> > > starts up or shuts down, the display is shifted significantly to the
+> > > right and wrapped in the active region.  (No sync bars are visible.)
+> > > The timings are correct, it behaves as if the start address has been
+> > > shifted many pixels _into_ the framebuffer.
+> > > 
+> > > This occurs whenever the display mode size is changed - using xrandr
+> > > in Xorg shows that changing the resolution triggers the problem
+> > > almost every time, but changing the refresh rate does not.
+> > 
+> > Thanks for reporting this. To double check your issue, you are booting
+> > with HDLCD using the native monitor resolution as detected via EDID
+> > and then using xrandr to change the display mode. When you do that you
+> > are seeing the image being shifted to the right. Is that a correct
+> > description? (I'm trying to reproduce it here and want to make sure 
+> > I've got the details right).
 > 
-> As said in errata, "When the USB host ports are used in high speed
-> mode (EHCI), it is not possible to suspend the ports if no device is
-> attached on each port. This leads to increased power consumption even
-> if the system is in a low power mode." That is why the the USB host
-> is disabled.
-> 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> I first noticed it when booting with the buggy I2C EDID reading, so
+> DRM wasn't seeing a valid EDID.  Then when Xorg started up and shut
+> down, I noticed that the framebuffer console was shifted.  It's actually
+> shifted to the left because framebuffer pixel 0,0 is not displayed.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+I see. So the reason why I did not notice this was the EDID transfers
+mostly working for me.
 
-Thanks Wenyou.
+> 
+> > > Using devmem2 to disable and re-enable the HDLCD resolves the issue,
+> > > and repeated disable/enable cycles do not make the issue re-appear.
+> > 
+> > Do you resize the display mode as well afer re-enabling HDLCD?
+> 
+> I quite literally just did:
+> 
+> ./devmem2 0x7ff60230 w 0; ./devmem2 0x7ff60230 w 1
 
-Regards,
+Sorry, was not very clear. Under my assumption that you were resizing the
+display with xrandr, I was wondering if the issue you were seeing disappeared
+when using devmem2 plus the resizing.
 
-> ---
 > 
-> Changes in v3:
->  - Use a dual license scheme for DT files.
->  - Use the proper model name and the compatible string to reflect
->    the nature of this new "CMP" board.
->  - Change name of wakeup property to "wakeup-source".
->  - Remove unnecessary comments.
->  - Remove bootargs.
+> (with a devmem2 fixed for ARM64) which immediately fixed the issue.
 > 
-> Changes in v2:
->  - Add the pinctrl sleep state for adc0 node to fix the over
->    consumption on VDDANA.
->  - Improve the commit log.
+> > > What I think is going on is that the FIFO or address generator for
+> > > reading data from the AXI bus is not properly reset when changing the
+> > > resolution, and the enable-disable-enable cycle causes the HDLCD
+> > > hardware to sort itself out.
+> > 
+> > That is likely what is happening. According to the datasheet, changing
+> > the resolution should be done while the HDLCD command mode is disabled,
+> > which is what writing 0 into HDLCD_REG_COMMAND does.
 > 
->  arch/arm/boot/dts/sama5d36ek_cmp.dts  |  87 ++++++++++
->  arch/arm/boot/dts/sama5d3xcm_cmp.dtsi | 201 +++++++++++++++++++++++
->  arch/arm/boot/dts/sama5d3xmb_cmp.dtsi | 301 ++++++++++++++++++++++++++++++++++
->  3 files changed, 589 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sama5d36ek_cmp.dts
->  create mode 100644 arch/arm/boot/dts/sama5d3xcm_cmp.dtsi
->  create mode 100644 arch/arm/boot/dts/sama5d3xmb_cmp.dtsi
+> That does not appear to be sufficient.
 > 
-> diff --git a/arch/arm/boot/dts/sama5d36ek_cmp.dts b/arch/arm/boot/dts/sama5d36ek_cmp.dts
-> new file mode 100644
-> index 0000000..b632143
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sama5d36ek_cmp.dts
-> @@ -0,0 +1,87 @@
-> +/*
-> + * sama5d36ek_cmp.dts - Device Tree file for SAMA5D36-EK CMP board
-> + *
-> + *  Copyright (C) 2016 Atmel,
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +/dts-v1/;
-> +#include "sama5d36.dtsi"
-> +#include "sama5d3xmb_cmp.dtsi"
-> +
-> +/ {
-> +	model = "Atmel SAMA5D36EK-CMP";
-> +	compatible = "atmel,sama5d36ek-cmp", "atmel,sama5d3xmb-cmp", "atmel,sama5d3xcm-cmp", "atmel,sama5d36", "atmel,sama5d3", "atmel,sama5";
-> +
-> +	ahb {
-> +		apb {
-> +			spi0: spi at f0004000 {
-> +				status = "okay";
-> +			};
-> +
-> +			ssc0: ssc at f0008000 {
-> +				status = "okay";
-> +			};
-> +
-> +			can0: can at f000c000 {
-> +				status = "okay";
-> +			};
-> +
-> +			i2c0: i2c at f0014000 {
-> +				status = "okay";
-> +			};
-> +
-> +			i2c1: i2c at f0018000 {
-> +				status = "okay";
-> +			};
-> +
-> +			macb0: ethernet at f0028000 {
-> +				status = "okay";
-> +			};
-> +
-> +			macb1: ethernet at f802c000 {
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-> +
-> +	sound {
-> +		status = "okay";
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/sama5d3xcm_cmp.dtsi b/arch/arm/boot/dts/sama5d3xcm_cmp.dtsi
-> new file mode 100644
-> index 0000000..dc7572b
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sama5d3xcm_cmp.dtsi
-> @@ -0,0 +1,201 @@
-> +/*
-> + * sama5d3xcm_cmp.dtsi - Device Tree Include file for SAMA5D36 CMP CPU Module
-> + *
-> + *  Copyright (C) 2016 Atmel,
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/ {
-> +	compatible = "atmel,sama5d3xcm-cmp", "atmel,sama5d3", "atmel,sama5";
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	memory {
-> +		reg = <0x20000000 0x20000000>;
-> +	};
-> +
-> +	clocks {
-> +		slow_xtal {
-> +			clock-frequency = <32768>;
-> +		};
-> +
-> +		main_xtal {
-> +			clock-frequency = <12000000>;
-> +		};
-> +	};
-> +
-> +	ahb {
-> +		apb {
-> +			spi0: spi at f0004000 {
-> +				cs-gpios = <&pioD 13 0>, <0>, <0>, <0>;
-> +			};
-> +
-> +			macb0: ethernet at f0028000 {
-> +				phy-mode = "rgmii";
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				ethernet-phy at 1 {
-> +					reg = <0x1>;
-> +					interrupt-parent = <&pioB>;
-> +					interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
-> +					txen-skew-ps = <800>;
-> +					txc-skew-ps = <3000>;
-> +					rxdv-skew-ps = <400>;
-> +					rxc-skew-ps = <3000>;
-> +					rxd0-skew-ps = <400>;
-> +					rxd1-skew-ps = <400>;
-> +					rxd2-skew-ps = <400>;
-> +					rxd3-skew-ps = <400>;
-> +				};
-> +
-> +				ethernet-phy at 7 {
-> +					reg = <0x7>;
-> +					interrupt-parent = <&pioB>;
-> +					interrupts = <25 IRQ_TYPE_EDGE_FALLING>;
-> +					txen-skew-ps = <800>;
-> +					txc-skew-ps = <3000>;
-> +					rxdv-skew-ps = <400>;
-> +					rxc-skew-ps = <3000>;
-> +					rxd0-skew-ps = <400>;
-> +					rxd1-skew-ps = <400>;
-> +					rxd2-skew-ps = <400>;
-> +					rxd3-skew-ps = <400>;
-> +				};
-> +			};
-> +
-> +			i2c1: i2c at f0018000 {
-> +				pmic: act8865 at 5b {
-> +					compatible = "active-semi,act8865";
-> +					reg = <0x5b>;
-> +					status = "disabled";
-> +
-> +					regulators {
-> +						vcc_1v8_reg: DCDC_REG1 {
-> +							regulator-name = "VCC_1V8";
-> +							regulator-min-microvolt = <1800000>;
-> +							regulator-max-microvolt = <1800000>;
-> +							regulator-always-on;
-> +						};
-> +
-> +						vcc_1v2_reg: DCDC_REG2 {
-> +							regulator-name = "VCC_1V2";
-> +							regulator-min-microvolt = <1100000>;
-> +							regulator-max-microvolt = <1300000>;
-> +							regulator-always-on;
-> +						};
-> +
-> +						vcc_3v3_reg: DCDC_REG3 {
-> +							regulator-name = "VCC_3V3";
-> +							regulator-min-microvolt = <3300000>;
-> +							regulator-max-microvolt = <3300000>;
-> +							regulator-always-on;
-> +						};
-> +
-> +						vddana_reg: LDO_REG1 {
-> +							regulator-name = "VDDANA";
-> +							regulator-min-microvolt = <3300000>;
-> +							regulator-max-microvolt = <3300000>;
-> +							regulator-always-on;
-> +						};
-> +
-> +						vddfuse_reg: LDO_REG2 {
-> +							regulator-name = "FUSE_2V5";
-> +							regulator-min-microvolt = <2500000>;
-> +							regulator-max-microvolt = <2500000>;
-> +						};
-> +					};
-> +				};
-> +			};
-> +		};
-> +
-> +		nand0: nand at 60000000 {
-> +			nand-bus-width = <8>;
-> +			nand-ecc-mode = "hw";
-> +			atmel,has-pmecc;
-> +			atmel,pmecc-cap = <4>;
-> +			atmel,pmecc-sector-size = <512>;
-> +			nand-on-flash-bbt;
-> +			status = "okay";
-> +
-> +			at91bootstrap at 0 {
-> +				label = "at91bootstrap";
-> +				reg = <0x0 0x40000>;
-> +			};
-> +
-> +			bootloader at 40000 {
-> +				label = "bootloader";
-> +				reg = <0x40000 0x80000>;
-> +			};
-> +
-> +			bootloaderenv at c0000 {
-> +				label = "bootloader env";
-> +				reg = <0xc0000 0xc0000>;
-> +			};
-> +
-> +			dtb at 180000 {
-> +				label = "device tree";
-> +				reg = <0x180000 0x80000>;
-> +			};
-> +
-> +			kernel at 200000 {
-> +				label = "kernel";
-> +				reg = <0x200000 0x600000>;
-> +			};
-> +
-> +			rootfs at 800000 {
-> +				label = "rootfs";
-> +				reg = <0x800000 0x0f800000>;
-> +			};
-> +		};
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +
-> +		d2 {
-> +			label = "d2";
-> +			gpios = <&pioE 25 GPIO_ACTIVE_LOW>;
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/sama5d3xmb_cmp.dtsi b/arch/arm/boot/dts/sama5d3xmb_cmp.dtsi
-> new file mode 100644
-> index 0000000..252e0d3
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sama5d3xmb_cmp.dtsi
-> @@ -0,0 +1,301 @@
-> +/*
-> + * sama5d3xmb_cmp.dts - Device Tree file for SAMA5D3x CMP mother board
-> + *
-> + *  Copyright (C) 2016 Atmel,
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +#include "sama5d3xcm_cmp.dtsi"
-> +
-> +/ {
-> +	compatible = "atmel,sama5d3xmb-cmp", "atmel,sama5d3xcm-cmp", "atmel,sama5d3", "atmel,sama5";
-> +
-> +	ahb {
-> +		apb {
-> +			mmc0: mmc at f0000000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_mmc0_clk_cmd_dat0 &pinctrl_mmc0_dat1_3 &pinctrl_mmc0_cd>;
-> +				status = "okay";
-> +				slot at 0 {
-> +					reg = <0>;
-> +					bus-width = <4>;
-> +					cd-gpios = <&pioD 17 GPIO_ACTIVE_HIGH>;
-> +				};
-> +			};
-> +
-> +			spi0: spi at f0004000 {
-> +				dmas = <0>, <0>;	/*  Do not use DMA for spi0 */
-> +
-> +				m25p80 at 0 {
-> +					compatible = "atmel,at25df321a";
-> +					spi-max-frequency = <50000000>;
-> +					reg = <0>;
-> +				};
-> +			};
-> +
-> +			ssc0: ssc at f0008000 {
-> +				atmel,clk-from-rk-pin;
-> +			};
-> +
-> +			/*
-> +			 * i2c0 conflicts with ISI:
-> +			 * disable it to allow the use of ISI
-> +			 * can not enable audio when i2c0 disabled
-> +			 */
-> +			i2c0: i2c at f0014000 {
-> +				wm8904: wm8904 at 1a {
-> +					compatible = "wlf,wm8904";
-> +					reg = <0x1a>;
-> +					clocks = <&pck0>;
-> +					clock-names = "mclk";
-> +				};
-> +			};
-> +
-> +			i2c1: i2c at f0018000 {
-> +				ov2640: camera at 0x30 {
-> +					compatible = "ovti,ov2640";
-> +					reg = <0x30>;
-> +					pinctrl-names = "default";
-> +					pinctrl-0 = <&pinctrl_pck1_as_isi_mck &pinctrl_sensor_power &pinctrl_sensor_reset>;
-> +					resetb-gpios = <&pioE 24 GPIO_ACTIVE_LOW>;
-> +					pwdn-gpios = <&pioE 29 GPIO_ACTIVE_HIGH>;
-> +					/* use pck1 for the master clock of ov2640 */
-> +					clocks = <&pck1>;
-> +					clock-names = "xvclk";
-> +					assigned-clocks = <&pck1>;
-> +					assigned-clock-rates = <25000000>;
-> +
-> +					port {
-> +						ov2640_0: endpoint {
-> +							remote-endpoint = <&isi_0>;
-> +							bus-width = <8>;
-> +						};
-> +					};
-> +				};
-> +			};
-> +
-> +			usart1: serial at f0020000 {
-> +				dmas = <0>, <0>;	/*  Do not use DMA for usart1 */
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_usart1 &pinctrl_usart1_rts_cts>;
-> +				status = "okay";
-> +			};
-> +
-> +			isi: isi at f0034000 {
-> +				port {
-> +					isi_0: endpoint {
-> +						remote-endpoint = <&ov2640_0>;
-> +						bus-width = <8>;
-> +						vsync-active = <1>;
-> +						hsync-active = <1>;
-> +					};
-> +				};
-> +			};
-> +
-> +			mmc1: mmc at f8000000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_mmc1_clk_cmd_dat0 &pinctrl_mmc1_dat1_3 &pinctrl_mmc1_cd>;
-> +				status = "okay";
-> +				slot at 0 {
-> +					reg = <0>;
-> +					bus-width = <4>;
-> +					cd-gpios = <&pioD 18 GPIO_ACTIVE_HIGH>;
-> +				};
-> +			};
-> +
-> +			adc0: adc at f8018000 {
-> +				pinctrl-names = "default", "sleep";
-> +				pinctrl-0 = <
-> +					&pinctrl_adc0_adtrg
-> +					&pinctrl_adc0_ad0
-> +					&pinctrl_adc0_ad1
-> +					&pinctrl_adc0_ad2
-> +					&pinctrl_adc0_ad3
-> +					&pinctrl_adc0_ad4
-> +					>;
-> +				pinctrl-1 = <
-> +					&pinctrl_adc0_adtrg_sleep
-> +					&pinctrl_adc0_ad0_sleep
-> +					&pinctrl_adc0_ad1_sleep
-> +					&pinctrl_adc0_ad2_sleep
-> +					&pinctrl_adc0_ad3_sleep
-> +					&pinctrl_adc0_ad4_sleep
-> +					>;
-> +				status = "okay";
-> +			};
-> +
-> +			macb1: ethernet at f802c000 {
-> +				phy-mode = "rmii";
-> +
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				phy0: ethernet-phy at 1 {
-> +					/*interrupt-parent = <&pioE>;*/
-> +					/*interrupts = <30 IRQ_TYPE_EDGE_FALLING>;*/
-> +					reg = <1>;
-> +				};
-> +			};
-> +
-> +			pinctrl at fffff200 {
-> +				adc0 {
-> +					pinctrl_adc0_adtrg_sleep: adc0_adtrg_1 {
-> +						atmel,pins =
-> +							<AT91_PIOD 19 AT91_PERIPH_GPIO (AT91_PINCTRL_OUTPUT | AT91_PINCTRL_OUTPUT_VAL(0))>;
-> +					};
-> +					pinctrl_adc0_ad0_sleep: adc0_ad0_1 {
-> +						atmel,pins =
-> +							<AT91_PIOD 20 AT91_PERIPH_GPIO (AT91_PINCTRL_OUTPUT | AT91_PINCTRL_OUTPUT_VAL(0))>;
-> +					};
-> +					pinctrl_adc0_ad1_sleep: adc0_ad1_1 {
-> +						atmel,pins =
-> +							<AT91_PIOD 21 AT91_PERIPH_GPIO (AT91_PINCTRL_OUTPUT | AT91_PINCTRL_OUTPUT_VAL(0))>;
-> +					};
-> +					pinctrl_adc0_ad2_sleep: adc0_ad2_1 {
-> +						atmel,pins =
-> +							<AT91_PIOD 22 AT91_PERIPH_GPIO (AT91_PINCTRL_OUTPUT | AT91_PINCTRL_OUTPUT_VAL(0))>;
-> +					};
-> +					pinctrl_adc0_ad3_sleep: adc0_ad3_1 {
-> +						atmel,pins =
-> +							<AT91_PIOD 23 AT91_PERIPH_GPIO (AT91_PINCTRL_OUTPUT | AT91_PINCTRL_OUTPUT_VAL(0))>;
-> +					};
-> +					pinctrl_adc0_ad4_sleep: adc0_ad4_1 {
-> +						atmel,pins =
-> +							<AT91_PIOD 24 AT91_PERIPH_GPIO (AT91_PINCTRL_OUTPUT | AT91_PINCTRL_OUTPUT_VAL(0))>;
-> +					};
-> +				};
-> +
-> +				board {
-> +					pinctrl_gpio_keys: gpio_keys {
-> +						atmel,pins =
-> +							<AT91_PIOE 27 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP>;
-> +					};
-> +
-> +					pinctrl_mmc0_cd: mmc0_cd {
-> +						atmel,pins =
-> +							<AT91_PIOD 17 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
-> +					};
-> +
-> +					pinctrl_mmc1_cd: mmc1_cd {
-> +						atmel,pins =
-> +							<AT91_PIOD 18 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
-> +					};
-> +
-> +					pinctrl_pck0_as_audio_mck: pck0_as_audio_mck {
-> +						atmel,pins =
-> +							<AT91_PIOD 30 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_pck1_as_isi_mck: pck1_as_isi_mck-0 {
-> +						atmel,pins =
-> +							<AT91_PIOD 31 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_sensor_reset: sensor_reset-0 {
-> +						atmel,pins =
-> +							<AT91_PIOE 24 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_sensor_power: sensor_power-0 {
-> +						atmel,pins =
-> +							<AT91_PIOE 29 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_usba_vbus: usba_vbus {
-> +						atmel,pins =
-> +							<AT91_PIOD 29 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;
-> +					};
-> +				};
-> +			};
-> +
-> +			dbgu: serial at ffffee00 {
-> +				dmas = <0>, <0>;	/*  Do not use DMA for dbgu */
-> +				status = "okay";
-> +			};
-> +
-> +			watchdog at fffffe40 {
-> +				status = "okay";
-> +			};
-> +		};
-> +
-> +		usb0: gadget at 00500000 {
-> +			atmel,vbus-gpio = <&pioD 29 GPIO_ACTIVE_HIGH>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_usba_vbus>;
-> +			status = "okay";
-> +		};
-> +	};
-> +
-> +	sound {
-> +		compatible = "atmel,asoc-wm8904";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_pck0_as_audio_mck>;
-> +
-> +		atmel,model = "wm8904 @ SAMA5D3EK";
-> +		atmel,audio-routing =
-> +			"Headphone Jack", "HPOUTL",
-> +			"Headphone Jack", "HPOUTR",
-> +			"IN2L", "Line In Jack",
-> +			"IN2R", "Line In Jack",
-> +			"Mic", "MICBIAS",
-> +			"IN1L", "Mic";
-> +
-> +		atmel,ssc-controller = <&ssc0>;
-> +		atmel,audio-codec = <&wm8904>;
-> +
-> +		status = "disabled";
-> +	};
-> +
-> +	/* Conflict with LCD pins */
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +		status = "okay";
-> +
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_gpio_keys>;
-> +
-> +		pb_user1 {
-> +			label = "pb_user1";
-> +			gpios = <&pioE 27 GPIO_ACTIVE_HIGH>;
-> +			linux,code = <0x100>;
-> +			wakeup-source;
-> +		};
-> +	};
-> +};
+> > > It's (eg) significantly out - for example,
+> > > to properly align the display, I have to program an address of
+> > > 0xf4ff0200 into the hardware rather than 0xf5000000 - that's 896 pixels
+> > > before the real start of the frame buffer.
+> > 
+> > What is the resolution you are using?
 > 
+> In the case I detailed here, 1920x1080.
+> 
+> > > With this patch, a patch to TDA998x to avoid the i2c-designware issue,
+> > > and xf86-video-armada, I have LXDE running on the Juno.
+> > 
+> > Can you tell me more about the TDA998x and i2c-designware issue?
+> > Also, I don't think you need to use xf86-video-armada, the mode-setting
+> > driver built into Xorg should be working fine (that is what I've used
+> > in my testing).
+> 
+> See the i2c-designware thread on lakml.  It's a spontaneous high
+> interrupt latency causing the Tx FIFO not to be loaded before it
+> empties, and the i2c-designware crap decides at that point to
+> immediately generate an I2C stop.  The I2C controller in Juno can
+> only work reliably in a system which has guaranteed low interrupt
+> latencies.
 
+Sorry, my email setup had a hickup and it was slow fetching all my emails.
+I've seen the thread after replying in this thread.
+
+> 
+> > > Something I also noticed is this:
+> > > 
+> > >         scanout_start = gem->paddr + plane->state->fb->offsets[0] +
+> > >                 plane->state->crtc_y * plane->state->fb->pitches[0] +
+> > >                 plane->state->crtc_x * bpp / 8;
+> > > 
+> > > Surely this should be using src_[xy] (which are the position in the
+> > > source - iow, memory, and not crtc_[xy] which is the position on the
+> > > CRTC displayed window.  To put it another way, the src_* define the
+> > > region of the source material that is mapped onto a rectangular area
+> > > on the display defined by crtc_*.
+> > 
+> > Yes, that is a bug and most likely the source of the issue that you are
+> > seeing if my understanding of your testing is correct.
+> 
+> It isn't the source of this issue at all.  gem->paddr is 0xf5000000, and
+> the value programmed originally into the register is the same.  So, from
+> those two pieces of information, we can reasonably assume that crtc_y
+> and crtc_x were both zero here.
+
+Yes, they should be zero all the time, as we don't support plane positioning
+with HDLCD.
+
+> 
+> > > Another note is that since the CRTC can't place the plane in arbitary
+> > > positions and sizes within the active area, should the atomic_check
+> > > ensure that crtc_x = crtc_y = 0, and the crtc width/height are the
+> > > size of the active area?
+> > 
+> > That should be the case, indeed. I'm going prepare a patch to do that.
+> 
+> I've already a patch along the lines of Daniel Vetter's response to this
+> point which I'm just testing.
+
+OK, let me know how it goes and please Cc me on it.
+
+
+> 
+> > > diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
+> > > index 48019ae22ddb..3e97acf6e2a7 100644
+> > > --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
+> > > +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
+> > > @@ -150,6 +150,8 @@ static void hdlcd_crtc_enable(struct drm_crtc *crtc)
+> > >  	clk_prepare_enable(hdlcd->clk);
+> > >  	hdlcd_crtc_mode_set_nofb(crtc);
+> > >  	hdlcd_write(hdlcd, HDLCD_REG_COMMAND, 1);
+> > > +	hdlcd_write(hdlcd, HDLCD_REG_COMMAND, 0);
+> > > +	hdlcd_write(hdlcd, HDLCD_REG_COMMAND, 1);
+> > 
+> > I am not convinced that this is the right fix. If anything, I would put a
+> > hdlcd_write(hdlcd, HDLCD_REG_COMMAND, 0); line before hdlcd_crtc_mode_set_nofs(crtc);
+> > line to make sure the command mode is disabled before setting the mode, but
+> > again, I need to understand your use case to make sure that this indeed fixes it.
+> 
+> Maybe hdlcd shouldn't be implementing the ->enable callback but instead
+> the ->commit callback then?
+
+I believe we need ->enable for the initial setup (cold boot or module reloading).
+
+Best regards,
+Liviu
+
+> 
+> I'll give it a try.
+> 
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
 
 -- 
-Nicolas Ferre
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
