@@ -1,75 +1,134 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 21 Nov 2016 13:05:10 +0100
-Subject: [GIT PULL v2] Second Round of Renesas ARM64 Based SoC DT Updates for
- v4.10
-Message-ID: <cover.1479726397.git.horms+renesas@verge.net.au>
+Date: Mon, 21 Nov 2016 13:05:30 +0100
+Subject: [PATCH 01/18] arm64: dts: r8a7796: add I2C support
+In-Reply-To: <cover.1479726397.git.horms+renesas@verge.net.au>
+References: <cover.1479726397.git.horms+renesas@verge.net.au>
+Message-ID: <fcb008a75702c9932f54e5425e7c12b0ea5cf487.1479726397.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-Please consider these second round of Renesas ARM64 based SoC DT updates for v4.10.
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Tested-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 94 ++++++++++++++++++++++++++++++++
+ 1 file changed, 94 insertions(+)
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-arm64-dt-for-v4.10,
-which I have already sent a pull-request for.
-
-Changes since v1:
-* No longer includes unnecessary dependencies in base
-
-
-The following changes since commit 935085209343a0c507e3d9a3e01883b25c8f743e:
-
-  arm64: renesas: r8a7796: add SYS-DMAC controller nodes (2016-11-04 10:18:07 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt2-for-v4.10
-
-for you to fetch changes up to 5de68961cf5618c1ce5bb15848b36121247f23d5:
-
-  arm64: dts: r8a7796: Add device node for PRR (2016-11-21 10:18:53 +0100)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM64 Based SoC DT Updates for v4.10
-
-Enhancements:
-* Add device nodes for PRR
-* Add m3ulcb board
-* Enable I2C on r8a7796/salvator-x board
-* Enable SDHI0 on h3ulcb board
-
-----------------------------------------------------------------
-Geert Uytterhoeven (2):
-      arm64: dts: r8a7795: Add device node for PRR
-      arm64: dts: r8a7796: Add device node for PRR
-
-Ulrich Hecht (3):
-      arm64: dts: r8a7796: add I2C support
-      arm64: dts: r8a7796: Enable I2C DMA
-      arm64: dts: r8a7796: salvator-x: enable I2C
-
-Vladimir Barinov (13):
-      arm64: dts: h3ulcb: update documentation with official board name
-      arm64: dts: h3ulcb: update header
-      arm64: dts: m3ulcb: add M3ULCB board DT bindings
-      arm64: dts: m3ulcb: initial device tree
-      arm64: dts: m3ulcb: enable SCIF clk and pins
-      arm64: dts: m3ulcb: enable GPIO leds
-      arm64: dts: m3ulcb: enable GPIO keys
-      arm64: dts: m3ulcb: enable EXTALR clk
-      arm64: dts: m3ulcb: enable WDT
-      arm64: dts: m3ulcb: enable SDHI0
-      arm64: dts: m3ulcb: enable SDHI2
-      arm64: dts: h3ulcb: enable SDHI2
-      arm64: dts: h3ulcb: rename SDHI0 pins
-
- Documentation/devicetree/bindings/arm/shmobile.txt |   4 +-
- arch/arm64/boot/dts/renesas/Makefile               |   2 +-
- arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts     |  53 +++++-
- arch/arm64/boot/dts/renesas/r8a7795.dtsi           |   5 +
- arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts     | 189 +++++++++++++++++++++
- arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts |  12 ++
- arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 116 +++++++++++++
- 7 files changed, 374 insertions(+), 7 deletions(-)
- create mode 100644 arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index f9cb7796ad49..2e940ff61378 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -17,6 +17,16 @@
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+ 
++	aliases {
++		i2c0 = &i2c0;
++		i2c1 = &i2c1;
++		i2c2 = &i2c2;
++		i2c3 = &i2c3;
++		i2c4 = &i2c4;
++		i2c5 = &i2c5;
++		i2c6 = &i2c6;
++	};
++
+ 	psci {
+ 		compatible = "arm,psci-0.2";
+ 		method = "smc";
+@@ -239,6 +249,90 @@
+ 			#power-domain-cells = <1>;
+ 		};
+ 
++		i2c0: i2c at e6500000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7796";
++			reg = <0 0xe6500000 0 0x40>;
++			interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 931>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			i2c-scl-internal-delay-ns = <110>;
++			status = "disabled";
++		};
++
++		i2c1: i2c at e6508000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7796";
++			reg = <0 0xe6508000 0 0x40>;
++			interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 930>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			i2c-scl-internal-delay-ns = <6>;
++			status = "disabled";
++		};
++
++		i2c2: i2c at e6510000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7796";
++			reg = <0 0xe6510000 0 0x40>;
++			interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 929>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			i2c-scl-internal-delay-ns = <6>;
++			status = "disabled";
++		};
++
++		i2c3: i2c at e66d0000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7796";
++			reg = <0 0xe66d0000 0 0x40>;
++			interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 928>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			i2c-scl-internal-delay-ns = <110>;
++			status = "disabled";
++		};
++
++		i2c4: i2c at e66d8000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7796";
++			reg = <0 0xe66d8000 0 0x40>;
++			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 927>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			i2c-scl-internal-delay-ns = <110>;
++			status = "disabled";
++		};
++
++		i2c5: i2c at e66e0000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7796";
++			reg = <0 0xe66e0000 0 0x40>;
++			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 919>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			i2c-scl-internal-delay-ns = <110>;
++			status = "disabled";
++		};
++
++		i2c6: i2c at e66e8000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7796";
++			reg = <0 0xe66e8000 0 0x40>;
++			interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 918>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			i2c-scl-internal-delay-ns = <6>;
++			status = "disabled";
++		};
++
+ 		scif2: serial at e6e88000 {
+ 			compatible = "renesas,scif-r8a7796",
+ 				     "renesas,rcar-gen3-scif", "renesas,scif";
+-- 
+2.7.0.rc3.207.g0ac5344
