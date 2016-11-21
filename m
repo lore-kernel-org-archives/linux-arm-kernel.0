@@ -1,161 +1,39 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 21 Nov 2016 11:28:01 +0530
-Subject: [PATCH] ARM: dts: AM571x-IDK Initial Support
-Message-ID: <20161121055801.573-1-lokeshvutla@ti.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 21 Nov 2016 15:01:57 +0900
+Subject: [PATCH v2] ARM: Drop fixed 200 Hz timer requirement from Samsung
+ platforms
+In-Reply-To: <22757093.ejshJp9T7L@wuerfel>
+References: <1479453418-25314-1-git-send-email-krzk@kernel.org>
+ <22757093.ejshJp9T7L@wuerfel>
+Message-ID: <CA+Ln22GyRwywcxdO4Gp67d8TfpjfNzaE0z25=WW9GWibjGkDuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Schuyler Patton <spatton@ti.com>
+2016-11-18 17:46 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> Maybe add a paragraph about the specific problem:
+>
+> "On s3c24xx, the PWM counter is only 16 bit wide, and with the
+> typical 12MHz input clock that overflows every 5.5ms. This works
+> with HZ=200 or higher but not with HZ=100 which needs a 10ms
+> interval between ticks. On Later chips (S3C64xx, S5P and EXYNOS),
+> the counter is 32 bits and does not have this problem.
+> The new samsung_pwm_timer driver solves the problem by scaling
+> the input clock by a factor of 50 on s3c24xx, which makes it
+> less accurate but allows HZ=100 as well as CONFIG_NO_HZ with
+> fewer wakeups".
 
-The AM571x-IDK board is a board based on TI's AM5718 SOC
-which has a single core 1.5GHz A15 processor. This board is a
-development platform for the Industrial market with:
-- 1GB of DDR3L
-- Dual 1Gbps Ethernet
-- HDMI,
-- PRU-ICSS
-- uSD
-- 16GB eMMC
-- CAN
-- RS-485
-- PCIe
-- USB3.0
-- Video Input Port
-- Industrial IO port and expansion connector
+One thing to correct here is that the typical clock is PCLK, which is
+derived from one of the PLLs and AFAIR is between 33-66 MHz on
+s3c24xx. Technically you can drive the PWM block from an external
+clock (12 MHz for some board-file based boards), but for simplicity
+this functionality was omitted in the new PWM timer driver used for DT
+boards (which worked fine with the PWM driven by PCLK).
 
-The link to the data sheet and TRM can be found here:
+Also I'm wondering if the divisor we use right now for 16-bit timers
+isn't too small, since it gives us a really short wraparound time,
+which means getting more timer interrupts for longer intervals, kind
+of defeating the benefit of tickless mode. However, AFAICT it doesn't
+affect the HZ problem.
 
-http://www.ti.com/product/AM5718
-
-Initial support is only for basic peripherals.
-
-Signed-off-by: Schuyler Patton <spatton@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
-
-Logs: http://pastebin.ubuntu.com/23510390/
-
- .../devicetree/bindings/arm/omap/omap.txt          |  3 +
- arch/arm/boot/dts/Makefile                         |  1 +
- arch/arm/boot/dts/am571x-idk.dts                   | 82 ++++++++++++++++++++++
- 3 files changed, 86 insertions(+)
- create mode 100644 arch/arm/boot/dts/am571x-idk.dts
-
-diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-index f53e2ee..647ffd3 100644
---- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-@@ -175,6 +175,9 @@ Boards:
- - AM5728 IDK
-   compatible = "ti,am5728-idk", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7"
- 
-+- AM5718 IDK
-+  compatible = "ti,am5718-idk", "ti,am5728", "ti,dra722", "ti,dra72", "ti,dra7"
-+
- - DRA742 EVM:  Software Development Board for DRA742
-   compatible = "ti,dra7-evm", "ti,dra742", "ti,dra74", "ti,dra7"
- 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index befcd26..c298078 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -588,6 +588,7 @@ dtb-$(CONFIG_SOC_DRA7XX) += \
- 	am57xx-cl-som-am57x.dtb \
- 	am57xx-sbc-am57x.dtb \
- 	am572x-idk.dtb \
-+	am571x-idk.dtb \
- 	dra7-evm.dtb \
- 	dra72-evm.dtb \
- 	dra72-evm-revc.dtb
-diff --git a/arch/arm/boot/dts/am571x-idk.dts b/arch/arm/boot/dts/am571x-idk.dts
-new file mode 100644
-index 0000000..a6a743e
---- /dev/null
-+++ b/arch/arm/boot/dts/am571x-idk.dts
-@@ -0,0 +1,82 @@
-+/*
-+ * Copyright (C) 2015-2016 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+
-+#include "dra72x.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include "am57xx-idk-common.dtsi"
-+
-+/ {
-+	model = "TI AM5718 IDK";
-+	compatible = "ti,am5718-idk", "ti,am5718", "ti,dra722",
-+		     "ti,dra72", "ti,dra7";
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x80000000 0x0 0x40000000>;
-+	};
-+
-+	status-leds {
-+		compatible = "gpio-leds";
-+		cpu0-led {
-+			label = "status0:red:cpu0";
-+			gpios = <&gpio2 25 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			linux,default-trigger = "cpu0";
-+		};
-+
-+		usr0-led {
-+			label = "status0:green:usr";
-+			gpios = <&gpio2 26 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+		heartbeat-led {
-+			label = "status0:blue:heartbeat";
-+			gpios = <&gpio2 27 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		usr1-led {
-+			label = "status1:red:usr";
-+			gpios = <&gpio2 28 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+		usr2-led {
-+			label = "status1:green:usr";
-+			gpios = <&gpio2 21 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+
-+		mmc0-led {
-+			label = "status1:blue:mmc0";
-+			gpios = <&gpio2 19 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			linux,default-trigger = "mmc0";
-+		};
-+	};
-+
-+	extcon_usb2: extcon_usb2 {
-+	     compatible = "linux,extcon-usb-gpio";
-+	     id-gpio = <&gpio5 7 GPIO_ACTIVE_HIGH>;
-+	};
-+};
-+
-+&mmc1 {
-+	status = "okay";
-+	vmmc-supply = <&ldo1_reg>;
-+	bus-width = <4>;
-+	cd-gpios = <&gpio6 27 0>; /* gpio 219 */
-+};
-+
-+&omap_dwc3_2 {
-+	extcon = <&extcon_usb2>;
-+};
--- 
-2.10.1
+Best regards.
+Tomasz
