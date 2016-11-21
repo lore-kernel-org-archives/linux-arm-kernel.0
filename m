@@ -1,59 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 21 Nov 2016 08:30:47 +0100
-Subject: [PATCH 5/5] drm/sun4i: Add support for the overscan profiles
-In-Reply-To: <20161111091755.tfqizju5voazjrmm@phenom.ffwll.local>
-References: <cover.bb9be34c7fd7767e31823f78a15ae1c127293c34.1476779323.git-series.maxime.ripard@free-electrons.com>
- <b980759ad766658d7bc3d67c18f505c5bf727ef5.1476779323.git-series.maxime.ripard@free-electrons.com>
- <20161108085927.ibyett46cjgyfwu2@phenom.ffwll.local>
- <20161110145630.wvzlh6rxusrufv2r@lukather>
- <20161111091755.tfqizju5voazjrmm@phenom.ffwll.local>
-Message-ID: <20161121073047.zv5cfjd3ti4hh4gl@lukather>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Mon, 21 Nov 2016 15:32:21 +0800
+Subject: [PATCH v16 05/15] clocksource/drivers/arm_arch_timer: fix a bug
+ in arch_timer_register about arch_timer_uses_ppi
+In-Reply-To: <20161118185252.GI1197@leverpostej>
+References: <1479304148-2965-1-git-send-email-fu.wei@linaro.org>
+ <1479304148-2965-6-git-send-email-fu.wei@linaro.org>
+ <20161118185252.GI1197@leverpostej>
+Message-ID: <CADyBb7v0c6t=Bn72qnpfVZjTVqcy+8QLr7XhfXP156DPXT2Vqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2016 at 10:17:55AM +0100, Daniel Vetter wrote:
-> On Thu, Nov 10, 2016 at 03:56:30PM +0100, Maxime Ripard wrote:
-> > Hi Daniel,
-> > 
-> > On Tue, Nov 08, 2016 at 09:59:27AM +0100, Daniel Vetter wrote:
-> > > On Tue, Oct 18, 2016 at 10:29:38AM +0200, Maxime Ripard wrote:
-> > > > Create overscan profiles reducing the displayed zone.
-> > > > 
-> > > > For each TV standard (PAL and NTSC so far), we create 4 more reduced modes
-> > > > by steps of 5% that the user will be able to select.
-> > > > 
-> > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > 
-> > > tbh I think if we agree to do this (and that still seems an open question)
-> > > I think there should be a generic helper to add these overscan modes with
-> > > increased porches. Anything that only depends upon the sink (and
-> > > overscanning is something the sink does) should imo be put into a suitable
-> > > helper library for everyone to share.
-> > > 
-> > > Or maybe even stash it into the probe helpers and call it for all TV
-> > > connectors. Definitely not a driver-private thing.
-> > 
-> > Last time we discussed it, my recollection was that you didn't want to
-> > have generic code for it, but I'd be happy to implement it.
-> > 
-> > I'll come up with something like that.
-> 
-> Well I can flip-flop around with the nonsense I'm sometimes emitting ;-)
-> Since you called me out, feel free to do whatever you want ...
+Hi Mark,
 
-I also found the generic solution to be a much better solution, so
-I'll definitely implement it :)
+On 19 November 2016 at 02:52, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, Nov 16, 2016 at 09:48:58PM +0800, fu.wei at linaro.org wrote:
+>> From: Fu Wei <fu.wei@linaro.org>
+>>
+>> The patch fix a potential bug about arch_timer_uses_ppi in
+>> arch_timer_register.
+>> On ARM64, we don't use ARCH_TIMER_PHYS_SECURE_PPI in Linux, so we will
+>> just igorne it in init code.
+>
+> That's not currently the case. I assume you mean we will in later
+> patches? If so, please make that clear in the commit message.
+>
+>> If arch_timer_uses_ppi is ARCH_TIMER_PHYS_NONSECURE_PPI, the orignal
+>> code of arch_timer_uses_ppi may go wrong.
+>
+> How? What specifically happens?
+>
+> We don't currently assign ARCH_TIMER_PHYS_NONSECURE_PPI to
+> arch_timer_uses_ppi, so I assume a later patch changes this. This change
+> should be folded into said patch; it doesn't make sense in isolation.
 
-Maxime
+yes, this patch is a preparation for the next which may set
+arch_timer_use_ppi as ARCH_TIMER_PHYS_NONSECURE_PPI.
+So you are right, I will merge this into the next and mention this
+change in the commit message.
+
+Great thanks
+
+>
+> Thanks,
+> Mark.
+>
+>> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+>> ---
+>>  drivers/clocksource/arm_arch_timer.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>> index dd1040d..6de164f 100644
+>> --- a/drivers/clocksource/arm_arch_timer.c
+>> +++ b/drivers/clocksource/arm_arch_timer.c
+>> @@ -699,7 +699,7 @@ static int __init arch_timer_register(void)
+>>       case ARCH_TIMER_PHYS_NONSECURE_PPI:
+>>               err = request_percpu_irq(ppi, arch_timer_handler_phys,
+>>                                        "arch_timer", arch_timer_evt);
+>> -             if (!err && arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI]) {
+>> +             if (!err && arch_timer_has_nonsecure_ppi()) {
+>>                       ppi = arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI];
+>>                       err = request_percpu_irq(ppi, arch_timer_handler_phys,
+>>                                                "arch_timer", arch_timer_evt);
+>> --
+>> 2.7.4
+>>
+
+
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161121/7da26be6/attachment-0001.sig>
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
