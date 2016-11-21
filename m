@@ -1,58 +1,95 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 21 Nov 2016 14:07:53 +0530
-Subject: [PATCH] spi: davinci: Allow device tree devices to use DMA
-In-Reply-To: <946d60bc-ac14-7934-c1b3-e2de03831459@lechnology.com>
-References: <1479530464-12538-1-git-send-email-david@lechnology.com>
- <79f186b5-ac71-189f-c19f-977670395043@ti.com>
- <946d60bc-ac14-7934-c1b3-e2de03831459@lechnology.com>
-Message-ID: <fd697f3b-dba1-1e5f-c12c-45f71c0c07a1@ti.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Mon, 21 Nov 2016 08:52:52 +0000
+Subject: [PATCH] PCI: Add information about describing PCI in ACPI
+In-Reply-To: <20161118175404.GI25762@bhelgaas-glaptop.roam.corp.google.com>
+References: <20161117175938.17465.45820.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F921A88@lhreml507-mbx>
+ <20161118175404.GI25762@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F927053@lhreml507-mbx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 20 November 2016 10:31 PM, David Lechner wrote:
+Hi Bjorn
 
-> On 11/20/2016 06:59 AM, Sekhar Nori wrote:
-
->> On Saturday 19 November 2016 10:11 AM, David Lechner wrote:
-
->>> @@ -400,6 +401,9 @@ static int davinci_spi_of_setup(struct spi_device
->>> *spi)
->>>          if (!of_property_read_u32(np, "ti,spi-wdelay", &prop))
->>>              spicfg->wdelay = (u8)prop;
->>>          spi->controller_data = spicfg;
->>> +        /* Use DMA for device if master supports it */
->>> +        if (dspi->dma_rx)
->>
->> This should be
->>
->>         if (!(IS_ERR(dpsi->dma_rx) || IS_ERR(dspi->dma_tx))
+> -----Original Message-----
+> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+> Sent: 18 November 2016 17:54
+> To: Gabriele Paoloni
+> Cc: Bjorn Helgaas; linux-pci at vger.kernel.org; linux-
+> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linaro-acpi at lists.linaro.org
+> Subject: Re: [PATCH] PCI: Add information about describing PCI in ACPI
 > 
+> On Fri, Nov 18, 2016 at 05:17:34PM +0000, Gabriele Paoloni wrote:
+> > > -----Original Message-----
+> > > From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+> > > owner at vger.kernel.org] On Behalf Of Bjorn Helgaas
+> > > Sent: 17 November 2016 18:00
 > 
-> There is the following code in davinci_spi_probe():
+> > > +Static tables like MCFG, HPET, ECDT, etc., are *not* mechanisms
+> for
+> > > +reserving address space!  The static tables are for things the OS
+> > > +needs to know early in boot, before it can parse the ACPI
+> namespace.
+> > > +If a new table is defined, an old OS needs to operate correctly
+> even
+> > > +though it ignores the table.  _CRS allows that because it is
+> generic
+> > > +and understood by the old OS; a static table does not.
+> >
+> > Right so if my understanding is correct you are saying that resources
+> > described in the MCFG table should also be declared in PNP0C02
+> devices
+> > so that the PNP driver can reserve these resources.
 > 
->     ret = davinci_spi_request_dma(dspi);
->     if (ret == -EPROBE_DEFER) {
->         goto free_clk;
->     } else if (ret) {
->         dev_info(&pdev->dev, "DMA is not supported (%d)\n", ret);
->         dspi->dma_rx = NULL;
->         dspi->dma_tx = NULL;
->     }
+> Yes.
 > 
-> So, I does not look like it is possible to get anything other than NULL
-> or a valid pointer for dpsi->dma_rx and that checking dpsi->dma_tx is
-> not necessary.
+> > On the other side the PCI Root bridge driver should not reserve such
+> > resources.
+> >
+> > Well if my understanding is correct I think we have a problem here:
+> > http://lxr.free-electrons.com/source/drivers/pci/ecam.c#L74
+> >
+> > As you can see pci_ecam_create() will conflict with the pnp driver
+> > as it will try to reserve the resources from the MCFG table...
+> >
+> > Maybe we need to rework pci_ecam_create() ?
 > 
-> So, I think if (dspi->dma_rx) is sufficient. In fact the same check is
-> used during unwinding if the probe function fails.
+> I think it's OK as it is.
+> 
+> The pnp/system.c driver does try to reserve PNP0C02 resources, and it
+> marks them as "not busy".  That way they appear in /proc/iomem and
+> won't be allocated for anything else, but they can still be requested
+> by drivers, e.g., pci/ecam.c, which will mark them "busy".
+> 
+> This is analogous to what the PCI core does in pci_claim_resource().
+> This is really a function of the ACPI/PNP *core*, which should reserve
+> all _CRS resources for all devices (not just PNP0C02 devices).  But
+> it's done by pnp/system.c, and only for PNP0C02, because there's a
+> bunch of historical baggage there.
+> 
+> You'll also notice that in this case, things are out of order:
+> logically the pnp/system.c reservation should happen first, but in
+> fact the pci/ecam.c request happens *before* the pnp/system.c one.
+> That means the pnp/system.c one might fail and complain "[mem ...]
+> could not be reserved".
 
-You are right, I see it now. Setting dma_rx to NULL overriding the error
-value is confusing since dma_request_chan() itself does not use NULL as
-an error value.
+Correct me if I am wrong...
 
-I think it is better to fix the existing code to remove the NULL
-overwrite and use IS_ERR() instead. You should probably wait for some
-feedback from the SPI maintainer though.
+So currently we are relying on the fact that pci_ecam_create() is called
+before the pnp driver.
+If the pnp driver came first we would end up in pci_ecam_create() failing
+here:
+http://lxr.free-electrons.com/source/drivers/pci/ecam.c#L76
 
-Thanks,
-Sekhar
+I am not sure but it seems to me like a bit weak condition to rely on...
+what about removing the error condition in pci_ecam_create() and logging
+just a dev_info()?
+
+Thanks
+
+Gab
+
+
+> 
+> Bjorn
