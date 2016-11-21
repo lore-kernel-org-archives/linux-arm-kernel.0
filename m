@@ -1,49 +1,134 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Mon, 21 Nov 2016 15:36:58 +0100
-Subject: Synopsys Ethernet QoS Driver
-In-Reply-To: <afc18eb0-4c11-9668-498d-982624c6de78@synopsys.com>
-References: <CADvZ6ErjyVR5ShWTk0QesWLYR1m3p8yAMkK8v9gm2kN5xTv8zw@mail.gmail.com>
- <1dbb6047-2bbb-4d56-2a62-ab65a0254844@synopsys.com>
- <20161119135654.GA14079@lnxartpec.se.axis.com>
- <CAJ3bTp7PpUJcz=1JohX=A54UP6vVAafWnB0PGUBSxb5JJiO8Lg@mail.gmail.com>
- <1248f4ce-4859-10e6-fef9-342ea543f8d4@synopsys.com>
- <87c8a24b-0812-7850-cb3f-7be691bab432@st.com>
- <afc18eb0-4c11-9668-498d-982624c6de78@synopsys.com>
-Message-ID: <937252db-9538-2cf6-c8fa-82b558531c51@st.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Mon, 21 Nov 2016 22:38:51 +0800
+Subject: [PATCH v16 08/15] clocksource/drivers/arm_arch_timer: Refactor
+ arch_timer_needs_probing, and call it only if acpi disabled.
+In-Reply-To: <20161118195657.GM1197@leverpostej>
+References: <1479304148-2965-1-git-send-email-fu.wei@linaro.org>
+ <1479304148-2965-9-git-send-email-fu.wei@linaro.org>
+ <20161118195657.GM1197@leverpostej>
+Message-ID: <CADyBb7uXaPVT1ppJav5=ckdvBcfv+6fSsMc3xbDjFEO2G_zjSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Joao
+Hi Mark,
 
-On 11/21/2016 2:48 PM, Joao Pinto wrote:
-> Synopsys QoS IP is a separated hardware component, so it should be reusable by
-> all implementations using it and so have its own "core driver" and platform +
-> pci glue drivers. This is necessary for example in hardware validation, where
-> you prototype an IP and instantiate its drivers and test it.
+On 19 November 2016 at 03:56, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, Nov 16, 2016 at 09:49:01PM +0800, fu.wei at linaro.org wrote:
+>> From: Fu Wei <fu.wei@linaro.org>
+>>
+>> The patch refactor original arch_timer_needs_probing function:
+>>     (1) Separate out arch_timer_needs_probing from arch_timer_common_init,
+>>     and call it only if acpi disabled.
+>>     (2) Rename arch_timer_needs_probing to arch_timer_needs_of_probing.
 >
-> Was there a strong reason to integrate QoS features directly in stmmac and not
-> in synopsys/dwc_eth_qos.*?
+> Please write a real commit message.
 
-We decided to enhance the stmmac on supporting the QoS for several
-reasons; for example the common APIs that the driver already exposed and
-actually suitable for other SYNP chips. Then, PTP, EEE,
-S/RGMII, MMC could be shared among different chips with a minimal
-effort.  This meant a lot of code already ready.
+OK, how about this:
 
-For sure, the net-core, Ethtool, mdio parts were reused. Same for the
-glue logic files.
-For the latter, this helped to easily bring-up new platforms also
-because the stmmac uses the HW cap register to auto-configure many
-parts of the MAC core, DMA and modules. This helped many users, AFAIK.
+clocksource/drivers/arm_arch_timer: Refactor
+arch_timer_needs_probing, only use it in the DT init code
 
-For validation purpose, this is my experience, the stmmac helped
-a lot because people used the same code to validate different HW
-and it was easy to switch to a platform to another one in order to
-verify / check if the support was ok or if a regression was introduced.
-This is important for complex supports like PTP or EEE.
+Currently, the arch_timer_common_init uses arch_timer_needs_probing call to
+wait for both timers been probed which is only for booting from DT.
 
-Hoping this can help.
+For booting from ACPI, we don't need these in arch_timer_common_init, these code
+should be only in the DT init code.
 
-Do not hesitate to contact me for further details
+This patch seperates arch_timer_needs_probing related code out into a
+new function
+named arch_timer_needs_of_probing, and then reworks arch_timer_of_init
+to use it,
+so that we can keep this only in the DT init code.
 
-peppe
+
+>
+>> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+>> ---
+>>  drivers/clocksource/arm_arch_timer.c | 34 +++++++++++++++++++---------------
+>>  1 file changed, 19 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>> index fe4e812..9ddc091 100644
+>> --- a/drivers/clocksource/arm_arch_timer.c
+>> +++ b/drivers/clocksource/arm_arch_timer.c
+>> @@ -792,15 +792,28 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
+>>       {},
+>>  };
+>>
+>> -static bool __init
+>> -arch_timer_needs_probing(int type, const struct of_device_id *matches)
+>> +static bool __init arch_timer_needs_of_probing(void)
+>>  {
+>>       struct device_node *dn;
+>>       bool needs_probing = false;
+>> +     unsigned int mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
+>> +
+>> +     /* We have two timers, and both device-tree nodes are probed. */
+>> +     if ((arch_timers_present & mask) == mask)
+>> +             return false;
+>> +
+>> +     /*
+>> +      * Only one type of timer is probed,
+>> +      * check if we have another type of timer node in device-tree.
+>> +      */
+>> +     if (arch_timers_present & ARCH_TIMER_TYPE_CP15)
+>> +             dn = of_find_matching_node(NULL, arch_timer_mem_of_match);
+>> +     else
+>> +             dn = of_find_matching_node(NULL, arch_timer_of_match);
+>>
+>> -     dn = of_find_matching_node(NULL, matches);
+>> -     if (dn && of_device_is_available(dn) && !(arch_timers_present & type))
+>> +     if (dn && of_device_is_available(dn))
+>>               needs_probing = true;
+>> +
+>>       of_node_put(dn);
+>>
+>>       return needs_probing;
+>> @@ -808,17 +821,8 @@ arch_timer_needs_probing(int type, const struct of_device_id *matches)
+>>
+>>  static int __init arch_timer_common_init(void)
+>>  {
+>> -     unsigned int mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
+>> -
+>> -     /* Wait until both nodes are probed if we have two timers */
+>> -     if ((arch_timers_present & mask) != mask) {
+>> -             if (arch_timer_needs_probing(ARCH_TIMER_TYPE_MEM,
+>> -                                          arch_timer_mem_of_match))
+>> -                     return 0;
+>> -             if (arch_timer_needs_probing(ARCH_TIMER_TYPE_CP15,
+>> -                                          arch_timer_of_match))
+>> -                     return 0;
+>> -     }
+>
+> Why can't we just move this into the DT-specific caller of
+> arch_timer_common_init()?
+
+yes, I have thought about this, but that means we have to split arch_timer_init,
+and use arch_timer_register and arch_timer_common_init directly in
+arch_timer_of_init.
+
+In another word, I also need to modify arch_timer_of_init, not only
+arch_timer_common_init,
+but let me have a try in v17, see if you like it.
+
+>
+> Thanks
+> Mark.
+>
+>> +     if (acpi_disabled && arch_timer_needs_of_probing())
+>> +             return 0;
+>>
+>>       arch_timer_banner(arch_timers_present);
+>>       arch_counter_register(arch_timers_present);
+>> --
+>> 2.7.4
+>>
+
+
+
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
