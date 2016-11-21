@@ -1,102 +1,54 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 22 Nov 2016 00:24:21 +0800
-Subject: [PATCH 3/3] ARM: dts: sunxi: enable SDIO Wi-Fi on Orange Pi Zero
-In-Reply-To: <20161121162421.800-1-icenowy@aosc.xyz>
-References: <20161121162421.800-1-icenowy@aosc.xyz>
-Message-ID: <20161121162421.800-3-icenowy@aosc.xyz>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 21 Nov 2016 17:27:09 +0100
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.10
+In-Reply-To: <CAOesGMjk=KWifGT7sugpWVjNJSKhmgxg8gN9Cgi=emGrg66z0w@mail.gmail.com>
+References: <cover.1479387356.git.horms+renesas@verge.net.au>
+ <20161119012836.GA2543@localhost>
+ <CAMuHMdXAuDcbr84phfPRpqZYRzAZf2j4vsv+i_Frz0G8ksd_Vg@mail.gmail.com>
+ <CAOesGMjk=KWifGT7sugpWVjNJSKhmgxg8gN9Cgi=emGrg66z0w@mail.gmail.com>
+Message-ID: <CAMuHMdUhpeiOj6Mjhgt=9R3yuV-HwOAy5AAsDSTDjagRRDtYCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's a Allwinner's XR819 SDIO Wi-Fi module soldered on the board of
-Orange Pi Zero, which used a dedicated regulator to power.
+Hi Olof,
 
-Add the device tree node of the regulator, the enable gpio (with
-mmc-pwrseq) and the sdio controller.
+On Mon, Nov 21, 2016 at 5:19 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Mon, Nov 21, 2016 at 1:31 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+>> On Sat, Nov 19, 2016 at 2:28 AM, Olof Johansson <olof@lixom.net> wrote:
+>>> On Thu, Nov 17, 2016 at 02:34:25PM +0100, Simon Horman wrote:
+>>>> Please consider these second round of Renesas ARM based SoC updates for v4.10.
+>>
+>>>> * Basic support for r8a7745 SoC
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> Sergei Shtylyov (2):
+>>>>       ARM: shmobile: r8a7745: basic SoC support
+>>>>       ARM: shmobile: document SK-RZG1E board
+>>>
+>>> Is there a reason you're adding a config option per SoC?
+>>>
+>>> I think you'd be better off not adding these config options, and just adding
+>>> support for the SoCs through compatibles (and adding the drivers to defconfigs,
+>>> etc).
+>>
+>> Yes there is a reason: kernel size.
+>> The main offenders are the pinctrl tables, which add ca. 20-50 KiB per
+>> supported SoC.
+>
+> So don't turn on that pinctrl driver unless you have that SoC?
 
-There's a out-of-tree driver tested to work with this device tree.
+The enablement of the pinctrl driver (and the clock driver, FWIW) is controlled
+by the SoC Kconfig symbol. If you want support for the SoC, you want the
+pinctrl driver, too.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
-New patch in the patchset, since a out-of-tree working xradio driver is done.
+Gr{oetje,eeting}s,
 
-If there is any problem in this patch, it can be omitted.
+                        Geert
 
- arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts | 42 ++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-diff --git a/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts
-index b428e47..39cac26 100644
---- a/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts
-+++ b/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts
-@@ -79,6 +79,24 @@
- 			gpios = <&pio 0 17 GPIO_ACTIVE_HIGH>;
- 		};
- 	};
-+
-+	reg_vcc_wifi: reg_vcc_wifi {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&vcc_wifi_pin_opi0>;
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-name = "vcc-wifi";
-+		enable-active-high;
-+		gpio = <&pio 0 20 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	wifi_pwrseq: wifi_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wifi_pwrseq_pin_opi0>;
-+		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>;
-+	};
- };
- 
- &ehci1 {
-@@ -95,6 +113,20 @@
- 	status = "okay";
- };
- 
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins_a>;
-+	vmmc-supply = <&reg_vcc_wifi>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&mmc1_pins_a {
-+	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+};
-+
- &ohci1 {
- 	status = "okay";
- };
-@@ -104,6 +136,11 @@
- 		pins = "PA17";
- 		function = "gpio_out";
- 	};
-+
-+	vcc_wifi_pin_opi0: vcc_wifi_pin at 0 {
-+		allwinner,pins = "PA20";
-+		allwinner,function = "gpio_out";
-+	};
- };
- 
- &r_pio {
-@@ -111,6 +148,11 @@
- 		pins = "PL10";
- 		function = "gpio_out";
- 	};
-+
-+	wifi_pwrseq_pin_opi0: wifi_pwrseq_pin at 0 {
-+		allwinner,pins = "PL7";
-+		allwinner,function = "gpio_out";
-+	};
- };
- 
- &uart0 {
--- 
-2.10.2
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
