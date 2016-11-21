@@ -1,175 +1,111 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 21 Nov 2016 15:53:01 +0100
-Subject: [PATCH v6 0/3] Add Mediatek JPEG Decoder
-In-Reply-To: <1479353915-5043-1-git-send-email-rick.chang@mediatek.com>
-References: <1479353915-5043-1-git-send-email-rick.chang@mediatek.com>
-Message-ID: <ac60814a-f54d-a11a-fc65-bdc733682535@xs4all.nl>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Nov 2016 14:55:28 +0000
+Subject: [BUG] hdlcd gets confused about base address
+In-Reply-To: <20161121143053.GH1041@n2100.armlinux.org.uk>
+References: <20161118233733.GP1041@n2100.armlinux.org.uk>
+ <20161121110604.GC1005@e106497-lin.cambridge.arm.com>
+ <20161121112030.GC1041@n2100.armlinux.org.uk>
+ <20161121113212.GF1005@e106497-lin.cambridge.arm.com>
+ <20161121122556.GE1041@n2100.armlinux.org.uk>
+ <20161121125653.GJ1005@e106497-lin.cambridge.arm.com>
+ <20161121132419.GF1041@n2100.armlinux.org.uk>
+ <20161121143053.GH1041@n2100.armlinux.org.uk>
+Message-ID: <20161121145528.GI1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm missing a MAINTAINERS patch for this new driver.
+On Mon, Nov 21, 2016 at 02:30:53PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 21, 2016 at 01:24:19PM +0000, Russell King - ARM Linux wrote:
+> > On Mon, Nov 21, 2016 at 12:56:53PM +0000, Liviu Dudau wrote:
+> > > That is mostly due to the check in hdlcd_crtc_disable() which I should
+> > > remove, I've added it because I was getting a ->disable() hook call
+> > > before any ->enable() was called at startup time. I need to revisit
+> > > this as I remember Daniel was commenting that this was not needed.
+> > 
+> > Removing that test results in:
+> > 
+> > [drm:drm_atomic_helper_commit_cleanup_done] *ERROR* [CRTC:24:crtc-0] flip_done timed out
+> > 
+> > and the kernel hanging, seemingly in an IRQs-off region.
+> 
+> Annoyingly, enabling DRM debug prevents the kernel hanging...
 
-Can you post a patch for that?
+I've been trying to trace through what's happening with this flip_done
+stuff, but I'm finding it _extremely_ difficult to follow the atomic
+code.
 
-It's the only thing preventing this from being merged.
+(Sorry, I'm going to go over my usual 72 column limit for this due to
+the damn long DRM function names.)
 
-Regards,
+I can see that drm_atomic_helper_commit() calls drm_atomic_helper_setup_commit()
+which sets up commit->flip_done for each CRTC, and sets up an event for
+each.
 
-	Hans
+drm_atomic_helper_commit() continues on to eventually call drm_atomic_helper_swap_state()
+which then swaps the state for the CRTCs, but then ends up dropping
+the event reference:
 
-On 17/11/16 04:38, Rick Chang wrote:
-> This series of patches provide a v4l2 driver to control Mediatek JPEG decoder
-> for decoding JPEG image and Motion JPEG bitstream.
->
-> changes since v5:
-> - remove redundant name from struct mtk_jpeg_fmt
-> - Set state of all buffers to VB2_BUF_STATE_QUEUED if fail in start streaming
-> - Remove VB2_USERPTR
-> - Add check for buffer index
->
-> changes since v4:
-> - Change file name of binding documentation
-> - Revise DT binding documentation
-> - Revise compatible string
->
-> changes since v3:
-> - Revise DT binding documentation
-> - Revise compatible string
->
-> changes since v2:
-> - Revise DT binding documentation
->
-> changes since v1:
-> - Rebase for v4.9-rc1.
-> - Update Compliance test version and result
-> - Remove redundant path in Makefile
-> - Fix potential build error without CONFIG_PM_RUNTIME and CONFIG_PM_SLEEP
-> - Fix warnings from patch check and smatch check
->
-> * Dependency
-> The patch "arm: dts: mt2701: Add node for JPEG decoder" depends on:
->   CCF "Add clock support for Mediatek MT2701"[1]
->   iommu and smi "Add the dtsi node of iommu and smi for mt2701"[2]
->
-> [1] http://lists.infradead.org/pipermail/linux-mediatek/2016-October/007271.html
-> [2] https://patchwork.kernel.org/patch/9164013/
->
-> * Compliance test
-> v4l2-compliance SHA   : 4ad7174b908a36c4f315e3fe2efa7e2f8a6f375a
->
-> Driver Info:
->         Driver name   : mtk-jpeg decode
->         Card type     : mtk-jpeg decoder
->         Bus info      : platform:15004000.jpegdec
->         Driver version: 4.9.0
->         Capabilities  : 0x84204000
->                 Video Memory-to-Memory Multiplanar
->                 Streaming
->                 Extended Pix Format
->                 Device Capabilities
->         Device Caps   : 0x04204000
->                 Video Memory-to-Memory Multiplanar
->                 Streaming
->                 Extended Pix Format
->
-> Compliance test for device /dev/video3 (not using libv4l2):
->
-> Required ioctls:
->         test VIDIOC_QUERYCAP: OK
->
-> Allow for multiple opens:
->         test second video open: OK
->         test VIDIOC_QUERYCAP: OK
->         test VIDIOC_G/S_PRIORITY: OK
->         test for unlimited opens: OK
->
-> Debug ioctls:
->         test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
->         test VIDIOC_LOG_STATUS: OK (Not Supported)
->
-> Input ioctls:
->         test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
->         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
->         test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
->         test VIDIOC_ENUMAUDIO: OK (Not Supported)
->         test VIDIOC_G/S/ENUMINPUT: OK (Not Supported)
->         test VIDIOC_G/S_AUDIO: OK (Not Supported)
->         Inputs: 0 Audio Inputs: 0 Tuners: 0
->
-> Output ioctls:
->         test VIDIOC_G/S_MODULATOR: OK (Not Supported)
->         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
->         test VIDIOC_ENUMAUDOUT: OK (Not Supported)
->         test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
->         test VIDIOC_G/S_AUDOUT: OK (Not Supported)
->         Outputs: 0 Audio Outputs: 0 Modulators: 0
->
-> Input/Output configuration ioctls:
->         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
->         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
->         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
->         test VIDIOC_G/S_EDID: OK (Not Supported)
->
->         Control ioctls:
->                 test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
->                 test VIDIOC_QUERYCTRL: OK (Not Supported)
->                 test VIDIOC_G/S_CTRL: OK (Not Supported)
->                 test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
->                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
->                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
->                 Standard Controls: 0 Private Controls: 0
->
->         Format ioctls:
->                 test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
->                 test VIDIOC_G/S_PARM: OK (Not Supported)
->                 test VIDIOC_G_FBUF: OK (Not Supported)
->                 test VIDIOC_G_FMT: OK
->                 test VIDIOC_TRY_FMT: OK
->                 test VIDIOC_S_FMT: OK
->                 test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
->                 test Cropping: OK (Not Supported)
->                 test Composing: OK
->                 test Scaling: OK
->
->         Codec ioctls:
->                 test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
->                 test VIDIOC_G_ENC_INDEX: OK (Not Supported)
->                 test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
->
->         Buffer ioctls:
->                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
->                 test VIDIOC_EXPBUF: OK
->
-> Test input 0:
->
->
-> Total: 43, Succeeded: 43, Failed: 0, Warnings: 0
->
-> Rick Chang (3):
->   dt-bindings: mediatek: Add a binding for Mediatek JPEG Decoder
->   vcodec: mediatek: Add Mediatek JPEG Decoder Driver
->   arm: dts: mt2701: Add node for Mediatek JPEG Decoder
->
->  .../bindings/media/mediatek-jpeg-decoder.txt       |   37 +
->  arch/arm/boot/dts/mt2701.dtsi                      |   14 +
->  drivers/media/platform/Kconfig                     |   15 +
->  drivers/media/platform/Makefile                    |    2 +
->  drivers/media/platform/mtk-jpeg/Makefile           |    2 +
->  drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c    | 1303 ++++++++++++++++++++
->  drivers/media/platform/mtk-jpeg/mtk_jpeg_core.h    |  139 +++
->  drivers/media/platform/mtk-jpeg/mtk_jpeg_hw.c      |  417 +++++++
->  drivers/media/platform/mtk-jpeg/mtk_jpeg_hw.h      |   91 ++
->  drivers/media/platform/mtk-jpeg/mtk_jpeg_parse.c   |  160 +++
->  drivers/media/platform/mtk-jpeg/mtk_jpeg_parse.h   |   25 +
->  drivers/media/platform/mtk-jpeg/mtk_jpeg_reg.h     |   58 +
->  12 files changed, 2263 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/mediatek-jpeg-decoder.txt
->  create mode 100644 drivers/media/platform/mtk-jpeg/Makefile
->  create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
->  create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_core.h
->  create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_hw.c
->  create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_hw.h
->  create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_parse.c
->  create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_parse.h
->  create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_reg.h
->
+	state->crtcs[i].commit->event = NULL;
+
+What I can't see is why this isn't a leaked pointer - I don't see
+anything inbetween taking charge of that structure.  The _commit_
+hasn't been swapped from what I can see, it's just state->crtcs[i].state
+that have been swapped.
+
+So I can't see who's responsible for generating this event, or how the
+backend DRM drivers get to know about this event, and that they should
+complete the flip.
+
+What I also don't get is why DRM is wanting to wait for a flip event
+when we're disabling the CRTC.  None of this makes sense to me, like
+much of the atomic modeset code...
+
+(I'm probably never going to convert Armada DRM to atomic modeset, I
+just don't seem to be capable of understanding atomic modeset.  Maybe
+I'm too old?)
+
+[drm:drm_ioctl] pid=2178, dev=0xe200, auth=1, DRM_IOCTL_MODE_RMFB
+[drm:drm_mode_object_unreference] OBJ ID: 38 (4)
+[drm:drm_atomic_state_init] Allocated atomic state ffffffc974c7c300
+[drm:drm_mode_object_reference] OBJ ID: 43 (1)
+[drm:drm_atomic_get_crtc_state] Added [CRTC:24:crtc-0] ffffffc975e59400 state to ffffffc974c7c300
+[drm:drm_mode_object_reference] OBJ ID: 38 (3)
+[drm:drm_atomic_get_plane_state] Added [PLANE:23:plane-0] ffffffc974c7c100 state to ffffffc974c7c300
+[drm:drm_mode_object_unreference] OBJ ID: 43 (2)
+[drm:drm_atomic_set_mode_for_crtc] Set [NOMODE] for CRTC state ffffffc975e59400
+[drm:drm_atomic_set_crtc_for_plane] Link plane state ffffffc974c7c100 to [NOCRTC]
+[drm:drm_mode_object_unreference] OBJ ID: 38 (4)
+[drm:drm_atomic_set_fb_for_plane] Set [NOFB] for plane state ffffffc974c7c100
+[drm:drm_atomic_add_affected_connectors] Adding all current connectors for [CRTC:24:crtc-0] to ffffffc974c7c300
+[drm:drm_mode_object_reference] OBJ ID: 26 (4)
+[drm:drm_mode_object_reference] OBJ ID: 26 (5)
+[drm:drm_atomic_get_connector_state] Added [CONNECTOR:26] ffffffc974c7c000 state to ffffffc974c7c300
+[drm:drm_mode_object_unreference] OBJ ID: 26 (6)
+[drm:drm_atomic_set_crtc_for_connector] Link connector state ffffffc974c7c000 to [NOCRTC]
+[drm:drm_atomic_check_only] checking ffffffc974c7c300
+[drm:drm_atomic_helper_check_modeset] [CRTC:24:crtc-0] mode changed
+[drm:drm_atomic_helper_check_modeset] [CRTC:24:crtc-0] enable changed
+[drm:drm_atomic_helper_check_modeset] Updating routing for [CONNECTOR:26:HDMI-A-1]
+[drm:drm_atomic_helper_check_modeset] Disabling [CONNECTOR:26:HDMI-A-1]
+[drm:drm_atomic_helper_check_modeset] [CRTC:24:crtc-0] active changed
+[drm:drm_atomic_helper_check_modeset] [CRTC:24:crtc-0] needs all connectors, enable: n, active: n
+[drm:drm_atomic_add_affected_connectors] Adding all current connectors for [CRTC:24:crtc-0] to ffffffc974c7c300
+[drm:drm_atomic_commit] commiting ffffffc974c7c300
+[drm:drm_atomic_helper_commit_modeset_disables] disabling [ENCODER:25:TMDS-25]
+[drm:drm_atomic_helper_commit_modeset_disables] disabling [CRTC:24:crtc-0]
+hdlcd_crtc_disable: active 0
+[drm:drm_atomic_helper_commit_cleanup_done] *ERROR* [CRTC:24:crtc-0] flip_done timed out
+[drm:drm_atomic_state_default_clear] Clearing atomic state ffffffc974c7c300
+[drm:drm_mode_object_unreference] OBJ ID: 26 (5)
+[drm:drm_mode_object_unreference] OBJ ID: 26 (4)
+[drm:drm_mode_object_unreference] OBJ ID: 43 (1)
+[drm:drm_mode_object_unreference] OBJ ID: 38 (3)
+[drm:drm_atomic_state_free] Freeing atomic state ffffffc974c7c300
+[drm:drm_mode_object_unreference] OBJ ID: 38 (2)
+[drm:drm_mode_object_unreference] OBJ ID: 38 (1)
+
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
