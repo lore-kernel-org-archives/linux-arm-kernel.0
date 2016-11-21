@@ -1,126 +1,128 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 21 Nov 2016 14:27:13 +0100
-Subject: [PATCH] PM / Domains: Fix compatible for domain idle state
-In-Reply-To: <1478210075-92045-2-git-send-email-lina.iyer@linaro.org>
-References: <1478210075-92045-1-git-send-email-lina.iyer@linaro.org>
- <1478210075-92045-2-git-send-email-lina.iyer@linaro.org>
-Message-ID: <CAPDyKFomCaT+dV+C7wzcqnMzwKOn6w7wPo3Gm94O2x3RRL_tLw@mail.gmail.com>
+From: lars.persson@axis.com (Lars Persson)
+Date: Mon, 21 Nov 2016 13:28:36 +0000
+Subject: Synopsys Ethernet QoS Driver
+In-Reply-To: <87c8a24b-0812-7850-cb3f-7be691bab432@st.com>
+References: <CADvZ6ErjyVR5ShWTk0QesWLYR1m3p8yAMkK8v9gm2kN5xTv8zw@mail.gmail.com>
+ <1dbb6047-2bbb-4d56-2a62-ab65a0254844@synopsys.com>
+ <20161119135654.GA14079@lnxartpec.se.axis.com>
+ <CAJ3bTp7PpUJcz=1JohX=A54UP6vVAafWnB0PGUBSxb5JJiO8Lg@mail.gmail.com>
+ <1248f4ce-4859-10e6-fef9-342ea543f8d4@synopsys.com>,
+ <87c8a24b-0812-7850-cb3f-7be691bab432@st.com>
+Message-ID: <BFA799B0-BB22-4515-AC14-3544A3167B0A@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 November 2016 at 22:54, Lina Iyer <lina.iyer@linaro.org> wrote:
-> Re-using idle state definition provided by arm,idle-state for domain
-> idle states creates a lot of confusion and limits further evolution of
-> the domain idle definition. To keep things clear and simple, define a
-> idle states for domain using a new compatible "domain-idle-state".
->
-> Fix existing PM domains code to look for the newly defined compatible.
->
-> Cc: <devicetree@vger.kernel.org>
-> Cc: Rob Herring <robh@kernel.org>
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Kind regards
-Uffe
+> 21 nov. 2016 kl. 13:53 skrev Giuseppe CAVALLARO <peppe.cavallaro@st.com>:
+> 
+> Hello Joao
+> 
+>> On 11/21/2016 1:32 PM, Joao Pinto wrote:
+>> Hello,
+>> 
+>>> On 21-11-2016 05:29, Rayagond Kokatanur wrote:
+>>>> On Sat, Nov 19, 2016 at 7:26 PM, Rabin Vincent <rabin@rab.in> wrote:
+>>>>> On Fri, Nov 18, 2016 at 02:20:27PM +0000, Joao Pinto wrote:
+>>>>> For now we are interesting in improving the synopsys QoS driver under
+>>>>> /nect/ethernet/synopsys. For now the driver structure consists of a single file
+>>>>> called dwc_eth_qos.c, containing synopsys ethernet qos common ops and platform
+>>>>> related stuff.
+>>>>> 
+>>>>> Our strategy would be:
+>>>>> 
+>>>>> a) Implement a platform glue driver (dwc_eth_qos_pltfm.c)
+>>>>> b) Implement a pci glue driver (dwc_eth_qos_pci.c)
+>>>>> c) Implement a "core driver" (dwc_eth_qos.c) that would only have Ethernet QoS
+>>>>> related stuff to be reused by the platform / pci drivers
+>>>>> d) Add a set of features to the "core driver" that we have available internally
+>>>> 
+>>>> Note that there are actually two drivers in mainline for this hardware:
+>>>> 
+>>>> drivers/net/ethernet/synopsis/
+>>>> drivers/net/ethernet/stmicro/stmmac/
+>>> 
+>>> Yes the later driver (drivers/net/ethernet/stmicro/stmmac/) supports
+>>> both 3.x and 4.x. It has glue layer for pci, platform, core etc,
+>>> please refer this driver once before you start.
+>>> 
+>>> You can start adding missing feature of 4.x in stmmac driver.
+>> 
+>> Thanks you all for all the info.
+>> Well, I think we are in a good position to organize the ethernet drivers
+>> concerning Synopsys IPs.
+>> 
+>> First of all, in my opinion, it does not make sense to have a ethernet/synopsis
+>> (typo :)) when ethernet/stmicro is also for a synopsys IP. If we have another
+>> vendor using the same IP it should be able to reuse the commonn operations. But
+>> I would put that discussion for later :)
+>> 
+>> For now I suggest that for we create ethernet/qos and create there a folder
+>> called dwc (designware controller) where all the synopsys qos IP specific code
+>> in order to be reused for example by ethernet/stmicro/stmmac/. We just have to
+>> figure out a clean interface for "client drivers" like stmmac to interact with
+>> the new qos driver.
+>> 
+>> What do you think about this approach?
+> 
+> The stmmac drivers run since many years on several platforms
+> (sh4, stm32, arm, x86, mips ...) and it supports an huge of amount of
+> configurations starting from 3.1x to 3.7x databooks.
+> 
+> It also supports QoS hardware; for example, 4.00a, 4.10a and 4.20a
+> are fully working.
+> 
+> Also the stmmac has platform, device-tree and pcie supports and
+> a lot of maintained glue-logic files.
+> 
+> It is fully documented inside the kernel tree.
+> 
+> I am happy to have new enhancements from other developers.
+> So, on my side, if you want to spend your time on improving it on your
+> platforms please feel free to do it!
+> 
+> Concerning the stmicro/stmmac naming, these come from a really old
+> story and have no issue to adopt new folder/file names.
+> 
+> I am also open to merge fixes and changes from ethernet/synopsis.
+> I want to point you on some benchmarks made by Alex some months ago
+> (IIRC) that showed an stmmac winner (due to the several optimizations
+> analyzed and reviewed in this mailing list).
+> 
+> Peppe
+> 
 
-> ---
->  .../bindings/power/domain-idle-state.txt           | 33 ++++++++++++++++++++++
->  .../devicetree/bindings/power/power_domain.txt     |  8 +++---
->  drivers/base/power/domain.c                        |  2 +-
->  3 files changed, 38 insertions(+), 5 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/power/domain-idle-state.txt
->
-> diff --git a/Documentation/devicetree/bindings/power/domain-idle-state.txt b/Documentation/devicetree/bindings/power/domain-idle-state.txt
-> new file mode 100644
-> index 0000000..eefc7ed
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/domain-idle-state.txt
-> @@ -0,0 +1,33 @@
-> +PM Domain Idle State Node:
-> +
-> +A domain idle state node represents the state parameters that will be used to
-> +select the state when there are no active components in the domain.
-> +
-> +The state node has the following parameters -
-> +
-> +- compatible:
-> +       Usage: Required
-> +       Value type: <string>
-> +       Definition: Must be "domain-idle-state".
-> +
-> +- entry-latency-us
-> +       Usage: Required
-> +       Value type: <prop-encoded-array>
-> +       Definition: u32 value representing worst case latency in
-> +                   microseconds required to enter the idle state.
-> +                   The exit-latency-us duration may be guaranteed
-> +                   only after entry-latency-us has passed.
-> +
-> +- exit-latency-us
-> +       Usage: Required
-> +       Value type: <prop-encoded-array>
-> +       Definition: u32 value representing worst case latency
-> +                   in microseconds required to exit the idle state.
-> +
-> +- min-residency-us
-> +       Usage: Required
-> +       Value type: <prop-encoded-array>
-> +       Definition: u32 value representing minimum residency duration
-> +                   in microseconds after which the idle state will yield
-> +                   power benefits after overcoming the overhead in entering
-> +i                  the idle state.
-> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
-> index e165036..723e1ad 100644
-> --- a/Documentation/devicetree/bindings/power/power_domain.txt
-> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
-> @@ -31,7 +31,7 @@ Optional properties:
->
->  - domain-idle-states : A phandle of an idle-state that shall be soaked into a
->                  generic domain power state. The idle state definitions are
-> -                compatible with arm,idle-state specified in [1].
-> +                compatible with domain-idle-state specified in [1].
->    The domain-idle-state property reflects the idle state of this PM domain and
->    not the idle states of the devices or sub-domains in the PM domain. Devices
->    and sub-domains have their own idle-states independent of the parent
-> @@ -85,7 +85,7 @@ Example 3:
->         };
->
->         DOMAIN_RET: state at 0 {
-> -               compatible = "arm,idle-state";
-> +               compatible = "domain-idle-state";
->                 reg = <0x0>;
->                 entry-latency-us = <1000>;
->                 exit-latency-us = <2000>;
-> @@ -93,7 +93,7 @@ Example 3:
->         };
->
->         DOMAIN_PWR_DN: state at 1 {
-> -               compatible = "arm,idle-state";
-> +               compatible = "domain-idle-state";
->                 reg = <0x1>;
->                 entry-latency-us = <5000>;
->                 exit-latency-us = <8000>;
-> @@ -118,4 +118,4 @@ The node above defines a typical PM domain consumer device, which is located
->  inside a PM domain with index 0 of a power controller represented by a node
->  with the label "power".
->
-> -[1]. Documentation/devicetree/bindings/arm/idle-states.txt
-> +[1]. Documentation/devicetree/bindings/power/domain-idle-state.txt
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 661737c..f0bc672 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -2048,7 +2048,7 @@ int genpd_dev_pm_attach(struct device *dev)
->  EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
->
->  static const struct of_device_id idle_state_match[] = {
-> -       { .compatible = "arm,idle-state", },
-> +       { .compatible = "domain-idle-state", },
->         { }
->  };
->
-> --
-> 2.7.4
->
+Hello Joao and others,
+
+As the maintainer of dwc_eth_qos.c I prefer also that we put efforts on the most mature driver, the stmmac.
+
+I hope that the code can migrate into an ethernet/synopsys folder to keep the convention of naming the folder after the vendor. This makes it easy for others to find the driver. 
+
+The dwc_eth_qos.c will eventually be removed and its DT binding interface can then be implemented in the stmmac driver.
+
+- Lars
+
+>> 
+>> 
+>>> 
+>>>> 
+>>>> (See http://lists.openwall.net/netdev/2016/02/29/127)
+>>>> 
+>>>> The former only supports 4.x of the hardware.
+>>>> 
+>>>> The later supports 4.x and 3.x and already has a platform glue driver
+>>>> with support for several platforms, a PCI glue driver, and a core driver
+>>>> with several features not present in the former (for example: TX/RX
+>>>> interrupt coalescing, EEE, PTP).
+>>>> 
+>>>> Have you evaluated both drivers?  Why have you decided to work on the
+>>>> former rather than the latter?
+>>> 
+>>> 
+>> 
+>> Thanks.
+>> 
+>> 
+>> 
+>> 
+> 
