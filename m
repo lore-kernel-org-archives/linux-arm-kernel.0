@@ -1,35 +1,58 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 21 Nov 2016 11:04:48 -0600
-Subject: [PATCH 0/2] ARM: davinvi: da850 add ohci DT nodes
-In-Reply-To: <20161121165920.29809-1-ahaslam@baylibre.com>
-References: <20161121165920.29809-1-ahaslam@baylibre.com>
-Message-ID: <4d414c4d-3d08-f3d9-2bc5-aa90c8a631ce@lechnology.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 21 Nov 2016 09:06:54 -0800
+Subject: [PATCH 1/2] ARM64: dts: Add support for Meson GXM
+In-Reply-To: <20161121162905.14285-2-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Mon, 21 Nov 2016 17:29:04 +0100")
+References: <20161121162905.14285-1-narmstrong@baylibre.com>
+ <20161121162905.14285-2-narmstrong@baylibre.com>
+Message-ID: <m2wpfw3gpd.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2016 10:59 AM, Axel Haslam wrote:
-> This adds the DT node for the ohci controller and
-> enables it for the omapl138-lckd platform.
->
-> DEPENDENCIES:
->
-> 1. [PATCH v6 0/5] USB: ohci-da8xx: Add device tree support
-> https://lkml.org/lkml/2016/11/21/558
->
-> 2. [PATCH v3 0/2] regulator: handling of error conditions for usb drivers
-> https://lkml.org/lkml/2016/11/4/465
->
-> Axel Haslam (2):
->   ARM: dts: da850: Add usb device node
->   ARM: dts: da850-lcdk: Enable ohci for omapl138 lcdk
->
->  arch/arm/boot/dts/da850-lcdk.dts | 8 ++++++++
->  arch/arm/boot/dts/da850.dtsi     | 8 ++++++++
->  2 files changed, 16 insertions(+)
->
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-It does not look like you rebased these patches. Sekhar pushed the musb 
-counterpart to v4.10/dt yesterday, which will cause conflicts with this 
-series.
+> Following the Amlogic Linux kernel, it seem the only differences
+> between the GXL and GXM SoCs are the CPU Clusters.
+>
+> This commit renames the gxl-s905d-p23x DTSI in a common file for
+> S905D p20x and S912 q20x boards.
+>
+> Then adds a meson-gxm dtsi and reproduce the P23x to Q20x boards
+> dts files since the S905D and S912 SoCs shares the same pinout
+> and the P23x and Q20x boards are identical.
+>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  Documentation/devicetree/bindings/arm/amlogic.txt  |   6 +
+>  arch/arm64/boot/dts/amlogic/Makefile               |   2 +
+>  .../arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi | 190 +++++++++++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts    |  19 +++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts    |   7 +
+>  .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      |   3 +-
+>  .../boot/dts/amlogic/meson-gxl-s905d-p231.dts      |   3 +-
+>  .../boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi     | 188 --------------------
+>  .../arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts |  77 +++++++++
+>  .../arm64/boot/dts/amlogic/meson-gxm-s912-q201.dts |  58 +++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxm.dtsi         | 114 +++++++++++++
+>  11 files changed, 477 insertions(+), 190 deletions(-)
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
+>  delete mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-s912-q201.dts
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
 
-https://git.kernel.org/cgit/linux/kernel/git/nsekhar/linux-davinci.git/log/?h=v4.10/dt
+Applied.
+
+Git tip: for future reference, set 'git config diff.renames true' so and
+the diffstat shows a better summary when files are moved/renamed.
+
+e.g, rather than the large ++ and -- above, you'd see:
+
+ ...gxl-s905d-p23x.dtsi => meson-gx-p23x-q20x.dtsi} |   4 +-
+ 
+Which is much more comforting to a maintainer than a bunch of
+(potentially unrelated) adds and removes.
+
+Thanks,
+
+Kevin
