@@ -1,136 +1,157 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 21 Nov 2016 23:22:09 +0100
-Subject: [GIT PULL] Allwinner DT changes for 4.10
-In-Reply-To: <CAOesGMg=OQDtKkb4Mut4M1zAwM5CX3=YHxS7equO=Nx2a1tv1Q@mail.gmail.com>
-References: <20161115204122.x3vnb3bkny5esdya@lukather>
- <20161119002316.GN8882@localhost>
- <20161121132712.43b5eld2qthi6664@lukather>
- <CAOesGMg=OQDtKkb4Mut4M1zAwM5CX3=YHxS7equO=Nx2a1tv1Q@mail.gmail.com>
-Message-ID: <20161121222209.ipqft65zcqsfsu2n@lukather>
+From: tbaicar@codeaurora.org (Tyler Baicar)
+Date: Mon, 21 Nov 2016 15:35:53 -0700
+Subject: [PATCH V5 00/10] Add UEFI 2.6 and ACPI 6.1 updates for RAS on ARM64
+Message-ID: <1479767763-27532-1-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2016 at 08:28:09AM -0800, Olof Johansson wrote:
-> HI,
-> 
-> On Mon, Nov 21, 2016 at 5:27 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi Olof,
-> >
-> > On Fri, Nov 18, 2016 at 04:23:16PM -0800, Olof Johansson wrote:
-> >> Hi,
-> >>
-> >> On Tue, Nov 15, 2016 at 09:41:22PM +0100, Maxime Ripard wrote:
-> >> > Hi Arnd, Olof,
-> >> >
-> >> > Here is our pull request for the next merge window.
-> >> >
-> >> > Thanks!
-> >> > Maxime
-> >> >
-> >> > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-> >> >
-> >> >   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-> >> >
-> >> > are available in the git repository at:
-> >> >
-> >> >   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.10
-> >> >
-> >> > for you to fetch changes up to e39a30cf736144814b0bddb3fff28fbbc2a8be0f:
-> >> >
-> >> >   ARM: sunxi: Add the missing clocks to the pinctrl nodes (2016-11-15 18:49:47 +0100)
-> >> >
-> >> > ----------------------------------------------------------------
-> >> > Allwinner DT additions for 4.10
-> >> >
-> >> > The usual bunch of DT additions, but most notably:
-> >> >   - A31 DRM driver
-> >> >   - A31 audio codec
-> >> >   - WiFi for the A80-Based boards and the CHIP
-> >> >   - Support for the NextThing Co CHIP Pro (the first board with NAND
-> >> >     enabled)
-> >> >   - New boards: NanoPi M1,
-> >> >
-> >> [...]
-> >>
-> >> > Maxime Ripard (16):
-> >> >       ARM: sun5i: a13-olinuxino: Enable VGA bridge
-> >> >       ARM: gr8: Add the UART3
-> >> >       ARM: gr8: Fix typo in the i2s mclk pin group
-> >> >       ARM: gr8: Add missing pwm channel 1 pin
-> >> >       ARM: gr8: Add UART2 pins
-> >> >       ARM: gr8: Add UART3 pins
-> >> >       ARM: gr8: Add CHIP Pro support
-> >> >       ARM: sun5i: chip: Enable Wi-Fi SDIO chip
-> >> >       ARM: sun5i: Rename A10s pins
-> >> >       ARM: sun5i: Add SPI2 pins
-> >> >       ARM: sun5i: Add RGB 565 LCD pins
-> >> >       ARM: sun5i: chip: Add optional buses
-> >> >       ARM: gr8: evb: Enable SPDIF
-> >> >       ARM: gr8: evb: Add i2s codec
-> >> >       ARM: sun8i: sina33: Enable USB gadget
-> >> >       ARM: sunxi: Add the missing clocks to the pinctrl nodes
-> >> >
-> >> [...]
-> >>
-> >> >  arch/arm/boot/dts/Makefile                         |   1 +
-> >> >  arch/arm/boot/dts/ntc-gr8-chip-pro.dts             | 266 +++++++++++++++++++++
-> >> >  arch/arm/boot/dts/ntc-gr8-evb.dts                  |  33 +++
-> >> >  arch/arm/boot/dts/ntc-gr8.dtsi                     |  47 +++-
-> >> >  arch/arm/boot/dts/sun4i-a10.dtsi                   |   3 +-
-> >>
-> >> NTC isn't the SoC manufacturer, and we try to keep the prefixes down to
-> >> manufacturer to keep the namespace a little more manageable, even if
-> >> we never got subdirectories setup as on arm64.
-> >>
-> >> I think this should probably be sun4i-a10-gr8 or sun4i-r8-gr8 as prefix?
-> >
-> > The users really expect a SoC from Nextthing, it's always been
-> > marketed that way, the marking on the SoC also says so, etc. The fact
-> > that it's been a design in cooperation with Allwinner, and that the
-> > design is based on some earlier family is an implementation detail,
-> > and I'd really like not for it to have the sun5i prefix, it's just
-> > confusing.
-> 
-> I don't care so much about what's printed on the top of the package, I
-> care a lot more about what's on the insides. We've got a long
-> tradition of not renaming things randomly when companies get acquired
-> or renames themselves, and I think that same spirit is applicable
-> here.
+When a memory error, CPU error, PCIe error, or other type of hardware error
+that's covered by RAS occurs, firmware should populate the shared GHES memory
+location with the proper GHES structures to notify the OS of the error.
+For example, platforms that implement firmware first handling may implement
+separate GHES sources for corrected errors and uncorrected errors. If the
+error is an uncorrectable error, then the firmware will notify the OS
+immediately since the error needs to be handled ASAP. The OS will then be able
+to take the appropriate action needed such as offlining a page. If the error
+is a corrected error, then the firmware will not interrupt the OS immediately.
+Instead, the OS will see and report the error the next time it's GHES timer
+expires. The kernel will first parse the GHES structures and report the errors
+through the kernel logs and then notify the user space through RAS trace
+events. This allows user space applications such as RAS Daemon to see the
+errors and report them however the user desires. This patchset extends the
+kernel functionality for RAS errors based on updates in the UEFI 2.6 and
+ACPI 6.1 specifications.
 
-Yet, we called the imx23 and imx28 that way while it was really a
-sigmatel design. And I'm pretty sure there's other examples too.
+An example flow from firmware to user space could be:
 
-> Calling it an SoC is inaccurate as well, it's really a
-> system-in-package. It's just a new way to integrate an SoC into a
-> module to build boards out of. Compare to Octavo OSD335x, for example.
-> 
-> System-in-package solutions are going to get more and more common, and
-> it's going to become really chaotic if we expect to use the prefix of
-> the company custom-ordering the package for each and every one of
-> them.
+                 +---------------+
+       +-------->|               |
+       |         |  GHES polling |--+
++-------------+  |    source     |  |   +---------------+   +------------+
+|             |  +---------------+  |   |  Kernel GHES  |   |            |
+|  Firmware   |                     +-->|  CPER AER and |-->|  RAS trace |
+|             |  +---------------+  |   |  EDAC drivers |   |   event    |
++-------------+  |               |  |   +---------------+   +------------+
+       |         |  GHES sci     |--+
+       +-------->|   source      |
+                 +---------------+
 
-This is indeed a SIP, but one with a custom SoC (or whatever the !RAM
-part in a SIP is called) that was designed by Allwinner *and* Next
-Thing Co., unlike the OSD335x that has a standard AM335x SoC in it.
+Add support for Generic Hardware Error Source (GHES) v2, which introduces the
+capability for the OS to acknowledge the consumption of the error record
+generated by the Reliability, Availability and Serviceability (RAS) controller.
+This eliminates potential race conditions between the OS and the RAS controller.
 
-> > And the ntc prefix has been asked for during the reviews...
->
-> Having a link to that requeset/email would be helpful if you try to
-> use it as an argument.
+Add support for the timestamp field added to the Generic Error Data Entry v3,
+allowing the OS to log the time that the error is generated by the firmware,
+rather than the time the error is consumed. This improves the correctness of
+event sequences when analyzing error logs. The timestamp is added in
+ACPI 6.1, reference Table 18-343 Generic Error Data Entry.
 
-Yeah, it turns out it was off list... so it's a pretty weak one :)
+Add support for ARMv8 Common Platform Error Record (CPER) per UEFI 2.6
+specification. ARMv8 specific processor error information is reported as part of
+the CPER records.  This provides more detail on for processor error logs. This
+can help describe ARMv8 cache, tlb, and bus errors.
 
-Maxime
+Synchronous External Abort (SEA) represents a specific processor error condition
+in ARM systems. A handler is added to recognize SEA errors, and a notifier is
+added to parse and report the errors before the process is killed. Refer to
+section N.2.1.1 in the Common Platform Error Record appendix of the UEFI 2.6
+specification.
+
+Currently the kernel ignores CPER records that are unrecognized.
+On the other hand, UEFI spec allows for non-standard (eg. vendor
+proprietary) error section type in CPER (Common Platform Error Record),
+as defined in section N2.3 of UEFI version 2.5. Therefore, user
+is not able to see hardware error data of non-standard section.
+
+If section Type field of Generic Error Data Entry is unrecognized,
+prints out the raw data in dmesg buffer, and also adds a tracepoint
+for reporting such hardware errors.
+
+Currently even if an error status block's severity is fatal, the kernel
+does not honor the severity level and panic. With the firmware first
+model, the platform could inform the OS about a fatal hardware error
+through the non-NMI GHES notification type. The OS should panic when a
+hardware error record is received with this severity.
+
+Add support to handle SEAs that occur while a KVM guest kernel is
+running. Currently these are unsupported by the guest abort handling.
+
+Depends on: [PATCH v14] acpi, apei, arm64: APEI initial support for aarch64.
+            https://lkml.org/lkml/2016/8/10/231
+
+V5: Fix GHES goto logic for error conditions
+    Change ghes_do_read_ack to ghes_ack_error
+    Make sure data version check is >= 3
+    Use CPER helper functions in print functions
+    Make handle_guest_sea() dummy function static for arm
+    Add arm to subject line for KVM patch
+
+V4: Add bit offset left shift to read_ack_write value
+    Make HEST generic and generic_v2 structures a union in the ghes structure
+    Move gdata v3 helper functions into ghes.h to avoid duplication
+    Reorder the timestamp print and avoid memcpy
+    Add helper functions for gdata size checking
+    Rename the SEA functions
+    Add helper function for GHES panics
+    Set fru_id to NULL UUID at variable declaration
+    Limit ARM trace event parameters to the needed structures
+    Reorder the ARM trace event variables to save space
+    Add comment for why we don't pass SEAs to the guest when it aborts
+    Move ARM trace event call into GHES driver instead of CPER
+
+V3: Fix unmapped address to the read_ack_register in ghes.c
+    Add helper function to get the proper payload based on generic data entry
+     version
+    Move timestamp print to avoid changing function calls in cper.c
+    Remove patch "arm64: exception: handle instruction abort at current EL"
+     since the el1_ia handler is already added in 4.8
+    Add EFI and ARM64 dependencies for HAVE_ACPI_APEI_SEA
+    Add a new trace event for ARM type errors
+    Add support to handle KVM guest SEAs
+
+V2: Add PSCI state print for the ARMv8 error type.
+    Separate timestamp year into year and century using BCD format.
+    Rebase on top of ACPICA 20160318 release and remove header file changes
+     in include/acpi/actbl1.h.
+    Add panic OS with fatal error status block patch.
+    Add processing of unrecognized CPER error section patches with updates
+     from previous comments. Original patches: https://lkml.org/lkml/2015/9/8/646
+
+V1: https://lkml.org/lkml/2016/2/5/544
+
+Jonathan (Zhixiong) Zhang (1):
+  acpi: apei: panic OS with fatal error status block
+
+Tyler Baicar (9):
+  acpi: apei: read ack upon ghes record consumption
+  ras: acpi/apei: cper: generic error data entry v3 per ACPI 6.1
+  efi: parse ARMv8 processor error
+  arm64: exception: handle Synchronous External Abort
+  acpi: apei: handle SEA notification type for ARMv8
+  efi: print unrecognized CPER section
+  ras: acpi / apei: generate trace event for unrecognized CPER section
+  trace, ras: add ARM processor error trace event
+  arm/arm64: KVM: add guest SEA support
+
+ arch/arm/include/asm/kvm_arm.h       |   1 +
+ arch/arm/include/asm/system_misc.h   |   5 +
+ arch/arm/kvm/mmu.c                   |  18 ++-
+ arch/arm64/Kconfig                   |   1 +
+ arch/arm64/include/asm/kvm_arm.h     |   1 +
+ arch/arm64/include/asm/system_misc.h |  15 +++
+ arch/arm64/mm/fault.c                |  71 ++++++++++--
+ drivers/acpi/apei/Kconfig            |  14 +++
+ drivers/acpi/apei/ghes.c             | 188 ++++++++++++++++++++++++++++---
+ drivers/acpi/apei/hest.c             |   7 +-
+ drivers/firmware/efi/cper.c          | 210 ++++++++++++++++++++++++++++++++---
+ drivers/ras/ras.c                    |   2 +
+ include/acpi/ghes.h                  |  15 ++-
+ include/linux/cper.h                 |  84 ++++++++++++++
+ include/ras/ras_event.h              | 100 +++++++++++++++++
+ 15 files changed, 688 insertions(+), 44 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161121/a2e39d2c/attachment.sig>
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
