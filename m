@@ -1,65 +1,26 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 21 Nov 2016 14:03:45 +0100
-Subject: [GIT PULL] Allwinner late DT changes for 4.10
-In-Reply-To: <20161119002733.GA15902@localhost>
-References: <20161115210034.mwqnsggmmbzoav77@lukather>
- <20161119002733.GA15902@localhost>
-Message-ID: <20161121130345.mpdhouxqtrrv3x6u@lukather>
+From: woogyom.kim@gmail.com (Milo Kim)
+Date: Mon, 21 Nov 2016 22:05:21 +0900
+Subject: [PATCH v2 5/8] dt-bindings: mfd: Provide human readable defines
+ for TPS65217 interrupts
+In-Reply-To: <20161118151051.GV4082@atomide.com>
+References: <20161028123702.21849-1-woogyom.kim@gmail.com>
+ <20161028123702.21849-6-woogyom.kim@gmail.com>
+ <20161118145353.GE2301@dell.home> <20161118151051.GV4082@atomide.com>
+Message-ID: <c04af1ac-b692-f3df-47b0-72c5263374bf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 04:27:33PM -0800, Olof Johansson wrote:
-> On Tue, Nov 15, 2016 at 10:00:34PM +0100, Maxime Ripard wrote:
-> > Hi Arnd, Olof,
-> > 
-> > Here is a pull request that should be merged after the pinctrl PR,
-> > hence probably in your late PR.
-> > 
-> > This is just a mechanic conversion to the generic pinconf bindings and
-> > removal of the useless pinmux properties we had.
-> > 
-> > This is based on the previous DT PR I just sent.
-> > 
-> > Thanks!
-> > Maxime
-> > 
-> > The following changes since commit e39a30cf736144814b0bddb3fff28fbbc2a8be0f:
-> > 
-> >   ARM: sunxi: Add the missing clocks to the pinctrl nodes (2016-11-15 18:49:47 +0100)
-> > 
-> > are available in the git repository at:
-> > 
-> >   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-late-for-4.10
-> > 
-> > for you to fetch changes up to 1d20ba07ea57ae227a925302b42221df5b830f2b:
-> > 
-> >   ARM: sunxi: Convert pinctrl nodes to generic bindings (2016-11-15 21:56:30 +0100)
-> 
-> Nice cleanup!
-> 
-> Unfortuantely, see comment on previous pull request, so this would need
-> to be rebased.
-> 
-> Also, this won't work since this branch does not contain the required
-> pinctrl changes. If we merge this without basing it on those changes we lose
-> bisectability.
-> 
-> It'd be easiest if you just held off on these until right after 4.10-rc1, and
-> we could get them in before -rc2.
+On 11/19/2016 12:10 AM, Tony Lindgren wrote:
+>>> +#define TPS65217_IRQ_USB	0
+>>> > > +#define TPS65217_IRQ_AC		1
+>>> > > +#define TPS65217_IRQ_PB		2
+>> >
+>> > What are "AC" and "PB".  Seeing as these are meant to be "human
+>> > readable", let's make them more human friendly.
+> Good idea. Milo, please do an incremental single follow-up patch as
+> I already have applied this and the dts changes using it.
 
-That works for me. I'll respin it as soon as rc1 is out.
+Thanks for catching this. Let me send a patch soon.
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161121/e2a43eee/attachment.sig>
+Best regards,
+Milo
