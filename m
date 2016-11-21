@@ -1,89 +1,81 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 21 Nov 2016 17:48:28 +0100
-Subject: [PATCH v2 1/5] ARM: memory: da8xx-ddrctl: new driver
-In-Reply-To: <a309a738-7fa7-3aab-4457-f7d693e6b37f@ti.com>
-References: <1477925138-23457-1-git-send-email-bgolaszewski@baylibre.com>
- <1477925138-23457-2-git-send-email-bgolaszewski@baylibre.com>
- <a309a738-7fa7-3aab-4457-f7d693e6b37f@ti.com>
-Message-ID: <CAMpxmJUXJi6PDq0qc-0+r2mLPASLpJUt_njWtXr4Mx4k0Fa82g@mail.gmail.com>
+From: manu@bidouilliste.com (Emmanuel Vadot)
+Date: Mon, 21 Nov 2016 17:49:11 +0100
+Subject: [PATCH] ARM: dts: sunxi: Enable UEXT related nodes for Olimex A20 SOM
+ EVB
+Message-ID: <20161121164911.76900-1-manu@bidouilliste.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-11-21 17:33 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
-> On Monday 31 October 2016 08:15 PM, Bartosz Golaszewski wrote:
->> +static int da8xx_ddrctl_probe(struct platform_device *pdev)
->> +{
->> +     const struct da8xx_ddrctl_config_knob *knob;
->> +     const struct da8xx_ddrctl_setting *setting;
->> +     struct device_node *node;
->> +     struct resource *res;
->> +     void __iomem *ddrctl;
->> +     struct device *dev;
->> +     u32 reg;
->> +
->> +     dev = &pdev->dev;
->> +     node = dev->of_node;
->> +
->> +     setting = da8xx_ddrctl_get_board_settings();
->> +     if (!setting) {
->> +             dev_err(dev, "no settings for board '%s'\n",
->> +                     of_flat_dt_get_machine_name());
->> +             return -EINVAL;
->> +     }
->
-> This causes a section mismatch because of_flat_dt_get_machine_name()
-> has an __init annotation. I did not notice that before, sorry.
->
-> It can be fixed with a patch like below:
->
-> ---8<---
-> diff --git a/drivers/memory/da8xx-ddrctl.c b/drivers/memory/da8xx-ddrctl.c
-> index a20e7bbbcbe0..9ca5aab3ac54 100644
-> --- a/drivers/memory/da8xx-ddrctl.c
-> +++ b/drivers/memory/da8xx-ddrctl.c
-> @@ -102,6 +102,18 @@ static const struct da8xx_ddrctl_setting *da8xx_ddrctl_get_board_settings(void)
->         return NULL;
->  }
->
-> +static const char* da8xx_ddrctl_get_machine_name(void)
-> +{
-> +       const char *str;
-> +       int ret;
-> +
-> +       ret = of_property_read_string(of_root, "model", &str);
-> +       if (ret)
-> +               ret = of_property_read_string(of_root, "compatible", &str);
-> +
-> +       return str;
-> +}
-> +
->  static int da8xx_ddrctl_probe(struct platform_device *pdev)
->  {
->         const struct da8xx_ddrctl_config_knob *knob;
-> @@ -118,7 +130,7 @@ static int da8xx_ddrctl_probe(struct platform_device *pdev)
->         setting = da8xx_ddrctl_get_board_settings();
->         if (!setting) {
->                 dev_err(dev, "no settings for board '%s'\n",
-> -                       of_flat_dt_get_machine_name());
-> +                       da8xx_ddrctl_get_machine_name());
->                 return -EINVAL;
->         }
-> ---8<---
->
-> A similar fix is required for the other driver in this series (patch
-> 2/5). I need some advise on whether I should introduce a common
-> function to get the machine name post kernel boot-up (I cannot see an
-> existing one). If yes, any advise on which file it should go into?
->
+UEXT are Universal EXTension connector from Olimex. They embed i2c, spi
+and uart pins along power in one connector and are found on most,
+if not all, Olimex boards.
+The Olimex A20 SOM EVB have two UEXT connector so enable the nodes found on
+those two connectors.
 
-Hi Sekhar,
+Signed-off-by: Emmanuel Vadot <manu@bidouilliste.com>
+---
+ arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 36 ++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-thanks for spotting that.
-
-I think we should introduce this function right away, rather than
-having two static functions doing the same thing. If you don't mind,
-I'll try to find a good spot for it and send a follow-up series fixing
-the issue.
-
-Best regards,
-Bartosz Golaszewski
+diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+index 23aacce..e879c119 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+@@ -116,6 +116,18 @@
+ 	};
+ };
+ 
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	status = "okay";
++};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins_a>;
++	status = "okay";
++};
++
+ &lradc {
+ 	vref-supply = <&reg_vcc3v0>;
+ 	status = "okay";
+@@ -284,12 +296,36 @@
+ 	status = "okay";
+ };
+ 
++&spi1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi1_pins_a>,
++		<&spi1_cs0_pins_a>;
++};
++
++&spi2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi2_pins_a>,
++		<&spi2_cs0_pins_a>;
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+ 	status = "okay";
+ };
+ 
++&uart6 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart6_pins_a>;
++	status = "okay";
++};
++
++&uart7 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart7_pins_a>;
++	status = "okay";
++};
++
+ &usb_otg {
+ 	dr_mode = "otg";
+ 	status = "okay";
+-- 
+2.9.2
