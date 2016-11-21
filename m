@@ -1,29 +1,17 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Tue, 22 Nov 2016 00:44:30 +0530
-Subject: [PATCH v2 1/4] spi: spi-fsl-dspi: Fix SPI transfer issue when
- using multiple SPI_IOC_MESSAGE
-In-Reply-To: <20161121191847.vg32cwople4qmini@sirena.org.uk>
-References: <cover.1479706671.git.maitysanchayan@gmail.com>
- <bbdbc8df434dd2af74eb351b799a2812a1c1967e.1479706671.git.maitysanchayan@gmail.com>
- <20161121191847.vg32cwople4qmini@sirena.org.uk>
-Message-ID: <20161121191430.GA24521@Sanchayan-Arch.localdomain>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 21 Nov 2016 11:27:47 -0800
+Subject: [PATCH 0/2] arm64: dts: NS2: Add sdio1, PCI phys
+In-Reply-To: <1479425103-2119-1-git-send-email-jon.mason@broadcom.com>
+References: <1479425103-2119-1-git-send-email-jon.mason@broadcom.com>
+Message-ID: <4c9d5d1a-bd4d-7e21-2076-da95af383e05@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+On 11/17/2016 03:25 PM, Jon Mason wrote:
+> The second SDIO seems to have been forgotten to be enabled in the
+> Northstar2 SVK dts.  Also, the PCI PHY entries are missing from the PCI
+> bus device tree entries.
 
-On 16-11-21 19:18:47, Mark Brown wrote:
-> On Mon, Nov 21, 2016 at 11:24:01AM +0530, Sanchayan Maity wrote:
-> > Current DMA implementation had a bug where the DMA transfer would
-> > exit the loop in dspi_transfer_one_message after the completion of
-> > a single transfer. This results in a multi message transfer submitted
-> > with SPI_IOC_MESSAGE to terminate incorrectly without an error.
-> 
-> Please don't resend already applied patches.  If there are any changes
-> needed please send incremental changes on top of what's already applied.
-
-This is not a resend of an applied patch. The whole series applies on
-top of your topic/fsl-dspi branch and has fixes for the SPI DMA as
-incremental changes
-
-- Sanchaya.
+Series applied, thanks Jon
+-- 
+Florian
