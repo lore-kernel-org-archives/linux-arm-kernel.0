@@ -1,36 +1,130 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 21 Nov 2016 14:06:29 +0100
-Subject: [PATCH] clk: sunxi-ng: sun6i-a31: Enable PLL-MIPI LDOs when
- ungating it
-In-Reply-To: <20161118071557.30195-1-wens@csie.org>
-References: <20161118071557.30195-1-wens@csie.org>
-Message-ID: <20161121130629.2qp6tvdd5slvl5m6@lukather>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Mon, 21 Nov 2016 14:11:02 +0100
+Subject: [PATCH] PM / Domains: Fix compatible for domain idle state
+In-Reply-To: <87zikt6mc1.fsf@arm.com>
+References: <1478210075-92045-1-git-send-email-lina.iyer@linaro.org>
+ <1478210075-92045-2-git-send-email-lina.iyer@linaro.org>
+ <87zikt6mc1.fsf@arm.com>
+Message-ID: <CAJZ5v0gzc0S=WB9B=qDyEVL4yz-SUeML56K+dRTrHt7uojxfCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 03:15:57PM +0800, Chen-Yu Tsai wrote:
-> The PLL-MIPI clock is somewhat special as it has its own LDOs which
-> need to be turned on for this PLL to actually work and output a clock
-> signal.
-> 
-> Add the 2 LDO enable bits to the gate bits. This fixes issues with
-> the TCON not sending vblank interrupts when the tcon and dot clock are
-> indirectly clocked from the PLL-MIPI clock.
-> 
-> Fixes: c6e6c96d8fa6 ("clk: sunxi-ng: Add A31/A31s clocks")
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On Mon, Nov 21, 2016 at 1:37 PM, Brendan Jackman
+<brendan.jackman@arm.com> wrote:
+> Hi,
+>
+> On Thu, Nov 03 2016 at 21:54, Lina Iyer <lina.iyer@linaro.org> wrote:
+>> Re-using idle state definition provided by arm,idle-state for domain
+>> idle states creates a lot of confusion and limits further evolution of
+>> the domain idle definition. To keep things clear and simple, define a
+>> idle states for domain using a new compatible "domain-idle-state".
+>>
+>> Fix existing PM domains code to look for the newly defined compatible.
+>
+> This looks good to me, pinging for review from others/queue for merge.
 
-Applied, thanks!
-Maxime
+Well, I need an ACK from at least one DT bindings maintainer so that I
+can queue it up.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161121/9c40b2a4/attachment.sig>
+>> Cc: <devicetree@vger.kernel.org>
+>> Cc: Rob Herring <robh@kernel.org>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> ---
+>>  .../bindings/power/domain-idle-state.txt           | 33 ++++++++++++++++++++++
+>>  .../devicetree/bindings/power/power_domain.txt     |  8 +++---
+>>  drivers/base/power/domain.c                        |  2 +-
+>>  3 files changed, 38 insertions(+), 5 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/power/domain-idle-state.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/power/domain-idle-state.txt b/Documentation/devicetree/bindings/power/domain-idle-state.txt
+>> new file mode 100644
+>> index 0000000..eefc7ed
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/power/domain-idle-state.txt
+>> @@ -0,0 +1,33 @@
+>> +PM Domain Idle State Node:
+>> +
+>> +A domain idle state node represents the state parameters that will be used to
+>> +select the state when there are no active components in the domain.
+>> +
+>> +The state node has the following parameters -
+>> +
+>> +- compatible:
+>> +     Usage: Required
+>> +     Value type: <string>
+>> +     Definition: Must be "domain-idle-state".
+>> +
+>> +- entry-latency-us
+>> +     Usage: Required
+>> +     Value type: <prop-encoded-array>
+>> +     Definition: u32 value representing worst case latency in
+>> +                 microseconds required to enter the idle state.
+>> +                 The exit-latency-us duration may be guaranteed
+>> +                 only after entry-latency-us has passed.
+>> +
+>> +- exit-latency-us
+>> +     Usage: Required
+>> +     Value type: <prop-encoded-array>
+>> +     Definition: u32 value representing worst case latency
+>> +                 in microseconds required to exit the idle state.
+>> +
+>> +- min-residency-us
+>> +     Usage: Required
+>> +     Value type: <prop-encoded-array>
+>> +     Definition: u32 value representing minimum residency duration
+>> +                 in microseconds after which the idle state will yield
+>> +                 power benefits after overcoming the overhead in entering
+>> +i                the idle state.
+>> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+>> index e165036..723e1ad 100644
+>> --- a/Documentation/devicetree/bindings/power/power_domain.txt
+>> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
+>> @@ -31,7 +31,7 @@ Optional properties:
+>>
+>>  - domain-idle-states : A phandle of an idle-state that shall be soaked into a
+>>                  generic domain power state. The idle state definitions are
+>> -                compatible with arm,idle-state specified in [1].
+>> +                compatible with domain-idle-state specified in [1].
+>>    The domain-idle-state property reflects the idle state of this PM domain and
+>>    not the idle states of the devices or sub-domains in the PM domain. Devices
+>>    and sub-domains have their own idle-states independent of the parent
+>> @@ -85,7 +85,7 @@ Example 3:
+>>       };
+>>
+>>       DOMAIN_RET: state at 0 {
+>> -             compatible = "arm,idle-state";
+>> +             compatible = "domain-idle-state";
+>>               reg = <0x0>;
+>>               entry-latency-us = <1000>;
+>>               exit-latency-us = <2000>;
+>> @@ -93,7 +93,7 @@ Example 3:
+>>       };
+>>
+>>       DOMAIN_PWR_DN: state at 1 {
+>> -             compatible = "arm,idle-state";
+>> +             compatible = "domain-idle-state";
+>>               reg = <0x1>;
+>>               entry-latency-us = <5000>;
+>>               exit-latency-us = <8000>;
+>> @@ -118,4 +118,4 @@ The node above defines a typical PM domain consumer device, which is located
+>>  inside a PM domain with index 0 of a power controller represented by a node
+>>  with the label "power".
+>>
+>> -[1]. Documentation/devicetree/bindings/arm/idle-states.txt
+>> +[1]. Documentation/devicetree/bindings/power/domain-idle-state.txt
+>> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+>> index 661737c..f0bc672 100644
+>> --- a/drivers/base/power/domain.c
+>> +++ b/drivers/base/power/domain.c
+>> @@ -2048,7 +2048,7 @@ int genpd_dev_pm_attach(struct device *dev)
+>>  EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
+>>
+>>  static const struct of_device_id idle_state_match[] = {
+>> -     { .compatible = "arm,idle-state", },
+>> +     { .compatible = "domain-idle-state", },
+>>       { }
+>>  };
+> --
+
+Thanks,
+Rafael
