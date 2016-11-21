@@ -1,83 +1,64 @@
-From: Joao.Pinto@synopsys.com (Joao Pinto)
-Date: Mon, 21 Nov 2016 15:14:40 +0000
-Subject: Synopsys Ethernet QoS Driver
-In-Reply-To: <7318c77e-3011-03f3-e673-54e3bb0554aa@st.com>
-References: <CADvZ6ErjyVR5ShWTk0QesWLYR1m3p8yAMkK8v9gm2kN5xTv8zw@mail.gmail.com>
- <1dbb6047-2bbb-4d56-2a62-ab65a0254844@synopsys.com>
- <20161119135654.GA14079@lnxartpec.se.axis.com>
- <CAJ3bTp7PpUJcz=1JohX=A54UP6vVAafWnB0PGUBSxb5JJiO8Lg@mail.gmail.com>
- <1248f4ce-4859-10e6-fef9-342ea543f8d4@synopsys.com>
- <87c8a24b-0812-7850-cb3f-7be691bab432@st.com>
- <afc18eb0-4c11-9668-498d-982624c6de78@synopsys.com>
- <937252db-9538-2cf6-c8fa-82b558531c51@st.com>
- <48776f8b-4e06-1456-1b52-3ea08a22b2a4@synopsys.com>
- <7318c77e-3011-03f3-e673-54e3bb0554aa@st.com>
-Message-ID: <8e634d55-8119-2a78-2358-80e88685112a@synopsys.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 21 Nov 2016 15:21:36 +0000
+Subject: spin_lock behavior with ARM64 big.Little/HMP
+In-Reply-To: <f9fc9549d801fece7422d97d5d89df8b@codeaurora.org>
+References: <400ab4b8b2354c5b9283f6ed657363a0@codeaurora.org>
+ <8d9d6333-0ebe-65c4-c6f1-3e3475e3e535@arm.com>
+ <f9fc9549d801fece7422d97d5d89df8b@codeaurora.org>
+Message-ID: <f17207e7-e58c-2e42-04a8-50ed83a9616f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21-11-2016 15:03, Giuseppe CAVALLARO wrote:
-> On 11/21/2016 4:00 PM, Joao Pinto wrote:
->> On 21-11-2016 14:36, Giuseppe CAVALLARO wrote:
->>> Hello Joao
->>>
->>> On 11/21/2016 2:48 PM, Joao Pinto wrote:
->>>> Synopsys QoS IP is a separated hardware component, so it should be reusable by
->>>> all implementations using it and so have its own "core driver" and platform +
->>>> pci glue drivers. This is necessary for example in hardware validation, where
->>>> you prototype an IP and instantiate its drivers and test it.
->>>>
->>>> Was there a strong reason to integrate QoS features directly in stmmac and not
->>>> in synopsys/dwc_eth_qos.*?
->>>
->>> We decided to enhance the stmmac on supporting the QoS for several
->>> reasons; for example the common APIs that the driver already exposed and
->>> actually suitable for other SYNP chips. Then, PTP, EEE,
->>> S/RGMII, MMC could be shared among different chips with a minimal
->>> effort.  This meant a lot of code already ready.
->>>
->>> For sure, the net-core, Ethtool, mdio parts were reused. Same for the
->>> glue logic files.
->>> For the latter, this helped to easily bring-up new platforms also
->>> because the stmmac uses the HW cap register to auto-configure many
->>> parts of the MAC core, DMA and modules. This helped many users, AFAIK.
->>>
->>> For validation purpose, this is my experience, the stmmac helped
->>> a lot because people used the same code to validate different HW
->>> and it was easy to switch to a platform to another one in order to
->>> verify / check if the support was ok or if a regression was introduced.
->>> This is important for complex supports like PTP or EEE.
->>>
->>> Hoping this can help.
->>>
->>> Do not hesitate to contact me for further details
->>
->> Thanks for the highly detailed info.
->> My target application is to prototype the Ethernet QoS IP in a FPGA, with a PHY
->> attached and make hardware validation.
->>
->> In your opinion a refactored stmmac with the missing QoS features would be
->> suitable for it?
-> 
-> I think so; somebody also added code for FPGA.
-> 
-> In any case, step-by-step we can explore and understand
-> how to proceed. I wonder if you could start looking at the internal
-> of the stmmac. Then welcome doubts and open question...
 
-Yes I am going to do that thanks... taking my first steps in this IP :)
 
-> 
+On 18/11/16 20:22, Vikram Mulukutla wrote:
+>
+> Hi Sudeep,
+>
+> Thanks for taking a look!
+>
+> On 2016-11-18 02:30, Sudeep Holla wrote:
+>> Hi Vikram,
 >>
->> Thanks.
-> 
-> welcome
-> 
-> peppe
-> 
->>
+>> On 18/11/16 02:22, Vikram Mulukutla wrote:
+>>> Hello,
 >>>
->>> peppe
+>>> This isn't really a bug report, but just a description of a
+>>> frequency/IPC
+>>> dependent behavior that I'm curious if we should worry about. The
+>>> behavior
+>>> is exposed by questionable design so I'm leaning towards don't-care.
+>>>
+>>> Consider these threads running in parallel on two ARM64 CPUs running
+>>> mainline
+>>> Linux:
+>>>
 >>
+>> Are you seeing this behavior with the mainline kernel on any platforms
+>> as we have a sort of workaround for this ?
 >>
-> 
+>
+> If I understand that workaround correctly, the ARM timer event stream is
+> used
+> to periodically wake up CPUs that are waiting in WFE, is that right? I
+> think
+> my scenario below may be different because LittleCPU doesn't actually wait
+> on a WFE event in the loop that is trying to increment lock->next, i.e.
+> it's
+> stuck in the following loop:
+>
+>         ARM64_LSE_ATOMIC_INSN(
+>         /* LL/SC */
+> "       prfm    pstl1strm, %3\n"
+> "1:     ldaxr   %w0, %3\n"
+> "       add     %w1, %w0, %w5\n"
+> "       stxr    %w2, %w1, %3\n"
+> "       cbnz    %w2, 1b\n",
+>
+
+Interesting. Just curious if this is r0p0/p1 A53 ? If so, is the errata
+819472 enabled ?
+
+-- 
+Regards,
+Sudeep
