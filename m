@@ -1,60 +1,133 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 21 Nov 2016 15:15:41 -0800
-Subject: [PATCH v2 2/4] spi: spi-fsl-dspi: Fix continuous selection format
-In-Reply-To: <1317eff8a40789c47311c219d9cfb4105863bd9f.1479706671.git.maitysanchayan@gmail.com>
+Date: Mon, 21 Nov 2016 15:16:51 -0800
+Subject: [PATCH v2 3/4] spi: spi-fsl-dspi: Fix incorrect DMA setup
+In-Reply-To: <a36bac5f2499d1002693a7dbf95982bab186e51f.1479706671.git.maitysanchayan@gmail.com>
 References: <cover.1479706671.git.maitysanchayan@gmail.com>
- <1317eff8a40789c47311c219d9cfb4105863bd9f.1479706671.git.maitysanchayan@gmail.com>
-Message-ID: <59ac10adfe92916770aa30146e958887@agner.ch>
+ <a36bac5f2499d1002693a7dbf95982bab186e51f.1479706671.git.maitysanchayan@gmail.com>
+Message-ID: <ac1daf304f9d250ca9602ae3a0f69193@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 2016-11-20 21:54, Sanchayan Maity wrote:
-> Current DMA implementation was not handling the continuous selection
-> format viz. SPI chip select would be deasserted even between sequential
-> serial transfers. Use the cs_change variable and correctly set or
-> reset the CONT bit accordingly for case where peripherals require
-> the chip select to be asserted between sequential transfers.
+> Currently dmaengine_prep_slave_single was being called with length
+> set to the complete DMA buffer size. This resulted in unwanted bytes
+> being transferred to the SPI register leading to clock and MOSI lines
+> having unwanted data even after chip select got deasserted and the
+> required bytes having been transferred.
+> 
+> While at it also clean up the use of curr_xfer_len which is central
+> to the DMA setup, from bytes to DMA transfers for every use.
 > 
 > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+
+Looks good to me:
+
+Reviewed-by: Stefan Agner <stefan@agner.ch>
+
 > ---
->  drivers/spi/spi-fsl-dspi.c | 2 ++
->  1 file changed, 2 insertions(+)
+>  drivers/spi/spi-fsl-dspi.c | 35 ++++++++++++++++++-----------------
+>  1 file changed, 18 insertions(+), 17 deletions(-)
 > 
 > diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
-> index b1ee1f5..41422cd 100644
+> index 41422cd..08882f7 100644
 > --- a/drivers/spi/spi-fsl-dspi.c
 > +++ b/drivers/spi/spi-fsl-dspi.c
-> @@ -261,6 +261,8 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
->  	dspi->dma->tx_dma_buf[i] = SPI_PUSHR_TXDATA(val) |
->  					SPI_PUSHR_PCS(dspi->cs) |
->  					SPI_PUSHR_CTAS(0);
-> +	if (!dspi->cs_change)
-> +		dspi->dma->tx_dma_buf[i] |= SPI_PUSHR_CONT;
->  	dspi->tx += tx_word + 1;
+> @@ -151,6 +151,7 @@ static const struct fsl_dspi_devtype_data ls2085a_data = {
+>  };
+>  
+>  struct fsl_dspi_dma {
+> +	/* Length of transfer in words of DSPI_FIFO_SIZE */
+>  	u32 curr_xfer_len;
+>  
+>  	u32 *tx_dma_buf;
+> @@ -217,15 +218,13 @@ static void dspi_rx_dma_callback(void *arg)
+>  	struct fsl_dspi *dspi = arg;
+>  	struct fsl_dspi_dma *dma = dspi->dma;
+>  	int rx_word;
+> -	int i, len;
+> +	int i;
+>  	u16 d;
+>  
+>  	rx_word = is_double_byte_mode(dspi);
+>  
+> -	len = rx_word ? (dma->curr_xfer_len / 2) : dma->curr_xfer_len;
+> -
+>  	if (!(dspi->dataflags & TRAN_STATE_RX_VOID)) {
+> -		for (i = 0; i < len; i++) {
+> +		for (i = 0; i < dma->curr_xfer_len; i++) {
+>  			d = dspi->dma->rx_dma_buf[i];
+>  			rx_word ? (*(u16 *)dspi->rx = d) :
+>  						(*(u8 *)dspi->rx = d);
+> @@ -242,14 +241,12 @@ static int dspi_next_xfer_dma_submit(struct
+> fsl_dspi *dspi)
+>  	struct device *dev = &dspi->pdev->dev;
+>  	int time_left;
+>  	int tx_word;
+> -	int i, len;
+> +	int i;
+>  	u16 val;
+>  
+>  	tx_word = is_double_byte_mode(dspi);
+>  
+> -	len = tx_word ? (dma->curr_xfer_len / 2) : dma->curr_xfer_len;
+> -
+> -	for (i = 0; i < len - 1; i++) {
+> +	for (i = 0; i < dma->curr_xfer_len - 1; i++) {
+>  		val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
+>  		dspi->dma->tx_dma_buf[i] =
+>  			SPI_PUSHR_TXDATA(val) | SPI_PUSHR_PCS(dspi->cs) |
+> @@ -267,7 +264,9 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
 >  
 >  	dma->tx_desc = dmaengine_prep_slave_single(dma->chan_tx,
-
-Other transfer mode use:
-
-if ((dspi->cs_change) && (!dspi->len))                                  
-                                                           
-        dspi_pushr &= ~SPI_PUSHR_CONT;
-
-which indicates that they only clear SPI_PUSHR_CONT at the very end of a
-transfer... The DMA code currently deselects after every DMA transfer if
-dspi->cs_change is set.
-
-Maybe we should use the helper dspi_data_to_pushr to fill the DMA buffer
-and _clear_ SPI_PUSHR_CONT if necessary like the other transfer modes
-do... Then we can use the for loop to fill the complete buffer and get
-rid of some code dupplication.
-
-I see that dspi_data_to_pushr does move len too, which we did not in the
-DMA case. dspi->len gets incremented only on successful DMA transfer in
-dspi_dma_xfer. However, I wonder if that is not even a bug: We increment
-dspi->tx always, but len only on success. This makes len go off sync
-with regards to the tx pointer which does not help anybody. So lets get
-rid of the update code in dspi_dma_xfer
-
---
-Stefan
+>  					dma->tx_dma_phys,
+> -					DSPI_DMA_BUFSIZE, DMA_MEM_TO_DEV,
+> +					dma->curr_xfer_len *
+> +					DMA_SLAVE_BUSWIDTH_4_BYTES,
+> +					DMA_MEM_TO_DEV,
+>  					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+>  	if (!dma->tx_desc) {
+>  		dev_err(dev, "Not able to get desc for DMA xfer\n");
+> @@ -283,7 +282,9 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
+>  
+>  	dma->rx_desc = dmaengine_prep_slave_single(dma->chan_rx,
+>  					dma->rx_dma_phys,
+> -					DSPI_DMA_BUFSIZE, DMA_DEV_TO_MEM,
+> +					dma->curr_xfer_len *
+> +					DMA_SLAVE_BUSWIDTH_4_BYTES,
+> +					DMA_DEV_TO_MEM,
+>  					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+>  	if (!dma->rx_desc) {
+>  		dev_err(dev, "Not able to get desc for DMA xfer\n");
+> @@ -330,17 +331,17 @@ static int dspi_dma_xfer(struct fsl_dspi *dspi)
+>  	struct device *dev = &dspi->pdev->dev;
+>  	int curr_remaining_bytes;
+>  	int bytes_per_buffer;
+> -	int tx_word;
+> +	int word = 1;
+>  	int ret = 0;
+>  
+> -	tx_word = is_double_byte_mode(dspi);
+> +	if (is_double_byte_mode(dspi))
+> +		word = 2;
+>  	curr_remaining_bytes = dspi->len;
+> +	bytes_per_buffer = DSPI_DMA_BUFSIZE / DSPI_FIFO_SIZE;
+>  	while (curr_remaining_bytes) {
+>  		/* Check if current transfer fits the DMA buffer */
+> -		dma->curr_xfer_len = curr_remaining_bytes;
+> -		bytes_per_buffer = DSPI_DMA_BUFSIZE /
+> -				(DSPI_FIFO_SIZE / (tx_word ? 2 : 1));
+> -		if (curr_remaining_bytes > bytes_per_buffer)
+> +		dma->curr_xfer_len = curr_remaining_bytes / word;
+> +		if (dma->curr_xfer_len > bytes_per_buffer)
+>  			dma->curr_xfer_len = bytes_per_buffer;
+>  
+>  		ret = dspi_next_xfer_dma_submit(dspi);
+> @@ -349,7 +350,7 @@ static int dspi_dma_xfer(struct fsl_dspi *dspi)
+>  			goto exit;
+>  
+>  		} else {
+> -			curr_remaining_bytes -= dma->curr_xfer_len;
+> +			curr_remaining_bytes -= dma->curr_xfer_len * word;
+>  			if (curr_remaining_bytes < 0)
+>  				curr_remaining_bytes = 0;
+>  			dspi->len = curr_remaining_bytes;
