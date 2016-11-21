@@ -1,110 +1,78 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 21 Nov 2016 10:14:28 +0200
-Subject: [PATCH 1/3] Documentation: dt: Add TI SCI clock driver
-In-Reply-To: <CAL_JsqLtSs6ifnMdEOsfXpGoWnmXuGAx83+ziB9yU+zurvob+A@mail.gmail.com>
-References: <1477053961-27128-1-git-send-email-t-kristo@ti.com>
- <1477053961-27128-2-git-send-email-t-kristo@ti.com>
- <20161030204121.qvb5d33dh65awwzx@rob-hp-laptop>
- <41c58712-bc00-ed05-9d1d-42e31397a70c@ti.com>
- <CAL_JsqLtSs6ifnMdEOsfXpGoWnmXuGAx83+ziB9yU+zurvob+A@mail.gmail.com>
-Message-ID: <0fe81866-8bfd-f3a7-d808-9cb23841f504@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 21 Nov 2016 09:17:52 +0100
+Subject: [GIT PULL 1/10] mailbox: Add Tegra HSP driver
+In-Reply-To: <20161119022742.GK2543@localhost>
+References: <20161118161719.24153-1-thierry.reding@gmail.com>
+ <20161119022742.GK2543@localhost>
+Message-ID: <20161121081752.GC25171@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/11/16 19:20, Rob Herring wrote:
-> On Mon, Oct 31, 2016 at 7:50 AM, Tero Kristo <t-kristo@ti.com> wrote:
->> On 30/10/16 22:41, Rob Herring wrote:
->>>
->>> On Fri, Oct 21, 2016 at 03:45:59PM +0300, Tero Kristo wrote:
->>>>
->>>> Add a clock implementation, TI SCI clock, that will hook to the common
->>>> clock framework, and allow each clock to be controlled via TI SCI
->>>> protocol.
->>>>
->>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>>> ---
->>>>  .../devicetree/bindings/clock/ti,sci-clk.txt       | 37
->>>> ++++++++++++++++++++++
->>>>  MAINTAINERS                                        |  1 +
->>>>  2 files changed, 38 insertions(+)
->>>>  create mode 100644
->>>> Documentation/devicetree/bindings/clock/ti,sci-clk.txt
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
->>>> b/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
->>>> new file mode 100644
->>>> index 0000000..bfc3ca4
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
->>>> @@ -0,0 +1,37 @@
->>>> +Texas Instruments TI-SCI Clocks
->>>> +===============================
->>>> +
->>>> +All clocks on Texas Instruments' SoCs that contain a System Controller,
->>>> +are only controlled by this entity. Communication between a host
->>>> processor
->>>> +running an OS and the System Controller happens through a protocol known
->>>> +as TI-SCI[1]. This clock implementation plugs into the common clock
->>>> +framework and makes use of the TI-SCI protocol on clock API requests.
->>>> +
->>>> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
->>>> +
->>>> +Required properties:
->>>> +-------------------
->>>> +- compatible: Must be "ti,k2g-sci-clk"
->>>> +- #clock-cells: Shall be 2.
->>>> +  In clock consumers, this cell represents the device ID and clock ID
->>>> +  exposed by the PM firmware. The assignments can be found in the header
->>>> +  files <dt-bindings/genpd/<soc>.h> (which covers the device IDs) and
->>>> +  <dt-bindings/clock/<soc>.h> (which covers the clock IDs), where <soc>
->>>> +  is the SoC involved, for example 'k2g'.
->>>> +
->>>> +Examples:
->>>> +--------
->>>> +
->>>> +pmmc: pmmc {
->>>> +       compatible = "ti,k2g-sci";
->>>> +
->>>> +       k2g_clks: k2g_clks {
->>>
->>>
->>> Use "clocks" for node name instead.
->>>
->>>> +               compatible = "ti,k2g-sci-clk";
->>>
->>>
->>> I'm starting to think all these child nodes for SCI are pointless. Is
->>> there any reason why the parent node can't be the clock provider (along
->>> with all the other providers it acks as)?
->>
->>
->> I believe the only reason to keep them separate is to have kernel side of
->> things modular. If we have separate nodes, the drivers can be probed
->> separately.
->>
->> If not, we need to build one huge blob with all the features in it, so the
->> main driver can probe everything in one go, with annoying back-and-forth
->> callbacks in place (assuming we still want to keep stuff somehow modular.)
->
-> Since when is DT the only way to create a device? The main driver can
-> create devices for all the sub-functions like clocks. This is the same
-> as MFDs which have been done both ways.
+On Fri, Nov 18, 2016 at 06:27:42PM -0800, Olof Johansson wrote:
+> Hi,
+> 
+> On Fri, Nov 18, 2016 at 05:17:10PM +0100, Thierry Reding wrote:
+> > Hi ARM SoC maintainers,
+> > 
+> > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+> > 
+> >   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.10-mailbox
+> > 
+> > for you to fetch changes up to 68050eb6c611527232fe5574c7306e97e47499ef:
+> > 
+> >   mailbox: tegra-hsp: Use after free in tegra_hsp_remove_doorbells() (2016-11-18 14:32:13 +0100)
+> > 
+> > Thanks,
+> > Thierry
+> > 
+> > ----------------------------------------------------------------
+> > mailbox: Add Tegra HSP driver
+> > 
+> > This contains the device tree bindings and a driver for the Tegra HSP, a
+> > hardware block that provides hardware synchronization primitives and is
+> > the foundation for inter-processor communication between CPU and BPMP.
+> > 
+> > ----------------------------------------------------------------
+> > Dan Carpenter (1):
+> >       mailbox: tegra-hsp: Use after free in tegra_hsp_remove_doorbells()
+> > 
+> > Joseph Lo (2):
+> >       soc/tegra: Add Tegra186 support
+> 
+> I don't think you really needed to merge this in here, since all you need it
+> for is to fulfill the kconfig dependency and enable the driver, right? That'd
+> happen when the driver and soc branch is merged at the toplevel anyway.
 
-Yes obviously this can be done, my main point was that it will require 
-building some sort of infra within the driver to handle this. With 
-separate nodes, none of this is going to be needed. Also, we will lose 
-any kind of configurability via DT if we don't have separate nodes; now 
-we can select the available clocks / genpds via the compatible string of 
-the clocks/genpd nodes themselves (this isn't clearly evident as of now 
-as we only support a grand total of one device, which is k2g-evm.) 
-Otherwise we need to probe against the main node and add a separate 
-compatible string for every device, and carry this information to the 
-sibling devices also somehow. It is just so much simpler if we can just 
-keep separate nodes for them.
+The reason I did this is that I wanted each branch to be buildable as a
+way to confirm that the dependencies are correct. In order to do that I
+need the Kconfig symbol to enable the driver.
 
-Also, plenty of things are doing this kind of stuff already in 
-DT/kernel, having a parent node in place and sub-functions added 
-separately for ease of use, with apparently no visible point for having 
-the nodes within the DT.
+I suppose there are other ways I could've done that, though. Maybe in
+the future new SoC Kconfig symbols should just be introduced way ahead
+of time, so that they're already in a release or two before actual code
+starts to emerge.
 
--Tero
+> Anyhow, no damage done, I've merged this in. I would say that it'd be a little
+> more logical to send the SoC branch before the driver branch given this
+> dependency though.
+
+The reason that the SoC branch was sent after is because only the first
+commit in that branch was pulled into the mailbox branch.
+
+In retrospect, I think perhaps a better approach would've been to have a
+separate branch with only the Kconfig symbol addition and pull that in
+where needed.
+
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161121/84d12034/attachment.sig>
