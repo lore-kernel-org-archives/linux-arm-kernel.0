@@ -1,114 +1,46 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 Nov 2016 08:28:09 -0800
-Subject: [GIT PULL] Allwinner DT changes for 4.10
-In-Reply-To: <20161121132712.43b5eld2qthi6664@lukather>
-References: <20161115204122.x3vnb3bkny5esdya@lukather>
- <20161119002316.GN8882@localhost>
- <20161121132712.43b5eld2qthi6664@lukather>
-Message-ID: <CAOesGMg=OQDtKkb4Mut4M1zAwM5CX3=YHxS7equO=Nx2a1tv1Q@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 21 Nov 2016 17:29:03 +0100
+Subject: [PATCH 0/2] ARM64: dts: Add support for Meson GXM
+Message-ID: <20161121162905.14285-1-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI,
+The new Amlogic GXM SoC (S912) is part of the Meson GX family and is nearly
+identical to GXM but with a second Quad-A53 core cluster.
 
-On Mon, Nov 21, 2016 at 5:27 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Olof,
->
-> On Fri, Nov 18, 2016 at 04:23:16PM -0800, Olof Johansson wrote:
->> Hi,
->>
->> On Tue, Nov 15, 2016 at 09:41:22PM +0100, Maxime Ripard wrote:
->> > Hi Arnd, Olof,
->> >
->> > Here is our pull request for the next merge window.
->> >
->> > Thanks!
->> > Maxime
->> >
->> > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
->> >
->> >   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
->> >
->> > are available in the git repository at:
->> >
->> >   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.10
->> >
->> > for you to fetch changes up to e39a30cf736144814b0bddb3fff28fbbc2a8be0f:
->> >
->> >   ARM: sunxi: Add the missing clocks to the pinctrl nodes (2016-11-15 18:49:47 +0100)
->> >
->> > ----------------------------------------------------------------
->> > Allwinner DT additions for 4.10
->> >
->> > The usual bunch of DT additions, but most notably:
->> >   - A31 DRM driver
->> >   - A31 audio codec
->> >   - WiFi for the A80-Based boards and the CHIP
->> >   - Support for the NextThing Co CHIP Pro (the first board with NAND
->> >     enabled)
->> >   - New boards: NanoPi M1,
->> >
->> [...]
->>
->> > Maxime Ripard (16):
->> >       ARM: sun5i: a13-olinuxino: Enable VGA bridge
->> >       ARM: gr8: Add the UART3
->> >       ARM: gr8: Fix typo in the i2s mclk pin group
->> >       ARM: gr8: Add missing pwm channel 1 pin
->> >       ARM: gr8: Add UART2 pins
->> >       ARM: gr8: Add UART3 pins
->> >       ARM: gr8: Add CHIP Pro support
->> >       ARM: sun5i: chip: Enable Wi-Fi SDIO chip
->> >       ARM: sun5i: Rename A10s pins
->> >       ARM: sun5i: Add SPI2 pins
->> >       ARM: sun5i: Add RGB 565 LCD pins
->> >       ARM: sun5i: chip: Add optional buses
->> >       ARM: gr8: evb: Enable SPDIF
->> >       ARM: gr8: evb: Add i2s codec
->> >       ARM: sun8i: sina33: Enable USB gadget
->> >       ARM: sunxi: Add the missing clocks to the pinctrl nodes
->> >
->> [...]
->>
->> >  arch/arm/boot/dts/Makefile                         |   1 +
->> >  arch/arm/boot/dts/ntc-gr8-chip-pro.dts             | 266 +++++++++++++++++++++
->> >  arch/arm/boot/dts/ntc-gr8-evb.dts                  |  33 +++
->> >  arch/arm/boot/dts/ntc-gr8.dtsi                     |  47 +++-
->> >  arch/arm/boot/dts/sun4i-a10.dtsi                   |   3 +-
->>
->> NTC isn't the SoC manufacturer, and we try to keep the prefixes down to
->> manufacturer to keep the namespace a little more manageable, even if
->> we never got subdirectories setup as on arm64.
->>
->> I think this should probably be sun4i-a10-gr8 or sun4i-r8-gr8 as prefix?
->
-> The users really expect a SoC from Nextthing, it's always been
-> marketed that way, the marking on the SoC also says so, etc. The fact
-> that it's been a design in cooperation with Allwinner, and that the
-> design is based on some earlier family is an implementation detail,
-> and I'd really like not for it to have the sun5i prefix, it's just
-> confusing.
+The GXM dtsi includes the GXL dtsi and the p20x dtsi is refactored in a
+common p20x/q20x to support the GXM Q200 and Q201 board that uses the exact
+same board layout since the S905D and S912 are pinout compatible.
 
-I don't care so much about what's printed on the top of the package, I
-care a lot more about what's on the insides. We've got a long
-tradition of not renaming things randomly when companies get acquired
-or renames themselves, and I think that same spirit is applicable
-here.
+The last patch adds support for the Nexbox A1 Set-Top-Box based on the S912.
 
-Calling it an SoC is inaccurate as well, it's really a
-system-in-package. It's just a new way to integrate an SoC into a
-module to build boards out of. Compare to Octavo OSD335x, for example.
+Changes since RFC :
+ - Refactor the p20x/q20x dtsi into a single common file
+ - Add support for Nexbox A1
 
-System-in-package solutions are going to get more and more common, and
-it's going to become really chaotic if we expect to use the prefix of
-the company custom-ordering the package for each and every one of
-them.
+Neil Armstrong (2):
+  ARM64: dts: Add support for Meson GXM
+  Add support for the Nexbox A1 board based on the Amlogic S912 SoC.
 
-> And the ntc prefix has been asked for during the reviews...
+ Documentation/devicetree/bindings/arm/amlogic.txt  |   7 +
+ arch/arm64/boot/dts/amlogic/Makefile               |   3 +
+ .../arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi | 190 +++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts    |  19 +++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts    |   7 +
+ .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      |   3 +-
+ .../boot/dts/amlogic/meson-gxl-s905d-p231.dts      |   3 +-
+ .../boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi     | 188 --------------------
+ .../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts | 169 ++++++++++++++++++
+ .../arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts |  77 +++++++++
+ .../arm64/boot/dts/amlogic/meson-gxm-s912-q201.dts |  58 +++++++
+ arch/arm64/boot/dts/amlogic/meson-gxm.dtsi         | 114 +++++++++++++
+ 12 files changed, 648 insertions(+), 190 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
+ delete mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-s912-q201.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
 
-Having a link to that requeset/email would be helpful if you try to
-use it as an argument.
-
-
--Olof
+-- 
+2.7.0
