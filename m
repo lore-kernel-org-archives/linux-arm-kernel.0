@@ -1,111 +1,171 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Mon, 21 Nov 2016 13:52:42 +0100
-Subject: Synopsys Ethernet QoS Driver
-In-Reply-To: <1248f4ce-4859-10e6-fef9-342ea543f8d4@synopsys.com>
-References: <CADvZ6ErjyVR5ShWTk0QesWLYR1m3p8yAMkK8v9gm2kN5xTv8zw@mail.gmail.com>
- <1dbb6047-2bbb-4d56-2a62-ab65a0254844@synopsys.com>
- <20161119135654.GA14079@lnxartpec.se.axis.com>
- <CAJ3bTp7PpUJcz=1JohX=A54UP6vVAafWnB0PGUBSxb5JJiO8Lg@mail.gmail.com>
- <1248f4ce-4859-10e6-fef9-342ea543f8d4@synopsys.com>
-Message-ID: <87c8a24b-0812-7850-cb3f-7be691bab432@st.com>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Mon, 21 Nov 2016 12:56:53 +0000
+Subject: [BUG] hdlcd gets confused about base address
+In-Reply-To: <20161121122556.GE1041@n2100.armlinux.org.uk>
+References: <20161118233733.GP1041@n2100.armlinux.org.uk>
+ <20161121110604.GC1005@e106497-lin.cambridge.arm.com>
+ <20161121112030.GC1041@n2100.armlinux.org.uk>
+ <20161121113212.GF1005@e106497-lin.cambridge.arm.com>
+ <20161121122556.GE1041@n2100.armlinux.org.uk>
+Message-ID: <20161121125653.GJ1005@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Joao
+On Mon, Nov 21, 2016 at 12:25:56PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 21, 2016 at 11:32:12AM +0000, Liviu Dudau wrote:
+> > On Mon, Nov 21, 2016 at 11:20:30AM +0000, Russell King - ARM Linux wrote:
+> > > I first noticed it when booting with the buggy I2C EDID reading, so
+> > > DRM wasn't seeing a valid EDID.  Then when Xorg started up and shut
+> > > down, I noticed that the framebuffer console was shifted.  It's actually
+> > > shifted to the left because framebuffer pixel 0,0 is not displayed.
+> > 
+> > I see. So the reason why I did not notice this was the EDID transfers
+> > mostly working for me.
+> 
+> It also happens when EDID transfers work too!
+> 
+> > > > > Using devmem2 to disable and re-enable the HDLCD resolves the issue,
+> > > > > and repeated disable/enable cycles do not make the issue re-appear.
+> > > > 
+> > > > Do you resize the display mode as well afer re-enabling HDLCD?
+> > > 
+> > > I quite literally just did:
+> > > 
+> > > ./devmem2 0x7ff60230 w 0; ./devmem2 0x7ff60230 w 1
+> > 
+> > Sorry, was not very clear. Under my assumption that you were resizing the
+> > display with xrandr, I was wondering if the issue you were seeing disappeared
+> > when using devmem2 plus the resizing.
+> 
+> I think the problems are much deeper.  I've added this:
+> 
+> static void hdlcd_crtc_enable(struct drm_crtc *crtc)
+> {
+>         struct hdlcd_drm_private *hdlcd = crtc_to_hdlcd_priv(crtc);
+> printk("%s: active %d cmd %08x\n", __func__, crtc->state->active, hdlcd_read(hdlcd, HDLCD_REG_COMMAND));
+>         clk_prepare_enable(hdlcd->clk);
+> 
+> ...
+> static void hdlcd_crtc_disable(struct drm_crtc *crtc)
+> {
+>         struct hdlcd_drm_private *hdlcd = crtc_to_hdlcd_priv(crtc);
+> printk("%s: active %d\n", __func__, crtc->state->active);
+>         if (!crtc->state->active)
+>                 return;
+> 
+> What I see in the kernel log each time I change the resolution is:
+> 
+> [  221.409577] hdlcd_crtc_disable: active 0
+> [  221.430206] hdlcd_crtc_enable: active 1 cmd 00000001
+> [  239.264672] hdlcd_crtc_disable: active 0
+> [  239.285180] hdlcd_crtc_enable: active 1 cmd 00000001
+> [  278.712792] hdlcd_crtc_disable: active 0
+> [  278.730361] hdlcd_crtc_enable: active 1 cmd 00000001
+> [  281.633841] hdlcd_crtc_disable: active 0
+> [  281.668578] hdlcd_crtc_enable: active 1 cmd 00000001
+> 
+> So, when ->disable is called, active is always zero.  
 
-On 11/21/2016 1:32 PM, Joao Pinto wrote:
-> Hello,
->
-> On 21-11-2016 05:29, Rayagond Kokatanur wrote:
->> On Sat, Nov 19, 2016 at 7:26 PM, Rabin Vincent <rabin@rab.in> wrote:
->>> On Fri, Nov 18, 2016 at 02:20:27PM +0000, Joao Pinto wrote:
->>>> For now we are interesting in improving the synopsys QoS driver under
->>>> /nect/ethernet/synopsys. For now the driver structure consists of a single file
->>>> called dwc_eth_qos.c, containing synopsys ethernet qos common ops and platform
->>>> related stuff.
->>>>
->>>> Our strategy would be:
->>>>
->>>> a) Implement a platform glue driver (dwc_eth_qos_pltfm.c)
->>>> b) Implement a pci glue driver (dwc_eth_qos_pci.c)
->>>> c) Implement a "core driver" (dwc_eth_qos.c) that would only have Ethernet QoS
->>>> related stuff to be reused by the platform / pci drivers
->>>> d) Add a set of features to the "core driver" that we have available internally
->>>
->>> Note that there are actually two drivers in mainline for this hardware:
->>>
->>>  drivers/net/ethernet/synopsis/
->>>  drivers/net/ethernet/stmicro/stmmac/
->>
->> Yes the later driver (drivers/net/ethernet/stmicro/stmmac/) supports
->> both 3.x and 4.x. It has glue layer for pci, platform, core etc,
->> please refer this driver once before you start.
->>
->> You can start adding missing feature of 4.x in stmmac driver.
->
-> Thanks you all for all the info.
-> Well, I think we are in a good position to organize the ethernet drivers
-> concerning Synopsys IPs.
->
-> First of all, in my opinion, it does not make sense to have a ethernet/synopsis
-> (typo :)) when ethernet/stmicro is also for a synopsys IP. If we have another
-> vendor using the same IP it should be able to reuse the commonn operations. But
-> I would put that discussion for later :)
->
-> For now I suggest that for we create ethernet/qos and create there a folder
-> called dwc (designware controller) where all the synopsys qos IP specific code
-> in order to be reused for example by ethernet/stmicro/stmmac/. We just have to
-> figure out a clean interface for "client drivers" like stmmac to interact with
-> the new qos driver.
->
-> What do you think about this approach?
+That is expected, the DRM framework will determine that the crtc is no longer active and
+call ->disable hook on the CRTC helper struct.
 
-The stmmac drivers run since many years on several platforms
-(sh4, stm32, arm, x86, mips ...) and it supports an huge of amount of
-configurations starting from 3.1x to 3.7x databooks.
+> This leads to...
+> 
+> $ head -n3 /sys/kernel/debug/clk/clk_summary
+>    clock                         enable_cnt  prepare_cnt        rate   accuracy
+>   phase
+> ----------------------------------------------------------------------------------------
+>  pxlclk                                   6            6   148500000          0 0
+> 
+> the enable and prepare counts for this clock incrementing by one each
+> time I change the resolution.
 
-It also supports QoS hardware; for example, 4.00a, 4.10a and 4.20a
-are fully working.
+That is mostly due to the check in hdlcd_crtc_disable() which I should remove,
+I've added it because I was getting a ->disable() hook call before any ->enable()
+was called at startup time. I need to revisit this as I remember Daniel was commenting
+that this was not needed.
 
-Also the stmmac has platform, device-tree and pcie supports and
-a lot of maintained glue-logic files.
+> 
+> > > Maybe hdlcd shouldn't be implementing the ->enable callback but instead
+> > > the ->commit callback then?
+> > 
+> > I believe we need ->enable for the initial setup (cold boot or module
+> > reloading).
+> 
+> Yes, I found a comment in DRM saying that ->commit is for legacy drivers
+> only.
+> 
+> I think the problem is that hdlcd is not really knowing what the true
+> state of the CRTC is, as illustrated by the clock counts increasing
+> and the state of crtc->state->active.
 
-It is fully documented inside the kernel tree.
+I think crtc->state->active is correct, we are just not acting as we should
+in HDLCD.
 
-I am happy to have new enhancements from other developers.
-So, on my side, if you want to spend your time on improving it on your
-platforms please feel free to do it!
+> 
+> I'm wondering if this is a core DRM bug though... the comments and
+> code do not align:
+> 
+> /**
+>  * drm_atomic_helper_commit_tail - commit atomic update to hardware
+>  * @state: new modeset state to be committed
+> 
+> void drm_atomic_helper_commit_tail(struct drm_atomic_state *state)
+> {
+>         struct drm_device *dev = state->dev;
+> 
+>         drm_atomic_helper_commit_modeset_disables(dev, state);
+> 
+> /**
+>  * drm_atomic_helper_commit_modeset_disables - modeset commit to disable outputs * @dev: DRM device
+>  * @old_state: atomic state object with old state structures
+> void drm_atomic_helper_commit_modeset_disables(struct drm_device *dev,
+>                                                struct drm_atomic_state *old_state)
+> 
+> So, is "state" in drm_atomic_helper_commit_tail the old state or the
+> new state?  Should this state be passed to
+> drm_atomic_helper_commit_modeset_disables(), which seems to expect
+> the old state?
 
-Concerning the stmicro/stmmac naming, these come from a really old
-story and have no issue to adopt new folder/file names.
+Yes, you have reached one (of the many?) DRM quirks. When drm_atomic_helper_commit_tail()
+gets called the *state pointer contains the old state that was swapped
+out by drm_atomic_helper_commit() function before calling commit_tail().
+The comment on drm_atomic_helper_commit_tail function (and maybe parameter name)
+should be updated.
 
-I am also open to merge fixes and changes from ethernet/synopsis.
-I want to point you on some benchmarks made by Alex some months ago
-(IIRC) that showed an stmmac winner (due to the several optimizations
-analyzed and reviewed in this mailing list).
 
-Peppe
+> 
+> It looks _really_ screwed up here - in any case, it really doesn't
+> help when you're not experienced with atomic mode set to work out
+> what the hell this code is doing... it seems to be a horrible mess.
+> Maybe someone who understands this code ought to read through it
+> from the point of view of someone who doesn't understand it and fix
+> the comments, or get rid of the down-right misleading comments.
+> 
+> Comments are worse than useless if they mislead.  Better to have no
+> comments than misleading comments.
 
->
->
->>
->>>
->>> (See http://lists.openwall.net/netdev/2016/02/29/127)
->>>
->>> The former only supports 4.x of the hardware.
->>>
->>> The later supports 4.x and 3.x and already has a platform glue driver
->>> with support for several platforms, a PCI glue driver, and a core driver
->>> with several features not present in the former (for example: TX/RX
->>> interrupt coalescing, EEE, PTP).
->>>
->>> Have you evaluated both drivers?  Why have you decided to work on the
->>> former rather than the latter?
->>
->>
->
-> Thanks.
->
->
->
->
+Sometimes code gets shuffled around and functions that made sense in
+one workflow are kept in the new workflow except their order gets changed.
+I believe that was the case for the function above.
+
+Best regards,
+Liviu
+
+> 
+> Daniel?
+> 
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
