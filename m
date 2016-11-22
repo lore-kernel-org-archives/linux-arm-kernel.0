@@ -1,59 +1,65 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 22 Nov 2016 11:45:49 -0800
-Subject: [PATCH 2/4] ARM: dts: davinci: da850: add VPIF
+Date: Tue, 22 Nov 2016 11:45:50 -0800
+Subject: [PATCH 3/4] ARM: dts: davinci: da850-lcdk: enable VPIF capture via
+ TVP5147
 In-Reply-To: <20161122194551.3420-1-khilman@baylibre.com>
 References: <20161122194551.3420-1-khilman@baylibre.com>
-Message-ID: <20161122194551.3420-3-khilman@baylibre.com>
+Message-ID: <20161122194551.3420-4-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add VPIF and VPIF capture nodes to da850.  VPIF capture has two input
-channels describe using the standard DT ports and enpoints.
+Enable video capture via the on-board TVP5147 decoder hooked up to ch0
+one of the VPIF capture input.
 
 Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 ---
- arch/arm/boot/dts/da850.dtsi | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ arch/arm/boot/dts/da850-lcdk.dts | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 6205917b4f59..e05e2bb834e8 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -453,7 +453,35 @@
- 			interrupts = <52>;
- 			status = "disabled";
- 		};
-+
-+		vpif: video at 0x00217000 {
-+			compatible = "ti,da850-vpif";
-+			reg = <0x00217000 0x1000>;
-+			status = "disabled";
-+		};
-+
-+		vpif_capture: video-capture at 0x00217000 {
-+			compatible = "ti,da850-vpif-capture";
-+			reg = <0x00217000 0x1000>;
-+			interrupts = <92>;
-+			status = "disabled";
-+
-+			/* VPIF capture: input channels */
-+			port {
-+				vpif_ch0: endpoint at 0 {
-+					  reg = <0>;
-+					  bus-width = <8>;
-+				};
-+
-+				vpif_ch1: endpoint at 1 {
-+					  reg = <1>;
-+					  bus-width = <8>;
-+					  data-shift = <8>;
-+				};
-+			};
-+		};
+diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+index 03f9bfda5385..39db2ffa1902 100644
+--- a/arch/arm/boot/dts/da850-lcdk.dts
++++ b/arch/arm/boot/dts/da850-lcdk.dts
+@@ -138,6 +138,24 @@
+ 		reg = <0x18>;
+ 		status = "okay";
  	};
 +
- 	aemif: aemif at 68000000 {
- 		compatible = "ti,da850-aemif";
- 		#address-cells = <2>;
++	tvp5147 at 5d {
++		compatible = "ti,tvp5147";
++		reg = <0x5d>;
++		status = "okay";
++
++		port {
++			composite: endpoint {
++				hsync-active = <1>;
++				vsync-active = <1>;
++				pclk-sample = <0>;
++
++				/* VPIF channel 0 (lower 8-bits) */
++				remote-endpoint = <&vpif_ch0>;
++				bus-width = <8>;
++			};
++		};
++	};
+ };
+ 
+ &mcasp0 {
+@@ -227,3 +245,15 @@
+ 		};
+ 	};
+ };
++
++&vpif {
++	status = "okay";
++};
++
++&vpif_capture {
++	status = "okay";
++};
++
++&vpif_ch0 {
++	remote-endpoint = <&composite>;
++};
 -- 
 2.9.3
