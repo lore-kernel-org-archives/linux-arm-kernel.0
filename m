@@ -1,70 +1,48 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 22 Nov 2016 09:58:37 +0000
-Subject: [RFC PATCH 04/11] PCI: tegra: limit to MMU build only
-In-Reply-To: <28079479.jInxCWkYlm@wuerfel>
-References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
- <11637152.Dd0IBkEQ8q@wuerfel> <58341297.9090303@arm.com>
- <28079479.jInxCWkYlm@wuerfel>
-Message-ID: <583416CD.8040106@arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 22 Nov 2016 11:00:44 +0100
+Subject: [PATCH v2 0/2] ARM64: dts: Add support for Meson GXM
+Message-ID: <20161122100046.25899-1-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/11/16 09:54, Arnd Bergmann wrote:
-> On Tuesday, November 22, 2016 9:40:39 AM CET Vladimir Murzin wrote:
->> On 22/11/16 09:31, Arnd Bergmann wrote:
->>> On Tuesday, November 22, 2016 9:26:01 AM CET Vladimir Murzin wrote:
->>>> This driver uses functionality which available for MMU build only,
->>>> thus add dependency on MMU.
->>>>
->>>> Cc: Thierry Reding <thierry.reding@gmail.com>
->>>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->>>>
->>>
->>> Can you be more specific about what requires the MMU here?
->>>
->>> Is it the I/O space remapping or something else?
->>
->> Yes it comes from I/O space remapping.
->>
->> The fill error log:
->>
->>   CC      drivers/pci/host/pci-tegra.o
->> In file included from ./arch/arm/include/asm/page.h:22:0,
->>                  from ./arch/arm/include/asm/thread_info.h:17,
->>                  from ./include/linux/thread_info.h:58,
->>                  from ./include/asm-generic/current.h:4,
->>                  from ./arch/arm/include/generated/asm/current.h:1,
->>                  from ./include/linux/mutex.h:13,
->>                  from ./include/linux/notifier.h:13,
->>                  from ./include/linux/clk.h:17,
->>                  from drivers/pci/host/pci-tegra.c:29:
->> drivers/pci/host/pci-tegra.c: In function 'tegra_pcie_bus_alloc':
->> drivers/pci/host/pci-tegra.c:388:27: error: 'L_PTE_PRESENT' undeclared (first use in this function)
->>   pgprot_t prot = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
-> 
-> 
-> That is not the I/O space, that is the config space.
+The new Amlogic GXM SoC (S912) is part of the Meson GX family and is nearly
+identical to GXM but with a second Quad-A53 core cluster.
 
-Sorry for that, I'm not in PCI :(
+The GXM dtsi includes the GXL dtsi and the p20x dtsi is refactored in a
+common p20x/q20x to support the GXM Q200 and Q201 board that uses the exact
+same board layout since the S905D and S912 are pinout compatible.
 
-> 
-> Not sure what a better alternative would be, but the manual selection
-> of page flags makes the driver non-portable and dependent on architecture
-> specifics that it really shouldn't have to worry about.
-> 
-> In common PCI code, we use pgprot_device(PAGE_KERNEL)) at some point,
-> and that sounds like the right thing to do, but ARM doesn't provide
-> an override for it and the fallback is pgprot_noncached(), which is
-> probably wrong here.
-> 
-> Unless someone has a good idea for how to change the driver, just
-> mention this in the changelog.
+The last patch adds support for the Nexbox A1 Set-Top-Box based on the S912.
 
-Thanks for explanation! I'll wait for Thierry's thoughts on this. 
+Changes since v1 at [1] :
+ - Remove bad p200/p201 changes
+ - Fix cpu-map
 
-Cheers
-Vladimir 
+Changes since RFC :
+ - Refactor the p20x/q20x dtsi into a single common file
+ - Add support for Nexbox A1
 
-> 
-> 	Arnd
-> 
+[1] http://lkml.kernel.org/r/20161121162905.14285-1-narmstrong at baylibre.com
+
+Neil Armstrong (2):
+  ARM64: dts: Add support for Meson GXM
+  ARM64: dts: meson-gxm: Add support for the Nexbox A1
+
+ Documentation/devicetree/bindings/arm/amlogic.txt  |   7 +
+ arch/arm64/boot/dts/amlogic/Makefile               |   3 +
+ ...gxl-s905d-p23x.dtsi => meson-gx-p23x-q20x.dtsi} |   4 +-
+ .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      |   3 +-
+ .../boot/dts/amlogic/meson-gxl-s905d-p231.dts      |   3 +-
+ .../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts | 169 +++++++++++++++++++++
+ .../arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts |  77 ++++++++++
+ .../arm64/boot/dts/amlogic/meson-gxm-s912-q201.dts |  58 +++++++
+ arch/arm64/boot/dts/amlogic/meson-gxm.dtsi         | 114 ++++++++++++++
+ 9 files changed, 435 insertions(+), 3 deletions(-)
+ rename arch/arm64/boot/dts/amlogic/{meson-gxl-s905d-p23x.dtsi => meson-gx-p23x-q20x.dtsi} (97%)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-s912-q201.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
+
+-- 
+2.7.0
