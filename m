@@ -1,70 +1,63 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 22 Nov 2016 09:28:23 +0100
-Subject: [PATCH 2/2] MAINTAINERS: Add myself as co-maintainer to fpga mgr
- framework.
-In-Reply-To: <20161122080713.GB22441@kroah.com>
-References: <1479764942-14321-1-git-send-email-mdf@kernel.org>
- <1479764942-14321-2-git-send-email-mdf@kernel.org>
- <alpine.DEB.2.20.1611212021050.3633@atull-VirtualBox2>
- <47eb36a7-ee48-53bd-fbdc-15225c3147ec@xilinx.com>
- <20161122080713.GB22441@kroah.com>
-Message-ID: <abcd566c-3ba8-71cb-272c-301d04e599ea@xilinx.com>
+From: mueddib@yandex.com (Ozgur Karatas)
+Date: Tue, 22 Nov 2016 10:38:20 +0200
+Subject: Synopsys Ethernet QoS Driver
+In-Reply-To: <937252db-9538-2cf6-c8fa-82b558531c51@st.com>
+References: <CADvZ6ErjyVR5ShWTk0QesWLYR1m3p8yAMkK8v9gm2kN5xTv8zw@mail.gmail.com>
+ <1dbb6047-2bbb-4d56-2a62-ab65a0254844@synopsys.com>
+ <20161119135654.GA14079@lnxartpec.se.axis.com>
+ <CAJ3bTp7PpUJcz=1JohX=A54UP6vVAafWnB0PGUBSxb5JJiO8Lg@mail.gmail.com>
+ <1248f4ce-4859-10e6-fef9-342ea543f8d4@synopsys.com>
+ <87c8a24b-0812-7850-cb3f-7be691bab432@st.com>
+ <afc18eb0-4c11-9668-498d-982624c6de78@synopsys.com>
+ <937252db-9538-2cf6-c8fa-82b558531c51@st.com>
+Message-ID: <1806171479803900@web16j.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.11.2016 09:07, Greg Kroah-Hartman wrote:
-> On Tue, Nov 22, 2016 at 08:48:57AM +0100, Michal Simek wrote:
->> On 22.11.2016 03:29, atull wrote:
->>> On Mon, 21 Nov 2016, Moritz Fischer wrote:
->>>
->>>> Add myself as co-maintainer to fpga mgr framework.
->>>>
->>>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
->>>> Cc: Alan Tull <atull@opensource.altera.com>
->>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->>>> Cc: linux-kernel at vger.kernel.org
->>>> Cc: linux-fpga at vger.kernel.org
->>>> ---
->>>> Hi all,
->>>>
->>>> Lately we've fallen behind a bit on reviewing patches lately.
->>>
->>> Hi Moritz,
->>>
->>> drivers/fpga has been in the upstream kernel a year now.  Most of that
->>> time, traffic has been very slow.  Recently we had more traffic while
->>> I was travelling and moving to a new office, both cases leaving me
->>> with bad network connectivity.  Things will probably return to normal.
->>> I appreciate your passion and all your effort reviewing stuff.  I
->>> don't see a need for two maintainers at this point.
->>
->> TBH. I think it is not a bad option. I do normally have backup person
->> for all repos I do maintain. It doesn't mean that second maintainer does
->> something but it has all accesses to repos you maintain.
->> It means if something really happens to you (hopefully not) than this
->> person can continue in this work without any delay which is not a bad
->> thing.
->> It is really just about talking to each other what that second person
->> will do - probably just review patches as is done now. You can also
->> learn from each other.
->> I would like to be involved more in this but unfortunately I don't have
->> enough time to do it properly.
->>
->> Regarding maintaining this repo. It is just standard process. Apply
->> sensible things, well described and test it. And then send pull request
->> to Greg based on signed tags and you are done.
->> Greg should told you what should be the base which you should use for
->> pull request. Someone is taking patches based on rc1 tag, someone is
->> rebasing it on the final tag.
-> 
-> Greg doesn't care what base you use, as long as you don't rebase
-> patches.  What subsystem does that?  I need to go yell at someone...
+Hello all,
 
-:-) Not sure if there is any subsystem which use this.
-And for my microblaze tree I do normally base patches on the top of
-rc7/8 or final tag but that's done mostly because I collect patches at
-that time. But IIRC when I started with this someone mentioned that for
-small number of patches this is fine.
+I think, ethtool and mdio don't work because the tool's not support to "QoS", right?
 
-Thanks,
-Michal
+Maybe, need a new API. I'm looking for dwceqos code but "tc" tools is very idea.
+
+I hope to be me always helpful.
+
+Regards,
+
+Ozgur
+
+21.11.2016, 16:38, "Giuseppe CAVALLARO" <peppe.cavallaro@st.com>:
+> Hello Joao
+>
+> On 11/21/2016 2:48 PM, Joao Pinto wrote:
+>> ?Synopsys QoS IP is a separated hardware component, so it should be reusable by
+>> ?all implementations using it and so have its own "core driver" and platform +
+>> ?pci glue drivers. This is necessary for example in hardware validation, where
+>> ?you prototype an IP and instantiate its drivers and test it.
+>>
+>> ?Was there a strong reason to integrate QoS features directly in stmmac and not
+>> ?in synopsys/dwc_eth_qos.*?
+>
+> We decided to enhance the stmmac on supporting the QoS for several
+> reasons; for example the common APIs that the driver already exposed and
+> actually suitable for other SYNP chips. Then, PTP, EEE,
+> S/RGMII, MMC could be shared among different chips with a minimal
+> effort. This meant a lot of code already ready.
+>
+> For sure, the net-core, Ethtool, mdio parts were reused. Same for the
+> glue logic files.
+> For the latter, this helped to easily bring-up new platforms also
+> because the stmmac uses the HW cap register to auto-configure many
+> parts of the MAC core, DMA and modules. This helped many users, AFAIK.
+>
+> For validation purpose, this is my experience, the stmmac helped
+> a lot because people used the same code to validate different HW
+> and it was easy to switch to a platform to another one in order to
+> verify / check if the support was ok or if a regression was introduced.
+> This is important for complex supports like PTP or EEE.
+>
+> Hoping this can help.
+>
+> Do not hesitate to contact me for further details
+>
+> peppe
