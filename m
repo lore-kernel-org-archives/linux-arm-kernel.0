@@ -1,43 +1,41 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 22 Nov 2016 10:44:22 +0100
-Subject: [PATCH 2/4] arm64: dts: rockchip: Arch counter doesn't tick in system
- suspend
+Date: Tue, 22 Nov 2016 10:44:23 +0100
+Subject: [PATCH 3/4] clocksource/drivers/arm_arch_timer: Map frame with
+ of_io_request_and_map()
 In-Reply-To: <1479807866-6957-1-git-send-email-daniel.lezcano@linaro.org>
 References: <20161122094300.GA2017@mai>
  <1479807866-6957-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1479807866-6957-2-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1479807866-6957-3-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Brian Norris <briannorris@chromium.org>
+From: Stephen Boyd <sboyd@codeaurora.org>
 
-The "arm,no-tick-in-suspend" property was introduced to note
-implementations where the system counter does not quite follow the ARM
-specification that it "must be implemented in an always-on power
-domain".
+Let's use the of_io_request_and_map() API so that the frame
+region is protected and shows up in /proc/iomem.
 
-Particularly, RK3399's counter stops ticking when we switch from the
-24MHz clock to the 32KHz clock in low-power suspend, so let's mark it as
-such.
-
-Signed-off-by: Brian Norris <briannorris@chromium.org>
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clocksource/arm_arch_timer.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index b65c193..d85b651 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -174,6 +174,7 @@
- 			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW 0>,
- 			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW 0>,
- 			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW 0>;
-+		arm,no-tick-in-suspend;
- 	};
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index a2503db..02fef68 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -971,8 +971,9 @@ static int __init arch_timer_mem_init(struct device_node *np)
+ 	}
  
- 	xin24m: xin24m {
+ 	ret= -ENXIO;
+-	base = arch_counter_base = of_iomap(best_frame, 0);
+-	if (!base) {
++	base = arch_counter_base = of_io_request_and_map(best_frame, 0,
++							 "arch_mem_timer");
++	if (IS_ERR(base)) {
+ 		pr_err("arch_timer: Can't map frame's registers\n");
+ 		goto out;
+ 	}
 -- 
 2.7.4
