@@ -1,83 +1,66 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Tue, 22 Nov 2016 15:49:21 +0800
-Subject: [PATCH 6/6] arm64: dts: hi6220: update reset node according to
- reset-hi6220.c
-In-Reply-To: <1479800961-6249-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1479800961-6249-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1479800961-6249-7-git-send-email-zhangfei.gao@linaro.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 22 Nov 2016 09:07:13 +0100
+Subject: [PATCH 2/2] MAINTAINERS: Add myself as co-maintainer to fpga mgr
+ framework.
+In-Reply-To: <47eb36a7-ee48-53bd-fbdc-15225c3147ec@xilinx.com>
+References: <1479764942-14321-1-git-send-email-mdf@kernel.org>
+ <1479764942-14321-2-git-send-email-mdf@kernel.org>
+ <alpine.DEB.2.20.1611212021050.3633@atull-VirtualBox2>
+ <47eb36a7-ee48-53bd-fbdc-15225c3147ec@xilinx.com>
+Message-ID: <20161122080713.GB22441@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 20 +++++++++++++++-----
- 1 file changed, 15 insertions(+), 5 deletions(-)
+On Tue, Nov 22, 2016 at 08:48:57AM +0100, Michal Simek wrote:
+> On 22.11.2016 03:29, atull wrote:
+> > On Mon, 21 Nov 2016, Moritz Fischer wrote:
+> > 
+> >> Add myself as co-maintainer to fpga mgr framework.
+> >>
+> >> Signed-off-by: Moritz Fischer <mdf@kernel.org>
+> >> Cc: Alan Tull <atull@opensource.altera.com>
+> >> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> >> Cc: linux-kernel at vger.kernel.org
+> >> Cc: linux-fpga at vger.kernel.org
+> >> ---
+> >> Hi all,
+> >>
+> >> Lately we've fallen behind a bit on reviewing patches lately.
+> > 
+> > Hi Moritz,
+> > 
+> > drivers/fpga has been in the upstream kernel a year now.  Most of that
+> > time, traffic has been very slow.  Recently we had more traffic while
+> > I was travelling and moving to a new office, both cases leaving me
+> > with bad network connectivity.  Things will probably return to normal.
+> > I appreciate your passion and all your effort reviewing stuff.  I
+> > don't see a need for two maintainers at this point.
+> 
+> TBH. I think it is not a bad option. I do normally have backup person
+> for all repos I do maintain. It doesn't mean that second maintainer does
+> something but it has all accesses to repos you maintain.
+> It means if something really happens to you (hopefully not) than this
+> person can continue in this work without any delay which is not a bad
+> thing.
+> It is really just about talking to each other what that second person
+> will do - probably just review patches as is done now. You can also
+> learn from each other.
+> I would like to be involved more in this but unfortunately I don't have
+> enough time to do it properly.
+> 
+> Regarding maintaining this repo. It is just standard process. Apply
+> sensible things, well described and test it. And then send pull request
+> to Greg based on signed tags and you are done.
+> Greg should told you what should be the base which you should use for
+> pull request. Someone is taking patches based on rc1 tag, someone is
+> rebasing it on the final tag.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 17839db..7918043 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -246,14 +246,24 @@
- 			compatible = "hisilicon,hi6220-sysctrl", "syscon";
- 			reg = <0x0 0xf7030000 0x0 0x2000>;
- 			#clock-cells = <1>;
--			#reset-cells = <1>;
- 		};
- 
- 		media_ctrl: media_ctrl at f4410000 {
- 			compatible = "hisilicon,hi6220-mediactrl", "syscon";
- 			reg = <0x0 0xf4410000 0x0 0x1000>;
- 			#clock-cells = <1>;
-+		};
-+
-+		sys_ctrl_rst: sys_rst_controller {
-+			compatible = "hisilicon,hi6220-reset-sysctrl";
-+			#reset-cells = <1>;
-+			hisi,rst-syscon = <&sys_ctrl>;
-+		};
-+
-+		media_ctrl_rst: media_rst_controller {
-+			compatible = "hisilicon,hi6220-reset-mediactrl";
- 			#reset-cells = <1>;
-+			hisi,rst-syscon = <&media_ctrl>;
- 		};
- 
- 		pm_ctrl: pm_ctrl at f7032000 {
-@@ -771,7 +781,7 @@
- 			interrupts = <0x0 0x48 0x4>;
- 			clocks = <&sys_ctrl 2>, <&sys_ctrl 1>;
- 			clock-names = "ciu", "biu";
--			resets = <&sys_ctrl PERIPH_RSTDIS0_MMC0>;
-+			resets = <&sys_ctrl_rst PERIPH_RSTDIS0_MMC0>;
- 			bus-width = <0x8>;
- 			vmmc-supply = <&ldo19>;
- 			pinctrl-names = "default";
-@@ -794,7 +804,7 @@
- 			#size-cells = <0x0>;
- 			clocks = <&sys_ctrl 4>, <&sys_ctrl 3>;
- 			clock-names = "ciu", "biu";
--			resets = <&sys_ctrl PERIPH_RSTDIS0_MMC1>;
-+			resets = <&sys_ctrl_rst PERIPH_RSTDIS0_MMC1>;
- 			vqmmc-supply = <&ldo7>;
- 			vmmc-supply = <&ldo10>;
- 			bus-width = <0x4>;
-@@ -812,7 +822,7 @@
- 			interrupts = <0x0 0x4a 0x4>;
- 			clocks = <&sys_ctrl HI6220_MMC2_CIUCLK>, <&sys_ctrl HI6220_MMC2_CLK>;
- 			clock-names = "ciu", "biu";
--			resets = <&sys_ctrl PERIPH_RSTDIS0_MMC2>;
-+			resets = <&sys_ctrl_rst PERIPH_RSTDIS0_MMC2>;
- 			bus-width = <0x4>;
- 			broken-cd;
- 			pinctrl-names = "default", "idle";
-@@ -867,7 +877,7 @@
- 			reg = <0x0 0xf4100000 0x0 0x7800>;
- 			reg-names = "ade_base";
- 			hisilicon,noc-syscon = <&medianoc_ade>;
--			resets = <&media_ctrl MEDIA_ADE>;
-+			resets = <&media_ctrl_rst MEDIA_ADE>;
- 			interrupts = <0 115 4>; /* ldi interrupt */
- 
- 			clocks = <&media_ctrl HI6220_ADE_CORE>,
--- 
-2.7.4
+Greg doesn't care what base you use, as long as you don't rebase
+patches.  What subsystem does that?  I need to go yell at someone...
+
+And I take patches just as easily, what ever works best for the
+subsystem.
+
+thanks,
+
+greg k-h
