@@ -1,36 +1,116 @@
-From: ahaslam@baylibre.com (Axel Haslam)
-Date: Tue, 22 Nov 2016 10:38:12 +0100
-Subject: [PATCH 0/2] ARM: davinvi: da850 add ohci DT nodes
-In-Reply-To: <3543ab96-1a7e-395f-26a6-c748cf0423f1@ti.com>
-References: <20161121165920.29809-1-ahaslam@baylibre.com>
- <3543ab96-1a7e-395f-26a6-c748cf0423f1@ti.com>
-Message-ID: <CAKXjFTMBiMq3WGpYNfes6i5V8syeR_-VP_ss0KytvTn+Biie4w@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 22 Nov 2016 09:40:39 +0000
+Subject: [RFC PATCH 04/11] PCI: tegra: limit to MMU build only
+In-Reply-To: <11637152.Dd0IBkEQ8q@wuerfel>
+References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
+ <1479806768-39911-5-git-send-email-vladimir.murzin@arm.com>
+ <11637152.Dd0IBkEQ8q@wuerfel>
+Message-ID: <58341297.9090303@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2016 at 10:33 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> On Monday 21 November 2016 10:29 PM, Axel Haslam wrote:
->> This adds the DT node for the ohci controller and
->> enables it for the omapl138-lckd platform.
+On 22/11/16 09:31, Arnd Bergmann wrote:
+> On Tuesday, November 22, 2016 9:26:01 AM CET Vladimir Murzin wrote:
+>> This driver uses functionality which available for MMU build only,
+>> thus add dependency on MMU.
 >>
->> DEPENDENCIES:
+>> Cc: Thierry Reding <thierry.reding@gmail.com>
+>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 >>
->> 1. [PATCH v6 0/5] USB: ohci-da8xx: Add device tree support
->> https://lkml.org/lkml/2016/11/21/558
->
-> Looks like atleast this series is not merged (checking today's linux-next).
->
->>
->> 2. [PATCH v3 0/2] regulator: handling of error conditions for usb drivers
->> https://lkml.org/lkml/2016/11/4/465
->
-> Can you let me know once the dependencies are merged so I can pick these.
+> 
+> Can you be more specific about what requires the MMU here?
+> 
+> Is it the I/O space remapping or something else?
 
-Right, the driver changes are not yet picked up, ill ping once those get in.
+Yes it comes from I/O space remapping.
 
-Regards
-Axel.
+The fill error log:
 
->
-> Thanks,
-> Sekhar
+  CC      drivers/pci/host/pci-tegra.o
+In file included from ./arch/arm/include/asm/page.h:22:0,
+                 from ./arch/arm/include/asm/thread_info.h:17,
+                 from ./include/linux/thread_info.h:58,
+                 from ./include/asm-generic/current.h:4,
+                 from ./arch/arm/include/generated/asm/current.h:1,
+                 from ./include/linux/mutex.h:13,
+                 from ./include/linux/notifier.h:13,
+                 from ./include/linux/clk.h:17,
+                 from drivers/pci/host/pci-tegra.c:29:
+drivers/pci/host/pci-tegra.c: In function 'tegra_pcie_bus_alloc':
+drivers/pci/host/pci-tegra.c:388:27: error: 'L_PTE_PRESENT' undeclared (first use in this function)
+  pgprot_t prot = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+                           ^
+./arch/arm/include/asm/page-nommu.h:41:26: note: in definition of macro '__pgprot'
+ #define __pgprot(x)     (x)
+                          ^
+drivers/pci/host/pci-tegra.c:388:27: note: each undeclared identifier is reported only once for each function it appears in
+  pgprot_t prot = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+                           ^
+./arch/arm/include/asm/page-nommu.h:41:26: note: in definition of macro '__pgprot'
+ #define __pgprot(x)     (x)
+                          ^
+drivers/pci/host/pci-tegra.c:388:43: error: 'L_PTE_YOUNG' undeclared (first use in this function)
+  pgprot_t prot = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+                                           ^
+./arch/arm/include/asm/page-nommu.h:41:26: note: in definition of macro '__pgprot'
+ #define __pgprot(x)     (x)
+                          ^
+drivers/pci/host/pci-tegra.c:388:57: error: 'L_PTE_DIRTY' undeclared (first use in this function)
+  pgprot_t prot = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+                                                         ^
+./arch/arm/include/asm/page-nommu.h:41:26: note: in definition of macro '__pgprot'
+ #define __pgprot(x)     (x)
+                          ^
+drivers/pci/host/pci-tegra.c:389:6: error: 'L_PTE_XN' undeclared (first use in this function)
+      L_PTE_XN | L_PTE_MT_DEV_SHARED | L_PTE_SHARED);
+      ^
+./arch/arm/include/asm/page-nommu.h:41:26: note: in definition of macro '__pgprot'
+ #define __pgprot(x)     (x)
+                          ^
+drivers/pci/host/pci-tegra.c:389:17: error: 'L_PTE_MT_DEV_SHARED' undeclared (first use in this function)
+      L_PTE_XN | L_PTE_MT_DEV_SHARED | L_PTE_SHARED);
+                 ^
+./arch/arm/include/asm/page-nommu.h:41:26: note: in definition of macro '__pgprot'
+ #define __pgprot(x)     (x)
+                          ^
+drivers/pci/host/pci-tegra.c:389:39: error: 'L_PTE_SHARED' undeclared (first use in this function)
+      L_PTE_XN | L_PTE_MT_DEV_SHARED | L_PTE_SHARED);
+                                       ^
+./arch/arm/include/asm/page-nommu.h:41:26: note: in definition of macro '__pgprot'
+ #define __pgprot(x)     (x)
+                          ^
+drivers/pci/host/pci-tegra.c: At top level:
+drivers/pci/host/pci-tegra.c:501:10: error: 'pci_generic_config_read32' undeclared here (not in a function)
+  .read = pci_generic_config_read32,
+          ^
+drivers/pci/host/pci-tegra.c:502:11: error: 'pci_generic_config_write32' undeclared here (not in a function)
+  .write = pci_generic_config_write32,
+           ^
+drivers/pci/host/pci-tegra.c: In function 'tegra_pcie_relax_enable':
+drivers/pci/host/pci-tegra.c:609:2: error: implicit declaration of function 'pcie_capability_set_word' [-Werror=implicit-function-declaration]
+  pcie_capability_set_word(dev, PCI_EXP_DEVCTL, PCI_EXP_DEVCTL_RELAX_EN);
+  ^
+drivers/pci/host/pci-tegra.c: In function 'tegra_pcie_setup':
+drivers/pci/host/pci-tegra.c:626:8: error: implicit declaration of function 'pci_remap_iospace' [-Werror=implicit-function-declaration]
+  err = pci_remap_iospace(&pcie->pio, pcie->io.start);
+        ^
+drivers/pci/host/pci-tegra.c:628:3: error: implicit declaration of function 'pci_add_resource_offset' [-Werror=implicit-function-declaration]
+   pci_add_resource_offset(&sys->resources, &pcie->pio,
+   ^
+drivers/pci/host/pci-tegra.c:634:2: error: implicit declaration of function 'pci_add_resource' [-Werror=implicit-function-declaration]
+  pci_add_resource(&sys->resources, &pcie->busn);
+  ^
+drivers/pci/host/pci-tegra.c:636:8: error: implicit declaration of function 'devm_request_pci_bus_resources' [-Werror=implicit-function-declaration]
+  err = devm_request_pci_bus_resources(dev, &sys->resources);
+        ^
+cc1: some warnings being treated as errors
+make[1]: *** [drivers/pci/host/pci-tegra.o] Error 1
+make: *** [drivers/pci/host/pci-tegra.o] Error 2
+
+Cheers
+Vladimir
+
+> 
+> 	Arnd
+> 
+> 
