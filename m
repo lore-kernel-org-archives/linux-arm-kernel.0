@@ -1,95 +1,88 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Tue, 22 Nov 2016 11:42:23 +0530
-Subject: [PATCH v2 4/4] spi: spi-fsl-dspi: Minor code cleanup and error
- path fixes
-In-Reply-To: <43b518a92352986f09b0893646ff8016@agner.ch>
-References: <cover.1479706671.git.maitysanchayan@gmail.com>
- <971874d8e662622c0cfe478adaa4c75b08388d0e.1479706671.git.maitysanchayan@gmail.com>
- <43b518a92352986f09b0893646ff8016@agner.ch>
-Message-ID: <20161122061222.GB2484@Sanchayan-Arch.localdomain>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 22 Nov 2016 11:55:21 +0530
+Subject: [PATCH v2 1/5] ARM: memory: da8xx-ddrctl: new driver
+In-Reply-To: <5833A2DA.40701@gmail.com>
+References: <1477925138-23457-1-git-send-email-bgolaszewski@baylibre.com>
+ <1477925138-23457-2-git-send-email-bgolaszewski@baylibre.com>
+ <a309a738-7fa7-3aab-4457-f7d693e6b37f@ti.com> <5833A2DA.40701@gmail.com>
+Message-ID: <800171a8-2e2c-2afb-f96d-800a17eaa17a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16-11-21 15:22:09, Stefan Agner wrote:
-> On 2016-11-20 21:54, Sanchayan Maity wrote:
-> > Code cleanup for improving code readability and error path fixes
-> > and cleanup removing use of devm_kfree.
-> 
-> Two things in one, not very nice. Especially the dma_free_coherent is
-> really a bug and the other is a cleanup. Can you make a separate patch
-> for the bug?
-> 
-> As for the cleanup, I don't like the one line conditions too, but I
-> don't think it is worth a patch. At least the TX path should be solved
-> with my suggestion in patch 2.
+Hi Frank,
 
-Agreed.
-
-- Sanchayan.
-
+On Tuesday 22 November 2016 07:13 AM, Frank Rowand wrote:
+> On 11/21/16 08:33, Sekhar Nori wrote:
+>> On Monday 31 October 2016 08:15 PM, Bartosz Golaszewski wrote:
+>>> +static int da8xx_ddrctl_probe(struct platform_device *pdev)
+>>> +{
+>>> +	const struct da8xx_ddrctl_config_knob *knob;
+>>> +	const struct da8xx_ddrctl_setting *setting;
+>>> +	struct device_node *node;
+>>> +	struct resource *res;
+>>> +	void __iomem *ddrctl;
+>>> +	struct device *dev;
+>>> +	u32 reg;
+>>> +
+>>> +	dev = &pdev->dev;
+>>> +	node = dev->of_node;
+>>> +
+>>> +	setting = da8xx_ddrctl_get_board_settings();
+>>> +	if (!setting) {
+>>> +		dev_err(dev, "no settings for board '%s'\n",
+>>> +			of_flat_dt_get_machine_name());
+>>> +		return -EINVAL;
+>>> +	}
+>>
+>> This causes a section mismatch because of_flat_dt_get_machine_name() 
+>> has an __init annotation. I did not notice that before, sorry.
+>>
+>> It can be fixed with a patch like below:
+>>
+>> ---8<---
+>> diff --git a/drivers/memory/da8xx-ddrctl.c b/drivers/memory/da8xx-ddrctl.c
+>> index a20e7bbbcbe0..9ca5aab3ac54 100644
+>> --- a/drivers/memory/da8xx-ddrctl.c
+>> +++ b/drivers/memory/da8xx-ddrctl.c
+>> @@ -102,6 +102,18 @@ static const struct da8xx_ddrctl_setting *da8xx_ddrctl_get_board_settings(void)
+>>  	return NULL;
+>>  }
+>>  
+>> +static const char* da8xx_ddrctl_get_machine_name(void)
+>> +{
+>> +	const char *str;
+>> +	int ret;
+>> +
+>> +	ret = of_property_read_string(of_root, "model", &str);
+>> +	if (ret)
+>> +		ret = of_property_read_string(of_root, "compatible", &str);
+>> +
+>> +	return str;
+>> +}
+>> +
+>>  static int da8xx_ddrctl_probe(struct platform_device *pdev)
+>>  {
+>>  	const struct da8xx_ddrctl_config_knob *knob;
+>> @@ -118,7 +130,7 @@ static int da8xx_ddrctl_probe(struct platform_device *pdev)
+>>  	setting = da8xx_ddrctl_get_board_settings();
+>>  	if (!setting) {
+>>  		dev_err(dev, "no settings for board '%s'\n",
+>> -			of_flat_dt_get_machine_name());
 > 
-> --
-> Stefan
+> da8xx_ddrctl_get_board_settings() tries to match based on the "compatible"
+> property in the root node.  The "model" property in the root node has
+> nothing to do with the failure to match. So creating and then using
+> da8xx_ddrctl_get_machine_name() to potentially report model is not useful.
 > 
-> > 
-> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> > ---
-> >  drivers/spi/spi-fsl-dspi.c | 22 ++++++++++++++++------
-> >  1 file changed, 16 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
-> > index 08882f7..2987a16 100644
-> > --- a/drivers/spi/spi-fsl-dspi.c
-> > +++ b/drivers/spi/spi-fsl-dspi.c
-> > @@ -226,8 +226,10 @@ static void dspi_rx_dma_callback(void *arg)
-> >  	if (!(dspi->dataflags & TRAN_STATE_RX_VOID)) {
-> >  		for (i = 0; i < dma->curr_xfer_len; i++) {
-> >  			d = dspi->dma->rx_dma_buf[i];
-> > -			rx_word ? (*(u16 *)dspi->rx = d) :
-> > -						(*(u8 *)dspi->rx = d);
-> > +			if (rx_word)
-> > +				*(u16 *)dspi->rx = d;
-> > +			else
-> > +				*(u8 *)dspi->rx = d;
-> >  			dspi->rx += rx_word + 1;
-> >  		}
-> >  	}
-> > @@ -247,14 +249,20 @@ static int dspi_next_xfer_dma_submit(struct
-> > fsl_dspi *dspi)
-> >  	tx_word = is_double_byte_mode(dspi);
-> >  
-> >  	for (i = 0; i < dma->curr_xfer_len - 1; i++) {
-> > -		val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
-> > +		if (tx_word)
-> > +			val = *(u16 *) dspi->tx;
-> > +		else
-> > +			val = *(u8 *) dspi->tx;
-> >  		dspi->dma->tx_dma_buf[i] =
-> >  			SPI_PUSHR_TXDATA(val) | SPI_PUSHR_PCS(dspi->cs) |
-> >  			SPI_PUSHR_CTAS(0) | SPI_PUSHR_CONT;
-> >  		dspi->tx += tx_word + 1;
-> >  	}
-> >  
-> > -	val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
-> > +	if (tx_word)
-> > +		val = *(u16 *) dspi->tx;
-> > +	else
-> > +		val = *(u8 *) dspi->tx;
-> >  	dspi->dma->tx_dma_buf[i] = SPI_PUSHR_TXDATA(val) |
-> >  					SPI_PUSHR_PCS(dspi->cs) |
-> >  					SPI_PUSHR_CTAS(0);
-> > @@ -430,9 +438,11 @@ static int dspi_request_dma(struct fsl_dspi
-> > *dspi, phys_addr_t phy_addr)
-> >  	return 0;
-> >  
-> >  err_slave_config:
-> > -	devm_kfree(dev, dma->rx_dma_buf);
-> > +	dma_free_coherent(dev, DSPI_DMA_BUFSIZE,
-> > +			dma->rx_dma_buf, dma->rx_dma_phys);
-> >  err_rx_dma_buf:
-> > -	devm_kfree(dev, dma->tx_dma_buf);
-> > +	dma_free_coherent(dev, DSPI_DMA_BUFSIZE,
-> > +			dma->tx_dma_buf, dma->tx_dma_phys);
-> >  err_tx_dma_buf:
-> >  	dma_release_channel(dma->chan_tx);
-> >  err_tx_channel:
+> It should be sufficient to simply report that no compatible matched.
+
+I agree with you on this. Even if model name is printed, you will have
+to go back and check the compatible anyway. But I think it will be
+useful to print the compatible instead of just reporting that nothing
+matched.
+
+Bartosz, if you agree too, could you send a fix patch just printing the
+compatible?
+
+Thanks,
+Sekhar
