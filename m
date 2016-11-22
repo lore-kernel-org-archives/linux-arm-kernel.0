@@ -1,54 +1,75 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Tue, 22 Nov 2016 12:31:29 +0530
-Subject: [PATCH v3 0/3] Fixes for Vybrid SPI DMA implementation
-Message-ID: <cover.1479796821.git.maitysanchayan@gmail.com>
+Date: Tue, 22 Nov 2016 12:31:31 +0530
+Subject: [PATCH v3 2/3] spi: spi-fsl-dspi: Fix continuous selection format
+In-Reply-To: <cover.1479796821.git.maitysanchayan@gmail.com>
+References: <cover.1479796821.git.maitysanchayan@gmail.com>
+Message-ID: <fd5dac77580ba02edb38319d04345e23a34b2d9d.1479796821.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Current DMA implementation was not handling the continuous selection
+format viz. SPI chip select would be deasserted even between sequential
+serial transfers.
 
-This v3 set of patches have fixes for Vybrid SPI DMA
-implementation and is rebased on top of latest topic/fsl-dspi. 
+Use existing dspi_data_to_pushr function to restructure the transmit
+code path and set or reset the CONT bit on same lines as code path
+in EOQ mode does. This correctly implements continuous selection format
+while also correcting and cleaning up the transmit code path.
 
-http://git.kernel.org/cgit/linux/kernel/git/broonie/spi.git/log/?h=topic/fsl-dspi
+Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+---
+ drivers/spi/spi-fsl-dspi.c | 20 ++++++--------------
+ 1 file changed, 6 insertions(+), 14 deletions(-)
 
-The patches have been tested on a Toradex Colibri Vybrid VF61 module
-and now incoporate feedback from Stefan on version 2 of patchset.
-
-Changes since v2:
-1. Drop the patch "Fix SPI transfer issue when using multiple SPI_IOC_MESSAGE"
-since it's now applied and rebase the whole patchset
-2. Second patch in this series "Fix continuous selection format" now
-fixes the issue using an existing function and handling it similar to
-existing EOQ mode and also cleaning up nicely the transmit code path.
-3. Third patch now just fixes the incorrect freeing of DMA allocated buffers
-and drops the minor clean up patch from earlier series completely due to
-the clean up from 2 above.
-
-Changes since v1:
-1. Place the continuous selection format patch second in order and remove
-code duplication
-2. Improve the use of curr_xfer_len and instead of converting from bytes
-to DMA transfers in every use, do it at a single place. Accordingly change
-it's use at other places
-3. Code cleanup patch has less to clean with change above
-
-v2:
-https://www.spinics.net/lists/arm-kernel/msg543941.html
-
-v1:
-http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1274632.html
-
-Thanks & Regards,
-Sanchayan.
-
-Sanchayan Maity (3):
-  spi: spi-fsl-dspi: Fix incorrect DMA setup
-  spi: spi-fsl-dspi: Fix continuous selection format
-  spi: spi-fsl-dspi: Fix incorrect freeing of DMA allocated buffers
-
- drivers/spi/spi-fsl-dspi.c | 59 +++++++++++++++++++++-------------------------
- 1 file changed, 27 insertions(+), 32 deletions(-)
-
+diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
+index 911aadb..8af3151 100644
+--- a/drivers/spi/spi-fsl-dspi.c
++++ b/drivers/spi/spi-fsl-dspi.c
+@@ -196,6 +196,8 @@ struct fsl_dspi {
+ 	struct fsl_dspi_dma	*dma;
+ };
+ 
++static u32 dspi_data_to_pushr(struct fsl_dspi *dspi, int tx_word);
++
+ static inline int is_double_byte_mode(struct fsl_dspi *dspi)
+ {
+ 	unsigned int val;
+@@ -242,24 +244,15 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
+ 	int time_left;
+ 	int tx_word;
+ 	int i;
+-	u16 val;
+ 
+ 	tx_word = is_double_byte_mode(dspi);
+ 
+-	for (i = 0; i < dma->curr_xfer_len - 1; i++) {
+-		val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
+-		dspi->dma->tx_dma_buf[i] =
+-			SPI_PUSHR_TXDATA(val) | SPI_PUSHR_PCS(dspi->cs) |
+-			SPI_PUSHR_CTAS(0) | SPI_PUSHR_CONT;
+-		dspi->tx += tx_word + 1;
++	for (i = 0; i < dma->curr_xfer_len; i++) {
++		dspi->dma->tx_dma_buf[i] = dspi_data_to_pushr(dspi, tx_word);
++		if ((dspi->cs_change) && (!dspi->len))
++			dspi->dma->tx_dma_buf[i] &= ~SPI_PUSHR_CONT;
+ 	}
+ 
+-	val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
+-	dspi->dma->tx_dma_buf[i] = SPI_PUSHR_TXDATA(val) |
+-					SPI_PUSHR_PCS(dspi->cs) |
+-					SPI_PUSHR_CTAS(0);
+-	dspi->tx += tx_word + 1;
+-
+ 	dma->tx_desc = dmaengine_prep_slave_single(dma->chan_tx,
+ 					dma->tx_dma_phys,
+ 					dma->curr_xfer_len *
+@@ -351,7 +344,6 @@ static int dspi_dma_xfer(struct fsl_dspi *dspi)
+ 			curr_remaining_bytes -= dma->curr_xfer_len * word;
+ 			if (curr_remaining_bytes < 0)
+ 				curr_remaining_bytes = 0;
+-			dspi->len = curr_remaining_bytes;
+ 		}
+ 	}
+ 
 -- 
 2.10.2
