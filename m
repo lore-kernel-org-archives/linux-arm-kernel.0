@@ -1,164 +1,142 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 22 Nov 2016 15:26:16 +0100
-Subject: [GIT PULL] Allwinner DT changes for 4.10
-In-Reply-To: <CAOesGMh3uph=eU6XhHHn+OYUvGx0hXYGAAbFT0LPKUeah5bggA@mail.gmail.com>
-References: <20161115204122.x3vnb3bkny5esdya@lukather>
- <20161119002316.GN8882@localhost>
- <20161121132712.43b5eld2qthi6664@lukather>
- <CAOesGMg=OQDtKkb4Mut4M1zAwM5CX3=YHxS7equO=Nx2a1tv1Q@mail.gmail.com>
- <20161121222209.ipqft65zcqsfsu2n@lukather>
- <CAOesGMh3uph=eU6XhHHn+OYUvGx0hXYGAAbFT0LPKUeah5bggA@mail.gmail.com>
-Message-ID: <20161122142616.uninnasqhmfjmy4n@lukather>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Tue, 22 Nov 2016 15:28:04 +0100
+Subject: [PATCH V8 2/6] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <20161119042224.GA25063@localhost.localdomain>
+References: <1478081906-12009-1-git-send-email-kernel@martin.sperl.org>
+ <1478081906-12009-3-git-send-email-kernel@martin.sperl.org>
+ <20161117021107.GA2647@localhost.localdomain>
+ <766e1b70-d83a-eb52-fa2b-aec435e85673@martin.sperl.org>
+ <20161117151019.GA3115@localhost.localdomain>
+ <7957B3CC-0E18-4B27-82EB-EF88B7695E28@martin.sperl.org>
+ <20161119042224.GA25063@localhost.localdomain>
+Message-ID: <28F93ABE-8210-4389-AE77-4D5E830E669B@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2016 at 03:34:50PM -0800, Olof Johansson wrote:
-> On Mon, Nov 21, 2016 at 2:22 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Mon, Nov 21, 2016 at 08:28:09AM -0800, Olof Johansson wrote:
-> >> HI,
-> >>
-> >> On Mon, Nov 21, 2016 at 5:27 AM, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >> > Hi Olof,
-> >> >
-> >> > On Fri, Nov 18, 2016 at 04:23:16PM -0800, Olof Johansson wrote:
-> >> >> Hi,
-> >> >>
-> >> >> On Tue, Nov 15, 2016 at 09:41:22PM +0100, Maxime Ripard wrote:
-> >> >> > Hi Arnd, Olof,
-> >> >> >
-> >> >> > Here is our pull request for the next merge window.
-> >> >> >
-> >> >> > Thanks!
-> >> >> > Maxime
-> >> >> >
-> >> >> > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-> >> >> >
-> >> >> >   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-> >> >> >
-> >> >> > are available in the git repository at:
-> >> >> >
-> >> >> >   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.10
-> >> >> >
-> >> >> > for you to fetch changes up to e39a30cf736144814b0bddb3fff28fbbc2a8be0f:
-> >> >> >
-> >> >> >   ARM: sunxi: Add the missing clocks to the pinctrl nodes (2016-11-15 18:49:47 +0100)
-> >> >> >
-> >> >> > ----------------------------------------------------------------
-> >> >> > Allwinner DT additions for 4.10
-> >> >> >
-> >> >> > The usual bunch of DT additions, but most notably:
-> >> >> >   - A31 DRM driver
-> >> >> >   - A31 audio codec
-> >> >> >   - WiFi for the A80-Based boards and the CHIP
-> >> >> >   - Support for the NextThing Co CHIP Pro (the first board with NAND
-> >> >> >     enabled)
-> >> >> >   - New boards: NanoPi M1,
-> >> >> >
-> >> >> [...]
-> >> >>
-> >> >> > Maxime Ripard (16):
-> >> >> >       ARM: sun5i: a13-olinuxino: Enable VGA bridge
-> >> >> >       ARM: gr8: Add the UART3
-> >> >> >       ARM: gr8: Fix typo in the i2s mclk pin group
-> >> >> >       ARM: gr8: Add missing pwm channel 1 pin
-> >> >> >       ARM: gr8: Add UART2 pins
-> >> >> >       ARM: gr8: Add UART3 pins
-> >> >> >       ARM: gr8: Add CHIP Pro support
-> >> >> >       ARM: sun5i: chip: Enable Wi-Fi SDIO chip
-> >> >> >       ARM: sun5i: Rename A10s pins
-> >> >> >       ARM: sun5i: Add SPI2 pins
-> >> >> >       ARM: sun5i: Add RGB 565 LCD pins
-> >> >> >       ARM: sun5i: chip: Add optional buses
-> >> >> >       ARM: gr8: evb: Enable SPDIF
-> >> >> >       ARM: gr8: evb: Add i2s codec
-> >> >> >       ARM: sun8i: sina33: Enable USB gadget
-> >> >> >       ARM: sunxi: Add the missing clocks to the pinctrl nodes
-> >> >> >
-> >> >> [...]
-> >> >>
-> >> >> >  arch/arm/boot/dts/Makefile                         |   1 +
-> >> >> >  arch/arm/boot/dts/ntc-gr8-chip-pro.dts             | 266 +++++++++++++++++++++
-> >> >> >  arch/arm/boot/dts/ntc-gr8-evb.dts                  |  33 +++
-> >> >> >  arch/arm/boot/dts/ntc-gr8.dtsi                     |  47 +++-
-> >> >> >  arch/arm/boot/dts/sun4i-a10.dtsi                   |   3 +-
-> >> >>
-> >> >> NTC isn't the SoC manufacturer, and we try to keep the prefixes down to
-> >> >> manufacturer to keep the namespace a little more manageable, even if
-> >> >> we never got subdirectories setup as on arm64.
-> >> >>
-> >> >> I think this should probably be sun4i-a10-gr8 or sun4i-r8-gr8 as prefix?
-> >> >
-> >> > The users really expect a SoC from Nextthing, it's always been
-> >> > marketed that way, the marking on the SoC also says so, etc. The fact
-> >> > that it's been a design in cooperation with Allwinner, and that the
-> >> > design is based on some earlier family is an implementation detail,
-> >> > and I'd really like not for it to have the sun5i prefix, it's just
-> >> > confusing.
-> >>
-> >> I don't care so much about what's printed on the top of the package, I
-> >> care a lot more about what's on the insides. We've got a long
-> >> tradition of not renaming things randomly when companies get acquired
-> >> or renames themselves, and I think that same spirit is applicable
-> >> here.
-> >
-> > Yet, we called the imx23 and imx28 that way while it was really a
-> > sigmatel design. And I'm pretty sure there's other examples too.
+Hi Eduardo!
+
+On 19.11.2016 05:22, Eduardo Valentin wrote:
+> Hello Martin,
 > 
-> Had Sigmatel had a whole bunch of SoCs in-tree we might have had
-> discussions about that as well.
-
-So what happens if and when we have more NextThing SIP in tree, we
-rename all of them once we have "a whole bunch"?
-
-This is a circular argument.
-
-> >> Calling it an SoC is inaccurate as well, it's really a
-> >> system-in-package. It's just a new way to integrate an SoC into a
-> >> module to build boards out of. Compare to Octavo OSD335x, for example.
-> >>
-> >> System-in-package solutions are going to get more and more common, and
-> >> it's going to become really chaotic if we expect to use the prefix of
-> >> the company custom-ordering the package for each and every one of
-> >> them.
-> >
-> > This is indeed a SIP, but one with a custom SoC (or whatever the !RAM
-> > part in a SIP is called) that was designed by Allwinner *and* Next
-> > Thing Co., unlike the OSD335x that has a standard AM335x SoC in it.
+> Thanks for your patience to take the time to explain to me how the
+> firmware/linux split is done in your platform. Still, one thing is not
+> clear to me.
 > 
-> Even NTC's marketing material says it's an Allwinner R8, at
-> https://getchip.com/pages/chippro: "Powered by a chip you can actually
-> buy. R8 SoC + 256MB DDR3. 1 package. 1 price. $6 in any quantity."
+> On Fri, Nov 18, 2016 at 09:32:47AM +0100, kernel at martin.sperl.org wrote:
+>> 
+> 
+>> The way that firmware works on the RPI is quite different from most others I guess.
+>> in principle you got 2 different CPUs on the bcm2835:
+>> * ARM, which runs the linux instance
+>> * VideoCore 4, which runs the firmware (loading from SD initially) and
+>>  then booting the ARM.
+>> 
+>> So this Firmware on VC4 is the one that I am talking about.
+>> Without the working firmware linux can not boot on arm.
+> 
+> Given that "without the working firmware linux can not boot on arm",
+> 
+> (...)
+> 
+>> As far as I understand the conversion is continuous (as soon as the HW is
+>> configured). This case is there primarily to handle the situation where
+>> we initialize the HW ourselves (see line 226 and below), and we immediately
+> 
+> and around line 226 we have the comment:
+> +       /*
+> +        * right now the FW does set up the HW-block, so we are not
+> +        * touching the configuration registers.
+> +        * But if the HW is not enabled, then set it up
+> +        * using "sane" values used by the firmware right now.
+> +        */
+> 
+> 
+>> want to read the ADC value before the first conversion is finished.
+>> 
+> 
+> then, does the firmware initializes the device or not?
+> 
 
-I've been working on it for the last couple of monthes, and I can tell
-you it isn't an R8. It has more IPs, including some that were never
-found in any SoC of that generation before (the others being just a
-different mix of what was already there).
+Yes, it does (normally)
 
-> This is really quite similar to the situation with SoM manufacturers
-> such as Toradex, who integrate SoC, memory and some I/O on a module
-> that you then build your product around. The only difference is the
-> level it's integrated at. We've chosen to slice our naming across SoC
-> family lines, not who makes the substrate that the SoC is mounted to.
+> What are the cases you would load this driver but still get an
+> uninitialized device? That looks like some bug workaround hidden
+> somewhere. Do system integrators/engineers need to be aware of this w/a?
+> Would the driver work right aways when the subsystem is loaded during
+> boot? How about module insertion?
+> 
 
-I disagree with the comparison. Toradex bought plain off the shelves
-SoCs from Freescale, NextThing didn't. It makes sense for the Toradex
-case, but I'm still convinced it isn't in this case.
+I was asked to implement the "initialize" case just in case FW ever
+stopped setting up the device itself, so that is why this code is
+included.
 
-Anyway... I'll send a patch to fix the DTs we have already in 4.9, and
-will resend that pull request.
+> 
+> Who has the ownership of this device?
 
-Maxime
+Joined ownership I suppose...
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161122/a637fee0/attachment-0001.sig>
+> 
+>> The above mentioned ?configuration if not running? reflect the values that
+>> the FW is currently setting. We should not change those values as long as the
+>> Firmware is also reading the temperature on its own.
+> 
+> hmm.. that looks like racy to me. Again, How do you synchronize accesses to
+> this device? What if you configure the device and right after the
+> firmware updates the configs? How do you make sure the configs you are
+> writing here are the same used by the firmware? What if the firmware
+> version changes? What versions of the firmware does this driver support?
+> 
+> Would it make sense to simply always initialize the device? Do you have
+> a way to tell the firmware that it should not use the device?
+> 
+> Or, if you want to keep the device driver simply being a dummy reader,
+> would it make sense to simply avoid writing configurations to the
+> device, and simply retry to check if the firmware gets the device
+> initialized?
+
+Again: the device registers are only ever written if the device is not started
+already. Otherwise the driver only reads for the ADC register, so there
+is no real race here.
+
+> 
+>> 
+>>> 
+>>>> So do you need another version of the patchset that uses that new API?
+>>> 
+>>> I think the API usage is change that can be done together with
+>>> clarification for the above questions too: on hardware state,
+>>> firmware loading, maybe a master driver dependency, and the ADC
+>>> conversion sequence, which are not well clear to me on this driver. As long as
+>>> this is clarified and documented in the code (can be simple comments so
+>>> it is clear to whoever reads in the future), then I would be OK with
+>>> this driver.
+>> 
+>> So how do you want this to get ?documented? in the driver?
+>> The setup and Firmware is a generic feature of the SOC, so if we would put
+>> some clarifications in this driver, then we would need to put it in every
+>> bcm283X driver (which seems unreasonable).
+>> 
+> 
+> I think a simple comment explaining the firmware dependency and the
+> expected pre-conditions to get this driver working in a sane state would
+> do it.
+> 
+> A better device initialization would also be appreciated. Based on my
+> limited understanding of this platform, and your explanations, this
+> device seams to have a serious race condition with firmware while
+> accessing this device.
+
+Again: the firmware runs before the ARM is started and for all practical
+purposes the firmware is (as of now) configuring the thermal device.
+
+As for the use of thermal_zone_get_offset/slope: looking into the code
+it looks like this actually blows up the code, as we now would need to
+allocate thermal_zone_params and preset it with the ?correct? values.
+
+So more code to maintain and more memory consumed.
+The only advantage I would see is that it would allow to set offset and
+slope directly in the device tree.
+
+Thanks,
+		Martin
