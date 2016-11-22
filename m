@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 22 Nov 2016 17:26:34 +0000
-Subject: Applied "ASoC: samsung: Remove non-existing MACH dependencies" to the
- asoc tree
-In-Reply-To: <1479566911-5580-2-git-send-email-krzk@kernel.org>
-Message-ID: <E1c9Eq2-0005p0-CW@debutante>
+Date: Tue, 22 Nov 2016 17:26:28 +0000
+Subject: Applied "ASoC: samsung: Enable COMPILE_TEST for entire Samsung ASoc"
+ to the asoc tree
+In-Reply-To: <1479566911-5580-6-git-send-email-krzk@kernel.org>
+Message-ID: <E1c9Epw-0005mh-9x@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: samsung: Remove non-existing MACH dependencies
+   ASoC: samsung: Enable COMPILE_TEST for entire Samsung ASoc
 
 has been applied to the asoc tree at
 
@@ -34,33 +34,34 @@ to this mail.
 Thanks,
 Mark
 
->From f8cbab42d98298ab9c4878dc9105d350b0b902ff Mon Sep 17 00:00:00 2001
+>From a41dcdeee5d87cf3852b857cc3a8507832ec8b42 Mon Sep 17 00:00:00 2001
 From: Krzysztof Kozlowski <krzk@kernel.org>
-Date: Sun, 20 Nov 2016 21:24:51 +0200
-Subject: [PATCH] ASoC: samsung: Remove non-existing MACH dependencies
+Date: Sun, 20 Nov 2016 21:24:54 +0200
+Subject: [PATCH] ASoC: samsung: Enable COMPILE_TEST for entire Samsung ASoc
 
-MACH_SMDKC100 was removed in commit b8529ec1c1b0 ("ARM: S5PC100: no more
-support S5PC100 SoC"). MACH_SMDKV210 and MACH_SMDKC110 in commit
-28c8331d386 ("ARM: S5PV210: Remove support for board files").
+Instead of build time, Samsung ASoC drivers have rather runtime
+dependency on Exynos or other Samsung platforms.  For building they
+require Common Clock Framework.  If it is provided they could be compile
+tested to increase build coverage.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/samsung/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ sound/soc/samsung/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index 79ae6a7c93ff..ea0fa9971a0c 100644
+index ea0fa9971a0c..48dcd3dd9ec7 100644
 --- a/sound/soc/samsung/Kconfig
 +++ b/sound/soc/samsung/Kconfig
-@@ -49,7 +49,7 @@ config SND_SOC_SAMSUNG_JIVE_WM8750
- 
- config SND_SOC_SAMSUNG_SMDK_WM8580
- 	tristate "SoC I2S Audio support for WM8580 on SMDK"
--	depends on MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110
-+	depends on MACH_SMDK6410
- 	depends on I2C
- 	select SND_SOC_WM8580
- 	select SND_SAMSUNG_I2S
+@@ -1,6 +1,7 @@
+ menuconfig SND_SOC_SAMSUNG
+ 	tristate "ASoC support for Samsung"
+-	depends on (PLAT_SAMSUNG || ARCH_EXYNOS)
++	depends on PLAT_SAMSUNG || ARCH_EXYNOS || COMPILE_TEST
++	depends on COMMON_CLK
+ 	select SND_SOC_GENERIC_DMAENGINE_PCM
+ 	---help---
+ 	  Say Y or M if you want to add support for codecs attached to
 -- 
 2.10.2
