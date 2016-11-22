@@ -1,27 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Nov 2016 09:48:32 +0100
-Subject: [PATCH 4/6] dt-bindings: change hi6220-reset.txt according to
- reset-hi6220.c
-In-Reply-To: <1479800961-6249-5-git-send-email-zhangfei.gao@linaro.org>
+Date: Tue, 22 Nov 2016 09:49:16 +0100
+Subject: [PATCH 5/6] reset: hisilicon: Use new driver reset-hi6222
+In-Reply-To: <1479800961-6249-6-git-send-email-zhangfei.gao@linaro.org>
 References: <1479800961-6249-1-git-send-email-zhangfei.gao@linaro.org>
- <1479800961-6249-5-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <2314383.qiZ3Cq7QsP@wuerfel>
+ <1479800961-6249-6-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <3837594.jmpXXfpk9Q@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 22, 2016 3:49:19 PM CET Zhangfei Gao wrote:
->  Required properties:
->  - compatible: should be one of the following:
-> -  - "hisilicon,hi6220-sysctrl", "syscon" : For peripheral reset controller.
-> -  - "hisilicon,hi6220-mediactrl", "syscon" : For media reset controller.
-> -- reg: should be register base and length as documented in the
-> -  datasheet
-> +  - "hisilicon,hi6220-reset-sysctrl" : For peripheral reset controller.
-> +  - "hisilicon,hi6220-reset-mediactrl" : For media reset controller.
-> +- hisi,rst-syscon: phandle of the reset's syscon.
->  - #reset-cells: 1, see below
+On Tuesday, November 22, 2016 3:49:20 PM CET Zhangfei Gao wrote:
 > 
+> -#define PERIPH_RSTDIS0_MMC0             0x000
+> -#define PERIPH_RSTDIS0_MMC1             0x001
+> -#define PERIPH_RSTDIS0_MMC2             0x002
+> -#define PERIPH_RSTDIS0_NANDC            0x003
+> -#define PERIPH_RSTDIS0_USBOTG_BUS       0x004
+> -#define PERIPH_RSTDIS0_POR_PICOPHY      0x005
+> -#define PERIPH_RSTDIS0_USBOTG           0x006
+> -#define PERIPH_RSTDIS0_USBOTG_32K       0x007
+> -#define PERIPH_RSTDIS1_HIFI             0x100
+> -#define PERIPH_RSTDIS1_DIGACODEC        0x105
 
-Please keep the old strings around for compatibility.
+> +/* reset in sysctrl */
+> +#define PERIPH_RSTDIS0_MMC0             0
+> +#define PERIPH_RSTDIS0_MMC1             1
+> +#define PERIPH_RSTDIS0_MMC2             2
+> +#define PERIPH_RSTDIS0_NANDC            3
+> +#define PERIPH_RSTDIS0_USBOTG_BUS       4
+> +#define PERIPH_RSTDIS0_POR_PICOPHY      5
+> +#define PERIPH_RSTDIS0_USBOTG           6
+> +#define PERIPH_RSTDIS0_USBOTG_32K       7
+> +#define PERIPH_RSTDIS1_HIFI             8
+
+You can't redefined the binding here, this is part of the ABI.
+You can however add new numbers as long as the old ones keep
+working.
 
 	Arnd
