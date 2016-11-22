@@ -1,62 +1,47 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 22 Nov 2016 15:47:31 +0100
-Subject: [GIT PULL] Allwinner arm64 DT changes for 4.10, bis
-Message-ID: <20161122144731.c6q6jxgd7cyeieqr@lukather>
+Date: Tue, 22 Nov 2016 15:59:49 +0100
+Subject: [GIT PULL] Allwinner clock fixes for 4.9, take 2
+Message-ID: <20161122145949.quvtzoupxbxbeql6@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Mike, Stephen,
 
-Here is a second run at the arm64 PR I sent earlier.
+Here are two new fixes for the 4.9 release.
 
-We had a (build) dependency against the clock patches that have been
-merged by Stephen and Mike through the clock tree.
+That should be my final PR for both the 4.9 fixes and 4.10
+developments.
 
-Hence, this new PR is based on top of the tag I sent their way, and it
-supersedes the previous arm64 PR.
-
-I used this occasion to rename the patches prefix as Olof suggested in
-the earlier pull request.
-
-Thanks,
+Thanks!
 Maxime
 
-The following changes since commit 0f6f9302b819ca352cfd4f42c18ec08d521f9cae:
+The following changes since commit ac95330b96376550ae7a533d1396272d675adfa2:
 
-  clk: sunxi-ng: sun8i-h3: Set CLK_SET_RATE_PARENT for audio module clocks (2016-11-11 21:47:41 +0100)
+  clk: sunxi: Fix M factor computation for APB1 (2016-11-04 08:49:46 +0100)
 
 are available in the git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt64-for-4.10-bis
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clk-fixes-for-4.9-2
 
-for you to fetch changes up to 5757867e8758f40227e710625df64a471ec81411:
+for you to fetch changes up to df8e3c1fe1050fa2749c346676d12f4d30dcd935:
 
-  arm64: dts: allwinner: add Pine64 support (2016-11-22 15:43:01 +0100)
-
-----------------------------------------------------------------
-Allwinner arm64 DT changes for 4.10, bis
-
-Support for the Allwinner A64, their first armv8 SoC.
+  clk: sunxi-ng: enable so-said LDOs for A33 SoC's pll-mipi clock (2016-11-21 19:50:49 +0100)
 
 ----------------------------------------------------------------
-Andre Przywara (3):
-      arm64: dts: allwinner: add Allwinner A64 SoC .dtsi
-      Documentation: devicetree: add vendor prefix for Pine64
-      arm64: dts: allwinner: add Pine64 support
+Allwinner clock fixes for 4.9, take 2
 
- Documentation/devicetree/bindings/arm/sunxi.txt    |   1 +
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- MAINTAINERS                                        |   1 +
- arch/arm64/boot/dts/Makefile                       |   1 +
- arch/arm64/boot/dts/allwinner/Makefile             |   5 +
- .../boot/dts/allwinner/sun50i-a64-pine64-plus.dts  |  50 ++++
- .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts |  74 ++++++
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 263 +++++++++++++++++++++
- 8 files changed, 396 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/Makefile
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+Two new patches to fix the gating of the MIPI PLL on the A23, A31 and A33.
+
+----------------------------------------------------------------
+Chen-Yu Tsai (1):
+      clk: sunxi-ng: sun6i-a31: Enable PLL-MIPI LDOs when ungating it
+
+Icenowy Zheng (1):
+      clk: sunxi-ng: enable so-said LDOs for A33 SoC's pll-mipi clock
+
+ drivers/clk/sunxi-ng/ccu-sun6i-a31.c | 2 +-
+ drivers/clk/sunxi-ng/ccu-sun8i-a33.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
 -- 
 Maxime Ripard, Free Electrons
@@ -68,4 +53,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161122/3b840c1a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161122/ca7df353/attachment.sig>
