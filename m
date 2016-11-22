@@ -1,66 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Nov 2016 10:42:47 +0100
-Subject: [PATCH 3/6] reset: hisilicon: add reset-hi3660
-In-Reply-To: <d6e602c0-70e9-0309-86b5-bfd006d86028@linaro.org>
-References: <1479800961-6249-1-git-send-email-zhangfei.gao@linaro.org>
- <2220300.Yj4lYzeH2z@wuerfel>
- <d6e602c0-70e9-0309-86b5-bfd006d86028@linaro.org>
-Message-ID: <3166877.sQekoU5ezv@wuerfel>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 22 Nov 2016 10:44:21 +0100
+Subject: [PATCH 1/4] clocksource/drivers/arm_arch_timer: Don't assume clock
+ runs in suspend
+In-Reply-To: <20161122094300.GA2017@mai>
+References: <20161122094300.GA2017@mai>
+Message-ID: <1479807866-6957-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 22, 2016 5:34:05 PM CET zhangfei wrote:
-> On 2016?11?22? 16:50, Arnd Bergmann wrote:
-> > On Tuesday, November 22, 2016 3:49:18 PM CET Zhangfei Gao wrote:
-> >> +static const struct hisi_reset_channel_data hi3660_iomcu_rst[] = {
-> >> +       [HI3660_RST_I2C0] = HISI_RST_SEP(0x20, 3),
-> >> +       [HI3660_RST_I2C1] = HISI_RST_SEP(0x20, 4),
-> >> +       [HI3660_RST_I2C2] = HISI_RST_SEP(0x20, 5),
-> >> +       [HI3660_RST_I2C6] = HISI_RST_SEP(0x20, 27),
-> >> +};
-> >> +
-> >> +static struct hisi_reset_controller_data hi3660_iomcu_controller = {
-> >> +       .nr_channels = ARRAY_SIZE(hi3660_iomcu_rst),
-> >> +       .channels = hi3660_iomcu_rst,
-> >> +};
-> >> +
-> >> +static const struct hisi_reset_channel_data hi3660_crgctrl_rst[] = {
-> >> +       [HI3660_RST_I2C3] = HISI_RST_SEP(0x78, 7),
-> >> +       [HI3660_RST_I2C4] = HISI_RST_SEP(0x78, 27),
-> >> +       [HI3660_RST_I2C7] = HISI_RST_SEP(0x60, 14),
-> >> +       [HI3660_RST_SD] = HISI_RST_SEP(0x90, 18),
-> >> +       [HI3660_RST_SDIO] = HISI_RST_SEP(0x90, 20),
-> >> +       [HI3660_RST_UFS] = HISI_RST_SEP(0x84, 12),
-> >> +       [HI3660_RST_UFS_ASSERT] = HISI_RST_SEP(0x84, 7),
-> >> +       [HI3660_RST_PCIE_SYS] = HISI_RST_SEP(0x84, 26),
-> >> +       [HI3660_RST_PCIE_PHY] = HISI_RST_SEP(0x84, 27),
-> >> +       [HI3660_RST_PCIE_BUS] = HISI_RST_SEP(0x84, 31),
-> >> +       [HI3660_RST_USB3OTG_PHY] = HISI_RST_SEP(0x90, 3),
-> >> +       [HI3660_RST_USB3OTG] = HISI_RST_SEP(0x90, 5),
-> >> +       [HI3660_RST_USB3OTG_32K] = HISI_RST_SEP(0x90, 6),
-> >> +       [HI3660_RST_USB3OTG_AHB] = HISI_RST_SEP(0x90, 7),
-> >> +       [HI3660_RST_USB3OTG_MUX] = HISI_RST_SEP(0x90, 8),
-> >> +};
-> > I think you can avoid the trap of the ABI incompatibility if
-> > you just define those as in the binding as tuples, using #reset-cells=2.
-> >
-> > In particular for the first set, it seems really silly to redefine
-> > the numbers when there is just a simple integer number.
-> 
-> Could you clarify more, still not understand.
-> The number is index of the arrays, and the index will be used in dts.
-> The arrays lists the registers offset and bit shift.
-> For example:
-> 
-> [HI3660_RST_I2C0] = HISI_RST_SEP(0x20, 3), means register offset : 0x20, and bit shift = 3.
-> 
-> And Documentation/devicetree/bindings/reset/reset.txt
-> Required properties:
-> #reset-cells:   Number of cells in a reset specifier; Typically 0 for nodes
->                  with a single reset output and 1 for nodes with multiple
->                  reset outputs.
+From: Brian Norris <briannorris@chromium.org>
 
-You can easily enumerate the registers that contain reset bits here,
-so just use one cell for the register and another one for the index.
+The ARM specifies that the system counter "must be implemented in an
+always-on power domain," and so we try to use the counter as a source of
+timekeeping across suspend/resume. Unfortunately, some SoCs (e.g.,
+Rockchip's RK3399) do not keep the counter ticking properly when
+switched from their high-power clock to the lower-power clock used in
+system suspend. Support this quirk by adding a new device tree property.
 
-	Arnd
+Signed-off-by: Brian Norris <briannorris@chromium.org>
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ Documentation/devicetree/bindings/arm/arch_timer.txt | 5 +++++
+ drivers/clocksource/arm_arch_timer.c                 | 9 ++++++++-
+ 2 files changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+index ef5fbe9..ad440a2 100644
+--- a/Documentation/devicetree/bindings/arm/arch_timer.txt
++++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+@@ -38,6 +38,11 @@ to deliver its interrupts via SPIs.
+   architecturally-defined reset values. Only supported for 32-bit
+   systems which follow the ARMv7 architected reset values.
+ 
++- arm,no-tick-in-suspend : The main counter does not tick when the system is in
++  low-power system suspend on some SoCs. This behavior does not match the
++  Architecture Reference Manual's specification that the system counter "must
++  be implemented in an always-on power domain."
++
+ 
+ Example:
+ 
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 73c487d..a2503db 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -81,6 +81,7 @@ static struct clock_event_device __percpu *arch_timer_evt;
+ static enum ppi_nr arch_timer_uses_ppi = VIRT_PPI;
+ static bool arch_timer_c3stop;
+ static bool arch_timer_mem_use_virtual;
++static bool arch_counter_suspend_stop;
+ 
+ static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
+ 
+@@ -576,7 +577,7 @@ static struct clocksource clocksource_counter = {
+ 	.rating	= 400,
+ 	.read	= arch_counter_read,
+ 	.mask	= CLOCKSOURCE_MASK(56),
+-	.flags	= CLOCK_SOURCE_IS_CONTINUOUS | CLOCK_SOURCE_SUSPEND_NONSTOP,
++	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
+ 
+ static struct cyclecounter cyclecounter = {
+@@ -616,6 +617,8 @@ static void __init arch_counter_register(unsigned type)
+ 		arch_timer_read_counter = arch_counter_get_cntvct_mem;
+ 	}
+ 
++	if (!arch_counter_suspend_stop)
++		clocksource_counter.flags |= CLOCK_SOURCE_SUSPEND_NONSTOP;
+ 	start_count = arch_timer_read_counter();
+ 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
+ 	cyclecounter.mult = clocksource_counter.mult;
+@@ -907,6 +910,10 @@ static int __init arch_timer_of_init(struct device_node *np)
+ 	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
+ 		arch_timer_uses_ppi = PHYS_SECURE_PPI;
+ 
++	/* On some systems, the counter stops ticking when in suspend. */
++	arch_counter_suspend_stop = of_property_read_bool(np,
++							 "arm,no-tick-in-suspend");
++
+ 	return arch_timer_init();
+ }
+ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer, "arm,armv7-timer", arch_timer_of_init);
+-- 
+2.7.4
