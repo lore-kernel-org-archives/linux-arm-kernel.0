@@ -1,51 +1,36 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 22 Nov 2016 10:36:46 +0100
-Subject: linux-next: manual merge of the clk tree with the arm-soc tree
-In-Reply-To: <20161122194130.4efdd019@canb.auug.org.au>
-References: <20161122194130.4efdd019@canb.auug.org.au>
-Message-ID: <CAMuHMdU5Df2kNT=ccr7Ts6=a1ELRJdiBbh1xxuqo+e_UeYw-tw@mail.gmail.com>
+From: ahaslam@baylibre.com (Axel Haslam)
+Date: Tue, 22 Nov 2016 10:38:12 +0100
+Subject: [PATCH 0/2] ARM: davinvi: da850 add ohci DT nodes
+In-Reply-To: <3543ab96-1a7e-395f-26a6-c748cf0423f1@ti.com>
+References: <20161121165920.29809-1-ahaslam@baylibre.com>
+ <3543ab96-1a7e-395f-26a6-c748cf0423f1@ti.com>
+Message-ID: <CAKXjFTMBiMq3WGpYNfes6i5V8syeR_-VP_ss0KytvTn+Biie4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Tue, Nov 22, 2016 at 9:41 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Today's linux-next merge of the clk tree got conflicts in:
+On Tue, Nov 22, 2016 at 10:33 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On Monday 21 November 2016 10:29 PM, Axel Haslam wrote:
+>> This adds the DT node for the ohci controller and
+>> enables it for the omapl138-lckd platform.
+>>
+>> DEPENDENCIES:
+>>
+>> 1. [PATCH v6 0/5] USB: ohci-da8xx: Add device tree support
+>> https://lkml.org/lkml/2016/11/21/558
 >
->   arch/arm/boot/dts/r8a7779.dtsi
->   arch/arm/boot/dts/r8a7790.dtsi
->   arch/arm/boot/dts/r8a7791.dtsi
->   arch/arm/boot/dts/r8a7792.dtsi
->   arch/arm/boot/dts/r8a7793.dtsi
->   arch/arm/boot/dts/r8a7794.dtsi
->   arch/arm/mach-shmobile/setup-rcar-gen2.c
->   arch/arm64/boot/dts/renesas/r8a7795.dtsi
->   arch/arm64/boot/dts/renesas/r8a7796.dtsi
->   drivers/soc/renesas/Makefile
+> Looks like atleast this series is not merged (checking today's linux-next).
 >
-> between various commits from the arm-soc tree and commits from the
-> clk tree.
+>>
+>> 2. [PATCH v3 0/2] regulator: handling of error conditions for usb drivers
+>> https://lkml.org/lkml/2016/11/4/465
 >
-> It was just too much at this time of day, so please talk to each other
-> and figure out how to fix these up.  I have used the clk tree from
-> next-20161117 for today.
+> Can you let me know once the dependencies are merged so I can pick these.
 
-Most of these are of the "add both sides" type.
-The only exception is the one in arch/arm/mach-shmobile/setup-rcar-gen2.c,
-where you just want to keep the call to of_clk_init(NULL);
+Right, the driver changes are not yet picked up, ill ping once those get in.
 
-There's a resolution in
-https://git.kernel.org/cgit/linux/kernel/git/geert/renesas-drivers.git/log/?h=renesas-devel-20161117v2-v4.9-rc5%2brcar-rst
+Regards
+Axel.
 
-Sorry for the mess.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>
+> Thanks,
+> Sekhar
