@@ -1,35 +1,106 @@
-From: ahaslam@baylibre.com (Axel Haslam)
-Date: Tue, 22 Nov 2016 11:10:05 +0100
-Subject: [PATCH 1/3] ARM: davinci: hawk: fix mmc card detect gpio
-In-Reply-To: <8ced1194-4c68-7385-1594-0983855e7c89@ti.com>
-References: <20161121161541.27048-1-ahaslam@baylibre.com>
- <20161121161541.27048-2-ahaslam@baylibre.com>
- <8ced1194-4c68-7385-1594-0983855e7c89@ti.com>
-Message-ID: <CAKXjFTMW7p-TAehV_eTd4nDtC3gvNmcg-e9tLmv4LSX1LEXnhw@mail.gmail.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Tue, 22 Nov 2016 11:13:57 +0100
+Subject: [RFC PATCH net v2 2/3] dt: bindings: add ethernet phy
+ eee-disable-advert option documentation
+In-Reply-To: <e792c889-8725-3952-ca28-a08537d9f87a@gmail.com>
+References: <1479742524-30222-1-git-send-email-jbrunet@baylibre.com>
+ <1479742524-30222-3-git-send-email-jbrunet@baylibre.com>
+ <20161121160149.GF1922@lunn.ch> <1479744993.17538.85.camel@baylibre.com>
+ <20161121164733.GG1922@lunn.ch>
+ <e792c889-8725-3952-ca28-a08537d9f87a@gmail.com>
+Message-ID: <1479809637.17538.113.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2016 at 10:53 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> On Monday 21 November 2016 09:45 PM, Axel Haslam wrote:
->> The card detect gpio on the hawk board is gpio4_0 and not gpio3_12
->>
->> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
->
-> The LCDK and HawkBoard are different boards. The HawkBoard schematic
-> from eLinux.org page is broken, but looking for it on the net, I found
-> one and the MMC/SD CD pin in that schematic is indeed connected to GPIO3_12.
->
-> So I believe the original code is correct.
+On Mon, 2016-11-21 at 21:35 -0800, Florian Fainelli wrote:
+> Le 21/11/2016 ? 08:47, Andrew Lunn a ?crit :
+> > 
+> > > 
+> > > What I did not realize when doing this patch for the realtek
+> > > driver is
+> > > that there is already 6 valid modes defined in the kernel
+> > > 
+> > > #define MDIO_EEE_100TX		MDIO_AN_EEE_ADV_100TX	
+> > > /*
+> > > 100TX EEE cap */
+> > > #define MDIO_EEE_1000T		MDIO_AN_EEE_ADV_1000T	
+> > > /*
+> > > 1000T EEE cap */
+> > > #define MDIO_EEE_10GT		0x0008	/* 10GT EEE
+> > > cap */
+> > > #define MDIO_EEE_1000KX		0x0010	/* 1000KX
+> > > EEE cap
+> > > */
+> > > #define MDIO_EEE_10GKX4		0x0020	/* 10G KX4
+> > > EEE cap
+> > > */
+> > > #define MDIO_EEE_10GKR		0x0040	/* 10G KR EEE
+> > > cap
+> > > */
+> > > 
+> > > I took care of only 2 in the case of realtek.c since it only
+> > > support
+> > > MDIO_EEE_100TX and MDIO_EEE_1000T.
+> > > 
+> > > Defining a property for each is certainly doable but it does not
+> > > look
+> > > very nice either. If it extends in the future, it will get even
+> > > more
+> > > messier, especially if you want to disable everything.
+> > 
+> > Yes, agreed.
+> 
+> One risk with the definition a group of advertisement capabilities
+> (under the form of a bitmask for instance) to enable/disable is that
+> we
+> end up with Device Tree contain some kind of configuration policy as
+> opposed to just flagging particular hardware features as broken.
 
-mmm, ok, the lcdk is booted using the hawk board file,
-so we should differentiate the two boards?
-or should we just live with inconsistencies on the lcdk?
+The code proposed only allows to disable EEE advertisement (not
+enable), so we should not see it used as a configuration policy in DT.
+To make this more explicit, I could replace the property "eee-advert-
+disable" by "eee-broken" ?
 
-(im guessing the same will be ture for the usb)
+> 
+> Fortunately, there does not seem to be a ton of PHYs out there which
+> require EEE
 
-Regards
-Axel.
->
-> Thanks,
-> Sekhar
->
+It is quite difficult to have the real picture here because some PHYs
+have EEE disabled by default and you have to explicitly enable it.
+I have no idea of the ratio between the 2 phy policies.
+
+> to be disabled to function properly so having individual
+> properties vs. bitmasks/groups is kind of speculative here.
+
+In the particular instance of the OdroidC2, disabling EEE for GbE only
+enough. However, If you have a PHY broken with, I think it is likely
+that you might want to disable all (supported) EEE modes. That's reason
+why I prefer bitmask. I agree both are functionally similar, this is
+kind of a cosmetic debate.
+
+> 
+> Another approach to solving this problem could be to register a PHY
+> fixup which disables EEE at the PHY level, and which is only called
+> for
+> specific boards affected by this problem
+> (of_machine_is_compatible()).
+> This code can leave in arch/*/* when that is possible, 
+
+That something I was looking at, but we don't have these files anymore
+on ARM64 (looking at your comment, you already know this)
+
+> or it can just be
+> somewhere where it is relevant, e.g; in the PHY driver for instance
+> (similarly to how PCI fixups are done).
+
+Do you prefer having board specific code inside generic driver than
+having the setting living in DT? Peppe told me they also had a few
+platform with similar issues. The point is that this could be useful to
+other people, so it could spread a grow a bit.
+
+I would prefer having this in the DT, but I can definitely do it the
+PHY with?of_machine_is_compatible() and register_fixup is this what you
+prefer/want.?
+
+Cheers
+Jerome
