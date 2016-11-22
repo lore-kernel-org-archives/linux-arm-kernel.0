@@ -1,49 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Nov 2016 15:28:11 +0100
-Subject: [PATCH] ARM: fix kmemleak for XIP_KERNEL
-Message-ID: <20161122142829.1776129-1-arnd@arndb.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 22 Nov 2016 15:31:34 +0100
+Subject: [GIT PULL] Allwinner fixes for 4.9, take 2
+Message-ID: <20161122143134.wxinkyp3x6jjnk7e@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added check for RO_AFTER_INIT_DATA in kmemleak breaks ARM whenever
-XIP_KERNEL is enabled:
+Hi Arnd, Olof,
 
-mm/kmemleak.o: In function `kmemleak_scan':
-kmemleak.c:(.text.kmemleak_scan+0x2e4): undefined reference to `__end_data_ro_after_init'
-kmemleak.c:(.text.kmemleak_scan+0x2e8): undefined reference to `__start_data_ro_after_init'
+Please find attached a commit to rename the GR8 device trees.
 
-This adds the start/end symbols for the section even in the case of having
-no data in the section, to make the check work while keeping the architecture
-specific override in one place.
+Thanks!
+Maxime
 
-Fixes: d7c19b066dcf ("mm: kmemleak: scan .data.ro_after_init")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-The patch causing this was merged late into v4.9-rc, this one should
-probably go there as well.
+The following changes since commit b7f865ede20c87073216f77fe97f6fc56666e3da:
 
-I assume the same problem exists on s390, but I have not checked that.
----
- arch/arm/kernel/vmlinux-xip.lds.S | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+  ARM: dts: sun8i: fix the pinmux for UART1 (2016-10-25 12:51:06 +0200)
 
-diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
-index 06c178214629..bf900f5421a1 100644
---- a/arch/arm/kernel/vmlinux-xip.lds.S
-+++ b/arch/arm/kernel/vmlinux-xip.lds.S
-@@ -3,8 +3,11 @@
-  * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>
-  */
- 
--/* No __ro_after_init data in the .rodata section - which will always be ro */
--#define RO_AFTER_INIT_DATA
-+/* empty __ro_after_init data in the .rodata section - it will always be ro */
-+#define RO_AFTER_INIT_DATA						\
-+	__start_data_ro_after_init = .;                                 \
-+	__end_data_ro_after_init = .;
-+
- 
- #include <asm-generic/vmlinux.lds.h>
- #include <asm/cache.h>
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-fixes-for-4.9-2
+
+for you to fetch changes up to e5cd7ff7058dc6f2133455636809a09b691ee419:
+
+  ARM: gr8: Rename the DTSI and relevant DTS (2016-11-22 15:06:04 +0100)
+
+----------------------------------------------------------------
+Allwinner fixes for 4.9, second iteration
+
+A renaming of the GR8 DTSI and DTS to make it explicitly part of the sun5i
+family.
+
+----------------------------------------------------------------
+Maxime Ripard (1):
+      ARM: gr8: Rename the DTSI and relevant DTS
+
+ arch/arm/boot/dts/Makefile                               | 2 +-
+ arch/arm/boot/dts/{ntc-gr8-evb.dts => sun5i-gr8-evb.dts} | 2 +-
+ arch/arm/boot/dts/{ntc-gr8.dtsi => sun5i-gr8.dtsi}       | 0
+ 3 files changed, 2 insertions(+), 2 deletions(-)
+ rename arch/arm/boot/dts/{ntc-gr8-evb.dts => sun5i-gr8-evb.dts} (99%)
+ rename arch/arm/boot/dts/{ntc-gr8.dtsi => sun5i-gr8.dtsi} (100%)
+
 -- 
-2.9.0
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161122/b6f72872/attachment.sig>
