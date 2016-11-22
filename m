@@ -1,43 +1,99 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Nov 2016 10:41:12 +0100
-Subject: [PATCH 1/6] reset: hisilicon: add reset core
-In-Reply-To: <0084ef53-c0e6-51e8-afa5-07264dfce529@linaro.org>
-References: <1479800961-6249-1-git-send-email-zhangfei.gao@linaro.org>
- <3993565.nedzUBZcVS@wuerfel>
- <0084ef53-c0e6-51e8-afa5-07264dfce529@linaro.org>
-Message-ID: <2907606.qYBKeXi75W@wuerfel>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 22 Nov 2016 10:41:24 +0100
+Subject: [PATCH 1/2] ARM64: dts: Add support for Meson GXM
+In-Reply-To: <m2oa181jtd.fsf@baylibre.com>
+References: <20161121162905.14285-1-narmstrong@baylibre.com>
+ <20161121162905.14285-2-narmstrong@baylibre.com>
+ <m2oa181jtd.fsf@baylibre.com>
+Message-ID: <65b791bb-243e-ded9-e651-4021f0b23f1a@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 22, 2016 5:22:42 PM CET zhangfei wrote:
-> Hi, Arnd
+On 11/22/2016 12:42 AM, Kevin Hilman wrote:
+> Neil,
 > 
-> On 2016?11?22? 16:45, Arnd Bergmann wrote:
-> > On Tuesday, November 22, 2016 3:49:16 PM CET Zhangfei Gao wrote:
-> >> @@ -1,8 +1,8 @@
-> >>   obj-y += core.o
-> >> -obj-y += hisilicon/
-> >>   obj-$(CONFIG_ARCH_STI) += sti/
-> >>   obj-$(CONFIG_RESET_ATH79) += reset-ath79.o
-> >>   obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
-> >> +obj-$(CONFIG_ARCH_HISI) += hisilicon/
-> >>   obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
-> >>   obj-$(CONFIG_RESET_MESON) += reset-meson.o
-> >>   obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
-> > Please leave the obj-y line, otherwise the COMPILE_TEST variant won't work.
+> Neil Armstrong <narmstrong@baylibre.com> writes:
 > 
-> COMPILE_TEST is added in drivers/reset/hisilicon/Kconfig
-> like
-> config COMMON_RESET_HI3660
->          tristate "Hi3660 Reset Driver"
->          depends on ARCH_HISI || COMPILE_TEST
+>> Following the Amlogic Linux kernel, it seem the only differences
+>> between the GXL and GXM SoCs are the CPU Clusters.
+>>
+>> This commit renames the gxl-s905d-p23x DTSI in a common file for
+>> S905D p20x and S912 q20x boards.
 > 
-> The reason not using "obj-y" here is that reset.c will be compiled unconditionally.
+> s/p20x/p23x/ ??
 > 
-> drivers/reset/hisilicon/Makefile
-> obj-y   += reset.o
+>> Then adds a meson-gxm dtsi and reproduce the P23x to Q20x boards
+>> dts files since the S905D and S912 SoCs shares the same pinout
+>> and the P23x and Q20x boards are identical.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> 
+> I had to drop this as it breaks the network on (at least) gxbb-p200, but...
+> 
+> [...]
+> 
+>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+>> index 03e3d76..17bb77c 100644
+>> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+>> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+>> @@ -56,3 +56,22 @@
+>>  	pinctrl-0 = <&i2c_b_pins>;
+>>  	pinctrl-names = "default";
+>>  };
+>> +
+>> +&ethmac {
+>> +	status = "okay";
+>> +	pinctrl-0 = <&eth_rgmii_pins>;
+>> +	pinctrl-names = "default";
+>> +
+>> +	phy-handle = <&eth_phy0>;
+>> +
+>> +	mdio {
+>> +		compatible = "snps,dwmac-mdio";
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +
+>> +		eth_phy0: ethernet-phy at 0 {
+>> +			reg = <0>;
+>> +			realtek,disable-eee-1000t;
+>> +		};
+>> +	};
+>> +};
+> 
+> ... backing out this change makes it work again.
+> 
+> This change also looks suspicious as it's using the proposed disable-eee
+> properties, which I don't think have been merged yet.
+> 
+>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
+>> index 39bb037..5608c51 100644
+>> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
+>> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
+>> @@ -50,3 +50,10 @@
+>>  	compatible = "amlogic,p201", "amlogic,meson-gxbb";
+>>  	model = "Amlogic Meson GXBB P201 Development Board";
+>>  };
+>> +
+>> +&ethmac {
+>> +	status = "okay";
+>> +	pinctrl-0 = <&eth_rmii_pins>;
+>> +	pinctrl-names = "default";
+>> +	phy-mode = "rmii";
+>> +};
+> 
+> This also doesn't look releveant to the GXL/GXM changes being introduced
+> in this patch.
+> 
+> Could you separate out any GXBB-related changes into a separate patch
+> (if they are in fact needed) and re-spin this?
+> 
+> Thanks,
+> 
+> Kevin
+> 
 
-Yes, that line has to change as well then, to only build it when one
-of the hardware specific drivers is enabled.
+Sorry leftover for another work...
 
-	Arnd
+Will cleanup for v2.
+
+Neil
