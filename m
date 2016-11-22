@@ -1,49 +1,36 @@
 From: rick.chang@mediatek.com (Rick Chang)
-Date: Tue, 22 Nov 2016 11:46:16 +0800
-Subject: [PATCH v7 3/4] arm: dts: mt2701: Add node for Mediatek JPEG Decoder
+Date: Tue, 22 Nov 2016 11:46:17 +0800
+Subject: [PATCH v7 4/4] vcodec: mediatek: Add Maintainers entry for Mediatek
+ JPEG driver
 In-Reply-To: <1479786377-11567-1-git-send-email-rick.chang@mediatek.com>
 References: <1479786377-11567-1-git-send-email-rick.chang@mediatek.com>
-Message-ID: <1479786377-11567-4-git-send-email-rick.chang@mediatek.com>
+Message-ID: <1479786377-11567-5-git-send-email-rick.chang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Rick Chang <rick.chang@mediatek.com>
 Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
 ---
-This patch depends on: 
-  CCF "Add clock support for Mediatek MT2701"[1]
-  iommu and smi "Add the dtsi node of iommu and smi for mt2701"[2]
+ MAINTAINERS | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-[1] http://lists.infradead.org/pipermail/linux-mediatek/2016-October/007271.html
-[2] https://patchwork.kernel.org/patch/9164013/
----
- arch/arm/boot/dts/mt2701.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
-
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 8f13c70..4dd5048 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -298,6 +298,20 @@
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
- 	};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 93e9f42..a9e7ee0 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7818,6 +7818,13 @@ L:	netdev at vger.kernel.org
+ S:	Maintained
+ F:	drivers/net/ethernet/mediatek/
  
-+	jpegdec: jpegdec at 15004000 {
-+		compatible = "mediatek,mt2701-jpgdec";
-+		reg = <0 0x15004000 0 0x1000>;
-+		interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_LOW>;
-+		clocks =  <&imgsys CLK_IMG_JPGDEC_SMI>,
-+			  <&imgsys CLK_IMG_JPGDEC>;
-+		clock-names = "jpgdec-smi",
-+			      "jpgdec";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
-+		mediatek,larb = <&larb2>;
-+		iommus = <&iommu MT2701_M4U_PORT_JPGDEC_WDMA>,
-+			 <&iommu MT2701_M4U_PORT_JPGDEC_BSDMA>;
-+	};
++MEDIATEK JPEG DRIVER
++M:	Rick Chang <rick.chang@mediatek.com>
++M:	Minghsiu Tsai <minghsiu.tsai@mediatek.com>
++S:	Supported
++F:	drivers/media/platform/mtk-jpeg/
++F:	Documentation/devicetree/bindings/media/mediatek-jpeg-decoder.txt
 +
- 	vdecsys: syscon at 16000000 {
- 		compatible = "mediatek,mt2701-vdecsys", "syscon";
- 		reg = <0 0x16000000 0 0x1000>;
+ MEDIATEK MEDIA DRIVER
+ M:	Tiffany Lin <tiffany.lin@mediatek.com>
+ M:	Andrew-CT Chen <andrew-ct.chen@mediatek.com>
 -- 
 1.9.1
