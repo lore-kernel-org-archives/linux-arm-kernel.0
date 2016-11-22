@@ -1,66 +1,95 @@
 From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Tue, 22 Nov 2016 11:41:53 +0530
-Subject: [PATCH v2 2/4] spi: spi-fsl-dspi: Fix continuous selection format
-In-Reply-To: <59ac10adfe92916770aa30146e958887@agner.ch>
+Date: Tue, 22 Nov 2016 11:42:23 +0530
+Subject: [PATCH v2 4/4] spi: spi-fsl-dspi: Minor code cleanup and error
+ path fixes
+In-Reply-To: <43b518a92352986f09b0893646ff8016@agner.ch>
 References: <cover.1479706671.git.maitysanchayan@gmail.com>
- <1317eff8a40789c47311c219d9cfb4105863bd9f.1479706671.git.maitysanchayan@gmail.com>
- <59ac10adfe92916770aa30146e958887@agner.ch>
-Message-ID: <20161122061153.GA2484@Sanchayan-Arch.localdomain>
+ <971874d8e662622c0cfe478adaa4c75b08388d0e.1479706671.git.maitysanchayan@gmail.com>
+ <43b518a92352986f09b0893646ff8016@agner.ch>
+Message-ID: <20161122061222.GB2484@Sanchayan-Arch.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16-11-21 15:15:41, Stefan Agner wrote:
+On 16-11-21 15:22:09, Stefan Agner wrote:
 > On 2016-11-20 21:54, Sanchayan Maity wrote:
-> > Current DMA implementation was not handling the continuous selection
-> > format viz. SPI chip select would be deasserted even between sequential
-> > serial transfers. Use the cs_change variable and correctly set or
-> > reset the CONT bit accordingly for case where peripherals require
-> > the chip select to be asserted between sequential transfers.
+> > Code cleanup for improving code readability and error path fixes
+> > and cleanup removing use of devm_kfree.
+> 
+> Two things in one, not very nice. Especially the dma_free_coherent is
+> really a bug and the other is a cleanup. Can you make a separate patch
+> for the bug?
+> 
+> As for the cleanup, I don't like the one line conditions too, but I
+> don't think it is worth a patch. At least the TX path should be solved
+> with my suggestion in patch 2.
+
+Agreed.
+
+- Sanchayan.
+
+> 
+> --
+> Stefan
+> 
 > > 
 > > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 > > ---
-> >  drivers/spi/spi-fsl-dspi.c | 2 ++
-> >  1 file changed, 2 insertions(+)
+> >  drivers/spi/spi-fsl-dspi.c | 22 ++++++++++++++++------
+> >  1 file changed, 16 insertions(+), 6 deletions(-)
 > > 
 > > diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
-> > index b1ee1f5..41422cd 100644
+> > index 08882f7..2987a16 100644
 > > --- a/drivers/spi/spi-fsl-dspi.c
 > > +++ b/drivers/spi/spi-fsl-dspi.c
-> > @@ -261,6 +261,8 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
+> > @@ -226,8 +226,10 @@ static void dspi_rx_dma_callback(void *arg)
+> >  	if (!(dspi->dataflags & TRAN_STATE_RX_VOID)) {
+> >  		for (i = 0; i < dma->curr_xfer_len; i++) {
+> >  			d = dspi->dma->rx_dma_buf[i];
+> > -			rx_word ? (*(u16 *)dspi->rx = d) :
+> > -						(*(u8 *)dspi->rx = d);
+> > +			if (rx_word)
+> > +				*(u16 *)dspi->rx = d;
+> > +			else
+> > +				*(u8 *)dspi->rx = d;
+> >  			dspi->rx += rx_word + 1;
+> >  		}
+> >  	}
+> > @@ -247,14 +249,20 @@ static int dspi_next_xfer_dma_submit(struct
+> > fsl_dspi *dspi)
+> >  	tx_word = is_double_byte_mode(dspi);
+> >  
+> >  	for (i = 0; i < dma->curr_xfer_len - 1; i++) {
+> > -		val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
+> > +		if (tx_word)
+> > +			val = *(u16 *) dspi->tx;
+> > +		else
+> > +			val = *(u8 *) dspi->tx;
+> >  		dspi->dma->tx_dma_buf[i] =
+> >  			SPI_PUSHR_TXDATA(val) | SPI_PUSHR_PCS(dspi->cs) |
+> >  			SPI_PUSHR_CTAS(0) | SPI_PUSHR_CONT;
+> >  		dspi->tx += tx_word + 1;
+> >  	}
+> >  
+> > -	val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
+> > +	if (tx_word)
+> > +		val = *(u16 *) dspi->tx;
+> > +	else
+> > +		val = *(u8 *) dspi->tx;
 > >  	dspi->dma->tx_dma_buf[i] = SPI_PUSHR_TXDATA(val) |
 > >  					SPI_PUSHR_PCS(dspi->cs) |
 > >  					SPI_PUSHR_CTAS(0);
-> > +	if (!dspi->cs_change)
-> > +		dspi->dma->tx_dma_buf[i] |= SPI_PUSHR_CONT;
-> >  	dspi->tx += tx_word + 1;
+> > @@ -430,9 +438,11 @@ static int dspi_request_dma(struct fsl_dspi
+> > *dspi, phys_addr_t phy_addr)
+> >  	return 0;
 > >  
-> >  	dma->tx_desc = dmaengine_prep_slave_single(dma->chan_tx,
-> 
-> Other transfer mode use:
-> 
-> if ((dspi->cs_change) && (!dspi->len))                                  
->                                                            
->         dspi_pushr &= ~SPI_PUSHR_CONT;
-> 
-> which indicates that they only clear SPI_PUSHR_CONT at the very end of a
-> transfer... The DMA code currently deselects after every DMA transfer if
-> dspi->cs_change is set.
-> 
-> Maybe we should use the helper dspi_data_to_pushr to fill the DMA buffer
-> and _clear_ SPI_PUSHR_CONT if necessary like the other transfer modes
-> do... Then we can use the for loop to fill the complete buffer and get
-> rid of some code dupplication.
-> 
-> I see that dspi_data_to_pushr does move len too, which we did not in the
-> DMA case. dspi->len gets incremented only on successful DMA transfer in
-> dspi_dma_xfer. However, I wonder if that is not even a bug: We increment
-> dspi->tx always, but len only on success. This makes len go off sync
-> with regards to the tx pointer which does not help anybody. So lets get
-> rid of the update code in dspi_dma_xfer
-> 
-
-Thanks for the feedback. Using dspi_data_to_pushr really cleans up that
-tx path very nicely. Why didn't I see it. Will send a follow up patch
-soon after testing again.
-
-- Sanchayan.
+> >  err_slave_config:
+> > -	devm_kfree(dev, dma->rx_dma_buf);
+> > +	dma_free_coherent(dev, DSPI_DMA_BUFSIZE,
+> > +			dma->rx_dma_buf, dma->rx_dma_phys);
+> >  err_rx_dma_buf:
+> > -	devm_kfree(dev, dma->tx_dma_buf);
+> > +	dma_free_coherent(dev, DSPI_DMA_BUFSIZE,
+> > +			dma->tx_dma_buf, dma->tx_dma_phys);
+> >  err_tx_dma_buf:
+> >  	dma_release_channel(dma->chan_tx);
+> >  err_tx_channel:
