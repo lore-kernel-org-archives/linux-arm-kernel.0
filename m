@@ -1,35 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Nov 2016 23:52:06 +0100
-Subject: [RFC PATCH 04/11] PCI: tegra: limit to MMU build only
-In-Reply-To: <d9fd3fab-d648-0664-bd73-994bebf36bf4@wwwdotorg.org>
-References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
- <4182371.efWsDqfOeS@wuerfel>
- <d9fd3fab-d648-0664-bd73-994bebf36bf4@wwwdotorg.org>
-Message-ID: <3175374.ys6NksbXAK@wuerfel>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 22 Nov 2016 17:13:21 -0600
+Subject: [PATCH V9 11/11] ARM64/PCI: Support for ACPI based PCI host
+ controller
+In-Reply-To: <1465588519-11334-12-git-send-email-tn@semihalf.com>
+References: <1465588519-11334-1-git-send-email-tn@semihalf.com>
+ <1465588519-11334-12-git-send-email-tn@semihalf.com>
+Message-ID: <20161122231321.GA20246@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 22, 2016 3:27:35 PM CET Stephen Warren wrote:
-> On 11/22/2016 02:16 PM, Arnd Bergmann wrote:
-> > On Tuesday, November 22, 2016 9:15:13 AM CET Stephen Warren wrote:
-> >> On 11/22/2016 02:26 AM, Vladimir Murzin wrote:
-> >>> This driver uses functionality which available for MMU build only,
-> >>> thus add dependency on MMU.
-> >>
-> >> I'd expect ARCH_TEGRA to depend on MMU instead.
-> >>
-> >
-> > Any particular reason for why we'd single out Tegra?
+Hi Tomasz,
+
+On Fri, Jun 10, 2016 at 09:55:19PM +0200, Tomasz Nowicki wrote:
+> Implement pci_acpi_scan_root and other arch-specific call so that ARM64
+> can start using ACPI to setup and enumerate PCI buses.
 > 
->  From the cover letter, it sounded like the point of the series was to 
-> all !MMU builds for a bunch of SoCs with M-class cores. Tegra doesn't 
-> have an M-class core so I wouldn't expect it to be included in such a 
-> build. I'd expect the same fix that I suggested to apply to all 
-> non-M-class SoCs, rather than fixing up individual drivers to depend on 
-> !MMU.
+> Prior to buses enumeration the pci_acpi_scan_root() implementation looks
+> for configuration space start address (obtained through ACPI _CBA method or
+> MCFG interface). If succeed, it uses ECAM library to create new mapping.
+> Then it attaches generic ECAM ops (pci_generic_ecam_ops) which are used
+> for accessing configuration space later on.
+> ...
 
-I think you misread that, the point is to get NOMMU support back for
-machines other than ARMv7-M, the Cortex-M based machines already work
-without this.
+> +static struct acpi_pci_root_ops acpi_pci_root_ops = {
+> +	.release_info = pci_acpi_generic_release_info,
+> +};
+> +
+> +/* Interface called from ACPI code to setup PCI host controller */
+>  struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>  {
+> -	/* TODO: Should be revisited when implementing PCI on ACPI */
+> -	return NULL;
+> +	int node = acpi_get_node(root->device->handle);
+> +	struct acpi_pci_generic_root_info *ri;
+> +	struct pci_bus *bus, *child;
+> +
+> +	ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
+> +	if (!ri)
+> +		return NULL;
+> +
+> +	ri->cfg = pci_acpi_setup_ecam_mapping(root);
+> +	if (!ri->cfg) {
+> +		kfree(ri);
+> +		return NULL;
+> +	}
+> +
+> +	acpi_pci_root_ops.pci_ops = &ri->cfg->ops->pci_ops;
 
-	Arnd
+This has already been merged, but this isn't right, is it?  We're
+writing a host controller-specific pointer into the single system-wide
+acpi_pci_root_ops, then passing it on to acpi_pci_root_create().
+
+Today, I think ri->cfg->ops->pci_ops is always &pci_generic_ecam_ops,
+from this path:
+
+  ri->cfg = pci_acpi_setup_ecam_mapping
+    cfg = pci_ecam_create(..., &pci_generic_ecam_ops)
+      cfg = kzalloc(...)
+      cfg->ops = ops             # &pci_generic_ecam_ops
+
+But we're about to merge the ECAM quirks series, which will mean it
+may not be &pci_generic_ecam_ops.  Even apart from the ECAM quirks, we
+should avoid this pattern of putting device-specific info in a single
+shared structure because it's too difficult to verify that it's
+correct.
+
+> +	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, &ri->common,
+> +				   ri->cfg);
+
+Bjorn
