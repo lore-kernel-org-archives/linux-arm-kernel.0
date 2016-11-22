@@ -1,29 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Nov 2016 09:47:20 +0100
-Subject: [PATCH] ARM: ux500: fix prcmu_is_cpu_in_wfi() calculation
-In-Reply-To: <20161116152047.3336967-1-arnd@arndb.de>
-References: <20161116152047.3336967-1-arnd@arndb.de>
-Message-ID: <CACRpkdb1RdDCjT3ChiJdF8WZHp-Sb1un1tvSOh3uShZn2DaZ-Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Nov 2016 09:48:32 +0100
+Subject: [PATCH 4/6] dt-bindings: change hi6220-reset.txt according to
+ reset-hi6220.c
+In-Reply-To: <1479800961-6249-5-git-send-email-zhangfei.gao@linaro.org>
+References: <1479800961-6249-1-git-send-email-zhangfei.gao@linaro.org>
+ <1479800961-6249-5-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <2314383.qiZ3Cq7QsP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 16, 2016 at 4:20 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Tuesday, November 22, 2016 3:49:19 PM CET Zhangfei Gao wrote:
+>  Required properties:
+>  - compatible: should be one of the following:
+> -  - "hisilicon,hi6220-sysctrl", "syscon" : For peripheral reset controller.
+> -  - "hisilicon,hi6220-mediactrl", "syscon" : For media reset controller.
+> -- reg: should be register base and length as documented in the
+> -  datasheet
+> +  - "hisilicon,hi6220-reset-sysctrl" : For peripheral reset controller.
+> +  - "hisilicon,hi6220-reset-mediactrl" : For media reset controller.
+> +- hisi,rst-syscon: phandle of the reset's syscon.
+>  - #reset-cells: 1, see below
+> 
 
-> This function clearly never worked and always returns true,
-> as pointed out by gcc-7:
->
-> arch/arm/mach-ux500/pm.c: In function 'prcmu_is_cpu_in_wfi':
-> arch/arm/mach-ux500/pm.c:137:212: error: ?: using integer constants in boolean context, the expression will always evaluate to 'true' [-Werror=int-in-bool-context]
->
-> With the added braces, the condition actually makes sense.
->
-> Fixes: 34fe6f107eab ("mfd : Check if the other db8500 core is in WFI")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Please keep the old strings around for compatibility.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Will you apply it directly to ARM SoC or should I queue it and
-send it with a pull request?
-
-Yours,
-Linus Walleij
+	Arnd
