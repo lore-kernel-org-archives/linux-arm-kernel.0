@@ -1,67 +1,88 @@
-From: rick.chang@mediatek.com (Rick Chang)
-Date: Tue, 22 Nov 2016 11:21:45 +0800
-Subject: [PATCH v6 3/3] arm: dts: mt2701: Add node for Mediatek JPEG
- Decoder
-In-Reply-To: <d602365a-e87b-5bae-8698-bd43063ef079@xs4all.nl>
-References: <1479353915-5043-1-git-send-email-rick.chang@mediatek.com>
- <1479353915-5043-4-git-send-email-rick.chang@mediatek.com>
- <d602365a-e87b-5bae-8698-bd43063ef079@xs4all.nl>
-Message-ID: <1479784905.8964.15.camel@mtksdaap41>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Tue, 22 Nov 2016 13:55:45 +1030
+Subject: [PATCH v2 3/6] mfd: dt: Add bindings for the Aspeed LPC Host
+ Controller (LPCHC)
+In-Reply-To: <20161118184535.GE19884@dell.home>
+References: <1478097481-14895-1-git-send-email-andrew@aj.id.au>
+ <1478097481-14895-4-git-send-email-andrew@aj.id.au>
+ <20161118184437.GD19884@dell.home> <20161118184535.GE19884@dell.home>
+Message-ID: <1479785145.2503.20.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-On Mon, 2016-11-21 at 15:51 +0100, Hans Verkuil wrote:
-> On 17/11/16 04:38, Rick Chang wrote:
-> > Signed-off-by: Rick Chang <rick.chang@mediatek.com>
-> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-> > ---
-> > This patch depends on:
-> >   CCF "Add clock support for Mediatek MT2701"[1]
-> >   iommu and smi "Add the dtsi node of iommu and smi for mt2701"[2]
-> >
-> > [1] http://lists.infradead.org/pipermail/linux-mediatek/2016-October/007271.html
-> > [2] https://patchwork.kernel.org/patch/9164013/
+On Fri, 2016-11-18 at 18:45 +0000, Lee Jones wrote:
+> [Sending Arnd this time!]
 > 
-> I assume that 1 & 2 will appear in 4.10? So this patch needs to go in 
-> after the
-> other two are merged in 4.10?
-> 
-> Regards,
-> 
-> 	Hans
+> > Arnd,
+> > 
+> > Do you have a preference?
+> > 
+> > > The Aspeed LPC Host Controller is presented as a syscon device to
+> > > arbitrate access by LPC and pinmux drivers. LPC pinmux configuration on
+> > > fifth generation SoCs depends on bits in both the System Control Unit
+> > > and the LPC Host Controller.
+> > > 
+> > > > > > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> > > ---
+> > > ?Documentation/devicetree/bindings/mfd/aspeed-lpchc.txt | 17 +++++++++++++++++
+> > 
+> > Create a new directory in bindings/mfd called 'syscon'.
+> > 
+> > Or perhaps 'bindings/syscon'.
+> > 
 
-[1] will appear in 4.10, but [2] will appear latter than 4.10.So this
-patch needs to go in after [1] & [2] will be merged in 4.11.
+Sounds good to me. I'll wait for Arnd's feedback.
 
-> > ---
-> >  arch/arm/boot/dts/mt2701.dtsi | 14 ++++++++++++++
-> >  1 file changed, 14 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-> > index 8f13c70..4dd5048 100644
-> > --- a/arch/arm/boot/dts/mt2701.dtsi
-> > +++ b/arch/arm/boot/dts/mt2701.dtsi
-> > @@ -298,6 +298,20 @@
-> >  		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
-> >  	};
-> >
-> > +	jpegdec: jpegdec at 15004000 {
-> > +		compatible = "mediatek,mt2701-jpgdec";
-> > +		reg = <0 0x15004000 0 0x1000>;
-> > +		interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_LOW>;
-> > +		clocks =  <&imgsys CLK_IMG_JPGDEC_SMI>,
-> > +			  <&imgsys CLK_IMG_JPGDEC>;
-> > +		clock-names = "jpgdec-smi",
-> > +			      "jpgdec";
-> > +		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
-> > +		mediatek,larb = <&larb2>;
-> > +		iommus = <&iommu MT2701_M4U_PORT_JPGDEC_WDMA>,
-> > +			 <&iommu MT2701_M4U_PORT_JPGDEC_BSDMA>;
-> > +	};
-> > +
-> >  	vdecsys: syscon at 16000000 {
-> >  		compatible = "mediatek,mt2701-vdecsys", "syscon";
-> >  		reg = <0 0x16000000 0 0x1000>;
-> >
+Note that this patch conflicts with some of the ideas I outlined in
+
+https://www.spinics.net/lists/arm-kernel/msg543233.html
+
+I sent it hoping to get some feedback on the approach to take for these
+LPC-related bits. Did you have any suggestions? The problems with
+hardware complexity are amplified by the fact that the datasheet is
+only available under NDA, but I will do what I can to clarify.
+
+> > > ?1 file changed, 17 insertions(+)
+> > > ?create mode 100644 Documentation/devicetree/bindings/mfd/aspeed-lpchc.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/mfd/aspeed-lpchc.txt b/Documentation/devicetree/bindings/mfd/aspeed-lpchc.txt
+> > > new file mode 100644
+> > > index 000000000000..792651488c3d
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/mfd/aspeed-lpchc.txt
+> > > @@ -0,0 +1,17 @@
+> > > +* Device tree bindings for the Aspeed LPC Host Controller (LPCHC)
+> > > +
+> > > +The LPCHC registers configure LPC behaviour between the BMC and the host
+> > > +system. The LPCHC also participates in pinmux requests on g5 SoCs and is
+> > > +therefore considered a syscon device.
+> > > +
+> > > +Required properties:
+> > > > > > +- compatible:		"aspeed,ast2500-lpchc", "syscon"
+> > > > > > +- reg:			contains offset/length value of the LPCHC memory
+> > > +			region.
+> > 
+> > Why not just use a single tab, then you don't have to linewrap?
+
+I'll clean that up.
+
+Cheers,
+
+Andrew
+
+> > 
+> > > +Example:
+> > > +
+> > > > > > +lpchc: lpchc at 1e7890a0 {
+> > > > > > +	compatible = "aspeed,ast2500-lpchc", "syscon";
+> > > > > > +	reg = <0x1e7890a0 0xc4>;
+> > > +};
+> 
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161122/b6462917/attachment.sig>
