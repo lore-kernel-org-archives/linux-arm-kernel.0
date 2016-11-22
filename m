@@ -1,30 +1,68 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 22 Nov 2016 13:57:46 +0100
-Subject: [PATCH v2 0/2] da8xx: fix section mismatch in new drivers
-Message-ID: <1479819468-4016-1-git-send-email-bgolaszewski@baylibre.com>
+Date: Tue, 22 Nov 2016 13:57:47 +0100
+Subject: [PATCH v2 1/2] bus: da8xx-mstpri: drop the call to
+ of_flat_dt_get_machine_name()
+In-Reply-To: <1479819468-4016-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1479819468-4016-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1479819468-4016-2-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar noticed there's a section mismatch in the da8xx-mstpri and
-da8xx-ddrctl drivers. This is caused by calling
-of_flat_dt_get_machine_name() which has an __init annotation.
+In order to avoid a section mismatch use a locally implemented routine
+instead of of_flat_dt_get_machine_name() when printing the error
+message.
 
-This series addresses this issue by open coding routines that return
-the machine compatible string in both drivers. Once a general function
-for that in of/base is merged, we'll remove them.
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ drivers/bus/da8xx-mstpri.c | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
 
-v1 -> v2:
-- drop patch [1/3] from v1
-- introduce internal routines in the drivers instead of a general
-  function in of/base.c
-
-Bartosz Golaszewski (2):
-  bus: da8xx-mstpri: drop the call to of_flat_dt_get_machine_name()
-  memory: da8xx-ddrctl: drop the call to of_flat_dt_get_machine_name()
-
- drivers/bus/da8xx-mstpri.c    | 22 ++++++++++++++++++++--
- drivers/memory/da8xx-ddrctl.c | 22 ++++++++++++++++++++--
- 2 files changed, 40 insertions(+), 4 deletions(-)
-
+diff --git a/drivers/bus/da8xx-mstpri.c b/drivers/bus/da8xx-mstpri.c
+index 85f0b53..bd38170 100644
+--- a/drivers/bus/da8xx-mstpri.c
++++ b/drivers/bus/da8xx-mstpri.c
+@@ -16,7 +16,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/regmap.h>
+-#include <linux/of_fdt.h>
+ 
+ /*
+  * REVISIT: Linux doesn't have a good framework for the kind of performance
+@@ -190,6 +189,25 @@ static const struct da8xx_mstpri_board_priorities da8xx_mstpri_board_confs[] = {
+ 	},
+ };
+ 
++/*
++ * FIXME Remove this function once of/base gets a general routine for getting
++ * the machine model/compatible string.
++ */
++static const char *da8xx_mstpri_machine_get_compatible(void)
++{
++	struct device_node *root;
++	const char *compatible;
++	int ret = -1;
++
++	root = of_find_node_by_path("/");
++	if (root) {
++		ret = of_property_read_string(root, "compatible", &compatible);
++		of_node_put(root);
++	}
++
++	return ret ? NULL : compatible;
++}
++
+ static const struct da8xx_mstpri_board_priorities *
+ da8xx_mstpri_get_board_prio(void)
+ {
+@@ -227,7 +245,7 @@ static int da8xx_mstpri_probe(struct platform_device *pdev)
+ 	prio_list = da8xx_mstpri_get_board_prio();
+ 	if (!prio_list) {
+ 		dev_err(dev, "no master priotities defined for board '%s'\n",
+-			of_flat_dt_get_machine_name());
++			da8xx_mstpri_machine_get_compatible());
+ 		return -EINVAL;
+ 	}
+ 
 -- 
 2.9.3
