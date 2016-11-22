@@ -1,25 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Nov 2016 22:13:54 +0100
-Subject: [PATCH 1/2] PCI: iproc: fix 32-bit build
-In-Reply-To: <e03e5c52-f321-916e-4650-c8bb271cd041@broadcom.com>
-References: <20161122141844.1655574-1-arnd@arndb.de>
- <e03e5c52-f321-916e-4650-c8bb271cd041@broadcom.com>
-Message-ID: <4393833.rTFctaL9Kd@wuerfel>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 22 Nov 2016 13:14:02 -0800
+Subject: [PATCH] ARM: fix kmemleak for XIP_KERNEL
+In-Reply-To: <20161122142829.1776129-1-arnd@arndb.de>
+References: <20161122142829.1776129-1-arnd@arndb.de>
+Message-ID: <CAGXu5jLAFHtErSCip+xBsY+qd1adp5fwxj6Nxwo_cuXzcZGezg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 22, 2016 9:42:05 AM CET Ray Jui wrote:
-> 
-> Hmmm, somehow we've never seen this link error for the ARM32 based
-> platforms that we build for. Does it behave differently between
-> different versions of compilers?
-> 
-> Nevertheless, this is a good change to take, thanks!
+On Tue, Nov 22, 2016 at 6:28 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The newly added check for RO_AFTER_INIT_DATA in kmemleak breaks ARM whenever
+> XIP_KERNEL is enabled:
+>
+> mm/kmemleak.o: In function `kmemleak_scan':
+> kmemleak.c:(.text.kmemleak_scan+0x2e4): undefined reference to `__end_data_ro_after_init'
+> kmemleak.c:(.text.kmemleak_scan+0x2e8): undefined reference to `__start_data_ro_after_init'
+>
+> This adds the start/end symbols for the section even in the case of having
+> no data in the section, to make the check work while keeping the architecture
+> specific override in one place.
+>
+> Fixes: d7c19b066dcf ("mm: kmemleak: scan .data.ro_after_init")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I looked at it again, and see now that it only happens with
-a 64-bit RESOURCE_SIZE_T, which is only used on 32-bit
-platforms with more than 4GB of memory addresses. It would
-however show up in a multiplatform distro build for ARMv7VE,
-so the fix is still clearly needed.
+Acked-by: Kees Cook <keescook@chromium.org>
 
-	Arnd
+-Kees
+
+> ---
+> The patch causing this was merged late into v4.9-rc, this one should
+> probably go there as well.
+>
+> I assume the same problem exists on s390, but I have not checked that.
+> ---
+>  arch/arm/kernel/vmlinux-xip.lds.S | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
+> index 06c178214629..bf900f5421a1 100644
+> --- a/arch/arm/kernel/vmlinux-xip.lds.S
+> +++ b/arch/arm/kernel/vmlinux-xip.lds.S
+> @@ -3,8 +3,11 @@
+>   * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>
+>   */
+>
+> -/* No __ro_after_init data in the .rodata section - which will always be ro */
+> -#define RO_AFTER_INIT_DATA
+> +/* empty __ro_after_init data in the .rodata section - it will always be ro */
+> +#define RO_AFTER_INIT_DATA                                             \
+> +       __start_data_ro_after_init = .;                                 \
+> +       __end_data_ro_after_init = .;
+> +
+>
+>  #include <asm-generic/vmlinux.lds.h>
+>  #include <asm/cache.h>
+> --
+> 2.9.0
+>
+
+
+
+-- 
+Kees Cook
+Nexus Security
