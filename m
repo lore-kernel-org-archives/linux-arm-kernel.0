@@ -1,104 +1,220 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Nov 2016 15:30:10 -0800
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.10
-In-Reply-To: <CAMuHMdUtu9N28rOb+813DumtbyAZJB3G+euD0mwwXD_jCiXrRg@mail.gmail.com>
-References: <cover.1479387356.git.horms+renesas@verge.net.au>
- <20161119012836.GA2543@localhost>
- <CAMuHMdXAuDcbr84phfPRpqZYRzAZf2j4vsv+i_Frz0G8ksd_Vg@mail.gmail.com>
- <CAOesGMjk=KWifGT7sugpWVjNJSKhmgxg8gN9Cgi=emGrg66z0w@mail.gmail.com>
- <CAMuHMdUhpeiOj6Mjhgt=9R3yuV-HwOAy5AAsDSTDjagRRDtYCw@mail.gmail.com>
- <CAOesGMj47EZ1Zjc41VV2D-cM5XUsK28PDF-jSHKUkkind32ZRA@mail.gmail.com>
- <CAMuHMdUtu9N28rOb+813DumtbyAZJB3G+euD0mwwXD_jCiXrRg@mail.gmail.com>
-Message-ID: <CAOesGMimsQphE4TzrJ7EPpp90VQG23vGP3jVrJK3qQrZgNEd3g@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 23 Nov 2016 10:59:27 +1100
+Subject: linux-next: manual merge of the clk tree with the arm-soc tree
+In-Reply-To: <CAMuHMdU5Df2kNT=ccr7Ts6=a1ELRJdiBbh1xxuqo+e_UeYw-tw@mail.gmail.com>
+References: <20161122194130.4efdd019@canb.auug.org.au>
+ <CAMuHMdU5Df2kNT=ccr7Ts6=a1ELRJdiBbh1xxuqo+e_UeYw-tw@mail.gmail.com>
+Message-ID: <20161123105927.4d2c263c@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2016 at 1:56 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Olof,
+Hi Geert,
+
+On Tue, 22 Nov 2016 10:36:46 +0100 Geert Uytterhoeven <geert@linux-m68k.org> wrote:
 >
-> On Mon, Nov 21, 2016 at 5:35 PM, Olof Johansson <olof@lixom.net> wrote:
->> On Mon, Nov 21, 2016 at 8:27 AM, Geert Uytterhoeven
->> <geert@linux-m68k.org> wrote:
->>> On Mon, Nov 21, 2016 at 5:19 PM, Olof Johansson <olof@lixom.net> wrote:
->>>> On Mon, Nov 21, 2016 at 1:31 AM, Geert Uytterhoeven
->>>> <geert@linux-m68k.org> wrote:
->>>>> On Sat, Nov 19, 2016 at 2:28 AM, Olof Johansson <olof@lixom.net> wrote:
->>>>>> On Thu, Nov 17, 2016 at 02:34:25PM +0100, Simon Horman wrote:
->>>>>>> Please consider these second round of Renesas ARM based SoC updates for v4.10.
->>>>>
->>>>>>> * Basic support for r8a7745 SoC
->>>>>>>
->>>>>>> ----------------------------------------------------------------
->>>>>>> Sergei Shtylyov (2):
->>>>>>>       ARM: shmobile: r8a7745: basic SoC support
->>>>>>>       ARM: shmobile: document SK-RZG1E board
->>>>>>
->>>>>> Is there a reason you're adding a config option per SoC?
->>>>>>
->>>>>> I think you'd be better off not adding these config options, and just adding
->>>>>> support for the SoCs through compatibles (and adding the drivers to defconfigs,
->>>>>> etc).
->>>>>
->>>>> Yes there is a reason: kernel size.
->>>>> The main offenders are the pinctrl tables, which add ca. 20-50 KiB per
->>>>> supported SoC.
->>>>
->>>> So don't turn on that pinctrl driver unless you have that SoC?
->>>
->>> The enablement of the pinctrl driver (and the clock driver, FWIW) is controlled
->>> by the SoC Kconfig symbol. If you want support for the SoC, you want the
->>> pinctrl driver, too.
->>
->> Oh, that's trivial to fix! Do as almost all other SoCs do, and don't
->> use silent options.
->
-> What does that gain us? The ability to enable support for an SoC, without
-> enabling the accompanying pinctrl driver, leading to a non-booting system?
+> Most of these are of the "add both sides" type.
+> The only exception is the one in arch/arm/mach-shmobile/setup-rcar-gen2.c,
+> where you just want to keep the call to of_clk_init(NULL);
+> 
+> There's a resolution in
+> https://git.kernel.org/cgit/linux/kernel/git/geert/renesas-drivers.git/log/?h=renesas-devel-20161117v2-v4.9-rc5%2brcar-rst
+> 
+> Sorry for the mess.
 
-It doesn't enable anything new, it just makes it less awkward for you
-to add new SoCs in the future without creating dependencies on new
-Kconfig symbols in the arch directory.
+Thanks for the help.  Today I did this much earlier in the build and
+got the following merge resolution (which matches yours, I think).
+The resolution for arch/arm/mach-shmobile/setup-rcar-gen2.c is empty
+because I used the clk tree side of the conflicts.
+-- 
+Cheers,
+Stephen Rothwell
 
-> As soon as you have any pinctrl properties in the DT, you need the pinctrl
-> driver. Unless you disable CONFIG_PINCTRL (it's selected, and not
-> user-controlled), and rely on fragile reset state/boot loader.
->
-> Pinctrl (and clock and irqchip) on-SoC drivers are special: if you fail to
-> include them, the system won't boot.
-
-This isn't about booting without a pinctrl driver. It's about avoiding
-adding new config symbols when they're not needed.
-
-I started out comparing your way of using config options with, for
-example, Exynos that has a bunch of different SoCs enabled. Having
-dependencies described clearly has some value, since it can be hard to
-know if you can turn off a driver and still have a bootable system
-with some of the other platforms.
-
-That being said, I think you should look at changing how you use your
-config options to make it less messy to add new ones:
-
-Looking around a bit, I noticed CLK_RENESAS_CPG_MSTP. This config
-option is used awkwardly -- what you should have is a (silent) config
-option that it depends on (such as {NEEDS|HAS}_CLK_CPG_MSTP or
-similar), that each platform needing this can select. Then
-CLK_RENESAS_CPG_MSTP only depends on that. No more need to touch this
-config entry for every new SoC that is enabled.
-
-Also, right now drivers/clk/renesas/Makefile is all keyed off of the
-SoC config option, when instead you should consider a CLK_* option to
-avoid duplication like you have today. For the shared platforms you
-can do it just as above with HAS_.* config entries. Again, for some of
-these you won't have to touch the clk/ directory at all any more for
-new SoCs, the way the rcar2 ones have been made!
-
-pinctrl config seems like it's a bit heavy on boiler plate as well.
-Most of the entries do the same things. Many other platforms instead
-select the pinctrl driver from the SoC Kconfig entry, maybe this is a
-good approach here too, and avoids more boilerplate in the driver
-directory. Of course, legacy SH platforms can probably be left alone
-as they are though.
-
-
--Olof
+diff --cc arch/arm/boot/dts/r8a7779.dtsi
+index 9d3bb74bd3f6,8cf16008a09b..000000000000
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@@ -590,11 -590,11 +590,16 @@@
+  		};
+  	};
+  
+ +	prr: chipid at ff000044 {
+ +		compatible = "renesas,prr";
+ +		reg = <0xff000044 4>;
+ +	};
+ +
++ 	rst: reset-controller at ffcc0000 {
++ 		compatible = "renesas,r8a7779-reset-wdt";
++ 		reg = <0xffcc0000 0x48>;
++ 	};
++ 
+  	sysc: system-controller at ffd85000 {
+  		compatible = "renesas,r8a7779-sysc";
+  		reg = <0xffd85000 0x0200>;
+diff --cc arch/arm/boot/dts/r8a7790.dtsi
+index f554ef3c8096,3f10b0bf1b08..000000000000
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@@ -1471,11 -1471,11 +1471,16 @@@
+  		};
+  	};
+  
+ +	prr: chipid at ff000044 {
+ +		compatible = "renesas,prr";
+ +		reg = <0 0xff000044 0 4>;
+ +	};
+ +
++ 	rst: reset-controller at e6160000 {
++ 		compatible = "renesas,r8a7790-rst";
++ 		reg = <0 0xe6160000 0 0x0100>;
++ 	};
++ 
+  	sysc: system-controller at e6180000 {
+  		compatible = "renesas,r8a7790-sysc";
+  		reg = <0 0xe6180000 0 0x0200>;
+diff --cc arch/arm/boot/dts/r8a7791.dtsi
+index 4c50de2faef1,c465c79bcca6..000000000000
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@@ -1485,11 -1482,11 +1485,16 @@@
+  		};
+  	};
+  
+ +	prr: chipid at ff000044 {
+ +		compatible = "renesas,prr";
+ +		reg = <0 0xff000044 0 4>;
+ +	};
+ +
++ 	rst: reset-controller at e6160000 {
++ 		compatible = "renesas,r8a7791-rst";
++ 		reg = <0 0xe6160000 0 0x0100>;
++ 	};
++ 
+  	sysc: system-controller at e6180000 {
+  		compatible = "renesas,r8a7791-sysc";
+  		reg = <0 0xe6180000 0 0x0200>;
+diff --cc arch/arm/boot/dts/r8a7792.dtsi
+index 69789020cf39,6e1f61f65d29..000000000000
+--- a/arch/arm/boot/dts/r8a7792.dtsi
++++ b/arch/arm/boot/dts/r8a7792.dtsi
+@@@ -120,11 -118,11 +120,16 @@@
+  				      IRQ_TYPE_LEVEL_LOW)>;
+  		};
+  
+ +		prr: chipid at ff000044 {
+ +			compatible = "renesas,prr";
+ +			reg = <0 0xff000044 0 4>;
+ +		};
+ +
++ 		rst: reset-controller at e6160000 {
++ 			compatible = "renesas,r8a7792-rst";
++ 			reg = <0 0xe6160000 0 0x0100>;
++ 		};
++ 
+  		sysc: system-controller at e6180000 {
+  			compatible = "renesas,r8a7792-sysc";
+  			reg = <0 0xe6180000 0 0x0200>;
+diff --cc arch/arm/boot/dts/r8a7793.dtsi
+index a377dda17724,e4b385eccf74..000000000000
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@@ -1306,11 -1279,11 +1306,16 @@@
+  		};
+  	};
+  
+ +	prr: chipid at ff000044 {
+ +		compatible = "renesas,prr";
+ +		reg = <0 0xff000044 0 4>;
+ +	};
+ +
++ 	rst: reset-controller at e6160000 {
++ 		compatible = "renesas,r8a7793-rst";
++ 		reg = <0 0xe6160000 0 0x0100>;
++ 	};
++ 
+  	sysc: system-controller at e6180000 {
+  		compatible = "renesas,r8a7793-sysc";
+  		reg = <0 0xe6180000 0 0x0200>;
+diff --cc arch/arm/boot/dts/r8a7794.dtsi
+index 63dc7f29d216,69e4f4fad89b..000000000000
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@@ -1377,11 -1375,11 +1377,16 @@@
+  		};
+  	};
+  
+ +	prr: chipid at ff000044 {
+ +		compatible = "renesas,prr";
+ +		reg = <0 0xff000044 0 4>;
+ +	};
+ +
++ 	rst: reset-controller at e6160000 {
++ 		compatible = "renesas,r8a7794-rst";
++ 		reg = <0 0xe6160000 0 0x0100>;
++ 	};
++ 
+  	sysc: system-controller at e6180000 {
+  		compatible = "renesas,r8a7794-sysc";
+  		reg = <0 0xe6180000 0 0x0200>;
+diff --cc arch/arm/mach-shmobile/setup-rcar-gen2.c
+index 14c1f0ed2ecb,b527258e0a62..000000000000
+--- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+diff --cc arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index a39a702b904d,625dda713548..000000000000
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@@ -321,11 -321,11 +321,16 @@@
+  			#power-domain-cells = <0>;
+  		};
+  
+ +		prr: chipid at fff00044 {
+ +			compatible = "renesas,prr";
+ +			reg = <0 0xfff00044 0 4>;
+ +		};
+ +
++ 		rst: reset-controller at e6160000 {
++ 			compatible = "renesas,r8a7795-rst";
++ 			reg = <0 0xe6160000 0 0x0200>;
++ 		};
++ 
+  		sysc: system-controller at e6180000 {
+  			compatible = "renesas,r8a7795-sysc";
+  			reg = <0 0xe6180000 0 0x0400>;
+diff --cc arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index 41a050d2f192,75c8c55a8248..000000000000
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@@ -243,11 -233,11 +243,16 @@@
+  			#power-domain-cells = <0>;
+  		};
+  
+ +		prr: chipid at fff00044 {
+ +			compatible = "renesas,prr";
+ +			reg = <0 0xfff00044 0 4>;
+ +		};
+ +
++ 		rst: reset-controller at e6160000 {
++ 			compatible = "renesas,r8a7796-rst";
++ 			reg = <0 0xe6160000 0 0x0200>;
++ 		};
++ 
+  		sysc: system-controller at e6180000 {
+  			compatible = "renesas,r8a7796-sysc";
+  			reg = <0 0xe6180000 0 0x0400>;
+diff --cc drivers/soc/renesas/Makefile
+index 91c42b34705f,86cc78cd1962..000000000000
+--- a/drivers/soc/renesas/Makefile
++++ b/drivers/soc/renesas/Makefile
+@@@ -1,7 -1,8 +1,12 @@@
+ +obj-$(CONFIG_SOC_BUS)		+= renesas-soc.o
+ +
++ obj-$(CONFIG_ARCH_RCAR_GEN1)	+= rcar-rst.o
++ obj-$(CONFIG_ARCH_RCAR_GEN2)	+= rcar-rst.o
++ obj-$(CONFIG_ARCH_R8A7795)	+= rcar-rst.o
++ obj-$(CONFIG_ARCH_R8A7796)	+= rcar-rst.o
++ 
+ +obj-$(CONFIG_ARCH_R8A7743)	+= rcar-sysc.o r8a7743-sysc.o
+ +obj-$(CONFIG_ARCH_R8A7745)	+= rcar-sysc.o r8a7745-sysc.o
+  obj-$(CONFIG_ARCH_R8A7779)	+= rcar-sysc.o r8a7779-sysc.o
+  obj-$(CONFIG_ARCH_R8A7790)	+= rcar-sysc.o r8a7790-sysc.o
+  obj-$(CONFIG_ARCH_R8A7791)	+= rcar-sysc.o r8a7791-sysc.o
