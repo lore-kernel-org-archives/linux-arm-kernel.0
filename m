@@ -1,34 +1,38 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 22 Nov 2016 09:26:00 +0000
-Subject: [RFC PATCH 03/11] ARM: omap: do not select HIGHMEM explicitly
+Date: Tue, 22 Nov 2016 09:25:59 +0000
+Subject: [RFC PATCH 02/11] ARM: ep93xx: select ARM_PATCH_PHYS_VIRT for MMU
+ builds only
 In-Reply-To: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
 References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1479806768-39911-4-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1479806768-39911-3-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Explicit selection of HIGHMEM breaks NOMMU builds. It seems that
-HIGHMEM is user selectable option, so probably it would be better to
-let user to make a decision on this options or, at least, move it to
-defconfig.
+Building in NOMMU configurations lead to the following splat:
 
-Cc: Tony Lindgren <tony@atomide.com>
+warning: (ARCH_INTEGRATOR && ARCH_MULTIPLATFORM && ARCH_EP93XX) selects ARM_PATCH_PHYS_VIRT which has unmet direct dependencies (!XIP_KERNEL && MMU)
+
+Make sure ARM_PATCH_PHYS_VIRT is selected for MMU builds only.
+
+Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <rmallon@gmail.com>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/mach-omap2/Kconfig |    1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index a9afeeb..4e3fb69 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -120,7 +120,6 @@ config ARCH_OMAP2PLUS_TYPICAL
- 	bool "Typical OMAP configuration"
- 	default y
- 	select AEABI
--	select HIGHMEM
- 	select I2C
- 	select I2C_OMAP
- 	select MENELAUS if ARCH_OMAP2
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index b5d529f..49e0f01 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -380,7 +380,7 @@ config ARCH_EP93XX
+ 	bool "EP93xx-based"
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARM_AMBA
+-	select ARM_PATCH_PHYS_VIRT
++	select ARM_PATCH_PHYS_VIRT if MMU
+ 	select ARM_VIC
+ 	select AUTO_ZRELADDR
+ 	select CLKDEV_LOOKUP
 -- 
 1.7.9.5
