@@ -1,69 +1,50 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 22 Nov 2016 12:26:19 +0100
-Subject: [RFC PATCH 04/11] PCI: tegra: limit to MMU build only
-In-Reply-To: <28079479.jInxCWkYlm@wuerfel>
-References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
- <11637152.Dd0IBkEQ8q@wuerfel> <58341297.9090303@arm.com>
- <28079479.jInxCWkYlm@wuerfel>
-Message-ID: <20161122112619.GA22862@ulmo.ba.sec>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 22 Nov 2016 12:35:05 +0100
+Subject: [PATCH v3] clkdev: Detect errors in clk_hw_register_clkdev() for
+ mass registration
+In-Reply-To: <CAMuHMdW8V2v7na1c4B=w2qzN=qVF0QUA3fcqaUXdTEVB20JREg@mail.gmail.com>
+References: <1477033358-7934-1-git-send-email-geert@linux-m68k.org>
+ <20161031092223.GW1041@n2100.armlinux.org.uk>
+ <CAMuHMdW8V2v7na1c4B=w2qzN=qVF0QUA3fcqaUXdTEVB20JREg@mail.gmail.com>
+Message-ID: <CAMuHMdXE89a1-qzH5Se-w1L2bLknTae7jPQ07q5Zw_nKt7RLPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2016 at 10:54:01AM +0100, Arnd Bergmann wrote:
-> On Tuesday, November 22, 2016 9:40:39 AM CET Vladimir Murzin wrote:
-> > On 22/11/16 09:31, Arnd Bergmann wrote:
-> > > On Tuesday, November 22, 2016 9:26:01 AM CET Vladimir Murzin wrote:
-> > >> This driver uses functionality which available for MMU build only,
-> > >> thus add dependency on MMU.
-> > >>
-> > >> Cc: Thierry Reding <thierry.reding@gmail.com>
-> > >> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> > >>
-> > > 
-> > > Can you be more specific about what requires the MMU here?
-> > > 
-> > > Is it the I/O space remapping or something else?
-> > 
-> > Yes it comes from I/O space remapping.
-> > 
-> > The fill error log:
-> > 
-> >   CC      drivers/pci/host/pci-tegra.o
-> > In file included from ./arch/arm/include/asm/page.h:22:0,
-> >                  from ./arch/arm/include/asm/thread_info.h:17,
-> >                  from ./include/linux/thread_info.h:58,
-> >                  from ./include/asm-generic/current.h:4,
-> >                  from ./arch/arm/include/generated/asm/current.h:1,
-> >                  from ./include/linux/mutex.h:13,
-> >                  from ./include/linux/notifier.h:13,
-> >                  from ./include/linux/clk.h:17,
-> >                  from drivers/pci/host/pci-tegra.c:29:
-> > drivers/pci/host/pci-tegra.c: In function 'tegra_pcie_bus_alloc':
-> > drivers/pci/host/pci-tegra.c:388:27: error: 'L_PTE_PRESENT' undeclared (first use in this function)
-> >   pgprot_t prot = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
-> 
-> 
-> That is not the I/O space, that is the config space.
-> 
-> Not sure what a better alternative would be, but the manual selection
-> of page flags makes the driver non-portable and dependent on architecture
-> specifics that it really shouldn't have to worry about.
-> 
-> In common PCI code, we use pgprot_device(PAGE_KERNEL)) at some point,
-> and that sounds like the right thing to do, but ARM doesn't provide
-> an override for it and the fallback is pgprot_noncached(), which is
-> probably wrong here.
+On Mon, Oct 31, 2016 at 10:31 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> On Mon, Oct 31, 2016 at 10:22 AM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+>> On Fri, Oct 21, 2016 at 09:02:38AM +0200, Geert Uytterhoeven wrote:
+>>> Unlike clk_register_clkdev(), clk_hw_register_clkdev() doesn't check for
+>>> passed error objects from a previous registration call. Hence the caller
+>>> of clk_hw_register_*() has to check for errors before calling
+>>> clk_hw_register_clkdev*().
+>>>
+>>> Make clk_hw_register_clkdev() more similar to clk_register_clkdev() by
+>>> adding this error check, removing the burden from callers that do mass
+>>> registration.
+>>>
+>>> Fixes: e4f1b49bda6d6aa2 ("clkdev: Add clk_hw based registration APIs")
+>>> Fixes: 944b9a41e004534f ("clk: ls1x: Migrate to clk_hw based OF and registration APIs")
+>>> Fixes: 44ce9a9ae977736f ("MIPS: TXx9: Convert to Common Clock Framework")
+>>> Fixes: f48d947a162dfa9d ("clk: clps711x: Migrate to clk_hw based OF and registration APIs")
+>>> Fixes: b4626a7f489238a5 ("CLK: Add Loongson1C clock support")
+>>> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+>>
+>> Please put this in the patch system, thanks.
+>
+> Done. I hope it went through, the "new" README predates git-send-email.
 
-Actually I think pgprot_noncached() is correct. Very early on we used to
-map this using ioremap() and I remember that working. I also just tested
-the pci-tegra driver with pgprot_device(PAGE_KERNEL) instead of the ARM-
-specific flags and it seems to work well.
+Still no evidence of the patch having arrived...
+Tried the web interface instead, patch is now 8631/1.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161122/220bb54b/attachment-0001.sig>
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
