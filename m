@@ -1,18 +1,19 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 22 Nov 2016 17:26:52 +0000
-Subject: Applied "spi: spi-fsl-dspi: Fix incorrect DMA setup" to the spi tree
-In-Reply-To: <a36bac5f2499d1002693a7dbf95982bab186e51f.1479706671.git.maitysanchayan@gmail.com>
-Message-ID: <E1c9EqK-0005xg-C2@debutante>
+Date: Tue, 22 Nov 2016 17:26:31 +0000
+Subject: Applied "ASoC: samsung: smdk_wm8580: Remove old platforms and drop
+ mach-types usage" to the asoc tree
+In-Reply-To: <1479669895-19124-3-git-send-email-krzk@kernel.org>
+Message-ID: <E1c9Epz-0005o0-BN@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: spi-fsl-dspi: Fix incorrect DMA setup
+   ASoC: samsung: smdk_wm8580: Remove old platforms and drop mach-types usage
 
-has been applied to the spi tree at
+has been applied to the asoc tree at
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
 All being well this means that it will be integrated into the linux-next
 tree (usually sometime in the next 24 hours) and sent to Linus during
@@ -33,128 +34,105 @@ to this mail.
 Thanks,
 Mark
 
->From 1eaccf210c59e04eb6e9b5469a60d6609c95ac61 Mon Sep 17 00:00:00 2001
-From: Sanchayan Maity <maitysanchayan@gmail.com>
-Date: Tue, 22 Nov 2016 12:31:30 +0530
-Subject: [PATCH] spi: spi-fsl-dspi: Fix incorrect DMA setup
+>From cd9e2b62768c21c051c585f9d4935b4fa6e9603e Mon Sep 17 00:00:00 2001
+From: Krzysztof Kozlowski <krzk@kernel.org>
+Date: Sun, 20 Nov 2016 21:24:52 +0200
+Subject: [PATCH] ASoC: samsung: smdk_wm8580: Remove old platforms and drop
+ mach-types usage
 
-Currently dmaengine_prep_slave_single was being called with length
-set to the complete DMA buffer size. This resulted in unwanted bytes
-being transferred to the SPI register leading to clock and MOSI lines
-having unwanted data even after chip select got deasserted and the
-required bytes having been transferred.
+MACH_SMDKC100, MACH_SMDKV210 and MACH_SMDKC110 are no longer supported
+so we can drop the dead code.  After this the driver no longer
+differentiates between machines (S3C24xx machines are not supported by
+it) so there is no need to override I2S device id in cpu_dai_name and
+SEC_PLAYBACK dai_link can be removed as well.
 
-While at it also clean up the use of curr_xfer_len which is central
-to the DMA setup, from bytes to DMA transfers for every use.
-
-Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-Reviewed-by: Stefan Agner <stefan@agner.ch>
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-fsl-dspi.c | 35 ++++++++++++++++++-----------------
- 1 file changed, 18 insertions(+), 17 deletions(-)
+ sound/soc/samsung/smdk_wm8580.c | 30 +++---------------------------
+ 1 file changed, 3 insertions(+), 27 deletions(-)
 
-diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
-index 22f7ce1279bd..cb41c327bd77 100644
---- a/drivers/spi/spi-fsl-dspi.c
-+++ b/drivers/spi/spi-fsl-dspi.c
-@@ -151,6 +151,7 @@ static const struct fsl_dspi_devtype_data ls2085a_data = {
+diff --git a/sound/soc/samsung/smdk_wm8580.c b/sound/soc/samsung/smdk_wm8580.c
+index 548bfd993788..de724ce7b955 100644
+--- a/sound/soc/samsung/smdk_wm8580.c
++++ b/sound/soc/samsung/smdk_wm8580.c
+@@ -14,8 +14,6 @@
+ #include <sound/soc.h>
+ #include <sound/pcm_params.h>
+ 
+-#include <asm/mach-types.h>
+-
+ #include "../codecs/wm8580.h"
+ #include "i2s.h"
+ 
+@@ -147,7 +145,6 @@ static int smdk_wm8580_init_paiftx(struct snd_soc_pcm_runtime *rtd)
+ enum {
+ 	PRI_PLAYBACK = 0,
+ 	PRI_CAPTURE,
+-	SEC_PLAYBACK,
  };
  
- struct fsl_dspi_dma {
-+	/* Length of transfer in words of DSPI_FIFO_SIZE */
- 	u32 curr_xfer_len;
+ #define SMDK_DAI_FMT (SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF | \
+@@ -157,7 +154,7 @@ static struct snd_soc_dai_link smdk_dai[] = {
+ 	[PRI_PLAYBACK] = { /* Primary Playback i/f */
+ 		.name = "WM8580 PAIF RX",
+ 		.stream_name = "Playback",
+-		.cpu_dai_name = "samsung-i2s.0",
++		.cpu_dai_name = "samsung-i2s.2",
+ 		.codec_dai_name = "wm8580-hifi-playback",
+ 		.platform_name = "samsung-i2s.0",
+ 		.codec_name = "wm8580.0-001b",
+@@ -167,7 +164,7 @@ static struct snd_soc_dai_link smdk_dai[] = {
+ 	[PRI_CAPTURE] = { /* Primary Capture i/f */
+ 		.name = "WM8580 PAIF TX",
+ 		.stream_name = "Capture",
+-		.cpu_dai_name = "samsung-i2s.0",
++		.cpu_dai_name = "samsung-i2s.2",
+ 		.codec_dai_name = "wm8580-hifi-capture",
+ 		.platform_name = "samsung-i2s.0",
+ 		.codec_name = "wm8580.0-001b",
+@@ -175,23 +172,13 @@ static struct snd_soc_dai_link smdk_dai[] = {
+ 		.init = smdk_wm8580_init_paiftx,
+ 		.ops = &smdk_ops,
+ 	},
+-	[SEC_PLAYBACK] = { /* Sec_Fifo Playback i/f */
+-		.name = "Sec_FIFO TX",
+-		.stream_name = "Playback",
+-		.cpu_dai_name = "samsung-i2s-sec",
+-		.codec_dai_name = "wm8580-hifi-playback",
+-		.platform_name = "samsung-i2s-sec",
+-		.codec_name = "wm8580.0-001b",
+-		.dai_fmt = SMDK_DAI_FMT,
+-		.ops = &smdk_ops,
+-	},
+ };
  
- 	u32 *tx_dma_buf;
-@@ -217,15 +218,13 @@ static void dspi_rx_dma_callback(void *arg)
- 	struct fsl_dspi *dspi = arg;
- 	struct fsl_dspi_dma *dma = dspi->dma;
- 	int rx_word;
--	int i, len;
-+	int i;
- 	u16 d;
+ static struct snd_soc_card smdk = {
+ 	.name = "SMDK-I2S",
+ 	.owner = THIS_MODULE,
+ 	.dai_link = smdk_dai,
+-	.num_links = 2,
++	.num_links = ARRAY_SIZE(smdk_dai),
  
- 	rx_word = is_double_byte_mode(dspi);
- 
--	len = rx_word ? (dma->curr_xfer_len / 2) : dma->curr_xfer_len;
+ 	.dapm_widgets = smdk_wm8580_dapm_widgets,
+ 	.num_dapm_widgets = ARRAY_SIZE(smdk_wm8580_dapm_widgets),
+@@ -204,17 +191,6 @@ static struct platform_device *smdk_snd_device;
+ static int __init smdk_audio_init(void)
+ {
+ 	int ret;
+-	char *str;
 -
- 	if (!(dspi->dataflags & TRAN_STATE_RX_VOID)) {
--		for (i = 0; i < len; i++) {
-+		for (i = 0; i < dma->curr_xfer_len; i++) {
- 			d = dspi->dma->rx_dma_buf[i];
- 			rx_word ? (*(u16 *)dspi->rx = d) :
- 						(*(u8 *)dspi->rx = d);
-@@ -242,14 +241,12 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
- 	struct device *dev = &dspi->pdev->dev;
- 	int time_left;
- 	int tx_word;
--	int i, len;
-+	int i;
- 	u16 val;
+-	if (machine_is_smdkc100()
+-			|| machine_is_smdkv210() || machine_is_smdkc110()) {
+-		smdk.num_links = 3;
+-	} else if (machine_is_smdk6410()) {
+-		str = (char *)smdk_dai[PRI_PLAYBACK].cpu_dai_name;
+-		str[strlen(str) - 1] = '2';
+-		str = (char *)smdk_dai[PRI_CAPTURE].cpu_dai_name;
+-		str[strlen(str) - 1] = '2';
+-	}
  
- 	tx_word = is_double_byte_mode(dspi);
- 
--	len = tx_word ? (dma->curr_xfer_len / 2) : dma->curr_xfer_len;
--
--	for (i = 0; i < len - 1; i++) {
-+	for (i = 0; i < dma->curr_xfer_len - 1; i++) {
- 		val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
- 		dspi->dma->tx_dma_buf[i] =
- 			SPI_PUSHR_TXDATA(val) | SPI_PUSHR_PCS(dspi->cs) |
-@@ -265,7 +262,9 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
- 
- 	dma->tx_desc = dmaengine_prep_slave_single(dma->chan_tx,
- 					dma->tx_dma_phys,
--					DSPI_DMA_BUFSIZE, DMA_MEM_TO_DEV,
-+					dma->curr_xfer_len *
-+					DMA_SLAVE_BUSWIDTH_4_BYTES,
-+					DMA_MEM_TO_DEV,
- 					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
- 	if (!dma->tx_desc) {
- 		dev_err(dev, "Not able to get desc for DMA xfer\n");
-@@ -281,7 +280,9 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
- 
- 	dma->rx_desc = dmaengine_prep_slave_single(dma->chan_rx,
- 					dma->rx_dma_phys,
--					DSPI_DMA_BUFSIZE, DMA_DEV_TO_MEM,
-+					dma->curr_xfer_len *
-+					DMA_SLAVE_BUSWIDTH_4_BYTES,
-+					DMA_DEV_TO_MEM,
- 					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
- 	if (!dma->rx_desc) {
- 		dev_err(dev, "Not able to get desc for DMA xfer\n");
-@@ -328,17 +329,17 @@ static int dspi_dma_xfer(struct fsl_dspi *dspi)
- 	struct device *dev = &dspi->pdev->dev;
- 	int curr_remaining_bytes;
- 	int bytes_per_buffer;
--	int tx_word;
-+	int word = 1;
- 	int ret = 0;
- 
--	tx_word = is_double_byte_mode(dspi);
-+	if (is_double_byte_mode(dspi))
-+		word = 2;
- 	curr_remaining_bytes = dspi->len;
-+	bytes_per_buffer = DSPI_DMA_BUFSIZE / DSPI_FIFO_SIZE;
- 	while (curr_remaining_bytes) {
- 		/* Check if current transfer fits the DMA buffer */
--		dma->curr_xfer_len = curr_remaining_bytes;
--		bytes_per_buffer = DSPI_DMA_BUFSIZE /
--				(DSPI_FIFO_SIZE / (tx_word ? 2 : 1));
--		if (curr_remaining_bytes > bytes_per_buffer)
-+		dma->curr_xfer_len = curr_remaining_bytes / word;
-+		if (dma->curr_xfer_len > bytes_per_buffer)
- 			dma->curr_xfer_len = bytes_per_buffer;
- 
- 		ret = dspi_next_xfer_dma_submit(dspi);
-@@ -347,7 +348,7 @@ static int dspi_dma_xfer(struct fsl_dspi *dspi)
- 			goto exit;
- 
- 		} else {
--			curr_remaining_bytes -= dma->curr_xfer_len;
-+			curr_remaining_bytes -= dma->curr_xfer_len * word;
- 			if (curr_remaining_bytes < 0)
- 				curr_remaining_bytes = 0;
- 			dspi->len = curr_remaining_bytes;
+ 	smdk_snd_device = platform_device_alloc("soc-audio", -1);
+ 	if (!smdk_snd_device)
 -- 
 2.10.2
