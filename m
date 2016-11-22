@@ -1,66 +1,98 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 22 Nov 2016 09:07:13 +0100
-Subject: [PATCH 2/2] MAINTAINERS: Add myself as co-maintainer to fpga mgr
- framework.
-In-Reply-To: <47eb36a7-ee48-53bd-fbdc-15225c3147ec@xilinx.com>
-References: <1479764942-14321-1-git-send-email-mdf@kernel.org>
- <1479764942-14321-2-git-send-email-mdf@kernel.org>
- <alpine.DEB.2.20.1611212021050.3633@atull-VirtualBox2>
- <47eb36a7-ee48-53bd-fbdc-15225c3147ec@xilinx.com>
-Message-ID: <20161122080713.GB22441@kroah.com>
+From: yuantian.tang@nxp.com (Y.T. Tang)
+Date: Tue, 22 Nov 2016 08:20:00 +0000
+Subject: [PATCH] clk: qoriq: added ls1012a clock configuration
+In-Reply-To: <1479279262.21746.40.camel@buserror.net>
+References: <1479275900-42365-1-git-send-email-yuantian.tang@nxp.com>
+ <1479279262.21746.40.camel@buserror.net>
+Message-ID: <DB6PR0402MB28371BAAD862417B8AC8AED4F0B40@DB6PR0402MB2837.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2016 at 08:48:57AM +0100, Michal Simek wrote:
-> On 22.11.2016 03:29, atull wrote:
-> > On Mon, 21 Nov 2016, Moritz Fischer wrote:
-> > 
-> >> Add myself as co-maintainer to fpga mgr framework.
-> >>
-> >> Signed-off-by: Moritz Fischer <mdf@kernel.org>
-> >> Cc: Alan Tull <atull@opensource.altera.com>
-> >> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> >> Cc: linux-kernel at vger.kernel.org
-> >> Cc: linux-fpga at vger.kernel.org
-> >> ---
-> >> Hi all,
-> >>
-> >> Lately we've fallen behind a bit on reviewing patches lately.
-> > 
-> > Hi Moritz,
-> > 
-> > drivers/fpga has been in the upstream kernel a year now.  Most of that
-> > time, traffic has been very slow.  Recently we had more traffic while
-> > I was travelling and moving to a new office, both cases leaving me
-> > with bad network connectivity.  Things will probably return to normal.
-> > I appreciate your passion and all your effort reviewing stuff.  I
-> > don't see a need for two maintainers at this point.
+Hi Scott,
+
+> -----Original Message-----
+> From: Scott Wood [mailto:oss at buserror.net]
+> Sent: Wednesday, November 16, 2016 2:54 PM
+> To: Y.T. Tang <yuantian.tang@nxp.com>; mturquette at baylibre.com
+> Cc: sboyd at codeaurora.org; linux-kernel at vger.kernel.org; Scott Wood
+> <scott.wood@nxp.com>; linux-clk at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH] clk: qoriq: added ls1012a clock configuration
 > 
-> TBH. I think it is not a bad option. I do normally have backup person
-> for all repos I do maintain. It doesn't mean that second maintainer does
-> something but it has all accesses to repos you maintain.
-> It means if something really happens to you (hopefully not) than this
-> person can continue in this work without any delay which is not a bad
-> thing.
-> It is really just about talking to each other what that second person
-> will do - probably just review patches as is done now. You can also
-> learn from each other.
-> I would like to be involved more in this but unfortunately I don't have
-> enough time to do it properly.
+> On Wed, 2016-11-16 at 13:58 +0800, yuantian.tang at nxp.com wrote:
+> > From: Tang Yuantian <Yuantian.Tang@nxp.com>
+> >
+> > Added ls1012a clock configuation information.
 > 
-> Regarding maintaining this repo. It is just standard process. Apply
-> sensible things, well described and test it. And then send pull request
-> to Greg based on signed tags and you are done.
-> Greg should told you what should be the base which you should use for
-> pull request. Someone is taking patches based on rc1 tag, someone is
-> rebasing it on the final tag.
+> Do we really need the same line in the changelog twice?
+> 
+> >
+> > Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
+> > ---
+> > ?drivers/clk/clk-qoriq.c | 19 +++++++++++++++++++
+> > ?1 file changed, 19 insertions(+)
+> >
+> > diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c index
+> > 1bece0f..563d874 100644
+> > --- a/drivers/clk/clk-qoriq.c
+> > +++ b/drivers/clk/clk-qoriq.c
+> > @@ -202,6 +202,14 @@ static const struct clockgen_muxinfo ls1021a_cmux
+> = {
+> > ?	}
+> > ?};
+> >
+> > +static const struct clockgen_muxinfo ls1012a_cmux = {
+> > +	{
+> > +		[0] = { CLKSEL_VALID, CGA_PLL1, PLL_DIV1 },
+> > +		{},
+> > +		[2] = { CLKSEL_VALID, CGA_PLL1, PLL_DIV2 },
+> > +	}
+> > +};
+> > +
+> 
+> Based on the "ls1021a_cmux" in the context it looks like this patch is
+> intended to apply on top
+> of?https://patchwork.kernel.org/patch/8923541/?but I don't see any mention
+> of that.
+> 
+I saw this patch had been merged already.
 
-Greg doesn't care what base you use, as long as you don't rebase
-patches.  What subsystem does that?  I need to go yell at someone...
+Regards,
+Yuantian
 
-And I take patches just as easily, what ever works best for the
-subsystem.
-
-thanks,
-
-greg k-h
+> > ?static const struct clockgen_muxinfo t1040_cmux = {
+> > ?	{
+> > ?		[0] = { CLKSEL_VALID, CGA_PLL1, PLL_DIV1 }, @@ -482,6
+> +490,16 @@
+> > static const struct clockgen_chipinfo chipinfo[] = {
+> > ?		.pll_mask = 0x03,
+> > ?	},
+> > ?	{
+> > +		.compat = "fsl,ls1012a-clockgen",
+> > +		.cmux_groups = {
+> > +			&ls1012a_cmux
+> > +		},
+> > +		.cmux_to_group = {
+> > +			0, -1
+> > +		},
+> > +		.pll_mask = 0x03,
+> > +	},
+> > +	{
+> > ?		.compat = "fsl,ls1043a-clockgen",
+> > ?		.init_periph = t2080_init_periph,
+> > ?		.cmux_groups = {
+> > @@ -1284,6 +1302,7 @@ CLK_OF_DECLARE(qoriq_clockgen_2,
+> > "fsl,qoriq-clockgen- 2.0", clockgen_init);
+> > ?CLK_OF_DECLARE(qoriq_clockgen_ls1021a, "fsl,ls1021a-clockgen",
+> > clockgen_init);
+> > ?CLK_OF_DECLARE(qoriq_clockgen_ls1043a, "fsl,ls1043a-clockgen",
+> > clockgen_init);
+> > ?CLK_OF_DECLARE(qoriq_clockgen_ls2080a, "fsl,ls2080a-clockgen",
+> > clockgen_init);
+> > +CLK_OF_DECLARE(qoriq_clockgen_ls1012a, "fsl,ls1012a-clockgen",
+> > clockgen_init);
+> 
+> Please keep these lists of chips sorted (or as close as you can in the case of
+> the cmux structs which already have some sorting issues).
+> 
+> -Scott
