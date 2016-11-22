@@ -1,50 +1,57 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 22 Nov 2016 12:35:05 +0100
-Subject: [PATCH v3] clkdev: Detect errors in clk_hw_register_clkdev() for
- mass registration
-In-Reply-To: <CAMuHMdW8V2v7na1c4B=w2qzN=qVF0QUA3fcqaUXdTEVB20JREg@mail.gmail.com>
-References: <1477033358-7934-1-git-send-email-geert@linux-m68k.org>
- <20161031092223.GW1041@n2100.armlinux.org.uk>
- <CAMuHMdW8V2v7na1c4B=w2qzN=qVF0QUA3fcqaUXdTEVB20JREg@mail.gmail.com>
-Message-ID: <CAMuHMdXE89a1-qzH5Se-w1L2bLknTae7jPQ07q5Zw_nKt7RLPA@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 22 Nov 2016 14:40:25 +0300
+Subject: [PATCH 16/18] arm64: dts: h3ulcb: rename SDHI0 pins
+In-Reply-To: <f4f57fbc-313c-669f-94c7-073747a20a82@cogentembedded.com>
+References: <cover.1479726397.git.horms+renesas@verge.net.au>
+ <93373c309a703b57690216db4106a4a534929c15.1479726397.git.horms+renesas@verge.net.au>
+ <45a251f6-ee0c-5eba-ffd1-3f61a1e7ccc7@cogentembedded.com>
+ <f4f57fbc-313c-669f-94c7-073747a20a82@cogentembedded.com>
+Message-ID: <d4fbb71f-2a4d-2239-faa9-c017c74e1d79@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 31, 2016 at 10:31 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Mon, Oct 31, 2016 at 10:22 AM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
->> On Fri, Oct 21, 2016 at 09:02:38AM +0200, Geert Uytterhoeven wrote:
->>> Unlike clk_register_clkdev(), clk_hw_register_clkdev() doesn't check for
->>> passed error objects from a previous registration call. Hence the caller
->>> of clk_hw_register_*() has to check for errors before calling
->>> clk_hw_register_clkdev*().
+On 11/22/2016 2:22 PM, Vladimir Barinov wrote:
+
+>>> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 >>>
->>> Make clk_hw_register_clkdev() more similar to clk_register_clkdev() by
->>> adding this error check, removing the burden from callers that do mass
->>> registration.
+>>> This changes SDHI0 pin names for H3ULCB board
 >>>
->>> Fixes: e4f1b49bda6d6aa2 ("clkdev: Add clk_hw based registration APIs")
->>> Fixes: 944b9a41e004534f ("clk: ls1x: Migrate to clk_hw based OF and registration APIs")
->>> Fixes: 44ce9a9ae977736f ("MIPS: TXx9: Convert to Common Clock Framework")
->>> Fixes: f48d947a162dfa9d ("clk: clps711x: Migrate to clk_hw based OF and registration APIs")
->>> Fixes: b4626a7f489238a5 ("CLK: Add Loongson1C clock support")
->>> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+>>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>> ---
+>>>  arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 8 ++++----
+>>>  1 file changed, 4 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+>>> b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+>>> index 8d0ac076d8e2..6ffb0517421a 100644
+>>> --- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+>>> +++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+>>> @@ -163,13 +163,13 @@
+>>>          function = "avb";
+>>>      };
+>>>
+>>> -    sdhi0_pins_3v3: sd0_3v3 {
+>>> +    sdhi0_pins: sd0 {
+>>>          groups = "sdhi0_data4", "sdhi0_ctrl";
+>>>          function = "sdhi0";
+>>>          power-source = <3300>;
+>>>      };
+>>>
+>>> -    sdhi0_pins_1v8: sd0_1v8 {
+>>> +    sdhi0_pins_uhs: sd0 {
 >>
->> Please put this in the patch system, thanks.
+>>    I'm afraid the following will just override the props of the node above
+>> which is not what we ant.
+> Thank you for pointing to this.
 >
-> Done. I hope it went through, the "new" README predates git-send-email.
+> This is my typo.
+> I will rework the patch to have different node names.
 
-Still no evidence of the patch having arrived...
-Tried the web interface instead, patch is now 8631/1.
+    The patch had been already merged by Simon and was posted a s apart of a 
+pull request (if I don't mistake), so I guess an incremental patch needed now...
 
-Gr{oetje,eeting}s,
+> Regards,
+> Vladimir
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+MBR, Sergei
