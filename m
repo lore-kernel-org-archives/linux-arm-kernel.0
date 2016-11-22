@@ -1,35 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 22 Nov 2016 16:49:01 +0100
-Subject: [PATCH] drm/sun4i: Fix a return value in case of error
-In-Reply-To: <20161118181847.8436-1-christophe.jaillet@wanadoo.fr>
-References: <20161118181847.8436-1-christophe.jaillet@wanadoo.fr>
-Message-ID: <20161122154901.3bccughk6q6miu6w@lukather>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 22 Nov 2016 15:57:59 +0000
+Subject: [PATCH] dt-bindings: mfd: Improve readability for TPS65217
+ interrupt sources
+In-Reply-To: <20161121131515.8040-1-woogyom.kim@gmail.com>
+References: <20161121131515.8040-1-woogyom.kim@gmail.com>
+Message-ID: <20161122155759.GG10134@dell.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 07:18:47PM +0100, Christophe JAILLET wrote:
-> If 'sun4i_backend_drm_format_to_layer()' does not return 0, then 'val' is
-> left unmodified.
-> As it is not initialized either, the return value can be anything.
-> 
-> It is likely that returning the error code was expected here.
-> 
-> As the only caller of 'sun4i_backend_update_layer_formats()' does not check
-> the return value, this fix is purely theorical.
-> 
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+On Mon, 21 Nov 2016, Milo Kim wrote:
 
-Applied, thanks!
-Maxime
+> AC and USB interrupts are related with external power input.
+> PB interrupt means push button pressed or released event.
+> Use better human readable definitions.
+> 
+> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+> ---
+>  arch/arm/boot/dts/am335x-bone-common.dtsi | 4 ++--
+>  include/dt-bindings/mfd/tps65217.h        | 6 +++---
+>  2 files changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+> index dc561d5..1848d58 100644
+> --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
+> +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+> @@ -319,13 +319,13 @@
+>  	ti,pmic-shutdown-controller;
+>  
+>  	charger {
+> -		interrupts = <TPS65217_IRQ_AC>, <TPS65217_IRQ_USB>;
+> +		interrupts = <TPS65217_IRQ_AC_POWER>, <TPS65217_IRQ_USB_POWER>;
+>  		interrupts-names = "AC", "USB";
+>  		status = "okay";
+>  	};
+>  
+>  	pwrbutton {
+> -		interrupts = <TPS65217_IRQ_PB>;
+> +		interrupts = <TPS65217_IRQ_PUSHBUTTON>;
+
+Push button or power button?
+
+>  		status = "okay";
+>  	};
+>  
+> diff --git a/include/dt-bindings/mfd/tps65217.h b/include/dt-bindings/mfd/tps65217.h
+> index cafb9e6..0293fdd 100644
+> --- a/include/dt-bindings/mfd/tps65217.h
+> +++ b/include/dt-bindings/mfd/tps65217.h
+> @@ -19,8 +19,8 @@
+>  #ifndef __DT_BINDINGS_TPS65217_H__
+>  #define __DT_BINDINGS_TPS65217_H__
+>  
+> -#define TPS65217_IRQ_USB	0
+> -#define TPS65217_IRQ_AC		1
+> -#define TPS65217_IRQ_PB		2
+> +#define TPS65217_IRQ_USB_POWER		0	/* USB power state change */
+> +#define TPS65217_IRQ_AC_POWER		1	/* AC power state change */
+> +#define TPS65217_IRQ_PUSHBUTTON		2	/* Push button state change */
+
+This changes the ABI.
+
+It will require a DT Ack.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161122/a28ed215/attachment-0001.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
