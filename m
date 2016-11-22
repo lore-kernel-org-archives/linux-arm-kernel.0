@@ -1,19 +1,19 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 22 Nov 2016 17:26:28 +0000
-Subject: Applied "ASoC: samsung: Enable COMPILE_TEST for entire Samsung ASoc"
- to the asoc tree
-In-Reply-To: <1479566911-5580-6-git-send-email-krzk@kernel.org>
-Message-ID: <E1c9Epw-0005mh-9x@debutante>
+Date: Tue, 22 Nov 2016 17:26:49 +0000
+Subject: Applied "spi: spi-fsl-dspi: Fix continuous selection format" to the
+ spi tree
+In-Reply-To: <fd5dac77580ba02edb38319d04345e23a34b2d9d.1479796821.git.maitysanchayan@gmail.com>
+Message-ID: <E1c9EqH-0005wi-D8@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: samsung: Enable COMPILE_TEST for entire Samsung ASoc
+   spi: spi-fsl-dspi: Fix continuous selection format
 
-has been applied to the asoc tree at
+has been applied to the spi tree at
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
 All being well this means that it will be integrated into the linux-next
 tree (usually sometime in the next 24 hours) and sent to Linus during
@@ -34,34 +34,75 @@ to this mail.
 Thanks,
 Mark
 
->From a41dcdeee5d87cf3852b857cc3a8507832ec8b42 Mon Sep 17 00:00:00 2001
-From: Krzysztof Kozlowski <krzk@kernel.org>
-Date: Sun, 20 Nov 2016 21:24:54 +0200
-Subject: [PATCH] ASoC: samsung: Enable COMPILE_TEST for entire Samsung ASoc
+>From ccf7d8ee3d6eb600338a184e9a192ec1d5aee924 Mon Sep 17 00:00:00 2001
+From: Sanchayan Maity <maitysanchayan@gmail.com>
+Date: Tue, 22 Nov 2016 12:31:31 +0530
+Subject: [PATCH] spi: spi-fsl-dspi: Fix continuous selection format
 
-Instead of build time, Samsung ASoC drivers have rather runtime
-dependency on Exynos or other Samsung platforms.  For building they
-require Common Clock Framework.  If it is provided they could be compile
-tested to increase build coverage.
+Current DMA implementation was not handling the continuous selection
+format viz. SPI chip select would be deasserted even between sequential
+serial transfers.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+Use existing dspi_data_to_pushr function to restructure the transmit
+code path and set or reset the CONT bit on same lines as code path
+in EOQ mode does. This correctly implements continuous selection format
+while also correcting and cleaning up the transmit code path.
+
+Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/samsung/Kconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/spi/spi-fsl-dspi.c | 20 ++++++--------------
+ 1 file changed, 6 insertions(+), 14 deletions(-)
 
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index ea0fa9971a0c..48dcd3dd9ec7 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -1,6 +1,7 @@
- menuconfig SND_SOC_SAMSUNG
- 	tristate "ASoC support for Samsung"
--	depends on (PLAT_SAMSUNG || ARCH_EXYNOS)
-+	depends on PLAT_SAMSUNG || ARCH_EXYNOS || COMPILE_TEST
-+	depends on COMMON_CLK
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	---help---
- 	  Say Y or M if you want to add support for codecs attached to
+diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
+index cb41c327bd77..7ada112bfd85 100644
+--- a/drivers/spi/spi-fsl-dspi.c
++++ b/drivers/spi/spi-fsl-dspi.c
+@@ -196,6 +196,8 @@ struct fsl_dspi {
+ 	struct fsl_dspi_dma	*dma;
+ };
+ 
++static u32 dspi_data_to_pushr(struct fsl_dspi *dspi, int tx_word);
++
+ static inline int is_double_byte_mode(struct fsl_dspi *dspi)
+ {
+ 	unsigned int val;
+@@ -242,24 +244,15 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
+ 	int time_left;
+ 	int tx_word;
+ 	int i;
+-	u16 val;
+ 
+ 	tx_word = is_double_byte_mode(dspi);
+ 
+-	for (i = 0; i < dma->curr_xfer_len - 1; i++) {
+-		val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
+-		dspi->dma->tx_dma_buf[i] =
+-			SPI_PUSHR_TXDATA(val) | SPI_PUSHR_PCS(dspi->cs) |
+-			SPI_PUSHR_CTAS(0) | SPI_PUSHR_CONT;
+-		dspi->tx += tx_word + 1;
++	for (i = 0; i < dma->curr_xfer_len; i++) {
++		dspi->dma->tx_dma_buf[i] = dspi_data_to_pushr(dspi, tx_word);
++		if ((dspi->cs_change) && (!dspi->len))
++			dspi->dma->tx_dma_buf[i] &= ~SPI_PUSHR_CONT;
+ 	}
+ 
+-	val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
+-	dspi->dma->tx_dma_buf[i] = SPI_PUSHR_TXDATA(val) |
+-					SPI_PUSHR_PCS(dspi->cs) |
+-					SPI_PUSHR_CTAS(0);
+-	dspi->tx += tx_word + 1;
+-
+ 	dma->tx_desc = dmaengine_prep_slave_single(dma->chan_tx,
+ 					dma->tx_dma_phys,
+ 					dma->curr_xfer_len *
+@@ -351,7 +344,6 @@ static int dspi_dma_xfer(struct fsl_dspi *dspi)
+ 			curr_remaining_bytes -= dma->curr_xfer_len * word;
+ 			if (curr_remaining_bytes < 0)
+ 				curr_remaining_bytes = 0;
+-			dspi->len = curr_remaining_bytes;
+ 		}
+ 	}
+ 
 -- 
 2.10.2
