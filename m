@@ -1,10 +1,10 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 21 Nov 2016 21:21:39 -0800
-Subject: [GIT PULL 3/4] bcm2835-defconfig-next-2016-11-18
-In-Reply-To: <20161118185835.14452-3-eric@anholt.net>
+Date: Mon, 21 Nov 2016 21:26:50 -0800
+Subject: [GIT PULL 4/4] bcm2835-defconfig-64-next-2016-11-18
+In-Reply-To: <20161118185835.14452-4-eric@anholt.net>
 References: <20161118185835.14452-1-eric@anholt.net>
- <20161118185835.14452-3-eric@anholt.net>
-Message-ID: <9b2d920e-aad4-e25a-1657-32d0a1b4f77d@gmail.com>
+ <20161118185835.14452-4-eric@anholt.net>
+Message-ID: <926ac58e-599b-0f10-7bf7-bd91a633c817@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,15 +13,16 @@ Le 18/11/2016 ? 10:58, Eric Anholt a ?crit :
 > 
 > are available in the git repository at:
 > 
->   https://github.com/anholt/linux tags/bcm2835-defconfig-next-2016-11-18
+>   https://github.com/anholt/linux tags/bcm2835-defconfig-64-next-2016-11-18
 > 
-> for you to fetch changes up to bab0cb90550467c71f4e1b73da406a2280c4f418:
+> for you to fetch changes up to ac178e4280e65f4d0d14b13a7bfec3a43ff90e66:
 > 
->   ARM: bcm2835: add thermal driver to default config (2016-11-11 09:00:37 -0800)
+>   ARM64: bcm2835: add thermal driver to default config (2016-11-11 09:00:00 -0800)
 > 
 > ----------------------------------------------------------------
-> This pull request enables the BCM2835 (Raspberry Pi) thermal driver in
-> the Pi1 defconfig.
+> This pull enables the BCM2837 (Pi 3) thermal driver in the defconfig.
+> 
+> ----------------------------------------------------------------
 
 Merged, thanks!
 -- 
