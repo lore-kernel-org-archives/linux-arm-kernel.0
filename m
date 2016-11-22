@@ -1,25 +1,60 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 22 Nov 2016 09:35:56 -0700
-Subject: [PATCH 2/2] MAINTAINERS: Add myself as co-maintainer to fpga mgr
- framework.
-In-Reply-To: <47eb36a7-ee48-53bd-fbdc-15225c3147ec@xilinx.com>
-References: <1479764942-14321-1-git-send-email-mdf@kernel.org>
- <1479764942-14321-2-git-send-email-mdf@kernel.org>
- <alpine.DEB.2.20.1611212021050.3633@atull-VirtualBox2>
- <47eb36a7-ee48-53bd-fbdc-15225c3147ec@xilinx.com>
-Message-ID: <20161122163556.GA3956@obsidianresearch.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 22 Nov 2016 17:37:47 +0100
+Subject: [PATCH net-next] net: mvneta: Only disable mvneta_bm for 64-bits
+In-Reply-To: <20161122.111223.676925674747527292.davem@davemloft.net> (David
+ Miller's message of "Tue, 22 Nov 2016 11:12:23 -0500 (EST)")
+References: <20161122160037.14400-1-gregory.clement@free-electrons.com>
+ <20161122.111223.676925674747527292.davem@davemloft.net>
+Message-ID: <87lgwbo4h0.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2016 at 08:48:57AM +0100, Michal Simek wrote:
+Hi David,
+ 
+ On mar., nov. 22 2016, David Miller <davem@davemloft.net> wrote:
 
-> TBH. I think it is not a bad option. I do normally have backup person
-> for all repos I do maintain. It doesn't mean that second maintainer does
-> something but it has all accesses to repos you maintain.
+> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Date: Tue, 22 Nov 2016 17:00:37 +0100
+>
+>> Actually only the mvneta_bm support is not 64-bits compatible.
+>> The mvneta code itself can run on 64-bits architecture.
+>> 
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>
+> No it cannot, it emits warnings because it casts pointers to and
+> from 32-bit integers.
+>
+> I'm not applying this.
+>
+> drivers/net/ethernet/marvell/mvneta.c: In function ?mvneta_rx_refill?:
+> drivers/net/ethernet/marvell/mvneta.c:1802:42: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+>   mvneta_rx_desc_fill(rx_desc, phys_addr, (u32)data);
+>                                           ^
+> drivers/net/ethernet/marvell/mvneta.c: In function ?mvneta_rxq_drop_pkts?:
+> drivers/net/ethernet/marvell/mvneta.c:1864:16: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+>    void *data = (void *)rx_desc->buf_cookie;
+>                 ^
+> drivers/net/ethernet/marvell/mvneta.c: In function ?mvneta_rx_swbm?:
+> drivers/net/ethernet/marvell/mvneta.c:1902:10: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+>    data = (unsigned char *)rx_desc->buf_cookie;
+>           ^
+> drivers/net/ethernet/marvell/mvneta.c: In function ?mvneta_rx_hwbm?:
+> drivers/net/ethernet/marvell/mvneta.c:2023:10: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+>    data = (unsigned char *)rx_desc->buf_cookie;
+>           ^
 
-I agree, it is a good idea to have a maintainer team model as early as
-possible just because stuff does happen. We've had to recover from MIA
-maintainers in RDMA and TPM, and it is not really nice. Generally
-a lot of patches just get dropped :(
+Indeed!
 
-Jason
+There was a missing patch for it that I had in my tree and I didn't
+submit yet. I am bout to doing it now.
+
+Thanks,
+
+Gregory
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
