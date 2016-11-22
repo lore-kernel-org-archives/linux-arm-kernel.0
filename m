@@ -1,22 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Nov 2016 22:16:51 +0100
-Subject: [RFC PATCH 04/11] PCI: tegra: limit to MMU build only
-In-Reply-To: <65053923-c783-d8d9-d594-aa18cbed413e@wwwdotorg.org>
-References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
- <1479806768-39911-5-git-send-email-vladimir.murzin@arm.com>
- <65053923-c783-d8d9-d594-aa18cbed413e@wwwdotorg.org>
-Message-ID: <4182371.efWsDqfOeS@wuerfel>
+From: mmarek@suse.com (Michal Marek)
+Date: Tue, 22 Nov 2016 22:34:30 +0100
+Subject: [PATCH 2/6] arm: Use full path in KBUILD_IMAGE definition
+In-Reply-To: <20161122213434.14788-1-mmarek@suse.com>
+References: <20161122213434.14788-1-mmarek@suse.com>
+Message-ID: <20161122213434.14788-2-mmarek@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 22, 2016 9:15:13 AM CET Stephen Warren wrote:
-> On 11/22/2016 02:26 AM, Vladimir Murzin wrote:
-> > This driver uses functionality which available for MMU build only,
-> > thus add dependency on MMU.
-> 
-> I'd expect ARCH_TEGRA to depend on MMU instead.
-> 
+The KBUILD_IMAGE variable is used by the rpm and deb-pkg targets, which
+expect it to point to the image file in the build directory. The
+builddeb script has a workaround for architectures which only provide
+the basename, but let's provide a clean interface for packaging tools.
 
-Any particular reason for why we'd single out Tegra?
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Michal Marek <mmarek@suse.com>
+---
+ arch/arm/Makefile | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-	Arnd
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 6be9ee148b78..f3fa2cafca15 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -296,10 +296,11 @@ drivers-$(CONFIG_OPROFILE)      += arch/arm/oprofile/
+ libs-y				:= arch/arm/lib/ $(libs-y)
+ 
+ # Default target when executing plain make
++boot := arch/arm/boot
+ ifeq ($(CONFIG_XIP_KERNEL),y)
+-KBUILD_IMAGE := xipImage
++KBUILD_IMAGE := $(boot)/xipImage
+ else
+-KBUILD_IMAGE := zImage
++KBUILD_IMAGE := $(boot)/zImage
+ endif
+ 
+ # Build the DT binary blobs if we have OF configured
+@@ -307,9 +308,8 @@ ifeq ($(CONFIG_USE_OF),y)
+ KBUILD_DTBS := dtbs
+ endif
+ 
+-all:	$(KBUILD_IMAGE) $(KBUILD_DTBS)
++all:	$(notdir $(KBUILD_IMAGE)) $(KBUILD_DTBS)
+ 
+-boot := arch/arm/boot
+ 
+ archprepare:
+ 	$(Q)$(MAKE) $(build)=arch/arm/tools include/generated/mach-types.h
+-- 
+2.10.0
