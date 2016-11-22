@@ -1,47 +1,68 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 22 Nov 2016 09:43:16 -0600
-Subject: [PATCH v2] ARM: dts: AM571x-IDK Initial Support
-In-Reply-To: <20161122041732.8385-1-lokeshvutla@ti.com>
-References: <20161122041732.8385-1-lokeshvutla@ti.com>
-Message-ID: <CAL_JsqLv2t0qzJ1V6NGPj3iy9tOmMcnr3nsHxojb9aJxp9+8BQ@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 22 Nov 2016 15:46:25 +0000
+Subject: [PATCH 1/3] of: base: add support to get machine compatible string
+In-Reply-To: <67a3c2c7-0cb9-9764-2710-6ee66fc4dde4@ti.com>
+References: <1479811311-3080-1-git-send-email-bgolaszewski@baylibre.com>
+ <1479811311-3080-2-git-send-email-bgolaszewski@baylibre.com>
+ <5ce9fb9f-459a-562b-2e9f-85d35f9ec035@arm.com>
+ <67a3c2c7-0cb9-9764-2710-6ee66fc4dde4@ti.com>
+Message-ID: <fdb93150-9089-c7bb-2b0a-21ded241a647@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2016 at 10:17 PM, Lokesh Vutla <lokeshvutla@ti.com> wrote:
-> From: Schuyler Patton <spatton@ti.com>
->
-> The AM571x-IDK board is a board based on TI's AM5718 SOC
-> which has a single core 1.5GHz A15 processor. This board is a
-> development platform for the Industrial market with:
-> - 1GB of DDR3L
-> - Dual 1Gbps Ethernet
-> - HDMI,
-> - PRU-ICSS
-> - uSD
-> - 16GB eMMC
-> - CAN
-> - RS-485
-> - PCIe
-> - USB3.0
-> - Video Input Port
-> - Industrial IO port and expansion connector
->
-> The link to the data sheet and TRM can be found here:
->
-> http://www.ti.com/product/AM5718
->
-> Initial support is only for basic peripherals.
->
-> Signed-off-by: Schuyler Patton <spatton@ti.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
-> Cahnges since v1:
-> - Dropped "ti,dra722", and "ti,dra72" from compatibles
-> - Fixes few node names as suggested by Rob.
-> Logs: http://pastebin.ubuntu.com/23515001/
+Hi Sekhar,
 
-Please add acks when posting new versions.
+On 22/11/16 15:06, Sekhar Nori wrote:
+> Hi Sudeep,
+>
+> On Tuesday 22 November 2016 04:23 PM, Sudeep Holla wrote:
+>>
+>>
+>> On 22/11/16 10:41, Bartosz Golaszewski wrote:
+>>> Add a function allowing to retrieve the compatible string of the root
+>>> node of the device tree.
+>>>
+>>
+>> Rob has queued [1] and it's in -next today. You can reuse that if you
+>> are planning to target this for v4.11 or just use open coding in your
+>> driver for v4.10 and target this move for v4.11 to avoid cross tree
+>> dependencies as I already mentioned in your previous thread.
+>
+> I dont have your original patch in my mailbox, but I wonder if
+> returning a pointer to property string for a node whose reference has
+> already been released is safe to do? Probably not an issue for the root
+> node, but still feels counter-intuitive.
+>
 
-Rob
+I am not sure if I understand the issue here. Are you referring a case
+where of_root is freed ?
+
+Also I have seen drivers today just using this pointer directly, but
+it's better to copy the string(I just saw this done in one case)
+
+> This is the code for reference:
+>
+> +int of_machine_get_model_name(const char **model)
+> +{
+> +       int error;
+> +
+> +       if (!of_node_get(of_root))
+> +               return -EINVAL;
+> +
+> +       error = of_property_read_string(of_root, "model", model);
+> +       if (error)
+> +               error = of_property_read_string_index(of_root, "compatible",
+> +                                                     0, model);
+> +       of_node_put(of_root);
+> +
+> +       return error;
+> +}
+> +EXPORT_SYMBOL(of_machine_get_model_name);
+>
+> Thanks,
+> Sekhar
+>
+
+-- 
+Regards,
+Sudeep
