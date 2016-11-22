@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 22 Nov 2016 17:26:49 +0000
-Subject: Applied "spi: spi-fsl-dspi: Fix continuous selection format" to the
- spi tree
-In-Reply-To: <fd5dac77580ba02edb38319d04345e23a34b2d9d.1479796821.git.maitysanchayan@gmail.com>
-Message-ID: <E1c9EqH-0005wi-D8@debutante>
+Date: Tue, 22 Nov 2016 17:26:55 +0000
+Subject: Applied "spi: spi-fsl-dspi: Fix incorrect freeing of DMA allocated
+ buffers" to the spi tree
+In-Reply-To: <fd3b1fa5d9fb2a0c2d1f6ded314acf20f5081a89.1479796821.git.maitysanchayan@gmail.com>
+Message-ID: <E1c9EqN-0005yc-Dr@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: spi-fsl-dspi: Fix continuous selection format
+   spi: spi-fsl-dspi: Fix incorrect freeing of DMA allocated buffers
 
 has been applied to the spi tree at
 
@@ -34,75 +34,39 @@ to this mail.
 Thanks,
 Mark
 
->From ccf7d8ee3d6eb600338a184e9a192ec1d5aee924 Mon Sep 17 00:00:00 2001
+>From 27d21e9f988e527982a7516fcf411994f498787d Mon Sep 17 00:00:00 2001
 From: Sanchayan Maity <maitysanchayan@gmail.com>
-Date: Tue, 22 Nov 2016 12:31:31 +0530
-Subject: [PATCH] spi: spi-fsl-dspi: Fix continuous selection format
+Date: Tue, 22 Nov 2016 12:31:32 +0530
+Subject: [PATCH] spi: spi-fsl-dspi: Fix incorrect freeing of DMA allocated
+ buffers
 
-Current DMA implementation was not handling the continuous selection
-format viz. SPI chip select would be deasserted even between sequential
-serial transfers.
-
-Use existing dspi_data_to_pushr function to restructure the transmit
-code path and set or reset the CONT bit on same lines as code path
-in EOQ mode does. This correctly implements continuous selection format
-while also correcting and cleaning up the transmit code path.
+Buffers allocated with a call to dma_alloc_coherent should be
+freed with dma_free_coherent instead of the currently used
+devm_kfree.
 
 Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-fsl-dspi.c | 20 ++++++--------------
- 1 file changed, 6 insertions(+), 14 deletions(-)
+ drivers/spi/spi-fsl-dspi.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
-index cb41c327bd77..7ada112bfd85 100644
+index b1ee1f521ba0..22f7ce1279bd 100644
 --- a/drivers/spi/spi-fsl-dspi.c
 +++ b/drivers/spi/spi-fsl-dspi.c
-@@ -196,6 +196,8 @@ struct fsl_dspi {
- 	struct fsl_dspi_dma	*dma;
- };
+@@ -427,9 +427,11 @@ static int dspi_request_dma(struct fsl_dspi *dspi, phys_addr_t phy_addr)
+ 	return 0;
  
-+static u32 dspi_data_to_pushr(struct fsl_dspi *dspi, int tx_word);
-+
- static inline int is_double_byte_mode(struct fsl_dspi *dspi)
- {
- 	unsigned int val;
-@@ -242,24 +244,15 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
- 	int time_left;
- 	int tx_word;
- 	int i;
--	u16 val;
- 
- 	tx_word = is_double_byte_mode(dspi);
- 
--	for (i = 0; i < dma->curr_xfer_len - 1; i++) {
--		val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
--		dspi->dma->tx_dma_buf[i] =
--			SPI_PUSHR_TXDATA(val) | SPI_PUSHR_PCS(dspi->cs) |
--			SPI_PUSHR_CTAS(0) | SPI_PUSHR_CONT;
--		dspi->tx += tx_word + 1;
-+	for (i = 0; i < dma->curr_xfer_len; i++) {
-+		dspi->dma->tx_dma_buf[i] = dspi_data_to_pushr(dspi, tx_word);
-+		if ((dspi->cs_change) && (!dspi->len))
-+			dspi->dma->tx_dma_buf[i] &= ~SPI_PUSHR_CONT;
- 	}
- 
--	val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
--	dspi->dma->tx_dma_buf[i] = SPI_PUSHR_TXDATA(val) |
--					SPI_PUSHR_PCS(dspi->cs) |
--					SPI_PUSHR_CTAS(0);
--	dspi->tx += tx_word + 1;
--
- 	dma->tx_desc = dmaengine_prep_slave_single(dma->chan_tx,
- 					dma->tx_dma_phys,
- 					dma->curr_xfer_len *
-@@ -351,7 +344,6 @@ static int dspi_dma_xfer(struct fsl_dspi *dspi)
- 			curr_remaining_bytes -= dma->curr_xfer_len * word;
- 			if (curr_remaining_bytes < 0)
- 				curr_remaining_bytes = 0;
--			dspi->len = curr_remaining_bytes;
- 		}
- 	}
- 
+ err_slave_config:
+-	devm_kfree(dev, dma->rx_dma_buf);
++	dma_free_coherent(dev, DSPI_DMA_BUFSIZE,
++			dma->rx_dma_buf, dma->rx_dma_phys);
+ err_rx_dma_buf:
+-	devm_kfree(dev, dma->tx_dma_buf);
++	dma_free_coherent(dev, DSPI_DMA_BUFSIZE,
++			dma->tx_dma_buf, dma->tx_dma_phys);
+ err_tx_dma_buf:
+ 	dma_release_channel(dma->chan_tx);
+ err_tx_channel:
 -- 
 2.10.2
