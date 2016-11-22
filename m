@@ -1,45 +1,44 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Tue, 22 Nov 2016 13:43:34 +0100
-Subject: [PATCH v6 3/3] arm: dts: mt2701: Add node for Mediatek JPEG
- Decoder
-In-Reply-To: <1479784905.8964.15.camel@mtksdaap41>
-References: <1479353915-5043-1-git-send-email-rick.chang@mediatek.com>
- <1479353915-5043-4-git-send-email-rick.chang@mediatek.com>
- <d602365a-e87b-5bae-8698-bd43063ef079@xs4all.nl>
- <1479784905.8964.15.camel@mtksdaap41>
-Message-ID: <badf8125-27ed-9c5b-fbc0-75716ffdfb0e@xs4all.nl>
+From: ahaslam@baylibre.com (Axel Haslam)
+Date: Tue, 22 Nov 2016 13:49:35 +0100
+Subject: [PATCH 3/3] ARM: davinci: hawk: use gpio descriptor for card
+ detect
+In-Reply-To: <51a13cb8-082c-c6c8-c1a1-c39de252d022@ti.com>
+References: <20161121161541.27048-1-ahaslam@baylibre.com>
+ <20161121161541.27048-4-ahaslam@baylibre.com>
+ <51a13cb8-082c-c6c8-c1a1-c39de252d022@ti.com>
+Message-ID: <CAKXjFTNfnEZ09XDRV8YvaD=f6OCz=iNk7R-=vN-BtBEcQzDXRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/11/16 04:21, Rick Chang wrote:
-> Hi Hans,
+On Tue, Nov 22, 2016 at 11:26 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On Monday 21 November 2016 09:45 PM, Axel Haslam wrote:
+>> Currently the mmc driver is polling the gpio to know if the
+>> card was removed.
+>>
+>> By using a gpio descriptor instead of the platform callbacks, the
+>> driver will be able to register the gpio with the mmc core with API's
+>> designed for this purpose.
+>>
+>> This has the advantage that an irq will be registered,
+>> and polling is no longer needed. Also, platform callbacks can be removed.
+>>
+>> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
 >
-> On Mon, 2016-11-21 at 15:51 +0100, Hans Verkuil wrote:
->> On 17/11/16 04:38, Rick Chang wrote:
->>> Signed-off-by: Rick Chang <rick.chang@mediatek.com>
->>> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
->>> ---
->>> This patch depends on:
->>>   CCF "Add clock support for Mediatek MT2701"[1]
->>>   iommu and smi "Add the dtsi node of iommu and smi for mt2701"[2]
->>>
->>> [1] http://lists.infradead.org/pipermail/linux-mediatek/2016-October/007271.html
->>> [2] https://patchwork.kernel.org/patch/9164013/
->>
->> I assume that 1 & 2 will appear in 4.10? So this patch needs to go in
->> after the
->> other two are merged in 4.10?
->>
->> Regards,
->>
->> 	Hans
+> This patch looks good, provided it is not based of 1/3 and 2/3. There
+> are other boards in mach-davinci using the card detect and wp callbacks.
+> And some like board-dm365-evm.c have those pins routed through a CPLD.
+> So I guess there is more work to be done before platform callbacks can
+> completely be removed from MMC/SD driver. But the closer we get, the
+> better it is :)
 >
-> [1] will appear in 4.10, but [2] will appear latter than 4.10.So this
-> patch needs to go in after [1] & [2] will be merged in 4.11.
 
-So what should I do? Merge the driver for 4.11 and wait with this patch
-until [2] is merged in 4.11? Does that sound reasonable?
+Yes, i saw the platform using CPLD for the pins. that might be tricky to remove.
+we can flag the mmc "broken card detect" which would force polling on the pin.
+im not sure if it is feasible to move the cpld pin handling to a
+driver.. (maybe a
+gpio driver?)
 
-Regards,
 
-	Hans
+> Thanks,
+> Sekhar
+>
