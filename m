@@ -1,21 +1,41 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 22 Nov 2016 16:12:08 +0530
-Subject: [RESEND PATCH 3/3] ARM: davinci: remove ohci platform usage
-In-Reply-To: <20161121165349.29128-4-ahaslam@baylibre.com>
-References: <20161121165349.29128-1-ahaslam@baylibre.com>
- <20161121165349.29128-4-ahaslam@baylibre.com>
-Message-ID: <995f3c7a-bb06-dbb4-81b5-5ad08859cc27@ti.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 22 Nov 2016 12:45:10 +0200
+Subject: [PATCH v2] mfd: twl-core: make driver DT only
+In-Reply-To: <1479810090-12183-1-git-send-email-Nicolae_Rosia@mentor.com>
+References: <1479810090-12183-1-git-send-email-Nicolae_Rosia@mentor.com>
+Message-ID: <20161122104510.iujd5revibqgbldl@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 November 2016 10:23 PM, Axel Haslam wrote:
-> As all users of ohci platform data have been converted
-> to use a regulator, we dont need to pass platform
-> data to register the ohci device anymore.
+Hi Nicolae,
+
+On Tue, Nov 22, 2016 at 12:21:30PM +0200, Nicolae Rosia wrote:
+> All users are DT-only and it makes no sense to keep
+> unused code which also prevents further cleanups.
 > 
-> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+> Signed-off-by: Nicolae Rosia <Nicolae_Rosia@mentor.com>
+> ---
+> Changes in v2:
+> Increased audience in CC list
+> 
+>  drivers/mfd/Kconfig    |   1 +
+>  drivers/mfd/twl-core.c | 395 ++-----------------------------------------------
+>  2 files changed, 10 insertions(+), 386 deletions(-)
 
-This looks good to me.
+[...]
 
-Thanks,
-Sekhar
+> @@ -1080,7 +710,6 @@ static struct of_dev_auxdata twl_auxdata_lookup[] = {
+>  static int
+>  twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+>  {
+> -	struct twl4030_platform_data	*pdata = dev_get_platdata(&client->dev);
+
+Can struct twl4030_platform_data declaration be removed now from 
+include/linux/i2c/twl.h?
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
