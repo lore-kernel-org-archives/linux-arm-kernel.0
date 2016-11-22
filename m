@@ -1,60 +1,25 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Tue, 22 Nov 2016 17:34:34 +0100
-Subject: [GIT PULL] STM32 DT changes for v4.10 #2
-In-Reply-To: <20161118183736.GJ8882@localhost>
-References: <2f793efd-01c6-fa28-0332-9e292341c064@st.com>
- <20161118183736.GJ8882@localhost>
-Message-ID: <19e6d8bc-a7bf-5681-0f40-127f5c22d554@st.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 22 Nov 2016 09:35:56 -0700
+Subject: [PATCH 2/2] MAINTAINERS: Add myself as co-maintainer to fpga mgr
+ framework.
+In-Reply-To: <47eb36a7-ee48-53bd-fbdc-15225c3147ec@xilinx.com>
+References: <1479764942-14321-1-git-send-email-mdf@kernel.org>
+ <1479764942-14321-2-git-send-email-mdf@kernel.org>
+ <alpine.DEB.2.20.1611212021050.3633@atull-VirtualBox2>
+ <47eb36a7-ee48-53bd-fbdc-15225c3147ec@xilinx.com>
+Message-ID: <20161122163556.GA3956@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Tue, Nov 22, 2016 at 08:48:57AM +0100, Michal Simek wrote:
 
-On 11/18/2016 07:37 PM, Olof Johansson wrote:
-> On Tue, Nov 15, 2016 at 03:40:24PM +0100, Alexandre Torgue wrote:
->> Hi Olof, Arnd and Kevin,
->>
->> Please consider this second round of STM32 DT updates for v4.10:
->>
->> The following changes since commit f6dbbff4f0af1a5c0d6eaf414572b5eff7a73a8b:
->>
->>   ARM: dts: stm32f429: add LSI and LSE clocks (2016-11-04 15:08:08 +0100)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
->> tags/stm32-dt-for-v4.10-2
->>
->> for you to fetch changes up to 2ecaa477b404d707bac93c56f09a0a6162e04ed7:
->>
->>   ARM: dts: stm32f429: Add QSPI clock (2016-11-15 13:59:11 +0100)
->>
->> ----------------------------------------------------------------
->> STM32 DT updates for v4.10, round 2.
->>
->> Highlights:
->> ----------
->>  - Add support of STM32F746 MCU and STM32746G-Eval board
->>  - Add QSPI support for STM32F469-Disco board
->>
->> ----------------------------------------------------------------
->> Alexandre TORGUE (1):
->>       ARM: dts: Add STM32F746 MCU and STM32746g-EVAL board
->>
->> Gabriel Fernandez (1):
->>       ARM: dts: stm32f429: Add QSPI clock
->
-> Hi, merged. But here too, please use common prefixes in the future,
-> please. I'd recommend 'ARM: dts: stm32: <...>'.
+> TBH. I think it is not a bad option. I do normally have backup person
+> for all repos I do maintain. It doesn't mean that second maintainer does
+> something but it has all accesses to repos you maintain.
 
-Thanks. I would take care next time.
+I agree, it is a good idea to have a maintainer team model as early as
+possible just because stuff does happen. We've had to recover from MIA
+maintainers in RDMA and TPM, and it is not really nice. Generally
+a lot of patches just get dropped :(
 
-Alex
-
->
->
-> Thanks!
->
->
-> -Olof
->
+Jason
