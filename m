@@ -1,77 +1,54 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 22 Nov 2016 17:03:29 +0000
-Subject: [RFC PATCH 09/11] ARM: NOMMU: define SECTION_xxx macros
-In-Reply-To: <20161122115456.GX1041@n2100.armlinux.org.uk>
-References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
- <1479806768-39911-10-git-send-email-vladimir.murzin@arm.com>
- <20161122100713.GW1041@n2100.armlinux.org.uk> <58343121.4030906@arm.com>
- <20161122115456.GX1041@n2100.armlinux.org.uk>
-Message-ID: <58347A61.306@arm.com>
+From: manu@bidouilliste.com (Emmanuel Vadot)
+Date: Tue, 22 Nov 2016 18:06:16 +0100
+Subject: [PATCH] ARM: dts: sunxi: Add num-cs for A20 spi nodes
+Message-ID: <20161122170616.29557-1-manu@bidouilliste.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/11/16 11:54, Russell King - ARM Linux wrote:
-> On Tue, Nov 22, 2016 at 11:50:57AM +0000, Vladimir Murzin wrote:
->> On 22/11/16 10:07, Russell King - ARM Linux wrote:
->>> On Tue, Nov 22, 2016 at 09:26:06AM +0000, Vladimir Murzin wrote:
->>>> Pickup defines from pgtable-2level.h to make NOMMU build happy.
->>>
->>> This needs more detail.
->>>
->>
->> It comes from
->>
->>   CC      arch/arm/kernel/setup.o
->> arch/arm/kernel/setup.c: In function 'reserve_crashkernel':
->> arch/arm/kernel/setup.c:1001:25: error: 'SECTION_SIZE' undeclared (first use in this function)
->>              crash_size, SECTION_SIZE);
->>                          ^
->> arch/arm/kernel/setup.c:1001:25: note: each undeclared identifier is reported only once for each function it appears in
->> make[1]: *** [arch/arm/kernel/setup.o] Error 1
->> make: *** [arch/arm/kernel] Error 2
-> 
-> Hmm, I decided not to use CRASH_ALIGN there because I didn't want to
-> break anyone's existing setup unnecessarily, however arguably it
-> should be CRASH_ALIGN to ensure that the new kernel is properly
-> positioned.
-> 
-> I wonder if we can get away with changing that, rather than
-> unnecessarily introducing these otherwise meaningless definitions
-> for R-class.
-> 
+The spi0 controller on the A20 have up to 4 CS (Chip Select) while the
+others three only have 1.
+Add the num-cs property to each node.
 
-CRASH_ALIGN works fine but it seems not only user of SECTION_SIZE
+Signed-off-by: Emmanuel Vadot <manu@bidouilliste.com>
+---
+ arch/arm/boot/dts/sun7i-a20.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-In file included from ./include/linux/cache.h:4:0,
-                 from ./include/linux/printk.h:8,
-                 from ./include/linux/kernel.h:13,
-                 from arch/arm/mach-omap2/omap-secure.c:15:
-arch/arm/mach-omap2/omap-secure.c: In function 'omap_secure_ram_reserve_memblock':
-arch/arm/mach-omap2/omap-secure.c:65:21: error: 'SECTION_SIZE' undeclared (first use in this function)
-  size = ALIGN(size, SECTION_SIZE);
-                     ^
-./include/uapi/linux/kernel.h:10:47: note: in definition of macro '__ALIGN_KERNEL_MASK'
- #define __ALIGN_KERNEL_MASK(x, mask) (((x) + (mask)) & ~(mask))
-                                               ^
-./include/linux/kernel.h:48:22: note: in expansion of macro '__ALIGN_KERNEL'
- #define ALIGN(x, a)  __ALIGN_KERNEL((x), (a))
-                      ^
-arch/arm/mach-omap2/omap-secure.c:65:9: note: in expansion of macro 'ALIGN'
-  size = ALIGN(size, SECTION_SIZE);
-         ^
-arch/arm/mach-omap2/omap-secure.c:65:21: note: each undeclared identifier is reported only once for each function it appears in
-  size = ALIGN(size, SECTION_SIZE);
-                     ^
-./include/uapi/linux/kernel.h:10:47: note: in definition of macro '__ALIGN_KERNEL_MASK'
- #define __ALIGN_KERNEL_MASK(x, mask) (((x) + (mask)) & ~(mask))
-                                               ^
-./include/linux/kernel.h:48:22: note: in expansion of macro '__ALIGN_KERNEL'
- #define ALIGN(x, a)  __ALIGN_KERNEL((x), (a))
-                      ^
-arch/arm/mach-omap2/omap-secure.c:65:9: note: in expansion of macro 'ALIGN'
-  size = ALIGN(size, SECTION_SIZE);
-         ^
-make[1]: *** [arch/arm/mach-omap2/omap-secure.o] Error 1
-
-Cheers
-Vladimir
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 94cf5a1..ed21982 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -871,6 +871,7 @@
+ 			status = "disabled";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			num-cs = 4;
+ 		};
+ 
+ 		spi1: spi at 01c06000 {
+@@ -885,6 +886,7 @@
+ 			status = "disabled";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			num-cs = 1;
+ 		};
+ 
+ 		emac: ethernet at 01c0b000 {
+@@ -1037,6 +1039,7 @@
+ 			status = "disabled";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			num-cs = 1;
+ 		};
+ 
+ 		ahci: sata at 01c18000 {
+@@ -1079,6 +1082,7 @@
+ 			status = "disabled";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
++			num-cs = 1;
+ 		};
+ 
+ 		pio: pinctrl at 01c20800 {
+-- 
+2.9.2
