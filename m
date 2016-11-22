@@ -1,71 +1,78 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 22 Nov 2016 09:26:07 +0000
-Subject: [RFC PATCH 10/11] ARM: NOMMU: define __arm_ioremap_exec and
- pci_ioremap functions
+Date: Tue, 22 Nov 2016 09:26:02 +0000
+Subject: [RFC PATCH 05/11] ARM: move arm_heavy_mb to MMU/noMMU neutral place
 In-Reply-To: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
 References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1479806768-39911-11-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1479806768-39911-6-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define __arm_ioremap_exec and pci_ioremap* functions fallowing pattern
-for other ioremap functions.
+So it can be referenced from both camps.
 
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/mm/nommu.c |   35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+ arch/arm/mm/flush.c |   15 ---------------
+ arch/arm/mm/iomap.c |   17 +++++++++++++++++
+ 2 files changed, 17 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-index 2740967..681cec8 100644
---- a/arch/arm/mm/nommu.c
-+++ b/arch/arm/mm/nommu.c
-@@ -19,6 +19,7 @@
- #include <asm/cputype.h>
- #include <asm/mpu.h>
- #include <asm/procinfo.h>
-+#include <asm/mach/map.h>
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 3cced84..0c73969 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -21,21 +21,6 @@
  
  #include "mm.h"
  
-@@ -401,3 +402,37 @@ void iounmap(volatile void __iomem *addr)
- {
+-#ifdef CONFIG_ARM_HEAVY_MB
+-void (*soc_mb)(void);
+-
+-void arm_heavy_mb(void)
+-{
+-#ifdef CONFIG_OUTER_CACHE_SYNC
+-	if (outer_cache.sync)
+-		outer_cache.sync();
+-#endif
+-	if (soc_mb)
+-		soc_mb();
+-}
+-EXPORT_SYMBOL(arm_heavy_mb);
+-#endif
+-
+ #ifdef CONFIG_CPU_CACHE_VIPT
+ 
+ static void flush_pfn_alias(unsigned long pfn, unsigned long vaddr)
+diff --git a/arch/arm/mm/iomap.c b/arch/arm/mm/iomap.c
+index 4614208..1b601db 100644
+--- a/arch/arm/mm/iomap.c
++++ b/arch/arm/mm/iomap.c
+@@ -9,6 +9,8 @@
+ #include <linux/ioport.h>
+ #include <linux/io.h>
+ 
++#include <asm/outercache.h>
++
+ unsigned long vga_base;
+ EXPORT_SYMBOL(vga_base);
+ 
+@@ -40,3 +42,18 @@ void pci_iounmap(struct pci_dev *dev, void __iomem *addr)
  }
- EXPORT_SYMBOL(iounmap);
+ EXPORT_SYMBOL(pci_iounmap);
+ #endif
 +
-+void __iomem *
-+__arm_ioremap_exec(phys_addr_t phys_addr, size_t size, bool cached)
++#ifdef CONFIG_ARM_HEAVY_MB
++void (*soc_mb)(void);
++
++void arm_heavy_mb(void)
 +{
-+	unsigned int mtype;
-+
-+	if (cached)
-+		mtype = MT_MEMORY_RWX;
-+	else
-+		mtype = MT_MEMORY_RWX_NONCACHED;
-+
-+	return __arm_ioremap_caller(phys_addr, size, mtype,
-+			__builtin_return_address(0));
++#ifdef CONFIG_OUTER_CACHE_SYNC
++	if (outer_cache.sync)
++		outer_cache.sync();
++#endif
++	if (soc_mb)
++		soc_mb();
 +}
-+
-+#ifdef CONFIG_PCI
-+static int pci_ioremap_mem_type = MT_DEVICE;
-+
-+void pci_ioremap_set_mem_type(int mem_type)
-+{
-+	pci_ioremap_mem_type = mem_type;
-+}
-+
-+int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
-+{
-+	BUG_ON(offset + SZ_64K > IO_SPACE_LIMIT);
-+
-+	return ioremap_page_range(PCI_IO_VIRT_BASE + offset,
-+				  PCI_IO_VIRT_BASE + offset + SZ_64K,
-+				  phys_addr,
-+				  MT_DEVICE);
-+}
-+EXPORT_SYMBOL_GPL(pci_ioremap_io);
++EXPORT_SYMBOL(arm_heavy_mb);
 +#endif
 -- 
 1.7.9.5
