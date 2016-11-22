@@ -1,74 +1,33 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 22 Nov 2016 17:16:02 +0100
-Subject: [PATCH] arm64: tegra: Add VDD_GPU regulator to Jetson TX1
-Message-ID: <20161122161602.3984-1-thierry.reding@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 22 Nov 2016 16:22:51 +0000
+Subject: [PATCH v2 1/4] spi: spi-fsl-dspi: Fix SPI transfer issue when
+ using multiple SPI_IOC_MESSAGE
+In-Reply-To: <20161121191850.GB24521@Sanchayan-Arch.localdomain>
+References: <cover.1479706671.git.maitysanchayan@gmail.com>
+ <bbdbc8df434dd2af74eb351b799a2812a1c1967e.1479706671.git.maitysanchayan@gmail.com>
+ <20161121191847.vg32cwople4qmini@sirena.org.uk>
+ <20161121191430.GA24521@Sanchayan-Arch.localdomain>
+ <20161121191850.GB24521@Sanchayan-Arch.localdomain>
+Message-ID: <20161122162251.x7uheu47426g3mpg@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandre Courbot <acourbot@nvidia.com>
+On Tue, Nov 22, 2016 at 12:48:50AM +0530, maitysanchayan at gmail.com wrote:
+> On 16-11-22 00:44:30, maitysanchayan at gmail.com wrote:
 
-Add the VDD_GPU regulator (a GPIO-enabled PWM regulator) to the Jetson
-TX1 board. This addition allows the GPU to be used provided the
-bootloader properly enabled the GPU node.
+> > This is not a resend of an applied patch. The whole series applies on
+> > top of your topic/fsl-dspi branch and has fixes for the SPI DMA as
+> > incremental changes
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
-Hi ARM-SoC maintainers,
+> Sorry. I take that back. I now see you applied the patch and I got the applied
+> mail after I replied.
 
-This was part of a pull request for v4.8 but it seems everything of the
-pull request except this one patch made it upstream. I think perhaps it
-may have been the dependency on the regulator tree that made you defer
-this to after v4.8-rc1 and then I forgot to resend.
-
-Here's a link to the pull request:
-
-	http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/443469.html
-
-There was no discussion on the list, but we might have discussed it on
-IRC.
-
-Can you please pick this up for v4.10-rc1?
-
-Thanks,
-Thierry
-
- arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi b/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
-index 5fda583351d7..906fb836d241 100644
---- a/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
-@@ -21,6 +21,10 @@
- 		reg = <0x0 0x80000000 0x1 0x0>;
- 	};
- 
-+	gpu at 57000000 {
-+		vdd-supply = <&vdd_gpu>;
-+	};
-+
- 	/* debug port */
- 	serial at 70006000 {
- 		status = "okay";
-@@ -291,4 +295,18 @@
- 			clock-frequency = <32768>;
- 		};
- 	};
-+
-+	regulators {
-+		vdd_gpu: regulator at 100 {
-+			compatible = "pwm-regulator";
-+			reg = <100>;
-+			pwms = <&pwm 1 4880>;
-+			regulator-name = "VDD_GPU";
-+			regulator-min-microvolt = <710000>;
-+			regulator-max-microvolt = <1320000>;
-+			enable-gpios = <&pmic 6 GPIO_ACTIVE_HIGH>;
-+			regulator-ramp-delay = <80>;
-+			regulator-enable-ramp-delay = <1000>;
-+		};
-+	};
- };
--- 
-2.10.2
+Ah, I did apply it on Friday but somehow it didn't get pushed until
+yesterday.  Sorry for the confusion.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 455 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161122/ce824c66/attachment.sig>
