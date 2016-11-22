@@ -1,88 +1,170 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Tue, 22 Nov 2016 13:55:45 +1030
-Subject: [PATCH v2 3/6] mfd: dt: Add bindings for the Aspeed LPC Host
- Controller (LPCHC)
-In-Reply-To: <20161118184535.GE19884@dell.home>
-References: <1478097481-14895-1-git-send-email-andrew@aj.id.au>
- <1478097481-14895-4-git-send-email-andrew@aj.id.au>
- <20161118184437.GD19884@dell.home> <20161118184535.GE19884@dell.home>
-Message-ID: <1479785145.2503.20.camel@aj.id.au>
+From: rick.chang@mediatek.com (Rick Chang)
+Date: Tue, 22 Nov 2016 11:46:13 +0800
+Subject: [PATCH v7 0/4] Add Mediatek JPEG Decoder
+Message-ID: <1479786377-11567-1-git-send-email-rick.chang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-11-18 at 18:45 +0000, Lee Jones wrote:
-> [Sending Arnd this time!]
-> 
-> > Arnd,
-> > 
-> > Do you have a preference?
-> > 
-> > > The Aspeed LPC Host Controller is presented as a syscon device to
-> > > arbitrate access by LPC and pinmux drivers. LPC pinmux configuration on
-> > > fifth generation SoCs depends on bits in both the System Control Unit
-> > > and the LPC Host Controller.
-> > > 
-> > > > > > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-> > > ---
-> > > ?Documentation/devicetree/bindings/mfd/aspeed-lpchc.txt | 17 +++++++++++++++++
-> > 
-> > Create a new directory in bindings/mfd called 'syscon'.
-> > 
-> > Or perhaps 'bindings/syscon'.
-> > 
+This series of patches provide a v4l2 driver to control Mediatek JPEG decoder
+for decoding JPEG image and Motion JPEG bitstream.
 
-Sounds good to me. I'll wait for Arnd's feedback.
+changes since v6:
+- fix kbuild test fail
+- Add patch for MAINTAINERS
 
-Note that this patch conflicts with some of the ideas I outlined in
+changes since v5:
+- remove redundant name from struct mtk_jpeg_fmt
+- Set state of all buffers to VB2_BUF_STATE_QUEUED if fail in start streaming
+- Remove VB2_USERPTR
+- Add check for buffer index
 
-https://www.spinics.net/lists/arm-kernel/msg543233.html
+changes since v4:
+- Change file name of binding documentation
+- Revise DT binding documentation
+- Revise compatible string
 
-I sent it hoping to get some feedback on the approach to take for these
-LPC-related bits. Did you have any suggestions? The problems with
-hardware complexity are amplified by the fact that the datasheet is
-only available under NDA, but I will do what I can to clarify.
+changes since v3:
+- Revise DT binding documentation
+- Revise compatible string
 
-> > > ?1 file changed, 17 insertions(+)
-> > > ?create mode 100644 Documentation/devicetree/bindings/mfd/aspeed-lpchc.txt
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/mfd/aspeed-lpchc.txt b/Documentation/devicetree/bindings/mfd/aspeed-lpchc.txt
-> > > new file mode 100644
-> > > index 000000000000..792651488c3d
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/mfd/aspeed-lpchc.txt
-> > > @@ -0,0 +1,17 @@
-> > > +* Device tree bindings for the Aspeed LPC Host Controller (LPCHC)
-> > > +
-> > > +The LPCHC registers configure LPC behaviour between the BMC and the host
-> > > +system. The LPCHC also participates in pinmux requests on g5 SoCs and is
-> > > +therefore considered a syscon device.
-> > > +
-> > > +Required properties:
-> > > > > > +- compatible:		"aspeed,ast2500-lpchc", "syscon"
-> > > > > > +- reg:			contains offset/length value of the LPCHC memory
-> > > +			region.
-> > 
-> > Why not just use a single tab, then you don't have to linewrap?
+changes since v2:
+- Revise DT binding documentation 
 
-I'll clean that up.
+changes since v1:
+- Rebase for v4.9-rc1.
+- Update Compliance test version and result
+- Remove redundant path in Makefile
+- Fix potential build error without CONFIG_PM_RUNTIME and CONFIG_PM_SLEEP
+- Fix warnings from patch check and smatch check
 
-Cheers,
+* Dependency
+The patch "arm: dts: mt2701: Add node for JPEG decoder" depends on: 
+  CCF "Add clock support for Mediatek MT2701"[1]
+  iommu and smi "Add the dtsi node of iommu and smi for mt2701"[2]
 
-Andrew
+[1] http://lists.infradead.org/pipermail/linux-mediatek/2016-October/007271.html
+[2] https://patchwork.kernel.org/patch/9164013/
 
-> > 
-> > > +Example:
-> > > +
-> > > > > > +lpchc: lpchc at 1e7890a0 {
-> > > > > > +	compatible = "aspeed,ast2500-lpchc", "syscon";
-> > > > > > +	reg = <0x1e7890a0 0xc4>;
-> > > +};
-> 
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161122/b6462917/attachment.sig>
+* Compliance test
+v4l2-compliance SHA   : 4ad7174b908a36c4f315e3fe2efa7e2f8a6f375a
+
+Driver Info:
+        Driver name   : mtk-jpeg decode
+        Card type     : mtk-jpeg decoder
+        Bus info      : platform:15004000.jpegdec
+        Driver version: 4.9.0
+        Capabilities  : 0x84204000
+                Video Memory-to-Memory Multiplanar
+                Streaming
+                Extended Pix Format
+                Device Capabilities
+        Device Caps   : 0x04204000
+                Video Memory-to-Memory Multiplanar
+                Streaming
+                Extended Pix Format
+
+Compliance test for device /dev/video3 (not using libv4l2):
+
+Required ioctls:
+        test VIDIOC_QUERYCAP: OK
+
+Allow for multiple opens:
+        test second video open: OK
+        test VIDIOC_QUERYCAP: OK
+        test VIDIOC_G/S_PRIORITY: OK
+        test for unlimited opens: OK
+
+Debug ioctls:
+        test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
+        test VIDIOC_LOG_STATUS: OK (Not Supported)
+
+Input ioctls:
+        test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
+        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+        test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
+        test VIDIOC_ENUMAUDIO: OK (Not Supported)
+        test VIDIOC_G/S/ENUMINPUT: OK (Not Supported)
+        test VIDIOC_G/S_AUDIO: OK (Not Supported)
+        Inputs: 0 Audio Inputs: 0 Tuners: 0
+
+Output ioctls:
+        test VIDIOC_G/S_MODULATOR: OK (Not Supported)
+        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+        test VIDIOC_ENUMAUDOUT: OK (Not Supported)
+        test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
+        test VIDIOC_G/S_AUDOUT: OK (Not Supported)
+        Outputs: 0 Audio Outputs: 0 Modulators: 0
+
+Input/Output configuration ioctls:
+        test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+        test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+        test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+        test VIDIOC_G/S_EDID: OK (Not Supported)
+
+        Control ioctls:
+                test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
+                test VIDIOC_QUERYCTRL: OK (Not Supported)
+                test VIDIOC_G/S_CTRL: OK (Not Supported)
+                test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
+                test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
+                test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+                Standard Controls: 0 Private Controls: 0
+
+        Format ioctls:
+                test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+                test VIDIOC_G/S_PARM: OK (Not Supported)
+                test VIDIOC_G_FBUF: OK (Not Supported)
+                test VIDIOC_G_FMT: OK
+                test VIDIOC_TRY_FMT: OK
+                test VIDIOC_S_FMT: OK
+                test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
+                test Cropping: OK (Not Supported)
+                test Composing: OK
+                test Scaling: OK
+
+        Codec ioctls:
+                test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
+                test VIDIOC_G_ENC_INDEX: OK (Not Supported)
+                test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
+
+        Buffer ioctls:
+                test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+                test VIDIOC_EXPBUF: OK
+
+Test input 0:
+
+
+Total: 43, Succeeded: 43, Failed: 0, Warnings: 0
+
+Rick Chang (4):
+  dt-bindings: mediatek: Add a binding for Mediatek JPEG Decoder
+  vcodec: mediatek: Add Mediatek JPEG Decoder Driver
+  arm: dts: mt2701: Add node for Mediatek JPEG Decoder
+  vcodec: mediatek: Add Maintainers entry for Mediatek JPEG driver
+
+ .../bindings/media/mediatek-jpeg-decoder.txt       |   37 +
+ MAINTAINERS                                        |    7 +
+ arch/arm/boot/dts/mt2701.dtsi                      |   14 +
+ drivers/media/platform/Kconfig                     |   15 +
+ drivers/media/platform/Makefile                    |    2 +
+ drivers/media/platform/mtk-jpeg/Makefile           |    2 +
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c    | 1302 ++++++++++++++++++++
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_core.h    |  139 +++
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_hw.c      |  417 +++++++
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_hw.h      |   91 ++
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_parse.c   |  160 +++
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_parse.h   |   25 +
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_reg.h     |   58 +
+ 13 files changed, 2269 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/mediatek-jpeg-decoder.txt
+ create mode 100644 drivers/media/platform/mtk-jpeg/Makefile
+ create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
+ create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_core.h
+ create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_hw.c
+ create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_hw.h
+ create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_parse.c
+ create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_parse.h
+ create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_reg.h
+
+-- 
+1.9.1
