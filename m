@@ -1,59 +1,44 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 22 Nov 2016 08:48:57 +0100
-Subject: [PATCH 2/2] MAINTAINERS: Add myself as co-maintainer to fpga mgr
- framework.
-In-Reply-To: <alpine.DEB.2.20.1611212021050.3633@atull-VirtualBox2>
-References: <1479764942-14321-1-git-send-email-mdf@kernel.org>
- <1479764942-14321-2-git-send-email-mdf@kernel.org>
- <alpine.DEB.2.20.1611212021050.3633@atull-VirtualBox2>
-Message-ID: <47eb36a7-ee48-53bd-fbdc-15225c3147ec@xilinx.com>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Tue, 22 Nov 2016 15:49:15 +0800
+Subject: [PATCH 0/6] add hisilicon reset
+Message-ID: <1479800961-6249-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.11.2016 03:29, atull wrote:
-> On Mon, 21 Nov 2016, Moritz Fischer wrote:
-> 
->> Add myself as co-maintainer to fpga mgr framework.
->>
->> Signed-off-by: Moritz Fischer <mdf@kernel.org>
->> Cc: Alan Tull <atull@opensource.altera.com>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Cc: linux-kernel at vger.kernel.org
->> Cc: linux-fpga at vger.kernel.org
->> ---
->> Hi all,
->>
->> Lately we've fallen behind a bit on reviewing patches lately.
-> 
-> Hi Moritz,
-> 
-> drivers/fpga has been in the upstream kernel a year now.  Most of that
-> time, traffic has been very slow.  Recently we had more traffic while
-> I was travelling and moving to a new office, both cases leaving me
-> with bad network connectivity.  Things will probably return to normal.
-> I appreciate your passion and all your effort reviewing stuff.  I
-> don't see a need for two maintainers at this point.
+Add reset-hi3660.c
+Update reset-hi6220 as well
+reset.c is shared by reset-hi3660.c and reset-hi6220.c
+Change hi6220.dtsi accordingly
 
-TBH. I think it is not a bad option. I do normally have backup person
-for all repos I do maintain. It doesn't mean that second maintainer does
-something but it has all accesses to repos you maintain.
-It means if something really happens to you (hopefully not) than this
-person can continue in this work without any delay which is not a bad
-thing.
-It is really just about talking to each other what that second person
-will do - probably just review patches as is done now. You can also
-learn from each other.
-I would like to be involved more in this but unfortunately I don't have
-enough time to do it properly.
+Zhangfei Gao (6):
+  reset: hisilicon: add reset core
+  dt-bindings: Document the hi3660 reset bindings
+  reset: hisilicon: add reset-hi3660
+  dt-bindings: change hi6220-reset.txt according to reset-hi6220.c
+  reset: hisilicon: Use new driver reset-hi6222
+  arm64: dts: hi6220: update reset node according to reset-hi6220.c
 
-Regarding maintaining this repo. It is just standard process. Apply
-sensible things, well described and test it. And then send pull request
-to Greg based on signed tags and you are done.
-Greg should told you what should be the base which you should use for
-pull request. Someone is taking patches based on rc1 tag, someone is
-rebasing it on the final tag.
+ .../bindings/reset/hisilicon,hi3660-reset.txt      |  42 ++++++
+ .../bindings/reset/hisilicon,hi6220-reset.txt      |  14 +-
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  20 ++-
+ drivers/reset/Makefile                             |   2 +-
+ drivers/reset/hisilicon/Kconfig                    |   7 +
+ drivers/reset/hisilicon/Makefile                   |   4 +-
+ drivers/reset/hisilicon/hi6220_reset.c             | 157 ---------------------
+ drivers/reset/hisilicon/reset-hi3660.c             |  78 ++++++++++
+ drivers/reset/hisilicon/reset-hi6220.c             | 123 ++++++++++++++++
+ drivers/reset/hisilicon/reset.c                    | 108 ++++++++++++++
+ drivers/reset/hisilicon/reset.h                    |  37 +++++
+ include/dt-bindings/reset/hisi,hi3660-resets.h     |  38 +++++
+ include/dt-bindings/reset/hisi,hi6220-resets.h     | 130 ++++++++---------
+ 13 files changed, 527 insertions(+), 233 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+ delete mode 100644 drivers/reset/hisilicon/hi6220_reset.c
+ create mode 100644 drivers/reset/hisilicon/reset-hi3660.c
+ create mode 100644 drivers/reset/hisilicon/reset-hi6220.c
+ create mode 100644 drivers/reset/hisilicon/reset.c
+ create mode 100644 drivers/reset/hisilicon/reset.h
+ create mode 100644 include/dt-bindings/reset/hisi,hi3660-resets.h
 
-Acked-by: Michal Simek <michal.simek@xilinx.com>
-
-Thanks,
-Michal
+-- 
+2.7.4
