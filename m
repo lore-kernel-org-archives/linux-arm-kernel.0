@@ -1,68 +1,39 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 22 Nov 2016 14:06:07 -0600
-Subject: [PATCH 1/4] ARM: davinci: da8xx: VPIF: enable DT init
-In-Reply-To: <20161122194551.3420-2-khilman@baylibre.com>
-References: <20161122194551.3420-1-khilman@baylibre.com>
- <20161122194551.3420-2-khilman@baylibre.com>
-Message-ID: <31948202-333f-b465-07b8-6260cce29b59@lechnology.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 22 Nov 2016 12:45:28 -0800
+Subject: [PATCH] clk: bcm2835: Fix ->fixed_divider of pllh_aux
+Message-ID: <20161122204528.18435-1-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2016 01:45 PM, Kevin Hilman wrote:
-> Add basic support for DT initializaion of VPIF (capture) via DT.  Clocks
-> and mux still need to happen in this file until there are real clock and
-> pinctrl drivers, but the video nodes and subdevs can all come from DT.
->
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
-> ---
->  arch/arm/mach-davinci/da8xx-dt.c | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->
-> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-> index c9f7e9274aa8..7b41611f2665 100644
-> --- a/arch/arm/mach-davinci/da8xx-dt.c
-> +++ b/arch/arm/mach-davinci/da8xx-dt.c
-> @@ -17,6 +17,7 @@
->  #include <mach/common.h>
->  #include "cp_intc.h"
->  #include <mach/da8xx.h>
-> +#include <mach/mux.h>
->
->  static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
->  	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
-> @@ -38,14 +39,30 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
->  		       NULL),
->  	OF_DEV_AUXDATA("ti,da830-mcasp-audio", 0x01d00000, "davinci-mcasp.0", NULL),
->  	OF_DEV_AUXDATA("ti,da850-aemif", 0x68000000, "ti-aemif", NULL),
-> +	OF_DEV_AUXDATA("ti,da850-vpif", 0x01e17000, "vpif", NULL),
->  	{}
->  };
->
->  #ifdef CONFIG_ARCH_DAVINCI_DA850
->
-> +#if IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE)
-> +static __init void da850_vpif_capture_init(void)
-> +{
-> +	int ret;
-> +
-> +	ret = davinci_cfg_reg_list(da850_vpif_capture_pins);
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Why can't we use the existing pinctrl-single node in device tree for 
-muxing the pins?
+There is no fixed divider on pllh_aux.
 
-> +	if (ret)
-> +		pr_warn("da850_evm_init: VPIF capture mux setup failed: %d\n",
-> +			ret);
-> +}
-> +#else
-> +#define da850_vpif_capture_init()
-> +#endif
-> +
->  static void __init da850_init_machine(void)
->  {
->  	of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
-> +	da850_vpif_capture_init();
->  }
->
->  static const char *const da850_boards_compat[] __initconst = {
->
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Eric Anholt <eric@anholt.net>
+Reviewed-by: Eric Anholt <eric@anholt.net>
+---
+
+This was copy and paste failure on my (anholt's) part.  The divider of
+10 is on PLLH_PIX.  No need to worry about backporting, as this
+channel is only used for the VEC support I'm hoping to land for
+4.11.
+
+ drivers/clk/bcm/clk-bcm2835.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index b68bf573dcfb..82568bfe5a72 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -1599,7 +1599,7 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.a2w_reg = A2W_PLLH_AUX,
+ 		.load_mask = CM_PLLH_LOADAUX,
+ 		.hold_mask = 0,
+-		.fixed_divider = 10),
++		.fixed_divider = 1),
+ 	[BCM2835_PLLH_PIX]	= REGISTER_PLL_DIV(
+ 		.name = "pllh_pix",
+ 		.source_pll = "pllh",
+-- 
+2.10.2
