@@ -1,48 +1,233 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 22 Nov 2016 17:47:08 +0530
-Subject: [PATCH 1/3] of: base: add support to get machine compatible string
-In-Reply-To: <dd85c5f9-0899-7da3-ab58-730107bfb02c@arm.com>
-References: <1479811311-3080-1-git-send-email-bgolaszewski@baylibre.com>
- <1479811311-3080-2-git-send-email-bgolaszewski@baylibre.com>
- <5ce9fb9f-459a-562b-2e9f-85d35f9ec035@arm.com>
- <CAMpxmJU=wR4mdQr5tpNSv8POirtWXR=_s7D_Q_H=Cuy=W=-Jtw@mail.gmail.com>
- <dd85c5f9-0899-7da3-ab58-730107bfb02c@arm.com>
-Message-ID: <8a05aded-3904-e268-081d-baed0ff85f42@ti.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Tue, 22 Nov 2016 13:42:55 +0100
+Subject: [kvm-unit-tests PATCH v10 2/3] arm: pmu: Check cycle count
+ increases
+In-Reply-To: <1479759895-10042-3-git-send-email-wei@redhat.com>
+References: <1479759895-10042-1-git-send-email-wei@redhat.com>
+ <1479759895-10042-3-git-send-email-wei@redhat.com>
+Message-ID: <20161122124255.y462bmnv23e4fqjr@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 November 2016 04:36 PM, Sudeep Holla wrote:
+On Mon, Nov 21, 2016 at 02:24:54PM -0600, Wei Huang wrote:
+> From: Christopher Covington <cov@codeaurora.org>
 > 
+> Ensure that reads of the PMCCNTR_EL0 are monotonically increasing,
+> even for the smallest delta of two subsequent reads.
 > 
-> On 22/11/16 10:57, Bartosz Golaszewski wrote:
->> 2016-11-22 11:53 GMT+01:00 Sudeep Holla <sudeep.holla@arm.com>:
->>>
->>>
->>> On 22/11/16 10:41, Bartosz Golaszewski wrote:
->>>>
->>>> Add a function allowing to retrieve the compatible string of the root
->>>> node of the device tree.
->>>>
->>>
->>> Rob has queued [1] and it's in -next today. You can reuse that if you
->>> are planning to target this for v4.11 or just use open coding in your
->>> driver for v4.10 and target this move for v4.11 to avoid cross tree
->>> dependencies as I already mentioned in your previous thread.
->>
->> Rob's patch checks the model first - I'm not sure this is the behavior
->> we want here as Sekhar suggested we print the machine compatible.
-> 
-> IIUC, you are replacing of_flat_dt_get_machine_name and
-> of_machine_get_model_name does exactly same. So I don't see any point in
-> adding this new function and it's just used for logging purpose.
-> Also Sekhar just gave example by using just compatible adding that
-> function in the driver itself.
-> 
-> As Arnd suggested me[1], you should for v4.10 fix it in the driver
-> itself to avoid the cross tree dependencies at this point similar to [2]
+> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> Signed-off-by: Wei Huang <wei@redhat.com>
 
-+1. Bartosz, can you please fix it in the driver for v4.10. If there is
-an API available, we can move to it for v4.11
+Reviewed-by: Andrew Jones <drjones@redhat.com>
 
-Thanks,
-Sekhar
+> ---
+>  arm/pmu.c | 156 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 156 insertions(+)
+> 
+> diff --git a/arm/pmu.c b/arm/pmu.c
+> index 9d9c53b..176b070 100644
+> --- a/arm/pmu.c
+> +++ b/arm/pmu.c
+> @@ -15,6 +15,9 @@
+>  #include "libcflat.h"
+>  #include "asm/barrier.h"
+>  
+> +#define PMU_PMCR_E         (1 << 0)
+> +#define PMU_PMCR_C         (1 << 2)
+> +#define PMU_PMCR_LC        (1 << 6)
+>  #define PMU_PMCR_N_SHIFT   11
+>  #define PMU_PMCR_N_MASK    0x1f
+>  #define PMU_PMCR_ID_SHIFT  16
+> @@ -22,6 +25,14 @@
+>  #define PMU_PMCR_IMP_SHIFT 24
+>  #define PMU_PMCR_IMP_MASK  0xff
+>  
+> +#define ID_DFR0_PERFMON_SHIFT 24
+> +#define ID_DFR0_PERFMON_MASK  0xf
+> +
+> +#define PMU_CYCLE_IDX         31
+> +
+> +#define NR_SAMPLES 10
+> +
+> +static unsigned int pmu_version;
+>  #if defined(__arm__)
+>  static inline uint32_t pmcr_read(void)
+>  {
+> @@ -30,6 +41,69 @@ static inline uint32_t pmcr_read(void)
+>  	asm volatile("mrc p15, 0, %0, c9, c12, 0" : "=r" (ret));
+>  	return ret;
+>  }
+> +
+> +static inline void pmcr_write(uint32_t value)
+> +{
+> +	asm volatile("mcr p15, 0, %0, c9, c12, 0" : : "r" (value));
+> +	isb();
+> +}
+> +
+> +static inline void pmselr_write(uint32_t value)
+> +{
+> +	asm volatile("mcr p15, 0, %0, c9, c12, 5" : : "r" (value));
+> +	isb();
+> +}
+> +
+> +static inline void pmxevtyper_write(uint32_t value)
+> +{
+> +	asm volatile("mcr p15, 0, %0, c9, c13, 1" : : "r" (value));
+> +}
+> +
+> +static inline uint64_t pmccntr_read(void)
+> +{
+> +	uint32_t lo, hi = 0;
+> +
+> +	if (pmu_version == 0x3)
+> +		asm volatile("mrrc p15, 0, %0, %1, c9" : "=r" (lo), "=r" (hi));
+> +	else
+> +		asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r" (lo));
+> +
+> +	return ((uint64_t)hi << 32) | lo;
+> +}
+> +
+> +static inline void pmccntr_write(uint64_t value)
+> +{
+> +	uint32_t lo, hi;
+> +
+> +	lo = value & 0xffffffff;
+> +	hi = (value >> 32) & 0xffffffff;
+> +
+> +	if (pmu_version == 0x3)
+> +		asm volatile("mcrr p15, 0, %0, %1, c9" : : "r" (lo), "r" (hi));
+> +	else
+> +		asm volatile("mcr p15, 0, %0, c9, c13, 0" : : "r" (lo));
+> +}
+> +
+> +static inline void pmcntenset_write(uint32_t value)
+> +{
+> +	asm volatile("mcr p15, 0, %0, c9, c12, 1" : : "r" (value));
+> +}
+> +
+> +/* PMCCFILTR is an obsolete name for PMXEVTYPER31 in ARMv7 */
+> +static inline void pmccfiltr_write(uint32_t value)
+> +{
+> +	pmselr_write(PMU_CYCLE_IDX);
+> +	pmxevtyper_write(value);
+> +	isb();
+> +}
+> +
+> +static inline uint32_t id_dfr0_read(void)
+> +{
+> +	uint32_t val;
+> +
+> +	asm volatile("mrc p15, 0, %0, c0, c1, 2" : "=r" (val));
+> +	return val;
+> +}
+>  #elif defined(__aarch64__)
+>  static inline uint32_t pmcr_read(void)
+>  {
+> @@ -38,6 +112,44 @@ static inline uint32_t pmcr_read(void)
+>  	asm volatile("mrs %0, pmcr_el0" : "=r" (ret));
+>  	return ret;
+>  }
+> +
+> +static inline void pmcr_write(uint32_t value)
+> +{
+> +	asm volatile("msr pmcr_el0, %0" : : "r" (value));
+> +	isb();
+> +}
+> +
+> +static inline uint64_t pmccntr_read(void)
+> +{
+> +	uint64_t cycles;
+> +
+> +	asm volatile("mrs %0, pmccntr_el0" : "=r" (cycles));
+> +	return cycles;
+> +}
+> +
+> +static inline void pmccntr_write(uint64_t value)
+> +{
+> +	asm volatile("msr pmccntr_el0, %0" : : "r" (value));
+> +}
+> +
+> +static inline void pmcntenset_write(uint32_t value)
+> +{
+> +	asm volatile("msr pmcntenset_el0, %0" : : "r" (value));
+> +}
+> +
+> +static inline void pmccfiltr_write(uint32_t value)
+> +{
+> +	asm volatile("msr pmccfiltr_el0, %0" : : "r" (value));
+> +	isb();
+> +}
+> +
+> +static inline uint32_t id_dfr0_read(void)
+> +{
+> +	uint32_t id;
+> +
+> +	asm volatile("mrs %0, id_dfr0_el1" : "=r" (id));
+> +	return id;
+> +}
+>  #endif
+>  
+>  /*
+> @@ -64,11 +176,55 @@ static bool check_pmcr(void)
+>  	return ((pmcr >> PMU_PMCR_IMP_SHIFT) & PMU_PMCR_IMP_MASK) != 0;
+>  }
+>  
+> +/*
+> + * Ensure that the cycle counter progresses between back-to-back reads.
+> + */
+> +static bool check_cycles_increase(void)
+> +{
+> +	bool success = true;
+> +
+> +	/* init before event access, this test only cares about cycle count */
+> +	pmcntenset_write(1 << PMU_CYCLE_IDX);
+> +	pmccfiltr_write(0); /* count cycles in EL0, EL1, but not EL2 */
+> +	pmccntr_write(0);
+> +
+> +	pmcr_write(pmcr_read() | PMU_PMCR_LC | PMU_PMCR_C | PMU_PMCR_E);
+> +
+> +	for (int i = 0; i < NR_SAMPLES; i++) {
+> +		uint64_t a, b;
+> +
+> +		a = pmccntr_read();
+> +		b = pmccntr_read();
+> +
+> +		if (a >= b) {
+> +			printf("Read %"PRId64" then %"PRId64".\n", a, b);
+> +			success = false;
+> +			break;
+> +		}
+> +	}
+> +
+> +	pmcr_write(pmcr_read() & ~PMU_PMCR_E);
+> +
+> +	return success;
+> +}
+> +
+> +void pmu_init(void)
+> +{
+> +	uint32_t dfr0;
+> +
+> +	/* probe pmu version */
+> +	dfr0 = id_dfr0_read();
+> +	pmu_version = (dfr0 >> ID_DFR0_PERFMON_SHIFT) & ID_DFR0_PERFMON_MASK;
+> +	printf("PMU version: %d\n", pmu_version);
+> +}
+> +
+>  int main(void)
+>  {
+>  	report_prefix_push("pmu");
+>  
+> +	pmu_init();
+>  	report("Control register", check_pmcr());
+> +	report("Monotonically increasing cycle count", check_cycles_increase());
+>  
+>  	return report_summary();
+>  }
+> -- 
+> 1.8.3.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
