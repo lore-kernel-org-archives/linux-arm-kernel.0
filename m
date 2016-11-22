@@ -1,64 +1,35 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 22 Nov 2016 13:14:02 -0800
-Subject: [PATCH] ARM: fix kmemleak for XIP_KERNEL
-In-Reply-To: <20161122142829.1776129-1-arnd@arndb.de>
-References: <20161122142829.1776129-1-arnd@arndb.de>
-Message-ID: <CAGXu5jLAFHtErSCip+xBsY+qd1adp5fwxj6Nxwo_cuXzcZGezg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Nov 2016 22:15:08 +0100
+Subject: [PATCH 2/2] PCI: iproc: avoid maybe-uninitialized warning
+In-Reply-To: <31c4c52b-3de5-2277-7a44-2a4231531074@broadcom.com>
+References: <20161122141844.1655574-1-arnd@arndb.de>
+ <20161122141844.1655574-2-arnd@arndb.de>
+ <31c4c52b-3de5-2277-7a44-2a4231531074@broadcom.com>
+Message-ID: <2504851.C6gOdhdaGF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2016 at 6:28 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The newly added check for RO_AFTER_INIT_DATA in kmemleak breaks ARM whenever
-> XIP_KERNEL is enabled:
->
-> mm/kmemleak.o: In function `kmemleak_scan':
-> kmemleak.c:(.text.kmemleak_scan+0x2e4): undefined reference to `__end_data_ro_after_init'
-> kmemleak.c:(.text.kmemleak_scan+0x2e8): undefined reference to `__start_data_ro_after_init'
->
-> This adds the start/end symbols for the section even in the case of having
-> no data in the section, to make the check work while keeping the architecture
-> specific override in one place.
->
-> Fixes: d7c19b066dcf ("mm: kmemleak: scan .data.ro_after_init")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On Tuesday, November 22, 2016 9:45:24 AM CET Ray Jui wrote:
+> > diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+> > index 857ff5198317..0359569c8d78 100644
+> > --- a/drivers/pci/host/pcie-iproc.c
+> > +++ b/drivers/pci/host/pcie-iproc.c
+> > @@ -936,6 +936,7 @@ static int iproc_pcie_setup_ib(struct iproc_pcie *pcie,
+> >  
+> >               }
+> >       }
+> > +     ret = -EINVAL;
+> >  err_ib:
+> >       dev_err(dev, "unable to configure inbound mapping\n");
+> >       dev_err(dev, "axi %pap, pci %pap, res size %pap\n",
+> > 
+> 
+> This change is good, but in my opinion, a further improvement for
+> clarity would be to initialize 'ret' to -EINVAL in the beginning of this
+> function when 'ret' is declared. What do you think?
+> 
 
-Acked-by: Kees Cook <keescook@chromium.org>
+I never do that, see https://rusty.ozlabs.org/?p=232 for a great
+explanation about why.
 
--Kees
-
-> ---
-> The patch causing this was merged late into v4.9-rc, this one should
-> probably go there as well.
->
-> I assume the same problem exists on s390, but I have not checked that.
-> ---
->  arch/arm/kernel/vmlinux-xip.lds.S | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
-> index 06c178214629..bf900f5421a1 100644
-> --- a/arch/arm/kernel/vmlinux-xip.lds.S
-> +++ b/arch/arm/kernel/vmlinux-xip.lds.S
-> @@ -3,8 +3,11 @@
->   * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>
->   */
->
-> -/* No __ro_after_init data in the .rodata section - which will always be ro */
-> -#define RO_AFTER_INIT_DATA
-> +/* empty __ro_after_init data in the .rodata section - it will always be ro */
-> +#define RO_AFTER_INIT_DATA                                             \
-> +       __start_data_ro_after_init = .;                                 \
-> +       __end_data_ro_after_init = .;
-> +
->
->  #include <asm-generic/vmlinux.lds.h>
->  #include <asm/cache.h>
-> --
-> 2.9.0
->
-
-
-
--- 
-Kees Cook
-Nexus Security
+	Arnd
