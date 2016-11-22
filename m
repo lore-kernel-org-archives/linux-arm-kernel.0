@@ -1,38 +1,41 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Nov 2016 10:03:45 +0000
-Subject: [RFC PATCH 06/11] ARM: tlbflush: drop dependency on CONFIG_SMP
-In-Reply-To: <1479806768-39911-7-git-send-email-vladimir.murzin@arm.com>
+Date: Tue, 22 Nov 2016 10:07:13 +0000
+Subject: [RFC PATCH 09/11] ARM: NOMMU: define SECTION_xxx macros
+In-Reply-To: <1479806768-39911-10-git-send-email-vladimir.murzin@arm.com>
 References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
- <1479806768-39911-7-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20161122100345.GV1041@n2100.armlinux.org.uk>
+ <1479806768-39911-10-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20161122100713.GW1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2016 at 09:26:03AM +0000, Vladimir Murzin wrote:
-> It can be referenced in UP case as well.
+On Tue, Nov 22, 2016 at 09:26:06AM +0000, Vladimir Murzin wrote:
+> Pickup defines from pgtable-2level.h to make NOMMU build happy.
 
-What's missing is an explanation of why you want this change.
-Exposing the local_* stuff doesn't make sense for UP.
+This needs more detail.
 
+> 
 > Cc: Russell King <linux@armlinux.org.uk>
 > Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 > ---
->  arch/arm/include/asm/tlbflush.h |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/include/asm/pgtable-nommu.h |    5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-> index def9e57..d9a6e2e 100644
-> --- a/arch/arm/include/asm/tlbflush.h
-> +++ b/arch/arm/include/asm/tlbflush.h
-> @@ -641,7 +641,7 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
+> diff --git a/arch/arm/include/asm/pgtable-nommu.h b/arch/arm/include/asm/pgtable-nommu.h
+> index add094d..9115801 100644
+> --- a/arch/arm/include/asm/pgtable-nommu.h
+> +++ b/arch/arm/include/asm/pgtable-nommu.h
+> @@ -35,6 +35,11 @@
 >  
->  #endif
+>  #define PGDIR_SIZE		(1UL << PGDIR_SHIFT)
+>  #define PGDIR_MASK		(~(PGDIR_SIZE-1))
+> +
+> +#define SECTION_SHIFT           20
+> +#define SECTION_SIZE            (1UL << SECTION_SHIFT)
+> +#define SECTION_MASK            (~(SECTION_SIZE-1))
+> +
+>  /* FIXME */
 >  
-> -#elif defined(CONFIG_SMP)	/* !CONFIG_MMU */
-> +#else /* !CONFIG_MMU */
->  
->  #ifndef __ASSEMBLY__
->  
+>  #define PAGE_NONE	__pgprot(0)
 > -- 
 > 1.7.9.5
 > 
