@@ -1,78 +1,81 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 22 Nov 2016 16:57:42 +0100
-Subject: [PATCH v4 3/3] dmaengine: sun6i: share the dma driver with sun50i
-In-Reply-To: <1479638740-20520-4-git-send-email-hao5781286@gmail.com>
-References: <1479638740-20520-1-git-send-email-hao5781286@gmail.com>
- <1479638740-20520-4-git-send-email-hao5781286@gmail.com>
-Message-ID: <20161122155742.cybr46q7mbvzkwbh@lukather>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 22 Nov 2016 23:58:29 +0800
+Subject: [PATCH v2 1/3] arm64: dts: add USB1-related nodes of Allwinner A64
+Message-ID: <20161122155831.8724-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Allwinner A64 have two HCI USB controllers, a OTG controller and a USB
+PHY device which have two ports. One of the port is wired to both a HCI
+USB controller and the OTG controller, which is currently not supported.
+The another one is only wired to a HCI controller, and the device node of
+OHCI/EHCI controller of the port can be added now.
 
-On Sun, Nov 20, 2016 at 06:45:40PM +0800, Hao Zhang wrote:
-> Changes the limited buswith to 8 bytes,and add
-> the test in sun6i_dma_config function
-> 
-> Accroding to sun6i dma driver, i think ,if the client
-> doesn't configure the address width with dmaengine_slave_config
-> function, it would use the default width. So we can add the test
-> in sun6i_dma_config function called by dmaengine_slave_config,
-> and test the configuration whether is support for the device.
-> 
-> Signed-off-by: Hao Zhang <hao5781286@gmail.com>
-> ---
->  drivers/dma/sun6i-dma.c | 33 ++++++++++++++++++++++++++++++++-
->  1 file changed, 32 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-> index a235878..f7c90b6 100644
-> --- a/drivers/dma/sun6i-dma.c
-> +++ b/drivers/dma/sun6i-dma.c
-> @@ -250,7 +250,7 @@ static inline s8 convert_burst(u32 maxburst)
->  static inline s8 convert_buswidth(enum dma_slave_buswidth addr_width)
->  {
->  	if ((addr_width < DMA_SLAVE_BUSWIDTH_1_BYTE) ||
-> -	    (addr_width > DMA_SLAVE_BUSWIDTH_4_BYTES))
-> +	    (addr_width > DMA_SLAVE_BUSWIDTH_8_BYTES))
->  		return -EINVAL;
->  
->  	return addr_width >> 1;
-> @@ -758,6 +758,18 @@ static int sun6i_dma_config(struct dma_chan *chan,
->  {
->  	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
->  
-> +	if ((BIT(config->src_addr_width) | chan->device->src_addr_widths) !=
-> +		chan->device->src_addr_widths) {
+Also the A64 USB PHY device node is also added for the HCI controllers to
+work.
 
-Using an and operator would make this more obvious.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+Changes since v1:
+- Remove manual CLK_USB_OHCI0 gate, as it's dealed by ccu driver now.
+- Sort the nodes and fixed {e,o}hci1 regs.
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 44 +++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
-> +		dev_err(chan2dev(chan), "Invalid DMA configuration\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	if ((BIT(config->dst_addr_width) | chan->device->dst_addr_widths) !=
-> +			chan->device->dst_addr_widths) {
-> +		dev_err(chan2dev(chan), "Invalid DMA configuration\n");
-> +		return -EINVAL;
-> +	}
-> +
-
-And I really think both these tests should be in
-dmaengine_slave_config directly. There's nothing special about those
-tests, and they apply to all the DMA drivers.
-
-Thanks!
-Maxime
-
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 3d70be3..2572dd6 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -122,6 +122,50 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
++		usbphy: phy at 01c19400 {
++			compatible = "allwinner,sun50i-a64-usb-phy";
++			reg = <0x01c19400 0x14>,
++			      <0x01c1b800 0x4>;
++			reg-names = "phy_ctrl",
++				    "pmu1";
++			clocks = <&ccu CLK_USB_PHY0>,
++				 <&ccu CLK_USB_PHY1>;
++			clock-names = "usb0_phy",
++				      "usb1_phy";
++			resets = <&ccu RST_USB_PHY0>,
++				 <&ccu RST_USB_PHY1>;
++			reset-names = "usb0_reset",
++				      "usb1_reset";
++			status = "disabled";
++			#phy-cells = <1>;
++		};
++
++		ohci1: usb at 01c1b400 {
++			compatible = "allwinner,sun50i-a64-ohci", "generic-ohci";
++			reg = <0x01c1b400 0x100>;
++			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_OHCI1>,
++				 <&ccu CLK_USB_OHCI1>;
++			resets = <&ccu RST_BUS_OHCI1>;
++			phys = <&usbphy 1>;
++			phy-names = "usb";
++			status = "disabled";
++		};
++
++		ehci1: usb at 01c1b000 {
++			compatible = "allwinner,sun50i-a64-ehci", "generic-ehci";
++			reg = <0x01c1b000 0x100>;
++			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_OHCI1>,
++				 <&ccu CLK_BUS_EHCI1>,
++				 <&ccu CLK_USB_OHCI1>;
++			resets = <&ccu RST_BUS_OHCI1>,
++				 <&ccu RST_BUS_EHCI1>;
++			phys = <&usbphy 1>;
++			phy-names = "usb";
++			status = "disabled";
++		};
++
+ 		ccu: clock at 01c20000 {
+ 			compatible = "allwinner,sun50i-a64-ccu";
+ 			reg = <0x01c20000 0x400>;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161122/5367881f/attachment.sig>
+2.10.2
