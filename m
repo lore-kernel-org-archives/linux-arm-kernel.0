@@ -1,71 +1,48 @@
-From: vladimir.barinov@cogentembedded.com (Vladimir Barinov)
-Date: Tue, 22 Nov 2016 15:08:49 +0300
-Subject: [PATCH 16/18] arm64: dts: h3ulcb: rename SDHI0 pins
-In-Reply-To: <d4fbb71f-2a4d-2239-faa9-c017c74e1d79@cogentembedded.com>
-References: <cover.1479726397.git.horms+renesas@verge.net.au>
- <93373c309a703b57690216db4106a4a534929c15.1479726397.git.horms+renesas@verge.net.au>
- <45a251f6-ee0c-5eba-ffd1-3f61a1e7ccc7@cogentembedded.com>
- <f4f57fbc-313c-669f-94c7-073747a20a82@cogentembedded.com>
- <d4fbb71f-2a4d-2239-faa9-c017c74e1d79@cogentembedded.com>
-Message-ID: <8acc79fe-393d-2b69-b7e7-e87a53d95264@cogentembedded.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 22 Nov 2016 17:47:08 +0530
+Subject: [PATCH 1/3] of: base: add support to get machine compatible string
+In-Reply-To: <dd85c5f9-0899-7da3-ab58-730107bfb02c@arm.com>
+References: <1479811311-3080-1-git-send-email-bgolaszewski@baylibre.com>
+ <1479811311-3080-2-git-send-email-bgolaszewski@baylibre.com>
+ <5ce9fb9f-459a-562b-2e9f-85d35f9ec035@arm.com>
+ <CAMpxmJU=wR4mdQr5tpNSv8POirtWXR=_s7D_Q_H=Cuy=W=-Jtw@mail.gmail.com>
+ <dd85c5f9-0899-7da3-ab58-730107bfb02c@arm.com>
+Message-ID: <8a05aded-3904-e268-081d-baed0ff85f42@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
-
-On 22.11.2016 14:40, Sergei Shtylyov wrote:
-> On 11/22/2016 2:22 PM, Vladimir Barinov wrote:
->
->>>> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>>>
->>>> This changes SDHI0 pin names for H3ULCB board
->>>>
->>>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>>> ---
->>>>  arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 8 ++++----
->>>>  1 file changed, 4 insertions(+), 4 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
->>>> b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
->>>> index 8d0ac076d8e2..6ffb0517421a 100644
->>>> --- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
->>>> +++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
->>>> @@ -163,13 +163,13 @@
->>>>          function = "avb";
->>>>      };
->>>>
->>>> -    sdhi0_pins_3v3: sd0_3v3 {
->>>> +    sdhi0_pins: sd0 {
->>>>          groups = "sdhi0_data4", "sdhi0_ctrl";
->>>>          function = "sdhi0";
->>>>          power-source = <3300>;
->>>>      };
->>>>
->>>> -    sdhi0_pins_1v8: sd0_1v8 {
->>>> +    sdhi0_pins_uhs: sd0 {
+On Tuesday 22 November 2016 04:36 PM, Sudeep Holla wrote:
+> 
+> 
+> On 22/11/16 10:57, Bartosz Golaszewski wrote:
+>> 2016-11-22 11:53 GMT+01:00 Sudeep Holla <sudeep.holla@arm.com>:
 >>>
->>>    I'm afraid the following will just override the props of the node 
->>> above
->>> which is not what we ant.
->> Thank you for pointing to this.
+>>>
+>>> On 22/11/16 10:41, Bartosz Golaszewski wrote:
+>>>>
+>>>> Add a function allowing to retrieve the compatible string of the root
+>>>> node of the device tree.
+>>>>
+>>>
+>>> Rob has queued [1] and it's in -next today. You can reuse that if you
+>>> are planning to target this for v4.11 or just use open coding in your
+>>> driver for v4.10 and target this move for v4.11 to avoid cross tree
+>>> dependencies as I already mentioned in your previous thread.
 >>
->> This is my typo.
->> I will rework the patch to have different node names.
->
->    The patch had been already merged by Simon and was posted a s apart 
-> of a pull request (if I don't mistake), so I guess an incremental 
-> patch needed now...
-Thanks for clarification.
+>> Rob's patch checks the model first - I'm not sure this is the behavior
+>> we want here as Sekhar suggested we print the machine compatible.
+> 
+> IIUC, you are replacing of_flat_dt_get_machine_name and
+> of_machine_get_model_name does exactly same. So I don't see any point in
+> adding this new function and it's just used for logging purpose.
+> Also Sekhar just gave example by using just compatible adding that
+> function in the driver itself.
+> 
+> As Arnd suggested me[1], you should for v4.10 fix it in the driver
+> itself to avoid the cross tree dependencies at this point similar to [2]
 
-I will make incremental patch.
++1. Bartosz, can you please fix it in the driver for v4.10. If there is
+an API available, we can move to it for v4.11
 
-Regards,
-Vladimir
-
->
->> Regards,
->> Vladimir
->
-> MBR, Sergei
->
+Thanks,
+Sekhar
