@@ -1,40 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Nov 2016 22:08:10 +0100
-Subject: [PATCH] dt-bindings: mfd: Improve readability for TPS65217
- interrupt sources
-In-Reply-To: <20161122160013.GH10134@dell.home>
-References: <20161121131515.8040-1-woogyom.kim@gmail.com>
- <20161122155759.GG10134@dell.home> <20161122160013.GH10134@dell.home>
-Message-ID: <2502592.54T1nU6yzL@wuerfel>
+Date: Tue, 22 Nov 2016 22:13:54 +0100
+Subject: [PATCH 1/2] PCI: iproc: fix 32-bit build
+In-Reply-To: <e03e5c52-f321-916e-4650-c8bb271cd041@broadcom.com>
+References: <20161122141844.1655574-1-arnd@arndb.de>
+ <e03e5c52-f321-916e-4650-c8bb271cd041@broadcom.com>
+Message-ID: <4393833.rTFctaL9Kd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 22, 2016 4:00:13 PM CET Lee Jones wrote:
-> > > diff --git a/include/dt-bindings/mfd/tps65217.h b/include/dt-bindings/mfd/tps65217.h
-> > > index cafb9e6..0293fdd 100644
-> > > --- a/include/dt-bindings/mfd/tps65217.h
-> > > +++ b/include/dt-bindings/mfd/tps65217.h
-> > > @@ -19,8 +19,8 @@
-> > >  #ifndef __DT_BINDINGS_TPS65217_H__
-> > >  #define __DT_BINDINGS_TPS65217_H__
-> > >  
-> > > -#define TPS65217_IRQ_USB   0
-> > > -#define TPS65217_IRQ_AC            1
-> > > -#define TPS65217_IRQ_PB            2
-> > > +#define TPS65217_IRQ_USB_POWER             0       /* USB power state change */
-> > > +#define TPS65217_IRQ_AC_POWER              1       /* AC power state change */
-> > > +#define TPS65217_IRQ_PUSHBUTTON            2       /* Push button state change */
-> > 
-> > This changes the ABI.
-> > 
-> > It will require a DT Ack.
+On Tuesday, November 22, 2016 9:42:05 AM CET Ray Jui wrote:
 > 
-> Tell a lie.  Sorry, I was getting false positives from my grep.  It
-> looks like you use the same scheme from within include/linux.  I
-> suggest that you probable don't want to do that.
+> Hmmm, somehow we've never seen this link error for the ARM32 based
+> platforms that we build for. Does it behave differently between
+> different versions of compilers?
+> 
+> Nevertheless, this is a good change to take, thanks!
 
-Doing this change however would cause a bisection problem: you
-can't rename just the constants in the header or just the driver
-using those constants.
+I looked at it again, and see now that it only happens with
+a 64-bit RESOURCE_SIZE_T, which is only used on 32-bit
+platforms with more than 4GB of memory addresses. It would
+however show up in a multiplatform distro build for ARMv7VE,
+so the fix is still clearly needed.
 
 	Arnd
