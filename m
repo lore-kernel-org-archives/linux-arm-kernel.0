@@ -1,28 +1,34 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 22 Nov 2016 11:41:48 +0100
-Subject: [PATCH 0/3] ARM: da8xx: fix section mismatch in new drivers
-Message-ID: <1479811311-3080-1-git-send-email-bgolaszewski@baylibre.com>
+Date: Tue, 22 Nov 2016 11:41:51 +0100
+Subject: [PATCH 3/3] memory: da8xx-ddrctl: drop the call to
+ of_flat_dt_get_machine_name()
+In-Reply-To: <1479811311-3080-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1479811311-3080-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1479811311-3080-4-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar noticed there's a section mismatch in the da8xx-mstpri and
-da8xx-ddrctl drivers. This is caused by calling
-of_flat_dt_get_machine_name() which has an __init annotation.
+In order to avoid a section mismatch use of_machine_get_compatible()
+instead of of_flat_dt_get_machine_name() when printing the error
+message.
 
-This series addresses this issue by introducing a new function that
-allows to retrieve the compatible property of the root node and
-using it instead of of_flat_dt_get_machine_name() in the new drivers.
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ drivers/memory/da8xx-ddrctl.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Bartosz Golaszewski (3):
-  of: base: add support to get machine compatible string
-  bus: da8xx-mstpri: drop the call to of_flat_dt_get_machine_name()
-  memory: da8xx-ddrctl: drop the call to of_flat_dt_get_machine_name()
-
- drivers/bus/da8xx-mstpri.c    |  2 +-
- drivers/memory/da8xx-ddrctl.c |  2 +-
- drivers/of/base.c             | 22 ++++++++++++++++++++++
- include/linux/of.h            |  6 ++++++
- 4 files changed, 30 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/memory/da8xx-ddrctl.c b/drivers/memory/da8xx-ddrctl.c
+index a20e7bb..179f505 100644
+--- a/drivers/memory/da8xx-ddrctl.c
++++ b/drivers/memory/da8xx-ddrctl.c
+@@ -118,7 +118,7 @@ static int da8xx_ddrctl_probe(struct platform_device *pdev)
+ 	setting = da8xx_ddrctl_get_board_settings();
+ 	if (!setting) {
+ 		dev_err(dev, "no settings for board '%s'\n",
+-			of_flat_dt_get_machine_name());
++			of_machine_get_compatible());
+ 		return -EINVAL;
+ 	}
+ 
 -- 
 2.9.3
