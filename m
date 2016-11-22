@@ -1,33 +1,43 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 22 Nov 2016 10:41:29 +0100
-Subject: [PATCH] drm: tilcdc: fix a DT property parsing
-Message-ID: <1479807689-23804-1-git-send-email-bgolaszewski@baylibre.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Nov 2016 10:41:12 +0100
+Subject: [PATCH 1/6] reset: hisilicon: add reset core
+In-Reply-To: <0084ef53-c0e6-51e8-afa5-07264dfce529@linaro.org>
+References: <1479800961-6249-1-git-send-email-zhangfei.gao@linaro.org>
+ <3993565.nedzUBZcVS@wuerfel>
+ <0084ef53-c0e6-51e8-afa5-07264dfce529@linaro.org>
+Message-ID: <2907606.qYBKeXi75W@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DT binding for tildc is not consistent with the driver code - the
-option in the binding is called 'max-width' while the code expects
-'ti,max-width'.
+On Tuesday, November 22, 2016 5:22:42 PM CET zhangfei wrote:
+> Hi, Arnd
+> 
+> On 2016?11?22? 16:45, Arnd Bergmann wrote:
+> > On Tuesday, November 22, 2016 3:49:16 PM CET Zhangfei Gao wrote:
+> >> @@ -1,8 +1,8 @@
+> >>   obj-y += core.o
+> >> -obj-y += hisilicon/
+> >>   obj-$(CONFIG_ARCH_STI) += sti/
+> >>   obj-$(CONFIG_RESET_ATH79) += reset-ath79.o
+> >>   obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
+> >> +obj-$(CONFIG_ARCH_HISI) += hisilicon/
+> >>   obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
+> >>   obj-$(CONFIG_RESET_MESON) += reset-meson.o
+> >>   obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
+> > Please leave the obj-y line, otherwise the COMPILE_TEST variant won't work.
+> 
+> COMPILE_TEST is added in drivers/reset/hisilicon/Kconfig
+> like
+> config COMMON_RESET_HI3660
+>          tristate "Hi3660 Reset Driver"
+>          depends on ARCH_HISI || COMPILE_TEST
+> 
+> The reason not using "obj-y" here is that reset.c will be compiled unconditionally.
+> 
+> drivers/reset/hisilicon/Makefile
+> obj-y   += reset.o
 
-Make the driver code consistent with the binding.
+Yes, that line has to change as well then, to only build it when one
+of the hardware specific drivers is enabled.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- drivers/gpu/drm/tilcdc/tilcdc_drv.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_drv.c b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-index a7c91f7..4d3adf8e 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-@@ -302,7 +302,7 @@ static int tilcdc_init(struct drm_driver *ddrv, struct device *dev)
- 
- 	DBG("Maximum Bandwidth Value %d", priv->max_bandwidth);
- 
--	if (of_property_read_u32(node, "ti,max-width", &priv->max_width))
-+	if (of_property_read_u32(node, "max-width", &priv->max_width))
- 		priv->max_width = TILCDC_DEFAULT_MAX_WIDTH;
- 
- 	DBG("Maximum Horizontal Pixel Width Value %dpixels", priv->max_width);
--- 
-2.9.3
+	Arnd
