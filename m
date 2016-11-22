@@ -1,75 +1,44 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 22 Nov 2016 10:44:24 +0100
-Subject: [PATCH 4/4] clocksource/drivers/bcm2835_timer: Unmap region obtained
- by of_iomap
-In-Reply-To: <1479807866-6957-1-git-send-email-daniel.lezcano@linaro.org>
-References: <20161122094300.GA2017@mai>
- <1479807866-6957-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1479807866-6957-4-git-send-email-daniel.lezcano@linaro.org>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Tue, 22 Nov 2016 17:46:22 +0800
+Subject: [PATCH 5/6] reset: hisilicon: Use new driver reset-hi6222
+In-Reply-To: <3837594.jmpXXfpk9Q@wuerfel>
+References: <1479800961-6249-1-git-send-email-zhangfei.gao@linaro.org>
+ <1479800961-6249-6-git-send-email-zhangfei.gao@linaro.org>
+ <3837594.jmpXXfpk9Q@wuerfel>
+Message-ID: <0dcef3c7-7406-0728-5a18-c277bb8915ad@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arvind Yadav <arvind.yadav.cs@gmail.com>
 
-Free memory mapping, if bcm2835_timer_init is not successful.
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-Reviewed-by: Eric Anholt <eric@anholt.net>
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- drivers/clocksource/bcm2835_timer.c | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+On 2016?11?22? 16:49, Arnd Bergmann wrote:
+> On Tuesday, November 22, 2016 3:49:20 PM CET Zhangfei Gao wrote:
+>> -#define PERIPH_RSTDIS0_MMC0             0x000
+>> -#define PERIPH_RSTDIS0_MMC1             0x001
+>> -#define PERIPH_RSTDIS0_MMC2             0x002
+>> -#define PERIPH_RSTDIS0_NANDC            0x003
+>> -#define PERIPH_RSTDIS0_USBOTG_BUS       0x004
+>> -#define PERIPH_RSTDIS0_POR_PICOPHY      0x005
+>> -#define PERIPH_RSTDIS0_USBOTG           0x006
+>> -#define PERIPH_RSTDIS0_USBOTG_32K       0x007
+>> -#define PERIPH_RSTDIS1_HIFI             0x100
+>> -#define PERIPH_RSTDIS1_DIGACODEC        0x105
+>> +/* reset in sysctrl */
+>> +#define PERIPH_RSTDIS0_MMC0             0
+>> +#define PERIPH_RSTDIS0_MMC1             1
+>> +#define PERIPH_RSTDIS0_MMC2             2
+>> +#define PERIPH_RSTDIS0_NANDC            3
+>> +#define PERIPH_RSTDIS0_USBOTG_BUS       4
+>> +#define PERIPH_RSTDIS0_POR_PICOPHY      5
+>> +#define PERIPH_RSTDIS0_USBOTG           6
+>> +#define PERIPH_RSTDIS0_USBOTG_32K       7
+>> +#define PERIPH_RSTDIS1_HIFI             8
+> You can't redefined the binding here, this is part of the ABI.
+> You can however add new numbers as long as the old ones keep
+> working.
+The methods are different.
+The original define is offset | bit_shift, and driver has to parse 
+offset and bit shift.
+The new define is just index of array, which is defined in the reset-xxx.c
 
-diff --git a/drivers/clocksource/bcm2835_timer.c b/drivers/clocksource/bcm2835_timer.c
-index e71acf2..f2f29d2 100644
---- a/drivers/clocksource/bcm2835_timer.c
-+++ b/drivers/clocksource/bcm2835_timer.c
-@@ -96,7 +96,7 @@ static int __init bcm2835_timer_init(struct device_node *node)
- 	ret = of_property_read_u32(node, "clock-frequency", &freq);
- 	if (ret) {
- 		pr_err("Can't read clock-frequency");
--		return ret;
-+		goto err_iounmap;
- 	}
- 
- 	system_clock = base + REG_COUNTER_LO;
-@@ -108,13 +108,15 @@ static int __init bcm2835_timer_init(struct device_node *node)
- 	irq = irq_of_parse_and_map(node, DEFAULT_TIMER);
- 	if (irq <= 0) {
- 		pr_err("Can't parse IRQ");
--		return -EINVAL;
-+		ret = -EINVAL;
-+		goto err_iounmap;
- 	}
- 
- 	timer = kzalloc(sizeof(*timer), GFP_KERNEL);
- 	if (!timer) {
- 		pr_err("Can't allocate timer struct\n");
--		return -ENOMEM;
-+		ret = -ENOMEM;
-+		goto err_iounmap;
- 	}
- 
- 	timer->control = base + REG_CONTROL;
-@@ -133,7 +135,7 @@ static int __init bcm2835_timer_init(struct device_node *node)
- 	ret = setup_irq(irq, &timer->act);
- 	if (ret) {
- 		pr_err("Can't set up timer IRQ\n");
--		return ret;
-+		goto err_iounmap;
- 	}
- 
- 	clockevents_config_and_register(&timer->evt, freq, 0xf, 0xffffffff);
-@@ -141,6 +143,10 @@ static int __init bcm2835_timer_init(struct device_node *node)
- 	pr_info("bcm2835: system timer (irq = %d)\n", irq);
- 
- 	return 0;
-+
-+err_iounmap:
-+	iounmap(base);
-+	return ret;
- }
- CLOCKSOURCE_OF_DECLARE(bcm2835, "brcm,bcm2835-system-timer",
- 			bcm2835_timer_init);
--- 
-2.7.4
+Thanks
