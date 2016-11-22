@@ -1,117 +1,37 @@
 From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Tue, 22 Nov 2016 01:14:05 +0100
-Subject: [PATCH 4/6] apalis-tk1: adjust pin muxing for v1.1 hw
+Date: Tue, 22 Nov 2016 01:14:03 +0100
+Subject: [PATCH 2/6] apalis-tk1: temp alert pull-up
 In-Reply-To: <1479773647-14726-1-git-send-email-marcel.ziswiler@toradex.com>
 References: <1479773647-14726-1-git-send-email-marcel.ziswiler@toradex.com>
-Message-ID: <1479773647-14726-5-git-send-email-marcel.ziswiler@toradex.com>
+Message-ID: <1479773647-14726-3-git-send-email-marcel.ziswiler@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configure Apalis MMC1 D6 GPIO on SDMMC3_CLK_LB_IN as reserved function
-without any pull-up/down.
-
-Configure GPIO_PV2 as SD1_CD# according to latest V1.1 HW.
-
-Leave SDMMC3_CLK_LB_OUT muxed as SDMMC3 with output driver enabled aka
-not tristated and input driver enabled as well as it features some
-magic properties even though the external loopback is disabled and the
-internal loopback used as per SDMMC_VENDOR_MISC_CNTRL_0 register's
-SDMMC_SPARE1 bits being set to 0xfffd according to the TRM! This pin is
-now a not-connect on V1.1 HW in order to avoid any interference.
+Pull-up GPIO_PI6 connected to TMP451's ALERT#/THERM2#.
 
 Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 ---
 
- arch/arm/boot/dts/tegra124-apalis.dtsi | 53 +++++++++++++++-------------------
- 1 file changed, 23 insertions(+), 30 deletions(-)
+ arch/arm/boot/dts/tegra124-apalis.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/tegra124-apalis.dtsi b/arch/arm/boot/dts/tegra124-apalis.dtsi
-index 747ce81..2bfc579 100644
+index 6aa4952..0534601 100644
 --- a/arch/arm/boot/dts/tegra124-apalis.dtsi
 +++ b/arch/arm/boot/dts/tegra124-apalis.dtsi
-@@ -414,18 +414,10 @@
- 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
- 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
+@@ -1151,11 +1151,11 @@
+ 				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
  			};
--			/*
--			 * Don't use MMC1_D6 aka SDMMC3_CLK_LB_IN for now as it
--			 * features some magic properties even though the
--			 * external loopback is disabled and the internal
--			 * loopback used as per SDMMC_VENDOR_MISC_CNTRL_0
--			 * register's SDMMC_SPARE1 bits being set to 0xfffd
--			 * according to the TRM!
--			 */
- 			sdmmc3_clk_lb_in_pee5 { /* D6 GPIO */
- 				nvidia,pins = "sdmmc3_clk_lb_in_pee5";
--				nvidia,function = "sdmmc3";
--				nvidia,pull = <TEGRA_PIN_PULL_UP>;
-+				nvidia,function = "rsvd2";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
- 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
- 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
- 			};
-@@ -520,20 +512,12 @@
- 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
- 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
- 			};
--			/*
--			 * Don't use SD1_CD# aka SDMMC3_CLK_LB_OUT for now as it
--			 * features some magic properties even though the
--			 * external loopback is disabled and the internal
--			 * loopback used as per SDMMC_VENDOR_MISC_CNTRL_0
--			 * register's SDMMC_SPARE1 bits being set to 0xfffd
--			 * according to the TRM!
--			 */
--			sdmmc3_clk_lb_out_pee4 { /* CD# GPIO */
--				nvidia,pins = "sdmmc3_clk_lb_out_pee4";
--				nvidia,function = "rsvd2";
+ 
+-			/* GPIO_PI6 aka TEMP_ALERT_L */
++			/* GPIO_PI6 aka TMP451 ALERT#/THERM2# */
+ 			pi6 {
+ 				nvidia,pins = "pi6";
+ 				nvidia,function = "rsvd1";
 -				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+			sdmmc3_cd_n_pv2 { /* CD# GPIO */
-+				nvidia,pins = "sdmmc3_cd_n_pv2";
-+				nvidia,function = "rsvd3";
 +				nvidia,pull = <TEGRA_PIN_PULL_UP>;
  				nvidia,tristate = <TEGRA_PIN_ENABLE>;
--				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
+ 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
  			};
- 
- 			/* Apalis SPDIF */
-@@ -1512,13 +1496,6 @@
- 				nvidia,tristate = <TEGRA_PIN_ENABLE>;
- 				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
- 			};
--			sdmmc3_cd_n_pv2 { /* NC */
--				nvidia,pins = "sdmmc3_cd_n_pv2";
--				nvidia,function = "rsvd3";
--				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
--				nvidia,tristate = <TEGRA_PIN_ENABLE>;
--				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
--			};
- 			gpio_x1_aud_px1 { /* NC */
- 				nvidia,pins = "gpio_x1_aud_px1";
- 				nvidia,function = "rsvd2";
-@@ -1568,6 +1545,22 @@
- 				nvidia,tristate = <TEGRA_PIN_ENABLE>;
- 				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
- 			};
-+			/*
-+			 * Leave SDMMC3_CLK_LB_OUT muxed as SDMMC3 with output
-+			 * driver enabled aka not tristated and input driver
-+			 * enabled as well as it features some magic properties
-+			 * even though the external loopback is disabled and the
-+			 * internal loopback used as per
-+			 * SDMMC_VENDOR_MISC_CNTRL_0 register's SDMMC_SPARE1
-+			 * bits being set to 0xfffd according to the TRM!
-+			 */
-+			sdmmc3_clk_lb_out_pee4 { /* NC */
-+				nvidia,pins = "sdmmc3_clk_lb_out_pee4";
-+				nvidia,function = "sdmmc3";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
-+			};
- 		};
- 	};
- 
 -- 
 2.5.5
