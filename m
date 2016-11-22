@@ -1,46 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Nov 2016 10:55:21 +0100
-Subject: [PATCH 5/6] reset: hisilicon: Use new driver reset-hi6222
-In-Reply-To: <0dcef3c7-7406-0728-5a18-c277bb8915ad@linaro.org>
-References: <1479800961-6249-1-git-send-email-zhangfei.gao@linaro.org>
- <3837594.jmpXXfpk9Q@wuerfel>
- <0dcef3c7-7406-0728-5a18-c277bb8915ad@linaro.org>
-Message-ID: <6136167.uxgaKz0PCj@wuerfel>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 22 Nov 2016 10:56:11 +0100
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.10
+In-Reply-To: <CAOesGMj47EZ1Zjc41VV2D-cM5XUsK28PDF-jSHKUkkind32ZRA@mail.gmail.com>
+References: <cover.1479387356.git.horms+renesas@verge.net.au>
+ <20161119012836.GA2543@localhost>
+ <CAMuHMdXAuDcbr84phfPRpqZYRzAZf2j4vsv+i_Frz0G8ksd_Vg@mail.gmail.com>
+ <CAOesGMjk=KWifGT7sugpWVjNJSKhmgxg8gN9Cgi=emGrg66z0w@mail.gmail.com>
+ <CAMuHMdUhpeiOj6Mjhgt=9R3yuV-HwOAy5AAsDSTDjagRRDtYCw@mail.gmail.com>
+ <CAOesGMj47EZ1Zjc41VV2D-cM5XUsK28PDF-jSHKUkkind32ZRA@mail.gmail.com>
+Message-ID: <CAMuHMdUtu9N28rOb+813DumtbyAZJB3G+euD0mwwXD_jCiXrRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 22, 2016 5:46:22 PM CET zhangfei wrote:
-> On 2016?11?22? 16:49, Arnd Bergmann wrote:
-> > On Tuesday, November 22, 2016 3:49:20 PM CET Zhangfei Gao wrote:
-> >> -#define PERIPH_RSTDIS0_MMC0             0x000
-> >> -#define PERIPH_RSTDIS0_MMC1             0x001
-> >> -#define PERIPH_RSTDIS0_MMC2             0x002
-> >> -#define PERIPH_RSTDIS0_NANDC            0x003
-> >> -#define PERIPH_RSTDIS0_USBOTG_BUS       0x004
-> >> -#define PERIPH_RSTDIS0_POR_PICOPHY      0x005
-> >> -#define PERIPH_RSTDIS0_USBOTG           0x006
-> >> -#define PERIPH_RSTDIS0_USBOTG_32K       0x007
-> >> -#define PERIPH_RSTDIS1_HIFI             0x100
-> >> -#define PERIPH_RSTDIS1_DIGACODEC        0x105
-> >> +/* reset in sysctrl */
-> >> +#define PERIPH_RSTDIS0_MMC0             0
-> >> +#define PERIPH_RSTDIS0_MMC1             1
-> >> +#define PERIPH_RSTDIS0_MMC2             2
-> >> +#define PERIPH_RSTDIS0_NANDC            3
-> >> +#define PERIPH_RSTDIS0_USBOTG_BUS       4
-> >> +#define PERIPH_RSTDIS0_POR_PICOPHY      5
-> >> +#define PERIPH_RSTDIS0_USBOTG           6
-> >> +#define PERIPH_RSTDIS0_USBOTG_32K       7
-> >> +#define PERIPH_RSTDIS1_HIFI             8
-> > You can't redefined the binding here, this is part of the ABI.
-> > You can however add new numbers as long as the old ones keep
-> > working.
-> The methods are different.
-> The original define is offset | bit_shift, and driver has to parse 
-> offset and bit shift.
-> The new define is just index of array, which is defined in the reset-xxx.c
+Hi Olof,
 
-I understand that, what I mean is you have to find a way to let the new
-driver still support the old binding, you can't change it.
+On Mon, Nov 21, 2016 at 5:35 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Mon, Nov 21, 2016 at 8:27 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+>> On Mon, Nov 21, 2016 at 5:19 PM, Olof Johansson <olof@lixom.net> wrote:
+>>> On Mon, Nov 21, 2016 at 1:31 AM, Geert Uytterhoeven
+>>> <geert@linux-m68k.org> wrote:
+>>>> On Sat, Nov 19, 2016 at 2:28 AM, Olof Johansson <olof@lixom.net> wrote:
+>>>>> On Thu, Nov 17, 2016 at 02:34:25PM +0100, Simon Horman wrote:
+>>>>>> Please consider these second round of Renesas ARM based SoC updates for v4.10.
+>>>>
+>>>>>> * Basic support for r8a7745 SoC
+>>>>>>
+>>>>>> ----------------------------------------------------------------
+>>>>>> Sergei Shtylyov (2):
+>>>>>>       ARM: shmobile: r8a7745: basic SoC support
+>>>>>>       ARM: shmobile: document SK-RZG1E board
+>>>>>
+>>>>> Is there a reason you're adding a config option per SoC?
+>>>>>
+>>>>> I think you'd be better off not adding these config options, and just adding
+>>>>> support for the SoCs through compatibles (and adding the drivers to defconfigs,
+>>>>> etc).
+>>>>
+>>>> Yes there is a reason: kernel size.
+>>>> The main offenders are the pinctrl tables, which add ca. 20-50 KiB per
+>>>> supported SoC.
+>>>
+>>> So don't turn on that pinctrl driver unless you have that SoC?
+>>
+>> The enablement of the pinctrl driver (and the clock driver, FWIW) is controlled
+>> by the SoC Kconfig symbol. If you want support for the SoC, you want the
+>> pinctrl driver, too.
+>
+> Oh, that's trivial to fix! Do as almost all other SoCs do, and don't
+> use silent options.
 
-	Arnd
+What does that gain us? The ability to enable support for an SoC, without
+enabling the accompanying pinctrl driver, leading to a non-booting system?
+
+As soon as you have any pinctrl properties in the DT, you need the pinctrl
+driver. Unless you disable CONFIG_PINCTRL (it's selected, and not
+user-controlled), and rely on fragile reset state/boot loader.
+
+Pinctrl (and clock and irqchip) on-SoC drivers are special: if you fail to
+include them, the system won't boot.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
