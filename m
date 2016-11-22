@@ -1,132 +1,37 @@
-From: Joao.Pinto@synopsys.com (Joao Pinto)
-Date: Tue, 22 Nov 2016 14:16:53 +0000
-Subject: Synopsys Ethernet QoS Driver
-In-Reply-To: <7c7798b5-8cd4-ba99-f526-22d3e06e05db@synopsys.com>
-References: <CADvZ6ErjyVR5ShWTk0QesWLYR1m3p8yAMkK8v9gm2kN5xTv8zw@mail.gmail.com>
- <1dbb6047-2bbb-4d56-2a62-ab65a0254844@synopsys.com>
- <20161119135654.GA14079@lnxartpec.se.axis.com>
- <CAJ3bTp7PpUJcz=1JohX=A54UP6vVAafWnB0PGUBSxb5JJiO8Lg@mail.gmail.com>
- <1248f4ce-4859-10e6-fef9-342ea543f8d4@synopsys.com>
- <87c8a24b-0812-7850-cb3f-7be691bab432@st.com>
- <BFA799B0-BB22-4515-AC14-3544A3167B0A@axis.com>
- <ffd3b27c-0bc9-b53b-cc65-c7808595a553@st.com>
- <b126021d-e902-7a53-4d7a-e73ea89a66cf@synopsys.com>
- <A001080B-2DC8-48D9-BD82-8276A9B3BE3D@axis.com>
- <7c7798b5-8cd4-ba99-f526-22d3e06e05db@synopsys.com>
-Message-ID: <2eefdb8f-7e87-6009-6e50-c536d4b95dd6@synopsys.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Nov 2016 15:17:51 +0100
+Subject: [PATCH 1/2] PCI: iproc: fix 32-bit build
+Message-ID: <20161122141844.1655574-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The newly added code to setup the inbound ranges causes a link error
+on 32-bit machines from a 32-bit division:
 
-Hi Lars and Peppe,
+drivers/pci/host/pcie-iproc.o: In function `iproc_pcie_setup_ib':
+pcie-iproc.c:(.text.iproc_pcie_setup_ib+0x14c): undefined reference to `__aeabi_uldivmod'
 
-On 21-11-2016 16:11, Joao Pinto wrote:
-> On 21-11-2016 15:43, Lars Persson wrote:
->>
->>
->>> 21 nov. 2016 kl. 16:06 skrev Joao Pinto <Joao.Pinto@synopsys.com>:
->>>
->>>> On 21-11-2016 14:25, Giuseppe CAVALLARO wrote:
->>>>> On 11/21/2016 2:28 PM, Lars Persson wrote:
->>>>>
->>>>>
->>>>>> 21 nov. 2016 kl. 13:53 skrev Giuseppe CAVALLARO <peppe.cavallaro@st.com>:
->>>>>>
->>>>>> Hello Joao
->>>>>>
->>>>>>> On 11/21/2016 1:32 PM, Joao Pinto wrote:
->>>>>>> Hello,
->>>>>>>
->>>>>>>>> On 21-11-2016 05:29, Rayagond Kokatanur wrote:
->>>>>>>>>> On Sat, Nov 19, 2016 at 7:26 PM, Rabin Vincent <rabin@rab.in> wrote:
->>>>>>>>>> On Fri, Nov 18, 2016 at 02:20:27PM +0000, Joao Pinto wrote:
->>>>>>>>>> For now we are interesting in improving the synopsys QoS driver under
->>>>>>>>>> /nect/ethernet/synopsys. For now the driver structure consists of a
->>>>>>>>>> single file
->>>>>>>>>> called dwc_eth_qos.c, containing synopsys ethernet qos common ops and
-> 
+As both sides of the division are always power-of-two numbers and
+we already rely on that, we can use a shift instead.
 
-snip (...)
+Fixes: 87c240b19bba ("PCI: iproc: Add inbound DMA mapping support")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/pci/host/pcie-iproc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
->>>>>>
->>>>>> Peppe
->>>>>>
->>>>>
->>>>> Hello Joao and others,
->>>>>
->>>
->>> Hi Lars,
->>>
->>>>> As the maintainer of dwc_eth_qos.c I prefer also that we put efforts on the
->>>>> most mature driver, the stmmac.
->>>>>
->>>>> I hope that the code can migrate into an ethernet/synopsys folder to keep the
->>>>> convention of naming the folder after the vendor. This makes it easy for
->>>>> others to find the driver.
->>>>>
->>>>> The dwc_eth_qos.c will eventually be removed and its DT binding interface can
->>>>> then be implemented in the stmmac driver.
->>>
->>> So your ideia is to pick the ethernet/stmmac and rename it to ethernet/synopsys
->>> and try to improve the structure and add the missing QoS features to it?
->>
->> Indeed this is what I prefer.
-> 
-> Ok, it makes sense.
-> Just for curiosity the target setup is the following:
-> https://www.youtube.com/watch?v=8V-LB5y2Cos
-> but instead of using internal drivers, we desire to use mainline drivers only.
-> 
-> Thanks!
-
-Regarding this subject, I am thinking of making the following adaption:
-
-a) delete ethernet/synopsys
-b) rename ethernet/stmicro/stmmac to ethernet/synopsys
-
-and send you a patch for you to evaluate. Both agree with the approach?
-To have a new work base would be important, because I will add to the "new"
-structure some missing QoS features like Multichannel support, CBS and later TSN.
-
-Thanks.
-
-> 
->>
->>>
->>>>
->>>> Thanks Lars, I will be happy to support all you on this transition
->>>> and I agree on renaming all.
->>>>
->>>> peppe
->>>>
->>>>
->>>>> - Lars
->>>>>
->>>>>>>
->>>>>>>
->>>>>>>>
->>>>>>>>>
->>>>>>>>> (See http://lists.openwall.net/netdev/2016/02/29/127)
->>>>>>>>>
->>>>>>>>> The former only supports 4.x of the hardware.
->>>>>>>>>
->>>>>>>>> The later supports 4.x and 3.x and already has a platform glue driver
->>>>>>>>> with support for several platforms, a PCI glue driver, and a core driver
->>>>>>>>> with several features not present in the former (for example: TX/RX
->>>>>>>>> interrupt coalescing, EEE, PTP).
->>>>>>>>>
->>>>>>>>> Have you evaluated both drivers?  Why have you decided to work on the
->>>>>>>>> former rather than the latter?
->>>>>>>>
->>>>>>>>
->>>>>>>
->>>>>>> Thanks.
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>
->>>>>
->>>>
->>>
-> 
+diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+index d10e6aa32e0d..857ff5198317 100644
+--- a/drivers/pci/host/pcie-iproc.c
++++ b/drivers/pci/host/pcie-iproc.c
+@@ -865,7 +865,7 @@ static int iproc_pcie_ib_write(struct iproc_pcie *pcie, int region_idx,
+ 	 * Now program the IMAP registers.  Each IARR region may have one or
+ 	 * more IMAP windows.
+ 	 */
+-	size /= nr_windows;
++	size >>= ilog2(nr_windows);
+ 	for (window_idx = 0; window_idx < nr_windows; window_idx++) {
+ 		val = readl(pcie->base + imap_offset);
+ 		val |= lower_32_bits(axi_addr) | IMAP_VALID;
+-- 
+2.9.0
