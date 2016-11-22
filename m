@@ -1,47 +1,52 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 22 Nov 2016 16:02:41 +0100
-Subject: [PATCH 2/4] arm64: dts: rockchip: Arch counter doesn't tick in
- system suspend
-In-Reply-To: <1479807866-6957-2-git-send-email-daniel.lezcano@linaro.org>
-References: <20161122094300.GA2017@mai>
- <1479807866-6957-1-git-send-email-daniel.lezcano@linaro.org>
- <1479807866-6957-2-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <6410694.RN5yFFi4kR@diego>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 22 Nov 2016 20:36:26 +0530
+Subject: [PATCH 1/3] of: base: add support to get machine compatible string
+In-Reply-To: <5ce9fb9f-459a-562b-2e9f-85d35f9ec035@arm.com>
+References: <1479811311-3080-1-git-send-email-bgolaszewski@baylibre.com>
+ <1479811311-3080-2-git-send-email-bgolaszewski@baylibre.com>
+ <5ce9fb9f-459a-562b-2e9f-85d35f9ec035@arm.com>
+Message-ID: <67a3c2c7-0cb9-9764-2710-6ee66fc4dde4@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 22. November 2016, 10:44:22 schrieb Daniel Lezcano:
-> From: Brian Norris <briannorris@chromium.org>
-> 
-> The "arm,no-tick-in-suspend" property was introduced to note
-> implementations where the system counter does not quite follow the ARM
-> specification that it "must be implemented in an always-on power
-> domain".
-> 
-> Particularly, RK3399's counter stops ticking when we switch from the
-> 24MHz clock to the 32KHz clock in low-power suspend, so let's mark it as
-> such.
-> 
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
-> Reviewed-by: Douglas Anderson <dianders@chromium.org>
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Hi Sudeep,
 
-not sure if needed, but anyway
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+On Tuesday 22 November 2016 04:23 PM, Sudeep Holla wrote:
+> 
+> 
+> On 22/11/16 10:41, Bartosz Golaszewski wrote:
+>> Add a function allowing to retrieve the compatible string of the root
+>> node of the device tree.
+>>
+> 
+> Rob has queued [1] and it's in -next today. You can reuse that if you
+> are planning to target this for v4.11 or just use open coding in your
+> driver for v4.10 and target this move for v4.11 to avoid cross tree
+> dependencies as I already mentioned in your previous thread.
 
-> ---
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index b65c193..d85b651 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> @@ -174,6 +174,7 @@
->  			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW 0>,
->  			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW 0>,
->  			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW 0>;
-> +		arm,no-tick-in-suspend;
->  	};
-> 
->  	xin24m: xin24m {
+I dont have your original patch in my mailbox, but I wonder if 
+returning a pointer to property string for a node whose reference has 
+already been released is safe to do? Probably not an issue for the root 
+node, but still feels counter-intuitive.
+
+This is the code for reference:
+
++int of_machine_get_model_name(const char **model)
++{
++       int error;
++
++       if (!of_node_get(of_root))
++               return -EINVAL;
++
++       error = of_property_read_string(of_root, "model", model);
++       if (error)
++               error = of_property_read_string_index(of_root, "compatible",
++                                                     0, model);
++       of_node_put(of_root);
++
++       return error;
++}
++EXPORT_SYMBOL(of_machine_get_model_name);
+
+Thanks,
+Sekhar
