@@ -1,63 +1,71 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 22 Nov 2016 09:26:04 +0000
-Subject: [RFC PATCH 07/11] ARM: sleep: allow it to be build for R-class
+Date: Tue, 22 Nov 2016 09:26:07 +0000
+Subject: [RFC PATCH 10/11] ARM: NOMMU: define __arm_ioremap_exec and
+ pci_ioremap functions
 In-Reply-To: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
 References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1479806768-39911-8-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1479806768-39911-11-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dependency on MMU is quite strict and prevent R-class from being built -
-relax this condition and guard against M-class only
+Define __arm_ioremap_exec and pci_ioremap* functions fallowing pattern
+for other ioremap functions.
 
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/Kconfig        |    2 +-
- arch/arm/kernel/sleep.S |    4 ----
- 2 files changed, 1 insertion(+), 5 deletions(-)
+ arch/arm/mm/nommu.c |   35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 49e0f01..f9ff570 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2179,7 +2179,7 @@ config ARCH_SUSPEND_POSSIBLE
- 	def_bool y
+diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+index 2740967..681cec8 100644
+--- a/arch/arm/mm/nommu.c
++++ b/arch/arm/mm/nommu.c
+@@ -19,6 +19,7 @@
+ #include <asm/cputype.h>
+ #include <asm/mpu.h>
+ #include <asm/procinfo.h>
++#include <asm/mach/map.h>
  
- config ARM_CPU_SUSPEND
--	def_bool PM_SLEEP || BL_SWITCHER || ARM_PSCI_FW
-+	def_bool (PM_SLEEP || BL_SWITCHER || ARM_PSCI_FW) && !CPU_V7M
- 	depends on ARCH_SUSPEND_POSSIBLE
+ #include "mm.h"
  
- config ARCH_HIBERNATION_POSSIBLE
-diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-index 0f6c100..0e7fddf 100644
---- a/arch/arm/kernel/sleep.S
-+++ b/arch/arm/kernel/sleep.S
-@@ -119,14 +119,12 @@ ENDPROC(cpu_resume_after_mmu)
- 	.text
- 	.align
- 
--#ifdef CONFIG_MMU
- 	.arm
- ENTRY(cpu_resume_arm)
-  THUMB(	badr	r9, 1f		)	@ Kernel is entered in ARM.
-  THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
-  THUMB(	.thumb			)	@ switch to Thumb now.
-  THUMB(1:			)
--#endif
- 
- ENTRY(cpu_resume)
- ARM_BE8(setend be)			@ ensure we are in BE mode
-@@ -160,9 +158,7 @@ THUMB(	mov	sp, r2			)
- THUMB(	bx	r3			)
- ENDPROC(cpu_resume)
- 
--#ifdef CONFIG_MMU
- ENDPROC(cpu_resume_arm)
--#endif
- 
- 	.align 2
- _sleep_save_sp:
+@@ -401,3 +402,37 @@ void iounmap(volatile void __iomem *addr)
+ {
+ }
+ EXPORT_SYMBOL(iounmap);
++
++void __iomem *
++__arm_ioremap_exec(phys_addr_t phys_addr, size_t size, bool cached)
++{
++	unsigned int mtype;
++
++	if (cached)
++		mtype = MT_MEMORY_RWX;
++	else
++		mtype = MT_MEMORY_RWX_NONCACHED;
++
++	return __arm_ioremap_caller(phys_addr, size, mtype,
++			__builtin_return_address(0));
++}
++
++#ifdef CONFIG_PCI
++static int pci_ioremap_mem_type = MT_DEVICE;
++
++void pci_ioremap_set_mem_type(int mem_type)
++{
++	pci_ioremap_mem_type = mem_type;
++}
++
++int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
++{
++	BUG_ON(offset + SZ_64K > IO_SPACE_LIMIT);
++
++	return ioremap_page_range(PCI_IO_VIRT_BASE + offset,
++				  PCI_IO_VIRT_BASE + offset + SZ_64K,
++				  phys_addr,
++				  MT_DEVICE);
++}
++EXPORT_SYMBOL_GPL(pci_ioremap_io);
++#endif
 -- 
 1.7.9.5
