@@ -1,321 +1,909 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 22 Nov 2016 17:13:27 +0100
-Subject: [PATCH 7/7] add stm32 multi-functions timer driver in DT
+Date: Tue, 22 Nov 2016 17:13:26 +0100
+Subject: [PATCH 6/7] add STM32 IIO timer driver
 In-Reply-To: <1479831207-32699-1-git-send-email-benjamin.gaignard@st.com>
 References: <1479831207-32699-1-git-send-email-benjamin.gaignard@st.com>
-Message-ID: <1479831207-32699-8-git-send-email-benjamin.gaignard@st.com>
+Message-ID: <1479831207-32699-7-git-send-email-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add timers MFD and childs into DT for stm32f4.
-Define and enable pwm1 and pwm3 for stm32f469 discovery board
+Timers IPs can be used to generate triggers for other IPs like
+DAC, ADC or other timers.
+Each trigger may result of timer internals signals like counter enable,
+reset or edge, this configuration could be done through "master_mode"
+device attribute.
+
+A timer device could be triggered by other timers, we use the trigger
+name and is_stm32_iio_timer_trigger() function to distinguish them
+and configure IP input switch.
+
+Timer may also decide on which event (edge, level) they could
+be activated by a trigger, this configuration is done by writing in
+"slave_mode" device attribute.
+
+Since triggers could also be used by DAC or ADC their names are defined
+in include/linux/iio/timer/stm32-iio-timers.h so those IPs will be able
+to configure themselves in valid_trigger function
+
+Trigger have a "sampling_frequency" attribute which allow to configure
+timer sampling frequency without using pwm interface
 
 Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 ---
- arch/arm/boot/dts/stm32f429.dtsi      | 246 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/stm32f469-disco.dts |  29 ++++
- 2 files changed, 275 insertions(+)
+ drivers/iio/Kconfig                        |   2 +-
+ drivers/iio/Makefile                       |   1 +
+ drivers/iio/timer/Kconfig                  |  15 +
+ drivers/iio/timer/Makefile                 |   1 +
+ drivers/iio/timer/stm32-iio-timer.c        | 766 +++++++++++++++++++++++++++++
+ drivers/iio/trigger/Kconfig                |   1 -
+ include/linux/iio/timer/stm32-iio-timers.h |  25 +
+ 7 files changed, 809 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/iio/timer/Kconfig
+ create mode 100644 drivers/iio/timer/Makefile
+ create mode 100644 drivers/iio/timer/stm32-iio-timer.c
+ create mode 100644 include/linux/iio/timer/stm32-iio-timers.h
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index bca491d..28a0fe9 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -355,6 +355,21 @@
- 					slew-rate = <2>;
- 				};
- 			};
+diff --git a/drivers/iio/Kconfig b/drivers/iio/Kconfig
+index 6743b18..2de2a80 100644
+--- a/drivers/iio/Kconfig
++++ b/drivers/iio/Kconfig
+@@ -90,5 +90,5 @@ source "drivers/iio/potentiometer/Kconfig"
+ source "drivers/iio/pressure/Kconfig"
+ source "drivers/iio/proximity/Kconfig"
+ source "drivers/iio/temperature/Kconfig"
+-
++source "drivers/iio/timer/Kconfig"
+ endif # IIO
+diff --git a/drivers/iio/Makefile b/drivers/iio/Makefile
+index 87e4c43..b797c08 100644
+--- a/drivers/iio/Makefile
++++ b/drivers/iio/Makefile
+@@ -32,4 +32,5 @@ obj-y += potentiometer/
+ obj-y += pressure/
+ obj-y += proximity/
+ obj-y += temperature/
++obj-y += timer/
+ obj-y += trigger/
+diff --git a/drivers/iio/timer/Kconfig b/drivers/iio/timer/Kconfig
+new file mode 100644
+index 0000000..55764e8
+--- /dev/null
++++ b/drivers/iio/timer/Kconfig
+@@ -0,0 +1,15 @@
++#
++# Timers drivers
 +
-+			pwm1_pins: pwm at 1 {
-+				pins {
-+					pinmux = <STM32F429_PA8_FUNC_TIM1_CH1>,
-+						 <STM32F429_PB13_FUNC_TIM1_CH1N>,
-+						 <STM32F429_PB12_FUNC_TIM1_BKIN>;
-+				};
-+			};
++menu "Timers"
 +
-+			pwm3_pins: pwm at 3 {
-+				pins {
-+					pinmux = <STM32F429_PB4_FUNC_TIM3_CH1>,
-+						 <STM32F429_PB5_FUNC_TIM3_CH2>;
-+				};
-+			};
- 		};
++config IIO_STM32_TIMER
++	tristate "stm32 iio timer"
++	depends on ARCH_STM32
++	depends on OF
++	select IIO_TRIGGERED_EVENT
++	select MFD_STM32_TIMER
++	help
++	  Select this option to enable stm32 timers hardware IPs
++
++endmenu
+diff --git a/drivers/iio/timer/Makefile b/drivers/iio/timer/Makefile
+new file mode 100644
+index 0000000..a360c9f
+--- /dev/null
++++ b/drivers/iio/timer/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_IIO_STM32_TIMER) += stm32-iio-timer.o
+diff --git a/drivers/iio/timer/stm32-iio-timer.c b/drivers/iio/timer/stm32-iio-timer.c
+new file mode 100644
+index 0000000..a1d54c4
+--- /dev/null
++++ b/drivers/iio/timer/stm32-iio-timer.c
+@@ -0,0 +1,766 @@
++/*
++ * stm32-iio-timer.c
++ *
++ * Copyright (C) STMicroelectronics 2016
++ * Author: Benjamin Gaignard <benjamin.gaignard@st.com> for STMicroelectronics.
++ * License terms:  GNU General Public License (GPL), version 2
++ */
++
++#include <linux/iio/iio.h>
++#include <linux/iio/sysfs.h>
++#include <linux/iio/timer/stm32-iio-timers.h>
++#include <linux/iio/trigger.h>
++#include <linux/iio/triggered_event.h>
++#include <linux/interrupt.h>
++#include <linux/mfd/stm32-mfd-timer.h>
++#include <linux/module.h>
++
++#define DRIVER_NAME "stm32-iio-timer"
++
++struct stm32_trigger {
++	const char *name;
++};
++
++struct stm32_valid_trigger {
++	const char *name;
++	int ts_value;
++};
++
++struct stm32_trig_cfg {
++	const struct stm32_trigger *triggers;
++	int nb_triggers;
++	const struct stm32_valid_trigger *valids;
++	int nb_valids;
++};
++
++struct stm32_iio_timer_dev {
++	struct device *dev;
++	struct regmap *regmap;
++	struct clk *clk;
++	int irq;
++	struct stm32_trig_cfg *cfg;
++	bool own_timer;
++	unsigned int sampling_frequency;
++	struct iio_trigger *active_trigger;
++};
++
++static ssize_t _store_frequency(struct device *dev,
++				struct device_attribute *attr,
++				const char *buf, size_t len)
++{
++	struct iio_trigger *trig = to_iio_trigger(dev);
++	struct stm32_iio_timer_dev *stm32 = iio_trigger_get_drvdata(trig);
++	unsigned int freq;
++	int ret;
++
++	ret = kstrtouint(buf, 10, &freq);
++	if (ret)
++		return ret;
++
++	stm32->sampling_frequency = freq;
++
++	return len;
++}
++
++static ssize_t _read_frequency(struct device *dev,
++			       struct device_attribute *attr, char *buf)
++{
++	struct iio_trigger *trig = to_iio_trigger(dev);
++	struct stm32_iio_timer_dev *stm32 = iio_trigger_get_drvdata(trig);
++	unsigned long long freq = stm32->sampling_frequency;
++	u32 psc, arr, cr1;
++
++	regmap_read(stm32->regmap, TIM_CR1, &cr1);
++	regmap_read(stm32->regmap, TIM_PSC, &psc);
++	regmap_read(stm32->regmap, TIM_ARR, &arr);
++
++	if (psc && arr && (cr1 & TIM_CR1_CEN)) {
++		freq = (unsigned long long)clk_get_rate(stm32->clk);
++		do_div(freq, psc);
++		do_div(freq, arr);
++	}
++
++	return sprintf(buf, "%d\n", (unsigned int) freq);
++}
++
++static IIO_DEV_ATTR_SAMP_FREQ(S_IWUSR | S_IRUGO,
++			      _read_frequency,
++			      _store_frequency);
++
++static struct attribute *stm32_trigger_attrs[] = {
++	&iio_dev_attr_sampling_frequency.dev_attr.attr,
++	NULL,
++};
++
++static const struct attribute_group stm32_trigger_attr_group = {
++	.attrs = stm32_trigger_attrs,
++};
++
++static const struct attribute_group *stm32_trigger_attr_groups[] = {
++	&stm32_trigger_attr_group,
++	NULL,
++};
++
++static
++ssize_t _show_master_mode(struct device *dev,
++			  struct device_attribute *attr, char *buf)
++{
++	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
++	struct stm32_iio_timer_dev *stm32 = iio_priv(indio_dev);
++	u32 cr2;
++
++	regmap_read(stm32->regmap, TIM_CR2, &cr2);
++
++	return snprintf(buf, PAGE_SIZE, "%d\n", (cr2 >> 4) & 0x7);
++}
++
++static
++ssize_t _store_master_mode(struct device *dev,
++			   struct device_attribute *attr,
++			   const char *buf, size_t len)
++{
++	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
++	struct stm32_iio_timer_dev *stm32 = iio_priv(indio_dev);
++	u8 mode;
++	int ret;
++
++	ret = kstrtou8(buf, 10, &mode);
++	if (ret)
++		return ret;
++
++	if (mode > 0x7)
++		return -EINVAL;
++
++	regmap_update_bits(stm32->regmap, TIM_CR2, TIM_CR2_MMS, mode << 4);
++
++	return len;
++}
++
++static IIO_DEVICE_ATTR(master_mode, S_IRUGO | S_IWUSR,
++		       _show_master_mode,
++		       _store_master_mode,
++		       0);
++
++static
++ssize_t _show_slave_mode(struct device *dev,
++			 struct device_attribute *attr, char *buf)
++{
++	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
++	struct stm32_iio_timer_dev *stm32 = iio_priv(indio_dev);
++	u32 smcr;
++
++	regmap_read(stm32->regmap, TIM_SMCR, &smcr);
++
++	return snprintf(buf, PAGE_SIZE, "%d\n", smcr & 0x3);
++}
++
++static
++ssize_t _store_slave_mode(struct device *dev,
++			  struct device_attribute *attr,
++			  const char *buf, size_t len)
++{
++	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
++	struct stm32_iio_timer_dev *stm32 = iio_priv(indio_dev);
++	u8 mode;
++	int ret;
++
++	ret = kstrtou8(buf, 10, &mode);
++	if (ret)
++		return ret;
++
++	if (mode > 0x7)
++		return -EINVAL;
++
++	regmap_update_bits(stm32->regmap, TIM_SMCR, TIM_SMCR_SMS, mode);
++
++	return len;
++}
++
++static IIO_DEVICE_ATTR(slave_mode, S_IRUGO | S_IWUSR,
++		       _show_slave_mode,
++		       _store_slave_mode,
++		       0);
++
++static struct attribute *stm32_timer_attrs[] = {
++	&iio_dev_attr_master_mode.dev_attr.attr,
++	&iio_dev_attr_slave_mode.dev_attr.attr,
++	NULL,
++};
++
++static const struct attribute_group stm32_timer_attr_group = {
++	.attrs = stm32_timer_attrs,
++};
++
++static const struct stm32_trigger trigger1[] = {
++	{
++		.name = TIM1_TRGO,
++	},
++};
++
++static const struct stm32_valid_trigger valid1[] = {
++	{
++		.name = TIM5_TRGO,
++		.ts_value = 0,
++	},
++	{
++		.name = TIM2_TRGO,
++		.ts_value = 1,
++	},
++	{
++		.name = TIM3_TRGO,
++		.ts_value = 2,
++	},
++	{
++		.name = TIM4_TRGO,
++		.ts_value = 3,
++	},
++};
++
++static const struct stm32_trig_cfg trigger1_cfg = {
++	.triggers = trigger1,
++	.nb_triggers = ARRAY_SIZE(trigger1),
++	.valids = valid1,
++	.nb_valids = ARRAY_SIZE(valid1),
++};
++
++static const struct stm32_trigger trigger2[] = {
++	{
++		.name = TIM2_TRGO,
++	},
++};
++
++static const struct stm32_valid_trigger valid2[] = {
++	{
++		.name = TIM1_TRGO,
++		.ts_value = 0,
++	},
++	{
++		.name = TIM8_TRGO,
++		.ts_value = 1,
++	},
++	{
++		.name = TIM3_TRGO,
++		.ts_value = 2,
++	},
++	{
++		.name = TIM4_TRGO,
++		.ts_value = 3,
++	},
++};
++
++static const struct stm32_trig_cfg trigger2_cfg = {
++	.triggers = trigger2,
++	.nb_triggers = ARRAY_SIZE(trigger2),
++	.valids = valid2,
++	.nb_valids = ARRAY_SIZE(valid2),
++};
++
++static const struct stm32_trigger trigger3[] = {
++	{
++		.name = TIM3_TRGO,
++	},
++};
++
++static const struct stm32_valid_trigger valid3[] = {
++	{
++		.name = TIM1_TRGO,
++		.ts_value = 0,
++	},
++	{
++		.name = TIM8_TRGO,
++		.ts_value = 1,
++	},
++	{
++		.name = TIM5_TRGO,
++		.ts_value = 2,
++	},
++	{
++		.name = TIM4_TRGO,
++		.ts_value = 3,
++	},
++};
++
++static const struct stm32_trig_cfg trigger3_cfg = {
++	.triggers = trigger3,
++	.nb_triggers = ARRAY_SIZE(trigger3),
++	.valids = valid3,
++	.nb_valids = ARRAY_SIZE(valid3),
++};
++
++static const struct stm32_trigger trigger4[] = {
++	{
++		.name = TIM4_TRGO,
++	},
++};
++
++static const struct stm32_valid_trigger valid4[] = {
++	{
++		.name = TIM1_TRGO,
++		.ts_value = 0,
++	},
++	{
++		.name = TIM2_TRGO,
++		.ts_value = 1,
++	},
++	{
++		.name = TIM3_TRGO,
++		.ts_value = 2,
++	},
++	{
++		.name = TIM8_TRGO,
++		.ts_value = 3,
++	},
++};
++
++static const struct stm32_trig_cfg trigger4_cfg = {
++	.triggers = trigger4,
++	.nb_triggers = ARRAY_SIZE(trigger4),
++	.valids = valid4,
++	.nb_valids = ARRAY_SIZE(valid4),
++};
++
++static const struct stm32_trigger trigger5[] = {
++	{
++		.name = TIM5_TRGO,
++	},
++};
++
++static const struct stm32_valid_trigger valid5[] = {
++	{
++		.name = TIM2_TRGO,
++		.ts_value = 0,
++	},
++	{
++		.name = TIM3_TRGO,
++		.ts_value = 1,
++	},
++	{
++		.name = TIM4_TRGO,
++		.ts_value = 2,
++	},
++	{
++		.name = TIM8_TRGO,
++		.ts_value = 3,
++	},
++};
++
++static const struct stm32_trig_cfg trigger5_cfg = {
++	.triggers = trigger5,
++	.nb_triggers = ARRAY_SIZE(trigger5),
++	.valids = valid5,
++	.nb_valids = ARRAY_SIZE(valid5),
++};
++
++static const struct stm32_trigger trigger6[] = {
++	{
++		.name = TIM6_TRGO,
++	},
++};
++
++static const struct stm32_trig_cfg trigger6_cfg = {
++	.triggers = trigger6,
++	.nb_triggers = ARRAY_SIZE(trigger6),
++	.nb_valids = 0,
++};
++
++static const struct stm32_trigger trigger7[] = {
++	{
++		.name = TIM7_TRGO,
++	},
++};
++
++static const struct stm32_trig_cfg trigger7_cfg = {
++	.triggers = trigger7,
++	.nb_triggers = ARRAY_SIZE(trigger7),
++	.nb_valids = 0,
++};
++
++static const struct stm32_trigger trigger8[] = {
++	{
++		.name = TIM8_TRGO,
++	},
++};
++
++static const struct stm32_valid_trigger valid8[] = {
++	{
++		.name = TIM1_TRGO,
++		.ts_value = 0,
++	},
++	{
++		.name = TIM2_TRGO,
++		.ts_value = 1,
++	},
++	{
++		.name = TIM4_TRGO,
++		.ts_value = 2,
++	},
++	{
++		.name = TIM5_TRGO,
++		.ts_value = 3,
++	},
++};
++
++static const struct stm32_trig_cfg trigger8_cfg = {
++	.triggers = trigger8,
++	.nb_triggers = ARRAY_SIZE(trigger8),
++	.valids = valid8,
++	.nb_valids = ARRAY_SIZE(valid8),
++};
++
++static const struct stm32_trigger trigger9[] = {
++	{
++		.name = TIM9_TRGO,
++	},
++};
++
++static const struct stm32_valid_trigger valid9[] = {
++	{
++		.name = TIM2_TRGO,
++		.ts_value = 0,
++	},
++	{
++		.name = TIM3_TRGO,
++		.ts_value = 1,
++	},
++};
++
++static const struct stm32_trig_cfg trigger9_cfg = {
++	.triggers = trigger9,
++	.nb_triggers = ARRAY_SIZE(trigger9),
++	.valids = valid9,
++	.nb_valids = ARRAY_SIZE(valid9),
++};
++
++static const struct stm32_trigger trigger12[] = {
++	{
++		.name = TIM12_TRGO,
++	},
++};
++
++static const struct stm32_valid_trigger valid12[] = {
++	{
++		.name = TIM4_TRGO,
++		.ts_value = 0,
++	},
++	{
++		.name = TIM5_TRGO,
++		.ts_value = 1,
++	},
++};
++
++static const struct stm32_trig_cfg trigger12_cfg = {
++	.triggers = trigger12,
++	.nb_triggers = ARRAY_SIZE(trigger12),
++	.valids = valid12,
++	.nb_valids = ARRAY_SIZE(valid12),
++};
++
++static const struct of_device_id stm32_trig_of_match[] = {
++	{
++		.compatible = "st,stm32-iio-timer1",
++		.data = &trigger1_cfg,
++	},
++	{
++		.compatible = "st,stm32-iio-timer2",
++		.data = &trigger2_cfg,
++	},
++	{
++		.compatible = "st,stm32-iio-timer3",
++		.data = &trigger3_cfg,
++	},
++	{
++		.compatible = "st,stm32-iio-timer4",
++		.data = &trigger4_cfg,
++	},
++	{
++		.compatible = "st,stm32-iio-timer5",
++		.data = &trigger5_cfg,
++	},
++	{
++		.compatible = "st,stm32-iio-timer6",
++		.data = &trigger6_cfg,
++	},
++	{
++		.compatible = "st,stm32-iio-timer7",
++		.data = &trigger7_cfg,
++	},
++	{
++		.compatible = "st,stm32-iio-timer8",
++		.data = &trigger8_cfg,
++	},
++	{
++		.compatible = "st,stm32-iio-timer9",
++		.data = &trigger9_cfg,
++	},
++	{
++		.compatible = "st,stm32-iio-timer12",
++		.data = &trigger12_cfg,
++	},
++};
++MODULE_DEVICE_TABLE(of, stm32_trig_of_match);
++
++static int stm32_timer_start(struct stm32_iio_timer_dev *stm32)
++{
++	unsigned long long prd, div;
++	int prescaler = 0;
++	u32 max_arr = 0xFFFF, cr1;
++
++	if (stm32->sampling_frequency == 0)
++		return 0;
++
++	/* Period and prescaler values depends of clock rate */
++	div = (unsigned long long)clk_get_rate(stm32->clk);
++
++	do_div(div, stm32->sampling_frequency);
++
++	prd = div;
++
++	while (div > max_arr) {
++		prescaler++;
++		div = prd;
++		do_div(div, (prescaler + 1));
++	}
++	prd = div;
++
++	if (prescaler > MAX_TIM_PSC) {
++		dev_err(stm32->dev, "prescaler exceeds the maximum value\n");
++		return -EINVAL;
++	}
++
++	/* Check that we own the timer */
++	regmap_read(stm32->regmap, TIM_CR1, &cr1);
++	if ((cr1 & TIM_CR1_CEN) && !stm32->own_timer)
++		return -EBUSY;
++
++	if (!stm32->own_timer) {
++		stm32->own_timer = true;
++		clk_enable(stm32->clk);
++	}
++
++	regmap_write(stm32->regmap, TIM_PSC, prescaler);
++	regmap_write(stm32->regmap, TIM_ARR, prd - 1);
++	regmap_update_bits(stm32->regmap, TIM_CR1, TIM_CR1_ARPE, TIM_CR1_ARPE);
++
++	/* Force master mode to update mode */
++	regmap_update_bits(stm32->regmap, TIM_CR2, TIM_CR2_MMS, 0x20);
++
++	/* Make sure that registers are updated */
++	regmap_update_bits(stm32->regmap, TIM_EGR, TIM_EGR_UG, TIM_EGR_UG);
++
++	/* Enable interrupt */
++	regmap_write(stm32->regmap, TIM_SR, 0);
++	regmap_update_bits(stm32->regmap, TIM_DIER, TIM_DIER_UIE, TIM_DIER_UIE);
++
++	/* Enable controller */
++	regmap_update_bits(stm32->regmap, TIM_CR1, TIM_CR1_CEN, TIM_CR1_CEN);
++
++	return 0;
++}
++
++static int stm32_timer_stop(struct stm32_iio_timer_dev *stm32)
++{
++	if (!stm32->own_timer)
++		return 0;
++
++	/* Stop timer */
++	regmap_update_bits(stm32->regmap, TIM_DIER, TIM_DIER_UIE, 0);
++	regmap_update_bits(stm32->regmap, TIM_CR1, TIM_CR1_CEN, 0);
++	regmap_write(stm32->regmap, TIM_PSC, 0);
++	regmap_write(stm32->regmap, TIM_ARR, 0);
++
++	clk_disable(stm32->clk);
++
++	stm32->own_timer = false;
++	stm32->active_trigger = NULL;
++
++	return 0;
++}
++
++static int stm32_set_trigger_state(struct iio_trigger *trig, bool state)
++{
++	struct stm32_iio_timer_dev *stm32 = iio_trigger_get_drvdata(trig);
++
++	stm32->active_trigger = trig;
++
++	if (state)
++		return stm32_timer_start(stm32);
++	else
++		return stm32_timer_stop(stm32);
++}
++
++static irqreturn_t stm32_timer_irq_handler(int irq, void *private)
++{
++	struct stm32_iio_timer_dev *stm32 = private;
++	u32 sr;
++
++	regmap_read(stm32->regmap, TIM_SR, &sr);
++	regmap_write(stm32->regmap, TIM_SR, 0);
++
++	if ((sr & TIM_SR_UIF) && stm32->active_trigger)
++		iio_trigger_poll(stm32->active_trigger);
++
++	return IRQ_HANDLED;
++}
++
++static const struct iio_trigger_ops timer_trigger_ops = {
++	.owner = THIS_MODULE,
++	.set_trigger_state = stm32_set_trigger_state,
++};
++
++static int stm32_setup_iio_triggers(struct stm32_iio_timer_dev *stm32)
++{
++	int i, ret;
++	const struct stm32_trigger *triggers = stm32->cfg->triggers;
++
++	for (i = 0; i < stm32->cfg->nb_triggers; i++) {
++		struct iio_trigger *trig;
++
++		trig = devm_iio_trigger_alloc(stm32->dev,
++					      "%s", triggers[i].name);
++		if  (!trig)
++			return -ENOMEM;
++
++		ret = devm_request_irq(stm32->dev, stm32->irq,
++				       stm32_timer_irq_handler, IRQF_SHARED,
++				       "timer_event", stm32);
++		if (ret)
++			return ret;
++
++		trig->dev.parent = stm32->dev->parent;
++		trig->ops = &timer_trigger_ops;
++		trig->dev.groups = stm32_trigger_attr_groups;
++		iio_trigger_set_drvdata(trig, stm32);
++
++		ret = devm_iio_trigger_register(stm32->dev, trig);
++		if (ret)
++			return ret;
++	}
++
++	return 0;
++}
++
++/**
++ * is_stm32_iio_timer_trigger
++ * @trig: trigger to be checked
++ *
++ * return true if the trigger is a valid stm32 iio timer trigger
++ * either return false
++ */
++bool is_stm32_iio_timer_trigger(struct iio_trigger *trig)
++{
++	return (trig->ops == &timer_trigger_ops);
++}
++EXPORT_SYMBOL(is_stm32_iio_timer_trigger);
++
++static int stm32_validate_trigger(struct iio_dev *indio_dev,
++				  struct iio_trigger *trig)
++{
++	struct stm32_iio_timer_dev *dev = iio_priv(indio_dev);
++	const struct stm32_valid_trigger *valids = dev->cfg->valids;
++	int i;
++
++	if (!is_stm32_iio_timer_trigger(trig))
++		return -EINVAL;
++
++	for (i = 0; i < dev->cfg->nb_valids; i++) {
++		if (strcmp(valids[i].name, trig->name) == 0) {
++			regmap_update_bits(dev->regmap, TIM_SMCR, TIM_SMCR_TS,
++					   valids[i].ts_value << 4);
++			return 0;
++		}
++	}
++
++	return -EINVAL;
++}
++
++static const struct iio_info stm32_trigger_info = {
++	.driver_module = THIS_MODULE,
++	.validate_trigger = stm32_validate_trigger,
++	.attrs = &stm32_timer_attr_group,
++};
++
++static struct stm32_iio_timer_dev *stm32_setup_iio_device(struct device *dev)
++{
++	struct iio_dev *indio_dev;
++	int ret;
++
++	indio_dev = devm_iio_device_alloc(dev, sizeof(struct stm32_iio_timer_dev));
++	if (!indio_dev)
++		return NULL;
++
++	indio_dev->name = dev_name(dev);
++	indio_dev->dev.parent = dev;
++	indio_dev->info = &stm32_trigger_info;
++	indio_dev->modes = INDIO_EVENT_TRIGGERED;
++	indio_dev->num_channels = 0;
++	indio_dev->dev.of_node = dev->of_node;
++
++	ret = iio_triggered_event_setup(indio_dev,
++					NULL,
++					stm32_timer_irq_handler);
++	if (ret)
++		return NULL;
++
++	ret = devm_iio_device_register(dev, indio_dev);
++	if (ret) {
++		iio_triggered_event_cleanup(indio_dev);
++		return NULL;
++	}
++
++	return iio_priv(indio_dev);
++}
++
++static int stm32_iio_timer_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	struct stm32_iio_timer_dev *stm32;
++	struct stm32_mfd_timer_dev *mfd = pdev->dev.platform_data;
++	int ret;
++
++	stm32 = stm32_setup_iio_device(dev);
++	if (!stm32)
++		return -ENOMEM;
++
++	stm32->dev = dev;
++	stm32->regmap = mfd->regmap;
++	stm32->clk = mfd->clk;
++	stm32->irq = mfd->irq;
++
++	if (!of_match_node(stm32_trig_of_match, np)->data)
++		return -EINVAL;
++
++	stm32->cfg =
++	(struct stm32_trig_cfg *)of_match_node(stm32_trig_of_match, np)->data;
++
++	ret = stm32_setup_iio_triggers(stm32);
++	if (ret)
++		return ret;
++
++	platform_set_drvdata(pdev, stm32);
++
++	return 0;
++}
++
++static int stm32_iio_timer_remove(struct platform_device *pdev)
++{
++	struct stm32_iio_timer_dev *stm32 = platform_get_drvdata(pdev);
++
++	iio_triggered_event_cleanup((struct iio_dev *)stm32);
++
++	return 0;
++}
++
++static struct platform_driver stm32_iio_timer_driver = {
++	.probe = stm32_iio_timer_probe,
++	.remove = stm32_iio_timer_remove,
++	.driver = {
++		.name = DRIVER_NAME,
++		.of_match_table = stm32_trig_of_match,
++	},
++};
++module_platform_driver(stm32_iio_timer_driver);
++
++MODULE_ALIAS("platform:" DRIVER_NAME);
++MODULE_DESCRIPTION("STMicroelectronics STM32 iio timer driver");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/iio/trigger/Kconfig b/drivers/iio/trigger/Kconfig
+index 809b2e7..f2af4fe 100644
+--- a/drivers/iio/trigger/Kconfig
++++ b/drivers/iio/trigger/Kconfig
+@@ -46,5 +46,4 @@ config IIO_SYSFS_TRIGGER
  
- 		rcc: rcc at 40023810 {
-@@ -426,6 +441,237 @@
- 			interrupts = <80>;
- 			clocks = <&rcc 0 38>;
- 		};
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called iio-trig-sysfs.
+-
+ endmenu
+diff --git a/include/linux/iio/timer/stm32-iio-timers.h b/include/linux/iio/timer/stm32-iio-timers.h
+new file mode 100644
+index 0000000..c91ddbd
+--- /dev/null
++++ b/include/linux/iio/timer/stm32-iio-timers.h
+@@ -0,0 +1,25 @@
++/*
++ * stm32-iio-timers.h
++ *
++ * Copyright (C) STMicroelectronics 2016
++ * Author: Benjamin Gaignard <benjamin.gaignard@st.com> for STMicroelectronics.
++ * License terms:  GNU General Public License (GPL), version 2
++ */
 +
-+		mfd_timer1: mfdtimer1 at 40010000 {
-+			compatible = "st,stm32-mfd-timer1";
-+			reg = <0x40010000 0x400>;
-+			clocks = <&rcc 0 160>;
-+			clock-names = "mfd_timer_clk";
-+			interrupts = <27>;
-+			status = "disabled";
++#ifndef _STM32_TRIGGERS_H_
++#define _STM32_TRIGGERS_H_
 +
-+			pwm1: pwm1 at 40010000 {
-+				compatible = "st,stm32-pwm1";
-+				status = "disabled";
-+			};
++#define TIM1_TRGO	"tim1_trgo"
++#define TIM2_TRGO	"tim2_trgo"
++#define TIM3_TRGO	"tim3_trgo"
++#define TIM4_TRGO	"tim4_trgo"
++#define TIM5_TRGO	"tim5_trgo"
++#define TIM6_TRGO	"tim6_trgo"
++#define TIM7_TRGO	"tim7_trgo"
++#define TIM8_TRGO	"tim8_trgo"
++#define TIM9_TRGO	"tim9_trgo"
++#define TIM12_TRGO	"tim12_trgo"
 +
-+			iiotimer1: iiotimer1 at 40010000 {
-+				compatible = "st,stm32-iio-timer1";
-+				status = "disabled";
-+			};
-+		};
++bool is_stm32_iio_timer_trigger(struct iio_trigger *trig);
 +
-+		mfd_timer2: mfdtimer2 at 40000000 {
-+			compatible = "st,stm32-mfd-timer2";
-+			reg = <0x40000000 0x400>;
-+			clocks = <&rcc 0 128>;
-+			clock-names = "mfd_timer_clk";
-+			interrupts = <28>;
-+			status = "disabled";
-+
-+			pwm2: pwm2 at 40000000 {
-+				compatible = "st,stm32-pwm2";
-+				status = "disabled";
-+			};
-+			iiotimer2: iiotimer2 at 40000000 {
-+				compatible = "st,stm32-iio-timer2";
-+				status = "disabled";
-+			};
-+		};
-+
-+		mfd_timer3: mfdtimer3 at 40000400 {
-+			compatible = "st,stm32-mfd-timer3";
-+			reg = <0x40000400 0x400>;
-+			clocks = <&rcc 0 129>;
-+			clock-names = "mfd_timer_clk";
-+			interrupts = <29>;
-+			status = "disabled";
-+
-+			pwm3: pwm3 at 40000400 {
-+				compatible = "st,stm32-pwm3";
-+				status = "disabled";
-+			};
-+			iiotimer3: iiotimer3 at 40000400 {
-+				compatible = "st,stm32-iio-timer3";
-+				status = "disabled";
-+			};
-+		};
-+
-+		mfd_timer4: mfdtimer4 at 40000800 {
-+			compatible = "st,stm32-mfd-timer4";
-+			reg = <0x40000800 0x400>;
-+			clocks = <&rcc 0 130>;
-+			clock-names = "mfd_timer_clk";
-+			interrupts = <30>;
-+			status = "disabled";
-+
-+			pwm4: pwm4 at 40000800 {
-+				compatible = "st,stm32-pwm4";
-+				status = "disabled";
-+			};
-+			iiotimer4: iiotimer4 at 40000800 {
-+				compatible = "st,stm32-iio-timer4";
-+				status = "disabled";
-+			};
-+		};
-+
-+		mfd_timer5: mfdtimer5 at 40000C00 {
-+			compatible = "st,stm32-mfd-timer5";
-+			reg = <0x40000C00 0x400>;
-+			clocks = <&rcc 0 131>;
-+			clock-names = "mfd_timer_clk";
-+			interrupts = <50>;
-+			status = "disabled";
-+
-+			pwm5: pwm5 at 40000C00 {
-+				compatible = "st,stm32-pwm5";
-+				status = "disabled";
-+			};
-+			iiotimer5: iiotimer5 at 40000800 {
-+				compatible = "st,stm32-iio-timer5";
-+				status = "disabled";
-+			};
-+		};
-+
-+		mfd_timer6: mfdtimer6 at 40001000 {
-+			compatible = "st,stm32-mfd-timer6";
-+			reg = <0x40001000 0x400>;
-+			clocks = <&rcc 0 132>;
-+			clock-names = "mfd_timer_clk";
-+			interrupts = <54>;
-+			status = "disabled";
-+
-+			iiotimer6: iiotimer6 at 40001000 {
-+				compatible = "st,stm32-iio-timer6";
-+				status = "disabled";
-+			};
-+		};
-+
-+		mfd_timer7: mfdtimer7 at 40001400 {
-+			compatible = "st,stm32-mfd-timer7";
-+			reg = <0x40001400 0x400>;
-+			clocks = <&rcc 0 133>;
-+			clock-names = "mfd_timer_clk";
-+			interrupts = <55>;
-+			status = "disabled";
-+
-+			iiotimer7: iiotimer7 at 40001400 {
-+				compatible = "st,stm32-iio-timer7";
-+				status = "disabled";
-+			};
-+		};
-+
-+		mfd_timer8: mfdtimer8 at 40010400 {
-+			compatible = "st,stm32-mfd-timer8";
-+			reg = <0x40010400 0x400>;
-+			clocks = <&rcc 0 161>;
-+			clock-names = "mfd_timer_clk";
-+			interrupts = <46>;
-+			status = "disabled";
-+
-+			pwm8: pwm8 at 40010400 {
-+				compatible = "st,stm32-pwm8";
-+				status = "disabled";
-+			};
-+
-+			iiotimer8: iiotimer7 at 40010400 {
-+				compatible = "st,stm32-iio-timer8";
-+				status = "disabled";
-+			};
-+		};
-+
-+		mfd_timer9: mfdtimer9 at 40014000 {
-+			compatible = "st,stm32-mfd-timer9";
-+			reg = <0x40014000 0x400>;
-+			clocks = <&rcc 0 176>;
-+			clock-names = "mfd_timer_clk";
-+			interrupts = <24>;
-+			status = "disabled";
-+
-+			pwm9: pwm9 at 40014000 {
-+				compatible = "st,stm32-pwm9";
-+				status = "disabled";
-+			};
-+
-+			iiotimer9: iiotimer9 at 40014000 {
-+				compatible = "st,stm32-iio-timer9";
-+				status = "disabled";
-+			};
-+		};
-+
-+		mfd_timer10: mfdtimer10 at 40014400 {
-+			compatible = "st,stm32-mfd-timer10";
-+			reg = <0x40014400 0x400>;
-+			clocks = <&rcc 0 177>;
-+			clock-names = "mfd_timer_clk";
-+			interrupts = <25>;
-+			status = "disabled";
-+
-+			pwm10: pwm10 at 40014400 {
-+				compatible = "st,stm32-pwm10";
-+				status = "disabled";
-+			};
-+		};
-+
-+		mfd_timer11: mfdtimer11 at 40014800 {
-+			compatible = "st,stm32-mfd-timer11";
-+			reg = <0x40014800 0x400>;
-+			clocks = <&rcc 0 178>;
-+			clock-names = "mfd_timer_clk";
-+			interrupts = <26>;
-+			status = "disabled";
-+
-+			pwm11: pwm11 at 40014800 {
-+				compatible = "st,stm32-pwm11";
-+				status = "disabled";
-+			};
-+		};
-+
-+		mfd_timer12: mfdtimer12 at 40001800 {
-+			compatible = "st,stm32-mfd-timer12";
-+			reg = <0x40001800 0x400>;
-+			clocks = <&rcc 0 134>;
-+			clock-names = "mfd_timer_clk";
-+			interrupts = <43>;
-+			status = "disabled";
-+
-+			pwm12: pwm12 at 40001800 {
-+				compatible = "st,stm32-pwm12";
-+				status = "disabled";
-+			};
-+			iiotimer12: iiotimer12 at 40001800 {
-+				compatible = "st,stm32-iio-timer12";
-+				status = "disabled";
-+			};
-+		};
-+
-+		mfd_timer13: mfdtimer13 at 40001C00 {
-+			compatible = "st,stm32-mfd-timer13";
-+			reg = <0x40001C00 0x400>;
-+			clocks = <&rcc 0 135>;
-+			clock-names = "mfd_timer_clk";
-+			interrupts = <44>;
-+			status = "disabled";
-+
-+			pwm13: pwm13 at 40001C00 {
-+				compatible = "st,stm32-pwm13";
-+				status = "disabled";
-+			};
-+		};
-+
-+		mfd_timer14: mfdtimer14 at 40002000 {
-+			compatible = "st,stm32-mfd-timer14";
-+			reg = <0x40002000 0x400>;
-+			clocks = <&rcc 0 136>;
-+			clock-names = "mfd_timer_clk";
-+			interrupts = <45>;
-+			status = "disabled";
-+
-+			pwm14: pwm14 at 40002000 {
-+				compatible = "st,stm32-pwm14";
-+				status = "disabled";
-+			};
-+		};
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
-index 8a163d7..a8f1788 100644
---- a/arch/arm/boot/dts/stm32f469-disco.dts
-+++ b/arch/arm/boot/dts/stm32f469-disco.dts
-@@ -81,3 +81,32 @@
- &usart3 {
- 	status = "okay";
- };
-+
-+&mfd_timer1 {
-+	status = "okay";
-+};
-+
-+&pwm1 {
-+	pinctrl-0	= <&pwm1_pins>;
-+	pinctrl-names	= "default";
-+	st,breakinput-polarity = <0>;
-+	status = "okay";
-+};
-+
-+&iiotimer1 {
-+	status = "okay";
-+};
-+
-+&mfd_timer3 {
-+	status = "okay";
-+};
-+
-+&pwm3 {
-+	pinctrl-0	= <&pwm3_pins>;
-+	pinctrl-names	= "default";
-+	status = "okay";
-+};
-+
-+&iiotimer3 {
-+	status = "okay";
-+};
++#endif
 -- 
 1.9.1
