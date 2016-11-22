@@ -1,57 +1,251 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 22 Nov 2016 14:40:25 +0300
-Subject: [PATCH 16/18] arm64: dts: h3ulcb: rename SDHI0 pins
-In-Reply-To: <f4f57fbc-313c-669f-94c7-073747a20a82@cogentembedded.com>
-References: <cover.1479726397.git.horms+renesas@verge.net.au>
- <93373c309a703b57690216db4106a4a534929c15.1479726397.git.horms+renesas@verge.net.au>
- <45a251f6-ee0c-5eba-ffd1-3f61a1e7ccc7@cogentembedded.com>
- <f4f57fbc-313c-669f-94c7-073747a20a82@cogentembedded.com>
-Message-ID: <d4fbb71f-2a4d-2239-faa9-c017c74e1d79@cogentembedded.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 22 Nov 2016 12:41:54 +0100
+Subject: [PATCH] ARM64: dts: meson-gxl: Add support for Nexbox A95X
+Message-ID: <20161122114154.17566-1-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2016 2:22 PM, Vladimir Barinov wrote:
+The Nexbox A95X exists with a Meson GXBB (S905) Soc or a Meson GXL SoC (S905X).
+Add the S905X variant which uses the internal PHY instead of an external PHY.
+---
+ Documentation/devicetree/bindings/arm/amlogic.txt  |   1 +
+ arch/arm64/boot/dts/amlogic/Makefile               |   1 +
+ .../boot/dts/amlogic/meson-gxl-nexbox-a95x.dts     | 205 +++++++++++++++++++++
+ 3 files changed, 207 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts
 
->>> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>>
->>> This changes SDHI0 pin names for H3ULCB board
->>>
->>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>> ---
->>>  arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 8 ++++----
->>>  1 file changed, 4 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
->>> b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
->>> index 8d0ac076d8e2..6ffb0517421a 100644
->>> --- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
->>> +++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
->>> @@ -163,13 +163,13 @@
->>>          function = "avb";
->>>      };
->>>
->>> -    sdhi0_pins_3v3: sd0_3v3 {
->>> +    sdhi0_pins: sd0 {
->>>          groups = "sdhi0_data4", "sdhi0_ctrl";
->>>          function = "sdhi0";
->>>          power-source = <3300>;
->>>      };
->>>
->>> -    sdhi0_pins_1v8: sd0_1v8 {
->>> +    sdhi0_pins_uhs: sd0 {
->>
->>    I'm afraid the following will just override the props of the node above
->> which is not what we ant.
-> Thank you for pointing to this.
->
-> This is my typo.
-> I will rework the patch to have different node names.
-
-    The patch had been already merged by Simon and was posted a s apart of a 
-pull request (if I don't mistake), so I guess an incremental patch needed now...
-
-> Regards,
-> Vladimir
-
-MBR, Sergei
+diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+index 6ef7c52..9b2b41a 100644
+--- a/Documentation/devicetree/bindings/arm/amlogic.txt
++++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+@@ -45,4 +45,5 @@ Board compatible values:
+   - "amlogic,p231" (Meson gxl s905d)
+   - "amlogic,q200" (Meson gxm s912)
+   - "amlogic,q201" (Meson gxm s912)
++  - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
+   - "nexbox,a1" (Meson gxm s912)
+diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
+index 2fbb8e3..0d7bfbf 100644
+--- a/arch/arm64/boot/dts/amlogic/Makefile
++++ b/arch/arm64/boot/dts/amlogic/Makefile
+@@ -8,6 +8,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-telos.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-p212.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
++dtb-$(CONFIG_ARCH_MESON) += meson-gxl-nexbox-a95x.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxm-s912-q200.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxm-s912-q201.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts
+new file mode 100644
+index 0000000..e99101a
+--- /dev/null
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts
+@@ -0,0 +1,205 @@
++/*
++ * Copyright (c) 2016 Andreas F?rber
++ * Copyright (c) 2016 BayLibre, Inc.
++ * Author: Neil Armstrong <narmstrong@kernel.org>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "meson-gxl-s905x.dtsi"
++
++/ {
++	compatible = "nexbox,a95x", "amlogic,s905x", "amlogic,meson-gxl";
++	model = "NEXBOX A95X (S905X)";
++
++	aliases {
++		serial0 = &uart_AO;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory at 0 {
++		device_type = "memory";
++		reg = <0x0 0x0 0x0 0x80000000>;
++	};
++
++	vddio_card: gpio-regulator {
++		compatible = "regulator-gpio";
++
++		regulator-name = "VDDIO_CARD";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpios = <&gpio_ao GPIOAO_5 GPIO_ACTIVE_HIGH>;
++		gpios-states = <1>;
++
++		/* Based on P200 schematics, signal CARD_1.8V/3.3V_CTR */
++		states = <1800000 0
++			  3300000 1>;
++	};
++
++	vddio_boot: regulator-vddio_boot {
++		compatible = "regulator-fixed";
++		regulator-name = "VDDIO_BOOT";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++	};
++
++	vddao_3v3: regulator-vddao_3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "VDDAO_3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	vcc_3v3: regulator-vcc_3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "VCC_3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	emmc_pwrseq: emmc-pwrseq {
++		compatible = "mmc-pwrseq-emmc";
++		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
++	};
++
++	wifi32k: wifi32k {
++		compatible = "pwm-clock";
++		#clock-cells = <0>;
++		clock-frequency = <32768>;
++		pwms = <&pwm_ef 0 30518 0>; /* PWM_E at 32.768KHz */
++	};
++
++	sdio_pwrseq: sdio-pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&gpio GPIOX_6 GPIO_ACTIVE_LOW>;
++		clocks = <&wifi32k>;
++		clock-names = "ext_clock";
++	};
++};
++
++&uart_AO {
++	status = "okay";
++	pinctrl-0 = <&uart_ao_a_pins>;
++	pinctrl-names = "default";
++};
++
++&ethmac {
++	status = "okay";
++	phy-mode = "rmii";
++	phy-handle = <&internal_phy>;
++};
++
++&ir {
++	status = "okay";
++	pinctrl-0 = <&remote_input_ao_pins>;
++	pinctrl-names = "default";
++};
++
++/* Wireless SDIO Module */
++&sd_emmc_a {
++	status = "okay";
++	pinctrl-0 = <&sdio_pins>;
++	pinctrl-names = "default";
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	bus-width = <4>;
++	cap-sd-highspeed;
++	max-frequency = <100000000>;
++
++	non-removable;
++	disable-wp;
++
++	mmc-pwrseq = <&sdio_pwrseq>;
++
++	vmmc-supply = <&vddao_3v3>;
++	vqmmc-supply = <&vddio_boot>;
++};
++
++/* SD card */
++&sd_emmc_b {
++	status = "okay";
++	pinctrl-0 = <&sdcard_pins>;
++	pinctrl-names = "default";
++
++	bus-width = <4>;
++	cap-sd-highspeed;
++	max-frequency = <100000000>;
++	disable-wp;
++
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
++
++	vmmc-supply = <&vddao_3v3>;
++	vqmmc-supply = <&vddio_card>;
++};
++
++/* eMMC */
++&sd_emmc_c {
++	status = "okay";
++	pinctrl-0 = <&emmc_pins>;
++	pinctrl-names = "default";
++
++	bus-width = <8>;
++	cap-sd-highspeed;
++	cap-mmc-highspeed;
++	max-frequency = <200000000>;
++	non-removable;
++	disable-wp;
++	mmc-ddr-1_8v;
++	mmc-hs200-1_8v;
++
++	mmc-pwrseq = <&emmc_pwrseq>;
++	vmmc-supply = <&vcc_3v3>;
++	vqmmc-supply = <&vddio_boot>;
++};
++
++&pwm_ef {
++	status = "okay";
++	pinctrl-0 = <&pwm_e_pins>;
++	pinctrl-names = "default";
++	clocks = <&clkc CLKID_FCLK_DIV4>;
++	clock-names = "clkin0";
++};
+-- 
+2.7.0
