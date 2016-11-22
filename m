@@ -1,78 +1,47 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 22 Nov 2016 09:26:02 +0000
-Subject: [RFC PATCH 05/11] ARM: move arm_heavy_mb to MMU/noMMU neutral place
+Date: Tue, 22 Nov 2016 09:26:08 +0000
+Subject: [RFC PATCH 11/11] ARM: Allow ARCH_MULTIPLATFORM to be selected for
+ NOMMU
 In-Reply-To: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
 References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1479806768-39911-6-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1479806768-39911-12-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So it can be referenced from both camps.
+With this patch applied potentially any platform can be built in NOMMU
+configurations if CONFIG_EXPERT is selected. However, there is no
+guaranty that platform can successfully run such Image. So the main
+motivation behind of this patch:
+- bring build coverage for NOMMU configurations
+- allow known working NOMMU platforms (like R-class) to be used
+- pave a way to add support for single address space (aka 1:1 mapping)
+  for MMU platforms, so they can be usable in NOMMU configurations
 
+Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <rmallon@gmail.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Thierry Reding <thierry.reding@gmail.com>
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/mm/flush.c |   15 ---------------
- arch/arm/mm/iomap.c |   17 +++++++++++++++++
- 2 files changed, 17 insertions(+), 15 deletions(-)
+ arch/arm/Kconfig |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index 3cced84..0c73969 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -21,21 +21,6 @@
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index f9ff570..8e7496c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -327,9 +327,9 @@ choice
  
- #include "mm.h"
- 
--#ifdef CONFIG_ARM_HEAVY_MB
--void (*soc_mb)(void);
--
--void arm_heavy_mb(void)
--{
--#ifdef CONFIG_OUTER_CACHE_SYNC
--	if (outer_cache.sync)
--		outer_cache.sync();
--#endif
--	if (soc_mb)
--		soc_mb();
--}
--EXPORT_SYMBOL(arm_heavy_mb);
--#endif
--
- #ifdef CONFIG_CPU_CACHE_VIPT
- 
- static void flush_pfn_alias(unsigned long pfn, unsigned long vaddr)
-diff --git a/arch/arm/mm/iomap.c b/arch/arm/mm/iomap.c
-index 4614208..1b601db 100644
---- a/arch/arm/mm/iomap.c
-+++ b/arch/arm/mm/iomap.c
-@@ -9,6 +9,8 @@
- #include <linux/ioport.h>
- #include <linux/io.h>
- 
-+#include <asm/outercache.h>
-+
- unsigned long vga_base;
- EXPORT_SYMBOL(vga_base);
- 
-@@ -40,3 +42,18 @@ void pci_iounmap(struct pci_dev *dev, void __iomem *addr)
- }
- EXPORT_SYMBOL(pci_iounmap);
- #endif
-+
-+#ifdef CONFIG_ARM_HEAVY_MB
-+void (*soc_mb)(void);
-+
-+void arm_heavy_mb(void)
-+{
-+#ifdef CONFIG_OUTER_CACHE_SYNC
-+	if (outer_cache.sync)
-+		outer_cache.sync();
-+#endif
-+	if (soc_mb)
-+		soc_mb();
-+}
-+EXPORT_SYMBOL(arm_heavy_mb);
-+#endif
+ config ARCH_MULTIPLATFORM
+ 	bool "Allow multiple platforms to be selected"
+-	depends on MMU
++	depends on MMU || EXPERT
+ 	select ARM_HAS_SG_CHAIN
+-	select ARM_PATCH_PHYS_VIRT
++	select ARM_PATCH_PHYS_VIRT if MMU
+ 	select AUTO_ZRELADDR
+ 	select CLKSRC_OF
+ 	select COMMON_CLK
 -- 
 1.7.9.5
