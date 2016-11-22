@@ -1,62 +1,60 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 22 Nov 2016 11:34:48 -0500 (EST)
-Subject: [PATCH 1/2] kbuild: provide include/asm/asm-prototypes.h for ARM
-In-Reply-To: <20161122110557.1533467-1-arnd@arndb.de>
-References: <20161122110557.1533467-1-arnd@arndb.de>
-Message-ID: <alpine.LFD.2.20.1611221106410.1814@knanqh.ubzr>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 22 Nov 2016 17:34:34 +0100
+Subject: [GIT PULL] STM32 DT changes for v4.10 #2
+In-Reply-To: <20161118183736.GJ8882@localhost>
+References: <2f793efd-01c6-fa28-0332-9e292341c064@st.com>
+ <20161118183736.GJ8882@localhost>
+Message-ID: <19e6d8bc-a7bf-5681-0f40-127f5c22d554@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Nov 2016, Arnd Bergmann wrote:
+Hi Olof,
 
-> This adds an asm/asm-prototypes.h header for ARM to fix the broken symbol
-> versioning for symbols exported from assembler files.
-> 
-> I couldn't find the correct prototypes for the compiler builtins,
-> so I went with the fake 'void f(void)' prototypes that we had
-> before, restoring the state before they were moved.
-> 
-> Originally I assumed that the problem was just a harmless warning
-> in unusual configurations, but as Uwe found, we actually need this
-> to load most modules when symbol versioning is enabled, as it is
-> in many distro kernels.
-> 
-> Cc: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
-> Fixes: 4dd1837d7589 ("arm: move exports to definitions")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> Compared to the earlier version, I dropped the changes to the
-> csumpartial files, which now get handled correctly by Kbuild
-> even when the export comes from a macro, and I also dropped the
-> changes to the bitops files, which were already fixed in a
-> patch from Nico.
-> 
-> The patch applies cleanly on top of the rmk/fixes tree but has
-> no effect there, as it also needs 4efca4ed05cb ("kbuild: modversions
-> for EXPORT_SYMBOL() for asm") and cc6acc11cad1 ("kbuild: be more
-> careful about matching preprocessed asm ___EXPORT_SYMBOL").
-> 
-> With the combination of rmk/fixes, torvalds/master and these two
-> patches, symbol versioning works again on ARM. As it is still
-> broken on almost all other architectures (powerpc is fixed,
-> x86 has a patch), I wonder if we should make CONFIG_MODVERSIONS
-> as broken for everything else.
+On 11/18/2016 07:37 PM, Olof Johansson wrote:
+> On Tue, Nov 15, 2016 at 03:40:24PM +0100, Alexandre Torgue wrote:
+>> Hi Olof, Arnd and Kevin,
+>>
+>> Please consider this second round of STM32 DT updates for v4.10:
+>>
+>> The following changes since commit f6dbbff4f0af1a5c0d6eaf414572b5eff7a73a8b:
+>>
+>>   ARM: dts: stm32f429: add LSI and LSE clocks (2016-11-04 15:08:08 +0100)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
+>> tags/stm32-dt-for-v4.10-2
+>>
+>> for you to fetch changes up to 2ecaa477b404d707bac93c56f09a0a6162e04ed7:
+>>
+>>   ARM: dts: stm32f429: Add QSPI clock (2016-11-15 13:59:11 +0100)
+>>
+>> ----------------------------------------------------------------
+>> STM32 DT updates for v4.10, round 2.
+>>
+>> Highlights:
+>> ----------
+>>  - Add support of STM32F746 MCU and STM32746G-Eval board
+>>  - Add QSPI support for STM32F469-Disco board
+>>
+>> ----------------------------------------------------------------
+>> Alexandre TORGUE (1):
+>>       ARM: dts: Add STM32F746 MCU and STM32746g-EVAL board
+>>
+>> Gabriel Fernandez (1):
+>>       ARM: dts: stm32f429: Add QSPI clock
+>
+> Hi, merged. But here too, please use common prefixes in the future,
+> please. I'd recommend 'ARM: dts: stm32: <...>'.
 
-I'm not sure I like this at all.
+Thanks. I would take care next time.
 
-The goal for moving EXPORT_SYMBOL() to assembly code where symbols were 
-defined is to make things close together and avoid those centralized 
-list of symbols that you can easily miss when modifying the actual code.
+Alex
 
-This series is therefore bringing back a centralized list of symbols in 
-a slightly different form, nullifying the advantages from having moved 
-EXPORT_SYMBOL() to asm code.  To me this looks like a big step backward.
-
-Why not simply extending the original idea of keeping exports close to 
-the actual code by _also_ having a macro that provides the function 
-prototype alongside the EXPORT_SYMBOL() instance?  That could even be 
-expressed with some EXPORT_SYMBOL_PROTO(ret, sym, arg...) macro that 
-does it all.
-
-
-Nicolas
+>
+>
+> Thanks!
+>
+>
+> -Olof
+>
