@@ -1,25 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Nov 2016 09:45:35 +0100
-Subject: [PATCH 1/6] reset: hisilicon: add reset core
-In-Reply-To: <1479800961-6249-2-git-send-email-zhangfei.gao@linaro.org>
-References: <1479800961-6249-1-git-send-email-zhangfei.gao@linaro.org>
- <1479800961-6249-2-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <3993565.nedzUBZcVS@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Nov 2016 09:47:20 +0100
+Subject: [PATCH] ARM: ux500: fix prcmu_is_cpu_in_wfi() calculation
+In-Reply-To: <20161116152047.3336967-1-arnd@arndb.de>
+References: <20161116152047.3336967-1-arnd@arndb.de>
+Message-ID: <CACRpkdb1RdDCjT3ChiJdF8WZHp-Sb1un1tvSOh3uShZn2DaZ-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 22, 2016 3:49:16 PM CET Zhangfei Gao wrote:
-> @@ -1,8 +1,8 @@
->  obj-y += core.o
-> -obj-y += hisilicon/
->  obj-$(CONFIG_ARCH_STI) += sti/
->  obj-$(CONFIG_RESET_ATH79) += reset-ath79.o
->  obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
-> +obj-$(CONFIG_ARCH_HISI) += hisilicon/
->  obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
->  obj-$(CONFIG_RESET_MESON) += reset-meson.o
->  obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
+On Wed, Nov 16, 2016 at 4:20 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Please leave the obj-y line, otherwise the COMPILE_TEST variant won't work.
+> This function clearly never worked and always returns true,
+> as pointed out by gcc-7:
+>
+> arch/arm/mach-ux500/pm.c: In function 'prcmu_is_cpu_in_wfi':
+> arch/arm/mach-ux500/pm.c:137:212: error: ?: using integer constants in boolean context, the expression will always evaluate to 'true' [-Werror=int-in-bool-context]
+>
+> With the added braces, the condition actually makes sense.
+>
+> Fixes: 34fe6f107eab ("mfd : Check if the other db8500 core is in WFI")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-	Arnd
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Will you apply it directly to ARM SoC or should I queue it and
+send it with a pull request?
+
+Yours,
+Linus Walleij
