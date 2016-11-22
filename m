@@ -1,22 +1,70 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 22 Nov 2016 15:26:30 +0530
-Subject: [PATCH 2/3] ARM: davinci: hawk: remove mmc ro pin
-In-Reply-To: <20161121161541.27048-3-ahaslam@baylibre.com>
-References: <20161121161541.27048-1-ahaslam@baylibre.com>
- <20161121161541.27048-3-ahaslam@baylibre.com>
-Message-ID: <5cbc372e-03d6-226b-1468-a254daf603e2@ti.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 22 Nov 2016 09:58:37 +0000
+Subject: [RFC PATCH 04/11] PCI: tegra: limit to MMU build only
+In-Reply-To: <28079479.jInxCWkYlm@wuerfel>
+References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
+ <11637152.Dd0IBkEQ8q@wuerfel> <58341297.9090303@arm.com>
+ <28079479.jInxCWkYlm@wuerfel>
+Message-ID: <583416CD.8040106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 November 2016 09:45 PM, Axel Haslam wrote:
-> The hawk board does not have a write protect pin to read the card
-> write protect status.
+On 22/11/16 09:54, Arnd Bergmann wrote:
+> On Tuesday, November 22, 2016 9:40:39 AM CET Vladimir Murzin wrote:
+>> On 22/11/16 09:31, Arnd Bergmann wrote:
+>>> On Tuesday, November 22, 2016 9:26:01 AM CET Vladimir Murzin wrote:
+>>>> This driver uses functionality which available for MMU build only,
+>>>> thus add dependency on MMU.
+>>>>
+>>>> Cc: Thierry Reding <thierry.reding@gmail.com>
+>>>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>>>>
+>>>
+>>> Can you be more specific about what requires the MMU here?
+>>>
+>>> Is it the I/O space remapping or something else?
+>>
+>> Yes it comes from I/O space remapping.
+>>
+>> The fill error log:
+>>
+>>   CC      drivers/pci/host/pci-tegra.o
+>> In file included from ./arch/arm/include/asm/page.h:22:0,
+>>                  from ./arch/arm/include/asm/thread_info.h:17,
+>>                  from ./include/linux/thread_info.h:58,
+>>                  from ./include/asm-generic/current.h:4,
+>>                  from ./arch/arm/include/generated/asm/current.h:1,
+>>                  from ./include/linux/mutex.h:13,
+>>                  from ./include/linux/notifier.h:13,
+>>                  from ./include/linux/clk.h:17,
+>>                  from drivers/pci/host/pci-tegra.c:29:
+>> drivers/pci/host/pci-tegra.c: In function 'tegra_pcie_bus_alloc':
+>> drivers/pci/host/pci-tegra.c:388:27: error: 'L_PTE_PRESENT' undeclared (first use in this function)
+>>   pgprot_t prot = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
 > 
-> So remove un-needed platform data declaration for this gpio.
 > 
-> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+> That is not the I/O space, that is the config space.
 
-The schematic I found has the SD_WP pin connected to GPIO3_13.
+Sorry for that, I'm not in PCI :(
 
-Thanks,
-Sekhar
+> 
+> Not sure what a better alternative would be, but the manual selection
+> of page flags makes the driver non-portable and dependent on architecture
+> specifics that it really shouldn't have to worry about.
+> 
+> In common PCI code, we use pgprot_device(PAGE_KERNEL)) at some point,
+> and that sounds like the right thing to do, but ARM doesn't provide
+> an override for it and the fallback is pgprot_noncached(), which is
+> probably wrong here.
+> 
+> Unless someone has a good idea for how to change the driver, just
+> mention this in the changelog.
+
+Thanks for explanation! I'll wait for Thierry's thoughts on this. 
+
+Cheers
+Vladimir 
+
+> 
+> 	Arnd
+> 
