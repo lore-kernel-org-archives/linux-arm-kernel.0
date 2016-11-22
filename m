@@ -1,45 +1,40 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 22 Nov 2016 16:38:48 +0100
-Subject: [PATCH] net: mvneta: Only disable mvneta_bm for 64-bits
-Message-ID: <20161122153848.13071-1-gregory.clement@free-electrons.com>
+From: ahaslam@baylibre.com (Axel Haslam)
+Date: Tue, 22 Nov 2016 16:41:30 +0100
+Subject: [RESEND PATCH 2/3] ARM: davinci: hawk: Remove vbus and over
+ current gpios
+In-Reply-To: <cf13650b-1880-7dda-e249-9763bfe3032a@ti.com>
+References: <20161121165349.29128-1-ahaslam@baylibre.com>
+ <20161121165349.29128-3-ahaslam@baylibre.com>
+ <cf13650b-1880-7dda-e249-9763bfe3032a@ti.com>
+Message-ID: <CAKXjFTMLt0j4yfHUww6k6FMu4=Z+mhZJCKi-tqmqdaOUs0fJ9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Actually only the mvneta_bm support is not 64-bits compatible.
-The mvneta code itself can run on 64-bits architecture.
+Hi Sekhar
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/net/ethernet/marvell/Kconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+On Tue, Nov 22, 2016 at 11:37 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On Monday 21 November 2016 10:23 PM, Axel Haslam wrote:
+>> The hawk board VBUS is fixed to a 5v source, and the over
+>> current pin is actually not connected to the SoC.
+>>
+>> Do not reseve these gpios for OHCI as they are not related
+>> to usb.
+>>
+>> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+>
+> As discussed over the MMC/SD patches, this patch should be based off the
+> hawkboard schematic, not the LCDK schematic.
+>
 
-diff --git a/drivers/net/ethernet/marvell/Kconfig b/drivers/net/ethernet/marvell/Kconfig
-index 66fd9dbb2ca7..2ccea9dd9248 100644
---- a/drivers/net/ethernet/marvell/Kconfig
-+++ b/drivers/net/ethernet/marvell/Kconfig
-@@ -44,6 +44,7 @@ config MVMDIO
- config MVNETA_BM_ENABLE
- 	tristate "Marvell Armada 38x/XP network interface BM support"
- 	depends on MVNETA
-+	depends on !64BIT
- 	---help---
- 	  This driver supports auxiliary block of the network
- 	  interface units in the Marvell ARMADA XP and ARMADA 38x SoC
-@@ -58,7 +59,6 @@ config MVNETA
- 	tristate "Marvell Armada 370/38x/XP network interface support"
- 	depends on PLAT_ORION || COMPILE_TEST
- 	depends on HAS_DMA
--	depends on !64BIT
- 	select MVMDIO
- 	select FIXED_PHY
- 	---help---
-@@ -71,6 +71,7 @@ config MVNETA
- 
- config MVNETA_BM
- 	tristate
-+	depends on !64BIT
- 	default y if MVNETA=y && MVNETA_BM_ENABLE!=n
- 	default MVNETA_BM_ENABLE
- 	select HWBM
--- 
-2.10.2
+I looked at the hawkboard schematics and they are the same
+as the lcdk as far as usb i concerned:
+
+The ohci vbus is fixed to 5v, and the over current pins of the
+TPS are not connected. so this patch should be ok for
+both the hawk and the lcdk.
+
+Regards
+Axel
+
+> Thanks,
+> Sekhar
