@@ -1,48 +1,66 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 21 Nov 2016 21:48:24 -0800
-Subject: [GIT PULL 6/6] Broadcom defconfig-arm64 changes for 4.10
-In-Reply-To: <20161122054824.16974-1-f.fainelli@gmail.com>
-References: <20161122054824.16974-1-f.fainelli@gmail.com>
-Message-ID: <20161122054824.16974-6-f.fainelli@gmail.com>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Tue, 22 Nov 2016 11:41:53 +0530
+Subject: [PATCH v2 2/4] spi: spi-fsl-dspi: Fix continuous selection format
+In-Reply-To: <59ac10adfe92916770aa30146e958887@agner.ch>
+References: <cover.1479706671.git.maitysanchayan@gmail.com>
+ <1317eff8a40789c47311c219d9cfb4105863bd9f.1479706671.git.maitysanchayan@gmail.com>
+ <59ac10adfe92916770aa30146e958887@agner.ch>
+Message-ID: <20161122061153.GA2484@Sanchayan-Arch.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+On 16-11-21 15:15:41, Stefan Agner wrote:
+> On 2016-11-20 21:54, Sanchayan Maity wrote:
+> > Current DMA implementation was not handling the continuous selection
+> > format viz. SPI chip select would be deasserted even between sequential
+> > serial transfers. Use the cs_change variable and correctly set or
+> > reset the CONT bit accordingly for case where peripherals require
+> > the chip select to be asserted between sequential transfers.
+> > 
+> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> > ---
+> >  drivers/spi/spi-fsl-dspi.c | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
+> > index b1ee1f5..41422cd 100644
+> > --- a/drivers/spi/spi-fsl-dspi.c
+> > +++ b/drivers/spi/spi-fsl-dspi.c
+> > @@ -261,6 +261,8 @@ static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
+> >  	dspi->dma->tx_dma_buf[i] = SPI_PUSHR_TXDATA(val) |
+> >  					SPI_PUSHR_PCS(dspi->cs) |
+> >  					SPI_PUSHR_CTAS(0);
+> > +	if (!dspi->cs_change)
+> > +		dspi->dma->tx_dma_buf[i] |= SPI_PUSHR_CONT;
+> >  	dspi->tx += tx_word + 1;
+> >  
+> >  	dma->tx_desc = dmaengine_prep_slave_single(dma->chan_tx,
+> 
+> Other transfer mode use:
+> 
+> if ((dspi->cs_change) && (!dspi->len))                                  
+>                                                            
+>         dspi_pushr &= ~SPI_PUSHR_CONT;
+> 
+> which indicates that they only clear SPI_PUSHR_CONT at the very end of a
+> transfer... The DMA code currently deselects after every DMA transfer if
+> dspi->cs_change is set.
+> 
+> Maybe we should use the helper dspi_data_to_pushr to fill the DMA buffer
+> and _clear_ SPI_PUSHR_CONT if necessary like the other transfer modes
+> do... Then we can use the for loop to fill the complete buffer and get
+> rid of some code dupplication.
+> 
+> I see that dspi_data_to_pushr does move len too, which we did not in the
+> DMA case. dspi->len gets incremented only on successful DMA transfer in
+> dspi_dma_xfer. However, I wonder if that is not even a bug: We increment
+> dspi->tx always, but len only on success. This makes len go off sync
+> with regards to the tx pointer which does not help anybody. So lets get
+> rid of the update code in dspi_dma_xfer
+> 
 
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+Thanks for the feedback. Using dspi_data_to_pushr really cleans up that
+tx path very nicely. Why didn't I see it. Will send a follow up patch
+soon after testing again.
 
-are available in the git repository at:
-
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.10/defconfig-arm64
-
-for you to fetch changes up to 9efacfc80902c6ddf538a2f396e0112c1f6d1e23:
-
-  Merge tag 'bcm2835-defconfig-64-next-2016-11-18' into defconfig-arm64/next (2016-11-21 21:22:55 -0800)
-
-----------------------------------------------------------------
-This pull request contains Broadcom ARM64-based SoCs defconfig changes for 4.10,
-please pull the following changes:
-
-- Eric updates the ARMv8 defconfig to contain everything that is needed to run
-  a 64-bit kernel on the Raspberry Pi 3
-
-- Scott enables the standard AT25 EEPROM driver as module for the ARM64 defconfig
-
-- Martin enables the Raspberry Pi Thermal driver in the ARM64 defconfig
-
-----------------------------------------------------------------
-Eric Anholt (1):
-      arm64: Add BCM2835 (Raspberry Pi 3) support to the defconfig
-
-Florian Fainelli (2):
-      Merge tag 'bcm2835-defconfig-64-next-2016-09-22' into defconfig-arm64/next
-      Merge tag 'bcm2835-defconfig-64-next-2016-11-18' into defconfig-arm64/next
-
-Martin Sperl (1):
-      ARM64: bcm2835: add thermal driver to default config
-
-Scott Branden (1):
-      arm64: defconfig: enable EEPROM_AT25 config option
-
- arch/arm64/configs/defconfig | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+- Sanchayan.
