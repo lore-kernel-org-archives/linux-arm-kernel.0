@@ -1,32 +1,25 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 22 Nov 2016 19:41:30 +1100
-Subject: linux-next: manual merge of the clk tree with the arm-soc tree
-Message-ID: <20161122194130.4efdd019@canb.auug.org.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Nov 2016 09:45:35 +0100
+Subject: [PATCH 1/6] reset: hisilicon: add reset core
+In-Reply-To: <1479800961-6249-2-git-send-email-zhangfei.gao@linaro.org>
+References: <1479800961-6249-1-git-send-email-zhangfei.gao@linaro.org>
+ <1479800961-6249-2-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <3993565.nedzUBZcVS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tuesday, November 22, 2016 3:49:16 PM CET Zhangfei Gao wrote:
+> @@ -1,8 +1,8 @@
+>  obj-y += core.o
+> -obj-y += hisilicon/
+>  obj-$(CONFIG_ARCH_STI) += sti/
+>  obj-$(CONFIG_RESET_ATH79) += reset-ath79.o
+>  obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
+> +obj-$(CONFIG_ARCH_HISI) += hisilicon/
+>  obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
+>  obj-$(CONFIG_RESET_MESON) += reset-meson.o
+>  obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
 
-Today's linux-next merge of the clk tree got conflicts in:
+Please leave the obj-y line, otherwise the COMPILE_TEST variant won't work.
 
-  arch/arm/boot/dts/r8a7779.dtsi
-  arch/arm/boot/dts/r8a7790.dtsi
-  arch/arm/boot/dts/r8a7791.dtsi
-  arch/arm/boot/dts/r8a7792.dtsi
-  arch/arm/boot/dts/r8a7793.dtsi
-  arch/arm/boot/dts/r8a7794.dtsi
-  arch/arm/mach-shmobile/setup-rcar-gen2.c
-  arch/arm64/boot/dts/renesas/r8a7795.dtsi
-  arch/arm64/boot/dts/renesas/r8a7796.dtsi
-  drivers/soc/renesas/Makefile
-
-between various commits from the arm-soc tree and commits from the
-clk tree.
-
-It was just too much at this time of day, so please talk to each other
-and figure out how to fix these up.  I have used the clk tree from
-next-20161117 for today.
-
--- 
-Cheers,
-Stephen Rothwell
+	Arnd
