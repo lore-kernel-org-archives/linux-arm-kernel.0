@@ -1,39 +1,59 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Tue, 22 Nov 2016 12:31:32 +0530
-Subject: [PATCH v3 3/3] spi: spi-fsl-dspi: Fix incorrect freeing of DMA
- allocated buffers
-In-Reply-To: <cover.1479796821.git.maitysanchayan@gmail.com>
-References: <cover.1479796821.git.maitysanchayan@gmail.com>
-Message-ID: <fd3b1fa5d9fb2a0c2d1f6ded314acf20f5081a89.1479796821.git.maitysanchayan@gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 22 Nov 2016 08:48:57 +0100
+Subject: [PATCH 2/2] MAINTAINERS: Add myself as co-maintainer to fpga mgr
+ framework.
+In-Reply-To: <alpine.DEB.2.20.1611212021050.3633@atull-VirtualBox2>
+References: <1479764942-14321-1-git-send-email-mdf@kernel.org>
+ <1479764942-14321-2-git-send-email-mdf@kernel.org>
+ <alpine.DEB.2.20.1611212021050.3633@atull-VirtualBox2>
+Message-ID: <47eb36a7-ee48-53bd-fbdc-15225c3147ec@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Buffers allocated with a call to dma_alloc_coherent should be
-freed with dma_free_coherent instead of the currently used
-devm_kfree.
+On 22.11.2016 03:29, atull wrote:
+> On Mon, 21 Nov 2016, Moritz Fischer wrote:
+> 
+>> Add myself as co-maintainer to fpga mgr framework.
+>>
+>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
+>> Cc: Alan Tull <atull@opensource.altera.com>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: linux-kernel at vger.kernel.org
+>> Cc: linux-fpga at vger.kernel.org
+>> ---
+>> Hi all,
+>>
+>> Lately we've fallen behind a bit on reviewing patches lately.
+> 
+> Hi Moritz,
+> 
+> drivers/fpga has been in the upstream kernel a year now.  Most of that
+> time, traffic has been very slow.  Recently we had more traffic while
+> I was travelling and moving to a new office, both cases leaving me
+> with bad network connectivity.  Things will probably return to normal.
+> I appreciate your passion and all your effort reviewing stuff.  I
+> don't see a need for two maintainers at this point.
 
-Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
----
- drivers/spi/spi-fsl-dspi.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+TBH. I think it is not a bad option. I do normally have backup person
+for all repos I do maintain. It doesn't mean that second maintainer does
+something but it has all accesses to repos you maintain.
+It means if something really happens to you (hopefully not) than this
+person can continue in this work without any delay which is not a bad
+thing.
+It is really just about talking to each other what that second person
+will do - probably just review patches as is done now. You can also
+learn from each other.
+I would like to be involved more in this but unfortunately I don't have
+enough time to do it properly.
 
-diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
-index 8af3151..7ada112 100644
---- a/drivers/spi/spi-fsl-dspi.c
-+++ b/drivers/spi/spi-fsl-dspi.c
-@@ -420,9 +420,11 @@ static int dspi_request_dma(struct fsl_dspi *dspi, phys_addr_t phy_addr)
- 	return 0;
- 
- err_slave_config:
--	devm_kfree(dev, dma->rx_dma_buf);
-+	dma_free_coherent(dev, DSPI_DMA_BUFSIZE,
-+			dma->rx_dma_buf, dma->rx_dma_phys);
- err_rx_dma_buf:
--	devm_kfree(dev, dma->tx_dma_buf);
-+	dma_free_coherent(dev, DSPI_DMA_BUFSIZE,
-+			dma->tx_dma_buf, dma->tx_dma_phys);
- err_tx_dma_buf:
- 	dma_release_channel(dma->chan_tx);
- err_tx_channel:
--- 
-2.10.2
+Regarding maintaining this repo. It is just standard process. Apply
+sensible things, well described and test it. And then send pull request
+to Greg based on signed tags and you are done.
+Greg should told you what should be the base which you should use for
+pull request. Someone is taking patches based on rc1 tag, someone is
+rebasing it on the final tag.
+
+Acked-by: Michal Simek <michal.simek@xilinx.com>
+
+Thanks,
+Michal
