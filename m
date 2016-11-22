@@ -1,76 +1,78 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 22 Nov 2016 16:00:13 +0000
-Subject: [PATCH] dt-bindings: mfd: Improve readability for TPS65217
- interrupt sources
-In-Reply-To: <20161122155759.GG10134@dell.home>
-References: <20161121131515.8040-1-woogyom.kim@gmail.com>
- <20161122155759.GG10134@dell.home>
-Message-ID: <20161122160013.GH10134@dell.home>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 22 Nov 2016 16:57:42 +0100
+Subject: [PATCH v4 3/3] dmaengine: sun6i: share the dma driver with sun50i
+In-Reply-To: <1479638740-20520-4-git-send-email-hao5781286@gmail.com>
+References: <1479638740-20520-1-git-send-email-hao5781286@gmail.com>
+ <1479638740-20520-4-git-send-email-hao5781286@gmail.com>
+Message-ID: <20161122155742.cybr46q7mbvzkwbh@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Nov 2016, Lee Jones wrote:
+Hi,
 
-> On Mon, 21 Nov 2016, Milo Kim wrote:
+On Sun, Nov 20, 2016 at 06:45:40PM +0800, Hao Zhang wrote:
+> Changes the limited buswith to 8 bytes,and add
+> the test in sun6i_dma_config function
 > 
-> > AC and USB interrupts are related with external power input.
-> > PB interrupt means push button pressed or released event.
-> > Use better human readable definitions.
-> > 
-> > Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/am335x-bone-common.dtsi | 4 ++--
-> >  include/dt-bindings/mfd/tps65217.h        | 6 +++---
-> >  2 files changed, 5 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-> > index dc561d5..1848d58 100644
-> > --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-> > +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-> > @@ -319,13 +319,13 @@
-> >  	ti,pmic-shutdown-controller;
-> >  
-> >  	charger {
-> > -		interrupts = <TPS65217_IRQ_AC>, <TPS65217_IRQ_USB>;
-> > +		interrupts = <TPS65217_IRQ_AC_POWER>, <TPS65217_IRQ_USB_POWER>;
-> >  		interrupts-names = "AC", "USB";
-> >  		status = "okay";
-> >  	};
-> >  
-> >  	pwrbutton {
-> > -		interrupts = <TPS65217_IRQ_PB>;
-> > +		interrupts = <TPS65217_IRQ_PUSHBUTTON>;
+> Accroding to sun6i dma driver, i think ,if the client
+> doesn't configure the address width with dmaengine_slave_config
+> function, it would use the default width. So we can add the test
+> in sun6i_dma_config function called by dmaengine_slave_config,
+> and test the configuration whether is support for the device.
 > 
-> Push button or power button?
+> Signed-off-by: Hao Zhang <hao5781286@gmail.com>
+> ---
+>  drivers/dma/sun6i-dma.c | 33 ++++++++++++++++++++++++++++++++-
+>  1 file changed, 32 insertions(+), 1 deletion(-)
 > 
-> >  		status = "okay";
-> >  	};
-> >  
-> > diff --git a/include/dt-bindings/mfd/tps65217.h b/include/dt-bindings/mfd/tps65217.h
-> > index cafb9e6..0293fdd 100644
-> > --- a/include/dt-bindings/mfd/tps65217.h
-> > +++ b/include/dt-bindings/mfd/tps65217.h
-> > @@ -19,8 +19,8 @@
-> >  #ifndef __DT_BINDINGS_TPS65217_H__
-> >  #define __DT_BINDINGS_TPS65217_H__
-> >  
-> > -#define TPS65217_IRQ_USB	0
-> > -#define TPS65217_IRQ_AC		1
-> > -#define TPS65217_IRQ_PB		2
-> > +#define TPS65217_IRQ_USB_POWER		0	/* USB power state change */
-> > +#define TPS65217_IRQ_AC_POWER		1	/* AC power state change */
-> > +#define TPS65217_IRQ_PUSHBUTTON		2	/* Push button state change */
-> 
-> This changes the ABI.
-> 
-> It will require a DT Ack.
+> diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+> index a235878..f7c90b6 100644
+> --- a/drivers/dma/sun6i-dma.c
+> +++ b/drivers/dma/sun6i-dma.c
+> @@ -250,7 +250,7 @@ static inline s8 convert_burst(u32 maxburst)
+>  static inline s8 convert_buswidth(enum dma_slave_buswidth addr_width)
+>  {
+>  	if ((addr_width < DMA_SLAVE_BUSWIDTH_1_BYTE) ||
+> -	    (addr_width > DMA_SLAVE_BUSWIDTH_4_BYTES))
+> +	    (addr_width > DMA_SLAVE_BUSWIDTH_8_BYTES))
+>  		return -EINVAL;
+>  
+>  	return addr_width >> 1;
+> @@ -758,6 +758,18 @@ static int sun6i_dma_config(struct dma_chan *chan,
+>  {
+>  	struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
+>  
+> +	if ((BIT(config->src_addr_width) | chan->device->src_addr_widths) !=
+> +		chan->device->src_addr_widths) {
 
-Tell a lie.  Sorry, I was getting false positives from my grep.  It
-looks like you use the same scheme from within include/linux.  I
-suggest that you probable don't want to do that.
+Using an and operator would make this more obvious.
+
+> +		dev_err(chan2dev(chan), "Invalid DMA configuration\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	if ((BIT(config->dst_addr_width) | chan->device->dst_addr_widths) !=
+> +			chan->device->dst_addr_widths) {
+> +		dev_err(chan2dev(chan), "Invalid DMA configuration\n");
+> +		return -EINVAL;
+> +	}
+> +
+
+And I really think both these tests should be in
+dmaengine_slave_config directly. There's nothing special about those
+tests, and they apply to all the DMA drivers.
+
+Thanks!
+Maxime
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161122/5367881f/attachment.sig>
