@@ -1,73 +1,46 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 22 Nov 2016 09:54:53 +0000
-Subject: [RFC PATCH 01/11] ARM: NOMMU: define stubs for fixup
-In-Reply-To: <20161122094851.GT1041@n2100.armlinux.org.uk>
-References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
- <1479806768-39911-2-git-send-email-vladimir.murzin@arm.com>
- <20161122094851.GT1041@n2100.armlinux.org.uk>
-Message-ID: <583415ED.200@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Nov 2016 10:55:21 +0100
+Subject: [PATCH 5/6] reset: hisilicon: Use new driver reset-hi6222
+In-Reply-To: <0dcef3c7-7406-0728-5a18-c277bb8915ad@linaro.org>
+References: <1479800961-6249-1-git-send-email-zhangfei.gao@linaro.org>
+ <3837594.jmpXXfpk9Q@wuerfel>
+ <0dcef3c7-7406-0728-5a18-c277bb8915ad@linaro.org>
+Message-ID: <6136167.uxgaKz0PCj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/11/16 09:48, Russell King - ARM Linux wrote:
-> On Tue, Nov 22, 2016 at 09:25:58AM +0000, Vladimir Murzin wrote:
->> When build for NOMMU following errors show ups:
->>
->> arch/arm/kernel/patch.c: In function 'patch_map':
->> arch/arm/kernel/patch.c:39:2: error: implicit declaration of function 'set_fixmap' [-Werror=implicit-function-declaration]
->>   set_fixmap(fixmap, page_to_phys(page));
->>   ^
->> arch/arm/kernel/patch.c:41:2: error: implicit declaration of function '__fix_to_virt' [-Werror=implicit-function-declaration]
->>   return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
->>   ^
->> arch/arm/kernel/patch.c: In function 'patch_unmap':
->> arch/arm/kernel/patch.c:47:2: error: implicit declaration of function 'clear_fixmap' [-Werror=implicit-function-declaration]
->>   clear_fixmap(fixmap);
->>   ^
->> cc1: some warnings being treated as errors
->>
->> Fixup does not make much sense in NOMMU configurations, so provide
->> stub definitions.
->>
->> Cc: Russell King <linux@armlinux.org.uk>
-> 
-> I think there should be a Fixes: line for the commit which introduced
-> this?
+On Tuesday, November 22, 2016 5:46:22 PM CET zhangfei wrote:
+> On 2016?11?22? 16:49, Arnd Bergmann wrote:
+> > On Tuesday, November 22, 2016 3:49:20 PM CET Zhangfei Gao wrote:
+> >> -#define PERIPH_RSTDIS0_MMC0             0x000
+> >> -#define PERIPH_RSTDIS0_MMC1             0x001
+> >> -#define PERIPH_RSTDIS0_MMC2             0x002
+> >> -#define PERIPH_RSTDIS0_NANDC            0x003
+> >> -#define PERIPH_RSTDIS0_USBOTG_BUS       0x004
+> >> -#define PERIPH_RSTDIS0_POR_PICOPHY      0x005
+> >> -#define PERIPH_RSTDIS0_USBOTG           0x006
+> >> -#define PERIPH_RSTDIS0_USBOTG_32K       0x007
+> >> -#define PERIPH_RSTDIS1_HIFI             0x100
+> >> -#define PERIPH_RSTDIS1_DIGACODEC        0x105
+> >> +/* reset in sysctrl */
+> >> +#define PERIPH_RSTDIS0_MMC0             0
+> >> +#define PERIPH_RSTDIS0_MMC1             1
+> >> +#define PERIPH_RSTDIS0_MMC2             2
+> >> +#define PERIPH_RSTDIS0_NANDC            3
+> >> +#define PERIPH_RSTDIS0_USBOTG_BUS       4
+> >> +#define PERIPH_RSTDIS0_POR_PICOPHY      5
+> >> +#define PERIPH_RSTDIS0_USBOTG           6
+> >> +#define PERIPH_RSTDIS0_USBOTG_32K       7
+> >> +#define PERIPH_RSTDIS1_HIFI             8
+> > You can't redefined the binding here, this is part of the ABI.
+> > You can however add new numbers as long as the old ones keep
+> > working.
+> The methods are different.
+> The original define is offset | bit_shift, and driver has to parse 
+> offset and bit shift.
+> The new define is just index of array, which is defined in the reset-xxx.c
 
-It was discovered only after PATCH 11/11 was applied. Without that patch this
-error is unreachable, so no regression.
+I understand that, what I mean is you have to find a way to let the new
+driver still support the old binding, you can't change it.
 
-If you do think it is a good to have Fixes: I can add 
-
-Fixes: ab0615e2d6fb (" arm: use fixmap for text patching when text is RO")
-
-Cheers
-Vladimir
-
-> 
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->> ---
->>  arch/arm/include/asm/fixmap.h |    6 ++++++
->>  1 file changed, 6 insertions(+)
->>
->> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
->> index 5c17d2d..0bfc2e3 100644
->> --- a/arch/arm/include/asm/fixmap.h
->> +++ b/arch/arm/include/asm/fixmap.h
->> @@ -59,6 +59,12 @@ enum fixed_addresses {
->>  
->>  #else
->>  
->> +#define set_fixmap(idx, phys)
->> +#define clear_fixmap(idx)
->> +
->> +#define __fix_to_virt(x)	(x)
->> +#define __virt_to_fix(x)	(x)
->> +
->>  static inline void early_fixmap_init(void) { }
->>  
->>  #endif
->> -- 
->> 1.7.9.5
->>
-> 
+	Arnd
