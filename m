@@ -1,63 +1,70 @@
-From: yuantian.tang@nxp.com (yuantian.tang at nxp.com)
-Date: Tue, 22 Nov 2016 16:14:59 +0800
-Subject: [PATCH v2] clk: qoriq: added ls1012a clock configuration
-Message-ID: <1479802499-9083-1-git-send-email-yuantian.tang@nxp.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 22 Nov 2016 09:28:23 +0100
+Subject: [PATCH 2/2] MAINTAINERS: Add myself as co-maintainer to fpga mgr
+ framework.
+In-Reply-To: <20161122080713.GB22441@kroah.com>
+References: <1479764942-14321-1-git-send-email-mdf@kernel.org>
+ <1479764942-14321-2-git-send-email-mdf@kernel.org>
+ <alpine.DEB.2.20.1611212021050.3633@atull-VirtualBox2>
+ <47eb36a7-ee48-53bd-fbdc-15225c3147ec@xilinx.com>
+ <20161122080713.GB22441@kroah.com>
+Message-ID: <abcd566c-3ba8-71cb-272c-301d04e599ea@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tang Yuantian <Yuantian.Tang@nxp.com>
+On 22.11.2016 09:07, Greg Kroah-Hartman wrote:
+> On Tue, Nov 22, 2016 at 08:48:57AM +0100, Michal Simek wrote:
+>> On 22.11.2016 03:29, atull wrote:
+>>> On Mon, 21 Nov 2016, Moritz Fischer wrote:
+>>>
+>>>> Add myself as co-maintainer to fpga mgr framework.
+>>>>
+>>>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
+>>>> Cc: Alan Tull <atull@opensource.altera.com>
+>>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>>> Cc: linux-kernel at vger.kernel.org
+>>>> Cc: linux-fpga at vger.kernel.org
+>>>> ---
+>>>> Hi all,
+>>>>
+>>>> Lately we've fallen behind a bit on reviewing patches lately.
+>>>
+>>> Hi Moritz,
+>>>
+>>> drivers/fpga has been in the upstream kernel a year now.  Most of that
+>>> time, traffic has been very slow.  Recently we had more traffic while
+>>> I was travelling and moving to a new office, both cases leaving me
+>>> with bad network connectivity.  Things will probably return to normal.
+>>> I appreciate your passion and all your effort reviewing stuff.  I
+>>> don't see a need for two maintainers at this point.
+>>
+>> TBH. I think it is not a bad option. I do normally have backup person
+>> for all repos I do maintain. It doesn't mean that second maintainer does
+>> something but it has all accesses to repos you maintain.
+>> It means if something really happens to you (hopefully not) than this
+>> person can continue in this work without any delay which is not a bad
+>> thing.
+>> It is really just about talking to each other what that second person
+>> will do - probably just review patches as is done now. You can also
+>> learn from each other.
+>> I would like to be involved more in this but unfortunately I don't have
+>> enough time to do it properly.
+>>
+>> Regarding maintaining this repo. It is just standard process. Apply
+>> sensible things, well described and test it. And then send pull request
+>> to Greg based on signed tags and you are done.
+>> Greg should told you what should be the base which you should use for
+>> pull request. Someone is taking patches based on rc1 tag, someone is
+>> rebasing it on the final tag.
+> 
+> Greg doesn't care what base you use, as long as you don't rebase
+> patches.  What subsystem does that?  I need to go yell at someone...
 
-Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
----
-v2:
-  - remove commit message as it is duplicated to title
+:-) Not sure if there is any subsystem which use this.
+And for my microblaze tree I do normally base patches on the top of
+rc7/8 or final tag but that's done mostly because I collect patches at
+that time. But IIRC when I started with this someone mentioned that for
+small number of patches this is fine.
 
- drivers/clk/clk-qoriq.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
-
-diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c
-index 1bece0f..65c21d7 100644
---- a/drivers/clk/clk-qoriq.c
-+++ b/drivers/clk/clk-qoriq.c
-@@ -202,6 +202,14 @@ static const struct clockgen_muxinfo ls1021a_cmux = {
- 	}
- };
- 
-+static const struct clockgen_muxinfo ls1012a_cmux = {
-+	{
-+		[0] = { CLKSEL_VALID, CGA_PLL1, PLL_DIV1 },
-+		{},
-+		[2] = { CLKSEL_VALID, CGA_PLL1, PLL_DIV2 },
-+	}
-+};
-+
- static const struct clockgen_muxinfo t1040_cmux = {
- 	{
- 		[0] = { CLKSEL_VALID, CGA_PLL1, PLL_DIV1 },
-@@ -482,6 +490,16 @@ static const struct clockgen_chipinfo chipinfo[] = {
- 		.pll_mask = 0x03,
- 	},
- 	{
-+		.compat = "fsl,ls1012a-clockgen",
-+		.cmux_groups = {
-+			&ls1012a_cmux
-+		},
-+		.cmux_to_group = {
-+			0, -1
-+		},
-+		.pll_mask = 0x03,
-+	},
-+	{
- 		.compat = "fsl,ls1043a-clockgen",
- 		.init_periph = t2080_init_periph,
- 		.cmux_groups = {
-@@ -1282,6 +1300,7 @@ static void __init clockgen_init(struct device_node *np)
- CLK_OF_DECLARE(qoriq_clockgen_1, "fsl,qoriq-clockgen-1.0", clockgen_init);
- CLK_OF_DECLARE(qoriq_clockgen_2, "fsl,qoriq-clockgen-2.0", clockgen_init);
- CLK_OF_DECLARE(qoriq_clockgen_ls1021a, "fsl,ls1021a-clockgen", clockgen_init);
-+CLK_OF_DECLARE(qoriq_clockgen_ls1012a, "fsl,ls1012a-clockgen", clockgen_init);
- CLK_OF_DECLARE(qoriq_clockgen_ls1043a, "fsl,ls1043a-clockgen", clockgen_init);
- CLK_OF_DECLARE(qoriq_clockgen_ls2080a, "fsl,ls2080a-clockgen", clockgen_init);
- 
--- 
-2.1.0.27.g96db324
+Thanks,
+Michal
