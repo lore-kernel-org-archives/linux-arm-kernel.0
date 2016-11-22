@@ -1,65 +1,69 @@
-From: vladimir.barinov@cogentembedded.com (Vladimir Barinov)
-Date: Tue, 22 Nov 2016 14:22:09 +0300
-Subject: [PATCH 16/18] arm64: dts: h3ulcb: rename SDHI0 pins
-In-Reply-To: <45a251f6-ee0c-5eba-ffd1-3f61a1e7ccc7@cogentembedded.com>
-References: <cover.1479726397.git.horms+renesas@verge.net.au>
- <93373c309a703b57690216db4106a4a534929c15.1479726397.git.horms+renesas@verge.net.au>
- <45a251f6-ee0c-5eba-ffd1-3f61a1e7ccc7@cogentembedded.com>
-Message-ID: <f4f57fbc-313c-669f-94c7-073747a20a82@cogentembedded.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 22 Nov 2016 12:26:19 +0100
+Subject: [RFC PATCH 04/11] PCI: tegra: limit to MMU build only
+In-Reply-To: <28079479.jInxCWkYlm@wuerfel>
+References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
+ <11637152.Dd0IBkEQ8q@wuerfel> <58341297.9090303@arm.com>
+ <28079479.jInxCWkYlm@wuerfel>
+Message-ID: <20161122112619.GA22862@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Tue, Nov 22, 2016 at 10:54:01AM +0100, Arnd Bergmann wrote:
+> On Tuesday, November 22, 2016 9:40:39 AM CET Vladimir Murzin wrote:
+> > On 22/11/16 09:31, Arnd Bergmann wrote:
+> > > On Tuesday, November 22, 2016 9:26:01 AM CET Vladimir Murzin wrote:
+> > >> This driver uses functionality which available for MMU build only,
+> > >> thus add dependency on MMU.
+> > >>
+> > >> Cc: Thierry Reding <thierry.reding@gmail.com>
+> > >> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> > >>
+> > > 
+> > > Can you be more specific about what requires the MMU here?
+> > > 
+> > > Is it the I/O space remapping or something else?
+> > 
+> > Yes it comes from I/O space remapping.
+> > 
+> > The fill error log:
+> > 
+> >   CC      drivers/pci/host/pci-tegra.o
+> > In file included from ./arch/arm/include/asm/page.h:22:0,
+> >                  from ./arch/arm/include/asm/thread_info.h:17,
+> >                  from ./include/linux/thread_info.h:58,
+> >                  from ./include/asm-generic/current.h:4,
+> >                  from ./arch/arm/include/generated/asm/current.h:1,
+> >                  from ./include/linux/mutex.h:13,
+> >                  from ./include/linux/notifier.h:13,
+> >                  from ./include/linux/clk.h:17,
+> >                  from drivers/pci/host/pci-tegra.c:29:
+> > drivers/pci/host/pci-tegra.c: In function 'tegra_pcie_bus_alloc':
+> > drivers/pci/host/pci-tegra.c:388:27: error: 'L_PTE_PRESENT' undeclared (first use in this function)
+> >   pgprot_t prot = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
+> 
+> 
+> That is not the I/O space, that is the config space.
+> 
+> Not sure what a better alternative would be, but the manual selection
+> of page flags makes the driver non-portable and dependent on architecture
+> specifics that it really shouldn't have to worry about.
+> 
+> In common PCI code, we use pgprot_device(PAGE_KERNEL)) at some point,
+> and that sounds like the right thing to do, but ARM doesn't provide
+> an override for it and the fallback is pgprot_noncached(), which is
+> probably wrong here.
 
-On 21.11.2016 16:13, Sergei Shtylyov wrote:
-> Hello.
->
-> On 11/21/2016 03:05 PM, Simon Horman wrote:
->
->> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>
->> This changes SDHI0 pin names for H3ULCB board
->>
->> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->> ---
->>  arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 8 ++++----
->>  1 file changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts 
->> b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
->> index 8d0ac076d8e2..6ffb0517421a 100644
->> --- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
->> +++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
->> @@ -163,13 +163,13 @@
->>          function = "avb";
->>      };
->>
->> -    sdhi0_pins_3v3: sd0_3v3 {
->> +    sdhi0_pins: sd0 {
->>          groups = "sdhi0_data4", "sdhi0_ctrl";
->>          function = "sdhi0";
->>          power-source = <3300>;
->>      };
->>
->> -    sdhi0_pins_1v8: sd0_1v8 {
->> +    sdhi0_pins_uhs: sd0 {
->
->    I'm afraid the following will just override the props of the node 
-> above which is not what we ant.
-Thank you for pointing to this.
+Actually I think pgprot_noncached() is correct. Very early on we used to
+map this using ioremap() and I remember that working. I also just tested
+the pci-tegra driver with pgprot_device(PAGE_KERNEL) instead of the ARM-
+specific flags and it seems to work well.
 
-This is my typo.
-I will rework the patch to have different node names.
-
-Regards,
-Vladimir
-
->
->>          groups = "sdhi0_data4", "sdhi0_ctrl";
->>          function = "sdhi0";
->>          power-source = <1800>;
-> [...]
->
-> MBR, Sergei
->
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161122/220bb54b/attachment-0001.sig>
