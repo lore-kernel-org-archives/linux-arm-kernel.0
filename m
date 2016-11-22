@@ -1,33 +1,48 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 22 Nov 2016 15:56:33 +0530
-Subject: [PATCH 3/3] ARM: davinci: hawk: use gpio descriptor for card
- detect
-In-Reply-To: <20161121161541.27048-4-ahaslam@baylibre.com>
-References: <20161121161541.27048-1-ahaslam@baylibre.com>
- <20161121161541.27048-4-ahaslam@baylibre.com>
-Message-ID: <51a13cb8-082c-c6c8-c1a1-c39de252d022@ti.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 22 Nov 2016 12:27:33 +0200
+Subject: [PATCH] ARM: dts: da850: specify max width for display node
+In-Reply-To: <1479807775-28283-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1479807775-28283-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <77c993f3-1b5f-94cf-c4bc-8a30148e0a4d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 November 2016 09:45 PM, Axel Haslam wrote:
-> Currently the mmc driver is polling the gpio to know if the
-> card was removed.
+On 22/11/16 11:42, Bartosz Golaszewski wrote:
+> It has been determined that the highest resolution supported correctly
+> by LCDC rev1 is 800x600 on da850 due to memory bandwidth constraints.
 > 
-> By using a gpio descriptor instead of the platform callbacks, the
-> driver will be able to register the gpio with the mmc core with API's
-> designed for this purpose.
+> Set the max_width property in da850.dtsi to 800.
 > 
-> This has the advantage that an irq will be registered,
-> and polling is no longer needed. Also, platform callbacks can be removed.
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/arm/boot/dts/da850.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> index 36066fa..0876238 100644
+> --- a/arch/arm/boot/dts/da850.dtsi
+> +++ b/arch/arm/boot/dts/da850.dtsi
+> @@ -441,6 +441,7 @@
+>  			compatible = "ti,da850-tilcdc";
+>  			reg = <0x213000 0x1000>;
+>  			interrupts = <52>;
+> +			max-width = <800>;
+>  			status = "disabled";
+>  		};
+>  	};
+> 
 
-This patch looks good, provided it is not based of 1/3 and 2/3. There
-are other boards in mach-davinci using the card detect and wp callbacks.
-And some like board-dm365-evm.c have those pins routed through a CPLD.
-So I guess there is more work to be done before platform callbacks can
-completely be removed from MMC/SD driver. But the closer we get, the
-better it is :)
+Does 1024x768 at 10 work?
 
-Thanks,
-Sekhar
+The max-width should be the hardware's maximum supported width, not used
+for bandwidth. tilcdc has max-bandwidth property for that.
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161122/6e711402/attachment.sig>
