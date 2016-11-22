@@ -1,71 +1,75 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 22 Nov 2016 18:23:16 +0100
-Subject: [PATCH 5/10] dt: bindings: Add bindings for Marvell Xenon SD Host
- Controller
-In-Reply-To: <15b06a12-ed69-03a7-ccc7-0c133ce1ac1e@marvell.com> (Ziji Hu's
- message of "Thu, 10 Nov 2016 19:44:19 +0800")
-References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
- <ee296deafdcbeb431a592b591ae38a758ba4cce7.1477911954.git-series.gregory.clement@free-electrons.com>
- <20161109182426.vfrpb4i2mfatdzz3@rob-hp-laptop>
- <15b06a12-ed69-03a7-ccc7-0c133ce1ac1e@marvell.com>
-Message-ID: <87d1hno2d7.fsf@free-electrons.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 22 Nov 2016 17:26:22 +0000
+Subject: Applied "ASoC: samsung: Enable COMPILE_TEST for SmartQ and WM8580" to
+ the asoc tree
+In-Reply-To: <1479566911-5580-5-git-send-email-krzk@kernel.org>
+Message-ID: <E1c9Epq-0005lX-10@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+The patch
+
+   ASoC: samsung: Enable COMPILE_TEST for SmartQ and WM8580
+
+has been applied to the asoc tree at
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 95f5609d223d661419061bd6231da01a317c30d9 Mon Sep 17 00:00:00 2001
+From: Krzysztof Kozlowski <krzk@kernel.org>
+Date: Sun, 20 Nov 2016 21:24:53 +0200
+Subject: [PATCH] ASoC: samsung: Enable COMPILE_TEST for SmartQ and WM8580
+
+The I2S sound drivers for SmartQ board and WM8580 codec can be compile
+tested to increase build coverage.
+
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/samsung/Kconfig | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+index 48dcd3dd9ec7..a6cc6ca93fa7 100644
+--- a/sound/soc/samsung/Kconfig
++++ b/sound/soc/samsung/Kconfig
+@@ -50,7 +50,7 @@ config SND_SOC_SAMSUNG_JIVE_WM8750
  
- On jeu., nov. 10 2016, Ziji Hu <huziji@marvell.com> wrote:
-
-[...]
-
->>> +
->>> +- reg:
->>> +  * For "marvell,xenon-sdhci", one register area for Xenon IP.
->>> +
->>> +  * For "marvell,armada-3700-sdhci", two register areas.
->>> +    The first one for Xenon IP register. The second one for the Armada 3700 SOC
->>> +    PHY PAD Voltage Control register.
->>> +    Please follow the examples with compatible "marvell,armada-3700-sdhci"
->>> +    in below.
->>> +    Please also check property marvell,pad-type in below.
->>> +
->>> +Optional Properties:
->>> +- marvell,xenon-slotno:
->> 
->> Multiple slots should be represented as child nodes IMO. I think some 
->> other bindings already do this.
->> 
->
-> 	All the slots are entirely independent.
-> 	I prefer to consider it as multiple independent SDHCs placed in
-> 	a single IP, instead of that a IP contains multiple child slots.
-
-It was indeed what I tried to show in my answer for the 1st version:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-October/461860.html
-
-Maybe you missed it.
-
-You also mentioned other bindings using child nodes, but for this one
-we have one controller with only one set of register with multiple slots
-(Atmel is an example). Here each slot have it own set of register.
-
-Actually giving the fact that each slot is controlled by a different set
-of register I wonder why the hardware can't also deduce the slot number
-from the address register. For me it looks like an hardware bug but we
-have to deal with it.
-
-Do you still think we needchild node here?
-
->
-> 	It is unlike the implementation which put multiple slots behind PCIe EP interface. sdhci-pci.c will handle each slot init one by one.
-> 	If Xenon SDHC slots are represented as child nodes, there should also be a main entry in Xenon driver to init each child node one by one.
-> 	In my very own opinion, it is inconvenient and unnecessary.
-
-
-Gregory
-
+ config SND_SOC_SAMSUNG_SMDK_WM8580
+ 	tristate "SoC I2S Audio support for WM8580 on SMDK"
+-	depends on MACH_SMDK6410
++	depends on MACH_SMDK6410 || COMPILE_TEST
+ 	depends on I2C
+ 	select SND_SOC_WM8580
+ 	select SND_SAMSUNG_I2S
+@@ -110,7 +110,8 @@ config SND_SOC_SAMSUNG_RX1950_UDA1380
+ 
+ config SND_SOC_SMARTQ
+ 	tristate "SoC I2S Audio support for SmartQ board"
+-	depends on MACH_SMARTQ && I2C
++	depends on MACH_SMARTQ || COMPILE_TEST
++	depends on I2C
+ 	select SND_SAMSUNG_I2S
+ 	select SND_SOC_WM8750
+ 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.10.2
