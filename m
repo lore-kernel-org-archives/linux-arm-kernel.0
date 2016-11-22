@@ -1,20 +1,32 @@
 From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Tue, 22 Nov 2016 18:14:09 +0100
-Subject: [PATCH 0/2] serial: introduce DSR handling property
-Message-ID: <1479834851-32442-1-git-send-email-chf.fritz@googlemail.com>
+Date: Tue, 22 Nov 2016 18:14:10 +0100
+Subject: [PATCH 1/2] doc: DT: add generic serial property to disable DSR
+In-Reply-To: <1479834851-32442-1-git-send-email-chf.fritz@googlemail.com>
+References: <1479834851-32442-1-git-send-email-chf.fritz@googlemail.com>
+Message-ID: <1479834851-32442-2-git-send-email-chf.fritz@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset introduces device-tree property "disable-dsr" including
-documentation and usage.
+Introduce a generic serial property to disable DSR events which
+can be necessary for buggy hardware.
 
-Christoph Fritz (2):
-  doc: DT: add generic serial property to disable DSR
-  serial: imx: make DSR irq handling conditional
-
+Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
+---
  Documentation/devicetree/bindings/serial/serial.txt | 2 ++
- drivers/tty/serial/imx.c                            | 9 +++++++--
- 2 files changed, 9 insertions(+), 2 deletions(-)
+ 1 file changed, 2 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/serial/serial.txt b/Documentation/devicetree/bindings/serial/serial.txt
+index fd970f7..26e274e 100644
+--- a/Documentation/devicetree/bindings/serial/serial.txt
++++ b/Documentation/devicetree/bindings/serial/serial.txt
+@@ -25,6 +25,8 @@ Optional properties:
+     Note that this property is mutually-exclusive with "cts-gpios" and
+     "rts-gpios" above.
+ 
++  - disable-dsr: The presence of this property disables DSR events reporting.
++
+ 
+ Examples:
+ 
 -- 
 2.1.4
