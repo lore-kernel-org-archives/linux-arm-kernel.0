@@ -1,51 +1,31 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 22 Nov 2016 09:25:58 +0000
-Subject: [RFC PATCH 01/11] ARM: NOMMU: define stubs for fixup
+Date: Tue, 22 Nov 2016 09:26:05 +0000
+Subject: [RFC PATCH 08/11] ARM: NOMMU: define debug_ll_io_ini
 In-Reply-To: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
 References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1479806768-39911-2-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1479806768-39911-9-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When build for NOMMU following errors show ups:
-
-arch/arm/kernel/patch.c: In function 'patch_map':
-arch/arm/kernel/patch.c:39:2: error: implicit declaration of function 'set_fixmap' [-Werror=implicit-function-declaration]
-  set_fixmap(fixmap, page_to_phys(page));
-  ^
-arch/arm/kernel/patch.c:41:2: error: implicit declaration of function '__fix_to_virt' [-Werror=implicit-function-declaration]
-  return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
-  ^
-arch/arm/kernel/patch.c: In function 'patch_unmap':
-arch/arm/kernel/patch.c:47:2: error: implicit declaration of function 'clear_fixmap' [-Werror=implicit-function-declaration]
-  clear_fixmap(fixmap);
-  ^
-cc1: some warnings being treated as errors
-
-Fixup does not make much sense in NOMMU configurations, so provide
-stub definitions.
+We do not need to do anything in debug_ll_io_init in case of NOMMU.
 
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/include/asm/fixmap.h |    6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/include/asm/mach/map.h |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 5c17d2d..0bfc2e3 100644
---- a/arch/arm/include/asm/fixmap.h
-+++ b/arch/arm/include/asm/fixmap.h
-@@ -59,6 +59,12 @@ enum fixed_addresses {
- 
+diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
+index 9b7c328..6b86b9c 100644
+--- a/arch/arm/include/asm/mach/map.h
++++ b/arch/arm/include/asm/mach/map.h
+@@ -62,6 +62,8 @@ extern int ioremap_page(unsigned long virt, unsigned long phys,
  #else
- 
-+#define set_fixmap(idx, phys)
-+#define clear_fixmap(idx)
+ #define iotable_init(map,num)	do { } while (0)
+ #define vm_reserve_area_early(a,s,c)	do { } while (0)
++#define debug_ll_io_init() do { } while (0)
 +
-+#define __fix_to_virt(x)	(x)
-+#define __virt_to_fix(x)	(x)
-+
- static inline void early_fixmap_init(void) { }
+ #endif
  
  #endif
 -- 
