@@ -1,41 +1,59 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 23 Nov 2016 10:42:18 +0530
-Subject: [RESEND PATCH 2/3] ARM: davinci: hawk: Remove vbus and over
- current gpios
-In-Reply-To: <CAKXjFTMLt0j4yfHUww6k6FMu4=Z+mhZJCKi-tqmqdaOUs0fJ9Q@mail.gmail.com>
-References: <20161121165349.29128-1-ahaslam@baylibre.com>
- <20161121165349.29128-3-ahaslam@baylibre.com>
- <cf13650b-1880-7dda-e249-9763bfe3032a@ti.com>
- <CAKXjFTMLt0j4yfHUww6k6FMu4=Z+mhZJCKi-tqmqdaOUs0fJ9Q@mail.gmail.com>
-Message-ID: <788edcf1-e8bf-6cbf-ad46-981db6b0ded7@ti.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 22 Nov 2016 21:38:58 -0800
+Subject: [PATCH 1/4] ARM: davinci: da8xx: VPIF: enable DT init
+In-Reply-To: <31948202-333f-b465-07b8-6260cce29b59@lechnology.com> (David
+ Lechner's message of "Tue, 22 Nov 2016 14:06:07 -0600")
+References: <20161122194551.3420-1-khilman@baylibre.com>
+ <20161122194551.3420-2-khilman@baylibre.com>
+ <31948202-333f-b465-07b8-6260cce29b59@lechnology.com>
+Message-ID: <7hlgwaiwlp.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 November 2016 09:11 PM, Axel Haslam wrote:
-> Hi Sekhar
-> 
-> On Tue, Nov 22, 2016 at 11:37 AM, Sekhar Nori <nsekhar@ti.com> wrote:
->> On Monday 21 November 2016 10:23 PM, Axel Haslam wrote:
->>> The hawk board VBUS is fixed to a 5v source, and the over
->>> current pin is actually not connected to the SoC.
->>>
->>> Do not reseve these gpios for OHCI as they are not related
->>> to usb.
->>>
->>> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
->>
->> As discussed over the MMC/SD patches, this patch should be based off the
->> hawkboard schematic, not the LCDK schematic.
->>
-> 
-> I looked at the hawkboard schematics and they are the same
-> as the lcdk as far as usb i concerned:
-> 
-> The ohci vbus is fixed to 5v, and the over current pins of the
-> TPS are not connected. so this patch should be ok for
-> both the hawk and the lcdk.
+David Lechner <david@lechnology.com> writes:
 
-Alright! Thanks for checking.
+> On 11/22/2016 01:45 PM, Kevin Hilman wrote:
+>> Add basic support for DT initializaion of VPIF (capture) via DT.  Clocks
+>> and mux still need to happen in this file until there are real clock and
+>> pinctrl drivers, but the video nodes and subdevs can all come from DT.
+>>
+>> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+>> ---
+>>  arch/arm/mach-davinci/da8xx-dt.c | 17 +++++++++++++++++
+>>  1 file changed, 17 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+>> index c9f7e9274aa8..7b41611f2665 100644
+>> --- a/arch/arm/mach-davinci/da8xx-dt.c
+>> +++ b/arch/arm/mach-davinci/da8xx-dt.c
+>> @@ -17,6 +17,7 @@
+>>  #include <mach/common.h>
+>>  #include "cp_intc.h"
+>>  #include <mach/da8xx.h>
+>> +#include <mach/mux.h>
+>>
+>>  static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+>>  	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
+>> @@ -38,14 +39,30 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+>>  		       NULL),
+>>  	OF_DEV_AUXDATA("ti,da830-mcasp-audio", 0x01d00000, "davinci-mcasp.0", NULL),
+>>  	OF_DEV_AUXDATA("ti,da850-aemif", 0x68000000, "ti-aemif", NULL),
+>> +	OF_DEV_AUXDATA("ti,da850-vpif", 0x01e17000, "vpif", NULL),
+>>  	{}
+>>  };
+>>
+>>  #ifdef CONFIG_ARCH_DAVINCI_DA850
+>>
+>> +#if IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE)
+>> +static __init void da850_vpif_capture_init(void)
+>> +{
+>> +	int ret;
+>> +
+>> +	ret = davinci_cfg_reg_list(da850_vpif_capture_pins);
+>
+> Why can't we use the existing pinctrl-single node in device tree for
+> muxing the pins?
 
-Regards,
-Sekhar
+Oops, you're right.  They can.
+
+Kevin
