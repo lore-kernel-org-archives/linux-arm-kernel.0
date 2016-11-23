@@ -1,62 +1,70 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 23 Nov 2016 11:08:19 +0100
-Subject: [PATCH 1/4] serial: core: Add LED trigger support
-In-Reply-To: <20161123100106.15969-2-s.hauer@pengutronix.de>
-References: <20161123100106.15969-1-s.hauer@pengutronix.de>
- <20161123100106.15969-2-s.hauer@pengutronix.de>
-Message-ID: <20161123100819.GA20137@kroah.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Nov 2016 11:15:32 +0100
+Subject: [PATCH net-next 1/4] net: mvneta: Convert to be 64 bits compatible
+In-Reply-To: <20161123175341.4777595f@xhacker>
+References: <20161122164844.19566-1-gregory.clement@free-electrons.com>
+ <2948812.F3se4ieqO6@wuerfel> <20161123175341.4777595f@xhacker>
+Message-ID: <9432400.S1OrxC027t@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2016 at 11:01:03AM +0100, Sascha Hauer wrote:
-> With this patch the serial core provides LED triggers for RX and TX.
+On Wednesday, November 23, 2016 5:53:41 PM CET Jisheng Zhang wrote:
+> On Tue, 22 Nov 2016 22:04:12 +0100 Arnd Bergmann wrote:
 > 
-> As the serial core layer does not know when the hardware actually sends
-> or receives characters, this needs help from the UART drivers. The
-> LED triggers are registered in uart_add_led_triggers() called from
-> the UART drivers which want to support LED triggers. All the driver
-> has to do then is to call uart_led_trigger_[tx|rx] to indicate
-> activity.
+> > On Tuesday, November 22, 2016 5:48:41 PM CET Gregory CLEMENT wrote:
+> > > +#ifdef CONFIG_64BIT
+> > > +       void *data_tmp;
+> > > +
+> > > +       /* In Neta HW only 32 bits data is supported, so in order to
+> > > +        * obtain whole 64 bits address from RX descriptor, we store
+> > > +        * the upper 32 bits when allocating buffer, and put it back
+> > > +        * when using buffer cookie for accessing packet in memory.
+> > > +        * Frags should be allocated from single 'memory' region,
+> > > +        * hence common upper address half should be sufficient.
+> > > +        */
+> > > +       data_tmp = mvneta_frag_alloc(pp->frag_size);
+> > > +       if (data_tmp) {
+> > > +               pp->data_high = (u64)upper_32_bits((u64)data_tmp) << 32;
+> > > +               mvneta_frag_free(pp->frag_size, data_tmp);
+> > > +       }
+> > >   
+> > 
+> > How does this work when the region spans a n*4GB address boundary?
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/tty/serial/serial_core.c | 73 ++++++++++++++++++++++++++++++++++++++++
->  include/linux/serial_core.h      | 10 ++++++
->  2 files changed, 83 insertions(+)
+> indeed. We also make use of this driver on 64bit platforms. We use
+> different solution to make the driver 64bit safe.
 > 
-> diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
-> index f2303f3..3e8afb7 100644
-> --- a/drivers/tty/serial/serial_core.c
-> +++ b/drivers/tty/serial/serial_core.c
-> @@ -34,6 +34,7 @@
->  #include <linux/serial_core.h>
->  #include <linux/delay.h>
->  #include <linux/mutex.h>
-> +#include <linux/leds.h>
->  
->  #include <asm/irq.h>
->  #include <asm/uaccess.h>
-> @@ -2703,6 +2704,77 @@ static const struct attribute_group tty_dev_attr_group = {
->  	.attrs = tty_dev_attrs,
->  	};
->  
-> +void uart_led_trigger_tx(struct uart_port *uport)
-> +{
-> +	unsigned long delay = 50;
-> +
-> +	led_trigger_blink_oneshot(uport->led_trigger_tx, &delay, &delay, 0);
-> +}
-> +
-> +void uart_led_trigger_rx(struct uart_port *uport)
-> +{
-> +	unsigned long delay = 50;
-> +
-> +	led_trigger_blink_oneshot(uport->led_trigger_rx, &delay, &delay, 0);
-> +}
+> solA: make use of the reserved field in the mvneta_rx_desc, such
+> as reserved2 etc. Yes, the field is marked as "for future use, PnC", but
+> now it's not used at all. This is one possible solution however.
 
-Don't these functions need an EXPORT_SYMBOL_GPL() to work properly with
-uart drivers being built as a module?
+Right, this sounds like the most straightforward choice.
 
-thanks,
+> solB: allocate a shadow buf cookie during init, e.g
+> 
+> rxq->descs_bufcookie = kmalloc(rxq->size * sizeof(void*), GFP_KERNEL);
+> 
+> then modify mvneta_rx_desc_fill a bit to save the 64bit pointer in
+> the shadow buf cookie, e.g
+> static void mvneta_rx_desc_fill(struct mvneta_rx_desc *rx_desc,
+>                                 u32 phys_addr, u32 cookie,
+> 				struct mvneta_rx_queue *rxq)
+> 
+> {
+> 	int i;
+> 
+> 	rx_desc->buf_cookie = cookie;
+> 	rx_desc->buf_phys_addr = phys_addr;
+> 	i = rx_desc - rxq->descs;
+> 	rxq->descs_bufcookie[i] = cookie;
+> }
+> 
+> then fetch the desc from the shadow buf cookie in all code path, such
+> as mvneta_rx() etc.
+> 
+> Both solutions should not have the problems pointed out by Arnd.
 
-greg k-h
+Wait, since you compute an index 'i' here, can't you just store 'i'
+directly in the descriptor instead of the pointer?
+
+	Arnd
