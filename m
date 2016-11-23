@@ -1,197 +1,36 @@
-From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
-Date: Wed, 23 Nov 2016 18:31:58 +0530
-Subject: [PATCH v9 11/11] arm: vgic: Save and restore GICv3 CPU interface regs
- for AArch32
-In-Reply-To: <1479906118-15832-1-git-send-email-vijay.kilari@gmail.com>
-References: <1479906118-15832-1-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <1479906118-15832-12-git-send-email-vijay.kilari@gmail.com>
+From: woogyom.kim@gmail.com (Milo Kim)
+Date: Wed, 23 Nov 2016 22:06:18 +0900
+Subject: [PATCH] dt-bindings: mfd: Improve readability for TPS65217
+ interrupt sources
+In-Reply-To: <33562327.jVWx4tN2gP@wuerfel>
+References: <20161121131515.8040-1-woogyom.kim@gmail.com>
+ <20161122155759.GG10134@dell.home>
+ <bd4944d8-3cef-b3f7-4fba-6de590493047@gmail.com>
+ <33562327.jVWx4tN2gP@wuerfel>
+Message-ID: <27c48fc3-29bd-996b-bdc4-75884a39865a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+On 11/23/2016 08:51 PM, Arnd Bergmann wrote:
+> Ah, the numbers come from the data sheet. Please just remove the
+> header then, there is no need to keep them as an ABI, in particular
+> when the driver doesn't even include that header today.
 
-Use coproc_reg infrastructure to save and restore CPU
-interface register of GICv3 for AArch32 host.
+Got it.
 
-Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
----
- arch/arm/kvm/Makefile                  |   2 +
- virt/kvm/arm/vgic/vgic-coproc-reg-v3.c | 155 +++++++++++++++++++++++++++++++++
- 2 files changed, 157 insertions(+)
+> What matters here is the binding documentation in
+> Documentation/devicetree/bindings/power/supply/tps65217_charger.txt
 
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index d571243..451e666 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -32,6 +32,8 @@ obj-y += $(KVM)/arm/vgic/vgic-mmio.o
- obj-y += $(KVM)/arm/vgic/vgic-mmio-v2.o
- obj-y += $(KVM)/arm/vgic/vgic-mmio-v3.o
- obj-y += $(KVM)/arm/vgic/vgic-kvm-device.o
-+obj-y += $(KVM)/arm/vgic/vgic-sys-reg-common.o
-+obj-y += $(KVM)/arm/vgic/vgic-coproc-reg-v3.o
- obj-y += $(KVM)/arm/vgic/vgic-its.o
- obj-y += $(KVM)/irqchip.o
- obj-y += $(KVM)/arm/arch_timer.o
-diff --git a/virt/kvm/arm/vgic/vgic-coproc-reg-v3.c b/virt/kvm/arm/vgic/vgic-coproc-reg-v3.c
-new file mode 100644
-index 0000000..25d00e5
---- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic-coproc-reg-v3.c
-@@ -0,0 +1,155 @@
-+/*
-+ * VGIC system registers handling functions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/kvm.h>
-+#include <linux/kvm_host.h>
-+#include <kvm/arm_vgic.h>
-+#include <asm/kvm_emulate.h>
-+#include <asm/kvm_arm.h>
-+
-+#include "vgic.h"
-+#include "coproc.h"
-+
-+#define ACCESS_COPROC_REG(REG)						\
-+static bool access_gic_##REG##_coproc_reg(struct kvm_vcpu *vcpu,	\
-+				   struct coproc_params *p,		\
-+				   const struct coproc_reg *r)		\
-+{									\
-+	return  access_gic_##REG##_reg(vcpu, p->is_write, &p->Rt1);	\
-+}
-+
-+ACCESS_COPROC_REG(ctlr)
-+ACCESS_COPROC_REG(pmr)
-+ACCESS_COPROC_REG(bpr0)
-+ACCESS_COPROC_REG(bpr1)
-+ACCESS_COPROC_REG(sre)
-+ACCESS_COPROC_REG(grpen0)
-+ACCESS_COPROC_REG(grpen1)
-+
-+#define ACCESS_COPROC_APNR_REG(REG)					\
-+static bool access_gic_##REG##_coproc_reg(struct kvm_vcpu *vcpu,	\
-+				   struct coproc_params *p,		\
-+				   const struct coproc_reg *r)		\
-+{									\
-+	u8 idx = p->Op2 & 3;						\
-+									\
-+	return access_gic_##REG##_reg(vcpu, p->is_write, idx, &p->Rt1);	\
-+}
-+
-+ACCESS_COPROC_APNR_REG(ap0r)
-+ACCESS_COPROC_APNR_REG(ap1r)
-+
-+static const struct coproc_reg gic_v3_icc_coproc_reg_descs[] = {
-+	/* ICC_PMR_EL1 */
-+	{ CRn(0), CRm(6), Op1(0), Op2(0), is32, access_gic_pmr_coproc_reg },
-+	/* ICC_BPR0_EL1 */
-+	{ CRn(12), CRm(8), Op1(0), Op2(3), is32, access_gic_bpr0_coproc_reg },
-+	/* ICC_AP0R0_EL1 */
-+	{ CRn(12), CRm(8), Op1(0), Op2(4), is32, access_gic_ap0r_coproc_reg },
-+	/* ICC_AP0R1_EL1 */
-+	{ CRn(12), CRm(8), Op1(0), Op2(5), is32, access_gic_ap0r_coproc_reg },
-+	/* ICC_AP0R2_EL1 */
-+	{ CRn(12), CRm(8), Op1(0), Op2(6), is32, access_gic_ap0r_coproc_reg },
-+	/* ICC_AP0R3_EL1 */
-+	{ CRn(12), CRm(8), Op1(0), Op2(7), is32, access_gic_ap0r_coproc_reg },
-+	/* ICC_AP1R0_EL1 */
-+	{ CRn(12), CRm(9), Op1(0), Op2(0), is32, access_gic_ap1r_coproc_reg },
-+	/* ICC_AP1R1_EL1 */
-+	{ CRn(12), CRm(9), Op1(0), Op2(1), is32, access_gic_ap1r_coproc_reg },
-+	/* ICC_AP1R2_EL1 */
-+	{ CRn(12), CRm(9), Op1(0), Op2(2), is32, access_gic_ap1r_coproc_reg },
-+	/* ICC_AP1R3_EL1 */
-+	{ CRn(12), CRm(9), Op1(0), Op2(3), is32, access_gic_ap1r_coproc_reg },
-+	/* ICC_BPR1_EL1 */
-+	{ CRn(12), CRm(12), Op1(0), Op2(3), is32, access_gic_bpr1_coproc_reg },
-+	/* ICC_CTLR_EL1 */
-+	{ CRn(12), CRm(12), Op1(0), Op2(4), is32, access_gic_ctlr_coproc_reg },
-+	/* ICC_SRE_EL1 */
-+	{ CRn(12), CRm(12), Op1(0), Op2(5), is32, access_gic_sre_coproc_reg },
-+	/* ICC_IGRPEN0_EL1 */
-+	{ CRn(12), CRm(12), Op1(0), Op2(6), is32,
-+	  access_gic_grpen0_coproc_reg },
-+	/* ICC_GRPEN1_EL1 */
-+	{ CRn(12), CRm(12), Op1(0), Op2(7), is32,
-+	  access_gic_grpen1_coproc_reg },
-+};
-+
-+
-+#define KVM_DEV_ARM_VGIC_COPROC_MASK 0x3fff
-+
-+/* As per Documentation/virtual/kvm/devices/arm-vgic-v3.txt,
-+ * CPUREGs id is passed in AArch64 system register encoding format.
-+ * Format to COPROC register format for AArch32 mode before using.
-+ */
-+static u64 vgic_to_cpreg(u64 id)
-+{
-+	u64 cpreg = 0;
-+
-+	id = id & KVM_DEV_ARM_VGIC_COPROC_MASK;
-+	cpreg = ((id & KVM_REG_ARM_VGIC_SYSREG_OP2_MASK) >>
-+		  KVM_REG_ARM_VGIC_SYSREG_OP2_SHIFT) <<
-+		  KVM_REG_ARM_32_OPC2_SHIFT;
-+	cpreg |= ((id & KVM_REG_ARM_VGIC_SYSREG_CRM_MASK) >>
-+		  KVM_REG_ARM_VGIC_SYSREG_CRM_SHIFT) << KVM_REG_ARM_CRM_SHIFT;
-+	cpreg |= ((id & KVM_REG_ARM_VGIC_SYSREG_CRN_MASK) >>
-+		   KVM_REG_ARM_VGIC_SYSREG_CRN_SHIFT) <<
-+		   KVM_REG_ARM_32_CRN_SHIFT;
-+	cpreg |= ((id & KVM_REG_ARM_VGIC_SYSREG_OP1_MASK) >>
-+		   KVM_REG_ARM_VGIC_SYSREG_OP1_SHIFT) << KVM_REG_ARM_OPC1_SHIFT;
-+	id |= (KVM_REG_ARM_COPROC_MASK | KVM_REG_SIZE_U32);
-+
-+	return cpreg;
-+}
-+
-+int vgic_v3_has_cpu_sysregs_attr(struct kvm_vcpu *vcpu, bool is_write, u64 id,
-+				 u64 *reg)
-+{
-+	struct coproc_params params;
-+	u64 cpreg = vgic_to_cpreg(id);
-+
-+	params.Rt1 = *reg;
-+	params.is_write = is_write;
-+	params.is_64bit = false;
-+
-+	if (find_coproc_reg_by_id(cpreg, &params, gic_v3_icc_coproc_reg_descs,
-+				  ARRAY_SIZE(gic_v3_icc_coproc_reg_descs)))
-+		return 0;
-+
-+	return -ENOENT;
-+}
-+
-+int vgic_v3_cpu_sysregs_uaccess(struct kvm_vcpu *vcpu, bool is_write, u64 id,
-+				u64 *reg)
-+{
-+	struct coproc_params params;
-+	const struct coproc_reg *r;
-+	u64 cpreg = vgic_to_cpreg(id);
-+
-+	if (is_write)
-+		params.Rt1 = *reg;
-+	params.is_write = is_write;
-+	params.is_64bit = false;
-+
-+	r = find_coproc_reg_by_id(cpreg, &params, gic_v3_icc_coproc_reg_descs,
-+				  ARRAY_SIZE(gic_v3_icc_coproc_reg_descs));
-+	if (!r)
-+		return -ENXIO;
-+
-+	if (!r->access(vcpu, &params, r))
-+		return -EINVAL;
-+
-+	if (!is_write)
-+		*reg = params.Rt1;
-+
-+	return 0;
-+}
--- 
-1.9.1
+OK, in addition to this, the interrupt specifier needs to be added in 
+Documentation/devicetree/bindings/input/tps65218-pwrbutton.txt.
+
+> Please fix that instead to mandate that the two interrupts are
+> required, what their functions are, and what the interrupt-names
+> (not interrupts-names) property must list.
+
+Oops, wrong interrupt name property - my bad.
+
+Thanks for all your feedback.
+
+Best regards,
+Milo
