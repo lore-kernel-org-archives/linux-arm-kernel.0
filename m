@@ -1,141 +1,89 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 23 Nov 2016 18:02:01 +0100
-Subject: [PATCH 1/7] add binding for stm32 multifunctions timer driver
-In-Reply-To: <20161123092148.GO10134@dell.home>
-References: <1479831207-32699-1-git-send-email-benjamin.gaignard@st.com>
- <1479831207-32699-2-git-send-email-benjamin.gaignard@st.com>
- <20161122165228.GK10134@dell.home>
- <CA+M3ks4cVLtVe4zSvSiDUz6jKy0Wbw8j24VuStf_31D5ntwfvw@mail.gmail.com>
- <20161123092148.GO10134@dell.home>
-Message-ID: <CA+M3ks6rnago88JC0C5Uj6JpGZGuwyoOj-W8+r7Oj4s8_GuXyA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Nov 2016 18:07:11 +0100
+Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F931E08@lhreml507-mbx>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+ <2359248.XjnRfPbj1B@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F931E08@lhreml507-mbx>
+Message-ID: <2168980.T3HadihU3R@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-11-23 10:21 GMT+01:00 Lee Jones <lee.jones@linaro.org>:
-> On Wed, 23 Nov 2016, Benjamin Gaignard wrote:
->
->> 2016-11-22 17:52 GMT+01:00 Lee Jones <lee.jones@linaro.org>:
->> > On Tue, 22 Nov 2016, Benjamin Gaignard wrote:
->> >
->> >> Add bindings information for stm32 timer MFD
->> >>
->> >> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
->> >> ---
->> >>  .../devicetree/bindings/mfd/stm32-timer.txt        | 53 ++++++++++++++++++++++
->> >>  1 file changed, 53 insertions(+)
->> >>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-timer.txt
->> >>
->> >> diff --git a/Documentation/devicetree/bindings/mfd/stm32-timer.txt b/Documentation/devicetree/bindings/mfd/stm32-timer.txt
->> >> new file mode 100644
->> >> index 0000000..3cefce1
->> >> --- /dev/null
->> >> +++ b/Documentation/devicetree/bindings/mfd/stm32-timer.txt
->> >> @@ -0,0 +1,53 @@
->> >> +STM32 multifunctions timer driver
->> >
->> > "STM32 Multi-Function Timer/PWM device bindings"
->> >
->> > Doesn't this shared device have a better name?
->>
->> In SoC documentation those hardware blocks are named "advanced-control
->> timers", "general purpose timers" or "basic timers"
->> "stm32-timer" name is already used for clock source driver, that why I
->> have prefix it with mfd
->
-> MFD is a Linuxisum and has no place in hardware description.
->
-> Please used one of the names you mentioned above.
+On Wednesday, November 23, 2016 3:22:33 PM CET Gabriele Paoloni wrote:
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > On Friday, November 18, 2016 5:03:11 PM CET Gabriele Paoloni wrote:
 
-I will go for "st,stm32-advanced-timer"
+> > > I think this is effectively what we are doing so far with patch 2/3.
+> > > The problem with this patch is that we are carving out a "forbidden"
+> > > IO tokens range that goes from 0 to PCIBIOS_MIN_IO.
+> > >
+> > > I think that the proper solution would be to have the LPC driver to
+> > > set the carveout threshold used in pci_register_io_range(),
+> > > pci_pio_to_address(), pci_address_to_pio(), but this would impose
+> > > a probe dependency on the LPC itself that should be probed before
+> > > the PCI controller (or before any other devices calling these
+> > > functions...)
+> > 
+> > Why do you think the order matters? My point was that we should
+> > be able to register any region of logical port numbers for any
+> > bus here.
+> 
+> Maybe I have not followed well so let's roll back to your previous
+> comment...
+> 
+> "we need to associate a bus address with a logical Linux port number,
+> both in of_address_to_resource and in inb()/outb()"
+> 
+> Actually of_address_to_resource() returns the port number to used
+> in inb/outb(); inb() and outb() add the port number to PCI_IOBASE
+> to rd/wr to the right virtual address.
 
->
-> Hopefully the one that best fits.
->
->> >> +stm32 timer MFD allow to handle at the same time pwm and IIO timer devices
->> >
->> > No need for this sentence.
->> >
->> OK
->>
->> >> +Required parameters:
->> >> +- compatible: must be one of the follow value:
->> >> +     "st,stm32-mfd-timer1"
->> >> +     "st,stm32-mfd-timer2"
->> >> +     "st,stm32-mfd-timer3"
->> >> +     "st,stm32-mfd-timer4"
->> >> +     "st,stm32-mfd-timer5"
->> >> +     "st,stm32-mfd-timer6"
->> >> +     "st,stm32-mfd-timer7"
->> >> +     "st,stm32-mfd-timer8"
->> >> +     "st,stm32-mfd-timer9"
->> >> +     "st,stm32-mfd-timer10"
->> >> +     "st,stm32-mfd-timer11"
->> >> +     "st,stm32-mfd-timer12"
->> >> +     "st,stm32-mfd-timer13"
->> >> +     "st,stm32-mfd-timer14"
->> >
->> > We don't normally number devices.
->> >
->> > What's stopping you from simply doing:
->> >
->> >         pwm1: pwm1 at 40010000 {
->> >                 compatible = "st,stm32-pwm";
->> >         };
->> >         pwm2: pwm1 at 40020000 {
->> >                 compatible = "st,stm32-pwm";
->> >         };
->> >         pwm3: pwm1 at 40030000 {
->> >                 compatible = "st,stm32-pwm";
->> >         };
->> >
->>
->> Because each instance of the hardware is slightly different: number of
->> pwm channels, triggers capabilities, etc ..
->> so I need to distinguish them.
->> Since it look to be a problem I will follow your suggestion and add a
->> property this driver to be able to identify each instance.
->> Do you think that "id" parameter (integer for 1 to 14) is acceptable ?
->
-> Unfortunately not. IDs aren't allowed in DT.
->
-> What about "pwm-chans" and "trigger"?
->
-> pwm-chans              : Number of available channels available
+Correct.
 
-For pwm I need those 4 properties:
-st,pwm-number: the number of PWM devices
-st,complementary: if exist have complementary ouput
-st,32bit-counter: if exist have 32 bits counter
-st,breakinput-polarity: if set enable break input feature.
+> Our LPC cannot operate on the virtual address and it operates on
+> a bus address range that for LPC is also equal to the cpu address
+> range and goes from 0 to 0x1000.
 
-Is it acceptable from pwm maintainer point of view ?
+There is no "cpu address" here, otherwise this is correct.
 
-> trigger                : Boolean value specifying whether a timer is present
+> Now as I understand it is risky and not appropriate to reserve
+> the logical port numbers from 0 to 0x1000 or to whatever other
+> upper bound because existing systems may rely on these port numbers
+> retrieved by __of_address_to_resource().
 
-Following our discussion on IRC I will try to code for your proposal:
+Right again.
 
-advanced-timer at 40010000 {
-        compatible = "st,stm32-advanced-timer";
-        reg = <0x40010000 0x400>;
-        clocks = <&rcc 0 160>;
-        clock-names = "clk_int";
+> In this scenario I think the best thing to do would be
+> in the probe function of the LPC driver:
+> 1) call pci_register_io_range() passing [0, 0x1000] (that is the
+>    range for LPC)
 
-        pwm at 0 {
-                compatible = "st,stm32-pwm";
-                st,pwm-number= <4>;
-                st,complementary;
-                st,breakinput;
-        };
+pci_register_io_range() takes a physical address, not a port number,
+so that would not be appropriate as you say above. We can however
+add a variant that reserves a range of port numbers in io_range_list
+for an indirect access method.
 
-        timer at 0 {
-                reg = <1>;
-                compatible = "st,stm32-iio-timer";
-                interrupts = <27>;
-                triggers = <5 2 3 4>;
-        };
-};
+> 2) retrieve the logical port numbers associated to the LPC range
+>    by calling pci_address_to_pio() for 0 and 0x1000 and assign
+>    them to extio_ops_node->start and extio_ops_node->end
 
-triggers parameter will be used to know which trigger are valid for
-the IIO device
+Again, calling pci_address_to_pio() doesn't seem right here, because
+we don't have a phys_addr_t address
 
-[snip]
+> 3) implement the LPC accessors to operate on the logical ports
+>    associated to the LPC range (in practice in the accessors
+>    implementation we will call pci_pio_to_address to retrieve
+>    the cpu address to operate on)
+
+Please don't proliferate the use of
+pci_pio_to_address/pci_address_to_pio here, computing the physical
+address from the logical address is trivial, you just need to
+subtract the start of the range that you already use when matching
+the port number range.
+
+The only thing we need here is to make of_address_to_resource()
+return the correct logical port number that was registered for
+a given host device when asked to translate an address that
+does not have a CPU address associated with it.
+
+	Arnd
