@@ -1,120 +1,58 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 23 Nov 2016 08:59:50 +0100
-Subject: [PATCH 3/3] ARM: dts: sunxi: enable SDIO Wi-Fi on Orange Pi Zero
-In-Reply-To: <20161121162421.800-3-icenowy@aosc.xyz>
+Date: Wed, 23 Nov 2016 08:54:40 +0100
+Subject: [PATCH v2 1/3] ARM: sunxi: add support for H2+ SoC
+In-Reply-To: <20161121162421.800-1-icenowy@aosc.xyz>
 References: <20161121162421.800-1-icenowy@aosc.xyz>
- <20161121162421.800-3-icenowy@aosc.xyz>
-Message-ID: <20161123075950.fjtplylunwale6j4@lukather>
+Message-ID: <20161123075440.jyubhodklpaueupw@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Nov 22, 2016 at 12:24:21AM +0800, Icenowy Zheng wrote:
-> There's a Allwinner's XR819 SDIO Wi-Fi module soldered on the board of
-> Orange Pi Zero, which used a dedicated regulator to power.
+On Tue, Nov 22, 2016 at 12:24:19AM +0800, Icenowy Zheng wrote:
+> Allwinner H2+ is a quad-core Cortex-A7 SoC.
 > 
-> Add the device tree node of the regulator, the enable gpio (with
-> mmc-pwrseq) and the sdio controller.
-> 
-> There's a out-of-tree driver tested to work with this device tree.
+> It is very like H3, that they share the same SoC ID (0x1680), and H3
+> memory maps as well as drivers works well on the SoC.
 > 
 > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 > ---
-> New patch in the patchset, since a out-of-tree working xradio driver is done.
+>  Documentation/arm/sunxi/README                  | 4 ++++
+>  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+>  arch/arm/mach-sunxi/sunxi.c                     | 1 +
+>  3 files changed, 6 insertions(+)
 > 
-> If there is any problem in this patch, it can be omitted.
-
-No particular problem with this one, however it can and should be
-merged with the previous one.
-
-Minor comments below though.
-
-> 
->  arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts | 42 ++++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts
-> index b428e47..39cac26 100644
-> --- a/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts
-> +++ b/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts
-> @@ -79,6 +79,24 @@
->  			gpios = <&pio 0 17 GPIO_ACTIVE_HIGH>;
->  		};
->  	};
-> +
-> +	reg_vcc_wifi: reg_vcc_wifi {
-> +		compatible = "regulator-fixed";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&vcc_wifi_pin_opi0>;
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		regulator-name = "vcc-wifi";
-> +		enable-active-high;
-> +		gpio = <&pio 0 20 GPIO_ACTIVE_HIGH>;
-> +	};
-> +
-> +	wifi_pwrseq: wifi_pwrseq {
-> +		compatible = "mmc-pwrseq-simple";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&wifi_pwrseq_pin_opi0>;
-> +		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>;
-> +	};
->  };
+> diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+> index cd02433..1fe4d99c 100644
+> --- a/Documentation/arm/sunxi/README
+> +++ b/Documentation/arm/sunxi/README
+> @@ -63,6 +63,10 @@ SunXi family
+>          + User Manual
+>            http://dl.linux-sunxi.org/A33/A33%20user%20manual%20release%201.1.pdf
 >  
->  &ehci1 {
-> @@ -95,6 +113,20 @@
->  	status = "okay";
->  };
->  
-> +&mmc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc1_pins_a>;
-> +	vmmc-supply = <&reg_vcc_wifi>;
-> +	mmc-pwrseq = <&wifi_pwrseq>;
-> +	bus-width = <4>;
-> +	non-removable;
-> +	status = "okay";
-> +};
+> +      - Allwinner H2+ (sun8i)
+> +        + No document available now, but is known to be working properly with
+> +          H3 drivers and memory map.
 > +
-> +&mmc1_pins_a {
-> +	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
 
-This should be bias-pull-up.
+I'm not sure the phrasing is right here. I would prefer something like:
 
-> +};
-> +
->  &ohci1 {
->  	status = "okay";
->  };
-> @@ -104,6 +136,11 @@
->  		pins = "PA17";
->  		function = "gpio_out";
->  	};
-> +
-> +	vcc_wifi_pin_opi0: vcc_wifi_pin at 0 {
-> +		allwinner,pins = "PA20";
+"No document publicly available now, but looks very similar to the H3" 
 
-This should be pins
+>        - Allwinner H3 (sun8i)
+>          + Datasheet
+>            http://dl.linux-sunxi.org/H3/Allwinner_H3_Datasheet_V1.0.pdf
+> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+> index 4d6467c..26b35a7 100644
+> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+> @@ -13,6 +13,7 @@ using one of the following compatible strings:
+>    allwinner,sun8i-a33
+>    allwinner,sun8i-a83t
+>    allwinner,sun8i-h3
+> +  allwinner,sun8i-h2plus
 
-> +		allwinner,function = "gpio_out";
-
-This should be function
-
-> +	};
->  };
->  
->  &r_pio {
-> @@ -111,6 +148,11 @@
->  		pins = "PL10";
->  		function = "gpio_out";
->  	};
-> +
-> +	wifi_pwrseq_pin_opi0: wifi_pwrseq_pin at 0 {
-> +		allwinner,pins = "PL7";
-> +		allwinner,function = "gpio_out";
-
-And same thing here.
+h2-plus please.
 
 Thanks!
 Maxime
@@ -129,4 +67,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161123/d0892fbe/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161123/57bf0c4d/attachment.sig>
