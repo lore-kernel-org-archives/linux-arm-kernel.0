@@ -1,37 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Nov 2016 07:55:03 -0800
-Subject: [RFC PATCH 11/11] ARM: Allow ARCH_MULTIPLATFORM to be selected
- for NOMMU
-In-Reply-To: <583478FB.4020008@arm.com>
-References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
- <1479806768-39911-12-git-send-email-vladimir.murzin@arm.com>
- <16587553.f9R1mxJih5@wuerfel> <583478FB.4020008@arm.com>
-Message-ID: <20161123155503.GE4082@atomide.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 23 Nov 2016 07:58:23 -0800
+Subject: [PATCH v2 1/2] ARM64: dts: Add support for Meson GXM
+In-Reply-To: <CAFBinCAbUK-6uLc_ceJ5d-oD4N_HGz9rbtCvivTp1N8OOVBNBg@mail.gmail.com>
+ (Martin Blumenstingl's message of "Wed, 23 Nov 2016 13:23:24 +0100")
+References: <20161122100046.25899-1-narmstrong@baylibre.com>
+ <20161122100046.25899-2-narmstrong@baylibre.com>
+ <CAFBinCAbUK-6uLc_ceJ5d-oD4N_HGz9rbtCvivTp1N8OOVBNBg@mail.gmail.com>
+Message-ID: <m2r362w5ls.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vladimir Murzin <vladimir.murzin@arm.com> [161122 08:57]:
-> On 22/11/16 10:17, Arnd Bergmann wrote:
-> > Another question is what architecture levels and what platforms
-> > we want to support without MMU. The only ARMv4/v5 platform we
-> > still have that can actually use NOMMU cores is Integrator
-> > with its ARM7TDMI, ARM920T and ARM966E core tiles (and possibly
-> > others I couldn't immediately find). Do we actually care about
-> > them any more now that all the NOMMU world is ARMv7-M? Are
-> > there any benefits in running an ARM920T or ARM926E core
-> > with MMU disabled, and does this work with your patches?
-> > 
-> 
-> I don't have such hardware, so I can't acctually test it - it is why "there is
-> no guaranty" :( OTOH, if sombody has these platforms these pathces is a good
-> start to try NOMMU.
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-I believe the reason to run them without MMU might be still
-valid if we ever get mainline Linux kernel working on some
-3G/LTE modems for latency reasons. Not that I know of any
-use cases, but if we have it working we might as well keep
-it working.
+> On Tue, Nov 22, 2016 at 11:00 AM, Neil Armstrong
+> <narmstrong@baylibre.com> wrote:
+>> Following the Amlogic Linux kernel, it seem the only differences
+>> between the GXL and GXM SoCs are the CPU Clusters.
+>>
+>> This commit renames the gxl-s905d-p23x DTSI in a common file for
+>> S905D p23x and S912 q20x boards.
+>>
+>> Then adds a meson-gxm dtsi and reproduce the P23x to Q20x boards
+>> dts files since the S905D and S912 SoCs shares the same pinout
+>> and the P23x and Q20x boards are identical.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> Tested-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>
+> I have tested this successfully on a Mecool BB2 (similar to the Q200
+> reference board).
 
-Regards,
+Thanks for testing (and reporting),
 
-Tony
+Kevin
