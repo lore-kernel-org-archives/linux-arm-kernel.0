@@ -1,88 +1,53 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 23 Nov 2016 14:32:05 -0800
-Subject: [PATCH v2] ARM: dts: da850: add the mstpri and ddrctl nodes
-In-Reply-To: <5e647eb0-2f8a-b46b-2048-7616bfb54ad7@lechnology.com> (David
- Lechner's message of "Wed, 23 Nov 2016 10:19:53 -0600")
-References: <1479207611-18028-1-git-send-email-bgolaszewski@baylibre.com>
- <a39b9276-865b-6382-574e-a5ef040a452f@lechnology.com>
- <CAMpxmJVqog0Fno_DO0NQKmVNvzu5d=3GOLk145wBmB-V70BLeg@mail.gmail.com>
- <5e647eb0-2f8a-b46b-2048-7616bfb54ad7@lechnology.com>
-Message-ID: <m2bmx5x1y2.fsf@baylibre.com>
+Date: Wed, 23 Nov 2016 14:33:38 -0800
+Subject: [PATCH 3/3] ARM: dts: da850: Add node for pullup/pulldown pinconf
+In-Reply-To: <06bc8517-8c33-85a1-9d5a-29042c7281db@lechnology.com> (David
+ Lechner's message of "Wed, 23 Nov 2016 10:24:06 -0600")
+References: <1479871767-20160-1-git-send-email-david@lechnology.com>
+ <1479871767-20160-4-git-send-email-david@lechnology.com>
+ <8c3e6535-4b79-9731-f801-c13f007e48ab@ti.com>
+ <06bc8517-8c33-85a1-9d5a-29042c7281db@lechnology.com>
+Message-ID: <m260ndx1vh.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 David Lechner <david@lechnology.com> writes:
 
-> On 11/23/2016 04:27 AM, Bartosz Golaszewski wrote:
->> 2016-11-22 23:23 GMT+01:00 David Lechner <david@lechnology.com>:
->>> On 11/15/2016 05:00 AM, Bartosz Golaszewski wrote:
->>>>
->>>> Add the nodes for the MSTPRI configuration and DDR2/mDDR memory
->>>> controller drivers to da850.dtsi.
->>>>
->>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>> ---
->>>> v1 -> v2:
->>>> - moved the priority controller node above the cfgchip node
->>>> - renamed added nodes to better reflect their purpose
->>>>
->>>>  arch/arm/boot/dts/da850.dtsi | 8 ++++++++
->>>>  1 file changed, 8 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
->>>> index 1bb1f6d..412eec6 100644
->>>> --- a/arch/arm/boot/dts/da850.dtsi
->>>> +++ b/arch/arm/boot/dts/da850.dtsi
->>>> @@ -210,6 +210,10 @@
->>>>                         };
->>>>
->>>>                 };
->>>> +               prictrl: priority-controller at 14110 {
->>>> +                       compatible = "ti,da850-mstpri";
->>>> +                       reg = <0x14110 0x0c>;
+> On 11/23/2016 05:12 AM, Sekhar Nori wrote:
+>> On Wednesday 23 November 2016 08:59 AM, David Lechner wrote:
+>>> This SoC has a separate pin controller for configuring pullup/pulldown
+>>> bias on groups of pins.
 >>>
+>>> Signed-off-by: David Lechner <david@lechnology.com>
+>>> ---
+>>>  arch/arm/boot/dts/da850.dtsi | 5 +++++
+>>>  1 file changed, 5 insertions(+)
 >>>
->>> I think we should add status = "disabled"; here and let boards opt in.
+>>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+>>> index 8945815..1c0224c 100644
+>>> --- a/arch/arm/boot/dts/da850.dtsi
+>>> +++ b/arch/arm/boot/dts/da850.dtsi
+>>> @@ -210,6 +210,11 @@
+>>>  			};
 >>>
->>>> +               };
->>>>                 cfgchip: chip-controller at 1417c {
->>>>                         compatible = "ti,da830-cfgchip", "syscon",
->>>> "simple-mfd";
->>>>                         reg = <0x1417c 0x14>;
->>>> @@ -451,4 +455,8 @@
->>>>                           1 0 0x68000000 0x00008000>;
->>>>                 status = "disabled";
->>>>         };
->>>> +       memctrl: memory-controller at b0000000 {
->>>> +               compatible = "ti,da850-ddr-controller";
->>>> +               reg = <0xb0000000 0xe8>;
->>>
->>>
->>> same here. status = "disabled";
->>>
->>>> +       };
->>>>  };
->>>>
+>>>  		};
+>>> +		pinconf: pin-controller at 22c00c {
+>>> +			compatible = "ti,da850-pupd";
+>>> +			reg = <0x22c00c 0x8>;
+>>> +			status = "disabled";
+>>> +		};
 >>
->> Hi David,
->>
->> I did that initially[1][2] and it was rejected by Kevin[3] and Laurent[4].
->>
->> FYI this patch has already been queued by Sekhar.
+>> Can you please place this below the i2c1 node. I am trying to keep the
+>> nodes sorted by unit address. I know thats broken in many places today,
+>> but lets add the new ones where they should eventually end up.
 >
-> Thanks. I did not see those threads.
+> I can do this, but it seems that the predominant sorting pattern here
+> is to keep subsystems together (e.g. all i2c are together, all uart
+> are together, etc.)
 >
-> FYI to maintainers, having these enabled by default causes error
-> messages in the kernel log for other boards that are not supported by
-> the drivers.
+> Would a separate patch to sort everything by unit address to get this
+> cleaned up be acceptable?
 
-Then the driver is too noisy and should be cleaned up.
-
-> Since there is only one board that is supported and soon
-> to be 2 that are not, I would rather have this disabled by default to
-> avoid the error messages.
-
-IMO, what exactly are the error messages? Sounds like the driver is
-being too verbose, and calling things errors that are not really errors.
+No thanks. That kind of thing is the needless churn that gets us flamed.
 
 Kevin
