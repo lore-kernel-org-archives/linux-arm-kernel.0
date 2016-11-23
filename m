@@ -1,84 +1,42 @@
-From: chris.paterson2@renesas.com (Chris Paterson)
-Date: Wed, 23 Nov 2016 12:14:48 +0000
-Subject: [PATCH 3/3] arm64: dts: r8a7796: Add CAN FD support
-Message-ID: <1479903288-2009-1-git-send-email-chris.paterson2@renesas.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 23 Nov 2016 12:15:37 +0000
+Subject: [PATCH 1/3] of: base: add support to get machine compatible string
+In-Reply-To: <11467504-c700-cbfa-a945-be9ec8776144@ti.com>
+References: <1479811311-3080-1-git-send-email-bgolaszewski@baylibre.com>
+ <1479811311-3080-2-git-send-email-bgolaszewski@baylibre.com>
+ <5ce9fb9f-459a-562b-2e9f-85d35f9ec035@arm.com>
+ <67a3c2c7-0cb9-9764-2710-6ee66fc4dde4@ti.com>
+ <fdb93150-9089-c7bb-2b0a-21ded241a647@arm.com>
+ <ae92e013-b41b-6caa-b32f-284ffb6f5aa0@ti.com>
+ <2a644b8c-d91e-5ab1-200b-00f749a36307@arm.com>
+ <ff1ea88a-87c6-6721-8e63-ddb05900cc58@ti.com>
+ <f0ba1a7a-8948-21c3-8a96-d46bf105bb7e@arm.com>
+ <11467504-c700-cbfa-a945-be9ec8776144@ti.com>
+Message-ID: <b47cd425-ea89-31ff-5b99-dea27bea2d14@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds CAN FD controller node for r8a7796.
 
-Based on a patch for r8a7795 by Ramesh Shanmugasundaram.
 
-Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
----
- .../devicetree/bindings/net/can/rcar_canfd.txt     | 12 ++++++-----
- arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 24 ++++++++++++++++++++++
- 2 files changed, 31 insertions(+), 5 deletions(-)
+On 23/11/16 12:13, Sekhar Nori wrote:
+> On Wednesday 23 November 2016 05:37 PM, Sudeep Holla wrote:
+>>> So, the if(!of_node_get()) is just an expensive NULL pointer check. I
+>>> think
+>>> it is better to be explicit about it by not using of_node_get/put() at
+>>> all.
+>>> How about:
+>>>
+>>
+>> Are we planning to use this in any time sensitive paths? Anyways I am
+>> fine removing them.
+>
+> Not worried about the time taken as much as it serving as a bad example
+> and getting carried over to other places where the impact might actually
+> be real.
+>
 
-diff --git a/Documentation/devicetree/bindings/net/can/rcar_canfd.txt b/Documentation/devicetree/bindings/net/can/rcar_canfd.txt
-index 22a6f10..788f273 100644
---- a/Documentation/devicetree/bindings/net/can/rcar_canfd.txt
-+++ b/Documentation/devicetree/bindings/net/can/rcar_canfd.txt
-@@ -5,6 +5,7 @@ Required properties:
- - compatible: Must contain one or more of the following:
-   - "renesas,rcar-gen3-canfd" for R-Car Gen3 compatible controller.
-   - "renesas,r8a7795-canfd" for R8A7795 (R-Car H3) compatible controller.
-+  - "renesas,r8a7796-canfd" for R8A7796 (R-Car M3) compatible controller.
- 
-   When compatible with the generic version, nodes must list the
-   SoC-specific version corresponding to the platform first, followed by the
-@@ -23,11 +24,12 @@ The name of the child nodes are "channel0" and "channel1" respectively. Each
- child node supports the "status" property only, which is used to
- enable/disable the respective channel.
- 
--Required properties for "renesas,r8a7795-canfd" compatible:
--In R8A7795 SoC, canfd clock is a div6 clock and can be used by both CAN
--and CAN FD controller at the same time. It needs to be scaled to maximum
--frequency if any of these controllers use it. This is done using the
--below properties.
-+Required properties for "renesas,r8a7795-canfd" and "renesas,r8a7796-canfd"
-+compatible:
-+In R8A7795 and R8A7796 SoCs, canfd clock is a div6 clock and can be used by both
-+CAN and CAN FD controller at the same time. It needs to be scaled to maximum
-+frequency if any of these controllers use it. This is done using the below
-+properties:
- 
- - assigned-clocks: phandle of canfd clock.
- - assigned-clock-rates: maximum frequency of this clock.
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 95857fc..c069d77 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -392,6 +392,30 @@
- 			status = "disabled";
- 		};
- 
-+		canfd: can at e66c0000 {
-+			compatible = "renesas,r8a7796-canfd",
-+				     "renesas,rcar-gen3-canfd";
-+			reg = <0 0xe66c0000 0 0x8000>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>,
-+				   <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 914>,
-+			       <&cpg CPG_CORE R8A7796_CLK_CANFD>,
-+			       <&can_clk>;
-+			clock-names = "fck", "canfd", "can_clk";
-+			assigned-clocks = <&cpg CPG_CORE R8A7796_CLK_CANFD>;
-+			assigned-clock-rates = <40000000>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			status = "disabled";
-+
-+			channel0 {
-+				status = "disabled";
-+			};
-+
-+			channel1 {
-+				status = "disabled";
-+			};
-+		};
-+
- 		scif2: serial at e6e88000 {
- 			compatible = "renesas,scif-r8a7796",
- 				     "renesas,rcar-gen3-scif", "renesas,scif";
+Ah OK, sure.
+
 -- 
-1.9.1
+Regards,
+Sudeep
