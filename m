@@ -1,59 +1,63 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 23 Nov 2016 15:31:43 +0100
-Subject: [PATCH 0/3] arm64: dts: r8a7796: Add CAN/CAN FD support
-In-Reply-To: <20161123142938.GF9057@verge.net.au>
-References: <1479903243-1860-1-git-send-email-chris.paterson2@renesas.com>
- <f358442c-8373-328c-1270-709498c133f5@pengutronix.de>
- <20161123142938.GF9057@verge.net.au>
-Message-ID: <5a04de78-1181-8198-0bd5-edd435a83289@pengutronix.de>
+From: geliangtang@gmail.com (Geliang Tang)
+Date: Wed, 23 Nov 2016 22:39:52 +0800
+Subject: [PATCH] arm: perf: use builtin_platform_driver
+Message-ID: <5fa901e2e1441ba60df316dfd3e14c87bd7bdfd1.1479911941.git.geliangtang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2016 03:29 PM, Simon Horman wrote:
-> On Wed, Nov 23, 2016 at 02:18:13PM +0100, Marc Kleine-Budde wrote:
->> On 11/23/2016 01:14 PM, Chris Paterson wrote:
->>> This patch series adds CAN and CAN FD support to the r8a7796.
->>>
->>> Based on renesas-devel-20161122-v4.9-rc6.
->>>
->>> Chris Paterson (3):
->>>   arm64: dts: r8a7796: Add CAN external clock support
->>>   arm64: dts: r8a7796: Add CAN support
->>>   arm64: dts: r8a7796: Add CAN FD support
->>>
->>>  .../devicetree/bindings/net/can/rcar_can.txt       | 12 +++--
->>>  .../devicetree/bindings/net/can/rcar_canfd.txt     | 12 +++--
->>>  arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 61 ++++++++++++++++++++++
->>>  3 files changed, 75 insertions(+), 10 deletions(-)
->>
->> For all three:
->>
->> Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
->>
->> Who takes this series?
-> 
-> I would like to see these patches split up so that the
-> .../devicetree/bindings/ portions can go through you whole
-> the arch/arm64/boot/dts/renesas/ portions go thorugh my renesas tree.
+Use builtin_platform_driver() helper to simplify the code.
 
-Ok
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
+---
+ arch/arm/kernel/perf_event_v6.c     | 6 +-----
+ arch/arm/kernel/perf_event_v7.c     | 6 +-----
+ arch/arm/kernel/perf_event_xscale.c | 6 +-----
+ 3 files changed, 3 insertions(+), 15 deletions(-)
 
-> Regarding the arch/arm64/boot/dts/renesas/ portion, I would like
-> some consideration given to what effect enabling memory above 4Gb
-> (64bit addressing) would have.
-
-Marc
-
+diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
+index 09413e7..96b7a47 100644
+--- a/arch/arm/kernel/perf_event_v6.c
++++ b/arch/arm/kernel/perf_event_v6.c
+@@ -581,9 +581,5 @@ static struct platform_driver armv6_pmu_driver = {
+ 	.probe		= armv6_pmu_device_probe,
+ };
+ 
+-static int __init register_armv6_pmu_driver(void)
+-{
+-	return platform_driver_register(&armv6_pmu_driver);
+-}
+-device_initcall(register_armv6_pmu_driver);
++builtin_platform_driver(armv6_pmu_driver);
+ #endif	/* CONFIG_CPU_V6 || CONFIG_CPU_V6K */
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index b942349..ab6522b 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -2034,9 +2034,5 @@ static struct platform_driver armv7_pmu_driver = {
+ 	.probe		= armv7_pmu_device_probe,
+ };
+ 
+-static int __init register_armv7_pmu_driver(void)
+-{
+-	return platform_driver_register(&armv7_pmu_driver);
+-}
+-device_initcall(register_armv7_pmu_driver);
++builtin_platform_driver(armv7_pmu_driver);
+ #endif	/* CONFIG_CPU_V7 */
+diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
+index aa0499e..0e51f5e 100644
+--- a/arch/arm/kernel/perf_event_xscale.c
++++ b/arch/arm/kernel/perf_event_xscale.c
+@@ -767,9 +767,5 @@ static struct platform_driver xscale_pmu_driver = {
+ 	.probe		= xscale_pmu_device_probe,
+ };
+ 
+-static int __init register_xscale_pmu_driver(void)
+-{
+-	return platform_driver_register(&xscale_pmu_driver);
+-}
+-device_initcall(register_xscale_pmu_driver);
++builtin_platform_driver(xscale_pmu_driver);
+ #endif	/* CONFIG_CPU_XSCALE */
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161123/803507ec/attachment.sig>
+2.9.3
