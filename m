@@ -1,31 +1,37 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 23 Nov 2016 07:49:57 -0800
-Subject: [RFC PATCH 03/11] ARM: omap: do not select HIGHMEM explicitly
-In-Reply-To: <20161122095136.GU1041@n2100.armlinux.org.uk>
+Date: Wed, 23 Nov 2016 07:55:03 -0800
+Subject: [RFC PATCH 11/11] ARM: Allow ARCH_MULTIPLATFORM to be selected
+ for NOMMU
+In-Reply-To: <583478FB.4020008@arm.com>
 References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
- <1479806768-39911-4-git-send-email-vladimir.murzin@arm.com>
- <20161122095136.GU1041@n2100.armlinux.org.uk>
-Message-ID: <20161123154957.GD4082@atomide.com>
+ <1479806768-39911-12-git-send-email-vladimir.murzin@arm.com>
+ <16587553.f9R1mxJih5@wuerfel> <583478FB.4020008@arm.com>
+Message-ID: <20161123155503.GE4082@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@armlinux.org.uk> [161122 01:51]:
-> On Tue, Nov 22, 2016 at 09:26:00AM +0000, Vladimir Murzin wrote:
-> > Explicit selection of HIGHMEM breaks NOMMU builds. It seems that
-> > HIGHMEM is user selectable option, so probably it would be better to
-> > let user to make a decision on this options or, at least, move it to
-> > defconfig.
+* Vladimir Murzin <vladimir.murzin@arm.com> [161122 08:57]:
+> On 22/11/16 10:17, Arnd Bergmann wrote:
+> > Another question is what architecture levels and what platforms
+> > we want to support without MMU. The only ARMv4/v5 platform we
+> > still have that can actually use NOMMU cores is Integrator
+> > with its ARM7TDMI, ARM920T and ARM966E core tiles (and possibly
+> > others I couldn't immediately find). Do we actually care about
+> > them any more now that all the NOMMU world is ARMv7-M? Are
+> > there any benefits in running an ARM920T or ARM926E core
+> > with MMU disabled, and does this work with your patches?
+> > 
 > 
-> That's kind of the point of ARCH_OMAP2PLUS_TYPICAL - it's a user
-> option to let the user select a range of options for typical OMAP2+
-> configurations, so that the user doesn't have to dig around looking
-> for multiple options, some of which are hard requirements for OMAP
-> to be functional.  OMAP is a particularly difficult case because the
-> hardware tends to be very complex.
-> 
-> However, HIGHMEM should never be a requirement to boot, so this looks
-> sane.
+> I don't have such hardware, so I can't acctually test it - it is why "there is
+> no guaranty" :( OTOH, if sombody has these platforms these pathces is a good
+> start to try NOMMU.
 
-Yeah we can add that to the defconfig:
+I believe the reason to run them without MMU might be still
+valid if we ever get mainline Linux kernel working on some
+3G/LTE modems for latency reasons. Not that I know of any
+use cases, but if we have it working we might as well keep
+it working.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Regards,
+
+Tony
