@@ -1,85 +1,27 @@
-From: david@lechnology.com (David Lechner)
-Date: Wed, 23 Nov 2016 10:19:53 -0600
-Subject: [PATCH v2] ARM: dts: da850: add the mstpri and ddrctl nodes
-In-Reply-To: <CAMpxmJVqog0Fno_DO0NQKmVNvzu5d=3GOLk145wBmB-V70BLeg@mail.gmail.com>
-References: <1479207611-18028-1-git-send-email-bgolaszewski@baylibre.com>
- <a39b9276-865b-6382-574e-a5ef040a452f@lechnology.com>
- <CAMpxmJVqog0Fno_DO0NQKmVNvzu5d=3GOLk145wBmB-V70BLeg@mail.gmail.com>
-Message-ID: <5e647eb0-2f8a-b46b-2048-7616bfb54ad7@lechnology.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Wed, 23 Nov 2016 17:20:38 +0100
+Subject: [PATCH 0/2] minor GXL and GXM improvements
+Message-ID: <20161123162040.24843-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2016 04:27 AM, Bartosz Golaszewski wrote:
-> 2016-11-22 23:23 GMT+01:00 David Lechner <david@lechnology.com>:
->> On 11/15/2016 05:00 AM, Bartosz Golaszewski wrote:
->>>
->>> Add the nodes for the MSTPRI configuration and DDR2/mDDR memory
->>> controller drivers to da850.dtsi.
->>>
->>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>> ---
->>> v1 -> v2:
->>> - moved the priority controller node above the cfgchip node
->>> - renamed added nodes to better reflect their purpose
->>>
->>>  arch/arm/boot/dts/da850.dtsi | 8 ++++++++
->>>  1 file changed, 8 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
->>> index 1bb1f6d..412eec6 100644
->>> --- a/arch/arm/boot/dts/da850.dtsi
->>> +++ b/arch/arm/boot/dts/da850.dtsi
->>> @@ -210,6 +210,10 @@
->>>                         };
->>>
->>>                 };
->>> +               prictrl: priority-controller at 14110 {
->>> +                       compatible = "ti,da850-mstpri";
->>> +                       reg = <0x14110 0x0c>;
->>
->>
->> I think we should add status = "disabled"; here and let boards opt in.
->>
->>> +               };
->>>                 cfgchip: chip-controller at 1417c {
->>>                         compatible = "ti,da830-cfgchip", "syscon",
->>> "simple-mfd";
->>>                         reg = <0x1417c 0x14>;
->>> @@ -451,4 +455,8 @@
->>>                           1 0 0x68000000 0x00008000>;
->>>                 status = "disabled";
->>>         };
->>> +       memctrl: memory-controller at b0000000 {
->>> +               compatible = "ti,da850-ddr-controller";
->>> +               reg = <0xb0000000 0xe8>;
->>
->>
->> same here. status = "disabled";
->>
->>> +       };
->>>  };
->>>
->
-> Hi David,
->
-> I did that initially[1][2] and it was rejected by Kevin[3] and Laurent[4].
->
-> FYI this patch has already been queued by Sekhar.
+This series adds SCPI support to GXL and GXM SoCs by moving the nodes
+to meson-gx.dtsi. Additionally this updates the compatible string to
+match the recent changes, see [0]
 
-Thanks. I did not see those threads.
+Now that we have SCPI support for GXM we can also use it to configure
+the CPU cores using the SCPI DVFS clocks.
 
-FYI to maintainers, having these enabled by default causes error 
-messages in the kernel log for other boards that are not supported by 
-the drivers. Since there is only one board that is supported and soon to 
-be 2 that are not, I would rather have this disabled by default to avoid 
-the error messages.
+[0] http://lists.infradead.org/pipermail/linux-amlogic/2016-November/001632.html
 
->
-> Best regards,
-> Bartosz Golaszewski
->
-> [1] https://www.spinics.net/lists/arm-kernel/msg539638.html
-> [2] http://www.spinics.net/lists/devicetree/msg148575.html
-> [3] http://www.spinics.net/lists/devicetree/msg148667.html
-> [4] http://www.spinics.net/lists/devicetree/msg148655.html
->
+Martin Blumenstingl (2):
+  ARM64: dts: meson-gx: move the SCPI and SRAM nodes to meson-gx
+  ARM64: dts: meson-gxm: add SCPI configuration for GXM
+
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi   | 45 +++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 57 -----------------------------
+ arch/arm64/boot/dts/amlogic/meson-gxm.dtsi  |  9 +++++
+ 3 files changed, 54 insertions(+), 57 deletions(-)
+
+-- 
+2.10.2
