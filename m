@@ -1,50 +1,141 @@
-From: david@lechnology.com (David Lechner)
-Date: Wed, 23 Nov 2016 10:24:06 -0600
-Subject: [PATCH 3/3] ARM: dts: da850: Add node for pullup/pulldown pinconf
-In-Reply-To: <8c3e6535-4b79-9731-f801-c13f007e48ab@ti.com>
-References: <1479871767-20160-1-git-send-email-david@lechnology.com>
- <1479871767-20160-4-git-send-email-david@lechnology.com>
- <8c3e6535-4b79-9731-f801-c13f007e48ab@ti.com>
-Message-ID: <06bc8517-8c33-85a1-9d5a-29042c7281db@lechnology.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 23 Nov 2016 18:02:01 +0100
+Subject: [PATCH 1/7] add binding for stm32 multifunctions timer driver
+In-Reply-To: <20161123092148.GO10134@dell.home>
+References: <1479831207-32699-1-git-send-email-benjamin.gaignard@st.com>
+ <1479831207-32699-2-git-send-email-benjamin.gaignard@st.com>
+ <20161122165228.GK10134@dell.home>
+ <CA+M3ks4cVLtVe4zSvSiDUz6jKy0Wbw8j24VuStf_31D5ntwfvw@mail.gmail.com>
+ <20161123092148.GO10134@dell.home>
+Message-ID: <CA+M3ks6rnago88JC0C5Uj6JpGZGuwyoOj-W8+r7Oj4s8_GuXyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2016 05:12 AM, Sekhar Nori wrote:
-> On Wednesday 23 November 2016 08:59 AM, David Lechner wrote:
->> This SoC has a separate pin controller for configuring pullup/pulldown
->> bias on groups of pins.
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> ---
->>  arch/arm/boot/dts/da850.dtsi | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
->> index 8945815..1c0224c 100644
->> --- a/arch/arm/boot/dts/da850.dtsi
->> +++ b/arch/arm/boot/dts/da850.dtsi
->> @@ -210,6 +210,11 @@
->>  			};
->>
->>  		};
->> +		pinconf: pin-controller at 22c00c {
->> +			compatible = "ti,da850-pupd";
->> +			reg = <0x22c00c 0x8>;
->> +			status = "disabled";
->> +		};
+2016-11-23 10:21 GMT+01:00 Lee Jones <lee.jones@linaro.org>:
+> On Wed, 23 Nov 2016, Benjamin Gaignard wrote:
 >
-> Can you please place this below the i2c1 node. I am trying to keep the
-> nodes sorted by unit address. I know thats broken in many places today,
-> but lets add the new ones where they should eventually end up.
+>> 2016-11-22 17:52 GMT+01:00 Lee Jones <lee.jones@linaro.org>:
+>> > On Tue, 22 Nov 2016, Benjamin Gaignard wrote:
+>> >
+>> >> Add bindings information for stm32 timer MFD
+>> >>
+>> >> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>> >> ---
+>> >>  .../devicetree/bindings/mfd/stm32-timer.txt        | 53 ++++++++++++++++++++++
+>> >>  1 file changed, 53 insertions(+)
+>> >>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-timer.txt
+>> >>
+>> >> diff --git a/Documentation/devicetree/bindings/mfd/stm32-timer.txt b/Documentation/devicetree/bindings/mfd/stm32-timer.txt
+>> >> new file mode 100644
+>> >> index 0000000..3cefce1
+>> >> --- /dev/null
+>> >> +++ b/Documentation/devicetree/bindings/mfd/stm32-timer.txt
+>> >> @@ -0,0 +1,53 @@
+>> >> +STM32 multifunctions timer driver
+>> >
+>> > "STM32 Multi-Function Timer/PWM device bindings"
+>> >
+>> > Doesn't this shared device have a better name?
+>>
+>> In SoC documentation those hardware blocks are named "advanced-control
+>> timers", "general purpose timers" or "basic timers"
+>> "stm32-timer" name is already used for clock source driver, that why I
+>> have prefix it with mfd
+>
+> MFD is a Linuxisum and has no place in hardware description.
+>
+> Please used one of the names you mentioned above.
 
-I can do this, but it seems that the predominant sorting pattern here is 
-to keep subsystems together (e.g. all i2c are together, all uart are 
-together, etc.)
-
-Would a separate patch to sort everything by unit address to get this 
-cleaned up be acceptable?
+I will go for "st,stm32-advanced-timer"
 
 >
-> Thanks,
-> Sekhar
+> Hopefully the one that best fits.
 >
+>> >> +stm32 timer MFD allow to handle at the same time pwm and IIO timer devices
+>> >
+>> > No need for this sentence.
+>> >
+>> OK
+>>
+>> >> +Required parameters:
+>> >> +- compatible: must be one of the follow value:
+>> >> +     "st,stm32-mfd-timer1"
+>> >> +     "st,stm32-mfd-timer2"
+>> >> +     "st,stm32-mfd-timer3"
+>> >> +     "st,stm32-mfd-timer4"
+>> >> +     "st,stm32-mfd-timer5"
+>> >> +     "st,stm32-mfd-timer6"
+>> >> +     "st,stm32-mfd-timer7"
+>> >> +     "st,stm32-mfd-timer8"
+>> >> +     "st,stm32-mfd-timer9"
+>> >> +     "st,stm32-mfd-timer10"
+>> >> +     "st,stm32-mfd-timer11"
+>> >> +     "st,stm32-mfd-timer12"
+>> >> +     "st,stm32-mfd-timer13"
+>> >> +     "st,stm32-mfd-timer14"
+>> >
+>> > We don't normally number devices.
+>> >
+>> > What's stopping you from simply doing:
+>> >
+>> >         pwm1: pwm1 at 40010000 {
+>> >                 compatible = "st,stm32-pwm";
+>> >         };
+>> >         pwm2: pwm1 at 40020000 {
+>> >                 compatible = "st,stm32-pwm";
+>> >         };
+>> >         pwm3: pwm1 at 40030000 {
+>> >                 compatible = "st,stm32-pwm";
+>> >         };
+>> >
+>>
+>> Because each instance of the hardware is slightly different: number of
+>> pwm channels, triggers capabilities, etc ..
+>> so I need to distinguish them.
+>> Since it look to be a problem I will follow your suggestion and add a
+>> property this driver to be able to identify each instance.
+>> Do you think that "id" parameter (integer for 1 to 14) is acceptable ?
+>
+> Unfortunately not. IDs aren't allowed in DT.
+>
+> What about "pwm-chans" and "trigger"?
+>
+> pwm-chans              : Number of available channels available
+
+For pwm I need those 4 properties:
+st,pwm-number: the number of PWM devices
+st,complementary: if exist have complementary ouput
+st,32bit-counter: if exist have 32 bits counter
+st,breakinput-polarity: if set enable break input feature.
+
+Is it acceptable from pwm maintainer point of view ?
+
+> trigger                : Boolean value specifying whether a timer is present
+
+Following our discussion on IRC I will try to code for your proposal:
+
+advanced-timer at 40010000 {
+        compatible = "st,stm32-advanced-timer";
+        reg = <0x40010000 0x400>;
+        clocks = <&rcc 0 160>;
+        clock-names = "clk_int";
+
+        pwm at 0 {
+                compatible = "st,stm32-pwm";
+                st,pwm-number= <4>;
+                st,complementary;
+                st,breakinput;
+        };
+
+        timer at 0 {
+                reg = <1>;
+                compatible = "st,stm32-iio-timer";
+                interrupts = <27>;
+                triggers = <5 2 3 4>;
+        };
+};
+
+triggers parameter will be used to know which trigger are valid for
+the IIO device
+
+[snip]
