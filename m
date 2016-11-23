@@ -1,41 +1,46 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 23 Nov 2016 19:34:46 +0000
-Subject: ath9k ARMv7 OOPS in v4.8.6, v4.2.8
-In-Reply-To: <87a8cqgfpp.fsf@kamboji.qca.qualcomm.com>
-References: <20161123191539.GF2799@io.lakedaemon.net>
- <87a8cqgfpp.fsf@kamboji.qca.qualcomm.com>
-Message-ID: <20161123193446.GG2799@io.lakedaemon.net>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 24 Nov 2016 03:40:36 +0800
+Subject: [PATCH 2/4] serial: 8250: Add LED trigger support
+In-Reply-To: <20161123100106.15969-3-s.hauer@pengutronix.de>
+Message-ID: <201611240333.mxPBkhqh%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kalle,
+Hi Sascha,
 
-On Wed, Nov 23, 2016 at 09:26:42PM +0200, Kalle Valo wrote:
-> Jason Cooper <jason@lakedaemon.net> writes:
-> > I have a Ubiquiti SR-71 mini-pcie ath9k card in a Globalscale Mirabox
-> > board (Marvell Armada 370 SoC).  Every day or so I get a consistent
-> > crash that brings down the whole board.  I've attached three oops I
-> > captured on the serial port.
-> >
-> > I looked at the commits from v4.8.6 to v4.9-rc6, and nothing jumped out
-> > at me as "this would fix it".  And since it takes a day or so to trigger
-> > the oops, bisecting would be a bit brutal.  Does anyone have any insight
-> > into this?
-> 
-> Is this a regression, meaning that it didn't crash on older kernels but
-> crashes on newer ones? Or has it always crashed?
+[auto build test ERROR on tty/tty-testing]
+[also build test ERROR on v4.9-rc6 next-20161123]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-iirc, it's always done this.  It's one of my spare wifi backhauls that
-spends most of it's time in a cardboard box waiting for a task,
-collecting dust.  Kinda like the toys in Toy Story.
+url:    https://github.com/0day-ci/linux/commits/Sascha-Hauer/serial-core-Add-LED-trigger-support/20161124-010846
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git tty-testing
+config: m32r-m32104ut_defconfig (attached as .config)
+compiler: m32r-linux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=m32r 
 
-I pulled it out a month or so ago and the behavior started.  It had
-4.2.8 on it at the time.  I upgraded to latest stable a few weeks ago
-(v4.8.6) and I'm getting the same issue.
+All errors (new ones prefixed by >>):
 
-When I originally set it up, it didn't run long enough for me to recall
-if the issue occurred.  Best I recall, that was with v4.2.8.
+>> ERROR: "uart_led_trigger_rx" [drivers/tty/serial/8250/8250_base.ko] undefined!
+>> ERROR: "uart_led_trigger_tx" [drivers/tty/serial/8250/8250_base.ko] undefined!
+>> ERROR: "uart_remove_led_triggers" [drivers/tty/serial/8250/8250.ko] undefined!
+>> ERROR: "uart_add_led_triggers" [drivers/tty/serial/8250/8250.ko] undefined!
+--
+>> ERROR: "uart_led_trigger_rx" [drivers/tty/serial/8250/8250_base.ko] undefined!
+>> ERROR: "uart_led_trigger_tx" [drivers/tty/serial/8250/8250_base.ko] undefined!
+>> ERROR: "uart_remove_led_triggers" [drivers/tty/serial/8250/8250.ko] undefined!
+>> ERROR: "uart_add_led_triggers" [drivers/tty/serial/8250/8250.ko] undefined!
 
-thx,
-
-Jason.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 10628 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161124/2ef736c6/attachment.gz>
