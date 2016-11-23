@@ -1,46 +1,105 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 23 Nov 2016 07:09:53 +0530
-Subject: [PATCH 0/2] kexec-tools: arm64: Add dcache enabling facility
-In-Reply-To: <8415f028-f42e-2980-9b60-e85aae046d02@infradead.org>
-References: <cover.1479788404.git.panand@redhat.com>
- <8415f028-f42e-2980-9b60-e85aae046d02@infradead.org>
-Message-ID: <3b5b6613-acb2-0888-a78c-6da69c1b55e0@redhat.com>
+From: npiggin@gmail.com (Nicholas Piggin)
+Date: Wed, 23 Nov 2016 12:40:17 +1100
+Subject: [PATCH 1/2] kbuild: provide include/asm/asm-prototypes.h for ARM
+In-Reply-To: <20161123004106.GA14217@n2100.armlinux.org.uk>
+References: <20161122110557.1533467-1-arnd@arndb.de>
+ <alpine.LFD.2.20.1611221106410.1814@knanqh.ubzr>
+ <20161123004106.GA14217@n2100.armlinux.org.uk>
+Message-ID: <20161123124017.648c44d9@roar.ozlabs.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
+On Wed, 23 Nov 2016 00:41:07 +0000
+Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 
-On Wednesday 23 November 2016 12:26 AM, Geoff Levand wrote:
-> Hi Pratyush,
->
-> On 11/21/2016 08:32 PM, Pratyush Anand wrote:
->> It takes more that 2 minutes to verify SHA in purgatory when vmlinuz
->> image
->> is around 13MB and initramfs is around 30MB. It takes more than 20 second
->> even when we have -O2 optimization enabled. However, if dcache is enabled
->> during purgatory execution then, it takes just a second in SHA
->> verification.
->
-> As I had mentioned in another thread, I think -O2 optimization is
-> sufficient considering the complexity of the code needed to enable
-> the dcache.  Integrity checking is only needed for crash dump
-> support.  If the crash reboot takes an extra 20 seconds does it
-> matter?
->
+> On Tue, Nov 22, 2016 at 11:34:48AM -0500, Nicolas Pitre wrote:
+> > On Tue, 22 Nov 2016, Arnd Bergmann wrote:  
+> > > This adds an asm/asm-prototypes.h header for ARM to fix the broken symbol
+> > > versioning for symbols exported from assembler files.
+> > > 
+> > > I couldn't find the correct prototypes for the compiler builtins,
+> > > so I went with the fake 'void f(void)' prototypes that we had
+> > > before, restoring the state before they were moved.
+> > > 
+> > > Originally I assumed that the problem was just a harmless warning
+> > > in unusual configurations, but as Uwe found, we actually need this
+> > > to load most modules when symbol versioning is enabled, as it is
+> > > in many distro kernels.
+> > > 
+> > > Cc: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+> > > Fixes: 4dd1837d7589 ("arm: move exports to definitions")
+> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > ---
+> > > Compared to the earlier version, I dropped the changes to the
+> > > csumpartial files, which now get handled correctly by Kbuild
+> > > even when the export comes from a macro, and I also dropped the
+> > > changes to the bitops files, which were already fixed in a
+> > > patch from Nico.
+> > > 
+> > > The patch applies cleanly on top of the rmk/fixes tree but has
+> > > no effect there, as it also needs 4efca4ed05cb ("kbuild: modversions
+> > > for EXPORT_SYMBOL() for asm") and cc6acc11cad1 ("kbuild: be more
+> > > careful about matching preprocessed asm ___EXPORT_SYMBOL").
+> > > 
+> > > With the combination of rmk/fixes, torvalds/master and these two
+> > > patches, symbol versioning works again on ARM. As it is still
+> > > broken on almost all other architectures (powerpc is fixed,
+> > > x86 has a patch), I wonder if we should make CONFIG_MODVERSIONS
+> > > as broken for everything else.  
+> > 
+> > I'm not sure I like this at all.
+> > 
+> > The goal for moving EXPORT_SYMBOL() to assembly code where symbols were 
+> > defined is to make things close together and avoid those centralized 
+> > list of symbols that you can easily miss when modifying the actual code.
+> > 
+> > This series is therefore bringing back a centralized list of symbols in 
+> > a slightly different form, nullifying the advantages from having moved 
+> > EXPORT_SYMBOL() to asm code.  To me this looks like a big step backward.
+> > 
+> > Why not simply extending the original idea of keeping exports close to 
+> > the actual code by _also_ having a macro that provides the function 
+> > prototype alongside the EXPORT_SYMBOL() instance?  That could even be 
+> > expressed with some EXPORT_SYMBOL_PROTO(ret, sym, arg...) macro that 
+> > does it all.  
+> 
+> What you're saying is that you don't like the solution that's taken
+> weeks to get merged up to this point, so where do we go from here
+> now?  This crap has been broken since 4.9-rc1, and is a regression.
+> 
+> I think at this point, we just declare that modversions are broken
+> on ARM, and those who created this mess get to explain to people
+> why the fsck they broke the kernel.
 
-Even this 20 second for kdump case is also annoying and this could 
-increase if the size of initramfs increases.
+Let's fix it instead :)
 
-Moreover, by default d-cache is still disabled, so even if it is complex 
-and you might see some instability, it will not affect the existing 
-systems. So, IMHO we should have this in the upstream.
+Why not merge Arnd's 2 patches? I think he mostly addressed your concerns
+of them. Or...
 
+> 
+> 4.9 is the next LTS kernel?  ROTFL!
+> 
+> I agree with Nicolas - it seems that the whole EXPORT_SYMBOL() crap
+> has just been a pointless exercise in churn, resulting only in
+> something "different" because it looks "cool" to do it some other
+> way.  There's no real benefit here at all, only harm.
+> 
+> Just revert the damned patches that created this breakage in the
+> first place please.  It's now way too late to be trying to fix it
+> any other way.
+> 
 
-> For the re-boot of a stable system where the new kernel is loaded
-> then immediately kexec'ed into integrity checking is not needed.
-> For that arm64 support needs to be added to kexec-lite.
+4dd1837d7589 diffstat is entirely in arch/arm. I think reverting that
+would fix it (I haven't tested it myself so I would advise testing
+before committing). So the ball is in your court.
 
-I think kexec-lite is a separate project and --lite in kexec-tools was 
-never acked. So, even for `kexec -l` it will be helpful.
+As for process concerns, you have made valid points. Sometimes a mistake
+is made or we make an incorrect assumption about how another person works
+or what mailing lists they have read, or do not anticipate the fallout
+from some change.
 
-~Pratyush
+Everyone does it sometimes, so it's never a bad time to reflect on how
+we work with others and try to do better.
+
+Thanks,
+Nick
