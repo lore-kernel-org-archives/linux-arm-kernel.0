@@ -1,114 +1,78 @@
-From: Joao.Pinto@synopsys.com (Joao Pinto)
-Date: Wed, 23 Nov 2016 11:43:39 +0000
-Subject: Synopsys Ethernet QoS Driver
-In-Reply-To: <899DC02E-84BB-489E-A1FE-5D8F3BB795B6@axis.com>
-References: <CADvZ6ErjyVR5ShWTk0QesWLYR1m3p8yAMkK8v9gm2kN5xTv8zw@mail.gmail.com>
- <1dbb6047-2bbb-4d56-2a62-ab65a0254844@synopsys.com>
- <20161119135654.GA14079@lnxartpec.se.axis.com>
- <CAJ3bTp7PpUJcz=1JohX=A54UP6vVAafWnB0PGUBSxb5JJiO8Lg@mail.gmail.com>
- <1248f4ce-4859-10e6-fef9-342ea543f8d4@synopsys.com>
- <87c8a24b-0812-7850-cb3f-7be691bab432@st.com>
- <BFA799B0-BB22-4515-AC14-3544A3167B0A@axis.com>
- <ffd3b27c-0bc9-b53b-cc65-c7808595a553@st.com>
- <b126021d-e902-7a53-4d7a-e73ea89a66cf@synopsys.com>
- <A001080B-2DC8-48D9-BD82-8276A9B3BE3D@axis.com>
- <7c7798b5-8cd4-ba99-f526-22d3e06e05db@synopsys.com>
- <2eefdb8f-7e87-6009-6e50-c536d4b95dd6@synopsys.com>
- <c37c47e1-8e21-1b11-ed15-6b899ed1dd03@st.com>
- <7c259adb-5c73-f997-6b96-5be427157b08@synopsys.com>
- <899DC02E-84BB-489E-A1FE-5D8F3BB795B6@axis.com>
-Message-ID: <f4dd5d22-4467-d046-6b65-2a28f3fc5a7c@synopsys.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 23 Nov 2016 17:17:43 +0530
+Subject: [PATCH 1/3] of: base: add support to get machine compatible string
+In-Reply-To: <2a644b8c-d91e-5ab1-200b-00f749a36307@arm.com>
+References: <1479811311-3080-1-git-send-email-bgolaszewski@baylibre.com>
+ <1479811311-3080-2-git-send-email-bgolaszewski@baylibre.com>
+ <5ce9fb9f-459a-562b-2e9f-85d35f9ec035@arm.com>
+ <67a3c2c7-0cb9-9764-2710-6ee66fc4dde4@ti.com>
+ <fdb93150-9089-c7bb-2b0a-21ded241a647@arm.com>
+ <ae92e013-b41b-6caa-b32f-284ffb6f5aa0@ti.com>
+ <2a644b8c-d91e-5ab1-200b-00f749a36307@arm.com>
+Message-ID: <ff1ea88a-87c6-6721-8e63-ddb05900cc58@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23-11-2016 11:41, Lars Persson wrote:
+On Wednesday 23 November 2016 03:35 PM, Sudeep Holla wrote:
 > 
->> 23 nov. 2016 kl. 12:11 skrev Joao Pinto <Joao.Pinto@synopsys.com>:
->>
->> Hi Peppe and Lars,
->>
->>> On 23-11-2016 10:59, Giuseppe CAVALLARO wrote:
->>> Hello Joao, Lars.
+> 
+> On 23/11/16 07:49, Sekhar Nori wrote:
+>> On Tuesday 22 November 2016 09:16 PM, Sudeep Holla wrote:
+>>> Hi Sekhar,
 >>>
->>>> On 11/22/2016 3:16 PM, Joao Pinto wrote:
->>>>>> Ok, it makes sense.
->>>>>> Just for curiosity the target setup is the following:
->>>>>> https://www.youtube.com/watch?v=8V-LB5y2Cos
->>>>>> but instead of using internal drivers, we desire to use mainline drivers only.
+>>> On 22/11/16 15:06, Sekhar Nori wrote:
+>>>> Hi Sudeep,
+>>>>
+>>>> On Tuesday 22 November 2016 04:23 PM, Sudeep Holla wrote:
+>>>>>
+>>>>>
+>>>>> On 22/11/16 10:41, Bartosz Golaszewski wrote:
+>>>>>> Add a function allowing to retrieve the compatible string of the root
+>>>>>> node of the device tree.
 >>>>>>
->>>>>> Thanks!
->>>> Regarding this subject, I am thinking of making the following adaption:
+>>>>>
+>>>>> Rob has queued [1] and it's in -next today. You can reuse that if you
+>>>>> are planning to target this for v4.11 or just use open coding in your
+>>>>> driver for v4.10 and target this move for v4.11 to avoid cross tree
+>>>>> dependencies as I already mentioned in your previous thread.
 >>>>
->>>> a) delete ethernet/synopsys
->>>> b) rename ethernet/stmicro/stmmac to ethernet/synopsys
+>>>> I dont have your original patch in my mailbox, but I wonder if
+>>>> returning a pointer to property string for a node whose reference has
+>>>> already been released is safe to do? Probably not an issue for the root
+>>>> node, but still feels counter-intuitive.
 >>>>
->>>> and send you a patch for you to evaluate. Both agree with the approach?
->>>> To have a new work base would be important, because I will add to the "new"
->>>> structure some missing QoS features like Multichannel support, CBS and later TSN.
 >>>
->>> IMO, we have to agree on a common strategy making the change for
->>> net-next; I imaged the following steps:
+>>> I am not sure if I understand the issue here. Are you referring a case
+>>> where of_root is freed ?
 >>
->> Yes it makes totally sense.
+>> Yes, right, thats what I was hinting at. Since you are giving up the
+>> reference to the device node before the function returns, the user can
+>> be left with a dangling reference.
 >>
->>>
->>> - to port missing feature or fixes from ethernet/synopsys
->>>  inside the stmmac taking care about the documentation too.
->>
->> @Lars: You are familiar with the synopsys qos driver. Could you please do this
->> porting. You can also make an analysis of what to port and I can do the porting
->> for you if you don't have the availability for it.
 > 
-> As my main duty is changing diapers until March next year, please go ahead with this step if you can spend time on it before I am back in office.
+> Yes I agree.
 
-Congratulations :)!
+So, the if(!of_node_get()) is just an expensive NULL pointer check. I think 
+it is better to be explicit about it by not using of_node_get/put() at all. 
+How about:
 
-> 
-> Rabin Vincent can review and test that the port works properly on our Artpec-chips that use dwc_eth_qos.c today.
-> 
-> The main porting step is to implement the device tree binding in bindings/net/snps,dwc-qos-ethernet.txt. Also our chip has a strict requirement that the phy is enabled when the SWR reset bit is set (it needs a tx clock to complete the reset).
-> 
-> - Lars
++int of_machine_get_model_name(const char **model)
++{
++       int error;
++
++       if (!of_root)
++               return -EINVAL;
++
++       error = of_property_read_string(of_root, "model", model);
++       if (error)
++               error = of_property_read_string_index(of_root, "compatible",
++                                                     0, model);
++       return error;
++}
++EXPORT_SYMBOL(of_machine_get_model_name);
 
-Ok, I will do the task.
+I know the patch is already in -next so I guess it depends on how strongly 
+Rob feels about this.
 
-@Peppe: Agree with the plan?
-
-> 
->>
->>> - remove ethernet/synopsys
->>> - rename ethernet/stmicro/stmmac to ethernet/synopsys
->>
->> I volunteer to do this task.
->>
->>>
->>>  These latest two have some relevant impacts.
->>>
->>>  This change should be propagated to all the platforms that are using:
->>>      CONFIG_SYNOPSYS_DWC_ETH_QOS and CONFIG_STMMAC_ETH
->>>  plus device-tree compatibility.
->>
->> I volunteer to do this task also.
->>
->>>
->>> - enhance the stmmac with new features and new glue (part of these
->>>  can be anticipated for sure).
->>
->> I have to implement 3 new features for now, but I will take some time for it, so
->> I would suggest to make the previous task and incrementally add features.
->>
->>>
->>> what do you think? does it make sense? If yes, we can also
->>> understand how/who starts.
->>>
->>> Regards,
->>> Peppe
->>
->> Thanks and regards.
->>
->> Joao
->>
->>>
->>>> Thanks.
->>>
->>
+Thanks,
+Sekhar
