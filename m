@@ -1,105 +1,83 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 24 Nov 2016 04:07:48 +0800
-Subject: [PATCH 1/4] serial: core: Add LED trigger support
-In-Reply-To: <20161123100106.15969-2-s.hauer@pengutronix.de>
-Message-ID: <201611240407.mIazfoB3%fengguang.wu@intel.com>
+From: ddutile@redhat.com (Don Dutile)
+Date: Wed, 23 Nov 2016 15:12:41 -0500
+Subject: Summary of LPC guest MSI discussion in Santa Fe
+In-Reply-To: <83d7bf8e-1aa9-b61b-4e83-ba9da1926d19@jonmasters.org>
+References: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
+ <20161103220205.37715b49@t450s.home> <20161108024559.GA20591@arm.com>
+ <83d7bf8e-1aa9-b61b-4e83-ba9da1926d19@jonmasters.org>
+Message-ID: <5835F839.40905@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On 11/21/2016 12:13 AM, Jon Masters wrote:
+> On 11/07/2016 07:45 PM, Will Deacon wrote:
+>
+>> I figured this was a reasonable post to piggy-back on for the LPC minutes
+>> relating to guest MSIs on arm64.
+>
+> Thanks for this Will. I'm still digging out post-LPC and SC16, but the
+> summary was much appreciated, and I'm glad the conversation is helping.
+>
+>>    1. The physical memory map is not standardised (Jon pointed out that
+>>       this is something that was realised late on)
+>
+> Just to note, we discussed this one about 3-4 years ago. I recall making
+> a vigorous slideshow at a committee meeting in defense of having a
+> single memory map for ARMv8 servers and requiring everyone to follow it.
+> I was weak. I listened to the comments that this was "unreasonable".
+> Instead, I consider it was unreasonable of me to not get with the other
+> OS vendors and force things to be done one way. The lack of a "map at
+> zero" RAM location on ARMv8 has been annoying enough for 32-bit DMA only
+> devices on 64-bit (behind an SMMU but in passthrough mode it doesn't
+> help) and other issues beyond fixing the MSI doorbell regions. If I ever
+> have a time machine, I tried harder.
+>
+>> Jon pointed out that most people are pretty conservative about hardware
+>> choices when migrating between them -- that is, they may only migrate
+>> between different revisions of the same SoC, or they know ahead of time
+>> all of the memory maps they want to support and this could be communicated
+>> by way of configuration to libvirt.
+>
+> I think it's certainly reasonable to assume this in an initial
+> implementation and fix it later. Currently, we're very conservative
+> about host CPU passthrough anyway and can't migrate from one microarch
+> to another revision of the same microarch even. And on x86, nobody
+> really supports e.g. Intel to AMD and back again. I've always been of
+Thats primarily due to diff virt implentations ... vme vs svm.
+1) thats not the case here; can argue cross arch variations .. gicv2 vs gicv3 vs gicv4 ...
+    but cross vendor should work if arch and common feature map (like x86 libvirt can resolve)
+    is provided
+2) second chance to do it better; look n learn!
+    and common thread i am trying to drive home here ... learn from past mistakes *and* good choices.
 
-[auto build test WARNING on tty/tty-testing]
-[also build test WARNING on v4.9-rc6 next-20161123]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-url:    https://github.com/0day-ci/linux/commits/Sascha-Hauer/serial-core-Add-LED-trigger-support/20161124-010846
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git tty-testing
-reproduce: make htmldocs
-
-All warnings (new ones prefixed by >>):
-
-   make[3]: warning: jobserver unavailable: using -j1.  Add '+' to parent make rule.
-   include/linux/init.h:1: warning: no structured comments found
-   include/linux/workqueue.h:392: warning: No description found for parameter '...'
-   include/linux/workqueue.h:392: warning: Excess function parameter 'args' description in 'alloc_workqueue'
-   include/linux/workqueue.h:413: warning: No description found for parameter '...'
-   include/linux/workqueue.h:413: warning: Excess function parameter 'args' description in 'alloc_ordered_workqueue'
-   include/linux/kthread.h:26: warning: No description found for parameter '...'
-   kernel/sys.c:1: warning: no structured comments found
-   drivers/dma-buf/seqno-fence.c:1: warning: no structured comments found
-   include/linux/fence-array.h:61: warning: No description found for parameter 'fence'
->> drivers/tty/serial/serial_core.c:2773: warning: Excess function parameter 'drv' description in 'uart_remove_led_triggers'
-   include/sound/core.h:324: warning: No description found for parameter '...'
-   include/sound/core.h:335: warning: No description found for parameter '...'
-   include/sound/core.h:388: warning: No description found for parameter '...'
-   include/media/media-entity.h:1054: warning: No description found for parameter '...'
-   include/net/mac80211.h:2148: WARNING: Inline literal start-string without end-string.
-   include/net/mac80211.h:2153: WARNING: Inline literal start-string without end-string.
-   include/net/mac80211.h:3202: ERROR: Unexpected indentation.
-   include/net/mac80211.h:3205: WARNING: Block quote ends without a blank line; unexpected unindent.
-   include/net/mac80211.h:3207: ERROR: Unexpected indentation.
-   include/net/mac80211.h:3208: WARNING: Block quote ends without a blank line; unexpected unindent.
-   include/net/mac80211.h:1435: WARNING: Inline emphasis start-string without end-string.
-   include/net/mac80211.h:1172: WARNING: Inline literal start-string without end-string.
-   include/net/mac80211.h:1173: WARNING: Inline literal start-string without end-string.
-   include/net/mac80211.h:814: ERROR: Unexpected indentation.
-   include/net/mac80211.h:815: WARNING: Block quote ends without a blank line; unexpected unindent.
-   include/net/mac80211.h:820: ERROR: Unexpected indentation.
-   include/net/mac80211.h:821: WARNING: Block quote ends without a blank line; unexpected unindent.
-   include/net/mac80211.h:2489: ERROR: Unexpected indentation.
-   include/net/mac80211.h:1768: ERROR: Unexpected indentation.
-   include/net/mac80211.h:1772: WARNING: Block quote ends without a blank line; unexpected unindent.
-   include/net/mac80211.h:1746: WARNING: Inline emphasis start-string without end-string.
-   kernel/sched/fair.c:7259: WARNING: Inline emphasis start-string without end-string.
-   kernel/time/timer.c:1240: ERROR: Unexpected indentation.
-   kernel/time/timer.c:1242: ERROR: Unexpected indentation.
-   kernel/time/timer.c:1243: WARNING: Block quote ends without a blank line; unexpected unindent.
-   include/linux/wait.h:121: WARNING: Block quote ends without a blank line; unexpected unindent.
-   include/linux/wait.h:124: ERROR: Unexpected indentation.
-   include/linux/wait.h:126: WARNING: Block quote ends without a blank line; unexpected unindent.
-   kernel/time/hrtimer.c:1021: WARNING: Block quote ends without a blank line; unexpected unindent.
-   kernel/signal.c:317: WARNING: Inline literal start-string without end-string.
-   drivers/base/firmware_class.c:1348: WARNING: Bullet list ends without a blank line; unexpected unindent.
-   drivers/message/fusion/mptbase.c:5054: WARNING: Definition list ends without a blank line; unexpected unindent.
-   drivers/tty/serial/serial_core.c:1897: WARNING: Definition list ends without a blank line; unexpected unindent.
-   include/linux/spi/spi.h:369: ERROR: Unexpected indentation.
-   WARNING: dvipng command 'dvipng' cannot be run (needed for math display), check the imgmath_dvipng setting
-
-vim +2773 drivers/tty/serial/serial_core.c
-
-  2757	err_alloc:
-  2758		kfree(uport->led_trigger_tx_name);
-  2759		kfree(uport->led_trigger_rx_name);
-  2760	
-  2761		return ret;
-  2762	}
-  2763	
-  2764	/**
-  2765	 *	uart_remove_led_triggers - remove LED triggers
-  2766	 *	@drv: pointer to the uart low level driver structure for this port
-  2767	 *	@uport: uart port structure to use for this port.
-  2768	 *
-  2769	 *	Remove LED triggers previously registered with uart_add_led_triggers
-  2770	 */
-  2771	void uart_remove_led_triggers(struct uart_port *uport)
-  2772	{
-> 2773		if (uport->led_trigger_rx)
-  2774			led_trigger_unregister_simple(uport->led_trigger_rx);
-  2775		kfree(uport->led_trigger_rx_name);
-  2776	
-  2777		if (uport->led_trigger_tx)
-  2778			led_trigger_unregister_simple(uport->led_trigger_tx);
-  2779		kfree(uport->led_trigger_tx_name);
-  2780	}
-  2781	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 6425 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161124/298326e0/attachment.gz>
+> the mind that we should ensure the architecture can handle this, but
+> then cautiously approach this with a default to not doing it.
+>
+>> Alex asked if there was a security
+>> issue with DMA bypassing the SMMU, but there aren't currently any systems
+>> where that is known to happen. Such a system would surely not be safe for
+>> passthrough.
+>
+> There are other potential security issues that came up but don't need to
+> be noted here (yet). I have wanted to clarify the SBSA for a long time
+> when it comes to how IOMMUs should be implemented. It's past time that
+> we went back and had a few conversations about that. I've poked.
+>
+>> Ben mused that a way to handle conflicts dynamically might be to hotplug
+>> on the entire host bridge in the guest, passing firmware tables describing
+>> the new reserved regions as a property of the host bridge. Whilst this
+>> may well solve the issue, it was largely considered future work due to
+>> its invasive nature and dependency on firmware tables (and guest support)
+>> that do not currently exist.
+>
+> Indeed. It's an elegant solution (thanks Ben) that I gather POWER
+> already does (good for them). We've obviously got a few things to clean
+> up after we get the basics in place. Again, I think we can consider it
+> reasonable that the MSI doorbell regions are predetermined on system A
+> well ahead of any potential migration (that may or may not then work)
+> for the moment. Vendors will want to loosen this later, and they can
+> drive the work to do that, for example by hotplugging a host bridge.
+>
+> Jon.
+>
