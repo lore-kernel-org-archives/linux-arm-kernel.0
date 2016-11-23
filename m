@@ -1,406 +1,87 @@
-From: uwe@kleine-koenig.org (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 23 Nov 2016 09:19:23 +0100
-Subject: [RFC PATCH] ARM: dts: Add support for Turris Omnia
-In-Reply-To: <1479859770-9375-1-git-send-email-tmshlvck@gmail.com>
-References: <1479851991.26813.2@smtp.gmail.com>
- <1479859770-9375-1-git-send-email-tmshlvck@gmail.com>
-Message-ID: <20161123081923.p5eqgxf33mtqiqza@perseus.defre.kleine-koenig.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 23 Nov 2016 09:19:59 +0100
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.10
+In-Reply-To: <CAOesGMimsQphE4TzrJ7EPpp90VQG23vGP3jVrJK3qQrZgNEd3g@mail.gmail.com>
+References: <cover.1479387356.git.horms+renesas@verge.net.au>
+ <20161119012836.GA2543@localhost>
+ <CAMuHMdXAuDcbr84phfPRpqZYRzAZf2j4vsv+i_Frz0G8ksd_Vg@mail.gmail.com>
+ <CAOesGMjk=KWifGT7sugpWVjNJSKhmgxg8gN9Cgi=emGrg66z0w@mail.gmail.com>
+ <CAMuHMdUhpeiOj6Mjhgt=9R3yuV-HwOAy5AAsDSTDjagRRDtYCw@mail.gmail.com>
+ <CAOesGMj47EZ1Zjc41VV2D-cM5XUsK28PDF-jSHKUkkind32ZRA@mail.gmail.com>
+ <CAMuHMdUtu9N28rOb+813DumtbyAZJB3G+euD0mwwXD_jCiXrRg@mail.gmail.com>
+ <CAOesGMimsQphE4TzrJ7EPpp90VQG23vGP3jVrJK3qQrZgNEd3g@mail.gmail.com>
+Message-ID: <CAMuHMdVs=SCTEmdckD6FNF89Xi2deRQwnukV9azpcBWUnp5HSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tomas,
+Hi Olof,
 
-calling it v4 would be nice.
+On Wed, Nov 23, 2016 at 12:30 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, Nov 22, 2016 at 1:56 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+>> On Mon, Nov 21, 2016 at 5:35 PM, Olof Johansson <olof@lixom.net> wrote:
+>>> On Mon, Nov 21, 2016 at 8:27 AM, Geert Uytterhoeven
+>>> <geert@linux-m68k.org> wrote:
+>>>> On Mon, Nov 21, 2016 at 5:19 PM, Olof Johansson <olof@lixom.net> wrote:
+>>>>> On Mon, Nov 21, 2016 at 1:31 AM, Geert Uytterhoeven
+>>>>> <geert@linux-m68k.org> wrote:
+>>>>>> On Sat, Nov 19, 2016 at 2:28 AM, Olof Johansson <olof@lixom.net> wrote:
+>>>>>>> Is there a reason you're adding a config option per SoC?
+>>>>>>>
+>>>>>>> I think you'd be better off not adding these config options, and just adding
+>>>>>>> support for the SoCs through compatibles (and adding the drivers to defconfigs,
+>>>>>>> etc).
+>>>>>>
+>>>>>> Yes there is a reason: kernel size.
+>>>>>> The main offenders are the pinctrl tables, which add ca. 20-50 KiB per
+>>>>>> supported SoC.
+>>>>>
+>>>>> So don't turn on that pinctrl driver unless you have that SoC?
+>>>>
+>>>> The enablement of the pinctrl driver (and the clock driver, FWIW) is controlled
+>>>> by the SoC Kconfig symbol. If you want support for the SoC, you want the
+>>>> pinctrl driver, too.
+>>>
+>>> Oh, that's trivial to fix! Do as almost all other SoCs do, and don't
+>>> use silent options.
+>>
+>> What does that gain us? The ability to enable support for an SoC, without
+>> enabling the accompanying pinctrl driver, leading to a non-booting system?
+>
+> It doesn't enable anything new, it just makes it less awkward for you
+> to add new SoCs in the future without creating dependencies on new
+> Kconfig symbols in the arch directory.
+>
+>> As soon as you have any pinctrl properties in the DT, you need the pinctrl
+>> driver. Unless you disable CONFIG_PINCTRL (it's selected, and not
+>> user-controlled), and rely on fragile reset state/boot loader.
+>>
+>> Pinctrl (and clock and irqchip) on-SoC drivers are special: if you fail to
+>> include them, the system won't boot.
+>
+> This isn't about booting without a pinctrl driver. It's about avoiding
+> adding new config symbols when they're not needed.
+>
+> I started out comparing your way of using config options with, for
+> example, Exynos that has a bunch of different SoCs enabled. Having
+> dependencies described clearly has some value, since it can be hard to
+> know if you can turn off a driver and still have a bootable system
+> with some of the other platforms.
+>
+> That being said, I think you should look at changing how you use your
+> config options to make it less messy to add new ones:
 
-On Wed, Nov 23, 2016 at 01:09:20AM +0100, Tomas Hlavacek wrote:
-> Turris Omnia board by CZ.NIC:
-> 
->   * Marvell Armada 385 SoC
->   * 1 or 2 GB DDR3
->   * eMMC
->   * 8 MB SPI flash (U-Boot and rescue Linux image)
->   * 88E1514 PHY
->   * 88E6176 Ethernet switch (not supported)
-> 
-> Supported board revision: CZ11NIC13 (production board).
-> 
-> Signed-off-by: Tomas Hlavacek <tmshlvck@gmail.com>
+[...]
 
-As you picked my v3, you should keep my S-o-b.
+Thanks, I'll have a look to see if we can improve things...
 
-> ---
-> Changes since Uwe's version:
-> 
-> - add MBUS regions (needed for Marvell CESA)
-> - remove rtc disable (WFM with CZ11NIC13 = production board)
+Gr{oetje,eeting}s,
 
-If I do
+                        Geert
 
-	mw 0xf10184a0 0xfd4d4cfa
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-in the boot loader, it seems to work for me, too. You don't need that?
-
-> - cleanup comments
-> 
-> Unsupported peripherals:
-> - MV88E7176 switch
-> - SFP
-> - LEDs
-
-LEDs is not that bad IMHO, because they work. You just cannot change
-their function, but they blink according to their default trigger.
- 
-> ---
->  arch/arm/boot/dts/Makefile                    |   1 +
->  arch/arm/boot/dts/armada-385-turris-omnia.dts | 279 ++++++++++++++++++++++++++
->  2 files changed, 280 insertions(+)
->  create mode 100644 arch/arm/boot/dts/armada-385-turris-omnia.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index befcd26..f1d3b9ff 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -920,6 +920,7 @@ dtb-$(CONFIG_MACH_ARMADA_38X) += \
->  	armada-385-db-ap.dtb \
->  	armada-385-linksys-caiman.dtb \
->  	armada-385-linksys-cobra.dtb \
-> +	armada-385-turris-omnia.dtb \
->  	armada-388-clearfog.dtb \
->  	armada-388-db.dtb \
->  	armada-388-gp.dtb \
-> diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-> new file mode 100644
-> index 0000000..5ef3d62
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-> @@ -0,0 +1,279 @@
-> +/*
-> + * Device Tree file for the Turris Omnia
-> + * Schematic available at https://www.turris.cz/doc/_media/rtrom01-schema.pdf
-> + *
-> + * Copyright (C) 2016 Uwe Kleine-K?nig <uwe@kleine-koenig.org>
-> + * Copyright (C) 2016 Tomas Hlavacek <tmshlvkc@gmail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is licensed under the terms of the GNU General Public
-> + *     License version 2.  This program is licensed "as is" without
-> + *     any warranty of any kind, whether express or implied.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +#include "armada-385.dtsi"
-> +
-> +/ {
-> +	model = "Turris Omnia";
-> +	compatible = "cznic,turris-omnia", "marvell,armada385", \
-> +			"marvell,armada380";
-
-You don't need a \ here AFAIK.
-
-> +
-> +	chosen {
-> +		stdout-path = &uart0;
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x40000000>; /* 1024 MB */
-> +	};
-> +
-> +	soc {
-> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
-> +			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
-> +			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
-> +			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
-> +
-> +		internal-regs {
-> +
-> +			/* USB part of the PCIe2/USB 2.0 port */
-> +			usb at 58000 {
-> +				status = "okay";
-> +			};
-> +
-> +			sata at a8000 {
-> +				status = "okay";
-> +			};
-> +
-> +			sdhci at d8000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&sdhci_pins>;
-> +				status = "okay";
-> +
-> +				bus-width = <8>;
-> +				no-1-8-v;
-> +				non-removable;
-> +			};
-> +
-> +			usb3 at f0000 {
-> +				status = "okay";
-> +			};
-> +
-> +			usb3 at f8000 {
-> +				status = "okay";
-> +			};
-> +		};
-> +
-> +		pcie-controller {
-> +			status = "okay";
-> +
-> +			pcie at 1,0 {
-> +				/* Port 0, Lane 0 */
-> +				status = "okay";
-> +			};
-> +
-> +			pcie at 2,0 {
-> +				/* Port 1, Lane 0 */
-> +				status = "okay";
-> +			};
-> +
-> +			pcie at 3,0 {
-> +				/* Port 2, Lane 0 */
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +/* Connected to 88E6176 switch, port 6 */
-> +&eth0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&ge0_rgmii_pins>;
-> +	status = "okay";
-> +	phy-mode = "rgmii-id";
-> +
-> +	fixed-link {
-> +		speed = <1000>;
-> +		full-duplex;
-> +	};
-> +};
-> +
-> +/* Connected to 88E6176 switch, port 5 */
-> +&eth1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&ge1_rgmii_pins>;
-> +	status = "okay";
-> +	phy-mode = "rgmii-id";
-> +
-> +	fixed-link {
-> +		speed = <1000>;
-> +		full-duplex;
-> +	};
-> +};
-> +
-> +/* WAN port */
-> +&eth2 {
-> +	status = "okay";
-> +	phy-mode = "sgmii";
-> +	phy = <&phy1>;
-> +};
-> +
-> +&i2c0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c0_pins>;
-> +	status = "okay";
-> +
-> +	i2cmux at 70 {
-> +		compatible = "nxp,pca9547";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		reg = <0x70>;
-> +		status = "okay";
-> +
-> +		i2c at 0 {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0>;
-> +			status = "okay";
-> +
-> +			/* STM32F0 command interface at address 0x2a.
-> +			 * STM32F0 LED interface at address 0x2b.
-> +			 */
-
-Should this better be:
-
-			/*
-			 * STM32F0 command interface at address 0x2a.
-			 * STM32F0 LED interface at address 0x2b.
-			 */
-
-As is recommended for comments in .c?
-
-> +
-> +			eeprom at 54 {
-> +				compatible = "at,24c64";
-> +				reg = <0x54>;
-> +
-> +				/* The EEPROM contains data for bootloader.
-> +				 * Contents:
-> +				 *	struct omnia_eeprom {
-> +				 *		u32 magic; (=0x0341a034)
-> +				 *		u32 ramsize;
-ramsize in GiB?
-
-> +				 *		char region[4] (=0x0);
-This is for the WLAN regdomain, right?
-
-> +				 *		u32 crc32;
-> +				 *	};
-> +				 */
-ditto for the comment format.
-
-> +			};
-> +		};
-> +
-> +		/* Channel 1: Routed to PCIe0/mSATA connector (CN7A).
-> +		 * Channel 2: Routed to PCIe1/USB2 connector (CN61A).
-> +		 * Channel 3: Routed to PCIe2 connector (CN62A).
-> +		 * Channel 4: Routed to SFP+.
-> +		 * Channel 5: ATSHA204A at address 0x64.
-> +		 * Channel 6: Routed to user pin header CN11.
-> +		 */
-I'd like to keep the busses as Andrew already pointed out. For example
-this might make it possible to use i2c-tools to read out the mac address
-from the ATSHA.
-
-> +		i2c at 7 {
-> +			/* GPIO expander for SFP+ signals */
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <7>;
-> +
-> +			wangpio: gpio at 71 {
-> +				compatible = "nxp,pca9538";
-> +				reg = <0x71>;
-> +				interrupt-parent = <&gpio1>;
-> +				interrupts = <14 IRQ_TYPE_LEVEL_LOW>;
-> +				gpio-controller;
-> +				#gpio-cells = <2>;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&mdio {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mdio_pins>;
-> +	status = "okay";
-> +
-> +	phy1: phy at 1 {
-> +		status = "okay";
-> +		compatible = "ethernet-phy-id0141.0DD1", \
-> +				"ethernet-phy-ieee802.3-c22";
-
-Drop the \
-
-> +		reg = <1>;
-> +		/* IRQ is connected to PCA9538 pin 7. Currently it
-> +		 * can not be utilized.
-> +		 */
-> +	};
-> +
-> +	/* Switch MV88E7176 at address 0x10. */
-> +};
-> +
-> +&pinctrl {
-> +	spi0cs1_pins: spi0-pins-0cs1 {
-> +		marvell,pins = "mpp26";
-> +		marvell,function = "spi0";
-> +	};
-
-Why did you drop the pcawan pinctrl?
-
-> +};
-> +
-> +&spi0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&spi0_pins &spi0cs1_pins>;
-
-Oh, this is wrong (already in my patch): this is cs0 not cs1.
-
-> +	status = "okay";
-> +
-> +	spi-nor at 0 {
-> +		compatible = "spansion,s25fl164k", "jedec,spi-nor";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		reg = <0>;
-> +		spi-max-frequency = <40000000>;
-> +
-> +		partition at 0 {
-> +			reg = <0x0 0x00100000>;
-> +			label = "U-Boot";
-> +		};
-> +
-> +		partition at 1 {
-> +			reg = <0x00100000 0x00700000>;
-> +			label = "Rescue system";
-> +		};
-> +	};
-> +
-> +	/* SPI0 + CS1 (MPP26) is routed to a pin header CN11. */
-
-Looks strange. What about
-
-	/* MISO, MOSI, SCLK and CS1 are routed to pin header CN11 */
-
-Maybe also add the node for this pin to &pinctrl, but don't use it in
-&spi0.pinctrl-0? This would nicely document the MPP26 part.
-
-> +};
-> +
-> +&uart0 {
-> +	/* Pin header CN10. */
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart0_pins>;
-> +	status = "okay";
-> +};
-> +
-> +&uart1 {
-> +	/* Pin header CN11. */
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart1_pins>;
-> +	status = "okay";
-> +};
-> +
-
-Trailing new line
-
-Best regards
-Uwe
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161123/dac38887/attachment-0001.sig>
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
