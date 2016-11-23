@@ -1,29 +1,30 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 23 Nov 2016 14:19:09 +0100
-Subject: [PATCH 3/3] arm64: dts: r8a7796: Add CAN FD support
-In-Reply-To: <1479903288-2009-1-git-send-email-chris.paterson2@renesas.com>
-References: <1479903288-2009-1-git-send-email-chris.paterson2@renesas.com>
-Message-ID: <CAMuHMdW=kLVDU+7qXJWDUb0s1ZzJeGhJnYje7wU59TC7iVG35Q@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed, 23 Nov 2016 14:36:16 +0100
+Subject: [PATCH] arm64: defconfig: Do not lower CONFIG_LOG_BUF_SHIFT
+Message-ID: <1479908176-13625-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2016 at 1:14 PM, Chris Paterson
-<chris.paterson2@renesas.com> wrote:
-> Adds CAN FD controller node for r8a7796.
->
-> Based on a patch for r8a7795 by Ramesh Shanmugasundaram.
->
-> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+The default value of 17 for CONFIG_LOG_BUF_SHIFT is much more suitable
+than 14. The latter easily leads to lost kernel messages on systems with
+only one CPU core.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm64/configs/defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 0e41290f6cbb4101..f284568373adf917 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -11,7 +11,6 @@ CONFIG_TASK_XACCT=y
+ CONFIG_TASK_IO_ACCOUNTING=y
+ CONFIG_IKCONFIG=y
+ CONFIG_IKCONFIG_PROC=y
+-CONFIG_LOG_BUF_SHIFT=14
+ CONFIG_MEMCG=y
+ CONFIG_MEMCG_SWAP=y
+ CONFIG_BLK_CGROUP=y
+-- 
+1.9.1
