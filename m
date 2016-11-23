@@ -1,42 +1,84 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Nov 2016 21:17:45 +0000
-Subject: ath9k ARMv7 OOPS in v4.8.6, v4.2.8
-In-Reply-To: <20161123205917.GI2799@io.lakedaemon.net>
-References: <20161123191539.GF2799@io.lakedaemon.net>
- <20161123195120.GE14217@n2100.armlinux.org.uk>
- <20161123205917.GI2799@io.lakedaemon.net>
-Message-ID: <20161123211745.GF14217@n2100.armlinux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 23 Nov 2016 21:25:06 +0000
+Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire
+ section
+In-Reply-To: <20161123211538.GH10776@rric.localdomain>
+References: <CAKv+Gu-oYzSn_eeqaX3QVFeQjBGkaX-Wh7+oPcQFcXv7J6GOFQ@mail.gmail.com>
+ <20161006161114.GH22012@rric.localdomain>
+ <20161017185801.GT25086@rric.localdomain>
+ <20161027160136.GD24290@arm.com> <20161028091905.GM22012@rric.localdomain>
+ <20161107210514.GP20591@arm.com> <20161109195132.GZ22012@rric.localdomain>
+ <20161117142528.GJ22855@arm.com> <20161117151805.GJ2151@rric.localdomain>
+ <CAKv+Gu-2uGJGovqQL-gbB54u=fQ9L9YUbDdRo6u3oWqF6znn6Q@mail.gmail.com>
+ <20161123211538.GH10776@rric.localdomain>
+Message-ID: <CAKv+Gu8aWpz5vXSWdKHwL5Xk2aWyQBOoR1WHOnVPaWZOwqojBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2016 at 08:59:17PM +0000, Jason Cooper wrote:
-> As requested on irc:
+On 23 November 2016 at 21:15, Robert Richter <robert.richter@cavium.com> wrote:
+> On 20.11.16 17:07:44, Ard Biesheuvel wrote:
+>> On 17 November 2016 at 15:18, Robert Richter <robert.richter@cavium.com> wrote:
+>
+>> > The risk of breaking something with my patch is small and limited only
+>> > to the mapping of efi reserved regions (which is the state of 4.4). If
+>> > something breaks anyway it can easily be fixed by adding more checks
+>> > to pfn_valid() as suggested above.
+>> >
+>>
+>> As I noted before, it looks to me like setting CONFIG_HOLES_IN_ZONE is
+>> the correct way to address this. However, doing that does uncover a
+>> bug in move_freepages() where the VM_BUG_ON_PAGE() dereferences struct
+>> page fields before the pfn_valid_within() check, so it seems those
+>> need to be switched around.
+>>
+>> Robert, you mentioned that CONFIG_HOLES_IN_ZONE seems inappropriate
+>> for sparsemem. Care to elaborate why?
+>
+> HOLES_IN_ZONE is of rare use in the kernel. I think it was introduced
+> to save memory for the memmap and only some single systems enable it.
+> There is no architecture that enables it entirely. For good reasons...
+>
+> It introduces additional checks. pfn_valid() is usually checked only
+> once for the whole memmap. There are a number of checks enabled, just
+> grep for pfn_valid_within. This will increase the number of
+> pfn_valid() calls by a factor of MAX_ORDER_NR_PAGES, in my config this
+> is 8k. So, this is not the direction to go.
+>
 
-Thanks.
+That does sound like a potential issue. But does it cause any slowdown
+in practice?
 
->      7f0:	ea000002 	b	800 <ath_cmn_process_fft+0xac>
->      7f4:	e7970102 	ldr	r0, [r7, r2, lsl #2]
->      7f8:	ebfffffe 	bl	0 <relay_buf_full>
->      7fc:	e0844000 	add	r4, r4, r0
->      800:	e300a000 	movw	sl, #0
->      804:	e28b2001 	add	r2, fp, #1
->      808:	e340a000 	movt	sl, #0
->      80c:	e3a01004 	mov	r1, #4
->      810:	e1a0000a 	mov	r0, sl
->      814:	ebfffffe 	bl	0 <_find_next_bit_le>
->      818:	e5953000 	ldr	r3, [r5]
->      81c:	e1500003 	cmp	r0, r3
->      820:	e1a0b000 	mov	fp, r0
->      824:	e2802008 	add	r2, r0, #8
->      828:	bafffff1 	blt	7f4 <ath_cmn_process_fft+0xa0>
+The reality is that CONFIG_HOLES_IN_ZONE perfectly describes the
+situation, and so it is still my preferred option if the performance
+hit is tolerable.
 
-Okay, so i was 0, so running UP probably isn't going to help.  r7 is
-also spec_priv->rfs_chan_spec_scan.
+> My patch fixes a regression in the kernel that was introduced by the
+> nomap implementation. Some systems can not boot anymore, beside of
+> that the BUG_ON() may occur any time depending only on physical page
+> access, we need to fix 4.9. Here is a reproducer:
+>
+>  https://patchwork.kernel.org/patch/9407677/
+>
+> My patch also does not break memremap(). With my patch applied
+> try_ram_remap() would return a linear addr for nomap regions. But this
+> is only called if WB is explicitly requested, so it should not happen.
 
-So, I think the question is... how is this NULL - and has it always
-been NULL...
+Why? MEMREMAP_WB is used often, among other things for mapping
+firmware tables, which are marked as NOMAP, so in these cases, the
+linear address is not mapped.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> If you think pfn_valid() is wrong here, I am happy to send a patch
+> that fixes this by using page_is_ram(). In any case, the worst case
+> that may happen is to behave the same as v4.4, we might fix then the
+> wrong use of pfn_valid() where it is not correctly used to check for
+> ram.
+>
+
+page_is_ram() uses string comparisons to look for regions called
+'System RAM'. Is that something we can tolerate for each pfn_valid()
+calll?
+
+Perhaps the solution is to reimplement page_is_ram() for arm64 using
+memblock_is_memory() instead, But that still means we need to modify
+the generic memremap() code first to switch to it before changing the
+arm64 implementation of pfn_valid
