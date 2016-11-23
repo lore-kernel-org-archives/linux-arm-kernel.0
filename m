@@ -1,61 +1,108 @@
-From: tomas.hlavacek@nic.cz (tomas.hlavacek at nic.cz)
-Date: Wed, 23 Nov 2016 23:45:20 +0100
-Subject: [PATCH RFC] ARM: dts: add support for Turris Omnia
-In-Reply-To: <20161123145916.GL14947@lunn.ch>
-References: <20161105203841.9661-1-uwe@kleine-koenig.org>
- <1479126185.15557.5@smtp.gmail.com>
- <20161114201640.rr32iyjf5a53v33t@perseus.defre.kleine-koenig.org>
- <20161114202832.GG24546@lunn.ch> <1479586147.10840.0@smtp.gmail.com>
- <20161120203037.pd5mhqyjeotileve@perseus.defre.kleine-koenig.org>
- <1479851991.26813.2@smtp.gmail.com> <20161123145916.GL14947@lunn.ch>
-Message-ID: <1479941120.10840.13@smtp.gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Wed, 23 Nov 2016 16:48:11 -0600
+Subject: [PATCH v2] ARM: dts: da850: add the mstpri and ddrctl nodes
+In-Reply-To: <m2bmx5x1y2.fsf@baylibre.com>
+References: <1479207611-18028-1-git-send-email-bgolaszewski@baylibre.com>
+ <a39b9276-865b-6382-574e-a5ef040a452f@lechnology.com>
+ <CAMpxmJVqog0Fno_DO0NQKmVNvzu5d=3GOLk145wBmB-V70BLeg@mail.gmail.com>
+ <5e647eb0-2f8a-b46b-2048-7616bfb54ad7@lechnology.com>
+ <m2bmx5x1y2.fsf@baylibre.com>
+Message-ID: <f88df859-3c0f-38f2-275d-ce6a9996fb6e@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew!
+On 11/23/2016 04:32 PM, Kevin Hilman wrote:
+> David Lechner <david@lechnology.com> writes:
+>
+>> On 11/23/2016 04:27 AM, Bartosz Golaszewski wrote:
+>>> 2016-11-22 23:23 GMT+01:00 David Lechner <david@lechnology.com>:
+>>>> On 11/15/2016 05:00 AM, Bartosz Golaszewski wrote:
+>>>>>
+>>>>> Add the nodes for the MSTPRI configuration and DDR2/mDDR memory
+>>>>> controller drivers to da850.dtsi.
+>>>>>
+>>>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>>> ---
+>>>>> v1 -> v2:
+>>>>> - moved the priority controller node above the cfgchip node
+>>>>> - renamed added nodes to better reflect their purpose
+>>>>>
+>>>>>  arch/arm/boot/dts/da850.dtsi | 8 ++++++++
+>>>>>  1 file changed, 8 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+>>>>> index 1bb1f6d..412eec6 100644
+>>>>> --- a/arch/arm/boot/dts/da850.dtsi
+>>>>> +++ b/arch/arm/boot/dts/da850.dtsi
+>>>>> @@ -210,6 +210,10 @@
+>>>>>                         };
+>>>>>
+>>>>>                 };
+>>>>> +               prictrl: priority-controller at 14110 {
+>>>>> +                       compatible = "ti,da850-mstpri";
+>>>>> +                       reg = <0x14110 0x0c>;
+>>>>
+>>>>
+>>>> I think we should add status = "disabled"; here and let boards opt in.
+>>>>
+>>>>> +               };
+>>>>>                 cfgchip: chip-controller at 1417c {
+>>>>>                         compatible = "ti,da830-cfgchip", "syscon",
+>>>>> "simple-mfd";
+>>>>>                         reg = <0x1417c 0x14>;
+>>>>> @@ -451,4 +455,8 @@
+>>>>>                           1 0 0x68000000 0x00008000>;
+>>>>>                 status = "disabled";
+>>>>>         };
+>>>>> +       memctrl: memory-controller at b0000000 {
+>>>>> +               compatible = "ti,da850-ddr-controller";
+>>>>> +               reg = <0xb0000000 0xe8>;
+>>>>
+>>>>
+>>>> same here. status = "disabled";
+>>>>
+>>>>> +       };
+>>>>>  };
+>>>>>
+>>>
+>>> Hi David,
+>>>
+>>> I did that initially[1][2] and it was rejected by Kevin[3] and Laurent[4].
+>>>
+>>> FYI this patch has already been queued by Sekhar.
+>>
+>> Thanks. I did not see those threads.
+>>
+>> FYI to maintainers, having these enabled by default causes error
+>> messages in the kernel log for other boards that are not supported by
+>> the drivers.
+>
+> Then the driver is too noisy and should be cleaned up.
+>
+>> Since there is only one board that is supported and soon
+>> to be 2 that are not, I would rather have this disabled by default to
+>> avoid the error messages.
+>
+> IMO, what exactly are the error messages? Sounds like the driver is
+> being too verbose, and calling things errors that are not really errors.
 
-On Wed, Nov 23, 2016 at 3:59 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->>  >CZ11NIC12 is indicated on my board.
->> 
->>  :-( Well, this board version has wrongly matched length of some
->>  differential pairs, IRQ from 88E1514 is connected differently, there
->>  are slight differences in power supplies and (if I am not mistaken)
->>  something changed in RTC support circuitry. It looks like a huge
->>  mistake on our side.
-> 
-> Hi Tomas
-> 
-> Would these problems also explain why the Ethernet links to the switch
-> don't work? Maybe the differential pairs?
+It is just one line per driver.
 
-I do not think so. The ethernet links to the switch are RGMII, not 
-differential pairs. Differential pair is used only for the eth2 to link 
-either SFP+ or 88E1514 (via a high-speed switch that selects one or 
-another). So the problems with differential pairs affect only WAN 
-interface.
+	dev_err(dev, "no master priorities defined for this board\n");
 
-> 
-> 
->>  It seems that libphy is probed before pca9538 and we end up with:
->>  [    4.217550] libphy: orion_mdio_bus: probed
->>  [    4.221777] irq: no irq domain found for
->>  /soc/internal-regs/i2c at 11000/i2cmux at 70/i2c at 7/gpio at 71 !
->> 
->>  Any clue where to look in order to defer probing libphy or at least
->>  orion_mdio_bus?
-> 
-> I think there is a known phylib problem here. Somewhere in the call
-> chain there is a void function, so the EPROBE_DEFFER gets
-> discarded. But i could be remembering this wrongly.
+and
 
-Oh yes, I thought that and I tried to find exactly this type of problem 
-yesterday, but I didn't succeed. But I think that we agreed that we are 
-going to stick with PHY polling rather then experimenting with 
-unreliable IRQ over the GPIO expander, so we can leave this unresolved.
+	dev_err(dev, "no settings defined for this board\n");
 
-I will look into the I2C mux concerns, fix the remaining comments 
-regarding my version and test RTC more extensively - Uwe's board is 
-still not ticking, mine does, so we have to rule out that it is a 
-common problem.
 
-Tomas
+Since "ti,da850-lcdk" is the only board supported in these drivers, all 
+other boards will see these error messages.
+
+Also, these modules will be loaded and taking up memory on boards that 
+don't use them. This not really a big deal and they can be explicitly 
+disabled, so maybe it was not worth mentioning.
+
+
+>
+> Kevin
+>
