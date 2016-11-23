@@ -1,38 +1,44 @@
 From: ray.jui@broadcom.com (Ray Jui)
-Date: Tue, 22 Nov 2016 18:59:28 -0800
-Subject: [PATCH 1/2] PCI: iproc: fix 32-bit build
-In-Reply-To: <4393833.rTFctaL9Kd@wuerfel>
+Date: Tue, 22 Nov 2016 19:00:58 -0800
+Subject: [PATCH 2/2] PCI: iproc: avoid maybe-uninitialized warning
+In-Reply-To: <2504851.C6gOdhdaGF@wuerfel>
 References: <20161122141844.1655574-1-arnd@arndb.de>
- <e03e5c52-f321-916e-4650-c8bb271cd041@broadcom.com>
- <4393833.rTFctaL9Kd@wuerfel>
-Message-ID: <e6808a93-b38a-f111-064d-efe621fa59af@broadcom.com>
+ <20161122141844.1655574-2-arnd@arndb.de>
+ <31c4c52b-3de5-2277-7a44-2a4231531074@broadcom.com>
+ <2504851.C6gOdhdaGF@wuerfel>
+Message-ID: <d3d3f706-1656-e193-0fbd-4cb3126b3769@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 11/22/2016 1:13 PM, Arnd Bergmann wrote:
-> On Tuesday, November 22, 2016 9:42:05 AM CET Ray Jui wrote:
+On 11/22/2016 1:15 PM, Arnd Bergmann wrote:
+> On Tuesday, November 22, 2016 9:45:24 AM CET Ray Jui wrote:
+>>> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+>>> index 857ff5198317..0359569c8d78 100644
+>>> --- a/drivers/pci/host/pcie-iproc.c
+>>> +++ b/drivers/pci/host/pcie-iproc.c
+>>> @@ -936,6 +936,7 @@ static int iproc_pcie_setup_ib(struct iproc_pcie *pcie,
+>>>  
+>>>               }
+>>>       }
+>>> +     ret = -EINVAL;
+>>>  err_ib:
+>>>       dev_err(dev, "unable to configure inbound mapping\n");
+>>>       dev_err(dev, "axi %pap, pci %pap, res size %pap\n",
+>>>
 >>
->> Hmmm, somehow we've never seen this link error for the ARM32 based
->> platforms that we build for. Does it behave differently between
->> different versions of compilers?
+>> This change is good, but in my opinion, a further improvement for
+>> clarity would be to initialize 'ret' to -EINVAL in the beginning of this
+>> function when 'ret' is declared. What do you think?
 >>
->> Nevertheless, this is a good change to take, thanks!
 > 
-> I looked at it again, and see now that it only happens with
-> a 64-bit RESOURCE_SIZE_T, which is only used on 32-bit
-> platforms with more than 4GB of memory addresses. It would
-> however show up in a multiplatform distro build for ARMv7VE,
-> so the fix is still clearly needed.
+> I never do that, see https://rusty.ozlabs.org/?p=232 for a great
+> explanation about why.
 > 
 > 	Arnd
 > 
 
-Yes, got it for how it showed up in your environment, :)
-
-This change stands good as it has been.
-
-Thanks,
+Okay got it. Thanks!
 
 Ray
