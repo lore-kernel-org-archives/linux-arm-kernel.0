@@ -1,116 +1,38 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Wed, 23 Nov 2016 17:21:47 +0000
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <58358E79.5050404@free.fr> (Mason's message of "Wed, 23 Nov 2016
- 13:41:29 +0100")
-References: <58356EA8.2010806@free.fr> <yw1xpolmbdih.fsf@unicorn.mansr.com>
- <58358E79.5050404@free.fr>
-Message-ID: <yw1xh96yaz84.fsf@unicorn.mansr.com>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Wed, 23 Nov 2016 20:29:31 +0300
+Subject: [PATCH 3/9] clocksource/drivers/rockchip_timer: drop unused rk_base()
+ and rk_ctrl()
+In-Reply-To: <1479922177-20136-1-git-send-email-al.kochet@gmail.com>
+References: <1479922177-20136-1-git-send-email-al.kochet@gmail.com>
+Message-ID: <1479922177-20136-3-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+---
+ drivers/clocksource/rockchip_timer.c |   10 ----------
+ 1 file changed, 10 deletions(-)
 
-> On 23/11/2016 13:13, M?ns Rullg?rd wrote:
->
->> Mason wrote:
->> 
->>> On my platform, setting up a DMA transfer is a two-step process:
->>>
->>> 1) configure the "switch box" to connect a device to a memory channel
->>> 2) configure the transfer details (address, size, command)
->>>
->>> When the transfer is done, the sbox setup can be torn down,
->>> and the DMA driver can start another transfer.
->>>
->>> The current software architecture for my NFC (NAND Flash controller)
->>> driver is as follows (for one DMA transfer).
->>>
->>>   sg_init_one
->>>   dma_map_sg
->>>   dmaengine_prep_slave_sg
->>>   dmaengine_submit
->>>   dma_async_issue_pending
->>>   configure_NFC_transfer
->>>   wait_for_IRQ_from_DMA_engine // via DMA_PREP_INTERRUPT
->>>   wait_for_NFC_idle
->>>   dma_unmap_sg
->>>
->>> The problem is that the DMA driver tears down the sbox setup
->>> as soon as it receives the IRQ. However, when writing to the
->>> device, the interrupt only means "I have pushed all data from
->>> memory to the memory channel". These data have not reached
->>> the device yet, and may still be "in flight". Thus the sbox
->>> setup can only be torn down after the NFC is idle.
->>>
->>> How do I call back into the DMA driver after wait_for_NFC_idle,
->>> to request sbox tear down?
->>>
->>> The new architecture would become:
->>>
->>>   sg_init_one
->>>   dma_map_sg
->>>   dmaengine_prep_slave_sg
->>>   dmaengine_submit
->>>   dma_async_issue_pending
->>>   configure_NFC_transfer
->>>   wait_for_IRQ_from_DMA_engine // via DMA_PREP_INTERRUPT
->>>   wait_for_NFC_idle
->>>   request_sbox_tear_down /*** HOW TO DO THAT ***/
->>>   dma_unmap_sg
->>>
->>> As far as I can tell, my NFC driver should call dmaengine_synchronize ??
->>> (In other words request_sbox_tear_down == dmaengine_synchronize)
->>>
->>> So the DMA driver should implement the device_synchronize hook,
->>> and tear the sbox down in that function.
->>>
->>> Is that correct? Or am I on the wrong track?
->> 
->> dmaengine_synchronize() is not meant for this.  See the documentation:
->> 
->> /**
->>  * dmaengine_synchronize() - Synchronize DMA channel termination
->>  * @chan: The channel to synchronize
->>  *
->>  * Synchronizes to the DMA channel termination to the current context. When this
->>  * function returns it is guaranteed that all transfers for previously issued
->>  * descriptors have stopped and and it is safe to free the memory assoicated
->>  * with them. Furthermore it is guaranteed that all complete callback functions
->>  * for a previously submitted descriptor have finished running and it is safe to
->>  * free resources accessed from within the complete callbacks.
->>  *
->>  * The behavior of this function is undefined if dma_async_issue_pending() has
->>  * been called between dmaengine_terminate_async() and this function.
->>  *
->>  * This function must only be called from non-atomic context and must not be
->>  * called from within a complete callback of a descriptor submitted on the same
->>  * channel.
->>  */
->> 
->> This is for use after a dmaengine_terminate_async() call to wait for the
->> dma engine to finish whatever it was doing.  This is not the problem
->> here.  Your problem is that the dma engine interrupt fires before the
->> transfer is actually complete.  Although you get an indication from the
->> target device when it has received all the data, there is no way to make
->> the dma driver wait for this.
->
-> Hello Mans,
->
-> I'm confused. Are you saying there is no solution to my problem
-> within the existing DMA framework?
->
-> In its current form, the tangox-dma.c driver will fail randomly
-> for writes to a device (SATA, NFC).
->
-> Maybe an extra hook can be added to the DMA framework?
->
-> I'd like to hear from the framework's maintainers. Perhaps they
-> can provide some guidance.
-
-You could have the dma descriptor callback wait for the receiving device
-to finish.  Bear in mind this runs from a tasklet, so it's not allowed
-to sleep.
-
+diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
+index f84f67c..2f18166 100644
+--- a/drivers/clocksource/rockchip_timer.c
++++ b/drivers/clocksource/rockchip_timer.c
+@@ -53,16 +53,6 @@ static inline struct rk_timer *rk_timer(struct clock_event_device *ce)
+ 	return &rk_clock_event_device(ce)->timer;
+ }
+ 
+-static inline void __iomem *rk_base(struct clock_event_device *ce)
+-{
+-	return rk_timer(ce)->base;
+-}
+-
+-static inline void __iomem *rk_ctrl(struct clock_event_device *ce)
+-{
+-	return rk_timer(ce)->ctrl;
+-}
+-
+ static inline void rk_timer_disable(struct rk_timer *timer)
+ {
+ 	writel_relaxed(TIMER_DISABLE, timer->ctrl);
 -- 
-M?ns Rullg?rd
+1.7.9.5
