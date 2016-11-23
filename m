@@ -1,100 +1,64 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Wed, 23 Nov 2016 22:03:18 +0100
-Subject: [RFC PATCH v2 1/2] macb: Add 1588 support in Cadence GEM.
-In-Reply-To: <e592169a-6287-7f3c-b4fd-23c4c79198b0@microchip.com>
-References: <1479478912-14067-1-git-send-email-andrei.pistirica@microchip.com>
- <20161120191823.GA6950@localhost.localdomain>
- <e592169a-6287-7f3c-b4fd-23c4c79198b0@microchip.com>
-Message-ID: <20161123210318.GB2845@localhost.localdomain>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Wed, 23 Nov 2016 22:15:38 +0100
+Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire
+ section
+In-Reply-To: <CAKv+Gu-2uGJGovqQL-gbB54u=fQ9L9YUbDdRo6u3oWqF6znn6Q@mail.gmail.com>
+References: <CAKv+Gu-oYzSn_eeqaX3QVFeQjBGkaX-Wh7+oPcQFcXv7J6GOFQ@mail.gmail.com>
+ <20161006161114.GH22012@rric.localdomain>
+ <20161017185801.GT25086@rric.localdomain>
+ <20161027160136.GD24290@arm.com>
+ <20161028091905.GM22012@rric.localdomain>
+ <20161107210514.GP20591@arm.com>
+ <20161109195132.GZ22012@rric.localdomain>
+ <20161117142528.GJ22855@arm.com>
+ <20161117151805.GJ2151@rric.localdomain>
+ <CAKv+Gu-2uGJGovqQL-gbB54u=fQ9L9YUbDdRo6u3oWqF6znn6Q@mail.gmail.com>
+Message-ID: <20161123211538.GH10776@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2016 at 02:34:03PM +0100, Andrei Pistirica wrote:
-> From what I understand, your suggestion is:
-> (ns | frac) * ppb = (total_ns | total_frac)
-> (total_ns | total_frac) / 10^9 = (adj_ns | adj_frac)
-> This is correct iff total_ns/10^9 >= 1, but the problem is that there are
-> missed fractions due to the following approximation:
-> frac*ppb =~ (ns*ppb+frac*ppb*2^16)*2^16-10^9*2^16*flor(ns*ppb+frac*ppb*2^16,
-> 10^9).
+On 20.11.16 17:07:44, Ard Biesheuvel wrote:
+> On 17 November 2016 at 15:18, Robert Richter <robert.richter@cavium.com> wrote:
 
--ENOPARSE;
- 
-> An example which uses values from a real test:
-> let ppb=4891, ns=12 and frac=3158
+> > The risk of breaking something with my patch is small and limited only
+> > to the mapping of efi reserved regions (which is the state of 4.4). If
+> > something breaks anyway it can easily be fixed by adding more checks
+> > to pfn_valid() as suggested above.
+> >
+> 
+> As I noted before, it looks to me like setting CONFIG_HOLES_IN_ZONE is
+> the correct way to address this. However, doing that does uncover a
+> bug in move_freepages() where the VM_BUG_ON_PAGE() dereferences struct
+> page fields before the pfn_valid_within() check, so it seems those
+> need to be switched around.
+> 
+> Robert, you mentioned that CONFIG_HOLES_IN_ZONE seems inappropriate
+> for sparsemem. Care to elaborate why?
 
-That is a very strange example for nominal frequency.  The clock
-period is 12.048187255859375 nanoseconds, and so the frequency is
-83000037.99 Hz.
+HOLES_IN_ZONE is of rare use in the kernel. I think it was introduced
+to save memory for the memmap and only some single systems enable it.
+There is no architecture that enables it entirely. For good reasons...
 
-But hey, let's go with it...
+It introduces additional checks. pfn_valid() is usually checked only
+once for the whole memmap. There are a number of checks enabled, just
+grep for pfn_valid_within. This will increase the number of
+pfn_valid() calls by a factor of MAX_ORDER_NR_PAGES, in my config this
+is 8k. So, this is not the direction to go.
 
-> - using suggested algorithm, yields: adj_ns = 0 and adj_frac = 0
-> - using in-place algorithm, yields: adj_ns = 0, adj_frac = 4
-> You can check the calculus.
+My patch fixes a regression in the kernel that was introduced by the
+nomap implementation. Some systems can not boot anymore, beside of
+that the BUG_ON() may occur any time depending only on physical page
+access, we need to fix 4.9. Here is a reproducer:
 
-The test program, below, shows you what I meant.  (Of course, you
-should adjust this to fit the adjfine() method.)
+ https://patchwork.kernel.org/patch/9407677/
 
-Unfortunately, this device has a very coarse frequency resolution.
-Using a nominal period of ns=12 as an example, the resolution is
-2^-16 / 12 or 1.27 ppm.  The 24 bit device is much better in this
-repect.
+My patch also does not break memremap(). With my patch applied
+try_ram_remap() would return a linear addr for nomap regions. But this
+is only called if WB is explicitly requested, so it should not happen.
+If you think pfn_valid() is wrong here, I am happy to send a patch
+that fixes this by using page_is_ram(). In any case, the worst case
+that may happen is to behave the same as v4.4, we might fix then the
+wrong use of pfn_valid() where it is not correctly used to check for
+ram.
 
-The output using your example numbers is:
-
-   $ ./a.out 12 3158 4891
-   ns=12 frac=3158
-   ns=12 frac=3162
-
-   $ ./a.out 12 3158 -4891
-   ns=12 frac=3158
-   ns=12 frac=3154
-
-See how you get a result of +/- 4 with just one division?
-
-Thanks,
-Richard
-
----
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-static void adjfreq(uint32_t ns, uint32_t frac, int32_t ppb)
-{
-	uint64_t adj;
-	uint32_t diff, word;
-	int neg_adj = 0;
-
-	printf("ns=%u frac=%u\n", ns, frac);
-
-	if (ppb < 0) {
-		neg_adj = 1;
-		ppb = -ppb;
-	}
-	word = (ns << 16) + frac;
-	adj = word;
-	adj *= ppb;
-	adj += 500000000UL;
-	diff = adj / 1000000000UL;
-
-	word = neg_adj ? word - diff : word + diff;
-	printf("ns=%u frac=%u\n", word >> 16, word & 0xffff);
-}
-
-int main(int argc, char *argv[])
-{
-	uint32_t ns, frac;
-	int32_t ppb;
-
-	if (argc != 4) {
-		puts("need ns, frac, and ppb");
-		return -1;
-	}
-	ns = atoi(argv[1]);
-	frac = atoi(argv[2]);
-	ppb = atoi(argv[3]);
-	adjfreq(ns, frac, ppb);
-	return 0;
-}
+-Robert
