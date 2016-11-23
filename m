@@ -1,13 +1,11 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Wed, 23 Nov 2016 09:59:14 +0100
-Subject: [GIT PULL] STi defconfig fix for v4.9-rcs
-Message-ID: <0492803d-d136-618d-bf06-51f0001d039b@st.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 23 Nov 2016 10:01:08 +0100
+Subject: [GIT PULL v2] ARM: OXNAS SoC updates for 4.10
+Message-ID: <55c31b07-ae4e-5bb3-3576-b597805c009d@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof, Kevin
-
-Please consider this set for inclusion into the v4.9-rc.
+Dear arm-soc maintainers,
 
 The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
@@ -15,21 +13,36 @@ The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git tags/sti-defconfig-for-4.9-rc
+  https://github.com/OXNAS/linux.git tags/oxnas-arm-soc-for-4.10-v2
 
-for you to fetch changes up to bb8d1edc272b972758dc75e861c9c17cddcd1d21:
+for you to fetch changes up to e330ea5e8cea7ba58f0ba9d40063b13cf8639555:
 
-  ARM: multi_v7_defconfig: enable STMicroelectronics HVA driver (2016-11-23 09:25:23 +0100)
-
-----------------------------------------------------------------
-STi defconfig fix:
-
-Enable HVA (Hardware Video Accelerator) video encoder
-driver for STMicroelectronics SoC.
+  ARM: oxnas: Add OX820 config and makefile entry (2016-11-23 09:53:55 +0100)
 
 ----------------------------------------------------------------
-Patrice Chotard (1):
-      ARM: multi_v7_defconfig: enable STMicroelectronics HVA driver
+- Add SMP support for the Oxford Semiconductor OX820 SoC
+from http://lkml.kernel.org/r/20161021085848.1754-1-narmstrong at baylibre.com
 
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Changes since v1 Pull Request at : http://lkml.kernel.org/r/1305c61f-b1ef-7caf-7788-67e2b907e873 at baylibre.com
+ - Clarify copyright dates in commit message
+ - Remove linux/arch/... lines from the top of the files
+
+----------------------------------------------------------------
+Neil Armstrong (2):
+      ARM: oxnas: Add OX820 SMP support
+      ARM: oxnas: Add OX820 config and makefile entry
+
+ arch/arm/Makefile             |   1 +
+ arch/arm/mach-oxnas/Kconfig   |  30 ++++++++----
+ arch/arm/mach-oxnas/Makefile  |   2 +
+ arch/arm/mach-oxnas/headsmp.S |  26 ++++++++++
+ arch/arm/mach-oxnas/hotplug.c | 109 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-oxnas/platsmp.c | 102 +++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 261 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm/mach-oxnas/Makefile
+ create mode 100644 arch/arm/mach-oxnas/headsmp.S
+ create mode 100644 arch/arm/mach-oxnas/hotplug.c
+ create mode 100644 arch/arm/mach-oxnas/platsmp.c
+
+Thanks,
+Neil
