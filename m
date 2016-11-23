@@ -1,159 +1,85 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 23 Nov 2016 11:01:03 +0100
-Subject: [PATCH 1/4] serial: core: Add LED trigger support
+Date: Wed, 23 Nov 2016 11:01:06 +0100
+Subject: [PATCH 4/4] serial: imx: Add LED trigger support
 In-Reply-To: <20161123100106.15969-1-s.hauer@pengutronix.de>
 References: <20161123100106.15969-1-s.hauer@pengutronix.de>
-Message-ID: <20161123100106.15969-2-s.hauer@pengutronix.de>
+Message-ID: <20161123100106.15969-5-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With this patch the serial core provides LED triggers for RX and TX.
-
-As the serial core layer does not know when the hardware actually sends
-or receives characters, this needs help from the UART drivers. The
-LED triggers are registered in uart_add_led_triggers() called from
-the UART drivers which want to support LED triggers. All the driver
-has to do then is to call uart_led_trigger_[tx|rx] to indicate
-activity.
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/tty/serial/serial_core.c | 73 ++++++++++++++++++++++++++++++++++++++++
- include/linux/serial_core.h      | 10 ++++++
- 2 files changed, 83 insertions(+)
+ drivers/tty/serial/imx.c | 24 ++++++++++++++++++++++--
+ 1 file changed, 22 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
-index f2303f3..3e8afb7 100644
---- a/drivers/tty/serial/serial_core.c
-+++ b/drivers/tty/serial/serial_core.c
-@@ -34,6 +34,7 @@
- #include <linux/serial_core.h>
- #include <linux/delay.h>
- #include <linux/mutex.h>
-+#include <linux/leds.h>
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index a70356d..5eaf576 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -444,6 +444,8 @@ static inline void imx_transmit_buffer(struct imx_port *sport)
+ 		return;
+ 	}
  
- #include <asm/irq.h>
- #include <asm/uaccess.h>
-@@ -2703,6 +2704,77 @@ static const struct attribute_group tty_dev_attr_group = {
- 	.attrs = tty_dev_attrs,
- 	};
++	uart_led_trigger_tx(&sport->port);
++
+ 	if (sport->dma_is_enabled) {
+ 		/*
+ 		 * We've just sent a X-char Ensure the TX DMA is enabled
+@@ -569,6 +571,7 @@ static void imx_dma_tx(struct imx_port *sport)
+ 	/* fire it */
+ 	sport->dma_is_txing = 1;
+ 	dmaengine_submit(desc);
++	uart_led_trigger_tx(&sport->port);
+ 	dma_async_issue_pending(chan);
+ 	return;
+ }
+@@ -655,6 +658,8 @@ static irqreturn_t imx_rxint(int irq, void *dev_id)
+ 	struct tty_port *port = &sport->port.state->port;
+ 	unsigned long flags, temp;
  
-+void uart_led_trigger_tx(struct uart_port *uport)
-+{
-+	unsigned long delay = 50;
++	uart_led_trigger_rx(&sport->port);
 +
-+	led_trigger_blink_oneshot(uport->led_trigger_tx, &delay, &delay, 0);
-+}
+ 	spin_lock_irqsave(&sport->port.lock, flags);
+ 
+ 	while (readl(sport->port.membase + USR2) & USR2_RDR) {
+@@ -729,6 +734,8 @@ static void imx_dma_rxint(struct imx_port *sport)
+ 	unsigned long temp;
+ 	unsigned long flags;
+ 
++	uart_led_trigger_rx(&sport->port);
 +
-+void uart_led_trigger_rx(struct uart_port *uport)
-+{
-+	unsigned long delay = 50;
+ 	spin_lock_irqsave(&sport->port.lock, flags);
+ 
+ 	temp = readl(sport->port.membase + USR2);
+@@ -2184,14 +2191,27 @@ static int serial_imx_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, sport);
+ 
+-	return uart_add_one_port(&imx_reg, &sport->port);
++	ret = uart_add_one_port(&imx_reg, &sport->port);
++	if (ret)
++		return ret;
 +
-+	led_trigger_blink_oneshot(uport->led_trigger_rx, &delay, &delay, 0);
-+}
-+
-+/**
-+ *	uart_add_led_triggers - register LED triggers for a UART
-+ *	@drv: pointer to the uart low level driver structure for this port
-+ *	@uport: uart port structure to use for this port.
-+ *
-+ *	Called by the driver to register LED triggers for a UART. It's the
-+ *	drivers responsibility to call uart_led_trigger_rx/tx on received
-+ *	and transmitted chars then.
-+ */
-+int uart_add_led_triggers(struct uart_driver *drv, struct uart_port *uport)
-+{
-+	int ret;
-+
-+	if (!IS_ENABLED(CONFIG_LEDS_TRIGGERS))
-+		return 0;
-+
-+	uport->led_trigger_tx_name = kasprintf(GFP_KERNEL, "%s%d-tx",
-+					       drv->dev_name, uport->line);
-+	uport->led_trigger_rx_name = kasprintf(GFP_KERNEL, "%s%d-rx",
-+					       drv->dev_name, uport->line);
-+	if (!uport->led_trigger_tx_name || !uport->led_trigger_rx_name) {
-+		ret = -ENOMEM;
-+		goto err_alloc;
-+	}
-+
-+	led_trigger_register_simple(uport->led_trigger_tx_name,
-+				    &uport->led_trigger_tx);
-+	led_trigger_register_simple(uport->led_trigger_rx_name,
-+				    &uport->led_trigger_rx);
++	uart_add_led_triggers(&imx_reg, &sport->port);
 +
 +	return 0;
-+
-+err_alloc:
-+	kfree(uport->led_trigger_tx_name);
-+	kfree(uport->led_trigger_rx_name);
-+
-+	return ret;
-+}
-+
-+/**
-+ *	uart_remove_led_triggers - remove LED triggers
-+ *	@drv: pointer to the uart low level driver structure for this port
-+ *	@uport: uart port structure to use for this port.
-+ *
-+ *	Remove LED triggers previously registered with uart_add_led_triggers
-+ */
-+void uart_remove_led_triggers(struct uart_port *uport)
-+{
-+	if (uport->led_trigger_rx)
-+		led_trigger_unregister_simple(uport->led_trigger_rx);
-+	kfree(uport->led_trigger_rx_name);
-+
-+	if (uport->led_trigger_tx)
-+		led_trigger_unregister_simple(uport->led_trigger_tx);
-+	kfree(uport->led_trigger_tx_name);
-+}
-+
- /**
-  *	uart_add_one_port - attach a driver-defined port structure
-  *	@drv: pointer to the uart low level driver structure for this port
-@@ -2872,6 +2944,7 @@ int uart_remove_one_port(struct uart_driver *drv, struct uart_port *uport)
- 	WARN_ON(atomic_dec_return(&state->refcount) < 0);
- 	wait_event(state->remove_wait, !atomic_read(&state->refcount));
- 	state->uart_port = NULL;
-+
- 	mutex_unlock(&port->mutex);
- out:
- 	mutex_unlock(&port_mutex);
-diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
-index 3442014..1b0a169 100644
---- a/include/linux/serial_core.h
-+++ b/include/linux/serial_core.h
-@@ -29,6 +29,7 @@
- #include <linux/tty.h>
- #include <linux/mutex.h>
- #include <linux/sysrq.h>
-+#include <linux/leds.h>
- #include <uapi/linux/serial_core.h>
+ }
  
- #ifdef CONFIG_SERIAL_CORE_CONSOLE
-@@ -249,6 +250,10 @@ struct uart_port {
- 	const struct attribute_group **tty_groups;	/* all attributes (serial core use only) */
- 	struct serial_rs485     rs485;
- 	void			*private_data;		/* generic platform data pointer */
-+	struct led_trigger	*led_trigger_rx;
-+	char			*led_trigger_rx_name;
-+	struct led_trigger	*led_trigger_tx;
-+	char			*led_trigger_tx_name;
- };
+ static int serial_imx_remove(struct platform_device *pdev)
+ {
+ 	struct imx_port *sport = platform_get_drvdata(pdev);
++	int ret;
  
- static inline int serial_port_in(struct uart_port *up, int offset)
-@@ -392,6 +397,11 @@ void uart_console_write(struct uart_port *port, const char *s,
- 			unsigned int count,
- 			void (*putchar)(struct uart_port *, int));
- 
-+int uart_add_led_triggers(struct uart_driver *drv, struct uart_port *uport);
-+void uart_remove_led_triggers(struct uart_port *uport);
-+void uart_led_trigger_tx(struct uart_port *port);
-+void uart_led_trigger_rx(struct uart_port *port);
+-	return uart_remove_one_port(&imx_reg, &sport->port);
++	ret = uart_remove_one_port(&imx_reg, &sport->port);
++	if (ret)
++		return ret;
 +
- /*
-  * Port/driver registration/removal
-  */
++	uart_remove_led_triggers(&sport->port);
++
++	return 0;
+ }
+ 
+ static void serial_imx_restore_context(struct imx_port *sport)
 -- 
 2.10.2
