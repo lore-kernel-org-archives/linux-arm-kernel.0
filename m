@@ -1,16 +1,15 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 23 Nov 2016 14:10:23 +0100
-Subject: [PATCH 1/3] arm64: dts: r8a7796: Add CAN external clock support
-In-Reply-To: <1479903264-1909-1-git-send-email-chris.paterson2@renesas.com>
-References: <1479903264-1909-1-git-send-email-chris.paterson2@renesas.com>
-Message-ID: <CAMuHMdVsj9XWUNkLTrBMKSLjy_o769j5_vOu7f+zi9pUynkP0A@mail.gmail.com>
+Date: Wed, 23 Nov 2016 14:10:17 +0100
+Subject: [PATCH 2/3] arm64: dts: r8a7796: Add CAN support
+In-Reply-To: <1479903279-1950-1-git-send-email-chris.paterson2@renesas.com>
+References: <1479903279-1950-1-git-send-email-chris.paterson2@renesas.com>
+Message-ID: <CAMuHMdWzFWBSPACz0SCgeMwCeHcZiSkBZej88oiU9n0idnD+Vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Nov 23, 2016 at 1:14 PM, Chris Paterson
 <chris.paterson2@renesas.com> wrote:
-> Adds external CAN clock node for r8a7796. This clock can be used as
-> fCAN clock of CAN and CAN FD controller.
+> Adds CAN controller nodes for r8a7796.
 >
 > Based on a patch for r8a7795 by Ramesh Shanmugasundaram.
 >
