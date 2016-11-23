@@ -1,39 +1,59 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 23 Nov 2016 15:29:38 +0100
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 23 Nov 2016 15:31:43 +0100
 Subject: [PATCH 0/3] arm64: dts: r8a7796: Add CAN/CAN FD support
-In-Reply-To: <f358442c-8373-328c-1270-709498c133f5@pengutronix.de>
+In-Reply-To: <20161123142938.GF9057@verge.net.au>
 References: <1479903243-1860-1-git-send-email-chris.paterson2@renesas.com>
  <f358442c-8373-328c-1270-709498c133f5@pengutronix.de>
-Message-ID: <20161123142938.GF9057@verge.net.au>
+ <20161123142938.GF9057@verge.net.au>
+Message-ID: <5a04de78-1181-8198-0bd5-edd435a83289@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2016 at 02:18:13PM +0100, Marc Kleine-Budde wrote:
-> On 11/23/2016 01:14 PM, Chris Paterson wrote:
-> > This patch series adds CAN and CAN FD support to the r8a7796.
-> > 
-> > Based on renesas-devel-20161122-v4.9-rc6.
-> > 
-> > Chris Paterson (3):
-> >   arm64: dts: r8a7796: Add CAN external clock support
-> >   arm64: dts: r8a7796: Add CAN support
-> >   arm64: dts: r8a7796: Add CAN FD support
-> > 
-> >  .../devicetree/bindings/net/can/rcar_can.txt       | 12 +++--
-> >  .../devicetree/bindings/net/can/rcar_canfd.txt     | 12 +++--
-> >  arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 61 ++++++++++++++++++++++
-> >  3 files changed, 75 insertions(+), 10 deletions(-)
+On 11/23/2016 03:29 PM, Simon Horman wrote:
+> On Wed, Nov 23, 2016 at 02:18:13PM +0100, Marc Kleine-Budde wrote:
+>> On 11/23/2016 01:14 PM, Chris Paterson wrote:
+>>> This patch series adds CAN and CAN FD support to the r8a7796.
+>>>
+>>> Based on renesas-devel-20161122-v4.9-rc6.
+>>>
+>>> Chris Paterson (3):
+>>>   arm64: dts: r8a7796: Add CAN external clock support
+>>>   arm64: dts: r8a7796: Add CAN support
+>>>   arm64: dts: r8a7796: Add CAN FD support
+>>>
+>>>  .../devicetree/bindings/net/can/rcar_can.txt       | 12 +++--
+>>>  .../devicetree/bindings/net/can/rcar_canfd.txt     | 12 +++--
+>>>  arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 61 ++++++++++++++++++++++
+>>>  3 files changed, 75 insertions(+), 10 deletions(-)
+>>
+>> For all three:
+>>
+>> Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
+>>
+>> Who takes this series?
 > 
-> For all three:
-> 
-> Acked-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> 
-> Who takes this series?
+> I would like to see these patches split up so that the
+> .../devicetree/bindings/ portions can go through you whole
+> the arch/arm64/boot/dts/renesas/ portions go thorugh my renesas tree.
 
-I would like to see these patches split up so that the
-.../devicetree/bindings/ portions can go through you whole
-the arch/arm64/boot/dts/renesas/ portions go thorugh my renesas tree.
+Ok
 
-Regarding the arch/arm64/boot/dts/renesas/ portion, I would like
-some consideration given to what effect enabling memory above 4Gb
-(64bit addressing) would have.
+> Regarding the arch/arm64/boot/dts/renesas/ portion, I would like
+> some consideration given to what effect enabling memory above 4Gb
+> (64bit addressing) would have.
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161123/803507ec/attachment.sig>
