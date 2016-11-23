@@ -1,54 +1,124 @@
-From: dhowells@redhat.com (David Howells)
-Date: Wed, 23 Nov 2016 12:54:25 +0000
-Subject: [PATCH 7/7] efi: Add EFI_SECURE_BOOT bit [ver #3]
-In-Reply-To: <147990561294.7576.6464430479448167484.stgit@warthog.procyon.org.uk>
-References: <147990561294.7576.6464430479448167484.stgit@warthog.procyon.org.uk>
-Message-ID: <147990566529.7576.3473031193517498415.stgit@warthog.procyon.org.uk>
+From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
+Date: Wed, 23 Nov 2016 18:31:47 +0530
+Subject: [PATCH v9 0/11] arm/arm64: vgic: Implement API for vGICv3 live
+ migration
+Message-ID: <1479906118-15832-1-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Josh Boyer <jwboyer@fedoraproject.org>
+From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
 
-UEFI machines can be booted in Secure Boot mode.  Add a EFI_SECURE_BOOT bit
-that can be passed to efi_enabled() to find out whether secure boot is
-enabled.
+This patchset adds API for saving and restoring
+of VGICv3 registers to support live migration with new vgic feature.
+This API definition is as per version of VGICv3 specification
+Documentation/virtual/kvm/devices/arm-vgic-v3.txt
 
-This will be used by the SysRq+x handler, registered by the x86 arch, to find
-out whether secure boot mode is enabled so that it can be disabled.
+The patch 3 & 4 are picked from the Pavel's previous implementation.
+http://www.spinics.net/lists/kvm/msg122040.html
 
-Signed-off-by: Josh Boyer <jwboyer@fedoraproject.org>
-Signed-off-by: David Howells <dhowells@redhat.com>
----
+NOTE: Only compilation tested for AArch32. No hardware to test.
 
- arch/x86/kernel/setup.c |    5 +++++
- include/linux/efi.h     |    1 +
- 2 files changed, 6 insertions(+)
+v8 => v9:
+ - Rebased to kvmarm/next branch
+ - Introduce support for save and restore of CPU interface
+   registers for AArch32 mode (9,10 and 11 patches).
+   Only compilation tested.
+ - Fixed vmcr.ctlr format
+ - Updated error code for invalid CPU REG value in Documentation
+ - Updated commit messages and added comments required
+ - Queued IRQ when irq_line is set.
+ - Compatibility check on ICC_CTLR_EL1.SEIS and A3V
 
-diff --git a/arch/x86/kernel/setup.c b/arch/x86/kernel/setup.c
-index 9c337b0e8ba7..aa972b4cb680 100644
---- a/arch/x86/kernel/setup.c
-+++ b/arch/x86/kernel/setup.c
-@@ -1160,6 +1160,11 @@ void __init setup_arch(char **cmdline_p)
- 
- 	io_delay_init();
- 
-+	if (IS_ENABLED(CONFIG_EFI) && boot_params.secure_boot) {
-+		set_bit(EFI_SECURE_BOOT, &efi.flags);
-+		pr_info("Secure boot enabled\n");
-+	}
-+
- 	/*
- 	 * Parse the ACPI tables for possible boot-time SMP configuration.
- 	 */
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index 5d6c60a9caf8..333d31bf55bf 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -1066,6 +1066,7 @@ extern int __init efi_setup_pcdp_console(char *);
- #define EFI_ARCH_1		7	/* First arch-specific bit */
- #define EFI_DBG			8	/* Print additional debug info at runtime */
- #define EFI_NX_PE_DATA		9	/* Can runtime data regions be mapped non-executable? */
-+#define EFI_SECURE_BOOT		10	/* Are we in Secure Boot mode? */
- 
- #ifdef CONFIG_EFI
- /*
+v7 => v8:
+ - Rebased to 4.9-rc3
+ - Fixed wrong parameter to VGIC_TO_MPIDR
+v6 => v7:
+ - Rename all patches heading from vgic-new to vgic
+ - Moved caching of priority and ID bits from vgic global struct
+   to vgic_cpu struct.
+
+v5 => v6:
+ - Collated all register definitions to single patch (4)
+ - Introduce macro to convert userspace MPIDR format to MPIDR reg format
+ - Check on ICC_CTLR_EL1.CBPR value is made while accessing ICC_BPR1_EL1
+ - Cached ich_vtr_el2 and guests priority and ID bits
+ - Check on number of priority and ID bits when ICC_CTRL_EL1 write is made
+ - Check is made on SRE bit for ICC_SRE_EL1 write
+
+v4 => v5:
+ - ICC_CTLR_EL1 access is updated to reflect HW values
+ - Updated ICC reg access mask and shift macros
+ - Introduced patch 4 for VMCR changes
+ - Other minor fixes.
+v3 => v4:
+ - Rebased to latest code base
+ - Moved vgic_uaccess() from vgic-mmio-v2.c to vgic-mmio.c
+ - Dropped macro REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED_UACCESS
+ - Dropped LE conversion for userspace access
+ - Introduced vgic_uaccess_write_pending() for ISPENDR write
+ - Change macro KVM_DEV_ARM_VGIC_V3_CPUID_MASK to KVM_DEV_ARM_VGIC_V3_MIDR_MASK
+ - Refactored some code as common code.
+ - Changed handing of ICC_* registers
+ - Allowed ICC_SRE_EL1 read by userspace
+ - Fixed KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_* macros
+
+v2 => v3:
+ - Implemented separate API for ISPENDR and ICPENDR to
+   read soft_pending instead of pending for level triggerred interrupts
+ - Implemented ioctl KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO to access line level
+ - Rebased on top of Christoffer's patch set
+   http://www.spinics.net/lists/kvm/msg136840.html
+
+ NOTE: GICD_STATUSR and GICR_STATUSR are implemented as RAZ/WI.
+
+v1 => v2:
+ - The init sequence change patch is no more required.
+   Fixed in patch 2 by using static vgic_io_dev regions structure instead
+   of using dynamic allocation pointer.
+ - Updated commit message of patch 4.
+ - Dropped usage of union to manage 32-bit and 64-bit access in patch 1.
+   Used local variable for 32-bit access.
+ - Updated macro __ARM64_SYS_REG and ARM64_SYS_REG in
+   arch/arm64/include/uapi/asm/kvm.h as per qemu requirements.
+
+Vijaya Kumar K (11):
+  arm/arm64: vgic: Implement support for userspace access
+  arm/arm64: vgic: Add distributor and redistributor access
+  arm/arm64: vgic: Introduce find_reg_by_id()
+  irqchip/gic-v3: Add missing system register definitions
+  arm/arm64: vgic: Introduce VENG0 and VENG1 fields to vmcr struct
+  arm/arm64: vgic: Implement VGICv3 CPU interface access
+  arm/arm64: vgic: Implement KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
+  arm/arm64: Documentation: Update arm-vgic-v3.txt
+  arm: coproc: Drop const from coproc reg access function
+  arm: coproc: Introduce find_coproc_reg_by_id()
+  arm: vgic: Save and restore GICv3 CPU interface regs for AArch32
+
+ Documentation/virtual/kvm/devices/arm-vgic-v3.txt |   2 +-
+ arch/arm/include/uapi/asm/kvm.h                   |  13 ++
+ arch/arm/kvm/Makefile                             |   2 +
+ arch/arm/kvm/coproc.c                             |  42 ++--
+ arch/arm/kvm/coproc.h                             |   8 +-
+ arch/arm64/include/uapi/asm/kvm.h                 |  13 ++
+ arch/arm64/kvm/Makefile                           |   2 +
+ arch/arm64/kvm/sys_regs.c                         |  22 +-
+ arch/arm64/kvm/sys_regs.h                         |   4 +
+ include/kvm/arm_vgic.h                            |   9 +
+ include/linux/irqchip/arm-gic-v3.h                |  45 +++-
+ virt/kvm/arm/vgic/vgic-coproc-reg-v3.c            | 155 +++++++++++++
+ virt/kvm/arm/vgic/vgic-kvm-device.c               | 219 +++++++++++++++++-
+ virt/kvm/arm/vgic/vgic-mmio-v2.c                  |  57 +----
+ virt/kvm/arm/vgic/vgic-mmio-v3.c                  | 203 +++++++++++++++--
+ virt/kvm/arm/vgic/vgic-mmio.c                     | 154 ++++++++++++-
+ virt/kvm/arm/vgic/vgic-mmio.h                     |  28 +++
+ virt/kvm/arm/vgic/vgic-sys-reg-common.c           | 258 ++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-sys-reg-v3.c               | 142 ++++++++++++
+ virt/kvm/arm/vgic/vgic-v3.c                       |  30 ++-
+ virt/kvm/arm/vgic/vgic.h                          |  78 ++++++-
+ 21 files changed, 1365 insertions(+), 121 deletions(-)
+ create mode 100644 virt/kvm/arm/vgic/vgic-coproc-reg-v3.c
+ create mode 100644 virt/kvm/arm/vgic/vgic-sys-reg-common.c
+ create mode 100644 virt/kvm/arm/vgic/vgic-sys-reg-v3.c
+
+-- 
+1.9.1
