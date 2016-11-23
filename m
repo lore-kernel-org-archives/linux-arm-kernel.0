@@ -1,177 +1,249 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 22 Nov 2016 19:06:00 -0600
-Subject: [PATCH] PCI: Add information about describing PCI in ACPI
-In-Reply-To: <CAKv+Gu_xW+7KAC8fHquEwHynYzpy6OoO1ZjEm5mVKMo1S8j4Nw@mail.gmail.com>
-References: <20161117175938.17465.45820.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu_xW+7KAC8fHquEwHynYzpy6OoO1ZjEm5mVKMo1S8j4Nw@mail.gmail.com>
-Message-ID: <20161123010600.GF4832@bhelgaas-glaptop.roam.corp.google.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 23 Nov 2016 10:14:10 +0900
+Subject: [PATCH 1/2] clk: uniphier: add CPU-gear change (cpufreq) support
+In-Reply-To: <1477503088-26508-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1477503088-26508-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNATUd2bw34a3U0EYgw0Ok7DP3D+nvv0ConF=kBOR+UPCHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2016 at 10:09:50AM +0000, Ard Biesheuvel wrote:
-> On 17 November 2016 at 17:59, Bjorn Helgaas <bhelgaas@google.com> wrote:
+Hi Stephen,
 
-> > +PCI host bridges are PNP0A03 or PNP0A08 devices.  Their _CRS should
-> > +describe all the address space they consume.  In principle, this would
-> > +be all the windows they forward down to the PCI bus, as well as the
-> > +bridge registers themselves.  The bridge registers include things like
-> > +secondary/subordinate bus registers that determine the bus range below
-> > +the bridge, window registers that describe the apertures, etc.  These
-> > +are all device-specific, non-architected things, so the only way a
-> > +PNP0A03/PNP0A08 driver can manage them is via _PRS/_CRS/_SRS, which
-> > +contain the device-specific details.  These bridge registers also
-> > +include ECAM space, since it is consumed by the bridge.
-> > +
-> > +ACPI defined a Producer/Consumer bit that was intended to distinguish
-> > +the bridge apertures from the bridge registers [4, 5].  However,
-> > +BIOSes didn't use that bit correctly, and the result is that OSes have
-> > +to assume that everything in a PCI host bridge _CRS is a window.  That
-> > +leaves no way to describe the bridge registers in the PNP0A03/PNP0A08
-> > +device itself.
-> 
-> Is that universally true? Or is it still possible to do the right
-> thing here on new ACPI architectures such as arm64?
 
-That's a very good question.  I had thought that the ACPI spec had
-given up on Consumer/Producer completely, but I was wrong.  In the 6.0
-spec, the Consumer/Producer bit is still documented in the Extended
-Address Space Descriptor (sec 6.4.3.5.4).  It is documented as
-"ignored" in the QWord, DWord, and Word descriptors (sec 6.4.3.5.1,2,3).
+Ping.
 
-Linux looks at the producer_consumer bit in acpi_decode_space(), which
-I think is used for all these descriptors (QWord, DWord, Word, and
-Extended).  This doesn't quite follow the spec -- we probably should
-ignore it except for Extended.  In any event, acpi_decode_space() sets
-IORESOURCE_WINDOW for Producer descriptors, but we don't test
-IORESOURCE_WINDOW in the PCI host bridge code.
 
-x86 and ia64 supply their own pci_acpi_root_prepare_resources()
-functions that call acpi_pci_probe_root_resources(), which parses _CRS
-and looks at producer_consumer.  Then they do a little arch-specific
-stuff on the result.
 
-On arm64 we use acpi_pci_probe_root_resources() directly, with no
-arch-specific stuff.
-
-On all three arches, we ignore the Consumer/Producer bit, so all the
-resources are treated as Producers, e.g., as bridge windows.
-
-I think we *could* implement an arm64 version of
-pci_acpi_root_prepare_resources() that would pay attention to the
-Consumer/Producer bit by checking IORESOURCE_WINDOW.  To be spec
-compliant, we would have to use Extended descriptors for all bridge
-windows, even if they would fit in a DWord or QWord.
-
-Should we do that?  I dunno.  I'd like to hear your opinion(s).
-
-It *would* be nice to have bridge registers in the bridge _CRS.  That
-would eliminate the need for looking up the HISI0081/PNP0C02 devices
-to find the bridge registers.  Avoiding that lookup is only a
-temporary advantage -- the next round of bridges are supposed to fully
-implement ECAM, and then we won't need to know where the registers
-are.
-
-Apart from the lookup, there's still some advantage in describing the
-registers in the PNP0A03 device instead of an unrelated PNP0C02
-device, because it makes /proc/iomem more accurate and potentially
-makes host bridge hotplug cleaner.  We would have to enhance the host
-bridge driver to do the reservations currently done by pnp/system.c.
-
-There's some value in doing it the same way as on x86, even though
-that way is somewhat broken.
-
-Whatever we decide, I think it's very important to get it figured out
-ASAP because it affects the ECAM quirks that we're trying to merge in
-v4.10.
-
-> > +The workaround is to describe the bridge registers (including ECAM
-> > +space) in PNP0C02 catch-all devices [6].  With the exception of ECAM,
-> > +the bridge register space is device-specific anyway, so the generic
-> > +PNP0A03/PNP0A08 driver (pci_root.c) has no need to know about it.  For
-> > +ECAM, pci_root.c learns about the space from either MCFG or the _CBA
-> > +method.
-> > +
-> > +Note that the PCIe spec actually does require ECAM unless there's a
-> > +standard firmware interface for config access, e.g., the ia64 SAL
-> > +interface [7].  One reason is that we want a generic host bridge
-> > +driver (pci_root.c), and a generic driver requires a generic way to
-> > +access config space.
-> > +
-> > +
-> > +[1] ACPI 6.0, sec 6.1:
-> > +    For any device that is on a non-enumerable type of bus (for
-> > +    example, an ISA bus), OSPM enumerates the devices' identifier(s)
-> > +    and the ACPI system firmware must supply an _HID object ... for
-> > +    each device to enable OSPM to do that.
-> > +
-> > +[2] ACPI 6.0, sec 3.7:
-> > +    The OS enumerates motherboard devices simply by reading through
-> > +    the ACPI Namespace looking for devices with hardware IDs.
-> > +
-> > +    Each device enumerated by ACPI includes ACPI-defined objects in
-> > +    the ACPI Namespace that report the hardware resources the device
-> > +    could occupy [_PRS], an object that reports the resources that are
-> > +    currently used by the device [_CRS], and objects for configuring
-> > +    those resources [_SRS].  The information is used by the Plug and
-> > +    Play OS (OSPM) to configure the devices.
-> > +
-> > +[3] ACPI 6.0, sec 6.2:
-> > +    OSPM uses device configuration objects to configure hardware
-> > +    resources for devices enumerated via ACPI.  Device configuration
-> > +    objects provide information about current and possible resource
-> > +    requirements, the relationship between shared resources, and
-> > +    methods for configuring hardware resources.
-> > +
-> > +    When OSPM enumerates a device, it calls _PRS to determine the
-> > +    resource requirements of the device.  It may also call _CRS to
-> > +    find the current resource settings for the device.  Using this
-> > +    information, the Plug and Play system determines what resources
-> > +    the device should consume and sets those resources by calling the
-> > +    device?s _SRS control method.
-> > +
-> > +    In ACPI, devices can consume resources (for example, legacy
-> > +    keyboards), provide resources (for example, a proprietary PCI
-> > +    bridge), or do both.  Unless otherwise specified, resources for a
-> > +    device are assumed to be taken from the nearest matching resource
-> > +    above the device in the device hierarchy.
-> > +
-> > +[4] ACPI 6.0, sec 6.4.3.5.4:
-> > +    Extended Address Space Descriptor
-> > +    General Flags: Bit [0] Consumer/Producer:
-> > +       1?This device consumes this resource
-> > +       0?This device produces and consumes this resource
-> > +
-> > +[5] ACPI 6.0, sec 19.6.43:
-> > +    ResourceUsage specifies whether the Memory range is consumed by
-> > +    this device (ResourceConsumer) or passed on to child devices
-> > +    (ResourceProducer).  If nothing is specified, then
-> > +    ResourceConsumer is assumed.
-> > +
-> > +[6] PCI Firmware 3.0, sec 4.1.2:
-> > +    If the operating system does not natively comprehend reserving the
-> > +    MMCFG region, the MMCFG region must be reserved by firmware.  The
-> > +    address range reported in the MCFG table or by _CBA method (see
-> > +    Section 4.1.3) must be reserved by declaring a motherboard
-> > +    resource.  For most systems, the motherboard resource would appear
-> > +    at the root of the ACPI namespace (under \_SB) in a node with a
-> > +    _HID of EISAID (PNP0C02), and the resources in this case should
-> > +    not be claimed in the root PCI bus?s _CRS.  The resources can
-> > +    optionally be returned in Int15 E820 or EFIGetMemoryMap as
-> > +    reserved memory but must always be reported through ACPI as a
-> > +    motherboard resource.
-> > +
-> > +[7] PCI Express 3.0, sec 7.2.2:
-> > +    For systems that are PC-compatible, or that do not implement a
-> > +    processor-architecture-specific firmware interface standard that
-> > +    allows access to the Configuration Space, the ECAM is required as
-> > +    defined in this section.
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+2016-10-27 2:31 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Core support code for CPU frequency changes, which will be used by
+> the generic cpufreq driver.
+>
+> The register view is different from the generic clk-mux; it has
+> a separate status register, and an update bit to load the register
+> setting.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+>
+>  drivers/clk/uniphier/Makefile               |   3 +
+>  drivers/clk/uniphier/clk-uniphier-core.c    |   3 +
+>  drivers/clk/uniphier/clk-uniphier-cpugear.c | 115 ++++++++++++++++++++++++++++
+>  drivers/clk/uniphier/clk-uniphier.h         |  17 +++-
+>  4 files changed, 136 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/clk/uniphier/clk-uniphier-cpugear.c
+>
+> diff --git a/drivers/clk/uniphier/Makefile b/drivers/clk/uniphier/Makefile
+> index f27b3603..665d1d6 100644
+> --- a/drivers/clk/uniphier/Makefile
+> +++ b/drivers/clk/uniphier/Makefile
+> @@ -1,8 +1,11 @@
+>  obj-y  += clk-uniphier-core.o
+> +
+> +obj-y  += clk-uniphier-cpugear.o
+>  obj-y  += clk-uniphier-fixed-factor.o
+>  obj-y  += clk-uniphier-fixed-rate.o
+>  obj-y  += clk-uniphier-gate.o
+>  obj-y  += clk-uniphier-mux.o
+> +
+>  obj-y  += clk-uniphier-sys.o
+>  obj-y  += clk-uniphier-mio.o
+>  obj-y  += clk-uniphier-peri.o
+> diff --git a/drivers/clk/uniphier/clk-uniphier-core.c b/drivers/clk/uniphier/clk-uniphier-core.c
+> index 26c53f7..0007218 100644
+> --- a/drivers/clk/uniphier/clk-uniphier-core.c
+> +++ b/drivers/clk/uniphier/clk-uniphier-core.c
+> @@ -27,6 +27,9 @@ static struct clk_hw *uniphier_clk_register(struct device *dev,
+>                                         const struct uniphier_clk_data *data)
+>  {
+>         switch (data->type) {
+> +       case UNIPHIER_CLK_TYPE_CPUGEAR:
+> +               return uniphier_clk_register_cpugear(dev, regmap, data->name,
+> +                                                    &data->data.cpugear);
+>         case UNIPHIER_CLK_TYPE_FIXED_FACTOR:
+>                 return uniphier_clk_register_fixed_factor(dev, data->name,
+>                                                           &data->data.factor);
+> diff --git a/drivers/clk/uniphier/clk-uniphier-cpugear.c b/drivers/clk/uniphier/clk-uniphier-cpugear.c
+> new file mode 100644
+> index 0000000..9bff26e
+> --- /dev/null
+> +++ b/drivers/clk/uniphier/clk-uniphier-cpugear.c
+> @@ -0,0 +1,115 @@
+> +/*
+> + * Copyright (C) 2016 Socionext Inc.
+> + *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/delay.h>
+> +#include <linux/device.h>
+> +#include <linux/regmap.h>
+> +
+> +#include "clk-uniphier.h"
+> +
+> +#define UNIPHIER_CLK_CPUGEAR_STAT      0       /* status */
+> +#define UNIPHIER_CLK_CPUGEAR_SET       4       /* set */
+> +#define UNIPHIER_CLK_CPUGEAR_UPD       8       /* update */
+> +#define   UNIPHIER_CLK_CPUGEAR_UPD_BIT BIT(0)
+> +
+> +struct uniphier_clk_cpugear {
+> +       struct clk_hw hw;
+> +       struct regmap *regmap;
+> +       unsigned int regbase;
+> +       unsigned int mask;
+> +};
+> +
+> +#define to_uniphier_clk_cpugear(_hw) \
+> +                       container_of(_hw, struct uniphier_clk_cpugear, hw)
+> +
+> +static int uniphier_clk_cpugear_set_parent(struct clk_hw *hw, u8 index)
+> +{
+> +       struct uniphier_clk_cpugear *gear = to_uniphier_clk_cpugear(hw);
+> +       int ret;
+> +       unsigned int val;
+> +
+> +       ret = regmap_write_bits(gear->regmap,
+> +                               gear->regbase + UNIPHIER_CLK_CPUGEAR_SET,
+> +                               gear->mask, index);
+> +       if (ret)
+> +               return ret;
+> +
+> +       ret = regmap_write_bits(gear->regmap,
+> +                               gear->regbase + UNIPHIER_CLK_CPUGEAR_SET,
+> +                               UNIPHIER_CLK_CPUGEAR_UPD_BIT,
+> +                               UNIPHIER_CLK_CPUGEAR_UPD_BIT);
+> +       if (ret)
+> +               return ret;
+> +
+> +       return regmap_read_poll_timeout(gear->regmap,
+> +                               gear->regbase + UNIPHIER_CLK_CPUGEAR_UPD,
+> +                               val, !(val & UNIPHIER_CLK_CPUGEAR_UPD_BIT),
+> +                               0, 1);
+> +}
+> +
+> +static u8 uniphier_clk_cpugear_get_parent(struct clk_hw *hw)
+> +{
+> +       struct uniphier_clk_cpugear *gear = to_uniphier_clk_cpugear(hw);
+> +       int num_parents = clk_hw_get_num_parents(hw);
+> +       int ret;
+> +       unsigned int val;
+> +
+> +       ret = regmap_read(gear->regmap,
+> +                         gear->regbase + UNIPHIER_CLK_CPUGEAR_STAT, &val);
+> +       if (ret)
+> +               return ret;
+> +
+> +       val &= gear->mask;
+> +
+> +       return val < num_parents ? val : -EINVAL;
+> +}
+> +
+> +static const struct clk_ops uniphier_clk_cpugear_ops = {
+> +       .determine_rate = __clk_mux_determine_rate,
+> +       .set_parent = uniphier_clk_cpugear_set_parent,
+> +       .get_parent = uniphier_clk_cpugear_get_parent,
+> +};
+> +
+> +struct clk_hw *uniphier_clk_register_cpugear(struct device *dev,
+> +                                        struct regmap *regmap,
+> +                                        const char *name,
+> +                               const struct uniphier_clk_cpugear_data *data)
+> +{
+> +       struct uniphier_clk_cpugear *gear;
+> +       struct clk_init_data init;
+> +       int ret;
+> +
+> +       gear = devm_kzalloc(dev, sizeof(*gear), GFP_KERNEL);
+> +       if (!gear)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       init.name = name;
+> +       init.ops = &uniphier_clk_cpugear_ops;
+> +       init.flags = CLK_SET_RATE_PARENT;
+> +       init.parent_names = data->parent_names;
+> +       init.num_parents = data->num_parents,
+> +
+> +       gear->regmap = regmap;
+> +       gear->regbase = data->regbase;
+> +       gear->mask = data->mask;
+> +       gear->hw.init = &init;
+> +
+> +       ret = devm_clk_hw_register(dev, &gear->hw);
+> +       if (ret)
+> +               return ERR_PTR(ret);
+> +
+> +       return &gear->hw;
+> +}
+> diff --git a/drivers/clk/uniphier/clk-uniphier.h b/drivers/clk/uniphier/clk-uniphier.h
+> index 0244dba..9707b0f 100644
+> --- a/drivers/clk/uniphier/clk-uniphier.h
+> +++ b/drivers/clk/uniphier/clk-uniphier.h
+> @@ -20,15 +20,24 @@
+>  struct device;
+>  struct regmap;
+>
+> -#define UNIPHIER_CLK_MUX_MAX_PARENTS   8
+> +#define UNIPHIER_CLK_CPUGEAR_MAX_PARENTS       16
+> +#define UNIPHIER_CLK_MUX_MAX_PARENTS           8
+>
+>  enum uniphier_clk_type {
+> +       UNIPHIER_CLK_TYPE_CPUGEAR,
+>         UNIPHIER_CLK_TYPE_FIXED_FACTOR,
+>         UNIPHIER_CLK_TYPE_FIXED_RATE,
+>         UNIPHIER_CLK_TYPE_GATE,
+>         UNIPHIER_CLK_TYPE_MUX,
+>  };
+>
+> +struct uniphier_clk_cpugear_data {
+> +       const char *parent_names[UNIPHIER_CLK_CPUGEAR_MAX_PARENTS];
+> +       unsigned int num_parents;
+> +       unsigned int regbase;
+> +       unsigned int mask;
+> +};
+> +
+>  struct uniphier_clk_fixed_factor_data {
+>         const char *parent_name;
+>         unsigned int mult;
+> @@ -58,6 +67,7 @@ struct uniphier_clk_data {
+>         enum uniphier_clk_type type;
+>         int idx;
+>         union {
+> +               struct uniphier_clk_cpugear_data cpugear;
+>                 struct uniphier_clk_fixed_factor_data factor;
+>                 struct uniphier_clk_fixed_rate_data rate;
+>                 struct uniphier_clk_gate_data gate;
+> @@ -90,7 +100,10 @@ struct uniphier_clk_data {
+>                 },                                              \
+>         }
+>
+> -
+> +struct clk_hw *uniphier_clk_register_cpugear(struct device *dev,
+> +                                            struct regmap *regmap,
+> +                                            const char *name,
+> +                               const struct uniphier_clk_cpugear_data *data);
+>  struct clk_hw *uniphier_clk_register_fixed_factor(struct device *dev,
+>                                                   const char *name,
+>                         const struct uniphier_clk_fixed_factor_data *data);
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
