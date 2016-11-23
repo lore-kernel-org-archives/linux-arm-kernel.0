@@ -1,54 +1,78 @@
 From: dhowells@redhat.com (David Howells)
-Date: Wed, 23 Nov 2016 12:53:33 +0000
-Subject: [PATCH 0/7] efi: Pass secure boot mode to kernel [ver #3]
-Message-ID: <147990561294.7576.6464430479448167484.stgit@warthog.procyon.org.uk>
+Date: Wed, 23 Nov 2016 12:53:40 +0000
+Subject: [PATCH 1/7] efi: use typed function pointers for runtime services
+ table [ver #3]
+In-Reply-To: <147990561294.7576.6464430479448167484.stgit@warthog.procyon.org.uk>
+References: <147990561294.7576.6464430479448167484.stgit@warthog.procyon.org.uk>
+Message-ID: <147990562059.7576.2346857409853503447.stgit@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Here's a set of patches that can determine the secure boot state of the
-UEFI BIOS and pass that along to the main kernel image.  This involves
-generalising ARM's efi_get_secureboot() function and making it mixed-mode
-safe.
+Instead of using void pointers, and casting them to correctly typed
+function pointers upon use, declare the runtime services pointers
+as function pointers using their respective prototypes, for which
+typedefs are already available.
 
-The patches can be found here also:
-
-	http://git.kernel.org/cgit/linux/kernel/git/dhowells/linux-fs.git/log/?h=efi-secure-boot
-
-at tag:
-
-	efi-secure-boot-20161123-2
-
-Note that the patches are not terminal on the branch.
-
-David
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: David Howells <dhowells@redhat.com>
 ---
-Ard Biesheuvel (1):
-      efi: use typed function pointers for runtime services table
 
-David Howells (4):
-      x86/efi: Allow invocation of arbitrary runtime services
-      arm/efi: Allow invocation of arbitrary runtime services
-      efi: Add SHIM and image security database GUID definitions
-      efi: Get the secure boot status
+ include/linux/efi.h |   36 ++++++++++++++++++------------------
+ 1 file changed, 18 insertions(+), 18 deletions(-)
 
-Josh Boyer (2):
-      efi: Disable secure boot if shim is in insecure mode
-      efi: Add EFI_SECURE_BOOT bit
-
-
- Documentation/x86/zero-page.txt           |    2 +
- arch/arm/include/asm/efi.h                |    1 
- arch/arm64/include/asm/efi.h              |    1 
- arch/x86/boot/compressed/eboot.c          |    3 +
- arch/x86/boot/compressed/head_32.S        |    6 +-
- arch/x86/boot/compressed/head_64.S        |    8 +-
- arch/x86/include/asm/efi.h                |    5 ++
- arch/x86/include/uapi/asm/bootparam.h     |    3 +
- arch/x86/kernel/setup.c                   |    5 ++
- drivers/firmware/efi/libstub/Makefile     |    2 -
- drivers/firmware/efi/libstub/arm-stub.c   |   46 --------------
- drivers/firmware/efi/libstub/secureboot.c |   93 +++++++++++++++++++++++++++++
- include/linux/efi.h                       |   42 +++++++------
- 13 files changed, 144 insertions(+), 73 deletions(-)
- create mode 100644 drivers/firmware/efi/libstub/secureboot.c
+diff --git a/include/linux/efi.h b/include/linux/efi.h
+index a07a476178cd..93a82de167eb 100644
+--- a/include/linux/efi.h
++++ b/include/linux/efi.h
+@@ -508,24 +508,6 @@ typedef struct {
+ 	u64 query_variable_info;
+ } efi_runtime_services_64_t;
+ 
+-typedef struct {
+-	efi_table_hdr_t hdr;
+-	void *get_time;
+-	void *set_time;
+-	void *get_wakeup_time;
+-	void *set_wakeup_time;
+-	void *set_virtual_address_map;
+-	void *convert_pointer;
+-	void *get_variable;
+-	void *get_next_variable;
+-	void *set_variable;
+-	void *get_next_high_mono_count;
+-	void *reset_system;
+-	void *update_capsule;
+-	void *query_capsule_caps;
+-	void *query_variable_info;
+-} efi_runtime_services_t;
+-
+ typedef efi_status_t efi_get_time_t (efi_time_t *tm, efi_time_cap_t *tc);
+ typedef efi_status_t efi_set_time_t (efi_time_t *tm);
+ typedef efi_status_t efi_get_wakeup_time_t (efi_bool_t *enabled, efi_bool_t *pending,
+@@ -560,6 +542,24 @@ typedef efi_status_t efi_query_variable_store_t(u32 attributes,
+ 						unsigned long size,
+ 						bool nonblocking);
+ 
++typedef struct {
++	efi_table_hdr_t			hdr;
++	efi_get_time_t			*get_time;
++	efi_set_time_t			*set_time;
++	efi_get_wakeup_time_t		*get_wakeup_time;
++	efi_set_wakeup_time_t		*set_wakeup_time;
++	efi_set_virtual_address_map_t	*set_virtual_address_map;
++	void				*convert_pointer;
++	efi_get_variable_t		*get_variable;
++	efi_get_next_variable_t		*get_next_variable;
++	efi_set_variable_t		*set_variable;
++	efi_get_next_high_mono_count_t	*get_next_high_mono_count;
++	efi_reset_system_t		*reset_system;
++	efi_update_capsule_t		*update_capsule;
++	efi_query_capsule_caps_t	*query_capsule_caps;
++	efi_query_variable_info_t	*query_variable_info;
++} efi_runtime_services_t;
++
+ void efi_native_runtime_setup(void);
+ 
+ /*
