@@ -1,56 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 23 Nov 2016 21:14:31 +0100
-Subject: [PATCH 24/31] ARM: dts: sk-rzg1e: add Ether support
+Date: Wed, 23 Nov 2016 21:14:33 +0100
+Subject: [PATCH 26/31] ARM: dts: r8a7779: Add device node for PRR
 In-Reply-To: <cover.1479931686.git.horms+renesas@verge.net.au>
 References: <cover.1479931686.git.horms+renesas@verge.net.au>
-Message-ID: <6b334366e63678c777367002eb87c297a10d2751.1479931687.git.horms+renesas@verge.net.au>
+Message-ID: <9ba368e2226e949e42596cc6027854656f6216a2.1479931687.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Define the SK-RZG1E board dependent part of the Ether device node.
-Enable DHCP and NFS root  for the kernel booting.
+Add a device node for the Product Register, which provides SoC product
+and revision information.
 
-Based on the original (and large) patch by Dmitry Shifrin
-<dmitry.shifrin@cogentembedded.com>.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7745-sk-rzg1e.dts | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7779.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7745-sk-rzg1e.dts b/arch/arm/boot/dts/r8a7745-sk-rzg1e.dts
-index 667ec4b259d5..97840b340197 100644
---- a/arch/arm/boot/dts/r8a7745-sk-rzg1e.dts
-+++ b/arch/arm/boot/dts/r8a7745-sk-rzg1e.dts
-@@ -20,7 +20,7 @@
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index 3005308a1807..9d3bb74bd3f6 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -590,6 +590,11 @@
+ 		};
  	};
  
- 	chosen {
--		bootargs = "ignore_loglevel";
-+		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-@@ -37,3 +37,16 @@
- &scif2 {
- 	status = "okay";
- };
-+
-+&ether {
-+	phy-handle = <&phy1>;
-+	renesas,ether-link-active-low;
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+		interrupt-parent = <&irqc>;
-+		interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
-+		micrel,led-mode = <1>;
++	prr: chipid at ff000044 {
++		compatible = "renesas,prr";
++		reg = <0xff000044 4>;
 +	};
-+};
++
+ 	sysc: system-controller at ffd85000 {
+ 		compatible = "renesas,r8a7779-sysc";
+ 		reg = <0xffd85000 0x0200>;
 -- 
 2.7.0.rc3.207.g0ac5344
