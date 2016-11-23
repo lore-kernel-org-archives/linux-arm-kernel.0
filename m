@@ -1,104 +1,28 @@
 From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Wed, 23 Nov 2016 20:29:29 +0300
-Subject: [PATCH 1/9] clocksource/drivers/rockchip_timer: split bc_timer into
- rk_timer and rk_clock_event_device
-Message-ID: <1479922177-20136-1-git-send-email-al.kochet@gmail.com>
+Date: Wed, 23 Nov 2016 20:29:36 +0300
+Subject: [PATCH 8/9] dt-bindings: add rockchip,
+ clocksource property to rk-timer
+In-Reply-To: <1479922177-20136-1-git-send-email-al.kochet@gmail.com>
+References: <1479922177-20136-1-git-send-email-al.kochet@gmail.com>
+Message-ID: <1479922177-20136-8-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move ce field out of struct bc_timer into struct rk_clock_event_device,
-rename struct bc_timer to struct rk_timer.
-
-Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
 ---
- drivers/clocksource/rockchip_timer.c |   33 ++++++++++++++++++++++-----------
- 1 file changed, 22 insertions(+), 11 deletions(-)
+ .../bindings/timer/rockchip,rk-timer.txt           |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
-index 23e267a..6d68d4c 100644
---- a/drivers/clocksource/rockchip_timer.c
-+++ b/drivers/clocksource/rockchip_timer.c
-@@ -29,18 +29,28 @@
- #define TIMER_MODE_USER_DEFINED_COUNT		(1 << 1)
- #define TIMER_INT_UNMASK			(1 << 2)
+diff --git a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
+index a41b184..ed5392a 100644
+--- a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
++++ b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
+@@ -9,6 +9,7 @@ Required properties:
+ - clocks : must contain an entry for each entry in clock-names
+ - clock-names : must include the following entries:
+   "timer", "pclk"
++- rockchip,clocksource: setup the timer as clocksource
  
--struct bc_timer {
--	struct clock_event_device ce;
-+struct rk_timer {
- 	void __iomem *base;
- 	void __iomem *ctrl;
- 	u32 freq;
- };
- 
--static struct bc_timer bc_timer;
-+struct rk_clock_event_device {
-+	struct clock_event_device ce;
-+	struct rk_timer timer;
-+};
-+
-+static struct rk_clock_event_device bc_timer;
-+
-+static inline struct rk_clock_event_device*
-+rk_clock_event_device(struct clock_event_device *ce)
-+{
-+	return container_of(ce, struct rk_clock_event_device, ce);
-+}
- 
--static inline struct bc_timer *rk_timer(struct clock_event_device *ce)
-+static inline struct rk_timer *rk_timer(struct clock_event_device *ce)
- {
--	return container_of(ce, struct bc_timer, ce);
-+	return &rk_clock_event_device(ce)->timer;
- }
- 
- static inline void __iomem *rk_base(struct clock_event_device *ce)
-@@ -116,16 +126,17 @@ static irqreturn_t rk_timer_interrupt(int irq, void *dev_id)
- static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
- {
- 	struct clock_event_device *ce = &bc_timer.ce;
-+	struct rk_timer *timer = &bc_timer.timer;
- 	struct clk *timer_clk;
- 	struct clk *pclk;
- 	int ret = -EINVAL, irq;
- 
--	bc_timer.base = of_iomap(np, 0);
--	if (!bc_timer.base) {
-+	timer->base = of_iomap(np, 0);
-+	if (!timer->base) {
- 		pr_err("Failed to get base address for '%s'\n", TIMER_NAME);
- 		return -ENXIO;
- 	}
--	bc_timer.ctrl = bc_timer.base + ctrl_reg;
-+	timer->ctrl = timer->base + ctrl_reg;
- 
- 	pclk = of_clk_get_by_name(np, "pclk");
- 	if (IS_ERR(pclk)) {
-@@ -153,7 +164,7 @@ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
- 		goto out_timer_clk;
- 	}
- 
--	bc_timer.freq = clk_get_rate(timer_clk);
-+	timer->freq = clk_get_rate(timer_clk);
- 
- 	irq = irq_of_parse_and_map(np, 0);
- 	if (!irq) {
-@@ -181,7 +192,7 @@ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
- 		goto out_irq;
- 	}
- 
--	clockevents_config_and_register(ce, bc_timer.freq, 1, UINT_MAX);
-+	clockevents_config_and_register(ce, timer->freq, 1, UINT_MAX);
- 
- 	return 0;
- 
-@@ -190,7 +201,7 @@ out_irq:
- out_timer_clk:
- 	clk_disable_unprepare(pclk);
- out_unmap:
--	iounmap(bc_timer.base);
-+	iounmap(timer->base);
- 
- 	return ret;
- }
+ Example:
+ 	timer: timer at ff810000 {
 -- 
 1.7.9.5
