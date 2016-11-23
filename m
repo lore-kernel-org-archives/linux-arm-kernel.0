@@ -1,81 +1,67 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Wed, 23 Nov 2016 20:29:37 +0300
-Subject: [PATCH 9/9] ARM: dts: rockchip: add timer entries to rk3188.dtsi
-In-Reply-To: <1479922177-20136-1-git-send-email-al.kochet@gmail.com>
-References: <1479922177-20136-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1479922177-20136-9-git-send-email-al.kochet@gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 23 Nov 2016 19:37:39 +0200
+Subject: [PATCH v3] ARM: Drop fixed 200 Hz timer requirement from Samsung
+ platforms
+In-Reply-To: <1479467712-5218-1-git-send-email-krzk@kernel.org>
+References: <1479467712-5218-1-git-send-email-krzk@kernel.org>
+Message-ID: <20161123173739.GA9228@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is correct configuration borrowed from 3.0 kernel[1].
-timer 6 used as clocksource, timers 0, 1, 4 and 5 used
-as clockevents.
+On Fri, Nov 18, 2016 at 01:15:12PM +0200, Krzysztof Kozlowski wrote:
+> All Samsung platforms, including the Exynos, are selecting HZ_FIXED with
+> 200 Hz.  Unfortunately in case of multiplatform image this affects also
+> other platforms when Exynos is enabled.
+> 
+> This looks like an very old legacy code, dating back to initial
+> upstreaming of S3C24xx.  Probably it was required for s3c24xx timer
+> driver, which was removed in commit ad38bdd15d5b ("ARM: SAMSUNG: Remove
+> unused plat-samsung/time.c").
+> 
+> Since then, this fixed 200 Hz spread everywhere, including out-of-tree
+> Samsung kernels (SoC vendor's and Tizen's).  I believe this choice
+> was rather an effect of coincidence instead of conscious choice.
+> 
+> On S3C24xx, the PWM counter is only 16 bit wide, and with the
+> typical 12MHz input clock that overflows every 5.5ms.  This works
+> with HZ=200 or higher but not with HZ=100 which needs a 10ms
+> interval between ticks.  On Later chips (S3C64xx, S5P and EXYNOS),
+> the counter is 32 bits and does not have this problem.
+> 
+> The new samsung_pwm_timer driver solves the problem by scaling the input
+> clock by a factor of 50 on S3C24xx, which makes it less accurate but
+> allows HZ=100 as well as CONFIG_NO_HZ with fewer wakeups.
+> 
+> Few perf mem and sched tests on Odroid XU3 board (Exynos5422, 4x Cortex
+> A7, 4x Cortex A15) show no regressions when switching from 200 Hz to
+> other values.
+> 
+> Reported-by: Lee Jones <lee.jones@linaro.org>
+> [Dropping of 200_HZ from S3C/S5P was suggested by Arnd]
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> [Tested on Exynos5800]
+> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Acked-by: Kukjin Kim <kgene@kernel.org>
+> [Tested on S3C2440]
+> Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> 
+> ---
+> 
+> Changes since v2:
+> 1. Extend message.
+> 2. Add Kukjin's ack.
+> 3. Add Sylwester's tested-by.
+> 
+> Changes since v1:
+> 1. Add Javier's tested-by.
+> 2. Drop HZ_FIXED also from ARCH_S5PV210 and ARCH_S3C24XX after Arnd
+>    suggestions and analysis.
+> ---
+>  arch/arm/Kconfig | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+>
 
-Timers can do interrupts and work as expected with correct
-driver support.
-
-[1] https://github.com/radxa/linux-rockchip/blob/radxa-stable-3.0/arch/arm/mach-rk3188/rk_timer.c
-
-Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
----
- arch/arm/boot/dts/rk3188.dtsi |   45 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index 31f81b2..e2f88c8 100644
---- a/arch/arm/boot/dts/rk3188.dtsi
-+++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -106,6 +106,51 @@
- 		};
- 	};
- 
-+	timer0: timer at 20038000 {
-+		compatible = "rockchip,rk3288-timer";
-+		reg = <0x20038000 0x20>;
-+		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_TIMER0>, <&cru PCLK_TIMER0>;
-+		clock-names = "timer", "pclk";
-+		status = "disabled";
-+	};
-+
-+	timer1: timer at 20038020 {
-+		compatible = "rockchip,rk3288-timer";
-+		reg = <0x20038020 0x20>;
-+		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_TIMER1>, <&cru PCLK_TIMER0>;
-+		clock-names = "timer", "pclk";
-+		status = "disabled";
-+	};
-+
-+	timer4: timer at 20038060 {
-+		compatible = "rockchip,rk3288-timer";
-+		reg = <0x20038060 0x20>;
-+		interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_TIMER4>, <&cru PCLK_TIMER0>;
-+		clock-names = "timer", "pclk";
-+		status = "disabled";
-+	};
-+
-+	timer5: timer at 20038080 {
-+		compatible = "rockchip,rk3288-timer";
-+		reg = <0x20038080 0x20>;
-+		interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_TIMER5>, <&cru PCLK_TIMER0>;
-+		clock-names = "timer", "pclk";
-+		status = "disabled";
-+	};
-+
-+	timer6: timer at 200380A0 {
-+		compatible = "rockchip,rk3288-timer";
-+		reg = <0x200380A0 0x20>;
-+		interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_TIMER6>, <&cru PCLK_TIMER0>;
-+		clock-names = "timer", "pclk";
-+		status = "disabled";
-+	};
-+
- 	i2s0: i2s at 1011a000 {
- 		compatible = "rockchip,rk3188-i2s", "rockchip,rk3066-i2s";
- 		reg = <0x1011a000 0x2000>;
--- 
-1.7.9.5
+Applied,
+Krzysztof
