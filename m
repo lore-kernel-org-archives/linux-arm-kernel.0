@@ -1,41 +1,31 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 23 Nov 2016 15:59:16 +0100
-Subject: [PATCH RFC] ARM: dts: add support for Turris Omnia
-In-Reply-To: <1479851991.26813.2@smtp.gmail.com>
-References: <20161105203841.9661-1-uwe@kleine-koenig.org>
- <1479126185.15557.5@smtp.gmail.com>
- <20161114201640.rr32iyjf5a53v33t@perseus.defre.kleine-koenig.org>
- <20161114202832.GG24546@lunn.ch>
- <1479586147.10840.0@smtp.gmail.com>
- <20161120203037.pd5mhqyjeotileve@perseus.defre.kleine-koenig.org>
- <1479851991.26813.2@smtp.gmail.com>
-Message-ID: <20161123145916.GL14947@lunn.ch>
+From: geliangtang@gmail.com (Geliang Tang)
+Date: Wed, 23 Nov 2016 23:04:21 +0800
+Subject: [PATCH] soc/fsl/qe: use builtin_platform_driver
+Message-ID: <2fd43af1f6666eb4ebdbaeb80aa8618b97236813.1479913430.git.geliangtang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >CZ11NIC12 is indicated on my board.
-> 
-> :-( Well, this board version has wrongly matched length of some
-> differential pairs, IRQ from 88E1514 is connected differently, there
-> are slight differences in power supplies and (if I am not mistaken)
-> something changed in RTC support circuitry. It looks like a huge
-> mistake on our side.
+Use builtin_platform_driver() helper to simplify the code.
 
-Hi Tomas
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
+---
+ drivers/soc/fsl/qe/qe.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-Would these problems also explain why the Ethernet links to the switch
-don't work? Maybe the differential pairs?
-
-> It seems that libphy is probed before pca9538 and we end up with:
-> [    4.217550] libphy: orion_mdio_bus: probed
-> [    4.221777] irq: no irq domain found for
-> /soc/internal-regs/i2c at 11000/i2cmux at 70/i2c at 7/gpio at 71 !
-> 
-> Any clue where to look in order to defer probing libphy or at least
-> orion_mdio_bus?
-
-I think there is a known phylib problem here. Somewhere in the call
-chain there is a void function, so the EPROBE_DEFFER gets
-discarded. But i could be remembering this wrongly.
-
-      Andrew
+diff --git a/drivers/soc/fsl/qe/qe.c b/drivers/soc/fsl/qe/qe.c
+index 2707a82..ade168f 100644
+--- a/drivers/soc/fsl/qe/qe.c
++++ b/drivers/soc/fsl/qe/qe.c
+@@ -717,9 +717,5 @@ static struct platform_driver qe_driver = {
+ 	.resume = qe_resume,
+ };
+ 
+-static int __init qe_drv_init(void)
+-{
+-	return platform_driver_register(&qe_driver);
+-}
+-device_initcall(qe_drv_init);
++builtin_platform_driver(qe_driver);
+ #endif /* defined(CONFIG_SUSPEND) && defined(CONFIG_PPC_85xx) */
+-- 
+2.9.3
