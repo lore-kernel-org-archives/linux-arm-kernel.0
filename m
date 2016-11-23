@@ -1,48 +1,38 @@
-From: uwe@kleine-koenig.org (=?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?=)
-Date: Wed, 23 Nov 2016 19:36:53 +0100
-Subject: [PATCH RFC] ARM: dts: add support for Turris Omnia
-In-Reply-To: <20161123145916.GL14947@lunn.ch>
-References: <20161105203841.9661-1-uwe@kleine-koenig.org>
- <1479126185.15557.5@smtp.gmail.com>
- <20161114201640.rr32iyjf5a53v33t@perseus.defre.kleine-koenig.org>
- <20161114202832.GG24546@lunn.ch> <1479586147.10840.0@smtp.gmail.com>
- <20161120203037.pd5mhqyjeotileve@perseus.defre.kleine-koenig.org>
- <1479851991.26813.2@smtp.gmail.com> <20161123145916.GL14947@lunn.ch>
-Message-ID: <09b7d4a1-40e5-7aee-d777-9bd9f9b434b4@kleine-koenig.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 23 Nov 2016 10:57:13 -0800
+Subject: [PATCH 1/4] serial: core: Add LED trigger support
+In-Reply-To: <20161123100106.15969-2-s.hauer@pengutronix.de>
+References: <20161123100106.15969-1-s.hauer@pengutronix.de>
+ <20161123100106.15969-2-s.hauer@pengutronix.de>
+Message-ID: <e9fc12b8-d4a7-067d-ef87-03f0aae39bd7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andrew,
-
-On 11/23/2016 03:59 PM, Andrew Lunn wrote:
->>> CZ11NIC12 is indicated on my board.
->>
->> :-( Well, this board version has wrongly matched length of some
->> differential pairs, IRQ from 88E1514 is connected differently, there
->> are slight differences in power supplies and (if I am not mistaken)
->> something changed in RTC support circuitry. It looks like a huge
->> mistake on our side.
+On 11/23/2016 02:01 AM, Sascha Hauer wrote:
+> With this patch the serial core provides LED triggers for RX and TX.
 > 
-> Hi Tomas
-> 
-> Would these problems also explain why the Ethernet links to the switch
-> don't work? Maybe the differential pairs?
+> As the serial core layer does not know when the hardware actually sends
+> or receives characters, this needs help from the UART drivers.
 
-no this is not the problem. When booting the OpenWRT based system I can
-communicate with the device via the switch. (Didn't test deeply, but my
-Laptop got a dhcp lease from the Turris Omnia and I can ping it.) But
-this convinces me, that the hardware is good enough.
+Looking at 8250, we call serial8250_tx_chars from __start_tx which is
+called form the uart_ops::start_tx, for RX I sort of agree, since this
+happens in interrupt handler. I suppose some drivers could actually
+queue work but not do it right away though?
 
-If you have any ideas what I can try to make the switch work or help to
-diagnose the problem, just let me know.
+> The LED triggers are registered in uart_add_led_triggers() called from
+> the UART drivers which want to support LED triggers. All the driver
+> has to do then is to call uart_led_trigger_[tx|rx] to indicate
+> activity.
 
-Best regards
-Uwe
+Could we somehow remedy the lack of knowledge from the core as whether
+the HW sends/receives characters first before adding support for LED
+triggers? It would be more generic and future proof to require UART
+drivers to report to the core when they actually TX/RX, and then at the
+core level, utilize that knowledge to perform the LED trigger.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161123/3b35fee8/attachment.sig>
+Side note: are you positive using drv->dev_name is robust enough on
+systems with many different UART drivers, yet all of them being ttyS*?
+
+Thanks!
+-- 
+Florian
