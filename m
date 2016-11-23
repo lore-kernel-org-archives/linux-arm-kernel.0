@@ -1,51 +1,31 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 23 Nov 2016 17:02:17 -0600
-Subject: [PATCH v2] ARM: dts: AM571x-IDK Initial Support
-In-Reply-To: <20161122041732.8385-1-lokeshvutla@ti.com>
-References: <20161122041732.8385-1-lokeshvutla@ti.com>
-Message-ID: <20161123230217.iq5fyyazgzdaccqv@rob-hp-laptop>
+Date: Wed, 23 Nov 2016 17:06:37 -0600
+Subject: [PATCH 4/6] dt-bindings: change hi6220-reset.txt according to
+ reset-hi6220.c
+In-Reply-To: <2314383.qiZ3Cq7QsP@wuerfel>
+References: <1479800961-6249-1-git-send-email-zhangfei.gao@linaro.org>
+ <1479800961-6249-5-git-send-email-zhangfei.gao@linaro.org>
+ <2314383.qiZ3Cq7QsP@wuerfel>
+Message-ID: <20161123230637.m4cvc2l4huxlf5dd@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2016 at 09:47:32AM +0530, Lokesh Vutla wrote:
-> From: Schuyler Patton <spatton@ti.com>
+On Tue, Nov 22, 2016 at 09:48:32AM +0100, Arnd Bergmann wrote:
+> On Tuesday, November 22, 2016 3:49:19 PM CET Zhangfei Gao wrote:
+> >  Required properties:
+> >  - compatible: should be one of the following:
+> > -  - "hisilicon,hi6220-sysctrl", "syscon" : For peripheral reset controller.
+> > -  - "hisilicon,hi6220-mediactrl", "syscon" : For media reset controller.
+> > -- reg: should be register base and length as documented in the
+> > -  datasheet
+> > +  - "hisilicon,hi6220-reset-sysctrl" : For peripheral reset controller.
+> > +  - "hisilicon,hi6220-reset-mediactrl" : For media reset controller.
+> > +- hisi,rst-syscon: phandle of the reset's syscon.
+> >  - #reset-cells: 1, see below
+> > 
 > 
-> The AM571x-IDK board is a board based on TI's AM5718 SOC
-> which has a single core 1.5GHz A15 processor. This board is a
-> development platform for the Industrial market with:
-> - 1GB of DDR3L
-> - Dual 1Gbps Ethernet
-> - HDMI,
-> - PRU-ICSS
-> - uSD
-> - 16GB eMMC
-> - CAN
-> - RS-485
-> - PCIe
-> - USB3.0
-> - Video Input Port
-> - Industrial IO port and expansion connector
-> 
-> The link to the data sheet and TRM can be found here:
-> 
-> http://www.ti.com/product/AM5718
-> 
-> Initial support is only for basic peripherals.
-> 
-> Signed-off-by: Schuyler Patton <spatton@ti.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
-> Cahnges since v1:
-> - Dropped "ti,dra722", and "ti,dra72" from compatibles
-> - Fixes few node names as suggested by Rob.
-> Logs: http://pastebin.ubuntu.com/23515001/
-> 
->  .../devicetree/bindings/arm/omap/omap.txt          |  3 +
->  arch/arm/boot/dts/Makefile                         |  1 +
->  arch/arm/boot/dts/am571x-idk.dts                   | 81 ++++++++++++++++++++++
->  3 files changed, 85 insertions(+)
->  create mode 100644 arch/arm/boot/dts/am571x-idk.dts
+> Please keep the old strings around for compatibility.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Why are these even changing? The commit message should say why.
+
+Rob
