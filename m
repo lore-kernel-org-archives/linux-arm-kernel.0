@@ -1,56 +1,98 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 23 Nov 2016 13:19:47 +0530
-Subject: [PATCH 1/3] of: base: add support to get machine compatible string
-In-Reply-To: <fdb93150-9089-c7bb-2b0a-21ded241a647@arm.com>
-References: <1479811311-3080-1-git-send-email-bgolaszewski@baylibre.com>
- <1479811311-3080-2-git-send-email-bgolaszewski@baylibre.com>
- <5ce9fb9f-459a-562b-2e9f-85d35f9ec035@arm.com>
- <67a3c2c7-0cb9-9764-2710-6ee66fc4dde4@ti.com>
- <fdb93150-9089-c7bb-2b0a-21ded241a647@arm.com>
-Message-ID: <ae92e013-b41b-6caa-b32f-284ffb6f5aa0@ti.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Wed, 23 Nov 2016 16:02:02 +0800
+Subject: [PATCH 3/6] reset: hisilicon: add reset-hi3660
+In-Reply-To: <1479810156.13701.1.camel@pengutronix.de>
+References: <1479800961-6249-1-git-send-email-zhangfei.gao@linaro.org>
+ <2220300.Yj4lYzeH2z@wuerfel>
+ <d6e602c0-70e9-0309-86b5-bfd006d86028@linaro.org>
+ <3166877.sQekoU5ezv@wuerfel> <1479810156.13701.1.camel@pengutronix.de>
+Message-ID: <26a54e14-236e-78e2-020b-4a51342e2694@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 22 November 2016 09:16 PM, Sudeep Holla wrote:
-> Hi Sekhar,
-> 
-> On 22/11/16 15:06, Sekhar Nori wrote:
->> Hi Sudeep,
->>
->> On Tuesday 22 November 2016 04:23 PM, Sudeep Holla wrote:
->>>
->>>
->>> On 22/11/16 10:41, Bartosz Golaszewski wrote:
->>>> Add a function allowing to retrieve the compatible string of the root
->>>> node of the device tree.
+Hi, Philipp
+
+
+On 2016?11?22? 18:22, Philipp Zabel wrote:
+> Am Dienstag, den 22.11.2016, 10:42 +0100 schrieb Arnd Bergmann:
+>> On Tuesday, November 22, 2016 5:34:05 PM CET zhangfei wrote:
+>>> On 2016?11?22? 16:50, Arnd Bergmann wrote:
+>>>> On Tuesday, November 22, 2016 3:49:18 PM CET Zhangfei Gao wrote:
+>>>>> +static const struct hisi_reset_channel_data hi3660_iomcu_rst[] = {
+>>>>> +       [HI3660_RST_I2C0] = HISI_RST_SEP(0x20, 3),
+>>>>> +       [HI3660_RST_I2C1] = HISI_RST_SEP(0x20, 4),
+>>>>> +       [HI3660_RST_I2C2] = HISI_RST_SEP(0x20, 5),
+>>>>> +       [HI3660_RST_I2C6] = HISI_RST_SEP(0x20, 27),
+>>>>> +};
+>>>>> +
+>>>>> +static struct hisi_reset_controller_data hi3660_iomcu_controller = {
+>>>>> +       .nr_channels = ARRAY_SIZE(hi3660_iomcu_rst),
+>>>>> +       .channels = hi3660_iomcu_rst,
+>>>>> +};
+>>>>> +
+>>>>> +static const struct hisi_reset_channel_data hi3660_crgctrl_rst[] = {
+>>>>> +       [HI3660_RST_I2C3] = HISI_RST_SEP(0x78, 7),
+>>>>> +       [HI3660_RST_I2C4] = HISI_RST_SEP(0x78, 27),
+>>>>> +       [HI3660_RST_I2C7] = HISI_RST_SEP(0x60, 14),
+>>>>> +       [HI3660_RST_SD] = HISI_RST_SEP(0x90, 18),
+>>>>> +       [HI3660_RST_SDIO] = HISI_RST_SEP(0x90, 20),
+>>>>> +       [HI3660_RST_UFS] = HISI_RST_SEP(0x84, 12),
+>>>>> +       [HI3660_RST_UFS_ASSERT] = HISI_RST_SEP(0x84, 7),
+>>>>> +       [HI3660_RST_PCIE_SYS] = HISI_RST_SEP(0x84, 26),
+>>>>> +       [HI3660_RST_PCIE_PHY] = HISI_RST_SEP(0x84, 27),
+>>>>> +       [HI3660_RST_PCIE_BUS] = HISI_RST_SEP(0x84, 31),
+>>>>> +       [HI3660_RST_USB3OTG_PHY] = HISI_RST_SEP(0x90, 3),
+>>>>> +       [HI3660_RST_USB3OTG] = HISI_RST_SEP(0x90, 5),
+>>>>> +       [HI3660_RST_USB3OTG_32K] = HISI_RST_SEP(0x90, 6),
+>>>>> +       [HI3660_RST_USB3OTG_AHB] = HISI_RST_SEP(0x90, 7),
+>>>>> +       [HI3660_RST_USB3OTG_MUX] = HISI_RST_SEP(0x90, 8),
+>>>>> +};
+>>>> I think you can avoid the trap of the ABI incompatibility if
+>>>> you just define those as in the binding as tuples, using #reset-cells=2.
 >>>>
+>>>> In particular for the first set, it seems really silly to redefine
+>>>> the numbers when there is just a simple integer number.
+>>> Could you clarify more, still not understand.
+>>> The number is index of the arrays, and the index will be used in dts.
+>>> The arrays lists the registers offset and bit shift.
+>>> For example:
 >>>
->>> Rob has queued [1] and it's in -next today. You can reuse that if you
->>> are planning to target this for v4.11 or just use open coding in your
->>> driver for v4.10 and target this move for v4.11 to avoid cross tree
->>> dependencies as I already mentioned in your previous thread.
->>
->> I dont have your original patch in my mailbox, but I wonder if
->> returning a pointer to property string for a node whose reference has
->> already been released is safe to do? Probably not an issue for the root
->> node, but still feels counter-intuitive.
->>
-> 
-> I am not sure if I understand the issue here. Are you referring a case
-> where of_root is freed ?
+>>> [HI3660_RST_I2C0] = HISI_RST_SEP(0x20, 3), means register offset : 0x20, and bit shift = 3.
+>>>
+>>> And Documentation/devicetree/bindings/reset/reset.txt
+>>> Required properties:
+>>> #reset-cells:   Number of cells in a reset specifier; Typically 0 for nodes
+>>>                   with a single reset output and 1 for nodes with multiple
+>>>                   reset outputs.
+> This is just a suggestion, for reset controllers where the reset lines
+> can reasonably be enumerated by a single integer. If there is a good
+> reason to use more complicated bindings, more cells can be used.
+> That being said, I dislike having to spread register/bit information
+> throughout the device trees at the consumer/phandle sites, if the
+> register/bit information absolutely has to be put into the device tree,
+> I'd prefer a binding similar to ti-syscon, where it's all in one place.
+Thanks for the suggestion.
+Will use table in dts instead of 
+include/dt-bindings/reset/hisi,hi3660-resets.h
+like
++               hisi,reset-bits = <0x20 0x8             /* 0: i2c0 */
++                                  0x20 0x10            /* 1: i2c1 */
++                                  0x20 0x20            /* 2: i2c2 */
++                                  0x20 0x8000000>;     /* 3: i2c6 */
 
-Yes, right, thats what I was hinting at. Since you are giving up the
-reference to the device node before the function returns, the user can
-be left with a dangling reference.
+To remove the potential ABI issue as pointed by Arnd.
+>
+>> You can easily enumerate the registers that contain reset bits here,
+>> so just use one cell for the register and another one for the index.
+> Changing the reset cells is an incompatible change, and this is not a
+> straight forward register/bit mapping in hardware either. There are
+> currently three registers involved: enable (+0x0), disable (+0x4), and
+> status (+0x8). Also, what if in the future one of these reset bits have
+> to be handled inverted (as just happened for hi3519)?
+Discussed with Jianchen, we are only considering Kirin series now.
+The inverted in hi3519 is only for some line, not the whole controller.
+It is more like a bug and kirin does not have such issue.
 
-> Also I have seen drivers today just using this pointer directly, but
-> it's better to copy the string(I just saw this done in one case)
+Will send a new RFC, help take a look.
 
-Hmm, the reference is given up before the API returns, so I doubt
-copying it later is any additional benefit.
-
-I suspect this is a theoretical issue though since root device node is
-probably never freed.
-
-Thanks,
-Sekhar
+Thanks
