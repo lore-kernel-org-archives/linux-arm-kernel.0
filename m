@@ -1,20 +1,18 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 23 Nov 2016 15:19:44 +0100
-Subject: [PATCH 0/2] ARM: dts: r8a7743/r8a7745: Add device nodes for PRR
-In-Reply-To: <1479465463-19572-1-git-send-email-geert+renesas@glider.be>
-References: <1479465463-19572-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20161123141943.GC9057@verge.net.au>
+Date: Wed, 23 Nov 2016 15:23:23 +0100
+Subject: [PATCH] arm64: dts: r8a7796: Add all MSIOF nodes
+In-Reply-To: <1479749213-13744-1-git-send-email-geert+renesas@glider.be>
+References: <1479749213-13744-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20161123142322.GE9057@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 11:37:41AM +0100, Geert Uytterhoeven wrote:
-> 	Hi Simon, Magnus,
+On Mon, Nov 21, 2016 at 06:26:53PM +0100, Geert Uytterhoeven wrote:
+> Add the device nodes for all MSIOF SPI controllers.
 > 
-> This patch series adds the device nodes for the Product Register to the
-> recently added RZ/G DTS files, which allow to provide SoC product
-> and revision information.
-> 
-> This depends on "[PATCH 0/2] ARM: dts: r8a7743/r8a7745: Move RST nodes
-> before SYSC nodes".
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> Tested with MSIOF2(B) on EXIO connector D of r8a7796/salvator-x, using
+> spidev, gpio-74x164, and a logic analyzer.
 
-Thanks, I have queued these up for v4.11.
+Thanks, I have queued this up for v4.11.
