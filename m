@@ -1,30 +1,121 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 23 Nov 2016 10:32:20 +0100
-Subject: [PATCH v2 3/3] usb: ohci-da8xx: rename driver to ohci-da8xx
-In-Reply-To: <CAKXjFTME9Y+KEg21i05zP6+10tB4bW=cMbSftAbYhozEg1B8ZA@mail.gmail.com>
-References: <20161103160308.29588-1-ahaslam@baylibre.com>
- <20161103160308.29588-4-ahaslam@baylibre.com>
- <CAKXjFTME9Y+KEg21i05zP6+10tB4bW=cMbSftAbYhozEg1B8ZA@mail.gmail.com>
-Message-ID: <20161123093220.GA32502@kroah.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Nov 2016 09:33:32 +0000
+Subject: [PATCH 1/2] kbuild: provide include/asm/asm-prototypes.h for ARM
+In-Reply-To: <alpine.LFD.2.20.1611222030050.1814@knanqh.ubzr>
+References: <20161122110557.1533467-1-arnd@arndb.de>
+ <alpine.LFD.2.20.1611221106410.1814@knanqh.ubzr>
+ <20161123120436.18dc21e7@roar.ozlabs.ibm.com>
+ <alpine.LFD.2.20.1611222030050.1814@knanqh.ubzr>
+Message-ID: <20161123093332.GB14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2016 at 06:10:50PM +0100, Axel Haslam wrote:
-> Hi Greg,
+On Tue, Nov 22, 2016 at 08:35:48PM -0500, Nicolas Pitre wrote:
+> On Wed, 23 Nov 2016, Nicholas Piggin wrote:
 > 
-> On Thu, Nov 3, 2016 at 5:03 PM, Axel Haslam <ahaslam@baylibre.com> wrote:
-> > The davinci ohci driver name (currently "ohci") is too generic.
-> > To be consistent with other usb dirvers, append the "-da8xx" postfix
-> > to the name.
-> >
+> > On Tue, 22 Nov 2016 11:34:48 -0500 (EST)
+> > Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > 
+> > > On Tue, 22 Nov 2016, Arnd Bergmann wrote:
+> > > 
+> > > > This adds an asm/asm-prototypes.h header for ARM to fix the broken symbol
+> > > > versioning for symbols exported from assembler files.
+> > > > 
+> > > > I couldn't find the correct prototypes for the compiler builtins,
+> > > > so I went with the fake 'void f(void)' prototypes that we had
+> > > > before, restoring the state before they were moved.
+> > > > 
+> > > > Originally I assumed that the problem was just a harmless warning
+> > > > in unusual configurations, but as Uwe found, we actually need this
+> > > > to load most modules when symbol versioning is enabled, as it is
+> > > > in many distro kernels.
+> > > > 
+> > > > Cc: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+> > > > Fixes: 4dd1837d7589 ("arm: move exports to definitions")
+> > > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > > ---
+> > > > Compared to the earlier version, I dropped the changes to the
+> > > > csumpartial files, which now get handled correctly by Kbuild
+> > > > even when the export comes from a macro, and I also dropped the
+> > > > changes to the bitops files, which were already fixed in a
+> > > > patch from Nico.
+> > > > 
+> > > > The patch applies cleanly on top of the rmk/fixes tree but has
+> > > > no effect there, as it also needs 4efca4ed05cb ("kbuild: modversions
+> > > > for EXPORT_SYMBOL() for asm") and cc6acc11cad1 ("kbuild: be more
+> > > > careful about matching preprocessed asm ___EXPORT_SYMBOL").
+> > > > 
+> > > > With the combination of rmk/fixes, torvalds/master and these two
+> > > > patches, symbol versioning works again on ARM. As it is still
+> > > > broken on almost all other architectures (powerpc is fixed,
+> > > > x86 has a patch), I wonder if we should make CONFIG_MODVERSIONS
+> > > > as broken for everything else.  
+> > > 
+> > > I'm not sure I like this at all.
+> > > 
+> > > The goal for moving EXPORT_SYMBOL() to assembly code where symbols were 
+> > > defined is to make things close together and avoid those centralized 
+> > > list of symbols that you can easily miss when modifying the actual code.
+> > 
+> > Right.
+> > 
+> > > 
+> > > This series is therefore bringing back a centralized list of symbols in 
+> > > a slightly different form, nullifying the advantages from having moved 
+> > > EXPORT_SYMBOL() to asm code.  To me this looks like a big step backward.
+> > 
+> > Exported symbols have C declarations in headers already. For the most
+> > part, anyway -- these ones Arnd adds are for compiler runtime which is
+> > why some architectures haven't had the prototypes.
 > 
-> if there are no objections, would it be possible to pick up this patch?
-> the corresponding phy patch was merged and the platform changes
-> are ack'ed, and will we taken by the davinci maintainer once this patch
-> gets in.
+> Hmmm. That's right.  That makes it much more justifiable.
+> My main objection is withdrawn.
 
-Now applied.
+I don't see it makes any difference - the armksyms.c originally had
+the same:
 
-thanks,
+-#include <linux/export.h>
+-#include <linux/sched.h>
+-#include <linux/string.h>
+-#include <linux/cryptohash.h>
+-#include <linux/delay.h>
+-#include <linux/in6.h>
+-#include <linux/syscalls.h>
+-#include <linux/uaccess.h>
+-#include <linux/io.h>
+-#include <linux/arm-smccc.h>
+-
+-#include <asm/checksum.h>
+-#include <asm/ftrace.h>
 
-greg k-h
+followed by prototypes for the GCC internal functions, and:
+
+-extern void fpundefinstr(void);
+-
+-void mmioset(void *, unsigned int, size_t);
+-void mmiocpy(void *, const void *, size_t);
+
+So, the asm-prototypes.h approach is just the same, only that we now
+have a bunch of prototypes in a header file, and the EXPORT_SYMBOL()s
+in the assembly files.
+
+As the C prototypes are remote from the definitions, it means that
+the C prototypes are going to get forgotten about in exactly the same
+way that armksyms.c would've been forgotten about too.
+
+It _is_ worse than that though - with the armksyms.c approach, if the
+assembly code for it is removed, you get a build error reminding you
+to remove the export (and prototype).  With this approach, you get no
+reminder to touch asm-prototypes.h.
+
+It's also error prone for another reason - adding a new assembly level
+export, if you forget to add it to asm-prototypes.h, we're back into
+the problem we have right now with MODVERSIONS breaking.
+
+So, I still think the whole approach is wrong - it's added extra
+fragility that wasn't there with the armksyms.c approach.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
