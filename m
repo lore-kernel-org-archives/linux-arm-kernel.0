@@ -1,48 +1,70 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 23 Nov 2016 10:16:58 +0000
-Subject: [PATCH v2 1/5] ARM: memory: da8xx-ddrctl: new driver
-In-Reply-To: <5833A2DA.40701@gmail.com>
-References: <1477925138-23457-1-git-send-email-bgolaszewski@baylibre.com>
- <1477925138-23457-2-git-send-email-bgolaszewski@baylibre.com>
- <a309a738-7fa7-3aab-4457-f7d693e6b37f@ti.com> <5833A2DA.40701@gmail.com>
-Message-ID: <60ae05f0-7719-f6c2-f725-97501f6fc219@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 23 Nov 2016 11:18:27 +0100
+Subject: [PATCH 1/4] serial: core: Add LED trigger support
+In-Reply-To: <20161123100819.GA20137@kroah.com>
+References: <20161123100106.15969-1-s.hauer@pengutronix.de>
+ <20161123100106.15969-2-s.hauer@pengutronix.de>
+ <20161123100819.GA20137@kroah.com>
+Message-ID: <20161123101827.5c3n5mrezyyw2us3@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Nov 23, 2016 at 11:08:19AM +0100, Greg Kroah-Hartman wrote:
+> On Wed, Nov 23, 2016 at 11:01:03AM +0100, Sascha Hauer wrote:
+> > With this patch the serial core provides LED triggers for RX and TX.
+> > 
+> > As the serial core layer does not know when the hardware actually sends
+> > or receives characters, this needs help from the UART drivers. The
+> > LED triggers are registered in uart_add_led_triggers() called from
+> > the UART drivers which want to support LED triggers. All the driver
+> > has to do then is to call uart_led_trigger_[tx|rx] to indicate
+> > activity.
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  drivers/tty/serial/serial_core.c | 73 ++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/serial_core.h      | 10 ++++++
+> >  2 files changed, 83 insertions(+)
+> > 
+> > diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
+> > index f2303f3..3e8afb7 100644
+> > --- a/drivers/tty/serial/serial_core.c
+> > +++ b/drivers/tty/serial/serial_core.c
+> > @@ -34,6 +34,7 @@
+> >  #include <linux/serial_core.h>
+> >  #include <linux/delay.h>
+> >  #include <linux/mutex.h>
+> > +#include <linux/leds.h>
+> >  
+> >  #include <asm/irq.h>
+> >  #include <asm/uaccess.h>
+> > @@ -2703,6 +2704,77 @@ static const struct attribute_group tty_dev_attr_group = {
+> >  	.attrs = tty_dev_attrs,
+> >  	};
+> >  
+> > +void uart_led_trigger_tx(struct uart_port *uport)
+> > +{
+> > +	unsigned long delay = 50;
+> > +
+> > +	led_trigger_blink_oneshot(uport->led_trigger_tx, &delay, &delay, 0);
+> > +}
+> > +
+> > +void uart_led_trigger_rx(struct uart_port *uport)
+> > +{
+> > +	unsigned long delay = 50;
+> > +
+> > +	led_trigger_blink_oneshot(uport->led_trigger_rx, &delay, &delay, 0);
+> > +}
+> 
+> Don't these functions need an EXPORT_SYMBOL_GPL() to work properly with
+> uart drivers being built as a module?
 
+Yes, for sure. Will fix in next version.
 
-On 22/11/16 01:43, Frank Rowand wrote:
-> Hi Sekhar,
->
-> (And adding Sudeep since he becomes involved in this further
-> down thread and at that point says he will re-work this
-> proposed work around in a manner that is incorrect in a
-> manner that is similar to this proposed work around.)
->
-> On 11/21/16 08:33, Sekhar Nori wrote:
-
-
-[...]
-
->>  static int da8xx_ddrctl_probe(struct platform_device *pdev)
->>  {
->>  	const struct da8xx_ddrctl_config_knob *knob;
->> @@ -118,7 +130,7 @@ static int da8xx_ddrctl_probe(struct platform_device *pdev)
->>  	setting = da8xx_ddrctl_get_board_settings();
->>  	if (!setting) {
->>  		dev_err(dev, "no settings for board '%s'\n",
->> -			of_flat_dt_get_machine_name());
->
-> da8xx_ddrctl_get_board_settings() tries to match based on the "compatible"
-> property in the root node.  The "model" property in the root node has
-> nothing to do with the failure to match. So creating and then using
-> da8xx_ddrctl_get_machine_name() to potentially report model is not useful.
->
-> It should be sufficient to simply report that no compatible matched.
->
-
-Agreed.
+Sascha
 
 -- 
-Regards,
-Sudeep
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
