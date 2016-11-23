@@ -1,28 +1,39 @@
 From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Wed, 23 Nov 2016 20:29:36 +0300
-Subject: [PATCH 8/9] dt-bindings: add rockchip,
- clocksource property to rk-timer
+Date: Wed, 23 Nov 2016 20:29:33 +0300
+Subject: [PATCH 5/9] clocksource/drivers/rockchip_timer: implement loading
+ 64bit value into timer
 In-Reply-To: <1479922177-20136-1-git-send-email-al.kochet@gmail.com>
 References: <1479922177-20136-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1479922177-20136-8-git-send-email-al.kochet@gmail.com>
+Message-ID: <1479922177-20136-5-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
 ---
- .../bindings/timer/rockchip,rk-timer.txt           |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/clocksource/rockchip_timer.c |   10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
-index a41b184..ed5392a 100644
---- a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
-@@ -9,6 +9,7 @@ Required properties:
- - clocks : must contain an entry for each entry in clock-names
- - clock-names : must include the following entries:
-   "timer", "pclk"
-+- rockchip,clocksource: setup the timer as clocksource
+diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
+index 3b530f9..f4c26be 100644
+--- a/drivers/clocksource/rockchip_timer.c
++++ b/drivers/clocksource/rockchip_timer.c
+@@ -63,11 +63,13 @@ static inline void rk_timer_enable(struct rk_timer *timer, u32 flags)
+ 	writel_relaxed(TIMER_ENABLE | flags, timer->ctrl);
+ }
  
- Example:
- 	timer: timer at ff810000 {
+-static void rk_timer_update_counter(unsigned long cycles,
+-				    struct rk_timer *timer)
++static void rk_timer_update_counter(u64 cycles, struct rk_timer *timer)
+ {
+-	writel_relaxed(cycles, timer->base + TIMER_LOAD_COUNT0);
+-	writel_relaxed(0, timer->base + TIMER_LOAD_COUNT1);
++	u32 lower = cycles & 0xFFFFFFFF;
++	u32 upper = (cycles >> 32) & 0xFFFFFFFF;
++
++	writel_relaxed(lower, timer->base + TIMER_LOAD_COUNT0);
++	writel_relaxed(upper, timer->base + TIMER_LOAD_COUNT1);
+ }
+ 
+ static void rk_timer_interrupt_clear(struct rk_timer *timer)
 -- 
 1.7.9.5
