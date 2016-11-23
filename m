@@ -1,54 +1,38 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 23 Nov 2016 09:30:14 +0100
-Subject: [PATCH 0/10] mmc: Add support to Marvell Xenon SD Host Controller
-In-Reply-To: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Mon, 31 Oct 2016 12:09:49 +0100")
-References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
-Message-ID: <87vavemwdl.fsf@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 23 Nov 2016 09:03:50 +0100
+Subject: [PATCH] ARM: dts: sunxi: Enable UEXT related nodes for Olimex
+ A20 SOM EVB
+In-Reply-To: <20161121164911.76900-1-manu@bidouilliste.com>
+References: <20161121164911.76900-1-manu@bidouilliste.com>
+Message-ID: <20161123080350.fstwdfndghk7c5xx@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
- 
- On lun., oct. 31 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+On Mon, Nov 21, 2016 at 05:49:11PM +0100, Emmanuel Vadot wrote:
+> UEXT are Universal EXTension connector from Olimex. They embed i2c, spi
+> and uart pins along power in one connector and are found on most,
+> if not all, Olimex boards.
+> The Olimex A20 SOM EVB have two UEXT connector so enable the nodes found on
+> those two connectors.
+> 
+> Signed-off-by: Emmanuel Vadot <manu@bidouilliste.com>
 
-> Hello,
->
-> This the second version of the series adding support for the SDHCI
-> Xenon controller. It can be currently found on the Armada 37xx and the
-> Armada 7K/8K but will be also used in more Marvell SoC (and not only
-> the mvebu ones actually).
->
-> Some of the remarks had been taking into account since the first
-> version, according to Ziji Hu, here are the following chcanges:
-> "Changes in V2:
->   rebase on v4.9-rc2.
->   Re-write Xenon bindings. Ajust Xenon DT property naming.
->   Add a new DT property to indicate eMMC card type, instead of using
->   variable card_candidate.
->   Clear quirks SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12 in Xenon platform data
->   Add support to HS400 retuning."
->
-> I think the main open point which remains is about issuing commands
-> from the ->set_ios() callback (in patch 7).
-> Ulf, could you comment about it?
+Fixed the indentation of the spi pinctrl cells, and applied.
 
-This part is the last thing missing, we are about to solve the last
-issues about the binding, but we still didn't have your opinion about
-issuing commands from the ->set_ios() callback and Adrian required it to
-take this series.
+Please note that I'm note planning to send any new pull request, so
+this will likely end up in 4.11.
 
-To have more context you can have a look on:
-http://marc.info/?l=linux-mmc&m=147618996414673&w=2
-
-it is the original email where Adrian wanted your agreement.
-
-Thanks,
-
-Gregory
+Thanks!
+Maxime
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161123/ada4f4d4/attachment-0001.sig>
