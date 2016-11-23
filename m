@@ -1,105 +1,31 @@
-From: yegorslists@googlemail.com (yegorslists at googlemail.com)
-Date: Wed, 23 Nov 2016 16:49:26 +0100
-Subject: [PATCH v2] ARM: dts: am335x-baltos: use phy-phandle declarations
-Message-ID: <1479916166-6633-1-git-send-email-yegorslists@googlemail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 23 Nov 2016 07:49:57 -0800
+Subject: [RFC PATCH 03/11] ARM: omap: do not select HIGHMEM explicitly
+In-Reply-To: <20161122095136.GU1041@n2100.armlinux.org.uk>
+References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
+ <1479806768-39911-4-git-send-email-vladimir.murzin@arm.com>
+ <20161122095136.GU1041@n2100.armlinux.org.uk>
+Message-ID: <20161123154957.GD4082@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yegor Yefremov <yegorslists@googlemail.com>
+* Russell King - ARM Linux <linux@armlinux.org.uk> [161122 01:51]:
+> On Tue, Nov 22, 2016 at 09:26:00AM +0000, Vladimir Murzin wrote:
+> > Explicit selection of HIGHMEM breaks NOMMU builds. It seems that
+> > HIGHMEM is user selectable option, so probably it would be better to
+> > let user to make a decision on this options or, at least, move it to
+> > defconfig.
+> 
+> That's kind of the point of ARCH_OMAP2PLUS_TYPICAL - it's a user
+> option to let the user select a range of options for typical OMAP2+
+> configurations, so that the user doesn't have to dig around looking
+> for multiple options, some of which are hard requirements for OMAP
+> to be functional.  OMAP is a particularly difficult case because the
+> hardware tends to be very complex.
+> 
+> However, HIGHMEM should never be a requirement to boot, so this looks
+> sane.
 
-phy-phandle is now a preferred method to reference a PHY device.
-Especially in regards to cpsw it enables PHY specific settings like
-max-speed etc. being specified in DTS.
+Yeah we can add that to the defconfig:
 
-Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
----
-Changes:
-	v2: add patch description (Tony Lindgren)
-
- arch/arm/boot/dts/am335x-baltos-ir2110.dts | 10 ++++++++--
- arch/arm/boot/dts/am335x-baltos-ir3220.dts |  2 +-
- arch/arm/boot/dts/am335x-baltos-ir5221.dts |  2 +-
- arch/arm/boot/dts/am335x-baltos.dtsi       |  5 ++++-
- 4 files changed, 14 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/boot/dts/am335x-baltos-ir2110.dts b/arch/arm/boot/dts/am335x-baltos-ir2110.dts
-index a9a9730..501c752 100644
---- a/arch/arm/boot/dts/am335x-baltos-ir2110.dts
-+++ b/arch/arm/boot/dts/am335x-baltos-ir2110.dts
-@@ -54,16 +54,22 @@
- 	dr_mode = "host";
- };
- 
-+&davinci_mdio {
-+	phy0: ethernet-phy at 0 {
-+		reg = <1>;
-+	};
-+};
-+
- &cpsw_emac0 {
--	phy_id = <&davinci_mdio>, <1>;
- 	phy-mode = "rmii";
- 	dual_emac_res_vlan = <1>;
-+	phy-handle = <&phy0>;
- };
- 
- &cpsw_emac1 {
--	phy_id = <&davinci_mdio>, <7>;
- 	phy-mode = "rgmii-txid";
- 	dual_emac_res_vlan = <2>;
-+	phy-handle = <&phy1>;
- };
- 
- &phy_sel {
-diff --git a/arch/arm/boot/dts/am335x-baltos-ir3220.dts b/arch/arm/boot/dts/am335x-baltos-ir3220.dts
-index fe002a1..19f53b8 100644
---- a/arch/arm/boot/dts/am335x-baltos-ir3220.dts
-+++ b/arch/arm/boot/dts/am335x-baltos-ir3220.dts
-@@ -109,9 +109,9 @@
- };
- 
- &cpsw_emac1 {
--	phy_id = <&davinci_mdio>, <7>;
- 	phy-mode = "rgmii-txid";
- 	dual_emac_res_vlan = <2>;
-+	phy-handle = <&phy1>;
- };
- 
- &phy_sel {
-diff --git a/arch/arm/boot/dts/am335x-baltos-ir5221.dts b/arch/arm/boot/dts/am335x-baltos-ir5221.dts
-index f599350..2b9d7f4 100644
---- a/arch/arm/boot/dts/am335x-baltos-ir5221.dts
-+++ b/arch/arm/boot/dts/am335x-baltos-ir5221.dts
-@@ -127,9 +127,9 @@
- };
- 
- &cpsw_emac1 {
--	phy_id = <&davinci_mdio>, <7>;
- 	phy-mode = "rgmii-txid";
- 	dual_emac_res_vlan = <2>;
-+	phy-handle = <&phy1>;
- };
- 
- &phy_sel {
-diff --git a/arch/arm/boot/dts/am335x-baltos.dtsi b/arch/arm/boot/dts/am335x-baltos.dtsi
-index 09b9541..efb5eae 100644
---- a/arch/arm/boot/dts/am335x-baltos.dtsi
-+++ b/arch/arm/boot/dts/am335x-baltos.dtsi
-@@ -364,11 +364,14 @@
- };
- 
- &davinci_mdio {
-+	status = "okay";
- 	pinctrl-names = "default", "sleep";
- 	pinctrl-0 = <&davinci_mdio_default>;
- 	pinctrl-1 = <&davinci_mdio_sleep>;
- 
--	status = "okay";
-+	phy1: ethernet-phy at 1 {
-+		reg = <7>;
-+	};
- };
- 
- &mmc1 {
--- 
-2.1.4
+Acked-by: Tony Lindgren <tony@atomide.com>
