@@ -1,52 +1,52 @@
-From: rick.chang@mediatek.com (Rick Chang)
-Date: Wed, 23 Nov 2016 09:54:14 +0800
-Subject: [PATCH v6 3/3] arm: dts: mt2701: Add node for Mediatek JPEG
- Decoder
-In-Reply-To: <badf8125-27ed-9c5b-fbc0-75716ffdfb0e@xs4all.nl>
-References: <1479353915-5043-1-git-send-email-rick.chang@mediatek.com>
- <1479353915-5043-4-git-send-email-rick.chang@mediatek.com>
- <d602365a-e87b-5bae-8698-bd43063ef079@xs4all.nl>
- <1479784905.8964.15.camel@mtksdaap41>
- <badf8125-27ed-9c5b-fbc0-75716ffdfb0e@xs4all.nl>
-Message-ID: <1479866054.8964.21.camel@mtksdaap41>
+From: dyoung@redhat.com (Dave Young)
+Date: Wed, 23 Nov 2016 10:03:00 +0800
+Subject: [PATCH 2/2] arm64: Pass RAM boundary and enable-dcache flag to
+ purgatory
+In-Reply-To: <54cad725-90f0-8dfe-bee6-fe1d3e02175d@redhat.com>
+References: <cover.1479788404.git.panand@redhat.com>
+ <b1b9e70db9d08364040436154cf0cf2f4600da49.1479788404.git.panand@redhat.com>
+ <53ee2a62-7822-5457-e59f-e65e64a57019@infradead.org>
+ <54cad725-90f0-8dfe-bee6-fe1d3e02175d@redhat.com>
+Message-ID: <20161123020300.GA3481@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+On 11/23/16 at 07:16am, Pratyush Anand wrote:
+> Hi Geoff,
+> 
+> On Wednesday 23 November 2016 12:27 AM, Geoff Levand wrote:
+> > Hi Pratyush,
+> > 
+> > On 11/21/2016 08:32 PM, Pratyush Anand wrote:
+> > > When "enable-dcache" is passed to the kexec() command line, kexec-tools
+> > > passes this information to purgatory, which in turn enables cache during
+> > > sha-256 verification.
+> > 
+> > What's the point of this enable-dcache option?  Why not just
+> > always enable the cache if we can?
+> 
+> As I have written in changelog of patch 1/2
+> 
+> "We are supporting only 4K and 64K page sizes. This code will not work if a
+> hardware is not supporting at least one of these page sizes.  Therefore,
+> D-cache is disabled by default and enabled only when "enable-dcache" is
+> passed to the kexec()."
+> 
+> 
+> Although this is very unlikely that a hardware will support only 16K page
+> sizes, however it is possible. Therefore, its better to keep it disabled by
+> default.
 
-On Tue, 2016-11-22 at 13:43 +0100, Hans Verkuil wrote:
-> On 22/11/16 04:21, Rick Chang wrote:
-> > Hi Hans,
-> >
-> > On Mon, 2016-11-21 at 15:51 +0100, Hans Verkuil wrote:
-> >> On 17/11/16 04:38, Rick Chang wrote:
-> >>> Signed-off-by: Rick Chang <rick.chang@mediatek.com>
-> >>> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-> >>> ---
-> >>> This patch depends on:
-> >>>   CCF "Add clock support for Mediatek MT2701"[1]
-> >>>   iommu and smi "Add the dtsi node of iommu and smi for mt2701"[2]
-> >>>
-> >>> [1] http://lists.infradead.org/pipermail/linux-mediatek/2016-October/007271.html
-> >>> [2] https://patchwork.kernel.org/patch/9164013/
-> >>
-> >> I assume that 1 & 2 will appear in 4.10? So this patch needs to go in
-> >> after the
-> >> other two are merged in 4.10?
-> >>
-> >> Regards,
-> >>
-> >> 	Hans
-> >
-> > [1] will appear in 4.10, but [2] will appear latter than 4.10.So this
-> > patch needs to go in after [1] & [2] will be merged in 4.11.
-> 
-> So what should I do? Merge the driver for 4.11 and wait with this patch
-> until [2] is merged in 4.11? Does that sound reasonable?
-> 
-> Regards,
-> 
-> 	Hans
+If it is *unlikely* it could be better to make it as default and add a
+--disable-dcache instead.
 
-What do you think about this? You merge the driver first and I send this
-patch again after [1] & [2] is merged.
+> 
+> ~Pratyush
+> 
+> _______________________________________________
+> kexec mailing list
+> kexec at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/kexec
+
+Thanks
+Dave
