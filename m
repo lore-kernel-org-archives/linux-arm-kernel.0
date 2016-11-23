@@ -1,27 +1,241 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 23 Nov 2016 07:41:52 +0530
-Subject: [PATCH 2/2] arm64: Pass RAM boundary and enable-dcache flag to
- purgatory
-In-Reply-To: <20161123020300.GA3481@dhcp-128-65.nay.redhat.com>
-References: <cover.1479788404.git.panand@redhat.com>
- <b1b9e70db9d08364040436154cf0cf2f4600da49.1479788404.git.panand@redhat.com>
- <53ee2a62-7822-5457-e59f-e65e64a57019@infradead.org>
- <54cad725-90f0-8dfe-bee6-fe1d3e02175d@redhat.com>
- <20161123020300.GA3481@dhcp-128-65.nay.redhat.com>
-Message-ID: <81975e6e-b97a-0401-0e18-b2d26722c1dd@redhat.com>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Wed, 23 Nov 2016 10:27:18 +0800
+Subject: [PATCH V9 1/6] tracing: add a possibility of exporting function
+ trace to other places instead of ring buffer only
+In-Reply-To: <20161122173950.56585f50@gandalf.local.home>
+References: <1479715043-6534-1-git-send-email-zhang.chunyan@linaro.org>
+ <1479715043-6534-2-git-send-email-zhang.chunyan@linaro.org>
+ <20161122173950.56585f50@gandalf.local.home>
+Message-ID: <CAG2=9p8AP4A09rnbqBLWr1UPiJ=7GzWB0Ncfzd0sb=yZ9kb56Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Wednesday 23 November 2016 07:33 AM, Dave Young wrote:
->> Although this is very unlikely that a hardware will support only 16K page
->> > sizes, however it is possible. Therefore, its better to keep it disabled by
->> > default.
-> If it is *unlikely* it could be better to make it as default and add a
-> --disable-dcache instead.
+On 23 November 2016 at 06:39, Steven Rostedt <rostedt@goodmis.org> wrote:
+> On Mon, 21 Nov 2016 15:57:18 +0800
+> Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
 >
+>> Currently Function traces can be only exported to ring buffer, this
+>> patch added trace_export concept which can process traces and export
+>> them to a registered destination as an addition to the current only
+>> one output of Ftrace - i.e. ring buffer.
+>>
+>> In this way, if we want Function traces to be sent to other destination
+>> rather than ring buffer only, we just need to register a new trace_export
+>> and implement its own .write() function for writing traces to storage.
+>>
+>> With this patch, only Function trace (trace type is TRACE_FN)
+>> is supported.
+>>
+>> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+>> ---
+>>  include/linux/trace.h |  28 +++++++++++
+>>  kernel/trace/trace.c  | 129 +++++++++++++++++++++++++++++++++++++++++++++++++-
+>>  2 files changed, 156 insertions(+), 1 deletion(-)
+>>  create mode 100644 include/linux/trace.h
+>>
+>> diff --git a/include/linux/trace.h b/include/linux/trace.h
+>> new file mode 100644
+>> index 0000000..9330a58
+>> --- /dev/null
+>> +++ b/include/linux/trace.h
+>> @@ -0,0 +1,28 @@
+>> +#ifndef _LINUX_TRACE_H
+>> +#define _LINUX_TRACE_H
+>> +
+>> +#ifdef CONFIG_TRACING
+>> +/*
+>> + * The trace export - an export of Ftrace output. The trace_export
+>> + * can process traces and export them to a registered destination as
+>> + * an addition to the current only output of Ftrace - i.e. ring buffer.
+>> + *
+>> + * If you want traces to be sent to some other place rather than ring
+>> + * buffer only, just need to register a new trace_export and implement
+>> + * its own .write() function for writing traces to the storage.
+>> + *
+>> + * next              - pointer to the next trace_export
+>> + * write     - copy traces which have been delt with ->commit() to
+>> + *             the destination
+>> + */
+>> +struct trace_export {
+>> +     struct trace_export __rcu       *next;
+>> +     void (*write)(const void *, unsigned int);
+>> +};
+>> +
+>> +int register_ftrace_export(struct trace_export *export);
+>> +int unregister_ftrace_export(struct trace_export *export);
+>> +
+>> +#endif       /* CONFIG_TRACING */
+>> +
+>> +#endif       /* _LINUX_TRACE_H */
+>> diff --git a/kernel/trace/trace.c b/kernel/trace/trace.c
+>> index 8696ce6..038291d 100644
+>> --- a/kernel/trace/trace.c
+>> +++ b/kernel/trace/trace.c
+>> @@ -40,6 +40,7 @@
+>>  #include <linux/poll.h>
+>>  #include <linux/nmi.h>
+>>  #include <linux/fs.h>
+>> +#include <linux/trace.h>
+>>  #include <linux/sched/rt.h>
+>>
+>>  #include "trace.h"
+>> @@ -2128,6 +2129,129 @@ void trace_buffer_unlock_commit_regs(struct trace_array *tr,
+>>       ftrace_trace_userstack(buffer, flags, pc);
+>>  }
+>>
+>> +static void
+>> +trace_process_export(struct trace_export *export,
+>> +            struct ring_buffer_event *event)
+>> +{
+>> +     struct trace_entry *entry;
+>> +     unsigned int size = 0;
+>> +
+>> +     entry = ring_buffer_event_data(event);
+>> +     size = ring_buffer_event_length(event);
+>> +     export->write(entry, size);
+>> +}
+>> +
+>> +static DEFINE_MUTEX(ftrace_export_lock);
+>> +
+>> +static struct trace_export __rcu *ftrace_exports_list __read_mostly;
+>> +
+>> +static DEFINE_STATIC_KEY_FALSE(ftrace_exports_enabled);
+>> +
+>> +static inline void ftrace_exports_enable(void)
+>> +{
+>> +     static_branch_enable(&ftrace_exports_enabled);
+>> +}
+>> +
+>> +static inline void ftrace_exports_disable(void)
+>> +{
+>> +     static_branch_disable(&ftrace_exports_enabled);
+>> +}
+>> +
+>> +void ftrace_exports(struct ring_buffer_event *event)
+>
+> I'm currently testing the patches, but is there a reason that
+> ftrace_exports() is not static?
 
-I think, I can do that.
+At present  ftrace_exports() is only used by function trace though,
+but I hope it can be used by other traces when it needed.
+So I didn't mark it with static, but if you think it should better be
+static for the time being, I can revise that.
 
-~Pratyush
+Thanks,
+Chunyan
+
+
+>
+> -- Steve
+>
+>> +{
+>> +     struct trace_export *export;
+>> +
+>> +     preempt_disable_notrace();
+>> +
+>> +     export = rcu_dereference_raw_notrace(ftrace_exports_list);
+>> +     while (export) {
+>> +             trace_process_export(export, event);
+>> +             export = rcu_dereference_raw_notrace(export->next);
+>> +     }
+>> +
+>> +     preempt_enable_notrace();
+>> +}
+>> +
+>> +static inline void
+>> +add_trace_export(struct trace_export **list, struct trace_export *export)
+>> +{
+>> +     rcu_assign_pointer(export->next, *list);
+>> +     /*
+>> +      * We are entering export into the list but another
+>> +      * CPU might be walking that list. We need to make sure
+>> +      * the export->next pointer is valid before another CPU sees
+>> +      * the export pointer included into the list.
+>> +      */
+>> +     rcu_assign_pointer(*list, export);
+>> +}
+>> +
+>> +static inline int
+>> +rm_trace_export(struct trace_export **list, struct trace_export *export)
+>> +{
+>> +     struct trace_export **p;
+>> +
+>> +     for (p = list; *p != NULL; p = &(*p)->next)
+>> +             if (*p == export)
+>> +                     break;
+>> +
+>> +     if (*p != export)
+>> +             return -1;
+>> +
+>> +     rcu_assign_pointer(*p, (*p)->next);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static inline void
+>> +add_ftrace_export(struct trace_export **list, struct trace_export *export)
+>> +{
+>> +     if (*list == NULL)
+>> +             ftrace_exports_enable();
+>> +
+>> +     add_trace_export(list, export);
+>> +}
+>> +
+>> +static inline int
+>> +rm_ftrace_export(struct trace_export **list, struct trace_export *export)
+>> +{
+>> +     int ret;
+>> +
+>> +     ret = rm_trace_export(list, export);
+>> +     if (*list == NULL)
+>> +             ftrace_exports_disable();
+>> +
+>> +     return ret;
+>> +}
+>> +
+>> +int register_ftrace_export(struct trace_export *export)
+>> +{
+>> +     if (WARN_ON_ONCE(!export->write))
+>> +             return -1;
+>> +
+>> +     mutex_lock(&ftrace_export_lock);
+>> +
+>> +     add_ftrace_export(&ftrace_exports_list, export);
+>> +
+>> +     mutex_unlock(&ftrace_export_lock);
+>> +
+>> +     return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(register_ftrace_export);
+>> +
+>> +int unregister_ftrace_export(struct trace_export *export)
+>> +{
+>> +     int ret;
+>> +
+>> +     mutex_lock(&ftrace_export_lock);
+>> +
+>> +     ret = rm_ftrace_export(&ftrace_exports_list, export);
+>> +
+>> +     mutex_unlock(&ftrace_export_lock);
+>> +
+>> +     return ret;
+>> +}
+>> +EXPORT_SYMBOL_GPL(unregister_ftrace_export);
+>> +
+>>  void
+>>  trace_function(struct trace_array *tr,
+>>              unsigned long ip, unsigned long parent_ip, unsigned long flags,
+>> @@ -2146,8 +2270,11 @@ trace_function(struct trace_array *tr,
+>>       entry->ip                       = ip;
+>>       entry->parent_ip                = parent_ip;
+>>
+>> -     if (!call_filter_check_discard(call, entry, buffer, event))
+>> +     if (!call_filter_check_discard(call, entry, buffer, event)) {
+>> +             if (static_branch_unlikely(&ftrace_exports_enabled))
+>> +                     ftrace_exports(event);
+>>               __buffer_unlock_commit(buffer, event);
+>> +     }
+>>  }
+>>
+>>  #ifdef CONFIG_STACKTRACE
+>
