@@ -1,29 +1,64 @@
-From: tomas.hlavacek@nic.cz (tomas.hlavacek at nic.cz)
-Date: Wed, 23 Nov 2016 01:27:31 +0100
-Subject: [PATCH RFC] ARM: dts: add support for Turris Omnia
-In-Reply-To: <1479851991.26813.2@smtp.gmail.com>
-References: <20161105203841.9661-1-uwe@kleine-koenig.org>
- <1479126185.15557.5@smtp.gmail.com>
- <20161114201640.rr32iyjf5a53v33t@perseus.defre.kleine-koenig.org>
- <20161114202832.GG24546@lunn.ch> <1479586147.10840.0@smtp.gmail.com>
- <20161120203037.pd5mhqyjeotileve@perseus.defre.kleine-koenig.org>
- <1479851991.26813.2@smtp.gmail.com>
-Message-ID: <1479860851.10840.11@smtp.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 23 Nov 2016 01:35:05 +0100
+Subject: [RFC PATCH] ARM: dts: Add support for Turris Omnia
+In-Reply-To: <1479859770-9375-1-git-send-email-tmshlvck@gmail.com>
+References: <1479851991.26813.2@smtp.gmail.com>
+ <1479859770-9375-1-git-send-email-tmshlvck@gmail.com>
+Message-ID: <20161123003505.GL2691@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe!
+> +++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
+> @@ -0,0 +1,279 @@
+> +/*
+> + * Device Tree file for the Turris Omnia
+> + * Schematic available at https://www.turris.cz/doc/_media/rtrom01-schema.pdf
 
-On Tue, Nov 22, 2016 at 10:59 PM, tomas.hlavacek at nic.cz wrote:
-> Anyway I took your patch and tried few things:
-> - add pca9538 interrupt-controller
-> - add IRQ for 88E1514 PHY - and there is a problem:
-...
+Hi Tomas
 
-I thought it over and if I am not mistaken this is not going to work 
-anyway, because pca9538 driver causes the GPIO driver to set 
-IRQ_NESTED_THREAD, so we can not simply use one of the GPIO expander 
-pins as IRQ source for 88E1514, because request_irq() on it will fail 
-ultimately.
+Cool that there is a link to the schematics. But please could you put
+it lower down. It is more likely to be seen if it comes after the
+copyright and license section.
 
-Tomas
+> +			sdhci at d8000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&sdhci_pins>;
+> +				status = "okay";
+> +
+> +				bus-width = <8>;
+> +				no-1-8-v;
+> +				non-removable;
+> +			};
+
+> +&i2c0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c0_pins>;
+> +	status = "okay";
+> +
+> +	i2cmux at 70 {
+> +		compatible = "nxp,pca9547";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		reg = <0x70>;
+> +		status = "okay";
+> +
+> +		/* Channel 1: Routed to PCIe0/mSATA connector (CN7A).
+> +		 * Channel 2: Routed to PCIe1/USB2 connector (CN61A).
+> +		 * Channel 3: Routed to PCIe2 connector (CN62A).
+> +		 * Channel 4: Routed to SFP+.
+> +		 * Channel 5: ATSHA204A at address 0x64.
+> +		 * Channel 6: Routed to user pin header CN11.
+> +		 */
+
+I've not looked at how the pca9547 works.... Will it instantiate a bus
+only if there is a node in the device tree with a reg property?
+
+What i'm thinking is that it is possible to indicate to the i2c core
+that a device is on a bus using echo to a file. But this only works if
+the bus exists. You could for example say using echo that there is an
+at24 EEPROM on channel 4 and get access to the EEPROM inside the SFP
+module. But that only works if the i2c bus exists. Does it?
+
+No leds? No buttons via gpio-keys?
+
+   Andrew
