@@ -1,42 +1,28 @@
-From: manu@bidouilliste.com (Emmanuel Vadot)
-Date: Wed, 23 Nov 2016 18:16:10 +0100
-Subject: [PATCH] ARM: dts: sunxi: Enable UEXT related nodes for Olimex
- A20 SOM EVB
-In-Reply-To: <20161123080350.fstwdfndghk7c5xx@lukather>
-References: <20161121164911.76900-1-manu@bidouilliste.com>
- <20161123080350.fstwdfndghk7c5xx@lukather>
-Message-ID: <20161123181610.cae67ad53f5f69246d341b30@bidouilliste.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 23 Nov 2016 19:19:22 +0200
+Subject: [PATCH 2/4] ARM: dts: exynos: specify snps,dwmac in compatible
+ string for gmac
+In-Reply-To: <1479911091-19812-1-git-send-email-niklass@axis.com>
+References: <1479911091-19812-1-git-send-email-niklass@axis.com>
+Message-ID: <20161123171922.GA4408@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Nov 2016 09:03:50 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-
-> On Mon, Nov 21, 2016 at 05:49:11PM +0100, Emmanuel Vadot wrote:
-> > UEXT are Universal EXTension connector from Olimex. They embed i2c, spi
-> > and uart pins along power in one connector and are found on most,
-> > if not all, Olimex boards.
-> > The Olimex A20 SOM EVB have two UEXT connector so enable the nodes found on
-> > those two connectors.
-> > 
-> > Signed-off-by: Emmanuel Vadot <manu@bidouilliste.com>
+On Wed, Nov 23, 2016 at 03:24:51PM +0100, Niklas Cassel wrote:
+> From: Niklas Cassel <niklas.cassel@axis.com>
 > 
-> Fixed the indentation of the spi pinctrl cells, and applied.
+> devicetree binding for stmmac states:
+> - compatible: Should be "snps,dwmac-<ip_version>", "snps,dwmac"
+> 	For backwards compatibility: "st,spear600-gmac" is also supported.
 > 
-> Please note that I'm note planning to send any new pull request, so
-> this will likely end up in 4.11.
+> No functional change intended.
 > 
-> Thanks!
-> Maxime
+> Signed-off-by: Niklas Cassel <niklas.cassel@axis.com>
+> ---
+>  arch/arm/boot/dts/exynos5440.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Thanks, applied.
 
- Sorry about the indentation, I'll be more carefull next time.
-
- Thank you.
-
--- 
-Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
+Best regards,
+Krzysztof
