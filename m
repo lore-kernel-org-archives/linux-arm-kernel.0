@@ -1,42 +1,63 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Wed, 23 Nov 2016 14:40:00 +0100
-Subject: [PATCH v4 2/2] memory: da8xx-ddrctl: drop the call to
- of_flat_dt_get_machine_name()
-In-Reply-To: <1479908400-10136-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1479908400-10136-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1479908400-10136-3-git-send-email-bgolaszewski@baylibre.com>
+From: andrei.pistirica@microchip.com (Andrei Pistirica)
+Date: Wed, 23 Nov 2016 14:36:55 +0100
+Subject: [RFC PATCH v2 1/2] macb: Add 1588 support in Cadence GEM.
+In-Reply-To: <20161120193720.GA7874@localhost.localdomain>
+References: <1479478912-14067-1-git-send-email-andrei.pistirica@microchip.com>
+ <20161120193720.GA7874@localhost.localdomain>
+Message-ID: <90432c85-871f-22be-bde2-51e321828c9a@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to avoid a section mismatch drop the call to
-of_flat_dt_get_machine_name() when printing the error message.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- drivers/memory/da8xx-ddrctl.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/drivers/memory/da8xx-ddrctl.c b/drivers/memory/da8xx-ddrctl.c
-index a20e7bb..030afbe 100644
---- a/drivers/memory/da8xx-ddrctl.c
-+++ b/drivers/memory/da8xx-ddrctl.c
-@@ -14,7 +14,6 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
--#include <linux/of_fdt.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
- 
-@@ -117,8 +116,7 @@ static int da8xx_ddrctl_probe(struct platform_device *pdev)
- 
- 	setting = da8xx_ddrctl_get_board_settings();
- 	if (!setting) {
--		dev_err(dev, "no settings for board '%s'\n",
--			of_flat_dt_get_machine_name());
-+		dev_err(dev, "no settings defined for this board\n");
- 		return -EINVAL;
- 	}
- 
--- 
-2.9.3
+On 20.11.2016 20:37, Richard Cochran wrote:
+> On Fri, Nov 18, 2016 at 03:21:51PM +0100, Andrei Pistirica wrote:
+>> +#ifdef CONFIG_MACB_USE_HWSTAMP
+>> +void macb_ptp_init(struct net_device *ndev);
+>> +#else
+>> +void macb_ptp_init(struct net_device *ndev) { }
+>
+> static inline ^^^
+
+I can do static inline only when PTP is not enabled (on else branch), 
+thus the empty function is defined in the header file (since the init 
+function is defined in macb_ptp and used in macb). To differentiate 
+between macb versions, I'll add a wrapper.
+Would this be ok?
+
+>
+>> +#endif
+>
+>
+>> +void macb_ptp_init(struct net_device *ndev)
+>> +{
+>> +	struct macb *bp = netdev_priv(ndev);
+>> +	struct timespec64 now;
+>> +	u32 rem = 0;
+>> +
+>> +	if (!(bp->caps | MACB_CAPS_GEM_HAS_PTP)){
+>> +		netdev_vdbg(bp->dev, "Platform does not support PTP!\n");
+>> +		return;
+>> +	}
+>
+> You would have needed '&' and not '|' here.
+
+Yes. Another stupid mistake... sorry. I will be more careful next time.
+
+>
+> Also, using a flag limits the code to your platform.  This works for
+> you, but it is short sighted.  The other MACB PTP blocks have
+> different register layouts, and this patch does not lay the ground
+> work for the others.
+>
+> The driver needs to be designed to support the other platforms.
+
+It will support Xilinx.
+
+>
+> Thanks,
+> Richard
+>
+
+Regards,
+Andrei
