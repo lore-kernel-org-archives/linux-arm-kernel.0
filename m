@@ -1,76 +1,86 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Wed, 23 Nov 2016 17:02:11 +0100
-Subject: [PATCH net-next 1/4] net: mvneta: Convert to be 64 bits compatible
-In-Reply-To: <87mvgqmjiy.fsf@free-electrons.com>
-References: <20161122164844.19566-1-gregory.clement@free-electrons.com>
- <2948812.F3se4ieqO6@wuerfel> <20161123175341.4777595f@xhacker>
- <9432400.S1OrxC027t@wuerfel> <87mvgqmjiy.fsf@free-electrons.com>
-Message-ID: <CAPv3WKf0a63qQT+xwXfUatbgLFF58e6L8J10VtBOUTam+kUcjg@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 23 Nov 2016 16:07:22 +0000
+Subject: [RFC PATCH 11/11] ARM: Allow ARCH_MULTIPLATFORM to be selected
+ for NOMMU
+In-Reply-To: <20161123154829.GA2489@afzalpc>
+References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
+ <1479806768-39911-12-git-send-email-vladimir.murzin@arm.com>
+ <16587553.f9R1mxJih5@wuerfel> <583478FB.4020008@arm.com>
+ <20161123154829.GA2489@afzalpc>
+Message-ID: <5835BEBA.8050905@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+On 23/11/16 15:48, Afzal Mohammed wrote:
+> Hi,
+> 
+> On Tue, Nov 22, 2016 at 04:57:31PM +0000, Vladimir Murzin wrote:
+> 
+>> I used defconfigs
+> 
+> Which defconfig was used ?
+> 
 
-2016-11-23 14:07 GMT+01:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
-> Hi Jisheng, Arnd,
->
->
-> Thanks for your feedback.
->
->
->  On mer., nov. 23 2016, Arnd Bergmann <arnd@arndb.de> wrote:
->
->> On Wednesday, November 23, 2016 5:53:41 PM CET Jisheng Zhang wrote:
->>> On Tue, 22 Nov 2016 22:04:12 +0100 Arnd Bergmann wrote:
->>>
->>> > On Tuesday, November 22, 2016 5:48:41 PM CET Gregory CLEMENT wrote:
->>> > > +#ifdef CONFIG_64BIT
->>> > > +       void *data_tmp;
->>> > > +
->>> > > +       /* In Neta HW only 32 bits data is supported, so in order to
->>> > > +        * obtain whole 64 bits address from RX descriptor, we store
->>> > > +        * the upper 32 bits when allocating buffer, and put it back
->>> > > +        * when using buffer cookie for accessing packet in memory.
->>> > > +        * Frags should be allocated from single 'memory' region,
->>> > > +        * hence common upper address half should be sufficient.
->>> > > +        */
->>> > > +       data_tmp = mvneta_frag_alloc(pp->frag_size);
->>> > > +       if (data_tmp) {
->>> > > +               pp->data_high = (u64)upper_32_bits((u64)data_tmp) << 32;
->>> > > +               mvneta_frag_free(pp->frag_size, data_tmp);
->>> > > +       }
->>> > >
->>> >
->>> > How does this work when the region spans a n*4GB address boundary?
->>>
->>> indeed. We also make use of this driver on 64bit platforms. We use
->>> different solution to make the driver 64bit safe.
->>>
->>> solA: make use of the reserved field in the mvneta_rx_desc, such
->>> as reserved2 etc. Yes, the field is marked as "for future use, PnC", but
->>> now it's not used at all. This is one possible solution however.
->>
->> Right, this sounds like the most straightforward choice.
->
-> The PnC (which stands for Parsing and Classification) is not used yet
-> indeed but this field will be needed when we will enable it. It is
-> something we want to do but it is not planned in a near future. However
-> from the datasheets I have it seems only present on the Armada XP. It is
-> not mentioned on datasheets for the Armada 38x or the Armada 3700.
->
+I had a script to traverse config directory, but seems that I messed
+things up.
 
-It is not mentioned in A38x spec, but this SoC has exactly the same
-PnC as Armada XP (they differ only with used SRAM details). I wouldn't
-be surprised if it was supported on A3700 as well.
+Now I'm running allmodconfig per Arnd suggestion.
 
-> That would mean it was safe to use on of this field in 64-bits mode on
-> the Armada 3700.
->
-> So I am going to take this approach.
->
+> multi_v7_defconfig, MMU & SMP disabled - thus spake the compiler,
+> 
+> kernel/built-in.o: In function `kimage_free_entry':
+> memremap.c:(.text+0x4dafc): undefined reference to
+> `arch_phys_to_idmap_offset'
+> memremap.c:(.text+0x4db04): undefined reference to
+> `arch_phys_to_idmap_offset'
+> kernel/built-in.o: In function `kimage_alloc_page':
+> memremap.c:(.text+0x4dbc0): undefined reference to
+> `arch_phys_to_idmap_offset'
+> memremap.c:(.text+0x4dbc8): undefined reference to
+> `arch_phys_to_idmap_offset'
+> memremap.c:(.text+0x4dc1c): undefined reference to
+> `arch_phys_to_idmap_offset'
+> kernel/built-in.o:memremap.c:(.text+0x4dc30): more undefined
+> references to `arch_phys_to_idmap_offset' follow
 
-I think for now it's safe and is much easier than handling extra
-software ring for virtual addresses.
+I think this one is fixed by
 
-Best regards,
-Marcin
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 8e7496c..c3349b9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2019,7 +2019,7 @@ config XIP_PHYS_ADDR
+ config KEXEC
+        bool "Kexec system call (EXPERIMENTAL)"
+        depends on (!SMP || PM_SLEEP_SMP)
+-       depends on !CPU_V7M
++       depends on MMU
+        select KEXEC_CORE
+        help
+          kexec is a system call that implements the ability to shutdown your
+
+but there are others I'm working on.
+
+> 
+> multi_v7_defconfig & MMU disabled, stderr was more verbose and was
+> unhappy with Kconfig dependencies,
+> 
+> warning: (SOC_IMX31 && SOC_IMX35 && SOC_VF610 && REALVIEW_DT) selects
+> SMP_ON_UP which has unmet direct dependencies (SMP && !XIP_KERNEL &&
+> MMU)
+> warning: (SOC_IMX31 && SOC_IMX35 && SOC_VF610 && REALVIEW_DT) selects
+> SMP_ON_UP which has unmet direct dependencies (SMP && !XIP_KERNEL &&
+> MMU)
+
+These we fixed in 9001214 ("ARM: imx: no need to select SMP_ON_UP explicitly")
+
+> 
+> Ulterior motive here is to try !MMU on Cortex A
+> 
+
+Thanks for trying it. Just a gentle remainder not to forget to set DRAM_BASE
+and DRAM_SIZE ;)
+
+> Regards
+> afzal
+> 
