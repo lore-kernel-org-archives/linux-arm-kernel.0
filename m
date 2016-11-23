@@ -1,102 +1,39 @@
-From: andrei.pistirica@microchip.com (Andrei Pistirica)
-Date: Wed, 23 Nov 2016 14:35:14 +0100
-Subject: [RFC PATCH v2 2/2] macb: Enable 1588 support in SAMA5D2 platform.
-In-Reply-To: <20161120195413.GB7874@localhost.localdomain>
-References: <1479478912-14067-1-git-send-email-andrei.pistirica@microchip.com>
- <1479478912-14067-2-git-send-email-andrei.pistirica@microchip.com>
- <20161120195413.GB7874@localhost.localdomain>
-Message-ID: <0717c12e-fd91-db48-eb7b-997695fa39dc@microchip.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Wed, 23 Nov 2016 14:39:58 +0100
+Subject: [PATCH v4 0/2] da8xx: fix section mismatch in new drivers
+Message-ID: <1479908400-10136-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Sekhar noticed there's a section mismatch in the da8xx-mstpri and
+da8xx-ddrctl drivers. This is caused by calling
+of_flat_dt_get_machine_name() which has an __init annotation.
 
+This series makes the drivers drop the call and not print the
+machine name in the error message.
 
-On 20.11.2016 20:54, Richard Cochran wrote:
-> On Fri, Nov 18, 2016 at 03:21:52PM +0100, Andrei Pistirica wrote:
->> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
->> index d975882..eb66b76 100644
->> --- a/drivers/net/ethernet/cadence/macb.c
->> +++ b/drivers/net/ethernet/cadence/macb.c
->> @@ -697,6 +697,8 @@ static void macb_tx_interrupt(struct macb_queue *queue)
->>
->>  			/* First, update TX stats if needed */
->>  			if (skb) {
->> +				macb_ptp_do_txstamp(bp, skb);
->
-> This is in the hot path, and so you should have an inline wrapper that
-> tests (bp->hwts_tx_en) and THEN calls into macb_ptp.c
+v1 -> v2:
+- drop patch [1/3] from v1
+- introduce internal routines in the drivers instead of a general
+  function in of/base.c
 
-Ack.
+v2 -> v3:
+- use of_property_read_string_index() instead of
+  of_property_read_string() to get the first compatible entry
+- s/priotities/priorities
 
->
-> In case PTP isn't configured, then the inline wrapper should be empty.
->
->>  				netdev_vdbg(bp->dev, "skb %u (data %p) TX complete\n",
->>  					    macb_tx_ring_wrap(tail), skb->data);
->>  				bp->stats.tx_packets++;
->> @@ -853,6 +855,8 @@ static int gem_rx(struct macb *bp, int budget)
->>  		    GEM_BFEXT(RX_CSUM, ctrl) & GEM_RX_CSUM_CHECKED_MASK)
->>  			skb->ip_summed = CHECKSUM_UNNECESSARY;
->>
->> +		macb_ptp_do_rxstamp(bp, skb);
->
-> Same here.
->
->>  		bp->stats.rx_packets++;
->>  		bp->stats.rx_bytes += skb->len;
->>
->> @@ -1946,6 +1950,8 @@ static int macb_open(struct net_device *dev)
->>
->>  	netif_tx_start_all_queues(dev);
->>
->> +	macb_ptp_init(dev);
->
-> This leaks PHC instances starting the second time that the interface goes up!
+v3 -> v4:
+- drop the compatible string printing altogether as the new function
+  is not safe
+- merge the typo fix into patch [1/2]
 
-Yes, I will call unregister at interface down.
+Bartosz Golaszewski (2):
+  bus: da8xx-mstpri: drop the call to of_flat_dt_get_machine_name()
+  memory: da8xx-ddrctl: drop the call to of_flat_dt_get_machine_name()
 
->
->>  	return 0;
->>  }
->>
->> @@ -2204,7 +2210,7 @@ static const struct ethtool_ops gem_ethtool_ops = {
->>  	.get_regs_len		= macb_get_regs_len,
->>  	.get_regs		= macb_get_regs,
->>  	.get_link		= ethtool_op_get_link,
->> -	.get_ts_info		= ethtool_op_get_ts_info,
->> +	.get_ts_info		= macb_get_ts_info,
->
-> You enable the time stamping logic unconditionally here ...
+ drivers/bus/da8xx-mstpri.c    | 4 +---
+ drivers/memory/da8xx-ddrctl.c | 4 +---
+ 2 files changed, 2 insertions(+), 6 deletions(-)
 
-I will add a wrapper to test if macb is gem and if it has PTP 
-capability, otherwise call ethtool_op_get_ts_info.
-
->
->>  	.get_ethtool_stats	= gem_get_ethtool_stats,
->>  	.get_strings		= gem_get_ethtool_strings,
->>  	.get_sset_count		= gem_get_sset_count,
->> @@ -2221,7 +2227,14 @@ static int macb_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
->>  	if (!phydev)
->>  		return -ENODEV;
->>
->> -	return phy_mii_ioctl(phydev, rq, cmd);
->> +	switch (cmd) {
->> +	case SIOCSHWTSTAMP:
->> +		return macb_hwtst_set(dev, rq, cmd);
->> +	case SIOCGHWTSTAMP:
->> +		return macb_hwtst_get(dev, rq);
->
-> and here.
->
-> Is that logic always available on every MACB device?  If so, is the
-> implementation also identical?
-
-As before, I will add a wrapper and the related tests.
-
->
-> Thanks,
-> Richard
->
-
-Regards,
-Andrei
+-- 
+2.9.3
