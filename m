@@ -1,32 +1,36 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 23 Nov 2016 17:07:25 -0600
-Subject: [PATCH 1/4] clocksource/drivers/arm_arch_timer: Don't assume
- clock runs in suspend
-In-Reply-To: <1479807866-6957-1-git-send-email-daniel.lezcano@linaro.org>
-References: <20161122094300.GA2017@mai>
- <1479807866-6957-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20161123230725.c3euemhmfnm3qjtn@rob-hp-laptop>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 24 Nov 2016 00:13:20 +0100
+Subject: [PATCH 6/9] power_supply: wm97xx_battery: use
+ power_supply_get_drvdata
+In-Reply-To: <1477510907-23495-7-git-send-email-robert.jarzmik@free.fr>
+References: <1477510907-23495-1-git-send-email-robert.jarzmik@free.fr>
+ <1477510907-23495-7-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <20161123231320.fo3kilw5h7cctngc@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2016 at 10:44:21AM +0100, Daniel Lezcano wrote:
-> From: Brian Norris <briannorris@chromium.org>
+Hi Robert,
+
+On Wed, Oct 26, 2016 at 09:41:44PM +0200, Robert Jarzmik wrote:
+> As the power supply framework provides a way to store and retrieve
+> private supply data, use it.
 > 
-> The ARM specifies that the system counter "must be implemented in an
-> always-on power domain," and so we try to use the counter as a source of
-> timekeeping across suspend/resume. Unfortunately, some SoCs (e.g.,
-> Rockchip's RK3399) do not keep the counter ticking properly when
-> switched from their high-power clock to the lower-power clock used in
-> system suspend. Support this quirk by adding a new device tree property.
+> In the process, change the platform data for wm97xx_battery from a
+> container of a single struct wm97xx_batt_pdata to the direct point to wm97xx_batt_pdata.
 > 
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
-> Reviewed-by: Douglas Anderson <dianders@chromium.org>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 > ---
->  Documentation/devicetree/bindings/arm/arch_timer.txt | 5 +++++
+>  drivers/input/touchscreen/wm97xx-core.c |  2 +-
+>  drivers/power/supply/wm97xx_battery.c   | 25 ++++++++++---------------
+>  2 files changed, 11 insertions(+), 16 deletions(-)
 
-Acked-by: Rob Herring <robh@kernel.org>
+I queued this into power-supply's for-next branch.
 
->  drivers/clocksource/arm_arch_timer.c                 | 9 ++++++++-
->  2 files changed, 13 insertions(+), 1 deletion(-)
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161124/37574d6b/attachment.sig>
