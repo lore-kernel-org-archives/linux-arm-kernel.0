@@ -1,42 +1,46 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 23 Nov 2016 02:39:40 +0100
-Subject: [PATCH RFC] ARM: dts: add support for Turris Omnia
-In-Reply-To: <1479860851.10840.11@smtp.gmail.com>
-References: <20161105203841.9661-1-uwe@kleine-koenig.org>
- <1479126185.15557.5@smtp.gmail.com>
- <20161114201640.rr32iyjf5a53v33t@perseus.defre.kleine-koenig.org>
- <20161114202832.GG24546@lunn.ch>
- <1479586147.10840.0@smtp.gmail.com>
- <20161120203037.pd5mhqyjeotileve@perseus.defre.kleine-koenig.org>
- <1479851991.26813.2@smtp.gmail.com>
- <1479860851.10840.11@smtp.gmail.com>
-Message-ID: <20161123013940.GM2691@lunn.ch>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 23 Nov 2016 07:09:53 +0530
+Subject: [PATCH 0/2] kexec-tools: arm64: Add dcache enabling facility
+In-Reply-To: <8415f028-f42e-2980-9b60-e85aae046d02@infradead.org>
+References: <cover.1479788404.git.panand@redhat.com>
+ <8415f028-f42e-2980-9b60-e85aae046d02@infradead.org>
+Message-ID: <3b5b6613-acb2-0888-a78c-6da69c1b55e0@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2016 at 01:27:31AM +0100, tomas.hlavacek at nic.cz wrote:
-> Hi Uwe!
-> 
-> On Tue, Nov 22, 2016 at 10:59 PM, tomas.hlavacek at nic.cz wrote:
-> >Anyway I took your patch and tried few things:
-> >- add pca9538 interrupt-controller
-> >- add IRQ for 88E1514 PHY - and there is a problem:
-> ...
-> 
-> I thought it over and if I am not mistaken this is not going to work
-> anyway, because pca9538 driver causes the GPIO driver to set
-> IRQ_NESTED_THREAD, so we can not simply use one of the GPIO expander
-> pins as IRQ source for 88E1514, because request_irq() on it will
-> fail ultimately.
+Hi Geoff,
 
-Actually, the phylib now does uses threaded IRQs, since i implemented
-interrupt support for the mv88e6xxx driver. Its interrupts require
-MDIO transactions, so have to be threaded.
+On Wednesday 23 November 2016 12:26 AM, Geoff Levand wrote:
+> Hi Pratyush,
+>
+> On 11/21/2016 08:32 PM, Pratyush Anand wrote:
+>> It takes more that 2 minutes to verify SHA in purgatory when vmlinuz
+>> image
+>> is around 13MB and initramfs is around 30MB. It takes more than 20 second
+>> even when we have -O2 optimization enabled. However, if dcache is enabled
+>> during purgatory execution then, it takes just a second in SHA
+>> verification.
+>
+> As I had mentioned in another thread, I think -O2 optimization is
+> sufficient considering the complexity of the code needed to enable
+> the dcache.  Integrity checking is only needed for crash dump
+> support.  If the crash reboot takes an extra 20 seconds does it
+> matter?
+>
 
-However, i don't think using interrupts on the pca9538 are
-reliable. Interrupt support is compile time optional for that
-driver. It is not clear to me if distributions do compile the driver
-with interrupts enabled. So it could be the probe fails with OpenWRT,
-Debian, etc...
+Even this 20 second for kdump case is also annoying and this could 
+increase if the size of initramfs increases.
 
-	Andrew
+Moreover, by default d-cache is still disabled, so even if it is complex 
+and you might see some instability, it will not affect the existing 
+systems. So, IMHO we should have this in the upstream.
+
+
+> For the re-boot of a stable system where the new kernel is loaded
+> then immediately kexec'ed into integrity checking is not needed.
+> For that arm64 support needs to be added to kexec-lite.
+
+I think kexec-lite is a separate project and --lite in kexec-tools was 
+never acked. So, even for `kexec -l` it will be helpful.
+
+~Pratyush
