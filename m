@@ -1,44 +1,60 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 23 Nov 2016 13:47:09 +0530
-Subject: [PATCH 2/2] arm64: Pass RAM boundary and enable-dcache flag to
- purgatory
-In-Reply-To: <20161123080816.GA30255@verge.net.au>
-References: <cover.1479788404.git.panand@redhat.com>
- <b1b9e70db9d08364040436154cf0cf2f4600da49.1479788404.git.panand@redhat.com>
- <53ee2a62-7822-5457-e59f-e65e64a57019@infradead.org>
- <54cad725-90f0-8dfe-bee6-fe1d3e02175d@redhat.com>
- <20161123020300.GA3481@dhcp-128-65.nay.redhat.com>
- <81975e6e-b97a-0401-0e18-b2d26722c1dd@redhat.com>
- <20161123080816.GA30255@verge.net.au>
-Message-ID: <CAHB_GupoWM5iRPDsyZBEByCsbPARf7OJwyHvvrXLtTCxsJ-0Mw@mail.gmail.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 23 Nov 2016 09:17:58 +0100
+Subject: [PATCH 5/7] add bindings for stm32 IIO timer drivers
+In-Reply-To: <20161122171820.GL10134@dell.home>
+References: <1479831207-32699-1-git-send-email-benjamin.gaignard@st.com>
+ <1479831207-32699-6-git-send-email-benjamin.gaignard@st.com>
+ <b9a82ce7-745a-1c25-f97f-68aaf0551f3b@metafoo.de>
+ <CA+M3ks6ZoOND4VobU65OntEYU-f_XoNCV4wNZZ0_dYoOxy73+w@mail.gmail.com>
+ <20161122171820.GL10134@dell.home>
+Message-ID: <CA+M3ks7MgnUJoDoNG157+MbdhgbqwzRmhPcD-uQKC7_DJVAK6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+If it is ok for you I will add "id" parameter in mfd driver and
+forward it to the sub-devices drivers
+to be able to distinguish the hardware blocks
 
-Thanks for your review comment.
 
-On Wed, Nov 23, 2016 at 1:38 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Nov 23, 2016 at 07:41:52AM +0530, Pratyush Anand wrote:
->>
->>
->> On Wednesday 23 November 2016 07:33 AM, Dave Young wrote:
->> >>Although this is very unlikely that a hardware will support only 16K page
->> >>> sizes, however it is possible. Therefore, its better to keep it disabled by
->> >>> default.
->> >If it is *unlikely* it could be better to make it as default and add a
->> >--disable-dcache instead.
+2016-11-22 18:18 GMT+01:00 Lee Jones <lee.jones@linaro.org>:
+> On Tue, 22 Nov 2016, Benjamin Gaignard wrote:
+>
+>> [snip]
+>> >> +     "st,stm32-iio-timer5"
+>> >> +     "st,stm32-iio-timer6"
+>> >> +     "st,stm32-iio-timer7"
+>> >> +     "st,stm32-iio-timer8"
+>> >> +     "st,stm32-iio-timer9"
+>> >> +     "st,stm32-iio-timer10"
+>> >> +     "st,stm32-iio-timer11"
+>> >> +     "st,stm32-iio-timer12"
+>> >> +     "st,stm32-iio-timer13"
+>> >> +     "st,stm32-iio-timer14"
+>> >
+>> > We can't do this. This is a binding for a driver, not for the hardware.
 >> >
 >>
->> I think, I can do that.
+>> Unfortunately each instance for the hardware IP have little
+>> differences like which triggers they could accept or size of the
+>> counter register,
+>> and I doesn't have value inside the hardware to distinguish them so
+>> the only way I found is to use compatible.
 >
-> Can this be detected at run-time?
+> Can't you represent these as properties?
+>
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
 
 
 
-Thats doable. OK, so if everyone agrees then I can send a V2 where
-neither --enable-dcache nor --disable-dcache will be used. It will
-enable dcache if 4K/64K page is supported and will do nothing
-otherwise.
+-- 
+Benjamin Gaignard
 
-~Pratyush
+Graphic Study Group
+
+Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro: Facebook | Twitter | Blog
