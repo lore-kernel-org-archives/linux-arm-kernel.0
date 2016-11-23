@@ -1,86 +1,120 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 23 Nov 2016 09:08:36 +0100
-Subject: [PATCH v2 1/3] arm64: dts: add USB1-related nodes of Allwinner A64
-In-Reply-To: <20161122155831.8724-1-icenowy@aosc.xyz>
-References: <20161122155831.8724-1-icenowy@aosc.xyz>
-Message-ID: <20161123080836.xigrwdmf4zxbqmqf@lukather>
+Date: Wed, 23 Nov 2016 08:59:50 +0100
+Subject: [PATCH 3/3] ARM: dts: sunxi: enable SDIO Wi-Fi on Orange Pi Zero
+In-Reply-To: <20161121162421.800-3-icenowy@aosc.xyz>
+References: <20161121162421.800-1-icenowy@aosc.xyz>
+ <20161121162421.800-3-icenowy@aosc.xyz>
+Message-ID: <20161123075950.fjtplylunwale6j4@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2016 at 11:58:29PM +0800, Icenowy Zheng wrote:
-> Allwinner A64 have two HCI USB controllers, a OTG controller and a USB
-> PHY device which have two ports. One of the port is wired to both a HCI
-> USB controller and the OTG controller, which is currently not supported.
-> The another one is only wired to a HCI controller, and the device node of
-> OHCI/EHCI controller of the port can be added now.
+Hi,
+
+On Tue, Nov 22, 2016 at 12:24:21AM +0800, Icenowy Zheng wrote:
+> There's a Allwinner's XR819 SDIO Wi-Fi module soldered on the board of
+> Orange Pi Zero, which used a dedicated regulator to power.
 > 
-> Also the A64 USB PHY device node is also added for the HCI controllers to
-> work.
+> Add the device tree node of the regulator, the enable gpio (with
+> mmc-pwrseq) and the sdio controller.
+> 
+> There's a out-of-tree driver tested to work with this device tree.
 > 
 > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 > ---
-> Changes since v1:
-> - Remove manual CLK_USB_OHCI0 gate, as it's dealed by ccu driver now.
-> - Sort the nodes and fixed {e,o}hci1 regs.
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 44 +++++++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
+> New patch in the patchset, since a out-of-tree working xradio driver is done.
 > 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> index 3d70be3..2572dd6 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -122,6 +122,50 @@
->  		#size-cells = <1>;
->  		ranges;
+> If there is any problem in this patch, it can be omitted.
+
+No particular problem with this one, however it can and should be
+merged with the previous one.
+
+Minor comments below though.
+
+> 
+>  arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts | 42 ++++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts
+> index b428e47..39cac26 100644
+> --- a/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts
+> +++ b/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts
+> @@ -79,6 +79,24 @@
+>  			gpios = <&pio 0 17 GPIO_ACTIVE_HIGH>;
+>  		};
+>  	};
+> +
+> +	reg_vcc_wifi: reg_vcc_wifi {
+> +		compatible = "regulator-fixed";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&vcc_wifi_pin_opi0>;
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		regulator-name = "vcc-wifi";
+> +		enable-active-high;
+> +		gpio = <&pio 0 20 GPIO_ACTIVE_HIGH>;
+> +	};
+> +
+> +	wifi_pwrseq: wifi_pwrseq {
+> +		compatible = "mmc-pwrseq-simple";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&wifi_pwrseq_pin_opi0>;
+> +		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>;
+> +	};
+>  };
 >  
-> +		usbphy: phy at 01c19400 {
-> +			compatible = "allwinner,sun50i-a64-usb-phy";
-> +			reg = <0x01c19400 0x14>,
-> +			      <0x01c1b800 0x4>;
-> +			reg-names = "phy_ctrl",
-> +				    "pmu1";
-> +			clocks = <&ccu CLK_USB_PHY0>,
-> +				 <&ccu CLK_USB_PHY1>;
-> +			clock-names = "usb0_phy",
-> +				      "usb1_phy";
-> +			resets = <&ccu RST_USB_PHY0>,
-> +				 <&ccu RST_USB_PHY1>;
-> +			reset-names = "usb0_reset",
-> +				      "usb1_reset";
-> +			status = "disabled";
-> +			#phy-cells = <1>;
-> +		};
+>  &ehci1 {
+> @@ -95,6 +113,20 @@
+>  	status = "okay";
+>  };
+>  
+> +&mmc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc1_pins_a>;
+> +	vmmc-supply = <&reg_vcc_wifi>;
+> +	mmc-pwrseq = <&wifi_pwrseq>;
+> +	bus-width = <4>;
+> +	non-removable;
+> +	status = "okay";
+> +};
 > +
-> +		ohci1: usb at 01c1b400 {
-> +			compatible = "allwinner,sun50i-a64-ohci", "generic-ohci";
-> +			reg = <0x01c1b400 0x100>;
-> +			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&ccu CLK_BUS_OHCI1>,
-> +				 <&ccu CLK_USB_OHCI1>;
-> +			resets = <&ccu RST_BUS_OHCI1>;
-> +			phys = <&usbphy 1>;
-> +			phy-names = "usb";
-> +			status = "disabled";
-> +		};
+> +&mmc1_pins_a {
+> +	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+
+This should be bias-pull-up.
+
+> +};
 > +
-> +		ehci1: usb at 01c1b000 {
-> +			compatible = "allwinner,sun50i-a64-ehci", "generic-ehci";
-> +			reg = <0x01c1b000 0x100>;
-> +			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&ccu CLK_BUS_OHCI1>,
-> +				 <&ccu CLK_BUS_EHCI1>,
-> +				 <&ccu CLK_USB_OHCI1>;
-> +			resets = <&ccu RST_BUS_OHCI1>,
-> +				 <&ccu RST_BUS_EHCI1>;
-> +			phys = <&usbphy 1>;
-> +			phy-names = "usb";
-> +			status = "disabled";
-> +		};
+>  &ohci1 {
+>  	status = "okay";
+>  };
+> @@ -104,6 +136,11 @@
+>  		pins = "PA17";
+>  		function = "gpio_out";
+>  	};
+> +
+> +	vcc_wifi_pin_opi0: vcc_wifi_pin at 0 {
+> +		allwinner,pins = "PA20";
 
-The nodes were inverted, also, please use "arm64: dts: allwinner:" for
-your prefix in the future.
+This should be pins
 
-I fixed both issues and queued for 4.11.
+> +		allwinner,function = "gpio_out";
+
+This should be function
+
+> +	};
+>  };
+>  
+>  &r_pio {
+> @@ -111,6 +148,11 @@
+>  		pins = "PL10";
+>  		function = "gpio_out";
+>  	};
+> +
+> +	wifi_pwrseq_pin_opi0: wifi_pwrseq_pin at 0 {
+> +		allwinner,pins = "PL7";
+> +		allwinner,function = "gpio_out";
+
+And same thing here.
 
 Thanks!
 Maxime
@@ -95,4 +129,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161123/63204017/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161123/d0892fbe/attachment.sig>
