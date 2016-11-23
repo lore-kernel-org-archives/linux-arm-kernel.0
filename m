@@ -1,70 +1,64 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 23 Nov 2016 11:18:27 +0100
-Subject: [PATCH 1/4] serial: core: Add LED trigger support
-In-Reply-To: <20161123100819.GA20137@kroah.com>
-References: <20161123100106.15969-1-s.hauer@pengutronix.de>
- <20161123100106.15969-2-s.hauer@pengutronix.de>
- <20161123100819.GA20137@kroah.com>
-Message-ID: <20161123101827.5c3n5mrezyyw2us3@pengutronix.de>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 23 Nov 2016 11:25:44 +0100
+Subject: Tearing down DMA transfer setup after DMA client has finished
+Message-ID: <58356EA8.2010806@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2016 at 11:08:19AM +0100, Greg Kroah-Hartman wrote:
-> On Wed, Nov 23, 2016 at 11:01:03AM +0100, Sascha Hauer wrote:
-> > With this patch the serial core provides LED triggers for RX and TX.
-> > 
-> > As the serial core layer does not know when the hardware actually sends
-> > or receives characters, this needs help from the UART drivers. The
-> > LED triggers are registered in uart_add_led_triggers() called from
-> > the UART drivers which want to support LED triggers. All the driver
-> > has to do then is to call uart_led_trigger_[tx|rx] to indicate
-> > activity.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  drivers/tty/serial/serial_core.c | 73 ++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/serial_core.h      | 10 ++++++
-> >  2 files changed, 83 insertions(+)
-> > 
-> > diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
-> > index f2303f3..3e8afb7 100644
-> > --- a/drivers/tty/serial/serial_core.c
-> > +++ b/drivers/tty/serial/serial_core.c
-> > @@ -34,6 +34,7 @@
-> >  #include <linux/serial_core.h>
-> >  #include <linux/delay.h>
-> >  #include <linux/mutex.h>
-> > +#include <linux/leds.h>
-> >  
-> >  #include <asm/irq.h>
-> >  #include <asm/uaccess.h>
-> > @@ -2703,6 +2704,77 @@ static const struct attribute_group tty_dev_attr_group = {
-> >  	.attrs = tty_dev_attrs,
-> >  	};
-> >  
-> > +void uart_led_trigger_tx(struct uart_port *uport)
-> > +{
-> > +	unsigned long delay = 50;
-> > +
-> > +	led_trigger_blink_oneshot(uport->led_trigger_tx, &delay, &delay, 0);
-> > +}
-> > +
-> > +void uart_led_trigger_rx(struct uart_port *uport)
-> > +{
-> > +	unsigned long delay = 50;
-> > +
-> > +	led_trigger_blink_oneshot(uport->led_trigger_rx, &delay, &delay, 0);
-> > +}
-> 
-> Don't these functions need an EXPORT_SYMBOL_GPL() to work properly with
-> uart drivers being built as a module?
+Hello,
 
-Yes, for sure. Will fix in next version.
+On my platform, setting up a DMA transfer is a two-step process:
 
-Sascha
+1) configure the "switch box" to connect a device to a memory channel
+2) configure the transfer details (address, size, command)
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+When the transfer is done, the sbox setup can be torn down,
+and the DMA driver can start another transfer.
+
+The current software architecture for my NFC (NAND Flash controller)
+driver is as follows (for one DMA transfer).
+
+  sg_init_one
+  dma_map_sg
+  dmaengine_prep_slave_sg
+  dmaengine_submit
+  dma_async_issue_pending
+  configure_NFC_transfer
+  wait_for_IRQ_from_DMA_engine // via DMA_PREP_INTERRUPT
+  wait_for_NFC_idle
+  dma_unmap_sg
+
+
+The problem is that the DMA driver tears down the sbox setup
+as soon as it receives the IRQ. However, when writing to the
+device, the interrupt only means "I have pushed all data from
+memory to the memory channel". These data have not reached
+the device yet, and may still be "in flight". Thus the sbox
+setup can only be torn down after the NFC is idle.
+
+How do I call back into the DMA driver after wait_for_NFC_idle,
+to request sbox tear down?
+
+The new architecture would become:
+
+  sg_init_one
+  dma_map_sg
+  dmaengine_prep_slave_sg
+  dmaengine_submit
+  dma_async_issue_pending
+  configure_NFC_transfer
+  wait_for_IRQ_from_DMA_engine // via DMA_PREP_INTERRUPT
+  wait_for_NFC_idle
+  request_sbox_tear_down /*** HOW TO DO THAT ***/
+  dma_unmap_sg
+
+
+As far as I can tell, my NFC driver should call dmaengine_synchronize ??
+(In other words request_sbox_tear_down == dmaengine_synchronize)
+
+So the DMA driver should implement the device_synchronize hook,
+and tear the sbox down in that function.
+
+Is that correct? Or am I on the wrong track?
+
+Regards.
