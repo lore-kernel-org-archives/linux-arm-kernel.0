@@ -1,58 +1,189 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 23 Nov 2016 08:54:40 +0100
-Subject: [PATCH v2 1/3] ARM: sunxi: add support for H2+ SoC
-In-Reply-To: <20161121162421.800-1-icenowy@aosc.xyz>
+Date: Wed, 23 Nov 2016 08:57:13 +0100
+Subject: [PATCH v2 2/3] ARM: dts: sunxi: add support for Orange Pi Zero
+ board
+In-Reply-To: <20161121162421.800-2-icenowy@aosc.xyz>
 References: <20161121162421.800-1-icenowy@aosc.xyz>
-Message-ID: <20161123075440.jyubhodklpaueupw@lukather>
+ <20161121162421.800-2-icenowy@aosc.xyz>
+Message-ID: <20161123075713.ks6gmud3rszjbdsh@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Nov 22, 2016 at 12:24:19AM +0800, Icenowy Zheng wrote:
-> Allwinner H2+ is a quad-core Cortex-A7 SoC.
+On Tue, Nov 22, 2016 at 12:24:20AM +0800, Icenowy Zheng wrote:
+> Orange Pi Zero is a board that came with the new Allwinner H2+ SoC.
 > 
-> It is very like H3, that they share the same SoC ID (0x1680), and H3
-> memory maps as well as drivers works well on the SoC.
+> Add a device tree file for it.
 > 
 > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 > ---
->  Documentation/arm/sunxi/README                  | 4 ++++
->  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
->  arch/arm/mach-sunxi/sunxi.c                     | 1 +
->  3 files changed, 6 insertions(+)
+> Changes since v2:
+> - Use generic pinconf binding instead of legacy allwinner pinctrl binding.
+> - removed uart3, which is not accessible on Orange Pi Zero.
+> - Removed sun8i-h2plus.dtsi and make Orange Pi Zero dts directly include
+>   sun8i-h3.dtsi.
+> - Removed allwinner,sun8i-h3 compatible.
 > 
-> diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
-> index cd02433..1fe4d99c 100644
-> --- a/Documentation/arm/sunxi/README
-> +++ b/Documentation/arm/sunxi/README
-> @@ -63,6 +63,10 @@ SunXi family
->          + User Manual
->            http://dl.linux-sunxi.org/A33/A33%20user%20manual%20release%201.1.pdf
->  
-> +      - Allwinner H2+ (sun8i)
-> +        + No document available now, but is known to be working properly with
-> +          H3 drivers and memory map.
+>  arch/arm/boot/dts/Makefile                       |   1 +
+>  arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts | 137 +++++++++++++++++++++++
+
+Ditto, h2-plus-orangepi-zero.
+
+>  2 files changed, 138 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 802a10d..51a1dd7 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -834,6 +834,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+>  	sun8i-a33-sinlinx-sina33.dtb \
+>  	sun8i-a83t-allwinner-h8homlet-v2.dtb \
+>  	sun8i-a83t-cubietruck-plus.dtb \
+> +	sun8i-h2plus-orangepi-zero.dtb \
+>  	sun8i-h3-bananapi-m2-plus.dtb \
+>  	sun8i-h3-nanopi-neo.dtb \
+>  	sun8i-h3-orangepi-2.dtb \
+> diff --git a/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts
+> new file mode 100644
+> index 0000000..b428e47
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts
+> @@ -0,0 +1,137 @@
+> +/*
+> + * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.xyz>
+> + *
+> + * Based on sun8i-h3-orangepi-one.dts, which is:
+> + *   Copyright (C) 2016 Hans de Goede <hdegoede@redhat.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
 > +
+> +/dts-v1/;
+> +#include "sun8i-h3.dtsi"
+> +#include "sunxi-common-regulators.dtsi"
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+> +
+> +/ {
+> +	model = "Xunlong Orange Pi Zero";
+> +	compatible = "xunlong,orangepi-zero", "allwinner,sun8i-h2plus";
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&leds_opi0>, <&leds_r_opi0>;
+> +
+> +		pwr_led {
+> +			label = "orangepi:green:pwr";
+> +			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
+> +			default-state = "on";
+> +		};
+> +
+> +		status_led {
+> +			label = "orangepi:red:status";
+> +			gpios = <&pio 0 17 GPIO_ACTIVE_HIGH>;
+> +		};
+> +	};
+> +};
+> +
+> +&ehci1 {
+> +	status = "okay";
+> +};
+> +
+> +&mmc0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	bus-width = <4>;
+> +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
+> +	cd-inverted;
+> +	status = "okay";
+> +};
+> +
+> +&ohci1 {
+> +	status = "okay";
+> +};
+> +
+> +&pio {
+> +	leds_opi0: led_pins at 0 {
+> +		pins = "PA17";
+> +		function = "gpio_out";
+> +	};
+> +};
+> +
+> +&r_pio {
+> +	leds_r_opi0: led_pins at 0 {
+> +		pins = "PL10";
+> +		function = "gpio_out";
+> +	};
+> +};
+> +
+> +&uart0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart0_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart1_pins>;
+> +	status = "disabled";
+> +};
+> +
+> +&uart2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart2_pins>;
+> +	status = "disabled";
+> +};
 
-I'm not sure the phrasing is right here. I would prefer something like:
-
-"No document publicly available now, but looks very similar to the H3" 
-
->        - Allwinner H3 (sun8i)
->          + Datasheet
->            http://dl.linux-sunxi.org/H3/Allwinner_H3_Datasheet_V1.0.pdf
-> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-> index 4d6467c..26b35a7 100644
-> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-> @@ -13,6 +13,7 @@ using one of the following compatible strings:
->    allwinner,sun8i-a33
->    allwinner,sun8i-a83t
->    allwinner,sun8i-h3
-> +  allwinner,sun8i-h2plus
-
-h2-plus please.
+I'm not sure you answered me on this one. Are those exposed on the
+headers? why did you put them as disabled here?
 
 Thanks!
 Maxime
@@ -67,4 +198,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161123/57bf0c4d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161123/8430f549/attachment.sig>
