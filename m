@@ -1,62 +1,88 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 23 Nov 2016 14:23:34 -0800
-Subject: [GIT PULL] Amlogic 64-bit DT changes for v4.10, round 2
-Message-ID: <m2k2btx2c9.fsf@baylibre.com>
+Date: Wed, 23 Nov 2016 14:32:05 -0800
+Subject: [PATCH v2] ARM: dts: da850: add the mstpri and ddrctl nodes
+In-Reply-To: <5e647eb0-2f8a-b46b-2048-7616bfb54ad7@lechnology.com> (David
+ Lechner's message of "Wed, 23 Nov 2016 10:19:53 -0600")
+References: <1479207611-18028-1-git-send-email-bgolaszewski@baylibre.com>
+ <a39b9276-865b-6382-574e-a5ef040a452f@lechnology.com>
+ <CAMpxmJVqog0Fno_DO0NQKmVNvzu5d=3GOLk145wBmB-V70BLeg@mail.gmail.com>
+ <5e647eb0-2f8a-b46b-2048-7616bfb54ad7@lechnology.com>
+Message-ID: <m2bmx5x1y2.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+David Lechner <david@lechnology.com> writes:
 
-Here's a final round of arm64 DT changes for Amlogic family SoCs.
+> On 11/23/2016 04:27 AM, Bartosz Golaszewski wrote:
+>> 2016-11-22 23:23 GMT+01:00 David Lechner <david@lechnology.com>:
+>>> On 11/15/2016 05:00 AM, Bartosz Golaszewski wrote:
+>>>>
+>>>> Add the nodes for the MSTPRI configuration and DDR2/mDDR memory
+>>>> controller drivers to da850.dtsi.
+>>>>
+>>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>> ---
+>>>> v1 -> v2:
+>>>> - moved the priority controller node above the cfgchip node
+>>>> - renamed added nodes to better reflect their purpose
+>>>>
+>>>>  arch/arm/boot/dts/da850.dtsi | 8 ++++++++
+>>>>  1 file changed, 8 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+>>>> index 1bb1f6d..412eec6 100644
+>>>> --- a/arch/arm/boot/dts/da850.dtsi
+>>>> +++ b/arch/arm/boot/dts/da850.dtsi
+>>>> @@ -210,6 +210,10 @@
+>>>>                         };
+>>>>
+>>>>                 };
+>>>> +               prictrl: priority-controller at 14110 {
+>>>> +                       compatible = "ti,da850-mstpri";
+>>>> +                       reg = <0x14110 0x0c>;
+>>>
+>>>
+>>> I think we should add status = "disabled"; here and let boards opt in.
+>>>
+>>>> +               };
+>>>>                 cfgchip: chip-controller at 1417c {
+>>>>                         compatible = "ti,da830-cfgchip", "syscon",
+>>>> "simple-mfd";
+>>>>                         reg = <0x1417c 0x14>;
+>>>> @@ -451,4 +455,8 @@
+>>>>                           1 0 0x68000000 0x00008000>;
+>>>>                 status = "disabled";
+>>>>         };
+>>>> +       memctrl: memory-controller at b0000000 {
+>>>> +               compatible = "ti,da850-ddr-controller";
+>>>> +               reg = <0xb0000000 0xe8>;
+>>>
+>>>
+>>> same here. status = "disabled";
+>>>
+>>>> +       };
+>>>>  };
+>>>>
+>>
+>> Hi David,
+>>
+>> I did that initially[1][2] and it was rejected by Kevin[3] and Laurent[4].
+>>
+>> FYI this patch has already been queued by Sekhar.
+>
+> Thanks. I did not see those threads.
+>
+> FYI to maintainers, having these enabled by default causes error
+> messages in the kernel log for other boards that are not supported by
+> the drivers.
 
-Please pull.
+Then the driver is too noisy and should be cleaned up.
 
-Thanks,
+> Since there is only one board that is supported and soon
+> to be 2 that are not, I would rather have this disabled by default to
+> avoid the error messages.
+
+IMO, what exactly are the error messages? Sounds like the driver is
+being too verbose, and calling things errors that are not really errors.
 
 Kevin
-
-The following changes since commit ab5b24fdd2d551ea729e8e19e47811a646260331:
-
-  ARM64: dts: meson-gxbb-vega-s95: Add SD/SDIO/MMC and PWM nodes (2016-11-15 12:05:54 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2
-
-for you to fetch changes up to 3db317765fcd55808c782f38c0d3f1862a922c2a:
-
-  ARM64: dts: meson-gxl: Add support for Nexbox A95X (2016-11-23 07:57:35 -0800)
-
-----------------------------------------------------------------
-Amlogic 64-bit DT updates for v4.10, round 2
-- new SoC support: S912/GXM series (8x A53)
-- new boards: Nexbox A1 (S912), Nexbox A95X (S905X)
-- resets for 2nd USB PHY
-
-----------------------------------------------------------------
-Martin Blumenstingl (1):
-      ARM64: dts: meson-gxbb: add the USB reset also to the second USB PHY
-
-Neil Armstrong (3):
-      ARM64: dts: Add support for Meson GXM
-      ARM64: dts: meson-gxm: Add support for the Nexbox A1
-      ARM64: dts: meson-gxl: Add support for Nexbox A95X
-
- Documentation/devicetree/bindings/arm/amlogic.txt                                  |   8 +++
- arch/arm64/boot/dts/amlogic/Makefile                                               |   4 ++
- arch/arm64/boot/dts/amlogic/{meson-gxl-s905d-p23x.dtsi => meson-gx-p23x-q20x.dtsi} |   4 +-
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                                        |   1 +
- arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts                              | 205 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts                               |   3 +-
- arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p231.dts                               |   3 +-
- arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts                                | 169 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts                                |  77 +++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxm-s912-q201.dts                                |  58 ++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxm.dtsi                                         | 114 +++++++++++++++++++++++++++++++++++++++
- 11 files changed, 643 insertions(+), 3 deletions(-)
- rename arch/arm64/boot/dts/amlogic/{meson-gxl-s905d-p23x.dtsi => meson-gx-p23x-q20x.dtsi} (97%)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm-s912-q201.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
