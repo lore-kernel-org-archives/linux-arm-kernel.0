@@ -1,63 +1,40 @@
-From: andrei.pistirica@microchip.com (Andrei Pistirica)
-Date: Wed, 23 Nov 2016 14:36:55 +0100
-Subject: [RFC PATCH v2 1/2] macb: Add 1588 support in Cadence GEM.
-In-Reply-To: <20161120193720.GA7874@localhost.localdomain>
-References: <1479478912-14067-1-git-send-email-andrei.pistirica@microchip.com>
- <20161120193720.GA7874@localhost.localdomain>
-Message-ID: <90432c85-871f-22be-bde2-51e321828c9a@microchip.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Wed, 23 Nov 2016 15:11:50 +0100
+Subject: [PATCH RESEND 1/2] gpio: axp209: use correct register for GPIO input
+ status
+In-Reply-To: <20161123141151.25315-1-quentin.schulz@free-electrons.com>
+References: <20161123141151.25315-1-quentin.schulz@free-electrons.com>
+Message-ID: <20161123141151.25315-2-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The GPIO input status was read from control register
+(AXP20X_GPIO[210]_CTRL) instead of status register (AXP20X_GPIO20_SS).
 
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+---
+ drivers/gpio/gpio-axp209.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-On 20.11.2016 20:37, Richard Cochran wrote:
-> On Fri, Nov 18, 2016 at 03:21:51PM +0100, Andrei Pistirica wrote:
->> +#ifdef CONFIG_MACB_USE_HWSTAMP
->> +void macb_ptp_init(struct net_device *ndev);
->> +#else
->> +void macb_ptp_init(struct net_device *ndev) { }
->
-> static inline ^^^
-
-I can do static inline only when PTP is not enabled (on else branch), 
-thus the empty function is defined in the header file (since the init 
-function is defined in macb_ptp and used in macb). To differentiate 
-between macb versions, I'll add a wrapper.
-Would this be ok?
-
->
->> +#endif
->
->
->> +void macb_ptp_init(struct net_device *ndev)
->> +{
->> +	struct macb *bp = netdev_priv(ndev);
->> +	struct timespec64 now;
->> +	u32 rem = 0;
->> +
->> +	if (!(bp->caps | MACB_CAPS_GEM_HAS_PTP)){
->> +		netdev_vdbg(bp->dev, "Platform does not support PTP!\n");
->> +		return;
->> +	}
->
-> You would have needed '&' and not '|' here.
-
-Yes. Another stupid mistake... sorry. I will be more careful next time.
-
->
-> Also, using a flag limits the code to your platform.  This works for
-> you, but it is short sighted.  The other MACB PTP blocks have
-> different register layouts, and this patch does not lay the ground
-> work for the others.
->
-> The driver needs to be designed to support the other platforms.
-
-It will support Xilinx.
-
->
-> Thanks,
-> Richard
->
-
-Regards,
-Andrei
+diff --git a/drivers/gpio/gpio-axp209.c b/drivers/gpio/gpio-axp209.c
+index d9c2a51..4a346b7 100644
+--- a/drivers/gpio/gpio-axp209.c
++++ b/drivers/gpio/gpio-axp209.c
+@@ -64,13 +64,9 @@ static int axp20x_gpio_get(struct gpio_chip *chip, unsigned offset)
+ {
+ 	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
+ 	unsigned int val;
+-	int reg, ret;
+-
+-	reg = axp20x_gpio_get_reg(offset);
+-	if (reg < 0)
+-		return reg;
++	int ret;
+ 
+-	ret = regmap_read(gpio->regmap, reg, &val);
++	ret = regmap_read(gpio->regmap, AXP20X_GPIO20_SS, &val);
+ 	if (ret)
+ 		return ret;
+ 
+-- 
+2.9.3
