@@ -1,98 +1,69 @@
-From: yegorslists@googlemail.com (yegorslists at googlemail.com)
-Date: Wed, 23 Nov 2016 10:52:37 +0100
-Subject: [PATCH] ARM: dts: am335x-baltos: use phy-phandle declarations
-Message-ID: <1479894757-32736-1-git-send-email-yegorslists@googlemail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 23 Nov 2016 10:57:18 +0100
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for
+ v4.10
+In-Reply-To: <20161121105315.GA19845@verge.net.au>
+References: <cover.1479391750.git.horms+renesas@verge.net.au>
+ <20161119014929.GE2543@localhost>
+ <20161121105315.GA19845@verge.net.au>
+Message-ID: <20161123095717.GA16339@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yegor Yefremov <yegorslists@googlemail.com>
+On Mon, Nov 21, 2016 at 11:53:18AM +0100, Simon Horman wrote:
+> On Fri, Nov 18, 2016 at 05:49:29PM -0800, Olof Johansson wrote:
+> > On Thu, Nov 17, 2016 at 03:11:45PM +0100, Simon Horman wrote:
+> > > Hi Olof, Hi Kevin, Hi Arnd,
+> > > 
+> > > Please consider these second round of Renesas ARM based SoC DT updates for v4.10.
+> > > 
+> > > This pull request is based on a merge of:
+> > > 
+> > > * The previous round of such requests, tagged as renesas-dt-for-v4.10,
+> > >   which I have already sent a pull-request for.
+> > > * The rzg-clock-defs tag of Geert Uytterhoeven's renesas-driver's tree.
+> > >   This is to provide dependencies for adding the r8a7743 and r8a7745 SoCs.
+> > > * The "Second Round of Renesas ARM Based SoC Drivers Updates for v4.10",
+> > >   tagged as renesas-drivers2-for-v4.10, which I have also sent a pull
+> > >   request for. This is included to provide dependencies for adding device
+> > >   nodes for PRR, and adding the r8a7743 and r8a7745 SoCs.
+> > 
+> > Again, nack. And again, I don't understand why you create dependencies that
+> > aren't needed. Please fix.
+> 
+> Hi Olof,
+> 
+> I agree that calling out PRR above was incorrect. Please disregard that.
+> 
+> However, there are dependencies for adding r8a7743 and r8a7745 SoCs
+> in the form of header files:
+> 
+> * The rzg-clock-defs tag provides dt-bindings/clock/r8a774[35]-cpg-mssr.h
+> * The renesas-drivers2-for-v4.10 tag provides
+>   dt-bindings/power/r8a774[35]-sysc.h
+> 
+> The drivers branches are usually pretty light-weight. But this time it is a
+> bit heavy and you rightly raised some questions about it. After some
+> discussion with Geert we'd like to suggest that for future releases
+> we provide a "driver-defs" branch which both driver code and DT can
+> depend on. Thus avoiding pulling (non essential) driver changes into the DT
+> branch.
+> 
+> Unfortunately its a bit late to do that for v4.10 as the r8a7743 sysc
+> driver and its defines were already accepted accepted together
+> (renesas-drivers-for-v4.10 tag). So for this release we would be grateful
+> if you could re-consider the renesas-drivers2-for-v4.10 tag given the
+> feedback which Geert has provided. And in turn re-consider this pull
+> request.
 
-Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
----
- arch/arm/boot/dts/am335x-baltos-ir2110.dts | 10 ++++++++--
- arch/arm/boot/dts/am335x-baltos-ir3220.dts |  2 +-
- arch/arm/boot/dts/am335x-baltos-ir5221.dts |  2 +-
- arch/arm/boot/dts/am335x-baltos.dtsi       |  5 ++++-
- 4 files changed, 14 insertions(+), 5 deletions(-)
+Hi again,
 
-diff --git a/arch/arm/boot/dts/am335x-baltos-ir2110.dts b/arch/arm/boot/dts/am335x-baltos-ir2110.dts
-index a9a9730..501c752 100644
---- a/arch/arm/boot/dts/am335x-baltos-ir2110.dts
-+++ b/arch/arm/boot/dts/am335x-baltos-ir2110.dts
-@@ -54,16 +54,22 @@
- 	dr_mode = "host";
- };
- 
-+&davinci_mdio {
-+	phy0: ethernet-phy at 0 {
-+		reg = <1>;
-+	};
-+};
-+
- &cpsw_emac0 {
--	phy_id = <&davinci_mdio>, <1>;
- 	phy-mode = "rmii";
- 	dual_emac_res_vlan = <1>;
-+	phy-handle = <&phy0>;
- };
- 
- &cpsw_emac1 {
--	phy_id = <&davinci_mdio>, <7>;
- 	phy-mode = "rgmii-txid";
- 	dual_emac_res_vlan = <2>;
-+	phy-handle = <&phy1>;
- };
- 
- &phy_sel {
-diff --git a/arch/arm/boot/dts/am335x-baltos-ir3220.dts b/arch/arm/boot/dts/am335x-baltos-ir3220.dts
-index fe002a1..19f53b8 100644
---- a/arch/arm/boot/dts/am335x-baltos-ir3220.dts
-+++ b/arch/arm/boot/dts/am335x-baltos-ir3220.dts
-@@ -109,9 +109,9 @@
- };
- 
- &cpsw_emac1 {
--	phy_id = <&davinci_mdio>, <7>;
- 	phy-mode = "rgmii-txid";
- 	dual_emac_res_vlan = <2>;
-+	phy-handle = <&phy1>;
- };
- 
- &phy_sel {
-diff --git a/arch/arm/boot/dts/am335x-baltos-ir5221.dts b/arch/arm/boot/dts/am335x-baltos-ir5221.dts
-index f599350..2b9d7f4 100644
---- a/arch/arm/boot/dts/am335x-baltos-ir5221.dts
-+++ b/arch/arm/boot/dts/am335x-baltos-ir5221.dts
-@@ -127,9 +127,9 @@
- };
- 
- &cpsw_emac1 {
--	phy_id = <&davinci_mdio>, <7>;
- 	phy-mode = "rgmii-txid";
- 	dual_emac_res_vlan = <2>;
-+	phy-handle = <&phy1>;
- };
- 
- &phy_sel {
-diff --git a/arch/arm/boot/dts/am335x-baltos.dtsi b/arch/arm/boot/dts/am335x-baltos.dtsi
-index 09b9541..efb5eae 100644
---- a/arch/arm/boot/dts/am335x-baltos.dtsi
-+++ b/arch/arm/boot/dts/am335x-baltos.dtsi
-@@ -364,11 +364,14 @@
- };
- 
- &davinci_mdio {
-+	status = "okay";
- 	pinctrl-names = "default", "sleep";
- 	pinctrl-0 = <&davinci_mdio_default>;
- 	pinctrl-1 = <&davinci_mdio_sleep>;
- 
--	status = "okay";
-+	phy1: ethernet-phy at 1 {
-+		reg = <7>;
-+	};
- };
- 
- &mmc1 {
--- 
-2.1.4
+while the above remains my preferred option I would like to put another one
+on the table in case it would help in any way for v4.10.
+
+I could split this pull-request up as follows:
+1. The patches that add the r8a774[35] SoCs:
+   - r8a7743 depends on renesas-drivers-for-v4.10 and rzg-clock-defs
+   - r8a7745 depends on renesas-drivers2-for-v4.10 and rzg-clock-defs
+2. The patches rest of the patches
+   - I believe these have no special dependencies
