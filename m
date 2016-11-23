@@ -1,83 +1,61 @@
-From: ddutile@redhat.com (Don Dutile)
-Date: Wed, 23 Nov 2016 15:12:41 -0500
-Subject: Summary of LPC guest MSI discussion in Santa Fe
-In-Reply-To: <83d7bf8e-1aa9-b61b-4e83-ba9da1926d19@jonmasters.org>
-References: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
- <20161103220205.37715b49@t450s.home> <20161108024559.GA20591@arm.com>
- <83d7bf8e-1aa9-b61b-4e83-ba9da1926d19@jonmasters.org>
-Message-ID: <5835F839.40905@redhat.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 23 Nov 2016 21:13:10 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC r8a7745 SYSC Driver Updates for v4.10
+Message-ID: <cover.1479929914.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2016 12:13 AM, Jon Masters wrote:
-> On 11/07/2016 07:45 PM, Will Deacon wrote:
->
->> I figured this was a reasonable post to piggy-back on for the LPC minutes
->> relating to guest MSIs on arm64.
->
-> Thanks for this Will. I'm still digging out post-LPC and SC16, but the
-> summary was much appreciated, and I'm glad the conversation is helping.
->
->>    1. The physical memory map is not standardised (Jon pointed out that
->>       this is something that was realised late on)
->
-> Just to note, we discussed this one about 3-4 years ago. I recall making
-> a vigorous slideshow at a committee meeting in defense of having a
-> single memory map for ARMv8 servers and requiring everyone to follow it.
-> I was weak. I listened to the comments that this was "unreasonable".
-> Instead, I consider it was unreasonable of me to not get with the other
-> OS vendors and force things to be done one way. The lack of a "map at
-> zero" RAM location on ARMv8 has been annoying enough for 32-bit DMA only
-> devices on 64-bit (behind an SMMU but in passthrough mode it doesn't
-> help) and other issues beyond fixing the MSI doorbell regions. If I ever
-> have a time machine, I tried harder.
->
->> Jon pointed out that most people are pretty conservative about hardware
->> choices when migrating between them -- that is, they may only migrate
->> between different revisions of the same SoC, or they know ahead of time
->> all of the memory maps they want to support and this could be communicated
->> by way of configuration to libvirt.
->
-> I think it's certainly reasonable to assume this in an initial
-> implementation and fix it later. Currently, we're very conservative
-> about host CPU passthrough anyway and can't migrate from one microarch
-> to another revision of the same microarch even. And on x86, nobody
-> really supports e.g. Intel to AMD and back again. I've always been of
-Thats primarily due to diff virt implentations ... vme vs svm.
-1) thats not the case here; can argue cross arch variations .. gicv2 vs gicv3 vs gicv4 ...
-    but cross vendor should work if arch and common feature map (like x86 libvirt can resolve)
-    is provided
-2) second chance to do it better; look n learn!
-    and common thread i am trying to drive home here ... learn from past mistakes *and* good choices.
+Hi Olof, Hi Kevin, Hi Arnd,
+
+Please consider these Renesas ARM based SoC r8a7745 SYSC Driver updates for
+v4.10.
+
+This pull request is based on v4.9-rc1.
+
+This pull request is broken out of an earlier pull request,
+"Second Round of Renesas ARM Based SoC Drivers Updates for v4.10".
+The motivation for breaking up the pull request is to provide
+branches with minimal dependencies.
+
+This pull request is targeted at the next/drivers branch of the arm-soc tree.
+
+It introduces some minor merge conflicts in:
+    Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt
+    drivers/soc/renesas/Makefile
+    drivers/soc/renesas/rcar-sysc.c
+    drivers/soc/renesas/rcar-sysc.h
+The resolution is to take both sides. A sample merge resolution is
+provided in the renesas-next-20161123v2-v4.9-rc1 tag of the renesas tree.
 
 
-> the mind that we should ensure the architecture can handle this, but
-> then cautiously approach this with a default to not doing it.
->
->> Alex asked if there was a security
->> issue with DMA bypassing the SMMU, but there aren't currently any systems
->> where that is known to happen. Such a system would surely not be safe for
->> passthrough.
->
-> There are other potential security issues that came up but don't need to
-> be noted here (yet). I have wanted to clarify the SBSA for a long time
-> when it comes to how IOMMUs should be implemented. It's past time that
-> we went back and had a few conversations about that. I've poked.
->
->> Ben mused that a way to handle conflicts dynamically might be to hotplug
->> on the entire host bridge in the guest, passing firmware tables describing
->> the new reserved regions as a property of the host bridge. Whilst this
->> may well solve the issue, it was largely considered future work due to
->> its invasive nature and dependency on firmware tables (and guest support)
->> that do not currently exist.
->
-> Indeed. It's an elegant solution (thanks Ben) that I gather POWER
-> already does (good for them). We've obviously got a few things to clean
-> up after we get the basics in place. Again, I think we can consider it
-> reasonable that the MSI doorbell regions are predetermined on system A
-> well ahead of any potential migration (that may or may not then work)
-> for the moment. Vendors will want to loosen this later, and they can
-> drive the work to do that, for example by hotplugging a host bridge.
->
-> Jon.
->
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-r8a7745-sysc-for-v4.10
+
+for you to fetch changes up to 141723e0cbdc1139410f77d8a572f17ce2de6bf5:
+
+  soc: renesas: rcar-sysc: add R8A7745 support (2016-11-23 14:28:41 +0100)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC r8a7745 SYSC Driver Updates for v4.10
+
+* Add support for the r8a7745 SoC to rcar-sysc
+
+----------------------------------------------------------------
+Sergei Shtylyov (2):
+      ARM: shmobile: r8a7745: add power domain index macros
+      soc: renesas: rcar-sysc: add R8A7745 support
+
+ .../bindings/power/renesas,rcar-sysc.txt           |  1 +
+ drivers/soc/renesas/Makefile                       |  1 +
+ drivers/soc/renesas/r8a7745-sysc.c                 | 32 ++++++++++++++++++++++
+ drivers/soc/renesas/rcar-sysc.c                    |  3 ++
+ drivers/soc/renesas/rcar-sysc.h                    |  1 +
+ include/dt-bindings/power/r8a7745-sysc.h           | 25 +++++++++++++++++
+ 6 files changed, 63 insertions(+)
+ create mode 100644 drivers/soc/renesas/r8a7745-sysc.c
+ create mode 100644 include/dt-bindings/power/r8a7745-sysc.h
