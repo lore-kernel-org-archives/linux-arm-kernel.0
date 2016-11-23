@@ -1,87 +1,116 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 23 Nov 2016 09:19:59 +0100
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.10
-In-Reply-To: <CAOesGMimsQphE4TzrJ7EPpp90VQG23vGP3jVrJK3qQrZgNEd3g@mail.gmail.com>
-References: <cover.1479387356.git.horms+renesas@verge.net.au>
- <20161119012836.GA2543@localhost>
- <CAMuHMdXAuDcbr84phfPRpqZYRzAZf2j4vsv+i_Frz0G8ksd_Vg@mail.gmail.com>
- <CAOesGMjk=KWifGT7sugpWVjNJSKhmgxg8gN9Cgi=emGrg66z0w@mail.gmail.com>
- <CAMuHMdUhpeiOj6Mjhgt=9R3yuV-HwOAy5AAsDSTDjagRRDtYCw@mail.gmail.com>
- <CAOesGMj47EZ1Zjc41VV2D-cM5XUsK28PDF-jSHKUkkind32ZRA@mail.gmail.com>
- <CAMuHMdUtu9N28rOb+813DumtbyAZJB3G+euD0mwwXD_jCiXrRg@mail.gmail.com>
- <CAOesGMimsQphE4TzrJ7EPpp90VQG23vGP3jVrJK3qQrZgNEd3g@mail.gmail.com>
-Message-ID: <CAMuHMdVs=SCTEmdckD6FNF89Xi2deRQwnukV9azpcBWUnp5HSQ@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 23 Nov 2016 13:57:48 +0530
+Subject: [PATCH 2/4] ARM: dts: davinci: da850: add VPIF
+In-Reply-To: <7hh96yiwdj.fsf@baylibre.com>
+References: <20161122194551.3420-1-khilman@baylibre.com>
+ <20161122194551.3420-3-khilman@baylibre.com>
+ <51071aa1-50c5-1121-3e64-018edaf544bf@lechnology.com>
+ <7hh96yiwdj.fsf@baylibre.com>
+Message-ID: <d4e696d1-f9b2-665c-c44f-c661856c5098@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
-On Wed, Nov 23, 2016 at 12:30 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Tue, Nov 22, 2016 at 1:56 AM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
->> On Mon, Nov 21, 2016 at 5:35 PM, Olof Johansson <olof@lixom.net> wrote:
->>> On Mon, Nov 21, 2016 at 8:27 AM, Geert Uytterhoeven
->>> <geert@linux-m68k.org> wrote:
->>>> On Mon, Nov 21, 2016 at 5:19 PM, Olof Johansson <olof@lixom.net> wrote:
->>>>> On Mon, Nov 21, 2016 at 1:31 AM, Geert Uytterhoeven
->>>>> <geert@linux-m68k.org> wrote:
->>>>>> On Sat, Nov 19, 2016 at 2:28 AM, Olof Johansson <olof@lixom.net> wrote:
->>>>>>> Is there a reason you're adding a config option per SoC?
->>>>>>>
->>>>>>> I think you'd be better off not adding these config options, and just adding
->>>>>>> support for the SoCs through compatibles (and adding the drivers to defconfigs,
->>>>>>> etc).
->>>>>>
->>>>>> Yes there is a reason: kernel size.
->>>>>> The main offenders are the pinctrl tables, which add ca. 20-50 KiB per
->>>>>> supported SoC.
->>>>>
->>>>> So don't turn on that pinctrl driver unless you have that SoC?
->>>>
->>>> The enablement of the pinctrl driver (and the clock driver, FWIW) is controlled
->>>> by the SoC Kconfig symbol. If you want support for the SoC, you want the
->>>> pinctrl driver, too.
+On Wednesday 23 November 2016 11:13 AM, Kevin Hilman wrote:
+> David Lechner <david@lechnology.com> writes:
+> 
+>> On 11/22/2016 01:45 PM, Kevin Hilman wrote:
+>>> Add VPIF and VPIF capture nodes to da850.  VPIF capture has two input
+>>> channels describe using the standard DT ports and enpoints.
 >>>
->>> Oh, that's trivial to fix! Do as almost all other SoCs do, and don't
->>> use silent options.
+>>> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+>>> ---
+>>>  arch/arm/boot/dts/da850.dtsi | 28 ++++++++++++++++++++++++++++
+>>>  1 file changed, 28 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+>>> index 6205917b4f59..e05e2bb834e8 100644
+>>> --- a/arch/arm/boot/dts/da850.dtsi
+>>> +++ b/arch/arm/boot/dts/da850.dtsi
+>>> @@ -453,7 +453,35 @@
+>>>  			interrupts = <52>;
+>>>  			status = "disabled";
+>>>  		};
+>>> +
+>>> +		vpif: video at 0x00217000 {
 >>
->> What does that gain us? The ability to enable support for an SoC, without
->> enabling the accompanying pinctrl driver, leading to a non-booting system?
->
-> It doesn't enable anything new, it just makes it less awkward for you
-> to add new SoCs in the future without creating dependencies on new
-> Kconfig symbols in the arch directory.
->
->> As soon as you have any pinctrl properties in the DT, you need the pinctrl
->> driver. Unless you disable CONFIG_PINCTRL (it's selected, and not
->> user-controlled), and rely on fragile reset state/boot loader.
+>> Should be @217000
 >>
->> Pinctrl (and clock and irqchip) on-SoC drivers are special: if you fail to
->> include them, the system won't boot.
->
-> This isn't about booting without a pinctrl driver. It's about avoiding
-> adding new config symbols when they're not needed.
->
-> I started out comparing your way of using config options with, for
-> example, Exynos that has a bunch of different SoCs enabled. Having
-> dependencies described clearly has some value, since it can be hard to
-> know if you can turn off a driver and still have a bootable system
-> with some of the other platforms.
->
-> That being said, I think you should look at changing how you use your
-> config options to make it less messy to add new ones:
+>>> +			compatible = "ti,da850-vpif";
+>>> +			reg = <0x00217000 0x1000>;
+>>
+>> Could omit leading 0's to be consistent with existing entries.
+>>
+>> 	reg = <0x217000 0x1000>;
+> 
+> Ugh, yeah. I hate that convention, but better to be consistent, I guess.
+> 
+>>> +			status = "disabled";
+>>> +		};
+>>> +
+>>> +		vpif_capture: video-capture at 0x00217000 {
+>>
+>> Again, @217000. But it seems odd to have two device nodes with the
+>> same address. Is enabling these mutually exclusive?
+> 
+> They're not mutually exclusive because the vpif is the one that actually
+> maps the register range (since it's shared between vpif_display and
+> vpif_capture) so I guess I should just drop the reg property from the
+> vpif_capture node.
 
-[...]
+Reading the documentation, VPIF is presented as a single device, with
+two channels dedicated to display and two for capture. Most of the
+channel registers are independent, but there are are some like interrupt
+enable which are common for all channels. So I believe we cannot use
+simple-mfd. But I believe VPIF display and capture should be subdevices
+of a single VPIF device.
 
-Thanks, I'll have a look to see if we can improve things...
+It should look something like this, I think:
 
-Gr{oetje,eeting}s,
+		vpif: video at 217000 {
+			compatible = "ti,da850-vpif";
+			reg = <0x217000 0x1000>;
+			interrupts = <92>;
+			status = "disabled";
 
-                        Geert
+			vpif_capture: video-capture {
+				compatible = "ti,da850-vpif-capture"
+				port {
+					vpif_ch0: endpoint at 0 {
+						  reg = <0>;
+						  bus-width = <8>;
+					};
+	
+					vpif_ch1: endpoint at 1 {
+						  reg = <1>;
+						  bus-width = <8>;
+						  data-shift = <8>;
+					};
+				};
+			};
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+			vpif_display: video-display {
+				compatible = "ti,da850-vpif-display"
+				port {
+					vpif_ch2: endpoint at 2 {
+						  reg = <2>;
+						  bus-width = <8>;
+						  data-shift = <16>;
+					};
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+					vpif_ch3: endpoint at 3 {
+						  reg = <3>;
+						  bus-width = <8>;
+						  data-shift = <24>;
+					};
+				};
+			};
+		};
+
+The interrupt too, seems to be common interrupt for both display and
+capture. So, it should not be under the capture node. BTW, I am sure
+what exactly data-shift is used for. It does not seem to be used in the
+driver patches too. I just extrapolated the values based on the pattern
+I saw.
+
+Thanks,
+Sekhar
