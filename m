@@ -1,159 +1,133 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Wed, 23 Nov 2016 15:22:33 +0000
-Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <2359248.XjnRfPbj1B@wuerfel>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <2364530.A9QSbaqvfm@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F921A0F@lhreml507-mbx>
- <2359248.XjnRfPbj1B@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F931E08@lhreml507-mbx>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 23 Nov 2016 07:35:03 -0800
+Subject: [PATCH 2/4] ARM: dts: davinci: da850: add VPIF
+In-Reply-To: <d4e696d1-f9b2-665c-c44f-c661856c5098@ti.com> (Sekhar Nori's
+ message of "Wed, 23 Nov 2016 13:57:48 +0530")
+References: <20161122194551.3420-1-khilman@baylibre.com>
+ <20161122194551.3420-3-khilman@baylibre.com>
+ <51071aa1-50c5-1121-3e64-018edaf544bf@lechnology.com>
+ <7hh96yiwdj.fsf@baylibre.com>
+ <d4e696d1-f9b2-665c-c44f-c661856c5098@ti.com>
+Message-ID: <m27f7uxl94.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
+Sekhar Nori <nsekhar@ti.com> writes:
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 23 November 2016 14:16
-> To: Gabriele Paoloni
-> Cc: linux-arm-kernel at lists.infradead.org; mark.rutland at arm.com;
-> benh at kernel.crashing.org; catalin.marinas at arm.com; liviu.dudau at arm.com;
-> Linuxarm; lorenzo.pieralisi at arm.com; xuwei (O); Jason Gunthorpe; linux-
-> serial at vger.kernel.org; linux-pci at vger.kernel.org;
-> devicetree at vger.kernel.org; minyard at acm.org; will.deacon at arm.com; John
-> Garry; zourongrong at gmail.com; robh+dt at kernel.org; bhelgaas at go og
-> le.com; kantyzc at 163.com; zhichang.yuan02 at gmail.com; T homas Petazzoni;
-> linux-kernel at vger.kernel.org; Yuanzhichang; olof at lixom.net
-> Subject: Re: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on
-> Hip06
-> 
-> On Friday, November 18, 2016 5:03:11 PM CET Gabriele Paoloni wrote:
-> > > On Friday, November 18, 2016 4:18:07 PM CET Gabriele Paoloni wrote:
-> > > > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > > > > On Friday, November 18, 2016 12:53:08 PM CET Gabriele Paoloni
-> > > wrote:
-> > > > > For the ISA/LPC spaces there are only 4k of addresses, they
-> > > > > the bus addresses always overlap, but we can trivially
-> > > > > figure out the bus address from Linux I/O port number
-> > > > > by subtracting the start of the range.
-> > > >
-> > > > Are you saying that our LPC controller should specify a
-> > > > range property to map bus addresses into a cpu address range?
-> > >
-> > > No. There is not CPU address associated with it, because it's
-> > > not memory mapped.
-> > >
-> > > Instead, we need to associate a bus address with a logical
-> > > Linux port number, both in of_address_to_resource and
-> > > in inb()/outb().
-> >
-> > I think this is effectively what we are doing so far with patch 2/3.
-> > The problem with this patch is that we are carving out a "forbidden"
-> > IO tokens range that goes from 0 to PCIBIOS_MIN_IO.
-> >
-> > I think that the proper solution would be to have the LPC driver to
-> > set the carveout threshold used in pci_register_io_range(),
-> > pci_pio_to_address(), pci_address_to_pio(), but this would impose
-> > a probe dependency on the LPC itself that should be probed before
-> > the PCI controller (or before any other devices calling these
-> > functions...)
-> 
-> Why do you think the order matters? My point was that we should
-> be able to register any region of logical port numbers for any
-> bus here.
-
-Maybe I have not followed well so let's roll back to your previous
-comment...
-
-"we need to associate a bus address with a logical Linux port number,
-both in of_address_to_resource and in inb()/outb()"
-
-Actually of_address_to_resource() returns the port number to used
-in inb/outb(); inb() and outb() add the port number to PCI_IOBASE
-to rd/wr to the right virtual address.
-
-Our LPC cannot operate on the virtual address and it operates on
-a bus address range that for LPC is also equal to the cpu address
-range and goes from 0 to 0x1000.
-
-Now as I understand it is risky and not appropriate to reserve
-the logical port numbers from 0 to 0x1000 or to whatever other
-upper bound because existing systems may rely on these port numbers
-retrieved by __of_address_to_resource().
-
-In this scenario I think the best thing to do would be
-in the probe function of the LPC driver:
-1) call pci_register_io_range() passing [0, 0x1000] (that is the
-   range for LPC)
-2) retrieve the logical port numbers associated to the LPC range
-   by calling pci_address_to_pio() for 0 and 0x1000 and assign
-   them to extio_ops_node->start and extio_ops_node->end
-3) implement the LPC accessors to operate on the logical ports
-   associated to the LPC range (in practice in the accessors
-   implementation we will call pci_pio_to_address to retrieve
-   the cpu address to operate on)
-
-What do you think?
-
-Thanks
-
-Gab
-
-
-> 
+> On Wednesday 23 November 2016 11:13 AM, Kevin Hilman wrote:
+>> David Lechner <david@lechnology.com> writes:
+>> 
+>>> On 11/22/2016 01:45 PM, Kevin Hilman wrote:
+>>>> Add VPIF and VPIF capture nodes to da850.  VPIF capture has two input
+>>>> channels describe using the standard DT ports and enpoints.
+>>>>
+>>>> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+>>>> ---
+>>>>  arch/arm/boot/dts/da850.dtsi | 28 ++++++++++++++++++++++++++++
+>>>>  1 file changed, 28 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+>>>> index 6205917b4f59..e05e2bb834e8 100644
+>>>> --- a/arch/arm/boot/dts/da850.dtsi
+>>>> +++ b/arch/arm/boot/dts/da850.dtsi
+>>>> @@ -453,7 +453,35 @@
+>>>>  			interrupts = <52>;
+>>>>  			status = "disabled";
+>>>>  		};
+>>>> +
+>>>> +		vpif: video at 0x00217000 {
+>>>
+>>> Should be @217000
+>>>
+>>>> +			compatible = "ti,da850-vpif";
+>>>> +			reg = <0x00217000 0x1000>;
+>>>
+>>> Could omit leading 0's to be consistent with existing entries.
+>>>
+>>> 	reg = <0x217000 0x1000>;
+>> 
+>> Ugh, yeah. I hate that convention, but better to be consistent, I guess.
+>> 
+>>>> +			status = "disabled";
+>>>> +		};
+>>>> +
+>>>> +		vpif_capture: video-capture at 0x00217000 {
+>>>
+>>> Again, @217000. But it seems odd to have two device nodes with the
+>>> same address. Is enabling these mutually exclusive?
+>> 
+>> They're not mutually exclusive because the vpif is the one that actually
+>> maps the register range (since it's shared between vpif_display and
+>> vpif_capture) so I guess I should just drop the reg property from the
+>> vpif_capture node.
 >
-> > > > > > To be honest with you I would keep things simple for this
-> > > > > > LPC and introduce more complex reworks later if more devices
-> > > > > > need to be introduced.
-> > > > > >
-> > > > > > What if we stick on a single domain now where we introduce a
-> > > > > > reserved threshold for the IO space (say INDIRECT_MAX_IO).
-> > > > >
-> > > > > I said having a single domain is fine, but I still don't
-> > > > > like the idea of reserving low port numbers for this hack,
-> > > > > it would mean that the numbers change for everyone else.
-> > > >
-> > > > I don't get this much...I/O tokens that are passed to the I/O
-> > > > accessors are not fixed anyway and they vary depending on the
-> order
-> > > > of adding ranges to io_range_list...so I don't see a big issue
-> > > > with this...
-> > >
-> > > On machines with a legacy devices behind the PCI bridge,
-> > > there may still be a reason to have the low I/O port range
-> > > reserved for the primary bus, e.g. to get a VGA text console
-> > > to work.
-> > >
-> > > On powerpc, this is called the "primary" PCI host, i.e. the
-> > > only one that is allowed to have an ISA bridge.
-> >
-> > Yes but
-> > 1) isn't the PCI controller range property that defines how IO bus
-> address
-> >    map into physical CPU addresses?
-> 
-> Correct, but the DT knows nothing about logical port numbers in Linux.
-> 
-> > 2) How can you guarantee that the cpu range associated with this
-> >    IO bus range is the first to be registered in
-> pci_register_io_range()?
-> >    ( i.e. are you saying that they are just relying on the fact that
-> it is the
-> >      only IO range in the system and by chance the IO tokens and
-> corresponding
-> >      bus addresses are the same? )
-> 
-> To clarify: the special properties of having the first 0x1000 logical
-> port numbers go to a particular physical bus are very obscure. I think
-> it's more important to not change the behavior for existing systems
-> that might rely on it than for new systems that have no such legacy.
-> 
-> The ipmi and uart drivers in particular will get the port numbers
-> filled
-> in their platform device from the DT bus scanning, so they don't care
-> at all about having the same numeric value for port numbers on the bus
-> and logical numbers, but other drivers might rely on particular ports
-> to be mapped on a specific PCI host, especially when those drivers
-> are  used only on systems that don't have more than one PCI domain.
-> 
-> 	Arnd
+> Reading the documentation, VPIF is presented as a single device, with
+> two channels dedicated to display and two for capture. Most of the
+> channel registers are independent, but there are are some like interrupt
+> enable which are common for all channels. So I believe we cannot use
+> simple-mfd. But I believe VPIF display and capture should be subdevices
+> of a single VPIF device.
+
+OK, I can give it a try that way.
+
+> It should look something like this, I think:
+>
+> 		vpif: video at 217000 {
+> 			compatible = "ti,da850-vpif";
+> 			reg = <0x217000 0x1000>;
+> 			interrupts = <92>;
+> 			status = "disabled";
+>
+> 			vpif_capture: video-capture {
+> 				compatible = "ti,da850-vpif-capture"
+> 				port {
+> 					vpif_ch0: endpoint at 0 {
+> 						  reg = <0>;
+> 						  bus-width = <8>;
+> 					};
+> 	
+> 					vpif_ch1: endpoint at 1 {
+> 						  reg = <1>;
+> 						  bus-width = <8>;
+> 						  data-shift = <8>;
+> 					};
+> 				};
+> 			};
+>
+> 			vpif_display: video-display {
+> 				compatible = "ti,da850-vpif-display"
+> 				port {
+> 					vpif_ch2: endpoint at 2 {
+> 						  reg = <2>;
+> 						  bus-width = <8>;
+> 						  data-shift = <16>;
+> 					};
+>
+> 					vpif_ch3: endpoint at 3 {
+> 						  reg = <3>;
+> 						  bus-width = <8>;
+> 						  data-shift = <24>;
+> 					};
+> 				};
+> 			};
+> 		};
+
+> The interrupt too, seems to be common interrupt for both display and
+> capture. So, it should not be under the capture node.
+
+Possibly.  That will require reworking of the way the driver works
+today, since the vpif driver doesn't request interrupts, but the capture
+and display drivers both register interrupts, one per channel.  I'll
+have a closer look.
+
+> BTW, I am sure
+> what exactly data-shift is used for. It does not seem to be used in the
+> driver patches too. I just extrapolated the values based on the pattern
+> I saw.
+
+For video out, the way I read the spec, and based on the schematics,
+there appears to be a separate 16-bit parallel bus, so the data-shift on
+the video-display endpoints should probably be zero and 16 like for
+catpure.  Anyways, I'll get to that when I get to the display part.
+
+Kevin
