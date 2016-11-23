@@ -1,8 +1,7 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 23 Nov 2016 13:32:56 +0100
-Subject: [git pull] soc_device_match() interface for matching against soc_bus
- attributes
-Message-ID: <1479904376-12453-1-git-send-email-geert+renesas@glider.be>
+Date: Wed, 23 Nov 2016 13:39:58 +0100
+Subject: [git pull] Renesas RZ/G1M and RZ/G1E CPG Core Clock Definitions
+Message-ID: <1479904798-12768-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,39 +13,33 @@ The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git tags/soc-device-match-tag1
+  git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git tags/rzg-clock-defs-tag1
 
-for you to fetch changes up to da65a1589dacc7ec44ea0557a14d70a39d991f32:
+for you to fetch changes up to 1fa8a875df6b8aa864f6c4f2b65dbc2ed477b859:
 
-  base: soc: Provide a dummy implementation of soc_device_match() (2016-11-10 10:10:37 +0100)
+  clk: renesas: Add r8a7745 CPG Core Clock Definitions (2016-11-07 15:13:30 +0100)
 
 ----------------------------------------------------------------
-soc_device_match() interface for matching against soc_bus attributes
+Renesas RZ/G1M and RZ/G1E CPG Core Clock Definitions
 
-This provides core infrastructure as a dependency for several users
-(Freescale/NXP, Samsung, Renesas).
+This contains clock definitions shared by clock drivers and DTS files,
+and is provided as a dependency for the latter.
 
-Its core parts have been acked by Greg, and the fixes by Arnd and/or
-Greg (the last fix only received an informal ack, that's why I hadn't
-added the ack).
-
-This has already been pulled by Ulf, and is present in mmc/next, as a
-dependency for a Freescale/NXP driver update.
+This has already been pulled by Stephen as part of a larger pull
+request, and is present in clk/clk-next, together with the corresponding
+clock drivers.
 
 Thanks for pulling!
 ----------------------------------------------------------------
-Arnd Bergmann (1):
-      base: soc: Introduce soc_device_match() interface
+Sergei Shtylyov (2):
+      clk: renesas: Add r8a7743 CPG Core Clock Definitions
+      clk: renesas: Add r8a7745 CPG Core Clock Definitions
 
-Geert Uytterhoeven (3):
-      base: soc: Early register bus when needed
-      base: soc: Check for NULL SoC device attributes
-      base: soc: Provide a dummy implementation of soc_device_match()
-
- drivers/base/Kconfig    |  1 +
- drivers/base/soc.c      | 79 +++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/sys_soc.h |  9 ++++++
- 3 files changed, 89 insertions(+)
+ include/dt-bindings/clock/r8a7743-cpg-mssr.h | 43 +++++++++++++++++++++++++++
+ include/dt-bindings/clock/r8a7745-cpg-mssr.h | 44 ++++++++++++++++++++++++++++
+ 2 files changed, 87 insertions(+)
+ create mode 100644 include/dt-bindings/clock/r8a7743-cpg-mssr.h
+ create mode 100644 include/dt-bindings/clock/r8a7745-cpg-mssr.h
 
 Gr{oetje,eeting}s,
 
