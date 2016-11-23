@@ -1,40 +1,38 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 23 Nov 2016 16:34:23 +0530
-Subject: [PATCH 2/3] pinctrl: New driver for TI DA8XX/OMAP-L138/AM18XX
- pinconf
-In-Reply-To: <1479871767-20160-3-git-send-email-david@lechnology.com>
-References: <1479871767-20160-1-git-send-email-david@lechnology.com>
- <1479871767-20160-3-git-send-email-david@lechnology.com>
-Message-ID: <88b3d16b-6e5b-ea75-d770-35d9adc6c677@ti.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Wed, 23 Nov 2016 12:06:24 +0100
+Subject: [PATCH v3 0/3] da8xx: fix section mismatch in new drivers
+Message-ID: <1479899187-10199-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 November 2016 08:59 AM, David Lechner wrote:
-> This adds a new driver for pinconf on TI DA8XX/OMAP-L138/AM18XX. These
+Sekhar noticed there's a section mismatch in the da8xx-mstpri and
+da8xx-ddrctl drivers. This is caused by calling
+of_flat_dt_get_machine_name() which has an __init annotation.
 
-s/DA8XX/DA850/
+This series addresses this issue by open coding routines that return
+the machine compatible string in both drivers. Once a general function
+for that in of/base is merged, we'll remove them.
 
-> SoCs have a separate controller for controlling pullup/pulldown groups.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
+The third patch fixes a typo that got in last time.
 
-> +static const char *da850_pupd_get_get_group_name(struct pinctrl_dev *pctldev,
-> +						 unsigned int selector)
-> +{
-> +	return da850_pupd_group_names[selector];
-> +}
-> +
-> +static int da850_pupd_get_get_group_pins(struct pinctrl_dev *pctldev,
-> +					 unsigned int selector,
-> +					 const unsigned int **pins,
-> +					 unsigned int *num_pins)
-> +{
-> +	*num_pins = 0;
-> +
-> +	return 0;
-> +}
+v1 -> v2:
+- drop patch [1/3] from v1
+- introduce internal routines in the drivers instead of a general
+  function in of/base.c
 
-usage of get_get_ in the function names above is odd.
+v2 -> v3:
+- use of_property_read_string_index() instead of
+  of_property_read_string() to get the first compatible entry
+- s/priotities/priorities
 
-Thanks,
-Sekhar
+Bartosz Golaszewski (3):
+  bus: da8xx-mstpri: drop the call to of_flat_dt_get_machine_name()
+  memory: da8xx-ddrctl: drop the call to of_flat_dt_get_machine_name()
+  bus: da8xx-mstpri: fix a typo
+
+ drivers/bus/da8xx-mstpri.c    | 25 ++++++++++++++++++++++---
+ drivers/memory/da8xx-ddrctl.c | 23 +++++++++++++++++++++--
+ 2 files changed, 43 insertions(+), 5 deletions(-)
+
+-- 
+2.9.3
