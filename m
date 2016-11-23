@@ -1,78 +1,49 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 23 Nov 2016 17:17:43 +0530
-Subject: [PATCH 1/3] of: base: add support to get machine compatible string
-In-Reply-To: <2a644b8c-d91e-5ab1-200b-00f749a36307@arm.com>
-References: <1479811311-3080-1-git-send-email-bgolaszewski@baylibre.com>
- <1479811311-3080-2-git-send-email-bgolaszewski@baylibre.com>
- <5ce9fb9f-459a-562b-2e9f-85d35f9ec035@arm.com>
- <67a3c2c7-0cb9-9764-2710-6ee66fc4dde4@ti.com>
- <fdb93150-9089-c7bb-2b0a-21ded241a647@arm.com>
- <ae92e013-b41b-6caa-b32f-284ffb6f5aa0@ti.com>
- <2a644b8c-d91e-5ab1-200b-00f749a36307@arm.com>
-Message-ID: <ff1ea88a-87c6-6721-8e63-ddb05900cc58@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Nov 2016 12:51:27 +0100
+Subject: [PATCH] dt-bindings: mfd: Improve readability for TPS65217
+ interrupt sources
+In-Reply-To: <bd4944d8-3cef-b3f7-4fba-6de590493047@gmail.com>
+References: <20161121131515.8040-1-woogyom.kim@gmail.com>
+ <20161122155759.GG10134@dell.home>
+ <bd4944d8-3cef-b3f7-4fba-6de590493047@gmail.com>
+Message-ID: <33562327.jVWx4tN2gP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 November 2016 03:35 PM, Sudeep Holla wrote:
+On Wednesday, November 23, 2016 8:38:00 PM CET Milo Kim wrote:
+> On 11/23/2016 12:57 AM, Lee Jones wrote:
+> >>      pwrbutton {
+> >> > -          interrupts = <TPS65217_IRQ_PB>;
+> >> > +          interrupts = <TPS65217_IRQ_PUSHBUTTON>;
+> > Push button or power button?
+> >
 > 
+> According to the datasheet, push button interrupt is correct.
 > 
-> On 23/11/16 07:49, Sekhar Nori wrote:
->> On Tuesday 22 November 2016 09:16 PM, Sudeep Holla wrote:
->>> Hi Sekhar,
->>>
->>> On 22/11/16 15:06, Sekhar Nori wrote:
->>>> Hi Sudeep,
->>>>
->>>> On Tuesday 22 November 2016 04:23 PM, Sudeep Holla wrote:
->>>>>
->>>>>
->>>>> On 22/11/16 10:41, Bartosz Golaszewski wrote:
->>>>>> Add a function allowing to retrieve the compatible string of the root
->>>>>> node of the device tree.
->>>>>>
->>>>>
->>>>> Rob has queued [1] and it's in -next today. You can reuse that if you
->>>>> are planning to target this for v4.11 or just use open coding in your
->>>>> driver for v4.10 and target this move for v4.11 to avoid cross tree
->>>>> dependencies as I already mentioned in your previous thread.
->>>>
->>>> I dont have your original patch in my mailbox, but I wonder if
->>>> returning a pointer to property string for a node whose reference has
->>>> already been released is safe to do? Probably not an issue for the root
->>>> node, but still feels counter-intuitive.
->>>>
->>>
->>> I am not sure if I understand the issue here. Are you referring a case
->>> where of_root is freed ?
->>
->> Yes, right, thats what I was hinting at. Since you are giving up the
->> reference to the device node before the function returns, the user can
->> be left with a dangling reference.
->>
+>         http://www.ti.com/lit/ds/symlink/tps65217.pdf
 > 
-> Yes I agree.
+> This is used for a power button input in Beaglebone boards. In other 
+> words, the power button is one of push button usages.
+> 
+> So, I'd like to keep general name for the interrupt.
 
-So, the if(!of_node_get()) is just an expensive NULL pointer check. I think 
-it is better to be explicit about it by not using of_node_get/put() at all. 
-How about:
+Ah, the numbers come from the data sheet. Please just remove the
+header then, there is no need to keep them as an ABI, in particular
+when the driver doesn't even include that header today.
 
-+int of_machine_get_model_name(const char **model)
-+{
-+       int error;
-+
-+       if (!of_root)
-+               return -EINVAL;
-+
-+       error = of_property_read_string(of_root, "model", model);
-+       if (error)
-+               error = of_property_read_string_index(of_root, "compatible",
-+                                                     0, model);
-+       return error;
-+}
-+EXPORT_SYMBOL(of_machine_get_model_name);
+I see you even have names for them in the node:
 
-I know the patch is already in -next so I guess it depends on how strongly 
-Rob feels about this.
+        charger {
+-               interrupts = <TPS65217_IRQ_AC>, <TPS65217_IRQ_USB>;
++               interrupts = <TPS65217_IRQ_AC_POWER>, <TPS65217_IRQ_USB_POWER>;
+                interrupts-names = "AC", "USB";
+                status = "okay";
 
-Thanks,
-Sekhar
+What matters here is the binding documentation in
+Documentation/devicetree/bindings/power/supply/tps65217_charger.txt
+
+Please fix that instead to mandate that the two interrupts are
+required, what their functions are, and what the interrupt-names
+(not interrupts-names) property must list.
+
+	Arnd
