@@ -1,77 +1,96 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 23 Nov 2016 15:16:50 +0100
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for
- v4.10
-In-Reply-To: <20161123095717.GA16339@verge.net.au>
-References: <cover.1479391750.git.horms+renesas@verge.net.au>
- <20161119014929.GE2543@localhost>
- <20161121105315.GA19845@verge.net.au>
- <20161123095717.GA16339@verge.net.au>
-Message-ID: <20161123141648.GA9057@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Nov 2016 15:16:07 +0100
+Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F921A0F@lhreml507-mbx>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+ <2364530.A9QSbaqvfm@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F921A0F@lhreml507-mbx>
+Message-ID: <2359248.XjnRfPbj1B@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2016 at 10:57:18AM +0100, Simon Horman wrote:
-> On Mon, Nov 21, 2016 at 11:53:18AM +0100, Simon Horman wrote:
-> > On Fri, Nov 18, 2016 at 05:49:29PM -0800, Olof Johansson wrote:
-> > > On Thu, Nov 17, 2016 at 03:11:45PM +0100, Simon Horman wrote:
-> > > > Hi Olof, Hi Kevin, Hi Arnd,
-> > > > 
-> > > > Please consider these second round of Renesas ARM based SoC DT updates for v4.10.
-> > > > 
-> > > > This pull request is based on a merge of:
-> > > > 
-> > > > * The previous round of such requests, tagged as renesas-dt-for-v4.10,
-> > > >   which I have already sent a pull-request for.
-> > > > * The rzg-clock-defs tag of Geert Uytterhoeven's renesas-driver's tree.
-> > > >   This is to provide dependencies for adding the r8a7743 and r8a7745 SoCs.
-> > > > * The "Second Round of Renesas ARM Based SoC Drivers Updates for v4.10",
-> > > >   tagged as renesas-drivers2-for-v4.10, which I have also sent a pull
-> > > >   request for. This is included to provide dependencies for adding device
-> > > >   nodes for PRR, and adding the r8a7743 and r8a7745 SoCs.
-> > > 
-> > > Again, nack. And again, I don't understand why you create dependencies that
-> > > aren't needed. Please fix.
+On Friday, November 18, 2016 5:03:11 PM CET Gabriele Paoloni wrote:
+> > On Friday, November 18, 2016 4:18:07 PM CET Gabriele Paoloni wrote:
+> > > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > > > On Friday, November 18, 2016 12:53:08 PM CET Gabriele Paoloni
+> > wrote:
+> > > > For the ISA/LPC spaces there are only 4k of addresses, they
+> > > > the bus addresses always overlap, but we can trivially
+> > > > figure out the bus address from Linux I/O port number
+> > > > by subtracting the start of the range.
+> > >
+> > > Are you saying that our LPC controller should specify a
+> > > range property to map bus addresses into a cpu address range?
 > > 
-> > Hi Olof,
+> > No. There is not CPU address associated with it, because it's
+> > not memory mapped.
 > > 
-> > I agree that calling out PRR above was incorrect. Please disregard that.
-> > 
-> > However, there are dependencies for adding r8a7743 and r8a7745 SoCs
-> > in the form of header files:
-> > 
-> > * The rzg-clock-defs tag provides dt-bindings/clock/r8a774[35]-cpg-mssr.h
-> > * The renesas-drivers2-for-v4.10 tag provides
-> >   dt-bindings/power/r8a774[35]-sysc.h
-> > 
-> > The drivers branches are usually pretty light-weight. But this time it is a
-> > bit heavy and you rightly raised some questions about it. After some
-> > discussion with Geert we'd like to suggest that for future releases
-> > we provide a "driver-defs" branch which both driver code and DT can
-> > depend on. Thus avoiding pulling (non essential) driver changes into the DT
-> > branch.
-> > 
-> > Unfortunately its a bit late to do that for v4.10 as the r8a7743 sysc
-> > driver and its defines were already accepted accepted together
-> > (renesas-drivers-for-v4.10 tag). So for this release we would be grateful
-> > if you could re-consider the renesas-drivers2-for-v4.10 tag given the
-> > feedback which Geert has provided. And in turn re-consider this pull
-> > request.
+> > Instead, we need to associate a bus address with a logical
+> > Linux port number, both in of_address_to_resource and
+> > in inb()/outb().
 > 
-> Hi again,
+> I think this is effectively what we are doing so far with patch 2/3.
+> The problem with this patch is that we are carving out a "forbidden"
+> IO tokens range that goes from 0 to PCIBIOS_MIN_IO.
 > 
-> while the above remains my preferred option I would like to put another one
-> on the table in case it would help in any way for v4.10.
-> 
-> I could split this pull-request up as follows:
-> 1. The patches that add the r8a774[35] SoCs:
->    - r8a7743 depends on renesas-drivers-for-v4.10 and rzg-clock-defs
->    - r8a7745 depends on renesas-drivers2-for-v4.10 and rzg-clock-defs
-> 2. The patches rest of the patches
->    - I believe these have no special dependencies
+> I think that the proper solution would be to have the LPC driver to
+> set the carveout threshold used in pci_register_io_range(), 
+> pci_pio_to_address(), pci_address_to_pio(), but this would impose
+> a probe dependency on the LPC itself that should be probed before
+> the PCI controller (or before any other devices calling these
+> functions...)
 
-After some discussion on IRC with Arnd I think it makes sense to simplify
-the dependencies pulled in to this pull request to the extent of
-only pulling in patches which provide headers for macros used in DT.
+Why do you think the order matters? My point was that we should
+be able to register any region of logical port numbers for any
+bus here.
 
-I am working on making this so.
+
+> > > > > To be honest with you I would keep things simple for this
+> > > > > LPC and introduce more complex reworks later if more devices
+> > > > > need to be introduced.
+> > > > >
+> > > > > What if we stick on a single domain now where we introduce a
+> > > > > reserved threshold for the IO space (say INDIRECT_MAX_IO).
+> > > >
+> > > > I said having a single domain is fine, but I still don't
+> > > > like the idea of reserving low port numbers for this hack,
+> > > > it would mean that the numbers change for everyone else.
+> > >
+> > > I don't get this much...I/O tokens that are passed to the I/O
+> > > accessors are not fixed anyway and they vary depending on the order
+> > > of adding ranges to io_range_list...so I don't see a big issue
+> > > with this...
+> > 
+> > On machines with a legacy devices behind the PCI bridge,
+> > there may still be a reason to have the low I/O port range
+> > reserved for the primary bus, e.g. to get a VGA text console
+> > to work.
+> > 
+> > On powerpc, this is called the "primary" PCI host, i.e. the
+> > only one that is allowed to have an ISA bridge.
+> 
+> Yes but
+> 1) isn't the PCI controller range property that defines how IO bus address
+>    map into physical CPU addresses?
+
+Correct, but the DT knows nothing about logical port numbers in Linux.
+
+> 2) How can you guarantee that the cpu range associated with this
+>    IO bus range is the first to be registered in pci_register_io_range()?
+>    ( i.e. are you saying that they are just relying on the fact that it is the
+>      only IO range in the system and by chance the IO tokens and corresponding
+>      bus addresses are the same? )
+
+To clarify: the special properties of having the first 0x1000 logical
+port numbers go to a particular physical bus are very obscure. I think
+it's more important to not change the behavior for existing systems
+that might rely on it than for new systems that have no such legacy.
+
+The ipmi and uart drivers in particular will get the port numbers filled
+in their platform device from the DT bus scanning, so they don't care
+at all about having the same numeric value for port numbers on the bus
+and logical numbers, but other drivers might rely on particular ports
+to be mapped on a specific PCI host, especially when those drivers
+are  used only on systems that don't have more than one PCI domain.
+
+	Arnd
