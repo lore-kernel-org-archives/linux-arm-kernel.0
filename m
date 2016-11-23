@@ -1,38 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 23 Nov 2016 21:14:32 +0100
-Subject: [PATCH 25/31] ARM: dts: r8a73a4: Add device node for PRR
+Date: Wed, 23 Nov 2016 21:14:31 +0100
+Subject: [PATCH 24/31] ARM: dts: sk-rzg1e: add Ether support
 In-Reply-To: <cover.1479931686.git.horms+renesas@verge.net.au>
 References: <cover.1479931686.git.horms+renesas@verge.net.au>
-Message-ID: <f02703320698bf60c81c8b74aeed1e64442f29c5.1479931687.git.horms+renesas@verge.net.au>
+Message-ID: <6b334366e63678c777367002eb87c297a10d2751.1479931687.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Add a device node for the Product Register, which provides SoC product
-and revision information.
+Define the SK-RZG1E board dependent part of the Ether device node.
+Enable DHCP and NFS root  for the kernel booting.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Based on the original (and large) patch by Dmitry Shifrin
+<dmitry.shifrin@cogentembedded.com>.
+
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a73a4.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/r8a7745-sk-rzg1e.dts | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-index ca8672778fe0..53183ffe04c1 100644
---- a/arch/arm/boot/dts/r8a73a4.dtsi
-+++ b/arch/arm/boot/dts/r8a73a4.dtsi
-@@ -751,6 +751,11 @@
- 		};
+diff --git a/arch/arm/boot/dts/r8a7745-sk-rzg1e.dts b/arch/arm/boot/dts/r8a7745-sk-rzg1e.dts
+index 667ec4b259d5..97840b340197 100644
+--- a/arch/arm/boot/dts/r8a7745-sk-rzg1e.dts
++++ b/arch/arm/boot/dts/r8a7745-sk-rzg1e.dts
+@@ -20,7 +20,7 @@
  	};
  
-+	prr: chipid at ff000044 {
-+		compatible = "renesas,prr";
-+		reg = <0 0xff000044 0 4>;
-+	};
+ 	chosen {
+-		bootargs = "ignore_loglevel";
++		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
+@@ -37,3 +37,16 @@
+ &scif2 {
+ 	status = "okay";
+ };
 +
- 	sysc: system-controller at e6180000 {
- 		compatible = "renesas,sysc-r8a73a4", "renesas,sysc-rmobile";
- 		reg = <0 0xe6180000 0 0x8000>, <0 0xe6188000 0 0x8000>;
++&ether {
++	phy-handle = <&phy1>;
++	renesas,ether-link-active-low;
++	status = "okay";
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++		interrupt-parent = <&irqc>;
++		interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
++		micrel,led-mode = <1>;
++	};
++};
 -- 
 2.7.0.rc3.207.g0ac5344
