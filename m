@@ -1,55 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 23 Nov 2016 21:14:29 +0100
-Subject: [PATCH 22/31] ARM: dts: r8a7745: add IRQC support
+Date: Wed, 23 Nov 2016 21:14:32 +0100
+Subject: [PATCH 25/31] ARM: dts: r8a73a4: Add device node for PRR
 In-Reply-To: <cover.1479931686.git.horms+renesas@verge.net.au>
 References: <cover.1479931686.git.horms+renesas@verge.net.au>
-Message-ID: <28c43fbb3ca0a9a8f547aece94dac8d791358444.1479931687.git.horms+renesas@verge.net.au>
+Message-ID: <f02703320698bf60c81c8b74aeed1e64442f29c5.1479931687.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Describe the IRQC interrupt controller in the R8A7745 device tree.
+Add a device node for the Product Register, which provides SoC product
+and revision information.
 
-Based on the original (and large) patch by Dmitry Shifrin
-<dmitry.shifrin@cogentembedded.com>.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7745.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/boot/dts/r8a73a4.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index 6fe48157f906..0b2e2f37150f 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -62,6 +62,25 @@
- 						 IRQ_TYPE_LEVEL_HIGH)>;
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index ca8672778fe0..53183ffe04c1 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -751,6 +751,11 @@
  		};
+ 	};
  
-+		irqc: interrupt-controller at e61c0000 {
-+			compatible = "renesas,irqc-r8a7745", "renesas,irqc";
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			reg = <0 0xe61c0000 0 0x200>;
-+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 407>;
-+			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+		};
++	prr: chipid at ff000044 {
++		compatible = "renesas,prr";
++		reg = <0 0xff000044 0 4>;
++	};
 +
- 		timer {
- 			compatible = "arm,armv7-timer";
- 			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
+ 	sysc: system-controller at e6180000 {
+ 		compatible = "renesas,sysc-r8a73a4", "renesas,sysc-rmobile";
+ 		reg = <0 0xe6180000 0 0x8000>, <0 0xe6188000 0 0x8000>;
 -- 
 2.7.0.rc3.207.g0ac5344
