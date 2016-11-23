@@ -1,34 +1,29 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Nov 2016 19:16:21 +0000
-Subject: [RFC PATCH 11/11] ARM: Allow ARCH_MULTIPLATFORM to be selected
- for NOMMU
-In-Reply-To: <20161123154829.GA2489@afzalpc>
-References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
- <1479806768-39911-12-git-send-email-vladimir.murzin@arm.com>
- <16587553.f9R1mxJih5@wuerfel> <583478FB.4020008@arm.com>
- <20161123154829.GA2489@afzalpc>
-Message-ID: <20161123191621.GD14217@n2100.armlinux.org.uk>
+From: kvalo@codeaurora.org (Kalle Valo)
+Date: Wed, 23 Nov 2016 21:26:42 +0200
+Subject: ath9k ARMv7 OOPS in v4.8.6, v4.2.8
+In-Reply-To: <20161123191539.GF2799@io.lakedaemon.net> (Jason Cooper's message
+ of "Wed, 23 Nov 2016 19:15:39 +0000")
+References: <20161123191539.GF2799@io.lakedaemon.net>
+Message-ID: <87a8cqgfpp.fsf@kamboji.qca.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2016 at 09:18:29PM +0530, Afzal Mohammed wrote:
-> multi_v7_defconfig & MMU disabled, stderr was more verbose and was
-> unhappy with Kconfig dependencies,
+Jason Cooper <jason@lakedaemon.net> writes:
 
-Well, !MMU and multiplatform _are_ exclusive in reality.  One of the
-things we work around in multiplatform is the different physical
-address space layouts of the platforms, particularly with where RAM
-is located.  That's not possible in !MMU configurations.  A kernel
-built to support every platform in multiplatform will not boot on
-most of them.
+> All,
+>
+> I have a Ubiquiti SR-71 mini-pcie ath9k card in a Globalscale Mirabox
+> board (Marvell Armada 370 SoC).  Every day or so I get a consistent
+> crash that brings down the whole board.  I've attached three oops I
+> captured on the serial port.
+>
+> I looked at the commits from v4.8.6 to v4.9-rc6, and nothing jumped out
+> at me as "this would fix it".  And since it takes a day or so to trigger
+> the oops, bisecting would be a bit brutal.  Does anyone have any insight
+> into this?
 
-So efforts to make !MMU work with multiplatform are IMHO rather
-misguided.
-
-!MMU makes sense with classifications of systems (like the Cortex-M*
-based systems) but not everything.
+Is this a regression, meaning that it didn't crash on older kernels but
+crashes on newer ones? Or has it always crashed?
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Kalle Valo
