@@ -1,42 +1,112 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 23 Nov 2016 12:15:37 +0000
-Subject: [PATCH 1/3] of: base: add support to get machine compatible string
-In-Reply-To: <11467504-c700-cbfa-a945-be9ec8776144@ti.com>
-References: <1479811311-3080-1-git-send-email-bgolaszewski@baylibre.com>
- <1479811311-3080-2-git-send-email-bgolaszewski@baylibre.com>
- <5ce9fb9f-459a-562b-2e9f-85d35f9ec035@arm.com>
- <67a3c2c7-0cb9-9764-2710-6ee66fc4dde4@ti.com>
- <fdb93150-9089-c7bb-2b0a-21ded241a647@arm.com>
- <ae92e013-b41b-6caa-b32f-284ffb6f5aa0@ti.com>
- <2a644b8c-d91e-5ab1-200b-00f749a36307@arm.com>
- <ff1ea88a-87c6-6721-8e63-ddb05900cc58@ti.com>
- <f0ba1a7a-8948-21c3-8a96-d46bf105bb7e@arm.com>
- <11467504-c700-cbfa-a945-be9ec8776144@ti.com>
-Message-ID: <b47cd425-ea89-31ff-5b99-dea27bea2d14@arm.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Wed, 23 Nov 2016 20:15:45 +0800
+Subject: [PATCH v16 14/15] clocksource/drivers/arm_arch_timer: Add GTDT
+ support for memory-mapped timer
+In-Reply-To: <20161118202000.GP1197@leverpostej>
+References: <1479304148-2965-1-git-send-email-fu.wei@linaro.org>
+ <1479304148-2965-15-git-send-email-fu.wei@linaro.org>
+ <20161118202000.GP1197@leverpostej>
+Message-ID: <CADyBb7v_SbTZBCeqEstq-E0svqOUqw2C8ssjfgsO7KdZ82=iBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mark,
 
-
-On 23/11/16 12:13, Sekhar Nori wrote:
-> On Wednesday 23 November 2016 05:37 PM, Sudeep Holla wrote:
->>> So, the if(!of_node_get()) is just an expensive NULL pointer check. I
->>> think
->>> it is better to be explicit about it by not using of_node_get/put() at
->>> all.
->>> How about:
->>>
+On 19 November 2016 at 04:20, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, Nov 16, 2016 at 09:49:07PM +0800, fu.wei at linaro.org wrote:
+>> From: Fu Wei <fu.wei@linaro.org>
 >>
->> Are we planning to use this in any time sensitive paths? Anyways I am
->> fine removing them.
+>> The patch add memory-mapped timer register support by using the
+>> information provided by the new GTDT driver of ACPI.
+>>
+>> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+>> ---
+>>  drivers/clocksource/arm_arch_timer.c | 26 +++++++++++++++++++++++++-
+>>  1 file changed, 25 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>> index c494ca8..0aad60a 100644
+>> --- a/drivers/clocksource/arm_arch_timer.c
+>> +++ b/drivers/clocksource/arm_arch_timer.c
+>> @@ -1067,7 +1067,28 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
+>>                      arch_timer_mem_of_init);
+>>
+>>  #ifdef CONFIG_ACPI_GTDT
+>> -/* Initialize per-processor generic timer */
+>> +static int __init arch_timer_mem_acpi_init(void)
+>> +{
+>> +     struct arch_timer_mem *timer_mem;
+>> +     int ret = 0;
+>> +     int i = 0;
+>> +
+>> +     timer_mem = kzalloc(sizeof(*timer_mem), GFP_KERNEL);
 >
-> Not worried about the time taken as much as it serving as a bad example
-> and getting carried over to other places where the impact might actually
-> be real.
+> Why do you need it zeroed? You don't clear it between iterations, so
+> either you don't need this, or you have a bug in the loop.
 >
+>> +     if (!timer_mem)
+>> +             return -ENOMEM;
+>> +
+>> +     while (!gtdt_arch_timer_mem_init(timer_mem, i)) {
+>
+> Huh?
+>
+> Why doesn't GTDT expose a function to fill in the entire arch_timer_mem
+> in one go?
 
-Ah OK, sure.
+Yes, that is a good idea, but I need to find a way to get the number of
+GT block in GTDT, then allocate a  struct arch_timer_mem array for all GT block
+
+>
+> There shouldn't be multiple instances, as far as I am aware. Am I
+> mistaken?
+
+I don't see any doc says : there is only one memory-mapped timer
+in a soc.
+Maybe we have more than one GT block in GTDT or
+(in another word) we may have more than one memory-mapped
+timer in a soc, right ??
+
+Please correct me, If I miss something.
+
+>
+>> +             ret = arch_timer_mem_init(timer_mem);
+>> +             if (ret)
+>> +                     break;
+>> +             i++;
+>> +     }
+>> +
+>> +     kfree(timer_mem);
+>> +     return ret;
+>> +}
+>
+>
+> Regardless, arch_timer_mem is small enough that you don't need dynamic
+> allocaiton. Just put it on the stack, e.g.
+>
+> static int __init arch_timer_mem_acpi_init(void)
+> {
+>         int i = 0;
+>         struct arch_timer_mem timer_mem;
+>
+>         while (!gtdt_arch_timer_mem_init(timer_mem, i)) {
+>                 int ret = arch_timer_mem_init();
+>                 if (ret)
+>                         return ret;
+>                 i++
+>         }
+>
+>         return 0;
+> }
+>
+> Thanks,
+> Mark.
+
+
 
 -- 
-Regards,
-Sudeep
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
