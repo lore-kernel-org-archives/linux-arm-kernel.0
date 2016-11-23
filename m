@@ -1,58 +1,116 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 23 Nov 2016 17:18:46 +0000
-Subject: System/uncore PMUs and unit aggregation
-In-Reply-To: <20161118111017.GA22798@hardcore>
-References: <20161117181708.GT22855@arm.com> <20161118111017.GA22798@hardcore>
-Message-ID: <20161123171846.GP24624@leverpostej>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Wed, 23 Nov 2016 17:21:47 +0000
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <58358E79.5050404@free.fr> (Mason's message of "Wed, 23 Nov 2016
+ 13:41:29 +0100")
+References: <58356EA8.2010806@free.fr> <yw1xpolmbdih.fsf@unicorn.mansr.com>
+ <58358E79.5050404@free.fr>
+Message-ID: <yw1xh96yaz84.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 12:10:17PM +0100, Jan Glauber wrote:
-> On Thu, Nov 17, 2016 at 06:17:08PM +0000, Will Deacon wrote:
+Mason <slash.tmp@free.fr> writes:
 
-> > Speaking to Mark earlier today, we came up with the following rough rules
-> > for drivers that present multiple hardware units as a single PMU:
-> > 
-> >   1. If the units share some part of the programming interface (e.g. control
-> >      registers or interrupts), then they must be handled by the same PMU.
-> >      Otherwise, they should be treated independently as separate PMU
-> >      instances.
-> 
-> Can you elaborate why they should be treated independent in the later
-> case? What is the problem with going through a list and writing the
-> control register per unit?
+> On 23/11/2016 13:13, M?ns Rullg?rd wrote:
+>
+>> Mason wrote:
+>> 
+>>> On my platform, setting up a DMA transfer is a two-step process:
+>>>
+>>> 1) configure the "switch box" to connect a device to a memory channel
+>>> 2) configure the transfer details (address, size, command)
+>>>
+>>> When the transfer is done, the sbox setup can be torn down,
+>>> and the DMA driver can start another transfer.
+>>>
+>>> The current software architecture for my NFC (NAND Flash controller)
+>>> driver is as follows (for one DMA transfer).
+>>>
+>>>   sg_init_one
+>>>   dma_map_sg
+>>>   dmaengine_prep_slave_sg
+>>>   dmaengine_submit
+>>>   dma_async_issue_pending
+>>>   configure_NFC_transfer
+>>>   wait_for_IRQ_from_DMA_engine // via DMA_PREP_INTERRUPT
+>>>   wait_for_NFC_idle
+>>>   dma_unmap_sg
+>>>
+>>> The problem is that the DMA driver tears down the sbox setup
+>>> as soon as it receives the IRQ. However, when writing to the
+>>> device, the interrupt only means "I have pushed all data from
+>>> memory to the memory channel". These data have not reached
+>>> the device yet, and may still be "in flight". Thus the sbox
+>>> setup can only be torn down after the NFC is idle.
+>>>
+>>> How do I call back into the DMA driver after wait_for_NFC_idle,
+>>> to request sbox tear down?
+>>>
+>>> The new architecture would become:
+>>>
+>>>   sg_init_one
+>>>   dma_map_sg
+>>>   dmaengine_prep_slave_sg
+>>>   dmaengine_submit
+>>>   dma_async_issue_pending
+>>>   configure_NFC_transfer
+>>>   wait_for_IRQ_from_DMA_engine // via DMA_PREP_INTERRUPT
+>>>   wait_for_NFC_idle
+>>>   request_sbox_tear_down /*** HOW TO DO THAT ***/
+>>>   dma_unmap_sg
+>>>
+>>> As far as I can tell, my NFC driver should call dmaengine_synchronize ??
+>>> (In other words request_sbox_tear_down == dmaengine_synchronize)
+>>>
+>>> So the DMA driver should implement the device_synchronize hook,
+>>> and tear the sbox down in that function.
+>>>
+>>> Is that correct? Or am I on the wrong track?
+>> 
+>> dmaengine_synchronize() is not meant for this.  See the documentation:
+>> 
+>> /**
+>>  * dmaengine_synchronize() - Synchronize DMA channel termination
+>>  * @chan: The channel to synchronize
+>>  *
+>>  * Synchronizes to the DMA channel termination to the current context. When this
+>>  * function returns it is guaranteed that all transfers for previously issued
+>>  * descriptors have stopped and and it is safe to free the memory assoicated
+>>  * with them. Furthermore it is guaranteed that all complete callback functions
+>>  * for a previously submitted descriptor have finished running and it is safe to
+>>  * free resources accessed from within the complete callbacks.
+>>  *
+>>  * The behavior of this function is undefined if dma_async_issue_pending() has
+>>  * been called between dmaengine_terminate_async() and this function.
+>>  *
+>>  * This function must only be called from non-atomic context and must not be
+>>  * called from within a complete callback of a descriptor submitted on the same
+>>  * channel.
+>>  */
+>> 
+>> This is for use after a dmaengine_terminate_async() call to wait for the
+>> dma engine to finish whatever it was doing.  This is not the problem
+>> here.  Your problem is that the dma engine interrupt fires before the
+>> transfer is actually complete.  Although you get an indication from the
+>> target device when it has received all the data, there is no way to make
+>> the dma driver wait for this.
+>
+> Hello Mans,
+>
+> I'm confused. Are you saying there is no solution to my problem
+> within the existing DMA framework?
+>
+> In its current form, the tangox-dma.c driver will fail randomly
+> for writes to a device (SATA, NFC).
+>
+> Maybe an extra hook can be added to the DMA framework?
+>
+> I'd like to hear from the framework's maintainers. Perhaps they
+> can provide some guidance.
 
-For one thing, event groups spanning those units cannot be scheduled
-atomically (some events would be counting while others were not),
-violating group semantics.
+You could have the dma descriptor callback wait for the receiving device
+to finish.  Bear in mind this runs from a tasklet, so it's not allowed
+to sleep.
 
-> >   3. Summing the counters across units is only permitted if the units
-> >      can all be started and stopped atomically. Otherwise, the counters
-> >      should be exposed individually. It's up to the driver author to
-> >      decide what makes sense to sum.
-> 
-> Do you mean started/stopped atomically across units?
-
-Yes. If some units are counting while others are not, values can be
-skewed, and therefore potentially misleading.
-
-> > For Cavium ThunderX, it's not clear whether or not the individual units
-> > could be expressed as separate PMUs, or whether they're caught by one of
-> > the rules above. The Qualcomm L2 looks like it's doing the right thing
-> > and we can't quite work out what the Hisilicon Hip0x topology looks like,
-> > since the interaction with djtag is confusing.
-> 
-> On Cavium ThunderX the current patches add 4 PMU types, which unfortunately
-> are all handled different. The L2C-TAD and OCX-TLK have control
-> registers per unit. The LMC and L2C-CBC don't have control registers,
-> (free-running counters). So rule 1 might be too restrictive.
-> 
-> I've not looked into groups, would these allow to merge counters from
-> different PMUs in the kernel?
-
-No; event groups are strictly single PMU, with the sole exception that
-software events may be placed inside a hardware event group (since
-there's no start/stop logic required for SW events).
-
-Thanks,
-Mark.
+-- 
+M?ns Rullg?rd
