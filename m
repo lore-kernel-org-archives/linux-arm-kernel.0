@@ -1,36 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 23 Nov 2016 14:55:09 +0000
-Subject: [PATCH] arm64: defconfig: Do not lower CONFIG_LOG_BUF_SHIFT
-In-Reply-To: <1479908176-13625-1-git-send-email-geert+renesas@glider.be>
-References: <1479908176-13625-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20161123145508.GK28723@e104818-lin.cambridge.arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 23 Nov 2016 15:59:16 +0100
+Subject: [PATCH RFC] ARM: dts: add support for Turris Omnia
+In-Reply-To: <1479851991.26813.2@smtp.gmail.com>
+References: <20161105203841.9661-1-uwe@kleine-koenig.org>
+ <1479126185.15557.5@smtp.gmail.com>
+ <20161114201640.rr32iyjf5a53v33t@perseus.defre.kleine-koenig.org>
+ <20161114202832.GG24546@lunn.ch>
+ <1479586147.10840.0@smtp.gmail.com>
+ <20161120203037.pd5mhqyjeotileve@perseus.defre.kleine-koenig.org>
+ <1479851991.26813.2@smtp.gmail.com>
+Message-ID: <20161123145916.GL14947@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2016 at 02:36:16PM +0100, Geert Uytterhoeven wrote:
-> The default value of 17 for CONFIG_LOG_BUF_SHIFT is much more suitable
-> than 14. The latter easily leads to lost kernel messages on systems with
-> only one CPU core.
+> >CZ11NIC12 is indicated on my board.
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
->  arch/arm64/configs/defconfig | 1 -
->  1 file changed, 1 deletion(-)
+> :-( Well, this board version has wrongly matched length of some
+> differential pairs, IRQ from 88E1514 is connected differently, there
+> are slight differences in power supplies and (if I am not mistaken)
+> something changed in RTC support circuitry. It looks like a huge
+> mistake on our side.
+
+Hi Tomas
+
+Would these problems also explain why the Ethernet links to the switch
+don't work? Maybe the differential pairs?
+
+> It seems that libphy is probed before pca9538 and we end up with:
+> [    4.217550] libphy: orion_mdio_bus: probed
+> [    4.221777] irq: no irq domain found for
+> /soc/internal-regs/i2c at 11000/i2cmux at 70/i2c at 7/gpio at 71 !
 > 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 0e41290f6cbb4101..f284568373adf917 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -11,7 +11,6 @@ CONFIG_TASK_XACCT=y
->  CONFIG_TASK_IO_ACCOUNTING=y
->  CONFIG_IKCONFIG=y
->  CONFIG_IKCONFIG_PROC=y
-> -CONFIG_LOG_BUF_SHIFT=14
->  CONFIG_MEMCG=y
->  CONFIG_MEMCG_SWAP=y
->  CONFIG_BLK_CGROUP=y
+> Any clue where to look in order to defer probing libphy or at least
+> orion_mdio_bus?
 
-The defconfig updates usually go via arm-soc. The patch looks fine to
-me:
+I think there is a known phylib problem here. Somewhere in the call
+chain there is a void function, so the EPROBE_DEFFER gets
+discarded. But i could be remembering this wrongly.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+      Andrew
