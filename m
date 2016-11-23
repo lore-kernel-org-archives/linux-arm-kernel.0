@@ -1,67 +1,37 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 23 Nov 2016 19:37:39 +0200
-Subject: [PATCH v3] ARM: Drop fixed 200 Hz timer requirement from Samsung
- platforms
-In-Reply-To: <1479467712-5218-1-git-send-email-krzk@kernel.org>
-References: <1479467712-5218-1-git-send-email-krzk@kernel.org>
-Message-ID: <20161123173739.GA9228@kozik-lap>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Wed, 23 Nov 2016 10:13:01 -0800
+Subject: [PATCH v2 1/5] ARM: memory: da8xx-ddrctl: new driver
+In-Reply-To: <b668871c-2b54-0a2f-0d68-afaa50e17e63@ti.com>
+References: <1477925138-23457-1-git-send-email-bgolaszewski@baylibre.com>
+ <1477925138-23457-2-git-send-email-bgolaszewski@baylibre.com>
+ <a309a738-7fa7-3aab-4457-f7d693e6b37f@ti.com> <5833A2DA.40701@gmail.com>
+ <800171a8-2e2c-2afb-f96d-800a17eaa17a@ti.com> <58348CB8.7050304@gmail.com>
+ <b668871c-2b54-0a2f-0d68-afaa50e17e63@ti.com>
+Message-ID: <5835DC2D.5080606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 01:15:12PM +0200, Krzysztof Kozlowski wrote:
-> All Samsung platforms, including the Exynos, are selecting HZ_FIXED with
-> 200 Hz.  Unfortunately in case of multiplatform image this affects also
-> other platforms when Exynos is enabled.
+On 11/22/16 21:55, Sekhar Nori wrote:
+> On Tuesday 22 November 2016 11:51 PM, Frank Rowand wrote:
+>> Please note that the compatible property might contain several strings, not just
+>> a single string.
 > 
-> This looks like an very old legacy code, dating back to initial
-> upstreaming of S3C24xx.  Probably it was required for s3c24xx timer
-> driver, which was removed in commit ad38bdd15d5b ("ARM: SAMSUNG: Remove
-> unused plat-samsung/time.c").
+> So I guess the best thing to do is to use
+> of_property_read_string_index() and print the sting at index 0.
 > 
-> Since then, this fixed 200 Hz spread everywhere, including out-of-tree
-> Samsung kernels (SoC vendor's and Tizen's).  I believe this choice
-> was rather an effect of coincidence instead of conscious choice.
-> 
-> On S3C24xx, the PWM counter is only 16 bit wide, and with the
-> typical 12MHz input clock that overflows every 5.5ms.  This works
-> with HZ=200 or higher but not with HZ=100 which needs a 10ms
-> interval between ticks.  On Later chips (S3C64xx, S5P and EXYNOS),
-> the counter is 32 bits and does not have this problem.
-> 
-> The new samsung_pwm_timer driver solves the problem by scaling the input
-> clock by a factor of 50 on S3C24xx, which makes it less accurate but
-> allows HZ=100 as well as CONFIG_NO_HZ with fewer wakeups.
-> 
-> Few perf mem and sched tests on Odroid XU3 board (Exynos5422, 4x Cortex
-> A7, 4x Cortex A15) show no regressions when switching from 200 Hz to
-> other values.
-> 
-> Reported-by: Lee Jones <lee.jones@linaro.org>
-> [Dropping of 200_HZ from S3C/S5P was suggested by Arnd]
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> [Tested on Exynos5800]
-> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Acked-by: Kukjin Kim <kgene@kernel.org>
-> [Tested on S3C2440]
-> Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> 
-> ---
-> 
-> Changes since v2:
-> 1. Extend message.
-> 2. Add Kukjin's ack.
-> 3. Add Sylwester's tested-by.
-> 
-> Changes since v1:
-> 1. Add Javier's tested-by.
-> 2. Drop HZ_FIXED also from ARCH_S5PV210 and ARCH_S3C24XX after Arnd
->    suggestions and analysis.
-> ---
->  arch/arm/Kconfig | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
->
+> Thanks,
+> Sekhar
 
-Applied,
-Krzysztof
+If you want to print just one compatible value, you could use that method.
+
+To give all of the information needed to understand the problem, the error
+message would need to include all of the strings contained in the compatible
+property and all of the .board values in the da8xx_ddrctl_board_confs[] array
+(currently only one entry, but coded to allow additional entries in the
+future).
+
+It is hard to justify an error message that complex.
+
+I would just print an error that no match was found.
+
+-Frank
