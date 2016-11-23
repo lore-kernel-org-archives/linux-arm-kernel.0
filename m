@@ -1,85 +1,71 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 23 Nov 2016 11:01:06 +0100
-Subject: [PATCH 4/4] serial: imx: Add LED trigger support
-In-Reply-To: <20161123100106.15969-1-s.hauer@pengutronix.de>
-References: <20161123100106.15969-1-s.hauer@pengutronix.de>
-Message-ID: <20161123100106.15969-5-s.hauer@pengutronix.de>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 23 Nov 2016 10:05:24 +0000
+Subject: [PATCH 1/3] of: base: add support to get machine compatible string
+In-Reply-To: <ae92e013-b41b-6caa-b32f-284ffb6f5aa0@ti.com>
+References: <1479811311-3080-1-git-send-email-bgolaszewski@baylibre.com>
+ <1479811311-3080-2-git-send-email-bgolaszewski@baylibre.com>
+ <5ce9fb9f-459a-562b-2e9f-85d35f9ec035@arm.com>
+ <67a3c2c7-0cb9-9764-2710-6ee66fc4dde4@ti.com>
+ <fdb93150-9089-c7bb-2b0a-21ded241a647@arm.com>
+ <ae92e013-b41b-6caa-b32f-284ffb6f5aa0@ti.com>
+Message-ID: <2a644b8c-d91e-5ab1-200b-00f749a36307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/tty/serial/imx.c | 24 ++++++++++++++++++++++--
- 1 file changed, 22 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index a70356d..5eaf576 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -444,6 +444,8 @@ static inline void imx_transmit_buffer(struct imx_port *sport)
- 		return;
- 	}
- 
-+	uart_led_trigger_tx(&sport->port);
-+
- 	if (sport->dma_is_enabled) {
- 		/*
- 		 * We've just sent a X-char Ensure the TX DMA is enabled
-@@ -569,6 +571,7 @@ static void imx_dma_tx(struct imx_port *sport)
- 	/* fire it */
- 	sport->dma_is_txing = 1;
- 	dmaengine_submit(desc);
-+	uart_led_trigger_tx(&sport->port);
- 	dma_async_issue_pending(chan);
- 	return;
- }
-@@ -655,6 +658,8 @@ static irqreturn_t imx_rxint(int irq, void *dev_id)
- 	struct tty_port *port = &sport->port.state->port;
- 	unsigned long flags, temp;
- 
-+	uart_led_trigger_rx(&sport->port);
-+
- 	spin_lock_irqsave(&sport->port.lock, flags);
- 
- 	while (readl(sport->port.membase + USR2) & USR2_RDR) {
-@@ -729,6 +734,8 @@ static void imx_dma_rxint(struct imx_port *sport)
- 	unsigned long temp;
- 	unsigned long flags;
- 
-+	uart_led_trigger_rx(&sport->port);
-+
- 	spin_lock_irqsave(&sport->port.lock, flags);
- 
- 	temp = readl(sport->port.membase + USR2);
-@@ -2184,14 +2191,27 @@ static int serial_imx_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, sport);
- 
--	return uart_add_one_port(&imx_reg, &sport->port);
-+	ret = uart_add_one_port(&imx_reg, &sport->port);
-+	if (ret)
-+		return ret;
-+
-+	uart_add_led_triggers(&imx_reg, &sport->port);
-+
-+	return 0;
- }
- 
- static int serial_imx_remove(struct platform_device *pdev)
- {
- 	struct imx_port *sport = platform_get_drvdata(pdev);
-+	int ret;
- 
--	return uart_remove_one_port(&imx_reg, &sport->port);
-+	ret = uart_remove_one_port(&imx_reg, &sport->port);
-+	if (ret)
-+		return ret;
-+
-+	uart_remove_led_triggers(&sport->port);
-+
-+	return 0;
- }
- 
- static void serial_imx_restore_context(struct imx_port *sport)
+
+On 23/11/16 07:49, Sekhar Nori wrote:
+> On Tuesday 22 November 2016 09:16 PM, Sudeep Holla wrote:
+>> Hi Sekhar,
+>>
+>> On 22/11/16 15:06, Sekhar Nori wrote:
+>>> Hi Sudeep,
+>>>
+>>> On Tuesday 22 November 2016 04:23 PM, Sudeep Holla wrote:
+>>>>
+>>>>
+>>>> On 22/11/16 10:41, Bartosz Golaszewski wrote:
+>>>>> Add a function allowing to retrieve the compatible string of the root
+>>>>> node of the device tree.
+>>>>>
+>>>>
+>>>> Rob has queued [1] and it's in -next today. You can reuse that if you
+>>>> are planning to target this for v4.11 or just use open coding in your
+>>>> driver for v4.10 and target this move for v4.11 to avoid cross tree
+>>>> dependencies as I already mentioned in your previous thread.
+>>>
+>>> I dont have your original patch in my mailbox, but I wonder if
+>>> returning a pointer to property string for a node whose reference has
+>>> already been released is safe to do? Probably not an issue for the root
+>>> node, but still feels counter-intuitive.
+>>>
+>>
+>> I am not sure if I understand the issue here. Are you referring a case
+>> where of_root is freed ?
+>
+> Yes, right, thats what I was hinting at. Since you are giving up the
+> reference to the device node before the function returns, the user can
+> be left with a dangling reference.
+>
+
+Yes I agree.
+
+>> Also I have seen drivers today just using this pointer directly, but
+>> it's better to copy the string(I just saw this done in one case)
+>
+> Hmm, the reference is given up before the API returns, so I doubt
+> copying it later is any additional benefit.
+>
+
+True.
+
+> I suspect this is a theoretical issue though since root device node is
+> probably never freed.
+>
+
+Indeed, not sure if it's worth adding additional code to release the nod
+at all call sites.
+
 -- 
-2.10.2
+Regards,
+Sudeep
