@@ -1,107 +1,54 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 23 Nov 2016 13:41:29 +0100
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <yw1xpolmbdih.fsf@unicorn.mansr.com>
-References: <58356EA8.2010806@free.fr> <yw1xpolmbdih.fsf@unicorn.mansr.com>
-Message-ID: <58358E79.5050404@free.fr>
+From: dhowells@redhat.com (David Howells)
+Date: Wed, 23 Nov 2016 12:53:33 +0000
+Subject: [PATCH 0/7] efi: Pass secure boot mode to kernel [ver #3]
+Message-ID: <147990561294.7576.6464430479448167484.stgit@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/11/2016 13:13, M?ns Rullg?rd wrote:
 
-> Mason wrote:
-> 
->> On my platform, setting up a DMA transfer is a two-step process:
->>
->> 1) configure the "switch box" to connect a device to a memory channel
->> 2) configure the transfer details (address, size, command)
->>
->> When the transfer is done, the sbox setup can be torn down,
->> and the DMA driver can start another transfer.
->>
->> The current software architecture for my NFC (NAND Flash controller)
->> driver is as follows (for one DMA transfer).
->>
->>   sg_init_one
->>   dma_map_sg
->>   dmaengine_prep_slave_sg
->>   dmaengine_submit
->>   dma_async_issue_pending
->>   configure_NFC_transfer
->>   wait_for_IRQ_from_DMA_engine // via DMA_PREP_INTERRUPT
->>   wait_for_NFC_idle
->>   dma_unmap_sg
->>
->> The problem is that the DMA driver tears down the sbox setup
->> as soon as it receives the IRQ. However, when writing to the
->> device, the interrupt only means "I have pushed all data from
->> memory to the memory channel". These data have not reached
->> the device yet, and may still be "in flight". Thus the sbox
->> setup can only be torn down after the NFC is idle.
->>
->> How do I call back into the DMA driver after wait_for_NFC_idle,
->> to request sbox tear down?
->>
->> The new architecture would become:
->>
->>   sg_init_one
->>   dma_map_sg
->>   dmaengine_prep_slave_sg
->>   dmaengine_submit
->>   dma_async_issue_pending
->>   configure_NFC_transfer
->>   wait_for_IRQ_from_DMA_engine // via DMA_PREP_INTERRUPT
->>   wait_for_NFC_idle
->>   request_sbox_tear_down /*** HOW TO DO THAT ***/
->>   dma_unmap_sg
->>
->> As far as I can tell, my NFC driver should call dmaengine_synchronize ??
->> (In other words request_sbox_tear_down == dmaengine_synchronize)
->>
->> So the DMA driver should implement the device_synchronize hook,
->> and tear the sbox down in that function.
->>
->> Is that correct? Or am I on the wrong track?
-> 
-> dmaengine_synchronize() is not meant for this.  See the documentation:
-> 
-> /**
->  * dmaengine_synchronize() - Synchronize DMA channel termination
->  * @chan: The channel to synchronize
->  *
->  * Synchronizes to the DMA channel termination to the current context. When this
->  * function returns it is guaranteed that all transfers for previously issued
->  * descriptors have stopped and and it is safe to free the memory assoicated
->  * with them. Furthermore it is guaranteed that all complete callback functions
->  * for a previously submitted descriptor have finished running and it is safe to
->  * free resources accessed from within the complete callbacks.
->  *
->  * The behavior of this function is undefined if dma_async_issue_pending() has
->  * been called between dmaengine_terminate_async() and this function.
->  *
->  * This function must only be called from non-atomic context and must not be
->  * called from within a complete callback of a descriptor submitted on the same
->  * channel.
->  */
-> 
-> This is for use after a dmaengine_terminate_async() call to wait for the
-> dma engine to finish whatever it was doing.  This is not the problem
-> here.  Your problem is that the dma engine interrupt fires before the
-> transfer is actually complete.  Although you get an indication from the
-> target device when it has received all the data, there is no way to make
-> the dma driver wait for this.
+Here's a set of patches that can determine the secure boot state of the
+UEFI BIOS and pass that along to the main kernel image.  This involves
+generalising ARM's efi_get_secureboot() function and making it mixed-mode
+safe.
 
-Hello Mans,
+The patches can be found here also:
 
-I'm confused. Are you saying there is no solution to my problem
-within the existing DMA framework?
+	http://git.kernel.org/cgit/linux/kernel/git/dhowells/linux-fs.git/log/?h=efi-secure-boot
 
-In its current form, the tangox-dma.c driver will fail randomly
-for writes to a device (SATA, NFC).
+at tag:
 
-Maybe an extra hook can be added to the DMA framework?
+	efi-secure-boot-20161123-2
 
-I'd like to hear from the framework's maintainers. Perhaps they
-can provide some guidance.
+Note that the patches are not terminal on the branch.
 
-Regards.
+David
+---
+Ard Biesheuvel (1):
+      efi: use typed function pointers for runtime services table
+
+David Howells (4):
+      x86/efi: Allow invocation of arbitrary runtime services
+      arm/efi: Allow invocation of arbitrary runtime services
+      efi: Add SHIM and image security database GUID definitions
+      efi: Get the secure boot status
+
+Josh Boyer (2):
+      efi: Disable secure boot if shim is in insecure mode
+      efi: Add EFI_SECURE_BOOT bit
+
+
+ Documentation/x86/zero-page.txt           |    2 +
+ arch/arm/include/asm/efi.h                |    1 
+ arch/arm64/include/asm/efi.h              |    1 
+ arch/x86/boot/compressed/eboot.c          |    3 +
+ arch/x86/boot/compressed/head_32.S        |    6 +-
+ arch/x86/boot/compressed/head_64.S        |    8 +-
+ arch/x86/include/asm/efi.h                |    5 ++
+ arch/x86/include/uapi/asm/bootparam.h     |    3 +
+ arch/x86/kernel/setup.c                   |    5 ++
+ drivers/firmware/efi/libstub/Makefile     |    2 -
+ drivers/firmware/efi/libstub/arm-stub.c   |   46 --------------
+ drivers/firmware/efi/libstub/secureboot.c |   93 +++++++++++++++++++++++++++++
+ include/linux/efi.h                       |   42 +++++++------
+ 13 files changed, 144 insertions(+), 73 deletions(-)
+ create mode 100644 drivers/firmware/efi/libstub/secureboot.c
