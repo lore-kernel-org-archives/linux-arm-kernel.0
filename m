@@ -1,53 +1,107 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 23 Nov 2016 13:39:58 +0100
-Subject: [git pull] Renesas RZ/G1M and RZ/G1E CPG Core Clock Definitions
-Message-ID: <1479904798-12768-1-git-send-email-geert+renesas@glider.be>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 23 Nov 2016 13:41:29 +0100
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <yw1xpolmbdih.fsf@unicorn.mansr.com>
+References: <58356EA8.2010806@free.fr> <yw1xpolmbdih.fsf@unicorn.mansr.com>
+Message-ID: <58358E79.5050404@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Olof, Kevin, Arnd,
+On 23/11/2016 13:13, M?ns Rullg?rd wrote:
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+> Mason wrote:
+> 
+>> On my platform, setting up a DMA transfer is a two-step process:
+>>
+>> 1) configure the "switch box" to connect a device to a memory channel
+>> 2) configure the transfer details (address, size, command)
+>>
+>> When the transfer is done, the sbox setup can be torn down,
+>> and the DMA driver can start another transfer.
+>>
+>> The current software architecture for my NFC (NAND Flash controller)
+>> driver is as follows (for one DMA transfer).
+>>
+>>   sg_init_one
+>>   dma_map_sg
+>>   dmaengine_prep_slave_sg
+>>   dmaengine_submit
+>>   dma_async_issue_pending
+>>   configure_NFC_transfer
+>>   wait_for_IRQ_from_DMA_engine // via DMA_PREP_INTERRUPT
+>>   wait_for_NFC_idle
+>>   dma_unmap_sg
+>>
+>> The problem is that the DMA driver tears down the sbox setup
+>> as soon as it receives the IRQ. However, when writing to the
+>> device, the interrupt only means "I have pushed all data from
+>> memory to the memory channel". These data have not reached
+>> the device yet, and may still be "in flight". Thus the sbox
+>> setup can only be torn down after the NFC is idle.
+>>
+>> How do I call back into the DMA driver after wait_for_NFC_idle,
+>> to request sbox tear down?
+>>
+>> The new architecture would become:
+>>
+>>   sg_init_one
+>>   dma_map_sg
+>>   dmaengine_prep_slave_sg
+>>   dmaengine_submit
+>>   dma_async_issue_pending
+>>   configure_NFC_transfer
+>>   wait_for_IRQ_from_DMA_engine // via DMA_PREP_INTERRUPT
+>>   wait_for_NFC_idle
+>>   request_sbox_tear_down /*** HOW TO DO THAT ***/
+>>   dma_unmap_sg
+>>
+>> As far as I can tell, my NFC driver should call dmaengine_synchronize ??
+>> (In other words request_sbox_tear_down == dmaengine_synchronize)
+>>
+>> So the DMA driver should implement the device_synchronize hook,
+>> and tear the sbox down in that function.
+>>
+>> Is that correct? Or am I on the wrong track?
+> 
+> dmaengine_synchronize() is not meant for this.  See the documentation:
+> 
+> /**
+>  * dmaengine_synchronize() - Synchronize DMA channel termination
+>  * @chan: The channel to synchronize
+>  *
+>  * Synchronizes to the DMA channel termination to the current context. When this
+>  * function returns it is guaranteed that all transfers for previously issued
+>  * descriptors have stopped and and it is safe to free the memory assoicated
+>  * with them. Furthermore it is guaranteed that all complete callback functions
+>  * for a previously submitted descriptor have finished running and it is safe to
+>  * free resources accessed from within the complete callbacks.
+>  *
+>  * The behavior of this function is undefined if dma_async_issue_pending() has
+>  * been called between dmaengine_terminate_async() and this function.
+>  *
+>  * This function must only be called from non-atomic context and must not be
+>  * called from within a complete callback of a descriptor submitted on the same
+>  * channel.
+>  */
+> 
+> This is for use after a dmaengine_terminate_async() call to wait for the
+> dma engine to finish whatever it was doing.  This is not the problem
+> here.  Your problem is that the dma engine interrupt fires before the
+> transfer is actually complete.  Although you get an indication from the
+> target device when it has received all the data, there is no way to make
+> the dma driver wait for this.
 
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+Hello Mans,
 
-are available in the git repository at:
+I'm confused. Are you saying there is no solution to my problem
+within the existing DMA framework?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git tags/rzg-clock-defs-tag1
+In its current form, the tangox-dma.c driver will fail randomly
+for writes to a device (SATA, NFC).
 
-for you to fetch changes up to 1fa8a875df6b8aa864f6c4f2b65dbc2ed477b859:
+Maybe an extra hook can be added to the DMA framework?
 
-  clk: renesas: Add r8a7745 CPG Core Clock Definitions (2016-11-07 15:13:30 +0100)
+I'd like to hear from the framework's maintainers. Perhaps they
+can provide some guidance.
 
-----------------------------------------------------------------
-Renesas RZ/G1M and RZ/G1E CPG Core Clock Definitions
-
-This contains clock definitions shared by clock drivers and DTS files,
-and is provided as a dependency for the latter.
-
-This has already been pulled by Stephen as part of a larger pull
-request, and is present in clk/clk-next, together with the corresponding
-clock drivers.
-
-Thanks for pulling!
-----------------------------------------------------------------
-Sergei Shtylyov (2):
-      clk: renesas: Add r8a7743 CPG Core Clock Definitions
-      clk: renesas: Add r8a7745 CPG Core Clock Definitions
-
- include/dt-bindings/clock/r8a7743-cpg-mssr.h | 43 +++++++++++++++++++++++++++
- include/dt-bindings/clock/r8a7745-cpg-mssr.h | 44 ++++++++++++++++++++++++++++
- 2 files changed, 87 insertions(+)
- create mode 100644 include/dt-bindings/clock/r8a7743-cpg-mssr.h
- create mode 100644 include/dt-bindings/clock/r8a7745-cpg-mssr.h
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+Regards.
