@@ -1,102 +1,30 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 23 Nov 2016 14:07:49 +0100
-Subject: [PATCH net-next 1/4] net: mvneta: Convert to be 64 bits compatible
-In-Reply-To: <9432400.S1OrxC027t@wuerfel> (Arnd Bergmann's message of "Wed, 23
- Nov 2016 11:15:32 +0100")
-References: <20161122164844.19566-1-gregory.clement@free-electrons.com>
- <2948812.F3se4ieqO6@wuerfel> <20161123175341.4777595f@xhacker>
- <9432400.S1OrxC027t@wuerfel>
-Message-ID: <87mvgqmjiy.fsf@free-electrons.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 23 Nov 2016 14:10:23 +0100
+Subject: [PATCH 1/3] arm64: dts: r8a7796: Add CAN external clock support
+In-Reply-To: <1479903264-1909-1-git-send-email-chris.paterson2@renesas.com>
+References: <1479903264-1909-1-git-send-email-chris.paterson2@renesas.com>
+Message-ID: <CAMuHMdVsj9XWUNkLTrBMKSLjy_o769j5_vOu7f+zi9pUynkP0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng, Arnd,
-
-
-Thanks for your feedback.
-
-
- On mer., nov. 23 2016, Arnd Bergmann <arnd@arndb.de> wrote:
-
-> On Wednesday, November 23, 2016 5:53:41 PM CET Jisheng Zhang wrote:
->> On Tue, 22 Nov 2016 22:04:12 +0100 Arnd Bergmann wrote:
->> 
->> > On Tuesday, November 22, 2016 5:48:41 PM CET Gregory CLEMENT wrote:
->> > > +#ifdef CONFIG_64BIT
->> > > +       void *data_tmp;
->> > > +
->> > > +       /* In Neta HW only 32 bits data is supported, so in order to
->> > > +        * obtain whole 64 bits address from RX descriptor, we store
->> > > +        * the upper 32 bits when allocating buffer, and put it back
->> > > +        * when using buffer cookie for accessing packet in memory.
->> > > +        * Frags should be allocated from single 'memory' region,
->> > > +        * hence common upper address half should be sufficient.
->> > > +        */
->> > > +       data_tmp = mvneta_frag_alloc(pp->frag_size);
->> > > +       if (data_tmp) {
->> > > +               pp->data_high = (u64)upper_32_bits((u64)data_tmp) << 32;
->> > > +               mvneta_frag_free(pp->frag_size, data_tmp);
->> > > +       }
->> > >   
->> > 
->> > How does this work when the region spans a n*4GB address boundary?
->> 
->> indeed. We also make use of this driver on 64bit platforms. We use
->> different solution to make the driver 64bit safe.
->> 
->> solA: make use of the reserved field in the mvneta_rx_desc, such
->> as reserved2 etc. Yes, the field is marked as "for future use, PnC", but
->> now it's not used at all. This is one possible solution however.
+On Wed, Nov 23, 2016 at 1:14 PM, Chris Paterson
+<chris.paterson2@renesas.com> wrote:
+> Adds external CAN clock node for r8a7796. This clock can be used as
+> fCAN clock of CAN and CAN FD controller.
 >
-> Right, this sounds like the most straightforward choice.
-
-The PnC (which stands for Parsing and Classification) is not used yet
-indeed but this field will be needed when we will enable it. It is
-something we want to do but it is not planned in a near future. However
-from the datasheets I have it seems only present on the Armada XP. It is
-not mentioned on datasheets for the Armada 38x or the Armada 3700.
-
-That would mean it was safe to use on of this field in 64-bits mode on
-the Armada 3700.
-
-So I am going to take this approach.
-
-Thanks,
-
-Gregory
-
+> Based on a patch for r8a7795 by Ramesh Shanmugasundaram.
 >
->> solB: allocate a shadow buf cookie during init, e.g
->> 
->> rxq->descs_bufcookie = kmalloc(rxq->size * sizeof(void*), GFP_KERNEL);
->> 
->> then modify mvneta_rx_desc_fill a bit to save the 64bit pointer in
->> the shadow buf cookie, e.g
->> static void mvneta_rx_desc_fill(struct mvneta_rx_desc *rx_desc,
->>                                 u32 phys_addr, u32 cookie,
->> 				struct mvneta_rx_queue *rxq)
->> 
->> {
->> 	int i;
->> 
->> 	rx_desc->buf_cookie = cookie;
->> 	rx_desc->buf_phys_addr = phys_addr;
->> 	i = rx_desc - rxq->descs;
->> 	rxq->descs_bufcookie[i] = cookie;
->> }
->> 
->> then fetch the desc from the shadow buf cookie in all code path, such
->> as mvneta_rx() etc.
->> 
->> Both solutions should not have the problems pointed out by Arnd.
->
-> Wait, since you compute an index 'i' here, can't you just store 'i'
-> directly in the descriptor instead of the pointer?
->
-> 	Arnd
+> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
