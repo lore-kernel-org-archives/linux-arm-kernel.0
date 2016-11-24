@@ -1,49 +1,63 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Thu, 24 Nov 2016 08:41:19 +0800
-Subject: [PATCH 4/6] dt-bindings: change hi6220-reset.txt according to
- reset-hi6220.c
-In-Reply-To: <20161123230637.m4cvc2l4huxlf5dd@rob-hp-laptop>
-References: <1479800961-6249-1-git-send-email-zhangfei.gao@linaro.org>
- <1479800961-6249-5-git-send-email-zhangfei.gao@linaro.org>
- <2314383.qiZ3Cq7QsP@wuerfel> <20161123230637.m4cvc2l4huxlf5dd@rob-hp-laptop>
-Message-ID: <b5451df3-2af5-1236-f1f4-a70ac2de9a3b@linaro.org>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 24 Nov 2016 09:57:32 +0900
+Subject: [PATCH 2/2] clk: uniphier: add clock data for cpufreq
+In-Reply-To: <20161124000503.GE6095@codeaurora.org>
+References: <1477503088-26508-1-git-send-email-yamada.masahiro@socionext.com>
+ <1477503088-26508-2-git-send-email-yamada.masahiro@socionext.com>
+ <20161124000503.GE6095@codeaurora.org>
+Message-ID: <CAK7LNAQ6XeSHd7DbvD1jWeMfOqk8+R27Q-fNDWtXxpRd=OFgjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Rob
+Hi Stephen,
 
 
-On 2016?11?24? 07:06, Rob Herring wrote:
-> On Tue, Nov 22, 2016 at 09:48:32AM +0100, Arnd Bergmann wrote:
->> On Tuesday, November 22, 2016 3:49:19 PM CET Zhangfei Gao wrote:
->>>   Required properties:
->>>   - compatible: should be one of the following:
->>> -  - "hisilicon,hi6220-sysctrl", "syscon" : For peripheral reset controller.
->>> -  - "hisilicon,hi6220-mediactrl", "syscon" : For media reset controller.
->>> -- reg: should be register base and length as documented in the
->>> -  datasheet
->>> +  - "hisilicon,hi6220-reset-sysctrl" : For peripheral reset controller.
->>> +  - "hisilicon,hi6220-reset-mediactrl" : For media reset controller.
->>> +- hisi,rst-syscon: phandle of the reset's syscon.
->>>   - #reset-cells: 1, see below
->>>
->> Please keep the old strings around for compatibility.
-> Why are these even changing? The commit message should say why.
-Have send [RFC V2:PATCH 0/2] add reset-hi3660
-Not touching this file any more.
-Only handle hi3660.
+2016-11-24 9:05 GMT+09:00 Stephen Boyd <sboyd@codeaurora.org>:
 
-But hi6220 can directly use the driver.
-Only need list reset info to hi6220.dts, same as hi3660.
-Like
-+       iomcu_rst: iomcu_rst_controller {
-+               compatible = "hisilicon,hi3660-reset";
-+               #reset-cells = <1>;
-+               hisi,rst-syscon = <&iomcu>;
-+               hisi,reset-bits = <0x20 0x8             /* 0: i2c0 */
-+                                  0x20 0x10            /* 1: i2c1 */
-+                                  0x20 0x20            /* 2: i2c2 */
-+                                  0x20 0x8000000>;     /* 3: i2c6 */
-+       };
+>> +#if 1
+>> +     /*
+>> +      * TODO:
+>> +      * The return type of .round_rate() is "long", which is 32 bit wide on
+>> +      * 32 bit systems.  Clock rate greater than LONG_MAX (~ 2.15 GHz) is
+>> +      * treated as an error.  Needs a workaround until the problem is fixed.
+>> +      */
+>
+> Just curious is the problem internal to the clk framework because
+> of the clk_ops::round_rate design? Or does the consumer, cpufreq
+> in this case, have to deal with rates that are larger than
+> unsigned long on a 32 bit system? If it's just a clk_ops problem
+> and we need to support rates up to 32 bits wide (~ 4.3 GHz) on
+> the system then the driver could be changed to use
+> .determine_rate() ops and that would allow us to use all the bits
+> of unsigned long to figure out rates.
+>
+> If the problem is rates even larger than unsigned long on 32 bit
+> systems, then at the least I'd like to see some sort of plan to
+> fix that in the framework before merging code. Hopefully it can
+> be done gradually, but as I start looking at it it seems more and
+> more complicated to support this so this will be a long term
+> project.
+>
+> We can discuss the clk API changes needed as well if those are
+> required, but that is another issue that requires changes in
+> other places outside of clk drivers.
+>
 
-Thanks
+I understand your point, but core frame-work changes
+need more careful review than clk data changes in low-level drivers.
+It is too late to be included in v4.10.
+
+If I drop 32bit SoC things, and send v2 only for 64bit SoCs,
+is that acceptable for 4.10-rc1?
+
+Our ARMv8 SoCs are more actively developed, so
+getting 64bit clk data in first will be helpful.
+
+I postpone the 32bit SoC data until
+I figure out the root cause of the problem
+(and possible change for the API if necessary).
+
+
+-- 
+Best Regards
+Masahiro Yamada
