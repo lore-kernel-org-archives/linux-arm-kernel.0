@@ -1,77 +1,198 @@
-From: ahaslam@baylibre.com (Axel Haslam)
-Date: Thu, 24 Nov 2016 16:28:31 +0100
-Subject: [PATCH v2 3/3] ARM: davinci: remove ohci platform usage
-In-Reply-To: <20161124152831.26678-1-ahaslam@baylibre.com>
-References: <20161124152831.26678-1-ahaslam@baylibre.com>
-Message-ID: <20161124152831.26678-4-ahaslam@baylibre.com>
+From: huziji@marvell.com (Ziji Hu)
+Date: Thu, 24 Nov 2016 23:37:37 +0800
+Subject: [PATCH 7/10] mmc: sdhci-xenon: Add support to PHYs of Marvell
+ Xenon SDHC
+In-Reply-To: <CAPDyKFrskyZvMwhmj8ioyaowU8GL5=d-6ipGQcmmig_a9E9AQQ@mail.gmail.com>
+References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
+ <a05ffd140f4edc02fc3128db8445b2264cf38723.1477911954.git-series.gregory.clement@free-electrons.com>
+ <CAPDyKFpkcoVMKbVOwjX1WDyNgc1vvUX60D6XRX6=YHGvkvHvnA@mail.gmail.com>
+ <3cd05a26-d340-476e-bab1-8be9d5446f47@marvell.com>
+ <CAPDyKFrskyZvMwhmj8ioyaowU8GL5=d-6ipGQcmmig_a9E9AQQ@mail.gmail.com>
+Message-ID: <436c6925-cb0d-afe7-e3a2-384eca15ff42@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As all users of ohci platform data have been converted
-to use a regulator, we dont need to pass platform
-data to register the ohci device anymore.
+Hi Ulf,
 
-Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
----
- arch/arm/mach-davinci/board-da830-evm.c     | 2 +-
- arch/arm/mach-davinci/board-omapl138-hawk.c | 2 +-
- arch/arm/mach-davinci/include/mach/da8xx.h  | 2 +-
- arch/arm/mach-davinci/usb-da8xx.c           | 3 +--
- 4 files changed, 4 insertions(+), 5 deletions(-)
+On 2016/11/24 22:33, Ulf Hansson wrote:
+> [...]
+> 
+>>>
+>>>>
+>>>> +
+>>>> +static int __xenon_emmc_delay_adj_test(struct mmc_card *card)
+>>>> +{
+>>>> +       int err;
+>>>> +       u8 *ext_csd = NULL;
+>>>> +
+>>>> +       err = mmc_get_ext_csd(card, &ext_csd);
+>>>> +       kfree(ext_csd);
+>>>
+>>> Why do you read the ext csd here?
+>>>
+>>    I would like to simply introduce the PHY setting of our SDHC.
+>>    The target of the PHY setting is to achieve a perfect sampling
+>>    point for transfers, during card initialization.
+> 
+> Okay, so the phy is involved when running the tuning sequence.
+> 
+    Actually, all the transfers pass our host PHY.
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index 253d9af..223de79 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -130,7 +130,7 @@ static __init void da830_evm_usb_init(void)
- 		pr_warn("%s: USB 1.1 regulator register failed: %d\n",
- 			__func__, ret);
- 
--	ret = da8xx_register_usb11(NULL);
-+	ret = da8xx_register_usb11();
- 	if (ret)
- 		pr_warn("%s: USB 1.1 registration failed: %d\n", __func__, ret);
- }
-diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-index a252404..cbe7324 100644
---- a/arch/arm/mach-davinci/board-omapl138-hawk.c
-+++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-@@ -197,7 +197,7 @@ static __init void omapl138_hawk_usb_init(void)
- 		pr_warn("%s: USB PHY registration failed: %d\n",
- 			__func__, ret);
- 
--	ret = da8xx_register_usb11(NULL);
-+	ret = da8xx_register_usb11();
- 	if (ret)
- 		pr_warn("%s: USB 1.1 registration failed: %d\n",
- 			__func__, ret);
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index 85ff218..b21ef07 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -91,7 +91,7 @@ int da8xx_register_spi_bus(int instance, unsigned num_chipselect);
- int da8xx_register_watchdog(void);
- int da8xx_register_usb_phy(void);
- int da8xx_register_usb20(unsigned mA, unsigned potpgt);
--int da8xx_register_usb11(struct da8xx_ohci_root_hub *pdata);
-+int da8xx_register_usb11(void);
- int da8xx_register_usb_refclkin(int rate);
- int da8xx_register_usb20_phy_clk(bool use_usb_refclkin);
- int da8xx_register_usb11_phy_clk(bool use_usb_refclkin);
-diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
-index b010e5f..a438e2b 100644
---- a/arch/arm/mach-davinci/usb-da8xx.c
-+++ b/arch/arm/mach-davinci/usb-da8xx.c
-@@ -119,9 +119,8 @@ static struct platform_device da8xx_usb11_device = {
- 	.resource	= da8xx_usb11_resources,
- };
- 
--int __init da8xx_register_usb11(struct da8xx_ohci_root_hub *pdata)
-+int __init da8xx_register_usb11(void)
- {
--	da8xx_usb11_device.dev.platform_data = pdata;
- 	return platform_device_register(&da8xx_usb11_device);
- }
- 
--- 
-2.9.3
+>>
+>>    For HS200/HS400/SDR104 whose SDCLK is more than 50MHz, SDHC HW
+>>    will search for this sampling point with DLL's help.
+> 
+> Apologize for my ignorance, but what is a "DLL" in this case?
+> 
+   DLL is Delay-locked Loop. It is a HW module similar to PLL.
+
+>>
+>>    For other speed mode whose SDLCK is less than or equals to 50MHz,
+>>    SW has to scan the PHY delay line to find out this perfect sampling
+>>    point. Our driver sends a command to verify a sampling point
+>>    in current environment.
+> 
+> Ahh, okay! I guess the important part here is to not only send a
+> command, but also to make sure data becomes transferred on the DAT
+> lines, as to confirm your tuning sequence!?
+
+   Yes.
+   It is the best if the test command can transfer on DAT lines.
+
+> 
+> In cases of HS200/HS400/SDR104 you should be able to use the
+> mmc_send_tuning() API, don't you think?
+
+   For HS200/HS400/SDR104, we finally call sdhci_execute_tuning() to
+   execute tuning. Those test commands are not used.
+   In HS200/HS400/SDR104, HW will provide our host driver with suitable
+   tuning step. Our host driver set the tuning step in SDHCI register and
+   then start standard tuning sequence. The tuning step value provided
+   by our host HW will enhance tuning. 
+
+> 
+> For the other cases (lower speed modes) which cards doesn't support
+> the tuning command, perhaps you can just assume the PHY scan succeeded
+> and then allow to core to continue with the card initialization
+> sequence? Or do you foresee any issues with that? My point is that, if
+> it will fail - it will fail anyway.
+
+  Usually, our host driver will always successfully scan and select a
+  perfect sampling point.
+  If driver cannot find any suitable sampling point, it is likely that
+  transfers will also fail after init. But usually it is a issue, caused by
+  incorrect setting on boards/SOC/other PHY parameters, especially in development.
+  We will fix the issue and then scan will succeed in final product.
+
+> 
+>>
+>>    As result, our SDHC driver has to implement the functionality to
+>>    send commands and check the results, in host layer.
+>>    If directly calling mmc_wait_for_cmd() is improper, could you please
+>>    give us some suggestions?
+>>
+>>    For eMMC, CMD8 is used to test current sampling point set in PHY.
+> 
+> Try to use mmc_send_tuning().
+> 
+
+    Could you please tell me the requirement of "op_code" parameter in
+    mmc_send_tuning()?
+    According to mmc_send_tuning(),it seems that tuning command(CMD19/CMD21)
+    is required. Thus device will not response mmc_send_tuning() if current
+    speed mode doesn't support tuning command.
+    Please correct me if I am wrong.
+    
+>>
+>>>> +
+>>>> +       return err;
+>>>> +}
+>>>> +
+>>>> +static int __xenon_sdio_delay_adj_test(struct mmc_card *card)
+>>>> +{
+>>>> +       struct mmc_command cmd = {0};
+>>>> +       int err;
+>>>> +
+>>>> +       cmd.opcode = SD_IO_RW_DIRECT;
+>>>> +       cmd.flags = MMC_RSP_R5 | MMC_CMD_AC;
+>>>> +
+>>>> +       err = mmc_wait_for_cmd(card->host, &cmd, 0);
+>>>> +       if (err)
+>>>> +               return err;
+>>>> +
+>>>> +       if (cmd.resp[0] & R5_ERROR)
+>>>> +               return -EIO;
+>>>> +       if (cmd.resp[0] & R5_FUNCTION_NUMBER)
+>>>> +               return -EINVAL;
+>>>> +       if (cmd.resp[0] & R5_OUT_OF_RANGE)
+>>>> +               return -ERANGE;
+>>>> +       return 0;
+>>>
+>>> No thanks! MMC/SD/SDIO protocol code belongs in the core.
+>>>
+>>    For SDIO, SD_IO_RW_DIRECT command is sent to test current sampling point
+>>    in PHY.
+>>    Please help provide some suggestion to implement the command transfer.
+> 
+> Again, I think mmc_send_tuning() should be possible for you to use.
+> 
+> [...]
+> 
+>>>> +       if (mmc->card)
+>>>> +               card = mmc->card;
+>>>> +       else
+>>>> +               /*
+>>>> +                * Only valid during initialization
+>>>> +                * before mmc->card is set
+>>>> +                */
+>>>> +               card = priv->card_candidate;
+>>>> +       if (unlikely(!card)) {
+>>>> +               dev_warn(mmc_dev(mmc), "card is not present\n");
+>>>> +               return -EINVAL;
+>>>> +       }
+>>>
+>>> That your host need to hold a copy of the card pointer, tells me that
+>>> something is not really correct.
+>>>
+>>> I might be wrong, if this turns out to be a special case, but I doubt
+>>> it. Although, if it *is* a special such case, we shall most likely try
+>>> to extend the the mmc core layer instead of adding all these hacks in
+>>> your host driver.
+>>>
+>>     This card pointer copies the temporary structure mmc_card
+>>     used in mmc_init_card(), mmc_sd_init_card() and mmc_sdio_init_card().
+>>     Since we call mmc_wait_for_cmd() to send test commands, we need a copy
+>>     of that temporary mmc_card here in our host driver.
+> 
+> I see, thanks for clarifying.
+> 
+>>
+>>     During PHY setting in card initialization, mmc_host->card is not updated
+>>     yet with that temporary mmc_card. Thus we are not able to directly use
+>>     mmc_host->card. Instead, this card pointer is introduced to enable
+>>     mmc_wait_for_cmd().
+>>
+>>     If we can improve our host driver to send test commands without mmc_card,
+>>     this card pointer can be removed.
+>>     Could you please share your opinion please?
+> 
+> The mmc_send_tuning() API takes the mmc_host as parameter. If you
+> convert to that, perhaps you would be able to remove the need to hold
+> the card pointer.
+> 
+> BTW, the reason why mmc_send_tuning() doesn't take the card as a
+> parameter, is exactly those you just described above.
+> 
+   Got it.
+   Thanks a lot for the information.
+
+   Thank you for the great help.
+
+Best regards,
+Hu Ziji
+
+> [...]
+> 
+> Kind regards
+> Uffe
+> 
