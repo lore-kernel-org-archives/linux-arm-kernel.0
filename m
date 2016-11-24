@@ -1,25 +1,34 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 24 Nov 2016 02:17:54 +0100
-Subject: [PATCH] cpufreq: dt: Add support for r8a7743 and r8a7745
-In-Reply-To: <20161116100906.GA20987@vireshk-i7>
-References: <1479290751-9705-1-git-send-email-geert+renesas@glider.be>
- <20161116100906.GA20987@vireshk-i7>
-Message-ID: <2982180.JIdENVDWHj@vostro.rjw.lan>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 24 Nov 2016 01:17:12 +0000
+Subject: [RFC PATCH 2/5] dmaengine: allow sun6i-dma for more SoCs
+In-Reply-To: <1479950235-26821-1-git-send-email-andre.przywara@arm.com>
+References: <1479950235-26821-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1479950235-26821-3-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 16, 2016 03:39:06 PM Viresh Kumar wrote:
-> On 16-11-16, 11:05, Geert Uytterhoeven wrote:
-> > Add the compatible strings for supporting the generic cpufreq driver on
-> > the Renesas RZ/G1M (r8a7743) and RZ/G1E (r8a7745) SoCs.
-> > 
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > ---
-> > Support for RZ/G1M and RZ/G1E is expected to land in v4.10.
-> 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+The sun6i DMA driver is used in the Allwinner A64 and H5 SoC, which
+have arm64 capable cores. Add the generic sunxi config symbol to allow
+the driver to be selected by arm64 Kconfigs, which don't feature
+SoC specific MACH_xxxx configs.
 
-Applied.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ drivers/dma/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Rafael
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index af63a6b..003c284 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -157,7 +157,7 @@ config DMA_SUN4I
+ 
+ config DMA_SUN6I
+ 	tristate "Allwinner A31 SoCs DMA support"
+-	depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST
++	depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST || ARCH_SUNXI
+ 	depends on RESET_CONTROLLER
+ 	select DMA_ENGINE
+ 	select DMA_VIRTUAL_CHANNELS
+-- 
+2.8.2
