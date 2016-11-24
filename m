@@ -1,57 +1,23 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Thu, 24 Nov 2016 15:11:49 +0100
-Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire
- section
-In-Reply-To: <CAKv+Gu9qB7P2epMGdwFJ3vJR3vt-bBxU0nKwmKdpaOpTKdqzzA@mail.gmail.com>
-References: <20161109195132.GZ22012@rric.localdomain>
- <20161117142528.GJ22855@arm.com>
- <20161117151805.GJ2151@rric.localdomain>
- <CAKv+Gu-2uGJGovqQL-gbB54u=fQ9L9YUbDdRo6u3oWqF6znn6Q@mail.gmail.com>
- <20161123211538.GH10776@rric.localdomain>
- <CAKv+Gu8aWpz5vXSWdKHwL5Xk2aWyQBOoR1WHOnVPaWZOwqojBQ@mail.gmail.com>
- <20161124134238.GI10776@rric.localdomain>
- <CAKv+Gu_Ug3XOD6jy5xziy1pS7WV=TC0RLD4j3DT6nytujQDzRQ@mail.gmail.com>
- <20161124135151.GJ10776@rric.localdomain>
- <CAKv+Gu9qB7P2epMGdwFJ3vJR3vt-bBxU0nKwmKdpaOpTKdqzzA@mail.gmail.com>
-Message-ID: <20161124141149.GE2213@rric.localdomain>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 24 Nov 2016 15:13:04 +0100
+Subject: [PATCH RESEND 1/2] gpio: axp209: use correct register for GPIO
+ input status
+In-Reply-To: <20161123141151.25315-2-quentin.schulz@free-electrons.com>
+References: <20161123141151.25315-1-quentin.schulz@free-electrons.com>
+ <20161123141151.25315-2-quentin.schulz@free-electrons.com>
+Message-ID: <CACRpkdY_FOK1KDRq+pvhZ0aZW2g4D8BgvxpLtf38ujXPy3QkGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.11.16 13:58:30, Ard Biesheuvel wrote:
-> On 24 November 2016 at 13:51, Robert Richter <robert.richter@cavium.com> wrote:
-> > On 24.11.16 13:44:31, Ard Biesheuvel wrote:
-> >> On 24 November 2016 at 13:42, Robert Richter <robert.richter@cavium.com> wrote:
-> >> > On 23.11.16 21:25:06, Ard Biesheuvel wrote:
-> >> >> Why? MEMREMAP_WB is used often, among other things for mapping
-> >> >> firmware tables, which are marked as NOMAP, so in these cases, the
-> >> >> linear address is not mapped.
-> >> >
-> >> > If fw tables are mapped wb, that is wrong and needs a separate fix.
-> >> >
-> >>
-> >> Why is that wrong?
-> >
-> > The whole issue with mapping acpi tables is not marking them cachable,
-> > what wb does.
-> 
-> What 'issue'?
-> 
-> > Otherwise we could just use linear mapping for those mem
-> > ranges.
-> >
-> 
-> Regions containing firmware tables are owned by the firmware, and it
-> is the firmware that tells us which memory attributes we are allowed
-> to use. If those attributes include WB, it is perfectly legal to use a
-> cacheable mapping. That does *not* mean they should be covered by the
-> linear mapping. The linear mapping is read-write-non-exec, for
-> instance, and we may prefer to use a read-only mapping and/or
-> executable mapping.
+On Wed, Nov 23, 2016 at 3:11 PM, Quentin Schulz
+<quentin.schulz@free-electrons.com> wrote:
 
-Ok, I am going to fix try_ram_remap().
+> The GPIO input status was read from control register
+> (AXP20X_GPIO[210]_CTRL) instead of status register (AXP20X_GPIO20_SS).
+>
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 
-Are there other concerns with this patch?
+Patch applied.
 
-Thanks,
-
--Robert
+Yours,
+Linus Walleij
