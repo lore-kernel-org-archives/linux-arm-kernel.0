@@ -1,89 +1,123 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 24 Nov 2016 16:37:36 +0800
-Subject: [PATCH net-next 1/4] net: mvneta: Convert to be 64 bits compatible
-In-Reply-To: <CAPv3WKf0a63qQT+xwXfUatbgLFF58e6L8J10VtBOUTam+kUcjg@mail.gmail.com>
-References: <20161122164844.19566-1-gregory.clement@free-electrons.com>
- <2948812.F3se4ieqO6@wuerfel>	<20161123175341.4777595f@xhacker>
- <9432400.S1OrxC027t@wuerfel>	<87mvgqmjiy.fsf@free-electrons.com>
- <CAPv3WKf0a63qQT+xwXfUatbgLFF58e6L8J10VtBOUTam+kUcjg@mail.gmail.com>
-Message-ID: <20161124163327.1cc261ab@xhacker>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Thu, 24 Nov 2016 09:48:41 +0100
+Subject: [PATCH v2] ARM: dts: da850: add the mstpri and ddrctl nodes
+In-Reply-To: <20fbc946-d56c-31a3-4ae7-cf61df96a3c3@ti.com>
+References: <1479207611-18028-1-git-send-email-bgolaszewski@baylibre.com>
+ <a39b9276-865b-6382-574e-a5ef040a452f@lechnology.com>
+ <CAMpxmJVqog0Fno_DO0NQKmVNvzu5d=3GOLk145wBmB-V70BLeg@mail.gmail.com>
+ <5e647eb0-2f8a-b46b-2048-7616bfb54ad7@lechnology.com>
+ <m2bmx5x1y2.fsf@baylibre.com>
+ <f88df859-3c0f-38f2-275d-ce6a9996fb6e@lechnology.com>
+ <20fbc946-d56c-31a3-4ae7-cf61df96a3c3@ti.com>
+Message-ID: <CAMpxmJX=8_vk0ep8dKe+AWMLk2_7=OJWsaPjAJyPFWyFDkyknw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin, Gregory, Arnd,
+2016-11-24 6:03 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+> On Thursday 24 November 2016 04:18 AM, David Lechner wrote:
+>> On 11/23/2016 04:32 PM, Kevin Hilman wrote:
+>>> David Lechner <david@lechnology.com> writes:
+>>>
+>>>> On 11/23/2016 04:27 AM, Bartosz Golaszewski wrote:
+>>>>> 2016-11-22 23:23 GMT+01:00 David Lechner <david@lechnology.com>:
+>>>>>> On 11/15/2016 05:00 AM, Bartosz Golaszewski wrote:
+>>>>>>>
+>>>>>>> Add the nodes for the MSTPRI configuration and DDR2/mDDR memory
+>>>>>>> controller drivers to da850.dtsi.
+>>>>>>>
+>>>>>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>>>>> ---
+>>>>>>> v1 -> v2:
+>>>>>>> - moved the priority controller node above the cfgchip node
+>>>>>>> - renamed added nodes to better reflect their purpose
+>>>>>>>
+>>>>>>>  arch/arm/boot/dts/da850.dtsi | 8 ++++++++
+>>>>>>>  1 file changed, 8 insertions(+)
+>>>>>>>
+>>>>>>> diff --git a/arch/arm/boot/dts/da850.dtsi
+>>>>>>> b/arch/arm/boot/dts/da850.dtsi
+>>>>>>> index 1bb1f6d..412eec6 100644
+>>>>>>> --- a/arch/arm/boot/dts/da850.dtsi
+>>>>>>> +++ b/arch/arm/boot/dts/da850.dtsi
+>>>>>>> @@ -210,6 +210,10 @@
+>>>>>>>                         };
+>>>>>>>
+>>>>>>>                 };
+>>>>>>> +               prictrl: priority-controller at 14110 {
+>>>>>>> +                       compatible = "ti,da850-mstpri";
+>>>>>>> +                       reg = <0x14110 0x0c>;
+>>>>>>
+>>>>>>
+>>>>>> I think we should add status = "disabled"; here and let boards opt in.
+>>>>>>
+>>>>>>> +               };
+>>>>>>>                 cfgchip: chip-controller at 1417c {
+>>>>>>>                         compatible = "ti,da830-cfgchip", "syscon",
+>>>>>>> "simple-mfd";
+>>>>>>>                         reg = <0x1417c 0x14>;
+>>>>>>> @@ -451,4 +455,8 @@
+>>>>>>>                           1 0 0x68000000 0x00008000>;
+>>>>>>>                 status = "disabled";
+>>>>>>>         };
+>>>>>>> +       memctrl: memory-controller at b0000000 {
+>>>>>>> +               compatible = "ti,da850-ddr-controller";
+>>>>>>> +               reg = <0xb0000000 0xe8>;
+>>>>>>
+>>>>>>
+>>>>>> same here. status = "disabled";
+>>>>>>
+>>>>>>> +       };
+>>>>>>>  };
+>>>>>>>
+>>>>>
+>>>>> Hi David,
+>>>>>
+>>>>> I did that initially[1][2] and it was rejected by Kevin[3] and
+>>>>> Laurent[4].
+>>>>>
+>>>>> FYI this patch has already been queued by Sekhar.
+>>>>
+>>>> Thanks. I did not see those threads.
+>>>>
+>>>> FYI to maintainers, having these enabled by default causes error
+>>>> messages in the kernel log for other boards that are not supported by
+>>>> the drivers.
+>>>
+>>> Then the driver is too noisy and should be cleaned up.
+>>>
+>>>> Since there is only one board that is supported and soon
+>>>> to be 2 that are not, I would rather have this disabled by default to
+>>>> avoid the error messages.
+>>>
+>>> IMO, what exactly are the error messages? Sounds like the driver is
+>>> being too verbose, and calling things errors that are not really errors.
+>>
+>> It is just one line per driver.
+>>
+>>     dev_err(dev, "no master priorities defined for this board\n");
+>>
+>> and
+>>
+>>     dev_err(dev, "no settings defined for this board\n");
+>>
+>>
+>> Since "ti,da850-lcdk" is the only board supported in these drivers, all
+>> other boards will see these error messages.
+>
+> Thats pretty bad. Sorry about that. The original justification for
+> keeping them enabled all the time was that they are in-SoC modules with
+> no external dependencies (like IO lines or voltage rails) so they can be
+> enabled on all boards that use DA850. While that remains true, the
+> configuration itself is board specific.
+>
+> I think the error messages are still useful, so instead of silencing
+> them, I think we should go back to keeping these nodes disabled by
+> default and enabling only on boards which have support for it in the driver.
+>
+> Thanks,
+> Sekhar
 
-On Wed, 23 Nov 2016 17:02:11 +0100 Marcin Wojtas  wrote:
-
-> Hi Gregory,
-> 
-> 2016-11-23 14:07 GMT+01:00 Gregory CLEMENT:
-> > Hi Jisheng, Arnd,
-> >
-> >
-> > Thanks for your feedback.
-> >
-> >
-> >  On mer., nov. 23 2016, Arnd Bergmann wrote:
-> >  
-> >> On Wednesday, November 23, 2016 5:53:41 PM CET Jisheng Zhang wrote:  
-> >>> On Tue, 22 Nov 2016 22:04:12 +0100 Arnd Bergmann wrote:
-> >>>  
-> >>> > On Tuesday, November 22, 2016 5:48:41 PM CET Gregory CLEMENT wrote:  
-> >>> > > +#ifdef CONFIG_64BIT
-> >>> > > +       void *data_tmp;
-> >>> > > +
-> >>> > > +       /* In Neta HW only 32 bits data is supported, so in order to
-> >>> > > +        * obtain whole 64 bits address from RX descriptor, we store
-> >>> > > +        * the upper 32 bits when allocating buffer, and put it back
-> >>> > > +        * when using buffer cookie for accessing packet in memory.
-> >>> > > +        * Frags should be allocated from single 'memory' region,
-> >>> > > +        * hence common upper address half should be sufficient.
-> >>> > > +        */
-> >>> > > +       data_tmp = mvneta_frag_alloc(pp->frag_size);
-> >>> > > +       if (data_tmp) {
-> >>> > > +               pp->data_high = (u64)upper_32_bits((u64)data_tmp) << 32;
-> >>> > > +               mvneta_frag_free(pp->frag_size, data_tmp);
-> >>> > > +       }
-> >>> > >  
-> >>> >
-> >>> > How does this work when the region spans a n*4GB address boundary?  
-> >>>
-> >>> indeed. We also make use of this driver on 64bit platforms. We use
-> >>> different solution to make the driver 64bit safe.
-> >>>
-> >>> solA: make use of the reserved field in the mvneta_rx_desc, such
-> >>> as reserved2 etc. Yes, the field is marked as "for future use, PnC", but
-> >>> now it's not used at all. This is one possible solution however.  
-> >>
-> >> Right, this sounds like the most straightforward choice.  
-> >
-> > The PnC (which stands for Parsing and Classification) is not used yet
-> > indeed but this field will be needed when we will enable it. It is
-> > something we want to do but it is not planned in a near future. However
-> > from the datasheets I have it seems only present on the Armada XP. It is
-> > not mentioned on datasheets for the Armada 38x or the Armada 3700.
-> >  
-> 
-> It is not mentioned in A38x spec, but this SoC has exactly the same
-> PnC as Armada XP (they differ only with used SRAM details). I wouldn't
-> be surprised if it was supported on A3700 as well.
-> 
-> > That would mean it was safe to use on of this field in 64-bits mode on
-> > the Armada 3700.
-> >
-> > So I am going to take this approach.
-> >  
-> 
-> I think for now it's safe and is much easier than handling extra
-> software ring for virtual addresses.
-> 
-
-solB (a SW shadow cookie) perhaps gives a better performance: in hot path,
-such as mvneta_rx(), the driver accesses buf_cookie and buf_phys_addr of
-rx_desc which is allocated by dma_alloc_coherent, it's noncacheable if the
-device isn't cache-coherent. I didn't measure the performance difference,
-because in fact we take solA as well internally. From your experience,
-can the performance gain deserve the complex code?
+I'll send a patch.
 
 Thanks,
-Jisheng
+Bartosz
