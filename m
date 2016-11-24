@@ -1,48 +1,30 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 24 Nov 2016 10:59:32 +0100
-Subject: [PATCH 1/4] serial: core: Add LED trigger support
-In-Reply-To: <20161124082626.ge7t64fwrtx3slvo@pengutronix.de>
-References: <20161123100106.15969-1-s.hauer@pengutronix.de>
- <20161123100106.15969-2-s.hauer@pengutronix.de>
- <20161123100819.GA20137@kroah.com>
- <20161124082626.ge7t64fwrtx3slvo@pengutronix.de>
-Message-ID: <20161124095932.GA14605@kroah.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 24 Nov 2016 18:58:08 +0900
+Subject: [PATCH v28 7/9] arm64: kdump: enable kdump in defconfig
+In-Reply-To: <20161124095523.6972-1-takahiro.akashi@linaro.org>
+References: <20161124095523.6972-1-takahiro.akashi@linaro.org>
+Message-ID: <20161124095809.7092-6-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2016 at 09:26:26AM +0100, Sascha Hauer wrote:
-> On Wed, Nov 23, 2016 at 11:08:19AM +0100, Greg Kroah-Hartman wrote:
-> > On Wed, Nov 23, 2016 at 11:01:03AM +0100, Sascha Hauer wrote:
-> > > With this patch the serial core provides LED triggers for RX and TX.
-> > > 
-> > > As the serial core layer does not know when the hardware actually sends
-> > > or receives characters, this needs help from the UART drivers. The
-> > > LED triggers are registered in uart_add_led_triggers() called from
-> > > the UART drivers which want to support LED triggers. All the driver
-> > > has to do then is to call uart_led_trigger_[tx|rx] to indicate
-> > > activity.
-> 
-> BTW last time LED triggers were discussed
-> (https://patchwork.kernel.org/patch/9212885/) You and Arnd mandated the
-> triggers should be implemented in the tty layer. By tty layer did you
-> really mean the tty layer or did you mean serial_core?
-> 
-> We could implement it in the tty layer, but tty doesn't know when the
-> characters are actually sent. There could be arbitrary time passing
-> between a tty_operations->put_char and the character being on the wire.
+Kdump is enabled by default as kexec is.
 
-With USB serial devices and even basic UARTs, you never really know when
-"the character is on the wire", you can only guess.  And really, just
-guessing is good enough given that no one is using this type of
-interface to actually count when exactly the bits hit the wire.  This is
-just for those that like blinky-lights :)
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-> Also I am not sure if we want to have LED triggers for each and every
-> tty in the system
-
-Why not?  It's opt-in by the user, so might as well let them do it for
-whatever tty they want to.
-
-thanks,
-
-greg k-h
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index dab2cb0..24922c9 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -79,6 +79,7 @@ CONFIG_CMA=y
+ CONFIG_SECCOMP=y
+ CONFIG_XEN=y
+ CONFIG_KEXEC=y
++CONFIG_CRASH_DUMP=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+ CONFIG_COMPAT=y
+ CONFIG_CPU_IDLE=y
+-- 
+2.10.0
