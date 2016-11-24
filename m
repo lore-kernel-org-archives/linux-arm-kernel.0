@@ -1,305 +1,317 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu, 24 Nov 2016 16:10:27 +0000
-Subject: [kvm-unit-tests PATCH v7 05/11] lib: add isaac prng library from CCAN
+Date: Thu, 24 Nov 2016 16:10:29 +0000
+Subject: [kvm-unit-tests PATCH v7 07/11] arm/tlbflush-code: Add TLB flush
+ during code execution test
 In-Reply-To: <20161124161033.11456-1-alex.bennee@linaro.org>
 References: <20161124161033.11456-1-alex.bennee@linaro.org>
-Message-ID: <20161124161033.11456-6-alex.bennee@linaro.org>
+Message-ID: <20161124161033.11456-8-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's often useful to introduce some sort of random variation when
-testing several racing CPU conditions. Instead of each test implementing
-some half-arsed PRNG bring in a a decent one which has good statistical
-randomness. Obviously it is deterministic for a given seed value which
-is likely the behaviour you want.
+This adds a fairly brain dead torture test for TLB flushes intended for
+stressing the MTTCG QEMU build. It takes the usual -smp option for
+multiple CPUs.
 
-I've pulled in the ISAAC library from CCAN:
+By default it CPU0 will do a TLBIALL flush after each cycle. You can
+pass options via -append to control additional aspects of the test:
 
-    http://ccodearchive.net/info/isaac.html
-
-I shaved off the float related stuff which is less useful for unit
-testing and re-indented to fit the style. The original license was
-CC0 (Public Domain) which is compatible with the LGPL v2 of
-kvm-unit-tests.
+  - "page" flush each page in turn (one per function)
+  - "self" do the flush after each computation cycle
+  - "verbose" report progress on each computation cycle
 
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-CC: Timothy B. Terriberry <tterribe@xiph.org>
-Acked-by: Andrew Jones <drjones@redhat.com>
+CC: Mark Rutland <mark.rutland@arm.com>
+
 ---
- arm/Makefile.common |   1 +
- lib/prng.c          | 162 ++++++++++++++++++++++++++++++++++++++++++++++++++++
- lib/prng.h          |  82 ++++++++++++++++++++++++++
- 3 files changed, 245 insertions(+)
- create mode 100644 lib/prng.c
- create mode 100644 lib/prng.h
+v2
+  - rename to tlbflush-test
+  - made makefile changes cleaner
+  - added self/other flush mode
+  - create specific prefix
+  - whitespace fixes
+v3
+  - using new SMP framework for test runing
+v4
+  - merge in the unitests.cfg
+v5
+  - max out at -smp 4
+  - printf fmtfix
+v7
+  - rename to tlbflush-code
+  - int -> bool flags
+---
+ arm/Makefile.common |   2 +
+ arm/tlbflush-code.c | 212 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arm/unittests.cfg   |  24 ++++++
+ 3 files changed, 238 insertions(+)
+ create mode 100644 arm/tlbflush-code.c
 
 diff --git a/arm/Makefile.common b/arm/Makefile.common
-index 6c0898f..52f7440 100644
+index cca0d9c..de99a6e 100644
 --- a/arm/Makefile.common
 +++ b/arm/Makefile.common
-@@ -40,6 +40,7 @@ cflatobjs += lib/pci-testdev.o
- cflatobjs += lib/virtio.o
- cflatobjs += lib/virtio-mmio.o
- cflatobjs += lib/chr-testdev.o
-+cflatobjs += lib/prng.o
- cflatobjs += lib/arm/io.o
- cflatobjs += lib/arm/setup.o
- cflatobjs += lib/arm/mmu.o
-diff --git a/lib/prng.c b/lib/prng.c
+@@ -13,6 +13,7 @@ tests-common  = $(TEST_DIR)/selftest.flat
+ tests-common += $(TEST_DIR)/spinlock-test.flat
+ tests-common += $(TEST_DIR)/pci-test.flat
+ tests-common += $(TEST_DIR)/gic.flat
++tests-common += $(TEST_DIR)/tlbflush-code.flat
+ 
+ all: test_cases
+ 
+@@ -81,3 +82,4 @@ generated_files = $(asm-offsets)
+ test_cases: $(generated_files) $(tests-common) $(tests)
+ 
+ $(TEST_DIR)/selftest.o $(cstart.o): $(asm-offsets)
++$(TEST_DIR)/tlbflush-code.elf: $(cstart.o) $(TEST_DIR)/tlbflush-code.o
+diff --git a/arm/tlbflush-code.c b/arm/tlbflush-code.c
 new file mode 100644
-index 0000000..ebd6df7
+index 0000000..cb5cdc2
 --- /dev/null
-+++ b/lib/prng.c
-@@ -0,0 +1,162 @@
++++ b/arm/tlbflush-code.c
+@@ -0,0 +1,212 @@
 +/*
-+ * Pseudo Random Number Generator
++ * TLB Flush Race Tests
 + *
-+ * Lifted from ccan modules ilog/isaac under CC0
-+ *   - http://ccodearchive.net/info/isaac.html
-+ *   - http://ccodearchive.net/info/ilog.html
++ * These tests are designed to test for incorrect TLB flush semantics
++ * under emulation. The initial CPU will set all the others working a
++ * compuation task and will then trigger TLB flushes across the
++ * system. It doesn't actually need to re-map anything but the flushes
++ * themselves will trigger QEMU's TCG self-modifying code detection
++ * which will invalidate any generated  code causing re-translation.
++ * Eventually the code buffer will fill and a general tb_lush() will
++ * be triggered.
 + *
-+ * And lightly hacked to compile under the KVM unit test environment.
-+ * This provides a handy RNG for torture tests that want to vary
-+ * delays and the like.
++ * Copyright (C) 2016, Linaro, Alex Benn?e <alex.bennee@linaro.org>
 + *
++ * This work is licensed under the terms of the GNU LGPL, version 2.
 + */
 +
-+/*Written by Timothy B. Terriberry (tterribe at xiph.org) 1999-2009.
-+  CC0 (Public domain) - see LICENSE file for details
-+  Based on the public domain implementation by Robert J. Jenkins Jr.*/
++#include <libcflat.h>
++#include <asm/smp.h>
++#include <asm/cpumask.h>
++#include <asm/barrier.h>
++#include <asm/mmu.h>
 +
-+#include "libcflat.h"
++#define SEQ_LENGTH 10
++#define SEQ_HASH 0x7cd707fe
 +
-+#include <string.h>
-+#include "prng.h"
++static cpumask_t smp_test_complete;
++static int flush_count = 1000000;
++static bool flush_self;
++static bool flush_page;
++static bool flush_verbose;
 +
-+#define ISAAC_MASK        (0xFFFFFFFFU)
++/*
++ * Work functions
++ *
++ * These work functions need to be:
++ *
++ *  - page aligned, so we can flush one function at a time
++ *  - have branches, so QEMU TCG generates multiple basic blocks
++ *  - call across pages, so we exercise the TCG basic block slow path
++ */
 +
-+/* Extract ISAAC_SZ_LOG bits (starting at bit 2). */
-+static inline uint32_t lower_bits(uint32_t x)
++/* Adler32 */
++__attribute__((aligned(PAGE_SIZE))) uint32_t hash_array(const void *buf,
++							size_t buflen)
 +{
-+	return (x & ((ISAAC_SZ-1) << 2)) >> 2;
++	const uint8_t *data = (uint8_t *) buf;
++	uint32_t s1 = 1;
++	uint32_t s2 = 0;
++
++	for (size_t n = 0; n < buflen; n++) {
++		s1 = (s1 + data[n]) % 65521;
++		s2 = (s2 + s1) % 65521;
++	}
++	return (s2 << 16) | s1;
 +}
 +
-+/* Extract next ISAAC_SZ_LOG bits (starting at bit ISAAC_SZ_LOG+2). */
-+static inline uint32_t upper_bits(uint32_t y)
++__attribute__((aligned(PAGE_SIZE))) void create_fib_sequence(int length,
++							unsigned int *array)
 +{
-+	return (y >> (ISAAC_SZ_LOG+2)) & (ISAAC_SZ-1);
-+}
-+
-+static void isaac_update(isaac_ctx *_ctx){
-+	uint32_t *m;
-+	uint32_t *r;
-+	uint32_t  a;
-+	uint32_t  b;
-+	uint32_t  x;
-+	uint32_t  y;
-+	int       i;
-+	m=_ctx->m;
-+	r=_ctx->r;
-+	a=_ctx->a;
-+	b=_ctx->b+(++_ctx->c);
-+	for(i=0;i<ISAAC_SZ/2;i++){
-+		x=m[i];
-+		a=(a^a<<13)+m[i+ISAAC_SZ/2];
-+		m[i]=y=m[lower_bits(x)]+a+b;
-+		r[i]=b=m[upper_bits(y)]+x;
-+		x=m[++i];
-+		a=(a^a>>6)+m[i+ISAAC_SZ/2];
-+		m[i]=y=m[lower_bits(x)]+a+b;
-+		r[i]=b=m[upper_bits(y)]+x;
-+		x=m[++i];
-+		a=(a^a<<2)+m[i+ISAAC_SZ/2];
-+		m[i]=y=m[lower_bits(x)]+a+b;
-+		r[i]=b=m[upper_bits(y)]+x;
-+		x=m[++i];
-+		a=(a^a>>16)+m[i+ISAAC_SZ/2];
-+		m[i]=y=m[lower_bits(x)]+a+b;
-+		r[i]=b=m[upper_bits(y)]+x;
-+	}
-+	for(i=ISAAC_SZ/2;i<ISAAC_SZ;i++){
-+		x=m[i];
-+		a=(a^a<<13)+m[i-ISAAC_SZ/2];
-+		m[i]=y=m[lower_bits(x)]+a+b;
-+		r[i]=b=m[upper_bits(y)]+x;
-+		x=m[++i];
-+		a=(a^a>>6)+m[i-ISAAC_SZ/2];
-+		m[i]=y=m[lower_bits(x)]+a+b;
-+		r[i]=b=m[upper_bits(y)]+x;
-+		x=m[++i];
-+		a=(a^a<<2)+m[i-ISAAC_SZ/2];
-+		m[i]=y=m[lower_bits(x)]+a+b;
-+		r[i]=b=m[upper_bits(y)]+x;
-+		x=m[++i];
-+		a=(a^a>>16)+m[i-ISAAC_SZ/2];
-+		m[i]=y=m[lower_bits(x)]+a+b;
-+		r[i]=b=m[upper_bits(y)]+x;
-+	}
-+	_ctx->b=b;
-+	_ctx->a=a;
-+	_ctx->n=ISAAC_SZ;
-+}
-+
-+static void isaac_mix(uint32_t _x[8]){
-+	static const unsigned char SHIFT[8]={11,2,8,16,10,4,8,9};
 +	int i;
-+	for(i=0;i<8;i++){
-+		_x[i]^=_x[(i+1)&7]<<SHIFT[i];
-+		_x[(i+3)&7]+=_x[i];
-+		_x[(i+1)&7]+=_x[(i+2)&7];
-+		i++;
-+		_x[i]^=_x[(i+1)&7]>>SHIFT[i];
-+		_x[(i+3)&7]+=_x[i];
-+		_x[(i+1)&7]+=_x[(i+2)&7];
++
++	/* first two values */
++	array[0] = 0;
++	array[1] = 1;
++	for (i=2; i<length; i++) {
++		array[i] = array[i-2] + array[i-1];
++	}
++}
++
++__attribute__((aligned(PAGE_SIZE))) unsigned long long factorial(unsigned int n)
++{
++	unsigned int i;
++	unsigned long long fac = 1;
++	for (i=1; i<=n; i++)
++	{
++		fac = fac * i;
++	}
++	return fac;
++}
++
++__attribute__((aligned(PAGE_SIZE))) void factorial_array
++(unsigned int n, unsigned int *input, unsigned long long *output)
++{
++	unsigned int i;
++	for (i=0; i<n; i++) {
++		output[i] = factorial(input[i]);
++	}
++}
++
++__attribute__((aligned(PAGE_SIZE))) unsigned int do_computation(void)
++{
++	unsigned int fib_array[SEQ_LENGTH];
++	unsigned long long facfib_array[SEQ_LENGTH];
++	uint32_t fib_hash, facfib_hash;
++
++	create_fib_sequence(SEQ_LENGTH, &fib_array[0]);
++	fib_hash = hash_array(&fib_array[0], sizeof(fib_array));
++	factorial_array(SEQ_LENGTH, &fib_array[0], &facfib_array[0]);
++	facfib_hash = hash_array(&facfib_array[0], sizeof(facfib_array));
++
++	return (fib_hash ^ facfib_hash);
++}
++
++/* This provides a table of the work functions so we can flush each
++ * page individually
++ */
++static void * pages[] = {&hash_array, &create_fib_sequence, &factorial,
++			 &factorial_array, &do_computation};
++
++static void do_flush(int i)
++{
++	if (flush_page) {
++		flush_tlb_page((unsigned long)pages[i % ARRAY_SIZE(pages)]);
++	} else {
++		flush_tlb_all();
 +	}
 +}
 +
 +
-+void isaac_init(isaac_ctx *_ctx,const unsigned char *_seed,int _nseed){
-+	_ctx->a=_ctx->b=_ctx->c=0;
-+	memset(_ctx->r,0,sizeof(_ctx->r));
-+	isaac_reseed(_ctx,_seed,_nseed);
++static void just_compute(void)
++{
++	int i, errors = 0;
++	int cpu = smp_processor_id();
++
++	uint32_t result;
++
++	printf("CPU%d online\n", cpu);
++
++	for (i=0; i < flush_count; i++) {
++		result = do_computation();
++
++		if (result != SEQ_HASH) {
++			errors++;
++			printf("CPU%d: seq%d 0x%"PRIx32"!=0x%x\n",
++				cpu, i, result, SEQ_HASH);
++		}
++
++		if (flush_verbose && (i % 1000) == 0) {
++			printf("CPU%d: seq%d\n", cpu, i);
++		}
++
++		if (flush_self) {
++			do_flush(i);
++		}
++	}
++
++	report("CPU%d: Done - Errors: %d\n", errors == 0, cpu, errors);
++
++	cpumask_set_cpu(cpu, &smp_test_complete);
++	if (cpu != 0)
++		halt();
 +}
 +
-+void isaac_reseed(isaac_ctx *_ctx,const unsigned char *_seed,int _nseed){
-+	uint32_t *m;
-+	uint32_t *r;
-+	uint32_t  x[8];
-+	int       i;
-+	int       j;
-+	m=_ctx->m;
-+	r=_ctx->r;
-+	if(_nseed>ISAAC_SEED_SZ_MAX)_nseed=ISAAC_SEED_SZ_MAX;
-+	for(i=0;i<_nseed>>2;i++){
-+		r[i]^=(uint32_t)_seed[i<<2|3]<<24|(uint32_t)_seed[i<<2|2]<<16|
-+			(uint32_t)_seed[i<<2|1]<<8|_seed[i<<2];
++static void just_flush(void)
++{
++	int cpu = smp_processor_id();
++	int i = 0;
++
++	/* set our CPU as done, keep flushing until everyone else
++	   finished */
++	cpumask_set_cpu(cpu, &smp_test_complete);
++
++	while (!cpumask_full(&smp_test_complete)) {
++		do_flush(i++);
 +	}
-+	_nseed-=i<<2;
-+	if(_nseed>0){
-+		uint32_t ri;
-+		ri=_seed[i<<2];
-+		for(j=1;j<_nseed;j++)ri|=(uint32_t)_seed[i<<2|j]<<(j<<3);
-+		r[i++]^=ri;
-+	}
-+	x[0]=x[1]=x[2]=x[3]=x[4]=x[5]=x[6]=x[7]=0x9E3779B9U;
-+	for(i=0;i<4;i++)isaac_mix(x);
-+	for(i=0;i<ISAAC_SZ;i+=8){
-+		for(j=0;j<8;j++)x[j]+=r[i+j];
-+		isaac_mix(x);
-+		memcpy(m+i,x,sizeof(x));
-+	}
-+	for(i=0;i<ISAAC_SZ;i+=8){
-+		for(j=0;j<8;j++)x[j]+=m[i+j];
-+		isaac_mix(x);
-+		memcpy(m+i,x,sizeof(x));
-+	}
-+	isaac_update(_ctx);
++
++	report("CPU%d: Done - Triggered %d flushes\n", true, cpu, i);
 +}
 +
-+uint32_t isaac_next_uint32(isaac_ctx *_ctx){
-+	if(!_ctx->n)isaac_update(_ctx);
-+	return _ctx->r[--_ctx->n];
-+}
++int main(int argc, char **argv)
++{
++	int cpu, i;
++	char prefix[100];
 +
-+uint32_t isaac_next_uint(isaac_ctx *_ctx,uint32_t _n){
-+	uint32_t r;
-+	uint32_t v;
-+	uint32_t d;
-+	do{
-+		r=isaac_next_uint32(_ctx);
-+		v=r%_n;
-+		d=r-v;
++	for (i=0; i<argc; i++) {
++		char *arg = argv[i];
++
++		if (strcmp(arg, "page") == 0) {
++			flush_page = true;
++                }
++
++                if (strcmp(arg, "self") == 0) {
++			flush_self = true;
++                }
++
++		if (strcmp(arg, "verbose") == 0) {
++			flush_verbose = true;
++                }
 +	}
-+	while(((d+_n-1)&ISAAC_MASK)<d);
-+	return v;
++
++	snprintf(prefix, sizeof(prefix), "tlbflush_%s_%s",
++		flush_page?"page":"all",
++		flush_self?"self":"other");
++	report_prefix_push(prefix);
++
++	for_each_present_cpu(cpu) {
++		if (cpu == 0)
++			continue;
++		smp_boot_secondary(cpu, just_compute);
++	}
++
++	if (flush_self)
++		just_compute();
++	else
++		just_flush();
++
++	while (!cpumask_full(&smp_test_complete))
++		cpu_relax();
++
++	return report_summary();
 +}
-diff --git a/lib/prng.h b/lib/prng.h
-new file mode 100644
-index 0000000..bf5776d
---- /dev/null
-+++ b/lib/prng.h
-@@ -0,0 +1,82 @@
-+/*
-+ * PRNG Header
-+ */
-+#ifndef __PRNG_H__
-+#define __PRNG_H__
+diff --git a/arm/unittests.cfg b/arm/unittests.cfg
+index c7392c7..beaae84 100644
+--- a/arm/unittests.cfg
++++ b/arm/unittests.cfg
+@@ -72,3 +72,27 @@ file = gic.flat
+ smp = $MAX_SMP
+ extra_params = -machine gic-version=3 -append 'ipi'
+ groups = gic
 +
-+# include <stdint.h>
++# TLB Torture Tests
++[tlbflush-code::all_other]
++file = tlbflush-code.flat
++smp = $(($MAX_SMP>4?4:$MAX_SMP))
++groups = tlbflush
 +
++[tlbflush-code::page_other]
++file = tlbflush-code.flat
++smp = $(($MAX_SMP>4?4:$MAX_SMP))
++extra_params = -append 'page'
++groups = tlbflush
 +
++[tlbflush-code::all_self]
++file = tlbflush-code.flat
++smp = $(($MAX_SMP>4?4:$MAX_SMP))
++extra_params = -append 'self'
++groups = tlbflush
 +
-+typedef struct isaac_ctx isaac_ctx;
-+
-+
-+
-+/*This value may be lowered to reduce memory usage on embedded platforms, at
-+  the cost of reducing security and increasing bias.
-+  Quoting Bob Jenkins: "The current best guess is that bias is detectable after
-+  2**37 values for [ISAAC_SZ_LOG]=3, 2**45 for 4, 2**53 for 5, 2**61 for 6,
-+  2**69 for 7, and 2**77 values for [ISAAC_SZ_LOG]=8."*/
-+#define ISAAC_SZ_LOG      (8)
-+#define ISAAC_SZ          (1<<ISAAC_SZ_LOG)
-+#define ISAAC_SEED_SZ_MAX (ISAAC_SZ<<2)
-+
-+
-+
-+/*ISAAC is the most advanced of a series of pseudo-random number generators
-+  designed by Robert J. Jenkins Jr. in 1996.
-+  http://www.burtleburtle.net/bob/rand/isaac.html
-+  To quote:
-+  No efficient method is known for deducing their internal states.
-+  ISAAC requires an amortized 18.75 instructions to produce a 32-bit value.
-+  There are no cycles in ISAAC shorter than 2**40 values.
-+  The expected cycle length is 2**8295 values.*/
-+struct isaac_ctx{
-+	unsigned n;
-+	uint32_t r[ISAAC_SZ];
-+	uint32_t m[ISAAC_SZ];
-+	uint32_t a;
-+	uint32_t b;
-+	uint32_t c;
-+};
-+
-+
-+/**
-+ * isaac_init - Initialize an instance of the ISAAC random number generator.
-+ * @_ctx:   The instance to initialize.
-+ * @_seed:  The specified seed bytes.
-+ *          This may be NULL if _nseed is less than or equal to zero.
-+ * @_nseed: The number of bytes to use for the seed.
-+ *          If this is greater than ISAAC_SEED_SZ_MAX, the extra bytes are
-+ *           ignored.
-+ */
-+void isaac_init(isaac_ctx *_ctx,const unsigned char *_seed,int _nseed);
-+
-+/**
-+ * isaac_reseed - Mix a new batch of entropy into the current state.
-+ * To reset ISAAC to a known state, call isaac_init() again instead.
-+ * @_ctx:   The instance to reseed.
-+ * @_seed:  The specified seed bytes.
-+ *          This may be NULL if _nseed is zero.
-+ * @_nseed: The number of bytes to use for the seed.
-+ *          If this is greater than ISAAC_SEED_SZ_MAX, the extra bytes are
-+ *           ignored.
-+ */
-+void isaac_reseed(isaac_ctx *_ctx,const unsigned char *_seed,int _nseed);
-+/**
-+ * isaac_next_uint32 - Return the next random 32-bit value.
-+ * @_ctx: The ISAAC instance to generate the value with.
-+ */
-+uint32_t isaac_next_uint32(isaac_ctx *_ctx);
-+/**
-+ * isaac_next_uint - Uniform random integer less than the given value.
-+ * @_ctx: The ISAAC instance to generate the value with.
-+ * @_n:   The upper bound on the range of numbers returned (not inclusive).
-+ *        This must be greater than zero and less than 2**32.
-+ *        To return integers in the full range 0...2**32-1, use
-+ *         isaac_next_uint32() instead.
-+ * Return: An integer uniformly distributed between 0 and _n-1 (inclusive).
-+ */
-+uint32_t isaac_next_uint(isaac_ctx *_ctx,uint32_t _n);
-+
-+#endif
++[tlbflush-code::page_self]
++file = tlbflush-code.flat
++smp = $(($MAX_SMP>4?4:$MAX_SMP))
++extra_params = -append 'page self'
++groups = tlbflush
 -- 
 2.10.1
