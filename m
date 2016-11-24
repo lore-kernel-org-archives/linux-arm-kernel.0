@@ -1,61 +1,55 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 24 Nov 2016 08:08:29 +0200
-Subject: [GIT PULL 3/3] arm64: dts: exynos: DT for v4.10, second round
-In-Reply-To: <1479967709-6619-1-git-send-email-krzk@kernel.org>
-References: <1479967709-6619-1-git-send-email-krzk@kernel.org>
-Message-ID: <1479967709-6619-4-git-send-email-krzk@kernel.org>
+From: myungjoo.ham@samsung.com (=?UTF-8?B?TXl1bmdKb28gSGFt?=)
+Date: Thu, 24 Nov 2016 06:14:16 +0000
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2MSAmIHY2IDEvMl0gUE0vZGV2ZnJlcTog?=
+ =?UTF-8?B?YWRkIHN1c3BlbmQgZnJlcXVlbmN5IHN1cHBvcnQ=?=
+References: <CGME20161124061416epcms1p44a0152bca14312f1229cab835ea0297f@epcms1p4>
+Message-ID: <20161124061416epcms1p44a0152bca14312f1229cab835ea0297f@epcms1p4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Nov 24, 2016 at 11:18 AM, hl <hl@rock-chips.com> wrote:
+> Hi MyungJoo Ham,
+[]
+>>
+>> We still need to sync the all status even i call target() in
+>> devfreq_suspend/resume_device
+>> directly, so still need update_devfreq() other setp except
+>> devfreq->governor->get_target_freq(devfreq, &freq);
+>
+> And i think it better to be governor behaviors, for userspace they may not
+> want to change
+> the suspend frequency like other governor, the frequency should decide by
+> the user, if they
+> want this function, they should like other governor to rigister a
+> devfreq_monitor_suspend().
 
-On top of previous pull/tag.
 
-Best regards,
-Krzysztof
+> What do you think about my rev6 patch?
+
+If I understand the intention correctly, this is for the stability of
+the device due to the behavior or bootloader/SoC-initializer, which
+has nothing to do with governors.
+
+Even if users are using userspace, as long as they set the custom
+frequencies lower than the default, they have the possibility of
+being unstable as ondemand is going to have.
 
 
-The following changes since commit 8ac46fc57df82efbc19194dddd335b6c7a960c31:
+To reuse the update_devfreq() code, you may do something like:
 
-  arm64: dts: exynos: Add dts file for Exynos5433-based TM2E board (2016-11-03 22:19:57 +0200)
+static int _update_freq(struct devfreq *devfreq, bool is_suspending)
+{
+    /* original contents of update_freq with if statement with is_suspending wrapping get_target_freq */
+}
+int update_freq(struct devfreq *devfreq)
+{
+	return _update_freq(devfreq, false);
+}
 
-are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.10-2
+There should be other good non-invasive methods that are not governoe-specific as well.
 
-for you to fetch changes up to 2a4c744fcb1549023478e4b9e724d268d8202158:
 
-  arm64: dts: exynos: Enable HS400 mode for eMMC for TM2 (2016-11-23 19:27:56 +0200)
 
-----------------------------------------------------------------
-Samsung DeviceTree arm64 second update for v4.10:
-1. Add Performance Monitor Unit to Exynos7.
-2. Add MFC, JPEG and Gscaler to Exynos5433 based TM2 board.
-3. Cleanups and fixes for recently added TM2 and TM2E boards.
-
-----------------------------------------------------------------
-Alim Akhtar (1):
-      arm64: dts: Add ARM PMU node for exynos7
-
-Jaehoon Chung (2):
-      arm64: dts: exynos: Add the mshc_2 node for supporting T-Flash
-      arm64: dts: exynos: Enable HS400 mode for eMMC for TM2
-
-Marek Szyprowski (8):
-      arm64: dts: exynos: Fix IRQ type flags for Exynos5433 SoC
-      arm64: dts: exynos: Fix FSYS CMU parent clocks in Exynos5433 SoC
-      arm64: dts: exynos: Add missing parent clocks to audio block in Exynos5433 SoC
-      arm64: dts: exynos: Move FSYS CMU configuration from Exynos5433 dtsi to TM2 dts
-      arm64: dts: exynos: TM2 - remove unused UART3 and set clocks directly on CMU
-      arm64: dts: exynos: TM2 - add support for GScaler devices
-      arm64: dts: exynos: TM2 - add support for JPEG codec device
-      arm64: dts: exynos: TM2 - add support for MFC video codec device
-
-Sylwester Nawrocki (1):
-      arm64: dts: exynos: Assign parent clock of the clkout clock for TM2 board
-
- arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi |  22 +-
- arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      |  85 +++++-
- arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 286 ++++++++++++++-------
- arch/arm64/boot/dts/exynos/exynos7.dtsi            |  18 +-
- 4 files changed, 306 insertions(+), 105 deletions(-)
+Cheers,
+MyungJoo
