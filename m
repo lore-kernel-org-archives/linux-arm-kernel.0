@@ -1,79 +1,41 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 24 Nov 2016 16:01:35 +0100
-Subject: [PATCH net-next 1/4] net: mvneta: Convert to be 64 bits compatible
-In-Reply-To: <21520380.oWTKcrq8DS@wuerfel> (Arnd Bergmann's message of "Thu,
- 24 Nov 2016 10:00:36 +0100")
-References: <20161122164844.19566-1-gregory.clement@free-electrons.com>
- <CAPv3WKf0a63qQT+xwXfUatbgLFF58e6L8J10VtBOUTam+kUcjg@mail.gmail.com>
- <20161124163327.1cc261ab@xhacker> <21520380.oWTKcrq8DS@wuerfel>
-Message-ID: <8760ncly5s.fsf@free-electrons.com>
+From: ahaslam@baylibre.com (Axel Haslam)
+Date: Thu, 24 Nov 2016 16:04:51 +0100
+Subject: [PATCH v2 0/3] ARM: davinci: use gpio descriptors for mmc pins
+Message-ID: <20161124150454.23899-1-ahaslam@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
- 
- On jeu., nov. 24 2016, Arnd Bergmann <arnd@arndb.de> wrote:
+For the boards that use gpios managed by the davinci gpio driver,
+we can use gpio descriptors to control the the mmc pins.
 
-> On Thursday, November 24, 2016 4:37:36 PM CET Jisheng Zhang wrote:
->> solB (a SW shadow cookie) perhaps gives a better performance: in hot path,
->> such as mvneta_rx(), the driver accesses buf_cookie and buf_phys_addr of
->> rx_desc which is allocated by dma_alloc_coherent, it's noncacheable if the
->> device isn't cache-coherent. I didn't measure the performance difference,
->> because in fact we take solA as well internally. From your experience,
->> can the performance gain deserve the complex code?
->
-> Yes, a read from uncached memory is fairly slow, so if you have a chance
-> to avoid that it will probably help. When adding complexity to the code,
-> it probably makes sense to take a runtime profile anyway quantify how
-> much it gains.
->
-> On machines that have cache-coherent DMA, accessing the descriptor
-> should be fine, as you already have to load the entire cache line
-> to read the status field.
->
-> Looking at this snippet:
->
->                 rx_status = rx_desc->status;
->                 rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
->                 data = (unsigned char *)rx_desc->buf_cookie;
->                 phys_addr = rx_desc->buf_phys_addr;
->                 pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc);
->                 bm_pool = &pp->bm_priv->bm_pools[pool_id];
->
->                 if (!mvneta_rxq_desc_is_first_last(rx_status) ||
->                     (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
-> err_drop_frame_ret_pool:
->                         /* Return the buffer to the pool */
->                         mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
->                                               rx_desc->buf_phys_addr);
-> err_drop_frame:
->
->
-> I think there is more room for optimizing if you start: you read
-> the status field twice (the second one in MVNETA_RX_GET_BM_POOL_ID)
-> and you can cache the buf_phys_addr along with the virtual address
-> once you add that.
+This will let the mmc driver register an interrupt for the
+card detect pin, and also allows us to remove the dependency
+on platform callbacks for these boards.
 
-I agree we can optimize this code but it is not related to the 64 bits
-conversion. Indeed this part is running when we use the HW buffer
-management, however currently this part is not ready at all for 64
-bits. The virtual address is directly handled by the hardware but it has
-only 32 bits to store it in the cookie. So if we want to use the HWBM in
-64 bits we need to redesign the code, (maybe by storing the virtual
-address in a array and pass the index in the cookie).
+For boards using a CPLD or an MSP the conversion is not yet done,
+and they still rely on the platform callbacks and polling.
+More work is needed to be able to manage those pins with gpio
+descriptors. Once that is done, we would be able to remove
+completely platform callbacks.
 
-Gregory
+Changes v1->v2
+*Convert da850-evm and da830-evm
+*keep hack board pins as they are not compatible with lcdk (Sekhar)
 
->
-> Generally speaking, I'd recommend using READ_ONCE()/WRITE_ONCE()
-> to access the descriptor fields, to ensure the compiler doesn't
-> add extra references as well as to annotate the expensive
-> operations.
->
-> 	Arnd
+Dependency:
+This patch depends on a mmc driver patch currently in linux-next.
+MMC: davinci: fix card detect and write protect
+https://lkml.org/lkml/2016/11/15/592
+
+Axel Haslam (3):
+  ARM: davinci: hawk: use gpio descriptor for card detect
+  ARM: davinci: da850-evm: use gpio descriptor for mmc pins
+  ARM: davinci: da830-evm: use gpio descriptor for mmc pins
+
+ arch/arm/mach-davinci/board-da830-evm.c     | 41 ++++++++--------------------
+ arch/arm/mach-davinci/board-da850-evm.c     | 35 +++++++-----------------
+ arch/arm/mach-davinci/board-omapl138-hawk.c | 42 ++++++++---------------------
+ 3 files changed, 32 insertions(+), 86 deletions(-)
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.9.3
