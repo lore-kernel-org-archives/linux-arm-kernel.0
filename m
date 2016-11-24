@@ -1,7 +1,9 @@
 From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Fri, 25 Nov 2016 00:16:38 +0100
-Subject: [PATCH] ARM: dts: imx6qdl-ntirogen6x: remove duplicate iomux entry
-Message-ID: <20161124231638.12840-1-gary.bisson@boundarydevices.com>
+Date: Fri, 25 Nov 2016 00:42:47 +0100
+Subject: [PATCH v2] ARM: dts: imx6qdl-nitrogen6x: remove duplicate iomux entry
+In-Reply-To: <20161124231638.12840-1-gary.bisson@boundarydevices.com>
+References: <20161124231638.12840-1-gary.bisson@boundarydevices.com>
+Message-ID: <20161124234247.18397-1-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,6 +17,14 @@ imx6q-pinctrl 20e0000.iomuxc: could not request pin 187
 (MX6Q_PAD_NANDF_CS2) from group usdhc2grp on device 20e0000.iomuxc
 
 Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+---
+Hi all,
+
+Changelog v1->v2:
+- fix typo in patch title
+
+Regards,
+Gary
 ---
  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 1 -
  1 file changed, 1 deletion(-)
