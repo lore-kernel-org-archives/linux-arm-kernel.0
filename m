@@ -1,76 +1,114 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 24 Nov 2016 11:49:14 +0530
-Subject: [PATCH 1/2] ARM: omap2: am437x: rollback to use
- omap3_gptimer_timer_init()
-Message-ID: <1479968355-18860-1-git-send-email-j-keerthy@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 24 Nov 2016 07:41:37 +0100
+Subject: [PATCH 1/4] serial: core: Add LED trigger support
+In-Reply-To: <20161123171302.GD19856@linaro.org>
+References: <20161123100106.15969-1-s.hauer@pengutronix.de>
+ <20161123100106.15969-2-s.hauer@pengutronix.de>
+ <20161123171302.GD19856@linaro.org>
+Message-ID: <20161124064137.l3i3p3brbyz74cd5@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grygorii Strashko <grygorii.strashko@ti.com>
+On Wed, Nov 23, 2016 at 10:13:02AM -0700, Mathieu Poirier wrote:
+> On Wed, Nov 23, 2016 at 11:01:03AM +0100, Sascha Hauer wrote:
+> > With this patch the serial core provides LED triggers for RX and TX.
+> > 
+> > As the serial core layer does not know when the hardware actually sends
+> > or receives characters, this needs help from the UART drivers. The
+> > LED triggers are registered in uart_add_led_triggers() called from
+> > the UART drivers which want to support LED triggers. All the driver
+> > has to do then is to call uart_led_trigger_[tx|rx] to indicate
+> > activite.
+> 
+> Hello Sascha,
+> 
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  drivers/tty/serial/serial_core.c | 73 ++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/serial_core.h      | 10 ++++++
+> >  2 files changed, 83 insertions(+)
+> > 
+> > diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
+> > index f2303f3..3e8afb7 100644
+> > --- a/drivers/tty/serial/serial_core.c
+> > +++ b/drivers/tty/serial/serial_core.c
+> > @@ -34,6 +34,7 @@
+> >  #include <linux/serial_core.h>
+> >  #include <linux/delay.h>
+> >  #include <linux/mutex.h>
+> > +#include <linux/leds.h>
+> >  
+> >  #include <asm/irq.h>
+> >  #include <asm/uaccess.h>
+> > @@ -2703,6 +2704,77 @@ static const struct attribute_group tty_dev_attr_group = {
+> >  	.attrs = tty_dev_attrs,
+> >  	};
+> >  
+> > +void uart_led_trigger_tx(struct uart_port *uport)
+> > +{
+> > +	unsigned long delay = 50;
+> > +
+> > +	led_trigger_blink_oneshot(uport->led_trigger_tx, &delay, &delay, 0);
+> > +}
+> > +
+> > +void uart_led_trigger_rx(struct uart_port *uport)
+> > +{
+> > +	unsigned long delay = 50;
+> > +
+> > +	led_trigger_blink_oneshot(uport->led_trigger_rx, &delay, &delay, 0);
+> 
+> For both rx/tx the core constrains the delay_on/off along with the inversion.
+> Instead of adding the led_trigger_rx/tx and led_trigger_rx/tx_name to the 
+> struct uart_port, wouldn't it be better to add a new struct led_trigger that
+> would encapsulate those along wit the on/off delay and the inversion?
+> 
+> That way those values could be communicated to the core at registration time
+> instead of hard-coding things.
 
-The commit 55ee7017ee31 ("arm: omap2: board-generic: use
-omap4_local_timer_init for AM437x") unintentionally changes the
-clocksource devices for AM437x from OMAP GP Timer to SyncTimer32K.
+Not sure this goes into the right direction. Looking at the other
+callers of led_trigger_blink_oneshot() most of them use an arbitrary
+blink time of 30 or 50ms and the users seem to be happy with it. There
+doesn't seem to be the desire to make that value configurable. If we
+want to make it configurable, it's probably better to move the option
+to the led device rather than putting the burden on every user of the
+led triggers.
 
-Unfortunately, the SyncTimer32K is starving from frequency deviation
-as mentioned in commit 5b5c01359152 ("ARM: OMAP2+: AM43x: Use gptimer
-as clocksource") and, as reported by Franklin [1], even its monotonic
-nature is under question (most probably there is a HW issue, but it's
-still under investigation).
+I don't think the inversion flag is meant for being configurable. It's
+rather used for the default state of the LED. The CAN layer for example
+turns the LED on when the interface is up and then blinks (turns off and
+on again) on activity. For this it uses the inversion flag.
 
-Taking into account above facts It's reasonable to rollback to the use
-of omap3_gptimer_timer_init().
+>  
+> > +}
+> > +
+> > +/**
+> > + *	uart_add_led_triggers - register LED triggers for a UART
+> > + *	@drv: pointer to the uart low level driver structure for this port
+> > + *	@uport: uart port structure to use for this port.
+> > + *
+> > + *	Called by the driver to register LED triggers for a UART. It's the
+> > + *	drivers responsibility to call uart_led_trigger_rx/tx on received
+> > + *	and transmitted chars then.
+> > + */
+> > +int uart_add_led_triggers(struct uart_driver *drv, struct uart_port *uport)
+> > +{
+> > +	int ret;
+> > +
+> > +	if (!IS_ENABLED(CONFIG_LEDS_TRIGGERS))
+> > +		return 0;
+> 
+> Since this is a public interface, checking for valid led_trigger_tx/rx before
+> moving on with the rest of the initialisation is probably a good idea.
 
-[1] http://www.spinics.net/lists/linux-omap/msg127425.html
-Reported-by: Cooper Jr., Franklin <fcooper@ti.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-Signed-off-by: Keerthy <j-keerthy@ti.com>
----
- arch/arm/mach-omap2/board-generic.c | 2 +-
- arch/arm/mach-omap2/timer.c         | 9 +++++----
- 2 files changed, 6 insertions(+), 5 deletions(-)
+What do you mean? Should we return an error when CONFIG_LEDS_TRIGGERS is
+disabled?
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 36d9943..dc9e34e 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -304,7 +304,7 @@ static void __init rx51_reserve(void)
- 	.init_late	= am43xx_init_late,
- 	.init_irq	= omap_gic_of_init,
- 	.init_machine	= omap_generic_init,
--	.init_time	= omap4_local_timer_init,
-+	.init_time	= omap3_gptimer_timer_init,
- 	.dt_compat	= am43_boards_compat,
- 	.restart	= omap44xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 5e2e221..b2f2448 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -510,18 +510,19 @@ void __init omap3_secure_sync32k_timer_init(void)
- }
- #endif /* CONFIG_ARCH_OMAP3 */
- 
--#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
-+#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX) || \
-+	defined(CONFIG_SOC_AM43XX)
- void __init omap3_gptimer_timer_init(void)
- {
- 	__omap_sync32k_timer_init(2, "timer_sys_ck", NULL,
- 			1, "timer_sys_ck", "ti,timer-alwon", true);
--
--	clocksource_probe();
-+	if (of_have_populated_dt())
-+		clocksource_probe();
- }
- #endif
- 
- #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) ||		\
--	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM43XX)
-+	defined(CONFIG_SOC_DRA7XX)
- static void __init omap4_sync32k_timer_init(void)
- {
- 	__omap_sync32k_timer_init(1, "timer_32k_ck", "ti,timer-alwon",
+Sascha
+
+
 -- 
-1.9.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
