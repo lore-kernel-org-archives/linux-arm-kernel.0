@@ -1,116 +1,110 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 24 Nov 2016 10:33:46 +0530
-Subject: [PATCH v2] ARM: dts: da850: add the mstpri and ddrctl nodes
-In-Reply-To: <f88df859-3c0f-38f2-275d-ce6a9996fb6e@lechnology.com>
-References: <1479207611-18028-1-git-send-email-bgolaszewski@baylibre.com>
- <a39b9276-865b-6382-574e-a5ef040a452f@lechnology.com>
- <CAMpxmJVqog0Fno_DO0NQKmVNvzu5d=3GOLk145wBmB-V70BLeg@mail.gmail.com>
- <5e647eb0-2f8a-b46b-2048-7616bfb54ad7@lechnology.com>
- <m2bmx5x1y2.fsf@baylibre.com>
- <f88df859-3c0f-38f2-275d-ce6a9996fb6e@lechnology.com>
-Message-ID: <20fbc946-d56c-31a3-4ae7-cf61df96a3c3@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 24 Nov 2016 13:04:40 +0800
+Subject: [PATCH v4 3/3] dmaengine: sun6i: share the dma driver with sun50i
+In-Reply-To: <1479638740-20520-4-git-send-email-hao5781286@gmail.com>
+References: <1479638740-20520-1-git-send-email-hao5781286@gmail.com>
+ <1479638740-20520-4-git-send-email-hao5781286@gmail.com>
+Message-ID: <CAGb2v65trUUAr4SNCkwYANG7d3s2d4cu7nkqOeDcg6z4zkZNWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 24 November 2016 04:18 AM, David Lechner wrote:
-> On 11/23/2016 04:32 PM, Kevin Hilman wrote:
->> David Lechner <david@lechnology.com> writes:
->>
->>> On 11/23/2016 04:27 AM, Bartosz Golaszewski wrote:
->>>> 2016-11-22 23:23 GMT+01:00 David Lechner <david@lechnology.com>:
->>>>> On 11/15/2016 05:00 AM, Bartosz Golaszewski wrote:
->>>>>>
->>>>>> Add the nodes for the MSTPRI configuration and DDR2/mDDR memory
->>>>>> controller drivers to da850.dtsi.
->>>>>>
->>>>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>>>> ---
->>>>>> v1 -> v2:
->>>>>> - moved the priority controller node above the cfgchip node
->>>>>> - renamed added nodes to better reflect their purpose
->>>>>>
->>>>>>  arch/arm/boot/dts/da850.dtsi | 8 ++++++++
->>>>>>  1 file changed, 8 insertions(+)
->>>>>>
->>>>>> diff --git a/arch/arm/boot/dts/da850.dtsi
->>>>>> b/arch/arm/boot/dts/da850.dtsi
->>>>>> index 1bb1f6d..412eec6 100644
->>>>>> --- a/arch/arm/boot/dts/da850.dtsi
->>>>>> +++ b/arch/arm/boot/dts/da850.dtsi
->>>>>> @@ -210,6 +210,10 @@
->>>>>>                         };
->>>>>>
->>>>>>                 };
->>>>>> +               prictrl: priority-controller at 14110 {
->>>>>> +                       compatible = "ti,da850-mstpri";
->>>>>> +                       reg = <0x14110 0x0c>;
->>>>>
->>>>>
->>>>> I think we should add status = "disabled"; here and let boards opt in.
->>>>>
->>>>>> +               };
->>>>>>                 cfgchip: chip-controller at 1417c {
->>>>>>                         compatible = "ti,da830-cfgchip", "syscon",
->>>>>> "simple-mfd";
->>>>>>                         reg = <0x1417c 0x14>;
->>>>>> @@ -451,4 +455,8 @@
->>>>>>                           1 0 0x68000000 0x00008000>;
->>>>>>                 status = "disabled";
->>>>>>         };
->>>>>> +       memctrl: memory-controller at b0000000 {
->>>>>> +               compatible = "ti,da850-ddr-controller";
->>>>>> +               reg = <0xb0000000 0xe8>;
->>>>>
->>>>>
->>>>> same here. status = "disabled";
->>>>>
->>>>>> +       };
->>>>>>  };
->>>>>>
->>>>
->>>> Hi David,
->>>>
->>>> I did that initially[1][2] and it was rejected by Kevin[3] and
->>>> Laurent[4].
->>>>
->>>> FYI this patch has already been queued by Sekhar.
->>>
->>> Thanks. I did not see those threads.
->>>
->>> FYI to maintainers, having these enabled by default causes error
->>> messages in the kernel log for other boards that are not supported by
->>> the drivers.
->>
->> Then the driver is too noisy and should be cleaned up.
->>
->>> Since there is only one board that is supported and soon
->>> to be 2 that are not, I would rather have this disabled by default to
->>> avoid the error messages.
->>
->> IMO, what exactly are the error messages? Sounds like the driver is
->> being too verbose, and calling things errors that are not really errors.
-> 
-> It is just one line per driver.
-> 
->     dev_err(dev, "no master priorities defined for this board\n");
-> 
-> and
-> 
->     dev_err(dev, "no settings defined for this board\n");
-> 
-> 
-> Since "ti,da850-lcdk" is the only board supported in these drivers, all
-> other boards will see these error messages.
+Hi,
 
-Thats pretty bad. Sorry about that. The original justification for
-keeping them enabled all the time was that they are in-SoC modules with
-no external dependencies (like IO lines or voltage rails) so they can be
-enabled on all boards that use DA850. While that remains true, the
-configuration itself is board specific.
+On Sun, Nov 20, 2016 at 6:45 PM, Hao Zhang <hao5781286@gmail.com> wrote:
+> Changes the limited buswith to 8 bytes,and add
+> the test in sun6i_dma_config function
+>
+> Accroding to sun6i dma driver, i think ,if the client
+> doesn't configure the address width with dmaengine_slave_config
+> function, it would use the default width. So we can add the test
+> in sun6i_dma_config function called by dmaengine_slave_config,
+> and test the configuration whether is support for the device.
+>
 
-I think the error messages are still useful, so instead of silencing
-them, I think we should go back to keeping these nodes disabled by
-default and enabling only on boards which have support for it in the driver.
+One thing people haven't really noticed is that starting with
+A80, A83T, H3, the DMA channel configuration registers have
+been slightly changed when compared to A31/A23/A33. The DMA
+burst length field offset was changed by 1.
 
-Thanks,
-Sekhar
+We need to fix this.
+
+ChenYu
+
+> Signed-off-by: Hao Zhang <hao5781286@gmail.com>
+> ---
+>  drivers/dma/sun6i-dma.c | 33 ++++++++++++++++++++++++++++++++-
+>  1 file changed, 32 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+> index a235878..f7c90b6 100644
+> --- a/drivers/dma/sun6i-dma.c
+> +++ b/drivers/dma/sun6i-dma.c
+> @@ -250,7 +250,7 @@ static inline s8 convert_burst(u32 maxburst)
+>  static inline s8 convert_buswidth(enum dma_slave_buswidth addr_width)
+>  {
+>         if ((addr_width < DMA_SLAVE_BUSWIDTH_1_BYTE) ||
+> -           (addr_width > DMA_SLAVE_BUSWIDTH_4_BYTES))
+> +           (addr_width > DMA_SLAVE_BUSWIDTH_8_BYTES))
+>                 return -EINVAL;
+>
+>         return addr_width >> 1;
+> @@ -758,6 +758,18 @@ static int sun6i_dma_config(struct dma_chan *chan,
+>  {
+>         struct sun6i_vchan *vchan = to_sun6i_vchan(chan);
+>
+> +       if ((BIT(config->src_addr_width) | chan->device->src_addr_widths) !=
+> +               chan->device->src_addr_widths) {
+> +               dev_err(chan2dev(chan), "Invalid DMA configuration\n");
+> +               return -EINVAL;
+> +       }
+> +
+> +       if ((BIT(config->dst_addr_width) | chan->device->dst_addr_widths) !=
+> +                       chan->device->dst_addr_widths) {
+> +               dev_err(chan2dev(chan), "Invalid DMA configuration\n");
+> +               return -EINVAL;
+> +       }
+> +
+>         memcpy(&vchan->cfg, config, sizeof(*config));
+>
+>         return 0;
+> @@ -1028,11 +1040,23 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
+>         .nr_max_vchans   = 34,
+>  };
+>
+> +/*
+> + * The A64 has 8 physical channels, a maximum DRQ port id of 27,
+> + * and a total of 38 usable source and destination endpoints.
+> + */
+> +
+> +static struct sun6i_dma_config sun50i_a64_dma_cfg = {
+> +       .nr_max_channels = 8,
+> +       .nr_max_requests = 27,
+> +       .nr_max_vchans   = 38,
+> +};
+> +
+>  static const struct of_device_id sun6i_dma_match[] = {
+>         { .compatible = "allwinner,sun6i-a31-dma", .data = &sun6i_a31_dma_cfg },
+>         { .compatible = "allwinner,sun8i-a23-dma", .data = &sun8i_a23_dma_cfg },
+>         { .compatible = "allwinner,sun8i-a83t-dma", .data = &sun8i_a83t_dma_cfg },
+>         { .compatible = "allwinner,sun8i-h3-dma", .data = &sun8i_h3_dma_cfg },
+> +       { .compatible = "allwinner,sun50i-a64-dma", .data = &sun50i_a64_dma_cfg },
+>         { /* sentinel */ }
+>  };
+>  MODULE_DEVICE_TABLE(of, sun6i_dma_match);
+> @@ -1112,6 +1136,13 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+>                                                   BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
+>         sdc->slave.directions                   = BIT(DMA_DEV_TO_MEM) |
+>                                                   BIT(DMA_MEM_TO_DEV);
+> +
+> +       if (of_device_is_compatible(pdev->dev.of_node,
+> +                                   "allwinner,sun50i-a64-dma")) {
+> +               sdc->slave.src_addr_widths      |= BIT(DMA_SLAVE_BUSWIDTH_8_BYTES);
+> +               sdc->slave.dst_addr_widths      |= BIT(DMA_SLAVE_BUSWIDTH_8_BYTES);
+> +       }
+> +
+>         sdc->slave.residue_granularity          = DMA_RESIDUE_GRANULARITY_BURST;
+>         sdc->slave.dev = &pdev->dev;
+>
+> --
+> 2.7.4
+>
