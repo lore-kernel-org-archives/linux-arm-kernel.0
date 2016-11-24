@@ -1,70 +1,35 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Fri, 25 Nov 2016 01:12:16 +0300
-Subject: [PATCH] dt-bindings: document how to setup rockchip timers as
- clocksource
-Message-ID: <1480025536-6837-1-git-send-email-al.kochet@gmail.com>
+From: gary.bisson@boundarydevices.com (Gary Bisson)
+Date: Fri, 25 Nov 2016 00:16:38 +0100
+Subject: [PATCH] ARM: dts: imx6qdl-ntirogen6x: remove duplicate iomux entry
+Message-ID: <20161124231638.12840-1-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch describes how to setup rockchip timers in device tree
-so they can be used as clocksource.
+The NANDF_CS2 pad is also part of the wlan-vmmcgrp iomux group.
 
-I'm going to implement this feature.
+Removing is from the usdhc2grp group avoids the following error:
+imx6q-pinctrl 20e0000.iomuxc: pin MX6Q_PAD_NANDF_CS2 already requested
+by regulators:regulator at 4; cannot claim for 2194000.usdhc
+imx6q-pinctrl 20e0000.iomuxc: pin-187 (2194000.usdhc) status -22
+imx6q-pinctrl 20e0000.iomuxc: could not request pin 187
+(MX6Q_PAD_NANDF_CS2) from group usdhc2grp on device 20e0000.iomuxc
 
-Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
 ---
- .../bindings/timer/rockchip,rk-timer.txt           |   35 +++++++++++++++++++-
- 1 file changed, 34 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
-index 7bc9691..15f8fed 100644
---- a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
-@@ -16,7 +16,18 @@ Required properties:
- - clock-names : must include the following entries:
-   "timer", "pclk"
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+index e476d01..26d0604 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+@@ -533,7 +533,6 @@
+ 				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17071
+ 				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17071
+ 				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17071
+-				MX6QDL_PAD_NANDF_CS2__GPIO6_IO15	0x000b0
+ 			>;
+ 		};
  
--Example:
-+Note:
-+If device tree contain only one timer, than the timer will be intialized
-+as clockevent provider. If device tree contain two timers, than first timer
-+will be initialized as clockevent provider and second one as clocksource.
-+
-+If you want to bind specific timer as clockevent (i.e. one from alive subsystem)
-+and specific timer as clocksource, you can number the timers in "aliases" node.
-+
-+If device tree contain only one timer and the timer is named as timer1 in
-+"aliases" node, then the timer will be initialized as clocksource.
-+
-+Example (clockevent only):
- 	timer: timer at ff810000 {
- 		compatible = "rockchip,rk3288-timer";
- 		reg = <0xff810000 0x20>;
-@@ -24,3 +35,25 @@ Example:
- 		clocks = <&xin24m>, <&cru PCLK_TIMER>;
- 		clock-names = "timer", "pclk";
- 	};
-+
-+Example (clockevent and clocksource with explicit numbering):
-+	aliases {
-+		timer0 = &timer6;
-+		timer1 = &timer5;
-+	};
-+
-+	timer5: timer at 20038080 {
-+		compatible = "rockchip,rk3188-timer", "rockchip,rk3288-timer";
-+		reg = <0x20038080 0x20>;
-+		interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_TIMER5>, <&cru PCLK_TIMER0>;
-+		clock-names = "timer", "pclk";
-+	};
-+
-+	timer6: timer at 200380A0 {
-+		compatible = ""rockchip,rk3188-timer", rockchip,rk3288-timer";
-+		reg = <0x200380A0 0x20>;
-+		interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_TIMER6>, <&cru PCLK_TIMER0>;
-+		clock-names = "timer", "pclk";
-+	};
 -- 
-1.7.9.5
+2.9.3
