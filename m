@@ -1,82 +1,49 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 24 Nov 2016 17:41:36 +0000
-Subject: [RFC PATCH 06/11] ARM: tlbflush: drop dependency on CONFIG_SMP
-In-Reply-To: <583449F9.6060804@arm.com>
+From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
+Date: Thu, 24 Nov 2016 23:37:51 +0530
+Subject: [RFC PATCH 11/11] ARM: Allow ARCH_MULTIPLATFORM to be selected
+ for NOMMU
+In-Reply-To: <20161124173532.GH14217@n2100.armlinux.org.uk>
 References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
- <1479806768-39911-7-git-send-email-vladimir.murzin@arm.com>
- <20161122100345.GV1041@n2100.armlinux.org.uk> <583449F9.6060804@arm.com>
-Message-ID: <58372650.30405@arm.com>
+ <1479806768-39911-12-git-send-email-vladimir.murzin@arm.com>
+ <16587553.f9R1mxJih5@wuerfel> <583478FB.4020008@arm.com>
+ <20161123154829.GA2489@afzalpc>
+ <20161123191621.GD14217@n2100.armlinux.org.uk>
+ <20161124172535.GA3524@afzalpc>
+ <20161124173532.GH14217@n2100.armlinux.org.uk>
+Message-ID: <20161124180751.GA5258@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/11/16 13:36, Vladimir Murzin wrote:
-> On 22/11/16 10:03, Russell King - ARM Linux wrote:
->> On Tue, Nov 22, 2016 at 09:26:03AM +0000, Vladimir Murzin wrote:
->>> It can be referenced in UP case as well.
->>
->> What's missing is an explanation of why you want this change.
->> Exposing the local_* stuff doesn't make sense for UP.
-> 
-> It comes from:
-> 
-> arch/arm/mach-mvebu/pmsu.c: In function 'armada_370_xp_pmsu_idle_enter':
-> arch/arm/mach-mvebu/pmsu.c:291:2: error: implicit declaration of function 'local_flush_tlb_all' [-Werror=implicit-function-declaration]
->   local_flush_tlb_all();
->   ^
-> 
-> make[1]: *** [arch/arm/mach-mvebu/pmsu.o] Error 1
-> 
-> and
-> 
-> arch/arm/mach-imx/pm-imx5.c: In function 'mx5_suspend_enter':
-> arch/arm/mach-imx/pm-imx5.c:227:3: error: implicit declaration of function 'local_flush_tlb_all' [-Werror=implicit-function-declaration]
-> 
->    local_flush_tlb_all();
->    ^
-> cc1: some warnings being treated as errors
-> make[1]: *** [arch/arm/mach-imx/pm-imx5.o] Error 1
-> 
-> Maybe there are other users, please, let me know if you want me to count them
-> all.
+Hi,
 
-Russell, is it a good argument to expose the local_* stuff or it should be
-addressed differently?
+On Thu, Nov 24, 2016 at 05:35:32PM +0000, Russell King - ARM Linux wrote:
 
-Thanks
-Vladimir
+> Right, so Freescale's iMX6, RAM starts at 0x10000000, so when building
+> for noMMU, you need to specify DRAM_START as 0x10000000 and DRAM_SIZE
+> to be the appropriate size of RAM.
 
-> 
-> Cheers
-> Vladimir
-> 
->>
->>> Cc: Russell King <linux@armlinux.org.uk>
->>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->>> ---
->>>  arch/arm/include/asm/tlbflush.h |    2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
->>> index def9e57..d9a6e2e 100644
->>> --- a/arch/arm/include/asm/tlbflush.h
->>> +++ b/arch/arm/include/asm/tlbflush.h
->>> @@ -641,7 +641,7 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
->>>  
->>>  #endif
->>>  
->>> -#elif defined(CONFIG_SMP)	/* !CONFIG_MMU */
->>> +#else /* !CONFIG_MMU */
->>>  
->>>  #ifndef __ASSEMBLY__
->>>  
->>> -- 
->>> 1.7.9.5
->>>
->>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Hmm.., i had thought that Vybrid's memory mappings starts from
+0x80000000 (same TI Sitara's), just rechecked the older boot logs of
+Vybrid & Data manual, it seems it is @0x80000000, probably iMX6 has a
+different map.
+
+> Also note that Cortex-A class CPUs don't perform well with the MMU
+> off, because you can't enable the data cache - and you must have the
+> data cache enabled for SMP to be functional, and it's also required
+> for exclusives to work.
+
+Yes, was aware of the performance degradation due to disabled dcache.
+
+Here the platforms at my disposal are all single core - vf610, am335x
+& am437x (though strictly speaking 2 of them are ARM SMP
+configurations, but with number of cores as 1). Seems at least from
+SMP pov, not expecting issues as they are single core (SMP disabled
+kernel with MMU enabled works on those)
+
+> There's also some cases where "Device, non-shared" must be used to
+> access some devices, which can only be done with the MMU enabled.
+
+Thanks for your valuable feedbacks.
+
+Regards
+afzal
