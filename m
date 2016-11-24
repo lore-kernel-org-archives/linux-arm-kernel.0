@@ -1,81 +1,66 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Thu, 24 Nov 2016 16:37:05 +0000
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <58370530.5080605@free.fr> (Mason's message of "Thu, 24 Nov 2016
- 16:20:16 +0100")
-References: <58356EA8.2010806@free.fr> <yw1xpolmbdih.fsf@unicorn.mansr.com>
- <58358E79.5050404@free.fr> <yw1xh96yaz84.fsf@unicorn.mansr.com>
- <5836C69A.3030309@free.fr> <yw1xr3619d3l.fsf@unicorn.mansr.com>
- <58370530.5080605@free.fr>
-Message-ID: <yw1xinrcal72.fsf@unicorn.mansr.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 24 Nov 2016 17:41:58 +0100
+Subject: [PATCH 0/3] arm64: dts: r8a7796: Add CAN/CAN FD support
+In-Reply-To: <HK2PR0601MB1329C747CA5C6B5222C02C3FB7B60@HK2PR0601MB1329.apcprd06.prod.outlook.com>
+References: <1479903243-1860-1-git-send-email-chris.paterson2@renesas.com>
+ <f358442c-8373-328c-1270-709498c133f5@pengutronix.de>
+ <20161123142938.GF9057@verge.net.au>
+ <HK2PR0601MB132929329C3574A0B4D9A0EAB7B60@HK2PR0601MB1329.apcprd06.prod.outlook.com>
+ <20161124101733.GA18027@verge.net.au>
+ <HK2PR0601MB1329C747CA5C6B5222C02C3FB7B60@HK2PR0601MB1329.apcprd06.prod.outlook.com>
+Message-ID: <CAMuHMdXO=uFuJCXPjkdYB_CeyfPMqy6cMrOW=s1DZzcJ9Gp33A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+Hi Chris,
 
-> On 24/11/2016 15:17, M?ns Rullg?rd wrote:
+On Thu, Nov 24, 2016 at 3:25 PM, Chris Paterson
+<Chris.Paterson2@renesas.com> wrote:
+> From: Simon Horman [mailto:horms at verge.net.au]
+> Sent: 24 November 2016 10:18
+>> On Thu, Nov 24, 2016 at 10:05:08AM +0000, Chris Paterson wrote:
+>> > From: Simon Horman [mailto:horms at verge.net.au]
+>> > > Regarding the arch/arm64/boot/dts/renesas/ portion, I would like
+>> > > some consideration given to what effect enabling memory above 4Gb
+>> > > (64bit
+>> > > addressing) would have.
+>> >
+>> > Can you give me some guidance here? I'm not sure what you're referring
+>> > to. As far as I know the DT reg definition here is 64-bit, or are you
+>> > referring to DMA usage? If the later, neither CAN driver uses DMA.
+>>
+>> Sorry for not being clearer.
+>>
+>> What I would like to know is if there are any problems in the CAN driver or
+>> hardware that would prevent it from functioning with memory that requires
+>> 64bit addressing present.
+>>
+>> If the CAN hardware cannot use DMA then DMA doesn't need to be taken
+>> into account. But if it DMA could be enabled in future for CAN, for example
+>> after some driver enhancements, then it would be good to know if 64bit
+>> memory can be supported - if not it would imply DMA cannot be enabled.
 >
->> Mason wrote:
->> 
->>> [   35.085854] SETUP DMA
->>> [   35.088272] START NAND TRANSFER
->>> [   35.091670] tangox_dma_pchan_start from tangox_dma_irq
->>> [   35.096882] tango_dma_callback from vchan_complete
->>> [   45.102513] DONE FAKE SPINNING
->>>
->>> So the IRQ rolls in, the ISR calls tangox_dma_pchan_start,
->>> which calls tangox_dma_pchan_detach to tear down the sbox
->>> setup; and only sometime later does the DMA framework call
->>> my callback function.
->> 
->> Yes, I realised this soon after I said it.  The dma driver could be
->> rearranged to make it work though.
+> Thank you for the clarification.
 >
-> There is a way to make the tasklet run and invoke the callback
-> before the interrupt service routine proceeds?
-
-No, but it would be possible to defer the teardown to the tasklet.
-Having said that, I'm not sure it's such a great idea since the tasklet
-could be held up for an arbitrary length of time waiting for the target
-to finish.
-
->>> So far, the work-arounds I've tested are:
->>>
->>> 1) delay sbox tear-down by 10 ?s in tangox_dma_pchan_detach.
->>> 2) statically setup sbox in probe, and never touch it henceforth.
->>>
->>> WA1 is fragile, it might break for devices other than NFC.
->>> WA2 is what I used when I wrote the NFC driver.
->>>
->>> Can tangox_dma_irq() be changed to have the framework call
->>> the client's callback *before* tangox_dma_pchan_start?
->>>
->>> (Thinking out loud) The DMA_PREP_INTERRUPT requests that the
->>> DMA framework invoke the callback from tasklet context,
->>> maybe a different flag DMA_PREP_INTERRUPT_EX can request
->>> calling the call-back directly from within the ISR?
->>>
->>> (Looking at existing flags) Could I use DMA_CTRL_ACK?
->>> Description sounds like some kind hand-shake between
->>> client and dmaengine.
->>>
->>> Grepping for DMA_PREP_INTERRUPT, I don't see where the framework
->>> checks that flag to spawn the tasklet? Or is that up to each
->>> driver individually?
->> 
->> Those flags all have defined meanings and abusing them for other things
->> is a bad idea.  As far as possible, device drivers should work with any
->> dma driver.
+> The CAN interface for r8a7795/6 does not support DMA.
 >
-> I was asking about introducing a new flag, not abusing existing
-> flags. (I don't understand the semantics of DMA_CTRL_ACK.)
+> With CAN FD there is currently a H/W issue that means DMA is unusable.
 
-This needs more than a new flag anyhow.
+Is that issue present on R-Car M3-W, or only on R-Car H3 ES1.x?
 
-> (FWIW, both the NFC and the MBUS agent are custom designs,
-> not third-party IP blocks.)
+> Potentially this issue could be fixed in the future and DMA support could
+> be added to the driver. If this happens I can see no reason why the CAN FD
+> IP wouldn't be able to handle DMA transfers when using 64bit addressing.
 
-Sure, but who knows what will be in the next chip?
+Yep, AFAIK it uses SYS-DMAC, which supports 64-bit addressing.
 
--- 
-M?ns Rullg?rd
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
