@@ -1,48 +1,43 @@
-From: stefan@datenfreihafen.org (Stefan Schmidt)
-Date: Thu, 24 Nov 2016 23:10:09 +0100
-Subject: [PATCH] ARM: pxa: ezx: fix a910 camera data
-In-Reply-To: <20161124162955.3887066-1-arnd@arndb.de>
-References: <20161124162955.3887066-1-arnd@arndb.de>
-Message-ID: <e0bdf159-93f2-5ed7-1e28-7fb80707d6c7@datenfreihafen.org>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Fri, 25 Nov 2016 01:10:55 +0300
+Subject: [PATCH] dt-bindings: clarify compatible field usage for rockchip
+ timers
+Message-ID: <1480025455-6797-1-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+rk3036 dtsi file already use compatible field as
+"rockchip,rk3036-timer", "rockchip,rk3288-timer".
 
-On 24.11.2016 17:29, Arnd Bergmann wrote:
-> The camera_supply_dummy_device definition is shared between a780 and a910,
-> but only provided when the first is enabled and fails to build for a
-> configuration with only a910:
-> 
-> arch/arm/mach-pxa/ezx.c:1097:3: error: 'camera_supply_dummy_device' undeclared here (not in a function)
-> 
-> This moves the definition into its own section.
-> 
-> Fixes: 6c1b417adc8f ("ARM: pxa: ezx: use the new pxa_camera platform_data")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mach-pxa/ezx.c | 56 ++++++++++++++++++++++++++-----------------------
+The patch clearly shows how that filed should be used on other chips.
 
-I wonder what we should do with ezx.c.
+Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+---
+ .../bindings/timer/rockchip,rk-timer.txt           |   12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-As far as I know neither Daniel nor Harald or myself are doing anything
-with this devices anymore. Besides a basic compile test having an ack or
-reviewed by from our side is a bit worthless. :/
-
-I should still have some of these phones around in a box somewhere. If
-there is someone with a good motivation and time to take over on this
-platform we will find a way to get the person this devices.
-
-Any takers? Robert? I guess you are already overloaded but you might
-also have an interest. Worth asking :)
-
-In the case nobody wants to pick up here what would you consider the
-bets way forward? I could send a patch removing ezx platform support
-from the kernel (basically ezx.c plus build support) or I can send a
-patch marking it at least orphan in MAINTAINERS. Let me know what you think.
-
-Daniel, Harald, if one of you is still interested in these and what to
-pick up the work again, please speak up now. :)
-
-regards
-Stefan Schmidt
+diff --git a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
+index a41b184..7bc9691 100644
+--- a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
++++ b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
+@@ -1,9 +1,15 @@
+ Rockchip rk timer
+ 
+ Required properties:
+-- compatible: shall be one of:
+-  "rockchip,rk3288-timer" - for rk3066, rk3036, rk3188, rk322x, rk3288, rk3368
+-  "rockchip,rk3399-timer" - for rk3399
++- compatible: should be:
++  "rockchip,rk3036-timer", "rockchip,rk3288-timer": for Rockchip RK3036
++  "rockchip,rk3066-timer", "rockchip,rk3288-timer": for Rockchip RK3066
++  "rockchip,rk3188-timer", "rockchip,rk3288-timer": for Rockchip RK3188
++  "rockchip,rk322x-timer", "rockchip,rk3288-timer": for Rockchip RK322X
++   (please replace rk322x with exact device name and update this file)
++  "rockchip,rk3288-timer": for Rockchip RK3288
++  "rockchip,rk3368-timer", "rockchip,rk3288-timer": for Rockchip RK3368
++  "rockchip,rk3399-timer": for Rockchip RK3399
+ - reg: base address of the timer register starting with TIMERS CONTROL register
+ - interrupts: should contain the interrupts for Timer0
+ - clocks : must contain an entry for each entry in clock-names
+-- 
+1.7.9.5
