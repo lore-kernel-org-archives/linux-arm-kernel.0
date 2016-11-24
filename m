@@ -1,58 +1,92 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 24 Nov 2016 11:24:47 +0530
-Subject: [PATCH 3/3] ARM: dts: da850: Add node for pullup/pulldown pinconf
-In-Reply-To: <06bc8517-8c33-85a1-9d5a-29042c7281db@lechnology.com>
-References: <1479871767-20160-1-git-send-email-david@lechnology.com>
- <1479871767-20160-4-git-send-email-david@lechnology.com>
- <8c3e6535-4b79-9731-f801-c13f007e48ab@ti.com>
- <06bc8517-8c33-85a1-9d5a-29042c7281db@lechnology.com>
-Message-ID: <263cdd6d-ed04-647e-a4e9-4e3e094e54d9@ti.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 24 Nov 2016 14:57:39 +0900
+Subject: [PATCH v2 1/3] clk: uniphier: remove unneeded member name for union
+Message-ID: <1479967061-25975-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 November 2016 09:54 PM, David Lechner wrote:
-> On 11/23/2016 05:12 AM, Sekhar Nori wrote:
->> On Wednesday 23 November 2016 08:59 AM, David Lechner wrote:
->>> This SoC has a separate pin controller for configuring pullup/pulldown
->>> bias on groups of pins.
->>>
->>> Signed-off-by: David Lechner <david@lechnology.com>
->>> ---
->>>  arch/arm/boot/dts/da850.dtsi | 5 +++++
->>>  1 file changed, 5 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
->>> index 8945815..1c0224c 100644
->>> --- a/arch/arm/boot/dts/da850.dtsi
->>> +++ b/arch/arm/boot/dts/da850.dtsi
->>> @@ -210,6 +210,11 @@
->>>              };
->>>
->>>          };
->>> +        pinconf: pin-controller at 22c00c {
->>> +            compatible = "ti,da850-pupd";
->>> +            reg = <0x22c00c 0x8>;
->>> +            status = "disabled";
->>> +        };
->>
->> Can you please place this below the i2c1 node. I am trying to keep the
->> nodes sorted by unit address. I know thats broken in many places today,
->> but lets add the new ones where they should eventually end up.
-> 
-> I can do this, but it seems that the predominant sorting pattern here is
-> to keep subsystems together (e.g. all i2c are together, all uart are
-> together, etc.)
+The struct member name of a union is unneeded.  This makes the code
+a bit shorter.
 
-Yeah, but that quickly gives away as there are many singleton devices
-and everyone tries to add theirs at the end of the list resulting in
-merge conflicts.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-> Would a separate patch to sort everything by unit address to get this
-> cleaned up be acceptable?
+Changes in v2:
+  - Newly added
 
-Agree with Kevin that it would be churn. If done, it should be last
-thing that gets done in a merge window. I would not attempt it in
-relatively busy merge windows like this one.
+ drivers/clk/uniphier/clk-uniphier-core.c | 8 ++++----
+ drivers/clk/uniphier/clk-uniphier-mio.c  | 2 +-
+ drivers/clk/uniphier/clk-uniphier.h      | 6 +++---
+ 3 files changed, 8 insertions(+), 8 deletions(-)
 
-Thanks,
-Sekhar
+diff --git a/drivers/clk/uniphier/clk-uniphier-core.c b/drivers/clk/uniphier/clk-uniphier-core.c
+index 26c53f7..726a10a 100644
+--- a/drivers/clk/uniphier/clk-uniphier-core.c
++++ b/drivers/clk/uniphier/clk-uniphier-core.c
+@@ -29,16 +29,16 @@ static struct clk_hw *uniphier_clk_register(struct device *dev,
+ 	switch (data->type) {
+ 	case UNIPHIER_CLK_TYPE_FIXED_FACTOR:
+ 		return uniphier_clk_register_fixed_factor(dev, data->name,
+-							  &data->data.factor);
++							  &data->factor);
+ 	case UNIPHIER_CLK_TYPE_FIXED_RATE:
+ 		return uniphier_clk_register_fixed_rate(dev, data->name,
+-							&data->data.rate);
++							&data->rate);
+ 	case UNIPHIER_CLK_TYPE_GATE:
+ 		return uniphier_clk_register_gate(dev, regmap, data->name,
+-						  &data->data.gate);
++						  &data->gate);
+ 	case UNIPHIER_CLK_TYPE_MUX:
+ 		return uniphier_clk_register_mux(dev, regmap, data->name,
+-						 &data->data.mux);
++						 &data->mux);
+ 	default:
+ 		dev_err(dev, "unsupported clock type\n");
+ 		return ERR_PTR(-EINVAL);
+diff --git a/drivers/clk/uniphier/clk-uniphier-mio.c b/drivers/clk/uniphier/clk-uniphier-mio.c
+index 218d20f..4974d38 100644
+--- a/drivers/clk/uniphier/clk-uniphier-mio.c
++++ b/drivers/clk/uniphier/clk-uniphier-mio.c
+@@ -30,7 +30,7 @@
+ 		.name = "sd" #ch "-sel",				\
+ 		.type = UNIPHIER_CLK_TYPE_MUX,				\
+ 		.idx = -1,						\
+-		.data.mux = {						\
++		.mux = {						\
+ 			.parent_names = {				\
+ 				"sd-44m",				\
+ 				"sd-33m",				\
+diff --git a/drivers/clk/uniphier/clk-uniphier.h b/drivers/clk/uniphier/clk-uniphier.h
+index 0244dba..4eb4f6d 100644
+--- a/drivers/clk/uniphier/clk-uniphier.h
++++ b/drivers/clk/uniphier/clk-uniphier.h
+@@ -62,7 +62,7 @@ struct uniphier_clk_data {
+ 		struct uniphier_clk_fixed_rate_data rate;
+ 		struct uniphier_clk_gate_data gate;
+ 		struct uniphier_clk_mux_data mux;
+-	} data;
++	};
+ };
+ 
+ #define UNIPHIER_CLK_FACTOR(_name, _idx, _parent, _mult, _div)	\
+@@ -70,7 +70,7 @@ struct uniphier_clk_data {
+ 		.name = (_name),				\
+ 		.type = UNIPHIER_CLK_TYPE_FIXED_FACTOR,		\
+ 		.idx = (_idx),					\
+-		.data.factor = {				\
++		.factor = {					\
+ 			.parent_name = (_parent),		\
+ 			.mult = (_mult),			\
+ 			.div = (_div),				\
+@@ -83,7 +83,7 @@ struct uniphier_clk_data {
+ 		.name = (_name),				\
+ 		.type = UNIPHIER_CLK_TYPE_GATE,			\
+ 		.idx = (_idx),					\
+-		.data.gate = {					\
++		.gate = {					\
+ 			.parent_name = (_parent),		\
+ 			.reg = (_reg),				\
+ 			.bit = (_bit),				\
+-- 
+2.7.4
