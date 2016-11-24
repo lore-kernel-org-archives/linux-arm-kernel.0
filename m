@@ -1,53 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 24 Nov 2016 11:57:25 +0100
-Subject: [RFC PATCH 3/5] arm64: defconfig: sunxi: include options for
- Allwinner H5 SoC
-In-Reply-To: <1479950235-26821-4-git-send-email-andre.przywara@arm.com>
-References: <1479950235-26821-1-git-send-email-andre.przywara@arm.com>
- <1479950235-26821-4-git-send-email-andre.przywara@arm.com>
-Message-ID: <20161124105725.va6gf6b3min74occ@lukather>
+From: huziji@marvell.com (Ziji Hu)
+Date: Thu, 24 Nov 2016 18:57:18 +0800
+Subject: [PATCH 7/10] mmc: sdhci-xenon: Add support to PHYs of Marvell
+ Xenon SDHC
+In-Reply-To: <2204525.IWIYQVjIXl@wuerfel>
+References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
+ <a05ffd140f4edc02fc3128db8445b2264cf38723.1477911954.git-series.gregory.clement@free-electrons.com>
+ <2204525.IWIYQVjIXl@wuerfel>
+Message-ID: <f7334e41-39dd-f868-ff10-199afaebe926@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2016 at 01:17:13AM +0000, Andre Przywara wrote:
-> The Allwinner H5 SoC is closely related to the H3 SoC, so select the
-> basic pinctrl driver and the DMA driver to let a defconfig kernel boot
-> on those boards.
+Hi Arnd,
+
+On 2016/11/24 17:56, Arnd Bergmann wrote:
+> On Monday, October 31, 2016 12:09:56 PM CET Gregory CLEMENT wrote:
+>> From: Ziji Hu <huziji@marvell.com>
+>>
+>> Marvell Xenon eMMC/SD/SDIO Host Controller contains PHY.
+>> Three types of PHYs are supported.
+>>
+>> Add support to multiple types of PHYs init and configuration.
+>> Add register definitions of PHYs.
+>>
+>> Signed-off-by: Hu Ziji <huziji@marvell.com>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  arch/arm64/Kconfig.platforms | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+> Please explain in the changelog why this is not a generic
+> phy driver (or three of them).
 > 
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index cfbdf02..8300677 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -5,8 +5,12 @@ config ARCH_SUNXI
->  	select GENERIC_IRQ_CHIP
->  	select PINCTRL
->  	select PINCTRL_SUN50I_A64
-> +	select PINCTRL_SUN8I_H3
-> +	select PINCTRL_SUN8I_H3_R
-> +	select DMA_SUN6I
+	Actually we tried to put the PHY code into Linux PHY framework.
+	But it cannot fit in Linux common PHY framework.
 
-I'm not sure I want to get an ever growing select which will be an
-union of all the drivers that all the arm64 Allwinner SoCs will
-require.
+	Our Xenon SDHC PHY register is a part of Xenon SDHC register set.
+	Besides, during MMC initialization, MMC sequence has to call several PHY functions to complete timing setting.
+	In those PHY setting functions, they have to access SDHC register and know current MMC setting, such as bus width, clock frequency and speed mode.
+	As a result, we have to implement PHY under MMC directory.
 
-Select leaves no option to disable that option, and we have defconfig
-to deal with that nicely.
+	Thank you.
 
-Maxime
+Best regards,
+Hu Ziji
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161124/00e005e3/attachment.sig>
+> 	Arnd
+> 
