@@ -1,143 +1,72 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu, 24 Nov 2016 12:10:44 +0100
-Subject: [PATCH V9 11/11] ARM64/PCI: Support for ACPI based PCI host
- controller
-In-Reply-To: <20161123182243.GF16033@bhelgaas-glaptop.roam.corp.google.com>
-References: <1465588519-11334-1-git-send-email-tn@semihalf.com>
- <1465588519-11334-12-git-send-email-tn@semihalf.com>
- <20161122231321.GA20246@bhelgaas-glaptop.roam.corp.google.com>
- <edf72769-e9c8-4617-8dc4-8f3d05a678e7@semihalf.com>
- <20161123182243.GF16033@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <a3548d7a-73cb-21d5-a3d9-a0e4f07a5db5@semihalf.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 24 Nov 2016 11:15:42 +0000
+Subject: [RFC PATCH 2/5] dmaengine: allow sun6i-dma for more SoCs
+In-Reply-To: <20161124105516.tv2ybfgka5teiv2h@lukather>
+References: <1479950235-26821-1-git-send-email-andre.przywara@arm.com>
+ <1479950235-26821-3-git-send-email-andre.przywara@arm.com>
+ <CAGb2v67M8DrPaf8GzSPEjekgV6cLcXXzO3tVUc9kjUDcM3BE_w@mail.gmail.com>
+ <34b5e50f-a091-9bd8-7a74-96e538a7351d@arm.com>
+ <CAGb2v65G7=9ah+sEet=z5vss60kL5ZLSkNsAcGpwu8V6AWdEGA@mail.gmail.com>
+ <20161124105516.tv2ybfgka5teiv2h@lukather>
+Message-ID: <606230fd-37f6-e1ed-adc3-72f606fa944c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.11.2016 19:22, Bjorn Helgaas wrote:
-> On Wed, Nov 23, 2016 at 12:21:03PM +0100, Tomasz Nowicki wrote:
->> Hi Bjorn,
->>
->> On 23.11.2016 00:13, Bjorn Helgaas wrote:
->>> Hi Tomasz,
+On 24/11/16 10:55, Maxime Ripard wrote:
+> On Thu, Nov 24, 2016 at 05:30:45PM +0800, Chen-Yu Tsai wrote:
+>> On Thu, Nov 24, 2016 at 5:16 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+>>> Hi,
 >>>
->>> On Fri, Jun 10, 2016 at 09:55:19PM +0200, Tomasz Nowicki wrote:
->>>> Implement pci_acpi_scan_root and other arch-specific call so that ARM64
->>>> can start using ACPI to setup and enumerate PCI buses.
+>>> On 24/11/16 04:16, Chen-Yu Tsai wrote:
+>>>> Hi,
 >>>>
->>>> Prior to buses enumeration the pci_acpi_scan_root() implementation looks
->>>> for configuration space start address (obtained through ACPI _CBA method or
->>>> MCFG interface). If succeed, it uses ECAM library to create new mapping.
->>>> Then it attaches generic ECAM ops (pci_generic_ecam_ops) which are used
->>>> for accessing configuration space later on.
->>>> ...
+>>>> On Thu, Nov 24, 2016 at 9:17 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+>>>>> The sun6i DMA driver is used in the Allwinner A64 and H5 SoC, which
+>>>>> have arm64 capable cores. Add the generic sunxi config symbol to allow
+>>>>> the driver to be selected by arm64 Kconfigs, which don't feature
+>>>>> SoC specific MACH_xxxx configs.
+>>>>>
+>>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>>>> ---
+>>>>>  drivers/dma/Kconfig | 2 +-
+>>>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>>
+>>>>> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+>>>>> index af63a6b..003c284 100644
+>>>>> --- a/drivers/dma/Kconfig
+>>>>> +++ b/drivers/dma/Kconfig
+>>>>> @@ -157,7 +157,7 @@ config DMA_SUN4I
+>>>>>
+>>>>>  config DMA_SUN6I
+>>>>>         tristate "Allwinner A31 SoCs DMA support"
+>>>>> -       depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST
+>>>>> +       depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST || ARCH_SUNXI
+>>>>
+>>>> AFAIK ARCH_SUNXI encompasses/supersedes MACH_SUN*I.
+>>>> (And I don't have to add MACH_SUN9I later :) )
 >>>
->>>> +static struct acpi_pci_root_ops acpi_pci_root_ops = {
->>>> +	.release_info = pci_acpi_generic_release_info,
->>>> +};
->>>> +
->>>> +/* Interface called from ACPI code to setup PCI host controller */
->>>> struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->>>> {
->>>> -	/* TODO: Should be revisited when implementing PCI on ACPI */
->>>> -	return NULL;
->>>> +	int node = acpi_get_node(root->device->handle);
->>>> +	struct acpi_pci_generic_root_info *ri;
->>>> +	struct pci_bus *bus, *child;
->>>> +
->>>> +	ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
->>>> +	if (!ri)
->>>> +		return NULL;
->>>> +
->>>> +	ri->cfg = pci_acpi_setup_ecam_mapping(root);
->>>> +	if (!ri->cfg) {
->>>> +		kfree(ri);
->>>> +		return NULL;
->>>> +	}
->>>> +
->>>> +	acpi_pci_root_ops.pci_ops = &ri->cfg->ops->pci_ops;
->>>
->>> This has already been merged, but this isn't right, is it?  We're
->>> writing a host controller-specific pointer into the single system-wide
->>> acpi_pci_root_ops, then passing it on to acpi_pci_root_create().
->>>
->>> Today, I think ri->cfg->ops->pci_ops is always &pci_generic_ecam_ops,
->> >from this path:
->>>
->>>  ri->cfg = pci_acpi_setup_ecam_mapping
->>>    cfg = pci_ecam_create(..., &pci_generic_ecam_ops)
->>>      cfg = kzalloc(...)
->>>      cfg->ops = ops             # &pci_generic_ecam_ops
->>>
->>> But we're about to merge the ECAM quirks series, which will mean it
->>> may not be &pci_generic_ecam_ops.  Even apart from the ECAM quirks, we
->>> should avoid this pattern of putting device-specific info in a single
->>> shared structure because it's too difficult to verify that it's
->>> correct.
->>>
+>>> Sure, admittedly it was just a quick hack to get things going.
+>>> Actually I don't know why we had a *depend* on those MACH_s before. I
+>>> think technically it does not depend on a certain SoC (having the
+>>> COMPILE_TEST in there hints on that). So what about:
 >>
->> Well spotted. I agree, we need to fix this. How about this:
->> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
->> index fb439c7..31c0e1c 100644
->> --- a/arch/arm64/kernel/pci.c
->> +++ b/arch/arm64/kernel/pci.c
->> @@ -152,33 +152,35 @@ static void
->> pci_acpi_generic_release_info(struct acpi_pci_root_info *ci)
->>
->>         ri = container_of(ci, struct acpi_pci_generic_root_info, common);
->>         pci_ecam_free(ri->cfg);
->> +       kfree(ci->ops);
->>         kfree(ri);
->>  }
->>
->> -static struct acpi_pci_root_ops acpi_pci_root_ops = {
->> -       .release_info = pci_acpi_generic_release_info,
->> -};
->> -
->>  /* Interface called from ACPI code to setup PCI host controller */
->>  struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->>  {
->>         int node = acpi_get_node(root->device->handle);
->>         struct acpi_pci_generic_root_info *ri;
->>         struct pci_bus *bus, *child;
->> +       struct acpi_pci_root_ops *root_ops;
->>
->>         ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
->>         if (!ri)
->>                 return NULL;
->>
->> +       root_ops = kzalloc_node(sizeof(*root_ops), GFP_KERNEL, node);
->> +       if (!root_ops)
->> +               return NULL;
->> +
->>         ri->cfg = pci_acpi_setup_ecam_mapping(root);
->>         if (!ri->cfg) {
->>                 kfree(ri);
->> +               kfree(root_ops);
->>                 return NULL;
->>         }
->>
->> -       acpi_pci_root_ops.pci_ops = &ri->cfg->ops->pci_ops;
->> -       bus = acpi_pci_root_create(root, &acpi_pci_root_ops, &ri->common,
->> -                                  ri->cfg);
->> +       root_ops->release_info = pci_acpi_generic_release_info;
->> +       root_ops->pci_ops = &ri->cfg->ops->pci_ops;
->> +       bus = acpi_pci_root_create(root, root_ops, &ri->common, ri->cfg);
->>         if (!bus)
->>                 return NULL;
->>
->> Of course, this should be the part of ECAM quirks core patches.
->>
->> The other option we have is to remove "struct pci_ops *pci_ops;"
->> from acpi_pci_root_ops structure and pass struct pci_ops as an extra
->> argument to acpi_pci_root_create(). What do you think?
->
-> I think your patch above is fine and avoids the need to change the x86 and
-> ia64 code.  Would you mind packaging this up with a changelog and
-> signed-off-by?  I can take care of putting it in the ECAM series.
->
+>> It was really because this DMA engine only comes with the later
+>> SoCs. We have dma-sun4i for the older one.
+> 
+> Indeed.
+> 
+>> But yes, there's no reason why you can't build it for the earlier
+>> SoC. It just doesn't get used.
+> 
+> I'm still in favor of keeping the depends on. There's no point of
+> compiling something we know have zero chance of running.
+> 
+> (But that would be (ARCH_SUNXI && ARM64))
 
-Sure, I have just sent the patch in replay to ECAM quirks V6 patch set.
+I am OK with that, just wondering if there is a definition of what
+"depends" really means. My impression what that it's a about code
+dependencies (requires a certain subsystem, for instance), not really if
+it's useful in a particular configuration.
 
-Let us know when you update your branch so we base our quirks on it.
-
-Thanks,
-Tomasz
+Cheers,
+Andre.
