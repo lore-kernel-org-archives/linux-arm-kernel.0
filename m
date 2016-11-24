@@ -1,34 +1,32 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 24 Nov 2016 21:15:14 +0100
-Subject: [PATCH renesas-next 3/3] ARM: dts: sh73a0: Use SoC-specific compat
+Date: Thu, 24 Nov 2016 21:15:11 +0100
+Subject: [PATCH renesas-next 0/3] ARM: dts: shmobile: Use SoC-specific compat
  string for mmcif
-In-Reply-To: <1480018514-31718-1-git-send-email-horms+renesas@verge.net.au>
-References: <1480018514-31718-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1480018514-31718-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1480018514-31718-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the SoC-specific compat string for mmcif in DT for the sh73a0 SoC.
-This is in keeping with the use of compat strings for mmcif for other
-Renesas ARM based SoCs.
+Hi,
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/sh73a0.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+this short series makes add of SoC-specific compat strings to the DT of
+the r8a73a4, r8a7778 and sh73a0 SoCs. This is in keeping with the
+rest of the Renesas ARM based SoCs with mmcif enabled in mainline.
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index e1267590b575..6b01ab354e88 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -263,7 +263,7 @@
- 	};
- 
- 	mmcif: mmc at e6bd0000 {
--		compatible = "renesas,sh-mmcif";
-+		compatible = "renesas,mmcif-sh73a0", "renesas,sh-mmcif";
- 		reg = <0xe6bd0000 0x100>;
- 		interrupts = <GIC_SPI 140 IRQ_TYPE_LEVEL_HIGH
- 			      GIC_SPI 141 IRQ_TYPE_LEVEL_HIGH>;
+Based on renesas-devel-20161123v2-v4.9-rc6
+
+Documentation of these compat strings for the mmcif driver has been posted
+separately as:
+  "[PATCH] mmc: sh_mmcif: Document r8a73a4, r8a7779 and sh73a0 DT bindings".
+
+Simon Horman (3):
+  ARM: dts: r8a73a4: Use SoC-specific compat string for mmcif
+  ARM: dts: r8a7778: Use SoC-specific compat string for mmcif
+  ARM: dts: sh73a0: Use SoC-specific compat string for mmcif
+
+ arch/arm/boot/dts/r8a73a4.dtsi | 4 ++--
+ arch/arm/boot/dts/r8a7778.dtsi | 2 +-
+ arch/arm/boot/dts/sh73a0.dtsi  | 2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
 -- 
 2.7.0.rc3.207.g0ac5344
