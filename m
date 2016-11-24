@@ -1,45 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 24 Nov 2016 10:26:21 +0000
-Subject: [PATCH v28 1/9] memblock: add memblock_cap_memory_range()
-In-Reply-To: <20161124095717.7037-1-takahiro.akashi@linaro.org>
-References: <20161124095523.6972-1-takahiro.akashi@linaro.org>
- <20161124095717.7037-1-takahiro.akashi@linaro.org>
-Message-ID: <20161124102619.GC78338@MBP.local>
+From: huziji@marvell.com (Ziji Hu)
+Date: Thu, 24 Nov 2016 18:38:19 +0800
+Subject: [PATCH 5/10] dt: bindings: Add bindings for Marvell Xenon SD Host
+ Controller
+In-Reply-To: <20161124111029.035553ce@free-electrons.com>
+References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
+ <4031579.CBE32NHUoW@wuerfel> <877f7tmduw.fsf@free-electrons.com>
+ <28082657.RK5ubAe11Q@wuerfel> <8737ihmctr.fsf@free-electrons.com>
+ <CAPv3WKddPHgpRU2_tVoDF=5Z-nqfFPxjgJ-+z9o-1tR2=fFvAA@mail.gmail.com>
+ <20161124111029.035553ce@free-electrons.com>
+Message-ID: <f7d2ff41-5f64-e8c1-b028-dfc7aea294ae@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hi all,
 
-On Thu, Nov 24, 2016 at 06:57:17PM +0900, AKASHI Takahiro wrote:
-> Add memblock_cap_memory_range() which will remove all the memblock regions
-> except the memory range specified in the arguments. In addition, rework is
-> done on memblock_mem_limit_remove_map() to re-implement it using
-> memblock_cap_memory_range().
+On 2016/11/24 18:10, Thomas Petazzoni wrote:
+> Hello,
 > 
-> This function, like memblock_mem_limit_remove_map(), will not remove
-> memblocks with MEMMAP_NOMAP attribute as they may be mapped and accessed
-> later as "device memory."
-> See the commit a571d4eb55d8 ("mm/memblock.c: add new infrastructure to
-> address the mem limit issue").
+> On Thu, 24 Nov 2016 10:49:23 +0100, Marcin Wojtas wrote:
 > 
-> This function is used, in a succeeding patch in the series of arm64 kdump
-> suuport, to limit the range of usable memory, or System RAM, on crash dump
-> kernel.
-> (Please note that "mem=" parameter is of little use for this purpose.)
+>> How about to avoid confusion, by simply renaming this number to
+>> port-id/xenon-id or anything else but slot? I guess this may allow to
+>> avoid some misunderstandings.
 > 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Reviewed-by: Will Deacon <will.deacon@arm.com>
-> Cc: linux-mm at kvack.org
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> ---
->  include/linux/memblock.h |  1 +
->  mm/memblock.c            | 44 +++++++++++++++++++++++++++++---------------
->  2 files changed, 30 insertions(+), 15 deletions(-)
+	We borrow the term "slot" from PCIe interface from SD spec.
+	According to Appendix C in SD spec 3.0, slot means an independent set of register from the view of SW.
 
-Are you OK with this patch to go in via the arm64 tree (together with
-the other patches in this series)?
+	I can avoid using "slot" and replace "slot index" with "sdhc-id".
+	Thanks for the suggestions.
 
-Thanks.
+	Thank you.
 
--- 
-Catalin
+Best regards,
+Hu Ziji
+
+> Agreed.
+> 
+> Thomas
+> 
