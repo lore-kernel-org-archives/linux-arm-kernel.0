@@ -1,45 +1,45 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 24 Nov 2016 12:16:59 +0800
-Subject: [RFC PATCH 2/5] dmaengine: allow sun6i-dma for more SoCs
-In-Reply-To: <1479950235-26821-3-git-send-email-andre.przywara@arm.com>
-References: <1479950235-26821-1-git-send-email-andre.przywara@arm.com>
- <1479950235-26821-3-git-send-email-andre.przywara@arm.com>
-Message-ID: <CAGb2v67M8DrPaf8GzSPEjekgV6cLcXXzO3tVUc9kjUDcM3BE_w@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 24 Nov 2016 12:46:55 +0800
+Subject: [PATCH 4/4] serial: imx: Add LED trigger support
+In-Reply-To: <20161123100106.15969-5-s.hauer@pengutronix.de>
+Message-ID: <201611241248.FSeTT57Y%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sascha,
 
-On Thu, Nov 24, 2016 at 9:17 AM, Andre Przywara <andre.przywara@arm.com> wrote:
-> The sun6i DMA driver is used in the Allwinner A64 and H5 SoC, which
-> have arm64 capable cores. Add the generic sunxi config symbol to allow
-> the driver to be selected by arm64 Kconfigs, which don't feature
-> SoC specific MACH_xxxx configs.
->
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  drivers/dma/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> index af63a6b..003c284 100644
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -157,7 +157,7 @@ config DMA_SUN4I
->
->  config DMA_SUN6I
->         tristate "Allwinner A31 SoCs DMA support"
-> -       depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST
-> +       depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST || ARCH_SUNXI
+[auto build test ERROR on tty/tty-testing]
+[also build test ERROR on v4.9-rc6 next-20161123]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-AFAIK ARCH_SUNXI encompasses/supersedes MACH_SUN*I.
-(And I don't have to add MACH_SUN9I later :) )
+url:    https://github.com/0day-ci/linux/commits/Sascha-Hauer/serial-core-Add-LED-trigger-support/20161124-010846
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git tty-testing
+config: s390-allmodconfig (attached as .config)
+compiler: s390x-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=s390 
 
-ChenYu
+All errors (new ones prefixed by >>):
 
->         depends on RESET_CONTROLLER
->         select DMA_ENGINE
->         select DMA_VIRTUAL_CHANNELS
-> --
-> 2.8.2
->
+>> ERROR: "uart_remove_led_triggers" [drivers/tty/serial/imx.ko] undefined!
+>> ERROR: "uart_led_trigger_rx" [drivers/tty/serial/imx.ko] undefined!
+>> ERROR: "uart_led_trigger_tx" [drivers/tty/serial/imx.ko] undefined!
+>> ERROR: "uart_add_led_triggers" [drivers/tty/serial/imx.ko] undefined!
+   ERROR: "uart_led_trigger_rx" [drivers/tty/serial/8250/8250_base.ko] undefined!
+   ERROR: "uart_led_trigger_tx" [drivers/tty/serial/8250/8250_base.ko] undefined!
+   ERROR: "uart_remove_led_triggers" [drivers/tty/serial/8250/8250.ko] undefined!
+   ERROR: "uart_add_led_triggers" [drivers/tty/serial/8250/8250.ko] undefined!
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 43170 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161124/34007947/attachment-0001.gz>
