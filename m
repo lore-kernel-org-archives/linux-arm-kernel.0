@@ -1,51 +1,75 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+From: horms@verge.net.au (Simon Horman)
 Date: Thu, 24 Nov 2016 15:32:39 +0100
-Subject: [PATCH 7/9] clocksource/drivers/rockchip_timer: implement
- clocksource timer
-In-Reply-To: <95FE175F-B7B4-4271-99FE-69516140C56A@gmail.com>
-References: <1479922177-20136-1-git-send-email-al.kochet@gmail.com>
- <4357439.aV0xjsImc7@diego> <95FE175F-B7B4-4271-99FE-69516140C56A@gmail.com>
-Message-ID: <28466016.LeLsKNAIhE@diego>
+Subject: [PATCH 0/3] arm64: dts: r8a7796: Add CAN/CAN FD support
+In-Reply-To: <HK2PR0601MB1329C747CA5C6B5222C02C3FB7B60@HK2PR0601MB1329.apcprd06.prod.outlook.com>
+References: <1479903243-1860-1-git-send-email-chris.paterson2@renesas.com>
+ <f358442c-8373-328c-1270-709498c133f5@pengutronix.de>
+ <20161123142938.GF9057@verge.net.au>
+ <HK2PR0601MB132929329C3574A0B4D9A0EAB7B60@HK2PR0601MB1329.apcprd06.prod.outlook.com>
+ <20161124101733.GA18027@verge.net.au>
+ <HK2PR0601MB1329C747CA5C6B5222C02C3FB7B60@HK2PR0601MB1329.apcprd06.prod.outlook.com>
+Message-ID: <20161124143238.GB24267@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 24. November 2016, 17:14:56 schrieb Alexander Kochetkov:
-> > 24 ????. 2016 ?., ? 16:21, Heiko St?bner <heiko@sntech.de> ???????(?):
+Hi Chris,
+
+On Thu, Nov 24, 2016 at 02:25:06PM +0000, Chris Paterson wrote:
+> Hello Simon,
+> 
+> From: Simon Horman [mailto:horms at verge.net.au]
+> Sent: 24 November 2016 10:18
+> > Hi Chris,
 > > 
-> > what I actually meant was that the driver could also recognize the rk3188-
-> > timer compatible as "we need a clocksource" and it shouldn't matter which
-> > timer actually gets used for this.
+> > On Thu, Nov 24, 2016 at 10:05:08AM +0000, Chris Paterson wrote:
+> > > Hello Simon,
+> > >
+> > > From: Simon Horman [mailto:horms at verge.net.au]
+> > > Sent: 23 November 2016 14:30
+> > > > On Wed, Nov 23, 2016 at 02:18:13PM +0100, Marc Kleine-Budde wrote:
+> > > > > On 11/23/2016 01:14 PM, Chris Paterson wrote:
+
+...
+
+> > > > Regarding the arch/arm64/boot/dts/renesas/ portion, I would like
+> > > > some consideration given to what effect enabling memory above 4Gb
+> > > > (64bit
+> > > > addressing) would have.
+> > >
+> > > Can you give me some guidance here? I'm not sure what you're referring
+> > > to. As far as I know the DT reg definition here is 64-bit, or are you
+> > > referring to DMA usage? If the later, neither CAN driver uses DMA.
+> > 
+> > Sorry for not being clearer.
+> > 
+> > What I would like to know is if there are any problems in the CAN driver or
+> > hardware that would prevent it from functioning with memory that requires
+> > 64bit addressing present.
+> > 
+> > If the CAN hardware cannot use DMA then DMA doesn't need to be taken
+> > into account. But if it DMA could be enabled in future for CAN, for example
+> > after some driver enhancements, then it would be good to know if 64bit
+> > memory can be supported - if not it would imply DMA cannot be enabled.
 > 
-> One rockchip timer cannot be used as clockevent and clocksource at the same
-> time.
+> Thank you for the clarification.
 > 
-> In case of clockevent we want interrupts from it at specified times. So we
-> load one value into timer counter and it generates an interrupt.
+> The CAN interface for r8a7795/6 does not support DMA.
 > 
-> In case of clocksource we load max value into timer counter, run timer and
-> read current value on demand.
+> With CAN FD there is currently a H/W issue that means DMA is unusable.
+> Potentially this issue could be fixed in the future and DMA support could
+> be added to the driver. If this happens I can see no reason why the CAN
+> FD IP wouldn't be able to handle DMA transfers when using 64bit
+> addressing.
 > 
-> rockchip_timer driver currently implement clockevent. So, if I create only
-> one timer in the device tree, it should be clockevent timer. As that
-> behavior already expected from driver by people used it.
+> > 
+> > As for non-DMA mode, will this function if memory above 4G is present?
+> > If not then in theory such memory couldn't be enabled if the CAN driver
+> > is enabled. This is my main concern.
 > 
-> I may suggest such solution here: if I want clocksource, I have to declare
-> two timer in device tree. First probed timer would be clockevent and second
-> one would be clocksource. All other timers will be ignored. Is that
-> solution good?
+> Yes, it functions fine. We have already tested this with the Renesas
+> v3.3.2 BSP with >4Gb memory.
+> 
+> If this is explanation okay for you, I'll proceed with a v2 splitting off
+> the DT bindings documentation.
 
-yep, sounds good, especially as with your patch 9/9 you already declare these 
-necessary timers.
-
-> If I want one timer and want it be clocksource not clockevent how that
-> situation should be configured? Device tree not good for this. Kconfig not
-> good. Pass that configuration on kernel command line?
-
-simply ignore that case :-)
-
-I.e. newer kernels are supposed to be able to run old devicetrees and in that 
-case they will have the global-timer as (slightly unstable) clocksource.
-
-Also on the cortex-a9 we also still have the smp-twd as clockevent device.
-
-Heiko
+Thanks for the explanation. I think it would be good to proceed with a v2.
