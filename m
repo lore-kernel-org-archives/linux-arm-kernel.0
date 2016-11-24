@@ -1,227 +1,148 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 24 Nov 2016 18:54:25 +0900
-Subject: [PATCH v1 & v6 1/2] PM/devfreq: add suspend frequency support
-In-Reply-To: <5836B2C2.6090308@samsung.com>
-References: <CGME20161124061416epcms1p44a0152bca14312f1229cab835ea0297f@epcms1p4>
- <20161124061416epcms1p44a0152bca14312f1229cab835ea0297f@epcms1p4>
- <58368C91.8030502@rock-chips.com> <5836927B.9010205@samsung.com>
- <5836980F.6050006@rock-chips.com> <5836A1E0.1070707@samsung.com>
- <5836A622.20007@rock-chips.com> <5836B2C2.6090308@samsung.com>
-Message-ID: <5836B8D1.9050707@samsung.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 24 Nov 2016 18:55:23 +0900
+Subject: [PATCH v28 0/9] arm64: add kdump support
+Message-ID: <20161124095523.6972-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lin,
+This patch series adds kdump support on arm64.
 
-On 2016? 11? 24? 18:28, Chanwoo Choi wrote:
-> Hi Lin,
-> 
-> On 2016? 11? 24? 17:34, hl wrote:
->> Hi Chanwoo Choi,
->>
->>
->> On 2016?11?24? 16:16, Chanwoo Choi wrote:
->>> Hi Lin,
->>>
->>> On 2016? 11? 24? 16:34, hl wrote:
->>>> Hi Chanwoo Choi,
->>>>
->>>>      I think the dev_pm_opp_get_suspend_opp() have implement most of
->>>> the funtion, all we need is just define the node in dts, like following:
->>>>
->>>> &dmc_opp_table {
->>>>      opp06 {
->>>>          opp-suspend;
->>>>      };
->>>> };
->>> Two approaches use the 'opp-suspend' property.
->>>
->>> I think that the method to support suspend-opp have to
->>> guarantee following conditions:
->>> - Support the all of devfreq's governors.
->>     As MyungJoo Ham suggestion, i will set the suspend frequency in devfreq_suspend_device(),
->> which will ingore governor.
-> 
-> Other approach already support the all of governors.
-> Before calling the mail, I discussed with Myungjoo Ham.
-> Myungjoo prefer to use the devfreq_suspend/devfreq_resume().
+To load a crash-dump kernel to the systems, a series of patches to
+kexec-tools[1] are also needed. Please use the latest one, v4 [2].
 
-It is not correct expression. We need to wait the reply from Myungjoo
-to clarify this.
+To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
+  - crash utility (v7.1.6 or later) [3]
 
-> 
-> To Myungjoo,
-> Please add your opinion how to support the suspend frequency.
+I validated this patchset on fast model.
+The previous version, v27, was also:
+Tested-by: Pratyush Anand <panand@redhat.com> (mustang and seattle)
+Tested-by: James Morse <james.morse@arm.com> (Juno)
 
-> 
->>> - Devfreq framework have the responsibility to change the
->>>    frequency/voltage for suspend-opp. If we uses the
->>>    new devfreq_suspend(), each devfreq device don't care
->>>    how to support the suspend-opp. Just the developer of each
->>>    devfreq device need to add 'opp-suspend' propet to OPP entry in DT file.
->> Why should support change the voltage in devfreq framework, i think it shuold be handle in
->> specific driver, i think the devfreq only handle it can get the right frequency, then pass it to
-> 
-> No, the frequency should be handled by governor or framework. 
-> The each devfreq device has no any responsibility of next frequency/voltage.
-> The governor and core of devfreq can decide the next frequency/voltage.
-> You can refer to the cpufreq subsystem.
-> 
->> specific driver, i think the voltage should handle in the devfreq->profile->target();
-> 
-> The call of devfreq->profile->target() have to be handled by devfreq framework.
-> If user want to set the suspend frequency, user can add the 'suspend-opp' property.
-> It think this way is easy. 
-> 
-> But,
-> If the each devfreq device want to decide the next frequency/voltage only for
-> suspend state. We can check the cpufreq subsystem.
-> 
-> If specific devfreq device want to handle the suspend frequency,
-> each devfreq will add the own suspend/resume functions as following:
-> 
-> 	struct devfreq_dev_profile {
-> 		int (*suspend)(struct devfreq *dev);	// new function pointer	
-> 		int (*resume)(struct devfreq *dev);	// new function pointer
-> 	} a_profile;
-> 
-> 	a_profile = devfreq_generic_suspend;
-> 
-> 	The devfreq framework will provide the devfreq_generic_suspend() funticon.
-> 		int devfreq_generic_suspend(struce devfreq *dev) {
-> 			...
-> 			devfreq->profile->target(..., devfreq->suspend_freq);
-> 			...
-> 		}	
-> 
-> 	or
-> 
-> 	a_profile = a_devfreq_suspend; // specific function of each devfreq device
-> 
-> 	The devfreq_suspend() will call 'devfreq->profile->suspend()' function
-> 	instead of devfreq->profile->target(); 
-> 
-> 	The devfreq call the 'devfreq->profile->suspend()'
-> 	to support the suspend frequency.
-> 
-> Regards,
-> Chanwoo Choi
+For your convenience, you can also find the patches:
+https://git.linaro.org/people/takahiro.akashi/linux-aarch64.git arm64/kdump
+https://git.linaro.org/people/takahiro.akashi/kexec-tools.git arm64/kdump
 
-The key difference between two approaches:
 
-Your approach:
-- The each developer should add the 'opp-suspend' property to the dts file.
-- The each devfreq should call the devfreq_suspend_device()
-  to support the suspend frequency.
+[1] https://git.kernel.org/pub/scm/utils/kernel/kexec/kexec-tools.git
+[2] http://lists.infradead.org/pipermail/kexec/2016-November/017555.html
+[3] https://github.com/crash-utility/crash.git
 
-  If each devfreq doesn't call the devfreq_suspend_device(), devfreq framework
-  can support the suspend frequency.
 
-Other approach:
-- The each developer only should add the 'opp-suspend' property to the dts file
-  without the additional behavior.
+Changes for v28 (Nov 22, 2016)
+  o rebased to Linux-v4.9-rc6
+  o revamp patch #1 and merge memblock_cap_memory_range() with
+    memblock_mem_limit_remove_map()
 
-In the cpufreq subsystem,
-When support the suspend frequency of cpufreq, we just add 'opp-suspend' property
-without the additional behavior.
+Changes for v27 (Nov 1, 2016)
+  o rebased to Linux-v4.9-rc3
+  o revert v26 change, i.e. revive "linux,usable-memory-range" property
+    (patch #2/#3, updating patch #9)
+  o minor fixes per review comments (patch #3/#4/#6/#8)
+  o re-order patches and improve commit messages for readability
 
-Regards,
-Chanwoo Choi
+Changes for v26 (Sep 7, 2016):
+  o Use /reserved-memory instead of "linux,usable-memory-range" property
+    (dropping v25's patch#2 and #3, updating ex-patch#9.)
 
-> 
->>> Best Regards,
->>> Chanwoo Choi
->>>
->>>> so i think my way semm more simple.
->>>>
->>>> On 2016?11?24? 15:10, Chanwoo Choi wrote:
->>>>> + Tobias Jakobi,
->>>>>
->>>>> Hi Lin,
->>>>>
->>>>> We need to discuss how to support the suspend-opp of devfreq device.
->>>>> Now, there are two patch thread for suspend-opp of devfreq.
->>>>>
->>>>> The Lin's approach modify the devfreq_suspend_device() to support suspend-opp.
->>>>> The Tobias's approach[1] add new devfreq_suspend() and then call it on dpm_suspend()
->>>>> when entering the suspend state.
->>>>>
->>>>> [1] [RFC 0/4] PM / devfreq: draft for OPP suspend impl
->>>>> - https://patchwork.kernel.org/patch/9443323/
->>>>> - https://patchwork.kernel.org/patch/9443325/
->>>>> - https://patchwork.kernel.org/patch/9443329/
->>>>> - https://patchwork.kernel.org/patch/9443331/
->>>>>
->>>>> I think we need to discuss it together.
->>>>>
->>>>> Regards,
->>>>> Chanwoo Choi
->>>>>
->>>>> On 2016? 11? 24? 15:45, hl wrote:
->>>>>> Hi MyungJoo Ham,
->>>>>>
->>>>>> On 2016?11?24? 14:14, MyungJoo Ham wrote:
->>>>>>> On Thu, Nov 24, 2016 at 11:18 AM, hl <hl@rock-chips.com> wrote:
->>>>>>>> Hi MyungJoo Ham,
->>>>>>> []
->>>>>>>>> We still need to sync the all status even i call target() in
->>>>>>>>> devfreq_suspend/resume_device
->>>>>>>>> directly, so still need update_devfreq() other setp except
->>>>>>>>> devfreq->governor->get_target_freq(devfreq, &freq);
->>>>>>>> And i think it better to be governor behaviors, for userspace they may not
->>>>>>>> want to change
->>>>>>>> the suspend frequency like other governor, the frequency should decide by
->>>>>>>> the user, if they
->>>>>>>> want this function, they should like other governor to rigister a
->>>>>>>> devfreq_monitor_suspend().
->>>>>>>> What do you think about my rev6 patch?
->>>>>>> If I understand the intention correctly, this is for the stability of
->>>>>>> the device due to the behavior or bootloader/SoC-initializer, which
->>>>>>> has nothing to do with governors.
->>>>>>>
->>>>>>> Even if users are using userspace, as long as they set the custom
->>>>>>> frequencies lower than the default, they have the possibility of
->>>>>>> being unstable as ondemand is going to have.
->>>>>>>
->>>>>>>
->>>>>>> To reuse the update_devfreq() code, you may do something like:
->>>>>>>
->>>>>>> static int _update_freq(struct devfreq *devfreq, bool is_suspending)
->>>>>>> {
->>>>>>>       /* original contents of update_freq with if statement with is_suspending wrapping get_target_freq */
->>>>>>> }
->>>>>>> int update_freq(struct devfreq *devfreq)
->>>>>>> {
->>>>>>>      return _update_freq(devfreq, false);
->>>>>>> }
->>>>>>>
->>>>>>>
->>>>>>> There should be other good non-invasive methods that are not governoe-specific as well.
->>>>>>>
->>>>>> Thanks for your suggestion, i will update the new version soon.
->>>>>>> Cheers,
->>>>>>> MyungJoo
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> _______________________________________________
->>>>>>> Linux-rockchip mailing list
->>>>>>> Linux-rockchip at lists.infradead.org
->>>>>>> http://lists.infradead.org/mailman/listinfo/linux-rockchip
->>>>>> -- 
->>>>>> Lin Huang
->>>>>>
->>>>>
->>>>>
->>>
->>>
->>>
->>
-> 
-> 
+Changes for v25 (Aug 29, 2016):
+  o Rebase to Linux-4.8-rc4
+  o Use memremap() instead of ioremap_cache() [patch#5]
 
+Changes for v24 (Aug 9, 2016):
+  o Rebase to Linux-4.8-rc1
+  o Update descriptions about newly added DT proerties
+
+Changes for v23 (July 26, 2016):
+
+  o Move memblock_reserve() to a single place in reserve_crashkernel()
+  o Use  cpu_park_loop() in ipi_cpu_crash_stop()
+  o Always enforce ARCH_LOW_ADDRESS_LIMIT to the memory range of crash kernel
+  o Re-implement fdt_enforce_memory_region() to remove non-reserve regions
+    (for ACPI) from usable memory at crash kernel
+
+Changes for v22 (July 12, 2016):
+
+  o Export "crashkernel-base" and "crashkernel-size" via device-tree,
+    and add some descriptions about them in chosen.txt
+  o Rename "usable-memory" to "usable-memory-range" to avoid inconsistency
+    with powerpc's "usable-memory"
+  o Make cosmetic changes regarding "ifdef" usage
+  o Correct some wordings in kdump.txt
+
+Changes for v21 (July 6, 2016):
+
+  o Remove kexec patches.
+  o Rebase to arm64's for-next/core (Linux-4.7-rc4 based).
+  o Clarify the description about kvm in kdump.txt.
+
+See the following link [4] for older changes:
+[4]  http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438780.html
+
+AKASHI Takahiro (8):
+  arm64: kdump: reserve memory for crash dump kernel
+  memblock: add memblock_cap_memory_range()
+  arm64: limit memory regions based on DT property, usable-memory-range
+  arm64: kdump: implement machine_crash_shutdown()
+  arm64: kdump: add kdump support
+  arm64: kdump: add VMCOREINFO's for user-space coredump tools
+  arm64: kdump: enable kdump in the arm64 defconfig
+  arm64: kdump: update a kernel doc
+
+James Morse (1):
+  Documentation: dt: chosen properties for arm64 kdump
+
+ Documentation/devicetree/bindings/chosen.txt |  45 ++++++
+ Documentation/kdump/kdump.txt                |  16 ++-
+ arch/arm64/Kconfig                           |  11 ++
+ arch/arm64/configs/defconfig                 |   1 +
+ arch/arm64/include/asm/hardirq.h             |   2 +-
+ arch/arm64/include/asm/kexec.h               |  41 +++++-
+ arch/arm64/include/asm/smp.h                 |   2 +
+ arch/arm64/kernel/Makefile                   |   1 +
+ arch/arm64/kernel/crash_dump.c               |  71 ++++++++++
+ arch/arm64/kernel/machine_kexec.c            |  67 ++++++++-
+ arch/arm64/kernel/setup.c                    |   7 +-
+ arch/arm64/kernel/smp.c                      |  63 +++++++++
+ arch/arm64/mm/init.c                         | 202 +++++++++++++++++++++++++++
+ include/linux/memblock.h                     |   1 +
+ mm/memblock.c                                |  28 ++++
+ 15 files changed, 551 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm64/kernel/crash_dump.c
 
 -- 
-Best Regards,
-Chanwoo Choi
+2.9.0
+
+
+AKASHI Takahiro (8):
+  memblock: add memblock_cap_memory_range()
+  arm64: limit memory regions based on DT property, usable-memory-range
+  arm64: kdump: reserve memory for crash dump kernel
+  arm64: kdump: implement machine_crash_shutdown()
+  arm64: kdump: add VMCOREINFO's for user-space tools
+  arm64: kdump: provide /proc/vmcore file
+  arm64: kdump: enable kdump in defconfig
+  Documentation: kdump: describe arm64 port
+
+James Morse (1):
+  Documentation: dt: chosen properties for arm64 kdump
+
+ Documentation/devicetree/bindings/chosen.txt |  50 +++++++
+ Documentation/kdump/kdump.txt                |  16 ++-
+ arch/arm64/Kconfig                           |  11 ++
+ arch/arm64/configs/defconfig                 |   1 +
+ arch/arm64/include/asm/hardirq.h             |   2 +-
+ arch/arm64/include/asm/kexec.h               |  42 +++++-
+ arch/arm64/include/asm/smp.h                 |   2 +
+ arch/arm64/kernel/Makefile                   |   1 +
+ arch/arm64/kernel/crash_dump.c               |  71 ++++++++++
+ arch/arm64/kernel/machine_kexec.c            |  67 ++++++++-
+ arch/arm64/kernel/setup.c                    |   7 +-
+ arch/arm64/kernel/smp.c                      |  63 +++++++++
+ arch/arm64/mm/init.c                         | 199 +++++++++++++++++++++++++++
+ include/linux/memblock.h                     |   1 +
+ mm/memblock.c                                |  44 ++++--
+ 15 files changed, 555 insertions(+), 22 deletions(-)
+ create mode 100644 arch/arm64/kernel/crash_dump.c
+
+-- 
+2.10.0
