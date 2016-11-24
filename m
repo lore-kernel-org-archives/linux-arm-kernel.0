@@ -1,87 +1,49 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 24 Nov 2016 13:40:03 +0000
-Subject: [PATCH 3/9] arm64: cpufeature: Cleanup feature bit tables
-In-Reply-To: <1479994809-9081-1-git-send-email-suzuki.poulose@arm.com>
-References: <1479994809-9081-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1479994809-9081-4-git-send-email-suzuki.poulose@arm.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Thu, 24 Nov 2016 14:42:38 +0100
+Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire
+ section
+In-Reply-To: <CAKv+Gu8aWpz5vXSWdKHwL5Xk2aWyQBOoR1WHOnVPaWZOwqojBQ@mail.gmail.com>
+References: <20161017185801.GT25086@rric.localdomain>
+ <20161027160136.GD24290@arm.com>
+ <20161028091905.GM22012@rric.localdomain>
+ <20161107210514.GP20591@arm.com>
+ <20161109195132.GZ22012@rric.localdomain>
+ <20161117142528.GJ22855@arm.com>
+ <20161117151805.GJ2151@rric.localdomain>
+ <CAKv+Gu-2uGJGovqQL-gbB54u=fQ9L9YUbDdRo6u3oWqF6znn6Q@mail.gmail.com>
+ <20161123211538.GH10776@rric.localdomain>
+ <CAKv+Gu8aWpz5vXSWdKHwL5Xk2aWyQBOoR1WHOnVPaWZOwqojBQ@mail.gmail.com>
+Message-ID: <20161124134238.GI10776@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch does the following clean ups :
+On 23.11.16 21:25:06, Ard Biesheuvel wrote:
+> Why? MEMREMAP_WB is used often, among other things for mapping
+> firmware tables, which are marked as NOMAP, so in these cases, the
+> linear address is not mapped.
 
-1) All undescribed fields of a register are now treated as "strict"
-   with a safe value of 0. Hence we could leave an empty table for
-   describing registers which are RAZ.
+If fw tables are mapped wb, that is wrong and needs a separate fix.
 
-2) ID_AA64DFR1_EL1 is RAZ and should use the table for RAZ register.
+> > If you think pfn_valid() is wrong here, I am happy to send a patch
+> > that fixes this by using page_is_ram(). In any case, the worst case
+> > that may happen is to behave the same as v4.4, we might fix then the
+> > wrong use of pfn_valid() where it is not correctly used to check for
+> > ram.
+> >
+> 
+> page_is_ram() uses string comparisons to look for regions called
+> 'System RAM'. Is that something we can tolerate for each pfn_valid()
+> calll?
+> 
+> Perhaps the solution is to reimplement page_is_ram() for arm64 using
+> memblock_is_memory() instead, But that still means we need to modify
+> the generic memremap() code first to switch to it before changing the
+> arm64 implementation of pfn_valid
 
-3) ftr_generic32 is used to represent a register with a 32bit feature
-   value. Rename this to ftr_singl32 to make it more obvious. Since
-   we don't have a 64bit singe feature register, kill ftr_generic.
+No, that's not the solution. pfn_valid() should just check if there is
+a valid struct page, as other archs do. And if there is a mis-use of
+pfn_valid() to check for ram, only that calls should be fixed to use
+page_is_ram(), however this is implemented, or something appropriate.
+But I don't see any problematic code, and if so, I will fix that.
 
-Based on a patch by Mark Rutland.
-
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/kernel/cpufeature.c | 19 +++++++------------
- 1 file changed, 7 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index aaf3cba..67e6935 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -246,18 +246,13 @@ static const struct arm64_ftr_bits ftr_generic_32bits[] = {
- 	ARM64_FTR_END,
- };
- 
--static const struct arm64_ftr_bits ftr_generic[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 64, 0),
--	ARM64_FTR_END,
--};
--
--static const struct arm64_ftr_bits ftr_generic32[] = {
-+/* Table for a single 32bit feature value */
-+static const struct arm64_ftr_bits ftr_single32[] = {
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 32, 0),
- 	ARM64_FTR_END,
- };
- 
--static const struct arm64_ftr_bits ftr_aa64raz[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 64, 0),
-+static const struct arm64_ftr_bits ftr_raz[] = {
- 	ARM64_FTR_END,
- };
- 
-@@ -298,15 +293,15 @@ static const struct __ftr_reg_entry {
- 
- 	/* Op1 = 0, CRn = 0, CRm = 4 */
- 	ARM64_FTR_REG(SYS_ID_AA64PFR0_EL1, ftr_id_aa64pfr0),
--	ARM64_FTR_REG(SYS_ID_AA64PFR1_EL1, ftr_aa64raz),
-+	ARM64_FTR_REG(SYS_ID_AA64PFR1_EL1, ftr_raz),
- 
- 	/* Op1 = 0, CRn = 0, CRm = 5 */
- 	ARM64_FTR_REG(SYS_ID_AA64DFR0_EL1, ftr_id_aa64dfr0),
--	ARM64_FTR_REG(SYS_ID_AA64DFR1_EL1, ftr_generic),
-+	ARM64_FTR_REG(SYS_ID_AA64DFR1_EL1, ftr_raz),
- 
- 	/* Op1 = 0, CRn = 0, CRm = 6 */
- 	ARM64_FTR_REG(SYS_ID_AA64ISAR0_EL1, ftr_id_aa64isar0),
--	ARM64_FTR_REG(SYS_ID_AA64ISAR1_EL1, ftr_aa64raz),
-+	ARM64_FTR_REG(SYS_ID_AA64ISAR1_EL1, ftr_raz),
- 
- 	/* Op1 = 0, CRn = 0, CRm = 7 */
- 	ARM64_FTR_REG(SYS_ID_AA64MMFR0_EL1, ftr_id_aa64mmfr0),
-@@ -318,7 +313,7 @@ static const struct __ftr_reg_entry {
- 	ARM64_FTR_REG(SYS_DCZID_EL0, ftr_dczid),
- 
- 	/* Op1 = 3, CRn = 14, CRm = 0 */
--	ARM64_FTR_REG(SYS_CNTFRQ_EL0, ftr_generic32),
-+	ARM64_FTR_REG(SYS_CNTFRQ_EL0, ftr_single32),
- };
- 
- static int search_cmp_ftr_reg(const void *id, const void *regp)
--- 
-2.7.4
+-Robert
