@@ -1,54 +1,69 @@
-From: wsa-dev@sang-engineering.com (Wolfram Sang)
-Date: Thu, 24 Nov 2016 16:18:47 +0100
-Subject: [PATCH 2/2] i2c: designware: fix rx fifo depth tracking
-In-Reply-To: <E1c7p18-0000R6-4w@rmk-PC.armlinux.org.uk>
-References: <20161118193542.GO1041@n2100.armlinux.org.uk>
- <E1c7p18-0000R6-4w@rmk-PC.armlinux.org.uk>
-Message-ID: <20161124151847.GH4271@katana>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 24 Nov 2016 16:20:16 +0100
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <yw1xr3619d3l.fsf@unicorn.mansr.com>
+References: <58356EA8.2010806@free.fr> <yw1xpolmbdih.fsf@unicorn.mansr.com>
+ <58358E79.5050404@free.fr> <yw1xh96yaz84.fsf@unicorn.mansr.com>
+ <5836C69A.3030309@free.fr> <yw1xr3619d3l.fsf@unicorn.mansr.com>
+Message-ID: <58370530.5080605@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2016 at 07:40:10PM +0000, Russell King wrote:
-> When loading the TX fifo to receive bytes on the I2C bus, we incorrectly
-> count the number of bytes:
-> 
-> 	rx_limit = dev->rx_fifo_depth - dw_readl(dev, DW_IC_RXFLR);
-> 
-> 	while (buf_len > 0 && tx_limit > 0 && rx_limit > 0) {
-> 		if (rx_limit - dev->rx_outstanding <= 0)
-> 			break;
-> 		rx_limit--;
-> 		dev->rx_outstanding++;
-> 	}
-> 
-> DW_IC_RXFLR indicates how many bytes are available to be read in the
-> FIFO, dev->rx_fifo_depth is the FIFO size, and dev->rx_outstanding is
-> the number of bytes that we've requested to be read so far, but which
-> have not been read.
-> 
-> Firstly, increasing dev->rx_outstanding and decreasing rx_limit and then
-> comparing them results in each byte consuming "two" bytes in this
-> tracking, so this is obviously wrong.
-> 
-> Secondly, the number of bytes that _could_ be received into the FIFO at
-> any time is the number of bytes we have so far requested but not yet
-> read from the FIFO - in other words dev->rx_outstanding.
-> 
-> So, in order to request enough bytes to fill the RX FIFO, we need to
-> request dev->rx_fifo_depth - dev->rx_outstanding bytes.
-> 
-> Modifying the code thusly results in us reaching the maximum number of
-> bytes outstanding each time we queue more "receive" operations, provided
-> the transfer allows that to happen.
-> 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+On 24/11/2016 15:17, M?ns Rullg?rd wrote:
 
-Applied to for-current, thanks!
+> Mason wrote:
+> 
+>> [   35.085854] SETUP DMA
+>> [   35.088272] START NAND TRANSFER
+>> [   35.091670] tangox_dma_pchan_start from tangox_dma_irq
+>> [   35.096882] tango_dma_callback from vchan_complete
+>> [   45.102513] DONE FAKE SPINNING
+>>
+>> So the IRQ rolls in, the ISR calls tangox_dma_pchan_start,
+>> which calls tangox_dma_pchan_detach to tear down the sbox
+>> setup; and only sometime later does the DMA framework call
+>> my callback function.
+> 
+> Yes, I realised this soon after I said it.  The dma driver could be
+> rearranged to make it work though.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161124/cd1f3cc5/attachment.sig>
+There is a way to make the tasklet run and invoke the callback
+before the interrupt service routine proceeds? Can you say more
+about this?
+
+
+>> So far, the work-arounds I've tested are:
+>>
+>> 1) delay sbox tear-down by 10 ?s in tangox_dma_pchan_detach.
+>> 2) statically setup sbox in probe, and never touch it henceforth.
+>>
+>> WA1 is fragile, it might break for devices other than NFC.
+>> WA2 is what I used when I wrote the NFC driver.
+>>
+>> Can tangox_dma_irq() be changed to have the framework call
+>> the client's callback *before* tangox_dma_pchan_start?
+>>
+>> (Thinking out loud) The DMA_PREP_INTERRUPT requests that the
+>> DMA framework invoke the callback from tasklet context,
+>> maybe a different flag DMA_PREP_INTERRUPT_EX can request
+>> calling the call-back directly from within the ISR?
+>>
+>> (Looking at existing flags) Could I use DMA_CTRL_ACK?
+>> Description sounds like some kind hand-shake between
+>> client and dmaengine.
+>>
+>> Grepping for DMA_PREP_INTERRUPT, I don't see where the framework
+>> checks that flag to spawn the tasklet? Or is that up to each
+>> driver individually?
+> 
+> Those flags all have defined meanings and abusing them for other things
+> is a bad idea.  As far as possible, device drivers should work with any
+> dma driver.
+
+I was asking about introducing a new flag, not abusing existing
+flags. (I don't understand the semantics of DMA_CTRL_ACK.)
+
+(FWIW, both the NFC and the MBUS agent are custom designs,
+not third-party IP blocks.)
+
+Regards.
