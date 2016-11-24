@@ -1,137 +1,57 @@
-From: hl@rock-chips.com (Lin Huang)
-Date: Thu, 24 Nov 2016 17:11:42 +0800
-Subject: [PATCH v7] PM/devfreq: add suspend frequency support
-Message-ID: <1479978702-21449-1-git-send-email-hl@rock-chips.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 24 Nov 2016 09:16:28 +0000
+Subject: [RFC PATCH 2/5] dmaengine: allow sun6i-dma for more SoCs
+In-Reply-To: <CAGb2v67M8DrPaf8GzSPEjekgV6cLcXXzO3tVUc9kjUDcM3BE_w@mail.gmail.com>
+References: <1479950235-26821-1-git-send-email-andre.przywara@arm.com>
+ <1479950235-26821-3-git-send-email-andre.przywara@arm.com>
+ <CAGb2v67M8DrPaf8GzSPEjekgV6cLcXXzO3tVUc9kjUDcM3BE_w@mail.gmail.com>
+Message-ID: <34b5e50f-a091-9bd8-7a74-96e538a7351d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add suspend frequency support and if needed set it to
-the frequency obtained from the suspend opp (can be defined
-using opp-v2 bindings and is optional).
+Hi,
 
-Signed-off-by: Lin Huang <hl@rock-chips.com>
----
-Changes in v2:
-- use update_devfreq() instead devfreq_update_status()
-Changes in v3:
-- fix build error
-Changes in v4:
-- move dev_pm_opp_get_suspend_opp() to devfreq_add_device()
-Changes in v5:
-- delete devfreq_opp_get_suspend_opp() in devfreq.h
-Changes in v6:
-- return to use stop_polling check suspend status
-Changes in v7:
-- move handle suspend frequency in devfreq_suspend_device()
+On 24/11/16 04:16, Chen-Yu Tsai wrote:
+> Hi,
+> 
+> On Thu, Nov 24, 2016 at 9:17 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+>> The sun6i DMA driver is used in the Allwinner A64 and H5 SoC, which
+>> have arm64 capable cores. Add the generic sunxi config symbol to allow
+>> the driver to be selected by arm64 Kconfigs, which don't feature
+>> SoC specific MACH_xxxx configs.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  drivers/dma/Kconfig | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+>> index af63a6b..003c284 100644
+>> --- a/drivers/dma/Kconfig
+>> +++ b/drivers/dma/Kconfig
+>> @@ -157,7 +157,7 @@ config DMA_SUN4I
+>>
+>>  config DMA_SUN6I
+>>         tristate "Allwinner A31 SoCs DMA support"
+>> -       depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST
+>> +       depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST || ARCH_SUNXI
+> 
+> AFAIK ARCH_SUNXI encompasses/supersedes MACH_SUN*I.
+> (And I don't have to add MACH_SUN9I later :) )
 
- drivers/devfreq/devfreq.c | 47 ++++++++++++++++++++++++++++++++++-------------
- include/linux/devfreq.h   |  1 +
- 2 files changed, 35 insertions(+), 13 deletions(-)
+Sure, admittedly it was just a quick hack to get things going.
+Actually I don't know why we had a *depend* on those MACH_s before. I
+think technically it does not depend on a certain SoC (having the
+COMPILE_TEST in there hints on that). So what about:
 
-diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
-index da72d97..958abc8 100644
---- a/drivers/devfreq/devfreq.c
-+++ b/drivers/devfreq/devfreq.c
-@@ -212,16 +212,7 @@ static int devfreq_notify_transition(struct devfreq *devfreq,
- 	return 0;
- }
- 
--/* Load monitoring helper functions for governors use */
--
--/**
-- * update_devfreq() - Reevaluate the device and configure frequency.
-- * @devfreq:	the devfreq instance.
-- *
-- * Note: Lock devfreq->lock before calling update_devfreq
-- *	 This function is exported for governors.
-- */
--int update_devfreq(struct devfreq *devfreq)
-+static int _update_devfreq(struct devfreq *devfreq, bool is_suspending)
- {
- 	struct devfreq_freqs freqs;
- 	unsigned long freq, cur_freq;
-@@ -237,9 +228,13 @@ int update_devfreq(struct devfreq *devfreq)
- 		return -EINVAL;
- 
- 	/* Reevaluate the proper frequency */
--	err = devfreq->governor->get_target_freq(devfreq, &freq);
--	if (err)
--		return err;
-+	if (is_suspending && devfreq->suspend_freq) {
-+		freq = devfreq->suspend_freq;
-+	} else {
-+		err = devfreq->governor->get_target_freq(devfreq, &freq);
-+		if (err)
-+			return err;
-+	}
- 
- 	/*
- 	 * Adjust the frequency with user freq and QoS.
-@@ -285,6 +280,21 @@ int update_devfreq(struct devfreq *devfreq)
- 	devfreq->previous_freq = freq;
- 	return err;
- }
-+
-+/* Load monitoring helper functions for governors use */
-+
-+/**
-+ * update_devfreq() - Reevaluate the device and configure frequency.
-+ * @devfreq:	the devfreq instance.
-+ *
-+ * Note: Lock devfreq->lock before calling update_devfreq
-+ *	 This function is exported for governors.
-+ */
-+
-+int update_devfreq(struct devfreq *devfreq)
-+{
-+	return _update_devfreq(devfreq, false);
-+}
- EXPORT_SYMBOL(update_devfreq);
- 
- /**
-@@ -524,6 +534,7 @@ struct devfreq *devfreq_add_device(struct device *dev,
- 	struct devfreq *devfreq;
- 	struct devfreq_governor *governor;
- 	int err = 0;
-+	struct dev_pm_opp *suspend_opp;
- 
- 	if (!dev || !profile || !governor_name) {
- 		dev_err(dev, "%s: Invalid parameters.\n", __func__);
-@@ -558,6 +569,12 @@ struct devfreq *devfreq_add_device(struct device *dev,
- 	devfreq->data = data;
- 	devfreq->nb.notifier_call = devfreq_notifier_call;
- 
-+	rcu_read_lock();
-+	suspend_opp = dev_pm_opp_get_suspend_opp(dev);
-+	if (suspend_opp)
-+		devfreq->suspend_freq = dev_pm_opp_get_freq(suspend_opp);
-+	rcu_read_unlock();
-+
- 	if (!devfreq->profile->max_state && !devfreq->profile->freq_table) {
- 		mutex_unlock(&devfreq->lock);
- 		devfreq_set_freq_table(devfreq);
-@@ -754,6 +771,10 @@ int devfreq_suspend_device(struct devfreq *devfreq)
- 	if (!devfreq->governor)
- 		return 0;
- 
-+	mutex_lock(&devfreq->lock);
-+	_update_devfreq(devfreq, true);
-+	mutex_unlock(&devfreq->lock);
-+
- 	return devfreq->governor->event_handler(devfreq,
- 				DEVFREQ_GOV_SUSPEND, NULL);
- }
-diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
-index 98c6993..517e394 100644
---- a/include/linux/devfreq.h
-+++ b/include/linux/devfreq.h
-@@ -172,6 +172,7 @@ struct devfreq {
- 	struct delayed_work work;
- 
- 	unsigned long previous_freq;
-+	unsigned long suspend_freq;
- 	struct devfreq_dev_status last_status;
- 
- 	void *data; /* private data for governors */
--- 
-2.6.6
+	depends on ARCH_SUNXI || COMPILE_TEST
+
+and maybe:
+
+	default y if MACH_SUN6I || MACH_SUN8I
+
+Though I see that both multi_v7_defconfig and sunxi_defconfig explicitly
+set this, so this wouldn't be needed?
+
+Cheers,
+Andre.
