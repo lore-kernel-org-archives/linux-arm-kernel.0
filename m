@@ -1,72 +1,35 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 24 Nov 2016 19:42:47 +0000
-Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire
- section
-In-Reply-To: <20161124192659.GH2213@rric.localdomain>
-References: <CAKv+Gu-2uGJGovqQL-gbB54u=fQ9L9YUbDdRo6u3oWqF6znn6Q@mail.gmail.com>
- <20161123211538.GH10776@rric.localdomain>
- <CAKv+Gu8aWpz5vXSWdKHwL5Xk2aWyQBOoR1WHOnVPaWZOwqojBQ@mail.gmail.com>
- <20161124134238.GI10776@rric.localdomain>
- <CAKv+Gu_Ug3XOD6jy5xziy1pS7WV=TC0RLD4j3DT6nytujQDzRQ@mail.gmail.com>
- <20161124135151.GJ10776@rric.localdomain>
- <CAKv+Gu9qB7P2epMGdwFJ3vJR3vt-bBxU0nKwmKdpaOpTKdqzzA@mail.gmail.com>
- <20161124141149.GE2213@rric.localdomain>
- <CAKv+Gu-SXX_Vv1Wi1Nm=5vdaXSS0MBp20QBpQVacSKPLfdH0-A@mail.gmail.com>
- <20161124150918.GF2213@rric.localdomain>
- <20161124192659.GH2213@rric.localdomain>
-Message-ID: <CAKv+Gu_C_17RtAiw2U0OOzVik3G7KkwUTo5eiGK-HDo-maQ-bA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 24 Nov 2016 20:53:48 +0100
+Subject: [RFC PATCH 2/2] arm64: dts: enable the MUSB controller of Pine64
+ in host-only mode
+In-Reply-To: <20161122165902.62543-2-icenowy@aosc.xyz>
+References: <20161122165902.62543-1-icenowy@aosc.xyz>
+ <20161122165902.62543-2-icenowy@aosc.xyz>
+Message-ID: <20161124195348.t53xxasm6hlvwz7s@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 November 2016 at 19:26, Robert Richter <robert.richter@cavium.com> wrote:
-> Ard,
->
->> > >> On 24 November 2016 at 13:51, Robert Richter <robert.richter@cavium.com> wrote:
->> > >> > On 24.11.16 13:44:31, Ard Biesheuvel wrote:
->
->> > >> Regions containing firmware tables are owned by the firmware, and it
->> > >> is the firmware that tells us which memory attributes we are allowed
->> > >> to use. If those attributes include WB, it is perfectly legal to use a
->> > >> cacheable mapping. That does *not* mean they should be covered by the
->> > >> linear mapping. The linear mapping is read-write-non-exec, for
->> > >> instance, and we may prefer to use a read-only mapping and/or
->> > >> executable mapping.
->> > >
->> > > Ok, I am going to fix try_ram_remap().
->
-> I revisited the code and it is working well already since:
->
->  e7cd190385d1 arm64: mark reserved memblock regions explicitly in iomem
->
-> Now, try_ram_remap() is only called if the region to be mapped is
-> entirely in IORESOURCE_SYSTEM_RAM. This is only true for normal mem
-> ranges and not NOMAP mem. region_intersects() then returns
-> REGION_INTERSECTS and calls try_ram_remap(). For the NOMAP memory case
-> REGION_DISJOINT would be returned and thus arch_memremap_wb() being
-> called directly. Before the e7cd190385d1 change try_ram_remap() was
-> called also for nomap regions.
->
-> So we can leave memremap() as it is and just apply this patch
-> unmodified. What do you think?
+On Wed, Nov 23, 2016 at 12:59:02AM +0800, Icenowy Zheng wrote:
+> A64 has a MUSB controller wired to the USB PHY 0, which is connected
+> to the upper USB Type-A port of Pine64.
+> 
+> As the port is a Type-A female port, enable it in host-only mode in the
+> device tree, which makes devices with USB Type-A male port can work on
+> this port (which is originally designed by Pine64 team).
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-I agree. The pfn_valid() check in try_ram_remap() is still appropriate
-simply because the PageHighmem check requires a valid struct page. But
-if we don't enter that code path anymore for NOMAP regions, I think
-we're ok.
+Applied both, thanks!
+Maxime
 
-> Please ack.
->
-
-I still don't fully understand how it is guaranteed that *all* memory
-(i.e., all regions for which memblock_is_memory() returns true) is
-covered by a struct page, but marked as reserved. Are we relying on
-the fact that NOMAP memory is also memblock_reserve()'d?
-
-> I am going to prepare the pfn_is_ram() change in addition to this
-> patch, but that should not be required for this fix to work correcly.
->
-
-I don't think you need to bother with page_is_ram() then. The only
-place we use it is in devmem_is_allowed(), and there it makes sense to
-allow NOMAP regions to be accessed (provided that you think /dev/mem
-is a good idea in the first place).
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161124/7504c3f1/attachment.sig>
