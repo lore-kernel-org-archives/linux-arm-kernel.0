@@ -1,65 +1,140 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Thu, 24 Nov 2016 16:14:19 +0100
-Subject: [PATCH v2 3/7] PWM: add pwm-stm32 DT bindings
-In-Reply-To: <1480000463-9625-1-git-send-email-benjamin.gaignard@st.com>
-References: <1480000463-9625-1-git-send-email-benjamin.gaignard@st.com>
-Message-ID: <1480000463-9625-4-git-send-email-benjamin.gaignard@st.com>
+Date: Thu, 24 Nov 2016 16:14:16 +0100
+Subject: [PATCH v2 0/7] Add pwm and IIO timer drivers for stm32
+Message-ID: <1480000463-9625-1-git-send-email-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define bindings for pwm-stm32
-
 version 2:
-- use parameters instead of compatible of handle the hardware configuration
+- keep only one compatible per driver
+- use DT parameters to describe hardware block configuration:
+  - pwm channels, complementary output, counter size, break input
+  - triggers accepted and create by IIO timers
+- change DT to limite use of reference to the node
+- interrupt is now in IIO timer driver
+- rename stm32-mfd-timer to stm32-gptimer (for general purpose timer)
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
----
- .../devicetree/bindings/pwm/pwm-stm32.txt          | 37 ++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+The following patches enable pwm and IIO Timer features for stm32 platforms.
+
+Those two features are mixed into the registers of the same hardware block
+(named general purpose timer) which lead to introduce a multifunctions driver 
+on the top of them to be able to share the registers.
+
+In stm32 14 instances of timer hardware block exist, even if they all have
+the same register mapping they could have a different number of pwm channels
+and/or different triggers capabilities. We use various parameters in DT to 
+describe the differences between hardware blocks
+
+The MFD (stm32-gptimer.c) takes care of clock and register mapping
+by using regmap. stm32_gptimer_dev structure is provided to its sub-node to
+share those information.
+
+PWM driver is implemented into pwm-stm32.c. Depending of the instance we may
+have up to 4 channels, sometime with complementary outputs or 32 bits counter
+instead of 16 bits. Some hardware blocks may also have a break input function
+which allows to stop pwm depending of a level, defined in devicetree, on an
+external pin.
+
+IIO timer driver (stm32-iio-timer.c and stm32-iio-timers.h) define a list of 
+hardware triggers usable by hardware blocks like ADC, DAC or other timers. 
+
+The matrix of possible connections between blocks is quite complex so we use 
+trigger names and is_stm32_iio_timer_trigger() function to be sure that
+triggers are valid and configure the IPs.
+Possible triggers ar listed in include/dt-bindings/iio/timer/st,stm32-iio-timer.h
+
+At run time IIO timer hardware blocks can configure (through "master_mode" 
+IIO device attribute) which internal signal (counter enable, reset,
+comparison block, etc...) is used to generate the trigger.
+
+By using "slave_mode" IIO device attribute timer can also configure on which
+event (level, rising edge) of the block is enabled.
+
+Since we can use trigger from one hardware to control an other block, we can
+use a pwm to control an other one. The following example shows how to configure
+pwm1 and pwm3 to make pwm3 generate pulse only when pwm1 pulse level is high.
+
+/sys/bus/iio/devices # ls
+iio:device0  iio:device1  trigger0     trigger1
+
+configure timer1 to use pwm1 channel 0 as output trigger
+/sys/bus/iio/devices # echo 4 > iio\:device0/master_mode
+configure timer3 to enable only when input is high
+/sys/bus/iio/devices # echo 5 > iio\:device1/slave_mode
+/sys/bus/iio/devices # cat trigger0/name
+tim1_trgo
+configure timer2 to use timer1 trigger is input
+/sys/bus/iio/devices # echo "tim1_trgo" > iio\:device1/trigger/current_trigger
+
+configure pwm3 channel 0 to generate a signal with a period of 100ms and a
+duty cycle of 50%
+/sys/devices/platform/soc/40000400.gptimer3/40000400.gptimer3:pwm3 at 0/pwm/pwmchip4 # echo 0 > export
+/sys/devices/platform/soc/40000400.gptimer3/40000400.gptimer3:pwm3 at 0/pwm/pwmchip4 # echo 100000000 > pwm0/period
+/sys/devices/platform/soc/40000400.gptimer3/40000400.gptimer3:pwm3 at 0/pwm/pwmchip4 # echo 50000000 > pwm0/duty_cycle
+/sys/devices/platform/soc/40000400.gptimer3/40000400.gptimer3:pwm3 at 0/pwm/pwmchip4# echo 1 > pwm0/enable
+here pwm3 channel 0, as expected, doesn't start because has to be triggered by
+pwm1 channel 0
+
+configure pwm1 channel 0 to generate a signal with a period of 1s and a
+duty cycle of 50%
+/sys/devices/platform/soc/40010000.gptimer1/40010000.gptimer1:pwm1 at 0/pwm/pwmchip0 # echo 0 > export
+/sys/devices/platform/soc/40010000.gptimer1/40010000.gptimer1:pwm1 at 0/pwm/pwmchip0 # echo 1000000000 > pwm0/period
+/sys/devices/platform/soc/40010000.gptimer1/40010000.gptimer1:pwm1 at 0/pwm/pwmchip0 # echo 500000000 > pwm0/duty_cycle
+/sys/devices/platform/soc/40010000.gptimer1/40010000.gptimer1:pwm1 at 0/pwm/pwmchip0 # echo 1 > pwm0/enable 
+finally pwm1 starts and pwm3 only generates pulse when pwm1 signal is high
+
+An other example to use a timer as source of clock for another device.
+Here timer1 is used a source clock for pwm3:
+
+/sys/bus/iio/devices # echo 100000 > trigger0/sampling_frequency 
+/sys/bus/iio/devices # echo tim1_trgo > iio\:device1/trigger/current_trigger 
+/sys/bus/iio/devices # echo 7 > iio\:device1/slave_mode
+/sys/devices/platform/soc/40000400.gptimer3/40000400.gptimer3:pwm3 at 0/pwm/pwmchip4 # echo 0 > export 
+/sys/devices/platform/soc/40000400.gptimer3/40000400.gptimer3:pwm3 at 0/pwm/pwmchip4 # echo 1000000 > pwm0/period 
+/sys/devices/platform/soc/40000400.gptimer3/40000400.gptimer3:pwm3 at 0/pwm/pwmchip4 # echo 500000 > pwm0/duty_cycle 
+/sys/devices/platform/soc/40000400.gptimer3/40000400.gptimer3:pwm3 at 0/pwm/pwmchip4 # echo 1 > pwm0/enable 
+
+Benjamin Gaignard (7):
+  MFD: add bindings for stm32 general purpose timer driver
+  MFD: add stm32 general purpose timer driver
+  PWM: add pwm-stm32 DT bindings
+  PWM: add pwm driver for stm32 plaftorm
+  IIO: add bindings for stm32 IIO timer driver
+  IIO: add STM32 IIO timer driver
+  ARM: dts: stm32: add stm32 general purpose timer driver in DT
+
+ .../bindings/iio/timer/stm32-iio-timer.txt         |  41 ++
+ .../bindings/mfd/stm32-general-purpose-timer.txt   |  43 ++
+ .../devicetree/bindings/pwm/pwm-stm32.txt          |  37 ++
+ arch/arm/boot/dts/stm32f429.dtsi                   | 305 +++++++++++++-
+ arch/arm/boot/dts/stm32f469-disco.dts              |  28 ++
+ drivers/iio/Kconfig                                |   2 +-
+ drivers/iio/Makefile                               |   1 +
+ drivers/iio/timer/Kconfig                          |  15 +
+ drivers/iio/timer/Makefile                         |   1 +
+ drivers/iio/timer/stm32-iio-timer.c                | 448 +++++++++++++++++++++
+ drivers/iio/trigger/Kconfig                        |   1 -
+ drivers/mfd/Kconfig                                |  10 +
+ drivers/mfd/Makefile                               |   2 +
+ drivers/mfd/stm32-gptimer.c                        |  73 ++++
+ drivers/pwm/Kconfig                                |   8 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-stm32.c                            | 285 +++++++++++++
+ include/dt-bindings/iio/timer/st,stm32-iio-timer.h |  23 ++
+ include/linux/iio/timer/stm32-iio-timers.h         |  16 +
+ include/linux/mfd/stm32-gptimer.h                  |  62 +++
+ 20 files changed, 1399 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-iio-timer.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/stm32-general-purpose-timer.txt
  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+ create mode 100644 drivers/iio/timer/Kconfig
+ create mode 100644 drivers/iio/timer/Makefile
+ create mode 100644 drivers/iio/timer/stm32-iio-timer.c
+ create mode 100644 drivers/mfd/stm32-gptimer.c
+ create mode 100644 drivers/pwm/pwm-stm32.c
+ create mode 100644 include/dt-bindings/iio/timer/st,stm32-iio-timer.h
+ create mode 100644 include/linux/iio/timer/stm32-iio-timers.h
+ create mode 100644 include/linux/mfd/stm32-gptimer.h
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-new file mode 100644
-index 0000000..36263f0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-@@ -0,0 +1,37 @@
-+STMicroelectronics PWM driver bindings for STM32
-+
-+Must be a sub-node of STM32 general purpose timer driver
-+
-+Required parameters:
-+- compatible:		Must be "st,stm32-pwm"
-+- pinctrl-names: 	Set to "default".
-+- pinctrl-0: 		List of phandles pointing to pin configuration nodes
-+			for PWM module.
-+			For Pinctrl properties, please refer to [1].
-+
-+Optional parameters:
-+- st,breakinput:	Set if the hardware have break input capabilities
-+- st,breakinput-polarity: Set break input polarity. Default is 0
-+			 The value define the active polarity:
-+			  - 0 (active LOW)
-+			  - 1 (active HIGH)
-+- st,pwm-num-chan:	Number of available PWM channels.  Default is 0.
-+- st,32bits-counter:	Set if the hardware have a 32 bits counter
-+- st,complementary:	Set if the hardware have complementary output channels
-+
-+[1] Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-+
-+Example:
-+	gptimer1: gptimer1 at 40010000 {
-+		compatible = "st,stm32-gptimer";
-+		reg = <0x40010000 0x400>;
-+		clocks = <&rcc 0 160>;
-+		clock-names = "clk_int";
-+
-+		pwm1 at 0 {
-+			compatible = "st,stm32-pwm";
-+			st,pwm-num-chan = <4>;
-+			st,breakinput;
-+			st,complementary;
-+		};
-+	};
 -- 
 1.9.1
