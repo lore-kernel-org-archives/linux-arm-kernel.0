@@ -1,29 +1,143 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Nov 2016 12:09:41 +0100
-Subject: [PATCH 7/10] mmc: sdhci-xenon: Add support to PHYs of Marvell
- Xenon SDHC
-In-Reply-To: <f7334e41-39dd-f868-ff10-199afaebe926@marvell.com>
-References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
- <2204525.IWIYQVjIXl@wuerfel>
- <f7334e41-39dd-f868-ff10-199afaebe926@marvell.com>
-Message-ID: <23084629.DpfWxNEgoY@wuerfel>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Thu, 24 Nov 2016 12:10:44 +0100
+Subject: [PATCH V9 11/11] ARM64/PCI: Support for ACPI based PCI host
+ controller
+In-Reply-To: <20161123182243.GF16033@bhelgaas-glaptop.roam.corp.google.com>
+References: <1465588519-11334-1-git-send-email-tn@semihalf.com>
+ <1465588519-11334-12-git-send-email-tn@semihalf.com>
+ <20161122231321.GA20246@bhelgaas-glaptop.roam.corp.google.com>
+ <edf72769-e9c8-4617-8dc4-8f3d05a678e7@semihalf.com>
+ <20161123182243.GF16033@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <a3548d7a-73cb-21d5-a3d9-a0e4f07a5db5@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 24, 2016 6:57:18 PM CET Ziji Hu wrote:
-> > 
-> > Please explain in the changelog why this is not a generic
-> > phy driver (or three of them).
-> > 
->         Actually we tried to put the PHY code into Linux PHY framework.
->         But it cannot fit in Linux common PHY framework.
-> 
->         Our Xenon SDHC PHY register is a part of Xenon SDHC register set.
->         Besides, during MMC initialization, MMC sequence has to call several PHY functions to complete timing setting.
->         In those PHY setting functions, they have to access SDHC register and know current MMC setting, such as bus width, clock frequency and speed mode.
->         As a result, we have to implement PHY under MMC directory.
-> 
+On 23.11.2016 19:22, Bjorn Helgaas wrote:
+> On Wed, Nov 23, 2016 at 12:21:03PM +0100, Tomasz Nowicki wrote:
+>> Hi Bjorn,
+>>
+>> On 23.11.2016 00:13, Bjorn Helgaas wrote:
+>>> Hi Tomasz,
+>>>
+>>> On Fri, Jun 10, 2016 at 09:55:19PM +0200, Tomasz Nowicki wrote:
+>>>> Implement pci_acpi_scan_root and other arch-specific call so that ARM64
+>>>> can start using ACPI to setup and enumerate PCI buses.
+>>>>
+>>>> Prior to buses enumeration the pci_acpi_scan_root() implementation looks
+>>>> for configuration space start address (obtained through ACPI _CBA method or
+>>>> MCFG interface). If succeed, it uses ECAM library to create new mapping.
+>>>> Then it attaches generic ECAM ops (pci_generic_ecam_ops) which are used
+>>>> for accessing configuration space later on.
+>>>> ...
+>>>
+>>>> +static struct acpi_pci_root_ops acpi_pci_root_ops = {
+>>>> +	.release_info = pci_acpi_generic_release_info,
+>>>> +};
+>>>> +
+>>>> +/* Interface called from ACPI code to setup PCI host controller */
+>>>> struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>>>> {
+>>>> -	/* TODO: Should be revisited when implementing PCI on ACPI */
+>>>> -	return NULL;
+>>>> +	int node = acpi_get_node(root->device->handle);
+>>>> +	struct acpi_pci_generic_root_info *ri;
+>>>> +	struct pci_bus *bus, *child;
+>>>> +
+>>>> +	ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
+>>>> +	if (!ri)
+>>>> +		return NULL;
+>>>> +
+>>>> +	ri->cfg = pci_acpi_setup_ecam_mapping(root);
+>>>> +	if (!ri->cfg) {
+>>>> +		kfree(ri);
+>>>> +		return NULL;
+>>>> +	}
+>>>> +
+>>>> +	acpi_pci_root_ops.pci_ops = &ri->cfg->ops->pci_ops;
+>>>
+>>> This has already been merged, but this isn't right, is it?  We're
+>>> writing a host controller-specific pointer into the single system-wide
+>>> acpi_pci_root_ops, then passing it on to acpi_pci_root_create().
+>>>
+>>> Today, I think ri->cfg->ops->pci_ops is always &pci_generic_ecam_ops,
+>> >from this path:
+>>>
+>>>  ri->cfg = pci_acpi_setup_ecam_mapping
+>>>    cfg = pci_ecam_create(..., &pci_generic_ecam_ops)
+>>>      cfg = kzalloc(...)
+>>>      cfg->ops = ops             # &pci_generic_ecam_ops
+>>>
+>>> But we're about to merge the ECAM quirks series, which will mean it
+>>> may not be &pci_generic_ecam_ops.  Even apart from the ECAM quirks, we
+>>> should avoid this pattern of putting device-specific info in a single
+>>> shared structure because it's too difficult to verify that it's
+>>> correct.
+>>>
+>>
+>> Well spotted. I agree, we need to fix this. How about this:
+>> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+>> index fb439c7..31c0e1c 100644
+>> --- a/arch/arm64/kernel/pci.c
+>> +++ b/arch/arm64/kernel/pci.c
+>> @@ -152,33 +152,35 @@ static void
+>> pci_acpi_generic_release_info(struct acpi_pci_root_info *ci)
+>>
+>>         ri = container_of(ci, struct acpi_pci_generic_root_info, common);
+>>         pci_ecam_free(ri->cfg);
+>> +       kfree(ci->ops);
+>>         kfree(ri);
+>>  }
+>>
+>> -static struct acpi_pci_root_ops acpi_pci_root_ops = {
+>> -       .release_info = pci_acpi_generic_release_info,
+>> -};
+>> -
+>>  /* Interface called from ACPI code to setup PCI host controller */
+>>  struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>>  {
+>>         int node = acpi_get_node(root->device->handle);
+>>         struct acpi_pci_generic_root_info *ri;
+>>         struct pci_bus *bus, *child;
+>> +       struct acpi_pci_root_ops *root_ops;
+>>
+>>         ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
+>>         if (!ri)
+>>                 return NULL;
+>>
+>> +       root_ops = kzalloc_node(sizeof(*root_ops), GFP_KERNEL, node);
+>> +       if (!root_ops)
+>> +               return NULL;
+>> +
+>>         ri->cfg = pci_acpi_setup_ecam_mapping(root);
+>>         if (!ri->cfg) {
+>>                 kfree(ri);
+>> +               kfree(root_ops);
+>>                 return NULL;
+>>         }
+>>
+>> -       acpi_pci_root_ops.pci_ops = &ri->cfg->ops->pci_ops;
+>> -       bus = acpi_pci_root_create(root, &acpi_pci_root_ops, &ri->common,
+>> -                                  ri->cfg);
+>> +       root_ops->release_info = pci_acpi_generic_release_info;
+>> +       root_ops->pci_ops = &ri->cfg->ops->pci_ops;
+>> +       bus = acpi_pci_root_create(root, root_ops, &ri->common, ri->cfg);
+>>         if (!bus)
+>>                 return NULL;
+>>
+>> Of course, this should be the part of ECAM quirks core patches.
+>>
+>> The other option we have is to remove "struct pci_ops *pci_ops;"
+>> from acpi_pci_root_ops structure and pass struct pci_ops as an extra
+>> argument to acpi_pci_root_create(). What do you think?
+>
+> I think your patch above is fine and avoids the need to change the x86 and
+> ia64 code.  Would you mind packaging this up with a changelog and
+> signed-off-by?  I can take care of putting it in the ECAM series.
+>
 
-Ok, that makes sense, just put the same text in the changelog comment.
+Sure, I have just sent the patch in replay to ECAM quirks V6 patch set.
 
-	Arnd
+Let us know when you update your branch so we base our quirks on it.
+
+Thanks,
+Tomasz
