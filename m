@@ -1,79 +1,216 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 24 Nov 2016 21:44:15 +0100
-Subject: [RFC PATCH 2/5] dmaengine: allow sun6i-dma for more SoCs
-In-Reply-To: <606230fd-37f6-e1ed-adc3-72f606fa944c@arm.com>
-References: <1479950235-26821-1-git-send-email-andre.przywara@arm.com>
- <1479950235-26821-3-git-send-email-andre.przywara@arm.com>
- <CAGb2v67M8DrPaf8GzSPEjekgV6cLcXXzO3tVUc9kjUDcM3BE_w@mail.gmail.com>
- <34b5e50f-a091-9bd8-7a74-96e538a7351d@arm.com>
- <CAGb2v65G7=9ah+sEet=z5vss60kL5ZLSkNsAcGpwu8V6AWdEGA@mail.gmail.com>
- <20161124105516.tv2ybfgka5teiv2h@lukather>
- <606230fd-37f6-e1ed-adc3-72f606fa944c@arm.com>
-Message-ID: <20161124204415.6lw3knylft2hzrfc@lukather>
+Date: Thu, 24 Nov 2016 22:29:30 +0100
+Subject: [PATCH v2 2/3] ARM: dts: sunxi: add support for Orange Pi Zero
+ board
+In-Reply-To: <a4393a37-5008-ec76-9886-05f8686dadd5@arm.com>
+References: <20161121162421.800-1-icenowy@aosc.xyz>
+ <20161121162421.800-2-icenowy@aosc.xyz>
+ <20161123075713.ks6gmud3rszjbdsh@lukather>
+ <a4393a37-5008-ec76-9886-05f8686dadd5@arm.com>
+Message-ID: <20161124212930.truoiherpczbabh7@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2016 at 11:15:42AM +0000, Andre Przywara wrote:
-> On 24/11/16 10:55, Maxime Ripard wrote:
-> > On Thu, Nov 24, 2016 at 05:30:45PM +0800, Chen-Yu Tsai wrote:
-> >> On Thu, Nov 24, 2016 at 5:16 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> >>> Hi,
-> >>>
-> >>> On 24/11/16 04:16, Chen-Yu Tsai wrote:
-> >>>> Hi,
-> >>>>
-> >>>> On Thu, Nov 24, 2016 at 9:17 AM, Andre Przywara <andre.przywara@arm.com> wrote:
-> >>>>> The sun6i DMA driver is used in the Allwinner A64 and H5 SoC, which
-> >>>>> have arm64 capable cores. Add the generic sunxi config symbol to allow
-> >>>>> the driver to be selected by arm64 Kconfigs, which don't feature
-> >>>>> SoC specific MACH_xxxx configs.
-> >>>>>
-> >>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >>>>> ---
-> >>>>>  drivers/dma/Kconfig | 2 +-
-> >>>>>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>>>>
-> >>>>> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> >>>>> index af63a6b..003c284 100644
-> >>>>> --- a/drivers/dma/Kconfig
-> >>>>> +++ b/drivers/dma/Kconfig
-> >>>>> @@ -157,7 +157,7 @@ config DMA_SUN4I
-> >>>>>
-> >>>>>  config DMA_SUN6I
-> >>>>>         tristate "Allwinner A31 SoCs DMA support"
-> >>>>> -       depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST
-> >>>>> +       depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST || ARCH_SUNXI
-> >>>>
-> >>>> AFAIK ARCH_SUNXI encompasses/supersedes MACH_SUN*I.
-> >>>> (And I don't have to add MACH_SUN9I later :) )
-> >>>
-> >>> Sure, admittedly it was just a quick hack to get things going.
-> >>> Actually I don't know why we had a *depend* on those MACH_s before. I
-> >>> think technically it does not depend on a certain SoC (having the
-> >>> COMPILE_TEST in there hints on that). So what about:
-> >>
-> >> It was really because this DMA engine only comes with the later
-> >> SoCs. We have dma-sun4i for the older one.
-> > 
-> > Indeed.
-> > 
-> >> But yes, there's no reason why you can't build it for the earlier
-> >> SoC. It just doesn't get used.
-> > 
-> > I'm still in favor of keeping the depends on. There's no point of
-> > compiling something we know have zero chance of running.
-> > 
-> > (But that would be (ARCH_SUNXI && ARM64))
+On Wed, Nov 23, 2016 at 09:23:49AM +0000, Andre Przywara wrote:
+> Hi Maxime,
 > 
-> I am OK with that, just wondering if there is a definition of what
-> "depends" really means. My impression what that it's a about code
-> dependencies (requires a certain subsystem, for instance), not really if
-> it's useful in a particular configuration.
+> On 23/11/16 07:57, Maxime Ripard wrote:
+> > On Tue, Nov 22, 2016 at 12:24:20AM +0800, Icenowy Zheng wrote:
+> >> Orange Pi Zero is a board that came with the new Allwinner H2+ SoC.
+> >>
+> >> Add a device tree file for it.
+> >>
+> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> >> ---
+> >> Changes since v2:
+> >> - Use generic pinconf binding instead of legacy allwinner pinctrl binding.
+> >> - removed uart3, which is not accessible on Orange Pi Zero.
+> >> - Removed sun8i-h2plus.dtsi and make Orange Pi Zero dts directly include
+> >>   sun8i-h3.dtsi.
+> >> - Removed allwinner,sun8i-h3 compatible.
+> >>
+> >>  arch/arm/boot/dts/Makefile                       |   1 +
+> >>  arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts | 137 +++++++++++++++++++++++
+> > 
+> > Ditto, h2-plus-orangepi-zero.
+> > 
+> >>  2 files changed, 138 insertions(+)
+> >>  create mode 100644 arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts
+> >>
+> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >> index 802a10d..51a1dd7 100644
+> >> --- a/arch/arm/boot/dts/Makefile
+> >> +++ b/arch/arm/boot/dts/Makefile
+> >> @@ -834,6 +834,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+> >>  	sun8i-a33-sinlinx-sina33.dtb \
+> >>  	sun8i-a83t-allwinner-h8homlet-v2.dtb \
+> >>  	sun8i-a83t-cubietruck-plus.dtb \
+> >> +	sun8i-h2plus-orangepi-zero.dtb \
+> >>  	sun8i-h3-bananapi-m2-plus.dtb \
+> >>  	sun8i-h3-nanopi-neo.dtb \
+> >>  	sun8i-h3-orangepi-2.dtb \
+> >> diff --git a/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts
+> >> new file mode 100644
+> >> index 0000000..b428e47
+> >> --- /dev/null
+> >> +++ b/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts
+> >> @@ -0,0 +1,137 @@
+> >> +/*
+> >> + * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.xyz>
+> >> + *
+> >> + * Based on sun8i-h3-orangepi-one.dts, which is:
+> >> + *   Copyright (C) 2016 Hans de Goede <hdegoede@redhat.com>
+> >> + *
+> >> + * This file is dual-licensed: you can use it either under the terms
+> >> + * of the GPL or the X11 license, at your option. Note that this dual
+> >> + * licensing only applies to this file, and not this project as a
+> >> + * whole.
+> >> + *
+> >> + *  a) This file is free software; you can redistribute it and/or
+> >> + *     modify it under the terms of the GNU General Public License as
+> >> + *     published by the Free Software Foundation; either version 2 of the
+> >> + *     License, or (at your option) any later version.
+> >> + *
+> >> + *     This file is distributed in the hope that it will be useful,
+> >> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> + *     GNU General Public License for more details.
+> >> + *
+> >> + * Or, alternatively,
+> >> + *
+> >> + *  b) Permission is hereby granted, free of charge, to any person
+> >> + *     obtaining a copy of this software and associated documentation
+> >> + *     files (the "Software"), to deal in the Software without
+> >> + *     restriction, including without limitation the rights to use,
+> >> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> >> + *     sell copies of the Software, and to permit persons to whom the
+> >> + *     Software is furnished to do so, subject to the following
+> >> + *     conditions:
+> >> + *
+> >> + *     The above copyright notice and this permission notice shall be
+> >> + *     included in all copies or substantial portions of the Software.
+> >> + *
+> >> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> >> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> >> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> >> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> >> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> >> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> >> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> >> + *     OTHER DEALINGS IN THE SOFTWARE.
+> >> + */
+> >> +
+> >> +/dts-v1/;
+> >> +#include "sun8i-h3.dtsi"
+> >> +#include "sunxi-common-regulators.dtsi"
+> >> +
+> >> +#include <dt-bindings/gpio/gpio.h>
+> >> +#include <dt-bindings/input/input.h>
+> >> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+> >> +
+> >> +/ {
+> >> +	model = "Xunlong Orange Pi Zero";
+> >> +	compatible = "xunlong,orangepi-zero", "allwinner,sun8i-h2plus";
+> >> +
+> >> +	aliases {
+> >> +		serial0 = &uart0;
+> >> +	};
+> >> +
+> >> +	chosen {
+> >> +		stdout-path = "serial0:115200n8";
+> >> +	};
+> >> +
+> >> +	leds {
+> >> +		compatible = "gpio-leds";
+> >> +		pinctrl-names = "default";
+> >> +		pinctrl-0 = <&leds_opi0>, <&leds_r_opi0>;
+> >> +
+> >> +		pwr_led {
+> >> +			label = "orangepi:green:pwr";
+> >> +			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
+> >> +			default-state = "on";
+> >> +		};
+> >> +
+> >> +		status_led {
+> >> +			label = "orangepi:red:status";
+> >> +			gpios = <&pio 0 17 GPIO_ACTIVE_HIGH>;
+> >> +		};
+> >> +	};
+> >> +};
+> >> +
+> >> +&ehci1 {
+> >> +	status = "okay";
+> >> +};
+> >> +
+> >> +&mmc0 {
+> >> +	pinctrl-names = "default";
+> >> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+> >> +	vmmc-supply = <&reg_vcc3v3>;
+> >> +	bus-width = <4>;
+> >> +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
+> >> +	cd-inverted;
+> >> +	status = "okay";
+> >> +};
+> >> +
+> >> +&ohci1 {
+> >> +	status = "okay";
+> >> +};
+> >> +
+> >> +&pio {
+> >> +	leds_opi0: led_pins at 0 {
+> >> +		pins = "PA17";
+> >> +		function = "gpio_out";
+> >> +	};
+> >> +};
+> >> +
+> >> +&r_pio {
+> >> +	leds_r_opi0: led_pins at 0 {
+> >> +		pins = "PL10";
+> >> +		function = "gpio_out";
+> >> +	};
+> >> +};
+> >> +
+> >> +&uart0 {
+> >> +	pinctrl-names = "default";
+> >> +	pinctrl-0 = <&uart0_pins_a>;
+> >> +	status = "okay";
+> >> +};
+> >> +
+> >> +&uart1 {
+> >> +	pinctrl-names = "default";
+> >> +	pinctrl-0 = <&uart1_pins>;
+> >> +	status = "disabled";
+> >> +};
+> >> +
+> >> +&uart2 {
+> >> +	pinctrl-names = "default";
+> >> +	pinctrl-0 = <&uart2_pins>;
+> >> +	status = "disabled";
+> >> +};
+> > 
+> > I'm not sure you answered me on this one. Are those exposed on the
+> > headers? why did you put them as disabled here?
+> 
+> So they are on headers, though you have to solder the actual header pins
+> yourself [1]. But also these are the normal pins multiplexed with GPIOs
+> and other peripherals, so keeping them disabled is in line with the
+> existing policy, if I got this correctly.
+> 
+> I agree that the status="disabled" is redundant, since we have that
+> exact line already in the .dtsi. But I saw it in other DTs as well, most
+> prominently in the sun8i-h3-orangepi-one.dts.
+> 
+> So I think we should remove the "status=" lines here, dtc will generate
+> an identical dtb out of it. But we should keep the uart descriptions in
+> to make it easier for users to see which SoC pins are used for these
+> pins labeled UART[012] in the board description and schematic. Also all
+> it takes to enable those is to overwrite the status property, which can
+> easily be done inline (without resizing the dtb).
 
-My understanding is that it's a hard dependency that prevents
-configuration that make no sense, ie being able to compile a driver
-that has no chance of being useful in the system, or a driver missing
-its framework of choice.
+I'd rather have the status still in the DTS. It's true that it's
+redundant, but it's also explicit. A node without any status would
+give the impression that it is actually enabled, especially since a
+node without a status is going to be probed.
 
 Maxime
 
@@ -87,4 +224,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161124/1a161529/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161124/39a986ab/attachment.sig>
