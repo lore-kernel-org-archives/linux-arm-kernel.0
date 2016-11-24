@@ -1,55 +1,80 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 24 Nov 2016 13:44:31 +0000
-Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire
- section
-In-Reply-To: <20161124134238.GI10776@rric.localdomain>
-References: <20161017185801.GT25086@rric.localdomain>
- <20161027160136.GD24290@arm.com>
- <20161028091905.GM22012@rric.localdomain> <20161107210514.GP20591@arm.com>
- <20161109195132.GZ22012@rric.localdomain> <20161117142528.GJ22855@arm.com>
- <20161117151805.GJ2151@rric.localdomain>
- <CAKv+Gu-2uGJGovqQL-gbB54u=fQ9L9YUbDdRo6u3oWqF6znn6Q@mail.gmail.com>
- <20161123211538.GH10776@rric.localdomain>
- <CAKv+Gu8aWpz5vXSWdKHwL5Xk2aWyQBOoR1WHOnVPaWZOwqojBQ@mail.gmail.com>
- <20161124134238.GI10776@rric.localdomain>
-Message-ID: <CAKv+Gu_Ug3XOD6jy5xziy1pS7WV=TC0RLD4j3DT6nytujQDzRQ@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 24 Nov 2016 13:49:25 +0000
+Subject: TDA998x crash on HDLCD probe failure
+In-Reply-To: <20161124132905.GG14217@n2100.armlinux.org.uk>
+References: <8281efe7-bac7-8e35-5784-e05cf0dc7eab@arm.com>
+ <20161124132905.GG14217@n2100.armlinux.org.uk>
+Message-ID: <459978b7-39d8-feae-257a-40b047f8d379@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 November 2016 at 13:42, Robert Richter <robert.richter@cavium.com> wrote:
-> On 23.11.16 21:25:06, Ard Biesheuvel wrote:
->> Why? MEMREMAP_WB is used often, among other things for mapping
->> firmware tables, which are marked as NOMAP, so in these cases, the
->> linear address is not mapped.
->
-> If fw tables are mapped wb, that is wrong and needs a separate fix.
->
-
-Why is that wrong?
-
->> > If you think pfn_valid() is wrong here, I am happy to send a patch
->> > that fixes this by using page_is_ram(). In any case, the worst case
->> > that may happen is to behave the same as v4.4, we might fix then the
->> > wrong use of pfn_valid() where it is not correctly used to check for
->> > ram.
->> >
+On 24/11/16 13:29, Russell King - ARM Linux wrote:
+> On Thu, Nov 24, 2016 at 01:18:39PM +0000, Robin Murphy wrote:
+>> Hi Liviu, Russell,
 >>
->> page_is_ram() uses string comparisons to look for regions called
->> 'System RAM'. Is that something we can tolerate for each pfn_valid()
->> calll?
+>> I'd been meaning to try digging into this if it hadn't gone away since I
+>> first noticed it, but I don't really have the time and it still happens
+>> with 4.9-rc and today's -next. Representative splat below, but in
+>> summary what happens is that if the HDLCD fails to probe, the TDA998x
+>> connector seems to get cleaned up twice, resulting in a NULL dereference
+>> the second time. I got as far as sketching out the following flow from a
+>> debug session (on the same 4.8-rc2 kernel), but I don't know nearly
+>> enough to tell which driver is at fault:
 >>
->> Perhaps the solution is to reimplement page_is_ram() for arm64 using
->> memblock_is_memory() instead, But that still means we need to modify
->> the generic memremap() code first to switch to it before changing the
->> arm64 implementation of pfn_valid
->
-> No, that's not the solution. pfn_valid() should just check if there is
-> a valid struct page, as other archs do. And if there is a mis-use of
-> pfn_valid() to check for ram, only that calls should be fixed to use
-> page_is_ram(), however this is implemented, or something appropriate.
-> But I don't see any problematic code, and if so, I will fix that.
->
+>> hdlcd_drm_bind
+>> -> drm_fbdev_cma_init (fails)
+>> ...
+>> -> drm_mode_config_cleanup
+>>    ...
+>>    -> drm_connector_cleanup
+>> -> component_unbind_all
+>>    ...
+>>    -> tda998x_unbind
+>>       -> drm_connector_cleanup (NULL connector)
+>>
+>> It's easily reproduced on Juno by booting arm64 defconfig with
+>> CONFIG_CMA_SIZE_MBYTES=1 and a sufficiently large monitor connected to
+>> warrant a >1MB framebuffer.
+> 
+> It looks to me like a hdlcd bug.
+> 
+> The probe path operates in this order:
+> 
+> - allocates hdlcd - 1
+> - allocates drm device - 2
+> - drm_mode_config_init - 3
+> - hdlcd_load - 4
+> - binds all components - 5
+> - enables runtime PM - 6
+> - drm_vblank_init - 7
+> - drm_mode_config_reset - 8
+> - drm_kms_helper_poll_init - 9
+> - drm_fbdev_cma_init - 10
+> - drm_dev_register - 11
+> 
+> However, the cleanup operates in this order:
+> - drm_fbdev_cma_fini - undoes 10
+> - drm_kms_helper_poll_fini - undoes 9
+> - drm_mode_config_cleanup - undoes 3
+> - drm_vblank_cleanup - undoes 7
+> - pm_runtime_disable - undoes 6
+> - component_unbind_all - undoes 5
+> - drm_irq_uninstall - undoes 4
+> - of_reserved_mem_device_release - undoes other half of 4
+> - drm_dev_unref - undoes 2
+> 
+> Spot the step which is out of the correct order - drm_mode_config_cleanup()
+> is misplaced - it's reversing the actions of drm_mode_config_init(), not
+> drm_mode_config_reset().
 
-memremap() uses pfn_valid() to decide whether some address is covered
-by the linear mapping. If we correct pfn_valid() to adhere to your
-definition, we will need to fix memremap() first in any case.
+Thanks for the explanation - that saves at least a day's worth of me
+trying to understand DRM code :)
+
+> So, drm_mode_config_cleanup() should be much later, after step 4 has
+> been undone, otherwise there are paths that leave various DRM objects
+> (created by drm_mode_create_standard_properties()) referenced, and
+> will cause problems exactly like you're seeing here.
+
+Liviu, can I leave this with you then?
+
+Robin.
