@@ -1,7 +1,7 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Thu, 24 Nov 2016 01:05:31 -0600
-Subject: [GIT PULL] Qualcomm Driver Updates for v4.10 - Part 2
-Message-ID: <1479971131-15142-1-git-send-email-andy.gross@linaro.org>
+Date: Thu, 24 Nov 2016 01:05:41 -0600
+Subject: [GIT PULL] Qualcomm ARM64 DT Updates for v4.10 - Part 2
+Message-ID: <1479971141-15185-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,30 +11,29 @@ Please consider taking this additional set of updates for 4.10.  These
 apply on top of the previous tagged set of changes.
 
 
-The following changes since commit e1ae0a7ee8849e12050933723e433a3d3ee26f7e:
+The following changes since commit 58432d74c9a7233bcfb23ef1108308dd17980e44:
 
-  Merge tag 'qcom-drivers-for-4.10' into drivers-for-4.10-2 (2016-11-23 11:01:54 -0600)
+  Merge tag 'qcom-arm64-for-4.10' into arm64-for-4.10-2 (2016-11-23 11:10:57 -0600)
 
 are available in the git repository at:
 
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.10-2
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-for-4.10-2
 
-for you to fetch changes up to ed19b86e817c5f30d557042f2e8ab68dc93940d4:
+for you to fetch changes up to c987775aa4af1034186ba17f67c21636451dc6d4:
 
-  firmware: qcom: scm: Return PTR_ERR when devm_clk_get fails (2016-11-23 11:03:00 -0600)
-
-----------------------------------------------------------------
-Qualcomm ARM Based Driver Updates for v4.10 - Part 2
-
-* Fixup QCOM SCM to support MSM8996
+  arm64: dts: qcom: msm8916: Add ddr support to sdhc1 (2016-11-24 00:33:26 -0600)
 
 ----------------------------------------------------------------
-spjoshi at codeaurora.org (3):
-      dt-bindings: firmware: scm: Add MSM8996 DT bindings
-      firmware: qcom: scm: Remove core, iface and bus clocks dependency
-      firmware: qcom: scm: Return PTR_ERR when devm_clk_get fails
+Qualcomm ARM64 Updates for v4.10 - Part 2
 
- .../devicetree/bindings/firmware/qcom,scm.txt      |  2 +
- drivers/firmware/qcom_scm.c                        | 49 ++++++++++++++++------
- 2 files changed, 39 insertions(+), 12 deletions(-)
+* Add SDHC xo clk and 1.8V DDR support
+
+----------------------------------------------------------------
+Ritesh Harjani (2):
+      ARM: dts: Add xo to sdhc clock node on qcom platforms
+      arm64: dts: qcom: msm8916: Add ddr support to sdhc1
+
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 11 +++++++----
+ arch/arm64/boot/dts/qcom/msm8996.dtsi |  9 +++++----
+ 2 files changed, 12 insertions(+), 8 deletions(-)
