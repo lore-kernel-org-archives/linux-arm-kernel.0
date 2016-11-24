@@ -1,32 +1,103 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu, 24 Nov 2016 16:10:28 +0000
-Subject: [kvm-unit-tests PATCH v7 06/11] arm/Makefile.common: force -fno-pic
-In-Reply-To: <20161124161033.11456-1-alex.bennee@linaro.org>
-References: <20161124161033.11456-1-alex.bennee@linaro.org>
-Message-ID: <20161124161033.11456-7-alex.bennee@linaro.org>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Thu, 24 Nov 2016 21:40:58 +0530
+Subject: [PATCH V3 0/8] IOMMU probe deferral support
+In-Reply-To: <918128b9-cdb0-1454-000a-146cee7a05ea@arm.com>
+References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
+ <60ee8066-f167-e9df-ae3e-4138f1133bad@arm.com>
+ <003a01d22f97$82534c70$86f9e550$@codeaurora.org>
+ <421e2b14-0231-d376-02a0-097423120b3d@arm.com>
+ <006f01d236ae$61751c40$245f54c0$@codeaurora.org>
+ <9f36244f-62d4-08e3-d64a-2b04ad4dc2e0@arm.com>
+ <002b01d24340$5d56e730$1804b590$@codeaurora.org>
+ <918128b9-cdb0-1454-000a-146cee7a05ea@arm.com>
+Message-ID: <004401d2466d$5b8b2170$12a16450$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As distro compilers move towards defaults for build hardening for things
-like ASLR we need to force -fno-pic. Failure to do can lead to weird
-relocation problems when we build our "lat" binaries.
+Hi Robin,
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
----
- arm/Makefile.common | 1 +
- 1 file changed, 1 insertion(+)
+<snip..>
 
-diff --git a/arm/Makefile.common b/arm/Makefile.common
-index 52f7440..cca0d9c 100644
---- a/arm/Makefile.common
-+++ b/arm/Makefile.common
-@@ -21,6 +21,7 @@ phys_base = $(LOADADDR)
- 
- CFLAGS += -std=gnu99
- CFLAGS += -ffreestanding
-+CFLAGS += -fno-pic
- CFLAGS += -Wextra
- CFLAGS += -O2
- CFLAGS += -I lib -I lib/libfdt
--- 
-2.10.1
+>
+>>>>>> iommu_group_get_for_dev which gets called in the add_device
+>>>>>> callback, increases the reference count of the iommu_group,
+>>>>>> so we do an iommu_group_put after that. iommu_group_get_for_dev
+>>>>>> inturn calls device_group callback and in the case of arm-smmu
+>>>>>> we call generic_device_group/pci_device_group which takes
+>>>>>> care of increasing the group's reference. But when we return
+>>>>>> an already existing group(when multiple devices have same group)
+>>>>>> the reference is not incremented, resulting in issues when the
+>>>>>> remove_device callback for the devices is invoked.
+>>>>>> Fixing the same here.
+>>>>>
+>>>>> Bah, yes, this does look like my fault - after flip-flopping between
+>>>>> about 3 different ways to keep refcounts for the S2CR entries, none of
+>>>>> which would quite work, I ripped it all out but apparently still got
+>>>>> things wrong, oh well. Thanks for figuring it out.
+>>>>>
+>>>>> On the probe-deferral angle, whilst it's useful to have uncovered this
+>>>>> bug, I don't think we should actually be calling remove_device() from
+>>>>> DMA teardown. I think it's preferable from a user perspective if group
+>>>>> numbering remains stable, rather than changing depending on the order in
+>>>>> which they unbind/rebind VFIO drivers. I'm really keen to try and get
+>>>>> this in shape for 4.10, so I've taken the liberty of hacking up my own
+>>>>> branch (iommu/defer) based on v3 - would you mind taking a look at the
+>>>>> two "iommu/of:" commits to see what you think? (Ignore the PCI changes
+>>>>> to your later patches - that was an experiment which didn't really work out)
+>>>>
+>>>> Ok, will take a look at this now and respond more on this.
+>>>>
+>>> Sorry for the delayed response on this. I was OOO for the last few days.
+>>> So i tested this branch and it worked fine. I tested it with a pci device
+>>> for both normal and deferred probe cases.  The of/iommu patches
+>>> are the cleanup/preparation patches and it looks fine. One thing is without
+>>> calling the remove_device callback, the resources like (smes for exmaple)
+>>> and the group association of the device all remain allocated. That does not
+>>> feel correct, given that the associated device does not exist. So to
+>>> understand that, what happens with VFIO in this case which makes the
+>>> group renumbering/rebinding a problem ?
+>>>
+>>
+>> Would it be ok if i post a V4 based on your branch above ?
+>
+>Sure, as long as none of the hacks slip through :) - I've just pushed
+>out a mild rework based on Lorenzo's v9, which I hope shouldn't break
+>anything for you.
+>
+
+Ok sure, i will test and just the post out the stuff from your branch then
+mostly by tomorrow.
+
+>Having thought a bit more about the add/remove thing, I'm inclined to
+>agree that the group numbering itself may not be that big an issue in
+>practice - sure, it could break my little script, but it looks like QEMU
+>and such work with the device ID rather than the group number directly,
+>so might not even notice. However, the fact remains that the callbacks
+>are intended to handle a device being added to/removed from its bus, and
+>will continue to do so on other platforms, so I don't like the idea of
+>introducing needlessly different behaviour. If you unbind a driver, the
+>stream IDs and everything don't stop existing at the hardware level; the
+>struct device to which the in-kernel data belongs still exists and
+>doesn't stop being associated with its bus. There's no good reason for
+>freeing SMEs that we'll only reallocate again (inadequately-specced
+>hardware with not enough SMRs/contexts is not a *good* reason), and
+
+ok, so SMRs/contexts was the reason i was adding the remove_dev
+callback, but if thats not good enough then there was no other
+intention.
+
+>there are also some strong arguments against letting any stream IDs the
+>kernel knows about go back to bypass after a driver has been bound - by
+
+ok, but not sure why is this so ?
+
+>keeping groups around as expected that's something we can implement
+>quite easily without having to completely lock down bypass for stream
+>IDs the kernel *doesn't* know about.
+>
+
+So do you mean in this case to keep the unbound device's group/context bank
+to bypass rather than resetting the streamids ?
+
+Regards,
+ Sricharan
