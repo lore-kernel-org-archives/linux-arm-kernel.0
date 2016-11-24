@@ -1,78 +1,55 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 24 Nov 2016 13:40:01 +0000
-Subject: [PATCH 1/9] arm64: cpufeature: treat unknown fields as RES0
+Date: Thu, 24 Nov 2016 13:40:05 +0000
+Subject: [PATCH 5/9] arm64: cpufeature: Define helpers for sys_reg id
 In-Reply-To: <1479994809-9081-1-git-send-email-suzuki.poulose@arm.com>
 References: <1479994809-9081-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1479994809-9081-2-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1479994809-9081-6-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+Define helper macros to extract op0, op1, CRn, CRm & op2
+for a given sys_reg id.
 
-Any fields not defined in an arm64_ftr_bits entry are propagated to the
-system-wide register value in init_cpu_ftr_reg(), and while we require
-that these strictly match for the sanity checks, we don't update them in
-update_cpu_ftr_reg().
-
-Generally, the lack of an arm64_ftr_bits entry indicates that the bits
-are currently RES0 (as is the case for the upper 32 bits of all
-supposedly 32-bit registers).
-
-A better default would be to use zero for the system-wide value of
-unallocated bits, making all register checking consistent, and allowing
-for subsequent simplifications to the arm64_ftr_bits arrays.
-
-This patch updates init_cpu_ftr_reg() to treat unallocated bits as RES0
-for the purpose of the system-wide safe value. These bits will still be
-sanity checked with strict match requirements, as is currently the case.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/sysreg.h | 21 ++++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index c02504e..a6ecf51 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -409,23 +409,33 @@ static void __init sort_ftr_regs(void)
- /*
-  * Initialise the CPU feature register from Boot CPU values.
-  * Also initiliases the strict_mask for the register.
-+ * Any bits that are not covered by an arm64_ftr_bits entry are considered
-+ * RES0 for the system-wide value, and must strictly match.
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 6c80b36..488b939 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -34,8 +34,27 @@
+  *	[11-8]  : CRm
+  *	[7-5]   : Op2
   */
- static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
- {
- 	u64 val = 0;
- 	u64 strict_mask = ~0x0ULL;
-+	u64 valid_mask = 0;
++#define Op0_shift	19
++#define Op0_mask	0x3
++#define Op1_shift	16
++#define Op1_mask	0x7
++#define CRn_shift	12
++#define CRn_mask	0xf
++#define CRm_shift	8
++#define CRm_mask	0xf
++#define Op2_shift	5
++#define Op2_mask	0x7
 +
- 	const struct arm64_ftr_bits *ftrp;
- 	struct arm64_ftr_reg *reg = get_arm64_ftr_reg(sys_reg);
+ #define sys_reg(op0, op1, crn, crm, op2) \
+-	((((op0)&3)<<19)|((op1)<<16)|((crn)<<12)|((crm)<<8)|((op2)<<5))
++	((((op0) & Op0_mask) << Op0_shift) | \
++	 ((op1) << Op1_shift) | ((crn) << CRn_shift) | \
++	 ((crm) << CRm_shift) | ((op2) << Op2_shift))
++
++#define sys_reg_Op0(id)	(((id) >> Op0_shift) & Op0_mask)
++#define sys_reg_Op1(id)	(((id) >> Op1_shift) & Op1_mask)
++#define sys_reg_CRn(id)	(((id) >> CRn_shift) & CRn_mask)
++#define sys_reg_CRm(id)	(((id) >> CRm_shift) & CRm_mask)
++#define sys_reg_Op2(id)	(((id) >> Op2_shift) & Op2_mask)
  
- 	BUG_ON(!reg);
- 
- 	for (ftrp  = reg->ftr_bits; ftrp->width; ftrp++) {
-+		u64 ftr_mask = arm64_ftr_mask(ftrp);
- 		s64 ftr_new = arm64_ftr_value(ftrp, new);
- 
- 		val = arm64_ftr_set_value(ftrp, val, ftr_new);
-+
-+		valid_mask |= ftr_mask;
- 		if (!ftrp->strict)
--			strict_mask &= ~arm64_ftr_mask(ftrp);
-+			strict_mask &= ~ftr_mask;
- 	}
-+
-+	val &= valid_mask;
-+
- 	reg->sys_val = val;
- 	reg->strict_mask = strict_mask;
- }
+ #define SYS_MIDR_EL1			sys_reg(3, 0, 0, 0, 0)
+ #define SYS_MPIDR_EL1			sys_reg(3, 0, 0, 0, 5)
 -- 
 2.7.4
