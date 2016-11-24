@@ -1,55 +1,81 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 24 Nov 2016 11:05:11 +0000
-Subject: [RFC PATCH 0/5] arm64: Allwinner H5 support
-In-Reply-To: <20161124105958.xzp4fr2fs4p42upx@lukather>
-References: <1479950235-26821-1-git-send-email-andre.przywara@arm.com>
- <20161124105958.xzp4fr2fs4p42upx@lukather>
-Message-ID: <560f873c-7ad9-5614-21f6-489879380ebe@arm.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Thu, 24 Nov 2016 12:05:23 +0100
+Subject: [PATCH V6 1/1] ARM64/PCI: Manage controller-specific information on
+ the host controller basis
+In-Reply-To: <1473449047-10499-1-git-send-email-tn@semihalf.com>
+References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
+Message-ID: <1479985523-10006-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Currently we use one shared global acpi_pci_root_ops structure to keep
+controller-specific ops. Then its pointer is passed to acpi_pci_root_create()
+and associated with host bridge instance for good. Such design implies
+serious drawback. Any potential manipulation on the single system-wide
+acpi_pci_root_ops leads to kernel crash. The structure content is not
+really changing even across multiple host bridges creation thus it was not
+the issue so far.
 
-thanks for looking at this.
+In preparation for adding ECAM quirks mechanism (where controller-specific
+PCI ops may be different for each host bridge) allocate new
+acpi_pci_root_ops and fill in with data for each bridge. Now it is safe
+to have different controller-specific info. As a consequence free
+acpi_pci_root_ops when host bridge is released.
 
-On 24/11/16 10:59, Maxime Ripard wrote:
-> On Thu, Nov 24, 2016 at 01:17:10AM +0000, Andre Przywara wrote:
->> This series adds support for the recently released Allwinner H5 SoC [1] and
->> the Orange Pi PC 2 board [2].
->> This exercise is rather easy this time, since the new SoC is very similar
->> to the existing H3 SoC and can thus share a lot of support.
->> To express this, the first patch splits the H3 .dtsi to allow reusing
->> it later. The last two patches add the H5 .dtsi and the .dts for the
->> first available board featuring this chip, based on that shared base DT.
->>
->> This is some early version, it's based on a merge of various -for-4.10
->> branches from Maxime's repository.
->> I can boot this on the OPi board and MMC and USB seem to work fine.
->> I haven't tested any other peripherals yet.
->> Some open issues:
->> - The naming: Following the Allwinner scheme this should be "sun50i-h5"
->> (which I use in this series), but it shares so much with the H3 that
->> "sun8i-h5" wouldn't be wrong either. It gets a bit weird with that shared
->> .dtsi, which I call sun8i-h3-h5.dtsi for now.
->> - The clocks and pinctrl look _almost_ similar. I may sound like a broken
->> record, but our habit of requiring kernel support for those almost identical
->> SoCs really bites us now. As the MMC got updated, I fear there is _one_
->> additional pin that we need for the HS400 transfer mode. Also I am afraid
->> the MMC clock may be slightly different due to the advanced MMC support.
->> At the moment this is not an issue, as the driver only support DDR50 at
->> most anyway, so we get away with it now.
->> I wonder if it's feasible to add those things to the existing H3 clocks
->> and pinctrl to avoid another set of drivers.
->> - I just see that I missed those patches that add just the names to the
->> binding docs. I will send them once we agreed on the naming.
-> 
-> I don't have any major comments but I guess it all depends on the DT
-> maintainers view on the symbolic link to share the DTSI.
+No functional changes in this patch.
 
-I am curious too ;-)
-But I saw symlinks for the RaspberryPi 3 (check
-arch/arm64/boot/dts/broadcom) and VExpress, so I picked that low hanging
-fruit ;-)
+Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+---
+ arch/arm64/kernel/pci.c | 17 ++++++++++-------
+ 1 file changed, 10 insertions(+), 7 deletions(-)
 
-Cheers,
-Andre.
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index fb439c7..5c08baf 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -152,33 +152,36 @@ static void pci_acpi_generic_release_info(struct acpi_pci_root_info *ci)
+ 
+ 	ri = container_of(ci, struct acpi_pci_generic_root_info, common);
+ 	pci_ecam_free(ri->cfg);
++	kfree(ci->ops);
+ 	kfree(ri);
+ }
+ 
+-static struct acpi_pci_root_ops acpi_pci_root_ops = {
+-	.release_info = pci_acpi_generic_release_info,
+-};
+-
+ /* Interface called from ACPI code to setup PCI host controller */
+ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ {
+ 	int node = acpi_get_node(root->device->handle);
+ 	struct acpi_pci_generic_root_info *ri;
+ 	struct pci_bus *bus, *child;
++	struct acpi_pci_root_ops *root_ops;
+ 
+ 	ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
+ 	if (!ri)
+ 		return NULL;
+ 
++	root_ops = kzalloc_node(sizeof(*root_ops), GFP_KERNEL, node);
++	if (!root_ops)
++		return NULL;
++
+ 	ri->cfg = pci_acpi_setup_ecam_mapping(root);
+ 	if (!ri->cfg) {
+ 		kfree(ri);
++		kfree(root_ops);
+ 		return NULL;
+ 	}
+ 
+-	acpi_pci_root_ops.pci_ops = &ri->cfg->ops->pci_ops;
+-	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, &ri->common,
+-				   ri->cfg);
++	root_ops->release_info = pci_acpi_generic_release_info;
++	root_ops->pci_ops = &ri->cfg->ops->pci_ops;
++	bus = acpi_pci_root_create(root, root_ops, &ri->common, ri->cfg);
+ 	if (!bus)
+ 		return NULL;
+ 
+-- 
+2.7.4
