@@ -1,57 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Nov 2016 10:00:36 +0100
-Subject: [PATCH net-next 1/4] net: mvneta: Convert to be 64 bits compatible
-In-Reply-To: <20161124163327.1cc261ab@xhacker>
-References: <20161122164844.19566-1-gregory.clement@free-electrons.com>
- <CAPv3WKf0a63qQT+xwXfUatbgLFF58e6L8J10VtBOUTam+kUcjg@mail.gmail.com>
- <20161124163327.1cc261ab@xhacker>
-Message-ID: <21520380.oWTKcrq8DS@wuerfel>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 24 Nov 2016 10:05:45 +0100
+Subject: [PATCH 5/10] dt: bindings: Add bindings for Marvell Xenon SD Host
+ Controller
+In-Reply-To: <87d1hno2d7.fsf@free-electrons.com>
+References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
+ <ee296deafdcbeb431a592b591ae38a758ba4cce7.1477911954.git-series.gregory.clement@free-electrons.com>
+ <20161109182426.vfrpb4i2mfatdzz3@rob-hp-laptop>
+ <15b06a12-ed69-03a7-ccc7-0c133ce1ac1e@marvell.com>
+ <87d1hno2d7.fsf@free-electrons.com>
+Message-ID: <CAPDyKFpoifsKkse7Fc-bbZAoa=QGT=9QOQ-4D=f60ptx0hzZsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 24, 2016 4:37:36 PM CET Jisheng Zhang wrote:
-> solB (a SW shadow cookie) perhaps gives a better performance: in hot path,
-> such as mvneta_rx(), the driver accesses buf_cookie and buf_phys_addr of
-> rx_desc which is allocated by dma_alloc_coherent, it's noncacheable if the
-> device isn't cache-coherent. I didn't measure the performance difference,
-> because in fact we take solA as well internally. From your experience,
-> can the performance gain deserve the complex code?
+On 22 November 2016 at 18:23, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi Rob,
+>
+>  On jeu., nov. 10 2016, Ziji Hu <huziji@marvell.com> wrote:
+>
+> [...]
+>
+>>>> +
+>>>> +- reg:
+>>>> +  * For "marvell,xenon-sdhci", one register area for Xenon IP.
+>>>> +
+>>>> +  * For "marvell,armada-3700-sdhci", two register areas.
+>>>> +    The first one for Xenon IP register. The second one for the Armada 3700 SOC
+>>>> +    PHY PAD Voltage Control register.
+>>>> +    Please follow the examples with compatible "marvell,armada-3700-sdhci"
+>>>> +    in below.
+>>>> +    Please also check property marvell,pad-type in below.
+>>>> +
+>>>> +Optional Properties:
+>>>> +- marvell,xenon-slotno:
+>>>
+>>> Multiple slots should be represented as child nodes IMO. I think some
+>>> other bindings already do this.
+>>>
+>>
+>>       All the slots are entirely independent.
+>>       I prefer to consider it as multiple independent SDHCs placed in
+>>       a single IP, instead of that a IP contains multiple child slots.
+>
+> It was indeed what I tried to show in my answer for the 1st version:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-October/461860.html
+>
+> Maybe you missed it.
+>
+> You also mentioned other bindings using child nodes, but for this one
+> we have one controller with only one set of register with multiple slots
+> (Atmel is an example). Here each slot have it own set of register.
+>
+> Actually giving the fact that each slot is controlled by a different set
+> of register I wonder why the hardware can't also deduce the slot number
+> from the address register. For me it looks like an hardware bug but we
+> have to deal with it.
+>
+> Do you still think we needchild node here?
 
-Yes, a read from uncached memory is fairly slow, so if you have a chance
-to avoid that it will probably help. When adding complexity to the code,
-it probably makes sense to take a runtime profile anyway quantify how
-much it gains.
+Using child-nodes for slots like what's done in the atmel case, is
+currently broken. I would recommend to avoid using child-nodes for
+slots, if possible.
 
-On machines that have cache-coherent DMA, accessing the descriptor
-should be fine, as you already have to load the entire cache line
-to read the status field.
+To give you some more background, currently the mmc core treats child
+nodes as embedded non-removable cards or SDIO funcs. However, we can
+change to make child-nodes also allowed to describe slots, but it
+requires a specific compatible for "slots" and of course then we also
+need to update the DT parsing of the child-nodes in the mmc core.
 
-Looking at this snippet:
+Documentation/devicetree/bindings/mmc/mmc.txt
+Documentation/devicetree/bindings/mmc/mmc-card.txt
 
-                rx_status = rx_desc->status;
-                rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
-                data = (unsigned char *)rx_desc->buf_cookie;
-                phys_addr = rx_desc->buf_phys_addr;
-                pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc);
-                bm_pool = &pp->bm_priv->bm_pools[pool_id];
+>
+>>
+>>       It is unlike the implementation which put multiple slots behind PCIe EP interface. sdhci-pci.c will handle each slot init one by one.
+>>       If Xenon SDHC slots are represented as child nodes, there should also be a main entry in Xenon driver to init each child node one by one.
+>>       In my very own opinion, it is inconvenient and unnecessary.
+>
 
-                if (!mvneta_rxq_desc_is_first_last(rx_status) ||
-                    (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
-err_drop_frame_ret_pool:
-                        /* Return the buffer to the pool */
-                        mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
-                                              rx_desc->buf_phys_addr);
-err_drop_frame:
-
-
-I think there is more room for optimizing if you start: you read
-the status field twice (the second one in MVNETA_RX_GET_BM_POOL_ID)
-and you can cache the buf_phys_addr along with the virtual address
-once you add that.
-
-Generally speaking, I'd recommend using READ_ONCE()/WRITE_ONCE()
-to access the descriptor fields, to ensure the compiler doesn't
-add extra references as well as to annotate the expensive
-operations.
-
-	Arnd
+Kind regards
+Uffe
