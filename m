@@ -1,63 +1,34 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 24 Nov 2016 09:57:32 +0900
-Subject: [PATCH 2/2] clk: uniphier: add clock data for cpufreq
-In-Reply-To: <20161124000503.GE6095@codeaurora.org>
-References: <1477503088-26508-1-git-send-email-yamada.masahiro@socionext.com>
- <1477503088-26508-2-git-send-email-yamada.masahiro@socionext.com>
- <20161124000503.GE6095@codeaurora.org>
-Message-ID: <CAK7LNAQ6XeSHd7DbvD1jWeMfOqk8+R27Q-fNDWtXxpRd=OFgjA@mail.gmail.com>
+From: marcel@ziswiler.com (marcel at ziswiler.com)
+Date: Thu, 24 Nov 2016 02:04:53 +0100
+Subject: [RESEND PATCH 3/6] apalis-tk1: optional displayport hot-plug detect
+In-Reply-To: <20161124010456.24604-1-marcel@ziswiler.com>
+References: <20161124010456.24604-1-marcel@ziswiler.com>
+Message-ID: <20161124010456.24604-4-marcel@ziswiler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 
+Configure DP_HPD_PFF0 pin as optional DisplayPort hot-plug detect.
 
-2016-11-24 9:05 GMT+09:00 Stephen Boyd <sboyd@codeaurora.org>:
+Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+---
 
->> +#if 1
->> +     /*
->> +      * TODO:
->> +      * The return type of .round_rate() is "long", which is 32 bit wide on
->> +      * 32 bit systems.  Clock rate greater than LONG_MAX (~ 2.15 GHz) is
->> +      * treated as an error.  Needs a workaround until the problem is fixed.
->> +      */
->
-> Just curious is the problem internal to the clk framework because
-> of the clk_ops::round_rate design? Or does the consumer, cpufreq
-> in this case, have to deal with rates that are larger than
-> unsigned long on a 32 bit system? If it's just a clk_ops problem
-> and we need to support rates up to 32 bits wide (~ 4.3 GHz) on
-> the system then the driver could be changed to use
-> .determine_rate() ops and that would allow us to use all the bits
-> of unsigned long to figure out rates.
->
-> If the problem is rates even larger than unsigned long on 32 bit
-> systems, then at the least I'd like to see some sort of plan to
-> fix that in the framework before merging code. Hopefully it can
-> be done gradually, but as I start looking at it it seems more and
-> more complicated to support this so this will be a long term
-> project.
->
-> We can discuss the clk API changes needed as well if those are
-> required, but that is another issue that requires changes in
-> other places outside of clk drivers.
->
+ arch/arm/boot/dts/tegra124-apalis.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I understand your point, but core frame-work changes
-need more careful review than clk data changes in low-level drivers.
-It is too late to be included in v4.10.
-
-If I drop 32bit SoC things, and send v2 only for 64bit SoCs,
-is that acceptable for 4.10-rc1?
-
-Our ARMv8 SoCs are more actively developed, so
-getting 64bit clk data in first will be helpful.
-
-I postpone the 32bit SoC data until
-I figure out the root cause of the problem
-(and possible change for the API if necessary).
-
-
+diff --git a/arch/arm/boot/dts/tegra124-apalis.dtsi b/arch/arm/boot/dts/tegra124-apalis.dtsi
+index 0534601..747ce81 100644
+--- a/arch/arm/boot/dts/tegra124-apalis.dtsi
++++ b/arch/arm/boot/dts/tegra124-apalis.dtsi
+@@ -255,7 +255,7 @@
+ 			};
+ 			dp_hpd_pff0 {
+ 				nvidia,pins = "dp_hpd_pff0";
+-				nvidia,function = "rsvd2";
++				nvidia,function = "dp";
+ 				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+ 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+ 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
 -- 
-Best Regards
-Masahiro Yamada
+2.9.3
