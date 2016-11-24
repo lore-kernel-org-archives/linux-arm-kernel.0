@@ -1,74 +1,82 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Thu, 24 Nov 2016 16:09:15 +0100
-Subject: [PATCH net-next 1/4] net: mvneta: Convert to be 64 bits compatible
-In-Reply-To: <8760ncly5s.fsf@free-electrons.com>
-References: <20161122164844.19566-1-gregory.clement@free-electrons.com>
- <CAPv3WKf0a63qQT+xwXfUatbgLFF58e6L8J10VtBOUTam+kUcjg@mail.gmail.com>
- <20161124163327.1cc261ab@xhacker> <21520380.oWTKcrq8DS@wuerfel>
- <8760ncly5s.fsf@free-electrons.com>
-Message-ID: <CAPv3WKec4kUEdfSVVdCwJQx2ktEGTaCcSi=MqbpKAYewAHOTkA@mail.gmail.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Thu, 24 Nov 2016 16:09:18 +0100
+Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire
+ section
+In-Reply-To: <CAKv+Gu-SXX_Vv1Wi1Nm=5vdaXSS0MBp20QBpQVacSKPLfdH0-A@mail.gmail.com>
+References: <20161117151805.GJ2151@rric.localdomain>
+ <CAKv+Gu-2uGJGovqQL-gbB54u=fQ9L9YUbDdRo6u3oWqF6znn6Q@mail.gmail.com>
+ <20161123211538.GH10776@rric.localdomain>
+ <CAKv+Gu8aWpz5vXSWdKHwL5Xk2aWyQBOoR1WHOnVPaWZOwqojBQ@mail.gmail.com>
+ <20161124134238.GI10776@rric.localdomain>
+ <CAKv+Gu_Ug3XOD6jy5xziy1pS7WV=TC0RLD4j3DT6nytujQDzRQ@mail.gmail.com>
+ <20161124135151.GJ10776@rric.localdomain>
+ <CAKv+Gu9qB7P2epMGdwFJ3vJR3vt-bBxU0nKwmKdpaOpTKdqzzA@mail.gmail.com>
+ <20161124141149.GE2213@rric.localdomain>
+ <CAKv+Gu-SXX_Vv1Wi1Nm=5vdaXSS0MBp20QBpQVacSKPLfdH0-A@mail.gmail.com>
+Message-ID: <20161124150918.GF2213@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+On 24.11.16 14:23:16, Ard Biesheuvel wrote:
+> On 24 November 2016 at 14:11, Robert Richter <robert.richter@cavium.com> wrote:
+> > On 24.11.16 13:58:30, Ard Biesheuvel wrote:
+> >> On 24 November 2016 at 13:51, Robert Richter <robert.richter@cavium.com> wrote:
+> >> > On 24.11.16 13:44:31, Ard Biesheuvel wrote:
+> >> >> On 24 November 2016 at 13:42, Robert Richter <robert.richter@cavium.com> wrote:
+> >> >> > On 23.11.16 21:25:06, Ard Biesheuvel wrote:
+> >> >> >> Why? MEMREMAP_WB is used often, among other things for mapping
+> >> >> >> firmware tables, which are marked as NOMAP, so in these cases, the
+> >> >> >> linear address is not mapped.
+> >> >> >
+> >> >> > If fw tables are mapped wb, that is wrong and needs a separate fix.
+> >> >> >
+> >> >>
+> >> >> Why is that wrong?
+> >> >
+> >> > The whole issue with mapping acpi tables is not marking them cachable,
+> >> > what wb does.
+> >>
+> >> What 'issue'?
+> >>
+> >> > Otherwise we could just use linear mapping for those mem
+> >> > ranges.
+> >> >
+> >>
+> >> Regions containing firmware tables are owned by the firmware, and it
+> >> is the firmware that tells us which memory attributes we are allowed
+> >> to use. If those attributes include WB, it is perfectly legal to use a
+> >> cacheable mapping. That does *not* mean they should be covered by the
+> >> linear mapping. The linear mapping is read-write-non-exec, for
+> >> instance, and we may prefer to use a read-only mapping and/or
+> >> executable mapping.
+> >
+> > Ok, I am going to fix try_ram_remap().
+> >
+> 
+> Thanks. Could you also add an arm64 version of page_is_ram() that uses
+> memblock_is_memory() while you're at it? I think using memblock
+> directly in try_ram_remap() may not be the best approach
 
-2016-11-24 16:01 GMT+01:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
-> Hi Arnd,
->
->  On jeu., nov. 24 2016, Arnd Bergmann <arnd@arndb.de> wrote:
->
->> On Thursday, November 24, 2016 4:37:36 PM CET Jisheng Zhang wrote:
->>> solB (a SW shadow cookie) perhaps gives a better performance: in hot path,
->>> such as mvneta_rx(), the driver accesses buf_cookie and buf_phys_addr of
->>> rx_desc which is allocated by dma_alloc_coherent, it's noncacheable if the
->>> device isn't cache-coherent. I didn't measure the performance difference,
->>> because in fact we take solA as well internally. From your experience,
->>> can the performance gain deserve the complex code?
->>
->> Yes, a read from uncached memory is fairly slow, so if you have a chance
->> to avoid that it will probably help. When adding complexity to the code,
->> it probably makes sense to take a runtime profile anyway quantify how
->> much it gains.
->>
->> On machines that have cache-coherent DMA, accessing the descriptor
->> should be fine, as you already have to load the entire cache line
->> to read the status field.
->>
->> Looking at this snippet:
->>
->>                 rx_status = rx_desc->status;
->>                 rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
->>                 data = (unsigned char *)rx_desc->buf_cookie;
->>                 phys_addr = rx_desc->buf_phys_addr;
->>                 pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc);
->>                 bm_pool = &pp->bm_priv->bm_pools[pool_id];
->>
->>                 if (!mvneta_rxq_desc_is_first_last(rx_status) ||
->>                     (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
->> err_drop_frame_ret_pool:
->>                         /* Return the buffer to the pool */
->>                         mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
->>                                               rx_desc->buf_phys_addr);
->> err_drop_frame:
->>
->>
->> I think there is more room for optimizing if you start: you read
->> the status field twice (the second one in MVNETA_RX_GET_BM_POOL_ID)
->> and you can cache the buf_phys_addr along with the virtual address
->> once you add that.
->
-> I agree we can optimize this code but it is not related to the 64 bits
-> conversion. Indeed this part is running when we use the HW buffer
-> management, however currently this part is not ready at all for 64
-> bits. The virtual address is directly handled by the hardware but it has
-> only 32 bits to store it in the cookie. So if we want to use the HWBM in
-> 64 bits we need to redesign the code, (maybe by storing the virtual
-> address in a array and pass the index in the cookie).
->
+Sure. I also want to mark the patches as stable.
 
-How about storing data (virt address and maybe other stuff) as a part
-of data buffer and using rx_packet_offset? It has to be used for a3700
-anyway. No need of additional rings whatsoever.
+> > Are there other concerns with this patch?
+> >
+> 
+> I think we all agree that pfn_valid() should return whether a pfn has
+> a struct page associated with it, the debate is about whether it makes
+> sense to allocate struct pages for memory that the kernel does not
+> own. But given that it does not really hurt to do so for small holes,
+> I think your suggestion makes sense.
 
-Best regards,
-Marcin
+Thanks for your comments and the review.
+
+> Should we be doing anything more to ensure that those pages are not
+> dereferenced inadvertently? Is there a page flag we should be setting?
+
+I don't think so. Boot mem is initialized in free_low_memory_core_
+early(). The PageReserved flag is set for pages from reserved memory
+ranges, and memory ranges not marked NOMAP is just freed. Since pages
+are either reservered or in the free_list of pages, pages from other
+memory ranges (NOMAP) is not visible to mm.
+
+-Robert
