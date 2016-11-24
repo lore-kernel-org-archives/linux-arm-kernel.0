@@ -1,125 +1,64 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 24 Nov 2016 17:16:32 +0900
-Subject: [PATCH v1 & v6 1/2] PM/devfreq: add suspend frequency support
-In-Reply-To: <5836980F.6050006@rock-chips.com>
-References: <CGME20161124061416epcms1p44a0152bca14312f1229cab835ea0297f@epcms1p4>
- <20161124061416epcms1p44a0152bca14312f1229cab835ea0297f@epcms1p4>
- <58368C91.8030502@rock-chips.com> <5836927B.9010205@samsung.com>
- <5836980F.6050006@rock-chips.com>
-Message-ID: <5836A1E0.1070707@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 24 Nov 2016 09:17:48 +0100
+Subject: [PATCH 1/4] serial: core: Add LED trigger support
+In-Reply-To: <e9fc12b8-d4a7-067d-ef87-03f0aae39bd7@gmail.com>
+References: <20161123100106.15969-1-s.hauer@pengutronix.de>
+ <20161123100106.15969-2-s.hauer@pengutronix.de>
+ <e9fc12b8-d4a7-067d-ef87-03f0aae39bd7@gmail.com>
+Message-ID: <20161124081748.fx3xm5ww64ngn5it@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lin,
-
-On 2016? 11? 24? 16:34, hl wrote:
-> Hi Chanwoo Choi,
+On Wed, Nov 23, 2016 at 10:57:13AM -0800, Florian Fainelli wrote:
+> On 11/23/2016 02:01 AM, Sascha Hauer wrote:
+> > With this patch the serial core provides LED triggers for RX and TX.
+> > 
+> > As the serial core layer does not know when the hardware actually sends
+> > or receives characters, this needs help from the UART drivers.
 > 
->     I think the dev_pm_opp_get_suspend_opp() have implement most of
-> the funtion, all we need is just define the node in dts, like following:
-> 
-> &dmc_opp_table {
->     opp06 {
->         opp-suspend;
->     };
-> };
+> Looking at 8250, we call serial8250_tx_chars from __start_tx which is
+> called form the uart_ops::start_tx, for RX I sort of agree, since this
+> happens in interrupt handler. I suppose some drivers could actually
+> queue work but not do it right away though?
 
-Two approaches use the 'opp-suspend' property.
-
-I think that the method to support suspend-opp have to
-guarantee following conditions:
-- Support the all of devfreq's governors.
-- Devfreq framework have the responsibility to change the
-  frequency/voltage for suspend-opp. If we uses the
-  new devfreq_suspend(), each devfreq device don't care
-  how to support the suspend-opp. Just the developer of each
-  devfreq device need to add 'opp-suspend' propet to OPP entry in DT file.
-
-Best Regards,
-Chanwoo Choi
+RX is not the problem. When characters are received all drivers call
+tty_flip_buffer_push() which could be used for LED triggering (either
+directly or we replace the calls to tty_flip_buffer_push() with some
+wrapper function).
+The problem comes with TX. The serial core has a FIFO which gets
+characters from the tty layer. There is no function which the serial
+drivers could call to read from this FIFO, instead they have to open code
+this.
+Continuing with the 8250 driver serial8250_tx_chars() is not only called
+from __start_tx(), but also from the interrupt handler. Transmission
+works without the serial_core ever noticing.
 
 > 
-> so i think my way semm more simple.
+> > The LED triggers are registered in uart_add_led_triggers() called from
+> > the UART drivers which want to support LED triggers. All the driver
+> > has to do then is to call uart_led_trigger_[tx|rx] to indicate
+> > activity.
 > 
-> On 2016?11?24? 15:10, Chanwoo Choi wrote:
->> + Tobias Jakobi,
->>
->> Hi Lin,
->>
->> We need to discuss how to support the suspend-opp of devfreq device.
->> Now, there are two patch thread for suspend-opp of devfreq.
->>
->> The Lin's approach modify the devfreq_suspend_device() to support suspend-opp.
->> The Tobias's approach[1] add new devfreq_suspend() and then call it on dpm_suspend()
->> when entering the suspend state.
->>
->> [1] [RFC 0/4] PM / devfreq: draft for OPP suspend impl
->> - https://patchwork.kernel.org/patch/9443323/
->> - https://patchwork.kernel.org/patch/9443325/
->> - https://patchwork.kernel.org/patch/9443329/
->> - https://patchwork.kernel.org/patch/9443331/
->>
->> I think we need to discuss it together.
->>
->> Regards,
->> Chanwoo Choi
->>
->> On 2016? 11? 24? 15:45, hl wrote:
->>> Hi MyungJoo Ham,
->>>
->>> On 2016?11?24? 14:14, MyungJoo Ham wrote:
->>>> On Thu, Nov 24, 2016 at 11:18 AM, hl <hl@rock-chips.com> wrote:
->>>>> Hi MyungJoo Ham,
->>>> []
->>>>>> We still need to sync the all status even i call target() in
->>>>>> devfreq_suspend/resume_device
->>>>>> directly, so still need update_devfreq() other setp except
->>>>>> devfreq->governor->get_target_freq(devfreq, &freq);
->>>>> And i think it better to be governor behaviors, for userspace they may not
->>>>> want to change
->>>>> the suspend frequency like other governor, the frequency should decide by
->>>>> the user, if they
->>>>> want this function, they should like other governor to rigister a
->>>>> devfreq_monitor_suspend().
->>>>> What do you think about my rev6 patch?
->>>> If I understand the intention correctly, this is for the stability of
->>>> the device due to the behavior or bootloader/SoC-initializer, which
->>>> has nothing to do with governors.
->>>>
->>>> Even if users are using userspace, as long as they set the custom
->>>> frequencies lower than the default, they have the possibility of
->>>> being unstable as ondemand is going to have.
->>>>
->>>>
->>>> To reuse the update_devfreq() code, you may do something like:
->>>>
->>>> static int _update_freq(struct devfreq *devfreq, bool is_suspending)
->>>> {
->>>>      /* original contents of update_freq with if statement with is_suspending wrapping get_target_freq */
->>>> }
->>>> int update_freq(struct devfreq *devfreq)
->>>> {
->>>>     return _update_freq(devfreq, false);
->>>> }
->>>>
->>>>
->>>> There should be other good non-invasive methods that are not governoe-specific as well.
->>>>
->>> Thanks for your suggestion, i will update the new version soon.
->>>> Cheers,
->>>> MyungJoo
->>>>
->>>>
->>>>
->>>>
->>>> _______________________________________________
->>>> Linux-rockchip mailing list
->>>> Linux-rockchip at lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-rockchip
->>> -- 
->>> Lin Huang
->>>
->>
->>
->>
+> Could we somehow remedy the lack of knowledge from the core as whether
+> the HW sends/receives characters first before adding support for LED
+> triggers? It would be more generic and future proof to require UART
+> drivers to report to the core when they actually TX/RX, and then at the
+> core level, utilize that knowledge to perform the LED trigger.
+
+Maybe we could introduce a function to read from the TX FIFO. Having
+open coded this in each and every driver is not nice anyway.
+
 > 
+> Side note: are you positive using drv->dev_name is robust enough on
+> systems with many different UART drivers, yet all of them being ttyS*?
+
+If we have different UART drivers, only one of them provides ttyS*, no?
+Other drivers will have to use another namespace.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
