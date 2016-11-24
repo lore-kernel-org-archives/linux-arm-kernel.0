@@ -1,46 +1,64 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Thu, 24 Nov 2016 15:12:15 +0300
-Subject: [PATCH 1/9] clocksource/drivers/rockchip_timer: split bc_timer
- into rk_timer and rk_clock_event_device
-In-Reply-To: <47746094.VbGlCfGZW0@diego>
-References: <1479922177-20136-1-git-send-email-al.kochet@gmail.com>
- <47746094.VbGlCfGZW0@diego>
-Message-ID: <2217A50B-A694-4304-9628-23C4541FED5A@gmail.com>
+From: john.garry@huawei.com (John Garry)
+Date: Thu, 24 Nov 2016 12:12:22 +0000
+Subject: [PATCH v4 1/6] arm64: arch_timer: Add device tree binding for
+ hisilicon-161601 erratum
+In-Reply-To: <c3020c0d-bc45-2bb1-f53a-c5e76ab45499@huawei.com>
+References: <1479212167-5812-1-git-send-email-dingtianhong@huawei.com>
+ <c3020c0d-bc45-2bb1-f53a-c5e76ab45499@huawei.com>
+Message-ID: <624c1751-9b66-1d10-78ae-8cb4edea6109@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Heiko,
+On 21/11/2016 12:49, Ding Tianhong wrote:
+> Ping....
 
-> I haven't looked to deep into your patches yet, but what is missing is the 
-> general goal of your whole series.
+Hi,
 
+was there a cover letter for 0/6? I never saw it.
 
-I will be very grateful to receive feedback
+Thanks,
+John
 
-> 24 ????. 2016 ?., ? 15:01, Heiko St?bner <heiko@sntech.de> ???????(?):
-> 
-> git format-patch has this nice "--cover-letter" option that creates obviously 
-> a cover-letter where you can describe what your series wants to achieve.
-> 
-I?ve used --cover-letter option but forget to add message text. Just subject.
-So all patches was sent without cover letter. I?ll be careful next time.
-
-> For those reading along, I guess what you want to achieve should be what I 
-> describe below, so of course no need to resend just for this :-)
-> 
-> -----
-> The clock supplying the arm-global-timer on the rk3188 is coming from the
-> the cpu clock itself and thus changes its rate everytime cpufreq adjusts the 
-> cpu frequency making this timer unsuitable as a stable clocksource.
-> 
-> The rk3188, rk3288 and following socs share a separate timer block already 
-> handled by the rockchip-timer driver. Therefore adapt this driver to also be 
-> able to act as clocksource on rk3188.
-> -----
-> 
-> Right?
-
-Yes, exactly as you wrote.
-
-Regards,
-Alexander.
+>
+> On 2016/11/15 20:16, Ding Tianhong wrote:
+>> This erratum describes a bug in logic outside the core, so MIDR can't be
+>> used to identify its presence, and reading an SoC-specific revision
+>> register from common arch timer code would be awkward.  So, describe it
+>> in the device tree.
+>>
+>> v2: Use the new erratum name and update the description.
+>>
+>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> ---
+>>  Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++++
+>>  1 file changed, 8 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+>> index ef5fbe9..c27b2c4 100644
+>> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
+>> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+>> @@ -31,6 +31,14 @@ to deliver its interrupts via SPIs.
+>>    This also affects writes to the tval register, due to the implicit
+>>    counter read.
+>>
+>> +- hisilicon,erratum-161601 : A boolean property. Indicates the presence of
+>> +  erratum 161601, which says that reading the counter is unreliable unless
+>> +  reading twice on the register and the value of the second read is larger
+>> +  than the first by less than 32. If the verification is unsuccessful, then
+>> +  discard the value of this read and repeat this procedure until the verification
+>> +  is successful.  This also affects writes to the tval register, due to the
+>> +  implicit counter read.
+>> +
+>>  ** Optional properties:
+>>
+>>  - arm,cpu-registers-not-fw-configured : Firmware does not initialize
+>>
+>
+> _______________________________________________
+> linuxarm mailing list
+> linuxarm at huawei.com
+> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
+>
+> .
+>
