@@ -1,45 +1,47 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 24 Nov 2016 16:41:48 +0100
-Subject: [GIT PULL 1/3] Rockchip defconfig64 changes for 4.10
-Message-ID: <1594090.z775ZFR2cz@phil>
+Date: Thu, 24 Nov 2016 16:42:35 +0100
+Subject: [GIT PULL 2/3] Rockchip dts64 changes for 4.10
+In-Reply-To: <1594090.z775ZFR2cz@phil>
+References: <1594090.z775ZFR2cz@phil>
+Message-ID: <1856918.gK9kzau163@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+The following changes since commit c49590691f3819bb6be3f77938ef39038eb76643:
 
-please find below (and in the replies) some more pull requests
-for 4.10.
-
-If that is to late, feel free to ignore them and I'll resubmit
-after 4.10-rc.
-
-
-Thanks
-Heiko
-
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+  arm64: dts: rockchip: replace to "max-frequency" instead of "clock-freq-min-max" (2016-11-09 15:08:55 +0100)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.10-rockchip-defconfig64
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.10-rockchip-dts64-2
 
-for you to fetch changes up to 92d22d77b14c988bce0293502a1b3ef25b267ed9:
+for you to fetch changes up to c6f049db0a783a35685104e83214c9cc02fb74b6:
 
-  arm64: defconfig: allow rk3399-based boards to boot from mmc and usb (2016-11-17 17:15:59 +0100)
-
-----------------------------------------------------------------
-64bit defconfig changes to allow arm64 Rockchip socs
-to basically boot.
+  dt-bindings: add rockchip RK1108 Evaluation board (2016-11-21 21:47:02 +0100)
 
 ----------------------------------------------------------------
-Andy Yan (2):
-      arm64: defconfig: enable I2C and DW MMC controller on rockchip platform
-      arm64: defconfig: enable RK808 components
+Some more powerdomains and usb2-otg support for the rk3399 as well
+as the binding doc for the 32bit rk1108 eval board to prevent it
+from conflicting with the recently added 64bit px5 board.
 
-Heiko Stuebner (1):
-      arm64: defconfig: allow rk3399-based boards to boot from mmc and usb
+----------------------------------------------------------------
+Andy Yan (1):
+      dt-bindings: add rockchip RK1108 Evaluation board
 
- arch/arm64/configs/defconfig | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Elaine Zhang (2):
+      arm64: dts: rockchip: add eMMC's power domain support for rk3399
+      arm64: dts: rockchip: add pd_sd power-domain node for rk3399
+
+Jeffy Chen (1):
+      arm64: dts: rockchip: add gmac needed pclk for rk3399 pd
+
+William Wu (1):
+      arm64: dts: rockchip: add usb2-phy otg-port support for rk3399
+
+Yakir Yang (1):
+      arm64: dts: rockchip: add backlight support for rk3399 evb board
+
+ Documentation/devicetree/bindings/arm/rockchip.txt |  4 ++
+ arch/arm64/boot/dts/rockchip/rk3399-evb.dts        | 40 +++++++++++++++++++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 46 +++++++++++++++++++++-
+ 3 files changed, 89 insertions(+), 1 deletion(-)
