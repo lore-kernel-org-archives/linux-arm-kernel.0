@@ -1,418 +1,479 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu, 24 Nov 2016 16:10:31 +0000
-Subject: [kvm-unit-tests PATCH v7 09/11] arm/locking-tests: add comprehensive
- locking test
+Date: Thu, 24 Nov 2016 16:10:30 +0000
+Subject: [kvm-unit-tests PATCH v7 08/11] arm/tlbflush-data: Add TLB flush
+ during data writes test
 In-Reply-To: <20161124161033.11456-1-alex.bennee@linaro.org>
 References: <20161124161033.11456-1-alex.bennee@linaro.org>
-Message-ID: <20161124161033.11456-10-alex.bennee@linaro.org>
+Message-ID: <20161124161033.11456-9-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This test has been written mainly to stress multi-threaded TCG behaviour
-but will demonstrate failure by default on real hardware. The test takes
-the following parameters:
+This test is the cousin of the tlbflush-code test. Instead of flushing
+running code it re-maps virtual addresses while a buffer is being filled
+up. It then audits the results checking for writes that have ended up in
+the wrong place.
 
-  - "lock" use GCC's locking semantics
-  - "atomic" use GCC's __atomic primitives
-  - "wfelock" use WaitForEvent sleep
-  - "excl" use load/store exclusive semantics
+While tlbflush-code exercises QEMU's translation invalidation logic this
+test stresses the SoftMMU cputlb code and ensures it is semantically
+correct.
 
-Also two more options allow the test to be tweaked
+The test optionally takes two parameters for debugging:
 
-  - "noshuffle" disables the memory shuffling
-  - "count=%ld" set your own per-CPU increment count
+   cycles           - change the default number of test iterations
+   page             - flush pages individually instead of all
 
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-
----
-v2
-  - Don't use thumb style strexeq stuff
-  - Add atomic and wfelock tests
-  - Add count/noshuffle test controls
-  - Move barrier tests to separate test file
-v4
-  - fix up unitests.cfg to use correct test name
-  - move into "locking" group, remove barrier tests
-  - use a table to add tests, mark which are expected to work
-  - correctly report XFAIL
-v5
-  - max out at -smp 4 in unittest.cfg
-v7
-  - make test control flags bools
-  - default the count to 100000 (so it doesn't timeout)
+CC: Mark Rutland <mark.rutland@arm.com>
 ---
  arm/Makefile.common |   2 +
- arm/locking-test.c  | 302 ++++++++++++++++++++++++++++++++++++++++++++++++++++
- arm/unittests.cfg   |  34 ++++++
- 3 files changed, 338 insertions(+)
- create mode 100644 arm/locking-test.c
+ arm/tlbflush-data.c | 401 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arm/unittests.cfg   |  12 ++
+ 3 files changed, 415 insertions(+)
+ create mode 100644 arm/tlbflush-data.c
 
 diff --git a/arm/Makefile.common b/arm/Makefile.common
-index 528166d..eb4cfdf 100644
+index de99a6e..528166d 100644
 --- a/arm/Makefile.common
 +++ b/arm/Makefile.common
-@@ -15,6 +15,7 @@ tests-common += $(TEST_DIR)/pci-test.flat
+@@ -14,6 +14,7 @@ tests-common += $(TEST_DIR)/spinlock-test.flat
+ tests-common += $(TEST_DIR)/pci-test.flat
  tests-common += $(TEST_DIR)/gic.flat
  tests-common += $(TEST_DIR)/tlbflush-code.flat
- tests-common += $(TEST_DIR)/tlbflush-data.flat
-+tests-common += $(TEST_DIR)/locking-test.flat
++tests-common += $(TEST_DIR)/tlbflush-data.flat
  
  all: test_cases
  
-@@ -85,3 +86,4 @@ test_cases: $(generated_files) $(tests-common) $(tests)
+@@ -83,3 +84,4 @@ test_cases: $(generated_files) $(tests-common) $(tests)
+ 
  $(TEST_DIR)/selftest.o $(cstart.o): $(asm-offsets)
  $(TEST_DIR)/tlbflush-code.elf: $(cstart.o) $(TEST_DIR)/tlbflush-code.o
- $(TEST_DIR)/tlbflush-data.elf: $(cstart.o) $(TEST_DIR)/tlbflush-data.o
-+$(TEST_DIR)/locking-test.elf: $(cstart.o) $(TEST_DIR)/locking-test.o
-diff --git a/arm/locking-test.c b/arm/locking-test.c
++$(TEST_DIR)/tlbflush-data.elf: $(cstart.o) $(TEST_DIR)/tlbflush-data.o
+diff --git a/arm/tlbflush-data.c b/arm/tlbflush-data.c
 new file mode 100644
-index 0000000..f10c61b
+index 0000000..7920179
 --- /dev/null
-+++ b/arm/locking-test.c
-@@ -0,0 +1,302 @@
++++ b/arm/tlbflush-data.c
+@@ -0,0 +1,401 @@
++/*
++ * TLB Flush Race Tests
++ *
++ * These tests are designed to test for incorrect TLB flush semantics
++ * under emulation. The initial CPU will set all the others working on
++ * a writing to a set of pages. It will then re-map one of the pages
++ * back and forth while recording the timestamps of when each page was
++ * active. The test fails if a write was detected on a page after the
++ * tlbflush switching to a new page should have completed.
++ *
++ * Copyright (C) 2016, Linaro, Alex Benn?e <alex.bennee@linaro.org>
++ *
++ * This work is licensed under the terms of the GNU LGPL, version 2.
++ */
++
 +#include <libcflat.h>
 +#include <asm/smp.h>
 +#include <asm/cpumask.h>
 +#include <asm/barrier.h>
 +#include <asm/mmu.h>
 +
-+#include <prng.h>
++#define NR_TIMESTAMPS 		((PAGE_SIZE/sizeof(u64)) << 2)
++#define NR_AUDIT_RECORDS	16384
++#define NR_DYNAMIC_PAGES 	3
++#define MAX_CPUS 		8
 +
-+#define MAX_CPUS 8
-+
-+/* Test definition structure
-+ *
-+ * A simple structure that describes the test name, expected pass and
-+ * increment function.
-+ */
-+
-+/* Function pointers for test */
-+typedef void (*inc_fn)(int cpu);
++#define MIN(a, b)		((a) < (b) ? (a) : (b))
 +
 +typedef struct {
-+	const char *test_name;
-+	bool  should_pass;
-+	inc_fn main_fn;
-+} test_descr_t;
++	u64    		timestamps[NR_TIMESTAMPS];
++} write_buffer;
 +
-+/* How many increments to do */
-+static int increment_count = 1000000;
-+static bool do_shuffle = true;
++typedef struct {
++	write_buffer 	*newbuf;
++	u64		time_before_flush;
++	u64		time_after_flush;
++} audit_rec_t;
 +
-+/* Shared value all the tests attempt to safely increment using
-+ * various forms of atomic locking and exclusive behaviour.
-+ */
-+static unsigned int shared_value;
++typedef struct {
++	audit_rec_t 	records[NR_AUDIT_RECORDS];
++} audit_buffer;
 +
-+/* PAGE_SIZE * uint32_t means we span several pages */
-+__attribute__((aligned(PAGE_SIZE))) static uint32_t memory_array[PAGE_SIZE];
++typedef struct {
++	write_buffer 	*stable_pages;
++	write_buffer    *dynamic_pages[NR_DYNAMIC_PAGES];
++	audit_buffer 	*audit;
++	unsigned int 	flush_count;
++} test_data_t;
 +
-+/* We use the alignment of the following to ensure accesses to locking
-+ * and synchronisation primatives don't interfere with the page of the
-+ * shared value
-+ */
-+__attribute__((aligned(PAGE_SIZE))) static unsigned int per_cpu_value[MAX_CPUS];
-+__attribute__((aligned(PAGE_SIZE))) static cpumask_t smp_test_complete;
-+__attribute__((aligned(PAGE_SIZE))) struct isaac_ctx prng_context[MAX_CPUS];
++static test_data_t test_data[MAX_CPUS];
 +
-+/* Some of the approaches use a global lock to prevent contention. */
-+static int global_lock;
++static cpumask_t ready;
++static cpumask_t complete;
 +
-+/* In any SMP setting this *should* fail due to cores stepping on
-+ * each other updating the shared variable
-+ */
-+static void increment_shared(int cpu)
++static bool test_complete;
++static bool flush_verbose;
++static bool flush_by_page;
++static int test_cycles=3;
++static int secondary_cpus;
++
++static write_buffer * alloc_test_pages(void)
 +{
-+	(void)cpu;
-+
-+	shared_value++;
++	write_buffer *pg;
++	pg = calloc(NR_TIMESTAMPS, sizeof(u64));
++	return pg;
 +}
 +
-+/* GCC __sync primitives are deprecated in favour of __atomic */
-+static void increment_shared_with_lock(int cpu)
++static void setup_pages_for_cpu(int cpu)
 +{
-+	(void)cpu;
++	unsigned int i;
 +
-+	while (__sync_lock_test_and_set(&global_lock, 1));
-+	shared_value++;
-+	__sync_lock_release(&global_lock);
-+}
++	test_data[cpu].stable_pages = alloc_test_pages();
 +
-+/* In practice even __ATOMIC_RELAXED uses ARM's ldxr/stex exclusive
-+ * semantics */
-+static void increment_shared_with_atomic(int cpu)
-+{
-+	(void)cpu;
-+
-+	__atomic_add_fetch(&shared_value, 1, __ATOMIC_SEQ_CST);
-+}
-+
-+
-+/*
-+ * Load/store exclusive with WFE (wait-for-event)
-+ *
-+ * See ARMv8 ARM examples:
-+ *   Use of Wait For Event (WFE) and Send Event (SEV) with locks
-+ */
-+
-+static void increment_shared_with_wfelock(int cpu)
-+{
-+	(void)cpu;
-+
-+#if defined(__aarch64__)
-+	asm volatile(
-+	"	mov     w1, #1\n"
-+	"       sevl\n"
-+	"       prfm PSTL1KEEP, [%[lock]]\n"
-+	"1:     wfe\n"
-+	"	ldaxr	w0, [%[lock]]\n"
-+	"	cbnz    w0, 1b\n"
-+	"	stxr    w0, w1, [%[lock]]\n"
-+	"	cbnz	w0, 1b\n"
-+	/* lock held */
-+	"	ldr	w0, [%[sptr]]\n"
-+	"	add	w0, w0, #0x1\n"
-+	"	str	w0, [%[sptr]]\n"
-+	/* now release */
-+	"	stlr	wzr, [%[lock]]\n"
-+	: /* out */
-+	: [lock] "r" (&global_lock), [sptr] "r" (&shared_value) /* in */
-+	: "w0", "w1", "cc");
-+#else
-+	asm volatile(
-+	"	mov     r1, #1\n"
-+	"1:	ldrex	r0, [%[lock]]\n"
-+	"	cmp     r0, #0\n"
-+	"	wfene\n"
-+	"	strexeq r0, r1, [%[lock]]\n"
-+	"	cmpeq	r0, #0\n"
-+	"	bne	1b\n"
-+	"	dmb\n"
-+	/* lock held */
-+	"	ldr	r0, [%[sptr]]\n"
-+	"	add	r0, r0, #0x1\n"
-+	"	str	r0, [%[sptr]]\n"
-+	/* now release */
-+	"	mov	r0, #0\n"
-+	"	dmb\n"
-+	"	str	r0, [%[lock]]\n"
-+	"	dsb\n"
-+	"	sev\n"
-+	: /* out */
-+	: [lock] "r" (&global_lock), [sptr] "r" (&shared_value) /* in */
-+	: "r0", "r1", "cc");
-+#endif
-+}
-+
-+
-+/*
-+ * Hand-written version of the load/store exclusive
-+ */
-+static void increment_shared_with_excl(int cpu)
-+{
-+	(void)cpu;
-+
-+#if defined(__aarch64__)
-+        asm volatile(
-+	"1:	ldxr	w0, [%[sptr]]\n"
-+	"	add     w0, w0, #0x1\n"
-+	"	stxr	w1, w0, [%[sptr]]\n"
-+	"	cbnz	w1, 1b\n"
-+	: /* out */
-+	: [sptr] "r" (&shared_value) /* in */
-+	: "w0", "w1", "cc");
-+#else
-+	asm volatile(
-+	"1:	ldrex	r0, [%[sptr]]\n"
-+	"	add     r0, r0, #0x1\n"
-+	"	strex	r1, r0, [%[sptr]]\n"
-+	"	cmp	r1, #0\n"
-+	"	bne	1b\n"
-+	: /* out */
-+	: [sptr] "r" (&shared_value) /* in */
-+	: "r0", "r1", "cc");
-+#endif
-+}
-+
-+/* Test array */
-+static test_descr_t tests[] = {
-+	{ "none", false, increment_shared },
-+	{ "lock", true, increment_shared_with_lock },
-+	{ "atomic", true, increment_shared_with_atomic },
-+	{ "wfelock", true, increment_shared_with_wfelock },
-+	{ "excl", true, increment_shared_with_excl }
-+};
-+
-+/* The idea of this is just to generate some random load/store
-+ * activity which may or may not race with an un-barried incremented
-+ * of the shared counter
-+ */
-+static void shuffle_memory(int cpu)
-+{
-+	int i;
-+	uint32_t lspat = isaac_next_uint32(&prng_context[cpu]);
-+	uint32_t seq = isaac_next_uint32(&prng_context[cpu]);
-+	int count = seq & 0x1f;
-+	uint32_t val=0;
-+
-+	seq >>= 5;
-+
-+	for (i=0; i<count; i++) {
-+		int index = seq & ~PAGE_MASK;
-+		if (lspat & 1) {
-+			val ^= memory_array[index];
-+		} else {
-+			memory_array[index] = val;
-+		}
-+		seq >>= PAGE_SHIFT;
-+		seq ^= lspat;
-+		lspat >>= 1;
++	for (i=0; i<NR_DYNAMIC_PAGES; i++) {
++		test_data[cpu].dynamic_pages[i] = alloc_test_pages();
 +	}
 +
++	test_data[cpu].audit = calloc(NR_AUDIT_RECORDS, sizeof(audit_rec_t));
 +}
 +
-+static inc_fn increment_function;
-+
-+static void do_increment(void)
++static audit_rec_t * get_audit_record(audit_buffer *buf, unsigned int record)
 +{
-+	int i;
-+	int cpu = smp_processor_id();
-+
-+	printf("CPU%d: online and ++ing\n", cpu);
-+
-+	for (i=0; i < increment_count; i++) {
-+		per_cpu_value[cpu]++;
-+		increment_function(cpu);
-+
-+		if (do_shuffle)
-+			shuffle_memory(cpu);
-+	}
-+
-+	printf("CPU%d: Done, %d incs\n", cpu, per_cpu_value[cpu]);
-+
-+	cpumask_set_cpu(cpu, &smp_test_complete);
-+	if (cpu != 0)
-+		halt();
++	return &buf->records[record];
 +}
 +
-+static void setup_and_run_test(test_descr_t *test)
++/* Sync on a given cpumask */
++static void wait_on(int cpu, cpumask_t *mask)
 +{
-+	unsigned int i, sum = 0;
-+	int cpu, cpu_cnt = 0;
-+
-+	increment_function = test->main_fn;
-+
-+	/* fill our random page */
-+        for (i=0; i<PAGE_SIZE; i++) {
-+		memory_array[i] = isaac_next_uint32(&prng_context[0]);
-+	}
-+
-+	for_each_present_cpu(cpu) {
-+		uint32_t seed2 = isaac_next_uint32(&prng_context[0]);
-+		cpu_cnt++;
-+		if (cpu == 0)
-+			continue;
-+
-+		isaac_init(&prng_context[cpu], (unsigned char *) &seed2, sizeof(seed2));
-+		smp_boot_secondary(cpu, do_increment);
-+	}
-+
-+	do_increment();
-+
-+	while (!cpumask_full(&smp_test_complete))
++	cpumask_set_cpu(cpu, mask);
++	while (!cpumask_full(mask))
 +		cpu_relax();
++}
 +
-+	/* All CPUs done, do we add up */
-+	for_each_present_cpu(cpu) {
-+		sum += per_cpu_value[cpu];
++static uint64_t sync_start(void)
++{
++	const uint64_t gate_mask = ~0x7ff;
++	uint64_t gate, now;
++	gate = get_cntvct() & gate_mask;
++	do {
++		now = get_cntvct();
++	} while ((now & gate_mask) == gate);
++
++	return now;
++}
++
++static void do_page_writes(void)
++{
++	unsigned int i, runs = 0;
++	int cpu = smp_processor_id();
++	write_buffer *stable_pages = test_data[cpu].stable_pages;
++	write_buffer *moving_page = test_data[cpu].dynamic_pages[0];
++
++	printf("CPU%d: ready %p/%p @ 0x%08" PRIx64"\n",
++		cpu, stable_pages, moving_page, get_cntvct());
++
++	while (!test_complete) {
++		u64 run_start, run_end;
++
++		smp_mb();
++		wait_on(cpu, &ready);
++		run_start = sync_start();
++
++		for (i = 0; i < NR_TIMESTAMPS; i++) {
++			u64 ts = get_cntvct();
++			moving_page->timestamps[i] = ts;
++			stable_pages->timestamps[i] = ts;
++		}
++
++		run_end = get_cntvct();
++		printf("CPU%d: run %d 0x%" PRIx64 "->0x%" PRIx64 " (%" PRId64 " cycles)\n",
++			cpu, runs++, run_start, run_end, run_end - run_start);
++
++		/* wait on completion - gets clear my main thread*/
++		wait_on(cpu, &complete);
 +	}
++}
 +
-+	if (test->should_pass) {
-+		report("total incs %d", sum == shared_value, shared_value);
++
++/*
++ * This is the core of the test. Timestamps are taken either side of
++ * the updating of the page table and the flush instruction. By
++ * keeping track of when the page mapping is changed we can detect any
++ * writes that shouldn't have made it to the other pages.
++ *
++ * This isn't the recommended way to update the page table. ARM
++ * recommends break-before-make so accesses that are in flight can
++ * trigger faults that can be handled cleanly.
++ */
++
++/* This mimics  __flush_tlb_range from the kernel, doing a series of
++ * flush operations and then the dsb() to complete. */
++static void flush_pages(unsigned long start, unsigned long end)
++{
++	unsigned long addr;
++	start = start >> 12;
++	end = end >> 12;
++
++	dsb(ishst);
++	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT -12)) {
++#if defined(__aarch64__)
++		asm("tlbi	vaae1is, %0" :: "r" (addr));
++#else
++		asm volatile("mcr p15, 0, %0, c8, c7, 3" :: "r" (addr));
++#endif
++	}
++	dsb(ish);
++}
++
++static void remap_one_page(test_data_t *data)
++{
++	u64 ts_before, ts_after;
++	int pg = (data->flush_count % (NR_DYNAMIC_PAGES + 1));
++	write_buffer *dynamic_pages_vaddr = data->dynamic_pages[0];
++	write_buffer *newbuf_paddr = data->dynamic_pages[pg];
++	write_buffer *end_page_paddr = newbuf_paddr+1;
++
++	ts_before = get_cntvct();
++	/* update the page table */
++	mmu_set_range_ptes(mmu_idmap,
++			(unsigned long) dynamic_pages_vaddr,
++			(unsigned long) newbuf_paddr,
++			(unsigned long) end_page_paddr,
++			__pgprot(PTE_WBWA));
++	/* until the flush + isb() writes may still go to old address */
++	if (flush_by_page) {
++		flush_pages((unsigned long)dynamic_pages_vaddr, (unsigned long)(dynamic_pages_vaddr+1));
 +	} else {
-+		report_xfail("total incs %d", true, sum == shared_value, shared_value);
++		flush_tlb_all();
 +	}
++	ts_after = get_cntvct();
++
++	if (data->flush_count < NR_AUDIT_RECORDS) {
++		audit_rec_t *rec = get_audit_record(data->audit, data->flush_count);
++		rec->newbuf = newbuf_paddr;
++		rec->time_before_flush = ts_before;
++		rec->time_after_flush = ts_after;
++	}
++	data->flush_count++;
++}
++
++static int check_pages(int cpu, char *msg,
++		write_buffer *base_page, write_buffer *test_page,
++		audit_buffer *audit, unsigned int flushes)
++{
++	write_buffer *prev_page = base_page;
++	unsigned int empty = 0, write = 0, late = 0, weird = 0;
++	unsigned int ts_index = 0, audit_index;
++	u64 ts;
++
++	/* For each audit record */
++	for (audit_index = 0; audit_index < MIN(flushes, NR_AUDIT_RECORDS); audit_index++) {
++		audit_rec_t *rec = get_audit_record(audit, audit_index);
++
++		do {
++			/* Work through timestamps until we overtake
++			 * this audit record */
++			ts = test_page->timestamps[ts_index];
++
++			if (ts == 0) {
++				empty++;
++			} else if (ts < rec->time_before_flush) {
++				if (test_page == prev_page) {
++					write++;
++				} else {
++					late++;
++				}
++			} else if (ts >= rec->time_before_flush
++				&& ts <= rec->time_after_flush) {
++				if (test_page == prev_page
++					|| test_page == rec->newbuf) {
++					write++;
++				} else {
++					weird++;
++				}
++			} else if (ts > rec->time_after_flush) {
++				if (test_page == rec->newbuf) {
++					write++;
++				}
++				/* It's possible the ts is way ahead
++				 * of the current record so we can't
++				 * call a non-match weird...
++				 *
++				 * Time to skip to next audit record
++				 */
++				break;
++			}
++
++			ts = test_page->timestamps[ts_index++];
++		} while (ts <= rec->time_after_flush && ts_index < NR_TIMESTAMPS);
++
++
++		/* Next record */
++		prev_page = rec->newbuf;
++	} /* for each audit record */
++
++	if (flush_verbose) {
++		printf("CPU%d: %s %p => %p %u/%u/%u/%u (0/OK/L/?) = %u total\n",
++			cpu, msg, test_page, base_page,
++			empty, write, late, weird, empty+write+late+weird);
++	}
++
++	return weird;
++}
++
++static int audit_cpu_pages(int cpu, test_data_t *data)
++{
++	unsigned int pg, writes=0, ts_index = 0;
++	write_buffer *test_page;
++	int errors = 0;
++
++	/* first the stable page */
++	test_page = data->stable_pages;
++	do {
++		if (test_page->timestamps[ts_index++]) {
++			writes++;
++		}
++	} while (ts_index < NR_TIMESTAMPS);
++
++	if (writes != ts_index) {
++		errors += 1;
++	}
++
++	if (flush_verbose) {
++		printf("CPU%d: stable page %p %u writes\n",
++			cpu, test_page, writes);
++	}
++
++
++	/* Restore the mapping for dynamic page */
++	test_page = data->dynamic_pages[0];
++
++	mmu_set_range_ptes(mmu_idmap,
++			(unsigned long) test_page,
++			(unsigned long) test_page,
++			(unsigned long) &test_page[1],
++			__pgprot(PTE_WBWA));
++	flush_tlb_all();
++
++	for (pg=0; pg<NR_DYNAMIC_PAGES; pg++) {
++		errors += check_pages(cpu, "dynamic page", test_page,
++				data->dynamic_pages[pg],
++				data->audit, data->flush_count);
++	}
++
++	/* reset for next run */
++	memset(data->stable_pages, 0, sizeof(write_buffer));
++	for (pg=0; pg<NR_DYNAMIC_PAGES; pg++) {
++		memset(data->dynamic_pages[pg], 0, sizeof(write_buffer));
++	}
++	memset(data->audit, 0, sizeof(audit_buffer));
++	data->flush_count = 0;
++	smp_mb();
++
++	report("CPU%d: checked, errors: %d", errors == 0, cpu, errors);
++	return errors;
++}
++
++static void do_page_flushes(void)
++{
++	int i, cpu;
++
++	printf("CPU0: ready @ 0x%08" PRIx64"\n", get_cntvct());
++
++	for (i=0; i<test_cycles; i++) {
++		unsigned int flushes=0;
++		u64 run_start, run_end;
++		int cpus_finished;
++
++		cpumask_clear(&complete);
++		wait_on(0, &ready);
++		run_start = sync_start();
++
++		do {
++			for_each_present_cpu(cpu) {
++				if (cpu == 0)
++					continue;
++
++				/* do remap & flush */
++				remap_one_page(&test_data[cpu]);
++				flushes++;
++			}
++
++			cpus_finished = cpumask_weight(&complete);
++		} while (cpus_finished < secondary_cpus);
++
++		run_end = get_cntvct();
++
++		printf("CPU0: run %d 0x%" PRIx64 "->0x%" PRIx64 " (%" PRId64 " cycles, %u flushes)\n",
++			i, run_start, run_end, run_end - run_start, flushes);
++
++		/* Reset our ready mask for next cycle */
++		cpumask_clear_cpu(0, &ready);
++		smp_mb();
++		wait_on(0, &complete);
++
++		/* Check for discrepancies */
++		for_each_present_cpu(cpu) {
++			if (cpu == 0)
++				continue;
++			audit_cpu_pages(cpu, &test_data[cpu]);
++		}
++	}
++
++	test_complete = true;
++	smp_mb();
++	cpumask_set_cpu(0, &ready);
++	cpumask_set_cpu(0, &complete);
 +}
 +
 +int main(int argc, char **argv)
 +{
-+	static const unsigned char seed[] = "myseed";
-+	test_descr_t *test = &tests[0];
-+	int i;
-+	unsigned int j;
-+
-+	isaac_init(&prng_context[0], &seed[0], sizeof(seed));
++	int cpu, i;
 +
 +	for (i=0; i<argc; i++) {
 +		char *arg = argv[i];
-+
-+		/* Check for test name */
-+		for (j = 0; j < ARRAY_SIZE(tests); j++) {
-+			if (strcmp(arg, tests[j].test_name) == 0)
-+				test = &tests[j];
++		if (strcmp(arg, "verbose") == 0) {
++			flush_verbose = true;
 +		}
-+
-+		/* Test modifiers */
-+		if (strcmp(arg, "noshuffle") == 0) {
-+			do_shuffle = false;
-+			report_prefix_push("noshuffle");
-+		} else if (strstr(arg, "count=") != NULL) {
++		if (strcmp(arg, "page") == 0) {
++			flush_by_page = true;
++		}
++		if (strstr(arg, "cycles=") != NULL) {
 +			char *p = strstr(arg, "=");
-+			increment_count = atol(p+1);
-+		} else {
-+			isaac_reseed(&prng_context[0], (unsigned char *) arg, strlen(arg));
++			test_cycles = atol(p+1);
 +		}
 +	}
 +
-+	if (test) {
-+		setup_and_run_test(test);
-+	} else {
-+		report("Unknown test", false);
++	for_each_present_cpu(cpu) {
++		if (cpu == 0)
++			continue;
++
++		setup_pages_for_cpu(cpu);
++		smp_boot_secondary(cpu, do_page_writes);
++		secondary_cpus++;
 +	}
++
++	/* CPU 0 does the flushes and checks the results */
++	do_page_flushes();
 +
 +	return report_summary();
 +}
 diff --git a/arm/unittests.cfg b/arm/unittests.cfg
-index 7dc7799..abbfe79 100644
+index beaae84..7dc7799 100644
 --- a/arm/unittests.cfg
 +++ b/arm/unittests.cfg
-@@ -108,3 +108,37 @@ smp = $(($MAX_SMP>4?4:$MAX_SMP))
- extra_params = -append "page"
+@@ -96,3 +96,15 @@ file = tlbflush-code.flat
+ smp = $(($MAX_SMP>4?4:$MAX_SMP))
+ extra_params = -append 'page self'
  groups = tlbflush
- 
-+# Locking tests
-+[locking::none]
-+file = locking-test.flat
-+smp = $(($MAX_SMP>4?4:$MAX_SMP))
-+groups = locking
-+accel = tcg
 +
-+[locking::lock]
-+file = locking-test.flat
++[tlbflush-data::all]
++file = tlbflush-data.flat
 +smp = $(($MAX_SMP>4?4:$MAX_SMP))
-+extra_params = -append 'lock'
-+groups = locking
-+accel = tcg
++groups = tlbflush
 +
-+[locking::atomic]
-+file = locking-test.flat
++[tlbflush-data::page]
++file = tlbflush-data.flat
 +smp = $(($MAX_SMP>4?4:$MAX_SMP))
-+extra_params = -append 'atomic'
-+groups = locking
-+accel = tcg
++extra_params = -append "page"
++groups = tlbflush
 +
-+[locking::wfelock]
-+file = locking-test.flat
-+smp = $(($MAX_SMP>4?4:$MAX_SMP))
-+extra_params = -append 'wfelock'
-+groups = locking
-+accel = tcg
-+
-+[locking::excl]
-+file = locking-test.flat
-+smp = $(($MAX_SMP>4?4:$MAX_SMP))
-+extra_params = -append 'excl'
-+groups = locking
-+accel = tcg
 -- 
 2.10.1
