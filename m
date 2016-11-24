@@ -1,97 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Nov 2016 17:29:18 +0100
-Subject: [PATCH] ARM: pxa: ezx: fix a910 camera data
-Message-ID: <20161124162955.3887066-1-arnd@arndb.de>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Thu, 24 Nov 2016 16:37:05 +0000
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <58370530.5080605@free.fr> (Mason's message of "Thu, 24 Nov 2016
+ 16:20:16 +0100")
+References: <58356EA8.2010806@free.fr> <yw1xpolmbdih.fsf@unicorn.mansr.com>
+ <58358E79.5050404@free.fr> <yw1xh96yaz84.fsf@unicorn.mansr.com>
+ <5836C69A.3030309@free.fr> <yw1xr3619d3l.fsf@unicorn.mansr.com>
+ <58370530.5080605@free.fr>
+Message-ID: <yw1xinrcal72.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The camera_supply_dummy_device definition is shared between a780 and a910,
-but only provided when the first is enabled and fails to build for a
-configuration with only a910:
+Mason <slash.tmp@free.fr> writes:
 
-arch/arm/mach-pxa/ezx.c:1097:3: error: 'camera_supply_dummy_device' undeclared here (not in a function)
+> On 24/11/2016 15:17, M?ns Rullg?rd wrote:
+>
+>> Mason wrote:
+>> 
+>>> [   35.085854] SETUP DMA
+>>> [   35.088272] START NAND TRANSFER
+>>> [   35.091670] tangox_dma_pchan_start from tangox_dma_irq
+>>> [   35.096882] tango_dma_callback from vchan_complete
+>>> [   45.102513] DONE FAKE SPINNING
+>>>
+>>> So the IRQ rolls in, the ISR calls tangox_dma_pchan_start,
+>>> which calls tangox_dma_pchan_detach to tear down the sbox
+>>> setup; and only sometime later does the DMA framework call
+>>> my callback function.
+>> 
+>> Yes, I realised this soon after I said it.  The dma driver could be
+>> rearranged to make it work though.
+>
+> There is a way to make the tasklet run and invoke the callback
+> before the interrupt service routine proceeds?
 
-This moves the definition into its own section.
+No, but it would be possible to defer the teardown to the tasklet.
+Having said that, I'm not sure it's such a great idea since the tasklet
+could be held up for an arbitrary length of time waiting for the target
+to finish.
 
-Fixes: 6c1b417adc8f ("ARM: pxa: ezx: use the new pxa_camera platform_data")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-pxa/ezx.c | 56 ++++++++++++++++++++++++++-----------------------
- 1 file changed, 30 insertions(+), 26 deletions(-)
+>>> So far, the work-arounds I've tested are:
+>>>
+>>> 1) delay sbox tear-down by 10 ?s in tangox_dma_pchan_detach.
+>>> 2) statically setup sbox in probe, and never touch it henceforth.
+>>>
+>>> WA1 is fragile, it might break for devices other than NFC.
+>>> WA2 is what I used when I wrote the NFC driver.
+>>>
+>>> Can tangox_dma_irq() be changed to have the framework call
+>>> the client's callback *before* tangox_dma_pchan_start?
+>>>
+>>> (Thinking out loud) The DMA_PREP_INTERRUPT requests that the
+>>> DMA framework invoke the callback from tasklet context,
+>>> maybe a different flag DMA_PREP_INTERRUPT_EX can request
+>>> calling the call-back directly from within the ISR?
+>>>
+>>> (Looking at existing flags) Could I use DMA_CTRL_ACK?
+>>> Description sounds like some kind hand-shake between
+>>> client and dmaengine.
+>>>
+>>> Grepping for DMA_PREP_INTERRUPT, I don't see where the framework
+>>> checks that flag to spawn the tasklet? Or is that up to each
+>>> driver individually?
+>> 
+>> Those flags all have defined meanings and abusing them for other things
+>> is a bad idea.  As far as possible, device drivers should work with any
+>> dma driver.
+>
+> I was asking about introducing a new flag, not abusing existing
+> flags. (I don't understand the semantics of DMA_CTRL_ACK.)
 
-diff --git a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
-index 0b8300e6fca3..a057cf9c0e7b 100644
---- a/arch/arm/mach-pxa/ezx.c
-+++ b/arch/arm/mach-pxa/ezx.c
-@@ -696,32 +696,7 @@ static struct pxa27x_keypad_platform_data e2_keypad_platform_data = {
- };
- #endif /* CONFIG_MACH_EZX_E2 */
- 
--#ifdef CONFIG_MACH_EZX_A780
--/* gpio_keys */
--static struct gpio_keys_button a780_buttons[] = {
--	[0] = {
--		.code       = SW_LID,
--		.gpio       = GPIO12_A780_FLIP_LID,
--		.active_low = 0,
--		.desc       = "A780 flip lid",
--		.type       = EV_SW,
--		.wakeup     = 1,
--	},
--};
--
--static struct gpio_keys_platform_data a780_gpio_keys_platform_data = {
--	.buttons  = a780_buttons,
--	.nbuttons = ARRAY_SIZE(a780_buttons),
--};
--
--static struct platform_device a780_gpio_keys = {
--	.name = "gpio-keys",
--	.id   = -1,
--	.dev  = {
--		.platform_data = &a780_gpio_keys_platform_data,
--	},
--};
--
-+#if defined(CONFIG_MACH_EZX_A780) || defined(CONFIG_MACH_EZX_A910)
- /* camera */
- static struct regulator_consumer_supply camera_dummy_supplies[] = {
- 	REGULATOR_SUPPLY("vdd", "0-005d"),
-@@ -750,6 +725,35 @@ static struct platform_device camera_supply_dummy_device = {
- 		.platform_data = &camera_dummy_config,
- 	},
- };
-+#endif
-+
-+#ifdef CONFIG_MACH_EZX_A780
-+/* gpio_keys */
-+static struct gpio_keys_button a780_buttons[] = {
-+	[0] = {
-+		.code       = SW_LID,
-+		.gpio       = GPIO12_A780_FLIP_LID,
-+		.active_low = 0,
-+		.desc       = "A780 flip lid",
-+		.type       = EV_SW,
-+		.wakeup     = 1,
-+	},
-+};
-+
-+static struct gpio_keys_platform_data a780_gpio_keys_platform_data = {
-+	.buttons  = a780_buttons,
-+	.nbuttons = ARRAY_SIZE(a780_buttons),
-+};
-+
-+static struct platform_device a780_gpio_keys = {
-+	.name = "gpio-keys",
-+	.id   = -1,
-+	.dev  = {
-+		.platform_data = &a780_gpio_keys_platform_data,
-+	},
-+};
-+
-+/* camera */
- static int a780_camera_reset(struct device *dev)
- {
- 	gpio_set_value(GPIO19_GEN1_CAM_RST, 0);
+This needs more than a new flag anyhow.
+
+> (FWIW, both the NFC and the MBUS agent are custom designs,
+> not third-party IP blocks.)
+
+Sure, but who knows what will be in the next chip?
+
 -- 
-2.9.0
+M?ns Rullg?rd
