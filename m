@@ -1,44 +1,48 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 24 Nov 2016 22:30:11 +0100
-Subject: [PATCH 3/3] ARM: dts: sunxi: enable SDIO Wi-Fi on Orange Pi Zero
-In-Reply-To: <CAGb2v64taF9x9MDYW+KUEEUUoSx0bF68QNc7uZXQoNrsozMGtg@mail.gmail.com>
-References: <20161121162421.800-1-icenowy@aosc.xyz>
- <20161121162421.800-3-icenowy@aosc.xyz>
- <20161123075950.fjtplylunwale6j4@lukather>
- <CAGb2v64taF9x9MDYW+KUEEUUoSx0bF68QNc7uZXQoNrsozMGtg@mail.gmail.com>
-Message-ID: <20161124213011.vyyfr6ikhgt3xath@lukather>
+From: stefan@datenfreihafen.org (Stefan Schmidt)
+Date: Thu, 24 Nov 2016 23:10:09 +0100
+Subject: [PATCH] ARM: pxa: ezx: fix a910 camera data
+In-Reply-To: <20161124162955.3887066-1-arnd@arndb.de>
+References: <20161124162955.3887066-1-arnd@arndb.de>
+Message-ID: <e0bdf159-93f2-5ed7-1e28-7fb80707d6c7@datenfreihafen.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2016 at 10:25:57PM +0800, Chen-Yu Tsai wrote:
-> >>  &r_pio {
-> >> @@ -111,6 +148,11 @@
-> >>               pins = "PL10";
-> >>               function = "gpio_out";
-> >>       };
-> >> +
-> >> +     wifi_pwrseq_pin_opi0: wifi_pwrseq_pin at 0 {
-> >> +             allwinner,pins = "PL7";
-> >> +             allwinner,function = "gpio_out";
-> >
-> > And same thing here.
+Hello.
+
+On 24.11.2016 17:29, Arnd Bergmann wrote:
+> The camera_supply_dummy_device definition is shared between a780 and a910,
+> but only provided when the first is enabled and fails to build for a
+> configuration with only a910:
 > 
-> Might we do away with the pinmux for gpio pins tradition?
-> Recent patches I've sent all omit them.
+> arch/arm/mach-pxa/ezx.c:1097:3: error: 'camera_supply_dummy_device' undeclared here (not in a function)
+> 
+> This moves the definition into its own section.
+> 
+> Fixes: 6c1b417adc8f ("ARM: pxa: ezx: use the new pxa_camera platform_data")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/mach-pxa/ezx.c | 56 ++++++++++++++++++++++++++-----------------------
 
-Oh, yes, that's true.
+I wonder what we should do with ezx.c.
 
-Thanks,
-Maxime
+As far as I know neither Daniel nor Harald or myself are doing anything
+with this devices anymore. Besides a basic compile test having an ack or
+reviewed by from our side is a bit worthless. :/
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161124/836dbe90/attachment.sig>
+I should still have some of these phones around in a box somewhere. If
+there is someone with a good motivation and time to take over on this
+platform we will find a way to get the person this devices.
+
+Any takers? Robert? I guess you are already overloaded but you might
+also have an interest. Worth asking :)
+
+In the case nobody wants to pick up here what would you consider the
+bets way forward? I could send a patch removing ezx platform support
+from the kernel (basically ezx.c plus build support) or I can send a
+patch marking it at least orphan in MAINTAINERS. Let me know what you think.
+
+Daniel, Harald, if one of you is still interested in these and what to
+pick up the work again, please speak up now. :)
+
+regards
+Stefan Schmidt
