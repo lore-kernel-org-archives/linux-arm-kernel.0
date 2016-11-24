@@ -1,196 +1,56 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 24 Nov 2016 18:58:04 +0900
-Subject: [PATCH v28 3/9] arm64: kdump: reserve memory for crash dump kernel
+Date: Thu, 24 Nov 2016 18:58:06 +0900
+Subject: [PATCH v28 5/9] arm64: kdump: add VMCOREINFO's for user-space tools
 In-Reply-To: <20161124095523.6972-1-takahiro.akashi@linaro.org>
 References: <20161124095523.6972-1-takahiro.akashi@linaro.org>
-Message-ID: <20161124095809.7092-2-takahiro.akashi@linaro.org>
+Message-ID: <20161124095809.7092-4-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"crashkernel=" kernel parameter specifies the size (and optionally
-the start address) of the system ram used by crash dump kernel.
-reserve_crashkernel() will allocate and reserve the memory at the startup
-of primary kernel.
+In addition to common VMCOREINFO's defined in
+crash_save_vmcoreinfo_init(), we need to know, for crash utility,
+  - kimage_voffset
+  - PHYS_OFFSET
+to examine the contents of a dump file (/proc/vmcore) correctly
+due to the introduction of KASLR (CONFIG_RANDOMIZE_BASE) in v4.6.
 
-This memory range will be exported to userspace via:
-	- an entry named "Crash kernel" in /proc/iomem, and
-	- "linux,crashkernel-base" and "linux,crashkernel-size" under
-	  /sys/firmware/devicetree/base/chosen
+  - VA_BITS
+is also required for makedumpfile command.
+
+arch_crash_save_vmcoreinfo() appends them to the dump file.
+More VMCOREINFO's may be added later.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Signed-off-by: Mark Salter <msalter@redhat.com>
-Signed-off-by: Pratyush Anand <panand@redhat.com>
 Reviewed-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/kernel/setup.c |   7 ++-
- arch/arm64/mm/init.c      | 110 ++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 116 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/machine_kexec.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index f534f49..f012659 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -31,7 +31,6 @@
- #include <linux/screen_info.h>
- #include <linux/init.h>
- #include <linux/kexec.h>
--#include <linux/crash_dump.h>
- #include <linux/root_dev.h>
- #include <linux/cpu.h>
- #include <linux/interrupt.h>
-@@ -225,6 +224,12 @@ static void __init request_standard_resources(void)
- 		    kernel_data.end <= res->end)
- 			request_resource(res, &kernel_data);
- 	}
-+
-+#ifdef CONFIG_KEXEC_CORE
-+	/* User space tools will find "Crash kernel" region in /proc/iomem. */
-+	if (crashk_res.end)
-+		insert_resource(&iomem_resource, &crashk_res);
-+#endif
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index c60346d..994fe0b 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -17,6 +17,7 @@
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/cpu_ops.h>
++#include <asm/memory.h>
+ #include <asm/mmu_context.h>
+ 
+ #include "cpu-reset.h"
+@@ -260,3 +261,13 @@ void machine_crash_shutdown(struct pt_regs *regs)
+ 
+ 	pr_info("Starting crashdump kernel...\n");
  }
- 
- u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 65f1241..1d62bf7 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -30,12 +30,14 @@
- #include <linux/gfp.h>
- #include <linux/memblock.h>
- #include <linux/sort.h>
-+#include <linux/of.h>
- #include <linux/of_fdt.h>
- #include <linux/dma-mapping.h>
- #include <linux/dma-contiguous.h>
- #include <linux/efi.h>
- #include <linux/swiotlb.h>
- #include <linux/vmalloc.h>
-+#include <linux/kexec.h>
- 
- #include <asm/boot.h>
- #include <asm/fixmap.h>
-@@ -76,6 +78,111 @@ static int __init early_initrd(char *p)
- early_param("initrd", early_initrd);
- #endif
- 
-+#ifdef CONFIG_KEXEC_CORE
-+static unsigned long long crash_size, crash_base;
-+static struct property crash_base_prop = {
-+	.name = "linux,crashkernel-base",
-+	.length = sizeof(u64),
-+	.value = &crash_base
-+};
-+static struct property crash_size_prop = {
-+	.name = "linux,crashkernel-size",
-+	.length = sizeof(u64),
-+	.value = &crash_size,
-+};
 +
-+static int __init export_crashkernel(void)
++void arch_crash_save_vmcoreinfo(void)
 +{
-+	struct device_node *node;
-+	int ret;
-+
-+	if (!crash_size)
-+		return 0;
-+
-+	/* Add /chosen/linux,crashkernel-* properties */
-+	node = of_find_node_by_path("/chosen");
-+	if (!node)
-+		return -ENOENT;
-+
-+	/*
-+	 * There might be existing crash kernel properties, but we can't
-+	 * be sure what's in them, so remove them.
-+	 */
-+	of_remove_property(node, of_find_property(node,
-+				"linux,crashkernel-base", NULL));
-+	of_remove_property(node, of_find_property(node,
-+				"linux,crashkernel-size", NULL));
-+
-+	ret = of_add_property(node, &crash_base_prop);
-+	if (ret)
-+		goto ret_err;
-+
-+	ret = of_add_property(node, &crash_size_prop);
-+	if (ret)
-+		goto ret_err;
-+
-+	return 0;
-+
-+ret_err:
-+	pr_warn("Exporting crashkernel region to device tree failed\n");
-+	return ret;
++	VMCOREINFO_NUMBER(VA_BITS);
++	/* Please note VMCOREINFO_NUMBER() uses "%d", not "%x" */
++	vmcoreinfo_append_str("NUMBER(kimage_voffset)=0x%llx\n",
++						kimage_voffset);
++	vmcoreinfo_append_str("NUMBER(PHYS_OFFSET)=0x%llx\n",
++						PHYS_OFFSET);
 +}
-+late_initcall(export_crashkernel);
-+
-+/*
-+ * reserve_crashkernel() - reserves memory for crash kernel
-+ *
-+ * This function reserves memory area given in "crashkernel=" kernel command
-+ * line parameter. The memory reserved is used by dump capture kernel when
-+ * primary kernel is crashing.
-+ */
-+static void __init reserve_crashkernel(void)
-+{
-+	int ret;
-+
-+	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-+				&crash_size, &crash_base);
-+	/* no crashkernel= or invalid value specified */
-+	if (ret || !crash_size)
-+		return;
-+
-+	if (crash_base == 0) {
-+		/* Current arm64 boot protocol requires 2MB alignment */
-+		crash_base = memblock_find_in_range(0, ARCH_LOW_ADDRESS_LIMIT,
-+				crash_size, SZ_2M);
-+		if (crash_base == 0) {
-+			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
-+				crash_size);
-+			return;
-+		}
-+	} else {
-+		/* User specifies base address explicitly. */
-+		if (!memblock_is_region_memory(crash_base, crash_size) ||
-+			memblock_is_region_reserved(crash_base, crash_size)) {
-+			pr_warn("crashkernel has wrong address or size\n");
-+			return;
-+		}
-+
-+		if (!IS_ALIGNED(crash_base, SZ_2M)) {
-+			pr_warn("crashkernel base address is not 2MB aligned\n");
-+			return;
-+		}
-+	}
-+	memblock_reserve(crash_base, crash_size);
-+
-+	pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
-+		crash_size >> 20, crash_base >> 20);
-+
-+	crashk_res.start = crash_base;
-+	crashk_res.end = crash_base + crash_size - 1;
-+}
-+#else
-+static void __init reserve_crashkernel(void)
-+{
-+	;
-+}
-+#endif /* CONFIG_KEXEC_CORE */
-+
- /*
-  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
-  * currently assumes that for memory starting above 4G, 32-bit devices will
-@@ -331,6 +438,9 @@ void __init arm64_memblock_init(void)
- 		arm64_dma_phys_limit = max_zone_dma_phys();
- 	else
- 		arm64_dma_phys_limit = PHYS_MASK + 1;
-+
-+	reserve_crashkernel();
-+
- 	dma_contiguous_reserve(arm64_dma_phys_limit);
- 
- 	memblock_allow_resize();
 -- 
 2.10.0
