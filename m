@@ -1,46 +1,73 @@
-From: jakub.kicinski@netronome.com (Jakub Kicinski)
-Date: Thu, 24 Nov 2016 01:30:03 -0800
-Subject: [PATCH] ARM: fix kmemleak for XIP_KERNEL
-In-Reply-To: <20161122142829.1776129-1-arnd@arndb.de>
-References: <20161122142829.1776129-1-arnd@arndb.de>
-Message-ID: <CAJpBn1zow6P5MUFP+jbOXafoH9dLV8Ng7cJqfRsE8FMEEe9J8Q@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 24 Nov 2016 17:30:45 +0800
+Subject: [RFC PATCH 2/5] dmaengine: allow sun6i-dma for more SoCs
+In-Reply-To: <34b5e50f-a091-9bd8-7a74-96e538a7351d@arm.com>
+References: <1479950235-26821-1-git-send-email-andre.przywara@arm.com>
+ <1479950235-26821-3-git-send-email-andre.przywara@arm.com>
+ <CAGb2v67M8DrPaf8GzSPEjekgV6cLcXXzO3tVUc9kjUDcM3BE_w@mail.gmail.com>
+ <34b5e50f-a091-9bd8-7a74-96e538a7351d@arm.com>
+Message-ID: <CAGb2v65G7=9ah+sEet=z5vss60kL5ZLSkNsAcGpwu8V6AWdEGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2016 at 6:28 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The newly added check for RO_AFTER_INIT_DATA in kmemleak breaks ARM whenever
-> XIP_KERNEL is enabled:
+On Thu, Nov 24, 2016 at 5:16 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+> Hi,
 >
-> mm/kmemleak.o: In function `kmemleak_scan':
-> kmemleak.c:(.text.kmemleak_scan+0x2e4): undefined reference to `__end_data_ro_after_init'
-> kmemleak.c:(.text.kmemleak_scan+0x2e8): undefined reference to `__start_data_ro_after_init'
+> On 24/11/16 04:16, Chen-Yu Tsai wrote:
+>> Hi,
+>>
+>> On Thu, Nov 24, 2016 at 9:17 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+>>> The sun6i DMA driver is used in the Allwinner A64 and H5 SoC, which
+>>> have arm64 capable cores. Add the generic sunxi config symbol to allow
+>>> the driver to be selected by arm64 Kconfigs, which don't feature
+>>> SoC specific MACH_xxxx configs.
+>>>
+>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>> ---
+>>>  drivers/dma/Kconfig | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+>>> index af63a6b..003c284 100644
+>>> --- a/drivers/dma/Kconfig
+>>> +++ b/drivers/dma/Kconfig
+>>> @@ -157,7 +157,7 @@ config DMA_SUN4I
+>>>
+>>>  config DMA_SUN6I
+>>>         tristate "Allwinner A31 SoCs DMA support"
+>>> -       depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST
+>>> +       depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST || ARCH_SUNXI
+>>
+>> AFAIK ARCH_SUNXI encompasses/supersedes MACH_SUN*I.
+>> (And I don't have to add MACH_SUN9I later :) )
 >
-> This adds the start/end symbols for the section even in the case of having
-> no data in the section, to make the check work while keeping the architecture
-> specific override in one place.
+> Sure, admittedly it was just a quick hack to get things going.
+> Actually I don't know why we had a *depend* on those MACH_s before. I
+> think technically it does not depend on a certain SoC (having the
+> COMPILE_TEST in there hints on that). So what about:
+
+It was really because this DMA engine only comes with the later
+SoCs. We have dma-sun4i for the older one. But yes, there's no
+reason why you can't build it for the earlier SoC. It just doesn't
+get used.
+
 >
-> Fixes: d7c19b066dcf ("mm: kmemleak: scan .data.ro_after_init")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> The patch causing this was merged late into v4.9-rc, this one should
-> probably go there as well.
+>         depends on ARCH_SUNXI || COMPILE_TEST
 >
-> I assume the same problem exists on s390, but I have not checked that.
+> and maybe:
+>
+>         default y if MACH_SUN6I || MACH_SUN8I
+>
+> Though I see that both multi_v7_defconfig and sunxi_defconfig explicitly
+> set this, so this wouldn't be needed?
 
-Hi Arnd!
+I guess it's just nice to get stuff out of defconfig?
+Why not go all the way and just have
 
-Sorry for breaking things again :( The confusion must have been caused
-by going via different trees.  Actually, Russell's commit is dated 6
-days after mine so could as well be:
+        default y if ARCH_SUNXI
 
-Fixes: 2a3811068fbc ("ARM: Fix XIP kernels")
+ChenYu
 
-Not that it matters.
-
-About s390 - I thought I took care of it in d7c19b066dcf ("mm:
-kmemleak: scan .data.ro_after_init"), do you see anything suspicious
-in the way I did it?  I'll do some more s390 builds just to triple
-check.
-
-Sorry again,
-Kuba
+>
+> Cheers,
+> Andre.
