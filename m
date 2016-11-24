@@ -1,57 +1,65 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 24 Nov 2016 09:16:28 +0000
-Subject: [RFC PATCH 2/5] dmaengine: allow sun6i-dma for more SoCs
-In-Reply-To: <CAGb2v67M8DrPaf8GzSPEjekgV6cLcXXzO3tVUc9kjUDcM3BE_w@mail.gmail.com>
-References: <1479950235-26821-1-git-send-email-andre.przywara@arm.com>
- <1479950235-26821-3-git-send-email-andre.przywara@arm.com>
- <CAGb2v67M8DrPaf8GzSPEjekgV6cLcXXzO3tVUc9kjUDcM3BE_w@mail.gmail.com>
-Message-ID: <34b5e50f-a091-9bd8-7a74-96e538a7351d@arm.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 24 Nov 2016 17:11:59 +0800
+Subject: [PATCH net-next 1/4] net: mvneta: Convert to be 64 bits compatible
+In-Reply-To: <21520380.oWTKcrq8DS@wuerfel>
+References: <20161122164844.19566-1-gregory.clement@free-electrons.com>
+ <CAPv3WKf0a63qQT+xwXfUatbgLFF58e6L8J10VtBOUTam+kUcjg@mail.gmail.com>
+ <20161124163327.1cc261ab@xhacker>	<21520380.oWTKcrq8DS@wuerfel>
+Message-ID: <20161124171159.2a82da4f@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 24 Nov 2016 10:00:36 +0100
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-On 24/11/16 04:16, Chen-Yu Tsai wrote:
-> Hi,
+> On Thursday, November 24, 2016 4:37:36 PM CET Jisheng Zhang wrote:
+> > solB (a SW shadow cookie) perhaps gives a better performance: in hot path,
+> > such as mvneta_rx(), the driver accesses buf_cookie and buf_phys_addr of
+> > rx_desc which is allocated by dma_alloc_coherent, it's noncacheable if the
+> > device isn't cache-coherent. I didn't measure the performance difference,
+> > because in fact we take solA as well internally. From your experience,
+> > can the performance gain deserve the complex code?  
 > 
-> On Thu, Nov 24, 2016 at 9:17 AM, Andre Przywara <andre.przywara@arm.com> wrote:
->> The sun6i DMA driver is used in the Allwinner A64 and H5 SoC, which
->> have arm64 capable cores. Add the generic sunxi config symbol to allow
->> the driver to be selected by arm64 Kconfigs, which don't feature
->> SoC specific MACH_xxxx configs.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  drivers/dma/Kconfig | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
->> index af63a6b..003c284 100644
->> --- a/drivers/dma/Kconfig
->> +++ b/drivers/dma/Kconfig
->> @@ -157,7 +157,7 @@ config DMA_SUN4I
->>
->>  config DMA_SUN6I
->>         tristate "Allwinner A31 SoCs DMA support"
->> -       depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST
->> +       depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST || ARCH_SUNXI
+> Yes, a read from uncached memory is fairly slow, so if you have a chance
+> to avoid that it will probably help. When adding complexity to the code,
+> it probably makes sense to take a runtime profile anyway quantify how
+> much it gains.
 > 
-> AFAIK ARCH_SUNXI encompasses/supersedes MACH_SUN*I.
-> (And I don't have to add MACH_SUN9I later :) )
+> On machines that have cache-coherent DMA, accessing the descriptor
+> should be fine, as you already have to load the entire cache line
+> to read the status field.
+> 
+> Looking at this snippet:
+> 
+>                 rx_status = rx_desc->status;
+>                 rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
+>                 data = (unsigned char *)rx_desc->buf_cookie;
+>                 phys_addr = rx_desc->buf_phys_addr;
+>                 pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc);
+>                 bm_pool = &pp->bm_priv->bm_pools[pool_id];
+> 
+>                 if (!mvneta_rxq_desc_is_first_last(rx_status) ||
+>                     (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
+> err_drop_frame_ret_pool:
+>                         /* Return the buffer to the pool */
+>                         mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
+>                                               rx_desc->buf_phys_addr);
+> err_drop_frame:
+> 
+> 
+> I think there is more room for optimizing if you start: you read
+> the status field twice (the second one in MVNETA_RX_GET_BM_POOL_ID)
+> and you can cache the buf_phys_addr along with the virtual address
+> once you add that.
 
-Sure, admittedly it was just a quick hack to get things going.
-Actually I don't know why we had a *depend* on those MACH_s before. I
-think technically it does not depend on a certain SoC (having the
-COMPILE_TEST in there hints on that). So what about:
+oh, yeah! buf_phy_addr could be included too.
 
-	depends on ARCH_SUNXI || COMPILE_TEST
+> 
+> Generally speaking, I'd recommend using READ_ONCE()/WRITE_ONCE()
+> to access the descriptor fields, to ensure the compiler doesn't
+> add extra references as well as to annotate the expensive
+> operations.
+> 
+> 	Arnd
 
-and maybe:
-
-	default y if MACH_SUN6I || MACH_SUN8I
-
-Though I see that both multi_v7_defconfig and sunxi_defconfig explicitly
-set this, so this wouldn't be needed?
-
-Cheers,
-Andre.
+Got it. Thanks so much for the detailed guide. 
