@@ -1,48 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 24 Nov 2016 17:32:42 +0000
-Subject: [PATCH 4/4] crypto: arm/crct10dif - port x86 SSE implementation
- to ARM
-In-Reply-To: <1480002201-1427-5-git-send-email-ard.biesheuvel@linaro.org>
-References: <1480002201-1427-1-git-send-email-ard.biesheuvel@linaro.org>
- <1480002201-1427-5-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu8tPfX76ntdQmMz53waE73RHfB11oRs8w=Ufy7d=YqbGA@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 24 Nov 2016 17:33:33 +0000
+Subject: [RFC PATCH 11/11] ARM: Allow ARCH_MULTIPLATFORM to be selected
+ for NOMMU
+In-Reply-To: <20161124172826.GB3524@afzalpc>
+References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
+ <1479806768-39911-12-git-send-email-vladimir.murzin@arm.com>
+ <16587553.f9R1mxJih5@wuerfel> <583478FB.4020008@arm.com>
+ <20161123154829.GA2489@afzalpc> <5835BEBA.8050905@arm.com>
+ <20161124172826.GB3524@afzalpc>
+Message-ID: <5837246D.5080106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 November 2016 at 15:43, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> This is a straight transliteration of the Intel algorithm implemented
-> using SSE and PCLMULQDQ instructions that resides under in the file
-> arch/x86/crypto/crct10dif-pcl-asm_64.S.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm/crypto/Kconfig                        |   5 +
->  arch/arm/crypto/Makefile                       |   2 +
->  arch/{arm64 => arm}/crypto/crct10dif-ce-core.S | 457 +++++++++++---------
->  arch/{arm64 => arm}/crypto/crct10dif-ce-glue.c |  23 +-
->  4 files changed, 277 insertions(+), 210 deletions(-)
->
+On 24/11/16 17:28, Afzal Mohammed wrote:
+> Hi,
+> 
+> On Wed, Nov 23, 2016 at 04:07:22PM +0000, Vladimir Murzin wrote:
+> 
+>> I think this one is fixed by
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 8e7496c..c3349b9 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -2019,7 +2019,7 @@ config XIP_PHYS_ADDR
+>>  config KEXEC
+>>         bool "Kexec system call (EXPERIMENTAL)"
+>>         depends on (!SMP || PM_SLEEP_SMP)
+>> -       depends on !CPU_V7M
+>> +       depends on MMU
+> 
+>> These we fixed in 9001214 ("ARM: imx: no need to select SMP_ON_UP explicitly")
+> 
+>> Thanks for trying it. Just a gentle remainder not to forget to set DRAM_BASE
+>> and DRAM_SIZE ;)
+> 
+> Thanks for the info.
+> 
+> Based on your feedback, have been able to build multi_v7 w/ MMU & SMP
+> disabled.
+> 
+> Trying to get something in the console on Cortex A platform.
 
-This patch needs the following hunk folded in to avoid breaking the
-Thumb2 build:
+Make sure you have ARM_MPU disabled, otherwise it will die early (I keep
+proper patch for that here).
 
-"""
-diff --git a/arch/arm/crypto/crct10dif-ce-core.S
-b/arch/arm/crypto/crct10dif-ce-core.S
-index 30168b0f8581..4fdbca94dd0c 100644
---- a/arch/arm/crypto/crct10dif-ce-core.S
-+++ b/arch/arm/crypto/crct10dif-ce-core.S
-@@ -152,7 +152,8 @@ CPU_LE(     vrev64.8        q7, q7                  )
-        // XOR the initial_crc value
-        veor.8          q0, q0, q10
+Cheers
+Vladimir
 
--       adrl            ip, rk3
-+ARM(   adrl            ip, rk3         )
-+THUMB( adr             ip, rk3         )
-        vld1.64         {q10}, [ip]     // xmm10 has rk3 and rk4
-                                        // type of pmull instruction
-                                        // will determine which constant to use
-"""
-
-Updated patch(es) can be found here
-https://git.kernel.org/cgit/linux/kernel/git/ardb/linux.git/log/?h=arm-crct10dif
+> 
+> Regards
+> afzal
+> 
