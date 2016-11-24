@@ -1,50 +1,76 @@
-From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
-Date: Thu, 24 Nov 2016 14:47:03 +0200
-Subject: [PATCH 0/2] OF phandle nexus support + GPIO nexus
-In-Reply-To: <20161124102529.20212-1-stephen.boyd@linaro.org>
-References: <20161124102529.20212-1-stephen.boyd@linaro.org>
-Message-ID: <59A46F04-80D5-4B9A-911D-C866C9B6755E@konsulko.com>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Thu, 24 Nov 2016 16:05:55 +0300
+Subject: [PATCH 7/9] clocksource/drivers/rockchip_timer: implement
+ clocksource timer
+In-Reply-To: <1800621.EhepfMxccR@diego>
+References: <1479922177-20136-1-git-send-email-al.kochet@gmail.com>
+ <1479922177-20136-7-git-send-email-al.kochet@gmail.com>
+ <FFD6E644-F68B-4880-BC76-88F6063D070E@gmail.com> <1800621.EhepfMxccR@diego>
+Message-ID: <0E972AC9-1132-4D0B-BF25-918BC1AA1A49@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hello Heiko!
 
-> On Nov 24, 2016, at 12:25 , Stephen Boyd <stephen.boyd@linaro.org> wrote:
+> 24 ????. 2016 ?., ? 15:17, Heiko St?bner <heiko@sntech.de> ???????(?):
 > 
-> This is one small chunk of work related to DT overlays for expansion
-> boards. It would be good to have a way to expose #<list>-cells types of
-> providers through a connector in a standard way. So we introduce a way
-> to make "nexus" nodes for these types of properties to remap the consumer
-> number space to the other side of the connector's number space. It's
-> basically a copy of the interrupt nexus implementation, but without
-> the address space matching design and interrupt-parent walking.
-> 
-> The first patch implements a generic method to do this, and the second patch
-> adds a unit test for it. The third patch is more of an example than anything
-> else. It shows how we would modify frameworks to use the new API.
-> 
+> In your dts-patch you reuse the rk3288-timer compatible value, which is also 
+> non-ideal.
 
-Excellent. It was about time this happened.
+rockchip,rk-timer.txt states what I should use rockchip,rk3288-timer for rk3188 timers:
 
-> Stephen Boyd (3):
->  of: Support parsing phandle argument lists through a nexus node
->  of: unittest: Add phandle remapping test
->  gpio: Support gpio nexus dt bindings
+Required properties:
+- compatible: shall be one of:
+  "rockchip,rk3288-timer" - for rk3066, rk3036, rk3188, rk322x, rk3288, rk3368
+
+Should I add "rockchip,rk3188-timer? (or better "rockchip,rk3036-timer?) ? Or may be second
+approach should be used?
+
+> What you may want to do is introduce a rockchip,rk3188-timer compatible and 
+> then make the timer-driver act accordingly, as you then know you are on a 
+> rk3188-board ... see drivers attaching specific structs to the of_device_id 
+> entries. From the documentation
+
+May be it is better to prepend compatible string with "rockchip,rk3188-timer? in the dts
+file only? elinux[1] recommend build compatible string from "exact device? string and
+?other devices? that the device is compatible with.
+
+As ?other devices? string defined already, I use it.
+
+[1] http://elinux.org/Device_Tree_Usage#Understanding_the_compatible_Property
+
+	timer0: timer at 20038000 {
+		compatible = "rockchip,rk3188-timer", "rockchip,rk3288-timer?;
+                ?
+	};
+
+Just found what rk3036 already declared such way:
+
+rk3036.dtsi:	timer: timer at 20044000 {
+rk3036.dtsi:		compatible = "rockchip,rk3036-timer", "rockchip,rk3288-timer?;
+
 > 
-> drivers/gpio/gpiolib-of.c                   |   5 +-
-> drivers/of/base.c                           | 146 ++++++++++++++++++++++++++++
-> drivers/of/unittest-data/testcases.dts      |  11 +++
-> drivers/of/unittest-data/tests-phandle.dtsi |  24 +++++
-> drivers/of/unittest.c                       | 124 +++++++++++++++++++++++
-> include/linux/of.h                          |  14 +++
-> 6 files changed, 322 insertions(+), 2 deletions(-)
-> 
-> -- 
-> 2.10.0.297.gf6727b0
-> 
+> it also shouldn't really matter which timer 
+> you use as clocksource, as on the rk3188 it seems all of them act the same way 
+> (except timer3 being always on).
 
-Comments inline?
+You are right.
 
-Regards
+I sent dts file with general timer settings, without clockevent enabled, so one could pick
+up timer and setup it in the board dts (radxarock, for example) like:
 
-? Pantelis
+&timer0 {
+    rockchip,clocksource;
+    status = ?okay?;
+};
+
+> When touching devicetree-properties, please also adapt the binding document
+> 	Documentation/devicetree/bindings/timer,rockchip,rk-timer.txt
+> in this case and also include the devicetree maintainers.
+
+If the patch[2] ok, I'll resend it and include devicetree maintainers.
+
+[2] http://lists.infradead.org/pipermail/linux-rockchip/2016-November/013148.html
+
+Regards,
+Alexander.
