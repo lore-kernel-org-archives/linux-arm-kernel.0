@@ -1,47 +1,57 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 24 Nov 2016 16:42:35 +0100
-Subject: [GIT PULL 2/3] Rockchip dts64 changes for 4.10
+Date: Thu, 24 Nov 2016 16:43:16 +0100
+Subject: [GIT PULL 3/3] Rockchip dts32 changes for 4.10
 In-Reply-To: <1594090.z775ZFR2cz@phil>
 References: <1594090.z775ZFR2cz@phil>
-Message-ID: <1856918.gK9kzau163@phil>
+Message-ID: <1575955.EYn93JYaxe@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit c49590691f3819bb6be3f77938ef39038eb76643:
+The following changes since commit 6a8883d614c7bede1075a4850139daa9723c291e:
 
-  arm64: dts: rockchip: replace to "max-frequency" instead of "clock-freq-min-max" (2016-11-09 15:08:55 +0100)
+  ARM: dts: rockchip: replace to "max-frequency" instead of "clock-freq-min-max" (2016-11-09 14:46:04 +0100)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.10-rockchip-dts64-2
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.10-rockchip-dts32-2
 
-for you to fetch changes up to c6f049db0a783a35685104e83214c9cc02fb74b6:
+for you to fetch changes up to c458e1b504a6a8c817fc56b4d4704273f2c459bb:
 
-  dt-bindings: add rockchip RK1108 Evaluation board (2016-11-21 21:47:02 +0100)
-
-----------------------------------------------------------------
-Some more powerdomains and usb2-otg support for the rk3399 as well
-as the binding doc for the 32bit rk1108 eval board to prevent it
-from conflicting with the recently added 64bit px5 board.
+  ARM: dts: rockchip: add the sdmmc pinctrl for rk1108 (2016-11-16 13:37:45 +0100)
 
 ----------------------------------------------------------------
-Andy Yan (1):
-      dt-bindings: add rockchip RK1108 Evaluation board
+A bit of attention for the rk3066, fixed tsadc reset node
+as well as enabling the dma for uart and mmc controllers.
 
-Elaine Zhang (2):
-      arm64: dts: rockchip: add eMMC's power domain support for rk3399
-      arm64: dts: rockchip: add pd_sd power-domain node for rk3399
+And one new soc, the rk1108 combining a single-core Cortex-A7
+with a separate DSP core.
 
-Jeffy Chen (1):
-      arm64: dts: rockchip: add gmac needed pclk for rk3399 pd
+----------------------------------------------------------------
+Andy Yan (2):
+      ARM: dts: rockchip: add basic support for RK1108 SOC
+      ARM: dts: rockchip: add rockchip RK1108 Evaluation board
 
-William Wu (1):
-      arm64: dts: rockchip: add usb2-phy otg-port support for rk3399
+Heiko Stuebner (1):
+      Merge branch 'v4.10-shared/clkids' into v4.10-armsoc/dts32
 
-Yakir Yang (1):
-      arm64: dts: rockchip: add backlight support for rk3399 evb board
+Jacob Chen (1):
+      ARM: dts: rockchip: add the sdmmc pinctrl for rk1108
 
- Documentation/devicetree/bindings/arm/rockchip.txt |  4 ++
- arch/arm64/boot/dts/rockchip/rk3399-evb.dts        | 40 +++++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 46 +++++++++++++++++++++-
- 3 files changed, 89 insertions(+), 1 deletion(-)
+Pawe? Jarosz (2):
+      ARM: dts: rockchip: fix TSADC reset node for rk3066a
+      ARM: dts: rockchip: enable dma for uart and mmc on rk3066a
+
+Shawn Lin (2):
+      dt-bindings: rockchip-dw-mshc: add RK1108 dw-mshc description
+      clk: rockchip: add dt-binding header for rk1108
+
+ .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/rk1108-evb.dts                   |  69 ++++
+ arch/arm/boot/dts/rk1108.dtsi                      | 452 +++++++++++++++++++++
+ arch/arm/boot/dts/rk3066a.dtsi                     |  19 +-
+ include/dt-bindings/clock/rk1108-cru.h             | 269 ++++++++++++
+ 6 files changed, 810 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/rk1108-evb.dts
+ create mode 100644 arch/arm/boot/dts/rk1108.dtsi
+ create mode 100644 include/dt-bindings/clock/rk1108-cru.h
