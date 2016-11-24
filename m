@@ -1,88 +1,41 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 24 Nov 2016 18:59:44 +0900
-Subject: [PATCH v28 9/9] Documentation: dt: chosen properties for arm64 kdump
-In-Reply-To: <20161124095523.6972-1-takahiro.akashi@linaro.org>
-References: <20161124095523.6972-1-takahiro.akashi@linaro.org>
-Message-ID: <20161124095944.7167-1-takahiro.akashi@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Nov 2016 11:04:36 +0100
+Subject: [PATCH 5/10] dt: bindings: Add bindings for Marvell Xenon SD Host
+ Controller
+In-Reply-To: <20161124104858.3604c11d@free-electrons.com>
+References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
+ <8737ihmctr.fsf@free-electrons.com>
+ <20161124104858.3604c11d@free-electrons.com>
+Message-ID: <8756050.yoKoJPCyHz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Morse <james.morse@arm.com>
+On Thursday, November 24, 2016 10:48:58 AM CET Thomas Petazzoni wrote:
+> Hello,
+> 
+> On Thu, 24 Nov 2016 10:44:48 +0100, Gregory CLEMENT wrote:
+> 
+> > "A single Xenon IP can support multiple slots.
+> > Each slot acts as an independent SDHC. It owns independent resources, such
+> > as register sets clock and PHY.
+> > Each slot should have an independent device tree node."
+> 
+> I think this wording is still very confusing, and continues to cause
+> confusion.
+> 
+> We should just state that each Xenon controller supports a single slot,
+> and that's it.
+> 
+> The text still says "a single Xenon IP can support multiple slots",
+> which continues to cause confusion.
 
-Add documentation for
-	linux,crashkernel-base and crashkernel-size,
-	linux,usable-memory-range
-	linux,elfcorehdr
-used by arm64 kdump to decribe the kdump reserved area, and
-the elfcorehdr's location within it.
+Agreed. Ideally we'd find out why exactly the slot number must
+be used for accessing some of the registers to have a better
+explanation to put in there, aside from stating that only one
+slot is supported but the number must be set.
 
-Signed-off-by: James Morse <james.morse@arm.com>
-[takahiro.akashi at linaro.org: added "linux,crashkernel-base" and "-size" ]
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: devicetree at vger.kernel.org
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
----
- Documentation/devicetree/bindings/chosen.txt | 50 ++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
+Could it be that this is some form of pinmuxing, i.e. that each
+controller could in theory be used for any of the slots but you
+have to pick one of them?
 
-diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
-index 6ae9d82..7b11516 100644
---- a/Documentation/devicetree/bindings/chosen.txt
-+++ b/Documentation/devicetree/bindings/chosen.txt
-@@ -52,3 +52,53 @@ This property is set (currently only on PowerPC, and only needed on
- book3e) by some versions of kexec-tools to tell the new kernel that it
- is being booted by kexec, as the booting environment may differ (e.g.
- a different secondary CPU release mechanism)
-+
-+linux,crashkernel-base
-+linux,crashkernel-size
-+----------------------
-+
-+These properties (currently used on PowerPC and arm64) indicates
-+the base address and the size, respectively, of the reserved memory
-+range for crash dump kernel.
-+e.g.
-+
-+/ {
-+	chosen {
-+		linux,crashkernel-base = <0x9 0xf0000000>;
-+		linux,crashkernel-size = <0x0 0x10000000>;
-+	};
-+};
-+
-+linux,usable-memory-range
-+-------------------------
-+
-+This property (currently used only on arm64) holds the memory range,
-+the base address and the size, which can be used as system ram on
-+the *current* kernel. Note that, if this property is present, any memory
-+regions under "memory" nodes in DT blob or ones marked as "conventional
-+memory" in EFI memory map should be ignored.
-+e.g.
-+
-+/ {
-+	chosen {
-+		linux,usable-memory-range = <0x9 0xf0000000 0x0 0x10000000>;
-+	};
-+};
-+
-+The main usage is for crash dump kernel to identify its own usable
-+memory and exclude, at its boot time, any other memory areas that are
-+part of the panicked kernel's memory.
-+
-+linux,elfcorehdr
-+----------------
-+
-+This property (currently used only on arm64) holds the memory range,
-+the address and the size, of the elf core header which mainly describes
-+the panicked kernel's memory layout as PT_LOAD segments of elf format.
-+e.g.
-+
-+/ {
-+	chosen {
-+		linux,elfcorehdr = <0x9 0xfffff000 0x0 0x800>;
-+	};
-+};
--- 
-2.10.0
+	Arnd
