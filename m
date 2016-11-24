@@ -1,45 +1,70 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 24 Nov 2016 15:17:36 +0100
-Subject: [PATCH RESEND 2/2] gpio: axp209: add pinctrl support
-In-Reply-To: <20161123141151.25315-3-quentin.schulz@free-electrons.com>
-References: <20161123141151.25315-1-quentin.schulz@free-electrons.com>
- <20161123141151.25315-3-quentin.schulz@free-electrons.com>
-Message-ID: <CACRpkdb8cej=AMs2kO1Vks-WYeae+CtAW2YOCc+Pz3E49mcrDQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 24 Nov 2016 14:23:16 +0000
+Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire
+ section
+In-Reply-To: <20161124141149.GE2213@rric.localdomain>
+References: <20161109195132.GZ22012@rric.localdomain>
+ <20161117142528.GJ22855@arm.com>
+ <20161117151805.GJ2151@rric.localdomain>
+ <CAKv+Gu-2uGJGovqQL-gbB54u=fQ9L9YUbDdRo6u3oWqF6znn6Q@mail.gmail.com>
+ <20161123211538.GH10776@rric.localdomain>
+ <CAKv+Gu8aWpz5vXSWdKHwL5Xk2aWyQBOoR1WHOnVPaWZOwqojBQ@mail.gmail.com>
+ <20161124134238.GI10776@rric.localdomain>
+ <CAKv+Gu_Ug3XOD6jy5xziy1pS7WV=TC0RLD4j3DT6nytujQDzRQ@mail.gmail.com>
+ <20161124135151.GJ10776@rric.localdomain>
+ <CAKv+Gu9qB7P2epMGdwFJ3vJR3vt-bBxU0nKwmKdpaOpTKdqzzA@mail.gmail.com>
+ <20161124141149.GE2213@rric.localdomain>
+Message-ID: <CAKv+Gu-SXX_Vv1Wi1Nm=5vdaXSS0MBp20QBpQVacSKPLfdH0-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2016 at 3:11 PM, Quentin Schulz
-<quentin.schulz@free-electrons.com> wrote:
-
-> The GPIOs present in the AXP209 PMIC have multiple functions. They
-> typically allow a pin to be used as GPIO input or output and can also be
-> used as ADC or regulator for example.[1]
+On 24 November 2016 at 14:11, Robert Richter <robert.richter@cavium.com> wrote:
+> On 24.11.16 13:58:30, Ard Biesheuvel wrote:
+>> On 24 November 2016 at 13:51, Robert Richter <robert.richter@cavium.com> wrote:
+>> > On 24.11.16 13:44:31, Ard Biesheuvel wrote:
+>> >> On 24 November 2016 at 13:42, Robert Richter <robert.richter@cavium.com> wrote:
+>> >> > On 23.11.16 21:25:06, Ard Biesheuvel wrote:
+>> >> >> Why? MEMREMAP_WB is used often, among other things for mapping
+>> >> >> firmware tables, which are marked as NOMAP, so in these cases, the
+>> >> >> linear address is not mapped.
+>> >> >
+>> >> > If fw tables are mapped wb, that is wrong and needs a separate fix.
+>> >> >
+>> >>
+>> >> Why is that wrong?
+>> >
+>> > The whole issue with mapping acpi tables is not marking them cachable,
+>> > what wb does.
+>>
+>> What 'issue'?
+>>
+>> > Otherwise we could just use linear mapping for those mem
+>> > ranges.
+>> >
+>>
+>> Regions containing firmware tables are owned by the firmware, and it
+>> is the firmware that tells us which memory attributes we are allowed
+>> to use. If those attributes include WB, it is perfectly legal to use a
+>> cacheable mapping. That does *not* mean they should be covered by the
+>> linear mapping. The linear mapping is read-write-non-exec, for
+>> instance, and we may prefer to use a read-only mapping and/or
+>> executable mapping.
 >
-> This adds the possibility to use all functions of the GPIOs present in
-> the AXP209 PMIC thanks to pinctrl subsystem.
+> Ok, I am going to fix try_ram_remap().
 >
-> [1] see registers 90H, 92H and 93H at
->     http://dl.linux-sunxi.org/AXP/AXP209_Datasheet_v1.0en.pdf
+
+Thanks. Could you also add an arm64 version of page_is_ram() that uses
+memblock_is_memory() while you're at it? I think using memblock
+directly in try_ram_remap() may not be the best approach
+
+> Are there other concerns with this patch?
 >
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 
-I need Maxime's review on this patch.
+I think we all agree that pfn_valid() should return whether a pfn has
+a struct page associated with it, the debate is about whether it makes
+sense to allocate struct pages for memory that the kernel does not
+own. But given that it does not really hurt to do so for small holes,
+I think your suggestion makes sense.
 
->  .../devicetree/bindings/gpio/gpio-axp209.txt       |  28 +-
-
-Also move the bindings to pinctrl/pinctrl-axp209.txt
-
->  drivers/gpio/gpio-axp209.c                         | 551 ++++++++++++++++++---
-
-Combined drivers should be in drivers/pinctrl/*.
-
-Make a separate patch moving the driver to
-drivers/pinctrl/pinctrl-axp209.c (remember -M to git format-patch)
-augment Kconfig and Makefile in both subsystems and make
-these patches on top of that.
-
-I will deal with cross-merging the result between the GPIO
-and pin control trees.
-
-Yours,
-Linus Walleij
+Should we be doing anything more to ensure that those pages are not
+dereferenced inadvertently? Is there a page flag we should be setting?
