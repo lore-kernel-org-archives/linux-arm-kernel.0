@@ -1,330 +1,69 @@
-From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Thu, 24 Nov 2016 14:48:03 +0530
-Subject: [PATCH 4/4] net: thunderx: Pause frame support
-In-Reply-To: <1479979083-15963-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1479979083-15963-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1479979083-15963-5-git-send-email-sunil.kovvuri@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 24 Nov 2016 10:22:31 +0100
+Subject: [PATCH 5/10] dt: bindings: Add bindings for Marvell Xenon SD Host
+ Controller
+In-Reply-To: <4031579.CBE32NHUoW@wuerfel> (Arnd Bergmann's message of "Thu, 24
+ Nov 2016 10:11:19 +0100")
+References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
+ <87d1hno2d7.fsf@free-electrons.com>
+ <CAPDyKFpoifsKkse7Fc-bbZAoa=QGT=9QOQ-4D=f60ptx0hzZsA@mail.gmail.com>
+ <4031579.CBE32NHUoW@wuerfel>
+Message-ID: <877f7tmduw.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
+Hi Arnd,
+ 
+ On jeu., nov. 24 2016, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Enable pause frames on both Rx and Tx side, configure pause
-interval e.t.c. Also support for enable/disable pause frames
-on Rx/Tx via ethtool has been added.
+> On Thursday, November 24, 2016 10:05:45 AM CET Ulf Hansson wrote:
+>> > You also mentioned other bindings using child nodes, but for this one
+>> > we have one controller with only one set of register with multiple slots
+>> > (Atmel is an example). Here each slot have it own set of register.
+>> >
+>> > Actually giving the fact that each slot is controlled by a different set
+>> > of register I wonder why the hardware can't also deduce the slot number
+>> > from the address register. For me it looks like an hardware bug but we
+>> > have to deal with it.
+>> >
+>> > Do you still think we needchild node here?
+>> 
+>> Using child-nodes for slots like what's done in the atmel case, is
+>> currently broken. I would recommend to avoid using child-nodes for
+>> slots, if possible.
+>> 
+>> To give you some more background, currently the mmc core treats child
+>> nodes as embedded non-removable cards or SDIO funcs. However, we can
+>> change to make child-nodes also allowed to describe slots, but it
+>> requires a specific compatible for "slots" and of course then we also
+>> need to update the DT parsing of the child-nodes in the mmc core.
+>> 
+>> Documentation/devicetree/bindings/mmc/mmc.txt
+>> Documentation/devicetree/bindings/mmc/mmc-card.txt
+>
+> I don't see anything wrong with having child nodes for the slots
+> even with the current binding, under one condition:
+>
+> The mmc.txt binding above must refer only to the child node, while
+> the parent node conceptually becomes a plain bus or MFD that
+> happens to encapsulate multiple MMC host controllers, and possibly
+> provides some shared registers to them.
 
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/nic.h          | 17 +++++++
- drivers/net/ethernet/cavium/thunder/nic_main.c     | 27 +++++++++++
- .../net/ethernet/cavium/thunder/nicvf_ethtool.c    | 51 +++++++++++++++++++++
- drivers/net/ethernet/cavium/thunder/nicvf_main.c   |  6 +++
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c  | 53 ++++++++++++++++++++++
- drivers/net/ethernet/cavium/thunder/thunder_bgx.h  | 12 +++++
- 6 files changed, 166 insertions(+)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-index be8404a..e739c71 100644
---- a/drivers/net/ethernet/cavium/thunder/nic.h
-+++ b/drivers/net/ethernet/cavium/thunder/nic.h
-@@ -149,6 +149,12 @@ struct nicvf_rss_info {
- 	u64 key[RSS_HASH_KEY_SIZE];
- } ____cacheline_aligned_in_smp;
- 
-+struct nicvf_pfc {
-+	u8    autoneg;
-+	u8    fc_rx;
-+	u8    fc_tx;
-+};
-+
- enum rx_stats_reg_offset {
- 	RX_OCTS = 0x0,
- 	RX_UCAST = 0x1,
-@@ -298,6 +304,7 @@ struct nicvf {
- 	bool			tns_mode;
- 	bool			loopback_supported;
- 	struct nicvf_rss_info	rss_info;
-+	struct nicvf_pfc	pfc;
- 	struct tasklet_struct	qs_err_task;
- 	struct work_struct	reset_task;
- 
-@@ -358,6 +365,7 @@ struct nicvf {
- #define	NIC_MBOX_MSG_SNICVF_PTR		0x15	/* Send sqet nicvf ptr to PVF */
- #define	NIC_MBOX_MSG_LOOPBACK		0x16	/* Set interface in loopback */
- #define	NIC_MBOX_MSG_RESET_STAT_COUNTER 0x17	/* Reset statistics counters */
-+#define	NIC_MBOX_MSG_PFC		0x18	/* Pause frame control */
- #define	NIC_MBOX_MSG_CFG_DONE		0xF0	/* VF configuration done */
- #define	NIC_MBOX_MSG_SHUTDOWN		0xF1	/* VF is being shutdown */
- 
-@@ -500,6 +508,14 @@ struct reset_stat_cfg {
- 	u16   sq_stat_mask;
- };
- 
-+struct pfc {
-+	u8    msg;
-+	u8    get; /* Get or set PFC settings */
-+	u8    autoneg;
-+	u8    fc_rx;
-+	u8    fc_tx;
-+};
-+
- /* 128 bit shared memory between PF and each VF */
- union nic_mbx {
- 	struct { u8 msg; }	msg;
-@@ -518,6 +534,7 @@ union nic_mbx {
- 	struct nicvf_ptr	nicvf;
- 	struct set_loopback	lbk;
- 	struct reset_stat_cfg	reset_stat;
-+	struct pfc		pfc;
- };
- 
- #define NIC_NODE_ID_MASK	0x03
-diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
-index 17490ec..767234e 100644
---- a/drivers/net/ethernet/cavium/thunder/nic_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
-@@ -898,6 +898,30 @@ static void nic_enable_vf(struct nicpf *nic, int vf, bool enable)
- 	bgx_lmac_rx_tx_enable(nic->node, bgx, lmac, enable);
- }
- 
-+static void nic_pause_frame(struct nicpf *nic, int vf, struct pfc *cfg)
-+{
-+	int bgx, lmac;
-+	struct pfc pfc;
-+	union nic_mbx mbx = {};
-+
-+	if (vf >= nic->num_vf_en)
-+		return;
-+	bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
-+	lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
-+
-+	if (cfg->get) {
-+		bgx_lmac_get_pfc(nic->node, bgx, lmac, &pfc);
-+		mbx.pfc.msg = NIC_MBOX_MSG_PFC;
-+		mbx.pfc.autoneg = pfc.autoneg;
-+		mbx.pfc.fc_rx = pfc.fc_rx;
-+		mbx.pfc.fc_tx = pfc.fc_tx;
-+		nic_send_msg_to_vf(nic, vf, &mbx);
-+	} else {
-+		bgx_lmac_set_pfc(nic->node, bgx, lmac, cfg);
-+		nic_mbx_send_ack(nic, vf);
-+	}
-+}
-+
- /* Interrupt handler to handle mailbox messages from VFs */
- static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
- {
-@@ -1037,6 +1061,9 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
- 	case NIC_MBOX_MSG_RESET_STAT_COUNTER:
- 		ret = nic_reset_stat_counters(nic, vf, &mbx.reset_stat);
- 		break;
-+	case NIC_MBOX_MSG_PFC:
-+		nic_pause_frame(nic, vf, &mbx.pfc);
-+		goto unlock;
- 	default:
- 		dev_err(&nic->pdev->dev,
- 			"Invalid msg from VF%d, msg 0x%x\n", vf, mbx.msg.msg);
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
-index d4d76a7..b048241 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
-@@ -720,6 +720,55 @@ static int nicvf_set_channels(struct net_device *dev,
- 	return err;
- }
- 
-+static void nicvf_get_pauseparam(struct net_device *dev,
-+				 struct ethtool_pauseparam *pause)
-+{
-+	struct nicvf *nic = netdev_priv(dev);
-+	union nic_mbx mbx = {};
-+
-+	/* Supported only for 10G/40G interfaces */
-+	if ((nic->mac_type == BGX_MODE_SGMII) ||
-+	    (nic->mac_type == BGX_MODE_QSGMII) ||
-+	    (nic->mac_type == BGX_MODE_RGMII))
-+		return;
-+
-+	mbx.pfc.msg = NIC_MBOX_MSG_PFC;
-+	mbx.pfc.get = 1;
-+	if (!nicvf_send_msg_to_pf(nic, &mbx)) {
-+		pause->autoneg = nic->pfc.autoneg;
-+		pause->rx_pause = nic->pfc.fc_rx;
-+		pause->tx_pause = nic->pfc.fc_tx;
-+	}
-+}
-+
-+static int nicvf_set_pauseparam(struct net_device *dev,
-+				struct ethtool_pauseparam *pause)
-+{
-+	struct nicvf *nic = netdev_priv(dev);
-+	union nic_mbx mbx = {};
-+
-+	/* Supported only for 10G/40G interfaces */
-+	if ((nic->mac_type == BGX_MODE_SGMII) ||
-+	    (nic->mac_type == BGX_MODE_QSGMII) ||
-+	    (nic->mac_type == BGX_MODE_RGMII))
-+		return -EOPNOTSUPP;
-+
-+	if (pause->autoneg)
-+		return -EOPNOTSUPP;
-+
-+	mbx.pfc.msg = NIC_MBOX_MSG_PFC;
-+	mbx.pfc.get = 0;
-+	mbx.pfc.fc_rx = pause->rx_pause;
-+	mbx.pfc.fc_tx = pause->tx_pause;
-+	if (nicvf_send_msg_to_pf(nic, &mbx))
-+		return -EAGAIN;
-+
-+	nic->pfc.fc_rx = pause->rx_pause;
-+	nic->pfc.fc_tx = pause->tx_pause;
-+
-+	return 0;
-+}
-+
- static const struct ethtool_ops nicvf_ethtool_ops = {
- 	.get_settings		= nicvf_get_settings,
- 	.get_link		= nicvf_get_link,
-@@ -741,6 +790,8 @@ static const struct ethtool_ops nicvf_ethtool_ops = {
- 	.set_rxfh		= nicvf_set_rxfh,
- 	.get_channels		= nicvf_get_channels,
- 	.set_channels		= nicvf_set_channels,
-+	.get_pauseparam         = nicvf_get_pauseparam,
-+	.set_pauseparam         = nicvf_set_pauseparam,
- 	.get_ts_info		= ethtool_op_get_ts_info,
- };
- 
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index c6c2303..1eacec8 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -256,6 +256,12 @@ static void  nicvf_handle_mbx_intr(struct nicvf *nic)
- 		nic->pnicvf = (struct nicvf *)mbx.nicvf.nicvf;
- 		nic->pf_acked = true;
- 		break;
-+	case NIC_MBOX_MSG_PFC:
-+		nic->pfc.autoneg = mbx.pfc.autoneg;
-+		nic->pfc.fc_rx = mbx.pfc.fc_rx;
-+		nic->pfc.fc_tx = mbx.pfc.fc_tx;
-+		nic->pf_acked = true;
-+		break;
- 	default:
- 		netdev_err(nic->netdev,
- 			   "Invalid message from PF, msg 0x%x\n", mbx.msg.msg);
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-index 29c727f..9211c75 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-@@ -212,6 +212,47 @@ void bgx_lmac_rx_tx_enable(int node, int bgx_idx, int lmacid, bool enable)
- }
- EXPORT_SYMBOL(bgx_lmac_rx_tx_enable);
- 
-+void bgx_lmac_get_pfc(int node, int bgx_idx, int lmacid, void *pause)
-+{
-+	struct pfc *pfc = (struct pfc *)pause;
-+	struct bgx *bgx = bgx_vnic[(node * MAX_BGX_PER_CN88XX) + bgx_idx];
-+	struct lmac *lmac;
-+	u64 cfg;
-+
-+	if (!bgx)
-+		return;
-+	lmac = &bgx->lmac[lmacid];
-+	if (lmac->is_sgmii)
-+		return;
-+
-+	cfg = bgx_reg_read(bgx, lmacid, BGX_SMUX_CBFC_CTL);
-+	pfc->fc_rx = cfg & RX_EN;
-+	pfc->fc_tx = cfg & TX_EN;
-+	pfc->autoneg = 0;
-+}
-+EXPORT_SYMBOL(bgx_lmac_get_pfc);
-+
-+void bgx_lmac_set_pfc(int node, int bgx_idx, int lmacid, void *pause)
-+{
-+	struct pfc *pfc = (struct pfc *)pause;
-+	struct bgx *bgx = bgx_vnic[(node * MAX_BGX_PER_CN88XX) + bgx_idx];
-+	struct lmac *lmac;
-+	u64 cfg;
-+
-+	if (!bgx)
-+		return;
-+	lmac = &bgx->lmac[lmacid];
-+	if (lmac->is_sgmii)
-+		return;
-+
-+	cfg = bgx_reg_read(bgx, lmacid, BGX_SMUX_CBFC_CTL);
-+	cfg &= ~(RX_EN | TX_EN);
-+	cfg |= (pfc->fc_rx ? RX_EN : 0x00);
-+	cfg |= (pfc->fc_tx ? TX_EN : 0x00);
-+	bgx_reg_write(bgx, lmacid, BGX_SMUX_CBFC_CTL, cfg);
-+}
-+EXPORT_SYMBOL(bgx_lmac_set_pfc);
-+
- static void bgx_sgmii_change_link_state(struct lmac *lmac)
- {
- 	struct bgx *bgx = lmac->bgx;
-@@ -525,6 +566,18 @@ static int bgx_lmac_xaui_init(struct bgx *bgx, struct lmac *lmac)
- 	cfg |= SMU_TX_CTL_DIC_EN;
- 	bgx_reg_write(bgx, lmacid, BGX_SMUX_TX_CTL, cfg);
- 
-+	/* Enable receive and transmission of pause frames */
-+	bgx_reg_write(bgx, lmacid, BGX_SMUX_CBFC_CTL, ((0xffffULL << 32) |
-+		      BCK_EN | DRP_EN | TX_EN | RX_EN));
-+	/* Configure pause time and interval */
-+	bgx_reg_write(bgx, lmacid,
-+		      BGX_SMUX_TX_PAUSE_PKT_TIME, DEFAULT_PAUSE_TIME);
-+	cfg = bgx_reg_read(bgx, lmacid, BGX_SMUX_TX_PAUSE_PKT_INTERVAL);
-+	cfg &= ~0xFFFFull;
-+	bgx_reg_write(bgx, lmacid, BGX_SMUX_TX_PAUSE_PKT_INTERVAL,
-+		      cfg | (DEFAULT_PAUSE_TIME - 0x1000));
-+	bgx_reg_write(bgx, lmacid, BGX_SMUX_TX_PAUSE_ZERO, 0x01);
-+
- 	/* take lmac_count into account */
- 	bgx_reg_modify(bgx, lmacid, BGX_SMUX_TX_THRESH, (0x100 - 1));
- 	/* max packet size */
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-index 01cc7c8..c18ebfe 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-@@ -27,6 +27,7 @@
- #define    MAX_BGX_CHANS_PER_LMAC		16
- #define    MAX_DMAC_PER_LMAC			8
- #define    MAX_FRAME_SIZE			9216
-+#define    DEFAULT_PAUSE_TIME			0xFFFF
- 
- #define	   BGX_ID_MASK				0x3
- 
-@@ -126,7 +127,10 @@
- #define  SMU_RX_CTL_STATUS			(3ull << 0)
- #define BGX_SMUX_TX_APPEND		0x20100
- #define  SMU_TX_APPEND_FCS_D			BIT_ULL(2)
-+#define BGX_SMUX_TX_PAUSE_PKT_TIME	0x20110
- #define BGX_SMUX_TX_MIN_PKT		0x20118
-+#define BGX_SMUX_TX_PAUSE_PKT_INTERVAL	0x20120
-+#define BGX_SMUX_TX_PAUSE_ZERO		0x20138
- #define BGX_SMUX_TX_INT			0x20140
- #define BGX_SMUX_TX_CTL			0x20178
- #define  SMU_TX_CTL_DIC_EN			BIT_ULL(0)
-@@ -136,6 +140,11 @@
- #define BGX_SMUX_CTL			0x20200
- #define  SMU_CTL_RX_IDLE			BIT_ULL(0)
- #define  SMU_CTL_TX_IDLE			BIT_ULL(1)
-+#define	BGX_SMUX_CBFC_CTL		0x20218
-+#define	RX_EN					BIT_ULL(0)
-+#define	TX_EN					BIT_ULL(1)
-+#define	BCK_EN					BIT_ULL(2)
-+#define	DRP_EN					BIT_ULL(3)
- 
- #define BGX_GMP_PCS_MRX_CTL		0x30000
- #define	 PCS_MRX_CTL_RST_AN			BIT_ULL(9)
-@@ -207,6 +216,9 @@ void bgx_set_lmac_mac(int node, int bgx_idx, int lmacid, const u8 *mac);
- void bgx_get_lmac_link_state(int node, int bgx_idx, int lmacid, void *status);
- void bgx_lmac_internal_loopback(int node, int bgx_idx,
- 				int lmac_idx, bool enable);
-+void bgx_lmac_get_pfc(int node, int bgx_idx, int lmacid, void *pause);
-+void bgx_lmac_set_pfc(int node, int bgx_idx, int lmacid, void *pause);
-+
- void xcv_init_hw(void);
- void xcv_setup_link(bool link_up, int link_speed);
- 
+I don't have an option for mmc in general, but using child node do not
+fit at all the xenon controller.
+
+For this controller each slot has its own set of register, so there is
+no common ressource to share so no advantage to use it. Using child node
+in our case will just make the code more complex for no benefit.
+
+Gregory
+
+>
+> 	Arnd
+
 -- 
-2.7.4
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
