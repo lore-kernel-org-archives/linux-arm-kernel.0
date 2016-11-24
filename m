@@ -1,45 +1,60 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 24 Nov 2016 12:46:55 +0800
-Subject: [PATCH 4/4] serial: imx: Add LED trigger support
-In-Reply-To: <20161123100106.15969-5-s.hauer@pengutronix.de>
-Message-ID: <201611241248.FSeTT57Y%fengguang.wu@intel.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Thu, 24 Nov 2016 04:57:43 +0000
+Subject: [alsa-devel] [PATCH v2] clkdev: add devm_of_clk_get()
+In-Reply-To: <87a8cpejn5.wl%kuninori.morimoto.gx@renesas.com>
+References: <87wpl2yyuw.wl%kuninori.morimoto.gx@renesas.com>
+ <146785219147.73491.2827268663638530377@resonance>
+ <87ziptixv7.wl%kuninori.morimoto.gx@renesas.com>
+ <20160707122636.GP1041@n2100.armlinux.org.uk>
+ <8760shgfzu.wl%kuninori.morimoto.gx@renesas.com>
+ <146794140875.73491.7115209079607438738@resonance>
+ <871t34hlin.wl%kuninori.morimoto.gx@renesas.com>
+ <878twndi54.wl%kuninori.morimoto.gx@renesas.com>
+ <8737isvwc6.wl%kuninori.morimoto.gx@renesas.com>
+ <20161123191037.GE25626@codeaurora.org>
+ <87a8cpejn5.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <87y409cw71.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
 
-[auto build test ERROR on tty/tty-testing]
-[also build test ERROR on v4.9-rc6 next-20161123]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Hi Stephen, again
 
-url:    https://github.com/0day-ci/linux/commits/Sascha-Hauer/serial-core-Add-LED-trigger-support/20161124-010846
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git tty-testing
-config: s390-allmodconfig (attached as .config)
-compiler: s390x-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=s390 
+> > I've seen bindings that have the 'clocks' property at the top
+> > level and the appropriate 'clock-names' property to relate the
+> > clocks to a subnode.
+> > 
+> >  	sound_soc {
+> > 		clocks = <&xxx>, <&xxx>;
+> > 		clock-names = "cpu", "codec";
+> >  		...
+> >  		cpu {
+> >  			...
+> >  		};
+> >  		codec {
+> >  			...
+> >  		};
+> >  	};
+> > 
+> > Then the subnodes call clk_get() with the top level device and
+> > the name of their node and things match up. I suppose this
+> > binding is finalized though, so we can't really do that?
+> > 
+> > I see that the gpio framework has a similar design called
+> > devm_get_gpiod_from_child(), so how about we add a
+> > devm_get_clk_from_child() API? That would more closely match the
+> > intent here, which is to restrict the clk_get() operation to
+> > child nodes of the device passed as the first argument.
+> > 
+> > struct clk *devm_get_clk_from_child(struct device *dev,
+> > 				    const char *con_id,
+> > 				    struct device_node *child);
 
-All errors (new ones prefixed by >>):
+Thanks, but, my point is that Linux already have "of_clk_get()",
+but we don't have its devm_ version.
+The point is that of_clk_get() can get clock from "device_node".
+Why having devm_ version become so problem ?
 
->> ERROR: "uart_remove_led_triggers" [drivers/tty/serial/imx.ko] undefined!
->> ERROR: "uart_led_trigger_rx" [drivers/tty/serial/imx.ko] undefined!
->> ERROR: "uart_led_trigger_tx" [drivers/tty/serial/imx.ko] undefined!
->> ERROR: "uart_add_led_triggers" [drivers/tty/serial/imx.ko] undefined!
-   ERROR: "uart_led_trigger_rx" [drivers/tty/serial/8250/8250_base.ko] undefined!
-   ERROR: "uart_led_trigger_tx" [drivers/tty/serial/8250/8250_base.ko] undefined!
-   ERROR: "uart_remove_led_triggers" [drivers/tty/serial/8250/8250.ko] undefined!
-   ERROR: "uart_add_led_triggers" [drivers/tty/serial/8250/8250.ko] undefined!
-
+Best regards
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 43170 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161124/34007947/attachment-0001.gz>
+Kuninori Morimoto
