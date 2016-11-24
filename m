@@ -1,723 +1,499 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu, 24 Nov 2016 16:10:33 +0000
-Subject: [kvm-unit-tests PATCH v7 11/11] arm/tcg-test: some basic TCG
- exercising tests
+Date: Thu, 24 Nov 2016 16:10:32 +0000
+Subject: [kvm-unit-tests PATCH v7 10/11] arm/barrier-litmus-tests: add simple
+ mp and sal litmus tests
 In-Reply-To: <20161124161033.11456-1-alex.bennee@linaro.org>
 References: <20161124161033.11456-1-alex.bennee@linaro.org>
-Message-ID: <20161124161033.11456-12-alex.bennee@linaro.org>
+Message-ID: <20161124161033.11456-11-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These tests are not really aimed at KVM at all but exist to stretch
-QEMU's TCG code generator. In particular these exercise the ability of
-the TCG to:
+This adds a framework for adding simple barrier litmus tests against
+ARM. The litmus tests aren't as comprehensive as the academic exercises
+which will attempt to do all sorts of things to keep racing CPUs synced
+up. These tests do honour the "sync" parameter to do a poor-mans
+equivalent.
 
-  * Chain TranslationBlocks together (tight)
-  * Handle heavy usage of the tb_jump_cache (paged)
-  * Pathological case of computed local jumps (computed)
+The two litmus tests are:
+  - message passing
+  - store-after-load
 
-In addition the tests can be varied by adding IPI IRQs or SMC sequences
-into the mix to stress the tcg_exit and invalidation mechanisms.
+They both have case that should fail (although won't on single-threaded
+TCG setups). If barriers aren't working properly the store-after-load
+test will fail even on an x86 backend as x86 allows re-ording of non
+aliased stores.
 
-To explicitly stress the tb_flush() mechanism you can use the mod/rounds
-parameters to force more frequent tb invalidation. Combined with setting
--tb-size 1 in QEMU to limit the code generation buffer size.
+I've imported a few more of the barrier primatives from the Linux source
+tree so we consistently use macros.
+
+The arm64 barrier primitives trip up on -Wstrict-aliasing so this is
+disabled in the Makefile.
 
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+CC: Will Deacon <will.deacon@arm.com>
 
 ---
-v5
-  - added armv8 version of the tcg tests
-  - max out at -smp 4 in unittests.cfg
-  - add up IRQs sent and delivered for PASS/FAIL
-  - take into account error count
-  - add "rounds=" parameter
-  - tweak smc to tb-size=1
-  - printf fmt fix
 v7
-  - merged in IRQ numerology
-  - updated to latest IRQ API
+  - merge in store-after-load
+  - clean-up sync-up code
+  - use new counter api
+  - fix xfail for sal test
+v6
+  - add a unittest.cfg
+  - -fno-strict-aliasing
 ---
- arm/Makefile.arm     |   2 +
- arm/Makefile.arm64   |   2 +
- arm/Makefile.common  |   1 +
- arm/tcg-test-asm.S   | 170 ++++++++++++++++++++++++++
- arm/tcg-test-asm64.S | 169 ++++++++++++++++++++++++++
- arm/tcg-test.c       | 337 +++++++++++++++++++++++++++++++++++++++++++++++++++
- arm/unittests.cfg    |  84 +++++++++++++
- 7 files changed, 765 insertions(+)
- create mode 100644 arm/tcg-test-asm.S
- create mode 100644 arm/tcg-test-asm64.S
- create mode 100644 arm/tcg-test.c
+ Makefile                  |   2 +
+ arm/Makefile.common       |   2 +
+ arm/barrier-litmus-test.c | 437 ++++++++++++++++++++++++++++++++++++++++++++++
+ arm/unittests.cfg         |  36 ++++
+ lib/arm/asm/barrier.h     |  63 ++++++-
+ lib/arm64/asm/barrier.h   |  50 ++++++
+ 6 files changed, 589 insertions(+), 1 deletion(-)
+ create mode 100644 arm/barrier-litmus-test.c
 
-diff --git a/arm/Makefile.arm b/arm/Makefile.arm
-index 92f3757..7058bd2 100644
---- a/arm/Makefile.arm
-+++ b/arm/Makefile.arm
-@@ -24,4 +24,6 @@ tests =
+diff --git a/Makefile b/Makefile
+index 5201472..53594a1 100644
+--- a/Makefile
++++ b/Makefile
+@@ -51,10 +51,12 @@ fomit_frame_pointer := $(call cc-option, $(frame-pointer-flag), "")
+ fnostack_protector := $(call cc-option, -fno-stack-protector, "")
+ fnostack_protector_all := $(call cc-option, -fno-stack-protector-all, "")
+ wno_frame_address := $(call cc-option, -Wno-frame-address, "")
++fno_strict_aliasing := $(call cc-option, -fno-strict-aliasing, "")
+ CFLAGS += $(fomit_frame_pointer)
+ CFLAGS += $(fno_stack_protector)
+ CFLAGS += $(fno_stack_protector_all)
+ CFLAGS += $(wno_frame_address)
++CFLAGS += $(fno_strict_aliasing)
  
- include $(TEST_DIR)/Makefile.common
+ CXXFLAGS += $(CFLAGS)
  
-+$(TEST_DIR)/tcg-test.elf: $(cstart.o) $(TEST_DIR)/tcg-test.o $(TEST_DIR)/tcg-test-asm.o
-+
- arch_clean: arm_clean
-diff --git a/arm/Makefile.arm64 b/arm/Makefile.arm64
-index 0b0761c..678fca4 100644
---- a/arm/Makefile.arm64
-+++ b/arm/Makefile.arm64
-@@ -16,5 +16,7 @@ tests =
- 
- include $(TEST_DIR)/Makefile.common
- 
-+$(TEST_DIR)/tcg-test.elf: $(cstart.o) $(TEST_DIR)/tcg-test.o $(TEST_DIR)/tcg-test-asm64.o
-+
- arch_clean: arm_clean
- 	$(RM) lib/arm64/.*.d
 diff --git a/arm/Makefile.common b/arm/Makefile.common
-index a508128..9af758f 100644
+index eb4cfdf..a508128 100644
 --- a/arm/Makefile.common
 +++ b/arm/Makefile.common
-@@ -17,6 +17,7 @@ tests-common += $(TEST_DIR)/tlbflush-code.flat
+@@ -16,6 +16,7 @@ tests-common += $(TEST_DIR)/gic.flat
+ tests-common += $(TEST_DIR)/tlbflush-code.flat
  tests-common += $(TEST_DIR)/tlbflush-data.flat
  tests-common += $(TEST_DIR)/locking-test.flat
- tests-common += $(TEST_DIR)/barrier-litmus-test.flat
-+tests-common += $(TEST_DIR)/tcg-test.flat
++tests-common += $(TEST_DIR)/barrier-litmus-test.flat
  
  all: test_cases
  
-diff --git a/arm/tcg-test-asm.S b/arm/tcg-test-asm.S
+@@ -87,3 +88,4 @@ $(TEST_DIR)/selftest.o $(cstart.o): $(asm-offsets)
+ $(TEST_DIR)/tlbflush-code.elf: $(cstart.o) $(TEST_DIR)/tlbflush-code.o
+ $(TEST_DIR)/tlbflush-data.elf: $(cstart.o) $(TEST_DIR)/tlbflush-data.o
+ $(TEST_DIR)/locking-test.elf: $(cstart.o) $(TEST_DIR)/locking-test.o
++$(TEST_DIR)/barrier-litmus-test.elf: $(cstart.o) $(TEST_DIR)/barrier-litmus-test.o
+diff --git a/arm/barrier-litmus-test.c b/arm/barrier-litmus-test.c
 new file mode 100644
-index 0000000..6e823b7
+index 0000000..2557a88
 --- /dev/null
-+++ b/arm/tcg-test-asm.S
-@@ -0,0 +1,170 @@
++++ b/arm/barrier-litmus-test.c
+@@ -0,0 +1,437 @@
 +/*
-+ * TCG Test assembler functions for armv7 tests.
++ * ARM Barrier Litmus Tests
 + *
-+ * Copyright (C) 2016, Linaro Ltd, Alex Benn?e <alex.bennee@linaro.org>
-+ *
-+ * This work is licensed under the terms of the GNU LGPL, version 2.
-+ *
-+ * These helper functions are written in pure asm to control the size
-+ * of the basic blocks and ensure they fit neatly into page
-+ * aligned chunks. The pattern of branches they follow is determined by
-+ * the 32 bit seed they are passed. It should be the same for each set.
-+ *
-+ * Calling convention
-+ *  - r0, iterations
-+ *  - r1, jump pattern
-+ *  - r2-r3, scratch
-+ *
-+ * Returns r0
-+ */
-+
-+.arm
-+
-+.section .text
-+
-+/* Tight - all blocks should quickly be patched and should run
-+ * very fast unless irqs or smc gets in the way
-+ */
-+
-+.global tight_start
-+tight_start:
-+        subs    r0, r0, #1
-+        beq     tight_end
-+
-+        ror     r1, r1, #1
-+        tst     r1, #1
-+        beq     tightA
-+        b       tight_start
-+
-+tightA:
-+        subs    r0, r0, #1
-+        beq     tight_end
-+
-+        ror     r1, r1, #1
-+        tst     r1, #1
-+        beq     tightB
-+        b       tight_start
-+
-+tightB:
-+        subs    r0, r0, #1
-+        beq     tight_end
-+
-+        ror     r1, r1, #1
-+        tst     r1, #1
-+        beq     tight_start
-+        b       tightA
-+
-+.global tight_end
-+tight_end:
-+        mov     pc, lr
-+
-+/*
-+ * Computed jumps cannot be hardwired into the basic blocks so each one
-+ * will cause an exit for the main execution loop to look up the next block.
-+ *
-+ * There is some caching which should ameliorate the cost a little.
-+ */
-+
-+        /* Align << 13 == 4096 byte alignment */
-+        .align 13
-+        .global computed_start
-+computed_start:
-+        subs    r0, r0, #1
-+        beq     computed_end
-+
-+        /* Jump table */
-+        ror     r1, r1, #1
-+        and     r2, r1, #1
-+        adr     r3, computed_jump_table
-+        ldr     r2, [r3, r2, lsl #2]
-+        mov     pc, r2
-+
-+        b       computed_err
-+
-+computed_jump_table:
-+        .word   computed_start
-+        .word   computedA
-+
-+computedA:
-+        subs    r0, r0, #1
-+        beq     computed_end
-+
-+        /* Jump into code */
-+        ror     r1, r1, #1
-+        and     r2, r1, #1
-+        adr     r3, 1f
-+        add	r3, r2, lsl #2
-+        mov     pc, r3
-+1:      b       computed_start
-+        b       computedB
-+
-+        b       computed_err
-+
-+
-+computedB:
-+        subs    r0, r0, #1
-+        beq     computed_end
-+        ror     r1, r1, #1
-+
-+        /* Conditional register load */
-+        adr     r3, computedA
-+        tst     r1, #1
-+        adreq   r3, computed_start
-+        mov     pc, r3
-+
-+        b       computed_err
-+
-+computed_err:
-+        mov     r0, #1
-+        .global computed_end
-+computed_end:
-+        mov     pc, lr
-+
-+
-+/*
-+ * Page hoping
-+ *
-+ * Each block is in a different page, hence the blocks never get joined
-+ */
-+        /* Align << 13 == 4096 byte alignment */
-+        .align 13
-+        .global paged_start
-+paged_start:
-+        subs    r0, r0, #1
-+        beq     paged_end
-+
-+        ror     r1, r1, #1
-+        tst     r1, #1
-+        beq     pagedA
-+        b       paged_start
-+
-+        /* Align << 13 == 4096 byte alignment */
-+        .align 13
-+pagedA:
-+        subs    r0, r0, #1
-+        beq     paged_end
-+
-+        ror     r1, r1, #1
-+        tst     r1, #1
-+        beq     pagedB
-+        b       paged_start
-+
-+        /* Align << 13 == 4096 byte alignment */
-+        .align 13
-+pagedB:
-+        subs    r0, r0, #1
-+        beq     paged_end
-+
-+        ror     r1, r1, #1
-+        tst     r1, #1
-+        beq     paged_start
-+        b       pagedA
-+
-+        /* Align << 13 == 4096 byte alignment */
-+        .align 13
-+.global paged_end
-+paged_end:
-+        mov     pc, lr
-+
-+.global test_code_end
-+test_code_end:
-diff --git a/arm/tcg-test-asm64.S b/arm/tcg-test-asm64.S
-new file mode 100644
-index 0000000..22bcfb4
---- /dev/null
-+++ b/arm/tcg-test-asm64.S
-@@ -0,0 +1,169 @@
-+/*
-+ * TCG Test assembler functions for armv8 tests.
-+ *
-+ * Copyright (C) 2016, Linaro Ltd, Alex Benn?e <alex.bennee@linaro.org>
-+ *
-+ * This work is licensed under the terms of the GNU LGPL, version 2.
-+ *
-+ * These helper functions are written in pure asm to control the size
-+ * of the basic blocks and ensure they fit neatly into page
-+ * aligned chunks. The pattern of branches they follow is determined by
-+ * the 32 bit seed they are passed. It should be the same for each set.
-+ *
-+ * Calling convention
-+ *  - x0, iterations
-+ *  - x1, jump pattern
-+ *  - x2-x3, scratch
-+ *
-+ * Returns x0
-+ */
-+
-+.section .text
-+
-+/* Tight - all blocks should quickly be patched and should run
-+ * very fast unless irqs or smc gets in the way
-+ */
-+
-+.global tight_start
-+tight_start:
-+        subs    x0, x0, #1
-+        beq     tight_end
-+
-+        ror     x1, x1, #1
-+        tst     x1, #1
-+        beq     tightA
-+        b       tight_start
-+
-+tightA:
-+        subs    x0, x0, #1
-+        beq     tight_end
-+
-+        ror     x1, x1, #1
-+        tst     x1, #1
-+        beq     tightB
-+        b       tight_start
-+
-+tightB:
-+        subs    x0, x0, #1
-+        beq     tight_end
-+
-+        ror     x1, x1, #1
-+        tst     x1, #1
-+        beq     tight_start
-+        b       tightA
-+
-+.global tight_end
-+tight_end:
-+        ret
-+
-+/*
-+ * Computed jumps cannot be hardwired into the basic blocks so each one
-+ * will cause an exit for the main execution loop to look up the next block.
-+ *
-+ * There is some caching which should ameliorate the cost a little.
-+ */
-+
-+        /* Align << 13 == 4096 byte alignment */
-+        .align 13
-+        .global computed_start
-+computed_start:
-+        subs    x0, x0, #1
-+        beq     computed_end
-+
-+        /* Jump table */
-+        ror     x1, x1, #1
-+        and     x2, x1, #1
-+        adr     x3, computed_jump_table
-+        ldr     x2, [x3, x2, lsl #3]
-+        br      x2
-+
-+        b       computed_err
-+
-+computed_jump_table:
-+        .quad   computed_start
-+        .quad   computedA
-+
-+computedA:
-+        subs    x0, x0, #1
-+        beq     computed_end
-+
-+        /* Jump into code */
-+        ror     x1, x1, #1
-+        and     x2, x1, #1
-+        adr     x3, 1f
-+        add	x3, x3, x2, lsl #2
-+        br      x3
-+1:      b       computed_start
-+        b       computedB
-+
-+        b       computed_err
-+
-+
-+computedB:
-+        subs    x0, x0, #1
-+        beq     computed_end
-+        ror     x1, x1, #1
-+
-+        /* Conditional register load */
-+        adr     x2, computedA
-+        adr     x3, computed_start
-+        tst     x1, #1
-+        csel    x2, x3, x2, eq
-+        br      x2
-+
-+        b       computed_err
-+
-+computed_err:
-+        mov     x0, #1
-+        .global computed_end
-+computed_end:
-+        ret
-+
-+
-+/*
-+ * Page hoping
-+ *
-+ * Each block is in a different page, hence the blocks never get joined
-+ */
-+        /* Align << 13 == 4096 byte alignment */
-+        .align 13
-+        .global paged_start
-+paged_start:
-+        subs    x0, x0, #1
-+        beq     paged_end
-+
-+        ror     x1, x1, #1
-+        tst     x1, #1
-+        beq     pagedA
-+        b       paged_start
-+
-+        /* Align << 13 == 4096 byte alignment */
-+        .align 13
-+pagedA:
-+        subs    x0, x0, #1
-+        beq     paged_end
-+
-+        ror     x1, x1, #1
-+        tst     x1, #1
-+        beq     pagedB
-+        b       paged_start
-+
-+        /* Align << 13 == 4096 byte alignment */
-+        .align 13
-+pagedB:
-+        subs    x0, x0, #1
-+        beq     paged_end
-+
-+        ror     x1, x1, #1
-+        tst     x1, #1
-+        beq     paged_start
-+        b       pagedA
-+
-+        /* Align << 13 == 4096 byte alignment */
-+        .align 13
-+.global paged_end
-+paged_end:
-+        ret
-+
-+.global test_code_end
-+test_code_end:
-diff --git a/arm/tcg-test.c b/arm/tcg-test.c
-new file mode 100644
-index 0000000..341dca3
---- /dev/null
-+++ b/arm/tcg-test.c
-@@ -0,0 +1,337 @@
-+/*
-+ * ARM TCG Tests
-+ *
-+ * These tests are explicitly aimed@stretching the QEMU TCG engine.
++ * This test provides a framework for testing barrier conditions on
++ * the processor. It's simpler than the more involved barrier testing
++ * frameworks as we are looking for simple failures of QEMU's TCG not
++ * weird edge cases the silicon gets wrong.
 + */
 +
 +#include <libcflat.h>
-+#include <asm/processor.h>
 +#include <asm/smp.h>
 +#include <asm/cpumask.h>
 +#include <asm/barrier.h>
 +#include <asm/mmu.h>
-+#include <asm/gic.h>
-+
-+#include <prng.h>
 +
 +#define MAX_CPUS 8
 +
-+/* These entry points are in the assembly code */
-+extern int tight_start(uint32_t count, uint32_t pattern);
-+extern int computed_start(uint32_t count, uint32_t pattern);
-+extern int paged_start(uint32_t count, uint32_t pattern);
-+extern uint32_t tight_end;
-+extern uint32_t computed_end;
-+extern uint32_t paged_end;
-+extern unsigned long test_code_end;
++/* Array size and access controls */
++static int array_size = 100000;
++static int wait_if_ahead = 0;
 +
-+typedef int (*test_fn)(uint32_t count, uint32_t pattern);
++static cpumask_t cpu_mask;
++
++/*
++ * These test_array_* structures are a contiguous array modified by two or more
++ * competing CPUs. The padding is to ensure the variables do not share
++ * cache lines.
++ *
++ * All structures start zeroed.
++ */
++
++typedef struct test_array
++{
++	volatile unsigned int x;
++	uint8_t dummy[64];
++	volatile unsigned int y;
++	uint8_t dummy2[64];
++	volatile unsigned int r[MAX_CPUS];
++} test_array;
++
++volatile test_array *array;
++
++/* Test definition structure
++ *
++ * The first function will always run on the primary CPU, it is
++ * usually the one that will detect any weirdness and trigger the
++ * failure of the test.
++ */
++
++typedef void (*test_fn)(void);
 +
 +typedef struct {
 +	const char *test_name;
-+	bool       should_pass;
-+	test_fn    start_fn;
-+	uint32_t   *code_end;
++	bool  should_pass;
++	test_fn main_fn;
++	test_fn secondary_fns[MAX_CPUS-1];
 +} test_descr_t;
 +
-+/* Test array */
-+static test_descr_t tests[] = {
-+       /*
-+	* Tight chain.
-+	*
-+	* These are a bunch of basic blocks that have fixed branches in
-+	* a page aligned space. The branches taken are decided by a
-+	* psuedo-random bitmap for each CPU.
-+	*
-+	* Once the basic blocks have been chained together by the TCG they
-+	* should run until they reach their block count. This will be the
-+	* most efficient mode in which generated code is run. The only other
-+	* exits will be caused by interrupts or TB invalidation.
-+	*/
-+	{ "tight", true, tight_start, &tight_end },
-+	/*
-+	 * Computed jumps.
-+	 *
-+	 * A bunch of basic blocks which just do computed jumps so the basic
-+	 * block is never chained but they are all within a page (maybe not
-+	 * required). This will exercise the cache lookup but not the new
-+	 * generation.
-+	 */
-+	{ "computed", true, computed_start, &computed_end },
-+        /*
-+	 * Page ping pong.
-+	 *
-+	 * Have the blocks are separated by PAGE_SIZE so they can never
-+	 * be chained together.
-+	 *
-+	 */
-+	{ "paged", true, paged_start, &paged_end}
-+};
++/* Litmus tests */
 +
-+static test_descr_t *test = NULL;
-+
-+static int iterations = 1000000;
-+static int rounds = 1000;
-+static int mod_freq = 5;
-+static uint32_t pattern[MAX_CPUS];
-+
-+/* control flags */
-+static int smc = 0;
-+static int irq = 0;
-+static int check_irq = 0;
-+
-+/* IRQ accounting */
-+#define MAX_IRQ_IDS 16
-+static int irqv;
-+static unsigned long irq_sent_ts[MAX_CPUS][MAX_CPUS][MAX_IRQ_IDS];
-+
-+static int irq_recv[MAX_CPUS];
-+static int irq_sent[MAX_CPUS];
-+static int irq_overlap[MAX_CPUS];  /* if ts > now, i.e a race */
-+static int irq_slow[MAX_CPUS];  /* if delay > threshold */
-+static unsigned long irq_latency[MAX_CPUS]; /* cumulative time */
-+
-+static int errors[MAX_CPUS];
-+
-+static cpumask_t smp_test_complete;
-+
-+static cpumask_t ready;
-+
-+static void wait_on_ready(void)
++static unsigned long sync_start(void)
 +{
-+	cpumask_set_cpu(smp_processor_id(), &ready);
-+	while (!cpumask_full(&ready))
-+		cpu_relax();
++	const unsigned long gate_mask = ~0x3ffff;
++	unsigned long gate, now;
++	gate = get_cntvct() & gate_mask;
++	do {
++		now =get_cntvct();
++	} while ((now & gate_mask)==gate);
++
++	return now;
 +}
 +
-+/* This triggers TCGs SMC detection by writing values to the executing
-+ * code pages. We are not actually modifying the instructions and the
-+ * underlying code will remain unchanged. However this should trigger
-+ * invalidation of the Translation Blocks
++/* Simple Message Passing
++ *
++ * x is the message data
++ * y is the flag to indicate the data is ready
++ *
++ * Reading x == 0 when y == 1 is a failure.
 + */
 +
-+void trigger_smc_detection(uint32_t *start, uint32_t *end)
++void message_passing_write(void)
 +{
-+	volatile uint32_t *ptr = start;
-+	while (ptr < end) {
-+		uint32_t inst = *ptr;
-+		*ptr++ = inst;
++	int i;
++
++	sync_start();
++	for (i=0; i< array_size; i++) {
++		volatile test_array *entry = &array[i];
++		entry->x = 1;
++		entry->y = 1;
 +	}
++
++	halt();
 +}
 +
-+/* Handler for receiving IRQs */
-+
-+static void irq_handler(struct pt_regs *regs __unused)
++void message_passing_read(void)
 +{
-+	unsigned long then, now = get_cntvct();
-+	int cpu = smp_processor_id();
-+	u32 irqstat = gic_read_iar();
-+	u32 irqnr = gic_iar_irqnr(irqstat);
++	int i;
++	int errors = 0, ready = 0;
 +
-+	if (irqnr != GICC_INT_SPURIOUS) {
-+		unsigned int src_cpu = (irqstat >> 10) & 0x7; ;
-+		gic_write_eoir(irqstat);
-+		irq_recv[cpu]++;
++	sync_start();
++	for (i=0; i< array_size; i++) {
++		volatile test_array *entry = &array[i];
++		unsigned int x,y;
++		y = entry->y;
++		x = entry->x;
 +
-+		then = irq_sent_ts[src_cpu][cpu][irqnr];
++		if (y && !x)
++			errors++;
++		ready += y;
++	}
 +
-+		if (then > now) {
-+			irq_overlap[cpu]++;
++	report_xfail("mp: %d errors, %d ready", true, errors == 0, errors, ready);
++}
++
++/* Simple Message Passing with barriers */
++void message_passing_write_barrier(void)
++{
++	int i;
++	sync_start();
++	for (i=0; i< array_size; i++) {
++		volatile test_array *entry = &array[i];
++		entry->x = 1;
++		smp_wmb();
++		entry->y = 1;
++	}
++
++	halt();
++}
++
++void message_passing_read_barrier(void)
++{
++	int i;
++	int errors = 0, ready = 0, not_ready = 0;
++
++	sync_start();
++	for (i=0; i< array_size; i++) {
++		volatile test_array *entry = &array[i];
++		unsigned int x, y;
++		y = entry->y;
++		smp_rmb();
++		x = entry->x;
++
++		if (y && !x)
++			errors++;
++
++		if (y) {
++			ready++;
 +		} else {
-+			unsigned long latency = (now - then);
-+			if (latency > 30000) {
-+				irq_slow[cpu]++;
-+			} else {
-+				irq_latency[cpu] += latency;
++			not_ready++;
++
++			if (not_ready > 2) {
++				entry = &array[i+1];
++				do {
++					not_ready = 0;
++				} while (wait_if_ahead && !entry->y);
 +			}
 +		}
 +	}
++
++	report("mp barrier: %d errors, %d ready", errors == 0, errors, ready);
 +}
 +
-+/* This triggers cross-CPU IRQs. Each IRQ should cause the basic block
-+ * execution to finish the main run-loop get entered again.
++/* Simple Message Passing with Acquire/Release */
++void message_passing_write_release(void)
++{
++	int i;
++	for (i=0; i< array_size; i++) {
++		volatile test_array *entry = &array[i];
++		entry->x = 1;
++		smp_store_release(&entry->y, 1);
++	}
++
++	halt();
++}
++
++void message_passing_read_acquire(void)
++{
++	int i;
++	int errors = 0, ready = 0, not_ready = 0;
++
++	for (i=0; i< array_size; i++) {
++		volatile test_array *entry = &array[i];
++		unsigned int x, y;
++		y = smp_load_acquire(&entry->y);
++		x = entry->x;
++
++		if (y && !x)
++			errors++;
++
++		if (y) {
++			ready++;
++		} else {
++			not_ready++;
++
++			if (not_ready > 2) {
++				entry = &array[i+1];
++				do {
++					not_ready = 0;
++				} while (wait_if_ahead && !entry->y);
++			}
++		}
++	}
++
++	report("mp acqrel: %d errors, %d ready", errors == 0, errors, ready);
++}
++
++/*
++ * Store after load
++ *
++ * T1: write 1 to x, load r from y
++ * T2: write 1 to y, load r from x
++ *
++ * Without memory fence r[0] && r[1] == 0
++ * With memory fence both == 0 should be impossible
 + */
-+int send_cross_cpu_irqs(int this_cpu, int irq)
++
++static void check_store_and_load_results(char *name, int thread, bool xfail,
++					unsigned long start, unsigned long end)
 +{
-+	int cpu, sent = 0;
-+	cpumask_t mask;
++	int i;
++	int neither = 0;
++	int only_first = 0;
++	int only_second = 0;
++	int both = 0;
 +
-+	cpumask_copy(&mask, &cpu_present_mask);
-+
-+	for_each_present_cpu(cpu) {
-+		if (cpu != this_cpu) {
-+			irq_sent_ts[this_cpu][cpu][irq] = get_cntvct();
-+			cpumask_clear_cpu(cpu, &mask);
-+			sent++;
++	for (i=0; i< array_size; i++) {
++		volatile test_array *entry = &array[i];
++		if (entry->r[0] == 0 &&
++		    entry->r[1] == 0) {
++			neither++;
++		} else if (entry->r[0] &&
++			entry->r[1]) {
++			both++;
++		} else if (entry->r[0]) {
++			only_first++;
++		} else {
++			only_second++;
 +		}
 +	}
 +
-+	gic_ipi_send_mask(irq, &mask);
++	printf("T%d: %08lx->%08lx neither=%d only_t1=%d only_t2=%d both=%d\n", thread,
++		start, end, neither, only_first, only_second, both);
 +
-+	return sent;
-+}
-+
-+void do_test(void)
-+{
-+	int cpu = smp_processor_id();
-+	int i, irq_id = 0;
-+
-+	printf("CPU%d: online and setting up with pattern 0x%"PRIx32"\n", cpu, pattern[cpu]);
-+
-+	if (irq) {
-+		gic_enable_defaults();
-+#ifdef __arm__
-+		install_exception_handler(EXCPTN_IRQ, irq_handler);
-+#else
-+		install_irq_handler(EL1H_IRQ, irq_handler);
-+#endif
-+		local_irq_enable();
-+
-+		wait_on_ready();
-+	}
-+
-+	for (i=0; i<rounds; i++)
-+	{
-+		/* Enter the blocks */
-+		errors[cpu] += test->start_fn(iterations, pattern[cpu]);
-+
-+		if ((i + cpu) % mod_freq == 0)
-+		{
-+			if (smc) {
-+				trigger_smc_detection((uint32_t *) test->start_fn,
-+						test->code_end);
-+			}
-+			if (irq) {
-+				irq_sent[cpu] += send_cross_cpu_irqs(cpu, irq_id);
-+				irq_id++;
-+				irq_id = irq_id % 15;
-+			}
++	if (thread == 1) {
++		if (xfail) {
++			report_xfail("%s: errors=%d", true, neither==0,
++				name, neither);
++		} else {
++			report("%s: errors=%d", neither==0, name, neither);
 +		}
++
 +	}
-+
-+	smp_wmb();
-+
-+	cpumask_set_cpu(cpu, &smp_test_complete);
-+	if (cpu != 0)
-+		halt();
 +}
 +
-+void report_irq_stats(int cpu)
++/*
++ * This attempts to synchronise the start of both threads to roughly
++ * the same time. On real hardware there is a little latency as the
++ * secondary vCPUs are powered up however this effect it much more
++ * exaggerated on a TCG host.
++ *
++ * Busy waits until the we pass a future point in time, returns final
++ * start time.
++ */
++
++void store_and_load_1(void)
 +{
-+	int recv = irq_recv[cpu];
-+	int race = irq_overlap[cpu];
-+	int slow = irq_slow[cpu];
++	int i;
++	unsigned long start, end;
 +
-+	unsigned long avg_latency = irq_latency[cpu] / (recv - (race + slow));
-+
-+	printf("CPU%d: %d irqs (%d races, %d slow,  %ld ticks avg latency)\n",
-+		cpu, recv, race, slow, avg_latency);
-+}
-+
-+
-+void setup_and_run_tcg_test(void)
-+{
-+	static const unsigned char seed[] = "tcg-test";
-+	struct isaac_ctx prng_context;
-+	int cpu;
-+	int total_err = 0, total_sent = 0, total_recv = 0;
-+
-+	isaac_init(&prng_context, &seed[0], sizeof(seed));
-+
-+	/* boot other CPUs */
-+	for_each_present_cpu(cpu) {
-+		pattern[cpu] = isaac_next_uint32(&prng_context);
-+
-+		if (cpu == 0)
-+			continue;
-+
-+		smp_boot_secondary(cpu, do_test);
++	start = sync_start();
++	for (i=0; i<array_size; i++) {
++		volatile test_array *entry = &array[i];
++		unsigned int r;
++		entry->x = 1;
++		r = entry->y;
++		entry->r[0] = r;
 +	}
-+
-+	do_test();
-+
-+	while (!cpumask_full(&smp_test_complete))
-+		cpu_relax();
++	end = get_cntvct();
 +
 +	smp_mb();
 +
-+	/* Now total up errors and irqs */
-+	for_each_present_cpu(cpu) {
-+		total_err += errors[cpu];
-+		total_sent += irq_sent[cpu];
-+		total_recv += irq_recv[cpu];
++	while (!cpumask_test_cpu(1, &cpu_mask))
++		cpu_relax();
 +
-+		if (check_irq) {
-+			report_irq_stats(cpu);
-+		}
++	check_store_and_load_results("sal", 1, true, start, end);
++}
++
++void store_and_load_2(void)
++{
++	int i;
++	unsigned long start, end;
++
++	start = sync_start();
++	for (i=0; i<array_size; i++) {
++		volatile test_array *entry = &array[i];
++		unsigned int r;
++		entry->y = 1;
++		r = entry->x;
++		entry->r[1] = r;
 +	}
++	end = get_cntvct();
 +
-+	if (check_irq) {
-+		if (total_sent != total_recv) {
-+			report("%d IRQs sent, %d received\n", false, total_sent, total_recv);
-+		} else {
-+			report("%d errors, IRQs OK", total_err == 0, total_err);
++	check_store_and_load_results("sal", 2, true, start, end);
++
++	cpumask_set_cpu(1, &cpu_mask);
++
++	halt();
++}
++
++void store_and_load_barrier_1(void)
++{
++	int i;
++	unsigned long start, end;
++
++	start = sync_start();
++	for (i=0; i< array_size; i++) {
++		volatile test_array *entry = &array[i];
++		unsigned int r;
++		entry->x = 1;
++		smp_mb();
++		r = entry->y;
++		entry->r[0] = r;
++	}
++	end = get_cntvct();
++
++	smp_mb();
++
++	while (!cpumask_test_cpu(1, &cpu_mask))
++		cpu_relax();
++
++	check_store_and_load_results("sal_barrier", 1, false, start, end);
++}
++
++void store_and_load_barrier_2(void)
++{
++	int i;
++	unsigned long start, end;
++
++	start = sync_start();
++	for (i=0; i< array_size; i++) {
++		volatile test_array *entry = &array[i];
++		unsigned int r;
++		entry->y = 1;
++		smp_mb();
++		r = entry->x;
++		entry->r[1] = r;
++	}
++	end = get_cntvct();
++
++	check_store_and_load_results("sal_barrier", 2, false, start, end);
++
++	cpumask_set_cpu(1, &cpu_mask);
++
++	halt();
++}
++
++
++/* Test array */
++static test_descr_t tests[] = {
++
++	{ "mp",         false,
++	  message_passing_read,
++	  { message_passing_write }
++	},
++
++	{ "mp_barrier", true,
++	  message_passing_read_barrier,
++	  { message_passing_write_barrier }
++	},
++
++	{ "mp_acqrel", true,
++	  message_passing_read_acquire,
++	  { message_passing_write_release }
++	},
++
++	{ "sal",       false,
++	  store_and_load_1,
++	  { store_and_load_2 }
++	},
++
++	{ "sal_barrier", true,
++	  store_and_load_barrier_1,
++	  { store_and_load_barrier_2 }
++	},
++};
++
++
++void setup_and_run_litmus(test_descr_t *test)
++{
++	array = calloc(array_size, sizeof(test_array));
++
++	if (array) {
++		int i = 0;
++		printf("Allocated test array @ %p\n", array);
++
++		while (test->secondary_fns[i]) {
++			smp_boot_secondary(i+1, test->secondary_fns[i]);
++			i++;
 +		}
++
++		test->main_fn();
 +	} else {
-+		report("%d errors, IRQs not checked", total_err == 0, total_err);
++		report("%s: failed to allocate memory",false, test->test_name);
 +	}
 +}
 +
@@ -725,54 +501,27 @@ index 0000000..341dca3
 +{
 +	int i;
 +	unsigned int j;
++	test_descr_t *test = NULL;
 +
 +	for (i=0; i<argc; i++) {
 +		char *arg = argv[i];
 +
 +		for (j = 0; j < ARRAY_SIZE(tests); j++) {
-+			if (strcmp(arg, tests[j].test_name) == 0) {
++			if (strcmp(arg, tests[j].test_name) == 0)
 +				test = &tests[j];
-+			}
 +		}
 +
 +		/* Test modifiers */
-+		if (strstr(arg, "mod=") != NULL) {
++		if (strstr(arg, "count=") != NULL) {
 +			char *p = strstr(arg, "=");
-+			mod_freq = atol(p+1);
-+		}
-+
-+		if (strstr(arg, "rounds=") != NULL) {
-+			char *p = strstr(arg, "=");
-+			rounds = atol(p+1);
-+		}
-+
-+		if (strcmp(arg, "smc") == 0) {
-+			unsigned long test_start = (unsigned long) &tight_start;
-+			unsigned long test_end = (unsigned long) &test_code_end;
-+
-+			smc = 1;
-+			mmu_set_range_ptes(mmu_idmap, test_start, test_start, test_end,
-+					__pgprot(PTE_WBWA));
-+
-+			report_prefix_push("smc");
-+		}
-+
-+		if (strcmp(arg, "irq") == 0) {
-+			irq = 1;
-+			if (!gic_init())
-+				report_abort("No supported gic present!");
-+			irqv = gic_version();
-+			report_prefix_push("irq");
-+		}
-+
-+		if (strcmp(arg, "check_irq") == 0) {
-+			check_irq = 1;
++			array_size = atol(p+1);
++		} else if (strcmp (arg, "wait") == 0) {
++			wait_if_ahead = 1;
 +		}
 +	}
 +
 +	if (test) {
-+		smp_mb();
-+		setup_and_run_tcg_test();
++		setup_and_run_litmus(test);
 +	} else {
 +		report("Unknown test", false);
 +	}
@@ -780,96 +529,188 @@ index 0000000..341dca3
 +	return report_summary();
 +}
 diff --git a/arm/unittests.cfg b/arm/unittests.cfg
-index 355dcfb..38934f2 100644
+index abbfe79..355dcfb 100644
 --- a/arm/unittests.cfg
 +++ b/arm/unittests.cfg
-@@ -178,3 +178,87 @@ extra_params = -append 'sal_barrier'
- groups = barrier
+@@ -142,3 +142,39 @@ smp = $(($MAX_SMP>4?4:$MAX_SMP))
+ extra_params = -append 'excl'
+ groups = locking
  accel = tcg
++
++[barrier-litmus::mp]
++file = barrier-litmus-test.flat
++smp = 2
++extra_params = -append 'mp'
++groups = barrier
++accel = tcg
++
++[barrier-litmus::mp-barrier]
++file = barrier-litmus-test.flat
++smp = 2
++extra_params = -append 'mp_barrier'
++groups = barrier
++accel = tcg
++
++[barrier-litmus::mp-acqrel]
++file = barrier-litmus-test.flat
++smp = 2
++extra_params = -append 'mp_acqrel'
++groups = barrier
++accel = tcg
++
++[barrier-litmus::sal]
++file = barrier-litmus-test.flat
++smp = 2
++extra_params = -append 'sal'
++groups = barrier
++accel = tcg
++
++[barrier-litmus::sal-barrier]
++file = barrier-litmus-test.flat
++smp = 2
++extra_params = -append 'sal_barrier'
++groups = barrier
++accel = tcg
++
+diff --git a/lib/arm/asm/barrier.h b/lib/arm/asm/barrier.h
+index 394a4a2..e3b7a2e 100644
+--- a/lib/arm/asm/barrier.h
++++ b/lib/arm/asm/barrier.h
+@@ -1,9 +1,11 @@
+ #ifndef _ASMARM_BARRIER_H_
+ #define _ASMARM_BARRIER_H_
+ /*
+- * Adapted form arch/arm/include/asm/barrier.h
++ * Adapted from arch/arm/include/asm/barrier.h
+  */
  
-+# TCG Tests
-+[tcg::tight]
-+file = tcg-test.flat
-+smp = $(($MAX_SMP>4?4:$MAX_SMP))
-+extra_params = -append 'tight'
-+groups = tcg
-+accel = tcg
++#include <stdint.h>
 +
-+[tcg::tight-smc]
-+file = tcg-test.flat
-+smp = $(($MAX_SMP>4?4:$MAX_SMP))
-+extra_params = -append 'tight smc' -tb-size 1
-+groups = tcg
-+accel = tcg
+ #define sev()		asm volatile("sev" : : : "memory")
+ #define wfe()		asm volatile("wfe" : : : "memory")
+ #define wfi()		asm volatile("wfi" : : : "memory")
+@@ -20,4 +22,63 @@
+ #define smp_rmb()	smp_mb()
+ #define smp_wmb()	dmb(ishst)
+ 
++extern void abort(void);
 +
-+[tcg::tight-irq]
-+file = tcg-test.flat
-+smp = $(($MAX_SMP>4?4:$MAX_SMP))
-+extra_params = -append 'tight irq'
-+groups = tcg
-+accel = tcg
++static inline void __write_once_size(volatile void *p, void *res, int size)
++{
++	switch (size) {
++	case 1: *(volatile uint8_t *)p = *(uint8_t *)res; break;
++	case 2: *(volatile uint16_t *)p = *(uint16_t *)res; break;
++	case 4: *(volatile uint32_t *)p = *(uint32_t *)res; break;
++	case 8: *(volatile uint64_t *)p = *(uint64_t *)res; break;
++	default:
++		/* unhandled case */
++		abort();
++	}
++}
 +
-+[tcg::tight-smc-irq]
-+file = tcg-test.flat
-+smp = $(($MAX_SMP>4?4:$MAX_SMP))
-+extra_params = -append 'tight smc irq'
-+groups = tcg
-+accel = tcg
++#define WRITE_ONCE(x, val) \
++({							\
++	union { typeof(x) __val; char __c[1]; } __u =	\
++		{ .__val = (typeof(x)) (val) }; \
++	__write_once_size(&(x), __u.__c, sizeof(x));	\
++	__u.__val;					\
++})
 +
-+[tcg::computed]
-+file = tcg-test.flat
-+smp = $(($MAX_SMP>4?4:$MAX_SMP))
-+extra_params = -append 'computed'
-+groups = tcg
-+accel = tcg
++#define smp_store_release(p, v)						\
++do {									\
++	smp_mb();							\
++	WRITE_ONCE(*p, v);						\
++} while (0)
 +
-+[tcg::computed-smc]
-+file = tcg-test.flat
-+smp = $(($MAX_SMP>4?4:$MAX_SMP))
-+extra_params = -append 'computed smc'
-+groups = tcg
-+accel = tcg
 +
-+[tcg::computed-irq]
-+file = tcg-test.flat
-+smp = $(($MAX_SMP>4?4:$MAX_SMP))
-+extra_params = -append 'computed irq'
-+groups = tcg
-+accel = tcg
++static inline
++void __read_once_size(const volatile void *p, void *res, int size)
++{
++	switch (size) {
++	case 1: *(uint8_t *)res = *(volatile uint8_t *)p; break;
++	case 2: *(uint16_t *)res = *(volatile uint16_t *)p; break;
++	case 4: *(uint32_t *)res = *(volatile uint32_t *)p; break;
++	case 8: *(uint64_t *)res = *(volatile uint64_t *)p; break;
++	default:
++		/* unhandled case */
++		abort();
++	}
++}
 +
-+[tcg::computed-smc-irq]
-+file = tcg-test.flat
-+smp = $(($MAX_SMP>4?4:$MAX_SMP))
-+extra_params = -append 'computed smc irq'
-+groups = tcg
-+accel = tcg
++#define READ_ONCE(x)							\
++({									\
++	union { typeof(x) __val; char __c[1]; } __u;			\
++	__read_once_size(&(x), __u.__c, sizeof(x));			\
++	__u.__val;							\
++})
 +
-+[tcg::paged]
-+file = tcg-test.flat
-+smp = $(($MAX_SMP>4?4:$MAX_SMP))
-+extra_params = -append 'paged'
-+groups = tcg
-+accel = tcg
 +
-+[tcg::paged-smc]
-+file = tcg-test.flat
-+smp = $(($MAX_SMP>4?4:$MAX_SMP))
-+extra_params = -append 'paged smc'
-+groups = tcg
-+accel = tcg
++#define smp_load_acquire(p)						\
++({									\
++	typeof(*p) ___p1 = READ_ONCE(*p);				\
++	smp_mb();							\
++	___p1;								\
++})
 +
-+[tcg::paged-irq]
-+file = tcg-test.flat
-+smp = $(($MAX_SMP>4?4:$MAX_SMP))
-+extra_params = -append 'paged irq'
-+groups = tcg
-+accel = tcg
+ #endif /* _ASMARM_BARRIER_H_ */
+diff --git a/lib/arm64/asm/barrier.h b/lib/arm64/asm/barrier.h
+index dbdac9d..aafabdc 100644
+--- a/lib/arm64/asm/barrier.h
++++ b/lib/arm64/asm/barrier.h
+@@ -19,4 +19,54 @@
+ #define smp_rmb()	dmb(ishld)
+ #define smp_wmb()	dmb(ishst)
+ 
++#define smp_store_release(p, v)						\
++do {									\
++	switch (sizeof(*p)) {						\
++	case 1:								\
++		asm volatile ("stlrb %w1, %0"				\
++				: "=Q" (*p) : "r" (v) : "memory");	\
++		break;							\
++	case 2:								\
++		asm volatile ("stlrh %w1, %0"				\
++				: "=Q" (*p) : "r" (v) : "memory");	\
++		break;							\
++	case 4:								\
++		asm volatile ("stlr %w1, %0"				\
++				: "=Q" (*p) : "r" (v) : "memory");	\
++		break;							\
++	case 8:								\
++		asm volatile ("stlr %1, %0"				\
++				: "=Q" (*p) : "r" (v) : "memory");	\
++		break;							\
++	}								\
++} while (0)
 +
-+[tcg::paged-smc-irq]
-+file = tcg-test.flat
-+smp = $(($MAX_SMP>4?4:$MAX_SMP))
-+extra_params = -append 'paged smc irq'
-+groups = tcg
-+accel = tcg
++#define smp_load_acquire(p)						\
++({									\
++	union { typeof(*p) __val; char __c[1]; } __u;			\
++	switch (sizeof(*p)) {						\
++	case 1:								\
++		asm volatile ("ldarb %w0, %1"				\
++			: "=r" (*(u8 *)__u.__c)				\
++			: "Q" (*p) : "memory");				\
++		break;							\
++	case 2:								\
++		asm volatile ("ldarh %w0, %1"				\
++			: "=r" (*(u16 *)__u.__c)			\
++			: "Q" (*p) : "memory");				\
++		break;							\
++	case 4:								\
++		asm volatile ("ldar %w0, %1"				\
++			: "=r" (*(u32 *)__u.__c)			\
++			: "Q" (*p) : "memory");				\
++		break;							\
++	case 8:								\
++		asm volatile ("ldar %0, %1"				\
++			: "=r" (*(u64 *)__u.__c)			\
++			: "Q" (*p) : "memory");				\
++		break;							\
++	}								\
++	__u.__val;							\
++})
++
+ #endif /* _ASMARM64_BARRIER_H_ */
 -- 
 2.10.1
