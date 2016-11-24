@@ -1,57 +1,60 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 24 Nov 2016 16:43:16 +0100
-Subject: [GIT PULL 3/3] Rockchip dts32 changes for 4.10
-In-Reply-To: <1594090.z775ZFR2cz@phil>
-References: <1594090.z775ZFR2cz@phil>
-Message-ID: <1575955.EYn93JYaxe@phil>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 24 Nov 2016 15:43:17 +0000
+Subject: [PATCH 0/4] crypto: CRCT10DIF support for ARM and arm64
+Message-ID: <1480002201-1427-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6a8883d614c7bede1075a4850139daa9723c291e:
+First of all, apologies to Yue Haibing for stealing his thunder, to some
+extent. But after reviewing (and replying to) his patch, I noticed that his
+code is not original code, but simply a transliteration of the existing Intel
+code that resides in arch/x86/crypto/crct10dif-pcl-asm_64.S, but with the
+license and copyright statement removed. 
 
-  ARM: dts: rockchip: replace to "max-frequency" instead of "clock-freq-min-max" (2016-11-09 14:46:04 +0100)
+So, if we are going to transliterate code, let's credit the original authors,
+even if the resulting code does not look like the code you started out with.
 
-are available in the git repository at:
+Then, I noticed that we could stay *much* closer to the original, and that
+there is no need for jump tables or computed gotos at all. So I got a bit
+carried away, and ended up reimplementing the whole thing, for both arm and64
+and ARM.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.10-rockchip-dts32-2
+Patch #1 fixes an issue in testmgr that results in spurious false negatives
+in the chunking tests if the third chunk exceeds 31 bytes.
 
-for you to fetch changes up to c458e1b504a6a8c817fc56b4d4704273f2c459bb:
+Patch #2 expands the existing CRCT10DIF test cases, to ensure that all
+code paths are actually covered.
 
-  ARM: dts: rockchip: add the sdmmc pinctrl for rk1108 (2016-11-16 13:37:45 +0100)
+Patch #3 is a straight transliteration of the Intel code to arm64.
 
-----------------------------------------------------------------
-A bit of attention for the rk3066, fixed tsadc reset node
-as well as enabling the dma for uart and mmc controllers.
+Patch #4 is a straight transliteration of the Intel code to ARM. This patch
+is against patch #3 (using --find-copies-harder) so that it is easy to
+see how the ARM code deviates from the arm64 code.
 
-And one new soc, the rk1108 combining a single-core Cortex-A7
-with a separate DSP core.
+NOTE: this code uses the 64x64->128 bit polynomial multiply instruction,
+which is only available on cores that implement the v8 Crypto Extensions.
 
-----------------------------------------------------------------
-Andy Yan (2):
-      ARM: dts: rockchip: add basic support for RK1108 SOC
-      ARM: dts: rockchip: add rockchip RK1108 Evaluation board
+Ard Biesheuvel (4):
+  crypto: testmgr - avoid overlap in chunked tests
+  crypto: testmgr - add/enhance test cases for CRC-T10DIF
+  crypto: arm64/crct10dif - port x86 SSE implementation to arm64
+  crypto: arm/crct10dif - port x86 SSE implementation to ARM
 
-Heiko Stuebner (1):
-      Merge branch 'v4.10-shared/clkids' into v4.10-armsoc/dts32
+ arch/arm/crypto/Kconfig               |   5 +
+ arch/arm/crypto/Makefile              |   2 +
+ arch/arm/crypto/crct10dif-ce-core.S   | 569 ++++++++++++++++++++
+ arch/arm/crypto/crct10dif-ce-glue.c   |  89 +++
+ arch/arm64/crypto/Kconfig             |   5 +
+ arch/arm64/crypto/Makefile            |   3 +
+ arch/arm64/crypto/crct10dif-ce-core.S | 518 ++++++++++++++++++
+ arch/arm64/crypto/crct10dif-ce-glue.c |  80 +++
+ crypto/testmgr.c                      |   2 +-
+ crypto/testmgr.h                      |  70 ++-
+ 10 files changed, 1314 insertions(+), 29 deletions(-)
+ create mode 100644 arch/arm/crypto/crct10dif-ce-core.S
+ create mode 100644 arch/arm/crypto/crct10dif-ce-glue.c
+ create mode 100644 arch/arm64/crypto/crct10dif-ce-core.S
+ create mode 100644 arch/arm64/crypto/crct10dif-ce-glue.c
 
-Jacob Chen (1):
-      ARM: dts: rockchip: add the sdmmc pinctrl for rk1108
-
-Pawe? Jarosz (2):
-      ARM: dts: rockchip: fix TSADC reset node for rk3066a
-      ARM: dts: rockchip: enable dma for uart and mmc on rk3066a
-
-Shawn Lin (2):
-      dt-bindings: rockchip-dw-mshc: add RK1108 dw-mshc description
-      clk: rockchip: add dt-binding header for rk1108
-
- .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |   1 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/rk1108-evb.dts                   |  69 ++++
- arch/arm/boot/dts/rk1108.dtsi                      | 452 +++++++++++++++++++++
- arch/arm/boot/dts/rk3066a.dtsi                     |  19 +-
- include/dt-bindings/clock/rk1108-cru.h             | 269 ++++++++++++
- 6 files changed, 810 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/rk1108-evb.dts
- create mode 100644 arch/arm/boot/dts/rk1108.dtsi
- create mode 100644 include/dt-bindings/clock/rk1108-cru.h
+-- 
+2.7.4
