@@ -1,40 +1,111 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu, 24 Nov 2016 16:10:26 +0000
-Subject: [kvm-unit-tests PATCH v7 04/11] libcflat: add PRI(dux)32 format types
+Date: Thu, 24 Nov 2016 16:10:25 +0000
+Subject: [kvm-unit-tests PATCH v7 03/11] run_tests: allow passing of options
+ to QEMU
 In-Reply-To: <20161124161033.11456-1-alex.bennee@linaro.org>
 References: <20161124161033.11456-1-alex.bennee@linaro.org>
-Message-ID: <20161124161033.11456-5-alex.bennee@linaro.org>
+Message-ID: <20161124161033.11456-4-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So we can have portable formatting of uint32_t types.
+This introduces a the option -o for passing of options directly to QEMU
+which is useful. In my case I'm using it to toggle MTTCG on an off:
+
+  ./run_tests.sh -t -o "-tcg mttcg=on"
 
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 ---
- lib/libcflat.h | 5 +++++
- 1 file changed, 5 insertions(+)
+ run_tests.sh           | 10 +++++++---
+ scripts/functions.bash | 13 +++++++------
+ 2 files changed, 14 insertions(+), 9 deletions(-)
 
-diff --git a/lib/libcflat.h b/lib/libcflat.h
-index bdcc561..6dab5be 100644
---- a/lib/libcflat.h
-+++ b/lib/libcflat.h
-@@ -55,12 +55,17 @@ typedef _Bool		bool;
- #define true  1
+diff --git a/run_tests.sh b/run_tests.sh
+index 4f2e5cb..05cc7fb 100755
+--- a/run_tests.sh
++++ b/run_tests.sh
+@@ -13,10 +13,11 @@ function usage()
+ {
+ cat <<EOF
  
- #if __SIZEOF_LONG__ == 8
-+#  define __PRI32_PREFIX
- #  define __PRI64_PREFIX	"l"
- #  define __PRIPTR_PREFIX	"l"
- #else
-+#  define __PRI32_PREFIX        "l"
- #  define __PRI64_PREFIX	"ll"
- #  define __PRIPTR_PREFIX
- #endif
-+#define PRId32  __PRI32_PREFIX	"d"
-+#define PRIu32  __PRI32_PREFIX	"u"
-+#define PRIx32  __PRI32_PREFIX	"x"
- #define PRId64  __PRI64_PREFIX	"d"
- #define PRIu64  __PRI64_PREFIX	"u"
- #define PRIx64  __PRI64_PREFIX	"x"
+-Usage: $0 [-g group] [-a accel] [-t] [-h] [-v]
++Usage: $0 [-g group] [-a accel] [-o qemu_opts] [-t] [-h] [-v]
+ 
+     -g: Only execute tests in the given group
+     -a: Force acceleration mode (tcg/kvm)
++    -o: additional options for QEMU command line
+     -t: disable timeouts
+     -h: Output this help text
+     -v: Enables verbose mode
+@@ -30,7 +31,7 @@ EOF
+ RUNTIME_arch_run="./$TEST_DIR/run"
+ source scripts/runtime.bash
+ 
+-while getopts "g:a:thv" opt; do
++while getopts "g:a:o:thv" opt; do
+     case $opt in
+         g)
+             only_group=$OPTARG
+@@ -38,6 +39,9 @@ while getopts "g:a:thv" opt; do
+         a)
+             force_accel=$OPTARG
+             ;;
++        o)
++            extra_opts=$OPTARG
++            ;;
+         t)
+             no_timeout="yes"
+             ;;
+@@ -67,4 +71,4 @@ RUNTIME_log_stdout () {
+ config=$TEST_DIR/unittests.cfg
+ rm -f test.log
+ printf "BUILD_HEAD=$(cat build-head)\n\n" > test.log
+-for_each_unittest $config run
++for_each_unittest $config run "$extra_opts"
+diff --git a/scripts/functions.bash b/scripts/functions.bash
+index ee9143c..d38a69e 100644
+--- a/scripts/functions.bash
++++ b/scripts/functions.bash
+@@ -2,11 +2,12 @@
+ function for_each_unittest()
+ {
+ 	local unittests="$1"
+-	local cmd="$2"
+-	local testname
++        local cmd="$2"
++        local extra_opts=$3
++        local testname
+ 	local smp
+ 	local kernel
+-	local opts
++        local opts=$extra_opts
+ 	local groups
+ 	local arch
+ 	local check
+@@ -21,7 +22,7 @@ function for_each_unittest()
+ 			testname=${BASH_REMATCH[1]}
+ 			smp=1
+ 			kernel=""
+-			opts=""
++                        opts=$extra_opts
+ 			groups=""
+ 			arch=""
+ 			check=""
+@@ -32,7 +33,7 @@ function for_each_unittest()
+ 		elif [[ $line =~ ^smp\ *=\ *(.*)$ ]]; then
+ 			smp=${BASH_REMATCH[1]}
+ 		elif [[ $line =~ ^extra_params\ *=\ *(.*)$ ]]; then
+-			opts=${BASH_REMATCH[1]}
++                        opts="$opts ${BASH_REMATCH[1]}"
+ 		elif [[ $line =~ ^groups\ *=\ *(.*)$ ]]; then
+ 			groups=${BASH_REMATCH[1]}
+ 		elif [[ $line =~ ^arch\ *=\ *(.*)$ ]]; then
+@@ -45,6 +46,6 @@ function for_each_unittest()
+ 			timeout=${BASH_REMATCH[1]}
+ 		fi
+ 	done
+-	"$cmd" "$testname" "$groups" "$smp" "$kernel" "$opts" "$arch" "$check" "$accel" "$timeout"
++        "$cmd" "$testname" "$groups" "$smp" "$kernel" "$opts" "$arch" "$check" "$accel" "$timeout"
+ 	exec {fd}<&-
+ }
 -- 
 2.10.1
