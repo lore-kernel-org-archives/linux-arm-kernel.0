@@ -1,109 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 24 Nov 2016 18:44:37 +0000
-Subject: [PATCH 9/9] arm64: Documentation - Expose CPU feature registers
-In-Reply-To: <1479994809-9081-10-git-send-email-suzuki.poulose@arm.com>
-References: <1479994809-9081-1-git-send-email-suzuki.poulose@arm.com>
- <1479994809-9081-10-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20161124184436.GG7452@e104818-lin.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Nov 2016 18:45:32 +0000
+Subject: [RFC PATCH 11/11] ARM: Allow ARCH_MULTIPLATFORM to be selected
+ for NOMMU
+In-Reply-To: <20161124180751.GA5258@afzalpc>
+References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
+ <1479806768-39911-12-git-send-email-vladimir.murzin@arm.com>
+ <16587553.f9R1mxJih5@wuerfel> <583478FB.4020008@arm.com>
+ <20161123154829.GA2489@afzalpc>
+ <20161123191621.GD14217@n2100.armlinux.org.uk>
+ <20161124172535.GA3524@afzalpc>
+ <20161124173532.GH14217@n2100.armlinux.org.uk>
+ <20161124180751.GA5258@afzalpc>
+Message-ID: <20161124184532.GI14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+On Thu, Nov 24, 2016 at 11:37:51PM +0530, Afzal Mohammed wrote:
+> Hi,
+> 
+> On Thu, Nov 24, 2016 at 05:35:32PM +0000, Russell King - ARM Linux wrote:
+> 
+> > Right, so Freescale's iMX6, RAM starts at 0x10000000, so when building
+> > for noMMU, you need to specify DRAM_START as 0x10000000 and DRAM_SIZE
+> > to be the appropriate size of RAM.
+> 
+> Hmm.., i had thought that Vybrid's memory mappings starts from
+> 0x80000000 (same TI Sitara's), just rechecked the older boot logs of
+> Vybrid & Data manual, it seems it is @0x80000000, probably iMX6 has a
+> different map.
 
-On Thu, Nov 24, 2016 at 01:40:09PM +0000, Suzuki K. Poulose wrote:
-> --- /dev/null
-> +++ b/Documentation/arm64/cpu-feature-registers.txt
-> @@ -0,0 +1,198 @@
-> +		ARM64 CPU Feature Registers
-> +		===========================
-> +
-> +Author: Suzuki K Poulose <suzuki.poulose@arm.com>
-> +
-> +
-> +This file describes the API for exporting the AArch64 CPU ID/feature
-> +registers to userspace. The availability of this API is advertised
-> +via the HWCAP_CPUID in HWCAPs.
+Right, so if you build a multiplatform kernel which covers TI Sitara
+and iMX6, then you have a choice:
 
-s/API/ABI/ maybe?
+- Set DRAM_START to 0x10000000, and have a kernel which will boot on
+  iMX6 but fail on TI Sitara.
+- Set DRAM_START to 0x80000000, and have a kernel which will boot on
+  TI Sitara, but fail on iMX6 with less than 2GiB of memory (0x70000000
+  bytes to be exact.)
 
-> +
-> +1. Motivation
-> +---------------
-> +
-> +The ARM architecture defines a set of feature registers, which describe
-> +the capabilities of the CPU/system. Access to these system registers is
-> +restricted from EL0 and there is no reliable way for an application to
-> +extract this information to make better decisions at runtime. There is
-> +limited information available to the application via HWCAPs, however
-> +there are some issues with their usage.
-> +
-> + a) Any change to the HWCAPs requires an update to userspace (e.g libc)
-> +    to detect the new changes, which can take a long time to appear in
-> +    distributions. Exposing the registers allows applications to get the
-> +    information without requiring updates to the toolchains.
-> +
-> + b) Access to HWCAPs is sometimes limited (e.g prior to libc, or
-> +    when ld is initialised at startup time).
-> +
-> + c) HWCAPs cannot represent non-boolean information effectively. The
-> +    architecture defines a canonical format for representing features
-> +    in the ID registers; this is well defined and is capable of
-> +    representing all valid architecture variations. Exposing the ID
-> +    registers avoids having to come up with HWCAP representations and
-> +    parsing code.
+This is why multiplatform doesn't make sense for noMMU - you can't
+actually build a multiplatform kernel that will work across all
+these platforms.
 
-For point (c) above, we don't (yet?) have an actual case on AArch64
-where HWCAP needs more than a boolean value.
+You'd have to re-link it (at the very least) to place the data section
+elsewhere in physical memory to make it work.
 
-And just to clarify my position: I consider that we should continue to
-expose HWCAP for new features (e.g. SVE) in parallel with the CPUID
-access emulation. There are different use-cases for them (i.e. dynamic
-loader uses HWCAP for the ifunc resolver).
+It's this reason that I don't like removing the "depends on MMU" from
+multiplatform - it gives the incorrect impression that we _can_ support
+a wide range of systems, but what it will lead to is a kernel that will
+work on some platforms but not others.  The result will be more "bug"
+reports because the kernel fails to boot...
 
-> +3. Implementation
-> +--------------------
-> +
-> +The infrastructure is built on the emulation of the 'MRS' instruction.
-> +Accessing a restricted system register from an application generates an
-> +exception and ends up in SIGILL being delivered to the process.
-> +The infrastructure hooks into the exception handler and emulates the
-> +operation if the source belongs to the supported system register space.
-> +
-> +The infrastructure emulates only the following system register space:
-> +	Op0=3, Op1=0, CRn=0
-> +
-> +(See Table C5-6 'System instruction encodings for non-Debug System
-> +register accesses' in ARMv8 ARM DDI 0487A.h, for the list of
-> +registers).
-> +
-> +
-> +The following rules are applied to the value returned by the
-> +infrastructure:
-> +
-> + a) The value of an 'IMPLEMENTATION DEFINED' field is set to 0.
-> + b) The value of a reserved field is populated with the reserved
-> +    value as defined by the architecture.
-> + c) The value of a field marked as not 'visible', is set to indicate
-> +    the feature is missing (as defined by the architecture).
-
-I don't understand point (c) above. If it is marked as not 'visible', it
-is always reported to user as 0. The above could be misinterpreted as
-reporting missing architecture features.
-
-[...]
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 94c188f..fb331de 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -81,6 +81,10 @@ static bool __maybe_unused
->  cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused);
->  
->  
-> +/*
-> + * NOTE: Any changes to the visibility of features should be kept in
-> + * sync with the documentation of the CPU feature register API.
-
-s/API/ABI/
+In any case, I think kernelci and similar would first need to be updated
+to avoid trying to boot noMMU kernels on hardware which it just can't
+boot on - we _really_ do not want to be randomly scribbling into physical
+memory, potentially hitting devices, especially with devices that contain
+OTP fuses that set options as security features.
 
 -- 
-Catalin
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
