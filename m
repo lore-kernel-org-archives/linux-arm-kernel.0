@@ -1,25 +1,53 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Thu, 24 Nov 2016 12:36:20 +0300
-Subject: [PATCH 7/9] clocksource/drivers/rockchip_timer: implement
- clocksource timer
-In-Reply-To: <1479922177-20136-7-git-send-email-al.kochet@gmail.com>
-References: <1479922177-20136-1-git-send-email-al.kochet@gmail.com>
- <1479922177-20136-7-git-send-email-al.kochet@gmail.com>
-Message-ID: <FFD6E644-F68B-4880-BC76-88F6063D070E@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Nov 2016 10:37:02 +0100
+Subject: [PATCH] ARM: fix kmemleak for XIP_KERNEL
+In-Reply-To: <CAJpBn1zow6P5MUFP+jbOXafoH9dLV8Ng7cJqfRsE8FMEEe9J8Q@mail.gmail.com>
+References: <20161122142829.1776129-1-arnd@arndb.de>
+ <CAJpBn1zow6P5MUFP+jbOXafoH9dLV8Ng7cJqfRsE8FMEEe9J8Q@mail.gmail.com>
+Message-ID: <2275597.t9zIij20nT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thursday, November 24, 2016 1:30:03 AM CET Jakub Kicinski wrote:
+> On Tue, Nov 22, 2016 at 6:28 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > The newly added check for RO_AFTER_INIT_DATA in kmemleak breaks ARM whenever
+> > XIP_KERNEL is enabled:
+> >
+> > mm/kmemleak.o: In function `kmemleak_scan':
+> > kmemleak.c:(.text.kmemleak_scan+0x2e4): undefined reference to `__end_data_ro_after_init'
+> > kmemleak.c:(.text.kmemleak_scan+0x2e8): undefined reference to `__start_data_ro_after_init'
+> >
+> > This adds the start/end symbols for the section even in the case of having
+> > no data in the section, to make the check work while keeping the architecture
+> > specific override in one place.
+> >
+> > Fixes: d7c19b066dcf ("mm: kmemleak: scan .data.ro_after_init")
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> > The patch causing this was merged late into v4.9-rc, this one should
+> > probably go there as well.
+> >
+> > I assume the same problem exists on s390, but I have not checked that.
+> 
+> Hi Arnd!
+> 
+> Sorry for breaking things again :( The confusion must have been caused
+> by going via different trees.  Actually, Russell's commit is dated 6
+> days after mine so could as well be:
+> 
+> Fixes: 2a3811068fbc ("ARM: Fix XIP kernels")
+> 
+> Not that it matters.
 
-> In order to use the patch you have to setup the timer using
-> 'rockchip,clocksource' device tree property
+Got it. I guess it's really the combination of the two, so I'd clarify
+that in the changelog and list both commits.
+ 
+> About s390 - I thought I took care of it in d7c19b066dcf ("mm:
+> kmemleak: scan .data.ro_after_init"), do you see anything suspicious
+> in the way I did it?  I'll do some more s390 builds just to triple
+> check.
 
-Just came in mind, that it is better to replace 'rockchip,clocksource' device tree property
-with KConfig option in order to enable clocksource on dedicated timer?
+You are right, I had already noticed that too but not replied yet.
+s390 is ok as far as I can tell.
 
-Someting like:
-[ ] enable clocksource
-   clocksource timer name:
-
-Any feedback would be appreciated.
-
-Alexander.
+	Arnd
