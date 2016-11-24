@@ -1,71 +1,34 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 24 Nov 2016 19:22:31 +0800
-Subject: [PATCH RFC] drm/sun4i: rgb: Add 5% tolerance to dot clock frequency
- check
-Message-ID: <20161124112231.4297-1-wens@csie.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 24 Nov 2016 12:24:56 +0100
+Subject: [PATCH 0/5] spi: atmel: enhance the DMA handling
+Message-ID: <cover.1479985886.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The panels shipped with Allwinner devices are very "generic", i.e.
-they do not have model numbers or reliable sources of information
-for the timings (that we know of) other than the fex files shipped
-on them. The dot clock frequency provided in the fex files have all
-been rounded to the nearest MHz, as that is the unit used in them.
+Use the dummy buffer handling and DMA mapping core infrastructure to simplify
+spi-atmel driver.
+By using these frameworks we also fix the use of any kind of memory with
+dmaengine. This work was triggered by issues encountered while using UBI/UBIFS
+on a serial flash.
 
-We were using the simple panel "urt,umsh-8596md-t" as a substitute
-for the A13 Q8 tablets in the absence of a specific model for what
-may be many different but otherwise timing compatible panels. This
-was usable without any visual artifacts or side effects, until the
-dot clock rate check was added in commit bb43d40d7c83 ("drm/sun4i:
-rgb: Validate the clock rate").
+Some good ideas of this series have been inspired by spi-rspi.c and commits by
+Geert Uytterhoeven.
 
-The reason this check fails is because the dotclock frequency for
-this model is 33.26 MHz, which is not achievable with our dot clock
-hardware, and the rate returned by clk_round_rate deviates slightly,
-causing the driver to reject the display mode.
+I have a side question still: is the is_dma_mapped tag still used and considered into
+the core spi routines or is it always the driver itself that have to deal with
+it (so how to do with the can_dma() routine)?
 
-The LCD panels have some tolerance on the dot clock frequency, even
-if it's not specified in their datasheets.
+Cyrille Pitchen (1):
+  spi: atmel: Use SPI core DMA mapping framework
 
-This patch adds a 5% tolerence to the dot clock check.
+Nicolas Ferre (4):
+  spi: atmel: trivial: move info banner to latest probe action
+  spi: atmel: Use core SPI_MASTER_MUST_[RT]X handling
+  spi: atmel: trivial: remove unused fields in DMA structure
+  spi: atmel: remove the use of private channel fields
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
+ drivers/spi/spi-atmel.c | 268 ++++++++++++++++++------------------------------
+ 1 file changed, 98 insertions(+), 170 deletions(-)
 
-The few LCD panel datasheets I found did not list minimums or maximums
-for the dot clock rate. The 5% tolerance is just something I made up.
-The point is to be able to use our dot clock, which doesn't have the
-resolution needed to generate the exact clock rate requested. AFAIK
-the sun4i driver is one of the strictest ones with regards to the dot
-clock frequency. Some drivers don't even check it.
-
-The clock rate given in vendor fex files are already rounded down to
-MHz resolution. I doubt not using the exact rate as specified in simple
-panels would cause any issues. But my experience is limited here.
-Feedback on this is requested.
-
----
- drivers/gpu/drm/sun4i/sun4i_rgb.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index d198ad7e5323..66ad86afa561 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -93,11 +93,12 @@ static int sun4i_rgb_mode_valid(struct drm_connector *connector,
- 
- 	DRM_DEBUG_DRIVER("Vertical parameters OK\n");
- 
-+	/* Check against a 5% tolerance for the dot clock */
- 	rounded_rate = clk_round_rate(tcon->dclk, rate);
--	if (rounded_rate < rate)
-+	if (rounded_rate < rate * 19 / 20)
- 		return MODE_CLOCK_LOW;
- 
--	if (rounded_rate > rate)
-+	if (rounded_rate > rate * 21 / 20)
- 		return MODE_CLOCK_HIGH;
- 
- 	DRM_DEBUG_DRIVER("Clock rate OK\n");
 -- 
-2.10.2
+2.9.0
