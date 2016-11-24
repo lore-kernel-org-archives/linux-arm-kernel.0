@@ -1,57 +1,71 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 24 Nov 2016 12:15:30 +0100
-Subject: [PATCH] SCPI (pre-v1.0): fix reading sensor value
-In-Reply-To: <f3d6f39e-ec45-7c62-22d4-fd7b0952b499@arm.com>
-References: <20161124001845.20830-1-martin.blumenstingl@googlemail.com>
- <f3d6f39e-ec45-7c62-22d4-fd7b0952b499@arm.com>
-Message-ID: <CAFBinCDP4PwXnUux=Wd9XJkNJef7qN3EOZm0Q8sg-B4gXqsjcA@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 24 Nov 2016 19:22:31 +0800
+Subject: [PATCH RFC] drm/sun4i: rgb: Add 5% tolerance to dot clock frequency
+ check
+Message-ID: <20161124112231.4297-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2016 at 11:47 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 24/11/16 00:18, Martin Blumenstingl wrote:
->>
->> I observed the following "strange" value when trying to read the SCPI
->> temperature sensor on my Amlogic GXM S912 device:
->> $ cat /sys/class/hwmon/hwmon0/temp1_input
->> 6875990994467160116
->>
->> The value reported by the original kernel (Amlogic vendor kernel, after
->> a reboot obviously) was 53C.
->> The Amlogic SCPI driver only uses a single 32bit value to read the
->> sensor value, instead of two. After stripping the upper 32bits from
->> above value gives "52" as result, which is basically identical to
->> what the vendor kernel reports.
->
->
-> Can you check why the upper 32-bit is not set to 0 ?
->
-> In scpi_process_cmd, we memset extra rx_buf length by 0 and that should
-> take care. Neil had mentioned that works but now I doubt if firmware
-> returns 8 instead of 4 in the size which is wrong as it supports only
-> 32-bit.
-according to the code "RX Length is not replied by the legacy
-Firmware", so for legacy firmwares the "if (match->rx_len > len)"
-condition will never be true (because both values are always equal).
-in the sensor case we then go and copy 8 byte from mem->payload to
-match->rx_buf, but SCPI firmware only wrote 4 bytes to mem->payload.
-This means we are simply reading 4 byte (hi_val) of uninitialized
-memory - which may be all zeroes if we're lucky - but in my case I got
-"garbage" (I guess it's the second byte from the *previous* command
-which are leaking here).
+The panels shipped with Allwinner devices are very "generic", i.e.
+they do not have model numbers or reliable sources of information
+for the timings (that we know of) other than the fex files shipped
+on them. The dot clock frequency provided in the fex files have all
+been rounded to the nearest MHz, as that is the unit used in them.
 
-while writing this I see a second (more generic) approach which might
-work as well:
-scpi_chan does not hold any information about rx_payload/tx_payload
-sizes (these are calculated in scpi_probe but not stored anywhere).
-(for now, let's assume we had the rx_payload_size available)
-we could then go ahead and memset(rx_payload, 0, rx_payload_size) in
-scpi_tx_prepare or scpi_send_message.
-However, I am not sure if that would have any side-effects (for
-example on newer SCPI implementations).
+We were using the simple panel "urt,umsh-8596md-t" as a substitute
+for the A13 Q8 tablets in the absence of a specific model for what
+may be many different but otherwise timing compatible panels. This
+was usable without any visual artifacts or side effects, until the
+dot clock rate check was added in commit bb43d40d7c83 ("drm/sun4i:
+rgb: Validate the clock rate").
 
+The reason this check fails is because the dotclock frequency for
+this model is 33.26 MHz, which is not achievable with our dot clock
+hardware, and the rate returned by clk_round_rate deviates slightly,
+causing the driver to reject the display mode.
 
-Regards,
-Martin
+The LCD panels have some tolerance on the dot clock frequency, even
+if it's not specified in their datasheets.
+
+This patch adds a 5% tolerence to the dot clock check.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+
+The few LCD panel datasheets I found did not list minimums or maximums
+for the dot clock rate. The 5% tolerance is just something I made up.
+The point is to be able to use our dot clock, which doesn't have the
+resolution needed to generate the exact clock rate requested. AFAIK
+the sun4i driver is one of the strictest ones with regards to the dot
+clock frequency. Some drivers don't even check it.
+
+The clock rate given in vendor fex files are already rounded down to
+MHz resolution. I doubt not using the exact rate as specified in simple
+panels would cause any issues. But my experience is limited here.
+Feedback on this is requested.
+
+---
+ drivers/gpu/drm/sun4i/sun4i_rgb.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+index d198ad7e5323..66ad86afa561 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
++++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+@@ -93,11 +93,12 @@ static int sun4i_rgb_mode_valid(struct drm_connector *connector,
+ 
+ 	DRM_DEBUG_DRIVER("Vertical parameters OK\n");
+ 
++	/* Check against a 5% tolerance for the dot clock */
+ 	rounded_rate = clk_round_rate(tcon->dclk, rate);
+-	if (rounded_rate < rate)
++	if (rounded_rate < rate * 19 / 20)
+ 		return MODE_CLOCK_LOW;
+ 
+-	if (rounded_rate > rate)
++	if (rounded_rate > rate * 21 / 20)
+ 		return MODE_CLOCK_HIGH;
+ 
+ 	DRM_DEBUG_DRIVER("Clock rate OK\n");
+-- 
+2.10.2
