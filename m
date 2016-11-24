@@ -1,88 +1,79 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 24 Nov 2016 17:38:57 +0000
-Subject: [RFC PATCH 09/11] ARM: NOMMU: define SECTION_xxx macros
-In-Reply-To: <58347A61.306@arm.com>
+Date: Thu, 24 Nov 2016 17:41:36 +0000
+Subject: [RFC PATCH 06/11] ARM: tlbflush: drop dependency on CONFIG_SMP
+In-Reply-To: <583449F9.6060804@arm.com>
 References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
- <1479806768-39911-10-git-send-email-vladimir.murzin@arm.com>
- <20161122100713.GW1041@n2100.armlinux.org.uk> <58343121.4030906@arm.com>
- <20161122115456.GX1041@n2100.armlinux.org.uk> <58347A61.306@arm.com>
-Message-ID: <583725B1.20907@arm.com>
+ <1479806768-39911-7-git-send-email-vladimir.murzin@arm.com>
+ <20161122100345.GV1041@n2100.armlinux.org.uk> <583449F9.6060804@arm.com>
+Message-ID: <58372650.30405@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/11/16 17:03, Vladimir Murzin wrote:
-> On 22/11/16 11:54, Russell King - ARM Linux wrote:
->> On Tue, Nov 22, 2016 at 11:50:57AM +0000, Vladimir Murzin wrote:
->>> On 22/11/16 10:07, Russell King - ARM Linux wrote:
->>>> On Tue, Nov 22, 2016 at 09:26:06AM +0000, Vladimir Murzin wrote:
->>>>> Pickup defines from pgtable-2level.h to make NOMMU build happy.
->>>>
->>>> This needs more detail.
->>>>
->>>
->>> It comes from
->>>
->>>   CC      arch/arm/kernel/setup.o
->>> arch/arm/kernel/setup.c: In function 'reserve_crashkernel':
->>> arch/arm/kernel/setup.c:1001:25: error: 'SECTION_SIZE' undeclared (first use in this function)
->>>              crash_size, SECTION_SIZE);
->>>                          ^
->>> arch/arm/kernel/setup.c:1001:25: note: each undeclared identifier is reported only once for each function it appears in
->>> make[1]: *** [arch/arm/kernel/setup.o] Error 1
->>> make: *** [arch/arm/kernel] Error 2
+On 22/11/16 13:36, Vladimir Murzin wrote:
+> On 22/11/16 10:03, Russell King - ARM Linux wrote:
+>> On Tue, Nov 22, 2016 at 09:26:03AM +0000, Vladimir Murzin wrote:
+>>> It can be referenced in UP case as well.
 >>
->> Hmm, I decided not to use CRASH_ALIGN there because I didn't want to
->> break anyone's existing setup unnecessarily, however arguably it
->> should be CRASH_ALIGN to ensure that the new kernel is properly
->> positioned.
->>
->> I wonder if we can get away with changing that, rather than
->> unnecessarily introducing these otherwise meaningless definitions
->> for R-class.
->>
+>> What's missing is an explanation of why you want this change.
+>> Exposing the local_* stuff doesn't make sense for UP.
 > 
-> CRASH_ALIGN works fine but it seems not only user of SECTION_SIZE
+> It comes from:
 > 
-> In file included from ./include/linux/cache.h:4:0,
->                  from ./include/linux/printk.h:8,
->                  from ./include/linux/kernel.h:13,
->                  from arch/arm/mach-omap2/omap-secure.c:15:
-> arch/arm/mach-omap2/omap-secure.c: In function 'omap_secure_ram_reserve_memblock':
-> arch/arm/mach-omap2/omap-secure.c:65:21: error: 'SECTION_SIZE' undeclared (first use in this function)
->   size = ALIGN(size, SECTION_SIZE);
->                      ^
-> ./include/uapi/linux/kernel.h:10:47: note: in definition of macro '__ALIGN_KERNEL_MASK'
->  #define __ALIGN_KERNEL_MASK(x, mask) (((x) + (mask)) & ~(mask))
->                                                ^
-> ./include/linux/kernel.h:48:22: note: in expansion of macro '__ALIGN_KERNEL'
->  #define ALIGN(x, a)  __ALIGN_KERNEL((x), (a))
->                       ^
-> arch/arm/mach-omap2/omap-secure.c:65:9: note: in expansion of macro 'ALIGN'
->   size = ALIGN(size, SECTION_SIZE);
->          ^
-> arch/arm/mach-omap2/omap-secure.c:65:21: note: each undeclared identifier is reported only once for each function it appears in
->   size = ALIGN(size, SECTION_SIZE);
->                      ^
-> ./include/uapi/linux/kernel.h:10:47: note: in definition of macro '__ALIGN_KERNEL_MASK'
->  #define __ALIGN_KERNEL_MASK(x, mask) (((x) + (mask)) & ~(mask))
->                                                ^
-> ./include/linux/kernel.h:48:22: note: in expansion of macro '__ALIGN_KERNEL'
->  #define ALIGN(x, a)  __ALIGN_KERNEL((x), (a))
->                       ^
-> arch/arm/mach-omap2/omap-secure.c:65:9: note: in expansion of macro 'ALIGN'
->   size = ALIGN(size, SECTION_SIZE);
->          ^
-> make[1]: *** [arch/arm/mach-omap2/omap-secure.o] Error 1
+> arch/arm/mach-mvebu/pmsu.c: In function 'armada_370_xp_pmsu_idle_enter':
+> arch/arm/mach-mvebu/pmsu.c:291:2: error: implicit declaration of function 'local_flush_tlb_all' [-Werror=implicit-function-declaration]
+>   local_flush_tlb_all();
+>   ^
+> 
+> make[1]: *** [arch/arm/mach-mvebu/pmsu.o] Error 1
+> 
+> and
+> 
+> arch/arm/mach-imx/pm-imx5.c: In function 'mx5_suspend_enter':
+> arch/arm/mach-imx/pm-imx5.c:227:3: error: implicit declaration of function 'local_flush_tlb_all' [-Werror=implicit-function-declaration]
+> 
+>    local_flush_tlb_all();
+>    ^
+> cc1: some warnings being treated as errors
+> make[1]: *** [arch/arm/mach-imx/pm-imx5.o] Error 1
+> 
+> Maybe there are other users, please, let me know if you want me to count them
+> all.
 
-Russell, do you have further comment on this? I would try to address them in
-the next version.
+Russell, is it a good argument to expose the local_* stuff or it should be
+addressed differently?
 
-Thanks!
+Thanks
 Vladimir
 
 > 
 > Cheers
 > Vladimir
+> 
+>>
+>>> Cc: Russell King <linux@armlinux.org.uk>
+>>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>>> ---
+>>>  arch/arm/include/asm/tlbflush.h |    2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+>>> index def9e57..d9a6e2e 100644
+>>> --- a/arch/arm/include/asm/tlbflush.h
+>>> +++ b/arch/arm/include/asm/tlbflush.h
+>>> @@ -641,7 +641,7 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
+>>>  
+>>>  #endif
+>>>  
+>>> -#elif defined(CONFIG_SMP)	/* !CONFIG_MMU */
+>>> +#else /* !CONFIG_MMU */
+>>>  
+>>>  #ifndef __ASSEMBLY__
+>>>  
+>>> -- 
+>>> 1.7.9.5
+>>>
+>>
+> 
 > 
 > _______________________________________________
 > linux-arm-kernel mailing list
