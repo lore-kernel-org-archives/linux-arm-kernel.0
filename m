@@ -1,23 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 24 Nov 2016 11:52:00 +0000
-Subject: [PATCH resend v3] ASoC: sun4i-codec: Add "Right Mixer" to "Line
- Out Mono Diff." route
-In-Reply-To: <20161124114649.5188-1-wens@csie.org>
-References: <20161124114649.5188-1-wens@csie.org>
-Message-ID: <20161124115200.iymvemh4jsh3hsxe@sirena.org.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 24 Nov 2016 13:01:31 +0100
+Subject: [PATCH 1/9] clocksource/drivers/rockchip_timer: split bc_timer
+ into rk_timer and rk_clock_event_device
+In-Reply-To: <1479922177-20136-1-git-send-email-al.kochet@gmail.com>
+References: <1479922177-20136-1-git-send-email-al.kochet@gmail.com>
+Message-ID: <47746094.VbGlCfGZW0@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2016 at 07:46:49PM +0800, Chen-Yu Tsai wrote:
+Hi Alexander,
 
-> This patch seems to have fallen through the cracks.
+I haven't looked to deep into your patches yet, but what is missing is the 
+general goal of your whole series.
 
-No, nobody has reviewed it and normally there's some review for sunxi
-patches.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161124/e22b4256/attachment.sig>
+git format-patch has this nice "--cover-letter" option that creates obviously 
+a cover-letter where you can describe what your series wants to achieve.
+
+For those reading along, I guess what you want to achieve should be what I 
+describe below, so of course no need to resend just for this :-)
+
+-----
+The clock supplying the arm-global-timer on the rk3188 is coming from the
+the cpu clock itself and thus changes its rate everytime cpufreq adjusts the 
+cpu frequency making this timer unsuitable as a stable clocksource.
+
+The rk3188, rk3288 and following socs share a separate timer block already 
+handled by the rockchip-timer driver. Therefore adapt this driver to also be 
+able to act as clocksource on rk3188.
+-----
+
+Right?
+
+
+Heiko
+
+
+Am Mittwoch, 23. November 2016, 20:29:29 schrieb Alexander Kochetkov:
+> Move ce field out of struct bc_timer into struct rk_clock_event_device,
+> rename struct bc_timer to struct rk_timer.
+>
+> Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
