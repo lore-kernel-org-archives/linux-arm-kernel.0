@@ -1,49 +1,25 @@
-From: ada@thorsis.com (Alexander Dahl)
-Date: Thu, 24 Nov 2016 10:29:27 +0100
-Subject: reboot fails on at91sam9g20 with kernel 4.x
-In-Reply-To: <20161123221121.pkkhwhgqig5elwa7@piout.net>
-References: <2093786.uQmBVvCouf@ada>
- <20161123221121.pkkhwhgqig5elwa7@piout.net>
-Message-ID: <2142335.mtG1e6fW2s@ada>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Nov 2016 10:34:27 +0100
+Subject: [PATCH 5/10] dt: bindings: Add bindings for Marvell Xenon SD Host
+ Controller
+In-Reply-To: <877f7tmduw.fsf@free-electrons.com>
+References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
+ <4031579.CBE32NHUoW@wuerfel> <877f7tmduw.fsf@free-electrons.com>
+Message-ID: <28082657.RK5ubAe11Q@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hei hei,
+On Thursday, November 24, 2016 10:22:31 AM CET Gregory CLEMENT wrote:
+> 
+> I don't have an option for mmc in general, but using child node do not
+> fit at all the xenon controller.
+> 
+> For this controller each slot has its own set of register, so there is
+> no common ressource to share so no advantage to use it. Using child node
+> in our case will just make the code more complex for no benefit.
 
-Am Mittwoch, 23. November 2016, 23:11:21 schrieb Alexandre Belloni:
-> Since 3.18, the shdwc and reset controller have their own drivers that
-> may or may not be compiled in the kernel. Can you check you have
-> CONFIG_POWER_RESET_AT91_POWEROFF and CONFIG_POWER_RESET_AT91_RESET
-> set in your configuration? Also, you probably want to check the DT
-> definition of the shdwc and the rstc.
+If every slot has its own registers, what is it that makes up the
+'controller'? It sounds to me that you just have to adjust the terminology
+and talk about multiple controllers then, with one slot per controller.
 
-You were right, those were not set.
-
--# CONFIG_POWER_RESET is not set
-+CONFIG_POWER_RESET=y
-+CONFIG_POWER_RESET_AT91_POWEROFF=y
-+CONFIG_POWER_RESET_AT91_RESET=y
-
-With the above change in the kernel config the board reboots fine.
-
-I'm not quite sure anymore how I got to my kernelconfig, maybe based on 
-a pre 3.18 config without going through oldconfig. 
-
-I double checked the at91_dt_defconfig from 4.8.10 now and it activates 
-those options, maybe I should have done this in the first place.
-
-So thank you very much for your hint. :-)
-
-Greets
-Alex
-
--- 
-------------------------------------------------------------------------
-Thorsis Technologies GmbH                     Tel.: +49-391-544 563-3036
-Oststra?e 18                                  Fax.: +49-391-544 563-9099
-39114 Magdeburg                                  http://www.thorsis.com/
-
-Sitz der Gesellschaft: Magdeburg
-Amtsgericht Stendal HRB 110339
-Gesch?ftsf?hrer: Dipl.-Ing. Thorsten Szczepanski
-------------------------------------------------------------------------
+	Arnd
