@@ -1,46 +1,137 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Nov 2016 10:11:19 +0100
-Subject: [PATCH 5/10] dt: bindings: Add bindings for Marvell Xenon SD Host
- Controller
-In-Reply-To: <CAPDyKFpoifsKkse7Fc-bbZAoa=QGT=9QOQ-4D=f60ptx0hzZsA@mail.gmail.com>
-References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
- <87d1hno2d7.fsf@free-electrons.com>
- <CAPDyKFpoifsKkse7Fc-bbZAoa=QGT=9QOQ-4D=f60ptx0hzZsA@mail.gmail.com>
-Message-ID: <4031579.CBE32NHUoW@wuerfel>
+From: hl@rock-chips.com (Lin Huang)
+Date: Thu, 24 Nov 2016 17:11:42 +0800
+Subject: [PATCH v7] PM/devfreq: add suspend frequency support
+Message-ID: <1479978702-21449-1-git-send-email-hl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 24, 2016 10:05:45 AM CET Ulf Hansson wrote:
-> > You also mentioned other bindings using child nodes, but for this one
-> > we have one controller with only one set of register with multiple slots
-> > (Atmel is an example). Here each slot have it own set of register.
-> >
-> > Actually giving the fact that each slot is controlled by a different set
-> > of register I wonder why the hardware can't also deduce the slot number
-> > from the address register. For me it looks like an hardware bug but we
-> > have to deal with it.
-> >
-> > Do you still think we needchild node here?
-> 
-> Using child-nodes for slots like what's done in the atmel case, is
-> currently broken. I would recommend to avoid using child-nodes for
-> slots, if possible.
-> 
-> To give you some more background, currently the mmc core treats child
-> nodes as embedded non-removable cards or SDIO funcs. However, we can
-> change to make child-nodes also allowed to describe slots, but it
-> requires a specific compatible for "slots" and of course then we also
-> need to update the DT parsing of the child-nodes in the mmc core.
-> 
-> Documentation/devicetree/bindings/mmc/mmc.txt
-> Documentation/devicetree/bindings/mmc/mmc-card.txt
+Add suspend frequency support and if needed set it to
+the frequency obtained from the suspend opp (can be defined
+using opp-v2 bindings and is optional).
 
-I don't see anything wrong with having child nodes for the slots
-even with the current binding, under one condition:
+Signed-off-by: Lin Huang <hl@rock-chips.com>
+---
+Changes in v2:
+- use update_devfreq() instead devfreq_update_status()
+Changes in v3:
+- fix build error
+Changes in v4:
+- move dev_pm_opp_get_suspend_opp() to devfreq_add_device()
+Changes in v5:
+- delete devfreq_opp_get_suspend_opp() in devfreq.h
+Changes in v6:
+- return to use stop_polling check suspend status
+Changes in v7:
+- move handle suspend frequency in devfreq_suspend_device()
 
-The mmc.txt binding above must refer only to the child node, while
-the parent node conceptually becomes a plain bus or MFD that
-happens to encapsulate multiple MMC host controllers, and possibly
-provides some shared registers to them.
+ drivers/devfreq/devfreq.c | 47 ++++++++++++++++++++++++++++++++++-------------
+ include/linux/devfreq.h   |  1 +
+ 2 files changed, 35 insertions(+), 13 deletions(-)
 
-	Arnd
+diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
+index da72d97..958abc8 100644
+--- a/drivers/devfreq/devfreq.c
++++ b/drivers/devfreq/devfreq.c
+@@ -212,16 +212,7 @@ static int devfreq_notify_transition(struct devfreq *devfreq,
+ 	return 0;
+ }
+ 
+-/* Load monitoring helper functions for governors use */
+-
+-/**
+- * update_devfreq() - Reevaluate the device and configure frequency.
+- * @devfreq:	the devfreq instance.
+- *
+- * Note: Lock devfreq->lock before calling update_devfreq
+- *	 This function is exported for governors.
+- */
+-int update_devfreq(struct devfreq *devfreq)
++static int _update_devfreq(struct devfreq *devfreq, bool is_suspending)
+ {
+ 	struct devfreq_freqs freqs;
+ 	unsigned long freq, cur_freq;
+@@ -237,9 +228,13 @@ int update_devfreq(struct devfreq *devfreq)
+ 		return -EINVAL;
+ 
+ 	/* Reevaluate the proper frequency */
+-	err = devfreq->governor->get_target_freq(devfreq, &freq);
+-	if (err)
+-		return err;
++	if (is_suspending && devfreq->suspend_freq) {
++		freq = devfreq->suspend_freq;
++	} else {
++		err = devfreq->governor->get_target_freq(devfreq, &freq);
++		if (err)
++			return err;
++	}
+ 
+ 	/*
+ 	 * Adjust the frequency with user freq and QoS.
+@@ -285,6 +280,21 @@ int update_devfreq(struct devfreq *devfreq)
+ 	devfreq->previous_freq = freq;
+ 	return err;
+ }
++
++/* Load monitoring helper functions for governors use */
++
++/**
++ * update_devfreq() - Reevaluate the device and configure frequency.
++ * @devfreq:	the devfreq instance.
++ *
++ * Note: Lock devfreq->lock before calling update_devfreq
++ *	 This function is exported for governors.
++ */
++
++int update_devfreq(struct devfreq *devfreq)
++{
++	return _update_devfreq(devfreq, false);
++}
+ EXPORT_SYMBOL(update_devfreq);
+ 
+ /**
+@@ -524,6 +534,7 @@ struct devfreq *devfreq_add_device(struct device *dev,
+ 	struct devfreq *devfreq;
+ 	struct devfreq_governor *governor;
+ 	int err = 0;
++	struct dev_pm_opp *suspend_opp;
+ 
+ 	if (!dev || !profile || !governor_name) {
+ 		dev_err(dev, "%s: Invalid parameters.\n", __func__);
+@@ -558,6 +569,12 @@ struct devfreq *devfreq_add_device(struct device *dev,
+ 	devfreq->data = data;
+ 	devfreq->nb.notifier_call = devfreq_notifier_call;
+ 
++	rcu_read_lock();
++	suspend_opp = dev_pm_opp_get_suspend_opp(dev);
++	if (suspend_opp)
++		devfreq->suspend_freq = dev_pm_opp_get_freq(suspend_opp);
++	rcu_read_unlock();
++
+ 	if (!devfreq->profile->max_state && !devfreq->profile->freq_table) {
+ 		mutex_unlock(&devfreq->lock);
+ 		devfreq_set_freq_table(devfreq);
+@@ -754,6 +771,10 @@ int devfreq_suspend_device(struct devfreq *devfreq)
+ 	if (!devfreq->governor)
+ 		return 0;
+ 
++	mutex_lock(&devfreq->lock);
++	_update_devfreq(devfreq, true);
++	mutex_unlock(&devfreq->lock);
++
+ 	return devfreq->governor->event_handler(devfreq,
+ 				DEVFREQ_GOV_SUSPEND, NULL);
+ }
+diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
+index 98c6993..517e394 100644
+--- a/include/linux/devfreq.h
++++ b/include/linux/devfreq.h
+@@ -172,6 +172,7 @@ struct devfreq {
+ 	struct delayed_work work;
+ 
+ 	unsigned long previous_freq;
++	unsigned long suspend_freq;
+ 	struct devfreq_dev_status last_status;
+ 
+ 	void *data; /* private data for governors */
+-- 
+2.6.6
