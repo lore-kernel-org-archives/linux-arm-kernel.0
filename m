@@ -1,69 +1,36 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 24 Nov 2016 16:20:16 +0100
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <yw1xr3619d3l.fsf@unicorn.mansr.com>
-References: <58356EA8.2010806@free.fr> <yw1xpolmbdih.fsf@unicorn.mansr.com>
- <58358E79.5050404@free.fr> <yw1xh96yaz84.fsf@unicorn.mansr.com>
- <5836C69A.3030309@free.fr> <yw1xr3619d3l.fsf@unicorn.mansr.com>
-Message-ID: <58370530.5080605@free.fr>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 24 Nov 2016 16:27:05 +0100
+Subject: [PATCH 0/2] OF phandle nexus support + GPIO nexus
+In-Reply-To: <20161124102529.20212-1-stephen.boyd@linaro.org>
+References: <20161124102529.20212-1-stephen.boyd@linaro.org>
+Message-ID: <CACRpkdZ4ceij+uvqFyfmgGwH9bGnJDn8jRr+0m8sCEYeexoz3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/11/2016 15:17, M?ns Rullg?rd wrote:
+On Thu, Nov 24, 2016 at 11:25 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
 
-> Mason wrote:
-> 
->> [   35.085854] SETUP DMA
->> [   35.088272] START NAND TRANSFER
->> [   35.091670] tangox_dma_pchan_start from tangox_dma_irq
->> [   35.096882] tango_dma_callback from vchan_complete
->> [   45.102513] DONE FAKE SPINNING
->>
->> So the IRQ rolls in, the ISR calls tangox_dma_pchan_start,
->> which calls tangox_dma_pchan_detach to tear down the sbox
->> setup; and only sometime later does the DMA framework call
->> my callback function.
-> 
-> Yes, I realised this soon after I said it.  The dma driver could be
-> rearranged to make it work though.
+> This is one small chunk of work related to DT overlays for expansion
+> boards. It would be good to have a way to expose #<list>-cells types of
+> providers through a connector in a standard way. So we introduce a way
+> to make "nexus" nodes for these types of properties to remap the consumer
+> number space to the other side of the connector's number space. It's
+> basically a copy of the interrupt nexus implementation, but without
+> the address space matching design and interrupt-parent walking.
+>
+> The first patch implements a generic method to do this, and the second patch
+> adds a unit test for it. The third patch is more of an example than anything
+> else. It shows how we would modify frameworks to use the new API.
+>
+> Stephen Boyd (3):
+>   of: Support parsing phandle argument lists through a nexus node
+>   of: unittest: Add phandle remapping test
+>   gpio: Support gpio nexus dt bindings
 
-There is a way to make the tasklet run and invoke the callback
-before the interrupt service routine proceeds? Can you say more
-about this?
+Looks perfectly reasonable to me. But it's mainly for the DT people to review
+I guess.
 
+I have no idea about the eventual merge path though, I guess it needs to
+go through the OF tree with my ACK.
 
->> So far, the work-arounds I've tested are:
->>
->> 1) delay sbox tear-down by 10 ?s in tangox_dma_pchan_detach.
->> 2) statically setup sbox in probe, and never touch it henceforth.
->>
->> WA1 is fragile, it might break for devices other than NFC.
->> WA2 is what I used when I wrote the NFC driver.
->>
->> Can tangox_dma_irq() be changed to have the framework call
->> the client's callback *before* tangox_dma_pchan_start?
->>
->> (Thinking out loud) The DMA_PREP_INTERRUPT requests that the
->> DMA framework invoke the callback from tasklet context,
->> maybe a different flag DMA_PREP_INTERRUPT_EX can request
->> calling the call-back directly from within the ISR?
->>
->> (Looking at existing flags) Could I use DMA_CTRL_ACK?
->> Description sounds like some kind hand-shake between
->> client and dmaengine.
->>
->> Grepping for DMA_PREP_INTERRUPT, I don't see where the framework
->> checks that flag to spawn the tasklet? Or is that up to each
->> driver individually?
-> 
-> Those flags all have defined meanings and abusing them for other things
-> is a bad idea.  As far as possible, device drivers should work with any
-> dma driver.
-
-I was asking about introducing a new flag, not abusing existing
-flags. (I don't understand the semantics of DMA_CTRL_ACK.)
-
-(FWIW, both the NFC and the MBUS agent are custom designs,
-not third-party IP blocks.)
-
-Regards.
+Yours,
+Linus Walleij
