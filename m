@@ -1,38 +1,91 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Thu, 24 Nov 2016 01:05:47 -0600
-Subject: [GIT PULL] Qualcomm Device Tree Changes for v4.10 - Part 2
-Message-ID: <1479971147-15222-1-git-send-email-andy.gross@linaro.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 24 Nov 2016 16:10:51 +0900
+Subject: [PATCH v1 & v6 1/2] PM/devfreq: add suspend frequency support
+In-Reply-To: <58368C91.8030502@rock-chips.com>
+References: <CGME20161124061416epcms1p44a0152bca14312f1229cab835ea0297f@epcms1p4>
+ <20161124061416epcms1p44a0152bca14312f1229cab835ea0297f@epcms1p4>
+ <58368C91.8030502@rock-chips.com>
+Message-ID: <5836927B.9010205@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Kevin, and Arnd,
++ Tobias Jakobi,
 
-Please consider taking this additional set of updates for 4.10.  These
-apply on top of the previous tagged set of changes.
+Hi Lin,
 
+We need to discuss how to support the suspend-opp of devfreq device.
+Now, there are two patch thread for suspend-opp of devfreq.
 
-The following changes since commit d4714a5ab2132e899a531bcd267bd13555244927:
+The Lin's approach modify the devfreq_suspend_device() to support suspend-opp.
+The Tobias's approach[1] add new devfreq_suspend() and then call it on dpm_suspend()
+when entering the suspend state.
 
-  Merge tag 'qcom-dts-for-4.10-1' into dts-for-4.10-2 (2016-11-24 00:24:40 -0600)
+[1] [RFC 0/4] PM / devfreq: draft for OPP suspend impl
+- https://patchwork.kernel.org/patch/9443323/
+- https://patchwork.kernel.org/patch/9443325/
+- https://patchwork.kernel.org/patch/9443329/
+- https://patchwork.kernel.org/patch/9443331/
 
-are available in the git repository at:
+I think we need to discuss it together.
 
+Regards,
+Chanwoo Choi
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-dts-for-4.10-2
-
-for you to fetch changes up to a91b2e690d409476d711523be8a83062b9083fb2:
-
-  ARM: dts: Add xo to sdhc clock node on qcom platforms (2016-11-24 00:31:02 -0600)
-
-----------------------------------------------------------------
-Qualcomm Device Tree Changes for v4.10 - Part 2
-
-* Add SDHC xo clk
-
-----------------------------------------------------------------
-Ritesh Harjani (1):
-      ARM: dts: Add xo to sdhc clock node on qcom platforms
-
- arch/arm/boot/dts/qcom-apq8084.dtsi | 16 ++++++++++------
- arch/arm/boot/dts/qcom-msm8974.dtsi | 16 ++++++++++------
- 2 files changed, 20 insertions(+), 12 deletions(-)
+On 2016? 11? 24? 15:45, hl wrote:
+> Hi MyungJoo Ham,
+> 
+> On 2016?11?24? 14:14, MyungJoo Ham wrote:
+>> On Thu, Nov 24, 2016 at 11:18 AM, hl <hl@rock-chips.com> wrote:
+>>> Hi MyungJoo Ham,
+>> []
+>>>> We still need to sync the all status even i call target() in
+>>>> devfreq_suspend/resume_device
+>>>> directly, so still need update_devfreq() other setp except
+>>>> devfreq->governor->get_target_freq(devfreq, &freq);
+>>> And i think it better to be governor behaviors, for userspace they may not
+>>> want to change
+>>> the suspend frequency like other governor, the frequency should decide by
+>>> the user, if they
+>>> want this function, they should like other governor to rigister a
+>>> devfreq_monitor_suspend().
+>>
+>>> What do you think about my rev6 patch?
+>> If I understand the intention correctly, this is for the stability of
+>> the device due to the behavior or bootloader/SoC-initializer, which
+>> has nothing to do with governors.
+>>
+>> Even if users are using userspace, as long as they set the custom
+>> frequencies lower than the default, they have the possibility of
+>> being unstable as ondemand is going to have.
+>>
+>>
+>> To reuse the update_devfreq() code, you may do something like:
+>>
+>> static int _update_freq(struct devfreq *devfreq, bool is_suspending)
+>> {
+>>     /* original contents of update_freq with if statement with is_suspending wrapping get_target_freq */
+>> }
+>> int update_freq(struct devfreq *devfreq)
+>> {
+>> 	return _update_freq(devfreq, false);
+>> }
+>>
+>>
+>> There should be other good non-invasive methods that are not governoe-specific as well.
+>>
+> Thanks for your suggestion, i will update the new version soon.
+>>
+>> Cheers,
+>> MyungJoo
+>>
+>>
+>>
+>>
+>> _______________________________________________
+>> Linux-rockchip mailing list
+>> Linux-rockchip at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+> 
+> -- 
+> Lin Huang
+> 
