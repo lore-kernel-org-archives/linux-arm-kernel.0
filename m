@@ -1,57 +1,34 @@
-From: manu@bidouilliste.com (Emmanuel Vadot)
-Date: Thu, 24 Nov 2016 21:08:34 +0100
-Subject: [PATCH] ARM: dts: sunxi: Enable UEXT related nodes for Olimex
- A20 SOM EVB
-In-Reply-To: <20161123181610.cae67ad53f5f69246d341b30@bidouilliste.com>
-References: <20161121164911.76900-1-manu@bidouilliste.com>
- <20161123080350.fstwdfndghk7c5xx@lukather>
- <20161123181610.cae67ad53f5f69246d341b30@bidouilliste.com>
-Message-ID: <20161124210834.a7da24a53b09364e8ab391d6@bidouilliste.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 24 Nov 2016 21:15:13 +0100
+Subject: [PATCH renesas-next 2/3] ARM: dts: r8a7778: Use SoC-specific compat
+ string for mmcif
+In-Reply-To: <1480018514-31718-1-git-send-email-horms+renesas@verge.net.au>
+References: <1480018514-31718-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1480018514-31718-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Nov 2016 18:16:10 +0100
-Emmanuel Vadot <manu@bidouilliste.com> wrote:
+Use the SoC-specific compat string for mmcif in DT for the r8a7778 SoC.
+This is in keeping with the use of compat strings for mmcif for other
+Renesas ARM based SoCs.
 
-> On Wed, 23 Nov 2016 09:03:50 +0100
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> 
-> > On Mon, Nov 21, 2016 at 05:49:11PM +0100, Emmanuel Vadot wrote:
-> > > UEXT are Universal EXTension connector from Olimex. They embed i2c, spi
-> > > and uart pins along power in one connector and are found on most,
-> > > if not all, Olimex boards.
-> > > The Olimex A20 SOM EVB have two UEXT connector so enable the nodes found on
-> > > those two connectors.
-> > > 
-> > > Signed-off-by: Emmanuel Vadot <manu@bidouilliste.com>
-> > 
-> > Fixed the indentation of the spi pinctrl cells, and applied.
-> > 
-> > Please note that I'm note planning to send any new pull request, so
-> > this will likely end up in 4.11.
-> > 
-> > Thanks!
-> > Maxime
-> > 
-> > -- 
-> > Maxime Ripard, Free Electrons
-> > Embedded Linux and Kernel engineering
-> > http://free-electrons.com
-> 
->  Sorry about the indentation, I'll be more carefull next time.
-> 
->  Thank you.
-> 
-> -- 
-> Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
-> 
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7778.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- Hi Maxime,
-
- Re-reading the patch I've seen that I've not enabled the SPI nodes, I
-guess it's easier if you revert my patch and that I send a new one ?
-
- Cheers,
-
+diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
+index f3ffe1d31544..1e59eda8e66e 100644
+--- a/arch/arm/boot/dts/r8a7778.dtsi
++++ b/arch/arm/boot/dts/r8a7778.dtsi
+@@ -369,7 +369,7 @@
+ 	};
+ 
+ 	mmcif: mmc at ffe4e000 {
+-		compatible = "renesas,sh-mmcif";
++		compatible = "renesas,mmcif-r8a7778", "renesas,sh-mmcif";
+ 		reg = <0xffe4e000 0x100>;
+ 		interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7778_CLK_MMC>;
 -- 
-Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
+2.7.0.rc3.207.g0ac5344
