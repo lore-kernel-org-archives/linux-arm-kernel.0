@@ -1,60 +1,89 @@
-From: uwe@kleine-koenig.org (=?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?=)
-Date: Thu, 24 Nov 2016 09:37:10 +0100
-Subject: [RFC PATCH] ARM: dts: Add support for Turris Omnia
-In-Reply-To: <20161123003505.GL2691@lunn.ch>
-References: <1479851991.26813.2@smtp.gmail.com>
- <1479859770-9375-1-git-send-email-tmshlvck@gmail.com>
- <20161123003505.GL2691@lunn.ch>
-Message-ID: <4e3f9628-dbf8-27c1-abea-d0ef58a67e51@kleine-koenig.org>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 24 Nov 2016 16:37:36 +0800
+Subject: [PATCH net-next 1/4] net: mvneta: Convert to be 64 bits compatible
+In-Reply-To: <CAPv3WKf0a63qQT+xwXfUatbgLFF58e6L8J10VtBOUTam+kUcjg@mail.gmail.com>
+References: <20161122164844.19566-1-gregory.clement@free-electrons.com>
+ <2948812.F3se4ieqO6@wuerfel>	<20161123175341.4777595f@xhacker>
+ <9432400.S1OrxC027t@wuerfel>	<87mvgqmjiy.fsf@free-electrons.com>
+ <CAPv3WKf0a63qQT+xwXfUatbgLFF58e6L8J10VtBOUTam+kUcjg@mail.gmail.com>
+Message-ID: <20161124163327.1cc261ab@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2016 01:35 AM, Andrew Lunn wrote:
->> +++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
->> @@ -0,0 +1,279 @@
->> +/*
->> + * Device Tree file for the Turris Omnia
->> + * Schematic available at https://www.turris.cz/doc/_media/rtrom01-schema.pdf
->
-> Cool that there is a link to the schematics. But please could you put
-> it lower down. It is more likely to be seen if it comes after the
-> copyright and license section.
+Hi Marcin, Gregory, Arnd,
 
-I added to the top because that's where I would look. But checking other
-dts files it seems indeed to be more common after the copyright stuff.
-I'd suggest to even start a new comment (i.e.
+On Wed, 23 Nov 2016 17:02:11 +0100 Marcin Wojtas  wrote:
 
-	 * last blabla of copyright
-	 */
+> Hi Gregory,
+> 
+> 2016-11-23 14:07 GMT+01:00 Gregory CLEMENT:
+> > Hi Jisheng, Arnd,
+> >
+> >
+> > Thanks for your feedback.
+> >
+> >
+> >  On mer., nov. 23 2016, Arnd Bergmann wrote:
+> >  
+> >> On Wednesday, November 23, 2016 5:53:41 PM CET Jisheng Zhang wrote:  
+> >>> On Tue, 22 Nov 2016 22:04:12 +0100 Arnd Bergmann wrote:
+> >>>  
+> >>> > On Tuesday, November 22, 2016 5:48:41 PM CET Gregory CLEMENT wrote:  
+> >>> > > +#ifdef CONFIG_64BIT
+> >>> > > +       void *data_tmp;
+> >>> > > +
+> >>> > > +       /* In Neta HW only 32 bits data is supported, so in order to
+> >>> > > +        * obtain whole 64 bits address from RX descriptor, we store
+> >>> > > +        * the upper 32 bits when allocating buffer, and put it back
+> >>> > > +        * when using buffer cookie for accessing packet in memory.
+> >>> > > +        * Frags should be allocated from single 'memory' region,
+> >>> > > +        * hence common upper address half should be sufficient.
+> >>> > > +        */
+> >>> > > +       data_tmp = mvneta_frag_alloc(pp->frag_size);
+> >>> > > +       if (data_tmp) {
+> >>> > > +               pp->data_high = (u64)upper_32_bits((u64)data_tmp) << 32;
+> >>> > > +               mvneta_frag_free(pp->frag_size, data_tmp);
+> >>> > > +       }
+> >>> > >  
+> >>> >
+> >>> > How does this work when the region spans a n*4GB address boundary?  
+> >>>
+> >>> indeed. We also make use of this driver on 64bit platforms. We use
+> >>> different solution to make the driver 64bit safe.
+> >>>
+> >>> solA: make use of the reserved field in the mvneta_rx_desc, such
+> >>> as reserved2 etc. Yes, the field is marked as "for future use, PnC", but
+> >>> now it's not used at all. This is one possible solution however.  
+> >>
+> >> Right, this sounds like the most straightforward choice.  
+> >
+> > The PnC (which stands for Parsing and Classification) is not used yet
+> > indeed but this field will be needed when we will enable it. It is
+> > something we want to do but it is not planned in a near future. However
+> > from the datasheets I have it seems only present on the Armada XP. It is
+> > not mentioned on datasheets for the Armada 38x or the Armada 3700.
+> >  
+> 
+> It is not mentioned in A38x spec, but this SoC has exactly the same
+> PnC as Armada XP (they differ only with used SRAM details). I wouldn't
+> be surprised if it was supported on A3700 as well.
+> 
+> > That would mean it was safe to use on of this field in 64-bits mode on
+> > the Armada 3700.
+> >
+> > So I am going to take this approach.
+> >  
+> 
+> I think for now it's safe and is much easier than handling extra
+> software ring for virtual addresses.
+> 
 
-	/*
-	 * Schematic available at ...
+solB (a SW shadow cookie) perhaps gives a better performance: in hot path,
+such as mvneta_rx(), the driver accesses buf_cookie and buf_phys_addr of
+rx_desc which is allocated by dma_alloc_coherent, it's noncacheable if the
+device isn't cache-coherent. I didn't measure the performance difference,
+because in fact we take solA as well internally. From your experience,
+can the performance gain deserve the complex code?
 
-) to be more "loud".
-
-@Tomas: I think it doesn't make sense when we alternate sending patches
-without prior arrangement. Do you already work on a v5? If not I can do
-that to fix the last few comments. Not sure when a submission is too
-late to enter v4.10, but I think the window isn't that big any more.
-
-> No leds? No buttons via gpio-keys?
-
-The leds are controlled by a Cortex-M0 and without intervention blink
-according to a hardware function (network, power, pci). IMHO that's ok
-for an initial setup.
-
-And there are no buttons that are routed to the Armada CPU. Just a reset
-button (well, ok, this one is routed to the Armada CPU, but you cannot
-make this a gpio-key :-) and the other button is used to control the
-brightness of the LEDs and is only routed to the M0.
-
-Best regards
-Uwe
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161124/8bd849c4/attachment-0001.sig>
+Thanks,
+Jisheng
