@@ -1,139 +1,60 @@
-From: hl@rock-chips.com (hl)
-Date: Thu, 24 Nov 2016 16:34:42 +0800
-Subject: [PATCH v1 & v6 1/2] PM/devfreq: add suspend frequency support
-In-Reply-To: <5836A1E0.1070707@samsung.com>
-References: <CGME20161124061416epcms1p44a0152bca14312f1229cab835ea0297f@epcms1p4>
- <20161124061416epcms1p44a0152bca14312f1229cab835ea0297f@epcms1p4>
- <58368C91.8030502@rock-chips.com> <5836927B.9010205@samsung.com>
- <5836980F.6050006@rock-chips.com> <5836A1E0.1070707@samsung.com>
-Message-ID: <5836A622.20007@rock-chips.com>
+From: uwe@kleine-koenig.org (=?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?=)
+Date: Thu, 24 Nov 2016 09:37:10 +0100
+Subject: [RFC PATCH] ARM: dts: Add support for Turris Omnia
+In-Reply-To: <20161123003505.GL2691@lunn.ch>
+References: <1479851991.26813.2@smtp.gmail.com>
+ <1479859770-9375-1-git-send-email-tmshlvck@gmail.com>
+ <20161123003505.GL2691@lunn.ch>
+Message-ID: <4e3f9628-dbf8-27c1-abea-d0ef58a67e51@kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo Choi,
+On 11/23/2016 01:35 AM, Andrew Lunn wrote:
+>> +++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
+>> @@ -0,0 +1,279 @@
+>> +/*
+>> + * Device Tree file for the Turris Omnia
+>> + * Schematic available at https://www.turris.cz/doc/_media/rtrom01-schema.pdf
+>
+> Cool that there is a link to the schematics. But please could you put
+> it lower down. It is more likely to be seen if it comes after the
+> copyright and license section.
 
+I added to the top because that's where I would look. But checking other
+dts files it seems indeed to be more common after the copyright stuff.
+I'd suggest to even start a new comment (i.e.
 
-On 2016?11?24? 16:16, Chanwoo Choi wrote:
-> Hi Lin,
->
-> On 2016? 11? 24? 16:34, hl wrote:
->> Hi Chanwoo Choi,
->>
->>      I think the dev_pm_opp_get_suspend_opp() have implement most of
->> the funtion, all we need is just define the node in dts, like following:
->>
->> &dmc_opp_table {
->>      opp06 {
->>          opp-suspend;
->>      };
->> };
-> Two approaches use the 'opp-suspend' property.
->
-> I think that the method to support suspend-opp have to
-> guarantee following conditions:
-> - Support the all of devfreq's governors.
-     As MyungJoo Ham suggestion, i will set the suspend frequency in 
-devfreq_suspend_device(),
-which will ingore governor.
-> - Devfreq framework have the responsibility to change the
->    frequency/voltage for suspend-opp. If we uses the
->    new devfreq_suspend(), each devfreq device don't care
->    how to support the suspend-opp. Just the developer of each
->    devfreq device need to add 'opp-suspend' propet to OPP entry in DT file.
-Why should support change the voltage in devfreq framework, i think it 
-shuold be handle in
-specific driver, i think the devfreq only handle it can get the right 
-frequency, then pass it to
-specific driver, i think the voltage should handle in the 
-devfreq->profile->target();
-> Best Regards,
-> Chanwoo Choi
->
->> so i think my way semm more simple.
->>
->> On 2016?11?24? 15:10, Chanwoo Choi wrote:
->>> + Tobias Jakobi,
->>>
->>> Hi Lin,
->>>
->>> We need to discuss how to support the suspend-opp of devfreq device.
->>> Now, there are two patch thread for suspend-opp of devfreq.
->>>
->>> The Lin's approach modify the devfreq_suspend_device() to support suspend-opp.
->>> The Tobias's approach[1] add new devfreq_suspend() and then call it on dpm_suspend()
->>> when entering the suspend state.
->>>
->>> [1] [RFC 0/4] PM / devfreq: draft for OPP suspend impl
->>> - https://patchwork.kernel.org/patch/9443323/
->>> - https://patchwork.kernel.org/patch/9443325/
->>> - https://patchwork.kernel.org/patch/9443329/
->>> - https://patchwork.kernel.org/patch/9443331/
->>>
->>> I think we need to discuss it together.
->>>
->>> Regards,
->>> Chanwoo Choi
->>>
->>> On 2016? 11? 24? 15:45, hl wrote:
->>>> Hi MyungJoo Ham,
->>>>
->>>> On 2016?11?24? 14:14, MyungJoo Ham wrote:
->>>>> On Thu, Nov 24, 2016 at 11:18 AM, hl <hl@rock-chips.com> wrote:
->>>>>> Hi MyungJoo Ham,
->>>>> []
->>>>>>> We still need to sync the all status even i call target() in
->>>>>>> devfreq_suspend/resume_device
->>>>>>> directly, so still need update_devfreq() other setp except
->>>>>>> devfreq->governor->get_target_freq(devfreq, &freq);
->>>>>> And i think it better to be governor behaviors, for userspace they may not
->>>>>> want to change
->>>>>> the suspend frequency like other governor, the frequency should decide by
->>>>>> the user, if they
->>>>>> want this function, they should like other governor to rigister a
->>>>>> devfreq_monitor_suspend().
->>>>>> What do you think about my rev6 patch?
->>>>> If I understand the intention correctly, this is for the stability of
->>>>> the device due to the behavior or bootloader/SoC-initializer, which
->>>>> has nothing to do with governors.
->>>>>
->>>>> Even if users are using userspace, as long as they set the custom
->>>>> frequencies lower than the default, they have the possibility of
->>>>> being unstable as ondemand is going to have.
->>>>>
->>>>>
->>>>> To reuse the update_devfreq() code, you may do something like:
->>>>>
->>>>> static int _update_freq(struct devfreq *devfreq, bool is_suspending)
->>>>> {
->>>>>       /* original contents of update_freq with if statement with is_suspending wrapping get_target_freq */
->>>>> }
->>>>> int update_freq(struct devfreq *devfreq)
->>>>> {
->>>>>      return _update_freq(devfreq, false);
->>>>> }
->>>>>
->>>>>
->>>>> There should be other good non-invasive methods that are not governoe-specific as well.
->>>>>
->>>> Thanks for your suggestion, i will update the new version soon.
->>>>> Cheers,
->>>>> MyungJoo
->>>>>
->>>>>
->>>>>
->>>>>
->>>>> _______________________________________________
->>>>> Linux-rockchip mailing list
->>>>> Linux-rockchip at lists.infradead.org
->>>>> http://lists.infradead.org/mailman/listinfo/linux-rockchip
->>>> -- 
->>>> Lin Huang
->>>>
->>>
->>>
->
->
->
+	 * last blabla of copyright
+	 */
 
--- 
-Lin Huang
+	/*
+	 * Schematic available at ...
+
+) to be more "loud".
+
+@Tomas: I think it doesn't make sense when we alternate sending patches
+without prior arrangement. Do you already work on a v5? If not I can do
+that to fix the last few comments. Not sure when a submission is too
+late to enter v4.10, but I think the window isn't that big any more.
+
+> No leds? No buttons via gpio-keys?
+
+The leds are controlled by a Cortex-M0 and without intervention blink
+according to a hardware function (network, power, pci). IMHO that's ok
+for an initial setup.
+
+And there are no buttons that are routed to the Armada CPU. Just a reset
+button (well, ok, this one is routed to the Armada CPU, but you cannot
+make this a gpio-key :-) and the other button is used to control the
+brightness of the LEDs and is only routed to the M0.
+
+Best regards
+Uwe
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161124/8bd849c4/attachment-0001.sig>
