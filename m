@@ -1,105 +1,76 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 24 Nov 2016 14:21:48 +0100
-Subject: [PATCH 7/9] clocksource/drivers/rockchip_timer: implement
- clocksource timer
-In-Reply-To: <0E972AC9-1132-4D0B-BF25-918BC1AA1A49@gmail.com>
-References: <1479922177-20136-1-git-send-email-al.kochet@gmail.com>
- <1800621.EhepfMxccR@diego> <0E972AC9-1132-4D0B-BF25-918BC1AA1A49@gmail.com>
-Message-ID: <4357439.aV0xjsImc7@diego>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Nov 2016 13:29:05 +0000
+Subject: TDA998x crash on HDLCD probe failure
+In-Reply-To: <8281efe7-bac7-8e35-5784-e05cf0dc7eab@arm.com>
+References: <8281efe7-bac7-8e35-5784-e05cf0dc7eab@arm.com>
+Message-ID: <20161124132905.GG14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
+On Thu, Nov 24, 2016 at 01:18:39PM +0000, Robin Murphy wrote:
+> Hi Liviu, Russell,
+> 
+> I'd been meaning to try digging into this if it hadn't gone away since I
+> first noticed it, but I don't really have the time and it still happens
+> with 4.9-rc and today's -next. Representative splat below, but in
+> summary what happens is that if the HDLCD fails to probe, the TDA998x
+> connector seems to get cleaned up twice, resulting in a NULL dereference
+> the second time. I got as far as sketching out the following flow from a
+> debug session (on the same 4.8-rc2 kernel), but I don't know nearly
+> enough to tell which driver is at fault:
+> 
+> hdlcd_drm_bind
+> -> drm_fbdev_cma_init (fails)
+> ...
+> -> drm_mode_config_cleanup
+>    ...
+>    -> drm_connector_cleanup
+> -> component_unbind_all
+>    ...
+>    -> tda998x_unbind
+>       -> drm_connector_cleanup (NULL connector)
+> 
+> It's easily reproduced on Juno by booting arm64 defconfig with
+> CONFIG_CMA_SIZE_MBYTES=1 and a sufficiently large monitor connected to
+> warrant a >1MB framebuffer.
 
-Am Donnerstag, 24. November 2016, 16:05:55 schrieb Alexander Kochetkov:
-> Hello Heiko!
-> 
-> > 24 ????. 2016 ?., ? 15:17, Heiko St?bner <heiko@sntech.de> ???????(?):
-> > 
-> > In your dts-patch you reuse the rk3288-timer compatible value, which is
-> > also non-ideal.
-> 
-> rockchip,rk-timer.txt states what I should use rockchip,rk3288-timer for
-> rk3188 timers:
-> 
-> Required properties:
-> - compatible: shall be one of:
->   "rockchip,rk3288-timer" - for rk3066, rk3036, rk3188, rk322x, rk3288,
-> rk3368
-> 
-> Should I add "rockchip,rk3188-timer? (or better "rockchip,rk3036-timer?) ?
-> Or may be second approach should be used?
->
-> > What you may want to do is introduce a rockchip,rk3188-timer compatible
-> > and
-> > then make the timer-driver act accordingly, as you then know you are on a
-> > rk3188-board ... see drivers attaching specific structs to the
-> > of_device_id
-> > entries. From the documentation
-> 
-> May be it is better to prepend compatible string with
-> "rockchip,rk3188-timer? in the dts file only? elinux[1] recommend build
-> compatible string from "exact device? string and ?other devices? that the
-> device is compatible with.
-> 
-> As ?other devices? string defined already, I use it.
-> 
-> [1]
-> http://elinux.org/Device_Tree_Usage#Understanding_the_compatible_Property
-> 
-> 	timer0: timer at 20038000 {
-> 		compatible = "rockchip,rk3188-timer", "rockchip,rk3288-timer?;
->                 ?
-> 	};
-> 
-> Just found what rk3036 already declared such way:
-> 
-> rk3036.dtsi:	timer: timer at 20044000 {
-> rk3036.dtsi:		compatible = "rockchip,rk3036-timer", "rockchip,rk3288-
-timer?;
+It looks to me like a hdlcd bug.
 
-correct, use both but also update the binding, like 
-mmc/rockchip-dw-mshc.txt does.
+The probe path operates in this order:
 
+- allocates hdlcd - 1
+- allocates drm device - 2
+- drm_mode_config_init - 3
+- hdlcd_load - 4
+- binds all components - 5
+- enables runtime PM - 6
+- drm_vblank_init - 7
+- drm_mode_config_reset - 8
+- drm_kms_helper_poll_init - 9
+- drm_fbdev_cma_init - 10
+- drm_dev_register - 11
 
-> > it also shouldn't really matter which timer
-> > you use as clocksource, as on the rk3188 it seems all of them act the same
-> > way (except timer3 being always on).
-> 
-> You are right.
-> 
-> I sent dts file with general timer settings, without clockevent enabled, so
-> one could pick up timer and setup it in the board dts (radxarock, for
-> example) like:
-> 
-> &timer0 {
->     rockchip,clocksource;
->     status = ?okay?;
-> };
+However, the cleanup operates in this order:
+- drm_fbdev_cma_fini - undoes 10
+- drm_kms_helper_poll_fini - undoes 9
+- drm_mode_config_cleanup - undoes 3
+- drm_vblank_cleanup - undoes 7
+- pm_runtime_disable - undoes 6
+- component_unbind_all - undoes 5
+- drm_irq_uninstall - undoes 4
+- of_reserved_mem_device_release - undoes other half of 4
+- drm_dev_unref - undoes 2
 
-what I actually meant was that the driver could also recognize the rk3188-
-timer compatible as "we need a clocksource" and it shouldn't matter which 
-timer actually gets used for this.
+Spot the step which is out of the correct order - drm_mode_config_cleanup()
+is misplaced - it's reversing the actions of drm_mode_config_init(), not
+drm_mode_config_reset().
 
+So, drm_mode_config_cleanup() should be much later, after step 4 has
+been undone, otherwise there are paths that leave various DRM objects
+(created by drm_mode_create_standard_properties()) referenced, and
+will cause problems exactly like you're seeing here.
 
-> > When touching devicetree-properties, please also adapt the binding
-> > document
-> > 
-> > 	Documentation/devicetree/bindings/timer,rockchip,rk-timer.txt
-> > 
-> > in this case and also include the devicetree maintainers.
-> 
-> If the patch[2] ok, I'll resend it and include devicetree maintainers.
-> 
-> [2]
-> http://lists.infradead.org/pipermail/linux-rockchip/2016-November/013148.ht
-> ml
-
-Only devicetree people can really tell you if that is ok :-) .
-
-The devicetree is supposed to be a hardware-description and implementation-
-independent, so rockchip,clocksource sounds pretty much like linux-specific 
-configuration things leaking into the devicetree.
-
-
-Heiko
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
