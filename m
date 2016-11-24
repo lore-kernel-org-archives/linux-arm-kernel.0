@@ -1,33 +1,72 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Thu, 24 Nov 2016 11:41:27 -0800
-Subject: [PATCH 5/7] efi: Get the secure boot status [ver #3]
-In-Reply-To: <147990565051.7576.9673287945782426886.stgit@warthog.procyon.org.uk>
-References: <147990561294.7576.6464430479448167484.stgit@warthog.procyon.org.uk>
- <147990565051.7576.9673287945782426886.stgit@warthog.procyon.org.uk>
-Message-ID: <1480016487.2444.18.camel@HansenPartnership.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 24 Nov 2016 19:42:47 +0000
+Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire
+ section
+In-Reply-To: <20161124192659.GH2213@rric.localdomain>
+References: <CAKv+Gu-2uGJGovqQL-gbB54u=fQ9L9YUbDdRo6u3oWqF6znn6Q@mail.gmail.com>
+ <20161123211538.GH10776@rric.localdomain>
+ <CAKv+Gu8aWpz5vXSWdKHwL5Xk2aWyQBOoR1WHOnVPaWZOwqojBQ@mail.gmail.com>
+ <20161124134238.GI10776@rric.localdomain>
+ <CAKv+Gu_Ug3XOD6jy5xziy1pS7WV=TC0RLD4j3DT6nytujQDzRQ@mail.gmail.com>
+ <20161124135151.GJ10776@rric.localdomain>
+ <CAKv+Gu9qB7P2epMGdwFJ3vJR3vt-bBxU0nKwmKdpaOpTKdqzzA@mail.gmail.com>
+ <20161124141149.GE2213@rric.localdomain>
+ <CAKv+Gu-SXX_Vv1Wi1Nm=5vdaXSS0MBp20QBpQVacSKPLfdH0-A@mail.gmail.com>
+ <20161124150918.GF2213@rric.localdomain>
+ <20161124192659.GH2213@rric.localdomain>
+Message-ID: <CAKv+Gu_C_17RtAiw2U0OOzVik3G7KkwUTo5eiGK-HDo-maQ-bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-11-23 at 12:54 +0000, David Howells wrote:
-> Get the firmware's secure-boot status in the kernel boot wrapper and 
-> stash it somewhere that the main kernel image can find.
-> 
-> The efi_get_secureboot() function is extracted from the arm stub and 
-> (a) generalised so that it can be called from x86 and (b) made to use
-> efi_call_runtime() so that it can be run in mixed-mode.
-> 
-> Suggested-by: Lukas Wunner <lukas@wunner.de>
-> Signed-off-by: David Howells <dhowells@redhat.com>
+On 24 November 2016 at 19:26, Robert Richter <robert.richter@cavium.com> wrote:
+> Ard,
+>
+>> > >> On 24 November 2016 at 13:51, Robert Richter <robert.richter@cavium.com> wrote:
+>> > >> > On 24.11.16 13:44:31, Ard Biesheuvel wrote:
+>
+>> > >> Regions containing firmware tables are owned by the firmware, and it
+>> > >> is the firmware that tells us which memory attributes we are allowed
+>> > >> to use. If those attributes include WB, it is perfectly legal to use a
+>> > >> cacheable mapping. That does *not* mean they should be covered by the
+>> > >> linear mapping. The linear mapping is read-write-non-exec, for
+>> > >> instance, and we may prefer to use a read-only mapping and/or
+>> > >> executable mapping.
+>> > >
+>> > > Ok, I am going to fix try_ram_remap().
+>
+> I revisited the code and it is working well already since:
+>
+>  e7cd190385d1 arm64: mark reserved memblock regions explicitly in iomem
+>
+> Now, try_ram_remap() is only called if the region to be mapped is
+> entirely in IORESOURCE_SYSTEM_RAM. This is only true for normal mem
+> ranges and not NOMAP mem. region_intersects() then returns
+> REGION_INTERSECTS and calls try_ram_remap(). For the NOMAP memory case
+> REGION_DISJOINT would be returned and thus arch_memremap_wb() being
+> called directly. Before the e7cd190385d1 change try_ram_remap() was
+> called also for nomap regions.
+>
+> So we can leave memremap() as it is and just apply this patch
+> unmodified. What do you think?
 
-Since you seem to be using this to mean "is the platform locked down?",
-this looks to be no longer complete in the UEFI 2.6 world.  If
-DeployedMode == 0, even if SecureBoot == 1 and SetupMode == 0, you can
-remove the platform key by writing 1 to AuditMode and gain control of
-the secure variables.  The lock down state becomes DeployedMode == 1,
-SecureBoot == 1 and SetupMode == 0
+I agree. The pfn_valid() check in try_ram_remap() is still appropriate
+simply because the PageHighmem check requires a valid struct page. But
+if we don't enter that code path anymore for NOMAP regions, I think
+we're ok.
 
-See the diagram on page 1817
+> Please ack.
+>
 
-http://www.uefi.org/sites/default/files/resources/UEFI%20Spec%202_6.pdf
+I still don't fully understand how it is guaranteed that *all* memory
+(i.e., all regions for which memblock_is_memory() returns true) is
+covered by a struct page, but marked as reserved. Are we relying on
+the fact that NOMAP memory is also memblock_reserve()'d?
 
-James
+> I am going to prepare the pfn_is_ram() change in addition to this
+> patch, but that should not be required for this fix to work correcly.
+>
+
+I don't think you need to bother with page_is_ram() then. The only
+place we use it is in devmem_is_allowed(), and there it makes sense to
+allow NOMAP regions to be accessed (provided that you think /dev/mem
+is a good idea in the first place).
