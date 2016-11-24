@@ -1,26 +1,41 @@
-From: scott.wood@nxp.com (Scott Wood)
-Date: Thu, 24 Nov 2016 08:21:15 +0000
-Subject: [PATCH v3] clk: qoriq: added ls1012a clock configuration
-References: <1479955015-37514-1-git-send-email-yuantian.tang@nxp.com>
-Message-ID: <DB5PR0401MB1928925ACE6E6E066961C64A91B60@DB5PR0401MB1928.eurprd04.prod.outlook.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 24 Nov 2016 09:26:26 +0100
+Subject: [PATCH 1/4] serial: core: Add LED trigger support
+In-Reply-To: <20161123100819.GA20137@kroah.com>
+References: <20161123100106.15969-1-s.hauer@pengutronix.de>
+ <20161123100106.15969-2-s.hauer@pengutronix.de>
+ <20161123100819.GA20137@kroah.com>
+Message-ID: <20161124082626.ge7t64fwrtx3slvo@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2016 08:50 PM, yuantian.tang at nxp.com wrote:
-> From: Tang Yuantian <Yuantian.Tang@nxp.com>
-> 
-> Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
-> ---
-> v3:
->   - rebased to latest kernel and re-sorted the code
-[snip]
-> @@ -1316,6 +1334,7 @@ CLK_OF_DECLARE(qoriq_clockgen_2, "fsl,qoriq-clockgen-2.0", clockgen_init);
->  CLK_OF_DECLARE(qoriq_clockgen_ls1021a, "fsl,ls1021a-clockgen", clockgen_init);
->  CLK_OF_DECLARE(qoriq_clockgen_ls1043a, "fsl,ls1043a-clockgen", clockgen_init);
->  CLK_OF_DECLARE(qoriq_clockgen_ls1046a, "fsl,ls1046a-clockgen", clockgen_init);
-> +CLK_OF_DECLARE(qoriq_clockgen_ls1012a, "fsl,ls1012a-clockgen", clockgen_init);
->  CLK_OF_DECLARE(qoriq_clockgen_ls2080a, "fsl,ls2080a-clockgen", clockgen_init);
+On Wed, Nov 23, 2016 at 11:08:19AM +0100, Greg Kroah-Hartman wrote:
+> On Wed, Nov 23, 2016 at 11:01:03AM +0100, Sascha Hauer wrote:
+> > With this patch the serial core provides LED triggers for RX and TX.
+> > 
+> > As the serial core layer does not know when the hardware actually sends
+> > or receives characters, this needs help from the UART drivers. The
+> > LED triggers are registered in uart_add_led_triggers() called from
+> > the UART drivers which want to support LED triggers. All the driver
+> > has to do then is to call uart_led_trigger_[tx|rx] to indicate
+> > activity.
 
-You need a better sorting algorithm. :-P
+BTW last time LED triggers were discussed
+(https://patchwork.kernel.org/patch/9212885/) You and Arnd mandated the
+triggers should be implemented in the tty layer. By tty layer did you
+really mean the tty layer or did you mean serial_core?
 
--Scott
+We could implement it in the tty layer, but tty doesn't know when the
+characters are actually sent. There could be arbitrary time passing
+between a tty_operations->put_char and the character being on the wire.
+
+Also I am not sure if we want to have LED triggers for each and every
+tty in the system
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
