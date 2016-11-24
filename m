@@ -1,160 +1,57 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 24 Nov 2016 08:52:59 +0000
-Subject: [PATCH 1/7] add binding for stm32 multifunctions timer driver
-In-Reply-To: <CA+M3ks6rnago88JC0C5Uj6JpGZGuwyoOj-W8+r7Oj4s8_GuXyA@mail.gmail.com>
-References: <1479831207-32699-1-git-send-email-benjamin.gaignard@st.com>
- <1479831207-32699-2-git-send-email-benjamin.gaignard@st.com>
- <20161122165228.GK10134@dell.home>
- <CA+M3ks4cVLtVe4zSvSiDUz6jKy0Wbw8j24VuStf_31D5ntwfvw@mail.gmail.com>
- <20161123092148.GO10134@dell.home>
- <CA+M3ks6rnago88JC0C5Uj6JpGZGuwyoOj-W8+r7Oj4s8_GuXyA@mail.gmail.com>
-Message-ID: <20161124085259.GU10134@dell.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Nov 2016 10:00:36 +0100
+Subject: [PATCH net-next 1/4] net: mvneta: Convert to be 64 bits compatible
+In-Reply-To: <20161124163327.1cc261ab@xhacker>
+References: <20161122164844.19566-1-gregory.clement@free-electrons.com>
+ <CAPv3WKf0a63qQT+xwXfUatbgLFF58e6L8J10VtBOUTam+kUcjg@mail.gmail.com>
+ <20161124163327.1cc261ab@xhacker>
+Message-ID: <21520380.oWTKcrq8DS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
+On Thursday, November 24, 2016 4:37:36 PM CET Jisheng Zhang wrote:
+> solB (a SW shadow cookie) perhaps gives a better performance: in hot path,
+> such as mvneta_rx(), the driver accesses buf_cookie and buf_phys_addr of
+> rx_desc which is allocated by dma_alloc_coherent, it's noncacheable if the
+> device isn't cache-coherent. I didn't measure the performance difference,
+> because in fact we take solA as well internally. From your experience,
+> can the performance gain deserve the complex code?
 
-Would you mind casting an eye on this please?
+Yes, a read from uncached memory is fairly slow, so if you have a chance
+to avoid that it will probably help. When adding complexity to the code,
+it probably makes sense to take a runtime profile anyway quantify how
+much it gains.
 
-On Wed, 23 Nov 2016, Benjamin Gaignard wrote:
-> 2016-11-23 10:21 GMT+01:00 Lee Jones <lee.jones@linaro.org>:
-> > On Wed, 23 Nov 2016, Benjamin Gaignard wrote:
-> >
-> >> 2016-11-22 17:52 GMT+01:00 Lee Jones <lee.jones@linaro.org>:
-> >> > On Tue, 22 Nov 2016, Benjamin Gaignard wrote:
-> >> >
-> >> >> Add bindings information for stm32 timer MFD
-> >> >>
-> >> >> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> >> >> ---
-> >> >>  .../devicetree/bindings/mfd/stm32-timer.txt        | 53 ++++++++++++++++++++++
-> >> >>  1 file changed, 53 insertions(+)
-> >> >>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-timer.txt
-> >> >>
-> >> >> diff --git a/Documentation/devicetree/bindings/mfd/stm32-timer.txt b/Documentation/devicetree/bindings/mfd/stm32-timer.txt
-> >> >> new file mode 100644
-> >> >> index 0000000..3cefce1
-> >> >> --- /dev/null
-> >> >> +++ b/Documentation/devicetree/bindings/mfd/stm32-timer.txt
-> >> >> @@ -0,0 +1,53 @@
-> >> >> +STM32 multifunctions timer driver
-> >> >
-> >> > "STM32 Multi-Function Timer/PWM device bindings"
-> >> >
-> >> > Doesn't this shared device have a better name?
-> >>
-> >> In SoC documentation those hardware blocks are named "advanced-control
-> >> timers", "general purpose timers" or "basic timers"
-> >> "stm32-timer" name is already used for clock source driver, that why I
-> >> have prefix it with mfd
-> >
-> > MFD is a Linuxisum and has no place in hardware description.
-> >
-> > Please used one of the names you mentioned above.
-> 
-> I will go for "st,stm32-advanced-timer"
-> 
-> >
-> > Hopefully the one that best fits.
-> >
-> >> >> +stm32 timer MFD allow to handle at the same time pwm and IIO timer devices
-> >> >
-> >> > No need for this sentence.
-> >> >
-> >> OK
-> >>
-> >> >> +Required parameters:
-> >> >> +- compatible: must be one of the follow value:
-> >> >> +     "st,stm32-mfd-timer1"
-> >> >> +     "st,stm32-mfd-timer2"
-> >> >> +     "st,stm32-mfd-timer3"
-> >> >> +     "st,stm32-mfd-timer4"
-> >> >> +     "st,stm32-mfd-timer5"
-> >> >> +     "st,stm32-mfd-timer6"
-> >> >> +     "st,stm32-mfd-timer7"
-> >> >> +     "st,stm32-mfd-timer8"
-> >> >> +     "st,stm32-mfd-timer9"
-> >> >> +     "st,stm32-mfd-timer10"
-> >> >> +     "st,stm32-mfd-timer11"
-> >> >> +     "st,stm32-mfd-timer12"
-> >> >> +     "st,stm32-mfd-timer13"
-> >> >> +     "st,stm32-mfd-timer14"
-> >> >
-> >> > We don't normally number devices.
-> >> >
-> >> > What's stopping you from simply doing:
-> >> >
-> >> >         pwm1: pwm1 at 40010000 {
-> >> >                 compatible = "st,stm32-pwm";
-> >> >         };
-> >> >         pwm2: pwm1 at 40020000 {
-> >> >                 compatible = "st,stm32-pwm";
-> >> >         };
-> >> >         pwm3: pwm1 at 40030000 {
-> >> >                 compatible = "st,stm32-pwm";
-> >> >         };
-> >> >
-> >>
-> >> Because each instance of the hardware is slightly different: number of
-> >> pwm channels, triggers capabilities, etc ..
-> >> so I need to distinguish them.
-> >> Since it look to be a problem I will follow your suggestion and add a
-> >> property this driver to be able to identify each instance.
-> >> Do you think that "id" parameter (integer for 1 to 14) is acceptable ?
-> >
-> > Unfortunately not. IDs aren't allowed in DT.
-> >
-> > What about "pwm-chans" and "trigger"?
-> >
-> > pwm-chans              : Number of available channels available
-> 
-> For pwm I need those 4 properties:
-> st,pwm-number: the number of PWM devices
+On machines that have cache-coherent DMA, accessing the descriptor
+should be fine, as you already have to load the entire cache line
+to read the status field.
 
-st,pwm-num-chan is already documented.
+Looking at this snippet:
 
-Please use that instead of creating new properties.
+                rx_status = rx_desc->status;
+                rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
+                data = (unsigned char *)rx_desc->buf_cookie;
+                phys_addr = rx_desc->buf_phys_addr;
+                pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc);
+                bm_pool = &pp->bm_priv->bm_pools[pool_id];
 
-> st,complementary: if exist have complementary ouput
-> st,32bit-counter: if exist have 32 bits counter
-> st,breakinput-polarity: if set enable break input feature.
-> 
-> Is it acceptable from pwm maintainer point of view ?
-> 
-> > trigger                : Boolean value specifying whether a timer is present
-> 
-> Following our discussion on IRC I will try to code for your proposal:
-> 
-> advanced-timer at 40010000 {
->         compatible = "st,stm32-advanced-timer";
->         reg = <0x40010000 0x400>;
->         clocks = <&rcc 0 160>;
->         clock-names = "clk_int";
-> 
->         pwm at 0 {
->                 compatible = "st,stm32-pwm";
->                 st,pwm-number= <4>;
->                 st,complementary;
->                 st,breakinput;
->         };
-> 
->         timer at 0 {
->                 reg = <1>;
->                 compatible = "st,stm32-iio-timer";
->                 interrupts = <27>;
->                 triggers = <5 2 3 4>;
->         };
-> };
-> 
-> triggers parameter will be used to know which trigger are valid for
-> the IIO device
+                if (!mvneta_rxq_desc_is_first_last(rx_status) ||
+                    (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
+err_drop_frame_ret_pool:
+                        /* Return the buffer to the pool */
+                        mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
+                                              rx_desc->buf_phys_addr);
+err_drop_frame:
 
-Except for "st,pwm-number" as mentioned above, this looks good to me.
 
-Rob, would what do you think?
+I think there is more room for optimizing if you start: you read
+the status field twice (the second one in MVNETA_RX_GET_BM_POOL_ID)
+and you can cache the buf_phys_addr along with the virtual address
+once you add that.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Generally speaking, I'd recommend using READ_ONCE()/WRITE_ONCE()
+to access the descriptor fields, to ensure the compiler doesn't
+add extra references as well as to annotate the expensive
+operations.
+
+	Arnd
