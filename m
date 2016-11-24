@@ -1,112 +1,88 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Thu, 24 Nov 2016 15:45:45 +0100
-Subject: [PATCH v2 5/9] clk: stm32f4: Add I2S clock
+Date: Thu, 24 Nov 2016 15:45:43 +0100
+Subject: [PATCH v2 3/9] clk: stm32f4: Add post divisor for I2S & SAI PLLs
 In-Reply-To: <1479998749-20358-1-git-send-email-gabriel.fernandez@st.com>
 References: <1479998749-20358-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1479998749-20358-6-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1479998749-20358-4-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-This patch introduces I2S clock for stm32f4 soc.
-The I2S clock could be derived from an external clock or from pll-i2s
+This patch adds post dividers of I2S & SAI PLLs.
+These dividers are managed by a dedicated register (RCC_DCKCFGR).
+The PLL should be off before a set rate.
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- Documentation/devicetree/bindings/clock/st,stm32-rcc.txt |  4 +++-
- drivers/clk/clk-stm32f4.c                                | 14 +++++++++++++-
- include/dt-bindings/clock/stm32f4-clock.h                |  3 ++-
- 3 files changed, 18 insertions(+), 3 deletions(-)
+ drivers/clk/clk-stm32f4.c | 41 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt b/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
-index 4cd08da6..8c1ca68 100644
---- a/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
-+++ b/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
-@@ -19,6 +19,7 @@ Required properties:
-   use.
- - clocks: External oscillator clock phandle
-   - high speed external clock signal (HSE)
-+  - external I2S clock (I2S_CKIN)
- 
- Example:
- 
-@@ -27,7 +28,7 @@ Example:
- 		#clock-cells = <2>
- 		compatible = "st,stm32f42xx-rcc", "st,stm32-rcc";
- 		reg = <0x40023800 0x400>;
--		clocks = <&clk_hse>;
-+		clocks = <&clk_hse>, <&clk_i2s_ckin>;
- 	};
- 
- Specifying gated clocks
-@@ -77,6 +78,7 @@ The secondary index is bound with the following magic numbers:
- 	6	PLL_VCO_I2S	(vco frequency of I2S pll)
- 	7	PLL_VCO_SAI	(vco frequency of SAI pll)
- 	8	CLK_LCD		(LCD-TFT)
-+	9	CLK_I2S		(I2S clocks)
- 
- Example:
- 
 diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
-index 86244fc..3063b30 100644
+index c2b62cc..3918305 100644
 --- a/drivers/clk/clk-stm32f4.c
 +++ b/drivers/clk/clk-stm32f4.c
-@@ -935,6 +935,8 @@ static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
+@@ -357,6 +357,18 @@ struct stm32f4_pll {
  
- static const char *lcd_parent[1] = { "pllsai-r-div" };
+ #define to_stm32f4_pll(_gate) container_of(_gate, struct stm32f4_pll, gate)
  
-+static const char *i2s_parents[2] = { "plli2s-r", NULL };
++struct stm32f4_pll_post_div_data {
++	u8 pll_num;
++	const char *name;
++	const char *parent;
++	u8 flag;
++	u8 offset;
++	u8 shift;
++	u8 width;
++	u8 flag_div;
++	const struct clk_div_table *div_table;
++};
 +
- struct stm32_aux_clk {
- 	int idx;
- 	const char *name;
-@@ -969,6 +971,12 @@ struct stm32f4_clk_data {
- 		STM32F4_RCC_APB2ENR, 26,
- 		CLK_SET_RATE_PARENT
- 	},
-+	{
-+		CLK_I2S, "i2s", i2s_parents, ARRAY_SIZE(i2s_parents),
-+		STM32F4_RCC_CFGR, 23, 1,
-+		NO_GATE, 0,
-+		CLK_SET_RATE_PARENT
-+	},
+ struct stm32f4_vco_data {
+ 	const char *vco_name;
+ 	u8 offset;
+@@ -370,6 +382,18 @@ struct stm32f4_vco_data {
+ 	{ "vco-sai", STM32F4_RCC_PLLSAICFGR, 28, 29 },
  };
  
- static const struct stm32f4_clk_data stm32f429_clk_data = {
-@@ -1063,7 +1071,7 @@ static struct clk_hw *stm32_register_aux_clk(const char *name,
- 
- static void __init stm32f4_rcc_init(struct device_node *np)
- {
--	const char *hse_clk;
-+	const char *hse_clk, *i2s_in_clk;
- 	int n;
- 	const struct of_device_id *match;
- 	const struct stm32f4_clk_data *data;
-@@ -1098,6 +1106,10 @@ static void __init stm32f4_rcc_init(struct device_node *np)
- 
- 	hse_clk = of_clk_get_parent_name(np, 0);
- 
-+	i2s_in_clk = of_clk_get_parent_name(np, 1);
++#define MAX_POST_DIV 3
++static const struct stm32f4_pll_post_div_data  post_div_data[MAX_POST_DIV] = {
++	{ PLL_I2S, "plli2s-q-div", "plli2s-q", CLK_SET_RATE_PARENT,
++		STM32F4_RCC_DCKCFGR, 0, 5, 0, NULL},
 +
-+	i2s_parents[1] = i2s_in_clk;
++	{ PLL_SAI, "pllsai-q-div", "pllsai-q", CLK_SET_RATE_PARENT,
++		STM32F4_RCC_DCKCFGR, 8, 5, 0, NULL },
 +
- 	clk_register_fixed_rate_with_accuracy(NULL, "hsi", NULL, 0,
- 			16000000, 160000);
- 	pllcfgr = readl(base + STM32F4_RCC_PLLCFGR);
-diff --git a/include/dt-bindings/clock/stm32f4-clock.h b/include/dt-bindings/clock/stm32f4-clock.h
-index 1be4a3a..b129ab9 100644
---- a/include/dt-bindings/clock/stm32f4-clock.h
-+++ b/include/dt-bindings/clock/stm32f4-clock.h
-@@ -28,7 +28,8 @@
- #define PLL_VCO_I2S		6
- #define PLL_VCO_SAI		7
- #define CLK_LCD			8
-+#define CLK_I2S			9
++	{ PLL_SAI, "pllsai-r-div", "pllsai-r", CLK_SET_RATE_PARENT,
++		STM32F4_RCC_DCKCFGR, 16, 2, CLK_DIVIDER_POWER_OF_TWO},
++};
++
+ struct stm32f4_div_data {
+ 	u8 shift;
+ 	u8 width;
+@@ -996,6 +1020,23 @@ static void __init stm32f4_rcc_init(struct device_node *np)
+ 	clks[PLL_VCO_SAI] = stm32f4_rcc_register_pll("vco_in",
+ 			&data->pll_data[2], &stm32f4_clk_lock);
  
--#define END_PRIMARY_CLK		9
-+#define END_PRIMARY_CLK		10
- 
- #endif
++	for (n = 0; n < MAX_POST_DIV; n++) {
++		const struct stm32f4_pll_post_div_data *post_div;
++
++		post_div = &post_div_data[n];
++
++		clk_register_pll_div(post_div->name,
++				post_div->parent,
++				post_div->flag,
++				base + post_div->offset,
++				post_div->shift,
++				post_div->width,
++				post_div->flag_div,
++				post_div->div_table,
++				clks[post_div->pll_num],
++				&stm32f4_clk_lock);
++	}
++
+ 	sys_parents[1] = hse_clk;
+ 	clk_register_mux_table(
+ 	    NULL, "sys", sys_parents, ARRAY_SIZE(sys_parents), 0,
 -- 
 1.9.1
