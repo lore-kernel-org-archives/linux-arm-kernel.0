@@ -1,82 +1,73 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Thu, 24 Nov 2016 16:09:18 +0100
-Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire
- section
-In-Reply-To: <CAKv+Gu-SXX_Vv1Wi1Nm=5vdaXSS0MBp20QBpQVacSKPLfdH0-A@mail.gmail.com>
-References: <20161117151805.GJ2151@rric.localdomain>
- <CAKv+Gu-2uGJGovqQL-gbB54u=fQ9L9YUbDdRo6u3oWqF6znn6Q@mail.gmail.com>
- <20161123211538.GH10776@rric.localdomain>
- <CAKv+Gu8aWpz5vXSWdKHwL5Xk2aWyQBOoR1WHOnVPaWZOwqojBQ@mail.gmail.com>
- <20161124134238.GI10776@rric.localdomain>
- <CAKv+Gu_Ug3XOD6jy5xziy1pS7WV=TC0RLD4j3DT6nytujQDzRQ@mail.gmail.com>
- <20161124135151.GJ10776@rric.localdomain>
- <CAKv+Gu9qB7P2epMGdwFJ3vJR3vt-bBxU0nKwmKdpaOpTKdqzzA@mail.gmail.com>
- <20161124141149.GE2213@rric.localdomain>
- <CAKv+Gu-SXX_Vv1Wi1Nm=5vdaXSS0MBp20QBpQVacSKPLfdH0-A@mail.gmail.com>
-Message-ID: <20161124150918.GF2213@rric.localdomain>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Thu, 24 Nov 2016 16:14:17 +0100
+Subject: [PATCH v2 1/7] MFD: add bindings for stm32 general purpose timer
+ driver
+In-Reply-To: <1480000463-9625-1-git-send-email-benjamin.gaignard@st.com>
+References: <1480000463-9625-1-git-send-email-benjamin.gaignard@st.com>
+Message-ID: <1480000463-9625-2-git-send-email-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.11.16 14:23:16, Ard Biesheuvel wrote:
-> On 24 November 2016 at 14:11, Robert Richter <robert.richter@cavium.com> wrote:
-> > On 24.11.16 13:58:30, Ard Biesheuvel wrote:
-> >> On 24 November 2016 at 13:51, Robert Richter <robert.richter@cavium.com> wrote:
-> >> > On 24.11.16 13:44:31, Ard Biesheuvel wrote:
-> >> >> On 24 November 2016 at 13:42, Robert Richter <robert.richter@cavium.com> wrote:
-> >> >> > On 23.11.16 21:25:06, Ard Biesheuvel wrote:
-> >> >> >> Why? MEMREMAP_WB is used often, among other things for mapping
-> >> >> >> firmware tables, which are marked as NOMAP, so in these cases, the
-> >> >> >> linear address is not mapped.
-> >> >> >
-> >> >> > If fw tables are mapped wb, that is wrong and needs a separate fix.
-> >> >> >
-> >> >>
-> >> >> Why is that wrong?
-> >> >
-> >> > The whole issue with mapping acpi tables is not marking them cachable,
-> >> > what wb does.
-> >>
-> >> What 'issue'?
-> >>
-> >> > Otherwise we could just use linear mapping for those mem
-> >> > ranges.
-> >> >
-> >>
-> >> Regions containing firmware tables are owned by the firmware, and it
-> >> is the firmware that tells us which memory attributes we are allowed
-> >> to use. If those attributes include WB, it is perfectly legal to use a
-> >> cacheable mapping. That does *not* mean they should be covered by the
-> >> linear mapping. The linear mapping is read-write-non-exec, for
-> >> instance, and we may prefer to use a read-only mapping and/or
-> >> executable mapping.
-> >
-> > Ok, I am going to fix try_ram_remap().
-> >
-> 
-> Thanks. Could you also add an arm64 version of page_is_ram() that uses
-> memblock_is_memory() while you're at it? I think using memblock
-> directly in try_ram_remap() may not be the best approach
+Add bindings information for stm32 general purpose timer
 
-Sure. I also want to mark the patches as stable.
+version 2:
+- rename stm32-mfd-timer to stm32-gptimer
+- only keep one compatible string
 
-> > Are there other concerns with this patch?
-> >
-> 
-> I think we all agree that pfn_valid() should return whether a pfn has
-> a struct page associated with it, the debate is about whether it makes
-> sense to allocate struct pages for memory that the kernel does not
-> own. But given that it does not really hurt to do so for small holes,
-> I think your suggestion makes sense.
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+---
+ .../bindings/mfd/stm32-general-purpose-timer.txt   | 43 ++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/stm32-general-purpose-timer.txt
 
-Thanks for your comments and the review.
-
-> Should we be doing anything more to ensure that those pages are not
-> dereferenced inadvertently? Is there a page flag we should be setting?
-
-I don't think so. Boot mem is initialized in free_low_memory_core_
-early(). The PageReserved flag is set for pages from reserved memory
-ranges, and memory ranges not marked NOMAP is just freed. Since pages
-are either reservered or in the free_list of pages, pages from other
-memory ranges (NOMAP) is not visible to mm.
-
--Robert
+diff --git a/Documentation/devicetree/bindings/mfd/stm32-general-purpose-timer.txt b/Documentation/devicetree/bindings/mfd/stm32-general-purpose-timer.txt
+new file mode 100644
+index 0000000..2f10e67
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/stm32-general-purpose-timer.txt
+@@ -0,0 +1,43 @@
++STM32 general purpose timer driver
++
++Required parameters:
++- compatible: must be "st,stm32-gptimer"
++
++- reg:			Physical base address and length of the controller's
++			registers.
++- clock-names: 		Set to "clk_int".
++- clocks: 		Phandle to the clock used by the timer module.
++			For Clk properties, please refer to ../clock/clock-bindings.txt
++
++Optional parameters:
++- resets:		Phandle to the parent reset controller.
++			See ..reset/st,stm32-rcc.txt
++
++Optional subnodes:
++- pwm:			See ../pwm/pwm-stm32.txt
++- iiotimer:		See ../iio/timer/stm32-iio-timer.txt
++
++Example:
++	gptimer1: gptimer1 at 40010000 {
++		compatible = "st,stm32-gptimer";
++		reg = <0x40010000 0x400>;
++		clocks = <&rcc 0 160>;
++		clock-names = "clk_int";
++
++		pwm1 at 0 {
++			compatible = "st,stm32-pwm";
++			st,pwm-num-chan = <4>;
++			st,breakinput;
++			st,complementary;
++		};
++
++		iiotimer1 at 0 {
++			compatible = "st,stm32-iio-timer";
++			interrupts = <27>;
++			st,input-triggers-names = TIM5_TRGO,
++						  TIM2_TRGO,
++						  TIM4_TRGO,
++						  TIM3_TRGO;
++			st,output-triggers-names = TIM1_TRGO;
++		};
++	};
+-- 
+1.9.1
