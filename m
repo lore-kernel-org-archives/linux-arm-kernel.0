@@ -1,30 +1,65 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 25 Nov 2016 11:20:28 +0000
-Subject: [RFC PATCH 11/11] ARM: Allow ARCH_MULTIPLATFORM to be selected
- for NOMMU
-In-Reply-To: <20161124184532.GI14217@n2100.armlinux.org.uk>
-References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
- <1479806768-39911-12-git-send-email-vladimir.murzin@arm.com>
- <16587553.f9R1mxJih5@wuerfel> <583478FB.4020008@arm.com>
- <20161123154829.GA2489@afzalpc>
- <20161123191621.GD14217@n2100.armlinux.org.uk>
- <20161124172535.GA3524@afzalpc>
- <20161124173532.GH14217@n2100.armlinux.org.uk>
- <20161124180751.GA5258@afzalpc>
- <20161124184532.GI14217@n2100.armlinux.org.uk>
-Message-ID: <58381E7C.9090000@arm.com>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Fri, 25 Nov 2016 22:29:01 +1100
+Subject: [PATCH v3 2/3] powerpc/reloc64: add support for 32-bit CRC
+ pseudo-symbols
+In-Reply-To: <1477585631-18574-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1477585631-18574-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1477585631-18574-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <87oa13ssqq.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/11/16 18:45, Russell King - ARM Linux wrote:
-> It's this reason that I don't like removing the "depends on MMU" from
-> multiplatform - it gives the incorrect impression that we _can_ support
-> a wide range of systems, but what it will lead to is a kernel that will
-> work on some platforms but not others.  The result will be more "bug"
-> reports because the kernel fails to boot...
+Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
 
-Do you think extra guarding with CONFIG_EXPERIMENTAL would be appropriate to
-reduce number of such reports?
+> diff --git a/arch/powerpc/relocs_check.sh b/arch/powerpc/relocs_check.sh
+> index ec2d5c835170..2f510fbc87da 100755
+> --- a/arch/powerpc/relocs_check.sh
+> +++ b/arch/powerpc/relocs_check.sh
+> @@ -43,7 +43,8 @@ R_PPC_ADDR16_HA
+>  R_PPC_RELATIVE
+>  R_PPC_NONE' |
+>  	grep -E -v '\<R_PPC64_ADDR64[[:space:]]+mach_' |
+> -	grep -E -v '\<R_PPC64_ADDR64[[:space:]]+__crc_'
+> +	grep -E -v '\<R_PPC64_ADDR64[[:space:]]+__crc_' |
+> +	grep -E -v '\<R_PPC64_ADDR32[[:space:]]+\*ABS\*'
 
-Cheers
-Vladimir
+I'm still getting:
+
+WARNING: 24 bad relocations
+c000000000d307c4 R_PPC64_ADDR32    __crc___arch_hweight16
+c000000000d307c8 R_PPC64_ADDR32    __crc___arch_hweight32
+c000000000d307cc R_PPC64_ADDR32    __crc___arch_hweight64
+c000000000d307d0 R_PPC64_ADDR32    __crc___arch_hweight8
+c000000000d30848 R_PPC64_ADDR32    __crc___bswapdi2
+c000000000d30854 R_PPC64_ADDR32    __crc___clear_user
+c000000000d30868 R_PPC64_ADDR32    __crc___copy_tofrom_user
+c000000000d30d4c R_PPC64_ADDR32    __crc__mcount
+c000000000d31344 R_PPC64_ADDR32    __crc_copy_page
+c000000000d3141c R_PPC64_ADDR32    __crc_current_stack_pointer
+c000000000d31840 R_PPC64_ADDR32    __crc_empty_zero_page
+c000000000d31a7c R_PPC64_ADDR32    __crc_flush_dcache_range
+c000000000d31a84 R_PPC64_ADDR32    __crc_flush_icache_range
+c000000000d32608 R_PPC64_ADDR32    __crc_load_fp_state
+c000000000d32614 R_PPC64_ADDR32    __crc_load_vr_state
+c000000000d32828 R_PPC64_ADDR32    __crc_memchr
+c000000000d32830 R_PPC64_ADDR32    __crc_memcmp
+c000000000d32834 R_PPC64_ADDR32    __crc_memcpy
+c000000000d32840 R_PPC64_ADDR32    __crc_memmove
+c000000000d32888 R_PPC64_ADDR32    __crc_memset
+c000000000d33c9c R_PPC64_ADDR32    __crc_store_fp_state
+c000000000d33ca0 R_PPC64_ADDR32    __crc_store_vr_state
+c000000000d33cf0 R_PPC64_ADDR32    __crc_strncmp
+c000000000d33cf4 R_PPC64_ADDR32    __crc_strncpy
+
+
+If I just add those to the whitelist it builds, but then things aren't
+happy@boot:
+
+
+[    7.607687] kvm: disagrees about version of symbol module_layout
+[    7.846799] virtio: disagrees about version of symbol module_layout
+[   22.012615] crc32c_vpmsum: disagrees about version of symbol module_layout
+[   22.012959] libcrc32c: disagrees about version of symbol module_layout
+
+
+cheers
