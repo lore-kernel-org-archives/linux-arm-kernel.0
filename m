@@ -1,256 +1,142 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Fri, 25 Nov 2016 18:34:36 +0800
-Subject: [PATCH v10 13/13] drm/mediatek: add support for Mediatek SoC MT2701
-In-Reply-To: <1480070076-6196-1-git-send-email-yt.shen@mediatek.com>
-References: <1480070076-6196-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1480070076-6196-14-git-send-email-yt.shen@mediatek.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Fri, 25 Nov 2016 18:42:22 +0800
+Subject: [RFC v2: PATCH 1/2] dt-bindings: Document the hi3660 reset
+ bindings
+In-Reply-To: <1480069523.4058.17.camel@pengutronix.de>
+References: <Arnd Bergmann <arnd@arndb.de>
+ <1479888476-13138-1-git-send-email-zhangfei.gao@linaro.org>
+ <1479888476-13138-2-git-send-email-zhangfei.gao@linaro.org>
+ <1479979605.2472.4.camel@pengutronix.de>
+ <ac3c8e65-e4f2-3a9d-452c-f270d245cf9d@linaro.org>
+ <1479981017.2472.14.camel@pengutronix.de>
+ <8328a235-faeb-2218-4c49-a3f282599e95@linaro.org>
+ <1480069523.4058.17.camel@pengutronix.de>
+Message-ID: <e71cfe28-cd31-828f-8c7f-b4faeed5d27f@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add support for the Mediatek MT2701 DISP subsystem.
-There is only one OVL engine in MT2701.
 
-Signed-off-by: YT Shen <yt.shen@mediatek.com>
----
- drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |  8 ++++++++
- drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |  6 ++++++
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c      | 17 +++++++++++++++++
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |  7 +++++++
- drivers/gpu/drm/mediatek/mtk_drm_drv.c      | 29 +++++++++++++++++++++++++++++
- drivers/gpu/drm/mediatek/mtk_dsi.c          |  1 +
- drivers/gpu/drm/mediatek/mtk_mipi_tx.c      |  6 ++++++
- 7 files changed, 74 insertions(+)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-index 678595c..0adb0e4 100644
---- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-+++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-@@ -35,6 +35,7 @@
- #define DISP_REG_OVL_PITCH(n)			(0x0044 + 0x20 * (n))
- #define DISP_REG_OVL_RDMA_CTRL(n)		(0x00c0 + 0x20 * (n))
- #define DISP_REG_OVL_RDMA_GMC(n)		(0x00c8 + 0x20 * (n))
-+#define DISP_REG_OVL_ADDR_MT2701		0x0040
- #define DISP_REG_OVL_ADDR_MT8173		0x0f40
- #define DISP_REG_OVL_ADDR(ovl, n)		((ovl)->data->addr + 0x20 * (n))
- 
-@@ -302,12 +303,19 @@ static int mtk_disp_ovl_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct mtk_disp_ovl_data mt2701_ovl_driver_data = {
-+	.addr = DISP_REG_OVL_ADDR_MT2701,
-+	.fmt_rgb565_is_0 = false,
-+};
-+
- static const struct mtk_disp_ovl_data mt8173_ovl_driver_data = {
- 	.addr = DISP_REG_OVL_ADDR_MT8173,
- 	.fmt_rgb565_is_0 = true,
- };
- 
- static const struct of_device_id mtk_disp_ovl_driver_dt_match[] = {
-+	{ .compatible = "mediatek,mt2701-disp-ovl",
-+	  .data = &mt2701_ovl_driver_data},
- 	{ .compatible = "mediatek,mt8173-disp-ovl",
- 	  .data = &mt8173_ovl_driver_data},
- 	{},
-diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-index e5e5318..b68a513 100644
---- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-+++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-@@ -236,11 +236,17 @@ static int mtk_disp_rdma_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct mtk_disp_rdma_data mt2701_rdma_driver_data = {
-+	.fifo_size = SZ_4K,
-+};
-+
- static const struct mtk_disp_rdma_data mt8173_rdma_driver_data = {
- 	.fifo_size = SZ_8K,
- };
- 
- static const struct of_device_id mtk_disp_rdma_driver_dt_match[] = {
-+	{ .compatible = "mediatek,mt2701-disp-rdma",
-+	  .data = &mt2701_rdma_driver_data},
- 	{ .compatible = "mediatek,mt8173-disp-rdma",
- 	  .data = &mt8173_rdma_driver_data},
- 	{},
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index a9b209c..8130f3d 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -60,6 +60,13 @@
- #define MT8173_MUTEX_MOD_DISP_PWM1		BIT(24)
- #define MT8173_MUTEX_MOD_DISP_OD		BIT(25)
- 
-+#define MT2701_MUTEX_MOD_DISP_OVL		BIT(3)
-+#define MT2701_MUTEX_MOD_DISP_WDMA		BIT(6)
-+#define MT2701_MUTEX_MOD_DISP_COLOR		BIT(7)
-+#define MT2701_MUTEX_MOD_DISP_BLS		BIT(9)
-+#define MT2701_MUTEX_MOD_DISP_RDMA0		BIT(10)
-+#define MT2701_MUTEX_MOD_DISP_RDMA1		BIT(12)
-+
- #define MUTEX_SOF_SINGLE_MODE		0
- #define MUTEX_SOF_DSI0			1
- #define MUTEX_SOF_DSI1			2
-@@ -92,6 +99,15 @@ struct mtk_ddp {
- 	const unsigned int		*mutex_mod;
- };
- 
-+static const unsigned int mt2701_mutex_mod[DDP_COMPONENT_ID_MAX] = {
-+	[DDP_COMPONENT_BLS] = MT2701_MUTEX_MOD_DISP_BLS,
-+	[DDP_COMPONENT_COLOR0] = MT2701_MUTEX_MOD_DISP_COLOR,
-+	[DDP_COMPONENT_OVL0] = MT2701_MUTEX_MOD_DISP_OVL,
-+	[DDP_COMPONENT_RDMA0] = MT2701_MUTEX_MOD_DISP_RDMA0,
-+	[DDP_COMPONENT_RDMA1] = MT2701_MUTEX_MOD_DISP_RDMA1,
-+	[DDP_COMPONENT_WDMA0] = MT2701_MUTEX_MOD_DISP_WDMA,
-+};
-+
- static const unsigned int mt8173_mutex_mod[DDP_COMPONENT_ID_MAX] = {
- 	[DDP_COMPONENT_AAL] = MT8173_MUTEX_MOD_DISP_AAL,
- 	[DDP_COMPONENT_COLOR0] = MT8173_MUTEX_MOD_DISP_COLOR0,
-@@ -390,6 +406,7 @@ static int mtk_ddp_remove(struct platform_device *pdev)
- }
- 
- static const struct of_device_id ddp_driver_dt_match[] = {
-+	{ .compatible = "mediatek,mt2701-disp-mutex", .data = mt2701_mutex_mod},
- 	{ .compatible = "mediatek,mt8173-disp-mutex", .data = mt8173_mutex_mod},
- 	{},
- };
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-index 7fb32d8..b10b3f2 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-@@ -39,6 +39,7 @@
- #define DISP_REG_UFO_START			0x0000
- 
- #define DISP_COLOR_CFG_MAIN			0x0400
-+#define DISP_COLOR_START_MT2701			0x0f00
- #define DISP_COLOR_START_MT8173			0x0c00
- #define DISP_COLOR_START(comp)			((comp)->data->color_offset)
- #define DISP_COLOR_WIDTH(comp)			(DISP_COLOR_START(comp) + 0x50)
-@@ -267,11 +268,17 @@ struct mtk_ddp_comp_match {
- 	[DDP_COMPONENT_WDMA1]	= { MTK_DISP_WDMA,	1, NULL },
- };
- 
-+static const struct mtk_ddp_comp_driver_data mt2701_color_driver_data = {
-+	.color_offset = DISP_COLOR_START_MT2701,
-+};
-+
- static const struct mtk_ddp_comp_driver_data mt8173_color_driver_data = {
- 	.color_offset = DISP_COLOR_START_MT8173,
- };
- 
- static const struct of_device_id mtk_disp_color_driver_dt_match[] = {
-+	{ .compatible = "mediatek,mt2701-disp-color",
-+	  .data = &mt2701_color_driver_data},
- 	{ .compatible = "mediatek,mt8173-disp-color",
- 	  .data = &mt8173_color_driver_data},
- 	{},
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-index 5f9b5e8..f5cb6f0 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-@@ -126,6 +126,19 @@ static int mtk_atomic_commit(struct drm_device *drm,
- 	.atomic_commit = mtk_atomic_commit,
- };
- 
-+static const enum mtk_ddp_comp_id mt2701_mtk_ddp_main[] = {
-+	DDP_COMPONENT_OVL0,
-+	DDP_COMPONENT_RDMA0,
-+	DDP_COMPONENT_COLOR0,
-+	DDP_COMPONENT_BLS,
-+	DDP_COMPONENT_DSI0,
-+};
-+
-+static const enum mtk_ddp_comp_id mt2701_mtk_ddp_ext[] = {
-+	DDP_COMPONENT_RDMA1,
-+	DDP_COMPONENT_DPI0,
-+};
-+
- static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
- 	DDP_COMPONENT_OVL0,
- 	DDP_COMPONENT_COLOR0,
-@@ -145,6 +158,14 @@ static int mtk_atomic_commit(struct drm_device *drm,
- 	DDP_COMPONENT_DPI0,
- };
- 
-+static const struct mtk_mmsys_driver_data mt2701_mmsys_driver_data = {
-+	.main_path = mt2701_mtk_ddp_main,
-+	.main_len = ARRAY_SIZE(mt2701_mtk_ddp_main),
-+	.ext_path = mt2701_mtk_ddp_ext,
-+	.ext_len = ARRAY_SIZE(mt2701_mtk_ddp_ext),
-+	.shadow_register = true,
-+};
-+
- static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
- 	.main_path = mt8173_mtk_ddp_main,
- 	.main_len = ARRAY_SIZE(mt8173_mtk_ddp_main),
-@@ -340,16 +361,22 @@ static void mtk_drm_unbind(struct device *dev)
- };
- 
- static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
-+	{ .compatible = "mediatek,mt2701-disp-ovl",   .data = (void *)MTK_DISP_OVL },
- 	{ .compatible = "mediatek,mt8173-disp-ovl",   .data = (void *)MTK_DISP_OVL },
-+	{ .compatible = "mediatek,mt2701-disp-rdma",  .data = (void *)MTK_DISP_RDMA },
- 	{ .compatible = "mediatek,mt8173-disp-rdma",  .data = (void *)MTK_DISP_RDMA },
- 	{ .compatible = "mediatek,mt8173-disp-wdma",  .data = (void *)MTK_DISP_WDMA },
-+	{ .compatible = "mediatek,mt2701-disp-color", .data = (void *)MTK_DISP_COLOR },
- 	{ .compatible = "mediatek,mt8173-disp-color", .data = (void *)MTK_DISP_COLOR },
- 	{ .compatible = "mediatek,mt8173-disp-aal",   .data = (void *)MTK_DISP_AAL},
- 	{ .compatible = "mediatek,mt8173-disp-gamma", .data = (void *)MTK_DISP_GAMMA, },
- 	{ .compatible = "mediatek,mt8173-disp-ufoe",  .data = (void *)MTK_DISP_UFOE },
-+	{ .compatible = "mediatek,mt2701-dsi",	      .data = (void *)MTK_DSI },
- 	{ .compatible = "mediatek,mt8173-dsi",        .data = (void *)MTK_DSI },
- 	{ .compatible = "mediatek,mt8173-dpi",        .data = (void *)MTK_DPI },
-+	{ .compatible = "mediatek,mt2701-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
- 	{ .compatible = "mediatek,mt8173-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
-+	{ .compatible = "mediatek,mt2701-disp-pwm",   .data = (void *)MTK_DISP_BLS },
- 	{ .compatible = "mediatek,mt8173-disp-pwm",   .data = (void *)MTK_DISP_PWM },
- 	{ .compatible = "mediatek,mt8173-disp-od",    .data = (void *)MTK_DISP_OD },
- 	{ }
-@@ -522,6 +549,8 @@ static SIMPLE_DEV_PM_OPS(mtk_drm_pm_ops, mtk_drm_sys_suspend,
- 			 mtk_drm_sys_resume);
- 
- static const struct of_device_id mtk_drm_of_ids[] = {
-+	{ .compatible = "mediatek,mt2701-mmsys",
-+	  .data = &mt2701_mmsys_driver_data},
- 	{ .compatible = "mediatek,mt8173-mmsys",
- 	  .data = &mt8173_mmsys_driver_data},
- 	{ }
-diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-index 0569f2e..f63cc91 100644
---- a/drivers/gpu/drm/mediatek/mtk_dsi.c
-+++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-@@ -1203,6 +1203,7 @@ static int mtk_dsi_remove(struct platform_device *pdev)
- }
- 
- static const struct of_device_id mtk_dsi_of_match[] = {
-+	{ .compatible = "mediatek,mt2701-dsi" },
- 	{ .compatible = "mediatek,mt8173-dsi" },
- 	{ },
- };
-diff --git a/drivers/gpu/drm/mediatek/mtk_mipi_tx.c b/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
-index 1ef00ac..00cc906 100644
---- a/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
-+++ b/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
-@@ -467,11 +467,17 @@ static int mtk_mipi_tx_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct mtk_mipitx_data mt2701_mipitx_data = {
-+	.mppll_preserve = (3 << 8)
-+};
-+
- static const struct mtk_mipitx_data mt8173_mipitx_data = {
- 	.mppll_preserve = (0 << 8)
- };
- 
- static const struct of_device_id mtk_mipi_tx_match[] = {
-+	{ .compatible = "mediatek,mt2701-mipi-tx",
-+	  .data = &mt2701_mipitx_data },
- 	{ .compatible = "mediatek,mt8173-mipi-tx",
- 	  .data = &mt8173_mipitx_data },
- 	{},
--- 
-1.9.1
+On 2016?11?25? 18:25, Philipp Zabel wrote:
+> Am Donnerstag, den 24.11.2016, 18:20 +0800 schrieb zhangfei:
+>> On 2016?11?24? 17:50, Philipp Zabel wrote:
+>>> Am Donnerstag, den 24.11.2016, 17:40 +0800 schrieb zhangfei:
+>>>> On 2016?11?24? 17:26, Philipp Zabel wrote:
+>>>>> Am Mittwoch, den 23.11.2016, 16:07 +0800 schrieb Zhangfei Gao:
+>>>>>> Add DT bindings documentation for hi3660 SoC reset controller.
+>>>>>>
+>>>>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>>>>>> ---
+>>>>>>     .../bindings/reset/hisilicon,hi3660-reset.txt      | 51 ++++++++++++++++++++++
+>>>>>>     1 file changed, 51 insertions(+)
+>>>>>>     create mode 100644 Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+>>>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+>>>>>> new file mode 100644
+>>>>>> index 0000000..250daf2
+>>>>>> --- /dev/null
+>>>>>> +++ b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+>>>>>> @@ -0,0 +1,51 @@
+>>>>>> +Hisilicon System Reset Controller
+>>>>>> +======================================
+>>>>>> +
+>>>>>> +Please also refer to reset.txt in this directory for common reset
+>>>>>> +controller binding usage.
+>>>>>> +
+>>>>>> +The reset controller registers are part of the system-ctl block on
+>>>>>> +hi3660 SoC.
+>>>>>> +
+>>>>>> +Required properties:
+>>>>>> +- compatible: should be
+>>>>>> +		 "hisilicon,hi3660-reset"
+>>>>>> +- #reset-cells: 1, see below
+>>>>>> +- hisi,rst-syscon: phandle of the reset's syscon.
+>>>>>> +- hisi,reset-bits: Contains the reset control register information
+>>>>>> +		  Should contain 2 cells for each reset exposed to
+>>>>>> +		  consumers, defined as:
+>>>>>> +			Cell #1 : offset from the syscon register base
+>>>>>> +			Cell #2 : bits position of the control register
+>>>>>> +
+>>>>>> +Example:
+>>>>>> +	iomcu: iomcu at ffd7e000 {
+>>>>>> +		compatible = "hisilicon,hi3660-iomcu", "syscon";
+>>>>>> +		reg = <0x0 0xffd7e000 0x0 0x1000>;
+>>>>>> +	};
+>>>>>> +
+>>>>>> +	iomcu_rst: iomcu_rst_controller {
+>>>>> This should be
+>>>>> 	iomcu_rst: reset-controller {
+>>>>>
+>>>>>> +		compatible = "hisilicon,hi3660-reset";
+>>>>>> +		#reset-cells = <1>;
+>>>>>> +		hisi,rst-syscon = <&iomcu>;
+>>>>>> +		hisi,reset-bits = <0x20 0x8		/* 0: i2c0 */
+>>>>>> +				   0x20 0x10		/* 1: i2c1 */
+>>>>>> +				   0x20 0x20		/* 2: i2c2 */
+>>>>>> +				   0x20 0x8000000>;	/* 3: i2c6 */
+>>>>>> +	};
+>>>>> The reset lines are controlled through iomcu bits, is there a reason not
+>>>>> to put the iomcu_rst node inside the iomcu node? That way the
+>>>>> hisi,rst-syscon property could be removed and the syscon could be
+>>>>> retrieved via the reset-controller parent node.
+>>>> iomcu is common registers, controls clock and reset, etc.
+>>>> So we use syscon, without mapping the registers everywhere.
+>>>> It is common case in hisilicon, same in hi6220.
+>>>>
+>>>> Also the #clock-cells and #reset-cells can not be put in the same node,
+>>>> if they are both using probe, since reset_probe will not be called.
+>>>>
+>>>> So we use hisi,rst-syscon as a general solution.
+>>> What I meant is this:
+>>>
+>>> 	iomcu: iomcu at ffd7e000 {
+>>> 		compatible = "hisilicon,hi3660-iomcu", "syscon", "simple-mfd";
+>>> 		reg = <0x0 0xffd7e000 0x0 0x1000>;
+>> #clock-cells = <1>;
+>>
+>> In my test, if there add #clock-cells = <1>, reset_probe will not be
+>> called any more.
+>> Since clk_probe is called first.
+>> No matter iomcu_rst is child node or not.
+> I don't understand this, does the clock driver bind to the iomcu node
+> using CLK_OF_DECLARE_DRIVER(..., "hisilicon,hi3660-iomcu", ...)?
+
+This method:CLK_OF_DECLARE_DRIVER is not prefered in clock,
+and we have to use probe instead, to make all driver build as modules as 
+possible.
+
+For example hi3660.
+static struct platform_driver hi3660_clk_driver = {
+         .probe          = hi3660_clk_probe,
+         .driver         = {
+                 .name   = "hi3660-clk",
+                 .of_match_table = hi3660_clk_match_table,
+         },
+};
+
+static int __init hi3660_clk_init(void)
+{
+         return platform_driver_register(&hi3660_clk_driver);
+}
+core_initcall(hi3660_clk_init);
+
+And many examples in drivers/clock, just
+#grep -rn probe drivers/clk/
+drivers/clk/clk-axm5516.c:587:    .probe        = axmclk_probe,
+
+If the parent node happen to be clock, and set
+
+#clock-cells = <1>;
+Then clock_probe/hi3660_clk_probe will be called first.
+But reset_probe will not be called any more.
+
+Thanks
+
+>
+> My comment was based only on this reset binding documentation and the
+> example DT snippet. Could you point me to the clock driver probe code
+> and show me a more complete part of the hi3660 device tree?
+>
+> regards
+> Philipp
+>
