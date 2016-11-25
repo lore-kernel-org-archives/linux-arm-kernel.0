@@ -1,96 +1,52 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 25 Nov 2016 14:01:51 +0100
-Subject: [PATCH v2 2/7] net: stmmac: dwmac-meson8b: make the RGMII TX delay
- configurable
+Date: Fri, 25 Nov 2016 14:01:54 +0100
+Subject: [PATCH v2 5/7] ARM64: dts: meson-gxbb-p20x: add reset for the
+ ethernet PHY
 In-Reply-To: <20161125130156.17879-1-martin.blumenstingl@googlemail.com>
 References: <20161124143417.10178-1-martin.blumenstingl@googlemail.com>
  <20161125130156.17879-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20161125130156.17879-3-martin.blumenstingl@googlemail.com>
+Message-ID: <20161125130156.17879-6-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prior to this patch we were using a hardcoded RGMII TX clock delay of
-2ns (= 1/4 cycle of the 125MHz RGMII TX clock). This value works for
-many boards, but unfortunately not for all (due to the way the actual
-circuit is designed, sometimes because the TX delay is enabled in the
-PHY, etc.). Making the TX delay on the MAC side configurable allows us
-to support all possible hardware combinations.
-
-This allows fixing a compatibility issue on some boards, where the
-RTL8211F PHY is configured to generate the TX delay. We can now turn
-off the TX delay in the MAC, because otherwise we would be applying the
-delay twice (which results in non-working TX traffic).
+This resets the ethernet PHY during boot to get the PHY into a "clean"
+state. While here also specify the phy-handle of the ethmac node to
+make the PHY configuration similar to the one we have on GXL devices.
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 ---
- .../net/ethernet/stmicro/stmmac/dwmac-meson8b.c    | 26 +++++++++++++++++-----
- 1 file changed, 20 insertions(+), 6 deletions(-)
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
-index 250e4ce..8ba33be 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
-@@ -35,10 +35,6 @@
- 
- #define PRG_ETH0_TXDLY_SHIFT		5
- #define PRG_ETH0_TXDLY_MASK		GENMASK(6, 5)
--#define PRG_ETH0_TXDLY_OFF		(0x0 << PRG_ETH0_TXDLY_SHIFT)
--#define PRG_ETH0_TXDLY_QUARTER		(0x1 << PRG_ETH0_TXDLY_SHIFT)
--#define PRG_ETH0_TXDLY_HALF		(0x2 << PRG_ETH0_TXDLY_SHIFT)
--#define PRG_ETH0_TXDLY_THREE_QUARTERS	(0x3 << PRG_ETH0_TXDLY_SHIFT)
- 
- /* divider for the result of m250_sel */
- #define PRG_ETH0_CLK_M250_DIV_SHIFT	7
-@@ -69,6 +65,8 @@ struct meson8b_dwmac {
- 
- 	struct clk_divider	m25_div;
- 	struct clk		*m25_div_clk;
-+
-+	u32			tx_delay_ns;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+index 203be28..2abc553 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+@@ -134,10 +134,25 @@
+ 	pinctrl-names = "default";
  };
  
- static void meson8b_dwmac_mask_bits(struct meson8b_dwmac *dwmac, u32 reg,
-@@ -179,6 +177,7 @@ static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
- {
- 	int ret;
- 	unsigned long clk_rate;
-+	u8 tx_dly_val;
++&mdio0 {
++	ethernet_phy0: ethernet-phy at 0 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <0>;
++	};
++};
++
+ &ethmac {
+ 	status = "okay";
+ 	pinctrl-0 = <&eth_rgmii_pins>;
+ 	pinctrl-names = "default";
++
++	phy-handle = <&ethernet_phy0>;
++
++	snps,reset-gpio = <&gpio GPIOZ_14 0>;
++	snps,reset-delays-us = <0 10000 1000000>;
++	snps,reset-active-low;
++
++	phy-mode = "rgmii";
+ };
  
- 	switch (dwmac->phy_mode) {
- 	case PHY_INTERFACE_MODE_RGMII:
-@@ -196,9 +195,13 @@ static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
- 		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0,
- 					PRG_ETH0_INVERTED_RMII_CLK, 0);
- 
--		/* TX clock delay - all known boards use a 1/4 cycle delay */
-+		/* TX clock delay in ns = "8ns / 4 * tx_dly_val" (where
-+		 * 8ns are exactly one cycle of the 125MHz RGMII TX clock):
-+		 * 0ns = 0x0, 2ns = 0x1, 4ns = 0x2, 6ns = 0x3
-+		 */
-+		tx_dly_val = dwmac->tx_delay_ns >> 1;
- 		meson8b_dwmac_mask_bits(dwmac, PRG_ETH0, PRG_ETH0_TXDLY_MASK,
--					PRG_ETH0_TXDLY_QUARTER);
-+					tx_dly_val << PRG_ETH0_TXDLY_SHIFT);
- 		break;
- 
- 	case PHY_INTERFACE_MODE_RMII:
-@@ -277,6 +280,17 @@ static int meson8b_dwmac_probe(struct platform_device *pdev)
- 	if (dwmac->phy_mode < 0) {
- 		dev_err(&pdev->dev, "missing phy-mode property\n");
- 		return -EINVAL;
-+	} else if (dwmac->phy_mode != PHY_INTERFACE_MODE_RMII) {
-+		ret = of_property_read_u32(pdev->dev.of_node,
-+					   "amlogic,tx-delay-ns",
-+					   &dwmac->tx_delay_ns);
-+		if (ret && dwmac->phy_mode == PHY_INTERFACE_MODE_RGMII)
-+			/* default to a TX clock delay of 2ns when the PHY is
-+			 * connected via RGMII (with RGMII_ID and RGMII_TXID
-+			 * the TX clock delay is generated by the PHY and thus
-+			 * we use the default 0ns delay in these case).
-+			 */
-+			dwmac->tx_delay_ns = 2;
- 	}
- 
- 	ret = meson8b_init_clk(dwmac);
+ &ir {
 -- 
 2.10.2
