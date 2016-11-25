@@ -1,53 +1,70 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Nov 2016 23:22:33 +0100
-Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
-In-Reply-To: <1512445.DtnT51NQqg@amdc3058>
-References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
- <2291876.8LAt3RcuXX@amdc3058> <1512445.DtnT51NQqg@amdc3058>
-Message-ID: <2979452.etgg2fh1hR@wuerfel>
+Date: Fri, 25 Nov 2016 23:26:47 +0100
+Subject: [PATCH 1/2] drivers: psci: PSCI checker module
+In-Reply-To: <20161108175547.31146-1-lorenzo.pieralisi@arm.com>
+References: <20161108175547.31146-1-lorenzo.pieralisi@arm.com>
+Message-ID: <4573128.hBCC419TUo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, October 31, 2016 7:24:46 PM CET Bartlomiej Zolnierkiewicz wrote:
-> On Monday, October 31, 2016 07:14:13 PM Bartlomiej Zolnierkiewicz wrote:
-> > On Monday, October 31, 2016 03:46:22 PM Russell King - ARM Linux wrote:
-> > > On Wed, Oct 26, 2016 at 07:01:12PM +0200, Bartlomiej Zolnierkiewicz wrote:
-> > > > > I'd be fine with just getting a pull request with all the patches that
-> > > > > had no negative feedback and that were not already applied (if any).
-> > > > 
-> > > > Here it is (sorry for taking so long).
-> > > 
-> > > I've just been digging in the dmesg logs from when I was using the
-> > > Assabet+Neponset as my firewall, and it was having to use the IDE
-> > > ide-cs driver rather than the pata pcmcia driver.
-> > > 
-> > > I don't recall whether the pata pcmcia driver was a problem or not,
-> > > as the PCMCIA interface can't cope with _any_ 32-bit accesses.  I
-> > > think PATA tries to use the "highest" possible access size by
-> > > default...
-> > 
-> > It doesn't actually - it defaults to 16-bits for PIO data access and
-> > you must explicitly enable 32-bits using ATA_PFLAG_PIO32 port flag
-> > (pata_pcmcia doesn't set it so it should be okay).  Also taskfile
-> > registers are accessed using 8-bits access by default transport
-> > functions (which are used by pata_pcmcia).
+On Tuesday, November 8, 2016 5:55:46 PM CET Lorenzo Pieralisi wrote:
+> From: Kevin Brodsky <kevin.brodsky@arm.com>
 > 
-> Please also note that:
+> On arm and arm64, PSCI is one of the possible firmware interfaces
+> used for power management. This includes both turning CPUs on and off,
+> and suspending them (entering idle states).
 > 
-> - assebet_defconfig currently doesn't even enable ide-cs
->   (CONFIG_BLK_DEV_IDECS) in the mainline kernel
+> This patch adds a PSCI checker module that enables basic testing of
+> PSCI operations during startup. There are two main tests: CPU
+> hotplugging and suspending.
 > 
-> - neponset_defconfig doesn't even enable IDE (CONFIG_IDE)
->   in the mainline kernel
+> In the hotplug tests, the hotplug API is used to turn off and on again
+> all CPUs in the system, and then all CPUs in each cluster, checking
+> the consistency of the return codes.
 > 
-> so there is no risk of breaking anything.. 
+> In the suspend tests, a high-priority thread is created on each core
+> and uses low-level cpuidle functionalities to enter suspend, in all
+> the possible states and multiple times. This should allow a maximum
+> number of CPUs to enter the same sleep state at the same or slightly
+> different time.
+> 
+> In essence, the suspend tests use a principle similar to that of the
+> intel_powerclamp driver (drivers/thermal/intel_powerclamp.c), but the
+> threads are only kept for the duration of the test (they are already
+> gone when userspace is started) and it does not require to stop/start
+> the tick.
+> 
+> While in theory power management PSCI functions (CPU_{ON,OFF,SUSPEND})
+> could be directly called, this proved too difficult as it would imply
+> the duplication of all the logic used by the kernel to allow for a
+> clean shutdown/bringup/suspend of the CPU (the deepest sleep states
+> implying potentially the shutdown of the CPU).
+> 
+> Note that this file cannot be compiled as a loadable module, since it
+> uses a number of non-exported identifiers (essentially for
+> PSCI-specific checks and direct use of cpuidle) and relies on the
+> absence of userspace to avoid races when calling hotplug and cpuidle
+> functions.
+> 
+> For now at least, CONFIG_PSCI_CHECKER is mutually exclusive with
+> CONFIG_TORTURE_TEST, because torture tests may also use hotplug and
+> cause false positives in the hotplug tests.
+> 
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Cc: Peter Zijlstra <peterz@infradead.org>
+> Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> [torture test config]
+> Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
+> [lpieralisi: added cpuidle locking, reworded commit log/kconfig entry]
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-I noticed this older pull request in my todo folder, my interpretation
-is that the concern was resolved and we simply missed it.
-
-I've pulled it into next/defconfig for v4.10 now, with the above
-in the merge commit text for reference.
-
-Thanks,
+Applied both patches to the next/drivers tree in arm-soc now, sorry
+for the delay,
 
 	Arnd
