@@ -1,135 +1,76 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 25 Nov 2016 13:46:26 +0100
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <20161125045549.GC2698@localhost>
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
-Message-ID: <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 25 Nov 2016 12:48:57 +0000
+Subject: [PATCH v3 2/3] powerpc/reloc64: add support for 32-bit CRC
+ pseudo-symbols
+In-Reply-To: <87oa13ssqq.fsf@concordia.ellerman.id.au>
+References: <1477585631-18574-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1477585631-18574-3-git-send-email-ard.biesheuvel@linaro.org>
+ <87oa13ssqq.fsf@concordia.ellerman.id.au>
+Message-ID: <CAKv+Gu8g=qgOg0Q5J7tFu0uBUFTUXdVQ+84N45oZseG3vTm0Bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/11/2016 05:55, Vinod Koul wrote:
-
-> On Wed, Nov 23, 2016 at 11:25:44AM +0100, Mason wrote:
+On 25 November 2016 at 11:29, Michael Ellerman <mpe@ellerman.id.au> wrote:
+> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
 >
->> On my platform, setting up a DMA transfer is a two-step process:
->>
->> 1) configure the "switch box" to connect a device to a memory channel
->> 2) configure the transfer details (address, size, command)
->>
->> When the transfer is done, the sbox setup can be torn down,
->> and the DMA driver can start another transfer.
->>
->> The current software architecture for my NFC (NAND Flash controller)
->> driver is as follows (for one DMA transfer).
->>
->>   sg_init_one
->>   dma_map_sg
->>   dmaengine_prep_slave_sg
->>   dmaengine_submit
->>   dma_async_issue_pending
->>   configure_NFC_transfer
->>   wait_for_IRQ_from_DMA_engine // via DMA_PREP_INTERRUPT
->>   wait_for_NFC_idle
->>   dma_unmap_sg
-> 
-> Looking at thread and discussion now, first thinking would be to ensure
-> the transaction is completed properly and then isr fired. You may need
-> to talk to your HW designers to find a way for that. It is quite common
-> that DMA controllers will fire and complete whereas the transaction is
-> still in flight.
+>> diff --git a/arch/powerpc/relocs_check.sh b/arch/powerpc/relocs_check.sh
+>> index ec2d5c835170..2f510fbc87da 100755
+>> --- a/arch/powerpc/relocs_check.sh
+>> +++ b/arch/powerpc/relocs_check.sh
+>> @@ -43,7 +43,8 @@ R_PPC_ADDR16_HA
+>>  R_PPC_RELATIVE
+>>  R_PPC_NONE' |
+>>       grep -E -v '\<R_PPC64_ADDR64[[:space:]]+mach_' |
+>> -     grep -E -v '\<R_PPC64_ADDR64[[:space:]]+__crc_'
+>> +     grep -E -v '\<R_PPC64_ADDR64[[:space:]]+__crc_' |
+>> +     grep -E -v '\<R_PPC64_ADDR32[[:space:]]+\*ABS\*'
+>
+> I'm still getting:
+>
+> WARNING: 24 bad relocations
+> c000000000d307c4 R_PPC64_ADDR32    __crc___arch_hweight16
+> c000000000d307c8 R_PPC64_ADDR32    __crc___arch_hweight32
+> c000000000d307cc R_PPC64_ADDR32    __crc___arch_hweight64
+> c000000000d307d0 R_PPC64_ADDR32    __crc___arch_hweight8
+> c000000000d30848 R_PPC64_ADDR32    __crc___bswapdi2
+> c000000000d30854 R_PPC64_ADDR32    __crc___clear_user
+> c000000000d30868 R_PPC64_ADDR32    __crc___copy_tofrom_user
+> c000000000d30d4c R_PPC64_ADDR32    __crc__mcount
+> c000000000d31344 R_PPC64_ADDR32    __crc_copy_page
+> c000000000d3141c R_PPC64_ADDR32    __crc_current_stack_pointer
+> c000000000d31840 R_PPC64_ADDR32    __crc_empty_zero_page
+> c000000000d31a7c R_PPC64_ADDR32    __crc_flush_dcache_range
+> c000000000d31a84 R_PPC64_ADDR32    __crc_flush_icache_range
+> c000000000d32608 R_PPC64_ADDR32    __crc_load_fp_state
+> c000000000d32614 R_PPC64_ADDR32    __crc_load_vr_state
+> c000000000d32828 R_PPC64_ADDR32    __crc_memchr
+> c000000000d32830 R_PPC64_ADDR32    __crc_memcmp
+> c000000000d32834 R_PPC64_ADDR32    __crc_memcpy
+> c000000000d32840 R_PPC64_ADDR32    __crc_memmove
+> c000000000d32888 R_PPC64_ADDR32    __crc_memset
+> c000000000d33c9c R_PPC64_ADDR32    __crc_store_fp_state
+> c000000000d33ca0 R_PPC64_ADDR32    __crc_store_vr_state
+> c000000000d33cf0 R_PPC64_ADDR32    __crc_strncmp
+> c000000000d33cf4 R_PPC64_ADDR32    __crc_strncpy
+>
 
-It seems there is a disconnect between what Linux expects - an IRQ
-when the transfer is complete - and the quirks of this HW :-(
+Ah right, my bad. The regex above should switch to ADDR32 as well for
+__crc_ symbols.
 
-On this system, there are MBUS "agents" connected via a "switch box".
-An agent fires an IRQ when it has dealt with its *half* of the transfer.
+>
+> If I just add those to the whitelist it builds, but then things aren't
+> happy at boot:
+>
+>
+> [    7.607687] kvm: disagrees about version of symbol module_layout
+> [    7.846799] virtio: disagrees about version of symbol module_layout
+> [   22.012615] crc32c_vpmsum: disagrees about version of symbol module_layout
+> [   22.012959] libcrc32c: disagrees about version of symbol module_layout
+>
 
-SOURCE_AGENT <---> SBOX <---> DESTINATION_AGENT
+Sigh. I suppose your modversions fixes are queued for v4.10? It's
+probably best to revisit this after the v4.10 merge window closes
+then, just to make sure I'm not aiming for a moving target.
 
-Here are the steps for a transfer, in the general case:
-
-1) setup the sbox to connect SOURCE TO DEST
-2) configure source to send N bytes
-3) configure dest to receive N bytes
-
-When SOURCE_AGENT has sent N bytes, it fires an IRQ
-When DEST_AGENT has received N bytes, it fires an IRQ
-The sbox connection can be torn down only when the destination
-agent has received all bytes.
-(And the twist is that some agents do not have an IRQ line.)
-
-The system provides 3 RAM-to-sbox agents (read channels)
-and 3 sbox-to-RAM agents (write channels).
-
-The NAND Flash controller read and write agents do not have
-IRQ lines.
-
-So for a NAND-to-memory transfer (read from device)
-- nothing happens when the NFC has finished sending N bytes to the sbox
-- the write channel fires an IRQ when it has received N bytes
-
-In that case, one IRQ fires when the transfer is complete,
-like Linux expects.
-
-For a memory-to-NAND transfer (write to device)
-- the read channel fires an IRQ when it has sent N bytes
-- the NFC driver is supposed to poll the NFC to determine
-when the controller has finished writing N bytes
-
-In that case, the IRQ does not indicate that the transfer
-is complete, merely that the sending half has finished
-its part.
-
-For a memory-to-memory transfer (memcpy)
-- the read channel fires an IRQ when it has sent N bytes
-- the write channel fires an IRQ when it has received N bytes
-
-So you actually get two IRQs in that case, which I don't
-think Linux (or the current DMA driver) expects.
-
-I'm not sure how we're supposed to handle this kind of HW
-in Linux? (That's why I started this thread.)
-
-
-> If that is not doable, then since you claim this is custom part which
-> other vendors won't use (hope we are wrong down the line),
-
-I'm not sure how to interpret "you claim this is custom part".
-Do you mean I may be wrong, that it is not custom?
-I don't know if other vendors may have HW with the same
-quirky behavior. What do you mean about being wrong down
-the line?
-
-> then we can have a custom api,
-> 
-> foo_sbox_configure(bool enable, ...);
-> 
-> This can be invoked from NFC driver when required for configuration and
-> teardown. For very specific cases where people need some specific
-> configuration we do allow custom APIs.
-
-I don't think that would work. The fundamental issue is
-that Linux expects a single IRQ to indicate "transfer
-complete". And the driver (as written) starts a new
-transfer as soon as the IRQ fires.
-
-But the HW may generate 0, 1, or even 2 IRQs for a single
-transfer. And when there is a single IRQ, it may not
-indicate "transfer complete" (as seen above).
-
-> Only problem with that would be it wont be a generic solution
-> and you seem to be fine with that.
-
-I think it is possible to have a generic solution:
-Right now, the callback is called from tasklet context.
-If we can have a new flag to have the callback invoked
-directly from the ISR, then the driver for the client
-device can do what is required.
-
-For example, the NFC driver waits for the IRQ from the
-memory agent, and then polls the controller itself.
-
-I can whip up a proof-of-concept if it's better to
-illustrate with a patch?
-
-Regards.
+Thanks,
+Ard.
