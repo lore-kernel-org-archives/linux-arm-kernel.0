@@ -1,35 +1,30 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 25 Nov 2016 07:35:46 +0100
-Subject: [PATCH] clk: sunxi-ng: fix PLL_CPUX adjusting on H3
-In-Reply-To: <20161125002852.18097-1-megous@megous.com>
-References: <20161125002852.18097-1-megous@megous.com>
-Message-ID: <20161125063546.n3s3dpxdi6ashjtq@lukather>
+From: moinejf@gmail.com (=?ISO-8859-1?Q?Jean-Fran=E7ois?= Moine)
+Date: Fri, 25 Nov 2016 07:57:32 +0100
+Subject: [linux-sunxi] [PATCH v6 3/5] ARM: dts: sun8i-h3: add HDMI video
+ nodes
+In-Reply-To: <6896101480051640@web28h.yandex.ru>
+References: <cover.1479641523.git.moinejf@free.fr>
+ <cdf50b8433e2d9a053e35f8788bfcd5d41504312.1479641523.git.moinejf@free.fr>
+ <6896101480051640@web28h.yandex.ru>
+Message-ID: <20161125075732.a2bdb9908bb9d5de7edb41a8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 25, 2016 at 01:28:47AM +0100, megous at megous.com wrote:
-> From: Ondrej Jirman <megous@megous.com>
-> 
-> When adjusting PLL_CPUX on H3, the PLL is temporarily driven
-> too high, and the system becomes unstable (oopses or hangs).
-> 
-> Add a notifier to avoid this situation by temporarily switching
-> to a known stable 24 MHz oscillator.
-> 
-> Signed-off-by: Ondrej Jirman <megous@megous.com>
-> Tested-by: Lutz Sammer <johns98@gmx.net>
+On Fri, 25 Nov 2016 13:27:20 +0800
+Icenowy Zheng <icenowy@aosc.xyz> wrote:
 
-Applied, thanks!
-Maxime
+> > + assigned-clocks = <&ccu CLK_PLL_DE>,
+> 
+> Cannot get the patch built on 4.9-rc, as CLK_PLL_DE is not an exported clock.
+
+Hi,
+
+Sorry, I forgot it. The symbol goes to
+include/dt-bindings/clock/sun8i-h3-ccu.h
+as:
+
+#define CLK_PLL_DE		13
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161125/8ebd4b9a/attachment.sig>
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
