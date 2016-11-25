@@ -1,146 +1,114 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 24 Nov 2016 21:20:15 -0800
-Subject: [PATCH V8 2/6] thermal: bcm2835: add thermal driver for bcm2835
- soc
-In-Reply-To: <28F93ABE-8210-4389-AE77-4D5E830E669B@martin.sperl.org>
-References: <1478081906-12009-1-git-send-email-kernel@martin.sperl.org>
- <1478081906-12009-3-git-send-email-kernel@martin.sperl.org>
- <20161117021107.GA2647@localhost.localdomain>
- <766e1b70-d83a-eb52-fa2b-aec435e85673@martin.sperl.org>
- <20161117151019.GA3115@localhost.localdomain>
- <7957B3CC-0E18-4B27-82EB-EF88B7695E28@martin.sperl.org>
- <20161119042224.GA25063@localhost.localdomain>
- <28F93ABE-8210-4389-AE77-4D5E830E669B@martin.sperl.org>
-Message-ID: <20161125052008.GA8342@localhost.localdomain>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Fri, 25 Nov 2016 13:27:20 +0800
+Subject: [linux-sunxi] [PATCH v6 3/5] ARM: dts: sun8i-h3: add HDMI video
+ nodes
+In-Reply-To: <cdf50b8433e2d9a053e35f8788bfcd5d41504312.1479641523.git.moinejf@free.fr>
+References: <cover.1479641523.git.moinejf@free.fr>
+ <cdf50b8433e2d9a053e35f8788bfcd5d41504312.1479641523.git.moinejf@free.fr>
+Message-ID: <6896101480051640@web28h.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, Nov 22, 2016 at 03:28:04PM +0100, Martin Sperl wrote:
-> Hi Eduardo!
-> 
-> On 19.11.2016 05:22, Eduardo Valentin wrote:
-> > Hello Martin,
-
-<cut>
-
-> 
-> I was asked to implement the "initialize" case just in case FW ever
-> stopped setting up the device itself, so that is why this code is
-> included.
-
-OK. Looks like we (like, we in the Linux side) do not understand the
-conditions that firmware fails to initialize the thermal device, but we
-still want to force an initialization, hoping to get the device in a sane
-state, even if we do not know if the firmware is correctly booted or
-not. And that is done silently, with no notification to user. I see.
-
-> 
-> > 
-> > Who has the ownership of this device?
-> 
-> Joined ownership I suppose...
-> 
-
-with no synchronization mechanism?
-
-> > 
-> >> The above mentioned ?configuration if not running? reflect the values that
-> >> the FW is currently setting. We should not change those values as long as the
-> >> Firmware is also reading the temperature on its own.
-> > 
-> > hmm.. that looks like racy to me. Again, How do you synchronize accesses to
-> > this device? What if you configure the device and right after the
-> > firmware updates the configs? How do you make sure the configs you are
-> > writing here are the same used by the firmware? What if the firmware
-> > version changes? What versions of the firmware does this driver support?
-> > 
-> > Would it make sense to simply always initialize the device? Do you have
-> > a way to tell the firmware that it should not use the device?
-> > 
-> > Or, if you want to keep the device driver simply being a dummy reader,
-> > would it make sense to simply avoid writing configurations to the
-> > device, and simply retry to check if the firmware gets the device
-> > initialized?
-> 
-> Again: the device registers are only ever written if the device is not started
-> already. Otherwise the driver only reads for the ADC register, so there
-> is no real race here.
-> 
-
-and no race?
-
-To me, there is a race when you write to the config of this device,
-given that there is no sync between the two. We do not know if the
-firmware would be still attempting to initialize the device or not, do
-we? 
-
-> > 
-> >> 
-> >>> 
-> >>>> So do you need another version of the patchset that uses that new API?
-> >>> 
-> >>> I think the API usage is change that can be done together with
-> >>> clarification for the above questions too: on hardware state,
-> >>> firmware loading, maybe a master driver dependency, and the ADC
-> >>> conversion sequence, which are not well clear to me on this driver. As long as
-> >>> this is clarified and documented in the code (can be simple comments so
-> >>> it is clear to whoever reads in the future), then I would be OK with
-> >>> this driver.
-> >> 
-> >> So how do you want this to get ?documented? in the driver?
-> >> The setup and Firmware is a generic feature of the SOC, so if we would put
-> >> some clarifications in this driver, then we would need to put it in every
-> >> bcm283X driver (which seems unreasonable).
-> >> 
-> > 
-> > I think a simple comment explaining the firmware dependency and the
-> > expected pre-conditions to get this driver working in a sane state would
-> > do it.
-> > 
-> > A better device initialization would also be appreciated. Based on my
-> > limited understanding of this platform, and your explanations, this
-> > device seams to have a serious race condition with firmware while
-> > accessing this device.
-> 
-> Again: the firmware runs before the ARM is started and for all practical
-> purposes the firmware is (as of now) configuring the thermal device.
-> 
-
-Oh, OK, we know the firmware wont touch the thermal device, right?
-
-Then, If that is the case, what is still not clear is in which conditions
-the firmware would leave the thermal device uninitialized.
-
-This driver seams to be only concerned of critical temperature. The
-concern I see with this code, and the explanations I heard, is a side
-effect of seeing spurious thermal shutdown, or even worse, getting the
-device booted hot and never shutting down, due to (possible) race
-between the two systems.
-
-Besides, if the firmware would not touch the thermal device when ARM is
-running, why not always writing to the device a configuration that you
-know is your sane starting point? Just do not rely on what was
-previously set. How do you know it is a sane configuration? Have you
-done sensor calibration exercise to confirm temperature reads are
-correct?
-
-> As for the use of thermal_zone_get_offset/slope: looking into the code
-> it looks like this actually blows up the code, as we now would need to
-> allocate thermal_zone_params and preset it with the ?correct? values.
-> 
-> So more code to maintain and more memory consumed.
-> The only advantage I would see is that it would allow to set offset and
-> slope directly in the device tree.
-> 
-
-Any specific reason not to use of-thermal, then?
 
 
-> Thanks,
-> 		Martin
+20.11.2016, 20:07, "Jean-Francois Moine" <moinejf@free.fr>:
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+> ?arch/arm/boot/dts/sun8i-h3.dtsi | 51 +++++++++++++++++++++++++++++++++++++++++
+> ?1 file changed, 51 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> index 416b825..7c6b1d5 100644
+> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> @@ -140,6 +140,16 @@
+> ?????????????????#size-cells = <1>;
+> ?????????????????ranges;
+>
+> + de: de-controller at 01000000 {
+> + compatible = "allwinner,sun8i-h3-display-engine";
+> + reg = <0x01000000 0x400000>;
+> + clocks = <&ccu CLK_BUS_DE>, <&ccu CLK_DE>;
+> + clock-names = "bus", "clock";
+> + resets = <&ccu RST_BUS_DE>;
+> + ports = <&lcd0_p>;
+> + status = "disabled";
+> + };
+> +
+> ?????????????????dma: dma-controller at 01c02000 {
+> ?????????????????????????compatible = "allwinner,sun8i-h3-dma";
+> ?????????????????????????reg = <0x01c02000 0x1000>;
+> @@ -149,6 +159,23 @@
+> ?????????????????????????#dma-cells = <1>;
+> ?????????????????};
+>
+> + lcd0: lcd-controller at 01c0c000 {
+> + compatible = "allwinner,sun8i-a83t-tcon";
+> + reg = <0x01c0c000 0x400>;
+> + clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_TCON0>;
+> + clock-names = "bus", "clock";
+> + resets = <&ccu RST_BUS_TCON0>;
+> + interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+> + status = "disabled";
+> + #address-cells = <1>;
+> + #size-cells = <0>;
+> + lcd0_p: port {
+> + lcd0_hdmi: endpoint {
+> + remote-endpoint = <&hdmi_lcd0>;
+> + };
+> + };
+> + };
+> +
+> ?????????????????mmc0: mmc at 01c0f000 {
+> ?????????????????????????compatible = "allwinner,sun7i-a20-mmc";
+> ?????????????????????????reg = <0x01c0f000 0x1000>;
+> @@ -314,6 +341,11 @@
+> ?????????????????????????clock-names = "hosc", "losc";
+> ?????????????????????????#clock-cells = <1>;
+> ?????????????????????????#reset-cells = <1>;
+> +
+> + assigned-clocks = <&ccu CLK_PLL_DE>,
 
-BR,
+Cannot get the patch built on 4.9-rc, as CLK_PLL_DE is not an exported clock.
 
-Eduardo Valentin
+Only CLK_DE is exported.
+
+> + <&ccu CLK_DE>;
+> + assigned-clock-rates = <864000000>,
+> + <432000000>;
+> ?????????????????};
+>
+> ?????????????????pio: pinctrl at 01c20800 {
+> @@ -564,6 +596,25 @@
+> ?????????????????????????interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+> ?????????????????};
+>
+> + hdmi: hdmi at 01ee0000 {
+> + compatible = "allwinner,sun8i-h3-hdmi";
+> + reg = <0x01ee0000 0x20000>;
+> + clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI>,
+> + <&ccu CLK_HDMI_DDC>;
+> + clock-names = "bus", "clock", "ddc-clock";
+> + resets = <&ccu RST_BUS_HDMI0>, <&ccu RST_BUS_HDMI1>;
+> + reset-names = "hdmi0", "hdmi1";
+> + status = "disabled";
+> + #address-cells = <1>;
+> + #size-cells = <0>;
+> + port at 0 { /* video */
+> + reg = <0>;
+> + hdmi_lcd0: endpoint {
+> + remote-endpoint = <&lcd0_hdmi>;
+> + };
+> + };
+> + };
+> +
+> ?????????????????rtc: rtc at 01f00000 {
+> ?????????????????????????compatible = "allwinner,sun6i-a31-rtc";
+> ?????????????????????????reg = <0x01f00000 0x54>;
+> --
+> 2.10.2
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
