@@ -1,47 +1,35 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 25 Nov 2016 20:34:38 +0800
-Subject: [PATCH v2 4/8] ARM: dts: sun8i-a23: Add device node for internal
- audio codec
-In-Reply-To: <20161125123442.28410-1-wens@csie.org>
-References: <20161125123442.28410-1-wens@csie.org>
-Message-ID: <20161125123442.28410-5-wens@csie.org>
+From: dhowells@redhat.com (David Howells)
+Date: Fri, 25 Nov 2016 12:35:03 +0000
+Subject: [PATCH 5/7] efi: Get the secure boot status [ver #3]
+In-Reply-To: <CAKv+Gu_d5+Kvo7Tptnpg7kfjpqxhQ3a3nsQ0Ufsm6rBOFry+mQ@mail.gmail.com>
+References: <CAKv+Gu_d5+Kvo7Tptnpg7kfjpqxhQ3a3nsQ0Ufsm6rBOFry+mQ@mail.gmail.com>
+ <147990561294.7576.6464430479448167484.stgit@warthog.procyon.org.uk>
+ <147990565051.7576.9673287945782426886.stgit@warthog.procyon.org.uk>
+ <1480016487.2444.18.camel@HansenPartnership.com>
+ <15173.1480066220@warthog.procyon.org.uk>
+ <CAKv+Gu_JxNLDjaK5jGbX9ACzM0uHJYMOFx7XDo4t7DtBMtFRGA@mail.gmail.com>
+ <16661.1480075392@warthog.procyon.org.uk>
+Message-ID: <17565.1480077303@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a device tree binding and driver for the A23's
-internal audio codec, add a device node for it.
+Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a23.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+> Yes. In pre-2.6, DeployedMode is not a reserved name, and so it may be
+> possible for someone to slip in a DeployedMode=0 on a secure boot
+> enabled system to trick the kernel into thinking lockdown should be
+> disabled.
 
-diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
-index 54d045dab825..4d1f929780a8 100644
---- a/arch/arm/boot/dts/sun8i-a23.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23.dtsi
-@@ -48,6 +48,22 @@
- 	memory {
- 		reg = <0x40000000 0x40000000>;
- 	};
-+
-+	soc at 01c00000 {
-+		codec: codec at 01c22c00 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun8i-a23-codec";
-+			reg = <0x01c22c00 0x400>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-+			clock-names = "apb", "codec";
-+			resets = <&ccu RST_BUS_CODEC>;
-+			dmas = <&dma 15>, <&dma 15>;
-+			dma-names = "rx", "tx";
-+			allwinner,codec-analog-controls = <&codec_analog>;
-+			status = "disabled";
-+		};
-+	};
- };
- 
- &ccu {
--- 
-2.10.2
+How does one get the version number?  Unfortunately, searching the document
+for 'version' doesn't help as every page has that in the footer:-/
+
+> > +               if (val == 1)
+> > +                       return 0;
+> 
+> I think the logic is the wrong way around here. Secure Boot is enabled
+> if SecureBoot=1 and SetupMode=0, unless DeployedMode=0. So you should
+> return 0 here if val == 0, but only when running on 2.6 or later.
+
+Good point.
+
+David
