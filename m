@@ -1,83 +1,71 @@
-From: dhowells@redhat.com (David Howells)
-Date: Fri, 25 Nov 2016 13:00:55 +0000
-Subject: [PATCH 5/7] efi: Get the secure boot status [ver #3]
-In-Reply-To: <CAKv+Gu9c-C2uXZ0fVatCM8ffXJZDgjBcDb_T0nsFecGqgrF11Q@mail.gmail.com>
-References: <CAKv+Gu9c-C2uXZ0fVatCM8ffXJZDgjBcDb_T0nsFecGqgrF11Q@mail.gmail.com>
- <147990561294.7576.6464430479448167484.stgit@warthog.procyon.org.uk>
- <147990565051.7576.9673287945782426886.stgit@warthog.procyon.org.uk>
- <1480016487.2444.18.camel@HansenPartnership.com>
- <15173.1480066220@warthog.procyon.org.uk>
- <CAKv+Gu_JxNLDjaK5jGbX9ACzM0uHJYMOFx7XDo4t7DtBMtFRGA@mail.gmail.com>
- <16661.1480075392@warthog.procyon.org.uk>
- <CAKv+Gu_d5+Kvo7Tptnpg7kfjpqxhQ3a3nsQ0Ufsm6rBOFry+mQ@mail.gmail.com>
- <17565.1480077303@warthog.procyon.org.uk>
-Message-ID: <31374.1480078855@warthog.procyon.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 25 Nov 2016 14:01:04 +0100
+Subject: [PATCH 6/10] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
+ functionality
+In-Reply-To: <76ce72f8-4b86-3b83-544f-b9a7ef871393@marvell.com>
+References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
+ <0390e7a05b6163deabb545f93729ea615eeaaee2.1477911954.git-series.gregory.clement@free-electrons.com>
+ <CAPDyKFpqPSqiEi=0UW5LoZmy+y-KHm9nbcGKBSy3RzchdLU9cA@mail.gmail.com>
+ <dd230463-04f6-df31-7056-1a185eb6cfc7@marvell.com>
+ <CAPDyKFr9uEjVQmTNP0KK8Zj9mxCW3i564E=47vTK0RLvXCjw3Q@mail.gmail.com>
+ <76ce72f8-4b86-3b83-544f-b9a7ef871393@marvell.com>
+Message-ID: <CAPDyKFrObxNVN+9uY7arCyGLDh_3jKCfdpw0d8KnncnGugwCbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Okay, how about the attached?
+[...]
 
-Can these variables every be anything other than 1 or 0?  E.g. should the
-check on SetupMode be that it isn't 0 rather than it is 1?
+>>
+>> Moreover, we have ->enable_sdio_irq() ops that deals with this.
+>>
+>    Yes. I mean the SDIO irqs on DAT1 line in async mode.
+>    This field enables our host to recognize the async SDIO irq from SDIO device.
+>    It controls our host side behavior, other than the SDIO device.
+>
+>    I think ->enable_sdio_irq() is a more reasonable place to put this workraound.
+>    I will export sdhci_enable_sdio_irq() and implement out host own
+>    enable_sdio_irq() calling sdhci_enable_sdio)irq() plus this workaround.
+>    Does it sound reasonable to you?
 
-David
----
-commit 6d4bb08e376045e27706c2740c0fdff0a6ec43f7
-Author: David Howells <dhowells@redhat.com>
-Date:   Fri Nov 25 11:52:05 2016 +0000
+Yes.
 
-    efi: Handle secure boot from UEFI-2.6
-    
-    UEFI-2.6 adds a new variable, DeployedMode.  If it exists, this must be 1
-    if we're to engage lockdown mode.
-    
-    Reported-by: James Bottomley <James.Bottomley@HansenPartnership.com>
-    Signed-off-by: David Howells <dhowells@redhat.com>
+[...]
 
-diff --git a/drivers/firmware/efi/libstub/secureboot.c b/drivers/firmware/efi/libstub/secureboot.c
-index ca643eba5a4b..157782d1c552 100644
---- a/drivers/firmware/efi/libstub/secureboot.c
-+++ b/drivers/firmware/efi/libstub/secureboot.c
-@@ -22,6 +22,9 @@ static const efi_char16_t const efi_SecureBoot_name[] = {
- static const efi_char16_t const efi_SetupMode_name[] = {
- 	'S', 'e', 't', 'u', 'p', 'M', 'o', 'd', 'e', 0
- };
-+static const efi_char16_t const efi_DeployedMode_name[] = {
-+	'D', 'e', 'p', 'l', 'o', 'y', 'e', 'd', 'M', 'o', 'd', 'e', 0
-+};
- 
- /* SHIM variables */
- static const efi_guid_t shim_guid = EFI_SHIM_LOCK_GUID;
-@@ -62,6 +65,17 @@ int efi_get_secureboot(efi_system_table_t *sys_table_arg)
- 	if (val == 1)
- 		return 0;
- 
-+	/* UEFI-2.6 requires DeployedMode to be 1. */
-+	if (sys_table_arg->hdr.revision == EFI_2_60_SYSTEM_TABLE_REVISION) {
-+		status = get_efi_var(efi_DeployedMode_name, &efi_variable_guid,
-+				     NULL, &size, &val);
-+		if (status != EFI_SUCCESS)
-+			goto out_efi_err;
-+
-+		if (val != 1)
-+			return 0;
-+	}
-+
- 	/* See if a user has put shim into insecure mode.  If so, and if the
- 	 * variable doesn't have the runtime attribute set, we might as well
- 	 * honor that.
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index 333d31bf55bf..563abb37f03f 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -645,6 +645,10 @@ typedef struct {
- 
- #define EFI_SYSTEM_TABLE_SIGNATURE ((u64)0x5453595320494249ULL)
- 
-+#define EFI_2_60_SYSTEM_TABLE_REVISION  ((2 << 16) | (60))
-+#define EFI_2_50_SYSTEM_TABLE_REVISION  ((2 << 16) | (50))
-+#define EFI_2_40_SYSTEM_TABLE_REVISION  ((2 << 16) | (40))
-+#define EFI_2_31_SYSTEM_TABLE_REVISION  ((2 << 16) | (31))
- #define EFI_2_30_SYSTEM_TABLE_REVISION  ((2 << 16) | (30))
- #define EFI_2_20_SYSTEM_TABLE_REVISION  ((2 << 16) | (20))
- #define EFI_2_10_SYSTEM_TABLE_REVISION  ((2 << 16) | (10))
+>>
+>> Got it. Although I think we can cope with that fine just by using the
+>> different SD/eMMC speed modes settings defined in DT (or from the
+>> SDHCI caps register)
+>>
+>     In my very opinion, I'm not sure if there is any corner case that driver cannot
+>     determine the eMMC card type from DT and SDHC caps.
+>
+>>>    Unfortunately, MMC driver cannot determine the card type yet when eMMC voltage
+>>>    setting should be executed.
+>>>    Thus an flag is required here to tell driver to execute eMMC voltage setting.
+>>>
+>>>    Besides, additional eMMC specific settings might be implemented in future, besides
+>>>    voltage setting. Most of them should be completed before MMC driver recognizes the
+>>>    card type. Thus I have to keep this flag to indicate current SDHC is for eMMC.
+>>
+>> I doubt you will need a generic "eMMC" flag, but let's see when we go forward.
+>>
+>> Currently it's clear you don't need such a flag, so I will submit a
+>> change adding a DT binding for "mmc-ddr-3_3v" then we can take it from
+>> there, to see if it suits your needs.
+>>
+>
+>     Actually, our eMMC is usually fixed as 1.8V.
+>
+>     The pair "no-sd" + "no-sdio" can provide the similar information.
+>     But I'm not sure if it is proper to use those two property in such a way.
+
+Well, potentially those could be used like that.
+
+The point of why we added them was to allow hosts that don't support
+the different protocols (which is somewhat true for your case, because
+of signal voltage issues) to tell the mmc core about it. That instead
+of having to all kind of crazy hacks in the drives, that in then
+didn't work out so well.
+
+Kind regards
+Uffe
