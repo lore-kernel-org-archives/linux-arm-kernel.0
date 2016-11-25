@@ -1,78 +1,25 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 25 Nov 2016 17:16:38 +0100
-Subject: [PATCH v5 2/2] ARM: dts: add support for Turris Omnia
-In-Reply-To: <20161125142658.21690-3-uwe@kleine-koenig.org> ("Uwe
- =?utf-8?Q?Kleine-K=C3=B6nig=22's?= message of "Fri, 25 Nov 2016 15:26:58
- +0100")
-References: <20161125142658.21690-1-uwe@kleine-koenig.org>
- <20161125142658.21690-3-uwe@kleine-koenig.org>
-Message-ID: <87lgw7ilg9.fsf@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 25 Nov 2016 16:20:40 +0000
+Subject: [PATCH v28 0/9] arm64: add kdump support
+In-Reply-To: <20161124095523.6972-1-takahiro.akashi@linaro.org>
+References: <20161124095523.6972-1-takahiro.akashi@linaro.org>
+Message-ID: <20161125162039.GB22099@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
- 
- On ven., nov. 25 2016, Uwe Kleine-K?nig <uwe@kleine-koenig.org> wrote:
+On Thu, Nov 24, 2016 at 06:55:23PM +0900, AKASHI Takahiro wrote:
+> AKASHI Takahiro (8):
+>   arm64: kdump: reserve memory for crash dump kernel
+>   memblock: add memblock_cap_memory_range()
+>   arm64: limit memory regions based on DT property, usable-memory-range
+>   arm64: kdump: implement machine_crash_shutdown()
+>   arm64: kdump: add kdump support
+>   arm64: kdump: add VMCOREINFO's for user-space coredump tools
+>   arm64: kdump: enable kdump in the arm64 defconfig
+>   arm64: kdump: update a kernel doc
 
-> This machine is an open hardware router by cz.nic driven by a
-> Marvell Armada 385.
->
-> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+Given that it's nearly -rc7, holiday in the US and more acks needed, we
+should defer merging this series to 4.11. In the meantime, since Will is
+going to handle the 4.11 merging window, I'm acking the whole series:
 
-Applied on mvebu/dt with few changes:
-
-First I added the SoB from Thomas Hlavacek you initially planed to add
-as seen on IRC.
-
-The other change I did are mentioned inline.
-
-Thanks,
-
-Gregory
-
-
-[...]
-
-> +&spi0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&spi0_pins &spi0cs0_pins>;
-> +	status = "okay";
-> +
-> +	spi-nor at 0 {
-> +		compatible = "spansion,s25fl164k", "jedec,spi-nor";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		reg = <0>;
-> +		spi-max-frequency = <40000000>;
-> +
-
-+
-+		partitions {
-+			compatible = "fixed-partitions";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-it is mandatory since v4.4 to use this pattern for partitions.
-
-
-> +		partition at 0 {
-> +			reg = <0x0 0x00100000>;
-> +			label = "U-Boot";
-> +		};
-> +
-> +		partition at 1 {
-                         @0x100000
-We should use the reg value here ^
-
-> +			reg = <0x00100000 0x00700000>;
-> +			label = "Rescue system";
-> +		};
-
-+ };
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
