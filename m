@@ -1,20 +1,18 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 26 Nov 2016 00:19:15 +0100
-Subject: [GIT PULL] ARM: at91: drivers for 4.10
-In-Reply-To: <20161114184438.k5ysd6pgcadlo5vw@piout.net>
-References: <20161114184438.k5ysd6pgcadlo5vw@piout.net>
-Message-ID: <5911355.oXFl802LTP@wuerfel>
+Date: Sat, 26 Nov 2016 00:22:14 +0100
+Subject: [PATCH] ARM: ixp4xx: drop duplicate header gpio.h
+In-Reply-To: <319a5803aac795e175306d4978134f0247cf87bc.1479457751.git.geliangtang@gmail.com>
+References: <319a5803aac795e175306d4978134f0247cf87bc.1479457751.git.geliangtang@gmail.com>
+Message-ID: <45930271.uxfUlR9HD0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 14, 2016 7:44:38 PM CET Alexandre Belloni wrote:
-> Drivers for 4.10:
+On Friday, November 18, 2016 10:21:10 PM CET Geliang Tang wrote:
+> Drop duplicate header gpio.h from dsmg600-setup.c.
 > 
->  - few fixes for the memory drivers
->  - minimal security module driver
->  - support for the Secure SRAM
+> Signed-off-by: Geliang Tang <geliangtang@gmail.com>
 > 
 
-For reference, Olof pulled this into next/drivers on Nov 18.
+Applied to arm-soc/next/fixes-non-critical, thanks
 
 	Arnd
