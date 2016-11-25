@@ -1,65 +1,62 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 25 Nov 2016 19:39:12 +0000
-Subject: [RFC PATCH 24/29] arm64/sve: Discard SVE state on system call
+Date: Fri, 25 Nov 2016 19:39:16 +0000
+Subject: [RFC PATCH 28/29] arm64: KVM: Treat SVE use by guests as undefined
+ instruction execution
 In-Reply-To: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
 References: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1480102762-23647-25-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1480102762-23647-29-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The base procedure call standard for the Scalable Vector Extension
-defines all of the SVE programmer's model state (Z0-31, P0-15, FFR)
-as caller-save, except for that subset of the state that aliases
-FPSIMD state.
+We don't currently support context-switching of Scalable Vector
+Extension context between vcpus, and the SVE access exception is
+thus left masked by default at EL2 when running a vcpu.
 
-System calls from userspace will almost always be made through C
-library wrappers -- as a consequence of the PCS there will thus
-rarely if ever be any live SVE state at syscall entry in practice.
+However, there's nothing to stop a guest trying to use SVE.  If it
+does, we'll get an SVE access exception to EL2 which will cause KVM
+to panic since this exception isn't yet recognised.
 
-This gives us an opportinity to make SVE explicitly caller-save
-around SVC and so stop carrying around the SVE state for tasks that
-use SVE only occasionally (say, by calling a library).
+This patch adds knowledge to KVM about the SVE access exception,
+translating it into an undefined instruction exception injected to
+the vcpu.
 
-Note that FPSIMD state will still be preserved around SVC.
+This prevents a malicious guest from panicking the host by
+attempted SVE use.
 
-As a crude heuristic to avoid pathological cases where a thread
-that uses SVE frequently has to fault back into the kernel again to
-re-enable SVE after a syscall, we switch the thread back to
-FPSIMD-only context tracking only if the context is actually
-switched out before returning to userspace.
+SVE-enabled guests will still not work properly for now, but they
+won't take the host down.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/kernel/fpsimd.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm64/kvm/handle_exit.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 5834f81..2e1056e 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -203,6 +203,23 @@ static void task_fpsimd_load(struct task_struct *task)
- static void task_fpsimd_save(struct task_struct *task)
- {
- 	if (IS_ENABLED(CONFIG_ARM64_SVE) &&
-+	    task_pt_regs(task)->syscallno != ~0UL &&
-+	    test_tsk_thread_flag(task, TIF_SVE)) {
-+		unsigned long tmp;
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index a204adf..f43b6d0 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -125,6 +125,14 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	return ret;
+ }
+ 
++static int handle_sve(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	/* Until SVE is supported for guests: */
++	kvm_inject_undefined(vcpu);
 +
-+		clear_tsk_thread_flag(task, TIF_SVE);
++	return 1;
++}
 +
-+		/* Trap if the task tries to use SVE again: */
-+		asm volatile (
-+			"mrs	%[tmp], cpacr_el1\n\t"
-+			"bic	%[tmp], %[tmp], %[mask]\n\t"
-+			"msr	cpacr_el1, %[tmp]"
-+			: [tmp] "=r" (tmp)
-+			: [mask] "i" (CPACR_EL1_ZEN_EL0EN)
-+		);
-+	}
-+
-+	if (IS_ENABLED(CONFIG_ARM64_SVE) &&
- 	    test_tsk_thread_flag(task, TIF_SVE))
- 		sve_save_state(__task_pffr(task),
- 			       &task->thread.fpsimd_state.fpsr);
+ static exit_handle_fn arm_exit_handlers[] = {
+ 	[ESR_ELx_EC_WFx]	= kvm_handle_wfx,
+ 	[ESR_ELx_EC_CP15_32]	= kvm_handle_cp15_32,
+@@ -137,6 +145,7 @@ static exit_handle_fn arm_exit_handlers[] = {
+ 	[ESR_ELx_EC_HVC64]	= handle_hvc,
+ 	[ESR_ELx_EC_SMC64]	= handle_smc,
+ 	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
++	[ESR_ELx_EC_SVE]	= handle_sve,
+ 	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
+ 	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
+ 	[ESR_ELx_EC_SOFTSTP_LOW]= kvm_handle_guest_debug,
 -- 
 2.1.4
