@@ -1,68 +1,125 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 25 Nov 2016 18:52:31 +0800
-Subject: [PATCH 01/10] power: supply: axp20x_usb_power: use of_device_id
- data field instead of device_is_compatible
-In-Reply-To: <20161125090921.23138-2-quentin.schulz@free-electrons.com>
-Message-ID: <201611251850.lfMksMrN%fengguang.wu@intel.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 25 Nov 2016 11:54:01 +0100
+Subject: [RFC v2: PATCH 1/2] dt-bindings: Document the hi3660 reset
+ bindings
+In-Reply-To: <e71cfe28-cd31-828f-8c7f-b4faeed5d27f@linaro.org>
+References: <Arnd Bergmann <arnd@arndb.de>
+ <1479888476-13138-1-git-send-email-zhangfei.gao@linaro.org>
+ <1479888476-13138-2-git-send-email-zhangfei.gao@linaro.org>
+ <1479979605.2472.4.camel@pengutronix.de>
+ <ac3c8e65-e4f2-3a9d-452c-f270d245cf9d@linaro.org>
+ <1479981017.2472.14.camel@pengutronix.de>
+ <8328a235-faeb-2218-4c49-a3f282599e95@linaro.org>
+ <1480069523.4058.17.camel@pengutronix.de>
+ <e71cfe28-cd31-828f-8c7f-b4faeed5d27f@linaro.org>
+Message-ID: <1480071241.4058.23.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Quentin,
+Am Freitag, den 25.11.2016, 18:42 +0800 schrieb zhangfei:
+> 
+> On 2016?11?25? 18:25, Philipp Zabel wrote:
+> > Am Donnerstag, den 24.11.2016, 18:20 +0800 schrieb zhangfei:
+> >> On 2016?11?24? 17:50, Philipp Zabel wrote:
+> >>> Am Donnerstag, den 24.11.2016, 17:40 +0800 schrieb zhangfei:
+> >>>> On 2016?11?24? 17:26, Philipp Zabel wrote:
+> >>>>> Am Mittwoch, den 23.11.2016, 16:07 +0800 schrieb Zhangfei Gao:
+> >>>>>> Add DT bindings documentation for hi3660 SoC reset controller.
+> >>>>>>
+> >>>>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> >>>>>> ---
+> >>>>>>     .../bindings/reset/hisilicon,hi3660-reset.txt      | 51 ++++++++++++++++++++++
+> >>>>>>     1 file changed, 51 insertions(+)
+> >>>>>>     create mode 100644 Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+> >>>>>>
+> >>>>>> diff --git a/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+> >>>>>> new file mode 100644
+> >>>>>> index 0000000..250daf2
+> >>>>>> --- /dev/null
+> >>>>>> +++ b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+> >>>>>> @@ -0,0 +1,51 @@
+> >>>>>> +Hisilicon System Reset Controller
+> >>>>>> +======================================
+> >>>>>> +
+> >>>>>> +Please also refer to reset.txt in this directory for common reset
+> >>>>>> +controller binding usage.
+> >>>>>> +
+> >>>>>> +The reset controller registers are part of the system-ctl block on
+> >>>>>> +hi3660 SoC.
+> >>>>>> +
+> >>>>>> +Required properties:
+> >>>>>> +- compatible: should be
+> >>>>>> +		 "hisilicon,hi3660-reset"
+> >>>>>> +- #reset-cells: 1, see below
+> >>>>>> +- hisi,rst-syscon: phandle of the reset's syscon.
+> >>>>>> +- hisi,reset-bits: Contains the reset control register information
+> >>>>>> +		  Should contain 2 cells for each reset exposed to
+> >>>>>> +		  consumers, defined as:
+> >>>>>> +			Cell #1 : offset from the syscon register base
+> >>>>>> +			Cell #2 : bits position of the control register
+> >>>>>> +
+> >>>>>> +Example:
+> >>>>>> +	iomcu: iomcu at ffd7e000 {
+> >>>>>> +		compatible = "hisilicon,hi3660-iomcu", "syscon";
+> >>>>>> +		reg = <0x0 0xffd7e000 0x0 0x1000>;
+> >>>>>> +	};
+> >>>>>> +
+> >>>>>> +	iomcu_rst: iomcu_rst_controller {
+> >>>>> This should be
+> >>>>> 	iomcu_rst: reset-controller {
+> >>>>>
+> >>>>>> +		compatible = "hisilicon,hi3660-reset";
+> >>>>>> +		#reset-cells = <1>;
+> >>>>>> +		hisi,rst-syscon = <&iomcu>;
+> >>>>>> +		hisi,reset-bits = <0x20 0x8		/* 0: i2c0 */
+> >>>>>> +				   0x20 0x10		/* 1: i2c1 */
+> >>>>>> +				   0x20 0x20		/* 2: i2c2 */
+> >>>>>> +				   0x20 0x8000000>;	/* 3: i2c6 */
+> >>>>>> +	};
+> >>>>> The reset lines are controlled through iomcu bits, is there a reason not
+> >>>>> to put the iomcu_rst node inside the iomcu node? That way the
+> >>>>> hisi,rst-syscon property could be removed and the syscon could be
+> >>>>> retrieved via the reset-controller parent node.
+> >>>> iomcu is common registers, controls clock and reset, etc.
+> >>>> So we use syscon, without mapping the registers everywhere.
+> >>>> It is common case in hisilicon, same in hi6220.
+> >>>>
+> >>>> Also the #clock-cells and #reset-cells can not be put in the same node,
+> >>>> if they are both using probe, since reset_probe will not be called.
+> >>>>
+> >>>> So we use hisi,rst-syscon as a general solution.
+> >>> What I meant is this:
+> >>>
+> >>> 	iomcu: iomcu at ffd7e000 {
+> >>> 		compatible = "hisilicon,hi3660-iomcu", "syscon", "simple-mfd";
+> >>> 		reg = <0x0 0xffd7e000 0x0 0x1000>;
+> >> #clock-cells = <1>;
+> >>
+> >> In my test, if there add #clock-cells = <1>, reset_probe will not be
+> >> called any more.
+> >> Since clk_probe is called first.
+> >> No matter iomcu_rst is child node or not.
+> > I don't understand this, does the clock driver bind to the iomcu node
+> > using CLK_OF_DECLARE_DRIVER(..., "hisilicon,hi3660-iomcu", ...)?
+> 
+> This method:CLK_OF_DECLARE_DRIVER is not prefered in clock,
+> and we have to use probe instead, to make all driver build as modules as 
+> possible.
+> 
+> For example hi3660.
+> static struct platform_driver hi3660_clk_driver = {
+>          .probe          = hi3660_clk_probe,
+>          .driver         = {
+>                  .name   = "hi3660-clk",
+>                  .of_match_table = hi3660_clk_match_table,
+>          },
+> };
 
-[auto build test WARNING on robh/for-next]
-[also build test WARNING on v4.9-rc6 next-20161124]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+hi3660_clk_match_table contains the "hisilicon,hi3660-iomcu" compatible?
+If so, you could call
+	of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+from hi3660_clk_probe instead of using "simple-mfd" to probe the iomcu
+node's children.
 
-url:    https://github.com/0day-ci/linux/commits/Quentin-Schulz/add-support-for-VBUS-max-current-and-min-voltage-limits-AXP20X-and-AXP22X-PMICs/20161125-172224
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: x86_64-randconfig-s5-11251757 (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
-
-All warnings (new ones prefixed by >>):
-
-   drivers/power/supply/axp20x_usb_power.c: In function 'axp20x_usb_power_probe':
->> drivers/power/supply/axp20x_usb_power.c:233:21: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-     power->axp20x_id = (int)of_id->data;
-                        ^
-
-vim +233 drivers/power/supply/axp20x_usb_power.c
-
-   217		if (!of_device_is_available(pdev->dev.of_node))
-   218			return -ENODEV;
-   219	
-   220		of_id = of_match_device(axp20x_usb_power_match, &pdev->dev);
-   221		if (!of_id)
-   222			return -ENODEV;
-   223	
-   224		if (!axp20x) {
-   225			dev_err(&pdev->dev, "Parent drvdata not set\n");
-   226			return -EINVAL;
-   227		}
-   228	
-   229		power = devm_kzalloc(&pdev->dev, sizeof(*power), GFP_KERNEL);
-   230		if (!power)
-   231			return -ENOMEM;
-   232	
- > 233		power->axp20x_id = (int)of_id->data;
-   234	
-   235		power->np = pdev->dev.of_node;
-   236		power->regmap = axp20x->regmap;
-   237	
-   238		if (power->axp20x_id == AXP202_ID) {
-   239			/* Enable vbus valid checking */
-   240			ret = regmap_update_bits(power->regmap, AXP20X_VBUS_MON,
-   241						 AXP20X_VBUS_MON_VBUS_VALID,
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 23302 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161125/f7be7673/attachment-0001.gz>
+regards
+Philipp
