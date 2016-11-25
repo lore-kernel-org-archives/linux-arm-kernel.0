@@ -1,74 +1,22 @@
-From: stefan@datenfreihafen.org (Stefan Schmidt)
-Date: Sat, 26 Nov 2016 00:30:52 +0100
-Subject: [PATCH] ARM: pxa: ezx: fix a910 camera data
-In-Reply-To: <87eg1zqqub.fsf@belgarion.home>
-References: <20161124162955.3887066-1-arnd@arndb.de>
- <e0bdf159-93f2-5ed7-1e28-7fb80707d6c7@datenfreihafen.org>
- <87eg1zqqub.fsf@belgarion.home>
-Message-ID: <df32cbf6-e897-56d9-89d8-c65af06323a8@datenfreihafen.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 26 Nov 2016 00:31:51 +0100
+Subject: [GIT PULL v2] ARM: OXNAS SoC updates for 4.10
+In-Reply-To: <55c31b07-ae4e-5bb3-3576-b597805c009d@baylibre.com>
+References: <55c31b07-ae4e-5bb3-3576-b597805c009d@baylibre.com>
+Message-ID: <138197303.qpOjHUtD8c@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 25.11.2016 20:53, Robert Jarzmik wrote:
-> Stefan Schmidt <stefan@datenfreihafen.org> writes:
+On Wednesday, November 23, 2016 10:01:08 AM CET Neil Armstrong wrote:
+> - Add SMP support for the Oxford Semiconductor OX820 SoC
+> from http://lkml.kernel.org/r/20161021085848.1754-1-narmstrong at baylibre.com
 > 
->> Hello.
->>
->> On 24.11.2016 17:29, Arnd Bergmann wrote:
->>> The camera_supply_dummy_device definition is shared between a780 and a910,
->>> but only provided when the first is enabled and fails to build for a
->>> configuration with only a910:
->>>
->>> arch/arm/mach-pxa/ezx.c:1097:3: error: 'camera_supply_dummy_device' undeclared here (not in a function)
->>>
->>> This moves the definition into its own section.
->>>
->>> Fixes: 6c1b417adc8f ("ARM: pxa: ezx: use the new pxa_camera platform_data")
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>> ---
->>>  arch/arm/mach-pxa/ezx.c | 56 ++++++++++++++++++++++++++-----------------------
->>
->> I wonder what we should do with ezx.c.
->>
->> As far as I know neither Daniel nor Harald or myself are doing anything
->> with this devices anymore. Besides a basic compile test having an ack or
->> reviewed by from our side is a bit worthless. :/
->>
->> I should still have some of these phones around in a box somewhere. If
->> there is someone with a good motivation and time to take over on this
->> platform we will find a way to get the person this devices.
->>
->> Any takers? Robert? I guess you are already overloaded but you might
->> also have an interest. Worth asking :)
-> Oh yes, I'm very interested in your box. Besides I really like old platforms
-> :)
+> Changes since v1 Pull Request at : http://lkml.kernel.org/r/1305c61f-b1ef-7caf-7788-67e2b907e873 at baylibre.com
+>  - Clarify copyright dates in commit message
+>  - Remove linux/arch/... lines from the top of the files
+> 
+> 
 
+Thanks for the v2 update, pulled into next/soc now.
 
-Great! I should have at least 3 or 4 different devices from the EZX
-platform around. I will go and search for the box over the weekend :)
-
->> In the case nobody wants to pick up here what would you consider the
->> bets way forward? I could send a patch removing ezx platform support
->> from the kernel (basically ezx.c plus build support) or I can send a
->> patch marking it at least orphan in MAINTAINERS. Let me know what you think.
->>
->> Daniel, Harald, if one of you is still interested in these and what to
->> pick up the work again, please speak up now. :)
-> Unless another maintainer steps in, you can submit a patch to transfer the
-> maintainance onto me, and we'll see off mailing lists how we could arange the
-> boards transfer.
-
-I cc'ed another developer who did a lot of work regarding EZX.
-
-Antonio, as you can see from the mail above we are pondering what who
-will maintain the ezx platform in the kernel going forward. Neither
-Daniel, Harald or me is going to do so. If you have time, interest and
-motivation to do so please speak up. I know life moved on and you ahve
-other projects and interests so do not feel pressured here. Just say no
-if you have no interest. Robert already agreed to act as a fallback so
-we would still be safe. :)
-
-regards
-Stefan Schmidt
+	Arnd
