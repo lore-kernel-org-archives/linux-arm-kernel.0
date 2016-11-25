@@ -1,48 +1,45 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 25 Nov 2016 12:43:52 +0000
-Subject: [PATCH 5/7] efi: Get the secure boot status [ver #3]
-In-Reply-To: <17565.1480077303@warthog.procyon.org.uk>
-References: <147990561294.7576.6464430479448167484.stgit@warthog.procyon.org.uk>
- <147990565051.7576.9673287945782426886.stgit@warthog.procyon.org.uk>
- <1480016487.2444.18.camel@HansenPartnership.com>
- <15173.1480066220@warthog.procyon.org.uk>
- <CAKv+Gu_JxNLDjaK5jGbX9ACzM0uHJYMOFx7XDo4t7DtBMtFRGA@mail.gmail.com>
- <16661.1480075392@warthog.procyon.org.uk>
- <CAKv+Gu_d5+Kvo7Tptnpg7kfjpqxhQ3a3nsQ0Ufsm6rBOFry+mQ@mail.gmail.com>
- <17565.1480077303@warthog.procyon.org.uk>
-Message-ID: <CAKv+Gu9c-C2uXZ0fVatCM8ffXJZDgjBcDb_T0nsFecGqgrF11Q@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 25 Nov 2016 12:45:29 +0000
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <20161125045549.GC2698@localhost>
+References: <58356EA8.2010806@free.fr>
+ <20161125045549.GC2698@localhost>
+Message-ID: <20161125124528.GJ14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 November 2016 at 12:35, David Howells <dhowells@redhat.com> wrote:
-> Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->
->> Yes. In pre-2.6, DeployedMode is not a reserved name, and so it may be
->> possible for someone to slip in a DeployedMode=0 on a secure boot
->> enabled system to trick the kernel into thinking lockdown should be
->> disabled.
->
-> How does one get the version number?  Unfortunately, searching the document
-> for 'version' doesn't help as every page has that in the footer:-/
->
+On Fri, Nov 25, 2016 at 10:25:49AM +0530, Vinod Koul wrote:
+> Looking at thread and discussion now, first thinking would be to ensure
+> the transaction is completed properly and then isr fired. You may need
+> to talk to your HW designers to find a way for that. It is quite common
+> that DMA controllers will fire and complete whereas the transaction is
+> still in flight.
+> 
+> If that is not doable, then since you claim this is custom part which
+> other vendors wont use (hope we are wrong down the line), then we can
+> have a custom api,
+> 
+> foo_sbox_configure(bool enable, ...);
+> 
+> This can be invoked from NFC driver when required for configuration and
+> teardown. For very specific cases where people need some specific
+> configuration we do allow custom APIs.
+> 
+> Only problem with that would be it wont be a generic solution and you
+> seem to be fine with that.
 
-There is a 'revision' field in the header ('hdr') of the EFI system
-table, so something like
+Isn't this just the same problem as PL08x or any other system which
+has multiple requests from devices, but only a limited number of
+hardware channels - so you have to route the request signals to the
+appropriate hardware channels according to the requests queued up?
 
-(sys_table_arg->hdr.revision >> 16) > 2 ||
-((sys_table_arg->hdr.revision >> 16) == 2 &&
-(sys_table_arg->hdr.revision & 0xffff) >= 6)
+If so, no new "custom" APIs are required, it's already able to be
+solved within the DMA engine drivers...
 
-should do the trick I think
+(We also have more complex situations already supported, such as
+PL08x with a FPGA routing on three of its request signals.)
 
-
->> > +               if (val == 1)
->> > +                       return 0;
->>
->> I think the logic is the wrong way around here. Secure Boot is enabled
->> if SecureBoot=1 and SetupMode=0, unless DeployedMode=0. So you should
->> return 0 here if val == 0, but only when running on 2.6 or later.
->
-> Good point.
->
-> David
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
