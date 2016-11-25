@@ -1,127 +1,91 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 25 Nov 2016 19:38:58 +0000
-Subject: [RFC PATCH 10/29] arm64/sve: Boot-time feature enablement
+Date: Fri, 25 Nov 2016 19:39:17 +0000
+Subject: [RFC PATCH 29/29] arm64/sve: Limit vector length to 512 bits by
+ default
 In-Reply-To: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
 References: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1480102762-23647-11-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1480102762-23647-30-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables Scalable Vector Extension access for the kernel
-on boot.
+As a transitional workaround for userspace incompatibilities caused
+by enlargement of the signal frame, this patch adds a new config
+option CONFIG_ARM64_SVE_FULL_VECTOR_LENGTH, which default to n.
+
+Unless this option is set to y, the vector length for SVE will be
+limited to 512 bits.  This leaves a bit of free space for other
+architecture extensions just in case we need it.
+
+This option will be removed and replaced with a user/kernel control
+interface in the future.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/include/asm/kvm_arm.h |  1 +
- arch/arm64/include/asm/sysreg.h  | 10 ++++++++++
- arch/arm64/kernel/head.S         | 16 +++++++++++++++-
- arch/arm64/mm/proc.S             | 22 +++++++++++++++++++++-
- 4 files changed, 47 insertions(+), 2 deletions(-)
+ arch/arm64/Kconfig   | 35 +++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/proc.S |  5 +++++
+ 2 files changed, 40 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 2a2752b..ae7afb2 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -185,6 +185,7 @@
- #define CPTR_EL2_TCPAC	(1 << 31)
- #define CPTR_EL2_TTA	(1 << 20)
- #define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
-+#define CPTR_EL2_TZ	(1 << 8)
- #define CPTR_EL2_DEFAULT	0x000033ff
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index bf9915cb..7cd9812 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -887,6 +887,41 @@ config ARM64_SVE
  
- /* Hyp Debug Configuration Register bits */
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index ccce9ad..09a44b3 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -302,4 +302,14 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
+ 	  To enable use of this extension on CPUs that implement it, say Y.
  
- #endif
++if ARM64_SVE
++
++config ARM64_SVE_FULL_VECTOR_LENGTH
++	bool "Enable full hardware vector length for userspace"
++	default n
++	help
++	  SVE vector lengths greater than 512 bits impact the size of signal
++	  frames and therefore the size requirements for any userspace stack
++	  onto which a signal may be delivered.  Using larger vector lengths
++	  may therefore cause problems for some software.  For this reason, the
++	  kernel currently limits the maximum vector length for userspace
++	  software to 512 bits by default.
++
++	  Enabling this option removes the limit, so that the full vector
++	  length implemented by the hardware is made available to userspace.
++
++	  Be aware: in general, software that (a) does not use SVE (including
++	  via libraries), or (b) does not handle signals, or (c) uses default
++	  process/thread stack sizes and does not use sigaltstack(2) should be
++	  unaffected by enabling larger vectors.  Software that does not meet
++	  these criteria or that relies on certain legacy uses of the ucontext
++	  API may be affected however.
++
++	  This is a transitional compatibility option only and will be replaced
++	  by a userspace ABI extension in the future.  Do not assume that this
++	  option will be available with compatible effect in future Linux
++	  releases.
++
++	  If you are developing software that uses SVE and understand the
++	  implications, you can consider saying Y here.
++
++	  If unsure, say N.
++
++endif
++
+ config ARM64_MODULE_CMODEL_LARGE
+ 	bool
  
-+#define ZIDR_EL1	sys_reg(3, 0, 0, 0, 7)
-+#define ZCR_EL1		sys_reg(3, 0, 1, 2, 0)
-+#define ZCR_EL2		sys_reg(3, 4, 1, 2, 0)
-+
-+#define ZCR_EL1_LEN_MASK	0x1ff
-+
-+#define CPACR_EL1_ZEN_EL1EN	(1 << 16)
-+#define CPACR_EL1_ZEN_EL0EN	(1 << 17)
-+#define CPACR_EL1_ZEN		(CPACR_EL1_ZEN_EL1EN | CPACR_EL1_ZEN_EL0EN)
-+
- #endif	/* __ASM_SYSREG_H */
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 332e331..ae4448f 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -572,9 +572,23 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
- 
- 	/* Coprocessor traps. */
- 	mov	x0, #0x33ff
-+
-+	/* SVE register access */
-+	mrs	x1, id_aa64pfr0_el1
-+	ubfx	x1, x1, #ID_AA64PFR0_SVE_SHIFT, #4
-+	cbz	x1, 4f
-+
-+	bic	x0, x0, #CPTR_EL2_TZ		// Disable SVE traps to EL2
- 	msr	cptr_el2, x0			// Disable copro. traps to EL2
--1:
-+	isb
-+
-+	mrs_s	x1, ZIDR_EL1			// Scalable Vector Extension:
-+	and	x1, x1, #ZCR_EL1_LEN_MASK	// Enable full vector length
-+	msr_s	ZCR_EL2, x1			// for EL1.
-+	b	1f
- 
-+4:	msr	cptr_el2, x0			// Disable copro. traps to EL2
-+1:
- #ifdef CONFIG_COMPAT
- 	msr	hstr_el2, xzr			// Disable CP15 traps to EL2
- #endif
 diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 352c73b..1da8160 100644
+index 1da8160..a2839e6 100644
 --- a/arch/arm64/mm/proc.S
 +++ b/arch/arm64/mm/proc.S
-@@ -27,6 +27,7 @@
- #include <asm/pgtable-hwdef.h>
- #include <asm/cpufeature.h>
- #include <asm/alternative.h>
-+#include <asm/sysreg.h>
+@@ -198,6 +198,11 @@ ENTRY(__cpu_setup)
  
- #ifdef CONFIG_ARM64_64K_PAGES
- #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
-@@ -184,12 +185,31 @@ ENTRY(__cpu_setup)
- 	dsb	nsh
+ 	mrs_s	x5, ZIDR_EL1			// SVE: Enable full vector len
+ 	and	x5, x5, #ZCR_EL1_LEN_MASK	// initially
++#ifndef CONFIG_ARM64_SVE_FULL_VECTOR_LENGTH
++	mov	x6, #(512 / 128 - 1)		// Clamp VL to 512 bits
++	cmp	x5, x6
++	csel	x5, x5, x6, lo
++#endif
+ 	msr_s	ZCR_EL1, x5
  
- 	mov	x0, #3 << 20
-+
-+	/* SVE */
-+	mrs	x5, id_aa64pfr0_el1
-+	ubfx	x5, x5, #ID_AA64PFR0_SVE_SHIFT, #4
-+	cbz	x5, 1f
-+
-+	bic	x0, x0, #CPACR_EL1_ZEN
-+	orr	x0, x0, #CPACR_EL1_ZEN_EL1EN	// SVE: trap for EL0, not EL1
- 	msr	cpacr_el1, x0			// Enable FP/ASIMD
--	mov	x0, #1 << 12			// Reset mdscr_el1 and disable
-+	isb
-+
-+	mrs_s	x5, ZIDR_EL1			// SVE: Enable full vector len
-+	and	x5, x5, #ZCR_EL1_LEN_MASK	// initially
-+	msr_s	ZCR_EL1, x5
-+
-+	b	2f
-+
-+1:	msr	cpacr_el1, x0			// Enable FP/ASIMD
-+
-+2:	mov	x0, #1 << 12			// Reset mdscr_el1 and disable
- 	msr	mdscr_el1, x0			// access to the DCC from EL0
- 	isb					// Unmask debug exceptions now,
- 	enable_dbg				// since this is per-cpu
- 	reset_pmuserenr_el0 x0			// Disable PMU access from EL0
-+
- 	/*
- 	 * Memory region attributes for LPAE:
- 	 *
+ 	b	2f
 -- 
 2.1.4
