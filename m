@@ -1,29 +1,124 @@
-From: dhowells@redhat.com (David Howells)
-Date: Fri, 25 Nov 2016 09:30:20 +0000
-Subject: [PATCH 5/7] efi: Get the secure boot status [ver #3]
-In-Reply-To: <1480016487.2444.18.camel@HansenPartnership.com>
-References: <1480016487.2444.18.camel@HansenPartnership.com>
- <147990561294.7576.6464430479448167484.stgit@warthog.procyon.org.uk>
- <147990565051.7576.9673287945782426886.stgit@warthog.procyon.org.uk>
-Message-ID: <15173.1480066220@warthog.procyon.org.uk>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Fri, 25 Nov 2016 17:41:51 +0800
+Subject: [PATCH v6 3/5] ARM: dts: sun8i-h3: add HDMI video nodes
+In-Reply-To: <cdf50b8433e2d9a053e35f8788bfcd5d41504312.1479641523.git.moinejf@free.fr>
+References: <cover.1479641523.git.moinejf@free.fr>
+ <cdf50b8433e2d9a053e35f8788bfcd5d41504312.1479641523.git.moinejf@free.fr>
+Message-ID: <3188681480066911@web3h.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-James Bottomley <James.Bottomley@HansenPartnership.com> wrote:
 
-> Since you seem to be using this to mean "is the platform locked down?",
-> this looks to be no longer complete in the UEFI 2.6 world.  If
-> DeployedMode == 0, even if SecureBoot == 1 and SetupMode == 0, you can
-> remove the platform key by writing 1 to AuditMode and gain control of
-> the secure variables.  The lock down state becomes DeployedMode == 1,
-> SecureBoot == 1 and SetupMode == 0
-> 
-> See the diagram on page 1817
-> 
-> http://www.uefi.org/sites/default/files/resources/UEFI%20Spec%202_6.pdf
 
-How many pages?!
+20.11.2016, 20:12, "Jean-Francois Moine" <moinejf@free.fr>:
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+> ?arch/arm/boot/dts/sun8i-h3.dtsi | 51 +++++++++++++++++++++++++++++++++++++++++
+> ?1 file changed, 51 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> index 416b825..7c6b1d5 100644
+> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> @@ -140,6 +140,16 @@
+> ?????????????????#size-cells = <1>;
+> ?????????????????ranges;
+>
+> + de: de-controller at 01000000 {
+> + compatible = "allwinner,sun8i-h3-display-engine";
+> + reg = <0x01000000 0x400000>;
+> + clocks = <&ccu CLK_BUS_DE>, <&ccu CLK_DE>;
+> + clock-names = "bus", "clock";
+> + resets = <&ccu RST_BUS_DE>;
+> + ports = <&lcd0_p>;
+> + status = "disabled";
+> + };
+> +
+> ?????????????????dma: dma-controller at 01c02000 {
+> ?????????????????????????compatible = "allwinner,sun8i-h3-dma";
+> ?????????????????????????reg = <0x01c02000 0x1000>;
+> @@ -149,6 +159,23 @@
+> ?????????????????????????#dma-cells = <1>;
+> ?????????????????};
+>
+> + lcd0: lcd-controller at 01c0c000 {
+> + compatible = "allwinner,sun8i-a83t-tcon";
+> + reg = <0x01c0c000 0x400>;
+> + clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_TCON0>;
+> + clock-names = "bus", "clock";
+> + resets = <&ccu RST_BUS_TCON0>;
+> + interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+> + status = "disabled";
+> + #address-cells = <1>;
+> + #size-cells = <0>;
+> + lcd0_p: port {
+> + lcd0_hdmi: endpoint {
+> + remote-endpoint = <&hdmi_lcd0>;
+> + };
+> + };
+> + };
+> +
+> ?????????????????mmc0: mmc at 01c0f000 {
+> ?????????????????????????compatible = "allwinner,sun7i-a20-mmc";
+> ?????????????????????????reg = <0x01c0f000 0x1000>;
+> @@ -314,6 +341,11 @@
+> ?????????????????????????clock-names = "hosc", "losc";
+> ?????????????????????????#clock-cells = <1>;
+> ?????????????????????????#reset-cells = <1>;
+> +
+> + assigned-clocks = <&ccu CLK_PLL_DE>,
+> + <&ccu CLK_DE>;
+> + assigned-clock-rates = <864000000>,
+> + <432000000>;
+> ?????????????????};
+>
+> ?????????????????pio: pinctrl at 01c20800 {
+> @@ -564,6 +596,25 @@
+> ?????????????????????????interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+> ?????????????????};
+>
+> + hdmi: hdmi at 01ee0000 {
+> + compatible = "allwinner,sun8i-h3-hdmi";
+> + reg = <0x01ee0000 0x20000>;
+> + clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI>,
+> + <&ccu CLK_HDMI_DDC>;
+> + clock-names = "bus", "clock", "ddc-clock";
+> + resets = <&ccu RST_BUS_HDMI0>, <&ccu RST_BUS_HDMI1>;
+> + reset-names = "hdmi0", "hdmi1";
+> + status = "disabled";
+> + #address-cells = <1>;
+> + #size-cells = <0>;
+> + port at 0 { /* video */
+> + reg = <0>;
+> + hdmi_lcd0: endpoint {
+> + remote-endpoint = <&lcd0_hdmi>;
+> + };
+> + };
+> + };
+> +
+> ?????????????????rtc: rtc at 01f00000 {
+> ?????????????????????????compatible = "allwinner,sun6i-a31-rtc";
+> ?????????????????????????reg = <0x01f00000 0x54>;
 
-Does the DeployedMode variable not exist in older versions of the UEFI spec?
+After removing CLK_PLL_DE's assigned-clock, the kernel passes compilation.
 
-David
+However, it cannot recognize any HDMI screen...
+
+(My board is Orange Pi One, and I manually added status="okay"; to &lcd0, &de, &hdmi)
+
+[   16.507802] sun8i-de2 1000000.de-controller: bound 1c0c000.lcd-controller (ops de2_lcd_ops [sun8i_de2_drm])
+[   16.675948] sun8i-de2 1000000.de-controller: bound 1ee0000.hdmi (ops de2_hdmi_fini [sun8i_de2_hdmi])
+[   16.685120] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+[   16.695876] [drm] No driver support for vblank timestamp query.
+[   16.701862] sun8i-de2 1000000.de-controller: No connectors reported connected with modes
+[   16.713061] [drm] Cannot find any crtc or sizes - going 1024x768
+[   16.734214] Console: switching to colour frame buffer device 128x48
+[   16.751022] sun8i-de2 1000000.de-controller: fb0:  frame buffer device
+
+> --
+> 2.10.2
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
