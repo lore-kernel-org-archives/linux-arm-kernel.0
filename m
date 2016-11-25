@@ -1,56 +1,107 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 25 Nov 2016 11:22:13 +0100
-Subject: [PATCH v6 3/5] ARM: dts: sun8i-h3: add HDMI video nodes
-In-Reply-To: <3188681480066911@web3h.yandex.ru>
-References: <cover.1479641523.git.moinejf@free.fr>
- <cdf50b8433e2d9a053e35f8788bfcd5d41504312.1479641523.git.moinejf@free.fr>
- <3188681480066911@web3h.yandex.ru>
-Message-ID: <20161125112213.83420594eb435b6bb1a4d164@free.fr>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 25 Nov 2016 11:25:23 +0100
+Subject: [RFC v2: PATCH 1/2] dt-bindings: Document the hi3660 reset
+ bindings
+In-Reply-To: <8328a235-faeb-2218-4c49-a3f282599e95@linaro.org>
+References: <Arnd Bergmann <arnd@arndb.de>
+ <1479888476-13138-1-git-send-email-zhangfei.gao@linaro.org>
+ <1479888476-13138-2-git-send-email-zhangfei.gao@linaro.org>
+ <1479979605.2472.4.camel@pengutronix.de>
+ <ac3c8e65-e4f2-3a9d-452c-f270d245cf9d@linaro.org>
+ <1479981017.2472.14.camel@pengutronix.de>
+ <8328a235-faeb-2218-4c49-a3f282599e95@linaro.org>
+Message-ID: <1480069523.4058.17.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 Nov 2016 17:41:51 +0800
-Icenowy Zheng <icenowy@aosc.xyz> wrote:
-
-> After removing CLK_PLL_DE's assigned-clock, the kernel passes compilation.
-
-The 'pll-de' and 'de' must have a fixed rate. Otherwise, if you do not
-use the legacy u-boot, I don't know which can be the rate of the DE.
-
-> However, it cannot recognize any HDMI screen...
+Am Donnerstag, den 24.11.2016, 18:20 +0800 schrieb zhangfei:
 > 
-> (My board is Orange Pi One, and I manually added status="okay"; to &lcd0, &de, &hdmi)
-> 
-> [   16.507802] sun8i-de2 1000000.de-controller: bound 1c0c000.lcd-controller (ops de2_lcd_ops [sun8i_de2_drm])
-> [   16.675948] sun8i-de2 1000000.de-controller: bound 1ee0000.hdmi (ops de2_hdmi_fini [sun8i_de2_hdmi])
-> [   16.685120] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
-> [   16.695876] [drm] No driver support for vblank timestamp query.
-> [   16.701862] sun8i-de2 1000000.de-controller: No connectors reported connected with modes
-> [   16.713061] [drm] Cannot find any crtc or sizes - going 1024x768
-> [   16.734214] Console: switching to colour frame buffer device 128x48
-> [   16.751022] sun8i-de2 1000000.de-controller: fb0:  frame buffer device
+> On 2016?11?24? 17:50, Philipp Zabel wrote:
+> > Am Donnerstag, den 24.11.2016, 17:40 +0800 schrieb zhangfei:
+> >> On 2016?11?24? 17:26, Philipp Zabel wrote:
+> >>> Am Mittwoch, den 23.11.2016, 16:07 +0800 schrieb Zhangfei Gao:
+> >>>> Add DT bindings documentation for hi3660 SoC reset controller.
+> >>>>
+> >>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> >>>> ---
+> >>>>    .../bindings/reset/hisilicon,hi3660-reset.txt      | 51 ++++++++++++++++++++++
+> >>>>    1 file changed, 51 insertions(+)
+> >>>>    create mode 100644 Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+> >>>>
+> >>>> diff --git a/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+> >>>> new file mode 100644
+> >>>> index 0000000..250daf2
+> >>>> --- /dev/null
+> >>>> +++ b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+> >>>> @@ -0,0 +1,51 @@
+> >>>> +Hisilicon System Reset Controller
+> >>>> +======================================
+> >>>> +
+> >>>> +Please also refer to reset.txt in this directory for common reset
+> >>>> +controller binding usage.
+> >>>> +
+> >>>> +The reset controller registers are part of the system-ctl block on
+> >>>> +hi3660 SoC.
+> >>>> +
+> >>>> +Required properties:
+> >>>> +- compatible: should be
+> >>>> +		 "hisilicon,hi3660-reset"
+> >>>> +- #reset-cells: 1, see below
+> >>>> +- hisi,rst-syscon: phandle of the reset's syscon.
+> >>>> +- hisi,reset-bits: Contains the reset control register information
+> >>>> +		  Should contain 2 cells for each reset exposed to
+> >>>> +		  consumers, defined as:
+> >>>> +			Cell #1 : offset from the syscon register base
+> >>>> +			Cell #2 : bits position of the control register
+> >>>> +
+> >>>> +Example:
+> >>>> +	iomcu: iomcu at ffd7e000 {
+> >>>> +		compatible = "hisilicon,hi3660-iomcu", "syscon";
+> >>>> +		reg = <0x0 0xffd7e000 0x0 0x1000>;
+> >>>> +	};
+> >>>> +
+> >>>> +	iomcu_rst: iomcu_rst_controller {
+> >>> This should be
+> >>> 	iomcu_rst: reset-controller {
+> >>>
+> >>>> +		compatible = "hisilicon,hi3660-reset";
+> >>>> +		#reset-cells = <1>;
+> >>>> +		hisi,rst-syscon = <&iomcu>;
+> >>>> +		hisi,reset-bits = <0x20 0x8		/* 0: i2c0 */
+> >>>> +				   0x20 0x10		/* 1: i2c1 */
+> >>>> +				   0x20 0x20		/* 2: i2c2 */
+> >>>> +				   0x20 0x8000000>;	/* 3: i2c6 */
+> >>>> +	};
+> >>> The reset lines are controlled through iomcu bits, is there a reason not
+> >>> to put the iomcu_rst node inside the iomcu node? That way the
+> >>> hisi,rst-syscon property could be removed and the syscon could be
+> >>> retrieved via the reset-controller parent node.
+> >> iomcu is common registers, controls clock and reset, etc.
+> >> So we use syscon, without mapping the registers everywhere.
+> >> It is common case in hisilicon, same in hi6220.
+> >>
+> >> Also the #clock-cells and #reset-cells can not be put in the same node,
+> >> if they are both using probe, since reset_probe will not be called.
+> >>
+> >> So we use hisi,rst-syscon as a general solution.
+> > What I meant is this:
+> >
+> > 	iomcu: iomcu at ffd7e000 {
+> > 		compatible = "hisilicon,hi3660-iomcu", "syscon", "simple-mfd";
+> > 		reg = <0x0 0xffd7e000 0x0 0x1000>;
+> #clock-cells = <1>;
+>
+> In my test, if there add #clock-cells = <1>, reset_probe will not be 
+> called any more.
+> Since clk_probe is called first.
+> No matter iomcu_rst is child node or not.
 
-I put a 'pr_warn' message is case the EDID cannot be read.
-Have you this message?
+I don't understand this, does the clock driver bind to the iomcu node
+using CLK_OF_DECLARE_DRIVER(..., "hisilicon,hi3660-iomcu", ...)?
 
-Anyway, there is a problem with the EDID:
-- my Orange Pi 2 (H3) randomly fails to read it. But this succeeds after
-  rebooting once or twice.
-- my Banana Pi M2+ (H3) reads it correctly each time.
-- my Banana Pi M3 (A83T) can never read it.
+My comment was based only on this reset binding documentation and the
+example DT snippet. Could you point me to the clock driver probe code
+and show me a more complete part of the hi3660 device tree?
 
-BTW, on first tries, I was forcing a CEA mode thru the kernel command
-line. This was working with the OPi2 and BPiM3, but there was no sound.
-In the last version, I use a EDID in edid_firmware for having sound
-with the BPiM3. This works fine.
-But, forcing a CEA mode is no more possible, so, when the OPi2 cannot
-read the EDID, the system switches to a VGA mode (default 1024x768)
-which is not supported. It seems that this is your case.
-
-So, in brief, if your board cannot read the EDID, put a EDID somewhere
-and its path in /sys/module/drm_kms_helper/parameters/edid_firmware.
-There will be no console, but X11 will work correctly.
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+regards
+Philipp
