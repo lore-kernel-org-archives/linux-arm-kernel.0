@@ -1,57 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 25 Nov 2016 16:20:47 +0100
-Subject: [PATCH] ARM: dts: sunxi: Add num-cs for A20 spi nodes
-In-Reply-To: <20161124210509.be743aae84c26c6c2e666c6e@bidouilliste.com>
-References: <20161122170616.29557-1-manu@bidouilliste.com>
- <20161124195517.qrq7briu3pwjnp4n@lukather>
- <20161124210509.be743aae84c26c6c2e666c6e@bidouilliste.com>
-Message-ID: <20161125152047.oadxi2xbgm4kdd7q@lukather>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 25 Nov 2016 16:21:49 +0100
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <yw1xoa137fvr.fsf@unicorn.mansr.com>
+References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
+ <20161125124528.GJ14217@n2100.armlinux.org.uk>
+ <yw1xtwav9092.fsf@unicorn.mansr.com>
+ <20161125133436.GK14217@n2100.armlinux.org.uk>
+ <yw1xlgw78y8k.fsf@unicorn.mansr.com>
+ <20161125135830.GL14217@n2100.armlinux.org.uk>
+ <yw1xh96v8xnb.fsf@unicorn.mansr.com>
+ <20161125141708.GM14217@n2100.armlinux.org.uk>
+ <d996bcdb-2413-770c-84d1-1b12ccd74477@free.fr>
+ <yw1xoa137fvr.fsf@unicorn.mansr.com>
+Message-ID: <cba10848-57b1-c28c-2a60-83eb9da4cc63@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2016 at 09:05:09PM +0100, Emmanuel Vadot wrote:
-> On Thu, 24 Nov 2016 20:55:17 +0100
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> 
-> > On Tue, Nov 22, 2016 at 06:06:16PM +0100, Emmanuel Vadot wrote:
-> > > The spi0 controller on the A20 have up to 4 CS (Chip Select) while the
-> > > others three only have 1.
-> > > Add the num-cs property to each node.
-> > > 
-> > > Signed-off-by: Emmanuel Vadot <manu@bidouilliste.com>
-> > 
-> > I don't think we have any code that uses it at the moment. What is the
-> > rationale behind this patch?
-> > 
-> > Thanks!
-> > Maxime
-> > 
-> > -- 
-> > Maxime Ripard, Free Electrons
-> > Embedded Linux and Kernel engineering
-> > http://free-electrons.com
-> 
->  Hi Maxime,
-> 
->  If num-cs isn't present nothing prevent to start a transfer with a
-> non-valid CS pin, resulting in an error.
->  num-cs are default property especially made for this and a SPI driver
-> should try to get the property at probe/attach time.
+On 25/11/2016 16:12, M?ns Rullg?rd wrote:
 
-Yes, but as far as I know, our driver doesn't. I'm all in for having
-support for that in our driver, but without it, that patch is kind of
-useless.
+> Mason writes:
+> 
+>> I've had several talks with the HW dev, and I don't think they
+>> anticipated the need to mux the 3 channels. In their minds,
+>> customers would choose at most 3 devices to support, and
+>> assign one channel to each device statically.
+>>
+>> In fact, in tango4, supported devices are:
+>> A) NAND Flash controllers 0 and 1
+>> NB: the upstream driver only uses controller 0
+>> B) IDE or SATA controllers 0 and 1
+>> C) a few crypto HW blocks which do not work as expected (unused)
+>>
+>> Customers typically use 1 channel for NAND, maybe 1 for SATA,
+>> and 1 channel remains unused.
+> 
+> The hardware has two sata controllers, and I have a board that uses both.
 
-Maxime
+I don't have the tango3 client devices in mind, but
+1 NAND + 2 SATA works out alright for 3 channels, right?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161125/c080bfc9/attachment.sig>
+Regards.
