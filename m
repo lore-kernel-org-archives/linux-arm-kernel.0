@@ -1,206 +1,151 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Nov 2016 13:03:33 +0100
-Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F939E0A@lhreml507-mbx>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <4675465.4Qhqy6WU4X@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F939E0A@lhreml507-mbx>
-Message-ID: <107039805.6PaPa1fbx1@wuerfel>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Fri, 25 Nov 2016 20:08:49 +0800
+Subject: [RFC v2: PATCH 1/2] dt-bindings: Document the hi3660 reset
+ bindings
+In-Reply-To: <1480071241.4058.23.camel@pengutronix.de>
+References: <Arnd Bergmann <arnd@arndb.de>
+ <1479888476-13138-1-git-send-email-zhangfei.gao@linaro.org>
+ <1479888476-13138-2-git-send-email-zhangfei.gao@linaro.org>
+ <1479979605.2472.4.camel@pengutronix.de>
+ <ac3c8e65-e4f2-3a9d-452c-f270d245cf9d@linaro.org>
+ <1479981017.2472.14.camel@pengutronix.de>
+ <8328a235-faeb-2218-4c49-a3f282599e95@linaro.org>
+ <1480069523.4058.17.camel@pengutronix.de>
+ <e71cfe28-cd31-828f-8c7f-b4faeed5d27f@linaro.org>
+ <1480071241.4058.23.camel@pengutronix.de>
+Message-ID: <bec21998-b30c-4076-62bf-6b24c9dd1dd6@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, November 25, 2016 8:46:11 AM CET Gabriele Paoloni wrote:
-> > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > 
-> > On Wednesday, November 23, 2016 6:07:11 PM CET Arnd Bergmann wrote:
-> > > On Wednesday, November 23, 2016 3:22:33 PM CET Gabriele Paoloni
-> > wrote:
-> > > > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > > > > On Friday, November 18, 2016 5:03:11 PM CET Gabriele Paoloni
-> >  /*
-> > @@ -549,9 +548,14 @@ static int of_translate_one(struct device_node
-> > *parent, struct of_bus *bus,
-> >   * that translation is impossible (that is we are not dealing with a
-> > value
-> >   * that can be mapped to a cpu physical address). This is not really
-> > specified
-> >   * that way, but this is traditionally the way IBM at least do things
-> > + *
-> > + * Whenever the translation fails, the *host pointer will be set to
-> > the
-> > + * device that lacks a tranlation, and the return code is relative to
-> > + * that node.
-> 
-> This seems to be wrong to me. We are abusing of the error conditions.
-> So effectively if there is a buggy DT for an IO resource we end up
-> assuming that we are using a special IO device with unmapped addresses.
-> 
-> The patch at the bottom apply on top of this one and I think is a more
-> reasonable approach
-
-It was meant as a logical extension to the existing interface,
-translating the address as far as we can, and reporting back
-how far we got.
-
-Maybe we can return 'of_root' by instead of NULL to signify
-that we have converted all the way to the root of the DT?
-That would make it more consistent, but slightly more complicated
-for the common case.
-
-> >   */
-> >  static u64 __of_translate_address(struct device_node *dev,
-> > -				  const __be32 *in_addr, const char *rprop)
-> > +				  const __be32 *in_addr, const char *rprop,
-> > +				  struct device_node **host)
-> >  {
-> >  	struct device_node *parent = NULL;
-> >  	struct of_bus *bus, *pbus;
-> > @@ -564,6 +568,7 @@ static u64 __of_translate_address(struct
-> > device_node *dev,
-> >  	/* Increase refcount at current level */
-> >  	of_node_get(dev);
-> > 
-> > +	*host = NULL;
-> >  	/* Get parent & match bus type */
-> >  	parent = of_get_parent(dev);
-> >  	if (parent == NULL)
-> > @@ -600,8 +605,9 @@ static u64 __of_translate_address(struct
-> > device_node *dev,
-> >  		pbus = of_match_bus(parent);
-> >  		pbus->count_cells(dev, &pna, &pns);
-> >  		if (!OF_CHECK_COUNTS(pna, pns)) {
-> > -			pr_err("Bad cell count for %s\n",
-> > -			       of_node_full_name(dev));
-> > +			pr_debug("Bad cell count for %s\n",
-> > +				 of_node_full_name(dev));
-> > +			*host = of_node_get(parent);
-> >  			break;
-> >  		}
-> > 
-> > @@ -609,7 +615,9 @@ static u64 __of_translate_address(struct
-> > device_node *dev,
-> >  		    pbus->name, pna, pns, of_node_full_name(parent));
-> > 
-> >  		/* Apply bus translation */
-> > -		if (of_translate_one(dev, bus, pbus, addr, na, ns, pna,
-> > rprop))
-> > +		result = of_translate_one(dev, bus, pbus, addr, na, ns,
-> > +					  pna, rprop);
-> > +		if (result == OF_BAD_ADDR)
-> 
-> It seems to me that here you missed "*host = of_node_get(parent);"..?
-> 
-
-Yes, Zhichang also pointed out the same thing, this is not
-right yet. My thought was that we need to check the #address-cells
-and #size-cells of the parent node and return if they are not set,
-but the bus should really have those.
-
-What we need to do instead is check the "ranges" of the parent
-and fail if there is no translation. Simply setting the host
-here however won't work either because that leads to returning
-OF_BAD_ADDR.
 
 
-> >  		/* Complete the move up one level */
-> > @@ -628,13 +636,32 @@ static u64 __of_translate_address(struct
-> > device_node *dev,
-> > 
-> >  u64 of_translate_address(struct device_node *dev, const __be32
-> > *in_addr)
-> >  {
-> > -	return __of_translate_address(dev, in_addr, "ranges");
-> > +	struct device_node *host;
-...
-> > +
-> >  phys_addr_t pci_pio_to_address(unsigned long pio)
-> >  {
-> >  	phys_addr_t address = (phys_addr_t)OF_BAD_ADDR;
-> > diff --git a/include/linux/pci.h b/include/linux/pci.h
-> > index 6bd94a803e8f..b7a8fa3da3ca 100644
-> > --- a/include/linux/pci.h
-> > +++ b/include/linux/pci.h
-> > @@ -1192,7 +1192,8 @@ int __must_check pci_bus_alloc_resource(struct
-> > pci_bus *bus,
-> >  			void *alignf_data);
+On 2016?11?25? 18:54, Philipp Zabel wrote:
+> Am Freitag, den 25.11.2016, 18:42 +0800 schrieb zhangfei:
+>> On 2016?11?25? 18:25, Philipp Zabel wrote:
+>>> Am Donnerstag, den 24.11.2016, 18:20 +0800 schrieb zhangfei:
+>>>> On 2016?11?24? 17:50, Philipp Zabel wrote:
+>>>>> Am Donnerstag, den 24.11.2016, 17:40 +0800 schrieb zhangfei:
+>>>>>> On 2016?11?24? 17:26, Philipp Zabel wrote:
+>>>>>>> Am Mittwoch, den 23.11.2016, 16:07 +0800 schrieb Zhangfei Gao:
+>>>>>>>> Add DT bindings documentation for hi3660 SoC reset controller.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>>>>>>>> ---
+>>>>>>>>      .../bindings/reset/hisilicon,hi3660-reset.txt      | 51 ++++++++++++++++++++++
+>>>>>>>>      1 file changed, 51 insertions(+)
+>>>>>>>>      create mode 100644 Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+>>>>>>>>
+>>>>>>>> diff --git a/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+>>>>>>>> new file mode 100644
+>>>>>>>> index 0000000..250daf2
+>>>>>>>> --- /dev/null
+>>>>>>>> +++ b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+>>>>>>>> @@ -0,0 +1,51 @@
+>>>>>>>> +Hisilicon System Reset Controller
+>>>>>>>> +======================================
+>>>>>>>> +
+>>>>>>>> +Please also refer to reset.txt in this directory for common reset
+>>>>>>>> +controller binding usage.
+>>>>>>>> +
+>>>>>>>> +The reset controller registers are part of the system-ctl block on
+>>>>>>>> +hi3660 SoC.
+>>>>>>>> +
+>>>>>>>> +Required properties:
+>>>>>>>> +- compatible: should be
+>>>>>>>> +		 "hisilicon,hi3660-reset"
+>>>>>>>> +- #reset-cells: 1, see below
+>>>>>>>> +- hisi,rst-syscon: phandle of the reset's syscon.
+>>>>>>>> +- hisi,reset-bits: Contains the reset control register information
+>>>>>>>> +		  Should contain 2 cells for each reset exposed to
+>>>>>>>> +		  consumers, defined as:
+>>>>>>>> +			Cell #1 : offset from the syscon register base
+>>>>>>>> +			Cell #2 : bits position of the control register
+>>>>>>>> +
+>>>>>>>> +Example:
+>>>>>>>> +	iomcu: iomcu at ffd7e000 {
+>>>>>>>> +		compatible = "hisilicon,hi3660-iomcu", "syscon";
+>>>>>>>> +		reg = <0x0 0xffd7e000 0x0 0x1000>;
+>>>>>>>> +	};
+>>>>>>>> +
+>>>>>>>> +	iomcu_rst: iomcu_rst_controller {
+>>>>>>> This should be
+>>>>>>> 	iomcu_rst: reset-controller {
+>>>>>>>
+>>>>>>>> +		compatible = "hisilicon,hi3660-reset";
+>>>>>>>> +		#reset-cells = <1>;
+>>>>>>>> +		hisi,rst-syscon = <&iomcu>;
+>>>>>>>> +		hisi,reset-bits = <0x20 0x8		/* 0: i2c0 */
+>>>>>>>> +				   0x20 0x10		/* 1: i2c1 */
+>>>>>>>> +				   0x20 0x20		/* 2: i2c2 */
+>>>>>>>> +				   0x20 0x8000000>;	/* 3: i2c6 */
+>>>>>>>> +	};
+>>>>>>> The reset lines are controlled through iomcu bits, is there a reason not
+>>>>>>> to put the iomcu_rst node inside the iomcu node? That way the
+>>>>>>> hisi,rst-syscon property could be removed and the syscon could be
+>>>>>>> retrieved via the reset-controller parent node.
+>>>>>> iomcu is common registers, controls clock and reset, etc.
+>>>>>> So we use syscon, without mapping the registers everywhere.
+>>>>>> It is common case in hisilicon, same in hi6220.
+>>>>>>
+>>>>>> Also the #clock-cells and #reset-cells can not be put in the same node,
+>>>>>> if they are both using probe, since reset_probe will not be called.
+>>>>>>
+>>>>>> So we use hisi,rst-syscon as a general solution.
+>>>>> What I meant is this:
+>>>>>
+>>>>> 	iomcu: iomcu at ffd7e000 {
+>>>>> 		compatible = "hisilicon,hi3660-iomcu", "syscon", "simple-mfd";
+>>>>> 		reg = <0x0 0xffd7e000 0x0 0x1000>;
+>>>> #clock-cells = <1>;
+>>>>
+>>>> In my test, if there add #clock-cells = <1>, reset_probe will not be
+>>>> called any more.
+>>>> Since clk_probe is called first.
+>>>> No matter iomcu_rst is child node or not.
+>>> I don't understand this, does the clock driver bind to the iomcu node
+>>> using CLK_OF_DECLARE_DRIVER(..., "hisilicon,hi3660-iomcu", ...)?
+>> This method:CLK_OF_DECLARE_DRIVER is not prefered in clock,
+>> and we have to use probe instead, to make all driver build as modules as
+>> possible.
+>>
+>> For example hi3660.
+>> static struct platform_driver hi3660_clk_driver = {
+>>           .probe          = hi3660_clk_probe,
+>>           .driver         = {
+>>                   .name   = "hi3660-clk",
+>>                   .of_match_table = hi3660_clk_match_table,
+>>           },
+>> };
+> hi3660_clk_match_table contains the "hisilicon,hi3660-iomcu" compatible?
+> If so, you could call
+> 	of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+> from hi3660_clk_probe instead of using "simple-mfd" to probe the iomcu
+> node's children.
 
-[Many lines of reply trimmed here, please make sure you don't quote too
-much context when you reply, it's really annoying to read through
-it otherwise]
+Not using simple-mfd:
 
->  /*
-> + * of_isa_indirect_io - get the IO address from some isa reg property value.
-> + *	For some isa/lpc devices, no ranges property in ancestor node.
-> + *	The device addresses are described directly in their regs property.
-> + *	This fixup function will be called to get the IO address of isa/lpc
-> + *	devices when the normal of_translation failed.
-> + *
-> + * @parent:	points to the parent dts node;
-> + * @bus:		points to the of_bus which can be used to parse address;
-> + * @addr:	the address from reg property;
-> + * @na:		the address cell counter of @addr;
-> + * @presult:	store the address paresed from @addr;
-> + *
-> + * return 1 when successfully get the I/O address;
-> + * 0 will return for some failures.
-> + */
-> +static int of_get_isa_indirect_io(struct device_node *parent,
-> +				struct of_bus *bus, __be32 *addr,
-> +				int na, u64 *presult)
-> +{
-> +	unsigned int flags;
-> +	unsigned int rlen;
-> +
-> +	/* whether support indirectIO */
-> +	if (!indirect_io_enabled())
-> +		return 0;
-> +
-> +	if (!of_bus_isa_match(parent))
-> +		return 0;
-> +
-> +	flags = bus->get_flags(addr);
-> +	if (!(flags & IORESOURCE_IO))
-> +		return 0;
-> +
-> +	/* there is ranges property, apply the normal translation directly. */
-> +	if (of_get_property(parent, "ranges", &rlen))
-> +		return 0;
-> +
-> +	*presult = of_read_number(addr + 1, na - 1);
-> +	/* this fixup is only valid for specific I/O range. */
-> +	return addr_is_indirect_io(*presult);
-> +}
+Like
+static const struct of_device_id hi3660_clk_match_table[] = {
+         { .compatible = "hisilicon,hi3660-iomcu", },
+         { }
+};
+MODULE_DEVICE_TABLE(of, hi3660_clk_match_table);
 
-Right, this would work. The reason I didn't go down this route is
-that I wanted to keep it generic enough to allow doing the same
-for PCI host bridges with a nonlinear mapping of the I/O space.
+static int hi3660_clk_probe(struct platform_device *pdev)
+{
+         struct device *dev = &pdev->dev;
+         struct device_node *np = pdev->dev.of_node;
+         const struct of_device_id *of_id;
+         enum hi3660_clk_type type;
 
-There isn't really anything special about ISA here, other than the
-fact that the one driver that needs it happens to be for ISA rather
-than PCI.
+         of_id = of_match_device(hi3660_clk_match_table, dev);
+         if (!of_id)
+                 return -EINVAL;
+~
+}
 
-> +/*
->   * Translate an address from the device-tree into a CPU physical address,
->   * this walks up the tree and applies the various bus mappings on the
->   * way.
-> @@ -600,14 +643,23 @@ static u64 __of_translate_address(struct device_node *dev,
->  			result = of_read_number(addr, na);
->  			break;
->  		}
-> +		/*
-> +		 * For indirectIO device which has no ranges property, get
-> +		 * the address from reg directly.
-> +		 */
-> +		if (of_get_isa_indirect_io(dev, bus, addr, na, &result)) {
-> +			pr_debug("isa indirectIO matched(%s)..addr = 0x%llx\n",
-> +				of_node_full_name(dev), result);
-> +			*host = of_node_get(parent);
-> +			break;
-> +		}
->  
+If put iomcu_rst as child node, and set #clock-cells = <1> to iomcu,
+then hi3660_clk_probe is called, hi3660_reset_probe will not be called.
+So using "hisi,rst-syscon" as pointer does not have the issue.
 
-If we do the special case for ISA as you suggest above, I would still want
-to keep it in of_translate_ioport(), I think that's a useful change by
-itself in my patch.
-
-	Arnde
+Thanks
