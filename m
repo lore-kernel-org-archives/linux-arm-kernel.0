@@ -1,45 +1,47 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 25 Nov 2016 19:39:02 +0000
-Subject: [RFC PATCH 14/29] Revert "arm64/sve: Allow kernel-mode NEON to be
- disabled in Kconfig"
-In-Reply-To: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 25 Nov 2016 20:25:52 +0000
+Subject: [RFC PATCH 06/29] arm64: efi: Add missing Kconfig dependency on
+ KERNEL_MODE_NEON
+In-Reply-To: <1480102762-23647-7-git-send-email-Dave.Martin@arm.com>
 References: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1480102762-23647-15-git-send-email-Dave.Martin@arm.com>
+ <1480102762-23647-7-git-send-email-Dave.Martin@arm.com>
+Message-ID: <CAKv+Gu_0HV1vLaxdLu2nW2oyk+CL2DnjVuPeVswS_YT4E8yuGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that KERNEL_MODE_NEON works for SVE, we can just default it
-back to y.
+On 25 November 2016 at 19:38, Dave Martin <Dave.Martin@arm.com> wrote:
+> The EFI runtime services ABI permits calls to EFI to clobber
+> certain FPSIMD/NEON registers, as per the AArch64 procedure call
+> standard.
+>
+> Saving/restoring the clobbered registers around such calls needs
+> KERNEL_MODE_NEON, but the dependency is missing from Kconfig.
+>
+> This patch adds the missing dependency.
+>
+> This will aid bisection of the patches implementing support for the
+> ARM Scalable Vector Extension (SVE).
+>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/Kconfig | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7266761..bf9915cb 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -224,6 +224,9 @@ config SWIOTLB
- config IOMMU_HELPER
- 	def_bool SWIOTLB
- 
-+config KERNEL_MODE_NEON
-+	def_bool y
-+
- config FIX_EARLYCON_MEM
- 	def_bool y
- 
-@@ -266,10 +269,6 @@ endmenu
- 
- menu "Kernel Features"
- 
--config KERNEL_MODE_NEON
--	bool "Support NEON/FPSIMD code in the kernel"
--	default y
--
- menu "ARM errata workarounds via the alternatives framework"
- 
- config ARM64_ERRATUM_826319
--- 
-2.1.4
+> ---
+>  arch/arm64/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 969ef88..d008bb6 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -963,6 +963,7 @@ config EFI_STUB
+>  config EFI
+>         bool "UEFI runtime support"
+>         depends on OF && !CPU_BIG_ENDIAN
+> +       depends on KERNEL_MODE_NEON
+>         select LIBFDT
+>         select UCS2_STRING
+>         select EFI_PARAMS_FROM_FDT
+> --
+> 2.1.4
+>
