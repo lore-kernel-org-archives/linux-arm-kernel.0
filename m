@@ -1,18 +1,18 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 26 Nov 2016 00:49:18 +0100
-Subject: [GIT PULL] ARM: mvebu: soc for v4.10 (#1)
-In-Reply-To: <874m33ampm.fsf@free-electrons.com>
-References: <874m33ampm.fsf@free-electrons.com>
-Message-ID: <10757189.naBipKj8HW@wuerfel>
+Date: Sat, 26 Nov 2016 00:50:23 +0100
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.10 (#2)
+In-Reply-To: <8737inamem.fsf@free-electrons.com>
+References: <8737inamem.fsf@free-electrons.com>
+Message-ID: <8252197.nM2ddXWoak@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, November 19, 2016 9:38:29 AM CET Gregory CLEMENT wrote:
-> mvebu soc for 4.10 (part 1)
+On Saturday, November 19, 2016 9:45:05 AM CET Gregory CLEMENT wrote:
+> mvebu dt64 for 4.10 (part 2)
 > 
-> remove legacy support of orion5x ls-chl
+> Fix DTC warning on Armada 37xx and 7K/8K
 > 
 
-Pulled into next/soc, thanks!
+Pulled into next/dt64, thanks!
 
 	Arnd
