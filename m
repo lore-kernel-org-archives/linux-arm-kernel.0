@@ -1,63 +1,134 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri, 25 Nov 2016 10:09:15 +0100
-Subject: [PATCH 04/10] power: supply: axp20x_usb_power: add 100mA max current
- limit for AXP223
+Date: Fri, 25 Nov 2016 10:09:13 +0100
+Subject: [PATCH 02/10] power: supply: axp20x_usb_power: set min voltage and
+ max current from sysfs
 In-Reply-To: <20161125090921.23138-1-quentin.schulz@free-electrons.com>
 References: <20161125090921.23138-1-quentin.schulz@free-electrons.com>
-Message-ID: <20161125090921.23138-5-quentin.schulz@free-electrons.com>
+Message-ID: <20161125090921.23138-3-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The X-Powers AXP223 shares most of its behaviour with the AXP221 PMIC
-but allows the VBUS power supply max current to be set to 100mA (like
-the AXP209 PMIC).
-
-This basically adds a new compatible to the VBUS power supply driver and
-adds a check on the compatible when setting current max limit.
+AXP20X and AXP22X PMICs allow setting the min voltage and max current of
+VBUS power supply. This adds entries in sysfs to allow to do so.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
- drivers/power/supply/axp20x_usb_power.c | 13 ++++++++-----
- 1 file changed, 8 insertions(+), 5 deletions(-)
+ drivers/power/supply/axp20x_usb_power.c | 72 +++++++++++++++++++++++++++++++++
+ include/linux/mfd/axp20x.h              |  3 ++
+ 2 files changed, 75 insertions(+)
 
 diff --git a/drivers/power/supply/axp20x_usb_power.c b/drivers/power/supply/axp20x_usb_power.c
-index 638cb52..6d5d451 100644
+index b19754e..638cb52 100644
 --- a/drivers/power/supply/axp20x_usb_power.c
 +++ b/drivers/power/supply/axp20x_usb_power.c
-@@ -88,11 +88,10 @@ static int axp20x_usb_power_get_property(struct power_supply *psy,
+@@ -155,6 +155,74 @@ static int axp20x_usb_power_get_property(struct power_supply *psy,
+ 	return 0;
+ }
  
- 		switch (v & AXP20X_VBUS_CLIMIT_MASK) {
- 		case AXP20X_VBUC_CLIMIT_100mA:
--			if (power->axp20x_id == AXP202_ID) {
--				val->intval = 100000;
--			} else {
++static int axp20x_usb_power_set_property(struct power_supply *psy,
++					 enum power_supply_property psp,
++					 const union power_supply_propval *val)
++{
++	struct axp20x_usb_power *power = power_supply_get_drvdata(psy);
++	int ret, val1;
++
++	switch (psp) {
++	case POWER_SUPPLY_PROP_VOLTAGE_MIN:
++		switch (val->intval) {
++		case 4000000:
++		case 4100000:
++		case 4200000:
++		case 4300000:
++		case 4400000:
++		case 4500000:
++		case 4600000:
++		case 4700000:
++			val1 = (val->intval - 4000000) / 100000;
++			ret = regmap_update_bits(power->regmap,
++						 AXP20X_VBUS_IPSOUT_MGMT,
++						 AXP20X_VBUS_VHOLD_MASK,
++						 val1 << 3);
++			if (ret)
++				return ret;
++
++			return 0;
++		default:
++			return -EINVAL;
++		}
++
++		return 0;
++
++	case POWER_SUPPLY_PROP_CURRENT_MAX:
++		switch (val->intval) {
++		case 100000:
 +			if (power->axp20x_id == AXP221_ID)
- 				val->intval = -1; /* No 100mA limit */
--			}
-+			else
-+				val->intval = 100000;
- 			break;
- 		case AXP20X_VBUC_CLIMIT_500mA:
- 			val->intval = 500000;
-@@ -268,6 +267,9 @@ static const struct of_device_id axp20x_usb_power_match[] = {
- 	}, {
- 		.compatible = "x-powers,axp221-usb-power-supply",
- 		.data = (void *)AXP221_ID,
-+	}, {
-+		.compatible = "x-powers,axp223-usb-power-supply",
-+		.data = (void *)AXP223_ID,
- 	}, { /* sentinel */ }
++				return -EINVAL;
++		case 500000:
++		case 900000:
++			val1 = (900000 - val->intval) / 400000;
++			ret = regmap_update_bits(power->regmap,
++						 AXP20X_VBUS_IPSOUT_MGMT,
++						 AXP20X_VBUS_CLIMIT_MASK, val1);
++			if (ret)
++				return ret;
++
++			return 0;
++		default:
++			return -EINVAL;
++		}
++
++		return 0;
++
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static int axp20x_usb_power_prop_writeable(struct power_supply *psy,
++					   enum power_supply_property psp)
++{
++	return psp == POWER_SUPPLY_PROP_VOLTAGE_MIN ||
++	       psp == POWER_SUPPLY_PROP_CURRENT_MAX;
++}
++
+ static enum power_supply_property axp20x_usb_power_properties[] = {
+ 	POWER_SUPPLY_PROP_HEALTH,
+ 	POWER_SUPPLY_PROP_PRESENT,
+@@ -178,7 +246,9 @@ static const struct power_supply_desc axp20x_usb_power_desc = {
+ 	.type = POWER_SUPPLY_TYPE_USB,
+ 	.properties = axp20x_usb_power_properties,
+ 	.num_properties = ARRAY_SIZE(axp20x_usb_power_properties),
++	.property_is_writeable = axp20x_usb_power_prop_writeable,
+ 	.get_property = axp20x_usb_power_get_property,
++	.set_property = axp20x_usb_power_set_property,
  };
- MODULE_DEVICE_TABLE(of, axp20x_usb_power_match);
-@@ -324,7 +326,8 @@ static int axp20x_usb_power_probe(struct platform_device *pdev)
  
- 		usb_power_desc = &axp20x_usb_power_desc;
- 		irq_names = axp20x_irq_names;
--	} else if (power->axp20x_id == AXP221_ID) {
-+	} else if (power->axp20x_id == AXP221_ID ||
-+		   power->axp20x_id == AXP223_ID) {
- 		usb_power_desc = &axp22x_usb_power_desc;
- 		irq_names = axp22x_irq_names;
- 	} else {
+ static const struct power_supply_desc axp22x_usb_power_desc = {
+@@ -186,7 +256,9 @@ static const struct power_supply_desc axp22x_usb_power_desc = {
+ 	.type = POWER_SUPPLY_TYPE_USB,
+ 	.properties = axp22x_usb_power_properties,
+ 	.num_properties = ARRAY_SIZE(axp22x_usb_power_properties),
++	.property_is_writeable = axp20x_usb_power_prop_writeable,
+ 	.get_property = axp20x_usb_power_get_property,
++	.set_property = axp20x_usb_power_set_property,
+ };
+ 
+ static const struct of_device_id axp20x_usb_power_match[] = {
+diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+index fec597f..8883595 100644
+--- a/include/linux/mfd/axp20x.h
++++ b/include/linux/mfd/axp20x.h
+@@ -56,6 +56,9 @@ enum {
+ #define AXP20X_LDO24_V_OUT		0x28
+ #define AXP20X_LDO3_V_OUT		0x29
+ #define AXP20X_VBUS_IPSOUT_MGMT		0x30
++
++#define AXP20X_VBUS_VHOLD_MASK		GENMASK(5, 3)
++
+ #define AXP20X_V_OFF			0x31
+ #define AXP20X_OFF_CTRL			0x32
+ #define AXP20X_CHRG_CTRL1		0x33
 -- 
 2.9.3
