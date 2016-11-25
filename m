@@ -1,89 +1,172 @@
 From: yt.shen@mediatek.com (YT Shen)
-Date: Fri, 25 Nov 2016 18:34:28 +0800
-Subject: [PATCH v10 05/13] drm/mediatek: update display module connections
+Date: Fri, 25 Nov 2016 18:34:30 +0800
+Subject: [PATCH v10 07/13] drm/mediatek: add dsi interrupt control
 In-Reply-To: <1480070076-6196-1-git-send-email-yt.shen@mediatek.com>
 References: <1480070076-6196-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1480070076-6196-6-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1480070076-6196-8-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-update connections for OVL, RDMA, BLS, DSI
+From: shaoming chen <shaoming.chen@mediatek.com>
 
-Signed-off-by: YT Shen <yt.shen@mediatek.com>
+add dsi interrupt control
+
+Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ drivers/gpu/drm/mediatek/mtk_dsi.c | 92 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 92 insertions(+)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index b77d456..a9b209c 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -32,6 +32,10 @@
- #define DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN	0x0c8
- #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
+diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
+index 4efeb38..d236e2d 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dsi.c
++++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
+@@ -18,6 +18,7 @@
+ #include <drm/drm_panel.h>
+ #include <linux/clk.h>
+ #include <linux/component.h>
++#include <linux/irq.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
+ #include <linux/of_graph.h>
+@@ -29,6 +30,16 @@
  
-+#define DISP_REG_CONFIG_DISP_OVL_MOUT_EN	0x030
-+#define DISP_REG_CONFIG_OUT_SEL			0x04c
-+#define DISP_REG_CONFIG_DSI_SEL			0x050
-+
- #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
- #define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
- #define DISP_REG_MUTEX_RST(n)	(0x28 + 0x20 * (n))
-@@ -71,6 +75,10 @@
- #define DPI0_SEL_IN_RDMA1		0x1
- #define COLOR1_SEL_IN_OVL1		0x1
+ #define DSI_START		0x00
  
-+#define OVL_MOUT_EN_RDMA		0x1
-+#define BLS_TO_DSI_RDMA1_TO_DPI1	0x8
-+#define DSI_SEL_IN_BLS			0x0
++#define DSI_INTEN		0x08
 +
- struct mtk_disp_mutex {
- 	int id;
- 	bool claimed;
-@@ -111,6 +119,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
- 	if (cur == DDP_COMPONENT_OVL0 && next == DDP_COMPONENT_COLOR0) {
- 		*addr = DISP_REG_CONFIG_DISP_OVL0_MOUT_EN;
- 		value = OVL0_MOUT_EN_COLOR0;
-+	} else if (cur == DDP_COMPONENT_OVL0 && next == DDP_COMPONENT_RDMA0) {
-+		*addr = DISP_REG_CONFIG_DISP_OVL_MOUT_EN;
-+		value = OVL_MOUT_EN_RDMA;
- 	} else if (cur == DDP_COMPONENT_OD && next == DDP_COMPONENT_RDMA0) {
- 		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
- 		value = OD_MOUT_EN_RDMA0;
-@@ -148,6 +159,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
- 	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
- 		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
- 		value = COLOR1_SEL_IN_OVL1;
-+	} else if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0) {
-+		*addr = DISP_REG_CONFIG_DSI_SEL;
-+		value = DSI_SEL_IN_BLS;
- 	} else {
- 		value = 0;
- 	}
-@@ -155,6 +169,15 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
- 	return value;
++#define DSI_INTSTA		0x0c
++#define LPRX_RD_RDY_INT_FLAG		BIT(0)
++#define CMD_DONE_INT_FLAG		BIT(1)
++#define TE_RDY_INT_FLAG			BIT(2)
++#define VM_DONE_INT_FLAG		BIT(3)
++#define EXT_TE_RDY_INT_FLAG		BIT(4)
++#define DSI_BUSY			BIT(31)
++
+ #define DSI_CON_CTRL		0x10
+ #define DSI_RESET			BIT(0)
+ #define DSI_EN				BIT(1)
+@@ -71,6 +82,9 @@
+ 
+ #define DSI_HSTX_CKL_WC		0x64
+ 
++#define DSI_RACK		0x84
++#define RACK				BIT(0)
++
+ #define DSI_PHY_LCCON		0x104
+ #define LC_HS_TX_EN			BIT(0)
+ #define LC_ULPM_EN			BIT(1)
+@@ -131,6 +145,8 @@ struct mtk_dsi {
+ 	struct videomode vm;
+ 	int refcount;
+ 	bool enabled;
++	u32 irq_data;
++	wait_queue_head_t irq_wait_queue;
+ };
+ 
+ static inline struct mtk_dsi *encoder_to_dsi(struct drm_encoder *e)
+@@ -437,6 +453,64 @@ static void mtk_dsi_start(struct mtk_dsi *dsi)
+ 	writel(1, dsi->regs + DSI_START);
  }
  
-+static void mtk_ddp_sout_sel(void __iomem *config_regs,
-+			     enum mtk_ddp_comp_id cur,
-+			     enum mtk_ddp_comp_id next)
++static void mtk_dsi_set_interrupt_enable(struct mtk_dsi *dsi)
 +{
-+	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0)
-+		writel_relaxed(BLS_TO_DSI_RDMA1_TO_DPI1,
-+			       config_regs + DISP_REG_CONFIG_OUT_SEL);
++	u32 inten = LPRX_RD_RDY_INT_FLAG | CMD_DONE_INT_FLAG | VM_DONE_INT_FLAG;
++
++	writel(inten, dsi->regs + DSI_INTEN);
 +}
 +
- void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
- 			      enum mtk_ddp_comp_id cur,
- 			      enum mtk_ddp_comp_id next)
-@@ -167,6 +190,8 @@ void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
- 		writel_relaxed(reg, config_regs + addr);
++static void mtk_dsi_irq_data_set(struct mtk_dsi *dsi, u32 irq_bit)
++{
++	dsi->irq_data |= irq_bit;
++}
++
++static __maybe_unused void mtk_dsi_irq_data_clear(struct mtk_dsi *dsi, u32 irq_bit)
++{
++	dsi->irq_data &= ~irq_bit;
++}
++
++static __maybe_unused s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
++				     unsigned int timeout)
++{
++	s32 ret = 0;
++	unsigned long jiffies = msecs_to_jiffies(timeout);
++
++	ret = wait_event_interruptible_timeout(dsi->irq_wait_queue,
++					       dsi->irq_data & irq_flag,
++					       jiffies);
++	if (ret == 0) {
++		DRM_WARN("Wait DSI IRQ(0x%08x) Timeout\n", irq_flag);
++
++		mtk_dsi_enable(dsi);
++		mtk_dsi_reset_engine(dsi);
++	}
++
++	return ret;
++}
++
++static irqreturn_t mtk_dsi_irq(int irq, void *dev_id)
++{
++	struct mtk_dsi *dsi = dev_id;
++	u32 status, tmp;
++	u32 flag = LPRX_RD_RDY_INT_FLAG | CMD_DONE_INT_FLAG | VM_DONE_INT_FLAG;
++
++	status = readl(dsi->regs + DSI_INTSTA) & flag;
++
++	if (status) {
++		do {
++			mtk_dsi_mask(dsi, DSI_RACK, RACK, RACK);
++			tmp = readl(dsi->regs + DSI_INTSTA);
++		} while (tmp & DSI_BUSY);
++
++		mtk_dsi_mask(dsi, DSI_INTSTA, status, 0);
++		mtk_dsi_irq_data_set(dsi, status);
++		wake_up_interruptible(&dsi->irq_wait_queue);
++	}
++
++	return IRQ_HANDLED;
++}
++
+ static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
+ {
+ 	if (WARN_ON(dsi->refcount == 0))
+@@ -485,6 +559,7 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi)
+ 
+ 	mtk_dsi_ps_control_vact(dsi);
+ 	mtk_dsi_config_vdo_timing(dsi);
++	mtk_dsi_set_interrupt_enable(dsi);
+ 
+ 	mtk_dsi_set_mode(dsi);
+ 	mtk_dsi_clk_hs_mode(dsi, 1);
+@@ -793,6 +868,7 @@ static int mtk_dsi_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *remote_node, *endpoint;
+ 	struct resource *regs;
++	int irq_num;
+ 	int comp_id;
+ 	int ret;
+ 
+@@ -869,6 +945,22 @@ static int mtk_dsi_probe(struct platform_device *pdev)
+ 		return ret;
  	}
  
-+	mtk_ddp_sout_sel(config_regs, cur, next);
++	irq_num = platform_get_irq(pdev, 0);
++	if (irq_num < 0) {
++		dev_err(&pdev->dev, "failed to request dsi irq resource\n");
++		return -EPROBE_DEFER;
++	}
 +
- 	value = mtk_ddp_sel_in(cur, next, &addr);
- 	if (value) {
- 		reg = readl_relaxed(config_regs + addr) | value;
++	irq_set_status_flags(irq_num, IRQ_TYPE_LEVEL_LOW);
++	ret = devm_request_irq(&pdev->dev, irq_num, mtk_dsi_irq,
++			       IRQF_TRIGGER_LOW, dev_name(&pdev->dev), dsi);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to request mediatek dsi irq\n");
++		return -EPROBE_DEFER;
++	}
++
++	init_waitqueue_head(&dsi->irq_wait_queue);
++
+ 	platform_set_drvdata(pdev, dsi);
+ 
+ 	return component_add(&pdev->dev, &mtk_dsi_component_ops);
 -- 
 1.9.1
