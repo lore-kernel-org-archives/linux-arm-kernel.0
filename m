@@ -1,25 +1,42 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 25 Nov 2016 15:05:05 +0100
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <yw1xa8cnai0p.fsf@unicorn.mansr.com>
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <yw1xa8cnai0p.fsf@unicorn.mansr.com>
-Message-ID: <ae97a212-a91e-5e0a-c9b6-2dba3b79ddc5@free.fr>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 25 Nov 2016 12:06:46 -0200
+Subject: [PATCH] bus: imx-weim: Fix the "fsl,weim-cs-gpr" lookup method
+Message-ID: <1480082806-8963-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/11/2016 12:57, M?ns Rullg?rd wrote:
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-> The same DMA unit is also used for SATA, which is an off the shelf
-> Designware controller with an in-kernel driver.  This interrupt timing
-> glitch can actually explain some intermittent errors I've observed with
-> it.
+Commit 1be81ea5860744520 ("ARM: dts: imx6: Add imx-weim parameters to
+dtsi's") causes the following probe error when the weim node is not
+present on the board dts (such as imx6q-sabresd):
 
-FWIW, newer chips embed an AHCI controller, with a dedicated
-memory channel.
+imx-weim 21b8000.weim: Invalid 'ranges' configuration
+imx-weim: probe of 21b8000.weim failed with error
 
-FWIW2, the HW dev said memory channels are "almost free", and he
-would have no problem giving each device their own private channel
-read/write pair.
+As the "fsl,weim-cs-gpr" property changed the location from the individual
+board dts "&weim" node to the common dtsi node we can no longer reach it
+via syscon_regmap_lookup_by_phandle(), so use
+syscon_regmap_lookup_by_compatible() instead, which will successfully
+find the "fsl,weim-cs-gpr" property.
 
-Regards.
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ drivers/bus/imx-weim.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
+index 4bd361d..9824c58 100644
+--- a/drivers/bus/imx-weim.c
++++ b/drivers/bus/imx-weim.c
+@@ -76,7 +76,7 @@ static int __init imx_weim_gpr_setup(struct platform_device *pdev)
+ 	int cs = 0;
+ 	int i = 0;
+ 
+-	gpr = syscon_regmap_lookup_by_phandle(np, "fsl,weim-cs-gpr");
++	gpr = syscon_regmap_lookup_by_compatible("fsl,weim-cs-gpr");
+ 	if (IS_ERR(gpr)) {
+ 		dev_dbg(&pdev->dev, "failed to find weim-cs-gpr\n");
+ 		return 0;
+-- 
+2.7.4
