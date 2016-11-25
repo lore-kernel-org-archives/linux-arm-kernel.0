@@ -1,59 +1,76 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 25 Nov 2016 10:58:26 +0100
-Subject: [PATCH] mtd: nand: mxc: Fix mxc_v1 ooblayout
-In-Reply-To: <1480065209-4179-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1480065209-4179-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <58eed307-ee50-9727-7b64-891d1b969790@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 25 Nov 2016 18:03:09 +0800
+Subject: [PATCH 05/10] mfd: axp20x: add separate MFD cell for AXP223
+In-Reply-To: <20161125090921.23138-6-quentin.schulz@free-electrons.com>
+References: <20161125090921.23138-1-quentin.schulz@free-electrons.com>
+ <20161125090921.23138-6-quentin.schulz@free-electrons.com>
+Message-ID: <CAGb2v65G5rXgwh23OKHr0dk5BfMgGvOr3q0XVP4GGxzh4d_L6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2016 10:13 AM, Boris Brezillon wrote:
-> Commit a894cf6c5a82 ("mtd: nand: mxc: switch to mtd_ooblayout_ops")
-> introduced a bug in the OOB layout description. Even if the driver claims
-> that 3 ECC bytes are reserved to protect 512 bytes of data, it's actually
-> 5 ECC bytes to protect 512+6 bytes of data (some OOB bytes are also
-> protected using extra ECC bytes).
-> 
-> Fix the mxc_v1_ooblayout_{free,ecc}() functions to reflect this behavior.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Fixes: a894cf6c5a82 ("mtd: nand: mxc: switch to mtd_ooblayout_ops")
-> Cc: <stable@vger.kernel.org>
+On Fri, Nov 25, 2016 at 5:09 PM, Quentin Schulz
+<quentin.schulz@free-electrons.com> wrote:
+> The AXP223 shares most of its logic with the AXP221 but has some
+> differences for the VBUS power supply driver. Thus, to probe the driver
+> with the correct compatible, the AXP221 and the AXP223 now have separate
+> MFD cells.
+>
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 > ---
->  drivers/mtd/nand/mxc_nand.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-> index 61ca020c5272..c19ec4f0983e 100644
-> --- a/drivers/mtd/nand/mxc_nand.c
-> +++ b/drivers/mtd/nand/mxc_nand.c
-> @@ -886,7 +886,7 @@ static int mxc_v1_ooblayout_ecc(struct mtd_info *mtd, int section,
->  		return -ERANGE;
->  
->  	oobregion->offset = (section * 16) + 6;
-> -	oobregion->length = nand_chip->ecc.bytes;
-> +	oobregion->length = 5;
+>  drivers/mfd/axp20x.c | 22 +++++++++++++++++++++-
+>  1 file changed, 21 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index ba130be..989d568 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -602,6 +602,21 @@ static struct mfd_cell axp22x_cells[] = {
+>         },
+>  };
+>
+> +static struct mfd_cell axp223_cells[] = {
+> +       {
+> +               .name                   = "axp20x-pek",
+> +               .num_resources          = ARRAY_SIZE(axp22x_pek_resources),
+> +               .resources              = axp22x_pek_resources,
+> +       }, {
+> +               .name                   = "axp20x-regulator",
+> +       }, {
+> +               .name           = "axp20x-usb-power-supply",
+> +               .of_compatible  = "x-powers,axp223-usb-power-supply",
+> +               .num_resources  = ARRAY_SIZE(axp22x_usb_power_supply_resources),
+> +               .resources      = axp22x_usb_power_supply_resources,
 
-Use a macro instead of hard-coding a value please :)
+Nit: Please align the statements. And you might want to rename the original
+axp22x_cells to axp221_cells to avoid confusion. Otherwise,
 
->  	return 0;
->  }
-> @@ -908,8 +908,7 @@ static int mxc_v1_ooblayout_free(struct mtd_info *mtd, int section,
->  			oobregion->length = 4;
->  		}
->  	} else {
-> -		oobregion->offset = ((section - 1) * 16) +
-> -				    nand_chip->ecc.bytes + 6;
-> +		oobregion->offset = ((section - 1) * 16) + 5 + 6;
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-DTTO here, the math here is cryptic enough.
-
->  		if (section < nand_chip->ecc.steps)
->  			oobregion->length = (section * 16) + 6 -
->  					    oobregion->offset;
-> 
-
-
--- 
-Best regards,
-Marek Vasut
+> +       },
+> +};
+> +
+>  static struct mfd_cell axp152_cells[] = {
+>         {
+>                 .name                   = "axp20x-pek",
+> @@ -789,12 +804,17 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
+>                 axp20x->regmap_irq_chip = &axp20x_regmap_irq_chip;
+>                 break;
+>         case AXP221_ID:
+> -       case AXP223_ID:
+>                 axp20x->nr_cells = ARRAY_SIZE(axp22x_cells);
+>                 axp20x->cells = axp22x_cells;
+>                 axp20x->regmap_cfg = &axp22x_regmap_config;
+>                 axp20x->regmap_irq_chip = &axp22x_regmap_irq_chip;
+>                 break;
+> +       case AXP223_ID:
+> +               axp20x->nr_cells = ARRAY_SIZE(axp223_cells);
+> +               axp20x->cells = axp223_cells;
+> +               axp20x->regmap_cfg = &axp22x_regmap_config;
+> +               axp20x->regmap_irq_chip = &axp22x_regmap_irq_chip;
+> +               break;
+>         case AXP288_ID:
+>                 axp20x->cells = axp288_cells;
+>                 axp20x->nr_cells = ARRAY_SIZE(axp288_cells);
+> --
+> 2.9.3
+>
