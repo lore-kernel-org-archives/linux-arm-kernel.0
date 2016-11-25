@@ -1,32 +1,47 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 25 Nov 2016 14:12:49 +0000
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <ae97a212-a91e-5e0a-c9b6-2dba3b79ddc5@free.fr> (Mason's message
- of "Fri, 25 Nov 2016 15:05:05 +0100")
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <yw1xa8cnai0p.fsf@unicorn.mansr.com>
- <ae97a212-a91e-5e0a-c9b6-2dba3b79ddc5@free.fr>
-Message-ID: <yw1xd1hj8x7i.fsf@unicorn.mansr.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 25 Nov 2016 15:17:42 +0100
+Subject: [PATCH] pinctrl: sx150x: use new nested IRQ infrastructure
+Message-ID: <1480083462-29591-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+Use the new gpiochip_irqchip_add_nested() and
+gpiochip_set_nested_irqchip() calls to properly created
+a nested irqchip and mark all child irqs properly with
+their parent IRQ.
 
-> On 25/11/2016 12:57, M?ns Rullg?rd wrote:
->
->> The same DMA unit is also used for SATA, which is an off the shelf
->> Designware controller with an in-kernel driver.  This interrupt timing
->> glitch can actually explain some intermittent errors I've observed with
->> it.
->
-> FWIW, newer chips embed an AHCI controller, with a dedicated
-> memory channel.
->
-> FWIW2, the HW dev said memory channels are "almost free", and he
-> would have no problem giving each device their own private channel
-> read/write pair.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-sx150x.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-We still need to deal with the existing hardware.
-
+diff --git a/drivers/pinctrl/pinctrl-sx150x.c b/drivers/pinctrl/pinctrl-sx150x.c
+index 1a1c8b51a992..36cb0f1ed538 100644
+--- a/drivers/pinctrl/pinctrl-sx150x.c
++++ b/drivers/pinctrl/pinctrl-sx150x.c
+@@ -1219,9 +1219,9 @@ static int sx150x_probe(struct i2c_client *client,
+ 		 * plus it will be instantly noticeable if it is ever
+ 		 * called (should not happen)
+ 		 */
+-		ret = gpiochip_irqchip_add(&pctl->gpio,
+-					   &pctl->irq_chip, 0,
+-					   handle_bad_irq, IRQ_TYPE_NONE);
++		ret = gpiochip_irqchip_add_nested(&pctl->gpio,
++					&pctl->irq_chip, 0,
++					handle_bad_irq, IRQ_TYPE_NONE);
+ 		if (ret) {
+ 			dev_err(dev, "could not connect irqchip to gpiochip\n");
+ 			return ret;
+@@ -1234,6 +1234,10 @@ static int sx150x_probe(struct i2c_client *client,
+ 						pctl->irq_chip.name, pctl);
+ 		if (ret < 0)
+ 			return ret;
++
++		gpiochip_set_nested_irqchip(&pctl->gpio,
++					    &pctl->irq_chip,
++					    client-irq);
+ 	}
+ 
+ 	/* Pinctrl_desc */
 -- 
-M?ns Rullg?rd
+2.7.4
