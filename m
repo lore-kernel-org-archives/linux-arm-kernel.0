@@ -1,53 +1,55 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 25 Nov 2016 15:28:39 +0000
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <cba10848-57b1-c28c-2a60-83eb9da4cc63@free.fr> (Mason's message
- of "Fri, 25 Nov 2016 16:21:49 +0100")
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <20161125124528.GJ14217@n2100.armlinux.org.uk>
- <yw1xtwav9092.fsf@unicorn.mansr.com>
- <20161125133436.GK14217@n2100.armlinux.org.uk>
- <yw1xlgw78y8k.fsf@unicorn.mansr.com>
- <20161125135830.GL14217@n2100.armlinux.org.uk>
- <yw1xh96v8xnb.fsf@unicorn.mansr.com>
- <20161125141708.GM14217@n2100.armlinux.org.uk>
- <d996bcdb-2413-770c-84d1-1b12ccd74477@free.fr>
- <yw1xoa137fvr.fsf@unicorn.mansr.com>
- <cba10848-57b1-c28c-2a60-83eb9da4cc63@free.fr>
-Message-ID: <yw1xk2br7f4o.fsf@unicorn.mansr.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 25 Nov 2016 16:30:13 +0100
+Subject: [PATCH net-next 0/5] Support Armada 37xx SoC (ARMv8 64-bits) in
+ mvneta driver
+Message-ID: <cover.2b146800967005632cd02d4da77397e6e2fdf51f.1480087510.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+Hi,
 
-> On 25/11/2016 16:12, M?ns Rullg?rd wrote:
->
->> Mason writes:
->> 
->>> I've had several talks with the HW dev, and I don't think they
->>> anticipated the need to mux the 3 channels. In their minds,
->>> customers would choose at most 3 devices to support, and
->>> assign one channel to each device statically.
->>>
->>> In fact, in tango4, supported devices are:
->>> A) NAND Flash controllers 0 and 1
->>> NB: the upstream driver only uses controller 0
->>> B) IDE or SATA controllers 0 and 1
->>> C) a few crypto HW blocks which do not work as expected (unused)
->>>
->>> Customers typically use 1 channel for NAND, maybe 1 for SATA,
->>> and 1 channel remains unused.
->> 
->> The hardware has two sata controllers, and I have a board that uses both.
->
-> I don't have the tango3 client devices in mind, but
-> 1 NAND + 2 SATA works out alright for 3 channels, right?
+The Armada 37xx is a new ARMv8 SoC from Marvell using same network
+controller as the older Armada 370/38x/XP SoCs. This series adapts the
+driver in order to be able to use it on this new SoC. The main changes
+are:
 
-There are only two usable channels.
+- 64-bits support: the first patches allow using the driver on a 64-bit
+  architecture.
 
-Besides, your 3.4 kernel allocates the channels dynamically, sort of,
-but since it has a completely custom api, this particular timing issue
-doesn't arise there.
+- MBUS support: the mbus configuration is different on Armada 37xx
+  from the older SoCs.
 
+- per cpu interrupt: Armada 37xx do not support per cpu interrupt for
+  the NETA IP, the non-per-CPU behavior was added back.
+
+The first item is solved by patches 1 to 3.
+The 2 last items are solved by patch 4.
+In patch 5 the dt support is added.
+
+Beside Armada 37xx, the series have been tested on Armada XP and
+Armada 38x (with Hardware Buffer Management and with Software Buffer
+Managment).
+
+Thanks,
+
+Gregory
+
+Gregory CLEMENT (3):
+  net: mvneta: Use cacheable memory to store the rx buffer virtual address
+  net: mvneta: Only disable mvneta_bm for 64-bits
+  ARM64: dts: marvell: Add network support for Armada 3700
+
+Marcin Wojtas (2):
+  net: mvneta: Convert to be 64 bits compatible
+  net: mvneta: Add network support for Armada 3700 SoC
+
+ Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt |   7 +-
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts                    |  23 ++++-
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi                      |  23 ++++-
+ drivers/net/ethernet/marvell/Kconfig                              |  10 +-
+ drivers/net/ethernet/marvell/mvneta.c                             | 400 ++++++++++++++++++++++++++++++++++++++++++++++++++++++------------------
+ 5 files changed, 362 insertions(+), 101 deletions(-)
+
+base-commit: 436accebb53021ef7c63535f60bda410aa87c136
 -- 
-M?ns Rullg?rd
+git-series 0.8.10
