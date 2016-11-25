@@ -1,37 +1,31 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Fri, 25 Nov 2016 09:55:39 +0100
-Subject: Synopsys Ethernet QoS Driver
-In-Reply-To: <f4dd5d22-4467-d046-6b65-2a28f3fc5a7c@synopsys.com>
-References: <CADvZ6ErjyVR5ShWTk0QesWLYR1m3p8yAMkK8v9gm2kN5xTv8zw@mail.gmail.com>
- <1dbb6047-2bbb-4d56-2a62-ab65a0254844@synopsys.com>
- <20161119135654.GA14079@lnxartpec.se.axis.com>
- <CAJ3bTp7PpUJcz=1JohX=A54UP6vVAafWnB0PGUBSxb5JJiO8Lg@mail.gmail.com>
- <1248f4ce-4859-10e6-fef9-342ea543f8d4@synopsys.com>
- <87c8a24b-0812-7850-cb3f-7be691bab432@st.com>
- <BFA799B0-BB22-4515-AC14-3544A3167B0A@axis.com>
- <ffd3b27c-0bc9-b53b-cc65-c7808595a553@st.com>
- <b126021d-e902-7a53-4d7a-e73ea89a66cf@synopsys.com>
- <A001080B-2DC8-48D9-BD82-8276A9B3BE3D@axis.com>
- <7c7798b5-8cd4-ba99-f526-22d3e06e05db@synopsys.com>
- <2eefdb8f-7e87-6009-6e50-c536d4b95dd6@synopsys.com>
- <c37c47e1-8e21-1b11-ed15-6b899ed1dd03@st.com>
- <7c259adb-5c73-f997-6b96-5be427157b08@synopsys.com>
- <899DC02E-84BB-489E-A1FE-5D8F3BB795B6@axis.com>
- <f4dd5d22-4467-d046-6b65-2a28f3fc5a7c@synopsys.com>
-Message-ID: <5d59aac4-1616-5316-a624-192b390d1569@st.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 25 Nov 2016 09:58:40 +0100
+Subject: [PATCH renesas-next 1/3] ARM: dts: r8a73a4: Use SoC-specific
+ compat string for mmcif
+In-Reply-To: <1480018514-31718-2-git-send-email-horms+renesas@verge.net.au>
+References: <1480018514-31718-1-git-send-email-horms+renesas@verge.net.au>
+ <1480018514-31718-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVGXQMRU-tn2EtrSAZXMLhBMNkHsxOtvUJ9duxR_Tnsxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2016 12:43 PM, Joao Pinto wrote:
->> > Rabin Vincent can review and test that the port works properly on our Artpec-chips that use dwc_eth_qos.c today.
->> >
->> > The main porting step is to implement the device tree binding in bindings/net/snps,dwc-qos-ethernet.txt. Also our chip has a strict requirement that the phy is enabled when the SWR reset bit is set (it needs a tx clock to complete the reset).
->> >
->> > - Lars
-> Ok, I will do the task.
+On Thu, Nov 24, 2016 at 9:15 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Use the SoC-specific compat string for mmcif in DT for the r8a73a4 SoC.
+> This is in keeping with the use of compat strings for mmcif for other
+> Renesas ARM based SoCs.
 >
-> @Peppe: Agree with the plan?
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Agree
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-peppe
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
