@@ -1,54 +1,90 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Fri, 25 Nov 2016 09:49:32 +0100
-Subject: [PATCH 1/1] net: macb: fix the RX queue reset in macb_rx()
-Message-ID: <fd8131cbe6c0546b2b8ee35bcaac5e7eb1a1647f.1480063339.git.cyrille.pitchen@atmel.com>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Fri, 25 Nov 2016 16:46:15 +0800
+Subject: [PATCH v17 07/15] clocksource/drivers/arm_arch_timer: Refactor
+ arch_timer_needs_probing
+In-Reply-To: <20161125084623.22515-1-fu.wei@linaro.org>
+References: <20161125084623.22515-1-fu.wei@linaro.org>
+Message-ID: <20161125084623.22515-8-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On macb only (not gem), when a RX queue corruption was detected from
-macb_rx(), the RX queue was reset: during this process the RX ring
-buffer descriptor was initialized by macb_init_rx_ring() but we forgot
-to also set bp->rx_tail to 0.
+From: Fu Wei <fu.wei@linaro.org>
 
-Indeed, when processing the received frames, bp->rx_tail provides the
-macb driver with the index in the RX ring buffer of the next buffer to
-process. So when the whole ring buffer is reset we must also reset
-bp->rx_tail so the driver is synchronized again with the hardware.
+When system init with device-tree, we don't know which node will be
+initialized first. And the code in arch_timer_common_init should wait
+until per-cpu timer and MMIO timer are both initialized. So we need
+arch_timer_needs_probing to detect the init status of system.
 
-Since macb_init_rx_ring() is called from many locations, currently from
-macb_rx() and macb_init_rings(), we'd rather add the "bp->rx_tail = 0;"
-line inside macb_init_rx_ring() than add the very same line after each
-call of this function.
+But currently the code is dispersed in arch_timer_needs_probing and
+arch_timer_common_init. And the function name doesn't specify that
+it's only for device-tree. This is somewhat confusing.
 
-Without this fix, the rx queue is not reset properly to recover from
-queue corruption and connection drop may occur.
+This patch move all related code from arch_timer_common_init to
+arch_timer_needs_probing, refactor it, and rename it to
+arch_timer_needs_of_probing. And make sure that it will be called
+only if acpi is disabled.
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-Fixes: 9ba723b081a2 ("net: macb: remove BUG_ON() and reset the queue to handle RX errors")
+Signed-off-by: Fu Wei <fu.wei@linaro.org>
 ---
- drivers/net/ethernet/cadence/macb.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/clocksource/arm_arch_timer.c | 34 +++++++++++++++++++---------------
+ 1 file changed, 19 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 0e489bb82456..8ee303b8da08 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -991,6 +991,7 @@ static inline void macb_init_rx_ring(struct macb *bp)
- 		addr += bp->rx_buffer_size;
- 	}
- 	bp->rx_ring[bp->rx_ring_size - 1].addr |= MACB_BIT(RX_WRAP);
-+	bp->rx_tail = 0;
- }
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index e554081..2c9085a 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -792,15 +792,28 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
+ 	{},
+ };
  
- static int macb_rx(struct macb *bp, int budget)
-@@ -1736,8 +1737,6 @@ static void macb_init_rings(struct macb *bp)
- 	bp->queues[0].tx_head = 0;
- 	bp->queues[0].tx_tail = 0;
- 	bp->queues[0].tx_ring[bp->tx_ring_size - 1].ctrl |= MACB_BIT(TX_WRAP);
+-static bool __init
+-arch_timer_needs_probing(int type, const struct of_device_id *matches)
++static bool __init arch_timer_needs_of_probing(void)
+ {
+ 	struct device_node *dn;
+ 	bool needs_probing = false;
++	unsigned int mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
+ 
+-	dn = of_find_matching_node(NULL, matches);
+-	if (dn && of_device_is_available(dn) && !(arch_timers_present & type))
++	/* We have two timers, and both device-tree nodes are probed. */
++	if ((arch_timers_present & mask) == mask)
++		return false;
++
++	/*
++	 * Only one type of timer is probed,
++	 * check if we have another type of timer node in device-tree.
++	 */
++	if (arch_timers_present & ARCH_TIMER_TYPE_CP15)
++		dn = of_find_matching_node(NULL, arch_timer_mem_of_match);
++	else
++		dn = of_find_matching_node(NULL, arch_timer_of_match);
++
++	if (dn && of_device_is_available(dn))
+ 		needs_probing = true;
++
+ 	of_node_put(dn);
+ 
+ 	return needs_probing;
+@@ -808,17 +821,8 @@ arch_timer_needs_probing(int type, const struct of_device_id *matches)
+ 
+ static int __init arch_timer_common_init(void)
+ {
+-	unsigned mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
 -
--	bp->rx_tail = 0;
- }
+-	/* Wait until both nodes are probed if we have two timers */
+-	if ((arch_timers_present & mask) != mask) {
+-		if (arch_timer_needs_probing(ARCH_TIMER_TYPE_MEM,
+-					     arch_timer_mem_of_match))
+-			return 0;
+-		if (arch_timer_needs_probing(ARCH_TIMER_TYPE_CP15,
+-					     arch_timer_of_match))
+-			return 0;
+-	}
++	if (acpi_disabled && arch_timer_needs_of_probing())
++		return 0;
  
- static void macb_reset_hw(struct macb *bp)
+ 	arch_timer_banner(arch_timers_present);
+ 	arch_counter_register(arch_timers_present);
 -- 
-2.7.4
+2.9.3
