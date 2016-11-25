@@ -1,62 +1,71 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 25 Nov 2016 19:39:16 +0000
-Subject: [RFC PATCH 28/29] arm64: KVM: Treat SVE use by guests as undefined
- instruction execution
+Date: Fri, 25 Nov 2016 19:39:13 +0000
+Subject: [RFC PATCH 25/29] arm64/sve: Avoid preempt_disable() during sigreturn
 In-Reply-To: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
 References: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1480102762-23647-29-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1480102762-23647-26-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't currently support context-switching of Scalable Vector
-Extension context between vcpus, and the SVE access exception is
-thus left masked by default at EL2 when running a vcpu.
+Currently the sigreturn implementation for SVE relies on
+preempt_disable() to avoid an intervening context switch from
+corrupting the SVE state in the task_struct.
 
-However, there's nothing to stop a guest trying to use SVE.  If it
-does, we'll get an SVE access exception to EL2 which will cause KVM
-to panic since this exception isn't yet recognised.
+Unforunately, __get_user() and friends are not safe under
+preempt_disable().
 
-This patch adds knowledge to KVM about the SVE access exception,
-translating it into an undefined instruction exception injected to
-the vcpu.
-
-This prevents a malicious guest from panicking the host by
-attempted SVE use.
-
-SVE-enabled guests will still not work properly for now, but they
-won't take the host down.
+As an alternative, this patch removes preempt_disable() and sets
+TIF_FOREIGN_FPSTATE instead: this will inform the context switch
+code that the current CPU registers don't contain the SVE/FPSIMD
+state of the current task, preventing writeback to the task_struct
+during context switch.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/kvm/handle_exit.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/kernel/signal.c | 12 +++++-------
+ 1 file changed, 5 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index a204adf..f43b6d0 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -125,6 +125,14 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	return ret;
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 2528ec1..942d66f 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -256,10 +256,8 @@ static int __restore_sve_fpsimd_context(struct user_ctxs *user,
+ 	if (vl != sve_get_vl())
+ 		return -EINVAL;
+ 
+-	preempt_disable();
+-
+ 	set_thread_flag(TIF_FOREIGN_FPSTATE);
+-	set_thread_flag(TIF_SVE);
++	barrier();
+ 
+ 	BUG_ON(SVE_SIG_REGS_SIZE(vq) > sizeof(*task_sve_regs));
+ 	BUG_ON(round_up(SVE_SIG_REGS_SIZE(vq), 16) < sizeof(*task_sve_regs));
+@@ -270,7 +268,7 @@ static int __restore_sve_fpsimd_context(struct user_ctxs *user,
+ 					SVE_SIG_REGS_OFFSET,
+ 			       SVE_SIG_REGS_SIZE(vq));
+ 	if (err)
+-		goto out_preempt;
++		return err;
+ 
+ 	/* copy the FP and status/control registers */
+ 	/* restore_sigframe() already checked that user->fpsimd != NULL. */
+@@ -279,13 +277,13 @@ static int __restore_sve_fpsimd_context(struct user_ctxs *user,
+ 	__get_user_error(fpsimd.fpsr, &user->fpsimd->fpsr, err);
+ 	__get_user_error(fpsimd.fpcr, &user->fpsimd->fpcr, err);
+ 
++	barrier();
++	set_thread_flag(TIF_SVE);
++
+ 	/* load the hardware registers from the fpsimd_state structure */
+ 	if (!err)
+ 		fpsimd_update_current_state(&fpsimd);
+ 
+-out_preempt:
+-	preempt_enable();
+-
+ 	return err;
  }
  
-+static int handle_sve(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	/* Until SVE is supported for guests: */
-+	kvm_inject_undefined(vcpu);
-+
-+	return 1;
-+}
-+
- static exit_handle_fn arm_exit_handlers[] = {
- 	[ESR_ELx_EC_WFx]	= kvm_handle_wfx,
- 	[ESR_ELx_EC_CP15_32]	= kvm_handle_cp15_32,
-@@ -137,6 +145,7 @@ static exit_handle_fn arm_exit_handlers[] = {
- 	[ESR_ELx_EC_HVC64]	= handle_hvc,
- 	[ESR_ELx_EC_SMC64]	= handle_smc,
- 	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
-+	[ESR_ELx_EC_SVE]	= handle_sve,
- 	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
- 	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
- 	[ESR_ELx_EC_SOFTSTP_LOW]= kvm_handle_guest_debug,
 -- 
 2.1.4
