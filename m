@@ -1,49 +1,91 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 25 Nov 2016 14:17:08 +0000
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 25 Nov 2016 15:21:00 +0100
 Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <yw1xh96v8xnb.fsf@unicorn.mansr.com>
+In-Reply-To: <yw1xpolj9021.fsf@unicorn.mansr.com>
 References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <20161125124528.GJ14217@n2100.armlinux.org.uk>
- <yw1xtwav9092.fsf@unicorn.mansr.com>
- <20161125133436.GK14217@n2100.armlinux.org.uk>
- <yw1xlgw78y8k.fsf@unicorn.mansr.com>
- <20161125135830.GL14217@n2100.armlinux.org.uk>
- <yw1xh96v8xnb.fsf@unicorn.mansr.com>
-Message-ID: <20161125141708.GM14217@n2100.armlinux.org.uk>
+ <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
+ <yw1xpolj9021.fsf@unicorn.mansr.com>
+Message-ID: <28bb9925-d0d7-9261-27fb-aa79345a19f1@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 25, 2016 at 02:03:20PM +0000, M?ns Rullg?rd wrote:
-> Russell King - ARM Linux <linux@armlinux.org.uk> writes:
-> 
-> > On Fri, Nov 25, 2016 at 01:50:35PM +0000, M?ns Rullg?rd wrote:
-> >> Russell King - ARM Linux <linux@armlinux.org.uk> writes:
-> >> > It would be unfair to augment the API and add the burden on everyone
-> >> > for the new API when 99.999% of the world doesn't require it.
-> >> 
-> >> I don't think making this particular dma driver wait for the descriptor
-> >> callback to return before reusing a channel quite amounts to a horrid
-> >> hack.  It certainly wouldn't burden anyone other than the poor drivers
-> >> for devices connected to it, all of which are specific to Sigma AFAIK.
-> >
-> > Except when you stop to think that delaying in a tasklet is exactly
-> > the same as randomly delaying in an interrupt handler - the tasklet
-> > runs on the return path back to the parent context of an interrupt
-> > handler.  Even if you sleep in the tasklet, you're sleeping on behalf
-> > of the currently executing thread - if it's a RT thread, you effectively
-> > destroy the RT-ness of the thread.  Let's hope no one cares about RT
-> > performance on that hardware...
-> 
-> That's why I suggested to do this only if the needed delay is known to
-> be no more than a few bus cycles.  The completion callback is currently
-> the only post-transfer interaction we have between the dma and device
-> drivers.  To handle an arbitrarily long delay, some new interface will
-> be required.
+On 25/11/2016 14:11, M?ns Rullg?rd wrote:
 
-And now we're back at the point I made a few emails ago about undue
-burden which is just about quoted above...
+> Mason writes:
+> 
+>> It seems there is a disconnect between what Linux expects - an IRQ
+>> when the transfer is complete - and the quirks of this HW :-(
+>>
+>> On this system, there are MBUS "agents" connected via a "switch box".
+>> An agent fires an IRQ when it has dealt with its *half* of the transfer.
+>>
+>> SOURCE_AGENT <---> SBOX <---> DESTINATION_AGENT
+>>
+>> Here are the steps for a transfer, in the general case:
+>>
+>> 1) setup the sbox to connect SOURCE TO DEST
+>> 2) configure source to send N bytes
+>> 3) configure dest to receive N bytes
+>>
+>> When SOURCE_AGENT has sent N bytes, it fires an IRQ
+>> When DEST_AGENT has received N bytes, it fires an IRQ
+>> The sbox connection can be torn down only when the destination
+>> agent has received all bytes.
+>> (And the twist is that some agents do not have an IRQ line.)
+>>
+>> The system provides 3 RAM-to-sbox agents (read channels)
+>> and 3 sbox-to-RAM agents (write channels).
+>>
+>> The NAND Flash controller read and write agents do not have
+>> IRQ lines.
+>>
+>> So for a NAND-to-memory transfer (read from device)
+>> - nothing happens when the NFC has finished sending N bytes to the sbox
+>> - the write channel fires an IRQ when it has received N bytes
+>>
+>> In that case, one IRQ fires when the transfer is complete,
+>> like Linux expects.
+>>
+>> For a memory-to-NAND transfer (write to device)
+>> - the read channel fires an IRQ when it has sent N bytes
+>> - the NFC driver is supposed to poll the NFC to determine
+>> when the controller has finished writing N bytes
+>>
+>> In that case, the IRQ does not indicate that the transfer
+>> is complete, merely that the sending half has finished
+>> its part.
+> 
+> When does your NAND controller signal completion?  When it has received
+> the DMA data, or only when it has finished the actual write operation?
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+The NAND controller provides a STATUS register.
+Bit 31 is the CMD_READY bit.
+This bit goes to 0 when the controller is busy, and to 1
+when the controller is ready to accept the next command.
+
+The NFC driver is doing:
+
+	res = wait_for_completion_timeout(&tx_done, HZ);
+	if (res > 0)
+		err = readl_poll_timeout(addr, val, val & CMD_READY, 0, 1000);
+
+So basically, sleep until the memory agent IRQ falls,
+then spin until the controller is idle.
+
+Did you see that adding a 10 ?s delay at the start of
+tangox_dma_pchan_detach() makes the system no longer
+fail (passes an mtd_speedtest).
+
+>> I think it is possible to have a generic solution:
+>> Right now, the callback is called from tasklet context.
+>> If we can have a new flag to have the callback invoked
+>> directly from the ISR, then the driver for the client
+>> device can do what is required.
+> 
+> No, that won't work.  The callback shouldn't run in interrupt context.
+
+What if the callback only spun for, at most, 10 ?s ?
+
+	readl_poll_timeout(addr, val, val & CMD_READY, 0, 10);
+
+Regards.
