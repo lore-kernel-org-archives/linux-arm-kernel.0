@@ -1,71 +1,120 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 25 Nov 2016 14:01:04 +0100
-Subject: [PATCH 6/10] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
- functionality
-In-Reply-To: <76ce72f8-4b86-3b83-544f-b9a7ef871393@marvell.com>
-References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
- <0390e7a05b6163deabb545f93729ea615eeaaee2.1477911954.git-series.gregory.clement@free-electrons.com>
- <CAPDyKFpqPSqiEi=0UW5LoZmy+y-KHm9nbcGKBSy3RzchdLU9cA@mail.gmail.com>
- <dd230463-04f6-df31-7056-1a185eb6cfc7@marvell.com>
- <CAPDyKFr9uEjVQmTNP0KK8Zj9mxCW3i564E=47vTK0RLvXCjw3Q@mail.gmail.com>
- <76ce72f8-4b86-3b83-544f-b9a7ef871393@marvell.com>
-Message-ID: <CAPDyKFrObxNVN+9uY7arCyGLDh_3jKCfdpw0d8KnncnGugwCbw@mail.gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Fri, 25 Nov 2016 14:01:49 +0100
+Subject: [PATCH v2 0/7] stmmac: dwmac-meson8b: configurable RGMII TX delay
+In-Reply-To: <20161124143417.10178-1-martin.blumenstingl@googlemail.com>
+References: <20161124143417.10178-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20161125130156.17879-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+Currently the dwmac-meson8b stmmac glue driver uses a hardcoded 1/4
+cycle TX clock delay. This seems to work fine for many boards (for
+example Odroid-C2 or Amlogic's reference boards) but there are some
+others where TX traffic is simply broken.
+There are probably multiple reasons why it's working on some boards
+while it's broken on others:
+- some of Amlogic's reference boards are using a Micrel PHY
+- hardware circuit design
+- maybe more...
 
->>
->> Moreover, we have ->enable_sdio_irq() ops that deals with this.
->>
->    Yes. I mean the SDIO irqs on DAT1 line in async mode.
->    This field enables our host to recognize the async SDIO irq from SDIO device.
->    It controls our host side behavior, other than the SDIO device.
->
->    I think ->enable_sdio_irq() is a more reasonable place to put this workraound.
->    I will export sdhci_enable_sdio_irq() and implement out host own
->    enable_sdio_irq() calling sdhci_enable_sdio)irq() plus this workaround.
->    Does it sound reasonable to you?
+iperf3 results on my Mecool BB2 board (Meson GXM, RTL8211F PHY) with
+TX clock delay disabled on the MAC (as it's enabled in the PHY driver).
+TX throughput was virtually zero before:
+$ iperf3 -c 192.168.1.100 -R
+Connecting to host 192.168.1.100, port 5201
+Reverse mode, remote host 192.168.1.100 is sending
+[  4] local 192.168.1.206 port 52828 connected to 192.168.1.100 port 5201
+[ ID] Interval           Transfer     Bandwidth
+[  4]   0.00-1.00   sec   108 MBytes   901 Mbits/sec
+[  4]   1.00-2.00   sec  94.2 MBytes   791 Mbits/sec
+[  4]   2.00-3.00   sec  96.5 MBytes   810 Mbits/sec
+[  4]   3.00-4.00   sec  96.2 MBytes   808 Mbits/sec
+[  4]   4.00-5.00   sec  96.6 MBytes   810 Mbits/sec
+[  4]   5.00-6.00   sec  96.5 MBytes   810 Mbits/sec
+[  4]   6.00-7.00   sec  96.6 MBytes   810 Mbits/sec
+[  4]   7.00-8.00   sec  96.5 MBytes   809 Mbits/sec
+[  4]   8.00-9.00   sec   105 MBytes   884 Mbits/sec
+[  4]   9.00-10.00  sec   111 MBytes   934 Mbits/sec
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Retr
+[  4]   0.00-10.00  sec  1000 MBytes   839 Mbits/sec    0             sender
+[  4]   0.00-10.00  sec   998 MBytes   837 Mbits/sec                  receiver
 
-Yes.
+iperf Done.
+$ iperf3 -c 192.168.1.100
+Connecting to host 192.168.1.100, port 5201
+[  4] local 192.168.1.206 port 52832 connected to 192.168.1.100 port 5201
+[ ID] Interval           Transfer     Bandwidth       Retr  Cwnd
+[  4]   0.00-1.01   sec  99.5 MBytes   829 Mbits/sec  117    139 KBytes
+[  4]   1.01-2.00   sec   105 MBytes   884 Mbits/sec  129   70.7 KBytes
+[  4]   2.00-3.01   sec   107 MBytes   889 Mbits/sec  106    187 KBytes
+[  4]   3.01-4.01   sec   105 MBytes   878 Mbits/sec   92    143 KBytes
+[  4]   4.01-5.00   sec   105 MBytes   882 Mbits/sec  140    129 KBytes
+[  4]   5.00-6.01   sec   106 MBytes   883 Mbits/sec  115    195 KBytes
+[  4]   6.01-7.00   sec   102 MBytes   863 Mbits/sec  133   70.7 KBytes
+[  4]   7.00-8.01   sec   106 MBytes   884 Mbits/sec  143   97.6 KBytes
+[  4]   8.01-9.01   sec   104 MBytes   875 Mbits/sec  124    107 KBytes
+[  4]   9.01-10.01  sec   105 MBytes   876 Mbits/sec   90    139 KBytes
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Retr
+[  4]   0.00-10.01  sec  1.02 GBytes   874 Mbits/sec  1189             sender
+[  4]   0.00-10.01  sec  1.02 GBytes   873 Mbits/sec                  receiver
 
-[...]
+iperf Done.
 
->>
->> Got it. Although I think we can cope with that fine just by using the
->> different SD/eMMC speed modes settings defined in DT (or from the
->> SDHCI caps register)
->>
->     In my very opinion, I'm not sure if there is any corner case that driver cannot
->     determine the eMMC card type from DT and SDHC caps.
->
->>>    Unfortunately, MMC driver cannot determine the card type yet when eMMC voltage
->>>    setting should be executed.
->>>    Thus an flag is required here to tell driver to execute eMMC voltage setting.
->>>
->>>    Besides, additional eMMC specific settings might be implemented in future, besides
->>>    voltage setting. Most of them should be completed before MMC driver recognizes the
->>>    card type. Thus I have to keep this flag to indicate current SDHC is for eMMC.
->>
->> I doubt you will need a generic "eMMC" flag, but let's see when we go forward.
->>
->> Currently it's clear you don't need such a flag, so I will submit a
->> change adding a DT binding for "mmc-ddr-3_3v" then we can take it from
->> there, to see if it suits your needs.
->>
->
->     Actually, our eMMC is usually fixed as 1.8V.
->
->     The pair "no-sd" + "no-sdio" can provide the similar information.
->     But I'm not sure if it is proper to use those two property in such a way.
+I get similar TX throughput on my Meson GXBB "MXQ Pro+" board when I
+disable the PHY's TX-delay and configure a 4ms TX-delay on the MAC.
+So changes to at least the RTL8211F PHY driver are needed to get it
+working properly in all situations.
 
-Well, potentially those could be used like that.
 
-The point of why we added them was to allow hosts that don't support
-the different protocols (which is somewhat true for your case, because
-of signal voltage issues) to tell the mmc core about it. That instead
-of having to all kind of crazy hacks in the drives, that in then
-didn't work out so well.
+NOTE: patches 3-7 should be taken though the Amlogic tree. patches 1
+and 2 can be taken through the net-tree or through the Amlogic tree.
+There shouldn't be a runtime dependency as long as phy-mode "rgmii"
+(or the not-relevant-for-this-case "rmii") is used (which is currently
+the case for all ARM64 meson-gx boards) due to the dwmac-meson8b's
+default 2ns TX-delay.
 
-Kind regards
-Uffe
+
+Changes since v1:
+- renamed the devicetree property "amlogic,tx-delay" to
+  "amlogic,tx-delay-ns", which makes the .dts easier to read as we can
+  simply specify human-readable values instead of having "preprocessor
+  defines and calculation in human brain". Thanks to Andrew Lunn for
+  the suggestion!
+- improved documentation to indicate when the MAC TX-delay should be
+  configured and how to use the PHY's TX-delay
+- changed the default TX-delay in the dwmac-meson8b driver from 2ns
+  to 0ms when any of the rgmii-*id modes are used (the 2ns default
+  value still applies for phy-mode "rgmii")
+- added patches to properly reset the PHY on Meson GXBB devices and to
+  use a similar configuration than the one we use on Meson GXL devices
+  (by passing a phy-handle to stmmac and defining the PHY in the mdio0
+  bus - patch 3-6)
+- add the "amlogic,tx-delay-ns" property to all boards which are using
+  the RGMII PHY (patch 7)
+
+
+Martin Blumenstingl (7):
+  net: dt-bindings: add RGMII TX delay configuration to meson8b-dwmac
+  net: stmmac: dwmac-meson8b: make the RGMII TX delay configurable
+  ARM64: dts: meson-gx: move the MDIO node to meson-gx
+  ARM64: dts: meson-gxbb-odroidc2: add reset for the ethernet PHY
+  ARM64: dts: meson-gxbb-p20x: add reset for the ethernet PHY
+  ARM64: dts: meson-gxbb-vega-s95: add reset for the ethernet PHY
+  ARM64: dts: amlogic: add the ethernet TX delay configuration
+
+ .../devicetree/bindings/net/meson-dwmac.txt        | 14 ++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi          |  6 +++++
+ .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 17 ++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   | 17 ++++++++++++++
+ .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      | 17 ++++++++++++++
+ .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      |  2 ++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         |  6 -----
+ .../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts |  2 ++
+ .../arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts |  2 ++
+ .../net/ethernet/stmicro/stmmac/dwmac-meson8b.c    | 26 +++++++++++++++++-----
+ 10 files changed, 97 insertions(+), 12 deletions(-)
+
+-- 
+2.10.2
