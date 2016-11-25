@@ -1,65 +1,75 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 25 Nov 2016 16:02:44 +0100
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <20161125141708.GM14217@n2100.armlinux.org.uk>
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <20161125124528.GJ14217@n2100.armlinux.org.uk>
- <yw1xtwav9092.fsf@unicorn.mansr.com>
- <20161125133436.GK14217@n2100.armlinux.org.uk>
- <yw1xlgw78y8k.fsf@unicorn.mansr.com>
- <20161125135830.GL14217@n2100.armlinux.org.uk>
- <yw1xh96v8xnb.fsf@unicorn.mansr.com>
- <20161125141708.GM14217@n2100.armlinux.org.uk>
-Message-ID: <d996bcdb-2413-770c-84d1-1b12ccd74477@free.fr>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Fri, 25 Nov 2016 23:06:32 +0800
+Subject: [PATCH v17 08/15] clocksource/drivers/arm_arch_timer: move
+ arch_timer_needs_of_probing into DT init call
+In-Reply-To: <201611252221.UyJ9iWPV%fengguang.wu@intel.com>
+References: <20161125084623.22515-9-fu.wei@linaro.org>
+ <201611252221.UyJ9iWPV%fengguang.wu@intel.com>
+Message-ID: <CADyBb7uAObQn_JVp_qw9+7POiqUctdzy3cYLsb0rk-JMX5W1uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/11/2016 15:17, Russell King - ARM Linux wrote:
-> On Fri, Nov 25, 2016 at 02:03:20PM +0000, M?ns Rullg?rd wrote:
->> Russell King - ARM Linux <linux@armlinux.org.uk> writes:
->>
->>> On Fri, Nov 25, 2016 at 01:50:35PM +0000, M?ns Rullg?rd wrote:
->>>> Russell King - ARM Linux <linux@armlinux.org.uk> writes:
->>>>> It would be unfair to augment the API and add the burden on everyone
->>>>> for the new API when 99.999% of the world doesn't require it.
->>>>
->>>> I don't think making this particular dma driver wait for the descriptor
->>>> callback to return before reusing a channel quite amounts to a horrid
->>>> hack.  It certainly wouldn't burden anyone other than the poor drivers
->>>> for devices connected to it, all of which are specific to Sigma AFAIK.
->>>
->>> Except when you stop to think that delaying in a tasklet is exactly
->>> the same as randomly delaying in an interrupt handler - the tasklet
->>> runs on the return path back to the parent context of an interrupt
->>> handler.  Even if you sleep in the tasklet, you're sleeping on behalf
->>> of the currently executing thread - if it's a RT thread, you effectively
->>> destroy the RT-ness of the thread.  Let's hope no one cares about RT
->>> performance on that hardware...
->>
->> That's why I suggested to do this only if the needed delay is known to
->> be no more than a few bus cycles.  The completion callback is currently
->> the only post-transfer interaction we have between the dma and device
->> drivers.  To handle an arbitrarily long delay, some new interface will
->> be required.
-> 
-> And now we're back at the point I made a few emails ago about undue
-> burden which is just about quoted above...
+Hi ,
 
-I've had several talks with the HW dev, and I don't think they
-anticipated the need to mux the 3 channels. In their minds,
-customers would choose at most 3 devices to support, and
-assign one channel to each device statically.
+On 25 November 2016 at 22:32, kbuild test robot <lkp@intel.com> wrote:
+> Hi Fu,
+>
+> [auto build test ERROR on pm/linux-next]
+> [also build test ERROR on v4.9-rc6]
+> [cannot apply to tip/timers/core next-20161125]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+>
+> url:    https://github.com/0day-ci/linux/commits/fu-wei-linaro-org/acpi-clocksource-add-GTDT-driver-and-GTDT-support-in-arm_arch_timer/20161125-171111
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+> config: arm64-defconfig (attached as .config)
+> compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm64
+>
+> Note: the linux-review/fu-wei-linaro-org/acpi-clocksource-add-GTDT-driver-and-GTDT-support-in-arm_arch_timer/20161125-171111 HEAD 498f1f2503da21841b0e7679ddbdb86a40451bdb builds fine.
+>       It only hurts bisectibility.
+>
+> All errors (new ones prefixed by >>):
+>
+>    drivers/clocksource/arm_arch_timer.c: In function 'arch_timer_acpi_init':
 
-In fact, in tango4, supported devices are:
-A) NAND Flash controllers 0 and 1
-NB: the upstream driver only uses controller 0
-B) IDE or SATA controllers 0 and 1
-C) a few crypto HW blocks which do not work as expected (unused)
+Sorry, again,
 
-Customers typically use 1 channel for NAND, maybe 1 for SATA,
-and 1 channel remains unused.
+a "+ int ret;" should be move from [12/15] to here, I have fix the
+problem in my repo, it would happen in next patchset
 
-I understand the desire to solve the general case in the
-driver, but actual use-cases are much more trivial.
+https://git.linaro.org/people/fu.wei/linux.git/log/?h=topic-gtdt-wakeup-timer_upstream_v18_devel
 
-Regards.
+>>> drivers/clocksource/arm_arch_timer.c:1071:2: error: 'ret' undeclared (first use in this function)
+>      ret = arch_timer_register();
+>      ^~~
+>    drivers/clocksource/arm_arch_timer.c:1071:2: note: each undeclared identifier is reported only once for each function it appears in
+>
+> vim +/ret +1071 drivers/clocksource/arm_arch_timer.c
+>
+>   1065                  return -EINVAL;
+>   1066          }
+>   1067
+>   1068          /* Always-on capability */
+>   1069          arch_timer_c3stop = !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
+>   1070
+>> 1071          ret = arch_timer_register();
+>   1072          if (ret)
+>   1073                  return ret;
+>   1074
+>
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+
+
+
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
