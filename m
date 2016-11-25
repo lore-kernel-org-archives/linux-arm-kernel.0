@@ -1,120 +1,66 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Fri, 25 Nov 2016 10:11:53 +0100
-Subject: [PATCH] ARM: da850-lcdk: add the dumb-vga-dac node
-Message-ID: <1480065113-2443-1-git-send-email-bgolaszewski@baylibre.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 25 Nov 2016 10:11:20 +0100
+Subject: [PATCH 1/1] net: macb: fix the RX queue reset in macb_rx()
+In-Reply-To: <fd8131cbe6c0546b2b8ee35bcaac5e7eb1a1647f.1480063339.git.cyrille.pitchen@atmel.com>
+References: <fd8131cbe6c0546b2b8ee35bcaac5e7eb1a1647f.1480063339.git.cyrille.pitchen@atmel.com>
+Message-ID: <8c91d53a-3556-4305-ce9d-589753445e19@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the dumb-vga-dac node to the board DT together with corresponding
-ports and vga connector. This allows to retrieve the edid info from
-the display automatically.
+Le 25/11/2016 ? 09:49, Cyrille Pitchen a ?crit :
+> On macb only (not gem), when a RX queue corruption was detected from
+> macb_rx(), the RX queue was reset: during this process the RX ring
+> buffer descriptor was initialized by macb_init_rx_ring() but we forgot
+> to also set bp->rx_tail to 0.
+> 
+> Indeed, when processing the received frames, bp->rx_tail provides the
+> macb driver with the index in the RX ring buffer of the next buffer to
+> process. So when the whole ring buffer is reset we must also reset
+> bp->rx_tail so the driver is synchronized again with the hardware.
+> 
+> Since macb_init_rx_ring() is called from many locations, currently from
+> macb_rx() and macb_init_rings(), we'd rather add the "bp->rx_tail = 0;"
+> line inside macb_init_rx_ring() than add the very same line after each
+> call of this function.
+> 
+> Without this fix, the rx queue is not reset properly to recover from
+> queue corruption and connection drop may occur.
+> 
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> Fixes: 9ba723b081a2 ("net: macb: remove BUG_ON() and reset the queue to handle RX errors")
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/boot/dts/da850-lcdk.dts | 58 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/da850.dtsi     | 17 ++++++++++++
- 2 files changed, 75 insertions(+)
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Thanks.
 
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index 7b8ab21..c5d3a2b 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -50,6 +50,53 @@
- 			system-clock-frequency = <24576000>;
- 		};
- 	};
-+
-+	vga_bridge {
-+		compatible = "dumb-vga-dac";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&lcd_pins>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0>;
-+
-+				vga_bridge_in: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&display_out_vga>;
-+				};
-+			};
-+
-+			port at 1 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <1>;
-+
-+				vga_bridge_out: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vga_con_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	vga {
-+		compatible = "vga-connector";
-+
-+		ddc-i2c-bus = <&i2c0>;
-+
-+		port {
-+			vga_con_in: endpoint {
-+				remote-endpoint = <&vga_bridge_out>;
-+			};
-+		};
-+	};
- };
- 
- &pmx_core {
-@@ -219,3 +266,14 @@
- 		};
- 	};
- };
-+
-+&display {
-+	status = "okay";
-+};
-+
-+&display_out {
-+	display_out_vga: endpoint at 0 {
-+		reg = <0>;
-+		remote-endpoint = <&vga_bridge_in>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 36066fa..6ab8df1 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -442,6 +442,23 @@
- 			reg = <0x213000 0x1000>;
- 			interrupts = <52>;
- 			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				display_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+				};
-+
-+				display_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+				};
-+			};
- 		};
- 	};
- 	aemif: aemif at 68000000 {
+Regards,
+
+> ---
+>  drivers/net/ethernet/cadence/macb.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+> index 0e489bb82456..8ee303b8da08 100644
+> --- a/drivers/net/ethernet/cadence/macb.c
+> +++ b/drivers/net/ethernet/cadence/macb.c
+> @@ -991,6 +991,7 @@ static inline void macb_init_rx_ring(struct macb *bp)
+>  		addr += bp->rx_buffer_size;
+>  	}
+>  	bp->rx_ring[bp->rx_ring_size - 1].addr |= MACB_BIT(RX_WRAP);
+> +	bp->rx_tail = 0;
+>  }
+>  
+>  static int macb_rx(struct macb *bp, int budget)
+> @@ -1736,8 +1737,6 @@ static void macb_init_rings(struct macb *bp)
+>  	bp->queues[0].tx_head = 0;
+>  	bp->queues[0].tx_tail = 0;
+>  	bp->queues[0].tx_ring[bp->tx_ring_size - 1].ctrl |= MACB_BIT(TX_WRAP);
+> -
+> -	bp->rx_tail = 0;
+>  }
+>  
+>  static void macb_reset_hw(struct macb *bp)
+> 
+
+
 -- 
-2.9.3
+Nicolas Ferre
