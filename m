@@ -1,70 +1,34 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Fri, 25 Nov 2016 11:04:50 +0800
-Subject: [RFC v2: PATCH 1/2] dt-bindings: Document the hi3660 reset
- bindings
-In-Reply-To: <1479979605.2472.4.camel@pengutronix.de>
-References: <Arnd Bergmann <arnd@arndb.de>
- <1479888476-13138-1-git-send-email-zhangfei.gao@linaro.org>
- <1479888476-13138-2-git-send-email-zhangfei.gao@linaro.org>
- <1479979605.2472.4.camel@pengutronix.de>
-Message-ID: <01de97d9-e910-d9f3-f081-215a78f7f4d2@linaro.org>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Fri, 25 Nov 2016 11:18:31 +0800
+Subject: [PATCH v4 1/6] arm64: arch_timer: Add device tree binding for
+ hisilicon-161601 erratum
+In-Reply-To: <58379AA4.6030401@linaro.org>
+References: <1479212167-5812-1-git-send-email-dingtianhong@huawei.com>
+ <c3020c0d-bc45-2bb1-f53a-c5e76ab45499@huawei.com>
+ <624c1751-9b66-1d10-78ae-8cb4edea6109@huawei.com>
+ <58379AA4.6030401@linaro.org>
+Message-ID: <4ebf32e8-4815-c01f-2e95-768a5c830859@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+OK
 
-
-On 2016?11?24? 17:26, Philipp Zabel wrote:
-> Am Mittwoch, den 23.11.2016, 16:07 +0800 schrieb Zhangfei Gao:
->> Add DT bindings documentation for hi3660 SoC reset controller.
+On 2016/11/25 9:57, Hanjun Guo wrote:
+> Hi John,
+> 
+> On 11/24/2016 08:12 PM, John Garry wrote:
+>> On 21/11/2016 12:49, Ding Tianhong wrote:
+>>> Ping....
 >>
->> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->> ---
->>   .../bindings/reset/hisilicon,hi3660-reset.txt      | 51 ++++++++++++++++++++++
->>   1 file changed, 51 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+>> Hi,
 >>
->> diff --git a/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
->> new file mode 100644
->> index 0000000..250daf2
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
->> @@ -0,0 +1,51 @@
->> +Hisilicon System Reset Controller
->> +======================================
->> +
->> +Please also refer to reset.txt in this directory for common reset
->> +controller binding usage.
->> +
->> +The reset controller registers are part of the system-ctl block on
->> +hi3660 SoC.
->> +
->> +Required properties:
->> +- compatible: should be
->> +		 "hisilicon,hi3660-reset"
->> +- #reset-cells: 1, see below
->> +- hisi,rst-syscon: phandle of the reset's syscon.
->> +- hisi,reset-bits: Contains the reset control register information
->> +		  Should contain 2 cells for each reset exposed to
->> +		  consumers, defined as:
->> +			Cell #1 : offset from the syscon register base
->> +			Cell #2 : bits position of the control register
->> +
->> +Example:
->> +	iomcu: iomcu at ffd7e000 {
->> +		compatible = "hisilicon,hi3660-iomcu", "syscon";
->> +		reg = <0x0 0xffd7e000 0x0 0x1000>;
->> +	};
->> +
->> +	iomcu_rst: iomcu_rst_controller {
-> This should be
-> 	iomcu_rst: reset-controller {
-By the way, could I keep the original name?
-Since there will be build error if several nodes use the same name.
-like:
--               iomcu_rst: iomcu_rst_controller {
-+               iomcu_rst: reset-controller {
-
--               crg_rst: crg_rst_controller {
-+               crg_rst: reset-controller {
-
-Thanks
+>> was there a cover letter for 0/6? I never saw it.
+> 
+> There isn't a cover letter, do we need to add it and
+> resend (to make thing clear)?
+> 
+> Thanks
+> Hanjun
+> 
+> .
+> 
