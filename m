@@ -1,185 +1,126 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 25 Nov 2016 19:39:06 +0000
-Subject: [RFC PATCH 18/29] arm64/sve: signal: Restore FPSIMD/SVE state in
- rt_sigreturn
+Date: Fri, 25 Nov 2016 19:39:09 +0000
+Subject: [RFC PATCH 21/29] arm64/sve: Enable SVE on demand for userspace
 In-Reply-To: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
 References: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1480102762-23647-19-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1480102762-23647-22-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the missing logic to restore the SVE state in
-rt_sigreturn.
-
-Because the FPSIMD and SVE state alias, this code replaces the
-existing fpsimd restore code when there is SVE state to restore.
-
-For Zn[127:0], the saved FPSIMD state in Vn takes precedence.
-
-Since __task_fpsimd_to_sve() is used to merge the FPSIMD and SVE
-state back together, and only for this purpose, we don't want it to
-zero out the SVE state -- hence delete the memset() from there.
+This patch tracks whether a task has ever attempted to use the
+Scalable Vector Extension.  If and only if SVE is in use by a task,
+it will be enabled for userspace when scheduling the task in.  For
+other tasks, SVE is disabled when scheduling in.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/kernel/fpsimd.c |  4 ---
- arch/arm64/kernel/signal.c | 87 ++++++++++++++++++++++++++++++++++++++++------
- 2 files changed, 76 insertions(+), 15 deletions(-)
+ arch/arm64/include/asm/thread_info.h |  1 +
+ arch/arm64/kernel/entry.S            | 18 +++++++++++++++++-
+ arch/arm64/kernel/fpsimd.c           | 30 ++++++++++++++++++++++++++++++
+ 3 files changed, 48 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index e9ea5a6..2deac86 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -117,6 +117,7 @@ static inline struct thread_info *current_thread_info(void)
+ #define TIF_SYSCALL_AUDIT	9
+ #define TIF_SYSCALL_TRACEPOINT	10
+ #define TIF_SECCOMP		11
++#define TIF_SVE			17	/* Scalable Vector Extension in use */
+ #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
+ #define TIF_FREEZE		19
+ #define TIF_RESTORE_SIGMASK	20
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 223d54a..fe20560 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -465,6 +465,10 @@ el0_sync:
+ 	b.eq	el0_ia
+ 	cmp	x24, #ESR_ELx_EC_FP_ASIMD	// FP/ASIMD access
+ 	b.eq	el0_fpsimd_acc
++#ifdef CONFIG_ARM64_SVE
++	cmp	x24, #ESR_ELx_EC_SVE		// SVE access
++	b.eq	el0_sve_acc
++#endif
+ 	cmp	x24, #ESR_ELx_EC_FP_EXC64	// FP/ASIMD exception
+ 	b.eq	el0_fpsimd_exc
+ 	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
+@@ -563,9 +567,21 @@ el0_fpsimd_acc:
+ 	mov	x1, sp
+ 	bl	do_fpsimd_acc
+ 	b	ret_to_user
++#ifdef CONFIG_ARM64_SVE
++	/*
++	 * Scalable Vector Extension access
++	 */
++el0_sve_acc:
++	enable_dbg
++	ct_user_exit
++	mov	x0, x25
++	mov	x1, sp
++	bl	do_sve_acc
++	b	ret_to_user
++#endif
+ el0_fpsimd_exc:
+ 	/*
+-	 * Floating Point or Advanced SIMD exception
++	 * Floating Point, Advanced SIMD or SVE exception
+ 	 */
+ 	enable_dbg
+ 	ct_user_exit
 diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 4ef2e37..b1a8d3e 100644
+index cda079e..40566a9 100644
 --- a/arch/arm64/kernel/fpsimd.c
 +++ b/arch/arm64/kernel/fpsimd.c
-@@ -266,9 +266,6 @@ static void task_sve_to_fpsimd(struct task_struct *task __always_unused) { }
- 
- void fpsimd_signal_preserve_current_state(void)
- {
--	WARN_ONCE(elf_hwcap & HWCAP_SVE,
--		  "SVE state save/restore around signals doesn't work properly, expect userspace corruption!\n");
--
- 	fpsimd_preserve_current_state();
- 	task_sve_to_fpsimd(current);
- }
-@@ -301,7 +298,6 @@ static void __task_fpsimd_to_sve(struct task_struct *task, unsigned int vq)
- 	struct fpsimd_state *fst = &task->thread.fpsimd_state;
- 	unsigned int i;
- 
--	memset(sst, 0, sizeof(*sst));
- 	for (i = 0; i < 32; ++i)
- 		sst->zregs[i][0] = fst->vregs[i];
- }
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 038e7338..2697d09 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -211,6 +211,11 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
+@@ -99,6 +99,20 @@ void do_fpsimd_acc(unsigned int esr, struct pt_regs *regs)
+ 	WARN_ON(1);
  }
  
- 
-+struct user_ctxs {
-+	struct fpsimd_context __user *fpsimd;
-+	struct sve_context __user *sve;
-+};
-+
- #ifdef CONFIG_ARM64_SVE
- 
- static int preserve_sve_context(struct sve_context __user *ctx)
-@@ -240,19 +245,68 @@ static int preserve_sve_context(struct sve_context __user *ctx)
- 	return err ? -EFAULT : 0;
- }
- 
-+static int __restore_sve_fpsimd_context(struct user_ctxs *user,
-+					unsigned int vl, unsigned int vq)
++#ifdef CONFIG_ARM64_SVE
++void do_sve_acc(unsigned int esr, struct pt_regs *regs)
 +{
-+	int err;
-+	struct fpsimd_sve_state(vq) *task_sve_regs =
-+		__task_sve_state(current);
-+	struct fpsimd_state fpsimd;
++	unsigned long tmp;
 +
-+	if (vl != sve_get_vl())
-+		return -EINVAL;
++	if (test_and_set_thread_flag(TIF_SVE))
++		BUG();
 +
-+	BUG_ON(SVE_SIG_REGS_SIZE(vq) > sizeof(*task_sve_regs));
-+	BUG_ON(round_up(SVE_SIG_REGS_SIZE(vq), 16) < sizeof(*task_sve_regs));
-+	BUG_ON(SVE_SIG_FFR_OFFSET(vq) - SVE_SIG_REGS_OFFSET !=
-+	       (char *)&task_sve_regs->ffr - (char *)task_sve_regs);
-+	err = __copy_from_user(task_sve_regs,
-+			       (char __user const *)user->sve +
-+					SVE_SIG_REGS_OFFSET,
-+			       SVE_SIG_REGS_SIZE(vq));
-+	if (err)
-+		return err;
-+
-+	/* copy the FP and status/control registers */
-+	/* restore_sigframe() already checked that user->fpsimd != NULL. */
-+	err = __copy_from_user(fpsimd.vregs, user->fpsimd->vregs,
-+			       sizeof(fpsimd.vregs));
-+	__get_user_error(fpsimd.fpsr, &user->fpsimd->fpsr, err);
-+	__get_user_error(fpsimd.fpcr, &user->fpsimd->fpcr, err);
-+
-+	/* load the hardware registers from the fpsimd_state structure */
-+	if (!err)
-+		fpsimd_update_current_state(&fpsimd);
-+
-+	return err;
++	asm ("mrs %0, cpacr_el1" : "=r" (tmp));
++	asm volatile ("msr cpacr_el1, %0" :: "r" (tmp | (1 << 17)));
++	/* Serialised by exception return to user */
 +}
++#endif
 +
-+static int restore_sve_fpsimd_context(struct user_ctxs *user)
-+{
-+	int err;
-+	u16 vl, vq;
-+
-+	err = __get_user(vl, &user->sve->vl);
-+	if (err)
-+		return err;
-+
-+	if (!sve_vl_valid(vl))
-+		return -EINVAL;
-+
-+	vq = sve_vq_from_vl(vl);
-+
-+	return __restore_sve_fpsimd_context(user, vl, vq);
-+}
-+
- #else /* ! CONFIG_ARM64_SVE */
- 
--/* Turn any non-optimised out attempt to use this into a link error: */
-+/* Turn any non-optimised out attempts to use these into a link error: */
- extern int preserve_sve_context(void __user *ctx);
-+extern int restore_sve_fpsimd_context(struct user_ctxs *user);
- 
- #endif /* ! CONFIG_ARM64_SVE */
- 
- 
--struct user_ctxs {
--	struct fpsimd_context __user *fpsimd;
--	struct sve_context __user *sve;
--};
--
- static int parse_user_sigframe(struct user_ctxs *user,
- 			       struct rt_sigframe __user *sf)
+ /*
+  * Raise a SIGFPE for the current process.
+  */
+@@ -283,11 +297,27 @@ void fpsimd_restore_current_state(void)
  {
-@@ -316,6 +370,9 @@ static int parse_user_sigframe(struct user_ctxs *user,
- 			if (!IS_ENABLED(CONFIG_ARM64_SVE))
- 				goto invalid;
- 
-+			if (!(elf_hwcap & HWCAP_SVE))
-+				goto invalid;
+ 	preempt_disable();
+ 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
++		unsigned long tmp;
++		unsigned long flags;
 +
- 			if (user->sve)
- 				goto invalid;
+ 		struct fpsimd_state *st = &current->thread.fpsimd_state;
  
-@@ -375,9 +432,6 @@ static int parse_user_sigframe(struct user_ctxs *user,
+ 		task_fpsimd_load(current);
+ 		this_cpu_write(fpsimd_last_state, st);
+ 		st->cpu = smp_processor_id();
++
++		if (IS_ENABLED(CONFIG_ARM64_SVE)) {
++			/*
++			 * Flip SVE enable for userspace if it doesn't
++			 * match the current_task.
++			 */
++			asm ("mrs %0, cpacr_el1" : "=r" (tmp));
++			flags = current_thread_info()->flags;
++			if ((tmp ^ (unsigned long)flags) & (1 << 17)) {
++				tmp ^= 1 << 17;
++				asm volatile ("msr cpacr_el1, %0" :: "r" (tmp));
++			}
++		}
  	}
- 
- done:
--	if (!user->fpsimd)
--		goto invalid;
--
- 	return 0;
- 
- invalid:
-@@ -411,8 +465,19 @@ static int restore_sigframe(struct pt_regs *regs,
- 	if (err == 0)
- 		err = parse_user_sigframe(&user, sf);
- 
--	if (err == 0)
--		err = restore_fpsimd_context(user.fpsimd);
-+	if (err == 0) {
-+		if (!user.fpsimd)
-+			return -EINVAL;
-+
-+		if (user.sve) {
-+			if (!IS_ENABLED(CONFIG_ARM64_SVE) ||
-+			    !(elf_hwcap & HWCAP_SVE))
-+				return -EINVAL;
-+
-+			err = restore_sve_fpsimd_context(&user);
-+		} else
-+			err = restore_fpsimd_context(user.fpsimd);
-+	}
- 
- 	return err;
+ 	preempt_enable();
  }
 -- 
 2.1.4
