@@ -1,74 +1,68 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 25 Nov 2016 10:49:08 +0000
-Subject: [RFC PATCH 04/11] PCI: tegra: limit to MMU build only
-In-Reply-To: <20161122112619.GA22862@ulmo.ba.sec>
-References: <1479806768-39911-1-git-send-email-vladimir.murzin@arm.com>
- <11637152.Dd0IBkEQ8q@wuerfel> <58341297.9090303@arm.com>
- <28079479.jInxCWkYlm@wuerfel> <20161122112619.GA22862@ulmo.ba.sec>
-Message-ID: <58381724.5090802@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 25 Nov 2016 18:52:31 +0800
+Subject: [PATCH 01/10] power: supply: axp20x_usb_power: use of_device_id
+ data field instead of device_is_compatible
+In-Reply-To: <20161125090921.23138-2-quentin.schulz@free-electrons.com>
+Message-ID: <201611251850.lfMksMrN%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/11/16 11:26, Thierry Reding wrote:
-> On Tue, Nov 22, 2016 at 10:54:01AM +0100, Arnd Bergmann wrote:
->> On Tuesday, November 22, 2016 9:40:39 AM CET Vladimir Murzin wrote:
->>> On 22/11/16 09:31, Arnd Bergmann wrote:
->>>> On Tuesday, November 22, 2016 9:26:01 AM CET Vladimir Murzin wrote:
->>>>> This driver uses functionality which available for MMU build only,
->>>>> thus add dependency on MMU.
->>>>>
->>>>> Cc: Thierry Reding <thierry.reding@gmail.com>
->>>>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->>>>>
->>>>
->>>> Can you be more specific about what requires the MMU here?
->>>>
->>>> Is it the I/O space remapping or something else?
->>>
->>> Yes it comes from I/O space remapping.
->>>
->>> The fill error log:
->>>
->>>   CC      drivers/pci/host/pci-tegra.o
->>> In file included from ./arch/arm/include/asm/page.h:22:0,
->>>                  from ./arch/arm/include/asm/thread_info.h:17,
->>>                  from ./include/linux/thread_info.h:58,
->>>                  from ./include/asm-generic/current.h:4,
->>>                  from ./arch/arm/include/generated/asm/current.h:1,
->>>                  from ./include/linux/mutex.h:13,
->>>                  from ./include/linux/notifier.h:13,
->>>                  from ./include/linux/clk.h:17,
->>>                  from drivers/pci/host/pci-tegra.c:29:
->>> drivers/pci/host/pci-tegra.c: In function 'tegra_pcie_bus_alloc':
->>> drivers/pci/host/pci-tegra.c:388:27: error: 'L_PTE_PRESENT' undeclared (first use in this function)
->>>   pgprot_t prot = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY |
->>
->>
->> That is not the I/O space, that is the config space.
->>
->> Not sure what a better alternative would be, but the manual selection
->> of page flags makes the driver non-portable and dependent on architecture
->> specifics that it really shouldn't have to worry about.
->>
->> In common PCI code, we use pgprot_device(PAGE_KERNEL)) at some point,
->> and that sounds like the right thing to do, but ARM doesn't provide
->> an override for it and the fallback is pgprot_noncached(), which is
->> probably wrong here.
-> 
-> Actually I think pgprot_noncached() is correct. Very early on we used to
-> map this using ioremap() and I remember that working. I also just tested
-> the pci-tegra driver with pgprot_device(PAGE_KERNEL) instead of the ARM-
-> specific flags and it seems to work well.
-> 
+Hi Quentin,
 
-I did try that, but tegra_pcie_bus_alloc() calls get_vm_area() so
+[auto build test WARNING on robh/for-next]
+[also build test WARNING on v4.9-rc6 next-20161124]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-drivers/built-in.o: In function `tegra_pcie_add_bus':
-:(.text+0x7763c): undefined reference to `get_vm_area'
-make: *** [vmlinux] Error 1
+url:    https://github.com/0day-ci/linux/commits/Quentin-Schulz/add-support-for-VBUS-max-current-and-min-voltage-limits-AXP20X-and-AXP22X-PMICs/20161125-172224
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: x86_64-randconfig-s5-11251757 (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-Cheers
-Vladimir
+All warnings (new ones prefixed by >>):
 
-> Thierry
-> 
+   drivers/power/supply/axp20x_usb_power.c: In function 'axp20x_usb_power_probe':
+>> drivers/power/supply/axp20x_usb_power.c:233:21: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+     power->axp20x_id = (int)of_id->data;
+                        ^
+
+vim +233 drivers/power/supply/axp20x_usb_power.c
+
+   217		if (!of_device_is_available(pdev->dev.of_node))
+   218			return -ENODEV;
+   219	
+   220		of_id = of_match_device(axp20x_usb_power_match, &pdev->dev);
+   221		if (!of_id)
+   222			return -ENODEV;
+   223	
+   224		if (!axp20x) {
+   225			dev_err(&pdev->dev, "Parent drvdata not set\n");
+   226			return -EINVAL;
+   227		}
+   228	
+   229		power = devm_kzalloc(&pdev->dev, sizeof(*power), GFP_KERNEL);
+   230		if (!power)
+   231			return -ENOMEM;
+   232	
+ > 233		power->axp20x_id = (int)of_id->data;
+   234	
+   235		power->np = pdev->dev.of_node;
+   236		power->regmap = axp20x->regmap;
+   237	
+   238		if (power->axp20x_id == AXP202_ID) {
+   239			/* Enable vbus valid checking */
+   240			ret = regmap_update_bits(power->regmap, AXP20X_VBUS_MON,
+   241						 AXP20X_VBUS_MON_VBUS_VALID,
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 23302 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161125/f7be7673/attachment-0001.gz>
