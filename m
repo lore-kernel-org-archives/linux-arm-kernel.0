@@ -1,65 +1,108 @@
-From: uwe@kleine-koenig.org (=?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?=)
-Date: Fri, 25 Nov 2016 15:34:55 +0100
-Subject: [RFC PATCH] ARM: dts: Add support for Turris Omnia
-In-Reply-To: <1480078151.381.4@smtp.gmail.com>
-References: <1479851991.26813.2@smtp.gmail.com>
- <1479859770-9375-1-git-send-email-tmshlvck@gmail.com>
- <20161123003505.GL2691@lunn.ch>
- <4e3f9628-dbf8-27c1-abea-d0ef58a67e51@kleine-koenig.org>
- <20161124150700.GD7155@lunn.ch> <1480078151.381.4@smtp.gmail.com>
-Message-ID: <0d17c6df-ba75-1e0c-735e-f23b61388a04@kleine-koenig.org>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 25 Nov 2016 14:37:04 +0000
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <28bb9925-d0d7-9261-27fb-aa79345a19f1@free.fr> (Mason's message
+ of "Fri, 25 Nov 2016 15:21:00 +0100")
+References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
+ <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
+ <yw1xpolj9021.fsf@unicorn.mansr.com>
+ <28bb9925-d0d7-9261-27fb-aa79345a19f1@free.fr>
+Message-ID: <yw1x8ts78w33.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Mason <slash.tmp@free.fr> writes:
 
-[trimmed Cc: a bit to annoy less]
-
-On 11/25/2016 01:49 PM, Tomas Hlavacek wrote:
-> On Thu, Nov 24, 2016 at 4:07 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->>>  @Tomas: I think it doesn't make sense when we alternate sending patches
->>>  without prior arrangement. Do you already work on a v5? If not I can do
->>>  that to fix the last few comments. Not sure when a submission is too
->>>  late to enter v4.10, but I think the window isn't that big any more.
->>
->> It is getting a bit late. But maybe Linus will add in another -rc
->> week.
-
-To keep the dice rolling I sent a v5 with is somewhere in the middle
-between my v3 and Tomas RFC patch. Assuming Tomas is happy with this
-change, can we still get it into 4.10? This would help me to put this in
-the Debian kernel for the next release.
-
->>>  > No leds? No buttons via gpio-keys?
+> On 25/11/2016 14:11, M?ns Rullg?rd wrote:
+>
+>> Mason writes:
+>> 
+>>> It seems there is a disconnect between what Linux expects - an IRQ
+>>> when the transfer is complete - and the quirks of this HW :-(
 >>>
->>>  The leds are controlled by a Cortex-M0 and without intervention blink
->>>  according to a hardware function (network, power, pci). IMHO that's ok
->>>  for an initial setup.
->>
->> Yes. That is fine. It is just unusual. Most boards have gpio-led and
->> gpio-keys, which are easy to add. That is why i asked. Adding an LED
->> driver which talks to this M0 can be added later.
-> 
-> Actually the WiP driver for MCU LED interface, that we use in our kernel
-> is here:
-> https://github.com/tmshlvck/omnia-linux/commit/2121afd8fbd2e4c720edcdd472b11b5303bc0dfb
-> 
-> 
-> It definitely needs some cleanup and it adds non-standard features (main
-> PWM for all LEDs, autonomous blink mode, colors) via custom /sys files,
-> which I suspect that is not going to be acceptable for upstream. Let's
-> keep it for the next iteration.
+>>> On this system, there are MBUS "agents" connected via a "switch box".
+>>> An agent fires an IRQ when it has dealt with its *half* of the transfer.
+>>>
+>>> SOURCE_AGENT <---> SBOX <---> DESTINATION_AGENT
+>>>
+>>> Here are the steps for a transfer, in the general case:
+>>>
+>>> 1) setup the sbox to connect SOURCE TO DEST
+>>> 2) configure source to send N bytes
+>>> 3) configure dest to receive N bytes
+>>>
+>>> When SOURCE_AGENT has sent N bytes, it fires an IRQ
+>>> When DEST_AGENT has received N bytes, it fires an IRQ
+>>> The sbox connection can be torn down only when the destination
+>>> agent has received all bytes.
+>>> (And the twist is that some agents do not have an IRQ line.)
+>>>
+>>> The system provides 3 RAM-to-sbox agents (read channels)
+>>> and 3 sbox-to-RAM agents (write channels).
+>>>
+>>> The NAND Flash controller read and write agents do not have
+>>> IRQ lines.
+>>>
+>>> So for a NAND-to-memory transfer (read from device)
+>>> - nothing happens when the NFC has finished sending N bytes to the sbox
+>>> - the write channel fires an IRQ when it has received N bytes
+>>>
+>>> In that case, one IRQ fires when the transfer is complete,
+>>> like Linux expects.
+>>>
+>>> For a memory-to-NAND transfer (write to device)
+>>> - the read channel fires an IRQ when it has sent N bytes
+>>> - the NFC driver is supposed to poll the NFC to determine
+>>> when the controller has finished writing N bytes
+>>>
+>>> In that case, the IRQ does not indicate that the transfer
+>>> is complete, merely that the sending half has finished
+>>> its part.
+>> 
+>> When does your NAND controller signal completion?  When it has received
+>> the DMA data, or only when it has finished the actual write operation?
+>
+> The NAND controller provides a STATUS register.
+> Bit 31 is the CMD_READY bit.
+> This bit goes to 0 when the controller is busy, and to 1
+> when the controller is ready to accept the next command.
+>
+> The NFC driver is doing:
+>
+> 	res = wait_for_completion_timeout(&tx_done, HZ);
+> 	if (res > 0)
+> 		err = readl_poll_timeout(addr, val, val & CMD_READY, 0, 1000);
+>
+> So basically, sleep until the memory agent IRQ falls,
+> then spin until the controller is idle.
 
-Ack, the leds are one of the less critical things for the machine. I'd
-like to tackle the switch next.
+This doesn't answer my question.  Waiting for the entire operation to
+finish isn't necessary.  The dma driver only needs to wait until all the
+data has been received by the nand controller, not until the controller
+is completely finished with the command.  Does the nand controller
+provide an indication for completion of the dma independently of the
+progress of the write command?  The dma glue Sigma added to the
+Designware sata controller does this.
 
-Best regards
-Uwe
+> Did you see that adding a 10 ?s delay at the start of
+> tangox_dma_pchan_detach() makes the system no longer
+> fail (passes an mtd_speedtest).
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 484 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161125/05e21cc2/attachment.sig>
+Yes, but maybe that's much longer than is actually necessary.
+
+>>> I think it is possible to have a generic solution:
+>>> Right now, the callback is called from tasklet context.
+>>> If we can have a new flag to have the callback invoked
+>>> directly from the ISR, then the driver for the client
+>>> device can do what is required.
+>> 
+>> No, that won't work.  The callback shouldn't run in interrupt context.
+>
+> What if the callback only spun for, at most, 10 ?s ?
+>
+> 	readl_poll_timeout(addr, val, val & CMD_READY, 0, 10);
+
+That's far too long to wait in interrupt of tasklet context.
+
+-- 
+M?ns Rullg?rd
