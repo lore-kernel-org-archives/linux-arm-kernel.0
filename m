@@ -1,72 +1,32 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 25 Nov 2016 10:48:18 +0100
-Subject: [PATCH 02/10] power: supply: axp20x_usb_power: set min voltage
- and max current from sysfs
-In-Reply-To: <20161125090921.23138-3-quentin.schulz@free-electrons.com>
-References: <20161125090921.23138-1-quentin.schulz@free-electrons.com>
- <20161125090921.23138-3-quentin.schulz@free-electrons.com>
-Message-ID: <20161125104818.597c0718@free-electrons.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 25 Nov 2016 09:52:28 +0000
+Subject: [PATCH 5/7] efi: Get the secure boot status [ver #3]
+In-Reply-To: <15173.1480066220@warthog.procyon.org.uk>
+References: <147990561294.7576.6464430479448167484.stgit@warthog.procyon.org.uk>
+ <147990565051.7576.9673287945782426886.stgit@warthog.procyon.org.uk>
+ <1480016487.2444.18.camel@HansenPartnership.com>
+ <15173.1480066220@warthog.procyon.org.uk>
+Message-ID: <CAKv+Gu_JxNLDjaK5jGbX9ACzM0uHJYMOFx7XDo4t7DtBMtFRGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quentin,
+On 25 November 2016 at 09:30, David Howells <dhowells@redhat.com> wrote:
+> James Bottomley <James.Bottomley@HansenPartnership.com> wrote:
+>
+>> Since you seem to be using this to mean "is the platform locked down?",
+>> this looks to be no longer complete in the UEFI 2.6 world.  If
+>> DeployedMode == 0, even if SecureBoot == 1 and SetupMode == 0, you can
+>> remove the platform key by writing 1 to AuditMode and gain control of
+>> the secure variables.  The lock down state becomes DeployedMode == 1,
+>> SecureBoot == 1 and SetupMode == 0
+>>
+>> See the diagram on page 1817
+>>
+>> http://www.uefi.org/sites/default/files/resources/UEFI%20Spec%202_6.pdf
+>
+> How many pages?!
+>
+> Does the DeployedMode variable not exist in older versions of the UEFI spec?
+>
 
-On Fri, 25 Nov 2016 10:09:13 +0100, Quentin Schulz wrote:
-
-> +static int axp20x_usb_power_set_property(struct power_supply *psy,
-> +					 enum power_supply_property psp,
-> +					 const union power_supply_propval *val)
-> +{
-> +	struct axp20x_usb_power *power = power_supply_get_drvdata(psy);
-> +	int ret, val1;
-> +
-> +	switch (psp) {
-> +	case POWER_SUPPLY_PROP_VOLTAGE_MIN:
-> +		switch (val->intval) {
-
-This nested switch construct doesn't look very pretty. What about
-instead:
-
-	switch(psp) {
-	case POWER_SUPPLY_PROP_VOLTAGE_MIN:
-		return axp20x_usb_power_set_prop_voltage_min(...);
-	case POWER_SUPPLY_PROP_CURRENT_MAX:
-		return axp20x_usb_power_set_prop_current_max(...);
-	default:
-		return -EINVAL;
-	}
-
-> +		case 4000000:
-> +		case 4100000:
-> +		case 4200000:
-> +		case 4300000:
-> +		case 4400000:
-> +		case 4500000:
-> +		case 4600000:
-> +		case 4700000:
-> +			val1 = (val->intval - 4000000) / 100000;
-> +			ret = regmap_update_bits(power->regmap,
-> +						 AXP20X_VBUS_IPSOUT_MGMT,
-> +						 AXP20X_VBUS_VHOLD_MASK,
-> +						 val1 << 3);
-> +			if (ret)
-> +				return ret;
-> +
-> +			return 0;
-
-Just do:
-
-			return regmap_update_bits(...);
-
-The dance to test ret is useless, since you anyway return ret when
-non-zero, or return zero when ret was zero.
-
-While you're at it, maybe make val1 a u32, since I guess it's written
-to a 32-bit register (unless u32 is not commonly used in this driver
-already, of course).
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+No, it was added in 2.6
