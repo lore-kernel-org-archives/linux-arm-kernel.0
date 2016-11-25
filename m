@@ -1,47 +1,59 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 25 Nov 2016 10:13:29 +0100
-Subject: [PATCH] mtd: nand: mxc: Fix mxc_v1 ooblayout
-Message-ID: <1480065209-4179-1-git-send-email-boris.brezillon@free-electrons.com>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Fri, 25 Nov 2016 12:17:53 +0300
+Subject: [PATCH 7/9] clocksource/drivers/rockchip_timer: implement
+ clocksource timer
+In-Reply-To: <1800621.EhepfMxccR@diego>
+References: <1479922177-20136-1-git-send-email-al.kochet@gmail.com>
+ <1479922177-20136-7-git-send-email-al.kochet@gmail.com>
+ <FFD6E644-F68B-4880-BC76-88F6063D070E@gmail.com> <1800621.EhepfMxccR@diego>
+Message-ID: <3FBBE6BD-3090-40AE-A4C7-5035D75A0F4C@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a894cf6c5a82 ("mtd: nand: mxc: switch to mtd_ooblayout_ops")
-introduced a bug in the OOB layout description. Even if the driver claims
-that 3 ECC bytes are reserved to protect 512 bytes of data, it's actually
-5 ECC bytes to protect 512+6 bytes of data (some OOB bytes are also
-protected using extra ECC bytes).
+Hello Heiko!
 
-Fix the mxc_v1_ooblayout_{free,ecc}() functions to reflect this behavior.
+> 24 ????. 2016 ?., ? 15:17, Heiko St?bner <heiko@sntech.de> ???????(?):
+> 
+> When touching devicetree-properties, please also adapt the binding document
+> 	Documentation/devicetree/bindings/timer,rockchip,rk-timer.txt
+> in this case and also include the devicetree maintainers.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Fixes: a894cf6c5a82 ("mtd: nand: mxc: switch to mtd_ooblayout_ops")
-Cc: <stable@vger.kernel.org>
----
- drivers/mtd/nand/mxc_nand.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+Could you please clarify, i should send whole patch series and include devicetree maintainers
+for whole patch series or i should send devicetree patches separately?
 
-diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 61ca020c5272..c19ec4f0983e 100644
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@ -886,7 +886,7 @@ static int mxc_v1_ooblayout_ecc(struct mtd_info *mtd, int section,
- 		return -ERANGE;
- 
- 	oobregion->offset = (section * 16) + 6;
--	oobregion->length = nand_chip->ecc.bytes;
-+	oobregion->length = 5;
- 
- 	return 0;
- }
-@@ -908,8 +908,7 @@ static int mxc_v1_ooblayout_free(struct mtd_info *mtd, int section,
- 			oobregion->length = 4;
- 		}
- 	} else {
--		oobregion->offset = ((section - 1) * 16) +
--				    nand_chip->ecc.bytes + 6;
-+		oobregion->offset = ((section - 1) * 16) + 5 + 6;
- 		if (section < nand_chip->ecc.steps)
- 			oobregion->length = (section * 16) + 6 -
- 					    oobregion->offset;
--- 
-2.7.4
+
+> 24 ????. 2016 ?., ? 16:21, Heiko St?bner <heiko@sntech.de> ???????(?):
+> 
+> correct, use both but also update the binding, like 
+> mmc/rockchip-dw-mshc.txt does.
+
+Here devicetree patch for this:
+http://www.spinics.net/lists/devicetree/msg152246.html
+
+
+> 24 ????. 2016 ?., ? 17:32, Heiko St?bner <heiko@sntech.de> ???????(?):
+> 
+>> I may suggest such solution here: if I want clocksource, I have to declare
+>> two timer in device tree. First probed timer would be clockevent and second
+>> one would be clocksource. All other timers will be ignored. Is that
+>> solution good?
+> 
+> yep, sounds good, especially as with your patch 9/9 you already declare these 
+> necessary timers.
+> 
+>> If I want one timer and want it be clocksource not clockevent how that
+>> situation should be configured? Device tree not good for this. Kconfig not
+>> good. Pass that configuration on kernel command line?
+> 
+> simply ignore that case :-)
+
+
+Here devicetree patch for this:
+http://www.spinics.net/lists/devicetree/msg152247.html
+
+And I?ll going to resend new patch series with discussed modifications.
+It will contain only rk_timer and dts modifications.
+I have to do more tests.
+
+Regards,
+Alexander.
