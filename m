@@ -1,41 +1,208 @@
 From: yt.shen@mediatek.com (YT Shen)
-Date: Fri, 25 Nov 2016 18:34:33 +0800
-Subject: [PATCH v10 10/13] drm/mediatek: add dsi ulp mode control
+Date: Fri, 25 Nov 2016 18:34:35 +0800
+Subject: [PATCH v10 12/13] drm/mediatek: update DSI sub driver flow for
+ sending commands to panel
 In-Reply-To: <1480070076-6196-1-git-send-email-yt.shen@mediatek.com>
 References: <1480070076-6196-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1480070076-6196-11-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1480070076-6196-13-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-modify dsi enter ultra low power mode method
+This patch update enable/disable flow of DSI module.
+Original flow works on there is a bridge chip: DSI -> bridge -> panel.
+In this case: DSI -> panel, the DSI sub driver flow should be updated.
+We need to initialize DSI first so that we can send commands to panel.
 
 Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
 Signed-off-by: YT Shen <yt.shen@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_dsi.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_dsi.c | 101 +++++++++++++++++++++++++++++--------
+ 1 file changed, 80 insertions(+), 21 deletions(-)
 
 diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-index d03a0f1..01df829 100644
+index ded4202..0569f2e 100644
 --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
 +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-@@ -289,7 +289,7 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
- static void mtk_dsi_clk_ulp_mode_enter(struct mtk_dsi *dsi)
- {
- 	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_HS_TX_EN, 0);
--	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_ULPM_EN, 0);
-+	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_ULPM_EN, LC_ULPM_EN);
+@@ -126,6 +126,10 @@
+ #define CLK_HS_POST			(0xff << 8)
+ #define CLK_HS_EXIT			(0xff << 16)
+ 
++#define DSI_VM_CMD_CON		0x130
++#define VM_CMD_EN			BIT(0)
++#define TS_VFP_EN			BIT(5)
++
+ #define DSI_CMDQ0		0x180
+ #define CONFIG				(0xff << 0)
+ #define SHORT_PACKET			0
+@@ -249,7 +253,9 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
+ 	 * mipi_ratio is mipi clk coefficient for balance the pixel clk in mipi.
+ 	 * we set mipi_ratio is 1.05.
+ 	 */
+-	dsi->data_rate = dsi->vm.pixelclock * 3 * 21 / (1 * 1000 * 10);
++	dsi->data_rate = dsi->vm.pixelclock * 12 * 21;
++	dsi->data_rate /= (dsi->lanes * 1000 * 10);
++	DRM_DEBUG_DRIVER("set mipitx's data rate: %dMHz\n", dsi->data_rate);
+ 
+ 	ret = clk_set_rate(dsi->hs_clk, dsi->data_rate * 1000000);
+ 	if (ret < 0) {
+@@ -333,16 +339,23 @@ static void mtk_dsi_set_mode(struct mtk_dsi *dsi)
+ 	u32 vid_mode = CMD_MODE;
+ 
+ 	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO) {
+-		vid_mode = SYNC_PULSE_MODE;
+-
+-		if ((dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) &&
+-		    !(dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE))
++		if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
+ 			vid_mode = BURST_MODE;
++		else if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE)
++			vid_mode = SYNC_PULSE_MODE;
++		else
++			vid_mode = SYNC_EVENT_MODE;
+ 	}
+ 
+ 	writel(vid_mode, dsi->regs + DSI_MODE_CTRL);
  }
  
- static void mtk_dsi_clk_ulp_mode_leave(struct mtk_dsi *dsi)
-@@ -302,7 +302,7 @@ static void mtk_dsi_clk_ulp_mode_leave(struct mtk_dsi *dsi)
- static void mtk_dsi_lane0_ulp_mode_enter(struct mtk_dsi *dsi)
++static void mtk_dsi_set_vm_cmd(struct mtk_dsi *dsi)
++{
++	mtk_dsi_mask(dsi, DSI_VM_CMD_CON, VM_CMD_EN, VM_CMD_EN);
++	mtk_dsi_mask(dsi, DSI_VM_CMD_CON, TS_VFP_EN, TS_VFP_EN);
++}
++
+ static void mtk_dsi_ps_control_vact(struct mtk_dsi *dsi)
  {
- 	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_HS_TX_EN, 0);
--	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_ULPM_EN, 0);
-+	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_ULPM_EN, LD0_ULPM_EN);
+ 	struct videomode *vm = &dsi->vm;
+@@ -480,6 +493,16 @@ static void mtk_dsi_start(struct mtk_dsi *dsi)
+ 	writel(1, dsi->regs + DSI_START);
  }
  
- static void mtk_dsi_lane0_ulp_mode_leave(struct mtk_dsi *dsi)
++static void mtk_dsi_stop(struct mtk_dsi *dsi)
++{
++	writel(0, dsi->regs + DSI_START);
++}
++
++static void mtk_dsi_set_cmd_mode(struct mtk_dsi *dsi)
++{
++	writel(CMD_MODE, dsi->regs + DSI_MODE_CTRL);
++}
++
+ static void mtk_dsi_set_interrupt_enable(struct mtk_dsi *dsi)
+ {
+ 	u32 inten = LPRX_RD_RDY_INT_FLAG | CMD_DONE_INT_FLAG | VM_DONE_INT_FLAG;
+@@ -538,6 +561,19 @@ static irqreturn_t mtk_dsi_irq(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
++static s32 mtk_dsi_switch_to_cmd_mode(struct mtk_dsi *dsi, u8 irq_flag, u32 t)
++{
++	mtk_dsi_irq_data_clear(dsi, irq_flag);
++	mtk_dsi_set_cmd_mode(dsi);
++
++	if (!mtk_dsi_wait_for_irq_done(dsi, irq_flag, t)) {
++		DRM_ERROR("failed to switch cmd mode\n");
++		return -ETIME;
++	} else {
++		return 0;
++	}
++}
++
+ static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
+ {
+ 	if (WARN_ON(dsi->refcount == 0))
+@@ -546,11 +582,6 @@ static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
+ 	if (--dsi->refcount != 0)
+ 		return;
+ 
+-	mtk_dsi_lane0_ulp_mode_enter(dsi);
+-	mtk_dsi_clk_ulp_mode_enter(dsi);
+-
+-	mtk_dsi_disable(dsi);
+-
+ 	clk_disable_unprepare(dsi->engine_clk);
+ 	clk_disable_unprepare(dsi->digital_clk);
+ 
+@@ -564,13 +595,6 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi)
+ 	if (dsi->enabled)
+ 		return;
+ 
+-	if (dsi->panel) {
+-		if (drm_panel_prepare(dsi->panel)) {
+-			DRM_ERROR("failed to setup the panel\n");
+-			return;
+-		}
+-	}
+-
+ 	ret = mtk_dsi_poweron(dsi);
+ 	if (ret < 0) {
+ 		DRM_ERROR("failed to power on dsi\n");
+@@ -578,21 +602,43 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi)
+ 	}
+ 
+ 	mtk_dsi_rxtx_control(dsi);
++	mtk_dsi_ps_control_vact(dsi);
++	mtk_dsi_set_vm_cmd(dsi);
++	mtk_dsi_config_vdo_timing(dsi);
++	mtk_dsi_set_interrupt_enable(dsi);
+ 
+ 	mtk_dsi_clk_ulp_mode_leave(dsi);
+ 	mtk_dsi_lane0_ulp_mode_leave(dsi);
+ 	mtk_dsi_clk_hs_mode(dsi, 0);
+-	mtk_dsi_set_mode(dsi);
+ 
+-	mtk_dsi_ps_control_vact(dsi);
+-	mtk_dsi_config_vdo_timing(dsi);
+-	mtk_dsi_set_interrupt_enable(dsi);
++	if (dsi->panel) {
++		if (drm_panel_prepare(dsi->panel)) {
++			DRM_ERROR("failed to prepare the panel\n");
++
++			mtk_dsi_stop(dsi);
++			mtk_dsi_poweroff(dsi);
++			return;
++		}
++	}
+ 
+ 	mtk_dsi_set_mode(dsi);
+ 	mtk_dsi_clk_hs_mode(dsi, 1);
+ 
+ 	mtk_dsi_start(dsi);
+ 
++	if (dsi->panel) {
++		if (drm_panel_enable(dsi->panel)) {
++			DRM_ERROR("failed to enable the panel\n");
++
++			if (drm_panel_unprepare(dsi->panel))
++				DRM_ERROR("failed to unprepare the panel\n");
++
++			mtk_dsi_stop(dsi);
++			mtk_dsi_poweroff(dsi);
++			return;
++		}
++	}
++
+ 	dsi->enabled = true;
+ }
+ 
+@@ -608,6 +654,19 @@ static void mtk_output_dsi_disable(struct mtk_dsi *dsi)
+ 		}
+ 	}
+ 
++	mtk_dsi_stop(dsi);
++	if (!mtk_dsi_switch_to_cmd_mode(dsi, VM_DONE_INT_FLAG, 500)) {
++		if (dsi->panel) {
++			if (drm_panel_unprepare(dsi->panel))
++				DRM_ERROR("failed to unprepare the panel\n");
++		}
++	}
++
++	mtk_dsi_reset_engine(dsi);
++	mtk_dsi_lane0_ulp_mode_enter(dsi);
++	mtk_dsi_clk_ulp_mode_enter(dsi);
++	mtk_dsi_disable(dsi);
++
+ 	mtk_dsi_poweroff(dsi);
+ 
+ 	dsi->enabled = false;
 -- 
 1.9.1
