@@ -1,124 +1,148 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Fri, 25 Nov 2016 17:41:51 +0800
-Subject: [PATCH v6 3/5] ARM: dts: sun8i-h3: add HDMI video nodes
-In-Reply-To: <cdf50b8433e2d9a053e35f8788bfcd5d41504312.1479641523.git.moinejf@free.fr>
-References: <cover.1479641523.git.moinejf@free.fr>
- <cdf50b8433e2d9a053e35f8788bfcd5d41504312.1479641523.git.moinejf@free.fr>
-Message-ID: <3188681480066911@web3h.yandex.ru>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 25 Nov 2016 17:42:26 +0800
+Subject: [PATCH 02/10] power: supply: axp20x_usb_power: set min voltage
+ and max current from sysfs
+In-Reply-To: <20161125090921.23138-3-quentin.schulz@free-electrons.com>
+References: <20161125090921.23138-1-quentin.schulz@free-electrons.com>
+ <20161125090921.23138-3-quentin.schulz@free-electrons.com>
+Message-ID: <CAGb2v67H7guQQg6cHM7fzLNbegNWsJv=BUDAmxuPNSVXkDcnWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-20.11.2016, 20:12, "Jean-Francois Moine" <moinejf@free.fr>:
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+On Fri, Nov 25, 2016 at 5:09 PM, Quentin Schulz
+<quentin.schulz@free-electrons.com> wrote:
+> AXP20X and AXP22X PMICs allow setting the min voltage and max current of
+> VBUS power supply. This adds entries in sysfs to allow to do so.
+>
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 > ---
-> ?arch/arm/boot/dts/sun8i-h3.dtsi | 51 +++++++++++++++++++++++++++++++++++++++++
-> ?1 file changed, 51 insertions(+)
+>  drivers/power/supply/axp20x_usb_power.c | 72 +++++++++++++++++++++++++++++++++
+>  include/linux/mfd/axp20x.h              |  3 ++
+>  2 files changed, 75 insertions(+)
 >
-> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> index 416b825..7c6b1d5 100644
-> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> @@ -140,6 +140,16 @@
-> ?????????????????#size-cells = <1>;
-> ?????????????????ranges;
+> diff --git a/drivers/power/supply/axp20x_usb_power.c b/drivers/power/supply/axp20x_usb_power.c
+> index b19754e..638cb52 100644
+> --- a/drivers/power/supply/axp20x_usb_power.c
+> +++ b/drivers/power/supply/axp20x_usb_power.c
+> @@ -155,6 +155,74 @@ static int axp20x_usb_power_get_property(struct power_supply *psy,
+>         return 0;
+>  }
 >
-> + de: de-controller at 01000000 {
-> + compatible = "allwinner,sun8i-h3-display-engine";
-> + reg = <0x01000000 0x400000>;
-> + clocks = <&ccu CLK_BUS_DE>, <&ccu CLK_DE>;
-> + clock-names = "bus", "clock";
-> + resets = <&ccu RST_BUS_DE>;
-> + ports = <&lcd0_p>;
-> + status = "disabled";
-> + };
+> +static int axp20x_usb_power_set_property(struct power_supply *psy,
+> +                                        enum power_supply_property psp,
+> +                                        const union power_supply_propval *val)
+> +{
+> +       struct axp20x_usb_power *power = power_supply_get_drvdata(psy);
+> +       int ret, val1;
 > +
-> ?????????????????dma: dma-controller at 01c02000 {
-> ?????????????????????????compatible = "allwinner,sun8i-h3-dma";
-> ?????????????????????????reg = <0x01c02000 0x1000>;
-> @@ -149,6 +159,23 @@
-> ?????????????????????????#dma-cells = <1>;
-> ?????????????????};
->
-> + lcd0: lcd-controller at 01c0c000 {
-> + compatible = "allwinner,sun8i-a83t-tcon";
-> + reg = <0x01c0c000 0x400>;
-> + clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_TCON0>;
-> + clock-names = "bus", "clock";
-> + resets = <&ccu RST_BUS_TCON0>;
-> + interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-> + status = "disabled";
-> + #address-cells = <1>;
-> + #size-cells = <0>;
-> + lcd0_p: port {
-> + lcd0_hdmi: endpoint {
-> + remote-endpoint = <&hdmi_lcd0>;
-> + };
-> + };
-> + };
+> +       switch (psp) {
+> +       case POWER_SUPPLY_PROP_VOLTAGE_MIN:
+> +               switch (val->intval) {
+> +               case 4000000:
+> +               case 4100000:
+> +               case 4200000:
+> +               case 4300000:
+> +               case 4400000:
+> +               case 4500000:
+> +               case 4600000:
+> +               case 4700000:
+> +                       val1 = (val->intval - 4000000) / 100000;
+> +                       ret = regmap_update_bits(power->regmap,
+> +                                                AXP20X_VBUS_IPSOUT_MGMT,
+> +                                                AXP20X_VBUS_VHOLD_MASK,
+> +                                                val1 << 3);
+
+Please also define the shift offset.
+
+> +                       if (ret)
+> +                               return ret;
 > +
-> ?????????????????mmc0: mmc at 01c0f000 {
-> ?????????????????????????compatible = "allwinner,sun7i-a20-mmc";
-> ?????????????????????????reg = <0x01c0f000 0x1000>;
-> @@ -314,6 +341,11 @@
-> ?????????????????????????clock-names = "hosc", "losc";
-> ?????????????????????????#clock-cells = <1>;
-> ?????????????????????????#reset-cells = <1>;
+> +                       return 0;
+> +               default:
+> +                       return -EINVAL;
+> +               }
 > +
-> + assigned-clocks = <&ccu CLK_PLL_DE>,
-> + <&ccu CLK_DE>;
-> + assigned-clock-rates = <864000000>,
-> + <432000000>;
-> ?????????????????};
->
-> ?????????????????pio: pinctrl at 01c20800 {
-> @@ -564,6 +596,25 @@
-> ?????????????????????????interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-> ?????????????????};
->
-> + hdmi: hdmi at 01ee0000 {
-> + compatible = "allwinner,sun8i-h3-hdmi";
-> + reg = <0x01ee0000 0x20000>;
-> + clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI>,
-> + <&ccu CLK_HDMI_DDC>;
-> + clock-names = "bus", "clock", "ddc-clock";
-> + resets = <&ccu RST_BUS_HDMI0>, <&ccu RST_BUS_HDMI1>;
-> + reset-names = "hdmi0", "hdmi1";
-> + status = "disabled";
-> + #address-cells = <1>;
-> + #size-cells = <0>;
-> + port at 0 { /* video */
-> + reg = <0>;
-> + hdmi_lcd0: endpoint {
-> + remote-endpoint = <&lcd0_hdmi>;
-> + };
-> + };
-> + };
+> +               return 0;
 > +
-> ?????????????????rtc: rtc at 01f00000 {
-> ?????????????????????????compatible = "allwinner,sun6i-a31-rtc";
-> ?????????????????????????reg = <0x01f00000 0x54>;
+> +       case POWER_SUPPLY_PROP_CURRENT_MAX:
+> +               switch (val->intval) {
+> +               case 100000:
+> +                       if (power->axp20x_id == AXP221_ID)
+> +                               return -EINVAL;
+> +               case 500000:
+> +               case 900000:
+> +                       val1 = (900000 - val->intval) / 400000;
+> +                       ret = regmap_update_bits(power->regmap,
+> +                                                AXP20X_VBUS_IPSOUT_MGMT,
+> +                                                AXP20X_VBUS_CLIMIT_MASK, val1);
+> +                       if (ret)
+> +                               return ret;
+> +
+> +                       return 0;
+> +               default:
+> +                       return -EINVAL;
+> +               }
+> +
+> +               return 0;
+> +
+> +       default:
+> +               return -EINVAL;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int axp20x_usb_power_prop_writeable(struct power_supply *psy,
+> +                                          enum power_supply_property psp)
+> +{
+> +       return psp == POWER_SUPPLY_PROP_VOLTAGE_MIN ||
+> +              psp == POWER_SUPPLY_PROP_CURRENT_MAX;
+> +}
+> +
+>  static enum power_supply_property axp20x_usb_power_properties[] = {
+>         POWER_SUPPLY_PROP_HEALTH,
+>         POWER_SUPPLY_PROP_PRESENT,
+> @@ -178,7 +246,9 @@ static const struct power_supply_desc axp20x_usb_power_desc = {
+>         .type = POWER_SUPPLY_TYPE_USB,
+>         .properties = axp20x_usb_power_properties,
+>         .num_properties = ARRAY_SIZE(axp20x_usb_power_properties),
+> +       .property_is_writeable = axp20x_usb_power_prop_writeable,
+>         .get_property = axp20x_usb_power_get_property,
+> +       .set_property = axp20x_usb_power_set_property,
+>  };
+>
+>  static const struct power_supply_desc axp22x_usb_power_desc = {
+> @@ -186,7 +256,9 @@ static const struct power_supply_desc axp22x_usb_power_desc = {
+>         .type = POWER_SUPPLY_TYPE_USB,
+>         .properties = axp22x_usb_power_properties,
+>         .num_properties = ARRAY_SIZE(axp22x_usb_power_properties),
+> +       .property_is_writeable = axp20x_usb_power_prop_writeable,
+>         .get_property = axp20x_usb_power_get_property,
+> +       .set_property = axp20x_usb_power_set_property,
+>  };
+>
+>  static const struct of_device_id axp20x_usb_power_match[] = {
+> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+> index fec597f..8883595 100644
+> --- a/include/linux/mfd/axp20x.h
+> +++ b/include/linux/mfd/axp20x.h
+> @@ -56,6 +56,9 @@ enum {
+>  #define AXP20X_LDO24_V_OUT             0x28
+>  #define AXP20X_LDO3_V_OUT              0x29
+>  #define AXP20X_VBUS_IPSOUT_MGMT                0x30
+> +
+> +#define AXP20X_VBUS_VHOLD_MASK         GENMASK(5, 3)
+> +
 
-After removing CLK_PLL_DE's assigned-clock, the kernel passes compilation.
+For the AXP drivers, we keep the per register bit field
+definitions in the drivers that use them.
 
-However, it cannot recognize any HDMI screen...
+Regards
+ChenYu
 
-(My board is Orange Pi One, and I manually added status="okay"; to &lcd0, &de, &hdmi)
-
-[   16.507802] sun8i-de2 1000000.de-controller: bound 1c0c000.lcd-controller (ops de2_lcd_ops [sun8i_de2_drm])
-[   16.675948] sun8i-de2 1000000.de-controller: bound 1ee0000.hdmi (ops de2_hdmi_fini [sun8i_de2_hdmi])
-[   16.685120] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
-[   16.695876] [drm] No driver support for vblank timestamp query.
-[   16.701862] sun8i-de2 1000000.de-controller: No connectors reported connected with modes
-[   16.713061] [drm] Cannot find any crtc or sizes - going 1024x768
-[   16.734214] Console: switching to colour frame buffer device 128x48
-[   16.751022] sun8i-de2 1000000.de-controller: fb0:  frame buffer device
-
+>  #define AXP20X_V_OFF                   0x31
+>  #define AXP20X_OFF_CTRL                        0x32
+>  #define AXP20X_CHRG_CTRL1              0x33
 > --
-> 2.10.2
+> 2.9.3
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
