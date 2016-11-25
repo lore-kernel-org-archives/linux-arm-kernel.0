@@ -1,70 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Nov 2016 23:26:47 +0100
-Subject: [PATCH 1/2] drivers: psci: PSCI checker module
-In-Reply-To: <20161108175547.31146-1-lorenzo.pieralisi@arm.com>
-References: <20161108175547.31146-1-lorenzo.pieralisi@arm.com>
-Message-ID: <4573128.hBCC419TUo@wuerfel>
+Date: Sat, 26 Nov 2016 00:01:20 +0100
+Subject: [GIT PULL] ARM: OXNAS SoC DT updates for 4.10
+In-Reply-To: <85ecb958-a6cb-bdd2-10db-873e1b894ad7@baylibre.com>
+References: <85ecb958-a6cb-bdd2-10db-873e1b894ad7@baylibre.com>
+Message-ID: <7834199.K9ccmT5zgF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 8, 2016 5:55:46 PM CET Lorenzo Pieralisi wrote:
-> From: Kevin Brodsky <kevin.brodsky@arm.com>
+On Friday, November 4, 2016 11:26:30 AM CET Neil Armstrong wrote:
+> - Add DTSI for Oxford Semiconductor OX820
+> - Add DTS for Cloud Engines PogoPlug v3 board
+> - Fix MAINTAINERS Oxnas entry for dts files
+> from http://lkml.kernel.org/r/20161102141850.25164-1-narmstrong at baylibre.com
 > 
-> On arm and arm64, PSCI is one of the possible firmware interfaces
-> used for power management. This includes both turning CPUs on and off,
-> and suspending them (entering idle states).
 > 
-> This patch adds a PSCI checker module that enables basic testing of
-> PSCI operations during startup. There are two main tests: CPU
-> hotplugging and suspending.
-> 
-> In the hotplug tests, the hotplug API is used to turn off and on again
-> all CPUs in the system, and then all CPUs in each cluster, checking
-> the consistency of the return codes.
-> 
-> In the suspend tests, a high-priority thread is created on each core
-> and uses low-level cpuidle functionalities to enter suspend, in all
-> the possible states and multiple times. This should allow a maximum
-> number of CPUs to enter the same sleep state at the same or slightly
-> different time.
-> 
-> In essence, the suspend tests use a principle similar to that of the
-> intel_powerclamp driver (drivers/thermal/intel_powerclamp.c), but the
-> threads are only kept for the duration of the test (they are already
-> gone when userspace is started) and it does not require to stop/start
-> the tick.
-> 
-> While in theory power management PSCI functions (CPU_{ON,OFF,SUSPEND})
-> could be directly called, this proved too difficult as it would imply
-> the duplication of all the logic used by the kernel to allow for a
-> clean shutdown/bringup/suspend of the CPU (the deepest sleep states
-> implying potentially the shutdown of the CPU).
-> 
-> Note that this file cannot be compiled as a loadable module, since it
-> uses a number of non-exported identifiers (essentially for
-> PSCI-specific checks and direct use of cpuidle) and relies on the
-> absence of userspace to avoid races when calling hotplug and cpuidle
-> functions.
-> 
-> For now at least, CONFIG_PSCI_CHECKER is mutually exclusive with
-> CONFIG_TORTURE_TEST, because torture tests may also use hotplug and
-> cause false positives in the hotplug tests.
-> 
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> [torture test config]
-> Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
-> [lpieralisi: added cpuidle locking, reworded commit log/kconfig entry]
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Applied both patches to the next/drivers tree in arm-soc now, sorry
-for the delay,
+This one seemed to have gone missing after Olof asked for a respin
+of the other oxnas branch. I've pulled it into next/dt now.
+
+I'd probably have put the MAINTAINERS update into a different
+branch (possibly even for v4.9), but it doesn't seem too important
+since there was no change in the maintainers and it's unlikely
+to cause conflicts.
 
 	Arnd
