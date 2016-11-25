@@ -1,31 +1,47 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Fri, 25 Nov 2016 10:13:02 +0100
-Subject: [PATCH] ARM: davinci_all_defconfig: enable dumb vga-dac drm bridge
-Message-ID: <1480065182-7095-1-git-send-email-bgolaszewski@baylibre.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 25 Nov 2016 10:13:29 +0100
+Subject: [PATCH] mtd: nand: mxc: Fix mxc_v1 ooblayout
+Message-ID: <1480065209-4179-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the dumb-vga-dac driver by default for davinci boards.
+Commit a894cf6c5a82 ("mtd: nand: mxc: switch to mtd_ooblayout_ops")
+introduced a bug in the OOB layout description. Even if the driver claims
+that 3 ECC bytes are reserved to protect 512 bytes of data, it's actually
+5 ECC bytes to protect 512+6 bytes of data (some OOB bytes are also
+protected using extra ECC bytes).
 
-The driver is needed for tilcdc support on da850-lcdk board.
+Fix the mxc_v1_ooblayout_{free,ecc}() functions to reflect this behavior.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Fixes: a894cf6c5a82 ("mtd: nand: mxc: switch to mtd_ooblayout_ops")
+Cc: <stable@vger.kernel.org>
 ---
- arch/arm/configs/davinci_all_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/mtd/nand/mxc_nand.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index b5e978f..ab1bf18 100644
---- a/arch/arm/configs/davinci_all_defconfig
-+++ b/arch/arm/configs/davinci_all_defconfig
-@@ -127,6 +127,8 @@ CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_TPS6507X=y
- CONFIG_DRM=m
- CONFIG_DRM_TILCDC=m
-+CONFIG_DRM_BRIDGE=y
-+CONFIG_DRM_DUMB_VGA_DAC=m
- CONFIG_FB=y
- CONFIG_FIRMWARE_EDID=y
- CONFIG_FB_DA8XX=y
+diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+index 61ca020c5272..c19ec4f0983e 100644
+--- a/drivers/mtd/nand/mxc_nand.c
++++ b/drivers/mtd/nand/mxc_nand.c
+@@ -886,7 +886,7 @@ static int mxc_v1_ooblayout_ecc(struct mtd_info *mtd, int section,
+ 		return -ERANGE;
+ 
+ 	oobregion->offset = (section * 16) + 6;
+-	oobregion->length = nand_chip->ecc.bytes;
++	oobregion->length = 5;
+ 
+ 	return 0;
+ }
+@@ -908,8 +908,7 @@ static int mxc_v1_ooblayout_free(struct mtd_info *mtd, int section,
+ 			oobregion->length = 4;
+ 		}
+ 	} else {
+-		oobregion->offset = ((section - 1) * 16) +
+-				    nand_chip->ecc.bytes + 6;
++		oobregion->offset = ((section - 1) * 16) + 5 + 6;
+ 		if (section < nand_chip->ecc.steps)
+ 			oobregion->length = (section * 16) + 6 -
+ 					    oobregion->offset;
 -- 
-2.9.3
+2.7.4
