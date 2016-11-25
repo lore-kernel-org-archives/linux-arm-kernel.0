@@ -1,99 +1,93 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 25 Nov 2016 13:11:18 +0000
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 25 Nov 2016 13:34:36 +0000
 Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr> (Mason's message
- of "Fri, 25 Nov 2016 13:46:26 +0100")
+In-Reply-To: <yw1xtwav9092.fsf@unicorn.mansr.com>
 References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
-Message-ID: <yw1xpolj9021.fsf@unicorn.mansr.com>
+ <20161125124528.GJ14217@n2100.armlinux.org.uk>
+ <yw1xtwav9092.fsf@unicorn.mansr.com>
+Message-ID: <20161125133436.GK14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+On Fri, Nov 25, 2016 at 01:07:05PM +0000, M?ns Rullg?rd wrote:
+> Russell King - ARM Linux <linux@armlinux.org.uk> writes:
+> 
+> > On Fri, Nov 25, 2016 at 10:25:49AM +0530, Vinod Koul wrote:
+> >> Looking at thread and discussion now, first thinking would be to ensure
+> >> the transaction is completed properly and then isr fired. You may need
+> >> to talk to your HW designers to find a way for that. It is quite common
+> >> that DMA controllers will fire and complete whereas the transaction is
+> >> still in flight.
+> >> 
+> >> If that is not doable, then since you claim this is custom part which
+> >> other vendors wont use (hope we are wrong down the line), then we can
+> >> have a custom api,
+> >> 
+> >> foo_sbox_configure(bool enable, ...);
+> >> 
+> >> This can be invoked from NFC driver when required for configuration and
+> >> teardown. For very specific cases where people need some specific
+> >> configuration we do allow custom APIs.
+> >> 
+> >> Only problem with that would be it wont be a generic solution and you
+> >> seem to be fine with that.
+> >
+> > Isn't this just the same problem as PL08x or any other system which
+> > has multiple requests from devices, but only a limited number of
+> > hardware channels - so you have to route the request signals to the
+> > appropriate hardware channels according to the requests queued up?
+> >
+> > If so, no new "custom" APIs are required, it's already able to be
+> > solved within the DMA engine drivers...
+> 
+> That isn't the problem.  The multiplexing of many devices on a limited
+> number of hardware channels is working fine.  The problem is that (some)
+> client devices need the routing to remain for some time after the dma
+> interrupt signals completion.  I'd characterise this hardware as broken,
+> but there's nothing we can do about that.
+> 
+> The fix has to provide some way for the dma driver to delay reusing a
+> hardware channel until the client device indicates completion.  If only
+> a short delay (a few bus cycles) is needed, it is probably acceptable to
+> rework the driver such that the descriptor completion callback can do
+> the necessary waiting (e.g. by busy-polling a device status register).
+> If the delay can be longer, some other method needs to be devised.
 
-> On 25/11/2016 05:55, Vinod Koul wrote:
->
->> On Wed, Nov 23, 2016 at 11:25:44AM +0100, Mason wrote:
->>
->>> On my platform, setting up a DMA transfer is a two-step process:
->>>
->>> 1) configure the "switch box" to connect a device to a memory channel
->>> 2) configure the transfer details (address, size, command)
->>>
->>> When the transfer is done, the sbox setup can be torn down,
->>> and the DMA driver can start another transfer.
->>>
->>> The current software architecture for my NFC (NAND Flash controller)
->>> driver is as follows (for one DMA transfer).
->>>
->>>   sg_init_one
->>>   dma_map_sg
->>>   dmaengine_prep_slave_sg
->>>   dmaengine_submit
->>>   dma_async_issue_pending
->>>   configure_NFC_transfer
->>>   wait_for_IRQ_from_DMA_engine // via DMA_PREP_INTERRUPT
->>>   wait_for_NFC_idle
->>>   dma_unmap_sg
->> 
->> Looking at thread and discussion now, first thinking would be to ensure
->> the transaction is completed properly and then isr fired. You may need
->> to talk to your HW designers to find a way for that. It is quite common
->> that DMA controllers will fire and complete whereas the transaction is
->> still in flight.
->
-> It seems there is a disconnect between what Linux expects - an IRQ
-> when the transfer is complete - and the quirks of this HW :-(
->
-> On this system, there are MBUS "agents" connected via a "switch box".
-> An agent fires an IRQ when it has dealt with its *half* of the transfer.
->
-> SOURCE_AGENT <---> SBOX <---> DESTINATION_AGENT
->
-> Here are the steps for a transfer, in the general case:
->
-> 1) setup the sbox to connect SOURCE TO DEST
-> 2) configure source to send N bytes
-> 3) configure dest to receive N bytes
->
-> When SOURCE_AGENT has sent N bytes, it fires an IRQ
-> When DEST_AGENT has received N bytes, it fires an IRQ
-> The sbox connection can be torn down only when the destination
-> agent has received all bytes.
-> (And the twist is that some agents do not have an IRQ line.)
->
-> The system provides 3 RAM-to-sbox agents (read channels)
-> and 3 sbox-to-RAM agents (write channels).
->
-> The NAND Flash controller read and write agents do not have
-> IRQ lines.
->
-> So for a NAND-to-memory transfer (read from device)
-> - nothing happens when the NFC has finished sending N bytes to the sbox
-> - the write channel fires an IRQ when it has received N bytes
->
-> In that case, one IRQ fires when the transfer is complete,
-> like Linux expects.
->
-> For a memory-to-NAND transfer (write to device)
-> - the read channel fires an IRQ when it has sent N bytes
-> - the NFC driver is supposed to poll the NFC to determine
-> when the controller has finished writing N bytes
->
-> In that case, the IRQ does not indicate that the transfer
-> is complete, merely that the sending half has finished
-> its part.
+What I understood from the original mail is:
 
-When does your NAND controller signal completion?  When it has received
-the DMA data, or only when it has finished the actual write operation?
+| The problem is that the DMA driver tears down the sbox setup
+| as soon as it receives the IRQ. However, when writing to the
+| device, the interrupt only means "I have pushed all data from
+| memory to the memory channel". These data have not reached
+| the device yet, and may still be "in flight". Thus the sbox
+| setup can only be torn down after the NFC is idle.
 
-> I think it is possible to have a generic solution:
-> Right now, the callback is called from tasklet context.
-> If we can have a new flag to have the callback invoked
-> directly from the ISR, then the driver for the client
-> device can do what is required.
+The interrupt comes in after it's read the the last data from memory,
+but the data is still sitting in the engine's buffers and has not yet
+been passed to the device.
 
-No, that won't work.  The callback shouldn't run in interrupt context.
+It sounds like the DMA engine buffers the data on its way to the device,
+and it's not clear from the description whether that is done in
+response to a request from the device or whether the data is prefetched.
+IOW, what the lifetime of the data in the dma engine is.
+
+It seems odd that the DMA engine provides no way to know whether the
+channel still contains data that is in-flight to the device, whether
+by interrupt (from the descriptions the IRQ is way too early) or by
+polling some status register within the DMA engine itself.
+
+If the delay is predictable, why not use a delayed workqueue or a
+hrtimer to wait a period after the IRQ before completing the DMA
+transaction?  If it's not predictable and you haven't some status
+register in the DMA engine hardware that indicates whether there's
+remaining data, then the design really is screwed up, and I don't
+think there's a reasonable solution to the problem - anything
+would be a horrid hack that would be specific to this SoC.
+
+It would be unfair to augment the API and add the burden on everyone
+for the new API when 99.999% of the world doesn't require it.
 
 -- 
-M?ns Rullg?rd
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
