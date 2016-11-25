@@ -1,35 +1,46 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 25 Nov 2016 16:17:04 +0100
-Subject: [PATCH RESEND 2/2] gpio: axp209: add pinctrl support
-In-Reply-To: <20161123141151.25315-3-quentin.schulz@free-electrons.com>
-References: <20161123141151.25315-1-quentin.schulz@free-electrons.com>
- <20161123141151.25315-3-quentin.schulz@free-electrons.com>
-Message-ID: <20161125151704.3am7wyqrlz767dvc@lukather>
+Date: Fri, 25 Nov 2016 16:20:47 +0100
+Subject: [PATCH] ARM: dts: sunxi: Add num-cs for A20 spi nodes
+In-Reply-To: <20161124210509.be743aae84c26c6c2e666c6e@bidouilliste.com>
+References: <20161122170616.29557-1-manu@bidouilliste.com>
+ <20161124195517.qrq7briu3pwjnp4n@lukather>
+ <20161124210509.be743aae84c26c6c2e666c6e@bidouilliste.com>
+Message-ID: <20161125152047.oadxi2xbgm4kdd7q@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Nov 23, 2016 at 03:11:51PM +0100, Quentin Schulz wrote:
-> The GPIOs present in the AXP209 PMIC have multiple functions. They
-> typically allow a pin to be used as GPIO input or output and can also be
-> used as ADC or regulator for example.[1]
+On Thu, Nov 24, 2016 at 09:05:09PM +0100, Emmanuel Vadot wrote:
+> On Thu, 24 Nov 2016 20:55:17 +0100
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 > 
-> This adds the possibility to use all functions of the GPIOs present in
-> the AXP209 PMIC thanks to pinctrl subsystem.
+> > On Tue, Nov 22, 2016 at 06:06:16PM +0100, Emmanuel Vadot wrote:
+> > > The spi0 controller on the A20 have up to 4 CS (Chip Select) while the
+> > > others three only have 1.
+> > > Add the num-cs property to each node.
+> > > 
+> > > Signed-off-by: Emmanuel Vadot <manu@bidouilliste.com>
+> > 
+> > I don't think we have any code that uses it at the moment. What is the
+> > rationale behind this patch?
+> > 
+> > Thanks!
+> > Maxime
+> > 
+> > -- 
+> > Maxime Ripard, Free Electrons
+> > Embedded Linux and Kernel engineering
+> > http://free-electrons.com
 > 
-> [1] see registers 90H, 92H and 93H at
->     http://dl.linux-sunxi.org/AXP/AXP209_Datasheet_v1.0en.pdf
+>  Hi Maxime,
 > 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+>  If num-cs isn't present nothing prevent to start a transfer with a
+> non-valid CS pin, resulting in an error.
+>  num-cs are default property especially made for this and a SPI driver
+> should try to get the property at probe/attach time.
 
-I've said it already face to face, but ideally you should split that
-patch into logical changes.
-
-I can see here at least three:
-  - Adding the pinctrl features
-  - Renaming the structure and functions
-  - Removal of a few functions
+Yes, but as far as I know, our driver doesn't. I'm all in for having
+support for that in our driver, but without it, that patch is kind of
+useless.
 
 Maxime
 
@@ -43,4 +54,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161125/3ba59778/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161125/c080bfc9/attachment.sig>
