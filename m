@@ -1,42 +1,59 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 25 Nov 2016 17:53:39 +0800
-Subject: [GIT PULL] ARM64: berlin: DT changes for v4.10
-Message-ID: <20161125175339.40748efa@xhacker>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 25 Nov 2016 10:58:26 +0100
+Subject: [PATCH] mtd: nand: mxc: Fix mxc_v1 ooblayout
+In-Reply-To: <1480065209-4179-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1480065209-4179-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <58eed307-ee50-9727-7b64-891d1b969790@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 11/25/2016 10:13 AM, Boris Brezillon wrote:
+> Commit a894cf6c5a82 ("mtd: nand: mxc: switch to mtd_ooblayout_ops")
+> introduced a bug in the OOB layout description. Even if the driver claims
+> that 3 ECC bytes are reserved to protect 512 bytes of data, it's actually
+> 5 ECC bytes to protect 512+6 bytes of data (some OOB bytes are also
+> protected using extra ECC bytes).
+> 
+> Fix the mxc_v1_ooblayout_{free,ecc}() functions to reflect this behavior.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Fixes: a894cf6c5a82 ("mtd: nand: mxc: switch to mtd_ooblayout_ops")
+> Cc: <stable@vger.kernel.org>
+> ---
+>  drivers/mtd/nand/mxc_nand.c | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+> index 61ca020c5272..c19ec4f0983e 100644
+> --- a/drivers/mtd/nand/mxc_nand.c
+> +++ b/drivers/mtd/nand/mxc_nand.c
+> @@ -886,7 +886,7 @@ static int mxc_v1_ooblayout_ecc(struct mtd_info *mtd, int section,
+>  		return -ERANGE;
+>  
+>  	oobregion->offset = (section * 16) + 6;
+> -	oobregion->length = nand_chip->ecc.bytes;
+> +	oobregion->length = 5;
 
-This is the first time I send pull request for berlin SoC. This is a PR for
-the Berlin64 DT changes for v4.10. Please pull.
+Use a macro instead of hard-coding a value please :)
 
-Thanks,
-Jisheng
+>  	return 0;
+>  }
+> @@ -908,8 +908,7 @@ static int mxc_v1_ooblayout_free(struct mtd_info *mtd, int section,
+>  			oobregion->length = 4;
+>  		}
+>  	} else {
+> -		oobregion->offset = ((section - 1) * 16) +
+> -				    nand_chip->ecc.bytes + 6;
+> +		oobregion->offset = ((section - 1) * 16) + 5 + 6;
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+DTTO here, the math here is cryptic enough.
 
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+>  		if (section < nand_chip->ecc.steps)
+>  			oobregion->length = (section * 16) + 6 -
+>  					    oobregion->offset;
+> 
 
-are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/jszhang/linux-berlin.git tags/berlin64-dt-for-v4.10-1
-
-for you to fetch changes up to 40fdc6b0d2b96cac46be51eb41042a715047b791:
-
-  arm64: dts: berlin4ct-dmp: add missing unit name to /memory node (2016-11-25 17:14:00 +0800)
-
-----------------------------------------------------------------
-Berlin64 DT changes for v4.10
-
-- fix some dtc compiler warnings
-
-----------------------------------------------------------------
-Jisheng Zhang (3):
-      arm64: dts: berlin4ct: add missing unit name to /soc node
-      arm64: dts: berlin4ct-stb: add missing unit name to /memory node
-      arm64: dts: berlin4ct-dmp: add missing unit name to /memory node
-
- arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts | 2 +-
- arch/arm64/boot/dts/marvell/berlin4ct-stb.dts | 2 +-
- arch/arm64/boot/dts/marvell/berlin4ct.dtsi    | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+-- 
+Best regards,
+Marek Vasut
