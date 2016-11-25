@@ -1,122 +1,56 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 25 Nov 2016 14:06:17 +0100
-Subject: [PATCH 6/10] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
- functionality
-In-Reply-To: <07e71ce4-a78e-750c-6325-0a88891519d5@marvell.com>
-References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
- <0390e7a05b6163deabb545f93729ea615eeaaee2.1477911954.git-series.gregory.clement@free-electrons.com>
- <CAPDyKFpqPSqiEi=0UW5LoZmy+y-KHm9nbcGKBSy3RzchdLU9cA@mail.gmail.com>
- <dd230463-04f6-df31-7056-1a185eb6cfc7@marvell.com>
- <CAPDyKFr9uEjVQmTNP0KK8Zj9mxCW3i564E=47vTK0RLvXCjw3Q@mail.gmail.com>
- <76ce72f8-4b86-3b83-544f-b9a7ef871393@marvell.com>
- <07e71ce4-a78e-750c-6325-0a88891519d5@marvell.com>
-Message-ID: <CAPDyKFoqyF5QkJy+PmGa-b8JhaUmVXeoqBfv+pdupFiJBgyiLg@mail.gmail.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 25 Nov 2016 13:07:05 +0000
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <20161125124528.GJ14217@n2100.armlinux.org.uk> (Russell King's
+ message of "Fri, 25 Nov 2016 12:45:29 +0000")
+References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
+ <20161125124528.GJ14217@n2100.armlinux.org.uk>
+Message-ID: <yw1xtwav9092.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+Russell King - ARM Linux <linux@armlinux.org.uk> writes:
 
->>>>>> +
->>>>>> +       /*
->>>>>> +        * Xenon Specific property:
->>>>>> +        * emmc: explicitly indicate whether this slot is for eMMC
->>>>>> +        * slotno: the index of slot. Refer to SDHC_SYS_CFG_INFO register
->>>>>> +        * tun-count: the interval between re-tuning
->>>>>> +        * PHY type: "sdhc phy", "emmc phy 5.0" or "emmc phy 5.1"
->>>>>> +        */
->>>>>> +       if (of_property_read_bool(np, "marvell,xenon-emmc"))
->>>>>> +               priv->emmc_slot = true;
->>>>>
->>>>> So, you need this because of the eMMC voltage switch behaviour, right?
->>>>>
->>>>> Then I would rather like to describe this a generic DT bindings for
->>>>> the eMMC voltage level support. There have acutally been some earlier
->>>>> discussions for this, but we haven't yet made some changes.
->>>>>
->>>>> I think what is missing is a mmc-ddr-3_3v DT binding, which when set,
->>>>> allows the host driver to accept I/O voltage switches to 3.3V. If not
->>>>> supported the  ->start_signal_voltage_switch() ops may return -EINVAL.
->>>>> This would inform the mmc core to move on to the next supported
->>>>> voltage level. There might be some minor additional changes to the mmc
->>>>> card initialization sequence, but those should be simple.
->>>>>
->>>>> I can help out to look into this, unless you want to do it yourself of course!?
->>>>>
->>>>    Yes. One of the reasons is to provide eMMC specific voltage setting.
->>>>    But in my very own opinion, it should be irrelevant to voltage level.
->>>>    The eMMC voltage setting on our SDHC is different from SD/SDIO voltage switch.
->>>>    It will become more complex with different SOC implementation details.
->>>
->>> Got it. Although I think we can cope with that fine just by using the
->>> different SD/eMMC speed modes settings defined in DT (or from the
->>> SDHCI caps register)
->>>
->>     In my very opinion, I'm not sure if there is any corner case that driver cannot
->>     determine the eMMC card type from DT and SDHC caps.
->>
->>>>    Unfortunately, MMC driver cannot determine the card type yet when eMMC voltage
->>>>    setting should be executed.
->>>>    Thus an flag is required here to tell driver to execute eMMC voltage setting.
->>>>
->>>>    Besides, additional eMMC specific settings might be implemented in future, besides
->>>>    voltage setting. Most of them should be completed before MMC driver recognizes the
->>>>    card type. Thus I have to keep this flag to indicate current SDHC is for eMMC.
->>>
->>> I doubt you will need a generic "eMMC" flag, but let's see when we go forward.
->>>
->>> Currently it's clear you don't need such a flag, so I will submit a
->>> change adding a DT binding for "mmc-ddr-3_3v" then we can take it from
->>> there, to see if it suits your needs.
->>>
+> On Fri, Nov 25, 2016 at 10:25:49AM +0530, Vinod Koul wrote:
+>> Looking at thread and discussion now, first thinking would be to ensure
+>> the transaction is completed properly and then isr fired. You may need
+>> to talk to your HW designers to find a way for that. It is quite common
+>> that DMA controllers will fire and complete whereas the transaction is
+>> still in flight.
+>> 
+>> If that is not doable, then since you claim this is custom part which
+>> other vendors wont use (hope we are wrong down the line), then we can
+>> have a custom api,
+>> 
+>> foo_sbox_configure(bool enable, ...);
+>> 
+>> This can be invoked from NFC driver when required for configuration and
+>> teardown. For very specific cases where people need some specific
+>> configuration we do allow custom APIs.
+>> 
+>> Only problem with that would be it wont be a generic solution and you
+>> seem to be fine with that.
 >
->     Another reason for a special "xenon-emmc" property is that our host IP usually can
->     support both eMMC and SD. Whether a host is used as eMMC or SD depends on the
->     final implementation of the actual product.
->     Thus our host driver needs to know whether current SDHC is fixed as eMMC or SD.
->     So far, It can only get the information from DT.
+> Isn't this just the same problem as PL08x or any other system which
+> has multiple requests from devices, but only a limited number of
+> hardware channels - so you have to route the request signals to the
+> appropriate hardware channels according to the requests queued up?
+>
+> If so, no new "custom" APIs are required, it's already able to be
+> solved within the DMA engine drivers...
 
-As a matter of fact for mounted non-removable cards, such as eMMC, we
-already have the option to describe some of their characteristics in
-DT. Perhaps that's what you need?
+That isn't the problem.  The multiplexing of many devices on a limited
+number of hardware channels is working fine.  The problem is that (some)
+client devices need the routing to remain for some time after the dma
+interrupt signals completion.  I'd characterise this hardware as broken,
+but there's nothing we can do about that.
 
-Please have a look at:
-Documentation/devicetree/bindings/mmc/mmc-card.txt
+The fix has to provide some way for the dma driver to delay reusing a
+hardware channel until the client device indicates completion.  If only
+a short delay (a few bus cycles) is needed, it is probably acceptable to
+rework the driver such that the descriptor completion callback can do
+the necessary waiting (e.g. by busy-polling a device status register).
+If the delay can be longer, some other method needs to be devised.
 
->
->     After out host driver get the card type information from DT, it can prepare eMMC
->     specific voltage, set eMMC specific mmc->caps/caps2 flags and do other
->     vendor specific init, before card init procedure.
->     Otherwise, our host driver has to wait until card type is determined in mmc_rescan().
->
->     A generic "eMMC" flag is unnecessary. I just require a private property,
->     which is only used in our host driver and DT.
->
->     Thank you.
->
-> Best regards,
-> Hu Ziji
->
->>
->>     Actually, our eMMC is usually fixed as 1.8V.
->>
->>     The pair "no-sd" + "no-sdio" can provide the similar information.
->>     But I'm not sure if it is proper to use those two property in such a way.
->>
->>     Thank you.
->>
->> Best regards
->> Hu Ziji
->>
->>> [...]
->>>
->>> Kind regards
->>> Uffe
->>>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
-
-Kind regards
-Uffe
+-- 
+M?ns Rullg?rd
