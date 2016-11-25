@@ -1,34 +1,34 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 25 Nov 2016 12:52:58 +0000
-Subject: [PATCH 5/7] efi: Get the secure boot status [ver #3]
-In-Reply-To: <17942.1480078269@warthog.procyon.org.uk>
-References: <147990561294.7576.6464430479448167484.stgit@warthog.procyon.org.uk>
- <147990565051.7576.9673287945782426886.stgit@warthog.procyon.org.uk>
- <1480016487.2444.18.camel@HansenPartnership.com>
- <15173.1480066220@warthog.procyon.org.uk>
- <CAKv+Gu_JxNLDjaK5jGbX9ACzM0uHJYMOFx7XDo4t7DtBMtFRGA@mail.gmail.com>
- <16661.1480075392@warthog.procyon.org.uk>
- <CAKv+Gu_d5+Kvo7Tptnpg7kfjpqxhQ3a3nsQ0Ufsm6rBOFry+mQ@mail.gmail.com>
- <17565.1480077303@warthog.procyon.org.uk>
- <CAKv+Gu9c-C2uXZ0fVatCM8ffXJZDgjBcDb_T0nsFecGqgrF11Q@mail.gmail.com>
- <17942.1480078269@warthog.procyon.org.uk>
-Message-ID: <CAKv+Gu87-vUp6OrdVuUg0BxvSOHNPOFcsCFF9dzpohOQsY8Jtw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 25 Nov 2016 13:57:26 +0100
+Subject: [PATCH v2 1/8] mfd: sun6i-prcm: Add codec analog controls
+ sub-device for Allwinner A23
+In-Reply-To: <20161125123442.28410-2-wens@csie.org>
+References: <20161125123442.28410-1-wens@csie.org>
+ <20161125123442.28410-2-wens@csie.org>
+Message-ID: <20161125125726.fsvldqhustgfpv7a@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 November 2016 at 12:51, David Howells <dhowells@redhat.com> wrote:
-> Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->
->> There is a 'revision' field in the header ('hdr') of the EFI system
->> table, so something like
->
-> Is this the same as the fw_revision in the system table?
->
->         #define EFI_2_60_SYSTEM_TABLE_REVISION ((2<<16) | (60))
->         #define EFI_2_50_SYSTEM_TABLE_REVISION ((2<<16) | (50))
->         #define EFI_2_40_SYSTEM_TABLE_REVISION ((2<<16) | (40))
->         ...
->
+On Fri, Nov 25, 2016 at 08:34:35PM +0800, Chen-Yu Tsai wrote:
+> The PRCM block on the A23 contains a message box like interface to
+> the registers for the analog path controls of the internal codec.
+> 
+> Add a sub-device for it.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Yes. And in fact, that means my example is incorrect (60 not 6 in the
-minor field)
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161125/37ff111a/attachment.sig>
