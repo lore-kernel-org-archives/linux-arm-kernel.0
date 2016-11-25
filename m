@@ -1,42 +1,41 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 25 Nov 2016 16:21:49 +0100
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <yw1xoa137fvr.fsf@unicorn.mansr.com>
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <20161125124528.GJ14217@n2100.armlinux.org.uk>
- <yw1xtwav9092.fsf@unicorn.mansr.com>
- <20161125133436.GK14217@n2100.armlinux.org.uk>
- <yw1xlgw78y8k.fsf@unicorn.mansr.com>
- <20161125135830.GL14217@n2100.armlinux.org.uk>
- <yw1xh96v8xnb.fsf@unicorn.mansr.com>
- <20161125141708.GM14217@n2100.armlinux.org.uk>
- <d996bcdb-2413-770c-84d1-1b12ccd74477@free.fr>
- <yw1xoa137fvr.fsf@unicorn.mansr.com>
-Message-ID: <cba10848-57b1-c28c-2a60-83eb9da4cc63@free.fr>
+From: sf84@laposte.net (Sebastian Frias)
+Date: Fri, 25 Nov 2016 16:24:02 +0100
+Subject: Adding a .platform_init callback to sdhci_arasan_ops
+Message-ID: <d50dcd8a-2489-4e82-1dc7-13e93e38d5ff@laposte.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/11/2016 16:12, M?ns Rullg?rd wrote:
+Hi,
 
-> Mason writes:
-> 
->> I've had several talks with the HW dev, and I don't think they
->> anticipated the need to mux the 3 channels. In their minds,
->> customers would choose at most 3 devices to support, and
->> assign one channel to each device statically.
->>
->> In fact, in tango4, supported devices are:
->> A) NAND Flash controllers 0 and 1
->> NB: the upstream driver only uses controller 0
->> B) IDE or SATA controllers 0 and 1
->> C) a few crypto HW blocks which do not work as expected (unused)
->>
->> Customers typically use 1 channel for NAND, maybe 1 for SATA,
->> and 1 channel remains unused.
-> 
-> The hardware has two sata controllers, and I have a board that uses both.
+When using the Arasan SDHCI HW IP, there is a set of parameters called
+"Hardware initialized registers"
 
-I don't have the tango3 client devices in mind, but
-1 NAND + 2 SATA works out alright for 3 channels, right?
+(Table 7, Section "Pin Signals", page 56 of Arasan "SD3.0/SDIO3.0/eMMC4.4
+AHB Host Controller", revision 6.0 document)
 
-Regards.
+In some platforms those signals are connected to registers that need to
+be programmed at some point for proper driver/HW initialisation.
+
+I found that the 'struct sdhci_ops' contains a '.platform_init' callback
+that is called from within 'sdhci_pltfm_init', and that seems a good
+candidate for a place to program those registers (*).
+
+Do you agree?
+
+Best regards,
+
+Sebastian
+
+
+(*): This has been prototyped on 4.7 as working properly.
+However, upstream commit:
+
+commit 3ea4666e8d429223fbb39c1dccee7599ef7657d5
+Author: Douglas Anderson <dianders@chromium.org>
+Date:   Mon Jun 20 10:56:47 2016 -0700
+
+    mmc: sdhci-of-arasan: Properly set corecfg_baseclkfreq on rk3399
+...
+
+could affect this solution because of the way the 'sdhci_arasan_of_match'
+struct is used after that commit.
