@@ -1,12 +1,12 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 25 Nov 2016 17:15:24 +0100
-Subject: [PATCH v5 1/2] devicetree: Add vendor prefix for CZ.NIC
-In-Reply-To: <20161125142658.21690-2-uwe@kleine-koenig.org> ("Uwe
- =?utf-8?Q?Kleine-K=C3=B6nig=22's?= message of "Fri, 25 Nov 2016 15:26:57
+Date: Fri, 25 Nov 2016 17:16:38 +0100
+Subject: [PATCH v5 2/2] ARM: dts: add support for Turris Omnia
+In-Reply-To: <20161125142658.21690-3-uwe@kleine-koenig.org> ("Uwe
+ =?utf-8?Q?Kleine-K=C3=B6nig=22's?= message of "Fri, 25 Nov 2016 15:26:58
  +0100")
 References: <20161125142658.21690-1-uwe@kleine-koenig.org>
- <20161125142658.21690-2-uwe@kleine-koenig.org>
-Message-ID: <87mvgnilib.fsf@free-electrons.com>
+ <20161125142658.21690-3-uwe@kleine-koenig.org>
+Message-ID: <87lgw7ilg9.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,34 +14,62 @@ Hi Uwe,
  
  On ven., nov. 25 2016, Uwe Kleine-K?nig <uwe@kleine-koenig.org> wrote:
 
+> This machine is an open hardware router by cz.nic driven by a
+> Marvell Armada 385.
+>
 > Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
 
-Applied on mvebu/dt and I added back the Acked-by from Rob Herring.
+Applied on mvebu/dt with few changes:
+
+First I added the SoB from Thomas Hlavacek you initially planed to add
+as seen on IRC.
+
+The other change I did are mentioned inline.
 
 Thanks,
 
 Gregory
 
 
-> ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index f0a48ea78659..ae9fce9fed03 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -67,6 +67,7 @@ creative	Creative Technology Ltd
->  crystalfontz	Crystalfontz America, Inc.
->  cubietech	Cubietech, Ltd.
->  cypress	Cypress Semiconductor Corporation
-> +cznic	CZ.NIC, z.s.p.o.
->  dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
->  davicom	DAVICOM Semiconductor, Inc.
->  delta	Delta Electronics, Inc.
-> -- 
-> 2.10.2
->
+[...]
+
+> +&spi0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&spi0_pins &spi0cs0_pins>;
+> +	status = "okay";
+> +
+> +	spi-nor at 0 {
+> +		compatible = "spansion,s25fl164k", "jedec,spi-nor";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		reg = <0>;
+> +		spi-max-frequency = <40000000>;
+> +
+
++
++		partitions {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
+it is mandatory since v4.4 to use this pattern for partitions.
+
+
+> +		partition at 0 {
+> +			reg = <0x0 0x00100000>;
+> +			label = "U-Boot";
+> +		};
+> +
+> +		partition at 1 {
+                         @0x100000
+We should use the reg value here ^
+
+> +			reg = <0x00100000 0x00700000>;
+> +			label = "Rescue system";
+> +		};
+
++ };
+
 
 -- 
 Gregory Clement, Free Electrons
