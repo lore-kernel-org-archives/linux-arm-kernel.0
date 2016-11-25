@@ -1,115 +1,170 @@
-From: huziji@marvell.com (Ziji Hu)
-Date: Fri, 25 Nov 2016 16:45:47 +0800
-Subject: [PATCH 6/10] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
- functionality
-In-Reply-To: <76ce72f8-4b86-3b83-544f-b9a7ef871393@marvell.com>
-References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
- <0390e7a05b6163deabb545f93729ea615eeaaee2.1477911954.git-series.gregory.clement@free-electrons.com>
- <CAPDyKFpqPSqiEi=0UW5LoZmy+y-KHm9nbcGKBSy3RzchdLU9cA@mail.gmail.com>
- <dd230463-04f6-df31-7056-1a185eb6cfc7@marvell.com>
- <CAPDyKFr9uEjVQmTNP0KK8Zj9mxCW3i564E=47vTK0RLvXCjw3Q@mail.gmail.com>
- <76ce72f8-4b86-3b83-544f-b9a7ef871393@marvell.com>
-Message-ID: <07e71ce4-a78e-750c-6325-0a88891519d5@marvell.com>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Fri, 25 Nov 2016 16:46:08 +0800
+Subject: [PATCH v17 00/15] acpi,
+ clocksource: add GTDT driver and GTDT support in arm_arch_timer
+Message-ID: <20161125084623.22515-1-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+From: Fu Wei <fu.wei@linaro.org>
 
-On 2016/11/24 23:00, Ziji Hu wrote:
-> Hi Ulf,
-> 
-> On 2016/11/24 21:34, Ulf Hansson wrote:
-<snip>
->>>>> +
->>>>> +       /*
->>>>> +        * Xenon Specific property:
->>>>> +        * emmc: explicitly indicate whether this slot is for eMMC
->>>>> +        * slotno: the index of slot. Refer to SDHC_SYS_CFG_INFO register
->>>>> +        * tun-count: the interval between re-tuning
->>>>> +        * PHY type: "sdhc phy", "emmc phy 5.0" or "emmc phy 5.1"
->>>>> +        */
->>>>> +       if (of_property_read_bool(np, "marvell,xenon-emmc"))
->>>>> +               priv->emmc_slot = true;
->>>>
->>>> So, you need this because of the eMMC voltage switch behaviour, right?
->>>>
->>>> Then I would rather like to describe this a generic DT bindings for
->>>> the eMMC voltage level support. There have acutally been some earlier
->>>> discussions for this, but we haven't yet made some changes.
->>>>
->>>> I think what is missing is a mmc-ddr-3_3v DT binding, which when set,
->>>> allows the host driver to accept I/O voltage switches to 3.3V. If not
->>>> supported the  ->start_signal_voltage_switch() ops may return -EINVAL.
->>>> This would inform the mmc core to move on to the next supported
->>>> voltage level. There might be some minor additional changes to the mmc
->>>> card initialization sequence, but those should be simple.
->>>>
->>>> I can help out to look into this, unless you want to do it yourself of course!?
->>>>
->>>    Yes. One of the reasons is to provide eMMC specific voltage setting.
->>>    But in my very own opinion, it should be irrelevant to voltage level.
->>>    The eMMC voltage setting on our SDHC is different from SD/SDIO voltage switch.
->>>    It will become more complex with different SOC implementation details.
->>
->> Got it. Although I think we can cope with that fine just by using the
->> different SD/eMMC speed modes settings defined in DT (or from the
->> SDHCI caps register)
->>
->     In my very opinion, I'm not sure if there is any corner case that driver cannot
->     determine the eMMC card type from DT and SDHC caps.
-> 
->>>    Unfortunately, MMC driver cannot determine the card type yet when eMMC voltage
->>>    setting should be executed.
->>>    Thus an flag is required here to tell driver to execute eMMC voltage setting.
->>>
->>>    Besides, additional eMMC specific settings might be implemented in future, besides
->>>    voltage setting. Most of them should be completed before MMC driver recognizes the
->>>    card type. Thus I have to keep this flag to indicate current SDHC is for eMMC.
->>
->> I doubt you will need a generic "eMMC" flag, but let's see when we go forward.
->>
->> Currently it's clear you don't need such a flag, so I will submit a
->> change adding a DT binding for "mmc-ddr-3_3v" then we can take it from
->> there, to see if it suits your needs.
->>
+This patchset:
+    (1)Preparation for adding GTDT support in arm_arch_timer:
+        1. Move some enums and marcos to header file;
+        2. Add a new enum for spi type;
+        3. Improve printk relevant code;
+        4. Rename some enums and defines;
+        5. Rework PPI determination;
+        6. Rework counter frequency detection;
+        7. Refactor arch_timer_needs_probing, move it into DT init call
+        8. Introduce some new structs and refactor the MMIO timer init code
+        for reusing some common code.
 
-    Another reason for a special "xenon-emmc" property is that our host IP usually can
-    support both eMMC and SD. Whether a host is used as eMMC or SD depends on the
-    final implementation of the actual product.
-    Thus our host driver needs to know whether current SDHC is fixed as eMMC or SD.
-    So far, It can only get the information from DT.
+    (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
+    Parse all kinds of timer in GTDT table of ACPI:arch timer,
+    memory-mapped timer and SBSA Generic Watchdog timer.
+    This driver can help to simplify all the relevant timer drivers,
+    and separate all the ACPI GTDT knowledge from them.
 
-    After out host driver get the card type information from DT, it can prepare eMMC
-    specific voltage, set eMMC specific mmc->caps/caps2 flags and do other
-    vendor specific init, before card init procedure.
-    Otherwise, our host driver has to wait until card type is determined in mmc_rescan().
+    (3)Simplify ACPI code for arm_arch_timer
 
-    A generic "eMMC" flag is unnecessary. I just require a private property,
-    which is only used in our host driver and DT.
+    (4)Add GTDT support for ARM memory-mapped timer.
 
-    Thank you.
+This patchset has been tested on the following platforms with ACPI enabled:
+    (1)ARM Foundation v8 model
 
-Best regards,
-Hu Ziji
+Changelog:
+v17: https://lkml.org/lkml/2016/11/25/
+     Take out some cleanups from 4/15.
+     Merge 5/15 and 6/15, improve PPI determination code,
+     improve commit message.
+     Rework counter frequency detection.
+     Move arch_timer_needs_of_probing into DT init call.
+     Move Platform Timer scan loop back to timer init call to avoid allocating
+     and free memory.
+     Improve all the exported functions' comment.
 
-> 
->     Actually, our eMMC is usually fixed as 1.8V.
-> 
->     The pair "no-sd" + "no-sdio" can provide the similar information.
->     But I'm not sure if it is proper to use those two property in such a way.
-> 
->     Thank you.
-> 
-> Best regards
-> Hu Ziji
-> 
->> [...]
->>
->> Kind regards
->> Uffe
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+v16: https://lkml.org/lkml/2016/11/16/268
+     Fix patchset problem about static enum ppi_nr of 01/13 in v15.
+     Refactor arch_timer_detect_rate.
+     Refactor arch_timer_needs_probing.
+
+v15: https://lkml.org/lkml/2016/11/15/366
+     Re-order patches
+     Add arm_arch_timer refactoring patches to prepare for GTDT:
+         1. rename some  enums and defines, and some cleanups
+         2. separate out arch_timer_uses_ppi init code and fix a potential bug
+         3. Improve some new structs, refactor the timer init code.
+     Since the some structs have been changed, GTDT parser for memory-mapped
+     timer and SBSA Generic Watchdog timer have been update.
+
+v14: https://lkml.org/lkml/2016/9/28/573
+     Separate memory-mapped timer GTDT support into two patches
+         1. Refactor the timer init code to prepare for GTDT
+         2. Add GTDT support for memory-mapped timer
+
+v13: http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1231717.html
+     Improve arm_arch_timer code for memory-mapped
+     timer GTDT support, refactor original memory-mapped timer
+     dt support for reusing some common code.
+
+v12: https://lkml.org/lkml/2016/9/13/250
+     Rebase to latest Linux 4.8-rc6
+     Delete the confusing "skipping" in the error message.
+
+V11: https://lkml.org/lkml/2016/9/6/354
+     Rebase to latest Linux 4.8-rc5
+     Delete typedef (suggested by checkpatch.pl)
+
+V10: https://lkml.org/lkml/2016/7/26/215
+     Drop the "readq" patch.
+     Rebase to latest Linux 4.7.
+
+V9: https://lkml.org/lkml/2016/7/25/345
+    Improve pr_err message in acpi gtdt driver.
+    Update Commit message for 7/9
+    shorten the irq mapping function name
+    Improve GTDT driver for memory-mapped timer
+
+v8: https://lkml.org/lkml/2016/7/19/660
+    Improve "pr_fmt(fmt)" definition: add "ACPI" in front of "GTDT",
+    and also improve printk message.
+    Simplify is_timer_block and is_watchdog.
+    Merge acpi_gtdt_desc_init and gtdt_arch_timer_init into acpi_gtdt_init();
+    Delete __init in include/linux/acpi.h for GTDT API
+    Make ARM64 select GTDT.
+    Delete "#include <linux/module.h>" from acpi_gtdt.c
+    Simplify GT block parse code.
+
+v7: https://lkml.org/lkml/2016/7/13/769
+    Move the GTDT driver to drivers/acpi/arm64
+    Add add the ARM64-specific ACPI Support maintainers in MAINTAINERS
+    Merge 3 patches of GTDT parser driver.
+    Fix the for_each_platform_timer bug.
+
+v6: https://lkml.org/lkml/2016/6/29/580
+    split the GTDT driver to 4 parts: basic, arch_timer, memory-mapped timer,
+    and SBSA Generic Watchdog timer
+    Improve driver by suggestions and example code from Daniel Lezcano
+
+v5: https://lkml.org/lkml/2016/5/24/356
+    Sorting out all patches, simplify the API of GTDT driver:
+    GTDT driver just fills the data struct for arm_arch_timer driver.
+
+v4: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006667.html
+    Delete the kvm relevant patches
+    Separate two patches for sorting out the code for arm_arch_timer.
+    Improve irq info export code to allow missing irq info in GTDT table.
+
+v3: https://lkml.org/lkml/2016/2/1/658
+    Improve GTDT driver code:
+      (1)improve pr_* by defining pr_fmt(fmt)
+      (2)simplify gtdt_sbsa_gwdt_init
+      (3)improve gtdt_arch_timer_data_init, if table is NULL, it will try
+      to get GTDT table.
+    Move enum ppi_nr to arm_arch_timer.h, and add enum spi_nr.
+    Add arm_arch_timer get ppi from DT and GTDT support for kvm.
+
+v2: https://lkml.org/lkml/2015/12/2/10
+    Rebase to latest kernel version(4.4-rc3).
+    Fix the bug about the config problem,
+    use CONFIG_ACPI_GTDT instead of CONFIG_ACPI in arm_arch_timer.c
+
+v1: The first upstreaming version: https://lkml.org/lkml/2015/10/28/553
+Fu Wei (15):
+  clocksource/drivers/arm_arch_timer: Move enums and defines to header
+    file
+  clocksource/drivers/arm_arch_timer: Add a new enum for spi type
+  clocksource/drivers/arm_arch_timer: Improve printk relevant code
+  clocksource/drivers/arm_arch_timer: rename some enums and defines.
+  clocksource/drivers/arm_arch_timer: rework PPI determination
+  clocksource/drivers/arm_arch_timer: Rework counter frequency
+    detection.
+  clocksource/drivers/arm_arch_timer: Refactor arch_timer_needs_probing
+  clocksource/drivers/arm_arch_timer: move arch_timer_needs_of_probing
+    into DT init call
+  clocksource/drivers/arm_arch_timer: Introduce some new structs to
+    prepare for GTDT
+  clocksource/drivers/arm_arch_timer: Refactor the timer init code to
+    prepare for GTDT
+  acpi/arm64: Add GTDT table parse driver
+  clocksource/drivers/arm_arch_timer: Simplify ACPI support code.
+  acpi/arm64: Add memory-mapped timer support in GTDT driver
+  clocksource/drivers/arm_arch_timer: Add GTDT support for memory-mapped
+    timer
+  acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver
+
+ arch/arm64/Kconfig                   |   1 +
+ drivers/acpi/arm64/Kconfig           |   3 +
+ drivers/acpi/arm64/Makefile          |   1 +
+ drivers/acpi/arm64/gtdt.c            | 374 +++++++++++++++++++++++++++
+ drivers/clocksource/arm_arch_timer.c | 478 ++++++++++++++++++++---------------
+ drivers/watchdog/Kconfig             |   1 +
+ include/clocksource/arm_arch_timer.h |  45 +++-
+ include/linux/acpi.h                 |   7 +
+ virt/kvm/arm/hyp/timer-sr.c          |   6 +-
+ 9 files changed, 708 insertions(+), 208 deletions(-)
+ create mode 100644 drivers/acpi/arm64/gtdt.c
+
+-- 
+2.9.3
