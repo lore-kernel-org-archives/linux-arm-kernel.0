@@ -1,65 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 26 Nov 2016 00:16:20 +0100
-Subject: [GIT PULL]: ARM ARTPEC changes for 4.10
-In-Reply-To: <20161110150930.GB19804@axis.com>
-References: <20161110150930.GB19804@axis.com>
-Message-ID: <5317474.MXurzNW7Do@wuerfel>
+Date: Sat, 26 Nov 2016 00:19:15 +0100
+Subject: [GIT PULL] ARM: at91: drivers for 4.10
+In-Reply-To: <20161114184438.k5ysd6pgcadlo5vw@piout.net>
+References: <20161114184438.k5ysd6pgcadlo5vw@piout.net>
+Message-ID: <5911355.oXFl802LTP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 10, 2016 4:09:31 PM CET Jesper Nilsson wrote:
-> Please pull the below signed tag for a trio of minor changes
-> adding PCIe for the ARM ARTPEC SoC.
+On Monday, November 14, 2016 7:44:38 PM CET Alexandre Belloni wrote:
+> Drivers for 4.10:
 > 
-> Thanks!
-> 
-> /Jesper
-> 
-> The following changes since commit bc33b0ca11e3df467777a4fa7639ba488c9d4911:
-> 
->   Linux 4.9-rc4 (2016-11-05 16:23:36 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/jesper/artpec.git tags/artpec-for-4.10
-> 
-> for you to fetch changes up to fa5541fc806771a108cd2a48245a229f1ba539ea:
-> 
->   ARM: dts: artpec: add pcie support (2016-11-10 15:51:10 +0100)
-> 
-> ----------------------------------------------------------------
-> ARTPEC changes for 4.10
-> 
-> ----------------------------------------------------------------
-> Niklas Cassel (3):
->       ARM: ARTPEC-6: add select MFD_SYSCON to MACH_ARTPEC6
->       ARM: ARTPEC-6: add pcie related options
->       ARM: dts: artpec: add pcie support
-> 
+>  - few fixes for the memory drivers
+>  - minimal security module driver
+>  - support for the Secure SRAM
 > 
 
-Hi Jesper and Niklas,
-
-I just found the old pull request while going through my mail backlog.
-
-A few things for you to remember for next time:
-
-- please send pull requests "To: arm at kernel.org" so we know they
-  are destined for arm-soc
-
-- please split up changes to the platform code from dts changes,
-  defconfig changes and driver changes. Each of them gets sent
-  to Linus in a separate arm-soc branch, so we have to pull them
-  in separately too
-
-- For the signed tag, please put in a cleartext description of
-  the branch, just like you describe each commit in its changelog
-  text. The tag comment becomes the merge commit text.
-
-- I've looked at the three patches individually and cherry-picked
-  the first into next/soc and the third into next/dt. The patch
-  "ARM: ARTPEC-6: add pcie related options" is no longer needed
-  after commit e13688f ("ARM: select PCI_DOMAINS config from
-  ARCH_MULTIPLATFORM"), so I dropped that.
+For reference, Olof pulled this into next/drivers on Nov 18.
 
 	Arnd
