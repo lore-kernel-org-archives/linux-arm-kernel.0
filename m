@@ -1,27 +1,19 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 25 Nov 2016 09:57:56 +0800
-Subject: [PATCH v4 1/6] arm64: arch_timer: Add device tree binding for
- hisilicon-161601 erratum
-In-Reply-To: <624c1751-9b66-1d10-78ae-8cb4edea6109@huawei.com>
-References: <1479212167-5812-1-git-send-email-dingtianhong@huawei.com>
- <c3020c0d-bc45-2bb1-f53a-c5e76ab45499@huawei.com>
- <624c1751-9b66-1d10-78ae-8cb4edea6109@huawei.com>
-Message-ID: <58379AA4.6030401@linaro.org>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Thu, 24 Nov 2016 18:31:38 -0800
+Subject: RPI3 doesn't boot in ARM64 mode on linux-next
+Message-ID: <1480041098.1504.1.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
+Last night I did a build of linux-next and I'm finding that I can no
+longer get my RPI 3 to boot in arm64 mode anymore.  It seems to be
+hanging very early in the boot process.  
 
-On 11/24/2016 08:12 PM, John Garry wrote:
-> On 21/11/2016 12:49, Ding Tianhong wrote:
->> Ping....
->
-> Hi,
->
-> was there a cover letter for 0/6? I never saw it.
+I know linux-next is going through a very large number of changes now,
+so does anybody know if arm64(not just the RPI 3) is just broken in
+general at this point? 4.9rc6 is working fine.
 
-There isn't a cover letter, do we need to add it and
-resend (to make thing clear)?
-
-Thanks
-Hanjun
+I don't have a JTAG debugger, so it's a bit hard for me to debug.  I've
+actually been looking for a decent cheap JTAG debugger for awhile now,
+so if anybody knows of one in the < $300.00 range it might be a good
+self Christmas present.
