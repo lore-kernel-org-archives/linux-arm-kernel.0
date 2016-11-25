@@ -1,60 +1,65 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 25 Nov 2016 22:32:46 +0800
-Subject: [PATCH v17 08/15] clocksource/drivers/arm_arch_timer: move
- arch_timer_needs_of_probing into DT init call
-In-Reply-To: <20161125084623.22515-9-fu.wei@linaro.org>
-Message-ID: <201611252221.UyJ9iWPV%fengguang.wu@intel.com>
+From: uwe@kleine-koenig.org (=?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?=)
+Date: Fri, 25 Nov 2016 15:34:55 +0100
+Subject: [RFC PATCH] ARM: dts: Add support for Turris Omnia
+In-Reply-To: <1480078151.381.4@smtp.gmail.com>
+References: <1479851991.26813.2@smtp.gmail.com>
+ <1479859770-9375-1-git-send-email-tmshlvck@gmail.com>
+ <20161123003505.GL2691@lunn.ch>
+ <4e3f9628-dbf8-27c1-abea-d0ef58a67e51@kleine-koenig.org>
+ <20161124150700.GD7155@lunn.ch> <1480078151.381.4@smtp.gmail.com>
+Message-ID: <0d17c6df-ba75-1e0c-735e-f23b61388a04@kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fu,
+Hello,
 
-[auto build test ERROR on pm/linux-next]
-[also build test ERROR on v4.9-rc6]
-[cannot apply to tip/timers/core next-20161125]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+[trimmed Cc: a bit to annoy less]
 
-url:    https://github.com/0day-ci/linux/commits/fu-wei-linaro-org/acpi-clocksource-add-GTDT-driver-and-GTDT-support-in-arm_arch_timer/20161125-171111
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+On 11/25/2016 01:49 PM, Tomas Hlavacek wrote:
+> On Thu, Nov 24, 2016 at 4:07 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>>>  @Tomas: I think it doesn't make sense when we alternate sending patches
+>>>  without prior arrangement. Do you already work on a v5? If not I can do
+>>>  that to fix the last few comments. Not sure when a submission is too
+>>>  late to enter v4.10, but I think the window isn't that big any more.
+>>
+>> It is getting a bit late. But maybe Linus will add in another -rc
+>> week.
 
-Note: the linux-review/fu-wei-linaro-org/acpi-clocksource-add-GTDT-driver-and-GTDT-support-in-arm_arch_timer/20161125-171111 HEAD 498f1f2503da21841b0e7679ddbdb86a40451bdb builds fine.
-      It only hurts bisectibility.
+To keep the dice rolling I sent a v5 with is somewhere in the middle
+between my v3 and Tomas RFC patch. Assuming Tomas is happy with this
+change, can we still get it into 4.10? This would help me to put this in
+the Debian kernel for the next release.
 
-All errors (new ones prefixed by >>):
+>>>  > No leds? No buttons via gpio-keys?
+>>>
+>>>  The leds are controlled by a Cortex-M0 and without intervention blink
+>>>  according to a hardware function (network, power, pci). IMHO that's ok
+>>>  for an initial setup.
+>>
+>> Yes. That is fine. It is just unusual. Most boards have gpio-led and
+>> gpio-keys, which are easy to add. That is why i asked. Adding an LED
+>> driver which talks to this M0 can be added later.
+> 
+> Actually the WiP driver for MCU LED interface, that we use in our kernel
+> is here:
+> https://github.com/tmshlvck/omnia-linux/commit/2121afd8fbd2e4c720edcdd472b11b5303bc0dfb
+> 
+> 
+> It definitely needs some cleanup and it adds non-standard features (main
+> PWM for all LEDs, autonomous blink mode, colors) via custom /sys files,
+> which I suspect that is not going to be acceptable for upstream. Let's
+> keep it for the next iteration.
 
-   drivers/clocksource/arm_arch_timer.c: In function 'arch_timer_acpi_init':
->> drivers/clocksource/arm_arch_timer.c:1071:2: error: 'ret' undeclared (first use in this function)
-     ret = arch_timer_register();
-     ^~~
-   drivers/clocksource/arm_arch_timer.c:1071:2: note: each undeclared identifier is reported only once for each function it appears in
+Ack, the leds are one of the less critical things for the machine. I'd
+like to tackle the switch next.
 
-vim +/ret +1071 drivers/clocksource/arm_arch_timer.c
+Best regards
+Uwe
 
-  1065			return -EINVAL;
-  1066		}
-  1067	
-  1068		/* Always-on capability */
-  1069		arch_timer_c3stop = !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
-  1070	
-> 1071		ret = arch_timer_register();
-  1072		if (ret)
-  1073			return ret;
-  1074	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 31917 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161125/cf2e05c2/attachment-0001.gz>
+Name: signature.asc
+Type: application/pgp-signature
+Size: 484 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161125/05e21cc2/attachment.sig>
