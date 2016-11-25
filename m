@@ -1,69 +1,46 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 25 Nov 2016 15:12:24 +0000
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <d996bcdb-2413-770c-84d1-1b12ccd74477@free.fr> (Mason's message
- of "Fri, 25 Nov 2016 16:02:44 +0100")
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <20161125124528.GJ14217@n2100.armlinux.org.uk>
- <yw1xtwav9092.fsf@unicorn.mansr.com>
- <20161125133436.GK14217@n2100.armlinux.org.uk>
- <yw1xlgw78y8k.fsf@unicorn.mansr.com>
- <20161125135830.GL14217@n2100.armlinux.org.uk>
- <yw1xh96v8xnb.fsf@unicorn.mansr.com>
- <20161125141708.GM14217@n2100.armlinux.org.uk>
- <d996bcdb-2413-770c-84d1-1b12ccd74477@free.fr>
-Message-ID: <yw1xoa137fvr.fsf@unicorn.mansr.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 25 Nov 2016 16:17:04 +0100
+Subject: [PATCH RESEND 2/2] gpio: axp209: add pinctrl support
+In-Reply-To: <20161123141151.25315-3-quentin.schulz@free-electrons.com>
+References: <20161123141151.25315-1-quentin.schulz@free-electrons.com>
+ <20161123141151.25315-3-quentin.schulz@free-electrons.com>
+Message-ID: <20161125151704.3am7wyqrlz767dvc@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+Hi,
 
-> On 25/11/2016 15:17, Russell King - ARM Linux wrote:
->> On Fri, Nov 25, 2016 at 02:03:20PM +0000, M?ns Rullg?rd wrote:
->>> Russell King - ARM Linux <linux@armlinux.org.uk> writes:
->>>
->>>> On Fri, Nov 25, 2016 at 01:50:35PM +0000, M?ns Rullg?rd wrote:
->>>>> Russell King - ARM Linux <linux@armlinux.org.uk> writes:
->>>>>> It would be unfair to augment the API and add the burden on everyone
->>>>>> for the new API when 99.999% of the world doesn't require it.
->>>>>
->>>>> I don't think making this particular dma driver wait for the descriptor
->>>>> callback to return before reusing a channel quite amounts to a horrid
->>>>> hack.  It certainly wouldn't burden anyone other than the poor drivers
->>>>> for devices connected to it, all of which are specific to Sigma AFAIK.
->>>>
->>>> Except when you stop to think that delaying in a tasklet is exactly
->>>> the same as randomly delaying in an interrupt handler - the tasklet
->>>> runs on the return path back to the parent context of an interrupt
->>>> handler.  Even if you sleep in the tasklet, you're sleeping on behalf
->>>> of the currently executing thread - if it's a RT thread, you effectively
->>>> destroy the RT-ness of the thread.  Let's hope no one cares about RT
->>>> performance on that hardware...
->>>
->>> That's why I suggested to do this only if the needed delay is known to
->>> be no more than a few bus cycles.  The completion callback is currently
->>> the only post-transfer interaction we have between the dma and device
->>> drivers.  To handle an arbitrarily long delay, some new interface will
->>> be required.
->> 
->> And now we're back at the point I made a few emails ago about undue
->> burden which is just about quoted above...
->
-> I've had several talks with the HW dev, and I don't think they
-> anticipated the need to mux the 3 channels. In their minds,
-> customers would choose at most 3 devices to support, and
-> assign one channel to each device statically.
->
-> In fact, in tango4, supported devices are:
-> A) NAND Flash controllers 0 and 1
-> NB: the upstream driver only uses controller 0
-> B) IDE or SATA controllers 0 and 1
-> C) a few crypto HW blocks which do not work as expected (unused)
->
-> Customers typically use 1 channel for NAND, maybe 1 for SATA,
-> and 1 channel remains unused.
+On Wed, Nov 23, 2016 at 03:11:51PM +0100, Quentin Schulz wrote:
+> The GPIOs present in the AXP209 PMIC have multiple functions. They
+> typically allow a pin to be used as GPIO input or output and can also be
+> used as ADC or regulator for example.[1]
+> 
+> This adds the possibility to use all functions of the GPIOs present in
+> the AXP209 PMIC thanks to pinctrl subsystem.
+> 
+> [1] see registers 90H, 92H and 93H at
+>     http://dl.linux-sunxi.org/AXP/AXP209_Datasheet_v1.0en.pdf
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 
-The hardware has two sata controllers, and I have a board that uses both.
+I've said it already face to face, but ideally you should split that
+patch into logical changes.
+
+I can see here at least three:
+  - Adding the pinctrl features
+  - Renaming the structure and functions
+  - Removal of a few functions
+
+Maxime
 
 -- 
-M?ns Rullg?rd
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161125/3ba59778/attachment.sig>
