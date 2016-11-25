@@ -1,41 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 26 Nov 2016 00:29:57 +0100
-Subject: [GIT PULL v2] Qualcomm Device Tree Changes for v4.10
-In-Reply-To: <1479535031-14817-1-git-send-email-andy.gross@linaro.org>
-References: <1479535031-14817-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <10048670.JfC4Mf6feL@wuerfel>
+From: stefan@datenfreihafen.org (Stefan Schmidt)
+Date: Sat, 26 Nov 2016 00:30:52 +0100
+Subject: [PATCH] ARM: pxa: ezx: fix a910 camera data
+In-Reply-To: <87eg1zqqub.fsf@belgarion.home>
+References: <20161124162955.3887066-1-arnd@arndb.de>
+ <e0bdf159-93f2-5ed7-1e28-7fb80707d6c7@datenfreihafen.org>
+ <87eg1zqqub.fsf@belgarion.home>
+Message-ID: <df32cbf6-e897-56d9-89d8-c65af06323a8@datenfreihafen.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, November 18, 2016 11:57:11 PM CET Andy Gross wrote:
-> Qualcomm Device Tree Changes for v4.10 - v2
+Hello.
+
+On 25.11.2016 20:53, Robert Jarzmik wrote:
+> Stefan Schmidt <stefan@datenfreihafen.org> writes:
 > 
-> * Add EBI2 support to MSM8660
-> * Add SMSC ethernet support to APQ8060
-> * Add support for display, pstore, iommu, and hdmi to APQ8064
-> * Add SDHCI node to MSM8974 Hammerhead
-> * Add WP8548 MangOH board support (MDM9615)
+>> Hello.
+>>
+>> On 24.11.2016 17:29, Arnd Bergmann wrote:
+>>> The camera_supply_dummy_device definition is shared between a780 and a910,
+>>> but only provided when the first is enabled and fails to build for a
+>>> configuration with only a910:
+>>>
+>>> arch/arm/mach-pxa/ezx.c:1097:3: error: 'camera_supply_dummy_device' undeclared here (not in a function)
+>>>
+>>> This moves the definition into its own section.
+>>>
+>>> Fixes: 6c1b417adc8f ("ARM: pxa: ezx: use the new pxa_camera platform_data")
+>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>> ---
+>>>  arch/arm/mach-pxa/ezx.c | 56 ++++++++++++++++++++++++++-----------------------
+>>
+>> I wonder what we should do with ezx.c.
+>>
+>> As far as I know neither Daniel nor Harald or myself are doing anything
+>> with this devices anymore. Besides a basic compile test having an ack or
+>> reviewed by from our side is a bit worthless. :/
+>>
+>> I should still have some of these phones around in a box somewhere. If
+>> there is someone with a good motivation and time to take over on this
+>> platform we will find a way to get the person this devices.
+>>
+>> Any takers? Robert? I guess you are already overloaded but you might
+>> also have an interest. Worth asking :)
+> Oh yes, I'm very interested in your box. Besides I really like old platforms
+> :)
 
-Thanks for respinning the pull request
 
-> ----------------------------------------------------------------
-> Archit Taneja (2):
->       arm: dts: qcom: apq8064: Add display DT nodes
->       arm: dts: qcom: apq8064-ifc6410: Add HDMI support
-> 
-> Bhushan Shah (1):
->       ARM: dts: qcom: msm8974-hammerhead: Add sdhci1 node
-> 
-> John Stultz (3):
->       arm: dts: qcom: apq8064: Add dsi, gpu and iommu nodes
->       arm: dts: qcom: apq8064-nexus7: Add DSI and panel nodes
->       arm: dts: qcom: apq8064-nexus7: Add pstore support to nexus7
+Great! I should have at least 3 or 4 different devices from the EZX
+platform around. I will go and search for the box over the weekend :)
 
-I see that some of the subject lines are still not what they
-should be, as Archit and John both used 'arm' instead of 'ARM'
-as the prefix.
+>> In the case nobody wants to pick up here what would you consider the
+>> bets way forward? I could send a patch removing ezx platform support
+>> from the kernel (basically ezx.c plus build support) or I can send a
+>> patch marking it at least orphan in MAINTAINERS. Let me know what you think.
+>>
+>> Daniel, Harald, if one of you is still interested in these and what to
+>> pick up the work again, please speak up now. :)
+> Unless another maintainer steps in, you can submit a patch to transfer the
+> maintainance onto me, and we'll see off mailing lists how we could arange the
+> boards transfer.
 
-It doesn't seem to justify doing a v3 for that, just watch out
-for merges in the future. Pulled into next/dt, thanks!
+I cc'ed another developer who did a lot of work regarding EZX.
 
-	Arnd
+Antonio, as you can see from the mail above we are pondering what who
+will maintain the ezx platform in the kernel going forward. Neither
+Daniel, Harald or me is going to do so. If you have time, interest and
+motivation to do so please speak up. I know life moved on and you ahve
+other projects and interests so do not feel pressured here. Just say no
+if you have no interest. Robert already agreed to act as a fallback so
+we would still be safe. :)
+
+regards
+Stefan Schmidt
