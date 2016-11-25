@@ -1,54 +1,135 @@
-From: tmshlvck@gmail.com (Tomas Hlavacek)
-Date: Fri, 25 Nov 2016 13:49:11 +0100
-Subject: [RFC PATCH] ARM: dts: Add support for Turris Omnia
-In-Reply-To: <20161124150700.GD7155@lunn.ch>
-References: <1479851991.26813.2@smtp.gmail.com>
- <1479859770-9375-1-git-send-email-tmshlvck@gmail.com>
- <20161123003505.GL2691@lunn.ch>
- <4e3f9628-dbf8-27c1-abea-d0ef58a67e51@kleine-koenig.org>
- <20161124150700.GD7155@lunn.ch>
-Message-ID: <1480078151.381.4@smtp.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 25 Nov 2016 13:49:08 +0100
+Subject: [PATCH 1/4] serial: core: Add LED trigger support
+In-Reply-To: <20161124154543.GA8937@linaro.org>
+References: <20161123100106.15969-1-s.hauer@pengutronix.de>
+ <20161123100106.15969-2-s.hauer@pengutronix.de>
+ <20161123171302.GD19856@linaro.org>
+ <20161124064137.l3i3p3brbyz74cd5@pengutronix.de>
+ <20161124154543.GA8937@linaro.org>
+Message-ID: <20161125124908.xlgtnik5c2rfqi6l@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-On Thu, Nov 24, 2016 at 4:07 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->>  @Tomas: I think it doesn't make sense when we alternate sending 
->> patches
->>  without prior arrangement. Do you already work on a v5? If not I 
->> can do
->>  that to fix the last few comments. Not sure when a submission is too
->>  late to enter v4.10, but I think the window isn't that big any more.
+On Thu, Nov 24, 2016 at 08:45:43AM -0700, Mathieu Poirier wrote:
+> On Thu, Nov 24, 2016 at 07:41:37AM +0100, Sascha Hauer wrote:
+> > On Wed, Nov 23, 2016 at 10:13:02AM -0700, Mathieu Poirier wrote:
+> > > On Wed, Nov 23, 2016 at 11:01:03AM +0100, Sascha Hauer wrote:
+> > > > With this patch the serial core provides LED triggers for RX and TX.
+> > > > 
+> > > > As the serial core layer does not know when the hardware actually sends
+> > > > or receives characters, this needs help from the UART drivers. The
+> > > > LED triggers are registered in uart_add_led_triggers() called from
+> > > > the UART drivers which want to support LED triggers. All the driver
+> > > > has to do then is to call uart_led_trigger_[tx|rx] to indicate
+> > > > activite.
+> > > 
+> > > Hello Sascha,
+> > > 
+> > > > 
+> > > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > > > ---
+> > > >  drivers/tty/serial/serial_core.c | 73 ++++++++++++++++++++++++++++++++++++++++
+> > > >  include/linux/serial_core.h      | 10 ++++++
+> > > >  2 files changed, 83 insertions(+)
+> > > > 
+> > > > diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
+> > > > index f2303f3..3e8afb7 100644
+> > > > --- a/drivers/tty/serial/serial_core.c
+> > > > +++ b/drivers/tty/serial/serial_core.c
+> > > > @@ -34,6 +34,7 @@
+> > > >  #include <linux/serial_core.h>
+> > > >  #include <linux/delay.h>
+> > > >  #include <linux/mutex.h>
+> > > > +#include <linux/leds.h>
+> > > >  
+> > > >  #include <asm/irq.h>
+> > > >  #include <asm/uaccess.h>
+> > > > @@ -2703,6 +2704,77 @@ static const struct attribute_group tty_dev_attr_group = {
+> > > >  	.attrs = tty_dev_attrs,
+> > > >  	};
+> > > >  
+> > > > +void uart_led_trigger_tx(struct uart_port *uport)
+> > > > +{
+> > > > +	unsigned long delay = 50;
+> > > > +
+> > > > +	led_trigger_blink_oneshot(uport->led_trigger_tx, &delay, &delay, 0);
+> > > > +}
+> > > > +
+> > > > +void uart_led_trigger_rx(struct uart_port *uport)
+> > > > +{
+> > > > +	unsigned long delay = 50;
+> > > > +
+> > > > +	led_trigger_blink_oneshot(uport->led_trigger_rx, &delay, &delay, 0);
+> > > 
+> > > For both rx/tx the core constrains the delay_on/off along with the inversion.
+> > > Instead of adding the led_trigger_rx/tx and led_trigger_rx/tx_name to the 
+> > > struct uart_port, wouldn't it be better to add a new struct led_trigger that
+> > > would encapsulate those along wit the on/off delay and the inversion?
+> > > 
+> > > That way those values could be communicated to the core at registration time
+> > > instead of hard-coding things.
+> > 
+> > Not sure this goes into the right direction. Looking at the other
+> > callers of led_trigger_blink_oneshot() most of them use an arbitrary
+> > blink time of 30 or 50ms and the users seem to be happy with it. There
+> > doesn't seem to be the desire to make that value configurable. If we
+> > want to make it configurable, it's probably better to move the option
+> > to the led device rather than putting the burden on every user of the
+> > led triggers.
 > 
-> It is getting a bit late. But maybe Linus will add in another -rc
-> week.
+> So you did find instances where the blink time wasn't 50ms.  To me that's
+> a valid reason to not hard code the blink time and proceed differently.
+
+But they are hardcoded to these values. My gut feeling is that the
+authors had to pick a value and some used 30ms while others used 50ms.
+
+Making this configurable to me only means that it will be harder to
+cleanup later. I'd rather wait until someone comes along who really
+can present good reasons to make that configurable.
+
 > 
->> 
->>  > No leds? No buttons via gpio-keys?
->> 
->>  The leds are controlled by a Cortex-M0 and without intervention 
->> blink
->>  according to a hardware function (network, power, pci). IMHO that's 
->> ok
->>  for an initial setup.
+> > 
+> > I don't think the inversion flag is meant for being configurable. It's
+> > rather used for the default state of the LED. The CAN layer for example
+> > turns the LED on when the interface is up and then blinks (turns off and
+> > on again) on activity. For this it uses the inversion flag.
+> > 
+> > >  
+> > > > +}
+> > > > +
+> > > > +/**
+> > > > + *	uart_add_led_triggers - register LED triggers for a UART
+> > > > + *	@drv: pointer to the uart low level driver structure for this port
+> > > > + *	@uport: uart port structure to use for this port.
+> > > > + *
+> > > > + *	Called by the driver to register LED triggers for a UART. It's the
+> > > > + *	drivers responsibility to call uart_led_trigger_rx/tx on received
+> > > > + *	and transmitted chars then.
+> > > > + */
+> > > > +int uart_add_led_triggers(struct uart_driver *drv, struct uart_port *uport)
+> > > > +{
+> > > > +	int ret;
+> > > > +
+> > > > +	if (!IS_ENABLED(CONFIG_LEDS_TRIGGERS))
+> > > > +		return 0;
+> > > 
+> > > Since this is a public interface, checking for valid led_trigger_tx/rx before
+> > > moving on with the rest of the initialisation is probably a good idea.
+> > 
+> > What do you mean? Should we return an error when CONFIG_LEDS_TRIGGERS is
+> > disabled?
 > 
-> Yes. That is fine. It is just unusual. Most boards have gpio-led and
-> gpio-keys, which are easy to add. That is why i asked. Adding an LED
-> driver which talks to this M0 can be added later.
+>         if (!uport->led_trigger_rx || !uport->led_triggertx)
+>                 return -EINVAL;
 
-Actually the WiP driver for MCU LED interface, that we use in our 
-kernel is here: 
-https://github.com/tmshlvck/omnia-linux/commit/2121afd8fbd2e4c720edcdd472b11b5303bc0dfb
+uport->led_trigger_rx|tx are structs allocated in this function. It's
+the normal case that they are NULL.
 
-It definitely needs some cleanup and it adds non-standard features 
-(main PWM for all LEDs, autonomous blink mode, colors) via custom /sys 
-files, which I suspect that is not going to be acceptable for upstream. 
-Let's keep it for the next iteration.
+Sascha
 
-Regarding the button, we actually have one, that is connected to the 
-MCU and by default it sets LED brigtness autonomously, but it should be 
-able to generate IRQs via the MCU if we change the mode in the MCU. 
-I'll look into that.
-
-Tomas
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
