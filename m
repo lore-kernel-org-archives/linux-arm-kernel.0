@@ -1,19 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Nov 2016 22:40:08 +0100
-Subject: [GIT PULL] STi defconfig fix for v4.9-rcs
-In-Reply-To: <0492803d-d136-618d-bf06-51f0001d039b@st.com>
-References: <0492803d-d136-618d-bf06-51f0001d039b@st.com>
-Message-ID: <6441620.Ib6HJmGOKY@wuerfel>
+Date: Fri, 25 Nov 2016 23:03:35 +0100
+Subject: [PATCH v2 1/2] arm64: dts: zx: Fix gic GICR property
+In-Reply-To: <20161017204919.GE3264@localhost>
+References: <1476361881-19685-1-git-send-email-jun.nie@linaro.org>
+ <1476361881-19685-2-git-send-email-jun.nie@linaro.org>
+ <20161017204919.GE3264@localhost>
+Message-ID: <2953810.EeueujTjSC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 23, 2016 9:59:14 AM CET Patrice Chotard wrote:
-> STi defconfig fix:
+On Monday, October 17, 2016 1:49:19 PM CET Olof Johansson wrote:
+> On Thu, Oct 13, 2016 at 08:31:20PM +0800, Jun Nie wrote:
+> > GICR for multiple CPU can be described with start address and stride,
+> > or with multiple address. Current multiple address and stride are
+> > both used. Fix it.
+> > 
+> > vmalloc patch 727a7f5a9 triggered this bug:
+> > [    0.097146] Unable to handle kernel paging request at virtual address ffff000008060008
+> > [    0.097150] pgd = ffff000008602000
+> > [    0.097160] [ffff000008060008] *pgd=000000007fffe003, *pud=000000007fffd003, *pmd=000000007fffc003, *pte=0000000000000000
+> > [    0.097165] Internal error: Oops: 96000007 [#1] PREEMPT SMP
+> > [    0.097170] Modules linked in:
+> > [    0.097177] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0+ #1474
+> > [    0.097179] Hardware name: ZTE zx296718 evaluation board (DT)
+> > [    0.097183] task: ffff80003e8c8b80 task.stack: ffff80003e8d0000
+> > [    0.097197] PC is at gic_populate_rdist+0x74/0x15c
+> > [    0.097202] LR is at gic_starting_cpu+0xc/0x20
+> > [    0.097206] pc : [<ffff0000082b1b18>] lr : [<ffff0000082b26e0>] pstate: 600001c5
+> > 
+> > Signed-off-by: Jun Nie <jun.nie@linaro.org>
 > 
-> Enable HVA (Hardware Video Accelerator) video encoder
-> driver for STMicroelectronics SoC.
+> A Fixes: tag would be useful on a patch like this, to tell what patch
+> introduced the problem. Please consider using them in the future.
+> 
+> I've applied this one to fixes now.
 
-Defconfig changes like this don't seem particularly urgent. Unless
-there is a good reason, I'd suggest putting this into v4.10 instead.
+Hi Olof,
+
+I happened to still have this one in my todo folder as I must have
+missed your reply, and I stumbled over it while looking for things
+that may have gone missing.
+
+I don't see it in v4.9-rc6, did it get dropped accidentally?
 
 	Arnd
