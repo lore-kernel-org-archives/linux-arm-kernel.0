@@ -1,128 +1,102 @@
 From: yt.shen@mediatek.com (YT Shen)
-Date: Fri, 25 Nov 2016 18:34:23 +0800
-Subject: [PATCH v10 00/13] MT2701 DRM support
-Message-ID: <1480070076-6196-1-git-send-email-yt.shen@mediatek.com>
+Date: Fri, 25 Nov 2016 18:34:24 +0800
+Subject: [PATCH v10 01/13] drm/mediatek: add helpers for coverting from the
+ generic components
+In-Reply-To: <1480070076-6196-1-git-send-email-yt.shen@mediatek.com>
+References: <1480070076-6196-1-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1480070076-6196-2-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is MT2701 DRM support PATCH v10, based on 4.9-rc1.
-We add DSI interrupt control, transfer function for MIPI DSI panel support.
-Most codes are the same, except some register changed.
+define helpers for converting from 'mtk_ddp_comp' to 'mtk_disp_ovl'
+define helpers for converting from 'mtk_ddp_comp' to 'mtk_disp_rdma'
 
-For example:
- - DISP_OVL address offset changed, color format definition changed.
- - DISP_RDMA fifo size changed.
- - DISP_COLOR offset changed.
- - MIPI_TX setting changed.
+Signed-off-by: YT Shen <yt.shen@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_disp_ovl.c  | 15 +++++++++------
+ drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 15 +++++++++------
+ 2 files changed, 18 insertions(+), 12 deletions(-)
 
-We add a new component DDP_COMPONENT_BLS, and the connections are updated.
-OVL -> RDMA -> COLOR -> BLS -> DSI
-RDMA -> DPI
-And we have shadow register support in MT2701.
-
-We remove dts patch from the patch series, which depends on MT2701 CCF and scpsys.
-
-Changes since v9:
-- Split DSI patches into smaller parts
-- Use a real linux errno for return value
-- Add error handling in mtk_output_dsi_enable()
-- Remove unused changes and redundant delays
-- Add helpers and macros for configuration
-- Combine "drm/mediatek: rename macros, add chip prefix" and "drm/mediatek: add *driver_data for different hardware setting"
-
-Changes since v8:
-- enable 3 DSI interrupts only
-- move mtk_dsi_wait_for_irq_done() to the patch of irq control
-- use the name BLS in DRM driver part
-- move BLS declaration to a separate patch
-- update mtk_dsi_switch_to_cmd_mode()
-- update mtk_output_dsi_enable() and mtk_output_dsi_disable()
-
-Changes since v7:
-- Remove redundant codes
-- Move the definition of DDP_COMPONENT_BLS to patch of "drm/mediatek: update display module connections"
-- Move _dsi_irq_wait_queue into platform driver data
-- Move mtk_dsi_irq_data_clear() to patch of "drm/mediatek: add dsi interrupt control"
-- Add more descriptions in the commit messages
-
-Changes since v6:
-- Change data type of irq_data to u32
-- Rewrite mtk_dsi_host_transfer() for simplify
-- Move some MIPI_TX config to patch of "drm/mediatek: add *driver_data for different hardware settings".
-- Remove device tree from this patch series
-
-Changes since v5:
-- Remove DPI device tree and compatible string
-- Use one wait queue to handle interrupt status
-- Update the interrupt check flow and DSI_INT_ALL_BITS
-- Use same function for host read/write command
-- various fixes
-
-Changes since v4:
-- Add messages when timeout in mtk_disp_mutex_acquire()
-- Add descriptions for DISP_REG_MUTEX registers
-- Move connection settings for display modules to a separate patch
-- Remove 'mt2701-disp-wdma' because it is unused
-- Move cleaning up and renaming to a separate patch
-- Use wait_event_interruptible_timeout() to replace polling
-- Remove irq_num from mtk_dsi structure
-- Remove redundant and debug codes
-
-Changes since v3:
-- Add DSI support for MIPI DSI panels
-- Update BLS binding to PWM nodes
-- Remove ufoe device nodes
-- Remove redundant parentheses
-- Remove global variable initialization
-
-Changes since v2:
-- Rename mtk_ddp_mux_sel to mtk_ddp_sout_sel
-- Update mt2701_mtk_ddp_ext components
-- Changed to prefix naming
-- Reorder the patch series
-- Use of_device_get_match_data() to get driver private data
-- Use iopoll macros to implement mtk_disp_mutex_acquire()
-- Removed empty device tree nodes
-
-Changes since v1:
-- Removed BLS bindings and codes, which belong to pwm driver
-- Moved mtk_disp_mutex_acquire() just before mtk_crtc_ddp_config()
-- Split patch into smaller parts
-- Added const keyword to constant structure
-- Removed codes for special memory align
-
-Thanks,
-yt.shen
-
-YT Shen (11):
-  drm/mediatek: add helpers for coverting from the generic components
-  drm/mediatek: add *driver_data for different hardware settings
-  drm/mediatek: add shadow register support
-  drm/mediatek: add BLS component
-  drm/mediatek: update display module connections
-  drm/mediatek: cleaning up and refine
-  drm/mediatek: add mipi_tx data rate check
-  drm/mediatek: add dsi ulp mode control
-  drm/mediatek: add dsi rxtx control
-  drm/mediatek: update DSI sub driver flow for sending commands to panel
-  drm/mediatek: add support for Mediatek SoC MT2701
-
-shaoming chen (2):
-  drm/mediatek: add dsi interrupt control
-  drm/mediatek: add dsi transfer function
-
- drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |  64 +++--
- drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |  39 ++-
- drivers/gpu/drm/mediatek/mtk_drm_crtc.c     |  76 +++--
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c      | 138 ++++++---
- drivers/gpu/drm/mediatek/mtk_drm_ddp.h      |   2 +
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |  41 ++-
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |   7 +
- drivers/gpu/drm/mediatek/mtk_drm_drv.c      |  54 +++-
- drivers/gpu/drm/mediatek/mtk_drm_drv.h      |   9 +
- drivers/gpu/drm/mediatek/mtk_dsi.c          | 430 ++++++++++++++++++++++++----
- drivers/gpu/drm/mediatek/mtk_mipi_tx.c      |  42 ++-
- 11 files changed, 737 insertions(+), 165 deletions(-)
-
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+index 019b7ca..17971e4 100644
+--- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
++++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+@@ -57,6 +57,11 @@ struct mtk_disp_ovl {
+ 	struct drm_crtc			*crtc;
+ };
+ 
++static inline struct mtk_disp_ovl *comp_to_ovl(struct mtk_ddp_comp *comp)
++{
++	return container_of(comp, struct mtk_disp_ovl, ddp_comp);
++}
++
+ static irqreturn_t mtk_disp_ovl_irq_handler(int irq, void *dev_id)
+ {
+ 	struct mtk_disp_ovl *priv = dev_id;
+@@ -76,19 +81,17 @@ static irqreturn_t mtk_disp_ovl_irq_handler(int irq, void *dev_id)
+ static void mtk_ovl_enable_vblank(struct mtk_ddp_comp *comp,
+ 				  struct drm_crtc *crtc)
+ {
+-	struct mtk_disp_ovl *priv = container_of(comp, struct mtk_disp_ovl,
+-						 ddp_comp);
++	struct mtk_disp_ovl *ovl = comp_to_ovl(comp);
+ 
+-	priv->crtc = crtc;
++	ovl->crtc = crtc;
+ 	writel_relaxed(OVL_FME_CPL_INT, comp->regs + DISP_REG_OVL_INTEN);
+ }
+ 
+ static void mtk_ovl_disable_vblank(struct mtk_ddp_comp *comp)
+ {
+-	struct mtk_disp_ovl *priv = container_of(comp, struct mtk_disp_ovl,
+-						 ddp_comp);
++	struct mtk_disp_ovl *ovl = comp_to_ovl(comp);
+ 
+-	priv->crtc = NULL;
++	ovl->crtc = NULL;
+ 	writel_relaxed(0x0, comp->regs + DISP_REG_OVL_INTEN);
+ }
+ 
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+index 0df05f9..21eff6f 100644
+--- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
++++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+@@ -49,6 +49,11 @@ struct mtk_disp_rdma {
+ 	struct drm_crtc			*crtc;
+ };
+ 
++static inline struct mtk_disp_rdma *comp_to_rdma(struct mtk_ddp_comp *comp)
++{
++	return container_of(comp, struct mtk_disp_rdma, ddp_comp);
++}
++
+ static irqreturn_t mtk_disp_rdma_irq_handler(int irq, void *dev_id)
+ {
+ 	struct mtk_disp_rdma *priv = dev_id;
+@@ -77,20 +82,18 @@ static void rdma_update_bits(struct mtk_ddp_comp *comp, unsigned int reg,
+ static void mtk_rdma_enable_vblank(struct mtk_ddp_comp *comp,
+ 				   struct drm_crtc *crtc)
+ {
+-	struct mtk_disp_rdma *priv = container_of(comp, struct mtk_disp_rdma,
+-						  ddp_comp);
++	struct mtk_disp_rdma *rdma = comp_to_rdma(comp);
+ 
+-	priv->crtc = crtc;
++	rdma->crtc = crtc;
+ 	rdma_update_bits(comp, DISP_REG_RDMA_INT_ENABLE, RDMA_FRAME_END_INT,
+ 			 RDMA_FRAME_END_INT);
+ }
+ 
+ static void mtk_rdma_disable_vblank(struct mtk_ddp_comp *comp)
+ {
+-	struct mtk_disp_rdma *priv = container_of(comp, struct mtk_disp_rdma,
+-						  ddp_comp);
++	struct mtk_disp_rdma *rdma = comp_to_rdma(comp);
+ 
+-	priv->crtc = NULL;
++	rdma->crtc = NULL;
+ 	rdma_update_bits(comp, DISP_REG_RDMA_INT_ENABLE, RDMA_FRAME_END_INT, 0);
+ }
+ 
 -- 
 1.9.1
