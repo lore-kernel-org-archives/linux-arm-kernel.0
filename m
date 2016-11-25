@@ -1,30 +1,45 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 25 Nov 2016 20:58:11 +0100
-Subject: [alsa-devel] [PATCH 2/9] ALSA: ac97: add an ac97 bus
-In-Reply-To: <6b97a129-bd10-b9be-616d-a3ea3b91b103@metafoo.de> (Lars-Peter
- Clausen's message of "Thu, 10 Nov 2016 12:38:40 +0100")
-References: <1477510907-23495-1-git-send-email-robert.jarzmik@free.fr>
- <1477510907-23495-3-git-send-email-robert.jarzmik@free.fr>
- <d57cdfba-da22-652d-3d75-6d1b754cf1d5@metafoo.de>
- <87eg2ly8k6.fsf@belgarion.home>
- <5ae15e01-eaaf-4996-27ec-1179041c0268@metafoo.de>
- <87mvh8uywm.fsf@belgarion.home>
- <6b97a129-bd10-b9be-616d-a3ea3b91b103@metafoo.de>
-Message-ID: <8760nbqqlo.fsf@belgarion.home>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 25 Nov 2016 19:39:02 +0000
+Subject: [RFC PATCH 14/29] Revert "arm64/sve: Allow kernel-mode NEON to be
+ disabled in Kconfig"
+In-Reply-To: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
+References: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1480102762-23647-15-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lars-Peter Clausen <lars@metafoo.de> writes:
-...
+Now that KERNEL_MODE_NEON works for SVE, we can just default it
+back to y.
 
-Ok Lars, let's do this : I integrate as many of your remarks as I can, and I
-respin this serie, limited to patches 1, 2, 3, 4 and 5.
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ arch/arm64/Kconfig | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-Then we'll iterate, that will enable me to settle the serie, as I was on
-holidays and lost a bit my track. I'll send it hopefully next week once I've
-gathered my thoughts.
-
-Cheers.
-
---
-Robert
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 7266761..bf9915cb 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -224,6 +224,9 @@ config SWIOTLB
+ config IOMMU_HELPER
+ 	def_bool SWIOTLB
+ 
++config KERNEL_MODE_NEON
++	def_bool y
++
+ config FIX_EARLYCON_MEM
+ 	def_bool y
+ 
+@@ -266,10 +269,6 @@ endmenu
+ 
+ menu "Kernel Features"
+ 
+-config KERNEL_MODE_NEON
+-	bool "Support NEON/FPSIMD code in the kernel"
+-	default y
+-
+ menu "ARM errata workarounds via the alternatives framework"
+ 
+ config ARM64_ERRATUM_826319
+-- 
+2.1.4
