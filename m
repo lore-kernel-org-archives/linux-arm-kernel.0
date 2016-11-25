@@ -1,186 +1,37 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Fri, 25 Nov 2016 16:46:21 +0800
-Subject: [PATCH v17 13/15] acpi/arm64: Add memory-mapped timer support in GTDT
- driver
-In-Reply-To: <20161125084623.22515-1-fu.wei@linaro.org>
-References: <20161125084623.22515-1-fu.wei@linaro.org>
-Message-ID: <20161125084623.22515-14-fu.wei@linaro.org>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Fri, 25 Nov 2016 09:55:39 +0100
+Subject: Synopsys Ethernet QoS Driver
+In-Reply-To: <f4dd5d22-4467-d046-6b65-2a28f3fc5a7c@synopsys.com>
+References: <CADvZ6ErjyVR5ShWTk0QesWLYR1m3p8yAMkK8v9gm2kN5xTv8zw@mail.gmail.com>
+ <1dbb6047-2bbb-4d56-2a62-ab65a0254844@synopsys.com>
+ <20161119135654.GA14079@lnxartpec.se.axis.com>
+ <CAJ3bTp7PpUJcz=1JohX=A54UP6vVAafWnB0PGUBSxb5JJiO8Lg@mail.gmail.com>
+ <1248f4ce-4859-10e6-fef9-342ea543f8d4@synopsys.com>
+ <87c8a24b-0812-7850-cb3f-7be691bab432@st.com>
+ <BFA799B0-BB22-4515-AC14-3544A3167B0A@axis.com>
+ <ffd3b27c-0bc9-b53b-cc65-c7808595a553@st.com>
+ <b126021d-e902-7a53-4d7a-e73ea89a66cf@synopsys.com>
+ <A001080B-2DC8-48D9-BD82-8276A9B3BE3D@axis.com>
+ <7c7798b5-8cd4-ba99-f526-22d3e06e05db@synopsys.com>
+ <2eefdb8f-7e87-6009-6e50-c536d4b95dd6@synopsys.com>
+ <c37c47e1-8e21-1b11-ed15-6b899ed1dd03@st.com>
+ <7c259adb-5c73-f997-6b96-5be427157b08@synopsys.com>
+ <899DC02E-84BB-489E-A1FE-5D8F3BB795B6@axis.com>
+ <f4dd5d22-4467-d046-6b65-2a28f3fc5a7c@synopsys.com>
+Message-ID: <5d59aac4-1616-5316-a624-192b390d1569@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+On 11/23/2016 12:43 PM, Joao Pinto wrote:
+>> > Rabin Vincent can review and test that the port works properly on our Artpec-chips that use dwc_eth_qos.c today.
+>> >
+>> > The main porting step is to implement the device tree binding in bindings/net/snps,dwc-qos-ethernet.txt. Also our chip has a strict requirement that the phy is enabled when the SWR reset bit is set (it needs a tx clock to complete the reset).
+>> >
+>> > - Lars
+> Ok, I will do the task.
+>
+> @Peppe: Agree with the plan?
 
-On platforms booting with ACPI, architected memory-mapped timers'
-configuration data is provided by firmware through the ACPI GTDT
-static table.
+Agree
 
-The clocksource architected timer kernel driver requires a firmware
-interface to collect timer configuration and configure its driver.
-this infrastructure is present for device tree systems, but it is
-missing on systems booting with ACPI.
-
-Implement the kernel infrastructure required to parse the static
-ACPI GTDT table so that the architected timer clocksource driver can
-make use of it on systems booting with ACPI, therefore enabling
-the corresponding timers configuration.
-
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/acpi/arm64/gtdt.c | 124 ++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/acpi.h      |   1 +
- 2 files changed, 125 insertions(+)
-
-diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
-index d93a790..91ea6cb 100644
---- a/drivers/acpi/arm64/gtdt.c
-+++ b/drivers/acpi/arm64/gtdt.c
-@@ -37,6 +37,28 @@ struct acpi_gtdt_descriptor {
- 
- static struct acpi_gtdt_descriptor acpi_gtdt_desc __initdata;
- 
-+static inline void *next_platform_timer(void *platform_timer)
-+{
-+	struct acpi_gtdt_header *gh = platform_timer;
-+
-+	platform_timer += gh->length;
-+	if (platform_timer < acpi_gtdt_desc.gtdt_end)
-+		return platform_timer;
-+
-+	return NULL;
-+}
-+
-+#define for_each_platform_timer(_g)				\
-+	for (_g = acpi_gtdt_desc.platform_timer; _g;	\
-+	     _g = next_platform_timer(_g))
-+
-+static inline bool is_timer_block(void *platform_timer)
-+{
-+	struct acpi_gtdt_header *gh = platform_timer;
-+
-+	return gh->type == ACPI_GTDT_TYPE_TIMER_BLOCK;
-+}
-+
- static int __init map_gt_gsi(u32 interrupt, u32 flags)
- {
- 	int trigger, polarity;
-@@ -155,3 +177,105 @@ int __init acpi_gtdt_init(struct acpi_table_header *table,
- 
- 	return ret;
- }
-+
-+static int __init gtdt_parse_timer_block(struct acpi_gtdt_timer_block *block,
-+					 struct arch_timer_mem *data)
-+{
-+	int i;
-+	struct acpi_gtdt_timer_entry *frame;
-+
-+	if (!block->timer_count) {
-+		pr_err(FW_BUG "GT block present, but frame count is zero.");
-+		return -ENODEV;
-+	}
-+
-+	if (block->timer_count > ARCH_TIMER_MEM_MAX_FRAMES) {
-+		pr_err(FW_BUG "GT block lists %d frames, ACPI spec only allows 8\n",
-+		       block->timer_count);
-+		return -EINVAL;
-+	}
-+
-+	data->cntctlbase = (phys_addr_t)block->block_address;
-+	/*
-+	 * According to "Table * CNTCTLBase memory map" of
-+	 * <ARM Architecture Reference Manual> for ARMv8,
-+	 * The size of the CNTCTLBase frame is 4KB(Offset 0x000 ? 0xFFC).
-+	 */
-+	data->size = SZ_4K;
-+	data->num_frames = block->timer_count;
-+
-+	frame = (void *)block + block->timer_offset;
-+	if (frame + block->timer_count != (void *)block + block->header.length)
-+		return -EINVAL;
-+
-+	/*
-+	 * Get the GT timer Frame data for every GT Block Timer
-+	 */
-+	for (i = 0; i < block->timer_count; i++, frame++) {
-+		if (!frame->base_address || !frame->timer_interrupt)
-+			return -EINVAL;
-+
-+		data->frame[i].phys_irq = map_gt_gsi(frame->timer_interrupt,
-+						     frame->timer_flags);
-+		if (data->frame[i].phys_irq <= 0) {
-+			pr_warn("failed to map physical timer irq in frame %d.\n",
-+				i);
-+			return -EINVAL;
-+		}
-+
-+		data->frame[i].virt_irq =
-+			map_gt_gsi(frame->virtual_timer_interrupt,
-+				   frame->virtual_timer_flags);
-+		if (data->frame[i].virt_irq <= 0) {
-+			pr_warn("failed to map virtual timer irq in frame %d.\n",
-+				i);
-+			acpi_unregister_gsi(frame->timer_interrupt);
-+			return -EINVAL;
-+		}
-+
-+		data->frame[i].frame_nr = frame->frame_number;
-+		data->frame[i].cntbase = frame->base_address;
-+		/*
-+		 * According to "Table * CNTBaseN memory map" of
-+		 * <ARM Architecture Reference Manual> for ARMv8,
-+		 * The size of the CNTBaseN frame is 4KB(Offset 0x000 ? 0xFFC).
-+		 */
-+		data->frame[i].size = SZ_4K;
-+	}
-+
-+	return 0;
-+}
-+
-+/**
-+ * acpi_arch_timer_mem_init() - Get the info of all GT blocks in GTDT table.
-+ * @data:	the pointer to the array of struct arch_timer_mem for returning
-+ *		the result of parsing. The element number of this array should
-+ *		be platform_timer_count(the total number of platform timers).
-+ * @count:	The pointer of int variate for returning the number of GT
-+ *		blocks we have parsed.
-+ *
-+ * Return: 0 if success, -EINVAL/-ENODEV if error.
-+ */
-+int __init acpi_arch_timer_mem_init(struct arch_timer_mem *data,
-+				    int *timer_count)
-+{
-+	int ret;
-+	void *platform_timer;
-+
-+	*timer_count = 0;
-+	for_each_platform_timer(platform_timer) {
-+		if (is_timer_block(platform_timer)) {
-+			ret = gtdt_parse_timer_block(platform_timer, data);
-+			if (ret)
-+				return ret;
-+			data++;
-+			(*timer_count)++;
-+		}
-+	}
-+
-+	if (*timer_count)
-+		pr_info("found %d memory-mapped timer block(s).\n",
-+			*timer_count);
-+
-+	return 0;
-+}
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index d201ce4..f5881de 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -581,6 +581,7 @@ int acpi_reconfig_notifier_unregister(struct notifier_block *nb);
- int acpi_gtdt_init(struct acpi_table_header *table, int *platform_timer_count);
- int acpi_gtdt_map_ppi(int type);
- bool acpi_gtdt_c3stop(int type);
-+int acpi_arch_timer_mem_init(struct arch_timer_mem *data, int *timer_count);
- #endif
- 
- #else	/* !CONFIG_ACPI */
--- 
-2.9.3
+peppe
