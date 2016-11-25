@@ -1,67 +1,71 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 25 Nov 2016 11:27:25 +0100
-Subject: [PATCH] mtd: nand: mxc: Fix mxc_v1 ooblayout
-In-Reply-To: <58eed307-ee50-9727-7b64-891d1b969790@gmail.com>
-References: <1480065209-4179-1-git-send-email-boris.brezillon@free-electrons.com>
- <58eed307-ee50-9727-7b64-891d1b969790@gmail.com>
-Message-ID: <20161125112725.0ee9d49d@bbrezillon>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Fri, 25 Nov 2016 18:32:07 +0800
+Subject: [PATCH v6 3/5] ARM: dts: sun8i-h3: add HDMI video nodes
+In-Reply-To: <20161125112213.83420594eb435b6bb1a4d164@free.fr>
+References: <cover.1479641523.git.moinejf@free.fr>
+ <cdf50b8433e2d9a053e35f8788bfcd5d41504312.1479641523.git.moinejf@free.fr>
+ <3188681480066911@web3h.yandex.ru>
+ <20161125112213.83420594eb435b6bb1a4d164@free.fr>
+Message-ID: <9050701480069927@web15h.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 Nov 2016 10:58:26 +0100
-Marek Vasut <marek.vasut@gmail.com> wrote:
 
-> On 11/25/2016 10:13 AM, Boris Brezillon wrote:
-> > Commit a894cf6c5a82 ("mtd: nand: mxc: switch to mtd_ooblayout_ops")
-> > introduced a bug in the OOB layout description. Even if the driver claims
-> > that 3 ECC bytes are reserved to protect 512 bytes of data, it's actually
-> > 5 ECC bytes to protect 512+6 bytes of data (some OOB bytes are also
-> > protected using extra ECC bytes).
-> > 
-> > Fix the mxc_v1_ooblayout_{free,ecc}() functions to reflect this behavior.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Fixes: a894cf6c5a82 ("mtd: nand: mxc: switch to mtd_ooblayout_ops")
-> > Cc: <stable@vger.kernel.org>
-> > ---
-> >  drivers/mtd/nand/mxc_nand.c | 5 ++---
-> >  1 file changed, 2 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-> > index 61ca020c5272..c19ec4f0983e 100644
-> > --- a/drivers/mtd/nand/mxc_nand.c
-> > +++ b/drivers/mtd/nand/mxc_nand.c
-> > @@ -886,7 +886,7 @@ static int mxc_v1_ooblayout_ecc(struct mtd_info *mtd, int section,
-> >  		return -ERANGE;
-> >  
-> >  	oobregion->offset = (section * 16) + 6;
-> > -	oobregion->length = nand_chip->ecc.bytes;
-> > +	oobregion->length = 5;  
-> 
-> Use a macro instead of hard-coding a value please :)
 
-Ideally, we should change ->eccbytes value in the
-imx27_nand_devtype_data and imx21_nand_devtype_data definitions, but I
-fear it could break other things.
+25.11.2016, 18:22, "Jean-Francois Moine" <moinejf@free.fr>:
+> On Fri, 25 Nov 2016 17:41:51 +0800
+> Icenowy Zheng <icenowy@aosc.xyz> wrote:
+>
+>> ?After removing CLK_PLL_DE's assigned-clock, the kernel passes compilation.
+>
+> The 'pll-de' and 'de' must have a fixed rate. Otherwise, if you do not
+> use the legacy u-boot, I don't know which can be the rate of the DE.
 
-I'll define a macro.
+Can't CCU deal with this?
 
-> 
-> >  	return 0;
-> >  }
-> > @@ -908,8 +908,7 @@ static int mxc_v1_ooblayout_free(struct mtd_info *mtd, int section,
-> >  			oobregion->length = 4;
-> >  		}
-> >  	} else {
-> > -		oobregion->offset = ((section - 1) * 16) +
-> > -				    nand_chip->ecc.bytes + 6;
-> > +		oobregion->offset = ((section - 1) * 16) + 5 + 6;  
-> 
-> DTTO here, the math here is cryptic enough.
-> 
-> >  		if (section < nand_chip->ecc.steps)
-> >  			oobregion->length = (section * 16) + 6 -
-> >  					    oobregion->offset;
-> >   
-> 
-> 
+I still kept the CLK_DE's assigned-clock...
+
+>
+>> ?However, it cannot recognize any HDMI screen...
+>>
+>> ?(My board is Orange Pi One, and I manually added status="okay"; to &lcd0, &de, &hdmi)
+>>
+>> ?[ 16.507802] sun8i-de2 1000000.de-controller: bound 1c0c000.lcd-controller (ops de2_lcd_ops [sun8i_de2_drm])
+>> ?[ 16.675948] sun8i-de2 1000000.de-controller: bound 1ee0000.hdmi (ops de2_hdmi_fini [sun8i_de2_hdmi])
+>> ?[ 16.685120] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+>> ?[ 16.695876] [drm] No driver support for vblank timestamp query.
+>> ?[ 16.701862] sun8i-de2 1000000.de-controller: No connectors reported connected with modes
+>> ?[ 16.713061] [drm] Cannot find any crtc or sizes - going 1024x768
+>> ?[ 16.734214] Console: switching to colour frame buffer device 128x48
+>> ?[ 16.751022] sun8i-de2 1000000.de-controller: fb0: frame buffer device
+>
+> I put a 'pr_warn' message is case the EDID cannot be read.
+> Have you this message?
+
+Seems no...
+
+>
+> Anyway, there is a problem with the EDID:
+> - my Orange Pi 2 (H3) randomly fails to read it. But this succeeds after
+> ??rebooting once or twice.
+> - my Banana Pi M2+ (H3) reads it correctly each time.
+> - my Banana Pi M3 (A83T) can never read it.
+>
+> BTW, on first tries, I was forcing a CEA mode thru the kernel command
+> line. This was working with the OPi2 and BPiM3, but there was no sound.
+> In the last version, I use a EDID in edid_firmware for having sound
+> with the BPiM3. This works fine.
+> But, forcing a CEA mode is no more possible, so, when the OPi2 cannot
+> read the EDID, the system switches to a VGA mode (default 1024x768)
+> which is not supported. It seems that this is your case.
+>
+> So, in brief, if your board cannot read the EDID, put a EDID somewhere
+> and its path in /sys/module/drm_kms_helper/parameters/edid_firmware.
+> There will be no console, but X11 will work correctly.
+
+The problem seems to be that the CRTC is not properly initialized...
+
+>
+> --
+> Ken ar c'henta? | ** Breizh ha Linux atav! **
+> Jef | http://moinejf.free.fr/
