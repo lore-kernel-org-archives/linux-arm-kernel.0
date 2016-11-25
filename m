@@ -1,76 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 25 Nov 2016 12:48:57 +0000
-Subject: [PATCH v3 2/3] powerpc/reloc64: add support for 32-bit CRC
- pseudo-symbols
-In-Reply-To: <87oa13ssqq.fsf@concordia.ellerman.id.au>
-References: <1477585631-18574-1-git-send-email-ard.biesheuvel@linaro.org>
- <1477585631-18574-3-git-send-email-ard.biesheuvel@linaro.org>
- <87oa13ssqq.fsf@concordia.ellerman.id.au>
-Message-ID: <CAKv+Gu8g=qgOg0Q5J7tFu0uBUFTUXdVQ+84N45oZseG3vTm0Bg@mail.gmail.com>
+From: tmshlvck@gmail.com (Tomas Hlavacek)
+Date: Fri, 25 Nov 2016 13:49:11 +0100
+Subject: [RFC PATCH] ARM: dts: Add support for Turris Omnia
+In-Reply-To: <20161124150700.GD7155@lunn.ch>
+References: <1479851991.26813.2@smtp.gmail.com>
+ <1479859770-9375-1-git-send-email-tmshlvck@gmail.com>
+ <20161123003505.GL2691@lunn.ch>
+ <4e3f9628-dbf8-27c1-abea-d0ef58a67e51@kleine-koenig.org>
+ <20161124150700.GD7155@lunn.ch>
+Message-ID: <1480078151.381.4@smtp.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 November 2016 at 11:29, Michael Ellerman <mpe@ellerman.id.au> wrote:
-> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
->
->> diff --git a/arch/powerpc/relocs_check.sh b/arch/powerpc/relocs_check.sh
->> index ec2d5c835170..2f510fbc87da 100755
->> --- a/arch/powerpc/relocs_check.sh
->> +++ b/arch/powerpc/relocs_check.sh
->> @@ -43,7 +43,8 @@ R_PPC_ADDR16_HA
->>  R_PPC_RELATIVE
->>  R_PPC_NONE' |
->>       grep -E -v '\<R_PPC64_ADDR64[[:space:]]+mach_' |
->> -     grep -E -v '\<R_PPC64_ADDR64[[:space:]]+__crc_'
->> +     grep -E -v '\<R_PPC64_ADDR64[[:space:]]+__crc_' |
->> +     grep -E -v '\<R_PPC64_ADDR32[[:space:]]+\*ABS\*'
->
-> I'm still getting:
->
-> WARNING: 24 bad relocations
-> c000000000d307c4 R_PPC64_ADDR32    __crc___arch_hweight16
-> c000000000d307c8 R_PPC64_ADDR32    __crc___arch_hweight32
-> c000000000d307cc R_PPC64_ADDR32    __crc___arch_hweight64
-> c000000000d307d0 R_PPC64_ADDR32    __crc___arch_hweight8
-> c000000000d30848 R_PPC64_ADDR32    __crc___bswapdi2
-> c000000000d30854 R_PPC64_ADDR32    __crc___clear_user
-> c000000000d30868 R_PPC64_ADDR32    __crc___copy_tofrom_user
-> c000000000d30d4c R_PPC64_ADDR32    __crc__mcount
-> c000000000d31344 R_PPC64_ADDR32    __crc_copy_page
-> c000000000d3141c R_PPC64_ADDR32    __crc_current_stack_pointer
-> c000000000d31840 R_PPC64_ADDR32    __crc_empty_zero_page
-> c000000000d31a7c R_PPC64_ADDR32    __crc_flush_dcache_range
-> c000000000d31a84 R_PPC64_ADDR32    __crc_flush_icache_range
-> c000000000d32608 R_PPC64_ADDR32    __crc_load_fp_state
-> c000000000d32614 R_PPC64_ADDR32    __crc_load_vr_state
-> c000000000d32828 R_PPC64_ADDR32    __crc_memchr
-> c000000000d32830 R_PPC64_ADDR32    __crc_memcmp
-> c000000000d32834 R_PPC64_ADDR32    __crc_memcpy
-> c000000000d32840 R_PPC64_ADDR32    __crc_memmove
-> c000000000d32888 R_PPC64_ADDR32    __crc_memset
-> c000000000d33c9c R_PPC64_ADDR32    __crc_store_fp_state
-> c000000000d33ca0 R_PPC64_ADDR32    __crc_store_vr_state
-> c000000000d33cf0 R_PPC64_ADDR32    __crc_strncmp
-> c000000000d33cf4 R_PPC64_ADDR32    __crc_strncpy
->
+Hi!
 
-Ah right, my bad. The regex above should switch to ADDR32 as well for
-__crc_ symbols.
+On Thu, Nov 24, 2016 at 4:07 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>>  @Tomas: I think it doesn't make sense when we alternate sending 
+>> patches
+>>  without prior arrangement. Do you already work on a v5? If not I 
+>> can do
+>>  that to fix the last few comments. Not sure when a submission is too
+>>  late to enter v4.10, but I think the window isn't that big any more.
+> 
+> It is getting a bit late. But maybe Linus will add in another -rc
+> week.
+> 
+>> 
+>>  > No leds? No buttons via gpio-keys?
+>> 
+>>  The leds are controlled by a Cortex-M0 and without intervention 
+>> blink
+>>  according to a hardware function (network, power, pci). IMHO that's 
+>> ok
+>>  for an initial setup.
+> 
+> Yes. That is fine. It is just unusual. Most boards have gpio-led and
+> gpio-keys, which are easy to add. That is why i asked. Adding an LED
+> driver which talks to this M0 can be added later.
 
->
-> If I just add those to the whitelist it builds, but then things aren't
-> happy at boot:
->
->
-> [    7.607687] kvm: disagrees about version of symbol module_layout
-> [    7.846799] virtio: disagrees about version of symbol module_layout
-> [   22.012615] crc32c_vpmsum: disagrees about version of symbol module_layout
-> [   22.012959] libcrc32c: disagrees about version of symbol module_layout
->
+Actually the WiP driver for MCU LED interface, that we use in our 
+kernel is here: 
+https://github.com/tmshlvck/omnia-linux/commit/2121afd8fbd2e4c720edcdd472b11b5303bc0dfb
 
-Sigh. I suppose your modversions fixes are queued for v4.10? It's
-probably best to revisit this after the v4.10 merge window closes
-then, just to make sure I'm not aiming for a moving target.
+It definitely needs some cleanup and it adds non-standard features 
+(main PWM for all LEDs, autonomous blink mode, colors) via custom /sys 
+files, which I suspect that is not going to be acceptable for upstream. 
+Let's keep it for the next iteration.
 
-Thanks,
-Ard.
+Regarding the button, we actually have one, that is connected to the 
+MCU and by default it sets LED brigtness autonomously, but it should be 
+able to generate IRQs via the MCU if we change the mode in the MCU. 
+I'll look into that.
+
+Tomas
