@@ -1,64 +1,59 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 25 Nov 2016 19:39:00 +0000
-Subject: [RFC PATCH 12/29] arm64/sve: Save/restore SVE state on context switch
- paths
-In-Reply-To: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
-References: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1480102762-23647-13-git-send-email-Dave.Martin@arm.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 25 Nov 2016 20:53:00 +0100
+Subject: [PATCH] ARM: pxa: ezx: fix a910 camera data
+In-Reply-To: <e0bdf159-93f2-5ed7-1e28-7fb80707d6c7@datenfreihafen.org> (Stefan
+ Schmidt's message of "Thu, 24 Nov 2016 23:10:09 +0100")
+References: <20161124162955.3887066-1-arnd@arndb.de>
+ <e0bdf159-93f2-5ed7-1e28-7fb80707d6c7@datenfreihafen.org>
+Message-ID: <87eg1zqqub.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements basic handling of the Scalable Vector
-Extension state on the primary context switch paths.
+Stefan Schmidt <stefan@datenfreihafen.org> writes:
 
-This does *not* (correctly) handle the signal path, and doesn't do
-save/restore for SVE-only accesses that don't affect the FPSIMD
-state (i.e., FFR).
+> Hello.
+>
+> On 24.11.2016 17:29, Arnd Bergmann wrote:
+>> The camera_supply_dummy_device definition is shared between a780 and a910,
+>> but only provided when the first is enabled and fails to build for a
+>> configuration with only a910:
+>> 
+>> arch/arm/mach-pxa/ezx.c:1097:3: error: 'camera_supply_dummy_device' undeclared here (not in a function)
+>> 
+>> This moves the definition into its own section.
+>> 
+>> Fixes: 6c1b417adc8f ("ARM: pxa: ezx: use the new pxa_camera platform_data")
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> ---
+>>  arch/arm/mach-pxa/ezx.c | 56 ++++++++++++++++++++++++++-----------------------
+>
+> I wonder what we should do with ezx.c.
+>
+> As far as I know neither Daniel nor Harald or myself are doing anything
+> with this devices anymore. Besides a basic compile test having an ack or
+> reviewed by from our side is a bit worthless. :/
+>
+> I should still have some of these phones around in a box somewhere. If
+> there is someone with a good motivation and time to take over on this
+> platform we will find a way to get the person this devices.
+>
+> Any takers? Robert? I guess you are already overloaded but you might
+> also have an interest. Worth asking :)
+Oh yes, I'm very interested in your box. Besides I really like old platforms
+:)
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/kernel/fpsimd.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+> In the case nobody wants to pick up here what would you consider the
+> bets way forward? I could send a patch removing ezx platform support
+> from the kernel (basically ezx.c plus build support) or I can send a
+> patch marking it at least orphan in MAINTAINERS. Let me know what you think.
+>
+> Daniel, Harald, if one of you is still interested in these and what to
+> pick up the work again, please speak up now. :)
+Unless another maintainer steps in, you can submit a patch to transfer the
+maintainance onto me, and we'll see off mailing lists how we could arange the
+boards transfer.
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 05eca45..81cfdb5 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -175,7 +175,7 @@ void fpsimd_thread_switch(struct task_struct *next)
- 	 * 'current'.
- 	 */
- 	if (current->mm && !test_thread_flag(TIF_FOREIGN_FPSTATE))
--		fpsimd_save_state(&current->thread.fpsimd_state);
-+		task_fpsimd_save(current);
- 
- 	if (next->mm) {
- 		/*
-@@ -224,7 +224,7 @@ void fpsimd_preserve_current_state(void)
- {
- 	preempt_disable();
- 	if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
--		fpsimd_save_state(&current->thread.fpsimd_state);
-+		task_fpsimd_save(current);
- 	preempt_enable();
- }
- 
-@@ -239,7 +239,7 @@ void fpsimd_restore_current_state(void)
- 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
- 		struct fpsimd_state *st = &current->thread.fpsimd_state;
- 
--		fpsimd_load_state(st);
-+		task_fpsimd_load(current);
- 		this_cpu_write(fpsimd_last_state, st);
- 		st->cpu = smp_processor_id();
- 	}
-@@ -325,7 +325,7 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
- 	switch (cmd) {
- 	case CPU_PM_ENTER:
- 		if (current->mm && !test_thread_flag(TIF_FOREIGN_FPSTATE))
--			fpsimd_save_state(&current->thread.fpsimd_state);
-+			task_fpsimd_save(current);
- 		this_cpu_write(fpsimd_last_state, NULL);
- 		break;
- 	case CPU_PM_EXIT:
+Cheers.
+
 -- 
-2.1.4
+Robert
