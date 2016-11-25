@@ -1,125 +1,71 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 25 Nov 2016 11:54:01 +0100
-Subject: [RFC v2: PATCH 1/2] dt-bindings: Document the hi3660 reset
- bindings
-In-Reply-To: <e71cfe28-cd31-828f-8c7f-b4faeed5d27f@linaro.org>
-References: <Arnd Bergmann <arnd@arndb.de>
- <1479888476-13138-1-git-send-email-zhangfei.gao@linaro.org>
- <1479888476-13138-2-git-send-email-zhangfei.gao@linaro.org>
- <1479979605.2472.4.camel@pengutronix.de>
- <ac3c8e65-e4f2-3a9d-452c-f270d245cf9d@linaro.org>
- <1479981017.2472.14.camel@pengutronix.de>
- <8328a235-faeb-2218-4c49-a3f282599e95@linaro.org>
- <1480069523.4058.17.camel@pengutronix.de>
- <e71cfe28-cd31-828f-8c7f-b4faeed5d27f@linaro.org>
-Message-ID: <1480071241.4058.23.camel@pengutronix.de>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Fri, 25 Nov 2016 22:12:33 +1100
+Subject: [PATCH v3 0/3] modversions: Fix CRC mangling under
+ CONFIG_RELOCATABLE=y
+In-Reply-To: <CAKv+Gu8XZbh2SoS=yR0fzumrAEpQfc4pYE2m4tS66QXsTqS6=w@mail.gmail.com>
+References: <1477585631-18574-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu8Yc9rUacE70mvZSR92g1OY6LYyN6zrd--omwZVqwg3TA@mail.gmail.com>
+ <87eg2kj757.fsf@concordia.ellerman.id.au>
+ <CAKv+Gu_Ej5j8MTQkzhw3Kyzkk4mENuBm12NoLU-aaw_R_OW_yQ@mail.gmail.com>
+ <CAKv+Gu8XZbh2SoS=yR0fzumrAEpQfc4pYE2m4tS66QXsTqS6=w@mail.gmail.com>
+Message-ID: <87r35zsti6.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 25.11.2016, 18:42 +0800 schrieb zhangfei:
-> 
-> On 2016?11?25? 18:25, Philipp Zabel wrote:
-> > Am Donnerstag, den 24.11.2016, 18:20 +0800 schrieb zhangfei:
-> >> On 2016?11?24? 17:50, Philipp Zabel wrote:
-> >>> Am Donnerstag, den 24.11.2016, 17:40 +0800 schrieb zhangfei:
-> >>>> On 2016?11?24? 17:26, Philipp Zabel wrote:
-> >>>>> Am Mittwoch, den 23.11.2016, 16:07 +0800 schrieb Zhangfei Gao:
-> >>>>>> Add DT bindings documentation for hi3660 SoC reset controller.
-> >>>>>>
-> >>>>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> >>>>>> ---
-> >>>>>>     .../bindings/reset/hisilicon,hi3660-reset.txt      | 51 ++++++++++++++++++++++
-> >>>>>>     1 file changed, 51 insertions(+)
-> >>>>>>     create mode 100644 Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
-> >>>>>>
-> >>>>>> diff --git a/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
-> >>>>>> new file mode 100644
-> >>>>>> index 0000000..250daf2
-> >>>>>> --- /dev/null
-> >>>>>> +++ b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
-> >>>>>> @@ -0,0 +1,51 @@
-> >>>>>> +Hisilicon System Reset Controller
-> >>>>>> +======================================
-> >>>>>> +
-> >>>>>> +Please also refer to reset.txt in this directory for common reset
-> >>>>>> +controller binding usage.
-> >>>>>> +
-> >>>>>> +The reset controller registers are part of the system-ctl block on
-> >>>>>> +hi3660 SoC.
-> >>>>>> +
-> >>>>>> +Required properties:
-> >>>>>> +- compatible: should be
-> >>>>>> +		 "hisilicon,hi3660-reset"
-> >>>>>> +- #reset-cells: 1, see below
-> >>>>>> +- hisi,rst-syscon: phandle of the reset's syscon.
-> >>>>>> +- hisi,reset-bits: Contains the reset control register information
-> >>>>>> +		  Should contain 2 cells for each reset exposed to
-> >>>>>> +		  consumers, defined as:
-> >>>>>> +			Cell #1 : offset from the syscon register base
-> >>>>>> +			Cell #2 : bits position of the control register
-> >>>>>> +
-> >>>>>> +Example:
-> >>>>>> +	iomcu: iomcu at ffd7e000 {
-> >>>>>> +		compatible = "hisilicon,hi3660-iomcu", "syscon";
-> >>>>>> +		reg = <0x0 0xffd7e000 0x0 0x1000>;
-> >>>>>> +	};
-> >>>>>> +
-> >>>>>> +	iomcu_rst: iomcu_rst_controller {
-> >>>>> This should be
-> >>>>> 	iomcu_rst: reset-controller {
-> >>>>>
-> >>>>>> +		compatible = "hisilicon,hi3660-reset";
-> >>>>>> +		#reset-cells = <1>;
-> >>>>>> +		hisi,rst-syscon = <&iomcu>;
-> >>>>>> +		hisi,reset-bits = <0x20 0x8		/* 0: i2c0 */
-> >>>>>> +				   0x20 0x10		/* 1: i2c1 */
-> >>>>>> +				   0x20 0x20		/* 2: i2c2 */
-> >>>>>> +				   0x20 0x8000000>;	/* 3: i2c6 */
-> >>>>>> +	};
-> >>>>> The reset lines are controlled through iomcu bits, is there a reason not
-> >>>>> to put the iomcu_rst node inside the iomcu node? That way the
-> >>>>> hisi,rst-syscon property could be removed and the syscon could be
-> >>>>> retrieved via the reset-controller parent node.
-> >>>> iomcu is common registers, controls clock and reset, etc.
-> >>>> So we use syscon, without mapping the registers everywhere.
-> >>>> It is common case in hisilicon, same in hi6220.
-> >>>>
-> >>>> Also the #clock-cells and #reset-cells can not be put in the same node,
-> >>>> if they are both using probe, since reset_probe will not be called.
-> >>>>
-> >>>> So we use hisi,rst-syscon as a general solution.
-> >>> What I meant is this:
-> >>>
-> >>> 	iomcu: iomcu at ffd7e000 {
-> >>> 		compatible = "hisilicon,hi3660-iomcu", "syscon", "simple-mfd";
-> >>> 		reg = <0x0 0xffd7e000 0x0 0x1000>;
-> >> #clock-cells = <1>;
-> >>
-> >> In my test, if there add #clock-cells = <1>, reset_probe will not be
-> >> called any more.
-> >> Since clk_probe is called first.
-> >> No matter iomcu_rst is child node or not.
-> > I don't understand this, does the clock driver bind to the iomcu node
-> > using CLK_OF_DECLARE_DRIVER(..., "hisilicon,hi3660-iomcu", ...)?
-> 
-> This method:CLK_OF_DECLARE_DRIVER is not prefered in clock,
-> and we have to use probe instead, to make all driver build as modules as 
-> possible.
-> 
-> For example hi3660.
-> static struct platform_driver hi3660_clk_driver = {
->          .probe          = hi3660_clk_probe,
->          .driver         = {
->                  .name   = "hi3660-clk",
->                  .of_match_table = hi3660_clk_match_table,
->          },
-> };
+Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
 
-hi3660_clk_match_table contains the "hisilicon,hi3660-iomcu" compatible?
-If so, you could call
-	of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
-from hi3660_clk_probe instead of using "simple-mfd" to probe the iomcu
-node's children.
+> On 15 November 2016 at 09:13, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> On 10 November 2016 at 05:22, Michael Ellerman <mpe@ellerman.id.au> wrote:
+>>> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
+>>>
+>>>> On 27 October 2016 at 17:27, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>>>> This series is a followup to the single patch 'modversions: treat symbol
+>>>>> CRCs as 32 bit quantities on 64 bit archs', of which two versions have
+>>>>> been sent out so far [0][1]
+>>>>>
+>>>>> As pointed out by Michael, GNU ld behaves a bit differently between arm64
+>>>>> and PowerPC64, and where the former gets rid of all runtime relocations
+>>>>> related to CRCs, the latter is not as easily convinced.
+>>>>>
+>>>>> Patch #1 fixes the issue where CRCs are corrupted by the runtime relocation
+>>>>> routines for 32-bit PowerPC, for which the original fix was effectively
+>>>>> reverted by commit 0e0ed6406e61 ("powerpc/modules: Module CRC relocation fix
+>>>>> causes perf issues")
+>>>>>
+>>>>> Patch #2 adds handling of R_PPC64_ADDR32 relocations against the NULL .dynsym
+>>>>> symbol entry to the PPC64 runtime relocation routines, so it is prepared to
+>>>>> deal with CRCs being emitted as 32-bit quantities.
+>>>>>
+>>>>> Patch #3 is the original patch from the v1 and v2 submissions.
+>>>>>
+>>>>> Changes since v2:
+>>>>> - added #1 and #2
+>>>>> - updated #3 to deal with CRC entries being emitted from assembler
+>>>>> - added Rusty's ack (#3)
+>>>>>
+>>>>> Branch can be found here:
+>>>>> https://git.kernel.org/cgit/linux/kernel/git/ardb/linux.git/log/?h=kcrctab-reloc
+>>>>>
+>>>>> [0] http://marc.info/?l=linux-kernel&m=147652300207369&w=2
+>>>>> [1] http://marc.info/?l=linux-kernel&m=147695629614409&w=2
+>>>>
+>>>> Ping?
+>>>
+>>> Sorry, you didn't cc linuxppc-dev, so it's not in my patchwork list
+>>> which tends to mean I miss it.
+>>
+>> Ah, my mistake. Apologies.
+>>
+>>> Will try and test and get back to you.
+>
+> Ping?
 
-regards
-Philipp
+Sorry :/
+
+I tried testing it last week or so but it was interacting badly with the
+other modversion CRC problems we were having (fixed recently in my fixes
+branch).
+
+I'll rebase on top of those fixes and try again.
+
+cheers
