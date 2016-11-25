@@ -1,96 +1,108 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 25 Nov 2016 13:50:13 +0000
-Subject: [PATCH 5/7] efi: Get the secure boot status [ver #3]
-In-Reply-To: <31374.1480078855@warthog.procyon.org.uk>
-References: <147990561294.7576.6464430479448167484.stgit@warthog.procyon.org.uk>
- <147990565051.7576.9673287945782426886.stgit@warthog.procyon.org.uk>
- <1480016487.2444.18.camel@HansenPartnership.com>
- <15173.1480066220@warthog.procyon.org.uk>
- <CAKv+Gu_JxNLDjaK5jGbX9ACzM0uHJYMOFx7XDo4t7DtBMtFRGA@mail.gmail.com>
- <16661.1480075392@warthog.procyon.org.uk>
- <CAKv+Gu_d5+Kvo7Tptnpg7kfjpqxhQ3a3nsQ0Ufsm6rBOFry+mQ@mail.gmail.com>
- <17565.1480077303@warthog.procyon.org.uk>
- <CAKv+Gu9c-C2uXZ0fVatCM8ffXJZDgjBcDb_T0nsFecGqgrF11Q@mail.gmail.com>
- <31374.1480078855@warthog.procyon.org.uk>
-Message-ID: <CAKv+Gu9qkPrq1rXN_7=BbZ=8v14Px+oHBqST0OnarUWVwhtZyg@mail.gmail.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 25 Nov 2016 13:50:35 +0000
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <20161125133436.GK14217@n2100.armlinux.org.uk> (Russell King's
+ message of "Fri, 25 Nov 2016 13:34:36 +0000")
+References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
+ <20161125124528.GJ14217@n2100.armlinux.org.uk>
+ <yw1xtwav9092.fsf@unicorn.mansr.com>
+ <20161125133436.GK14217@n2100.armlinux.org.uk>
+Message-ID: <yw1xlgw78y8k.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 November 2016 at 13:00, David Howells <dhowells@redhat.com> wrote:
-> Okay, how about the attached?
->
-> Can these variables every be anything other than 1 or 0?  E.g. should the
-> check on SetupMode be that it isn't 0 rather than it is 1?
->
+Russell King - ARM Linux <linux@armlinux.org.uk> writes:
 
-The firmware will ensure that these variables only ever assume the
-documented values.
+> On Fri, Nov 25, 2016 at 01:07:05PM +0000, M?ns Rullg?rd wrote:
+>> Russell King - ARM Linux <linux@armlinux.org.uk> writes:
+>> 
+>> > On Fri, Nov 25, 2016 at 10:25:49AM +0530, Vinod Koul wrote:
+>> >> Looking at thread and discussion now, first thinking would be to ensure
+>> >> the transaction is completed properly and then isr fired. You may need
+>> >> to talk to your HW designers to find a way for that. It is quite common
+>> >> that DMA controllers will fire and complete whereas the transaction is
+>> >> still in flight.
+>> >> 
+>> >> If that is not doable, then since you claim this is custom part which
+>> >> other vendors wont use (hope we are wrong down the line), then we can
+>> >> have a custom api,
+>> >> 
+>> >> foo_sbox_configure(bool enable, ...);
+>> >> 
+>> >> This can be invoked from NFC driver when required for configuration and
+>> >> teardown. For very specific cases where people need some specific
+>> >> configuration we do allow custom APIs.
+>> >> 
+>> >> Only problem with that would be it wont be a generic solution and you
+>> >> seem to be fine with that.
+>> >
+>> > Isn't this just the same problem as PL08x or any other system which
+>> > has multiple requests from devices, but only a limited number of
+>> > hardware channels - so you have to route the request signals to the
+>> > appropriate hardware channels according to the requests queued up?
+>> >
+>> > If so, no new "custom" APIs are required, it's already able to be
+>> > solved within the DMA engine drivers...
+>> 
+>> That isn't the problem.  The multiplexing of many devices on a limited
+>> number of hardware channels is working fine.  The problem is that (some)
+>> client devices need the routing to remain for some time after the dma
+>> interrupt signals completion.  I'd characterise this hardware as broken,
+>> but there's nothing we can do about that.
+>> 
+>> The fix has to provide some way for the dma driver to delay reusing a
+>> hardware channel until the client device indicates completion.  If only
+>> a short delay (a few bus cycles) is needed, it is probably acceptable to
+>> rework the driver such that the descriptor completion callback can do
+>> the necessary waiting (e.g. by busy-polling a device status register).
+>> If the delay can be longer, some other method needs to be devised.
+>
+> What I understood from the original mail is:
+>
+> | The problem is that the DMA driver tears down the sbox setup
+> | as soon as it receives the IRQ. However, when writing to the
+> | device, the interrupt only means "I have pushed all data from
+> | memory to the memory channel". These data have not reached
+> | the device yet, and may still be "in flight". Thus the sbox
+> | setup can only be torn down after the NFC is idle.
+>
+> The interrupt comes in after it's read the the last data from memory,
+> but the data is still sitting in the engine's buffers and has not yet
+> been passed to the device.
+>
+> It sounds like the DMA engine buffers the data on its way to the device,
+> and it's not clear from the description whether that is done in
+> response to a request from the device or whether the data is prefetched.
+> IOW, what the lifetime of the data in the dma engine is.
 
-> David
-> ---
-> commit 6d4bb08e376045e27706c2740c0fdff0a6ec43f7
-> Author: David Howells <dhowells@redhat.com>
-> Date:   Fri Nov 25 11:52:05 2016 +0000
->
->     efi: Handle secure boot from UEFI-2.6
->
->     UEFI-2.6 adds a new variable, DeployedMode.  If it exists, this must be 1
->     if we're to engage lockdown mode.
->
->     Reported-by: James Bottomley <James.Bottomley@HansenPartnership.com>
->     Signed-off-by: David Howells <dhowells@redhat.com>
->
-> diff --git a/drivers/firmware/efi/libstub/secureboot.c b/drivers/firmware/efi/libstub/secureboot.c
-> index ca643eba5a4b..157782d1c552 100644
-> --- a/drivers/firmware/efi/libstub/secureboot.c
-> +++ b/drivers/firmware/efi/libstub/secureboot.c
-> @@ -22,6 +22,9 @@ static const efi_char16_t const efi_SecureBoot_name[] = {
->  static const efi_char16_t const efi_SetupMode_name[] = {
->         'S', 'e', 't', 'u', 'p', 'M', 'o', 'd', 'e', 0
->  };
-> +static const efi_char16_t const efi_DeployedMode_name[] = {
-> +       'D', 'e', 'p', 'l', 'o', 'y', 'e', 'd', 'M', 'o', 'd', 'e', 0
-> +};
->
->  /* SHIM variables */
->  static const efi_guid_t shim_guid = EFI_SHIM_LOCK_GUID;
-> @@ -62,6 +65,17 @@ int efi_get_secureboot(efi_system_table_t *sys_table_arg)
->         if (val == 1)
->                 return 0;
->
-> +       /* UEFI-2.6 requires DeployedMode to be 1. */
-> +       if (sys_table_arg->hdr.revision == EFI_2_60_SYSTEM_TABLE_REVISION) {
+It's not clear from the information I have exactly when the interrupt
+fires, only that it appears to be somewhat too early.
 
->=
-
-> +               status = get_efi_var(efi_DeployedMode_name, &efi_variable_guid,
-> +                                    NULL, &size, &val);
-> +               if (status != EFI_SUCCESS)
-> +                       goto out_efi_err;
-> +
-> +               if (val != 1)
-> +                       return 0;
-
-val == 0 is better imo, since that will prevent unexpected values from
-being interpreted as 'secure boot disabled'
-
-> +       }
-> +
->         /* See if a user has put shim into insecure mode.  If so, and if the
->          * variable doesn't have the runtime attribute set, we might as well
->          * honor that.
-> diff --git a/include/linux/efi.h b/include/linux/efi.h
-> index 333d31bf55bf..563abb37f03f 100644
-> --- a/include/linux/efi.h
-> +++ b/include/linux/efi.h
-> @@ -645,6 +645,10 @@ typedef struct {
+> It seems odd that the DMA engine provides no way to know whether the
+> channel still contains data that is in-flight to the device, whether
+> by interrupt (from the descriptions the IRQ is way too early) or by
+> polling some status register within the DMA engine itself.
 >
->  #define EFI_SYSTEM_TABLE_SIGNATURE ((u64)0x5453595320494249ULL)
->
-> +#define EFI_2_60_SYSTEM_TABLE_REVISION  ((2 << 16) | (60))
-> +#define EFI_2_50_SYSTEM_TABLE_REVISION  ((2 << 16) | (50))
-> +#define EFI_2_40_SYSTEM_TABLE_REVISION  ((2 << 16) | (40))
-> +#define EFI_2_31_SYSTEM_TABLE_REVISION  ((2 << 16) | (31))
->  #define EFI_2_30_SYSTEM_TABLE_REVISION  ((2 << 16) | (30))
->  #define EFI_2_20_SYSTEM_TABLE_REVISION  ((2 << 16) | (20))
->  #define EFI_2_10_SYSTEM_TABLE_REVISION  ((2 << 16) | (10))
+> If the delay is predictable, why not use a delayed workqueue or a
+> hrtimer to wait a period after the IRQ before completing the DMA
+> transaction?  If it's not predictable and you haven't some status
+> register in the DMA engine hardware that indicates whether there's
+> remaining data, then the design really is screwed up, and I don't
+> think there's a reasonable solution to the problem - anything
+> would be a horrid hack that would be specific to this SoC.
+
+This would hardly be the first screwed up hardware design.  There is a
+completion indicator, just not in the dma engine.  For some idiotic
+reason, the designers put this responsibility on the client devices and
+their respective drivers.
+
+> It would be unfair to augment the API and add the burden on everyone
+> for the new API when 99.999% of the world doesn't require it.
+
+I don't think making this particular dma driver wait for the descriptor
+callback to return before reusing a channel quite amounts to a horrid
+hack.  It certainly wouldn't burden anyone other than the poor drivers
+for devices connected to it, all of which are specific to Sigma AFAIK.
+
+-- 
+M?ns Rullg?rd
