@@ -1,55 +1,146 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 25 Nov 2016 10:25:49 +0530
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <58356EA8.2010806@free.fr>
-References: <58356EA8.2010806@free.fr>
-Message-ID: <20161125045549.GC2698@localhost>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Thu, 24 Nov 2016 21:20:15 -0800
+Subject: [PATCH V8 2/6] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <28F93ABE-8210-4389-AE77-4D5E830E669B@martin.sperl.org>
+References: <1478081906-12009-1-git-send-email-kernel@martin.sperl.org>
+ <1478081906-12009-3-git-send-email-kernel@martin.sperl.org>
+ <20161117021107.GA2647@localhost.localdomain>
+ <766e1b70-d83a-eb52-fa2b-aec435e85673@martin.sperl.org>
+ <20161117151019.GA3115@localhost.localdomain>
+ <7957B3CC-0E18-4B27-82EB-EF88B7695E28@martin.sperl.org>
+ <20161119042224.GA25063@localhost.localdomain>
+ <28F93ABE-8210-4389-AE77-4D5E830E669B@martin.sperl.org>
+Message-ID: <20161125052008.GA8342@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2016 at 11:25:44AM +0100, Mason wrote:
-> Hello,
+Hello,
+
+On Tue, Nov 22, 2016 at 03:28:04PM +0100, Martin Sperl wrote:
+> Hi Eduardo!
 > 
-> On my platform, setting up a DMA transfer is a two-step process:
+> On 19.11.2016 05:22, Eduardo Valentin wrote:
+> > Hello Martin,
+
+<cut>
+
 > 
-> 1) configure the "switch box" to connect a device to a memory channel
-> 2) configure the transfer details (address, size, command)
+> I was asked to implement the "initialize" case just in case FW ever
+> stopped setting up the device itself, so that is why this code is
+> included.
+
+OK. Looks like we (like, we in the Linux side) do not understand the
+conditions that firmware fails to initialize the thermal device, but we
+still want to force an initialization, hoping to get the device in a sane
+state, even if we do not know if the firmware is correctly booted or
+not. And that is done silently, with no notification to user. I see.
+
 > 
-> When the transfer is done, the sbox setup can be torn down,
-> and the DMA driver can start another transfer.
+> > 
+> > Who has the ownership of this device?
 > 
-> The current software architecture for my NFC (NAND Flash controller)
-> driver is as follows (for one DMA transfer).
+> Joined ownership I suppose...
 > 
->   sg_init_one
->   dma_map_sg
->   dmaengine_prep_slave_sg
->   dmaengine_submit
->   dma_async_issue_pending
->   configure_NFC_transfer
->   wait_for_IRQ_from_DMA_engine // via DMA_PREP_INTERRUPT
->   wait_for_NFC_idle
->   dma_unmap_sg
 
-Looking at thread and discussion now, first thinking would be to ensure
-the transaction is completed properly and then isr fired. You may need
-to talk to your HW designers to find a way for that. It is quite common
-that DMA controllers will fire and complete whereas the transaction is
-still in flight.
+with no synchronization mechanism?
 
-If that is not doable, then since you claim this is custom part which
-other vendors wont use (hope we are wrong down the line), then we can
-have a custom api,
+> > 
+> >> The above mentioned ?configuration if not running? reflect the values that
+> >> the FW is currently setting. We should not change those values as long as the
+> >> Firmware is also reading the temperature on its own.
+> > 
+> > hmm.. that looks like racy to me. Again, How do you synchronize accesses to
+> > this device? What if you configure the device and right after the
+> > firmware updates the configs? How do you make sure the configs you are
+> > writing here are the same used by the firmware? What if the firmware
+> > version changes? What versions of the firmware does this driver support?
+> > 
+> > Would it make sense to simply always initialize the device? Do you have
+> > a way to tell the firmware that it should not use the device?
+> > 
+> > Or, if you want to keep the device driver simply being a dummy reader,
+> > would it make sense to simply avoid writing configurations to the
+> > device, and simply retry to check if the firmware gets the device
+> > initialized?
+> 
+> Again: the device registers are only ever written if the device is not started
+> already. Otherwise the driver only reads for the ADC register, so there
+> is no real race here.
+> 
 
-foo_sbox_configure(bool enable, ...);
+and no race?
 
-This can be invoked from NFC driver when required for configuration and
-teardown. For very specific cases where people need some specific
-configuration we do allow custom APIs.
+To me, there is a race when you write to the config of this device,
+given that there is no sync between the two. We do not know if the
+firmware would be still attempting to initialize the device or not, do
+we? 
 
-Only problem with that would be it wont be a generic solution and you
-seem to be fine with that.
+> > 
+> >> 
+> >>> 
+> >>>> So do you need another version of the patchset that uses that new API?
+> >>> 
+> >>> I think the API usage is change that can be done together with
+> >>> clarification for the above questions too: on hardware state,
+> >>> firmware loading, maybe a master driver dependency, and the ADC
+> >>> conversion sequence, which are not well clear to me on this driver. As long as
+> >>> this is clarified and documented in the code (can be simple comments so
+> >>> it is clear to whoever reads in the future), then I would be OK with
+> >>> this driver.
+> >> 
+> >> So how do you want this to get ?documented? in the driver?
+> >> The setup and Firmware is a generic feature of the SOC, so if we would put
+> >> some clarifications in this driver, then we would need to put it in every
+> >> bcm283X driver (which seems unreasonable).
+> >> 
+> > 
+> > I think a simple comment explaining the firmware dependency and the
+> > expected pre-conditions to get this driver working in a sane state would
+> > do it.
+> > 
+> > A better device initialization would also be appreciated. Based on my
+> > limited understanding of this platform, and your explanations, this
+> > device seams to have a serious race condition with firmware while
+> > accessing this device.
+> 
+> Again: the firmware runs before the ARM is started and for all practical
+> purposes the firmware is (as of now) configuring the thermal device.
+> 
+
+Oh, OK, we know the firmware wont touch the thermal device, right?
+
+Then, If that is the case, what is still not clear is in which conditions
+the firmware would leave the thermal device uninitialized.
+
+This driver seams to be only concerned of critical temperature. The
+concern I see with this code, and the explanations I heard, is a side
+effect of seeing spurious thermal shutdown, or even worse, getting the
+device booted hot and never shutting down, due to (possible) race
+between the two systems.
+
+Besides, if the firmware would not touch the thermal device when ARM is
+running, why not always writing to the device a configuration that you
+know is your sane starting point? Just do not rely on what was
+previously set. How do you know it is a sane configuration? Have you
+done sensor calibration exercise to confirm temperature reads are
+correct?
+
+> As for the use of thermal_zone_get_offset/slope: looking into the code
+> it looks like this actually blows up the code, as we now would need to
+> allocate thermal_zone_params and preset it with the ?correct? values.
+> 
+> So more code to maintain and more memory consumed.
+> The only advantage I would see is that it would allow to set offset and
+> slope directly in the device tree.
+> 
+
+Any specific reason not to use of-thermal, then?
 
 
--- 
-~Vinod
+> Thanks,
+> 		Martin
+
+BR,
+
+Eduardo Valentin
