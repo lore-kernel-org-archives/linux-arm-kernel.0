@@ -1,91 +1,31 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 25 Nov 2016 15:21:00 +0100
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <yw1xpolj9021.fsf@unicorn.mansr.com>
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
- <yw1xpolj9021.fsf@unicorn.mansr.com>
-Message-ID: <28bb9925-d0d7-9261-27fb-aa79345a19f1@free.fr>
+From: uwe@kleine-koenig.org (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri, 25 Nov 2016 15:26:56 +0100
+Subject: [PATCH v5 0/2] ARM: dts: add support for Turris Omnia
+Message-ID: <20161125142658.21690-1-uwe@kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/11/2016 14:11, M?ns Rullg?rd wrote:
+Hello,
 
-> Mason writes:
-> 
->> It seems there is a disconnect between what Linux expects - an IRQ
->> when the transfer is complete - and the quirks of this HW :-(
->>
->> On this system, there are MBUS "agents" connected via a "switch box".
->> An agent fires an IRQ when it has dealt with its *half* of the transfer.
->>
->> SOURCE_AGENT <---> SBOX <---> DESTINATION_AGENT
->>
->> Here are the steps for a transfer, in the general case:
->>
->> 1) setup the sbox to connect SOURCE TO DEST
->> 2) configure source to send N bytes
->> 3) configure dest to receive N bytes
->>
->> When SOURCE_AGENT has sent N bytes, it fires an IRQ
->> When DEST_AGENT has received N bytes, it fires an IRQ
->> The sbox connection can be torn down only when the destination
->> agent has received all bytes.
->> (And the twist is that some agents do not have an IRQ line.)
->>
->> The system provides 3 RAM-to-sbox agents (read channels)
->> and 3 sbox-to-RAM agents (write channels).
->>
->> The NAND Flash controller read and write agents do not have
->> IRQ lines.
->>
->> So for a NAND-to-memory transfer (read from device)
->> - nothing happens when the NFC has finished sending N bytes to the sbox
->> - the write channel fires an IRQ when it has received N bytes
->>
->> In that case, one IRQ fires when the transfer is complete,
->> like Linux expects.
->>
->> For a memory-to-NAND transfer (write to device)
->> - the read channel fires an IRQ when it has sent N bytes
->> - the NFC driver is supposed to poll the NFC to determine
->> when the controller has finished writing N bytes
->>
->> In that case, the IRQ does not indicate that the transfer
->> is complete, merely that the sending half has finished
->> its part.
-> 
-> When does your NAND controller signal completion?  When it has received
-> the DMA data, or only when it has finished the actual write operation?
+This is basicly my v3 plus some of the changes that Tomas changed for
+his RFC patch (implicitly "v4"). So compared to v3 the following
+changed:
 
-The NAND controller provides a STATUS register.
-Bit 31 is the CMD_READY bit.
-This bit goes to 0 when the controller is busy, and to 1
-when the controller is ready to accept the next command.
+ - Add more documentation (mostly from Tomas)
+ - Add more mbus ranges (by Tomas)
+ - Move link to schematic below copyright header (suggested by Andrew)
+ - reenable rtc as this is not that broken on production board
+ - fix spi chip select pinmuxing
 
-The NFC driver is doing:
+Uwe Kleine-K?nig (2):
+  devicetree: Add vendor prefix for CZ.NIC
+  ARM: dts: add support for Turris Omnia
 
-	res = wait_for_completion_timeout(&tx_done, HZ);
-	if (res > 0)
-		err = readl_poll_timeout(addr, val, val & CMD_READY, 0, 1000);
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/armada-385-turris-omnia.dts      | 334 +++++++++++++++++++++
+ 3 files changed, 336 insertions(+)
+ create mode 100644 arch/arm/boot/dts/armada-385-turris-omnia.dts
 
-So basically, sleep until the memory agent IRQ falls,
-then spin until the controller is idle.
-
-Did you see that adding a 10 ?s delay at the start of
-tangox_dma_pchan_detach() makes the system no longer
-fail (passes an mtd_speedtest).
-
->> I think it is possible to have a generic solution:
->> Right now, the callback is called from tasklet context.
->> If we can have a new flag to have the callback invoked
->> directly from the ISR, then the driver for the client
->> device can do what is required.
-> 
-> No, that won't work.  The callback shouldn't run in interrupt context.
-
-What if the callback only spun for, at most, 10 ?s ?
-
-	readl_poll_timeout(addr, val, val & CMD_READY, 0, 10);
-
-Regards.
+-- 
+2.10.2
