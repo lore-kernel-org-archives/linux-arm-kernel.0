@@ -1,23 +1,42 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 25 Nov 2016 17:56:56 +0800
-Subject: [PATCH 04/10] power: supply: axp20x_usb_power: add 100mA max
- current limit for AXP223
-In-Reply-To: <20161125090921.23138-5-quentin.schulz@free-electrons.com>
-References: <20161125090921.23138-1-quentin.schulz@free-electrons.com>
- <20161125090921.23138-5-quentin.schulz@free-electrons.com>
-Message-ID: <CAGb2v66WZCR3afRk6e03gs4RqUPbV4ixb_6=T3=qSMWgcscX3w@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 25 Nov 2016 17:53:39 +0800
+Subject: [GIT PULL] ARM64: berlin: DT changes for v4.10
+Message-ID: <20161125175339.40748efa@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 25, 2016 at 5:09 PM, Quentin Schulz
-<quentin.schulz@free-electrons.com> wrote:
-> The X-Powers AXP223 shares most of its behaviour with the AXP221 PMIC
-> but allows the VBUS power supply max current to be set to 100mA (like
-> the AXP209 PMIC).
->
-> This basically adds a new compatible to the VBUS power supply driver and
-> adds a check on the compatible when setting current max limit.
->
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+Hi,
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+This is the first time I send pull request for berlin SoC. This is a PR for
+the Berlin64 DT changes for v4.10. Please pull.
+
+Thanks,
+Jisheng
+
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/jszhang/linux-berlin.git tags/berlin64-dt-for-v4.10-1
+
+for you to fetch changes up to 40fdc6b0d2b96cac46be51eb41042a715047b791:
+
+  arm64: dts: berlin4ct-dmp: add missing unit name to /memory node (2016-11-25 17:14:00 +0800)
+
+----------------------------------------------------------------
+Berlin64 DT changes for v4.10
+
+- fix some dtc compiler warnings
+
+----------------------------------------------------------------
+Jisheng Zhang (3):
+      arm64: dts: berlin4ct: add missing unit name to /soc node
+      arm64: dts: berlin4ct-stb: add missing unit name to /memory node
+      arm64: dts: berlin4ct-dmp: add missing unit name to /memory node
+
+ arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts | 2 +-
+ arch/arm64/boot/dts/marvell/berlin4ct-stb.dts | 2 +-
+ arch/arm64/boot/dts/marvell/berlin4ct.dtsi    | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
