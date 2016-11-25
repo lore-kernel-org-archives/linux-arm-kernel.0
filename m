@@ -1,24 +1,28 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 25 Nov 2016 13:57:26 +0100
-Subject: [PATCH v2 1/8] mfd: sun6i-prcm: Add codec analog controls
- sub-device for Allwinner A23
-In-Reply-To: <20161125123442.28410-2-wens@csie.org>
+Date: Fri, 25 Nov 2016 13:57:54 +0100
+Subject: [PATCH v2 2/8] ASoC: sun4i-codec: Add support for A23 codec
+In-Reply-To: <20161125123442.28410-3-wens@csie.org>
 References: <20161125123442.28410-1-wens@csie.org>
- <20161125123442.28410-2-wens@csie.org>
-Message-ID: <20161125125726.fsvldqhustgfpv7a@lukather>
+ <20161125123442.28410-3-wens@csie.org>
+Message-ID: <20161125125754.ixgtbm5zyztedl7o@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 25, 2016 at 08:34:35PM +0800, Chen-Yu Tsai wrote:
-> The PRCM block on the A23 contains a message box like interface to
-> the registers for the analog path controls of the internal codec.
+On Fri, Nov 25, 2016 at 08:34:36PM +0800, Chen-Yu Tsai wrote:
+> The codec in the A23 is similar to the one found on the A31. One key
+> difference is the analog path controls are routed through the PRCM
+> block. This is supported by the sun8i-codec-analog driver, and tied
+> into this codec driver with the audio card's aux_dev.
 > 
-> Add a sub-device for it.
+> In addition, the A23 does not have LINEOUT, and it does not support
+> headset jack detection or buttons.
 > 
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Acked-by: Rob Herring <robh@kernel.org>
 
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
+Thanks!
 Maxime
 
 -- 
@@ -31,4 +35,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161125/37ff111a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161125/26d001dd/attachment-0001.sig>
