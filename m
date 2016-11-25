@@ -1,46 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Nov 2016 23:03:35 +0100
-Subject: [PATCH v2 1/2] arm64: dts: zx: Fix gic GICR property
-In-Reply-To: <20161017204919.GE3264@localhost>
-References: <1476361881-19685-1-git-send-email-jun.nie@linaro.org>
- <1476361881-19685-2-git-send-email-jun.nie@linaro.org>
- <20161017204919.GE3264@localhost>
-Message-ID: <2953810.EeueujTjSC@wuerfel>
+Date: Fri, 25 Nov 2016 23:06:28 +0100
+Subject: [PATCH] ARM: pxa: ezx: fix a910 camera data
+In-Reply-To: <87inrbqr16.fsf@belgarion.home>
+References: <20161124162955.3887066-1-arnd@arndb.de>
+ <87inrbqr16.fsf@belgarion.home>
+Message-ID: <3367313.o4F01WBXRf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, October 17, 2016 1:49:19 PM CET Olof Johansson wrote:
-> On Thu, Oct 13, 2016 at 08:31:20PM +0800, Jun Nie wrote:
-> > GICR for multiple CPU can be described with start address and stride,
-> > or with multiple address. Current multiple address and stride are
-> > both used. Fix it.
-> > 
-> > vmalloc patch 727a7f5a9 triggered this bug:
-> > [    0.097146] Unable to handle kernel paging request at virtual address ffff000008060008
-> > [    0.097150] pgd = ffff000008602000
-> > [    0.097160] [ffff000008060008] *pgd=000000007fffe003, *pud=000000007fffd003, *pmd=000000007fffc003, *pte=0000000000000000
-> > [    0.097165] Internal error: Oops: 96000007 [#1] PREEMPT SMP
-> > [    0.097170] Modules linked in:
-> > [    0.097177] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0+ #1474
-> > [    0.097179] Hardware name: ZTE zx296718 evaluation board (DT)
-> > [    0.097183] task: ffff80003e8c8b80 task.stack: ffff80003e8d0000
-> > [    0.097197] PC is at gic_populate_rdist+0x74/0x15c
-> > [    0.097202] LR is at gic_starting_cpu+0xc/0x20
-> > [    0.097206] pc : [<ffff0000082b1b18>] lr : [<ffff0000082b26e0>] pstate: 600001c5
-> > 
-> > Signed-off-by: Jun Nie <jun.nie@linaro.org>
+On Friday, November 25, 2016 8:48:53 PM CET Robert Jarzmik wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
 > 
-> A Fixes: tag would be useful on a patch like this, to tell what patch
-> introduced the problem. Please consider using them in the future.
+> > The camera_supply_dummy_device definition is shared between a780 and a910,
+> > but only provided when the first is enabled and fails to build for a
+> > configuration with only a910:
+> >
+> > arch/arm/mach-pxa/ezx.c:1097:3: error: 'camera_supply_dummy_device' undeclared here (not in a function)
+> >
+> > This moves the definition into its own section.
+> >
+> > Fixes: 6c1b417adc8f ("ARM: pxa: ezx: use the new pxa_camera platform_data")
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> I've applied this one to fixes now.
+> Ah yes, I'll queue that up in pxa/fixes.
+> 
+> This also means that you have a test robot which beats my Jenkins, as mine
+> didn't complain. Do you have a specific defconfig or is it a randconfig which
+> reveals that ?
+> 
 
-Hi Olof,
-
-I happened to still have this one in my todo folder as I must have
-missed your reply, and I stumbled over it while looking for things
-that may have gone missing.
-
-I don't see it in v4.9-rc6, did it get dropped accidentally?
+It showed up in randconfig builds, two out of several hundred.
+I'm not surprised that nobody else caught it.
 
 	Arnd
