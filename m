@@ -1,66 +1,81 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri, 25 Nov 2016 10:09:16 +0100
-Subject: [PATCH 05/10] mfd: axp20x: add separate MFD cell for AXP223
+Date: Fri, 25 Nov 2016 10:09:17 +0100
+Subject: [PATCH 06/10] ARM: dtsi: add DTSI for AXP223
 In-Reply-To: <20161125090921.23138-1-quentin.schulz@free-electrons.com>
 References: <20161125090921.23138-1-quentin.schulz@free-electrons.com>
-Message-ID: <20161125090921.23138-6-quentin.schulz@free-electrons.com>
+Message-ID: <20161125090921.23138-7-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP223 shares most of its logic with the AXP221 but has some
-differences for the VBUS power supply driver. Thus, to probe the driver
-with the correct compatible, the AXP221 and the AXP223 now have separate
-MFD cells.
+The AXP223 shares most of its logic with the AXP221 but it has some
+differences for the VBUS driver.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
- drivers/mfd/axp20x.c | 22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/axp223.dtsi | 55 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
+ create mode 100644 arch/arm/boot/dts/axp223.dtsi
 
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index ba130be..989d568 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -602,6 +602,21 @@ static struct mfd_cell axp22x_cells[] = {
- 	},
- };
- 
-+static struct mfd_cell axp223_cells[] = {
-+	{
-+		.name			= "axp20x-pek",
-+		.num_resources		= ARRAY_SIZE(axp22x_pek_resources),
-+		.resources		= axp22x_pek_resources,
-+	}, {
-+		.name			= "axp20x-regulator",
-+	}, {
-+		.name		= "axp20x-usb-power-supply",
-+		.of_compatible	= "x-powers,axp223-usb-power-supply",
-+		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
-+		.resources	= axp22x_usb_power_supply_resources,
-+	},
-+};
+diff --git a/arch/arm/boot/dts/axp223.dtsi b/arch/arm/boot/dts/axp223.dtsi
+new file mode 100644
+index 0000000..f8ce55c
+--- /dev/null
++++ b/arch/arm/boot/dts/axp223.dtsi
+@@ -0,0 +1,55 @@
++/*
++ * Copyright 2016 Free Electrons
++ *
++ * Quentin Schulz <quentin.schulz@free-electrons.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
- static struct mfd_cell axp152_cells[] = {
- 	{
- 		.name			= "axp20x-pek",
-@@ -789,12 +804,17 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
- 		axp20x->regmap_irq_chip = &axp20x_regmap_irq_chip;
- 		break;
- 	case AXP221_ID:
--	case AXP223_ID:
- 		axp20x->nr_cells = ARRAY_SIZE(axp22x_cells);
- 		axp20x->cells = axp22x_cells;
- 		axp20x->regmap_cfg = &axp22x_regmap_config;
- 		axp20x->regmap_irq_chip = &axp22x_regmap_irq_chip;
- 		break;
-+	case AXP223_ID:
-+		axp20x->nr_cells = ARRAY_SIZE(axp223_cells);
-+		axp20x->cells = axp223_cells;
-+		axp20x->regmap_cfg = &axp22x_regmap_config;
-+		axp20x->regmap_irq_chip = &axp22x_regmap_irq_chip;
-+		break;
- 	case AXP288_ID:
- 		axp20x->cells = axp288_cells;
- 		axp20x->nr_cells = ARRAY_SIZE(axp288_cells);
++/*
++ * AXP223 Integrated Power Management Chip
++ * http://www.x-powers.com/product/AXP22X.php
++ * http://dl.linux-sunxi.org/AXP/AXP223-en.pdf
++ */
++
++#include "axp22x.dtsi"
++
++&usb_power_supply {
++	compatible = "x-powers,axp223-usb-power-supply";
++};
 -- 
 2.9.3
