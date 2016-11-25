@@ -1,73 +1,65 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 25 Nov 2016 01:54:31 +0100
-Subject: [PATCH v2 1/2] firmware: arm_scpi: zero RX buffer before requesting
- data from the mbox
-In-Reply-To: <20161125005432.1205-1-martin.blumenstingl@googlemail.com>
+Date: Fri, 25 Nov 2016 01:56:59 +0100
+Subject: [PATCH] SCPI (pre-v1.0): fix reading sensor value
+In-Reply-To: <CAFBinCDP4PwXnUux=Wd9XJkNJef7qN3EOZm0Q8sg-B4gXqsjcA@mail.gmail.com>
 References: <20161124001845.20830-1-martin.blumenstingl@googlemail.com>
- <20161125005432.1205-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20161125005432.1205-2-martin.blumenstingl@googlemail.com>
+ <f3d6f39e-ec45-7c62-22d4-fd7b0952b499@arm.com>
+ <CAFBinCDP4PwXnUux=Wd9XJkNJef7qN3EOZm0Q8sg-B4gXqsjcA@mail.gmail.com>
+Message-ID: <CAFBinCD3EE0z+Omboo-pUugs1He7ce9bT5Lo4wgvZUJKbctSKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The original code was relying on the fact that the SCPI firmware
-responds with the same number of bytes (or more, all extra data would be
-ignored in that case) as requested.
-However, we have some pre-v1.0 SCPI firmwares which are responding with
-less data for some commands (sensor_value.hi_val did not exist in the
-old implementation). This means that some data from the previous
-command's RX buffer was leaked into the current command (as the RX
-buffer is re-used for all commands on the same channel). Clearing the
-RX buffer before (re-) using it ensures we get a consistent result, even
-if the SCPI firmware returns less bytes than requested.
+On Thu, Nov 24, 2016 at 12:15 PM, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> On Thu, Nov 24, 2016 at 11:47 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>
+>>
+>> On 24/11/16 00:18, Martin Blumenstingl wrote:
+>>>
+>>> I observed the following "strange" value when trying to read the SCPI
+>>> temperature sensor on my Amlogic GXM S912 device:
+>>> $ cat /sys/class/hwmon/hwmon0/temp1_input
+>>> 6875990994467160116
+>>>
+>>> The value reported by the original kernel (Amlogic vendor kernel, after
+>>> a reboot obviously) was 53C.
+>>> The Amlogic SCPI driver only uses a single 32bit value to read the
+>>> sensor value, instead of two. After stripping the upper 32bits from
+>>> above value gives "52" as result, which is basically identical to
+>>> what the vendor kernel reports.
+>>
+>>
+>> Can you check why the upper 32-bit is not set to 0 ?
+>>
+>> In scpi_process_cmd, we memset extra rx_buf length by 0 and that should
+>> take care. Neil had mentioned that works but now I doubt if firmware
+>> returns 8 instead of 4 in the size which is wrong as it supports only
+>> 32-bit.
+> according to the code "RX Length is not replied by the legacy
+> Firmware", so for legacy firmwares the "if (match->rx_len > len)"
+> condition will never be true (because both values are always equal).
+> in the sensor case we then go and copy 8 byte from mem->payload to
+> match->rx_buf, but SCPI firmware only wrote 4 bytes to mem->payload.
+> This means we are simply reading 4 byte (hi_val) of uninitialized
+> memory - which may be all zeroes if we're lucky - but in my case I got
+> "garbage" (I guess it's the second byte from the *previous* command
+> which are leaking here).
+>
+> while writing this I see a second (more generic) approach which might
+> work as well:
+> scpi_chan does not hold any information about rx_payload/tx_payload
+> sizes (these are calculated in scpi_probe but not stored anywhere).
+> (for now, let's assume we had the rx_payload_size available)
+> we could then go ahead and memset(rx_payload, 0, rx_payload_size) in
+> scpi_tx_prepare or scpi_send_message.
+> However, I am not sure if that would have any side-effects (for
+> example on newer SCPI implementations).
+I simply tried implementing this solution and I find it better than
+the old one. However, I am still not sure if there are any
+side-effects. maybe you can simply review v2 of this series which
+implements the described approach (the result is the same as with v1:
+temp1_input contains the correct value).
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- drivers/firmware/arm_scpi.c | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-index 70e1323..8c183d8 100644
---- a/drivers/firmware/arm_scpi.c
-+++ b/drivers/firmware/arm_scpi.c
-@@ -259,6 +259,7 @@ struct scpi_chan {
- 	struct mbox_chan *chan;
- 	void __iomem *tx_payload;
- 	void __iomem *rx_payload;
-+	resource_size_t max_payload_len;
- 	struct list_head rx_pending;
- 	struct list_head xfers_list;
- 	struct scpi_xfer *xfers;
-@@ -470,6 +471,20 @@ static void scpi_tx_prepare(struct mbox_client *c, void *msg)
- 	if (t->rx_buf) {
- 		if (!(++ch->token))
- 			++ch->token;
-+
-+		/* clear the RX buffer as it is shared across all commands on
-+		 * the same channel (to make sure we're not leaking data from
-+		 * the previous response into the current command if the SCPI
-+		 * firmware writes less data than requested).
-+		 * This is especially important for pre-v1.0 SCPI firmwares
-+		 * where some fields in the responses do not exist (while they
-+		 * exist but are optional in newer versions). One example for
-+		 * this problem is sensor_value.hi_val, which would contain
-+		 * ("leak") the second 4 bytes of the RX buffer from the
-+		 * previous command.
-+		 */
-+		memset_io(ch->rx_payload, 0, ch->max_payload_len);
-+
- 		ADD_SCPI_TOKEN(t->cmd, ch->token);
- 		spin_lock_irqsave(&ch->rx_lock, flags);
- 		list_add_tail(&t->node, &ch->rx_pending);
-@@ -921,7 +936,9 @@ static int scpi_probe(struct platform_device *pdev)
- 			ret = -EADDRNOTAVAIL;
- 			goto err;
- 		}
--		pchan->tx_payload = pchan->rx_payload + (size >> 1);
-+
-+		pchan->max_payload_len = size / 2;
-+		pchan->tx_payload = pchan->rx_payload + pchan->max_payload_len;
- 
- 		cl->dev = dev;
- 		cl->rx_callback = scpi_handle_remote_msg;
--- 
-2.10.2
+Regards,
+Martin
