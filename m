@@ -1,37 +1,54 @@
-From: mzoran@crowfest.net (Michael Zoran)
-Date: Fri, 25 Nov 2016 01:05:31 -0800
-Subject: RPI3 doesn't boot in ARM64 mode on linux-next
-In-Reply-To: <CAKv+Gu-SNWpAskP19Swr_YsW=uATuNXkvdWKBpWcoVC4ndFASQ@mail.gmail.com>
-References: <1480041098.1504.1.camel@crowfest.net>
- <CAKv+Gu-SNWpAskP19Swr_YsW=uATuNXkvdWKBpWcoVC4ndFASQ@mail.gmail.com>
-Message-ID: <1480064731.3309.1.camel@crowfest.net>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Fri, 25 Nov 2016 10:09:11 +0100
+Subject: [PATCH 00/10] add support for VBUS max current and min voltage limits
+ AXP20X and AXP22X PMICs
+Message-ID: <20161125090921.23138-1-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-11-25 at 08:12 +0000, Ard Biesheuvel wrote:
-> On 25 November 2016 at 02:31, Michael Zoran <mzoran@crowfest.net>
-> wrote:
-> > Last night I did a build of linux-next and I'm finding that I can
-> > no
-> > longer get my RPI 3 to boot in arm64 mode anymore.??It seems to be
-> > hanging very early in the boot process.
-> > 
-> > I know linux-next is going through a very large number of changes
-> > now,
-> > so does anybody know if arm64(not just the RPI 3) is just broken in
-> > general at this point? 4.9rc6 is working fine.
-> > 
-> > I don't have a JTAG debugger, so it's a bit hard for me to
-> > debug.??I've
-> > actually been looking for a decent cheap JTAG debugger for awhile
-> > now,
-> > so if anybody knows of one in the < $300.00 range it might be a
-> > good
-> > self Christmas present.
-> > 
-> 
-> Are you using earlycon?
+The X-Powers AXP209 and AXP20X PMICs are able to set a limit for the VBUS power
+supply for both max current and min voltage supplied. This series of patch adds
+the possibility to set these limits from sysfs.
 
-No, but that's a good thing for me to try next.  I also found the
-Segger J-Link on the web for $60 that I bought.  Hopefully one or the
-other will work.
+Also, the AXP223 PMIC shares most of its behaviour with the AXP221 but the
+former can set the VBUS power supply max current to 100mA, unlike the latter.
+The AXP223 VBUS power supply driver used to probe on the AXP221 compatible. This
+series of patch introduces a new compatible for the AXP223 to be able to set the
+current max limit to 100mA.
+
+With that new compatible, boards having the AXP223 see their DT updated to use
+the VBUS power supply driver with the correct compatible.
+
+This series of patch also migrates from of_device_is_compatible function to the
+data field of of_device_id to identify the compatible used to probe. This
+improves the code readability.
+
+Quentin Schulz (10):
+  power: supply: axp20x_usb_power: use of_device_id data field instead
+    of device_is_compatible
+  power: supply: axp20x_usb_power: set min voltage and max current from
+    sysfs
+  Documentation: DT: binding: axp20x_usb_power: add axp223 compatible
+  power: supply: axp20x_usb_power: add 100mA max current limit for
+    AXP223
+  mfd: axp20x: add separate MFD cell for AXP223
+  ARM: dtsi: add DTSI for AXP223
+  ARM: dts: sun8i-a33-olinuxino: use AXP223 DTSI
+  ARM: dts: sun8i-a33-sinlinx-sina33: use AXP223 DTSI
+  ARM: dts: sun8i-r16-parrot: use AXP223 DTSI
+  ARM: dtsi: sun8i-reference-design-tablet: use AXP223 DTSI
+
+ .../bindings/power/supply/axp20x_usb_power.txt     |   1 +
+ arch/arm/boot/dts/axp223.dtsi                      |  55 ++++++++++
+ arch/arm/boot/dts/sun8i-a33-olinuxino.dts          |   2 +-
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts     |   2 +-
+ arch/arm/boot/dts/sun8i-r16-parrot.dts             |   2 +-
+ .../boot/dts/sun8i-reference-design-tablet.dtsi    |   2 +-
+ drivers/mfd/axp20x.c                               |  22 +++-
+ drivers/power/supply/axp20x_usb_power.c            | 120 +++++++++++++++++----
+ include/linux/mfd/axp20x.h                         |   3 +
+ 9 files changed, 186 insertions(+), 23 deletions(-)
+ create mode 100644 arch/arm/boot/dts/axp223.dtsi
+
+-- 
+2.9.3
