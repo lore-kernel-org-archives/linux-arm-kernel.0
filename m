@@ -1,91 +1,64 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 25 Nov 2016 19:39:17 +0000
-Subject: [RFC PATCH 29/29] arm64/sve: Limit vector length to 512 bits by
- default
+Date: Fri, 25 Nov 2016 19:39:14 +0000
+Subject: [RFC PATCH 26/29] arm64/sve: Avoid stale user register state after
+ SVE access exception
 In-Reply-To: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
 References: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1480102762-23647-30-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1480102762-23647-27-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As a transitional workaround for userspace incompatibilities caused
-by enlargement of the signal frame, this patch adds a new config
-option CONFIG_ARM64_SVE_FULL_VECTOR_LENGTH, which default to n.
+Currently, when an SVE access exception is taken from userspace,
+the FPSIMD state in the task_struct is converted to SVE state and
+reloaded as SVE state.
 
-Unless this option is set to y, the vector length for SVE will be
-limited to 512 bits.  This leaves a bit of free space for other
-architecture extensions just in case we need it.
+Unfortunately, since we've been executing in userspace there's no
+guarantee that the FPSIMD state saved will actually be up to date
+with respect to the registers, so updates may be lost.
 
-This option will be removed and replaced with a user/kernel control
-interface in the future.
+This patch saves the FPSIMD state back to the task_struct first, to
+ensure that the task_struct copy of the data is up to date.
+
+Also, the CPACR handling logic is removed since task_fpsimd_load()
+handles it anyway.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/Kconfig   | 35 +++++++++++++++++++++++++++++++++++
- arch/arm64/mm/proc.S |  5 +++++
- 2 files changed, 40 insertions(+)
+ arch/arm64/kernel/fpsimd.c | 16 ++++++----------
+ 1 file changed, 6 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index bf9915cb..7cd9812 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -887,6 +887,41 @@ config ARM64_SVE
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 2e1056e..1750301 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -103,22 +103,18 @@ void do_fpsimd_acc(unsigned int esr, struct pt_regs *regs)
  
- 	  To enable use of this extension on CPUs that implement it, say Y.
+ static void task_fpsimd_to_sve(struct task_struct *task);
+ static void task_fpsimd_load(struct task_struct *task);
++static void task_fpsimd_save(struct task_struct *task);
  
-+if ARM64_SVE
-+
-+config ARM64_SVE_FULL_VECTOR_LENGTH
-+	bool "Enable full hardware vector length for userspace"
-+	default n
-+	help
-+	  SVE vector lengths greater than 512 bits impact the size of signal
-+	  frames and therefore the size requirements for any userspace stack
-+	  onto which a signal may be delivered.  Using larger vector lengths
-+	  may therefore cause problems for some software.  For this reason, the
-+	  kernel currently limits the maximum vector length for userspace
-+	  software to 512 bits by default.
-+
-+	  Enabling this option removes the limit, so that the full vector
-+	  length implemented by the hardware is made available to userspace.
-+
-+	  Be aware: in general, software that (a) does not use SVE (including
-+	  via libraries), or (b) does not handle signals, or (c) uses default
-+	  process/thread stack sizes and does not use sigaltstack(2) should be
-+	  unaffected by enabling larger vectors.  Software that does not meet
-+	  these criteria or that relies on certain legacy uses of the ucontext
-+	  API may be affected however.
-+
-+	  This is a transitional compatibility option only and will be replaced
-+	  by a userspace ABI extension in the future.  Do not assume that this
-+	  option will be available with compatible effect in future Linux
-+	  releases.
-+
-+	  If you are developing software that uses SVE and understand the
-+	  implications, you can consider saying Y here.
-+
-+	  If unsure, say N.
-+
-+endif
-+
- config ARM64_MODULE_CMODEL_LARGE
- 	bool
+ void do_sve_acc(unsigned int esr, struct pt_regs *regs)
+ {
+-	if (test_and_set_thread_flag(TIF_SVE)) {
+-		unsigned long tmp;
+-
+-		asm ("mrs %0, cpacr_el1" : "=r" (tmp));
+-
+-		printk(KERN_INFO "%s: Strange, ZEN=%u\n",
+-		       __func__, (unsigned int)((tmp >> 16) & 3));
+-		BUG();
+-	}
+-
+ 	BUG_ON(is_compat_task());
  
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 1da8160..a2839e6 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -198,6 +198,11 @@ ENTRY(__cpu_setup)
++	task_fpsimd_save(current);
++
+ 	task_fpsimd_to_sve(current);
++	if (test_and_set_thread_flag(TIF_SVE))
++		BUG(); /* We shouldn't trap if SVE was already enabled! */
++
+ 	task_fpsimd_load(current);
+ }
  
- 	mrs_s	x5, ZIDR_EL1			// SVE: Enable full vector len
- 	and	x5, x5, #ZCR_EL1_LEN_MASK	// initially
-+#ifndef CONFIG_ARM64_SVE_FULL_VECTOR_LENGTH
-+	mov	x6, #(512 / 128 - 1)		// Clamp VL to 512 bits
-+	cmp	x5, x6
-+	csel	x5, x5, x6, lo
-+#endif
- 	msr_s	ZCR_EL1, x5
- 
- 	b	2f
 -- 
 2.1.4
