@@ -1,81 +1,120 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri, 25 Nov 2016 10:09:17 +0100
-Subject: [PATCH 06/10] ARM: dtsi: add DTSI for AXP223
-In-Reply-To: <20161125090921.23138-1-quentin.schulz@free-electrons.com>
-References: <20161125090921.23138-1-quentin.schulz@free-electrons.com>
-Message-ID: <20161125090921.23138-7-quentin.schulz@free-electrons.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Fri, 25 Nov 2016 10:11:53 +0100
+Subject: [PATCH] ARM: da850-lcdk: add the dumb-vga-dac node
+Message-ID: <1480065113-2443-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP223 shares most of its logic with the AXP221 but it has some
-differences for the VBUS driver.
+Add the dumb-vga-dac node to the board DT together with corresponding
+ports and vga connector. This allows to retrieve the edid info from
+the display automatically.
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/boot/dts/axp223.dtsi | 55 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
- create mode 100644 arch/arm/boot/dts/axp223.dtsi
+ arch/arm/boot/dts/da850-lcdk.dts | 58 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/da850.dtsi     | 17 ++++++++++++
+ 2 files changed, 75 insertions(+)
 
-diff --git a/arch/arm/boot/dts/axp223.dtsi b/arch/arm/boot/dts/axp223.dtsi
-new file mode 100644
-index 0000000..f8ce55c
---- /dev/null
-+++ b/arch/arm/boot/dts/axp223.dtsi
-@@ -0,0 +1,55 @@
-+/*
-+ * Copyright 2016 Free Electrons
-+ *
-+ * Quentin Schulz <quentin.schulz@free-electrons.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
+diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+index 7b8ab21..c5d3a2b 100644
+--- a/arch/arm/boot/dts/da850-lcdk.dts
++++ b/arch/arm/boot/dts/da850-lcdk.dts
+@@ -50,6 +50,53 @@
+ 			system-clock-frequency = <24576000>;
+ 		};
+ 	};
 +
-+/*
-+ * AXP223 Integrated Power Management Chip
-+ * http://www.x-powers.com/product/AXP22X.php
-+ * http://dl.linux-sunxi.org/AXP/AXP223-en.pdf
-+ */
++	vga_bridge {
++		compatible = "dumb-vga-dac";
++		pinctrl-names = "default";
++		pinctrl-0 = <&lcd_pins>;
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+#include "axp22x.dtsi"
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
-+&usb_power_supply {
-+	compatible = "x-powers,axp223-usb-power-supply";
++			port at 0 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0>;
++
++				vga_bridge_in: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&display_out_vga>;
++				};
++			};
++
++			port at 1 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <1>;
++
++				vga_bridge_out: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&vga_con_in>;
++				};
++			};
++		};
++	};
++
++	vga {
++		compatible = "vga-connector";
++
++		ddc-i2c-bus = <&i2c0>;
++
++		port {
++			vga_con_in: endpoint {
++				remote-endpoint = <&vga_bridge_out>;
++			};
++		};
++	};
+ };
+ 
+ &pmx_core {
+@@ -219,3 +266,14 @@
+ 		};
+ 	};
+ };
++
++&display {
++	status = "okay";
 +};
++
++&display_out {
++	display_out_vga: endpoint at 0 {
++		reg = <0>;
++		remote-endpoint = <&vga_bridge_in>;
++	};
++};
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 36066fa..6ab8df1 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -442,6 +442,23 @@
+ 			reg = <0x213000 0x1000>;
+ 			interrupts = <52>;
+ 			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				display_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++				};
++
++				display_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++				};
++			};
+ 		};
+ 	};
+ 	aemif: aemif at 68000000 {
 -- 
 2.9.3
