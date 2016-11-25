@@ -1,18 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 26 Nov 2016 00:22:14 +0100
-Subject: [PATCH] ARM: ixp4xx: drop duplicate header gpio.h
-In-Reply-To: <319a5803aac795e175306d4978134f0247cf87bc.1479457751.git.geliangtang@gmail.com>
+Date: Sat, 26 Nov 2016 00:24:12 +0100
+Subject: [PATCH] ARM: lpc32xx: drop duplicate header device.h
+In-Reply-To: <1479761945.1477.0.camel@localhost>
 References: <319a5803aac795e175306d4978134f0247cf87bc.1479457751.git.geliangtang@gmail.com>
-Message-ID: <45930271.uxfUlR9HD0@wuerfel>
+ <31c0875cedae8fe20211b209c85b6e012fa9f6a5.1479457940.git.geliangtang@gmail.com>
+ <1479761945.1477.0.camel@localhost>
+Message-ID: <5792570.VjCognBBp5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, November 18, 2016 10:21:10 PM CET Geliang Tang wrote:
-> Drop duplicate header gpio.h from dsmg600-setup.c.
-> 
-> Signed-off-by: Geliang Tang <geliangtang@gmail.com>
+On Monday, November 21, 2016 3:59:05 PM CET Sylvain Lemieux wrote:
+> On Fri, 2016-11-18 at 22:21 +0800, Geliang Tang wrote:
+> > Drop duplicate header device.h from phy3250.c.
+> > 
+> > Signed-off-by: Geliang Tang <geliangtang@gmail.com>
+
+> Reviewed-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
 > 
 
-Applied to arm-soc/next/fixes-non-critical, thanks
+Applied into arm-soc/next/fixes-non-critical, I see we already merged
+your other pull requests, so it seems appropriate to take this
+trivial change directly.
 
 	Arnd
