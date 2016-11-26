@@ -1,18 +1,17 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 26 Nov 2016 00:50:23 +0100
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.10 (#2)
-In-Reply-To: <8737inamem.fsf@free-electrons.com>
-References: <8737inamem.fsf@free-electrons.com>
-Message-ID: <8252197.nM2ddXWoak@wuerfel>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 25 Nov 2016 20:21:43 -0500 (EST)
+Subject: [PATCH 0/4] net: thunderx: Support for 80xx, RED, PFC e.t.c
+In-Reply-To: <1479979083-15963-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1479979083-15963-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <20161125.202143.829794330055058597.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, November 19, 2016 9:45:05 AM CET Gregory CLEMENT wrote:
-> mvebu dt64 for 4.10 (part 2)
-> 
-> Fix DTC warning on Armada 37xx and 7K/8K
-> 
+From: sunil.kovvuri@gmail.com
+Date: Thu, 24 Nov 2016 14:47:59 +0530
 
-Pulled into next/dt64, thanks!
+> This patch series adds support for SLM modules present on 80xx
+> silicon, enables ramdom early discard, backpressure generation,
+> PFC and some ethtool changes to display supported link modes e.t.c.
 
-	Arnd
+Series applied to net-next.
