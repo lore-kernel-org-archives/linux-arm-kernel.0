@@ -1,85 +1,76 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat, 26 Nov 2016 15:56:33 +0100
-Subject: [PATCH 3/5] arm64: dts: meson-gxl: add USB support
+Date: Sat, 26 Nov 2016 15:56:35 +0100
+Subject: [PATCH 5/5] ARM64: dts: meson-gx-p23x-q20x: enable USB on P23x and
+ Q20x boards
 In-Reply-To: <20161126145635.24488-1-martin.blumenstingl@googlemail.com>
 References: <20161126145635.24488-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20161126145635.24488-4-martin.blumenstingl@googlemail.com>
+Message-ID: <20161126145635.24488-6-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds USB support the the Meson GXL SoC. On most devices only the
-dwc3 controller is used. It has an internal USB hub which provides two
-ports. The PHYs for these ports are defined through the USB3 PHY, which
-is ensures that all PHYs are using the same mode (because all of them
-are used by the same controller).
+All four devices are only using the dwc3 controller. The actual ports
+are provided by dwc3's internal USB hub.
+The implementation on P230, P231 and Q201 seems identical: the USB VBUS
+supply seems to be hard-wired, while on Q200 the USB VBUS is provided
+by GPIOAO_5.
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 49 ++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+ arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi | 12 ++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts | 17 +++++++++++++++++
+ 2 files changed, 29 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index 3af54dc..99ac900 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -44,9 +44,58 @@
- #include "meson-gx.dtsi"
- #include <dt-bindings/clock/gxbb-clkc.h>
- #include <dt-bindings/gpio/meson-gxl-gpio.h>
-+#include <dt-bindings/reset/amlogic,meson-gxbb-reset.h>
- 
- / {
- 	compatible = "amlogic,meson-gxl";
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
+index 7a078be..360c91d 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
+@@ -188,3 +188,15 @@
+ &ethmac {
+ 	status = "okay";
+ };
 +
-+	soc {
-+
-+		usb0: usb at c9000000 {
-+			compatible = "snps,dwc3";
-+			reg = <0x0 0xc9000000 0x0 0x100000>;
-+			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+			phys = <&usb3_phy0>;
-+			phy-names = "usb3-phy";
-+			dr_mode = "host";
-+			maximum-speed = "high-speed";
-+			snps,dis_u2_susphy_quirk;
-+		};
-+
-+		usb1: usb at c9100000 {
-+			compatible = "snps,dwc2";
-+			reg = <0x0 0xc9100000 0x0 0x40000>;
-+			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clkc CLKID_USB>;
-+			clock-names = "otg";
-+			dr_mode = "host";
-+			status = "disabled";
-+		};
-+	};
++&usb2_phys {
++	status = "okay";
 +};
 +
-+&apb {
-+	usb2_phys: phy at 78000 {
-+		compatible = "amlogic,meson-gxl-usb2-phy";
-+		#phy-cells = <1>;
-+		reg = <0x0 0x78000 0x0 0x80>;
-+		clocks = <&clkc CLKID_USB1>, <&clkc CLKID_USB1_DDR_BRIDGE>;
-+		clock-names = "usb", "usb_ddr";
-+		resets = <&reset RESET_USB_OTG>;
-+		status = "disabled";
-+	};
++&usb3_phy0 {
++	status = "okay";
++};
 +
-+	usb3_phy0: phy at 78080 {
-+		compatible = "amlogic,meson-gxl-usb3-phy";
-+		#phy-cells = <0>;
-+		reg = <0x0 0x78080 0x0 0x20>;
-+		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
++&usb0 {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts
+index 5dbc660..6c28e87 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts
+@@ -49,6 +49,19 @@
+ / {
+ 	compatible = "amlogic,q200", "amlogic,s912", "amlogic,meson-gxm";
+ 	model = "Amlogic Meson GXM (S912) Q200 Development Board";
 +
-+		/* dwc3 on GXL enables 2 USB ports on the internal hub */
-+		phys = <&usb2_phys 0>, <&usb2_phys 1>;
++	usb_pwr: regulator-usb-pwrs {
++		compatible = "regulator-fixed";
 +
-+		status = "disabled";
++		regulator-name = "USB_PWR";
++
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++
++		/* signal name in schematic: USB_PWR_EN */
++		gpio = <&gpio GPIODV_24 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
 +	};
  };
  
- &ethmac {
+ /* Q200 has exclusive choice between internal or external PHY */
+@@ -75,3 +88,7 @@
+ 		max-speed = <1000>;
+ 	};
+ };
++
++&usb3_phy0 {
++	phy-supply = <&usb_pwr>;
++};
 -- 
 2.10.2
