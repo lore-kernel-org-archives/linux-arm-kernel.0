@@ -1,33 +1,41 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat, 26 Nov 2016 16:07:21 +0100
-Subject: [GIT PULL] Amlogic 64-bit DT changes for v4.10, round 2
-In-Reply-To: <m2k2btx2c9.fsf@baylibre.com>
-References: <m2k2btx2c9.fsf@baylibre.com>
-Message-ID: <CAFBinCAvziwM4U6qJnTV+nEMKaZH4G9xdTM0pY6O83+Edk=Ovw@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 27 Nov 2016 03:10:53 +0900
+Subject: [PATCH] arm64: dts: uniphier: add SD-ctrl node for LD11 SoC
+Message-ID: <1480183853-1231-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+The LD11 SoC is equipped with SD-ctrl (0x59810000) as well as
+MIO-ctrl (0x5b3e0000).  The SD-ctrl block on this SoC has just
+one register for controlling RST_n pin of the eMMC device.
 
-On Wed, Nov 23, 2016 at 11:23 PM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Arnd, Olof,
->
-> Here's a final round of arm64 DT changes for Amlogic family SoCs.
-please note that SCPI is not working due to a change in Sudeep's
-repository which has not made it into the Amlogic tree yet:
-Sudeep's latest pull request indicates that we should use
-"arm,scpi-pre-1.0", while currently we are only using
-"amlogic,meson-gxbb-scpi": [0]
-I fixed that in the Amlogic .dts files in [1] but this patch has not
-been applied yet.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-No pressure on this one - I just want to save your time (so you don't
-have to search why SCPI is not working anymore)
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-
-Regards,
-Martin
-
-
-[0] http://lists.infradead.org/pipermail/linux-amlogic/2016-November/001632.html
-[1] http://lists.infradead.org/pipermail/linux-amlogic/2016-November/001665.html
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+index 0e5c58f..7a62fb9 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+@@ -273,6 +273,17 @@
+ 			reg = <0x59801000 0x400>;
+ 		};
+ 
++		sdctrl at 59810000 {
++			compatible = "socionext,uniphier-ld11-sdctrl",
++				     "simple-mfd", "syscon";
++			reg = <0x59810000 0x400>;
++
++			sd_rst: reset {
++				compatible = "socionext,uniphier-ld11-sd-reset";
++				#reset-cells = <1>;
++			};
++		};
++
+ 		perictrl at 59820000 {
+ 			compatible = "socionext,uniphier-perictrl",
+ 				     "simple-mfd", "syscon";
+-- 
+2.7.4
