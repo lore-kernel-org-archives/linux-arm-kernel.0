@@ -1,40 +1,60 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 27 Nov 2016 17:20:45 +0100
-Subject: [PATCH v5 2/2] ARM: dts: add support for Turris Omnia
-In-Reply-To: <20161127160731.GD4574@lunn.ch>
-References: <20161125142658.21690-1-uwe@kleine-koenig.org>
- <20161125142658.21690-3-uwe@kleine-koenig.org>
- <87lgw7ilg9.fsf@free-electrons.com>
- <a7f47999-ec83-6cc8-8119-0087dee17bac@suse.de>
- <20161127160731.GD4574@lunn.ch>
-Message-ID: <9ecdf89e-b1f9-63c1-fce8-65d921d2290c@suse.de>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sun, 27 Nov 2016 18:32:58 +0200
+Subject: [PATCH 1/2] dt-bindings: usb: add DT binding for s3c2410 USB
+ OHCI controller
+In-Reply-To: <1480085249-25014-2-git-send-email-sergio.prado@e-labworks.com>
+References: <1480085249-25014-1-git-send-email-sergio.prado@e-labworks.com>
+ <1480085249-25014-2-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <20161127163258.GA4423@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am 27.11.2016 um 17:07 schrieb Andrew Lunn:
->> @Uwe: Note that I had already told CZ.NIC's Michal ~two weeks ago that I
->> have a WIP .dts for the Omnia - looks like no one knows what the other
->> is doing.
+On Fri, Nov 25, 2016 at 12:47:28PM -0200, Sergio Prado wrote:
+> Adds the device tree bindings description for Samsung S3C2410 and
+> compatible USB OHCI controller.
 > 
-> Hi Andreas
+> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+> ---
+>  .../devicetree/bindings/usb/s3c2410-usb.txt        | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/s3c2410-usb.txt
 > 
-> Did you post to the list? Comment on the earlier versions of the
-> patches? The list is the please to coordinate these activities.
+> diff --git a/Documentation/devicetree/bindings/usb/s3c2410-usb.txt b/Documentation/devicetree/bindings/usb/s3c2410-usb.txt
+> new file mode 100644
+> index 000000000000..e45b38ce2986
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/s3c2410-usb.txt
+> @@ -0,0 +1,22 @@
+> +Samsung S3C2410 and compatible SoC USB controller
+> +
+> +OHCI
+> +
+> +Required properties:
+> + - compatible: should be "samsung,s3c2410-ohci" for USB host controller
+> + - reg: address and lenght of the controller memory mapped region
 
-No, it was not yet fully working (only WAN NIC) and I don't have a habit
-of spamming the list with RFCs. Also I was away the last two weekends.
+s/lenght/length/
 
-I would've expected to get CC'ed for review though, since CZ.NIC
-should've been aware of my work.
+Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-https://lists.opensuse.org/opensuse-arm/2016-11/msg00005.html
+Best regards,
+Krzysztof
 
-Cheers,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+> + - interrupts: interrupt number for the USB OHCI controller
+> + - clocks: Should reference the bus and host clocks
+> + - clock-names: Should contain two strings
+> +		"usb-bus-host" for the USB bus clock
+> +		"usb-host" for the USB host clock
+> +
+> +Example:
+> +
+> +usb0: ohci at 49000000 {
+> +	compatible = "samsung,s3c2410-ohci";
+> +	reg = <0x49000000 0x100>;
+> +	interrupts = <0 0 26 3>;
+> +	clocks = <&clocks UCLK>, <&clocks HCLK_USBH>;
+> +	clock-names = "usb-bus-host", "usb-host";
+> +};
+> -- 
+> 1.9.1
+> 
