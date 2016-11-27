@@ -1,353 +1,198 @@
-From: naga.sureshkumar.relli@xilinx.com (Naga Sureshkumar Relli)
-Date: Sun, 27 Nov 2016 14:03:36 +0530
-Subject: [LINUX RFC v4 3/4] mtd: spi-nor: add stripe support
-Message-ID: <1480235616-34038-1-git-send-email-nagasure@xilinx.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Sun, 27 Nov 2016 17:36:48 +0800
+Subject: [PATCH v2 2/3] ARM: dts: sunxi: add support for Orange Pi Zero
+ board
+In-Reply-To: <20161121162421.800-2-icenowy@aosc.xyz>
+References: <20161121162421.800-1-icenowy@aosc.xyz>
+ <20161121162421.800-2-icenowy@aosc.xyz>
+Message-ID: <5373671480239408@web31m.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds stripe support and it is needed for GQSPI parallel
-configuration mode by:
 
-- Adding required parameters like stripe and shift to spi_nor
-  structure.
-- Initializing all added parameters in spi_nor_scan()
-- Updating read_sr() and read_fsr() for getting status from both
-  flashes
-- Increasing page_size, sector_size, erase_size and toatal flash
-  size as and when required.
-- Dividing address by 2
-- Updating spi->master->flags for qspi driver to change CS
 
-Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
----
-Changes for v4:
- - rename isparallel to stripe
-Changes for v3:
- - No change
-Changes for v2:
- - Splitted to separate MTD layer changes from SPI core changes
----
- drivers/mtd/spi-nor/spi-nor.c | 130 ++++++++++++++++++++++++++++++++----------
- include/linux/mtd/spi-nor.h   |   2 +
- 2 files changed, 103 insertions(+), 29 deletions(-)
+22.11.2016, 00:26, "Icenowy Zheng" <icenowy@aosc.xyz>:
+> Orange Pi Zero is a board that came with the new Allwinner H2+ SoC.
+>
+> Add a device tree file for it.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+> Changes since v2:
+> - Use generic pinconf binding instead of legacy allwinner pinctrl binding.
+> - removed uart3, which is not accessible on Orange Pi Zero.
+> - Removed sun8i-h2plus.dtsi and make Orange Pi Zero dts directly include
+> ??sun8i-h3.dtsi.
+> - Removed allwinner,sun8i-h3 compatible.
+>
+> ?arch/arm/boot/dts/Makefile | 1 +
+> ?arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts | 137 +++++++++++++++++++++++
+> ?2 files changed, 138 insertions(+)
+> ?create mode 100644 arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts
+>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 802a10d..51a1dd7 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -834,6 +834,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+> ?????????sun8i-a33-sinlinx-sina33.dtb \
+> ?????????sun8i-a83t-allwinner-h8homlet-v2.dtb \
+> ?????????sun8i-a83t-cubietruck-plus.dtb \
+> + sun8i-h2plus-orangepi-zero.dtb \
+> ?????????sun8i-h3-bananapi-m2-plus.dtb \
+> ?????????sun8i-h3-nanopi-neo.dtb \
+> ?????????sun8i-h3-orangepi-2.dtb \
+> diff --git a/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts
+> new file mode 100644
+> index 0000000..b428e47
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun8i-h2plus-orangepi-zero.dts
+> @@ -0,0 +1,137 @@
+> +/*
+> + * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.xyz>
+> + *
+> + * Based on sun8i-h3-orangepi-one.dts, which is:
+> + * Copyright (C) 2016 Hans de Goede <hdegoede@redhat.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + * a) This file is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of the
+> + * License, or (at your option) any later version.
+> + *
+> + * This file is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + * b) Permission is hereby granted, free of charge, to any person
+> + * obtaining a copy of this software and associated documentation
+> + * files (the "Software"), to deal in the Software without
+> + * restriction, including without limitation the rights to use,
+> + * copy, modify, merge, publish, distribute, sublicense, and/or
+> + * sell copies of the Software, and to permit persons to whom the
+> + * Software is furnished to do so, subject to the following
+> + * conditions:
+> + *
+> + * The above copyright notice and this permission notice shall be
+> + * included in all copies or substantial portions of the Software.
+> + *
+> + * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + * OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "sun8i-h3.dtsi"
+> +#include "sunxi-common-regulators.dtsi"
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+> +
+> +/ {
+> + model = "Xunlong Orange Pi Zero";
+> + compatible = "xunlong,orangepi-zero", "allwinner,sun8i-h2plus";
+> +
+> + aliases {
+> + serial0 = &uart0;
+> + };
+> +
+> + chosen {
+> + stdout-path = "serial0:115200n8";
+> + };
+> +
+> + leds {
+> + compatible = "gpio-leds";
+> + pinctrl-names = "default";
+> + pinctrl-0 = <&leds_opi0>, <&leds_r_opi0>;
+> +
+> + pwr_led {
+> + label = "orangepi:green:pwr";
+> + gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
+> + default-state = "on";
+> + };
+> +
+> + status_led {
+> + label = "orangepi:red:status";
+> + gpios = <&pio 0 17 GPIO_ACTIVE_HIGH>;
+> + };
+> + };
+> +};
+> +
+> +&ehci1 {
+> + status = "okay";
+> +};
+> +
+> +&mmc0 {
+> + pinctrl-names = "default";
+> + pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+> + vmmc-supply = <&reg_vcc3v3>;
+> + bus-width = <4>;
+> + cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
+> + cd-inverted;
+> + status = "okay";
+> +};
+> +
+> +&ohci1 {
+> + status = "okay";
+> +};
+> +
+> +&pio {
+> + leds_opi0: led_pins at 0 {
+> + pins = "PA17";
+> + function = "gpio_out";
+> + };
+> +};
+> +
+> +&r_pio {
+> + leds_r_opi0: led_pins at 0 {
+> + pins = "PL10";
+> + function = "gpio_out";
+> + };
+> +};
+> +
+> +&uart0 {
+> + pinctrl-names = "default";
+> + pinctrl-0 = <&uart0_pins_a>;
+> + status = "okay";
+> +};
+> +
+> +&uart1 {
+> + pinctrl-names = "default";
+> + pinctrl-0 = <&uart1_pins>;
+> + status = "disabled";
+> +};
+> +
+> +&uart2 {
+> + pinctrl-names = "default";
+> + pinctrl-0 = <&uart2_pins>;
+> + status = "disabled";
+> +};
+> +
+> +&usbphy {
+> + /* USB VBUS is always on */
+> + status = "okay";
+> +};
 
-diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-index d0fc165..4252239 100644
---- a/drivers/mtd/spi-nor/spi-nor.c
-+++ b/drivers/mtd/spi-nor/spi-nor.c
-@@ -22,6 +22,7 @@
- #include <linux/of_platform.h>
- #include <linux/spi/flash.h>
- #include <linux/mtd/spi-nor.h>
-+#include <linux/spi/spi.h>
- 
- /* Define max times to check status register before we give up. */
- 
-@@ -89,15 +90,24 @@ static const struct flash_info *spi_nor_match_id(const char *name);
- static int read_sr(struct spi_nor *nor)
- {
- 	int ret;
--	u8 val;
-+	u8 val[2];
- 
--	ret = nor->read_reg(nor, SPINOR_OP_RDSR, &val, 1);
--	if (ret < 0) {
--		pr_err("error %d reading SR\n", (int) ret);
--		return ret;
-+	if (nor->stripe) {
-+		ret = nor->read_reg(nor, SPINOR_OP_RDSR, &val[0], 2);
-+		if (ret < 0) {
-+			pr_err("error %d reading SR\n", (int) ret);
-+			return ret;
-+		}
-+		val[0] |= val[1];
-+	} else {
-+		ret = nor->read_reg(nor, SPINOR_OP_RDSR, &val[0], 1);
-+		if (ret < 0) {
-+			pr_err("error %d reading SR\n", (int) ret);
-+			return ret;
-+		}
- 	}
- 
--	return val;
-+	return val[0];
- }
- 
- /*
-@@ -108,15 +118,24 @@ static int read_sr(struct spi_nor *nor)
- static int read_fsr(struct spi_nor *nor)
- {
- 	int ret;
--	u8 val;
-+	u8 val[2];
- 
--	ret = nor->read_reg(nor, SPINOR_OP_RDFSR, &val, 1);
--	if (ret < 0) {
--		pr_err("error %d reading FSR\n", ret);
--		return ret;
-+	if (nor->stripe) {
-+		ret = nor->read_reg(nor, SPINOR_OP_RDFSR, &val[0], 2);
-+		if (ret < 0) {
-+			pr_err("error %d reading FSR\n", ret);
-+			return ret;
-+		}
-+		val[0] &= val[1];
-+	} else {
-+		ret = nor->read_reg(nor, SPINOR_OP_RDFSR, &val[0], 1);
-+		if (ret < 0) {
-+			pr_err("error %d reading FSR\n", ret);
-+			return ret;
-+		}
- 	}
- 
--	return val;
-+	return val[0];
- }
- 
- /*
-@@ -290,9 +309,16 @@ static int spi_nor_wait_till_ready(struct spi_nor *nor)
-  */
- static int erase_chip(struct spi_nor *nor)
- {
-+	u32 ret;
-+
- 	dev_dbg(nor->dev, " %lldKiB\n", (long long)(nor->mtd.size >> 10));
- 
--	return nor->write_reg(nor, SPINOR_OP_CHIP_ERASE, NULL, 0);
-+	ret = nor->write_reg(nor, SPINOR_OP_CHIP_ERASE, NULL, 0);
-+	if (ret)
-+		return ret;
-+
-+	return ret;
-+
- }
- 
- static int spi_nor_lock_and_prep(struct spi_nor *nor, enum spi_nor_ops ops)
-@@ -349,7 +375,7 @@ static int spi_nor_erase_sector(struct spi_nor *nor, u32 addr)
- static int spi_nor_erase(struct mtd_info *mtd, struct erase_info *instr)
- {
- 	struct spi_nor *nor = mtd_to_spi_nor(mtd);
--	u32 addr, len;
-+	u32 addr, len, offset;
- 	uint32_t rem;
- 	int ret;
- 
-@@ -399,9 +425,13 @@ static int spi_nor_erase(struct mtd_info *mtd, struct erase_info *instr)
- 	/* "sector"-at-a-time erase */
- 	} else {
- 		while (len) {
-+
- 			write_enable(nor);
-+			offset = addr;
-+			if (nor->stripe)
-+				offset /= 2;
- 
--			ret = spi_nor_erase_sector(nor, addr);
-+			ret = spi_nor_erase_sector(nor, offset);
- 			if (ret)
- 				goto erase_err;
- 
-@@ -525,6 +555,8 @@ static int stm_lock(struct spi_nor *nor, loff_t ofs, uint64_t len)
- 	bool use_top;
- 	int ret;
- 
-+	ofs = ofs >> nor->shift;
-+
- 	status_old = read_sr(nor);
- 	if (status_old < 0)
- 		return status_old;
-@@ -610,6 +642,8 @@ static int stm_unlock(struct spi_nor *nor, loff_t ofs, uint64_t len)
- 	bool use_top;
- 	int ret;
- 
-+	ofs = ofs >> nor->shift;
-+
- 	status_old = read_sr(nor);
- 	if (status_old < 0)
- 		return status_old;
-@@ -709,6 +743,8 @@ static int spi_nor_lock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
- 	if (ret)
- 		return ret;
- 
-+	ofs = ofs >> nor->shift;
-+
- 	ret = nor->flash_lock(nor, ofs, len);
- 
- 	spi_nor_unlock_and_unprep(nor, SPI_NOR_OPS_UNLOCK);
-@@ -724,6 +760,8 @@ static int spi_nor_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
- 	if (ret)
- 		return ret;
- 
-+	ofs = ofs >> nor->shift;
-+
- 	ret = nor->flash_unlock(nor, ofs, len);
- 
- 	spi_nor_unlock_and_unprep(nor, SPI_NOR_OPS_LOCK);
-@@ -1018,6 +1056,9 @@ static const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
- 	u8			id[SPI_NOR_MAX_ID_LEN];
- 	const struct flash_info	*info;
- 
-+	nor->spi->master->flags &= ~(SPI_MASTER_BOTH_CS |
-+					SPI_MASTER_DATA_STRIPE);
-+
- 	tmp = nor->read_reg(nor, SPINOR_OP_RDID, id, SPI_NOR_MAX_ID_LEN);
- 	if (tmp < 0) {
- 		dev_dbg(nor->dev, "error %d reading JEDEC ID\n", tmp);
-@@ -1041,6 +1082,7 @@ static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
- {
- 	struct spi_nor *nor = mtd_to_spi_nor(mtd);
- 	int ret;
-+	u32 offset = from;
- 
- 	dev_dbg(nor->dev, "from 0x%08x, len %zd\n", (u32)from, len);
- 
-@@ -1049,7 +1091,13 @@ static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
- 		return ret;
- 
- 	while (len) {
--		ret = nor->read(nor, from, len, buf);
-+
-+		offset = from;
-+
-+		if (nor->stripe)
-+			offset /= 2;
-+
-+		ret = nor->read(nor, offset, len, buf);
- 		if (ret == 0) {
- 			/* We shouldn't see 0-length reads */
- 			ret = -EIO;
-@@ -1161,6 +1209,7 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
- 	struct spi_nor *nor = mtd_to_spi_nor(mtd);
- 	size_t page_offset, page_remain, i;
- 	ssize_t ret;
-+	u32 offset;
- 
- 	dev_dbg(nor->dev, "to 0x%08x, len %zd\n", (u32)to, len);
- 
-@@ -1178,9 +1227,13 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
- 		/* the size of data remaining on the first page */
- 		page_remain = min_t(size_t,
- 				    nor->page_size - page_offset, len - i);
-+		offset = (to + i);
-+
-+		if (nor->stripe)
-+			offset /= 2;
- 
- 		write_enable(nor);
--		ret = nor->write(nor, to + i, page_remain, buf + i);
-+		ret = nor->write(nor, (offset), page_remain, buf + i);
- 		if (ret < 0)
- 			goto write_err;
- 		written = ret;
-@@ -1302,22 +1355,22 @@ static int spi_nor_check(struct spi_nor *nor)
- 
- int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
- {
--	const struct flash_info *info = NULL;
-+	struct flash_info *info = NULL;
- 	struct device *dev = nor->dev;
- 	struct mtd_info *mtd = &nor->mtd;
- 	struct device_node *np = spi_nor_get_flash_node(nor);
--	int ret;
--	int i;
-+	struct device_node *np_spi;
-+	int ret, i, xlnx_qspi_mode;
- 
- 	ret = spi_nor_check(nor);
- 	if (ret)
- 		return ret;
- 
- 	if (name)
--		info = spi_nor_match_id(name);
-+		info = (struct flash_info *)spi_nor_match_id(name);
- 	/* Try to auto-detect if chip name wasn't specified or not found */
- 	if (!info)
--		info = spi_nor_read_id(nor);
-+		info = (struct flash_info *)spi_nor_read_id(nor);
- 	if (IS_ERR_OR_NULL(info))
- 		return -ENOENT;
- 
-@@ -1341,7 +1394,7 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
- 			 */
- 			dev_warn(dev, "found %s, expected %s\n",
- 				 jinfo->name, info->name);
--			info = jinfo;
-+			info = (struct flash_info *)jinfo;
- 		}
- 	}
- 
-@@ -1370,6 +1423,27 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
- 	mtd->size = info->sector_size * info->n_sectors;
- 	mtd->_erase = spi_nor_erase;
- 	mtd->_read = spi_nor_read;
-+#ifdef CONFIG_OF
-+	np_spi = of_get_next_parent(np);
-+
-+	if (of_property_read_u32(np_spi, "xlnx,qspi-mode",
-+				&xlnx_qspi_mode) < 0) {
-+		nor->shift = 0;
-+		nor->stripe = 0;
-+	} else if (xlnx_qspi_mode == 2) {
-+		nor->shift = 1;
-+		info->sector_size <<= nor->shift;
-+		info->page_size <<= nor->shift;
-+		mtd->size <<= nor->shift;
-+		nor->stripe = 1;
-+		nor->spi->master->flags |= (SPI_MASTER_BOTH_CS |
-+						SPI_MASTER_DATA_STRIPE);
-+	}
-+#else
-+	/* Default to single */
-+	nor->shift = 0;
-+	nor->stripe = 0;
-+#endif
- 
- 	/* NOR protection support for STmicro/Micron chips and similar */
- 	if (JEDEC_MFR(info) == SNOR_MFR_MICRON ||
-@@ -1400,10 +1474,10 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
- 	/* prefer "small sector" erase if possible */
- 	if (info->flags & SECT_4K) {
- 		nor->erase_opcode = SPINOR_OP_BE_4K;
--		mtd->erasesize = 4096;
-+		mtd->erasesize = 4096 << nor->shift;
- 	} else if (info->flags & SECT_4K_PMC) {
- 		nor->erase_opcode = SPINOR_OP_BE_4K_PMC;
--		mtd->erasesize = 4096;
-+		mtd->erasesize = 4096 << nor->shift;
- 	} else
- #endif
- 	{
-@@ -1508,16 +1582,14 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
- 	dev_info(dev, "%s (%lld Kbytes)\n", info->name,
- 			(long long)mtd->size >> 10);
- 
--	dev_dbg(dev,
--		"mtd .name = %s, .size = 0x%llx (%lldMiB), "
-+	dev_dbg(dev, "mtd .name = %s, .size = 0x%llx (%lldMiB), "
- 		".erasesize = 0x%.8x (%uKiB) .numeraseregions = %d\n",
- 		mtd->name, (long long)mtd->size, (long long)(mtd->size >> 20),
- 		mtd->erasesize, mtd->erasesize / 1024, mtd->numeraseregions);
- 
- 	if (mtd->numeraseregions)
- 		for (i = 0; i < mtd->numeraseregions; i++)
--			dev_dbg(dev,
--				"mtd.eraseregions[%d] = { .offset = 0x%llx, "
-+			dev_dbg(dev, "mtd.eraseregions[%d] = { .offset = 0x%llx, "
- 				".erasesize = 0x%.8x (%uKiB), "
- 				".numblocks = %d }\n",
- 				i, (long long)mtd->eraseregions[i].offset,
-diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
-index 84f3ce5..673ec68 100644
---- a/include/linux/mtd/spi-nor.h
-+++ b/include/linux/mtd/spi-nor.h
-@@ -165,6 +165,8 @@ struct spi_nor {
- 	u8			read_dummy;
- 	u8			program_opcode;
- 	enum read_mode		flash_read;
-+	bool			shift;
-+	bool			stripe;
- 	bool			sst_write_second;
- 	u32			flags;
- 	u8			cmd_buf[SPI_NOR_MAX_CMD_SIZE];
--- 
-2.10.2
+Something more interesting happened.
+
+Xunlong made a add-on board for Orange Pi Zero, which exposes the two USB Controllers exported at expansion bus as USB Type-A connectors.
+
+Also it exposes a analog A/V jack and a microphone.
+
+Should I enable {e,o}hci{2.3} in the device tree?
+
+> --
+> 2.10.2
