@@ -1,44 +1,48 @@
 From: naga.sureshkumar.relli@xilinx.com (Naga Sureshkumar Relli)
-Date: Sun, 27 Nov 2016 14:03:18 +0530
-Subject: [LINUX RFC v4 0/4] Add stripe support for ZynqMP SoC GQSPI controller
-Message-ID: <1480235598-33827-1-git-send-email-nagasure@xilinx.com>
+Date: Sun, 27 Nov 2016 14:03:30 +0530
+Subject: [LINUX RFC v4 2/4] mtd: add spi_device instance to spi_nor struct
+Message-ID: <1480235610-33960-1-git-send-email-nagasure@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is continuation to previous patches mentioned in below link
-http://marc.info/?l=linux-spi&m=145009963109143&w=2
+This patch adds struct spi_device instacne to the spi_nor structure.
 
-i am re-initiating this series, Could you please help us to get this done?
+Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
+---
+Changes for v4:
+ - No change
+Changes for v3:
+ - No change
+Changes for v2:
+ - This is new patch, basically splitted on request of Mark Brown
+---
+ drivers/mtd/devices/m25p80.c | 1 +
+ include/linux/mtd/spi-nor.h  | 1 +
+ 2 files changed, 2 insertions(+)
 
-what is dual parallel mode?
----------------------------
-ZynqMP GQSPI controller supports Dual Parallel mode with following functionalities:
-1) Supporting two SPI flash memories operating in parallel. 8 I/O lines.
-2) Chip selects, data lines and clock are differ to both the flash devices
-3) This mode is targeted for faster read/write speed and also doubles the size
-4) Commands/data can be transmitted/received from both the devices(mirror),
-   or only upper or only lower flash memory devices.
-5) Data arrangement:
-   With stripe enabled,
-   Even bytes i.e. 0, 2, 4,... are transmitted on Lower Data Bus
-   Odd bytes i.e. 1, 3, 5,.. are transmitted on Upper Data Bus.
-
-i have tested this on top of latest git-hub master.
-kindly suggest us the way, so that we can proceed further to add this support.
-
-Naga Sureshkumar Relli (4):
-  spi: adding support for data stripe feature in core
-  mtd: add spi_device instance to spi_nor struct
-  mtd: spi-nor: add stripe support
-  spi: zynqmp: gqspi: add support for stripe feature
-
- drivers/mtd/devices/m25p80.c   |   1 +
- drivers/mtd/spi-nor/spi-nor.c  | 130 ++++++++++++++++++++++++++++++++---------
- drivers/spi/spi-zynqmp-gqspi.c |  26 ++++++++-
- drivers/spi/spi.c              |   8 +++
- include/linux/mtd/spi-nor.h    |   3 +
- include/linux/spi/spi.h        |  11 ++++
- 6 files changed, 149 insertions(+), 30 deletions(-)
-
+diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+index 9cf7fcd..58cfb42 100644
+--- a/drivers/mtd/devices/m25p80.c
++++ b/drivers/mtd/devices/m25p80.c
+@@ -219,6 +219,7 @@ static int m25p_probe(struct spi_device *spi)
+ 
+ 	spi_set_drvdata(spi, flash);
+ 	flash->spi = spi;
++	nor->spi = spi;
+ 
+ 	if (spi->mode & SPI_RX_QUAD)
+ 		mode = SPI_NOR_QUAD;
+diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
+index c425c7b..84f3ce5 100644
+--- a/include/linux/mtd/spi-nor.h
++++ b/include/linux/mtd/spi-nor.h
+@@ -157,6 +157,7 @@ struct spi_nor {
+ 	struct mtd_info		mtd;
+ 	struct mutex		lock;
+ 	struct device		*dev;
++	struct spi_device       *spi;
+ 	u32			page_size;
+ 	u8			addr_width;
+ 	u8			erase_opcode;
 -- 
 2.10.2
