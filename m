@@ -1,36 +1,33 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 27 Nov 2016 20:39:18 +0100
-Subject: [PATCH v5 2/2] ARM: dts: add support for Turris Omnia
-In-Reply-To: <71af60f5-b657-cab4-32a8-00a604fc656e@suse.de>
-References: <20161125142658.21690-1-uwe@kleine-koenig.org>
- <20161125142658.21690-3-uwe@kleine-koenig.org>
- <71af60f5-b657-cab4-32a8-00a604fc656e@suse.de>
-Message-ID: <4fbd001b-ee92-c7a6-e9d4-b6a4b8dee599@suse.de>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Sun, 27 Nov 2016 20:54:44 +0100
+Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: Add missing newline
+Message-ID: <1480276484-5482-1-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 27.11.2016 um 20:22 schrieb Andreas F?rber:
-> Am 25.11.2016 um 15:26 schrieb Uwe Kleine-K?nig:
->> diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts b/arch/arm/boot/dts/armada-385-turris-omnia.dts
->> new file mode 100644
->> index 000000000000..bcc10c285889
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-> [...]
->> +	chosen {
->> +		stdout-path = &uart0;
->> +	};
-> 
-> I notice that the other 38x boards (and thus my previous Omnia .dts) use
-> "serial0:115200n8". Can we really rely on the driver defaults here?
+Found while reviewing Marvell dsa bindings usage.
 
-Answering my own question: No, with the mvebu/dt .dts I do not get any
-serial output. Patch sent.
+Fixes: f283745b3caf ("arm: vf610: zii devel b: Add support for switch interrupts")
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: David S. Miller <davem@davemloft.net>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Regards,
-Andreas
-
+diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+index 7ea617e47fe4..958b4c42d320 100644
+--- a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
++++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+@@ -153,7 +153,8 @@
+ 					switch0phy1: switch1phy0 at 1 {
+ 						reg = <1>;
+ 						interrupt-parent = <&switch0>;
+-						interrupts = <1 IRQ_TYPE_LEVEL_HIGH>;					};
++						interrupts = <1 IRQ_TYPE_LEVEL_HIGH>;
++					};
+ 					switch0phy2: switch1phy0 at 2 {
+ 						reg = <2>;
+ 						interrupt-parent = <&switch0>;
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+2.6.6
