@@ -1,38 +1,81 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 27 Nov 2016 23:08:46 +0100
-Subject: [PATCH 2/2] net: dsa: mv88e6xxx: Add 88E6176 device tree support
-In-Reply-To: <9500470d-09c3-3ecb-994b-3d108bffc99e@suse.de>
-References: <1480280279-9552-1-git-send-email-afaerber@suse.de>
- <1480280279-9552-2-git-send-email-afaerber@suse.de>
- <20161127212709.GD13318@lunn.ch>
- <9500470d-09c3-3ecb-994b-3d108bffc99e@suse.de>
-Message-ID: <20161127220846.GH13318@lunn.ch>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sun, 27 Nov 2016 23:14:37 +0100
+Subject: [PATCH] ARM: dts: mvebu: Fix armada-385-turris-omnia stdout-path
+In-Reply-To: <20161127212528.wmqbwciz5ltnfws3@pengutronix.de>
+References: <71af60f5-b657-cab4-32a8-00a604fc656e@suse.de>
+ <1480275444-4220-1-git-send-email-afaerber@suse.de>
+ <20161127212528.wmqbwciz5ltnfws3@pengutronix.de>
+Message-ID: <0f51c7a1-6d52-3e3e-edfe-e7b10917ecab@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > This driver already supports nearly 30 different Marvell switch
-> > models. Please document why the marvell,mv88e6176 is special and why
-> > it needs its own compatible string when the others don't.
+Am 27.11.2016 um 22:25 schrieb Uwe Kleine-K?nig:
+> On Sun, Nov 27, 2016 at 08:37:24PM +0100, Andreas F?rber wrote:
+>> Specify the baudrate.
+>>
+>> Fixes: 26ca8b52d6e1 ("ARM: dts: add support for Turris Omnia")
+>> Cc: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > 
-> I don't understand.
+> You said with plain &uart0 the kernel uses a wrong baud rate? That's
+> strange. For me it works and I think it's the intended behaviour to
+> dermine the baud rate setup by the bootloader and use this.
 
-Think about what i said. Why does the 6176 need its own compatible
-string, when the two 6352s and the 6165 on the zii-devel-b don't have
-one? And the DIR 665 has a 6171, which does not have a compatible
-string of its own. The clearfog actually has a 6176, and it seems to
-work fine without a compatible string.
+IIRC the 8250 driver defaults to 9600n8 if unspecified.
 
-> You as driver author should know that the .data pointer is vital to your
-> driver
+Kernel tested: 4.9.0-rc2-next-20161028-00010-g4fb44d9-dirty
 
-Exactly, so if i ask why is it needed, maybe you should stop and think
-for a while.
+Maybe you used some console= argument overriding it?
 
-> you even recently accepted another model that conflicted with
-> my patch.
+> I'd prefer it this way over hard coding the baud rate.
+> 
+>>  arch/arm/boot/dts/armada-385-turris-omnia.dts | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts b/arch/arm/boot/dts/armada-385-turris-omnia.dts
+>> index f53cb8b73610..2eff012287d4 100644
+>> --- a/arch/arm/boot/dts/armada-385-turris-omnia.dts
+>> +++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
+>> @@ -52,7 +52,7 @@
+>>  	compatible = "cznic,turris-omnia", "marvell,armada385", "marvell,armada380";
+>>  
+>>  	chosen {
+>> -		stdout-path = &uart0;
+>> +		stdout-path = "serial0:115200n8";
+>>  	};
+>>  
+>>  	memory {
+> 
+> This has the downside to depend on the alias. Not sure this is
+> considered modern. An alternative would be:
+> 
+> 	stdout-path = "/soc/internal-regs/serial at 12000:115200n8";
 
-And think about that also, and you will find the 6390 family, who's
-first device is 6190, is not compatible with the 6085, and so needs a
-different compatible string.
+Please don't unroll the path I'm trying to abstract elsewhere.
 
-	  Andrew
+Like I said, the "serialX:115200n8" syntax is what all other Armada 38x
+boards use:
+
+git grep stdout-path -- arch/arm/boot/dts/ | grep armada-38
+arch/arm/boot/dts/armada-385-db-ap.dts:		stdout-path = "serial1:115200n8";
+arch/arm/boot/dts/armada-385-linksys.dtsi:		stdout-path =
+"serial0:115200n8";
+arch/arm/boot/dts/armada-388-clearfog.dts:		stdout-path =
+"serial0:115200n8";
+arch/arm/boot/dts/armada-388-db.dts:		stdout-path = "serial0:115200n8";
+arch/arm/boot/dts/armada-388-gp.dts:		stdout-path = "serial0:115200n8";
+arch/arm/boot/dts/armada-388-rd.dts:		stdout-path = "serial0:115200n8";
+
+The alias is needed to reliably determine the tty device number and is
+set "globally" in armada-38x.dtsi, so why is it a problem to rely on?
+
+Regards,
+Andreas
+
+> 
+> (maybe there even exists syntactic sugar to express this using &uart0?)
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
