@@ -1,33 +1,45 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 27 Nov 2016 22:22:34 +0100
-Subject: [PATCH v5 2/2] ARM: dts: add support for Turris Omnia
-In-Reply-To: <a7f47999-ec83-6cc8-8119-0087dee17bac@suse.de>
-References: <20161125142658.21690-1-uwe@kleine-koenig.org>
- <20161125142658.21690-3-uwe@kleine-koenig.org>
- <87lgw7ilg9.fsf@free-electrons.com>
- <a7f47999-ec83-6cc8-8119-0087dee17bac@suse.de>
-Message-ID: <1405f210-0f58-463c-5353-3fdc43ac1f9d@suse.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 27 Nov 2016 22:22:56 +0100
+Subject: [PATCH] mv88e6xxx: Fix mv88e6xxx_g1_irq_free() interrupt count
+In-Reply-To: <1480279424-7830-1-git-send-email-afaerber@suse.de>
+References: <1480279424-7830-1-git-send-email-afaerber@suse.de>
+Message-ID: <20161127212256.GC13318@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 27.11.2016 um 17:00 schrieb Andreas F?rber:
-> @Uwe: Note that I had already told CZ.NIC's Michal ~two weeks ago that I
-> have a WIP .dts for the Omnia - looks like no one knows what the other
-> is doing. :( My branch includes cleanups for 385 .dtsi and bug fixes for
-> the switch that I am not seeing in your series:
+On Sun, Nov 27, 2016 at 09:43:44PM +0100, Andreas F?rber wrote:
+> mv88e6xxx_g1_irq_setup() sets up chip->g1_irq.nirqs interrupt mappings,
+> so free the same amount. This will be 8 or 9 in practice, less than 16.
+
+Hi Andreas
+
+The patch is correct, but please read
+Documentation/networking/netdev-FAQ.txt
+and then resubmit the patch.
+
+    Andrew
+
 > 
-> https://github.com/afaerber/linux/commits/omnia-next
-
-Archived at https://github.com/afaerber/linux/commits/omnia-next.pre-uwe
-
-It seems like four out of my five switch probing bug fixes were already
-resolved by Andrew in the meantime. Remaining one plus 88E6176
-mini-series sent out.
-
-Cheers,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+> Fixes: dc30c35be720 ("net: dsa: mv88e6xxx: Implement interrupt support.")
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  drivers/net/dsa/mv88e6xxx/chip.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/dsa/mv88e6xxx/chip.c b/drivers/net/dsa/mv88e6xxx/chip.c
+> index 98302358ceb9..95b9efb33ec7 100644
+> --- a/drivers/net/dsa/mv88e6xxx/chip.c
+> +++ b/drivers/net/dsa/mv88e6xxx/chip.c
+> @@ -421,7 +421,7 @@ static void mv88e6xxx_g1_irq_free(struct mv88e6xxx_chip *chip)
+>  
+>  	free_irq(chip->irq, chip);
+>  
+> -	for (irq = 0; irq < 16; irq++) {
+> +	for (irq = 0; irq < chip->g1_irq.nirqs; irq++) {
+>  		virq = irq_find_mapping(chip->g1_irq.domain, irq);
+>  		irq_dispose_mapping(virq);
+>  	}
+> -- 
+> 2.6.6
+> 
