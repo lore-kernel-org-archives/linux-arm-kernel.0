@@ -1,34 +1,31 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 27 Nov 2016 22:35:16 +0100
-Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: Add missing newline
-In-Reply-To: <e9336935-264e-5d1c-656e-a48f89d1b015@suse.de>
-References: <1480276484-5482-1-git-send-email-afaerber@suse.de>
- <20161127211727.GB13318@lunn.ch>
- <e9336935-264e-5d1c-656e-a48f89d1b015@suse.de>
-Message-ID: <20161127213516.GF13318@lunn.ch>
+Date: Sun, 27 Nov 2016 22:39:12 +0100
+Subject: [PATCH] mv88e6xxx: Fix mv88e6xxx_g1_irq_free() interrupt count
+In-Reply-To: <ff0d121a-0ecb-8af7-af11-cf94df31639c@suse.de>
+References: <1480279424-7830-1-git-send-email-afaerber@suse.de>
+ <20161127212256.GC13318@lunn.ch>
+ <ff0d121a-0ecb-8af7-af11-cf94df31639c@suse.de>
+Message-ID: <20161127213912.GG13318@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 27, 2016 at 10:30:54PM +0100, Andreas F?rber wrote:
-> Hi,
+On Sun, Nov 27, 2016 at 10:32:41PM +0100, Andreas F?rber wrote:
+> Hi Andrew,
 > 
-> Am 27.11.2016 um 22:17 schrieb Andrew Lunn:
-> > On Sun, Nov 27, 2016 at 08:54:44PM +0100, Andreas F?rber wrote:
-> >> Found while reviewing Marvell dsa bindings usage.
+> Am 27.11.2016 um 22:22 schrieb Andrew Lunn:
+> > On Sun, Nov 27, 2016 at 09:43:44PM +0100, Andreas F?rber wrote:
+> >> mv88e6xxx_g1_irq_setup() sets up chip->g1_irq.nirqs interrupt mappings,
+> >> so free the same amount. This will be 8 or 9 in practice, less than 16.
 > > 
 > > Hi Andreas
 > > 
-> > It is good practice to put the maintainer you expect to accept the
-> > patch on the To: line. You have at least two different maintainers on
-> > Cc: so it is currently ambiguous. And these lists can be high volume,
-> > so without a copy in the maintainers inbox, patches can be overlooked.
+> > The patch is correct, but please read
+> > Documentation/networking/netdev-FAQ.txt
+> > and then resubmit the patch.
 > 
-> As a vf610 DT patch with LAKML in To I am expecting it to be handled by
-> Shawn or anyone from the NXP/ARM side.
+> Do you mean --subject-prefix="PATCH net-next"
 
-So please have Shawn as To:
+Yep.
 
-The patch you are fixing went through Dave Miller, who is also on Cc:,
-hence the ambiguity.
-
-      Andrew
+Thanks
+	Andrew
