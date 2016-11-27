@@ -1,50 +1,33 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 27 Nov 2016 22:17:27 +0100
-Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: Add missing newline
-In-Reply-To: <1480276484-5482-1-git-send-email-afaerber@suse.de>
-References: <1480276484-5482-1-git-send-email-afaerber@suse.de>
-Message-ID: <20161127211727.GB13318@lunn.ch>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sun, 27 Nov 2016 22:22:34 +0100
+Subject: [PATCH v5 2/2] ARM: dts: add support for Turris Omnia
+In-Reply-To: <a7f47999-ec83-6cc8-8119-0087dee17bac@suse.de>
+References: <20161125142658.21690-1-uwe@kleine-koenig.org>
+ <20161125142658.21690-3-uwe@kleine-koenig.org>
+ <87lgw7ilg9.fsf@free-electrons.com>
+ <a7f47999-ec83-6cc8-8119-0087dee17bac@suse.de>
+Message-ID: <1405f210-0f58-463c-5353-3fdc43ac1f9d@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 27, 2016 at 08:54:44PM +0100, Andreas F?rber wrote:
-> Found while reviewing Marvell dsa bindings usage.
-
-Hi Andreas
-
-It is good practice to put the maintainer you expect to accept the
-patch on the To: line. You have at least two different maintainers on
-Cc: so it is currently ambiguous. And these lists can be high volume,
-so without a copy in the maintainers inbox, patches can be overlooked.
-
-> Fixes: f283745b3caf ("arm: vf610: zii devel b: Add support for switch interrupts")
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: David S. Miller <davem@davemloft.net>
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-
-    Andrew
-
-
-> ---
->  arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+Am 27.11.2016 um 17:00 schrieb Andreas F?rber:
+> @Uwe: Note that I had already told CZ.NIC's Michal ~two weeks ago that I
+> have a WIP .dts for the Omnia - looks like no one knows what the other
+> is doing. :( My branch includes cleanups for 385 .dtsi and bug fixes for
+> the switch that I am not seeing in your series:
 > 
-> diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-> index 7ea617e47fe4..958b4c42d320 100644
-> --- a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-> +++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-> @@ -153,7 +153,8 @@
->  					switch0phy1: switch1phy0 at 1 {
->  						reg = <1>;
->  						interrupt-parent = <&switch0>;
-> -						interrupts = <1 IRQ_TYPE_LEVEL_HIGH>;					};
-> +						interrupts = <1 IRQ_TYPE_LEVEL_HIGH>;
-> +					};
->  					switch0phy2: switch1phy0 at 2 {
->  						reg = <2>;
->  						interrupt-parent = <&switch0>;
-> -- 
-> 2.6.6
-> 
+> https://github.com/afaerber/linux/commits/omnia-next
+
+Archived at https://github.com/afaerber/linux/commits/omnia-next.pre-uwe
+
+It seems like four out of my five switch probing bug fixes were already
+resolved by Andrew in the meantime. Remaining one plus 88E6176
+mini-series sent out.
+
+Cheers,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
