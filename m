@@ -1,31 +1,40 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 27 Nov 2016 22:39:12 +0100
-Subject: [PATCH] mv88e6xxx: Fix mv88e6xxx_g1_irq_free() interrupt count
-In-Reply-To: <ff0d121a-0ecb-8af7-af11-cf94df31639c@suse.de>
-References: <1480279424-7830-1-git-send-email-afaerber@suse.de>
- <20161127212256.GC13318@lunn.ch>
- <ff0d121a-0ecb-8af7-af11-cf94df31639c@suse.de>
-Message-ID: <20161127213912.GG13318@lunn.ch>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sun, 27 Nov 2016 22:50:22 +0100
+Subject: [PATCH 2/2] net: dsa: mv88e6xxx: Add 88E6176 device tree support
+In-Reply-To: <20161127212709.GD13318@lunn.ch>
+References: <1480280279-9552-1-git-send-email-afaerber@suse.de>
+ <1480280279-9552-2-git-send-email-afaerber@suse.de>
+ <20161127212709.GD13318@lunn.ch>
+Message-ID: <9500470d-09c3-3ecb-994b-3d108bffc99e@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 27, 2016 at 10:32:41PM +0100, Andreas F?rber wrote:
-> Hi Andrew,
+Am 27.11.2016 um 22:27 schrieb Andrew Lunn:
+> On Sun, Nov 27, 2016 at 09:57:59PM +0100, Andreas F?rber wrote:
+>> This model is found on the Turris Omnia.
 > 
-> Am 27.11.2016 um 22:22 schrieb Andrew Lunn:
-> > On Sun, Nov 27, 2016 at 09:43:44PM +0100, Andreas F?rber wrote:
-> >> mv88e6xxx_g1_irq_setup() sets up chip->g1_irq.nirqs interrupt mappings,
-> >> so free the same amount. This will be 8 or 9 in practice, less than 16.
-> > 
-> > Hi Andreas
-> > 
-> > The patch is correct, but please read
-> > Documentation/networking/netdev-FAQ.txt
-> > and then resubmit the patch.
-> 
-> Do you mean --subject-prefix="PATCH net-next"
+> This driver already supports nearly 30 different Marvell switch
+> models. Please document why the marvell,mv88e6176 is special and why
+> it needs its own compatible string when the others don't.
 
-Yep.
+I don't understand.
 
-Thanks
-	Andrew
+The commit message above already points out for which device this is
+(and you also know from the LAKML thread).
+
+You as driver author should know that the .data pointer is vital to your
+driver - you even recently accepted another model that conflicted with
+my patch. So are you arguing for a ", which uses a Device Tree for
+booting" half-sentence here?
+
+The others not having an entry simply means no one needed them yet.
+
+And any Turris Omnia side changes need to go through the mvebu tree.
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
