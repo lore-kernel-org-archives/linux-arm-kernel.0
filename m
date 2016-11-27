@@ -1,33 +1,30 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun, 27 Nov 2016 21:57:59 +0100
-Subject: [PATCH 2/2] net: dsa: mv88e6xxx: Add 88E6176 device tree support
-In-Reply-To: <1480280279-9552-1-git-send-email-afaerber@suse.de>
-References: <1480280279-9552-1-git-send-email-afaerber@suse.de>
-Message-ID: <1480280279-9552-2-git-send-email-afaerber@suse.de>
+Date: Sun, 27 Nov 2016 22:04:35 +0100
+Subject: [PATCH] MAINTAINERS: Add device tree bindings to mv88e6xx section
+Message-ID: <1480280676-10117-1-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This model is found on the Turris Omnia.
+Also include the netdev list for convenience, as done elsewhere.
 
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- drivers/net/dsa/mv88e6xxx/chip.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/net/dsa/mv88e6xxx/chip.c b/drivers/net/dsa/mv88e6xxx/chip.c
-index 77f13ada2612..95b9efb33ec7 100644
---- a/drivers/net/dsa/mv88e6xxx/chip.c
-+++ b/drivers/net/dsa/mv88e6xxx/chip.c
-@@ -4280,6 +4280,10 @@ static const struct of_device_id mv88e6xxx_of_match[] = {
- 		.data = &mv88e6xxx_table[MV88E6085],
- 	},
- 	{
-+		.compatible = "marvell,mv88e6176",
-+		.data = &mv88e6xxx_table[MV88E6176],
-+	},
-+	{
- 		.compatible = "marvell,mv88e6190",
- 		.data = &mv88e6xxx_table[MV88E6190],
- 	},
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f73e19277a70..46ccf6eadcc9 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7670,6 +7670,7 @@ M:	Andrew Lunn <andrew@lunn.ch>
+ M:	Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+ S:	Maintained
+ F:	drivers/net/dsa/mv88e6xxx/
++F:	Documentation/devicetree/bindings/net/dsa/marvell.txt
+ 
+ MARVELL ARMADA DRM SUPPORT
+ M:	Russell King <rmk+kernel@armlinux.org.uk>
 -- 
 2.6.6
