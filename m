@@ -1,75 +1,108 @@
 From: naga.sureshkumar.relli@xilinx.com (Naga Sureshkumar Relli)
-Date: Sun, 27 Nov 2016 14:03:23 +0530
-Subject: [LINUX RFC v4 1/4] spi: adding support for data stripe feature in core
-Message-ID: <1480235603-33890-1-git-send-email-nagasure@xilinx.com>
+Date: Sun, 27 Nov 2016 14:03:42 +0530
+Subject: [LINUX RFC v4 4/4] spi: zynqmp: gqspi: add support for stripe feature
+Message-ID: <1480235622-34100-1-git-send-email-nagasure@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables data stripe feature in spi core. This feature is
-required to support dual parallel mode of ZynqMP GQSPI controller.
-
-To achieve the same an API SPI_MASTER_DATA_STRIPE is added.
-With data stripe enabled,
- - even bytes i.e. 0, 2, 4,... are transmitted on lower data bus
- - odd bytes i.e. 1, 3, 5,.. are transmitted on upper data bus.
-
-To support data stripe; need to  assert both chip selects once.
-This is achieved through API SPI_MASTER_BOTH_CS.
+This patch adds support of dual parallel mode configuration
+for Zynq Ultrascale+ MPSoC GQSPI controller driver.
 
 Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
 ---
 Changes for v4:
- - No changes, sending the previous one as is
-Change for v3:
- - Updated comments for newly added APIs
- - Changed patch description for ease of understanding
+ - No changes
+Changes for v3:
+ - No change
 Changes for v2:
- - Added error handling condition for newly added features
+ - No change
 ---
- drivers/spi/spi.c       |  8 ++++++++
- include/linux/spi/spi.h | 11 +++++++++++
- 2 files changed, 19 insertions(+)
+ drivers/spi/spi-zynqmp-gqspi.c | 26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
-index 5787b72..01980af 100644
---- a/drivers/spi/spi.c
-+++ b/drivers/spi/spi.c
-@@ -2538,6 +2538,14 @@ static int __spi_validate(struct spi_device *spi, struct spi_message *message)
- 	if (list_empty(&message->transfers))
- 		return -EINVAL;
+diff --git a/drivers/spi/spi-zynqmp-gqspi.c b/drivers/spi/spi-zynqmp-gqspi.c
+index 18aeace..dc7cf03 100644
+--- a/drivers/spi/spi-zynqmp-gqspi.c
++++ b/drivers/spi/spi-zynqmp-gqspi.c
+@@ -153,6 +153,7 @@ enum mode_type {GQSPI_MODE_IO, GQSPI_MODE_DMA};
+  * @dma_rx_bytes:	Remaining bytes to receive by DMA mode
+  * @dma_addr:		DMA address after mapping the kernel buffer
+  * @genfifoentry:	Used for storing the genfifoentry instruction.
++ * @isinstr:		To determine whether the transfer is instruction
+  * @mode:		Defines the mode in which QSPI is operating
+  */
+ struct zynqmp_qspi {
+@@ -170,6 +171,7 @@ struct zynqmp_qspi {
+ 	u32 dma_rx_bytes;
+ 	dma_addr_t dma_addr;
+ 	u32 genfifoentry;
++	bool isinstr;
+ 	enum mode_type mode;
+ };
  
-+	/*
-+	 *  Data stripe option is selected if and only if when
-+	 *  two chips are enabled
-+	 */
-+	if ((master->flags & SPI_MASTER_DATA_STRIPE)
-+		&& !(master->flags & SPI_MASTER_BOTH_CS))
-+		return -EINVAL;
+@@ -404,11 +406,24 @@ static void zynqmp_qspi_chipselect(struct spi_device *qspi, bool is_high)
+ 	u32 genfifoentry = 0x0, statusreg;
+ 
+ 	genfifoentry |= GQSPI_GENFIFO_MODE_SPI;
 +
- 	/* Half-duplex links include original MicroWire, and ones with
- 	 * only one data pin like SPI_3WIRE (switches direction) or where
- 	 * either MOSI or MISO is missing.  They can also be caused by
-diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
-index 4b743ac..94a5e6a 100644
---- a/include/linux/spi/spi.h
-+++ b/include/linux/spi/spi.h
-@@ -443,6 +443,17 @@ struct spi_master {
- #define SPI_MASTER_MUST_RX      BIT(3)		/* requires rx */
- #define SPI_MASTER_MUST_TX      BIT(4)		/* requires tx */
++
++	if (qspi->master->flags & SPI_MASTER_BOTH_CS) {
++		zynqmp_gqspi_selectslave(xqspi,
++				GQSPI_SELECT_FLASH_CS_BOTH,
++				GQSPI_SELECT_FLASH_BUS_BOTH);
++	} else {
++		zynqmp_gqspi_selectslave(xqspi,
++				GQSPI_SELECT_FLASH_CS_LOWER,
++				GQSPI_SELECT_FLASH_BUS_LOWER);
++	}
++
+ 	genfifoentry |= xqspi->genfifobus;
  
-+	/* Controller may support data stripe feature when more than one
-+	 * chips are present.
-+	 * Setting data stripe will send data in following manner:
-+	 * -> even bytes i.e. 0, 2, 4,... are transmitted on lower data bus
-+	 * -> odd bytes i.e. 1, 3, 5,.. are transmitted on upper data bus
-+	 */
-+#define SPI_MASTER_DATA_STRIPE	BIT(7)		/* support data stripe */
-+	/* Controller may support asserting more than one chip select at once.
-+	 * This flag will enable that feature.
-+	 */
-+#define SPI_MASTER_BOTH_CS	BIT(8)		/* assert both chip selects */
- 	/*
- 	 * on some hardware transfer / message size may be constrained
- 	 * the limit may depend on device transfer settings
+ 	if (!is_high) {
+ 		genfifoentry |= xqspi->genfifocs;
+ 		genfifoentry |= GQSPI_GENFIFO_CS_SETUP;
++		xqspi->isinstr = true;
+ 	} else {
+ 		genfifoentry |= GQSPI_GENFIFO_CS_HOLD;
+ 	}
+@@ -665,6 +680,7 @@ static irqreturn_t zynqmp_qspi_irq(int irq, void *dev_id)
+ 	if ((xqspi->bytes_to_receive == 0) && (xqspi->bytes_to_transfer == 0)
+ 			&& ((status & GQSPI_IRQ_MASK) == GQSPI_IRQ_MASK)) {
+ 		zynqmp_gqspi_write(xqspi, GQSPI_IDR_OFST, GQSPI_ISR_IDR_MASK);
++		xqspi->isinstr = false;
+ 		spi_finalize_current_transfer(master);
+ 		ret = IRQ_HANDLED;
+ 	}
+@@ -828,6 +844,9 @@ static int zynqmp_qspi_start_transfer(struct spi_master *master,
+ 	genfifoentry |= xqspi->genfifocs;
+ 	genfifoentry |= xqspi->genfifobus;
+ 
++	if ((!xqspi->isinstr) && (master->flags & SPI_MASTER_DATA_STRIPE))
++		genfifoentry |= GQSPI_GENFIFO_STRIPE;
++
+ 	zynqmp_qspi_txrxsetup(xqspi, transfer, &genfifoentry);
+ 
+ 	if (xqspi->mode == GQSPI_MODE_DMA)
+@@ -980,6 +999,7 @@ static int zynqmp_qspi_probe(struct platform_device *pdev)
+ 	struct zynqmp_qspi *xqspi;
+ 	struct resource *res;
+ 	struct device *dev = &pdev->dev;
++	u32 num_cs;
+ 
+ 	master = spi_alloc_master(&pdev->dev, sizeof(*xqspi));
+ 	if (!master)
+@@ -1040,7 +1060,11 @@ static int zynqmp_qspi_probe(struct platform_device *pdev)
+ 		goto clk_dis_all;
+ 	}
+ 
+-	master->num_chipselect = GQSPI_DEFAULT_NUM_CS;
++	ret = of_property_read_u32(pdev->dev.of_node, "num-cs", &num_cs);
++	if (ret < 0)
++		master->num_chipselect = GQSPI_DEFAULT_NUM_CS;
++	else
++		master->num_chipselect = num_cs;
+ 
+ 	master->setup = zynqmp_qspi_setup;
+ 	master->set_cs = zynqmp_qspi_chipselect;
 -- 
 2.10.2
