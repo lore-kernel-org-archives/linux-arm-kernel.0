@@ -1,32 +1,24 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 27 Nov 2016 22:32:41 +0100
-Subject: [PATCH] mv88e6xxx: Fix mv88e6xxx_g1_irq_free() interrupt count
-In-Reply-To: <20161127212256.GC13318@lunn.ch>
-References: <1480279424-7830-1-git-send-email-afaerber@suse.de>
- <20161127212256.GC13318@lunn.ch>
-Message-ID: <ff0d121a-0ecb-8af7-af11-cf94df31639c@suse.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 27 Nov 2016 22:33:01 +0100
+Subject: [PATCH v2] MAINTAINERS: Add device tree bindings to mv88e6xx
+ section
+In-Reply-To: <1480280850-10409-1-git-send-email-afaerber@suse.de>
+References: <1480280676-10117-1-git-send-email-afaerber@suse.de>
+ <1480280850-10409-1-git-send-email-afaerber@suse.de>
+Message-ID: <20161127213301.GE13318@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Sun, Nov 27, 2016 at 10:07:30PM +0100, Andreas F?rber wrote:
+> Also include the netdev list for convenience, as done elsewhere.
 
-Am 27.11.2016 um 22:22 schrieb Andrew Lunn:
-> On Sun, Nov 27, 2016 at 09:43:44PM +0100, Andreas F?rber wrote:
->> mv88e6xxx_g1_irq_setup() sets up chip->g1_irq.nirqs interrupt mappings,
->> so free the same amount. This will be 8 or 9 in practice, less than 16.
-> 
-> Hi Andreas
-> 
-> The patch is correct, but please read
-> Documentation/networking/netdev-FAQ.txt
-> and then resubmit the patch.
+Please indicate which maintainer you expect to accept this. And if that
+is David Miller, please fix the Subject: line.
+ 
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 
-Do you mean --subject-prefix="PATCH net-next" or something else?
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-Thanks,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+    Andrew
