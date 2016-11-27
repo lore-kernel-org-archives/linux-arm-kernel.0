@@ -1,33 +1,32 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun, 27 Nov 2016 20:54:44 +0100
-Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: Add missing newline
-Message-ID: <1480276484-5482-1-git-send-email-afaerber@suse.de>
+Date: Sun, 27 Nov 2016 21:43:44 +0100
+Subject: [PATCH] mv88e6xxx: Fix mv88e6xxx_g1_irq_free() interrupt count
+Message-ID: <1480279424-7830-1-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Found while reviewing Marvell dsa bindings usage.
+mv88e6xxx_g1_irq_setup() sets up chip->g1_irq.nirqs interrupt mappings,
+so free the same amount. This will be 8 or 9 in practice, less than 16.
 
-Fixes: f283745b3caf ("arm: vf610: zii devel b: Add support for switch interrupts")
+Fixes: dc30c35be720 ("net: dsa: mv88e6xxx: Implement interrupt support.")
 Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: David S. Miller <davem@davemloft.net>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/net/dsa/mv88e6xxx/chip.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-index 7ea617e47fe4..958b4c42d320 100644
---- a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-+++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
-@@ -153,7 +153,8 @@
- 					switch0phy1: switch1phy0 at 1 {
- 						reg = <1>;
- 						interrupt-parent = <&switch0>;
--						interrupts = <1 IRQ_TYPE_LEVEL_HIGH>;					};
-+						interrupts = <1 IRQ_TYPE_LEVEL_HIGH>;
-+					};
- 					switch0phy2: switch1phy0 at 2 {
- 						reg = <2>;
- 						interrupt-parent = <&switch0>;
+diff --git a/drivers/net/dsa/mv88e6xxx/chip.c b/drivers/net/dsa/mv88e6xxx/chip.c
+index 98302358ceb9..95b9efb33ec7 100644
+--- a/drivers/net/dsa/mv88e6xxx/chip.c
++++ b/drivers/net/dsa/mv88e6xxx/chip.c
+@@ -421,7 +421,7 @@ static void mv88e6xxx_g1_irq_free(struct mv88e6xxx_chip *chip)
+ 
+ 	free_irq(chip->irq, chip);
+ 
+-	for (irq = 0; irq < 16; irq++) {
++	for (irq = 0; irq < chip->g1_irq.nirqs; irq++) {
+ 		virq = irq_find_mapping(chip->g1_irq.domain, irq);
+ 		irq_dispose_mapping(virq);
+ 	}
 -- 
 2.6.6
