@@ -1,35 +1,24 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun, 27 Nov 2016 22:07:30 +0100
-Subject: [PATCH v2] MAINTAINERS: Add device tree bindings to mv88e6xx section
-In-Reply-To: <1480280676-10117-1-git-send-email-afaerber@suse.de>
-References: <1480280676-10117-1-git-send-email-afaerber@suse.de>
-Message-ID: <1480280850-10409-1-git-send-email-afaerber@suse.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 27 Nov 2016 22:10:17 +0100
+Subject: [PATCH] ARM: dts: mvebu: Fix armada-385-turris-omnia stdout-path
+In-Reply-To: <1480275444-4220-1-git-send-email-afaerber@suse.de>
+References: <71af60f5-b657-cab4-32a8-00a604fc656e@suse.de>
+ <1480275444-4220-1-git-send-email-afaerber@suse.de>
+Message-ID: <20161127211017.GA13318@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also include the netdev list for convenience, as done elsewhere.
+On Sun, Nov 27, 2016 at 08:37:24PM +0100, Andreas F?rber wrote:
+> Specify the baudrate.
 
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- MAINTAINERS | 2 ++
- 1 file changed, 2 insertions(+)
+Hi Andreas
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index f73e19277a70..677d73cfedc7 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7668,8 +7668,10 @@ S:	Maintained
- MARVELL 88E6XXX ETHERNET SWITCH FABRIC DRIVER
- M:	Andrew Lunn <andrew@lunn.ch>
- M:	Vivien Didelot <vivien.didelot@savoirfairelinux.com>
-+L:	netdev at vger.kernel.org
- S:	Maintained
- F:	drivers/net/dsa/mv88e6xxx/
-+F:	Documentation/devicetree/bindings/net/dsa/marvell.txt
- 
- MARVELL ARMADA DRM SUPPORT
- M:	Russell King <rmk+kernel@armlinux.org.uk>
--- 
-2.6.6
+Please put each patch/patchset in a new thread.
+
+> Fixes: 26ca8b52d6e1 ("ARM: dts: add support for Turris Omnia")
+> Cc: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+
+    Andrew
