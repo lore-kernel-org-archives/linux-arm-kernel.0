@@ -1,22 +1,84 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 27 Nov 2016 17:07:31 +0100
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sun, 27 Nov 2016 17:10:55 +0100
 Subject: [PATCH v5 2/2] ARM: dts: add support for Turris Omnia
-In-Reply-To: <a7f47999-ec83-6cc8-8119-0087dee17bac@suse.de>
+In-Reply-To: <1fc18002-0144-8300-1888-09f456860ef0@kleine-koenig.org>
 References: <20161125142658.21690-1-uwe@kleine-koenig.org>
  <20161125142658.21690-3-uwe@kleine-koenig.org>
  <87lgw7ilg9.fsf@free-electrons.com>
  <a7f47999-ec83-6cc8-8119-0087dee17bac@suse.de>
-Message-ID: <20161127160731.GD4574@lunn.ch>
+ <1fc18002-0144-8300-1888-09f456860ef0@kleine-koenig.org>
+Message-ID: <da10966e-0e5f-9254-57d3-9dd4b7f2be32@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> @Uwe: Note that I had already told CZ.NIC's Michal ~two weeks ago that I
-> have a WIP .dts for the Omnia - looks like no one knows what the other
-> is doing.
+Hi Uwe,
 
-Hi Andreas
+Am 27.11.2016 um 17:05 schrieb Uwe Kleine-K?nig:
+> On 11/27/2016 05:00 PM, Andreas F?rber wrote:
+>> @Uwe: Note that I had already told CZ.NIC's Michal ~two weeks ago that I
+>> have a WIP .dts for the Omnia - looks like no one knows what the other
+>> is doing. :( My branch includes cleanups for 385 .dtsi and bug fixes for
+>> the switch that I am not seeing in your series:
+> 
+> I'm not in contact with a Michal at cz.nic.
 
-Did you post to the list? Comment on the earlier versions of the
-patches? The list is the please to coordinate these activities.
+Right, but you have a Bedricha in CC from the same company!
 
-	 Andrew
+> Does the switch work in your setup with DSA?
+
+Not really:
+
+omnia:~ # ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN
+group default qlen 1
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+       valid_lft forever preferred_lft forever
+2: eth0: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group
+default qlen 532
+    link/ether d8:58:d7:00:61:70 brd ff:ff:ff:ff:ff:ff
+3: eth1: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group
+default qlen 532
+    link/ether d8:58:d7:00:61:6e brd ff:ff:ff:ff:ff:ff
+4: eth2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP
+group default qlen 532
+    link/ether d8:58:d7:00:61:6f brd ff:ff:ff:ff:ff:ff
+    inet 192.168.1.50/24 brd 192.168.1.255 scope global eth2
+       valid_lft forever preferred_lft forever
+    inet6 2003:86:6702:9f00:da58:d7ff:fe00:616f/64 scope global
+mngtmpaddr dynamic
+       valid_lft 7050sec preferred_lft 1650sec
+    inet6 fe80::da58:d7ff:fe00:616f/64 scope link
+       valid_lft forever preferred_lft forever
+5: sit0 at NONE: <NOARP> mtu 1480 qdisc noop state DOWN group default qlen 1
+    link/sit 0.0.0.0 brd 0.0.0.0
+6: lan0 at eth1: <BROADCAST,MULTICAST,M-DOWN> mtu 1500 qdisc noop state
+DOWN group default qlen 1000
+    link/ether d8:58:d7:00:61:6e brd ff:ff:ff:ff:ff:ff
+7: lan1 at eth1: <BROADCAST,MULTICAST,M-DOWN> mtu 1500 qdisc noop state
+DOWN group default qlen 1000
+    link/ether d8:58:d7:00:61:6e brd ff:ff:ff:ff:ff:ff
+8: lan2 at eth1: <BROADCAST,MULTICAST,M-DOWN> mtu 1500 qdisc noop state
+DOWN group default qlen 1000
+    link/ether d8:58:d7:00:61:6e brd ff:ff:ff:ff:ff:ff
+9: lan3 at eth1: <BROADCAST,MULTICAST,M-DOWN> mtu 1500 qdisc noop state
+DOWN group default qlen 1000
+    link/ether d8:58:d7:00:61:6e brd ff:ff:ff:ff:ff:ff
+10: lan4 at eth1: <BROADCAST,MULTICAST,M-DOWN> mtu 1500 qdisc noop state
+DOWN group default qlen 1000
+    link/ether d8:58:d7:00:61:6e brd ff:ff:ff:ff:ff:ff
+
+I get some interfaces for the switch, but I've not been able to get them
+up/usable. Feel free to browse my commits, maybe I'm doing something
+stupid - I already tried with and without fixed links, but the driver
+seems to use only one of the two cpu links.
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
