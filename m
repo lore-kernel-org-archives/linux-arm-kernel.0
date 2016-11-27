@@ -1,86 +1,44 @@
-From: guy.shapiro@mobi-wize.com (Guy Shapiro)
-Date: Sun, 27 Nov 2016 09:44:58 +0200
-Subject: [PATCH 2/2] input: touchscreen: sample averaging for imx6ul_tsc
-In-Reply-To: <1480232698-23075-1-git-send-email-guy.shapiro@mobi-wize.com>
-References: <1480232698-23075-1-git-send-email-guy.shapiro@mobi-wize.com>
-Message-ID: <1480232698-23075-2-git-send-email-guy.shapiro@mobi-wize.com>
+From: naga.sureshkumar.relli@xilinx.com (Naga Sureshkumar Relli)
+Date: Sun, 27 Nov 2016 14:03:18 +0530
+Subject: [LINUX RFC v4 0/4] Add stripe support for ZynqMP SoC GQSPI controller
+Message-ID: <1480235598-33827-1-git-send-email-nagasure@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX6UL internal touchscreen controller contains an option to
-average upon samples. This feature reduces noise from the produced
-touch locations.
+This patch series is continuation to previous patches mentioned in below link
+http://marc.info/?l=linux-spi&m=145009963109143&w=2
 
-This patch adds sample averaging support to the imx6ul_tsc device
-driver.
+i am re-initiating this series, Could you please help us to get this done?
 
-Signed-off-by: Guy Shapiro <guy.shapiro@mobi-wize.com>
----
- drivers/input/touchscreen/imx6ul_tsc.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+what is dual parallel mode?
+---------------------------
+ZynqMP GQSPI controller supports Dual Parallel mode with following functionalities:
+1) Supporting two SPI flash memories operating in parallel. 8 I/O lines.
+2) Chip selects, data lines and clock are differ to both the flash devices
+3) This mode is targeted for faster read/write speed and also doubles the size
+4) Commands/data can be transmitted/received from both the devices(mirror),
+   or only upper or only lower flash memory devices.
+5) Data arrangement:
+   With stripe enabled,
+   Even bytes i.e. 0, 2, 4,... are transmitted on Lower Data Bus
+   Odd bytes i.e. 1, 3, 5,.. are transmitted on Upper Data Bus.
 
-diff --git a/drivers/input/touchscreen/imx6ul_tsc.c b/drivers/input/touchscreen/imx6ul_tsc.c
-index 8275267..31724d9 100644
---- a/drivers/input/touchscreen/imx6ul_tsc.c
-+++ b/drivers/input/touchscreen/imx6ul_tsc.c
-@@ -25,6 +25,7 @@
- /* ADC configuration registers field define */
- #define ADC_AIEN		(0x1 << 7)
- #define ADC_CONV_DISABLE	0x1F
-+#define ADC_AVGE		(0x1 << 5)
- #define ADC_CAL			(0x1 << 7)
- #define ADC_CALF		0x2
- #define ADC_12BIT_MODE		(0x2 << 2)
-@@ -32,6 +33,7 @@
- #define ADC_CLK_DIV_8		(0x03 << 5)
- #define ADC_SHORT_SAMPLE_MODE	(0x0 << 4)
- #define ADC_HARDWARE_TRIGGER	(0x1 << 13)
-+#define ADC_AVGS_SHIFT		14
- #define SELECT_CHANNEL_4	0x04
- #define SELECT_CHANNEL_1	0x01
- #define DISABLE_CONVERSION_INT	(0x0 << 7)
-@@ -86,6 +88,7 @@ struct imx6ul_tsc {
- 
- 	int measure_delay_time;
- 	int pre_charge_time;
-+	int average_samples;
- 
- 	struct completion completion;
- };
-@@ -107,6 +110,8 @@ static int imx6ul_adc_init(struct imx6ul_tsc *tsc)
- 	adc_cfg = readl(tsc->adc_regs + REG_ADC_CFG);
- 	adc_cfg |= ADC_12BIT_MODE | ADC_IPG_CLK;
- 	adc_cfg |= ADC_CLK_DIV_8 | ADC_SHORT_SAMPLE_MODE;
-+	if (tsc->average_samples)
-+		adc_cfg |= (tsc->average_samples - 1) << ADC_AVGS_SHIFT;
- 	adc_cfg &= ~ADC_HARDWARE_TRIGGER;
- 	writel(adc_cfg, tsc->adc_regs + REG_ADC_CFG);
- 
-@@ -118,6 +123,8 @@ static int imx6ul_adc_init(struct imx6ul_tsc *tsc)
- 	/* start ADC calibration */
- 	adc_gc = readl(tsc->adc_regs + REG_ADC_GC);
- 	adc_gc |= ADC_CAL;
-+	if (tsc->average_samples)
-+		adc_gc |= ADC_AVGE;
- 	writel(adc_gc, tsc->adc_regs + REG_ADC_GC);
- 
- 	timeout = wait_for_completion_timeout
-@@ -450,6 +457,16 @@ static int imx6ul_tsc_probe(struct platform_device *pdev)
- 	if (err)
- 		tsc->pre_charge_time = 0xfff;
- 
-+	err = of_property_read_u32(np, "average-samples",
-+				   &tsc->average_samples);
-+	if (err)
-+		tsc->average_samples = 0;
-+	if (tsc->average_samples > 4) {
-+		dev_err(&pdev->dev, "average-samples (%u) must be [0-4]\n",
-+			tsc->average_samples);
-+		return -EINVAL;
-+	}
-+
- 	err = input_register_device(tsc->input);
- 	if (err) {
- 		dev_err(&pdev->dev,
+i have tested this on top of latest git-hub master.
+kindly suggest us the way, so that we can proceed further to add this support.
+
+Naga Sureshkumar Relli (4):
+  spi: adding support for data stripe feature in core
+  mtd: add spi_device instance to spi_nor struct
+  mtd: spi-nor: add stripe support
+  spi: zynqmp: gqspi: add support for stripe feature
+
+ drivers/mtd/devices/m25p80.c   |   1 +
+ drivers/mtd/spi-nor/spi-nor.c  | 130 ++++++++++++++++++++++++++++++++---------
+ drivers/spi/spi-zynqmp-gqspi.c |  26 ++++++++-
+ drivers/spi/spi.c              |   8 +++
+ include/linux/mtd/spi-nor.h    |   3 +
+ include/linux/spi/spi.h        |  11 ++++
+ 6 files changed, 149 insertions(+), 30 deletions(-)
+
 -- 
-2.1.4
+2.10.2
