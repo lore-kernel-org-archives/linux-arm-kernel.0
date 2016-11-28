@@ -1,56 +1,39 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Mon, 28 Nov 2016 11:51:35 +0100
-Subject: [Qemu-devel] [kvm-unit-tests PATCH v7 00/11] QEMU MTTCG Test cases
-In-Reply-To: <20161124161033.11456-1-alex.bennee@linaro.org>
-References: <20161124161033.11456-1-alex.bennee@linaro.org>
-Message-ID: <20161128105135.ryolphjeiho56hbm@kamzik.brq.redhat.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 28 Nov 2016 11:52:26 +0100
+Subject: [PATCH] ARM: dts: mvebu: Add Armada 38x labels and clean up
+ Turris Omnia
+In-Reply-To: <20161128103738.GT14217@n2100.armlinux.org.uk>
+References: <1fc18002-0144-8300-1888-09f456860ef0@kleine-koenig.org>
+ <1480272700-28888-1-git-send-email-afaerber@suse.de>
+ <20161128103738.GT14217@n2100.armlinux.org.uk>
+Message-ID: <4ad1108a-43c4-46f8-4683-1c4b89996036@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2016 at 04:10:22PM +0000, Alex Benn?e wrote:
-> Hi,
-> 
-> Looking at my records it seems as though it has been a while since I
-> last posted these tests. As I'm hoping to get the final bits of MTTCG
-> merged upstream on the next QEMU development cycle I've been re-basing
-> these and getting them cleaned up for merging.
-> 
-> Some of the patches might be worth taking now if the maintainers are
-> happy to do so (run_test tweaks, libcflat updates?). The others could
-> do with more serious review. I've CC'd some of the ARM guys to look
-> over the tlbflush/barrier tests so they can cast their expert eyes
-> over them ;-)
-> 
-> There are two additions to the series.
-> 
-> The tcg-test is a general torture test aimed at QEMU's TCG execution
-> model. It stresses the cpu execution loop through the use of
-> cross-page and computed jumps. It can also add IRQ's and self-modifying
-> code to the mix.
-> 
-> The tlbflush-data test is a new one, the old tlbflush test is renamed
-> tlbflush-code to better indicate the code path it exercise. The the
-> code test tests the translation invalidation pathways in QEMU the data
-> test exercises the SoftMMU's TLBs and explicitly that tlbflush
-> completion semantics are correct.
-> 
-> The tlbflush-data passes most of the times on real hardware but
-> definitely showed the problem with deferred TLB flushes running under
-> MTTCG QEMU. I've looked at some of the failure cases on real hardware
-> and it did look like a timestamp appeared on a page that shouldn't
-> have been accessible at the time - I don't know if this is a real
-> silicon bug or my misreading of the semantics so I'd appreciate
-> a comment from the experts.
+Hi Russell,
 
-One other thought. I'm not sure how best to approach a bunch of TCG-only
-tests getting integrated. I'm thinking it might be nice to give them
-their own subdir under the arch dir, e.g. arm/tcg. That subdir would
-have its own unittests.cfg file too. Otherwise when we run on KVM we'll
-have a load of "SKIP: requires TCG" type messages...
+Am 28.11.2016 um 11:37 schrieb Russell King - ARM Linux:
+> On Sun, Nov 27, 2016 at 07:51:39PM +0100, Andreas F?rber wrote:
+>> To more consistently reference nodes by label, add labels for sata,
+>> usb2, sdhci and usb3 nodes.
+>>
+>> Convert all other 38x boards for consistency. Add labels for nfc and rtc.
+> 
+> Please don't do this for clearfog - there's changes in the pipeline which
+> completely replace armada-388-clearfog.dts because there's a "base" and
+> "pro" versions of this hardware now, and making such a huge change will
+> effectively mean we have to start over with the DT files.
 
-We'll want to add a run_tests.sh option to pass the name of the subdir,
-'-d tcg'. When the subdir name is 'tcg' ACCEL could automatically be
-switched to 'tcg' as well.
+Would it help to split it back up into a series of add-labels,
+use-labels like I had originally? Then you could start using them in
+your refactoring as soon as the add-labels patch gets applied. Or are
+you completely against this style?
 
-Thanks,
-drew
+Thanks for pointing this out,
+
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
