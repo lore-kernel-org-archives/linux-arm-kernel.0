@@ -1,76 +1,76 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 28 Nov 2016 12:29:37 +0000
-Subject: [RFC PATCH 13/29] arm64/sve: Basic support for KERNEL_MODE_NEON
-In-Reply-To: <20161128120623.GA17125@e104818-lin.cambridge.arm.com>
-References: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
- <1480102762-23647-14-git-send-email-Dave.Martin@arm.com>
- <CAKv+Gu-MKdNHNrvSvMeoAoENdfscbAK0==NEMu6KJn8fjxz_tw@mail.gmail.com>
- <20161126113038.GA86651@MBP.local>
- <20161128114723.GG1574@e103592.cambridge.arm.com>
- <20161128120623.GA17125@e104818-lin.cambridge.arm.com>
-Message-ID: <20161128122937.GI1574@e103592.cambridge.arm.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 28 Nov 2016 13:31:46 +0100
+Subject: [PATCH net-next v3 4/4] ARM64: dts: meson: odroidc2: disable
+ advertisement EEE for GbE.
+In-Reply-To: <1480326409-25419-5-git-send-email-jbrunet@baylibre.com>
+References: <1480326409-25419-1-git-send-email-jbrunet@baylibre.com>
+ <1480326409-25419-5-git-send-email-jbrunet@baylibre.com>
+Message-ID: <9709dd57-e536-9281-6b56-5ff5f9e8035c@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2016 at 12:06:24PM +0000, Catalin Marinas wrote:
-> On Mon, Nov 28, 2016 at 11:47:26AM +0000, Dave P Martin wrote:
-> > On Sat, Nov 26, 2016 at 11:30:42AM +0000, Catalin Marinas wrote:
-> > > On Fri, Nov 25, 2016 at 08:45:02PM +0000, Ard Biesheuvel wrote:
-> > > > On 25 November 2016 at 19:39, Dave Martin <Dave.Martin@arm.com> wrote:
-> > > > > --- a/arch/arm64/kernel/fpsimd.c
-> > > > > +++ b/arch/arm64/kernel/fpsimd.c
-> > > > > @@ -282,11 +282,26 @@ static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
-> > > > >   */
-> > > > >  void kernel_neon_begin_partial(u32 num_regs)
-> > > > >  {
-> > > > > +       preempt_disable();
-> > > > > +
-> > > > > +       /*
-> > > > > +        * For now, we have no special storage for SVE registers in
-> > > > > +        * interrupt context, so always save the userland SVE state
-> > > > > +        * if there is any, even for interrupts.
-> > > > > +        */
-> > > > > +       if (IS_ENABLED(CONFIG_ARM64_SVE) && (elf_hwcap & HWCAP_SVE) &&
-> > > > > +           current->mm &&
-> > > > > +           !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE)) {
-> > > > > +               fpsimd_save_state(&current->thread.fpsimd_state);
-> > > > > +               this_cpu_write(fpsimd_last_state, NULL);
-> > > > > +       }
-> > > > > +
-> > > > 
-> > > > I am having trouble understanding why we need all of this if we don't
-> > > > support SVE in the kernel. Could you elaborate?
-> > > 
-> > > Dave knows all the details but a reason is that touching a Neon register
-> > > zeros the upper SVE state in the same vector register. So we can't
-> > > safely save/restore just the Neon part without corrupting the SVE state.
-> > 
-> > This is right -- this also means that EFI services can trash the upper
-> > bits of an SVE vector register (as a side-effect of FPSIMD/NEON usage).
-> > 
-> > It's overkill to save/restore absolutely everything -- I ignore num_regs
-> > for example -- but I wanted to keep things as simple as possible
-> > initially.
+Am 28.11.2016 um 10:46 schrieb Jerome Brunet:
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
 > 
-> Without looking at your patches in detail, could we mandate in the ABI
-> that the SVE state is lost on the user/kernel syscall boundary? I guess
-> even for the PCS, the SVE state is caller-saved, so there shouldn't be
-> an additional cost to user. On interrupts, however, we'd have to
-> preserve the SVE state but if we do this on entry/exit points, the
-> kernel_neon_*() functions would not have to deal with any SVE state (and
-> even ignore it completely if in interrupt).
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> index e6e3491d48a5..5624714d2b16 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> @@ -46,6 +46,7 @@
+>  
+>  #include "meson-gxbb.dtsi"
+>  #include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/net/mdio.h>
+>  
+>  / {
+>  	compatible = "hardkernel,odroid-c2", "amlogic,meson-gxbb";
+> @@ -98,3 +99,18 @@
+>  	pinctrl-0 = <&i2c_a_pins>;
+>  	pinctrl-names = "default";
+>  };
+> +
+> +&ethmac {
+> +	phy-handle = <&eth_phy0>;
+> +
+> +	mdio {
+> +		compatible = "snps,dwmac-mdio";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		eth_phy0: ethernet-phy at 0 {
+> +			reg = <0>;
+> +			eee-broken-modes = <MDIO_EEE_1000T>;
+> +		};
+> +	};
+> +};
 
-See [RFC PATCH 24/29] arm64/sve: Discard SVE state on system call.
+I've tested this hand-applied because it applies to neither amlogic
+v4.10/integ nor linux-next.git and will conflict if applied through the
+net-next tree.
 
-Currently, kernel_neon_begin_partial() doesn't take advandage of this --
-discarding the state is deferred until sched-out, and anyway I don't
-check for TIF_SVE in kernel_neon_begin_partial().  There's definitely
-some room for improvement.
+Note that there already is an &ethmac node that you should be extending
+rather than duplicating:
 
-> the requirements for syscall and sigcontext modifications.
+&ethmac {
+	status = "okay";
+	pinctrl-0 = <&eth_rgmii_pins>;
+	pinctrl-names = "default";
+};
 
-Agreed -- I wanted to get this series posted so skipped that for now,
-but I plan to include a Documentation patch alongside the final series.
+If you or your colleagues could please fix the sort order of the nodes
+to be alphabetical again (ethmac after i2c_A here; between uart_A and ir
+in-tree) this wouldn't happen so easily again.
 
-Cheers
----Dave
+I therefore suggest to not apply this patch 4/4 through net-next but
+through the amlogic tree instead.
+
+Thanks,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
