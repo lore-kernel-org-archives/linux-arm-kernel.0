@@ -1,44 +1,123 @@
 From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Mon, 28 Nov 2016 17:31:16 +0300
-Subject: [PATCHv2 01/11] dt-bindings: clarify compatible property for rockchip
- timers
+Date: Mon, 28 Nov 2016 17:31:21 +0300
+Subject: [PATCHv2 06/11] clocksource/drivers/rockchip_timer: low level
+ routines take rk_timer as parameter
 In-Reply-To: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
 References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1480343486-25539-2-git-send-email-al.kochet@gmail.com>
+Message-ID: <1480343486-25539-7-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make all properties description in form '"rockchip,<chip>-timer",
-"rockchip,rk3288-timer"' for all chips found in linux kernel.
+Pass rk_timer instead of clock_event_device to low lever timer routines.
+So that code could be reused by clocksource implementation.
 
-Suggested-by: Heiko St?bner <heiko@sntech.de>
+This is refactoring step without functional changes.
+
 Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
 ---
- .../bindings/timer/rockchip,rk-timer.txt           |   12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ drivers/clocksource/rockchip_timer.c |   47 +++++++++++++++++++---------------
+ 1 file changed, 27 insertions(+), 20 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
-index a41b184..16a5f45 100644
---- a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
-@@ -1,9 +1,15 @@
- Rockchip rk timer
+diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
+index 6d68d4c..aa9ccd1 100644
+--- a/drivers/clocksource/rockchip_timer.c
++++ b/drivers/clocksource/rockchip_timer.c
+@@ -63,60 +63,67 @@ static inline void __iomem *rk_ctrl(struct clock_event_device *ce)
+ 	return rk_timer(ce)->ctrl;
+ }
  
- Required properties:
--- compatible: shall be one of:
--  "rockchip,rk3288-timer" - for rk3066, rk3036, rk3188, rk322x, rk3288, rk3368
--  "rockchip,rk3399-timer" - for rk3399
-+- compatible: should be:
-+  "rockchip,rk3036-timer", "rockchip,rk3288-timer": for Rockchip RK3036
-+  "rockchip,rk3066-timer", "rockchip,rk3288-timer": for Rockchip RK3066
-+  "rockchip,rk3188-timer", "rockchip,rk3288-timer": for Rockchip RK3188
-+  "rockchip,rk3228-timer", "rockchip,rk3288-timer": for Rockchip RK3228
-+  "rockchip,rk3229-timer", "rockchip,rk3288-timer": for Rockchip RK3229
-+  "rockchip,rk3288-timer": for Rockchip RK3288
-+  "rockchip,rk3368-timer", "rockchip,rk3288-timer": for Rockchip RK3368
-+  "rockchip,rk3399-timer": for Rockchip RK3399
- - reg: base address of the timer register starting with TIMERS CONTROL register
- - interrupts: should contain the interrupts for Timer0
- - clocks : must contain an entry for each entry in clock-names
+-static inline void rk_timer_disable(struct clock_event_device *ce)
++static inline void rk_timer_disable(struct rk_timer *timer)
+ {
+-	writel_relaxed(TIMER_DISABLE, rk_ctrl(ce));
++	writel_relaxed(TIMER_DISABLE, timer->ctrl);
+ }
+ 
+-static inline void rk_timer_enable(struct clock_event_device *ce, u32 flags)
++static inline void rk_timer_enable(struct rk_timer *timer, u32 flags)
+ {
+ 	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
+-		       rk_ctrl(ce));
++		       timer->ctrl);
+ }
+ 
+ static void rk_timer_update_counter(unsigned long cycles,
+-				    struct clock_event_device *ce)
++				    struct rk_timer *timer)
+ {
+-	writel_relaxed(cycles, rk_base(ce) + TIMER_LOAD_COUNT0);
+-	writel_relaxed(0, rk_base(ce) + TIMER_LOAD_COUNT1);
++	writel_relaxed(cycles, timer->base + TIMER_LOAD_COUNT0);
++	writel_relaxed(0, timer->base + TIMER_LOAD_COUNT1);
+ }
+ 
+-static void rk_timer_interrupt_clear(struct clock_event_device *ce)
++static void rk_timer_interrupt_clear(struct rk_timer *timer)
+ {
+-	writel_relaxed(1, rk_base(ce) + TIMER_INT_STATUS);
++	writel_relaxed(1, timer->base + TIMER_INT_STATUS);
+ }
+ 
+ static inline int rk_timer_set_next_event(unsigned long cycles,
+ 					  struct clock_event_device *ce)
+ {
+-	rk_timer_disable(ce);
+-	rk_timer_update_counter(cycles, ce);
+-	rk_timer_enable(ce, TIMER_MODE_USER_DEFINED_COUNT);
++	struct rk_timer *timer = rk_timer(ce);
++
++	rk_timer_disable(timer);
++	rk_timer_update_counter(cycles, timer);
++	rk_timer_enable(timer, TIMER_MODE_USER_DEFINED_COUNT);
+ 	return 0;
+ }
+ 
+ static int rk_timer_shutdown(struct clock_event_device *ce)
+ {
+-	rk_timer_disable(ce);
++	struct rk_timer *timer = rk_timer(ce);
++
++	rk_timer_disable(timer);
+ 	return 0;
+ }
+ 
+ static int rk_timer_set_periodic(struct clock_event_device *ce)
+ {
+-	rk_timer_disable(ce);
+-	rk_timer_update_counter(rk_timer(ce)->freq / HZ - 1, ce);
+-	rk_timer_enable(ce, TIMER_MODE_FREE_RUNNING);
++	struct rk_timer *timer = rk_timer(ce);
++
++	rk_timer_disable(timer);
++	rk_timer_update_counter(timer->freq / HZ - 1, timer);
++	rk_timer_enable(timer, TIMER_MODE_FREE_RUNNING);
+ 	return 0;
+ }
+ 
+ static irqreturn_t rk_timer_interrupt(int irq, void *dev_id)
+ {
+ 	struct clock_event_device *ce = dev_id;
++	struct rk_timer *timer = rk_timer(ce);
+ 
+-	rk_timer_interrupt_clear(ce);
++	rk_timer_interrupt_clear(timer);
+ 
+ 	if (clockevent_state_oneshot(ce))
+-		rk_timer_disable(ce);
++		rk_timer_disable(timer);
+ 
+ 	ce->event_handler(ce);
+ 
+@@ -183,8 +190,8 @@ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
+ 	ce->cpumask = cpu_possible_mask;
+ 	ce->rating = 250;
+ 
+-	rk_timer_interrupt_clear(ce);
+-	rk_timer_disable(ce);
++	rk_timer_interrupt_clear(timer);
++	rk_timer_disable(timer);
+ 
+ 	ret = request_irq(irq, rk_timer_interrupt, IRQF_TIMER, TIMER_NAME, ce);
+ 	if (ret) {
 -- 
 1.7.9.5
