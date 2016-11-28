@@ -1,66 +1,78 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 28 Nov 2016 15:04:33 +0000
-Subject: [PATCH v28 4/9] arm64: kdump: implement machine_crash_shutdown()
-In-Reply-To: <20161124095809.7092-3-takahiro.akashi@linaro.org>
-References: <20161124095523.6972-1-takahiro.akashi@linaro.org>
- <20161124095809.7092-3-takahiro.akashi@linaro.org>
-Message-ID: <20161128150433.GC17125@e104818-lin.cambridge.arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 28 Nov 2016 16:16:34 +0100
+Subject: [PATCH 7/10] mmc: sdhci-xenon: Add support to PHYs of Marvell
+ Xenon SDHC
+In-Reply-To: <10a885f0-82e9-a35c-f62f-3fc4518ea8b4@marvell.com>
+References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
+ <a05ffd140f4edc02fc3128db8445b2264cf38723.1477911954.git-series.gregory.clement@free-electrons.com>
+ <CAPDyKFpkcoVMKbVOwjX1WDyNgc1vvUX60D6XRX6=YHGvkvHvnA@mail.gmail.com>
+ <3cd05a26-d340-476e-bab1-8be9d5446f47@marvell.com>
+ <CAPDyKFrskyZvMwhmj8ioyaowU8GL5=d-6ipGQcmmig_a9E9AQQ@mail.gmail.com>
+ <436c6925-cb0d-afe7-e3a2-384eca15ff42@marvell.com>
+ <8359307d-5f44-3db9-aae1-eb1fe8e1141d@marvell.com>
+ <CAPDyKFo3ezYOywtSZ8GGQ1XK9KPsxCgQNbaiz45EVgbgtnUxjg@mail.gmail.com>
+ <10a885f0-82e9-a35c-f62f-3fc4518ea8b4@marvell.com>
+Message-ID: <CAPDyKFr8rX04iY92OeQpSkS+3HN2-FxijCCiDb2sSKvP+TZPog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2016 at 06:58:05PM +0900, AKASHI Takahiro wrote:
-> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
-> index 04744dc..b5168e8 100644
-> --- a/arch/arm64/include/asm/kexec.h
-> +++ b/arch/arm64/include/asm/kexec.h
-> @@ -40,7 +40,47 @@
->  static inline void crash_setup_regs(struct pt_regs *newregs,
->  				    struct pt_regs *oldregs)
->  {
-> -	/* Empty routine needed to avoid build errors. */
-> +	if (oldregs) {
-> +		memcpy(newregs, oldregs, sizeof(*newregs));
-> +	} else {
-> +		u64 tmp1, tmp2;
-> +
-> +		__asm__ __volatile__ (
-> +			"stp	 x0,   x1, [%2, #16 *  0]\n"
-> +			"stp	 x2,   x3, [%2, #16 *  1]\n"
-> +			"stp	 x4,   x5, [%2, #16 *  2]\n"
-> +			"stp	 x6,   x7, [%2, #16 *  3]\n"
-> +			"stp	 x8,   x9, [%2, #16 *  4]\n"
-> +			"stp	x10,  x11, [%2, #16 *  5]\n"
-> +			"stp	x12,  x13, [%2, #16 *  6]\n"
-> +			"stp	x14,  x15, [%2, #16 *  7]\n"
-> +			"stp	x16,  x17, [%2, #16 *  8]\n"
-> +			"stp	x18,  x19, [%2, #16 *  9]\n"
-> +			"stp	x20,  x21, [%2, #16 * 10]\n"
-> +			"stp	x22,  x23, [%2, #16 * 11]\n"
-> +			"stp	x24,  x25, [%2, #16 * 12]\n"
-> +			"stp	x26,  x27, [%2, #16 * 13]\n"
-> +			"stp	x28,  x29, [%2, #16 * 14]\n"
-> +			"mov	 %0,  sp\n"
-> +			"stp	x30,  %0,  [%2, #16 * 15]\n"
-> +
-> +			"/* faked current PSTATE */\n"
-> +			"mrs	 %0, CurrentEL\n"
-> +			"mrs	 %1, SPSEL\n"
-> +			"orr	 %0, %0, %1\n"
-> +			"mrs	 %1, DAIF\n"
-> +			"orr	 %0, %0, %1\n"
-> +			"mrs	 %1, NZCV\n"
-> +			"orr	 %0, %0, %1\n"
-> +			/* pc */
-> +			"adr	 %1, 1f\n"
-> +		"1:\n"
-> +			"stp	 %1, %0,   [%2, #16 * 16]\n"
-> +			: "+r" (tmp1), "+r" (tmp2)
-> +			: "r" (newregs)
-> +			: "memory"
+On 28 November 2016 at 12:38, Ziji Hu <huziji@marvell.com> wrote:
+> Hi Ulf,
+>
+> On 2016/11/28 19:13, Ulf Hansson wrote:
+>>>
+>>>     As you suggest, I replace mmc_wait_for_cmd() with mmc_send_tuning(), to
+>>>     send commands for testing current sampling point set in our host PHY.
+>>>
+>>>     According to my test result, it shows that mmc_send_tuning() can only support
+>>>     tuning command (CMD21/CMD19).
+>>>     As a result, we cannot use mmc_send_tuning() when card is in the speed modes
+>>>     which doesn't support tuning, such as eMMC HS SDR, eMMC HS DRR and
+>>>     SD SDR 12/SDR25/DDR50. Card will not response to tuning commands in those
+>>>     speed modes.
+>>>
+>>>     Could you please provide suggestions for the speed mode in which tuning is
+>>>     not available?
+>>>
+>>
+>> Normally the mmc host driver shouldn't have to care about what the
+>> card supports, as that is the responsibility of the mmc core to
+>> manage.
+>>
+>> The host should only need to implement the ->execute_tuning() ops,
+>> which gets called when the card supports tuning (CMD19/21). Does it
+>> make sense?
+>>
+>    I think it is irrelevant to tuning procedure.
+>
+>    Our host requires to adjust PHY setting after each time ios setting
+>    (SDCLK/bus width/speed mode) is changed.
+>    The simplified sequence is:
+>    mmc change ios --> mmc_set_ios() --> ->set_ios() --> after sdhci_set_ios(),
+>    adjust PHY setting.
+>    During PHY setting adjustment, out host driver has to send commands to
+>    test current sampling point. Tuning is another independent step.
 
-tmp1 and tmp2 are not input arguments here, so you should use the "=&"
-modifier. With my compiler, I get warnings of these variables being used
-uninitialised.
+For those speed modes (or other ios changes) that *don't* requires
+tuning, then what will you do when you send the command to confirm the
+change of PHY setting and it fails?
 
--- 
-Catalin
+My assumption is that you will fail anyway, by propagating the error
+to the mmc core. At least that what was my understanding from your
+earlier replies, right!?
+
+Then, I think there are no point having the host driver sending a
+command to confirm the PHY settings, as the mmc core will anyway
+discover if something goes wrong when the next command is sent.
+
+Please correct me if I am wrong!
+
+>
+>    Thus our host needs a valid command in PHY setting adjustment. Tuning command
+>    can be borrowed to complete this task in SD SDR50. But for other speed mode,
+>    we have to find out a valid command.
+
+I thought we agreed on this wasn't necessary? Please see my upper response.
+
+Kind regards
+Uffe
