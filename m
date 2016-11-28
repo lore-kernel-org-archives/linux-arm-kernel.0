@@ -1,55 +1,56 @@
 From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Mon, 28 Nov 2016 17:31:23 +0300
-Subject: [PATCHv2 08/11] clocksource/drivers/rockchip_timer: move
- TIMER_INT_UNMASK out of rk_timer_enable()
+Date: Mon, 28 Nov 2016 17:31:25 +0300
+Subject: [PATCHv2 10/11] clocksource/drivers/rockchip_timer: implement reading
+ 64bit value from timer
 In-Reply-To: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
 References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1480343486-25539-9-git-send-email-al.kochet@gmail.com>
+Message-ID: <1480343486-25539-11-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allow to enable timer without enabling interrupts from it.
-As that mode will be used in clocksource implementation.
-
-This is refactoring step without functional changes.
-
 Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
 ---
- drivers/clocksource/rockchip_timer.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/clocksource/rockchip_timer.c |   21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
 diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
-index a17dc61..61c3bb1 100644
+index c2b0454..6224aa9 100644
 --- a/drivers/clocksource/rockchip_timer.c
 +++ b/drivers/clocksource/rockchip_timer.c
-@@ -60,8 +60,7 @@ static inline void rk_timer_disable(struct rk_timer *timer)
+@@ -19,6 +19,8 @@
  
- static inline void rk_timer_enable(struct rk_timer *timer, u32 flags)
+ #define TIMER_LOAD_COUNT0	0x00
+ #define TIMER_LOAD_COUNT1	0x04
++#define TIMER_CURRENT_VALUE0	0x08
++#define TIMER_CURRENT_VALUE1	0x0C
+ #define TIMER_CONTROL_REG3288	0x10
+ #define TIMER_CONTROL_REG3399	0x1c
+ #define TIMER_INT_STATUS	0x18
+@@ -72,6 +74,25 @@ static void rk_timer_update_counter(u64 cycles, struct rk_timer *timer)
+ 	writel_relaxed(upper, timer->base + TIMER_LOAD_COUNT1);
+ }
+ 
++static u64 rk_timer_counter_read(struct rk_timer *timer)
++{
++	u64 counter;
++	u32 lower;
++	u32 upper, old_upper;
++
++	upper = readl_relaxed(timer->base + TIMER_CURRENT_VALUE1);
++	do {
++		old_upper = upper;
++		lower = readl_relaxed(timer->base + TIMER_CURRENT_VALUE0);
++		upper = readl_relaxed(timer->base + TIMER_CURRENT_VALUE1);
++	} while (upper != old_upper);
++
++	counter = upper;
++	counter <<= 32;
++	counter |= lower;
++	return counter;
++}
++
+ static void rk_timer_interrupt_clear(struct rk_timer *timer)
  {
--	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
--		       timer->ctrl);
-+	writel_relaxed(TIMER_ENABLE | flags, timer->ctrl);
- }
- 
- static void rk_timer_update_counter(unsigned long cycles,
-@@ -83,7 +82,8 @@ static inline int rk_timer_set_next_event(unsigned long cycles,
- 
- 	rk_timer_disable(timer);
- 	rk_timer_update_counter(cycles, timer);
--	rk_timer_enable(timer, TIMER_MODE_USER_DEFINED_COUNT);
-+	rk_timer_enable(timer, TIMER_MODE_USER_DEFINED_COUNT |
-+			       TIMER_INT_UNMASK);
- 	return 0;
- }
- 
-@@ -101,7 +101,7 @@ static int rk_timer_set_periodic(struct clock_event_device *ce)
- 
- 	rk_timer_disable(timer);
- 	rk_timer_update_counter(timer->freq / HZ - 1, timer);
--	rk_timer_enable(timer, TIMER_MODE_FREE_RUNNING);
-+	rk_timer_enable(timer, TIMER_MODE_FREE_RUNNING | TIMER_INT_UNMASK);
- 	return 0;
- }
- 
+ 	writel_relaxed(1, timer->base + TIMER_INT_STATUS);
 -- 
 1.7.9.5
