@@ -1,157 +1,55 @@
-From: huziji@marvell.com (Ziji Hu)
-Date: Mon, 28 Nov 2016 18:10:56 +0800
-Subject: [PATCH 7/10] mmc: sdhci-xenon: Add support to PHYs of Marvell
- Xenon SDHC
-In-Reply-To: <436c6925-cb0d-afe7-e3a2-384eca15ff42@marvell.com>
-References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
- <a05ffd140f4edc02fc3128db8445b2264cf38723.1477911954.git-series.gregory.clement@free-electrons.com>
- <CAPDyKFpkcoVMKbVOwjX1WDyNgc1vvUX60D6XRX6=YHGvkvHvnA@mail.gmail.com>
- <3cd05a26-d340-476e-bab1-8be9d5446f47@marvell.com>
- <CAPDyKFrskyZvMwhmj8ioyaowU8GL5=d-6ipGQcmmig_a9E9AQQ@mail.gmail.com>
- <436c6925-cb0d-afe7-e3a2-384eca15ff42@marvell.com>
-Message-ID: <8359307d-5f44-3db9-aae1-eb1fe8e1141d@marvell.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 28 Nov 2016 18:16:04 +0800
+Subject: [PATCH v3] clkdev: add devm_of_clk_get()
+In-Reply-To: <87vav89chw.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <201611281832.klmeAity%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Hi Kuninori,
 
-On 2016/11/24 23:37, Ziji Hu wrote:
-> Hi Ulf,
-> 
-> On 2016/11/24 22:33, Ulf Hansson wrote:
-<snip>
->>>
->>>    As result, our SDHC driver has to implement the functionality to
->>>    send commands and check the results, in host layer.
->>>    If directly calling mmc_wait_for_cmd() is improper, could you please
->>>    give us some suggestions?
->>>
->>>    For eMMC, CMD8 is used to test current sampling point set in PHY.
->>
->> Try to use mmc_send_tuning().
->>
-> 
->     Could you please tell me the requirement of "op_code" parameter in
->     mmc_send_tuning()?
->     According to mmc_send_tuning(),it seems that tuning command(CMD19/CMD21)
->     is required. Thus device will not response mmc_send_tuning() if current
->     speed mode doesn't support tuning command.
->     Please correct me if I am wrong.
->
+[auto build test ERROR on clk/clk-next]
+[also build test ERROR on v4.9-rc7 next-20161128]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-    As you suggest, I replace mmc_wait_for_cmd() with mmc_send_tuning(), to
-    send commands for testing current sampling point set in our host PHY.
+url:    https://github.com/0day-ci/linux/commits/Kuninori-Morimoto/clkdev-add-devm_of_clk_get/20161128-173723
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+config: i386-randconfig-x004-201648 (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-    According to my test result, it shows that mmc_send_tuning() can only support
-    tuning command (CMD21/CMD19).
-    As a result, we cannot use mmc_send_tuning() when card is in the speed modes
-    which doesn't support tuning, such as eMMC HS SDR, eMMC HS DRR and
-    SD SDR 12/SDR25/DDR50. Card will not response to tuning commands in those
-    speed modes.
+All errors (new ones prefixed by >>):
 
-    Could you please provide suggestions for the speed mode in which tuning is
-    not available?
+>> drivers/clk/clk-devres.c:57:13: error: redefinition of 'devm_of_clk_get'
+    struct clk *devm_of_clk_get(struct device *dev,
+                ^~~~~~~~~~~~~~~
+   In file included from drivers/clk/clk-devres.c:7:0:
+   include/linux/clk.h:518:27: note: previous definition of 'devm_of_clk_get' was here
+    static inline struct clk *devm_of_clk_get(struct device *dev,
+                              ^~~~~~~~~~~~~~~
 
-    Thank you.
+vim +/devm_of_clk_get +57 drivers/clk/clk-devres.c
 
-Best regards,
-Hu Ziji
+    51		ret = devres_release(dev, devm_clk_release, devm_clk_match, clk);
+    52	
+    53		WARN_ON(ret);
+    54	}
+    55	EXPORT_SYMBOL(devm_clk_put);
+    56	
+  > 57	struct clk *devm_of_clk_get(struct device *dev,
+    58				    struct device_node *np, int index)
+    59	{
+    60		struct clk **ptr, *clk;
 
->>>
->>>>> +
->>>>> +       return err;
->>>>> +}
->>>>> +
->>>>> +static int __xenon_sdio_delay_adj_test(struct mmc_card *card)
->>>>> +{
->>>>> +       struct mmc_command cmd = {0};
->>>>> +       int err;
->>>>> +
->>>>> +       cmd.opcode = SD_IO_RW_DIRECT;
->>>>> +       cmd.flags = MMC_RSP_R5 | MMC_CMD_AC;
->>>>> +
->>>>> +       err = mmc_wait_for_cmd(card->host, &cmd, 0);
->>>>> +       if (err)
->>>>> +               return err;
->>>>> +
->>>>> +       if (cmd.resp[0] & R5_ERROR)
->>>>> +               return -EIO;
->>>>> +       if (cmd.resp[0] & R5_FUNCTION_NUMBER)
->>>>> +               return -EINVAL;
->>>>> +       if (cmd.resp[0] & R5_OUT_OF_RANGE)
->>>>> +               return -ERANGE;
->>>>> +       return 0;
->>>>
->>>> No thanks! MMC/SD/SDIO protocol code belongs in the core.
->>>>
->>>    For SDIO, SD_IO_RW_DIRECT command is sent to test current sampling point
->>>    in PHY.
->>>    Please help provide some suggestion to implement the command transfer.
->>
->> Again, I think mmc_send_tuning() should be possible for you to use.
->>
->> [...]
->>
->>>>> +       if (mmc->card)
->>>>> +               card = mmc->card;
->>>>> +       else
->>>>> +               /*
->>>>> +                * Only valid during initialization
->>>>> +                * before mmc->card is set
->>>>> +                */
->>>>> +               card = priv->card_candidate;
->>>>> +       if (unlikely(!card)) {
->>>>> +               dev_warn(mmc_dev(mmc), "card is not present\n");
->>>>> +               return -EINVAL;
->>>>> +       }
->>>>
->>>> That your host need to hold a copy of the card pointer, tells me that
->>>> something is not really correct.
->>>>
->>>> I might be wrong, if this turns out to be a special case, but I doubt
->>>> it. Although, if it *is* a special such case, we shall most likely try
->>>> to extend the the mmc core layer instead of adding all these hacks in
->>>> your host driver.
->>>>
->>>     This card pointer copies the temporary structure mmc_card
->>>     used in mmc_init_card(), mmc_sd_init_card() and mmc_sdio_init_card().
->>>     Since we call mmc_wait_for_cmd() to send test commands, we need a copy
->>>     of that temporary mmc_card here in our host driver.
->>
->> I see, thanks for clarifying.
->>
->>>
->>>     During PHY setting in card initialization, mmc_host->card is not updated
->>>     yet with that temporary mmc_card. Thus we are not able to directly use
->>>     mmc_host->card. Instead, this card pointer is introduced to enable
->>>     mmc_wait_for_cmd().
->>>
->>>     If we can improve our host driver to send test commands without mmc_card,
->>>     this card pointer can be removed.
->>>     Could you please share your opinion please?
->>
->> The mmc_send_tuning() API takes the mmc_host as parameter. If you
->> convert to that, perhaps you would be able to remove the need to hold
->> the card pointer.
->>
->> BTW, the reason why mmc_send_tuning() doesn't take the card as a
->> parameter, is exactly those you just described above.
->>
->    Got it.
->    Thanks a lot for the information.
-> 
->    Thank you for the great help.
-> 
-> Best regards,
-> Hu Ziji
-> 
->> [...]
->>
->> Kind regards
->> Uffe
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 26142 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161128/a56b37e6/attachment-0001.gz>
