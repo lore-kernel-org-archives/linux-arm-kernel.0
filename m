@@ -1,33 +1,51 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Mon, 28 Nov 2016 17:30:54 +0100
-Subject: [PATCH] ARM: davinci_all_defconfig: Enable the da8xx usb otg
-Message-ID: <1480350654-26284-1-git-send-email-abailon@baylibre.com>
+From: jintack@cs.columbia.edu (Jintack Lim)
+Date: Mon, 28 Nov 2016 11:37:39 -0500
+Subject: [PATCH] arm64: head.S: Fix CNTHCTL_EL2 access on VHE system
+Message-ID: <1480351059-11370-1-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The musb driver is enabled but the phy and the glue
-for the da8xx are not enabled.
-Enable them.
+From: Jintack <jintack@cs.columbia.edu>
 
-Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+Bit positions of CNTHCTL_EL2 are changing depending on HCR_EL2.E2H bit.
+EL1PCEN and EL1PCTEN are 1st and 0th bits when E2H is not set, but they
+are 11th and 10th bits respectively when E2H is set.  Current code is
+unintentionally setting wrong bits to CNTHCTL_EL2 with E2H set.
+
+In fact, we don't need to set those two bits, which allow EL1 and EL0 to
+access physical timer and counter respectively, if E2H and TGE are set
+for the host kernel. They will be configured later as necessary. First,
+we don't need to configure those bits for EL1, since the host kernel
+runs in EL2.  It is a hypervisor's responsibility to configure them
+before entering a VM, which runs in EL0 and EL1. Second, EL0 accesses
+are configured in the later stage of boot process.
+
+Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm/configs/davinci_all_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/kernel/head.S | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index b5e978f..21c548f 100644
---- a/arch/arm/configs/davinci_all_defconfig
-+++ b/arch/arm/configs/davinci_all_defconfig
-@@ -159,8 +159,10 @@ CONFIG_USB=m
- CONFIG_USB_MON=m
- CONFIG_USB_STORAGE=m
- CONFIG_USB_MUSB_HDRC=m
-+CONFIG_USB_MUSB_DA8XX=m
- CONFIG_MUSB_PIO_ONLY=y
- CONFIG_USB_TEST=m
-+CONFIG_NOP_USB_XCEIV=m
- CONFIG_USB_GADGET=m
- CONFIG_USB_GADGET_DEBUG_FILES=y
- CONFIG_USB_GADGET_DEBUG_FS=y
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 332e331..bc3d2db 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -524,10 +524,16 @@ set_hcr:
+ 	msr	hcr_el2, x0
+ 	isb
+ 
+-	/* Generic timers. */
++	/*
++	 * Allow Non-secure EL1 and EL0 to access physical timer and counter.
++	 * This is not necessary for VHE, since the host kernel runs in EL2,
++	 * and EL0 accesses are configured in the later stage of boot process.
++	 */
++	cbnz	x2, 1f
+ 	mrs	x0, cnthctl_el2
+ 	orr	x0, x0, #3			// Enable EL1 physical timers
+ 	msr	cnthctl_el2, x0
++1:
+ 	msr	cntvoff_el2, xzr		// Clear virtual offset
+ 
+ #ifdef CONFIG_ARM_GIC_V3
 -- 
-2.7.3
+1.9.1
