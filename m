@@ -1,47 +1,35 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 28 Nov 2016 08:32:36 +0100
-Subject: Adding a .platform_init callback to sdhci_arasan_ops
-In-Reply-To: <d50dcd8a-2489-4e82-1dc7-13e93e38d5ff@laposte.net>
-References: <d50dcd8a-2489-4e82-1dc7-13e93e38d5ff@laposte.net>
-Message-ID: <982d633b-e9c4-0f10-052b-e324f094d0f5@xilinx.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 28 Nov 2016 08:33:15 +0100
+Subject: [PATCH v3 00/12] Initial Tegra186 support
+In-Reply-To: <20161126133927.GE20568@xo-6d-61-c0.localdomain>
+References: <20160819173233.13260-1-thierry.reding@gmail.com>
+ <20161126133927.GE20568@xo-6d-61-c0.localdomain>
+Message-ID: <20161128073315.GA18805@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Sai for Xilinx perspective.
+On Sat, Nov 26, 2016 at 02:39:27PM +0100, Pavel Machek wrote:
+> Hi!
+> 
+> > From: Thierry Reding <treding@nvidia.com>
+> > 
+> > Hi everyone,
+> > 
+> > This is a set of patches to add initial support for Tegra186. It is
+> > based on Joseph's patches but I rewrote some of the drivers to be a
+> > little easier to comprehend and maintain (hopefully). I've also
+> > included clock and reset drivers as a proof of concept.
+> 
+> Is there any phone/tablet on the market with this chipset?
 
-On 25.11.2016 16:24, Sebastian Frias wrote:
-> Hi,
-> 
-> When using the Arasan SDHCI HW IP, there is a set of parameters called
-> "Hardware initialized registers"
-> 
-> (Table 7, Section "Pin Signals", page 56 of Arasan "SD3.0/SDIO3.0/eMMC4.4
-> AHB Host Controller", revision 6.0 document)
-> 
-> In some platforms those signals are connected to registers that need to
-> be programmed at some point for proper driver/HW initialisation.
-> 
-> I found that the 'struct sdhci_ops' contains a '.platform_init' callback
-> that is called from within 'sdhci_pltfm_init', and that seems a good
-> candidate for a place to program those registers (*).
-> 
-> Do you agree?
-> 
-> Best regards,
-> 
-> Sebastian
-> 
-> 
-> (*): This has been prototyped on 4.7 as working properly.
-> However, upstream commit:
-> 
-> commit 3ea4666e8d429223fbb39c1dccee7599ef7657d5
-> Author: Douglas Anderson <dianders@chromium.org>
-> Date:   Mon Jun 20 10:56:47 2016 -0700
-> 
->     mmc: sdhci-of-arasan: Properly set corecfg_baseclkfreq on rk3399
-> ...
-> 
-> could affect this solution because of the way the 'sdhci_arasan_of_match'
-> struct is used after that commit.
-> 
+I'm not aware of any. The chip is primarily targetted at automotive
+use-cases and probably not suited for phones or tablets.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161128/602266c6/attachment-0001.sig>
