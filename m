@@ -1,122 +1,71 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 28 Nov 2016 13:15:27 +0100
-Subject: [PATCH v2 1/2] ARM: dts: da850-lcdk: add the dumb-vga-dac node
-In-Reply-To: <1480335328-4010-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1480335328-4010-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1480335328-4010-2-git-send-email-bgolaszewski@baylibre.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 28 Nov 2016 12:15:53 +0000
+Subject: [PATCH] arm64: Remove I-cache invalidation from flush_cache_range()
+Message-ID: <1480335353-4030-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the dumb-vga-dac node to the board DT together with corresponding
-ports and vga connector. This allows to retrieve the edid info from
-the display automatically.
+The flush_cache_range() function (similarly for flush_cache_page()) is
+called when the kernel is changing an existing VA->PA mapping range to
+either a new PA or to different attributes. Since ARMv8 has PIPT-like
+D-caches, this function does not need to perform any D-cache
+maintenance. The I-cache maintenance is already handled via set_pte_at()
+and flush_cache_range() cannot anyway guarantee that there are no cache
+lines left after invalidation due to the speculative loads.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+This patch makes flush_cache_range() a no-op.
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/boot/dts/da850-lcdk.dts | 58 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/da850.dtsi     | 17 ++++++++++++
- 2 files changed, 75 insertions(+)
 
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index 711b9ad..d864f11 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -50,6 +50,53 @@
- 			system-clock-frequency = <24576000>;
- 		};
- 	};
-+
-+	vga_bridge {
-+		compatible = "dumb-vga-dac";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&lcd_pins>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0>;
-+
-+				vga_bridge_in: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&display_out_vga>;
-+				};
-+			};
-+
-+			port at 1 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <1>;
-+
-+				vga_bridge_out: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vga_con_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	vga {
-+		compatible = "vga-connector";
-+
-+		ddc-i2c-bus = <&i2c0>;
-+
-+		port {
-+			vga_con_in: endpoint {
-+				remote-endpoint = <&vga_bridge_out>;
-+			};
-+		};
-+	};
- };
+Cc'ing Russell as well, I think we can remove the __flush_icache_all()
+call in arch/arm for the VIPT (both aliasing and non-aliasing) caches
+since we already handle the I-cache in __sync_icache_dcache(). Any
+opinion?
+
+ arch/arm64/include/asm/cacheflush.h | 6 +++++-
+ arch/arm64/mm/flush.c               | 7 -------
+ 2 files changed, 5 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+index e9f64ecb75ce..5a2a6ee65f65 100644
+--- a/arch/arm64/include/asm/cacheflush.h
++++ b/arch/arm64/include/asm/cacheflush.h
+@@ -65,7 +65,6 @@
+  *		- kaddr  - page address
+  *		- size   - region size
+  */
+-extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
+ extern void flush_icache_range(unsigned long start, unsigned long end);
+ extern void __flush_dcache_area(void *addr, size_t len);
+ extern void __clean_dcache_area_poc(void *addr, size_t len);
+@@ -82,6 +81,11 @@ static inline void flush_cache_page(struct vm_area_struct *vma,
+ {
+ }
  
- &pmx_core {
-@@ -235,3 +282,14 @@
- &memctrl {
- 	status = "okay";
- };
++static inline void flush_cache_range(struct vm_area_struct *vma,
++				     unsigned long start, unsigned long end)
++{
++}
 +
-+&display {
-+	status = "okay";
-+};
-+
-+&display_out {
-+	display_out_vga: endpoint at 0 {
-+		reg = <0>;
-+		remote-endpoint = <&vga_bridge_in>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 4070619..5f4ba2e 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -454,6 +454,23 @@
- 			reg = <0x213000 0x1000>;
- 			interrupts = <52>;
- 			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				display_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+				};
-+
-+				display_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+				};
-+			};
- 		};
- 	};
- 	aemif: aemif at 68000000 {
--- 
-2.9.3
+ /*
+  * Cache maintenance functions used by the DMA API. No to be used directly.
+  */
+diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+index 2d78d5a9b89f..554a2558c12e 100644
+--- a/arch/arm64/mm/flush.c
++++ b/arch/arm64/mm/flush.c
+@@ -25,13 +25,6 @@
+ #include <asm/cachetype.h>
+ #include <asm/tlbflush.h>
+ 
+-void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
+-		       unsigned long end)
+-{
+-	if (vma->vm_flags & VM_EXEC)
+-		__flush_icache_all();
+-}
+-
+ void sync_icache_aliases(void *kaddr, unsigned long len)
+ {
+ 	unsigned long addr = (unsigned long)kaddr;
