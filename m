@@ -1,31 +1,40 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 28 Nov 2016 10:25:26 -0800
-Subject: [PATCH] ARM64: dts: meson-gxbb: add SCPI pre-1.0 compatible
-Message-ID: <20161128182526.1386-1-khilman@baylibre.com>
+Date: Mon, 28 Nov 2016 10:27:10 -0800
+Subject: [GIT PULL] Amlogic 64-bit DT changes for v4.10, round 2
+In-Reply-To: <CAFBinCAvziwM4U6qJnTV+nEMKaZH4G9xdTM0pY6O83+Edk=Ovw@mail.gmail.com>
+ (Martin Blumenstingl's message of "Sat, 26 Nov 2016 16:07:21 +0100")
+References: <m2k2btx2c9.fsf@baylibre.com>
+ <CAFBinCAvziwM4U6qJnTV+nEMKaZH4G9xdTM0pY6O83+Edk=Ovw@mail.gmail.com>
+Message-ID: <m2fumbtq81.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SCPI driver has an updated compatible to indicate the pre-released
-(pre v1.0) status of the driver.  Since Amlogic used a pre-1.0
-version, add that compatible as well.
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-Signed-off-by: Kevin Hilman <khilman@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Hi Kevin,
+>
+> On Wed, Nov 23, 2016 at 11:23 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+>> Arnd, Olof,
+>>
+>> Here's a final round of arm64 DT changes for Amlogic family SoCs.
+> please note that SCPI is not working due to a change in Sudeep's
+> repository which has not made it into the Amlogic tree yet:
+> Sudeep's latest pull request indicates that we should use
+> "arm,scpi-pre-1.0", while currently we are only using
+> "amlogic,meson-gxbb-scpi": [0]
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index ac5ad3bf1bd6..51edd5b5c460 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -51,7 +51,7 @@
- 	compatible = "amlogic,meson-gxbb";
- 
- 	scpi {
--		compatible = "amlogic,meson-gxbb-scpi";
-+		compatible = "amlogic,meson-gxbb-scpi", "arm,scpi-pre-1.0";
- 		mboxes = <&mailbox 1 &mailbox 2>;
- 		shmem = <&cpu_scp_lpri &cpu_scp_hpri>;
- 
--- 
-2.9.3
+Yes, I had to drop that legacy compatible as it was still under
+discsussion.  Now that it's agreed upon, I've just sent a patch to fix
+that.
+
+> I fixed that in the Amlogic .dts files in [1] but this patch has not
+> been applied yet.
+>
+> No pressure on this one - I just want to save your time (so you don't
+> have to search why SCPI is not working anymore)
+
+Thanks!
+
+Kevin
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-November/470842.html
