@@ -1,84 +1,47 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Mon, 28 Nov 2016 06:56:52 +0000
-Subject: [PATCH v2] clkdev: add devm_of_clk_get()
-Message-ID: <8737icayac.wl%kuninori.morimoto.gx@renesas.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 28 Nov 2016 08:32:36 +0100
+Subject: Adding a .platform_init callback to sdhci_arasan_ops
+In-Reply-To: <d50dcd8a-2489-4e82-1dc7-13e93e38d5ff@laposte.net>
+References: <d50dcd8a-2489-4e82-1dc7-13e93e38d5ff@laposte.net>
+Message-ID: <982d633b-e9c4-0f10-052b-e324f094d0f5@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current Linux has of_clk_get(), but doesn't have devm_of_clk_get().
-This patch adds it. This is based on devm_clk_get()
++Sai for Xilinx perspective.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
----
-v1 -> v2
-
- - update git log
-
- drivers/clk/clkdev.c | 26 ++++++++++++++++++++++++++
- include/linux/clk.h  |  7 +++++++
- 2 files changed, 33 insertions(+)
-
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 89cc700..93a613b 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -55,6 +55,32 @@ struct clk *of_clk_get(struct device_node *np, int index)
- }
- EXPORT_SYMBOL(of_clk_get);
- 
-+static void devm_of_clk_release(struct device *dev, void *res)
-+{
-+	clk_put(*(struct clk **)res);
-+}
-+
-+struct clk *devm_of_clk_get(struct device *dev,
-+			    struct device_node *np, int index)
-+{
-+	struct clk **ptr, *clk;
-+
-+	ptr = devres_alloc(devm_of_clk_release, sizeof(*ptr), GFP_KERNEL);
-+	if (!ptr)
-+		return ERR_PTR(-ENOMEM);
-+
-+	clk = of_clk_get(np, index);
-+	if (!IS_ERR(clk)) {
-+		*ptr = clk;
-+		devres_add(dev, ptr);
-+	} else {
-+		devres_free(ptr);
-+	}
-+
-+	return clk;
-+}
-+EXPORT_SYMBOL(devm_of_clk_get);
-+
- static struct clk *__of_clk_get_by_name(struct device_node *np,
- 					const char *dev_id,
- 					const char *name)
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index a89ba4e..33cd540 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -502,6 +502,8 @@ struct of_phandle_args;
- 
- #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
- struct clk *of_clk_get(struct device_node *np, int index);
-+struct clk *devm_of_clk_get(struct device *dev,
-+			    struct device_node *np, int index);
- struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
- struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
- #else
-@@ -509,6 +511,11 @@ static inline struct clk *of_clk_get(struct device_node *np, int index)
- {
- 	return ERR_PTR(-ENOENT);
- }
-+static inline struct clk *devm_of_clk_get(struct device *dev,
-+			    struct device_node *np, int index)
-+{
-+	return ERR_PTR(-ENOENT);
-+}
- static inline struct clk *of_clk_get_by_name(struct device_node *np,
- 					     const char *name)
- {
--- 
-1.9.1
+On 25.11.2016 16:24, Sebastian Frias wrote:
+> Hi,
+> 
+> When using the Arasan SDHCI HW IP, there is a set of parameters called
+> "Hardware initialized registers"
+> 
+> (Table 7, Section "Pin Signals", page 56 of Arasan "SD3.0/SDIO3.0/eMMC4.4
+> AHB Host Controller", revision 6.0 document)
+> 
+> In some platforms those signals are connected to registers that need to
+> be programmed at some point for proper driver/HW initialisation.
+> 
+> I found that the 'struct sdhci_ops' contains a '.platform_init' callback
+> that is called from within 'sdhci_pltfm_init', and that seems a good
+> candidate for a place to program those registers (*).
+> 
+> Do you agree?
+> 
+> Best regards,
+> 
+> Sebastian
+> 
+> 
+> (*): This has been prototyped on 4.7 as working properly.
+> However, upstream commit:
+> 
+> commit 3ea4666e8d429223fbb39c1dccee7599ef7657d5
+> Author: Douglas Anderson <dianders@chromium.org>
+> Date:   Mon Jun 20 10:56:47 2016 -0700
+> 
+>     mmc: sdhci-of-arasan: Properly set corecfg_baseclkfreq on rk3399
+> ...
+> 
+> could affect this solution because of the way the 'sdhci_arasan_of_match'
+> struct is used after that commit.
+> 
