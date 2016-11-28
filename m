@@ -1,60 +1,45 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 28 Nov 2016 16:50:24 +0100
-Subject: [PATCH net-next v4 0/4] Fix OdroidC2 Gigabit Tx link issue
-Message-ID: <1480348229-25672-1-git-send-email-jbrunet@baylibre.com>
+Date: Mon, 28 Nov 2016 16:50:26 +0100
+Subject: [PATCH net-next v4 2/4] dt-bindings: net: add EEE capability constants
+In-Reply-To: <1480348229-25672-1-git-send-email-jbrunet@baylibre.com>
+References: <1480348229-25672-1-git-send-email-jbrunet@baylibre.com>
+Message-ID: <1480348229-25672-3-git-send-email-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset fixes an issue with the OdroidC2 board (DWMAC + RTL8211F).
-The platform seems to enter LPI on the Rx path too often while performing
-relatively high TX transfer. This eventually break the link (both Tx and
-Rx), and require to bring the interface down and up again to get the Rx
-path working again.
-
-The root cause of this issue is not fully understood yet but disabling EEE
-advertisement on the PHY prevent this feature to be negotiated.
-With this change, the link is stable and reliable, with the expected
-throughput performance.
-
-The patchset adds options in the generic phy driver to disable EEE
-advertisement, through device tree. The way it is done is very similar
-to the handling of the max-speed property.
-
-Patch 4 is provided here for testing purpose only. Please don't merge
-patch 4, this change will go through the amlogic's tree.
-
-Chnages since V3: [3]
- - Fix signess error reported by kbuild test robot (Thx Julia)
-
-Changes since V2: [2]
- - Rename "eee-advert-disable" to "eee-broken-modes" to make the intended
-   purpose of this option clear (flag broken configuration, not a
-   configuration option)
- - Add DT bindings constants so the DT configuration is more user friendly
- - Submit to net-next instead of net.
-
-Changes since V1: [1]
- - Disable the advertisement of EEE in the generic code instead of the
-   realtek driver.
-
-[1] : http://lkml.kernel.org/r/1479220154-25851-1-git-send-email-jbrunet at baylibre.com
-[2] : http://lkml.kernel.org/r/1479742524-30222-1-git-send-email-jbrunet at baylibre.com
-[3] : http://lkml.kernel.org/r/1480326409-25419-1-git-send-email-jbrunet at baylibre.com
-
-Jerome Brunet (4):
-  net: phy: add an option to disable EEE advertisement
-  dt-bindings: net: add EEE capability constants
-  dt: bindings: add ethernet phy eee-broken-modes option documentation
-  ARM64: dts: meson: odroidc2: disable advertisement EEE for GbE.
-
- Documentation/devicetree/bindings/net/phy.txt      |  2 +
- .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 14 ++++
- drivers/net/phy/phy.c                              |  3 +
- drivers/net/phy/phy_device.c                       | 80 +++++++++++++++++++---
- include/dt-bindings/net/mdio.h                     | 19 +++++
- include/linux/phy.h                                |  3 +
- 6 files changed, 112 insertions(+), 9 deletions(-)
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+Tested-by: Yegor Yefremov <yegorslists@googlemail.com>
+Tested-by: Andreas F?rber <afaerber@suse.de>
+Tested-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ include/dt-bindings/net/mdio.h | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
  create mode 100644 include/dt-bindings/net/mdio.h
 
+diff --git a/include/dt-bindings/net/mdio.h b/include/dt-bindings/net/mdio.h
+new file mode 100644
+index 000000000000..99c6d903d439
+--- /dev/null
++++ b/include/dt-bindings/net/mdio.h
+@@ -0,0 +1,19 @@
++/*
++ * This header provides generic constants for ethernet MDIO bindings
++ */
++
++#ifndef _DT_BINDINGS_NET_MDIO_H
++#define _DT_BINDINGS_NET_MDIO_H
++
++/*
++ * EEE capability Advertisement
++ */
++
++#define MDIO_EEE_100TX		0x0002	/* 100TX EEE cap */
++#define MDIO_EEE_1000T		0x0004	/* 1000T EEE cap */
++#define MDIO_EEE_10GT		0x0008	/* 10GT EEE cap */
++#define MDIO_EEE_1000KX		0x0010	/* 1000KX EEE cap */
++#define MDIO_EEE_10GKX4		0x0020	/* 10G KX4 EEE cap */
++#define MDIO_EEE_10GKR		0x0040	/* 10G KR EEE cap */
++
++#endif
 -- 
 2.7.4
