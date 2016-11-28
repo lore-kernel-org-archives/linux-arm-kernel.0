@@ -1,36 +1,53 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Mon, 28 Nov 2016 13:37:00 +0100
-Subject: [GIT PULL] STi defconfig updates for v4.10 round 3
-Message-ID: <2956a25a-ef39-842a-d0cd-baf4a01f7a2c@st.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Mon, 28 Nov 2016 20:39:24 +0800
+Subject: [bug report v4.8] fs/locks.c: kernel oops during posix lock
+ stress test
+In-Reply-To: <20161128105254.GB1485@arm.com>
+References: <CACVXFVPsHjh3CWjdUrKB_r6=hkXK=qS3wpykbacdKe1rzz1H8Q@mail.gmail.com>
+ <20161128105254.GB1485@arm.com>
+Message-ID: <CACVXFVOtTczN4QW_igWMxK7t_3zbdSZeYKr7ew0aO3c6ZmyHjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+Hi Will,
 
-Please consider this third round of multi_v7_defconfig updates for v4.10 :
+On Mon, Nov 28, 2016 at 6:52 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Ming,
+>
+> On Mon, Nov 28, 2016 at 11:10:14AM +0800, Ming Lei wrote:
+>> When I run stress-ng via the following steps on one ARM64 dual
+>> socket system(Cavium Thunder), the kernel oops[1] can often be
+>> triggered after running the stress test for several hours(sometimes
+>> it may take longer):
+>>
+>> - git clone git://kernel.ubuntu.com/cking/stress-ng.git
+>> - apply the attachment patch which just makes the posix file
+>> lock stress test more aggressive
+>> - run the test via '~/git/stress-ng$./stress-ng --lockf 128 --aggressive'
+>>
+>>
+>> From the oops log, looks one garbage file_lock node is got
+>> from the linked list of 'ctx->flc_posix' when the issue happens.
+>>
+>> BTW, the issue isn't observed on single socket Cavium Thunder yet,
+>> and the same issue can be seen on Ubuntu Xenial(v4.4 based kernel)
+>> too.
+>
+> I've seen issues with the LSE atomics on the Thunder platform -- can you
+> try disabling those (CONFIG_ARM64_LSE_ATOMICS) and see if the problem
+> persists, please?
+>
 
-The following changes since commit 57dae748959d0abae2b382ccee68621a82f827c8:
+Ubuntu Xenial doesn't enable CONFIG_ARM64_LSE_ATOMICS, which
+is disabled in my v4.8 kernel config too, please see that in the attachement.
 
-  ARM: multi_v7_defconfig: Remove ST_THERMAL_SYSCFG Kconfig symbol (2016-10-21 17:05:54 +0200)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git tags/sti-defconfig-for-4.10-round3
-
-for you to fetch changes up to 88d7658bf31f17296b8792e62268825d066d23c4:
-
-  ARM: multi_v7_defconfig: enable STMicroelectronics HVA driver (2016-11-28 13:02:14 +0100)
-
-----------------------------------------------------------------
-
-STi defconfig fix:
-
-Enable HVA (Hardware Video Accelerator) video encoder
-driver for STMicroelectronics SoC.
-
-----------------------------------------------------------------
-Patrice Chotard (1):
-      ARM: multi_v7_defconfig: enable STMicroelectronics HVA driver
-
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Thanks,
+Ming
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: config-v4.8.tar.gz
+Type: application/x-gzip
+Size: 40134 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161128/32583ef0/attachment-0001.bin>
