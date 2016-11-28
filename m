@@ -1,62 +1,56 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 28 Nov 2016 11:43:59 +0100
-Subject: [PATCH] ARM: dts: da850: specify the maximum bandwidth for tilcdc
-In-Reply-To: <86f2b643-c270-1483-4f35-5bdf399a5919@ti.com>
-References: <1480088245-8368-1-git-send-email-bgolaszewski@baylibre.com>
- <8829c208-0674-43c0-8449-ef764071583f@ti.com>
- <953743fb-54f9-fa6f-bfdd-43d92271864f@ti.com>
- <86f2b643-c270-1483-4f35-5bdf399a5919@ti.com>
-Message-ID: <CAMpxmJXwq-w4WXwh+oF0_NACfcu4nE4n6MZPA19oMpt8j1Hdog@mail.gmail.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Mon, 28 Nov 2016 11:51:35 +0100
+Subject: [Qemu-devel] [kvm-unit-tests PATCH v7 00/11] QEMU MTTCG Test cases
+In-Reply-To: <20161124161033.11456-1-alex.bennee@linaro.org>
+References: <20161124161033.11456-1-alex.bennee@linaro.org>
+Message-ID: <20161128105135.ryolphjeiho56hbm@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-11-28 8:58 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
-> On Monday 28 November 2016 01:12 PM, Tomi Valkeinen wrote:
->> On 28/11/16 07:24, Sekhar Nori wrote:
->>> On Friday 25 November 2016 09:07 PM, Bartosz Golaszewski wrote:
->>>> It has been determined that the maximum resolution supported correctly
->>>> by tilcdc rev1 on da850 SoCs is 800x600 at 60. Due to memory throughput
->>>> constraints we must filter out higher modes.
->>>>
->>>> Specify the max-bandwidth property for the display node for
->>>> da850-based boards.
->>>>
->>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>> ---
->>>>  arch/arm/boot/dts/da850.dtsi | 1 +
->>>>  1 file changed, 1 insertion(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
->>>> index 8e30d9b..9b7c444 100644
->>>> --- a/arch/arm/boot/dts/da850.dtsi
->>>> +++ b/arch/arm/boot/dts/da850.dtsi
->>>> @@ -452,6 +452,7 @@
->>>>                     compatible = "ti,da850-tilcdc";
->>>>                     reg = <0x213000 0x1000>;
->>>>                     interrupts = <52>;
->>>> +                   max-bandwidth = <28800000>;
->>>
->>> If this is effectively the max pixel clock that the device supports,
->>> then why not use the datasheet specified value of 37.5 MHz (Tc = 26.66 ns).
->>
->> There's a separate property for max-pixelclock. This one is maximum
->> pixels per second (which does sound almost the same), but the doc says
->> it's about the particular memory interface + LCDC combination.
->
-> DA850 supports both mDDR and DDR2, at slightly different speeds. So
-> memory bandwidth limitation is also board specific. This should probably
-> move to board file.
->
-> But I would like to know why using max-pixelclock is not good enough.
-> Have experiments shown that LCDC on DA850 LCDK underflows even if pixel
-> clock is below the datasheet recommendation?
->
+On Thu, Nov 24, 2016 at 04:10:22PM +0000, Alex Benn?e wrote:
+> Hi,
+> 
+> Looking at my records it seems as though it has been a while since I
+> last posted these tests. As I'm hoping to get the final bits of MTTCG
+> merged upstream on the next QEMU development cycle I've been re-basing
+> these and getting them cleaned up for merging.
+> 
+> Some of the patches might be worth taking now if the maintainers are
+> happy to do so (run_test tweaks, libcflat updates?). The others could
+> do with more serious review. I've CC'd some of the ARM guys to look
+> over the tlbflush/barrier tests so they can cast their expert eyes
+> over them ;-)
+> 
+> There are two additions to the series.
+> 
+> The tcg-test is a general torture test aimed at QEMU's TCG execution
+> model. It stresses the cpu execution loop through the use of
+> cross-page and computed jumps. It can also add IRQ's and self-modifying
+> code to the mix.
+> 
+> The tlbflush-data test is a new one, the old tlbflush test is renamed
+> tlbflush-code to better indicate the code path it exercise. The the
+> code test tests the translation invalidation pathways in QEMU the data
+> test exercises the SoftMMU's TLBs and explicitly that tlbflush
+> completion semantics are correct.
+> 
+> The tlbflush-data passes most of the times on real hardware but
+> definitely showed the problem with deferred TLB flushes running under
+> MTTCG QEMU. I've looked at some of the failure cases on real hardware
+> and it did look like a timestamp appeared on a page that shouldn't
+> have been accessible at the time - I don't know if this is a real
+> silicon bug or my misreading of the semantics so I'd appreciate
+> a comment from the experts.
 
-Hi Sekhar,
+One other thought. I'm not sure how best to approach a bunch of TCG-only
+tests getting integrated. I'm thinking it might be nice to give them
+their own subdir under the arch dir, e.g. arm/tcg. That subdir would
+have its own unittests.cfg file too. Otherwise when we run on KVM we'll
+have a load of "SKIP: requires TCG" type messages...
 
-I've just tested 1024x768 at 37000 KHz - indeed seems like the
-underflows are gone as soon as we go below 37500 KHz. I'll submit a
-new patch using the max-pixelclock property.
+We'll want to add a run_tests.sh option to pass the name of the subdir,
+'-d tcg'. When the subdir name is 'tcg' ACCEL could automatically be
+switched to 'tcg' as well.
 
 Thanks,
-Bartosz Golaszewski
+drew
