@@ -1,25 +1,119 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 28 Nov 2016 14:09:26 +0000
-Subject: [Qemu-devel] [kvm-unit-tests PATCH v7 00/11] QEMU MTTCG Test cases
-In-Reply-To: <20161128140705.caqpoiuvxy3mg2zk@kamzik.brq.redhat.com>
-References: <20161124161033.11456-1-alex.bennee@linaro.org>
- <20161128103744.s3wq53xzsxvu5uus@kamzik.brq.redhat.com>
- <878ts3uac6.fsf@linaro.org>
- <CAFEAcA9JUOHnJL59EuhQ_dEWjt+YjEcu8LGiJ3CSk_7R4J5Efg@mail.gmail.com>
- <20161128115824.hrofgivt2mlfk7fh@kamzik.brq.redhat.com>
- <CAFEAcA8-3qHnp1T4bAiUL3NT8fHWik7-8zruyQKGgfADn5xF9w@mail.gmail.com>
- <20161128140445.j336ksd7vqhi4ivz@kamzik.brq.redhat.com>
- <20161128140705.caqpoiuvxy3mg2zk@kamzik.brq.redhat.com>
-Message-ID: <CAFEAcA9WBbYeOeWfAt9dtosW=n+Zi1waF0EtckeoJHs7FsjGOQ@mail.gmail.com>
+From: vbabka@suse.cz (Vlastimil Babka)
+Date: Mon, 28 Nov 2016 15:17:28 +0100
+Subject: [PATCH V2 fix 5/6] mm: hugetlb: add a new function to allocate a
+ new gigantic page
+In-Reply-To: <1479279304-31379-1-git-send-email-shijie.huang@arm.com>
+References: <1479107259-2011-6-git-send-email-shijie.huang@arm.com>
+ <1479279304-31379-1-git-send-email-shijie.huang@arm.com>
+Message-ID: <f6fc93b4-5c1c-bbab-7c74-a0d60d4afc84@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 November 2016 at 14:07, Andrew Jones <drjones@redhat.com> wrote:
-> Er... actually mach-virt is 123, as we only allocate 123 redistributors.
+On 11/16/2016 07:55 AM, Huang Shijie wrote:
+> There are three ways we can allocate a new gigantic page:
+>
+> 1. When the NUMA is not enabled, use alloc_gigantic_page() to get
+>    the gigantic page.
+>
+> 2. The NUMA is enabled, but the vma is NULL.
+>    There is no memory policy we can refer to.
+>    So create a @nodes_allowed, initialize it with init_nodemask_of_mempolicy()
+>    or init_nodemask_of_node(). Then use alloc_fresh_gigantic_page() to get
+>    the gigantic page.
+>
+> 3. The NUMA is enabled, and the vma is valid.
+>    We can follow the memory policy of the @vma.
+>
+>    Get @nodes_allowed by huge_nodemask(), and use alloc_fresh_gigantic_page()
+>    to get the gigantic page.
+>
+> Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+> ---
+> Since the huge_nodemask() is changed, we have to change this function a little.
+>
+> ---
+>  mm/hugetlb.c | 63 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 63 insertions(+)
+>
+> diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+> index 6995087..c33bddc 100644
+> --- a/mm/hugetlb.c
+> +++ b/mm/hugetlb.c
+> @@ -1502,6 +1502,69 @@ int dissolve_free_huge_pages(unsigned long start_pfn, unsigned long end_pfn)
+>
+>  /*
+>   * There are 3 ways this can get called:
+> + *
+> + * 1. When the NUMA is not enabled, use alloc_gigantic_page() to get
+> + *    the gigantic page.
+> + *
+> + * 2. The NUMA is enabled, but the vma is NULL.
+> + *    Create a @nodes_allowed, and use alloc_fresh_gigantic_page() to get
+> + *    the gigantic page.
+> + *
+> + * 3. The NUMA is enabled, and the vma is valid.
+> + *    Use the @vma's memory policy.
+> + *    Get @nodes_allowed by huge_nodemask(), and use alloc_fresh_gigantic_page()
+> + *    to get the gigantic page.
+> + */
+> +static struct page *__hugetlb_alloc_gigantic_page(struct hstate *h,
+> +		struct vm_area_struct *vma, unsigned long addr, int nid)
+> +{
+> +	NODEMASK_ALLOC(nodemask_t, nodes_allowed, GFP_KERNEL | __GFP_NORETRY);
 
-Oh yes, I'd forgotten about that limit. We'd need to add
-a KVM API for allocating redistributors in non-contiguous
-bits of memory if we wanted to raise that.
+What if the allocation fails and nodes_allowed is NULL?
+It might work fine now, but it's rather fragile, so I'd rather see an 
+explicit check.
 
-thanks
--- PMM
+BTW same thing applies to __nr_hugepages_store_common().
+
+> +	struct page *page = NULL;
+> +
+> +	/* Not NUMA */
+> +	if (!IS_ENABLED(CONFIG_NUMA)) {
+> +		if (nid == NUMA_NO_NODE)
+> +			nid = numa_mem_id();
+> +
+> +		page = alloc_gigantic_page(nid, huge_page_order(h));
+> +		if (page)
+> +			prep_compound_gigantic_page(page, huge_page_order(h));
+> +
+> +		NODEMASK_FREE(nodes_allowed);
+> +		return page;
+> +	}
+> +
+> +	/* NUMA && !vma */
+> +	if (!vma) {
+> +		if (nid == NUMA_NO_NODE) {
+> +			if (!init_nodemask_of_mempolicy(nodes_allowed)) {
+> +				NODEMASK_FREE(nodes_allowed);
+> +				nodes_allowed = &node_states[N_MEMORY];
+> +			}
+> +		} else if (nodes_allowed) {
+> +			init_nodemask_of_node(nodes_allowed, nid);
+> +		} else {
+> +			nodes_allowed = &node_states[N_MEMORY];
+> +		}
+> +
+> +		page = alloc_fresh_gigantic_page(h, nodes_allowed, true);
+> +
+> +		if (nodes_allowed != &node_states[N_MEMORY])
+> +			NODEMASK_FREE(nodes_allowed);
+> +
+> +		return page;
+> +	}
+> +
+> +	/* NUMA && vma */
+> +	if (huge_nodemask(vma, addr, nodes_allowed))
+> +		page = alloc_fresh_gigantic_page(h, nodes_allowed, true);
+> +
+> +	NODEMASK_FREE(nodes_allowed);
+> +	return page;
+> +}
+> +
+> +/*
+> + * There are 3 ways this can get called:
+>   * 1. With vma+addr: we use the VMA's memory policy
+>   * 2. With !vma, but nid=NUMA_NO_NODE:  We try to allocate a huge
+>   *    page from any node, and let the buddy allocator itself figure
+>
