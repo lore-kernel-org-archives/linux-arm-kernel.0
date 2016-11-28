@@ -1,78 +1,36 @@
-From: jesper.nilsson@axis.com (Jesper Nilsson)
-Date: Mon, 28 Nov 2016 13:33:31 +0100
-Subject: [GIT PULL]: ARM ARTPEC changes for 4.10
-In-Reply-To: <5317474.MXurzNW7Do@wuerfel>
-References: <20161110150930.GB19804@axis.com>
- <5317474.MXurzNW7Do@wuerfel>
-Message-ID: <20161128123331.GO19016@axis.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Mon, 28 Nov 2016 13:37:00 +0100
+Subject: [GIT PULL] STi defconfig updates for v4.10 round 3
+Message-ID: <2956a25a-ef39-842a-d0cd-baf4a01f7a2c@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 26, 2016 at 12:16:20AM +0100, Arnd Bergmann wrote:
-> On Thursday, November 10, 2016 4:09:31 PM CET Jesper Nilsson wrote:
-> > Please pull the below signed tag for a trio of minor changes
-> > adding PCIe for the ARM ARTPEC SoC.
-> > 
-> > Thanks!
-> > 
-> > /Jesper
-> > 
-> > The following changes since commit bc33b0ca11e3df467777a4fa7639ba488c9d4911:
-> > 
-> >   Linux 4.9-rc4 (2016-11-05 16:23:36 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/jesper/artpec.git tags/artpec-for-4.10
-> > 
-> > for you to fetch changes up to fa5541fc806771a108cd2a48245a229f1ba539ea:
-> > 
-> >   ARM: dts: artpec: add pcie support (2016-11-10 15:51:10 +0100)
-> > 
-> > ----------------------------------------------------------------
-> > ARTPEC changes for 4.10
-> > 
-> > ----------------------------------------------------------------
-> > Niklas Cassel (3):
-> >       ARM: ARTPEC-6: add select MFD_SYSCON to MACH_ARTPEC6
-> >       ARM: ARTPEC-6: add pcie related options
-> >       ARM: dts: artpec: add pcie support
-> > 
-> > 
-> 
-> Hi Jesper and Niklas,
-> 
-> I just found the old pull request while going through my mail backlog.
-> 
-> A few things for you to remember for next time:
-> 
-> - please send pull requests "To: arm at kernel.org" so we know they
->   are destined for arm-soc
+Hi Olof, Arnd and Kevin,
 
-Ok, should we add that in the MAINTAINERS file so we can
-get it automatically from get_maintainer?
+Please consider this third round of multi_v7_defconfig updates for v4.10 :
 
-> - please split up changes to the platform code from dts changes,
->   defconfig changes and driver changes. Each of them gets sent
->   to Linus in a separate arm-soc branch, so we have to pull them
->   in separately too
-> 
-> - For the signed tag, please put in a cleartext description of
->   the branch, just like you describe each commit in its changelog
->   text. The tag comment becomes the merge commit text.
+The following changes since commit 57dae748959d0abae2b382ccee68621a82f827c8:
 
-Ok, will do both in the future.
+  ARM: multi_v7_defconfig: Remove ST_THERMAL_SYSCFG Kconfig symbol (2016-10-21 17:05:54 +0200)
 
-> - I've looked at the three patches individually and cherry-picked
->   the first into next/soc and the third into next/dt. The patch
->   "ARM: ARTPEC-6: add pcie related options" is no longer needed
->   after commit e13688f ("ARM: select PCI_DOMAINS config from
->   ARCH_MULTIPLATFORM"), so I dropped that.
+are available in the git repository at:
 
-Thanks!
+  git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git tags/sti-defconfig-for-4.10-round3
 
-> 	Arnd
+for you to fetch changes up to 88d7658bf31f17296b8792e62268825d066d23c4:
 
-/^JN - Jesper Nilsson
--- 
-               Jesper Nilsson -- jesper.nilsson at axis.com
+  ARM: multi_v7_defconfig: enable STMicroelectronics HVA driver (2016-11-28 13:02:14 +0100)
+
+----------------------------------------------------------------
+
+STi defconfig fix:
+
+Enable HVA (Hardware Video Accelerator) video encoder
+driver for STMicroelectronics SoC.
+
+----------------------------------------------------------------
+Patrice Chotard (1):
+      ARM: multi_v7_defconfig: enable STMicroelectronics HVA driver
+
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
