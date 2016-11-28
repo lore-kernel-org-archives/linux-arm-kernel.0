@@ -1,55 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 28 Nov 2016 12:05:04 +0000
-Subject: [PATCH v4] crypto: arm64/sha2: integrate OpenSSL implementations
- of SHA256/SHA512
-In-Reply-To: <1479642121-17912-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1479642121-17912-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20161128120503.GC1485@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 28 Nov 2016 12:06:24 +0000
+Subject: [RFC PATCH 13/29] arm64/sve: Basic support for KERNEL_MODE_NEON
+In-Reply-To: <20161128114723.GG1574@e103592.cambridge.arm.com>
+References: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
+ <1480102762-23647-14-git-send-email-Dave.Martin@arm.com>
+ <CAKv+Gu-MKdNHNrvSvMeoAoENdfscbAK0==NEMu6KJn8fjxz_tw@mail.gmail.com>
+ <20161126113038.GA86651@MBP.local>
+ <20161128114723.GG1574@e103592.cambridge.arm.com>
+Message-ID: <20161128120623.GA17125@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 20, 2016 at 11:42:01AM +0000, Ard Biesheuvel wrote:
-> This integrates both the accelerated scalar and the NEON implementations
-> of SHA-224/256 as well as SHA-384/512 from the OpenSSL project.
+On Mon, Nov 28, 2016 at 11:47:26AM +0000, Dave P Martin wrote:
+> On Sat, Nov 26, 2016 at 11:30:42AM +0000, Catalin Marinas wrote:
+> > On Fri, Nov 25, 2016 at 08:45:02PM +0000, Ard Biesheuvel wrote:
+> > > On 25 November 2016 at 19:39, Dave Martin <Dave.Martin@arm.com> wrote:
+> > > > --- a/arch/arm64/kernel/fpsimd.c
+> > > > +++ b/arch/arm64/kernel/fpsimd.c
+> > > > @@ -282,11 +282,26 @@ static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
+> > > >   */
+> > > >  void kernel_neon_begin_partial(u32 num_regs)
+> > > >  {
+> > > > +       preempt_disable();
+> > > > +
+> > > > +       /*
+> > > > +        * For now, we have no special storage for SVE registers in
+> > > > +        * interrupt context, so always save the userland SVE state
+> > > > +        * if there is any, even for interrupts.
+> > > > +        */
+> > > > +       if (IS_ENABLED(CONFIG_ARM64_SVE) && (elf_hwcap & HWCAP_SVE) &&
+> > > > +           current->mm &&
+> > > > +           !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE)) {
+> > > > +               fpsimd_save_state(&current->thread.fpsimd_state);
+> > > > +               this_cpu_write(fpsimd_last_state, NULL);
+> > > > +       }
+> > > > +
+> > > 
+> > > I am having trouble understanding why we need all of this if we don't
+> > > support SVE in the kernel. Could you elaborate?
+> > 
+> > Dave knows all the details but a reason is that touching a Neon register
+> > zeros the upper SVE state in the same vector register. So we can't
+> > safely save/restore just the Neon part without corrupting the SVE state.
 > 
-> Relative performance compared to the respective generic C versions:
+> This is right -- this also means that EFI services can trash the upper
+> bits of an SVE vector register (as a side-effect of FPSIMD/NEON usage).
 > 
->                  |  SHA256-scalar  | SHA256-NEON* |  SHA512  |
->      ------------+-----------------+--------------+----------+
->      Cortex-A53  |      1.63x      |     1.63x    |   2.34x  |
->      Cortex-A57  |      1.43x      |     1.59x    |   1.95x  |
->      Cortex-A73  |      1.26x      |     1.56x    |     ?    |
-> 
-> The core crypto code was authored by Andy Polyakov of the OpenSSL
-> project, in collaboration with whom the upstream code was adapted so
-> that this module can be built from the same version of sha512-armv8.pl.
-> 
-> The version in this patch was taken from OpenSSL commit 32bbb62ea634
-> ("sha/asm/sha512-armv8.pl: fix big-endian support in __KERNEL__ case.")
-> 
-> * The core SHA algorithm is fundamentally sequential, but there is a
->   secondary transformation involved, called the schedule update, which
->   can be performed independently. The NEON version of SHA-224/SHA-256
->   only implements this part of the algorithm using NEON instructions,
->   the sequential part is always done using scalar instructions.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/crypto/Kconfig               |    8 +
->  arch/arm64/crypto/Makefile              |   17 +
->  arch/arm64/crypto/sha256-core.S_shipped | 2061 ++++++++++++++++++++
->  arch/arm64/crypto/sha256-glue.c         |  185 ++
->  arch/arm64/crypto/sha512-armv8.pl       |  778 ++++++++
->  arch/arm64/crypto/sha512-core.S_shipped | 1085 +++++++++++
->  arch/arm64/crypto/sha512-glue.c         |   94 +
->  7 files changed, 4228 insertions(+)
+> It's overkill to save/restore absolutely everything -- I ignore num_regs
+> for example -- but I wanted to keep things as simple as possible
+> initially.
 
-If I build a kernel with this applied and CRYPTO_SHA{256,512}_ARM64=y,
-then I end up with untracked .S files according to git:
+Without looking at your patches in detail, could we mandate in the ABI
+that the SVE state is lost on the user/kernel syscall boundary? I guess
+even for the PCS, the SVE state is caller-saved, so there shouldn't be
+an additional cost to user. On interrupts, however, we'd have to
+preserve the SVE state but if we do this on entry/exit points, the
+kernel_neon_*() functions would not have to deal with any SVE state (and
+even ignore it completely if in interrupt).
 
-$ git status
-Untracked files:
-	arch/arm64/crypto/sha256-core.S
-	arch/arm64/crypto/sha512-core.S
+BTW, we will need an SVE ABI document in Documentation/arm64/ to specify
+the requirements for syscall and sigcontext modifications.
 
-Will
+-- 
+Catalin
