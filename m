@@ -1,119 +1,39 @@
-From: vbabka@suse.cz (Vlastimil Babka)
-Date: Mon, 28 Nov 2016 15:17:28 +0100
-Subject: [PATCH V2 fix 5/6] mm: hugetlb: add a new function to allocate a
- new gigantic page
-In-Reply-To: <1479279304-31379-1-git-send-email-shijie.huang@arm.com>
-References: <1479107259-2011-6-git-send-email-shijie.huang@arm.com>
- <1479279304-31379-1-git-send-email-shijie.huang@arm.com>
-Message-ID: <f6fc93b4-5c1c-bbab-7c74-a0d60d4afc84@suse.cz>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 28 Nov 2016 22:19:35 +0800
+Subject: [GIT PULL] ZTE arm64 device tree updates for 4.10
+Message-ID: <20161128141934.GA20556@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2016 07:55 AM, Huang Shijie wrote:
-> There are three ways we can allocate a new gigantic page:
->
-> 1. When the NUMA is not enabled, use alloc_gigantic_page() to get
->    the gigantic page.
->
-> 2. The NUMA is enabled, but the vma is NULL.
->    There is no memory policy we can refer to.
->    So create a @nodes_allowed, initialize it with init_nodemask_of_mempolicy()
->    or init_nodemask_of_node(). Then use alloc_fresh_gigantic_page() to get
->    the gigantic page.
->
-> 3. The NUMA is enabled, and the vma is valid.
->    We can follow the memory policy of the @vma.
->
->    Get @nodes_allowed by huge_nodemask(), and use alloc_fresh_gigantic_page()
->    to get the gigantic page.
->
-> Signed-off-by: Huang Shijie <shijie.huang@arm.com>
-> ---
-> Since the huge_nodemask() is changed, we have to change this function a little.
->
-> ---
->  mm/hugetlb.c | 63 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 63 insertions(+)
->
-> diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-> index 6995087..c33bddc 100644
-> --- a/mm/hugetlb.c
-> +++ b/mm/hugetlb.c
-> @@ -1502,6 +1502,69 @@ int dissolve_free_huge_pages(unsigned long start_pfn, unsigned long end_pfn)
->
->  /*
->   * There are 3 ways this can get called:
-> + *
-> + * 1. When the NUMA is not enabled, use alloc_gigantic_page() to get
-> + *    the gigantic page.
-> + *
-> + * 2. The NUMA is enabled, but the vma is NULL.
-> + *    Create a @nodes_allowed, and use alloc_fresh_gigantic_page() to get
-> + *    the gigantic page.
-> + *
-> + * 3. The NUMA is enabled, and the vma is valid.
-> + *    Use the @vma's memory policy.
-> + *    Get @nodes_allowed by huge_nodemask(), and use alloc_fresh_gigantic_page()
-> + *    to get the gigantic page.
-> + */
-> +static struct page *__hugetlb_alloc_gigantic_page(struct hstate *h,
-> +		struct vm_area_struct *vma, unsigned long addr, int nid)
-> +{
-> +	NODEMASK_ALLOC(nodemask_t, nodes_allowed, GFP_KERNEL | __GFP_NORETRY);
+Hi Arnd, Olof,
 
-What if the allocation fails and nodes_allowed is NULL?
-It might work fine now, but it's rather fragile, so I'd rather see an 
-explicit check.
+If it's not too late, please pull this for 4.10.  It contains a single
+patch which adds clock controller device nodes for zx296718.  Thanks.
 
-BTW same thing applies to __nr_hugepages_store_common().
+Shawn
 
-> +	struct page *page = NULL;
-> +
-> +	/* Not NUMA */
-> +	if (!IS_ENABLED(CONFIG_NUMA)) {
-> +		if (nid == NUMA_NO_NODE)
-> +			nid = numa_mem_id();
-> +
-> +		page = alloc_gigantic_page(nid, huge_page_order(h));
-> +		if (page)
-> +			prep_compound_gigantic_page(page, huge_page_order(h));
-> +
-> +		NODEMASK_FREE(nodes_allowed);
-> +		return page;
-> +	}
-> +
-> +	/* NUMA && !vma */
-> +	if (!vma) {
-> +		if (nid == NUMA_NO_NODE) {
-> +			if (!init_nodemask_of_mempolicy(nodes_allowed)) {
-> +				NODEMASK_FREE(nodes_allowed);
-> +				nodes_allowed = &node_states[N_MEMORY];
-> +			}
-> +		} else if (nodes_allowed) {
-> +			init_nodemask_of_node(nodes_allowed, nid);
-> +		} else {
-> +			nodes_allowed = &node_states[N_MEMORY];
-> +		}
-> +
-> +		page = alloc_fresh_gigantic_page(h, nodes_allowed, true);
-> +
-> +		if (nodes_allowed != &node_states[N_MEMORY])
-> +			NODEMASK_FREE(nodes_allowed);
-> +
-> +		return page;
-> +	}
-> +
-> +	/* NUMA && vma */
-> +	if (huge_nodemask(vma, addr, nodes_allowed))
-> +		page = alloc_fresh_gigantic_page(h, nodes_allowed, true);
-> +
-> +	NODEMASK_FREE(nodes_allowed);
-> +	return page;
-> +}
-> +
-> +/*
-> + * There are 3 ways this can get called:
->   * 1. With vma+addr: we use the VMA's memory policy
->   * 2. With !vma, but nid=NUMA_NO_NODE:  We try to allocate a huge
->   *    page from any node, and let the buddy allocator itself figure
->
+
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/zte-dt64-4.10
+
+for you to fetch changes up to 392ce382743b847eded4b40990de4e78a5eb494d:
+
+  arm64: dts: zx: Add clock controller nodes (2016-10-24 16:54:20 +0800)
+
+----------------------------------------------------------------
+ZTE arm64 device tree update for 4.10:
+
+Add clock controller device nodes, including one top clock controller,
+two low speed clock controllers and one audio clock controller.
+
+----------------------------------------------------------------
+Jun Nie (1):
+      arm64: dts: zx: Add clock controller nodes
+
+ arch/arm64/boot/dts/zte/zx296718.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
