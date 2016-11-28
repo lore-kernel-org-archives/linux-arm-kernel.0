@@ -1,50 +1,25 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 28 Nov 2016 22:08:18 +0800
-Subject: [PATCH v2 1/2] arm64: dts: zx: Fix gic GICR property
-In-Reply-To: <2953810.EeueujTjSC@wuerfel>
-References: <1476361881-19685-1-git-send-email-jun.nie@linaro.org>
- <1476361881-19685-2-git-send-email-jun.nie@linaro.org>
- <20161017204919.GE3264@localhost> <2953810.EeueujTjSC@wuerfel>
-Message-ID: <CAAQ0ZWQkU6T=Fm4oZ1R5-zJEzErjroYAAJqU2TeNHfz=3UhYrg@mail.gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 28 Nov 2016 14:09:26 +0000
+Subject: [Qemu-devel] [kvm-unit-tests PATCH v7 00/11] QEMU MTTCG Test cases
+In-Reply-To: <20161128140705.caqpoiuvxy3mg2zk@kamzik.brq.redhat.com>
+References: <20161124161033.11456-1-alex.bennee@linaro.org>
+ <20161128103744.s3wq53xzsxvu5uus@kamzik.brq.redhat.com>
+ <878ts3uac6.fsf@linaro.org>
+ <CAFEAcA9JUOHnJL59EuhQ_dEWjt+YjEcu8LGiJ3CSk_7R4J5Efg@mail.gmail.com>
+ <20161128115824.hrofgivt2mlfk7fh@kamzik.brq.redhat.com>
+ <CAFEAcA8-3qHnp1T4bAiUL3NT8fHWik7-8zruyQKGgfADn5xF9w@mail.gmail.com>
+ <20161128140445.j336ksd7vqhi4ivz@kamzik.brq.redhat.com>
+ <20161128140705.caqpoiuvxy3mg2zk@kamzik.brq.redhat.com>
+Message-ID: <CAFEAcA9WBbYeOeWfAt9dtosW=n+Zi1waF0EtckeoJHs7FsjGOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 26, 2016 at 6:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday, October 17, 2016 1:49:19 PM CET Olof Johansson wrote:
->> On Thu, Oct 13, 2016 at 08:31:20PM +0800, Jun Nie wrote:
->> > GICR for multiple CPU can be described with start address and stride,
->> > or with multiple address. Current multiple address and stride are
->> > both used. Fix it.
->> >
->> > vmalloc patch 727a7f5a9 triggered this bug:
->> > [    0.097146] Unable to handle kernel paging request at virtual address ffff000008060008
->> > [    0.097150] pgd = ffff000008602000
->> > [    0.097160] [ffff000008060008] *pgd=000000007fffe003, *pud=000000007fffd003, *pmd=000000007fffc003, *pte=0000000000000000
->> > [    0.097165] Internal error: Oops: 96000007 [#1] PREEMPT SMP
->> > [    0.097170] Modules linked in:
->> > [    0.097177] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0+ #1474
->> > [    0.097179] Hardware name: ZTE zx296718 evaluation board (DT)
->> > [    0.097183] task: ffff80003e8c8b80 task.stack: ffff80003e8d0000
->> > [    0.097197] PC is at gic_populate_rdist+0x74/0x15c
->> > [    0.097202] LR is at gic_starting_cpu+0xc/0x20
->> > [    0.097206] pc : [<ffff0000082b1b18>] lr : [<ffff0000082b26e0>] pstate: 600001c5
->> >
->> > Signed-off-by: Jun Nie <jun.nie@linaro.org>
->>
->> A Fixes: tag would be useful on a patch like this, to tell what patch
->> introduced the problem. Please consider using them in the future.
->>
->> I've applied this one to fixes now.
->
-> Hi Olof,
->
-> I happened to still have this one in my todo folder as I must have
-> missed your reply, and I stumbled over it while looking for things
-> that may have gone missing.
->
-> I don't see it in v4.9-rc6, did it get dropped accidentally?
+On 28 November 2016 at 14:07, Andrew Jones <drjones@redhat.com> wrote:
+> Er... actually mach-virt is 123, as we only allocate 123 redistributors.
 
-Please help get this into v4.9 if possible, as it is required to get
-v4.9 kernel boot up on ZTE ZX296718 SoC.  Thanks.
+Oh yes, I'd forgotten about that limit. We'd need to add
+a KVM API for allocating redistributors in non-contiguous
+bits of memory if we wanted to raise that.
 
-Shawn
+thanks
+-- PMM
