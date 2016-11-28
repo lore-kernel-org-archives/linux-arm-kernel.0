@@ -1,78 +1,109 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 28 Nov 2016 16:16:34 +0100
-Subject: [PATCH 7/10] mmc: sdhci-xenon: Add support to PHYs of Marvell
- Xenon SDHC
-In-Reply-To: <10a885f0-82e9-a35c-f62f-3fc4518ea8b4@marvell.com>
-References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
- <a05ffd140f4edc02fc3128db8445b2264cf38723.1477911954.git-series.gregory.clement@free-electrons.com>
- <CAPDyKFpkcoVMKbVOwjX1WDyNgc1vvUX60D6XRX6=YHGvkvHvnA@mail.gmail.com>
- <3cd05a26-d340-476e-bab1-8be9d5446f47@marvell.com>
- <CAPDyKFrskyZvMwhmj8ioyaowU8GL5=d-6ipGQcmmig_a9E9AQQ@mail.gmail.com>
- <436c6925-cb0d-afe7-e3a2-384eca15ff42@marvell.com>
- <8359307d-5f44-3db9-aae1-eb1fe8e1141d@marvell.com>
- <CAPDyKFo3ezYOywtSZ8GGQ1XK9KPsxCgQNbaiz45EVgbgtnUxjg@mail.gmail.com>
- <10a885f0-82e9-a35c-f62f-3fc4518ea8b4@marvell.com>
-Message-ID: <CAPDyKFr8rX04iY92OeQpSkS+3HN2-FxijCCiDb2sSKvP+TZPog@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 28 Nov 2016 16:17:56 +0100
+Subject: [PATCH] memory/atmel-ebi: Fix ns <-> cycles conversions
+Message-ID: <1480346276-6796-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 November 2016 at 12:38, Ziji Hu <huziji@marvell.com> wrote:
-> Hi Ulf,
->
-> On 2016/11/28 19:13, Ulf Hansson wrote:
->>>
->>>     As you suggest, I replace mmc_wait_for_cmd() with mmc_send_tuning(), to
->>>     send commands for testing current sampling point set in our host PHY.
->>>
->>>     According to my test result, it shows that mmc_send_tuning() can only support
->>>     tuning command (CMD21/CMD19).
->>>     As a result, we cannot use mmc_send_tuning() when card is in the speed modes
->>>     which doesn't support tuning, such as eMMC HS SDR, eMMC HS DRR and
->>>     SD SDR 12/SDR25/DDR50. Card will not response to tuning commands in those
->>>     speed modes.
->>>
->>>     Could you please provide suggestions for the speed mode in which tuning is
->>>     not available?
->>>
->>
->> Normally the mmc host driver shouldn't have to care about what the
->> card supports, as that is the responsibility of the mmc core to
->> manage.
->>
->> The host should only need to implement the ->execute_tuning() ops,
->> which gets called when the card supports tuning (CMD19/21). Does it
->> make sense?
->>
->    I think it is irrelevant to tuning procedure.
->
->    Our host requires to adjust PHY setting after each time ios setting
->    (SDCLK/bus width/speed mode) is changed.
->    The simplified sequence is:
->    mmc change ios --> mmc_set_ios() --> ->set_ios() --> after sdhci_set_ios(),
->    adjust PHY setting.
->    During PHY setting adjustment, out host driver has to send commands to
->    test current sampling point. Tuning is another independent step.
+at91sam9_ebi_get_config() is incorrectly converting timings in clock
+cycles into timings in nanoseconds by multiplying the cycle values by
+the clk rate instead of the clk period.
 
-For those speed modes (or other ios changes) that *don't* requires
-tuning, then what will you do when you send the command to confirm the
-change of PHY setting and it fails?
+at91sam9_ebi_xslate_config() has the same problem for the
+tdf_ns -> tdf_cycles conversion.
 
-My assumption is that you will fail anyway, by propagating the error
-to the mmc core. At least that what was my understanding from your
-earlier replies, right!?
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Reported-by: Chris Leahy <leahycm@gmail.com>
+Fixes: 6a4ec4cd0888 ("memory: add Atmel EBI (External Bus Interface) driver")
+Cc: <stable@vger.kernel.org>
+---
+ drivers/memory/atmel-ebi.c | 27 ++++++++++++++-------------
+ 1 file changed, 14 insertions(+), 13 deletions(-)
 
-Then, I think there are no point having the host driver sending a
-command to confirm the PHY settings, as the mmc core will anyway
-discover if something goes wrong when the next command is sent.
-
-Please correct me if I am wrong!
-
->
->    Thus our host needs a valid command in PHY setting adjustment. Tuning command
->    can be borrowed to complete this task in SD SDR50. But for other speed mode,
->    we have to find out a valid command.
-
-I thought we agreed on this wasn't necessary? Please see my upper response.
-
-Kind regards
-Uffe
+diff --git a/drivers/memory/atmel-ebi.c b/drivers/memory/atmel-ebi.c
+index b5ed3bd082b5..e9ebc4f31d16 100644
+--- a/drivers/memory/atmel-ebi.c
++++ b/drivers/memory/atmel-ebi.c
+@@ -93,7 +93,7 @@ static void at91sam9_ebi_get_config(struct at91_ebi_dev *ebid,
+ 				    struct at91_ebi_dev_config *conf)
+ {
+ 	struct at91sam9_smc_generic_fields *fields = &ebid->ebi->sam9;
+-	unsigned int clk_rate = clk_get_rate(ebid->ebi->clk);
++	unsigned int clk_period = NSEC_PER_SEC / clk_get_rate(ebid->ebi->clk);
+ 	struct at91sam9_ebi_dev_config *config = &conf->sam9;
+ 	struct at91sam9_smc_timings *timings = &config->timings;
+ 	unsigned int val;
+@@ -102,43 +102,43 @@ static void at91sam9_ebi_get_config(struct at91_ebi_dev *ebid,
+ 	config->mode = val & ~AT91_SMC_TDF;
+ 
+ 	val = (val & AT91_SMC_TDF) >> 16;
+-	timings->tdf_ns = clk_rate * val;
++	timings->tdf_ns = clk_period * val;
+ 
+ 	regmap_fields_read(fields->setup, conf->cs, &val);
+ 	timings->ncs_rd_setup_ns = (val >> 24) & 0x1f;
+ 	timings->ncs_rd_setup_ns += ((val >> 29) & 0x1) * 128;
+-	timings->ncs_rd_setup_ns *= clk_rate;
++	timings->ncs_rd_setup_ns *= clk_period;
+ 	timings->nrd_setup_ns = (val >> 16) & 0x1f;
+ 	timings->nrd_setup_ns += ((val >> 21) & 0x1) * 128;
+-	timings->nrd_setup_ns *= clk_rate;
++	timings->nrd_setup_ns *= clk_period;
+ 	timings->ncs_wr_setup_ns = (val >> 8) & 0x1f;
+ 	timings->ncs_wr_setup_ns += ((val >> 13) & 0x1) * 128;
+-	timings->ncs_wr_setup_ns *= clk_rate;
++	timings->ncs_wr_setup_ns *= clk_period;
+ 	timings->nwe_setup_ns = val & 0x1f;
+ 	timings->nwe_setup_ns += ((val >> 5) & 0x1) * 128;
+-	timings->nwe_setup_ns *= clk_rate;
++	timings->nwe_setup_ns *= clk_period;
+ 
+ 	regmap_fields_read(fields->pulse, conf->cs, &val);
+ 	timings->ncs_rd_pulse_ns = (val >> 24) & 0x3f;
+ 	timings->ncs_rd_pulse_ns += ((val >> 30) & 0x1) * 256;
+-	timings->ncs_rd_pulse_ns *= clk_rate;
++	timings->ncs_rd_pulse_ns *= clk_period;
+ 	timings->nrd_pulse_ns = (val >> 16) & 0x3f;
+ 	timings->nrd_pulse_ns += ((val >> 22) & 0x1) * 256;
+-	timings->nrd_pulse_ns *= clk_rate;
++	timings->nrd_pulse_ns *= clk_period;
+ 	timings->ncs_wr_pulse_ns = (val >> 8) & 0x3f;
+ 	timings->ncs_wr_pulse_ns += ((val >> 14) & 0x1) * 256;
+-	timings->ncs_wr_pulse_ns *= clk_rate;
++	timings->ncs_wr_pulse_ns *= clk_period;
+ 	timings->nwe_pulse_ns = val & 0x3f;
+ 	timings->nwe_pulse_ns += ((val >> 6) & 0x1) * 256;
+-	timings->nwe_pulse_ns *= clk_rate;
++	timings->nwe_pulse_ns *= clk_period;
+ 
+ 	regmap_fields_read(fields->cycle, conf->cs, &val);
+ 	timings->nrd_cycle_ns = (val >> 16) & 0x7f;
+ 	timings->nrd_cycle_ns += ((val >> 23) & 0x3) * 256;
+-	timings->nrd_cycle_ns *= clk_rate;
++	timings->nrd_cycle_ns *= clk_period;
+ 	timings->nwe_cycle_ns = val & 0x7f;
+ 	timings->nwe_cycle_ns += ((val >> 7) & 0x3) * 256;
+-	timings->nwe_cycle_ns *= clk_rate;
++	timings->nwe_cycle_ns *= clk_period;
+ }
+ 
+ static int at91_xlate_timing(struct device_node *np, const char *prop,
+@@ -334,6 +334,7 @@ static int at91sam9_ebi_apply_config(struct at91_ebi_dev *ebid,
+ 				     struct at91_ebi_dev_config *conf)
+ {
+ 	unsigned int clk_rate = clk_get_rate(ebid->ebi->clk);
++	unsigned int clk_period = NSEC_PER_SEC / clk_rate;
+ 	struct at91sam9_ebi_dev_config *config = &conf->sam9;
+ 	struct at91sam9_smc_timings *timings = &config->timings;
+ 	struct at91sam9_smc_generic_fields *fields = &ebid->ebi->sam9;
+@@ -376,7 +377,7 @@ static int at91sam9_ebi_apply_config(struct at91_ebi_dev *ebid,
+ 	val |= AT91SAM9_SMC_NWECYCLE(coded_val);
+ 	regmap_fields_write(fields->cycle, conf->cs, val);
+ 
+-	val = DIV_ROUND_UP(timings->tdf_ns, clk_rate);
++	val = DIV_ROUND_UP(timings->tdf_ns, clk_period);
+ 	if (val > AT91_SMC_TDF_MAX)
+ 		val = AT91_SMC_TDF_MAX;
+ 	regmap_fields_write(fields->mode, conf->cs,
+-- 
+2.7.4
