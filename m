@@ -1,96 +1,70 @@
-From: uwe@kleine-koenig.org (=?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?=)
-Date: Mon, 28 Nov 2016 16:44:47 +0100
-Subject: [PATCH 2/2] net: dsa: mv88e6xxx: Add 88E6176 device tree support
-In-Reply-To: <20161128131735.GA4379@lunn.ch>
-References: <1480280279-9552-1-git-send-email-afaerber@suse.de>
- <1480280279-9552-2-git-send-email-afaerber@suse.de>
- <20161127212709.GD13318@lunn.ch>
- <9500470d-09c3-3ecb-994b-3d108bffc99e@suse.de>
- <20161127220846.GH13318@lunn.ch>
- <e5d45b55-a4c1-3b5e-0bdc-a5e340b072d0@suse.de>
- <20161127231009.GA17704@lunn.ch>
- <20161128080939.ippqlytvojitefkp@perseus.defre.kleine-koenig.org>
- <20161128131735.GA4379@lunn.ch>
-Message-ID: <2c59cc79-b6dc-9920-1725-a7785ff3b6bf@kleine-koenig.org>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 28 Nov 2016 16:44:39 +0100
+Subject: arasan,sdhci.txt "compatibility" DT binding
+In-Reply-To: <a20b2b4f-15d4-3c29-324c-1ced5dbcc67f@xilinx.com>
+References: <56B07BA5.4060407@free.fr> <56B166F1.5080605@rock-chips.com>
+ <56B1AA44.1010108@xilinx.com> <56B1BAF8.2050907@free.fr>
+ <56B1CF40.1030203@xilinx.com> <20160203152104.GP4215@xsjsorenbubuntu>
+ <56B21DDB.6050708@free.fr> <582ED9E0.5090506@free.fr>
+ <CAFd313x6MJeO90_+rxditdPn762g7TqZc0_D6ojGTKmtGJKjPA@mail.gmail.com>
+ <582EF744.8090307@free.fr> <a20b2b4f-15d4-3c29-324c-1ced5dbcc67f@xilinx.com>
+Message-ID: <583C50E7.6030400@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/2016 02:17 PM, Andrew Lunn wrote:
->> I still wonder (and didn't get an answer back when I asked about this)
->> why a comment is preferred here. For other devices I know it's usual and
->> requested by the maintainers to use:
->>
->> 	compatible = "exact name", "earlyer device to match driver";
->>
->> . This is more robust, documents the situation more formally and makes
->> it better greppable. The price to pay is only a few bytes in the dtb
->> which IMO is ok.
-> 
-> We did discuss this a while back. The information is useless and
-> should to be ignored if present.
+Hello,
 
-Who is "we"?
+@Shawn Lin, could you take a look below and tell me exactly
+which IP core(s) Rockchip is using in its SoCs?
 
-> The switch has a register which contains its model and revision. Each
-> port has a set of registers, and register 3 contains the
-> model/version. For all devices compatible with the 6085, the port
-> registers start at address 0x10. For the 6190, the port registers
-> start at 0x0. So given one of these two compatible strings, we can
-> find the model of the device, from something which is burned into the
-> silicon.
-> 
-> Now, say we did add per device compatible strings. We look up the
-> model burned into the silicon, find it is different to what the device
-> tree is and do what? Fail the probe? Or just keep going using the
-
-I'd say fail to probe is the right thing to do. Of course that doesn't
-work for already supported models because it will break compatibility.
-
-I'd value the advantages (i.e. easily find machines with a given
-hardware) higher than making broken dtbs work, so being a bit silly is
-fine for me.
-
-> value in the silicon? It seems silly to fail the probe if the driver
-> does support the model, but that means the device tree is never
-> verified and hence probably wrong. Why have wrong information in the
-> device tree, especially wrong information which we never use. It is
-> better to not have that information in the device tree.
-
-At least we'd have a canonical way to specify the type of switch. If
-it's not verified it's as good and bad as a dts comment. But the latter
-isn't available in the dtb, which I consider a small disadvantage.
-
-Also it seems wrong to write "marvell,mv88e6085" (only) if I know the
-hardware is really a "marvell,mv88e6176".
-
-> Linus has said he does not like ARM devices because of all the busses
-> which are not enumerable. Here we have a device which with a little
-> bit of help we can enumerate. So we should. 
-
-If you write
-
-	compatible = "marvell,mv88e6176", "marvell,mv88e6085";
-
-you can still enumerate in the same way as before.
-
-There are several more instances where the device tree specifies
-something that could be probed instead. Some examples:
-
-	compatible = "ethernet-phy-id0141.0DD1", "ethernet-phy-ieee802.3-c22";
-	compatible = "spansion,s25fl164k", "jedec,spi-nor";
-	compatible = "fsl,imx25-flexcan", "fsl,p1010-flexcan";
-	compatible = "arm,pl011", "arm,primecell";
-
-So you think they are all doing it wrong?
-
-Best regards
-Uwe
+Based on the feedback I received, here is an updated list of
+compatible strings and controller versions dealt with by the
+drivers/mmc/host/sdhci-of-arasan.c code.
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161128/42269bc2/attachment.sig>
+Xilinx Zynq:
+"SD2.0 / SDIO2.0 / MMC3.31 AHB Host Controller"
+"arasan,sdhci-8.9a"
+NB: 8.9a is the documentation revision (dated 2011-10-19)
+subsequent tweaks labeled 9.0a, 9.1a, 9.2a
+
+Xilinx ZynqMP:
+"SD3.0 / SDIO3.0 / eMMC4.51 AHB Host Controller"
+"arasan,sdhci-8.9a"
+NB: using the same compatible string as Zynq
+
+Sigma SMP87xx
+"SD3.0 / SDIO3.0 / eMMC4.4 AHB Host Controller"
+no compatible string yet, platform-specific init required
+
+APM:
+"SD3.0 / SDIO3.0 / eMMC4.41 AHB Host Controller"
+"arasan,sdhci-4.9a"
+NB: 4.9a appears to be the documentation revision
+no functional diff with "arasan,sdhci-8.9a"
+
+Rockchip
+Exact IP unknown, waiting for Shawn's answer
+"arasan,sdhci-5.1"
+NB: 5.1 appears to refer to the eMMC standard supported
+
+
+On a final note, there are many variations of the Arasan IP.
+I've tracked down at least the following:
+
+SD_2.0_SDIO_2.0__MMC_3.31_AHB_Host_Controller.pdf
+SD_3.0_SDIO_3.0_eMMC_4.41_OCP_Host_Controller.pdf
+SD_3.0_SDIO_3.0_eMMC_4.4__AHB_Host_Controller.pdf
+SD_3.0_SDIO_3.0_eMMC_4.51_Host_Controller.pdf
+SD_3.0_SDIO_3.0_eMMC_4.5__Host_Controller.pdf
+SD_4.1_SDIO_4.1_eMMC_4.51_Host_Controller.pdf
+SD_4.1_SDIO_4.1_eMMC_5.1__Host_Controller.pdf
+
+It seems to me the compatible string should specify
+the SD/SDIO version AND the eMMC version, since it
+seems many combinations are allowed, e.g. eMMC 4.51
+has two possible SD versions.
+
+What do you think?
+
+Regards.
