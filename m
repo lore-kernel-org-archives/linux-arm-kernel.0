@@ -1,51 +1,87 @@
-From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon, 28 Nov 2016 11:37:39 -0500
-Subject: [PATCH] arm64: head.S: Fix CNTHCTL_EL2 access on VHE system
-Message-ID: <1480351059-11370-1-git-send-email-jintack@cs.columbia.edu>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 28 Nov 2016 10:40:24 -0600
+Subject: [PATCH v2 1/3] devicetree: bindings: pinctrl: Add binding for ti,
+ da850-pupd
+In-Reply-To: <1480351226-3332-1-git-send-email-david@lechnology.com>
+References: <1480351226-3332-1-git-send-email-david@lechnology.com>
+Message-ID: <1480351226-3332-2-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jintack <jintack@cs.columbia.edu>
+Device-tree bindings for TI DA850/OMAP-L138/AM18XX pullup/pulldown
+pinconf controller.
 
-Bit positions of CNTHCTL_EL2 are changing depending on HCR_EL2.E2H bit.
-EL1PCEN and EL1PCTEN are 1st and 0th bits when E2H is not set, but they
-are 11th and 10th bits respectively when E2H is set.  Current code is
-unintentionally setting wrong bits to CNTHCTL_EL2 with E2H set.
-
-In fact, we don't need to set those two bits, which allow EL1 and EL0 to
-access physical timer and counter respectively, if E2H and TGE are set
-for the host kernel. They will be configured later as necessary. First,
-we don't need to configure those bits for EL1, since the host kernel
-runs in EL2.  It is a hypervisor's responsibility to configure them
-before entering a VM, which runs in EL0 and EL1. Second, EL0 accesses
-are configured in the later stage of boot process.
-
-Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+Signed-off-by: David Lechner <david@lechnology.com>
+Reviewed-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm64/kernel/head.S | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 332e331..bc3d2db 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -524,10 +524,16 @@ set_hcr:
- 	msr	hcr_el2, x0
- 	isb
- 
--	/* Generic timers. */
-+	/*
-+	 * Allow Non-secure EL1 and EL0 to access physical timer and counter.
-+	 * This is not necessary for VHE, since the host kernel runs in EL2,
-+	 * and EL0 accesses are configured in the later stage of boot process.
-+	 */
-+	cbnz	x2, 1f
- 	mrs	x0, cnthctl_el2
- 	orr	x0, x0, #3			// Enable EL1 physical timers
- 	msr	cnthctl_el2, x0
-+1:
- 	msr	cntvoff_el2, xzr		// Clear virtual offset
- 
- #ifdef CONFIG_ARM_GIC_V3
+v2 changes:
+* s/DA8XX/DA850/ in the commit message
+
+ .../devicetree/bindings/pinctrl/ti,da850-pupd.txt  | 55 ++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/ti,da850-pupd.txt
+
+diff --git a/Documentation/devicetree/bindings/pinctrl/ti,da850-pupd.txt b/Documentation/devicetree/bindings/pinctrl/ti,da850-pupd.txt
+new file mode 100644
+index 0000000..7f29805
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pinctrl/ti,da850-pupd.txt
+@@ -0,0 +1,55 @@
++* Pin configuration for TI DA850/OMAP-L138/AM18x
++
++These SoCs have a separate controller for setting bias (internal pullup/down).
++Bias can only be selected for groups rather than individual pins.
++
++Required Properties:
++
++  - compatible: Must be "ti,da850-pupd"
++  - reg: Base address and length of the memory resource used by the pullup/down
++    controller hardware module.
++
++The controller node also acts as a container for pin group configuration nodes.
++The names of these groups are ignored.
++
++Pin Group Node Properties:
++
++- groups: An array of strings, each string containing the name of a pin group.
++          Valid names are "cp0".."cp31".
++
++The pin configuration parameters use the generic pinconf bindings defined in
++pinctrl-bindings.txt in this directory. The supported parameters are
++bias-disable, bias-pull-up, bias-pull-down.
++
++
++Example
++-------
++
++In common dtsi file:
++
++	pinconf: pin-controller at 22c00c {
++		compatible = "ti,da850-pupd";
++		reg = <0x22c00c 0x8>;
++	};
++
++In board-specific file:
++
++	&pinconf {
++		pinctrl-0 = <&pinconf_bias_groups>;
++		pinctrl-names = "default";
++
++		pinconf_bias_groups: bias-groups {
++			pull-up {
++				groups = "cp30", "cp31";
++				bias-pull-up;
++			};
++			pull-down {
++				groups = "cp29", "cp28";
++				bias-pull-down;
++			};
++			disable {
++				groups = "cp27", "cp26";
++				bias-disable;
++			};
++		};
++	};
 -- 
-1.9.1
+2.7.4
