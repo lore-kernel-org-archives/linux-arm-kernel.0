@@ -1,436 +1,161 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Mon, 28 Nov 2016 11:29:58 +0100
-Subject: [kvm-unit-tests PATCH v7 09/11] arm/locking-tests: add
- comprehensive locking test
-In-Reply-To: <20161124161033.11456-10-alex.bennee@linaro.org>
-References: <20161124161033.11456-1-alex.bennee@linaro.org>
- <20161124161033.11456-10-alex.bennee@linaro.org>
-Message-ID: <20161128102958.6i4cfi2osbppr6t3@kamzik.brq.redhat.com>
+From: sf84@laposte.net (Sebastian Frias)
+Date: Mon, 28 Nov 2016 11:34:13 +0100
+Subject: [net-next PATCH v1 0/2] stmmac: dwmac-meson8b: configurable RGMII
+ TX delay
+In-Reply-To: <1b7f113e-34f9-69f4-a45f-9fd687d87990@gmail.com>
+References: <20161124143417.10178-1-martin.blumenstingl@googlemail.com>
+ <1480002964.17538.131.camel@baylibre.com>
+ <CAFBinCB7sXjXor++W+PW0-j_VxATRzhexjqHgXj2jD10tBpZFg@mail.gmail.com>
+ <e6ca0941-e2e3-dd93-d4d3-8fbd76b60e17@gmail.com>
+ <6a6af561-4e83-ca6e-d989-f421e18bce1e@laposte.net>
+ <1b7f113e-34f9-69f4-a45f-9fd687d87990@gmail.com>
+Message-ID: <6dfb67a8-2825-6256-3244-c99316531885@laposte.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2016 at 04:10:31PM +0000, Alex Benn?e wrote:
-> This test has been written mainly to stress multi-threaded TCG behaviour
-> but will demonstrate failure by default on real hardware. The test takes
-> the following parameters:
+On 25/11/16 18:44, Florian Fainelli wrote:
+> On 11/25/2016 03:13 AM, Sebastian Frias wrote:
+>> On 24/11/16 19:55, Florian Fainelli wrote:
+<snip>
+>>> Correct, the meaning of PHY_INTERFACE_MODE should be from the
+>>> perspective of the PHY device:
+>>>
+>>> - PHY_INTERFACE_MODE_RGMII_TXID means that the PHY is responsible for
+>>> adding a delay when the MAC transmits (TX MAC -> PHY (delay) -> wire)
+>>> - PHY_INTERFACE_MODE_RGMII_RXID means that the PHY is responsible for
+>>> adding a delay when the MAC receives (RX MAC <- (delay) PHY) <- wire)
+>>>
+>>
+>> Thanks for the explanation.
+>> Actually I had thought that the delay was to account for board routing
+>> (wires) between the MAC and the PHY.
+>> From your explanation it appears that the delay is to account for board
+>> routing (wires) between the PHY and the RJ45 socket.
 > 
->   - "lock" use GCC's locking semantics
->   - "atomic" use GCC's __atomic primitives
->   - "wfelock" use WaitForEvent sleep
->   - "excl" use load/store exclusive semantics
+> The placement of the (delay) was not meant to be exact, but it was
+> wrongly place anyway, so it should be between the MAC and PHY, always.
+> This is why you see people either fixing the need for a delay by
+> appropriately programming the PHY, or the MAC, or by just inserting a
+> fixed delay on the PCB between the PHY and the MAC and programming no
+> delays (or using the default values and hoping this works).
+
+Thanks.
+Your patch "[PATCH net-next 3/4] Documentation: net: phy: Add blurb about
+RGMII" on the documentation makes it clear.
+
+>>>
+>>> This also seems reasonable to do, provided that the PHY is also properly
+>>> configured not to add delays in both directions, and therefore assumes
+>>> that the MAC does it.
+>>>
+>>> We have a fairly large problem with how RGMII delays are done in PHYLIB
+>>> and Ethernet MAC drivers (or just in general), where we can't really
+>>> intersect properly what a PHY is supporting (in terms of internal
+>>> delays), and what the MAC supports either. One possible approach could
+>>> be to update PHY drivers a list of PHY_INTERFACE_MODE_* that they
+>>> support (ideally, even with normalized nanosecond delay values), 
+>>
+>> Just to make sure I understood this, the DT would say something like:
+>>
+>> phy-connection-type = "rgmii-txid";
+>> txid-delay-ns = <3>;
+>>
+>> For a 3ns TX delay, would that be good?
 > 
-> Also two more options allow the test to be tweaked
+> That's one possibility, although, see below, some PHYs support
+> sub-nanosecond values, but in general, that seems like a good
+> representation. If the "txid-delay-ns" property is omitted, a standard
+> 2ns delay is assumed.
+
+Sounds good.
+I did not see the "txid-delay-ns" property documented in your patches, if
+it is not too late, maybe it could be "txid-delay-ps" using picoseconds as
+unit, right?
+
+>>> and
+>>> then intersect that with the requested phy_interface_t during
+>>> phy_{attach,connect} time, and feed this back to the MAC with a special
+>>> error code/callback, so we could gracefully try to choose another
+>>> PHY_INTERFACE_MODE_* value that the MAC supports....
+>>>
+>>> A larger problem is that a number of drivers have been deployed, and
+>>> Device Trees, possibly with the meaning of "phy-mode" and
+>>> "phy-connection-type" being from the MAC perspective, and not the PHY
+>>> perspective *sigh*, good luck auditing those.
+>>>
+>>> So from there, here is possibly what we could do
+>>>
+>>> - submit a series of patches that update the PHYLIB documentation (there
+>>> are other things missing here) and make it clear from which entity (PHY
+>>> or MAC) does the delay apply to, document the "intersection" problem here
+>>
+>> I think documenting is necessary, thanks in advance!
+>>
+>> However, I'm wondering if there's a way to make this work in all cases.
+>> Indeed, if we consider for example that TX delay is required, we have 4
+>> cases:
+>>
+>>        PHY         |       MAC          | Who applies?
+>> TXID supported     | TXID supported     | PHY
+>> TXID supported     | TXID not supported | PHY
+>> TXID not supported | TXID supported     | MAC
+>> TXID not supported | TXID not supported | cannot be done
+>>
+>> That is basically what my patch:
+>>
+>> https://marc.info/?l=linux-netdev&m=147869658031783&w=2
+>>
+>> attempted to achieve. That would allow more combinations of MAC<->PHY to
+>> work, right?
 > 
->   - "noshuffle" disables the memory shuffling
->   - "count=%ld" set your own per-CPU increment count
+> Yes, indeed.
+
+Just one thing, from your patch "[PATCH net-next 3/4] Documentation: net:
+phy: Add blurb about RGMII" I have the impression that the 3rd option from
+the table above, would be a little bit more complex to implement.
+
+I will comment on the patch.
+
+>> Nevertheless, I think we also need to keep in mind that most of this
+>> discussion assumes the case where both, MAC and PHY have equal capabilities.
+>> Could it happen that the PHY supports only 2ns delay, and the MAC only
+>> 1ns delay?
 > 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> I doubt this exists at the MAC level what we should have is either a 2ns
+> delay, in either RX or TX path, or nothing, because that's the value
+> that results in shifting the data lines and the RX/TX lines by 90
+> degrees at 125Mhz (1/125^6 = 8 ns, one quarter shift is 90 degrees =
+> 2ns). The PHY may have a similar set of pre-programmed, fixed 2ns
+> delays, but it is not uncommon to see 0.X ns resolution available:
 > 
-> ---
-> v2
->   - Don't use thumb style strexeq stuff
->   - Add atomic and wfelock tests
->   - Add count/noshuffle test controls
->   - Move barrier tests to separate test file
-> v4
->   - fix up unitests.cfg to use correct test name
->   - move into "locking" group, remove barrier tests
->   - use a table to add tests, mark which are expected to work
->   - correctly report XFAIL
-> v5
->   - max out at -smp 4 in unittest.cfg
-> v7
->   - make test control flags bools
->   - default the count to 100000 (so it doesn't timeout)
-> ---
->  arm/Makefile.common |   2 +
->  arm/locking-test.c  | 302 ++++++++++++++++++++++++++++++++++++++++++++++++++++
->  arm/unittests.cfg   |  34 ++++++
->  3 files changed, 338 insertions(+)
->  create mode 100644 arm/locking-test.c
+> drivers/net/phy/mscc.c
+> drivers/net/phy/dp83867.c w/ arch/arm/boot/dts/dra72-evm-revc.dts
 > 
-> diff --git a/arm/Makefile.common b/arm/Makefile.common
-> index 528166d..eb4cfdf 100644
-> --- a/arm/Makefile.common
-> +++ b/arm/Makefile.common
-> @@ -15,6 +15,7 @@ tests-common += $(TEST_DIR)/pci-test.flat
->  tests-common += $(TEST_DIR)/gic.flat
->  tests-common += $(TEST_DIR)/tlbflush-code.flat
->  tests-common += $(TEST_DIR)/tlbflush-data.flat
-> +tests-common += $(TEST_DIR)/locking-test.flat
->  
->  all: test_cases
->  
-> @@ -85,3 +86,4 @@ test_cases: $(generated_files) $(tests-common) $(tests)
->  $(TEST_DIR)/selftest.o $(cstart.o): $(asm-offsets)
->  $(TEST_DIR)/tlbflush-code.elf: $(cstart.o) $(TEST_DIR)/tlbflush-code.o
->  $(TEST_DIR)/tlbflush-data.elf: $(cstart.o) $(TEST_DIR)/tlbflush-data.o
-> +$(TEST_DIR)/locking-test.elf: $(cstart.o) $(TEST_DIR)/locking-test.o
+> In these cases, if you end-up using a non 2ns delay, you are fixing a
+> PCB problem more than an interoperability problem between your MAC and PHY.
 
-Instead of adding a new test file, please extend the one we already have,
-which iirc was the first MTTCG test, arm/spinlock-test.c. If you don't
-like the naming or code in spinlock-test.c, then feel free to change it,
-delete it. It's currently not getting run by arm/unittests.cfg, and it's
-not getting maintained.
+I see, thanks.
 
-> diff --git a/arm/locking-test.c b/arm/locking-test.c
-> new file mode 100644
-> index 0000000..f10c61b
-> --- /dev/null
-> +++ b/arm/locking-test.c
-> @@ -0,0 +1,302 @@
-> +#include <libcflat.h>
-> +#include <asm/smp.h>
-> +#include <asm/cpumask.h>
-> +#include <asm/barrier.h>
-> +#include <asm/mmu.h>
-> +
-> +#include <prng.h>
-> +
-> +#define MAX_CPUS 8
-> +
-> +/* Test definition structure
-> + *
-> + * A simple structure that describes the test name, expected pass and
-> + * increment function.
-> + */
-> +
-> +/* Function pointers for test */
-> +typedef void (*inc_fn)(int cpu);
-> +
-> +typedef struct {
-> +	const char *test_name;
-> +	bool  should_pass;
-> +	inc_fn main_fn;
-> +} test_descr_t;
-> +
-> +/* How many increments to do */
-> +static int increment_count = 1000000;
-> +static bool do_shuffle = true;
-> +
-> +/* Shared value all the tests attempt to safely increment using
-> + * various forms of atomic locking and exclusive behaviour.
-> + */
-> +static unsigned int shared_value;
-> +
-> +/* PAGE_SIZE * uint32_t means we span several pages */
-> +__attribute__((aligned(PAGE_SIZE))) static uint32_t memory_array[PAGE_SIZE];
-> +
-> +/* We use the alignment of the following to ensure accesses to locking
-> + * and synchronisation primatives don't interfere with the page of the
-> + * shared value
-> + */
-> +__attribute__((aligned(PAGE_SIZE))) static unsigned int per_cpu_value[MAX_CPUS];
-> +__attribute__((aligned(PAGE_SIZE))) static cpumask_t smp_test_complete;
-> +__attribute__((aligned(PAGE_SIZE))) struct isaac_ctx prng_context[MAX_CPUS];
-> +
-> +/* Some of the approaches use a global lock to prevent contention. */
-> +static int global_lock;
-> +
-> +/* In any SMP setting this *should* fail due to cores stepping on
-> + * each other updating the shared variable
-> + */
-> +static void increment_shared(int cpu)
-> +{
-> +	(void)cpu;
-> +
-> +	shared_value++;
-> +}
-> +
-> +/* GCC __sync primitives are deprecated in favour of __atomic */
-> +static void increment_shared_with_lock(int cpu)
-> +{
-> +	(void)cpu;
-> +
-> +	while (__sync_lock_test_and_set(&global_lock, 1));
-> +	shared_value++;
-> +	__sync_lock_release(&global_lock);
-> +}
-> +
-> +/* In practice even __ATOMIC_RELAXED uses ARM's ldxr/stex exclusive
-> + * semantics */
-> +static void increment_shared_with_atomic(int cpu)
-> +{
-> +	(void)cpu;
-> +
-> +	__atomic_add_fetch(&shared_value, 1, __ATOMIC_SEQ_CST);
-> +}
-> +
-> +
-> +/*
-> + * Load/store exclusive with WFE (wait-for-event)
-> + *
-> + * See ARMv8 ARM examples:
-> + *   Use of Wait For Event (WFE) and Send Event (SEV) with locks
-> + */
-> +
-> +static void increment_shared_with_wfelock(int cpu)
-> +{
-> +	(void)cpu;
-> +
-> +#if defined(__aarch64__)
-> +	asm volatile(
-> +	"	mov     w1, #1\n"
-> +	"       sevl\n"
-> +	"       prfm PSTL1KEEP, [%[lock]]\n"
-> +	"1:     wfe\n"
-> +	"	ldaxr	w0, [%[lock]]\n"
-> +	"	cbnz    w0, 1b\n"
-> +	"	stxr    w0, w1, [%[lock]]\n"
-> +	"	cbnz	w0, 1b\n"
-> +	/* lock held */
-> +	"	ldr	w0, [%[sptr]]\n"
-> +	"	add	w0, w0, #0x1\n"
-> +	"	str	w0, [%[sptr]]\n"
-> +	/* now release */
-> +	"	stlr	wzr, [%[lock]]\n"
-> +	: /* out */
-> +	: [lock] "r" (&global_lock), [sptr] "r" (&shared_value) /* in */
-> +	: "w0", "w1", "cc");
-> +#else
-> +	asm volatile(
-> +	"	mov     r1, #1\n"
-> +	"1:	ldrex	r0, [%[lock]]\n"
-> +	"	cmp     r0, #0\n"
-> +	"	wfene\n"
-> +	"	strexeq r0, r1, [%[lock]]\n"
-> +	"	cmpeq	r0, #0\n"
-> +	"	bne	1b\n"
-> +	"	dmb\n"
-> +	/* lock held */
-> +	"	ldr	r0, [%[sptr]]\n"
-> +	"	add	r0, r0, #0x1\n"
-> +	"	str	r0, [%[sptr]]\n"
-> +	/* now release */
-> +	"	mov	r0, #0\n"
-> +	"	dmb\n"
-> +	"	str	r0, [%[lock]]\n"
-> +	"	dsb\n"
-> +	"	sev\n"
-> +	: /* out */
-> +	: [lock] "r" (&global_lock), [sptr] "r" (&shared_value) /* in */
-> +	: "r0", "r1", "cc");
-> +#endif
-> +}
-> +
-> +
-> +/*
-> + * Hand-written version of the load/store exclusive
-> + */
-> +static void increment_shared_with_excl(int cpu)
-> +{
-> +	(void)cpu;
-> +
-> +#if defined(__aarch64__)
-> +        asm volatile(
-> +	"1:	ldxr	w0, [%[sptr]]\n"
-> +	"	add     w0, w0, #0x1\n"
-> +	"	stxr	w1, w0, [%[sptr]]\n"
-> +	"	cbnz	w1, 1b\n"
-> +	: /* out */
-> +	: [sptr] "r" (&shared_value) /* in */
-> +	: "w0", "w1", "cc");
-> +#else
-> +	asm volatile(
-> +	"1:	ldrex	r0, [%[sptr]]\n"
-> +	"	add     r0, r0, #0x1\n"
-> +	"	strex	r1, r0, [%[sptr]]\n"
-> +	"	cmp	r1, #0\n"
-> +	"	bne	1b\n"
-> +	: /* out */
-> +	: [sptr] "r" (&shared_value) /* in */
-> +	: "r0", "r1", "cc");
-> +#endif
-> +}
-> +
-> +/* Test array */
-> +static test_descr_t tests[] = {
-> +	{ "none", false, increment_shared },
-> +	{ "lock", true, increment_shared_with_lock },
-> +	{ "atomic", true, increment_shared_with_atomic },
-> +	{ "wfelock", true, increment_shared_with_wfelock },
-> +	{ "excl", true, increment_shared_with_excl }
-> +};
-> +
-> +/* The idea of this is just to generate some random load/store
-> + * activity which may or may not race with an un-barried incremented
-> + * of the shared counter
-> + */
-> +static void shuffle_memory(int cpu)
-> +{
-> +	int i;
-> +	uint32_t lspat = isaac_next_uint32(&prng_context[cpu]);
-> +	uint32_t seq = isaac_next_uint32(&prng_context[cpu]);
-> +	int count = seq & 0x1f;
-> +	uint32_t val=0;
-> +
-> +	seq >>= 5;
-> +
-> +	for (i=0; i<count; i++) {
-> +		int index = seq & ~PAGE_MASK;
-> +		if (lspat & 1) {
-> +			val ^= memory_array[index];
-> +		} else {
-> +			memory_array[index] = val;
-> +		}
-> +		seq >>= PAGE_SHIFT;
-> +		seq ^= lspat;
-> +		lspat >>= 1;
-> +	}
-> +
+>> Could it happen that the delay is bigger than what is supported by
+>> either the PHY or MAC alone? maybe if combined it could work, for example
+>> a 3ns delay required and the PHY supporting 2ns and the MAC 1ns, combined
+>> it could work?
+> 
+> I suppose such a thing would work yes, but it would be difficult to
+> report correctly to the core PHYLIB how this can work considering the
+> vast array of options available to introduce delays in that case:
+> MAC-level, PHY-level, pinctrl/pad level and possibly at the PCB itself.
+> 
+> Once we can't rely on the fixed 2ns delay to work, we are going to have
+> people do various experiments until they can either measure what the
+> right delay value is for the specific PCB, or they just found the value
+> that happens to work. I don't think we can do much at that point from a
+> core PHYLIB perspective other than tell the network driver that the PHY
+> supports delay in either RX, TX or both directions, and have the MAC
+> decide what to apply that makes sense here, considering that this is
+> already kind of an exceptional situation to be in.
 
-extra line here
 
-> +}
-> +
-> +static inc_fn increment_function;
-> +
-> +static void do_increment(void)
-> +{
-> +	int i;
-> +	int cpu = smp_processor_id();
-> +
-> +	printf("CPU%d: online and ++ing\n", cpu);
-> +
-> +	for (i=0; i < increment_count; i++) {
-> +		per_cpu_value[cpu]++;
-> +		increment_function(cpu);
-> +
-> +		if (do_shuffle)
-> +			shuffle_memory(cpu);
-> +	}
-> +
-> +	printf("CPU%d: Done, %d incs\n", cpu, per_cpu_value[cpu]);
-> +
-> +	cpumask_set_cpu(cpu, &smp_test_complete);
-> +	if (cpu != 0)
-> +		halt();
-> +}
-> +
-> +static void setup_and_run_test(test_descr_t *test)
-> +{
-> +	unsigned int i, sum = 0;
-> +	int cpu, cpu_cnt = 0;
-> +
-> +	increment_function = test->main_fn;
-> +
-> +	/* fill our random page */
-> +        for (i=0; i<PAGE_SIZE; i++) {
-> +		memory_array[i] = isaac_next_uint32(&prng_context[0]);
-> +	}
-> +
-> +	for_each_present_cpu(cpu) {
-> +		uint32_t seed2 = isaac_next_uint32(&prng_context[0]);
-> +		cpu_cnt++;
-> +		if (cpu == 0)
-> +			continue;
-> +
-> +		isaac_init(&prng_context[cpu], (unsigned char *) &seed2, sizeof(seed2));
-> +		smp_boot_secondary(cpu, do_increment);
-> +	}
-> +
-> +	do_increment();
-> +
-> +	while (!cpumask_full(&smp_test_complete))
-> +		cpu_relax();
-> +
-> +	/* All CPUs done, do we add up */
-> +	for_each_present_cpu(cpu) {
-> +		sum += per_cpu_value[cpu];
-> +	}
-> +
-> +	if (test->should_pass) {
-> +		report("total incs %d", sum == shared_value, shared_value);
-> +	} else {
-> +		report_xfail("total incs %d", true, sum == shared_value, shared_value);
-> +	}
-> +}
-> +
-> +int main(int argc, char **argv)
-> +{
-> +	static const unsigned char seed[] = "myseed";
-> +	test_descr_t *test = &tests[0];
-> +	int i;
-> +	unsigned int j;
-> +
-> +	isaac_init(&prng_context[0], &seed[0], sizeof(seed));
-> +
-> +	for (i=0; i<argc; i++) {
-> +		char *arg = argv[i];
-> +
-> +		/* Check for test name */
-> +		for (j = 0; j < ARRAY_SIZE(tests); j++) {
-> +			if (strcmp(arg, tests[j].test_name) == 0)
-> +				test = &tests[j];
-> +		}
-> +
-> +		/* Test modifiers */
-> +		if (strcmp(arg, "noshuffle") == 0) {
-> +			do_shuffle = false;
-> +			report_prefix_push("noshuffle");
-> +		} else if (strstr(arg, "count=") != NULL) {
-> +			char *p = strstr(arg, "=");
-> +			increment_count = atol(p+1);
-> +		} else {
-> +			isaac_reseed(&prng_context[0], (unsigned char *) arg, strlen(arg));
-> +		}
-> +	}
-> +
-> +	if (test) {
-> +		setup_and_run_test(test);
-> +	} else {
-> +		report("Unknown test", false);
-> +	}
-> +
-> +	return report_summary();
-> +}
-> diff --git a/arm/unittests.cfg b/arm/unittests.cfg
-> index 7dc7799..abbfe79 100644
-> --- a/arm/unittests.cfg
-> +++ b/arm/unittests.cfg
-> @@ -108,3 +108,37 @@ smp = $(($MAX_SMP>4?4:$MAX_SMP))
->  extra_params = -append "page"
->  groups = tlbflush
->  
-> +# Locking tests
-> +[locking::none]
-> +file = locking-test.flat
-> +smp = $(($MAX_SMP>4?4:$MAX_SMP))
-> +groups = locking
-> +accel = tcg
-> +
-> +[locking::lock]
-> +file = locking-test.flat
-> +smp = $(($MAX_SMP>4?4:$MAX_SMP))
-> +extra_params = -append 'lock'
-> +groups = locking
-> +accel = tcg
-> +
-> +[locking::atomic]
-> +file = locking-test.flat
-> +smp = $(($MAX_SMP>4?4:$MAX_SMP))
-> +extra_params = -append 'atomic'
-> +groups = locking
-> +accel = tcg
-> +
-> +[locking::wfelock]
-> +file = locking-test.flat
-> +smp = $(($MAX_SMP>4?4:$MAX_SMP))
-> +extra_params = -append 'wfelock'
-> +groups = locking
-> +accel = tcg
-> +
-> +[locking::excl]
-> +file = locking-test.flat
-> +smp = $(($MAX_SMP>4?4:$MAX_SMP))
-> +extra_params = -append 'excl'
-> +groups = locking
-> +accel = tcg
-> -- 
-> 2.10.1
->
+Fair enough.
 
-I didn't look too closely at this one...
-
-Thanks,
-drew
+And thanks again for documenting this.
