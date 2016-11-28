@@ -1,28 +1,37 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sun, 27 Nov 2016 20:46:09 -0800
-Subject: [PATCH 2/2] input: touchscreen: sample averaging for imx6ul_tsc
-In-Reply-To: <CAOMZO5CCtLdH9_5vGXfqg1rAizngVc_EWaoE+JfcfTrMmJT4xA@mail.gmail.com>
-References: <1480232698-23075-1-git-send-email-guy.shapiro@mobi-wize.com>
- <1480232698-23075-2-git-send-email-guy.shapiro@mobi-wize.com>
- <CAOMZO5CCtLdH9_5vGXfqg1rAizngVc_EWaoE+JfcfTrMmJT4xA@mail.gmail.com>
-Message-ID: <20161128044609.GC2821@dtor-ws>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 28 Nov 2016 10:54:01 +0530
+Subject: [PATCH] ARM: dts: da850: specify the maximum bandwidth for tilcdc
+In-Reply-To: <1480088245-8368-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1480088245-8368-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <8829c208-0674-43c0-8449-ef764071583f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 27, 2016 at 10:39:10AM -0200, Fabio Estevam wrote:
-> On Sun, Nov 27, 2016 at 5:44 AM, Guy Shapiro <guy.shapiro@mobi-wize.com> wrote:
-> > The i.MX6UL internal touchscreen controller contains an option to
-> > average upon samples. This feature reduces noise from the produced
-> > touch locations.
-> >
-> > This patch adds sample averaging support to the imx6ul_tsc device
-> > driver.
-> >
-> > Signed-off-by: Guy Shapiro <guy.shapiro@mobi-wize.com>
+On Friday 25 November 2016 09:07 PM, Bartosz Golaszewski wrote:
+> It has been determined that the maximum resolution supported correctly
+> by tilcdc rev1 on da850 SoCs is 800x600 at 60. Due to memory throughput
+> constraints we must filter out higher modes.
 > 
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Specify the max-bandwidth property for the display node for
+> da850-based boards.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/arm/boot/dts/da850.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> index 8e30d9b..9b7c444 100644
+> --- a/arch/arm/boot/dts/da850.dtsi
+> +++ b/arch/arm/boot/dts/da850.dtsi
+> @@ -452,6 +452,7 @@
+>  			compatible = "ti,da850-tilcdc";
+>  			reg = <0x213000 0x1000>;
+>  			interrupts = <52>;
+> +			max-bandwidth = <28800000>;
 
-Folded the binding patch into this one and applied, thank you.
+If this is effectively the max pixel clock that the device supports,
+then why not use the datasheet specified value of 37.5 MHz (Tc = 26.66 ns).
 
--- 
-Dmitry
+Thanks,
+Sekhar
