@@ -1,109 +1,96 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 28 Nov 2016 16:17:56 +0100
-Subject: [PATCH] memory/atmel-ebi: Fix ns <-> cycles conversions
-Message-ID: <1480346276-6796-1-git-send-email-boris.brezillon@free-electrons.com>
+From: uwe@kleine-koenig.org (=?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?=)
+Date: Mon, 28 Nov 2016 16:44:47 +0100
+Subject: [PATCH 2/2] net: dsa: mv88e6xxx: Add 88E6176 device tree support
+In-Reply-To: <20161128131735.GA4379@lunn.ch>
+References: <1480280279-9552-1-git-send-email-afaerber@suse.de>
+ <1480280279-9552-2-git-send-email-afaerber@suse.de>
+ <20161127212709.GD13318@lunn.ch>
+ <9500470d-09c3-3ecb-994b-3d108bffc99e@suse.de>
+ <20161127220846.GH13318@lunn.ch>
+ <e5d45b55-a4c1-3b5e-0bdc-a5e340b072d0@suse.de>
+ <20161127231009.GA17704@lunn.ch>
+ <20161128080939.ippqlytvojitefkp@perseus.defre.kleine-koenig.org>
+ <20161128131735.GA4379@lunn.ch>
+Message-ID: <2c59cc79-b6dc-9920-1725-a7785ff3b6bf@kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-at91sam9_ebi_get_config() is incorrectly converting timings in clock
-cycles into timings in nanoseconds by multiplying the cycle values by
-the clk rate instead of the clk period.
+On 11/28/2016 02:17 PM, Andrew Lunn wrote:
+>> I still wonder (and didn't get an answer back when I asked about this)
+>> why a comment is preferred here. For other devices I know it's usual and
+>> requested by the maintainers to use:
+>>
+>> 	compatible = "exact name", "earlyer device to match driver";
+>>
+>> . This is more robust, documents the situation more formally and makes
+>> it better greppable. The price to pay is only a few bytes in the dtb
+>> which IMO is ok.
+> 
+> We did discuss this a while back. The information is useless and
+> should to be ignored if present.
 
-at91sam9_ebi_xslate_config() has the same problem for the
-tdf_ns -> tdf_cycles conversion.
+Who is "we"?
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Reported-by: Chris Leahy <leahycm@gmail.com>
-Fixes: 6a4ec4cd0888 ("memory: add Atmel EBI (External Bus Interface) driver")
-Cc: <stable@vger.kernel.org>
----
- drivers/memory/atmel-ebi.c | 27 ++++++++++++++-------------
- 1 file changed, 14 insertions(+), 13 deletions(-)
+> The switch has a register which contains its model and revision. Each
+> port has a set of registers, and register 3 contains the
+> model/version. For all devices compatible with the 6085, the port
+> registers start at address 0x10. For the 6190, the port registers
+> start at 0x0. So given one of these two compatible strings, we can
+> find the model of the device, from something which is burned into the
+> silicon.
+> 
+> Now, say we did add per device compatible strings. We look up the
+> model burned into the silicon, find it is different to what the device
+> tree is and do what? Fail the probe? Or just keep going using the
 
-diff --git a/drivers/memory/atmel-ebi.c b/drivers/memory/atmel-ebi.c
-index b5ed3bd082b5..e9ebc4f31d16 100644
---- a/drivers/memory/atmel-ebi.c
-+++ b/drivers/memory/atmel-ebi.c
-@@ -93,7 +93,7 @@ static void at91sam9_ebi_get_config(struct at91_ebi_dev *ebid,
- 				    struct at91_ebi_dev_config *conf)
- {
- 	struct at91sam9_smc_generic_fields *fields = &ebid->ebi->sam9;
--	unsigned int clk_rate = clk_get_rate(ebid->ebi->clk);
-+	unsigned int clk_period = NSEC_PER_SEC / clk_get_rate(ebid->ebi->clk);
- 	struct at91sam9_ebi_dev_config *config = &conf->sam9;
- 	struct at91sam9_smc_timings *timings = &config->timings;
- 	unsigned int val;
-@@ -102,43 +102,43 @@ static void at91sam9_ebi_get_config(struct at91_ebi_dev *ebid,
- 	config->mode = val & ~AT91_SMC_TDF;
- 
- 	val = (val & AT91_SMC_TDF) >> 16;
--	timings->tdf_ns = clk_rate * val;
-+	timings->tdf_ns = clk_period * val;
- 
- 	regmap_fields_read(fields->setup, conf->cs, &val);
- 	timings->ncs_rd_setup_ns = (val >> 24) & 0x1f;
- 	timings->ncs_rd_setup_ns += ((val >> 29) & 0x1) * 128;
--	timings->ncs_rd_setup_ns *= clk_rate;
-+	timings->ncs_rd_setup_ns *= clk_period;
- 	timings->nrd_setup_ns = (val >> 16) & 0x1f;
- 	timings->nrd_setup_ns += ((val >> 21) & 0x1) * 128;
--	timings->nrd_setup_ns *= clk_rate;
-+	timings->nrd_setup_ns *= clk_period;
- 	timings->ncs_wr_setup_ns = (val >> 8) & 0x1f;
- 	timings->ncs_wr_setup_ns += ((val >> 13) & 0x1) * 128;
--	timings->ncs_wr_setup_ns *= clk_rate;
-+	timings->ncs_wr_setup_ns *= clk_period;
- 	timings->nwe_setup_ns = val & 0x1f;
- 	timings->nwe_setup_ns += ((val >> 5) & 0x1) * 128;
--	timings->nwe_setup_ns *= clk_rate;
-+	timings->nwe_setup_ns *= clk_period;
- 
- 	regmap_fields_read(fields->pulse, conf->cs, &val);
- 	timings->ncs_rd_pulse_ns = (val >> 24) & 0x3f;
- 	timings->ncs_rd_pulse_ns += ((val >> 30) & 0x1) * 256;
--	timings->ncs_rd_pulse_ns *= clk_rate;
-+	timings->ncs_rd_pulse_ns *= clk_period;
- 	timings->nrd_pulse_ns = (val >> 16) & 0x3f;
- 	timings->nrd_pulse_ns += ((val >> 22) & 0x1) * 256;
--	timings->nrd_pulse_ns *= clk_rate;
-+	timings->nrd_pulse_ns *= clk_period;
- 	timings->ncs_wr_pulse_ns = (val >> 8) & 0x3f;
- 	timings->ncs_wr_pulse_ns += ((val >> 14) & 0x1) * 256;
--	timings->ncs_wr_pulse_ns *= clk_rate;
-+	timings->ncs_wr_pulse_ns *= clk_period;
- 	timings->nwe_pulse_ns = val & 0x3f;
- 	timings->nwe_pulse_ns += ((val >> 6) & 0x1) * 256;
--	timings->nwe_pulse_ns *= clk_rate;
-+	timings->nwe_pulse_ns *= clk_period;
- 
- 	regmap_fields_read(fields->cycle, conf->cs, &val);
- 	timings->nrd_cycle_ns = (val >> 16) & 0x7f;
- 	timings->nrd_cycle_ns += ((val >> 23) & 0x3) * 256;
--	timings->nrd_cycle_ns *= clk_rate;
-+	timings->nrd_cycle_ns *= clk_period;
- 	timings->nwe_cycle_ns = val & 0x7f;
- 	timings->nwe_cycle_ns += ((val >> 7) & 0x3) * 256;
--	timings->nwe_cycle_ns *= clk_rate;
-+	timings->nwe_cycle_ns *= clk_period;
- }
- 
- static int at91_xlate_timing(struct device_node *np, const char *prop,
-@@ -334,6 +334,7 @@ static int at91sam9_ebi_apply_config(struct at91_ebi_dev *ebid,
- 				     struct at91_ebi_dev_config *conf)
- {
- 	unsigned int clk_rate = clk_get_rate(ebid->ebi->clk);
-+	unsigned int clk_period = NSEC_PER_SEC / clk_rate;
- 	struct at91sam9_ebi_dev_config *config = &conf->sam9;
- 	struct at91sam9_smc_timings *timings = &config->timings;
- 	struct at91sam9_smc_generic_fields *fields = &ebid->ebi->sam9;
-@@ -376,7 +377,7 @@ static int at91sam9_ebi_apply_config(struct at91_ebi_dev *ebid,
- 	val |= AT91SAM9_SMC_NWECYCLE(coded_val);
- 	regmap_fields_write(fields->cycle, conf->cs, val);
- 
--	val = DIV_ROUND_UP(timings->tdf_ns, clk_rate);
-+	val = DIV_ROUND_UP(timings->tdf_ns, clk_period);
- 	if (val > AT91_SMC_TDF_MAX)
- 		val = AT91_SMC_TDF_MAX;
- 	regmap_fields_write(fields->mode, conf->cs,
--- 
-2.7.4
+I'd say fail to probe is the right thing to do. Of course that doesn't
+work for already supported models because it will break compatibility.
+
+I'd value the advantages (i.e. easily find machines with a given
+hardware) higher than making broken dtbs work, so being a bit silly is
+fine for me.
+
+> value in the silicon? It seems silly to fail the probe if the driver
+> does support the model, but that means the device tree is never
+> verified and hence probably wrong. Why have wrong information in the
+> device tree, especially wrong information which we never use. It is
+> better to not have that information in the device tree.
+
+At least we'd have a canonical way to specify the type of switch. If
+it's not verified it's as good and bad as a dts comment. But the latter
+isn't available in the dtb, which I consider a small disadvantage.
+
+Also it seems wrong to write "marvell,mv88e6085" (only) if I know the
+hardware is really a "marvell,mv88e6176".
+
+> Linus has said he does not like ARM devices because of all the busses
+> which are not enumerable. Here we have a device which with a little
+> bit of help we can enumerate. So we should. 
+
+If you write
+
+	compatible = "marvell,mv88e6176", "marvell,mv88e6085";
+
+you can still enumerate in the same way as before.
+
+There are several more instances where the device tree specifies
+something that could be probed instead. Some examples:
+
+	compatible = "ethernet-phy-id0141.0DD1", "ethernet-phy-ieee802.3-c22";
+	compatible = "spansion,s25fl164k", "jedec,spi-nor";
+	compatible = "fsl,imx25-flexcan", "fsl,p1010-flexcan";
+	compatible = "arm,pl011", "arm,primecell";
+
+So you think they are all doing it wrong?
+
+Best regards
+Uwe
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161128/42269bc2/attachment.sig>
