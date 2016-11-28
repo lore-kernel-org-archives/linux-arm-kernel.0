@@ -1,39 +1,49 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 28 Nov 2016 22:19:35 +0800
-Subject: [GIT PULL] ZTE arm64 device tree updates for 4.10
-Message-ID: <20161128141934.GA20556@dragon>
+From: vbabka@suse.cz (Vlastimil Babka)
+Date: Mon, 28 Nov 2016 15:20:05 +0100
+Subject: [PATCH v2 0/6] mm: fix the "counter.sh" failure for libhugetlbfs
+In-Reply-To: <1479107259-2011-1-git-send-email-shijie.huang@arm.com>
+References: <1479107259-2011-1-git-send-email-shijie.huang@arm.com>
+Message-ID: <6b83ea5d-a465-7582-a215-51a21fb4ce2e@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On 11/14/2016 08:07 AM, Huang Shijie wrote:
+> (1) Background
+>    For the arm64, the hugetlb page size can be 32M (PMD + Contiguous bit).
+>    In the 4K page environment, the max page order is 10 (max_order - 1),
+>    so 32M page is the gigantic page.
+>
+>    The arm64 MMU supports a Contiguous bit which is a hint that the TTE
+>    is one of a set of contiguous entries which can be cached in a single
+>    TLB entry.  Please refer to the arm64v8 mannul :
+>        DDI0487A_f_armv8_arm.pdf (in page D4-1811)
+>
+> (2) The bug
+>    After I tested the libhugetlbfs, I found the test case "counter.sh"
+>    will fail with the gigantic page (32M page in arm64 board).
+>
+>    This patch set adds support for gigantic surplus hugetlb pages,
+>    allowing the counter.sh unit test to pass.
+>
+> v1 -- > v2:
+>    1.) fix the compiler error in X86.
+>    2.) add new patches for NUMA.
+>        The patch #2 ~ #5 are new patches.
+>
+> Huang Shijie (6):
+>   mm: hugetlb: rename some allocation functions
+>   mm: hugetlb: add a new parameter for some functions
+>   mm: hugetlb: change the return type for alloc_fresh_gigantic_page
+>   mm: mempolicy: intruduce a helper huge_nodemask()
+>   mm: hugetlb: add a new function to allocate a new gigantic page
+>   mm: hugetlb: support gigantic surplus pages
+>
+>  include/linux/mempolicy.h |   8 +++
+>  mm/hugetlb.c              | 128 ++++++++++++++++++++++++++++++++++++----------
+>  mm/mempolicy.c            |  20 ++++++++
+>  3 files changed, 130 insertions(+), 26 deletions(-)
 
-If it's not too late, please pull this for 4.10.  It contains a single
-patch which adds clock controller device nodes for zx296718.  Thanks.
-
-Shawn
-
-
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/zte-dt64-4.10
-
-for you to fetch changes up to 392ce382743b847eded4b40990de4e78a5eb494d:
-
-  arm64: dts: zx: Add clock controller nodes (2016-10-24 16:54:20 +0800)
-
-----------------------------------------------------------------
-ZTE arm64 device tree update for 4.10:
-
-Add clock controller device nodes, including one top clock controller,
-two low speed clock controllers and one audio clock controller.
-
-----------------------------------------------------------------
-Jun Nie (1):
-      arm64: dts: zx: Add clock controller nodes
-
- arch/arm64/boot/dts/zte/zx296718.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+Can't say I'm entirely happy with the continued direction of maze of 
+functions for huge page allocation :( Feels like path of least 
+resistance to basically copy/paste the missing parts here. Is there no 
+way to consolidate the code more?
