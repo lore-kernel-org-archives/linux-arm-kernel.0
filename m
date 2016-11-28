@@ -1,163 +1,37 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Mon, 28 Nov 2016 13:44:47 +0200
-Subject: Adding a .platform_init callback to sdhci_arasan_ops
-In-Reply-To: <66751ab5-59a4-ec30-07cd-44ca03694723@laposte.net>
-References: <d50dcd8a-2489-4e82-1dc7-13e93e38d5ff@laposte.net>
- <982d633b-e9c4-0f10-052b-e324f094d0f5@xilinx.com>
- <2a949ade-edd7-4690-cd6a-434ae1e663dc@intel.com>
- <66751ab5-59a4-ec30-07cd-44ca03694723@laposte.net>
-Message-ID: <d1801c1e-cd74-b79c-0280-8fb5dc377c91@intel.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Mon, 28 Nov 2016 12:58:24 +0100
+Subject: [Qemu-devel] [kvm-unit-tests PATCH v7 00/11] QEMU MTTCG Test cases
+In-Reply-To: <CAFEAcA9JUOHnJL59EuhQ_dEWjt+YjEcu8LGiJ3CSk_7R4J5Efg@mail.gmail.com>
+References: <20161124161033.11456-1-alex.bennee@linaro.org>
+ <20161128103744.s3wq53xzsxvu5uus@kamzik.brq.redhat.com>
+ <878ts3uac6.fsf@linaro.org>
+ <CAFEAcA9JUOHnJL59EuhQ_dEWjt+YjEcu8LGiJ3CSk_7R4J5Efg@mail.gmail.com>
+Message-ID: <20161128115824.hrofgivt2mlfk7fh@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/11/16 13:20, Sebastian Frias wrote:
-> Hi Adrian,
+On Mon, Nov 28, 2016 at 11:14:48AM +0000, Peter Maydell wrote:
+> On 28 November 2016 at 11:12, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> >
+> > Andrew Jones <drjones@redhat.com> writes:
+> >> I've skimmed over everything looking at it from a framwork/sytle
+> >> perspective. I didn't dig in trying to understand the tests though.
+> >> One general comment, I see many tests introduce MAX_CPUS 8. Why do
+> >> that? Why not allow all cpus by using NR_CPUS for the array sizes?
+> >
+> > Yeah - I can fix those. I wonder what the maximum is with GIC V3?
 > 
-> On 28/11/16 11:30, Adrian Hunter wrote:
->> On 28/11/16 09:32, Michal Simek wrote:
->>> +Sai for Xilinx perspective.
->>>
->>> On 25.11.2016 16:24, Sebastian Frias wrote:
->>>> Hi,
->>>>
->>>> When using the Arasan SDHCI HW IP, there is a set of parameters called
->>>> "Hardware initialized registers"
->>>>
->>>> (Table 7, Section "Pin Signals", page 56 of Arasan "SD3.0/SDIO3.0/eMMC4.4
->>>> AHB Host Controller", revision 6.0 document)
->>>>
->>>> In some platforms those signals are connected to registers that need to
->>>> be programmed at some point for proper driver/HW initialisation.
->>>>
->>>> I found that the 'struct sdhci_ops' contains a '.platform_init' callback
->>>> that is called from within 'sdhci_pltfm_init', and that seems a good
->>>> candidate for a place to program those registers (*).
->>>>
->>>> Do you agree?
->>
->> We already killed .platform_init
-> 
-> I just saw that, yet it was the perfect place for the HW initialisation I'm
-> talking about.
-> Any way we can restore it?
+> So large that you don't want to hardcode it as an array size...
 
-It doesn't serve any purpose I am aware of.
+255 with the gic series, not yet merged. Even if you have a dozen arrays
+with that as the size, then unless your array element size is huge (on
+the order multiple pages), then it probably doesn't matter. Using the
+default memory allocation of a QEMU guest, 128 MB, unit tests have plenty
+of memory at their disposal. The framework itself only allocates a handful
+of pages.
 
-> 
->>
->> What is wrong with sdhci_arasan_probe()?
-> 
-> Well, in 4.7 sdhci_arasan_probe() did not call of_match_device(), so I had
-> put a call to it just before sdhci_pltfm_init(), something like:
-> 
-> +static const struct of_device_id sdhci_arasan_of_match[] = {
-> +       {
-> +               .compatible = "arasan,sdhci-8.9a",
-> +               .data = &sdhci_arasan_ops,
-> +       },
-> +       {
-> +               .compatible = "arasan,sdhci-5.1",
-> +               .data = &sdhci_arasan_ops,
-> +       },
-> +       {
-> +               .compatible = "arasan,sdhci-4.9a",
-> +               .data = &sdhci_arasan_ops,
-> +       },
-> +       {
-> +               .compatible = "sigma,smp8734-sdio",
-> +               .data = &sdhci_arasan_tango4_ops,
-> +       },
-> +       { }
-> +};
-> +MODULE_DEVICE_TABLE(of, sdhci_arasan_of_match);
-> 
-> ...
-> 
-> +       const struct of_device_id *match;
-> +
-> +       match = of_match_device(sdhci_arasan_of_match, &pdev->dev);
-> +       if (match)
-> +               sdhci_arasan_pdata.ops = match->data;
-> 
-> where 'sdhci_arasan_tango4_ops' contained a pointer to a .platform_init
-> callback.
-> 
-> However, as I stated earlier, an upstream commit:
-> 
-> commit 3ea4666e8d429223fbb39c1dccee7599ef7657d5
-> Author: Douglas Anderson <dianders@chromium.org>
-> Date:   Mon Jun 20 10:56:47 2016 -0700
-> 
->     mmc: sdhci-of-arasan: Properly set corecfg_baseclkfreq on rk3399
-> 
-> changed struct 'sdhci_arasan_of_match' to convey different data, which
-> means that instead of having a generic way of accessing such data (such
-> as 'of_match_device()' and ".data" field), one must also check for
-> specific "compatible" strings to make sense of the ".data" field, such as
-> "rockchip,rk3399-sdhci-5.1"
-> 
-> With the current code:
-> - there's no 'of_match_device()' before 'sdhci_pltfm_init()'
-> - the sdhci_pltfm_init() call is made with a static 'sdhci_arasan_pdata'
-> struct (so it cannot be made dependent on the "compatible" string).
-> - since 'sdhci_arasan_pdata' is the same for all compatible devices, even
-> for those that require special handling, more "compatible" matching code is
-> required
-> - leading to spread "compatible" matching code; IMHO it would be cleaner if
-> the 'sdhci_arasan_probe()' code was generic, with just a generic "compatible"
-> matching, which then proceeded with specific initialisation and generic
-> initialisation.
-> 
-> In a nutshell, IMHO it would be better if adding support for more SoCs only
-> involved changing just 'sdhci_arasan_of_match' without the need to change
-> 'sdhci_arasan_probe()'.
-> That would clearly separate the generic and "SoC"-specific code, thus allowing
-> better maintenance.
-> 
-> Does that makes sense to you guys?
+Of course the framework also supports dynamic memory allocation, so you
+could do malloc(nr_cpus * element_size), to avoid excess.
 
-If you want to do that, then why not define your match data with your own
-callbacks. e.g. something like
-
-struct sdhci_arasan_of_data {
-	struct sdhci_arasan_soc_ctl_map *soc_ctl_map;
-	void (*platform_init)(struct sdhci_arasan_data *sdhci_arasan);
-};
-
-	struct sdhci_arasan_of_data *data;
-
-	data = match->data;
-	sdhci_arasan->soc_ctl_map = data->soc_ctl_map;
-	if (data->platform_init)
-		platform_init(sdhci_arasan);
-
-> 
-> Best regards,
-> 
-> Sebastian
-> 
->>
->>>>
->>>> Best regards,
->>>>
->>>> Sebastian
->>>>
->>>>
->>>> (*): This has been prototyped on 4.7 as working properly.
->>>> However, upstream commit:
->>>>
->>>> commit 3ea4666e8d429223fbb39c1dccee7599ef7657d5
->>>> Author: Douglas Anderson <dianders@chromium.org>
->>>> Date:   Mon Jun 20 10:56:47 2016 -0700
->>>>
->>>>     mmc: sdhci-of-arasan: Properly set corecfg_baseclkfreq on rk3399
->>>> ...
->>>>
->>>> could affect this solution because of the way the 'sdhci_arasan_of_match'
->>>> struct is used after that commit.
->>>>
->>>
->>>
->>
-> 
-> 
+Thanks,
+drew
