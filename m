@@ -1,91 +1,192 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 28 Nov 2016 11:25:26 +0100
-Subject: [RFC PATCH 3/3] dt-bindings: display: add Amlogic Meson DRM
- Bindings
-In-Reply-To: <1695441.JP1H7VIm1f@avalon>
-References: <1480089791-12517-1-git-send-email-narmstrong@baylibre.com>
- <2350540.yAeGFdYPK2@avalon>
- <534f6d99-a579-27b6-fb54-48584cd1c7aa@baylibre.com>
- <1695441.JP1H7VIm1f@avalon>
-Message-ID: <ee5c5ecf-ef2a-864a-9c2a-1a1d64d857bb@baylibre.com>
+From: yegorslists@googlemail.com (Yegor Yefremov)
+Date: Mon, 28 Nov 2016 11:28:04 +0100
+Subject: [PATCH net-next v3 1/4] net: phy: add an option to disable EEE
+ advertisement
+In-Reply-To: <1480326409-25419-2-git-send-email-jbrunet@baylibre.com>
+References: <1480326409-25419-1-git-send-email-jbrunet@baylibre.com>
+ <1480326409-25419-2-git-send-email-jbrunet@baylibre.com>
+Message-ID: <CAGm1_ku63P+xT8RKCeGJdmv065dA03p_kzdJQhrvAxUjJc2oSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/2016 11:02 AM, Laurent Pinchart wrote:
-> Hi Neil,
-> 
-> On Monday 28 Nov 2016 10:56:30 Neil Armstrong wrote:
->> On 11/28/2016 10:37 AM, Laurent Pinchart wrote:
->>> On Monday 28 Nov 2016 10:23:43 Neil Armstrong wrote:
->>>> On 11/28/2016 09:33 AM, Laurent Pinchart wrote:
->>>>> On Friday 25 Nov 2016 17:03:11 Neil Armstrong wrote:
->>>>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->>>>>> ---
->>>>>>
->>>>>>  .../bindings/display/meson/meson-drm.txt           | 134
->>>>>>  +++++++++++++++
->>>>>>  1 file changed, 134 insertions(+)
->>>>>>  create mode 100644
->>>>>>
->>>>>> Documentation/devicetree/bindings/display/meson/meson-drm.txt
->>>>>>
->>>>>> diff --git
->>>>>> a/Documentation/devicetree/bindings/display/meson/meson-drm.txt
->>>>>> b/Documentation/devicetree/bindings/display/meson/meson-drm.txt new
->>>>>> file
->>>>>> mode 100644
->>>>>> index 0000000..89c1b5f
->>>>>> --- /dev/null
->>>>>> +++ b/Documentation/devicetree/bindings/display/meson/meson-drm.txt
->>
->> [...]
->>
->>>>>> +
->>>>>> +VENC CBVS Output
->>>>>> +----------------------
->>>>>> +
->>>>>> +The VENC can output Composite/CVBS output via a decicated VDAC.
->>>>>> +
->>>>>> +Required properties:
->>>>>> +  - compatible: value must be one of:
->>>>>> + - compatible: value should be different for each SoC family as :
->>>>> One of those two lines is redundant.
->>>>
->>>> Will fix.
->>>>
->>>>>> + 	- GXBB (S905) : "amlogic,meson-gxbb-venc-cvbs"
->>>>>> + 	- GXL (S905X, S905D) : "amlogic,meson-gxl-venc-cvbs"
->>>>>> + 	- GXM (S912) : "amlogic,meson-gxm-venc-cvbs"
->>>>>> +	followed by the common "amlogic,meson-gx-venc-cvbs"
->>>>>> +
->>>>>
->>>>> No registers ? Are the encoders registers part of the VPU register
->>>>> space, intertwined in a way that they can't be specified separately here
->>>>> ?
->>>>
->>>> Exact, all the video registers on the Amlogic SoC are part of a long
->>>> history of fixup/enhance from very old SoCs, it's quite hard to
->>>> distinguish a Venc registers array since they are mixed with the
->>>> multiple encoders registers...
->>>
->>> In that case is there really a reason to model the encoders as separate
->>> nodes in DT ?
->>
->> Here, it more the encoder-connector couple that is represented as a node,
->> and the CVBS output is optional.
-> 
-> You should actually have a DT node for the connector. I would merge the 
-> encoders into the VPU node (especially given that according to your diagram 
-> they are part of the VPU), and document the VPU output ports explicitly. If 
-> the CVBS output is not implemented by some of the SoCs in the family then the 
-> corresponding DT node should just omit that port.
-> 
+On Mon, Nov 28, 2016 at 10:46 AM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+> This patch adds an option to disable EEE advertisement in the generic PHY
+> by providing a mask of prohibited modes corresponding to the value found in
+> the MDIO_AN_EEE_ADV register.
+>
+> On some platforms, PHY Low power idle seems to be causing issues, even
+> breaking the link some cases. The patch provides a convenient way for these
+> platforms to disable EEE advertisement and work around the issue.
+>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 
-Yes, seems a way better option !
+Tested using Baltos ir2110 device (cpsw + at8035 PHY).
 
-[...]
+Tested-by: Yegor Yefremov <yegorslists@googlemail.com>
 
-
-Thanks for the hints,
-
-Neil
+> ---
+>  drivers/net/phy/phy.c        |  3 ++
+>  drivers/net/phy/phy_device.c | 80 +++++++++++++++++++++++++++++++++++++++-----
+>  include/linux/phy.h          |  3 ++
+>  3 files changed, 77 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
+> index 73adbaa9ac86..a3981cc6448a 100644
+> --- a/drivers/net/phy/phy.c
+> +++ b/drivers/net/phy/phy.c
+> @@ -1396,6 +1396,9 @@ int phy_ethtool_set_eee(struct phy_device *phydev, struct ethtool_eee *data)
+>  {
+>         int val = ethtool_adv_to_mmd_eee_adv_t(data->advertised);
+>
+> +       /* Mask prohibited EEE modes */
+> +       val &= ~phydev->eee_broken_modes;
+> +
+>         phy_write_mmd_indirect(phydev, MDIO_AN_EEE_ADV, MDIO_MMD_AN, val);
+>
+>         return 0;
+> diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
+> index ba86c191a13e..83e52f1b80f2 100644
+> --- a/drivers/net/phy/phy_device.c
+> +++ b/drivers/net/phy/phy_device.c
+> @@ -1121,6 +1121,43 @@ static int genphy_config_advert(struct phy_device *phydev)
+>  }
+>
+>  /**
+> + * genphy_config_eee_advert - disable unwanted eee mode advertisement
+> + * @phydev: target phy_device struct
+> + *
+> + * Description: Writes MDIO_AN_EEE_ADV after disabling unsupported energy
+> + *   efficent ethernet modes. Returns 0 if the PHY's advertisement hasn't
+> + *   changed, and 1 if it has changed.
+> + */
+> +static int genphy_config_eee_advert(struct phy_device *phydev)
+> +{
+> +       u32 broken = phydev->eee_broken_modes;
+> +       u32 old_adv, adv;
+> +
+> +       /* Nothing to disable */
+> +       if (!broken)
+> +               return 0;
+> +
+> +       /* If the following call fails, we assume that EEE is not
+> +        * supported by the phy. If we read 0, EEE is not advertised
+> +        * In both case, we don't need to continue
+> +        */
+> +       adv = phy_read_mmd_indirect(phydev, MDIO_AN_EEE_ADV, MDIO_MMD_AN);
+> +       if (adv <= 0)
+> +               return 0;
+> +
+> +       old_adv = adv;
+> +       adv &= ~broken;
+> +
+> +       /* Advertising remains unchanged with the broken mask */
+> +       if (old_adv == adv)
+> +               return 0;
+> +
+> +       phy_write_mmd_indirect(phydev, MDIO_AN_EEE_ADV, MDIO_MMD_AN, adv);
+> +
+> +       return 1;
+> +}
+> +
+> +/**
+>   * genphy_setup_forced - configures/forces speed/duplex from @phydev
+>   * @phydev: target phy_device struct
+>   *
+> @@ -1178,15 +1215,20 @@ EXPORT_SYMBOL(genphy_restart_aneg);
+>   */
+>  int genphy_config_aneg(struct phy_device *phydev)
+>  {
+> -       int result;
+> +       int err, changed;
+> +
+> +       changed = genphy_config_eee_advert(phydev);
+>
+>         if (AUTONEG_ENABLE != phydev->autoneg)
+>                 return genphy_setup_forced(phydev);
+>
+> -       result = genphy_config_advert(phydev);
+> -       if (result < 0) /* error */
+> -               return result;
+> -       if (result == 0) {
+> +       err = genphy_config_advert(phydev);
+> +       if (err < 0) /* error */
+> +               return err;
+> +
+> +       changed |= err;
+> +
+> +       if (changed == 0) {
+>                 /* Advertisement hasn't changed, but maybe aneg was never on to
+>                  * begin with?  Or maybe phy was isolated?
+>                  */
+> @@ -1196,16 +1238,16 @@ int genphy_config_aneg(struct phy_device *phydev)
+>                         return ctl;
+>
+>                 if (!(ctl & BMCR_ANENABLE) || (ctl & BMCR_ISOLATE))
+> -                       result = 1; /* do restart aneg */
+> +                       changed = 1; /* do restart aneg */
+>         }
+>
+>         /* Only restart aneg if we are advertising something different
+>          * than we were before.
+>          */
+> -       if (result > 0)
+> -               result = genphy_restart_aneg(phydev);
+> +       if (changed > 0)
+> +               return genphy_restart_aneg(phydev);
+>
+> -       return result;
+> +       return 0;
+>  }
+>  EXPORT_SYMBOL(genphy_config_aneg);
+>
+> @@ -1563,6 +1605,21 @@ static void of_set_phy_supported(struct phy_device *phydev)
+>                 __set_phy_supported(phydev, max_speed);
+>  }
+>
+> +static void of_set_phy_eee_broken(struct phy_device *phydev)
+> +{
+> +       struct device_node *node = phydev->mdio.dev.of_node;
+> +       u32 broken;
+> +
+> +       if (!IS_ENABLED(CONFIG_OF_MDIO))
+> +               return;
+> +
+> +       if (!node)
+> +               return;
+> +
+> +       if (!of_property_read_u32(node, "eee-broken-modes", &broken))
+> +               phydev->eee_broken_modes = broken;
+> +}
+> +
+>  /**
+>   * phy_probe - probe and init a PHY device
+>   * @dev: device to probe and init
+> @@ -1600,6 +1657,11 @@ static int phy_probe(struct device *dev)
+>         of_set_phy_supported(phydev);
+>         phydev->advertising = phydev->supported;
+>
+> +       /* Get the EEE modes we want to prohibit. We will ask
+> +        * the PHY stop advertising these mode later on
+> +        */
+> +       of_set_phy_eee_broken(phydev);
+> +
+>         /* Set the state to READY by default */
+>         phydev->state = PHY_READY;
+>
+> diff --git a/include/linux/phy.h b/include/linux/phy.h
+> index edde28ce163a..b53177fd38af 100644
+> --- a/include/linux/phy.h
+> +++ b/include/linux/phy.h
+> @@ -417,6 +417,9 @@ struct phy_device {
+>         u32 advertising;
+>         u32 lp_advertising;
+>
+> +       /* Energy efficient ethernet modes which should be prohibited */
+> +       u32 eee_broken_modes;
+> +
+>         int autoneg;
+>
+>         int link_timeout;
+> --
+> 2.7.4
+>
