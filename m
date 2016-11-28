@@ -1,153 +1,65 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 28 Nov 2016 12:02:57 +0200
-Subject: [RFC PATCH 3/3] dt-bindings: display: add Amlogic Meson DRM
- Bindings
-In-Reply-To: <534f6d99-a579-27b6-fb54-48584cd1c7aa@baylibre.com>
-References: <1480089791-12517-1-git-send-email-narmstrong@baylibre.com>
- <2350540.yAeGFdYPK2@avalon>
- <534f6d99-a579-27b6-fb54-48584cd1c7aa@baylibre.com>
-Message-ID: <1695441.JP1H7VIm1f@avalon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 28 Nov 2016 18:06:33 +0800
+Subject: [RFC PATCH] ARM: dts: sun8i: add simplefb node for H3
+In-Reply-To: <20161128095900.27615-1-icenowy@aosc.xyz>
+References: <20161128095900.27615-1-icenowy@aosc.xyz>
+Message-ID: <CAGb2v67akcT6z-xOdCzpLQRZbgNGh3E5akYEs1BvFNP1rH8UeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+On Mon, Nov 28, 2016 at 5:59 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+> As there's currently a fork of U-Boot which provides simplefb support
 
-On Monday 28 Nov 2016 10:56:30 Neil Armstrong wrote:
-> On 11/28/2016 10:37 AM, Laurent Pinchart wrote:
-> > On Monday 28 Nov 2016 10:23:43 Neil Armstrong wrote:
-> >> On 11/28/2016 09:33 AM, Laurent Pinchart wrote:
-> >>> On Friday 25 Nov 2016 17:03:11 Neil Armstrong wrote:
-> >>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> >>>> ---
-> >>>> 
-> >>>>  .../bindings/display/meson/meson-drm.txt           | 134
-> >>>>  +++++++++++++++
-> >>>>  1 file changed, 134 insertions(+)
-> >>>>  create mode 100644
-> >>>> 
-> >>>> Documentation/devicetree/bindings/display/meson/meson-drm.txt
-> >>>> 
-> >>>> diff --git
-> >>>> a/Documentation/devicetree/bindings/display/meson/meson-drm.txt
-> >>>> b/Documentation/devicetree/bindings/display/meson/meson-drm.txt new
-> >>>> file
-> >>>> mode 100644
-> >>>> index 0000000..89c1b5f
-> >>>> --- /dev/null
-> >>>> +++ b/Documentation/devicetree/bindings/display/meson/meson-drm.txt
-> 
-> [...]
-> 
-> >>>> +
-> >>>> +VENC CBVS Output
-> >>>> +----------------------
-> >>>> +
-> >>>> +The VENC can output Composite/CVBS output via a decicated VDAC.
-> >>>> +
-> >>>> +Required properties:
-> >>>> +  - compatible: value must be one of:
-> >>>> + - compatible: value should be different for each SoC family as :
-> >>> One of those two lines is redundant.
-> >> 
-> >> Will fix.
-> >> 
-> >>>> + 	- GXBB (S905) : "amlogic,meson-gxbb-venc-cvbs"
-> >>>> + 	- GXL (S905X, S905D) : "amlogic,meson-gxl-venc-cvbs"
-> >>>> + 	- GXM (S912) : "amlogic,meson-gxm-venc-cvbs"
-> >>>> +	followed by the common "amlogic,meson-gx-venc-cvbs"
-> >>>> +
-> >>> 
-> >>> No registers ? Are the encoders registers part of the VPU register
-> >>> space, intertwined in a way that they can't be specified separately here
-> >>> ?
-> >> 
-> >> Exact, all the video registers on the Amlogic SoC are part of a long
-> >> history of fixup/enhance from very old SoCs, it's quite hard to
-> >> distinguish a Venc registers array since they are mixed with the
-> >> multiple encoders registers...
-> > 
-> > In that case is there really a reason to model the encoders as separate
-> > nodes in DT ?
-> 
-> Here, it more the encoder-connector couple that is represented as a node,
-> and the CVBS output is optional.
+Please add it when its finalized...
 
-You should actually have a DT node for the connector. I would merge the 
-encoders into the VPU node (especially given that according to your diagram 
-they are part of the VPU), and document the VPU output ports explicitly. If 
-the CVBS output is not implemented by some of the SoCs in the family then the 
-corresponding DT node should just omit that port.
+> for H3, a simplefb node can be added to the device tree.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+>
+> I'm still not sure which pipeline should I use.
 
-> >> The only separate registers are the VDAC and HDMI PHY, I may move them to
-> >> these separate nodes since they are part of the HHI register space.
-> >> 
-> >> It is a problem if I move them in the next release ? Next release will
-> >> certainly have HDMI support, and will have these refactorings.
-> > 
-> > Given that DT bindings are considered as a stable ABI, I'm afraid it's an
-> > issue.
-> 
-> OK, I will add the VDAC/HDMI PHY registers as part if these output nodes.
+You are supposed to add _all_ the pipelines that are available and
+supported by U-boot. U-boot is then supposed to enable and update
+the one it set up.
 
-Thank you.
+ChenYu
 
-> >>>> +- ports: A ports node with endpoint definitions as defined in
-> >>>> +  Documentation/devicetree/bindings/media/video-interfaces.txt. The
-> >>>> +  first port should be the input endpoints, connected ot the VPU node.
-> >>>> +
-> >>>> +Example:
-> >>>> +
-> >>>> +venc_cvbs: venc-cvbs {
-> >>>> +	compatible = "amlogic,meson-gxbb-venc-cvbs";
-> >>>> +	status = "okay";
-> >>>> +
-> >>>> +	ports {
-> >>>> +		#address-cells = <1>;
-> >>>> +		#size-cells = <0>;
-> >>>> +
-> >>>> +		enc_cvbs_in: port at 0 {
-> >>>> +			 #address-cells = <1>;
-> >>>> +			 #size-cells = <0>;
-> >>>> +			 reg = <0>;
-> >>>> +
-> >>>> +			 venc_cvbs_in_vpu: endpoint at 0 {
-> >>>> +				 reg = <0>;
-> >>>> +				 remote-endpoint = 
-<&vpu_out_venc_cvbs>;
-> >>>> +			};
-> >>>> +		};
-> >>>> +	};
-> >>>> +};
-> >>>> +
-> >>>> +vpu: vpu at d0100000 {
-> >>>> +	compatible = "amlogic,meson-gxbb-vpu";
-> >>>> +	reg = <0x0 0xd0100000 0x0 0x100000>,
-> >>>> +	      <0x0 0xc883c000 0x0 0x1000>,
-> >>>> +	      <0x0 0xc8838000 0x0 0x1000>;
-> >>>> +	reg-names = "base", "hhi", "dmc";
-> >>>> +	interrupts = <GIC_SPI 3 IRQ_TYPE_EDGE_RISING>;
-> >>>> +
-> >>>> +	ports {
-> >>>> +		#address-cells = <1>;
-> >>>> +		#size-cells = <0>;
-> >>>> +
-> >>>> +		vpu_out: port at 1 {
-> >>>> +			 #address-cells = <1>;
-> >>>> +			 #size-cells = <0>;
-> >>>> +			 reg = <1>;
-> >>>> +
-> >>>> +			 vpu_out_venc_cvbs: endpoint at 0 {
-> >>>> +				 reg = <0>;
-> >>>> +				 remote-endpoint = 
-<&venc_cvbs_in_vpu>;
-> >>>> +			 };
-> >>>> +		 };
-> >>>> +	};
-> >>>> +};
-> >> 
-> >> Thanks for the review !
-
--- 
-Regards,
-
-Laurent Pinchart
+>
+> And, it seems that HDMI Slow Clock is not needed?
+>
+> (seems that it's only for EDID, but simplefb won't use EDID)
+>
+>  arch/arm/boot/dts/sun8i-h3.dtsi | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> index 75a8654..cacc8dd 100644
+> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> @@ -50,6 +50,22 @@
+>  / {
+>         interrupt-parent = <&gic>;
+>
+> +       chosen {
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               ranges;
+> +
+> +               simplefb_hdmi: framebuffer at 0 {
+> +                       compatible = "allwinner,simple-framebuffer",
+> +                                    "simple-framebuffer";
+> +                       allwinner,pipeline = "de0-lcd0-hdmi";
+> +                       clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_BUS_DE>,
+> +                                <&ccu CLK_BUS_HDMI>, <&ccu CLK_DE>,
+> +                                <&ccu CLK_TCON0>, <&ccu CLK_HDMI>;
+> +                       status = "disabled";
+> +               };
+> +       };
+> +
+>         cpus {
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+> --
+> 2.10.2
+>
