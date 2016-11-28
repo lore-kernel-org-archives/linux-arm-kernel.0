@@ -1,65 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 28 Nov 2016 12:06:24 +0000
-Subject: [RFC PATCH 13/29] arm64/sve: Basic support for KERNEL_MODE_NEON
-In-Reply-To: <20161128114723.GG1574@e103592.cambridge.arm.com>
-References: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
- <1480102762-23647-14-git-send-email-Dave.Martin@arm.com>
- <CAKv+Gu-MKdNHNrvSvMeoAoENdfscbAK0==NEMu6KJn8fjxz_tw@mail.gmail.com>
- <20161126113038.GA86651@MBP.local>
- <20161128114723.GG1574@e103592.cambridge.arm.com>
-Message-ID: <20161128120623.GA17125@e104818-lin.cambridge.arm.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Mon, 28 Nov 2016 13:14:27 +0100
+Subject: [GIT PULL] STi defconfig fix for v4.9-rcs
+In-Reply-To: <6441620.Ib6HJmGOKY@wuerfel>
+References: <0492803d-d136-618d-bf06-51f0001d039b@st.com>
+ <6441620.Ib6HJmGOKY@wuerfel>
+Message-ID: <94e9f0b7-f793-cc91-9592-4191f13c34c2@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2016 at 11:47:26AM +0000, Dave P Martin wrote:
-> On Sat, Nov 26, 2016 at 11:30:42AM +0000, Catalin Marinas wrote:
-> > On Fri, Nov 25, 2016 at 08:45:02PM +0000, Ard Biesheuvel wrote:
-> > > On 25 November 2016 at 19:39, Dave Martin <Dave.Martin@arm.com> wrote:
-> > > > --- a/arch/arm64/kernel/fpsimd.c
-> > > > +++ b/arch/arm64/kernel/fpsimd.c
-> > > > @@ -282,11 +282,26 @@ static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
-> > > >   */
-> > > >  void kernel_neon_begin_partial(u32 num_regs)
-> > > >  {
-> > > > +       preempt_disable();
-> > > > +
-> > > > +       /*
-> > > > +        * For now, we have no special storage for SVE registers in
-> > > > +        * interrupt context, so always save the userland SVE state
-> > > > +        * if there is any, even for interrupts.
-> > > > +        */
-> > > > +       if (IS_ENABLED(CONFIG_ARM64_SVE) && (elf_hwcap & HWCAP_SVE) &&
-> > > > +           current->mm &&
-> > > > +           !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE)) {
-> > > > +               fpsimd_save_state(&current->thread.fpsimd_state);
-> > > > +               this_cpu_write(fpsimd_last_state, NULL);
-> > > > +       }
-> > > > +
-> > > 
-> > > I am having trouble understanding why we need all of this if we don't
-> > > support SVE in the kernel. Could you elaborate?
-> > 
-> > Dave knows all the details but a reason is that touching a Neon register
-> > zeros the upper SVE state in the same vector register. So we can't
-> > safely save/restore just the Neon part without corrupting the SVE state.
+
+
+On 11/25/2016 10:40 PM, Arnd Bergmann wrote:
+> On Wednesday, November 23, 2016 9:59:14 AM CET Patrice Chotard wrote:
+>> STi defconfig fix:
+>>
+>> Enable HVA (Hardware Video Accelerator) video encoder
+>> driver for STMicroelectronics SoC.
 > 
-> This is right -- this also means that EFI services can trash the upper
-> bits of an SVE vector register (as a side-effect of FPSIMD/NEON usage).
+
+Hi Arnd
+
+> Defconfig changes like this don't seem particularly urgent. Unless
+> there is a good reason, I'd suggest putting this into v4.10 instead.
+
+You are right, it's not a urgent update for STi.
+I will send a pull request dedicated for v4.10.
+
+Thanks
+
+Patrice
+
 > 
-> It's overkill to save/restore absolutely everything -- I ignore num_regs
-> for example -- but I wanted to keep things as simple as possible
-> initially.
-
-Without looking at your patches in detail, could we mandate in the ABI
-that the SVE state is lost on the user/kernel syscall boundary? I guess
-even for the PCS, the SVE state is caller-saved, so there shouldn't be
-an additional cost to user. On interrupts, however, we'd have to
-preserve the SVE state but if we do this on entry/exit points, the
-kernel_neon_*() functions would not have to deal with any SVE state (and
-even ignore it completely if in interrupt).
-
-BTW, we will need an SVE ABI document in Documentation/arm64/ to specify
-the requirements for syscall and sigcontext modifications.
-
--- 
-Catalin
+> 	Arnd
+> 
