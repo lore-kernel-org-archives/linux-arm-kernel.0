@@ -1,106 +1,75 @@
-From: sf84@laposte.net (Sebastian Frias)
-Date: Mon, 28 Nov 2016 17:23:26 +0100
-Subject: arasan,sdhci.txt "compatibility" DT binding
-In-Reply-To: <583C50E7.6030400@free.fr>
-References: <56B07BA5.4060407@free.fr> <56B166F1.5080605@rock-chips.com>
- <56B1AA44.1010108@xilinx.com> <56B1BAF8.2050907@free.fr>
- <56B1CF40.1030203@xilinx.com> <20160203152104.GP4215@xsjsorenbubuntu>
- <56B21DDB.6050708@free.fr> <582ED9E0.5090506@free.fr>
- <CAFd313x6MJeO90_+rxditdPn762g7TqZc0_D6ojGTKmtGJKjPA@mail.gmail.com>
- <582EF744.8090307@free.fr> <a20b2b4f-15d4-3c29-324c-1ced5dbcc67f@xilinx.com>
- <583C50E7.6030400@free.fr>
-Message-ID: <e8425325-8036-b99e-1903-3590af96991c@laposte.net>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Mon, 28 Nov 2016 17:29:26 +0100
+Subject: [PATCH] ARM: davinci: da8xx: Fix sleeping function called from
+ invalid context
+Message-ID: <1480350566-26225-1-git-send-email-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/11/16 16:44, Mason wrote:
-> Hello,
-> 
-> @Shawn Lin, could you take a look below and tell me exactly
-> which IP core(s) Rockchip is using in its SoCs?
-> 
-> Based on the feedback I received, here is an updated list of
-> compatible strings and controller versions dealt with by the
-> drivers/mmc/host/sdhci-of-arasan.c code.
-> 
-> 
-> Xilinx Zynq:
-> "SD2.0 / SDIO2.0 / MMC3.31 AHB Host Controller"
-> "arasan,sdhci-8.9a"
-> NB: 8.9a is the documentation revision (dated 2011-10-19)
-> subsequent tweaks labeled 9.0a, 9.1a, 9.2a
-> 
-> Xilinx ZynqMP:
-> "SD3.0 / SDIO3.0 / eMMC4.51 AHB Host Controller"
-> "arasan,sdhci-8.9a"
-> NB: using the same compatible string as Zynq
-> 
-> Sigma SMP87xx
-> "SD3.0 / SDIO3.0 / eMMC4.4 AHB Host Controller"
-> no compatible string yet, platform-specific init required
-> 
-> APM:
-> "SD3.0 / SDIO3.0 / eMMC4.41 AHB Host Controller"
-> "arasan,sdhci-4.9a"
-> NB: 4.9a appears to be the documentation revision
-> no functional diff with "arasan,sdhci-8.9a"
-> 
-> Rockchip
-> Exact IP unknown, waiting for Shawn's answer
-> "arasan,sdhci-5.1"
-> NB: 5.1 appears to refer to the eMMC standard supported
-> 
-> 
-> On a final note, there are many variations of the Arasan IP.
-> I've tracked down at least the following:
-> 
-> SD_2.0_SDIO_2.0__MMC_3.31_AHB_Host_Controller.pdf
-> SD_3.0_SDIO_3.0_eMMC_4.41_OCP_Host_Controller.pdf
-> SD_3.0_SDIO_3.0_eMMC_4.4__AHB_Host_Controller.pdf
-> SD_3.0_SDIO_3.0_eMMC_4.51_Host_Controller.pdf
-> SD_3.0_SDIO_3.0_eMMC_4.5__Host_Controller.pdf
-> SD_4.1_SDIO_4.1_eMMC_4.51_Host_Controller.pdf
-> SD_4.1_SDIO_4.1_eMMC_5.1__Host_Controller.pdf
-> 
-> It seems to me the compatible string should specify
-> the SD/SDIO version AND the eMMC version, since it
-> seems many combinations are allowed, e.g. eMMC 4.51
-> has two possible SD versions.
-> 
-> What do you think?
+Everytime the usb20 phy is enabled, there is a
+"sleeping function called from invalid context" BUG.
+usb20_phy_clk_enable(), called with the irq disabled uses
+clk_get() and clk_enable_prepapre() which may sleep.
+Move clk_get() to da8xx_register_usb20_phy_clk() and
+replace clk_prepare_enable() by clk_enable().
 
+Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+---
+ arch/arm/mach-davinci/usb-da8xx.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-I'm trying to picture this. Imagine:
-a) SoC XYZ used two versions:
-  - SD_3.0_SDIO_3.0_eMMC_4.4__AHB_Host_Controller.pdf
-  - SD_3.0_SDIO_3.0_eMMC_4.5__Host_Controller.pdf
-b) That the compatible suffixes were defined as "sd30-emmc44" and
-"sd30-emmc45" respectively
-c) That the chip-specific init is the same for both.
-
-What would be the recommended way of dealing with that at DT/driver level?
-
-1) XYZ's DT1: compatible = "arasan,sdhci-sd30-emmc44", "XYZ,sdhci"
-         DT2: compatible = "arasan,sdhci-sd30-emmc45", "XYZ,sdhci"
-   driver: match "XYZ,sdhci" for chip-specific init, and then leaves
-"arasan,sdhci-sd30-emmc44" or arasan,sdhci-sd30-emmc45" for generic part
-
-2) XYZ's DT1: compatible = "XYZ,arasan-sdhci-sd30-emmc44"
-         DT2: compatible = "XYZ,arasan-sdhci-sd30-emmc45"
-   driver: match "XYZ,arasan-sdhci-sd30-emmc44" or "XYZ,arasan-sdhci-sd30-emmc45"
-for chip-specific init and generic parts
-
-3) XYZ's DT1: compatible = "arasan,sdhci-sd30-emmc44"
-         DT2: compatible = "arasan,sdhci-sd30-emmc45"
-   driver: match "arasan,sdhci-sd30-emmc44" or "arasan,sdhci-sd30-emmc45" for
-generic part; chip-specific init done somewhere else (bootloader?)
-
-4) something else?
-
-How would those solutions be affected if condition c) was changed to
-"chip-specific init is different for both"?
-
-
-> 
-> Regards.
-> 
+diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
+index b010e5f..c9b5cd4 100644
+--- a/arch/arm/mach-davinci/usb-da8xx.c
++++ b/arch/arm/mach-davinci/usb-da8xx.c
+@@ -156,23 +156,23 @@ int __init da8xx_register_usb_refclkin(int rate)
+ 	return 0;
+ }
+ 
++static struct clk *usb20_clk;
++
+ static void usb20_phy_clk_enable(struct clk *clk)
+ {
+-	struct clk *usb20_clk;
+ 	int err;
+ 	u32 val;
+ 	u32 timeout = 500000; /* 500 msec */
+ 
+ 	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+ 
+-	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
+-	if (IS_ERR(usb20_clk)) {
++	if (!usb20_clk || IS_ERR(usb20_clk)) {
+ 		pr_err("could not get usb20 clk: %ld\n", PTR_ERR(usb20_clk));
+ 		return;
+ 	}
+ 
+ 	/* The USB 2.O PLL requires that the USB 2.O PSC is enabled as well. */
+-	err = clk_prepare_enable(usb20_clk);
++	err = clk_enable(usb20_clk);
+ 	if (err) {
+ 		pr_err("failed to enable usb20 clk: %d\n", err);
+ 		clk_put(usb20_clk);
+@@ -197,8 +197,7 @@ static void usb20_phy_clk_enable(struct clk *clk)
+ 
+ 	pr_err("Timeout waiting for USB 2.0 PHY clock good\n");
+ done:
+-	clk_disable_unprepare(usb20_clk);
+-	clk_put(usb20_clk);
++	clk_disable(usb20_clk);
+ }
+ 
+ static void usb20_phy_clk_disable(struct clk *clk)
+@@ -287,6 +286,10 @@ int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
+ 	struct clk *parent;
+ 	int ret = 0;
+ 
++	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
++	if (IS_ERR(usb20_clk))
++		return PTR_ERR(parent);
++
+ 	parent = clk_get(NULL, use_usb_refclkin ? "usb_refclkin" : "pll0_aux");
+ 	if (IS_ERR(parent))
+ 		return PTR_ERR(parent);
+-- 
+2.7.3
