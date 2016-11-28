@@ -1,164 +1,75 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Mon, 28 Nov 2016 11:10:14 +0800
-Subject: [bug report v4.8] fs/locks.c: kernel oops during posix lock stress
- test
-Message-ID: <CACVXFVPsHjh3CWjdUrKB_r6=hkXK=qS3wpykbacdKe1rzz1H8Q@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sun, 27 Nov 2016 20:39:38 -0800
+Subject: [PATCH 1/4] serial: core: Add LED trigger support
+In-Reply-To: <20161124081748.fx3xm5ww64ngn5it@pengutronix.de>
+References: <20161123100106.15969-1-s.hauer@pengutronix.de>
+ <20161123100106.15969-2-s.hauer@pengutronix.de>
+ <e9fc12b8-d4a7-067d-ef87-03f0aae39bd7@gmail.com>
+ <20161124081748.fx3xm5ww64ngn5it@pengutronix.de>
+Message-ID: <9225f2da-c6c4-73c8-829a-1033716b4c71@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guys,
-
-When I run stress-ng via the following steps on one ARM64 dual
-socket system(Cavium Thunder), the kernel oops[1] can often be
-triggered after running the stress test for several hours(sometimes
-it may take longer):
-
-- git clone git://kernel.ubuntu.com/cking/stress-ng.git
-- apply the attachment patch which just makes the posix file
-lock stress test more aggressive
-- run the test via '~/git/stress-ng$./stress-ng --lockf 128 --aggressive'
 
 
->From the oops log, looks one garbage file_lock node is got
-from the linked list of 'ctx->flc_posix' when the issue happens.
+On 11/24/2016 12:17 AM, Sascha Hauer wrote:
+> On Wed, Nov 23, 2016 at 10:57:13AM -0800, Florian Fainelli wrote:
+>> On 11/23/2016 02:01 AM, Sascha Hauer wrote:
+>>> With this patch the serial core provides LED triggers for RX and TX.
+>>>
+>>> As the serial core layer does not know when the hardware actually sends
+>>> or receives characters, this needs help from the UART drivers.
+>>
+>> Looking at 8250, we call serial8250_tx_chars from __start_tx which is
+>> called form the uart_ops::start_tx, for RX I sort of agree, since this
+>> happens in interrupt handler. I suppose some drivers could actually
+>> queue work but not do it right away though?
+> 
+> RX is not the problem. When characters are received all drivers call
+> tty_flip_buffer_push() which could be used for LED triggering (either
+> directly or we replace the calls to tty_flip_buffer_push() with some
+> wrapper function).
+> The problem comes with TX. The serial core has a FIFO which gets
+> characters from the tty layer. There is no function which the serial
+> drivers could call to read from this FIFO, instead they have to open code
+> this.
+> Continuing with the 8250 driver serial8250_tx_chars() is not only called
+> from __start_tx(), but also from the interrupt handler. Transmission
+> works without the serial_core ever noticing.
+> 
+>>
+>>> The LED triggers are registered in uart_add_led_triggers() called from
+>>> the UART drivers which want to support LED triggers. All the driver
+>>> has to do then is to call uart_led_trigger_[tx|rx] to indicate
+>>> activity.
+>>
+>> Could we somehow remedy the lack of knowledge from the core as whether
+>> the HW sends/receives characters first before adding support for LED
+>> triggers? It would be more generic and future proof to require UART
+>> drivers to report to the core when they actually TX/RX, and then at the
+>> core level, utilize that knowledge to perform the LED trigger.
+> 
+> Maybe we could introduce a function to read from the TX FIFO. Having
+> open coded this in each and every driver is not nice anyway.
 
-BTW, the issue isn't observed on single socket Cavium Thunder yet,
-and the same issue can be seen on Ubuntu Xenial(v4.4 based kernel)
-too.
+Something like that could be nice to have yes.
 
-Thanks,
-Ming
+> 
+>>
+>> Side note: are you positive using drv->dev_name is robust enough on
+>> systems with many different UART drivers, yet all of them being ttyS*?
+> 
+> If we have different UART drivers, only one of them provides ttyS*, no?
+> Other drivers will have to use another namespace.
 
-[1] kernel oops log
-ubuntu at ubuntu:~/git/stress-ng$ ./stress-ng --lockf 128 --aggressive
-stress-ng: info:  [63828] defaulting to a 86400 second run per stressor
-stress-ng: info:  [63828] dispatching hogs: 128 lockf
-stress-ng: info:  [63828] cache allocate: default cache size: 16384K
-[80659.799092] Unable to handle kernel NULL pointer dereference at
-virtual address 00000030
-[80659.807219] pgd = ffff81001f365800
-[80659.810683] [00000030] *pgd=000001001a290003,
-*pud=000001001a290003, *pmd=0000010fa07f0003, *pte=0000000000000000
-[80659.821029] Internal error: Oops: 96000007 [#1] SMP
-[80659.825901] Modules linked in:
-[80659.828962] CPU: 15 PID: 63848 Comm: stress-ng-lockf Tainted: G
-   W       4.8.0 #167
-[80659.837132] Hardware name: Cavium ThunderX CRB/To be filled by
-O.E.M., BIOS 5.11 12/12/2012
-[80659.845479] task: ffff81001ee78580 task.stack: ffff81001f798000
-[80659.851402] PC is at posix_locks_conflict+0x94/0xc0
-[80659.856282] LR is at posix_lock_inode+0x90/0x6b0
-[80659.860896] pc : [<ffff00000828c694>] lr : [<ffff00000828cd90>]
-pstate: a0000145
-[80659.868285] sp : ffff81001f79bca0
-[80659.871596] x29: ffff81001f79bca0 x28: ffff81001f798000
-[80659.876915] x27: ffff800fdffbc160 x26: 0000000000000000
-[80659.882234] x25: ffff800fd2da2b30 x24: ffff800fce927430
-[80659.887551] x23: ffff800fce92d8f0 x22: ffff81001f79bd30
-[80659.892869] x21: ffff800fd2da2b18 x20: fffffffffffffff8
-[80659.898187] x19: ffff800fdffbc160 x18: 0000000000001140
-[80659.903504] x17: 0000ffff8870a578 x16: ffff000008245768
-[80659.908821] x15: 0000ffff888bc000 x14: 0000000000000000
-[80659.914139] x13: 00000003e8000000 x12: 0000000000000018
-[80659.919457] x11: 00000000000e6a17 x10: 00000000ffffffd0
-[80659.924776] x9 : 0000000000000000 x8 : ffff800fce927500
-[80659.930094] x7 : 0000000000000000 x6 : 000000000000007f
-[80659.935413] x5 : 0000000000000080 x4 : ffff800fce927438
-[80659.940729] x3 : ffff800fce927458 x2 : 00000000000026b9
-[80659.946047] x1 : ffff81001f37f300 x0 : 0000000000000000
-[80659.951363]
-[80659.952851] Process stress-ng-lockf (pid: 63848, stack limit =
-0xffff81001f798020)
-[80659.960415] Stack: (0xffff81001f79bca0 to 0xffff81001f79c000)
-[80659.966158] bca0: ffff81001f79bcc0 ffff00000828cd90
-fffffffffffffff8 ffff800fa3a66568
-[80659.973986] bcc0: ffff81001f79bd40 ffff00000828d5f0
-ffff800f8185c700 ffff800fdffbc160
-[80659.981812] bce0: 0000000000000006 0000000000000000
-ffff81001f79bdd0 0000000000000006
-[80659.989638] bd00: 0000000000000120 0000000000000019
-ffff0000088b1000 ffff81001f798000
-[80659.997465] bd20: ffff81001f79bd40 ffff000008403fec
-ffff81001f79bd30 ffff81001f79bd30
-[80660.005292] bd40: ffff81001f79bd70 ffff00000828d8bc
-ffff800f8185c700 ffff800fdffbc160
-[80660.013118] bd60: ffff800fdffbc1b8 ffff800f8185c700
-ffff81001f79bde0 ffff00000828ef10
-[80660.020944] bd80: ffff800f8185c700 0000000000000000
-ffff800fdffbc160 ffff800fa3a66568
-[80660.028770] bda0: 0000000000000006 0000000000000004
-ffff81001f79bde0 ffff00000828ee14
-[80660.036596] bdc0: ffff800f8185c700 00000000fffffff2
-ffff800fdffbc160 ffff810ff99aae80
-[80660.044423] bde0: ffff81001f79be70 ffff000008245b84
-ffff800f8185c700 ffff800f8185c700
-[80660.052249] be00: 0000000000000000 0000000000000006
-0000ffffdad5d4b0 0000000000000004
-[80660.060087] be20: 0000000000000120 000000000000003e
-0000000000010001 0000000000000000
-[80660.067916] be40: 0000000000000008 0000000000000000
-0000000000010001 0000000000000000
-[80660.075742] be60: 0000000000000008 0000000000000000
-0000000000000000 ffff0000080836f0
-[80660.083568] be80: 0000000000000000 00000000005c5000
-ffffffffffffffff 0000ffff8870a3b8
-[80660.091394] bea0: 0000000080000000 0000000000000015
-0000000080000000 00000000005c5000
-[80660.099220] bec0: 0000000000000004 0000000000000006
-0000ffffdad5d4b0 00000000ffffff80
-[80660.107046] bee0: 0000ffffdad5d490 0000000026c26373
-000000000000176f 0000000000004650
-[80660.114873] bf00: 0000000000000019 0000000000006536
-00000000ffffffd0 00000000000e6a17
-[80660.122698] bf20: 0000000000000018 00000003e8000000
-0000000000000000 0000ffff888bc000
-[80660.130524] bf40: 000000000048a170 0000ffff8870a578
-0000000000001140 000000000000055f
-[80660.138351] bf60: 00000000005c5000 0000000000000004
-0000ffff879f9008 0000000000000000
-[80660.146177] bf80: 0000000000000002 000000000048b530
-2001000800400201 0000ffffdad60758
-[80660.154004] bfa0: 000000000048b008 0000ffffdad5d390
-0000ffff8870a518 0000ffffdad5d390
-[80660.161830] bfc0: 0000ffff8870a3b8 0000000080000000
-0000000000000004 0000000000000019
-[80660.169656] bfe0: 0000000000000000 0000000000000000
-0000000000000000 0000000000000000
-[80660.177481] Call trace:
-[80660.179928] Exception stack(0xffff81001f79bad0 to 0xffff81001f79bc00)
-[80660.186365] bac0:
-ffff800fdffbc160 0001000000000000
-[80660.194192] bae0: ffff81001f79bca0 ffff00000828c694
-ffff800fc0002c00 ffff81001ee78600
-[80660.202017] bb00: ffff81001f79bb70 ffff00000820b57c
-ffff800fcb2a6d88 ffff800fc0002c00
-[80660.209843] bb20: 0000000000000001 ffff810008ddbf00
-ffff81001f79bc30 ffff81001f79bc30
-[80660.217670] bb40: 0000000000000000 ffff810fa0712be8
-ffff800f81dfd680 ffff810fa0712be8
-[80660.225496] bb60: 0000000000000001 ffff810008ddbf00
-0000000000000000 ffff81001f37f300
-[80660.233322] bb80: 00000000000026b9 ffff800fce927458
-ffff800fce927438 0000000000000080
-[80660.241148] bba0: 000000000000007f 0000000000000000
-ffff800fce927500 0000000000000000
-[80660.248974] bbc0: 00000000ffffffd0 00000000000e6a17
-0000000000000018 00000003e8000000
-[80660.256800] bbe0: 0000000000000000 0000ffff888bc000
-ffff000008245768 0000ffff8870a578
-[80660.264636] [<ffff00000828c694>] posix_locks_conflict+0x94/0xc0
-[80660.270559] [<ffff00000828cd90>] posix_lock_inode+0x90/0x6b0
-[80660.276220] [<ffff00000828d5f0>] vfs_lock_file+0x68/0x78
-[80660.281537] [<ffff00000828d8bc>] do_lock_file_wait+0x54/0xe0
-[80660.287199] [<ffff00000828ef10>] fcntl_setlk+0x1c0/0x308
-[80660.292513] [<ffff000008245b84>] SyS_fcntl+0x41c/0x5b8
-[80660.297653] [<ffff0000080836f0>] el0_svc_naked+0x24/0x28
-[80660.302961] Code: a8c27bfd d65f03c0 d503201f f9401e61 (f9401e80)
-[80660.309188] ---[ end trace aa50050684d3a3fe ]---
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: stress-ng-more-aggressive.patch
-Type: text/x-patch
-Size: 4864 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161128/9c079139/attachment-0001.bin>
+I remember this was a problem a couple of years ago last I tried, with
+the 8250 driver being actually preventing other drivers from using
+ttyS*, but if you don't have 8250 taking over the low ttyS numbers, you
+may run into a case where several drivers successfully register their
+character devices under a ttyS* numbering scheme.
+
+Whether this is hypothetical or not nowadays, it may be nicer to provide
+a more uniquely distinct name like what dev_name() returns, or
+ttyS*-driver-tx for instance?
+-- 
+Florian
