@@ -1,183 +1,128 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 28 Nov 2016 15:28:36 +0100
-Subject: [PATCH v9 05/11] arm/arm64: vgic: Introduce VENG0 and VENG1
- fields to vmcr struct
-In-Reply-To: <1479906118-15832-6-git-send-email-vijay.kilari@gmail.com>
-References: <1479906118-15832-1-git-send-email-vijay.kilari@gmail.com>
- <1479906118-15832-6-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <20161128142836.GE18170@cbox>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 28 Nov 2016 15:30:03 +0100
+Subject: [PATCH 0/5] Meson GXL and GXM USB support
+In-Reply-To: <20161126145635.24488-1-martin.blumenstingl@googlemail.com>
+References: <20161126145635.24488-1-martin.blumenstingl@googlemail.com>
+Message-ID: <2b23b2f4-d7f7-50f4-25b5-51d26167e7a6@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2016 at 06:31:52PM +0530, vijay.kilari at gmail.com wrote:
-> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+On 11/26/2016 03:56 PM, Martin Blumenstingl wrote:
+> USB support on GXL and GXM differs a lot from Meson8b and GXBB:
+> The most obvious change is that GXL and GXM now have one dwc3
+> controller and one dwc2 controller (instead of two dwc2 controllers).
+> With that there are also new USB PHYs.
 > 
-> ICC_VMCR_EL2 supports virtual access to ICC_IGRPEN1_EL1.Enable
-> and ICC_IGRPEN0_EL1.Enable fields. Add grpen0 and grpen1 member
-> variables to struct vmcr to support read and write of these fields.
+> Due to lack of hardware I was only able to test this on a board with
+> GXM, but as far as I understand the hardware my preparations should be
+> correct (so it should also work on GXL).
 > 
-> Also refactor vgic_set_vmcr and vgic_get_vmcr() code.
-> Drop ICH_VMCR_CTLR_SHIFT and ICH_VMCR_CTLR_MASK macros and instead
-> use ICH_VMCR_EOI* and ICH_VMCR_CBPR* macros
-> .
-> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-> ---
->  include/linux/irqchip/arm-gic-v3.h |  2 --
->  virt/kvm/arm/vgic/vgic-mmio-v2.c   | 16 ----------------
->  virt/kvm/arm/vgic/vgic-mmio.c      | 16 ++++++++++++++++
->  virt/kvm/arm/vgic/vgic-v3.c        | 22 ++++++++++++++++++++--
->  virt/kvm/arm/vgic/vgic.h           |  5 +++++
->  5 files changed, 41 insertions(+), 20 deletions(-)
+> dwc2 will probably stay unused on most GXM devices since it's limited
+> to device mode via some dwc2 hardware configuration register.
 > 
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index b4f8287..406fc3e 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -404,8 +404,6 @@
->  #define ICH_HCR_EN			(1 << 0)
->  #define ICH_HCR_UIE			(1 << 1)
->  
-> -#define ICH_VMCR_CTLR_SHIFT		0
-> -#define ICH_VMCR_CTLR_MASK		(0x21f << ICH_VMCR_CTLR_SHIFT)
->  #define ICH_VMCR_CBPR_SHIFT		4
->  #define ICH_VMCR_CBPR_MASK		(1 << ICH_VMCR_CBPR_SHIFT)
->  #define ICH_VMCR_EOIM_SHIFT		9
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> index 2cb04b7..ad353b5 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> @@ -212,22 +212,6 @@ static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
->  	}
->  }
->  
-> -static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-> -{
-> -	if (kvm_vgic_global_state.type == VGIC_V2)
-> -		vgic_v2_set_vmcr(vcpu, vmcr);
-> -	else
-> -		vgic_v3_set_vmcr(vcpu, vmcr);
-> -}
-> -
-> -static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-> -{
-> -	if (kvm_vgic_global_state.type == VGIC_V2)
-> -		vgic_v2_get_vmcr(vcpu, vmcr);
-> -	else
-> -		vgic_v3_get_vmcr(vcpu, vmcr);
-> -}
-> -
->  #define GICC_ARCH_VERSION_V2	0x2
->  
->  /* These are for userland accesses only, there is no guest-facing emulation. */
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> index 0d1bc98..f81e0e5 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> @@ -416,6 +416,22 @@ int vgic_validate_mmio_region_addr(struct kvm_device *dev,
->  	return -ENXIO;
->  }
->  
-> +void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-> +{
-> +	if (kvm_vgic_global_state.type == VGIC_V2)
-> +		vgic_v2_set_vmcr(vcpu, vmcr);
-> +	else
-> +		vgic_v3_set_vmcr(vcpu, vmcr);
-> +}
-> +
-> +void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-> +{
-> +	if (kvm_vgic_global_state.type == VGIC_V2)
-> +		vgic_v2_get_vmcr(vcpu, vmcr);
-> +	else
-> +		vgic_v3_get_vmcr(vcpu, vmcr);
-> +}
-> +
->  /*
->   * kvm_mmio_read_buf() returns a value in a format where it can be converted
->   * to a byte array and be directly observed as the guest wanted it to appear
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index 9f0dae3..a3ff04b 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -175,10 +175,19 @@ void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
->  {
->  	u32 vmcr;
->  
-> -	vmcr  = (vmcrp->ctlr << ICH_VMCR_CTLR_SHIFT) & ICH_VMCR_CTLR_MASK;
-> +	/*
-> +	 * Ignore the FIQen bit, because GIC emulation always implies
-> +	 * SRE=1 which means the vFIQEn bit is also RES1.
-> +	 */
-> +	vmcr = (vmcrp->ctlr & ICC_CTLR_EL1_EOImode_MASK) >>
-> +		ICC_CTLR_EL1_EOImode_SHIFT;
-> +	vmcr = (vmcr << ICH_VMCR_EOIM_SHIFT) & ICH_VMCR_EOIM_MASK;
-
-Nit: I think this can be written more nicely as:
-	vmcr = ((vmcrp->ctlr >> ICC_CTLR_EL1_EOImode_SHIFT)
-		<< ICH_VMCR_EOIM_SHIFT) & ICH_VMCR_EOIM_MASK;
-
-> +	vmcr |= (vmcrp->ctlr << ICH_VMCR_CBPR_SHIFT) & ICH_VMCR_CBPR_MASK;
->  	vmcr |= (vmcrp->abpr << ICH_VMCR_BPR1_SHIFT) & ICH_VMCR_BPR1_MASK;
->  	vmcr |= (vmcrp->bpr << ICH_VMCR_BPR0_SHIFT) & ICH_VMCR_BPR0_MASK;
->  	vmcr |= (vmcrp->pmr << ICH_VMCR_PMR_SHIFT) & ICH_VMCR_PMR_MASK;
-> +	vmcr |= (vmcrp->grpen0 << ICH_VMCR_ENG0_SHIFT) & ICH_VMCR_ENG0_MASK;
-> +	vmcr |= (vmcrp->grpen1 << ICH_VMCR_ENG1_SHIFT) & ICH_VMCR_ENG1_MASK;
->  
->  	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = vmcr;
->  }
-> @@ -187,10 +196,19 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
->  {
->  	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr;
->  
-> -	vmcrp->ctlr = (vmcr & ICH_VMCR_CTLR_MASK) >> ICH_VMCR_CTLR_SHIFT;
-> +	/*
-> +	 * Ignore the FIQen bit, because GIC emulation always implies
-> +	 * SRE=1 which means the vFIQEn bit is also RES1.
-> +	 */
-> +	vmcrp->ctlr = (vmcr & ICH_VMCR_EOIM_MASK) >> ICH_VMCR_EOIM_SHIFT;
-> +	vmcrp->ctlr = (vmcrp->ctlr << ICC_CTLR_EL1_EOImode_SHIFT) &
-> +		       ICC_CTLR_EL1_EOImode_MASK;
-
-similarly, this could be written as:
-	vmcrp->ctlr = ((vmcr >> ICH_VMCR_EOIM_SHIFT) <<
-			ICC_CTLR_EL1_EOImode_SHIFT) & ICC_CTLR_EL1_EOImode_MASK;
-
-> +	vmcrp->ctlr |= (vmcr & ICH_VMCR_CBPR_MASK) >> ICH_VMCR_CBPR_SHIFT;
->  	vmcrp->abpr = (vmcr & ICH_VMCR_BPR1_MASK) >> ICH_VMCR_BPR1_SHIFT;
->  	vmcrp->bpr  = (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
->  	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
-> +	vmcrp->grpen0 = (vmcr & ICH_VMCR_ENG0_MASK) >> ICH_VMCR_ENG0_SHIFT;
-> +	vmcrp->grpen1 = (vmcr & ICH_VMCR_ENG1_MASK) >> ICH_VMCR_ENG1_SHIFT;
->  }
->  
->  #define INITIAL_PENDBASER_VALUE						  \
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 91f58b2..9232791 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -78,6 +78,9 @@ struct vgic_vmcr {
->  	u32	abpr;
->  	u32	bpr;
->  	u32	pmr;
-> +	/* Below member variable are valid only for GICv3 */
-> +	u32	grpen0;
-> +	u32	grpen1;
->  };
->  
->  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
-> @@ -138,6 +141,8 @@ int vgic_v3_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
->  int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
->  			 int offset, u32 *val);
->  int kvm_register_vgic_device(unsigned long type);
-> +void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-> +void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
->  int vgic_lazy_init(struct kvm *kvm);
->  int vgic_init(struct kvm *kvm);
->  
-> -- 
-> 1.9.1
+> dwc3 is probably used on all devices, even if there is more than just
+> one USB port. dwc3 has a built-in USB2 hub - on GXL this hub has two
+> ports enabled, while on GXM there are three ports enabled (see below
+> for lsusb output). There are no USB3 ports enabled in the dwc3 hardware
+> configuration, meaning that the SoC is limited to high-speed mode.
+> On my GXM device the dwc3 hardware configuration forces it into "host
+> only" mode.
 > 
-My comments on style above notwithstanding:
+> The SoCs contain two PHY blocks: one USB3 PHY and up to four USB2 PHYs
+> (on GXM there are only three enabled, but the registers should support
+> up to four).
+> The USB3 PHY also handles the OTG interrupts, but since dwc3's hardware
+> configuration enforces "host only" mode I was not able to test this. It
+> simply takes care of an interrupt and then notifies all related PHYs
+> about the new mode.
+> The USB2 PHY block is a bit different: I created one PHY driver which
+> spans all "PHY ports" because the handling is a bit tricky. It turns
+> out that for each available USB port in dwc3's hub the corresponding
+> PHY must be enabled (even if there is no physical port - in my case
+> port 3 is not connected to anything, but disabling the PHY breaks
+> ports 1 and 2 as well).
+> I decided not not pass the USB2 PHYs directly to dwc3 due to three
+> reasons: 1. the USB3 PHY (which holds a reference to all relevant
+> USB2 PHY ports) controls the mode of the USB2 PHY ports (since both
+> are used with the same controller and thus it makes sense to keep the
+> mode consistent across all ports) 2. the dwc3 driver does not support
+> passing multiple USB2 PHYs (only one USB2 and one USB3 PHY can be
+> passed to it) 3. it is similar to how the vendor reference driver
+> manages the PHYs. Please note that this coupling is not a fixed, this
+> is all configurable via devicetree (so if the third USB2 PHY has to
+> be passed two the dwc2 controller then this is still possible by
+> just moving on PHY reference in the .dts).
+> 
+> The coupling of the USB2 and USB3 PHYs is the reason why I sent the
+> two drivers in one patch, even though they are handling different IP
+> blocks (different registers, etc.).
+> 
+> Unfortunately there are no datasheets available for any of these PHYs.
+> Both drivers were written by reading the reference drivers provided by
+> Amlogic and analyzing the registers on the kernel that was shipped with
+> my board.
+> 
+> As a last note: the dwc3 driver currently only explicitly enables the
+> first USB port "DWC3_GUSB2PHYCFG(0)" in the internal hub. The hardware
+> seems to enable the other two (DWC3_GUSB2PHYCFG(1) and
+> DWC3_GUSB2PHYCFG(2)) automatically. I will ask the dwc3 maintainers if
+> changes to dwc3 are desired any how these should look like, but for now
+> it's working fine even without changes there.
+> 
+> lsusb output on GXM for the dwc3 hub:
+> Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+> ...
+>  Hub Port Status:
+>    Port 1: 0000.0100 power
+>    Port 2: 0000.0100 power
+>    Port 3: 0000.0100 power
+> 
+> NOTE: The devicetree changes depend on my previous series:
+> "[PATCH 0/2] minor GXL and GXM improvements" - see [0]
+> 
+> NOTE2: This series depends on an upstream dwc3/xhci-plat DMA fix
+> (special thanks to Arnd Bergmann and Sriram Dash for fixing that):
+> "[PATCH v5 0/6] inherit dma configuration from parent dev" - see [1]
+> 
+> I have a tree with all dependencies applied available at [2] if
+> someone wants a quick way to test this (I don't take any responsibility
+> if anything explodes though).
+> 
+> [0] http://lists.infradead.org/pipermail/linux-amlogic/2016-November/001665.html
+> [1] http://marc.info/?l=linux-usb&m=147938307209685&w=2
+> [2] https://github.com/xdarklight/linux/commits/meson-gx-integration-4.10-20161126
+> 
+> Martin Blumenstingl (5):
+>   Documentation: dt-bindings: Add documentation for Meson GXL USB2/3
+>     PHYs
+>   phy: meson: add USB2 and USB3 PHY support for Meson GXL
+>   arm64: dts: meson-gxl: add USB support
+>   ARM64: dts: meson-gxm: add GXM specific USB configuration
+>   ARM64: dts: meson-gx-p23x-q20x: enable USB on P23x and Q20x boards
+> 
+>  .../devicetree/bindings/phy/meson-gxl-usb2-phy.txt |  25 ++
+>  .../devicetree/bindings/phy/meson-gxl-usb3-phy.txt |  27 ++
+>  .../arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi |  12 +
+>  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         |  49 +++
+>  .../arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts |  17 +
+>  arch/arm64/boot/dts/amlogic/meson-gxm.dtsi         |  10 +
+>  drivers/phy/Kconfig                                |  13 +
+>  drivers/phy/Makefile                               |   2 +
+>  drivers/phy/phy-meson-gxl-usb2.c                   | 374 ++++++++++++++++++++
+>  drivers/phy/phy-meson-gxl-usb3.c                   | 377 +++++++++++++++++++++
+>  10 files changed, 906 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/meson-gxl-usb2-phy.txt
+>  create mode 100644 Documentation/devicetree/bindings/phy/meson-gxl-usb3-phy.txt
+>  create mode 100644 drivers/phy/phy-meson-gxl-usb2.c
+>  create mode 100644 drivers/phy/phy-meson-gxl-usb3.c
+> 
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+With the patchset in [1], tested successfully on a Nexbox A1.
+
+On my Amlogic P230, the two USB-A ports works, the USB-OTG port work in Host mode, but does nothing connected as peripheral.
+When trying to enable the DWC2 in peripheral mode, it fails by :
+[   11.609586] dwc2 c9100000.usb: dwc2_core_reset() HANG! Soft Reset GRSTCTL=80000001
+[   11.616962] dwc2 c9100000.usb: Specified GNPTXFDEP=1024 > 768
+[   11.622643] dwc2 c9100000.usb: EPs: 7, dedicated fifos, 712 entries in SPRAM
+
+Tested-by: Neil Armstrong <narmstrong@baylibre.com>
