@@ -1,76 +1,78 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 28 Nov 2016 13:31:46 +0100
-Subject: [PATCH net-next v3 4/4] ARM64: dts: meson: odroidc2: disable
- advertisement EEE for GbE.
-In-Reply-To: <1480326409-25419-5-git-send-email-jbrunet@baylibre.com>
-References: <1480326409-25419-1-git-send-email-jbrunet@baylibre.com>
- <1480326409-25419-5-git-send-email-jbrunet@baylibre.com>
-Message-ID: <9709dd57-e536-9281-6b56-5ff5f9e8035c@suse.de>
+From: jesper.nilsson@axis.com (Jesper Nilsson)
+Date: Mon, 28 Nov 2016 13:33:31 +0100
+Subject: [GIT PULL]: ARM ARTPEC changes for 4.10
+In-Reply-To: <5317474.MXurzNW7Do@wuerfel>
+References: <20161110150930.GB19804@axis.com>
+ <5317474.MXurzNW7Do@wuerfel>
+Message-ID: <20161128123331.GO19016@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 28.11.2016 um 10:46 schrieb Jerome Brunet:
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> ---
->  arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
+On Sat, Nov 26, 2016 at 12:16:20AM +0100, Arnd Bergmann wrote:
+> On Thursday, November 10, 2016 4:09:31 PM CET Jesper Nilsson wrote:
+> > Please pull the below signed tag for a trio of minor changes
+> > adding PCIe for the ARM ARTPEC SoC.
+> > 
+> > Thanks!
+> > 
+> > /Jesper
+> > 
+> > The following changes since commit bc33b0ca11e3df467777a4fa7639ba488c9d4911:
+> > 
+> >   Linux 4.9-rc4 (2016-11-05 16:23:36 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/jesper/artpec.git tags/artpec-for-4.10
+> > 
+> > for you to fetch changes up to fa5541fc806771a108cd2a48245a229f1ba539ea:
+> > 
+> >   ARM: dts: artpec: add pcie support (2016-11-10 15:51:10 +0100)
+> > 
+> > ----------------------------------------------------------------
+> > ARTPEC changes for 4.10
+> > 
+> > ----------------------------------------------------------------
+> > Niklas Cassel (3):
+> >       ARM: ARTPEC-6: add select MFD_SYSCON to MACH_ARTPEC6
+> >       ARM: ARTPEC-6: add pcie related options
+> >       ARM: dts: artpec: add pcie support
+> > 
+> > 
 > 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> index e6e3491d48a5..5624714d2b16 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> @@ -46,6 +46,7 @@
->  
->  #include "meson-gxbb.dtsi"
->  #include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/net/mdio.h>
->  
->  / {
->  	compatible = "hardkernel,odroid-c2", "amlogic,meson-gxbb";
-> @@ -98,3 +99,18 @@
->  	pinctrl-0 = <&i2c_a_pins>;
->  	pinctrl-names = "default";
->  };
-> +
-> +&ethmac {
-> +	phy-handle = <&eth_phy0>;
-> +
-> +	mdio {
-> +		compatible = "snps,dwmac-mdio";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		eth_phy0: ethernet-phy at 0 {
-> +			reg = <0>;
-> +			eee-broken-modes = <MDIO_EEE_1000T>;
-> +		};
-> +	};
-> +};
+> Hi Jesper and Niklas,
+> 
+> I just found the old pull request while going through my mail backlog.
+> 
+> A few things for you to remember for next time:
+> 
+> - please send pull requests "To: arm at kernel.org" so we know they
+>   are destined for arm-soc
 
-I've tested this hand-applied because it applies to neither amlogic
-v4.10/integ nor linux-next.git and will conflict if applied through the
-net-next tree.
+Ok, should we add that in the MAINTAINERS file so we can
+get it automatically from get_maintainer?
 
-Note that there already is an &ethmac node that you should be extending
-rather than duplicating:
+> - please split up changes to the platform code from dts changes,
+>   defconfig changes and driver changes. Each of them gets sent
+>   to Linus in a separate arm-soc branch, so we have to pull them
+>   in separately too
+> 
+> - For the signed tag, please put in a cleartext description of
+>   the branch, just like you describe each commit in its changelog
+>   text. The tag comment becomes the merge commit text.
 
-&ethmac {
-	status = "okay";
-	pinctrl-0 = <&eth_rgmii_pins>;
-	pinctrl-names = "default";
-};
+Ok, will do both in the future.
 
-If you or your colleagues could please fix the sort order of the nodes
-to be alphabetical again (ethmac after i2c_A here; between uart_A and ir
-in-tree) this wouldn't happen so easily again.
+> - I've looked at the three patches individually and cherry-picked
+>   the first into next/soc and the third into next/dt. The patch
+>   "ARM: ARTPEC-6: add pcie related options" is no longer needed
+>   after commit e13688f ("ARM: select PCI_DOMAINS config from
+>   ARCH_MULTIPLATFORM"), so I dropped that.
 
-I therefore suggest to not apply this patch 4/4 through net-next but
-through the amlogic tree instead.
+Thanks!
 
-Thanks,
-Andreas
+> 	Arnd
 
+/^JN - Jesper Nilsson
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+               Jesper Nilsson -- jesper.nilsson at axis.com
