@@ -1,84 +1,72 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 28 Nov 2016 17:14:15 +0100
-Subject: [PATCH 2/2] net: dsa: mv88e6xxx: Add 88E6176 device tree support
-In-Reply-To: <2c59cc79-b6dc-9920-1725-a7785ff3b6bf@kleine-koenig.org>
-References: <1480280279-9552-1-git-send-email-afaerber@suse.de>
- <1480280279-9552-2-git-send-email-afaerber@suse.de>
- <20161127212709.GD13318@lunn.ch>
- <9500470d-09c3-3ecb-994b-3d108bffc99e@suse.de>
- <20161127220846.GH13318@lunn.ch>
- <e5d45b55-a4c1-3b5e-0bdc-a5e340b072d0@suse.de>
- <20161127231009.GA17704@lunn.ch>
- <20161128080939.ippqlytvojitefkp@perseus.defre.kleine-koenig.org>
- <20161128131735.GA4379@lunn.ch>
- <2c59cc79-b6dc-9920-1725-a7785ff3b6bf@kleine-koenig.org>
-Message-ID: <20161128161415.GI17704@lunn.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 28 Nov 2016 17:15:25 +0100
+Subject: arasan,sdhci.txt "compatibility" DT binding
+In-Reply-To: <583C50E7.6030400@free.fr>
+References: <56B07BA5.4060407@free.fr>
+ <a20b2b4f-15d4-3c29-324c-1ced5dbcc67f@xilinx.com> <583C50E7.6030400@free.fr>
+Message-ID: <14771688.Q8f97gHC2H@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2016 at 04:44:47PM +0100, Uwe Kleine-K?nig wrote:
-> On 11/28/2016 02:17 PM, Andrew Lunn wrote:
-> >> I still wonder (and didn't get an answer back when I asked about this)
-> >> why a comment is preferred here. For other devices I know it's usual and
-> >> requested by the maintainers to use:
-> >>
-> >> 	compatible = "exact name", "earlyer device to match driver";
-> >>
-> >> . This is more robust, documents the situation more formally and makes
-> >> it better greppable. The price to pay is only a few bytes in the dtb
-> >> which IMO is ok.
-> > 
-> > We did discuss this a while back. The information is useless and
-> > should to be ignored if present.
+On Monday, November 28, 2016 4:44:39 PM CET Mason wrote:
+> Hello,
 > 
-> Who is "we"?
-
-Anybody on netdev a while back, but mostly Vivien and myself.
-
-> I'd say fail to probe is the right thing to do. Of course that doesn't
-> work for already supported models because it will break compatibility.
-
-And that is the first rule of device tree, never break backwards
-compatibility.
-
-> Also it seems wrong to write "marvell,mv88e6085" (only) if I know the
-> hardware is really a "marvell,mv88e6176".
-
-Why? Remember, the property name is called "compatible", not "is".
-
-> > Linus has said he does not like ARM devices because of all the busses
-> > which are not enumerable. Here we have a device which with a little
-> > bit of help we can enumerate. So we should. 
+> @Shawn Lin, could you take a look below and tell me exactly
+> which IP core(s) Rockchip is using in its SoCs?
 > 
-> If you write
+> Based on the feedback I received, here is an updated list of
+> compatible strings and controller versions dealt with by the
+> drivers/mmc/host/sdhci-of-arasan.c code.
 > 
-> 	compatible = "marvell,mv88e6176", "marvell,mv88e6085";
 > 
-> you can still enumerate in the same way as before.
-
-Sure it would. But if the driver decides to ignore it, it is likely to
-be wrong. Developers are used to comments being wrong. We are
-suspicious of comments, we don't trust them 100%. But if somebody sees
-a property in a device tree, they put a higher 'trustability' value on
-it. But it actually has less trustable than a comment.
- 
-> There are several more instances where the device tree specifies
-> something that could be probed instead. Some examples:
+> Xilinx Zynq:
+> "SD2.0 / SDIO2.0 / MMC3.31 AHB Host Controller"
+> "arasan,sdhci-8.9a"
+> NB: 8.9a is the documentation revision (dated 2011-10-19)
+> subsequent tweaks labeled 9.0a, 9.1a, 9.2a
 > 
-> 	compatible = "ethernet-phy-id0141.0DD1", "ethernet-phy-ieee802.3-c22";
+> Xilinx ZynqMP:
+> "SD3.0 / SDIO3.0 / eMMC4.51 AHB Host Controller"
+> "arasan,sdhci-8.9a"
+> NB: using the same compatible string as Zynq
+> 
+> Sigma SMP87xx
+> "SD3.0 / SDIO3.0 / eMMC4.4 AHB Host Controller"
+> no compatible string yet, platform-specific init required
+> 
+> APM:
+> "SD3.0 / SDIO3.0 / eMMC4.41 AHB Host Controller"
+> "arasan,sdhci-4.9a"
+> NB: 4.9a appears to be the documentation revision
+> no functional diff with "arasan,sdhci-8.9a"
+> 
+> Rockchip
+> Exact IP unknown, waiting for Shawn's answer
+> "arasan,sdhci-5.1"
+> NB: 5.1 appears to refer to the eMMC standard supported
+> 
+> 
+> On a final note, there are many variations of the Arasan IP.
+> I've tracked down at least the following:
+> 
+> SD_2.0_SDIO_2.0__MMC_3.31_AHB_Host_Controller.pdf
+> SD_3.0_SDIO_3.0_eMMC_4.41_OCP_Host_Controller.pdf
+> SD_3.0_SDIO_3.0_eMMC_4.4__AHB_Host_Controller.pdf
+> SD_3.0_SDIO_3.0_eMMC_4.51_Host_Controller.pdf
+> SD_3.0_SDIO_3.0_eMMC_4.5__Host_Controller.pdf
+> SD_4.1_SDIO_4.1_eMMC_4.51_Host_Controller.pdf
+> SD_4.1_SDIO_4.1_eMMC_5.1__Host_Controller.pdf
+> 
+> It seems to me the compatible string should specify
+> the SD/SDIO version AND the eMMC version, since it
+> seems many combinations are allowed, e.g. eMMC 4.51
+> has two possible SD versions.
+> 
+> What do you think?
 
-There are examples of phys which don't implemented register 2 and
-3. In that case, you do need to specify the ID, if you want the
-correct driver to load.
+It seems wrong to have the eMMC or SD version in the compatible
+string.  Is that the only difference between the documents you
+found? Normally there should be a version of IP block itself,
+besides the supported protocol.
 
-> 	compatible = "spansion,s25fl164k", "jedec,spi-nor";
-
-And there was a push recently to add "jedec,spi-nor" everywhere and
-deprecate a specific compatible because it is also not needed.
-
-> 	compatible = "fsl,imx25-flexcan", "fsl,p1010-flexcan";
-> 	compatible = "arm,pl011", "arm,primecell";
-
-I don't know these hardwares, so cannot comment.
-
-  Andrew
+	Arnd
