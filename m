@@ -1,39 +1,36 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 28 Nov 2016 11:52:26 +0100
-Subject: [PATCH] ARM: dts: mvebu: Add Armada 38x labels and clean up
- Turris Omnia
-In-Reply-To: <20161128103738.GT14217@n2100.armlinux.org.uk>
-References: <1fc18002-0144-8300-1888-09f456860ef0@kleine-koenig.org>
- <1480272700-28888-1-git-send-email-afaerber@suse.de>
- <20161128103738.GT14217@n2100.armlinux.org.uk>
-Message-ID: <4ad1108a-43c4-46f8-4683-1c4b89996036@suse.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 28 Nov 2016 10:52:54 +0000
+Subject: [bug report v4.8] fs/locks.c: kernel oops during posix lock
+ stress test
+In-Reply-To: <CACVXFVPsHjh3CWjdUrKB_r6=hkXK=qS3wpykbacdKe1rzz1H8Q@mail.gmail.com>
+References: <CACVXFVPsHjh3CWjdUrKB_r6=hkXK=qS3wpykbacdKe1rzz1H8Q@mail.gmail.com>
+Message-ID: <20161128105254.GB1485@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Ming,
 
-Am 28.11.2016 um 11:37 schrieb Russell King - ARM Linux:
-> On Sun, Nov 27, 2016 at 07:51:39PM +0100, Andreas F?rber wrote:
->> To more consistently reference nodes by label, add labels for sata,
->> usb2, sdhci and usb3 nodes.
->>
->> Convert all other 38x boards for consistency. Add labels for nfc and rtc.
+On Mon, Nov 28, 2016 at 11:10:14AM +0800, Ming Lei wrote:
+> When I run stress-ng via the following steps on one ARM64 dual
+> socket system(Cavium Thunder), the kernel oops[1] can often be
+> triggered after running the stress test for several hours(sometimes
+> it may take longer):
 > 
-> Please don't do this for clearfog - there's changes in the pipeline which
-> completely replace armada-388-clearfog.dts because there's a "base" and
-> "pro" versions of this hardware now, and making such a huge change will
-> effectively mean we have to start over with the DT files.
+> - git clone git://kernel.ubuntu.com/cking/stress-ng.git
+> - apply the attachment patch which just makes the posix file
+> lock stress test more aggressive
+> - run the test via '~/git/stress-ng$./stress-ng --lockf 128 --aggressive'
+> 
+> 
+> From the oops log, looks one garbage file_lock node is got
+> from the linked list of 'ctx->flc_posix' when the issue happens.
+> 
+> BTW, the issue isn't observed on single socket Cavium Thunder yet,
+> and the same issue can be seen on Ubuntu Xenial(v4.4 based kernel)
+> too.
 
-Would it help to split it back up into a series of add-labels,
-use-labels like I had originally? Then you could start using them in
-your refactoring as soon as the add-labels patch gets applied. Or are
-you completely against this style?
+I've seen issues with the LSE atomics on the Thunder platform -- can you
+try disabling those (CONFIG_ARM64_LSE_ATOMICS) and see if the problem
+persists, please?
 
-Thanks for pointing this out,
-
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Will
