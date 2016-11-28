@@ -1,31 +1,86 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 28 Nov 2016 17:12:19 +0530
-Subject: [GIT PULL 4/4] DaVinci defconfig updates for v4.10 (part 3)
-In-Reply-To: <20161128114219.22325-1-nsekhar@ti.com>
-References: <20161128114219.22325-1-nsekhar@ti.com>
-Message-ID: <20161128114219.22325-5-nsekhar@ti.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 28 Nov 2016 11:47:26 +0000
+Subject: [RFC PATCH 13/29] arm64/sve: Basic support for KERNEL_MODE_NEON
+In-Reply-To: <20161126113038.GA86651@MBP.local>
+References: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
+ <1480102762-23647-14-git-send-email-Dave.Martin@arm.com>
+ <CAKv+Gu-MKdNHNrvSvMeoAoENdfscbAK0==NEMu6KJn8fjxz_tw@mail.gmail.com>
+ <20161126113038.GA86651@MBP.local>
+Message-ID: <20161128114723.GG1574@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit a652baa06413a4beacc09425883e518c5f1ed100:
+On Sat, Nov 26, 2016 at 11:30:42AM +0000, Catalin Marinas wrote:
+> On Fri, Nov 25, 2016 at 08:45:02PM +0000, Ard Biesheuvel wrote:
+> > On 25 November 2016 at 19:39, Dave Martin <Dave.Martin@arm.com> wrote:
+> > > In order to enable CONFIG_KERNEL_MODE_NEON and things that rely on
+> > > it to be configured together with Scalable Vector Extension support
+> > > in the same kernel, this patch implements basic support for
+> > > saving/restoring the SVE state around kernel_neon_begin()...
+> > > kernel_neon_end().
+> > >
+> > > This patch is not optimal and will generally save more state than
+> > > necessary, more often than necessary.  Further optimisations can be
+> > > implemented in future patches.
+> > >
+> > > This patch is not intended to allow general-purpose _SVE_ code to
+> > > execute in the kernel safely.  That functionality may also follow
+> > > in later patches.
+> > >
+> > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > > ---
+> > >  arch/arm64/Kconfig         |  1 -
+> > >  arch/arm64/kernel/fpsimd.c | 22 ++++++++++++++++++----
+> > >  2 files changed, 18 insertions(+), 5 deletions(-)
+> > >
+> > > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > > index e8d04dd..7266761 100644
+> > > --- a/arch/arm64/Kconfig
+> > > +++ b/arch/arm64/Kconfig
+> > > @@ -880,7 +880,6 @@ endmenu
+> > >  config ARM64_SVE
+> > >         bool "ARM Scalable Vector Extension support"
+> > >         default y
+> > > -       depends on !KERNEL_MODE_NEON    # until it works with SVE
+> > >         help
+> > >           The Scalable Vector Extension (SVE) is an extension to the AArch64
+> > >           execution state which complements and extends the SIMD functionality
+> > > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> > > index 81cfdb5..cb947dd 100644
+> > > --- a/arch/arm64/kernel/fpsimd.c
+> > > +++ b/arch/arm64/kernel/fpsimd.c
+> > > @@ -282,11 +282,26 @@ static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
+> > >   */
+> > >  void kernel_neon_begin_partial(u32 num_regs)
+> > >  {
+> > > +       preempt_disable();
+> > > +
+> > > +       /*
+> > > +        * For now, we have no special storage for SVE registers in
+> > > +        * interrupt context, so always save the userland SVE state
+> > > +        * if there is any, even for interrupts.
+> > > +        */
+> > > +       if (IS_ENABLED(CONFIG_ARM64_SVE) && (elf_hwcap & HWCAP_SVE) &&
+> > > +           current->mm &&
+> > > +           !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE)) {
+> > > +               fpsimd_save_state(&current->thread.fpsimd_state);
+> > > +               this_cpu_write(fpsimd_last_state, NULL);
+> > > +       }
+> > > +
+> > 
+> > I am having trouble understanding why we need all of this if we don't
+> > support SVE in the kernel. Could you elaborate?
+> 
+> Dave knows all the details but a reason is that touching a Neon register
+> zeros the upper SVE state in the same vector register. So we can't
+> safely save/restore just the Neon part without corrupting the SVE state.
 
-  ARM: davinci_all_defconfig: add missing options for systemd (2016-11-15 15:44:52 +0530)
+This is right -- this also means that EFI services can trash the upper
+bits of an SVE vector register (as a side-effect of FPSIMD/NEON usage).
 
-are available in the git repository at:
+It's overkill to save/restore absolutely everything -- I ignore num_regs
+for example -- but I wanted to keep things as simple as possible
+initially.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.10/defconfig-3
-
-for you to fetch changes up to 213971e7571e27f47b4e926904a9adf794925c51:
-
-  ARM: davinci_all_defconfig: Enable OHCI as module (2016-11-22 20:50:46 +0530)
-
-----------------------------------------------------------------
-A patch enabling USB OHCI support in davinci
-defconfig.
-
-----------------------------------------------------------------
-Axel Haslam (1):
-      ARM: davinci_all_defconfig: Enable OHCI as module
-
- arch/arm/configs/davinci_all_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Cheers
+---Dave
