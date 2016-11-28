@@ -1,182 +1,237 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 28 Nov 2016 10:33:07 +0200
-Subject: [RFC PATCH 3/3] dt-bindings: display: add Amlogic Meson DRM
- Bindings
-In-Reply-To: <1480089791-12517-4-git-send-email-narmstrong@baylibre.com>
-References: <1480089791-12517-1-git-send-email-narmstrong@baylibre.com>
- <1480089791-12517-4-git-send-email-narmstrong@baylibre.com>
-Message-ID: <3721857.XEGXu9B51N@avalon>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 28 Nov 2016 16:35:48 +0800
+Subject: [PATCH net-next 1/5] net: mvneta: Use cacheable memory to store
+ the rx buffer virtual address
+In-Reply-To: <7e6004f918d3fcde9ae71e7893d26b19086236a3.1480087510.git-series.gregory.clement@free-electrons.com>
+References: <cover.2b146800967005632cd02d4da77397e6e2fdf51f.1480087510.git-series.gregory.clement@free-electrons.com>
+ <7e6004f918d3fcde9ae71e7893d26b19086236a3.1480087510.git-series.gregory.clement@free-electrons.com>
+Message-ID: <20161128163548.70181560@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+Hi Gregory,
 
-Thank you for the patch.
+On Fri, 25 Nov 2016 16:30:14 +0100 Gregory CLEMENT wrote:
 
-On Friday 25 Nov 2016 17:03:11 Neil Armstrong wrote:
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  .../bindings/display/meson/meson-drm.txt           | 134 +++++++++++++++++
->  1 file changed, 134 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/display/meson/meson-drm.txt
+> Until now the virtual address of the received buffer were stored in the
+> cookie field of the rx descriptor. However, this field is 32-bits only
+> which prevents to use the driver on a 64-bits architecture.
 > 
-> diff --git a/Documentation/devicetree/bindings/display/meson/meson-drm.txt
-> b/Documentation/devicetree/bindings/display/meson/meson-drm.txt new file
-> mode 100644
-> index 0000000..89c1b5f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/meson/meson-drm.txt
-> @@ -0,0 +1,134 @@
-> +Amlogic Meson Display Controller
-> +================================
-> +
-> +The Amlogic Meson Display controller is composed of several components
-> +that are going to be documented below:
-> +
-> +DMC|---------------VPU (Video Processing Unit)------------|------HHI------|
-> +   | vd1   _______     _____________    _____________     |               |
-> +D  |-------|      |----|            |   |            |    |   HDMI PLL    |
-> +D  | vd2   | VIU  |    | Video Post |   | Video Encs |<---|-----VCLK      |
-> +R  |-------|      |----| Processing |   |            |    |               |
-> +   | osd2  |      |    |            |---| Enci ------|----|-----VDAC------|
-> +R  |-------| CSC  |----| Scalers    |   | Encp ------|----|----HDMI-TX----|
-> +A  | osd1  |      |    | Blenders   |   | Encl-------|----|---------------|
-> +M  |-------|______|----|____________|   |____________|    |               |
-> +___|______________________________________________________|_______________|
-> +
-> +
-> +VIU: Video Input Unit
-> +---------------------
-> +
-> +The Video Input Unit is in charge of the pixel scanout from the DDR memory.
-> +It fetches the frames addresses, stride and parameters from the "Canvas"
-> memory.
-> +This part is also in charge of the CSC (Colorspace Conversion).
-> +It can handle 2 OSD Planes and 2 Video Planes.
-> +
-> +VPP: Video Processing Unit
+> With this patch the virtual address is stored in an array not shared with
+> the hardware (no more need to use the DMA API). Thanks to this, it is
+> possible to use cache contrary to the access of the rx descriptor member.
+> 
+> The change is done in the swbm path only because the hwbm uses the cookie
+> field, this also means that currently the hwbm is not usable in 64-bits.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/net/ethernet/marvell/mvneta.c | 96 ++++++++++++++++++++++++----
+>  1 file changed, 84 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index 87274d4ab102..b6849f88cab7 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -561,6 +561,9 @@ struct mvneta_rx_queue {
+>  	u32 pkts_coal;
+>  	u32 time_coal;
+>  
+> +	/* Virtual address of the RX buffer */
+> +	void  **buf_virt_addr;
 
-Do you mean "Video Post Processing" ? In your diagram above Video Processing 
-Unit is abbreviated VPU and covers the VIU, VPP and encoders.
+can we store buf_phys_addr in cacheable memory as well?
 
-> +--------------------------
 > +
-> +The Video Processing Unit is in charge if the scaling and blending of the
-> +various planes into a single pixel stream.
-> +There is a special "pre-blending" used by the video planes with a dedicated
-> +scaler and a "post-blending" to merge with the OSD Planes.
-> +The OSD planes also have a dedicated scaler for one of the OSD.
+>  	/* Virtual address of the RX DMA descriptors array */
+>  	struct mvneta_rx_desc *descs;
+>  
+> @@ -1573,10 +1576,14 @@ static void mvneta_tx_done_pkts_coal_set(struct mvneta_port *pp,
+>  
+>  /* Handle rx descriptor fill by setting buf_cookie and buf_phys_addr */
+>  static void mvneta_rx_desc_fill(struct mvneta_rx_desc *rx_desc,
+> -				u32 phys_addr, u32 cookie)
+> +				u32 phys_addr, void *virt_addr,
+> +				struct mvneta_rx_queue *rxq)
+>  {
+> -	rx_desc->buf_cookie = cookie;
+> +	int i;
 > +
-> +VENC: Video Encoders
-> +--------------------
+>  	rx_desc->buf_phys_addr = phys_addr;
+> +	i = rx_desc - rxq->descs;
+> +	rxq->buf_virt_addr[i] = virt_addr;
+>  }
+>  
+>  /* Decrement sent descriptors counter */
+> @@ -1781,7 +1788,8 @@ EXPORT_SYMBOL_GPL(mvneta_frag_free);
+>  
+>  /* Refill processing for SW buffer management */
+>  static int mvneta_rx_refill(struct mvneta_port *pp,
+> -			    struct mvneta_rx_desc *rx_desc)
+> +			    struct mvneta_rx_desc *rx_desc,
+> +			    struct mvneta_rx_queue *rxq)
+>  
+>  {
+>  	dma_addr_t phys_addr;
+> @@ -1799,7 +1807,7 @@ static int mvneta_rx_refill(struct mvneta_port *pp,
+>  		return -ENOMEM;
+>  	}
+>  
+> -	mvneta_rx_desc_fill(rx_desc, phys_addr, (u32)data);
+> +	mvneta_rx_desc_fill(rx_desc, phys_addr, data, rxq);
+>  	return 0;
+>  }
+>  
+> @@ -1861,7 +1869,12 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
+>  
+>  	for (i = 0; i < rxq->size; i++) {
+>  		struct mvneta_rx_desc *rx_desc = rxq->descs + i;
+> -		void *data = (void *)rx_desc->buf_cookie;
+> +		void *data;
 > +
-> +The VENC is composed of the multiple pixel encoders :
-> + - ENCI : Interlace Video encoder for CVBS and Interlace HDMI
-> + - ENCP : Progressive Video Encoder for HDMI
-> + - ENCL : LCD LVDS Encoder
-> +The VENC Unit gets a Pixel Clocks (VCLK) from a dedicated HDMI PLL and
-> clock
-> +tree and provides the scanout clock to the VPP and VIU.
-> +The ENCI is connected to a single VDAC for Composite Output.
-> +The ENCI and ENCP are connected to an on-chip HDMI Transceiver.
+> +		if (!pp->bm_priv)
+> +			data = rxq->buf_virt_addr[i];
+> +		else
+> +			data = (void *)(uintptr_t)rx_desc->buf_cookie;
+>  
+>  		dma_unmap_single(pp->dev->dev.parent, rx_desc->buf_phys_addr,
+>  				 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
+> @@ -1894,12 +1907,13 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
+>  		unsigned char *data;
+>  		dma_addr_t phys_addr;
+>  		u32 rx_status, frag_size;
+> -		int rx_bytes, err;
+> +		int rx_bytes, err, index;
+>  
+>  		rx_done++;
+>  		rx_status = rx_desc->status;
+>  		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
+> -		data = (unsigned char *)rx_desc->buf_cookie;
+> +		index = rx_desc - rxq->descs;
+> +		data = (unsigned char *)rxq->buf_virt_addr[index];
+>  		phys_addr = rx_desc->buf_phys_addr;
+>  
+>  		if (!mvneta_rxq_desc_is_first_last(rx_status) ||
+> @@ -1938,7 +1952,7 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
+>  		}
+>  
+>  		/* Refill processing */
+> -		err = mvneta_rx_refill(pp, rx_desc);
+> +		err = mvneta_rx_refill(pp, rx_desc, rxq);
+>  		if (err) {
+>  			netdev_err(dev, "Linux processing - Can't refill\n");
+>  			rxq->missed++;
+> @@ -2020,7 +2034,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
+>  		rx_done++;
+>  		rx_status = rx_desc->status;
+>  		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
+> -		data = (unsigned char *)rx_desc->buf_cookie;
+> +		data = (u8 *)(uintptr_t)rx_desc->buf_cookie;
+>  		phys_addr = rx_desc->buf_phys_addr;
+>  		pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc);
+>  		bm_pool = &pp->bm_priv->bm_pools[pool_id];
+> @@ -2708,6 +2722,57 @@ static int mvneta_poll(struct napi_struct *napi, int budget)
+>  	return rx_done;
+>  }
+>  
+> +/* Refill processing for HW buffer management */
+> +static int mvneta_rx_hwbm_refill(struct mvneta_port *pp,
+> +				 struct mvneta_rx_desc *rx_desc)
 > +
-> +Device Tree Bindings:
-> +---------------------
+> +{
+> +	dma_addr_t phys_addr;
+> +	void *data;
 > +
-> +VPU: Video Processing Unit
-> +--------------------------
+> +	data = mvneta_frag_alloc(pp->frag_size);
+> +	if (!data)
+> +		return -ENOMEM;
 > +
-> +Required properties:
-> + - compatible: value should be different for each SoC family as :
-> + 	- GXBB (S905) : "amlogic,meson-gxbb-vpu"
-> + 	- GXL (S905X, S905D) : "amlogic,meson-gxl-vpu"
-> + 	- GXM (S912) : "amlogic,meson-gxm-vpu"
-> +	followed by the common "amlogic,meson-gx-vpu"
-> + - reg: base address and size of he following memory-mapped regions :
-> +	- vpu
-> +	- hhi
-> +	- dmc
-> + - reg-names: should contain the names of the previous memory regions
-> + - interrupts: should contain the VENC Vsync interrupt number
+> +	phys_addr = dma_map_single(pp->dev->dev.parent, data,
+> +				   MVNETA_RX_BUF_SIZE(pp->pkt_size),
+> +				   DMA_FROM_DEVICE);
+> +	if (unlikely(dma_mapping_error(pp->dev->dev.parent, phys_addr))) {
+> +		mvneta_frag_free(pp->frag_size, data);
+> +		return -ENOMEM;
+> +	}
 > +
-> +- ports: A ports node with endpoint definitions as defined in
-> +  Documentation/devicetree/bindings/media/video-interfaces.txt. The
-> +  second port should be the output endpoints for VENC connectors.
+> +	phys_addr += pp->rx_offset_correction;
+> +	rx_desc->buf_phys_addr = phys_addr;
+> +	rx_desc->buf_cookie = (uintptr_t)data;
 > +
-> +VENC CBVS Output
-> +----------------------
+> +	return 0;
+> +}
 > +
-> +The VENC can output Composite/CVBS output via a decicated VDAC.
+> +/* Handle rxq fill: allocates rxq skbs; called when initializing a port */
+> +static int mvneta_rxq_bm_fill(struct mvneta_port *pp,
+> +			      struct mvneta_rx_queue *rxq,
+> +			      int num)
+> +{
+> +	int i;
 > +
-> +Required properties:
-> +  - compatible: value must be one of:
-> + - compatible: value should be different for each SoC family as :
+> +	for (i = 0; i < num; i++) {
+> +		memset(rxq->descs + i, 0, sizeof(struct mvneta_rx_desc));
+> +		if (mvneta_rx_hwbm_refill(pp, rxq->descs + i) != 0) {
+> +			netdev_err(pp->dev, "%s:rxq %d, %d of %d buffs  filled\n",
+> +				   __func__, rxq->id, i, num);
+> +			break;
+> +		}
+> +	}
+> +
+> +	/* Add this number of RX descriptors as non occupied (ready to
+> +	 * get packets)
+> +	 */
+> +	mvneta_rxq_non_occup_desc_add(pp, rxq, i);
+> +
+> +	return i;
+> +}
+> +
+>  /* Handle rxq fill: allocates rxq skbs; called when initializing a port */
+>  static int mvneta_rxq_fill(struct mvneta_port *pp, struct mvneta_rx_queue *rxq,
+>  			   int num)
+> @@ -2716,7 +2781,7 @@ static int mvneta_rxq_fill(struct mvneta_port *pp, struct mvneta_rx_queue *rxq,
+>  
+>  	for (i = 0; i < num; i++) {
+>  		memset(rxq->descs + i, 0, sizeof(struct mvneta_rx_desc));
+> -		if (mvneta_rx_refill(pp, rxq->descs + i) != 0) {
+> +		if (mvneta_rx_refill(pp, rxq->descs + i, rxq) != 0) {
+>  			netdev_err(pp->dev, "%s:rxq %d, %d of %d buffs  filled\n",
+>  				__func__, rxq->id, i, num);
+>  			break;
+> @@ -2784,14 +2849,21 @@ static int mvneta_rxq_init(struct mvneta_port *pp,
+>  		mvneta_rxq_buf_size_set(pp, rxq,
+>  					MVNETA_RX_BUF_SIZE(pp->pkt_size));
+>  		mvneta_rxq_bm_disable(pp, rxq);
+> +
+> +		rxq->buf_virt_addr = devm_kmalloc(pp->dev->dev.parent,
+> +						  rxq->size * sizeof(void *),
+> +						  GFP_KERNEL);
 
-One of those two lines is redundant.
+I would suggest allocate this buffer during probe. Otherwise, there's
+memory leak if we either change the mtu or close then open the eth in
+a loop, e.g
 
-> + 	- GXBB (S905) : "amlogic,meson-gxbb-venc-cvbs"
-> + 	- GXL (S905X, S905D) : "amlogic,meson-gxl-venc-cvbs"
-> + 	- GXM (S912) : "amlogic,meson-gxm-venc-cvbs"
-> +	followed by the common "amlogic,meson-gx-venc-cvbs"
-> +
+while true
+do
+	ifconfig eth0 up
+	ifconfig eth0 down
+done
 
-No registers ? Are the encoders registers part of the VPU register space, 
-intertwined in a way that they can't be specified separately here ?
+Thanks,
+Jisheng
 
-> +- ports: A ports node with endpoint definitions as defined in
-> +  Documentation/devicetree/bindings/media/video-interfaces.txt. The
-> +  first port should be the input endpoints, connected ot the VPU node.
+> +		if (!rxq->buf_virt_addr)
+> +			return -ENOMEM;
 > +
-> +Example:
-> +
-> +venc_cvbs: venc-cvbs {
-> +	compatible = "amlogic,meson-gxbb-venc-cvbs";
-> +	status = "okay";
-> +
-> +	ports {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		enc_cvbs_in: port at 0 {
-> +			 #address-cells = <1>;
-> +			 #size-cells = <0>;
-> +			 reg = <0>;
-> +
-> +			 venc_cvbs_in_vpu: endpoint at 0 {
-> +				 reg = <0>;
-> +				 remote-endpoint = <&vpu_out_venc_cvbs>;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +vpu: vpu at d0100000 {
-> +	compatible = "amlogic,meson-gxbb-vpu";
-> +	reg = <0x0 0xd0100000 0x0 0x100000>,
-> +	      <0x0 0xc883c000 0x0 0x1000>,
-> +	      <0x0 0xc8838000 0x0 0x1000>;
-> +	reg-names = "base", "hhi", "dmc";
-> +	interrupts = <GIC_SPI 3 IRQ_TYPE_EDGE_RISING>;
-> +
-> +	ports {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		vpu_out: port at 1 {
-> +			 #address-cells = <1>;
-> +			 #size-cells = <0>;
-> +			 reg = <1>;
-> +
-> +			 vpu_out_venc_cvbs: endpoint at 0 {
-> +				 reg = <0>;
-> +				 remote-endpoint = <&venc_cvbs_in_vpu>;
-> +			 };
-> +		 };
-> +	};
-> +};
-
--- 
-Regards,
-
-Laurent Pinchart
+> +		mvneta_rxq_fill(pp, rxq, rxq->size);
+>  	} else {
+>  		mvneta_rxq_bm_enable(pp, rxq);
+>  		mvneta_rxq_long_pool_set(pp, rxq);
+>  		mvneta_rxq_short_pool_set(pp, rxq);
+> +		mvneta_rxq_bm_fill(pp, rxq, rxq->size);
+>  	}
+>  
+> -	mvneta_rxq_fill(pp, rxq, rxq->size);
+> -
+>  	return 0;
+>  }
+>  
