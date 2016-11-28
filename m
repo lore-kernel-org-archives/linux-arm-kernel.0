@@ -1,26 +1,35 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Nov 2016 10:37:38 +0000
-Subject: [PATCH] ARM: dts: mvebu: Add Armada 38x labels and clean up
- Turris Omnia
-In-Reply-To: <1480272700-28888-1-git-send-email-afaerber@suse.de>
-References: <1fc18002-0144-8300-1888-09f456860ef0@kleine-koenig.org>
- <1480272700-28888-1-git-send-email-afaerber@suse.de>
-Message-ID: <20161128103738.GT14217@n2100.armlinux.org.uk>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 28 Nov 2016 11:42:18 +0100
+Subject: [RFC PATCH] ARM: dts: sun8i: add simplefb node for H3
+In-Reply-To: <20161128095900.27615-1-icenowy@aosc.xyz>
+References: <20161128095900.27615-1-icenowy@aosc.xyz>
+Message-ID: <20161128114218.14d2ed434802a20fa6b62023@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 27, 2016 at 07:51:39PM +0100, Andreas F?rber wrote:
-> To more consistently reference nodes by label, add labels for sata,
-> usb2, sdhci and usb3 nodes.
-> 
-> Convert all other 38x boards for consistency. Add labels for nfc and rtc.
+On Mon, 28 Nov 2016 17:59:00 +0800
+Icenowy Zheng <icenowy@aosc.xyz> wrote:
 
-Please don't do this for clearfog - there's changes in the pipeline which
-completely replace armada-388-clearfog.dts because there's a "base" and
-"pro" versions of this hardware now, and making such a huge change will
-effectively mean we have to start over with the DT files.
+> As there's currently a fork of U-Boot which provides simplefb support
+> for H3, a simplefb node can be added to the device tree.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+> 
+> I'm still not sure which pipeline should I use.
+> 
+> And, it seems that HDMI Slow Clock is not needed?
+> 
+> (seems that it's only for EDID, but simplefb won't use EDID)
+
+So, I don't see how this may work.
+How can the u-boot know the resolutions of the HDMI display device?
+
+In other words: I have a new H3 board with the last u-boot and kernel.
+I plug my (rather old or brand new) HDMI display device.
+After powering on the system, I hope to get something on the screen.
+How?
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
