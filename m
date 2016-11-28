@@ -1,140 +1,136 @@
-From: sf84@laposte.net (Sebastian Frias)
-Date: Mon, 28 Nov 2016 12:20:42 +0100
-Subject: Adding a .platform_init callback to sdhci_arasan_ops
-In-Reply-To: <2a949ade-edd7-4690-cd6a-434ae1e663dc@intel.com>
-References: <d50dcd8a-2489-4e82-1dc7-13e93e38d5ff@laposte.net>
- <982d633b-e9c4-0f10-052b-e324f094d0f5@xilinx.com>
- <2a949ade-edd7-4690-cd6a-434ae1e663dc@intel.com>
-Message-ID: <66751ab5-59a4-ec30-07cd-44ca03694723@laposte.net>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Mon, 28 Nov 2016 11:22:46 +0000
+Subject: [Qemu-devel] [kvm-unit-tests PATCH v7 03/11] run_tests: allow
+ passing of options to QEMU
+In-Reply-To: <20161128091051.zvtsvoow34b2nd5w@kamzik.brq.redhat.com>
+References: <20161124161033.11456-1-alex.bennee@linaro.org>
+ <20161124161033.11456-4-alex.bennee@linaro.org>
+ <20161128091051.zvtsvoow34b2nd5w@kamzik.brq.redhat.com>
+Message-ID: <877f7nu9vd.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adrian,
 
-On 28/11/16 11:30, Adrian Hunter wrote:
-> On 28/11/16 09:32, Michal Simek wrote:
->> +Sai for Xilinx perspective.
+Andrew Jones <drjones@redhat.com> writes:
+
+> On Thu, Nov 24, 2016 at 04:10:25PM +0000, Alex Benn?e wrote:
+>> This introduces a the option -o for passing of options directly to QEMU
+>> which is useful. In my case I'm using it to toggle MTTCG on an off:
 >>
->> On 25.11.2016 16:24, Sebastian Frias wrote:
->>> Hi,
->>>
->>> When using the Arasan SDHCI HW IP, there is a set of parameters called
->>> "Hardware initialized registers"
->>>
->>> (Table 7, Section "Pin Signals", page 56 of Arasan "SD3.0/SDIO3.0/eMMC4.4
->>> AHB Host Controller", revision 6.0 document)
->>>
->>> In some platforms those signals are connected to registers that need to
->>> be programmed at some point for proper driver/HW initialisation.
->>>
->>> I found that the 'struct sdhci_ops' contains a '.platform_init' callback
->>> that is called from within 'sdhci_pltfm_init', and that seems a good
->>> candidate for a place to program those registers (*).
->>>
->>> Do you agree?
-> 
-> We already killed .platform_init
-
-I just saw that, yet it was the perfect place for the HW initialisation I'm
-talking about.
-Any way we can restore it?
-
-> 
-> What is wrong with sdhci_arasan_probe()?
-
-Well, in 4.7 sdhci_arasan_probe() did not call of_match_device(), so I had
-put a call to it just before sdhci_pltfm_init(), something like:
-
-+static const struct of_device_id sdhci_arasan_of_match[] = {
-+       {
-+               .compatible = "arasan,sdhci-8.9a",
-+               .data = &sdhci_arasan_ops,
-+       },
-+       {
-+               .compatible = "arasan,sdhci-5.1",
-+               .data = &sdhci_arasan_ops,
-+       },
-+       {
-+               .compatible = "arasan,sdhci-4.9a",
-+               .data = &sdhci_arasan_ops,
-+       },
-+       {
-+               .compatible = "sigma,smp8734-sdio",
-+               .data = &sdhci_arasan_tango4_ops,
-+       },
-+       { }
-+};
-+MODULE_DEVICE_TABLE(of, sdhci_arasan_of_match);
-
-...
-
-+       const struct of_device_id *match;
-+
-+       match = of_match_device(sdhci_arasan_of_match, &pdev->dev);
-+       if (match)
-+               sdhci_arasan_pdata.ops = match->data;
-
-where 'sdhci_arasan_tango4_ops' contained a pointer to a .platform_init
-callback.
-
-However, as I stated earlier, an upstream commit:
-
-commit 3ea4666e8d429223fbb39c1dccee7599ef7657d5
-Author: Douglas Anderson <dianders@chromium.org>
-Date:   Mon Jun 20 10:56:47 2016 -0700
-
-    mmc: sdhci-of-arasan: Properly set corecfg_baseclkfreq on rk3399
-
-changed struct 'sdhci_arasan_of_match' to convey different data, which
-means that instead of having a generic way of accessing such data (such
-as 'of_match_device()' and ".data" field), one must also check for
-specific "compatible" strings to make sense of the ".data" field, such as
-"rockchip,rk3399-sdhci-5.1"
-
-With the current code:
-- there's no 'of_match_device()' before 'sdhci_pltfm_init()'
-- the sdhci_pltfm_init() call is made with a static 'sdhci_arasan_pdata'
-struct (so it cannot be made dependent on the "compatible" string).
-- since 'sdhci_arasan_pdata' is the same for all compatible devices, even
-for those that require special handling, more "compatible" matching code is
-required
-- leading to spread "compatible" matching code; IMHO it would be cleaner if
-the 'sdhci_arasan_probe()' code was generic, with just a generic "compatible"
-matching, which then proceeded with specific initialisation and generic
-initialisation.
-
-In a nutshell, IMHO it would be better if adding support for more SoCs only
-involved changing just 'sdhci_arasan_of_match' without the need to change
-'sdhci_arasan_probe()'.
-That would clearly separate the generic and "SoC"-specific code, thus allowing
-better maintenance.
-
-Does that makes sense to you guys?
-
-Best regards,
-
-Sebastian
-
-> 
->>>
->>> Best regards,
->>>
->>> Sebastian
->>>
->>>
->>> (*): This has been prototyped on 4.7 as working properly.
->>> However, upstream commit:
->>>
->>> commit 3ea4666e8d429223fbb39c1dccee7599ef7657d5
->>> Author: Douglas Anderson <dianders@chromium.org>
->>> Date:   Mon Jun 20 10:56:47 2016 -0700
->>>
->>>     mmc: sdhci-of-arasan: Properly set corecfg_baseclkfreq on rk3399
->>> ...
->>>
->>> could affect this solution because of the way the 'sdhci_arasan_of_match'
->>> struct is used after that commit.
->>>
+>>   ./run_tests.sh -t -o "-tcg mttcg=on"
+>>
+>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>> ---
+>>  run_tests.sh           | 10 +++++++---
+>>  scripts/functions.bash | 13 +++++++------
+>>  2 files changed, 14 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/run_tests.sh b/run_tests.sh
+>> index 4f2e5cb..05cc7fb 100755
+>> --- a/run_tests.sh
+>> +++ b/run_tests.sh
+>> @@ -13,10 +13,11 @@ function usage()
+>>  {
+>>  cat <<EOF
+>>
+>> -Usage: $0 [-g group] [-a accel] [-t] [-h] [-v]
+>> +Usage: $0 [-g group] [-a accel] [-o qemu_opts] [-t] [-h] [-v]
+>>
+>>      -g: Only execute tests in the given group
+>>      -a: Force acceleration mode (tcg/kvm)
+>> +    -o: additional options for QEMU command line
+>>      -t: disable timeouts
+>>      -h: Output this help text
+>>      -v: Enables verbose mode
+>> @@ -30,7 +31,7 @@ EOF
+>>  RUNTIME_arch_run="./$TEST_DIR/run"
+>>  source scripts/runtime.bash
+>>
+>> -while getopts "g:a:thv" opt; do
+>> +while getopts "g:a:o:thv" opt; do
+>>      case $opt in
+>>          g)
+>>              only_group=$OPTARG
+>> @@ -38,6 +39,9 @@ while getopts "g:a:thv" opt; do
+>>          a)
+>>              force_accel=$OPTARG
+>>              ;;
+>> +        o)
+>> +            extra_opts=$OPTARG
+>> +            ;;
+>>          t)
+>>              no_timeout="yes"
+>>              ;;
+>> @@ -67,4 +71,4 @@ RUNTIME_log_stdout () {
+>>  config=$TEST_DIR/unittests.cfg
+>>  rm -f test.log
+>>  printf "BUILD_HEAD=$(cat build-head)\n\n" > test.log
+>> -for_each_unittest $config run
+>> +for_each_unittest $config run "$extra_opts"
+>> diff --git a/scripts/functions.bash b/scripts/functions.bash
+>> index ee9143c..d38a69e 100644
+>> --- a/scripts/functions.bash
+>> +++ b/scripts/functions.bash
+>> @@ -2,11 +2,12 @@
+>>  function for_each_unittest()
+>>  {
+>>  	local unittests="$1"
+>> -	local cmd="$2"
+>> -	local testname
+>> +        local cmd="$2"
+>> +        local extra_opts=$3
+>> +        local testname
+>
+> We use tabs in this file. Not sure why cmd and testname got
+> changed too...
+>
+>>  	local smp
+>>  	local kernel
+>> -	local opts
+>> +        local opts=$extra_opts
+>>  	local groups
+>>  	local arch
+>>  	local check
+>> @@ -21,7 +22,7 @@ function for_each_unittest()
+>>  			testname=${BASH_REMATCH[1]}
+>>  			smp=1
+>>  			kernel=""
+>> -			opts=""
+>> +                        opts=$extra_opts
+>>  			groups=""
+>>  			arch=""
+>>  			check=""
+>> @@ -32,7 +33,7 @@ function for_each_unittest()
+>>  		elif [[ $line =~ ^smp\ *=\ *(.*)$ ]]; then
+>>  			smp=${BASH_REMATCH[1]}
+>>  		elif [[ $line =~ ^extra_params\ *=\ *(.*)$ ]]; then
+>> -			opts=${BASH_REMATCH[1]}
+>> +                        opts="$opts ${BASH_REMATCH[1]}"
+>>  		elif [[ $line =~ ^groups\ *=\ *(.*)$ ]]; then
+>>  			groups=${BASH_REMATCH[1]}
+>>  		elif [[ $line =~ ^arch\ *=\ *(.*)$ ]]; then
+>> @@ -45,6 +46,6 @@ function for_each_unittest()
+>>  			timeout=${BASH_REMATCH[1]}
+>>  		fi
+>>  	done
+>> -	"$cmd" "$testname" "$groups" "$smp" "$kernel" "$opts" "$arch" "$check" "$accel" "$timeout"
+>> +        "$cmd" "$testname" "$groups" "$smp" "$kernel" "$opts" "$arch" "$check" "$accel" "$timeout"
+>>  	exec {fd}<&-
+>>  }
+>> --
+>> 2.10.1
 >>
 >>
-> 
+>
+> This is a pretty good idea, but I think I might like the extra options
+> to be given like this instead
+>
+>   ./run_tests.sh [run_tests.sh options] -- [qemu options]
+>
+> Thanks,
+> drew
+
+That sounds like a better way, I'll fix that.
+
+--
+Alex Benn?e
