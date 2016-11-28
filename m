@@ -1,24 +1,21 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 28 Nov 2016 11:08:48 -0800
-Subject: [PATCH 0/2] minor GXL and GXM improvements
-In-Reply-To: <20161123162040.24843-1-martin.blumenstingl@googlemail.com>
- (Martin Blumenstingl's message of "Wed, 23 Nov 2016 17:20:38 +0100")
-References: <20161123162040.24843-1-martin.blumenstingl@googlemail.com>
-Message-ID: <m28ts3toan.fsf@baylibre.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Mon, 28 Nov 2016 14:31:29 -0500
+Subject: [PATCH 0/2] arm64: dts: NS2: Add GICv2m and PAXC
+Message-ID: <1480361491-22221-1-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+Add support for GICv2m and PAXC.  GICv2m was tested on an e1000e
+adapter, with some hacking of the driver to verify MSI and legacy
+interrupts work.
 
-Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+Jon Mason (2):
+  arm64: dts: NS2: enable GICv2m for PAXB/PAXC interfaces
+  arm64: dts: NS2: enable PAXC on NS2 SVK
 
-> This series adds SCPI support to GXL and GXM SoCs by moving the nodes
-> to meson-gx.dtsi. Additionally this updates the compatible string to
-> match the recent changes, see [0]
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts |   4 +
+ arch/arm64/boot/dts/broadcom/ns2.dtsi    | 121 +++++++++++++++++++++++++------
+ 2 files changed, 101 insertions(+), 24 deletions(-)
 
-Can you rebase onto my current v4.10/dt64 branch please?  I have updated
-the compatible string there.
-
-Thanks,
-
-Kevin
+-- 
+2.7.4
