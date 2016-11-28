@@ -1,191 +1,452 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Mon, 28 Nov 2016 17:31:26 +0300
-Subject: [PATCHv2 11/11] clocksource/drivers/rockchip_timer: implement
- clocksource timer
-In-Reply-To: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
-References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1480343486-25539-12-git-send-email-al.kochet@gmail.com>
+From: sf84@laposte.net (Sebastian Frias)
+Date: Mon, 28 Nov 2016 15:39:10 +0100
+Subject: Adding a .platform_init callback to sdhci_arasan_ops
+In-Reply-To: <e32d2a01-ba3c-6127-51ba-a1fd4176e32c@laposte.net>
+References: <d50dcd8a-2489-4e82-1dc7-13e93e38d5ff@laposte.net>
+ <982d633b-e9c4-0f10-052b-e324f094d0f5@xilinx.com>
+ <2a949ade-edd7-4690-cd6a-434ae1e663dc@intel.com>
+ <66751ab5-59a4-ec30-07cd-44ca03694723@laposte.net>
+ <d1801c1e-cd74-b79c-0280-8fb5dc377c91@intel.com>
+ <e32d2a01-ba3c-6127-51ba-a1fd4176e32c@laposte.net>
+Message-ID: <485a747c-47e3-bc0e-093a-4ec9ab719987@laposte.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock supplying the arm-global-timer on the rk3188 is coming from the
-the cpu clock itself and thus changes its rate everytime cpufreq adjusts
-the cpu frequency making this timer unsuitable as a stable clocksource.
+On 28/11/16 14:28, Sebastian Frias wrote:
+> On 28/11/16 12:44, Adrian Hunter wrote:
+>> On 28/11/16 13:20, Sebastian Frias wrote:
+>>> Hi Adrian,
+>>>
+>>> On 28/11/16 11:30, Adrian Hunter wrote:
+>>>> On 28/11/16 09:32, Michal Simek wrote:
+>>>>> +Sai for Xilinx perspective.
+>>>>>
+>>>>> On 25.11.2016 16:24, Sebastian Frias wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> When using the Arasan SDHCI HW IP, there is a set of parameters called
+>>>>>> "Hardware initialized registers"
+>>>>>>
+>>>>>> (Table 7, Section "Pin Signals", page 56 of Arasan "SD3.0/SDIO3.0/eMMC4.4
+>>>>>> AHB Host Controller", revision 6.0 document)
+>>>>>>
+>>>>>> In some platforms those signals are connected to registers that need to
+>>>>>> be programmed at some point for proper driver/HW initialisation.
+>>>>>>
+>>>>>> I found that the 'struct sdhci_ops' contains a '.platform_init' callback
+>>>>>> that is called from within 'sdhci_pltfm_init', and that seems a good
+>>>>>> candidate for a place to program those registers (*).
+>>>>>>
+>>>>>> Do you agree?
+>>>>
+>>>> We already killed .platform_init
+>>>
+>>> I just saw that, yet it was the perfect place for the HW initialisation I'm
+>>> talking about.
+>>> Any way we can restore it?
+>>
+>> It doesn't serve any purpose I am aware of.
+> 
+> It would serve (for me) if it was there :-)
+> 
+>>
+>>>
+>>>>
+>>>> What is wrong with sdhci_arasan_probe()?
+>>>
+>>> Well, in 4.7 sdhci_arasan_probe() did not call of_match_device(), so I had
+>>> put a call to it just before sdhci_pltfm_init(), something like:
+>>>
+>>> +static const struct of_device_id sdhci_arasan_of_match[] = {
+>>> +       {
+>>> +               .compatible = "arasan,sdhci-8.9a",
+>>> +               .data = &sdhci_arasan_ops,
+>>> +       },
+>>> +       {
+>>> +               .compatible = "arasan,sdhci-5.1",
+>>> +               .data = &sdhci_arasan_ops,
+>>> +       },
+>>> +       {
+>>> +               .compatible = "arasan,sdhci-4.9a",
+>>> +               .data = &sdhci_arasan_ops,
+>>> +       },
+>>> +       {
+>>> +               .compatible = "sigma,smp8734-sdio",
+>>> +               .data = &sdhci_arasan_tango4_ops,
+>>> +       },
+>>> +       { }
+>>> +};
+>>> +MODULE_DEVICE_TABLE(of, sdhci_arasan_of_match);
+>>>
+>>> ...
+>>>
+>>> +       const struct of_device_id *match;
+>>> +
+>>> +       match = of_match_device(sdhci_arasan_of_match, &pdev->dev);
+>>> +       if (match)
+>>> +               sdhci_arasan_pdata.ops = match->data;
+>>>
+>>> where 'sdhci_arasan_tango4_ops' contained a pointer to a .platform_init
+>>> callback.
+>>>
+>>> However, as I stated earlier, an upstream commit:
+>>>
+>>> commit 3ea4666e8d429223fbb39c1dccee7599ef7657d5
+>>> Author: Douglas Anderson <dianders@chromium.org>
+>>> Date:   Mon Jun 20 10:56:47 2016 -0700
+>>>
+>>>     mmc: sdhci-of-arasan: Properly set corecfg_baseclkfreq on rk3399
+>>>
+>>> changed struct 'sdhci_arasan_of_match' to convey different data, which
+>>> means that instead of having a generic way of accessing such data (such
+>>> as 'of_match_device()' and ".data" field), one must also check for
+>>> specific "compatible" strings to make sense of the ".data" field, such as
+>>> "rockchip,rk3399-sdhci-5.1"
+>>>
+>>> With the current code:
+>>> - there's no 'of_match_device()' before 'sdhci_pltfm_init()'
+>>> - the sdhci_pltfm_init() call is made with a static 'sdhci_arasan_pdata'
+>>> struct (so it cannot be made dependent on the "compatible" string).
+>>> - since 'sdhci_arasan_pdata' is the same for all compatible devices, even
+>>> for those that require special handling, more "compatible" matching code is
+>>> required
+>>> - leading to spread "compatible" matching code; IMHO it would be cleaner if
+>>> the 'sdhci_arasan_probe()' code was generic, with just a generic "compatible"
+>>> matching, which then proceeded with specific initialisation and generic
+>>> initialisation.
+>>>
+>>> In a nutshell, IMHO it would be better if adding support for more SoCs only
+>>> involved changing just 'sdhci_arasan_of_match' without the need to change
+>>> 'sdhci_arasan_probe()'.
+>>> That would clearly separate the generic and "SoC"-specific code, thus allowing
+>>> better maintenance.
+>>>
+>>> Does that makes sense to you guys?
+>>
+>> If you want to do that, then why not define your match data with your own
+>> callbacks. e.g. something like
+>>
+>> struct sdhci_arasan_of_data {
+>> 	struct sdhci_arasan_soc_ctl_map *soc_ctl_map;
+>> 	void (*platform_init)(struct sdhci_arasan_data *sdhci_arasan);
+>> };
+>>
+>> 	struct sdhci_arasan_of_data *data;
+>>
+>> 	data = match->data;
+>> 	sdhci_arasan->soc_ctl_map = data->soc_ctl_map;
+>> 	if (data->platform_init)
+>> 		platform_init(sdhci_arasan);
+> 
+> Well, that adds a level in the hierarchy, but here is what it would look like:
+> 
+> 
+> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+> index 410a55b..1cb3861 100644
+> --- a/drivers/mmc/host/sdhci-of-arasan.c
+> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> @@ -382,22 +382,6 @@ static int sdhci_arasan_resume(struct device *dev)
+>  static SIMPLE_DEV_PM_OPS(sdhci_arasan_dev_pm_ops, sdhci_arasan_suspend,
+>  			 sdhci_arasan_resume);
+>  
+> -static const struct of_device_id sdhci_arasan_of_match[] = {
+> -	/* SoC-specific compatible strings w/ soc_ctl_map */
+> -	{
+> -		.compatible = "rockchip,rk3399-sdhci-5.1",
+> -		.data = &rk3399_soc_ctl_map,
+> -	},
+> -
+> -	/* Generic compatible below here */
+> -	{ .compatible = "arasan,sdhci-8.9a" },
+> -	{ .compatible = "arasan,sdhci-5.1" },
+> -	{ .compatible = "arasan,sdhci-4.9a" },
+> -
+> -	{ /* sentinel */ }
+> -};
+> -MODULE_DEVICE_TABLE(of, sdhci_arasan_of_match);
+> -
+>  /**
+>   * sdhci_arasan_sdcardclk_recalc_rate - Return the card clock rate
+>   *
+> @@ -578,6 +562,53 @@ static void sdhci_arasan_unregister_sdclk(struct device *dev)
+>  	of_clk_del_provider(dev->of_node);
+>  }
+>  
+> +static void sdhci_tango4_platform_init(struct sdhci_host *host)
+> +{
+> +	printk("%s\n", __func__);
+> +
+> +	/*
+> +	  pad_mode[2:0]=0    must be 0
+> +	  sel_sdio[3]=1      must be 1 for SDIO
+> +	  inv_sdwp_pol[4]=0  if set inverts the SD write protect polarity
+> +	  inv_sdcd_pol[5]=0  if set inverts the SD card present polarity
+> +	*/
+> +	sdhci_writel(host, 0x00000008, 0x100 + 0x0);
+> +}
+> +
+> +struct sdhci_arasan_chip_specific_data {
+> +	const struct sdhci_arasan_soc_ctl_map *soc_ctl_map;
+> +	void (*platform_init)(struct sdhci_host *host);
+> +};
+> +
+> +static const struct sdhci_arasan_chip_specific_data sdhci_arasan_rockchip = {
+> +	.soc_ctl_map = &rk3399_soc_ctl_map,
+> +};
+> +
+> +static const struct sdhci_arasan_chip_specific_data sdhci_arasan_sigma = {
+> +	.platform_init = sdhci_tango4_platform_init,
+> +};
+> +
+> +static const struct of_device_id sdhci_arasan_of_match[] = {
+> +	/* SoC-specific compatible strings w/ soc_ctl_map */
+> +	{
+> +		.compatible = "rockchip,rk3399-sdhci-5.1",
+> +		.data = &sdhci_arasan_rockchip,
+> +	},
+> +	{
+> +		.compatible = "sigma,sdio-v1",
+> +		.data = &sdhci_arasan_sigma,
+> +	},
+> +
+> +	/* Generic compatible below here */
+> +	{ .compatible = "arasan,sdhci-8.9a" },
+> +	{ .compatible = "arasan,sdhci-5.1" },
+> +	{ .compatible = "arasan,sdhci-4.9a" },
+> +
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, sdhci_arasan_of_match);
+> +
+> +
+>  static int sdhci_arasan_probe(struct platform_device *pdev)
+>  {
+>  	int ret;
+> @@ -587,6 +618,7 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>  	struct sdhci_host *host;
+>  	struct sdhci_pltfm_host *pltfm_host;
+>  	struct sdhci_arasan_data *sdhci_arasan;
+> +	struct sdhci_arasan_chip_specific_data *sdhci_arasan_chip_specific;
+>  	struct device_node *np = pdev->dev.of_node;
+>  
+>  	host = sdhci_pltfm_init(pdev, &sdhci_arasan_pdata,
+> @@ -599,7 +631,11 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>  	sdhci_arasan->host = host;
+>  
+>  	match = of_match_node(sdhci_arasan_of_match, pdev->dev.of_node);
+> -	sdhci_arasan->soc_ctl_map = match->data;
+> +	sdhci_arasan_chip_specific = (struct sdhci_arasan_chip_specific_data *)match;
+> +	if (sdhci_arasan_chip_specific->soc_ctl_map)
+> +		sdhci_arasan->soc_ctl_map = sdhci_arasan_chip_specific->soc_ctl_map;
+> +	if (sdhci_arasan_chip_specific->platform_init)
+> +		sdhci_arasan_chip_specific->platform_init(host);
+>  
+>  	node = of_parse_phandle(pdev->dev.of_node, "arasan,soc-ctl-syscon", 0);
+>  	if (node) {
+> 
+> 
+> I will try to send another patch with what a different approach
+> 
 
-The rk3188, rk3288 and following socs share a separate timer block already
-handled by the rockchip-timer driver. Therefore adapt this driver to also
-be able to act as clocksource on rk3188.
+Here's a different approach (I just tested that it built, because I don't have the
+rk3399 platform):
 
-In order to test clocksource you can run following commands and check
-how much time it take in real. On rk3188 it take about ~45 seconds.
-Such error cannot be fixed using NTP. Haven't test clocksource
-on rk3288 and onwards. Guess they can also have unstable clocksource.
-
-    cpufreq-set -f 1.6GHZ
-    date; sleep 60; date
-
-In order to use the patch you need to declare two timers in the dts
-file. The first timer will be initialized as clockevent provider
-and the second one as clocksource. The clockevent must be from
-alive subsystem as it used as backup for the local timers at sleep
-time.
-
-In order to resolve ambiguity between timers in the device tree,
-it is possible to correctly number the timers using "aliases" node.
-
-The patch does not break compatibility with older device tree files.
-The older device tree files contain only one timer. The timer
-will be initialized as clockevent, as expected.
-
-Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
----
- drivers/clocksource/rockchip_timer.c |  101 ++++++++++++++++++++++++++++------
- 1 file changed, 85 insertions(+), 16 deletions(-)
-
-diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
-index 6224aa9..430b182 100644
---- a/drivers/clocksource/rockchip_timer.c
-+++ b/drivers/clocksource/rockchip_timer.c
-@@ -11,6 +11,7 @@
- #include <linux/clockchips.h>
- #include <linux/init.h>
- #include <linux/interrupt.h>
-+#include <linux/sched_clock.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-@@ -42,7 +43,19 @@ struct rk_clock_event_device {
- 	struct rk_timer timer;
- };
+diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+index 410a55b..5be6e67 100644
+--- a/drivers/mmc/host/sdhci-of-arasan.c
++++ b/drivers/mmc/host/sdhci-of-arasan.c
+@@ -382,22 +382,6 @@ static int sdhci_arasan_resume(struct device *dev)
+ static SIMPLE_DEV_PM_OPS(sdhci_arasan_dev_pm_ops, sdhci_arasan_suspend,
+ 			 sdhci_arasan_resume);
  
-+struct rk_clocksource {
-+	struct clocksource cs;
-+	struct rk_timer timer;
-+};
-+
-+enum {
-+	ROCKCHIP_CLKSRC_CLOCKEVENT = 0,
-+	ROCKCHIP_CLKSRC_CLOCKSOURCE = 1,
-+};
-+
- static struct rk_clock_event_device bc_timer;
-+static struct rk_clocksource cs_timer;
-+static int rk_next_clksrc = ROCKCHIP_CLKSRC_CLOCKEVENT;
- 
- static inline struct rk_clock_event_device*
- rk_clock_event_device(struct clock_event_device *ce)
-@@ -143,13 +156,46 @@ static irqreturn_t rk_timer_interrupt(int irq, void *dev_id)
- 	return IRQ_HANDLED;
+-static const struct of_device_id sdhci_arasan_of_match[] = {
+-	/* SoC-specific compatible strings w/ soc_ctl_map */
+-	{
+-		.compatible = "rockchip,rk3399-sdhci-5.1",
+-		.data = &rk3399_soc_ctl_map,
+-	},
+-
+-	/* Generic compatible below here */
+-	{ .compatible = "arasan,sdhci-8.9a" },
+-	{ .compatible = "arasan,sdhci-5.1" },
+-	{ .compatible = "arasan,sdhci-4.9a" },
+-
+-	{ /* sentinel */ }
+-};
+-MODULE_DEVICE_TABLE(of, sdhci_arasan_of_match);
+-
+ /**
+  * sdhci_arasan_sdcardclk_recalc_rate - Return the card clock rate
+  *
+@@ -578,28 +562,18 @@ static void sdhci_arasan_unregister_sdclk(struct device *dev)
+ 	of_clk_del_provider(dev->of_node);
  }
  
-+static cycle_t rk_timer_clocksource_read(struct clocksource *cs)
-+{
-+	struct rk_clocksource *_cs =
-+		container_of(cs, struct rk_clocksource, cs);
-+
-+	return ~rk_timer_counter_read(&_cs->timer);
-+}
-+
-+static u64 notrace rk_timer_sched_clock_read(void)
-+{
-+	struct rk_clocksource *_cs = &cs_timer;
-+
-+	return ~rk_timer_counter_read(&_cs->timer);
-+}
-+
- static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
+-static int sdhci_arasan_probe(struct platform_device *pdev)
++static int sdhci_rockchip_platform_init(struct sdhci_host *host,
++					struct platform_device *pdev)
  {
--	struct clock_event_device *ce = &bc_timer.ce;
--	struct rk_timer *timer = &bc_timer.timer;
-+	struct clock_event_device *ce = NULL;
-+	struct clocksource *cs = NULL;
-+	struct rk_timer *timer = NULL;
- 	struct clk *timer_clk;
- 	struct clk *pclk;
- 	int ret = -EINVAL, irq;
-+	int clksrc;
-+
-+	clksrc = rk_next_clksrc;
-+	rk_next_clksrc++;
-+
-+	switch (clksrc) {
-+	case ROCKCHIP_CLKSRC_CLOCKEVENT:
-+		ce = &bc_timer.ce;
-+		timer = &bc_timer.timer;
-+		break;
-+	case ROCKCHIP_CLKSRC_CLOCKSOURCE:
-+		cs = &cs_timer.cs;
-+		timer = &cs_timer.timer;
-+		break;
-+	default:
-+		return -ENODEV;
-+	}
+ 	int ret;
+-	const struct of_device_id *match;
+ 	struct device_node *node;
+-	struct clk *clk_xin;
+-	struct sdhci_host *host;
+ 	struct sdhci_pltfm_host *pltfm_host;
+ 	struct sdhci_arasan_data *sdhci_arasan;
+-	struct device_node *np = pdev->dev.of_node;
+-
+-	host = sdhci_pltfm_init(pdev, &sdhci_arasan_pdata,
+-				sizeof(*sdhci_arasan));
+-	if (IS_ERR(host))
+-		return PTR_ERR(host);
  
- 	timer->base = of_iomap(np, 0);
- 	if (!timer->base) {
-@@ -193,26 +239,49 @@ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
- 		goto out_irq;
+ 	pltfm_host = sdhci_priv(host);
+ 	sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+-	sdhci_arasan->host = host;
+ 
+-	match = of_match_node(sdhci_arasan_of_match, pdev->dev.of_node);
+-	sdhci_arasan->soc_ctl_map = match->data;
++	sdhci_arasan->soc_ctl_map = &rk3399_soc_ctl_map;
+ 
+ 	node = of_parse_phandle(pdev->dev.of_node, "arasan,soc-ctl-syscon", 0);
+ 	if (node) {
+@@ -611,10 +585,107 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+ 			if (ret != -EPROBE_DEFER)
+ 				dev_err(&pdev->dev, "Can't get syscon: %d\n",
+ 					ret);
+-			goto err_pltfm_free;
++			return -1;
+ 		}
  	}
  
--	ce->name = TIMER_NAME;
--	ce->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
--		       CLOCK_EVT_FEAT_DYNIRQ;
--	ce->set_next_event = rk_timer_set_next_event;
--	ce->set_state_shutdown = rk_timer_shutdown;
--	ce->set_state_periodic = rk_timer_set_periodic;
--	ce->irq = irq;
--	ce->cpumask = cpu_possible_mask;
--	ce->rating = 250;
-+	if (ce) {
-+		ce->name = TIMER_NAME;
-+		ce->features = CLOCK_EVT_FEAT_PERIODIC |
-+			       CLOCK_EVT_FEAT_ONESHOT |
-+			       CLOCK_EVT_FEAT_DYNIRQ;
-+		ce->set_next_event = rk_timer_set_next_event;
-+		ce->set_state_shutdown = rk_timer_shutdown;
-+		ce->set_state_periodic = rk_timer_set_periodic;
-+		ce->irq = irq;
-+		ce->cpumask = cpu_possible_mask;
-+		ce->rating = 250;
++	if (of_property_read_bool(pdev->dev.of_node, "xlnx,fails-without-test-cd"))
++		sdhci_arasan->quirks |= SDHCI_ARASAN_QUIRK_FORCE_CDTEST;
++
++	return 0;
++}
++
++static int sdhci_rockchip_clock_init(struct sdhci_host *host,
++					struct platform_device *pdev)
++{
++	struct sdhci_pltfm_host *pltfm_host;
++	struct sdhci_arasan_data *sdhci_arasan;
++
++	pltfm_host = sdhci_priv(host);
++	sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
++
++	if (of_device_is_compatible(pdev->dev.of_node,
++				    "rockchip,rk3399-sdhci-5.1"))
++		sdhci_arasan_update_clockmultiplier(host, 0x0);
++
++	sdhci_arasan_update_baseclkfreq(host);
++
++	return sdhci_arasan_register_sdclk(sdhci_arasan, pltfm_host->clk, &pdev->dev);
++}
++
++static int sdhci_tango_platform_init(struct sdhci_host *host,
++				     struct platform_device *pdev)
++{
++	return 0;
++}
++
++/* Chip-specific ops */
++struct sdhci_arasan_cs_ops {
++	int (*platform_init)(struct sdhci_host *host,
++			     struct platform_device *pdev);
++	int (*clock_init)(struct sdhci_host *host,
++			  struct platform_device *pdev);
++};
++
++static const struct sdhci_arasan_cs_ops sdhci_rockchip_cs_ops = {
++	.platform_init = sdhci_rockchip_platform_init,
++	.clock_init = sdhci_rockchip_clock_init,
++};
++
++static const struct sdhci_arasan_cs_ops sdhci_tango_cs_ops = {
++	.platform_init = sdhci_tango_platform_init,
++};
++
++static const struct of_device_id sdhci_arasan_of_match[] = {
++	/* SoC-specific compatible strings */
++	{
++		.compatible = "rockchip,rk3399-sdhci-5.1",
++		.data = &sdhci_rockchip_cs_ops,
++	},
++	{
++		.compatible = "sigma,sdio-v1",
++		.data = &sdhci_tango_cs_ops,
++	},
++
++	/* Generic compatible below here */
++	{ .compatible = "arasan,sdhci-8.9a" },
++	{ .compatible = "arasan,sdhci-5.1" },
++	{ .compatible = "arasan,sdhci-4.9a" },
++
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, sdhci_arasan_of_match);
++
++static int sdhci_arasan_probe(struct platform_device *pdev)
++{
++	int ret;
++	const struct of_device_id *match;
++	struct clk *clk_xin;
++	struct sdhci_host *host;
++	struct sdhci_pltfm_host *pltfm_host;
++	struct sdhci_arasan_data *sdhci_arasan;
++	const struct sdhci_arasan_cs_ops *cs_ops;
++
++	host = sdhci_pltfm_init(pdev, &sdhci_arasan_pdata,
++				sizeof(*sdhci_arasan));
++	if (IS_ERR(host))
++		return PTR_ERR(host);
++
++	pltfm_host = sdhci_priv(host);
++	sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
++	sdhci_arasan->host = host;
++
++	match = of_match_device(sdhci_arasan_of_match, &pdev->dev);
++	if (match)
++		cs_ops = match->data;
++
++	/* SoC-specific platform init */
++	if (cs_ops && cs_ops->platform_init) {
++		ret = cs_ops->platform_init(host, pdev);
++		if (ret)
++			goto err_pltfm_free;
 +	}
 +
-+	if (cs) {
-+		cs->name = TIMER_NAME;
-+		cs->flags = CLOCK_SOURCE_IS_CONTINUOUS;
-+		cs->mask = CLOCKSOURCE_MASK(64);
-+		cs->read = rk_timer_clocksource_read;
-+		cs->rating = 350;
-+	}
- 
- 	rk_timer_interrupt_clear(timer);
- 	rk_timer_disable(timer);
- 
--	ret = request_irq(irq, rk_timer_interrupt, IRQF_TIMER, TIMER_NAME, ce);
--	if (ret) {
--		pr_err("Failed to initialize '%s': %d\n", TIMER_NAME, ret);
--		goto out_irq;
-+	if (ce) {
-+		ret = request_irq(irq, rk_timer_interrupt, IRQF_TIMER,
-+				  TIMER_NAME, ce);
-+		if (ret) {
-+			pr_err("Failed to initialize '%s': %d\n",
-+				TIMER_NAME, ret);
-+			goto out_irq;
-+		}
-+
-+		clockevents_config_and_register(ce, timer->freq, 1, UINT_MAX);
+ 	sdhci_arasan->clk_ahb = devm_clk_get(&pdev->dev, "clk_ahb");
+ 	if (IS_ERR(sdhci_arasan->clk_ahb)) {
+ 		dev_err(&pdev->dev, "clk_ahb clock not found.\n");
+@@ -642,21 +713,14 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
  	}
  
--	clockevents_config_and_register(ce, timer->freq, 1, UINT_MAX);
-+	if (cs) {
-+		rk_timer_update_counter(U64_MAX, timer);
-+		rk_timer_enable(timer, 0);
-+		clocksource_register_hz(cs, timer->freq);
-+		sched_clock_register(rk_timer_sched_clock_read, 64,
-+				     timer->freq);
+ 	sdhci_get_of_property(pdev);
+-
+-	if (of_property_read_bool(np, "xlnx,fails-without-test-cd"))
+-		sdhci_arasan->quirks |= SDHCI_ARASAN_QUIRK_FORCE_CDTEST;
+-
+ 	pltfm_host->clk = clk_xin;
+ 
+-	if (of_device_is_compatible(pdev->dev.of_node,
+-				    "rockchip,rk3399-sdhci-5.1"))
+-		sdhci_arasan_update_clockmultiplier(host, 0x0);
+-
+-	sdhci_arasan_update_baseclkfreq(host);
+-
+-	ret = sdhci_arasan_register_sdclk(sdhci_arasan, clk_xin, &pdev->dev);
+-	if (ret)
+-		goto clk_disable_all;
++	/* SoC-specific clock init */
++	if (cs_ops && cs_ops->clock_init) {
++		ret = cs_ops->clock_init(host, pdev);
++		if (ret)
++			goto clk_disable_all;
 +	}
  
- 	return 0;
- 
--- 
-1.7.9.5
+ 	ret = mmc_of_parse(host->mmc);
+ 	if (ret) {
+
+
+If you are ok with it I can clean it up to submit it properly.
