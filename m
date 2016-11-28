@@ -1,35 +1,39 @@
-From: jesper.nilsson@axis.com (Jesper Nilsson)
-Date: Mon, 28 Nov 2016 14:51:11 +0100
-Subject: [GIT PULL]: ARM ARTPEC changes for 4.10
-In-Reply-To: <10339600.mZlnsf0Sve@wuerfel>
-References: <20161110150930.GB19804@axis.com> <5317474.MXurzNW7Do@wuerfel>
- <20161128123331.GO19016@axis.com> <10339600.mZlnsf0Sve@wuerfel>
-Message-ID: <20161128135111.GP19016@axis.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 28 Nov 2016 13:57:11 +0000
+Subject: [PATCH 1/2] bus: vexpress-config: fix device reference leak
+In-Reply-To: <1479317491-7435-1-git-send-email-sudeep.holla@arm.com>
+References: <1479317491-7435-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <96487a8e-237c-9cb0-8cdf-fd6f82ab4a43@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2016 at 01:57:10PM +0100, Arnd Bergmann wrote:
-> On Monday, November 28, 2016 1:33:31 PM CET Jesper Nilsson wrote:
-> > > Hi Jesper and Niklas,
-> > > 
-> > > I just found the old pull request while going through my mail backlog.
-> > > 
-> > > A few things for you to remember for next time:
-> > > 
-> > > - please send pull requests "To: arm at kernel.org" so we know they
-> > >   are destined for arm-soc
-> > 
-> > Ok, should we add that in the MAINTAINERS file so we can
-> > get it automatically from get_maintainer?
-> 
-> No, we don't want to get every single patch that people submit to
-> platform maintainers, only the consolidated pull requests that you
-> send.
 
-Right, sounds reasonable, will do.
 
-> 	Arnd
+On 16/11/16 17:31, Sudeep Holla wrote:
+> From: Johan Hovold <johan@kernel.org>
+>
+> Make sure to drop the reference to the parent device taken by
+> class_find_device() after populating the bus.
+>
+> Fixes: 3b9334ac835b ("mfd: vexpress: Convert custom func API to regmap")
+> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> Signed-off-by: Johan Hovold <johan@kernel.org>
+> ---
+>  drivers/bus/vexpress-config.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+>
+> Hi ARM-SoC team,
+>
+> I am not sure if these couple of patches can be considered as fixes for
+> v4.9. I will leave that to you guys.
+>
+> Can you pick these couple of patches directly either for v4.9 or v4.10 ?
+> I am trying to avoid single patch pull requests here. Let me know if
+> you prefer PR instead.
+>
 
-/^JN - Jesper Nilsson
+Gentle ping. It need not go into v4.9. Please pick them for v4.10
+
 -- 
-               Jesper Nilsson -- jesper.nilsson at axis.com
+Regards,
+Sudeep
