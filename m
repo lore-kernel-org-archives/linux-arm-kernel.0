@@ -1,246 +1,41 @@
-From: sf84@laposte.net (Sebastian Frias)
-Date: Mon, 28 Nov 2016 14:28:13 +0100
-Subject: Adding a .platform_init callback to sdhci_arasan_ops
-In-Reply-To: <d1801c1e-cd74-b79c-0280-8fb5dc377c91@intel.com>
-References: <d50dcd8a-2489-4e82-1dc7-13e93e38d5ff@laposte.net>
- <982d633b-e9c4-0f10-052b-e324f094d0f5@xilinx.com>
- <2a949ade-edd7-4690-cd6a-434ae1e663dc@intel.com>
- <66751ab5-59a4-ec30-07cd-44ca03694723@laposte.net>
- <d1801c1e-cd74-b79c-0280-8fb5dc377c91@intel.com>
-Message-ID: <e32d2a01-ba3c-6127-51ba-a1fd4176e32c@laposte.net>
+From: vbabka@suse.cz (Vlastimil Babka)
+Date: Mon, 28 Nov 2016 14:29:03 +0100
+Subject: [PATCH v2 1/6] mm: hugetlb: rename some allocation functions
+In-Reply-To: <1479107259-2011-2-git-send-email-shijie.huang@arm.com>
+References: <1479107259-2011-1-git-send-email-shijie.huang@arm.com>
+ <1479107259-2011-2-git-send-email-shijie.huang@arm.com>
+Message-ID: <52b661c9-f4b0-3d94-cf9b-a0ffd5ecb723@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/11/16 12:44, Adrian Hunter wrote:
-> On 28/11/16 13:20, Sebastian Frias wrote:
->> Hi Adrian,
->>
->> On 28/11/16 11:30, Adrian Hunter wrote:
->>> On 28/11/16 09:32, Michal Simek wrote:
->>>> +Sai for Xilinx perspective.
->>>>
->>>> On 25.11.2016 16:24, Sebastian Frias wrote:
->>>>> Hi,
->>>>>
->>>>> When using the Arasan SDHCI HW IP, there is a set of parameters called
->>>>> "Hardware initialized registers"
->>>>>
->>>>> (Table 7, Section "Pin Signals", page 56 of Arasan "SD3.0/SDIO3.0/eMMC4.4
->>>>> AHB Host Controller", revision 6.0 document)
->>>>>
->>>>> In some platforms those signals are connected to registers that need to
->>>>> be programmed at some point for proper driver/HW initialisation.
->>>>>
->>>>> I found that the 'struct sdhci_ops' contains a '.platform_init' callback
->>>>> that is called from within 'sdhci_pltfm_init', and that seems a good
->>>>> candidate for a place to program those registers (*).
->>>>>
->>>>> Do you agree?
->>>
->>> We already killed .platform_init
->>
->> I just saw that, yet it was the perfect place for the HW initialisation I'm
->> talking about.
->> Any way we can restore it?
-> 
-> It doesn't serve any purpose I am aware of.
+On 11/14/2016 08:07 AM, Huang Shijie wrote:
+> After a future patch, the __alloc_buddy_huge_page() will not necessarily
+> use the buddy allocator.
+>
+> So this patch removes the "buddy" from these functions:
+> 	__alloc_buddy_huge_page -> __alloc_huge_page
+> 	__alloc_buddy_huge_page_no_mpol -> __alloc_huge_page_no_mpol
+> 	__alloc_buddy_huge_page_with_mpol -> __alloc_huge_page_with_mpol
+>
+> This patch makes preparation for the later patch.
+>
+> Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+> ---
+>  mm/hugetlb.c | 24 ++++++++++++++----------
+>  1 file changed, 14 insertions(+), 10 deletions(-)
+>
+> diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+> index 3edb759..496b703 100644
+> --- a/mm/hugetlb.c
+> +++ b/mm/hugetlb.c
+> @@ -1157,6 +1157,10 @@ static int alloc_fresh_gigantic_page(struct hstate *h,
+>
+>  static inline bool gigantic_page_supported(void) { return true; }
+>  #else
+> +static inline struct page *alloc_gigantic_page(int nid, unsigned int order)
+> +{
+> +	return NULL;
+> +}
 
-It would serve (for me) if it was there :-)
-
-> 
->>
->>>
->>> What is wrong with sdhci_arasan_probe()?
->>
->> Well, in 4.7 sdhci_arasan_probe() did not call of_match_device(), so I had
->> put a call to it just before sdhci_pltfm_init(), something like:
->>
->> +static const struct of_device_id sdhci_arasan_of_match[] = {
->> +       {
->> +               .compatible = "arasan,sdhci-8.9a",
->> +               .data = &sdhci_arasan_ops,
->> +       },
->> +       {
->> +               .compatible = "arasan,sdhci-5.1",
->> +               .data = &sdhci_arasan_ops,
->> +       },
->> +       {
->> +               .compatible = "arasan,sdhci-4.9a",
->> +               .data = &sdhci_arasan_ops,
->> +       },
->> +       {
->> +               .compatible = "sigma,smp8734-sdio",
->> +               .data = &sdhci_arasan_tango4_ops,
->> +       },
->> +       { }
->> +};
->> +MODULE_DEVICE_TABLE(of, sdhci_arasan_of_match);
->>
->> ...
->>
->> +       const struct of_device_id *match;
->> +
->> +       match = of_match_device(sdhci_arasan_of_match, &pdev->dev);
->> +       if (match)
->> +               sdhci_arasan_pdata.ops = match->data;
->>
->> where 'sdhci_arasan_tango4_ops' contained a pointer to a .platform_init
->> callback.
->>
->> However, as I stated earlier, an upstream commit:
->>
->> commit 3ea4666e8d429223fbb39c1dccee7599ef7657d5
->> Author: Douglas Anderson <dianders@chromium.org>
->> Date:   Mon Jun 20 10:56:47 2016 -0700
->>
->>     mmc: sdhci-of-arasan: Properly set corecfg_baseclkfreq on rk3399
->>
->> changed struct 'sdhci_arasan_of_match' to convey different data, which
->> means that instead of having a generic way of accessing such data (such
->> as 'of_match_device()' and ".data" field), one must also check for
->> specific "compatible" strings to make sense of the ".data" field, such as
->> "rockchip,rk3399-sdhci-5.1"
->>
->> With the current code:
->> - there's no 'of_match_device()' before 'sdhci_pltfm_init()'
->> - the sdhci_pltfm_init() call is made with a static 'sdhci_arasan_pdata'
->> struct (so it cannot be made dependent on the "compatible" string).
->> - since 'sdhci_arasan_pdata' is the same for all compatible devices, even
->> for those that require special handling, more "compatible" matching code is
->> required
->> - leading to spread "compatible" matching code; IMHO it would be cleaner if
->> the 'sdhci_arasan_probe()' code was generic, with just a generic "compatible"
->> matching, which then proceeded with specific initialisation and generic
->> initialisation.
->>
->> In a nutshell, IMHO it would be better if adding support for more SoCs only
->> involved changing just 'sdhci_arasan_of_match' without the need to change
->> 'sdhci_arasan_probe()'.
->> That would clearly separate the generic and "SoC"-specific code, thus allowing
->> better maintenance.
->>
->> Does that makes sense to you guys?
-> 
-> If you want to do that, then why not define your match data with your own
-> callbacks. e.g. something like
-> 
-> struct sdhci_arasan_of_data {
-> 	struct sdhci_arasan_soc_ctl_map *soc_ctl_map;
-> 	void (*platform_init)(struct sdhci_arasan_data *sdhci_arasan);
-> };
-> 
-> 	struct sdhci_arasan_of_data *data;
-> 
-> 	data = match->data;
-> 	sdhci_arasan->soc_ctl_map = data->soc_ctl_map;
-> 	if (data->platform_init)
-> 		platform_init(sdhci_arasan);
-
-Well, that adds a level in the hierarchy, but here is what it would look like:
-
-
-diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-index 410a55b..1cb3861 100644
---- a/drivers/mmc/host/sdhci-of-arasan.c
-+++ b/drivers/mmc/host/sdhci-of-arasan.c
-@@ -382,22 +382,6 @@ static int sdhci_arasan_resume(struct device *dev)
- static SIMPLE_DEV_PM_OPS(sdhci_arasan_dev_pm_ops, sdhci_arasan_suspend,
- 			 sdhci_arasan_resume);
- 
--static const struct of_device_id sdhci_arasan_of_match[] = {
--	/* SoC-specific compatible strings w/ soc_ctl_map */
--	{
--		.compatible = "rockchip,rk3399-sdhci-5.1",
--		.data = &rk3399_soc_ctl_map,
--	},
--
--	/* Generic compatible below here */
--	{ .compatible = "arasan,sdhci-8.9a" },
--	{ .compatible = "arasan,sdhci-5.1" },
--	{ .compatible = "arasan,sdhci-4.9a" },
--
--	{ /* sentinel */ }
--};
--MODULE_DEVICE_TABLE(of, sdhci_arasan_of_match);
--
- /**
-  * sdhci_arasan_sdcardclk_recalc_rate - Return the card clock rate
-  *
-@@ -578,6 +562,53 @@ static void sdhci_arasan_unregister_sdclk(struct device *dev)
- 	of_clk_del_provider(dev->of_node);
- }
- 
-+static void sdhci_tango4_platform_init(struct sdhci_host *host)
-+{
-+	printk("%s\n", __func__);
-+
-+	/*
-+	  pad_mode[2:0]=0    must be 0
-+	  sel_sdio[3]=1      must be 1 for SDIO
-+	  inv_sdwp_pol[4]=0  if set inverts the SD write protect polarity
-+	  inv_sdcd_pol[5]=0  if set inverts the SD card present polarity
-+	*/
-+	sdhci_writel(host, 0x00000008, 0x100 + 0x0);
-+}
-+
-+struct sdhci_arasan_chip_specific_data {
-+	const struct sdhci_arasan_soc_ctl_map *soc_ctl_map;
-+	void (*platform_init)(struct sdhci_host *host);
-+};
-+
-+static const struct sdhci_arasan_chip_specific_data sdhci_arasan_rockchip = {
-+	.soc_ctl_map = &rk3399_soc_ctl_map,
-+};
-+
-+static const struct sdhci_arasan_chip_specific_data sdhci_arasan_sigma = {
-+	.platform_init = sdhci_tango4_platform_init,
-+};
-+
-+static const struct of_device_id sdhci_arasan_of_match[] = {
-+	/* SoC-specific compatible strings w/ soc_ctl_map */
-+	{
-+		.compatible = "rockchip,rk3399-sdhci-5.1",
-+		.data = &sdhci_arasan_rockchip,
-+	},
-+	{
-+		.compatible = "sigma,sdio-v1",
-+		.data = &sdhci_arasan_sigma,
-+	},
-+
-+	/* Generic compatible below here */
-+	{ .compatible = "arasan,sdhci-8.9a" },
-+	{ .compatible = "arasan,sdhci-5.1" },
-+	{ .compatible = "arasan,sdhci-4.9a" },
-+
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, sdhci_arasan_of_match);
-+
-+
- static int sdhci_arasan_probe(struct platform_device *pdev)
- {
- 	int ret;
-@@ -587,6 +618,7 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
- 	struct sdhci_host *host;
- 	struct sdhci_pltfm_host *pltfm_host;
- 	struct sdhci_arasan_data *sdhci_arasan;
-+	struct sdhci_arasan_chip_specific_data *sdhci_arasan_chip_specific;
- 	struct device_node *np = pdev->dev.of_node;
- 
- 	host = sdhci_pltfm_init(pdev, &sdhci_arasan_pdata,
-@@ -599,7 +631,11 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
- 	sdhci_arasan->host = host;
- 
- 	match = of_match_node(sdhci_arasan_of_match, pdev->dev.of_node);
--	sdhci_arasan->soc_ctl_map = match->data;
-+	sdhci_arasan_chip_specific = (struct sdhci_arasan_chip_specific_data *)match;
-+	if (sdhci_arasan_chip_specific->soc_ctl_map)
-+		sdhci_arasan->soc_ctl_map = sdhci_arasan_chip_specific->soc_ctl_map;
-+	if (sdhci_arasan_chip_specific->platform_init)
-+		sdhci_arasan_chip_specific->platform_init(host);
- 
- 	node = of_parse_phandle(pdev->dev.of_node, "arasan,soc-ctl-syscon", 0);
- 	if (node) {
-
-
-I will try to send another patch with what a different approach
+This hunk is not explained by the description. Could belong to a later 
+patch?
