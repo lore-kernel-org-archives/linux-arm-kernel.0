@@ -1,161 +1,56 @@
-From: sf84@laposte.net (Sebastian Frias)
-Date: Mon, 28 Nov 2016 11:34:13 +0100
-Subject: [net-next PATCH v1 0/2] stmmac: dwmac-meson8b: configurable RGMII
- TX delay
-In-Reply-To: <1b7f113e-34f9-69f4-a45f-9fd687d87990@gmail.com>
-References: <20161124143417.10178-1-martin.blumenstingl@googlemail.com>
- <1480002964.17538.131.camel@baylibre.com>
- <CAFBinCB7sXjXor++W+PW0-j_VxATRzhexjqHgXj2jD10tBpZFg@mail.gmail.com>
- <e6ca0941-e2e3-dd93-d4d3-8fbd76b60e17@gmail.com>
- <6a6af561-4e83-ca6e-d989-f421e18bce1e@laposte.net>
- <1b7f113e-34f9-69f4-a45f-9fd687d87990@gmail.com>
-Message-ID: <6dfb67a8-2825-6256-3244-c99316531885@laposte.net>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Mon, 28 Nov 2016 12:30:37 +0200
+Subject: Adding a .platform_init callback to sdhci_arasan_ops
+In-Reply-To: <982d633b-e9c4-0f10-052b-e324f094d0f5@xilinx.com>
+References: <d50dcd8a-2489-4e82-1dc7-13e93e38d5ff@laposte.net>
+ <982d633b-e9c4-0f10-052b-e324f094d0f5@xilinx.com>
+Message-ID: <2a949ade-edd7-4690-cd6a-434ae1e663dc@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/11/16 18:44, Florian Fainelli wrote:
-> On 11/25/2016 03:13 AM, Sebastian Frias wrote:
->> On 24/11/16 19:55, Florian Fainelli wrote:
-<snip>
->>> Correct, the meaning of PHY_INTERFACE_MODE should be from the
->>> perspective of the PHY device:
->>>
->>> - PHY_INTERFACE_MODE_RGMII_TXID means that the PHY is responsible for
->>> adding a delay when the MAC transmits (TX MAC -> PHY (delay) -> wire)
->>> - PHY_INTERFACE_MODE_RGMII_RXID means that the PHY is responsible for
->>> adding a delay when the MAC receives (RX MAC <- (delay) PHY) <- wire)
->>>
->>
->> Thanks for the explanation.
->> Actually I had thought that the delay was to account for board routing
->> (wires) between the MAC and the PHY.
->> From your explanation it appears that the delay is to account for board
->> routing (wires) between the PHY and the RJ45 socket.
+On 28/11/16 09:32, Michal Simek wrote:
+> +Sai for Xilinx perspective.
 > 
-> The placement of the (delay) was not meant to be exact, but it was
-> wrongly place anyway, so it should be between the MAC and PHY, always.
-> This is why you see people either fixing the need for a delay by
-> appropriately programming the PHY, or the MAC, or by just inserting a
-> fixed delay on the PCB between the PHY and the MAC and programming no
-> delays (or using the default values and hoping this works).
+> On 25.11.2016 16:24, Sebastian Frias wrote:
+>> Hi,
+>>
+>> When using the Arasan SDHCI HW IP, there is a set of parameters called
+>> "Hardware initialized registers"
+>>
+>> (Table 7, Section "Pin Signals", page 56 of Arasan "SD3.0/SDIO3.0/eMMC4.4
+>> AHB Host Controller", revision 6.0 document)
+>>
+>> In some platforms those signals are connected to registers that need to
+>> be programmed at some point for proper driver/HW initialisation.
+>>
+>> I found that the 'struct sdhci_ops' contains a '.platform_init' callback
+>> that is called from within 'sdhci_pltfm_init', and that seems a good
+>> candidate for a place to program those registers (*).
+>>
+>> Do you agree?
 
-Thanks.
-Your patch "[PATCH net-next 3/4] Documentation: net: phy: Add blurb about
-RGMII" on the documentation makes it clear.
+We already killed .platform_init
 
->>>
->>> This also seems reasonable to do, provided that the PHY is also properly
->>> configured not to add delays in both directions, and therefore assumes
->>> that the MAC does it.
->>>
->>> We have a fairly large problem with how RGMII delays are done in PHYLIB
->>> and Ethernet MAC drivers (or just in general), where we can't really
->>> intersect properly what a PHY is supporting (in terms of internal
->>> delays), and what the MAC supports either. One possible approach could
->>> be to update PHY drivers a list of PHY_INTERFACE_MODE_* that they
->>> support (ideally, even with normalized nanosecond delay values), 
+What is wrong with sdhci_arasan_probe()?
+
 >>
->> Just to make sure I understood this, the DT would say something like:
+>> Best regards,
 >>
->> phy-connection-type = "rgmii-txid";
->> txid-delay-ns = <3>;
+>> Sebastian
 >>
->> For a 3ns TX delay, would that be good?
+>>
+>> (*): This has been prototyped on 4.7 as working properly.
+>> However, upstream commit:
+>>
+>> commit 3ea4666e8d429223fbb39c1dccee7599ef7657d5
+>> Author: Douglas Anderson <dianders@chromium.org>
+>> Date:   Mon Jun 20 10:56:47 2016 -0700
+>>
+>>     mmc: sdhci-of-arasan: Properly set corecfg_baseclkfreq on rk3399
+>> ...
+>>
+>> could affect this solution because of the way the 'sdhci_arasan_of_match'
+>> struct is used after that commit.
+>>
 > 
-> That's one possibility, although, see below, some PHYs support
-> sub-nanosecond values, but in general, that seems like a good
-> representation. If the "txid-delay-ns" property is omitted, a standard
-> 2ns delay is assumed.
-
-Sounds good.
-I did not see the "txid-delay-ns" property documented in your patches, if
-it is not too late, maybe it could be "txid-delay-ps" using picoseconds as
-unit, right?
-
->>> and
->>> then intersect that with the requested phy_interface_t during
->>> phy_{attach,connect} time, and feed this back to the MAC with a special
->>> error code/callback, so we could gracefully try to choose another
->>> PHY_INTERFACE_MODE_* value that the MAC supports....
->>>
->>> A larger problem is that a number of drivers have been deployed, and
->>> Device Trees, possibly with the meaning of "phy-mode" and
->>> "phy-connection-type" being from the MAC perspective, and not the PHY
->>> perspective *sigh*, good luck auditing those.
->>>
->>> So from there, here is possibly what we could do
->>>
->>> - submit a series of patches that update the PHYLIB documentation (there
->>> are other things missing here) and make it clear from which entity (PHY
->>> or MAC) does the delay apply to, document the "intersection" problem here
->>
->> I think documenting is necessary, thanks in advance!
->>
->> However, I'm wondering if there's a way to make this work in all cases.
->> Indeed, if we consider for example that TX delay is required, we have 4
->> cases:
->>
->>        PHY         |       MAC          | Who applies?
->> TXID supported     | TXID supported     | PHY
->> TXID supported     | TXID not supported | PHY
->> TXID not supported | TXID supported     | MAC
->> TXID not supported | TXID not supported | cannot be done
->>
->> That is basically what my patch:
->>
->> https://marc.info/?l=linux-netdev&m=147869658031783&w=2
->>
->> attempted to achieve. That would allow more combinations of MAC<->PHY to
->> work, right?
 > 
-> Yes, indeed.
-
-Just one thing, from your patch "[PATCH net-next 3/4] Documentation: net:
-phy: Add blurb about RGMII" I have the impression that the 3rd option from
-the table above, would be a little bit more complex to implement.
-
-I will comment on the patch.
-
->> Nevertheless, I think we also need to keep in mind that most of this
->> discussion assumes the case where both, MAC and PHY have equal capabilities.
->> Could it happen that the PHY supports only 2ns delay, and the MAC only
->> 1ns delay?
-> 
-> I doubt this exists at the MAC level what we should have is either a 2ns
-> delay, in either RX or TX path, or nothing, because that's the value
-> that results in shifting the data lines and the RX/TX lines by 90
-> degrees at 125Mhz (1/125^6 = 8 ns, one quarter shift is 90 degrees =
-> 2ns). The PHY may have a similar set of pre-programmed, fixed 2ns
-> delays, but it is not uncommon to see 0.X ns resolution available:
-> 
-> drivers/net/phy/mscc.c
-> drivers/net/phy/dp83867.c w/ arch/arm/boot/dts/dra72-evm-revc.dts
-> 
-> In these cases, if you end-up using a non 2ns delay, you are fixing a
-> PCB problem more than an interoperability problem between your MAC and PHY.
-
-I see, thanks.
-
->> Could it happen that the delay is bigger than what is supported by
->> either the PHY or MAC alone? maybe if combined it could work, for example
->> a 3ns delay required and the PHY supporting 2ns and the MAC 1ns, combined
->> it could work?
-> 
-> I suppose such a thing would work yes, but it would be difficult to
-> report correctly to the core PHYLIB how this can work considering the
-> vast array of options available to introduce delays in that case:
-> MAC-level, PHY-level, pinctrl/pad level and possibly at the PCB itself.
-> 
-> Once we can't rely on the fixed 2ns delay to work, we are going to have
-> people do various experiments until they can either measure what the
-> right delay value is for the specific PCB, or they just found the value
-> that happens to work. I don't think we can do much at that point from a
-> core PHYLIB perspective other than tell the network driver that the PHY
-> supports delay in either RX, TX or both directions, and have the MAC
-> decide what to apply that makes sense here, considering that this is
-> already kind of an exceptional situation to be in.
-
-
-Fair enough.
-
-And thanks again for documenting this.
