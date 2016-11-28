@@ -1,50 +1,84 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 28 Nov 2016 16:50:28 +0100
-Subject: [PATCH net-next v4 4/4] ARM64: dts: meson: odroidc2: disable
- advertisement EEE for GbE.
-In-Reply-To: <1480348229-25672-1-git-send-email-jbrunet@baylibre.com>
-References: <1480348229-25672-1-git-send-email-jbrunet@baylibre.com>
-Message-ID: <1480348229-25672-5-git-send-email-jbrunet@baylibre.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 28 Nov 2016 17:14:15 +0100
+Subject: [PATCH 2/2] net: dsa: mv88e6xxx: Add 88E6176 device tree support
+In-Reply-To: <2c59cc79-b6dc-9920-1725-a7785ff3b6bf@kleine-koenig.org>
+References: <1480280279-9552-1-git-send-email-afaerber@suse.de>
+ <1480280279-9552-2-git-send-email-afaerber@suse.de>
+ <20161127212709.GD13318@lunn.ch>
+ <9500470d-09c3-3ecb-994b-3d108bffc99e@suse.de>
+ <20161127220846.GH13318@lunn.ch>
+ <e5d45b55-a4c1-3b5e-0bdc-a5e340b072d0@suse.de>
+ <20161127231009.GA17704@lunn.ch>
+ <20161128080939.ippqlytvojitefkp@perseus.defre.kleine-koenig.org>
+ <20161128131735.GA4379@lunn.ch>
+ <2c59cc79-b6dc-9920-1725-a7785ff3b6bf@kleine-koenig.org>
+Message-ID: <20161128161415.GI17704@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-Tested-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+On Mon, Nov 28, 2016 at 04:44:47PM +0100, Uwe Kleine-K?nig wrote:
+> On 11/28/2016 02:17 PM, Andrew Lunn wrote:
+> >> I still wonder (and didn't get an answer back when I asked about this)
+> >> why a comment is preferred here. For other devices I know it's usual and
+> >> requested by the maintainers to use:
+> >>
+> >> 	compatible = "exact name", "earlyer device to match driver";
+> >>
+> >> . This is more robust, documents the situation more formally and makes
+> >> it better greppable. The price to pay is only a few bytes in the dtb
+> >> which IMO is ok.
+> > 
+> > We did discuss this a while back. The information is useless and
+> > should to be ignored if present.
+> 
+> Who is "we"?
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-index e6e3491d48a5..2036582ca0d6 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-@@ -46,6 +46,7 @@
+Anybody on netdev a while back, but mostly Vivien and myself.
+
+> I'd say fail to probe is the right thing to do. Of course that doesn't
+> work for already supported models because it will break compatibility.
+
+And that is the first rule of device tree, never break backwards
+compatibility.
+
+> Also it seems wrong to write "marvell,mv88e6085" (only) if I know the
+> hardware is really a "marvell,mv88e6176".
+
+Why? Remember, the property name is called "compatible", not "is".
+
+> > Linus has said he does not like ARM devices because of all the busses
+> > which are not enumerable. Here we have a device which with a little
+> > bit of help we can enumerate. So we should. 
+> 
+> If you write
+> 
+> 	compatible = "marvell,mv88e6176", "marvell,mv88e6085";
+> 
+> you can still enumerate in the same way as before.
+
+Sure it would. But if the driver decides to ignore it, it is likely to
+be wrong. Developers are used to comments being wrong. We are
+suspicious of comments, we don't trust them 100%. But if somebody sees
+a property in a device tree, they put a higher 'trustability' value on
+it. But it actually has less trustable than a comment.
  
- #include "meson-gxbb.dtsi"
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/net/mdio.h>
- 
- / {
- 	compatible = "hardkernel,odroid-c2", "amlogic,meson-gxbb";
-@@ -85,6 +86,19 @@
- 	status = "okay";
- 	pinctrl-0 = <&eth_pins>;
- 	pinctrl-names = "default";
-+
-+	phy-handle = <&eth_phy0>;
-+
-+	mdio {
-+		compatible = "snps,dwmac-mdio";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		eth_phy0: ethernet-phy at 0 {
-+			reg = <0>;
-+			eee-broken-modes = <MDIO_EEE_1000T>;
-+		};
-+	};
- };
- 
- &ir {
--- 
-2.7.4
+> There are several more instances where the device tree specifies
+> something that could be probed instead. Some examples:
+> 
+> 	compatible = "ethernet-phy-id0141.0DD1", "ethernet-phy-ieee802.3-c22";
+
+There are examples of phys which don't implemented register 2 and
+3. In that case, you do need to specify the ID, if you want the
+correct driver to load.
+
+> 	compatible = "spansion,s25fl164k", "jedec,spi-nor";
+
+And there was a push recently to add "jedec,spi-nor" everywhere and
+deprecate a specific compatible because it is also not needed.
+
+> 	compatible = "fsl,imx25-flexcan", "fsl,p1010-flexcan";
+> 	compatible = "arm,pl011", "arm,primecell";
+
+I don't know these hardwares, so cannot comment.
+
+  Andrew
