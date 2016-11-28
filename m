@@ -1,65 +1,96 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 28 Nov 2016 18:06:33 +0800
-Subject: [RFC PATCH] ARM: dts: sun8i: add simplefb node for H3
-In-Reply-To: <20161128095900.27615-1-icenowy@aosc.xyz>
-References: <20161128095900.27615-1-icenowy@aosc.xyz>
-Message-ID: <CAGb2v67akcT6z-xOdCzpLQRZbgNGh3E5akYEs1BvFNP1rH8UeA@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Nov 2016 10:10:36 +0000
+Subject: [PATCH v3] clkdev: add devm_of_clk_get()
+In-Reply-To: <87vav89chw.wl%kuninori.morimoto.gx@renesas.com>
+References: <87vav89chw.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20161128101036.GS14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2016 at 5:59 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
-> As there's currently a fork of U-Boot which provides simplefb support
-
-Please add it when its finalized...
-
-> for H3, a simplefb node can be added to the device tree.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+On Mon, Nov 28, 2016 at 09:32:51AM +0000, Kuninori Morimoto wrote:
+> 
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> 
+> Current Linux has of_clk_get(), but doesn't have devm_of_clk_get().
+> This patch adds it.
+> 
+> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 > ---
->
-> I'm still not sure which pipeline should I use.
-
-You are supposed to add _all_ the pipelines that are available and
-supported by U-boot. U-boot is then supposed to enable and update
-the one it set up.
-
-ChenYu
-
->
-> And, it seems that HDMI Slow Clock is not needed?
->
-> (seems that it's only for EDID, but simplefb won't use EDID)
->
->  arch/arm/boot/dts/sun8i-h3.dtsi | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> index 75a8654..cacc8dd 100644
-> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> @@ -50,6 +50,22 @@
->  / {
->         interrupt-parent = <&gic>;
->
-> +       chosen {
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               ranges;
+> v2 -> v3
+> 
+>  - implement in clk-devres.c, and reused existing devm_clk_release()
+> 
+>  drivers/clk/clk-devres.c | 21 +++++++++++++++++++++
+>  include/linux/clk.h      |  7 +++++++
+>  2 files changed, 28 insertions(+)
+> 
+> diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
+> index 8f57154..2449b25 100644
+> --- a/drivers/clk/clk-devres.c
+> +++ b/drivers/clk/clk-devres.c
+> @@ -53,3 +53,24 @@ void devm_clk_put(struct device *dev, struct clk *clk)
+>  	WARN_ON(ret);
+>  }
+>  EXPORT_SYMBOL(devm_clk_put);
 > +
-> +               simplefb_hdmi: framebuffer at 0 {
-> +                       compatible = "allwinner,simple-framebuffer",
-> +                                    "simple-framebuffer";
-> +                       allwinner,pipeline = "de0-lcd0-hdmi";
-> +                       clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_BUS_DE>,
-> +                                <&ccu CLK_BUS_HDMI>, <&ccu CLK_DE>,
-> +                                <&ccu CLK_TCON0>, <&ccu CLK_HDMI>;
-> +                       status = "disabled";
-> +               };
-> +       };
+> +struct clk *devm_of_clk_get(struct device *dev,
+> +			    struct device_node *np, int index)
+> +{
+> +	struct clk **ptr, *clk;
 > +
->         cpus {
->                 #address-cells = <1>;
->                 #size-cells = <0>;
-> --
-> 2.10.2
->
+> +	ptr = devres_alloc(devm_clk_release, sizeof(*ptr), GFP_KERNEL);
+> +	if (!ptr)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	clk = of_clk_get(np, index);
+> +	if (!IS_ERR(clk)) {
+> +		*ptr = clk;
+> +		devres_add(dev, ptr);
+> +	} else {
+> +		devres_free(ptr);
+> +	}
+> +
+> +	return clk;
+> +}
+> +EXPORT_SYMBOL(devm_of_clk_get);
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index 123c027..1b713db 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -506,6 +506,8 @@ static inline void clk_disable_unprepare(struct clk *clk)
+>  
+>  #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+>  struct clk *of_clk_get(struct device_node *np, int index);
+> +struct clk *devm_of_clk_get(struct device *dev,
+> +			    struct device_node *np, int index);
+
+No need for this to be within the ifdef.
+
+>  struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+>  struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+>  #else
+> @@ -513,6 +515,11 @@ static inline struct clk *of_clk_get(struct device_node *np, int index)
+>  {
+>  	return ERR_PTR(-ENOENT);
+>  }
+> +static inline struct clk *devm_of_clk_get(struct device *dev,
+> +			    struct device_node *np, int index)
+> +{
+> +	return ERR_PTR(-ENOENT);
+> +}
+
+and so no need for this either.  In any case, this will cause !OF ||
+!COMMON_CLK builds to fail because this definition will conflict with
+that in clk-devres.c
+
+>  static inline struct clk *of_clk_get_by_name(struct device_node *np,
+>  					     const char *name)
+>  {
+> -- 
+> 1.9.1
+> 
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
