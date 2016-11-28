@@ -1,70 +1,24 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Mon, 28 Nov 2016 18:19:50 +0800
-Subject: [RFC PATCH] ARM: dts: sun8i: add simplefb node for H3
-In-Reply-To: <CAGb2v67akcT6z-xOdCzpLQRZbgNGh3E5akYEs1BvFNP1rH8UeA@mail.gmail.com>
-References: <20161128095900.27615-1-icenowy@aosc.xyz>
- <CAGb2v67akcT6z-xOdCzpLQRZbgNGh3E5akYEs1BvFNP1rH8UeA@mail.gmail.com>
-Message-ID: <496171480328390@web15g.yandex.ru>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 28 Nov 2016 11:24:12 +0100
+Subject: [PATCH renesas-next 1/3] ARM: dts: r8a73a4: Use SoC-specific
+ compat string for mmcif
+In-Reply-To: <CAMuHMdVGXQMRU-tn2EtrSAZXMLhBMNkHsxOtvUJ9duxR_Tnsxg@mail.gmail.com>
+References: <1480018514-31718-1-git-send-email-horms+renesas@verge.net.au>
+ <1480018514-31718-2-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdVGXQMRU-tn2EtrSAZXMLhBMNkHsxOtvUJ9duxR_Tnsxg@mail.gmail.com>
+Message-ID: <20161128102411.GA23112@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Nov 25, 2016 at 09:58:40AM +0100, Geert Uytterhoeven wrote:
+> On Thu, Nov 24, 2016 at 9:15 PM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Use the SoC-specific compat string for mmcif in DT for the r8a73a4 SoC.
+> > This is in keeping with the use of compat strings for mmcif for other
+> > Renesas ARM based SoCs.
+> >
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-
-28.11.2016, 18:07, "Chen-Yu Tsai" <wens@csie.org>:
-> On Mon, Nov 28, 2016 at 5:59 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
->> ?As there's currently a fork of U-Boot which provides simplefb support
->
-> Please add it when its finalized...
->
->> ?for H3, a simplefb node can be added to the device tree.
->>
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ?---
->>
->> ?I'm still not sure which pipeline should I use.
->
-> You are supposed to add _all_ the pipelines that are available and
-> supported by U-boot. U-boot is then supposed to enable and update
-> the one it set up.
-
-I mean the pipeline string ;-)
-
->
-> ChenYu
->
->> ?And, it seems that HDMI Slow Clock is not needed?
->>
->> ?(seems that it's only for EDID, but simplefb won't use EDID)
->>
->> ??arch/arm/boot/dts/sun8i-h3.dtsi | 16 ++++++++++++++++
->> ??1 file changed, 16 insertions(+)
->>
->> ?diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
->> ?index 75a8654..cacc8dd 100644
->> ?--- a/arch/arm/boot/dts/sun8i-h3.dtsi
->> ?+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
->> ?@@ -50,6 +50,22 @@
->> ??/ {
->> ?????????interrupt-parent = <&gic>;
->>
->> ?+ chosen {
->> ?+ #address-cells = <1>;
->> ?+ #size-cells = <1>;
->> ?+ ranges;
->> ?+
->> ?+ simplefb_hdmi: framebuffer at 0 {
->> ?+ compatible = "allwinner,simple-framebuffer",
->> ?+ "simple-framebuffer";
->> ?+ allwinner,pipeline = "de0-lcd0-hdmi";
->> ?+ clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_BUS_DE>,
->> ?+ <&ccu CLK_BUS_HDMI>, <&ccu CLK_DE>,
->> ?+ <&ccu CLK_TCON0>, <&ccu CLK_HDMI>;
->> ?+ status = "disabled";
->> ?+ };
->> ?+ };
->> ?+
->> ?????????cpus {
->> ?????????????????#address-cells = <1>;
->> ?????????????????#size-cells = <0>;
->> ?--
->> ?2.10.2
+Thanks, I have queued up this and the following two patches for v4.11.
