@@ -1,254 +1,46 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Mon, 28 Nov 2016 15:01:34 +0100
-Subject: [PATCH] ARM: BCM5301X: Enable UART by default for BCM4708(1) and
- BCM4709(4)
-Message-ID: <20161128140134.25128-1-zajec5@gmail.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Mon, 28 Nov 2016 15:04:45 +0100
+Subject: [Qemu-devel] [kvm-unit-tests PATCH v7 00/11] QEMU MTTCG Test cases
+In-Reply-To: <CAFEAcA8-3qHnp1T4bAiUL3NT8fHWik7-8zruyQKGgfADn5xF9w@mail.gmail.com>
+References: <20161124161033.11456-1-alex.bennee@linaro.org>
+ <20161128103744.s3wq53xzsxvu5uus@kamzik.brq.redhat.com>
+ <878ts3uac6.fsf@linaro.org>
+ <CAFEAcA9JUOHnJL59EuhQ_dEWjt+YjEcu8LGiJ3CSk_7R4J5Efg@mail.gmail.com>
+ <20161128115824.hrofgivt2mlfk7fh@kamzik.brq.redhat.com>
+ <CAFEAcA8-3qHnp1T4bAiUL3NT8fHWik7-8zruyQKGgfADn5xF9w@mail.gmail.com>
+Message-ID: <20161128140445.j336ksd7vqhi4ivz@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+On Mon, Nov 28, 2016 at 01:30:54PM +0000, Peter Maydell wrote:
+> On 28 November 2016 at 11:58, Andrew Jones <drjones@redhat.com> wrote:
+> > On Mon, Nov 28, 2016 at 11:14:48AM +0000, Peter Maydell wrote:
+> >> On 28 November 2016 at 11:12, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> >> >
+> >> > Andrew Jones <drjones@redhat.com> writes:
+> >> >> I've skimmed over everything looking at it from a framwork/sytle
+> >> >> perspective. I didn't dig in trying to understand the tests though.
+> >> >> One general comment, I see many tests introduce MAX_CPUS 8. Why do
+> >> >> that? Why not allow all cpus by using NR_CPUS for the array sizes?
+> >> >
+> >> > Yeah - I can fix those. I wonder what the maximum is with GIC V3?
+> >>
+> >> So large that you don't want to hardcode it as an array size...
+> >
+> > 255 with the gic series, not yet merged.
+> 
+> I was talking about the architectural GICv3 limit, which is larger
+> than that by many orders of magnitude. For QEMU it looks like
+> MAX_CPUMASK_BITS is now 288 rather than 255.
 
-Every device tested so far got UART0 (at 0x18000300) working as serial
-console. It's most likely part of reference design and all vendors use
-it that way.
+Ah, yeah. So far we haven't considered testing limits beyond what
+KVM supports, VGIC_V3_MAX_CPUS=255. However with TCG, and some
+patience, we could attempt to test bigger limits. In that case,
+though, we'll want to recompile kvm-unit-tests with a larger NR_CPUS
+and run a specific unit test.
 
-It seems to be easier to enable it by default and just disable it if we
-ever see a device with different hardware design.
+mach-virt still has 255 as well, mc->max_cpus = 255, so we'd have
+to bump that too if we want to experiment.
 
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
----
- arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  | 4 ----
- arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts       | 4 ----
- arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts       | 4 ----
- arch/arm/boot/dts/bcm4708-netgear-r6250.dts        | 4 ----
- arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts      | 4 ----
- arch/arm/boot/dts/bcm4708.dtsi                     | 4 ++++
- arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 4 ----
- arch/arm/boot/dts/bcm47081.dtsi                    | 4 ++++
- arch/arm/boot/dts/bcm4709-netgear-r7000.dts        | 4 ----
- arch/arm/boot/dts/bcm4709-netgear-r8000.dts        | 4 ----
- arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts  | 4 ----
- arch/arm/boot/dts/bcm4709.dtsi                     | 1 +
- arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts      | 4 ----
- arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts      | 4 ----
- arch/arm/boot/dts/bcm47094-netgear-r8500.dts       | 4 ----
- arch/arm/boot/dts/bcm47094.dtsi                    | 1 +
- 16 files changed, 10 insertions(+), 48 deletions(-)
-
-diff --git a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-index 9cb186e..d49afec0 100644
---- a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-+++ b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-@@ -136,10 +136,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &usb2 {
- 	vcc-gpio = <&chipcommon 9 GPIO_ACTIVE_HIGH>;
- };
-diff --git a/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
-index 35e6ed6..f591b0f 100644
---- a/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
-+++ b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
-@@ -55,10 +55,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &spi_nor {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
-index 1c7e53d..50d65d8 100644
---- a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
-+++ b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
-@@ -56,10 +56,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &spi_nor {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-index 8ce39d5..8519548 100644
---- a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-+++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-@@ -83,10 +83,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &usb3 {
- 	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
- };
-diff --git a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-index 70f4bb9..74cfcd3 100644
---- a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-+++ b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-@@ -119,10 +119,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &spi_nor {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/bcm4708.dtsi b/arch/arm/boot/dts/bcm4708.dtsi
-index eed4dd1..d0eec09 100644
---- a/arch/arm/boot/dts/bcm4708.dtsi
-+++ b/arch/arm/boot/dts/bcm4708.dtsi
-@@ -34,3 +34,7 @@
- 	};
- 
- };
-+
-+&uart0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-index a9c8def..2922536 100644
---- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-+++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-@@ -122,7 +122,3 @@
- 		};
- 	};
- };
--
--&uart0 {
--	status = "okay";
--};
-diff --git a/arch/arm/boot/dts/bcm47081.dtsi b/arch/arm/boot/dts/bcm47081.dtsi
-index f720012..c5f7619 100644
---- a/arch/arm/boot/dts/bcm47081.dtsi
-+++ b/arch/arm/boot/dts/bcm47081.dtsi
-@@ -24,3 +24,7 @@
- 		};
- 	};
- };
-+
-+&uart0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
-index fd38d2a..0225d82 100644
---- a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
-+++ b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
-@@ -100,7 +100,3 @@
- 		};
- 	};
- };
--
--&uart0 {
--	status = "okay";
--};
-diff --git a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-index 92f8a72..56d38a3 100644
---- a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-+++ b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-@@ -107,10 +107,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &usb2 {
- 	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
- };
-diff --git a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
-index 9a92c24..c67bfaa 100644
---- a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
-+++ b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
-@@ -97,10 +97,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &usb2 {
- 	vcc-gpio = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
- };
-diff --git a/arch/arm/boot/dts/bcm4709.dtsi b/arch/arm/boot/dts/bcm4709.dtsi
-index f039765..c645fea 100644
---- a/arch/arm/boot/dts/bcm4709.dtsi
-+++ b/arch/arm/boot/dts/bcm4709.dtsi
-@@ -8,4 +8,5 @@
- 
- &uart0 {
- 	clock-frequency = <125000000>;
-+	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-index 661348d..7fb9270 100644
---- a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-+++ b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-@@ -105,10 +105,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &usb3 {
- 	vcc-gpio = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
- };
-diff --git a/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts b/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
-index 169b35f..2f4a651 100644
---- a/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
-+++ b/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
-@@ -98,10 +98,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &usb3 {
- 	vcc-gpio = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
- };
-diff --git a/arch/arm/boot/dts/bcm47094-netgear-r8500.dts b/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
-index 521b415..7ecd57c 100644
---- a/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
-+++ b/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
-@@ -97,7 +97,3 @@
- 		};
- 	};
- };
--
--&uart0 {
--	status = "okay";
--};
-diff --git a/arch/arm/boot/dts/bcm47094.dtsi b/arch/arm/boot/dts/bcm47094.dtsi
-index 4f09aa0..4840a78 100644
---- a/arch/arm/boot/dts/bcm47094.dtsi
-+++ b/arch/arm/boot/dts/bcm47094.dtsi
-@@ -14,4 +14,5 @@
- 
- &uart0 {
- 	clock-frequency = <125000000>;
-+	status = "okay";
- };
--- 
-2.10.1
+Thanks,
+drew
