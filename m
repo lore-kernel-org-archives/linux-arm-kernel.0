@@ -1,261 +1,147 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 28 Nov 2016 18:00:24 +0100
-Subject: [PATCH net-next 1/5] net: mvneta: Use cacheable memory to store
- the rx buffer virtual address
-In-Reply-To: <20161128163548.70181560@xhacker> (Jisheng Zhang's message of
- "Mon, 28 Nov 2016 16:35:48 +0800")
-References: <cover.2b146800967005632cd02d4da77397e6e2fdf51f.1480087510.git-series.gregory.clement@free-electrons.com>
- <7e6004f918d3fcde9ae71e7893d26b19086236a3.1480087510.git-series.gregory.clement@free-electrons.com>
- <20161128163548.70181560@xhacker>
-Message-ID: <8760n7h74n.fsf@free-electrons.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Mon, 28 Nov 2016 23:12:08 +0530
+Subject: [PATCH V3 0/8] IOMMU probe deferral support
+In-Reply-To: <f2ad6976-0f8f-d116-bc43-37337dd9f41f@arm.com>
+References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
+ <60ee8066-f167-e9df-ae3e-4138f1133bad@arm.com>
+ <003a01d22f97$82534c70$86f9e550$@codeaurora.org>
+ <421e2b14-0231-d376-02a0-097423120b3d@arm.com>
+ <006f01d236ae$61751c40$245f54c0$@codeaurora.org>
+ <9f36244f-62d4-08e3-d64a-2b04ad4dc2e0@arm.com>
+ <002b01d24340$5d56e730$1804b590$@codeaurora.org>
+ <918128b9-cdb0-1454-000a-146cee7a05ea@arm.com>
+ <004401d2466d$5b8b2170$12a16450$@codeaurora.org>
+ <f2ad6976-0f8f-d116-bc43-37337dd9f41f@arm.com>
+Message-ID: <000001d2499e$df7f2d80$9e7d8880$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
- 
- On lun., nov. 28 2016, Jisheng Zhang <jszhang@marvell.com> wrote:
+Hi Robin,
 
-> Hi Gregory,
+>> <snip..>
+>>
+>>>
+>>>>>>>> iommu_group_get_for_dev which gets called in the add_device
+>>>>>>>> callback, increases the reference count of the iommu_group,
+>>>>>>>> so we do an iommu_group_put after that. iommu_group_get_for_dev
+>>>>>>>> inturn calls device_group callback and in the case of arm-smmu
+>>>>>>>> we call generic_device_group/pci_device_group which takes
+>>>>>>>> care of increasing the group's reference. But when we return
+>>>>>>>> an already existing group(when multiple devices have same group)
+>>>>>>>> the reference is not incremented, resulting in issues when the
+>>>>>>>> remove_device callback for the devices is invoked.
+>>>>>>>> Fixing the same here.
+>>>>>>>
+>>>>>>> Bah, yes, this does look like my fault - after flip-flopping between
+>>>>>>> about 3 different ways to keep refcounts for the S2CR entries, none of
+>>>>>>> which would quite work, I ripped it all out but apparently still got
+>>>>>>> things wrong, oh well. Thanks for figuring it out.
+>>>>>>>
+>>>>>>> On the probe-deferral angle, whilst it's useful to have uncovered this
+>>>>>>> bug, I don't think we should actually be calling remove_device() from
+>>>>>>> DMA teardown. I think it's preferable from a user perspective if group
+>>>>>>> numbering remains stable, rather than changing depending on the order in
+>>>>>>> which they unbind/rebind VFIO drivers. I'm really keen to try and get
+>>>>>>> this in shape for 4.10, so I've taken the liberty of hacking up my own
+>>>>>>> branch (iommu/defer) based on v3 - would you mind taking a look at the
+>>>>>>> two "iommu/of:" commits to see what you think? (Ignore the PCI changes
+>>>>>>> to your later patches - that was an experiment which didn't really work out)
+>>>>>>
+>>>>>> Ok, will take a look at this now and respond more on this.
+>>>>>>
+>>>>> Sorry for the delayed response on this. I was OOO for the last few days.
+>>>>> So i tested this branch and it worked fine. I tested it with a pci device
+>>>>> for both normal and deferred probe cases.  The of/iommu patches
+>>>>> are the cleanup/preparation patches and it looks fine. One thing is without
+>>>>> calling the remove_device callback, the resources like (smes for exmaple)
+>>>>> and the group association of the device all remain allocated. That does not
+>>>>> feel correct, given that the associated device does not exist. So to
+>>>>> understand that, what happens with VFIO in this case which makes the
+>>>>> group renumbering/rebinding a problem ?
+>>>>>
+>>>>
+>>>> Would it be ok if i post a V4 based on your branch above ?
+>>>
+>>> Sure, as long as none of the hacks slip through :) - I've just pushed
+>>> out a mild rework based on Lorenzo's v9, which I hope shouldn't break
+>>> anything for you.
+>>>
+>>
+>> Ok sure, i will test and just the post out the stuff from your branch then
+>> mostly by tomorrow.
 >
-> On Fri, 25 Nov 2016 16:30:14 +0100 Gregory CLEMENT wrote:
->
->> Until now the virtual address of the received buffer were stored in the
->> cookie field of the rx descriptor. However, this field is 32-bits only
->> which prevents to use the driver on a 64-bits architecture.
->> 
->> With this patch the virtual address is stored in an array not shared with
->> the hardware (no more need to use the DMA API). Thanks to this, it is
->> possible to use cache contrary to the access of the rx descriptor member.
->> 
->> The change is done in the swbm path only because the hwbm uses the cookie
->> field, this also means that currently the hwbm is not usable in 64-bits.
->> 
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  drivers/net/ethernet/marvell/mvneta.c | 96 ++++++++++++++++++++++++----
->>  1 file changed, 84 insertions(+), 12 deletions(-)
->> 
->> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
->> index 87274d4ab102..b6849f88cab7 100644
->> --- a/drivers/net/ethernet/marvell/mvneta.c
->> +++ b/drivers/net/ethernet/marvell/mvneta.c
->> @@ -561,6 +561,9 @@ struct mvneta_rx_queue {
->>  	u32 pkts_coal;
->>  	u32 time_coal;
->>  
->> +	/* Virtual address of the RX buffer */
->> +	void  **buf_virt_addr;
->
-> can we store buf_phys_addr in cacheable memory as well?
-
-Even if we store in in cacheable memory we will still need to store it
-in the buffer descriptor as it is used by the hardware.
-
->
->> +
->>  	/* Virtual address of the RX DMA descriptors array */
->>  	struct mvneta_rx_desc *descs;
->>  
->> @@ -1573,10 +1576,14 @@ static void mvneta_tx_done_pkts_coal_set(struct mvneta_port *pp,
->>  
->>  /* Handle rx descriptor fill by setting buf_cookie and buf_phys_addr */
->>  static void mvneta_rx_desc_fill(struct mvneta_rx_desc *rx_desc,
->> -				u32 phys_addr, u32 cookie)
->> +				u32 phys_addr, void *virt_addr,
->> +				struct mvneta_rx_queue *rxq)
->>  {
->> -	rx_desc->buf_cookie = cookie;
->> +	int i;
->> +
->>  	rx_desc->buf_phys_addr = phys_addr;
->> +	i = rx_desc - rxq->descs;
->> +	rxq->buf_virt_addr[i] = virt_addr;
->>  }
->>  
->>  /* Decrement sent descriptors counter */
->> @@ -1781,7 +1788,8 @@ EXPORT_SYMBOL_GPL(mvneta_frag_free);
->>  
->>  /* Refill processing for SW buffer management */
->>  static int mvneta_rx_refill(struct mvneta_port *pp,
->> -			    struct mvneta_rx_desc *rx_desc)
->> +			    struct mvneta_rx_desc *rx_desc,
->> +			    struct mvneta_rx_queue *rxq)
->>  
->>  {
->>  	dma_addr_t phys_addr;
->> @@ -1799,7 +1807,7 @@ static int mvneta_rx_refill(struct mvneta_port *pp,
->>  		return -ENOMEM;
->>  	}
->>  
->> -	mvneta_rx_desc_fill(rx_desc, phys_addr, (u32)data);
->> +	mvneta_rx_desc_fill(rx_desc, phys_addr, data, rxq);
->>  	return 0;
->>  }
->>  
->> @@ -1861,7 +1869,12 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
->>  
->>  	for (i = 0; i < rxq->size; i++) {
->>  		struct mvneta_rx_desc *rx_desc = rxq->descs + i;
->> -		void *data = (void *)rx_desc->buf_cookie;
->> +		void *data;
->> +
->> +		if (!pp->bm_priv)
->> +			data = rxq->buf_virt_addr[i];
->> +		else
->> +			data = (void *)(uintptr_t)rx_desc->buf_cookie;
->>  
->>  		dma_unmap_single(pp->dev->dev.parent, rx_desc->buf_phys_addr,
->>  				 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
->> @@ -1894,12 +1907,13 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
->>  		unsigned char *data;
->>  		dma_addr_t phys_addr;
->>  		u32 rx_status, frag_size;
->> -		int rx_bytes, err;
->> +		int rx_bytes, err, index;
->>  
->>  		rx_done++;
->>  		rx_status = rx_desc->status;
->>  		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
->> -		data = (unsigned char *)rx_desc->buf_cookie;
->> +		index = rx_desc - rxq->descs;
->> +		data = (unsigned char *)rxq->buf_virt_addr[index];
->>  		phys_addr = rx_desc->buf_phys_addr;
->>  
->>  		if (!mvneta_rxq_desc_is_first_last(rx_status) ||
->> @@ -1938,7 +1952,7 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
->>  		}
->>  
->>  		/* Refill processing */
->> -		err = mvneta_rx_refill(pp, rx_desc);
->> +		err = mvneta_rx_refill(pp, rx_desc, rxq);
->>  		if (err) {
->>  			netdev_err(dev, "Linux processing - Can't refill\n");
->>  			rxq->missed++;
->> @@ -2020,7 +2034,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
->>  		rx_done++;
->>  		rx_status = rx_desc->status;
->>  		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
->> -		data = (unsigned char *)rx_desc->buf_cookie;
->> +		data = (u8 *)(uintptr_t)rx_desc->buf_cookie;
->>  		phys_addr = rx_desc->buf_phys_addr;
->>  		pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc);
->>  		bm_pool = &pp->bm_priv->bm_pools[pool_id];
->> @@ -2708,6 +2722,57 @@ static int mvneta_poll(struct napi_struct *napi, int budget)
->>  	return rx_done;
->>  }
->>  
->> +/* Refill processing for HW buffer management */
->> +static int mvneta_rx_hwbm_refill(struct mvneta_port *pp,
->> +				 struct mvneta_rx_desc *rx_desc)
->> +
->> +{
->> +	dma_addr_t phys_addr;
->> +	void *data;
->> +
->> +	data = mvneta_frag_alloc(pp->frag_size);
->> +	if (!data)
->> +		return -ENOMEM;
->> +
->> +	phys_addr = dma_map_single(pp->dev->dev.parent, data,
->> +				   MVNETA_RX_BUF_SIZE(pp->pkt_size),
->> +				   DMA_FROM_DEVICE);
->> +	if (unlikely(dma_mapping_error(pp->dev->dev.parent, phys_addr))) {
->> +		mvneta_frag_free(pp->frag_size, data);
->> +		return -ENOMEM;
->> +	}
->> +
->> +	phys_addr += pp->rx_offset_correction;
->> +	rx_desc->buf_phys_addr = phys_addr;
->> +	rx_desc->buf_cookie = (uintptr_t)data;
->> +
->> +	return 0;
->> +}
->> +
->> +/* Handle rxq fill: allocates rxq skbs; called when initializing a port */
->> +static int mvneta_rxq_bm_fill(struct mvneta_port *pp,
->> +			      struct mvneta_rx_queue *rxq,
->> +			      int num)
->> +{
->> +	int i;
->> +
->> +	for (i = 0; i < num; i++) {
->> +		memset(rxq->descs + i, 0, sizeof(struct mvneta_rx_desc));
->> +		if (mvneta_rx_hwbm_refill(pp, rxq->descs + i) != 0) {
->> +			netdev_err(pp->dev, "%s:rxq %d, %d of %d buffs  filled\n",
->> +				   __func__, rxq->id, i, num);
->> +			break;
->> +		}
->> +	}
->> +
->> +	/* Add this number of RX descriptors as non occupied (ready to
->> +	 * get packets)
->> +	 */
->> +	mvneta_rxq_non_occup_desc_add(pp, rxq, i);
->> +
->> +	return i;
->> +}
->> +
->>  /* Handle rxq fill: allocates rxq skbs; called when initializing a port */
->>  static int mvneta_rxq_fill(struct mvneta_port *pp, struct mvneta_rx_queue *rxq,
->>  			   int num)
->> @@ -2716,7 +2781,7 @@ static int mvneta_rxq_fill(struct mvneta_port *pp, struct mvneta_rx_queue *rxq,
->>  
->>  	for (i = 0; i < num; i++) {
->>  		memset(rxq->descs + i, 0, sizeof(struct mvneta_rx_desc));
->> -		if (mvneta_rx_refill(pp, rxq->descs + i) != 0) {
->> +		if (mvneta_rx_refill(pp, rxq->descs + i, rxq) != 0) {
->>  			netdev_err(pp->dev, "%s:rxq %d, %d of %d buffs  filled\n",
->>  				__func__, rxq->id, i, num);
->>  			break;
->> @@ -2784,14 +2849,21 @@ static int mvneta_rxq_init(struct mvneta_port *pp,
->>  		mvneta_rxq_buf_size_set(pp, rxq,
->>  					MVNETA_RX_BUF_SIZE(pp->pkt_size));
->>  		mvneta_rxq_bm_disable(pp, rxq);
->> +
->> +		rxq->buf_virt_addr = devm_kmalloc(pp->dev->dev.parent,
->> +						  rxq->size * sizeof(void *),
->> +						  GFP_KERNEL);
->
-> I would suggest allocate this buffer during probe. Otherwise, there's
-> memory leak if we either change the mtu or close then open the eth in
-> a loop, e.g
->
-> while true
-> do
-> 	ifconfig eth0 up
-> 	ifconfig eth0 down
-> done
-
-Indeed, I will move it.
-
-Thanks,
-
-Gregory
-
->
-> Thanks,
-> Jisheng
->
->> +		if (!rxq->buf_virt_addr)
->> +			return -ENOMEM;
->> +
->> +		mvneta_rxq_fill(pp, rxq, rxq->size);
->>  	} else {
->>  		mvneta_rxq_bm_enable(pp, rxq);
->>  		mvneta_rxq_long_pool_set(pp, rxq);
->>  		mvneta_rxq_short_pool_set(pp, rxq);
->> +		mvneta_rxq_bm_fill(pp, rxq, rxq->size);
->>  	}
->>  
->> -	mvneta_rxq_fill(pp, rxq, rxq->size);
->> -
->>  	return 0;
->>  }
->>  
+>Cool. We're rather hoping that the ACPI stuff is good to go for 4.10
+>now, so it's probably worth pulling the rest of that in (beyond the one
+>patch I picked) to make sure the of_dma_configure/acpi_dma_configure
+>paths don't inadvertently diverge.
 >
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+I rebased and was testing your branch with Lorenzo's series. One thing
+i am still trying to get right is the acpi_dma_configure call. With your
+series dma_configure calls pci_dma/of_dma configure, so i am just adding
+acpi_dma_configure call there for non-pci ACPI devices as well. I see that
+acpi_dma_configure right now is called from acpi_bind_one and 
+iort_add_smmu_platform_device, both go through the really_probe function
+path, so moving acpi_dma_configure from the above the two functions
+to dma_configure. I remember we discussed this on another thread, so
+hopefully it is correct. I do not have an platform to test the ACPI though.
+I will take some testing help on V4 for this.
+
+>>> Having thought a bit more about the add/remove thing, I'm inclined to
+>>> agree that the group numbering itself may not be that big an issue in
+>>> practice - sure, it could break my little script, but it looks like QEMU
+>>> and such work with the device ID rather than the group number directly,
+>>> so might not even notice. However, the fact remains that the callbacks
+>>> are intended to handle a device being added to/removed from its bus, and
+>>> will continue to do so on other platforms, so I don't like the idea of
+>>> introducing needlessly different behaviour. If you unbind a driver, the
+>>> stream IDs and everything don't stop existing at the hardware level; the
+>>> struct device to which the in-kernel data belongs still exists and
+>>> doesn't stop being associated with its bus. There's no good reason for
+>>> freeing SMEs that we'll only reallocate again (inadequately-specced
+>>> hardware with not enough SMRs/contexts is not a *good* reason), and
+>>
+>> ok, so SMRs/contexts was the reason i was adding the remove_dev
+>> callback, but if thats not good enough then there was no other
+>> intention.
+>>
+>>> there are also some strong arguments against letting any stream IDs the
+>>> kernel knows about go back to bypass after a driver has been bound - by
+>>
+>> ok, but not sure why is this so ?
+>
+>Any device the kernel is in control of, having bound a driver to it,
+>definitely should not be doing DMA after that driver is unbound...
+>
+
+ok.
+
+>>> keeping groups around as expected that's something we can implement
+>>> quite easily without having to completely lock down bypass for stream
+>>> IDs the kernel *doesn't* know about.
+>>>
+>>
+>> So do you mean in this case to keep the unbound device's group/context bank
+>> to bypass rather than resetting the streamids ?
+>
+>...which we can easily enforce by keeping the device attached to its
+>default domain, in which nothing should be mapped by that point (we
+>could even have a group notifier switch its S2CRs to faulting entries
+>for extreme paranoia). Freeing the SMRs means those stream IDs would
+>instead fall back to the default "unmatched" behaviour, which in general
+>is going to be bypass, and thus allow DMA attacks.
+>
+>It's harder to disable unmatched bypass in general, because we may have
+>devices which physically master through the SMMU but want low latency
+>more than they want translation (at the moment the best we can do is
+>leave the kernel unaware of those stream IDs), or there could be unknown
+>devices under control of the firmware or other agents which we would
+>disrupt by hitting a system-wide switch.
+>
+
+ok thanks, understand the point now. Agree that putting the previously bound
+devices to fault is right than putting it to bypass. So the notifier to switch the
+S2CRs to faulting entries can be added as a separate patch on top of this.
+
+Regards,
+ Sricharan
