@@ -1,64 +1,39 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Mon, 28 Nov 2016 14:31:31 -0500
-Subject: [PATCH 2/2] arm64: dts: NS2: enable PAXC on NS2 SVK
-In-Reply-To: <1480361491-22221-1-git-send-email-jon.mason@broadcom.com>
-References: <1480361491-22221-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1480361491-22221-3-git-send-email-jon.mason@broadcom.com>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 28 Nov 2016 20:32:13 +0100
+Subject: Adding a .platform_init callback to sdhci_arasan_ops
+In-Reply-To: <CAD=FV=XrJHFbpbhsJZAEE-HLMe47Ov=BgvHw8ZtfCazzT75pKQ@mail.gmail.com>
+References: <d50dcd8a-2489-4e82-1dc7-13e93e38d5ff@laposte.net>
+ <982d633b-e9c4-0f10-052b-e324f094d0f5@xilinx.com>
+ <2a949ade-edd7-4690-cd6a-434ae1e663dc@intel.com>
+ <66751ab5-59a4-ec30-07cd-44ca03694723@laposte.net>
+ <d1801c1e-cd74-b79c-0280-8fb5dc377c91@intel.com>
+ <e32d2a01-ba3c-6127-51ba-a1fd4176e32c@laposte.net>
+ <485a747c-47e3-bc0e-093a-4ec9ab719987@laposte.net>
+ <CAD=FV=XrJHFbpbhsJZAEE-HLMe47Ov=BgvHw8ZtfCazzT75pKQ@mail.gmail.com>
+Message-ID: <9c783843-d0e4-92ef-d156-6826e38d9fa8@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the PAXC based PCIe root complex on NS2 SVK. The PAXC based
-root complex is connected to internally emulated PCIe endpoints
+On 28/11/2016 18:46, Doug Anderson wrote:
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Signed-off-by: Jon Mason <jon.mason@broadcom.com>
----
- arch/arm64/boot/dts/broadcom/ns2-svk.dts |  4 ++++
- arch/arm64/boot/dts/broadcom/ns2.dtsi    | 17 +++++++++++++++++
- 2 files changed, 21 insertions(+)
+> As argued in my original patch the field "corecfg_baseclkfreq" is
+> documented in the generic Arasan document
+> <https://arasan.com/wp-content/media/eMMC-5-1-Total-Solution_Rev-1-3.pdf>
+> and thus is unlikely to be Rockchip specific.
 
-diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-index de8d379..5ae0816 100644
---- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-+++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-@@ -76,6 +76,10 @@
- 	status = "ok";
- };
- 
-+&pcie8 {
-+	status = "ok";
-+};
-+
- &i2c0 {
- 	status = "ok";
- };
-diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index 69775a8..96ed47b 100644
---- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -169,6 +169,23 @@
- 		msi-parent = <&v2m0>;
- 	};
- 
-+	pcie8: pcie at 60c00000 {
-+		compatible = "brcm,iproc-pcie-paxc";
-+		reg = <0 0x60c00000 0 0x1000>;
-+		linux,pci-domain = <8>;
-+
-+		bus-range = <0x0 0x1>;
-+
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		ranges = <0x83000000 0 0x00000000 0 0x60000000 0 0x00c00000>;
-+
-+		status = "disabled";
-+
-+		msi-parent = <&v2m0>;
-+	};
-+
- 	soc: soc {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
--- 
-2.7.4
+I downloaded the data sheet, which doesn't mention registers,
+but "pins" and "signals". Does that mean it is up to every
+platform to decide how to group these wires into individual
+registers?
+
+corecfg_baseclkfreq[7:0]
+Base Clock Frequency for SD Clock.
+This is the frequency of the xin_clk.
+
+How can 8 bits encode a frequency?
+Is there an implicit LUT? Is it a MHz count?
+
+"For maximum efficiency this should be around 200 MHz for eMMC
+or 208MHz (for SD3.0)"
+
+Regards.
