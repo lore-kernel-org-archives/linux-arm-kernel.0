@@ -1,50 +1,34 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Nov 2016 10:58:36 +0000
-Subject: [PATCH] ARM: dts: mvebu: Add Armada 38x labels and clean up
- Turris Omnia
-In-Reply-To: <4ad1108a-43c4-46f8-4683-1c4b89996036@suse.de>
-References: <1fc18002-0144-8300-1888-09f456860ef0@kleine-koenig.org>
- <1480272700-28888-1-git-send-email-afaerber@suse.de>
- <20161128103738.GT14217@n2100.armlinux.org.uk>
- <4ad1108a-43c4-46f8-4683-1c4b89996036@suse.de>
-Message-ID: <20161128105836.GU14217@n2100.armlinux.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 28 Nov 2016 12:09:33 +0100
+Subject: [PATCH 7/10] mmc: sdhci-xenon: Add support to PHYs of Marvell
+ Xenon SDHC
+In-Reply-To: <436c6925-cb0d-afe7-e3a2-384eca15ff42@marvell.com>
+References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
+ <a05ffd140f4edc02fc3128db8445b2264cf38723.1477911954.git-series.gregory.clement@free-electrons.com>
+ <CAPDyKFpkcoVMKbVOwjX1WDyNgc1vvUX60D6XRX6=YHGvkvHvnA@mail.gmail.com>
+ <3cd05a26-d340-476e-bab1-8be9d5446f47@marvell.com>
+ <CAPDyKFrskyZvMwhmj8ioyaowU8GL5=d-6ipGQcmmig_a9E9AQQ@mail.gmail.com>
+ <436c6925-cb0d-afe7-e3a2-384eca15ff42@marvell.com>
+Message-ID: <CAPDyKFp9rbGz=1PbAndKxvpv49H9DF5SWa=FfAcrMiYRceXOQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2016 at 11:52:26AM +0100, Andreas F?rber wrote:
-> Hi Russell,
-> 
-> Am 28.11.2016 um 11:37 schrieb Russell King - ARM Linux:
-> > On Sun, Nov 27, 2016 at 07:51:39PM +0100, Andreas F?rber wrote:
-> >> To more consistently reference nodes by label, add labels for sata,
-> >> usb2, sdhci and usb3 nodes.
-> >>
-> >> Convert all other 38x boards for consistency. Add labels for nfc and rtc.
-> > 
-> > Please don't do this for clearfog - there's changes in the pipeline which
-> > completely replace armada-388-clearfog.dts because there's a "base" and
-> > "pro" versions of this hardware now, and making such a huge change will
-> > effectively mean we have to start over with the DT files.
-> 
-> Would it help to split it back up into a series of add-labels,
-> use-labels like I had originally? Then you could start using them in
-> your refactoring as soon as the add-labels patch gets applied. Or are
-> you completely against this style?
+[...]
 
-What I mentioned is not a case of a work in progress, it's already out
-in the wild, and completely changing the clearfog dts file by changing
-the style of DT references will make applying the changes _much_ more
-difficult - not only obviously impossible to apply the original patch,
-but also quite impossible to identify the changes made downstream.
+>
+>     Could you please tell me the requirement of "op_code" parameter in
+>     mmc_send_tuning()?
+>     According to mmc_send_tuning(),it seems that tuning command(CMD19/CMD21)
+>     is required. Thus device will not response mmc_send_tuning() if current
+>     speed mode doesn't support tuning command.
+>     Please correct me if I am wrong.
+>
 
-So, I'd rather armada-388-clearfog.dts is not touched at all as it _will_
-cause conflicts, but I have nothing against the new style (and I actually
-prefer it.)
+When the mmc core decides it's time to execute tuning, it invokes the
+->execute_tuning() host ops, which has the "opcode" as a parameter.
+You should be able to use it when calling mmc_send_tuning().
 
-What I'm asking is that you don't make other people's lives harder than
-they need to be.
+[...]
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Kind regards
+Uffe
