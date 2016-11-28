@@ -1,79 +1,44 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Mon, 28 Nov 2016 09:32:51 +0000
-Subject: [PATCH v3] clkdev: add devm_of_clk_get()
-Message-ID: <87vav89chw.wl%kuninori.morimoto.gx@renesas.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Mon, 28 Nov 2016 10:33:04 +0100
+Subject: [Qemu-devel] [kvm-unit-tests PATCH v7 06/11]
+ arm/Makefile.common: force -fno-pic
+In-Reply-To: <20161124161033.11456-7-alex.bennee@linaro.org>
+References: <20161124161033.11456-1-alex.bennee@linaro.org>
+ <20161124161033.11456-7-alex.bennee@linaro.org>
+Message-ID: <20161128093304.74rfi7dk5qhuvo4g@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Nov 24, 2016 at 04:10:28PM +0000, Alex Benn?e wrote:
+> As distro compilers move towards defaults for build hardening for things
+> like ASLR we need to force -fno-pic. Failure to do can lead to weird
+> relocation problems when we build our "lat" binaries.
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> ---
+>  arm/Makefile.common | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arm/Makefile.common b/arm/Makefile.common
+> index 52f7440..cca0d9c 100644
+> --- a/arm/Makefile.common
+> +++ b/arm/Makefile.common
+> @@ -21,6 +21,7 @@ phys_base = $(LOADADDR)
+>  
+>  CFLAGS += -std=gnu99
+>  CFLAGS += -ffreestanding
+> +CFLAGS += -fno-pic
+>  CFLAGS += -Wextra
+>  CFLAGS += -O2
+>  CFLAGS += -I lib -I lib/libfdt
+> -- 
+> 2.10.1
+> 
+>
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Applied to arm/next
 
-Current Linux has of_clk_get(), but doesn't have devm_of_clk_get().
-This patch adds it.
+https://github.com/rhdrjones/kvm-unit-tests/commits/arm/next
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
----
-v2 -> v3
-
- - implement in clk-devres.c, and reused existing devm_clk_release()
-
- drivers/clk/clk-devres.c | 21 +++++++++++++++++++++
- include/linux/clk.h      |  7 +++++++
- 2 files changed, 28 insertions(+)
-
-diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
-index 8f57154..2449b25 100644
---- a/drivers/clk/clk-devres.c
-+++ b/drivers/clk/clk-devres.c
-@@ -53,3 +53,24 @@ void devm_clk_put(struct device *dev, struct clk *clk)
- 	WARN_ON(ret);
- }
- EXPORT_SYMBOL(devm_clk_put);
-+
-+struct clk *devm_of_clk_get(struct device *dev,
-+			    struct device_node *np, int index)
-+{
-+	struct clk **ptr, *clk;
-+
-+	ptr = devres_alloc(devm_clk_release, sizeof(*ptr), GFP_KERNEL);
-+	if (!ptr)
-+		return ERR_PTR(-ENOMEM);
-+
-+	clk = of_clk_get(np, index);
-+	if (!IS_ERR(clk)) {
-+		*ptr = clk;
-+		devres_add(dev, ptr);
-+	} else {
-+		devres_free(ptr);
-+	}
-+
-+	return clk;
-+}
-+EXPORT_SYMBOL(devm_of_clk_get);
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 123c027..1b713db 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -506,6 +506,8 @@ static inline void clk_disable_unprepare(struct clk *clk)
- 
- #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
- struct clk *of_clk_get(struct device_node *np, int index);
-+struct clk *devm_of_clk_get(struct device *dev,
-+			    struct device_node *np, int index);
- struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
- struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
- #else
-@@ -513,6 +515,11 @@ static inline struct clk *of_clk_get(struct device_node *np, int index)
- {
- 	return ERR_PTR(-ENOENT);
- }
-+static inline struct clk *devm_of_clk_get(struct device *dev,
-+			    struct device_node *np, int index)
-+{
-+	return ERR_PTR(-ENOENT);
-+}
- static inline struct clk *of_clk_get_by_name(struct device_node *np,
- 					     const char *name)
- {
--- 
-1.9.1
+Thanks,
+drew
