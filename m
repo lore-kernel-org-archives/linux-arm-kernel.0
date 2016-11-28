@@ -1,14 +1,19 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 28 Nov 2016 17:15:25 +0100
+From: sf84@laposte.net (Sebastian Frias)
+Date: Mon, 28 Nov 2016 17:23:26 +0100
 Subject: arasan,sdhci.txt "compatibility" DT binding
 In-Reply-To: <583C50E7.6030400@free.fr>
-References: <56B07BA5.4060407@free.fr>
- <a20b2b4f-15d4-3c29-324c-1ced5dbcc67f@xilinx.com> <583C50E7.6030400@free.fr>
-Message-ID: <14771688.Q8f97gHC2H@wuerfel>
+References: <56B07BA5.4060407@free.fr> <56B166F1.5080605@rock-chips.com>
+ <56B1AA44.1010108@xilinx.com> <56B1BAF8.2050907@free.fr>
+ <56B1CF40.1030203@xilinx.com> <20160203152104.GP4215@xsjsorenbubuntu>
+ <56B21DDB.6050708@free.fr> <582ED9E0.5090506@free.fr>
+ <CAFd313x6MJeO90_+rxditdPn762g7TqZc0_D6ojGTKmtGJKjPA@mail.gmail.com>
+ <582EF744.8090307@free.fr> <a20b2b4f-15d4-3c29-324c-1ced5dbcc67f@xilinx.com>
+ <583C50E7.6030400@free.fr>
+Message-ID: <e8425325-8036-b99e-1903-3590af96991c@laposte.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 28, 2016 4:44:39 PM CET Mason wrote:
+On 28/11/16 16:44, Mason wrote:
 > Hello,
 > 
 > @Shawn Lin, could you take a look below and tell me exactly
@@ -64,9 +69,38 @@ On Monday, November 28, 2016 4:44:39 PM CET Mason wrote:
 > 
 > What do you think?
 
-It seems wrong to have the eMMC or SD version in the compatible
-string.  Is that the only difference between the documents you
-found? Normally there should be a version of IP block itself,
-besides the supported protocol.
 
-	Arnd
+I'm trying to picture this. Imagine:
+a) SoC XYZ used two versions:
+  - SD_3.0_SDIO_3.0_eMMC_4.4__AHB_Host_Controller.pdf
+  - SD_3.0_SDIO_3.0_eMMC_4.5__Host_Controller.pdf
+b) That the compatible suffixes were defined as "sd30-emmc44" and
+"sd30-emmc45" respectively
+c) That the chip-specific init is the same for both.
+
+What would be the recommended way of dealing with that at DT/driver level?
+
+1) XYZ's DT1: compatible = "arasan,sdhci-sd30-emmc44", "XYZ,sdhci"
+         DT2: compatible = "arasan,sdhci-sd30-emmc45", "XYZ,sdhci"
+   driver: match "XYZ,sdhci" for chip-specific init, and then leaves
+"arasan,sdhci-sd30-emmc44" or arasan,sdhci-sd30-emmc45" for generic part
+
+2) XYZ's DT1: compatible = "XYZ,arasan-sdhci-sd30-emmc44"
+         DT2: compatible = "XYZ,arasan-sdhci-sd30-emmc45"
+   driver: match "XYZ,arasan-sdhci-sd30-emmc44" or "XYZ,arasan-sdhci-sd30-emmc45"
+for chip-specific init and generic parts
+
+3) XYZ's DT1: compatible = "arasan,sdhci-sd30-emmc44"
+         DT2: compatible = "arasan,sdhci-sd30-emmc45"
+   driver: match "arasan,sdhci-sd30-emmc44" or "arasan,sdhci-sd30-emmc45" for
+generic part; chip-specific init done somewhere else (bootloader?)
+
+4) something else?
+
+How would those solutions be affected if condition c) was changed to
+"chip-specific init is different for both"?
+
+
+> 
+> Regards.
+> 
