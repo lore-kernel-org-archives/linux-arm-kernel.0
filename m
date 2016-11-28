@@ -1,43 +1,41 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 28 Nov 2016 17:12:17 +0530
-Subject: [GIT PULL 2/4] DaVinci SoC updates for v4.10 (part 3)
+Date: Mon, 28 Nov 2016 17:12:18 +0530
+Subject: [GIT PULL 3/4] DaVinci DT updates for v4.10 (part 3)
 In-Reply-To: <20161128114219.22325-1-nsekhar@ti.com>
 References: <20161128114219.22325-1-nsekhar@ti.com>
-Message-ID: <20161128114219.22325-3-nsekhar@ti.com>
+Message-ID: <20161128114219.22325-4-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7e431af8fa0b9ed9d74378c99514856211cb9db8:
+The following changes since commit 83de086cc89410a8d4e0b6345e8a1116797ea703:
 
-  ARM: davinci: PM: support da8xx DT platforms (2016-11-16 14:45:07 +0530)
+  ARM: dts: da850-lcdk: Enable the usb otg device node (2016-11-20 17:02:18 +0530)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.10/soc-3
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.10/dt-3
 
-for you to fetch changes up to b5e1438cf98a1c588726b0f861178f9aa5a96caf:
+for you to fetch changes up to 878e908ad95637dc6567a9b5f6876a580ae90dfa:
 
-  ARM: davinci: da830-evm: use gpio descriptor for mmc pins (2016-11-28 14:01:17 +0530)
-
-----------------------------------------------------------------
-mach-davinci SoC support updates to adjust
-USB ohci device name to that used by drivers
-and update of various board files to use gpio
-descriptor API used by MMC subsystem for card
-detect and write-protect detection.
+  ARM: dts: da850: enable memctrl and mstpri nodes per board (2016-11-28 15:51:29 +0530)
 
 ----------------------------------------------------------------
-Axel Haslam (4):
-      ARM: davinci: da8xx: Fix ohci device name
-      ARM: davinci: hawk: use gpio descriptor for mmc pins
-      ARM: davinci: da850-evm: use gpio descriptor for mmc pins
-      ARM: davinci: da830-evm: use gpio descriptor for mmc pins
+Some fixes for device-tree patches already queued.
+- Fix SD card detect polarity
+- Prevent Ethernet from picking a random mac address
+- Fix error messages on platforms which dont use
+  bus master and emif priority settings.
 
- arch/arm/mach-davinci/board-da830-evm.c     | 41 ++++++++--------------------
- arch/arm/mach-davinci/board-da850-evm.c     | 35 +++++++-----------------
- arch/arm/mach-davinci/board-omapl138-hawk.c | 42 ++++++++---------------------
- arch/arm/mach-davinci/da830.c               |  2 +-
- arch/arm/mach-davinci/da850.c               |  2 +-
- arch/arm/mach-davinci/da8xx-dt.c            |  2 +-
- arch/arm/mach-davinci/usb-da8xx.c           |  4 +--
- 7 files changed, 37 insertions(+), 91 deletions(-)
+----------------------------------------------------------------
+Axel Haslam (1):
+      ARM: dts: da850-lcdk: fix mmc card detect polarity
+
+Bartosz Golaszewski (1):
+      ARM: dts: da850: enable memctrl and mstpri nodes per board
+
+Fabien Parent (1):
+      ARM: dts: da850-lcdk: Add ethernet0 alias to DT
+
+ arch/arm/boot/dts/da850-lcdk.dts | 11 ++++++++++-
+ arch/arm/boot/dts/da850.dtsi     |  2 ++
+ 2 files changed, 12 insertions(+), 1 deletion(-)
