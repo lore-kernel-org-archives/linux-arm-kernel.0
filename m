@@ -1,62 +1,51 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 28 Nov 2016 14:17:34 +0100
-Subject: [PATCH v4] crypto: arm64/sha2: integrate OpenSSL implementations
- of SHA256/SHA512
-In-Reply-To: <20161128120503.GC1485@arm.com>
-References: <1479642121-17912-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161128120503.GC1485@arm.com>
-Message-ID: <CAKv+Gu-uzqR758CSPZ_sWwbeejgw1cU-zwxpLU11A=3mnvqcNg@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 28 Nov 2016 14:17:35 +0100
+Subject: [PATCH 2/2] net: dsa: mv88e6xxx: Add 88E6176 device tree support
+In-Reply-To: <20161128080939.ippqlytvojitefkp@perseus.defre.kleine-koenig.org>
+References: <1480280279-9552-1-git-send-email-afaerber@suse.de>
+ <1480280279-9552-2-git-send-email-afaerber@suse.de>
+ <20161127212709.GD13318@lunn.ch>
+ <9500470d-09c3-3ecb-994b-3d108bffc99e@suse.de>
+ <20161127220846.GH13318@lunn.ch>
+ <e5d45b55-a4c1-3b5e-0bdc-a5e340b072d0@suse.de>
+ <20161127231009.GA17704@lunn.ch>
+ <20161128080939.ippqlytvojitefkp@perseus.defre.kleine-koenig.org>
+Message-ID: <20161128131735.GA4379@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 November 2016 at 13:05, Will Deacon <will.deacon@arm.com> wrote:
-> On Sun, Nov 20, 2016 at 11:42:01AM +0000, Ard Biesheuvel wrote:
->> This integrates both the accelerated scalar and the NEON implementations
->> of SHA-224/256 as well as SHA-384/512 from the OpenSSL project.
->>
->> Relative performance compared to the respective generic C versions:
->>
->>                  |  SHA256-scalar  | SHA256-NEON* |  SHA512  |
->>      ------------+-----------------+--------------+----------+
->>      Cortex-A53  |      1.63x      |     1.63x    |   2.34x  |
->>      Cortex-A57  |      1.43x      |     1.59x    |   1.95x  |
->>      Cortex-A73  |      1.26x      |     1.56x    |     ?    |
->>
->> The core crypto code was authored by Andy Polyakov of the OpenSSL
->> project, in collaboration with whom the upstream code was adapted so
->> that this module can be built from the same version of sha512-armv8.pl.
->>
->> The version in this patch was taken from OpenSSL commit 32bbb62ea634
->> ("sha/asm/sha512-armv8.pl: fix big-endian support in __KERNEL__ case.")
->>
->> * The core SHA algorithm is fundamentally sequential, but there is a
->>   secondary transformation involved, called the schedule update, which
->>   can be performed independently. The NEON version of SHA-224/SHA-256
->>   only implements this part of the algorithm using NEON instructions,
->>   the sequential part is always done using scalar instructions.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/crypto/Kconfig               |    8 +
->>  arch/arm64/crypto/Makefile              |   17 +
->>  arch/arm64/crypto/sha256-core.S_shipped | 2061 ++++++++++++++++++++
->>  arch/arm64/crypto/sha256-glue.c         |  185 ++
->>  arch/arm64/crypto/sha512-armv8.pl       |  778 ++++++++
->>  arch/arm64/crypto/sha512-core.S_shipped | 1085 +++++++++++
->>  arch/arm64/crypto/sha512-glue.c         |   94 +
->>  7 files changed, 4228 insertions(+)
->
-> If I build a kernel with this applied and CRYPTO_SHA{256,512}_ARM64=y,
-> then I end up with untracked .S files according to git:
->
-> $ git status
-> Untracked files:
->         arch/arm64/crypto/sha256-core.S
->         arch/arm64/crypto/sha512-core.S
->
+> I still wonder (and didn't get an answer back when I asked about this)
+> why a comment is preferred here. For other devices I know it's usual and
+> requested by the maintainers to use:
+> 
+> 	compatible = "exact name", "earlyer device to match driver";
+> 
+> . This is more robust, documents the situation more formally and makes
+> it better greppable. The price to pay is only a few bytes in the dtb
+> which IMO is ok.
 
-Ah right, I forgot to add a .gitignore for these: that is required
-with .S_shipped files. I didn't spot this myself because I always
-build out of tree
+We did discuss this a while back. The information is useless and
+should to be ignored if present.
 
-Would you mind taking a separate patch for that?
+The switch has a register which contains its model and revision. Each
+port has a set of registers, and register 3 contains the
+model/version. For all devices compatible with the 6085, the port
+registers start at address 0x10. For the 6190, the port registers
+start at 0x0. So given one of these two compatible strings, we can
+find the model of the device, from something which is burned into the
+silicon.
+
+Now, say we did add per device compatible strings. We look up the
+model burned into the silicon, find it is different to what the device
+tree is and do what? Fail the probe? Or just keep going using the
+value in the silicon? It seems silly to fail the probe if the driver
+does support the model, but that means the device tree is never
+verified and hence probably wrong. Why have wrong information in the
+device tree, especially wrong information which we never use. It is
+better to not have that information in the device tree.
+
+Linus has said he does not like ARM devices because of all the busses
+which are not enumerable. Here we have a device which with a little
+bit of help we can enumerate. So we should. 
+
+    Andrew
