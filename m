@@ -1,94 +1,86 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 28 Nov 2016 12:30:38 -0800
-Subject: [PATCH V8 2/6] thermal: bcm2835: add thermal driver for bcm2835
- soc
-In-Reply-To: <20161125052008.GA8342@localhost.localdomain>
-References: <1478081906-12009-1-git-send-email-kernel@martin.sperl.org>
- <1478081906-12009-3-git-send-email-kernel@martin.sperl.org>
- <20161117021107.GA2647@localhost.localdomain>
- <766e1b70-d83a-eb52-fa2b-aec435e85673@martin.sperl.org>
- <20161117151019.GA3115@localhost.localdomain>
- <7957B3CC-0E18-4B27-82EB-EF88B7695E28@martin.sperl.org>
- <20161119042224.GA25063@localhost.localdomain>
- <28F93ABE-8210-4389-AE77-4D5E830E669B@martin.sperl.org>
- <20161125052008.GA8342@localhost.localdomain>
-Message-ID: <87twarz6s1.fsf@eliezer.anholt.net>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 28 Nov 2016 12:32:35 -0800
+Subject: Adding a .platform_init callback to sdhci_arasan_ops
+In-Reply-To: <9c783843-d0e4-92ef-d156-6826e38d9fa8@free.fr>
+References: <d50dcd8a-2489-4e82-1dc7-13e93e38d5ff@laposte.net>
+ <982d633b-e9c4-0f10-052b-e324f094d0f5@xilinx.com>
+ <2a949ade-edd7-4690-cd6a-434ae1e663dc@intel.com>
+ <66751ab5-59a4-ec30-07cd-44ca03694723@laposte.net>
+ <d1801c1e-cd74-b79c-0280-8fb5dc377c91@intel.com>
+ <e32d2a01-ba3c-6127-51ba-a1fd4176e32c@laposte.net>
+ <485a747c-47e3-bc0e-093a-4ec9ab719987@laposte.net>
+ <CAD=FV=XrJHFbpbhsJZAEE-HLMe47Ov=BgvHw8ZtfCazzT75pKQ@mail.gmail.com>
+ <9c783843-d0e4-92ef-d156-6826e38d9fa8@free.fr>
+Message-ID: <CAD=FV=XH8_K2OAwmDKrOD=eq_VevG01UK8=cEOmTbkZ11+Z+zA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eduardo Valentin <edubezval@gmail.com> writes:
+Hi,
 
-> Hello,
+On Mon, Nov 28, 2016 at 11:32 AM, Mason <slash.tmp@free.fr> wrote:
+> On 28/11/2016 18:46, Doug Anderson wrote:
 >
-> On Tue, Nov 22, 2016 at 03:28:04PM +0100, Martin Sperl wrote:
->> Hi Eduardo!
->> 
->> On 19.11.2016 05:22, Eduardo Valentin wrote:
->> > Hello Martin,
+>> As argued in my original patch the field "corecfg_baseclkfreq" is
+>> documented in the generic Arasan document
+>> <https://arasan.com/wp-content/media/eMMC-5-1-Total-Solution_Rev-1-3.pdf>
+>> and thus is unlikely to be Rockchip specific.
 >
-> <cut>
->
->> 
->> I was asked to implement the "initialize" case just in case FW ever
->> stopped setting up the device itself, so that is why this code is
->> included.
->
-> OK. Looks like we (like, we in the Linux side) do not understand the
-> conditions that firmware fails to initialize the thermal device, but we
-> still want to force an initialization, hoping to get the device in a sane
-> state, even if we do not know if the firmware is correctly booted or
-> not. And that is done silently, with no notification to user. I see.
+> I downloaded the data sheet, which doesn't mention registers,
+> but "pins" and "signals". Does that mean it is up to every
+> platform to decide how to group these wires into individual
+> registers?
 
-The firmware today always initializes thermal.  I suggested adding the
-init code because we (myself and the Pi Foundation) would like to reduce
-how much closed firmware code is required in the platform, and the Linux
-driver doing this would help make that possible in the future.
+As I understand it: yes.  ...but remember that I'm not arasan nor even
+Rockchip and I don't have any access to that they provide their IP
+licensees.
 
->> > Who has the ownership of this device?
->> 
->> Joined ownership I suppose...
->> 
+That's why I structured my config the way it did.  It means that no
+matter how a licensee stuffs these configs into their register map we
+can support it.  Every configuration is individually described by a
+register offset, width, and mask.  Technically the width _ought_ to be
+the same for all users, so I guess you could try to optimize that out.
+...but it doesn't hurt the way it is.
+
+
+> corecfg_baseclkfreq[7:0]
+> Base Clock Frequency for SD Clock.
+> This is the frequency of the xin_clk.
 >
-> with no synchronization mechanism?
+> How can 8 bits encode a frequency?
+> Is there an implicit LUT? Is it a MHz count?
 
-Correct, because none is necessary.
+Use the source.  :)
 
->> >> The above mentioned ?configuration if not running? reflect the values that
->> >> the FW is currently setting. We should not change those values as long as the
->> >> Firmware is also reading the temperature on its own.
->> > 
->> > hmm.. that looks like racy to me. Again, How do you synchronize accesses to
->> > this device? What if you configure the device and right after the
->> > firmware updates the configs? How do you make sure the configs you are
->> > writing here are the same used by the firmware? What if the firmware
->> > version changes? What versions of the firmware does this driver support?
->> > 
->> > Would it make sense to simply always initialize the device? Do you have
->> > a way to tell the firmware that it should not use the device?
->> > 
->> > Or, if you want to keep the device driver simply being a dummy reader,
->> > would it make sense to simply avoid writing configurations to the
->> > device, and simply retry to check if the firmware gets the device
->> > initialized?
->> 
->> Again: the device registers are only ever written if the device is not started
->> already. Otherwise the driver only reads for the ADC register, so there
->> is no real race here.
->> 
->
-> and no race?
->
-> To me, there is a race when you write to the config of this device,
-> given that there is no sync between the two. We do not know if the
-> firmware would be still attempting to initialize the device or not, do
-> we? 
+ * The corecfg_baseclkfreq is supposed to contain the MHz of clk_xin.
 
-Either the device was initialized by the firmware before handing off to
-ARM (today's firmware) or it never will be (potential future firmware).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161128/af046805/attachment.sig>
+It also turns out to match the SDHCI spec "Base Clock Frequency for SD
+Clock".  See below.
+
+---
+
+It actually turns out that both of the "corecfg" bits we're setting
+right now for Rockchip are a bit on the silly side.  All they do is
+get mirrored out the other end in the "caps" register.  I found that
+out from folks at Rockchip much later after I wrote my patch.
+
+So, for instance, setting corecfg_clockmultiplier (I'm told) does
+nothing more than control the bits read here:
+
+  (caps[1] & SDHCI_CLOCK_MUL_MASK) >> SDHCI_CLOCK_MUL_SHIFT;
+
+I can certainly see that they are mirrored, but I have to just take it
+on faith that it does nothing else.
+
+>>> w(grf + 0xf02c, 0x00ff0011)
+>>> hex((r(sdhci + 0x44) & 0x00ff0000) >> 16)
+'0x11L'
+
+
+...and similar for the speed:
+
+>>> w(grf + 0xf000, 0xff009700)
+>>> hex((r(sdhci + 0x40) & 0x0000ff00) >> 8)
+'0x97L'
+
+
+-Doug
