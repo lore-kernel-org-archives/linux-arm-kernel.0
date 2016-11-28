@@ -1,51 +1,56 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 28 Nov 2016 14:17:35 +0100
-Subject: [PATCH 2/2] net: dsa: mv88e6xxx: Add 88E6176 device tree support
-In-Reply-To: <20161128080939.ippqlytvojitefkp@perseus.defre.kleine-koenig.org>
-References: <1480280279-9552-1-git-send-email-afaerber@suse.de>
- <1480280279-9552-2-git-send-email-afaerber@suse.de>
- <20161127212709.GD13318@lunn.ch>
- <9500470d-09c3-3ecb-994b-3d108bffc99e@suse.de>
- <20161127220846.GH13318@lunn.ch>
- <e5d45b55-a4c1-3b5e-0bdc-a5e340b072d0@suse.de>
- <20161127231009.GA17704@lunn.ch>
- <20161128080939.ippqlytvojitefkp@perseus.defre.kleine-koenig.org>
-Message-ID: <20161128131735.GA4379@lunn.ch>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Mon, 28 Nov 2016 21:17:48 +0800
+Subject: [PATCH 4/4] crypto: arm/crct10dif - port x86 SSE implementation
+ to ARM
+In-Reply-To: <CAKv+Gu8tPfX76ntdQmMz53waE73RHfB11oRs8w=Ufy7d=YqbGA@mail.gmail.com>
+References: <1480002201-1427-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1480002201-1427-5-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu8tPfX76ntdQmMz53waE73RHfB11oRs8w=Ufy7d=YqbGA@mail.gmail.com>
+Message-ID: <20161128131748.GA2757@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I still wonder (and didn't get an answer back when I asked about this)
-> why a comment is preferred here. For other devices I know it's usual and
-> requested by the maintainers to use:
+On Thu, Nov 24, 2016 at 05:32:42PM +0000, Ard Biesheuvel wrote:
+> On 24 November 2016 at 15:43, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > This is a straight transliteration of the Intel algorithm implemented
+> > using SSE and PCLMULQDQ instructions that resides under in the file
+> > arch/x86/crypto/crct10dif-pcl-asm_64.S.
+> >
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > ---
+> >  arch/arm/crypto/Kconfig                        |   5 +
+> >  arch/arm/crypto/Makefile                       |   2 +
+> >  arch/{arm64 => arm}/crypto/crct10dif-ce-core.S | 457 +++++++++++---------
+> >  arch/{arm64 => arm}/crypto/crct10dif-ce-glue.c |  23 +-
+> >  4 files changed, 277 insertions(+), 210 deletions(-)
+> >
 > 
-> 	compatible = "exact name", "earlyer device to match driver";
+> This patch needs the following hunk folded in to avoid breaking the
+> Thumb2 build:
 > 
-> . This is more robust, documents the situation more formally and makes
-> it better greppable. The price to pay is only a few bytes in the dtb
-> which IMO is ok.
+> """
+> diff --git a/arch/arm/crypto/crct10dif-ce-core.S
+> b/arch/arm/crypto/crct10dif-ce-core.S
+> index 30168b0f8581..4fdbca94dd0c 100644
+> --- a/arch/arm/crypto/crct10dif-ce-core.S
+> +++ b/arch/arm/crypto/crct10dif-ce-core.S
+> @@ -152,7 +152,8 @@ CPU_LE(     vrev64.8        q7, q7                  )
+>         // XOR the initial_crc value
+>         veor.8          q0, q0, q10
+> 
+> -       adrl            ip, rk3
+> +ARM(   adrl            ip, rk3         )
+> +THUMB( adr             ip, rk3         )
+>         vld1.64         {q10}, [ip]     // xmm10 has rk3 and rk4
+>                                         // type of pmull instruction
+>                                         // will determine which constant to use
+> """
 
-We did discuss this a while back. The information is useless and
-should to be ignored if present.
+I'm sorry but this patch doesn't apply on top of the other four.
+So please resend the whole series.
 
-The switch has a register which contains its model and revision. Each
-port has a set of registers, and register 3 contains the
-model/version. For all devices compatible with the 6085, the port
-registers start at address 0x10. For the 6190, the port registers
-start at 0x0. So given one of these two compatible strings, we can
-find the model of the device, from something which is burned into the
-silicon.
-
-Now, say we did add per device compatible strings. We look up the
-model burned into the silicon, find it is different to what the device
-tree is and do what? Fail the probe? Or just keep going using the
-value in the silicon? It seems silly to fail the probe if the driver
-does support the model, but that means the device tree is never
-verified and hence probably wrong. Why have wrong information in the
-device tree, especially wrong information which we never use. It is
-better to not have that information in the device tree.
-
-Linus has said he does not like ARM devices because of all the busses
-which are not enumerable. Here we have a device which with a little
-bit of help we can enumerate. So we should. 
-
-    Andrew
+Thanks,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
