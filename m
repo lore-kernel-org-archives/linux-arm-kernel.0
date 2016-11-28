@@ -1,44 +1,31 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 28 Nov 2016 18:13:39 +0000
-Subject: [PATCH V3 0/8] IOMMU probe deferral support
-In-Reply-To: <000001d2499e$df7f2d80$9e7d8880$@codeaurora.org>
-References: <60ee8066-f167-e9df-ae3e-4138f1133bad@arm.com>
- <003a01d22f97$82534c70$86f9e550$@codeaurora.org>
- <421e2b14-0231-d376-02a0-097423120b3d@arm.com>
- <006f01d236ae$61751c40$245f54c0$@codeaurora.org>
- <9f36244f-62d4-08e3-d64a-2b04ad4dc2e0@arm.com>
- <002b01d24340$5d56e730$1804b590$@codeaurora.org>
- <918128b9-cdb0-1454-000a-146cee7a05ea@arm.com>
- <004401d2466d$5b8b2170$12a16450$@codeaurora.org>
- <f2ad6976-0f8f-d116-bc43-37337dd9f41f@arm.com>
- <000001d2499e$df7f2d80$9e7d8880$@codeaurora.org>
-Message-ID: <20161128181339.GA32078@red-moon>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 28 Nov 2016 10:25:26 -0800
+Subject: [PATCH] ARM64: dts: meson-gxbb: add SCPI pre-1.0 compatible
+Message-ID: <20161128182526.1386-1-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2016 at 11:12:08PM +0530, Sricharan wrote:
+The SCPI driver has an updated compatible to indicate the pre-released
+(pre v1.0) status of the driver.  Since Amlogic used a pre-1.0
+version, add that compatible as well.
 
-[...]
+Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> >Cool. We're rather hoping that the ACPI stuff is good to go for 4.10
-> >now, so it's probably worth pulling the rest of that in (beyond the one
-> >patch I picked) to make sure the of_dma_configure/acpi_dma_configure
-> >paths don't inadvertently diverge.
-> >
-> 
-> I rebased and was testing your branch with Lorenzo's series. One thing
-> i am still trying to get right is the acpi_dma_configure call. With your
-> series dma_configure calls pci_dma/of_dma configure, so i am just adding
-> acpi_dma_configure call there for non-pci ACPI devices as well. I see that
-> acpi_dma_configure right now is called from acpi_bind_one and 
-> iort_add_smmu_platform_device, both go through the really_probe function
-> path, so moving acpi_dma_configure from the above the two functions
-> to dma_configure. I remember we discussed this on another thread, so
-> hopefully it is correct. I do not have an platform to test the ACPI though.
-> I will take some testing help on V4 for this.
-
-I am happy to test it for you please just send me a pointer at your v4
-code.
-
-Thank you !
-Lorenzo
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index ac5ad3bf1bd6..51edd5b5c460 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -51,7 +51,7 @@
+ 	compatible = "amlogic,meson-gxbb";
+ 
+ 	scpi {
+-		compatible = "amlogic,meson-gxbb-scpi";
++		compatible = "amlogic,meson-gxbb-scpi", "arm,scpi-pre-1.0";
+ 		mboxes = <&mailbox 1 &mailbox 2>;
+ 		shmem = <&cpu_scp_lpri &cpu_scp_hpri>;
+ 
+-- 
+2.9.3
