@@ -1,36 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 28 Nov 2016 10:52:54 +0000
-Subject: [bug report v4.8] fs/locks.c: kernel oops during posix lock
- stress test
-In-Reply-To: <CACVXFVPsHjh3CWjdUrKB_r6=hkXK=qS3wpykbacdKe1rzz1H8Q@mail.gmail.com>
-References: <CACVXFVPsHjh3CWjdUrKB_r6=hkXK=qS3wpykbacdKe1rzz1H8Q@mail.gmail.com>
-Message-ID: <20161128105254.GB1485@arm.com>
+From: uwe@kleine-koenig.org (=?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?=)
+Date: Mon, 28 Nov 2016 11:54:11 +0100
+Subject: [PATCH] ARM: dts: mvebu: Add Armada 38x labels and clean up
+ Turris Omnia
+In-Reply-To: <4ad1108a-43c4-46f8-4683-1c4b89996036@suse.de>
+References: <1fc18002-0144-8300-1888-09f456860ef0@kleine-koenig.org>
+ <1480272700-28888-1-git-send-email-afaerber@suse.de>
+ <20161128103738.GT14217@n2100.armlinux.org.uk>
+ <4ad1108a-43c4-46f8-4683-1c4b89996036@suse.de>
+Message-ID: <e29e1a96-c9d5-d9b1-a42d-8afddc2714a7@kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ming,
+Hello,
 
-On Mon, Nov 28, 2016 at 11:10:14AM +0800, Ming Lei wrote:
-> When I run stress-ng via the following steps on one ARM64 dual
-> socket system(Cavium Thunder), the kernel oops[1] can often be
-> triggered after running the stress test for several hours(sometimes
-> it may take longer):
+On 11/28/2016 11:52 AM, Andreas F?rber wrote:
+>> Please don't do this for clearfog - there's changes in the pipeline which
+>> completely replace armada-388-clearfog.dts because there's a "base" and
+>> "pro" versions of this hardware now, and making such a huge change will
+>> effectively mean we have to start over with the DT files.
 > 
-> - git clone git://kernel.ubuntu.com/cking/stress-ng.git
-> - apply the attachment patch which just makes the posix file
-> lock stress test more aggressive
-> - run the test via '~/git/stress-ng$./stress-ng --lockf 128 --aggressive'
-> 
-> 
-> From the oops log, looks one garbage file_lock node is got
-> from the linked list of 'ctx->flc_posix' when the issue happens.
-> 
-> BTW, the issue isn't observed on single socket Cavium Thunder yet,
-> and the same issue can be seen on Ubuntu Xenial(v4.4 based kernel)
-> too.
+> Would it help to split it back up into a series of add-labels,
+> use-labels like I had originally? Then you could start using them in
+> your refactoring as soon as the add-labels patch gets applied. Or are
+> you completely against this style?
 
-I've seen issues with the LSE atomics on the Thunder platform -- can you
-try disabling those (CONFIG_ARM64_LSE_ATOMICS) and see if the problem
-persists, please?
+I'd even go as far as:
 
-Will
+	1: add labels to .dtsi
+	2: use labels on .dts#1
+	3: use labels on .dts#2
+	...
+
+Best regards
+Uwe
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161128/10666366/attachment.sig>
