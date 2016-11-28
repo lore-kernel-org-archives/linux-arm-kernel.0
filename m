@@ -1,292 +1,272 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 28 Nov 2016 17:43:15 +0000
-Subject: [PATCH] KVM: arm/arm64: Access CNTHCTL_EL2 bit fields correctly
-In-Reply-To: <1480351570-11648-1-git-send-email-jintack@cs.columbia.edu>
-References: <1480351570-11648-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <d04fd17e-9157-07fe-4daa-9dbab149b5e6@arm.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 28 Nov 2016 09:46:59 -0800
+Subject: Adding a .platform_init callback to sdhci_arasan_ops
+In-Reply-To: <485a747c-47e3-bc0e-093a-4ec9ab719987@laposte.net>
+References: <d50dcd8a-2489-4e82-1dc7-13e93e38d5ff@laposte.net>
+ <982d633b-e9c4-0f10-052b-e324f094d0f5@xilinx.com>
+ <2a949ade-edd7-4690-cd6a-434ae1e663dc@intel.com>
+ <66751ab5-59a4-ec30-07cd-44ca03694723@laposte.net>
+ <d1801c1e-cd74-b79c-0280-8fb5dc377c91@intel.com>
+ <e32d2a01-ba3c-6127-51ba-a1fd4176e32c@laposte.net>
+ <485a747c-47e3-bc0e-093a-4ec9ab719987@laposte.net>
+Message-ID: <CAD=FV=XrJHFbpbhsJZAEE-HLMe47Ov=BgvHw8ZtfCazzT75pKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jintack,
+Hi,
 
-On 28/11/16 16:46, Jintack Lim wrote:
-> Bit positions of CNTHCTL_EL2 are changing depending on HCR_EL2.E2H bit.
-> EL1PCEN and EL1PCTEN are 1st and 0th bits when E2H is not set, but they
-> are 11th and 10th bits respectively when E2H is set.  Current code is
-> unintentionally setting wrong bits to CNTHCTL_EL2 with E2H set, which
-> may allow guest OS to access physical timer. So, fix it.
-> 
-> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-> ---
->  arch/arm/include/asm/kvm_timer.h     | 33 +++++++++++++++++++
->  arch/arm64/include/asm/kvm_timer.h   | 62 ++++++++++++++++++++++++++++++++++++
->  include/clocksource/arm_arch_timer.h |  6 ++--
->  virt/kvm/arm/hyp/timer-sr.c          |  8 ++---
->  4 files changed, 103 insertions(+), 6 deletions(-)
->  create mode 100644 arch/arm/include/asm/kvm_timer.h
->  create mode 100644 arch/arm64/include/asm/kvm_timer.h
-> 
-> diff --git a/arch/arm/include/asm/kvm_timer.h b/arch/arm/include/asm/kvm_timer.h
-> new file mode 100644
-> index 0000000..d19d4b3
-> --- /dev/null
-> +++ b/arch/arm/include/asm/kvm_timer.h
-> @@ -0,0 +1,33 @@
-> +/*
-> + * Copyright (C) 2016 - Columbia University
-> + * Author: Jintack Lim <jintack@cs.columbia.edu>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
+On Mon, Nov 28, 2016 at 6:39 AM, Sebastian Frias <sf84@laposte.net> wrote:
+>> I will try to send another patch with what a different approach
+>>
+>
+> Here's a different approach (I just tested that it built, because I don't have the
+> rk3399 platform):
+>
+> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+> index 410a55b..5be6e67 100644
+> --- a/drivers/mmc/host/sdhci-of-arasan.c
+> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> @@ -382,22 +382,6 @@ static int sdhci_arasan_resume(struct device *dev)
+>  static SIMPLE_DEV_PM_OPS(sdhci_arasan_dev_pm_ops, sdhci_arasan_suspend,
+>                          sdhci_arasan_resume);
+>
+> -static const struct of_device_id sdhci_arasan_of_match[] = {
+> -       /* SoC-specific compatible strings w/ soc_ctl_map */
+> -       {
+> -               .compatible = "rockchip,rk3399-sdhci-5.1",
+> -               .data = &rk3399_soc_ctl_map,
+> -       },
+> -
+> -       /* Generic compatible below here */
+> -       { .compatible = "arasan,sdhci-8.9a" },
+> -       { .compatible = "arasan,sdhci-5.1" },
+> -       { .compatible = "arasan,sdhci-4.9a" },
+> -
+> -       { /* sentinel */ }
+> -};
+> -MODULE_DEVICE_TABLE(of, sdhci_arasan_of_match);
+> -
+>  /**
+>   * sdhci_arasan_sdcardclk_recalc_rate - Return the card clock rate
+>   *
+> @@ -578,28 +562,18 @@ static void sdhci_arasan_unregister_sdclk(struct device *dev)
+>         of_clk_del_provider(dev->of_node);
+>  }
+>
+> -static int sdhci_arasan_probe(struct platform_device *pdev)
+> +static int sdhci_rockchip_platform_init(struct sdhci_host *host,
+> +                                       struct platform_device *pdev)
+>  {
+>         int ret;
+> -       const struct of_device_id *match;
+>         struct device_node *node;
+> -       struct clk *clk_xin;
+> -       struct sdhci_host *host;
+>         struct sdhci_pltfm_host *pltfm_host;
+>         struct sdhci_arasan_data *sdhci_arasan;
+> -       struct device_node *np = pdev->dev.of_node;
+> -
+> -       host = sdhci_pltfm_init(pdev, &sdhci_arasan_pdata,
+> -                               sizeof(*sdhci_arasan));
+> -       if (IS_ERR(host))
+> -               return PTR_ERR(host);
+>
+>         pltfm_host = sdhci_priv(host);
+>         sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+> -       sdhci_arasan->host = host;
+>
+> -       match = of_match_node(sdhci_arasan_of_match, pdev->dev.of_node);
+> -       sdhci_arasan->soc_ctl_map = match->data;
+> +       sdhci_arasan->soc_ctl_map = &rk3399_soc_ctl_map;
+>
+>         node = of_parse_phandle(pdev->dev.of_node, "arasan,soc-ctl-syscon", 0);
+>         if (node) {
+> @@ -611,10 +585,107 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>                         if (ret != -EPROBE_DEFER)
+>                                 dev_err(&pdev->dev, "Can't get syscon: %d\n",
+>                                         ret);
+> -                       goto err_pltfm_free;
+> +                       return -1;
+>                 }
+>         }
+>
+> +       if (of_property_read_bool(pdev->dev.of_node, "xlnx,fails-without-test-cd"))
+> +               sdhci_arasan->quirks |= SDHCI_ARASAN_QUIRK_FORCE_CDTEST;
 > +
-> +#ifndef __ARM_KVM_TIMER_H__
-> +#define __ARM_KVM_TIMER_H__
-> +
-> +#include <clocksource/arm_arch_timer.h>
-> +
-> +static inline u32 __hyp_text get_el1pcten(void)
-> +{
-> +	return CNTHCTL_EL1PCTEN_NVHE;
+> +       return 0;
 > +}
 > +
-> +static inline u32 __hyp_text get_el1pcen(void)
+> +static int sdhci_rockchip_clock_init(struct sdhci_host *host,
+> +                                       struct platform_device *pdev)
 > +{
-> +	return CNTHCTL_EL1PCEN_NVHE;
+> +       struct sdhci_pltfm_host *pltfm_host;
+> +       struct sdhci_arasan_data *sdhci_arasan;
+> +
+> +       pltfm_host = sdhci_priv(host);
+> +       sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+> +
+> +       if (of_device_is_compatible(pdev->dev.of_node,
+> +                                   "rockchip,rk3399-sdhci-5.1"))
+> +               sdhci_arasan_update_clockmultiplier(host, 0x0);
+
+This _does_ belong in a Rockchip-specific init function, for now.
+Other platforms might want different values for
+corecfg_clockmultiplier, I think.
+
+If it becomes common to need to set this, it wouldn't be hard to make
+it generic by putting it in the data matched by the device tree, then
+generically call sdhci_arasan_update_clockmultiplier() in cases where
+it is needed.  sdhci_arasan_update_clockmultiplier() itself should be
+generic enough to handle it.
+
+
+> +
+> +       sdhci_arasan_update_baseclkfreq(host);
+
+If you make soc_ctl_map always part of "struct sdhci_arasan_cs_ops"
+then other platforms will be able to use it.
+
+As argued in my original patch the field "corecfg_baseclkfreq" is
+documented in the generic Arasan document
+<https://arasan.com/wp-content/media/eMMC-5-1-Total-Solution_Rev-1-3.pdf>
+and thus is unlikely to be Rockchip specific.  It is entirely possible
+that not everyone who integrates this IP block will need this register
+set, but in that case they can set an offset as "-1" and they'll be
+fine.
+
+Said another way: the concept of whether or not to set "baseclkfreq"
+doesn't need to be tired to whether or not we're on Rockchip.
+
+
+> +
+> +       return sdhci_arasan_register_sdclk(sdhci_arasan, pltfm_host->clk, &pdev->dev);
+
+This is documented in "bindings/mmc/arasan,sdhci.txt" to be available
+to all people using this driver, not just Rockchip.  You should do it
+always.  If you don't specify "#clock-cells" in the device tree it
+will be a no-op anyway.
+
+
 > +}
 > +
-> +#endif	/* __ARM_KVM_TIMER_H__ */
-> diff --git a/arch/arm64/include/asm/kvm_timer.h b/arch/arm64/include/asm/kvm_timer.h
-> new file mode 100644
-> index 0000000..153f3da
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/kvm_timer.h
-> @@ -0,0 +1,62 @@
-> +/*
-> + * Copyright (C) 2016 - Columbia University
-> + * Author: Jintack Lim <jintack@cs.columbia.edu>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#ifndef __ARM64_KVM_TIMER_H__
-> +#define __ARM64_KVM_TIMER_H__
-> +
-> +#include <asm/kvm_hyp.h>
-> +#include <clocksource/arm_arch_timer.h>
-> +
-> +static inline u32 __hyp_text get_el1pcten_vhe(void)
+> +static int sdhci_tango_platform_init(struct sdhci_host *host,
+> +                                    struct platform_device *pdev)
 > +{
-> +	return CNTHCTL_EL1PCTEN_VHE;
+> +       return 0;
+
+I'll comment in your other patch where you actually had an
+implementation for this.
+
+
 > +}
 > +
-> +static inline u32 __hyp_text get_el1pcten_nvhe(void)
+> +/* Chip-specific ops */
+> +struct sdhci_arasan_cs_ops {
+> +       int (*platform_init)(struct sdhci_host *host,
+> +                            struct platform_device *pdev);
+> +       int (*clock_init)(struct sdhci_host *host,
+> +                         struct platform_device *pdev);
+> +};
+
+I really think it's a good idea to add the "soc_ctl_map" into this structure.
+
+If nothing else when the next Rockchip SoC comes out that uses this
+then we won't have to do a second level of matching for Rockchip SoCs.
+I'm also a firm believer that others will need "soc_ctl_map" at some
+point in time, but obviously I can't predict the future.
+
+
+> +
+> +static const struct sdhci_arasan_cs_ops sdhci_rockchip_cs_ops = {
+> +       .platform_init = sdhci_rockchip_platform_init,
+> +       .clock_init = sdhci_rockchip_clock_init,
+> +};
+> +
+> +static const struct sdhci_arasan_cs_ops sdhci_tango_cs_ops = {
+> +       .platform_init = sdhci_tango_platform_init,
+> +};
+> +
+> +static const struct of_device_id sdhci_arasan_of_match[] = {
+> +       /* SoC-specific compatible strings */
+> +       {
+> +               .compatible = "rockchip,rk3399-sdhci-5.1",
+> +               .data = &sdhci_rockchip_cs_ops,
+> +       },
+> +       {
+> +               .compatible = "sigma,sdio-v1",
+> +               .data = &sdhci_tango_cs_ops,
+> +       },
+> +
+> +       /* Generic compatible below here */
+> +       { .compatible = "arasan,sdhci-8.9a" },
+> +       { .compatible = "arasan,sdhci-5.1" },
+> +       { .compatible = "arasan,sdhci-4.9a" },
+> +
+> +       { /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, sdhci_arasan_of_match);
+> +
+> +static int sdhci_arasan_probe(struct platform_device *pdev)
 > +{
-> +	return CNTHCTL_EL1PCTEN_NVHE;
-> +}
+> +       int ret;
+> +       const struct of_device_id *match;
+> +       struct clk *clk_xin;
+> +       struct sdhci_host *host;
+> +       struct sdhci_pltfm_host *pltfm_host;
+> +       struct sdhci_arasan_data *sdhci_arasan;
+> +       const struct sdhci_arasan_cs_ops *cs_ops;
 > +
-> +static hyp_alternate_select(get_el1pcten_arch,
-> +			    get_el1pcten_nvhe, get_el1pcten_vhe,
-> +			    ARM64_HAS_VIRT_HOST_EXTN);
-
-This is pretty horrid ;-)
-
-First, the inline qualifier doesn't apply here, as the whole 
-hyp_alternate_select hack relies on thing not being inlined (it 
-actually creates a function pointer).
-
-Then, this gets potentially instantiated in any compilation unit that 
-will include this file. GCC is probably clever enough to eliminate it 
-if not used, but not without a well deserved warning.
-
+> +       host = sdhci_pltfm_init(pdev, &sdhci_arasan_pdata,
+> +                               sizeof(*sdhci_arasan));
+> +       if (IS_ERR(host))
+> +               return PTR_ERR(host);
 > +
-> +static inline u32 __hyp_text get_el1pten_vhe(void)
-> +{
-> +	return CNTHCTL_EL1PTEN_VHE;
-> +}
+> +       pltfm_host = sdhci_priv(host);
+> +       sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+> +       sdhci_arasan->host = host;
 > +
-> +static inline u32 __hyp_text get_el1pcen_nvhe(void)
-> +{
-> +	return CNTHCTL_EL1PCEN_NVHE;
-> +}
+> +       match = of_match_device(sdhci_arasan_of_match, &pdev->dev);
+> +       if (match)
+> +               cs_ops = match->data;
 > +
-> +static hyp_alternate_select(get_el1pcen_arch,
-> +			    get_el1pcen_nvhe, get_el1pten_vhe,
-> +			    ARM64_HAS_VIRT_HOST_EXTN);
+> +       /* SoC-specific platform init */
+> +       if (cs_ops && cs_ops->platform_init) {
+> +               ret = cs_ops->platform_init(host, pdev);
+> +               if (ret)
+> +                       goto err_pltfm_free;
+> +       }
 > +
-> +static inline u32 __hyp_text get_el1pcten(void)
-> +{
-> +	return get_el1pcten_arch()();
-> +}
-> +
-> +static inline u32 __hyp_text get_el1pcen(void)
-> +{
-> +	return get_el1pcen_arch()();
-> +}
-> +
-> +#endif	/* __ARM64_KVM_TIMER_H__ */
-> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-> index caedb74..4094529 100644
-> --- a/include/clocksource/arm_arch_timer.h
-> +++ b/include/clocksource/arm_arch_timer.h
-> @@ -23,8 +23,10 @@
->  #define ARCH_TIMER_CTRL_IT_MASK		(1 << 1)
->  #define ARCH_TIMER_CTRL_IT_STAT		(1 << 2)
->  
-> -#define CNTHCTL_EL1PCTEN		(1 << 0)
-> -#define CNTHCTL_EL1PCEN			(1 << 1)
-> +#define CNTHCTL_EL1PCTEN_NVHE		(1 << 0)
-> +#define CNTHCTL_EL1PCEN_NVHE		(1 << 1)
-> +#define CNTHCTL_EL1PCTEN_VHE		(1 << 10)
-> +#define CNTHCTL_EL1PTEN_VHE		(1 << 11)
->  #define CNTHCTL_EVNTEN			(1 << 2)
->  #define CNTHCTL_EVNTDIR			(1 << 3)
->  #define CNTHCTL_EVNTI			(0xF << 4)
-> diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
-> index 798866a..f3feee0 100644
-> --- a/virt/kvm/arm/hyp/timer-sr.c
-> +++ b/virt/kvm/arm/hyp/timer-sr.c
-> @@ -15,11 +15,11 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->  
-> -#include <clocksource/arm_arch_timer.h>
->  #include <linux/compiler.h>
->  #include <linux/kvm_host.h>
->  
->  #include <asm/kvm_hyp.h>
-> +#include <asm/kvm_timer.h>
->  
->  /* vcpu is already in the HYP VA space */
->  void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
-> @@ -37,7 +37,7 @@ void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
->  
->  	/* Allow physical timer/counter access for the host */
->  	val = read_sysreg(cnthctl_el2);
-> -	val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
-> +	val |= get_el1pcten() | get_el1pcen();
->  	write_sysreg(val, cnthctl_el2);
->  
->  	/* Clear cntvoff for the host */
-> @@ -55,8 +55,8 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
->  	 * Physical counter access is allowed
->  	 */
->  	val = read_sysreg(cnthctl_el2);
-> -	val &= ~CNTHCTL_EL1PCEN;
-> -	val |= CNTHCTL_EL1PCTEN;
-> +	val &= ~get_el1pcen();
-> +	val |= get_el1pcten();
->  	write_sysreg(val, cnthctl_el2);
->  
->  	if (timer->enabled) {
-> 
-
-Trying to solve this myself, I came up with an alternative approach,
-which is ugly in its own way (#define in common code, random shifts):
-
-diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
-index 798866a..5cacfa8 100644
---- a/virt/kvm/arm/hyp/timer-sr.c
-+++ b/virt/kvm/arm/hyp/timer-sr.c
-@@ -21,11 +21,41 @@
- 
- #include <asm/kvm_hyp.h>
- 
-+#ifdef CONFIG_ARM64
-+static unsigned int __hyp_text get_cnthclt_shift_nvhe(void)
-+{
-+	return 0;
-+}
-+
-+static unsigned int __hyp_text get_cnthclt_shift_vhe(void)
-+{
-+	return 10;
-+}
-+
-+static hyp_alternate_select(__get_cnthclt_shift,
-+			    get_cnthclt_shift_nvhe, get_cnthclt_shift_vhe,
-+			    ARM64_HAS_VIRT_HOST_EXTN)
-+
-+#define cnthclt_shift()		__get_cnthclt_shift()()
-+#else
-+#define cnthclt_shift()		(0)
-+#endif
-+
-+static inline void __hyp_text cnthctl_rmw(u32 clr, u32 set)
-+{
-+	u32 val;
-+	int shift = cnthclt_shift();
-+
-+	val = read_sysreg(cnthctl_el2);
-+	val &= ~clr << shift;
-+	val |= set << shift;
-+	write_sysreg(val, cnthctl_el2);
-+}
-+
- /* vcpu is already in the HYP VA space */
- void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
--	u64 val;
- 
- 	if (timer->enabled) {
- 		timer->cntv_ctl = read_sysreg_el0(cntv_ctl);
-@@ -36,9 +66,7 @@ void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
- 	write_sysreg_el0(0, cntv_ctl);
- 
- 	/* Allow physical timer/counter access for the host */
--	val = read_sysreg(cnthctl_el2);
--	val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
--	write_sysreg(val, cnthctl_el2);
-+	cnthctl_rmw(0, CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN);
- 
- 	/* Clear cntvoff for the host */
- 	write_sysreg(0, cntvoff_el2);
-@@ -48,16 +76,12 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
- {
- 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
--	u64 val;
- 
- 	/*
- 	 * Disallow physical timer access for the guest
- 	 * Physical counter access is allowed
- 	 */
--	val = read_sysreg(cnthctl_el2);
--	val &= ~CNTHCTL_EL1PCEN;
--	val |= CNTHCTL_EL1PCTEN;
--	write_sysreg(val, cnthctl_el2);
-+	cnthctl_rmw(CNTHCTL_EL1PCEN, CNTHCTL_EL1PCTEN);
- 
- 	if (timer->enabled) {
- 		write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
-
-We could make it nicer (read "faster") by introducing a
-hyp_alternate_select construct that only returns a value instead
-of calling a function. I remember writing something like that
-at some point, and dropping it...
-
-Thoughts?
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>         sdhci_arasan->clk_ahb = devm_clk_get(&pdev->dev, "clk_ahb");
+>         if (IS_ERR(sdhci_arasan->clk_ahb)) {
+>                 dev_err(&pdev->dev, "clk_ahb clock not found.\n");
+> @@ -642,21 +713,14 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>         }
+>
+>         sdhci_get_of_property(pdev);
+> -
+> -       if (of_property_read_bool(np, "xlnx,fails-without-test-cd"))
+> -               sdhci_arasan->quirks |= SDHCI_ARASAN_QUIRK_FORCE_CDTEST;
+> -
+>         pltfm_host->clk = clk_xin;
+>
+> -       if (of_device_is_compatible(pdev->dev.of_node,
+> -                                   "rockchip,rk3399-sdhci-5.1"))
+> -               sdhci_arasan_update_clockmultiplier(host, 0x0);
+> -
+> -       sdhci_arasan_update_baseclkfreq(host);
+> -
+> -       ret = sdhci_arasan_register_sdclk(sdhci_arasan, clk_xin, &pdev->dev);
+> -       if (ret)
+> -               goto clk_disable_all;
+> +       /* SoC-specific clock init */
+> +       if (cs_ops && cs_ops->clock_init) {
+> +               ret = cs_ops->clock_init(host, pdev);
+> +               if (ret)
+> +                       goto clk_disable_all;
+> +       }
+>
+>         ret = mmc_of_parse(host->mmc);
+>         if (ret) {
+>
+>
+> If you are ok with it I can clean it up to submit it properly.
