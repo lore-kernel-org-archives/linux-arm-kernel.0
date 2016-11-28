@@ -1,61 +1,66 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 28 Nov 2016 16:01:07 +0100
-Subject: [PATCH] drm/atmel-hlcdc: Rework the fbdev creation logic
-Message-ID: <1480345267-18461-1-git-send-email-boris.brezillon@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 28 Nov 2016 15:04:33 +0000
+Subject: [PATCH v28 4/9] arm64: kdump: implement machine_crash_shutdown()
+In-Reply-To: <20161124095809.7092-3-takahiro.akashi@linaro.org>
+References: <20161124095523.6972-1-takahiro.akashi@linaro.org>
+ <20161124095809.7092-3-takahiro.akashi@linaro.org>
+Message-ID: <20161128150433.GC17125@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we wait for DRM panels to be available before registering the
-DRM device (returning -EPROBE_DEFER if the panel has not been probed
-yet), we no longer need to put the fbdev creation code in
-->output_poll_changed().
+On Thu, Nov 24, 2016 at 06:58:05PM +0900, AKASHI Takahiro wrote:
+> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+> index 04744dc..b5168e8 100644
+> --- a/arch/arm64/include/asm/kexec.h
+> +++ b/arch/arm64/include/asm/kexec.h
+> @@ -40,7 +40,47 @@
+>  static inline void crash_setup_regs(struct pt_regs *newregs,
+>  				    struct pt_regs *oldregs)
+>  {
+> -	/* Empty routine needed to avoid build errors. */
+> +	if (oldregs) {
+> +		memcpy(newregs, oldregs, sizeof(*newregs));
+> +	} else {
+> +		u64 tmp1, tmp2;
+> +
+> +		__asm__ __volatile__ (
+> +			"stp	 x0,   x1, [%2, #16 *  0]\n"
+> +			"stp	 x2,   x3, [%2, #16 *  1]\n"
+> +			"stp	 x4,   x5, [%2, #16 *  2]\n"
+> +			"stp	 x6,   x7, [%2, #16 *  3]\n"
+> +			"stp	 x8,   x9, [%2, #16 *  4]\n"
+> +			"stp	x10,  x11, [%2, #16 *  5]\n"
+> +			"stp	x12,  x13, [%2, #16 *  6]\n"
+> +			"stp	x14,  x15, [%2, #16 *  7]\n"
+> +			"stp	x16,  x17, [%2, #16 *  8]\n"
+> +			"stp	x18,  x19, [%2, #16 *  9]\n"
+> +			"stp	x20,  x21, [%2, #16 * 10]\n"
+> +			"stp	x22,  x23, [%2, #16 * 11]\n"
+> +			"stp	x24,  x25, [%2, #16 * 12]\n"
+> +			"stp	x26,  x27, [%2, #16 * 13]\n"
+> +			"stp	x28,  x29, [%2, #16 * 14]\n"
+> +			"mov	 %0,  sp\n"
+> +			"stp	x30,  %0,  [%2, #16 * 15]\n"
+> +
+> +			"/* faked current PSTATE */\n"
+> +			"mrs	 %0, CurrentEL\n"
+> +			"mrs	 %1, SPSEL\n"
+> +			"orr	 %0, %0, %1\n"
+> +			"mrs	 %1, DAIF\n"
+> +			"orr	 %0, %0, %1\n"
+> +			"mrs	 %1, NZCV\n"
+> +			"orr	 %0, %0, %1\n"
+> +			/* pc */
+> +			"adr	 %1, 1f\n"
+> +		"1:\n"
+> +			"stp	 %1, %0,   [%2, #16 * 16]\n"
+> +			: "+r" (tmp1), "+r" (tmp2)
+> +			: "r" (newregs)
+> +			: "memory"
 
-This removes the 10 secs delay between DRM dev registration and fbdev
-creation (polling period = 10 seconds).
+tmp1 and tmp2 are not input arguments here, so you should use the "=&"
+modifier. With my compiler, I get warnings of these variables being used
+uninitialised.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Reported-by: Alex Vazquez <avazquez.dev@gmail.com>
----
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 18 +++++++-----------
- 1 file changed, 7 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-index 5f484310bee9..2325de7c5c6f 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-@@ -431,15 +431,8 @@ static void atmel_hlcdc_fb_output_poll_changed(struct drm_device *dev)
- {
- 	struct atmel_hlcdc_dc *dc = dev->dev_private;
- 
--	if (dc->fbdev) {
-+	if (dc->fbdev)
- 		drm_fbdev_cma_hotplug_event(dc->fbdev);
--	} else {
--		dc->fbdev = drm_fbdev_cma_init(dev, 24,
--				dev->mode_config.num_crtc,
--				dev->mode_config.num_connector);
--		if (IS_ERR(dc->fbdev))
--			dc->fbdev = NULL;
--	}
- }
- 
- struct atmel_hlcdc_dc_commit {
-@@ -652,10 +645,13 @@ static int atmel_hlcdc_dc_load(struct drm_device *dev)
- 
- 	platform_set_drvdata(pdev, dev);
- 
--	drm_kms_helper_poll_init(dev);
-+	dc->fbdev = drm_fbdev_cma_init(dev, 24,
-+			dev->mode_config.num_crtc,
-+			dev->mode_config.num_connector);
-+	if (IS_ERR(dc->fbdev))
-+		dc->fbdev = NULL;
- 
--	/* force connectors detection */
--	drm_helper_hpd_irq_event(dev);
-+	drm_kms_helper_poll_init(dev);
- 
- 	return 0;
- 
 -- 
-2.7.4
+Catalin
