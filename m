@@ -1,43 +1,48 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 29 Nov 2016 11:40:51 -0300
-Subject: [RESEND PATCH] drm/exynos: Use VIDEO_SAMSUNG_EXYNOS_GSC=n as GSC
- Kconfig dependency
-Message-ID: <1480430451-26957-1-git-send-email-javier@osg.samsung.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 29 Nov 2016 15:51:29 +0100
+Subject: [PATCH 4/5] arm64: dts: marvell: Add definition of SPI
+ controller for Armada 3700
+In-Reply-To: <20161129143939.3191-5-romain.perier@free-electrons.com>
+References: <20161129143939.3191-1-romain.perier@free-electrons.com>
+ <20161129143939.3191-5-romain.perier@free-electrons.com>
+Message-ID: <20161129155129.6f3c76b6@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit aeefb36832e5 ("drm/exynos: gsc: add device tree support and remove
-usage of static mappings") made the DRM_EXYNOS_GSC Kconfig symbol to only
-be selectable if the exynos-gsc V4L2 driver isn't enabled, since both use
-the same HW IP block.
+Hello,
 
-But added the dependency as depends on !VIDEO_SAMSUNG_EXYNOS_GSC which is
-not correct since Kconfig expressions are not boolean but tristate. So it
-will only evaluate to 'n' if VIDEO_SAMSUNG_EXYNOS_GSC=y but will evaluate
-to 'm' if VIDEO_SAMSUNG_EXYNOS_GSC=m.
+On Tue, 29 Nov 2016 15:39:38 +0100, Romain Perier wrote:
 
-This means that both the V4L2 and DRM drivers can be enabled if the former
-is enabled as a module, which isn't what we want since otherwise 2 drivers
-could attempt to use the hardware at the same time.
+> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> index e9bd587..84e4f57 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> @@ -98,6 +98,19 @@
+>  			/* 32M internal register @ 0xd000_0000 */
+>  			ranges = <0x0 0x0 0xd0000000 0x2000000>;
+>  
+> +			spi0: spi at 10600 {
+> +				compatible = "marvell,armada-3700-spi";
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				reg = <0x10600 0x5d>;
+> +				clocks = <&nb_periph_clk 7>;
+> +				clock-frequency = <200000000>;
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
----
+This property.
 
- drivers/gpu/drm/exynos/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> +				interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+> +				max-frequency = <66000000>;
 
-diff --git a/drivers/gpu/drm/exynos/Kconfig b/drivers/gpu/drm/exynos/Kconfig
-index 465d344f3391..d706ca4e2f02 100644
---- a/drivers/gpu/drm/exynos/Kconfig
-+++ b/drivers/gpu/drm/exynos/Kconfig
-@@ -114,7 +114,7 @@ config DRM_EXYNOS_ROTATOR
- 
- config DRM_EXYNOS_GSC
- 	bool "GScaler"
--	depends on DRM_EXYNOS_IPP && ARCH_EXYNOS5 && !VIDEO_SAMSUNG_EXYNOS_GSC
-+	depends on DRM_EXYNOS_IPP && ARCH_EXYNOS5 && VIDEO_SAMSUNG_EXYNOS_GSC=n
- 	help
- 	  Choose this option if you want to use Exynos GSC for DRM.
- 
+And this one no longer exist in your DT binding, so I guess they should
+be removed from here as well.
+
+(Please wait for other reviews, don't respin just for that issue.)
+
+Thanks!
+
+Thomas
 -- 
-2.7.4
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
