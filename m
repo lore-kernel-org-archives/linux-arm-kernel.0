@@ -1,47 +1,63 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Mon, 28 Nov 2016 16:42:27 -0800
-Subject: [PATCH v5 8/8] iommu/rockchip: Enable Rockchip IOMMU on ARM64
-In-Reply-To: <1466734413-7453-9-git-send-email-zhengsq@rock-chips.com>
-References: <1466734413-7453-9-git-send-email-zhengsq@rock-chips.com>
-Message-ID: <20161129004225.GA109697@google.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Tue, 29 Nov 2016 09:14:15 +0800
+Subject: [bug report v4.8] fs/locks.c: kernel oops during posix lock
+ stress test
+In-Reply-To: <1480340400.2606.10.camel@poochiereds.net>
+References: <CACVXFVPsHjh3CWjdUrKB_r6=hkXK=qS3wpykbacdKe1rzz1H8Q@mail.gmail.com>
+ <1480340400.2606.10.camel@poochiereds.net>
+Message-ID: <CACVXFVMqSyT3XsRqv697=NYS8cWW=2RMHLb7YCd2Ooz-iJJdgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jeff,
 
-On Fri, Jun 24, 2016 at 10:13:33AM +0800, Shunqian Zheng wrote:
-> From: Simon Xue <xxm@rock-chips.com>
-> 
-> This patch makes it possible to compile the rockchip-iommu driver on
-> ARM64, so that it can be used with 64-bit SoCs equipped with this type
-> of IOMMU.
-> 
-> Signed-off-by: Simon Xue <xxm@rock-chips.com>
-> Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
-> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
-> ---
->  drivers/iommu/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> index ad08603..5572621 100644
-> --- a/drivers/iommu/Kconfig
-> +++ b/drivers/iommu/Kconfig
-> @@ -218,7 +218,7 @@ config OMAP_IOMMU_DEBUG
->  
->  config ROCKCHIP_IOMMU
->  	bool "Rockchip IOMMU Support"
-> -	depends on ARM
-> +	depends on ARM || ARM64
->  	depends on ARCH_ROCKCHIP || COMPILE_TEST
->  	select IOMMU_API
->  	select ARM_DMA_USE_IOMMU
+On Mon, Nov 28, 2016 at 9:40 PM, Jeff Layton <jlayton@poochiereds.net> wrote:
+> On Mon, 2016-11-28 at 11:10 +0800, Ming Lei wrote:
+>> Hi Guys,
+>>
+>> When I run stress-ng via the following steps on one ARM64 dual
+>> socket system(Cavium Thunder), the kernel oops[1] can often be
+>> triggered after running the stress test for several hours(sometimes
+>> it may take longer):
+>>
+>> - git clone git://kernel.ubuntu.com/cking/stress-ng.git
+>> - apply the attachment patch which just makes the posix file
+>> lock stress test more aggressive
+>> - run the test via '~/git/stress-ng$./stress-ng --lockf 128 --aggressive'
+>>
+>>
+>> From the oops log, looks one garbage file_lock node is got
+>> from the linked list of 'ctx->flc_posix' when the issue happens.
+>>
+>> BTW, the issue isn't observed on single socket Cavium Thunder yet,
+>> and the same issue can be seen on Ubuntu Xenial(v4.4 based kernel)
+>> too.
+>>
+>> Thanks,
+>> Ming
+>>
+>
+> Some questions just for clarification:
+>
+> - I assume this is being run on a local fs of some sort? ext4 or xfs or
+> something?
 
-Whatever happened with the rest of this series? Some of the IOMMU bits
-made it, but the DRM fixes never did, and so this didn't get applied.
-This leaves the whole DRM stack unusable on ARM64 Rockchip systems.
+Yes, I just tested it on local ext4, and not test it on other filesystems yet.
 
-The patch context has changed a bit on patch 7 (and maybe 6?), so
-somebody will need to refresh those on the latest upstream.
+>
+> - have you seen this on any other arch, besides ARM?
 
-Brian
+I run the same tests on x86 before, and not see the issue.
+
+>
+> The file locking code does do some lockless checking to see whether the
+> i_flctx is even present and whether the list is empty in
+> locks_remove_posix. It's possible we have some barrier problems there,
+> but I don't quite see how that would cause us to have a corrupt lock on
+> the flc_posix list.
+
+Yeah, I looked at the function of posix_lock_inode(), seems both add and
+remove are protected by the lock.
+
+Thanks,
+Ming
