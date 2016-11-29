@@ -1,50 +1,27 @@
-From: jsarha@ti.com (Jyri Sarha)
-Date: Tue, 29 Nov 2016 11:24:20 +0200
-Subject: [PATCH v2] drm: tilcdc: fix parsing of some DT properties
-In-Reply-To: <1480333043-1292-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1480333043-1292-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <e54f3479-b849-4195-07c7-72d97c40883d@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 29 Nov 2016 14:54:46 +0530
+Subject: [PATCH 0/2] ARM: dts: dra7-evm: pinmuxing updates
+Message-ID: <cover.1480411308.git.nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/16 13:37, Bartosz Golaszewski wrote:
-> The DT binding for tildc is not consistent with the driver code: there
-> are two options - 'max-width' and 'max-pixelclock' specified in the
-> documentation which are parsed as 'ti,max-width' and
-> 'ti'max-pixelclock' respectively.
-> 
-> Make the driver code consistent with the binding.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Hi,
 
-Reviewed-by: Jyri Sarha <jsarha@ti.com>
+This patch series drops most of the pinmuxing from dra7-evm
+to satisfy erratum i869 and adds missing eMMC and SD card pinmuxing.
 
-I'll pick this up for a pull request that I'll send shortly.
+The patches apply to latest linux-next. Tested on DRA74x EVM Rev H
+using U-Boot 2016.11. Boot tested using NFS and basic testing carried
+out on SD card, eMMC, Audio capture and playback.
 
-> ---
-> v1 -> v2:
-> - fix max-pixelclock too
-> 
->  drivers/gpu/drm/tilcdc/tilcdc_drv.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/tilcdc/tilcdc_drv.c b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-> index 5efb369..bd0a3bd 100644
-> --- a/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-> +++ b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-> @@ -296,12 +296,12 @@ static int tilcdc_init(struct drm_driver *ddrv, struct device *dev)
->  
->  	DBG("Maximum Bandwidth Value %d", priv->max_bandwidth);
->  
-> -	if (of_property_read_u32(node, "ti,max-width", &priv->max_width))
-> +	if (of_property_read_u32(node, "max-width", &priv->max_width))
->  		priv->max_width = TILCDC_DEFAULT_MAX_WIDTH;
->  
->  	DBG("Maximum Horizontal Pixel Width Value %dpixels", priv->max_width);
->  
-> -	if (of_property_read_u32(node, "ti,max-pixelclock",
-> +	if (of_property_read_u32(node, "max-pixelclock",
->  					&priv->max_pixelclock))
->  		priv->max_pixelclock = TILCDC_DEFAULT_MAX_PIXELCLOCK;
->  
-> 
+Kishon Vijay Abraham I (1):
+  ARM: dts: dra7-evm: add pinmux configuration for mmc1/2
+
+Sekhar Nori (1):
+  ARM: dts: dra7-evm: Remove pinmux configurations for erratum i869
+
+ arch/arm/boot/dts/dra7-evm.dts | 275 ++++-------------------------------------
+ 1 file changed, 23 insertions(+), 252 deletions(-)
+
+-- 
+2.9.0
