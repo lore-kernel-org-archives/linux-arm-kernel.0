@@ -1,122 +1,38 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 29 Nov 2016 12:57:03 +0100
-Subject: [PATCH v3 1/2] ARM: dts: da850-lcdk: add the dumb-vga-dac node
+Date: Tue, 29 Nov 2016 12:57:04 +0100
+Subject: [PATCH v3 2/2] ARM: dts: da850: specify the maximum pixel clock rate
+ for tilcdc
 In-Reply-To: <1480420624-23544-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1480420624-23544-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1480420624-23544-2-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1480420624-23544-3-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the dumb-vga-dac node to the board DT together with corresponding
-ports and vga connector. This allows to retrieve the edid info from
-the display automatically.
+At maximum CPU frequency of 300 MHz the maximum pixel clock frequency
+is 37.5 MHz[1]. We must filter out any mode for which the calculated
+pixel clock rate would exceed this value.
+
+Specify the max-pixelclock property for the display node for
+da850-lcdk.
+
+[1] http://processors.wiki.ti.com/index.php/OMAP-L1x/C674x/AM1x_LCD_Controller_(LCDC)_Throughput_and_Optimization_Techniques
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/boot/dts/da850-lcdk.dts | 58 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/da850.dtsi     | 17 ++++++++++++
- 2 files changed, 75 insertions(+)
+ arch/arm/boot/dts/da850.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index 711b9ad..d864f11 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -50,6 +50,53 @@
- 			system-clock-frequency = <24576000>;
- 		};
- 	};
-+
-+	vga_bridge {
-+		compatible = "dumb-vga-dac";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&lcd_pins>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0>;
-+
-+				vga_bridge_in: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&display_out_vga>;
-+				};
-+			};
-+
-+			port at 1 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <1>;
-+
-+				vga_bridge_out: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vga_con_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	vga {
-+		compatible = "vga-connector";
-+
-+		ddc-i2c-bus = <&i2c0>;
-+
-+		port {
-+			vga_con_in: endpoint {
-+				remote-endpoint = <&vga_bridge_out>;
-+			};
-+		};
-+	};
- };
- 
- &pmx_core {
-@@ -235,3 +282,14 @@
- &memctrl {
- 	status = "okay";
- };
-+
-+&display {
-+	status = "okay";
-+};
-+
-+&display_out {
-+	display_out_vga: endpoint at 0 {
-+		reg = <0>;
-+		remote-endpoint = <&vga_bridge_in>;
-+	};
-+};
 diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 4070619..5f4ba2e 100644
+index 5f4ba2e..00692d3 100644
 --- a/arch/arm/boot/dts/da850.dtsi
 +++ b/arch/arm/boot/dts/da850.dtsi
-@@ -454,6 +454,23 @@
+@@ -453,6 +453,7 @@
+ 			compatible = "ti,da850-tilcdc";
  			reg = <0x213000 0x1000>;
  			interrupts = <52>;
++			max-pixelclock = <37500>;
  			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				display_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+				};
-+
-+				display_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+				};
-+			};
- 		};
- 	};
- 	aemif: aemif at 68000000 {
+ 
+ 			ports {
 -- 
 2.9.3
