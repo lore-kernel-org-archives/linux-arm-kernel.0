@@ -1,111 +1,73 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 29 Nov 2016 12:19:27 -0600
-Subject: [PATCH] PCI: Add information about describing PCI in ACPI
-In-Reply-To: <20161123150632.GA16033@bhelgaas-glaptop.roam.corp.google.com>
-References: <20161117175938.17465.45820.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu_xW+7KAC8fHquEwHynYzpy6OoO1ZjEm5mVKMo1S8j4Nw@mail.gmail.com>
- <20161123010600.GF4832@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu-TW__+eZFS2p=1ZLN7fBs7pqQ+SitbEX46Z4JiS64egA@mail.gmail.com>
- <20161123150632.GA16033@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20161129181927.GB17112@bhelgaas-glaptop.roam.corp.google.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 29 Nov 2016 19:20:02 +0100
+Subject: [PATCH 2/2] net: dsa: mv88e6xxx: Add 88E6176 device tree support
+In-Reply-To: <87oa0yb29b.fsf@ketchup.i-did-not-set--mail-host-address--so-tickle-me>
+References: <1480280279-9552-2-git-send-email-afaerber@suse.de>
+ <20161127212709.GD13318@lunn.ch>
+ <9500470d-09c3-3ecb-994b-3d108bffc99e@suse.de>
+ <20161127220846.GH13318@lunn.ch>
+ <e5d45b55-a4c1-3b5e-0bdc-a5e340b072d0@suse.de>
+ <20161127231009.GA17704@lunn.ch>
+ <20161128080939.ippqlytvojitefkp@perseus.defre.kleine-koenig.org>
+ <20161128131735.GA4379@lunn.ch>
+ <2c59cc79-b6dc-9920-1725-a7785ff3b6bf@kleine-koenig.org>
+ <87oa0yb29b.fsf@ketchup.i-did-not-set--mail-host-address--so-tickle-me>
+Message-ID: <20161129182002.GB21645@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 23, 2016 at 09:06:33AM -0600, Bjorn Helgaas wrote:
-> On Wed, Nov 23, 2016 at 07:28:12AM +0000, Ard Biesheuvel wrote:
-> > On 23 November 2016 at 01:06, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> > > On Tue, Nov 22, 2016 at 10:09:50AM +0000, Ard Biesheuvel wrote:
-> > >> On 17 November 2016 at 17:59, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> > >
-> > >> > +PCI host bridges are PNP0A03 or PNP0A08 devices.  Their _CRS should
-> > >> > +describe all the address space they consume.  In principle, this would
-> > >> > +be all the windows they forward down to the PCI bus, as well as the
-> > >> > +bridge registers themselves.  The bridge registers include things like
-> > >> > +secondary/subordinate bus registers that determine the bus range below
-> > >> > +the bridge, window registers that describe the apertures, etc.  These
-> > >> > +are all device-specific, non-architected things, so the only way a
-> > >> > +PNP0A03/PNP0A08 driver can manage them is via _PRS/_CRS/_SRS, which
-> > >> > +contain the device-specific details.  These bridge registers also
-> > >> > +include ECAM space, since it is consumed by the bridge.
-> > >> > +
-> > >> > +ACPI defined a Producer/Consumer bit that was intended to distinguish
-> > >> > +the bridge apertures from the bridge registers [4, 5].  However,
-> > >> > +BIOSes didn't use that bit correctly, and the result is that OSes have
-> > >> > +to assume that everything in a PCI host bridge _CRS is a window.  That
-> > >> > +leaves no way to describe the bridge registers in the PNP0A03/PNP0A08
-> > >> > +device itself.
-> > >>
-> > >> Is that universally true? Or is it still possible to do the right
-> > >> thing here on new ACPI architectures such as arm64?
-> > >
-> > > That's a very good question.  I had thought that the ACPI spec had
-> > > given up on Consumer/Producer completely, but I was wrong.  In the 6.0
-> > > spec, the Consumer/Producer bit is still documented in the Extended
-> > > Address Space Descriptor (sec 6.4.3.5.4).  It is documented as
-> > > "ignored" in the QWord, DWord, and Word descriptors (sec 6.4.3.5.1,2,3).
-> > >
-> > > Linux looks at the producer_consumer bit in acpi_decode_space(), which
-> > > I think is used for all these descriptors (QWord, DWord, Word, and
-> > > Extended).  This doesn't quite follow the spec -- we probably should
-> > > ignore it except for Extended.  In any event, acpi_decode_space() sets
-> > > IORESOURCE_WINDOW for Producer descriptors, but we don't test
-> > > IORESOURCE_WINDOW in the PCI host bridge code.
-> > >
-> > > x86 and ia64 supply their own pci_acpi_root_prepare_resources()
-> > > functions that call acpi_pci_probe_root_resources(), which parses _CRS
-> > > and looks at producer_consumer.  Then they do a little arch-specific
-> > > stuff on the result.
-> > >
-> > > On arm64 we use acpi_pci_probe_root_resources() directly, with no
-> > > arch-specific stuff.
-> > >
-> > > On all three arches, we ignore the Consumer/Producer bit, so all the
-> > > resources are treated as Producers, e.g., as bridge windows.
-> > >
-> > > I think we *could* implement an arm64 version of
-> > > pci_acpi_root_prepare_resources() that would pay attention to the
-> > > Consumer/Producer bit by checking IORESOURCE_WINDOW.  To be spec
-> > > compliant, we would have to use Extended descriptors for all bridge
-> > > windows, even if they would fit in a DWord or QWord.
-> > >
-> > > Should we do that?  I dunno.  I'd like to hear your opinion(s).
-> > >
-> > 
-> > Yes, I think we should. If the spec allows for a way for a PNP0A03
-> > device to describe all of its resources unambiguously, we should not
-> > be relying on workarounds that were designed for another architecture
-> > in another decade (for, presumably, another OS)
-> > 
-> > Just for my understanding, we will need to use extended descriptors
-> > for all consumed *and* produced regions, even though dword/qword are
-> > implicitly produced-only, due to the fact that the bit is ignored?
+On Tue, Nov 29, 2016 at 12:54:24PM -0500, Vivien Didelot wrote:
+> Hi,
 > 
-> From an ACPI spec point of view, I would say QWord/DWord/Word
-> descriptors are implicitly *consumer*-only because ResourceConsumer
-> is the default and they don't have a bit to indicate otherwise.
+> Uwe Kleine-K?nig <uwe@kleine-koenig.org> writes:
 > 
-> The current code assumes all PNP0A03 resources are producers.  If we
-> implement an arm64 pci_acpi_root_prepare_resources() that pays
-> attention to the Consumer/Producer bit, we would have to:
+> > Also it seems wrong to write "marvell,mv88e6085" (only) if I know the
+> > hardware is really a "marvell,mv88e6176".
 > 
->   - Reserve all producer regions in the iomem/ioport trees.  This is
->     already done via pci_acpi_root_add_resources(), but we might need
->     a new check to handle consumers differently.
+> I agree. It might be complex for a user to dig into the driver in order
+> to figure out how the switch ID is read and which compatible to choose.
 > 
->   - Reserve all consumer regions.  This corresponds to what
->     pnp/system.c does for PNP0C02 devices.  This is similar to the
->     producer regions, but I think the consumer ones should be marked
->     IORESOURCE_BUSY.
+> I've sent a patch to change this https://lkml.org/lkml/2016/6/8/1198 but
+> Andrew had a stronger opinion on compatible strings, which makes sense.
 > 
->   - Use every producer (IORESOURCE_WINDOW) as a host bridge window.
+> >> Linus has said he does not like ARM devices because of all the busses
+> >> which are not enumerable. Here we have a device which with a little
+> >> bit of help we can enumerate. So we should. 
+> >
+> > If you write
+> >
+> > 	compatible = "marvell,mv88e6176", "marvell,mv88e6085";
+> >
+> > you can still enumerate in the same way as before.
 > 
-> I think it's a bug that acpi_decode_space() looks at producer_consumer
-> for QWord/DWord/Word descriptors, but I think QWord/DWord/Word
-> descriptors for consumed regions should be safe, as long as they don't
-> set the Consumer/Producer bit.
+> So we don't break the existing DTS files, I like this.
+> 
+> The driver already prints info about the detected switch. Instead of
+> failing at probe, which seems against the notion of compatible and
+> breaks the existing behavior, it could report the eventual mismatch?
 
-I'm going to post a couple very lightly-tested patches that should
-make us ignore the Consumer/Producer bit for QWord/DWord/Word.  I'd
-appreciate any discussion about whether that's the right approach.
+I'm still against it.
 
-Bjorn
+Say we let the driver probe and warn when the compatible string is
+wrong. Is this likely to get fixed? Probably not, it is just a
+warning, people ignore them.
+
+A few years later, we have accumulated a number of broken device
+trees. And suddenly we really do have a Marvell device with a broken
+ID in its port register, or more likely, the revision number was not
+incremented but there was incompatible register changes. We suddenly
+do have to look at the compatible string. But we know many are actually
+wrong. How do we know which to trust? We basically have to say, if the
+compatible is "marvell,mv88e6042" we trust it, all the others we don't
+trust and ignore.
+
+Isn't that madness?
+
+What we have today is verified correct. If this hypothetical
+"marvell,mv88e6042" does happen, then no problems, we add a compatible
+string for it, and it works.
+
+We should probably add a comment to the mv88e6xxx_of_match array,
+explaining how it currently works.
+
+      Andrew
