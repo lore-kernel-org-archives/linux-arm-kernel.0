@@ -1,147 +1,74 @@
-From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon, 28 Nov 2016 22:28:18 -0500
-Subject: [PATCH] KVM: arm/arm64: Access CNTHCTL_EL2 bit fields correctly
-In-Reply-To: <799d03f5-a929-9547-1ae7-94026b76f116@arm.com>
-References: <1480351570-11648-1-git-send-email-jintack@cs.columbia.edu>
- <d04fd17e-9157-07fe-4daa-9dbab149b5e6@arm.com>
- <799d03f5-a929-9547-1ae7-94026b76f116@arm.com>
-Message-ID: <CAHyh4xhXoFWsbnNNePthWp2-ZAOtCuUVmLn-JKRe4sc=nqrYNw@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 29 Nov 2016 14:47:04 +0900
+Subject: [PATCH v28 4/9] arm64: kdump: implement machine_crash_shutdown()
+In-Reply-To: <20161128150433.GC17125@e104818-lin.cambridge.arm.com>
+References: <20161124095523.6972-1-takahiro.akashi@linaro.org>
+ <20161124095809.7092-3-takahiro.akashi@linaro.org>
+ <20161128150433.GC17125@e104818-lin.cambridge.arm.com>
+Message-ID: <20161129054703.GC23034@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2016 at 1:39 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 28/11/16 17:43, Marc Zyngier wrote:
->> Hi Jintack,
+On Mon, Nov 28, 2016 at 03:04:33PM +0000, Catalin Marinas wrote:
+> On Thu, Nov 24, 2016 at 06:58:05PM +0900, AKASHI Takahiro wrote:
+> > diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+> > index 04744dc..b5168e8 100644
+> > --- a/arch/arm64/include/asm/kexec.h
+> > +++ b/arch/arm64/include/asm/kexec.h
+> > @@ -40,7 +40,47 @@
+> >  static inline void crash_setup_regs(struct pt_regs *newregs,
+> >  				    struct pt_regs *oldregs)
+> >  {
+> > -	/* Empty routine needed to avoid build errors. */
+> > +	if (oldregs) {
+> > +		memcpy(newregs, oldregs, sizeof(*newregs));
+> > +	} else {
+> > +		u64 tmp1, tmp2;
+> > +
+> > +		__asm__ __volatile__ (
+> > +			"stp	 x0,   x1, [%2, #16 *  0]\n"
+> > +			"stp	 x2,   x3, [%2, #16 *  1]\n"
+> > +			"stp	 x4,   x5, [%2, #16 *  2]\n"
+> > +			"stp	 x6,   x7, [%2, #16 *  3]\n"
+> > +			"stp	 x8,   x9, [%2, #16 *  4]\n"
+> > +			"stp	x10,  x11, [%2, #16 *  5]\n"
+> > +			"stp	x12,  x13, [%2, #16 *  6]\n"
+> > +			"stp	x14,  x15, [%2, #16 *  7]\n"
+> > +			"stp	x16,  x17, [%2, #16 *  8]\n"
+> > +			"stp	x18,  x19, [%2, #16 *  9]\n"
+> > +			"stp	x20,  x21, [%2, #16 * 10]\n"
+> > +			"stp	x22,  x23, [%2, #16 * 11]\n"
+> > +			"stp	x24,  x25, [%2, #16 * 12]\n"
+> > +			"stp	x26,  x27, [%2, #16 * 13]\n"
+> > +			"stp	x28,  x29, [%2, #16 * 14]\n"
+> > +			"mov	 %0,  sp\n"
+> > +			"stp	x30,  %0,  [%2, #16 * 15]\n"
+> > +
+> > +			"/* faked current PSTATE */\n"
+> > +			"mrs	 %0, CurrentEL\n"
+> > +			"mrs	 %1, SPSEL\n"
+> > +			"orr	 %0, %0, %1\n"
+> > +			"mrs	 %1, DAIF\n"
+> > +			"orr	 %0, %0, %1\n"
+> > +			"mrs	 %1, NZCV\n"
+> > +			"orr	 %0, %0, %1\n"
+> > +			/* pc */
+> > +			"adr	 %1, 1f\n"
+> > +		"1:\n"
+> > +			"stp	 %1, %0,   [%2, #16 * 16]\n"
+> > +			: "+r" (tmp1), "+r" (tmp2)
+> > +			: "r" (newregs)
+> > +			: "memory"
+> 
+> tmp1 and tmp2 are not input arguments here, so you should use the "=&"
+> modifier. With my compiler, I get warnings of these variables being used
+> uninitialised.
 
-Hi Marc,
+Thank you for this heads-up.
+(I misunderstood "+" a bit.)
+With this change applied, I confirmed that kdump still works.
 
->>
->> On 28/11/16 16:46, Jintack Lim wrote:
->>> Bit positions of CNTHCTL_EL2 are changing depending on HCR_EL2.E2H bit.
->>> EL1PCEN and EL1PCTEN are 1st and 0th bits when E2H is not set, but they
->>> are 11th and 10th bits respectively when E2H is set.  Current code is
->>> unintentionally setting wrong bits to CNTHCTL_EL2 with E2H set, which
->>> may allow guest OS to access physical timer. So, fix it.
->>>
->>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
->>> ---
->>>  arch/arm/include/asm/kvm_timer.h     | 33 +++++++++++++++++++
->>>  arch/arm64/include/asm/kvm_timer.h   | 62 ++++++++++++++++++++++++++++++++++++
->>>  include/clocksource/arm_arch_timer.h |  6 ++--
->>>  virt/kvm/arm/hyp/timer-sr.c          |  8 ++---
->>>  4 files changed, 103 insertions(+), 6 deletions(-)
->>>  create mode 100644 arch/arm/include/asm/kvm_timer.h
->>>  create mode 100644 arch/arm64/include/asm/kvm_timer.h
->>>
->
-> [...]
->
->> We could make it nicer (read "faster") by introducing a
->> hyp_alternate_select construct that only returns a value instead
->> of calling a function. I remember writing something like that
->> at some point, and dropping it...
->
-> So here's what this could look like (warning, wacky code ahead,
-> though I fixed a stupid bug that was present in the previous patch).
-> The generated code is quite nice (no branch, only an extra mov
-> instruction on the default path)... Of course, completely untested!
+-Takahiro AKASHI
 
-This looks much cleaner than my patch.
-While we are at it, is it worth to consider that we just need to set
-those bits once for VHE case, not for every world switch as an
-optimization?
-
->
-> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-> index b18e852..d173902 100644
-> --- a/arch/arm64/include/asm/kvm_hyp.h
-> +++ b/arch/arm64/include/asm/kvm_hyp.h
-> @@ -121,6 +121,17 @@ typeof(orig) * __hyp_text fname(void)                                      \
->         return val;                                                     \
->  }
->
-> +#define hyp_alternate_select_const(fname, orig, alt, cond)             \
-> +inline const typeof(orig) __hyp_text fname(void)                       \
-> +{                                                                      \
-> +       typeof(alt) val = orig;                                         \
-> +       asm volatile(ALTERNATIVE("nop           \n",                    \
-> +                                "mov   %0, %1  \n",                    \
-> +                                cond)                                  \
-> +                    : "+r" (val) : "r" (alt));                         \
-> +       return val;                                                     \
-> +}
-> +
->  void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
->  void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
->  int __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu);
-> diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
-> index 798866a..7a783af 100644
-> --- a/virt/kvm/arm/hyp/timer-sr.c
-> +++ b/virt/kvm/arm/hyp/timer-sr.c
-> @@ -21,11 +21,29 @@
->
->  #include <asm/kvm_hyp.h>
->
-> +#ifdef CONFIG_ARM64
-> +static hyp_alternate_select_const(cnthclt_shift, 0, 10,
-> +                                 ARM64_HAS_VIRT_HOST_EXTN)
-> +
-> +#else
-> +#define cnthclt_shift()                (0)
-> +#endif
-> +
-> +static inline void __hyp_text cnthctl_rmw(u32 clr, u32 set)
-> +{
-> +       u32 val;
-> +       int shift = cnthclt_shift();
-> +
-> +       val = read_sysreg(cnthctl_el2);
-> +       val &= ~(clr << shift);
-> +       val |= set << shift;
-> +       write_sysreg(val, cnthctl_el2);
-> +}
-> +
->  /* vcpu is already in the HYP VA space */
->  void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
->  {
->         struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> -       u64 val;
->
->         if (timer->enabled) {
->                 timer->cntv_ctl = read_sysreg_el0(cntv_ctl);
-> @@ -36,9 +54,7 @@ void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
->         write_sysreg_el0(0, cntv_ctl);
->
->         /* Allow physical timer/counter access for the host */
-> -       val = read_sysreg(cnthctl_el2);
-> -       val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
-> -       write_sysreg(val, cnthctl_el2);
-> +       cnthctl_rmw(0, CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN);
->
->         /* Clear cntvoff for the host */
->         write_sysreg(0, cntvoff_el2);
-> @@ -48,16 +64,12 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
->  {
->         struct kvm *kvm = kern_hyp_va(vcpu->kvm);
->         struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> -       u64 val;
->
->         /*
->          * Disallow physical timer access for the guest
->          * Physical counter access is allowed
->          */
-> -       val = read_sysreg(cnthctl_el2);
-> -       val &= ~CNTHCTL_EL1PCEN;
-> -       val |= CNTHCTL_EL1PCTEN;
-> -       write_sysreg(val, cnthctl_el2);
-> +       cnthctl_rmw(CNTHCTL_EL1PCEN, CNTHCTL_EL1PCTEN);
->
->         if (timer->enabled) {
->                 write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
->
-> Thanks,
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
->
+> -- 
+> Catalin
