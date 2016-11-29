@@ -1,43 +1,32 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 29 Nov 2016 15:55:20 +0100
-Subject: [PATCH v4 net-next 2/7] net: mvneta: Do not allocate buffer in rxq
- init with HWBM
+Date: Tue, 29 Nov 2016 15:55:19 +0100
+Subject: [PATCH v4 net-next 1/7] net: mvneta: Optimize rx path for small frame
 In-Reply-To: <cover.654978388d6811b943dd58ecb9a9d9b6cceeaee3.1480431285.git-series.gregory.clement@free-electrons.com>
 References: <cover.654978388d6811b943dd58ecb9a9d9b6cceeaee3.1480431285.git-series.gregory.clement@free-electrons.com>
-Message-ID: <bbbf71fd39c93227248df0ec91fabfb29ba0e778.1480431285.git-series.gregory.clement@free-electrons.com>
+Message-ID: <50c3bed2264b0755205c622e72fc5e00cbe28233.1480431285.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For HWBM all buffers are allocated in mvneta_bm_construct() and in runtime
-they are put into descriptors by hardware. There is no need to fill them
-at this point.
+For small frame reuse the phys_addr variable instead of accessing the
+uncacheable value in the rx descriptor.
 
-Suggested-by: Marcin Wojtas <mw@semihalf.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvneta.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/marvell/mvneta.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 1b84f746d748..f5319c50f8d9 100644
+index 87274d4ab102..1b84f746d748 100644
 --- a/drivers/net/ethernet/marvell/mvneta.c
 +++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -2784,14 +2784,14 @@ static int mvneta_rxq_init(struct mvneta_port *pp,
- 		mvneta_rxq_buf_size_set(pp, rxq,
- 					MVNETA_RX_BUF_SIZE(pp->pkt_size));
- 		mvneta_rxq_bm_disable(pp, rxq);
-+		mvneta_rxq_fill(pp, rxq, rxq->size);
- 	} else {
- 		mvneta_rxq_bm_enable(pp, rxq);
- 		mvneta_rxq_long_pool_set(pp, rxq);
- 		mvneta_rxq_short_pool_set(pp, rxq);
-+		mvneta_rxq_non_occup_desc_add(pp, rxq, rxq->size);
- 	}
+@@ -1918,7 +1918,7 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
+ 				goto err_drop_frame;
  
--	mvneta_rxq_fill(pp, rxq, rxq->size);
--
- 	return 0;
- }
- 
+ 			dma_sync_single_range_for_cpu(dev->dev.parent,
+-						      rx_desc->buf_phys_addr,
++						      phys_addr,
+ 						      MVNETA_MH_SIZE + NET_SKB_PAD,
+ 						      rx_bytes,
+ 						      DMA_FROM_DEVICE);
 -- 
 git-series 0.8.10
