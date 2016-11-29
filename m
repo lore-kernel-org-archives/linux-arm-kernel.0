@@ -1,34 +1,39 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 29 Nov 2016 16:53:25 +0000
-Subject: [PATCH] KVM: arm/arm64: Access CNTHCTL_EL2 bit fields correctly
-In-Reply-To: <0a475329-6f50-42ae-3244-f0767c56ce09@arm.com>
-References: <1480351570-11648-1-git-send-email-jintack@cs.columbia.edu>
- <d04fd17e-9157-07fe-4daa-9dbab149b5e6@arm.com>
- <799d03f5-a929-9547-1ae7-94026b76f116@arm.com>
- <CAHyh4xhXoFWsbnNNePthWp2-ZAOtCuUVmLn-JKRe4sc=nqrYNw@mail.gmail.com>
- <0a475329-6f50-42ae-3244-f0767c56ce09@arm.com>
-Message-ID: <ee2dacff-691c-7548-ff71-3a992f399333@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 Nov 2016 17:06:40 +0000
+Subject: [PATCH v7 04/16] drivers: iommu: make of_iommu_set/get_ops() DT
+ agnostic
+In-Reply-To: <20161129160549.GH2078@8bytes.org>
+References: <20161111152248.GS2078@8bytes.org>
+ <552e674a-f434-f08f-8e16-a94544ce8e6e@arm.com>
+ <20161111162736.GV2078@8bytes.org>
+ <33769e3c-265f-6e89-adf9-6d35b1e03579@arm.com>
+ <20161114102654.GA1677@red-moon>
+ <41e3eff1-9ce6-bcfb-5716-c65ef38add63@arm.com>
+ <20161114155222.GZ2078@8bytes.org>
+ <313844ca-d948-1297-84b2-669f3a7d57d2@arm.com>
+ <20161116095615.GA25656@red-moon>
+ <20161129160549.GH2078@8bytes.org>
+Message-ID: <20161129170639.GH30283@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/11/16 09:36, Marc Zyngier wrote:
-> On 29/11/16 03:28, Jintack Lim wrote:
->> On Mon, Nov 28, 2016 at 1:39 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> On 28/11/16 17:43, Marc Zyngier wrote:
->> This looks much cleaner than my patch.
->> While we are at it, is it worth to consider that we just need to set
->> those bits once for VHE case, not for every world switch as an
->> optimization?
->
-> Ah! That's a much better idea indeed! And we could stop messing with
-> cntvoff_el2 as well, as it doesn't need to be restored to zero on exit.
-> Could you try and respin something along those lines?
->
+On Tue, Nov 29, 2016 at 05:05:49PM +0100, Joerg Roedel wrote:
+> On Wed, Nov 16, 2016 at 09:56:15AM +0000, Lorenzo Pieralisi wrote:
+> > I can easily make the changes Robin suggests above, I need to know
+> > what to do with this patch it is the last blocking point for this
+> > series and time is running out I can revert to using dev->bus to
+> > retrieve iommu_ops (even though I do not think it makes sense given
+> > what Robin outlines below) but I need to know please, we can't gate
+> > an entire series for this patch that is just syntactic sugar.
+> 
+> Well, I didn't really object to the approach per-se, I just wanted to
+> know the rationale behind the need for the iommu-ops pointer. So through
+> which tree should this series be merged?
 
-fyi, we have a static_key based cpus_have_const_cap() for Constant cap
-checking (like this case) available in linux-next. May be you could make use
-of that instead of alternatives.
+I was just about to send a pull request to you, since it conflicts with
+my ARM SMMU patches and the PCI/ACPI bits are acked by Rafael and Bjorn.
 
+My for-joerg/arm-smmu/updates is ready to go; just need to write the
+pull request.
 
-Cheers
-Suzuki
+Will
