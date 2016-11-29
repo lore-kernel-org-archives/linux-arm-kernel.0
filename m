@@ -1,63 +1,47 @@
 From: briannorris@chromium.org (Brian Norris)
-Date: Mon, 28 Nov 2016 15:51:35 -0800
-Subject: [PATCH] arm64: dts: Add symlinks for cros-ec-keyboard and
- cros-ec-sbs
-In-Reply-To: <1463090530-21864-1-git-send-email-dianders@chromium.org>
-References: <1463090530-21864-1-git-send-email-dianders@chromium.org>
-Message-ID: <20161128235132.GA71295@google.com>
+Date: Mon, 28 Nov 2016 16:42:27 -0800
+Subject: [PATCH v5 8/8] iommu/rockchip: Enable Rockchip IOMMU on ARM64
+In-Reply-To: <1466734413-7453-9-git-send-email-zhengsq@rock-chips.com>
+References: <1466734413-7453-9-git-send-email-zhengsq@rock-chips.com>
+Message-ID: <20161129004225.GA109697@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd,
+Hi,
 
-On Thu, May 12, 2016 at 03:02:10PM -0700, Doug Anderson wrote:
-> We'd like to be able to use the cros-ec-keyboard.dtsi and
-> cros-ec-sbs.dtsi snippets for arm64 devices.  Currently those files live
-> in the arm/boot/dts directory.
+On Fri, Jun 24, 2016 at 10:13:33AM +0800, Shunqian Zheng wrote:
+> From: Simon Xue <xxm@rock-chips.com>
 > 
-> Let's follow the convention set by commit 8ee57b8182c4 ("ARM64: dts:
-> vexpress: Use a symlink to vexpress-v2m-rs1.dtsi from arch=arm") and use
-> a symlink.  Note that in this case we put the files in a new
-> "include/common" directory since these snippets may need to be
-> referenced by dts files in many different subdirectories.
+> This patch makes it possible to compile the rockchip-iommu driver on
+> ARM64, so that it can be used with 64-bit SoCs equipped with this type
+> of IOMMU.
 > 
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> Signed-off-by: Simon Xue <xxm@rock-chips.com>
+> Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
+> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
 > ---
-> Note that, as of right now, there are no users of this.  However, given
-> development happening it is almost 100% certain that users will arrive
-> soon.  If we need to wait for the first user before landing this we can
-> leave this on the back burner.  If it's OK to have no users (yet), let's
-> land.
-
-This may not fit your definition of "soon", but I'm looking to start
-using these files in arch/arm64/. I'll probably carry along this patch
-and resend when I'm ready, but it'd be just as well if you'd merge it
-now (or express a preference for a different directory structure).
-
->  arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi | 1 +
->  arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi      | 1 +
->  2 files changed, 2 insertions(+)
->  create mode 120000 arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi
->  create mode 120000 arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi
+>  drivers/iommu/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> \ No newline at end of file
-> 
-> diff --git a/arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi b/arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi
-> new file mode 120000
-> index 000000000000..1c1889f0a791
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi
-> @@ -0,0 +1 @@
-> +../../../../../arm/boot/dts/cros-ec-keyboard.dtsi
-> \ No newline at end of file
-> diff --git a/arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi b/arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi
-> new file mode 120000
-> index 000000000000..3d7ae9c88bcd
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi
-> @@ -0,0 +1 @@
-> +../../../../../arm/boot/dts/cros-ec-sbs.dtsi
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> index ad08603..5572621 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -218,7 +218,7 @@ config OMAP_IOMMU_DEBUG
+>  
+>  config ROCKCHIP_IOMMU
+>  	bool "Rockchip IOMMU Support"
+> -	depends on ARM
+> +	depends on ARM || ARM64
+>  	depends on ARCH_ROCKCHIP || COMPILE_TEST
+>  	select IOMMU_API
+>  	select ARM_DMA_USE_IOMMU
 
-FWIW:
+Whatever happened with the rest of this series? Some of the IOMMU bits
+made it, but the DRM fixes never did, and so this didn't get applied.
+This leaves the whole DRM stack unusable on ARM64 Rockchip systems.
 
-Reviewed-by: Brian Norris <briannorris@chromium.org>
+The patch context has changed a bit on patch 7 (and maybe 6?), so
+somebody will need to refresh those on the latest upstream.
+
+Brian
