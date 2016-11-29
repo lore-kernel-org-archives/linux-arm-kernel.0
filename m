@@ -1,46 +1,31 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 29 Nov 2016 16:23:23 +0530
-Subject: [PATCH v2 2/2] ARM: dts: da850-lcdk: specify the maximum pixel
- clock rate for tilcdc
-In-Reply-To: <1480335328-4010-3-git-send-email-bgolaszewski@baylibre.com>
-References: <1480335328-4010-1-git-send-email-bgolaszewski@baylibre.com>
- <1480335328-4010-3-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <4f2a02c4-062f-6faf-1024-2a8718a9701f@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 Nov 2016 11:05:02 +0000
+Subject: [PATCH v28 0/9] arm64: add kdump support
+In-Reply-To: <20161125162039.GB22099@e104818-lin.cambridge.arm.com>
+References: <20161124095523.6972-1-takahiro.akashi@linaro.org>
+ <20161125162039.GB22099@e104818-lin.cambridge.arm.com>
+Message-ID: <20161129110502.GE30283@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 November 2016 05:45 PM, Bartosz Golaszewski wrote:
-> Due to memory throughput constraints any display mode for which the
-> pixel clock rate exceeds the recommended value of 37500 KHz must be
-> filtered out.
-
-I think there might be more reasons than memory throughput constraints
-for the reasoning behind 37.5Mhz cap on pixel clock. Why not just refer
-to the datasheet section that places this constraint so we know its a
-hardware restriction.
-
+On Fri, Nov 25, 2016 at 04:20:40PM +0000, Catalin Marinas wrote:
+> On Thu, Nov 24, 2016 at 06:55:23PM +0900, AKASHI Takahiro wrote:
+> > AKASHI Takahiro (8):
+> >   arm64: kdump: reserve memory for crash dump kernel
+> >   memblock: add memblock_cap_memory_range()
+> >   arm64: limit memory regions based on DT property, usable-memory-range
+> >   arm64: kdump: implement machine_crash_shutdown()
+> >   arm64: kdump: add kdump support
+> >   arm64: kdump: add VMCOREINFO's for user-space coredump tools
+> >   arm64: kdump: enable kdump in the arm64 defconfig
+> >   arm64: kdump: update a kernel doc
 > 
-> Specify the max-pixelclock property for the display node for
-> da850-lcdk.
+> Given that it's nearly -rc7, holiday in the US and more acks needed, we
+> should defer merging this series to 4.11. In the meantime, since Will is
+> going to handle the 4.11 merging window, I'm acking the whole series:
 > 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  arch/arm/boot/dts/da850-lcdk.dts | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-> index d864f11..1283263 100644
-> --- a/arch/arm/boot/dts/da850-lcdk.dts
-> +++ b/arch/arm/boot/dts/da850-lcdk.dts
-> @@ -285,6 +285,7 @@
->  
->  &display {
->  	status = "okay";
-> +	max-pixelclock = <37500>;
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Should this not be in da850.dtsi since its an SoC imposed constraint? If
-a board needs narrower constraint, it can override it. But I guess most
-well designed boards will just hit the SoC constraint.
+Okey doke. I'll keep my eyes peeled for a new version in the new year.
 
-Thanks,
-Sekhar
+Will
