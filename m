@@ -1,22 +1,22 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 29 Nov 2016 11:16:57 +0100
-Subject: [PATCH v7 8/8] ARM: dts: sun8i-h3: Add HDMI video to the Orange PI 2
+Date: Tue, 29 Nov 2016 11:14:40 +0100
+Subject: [PATCH v7 7/8] ARM: dts: sun8i-h3: Add HDMI video to the Banana Pi M2+
 In-Reply-To: <cover.1480414715.git.moinejf@free.fr>
 References: <cover.1480414715.git.moinejf@free.fr>
-Message-ID: <9c50a8f3028ea6eeb03861633e962453dc027049.1480414715.git.moinejf@free.fr>
+Message-ID: <80d22d5c43ddd2eda344743e89b4019b6cf31ea2.1480414715.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-2.dts | 12 ++++++++++++
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts | 12 ++++++++++++
  1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-index 047e9e1..7712972 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-@@ -105,16 +105,28 @@
+diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+index c0c49dd..9f3e2f8 100644
+--- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+@@ -93,6 +93,10 @@
  	};
  };
  
@@ -25,6 +25,9 @@ index 047e9e1..7712972 100644
 +};
 +
  &ehci1 {
+ 	status = "okay";
+ };
+@@ -101,12 +105,20 @@
  	status = "okay";
  };
  
