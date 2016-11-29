@@ -1,58 +1,51 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 29 Nov 2016 21:56:43 +0100
-Subject: [PATCH 0/2] ACPI: Ignore Consumer/Producer for QWord/DWord/Word
- Address Space
-In-Reply-To: <20161129182415.7618.99129.stgit@bhelgaas-glaptop.roam.corp.google.com>
-References: <20161129182415.7618.99129.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CAJZ5v0jQYfifkpp1nubH1uMumUnq0zSVW+-5y-XW+7E2U+Jomw@mail.gmail.com>
+From: jintack@cs.columbia.edu (Jintack Lim)
+Date: Tue, 29 Nov 2016 16:05:09 -0500
+Subject: [PATCH] KVM: arm/arm64: Access CNTHCTL_EL2 bit fields correctly
+In-Reply-To: <ee2dacff-691c-7548-ff71-3a992f399333@arm.com>
+References: <1480351570-11648-1-git-send-email-jintack@cs.columbia.edu>
+ <d04fd17e-9157-07fe-4daa-9dbab149b5e6@arm.com>
+ <799d03f5-a929-9547-1ae7-94026b76f116@arm.com>
+ <CAHyh4xhXoFWsbnNNePthWp2-ZAOtCuUVmLn-JKRe4sc=nqrYNw@mail.gmail.com>
+ <0a475329-6f50-42ae-3244-f0767c56ce09@arm.com>
+ <ee2dacff-691c-7548-ff71-3a992f399333@arm.com>
+Message-ID: <CAHyh4xi2oq8m2B_3oZu+BNeyk-++L2ziMY66+XZ+SDRjOHDN6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Nov 29, 2016 at 7:43 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> Per spec, the Consumer/Producer bit is defined only for Extended
-> Address Space descriptors and should be ignored for QWord/DWord/Word
-> Address Space descriptors.  My understanding is that this is because
-> x86 BIOSes didn't use the bit consistently, so it couldn't be relied
-> upon.  The Extended descriptors were added later and are presumably
-> more reliable.
+On Tue, Nov 29, 2016 at 11:53 AM, Suzuki K Poulose
+<suzuki.poulose@arm.com> wrote:
+> On 29/11/16 09:36, Marc Zyngier wrote:
+>>
+>> On 29/11/16 03:28, Jintack Lim wrote:
+>>>
+>>> On Mon, Nov 28, 2016 at 1:39 PM, Marc Zyngier <marc.zyngier@arm.com>
+>>> wrote:
+>>>>
+>>>> On 28/11/16 17:43, Marc Zyngier wrote:
+>>>
+>>> This looks much cleaner than my patch.
+>>> While we are at it, is it worth to consider that we just need to set
+>>> those bits once for VHE case, not for every world switch as an
+>>> optimization?
+>>
+>>
+>> Ah! That's a much better idea indeed! And we could stop messing with
+>> cntvoff_el2 as well, as it doesn't need to be restored to zero on exit.
+>> Could you try and respin something along those lines?
+>>
 >
-> Linux currently looks at Consumer/Producer for all Address Space
-> descriptors, although we don't use the result very much.  The x86 and
-> ia64 host bridge driver code doesn't use Consumer/Producer to identify
-> windows; it assumes all descriptors are windows.
+> fyi, we have a static_key based cpus_have_const_cap() for Constant cap
+> checking (like this case) available in linux-next. May be you could make use
+> of that instead of alternatives.
+
+Thanks Suzuki. This looks very useful.
+
+Marc, can I write a patch based on linux-next? The commit which has
+cpus_have_const_cap() is not in master and next branch in kvm/arm
+repo.
+
 >
-> We do currently use Consumer/Producer to decide whether to apply _TRA.
-> The change in these patches is to ignore Consumer/Producer for
-> QWord/DWord/Word, so we'll apply _TRA from Consumer descriptors where
-> we didn't before.  Per spec, that should be safe because _TRA is
-> required to be zero for Consumer resources.
 >
-> If we want to describe host bridge register space and ECAM space
-> directly in the PNP0A03 device on ARM64 (and I guess potentially even
-> on x86 & ia64), I think we need changes like this so the arch code can
-> use IORESOURCE_WINDOW to tell which descriptors are windows and which
-> are registers.
-
-It would be good to copy/move the above paragraph to the changelog of
-patch [2/2].
-
-The reason for that change is quite unclear otherwise.
-
-> This is a subtle area, so please take a look and let me know what you
-> think.
+> Cheers
+> Suzuki
 >
-> These patches are based on v4.9-rc1.  It's getting pretty late in the
-> cycle, but I think we'd really like to get the ARM64 ACPI PCI story
-> sorted out for the v4.10 merge window.
-
-So it is better if changes of this sort spend a few weeks in
-linux-next before they get merged, just in case they trigger some
-obscure issue and need to be rethought.
-
-I'm not against these changes, but I won't be entirely comfortable
-with them going straight into the mainline.
-
-Thanks,
-Rafael
