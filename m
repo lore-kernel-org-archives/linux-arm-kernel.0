@@ -1,64 +1,109 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 29 Nov 2016 14:42:58 -0800
-Subject: [PATCHv4 06/10] xen: Switch to using __pa_symbol
-In-Reply-To: <935fefbf-97dc-83fc-b7c3-ba3f19f2087f@oracle.com>
-References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
- <1480445729-27130-7-git-send-email-labbott@redhat.com>
- <935fefbf-97dc-83fc-b7c3-ba3f19f2087f@oracle.com>
-Message-ID: <b7bcf276-6983-7eef-07a9-890ad7158789@redhat.com>
+From: ghorbel@gmail.com (Oussama Ghorbel)
+Date: Tue, 29 Nov 2016 23:48:35 +0100
+Subject: [PATCH] arm: add stat support to fiq
+Message-ID: <1480459715-19496-1-git-send-email-ghorbel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2016 02:26 PM, Boris Ostrovsky wrote:
-> On 11/29/2016 01:55 PM, Laura Abbott wrote:
->> __pa_symbol is the correct macro to use on kernel
->> symbols. Switch to this from __pa.
->>
->> Signed-off-by: Laura Abbott <labbott@redhat.com>
->> ---
->> Found during a sweep of the kernel. Untested.
->> ---
->>  drivers/xen/xenbus/xenbus_dev_backend.c | 2 +-
->>  drivers/xen/xenfs/xenstored.c           | 2 +-
->>  2 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/xen/xenbus/xenbus_dev_backend.c b/drivers/xen/xenbus/xenbus_dev_backend.c
->> index 4a41ac9..31ca2bf 100644
->> --- a/drivers/xen/xenbus/xenbus_dev_backend.c
->> +++ b/drivers/xen/xenbus/xenbus_dev_backend.c
->> @@ -99,7 +99,7 @@ static int xenbus_backend_mmap(struct file *file, struct vm_area_struct *vma)
->>  		return -EINVAL;
->>  
->>  	if (remap_pfn_range(vma, vma->vm_start,
->> -			    virt_to_pfn(xen_store_interface),
->> +			    PHYS_PFN(__pa_symbol(xen_store_interface)),
->>  			    size, vma->vm_page_prot))
->>  		return -EAGAIN;
->>  
->> diff --git a/drivers/xen/xenfs/xenstored.c b/drivers/xen/xenfs/xenstored.c
->> index fef20db..21009ea 100644
->> --- a/drivers/xen/xenfs/xenstored.c
->> +++ b/drivers/xen/xenfs/xenstored.c
->> @@ -38,7 +38,7 @@ static int xsd_kva_mmap(struct file *file, struct vm_area_struct *vma)
->>  		return -EINVAL;
->>  
->>  	if (remap_pfn_range(vma, vma->vm_start,
->> -			    virt_to_pfn(xen_store_interface),
->> +			    PHYS_PFN(__pa_symbol(xen_store_interface)),
->>  			    size, vma->vm_page_prot))
->>  		return -EAGAIN;
->>  
-> 
-> 
-> I suspect this won't work --- xen_store_interface doesn't point to a
-> kernel symbol.
-> 
-> -boris
-> 
+This patch allows drivers that uses fiq to have a stat on the
+execution number of the fiq handler.
+For that three APIs has been defined:
+- fiq_kstat_enable: this function enables fiq stat and allocates required
+memory for it
+- fiq_kstat_disable: this function disable fiq stat and free its allocated
+memory
+- fiq_kstat_this_cpu_inc: This function increments the fiq stat counter of
+the current CPU running the fiq handler
 
-I reviewed this again and yes you are right. I missed that this
-was a pointer and not just a symbol so I think this patch can
-just be dropped.
+A driver may call fiq_kstat_enable at its initialization to enable fiq
+stat and then call fiq_kstat_this_cpu_inc from the fiq handler
 
-Thanks,
-Laura
+When the fiq stat is enabled by a driver, then /proc/interrupts shows the
+fiq entry as the following example:
+FIQ:          0   21642080          0          0  usb_fiq
+If the fiq stat is not enabled, the content will be similar to the old one
+as the following example:
+FIQ:                                              usb_fiq
+The fiq name will be always written on the first column after the last CPU
+column
+
+Signed-off-by: Oussama Ghorbel <ghorbel@gmail.com>
+---
+ arch/arm/include/asm/fiq.h | 10 ++++++++++
+ arch/arm/kernel/fiq.c      | 31 +++++++++++++++++++++++++++----
+ 2 files changed, 37 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/include/asm/fiq.h b/arch/arm/include/asm/fiq.h
+index d493d0b..77f819b 100644
+--- a/arch/arm/include/asm/fiq.h
++++ b/arch/arm/include/asm/fiq.h
+@@ -31,6 +31,8 @@ struct fiq_handler {
+ 	/* data for the relinquish/reacquire functions
+ 	 */
+ 	void *dev_id;
++	/* fiq stats percpu */
++	unsigned int __percpu *fiq_kstat;
+ };
+ 
+ extern int claim_fiq(struct fiq_handler *f);
+@@ -53,4 +55,12 @@ static inline void get_fiq_regs(struct pt_regs *regs)
+ 	__get_fiq_regs(&regs->ARM_r8);
+ }
+ 
++extern int fiq_kstat_enable(struct fiq_handler *fh);
++extern void fiq_kstat_disable(struct fiq_handler *fh);
++
++static inline void fiq_kstat_this_cpu_inc(struct fiq_handler *fh)
++{
++	__this_cpu_inc(*fh->fiq_kstat);
++}
++
+ #endif
+diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
+index 059c3da..4b606df 100644
+--- a/arch/arm/kernel/fiq.c
++++ b/arch/arm/kernel/fiq.c
+@@ -83,10 +83,19 @@ static struct fiq_handler *current_fiq = &default_owner;
+ 
+ int show_fiq_list(struct seq_file *p, int prec)
+ {
+-	if (current_fiq != &default_owner)
+-		seq_printf(p, "%*s:              %s\n", prec, "FIQ",
+-			current_fiq->name);
+-
++	int j;
++
++	if (current_fiq == &default_owner)
++		return 0;
++	seq_printf(p, "%*s: ", prec, "FIQ");
++	for_each_online_cpu(j) {
++		if (current_fiq->fiq_kstat)
++			seq_printf(p, "%10u ",
++				*per_cpu_ptr(current_fiq->fiq_kstat, j));
++		else
++			seq_printf(p, "%10s ", "");
++	}
++	seq_printf(p, " %s\n", current_fiq->name);
+ 	return 0;
+ }
+ 
+@@ -162,3 +171,17 @@ void __init init_FIQ(int start)
+ 	get_fiq_regs(&dfl_fiq_regs);
+ 	fiq_start = start;
+ }
++
++int fiq_kstat_enable(struct fiq_handler *fh)
++{
++	fh->fiq_kstat = alloc_percpu(unsigned int);
++	return fh->fiq_kstat != 0 ? 0 : 1;
++}
++EXPORT_SYMBOL(fiq_kstat_enable);
++
++void fiq_kstat_disable(struct fiq_handler *fh)
++{
++	free_percpu(fh->fiq_kstat);
++	fh->fiq_kstat = NULL;
++}
++EXPORT_SYMBOL(fiq_kstat_disable);
+-- 
+2.7.4
