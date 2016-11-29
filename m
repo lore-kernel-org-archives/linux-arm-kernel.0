@@ -1,58 +1,40 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 29 Nov 2016 11:39:44 -0800
-Subject: [PATCHv4 09/10] mm/usercopy: Switch to using lm_alias
-In-Reply-To: <1480445729-27130-10-git-send-email-labbott@redhat.com>
-References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
- <1480445729-27130-10-git-send-email-labbott@redhat.com>
-Message-ID: <CAGXu5jKrBc6R9JYay1L6pd958Vm5-6p=37tiUYgg6uPeZb1HtQ@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 29 Nov 2016 21:04:55 +0100
+Subject: [PATCH v7 4/8] drm/sunxi: Add DT bindings documentation of
+ Allwinner HDMI
+In-Reply-To: <6356753.Ekaj7GdA0W@avalon>
+References: <cover.1480414715.git.moinejf@free.fr> <5996605.Gh0PjPIAcn@avalon>
+ <20161129202751.e94f72a1b9e2c2fb064e9933@free.fr>
+ <6356753.Ekaj7GdA0W@avalon>
+Message-ID: <20161129210455.d0c8450d3ceb83c1abe521b0@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 10:55 AM, Laura Abbott <labbott@redhat.com> wrote:
->
-> The usercopy checking code currently calls __va(__pa(...)) to check for
-> aliases on symbols. Switch to using lm_alias instead.
->
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
+On Tue, 29 Nov 2016 21:33 +0200
+Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
 
-Acked-by: Kees Cook <keescook@chromium.org>
+> > > You need a third port for the HDMI encoder output, connected to an HDMI
+> > > connector DT node.
+> > 
+> > I don't see what you mean. The HDMI device is both the encoder
+> > and connector (as the TDA998x):
+> 
+> The driver might create both an encoder and a connector, but I very much doubt 
+> that the "allwinner,sun8i-a83t-hdmi" hardware contains a connector, unless the 
+> SoC package has an HDMI connector coming out of it :-)
+> 
+> > plane -> DE2 mixer ---> TCON -----> HDMI -----> display device
+> > ----- plane ------    - CRTC -   - encoder  \
+> >                                    connector -- (HDMI cable)
+> >          audio-controller -   - audio-codec /
 
-I should probably add a corresponding alias test to lkdtm...
+The schema is the same as the Dove Cubox: the TDA998x is just a chip
+with some wires going out and the physical connector is supposed to be
+at the end of the wires.
 
--Kees
-
-> ---
-> Found when reviewing the kernel. Tested.
-> ---
->  mm/usercopy.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/mm/usercopy.c b/mm/usercopy.c
-> index 3c8da0a..8345299 100644
-> --- a/mm/usercopy.c
-> +++ b/mm/usercopy.c
-> @@ -108,13 +108,13 @@ static inline const char *check_kernel_text_object(const void *ptr,
->          * __pa() is not just the reverse of __va(). This can be detected
->          * and checked:
->          */
-> -       textlow_linear = (unsigned long)__va(__pa(textlow));
-> +       textlow_linear = (unsigned long)lm_alias(textlow);
->         /* No different mapping: we're done. */
->         if (textlow_linear == textlow)
->                 return NULL;
->
->         /* Check the secondary mapping... */
-> -       texthigh_linear = (unsigned long)__va(__pa(texthigh));
-> +       texthigh_linear = (unsigned long)lm_alias(texthigh);
->         if (overlaps(ptr, n, textlow_linear, texthigh_linear))
->                 return "<linear kernel text>";
->
-> --
-> 2.7.4
->
-
-
+Here, the HDMI pins of the SoC go to a pure hardware chip and then to
+the physical connector. Which software entity do you want to add?
 
 -- 
-Kees Cook
-Nexus Security
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
