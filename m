@@ -1,63 +1,61 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 29 Nov 2016 12:39:53 +0000
-Subject: [RFC v2 PATCH 11/23] ARM: sleep: allow it to be build for R-class
+Date: Tue, 29 Nov 2016 12:39:52 +0000
+Subject: [RFC v2 PATCH 10/23] ARM: tlbflush: drop dependency on CONFIG_SMP
 In-Reply-To: <1480423205-48436-1-git-send-email-vladimir.murzin@arm.com>
 References: <1480423205-48436-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1480423205-48436-12-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1480423205-48436-11-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dependency on MMU is quite strict and prevent R-class from being built -
-relax this condition and guard against M-class only
+While building NOMMU and UP following errors show up:
+
+arch/arm/mach-mvebu/pmsu.c: In function 'armada_370_xp_pmsu_idle_enter':
+arch/arm/mach-mvebu/pmsu.c:291:2: error: implicit declaration of function 'local_flush_tlb_all' [-Werror=implicit-function-declaration]
+  local_flush_tlb_all();
+  ^
+  CC      arch/arm/mach-omap2/control.o
+cc1: some warnings being treated as errors
+make[1]: *** [arch/arm/mach-mvebu/pmsu.o] Error 1
+
+...
+
+arch/arm/mach-imx/pm-imx5.c: In function 'mx5_suspend_enter':
+arch/arm/mach-imx/pm-imx5.c:227:3: error: implicit declaration of function 'local_flush_tlb_all' [-Werror=implicit-function-declaration]
+   local_flush_tlb_all();
+   ^
+cc1: some warnings being treated as errors
+make[1]: *** [arch/arm/mach-imx/pm-imx5.o] Error 1
+
+...
+
+arch/arm/mach-imx/pm-imx6.c: In function 'imx6q_suspend_finish':
+arch/arm/mach-imx/pm-imx6.c:354:3: error: implicit declaration of function 'local_flush_tlb_all' [-Werror=implicit-function-declaration]
+   local_flush_tlb_all();
+   ^
+cc1: some warnings being treated as errors
+make[1]: *** [arch/arm/mach-imx/pm-imx6.o] Error 1
+
+Make local_* stuff available for UP (even though it doesn't make
+sense) so build can progress.
 
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/Kconfig        |    2 +-
- arch/arm/kernel/sleep.S |    4 ----
- 2 files changed, 1 insertion(+), 5 deletions(-)
+ arch/arm/include/asm/tlbflush.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b5d529f..c462d9e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2179,7 +2179,7 @@ config ARCH_SUSPEND_POSSIBLE
- 	def_bool y
+diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+index def9e57..d9a6e2e 100644
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -641,7 +641,7 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
  
- config ARM_CPU_SUSPEND
--	def_bool PM_SLEEP || BL_SWITCHER || ARM_PSCI_FW
-+	def_bool (PM_SLEEP || BL_SWITCHER || ARM_PSCI_FW) && !CPU_V7M
- 	depends on ARCH_SUSPEND_POSSIBLE
+ #endif
  
- config ARCH_HIBERNATION_POSSIBLE
-diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-index 0f6c100..0e7fddf 100644
---- a/arch/arm/kernel/sleep.S
-+++ b/arch/arm/kernel/sleep.S
-@@ -119,14 +119,12 @@ ENDPROC(cpu_resume_after_mmu)
- 	.text
- 	.align
+-#elif defined(CONFIG_SMP)	/* !CONFIG_MMU */
++#else /* !CONFIG_MMU */
  
--#ifdef CONFIG_MMU
- 	.arm
- ENTRY(cpu_resume_arm)
-  THUMB(	badr	r9, 1f		)	@ Kernel is entered in ARM.
-  THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
-  THUMB(	.thumb			)	@ switch to Thumb now.
-  THUMB(1:			)
--#endif
+ #ifndef __ASSEMBLY__
  
- ENTRY(cpu_resume)
- ARM_BE8(setend be)			@ ensure we are in BE mode
-@@ -160,9 +158,7 @@ THUMB(	mov	sp, r2			)
- THUMB(	bx	r3			)
- ENDPROC(cpu_resume)
- 
--#ifdef CONFIG_MMU
- ENDPROC(cpu_resume_arm)
--#endif
- 
- 	.align 2
- _sleep_save_sp:
 -- 
 1.7.9.5
