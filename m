@@ -1,17 +1,21 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 29 Nov 2016 21:39:34 +0800
-Subject: [PATCH v4 06/11] irqchip: gicv3-its: platform-msi: refactor
- its_pmsi_init() to prepare for ACPI
+Date: Tue, 29 Nov 2016 21:39:35 +0800
+Subject: [PATCH v4 07/11] irqchip: gicv3-its: platform-msi: scan MADT to
+ create platform msi domain
 In-Reply-To: <1480426779-31387-1-git-send-email-guohanjun@huawei.com>
 References: <1480426779-31387-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1480426779-31387-7-git-send-email-guohanjun@huawei.com>
+Message-ID: <1480426779-31387-8-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-Introduce its_pmsi_init_one() to refactor the code to isolate
-ACPI&DT common code to prepare for ACPI later.
+With the introduction of its_pmsi_init_one(), we can add some code
+on top for ACPI support of platform MSI.
+
+We are scanning the MADT table to get the ITS entry(ies), then use
+the information to create the platform msi domain for devices connect
+to it, just like the PCI MSI for ITS did.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 Tested-by: Sinan Kaya <okaya@codeaurora.org>
@@ -19,72 +23,60 @@ Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Tomasz Nowicki <tn@semihalf.com>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- drivers/irqchip/irq-gic-v3-its-platform-msi.c | 45 ++++++++++++++++-----------
- 1 file changed, 27 insertions(+), 18 deletions(-)
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c | 36 +++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-index 16587a9..ff72704 100644
+index ff72704..0be0437 100644
 --- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
 +++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-@@ -84,34 +84,43 @@ static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
- 	{},
- };
+@@ -105,6 +105,41 @@ static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
+ 	return 0;
+ }
  
--static int __init its_pmsi_init(void)
-+static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
-+				const char *name)
++#ifdef CONFIG_ACPI
++static int __init
++its_pmsi_parse_madt(struct acpi_subtable_header *header,
++			const unsigned long end)
++{
++	struct acpi_madt_generic_translator *its_entry;
++	struct fwnode_handle *domain_handle;
++	const char *node_name;
++	int err = -ENXIO;
++
++	its_entry = (struct acpi_madt_generic_translator *)header;
++	node_name = kasprintf(GFP_KERNEL, "ITS at 0x%lx",
++			      (long)its_entry->base_address);
++	domain_handle = iort_find_domain_token(its_entry->translation_id);
++	if (!domain_handle) {
++		pr_err("%s: Unable to locate ITS domain handle\n", node_name);
++		goto out;
++	}
++
++	err = its_pmsi_init_one(domain_handle, node_name);
++
++out:
++	kfree(node_name);
++	return err;
++}
++
++static void __init its_acpi_pmsi_init(void)
++{
++	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
++			      its_pmsi_parse_madt, 0);
++}
++#else
++static inline void its_acpi_pmsi_init(void) { }
++#endif
++
+ static void __init its_pmsi_of_init(void)
  {
--	struct device_node *np;
- 	struct irq_domain *parent;
- 
-+	parent = irq_find_matching_fwnode(fwnode, DOMAIN_BUS_NEXUS);
-+	if (!parent || !msi_get_domain_info(parent)) {
-+		pr_err("%s: unable to locate ITS domain\n", name);
-+		return -ENXIO;
-+	}
-+
-+	if (!platform_msi_create_irq_domain(fwnode, &its_pmsi_domain_info,
-+					    parent)) {
-+		pr_err("%s: unable to create platform domain\n", name);
-+		return -ENXIO;
-+	}
-+
-+	pr_info("Platform MSI: %s domain created\n", name);
-+	return 0;
-+}
-+
-+static void __init its_pmsi_of_init(void)
-+{
-+	struct device_node *np;
-+
- 	for (np = of_find_matching_node(NULL, its_device_id); np;
- 	     np = of_find_matching_node(np, its_device_id)) {
- 		if (!of_property_read_bool(np, "msi-controller"))
- 			continue;
- 
--		parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
--		if (!parent || !msi_get_domain_info(parent)) {
--			pr_err("%s: unable to locate ITS domain\n",
--			       np->full_name);
--			continue;
--		}
--
--		if (!platform_msi_create_irq_domain(of_node_to_fwnode(np),
--						    &its_pmsi_domain_info,
--						    parent)) {
--			pr_err("%s: unable to create platform domain\n",
--			       np->full_name);
--			continue;
--		}
--
--		pr_info("Platform MSI: %s domain created\n", np->full_name);
-+		its_pmsi_init_one(of_node_to_fwnode(np), np->full_name);
- 	}
-+}
- 
-+static int __init its_pmsi_init(void)
-+{
-+	its_pmsi_of_init();
+ 	struct device_node *np;
+@@ -121,6 +156,7 @@ static void __init its_pmsi_of_init(void)
+ static int __init its_pmsi_init(void)
+ {
+ 	its_pmsi_of_init();
++	its_acpi_pmsi_init();
  	return 0;
  }
  early_initcall(its_pmsi_init);
