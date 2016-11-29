@@ -1,47 +1,80 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 29 Nov 2016 19:31:44 +0800
-Subject: [PATCH V7 0/3] irqchip: qcom: Add IRQ combiner driver
-In-Reply-To: <1479074375-2629-1-git-send-email-agustinv@codeaurora.org>
-References: <1479074375-2629-1-git-send-email-agustinv@codeaurora.org>
-Message-ID: <4126fa80-c8da-764f-9ea3-ec9966a19ea9@linaro.org>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 29 Nov 2016 10:08:25 +0100
+Subject: [PATCH v7 4/8] drm/sunxi: Add DT bindings documentation of Allwinner
+ HDMI
+In-Reply-To: <cover.1480414715.git.moinejf@free.fr>
+References: <cover.1480414715.git.moinejf@free.fr>
+Message-ID: <cd1caff75b6069af98680f78d672546748cb43c5.1480414715.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Agustin,
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+ .../devicetree/bindings/display/sunxi/hdmi.txt     | 56 ++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/sunxi/hdmi.txt
 
-On 2016/11/14 5:59, Agustin Vega-Frias wrote:
-> Add support for IRQ combiners in the Top-level Control and Status
-> Registers (TCSR) hardware block in Qualcomm Technologies chips.
->
-> The first patch fixes IRQ probe deferral by allowing platform_device
-> IRQ resources to be re-initialized if the ACPI core failed to find
-> the IRQ domain during ACPI bus scan.
->
-> The second patch adds support for ResourceSource/IRQ domain mapping
-> when using Extended IRQ Resources with a specific ResourceSource.
-> These changes are conditional on the ACPI_GENERIC_GSI config.
->
-> The third patch takes advantage of the new capabilities to implement
-> the driver for the IRQ combiners.
->
-> Tested on top of v4.9-rc4.
->
-> Changes V6 -> V7:
-> * Consolidate changes for ResourceSource/IRQ domain mapping to the same
->   source file implementing the generic GSI support, making it conditional
->   on CONFIG_ACPI_GENERIC_GSI.
-> * Eliminate some code duplication by implementing acpi_register_gsi in
->   terms of the new acpi_register_irq API.
-
-I had a test on Hisilicon D03 which needs patch 1 and 2 in this patch
-set to enable the mbigen irqchip, and it works pretty good.
-
-Patch 1/3 can remove the device dependency for the irqchip and platform
-devices, and I removed my patch (ACPI: irq: introduce interrupt
-producer) then add your patch 2/3, devices such as SAS and native
-network works fine on my D03.
-
-I will comment on the patches later.
-
-Thanks
-Hanjun
+diff --git a/Documentation/devicetree/bindings/display/sunxi/hdmi.txt b/Documentation/devicetree/bindings/display/sunxi/hdmi.txt
+new file mode 100644
+index 0000000..1e107cb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/sunxi/hdmi.txt
+@@ -0,0 +1,56 @@
++Allwinner HDMI Transmitter
++==========================
++
++The Allwinner HDMI transmitters are included in the SoCs.
++They support audio and video.
++
++Required properties:
++ - compatible : should be one of
++		"allwinner,sun8i-a83t-hdmi"
++		"allwinner,sun8i-h3-hdmi"
++ - reg: base address and size of the I/O memory
++ - clocks : phandles to the HDMI clocks as described in
++	Documentation/devicetree/bindings/clock/clock-bindings.txt
++ - clock-names : must be
++		"bus" : bus gate
++		"clock" : streaming clock
++		"ddc-clock" : DDC clock
++ - resets : One or two phandles to the HDMI resets
++ - reset-names : when 2 phandles, must be
++		"hdmi0" and "hdmi1"
++ - #address-cells : should be <1>
++ - #size-cells : should be <0>
++
++Required nodes:
++ - port: Audio and video input port nodes with endpoint definitions
++	as defined in Documentation/devicetree/bindings/graph.txt.
++	port at 0 is video and port at 1 is audio.
++
++Example:
++
++	hdmi: hdmi at 01ee0000 {
++		compatible = "allwinner,sun8i-a83t-hdmi";
++		reg = <0x01ee0000 0x20000>;
++		clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI>,
++			 <&ccu CLK_HDMI_DDC>;
++		clock-names = "bus", "clock", "ddc-clock";
++		resets = <&ccu RST_HDMI0>, <&ccu RST_HDMI1>;
++		reset-names = "hdmi0", "hdmi1";
++		pinctrl-names = "default";
++		pinctrl-0 = <&hdmi_pins_a>;
++		status = "disabled";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		port at 0 {			/* video */
++			reg = <0>;
++			hdmi_tcon1: endpoint {
++				remote-endpoint = <&tcon1_hdmi>;
++			};
++		};
++		port at 1 {			/* audio */
++			reg = <1>;
++			hdmi_i2s2: endpoint {
++				remote-endpoint = <&i2s2_hdmi>;
++			};
++		};
++	};
+-- 
+2.10.2
