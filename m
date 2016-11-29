@@ -1,84 +1,37 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Nov 2016 17:22:35 +0000
-Subject: [RFC v2 PATCH 23/23] ARM: Allow ARCH_MULTIPLATFORM to be
- selected for NOMMU
-In-Reply-To: <1480423205-48436-24-git-send-email-vladimir.murzin@arm.com>
-References: <1480423205-48436-1-git-send-email-vladimir.murzin@arm.com>
- <1480423205-48436-24-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20161129172234.GY14217@n2100.armlinux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 29 Nov 2016 17:23:36 +0000
+Subject: [PATCH] crypto: arm/aesbs - fix brokenness after skcipher conversion
+Message-ID: <1480440216-341-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 12:40:05PM +0000, Vladimir Murzin wrote:
-> With this patch applied potentially any platform can be built in NOMMU
-> configurations if CONFIG_EXPERT is selected. However, there is no
-> guaranty that platform can successfully run such Image. So the main
+The CBC encryption routine should use the encryption round keys, not
+the decryption round keys.
 
-guarantee
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
 
-> motivation behind of this patch:
-> - bring build coverage for NOMMU configurations
-> - allow known working NOMMU platforms (like R-class) to be used
-> - pave a way to add support for single address space (aka 1:1 mapping)
->   for MMU platforms, so they can be usable in NOMMU configurations
-> 
-> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <rmallon@gmail.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Alexander Shiyan <shc_work@mail.ru>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> ---
->  arch/arm/Kconfig |   21 +++++++++++++++++++--
->  1 file changed, 19 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index e78c822..bc6f406 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -327,9 +327,9 @@ choice
->  
->  config ARCH_MULTIPLATFORM
->  	bool "Allow multiple platforms to be selected"
-> -	depends on MMU
-> +	depends on MMU || EXPERT
->  	select ARM_HAS_SG_CHAIN
-> -	select ARM_PATCH_PHYS_VIRT
-> +	select ARM_PATCH_PHYS_VIRT if MMU
->  	select AUTO_ZRELADDR
->  	select CLKSRC_OF
->  	select COMMON_CLK
-> @@ -339,6 +339,23 @@ config ARCH_MULTIPLATFORM
->  	select PCI_DOMAINS if PCI
->  	select SPARSE_IRQ
->  	select USE_OF
-> +	help
-> +	  Please, read carefully if you've selected CONFIG_MMU=n!
-> +
-> +	  Multiplatform with !MMU configuration *is not* meant that
-> +	  kernel built to support every platform will boot on them. It
-> +	  is because physical address space layouts (particularly where
-> +	  RAM is located) are different between platforms and there is
-> +	  no MMU to work that around.
-> +
-> +	  You must specify where RAM start (via DRAM_BASE config
-> +	  option) and appropriate size of RAM (via DRAM_SIZE config
-> +	  option) which are valid for the platform you are building
-> +	  for.
-> +
-> +	  This feature is *EXPERIMENTAL*, please, consider building
-> +	  with CONFIG_MMU=y unless you know what you do or want to
-> +	  help with testing.
+Another fix for the queued changes, this time for 32-bit ARM.
 
-Do you actually see this help text anywhere?  I don't think multiple-choice
-options show help for individual choices.
+I must say, I'm not impressed with the level of testing that has been
+carried out after applying these changes. If you had cc'd me on these
+patches, I would have been happy to test/review.
 
+ arch/arm/crypto/aesbs-glue.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/crypto/aesbs-glue.c b/arch/arm/crypto/aesbs-glue.c
+index f5eafce10557..d8e06de72ef3 100644
+--- a/arch/arm/crypto/aesbs-glue.c
++++ b/arch/arm/crypto/aesbs-glue.c
+@@ -113,7 +113,7 @@ static inline void aesbs_encrypt_one(struct crypto_skcipher *tfm,
+ {
+ 	struct aesbs_cbc_ctx *ctx = crypto_skcipher_ctx(tfm);
+ 
+-	AES_encrypt(src, dst, &ctx->dec.rk);
++	AES_encrypt(src, dst, &ctx->enc);
+ }
+ 
+ static int aesbs_cbc_encrypt(struct skcipher_request *req)
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.4
