@@ -1,32 +1,48 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 29 Nov 2016 10:37:21 +0100
-Subject: [PATCH v3 net-next 1/6] net: mvneta: Optimize rx path for small frame
+Date: Tue, 29 Nov 2016 10:37:24 +0100
+Subject: [PATCH v3 net-next 4/6] net: mvneta: Only disable mvneta_bm for
+ 64-bits
 In-Reply-To: <cover.a09aeaf5ba62853d595153626b6121ef52a3e9b4.1480412215.git-series.gregory.clement@free-electrons.com>
 References: <cover.a09aeaf5ba62853d595153626b6121ef52a3e9b4.1480412215.git-series.gregory.clement@free-electrons.com>
-Message-ID: <50c3bed2264b0755205c622e72fc5e00cbe28233.1480412215.git-series.gregory.clement@free-electrons.com>
+Message-ID: <040255efd08ba2497ab28edae78ca5e1835d5824.1480412215.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For small frame reuse the phys_addr variable instead of accessing the
-uncacheable value in the rx descriptor.
+Actually only the mvneta_bm support is not 64-bits compatible.
+The mvneta code itself can run on 64-bits architecture.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvneta.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/marvell/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 87274d4ab102..1b84f746d748 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -1918,7 +1918,7 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
- 				goto err_drop_frame;
+diff --git a/drivers/net/ethernet/marvell/Kconfig b/drivers/net/ethernet/marvell/Kconfig
+index 66fd9dbb2ca7..2ccea9dd9248 100644
+--- a/drivers/net/ethernet/marvell/Kconfig
++++ b/drivers/net/ethernet/marvell/Kconfig
+@@ -44,6 +44,7 @@ config MVMDIO
+ config MVNETA_BM_ENABLE
+ 	tristate "Marvell Armada 38x/XP network interface BM support"
+ 	depends on MVNETA
++	depends on !64BIT
+ 	---help---
+ 	  This driver supports auxiliary block of the network
+ 	  interface units in the Marvell ARMADA XP and ARMADA 38x SoC
+@@ -58,7 +59,6 @@ config MVNETA
+ 	tristate "Marvell Armada 370/38x/XP network interface support"
+ 	depends on PLAT_ORION || COMPILE_TEST
+ 	depends on HAS_DMA
+-	depends on !64BIT
+ 	select MVMDIO
+ 	select FIXED_PHY
+ 	---help---
+@@ -71,6 +71,7 @@ config MVNETA
  
- 			dma_sync_single_range_for_cpu(dev->dev.parent,
--						      rx_desc->buf_phys_addr,
-+						      phys_addr,
- 						      MVNETA_MH_SIZE + NET_SKB_PAD,
- 						      rx_bytes,
- 						      DMA_FROM_DEVICE);
+ config MVNETA_BM
+ 	tristate
++	depends on !64BIT
+ 	default y if MVNETA=y && MVNETA_BM_ENABLE!=n
+ 	default MVNETA_BM_ENABLE
+ 	select HWBM
 -- 
 git-series 0.8.10
