@@ -1,190 +1,51 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Nov 2016 20:41:30 +0200
-Subject: [PATCH v7 2/8] drm/sun8i: Add DT bindings documentation of
- Allwinner DE2
-In-Reply-To: <92fc53084274d5ab04fe28f2dc0b16cf5d94481e.1480414715.git.moinejf@free.fr>
-References: <cover.1480414715.git.moinejf@free.fr>
- <92fc53084274d5ab04fe28f2dc0b16cf5d94481e.1480414715.git.moinejf@free.fr>
-Message-ID: <36111311.d8ul9hQ2CU@avalon>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 29 Nov 2016 12:43:19 -0600
+Subject: [PATCH 0/2] ACPI: Ignore Consumer/Producer for QWord/DWord/Word
+ Address Space
+Message-ID: <20161129182415.7618.99129.stgit@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Fran?ois,
+Per spec, the Consumer/Producer bit is defined only for Extended
+Address Space descriptors and should be ignored for QWord/DWord/Word
+Address Space descriptors.  My understanding is that this is because
+x86 BIOSes didn't use the bit consistently, so it couldn't be relied
+upon.  The Extended descriptors were added later and are presumably
+more reliable.
 
-Thank you for the patch.
+Linux currently looks at Consumer/Producer for all Address Space
+descriptors, although we don't use the result very much.  The x86 and
+ia64 host bridge driver code doesn't use Consumer/Producer to identify
+windows; it assumes all descriptors are windows.
 
-On Monday 28 Nov 2016 19:02:39 Jean-Francois Moine wrote:
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> ---
->  .../bindings/display/sunxi/sun8i-de2.txt           | 121 ++++++++++++++++++
->  1 file changed, 121 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/display/sunxi/sun8i-de2.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun8i-de2.txt
-> b/Documentation/devicetree/bindings/display/sunxi/sun8i-de2.txt new file
-> mode 100644
-> index 0000000..edf38b8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/sunxi/sun8i-de2.txt
-> @@ -0,0 +1,121 @@
-> +Allwinner sun8i Display Engine 2 subsystem
-> +==========================================
-> +
-> +The Allwinner DE2 subsystem contains a display controller (DE2),
-> +one or two LCD controllers (Timing CONtrollers) and their external
-> +interfaces (encoders/connectors).
-> +
-> +          +-----------+
-> +          | DE2       |
-> +          |           |
-> +          | +-------+ |
-> +  plane --->|       | |   +------+
-> +          | | mixer |---->| TCON |---> encoder  ---> display
-> +  plane --->|       | |   +------+     connector     device
-> +          | +-------+ |
-> +          |           |
-> +          | +-------+ |
-> +  plane --->|       | |   +------+
-> +          | | mixer |---->| TCON |---> encoder  ---> display
-> +  plane --->|       | |   +------+     connector     device
-> +          | +-------+ |
-> +          +-----------+
-> +
-> +The DE2 contains a processor which mixes the input planes and creates
-> +the images which are sent to the TCONs.
-> +From the software point of vue, there are 2 independent real-time
-> +mixers, each one being statically associated to one TCON.
-> +
-> +The TCONs adjust the image format to the one of the display device.
-> +
-> +Display controller (DE2)
-> +========================
-> +
-> +Required properties:
-> +
-> +- compatible: value should be one of the following
-> +		"allwinner,sun8i-a83t-display-engine"
-> +		"allwinner,sun8i-h3-display-engine"
-> +
-> +- reg: base address and size of the I/O memory
-> +
-> +- clocks: must include clock specifiers corresponding to entries in the
-> +		clock-names property.
-> +
-> +- clock-names: must contain
-> +		"bus": bus gate
-> +		"clock": clock
-> +
-> +- resets: phandle to the reset of the device
-> +
-> +- ports: must contain a list of 2 phandles, indexed by mixer number,
-> +	and pointing to display interface ports of TCONs
-> +
-> +LCD controller (TCON)
-> +=====================
-> +
-> +Required properties:
-> +
-> +- compatible: should be
-> +		"allwinner,sun8i-a83t-tcon"
-> +
-> +- reg: base address and size of the I/O memory
-> +
-> +- clocks: must include clock specifiers corresponding to entries in the
-> +		clock-names property.
-> +
-> +- clock-names: must contain
-> +		"bus": bus gate
-> +		"clock": pixel clock
-> +
-> +- resets: phandle to the reset of the device
-> +
-> +- interrupts: interrupt number for the TCON
-> +
-> +- port: port node with endpoint definitions as defined in
-> +	Documentation/devicetree/bindings/media/video-interfaces.txt
-> +
-> +Example:
-> +
-> +	de: de-controller at 01000000 {
-> +		compatible = "allwinner,sun8i-h3-display-engine";
-> +		reg = <0x01000000 0x400000>;
-> +		clocks = <&ccu CLK_BUS_DE>, <&ccu CLK_DE>;
-> +		clock-names = "bus", "clock";
-> +		resets = <&ccu RST_BUS_DE>;
-> +		ports = <&tcon0_p>, <&tcon1_p>;
+We do currently use Consumer/Producer to decide whether to apply _TRA.
+The change in these patches is to ignore Consumer/Producer for
+QWord/DWord/Word, so we'll apply _TRA from Consumer descriptors where
+we didn't before.  Per spec, that should be safe because _TRA is
+required to be zero for Consumer resources.
 
-This isn't how the OF graph DT bindings are used. You should instead have
+If we want to describe host bridge register space and ECAM space
+directly in the PNP0A03 device on ARM64 (and I guess potentially even
+on x86 & ia64), I think we need changes like this so the arch code can
+use IORESOURCE_WINDOW to tell which descriptors are windows and which
+are registers.
 
-	ports {
-		#address-cells = <1>;
-		#size-cells = <0>;
-		port at 0 {
-			de_out_0: endpoint {
-				remote_endpoint = <&tcon0_hdmi>;
-			};
-		};
-		port at 1 {
-			/* No endpoint as the port is not connected */
-		};
-	};
+This is a subtle area, so please take a look and let me know what you
+think.
 
-> +	};
-> +
-> +	tcon0: lcd-controller at 01c0c000 {
-> +		compatible = "allwinner,sun8i-a83t-tcon";
-> +		reg = <0x01c0c000 0x400>;
-> +		clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_TCON0>;
-> +		clock-names = "bus", "clock";
-> +		resets = <&ccu RST_BUS_TCON0>;
-> +		interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		tcon0_p: port {
-> +			tcon0_hdmi: endpoint {
-> +				remote-endpoint = <&hdmi_tcon0>;
-> +			};
-> +		};
+These patches are based on v4.9-rc1.  It's getting pretty late in the
+cycle, but I think we'd really like to get the ARM64 ACPI PCI story
+sorted out for the v4.10 merge window.
 
-and here
+---
 
-	port {
-		tcon0_hdmi: endpoint {
-			remote-endpoint = <&de_out_0>;
-		};
-	};
+Bjorn Helgaas (2):
+      ACPI: Combine acpi_dev_resource_address_space() and acpi_dev_resource_ext_address_space()
+      ACPI: Ignore Consumer/Producer for QWord/DWord/Word Address Space
 
-> +	};
-> +
-> +	/* not used */
-> +	tcon1: lcd-controller at 01c0d000 {
-> +		compatible = "allwinner,sun8i-h3-tcon";
-> +		reg = <0x01c0d000 0x400>;
-> +		clocks = <&ccu CLK_BUS_TCON1>,
-> +			 <&ccu CLK_TCON0>;	/* no clock */
-> +		clock-names = "bus", "clock";
-> +		interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-> +		status = "disabled";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		tcon1_p: port {
-> +			endpoint {
-> +				/* empty */
-> +			};
-> +		};
 
-and here
-
-	port {
-		/* No endpoint as the port is not connected */
-	};
-
-(although I'm not sure why you don't connect it)
-
-> +	};
-
--- 
-Regards,
-
-Laurent Pinchart
+ drivers/acpi/ioapic.c          |    3 -
+ drivers/acpi/resource.c        |  130 ++++++++++++++++++----------------------
+ drivers/pnp/pnpacpi/rsparser.c |    3 -
+ include/linux/acpi.h           |    2 -
+ 4 files changed, 59 insertions(+), 79 deletions(-)
