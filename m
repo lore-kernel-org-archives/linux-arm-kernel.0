@@ -1,62 +1,47 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 29 Nov 2016 10:43:06 -0600
-Subject: [PATCH 2/2] ARM: omap: timers: reduce rating of gp_timer
- clocksource
-In-Reply-To: <1479968355-18860-2-git-send-email-j-keerthy@ti.com>
-References: <1479968355-18860-1-git-send-email-j-keerthy@ti.com>
- <1479968355-18860-2-git-send-email-j-keerthy@ti.com>
-Message-ID: <d3a71d3d-3015-bb1f-80a4-4bb9adecaa4c@ti.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 29 Nov 2016 09:47:11 -0700
+Subject: [PATCH 1/9] coresight: stm: return error code instead of zero in
+ .packet()
+In-Reply-To: <1480438039-24960-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1480438039-24960-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1480438039-24960-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Chunyan Zhang <zhang.chunyan@linaro.org>
 
+In STM framework driver, the trace data writing loop would keep running
+until it received a negative return value or the whole trace packet has
+been written to STM device.  So if the .packet() of STM device always
+returns zero since the device is not enabled or the parameter isn't
+supported, STM framework driver will stall into a dead loop.
 
-On 11/24/2016 12:19 AM, Keerthy wrote:
-> From: Grygorii Strashko <grygorii.strashko@ti.com>
->
-> Now ARM Global timer (rating 300) will not be selected as clocksource,
-> because it's initialized after OMAP GP Timer (rating 300) and
-> Timekeeping core will not allow to replace clocksource with new one if
-> both of them have the same rating.
->
-> Reduce rating of OMAP GP Timer (300->290) when it's used as
-> clocksource device - this will allow to select ARM Global timer (300)
-> as clocksource when enabled.
->
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
+Returning -EACCES (Permission denied) in .packet() if the device is
+disabled makes more sense, and this is the same for returning -EINVAL
+if the channel passed into is not supported.
 
-Unfortunately, this patch has dependency [1] and can't be used alone as
-it will cause ARM Global timer to be selected as clocksource
-always on am437x and this will kill cpuidle, because ARM Global timer
-is not in always_on domain.
+Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-stm.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-The intention of enabling ARM Global timer is only for non-pm aware use
-cases for RT-kernel latency improvement - where deep cpuidle states are 
-not enabled.
-
-[1] https://patchwork.kernel.org/patch/8940051/
-
-> ---
->  arch/arm/mach-omap2/timer.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index b2f2448..a0dbb0b 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -376,7 +376,7 @@ static cycle_t clocksource_read_cycles(struct clocksource *cs)
->  }
->
->  static struct clocksource clocksource_gpt = {
-> -	.rating		= 300,
-> +	.rating		= 290,
->  	.read		= clocksource_read_cycles,
->  	.mask		= CLOCKSOURCE_MASK(32),
->  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
->
-
+diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
+index 49e0f1b925a5..d397849c2c6a 100644
+--- a/drivers/hwtracing/coresight/coresight-stm.c
++++ b/drivers/hwtracing/coresight/coresight-stm.c
+@@ -419,10 +419,10 @@ static ssize_t stm_generic_packet(struct stm_data *stm_data,
+ 						   struct stm_drvdata, stm);
+ 
+ 	if (!(drvdata && local_read(&drvdata->mode)))
+-		return 0;
++		return -EACCES;
+ 
+ 	if (channel >= drvdata->numsp)
+-		return 0;
++		return -EINVAL;
+ 
+ 	ch_addr = (unsigned long)stm_channel_addr(drvdata, channel);
+ 
 -- 
-regards,
--grygorii
+2.7.4
