@@ -1,88 +1,45 @@
 From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Tue, 29 Nov 2016 19:14:43 +0300
-Subject: [PATCH v4 0/9] Implement clocksource for rockchip SoC using rockchip
- timer
-In-Reply-To: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
+Date: Tue, 29 Nov 2016 19:14:48 +0300
+Subject: [PATCH v4 5/9] ARM: dts: rockchip: disable arm-global-timer for rk3188
+In-Reply-To: <1480436092-10728-1-git-send-email-al.kochet@gmail.com>
 References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1480436092-10728-1-git-send-email-al.kochet@gmail.com>
+ <1480436092-10728-1-git-send-email-al.kochet@gmail.com>
+Message-ID: <1480436092-10728-6-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+arm-global-timer can provide clockevents, clocksource and shed_clock. But
+on rk3188 platform it provide only clocksource and shed_clock. clockevents
+from  arm-global-timer is not used by kernel because there is another
+clockevent provider with higher rating (smp-twd).
 
-This patch series contain:
-- devicetree bindings clarification for rockchip timers
-- dts files fixes for rk3228-evb, rk3229-evb and rk3188
-- implementation of clocksource and sched clock for rockchip SoC
+My commit from the series implement clocksource and shed_clock using
+rockchip_timer. But sched clock from rk_timer is not selected by kernel
+due to lower frequency than arm-global-timer, and clocksource from
+rk_timer is not selected by kernel due to lower rating than
+arm-global-timer. And I don't want to increase clocksource rating
+because ratings greater 300 used for high frequency clocksources.
 
-The clock supplying the arm-global-timer on the rk3188 is coming from the
-the cpu clock itself and thus changes its rate everytime cpufreq adjusts
-the cpu frequency making this timer unsuitable as a stable clocksource.
-    
-The rk3188, rk3288 and following socs share a separate timer block already
-handled by the rockchip-timer driver. Therefore adapt this driver to also
-be able to act as clocksource on rk3188.
-    
-In order to test clocksource you can run following commands and check
-how much time it take in real. On rk3188 it take about ~45 seconds.
-    
-        cpufreq-set -f 1.6GHZ
-        date; sleep 60; date
+clocksource and shed_clock is quite unstable, because their rate depends
+on cpu frequency. So disable arm-global-timer and use clocksource and
+sched_clock from rockchip_timer.
 
-rk3288 (and probably anything newer) is irrelevant to this patch,
-as it has the arch timer interface. This patch may be usefull
-for Cortex-A9/A5 based parts.
+Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+---
+ arch/arm/boot/dts/rk3188.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
-Regards,
-Alexander.
-
-This is try 4. Please discard all v1, v2, v3 patches.
-
-Changes in v4:
-merged 7 and 8 from series 3
-merged 10, 11, 12, 13 from series 3
-fixed commit message
-
-Changes in v3:
-added patches:
-ARM: dts: rockchip: disable arm-global-timer for rk3188
-clocksource/drivers/rockchip_timer: Prevent ftrace recursion
-
-devicetree v1 patches:
-https://patchwork.ozlabs.org/patch/699019/
-https://patchwork.ozlabs.org/patch/699020/
-
-kernel v1 patches:
-https://patchwork.kernel.org/patch/9443975/
-https://patchwork.kernel.org/patch/9443971/
-https://patchwork.kernel.org/patch/9443959/
-https://patchwork.kernel.org/patch/9443963/
-https://patchwork.kernel.org/patch/9443979/
-https://patchwork.kernel.org/patch/9443989/
-https://patchwork.kernel.org/patch/9443987/
-https://patchwork.kernel.org/patch/9443977/
-https://patchwork.kernel.org/patch/9443991/
-
-Alexander Kochetkov (9):
-  dt-bindings: clarify compatible property for rockchip timers
-  ARM: dts: rockchip: update compatible property for rk3228 timer
-  ARM: dts: rockchip: update compatible property for rk3229 timer
-  ARM: dts: rockchip: add timer entries to rk3188 SoC
-  ARM: dts: rockchip: disable arm-global-timer for rk3188
-  clocksource/drivers/rockchip_timer: split bc_timer into rk_timer and
-    rk_clock_event_device
-  clocksource/drivers/rockchip_timer: low level routines take rk_timer
-    as parameter
-  clocksource/drivers/rockchip_timer: move TIMER_INT_UNMASK out of
-    rk_timer_enable()
-  clocksource/drivers/rockchip_timer: implement clocksource timer
-
- .../bindings/timer/rockchip,rk-timer.txt           |   12 +-
- arch/arm/boot/dts/rk3188.dtsi                      |   17 ++
- arch/arm/boot/dts/rk3228-evb.dts                   |    4 +
- arch/arm/boot/dts/rk3229-evb.dts                   |    4 +
- drivers/clocksource/rockchip_timer.c               |  207 +++++++++++++++-----
- 5 files changed, 190 insertions(+), 54 deletions(-)
-
+diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+index 0dc52fe..44da3d42 100644
+--- a/arch/arm/boot/dts/rk3188.dtsi
++++ b/arch/arm/boot/dts/rk3188.dtsi
+@@ -546,6 +546,7 @@
+ 
+ &global_timer {
+ 	interrupts = <GIC_PPI 11 0xf04>;
++	status = "disabled";
+ };
+ 
+ &local_timer {
 -- 
 1.7.9.5
