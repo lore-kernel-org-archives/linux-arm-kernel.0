@@ -1,67 +1,66 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 30 Nov 2016 00:56:44 +0200
-Subject: [PATCH v7 0/8] drm: sun8i: Add DE2 HDMI video support
-In-Reply-To: <8398357e-5c5e-4d76-9022-1c668aff5076@googlegroups.com>
-References: <cover.1480414715.git.moinejf@free.fr>
- <20161129213650.uqcgekodq77wlmxs@lukather>
- <8398357e-5c5e-4d76-9022-1c668aff5076@googlegroups.com>
-Message-ID: <2256264.6LWGGhFAiO@avalon>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Tue, 29 Nov 2016 17:57:36 -0500
+Subject: [PATCH V8 0/3] irqchip: qcom: Add IRQ combiner driver
+Message-ID: <1480460259-8585-1-git-send-email-agustinv@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jernej,
+Add support for IRQ combiners in the Top-level Control and Status
+Registers (TCSR) hardware block in Qualcomm Technologies chips.
 
-(CC'ing Kieran Bingham)
+The first patch adds support for ResourceSource/IRQ domain mapping
+when using Extended IRQ Resources with a specific ResourceSource.
+The patch prevents the ACPI core from attempting to map IRQ resources
+with a valid ResourceSource as GSIs.
 
-On Tuesday 29 Nov 2016 14:47:20 Jernej Skrabec wrote:
-> Dne torek, 29. november 2016 22.37.03 UTC+1 je oseba Maxime Ripard napisala:
-> > On Tue, Nov 29, 2016 at 11:18:35AM +0100, Jean-Francois Moine wrote:
-> >> This patchset series adds HDMI video support to the Allwinner
-> >> sun8i SoCs which include the display engine 2 (DE2).
-> >> The driver contains the code for the A83T and H3 SoCs, and
-> >> some H3 boards, but it could be used/extended for other SoCs
-> >> (A64, H2, H5) and boards (Banana PIs, Orange PIs).
-> > 
-> > Honestly, I'm getting a bit worried by the fact that you ignore
-> > reviews.
-> > 
-> > On the important reviews that you got that are to be seen as major
-> > 
-> > issues that block the inclusion, we have:
-> >   - The fact that the HDMI driver is actually just a designware IP,
-> >     and while you should use the driver that already exists, you just
-> >     duplicated all that code.
-> 
-> That might be hard thing to do. A83T fits perfectly, but H3 and newer SoCs
-> do not. They are using completely different HDMI phy. Decoupling controller
-> and phy code means rewritting a good portion of the code, unless some tricks
-> are applied, like calling phy function pointers, if they are defined.
+The second patch fixes IRQ probe deferral by allowing platform_device
+IRQ resources to be re-initialized if the ACPI core failed to find
+the IRQ domain during ACPI bus scan.
 
-Same HDMI TX but different HDMI TX PHY ? Kieran is working on decoupling the 
-PHY configuration code for a Renesas SoC, that might be of interest to you.
+Both changes described above are conditional on the ACPI_GENERIC_GSI config.
 
-> Register addresses also differ, but that can be easily solved by using
-> undocumented magic value to restore them.
+The third patch takes advantage of the new capabilities to implement
+the driver for the IRQ combiners.
 
-I love that :-)
+Tested on top of v4.9-rc7.
 
-> >   - The fact that you ignored Rob (v6) and I (v5) comment on using OF
-> >     graph to model the connection between the display engine and the
-> >     TCON. Something that Laurent also pointed out in this version.
-> >   
-> >   - The fact that you ignored that you needed an HDMI connector node
-> >     as a child of the HDMI controller. This has been reported by Rob
-> >     (v6) and yet again in this version by Laurent.
-> >   
-> >   - And finally the fact that we can't have several display engine in
-> >     parallel, if needs be. This has happened in the past already on
-> >     Allwinner SoCs, so it's definitely something we should consider in
-> >     the DT bindings, since we can't break them.
-> > 
-> > Until those are fixed, I cannot see how this driver can be merged,
-> > unfortunately.
+Changes V7 -> V8:
+* Reorder patches to allow all new code to be under drivers/acpi/irq.c.
+* Change acpi_irq_get implementation to be more similar to of_irq_get
+  to improve maintainability.
 
--- 
-Regards,
+Changes V6 -> V7:
+* Consolidate changes for ResourceSource/IRQ domain mapping to the same
+  source file implementing the generic GSI support, making it conditional
+  on CONFIG_ACPI_GENERIC_GSI.
+* Eliminate some code duplication by implementing acpi_register_gsi in
+  terms of the new acpi_register_irq API.
 
-Laurent Pinchart
+Changes V5 -> V6:
+* Drop probe table and on-demand probing based on resource_source
+* Add patch to fix probe deferral
+* Change back combiner driver to use the platform_device/platform_driver
+  APIs
+
+Agustin Vega-Frias (3):
+  ACPI: Add support for ResourceSource/IRQ domain mapping
+  ACPI: Retry IRQ conversion if it failed previously
+  irqchip: qcom: Add IRQ combiner driver
+
+ drivers/acpi/Makefile               |   2 +-
+ drivers/acpi/gsi.c                  |  98 -----------
+ drivers/acpi/irq.c                  | 315 +++++++++++++++++++++++++++++++++
+ drivers/acpi/resource.c             |  29 ++--
+ drivers/base/platform.c             |   9 +-
+ drivers/irqchip/Kconfig             |   8 +
+ drivers/irqchip/Makefile            |   1 +
+ drivers/irqchip/qcom-irq-combiner.c | 337 ++++++++++++++++++++++++++++++++++++
+ include/linux/acpi.h                |  28 +++
+ 9 files changed, 714 insertions(+), 113 deletions(-)
+ delete mode 100644 drivers/acpi/gsi.c
+ create mode 100644 drivers/acpi/irq.c
+ create mode 100644 drivers/irqchip/qcom-irq-combiner.c
+
+--
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
