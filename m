@@ -1,109 +1,67 @@
-From: ghorbel@gmail.com (Oussama Ghorbel)
-Date: Tue, 29 Nov 2016 23:48:35 +0100
-Subject: [PATCH] arm: add stat support to fiq
-Message-ID: <1480459715-19496-1-git-send-email-ghorbel@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 30 Nov 2016 00:56:44 +0200
+Subject: [PATCH v7 0/8] drm: sun8i: Add DE2 HDMI video support
+In-Reply-To: <8398357e-5c5e-4d76-9022-1c668aff5076@googlegroups.com>
+References: <cover.1480414715.git.moinejf@free.fr>
+ <20161129213650.uqcgekodq77wlmxs@lukather>
+ <8398357e-5c5e-4d76-9022-1c668aff5076@googlegroups.com>
+Message-ID: <2256264.6LWGGhFAiO@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows drivers that uses fiq to have a stat on the
-execution number of the fiq handler.
-For that three APIs has been defined:
-- fiq_kstat_enable: this function enables fiq stat and allocates required
-memory for it
-- fiq_kstat_disable: this function disable fiq stat and free its allocated
-memory
-- fiq_kstat_this_cpu_inc: This function increments the fiq stat counter of
-the current CPU running the fiq handler
+Hi Jernej,
 
-A driver may call fiq_kstat_enable at its initialization to enable fiq
-stat and then call fiq_kstat_this_cpu_inc from the fiq handler
+(CC'ing Kieran Bingham)
 
-When the fiq stat is enabled by a driver, then /proc/interrupts shows the
-fiq entry as the following example:
-FIQ:          0   21642080          0          0  usb_fiq
-If the fiq stat is not enabled, the content will be similar to the old one
-as the following example:
-FIQ:                                              usb_fiq
-The fiq name will be always written on the first column after the last CPU
-column
+On Tuesday 29 Nov 2016 14:47:20 Jernej Skrabec wrote:
+> Dne torek, 29. november 2016 22.37.03 UTC+1 je oseba Maxime Ripard napisala:
+> > On Tue, Nov 29, 2016 at 11:18:35AM +0100, Jean-Francois Moine wrote:
+> >> This patchset series adds HDMI video support to the Allwinner
+> >> sun8i SoCs which include the display engine 2 (DE2).
+> >> The driver contains the code for the A83T and H3 SoCs, and
+> >> some H3 boards, but it could be used/extended for other SoCs
+> >> (A64, H2, H5) and boards (Banana PIs, Orange PIs).
+> > 
+> > Honestly, I'm getting a bit worried by the fact that you ignore
+> > reviews.
+> > 
+> > On the important reviews that you got that are to be seen as major
+> > 
+> > issues that block the inclusion, we have:
+> >   - The fact that the HDMI driver is actually just a designware IP,
+> >     and while you should use the driver that already exists, you just
+> >     duplicated all that code.
+> 
+> That might be hard thing to do. A83T fits perfectly, but H3 and newer SoCs
+> do not. They are using completely different HDMI phy. Decoupling controller
+> and phy code means rewritting a good portion of the code, unless some tricks
+> are applied, like calling phy function pointers, if they are defined.
 
-Signed-off-by: Oussama Ghorbel <ghorbel@gmail.com>
----
- arch/arm/include/asm/fiq.h | 10 ++++++++++
- arch/arm/kernel/fiq.c      | 31 +++++++++++++++++++++++++++----
- 2 files changed, 37 insertions(+), 4 deletions(-)
+Same HDMI TX but different HDMI TX PHY ? Kieran is working on decoupling the 
+PHY configuration code for a Renesas SoC, that might be of interest to you.
 
-diff --git a/arch/arm/include/asm/fiq.h b/arch/arm/include/asm/fiq.h
-index d493d0b..77f819b 100644
---- a/arch/arm/include/asm/fiq.h
-+++ b/arch/arm/include/asm/fiq.h
-@@ -31,6 +31,8 @@ struct fiq_handler {
- 	/* data for the relinquish/reacquire functions
- 	 */
- 	void *dev_id;
-+	/* fiq stats percpu */
-+	unsigned int __percpu *fiq_kstat;
- };
- 
- extern int claim_fiq(struct fiq_handler *f);
-@@ -53,4 +55,12 @@ static inline void get_fiq_regs(struct pt_regs *regs)
- 	__get_fiq_regs(&regs->ARM_r8);
- }
- 
-+extern int fiq_kstat_enable(struct fiq_handler *fh);
-+extern void fiq_kstat_disable(struct fiq_handler *fh);
-+
-+static inline void fiq_kstat_this_cpu_inc(struct fiq_handler *fh)
-+{
-+	__this_cpu_inc(*fh->fiq_kstat);
-+}
-+
- #endif
-diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-index 059c3da..4b606df 100644
---- a/arch/arm/kernel/fiq.c
-+++ b/arch/arm/kernel/fiq.c
-@@ -83,10 +83,19 @@ static struct fiq_handler *current_fiq = &default_owner;
- 
- int show_fiq_list(struct seq_file *p, int prec)
- {
--	if (current_fiq != &default_owner)
--		seq_printf(p, "%*s:              %s\n", prec, "FIQ",
--			current_fiq->name);
--
-+	int j;
-+
-+	if (current_fiq == &default_owner)
-+		return 0;
-+	seq_printf(p, "%*s: ", prec, "FIQ");
-+	for_each_online_cpu(j) {
-+		if (current_fiq->fiq_kstat)
-+			seq_printf(p, "%10u ",
-+				*per_cpu_ptr(current_fiq->fiq_kstat, j));
-+		else
-+			seq_printf(p, "%10s ", "");
-+	}
-+	seq_printf(p, " %s\n", current_fiq->name);
- 	return 0;
- }
- 
-@@ -162,3 +171,17 @@ void __init init_FIQ(int start)
- 	get_fiq_regs(&dfl_fiq_regs);
- 	fiq_start = start;
- }
-+
-+int fiq_kstat_enable(struct fiq_handler *fh)
-+{
-+	fh->fiq_kstat = alloc_percpu(unsigned int);
-+	return fh->fiq_kstat != 0 ? 0 : 1;
-+}
-+EXPORT_SYMBOL(fiq_kstat_enable);
-+
-+void fiq_kstat_disable(struct fiq_handler *fh)
-+{
-+	free_percpu(fh->fiq_kstat);
-+	fh->fiq_kstat = NULL;
-+}
-+EXPORT_SYMBOL(fiq_kstat_disable);
+> Register addresses also differ, but that can be easily solved by using
+> undocumented magic value to restore them.
+
+I love that :-)
+
+> >   - The fact that you ignored Rob (v6) and I (v5) comment on using OF
+> >     graph to model the connection between the display engine and the
+> >     TCON. Something that Laurent also pointed out in this version.
+> >   
+> >   - The fact that you ignored that you needed an HDMI connector node
+> >     as a child of the HDMI controller. This has been reported by Rob
+> >     (v6) and yet again in this version by Laurent.
+> >   
+> >   - And finally the fact that we can't have several display engine in
+> >     parallel, if needs be. This has happened in the past already on
+> >     Allwinner SoCs, so it's definitely something we should consider in
+> >     the DT bindings, since we can't break them.
+> > 
+> > Until those are fixed, I cannot see how this driver can be merged,
+> > unfortunately.
+
 -- 
-2.7.4
+Regards,
+
+Laurent Pinchart
