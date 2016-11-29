@@ -1,39 +1,37 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 29 Nov 2016 09:47:18 -0700
-Subject: [PATCH 8/9] coresight: Add support for ARM Coresight STM-500
+Date: Tue, 29 Nov 2016 09:47:17 -0700
+Subject: [PATCH 7/9] coresight: tmc: Remove duplicate memset
 In-Reply-To: <1480438039-24960-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1480438039-24960-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1480438039-24960-9-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1480438039-24960-8-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
+From: "Suzuki K. Poulose" <Suzuki.Poulose@arm.com>
 
-Add the PIDs for STM-500 to the known STM devices list.
+The tmc_etr_enable_hw() fills the buffer with 0's before enabling
+the hardware. So, we don't need an explicit memset() in
+tmc_enable_etr_sink_sysfs() before calling the tmc_etr_enable_hw().
+This patch removes the explicit memset from tmc_enable_etr_sink_sysfs.
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Chunyan Zhang <zhang.chunyan@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-stm.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index d397849c2c6a..944c17b48d23 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -920,6 +920,11 @@ static struct amba_id stm_ids[] = {
- 		.mask   = 0x0003ffff,
- 		.data	= "STM32",
- 	},
-+	{
-+		.id	= 0x0003b963,
-+		.mask	= 0x0003ffff,
-+		.data	= "STM500",
-+	},
- 	{ 0, 0},
- };
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 3b84d0d38c22..5d312699b3b9 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -150,8 +150,6 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
+ 		drvdata->buf = drvdata->vaddr;
+ 	}
  
+-	memset(drvdata->vaddr, 0, drvdata->size);
+-
+ 	drvdata->mode = CS_MODE_SYSFS;
+ 	tmc_etr_enable_hw(drvdata);
+ out:
 -- 
 2.7.4
