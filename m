@@ -1,67 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 29 Nov 2016 09:37:07 +0000
-Subject: [PATCH] KVM: arm/arm64: Access CNTHCTL_EL2 bit fields correctly
-In-Reply-To: <20161128194221.GG18170@cbox>
-References: <1480351570-11648-1-git-send-email-jintack@cs.columbia.edu>
- <d04fd17e-9157-07fe-4daa-9dbab149b5e6@arm.com>
- <799d03f5-a929-9547-1ae7-94026b76f116@arm.com> <20161128194221.GG18170@cbox>
-Message-ID: <c75fe6ae-8ae0-285d-6f47-3e28c7e8f431@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 29 Nov 2016 10:37:21 +0100
+Subject: [PATCH v3 net-next 1/6] net: mvneta: Optimize rx path for small frame
+In-Reply-To: <cover.a09aeaf5ba62853d595153626b6121ef52a3e9b4.1480412215.git-series.gregory.clement@free-electrons.com>
+References: <cover.a09aeaf5ba62853d595153626b6121ef52a3e9b4.1480412215.git-series.gregory.clement@free-electrons.com>
+Message-ID: <50c3bed2264b0755205c622e72fc5e00cbe28233.1480412215.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/11/16 19:42, Christoffer Dall wrote:
-> On Mon, Nov 28, 2016 at 06:39:04PM +0000, Marc Zyngier wrote:
->> On 28/11/16 17:43, Marc Zyngier wrote:
->>> Hi Jintack,
->>>
->>> On 28/11/16 16:46, Jintack Lim wrote:
->>>> Bit positions of CNTHCTL_EL2 are changing depending on HCR_EL2.E2H bit.
->>>> EL1PCEN and EL1PCTEN are 1st and 0th bits when E2H is not set, but they
->>>> are 11th and 10th bits respectively when E2H is set.  Current code is
->>>> unintentionally setting wrong bits to CNTHCTL_EL2 with E2H set, which
->>>> may allow guest OS to access physical timer. So, fix it.
->>>>
->>>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
->>>> ---
->>>>  arch/arm/include/asm/kvm_timer.h     | 33 +++++++++++++++++++
->>>>  arch/arm64/include/asm/kvm_timer.h   | 62 ++++++++++++++++++++++++++++++++++++
->>>>  include/clocksource/arm_arch_timer.h |  6 ++--
->>>>  virt/kvm/arm/hyp/timer-sr.c          |  8 ++---
->>>>  4 files changed, 103 insertions(+), 6 deletions(-)
->>>>  create mode 100644 arch/arm/include/asm/kvm_timer.h
->>>>  create mode 100644 arch/arm64/include/asm/kvm_timer.h
->>>>
->>
->> [...]
->>
->>> We could make it nicer (read "faster") by introducing a
->>> hyp_alternate_select construct that only returns a value instead
->>> of calling a function. I remember writing something like that
->>> at some point, and dropping it...
->>
->> So here's what this could look like (warning, wacky code ahead,
->> though I fixed a stupid bug that was present in the previous patch).
->> The generated code is quite nice (no branch, only an extra mov
->> instruction on the default path)... Of course, completely untested!
-> 
-> Isn't this all about determining which bitmask to use, statically, once,
-> after the system has booted?
-> 
-> How about a good old fashioned static variable, or global struct like
-> the global one we use for the VGIC, which sets the proper mit mask
-> during kvm init, and the world-switch code just uses a variable?
+For small frame reuse the phys_addr variable instead of accessing the
+uncacheable value in the rx descriptor.
 
-We could indeed do that (I've been carried away with my tendency for
-weird and wonderful hacks).
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/net/ethernet/marvell/mvneta.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-But as Jintack mentioned, there is a much better approach, which is to
-do nothing at all on the VHE path (we can set the permission bits once
-and for all). cntvoff_el2 also falls into the same category of things we
-should be able to only restore and not bother resetting (as it doesn't
-affect the EL2 virtual counter).
-
-Thoughts?
-
-	M.
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 87274d4ab102..1b84f746d748 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -1918,7 +1918,7 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
+ 				goto err_drop_frame;
+ 
+ 			dma_sync_single_range_for_cpu(dev->dev.parent,
+-						      rx_desc->buf_phys_addr,
++						      phys_addr,
+ 						      MVNETA_MH_SIZE + NET_SKB_PAD,
+ 						      rx_bytes,
+ 						      DMA_FROM_DEVICE);
 -- 
-Jazz is not dead. It just smells funny...
+git-series 0.8.10
