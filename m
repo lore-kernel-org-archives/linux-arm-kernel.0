@@ -1,61 +1,43 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 29 Nov 2016 22:57:58 +0100
-Subject: [PATCH v6 3/5] ARM: dts: sun8i-h3: add HDMI video nodes
-In-Reply-To: <20161125112213.83420594eb435b6bb1a4d164@free.fr>
-References: <cover.1479641523.git.moinejf@free.fr>
- <cdf50b8433e2d9a053e35f8788bfcd5d41504312.1479641523.git.moinejf@free.fr>
- <3188681480066911@web3h.yandex.ru>
- <20161125112213.83420594eb435b6bb1a4d164@free.fr>
-Message-ID: <20161129215758.u6vx3mfbya73ne43@lukather>
+Date: Tue, 29 Nov 2016 22:59:32 +0100
+Subject: [RFC PATCH] ARM: dts: sun8i: add simplefb node for H3
+In-Reply-To: <20161128114218.14d2ed434802a20fa6b62023@free.fr>
+References: <20161128095900.27615-1-icenowy@aosc.xyz>
+ <20161128114218.14d2ed434802a20fa6b62023@free.fr>
+Message-ID: <20161129215932.kmk6qodthicadpyb@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 25, 2016 at 11:22:13AM +0100, Jean-Francois Moine wrote:
-> On Fri, 25 Nov 2016 17:41:51 +0800
+On Mon, Nov 28, 2016 at 11:42:18AM +0100, Jean-Francois Moine wrote:
+> On Mon, 28 Nov 2016 17:59:00 +0800
 > Icenowy Zheng <icenowy@aosc.xyz> wrote:
 > 
-> > After removing CLK_PLL_DE's assigned-clock, the kernel passes compilation.
-> 
-> The 'pll-de' and 'de' must have a fixed rate. Otherwise, if you do not
-> use the legacy u-boot, I don't know which can be the rate of the DE.
-> 
-> > However, it cannot recognize any HDMI screen...
+> > As there's currently a fork of U-Boot which provides simplefb support
+> > for H3, a simplefb node can be added to the device tree.
 > > 
-> > (My board is Orange Pi One, and I manually added status="okay"; to &lcd0, &de, &hdmi)
+> > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> > ---
 > > 
-> > [   16.507802] sun8i-de2 1000000.de-controller: bound 1c0c000.lcd-controller (ops de2_lcd_ops [sun8i_de2_drm])
-> > [   16.675948] sun8i-de2 1000000.de-controller: bound 1ee0000.hdmi (ops de2_hdmi_fini [sun8i_de2_hdmi])
-> > [   16.685120] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
-> > [   16.695876] [drm] No driver support for vblank timestamp query.
-> > [   16.701862] sun8i-de2 1000000.de-controller: No connectors reported connected with modes
-> > [   16.713061] [drm] Cannot find any crtc or sizes - going 1024x768
-> > [   16.734214] Console: switching to colour frame buffer device 128x48
-> > [   16.751022] sun8i-de2 1000000.de-controller: fb0:  frame buffer device
+> > I'm still not sure which pipeline should I use.
+> > 
+> > And, it seems that HDMI Slow Clock is not needed?
+> > 
+> > (seems that it's only for EDID, but simplefb won't use EDID)
 > 
-> I put a 'pr_warn' message is case the EDID cannot be read.
-> Have you this message?
+> So, I don't see how this may work.
+> How can the u-boot know the resolutions of the HDMI display device?
 > 
-> Anyway, there is a problem with the EDID:
-> - my Orange Pi 2 (H3) randomly fails to read it. But this succeeds after
->   rebooting once or twice.
-> - my Banana Pi M2+ (H3) reads it correctly each time.
-> - my Banana Pi M3 (A83T) can never read it.
-> 
-> BTW, on first tries, I was forcing a CEA mode thru the kernel command
-> line. This was working with the OPi2 and BPiM3, but there was no sound.
-> In the last version, I use a EDID in edid_firmware for having sound
-> with the BPiM3. This works fine.
-> But, forcing a CEA mode is no more possible, so, when the OPi2 cannot
-> read the EDID, the system switches to a VGA mode (default 1024x768)
-> which is not supported. It seems that this is your case.
-> 
-> So, in brief, if your board cannot read the EDID, put a EDID somewhere
-> and its path in /sys/module/drm_kms_helper/parameters/edid_firmware.
-> There will be no console, but X11 will work correctly.
+> In other words: I have a new H3 board with the last u-boot and kernel.
+> I plug my (rather old or brand new) HDMI display device.
+> After powering on the system, I hope to get something on the screen.
+> How?
 
-This is one of the things that are usually very helpful to put in a
-cover letter. This is obviously also a blocker for the merge of the
-driver, and should be dealt with.
+If it works like the driver for the first display engine in U-Boot, it
+will use the preferred mode reported by the EDID, and will fallback to
+1024x768 if it cannot access it.
+
+Maybe it would be worth exchanging on the EDID code that has been done
+for the u-boot driver too, so that it can be fixed in your driver.
 
 Maxime
 
@@ -69,4 +51,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161129/a265faef/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161129/94d75cc0/attachment-0001.sig>
