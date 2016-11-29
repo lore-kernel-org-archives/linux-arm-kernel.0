@@ -1,54 +1,56 @@
 From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Tue, 29 Nov 2016 19:14:47 +0300
-Subject: [PATCH v4 4/9] ARM: dts: rockchip: add timer entries to rk3188 SoC
+Date: Tue, 29 Nov 2016 19:14:51 +0300
+Subject: [PATCH v4 8/9] clocksource/drivers/rockchip_timer: move
+ TIMER_INT_UNMASK out of rk_timer_enable()
 In-Reply-To: <1480436092-10728-1-git-send-email-al.kochet@gmail.com>
 References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
  <1480436092-10728-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1480436092-10728-5-git-send-email-al.kochet@gmail.com>
+Message-ID: <1480436092-10728-9-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch add two timers to all rk3188 based boards.
+This allow to enable timer without enabling interrupts from it.
+As that mode will be used in clocksource implementation.
 
-The first timer is from alive subsystem and it act as a backup
-for the local timers at sleep time. It act the same as other
-SoC rockchip timers already present in kernel.
-
-The second timer is from CPU subsystem and act as replacement
-for the arm-global-timer clocksource and sched clock. It run
-at stable frequency 24MHz.
+This is refactoring step without functional changes.
 
 Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
 ---
- arch/arm/boot/dts/rk3188.dtsi |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ drivers/clocksource/rockchip_timer.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index 31f81b2..0dc52fe 100644
---- a/arch/arm/boot/dts/rk3188.dtsi
-+++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -106,6 +106,22 @@
- 		};
- 	};
+diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
+index a17dc61..61c3bb1 100644
+--- a/drivers/clocksource/rockchip_timer.c
++++ b/drivers/clocksource/rockchip_timer.c
+@@ -60,8 +60,7 @@ static inline void rk_timer_disable(struct rk_timer *timer)
  
-+	timer3: timer at 2000e000 {
-+		compatible = "rockchip,rk3188-timer", "rockchip,rk3288-timer";
-+		reg = <0x2000e000 0x20>;
-+		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_TIMER3>, <&cru PCLK_TIMER3>;
-+		clock-names = "timer", "pclk";
-+	};
-+
-+	timer6: timer at 200380a0 {
-+		compatible = "rockchip,rk3188-timer", "rockchip,rk3288-timer";
-+		reg = <0x200380a0 0x20>;
-+		interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_TIMER6>, <&cru PCLK_TIMER0>;
-+		clock-names = "timer", "pclk";
-+	};
-+
- 	i2s0: i2s at 1011a000 {
- 		compatible = "rockchip,rk3188-i2s", "rockchip,rk3066-i2s";
- 		reg = <0x1011a000 0x2000>;
+ static inline void rk_timer_enable(struct rk_timer *timer, u32 flags)
+ {
+-	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
+-		       timer->ctrl);
++	writel_relaxed(TIMER_ENABLE | flags, timer->ctrl);
+ }
+ 
+ static void rk_timer_update_counter(unsigned long cycles,
+@@ -83,7 +82,8 @@ static inline int rk_timer_set_next_event(unsigned long cycles,
+ 
+ 	rk_timer_disable(timer);
+ 	rk_timer_update_counter(cycles, timer);
+-	rk_timer_enable(timer, TIMER_MODE_USER_DEFINED_COUNT);
++	rk_timer_enable(timer, TIMER_MODE_USER_DEFINED_COUNT |
++			       TIMER_INT_UNMASK);
+ 	return 0;
+ }
+ 
+@@ -101,7 +101,7 @@ static int rk_timer_set_periodic(struct clock_event_device *ce)
+ 
+ 	rk_timer_disable(timer);
+ 	rk_timer_update_counter(timer->freq / HZ - 1, timer);
+-	rk_timer_enable(timer, TIMER_MODE_FREE_RUNNING);
++	rk_timer_enable(timer, TIMER_MODE_FREE_RUNNING | TIMER_INT_UNMASK);
+ 	return 0;
+ }
+ 
 -- 
 1.7.9.5
