@@ -1,245 +1,148 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 29 Nov 2016 15:57:11 -0800
-Subject: [PATCH v4 3/4] [media] davinci: vpif_capture: get subdevs from DT
+Date: Tue, 29 Nov 2016 15:57:10 -0800
+Subject: [PATCH v4 2/4] [media] davinci: VPIF: add basic support for DT init
 In-Reply-To: <20161129235712.29846-1-khilman@baylibre.com>
 References: <20161129235712.29846-1-khilman@baylibre.com>
-Message-ID: <20161129235712.29846-4-khilman@baylibre.com>
+Message-ID: <20161129235712.29846-3-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow getting of subdevs from DT ports and endpoints.
+Add basic support for initialization via DT.
 
-The _get_pdata() function was larely inspired by (i.e. stolen from)
-am437x-vpfe.c
+Because existing capture and display devices are implemented as separate
+platform_devices, and in order to preserve that legacy support, during
+DT boot, manually create capture and display platform devices to
+initialize capture and display support.
 
 Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 ---
- drivers/media/platform/davinci/vpif_capture.c | 138 +++++++++++++++++++++++++-
- include/media/davinci/vpif_types.h            |   9 +-
- 2 files changed, 141 insertions(+), 6 deletions(-)
+ drivers/media/platform/davinci/vpif.c         | 48 ++++++++++++++++++++++++++-
+ drivers/media/platform/davinci/vpif_capture.c |  6 ++++
+ drivers/media/platform/davinci/vpif_display.c |  6 ++++
+ 3 files changed, 59 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/media/platform/davinci/vpif_capture.c b/drivers/media/platform/davinci/vpif_capture.c
-index a83df07e4051..4e363da2c21f 100644
---- a/drivers/media/platform/davinci/vpif_capture.c
-+++ b/drivers/media/platform/davinci/vpif_capture.c
-@@ -26,6 +26,8 @@
- #include <linux/slab.h>
+diff --git a/drivers/media/platform/davinci/vpif.c b/drivers/media/platform/davinci/vpif.c
+index 0380cf2e5775..528b30d52208 100644
+--- a/drivers/media/platform/davinci/vpif.c
++++ b/drivers/media/platform/davinci/vpif.c
+@@ -420,7 +420,8 @@ EXPORT_SYMBOL(vpif_channel_getfid);
  
- #include <media/v4l2-ioctl.h>
-+#include <media/v4l2-of.h>
-+#include <media/i2c/tvp514x.h>
- 
- #include "vpif.h"
- #include "vpif_capture.h"
-@@ -651,6 +653,10 @@ static int vpif_input_to_subdev(
- 
- 	vpif_dbg(2, debug, "vpif_input_to_subdev\n");
- 
-+	if (!chan_cfg)
-+		return -1;
-+	if (input_index >= chan_cfg->input_count)
-+		return -1;
- 	subdev_name = chan_cfg->inputs[input_index].subdev_name;
- 	if (subdev_name == NULL)
- 		return -1;
-@@ -658,7 +664,7 @@ static int vpif_input_to_subdev(
- 	/* loop through the sub device list to get the sub device info */
- 	for (i = 0; i < vpif_cfg->subdev_count; i++) {
- 		subdev_info = &vpif_cfg->subdev_info[i];
--		if (!strcmp(subdev_info->name, subdev_name))
-+		if (subdev_info && !strcmp(subdev_info->name, subdev_name))
- 			return i;
- 	}
- 	return -1;
-@@ -1328,6 +1334,21 @@ static int vpif_async_bound(struct v4l2_async_notifier *notifier,
+ static int vpif_probe(struct platform_device *pdev)
  {
- 	int i;
+-	static struct resource	*res;
++	static struct resource	*res, *res_irq;
++	struct platform_device *pdev_capture, *pdev_display;
  
-+	for (i = 0; i < vpif_obj.config->asd_sizes[0]; i++) {
-+		struct v4l2_async_subdev *_asd = vpif_obj.config->asd[i];
-+		const struct device_node *node = _asd->match.of.node;
-+
-+		if (node == subdev->of_node) {
-+			vpif_obj.sd[i] = subdev;
-+			vpif_obj.config->chan_config->inputs[i].subdev_name =
-+				(char *)subdev->of_node->full_name;
-+			vpif_dbg(2, debug,
-+				 "%s: setting input %d subdev_name = %s\n",
-+				 __func__, i, subdev->of_node->full_name);
-+			return 0;
-+		}
-+	}
-+
- 	for (i = 0; i < vpif_obj.config->subdev_count; i++)
- 		if (!strcmp(vpif_obj.config->subdev_info[i].name,
- 			    subdev->name)) {
-@@ -1423,6 +1444,118 @@ static int vpif_async_complete(struct v4l2_async_notifier *notifier)
- 	return vpif_probe_complete();
- }
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	vpif_base = devm_ioremap_resource(&pdev->dev, res);
+@@ -432,6 +433,42 @@ static int vpif_probe(struct platform_device *pdev)
  
-+static struct vpif_capture_config *
-+vpif_capture_get_pdata(struct platform_device *pdev)
-+{
-+	struct device_node *endpoint = NULL;
-+	struct v4l2_of_endpoint bus_cfg;
-+	struct vpif_capture_config *pdata;
-+	struct vpif_subdev_info *sdinfo;
-+	struct vpif_capture_chan_config *chan;
-+	unsigned int i;
+ 	spin_lock_init(&vpif_lock);
+ 	dev_info(&pdev->dev, "vpif probe success\n");
 +
-+	dev_dbg(&pdev->dev, "vpif_get_pdata\n");
++	if (!pdev->dev.of_node)
++		return 0;
 +
 +	/*
-+	 * DT boot: OF node from parent device contains
-+	 * video ports & endpoints data.
++	 * For DT platforms, manually create platform_devices for
++	 * capture/display drivers.
 +	 */
-+	if (pdev->dev.parent && pdev->dev.parent->of_node)
-+		pdev->dev.of_node = pdev->dev.parent->of_node;
-+	if (!IS_ENABLED(CONFIG_OF) || !pdev->dev.of_node)
-+		return pdev->dev.platform_data;
-+
-+	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata)
-+		return NULL;
-+	pdata->subdev_info =
-+		devm_kzalloc(&pdev->dev, sizeof(*pdata->subdev_info) *
-+			     VPIF_CAPTURE_NUM_CHANNELS, GFP_KERNEL);
-+
-+	if (!pdata->subdev_info)
-+		return NULL;
-+
-+	for (i = 0; i < VPIF_CAPTURE_NUM_CHANNELS; i++) {
-+		struct device_node *rem;
-+		unsigned int flags;
-+		int err;
-+
-+		endpoint = of_graph_get_next_endpoint(pdev->dev.of_node,
-+						      endpoint);
-+		if (!endpoint)
-+			break;
-+
-+		sdinfo = &pdata->subdev_info[i];
-+		chan = &pdata->chan_config[i];
-+		chan->inputs = devm_kzalloc(&pdev->dev,
-+					    sizeof(*chan->inputs) *
-+					    VPIF_CAPTURE_NUM_CHANNELS,
-+					    GFP_KERNEL);
-+
-+		chan->input_count++;
-+		chan->inputs[i].input.type = V4L2_INPUT_TYPE_CAMERA;
-+		chan->inputs[i].input.std = V4L2_STD_ALL;
-+		chan->inputs[i].input.capabilities = V4L2_IN_CAP_STD;
-+
-+		/*
-+		 * FIXME: need a new property for input/output routing?
-+		 * All known boards are using ch0:composite ch1: s-video.
-+		 */
-+		if (i == 0)
-+			chan->inputs[i].input_route = INPUT_CVBS_VI2B;
-+		else
-+			chan->inputs[i].input_route = INPUT_SVIDEO_VI2C_VI1C;
-+		chan->inputs[i].output_route = OUTPUT_10BIT_422_EMBEDDED_SYNC;
-+
-+		err = v4l2_of_parse_endpoint(endpoint, &bus_cfg);
-+		if (err) {
-+			dev_err(&pdev->dev, "Could not parse the endpoint\n");
-+			goto done;
-+		}
-+		dev_dbg(&pdev->dev, "Endpoint %s, bus_width = %d\n",
-+			endpoint->full_name, bus_cfg.bus.parallel.bus_width);
-+		flags = bus_cfg.bus.parallel.flags;
-+
-+		if (flags & V4L2_MBUS_HSYNC_ACTIVE_HIGH)
-+			chan->vpif_if.hd_pol = 1;
-+
-+		if (flags & V4L2_MBUS_VSYNC_ACTIVE_HIGH)
-+			chan->vpif_if.vd_pol = 1;
-+
-+		chan->vpif_if.if_type = VPIF_IF_BT656;
-+		rem = of_graph_get_remote_port_parent(endpoint);
-+		if (!rem) {
-+			dev_dbg(&pdev->dev, "Remote device at %s not found\n",
-+				endpoint->full_name);
-+			goto done;
-+		}
-+
-+		dev_dbg(&pdev->dev, "Remote device %s, %s found\n",
-+			rem->name, rem->full_name);
-+		sdinfo->name = rem->full_name;
-+
-+		pdata->asd[i] = devm_kzalloc(&pdev->dev,
-+					     sizeof(struct v4l2_async_subdev),
-+					     GFP_KERNEL);
-+		if (!pdata->asd[i]) {
-+			of_node_put(rem);
-+			pdata = NULL;
-+			goto done;
-+		}
-+
-+		pdata->asd[i]->match_type = V4L2_ASYNC_MATCH_OF;
-+		pdata->asd[i]->match.of.node = rem;
-+		of_node_put(rem);
++	res_irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
++	if (!res_irq) {
++		dev_warn(&pdev->dev, "Missing IRQ resource.\n");
++		return -EINVAL;
 +	}
 +
-+done:
-+	pdata->asd_sizes[0] = i;
-+	pdata->subdev_count = i;
-+	pdata->card_name = "DA850/OMAP-L138 Video Capture";
++	pdev_capture = devm_kzalloc(&pdev->dev, sizeof(*pdev_capture),
++				    GFP_KERNEL);
++	pdev_capture->name = "vpif_capture";
++	pdev_capture->id = -1;
++	pdev_capture->resource = res_irq;
++	pdev_capture->num_resources = 1;
++	pdev_capture->dev.dma_mask = pdev->dev.dma_mask;
++	pdev_capture->dev.coherent_dma_mask = pdev->dev.coherent_dma_mask;
++	pdev_capture->dev.parent = &pdev->dev;
++	platform_device_register(pdev_capture);
 +
-+	return pdata;
-+}
++	pdev_display = devm_kzalloc(&pdev->dev, sizeof(*pdev_display),
++				    GFP_KERNEL);
++	pdev_display->name = "vpif_display";
++	pdev_display->id = -1;
++	pdev_display->resource = res_irq;
++	pdev_display->num_resources = 1;
++	pdev_display->dev.dma_mask = pdev->dev.dma_mask;
++	pdev_display->dev.coherent_dma_mask = pdev->dev.coherent_dma_mask;
++	pdev_display->dev.parent = &pdev->dev;
++	platform_device_register(pdev_display);
 +
- /**
-  * vpif_probe : This function probes the vpif capture driver
-  * @pdev: platform device pointer
-@@ -1439,6 +1572,7 @@ static __init int vpif_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+@@ -464,8 +501,17 @@ static const struct dev_pm_ops vpif_pm = {
+ #define vpif_pm_ops NULL
+ #endif
+ 
++#if IS_ENABLED(CONFIG_OF)
++static const struct of_device_id vpif_of_match[] = {
++	{ .compatible = "ti,da850-vpif", },
++	{ /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(of, vpif_of_match);
++#endif
++
+ static struct platform_driver vpif_driver = {
+ 	.driver = {
++		.of_match_table = of_match_ptr(vpif_of_match),
+ 		.name	= "vpif",
+ 		.pm	= vpif_pm_ops,
+ 	},
+diff --git a/drivers/media/platform/davinci/vpif_capture.c b/drivers/media/platform/davinci/vpif_capture.c
+index 9f8f41c0f251..a83df07e4051 100644
+--- a/drivers/media/platform/davinci/vpif_capture.c
++++ b/drivers/media/platform/davinci/vpif_capture.c
+@@ -45,6 +45,7 @@ module_param(debug, int, 0644);
+ MODULE_PARM_DESC(debug, "Debug level 0-1");
+ 
+ #define VPIF_DRIVER_NAME	"vpif_capture"
++MODULE_ALIAS("platform:" VPIF_DRIVER_NAME);
+ 
+ /* global variables */
+ static struct vpif_device vpif_obj = { {NULL} };
+@@ -1438,6 +1439,11 @@ static __init int vpif_probe(struct platform_device *pdev)
  	int res_idx = 0;
  	int i, err;
  
-+	pdev->dev.platform_data = vpif_capture_get_pdata(pdev);
- 	if (!pdev->dev.platform_data) {
- 		dev_warn(&pdev->dev, "Missing platform data.  Giving up.\n");
- 		return -EINVAL;
-@@ -1481,7 +1615,7 @@ static __init int vpif_probe(struct platform_device *pdev)
- 		goto vpif_unregister;
- 	}
- 
--	if (!vpif_obj.config->asd_sizes) {
-+	if (!vpif_obj.config->asd_sizes[0]) {
- 		i2c_adap = i2c_get_adapter(1);
- 		for (i = 0; i < subdev_count; i++) {
- 			subdevdata = &vpif_obj.config->subdev_info[i];
-diff --git a/include/media/davinci/vpif_types.h b/include/media/davinci/vpif_types.h
-index 3cb1704a0650..4ee3b41975db 100644
---- a/include/media/davinci/vpif_types.h
-+++ b/include/media/davinci/vpif_types.h
-@@ -65,14 +65,14 @@ struct vpif_display_config {
- 
- struct vpif_input {
- 	struct v4l2_input input;
--	const char *subdev_name;
-+	char *subdev_name;
- 	u32 input_route;
- 	u32 output_route;
- };
- 
- struct vpif_capture_chan_config {
- 	struct vpif_interface vpif_if;
--	const struct vpif_input *inputs;
-+	struct vpif_input *inputs;
- 	int input_count;
- };
- 
-@@ -83,7 +83,8 @@ struct vpif_capture_config {
- 	struct vpif_subdev_info *subdev_info;
- 	int subdev_count;
- 	const char *card_name;
--	struct v4l2_async_subdev **asd;	/* Flat array, arranged in groups */
--	int *asd_sizes;		/* 0-terminated array of asd group sizes */
++	if (!pdev->dev.platform_data) {
++		dev_warn(&pdev->dev, "Missing platform data.  Giving up.\n");
++		return -EINVAL;
++	}
 +
-+	struct v4l2_async_subdev *asd[VPIF_CAPTURE_MAX_CHANNELS];
-+	int asd_sizes[VPIF_CAPTURE_MAX_CHANNELS];
- };
- #endif /* _VPIF_TYPES_H */
+ 	vpif_dev = &pdev->dev;
+ 
+ 	err = initialize_vpif();
+diff --git a/drivers/media/platform/davinci/vpif_display.c b/drivers/media/platform/davinci/vpif_display.c
+index 75b27233ec2f..7f632b757d32 100644
+--- a/drivers/media/platform/davinci/vpif_display.c
++++ b/drivers/media/platform/davinci/vpif_display.c
+@@ -42,6 +42,7 @@ module_param(debug, int, 0644);
+ MODULE_PARM_DESC(debug, "Debug level 0-1");
+ 
+ #define VPIF_DRIVER_NAME	"vpif_display"
++MODULE_ALIAS("platform:" VPIF_DRIVER_NAME);
+ 
+ /* Is set to 1 in case of SDTV formats, 2 in case of HDTV formats. */
+ static int ycmux_mode;
+@@ -1249,6 +1250,11 @@ static __init int vpif_probe(struct platform_device *pdev)
+ 	int res_idx = 0;
+ 	int i, err;
+ 
++	if (!pdev->dev.platform_data) {
++		dev_warn(&pdev->dev, "Missing platform data.  Giving up.\n");
++		return -EINVAL;
++	}
++
+ 	vpif_dev = &pdev->dev;
+ 	err = initialize_vpif();
+ 
 -- 
 2.9.3
