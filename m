@@ -1,63 +1,116 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Tue, 29 Nov 2016 09:14:15 +0800
-Subject: [bug report v4.8] fs/locks.c: kernel oops during posix lock
- stress test
-In-Reply-To: <1480340400.2606.10.camel@poochiereds.net>
-References: <CACVXFVPsHjh3CWjdUrKB_r6=hkXK=qS3wpykbacdKe1rzz1H8Q@mail.gmail.com>
- <1480340400.2606.10.camel@poochiereds.net>
-Message-ID: <CACVXFVMqSyT3XsRqv697=NYS8cWW=2RMHLb7YCd2Ooz-iJJdgw@mail.gmail.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Tue, 29 Nov 2016 01:21:30 +0000
+Subject: [PATCH v4] clkdev: add devm_of_clk_get()
+Message-ID: <87zikjw08i.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeff,
 
-On Mon, Nov 28, 2016 at 9:40 PM, Jeff Layton <jlayton@poochiereds.net> wrote:
-> On Mon, 2016-11-28 at 11:10 +0800, Ming Lei wrote:
->> Hi Guys,
->>
->> When I run stress-ng via the following steps on one ARM64 dual
->> socket system(Cavium Thunder), the kernel oops[1] can often be
->> triggered after running the stress test for several hours(sometimes
->> it may take longer):
->>
->> - git clone git://kernel.ubuntu.com/cking/stress-ng.git
->> - apply the attachment patch which just makes the posix file
->> lock stress test more aggressive
->> - run the test via '~/git/stress-ng$./stress-ng --lockf 128 --aggressive'
->>
->>
->> From the oops log, looks one garbage file_lock node is got
->> from the linked list of 'ctx->flc_posix' when the issue happens.
->>
->> BTW, the issue isn't observed on single socket Cavium Thunder yet,
->> and the same issue can be seen on Ubuntu Xenial(v4.4 based kernel)
->> too.
->>
->> Thanks,
->> Ming
->>
->
-> Some questions just for clarification:
->
-> - I assume this is being run on a local fs of some sort? ext4 or xfs or
-> something?
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Yes, I just tested it on local ext4, and not test it on other filesystems yet.
+Current Linux has of_clk_get(), but doesn't have devm_of_clk_get().
+This patch adds it. It is implemeted in clk-devres.c to share
+devm_clk_release().
 
->
-> - have you seen this on any other arch, besides ARM?
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+---
+v3 -> v4
 
-I run the same tests on x86 before, and not see the issue.
+ - git log explain why it is implemeted in clk-devres
+ - it is related to CONFIG_HAVE_CLK
 
->
-> The file locking code does do some lockless checking to see whether the
-> i_flctx is even present and whether the list is empty in
-> locks_remove_posix. It's possible we have some barrier problems there,
-> but I don't quite see how that would cause us to have a corrupt lock on
-> the flc_posix list.
+ drivers/clk/clk-devres.c | 21 +++++++++++++++++++++
+ include/linux/clk.h      | 27 +++++++++++++++++++++++----
+ 2 files changed, 44 insertions(+), 4 deletions(-)
 
-Yeah, I looked at the function of posix_lock_inode(), seems both add and
-remove are protected by the lock.
-
-Thanks,
-Ming
+diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
+index 8f57154..2449b25 100644
+--- a/drivers/clk/clk-devres.c
++++ b/drivers/clk/clk-devres.c
+@@ -53,3 +53,24 @@ void devm_clk_put(struct device *dev, struct clk *clk)
+ 	WARN_ON(ret);
+ }
+ EXPORT_SYMBOL(devm_clk_put);
++
++struct clk *devm_of_clk_get(struct device *dev,
++			    struct device_node *np, int index)
++{
++	struct clk **ptr, *clk;
++
++	ptr = devres_alloc(devm_clk_release, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return ERR_PTR(-ENOMEM);
++
++	clk = of_clk_get(np, index);
++	if (!IS_ERR(clk)) {
++		*ptr = clk;
++		devres_add(dev, ptr);
++	} else {
++		devres_free(ptr);
++	}
++
++	return clk;
++}
++EXPORT_SYMBOL(devm_of_clk_get);
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index 123c027..7f50c5f 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -17,8 +17,9 @@
+ #include <linux/notifier.h>
+ 
+ struct device;
+-
+ struct clk;
++struct device_node;
++struct of_phandle_args;
+ 
+ /**
+  * DOC: clk notifier callback types
+@@ -249,6 +250,21 @@ static inline void clk_unprepare(struct clk *clk)
+ struct clk *devm_clk_get(struct device *dev, const char *id);
+ 
+ /**
++ * devm_clk_get - lookup and obtain a managed reference to a clock producer.
++ * @dev: device for clock "consumer"
++ * @np: pointer to clock consumer node
++ * @index: clock index
++ *
++ * This function parses the clocks, and uses them to look up the
++ * struct clk from the registered list of clock providers by using
++ * @np and @index.
++ *
++ * The clock will automatically be freed when the device is unbound
++ * from the bus.
++ */
++struct clk *devm_of_clk_get(struct device *dev, struct device_node *np, int index);
++
++/**
+  * clk_enable - inform the system when the clock source should be running.
+  * @clk: clock source
+  *
+@@ -432,6 +448,12 @@ static inline struct clk *devm_clk_get(struct device *dev, const char *id)
+ 	return NULL;
+ }
+ 
++static inline struct clk *devm_of_clk_get(struct device *dev,
++					  struct device_node *np, int index)
++{
++	return NULL;
++}
++
+ static inline void clk_put(struct clk *clk) {}
+ 
+ static inline void devm_clk_put(struct device *dev, struct clk *clk) {}
+@@ -501,9 +523,6 @@ static inline void clk_disable_unprepare(struct clk *clk)
+ 	clk_unprepare(clk);
+ }
+ 
+-struct device_node;
+-struct of_phandle_args;
+-
+ #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+ struct clk *of_clk_get(struct device_node *np, int index);
+ struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+-- 
+1.9.1
