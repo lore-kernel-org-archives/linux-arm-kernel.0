@@ -1,61 +1,103 @@
-From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon, 28 Nov 2016 21:13:02 -0500
-Subject: [PATCH v2] arm64: head.S: Fix CNTHCTL_EL2 access on VHE system
-Message-ID: <1480385582-24176-1-git-send-email-jintack@cs.columbia.edu>
+From: huziji@marvell.com (Ziji Hu)
+Date: Tue, 29 Nov 2016 10:53:47 +0800
+Subject: [PATCH 7/10] mmc: sdhci-xenon: Add support to PHYs of Marvell
+ Xenon SDHC
+In-Reply-To: <CAPDyKFr8rX04iY92OeQpSkS+3HN2-FxijCCiDb2sSKvP+TZPog@mail.gmail.com>
+References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
+ <a05ffd140f4edc02fc3128db8445b2264cf38723.1477911954.git-series.gregory.clement@free-electrons.com>
+ <CAPDyKFpkcoVMKbVOwjX1WDyNgc1vvUX60D6XRX6=YHGvkvHvnA@mail.gmail.com>
+ <3cd05a26-d340-476e-bab1-8be9d5446f47@marvell.com>
+ <CAPDyKFrskyZvMwhmj8ioyaowU8GL5=d-6ipGQcmmig_a9E9AQQ@mail.gmail.com>
+ <436c6925-cb0d-afe7-e3a2-384eca15ff42@marvell.com>
+ <8359307d-5f44-3db9-aae1-eb1fe8e1141d@marvell.com>
+ <CAPDyKFo3ezYOywtSZ8GGQ1XK9KPsxCgQNbaiz45EVgbgtnUxjg@mail.gmail.com>
+ <10a885f0-82e9-a35c-f62f-3fc4518ea8b4@marvell.com>
+ <CAPDyKFr8rX04iY92OeQpSkS+3HN2-FxijCCiDb2sSKvP+TZPog@mail.gmail.com>
+Message-ID: <c30cead8-17b6-48b0-7355-cd82268842e1@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jintack <jintack@cs.columbia.edu>
+Hi Ulf,
 
-Bit positions of CNTHCTL_EL2 are changing depending on HCR_EL2.E2H bit.
-EL1PCEN and EL1PCTEN are 1st and 0th bits when E2H is not set, but they
-are 11th and 10th bits respectively when E2H is set.  Current code is
-unintentionally setting wrong bits to CNTHCTL_EL2 with E2H set.
+On 2016/11/28 23:16, Ulf Hansson wrote:
+> On 28 November 2016 at 12:38, Ziji Hu <huziji@marvell.com> wrote:
+>> Hi Ulf,
+>>
+>> On 2016/11/28 19:13, Ulf Hansson wrote:
+>>>>
+>>>>     As you suggest, I replace mmc_wait_for_cmd() with mmc_send_tuning(), to
+>>>>     send commands for testing current sampling point set in our host PHY.
+>>>>
+>>>>     According to my test result, it shows that mmc_send_tuning() can only support
+>>>>     tuning command (CMD21/CMD19).
+>>>>     As a result, we cannot use mmc_send_tuning() when card is in the speed modes
+>>>>     which doesn't support tuning, such as eMMC HS SDR, eMMC HS DRR and
+>>>>     SD SDR 12/SDR25/DDR50. Card will not response to tuning commands in those
+>>>>     speed modes.
+>>>>
+>>>>     Could you please provide suggestions for the speed mode in which tuning is
+>>>>     not available?
+>>>>
+>>>
+>>> Normally the mmc host driver shouldn't have to care about what the
+>>> card supports, as that is the responsibility of the mmc core to
+>>> manage.
+>>>
+>>> The host should only need to implement the ->execute_tuning() ops,
+>>> which gets called when the card supports tuning (CMD19/21). Does it
+>>> make sense?
+>>>
+>>    I think it is irrelevant to tuning procedure.
+>>
+>>    Our host requires to adjust PHY setting after each time ios setting
+>>    (SDCLK/bus width/speed mode) is changed.
+>>    The simplified sequence is:
+>>    mmc change ios --> mmc_set_ios() --> ->set_ios() --> after sdhci_set_ios(),
+>>    adjust PHY setting.
+>>    During PHY setting adjustment, out host driver has to send commands to
+>>    test current sampling point. Tuning is another independent step.
+> 
+> For those speed modes (or other ios changes) that *don't* requires
+> tuning, then what will you do when you send the command to confirm the
+> change of PHY setting and it fails?
+> 
+> My assumption is that you will fail anyway, by propagating the error
+> to the mmc core. At least that what was my understanding from your
+> earlier replies, right!?
+> 
+> Then, I think there are no point having the host driver sending a
+> command to confirm the PHY settings, as the mmc core will anyway
+> discover if something goes wrong when the next command is sent.
+> 
+> Please correct me if I am wrong!
+>
 
-In fact, we don't need to set those two bits, which allow EL1 and EL0 to
-access physical timer and counter respectively, if E2H and TGE are set
-for the host kernel. They will be configured later as necessary. First,
-we don't need to configure those bits for EL1, since the host kernel
-runs in EL2.  It is a hypervisor's responsibility to configure them
-before entering a VM, which runs in EL0 and EL1. Second, EL0 accesses
-are configured in the later stage of boot process.
+   Sorry that I didn't make myself clear.
 
-Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+   Our host PHY delay line consists of hundreds of sampling points.
+   Each sampling point represents a different phase shift.
 
----
-v2: Add comments about accessing CNTHCTL_EL2 when HCR_EL2.ECH == 1
+   In lower speed mode, our host driver will scan the delay line.
+   It will select and test multiple sampling points, other than testing
+   only single sampling point.
 
----
- arch/arm64/kernel/head.S | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+   If a sampling point fails to transfer cmd/data, our host driver will
+   move to test next sampling point, until we find out a group of successful
+   sampling points which can transfer cmd/data. At last we will select
+   a perfect one from them.
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 332e331..136cb0d 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -524,10 +524,21 @@ set_hcr:
- 	msr	hcr_el2, x0
- 	isb
+   Thank you.
+
+Best regards,
+Hu Ziji
  
--	/* Generic timers. */
-+	/*
-+	 * Allow Non-secure EL1 and EL0 to access physical timer and counter.
-+	 * This is not necessary for VHE, since the host kernel runs in EL2,
-+	 * and EL0 accesses are configured in the later stage of boot process.
-+	 * Note that when HCR_EL2.E2H == 1, CNTHCTL_EL2 has the same bit layout
-+	 * as CNTKCTL_EL1, and CNTKCTL_EL1 accessing instructions are redefined
-+	 * to access CNTHCTL_EL2. This allows the kernel designed to run at EL1
-+	 * to transparently mess with the EL0 bits via CNTKCTL_EL1 access in
-+	 * EL2.
-+	 */
-+	cbnz	x2, 1f
- 	mrs	x0, cnthctl_el2
- 	orr	x0, x0, #3			// Enable EL1 physical timers
- 	msr	cnthctl_el2, x0
-+1:
- 	msr	cntvoff_el2, xzr		// Clear virtual offset
- 
- #ifdef CONFIG_ARM_GIC_V3
--- 
-1.9.1
+>>
+>>    Thus our host needs a valid command in PHY setting adjustment. Tuning command
+>>    can be borrowed to complete this task in SD SDR50. But for other speed mode,
+>>    we have to find out a valid command.
+> 
+> I thought we agreed on this wasn't necessary? Please see my upper response.
+> 
+> Kind regards
+> Uffe
+> 
