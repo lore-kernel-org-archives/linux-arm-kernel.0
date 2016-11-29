@@ -1,42 +1,34 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 29 Nov 2016 12:39:55 +0000
-Subject: [RFC v2 PATCH 13/23] ARM: kexec: disallow kexec for NOMMU builds
+Date: Tue, 29 Nov 2016 12:40:01 +0000
+Subject: [RFC v2 PATCH 19/23] PCI: tegra: limit to MMU build only
 In-Reply-To: <1480423205-48436-1-git-send-email-vladimir.murzin@arm.com>
 References: <1480423205-48436-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1480423205-48436-14-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1480423205-48436-20-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While building for NOMMU the following error shows up:
+This driver rely on MMU for virtual address space optimisations (see
+comment around tegra_pcie_bus_alloc()) and breaks NOMMU build, thus
+add dependency on MMU.
 
-kernel/built-in.o: In function `kimage_free_entry':
-memremap.c:(.text+0x4dafc): undefined reference to `arch_phys_to_idmap_offset'
-memremap.c:(.text+0x4db04): undefined reference to `arch_phys_to_idmap_offset'
-kernel/built-in.o: In function `kimage_alloc_page':
-memremap.c:(.text+0x4dbc0): undefined reference to `arch_phys_to_idmap_offset'
-memremap.c:(.text+0x4dbc8): undefined reference to `arch_phys_to_idmap_offset'
-memremap.c:(.text+0x4dc1c): undefined reference to `arch_phys_to_idmap_offset'
-
-That comes from Kexec, add dependency on MMU there.
-
-Cc: Russell King <linux@armlinux.org.uk>
+Cc: Thierry Reding <thierry.reding@gmail.com>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/Kconfig |    2 +-
+ drivers/pci/host/Kconfig |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c462d9e..306a412 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2019,7 +2019,7 @@ config XIP_PHYS_ADDR
- config KEXEC
- 	bool "Kexec system call (EXPERIMENTAL)"
- 	depends on (!SMP || PM_SLEEP_SMP)
--	depends on !CPU_V7M
-+	depends on MMU
- 	select KEXEC_CORE
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index d7e7c0a..836fa02 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -69,7 +69,7 @@ config PCI_IMX6
+ 
+ config PCI_TEGRA
+ 	bool "NVIDIA Tegra PCIe controller"
+-	depends on ARCH_TEGRA && !ARM64
++	depends on ARCH_TEGRA && !ARM64 && MMU
  	help
- 	  kexec is a system call that implements the ability to shutdown your
+ 	  Say Y here if you want support for the PCIe host controller found
+ 	  on NVIDIA Tegra SoCs.
 -- 
 1.7.9.5
