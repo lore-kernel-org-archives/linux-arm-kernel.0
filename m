@@ -1,32 +1,54 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 29 Nov 2016 16:15:08 -0600
-Subject: [PATCH] soc: ti: qmss: fix the case when !SMP
-Message-ID: <20161129221508.10551-1-grygorii.strashko@ti.com>
+From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
+Date: Tue, 29 Nov 2016 17:26:18 -0500
+Subject: [PATCHv4 06/10] xen: Switch to using __pa_symbol
+In-Reply-To: <1480445729-27130-7-git-send-email-labbott@redhat.com>
+References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
+ <1480445729-27130-7-git-send-email-labbott@redhat.com>
+Message-ID: <935fefbf-97dc-83fc-b7c3-ba3f19f2087f@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The irq_set_affinity_hint() will always fail when !SMP and
-Networking will fail on Keystone 2 devices in this case.
-Hence, fix by ignoring IRQ affinity settings when !SMP.
+On 11/29/2016 01:55 PM, Laura Abbott wrote:
+> __pa_symbol is the correct macro to use on kernel
+> symbols. Switch to this from __pa.
+>
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> Found during a sweep of the kernel. Untested.
+> ---
+>  drivers/xen/xenbus/xenbus_dev_backend.c | 2 +-
+>  drivers/xen/xenfs/xenstored.c           | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/xen/xenbus/xenbus_dev_backend.c b/drivers/xen/xenbus/xenbus_dev_backend.c
+> index 4a41ac9..31ca2bf 100644
+> --- a/drivers/xen/xenbus/xenbus_dev_backend.c
+> +++ b/drivers/xen/xenbus/xenbus_dev_backend.c
+> @@ -99,7 +99,7 @@ static int xenbus_backend_mmap(struct file *file, struct vm_area_struct *vma)
+>  		return -EINVAL;
+>  
+>  	if (remap_pfn_range(vma, vma->vm_start,
+> -			    virt_to_pfn(xen_store_interface),
+> +			    PHYS_PFN(__pa_symbol(xen_store_interface)),
+>  			    size, vma->vm_page_prot))
+>  		return -EAGAIN;
+>  
+> diff --git a/drivers/xen/xenfs/xenstored.c b/drivers/xen/xenfs/xenstored.c
+> index fef20db..21009ea 100644
+> --- a/drivers/xen/xenfs/xenstored.c
+> +++ b/drivers/xen/xenfs/xenstored.c
+> @@ -38,7 +38,7 @@ static int xsd_kva_mmap(struct file *file, struct vm_area_struct *vma)
+>  		return -EINVAL;
+>  
+>  	if (remap_pfn_range(vma, vma->vm_start,
+> -			    virt_to_pfn(xen_store_interface),
+> +			    PHYS_PFN(__pa_symbol(xen_store_interface)),
+>  			    size, vma->vm_page_prot))
+>  		return -EAGAIN;
+>  
 
-Cc: Murali Karicheri <m-karicheri2@ti.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- drivers/soc/ti/knav_qmss_queue.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
-index b73e353..3aa0470 100644
---- a/drivers/soc/ti/knav_qmss_queue.c
-+++ b/drivers/soc/ti/knav_qmss_queue.c
-@@ -1228,7 +1228,7 @@ static int knav_setup_queue_range(struct knav_device *kdev,
- 
- 		range->num_irqs++;
- 
--		if (oirq.args_count == 3)
-+		if (IS_ENABLED(SMP) && oirq.args_count == 3)
- 			range->irqs[i].cpu_map =
- 				(oirq.args[2] & 0x0000ff00) >> 8;
- 	}
--- 
-2.10.1
+I suspect this won't work --- xen_store_interface doesn't point to a
+kernel symbol.
+
+-boris
