@@ -1,157 +1,96 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 29 Nov 2016 11:47:48 +0100
-Subject: [PATCH 3/4] dt-bindings: display: add Amlogic Meson DRM Bindings
-In-Reply-To: <1480416469-9655-1-git-send-email-narmstrong@baylibre.com>
-References: <1480416469-9655-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1480416469-9655-4-git-send-email-narmstrong@baylibre.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 29 Nov 2016 16:18:03 +0530
+Subject: [PATCH] ARM: davinci: da8xx: Fix sleeping function called from
+ invalid context
+In-Reply-To: <1480350566-26225-1-git-send-email-abailon@baylibre.com>
+References: <1480350566-26225-1-git-send-email-abailon@baylibre.com>
+Message-ID: <36a2e5e1-e7b7-2ca0-0484-98636771ec65@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- .../bindings/display/meson/meson-drm.txt           | 134 +++++++++++++++++++++
- 1 file changed, 134 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/meson/meson-drm.txt
+On Monday 28 November 2016 09:59 PM, Alexandre Bailon wrote:
+> Everytime the usb20 phy is enabled, there is a
+> "sleeping function called from invalid context" BUG.
 
-diff --git a/Documentation/devicetree/bindings/display/meson/meson-drm.txt b/Documentation/devicetree/bindings/display/meson/meson-drm.txt
-new file mode 100644
-index 0000000..cf241be
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/meson/meson-drm.txt
-@@ -0,0 +1,134 @@
-+Amlogic Meson Display Controller
-+================================
-+
-+The Amlogic Meson Display controller is composed of several components
-+that are going to be documented below:
-+
-+DMC|---------------VPU (Video Processing Unit)----------------|------HHI------|
-+   | vd1   _______     _____________    _________________     |               |
-+D  |-------|      |----|            |   |                |    |   HDMI PLL    |
-+D  | vd2   | VIU  |    | Video Post |   | Video Encoders |<---|-----VCLK      |
-+R  |-------|      |----| Processing |   |                |    |               |
-+   | osd2  |      |    |            |---| Enci ----------|----|-----VDAC------|
-+R  |-------| CSC  |----| Scalers    |   | Encp ----------|----|----HDMI-TX----|
-+A  | osd1  |      |    | Blenders   |   | Encl ----------|----|---------------|
-+M  |-------|______|----|____________|   |________________|    |               |
-+___|__________________________________________________________|_______________|
-+
-+
-+VIU: Video Input Unit
-+---------------------
-+
-+The Video Input Unit is in charge of the pixel scanout from the DDR memory.
-+It fetches the frames addresses, stride and parameters from the "Canvas" memory.
-+This part is also in charge of the CSC (Colorspace Conversion).
-+It can handle 2 OSD Planes and 2 Video Planes.
-+
-+VPP: Video Post Processing
-+--------------------------
-+
-+The Video Post Processing is in charge of the scaling and blending of the
-+various planes into a single pixel stream.
-+There is a special "pre-blending" used by the video planes with a dedicated
-+scaler and a "post-blending" to merge with the OSD Planes.
-+The OSD planes also have a dedicated scaler for one of the OSD.
-+
-+VENC: Video Encoders
-+--------------------
-+
-+The VENC is composed of the multiple pixel encoders :
-+ - ENCI : Interlace Video encoder for CVBS and Interlace HDMI
-+ - ENCP : Progressive Video Encoder for HDMI
-+ - ENCL : LCD LVDS Encoder
-+The VENC Unit gets a Pixel Clocks (VCLK) from a dedicated HDMI PLL and clock
-+tree and provides the scanout clock to the VPP and VIU.
-+The ENCI is connected to a single VDAC for Composite Output.
-+The ENCI and ENCP are connected to an on-chip HDMI Transceiver.
-+
-+Device Tree Bindings:
-+---------------------
-+
-+VPU: Video Processing Unit
-+--------------------------
-+
-+Required properties:
-+- compatible: value should be different for each SoC family as :
-+	- GXBB (S905) : "amlogic,meson-gxbb-vpu"
-+	- GXL (S905X, S905D) : "amlogic,meson-gxl-vpu"
-+	- GXM (S912) : "amlogic,meson-gxm-vpu"
-+	followed by the common "amlogic,meson-gx-vpu"
-+- reg: base address and size of he following memory-mapped regions :
-+	- vpu
-+	- hhi
-+	- dmc
-+- reg-names: should contain the names of the previous memory regions
-+- interrupts: should contain the VENC Vsync interrupt number
-+
-+- ports: A ports node with endpoint definitions as defined in
-+  Documentation/devicetree/bindings/media/video-interfaces.txt. The
-+  second port should be the output endpoints for VENC connectors.
-+
-+CBVS Output
-+-----------
-+
-+The VENC can output Composite/CVBS output via a dedicated VDAC, usage of such
-+Composite output is optional.
-+
-+Required properties:
-+- compatible: value should be different for each SoC family as :
-+ 	- GXBB (S905) : "amlogic,meson-gxbb-cvbs"
-+ 	- GXL (S905X, S905D) : "amlogic,meson-gxl-cvbs"
-+ 	- GXM (S912) : "amlogic,meson-gxm-cvbs"
-+	followed by the common "amlogic,meson-gx-cvbs"
-+
-+- ports: A ports node with endpoint definitions as defined in
-+  Documentation/devicetree/bindings/media/video-interfaces.txt. The
-+  first port should be the input endpoints, connected ot the VPU node.
-+
-+Example:
-+
-+venc_cvbs: venc-cvbs {
-+	compatible = "amlogic,meson-gxbb-cvbs";
-+	status = "okay";
-+
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		enc_cvbs_in: port at 0 {
-+			 #address-cells = <1>;
-+			 #size-cells = <0>;
-+			 reg = <0>;
-+
-+			 venc_cvbs_in_vpu: endpoint at 0 {
-+				 reg = <0>;
-+				 remote-endpoint = <&vpu_out_venc_cvbs>;
-+			};
-+		};
-+	};
-+};
-+
-+vpu: vpu at d0100000 {
-+	compatible = "amlogic,meson-gxbb-vpu";
-+	reg = <0x0 0xd0100000 0x0 0x100000>,
-+	      <0x0 0xc883c000 0x0 0x1000>,
-+	      <0x0 0xc8838000 0x0 0x1000>;
-+	reg-names = "base", "hhi", "dmc";
-+	interrupts = <GIC_SPI 3 IRQ_TYPE_EDGE_RISING>;
-+
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		vpu_out: port at 1 {
-+			 #address-cells = <1>;
-+			 #size-cells = <0>;
-+			 reg = <1>;
-+
-+			 vpu_out_venc_cvbs: endpoint at 0 {
-+				 reg = <0>;
-+				 remote-endpoint = <&venc_cvbs_in_vpu>;
-+			 };
-+		 };
-+	};
-+};
--- 
-1.9.1
+Who calls PHY clk_enable() from non-preemptible context? Can you provide
+the call stack?
+
+> usb20_phy_clk_enable(), called with the irq disabled uses
+> clk_get() and clk_enable_prepapre() which may sleep.
+> Move clk_get() to da8xx_register_usb20_phy_clk() and
+> replace clk_prepare_enable() by clk_enable().
+> 
+> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+> ---
+>  arch/arm/mach-davinci/usb-da8xx.c | 15 +++++++++------
+>  1 file changed, 9 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
+> index b010e5f..c9b5cd4 100644
+> --- a/arch/arm/mach-davinci/usb-da8xx.c
+> +++ b/arch/arm/mach-davinci/usb-da8xx.c
+> @@ -156,23 +156,23 @@ int __init da8xx_register_usb_refclkin(int rate)
+>  	return 0;
+>  }
+>  
+> +static struct clk *usb20_clk;
+> +
+>  static void usb20_phy_clk_enable(struct clk *clk)
+>  {
+> -	struct clk *usb20_clk;
+>  	int err;
+>  	u32 val;
+>  	u32 timeout = 500000; /* 500 msec */
+>  
+>  	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+>  
+> -	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
+> -	if (IS_ERR(usb20_clk)) {
+> +	if (!usb20_clk || IS_ERR(usb20_clk)) {
+
+NULL is a valid clock handle. There is no way clock enable of
+usb20_phy_clk can be invoked if its not registered. So, you can assume
+that usb20_clk is valid if you get here.
+
+>  		pr_err("could not get usb20 clk: %ld\n", PTR_ERR(usb20_clk));
+>  		return;
+>  	}
+>  
+>  	/* The USB 2.O PLL requires that the USB 2.O PSC is enabled as well. */
+> -	err = clk_prepare_enable(usb20_clk);
+> +	err = clk_enable(usb20_clk);
+>  	if (err) {
+>  		pr_err("failed to enable usb20 clk: %d\n", err);
+>  		clk_put(usb20_clk);
+> @@ -197,8 +197,7 @@ static void usb20_phy_clk_enable(struct clk *clk)
+>  
+>  	pr_err("Timeout waiting for USB 2.0 PHY clock good\n");
+>  done:
+> -	clk_disable_unprepare(usb20_clk);
+> -	clk_put(usb20_clk);
+> +	clk_disable(usb20_clk);
+
+
+I noticed that we are missing clk_disable(usb20_clk) in
+usb20_phy_clk_disable(). It will now be easier to do that after this
+patch. Can you add that in a separate patch?
+
+>  }
+>  
+>  static void usb20_phy_clk_disable(struct clk *clk)
+> @@ -287,6 +286,10 @@ int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
+>  	struct clk *parent;
+>  	int ret = 0;
+>  
+> +	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
+> +	if (IS_ERR(usb20_clk))
+> +		return PTR_ERR(parent);
+> +
+>  	parent = clk_get(NULL, use_usb_refclkin ? "usb_refclkin" : "pll0_aux");
+>  	if (IS_ERR(parent))
+>  		return PTR_ERR(parent);
+
+clk_put(usb20_clk) should be called here on failure path.
+
+Thanks,
+Sekhar
