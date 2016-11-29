@@ -1,40 +1,40 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 29 Nov 2016 17:47:12 -0600
-Subject: question about irq_enter()/irq_exit() calling policy
-Message-ID: <22d0d991-bbe2-ce10-5202-3cdf97a9ecf2@ti.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 29 Nov 2016 15:57:08 -0800
+Subject: [PATCH v4 0/4] davinci: VPIF: add DT support
+Message-ID: <20161129235712.29846-1-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Add DT support, including getting subdevs from DT ports/endpoints.
 
-Sorry for the may be dumb question, but what is the calling policy for irq_enter()/irq_exit()?
+Tested video capture to memory on da850-lcdk board using composite
+input.
 
-1) Should these function be called each time system enter/exit IRQ context?
+Changes since v3:
+- move to a single VPIF node, DT binding updated accordingly
+- misc fixes/updates based on reviews from Sakari
 
-HW IRQ:
- switch (IRQ mode)
-  ...
-  irq_enter()
-	handle irq - execute hw_irq_hadler
-  irq_exit()
-  ...
- switch
+Changes since v2:
+- DT binding doc: fix example to use correct compatible
 
-2) Should these function be called for each processed irq?
+Changes since v1:
+- more specific compatible strings, based on SoC: ti,da850-vpif*
+- fix locking bug when unlocking over subdev s_stream
 
 
-HW IRQ:
- switch (IRQ mode)
-  ...
-  while (irq = get_pending_irq()) {
-  	...
-  	irq_enter()
-		handle(irq) - execute hw_irq_hadler
-  	irq_exit()
- }
- ...
- switch
+Kevin Hilman (4):
+  [media] davinci: vpif_capture: don't lock over s_stream
+  [media] davinci: VPIF: add basic support for DT init
+  [media] davinci: vpif_capture: get subdevs from DT
+  [media] dt-bindings: add TI VPIF documentation
+
+ .../devicetree/bindings/media/ti,da850-vpif.txt    |  67 ++++++++++
+ drivers/media/platform/davinci/vpif.c              |  48 ++++++-
+ drivers/media/platform/davinci/vpif_capture.c      | 147 ++++++++++++++++++++-
+ drivers/media/platform/davinci/vpif_display.c      |   6 +
+ include/media/davinci/vpif_types.h                 |   9 +-
+ 5 files changed, 270 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/ti,da850-vpif.txt
 
 -- 
-regards,
--grygorii
+2.9.3
