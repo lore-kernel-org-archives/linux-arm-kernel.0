@@ -1,55 +1,98 @@
-From: wsa-dev@sang-engineering.com (Wolfram Sang)
-Date: Tue, 29 Nov 2016 22:17:16 +0100
-Subject: [PATCH v5 1/3] i2c: pxa: Add support for the I2C units found in
- Armada 3700
-In-Reply-To: <20161121133247.29889-2-romain.perier@free-electrons.com>
-References: <20161121133247.29889-1-romain.perier@free-electrons.com>
- <20161121133247.29889-2-romain.perier@free-electrons.com>
-Message-ID: <20161129211716.GA15594@katana>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 29 Nov 2016 13:26:00 -0800
+Subject: [PATCH v4] clkdev: add devm_of_clk_get()
+In-Reply-To: <87zikjw08i.wl%kuninori.morimoto.gx@renesas.com>
+References: <87zikjw08i.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20161129212600.GH6095@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +	if (of_device_is_compatible(np, "marvell,armada-3700-i2c")) {
-> +		i2c->fm_mask = ICR_BUSMODE_FM;
-> +		i2c->hs_mask = ICR_BUSMODE_HS;
+On 11/29, Kuninori Morimoto wrote:
+> 
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> 
+> Current Linux has of_clk_get(), but doesn't have devm_of_clk_get().
+> This patch adds it. It is implemeted in clk-devres.c to share
+> devm_clk_release().
+
+Please add an explanation of why we want this sort of API. The
+example you gave for audio sound card is useful. We're not going
+to remember 5 months from now why we did something, so we should
+put that here instead of digging through mailing list archives.
+
+> 
+> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> 
+> diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
+> index 8f57154..2449b25 100644
+> --- a/drivers/clk/clk-devres.c
+> +++ b/drivers/clk/clk-devres.c
+> @@ -53,3 +53,24 @@ void devm_clk_put(struct device *dev, struct clk *clk)
+>  	WARN_ON(ret);
+>  }
+>  EXPORT_SYMBOL(devm_clk_put);
+> +
+> +struct clk *devm_of_clk_get(struct device *dev,
+> +			    struct device_node *np, int index)
+
+Please call this devm_get_clk_from_child() instead. Also, replace
+the index argument with a string called con_id. Then call
+of_clk_get_by_name() instead of of_clk_get().
+
+> +{
+> +	struct clk **ptr, *clk;
+> +
+> +	ptr = devres_alloc(devm_clk_release, sizeof(*ptr), GFP_KERNEL);
+> +	if (!ptr)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	clk = of_clk_get(np, index);
+> +	if (!IS_ERR(clk)) {
+> +		*ptr = clk;
+> +		devres_add(dev, ptr);
 > +	} else {
-> +		i2c->fm_mask = ICR_FM;
-> +		i2c->hs_mask = ICR_HS;
+> +		devres_free(ptr);
 > +	}
+> +
+> +	return clk;
+> +}
+> +EXPORT_SYMBOL(devm_of_clk_get);
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index 123c027..7f50c5f 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -17,8 +17,9 @@
+>  #include <linux/notifier.h>
 >  
->  	*i2c_types = (enum pxa_i2c_types)(of_id->data);
+>  struct device;
+> -
+>  struct clk;
+> +struct device_node;
+> +struct of_phandle_args;
 >  
-> @@ -1181,6 +1194,13 @@ static int i2c_pxa_probe_pdata(struct platform_device *pdev,
->  			i2c->master_code = 0xe;
->  		i2c->rate = plat->rate;
->  	}
-> +	if (!strcmp(id->name, "armada-3700-i2c")) {
-> +		i2c->fm_mask = ICR_BUSMODE_FM;
-> +		i2c->hs_mask = ICR_BUSMODE_HS;
-> +	} else {
-> +		i2c->fm_mask = ICR_FM;
-> +		i2c->hs_mask = ICR_HS;
-> +	}
+>  /**
+>   * DOC: clk notifier callback types
+> @@ -249,6 +250,21 @@ static inline void clk_unprepare(struct clk *clk)
+>  struct clk *devm_clk_get(struct device *dev, const char *id);
+>  
+>  /**
+> + * devm_clk_get - lookup and obtain a managed reference to a clock producer.
 
-Okay, having the same code twice is not nice as well.
+That doesn't even match the name of the function.
 
-Sorry for missing this in the first review and going a step back, but I
-think now the best solution is to have again a REGS_A3700 struct, but we
-should extend it with new entries for the shifted bits. Then in the init
-code, you can do something like:
+> + * @dev: device for clock "consumer"
+> + * @np: pointer to clock consumer node
+> + * @index: clock index
+> + *
+> + * This function parses the clocks, and uses them to look up the
+> + * struct clk from the registered list of clock providers by using
+> + * @np and @index.
+> + *
+> + * The clock will automatically be freed when the device is unbound
+> + * from the bus.
+> + */
+> +struct clk *devm_of_clk_get(struct device *dev, struct device_node *np, int index);
 
-	i2c->fm_mask = pxa_reg_layout[i2c_type].fm_mask ?: ICR_FM;
-
-Makes sense?
-
-Thanks,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161129/53f523c7/attachment-0001.sig>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
