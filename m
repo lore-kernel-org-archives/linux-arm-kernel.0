@@ -1,51 +1,68 @@
-From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Tue, 29 Nov 2016 16:05:09 -0500
-Subject: [PATCH] KVM: arm/arm64: Access CNTHCTL_EL2 bit fields correctly
-In-Reply-To: <ee2dacff-691c-7548-ff71-3a992f399333@arm.com>
-References: <1480351570-11648-1-git-send-email-jintack@cs.columbia.edu>
- <d04fd17e-9157-07fe-4daa-9dbab149b5e6@arm.com>
- <799d03f5-a929-9547-1ae7-94026b76f116@arm.com>
- <CAHyh4xhXoFWsbnNNePthWp2-ZAOtCuUVmLn-JKRe4sc=nqrYNw@mail.gmail.com>
- <0a475329-6f50-42ae-3244-f0767c56ce09@arm.com>
- <ee2dacff-691c-7548-ff71-3a992f399333@arm.com>
-Message-ID: <CAHyh4xi2oq8m2B_3oZu+BNeyk-++L2ziMY66+XZ+SDRjOHDN6A@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 29 Nov 2016 13:05:56 -0800
+Subject: [alsa-devel] [PATCH v2] clkdev: add devm_of_clk_get()
+In-Reply-To: <87y409cw71.wl%kuninori.morimoto.gx@renesas.com>
+References: <87ziptixv7.wl%kuninori.morimoto.gx@renesas.com>
+ <20160707122636.GP1041@n2100.armlinux.org.uk>
+ <8760shgfzu.wl%kuninori.morimoto.gx@renesas.com>
+ <146794140875.73491.7115209079607438738@resonance>
+ <871t34hlin.wl%kuninori.morimoto.gx@renesas.com>
+ <878twndi54.wl%kuninori.morimoto.gx@renesas.com>
+ <8737isvwc6.wl%kuninori.morimoto.gx@renesas.com>
+ <20161123191037.GE25626@codeaurora.org>
+ <87a8cpejn5.wl%kuninori.morimoto.gx@renesas.com>
+ <87y409cw71.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20161129210556.GC6095@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 11:53 AM, Suzuki K Poulose
-<suzuki.poulose@arm.com> wrote:
-> On 29/11/16 09:36, Marc Zyngier wrote:
->>
->> On 29/11/16 03:28, Jintack Lim wrote:
->>>
->>> On Mon, Nov 28, 2016 at 1:39 PM, Marc Zyngier <marc.zyngier@arm.com>
->>> wrote:
->>>>
->>>> On 28/11/16 17:43, Marc Zyngier wrote:
->>>
->>> This looks much cleaner than my patch.
->>> While we are at it, is it worth to consider that we just need to set
->>> those bits once for VHE case, not for every world switch as an
->>> optimization?
->>
->>
->> Ah! That's a much better idea indeed! And we could stop messing with
->> cntvoff_el2 as well, as it doesn't need to be restored to zero on exit.
->> Could you try and respin something along those lines?
->>
->
-> fyi, we have a static_key based cpus_have_const_cap() for Constant cap
-> checking (like this case) available in linux-next. May be you could make use
-> of that instead of alternatives.
+On 11/24, Kuninori Morimoto wrote:
+> 
+> Hi Stephen, again
+> 
+> > > I've seen bindings that have the 'clocks' property at the top
+> > > level and the appropriate 'clock-names' property to relate the
+> > > clocks to a subnode.
+> > > 
+> > >  	sound_soc {
+> > > 		clocks = <&xxx>, <&xxx>;
+> > > 		clock-names = "cpu", "codec";
+> > >  		...
+> > >  		cpu {
+> > >  			...
+> > >  		};
+> > >  		codec {
+> > >  			...
+> > >  		};
+> > >  	};
+> > > 
+> > > Then the subnodes call clk_get() with the top level device and
+> > > the name of their node and things match up. I suppose this
+> > > binding is finalized though, so we can't really do that?
+> > > 
+> > > I see that the gpio framework has a similar design called
+> > > devm_get_gpiod_from_child(), so how about we add a
+> > > devm_get_clk_from_child() API? That would more closely match the
+> > > intent here, which is to restrict the clk_get() operation to
+> > > child nodes of the device passed as the first argument.
+> > > 
+> > > struct clk *devm_get_clk_from_child(struct device *dev,
+> > > 				    const char *con_id,
+> > > 				    struct device_node *child);
+> 
+> Thanks, but, my point is that Linux already have "of_clk_get()",
+> but we don't have its devm_ version.
+> The point is that of_clk_get() can get clock from "device_node".
+> Why having devm_ version become so problem ?
 
-Thanks Suzuki. This looks very useful.
+The problem is that it encourages the use of of_clk_get() when
+clk_get() is more desirable. Ideally of_clk_get() is never used
+when a device exists. In this case, it seems like we need to
+support it though, hence the suggestion of having a
+devm_get_clk_from_child() API, that explicitly reads as "get a
+clock from a child node of this device". The distinction is
+important, because of_clk_get() should rarely be used.
 
-Marc, can I write a patch based on linux-next? The commit which has
-cpus_have_const_cap() is not in master and next branch in kvm/arm
-repo.
-
->
->
-> Cheers
-> Suzuki
->
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
