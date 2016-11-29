@@ -1,83 +1,34 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Tue, 29 Nov 2016 17:48:31 +0100
-Subject: [PATCH v2] ARM: davinci: da8xx: Fix sleeping function called from
- invalid context
-Message-ID: <1480438111-11801-1-git-send-email-abailon@baylibre.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 29 Nov 2016 16:53:25 +0000
+Subject: [PATCH] KVM: arm/arm64: Access CNTHCTL_EL2 bit fields correctly
+In-Reply-To: <0a475329-6f50-42ae-3244-f0767c56ce09@arm.com>
+References: <1480351570-11648-1-git-send-email-jintack@cs.columbia.edu>
+ <d04fd17e-9157-07fe-4daa-9dbab149b5e6@arm.com>
+ <799d03f5-a929-9547-1ae7-94026b76f116@arm.com>
+ <CAHyh4xhXoFWsbnNNePthWp2-ZAOtCuUVmLn-JKRe4sc=nqrYNw@mail.gmail.com>
+ <0a475329-6f50-42ae-3244-f0767c56ce09@arm.com>
+Message-ID: <ee2dacff-691c-7548-ff71-3a992f399333@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Everytime the usb20 phy is enabled, there is a
-"sleeping function called from invalid context" BUG.
+On 29/11/16 09:36, Marc Zyngier wrote:
+> On 29/11/16 03:28, Jintack Lim wrote:
+>> On Mon, Nov 28, 2016 at 1:39 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> On 28/11/16 17:43, Marc Zyngier wrote:
+>> This looks much cleaner than my patch.
+>> While we are at it, is it worth to consider that we just need to set
+>> those bits once for VHE case, not for every world switch as an
+>> optimization?
+>
+> Ah! That's a much better idea indeed! And we could stop messing with
+> cntvoff_el2 as well, as it doesn't need to be restored to zero on exit.
+> Could you try and respin something along those lines?
+>
 
-clk_enable() from arch/arm/mach-davinci/clock.c uses spin_lock_irqsave()
-before to invoke the callback usb20_phy_clk_enable().
-usb20_phy_clk_enable() uses clk_get() and clk_enable_prepapre()
-which may sleep.
-Move clk_get() to da8xx_register_usb20_phy_clk() and
-replace clk_prepare_enable() by clk_enable().
+fyi, we have a static_key based cpus_have_const_cap() for Constant cap
+checking (like this case) available in linux-next. May be you could make use
+of that instead of alternatives.
 
-Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
----
- arch/arm/mach-davinci/usb-da8xx.c | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
-index b010e5f..2baa0e1 100644
---- a/arch/arm/mach-davinci/usb-da8xx.c
-+++ b/arch/arm/mach-davinci/usb-da8xx.c
-@@ -156,23 +156,18 @@ int __init da8xx_register_usb_refclkin(int rate)
- 	return 0;
- }
- 
-+static struct clk *usb20_clk;
-+
- static void usb20_phy_clk_enable(struct clk *clk)
- {
--	struct clk *usb20_clk;
- 	int err;
- 	u32 val;
- 	u32 timeout = 500000; /* 500 msec */
- 
- 	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
- 
--	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
--	if (IS_ERR(usb20_clk)) {
--		pr_err("could not get usb20 clk: %ld\n", PTR_ERR(usb20_clk));
--		return;
--	}
--
- 	/* The USB 2.O PLL requires that the USB 2.O PSC is enabled as well. */
--	err = clk_prepare_enable(usb20_clk);
-+	err = clk_enable(usb20_clk);
- 	if (err) {
- 		pr_err("failed to enable usb20 clk: %d\n", err);
- 		clk_put(usb20_clk);
-@@ -197,8 +192,7 @@ static void usb20_phy_clk_enable(struct clk *clk)
- 
- 	pr_err("Timeout waiting for USB 2.0 PHY clock good\n");
- done:
--	clk_disable_unprepare(usb20_clk);
--	clk_put(usb20_clk);
-+	clk_disable(usb20_clk);
- }
- 
- static void usb20_phy_clk_disable(struct clk *clk)
-@@ -287,9 +281,15 @@ int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
- 	struct clk *parent;
- 	int ret = 0;
- 
-+	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
-+	if (IS_ERR(usb20_clk))
-+		return PTR_ERR(parent);
-+
- 	parent = clk_get(NULL, use_usb_refclkin ? "usb_refclkin" : "pll0_aux");
--	if (IS_ERR(parent))
-+	if (IS_ERR(parent)) {
-+		clk_put(usb20_clk);
- 		return PTR_ERR(parent);
-+	}
- 
- 	usb20_phy_clk.parent = parent;
- 	ret = clk_register(&usb20_phy_clk);
--- 
-2.7.3
+Cheers
+Suzuki
