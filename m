@@ -1,35 +1,42 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 29 Nov 2016 12:40:03 +0000
-Subject: [RFC v2 PATCH 21/23] cnic: add dependency on MMU
+Date: Tue, 29 Nov 2016 12:39:55 +0000
+Subject: [RFC v2 PATCH 13/23] ARM: kexec: disallow kexec for NOMMU builds
 In-Reply-To: <1480423205-48436-1-git-send-email-vladimir.murzin@arm.com>
 References: <1480423205-48436-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1480423205-48436-22-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1480423205-48436-14-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CNIC selects UIO framework which has dependency on MMU, so for NOMMU
-builds following warning shows up:
+While building for NOMMU the following error shows up:
 
-warning: (CNIC) selects UIO which has unmet direct dependencies (MMU)
+kernel/built-in.o: In function `kimage_free_entry':
+memremap.c:(.text+0x4dafc): undefined reference to `arch_phys_to_idmap_offset'
+memremap.c:(.text+0x4db04): undefined reference to `arch_phys_to_idmap_offset'
+kernel/built-in.o: In function `kimage_alloc_page':
+memremap.c:(.text+0x4dbc0): undefined reference to `arch_phys_to_idmap_offset'
+memremap.c:(.text+0x4dbc8): undefined reference to `arch_phys_to_idmap_offset'
+memremap.c:(.text+0x4dc1c): undefined reference to `arch_phys_to_idmap_offset'
 
-Fix it with making CNIC dependant on MMU.
+That comes from Kexec, add dependency on MMU there.
 
+Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- drivers/net/ethernet/broadcom/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/broadcom/Kconfig b/drivers/net/ethernet/broadcom/Kconfig
-index bd8c80c..ea04b36 100644
---- a/drivers/net/ethernet/broadcom/Kconfig
-+++ b/drivers/net/ethernet/broadcom/Kconfig
-@@ -83,6 +83,7 @@ config BNX2
- config CNIC
- 	tristate "QLogic CNIC support"
- 	depends on PCI && (IPV6 || IPV6=n)
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c462d9e..306a412 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2019,7 +2019,7 @@ config XIP_PHYS_ADDR
+ config KEXEC
+ 	bool "Kexec system call (EXPERIMENTAL)"
+ 	depends on (!SMP || PM_SLEEP_SMP)
+-	depends on !CPU_V7M
 +	depends on MMU
- 	select BNX2
- 	select UIO
- 	---help---
+ 	select KEXEC_CORE
+ 	help
+ 	  kexec is a system call that implements the ability to shutdown your
 -- 
 1.7.9.5
