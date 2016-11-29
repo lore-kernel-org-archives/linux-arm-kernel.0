@@ -1,46 +1,56 @@
 From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Tue, 29 Nov 2016 16:45:10 +0300
-Subject: [PATCH v3 05/13] ARM: dts: rockchip: disable arm-global-timer for
- rk3188
+Date: Tue, 29 Nov 2016 16:45:14 +0300
+Subject: [PATCH v3 09/13] clocksource/drivers/rockchip_timer: move
+ TIMER_INT_UNMASK out of rk_timer_enable()
 In-Reply-To: <1480427118-5126-1-git-send-email-al.kochet@gmail.com>
 References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
  <1480427118-5126-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1480427118-5126-6-git-send-email-al.kochet@gmail.com>
+Message-ID: <1480427118-5126-10-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm-global-timer can provide clockevents, clocksource and shed_clock. But
-on rk3188 platform it provide only clocksource and shed_clock. clockevents
-from  arm-global-timer is not used by kernel because there is another
-clockevent provider with higher rating (smp-twd).
+This allow to enable timer without enabling interrupts from it.
+As that mode will be used in clocksource implementation.
 
-My commit from the series implement clocksource and shed_clock using
-rockchip_timer. But sched clock from rk_timer is not selected by kernel
-due to lower frequency than arm-global-timer, and clocksource from
-rk_timer is not selected by kernel due to lower rating than
-arm-global-timer. And I don't want to increase clocksource rating
-because ratings greater than 300 used for high frequency clocksources.
-
-clocksource and shed_clock is quite unstable, because their rate depends
-on cpu frequency. So disable arm-global-timer and use clocksource and
-sched_clock from rockchip_timer.
+This is refactoring step without functional changes.
 
 Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
 ---
- arch/arm/boot/dts/rk3188.dtsi |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/clocksource/rockchip_timer.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index 0dc52fe..44da3d42 100644
---- a/arch/arm/boot/dts/rk3188.dtsi
-+++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -546,6 +546,7 @@
+diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
+index a17dc61..61c3bb1 100644
+--- a/drivers/clocksource/rockchip_timer.c
++++ b/drivers/clocksource/rockchip_timer.c
+@@ -60,8 +60,7 @@ static inline void rk_timer_disable(struct rk_timer *timer)
  
- &global_timer {
- 	interrupts = <GIC_PPI 11 0xf04>;
-+	status = "disabled";
- };
+ static inline void rk_timer_enable(struct rk_timer *timer, u32 flags)
+ {
+-	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
+-		       timer->ctrl);
++	writel_relaxed(TIMER_ENABLE | flags, timer->ctrl);
+ }
  
- &local_timer {
+ static void rk_timer_update_counter(unsigned long cycles,
+@@ -83,7 +82,8 @@ static inline int rk_timer_set_next_event(unsigned long cycles,
+ 
+ 	rk_timer_disable(timer);
+ 	rk_timer_update_counter(cycles, timer);
+-	rk_timer_enable(timer, TIMER_MODE_USER_DEFINED_COUNT);
++	rk_timer_enable(timer, TIMER_MODE_USER_DEFINED_COUNT |
++			       TIMER_INT_UNMASK);
+ 	return 0;
+ }
+ 
+@@ -101,7 +101,7 @@ static int rk_timer_set_periodic(struct clock_event_device *ce)
+ 
+ 	rk_timer_disable(timer);
+ 	rk_timer_update_counter(timer->freq / HZ - 1, timer);
+-	rk_timer_enable(timer, TIMER_MODE_FREE_RUNNING);
++	rk_timer_enable(timer, TIMER_MODE_FREE_RUNNING | TIMER_INT_UNMASK);
+ 	return 0;
+ }
+ 
 -- 
 1.7.9.5
