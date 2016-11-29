@@ -1,85 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 29 Nov 2016 17:28:22 +0000
-Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.10
-Message-ID: <20161129172822.GI30283@arm.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Tue, 29 Nov 2016 10:30:02 -0700
+Subject: [PATCH V5 02/10] ras: acpi/apei: cper: generic error data entry
+ v3 per ACPI 6.1
+In-Reply-To: <86258A5CC0A3704780874CF6004BA8A62DC87D66@lhreml502-mbb>
+References: <1479767763-27532-1-git-send-email-tbaicar@codeaurora.org>
+ <1479767763-27532-3-git-send-email-tbaicar@codeaurora.org>
+ <86258A5CC0A3704780874CF6004BA8A62DC87D66@lhreml502-mbb>
+Message-ID: <9cec3193-74b4-4e27-670b-3d6d36ee27a5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On 11/29/2016 4:29 AM, Shiju Jose wrote:
+>> @@ -451,12 +484,12 @@ void cper_estatus_print(const char *pfx,
+>>   	printk("%s""event severity: %s\n", pfx,
+>> cper_severity_str(severity));
+>>   	data_len = estatus->data_length;
+>>   	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
+>> +
+>>   	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
+>> -	while (data_len >= sizeof(*gdata)) {
+>> -		gedata_len = gdata->error_data_length;
+>> +
+>> +	while (data_len >= acpi_hest_generic_data_size(gdata)) {
+>>   		cper_estatus_print_section(newpfx, gdata, sec_no);
+>> -		data_len -= gedata_len + sizeof(*gdata);
+>> -		gdata = (void *)(gdata + 1) + gedata_len;
+>> +		gdata = acpi_hest_generic_data_next(gdata);
+>>   		sec_no++;
+>>   	}
+>>   }
+> Hi Tyler,
+> Will the above while loop does not come out because data_len is not getting updated as it did in V4 patch?
+> This is the behaviour seen when we tested on our platform. It worked fine when we update the data_len.
 
-Please pull these arm-smmu updates for 4.10. The bulk of the changes here
-are the IORT support from Lorenzo, which also touches ACPI and PCI core
-code. Rafael and Bjorn have acked the relevant changes, but it makes sense
-to send it via you to avoid conflicts with the ARM SMMU drivers, which are
-modified to work with ACPI-based probing.
+Hello Shiju,
 
-The other changes are largely cosmetic (constification and cleanup), but
-the MMU-500 configuration change from Nipun results in a hefty performance
-boost in bypass mode.
+Thank you for testing, and you're right...looks like I got a little too excited at this code simplification. :)
+I'll add the data_len update in the next patchset.
 
 Thanks,
-
-Will
-
---->8
-
-The following changes since commit a25f0944ba9b1d8a6813fd6f1a86f1bd59ac25a6:
-
-  Linux 4.9-rc5 (2016-11-13 10:32:32 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
-
-for you to fetch changes up to 643b8e4d86f8b1a62cf5cd9ea221e9bc0d531d18:
-
-  ACPI/IORT: Introduce iort_iommu_configure (2016-11-29 15:57:48 +0000)
-
-----------------------------------------------------------------
-Bhumika Goyal (3):
-      iommu/arm-smmu: Constify iommu_gather_ops structures
-      iommu/arm-smmu: Constify iommu_gather_ops structures
-      iommu/io-pgtable-arm: Use const and __initconst for iommu_gather_ops structures
-
-Kefeng Wang (1):
-      iommu/io-pgtable-arm: Use for_each_set_bit to simplify the code
-
-Lorenzo Pieralisi (16):
-      ACPI: Add FWNODE_ACPI_STATIC fwnode type
-      ACPI/IORT: Introduce linker section for IORT entries probing
-      ACPI/IORT: Add support for IOMMU fwnode registration
-      iommu: Make of_iommu_set/get_ops() DT agnostic
-      iommu/arm-smmu: Convert struct device of_node to fwnode usage
-      iommu/arm-smmu-v3: Convert struct device of_node to fwnode usage
-      ACPI: Implement acpi_dma_configure
-      ACPI/IORT: Add node match function
-      ACPI/IORT: Add support for ARM SMMU platform devices creation
-      iommu/arm-smmu-v3: Split probe functions into DT/generic portions
-      iommu/arm-smmu-v3: Add IORT configuration
-      iommu/arm-smmu: Split probe functions into DT/generic portions
-      iommu/arm-smmu: Add IORT configuration
-      ACPI/IORT: Replace rid map type with type mask
-      ACPI/IORT: Add single mapping function
-      ACPI/IORT: Introduce iort_iommu_configure
-
-Nipun Gupta (1):
-      iommu/arm-smmu: Set SMTNMB_TLBEN in ACR to enable caching of bypass entries
-
- drivers/acpi/arm64/iort.c          | 585 ++++++++++++++++++++++++++++++++++++-
- drivers/acpi/glue.c                |   4 +-
- drivers/acpi/scan.c                |  45 +++
- drivers/iommu/arm-smmu-v3.c        | 104 +++++--
- drivers/iommu/arm-smmu.c           | 175 ++++++++---
- drivers/iommu/io-pgtable-arm-v7s.c |   5 +-
- drivers/iommu/io-pgtable-arm.c     |   7 +-
- drivers/iommu/iommu.c              |  40 +++
- drivers/iommu/of_iommu.c           |  39 ---
- drivers/pci/probe.c                |   3 +-
- include/acpi/acpi_bus.h            |   2 +
- include/asm-generic/vmlinux.lds.h  |   1 +
- include/linux/acpi.h               |  26 ++
- include/linux/acpi_iort.h          |  14 +
- include/linux/fwnode.h             |   3 +-
- include/linux/iommu.h              |  14 +
- include/linux/of_iommu.h           |  12 +-
- 17 files changed, 955 insertions(+), 124 deletions(-)
+Tyler
