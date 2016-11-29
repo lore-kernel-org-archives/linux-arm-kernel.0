@@ -1,263 +1,96 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Tue, 29 Nov 2016 22:06:27 +0530
-Subject: [PATCH v9 07/11] arm/arm64: vgic: Implement
- KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
-In-Reply-To: <20161128195028.GH18170@cbox>
-References: <1479906118-15832-1-git-send-email-vijay.kilari@gmail.com>
- <1479906118-15832-8-git-send-email-vijay.kilari@gmail.com>
- <20161128195028.GH18170@cbox>
-Message-ID: <CALicx6uW5RmjsPPBKB5wLW4TzNmcdc9ZADqp=M2ZJe9Cd+keZg@mail.gmail.com>
+From: ahaslam@baylibre.com (Axel Haslam)
+Date: Tue, 29 Nov 2016 17:36:05 +0100
+Subject: [PATCH] ARM: davinci: da8xx: Fix sleeping function called from
+ invalid context
+In-Reply-To: <1a24c04b-8c7e-9e6c-eada-0c5a0a6c8881@lechnology.com>
+References: <1480350566-26225-1-git-send-email-abailon@baylibre.com>
+ <36a2e5e1-e7b7-2ca0-0484-98636771ec65@ti.com>
+ <b2ddb9ed-2cf8-da93-6aba-e77ea0eea006@baylibre.com>
+ <aac017b2-fc5b-6773-46b3-fd797dc904a6@ti.com>
+ <1a24c04b-8c7e-9e6c-eada-0c5a0a6c8881@lechnology.com>
+Message-ID: <CAKXjFTNbxB8gLRoSTeihL5OC8eWYgOibJyGMQ4FeCBviWdRSLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 1:20 AM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Wed, Nov 23, 2016 at 06:31:54PM +0530, vijay.kilari at gmail.com wrote:
->> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+On Tue, Nov 29, 2016 at 5:22 PM, David Lechner <david@lechnology.com> wrote:
+> On 11/29/2016 06:34 AM, Sekhar Nori wrote:
 >>
->> Userspace requires to store and restore of line_level for
->> level triggered interrupts using ioctl KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO.
+>> On Tuesday 29 November 2016 04:46 PM, Alexandre Bailon wrote:
+>>>
+>>> On 11/29/2016 11:48 AM, Sekhar Nori wrote:
+>>>>
+>>>> On Monday 28 November 2016 09:59 PM, Alexandre Bailon wrote:
+>>>>>
+>>>>> Everytime the usb20 phy is enabled, there is a
+>>>>> "sleeping function called from invalid context" BUG.
+>>>>
+>>>>
+>>>> Who calls PHY clk_enable() from non-preemptible context? Can you provide
+>>>> the call stack?
+>>>
+>>> Actually, clk_enable() is called from preemptible context (from phy
+>>> driver) but it disables interrupts before to call the clk_enable()
+>>> callback.
+>>> I attached the call stack that is probably more understandable than
+>>> my explanation.
 >>
->> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
->> ---
->>  arch/arm/include/uapi/asm/kvm.h     |  7 ++++++
->>  arch/arm64/include/uapi/asm/kvm.h   |  6 +++++
->>  virt/kvm/arm/vgic/vgic-kvm-device.c | 49 ++++++++++++++++++++++++++++++++++++-
->>  virt/kvm/arm/vgic/vgic-mmio-v3.c    | 11 +++++++++
->>  virt/kvm/arm/vgic/vgic-mmio.c       | 38 ++++++++++++++++++++++++++++
->>  virt/kvm/arm/vgic/vgic-mmio.h       |  5 ++++
->>  virt/kvm/arm/vgic/vgic.h            |  2 ++
->>  7 files changed, 117 insertions(+), 1 deletion(-)
 >>
->> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
->> index 98658d9d..f347779 100644
->> --- a/arch/arm/include/uapi/asm/kvm.h
->> +++ b/arch/arm/include/uapi/asm/kvm.h
->> @@ -191,6 +191,13 @@ struct kvm_arch_memory_slot {
->>  #define KVM_DEV_ARM_VGIC_GRP_CTRL       4
->>  #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
->>  #define KVM_DEV_ARM_VGIC_CPU_SYSREGS    6
->> +#define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO 7
->> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT       10
->> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
->> +                     (0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
->> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK       0x3ff
->> +#define VGIC_LEVEL_INFO_LINE_LEVEL   0
->> +
->>  #define   KVM_DEV_ARM_VGIC_CTRL_INIT    0
+>> Thanks! So this happens due to spin_lock_irqsave() in clk_enable() in
+>> arch/arm/mach-davinci/clock.c. Can you add reference to this in your
+>> commit description.
 >>
->>  /* KVM_IRQ_LINE irq field index values */
->> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
->> index 91c7137..4100f8c 100644
->> --- a/arch/arm64/include/uapi/asm/kvm.h
->> +++ b/arch/arm64/include/uapi/asm/kvm.h
->> @@ -211,6 +211,12 @@ struct kvm_arch_memory_slot {
->>  #define KVM_DEV_ARM_VGIC_GRP_CTRL    4
->>  #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
->>  #define KVM_DEV_ARM_VGIC_CPU_SYSREGS    6
->> +#define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO 7
->> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT       10
->> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
->> +                     (0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
->> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK       0x3ff
->> +#define VGIC_LEVEL_INFO_LINE_LEVEL   0
->>
->>  #define   KVM_DEV_ARM_VGIC_CTRL_INIT 0
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
->> index b6266fe..52ed00b 100644
->> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
->> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
->> @@ -510,6 +510,25 @@ static int vgic_v3_attr_regs_access(struct kvm_device *dev,
->>                                                 regid, reg);
->>               break;
->>       }
->> +     case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
->> +             unsigned int info, intid;
->> +
->> +             info = (attr->attr & KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK) >>
->> +                     KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT;
->> +             if (info == VGIC_LEVEL_INFO_LINE_LEVEL) {
->> +                     if (is_write)
->> +                             tmp32 = *reg;
->> +                     intid = attr->attr &
->> +                             KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK;
->> +                     ret = vgic_v3_line_level_info_uaccess(vcpu, is_write,
->> +                                                           intid, &tmp32);
->> +                     if (!is_write)
->> +                             *reg = tmp32;
+>> Also +David since this issue should have shown up since the time this
+>> code was added.
 >
-> I had a comment here about not having to use the tmp32 by modifying the
-> line_level_info function, that you seem to have missed.
 >
-> Hint: The level info is not called from an MMIO path so you should be
-> able to just write it in a natural way.
-
-Ok. Changed the prototype of vgic_v3_line_level_info_uaccess() to take
-u64 reg instead of tmp32
-
+> I'm not trying to pass the blame, but it was actually Axel that added the
+> clk_get() code, so it will be good if he knows about the issue too. :-)
 >
->> +             } else {
->> +                     ret = -EINVAL;
->> +             }
->> +             break;
->> +     }
->>       default:
->>               ret = -EINVAL;
->>               break;
->> @@ -552,6 +571,17 @@ static int vgic_v3_set_attr(struct kvm_device *dev,
+> I don't think I have been building kernels with any of the kernel hacking
+> options turned on, so I will start doing this to make sure we catch bugs
+> like this.
+>
+
+Yes, sorry i missed this. i did not have that option enabled, and did
+not catch this, thanks Alex!
+
+
 >>
->>               return vgic_v3_attr_regs_access(dev, attr, &reg, true);
->>       }
->> +     case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
->> +             u32 __user *uaddr = (u32 __user *)(long)attr->addr;
->> +             u64 reg;
->> +             u32 tmp32;
->> +
->> +             if (get_user(tmp32, uaddr))
->> +                     return -EFAULT;
->> +
->> +             reg = tmp32;
->> +             return vgic_v3_attr_regs_access(dev, attr, &reg, true);
->> +     }
->>       }
->>       return -ENXIO;
->>  }
->> @@ -587,8 +617,18 @@ static int vgic_v3_get_attr(struct kvm_device *dev,
->>                       return ret;
->>               return put_user(reg, uaddr);
->>       }
->> -     }
->> +     case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
->> +             u32 __user *uaddr = (u32 __user *)(long)attr->addr;
->> +             u64 reg;
->> +             u32 tmp32;
+>>>>>                 pr_err("could not get usb20 clk: %ld\n",
+>>>>> PTR_ERR(usb20_clk));
+>>>>>                 return;
+>>>>>         }
+>>>>>
+>>>>>         /* The USB 2.O PLL requires that the USB 2.O PSC is enabled as
+>>>>> well. */
+>>>>> -       err = clk_prepare_enable(usb20_clk);
+>>>>> +       err = clk_enable(usb20_clk);
+>>>>>         if (err) {
+>>>>>                 pr_err("failed to enable usb20 clk: %d\n", err);
+>>>>>                 clk_put(usb20_clk);
+>>>>> @@ -197,8 +197,7 @@ static void usb20_phy_clk_enable(struct clk *clk)
+>>>>>
+>>>>>         pr_err("Timeout waiting for USB 2.0 PHY clock good\n");
+>>>>>  done:
+>>>>> -       clk_disable_unprepare(usb20_clk);
+>>>>> -       clk_put(usb20_clk);
+>>>>> +       clk_disable(usb20_clk);
+>>>>
+>>>>
+>>>>
+>>>> I noticed that we are missing clk_disable(usb20_clk) in
+>>>> usb20_phy_clk_disable(). It will now be easier to do that after this
+>>>> patch. Can you add that in a separate patch?
+>>>>
+>>> I don't think we need it.
+>>> What we don't see in this patch is that usb20_clk is enabled and,
+>>> it is disabled right after the PHY PLL is ready in
+>>> usb20_phy_clk_enable().
 >>
->> +             ret = vgic_v3_attr_regs_access(dev, attr, &reg, false);
->> +             if (ret)
->> +                     return ret;
->> +             tmp32 = reg;
->> +             return put_user(tmp32, uaddr);
->> +     }
->> +     }
->>       return -ENXIO;
->>  }
 >>
->> @@ -609,6 +649,13 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
->>               return vgic_v3_has_attr_regs(dev, attr);
->>       case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
->>               return 0;
->> +     case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
->> +             if (((attr->attr & KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK) >>
->> +                   KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT) ==
->> +                   VGIC_LEVEL_INFO_LINE_LEVEL)
->> +                     return 0;
->> +             break;
->> +     }
->>       case KVM_DEV_ARM_VGIC_GRP_CTRL:
->>               switch (attr->attr) {
->>               case KVM_DEV_ARM_VGIC_CTRL_INIT:
->> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
->> index 2f7b4ed..4d7d93d 100644
->> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
->> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
->> @@ -808,3 +808,14 @@ int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
->>               return vgic_uaccess(vcpu, &rd_dev, is_write,
->>                                   offset, val);
->>  }
->> +
->> +int vgic_v3_line_level_info_uaccess(struct kvm_vcpu *vcpu, bool is_write,
->> +                                 u32 intid, u32 *val)
->> +{
->> +     if (is_write)
->> +             vgic_write_irq_line_level_info(vcpu, intid, *val);
->> +     else
->> +             *val = vgic_read_irq_line_level_info(vcpu, intid);
->> +
->> +     return 0;
->> +}
->> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
->> index f81e0e5..d602081 100644
->> --- a/virt/kvm/arm/vgic/vgic-mmio.c
->> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
->> @@ -371,6 +371,44 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
->>       }
->>  }
+>> Agreed.
 >>
->> +unsigned long vgic_read_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid)
->> +{
->> +     int i;
->> +     unsigned long val = 0;
->> +
->> +     for (i = 0; i < 32; i++) {
->> +             struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->> +
->> +             if (irq->line_level)
->> +                     val |= (1U << i);
->> +
->> +             vgic_put_irq(vcpu->kvm, irq);
->> +     }
->> +
->> +     return val;
->> +}
->> +
->> +void vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
->> +                                 const unsigned long val)
->> +{
->> +     int i;
->> +
->> +     for (i = 0; i < 32; i++) {
->> +             struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->> +
->> +             spin_lock(&irq->irq_lock);
->> +             if (val & (1U << i)) {
->> +                     irq->line_level = true;
->> +                     vgic_queue_irq_unlock(vcpu->kvm, irq);
->> +             } else {
->> +                     irq->line_level = false;
->> +                     spin_unlock(&irq->irq_lock);
->> +             }
+>> Thanks,
+>> Sekhar
+>>
 >
-> I think you also missed my comment about having to keep the pending
-> state in sync with the level state.
->
-> Which means you have to set the pending state when the line_level goes
-> up, and lower it when it goes down unless soft_pending is also set,
-> assuming it's configured as a level triggered interrupt.
->
-> If it's an edge-triggered interrupt, I think you only need to set the
-> pending state on a line being asserted and the rest should be adjusted
-> in case the user restores the configuration state to level triggered
-> later.
-
-Is this ok?
-
-void vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
-                                    const u64 val)
-{
-        int i;
-
-        for (i = 0; i < 32; i++) {
-                struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-
-                spin_lock(&irq->irq_lock);
-                if (val & (1U << i)) {
-                        irq->line_level = true;
-                        irq->pending = true;
-                        vgic_queue_irq_unlock(vcpu->kvm, irq);
-                } else {
-                        if (irq->config == VGIC_CONFIG_EDGE ||
-                            (irq->config == VGIC_CONFIG_LEVEL &&
-                            !irq->soft_pending))
-                                irq->line_level = false;
-                        spin_unlock(&irq->irq_lock);
-                }
-
-                vgic_put_irq(vcpu->kvm, irq);
-        }
-}
-
-
->
-> Thanks,
-> -Christoffer
