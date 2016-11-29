@@ -1,103 +1,147 @@
-From: huziji@marvell.com (Ziji Hu)
-Date: Tue, 29 Nov 2016 10:53:47 +0800
-Subject: [PATCH 7/10] mmc: sdhci-xenon: Add support to PHYs of Marvell
- Xenon SDHC
-In-Reply-To: <CAPDyKFr8rX04iY92OeQpSkS+3HN2-FxijCCiDb2sSKvP+TZPog@mail.gmail.com>
-References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
- <a05ffd140f4edc02fc3128db8445b2264cf38723.1477911954.git-series.gregory.clement@free-electrons.com>
- <CAPDyKFpkcoVMKbVOwjX1WDyNgc1vvUX60D6XRX6=YHGvkvHvnA@mail.gmail.com>
- <3cd05a26-d340-476e-bab1-8be9d5446f47@marvell.com>
- <CAPDyKFrskyZvMwhmj8ioyaowU8GL5=d-6ipGQcmmig_a9E9AQQ@mail.gmail.com>
- <436c6925-cb0d-afe7-e3a2-384eca15ff42@marvell.com>
- <8359307d-5f44-3db9-aae1-eb1fe8e1141d@marvell.com>
- <CAPDyKFo3ezYOywtSZ8GGQ1XK9KPsxCgQNbaiz45EVgbgtnUxjg@mail.gmail.com>
- <10a885f0-82e9-a35c-f62f-3fc4518ea8b4@marvell.com>
- <CAPDyKFr8rX04iY92OeQpSkS+3HN2-FxijCCiDb2sSKvP+TZPog@mail.gmail.com>
-Message-ID: <c30cead8-17b6-48b0-7355-cd82268842e1@marvell.com>
+From: jintack@cs.columbia.edu (Jintack Lim)
+Date: Mon, 28 Nov 2016 22:28:18 -0500
+Subject: [PATCH] KVM: arm/arm64: Access CNTHCTL_EL2 bit fields correctly
+In-Reply-To: <799d03f5-a929-9547-1ae7-94026b76f116@arm.com>
+References: <1480351570-11648-1-git-send-email-jintack@cs.columbia.edu>
+ <d04fd17e-9157-07fe-4daa-9dbab149b5e6@arm.com>
+ <799d03f5-a929-9547-1ae7-94026b76f116@arm.com>
+Message-ID: <CAHyh4xhXoFWsbnNNePthWp2-ZAOtCuUVmLn-JKRe4sc=nqrYNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On Mon, Nov 28, 2016 at 1:39 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 28/11/16 17:43, Marc Zyngier wrote:
+>> Hi Jintack,
 
-On 2016/11/28 23:16, Ulf Hansson wrote:
-> On 28 November 2016 at 12:38, Ziji Hu <huziji@marvell.com> wrote:
->> Hi Ulf,
+Hi Marc,
+
 >>
->> On 2016/11/28 19:13, Ulf Hansson wrote:
->>>>
->>>>     As you suggest, I replace mmc_wait_for_cmd() with mmc_send_tuning(), to
->>>>     send commands for testing current sampling point set in our host PHY.
->>>>
->>>>     According to my test result, it shows that mmc_send_tuning() can only support
->>>>     tuning command (CMD21/CMD19).
->>>>     As a result, we cannot use mmc_send_tuning() when card is in the speed modes
->>>>     which doesn't support tuning, such as eMMC HS SDR, eMMC HS DRR and
->>>>     SD SDR 12/SDR25/DDR50. Card will not response to tuning commands in those
->>>>     speed modes.
->>>>
->>>>     Could you please provide suggestions for the speed mode in which tuning is
->>>>     not available?
->>>>
+>> On 28/11/16 16:46, Jintack Lim wrote:
+>>> Bit positions of CNTHCTL_EL2 are changing depending on HCR_EL2.E2H bit.
+>>> EL1PCEN and EL1PCTEN are 1st and 0th bits when E2H is not set, but they
+>>> are 11th and 10th bits respectively when E2H is set.  Current code is
+>>> unintentionally setting wrong bits to CNTHCTL_EL2 with E2H set, which
+>>> may allow guest OS to access physical timer. So, fix it.
 >>>
->>> Normally the mmc host driver shouldn't have to care about what the
->>> card supports, as that is the responsibility of the mmc core to
->>> manage.
+>>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+>>> ---
+>>>  arch/arm/include/asm/kvm_timer.h     | 33 +++++++++++++++++++
+>>>  arch/arm64/include/asm/kvm_timer.h   | 62 ++++++++++++++++++++++++++++++++++++
+>>>  include/clocksource/arm_arch_timer.h |  6 ++--
+>>>  virt/kvm/arm/hyp/timer-sr.c          |  8 ++---
+>>>  4 files changed, 103 insertions(+), 6 deletions(-)
+>>>  create mode 100644 arch/arm/include/asm/kvm_timer.h
+>>>  create mode 100644 arch/arm64/include/asm/kvm_timer.h
 >>>
->>> The host should only need to implement the ->execute_tuning() ops,
->>> which gets called when the card supports tuning (CMD19/21). Does it
->>> make sense?
->>>
->>    I think it is irrelevant to tuning procedure.
->>
->>    Our host requires to adjust PHY setting after each time ios setting
->>    (SDCLK/bus width/speed mode) is changed.
->>    The simplified sequence is:
->>    mmc change ios --> mmc_set_ios() --> ->set_ios() --> after sdhci_set_ios(),
->>    adjust PHY setting.
->>    During PHY setting adjustment, out host driver has to send commands to
->>    test current sampling point. Tuning is another independent step.
-> 
-> For those speed modes (or other ios changes) that *don't* requires
-> tuning, then what will you do when you send the command to confirm the
-> change of PHY setting and it fails?
-> 
-> My assumption is that you will fail anyway, by propagating the error
-> to the mmc core. At least that what was my understanding from your
-> earlier replies, right!?
-> 
-> Then, I think there are no point having the host driver sending a
-> command to confirm the PHY settings, as the mmc core will anyway
-> discover if something goes wrong when the next command is sent.
-> 
-> Please correct me if I am wrong!
 >
+> [...]
+>
+>> We could make it nicer (read "faster") by introducing a
+>> hyp_alternate_select construct that only returns a value instead
+>> of calling a function. I remember writing something like that
+>> at some point, and dropping it...
+>
+> So here's what this could look like (warning, wacky code ahead,
+> though I fixed a stupid bug that was present in the previous patch).
+> The generated code is quite nice (no branch, only an extra mov
+> instruction on the default path)... Of course, completely untested!
 
-   Sorry that I didn't make myself clear.
+This looks much cleaner than my patch.
+While we are at it, is it worth to consider that we just need to set
+those bits once for VHE case, not for every world switch as an
+optimization?
 
-   Our host PHY delay line consists of hundreds of sampling points.
-   Each sampling point represents a different phase shift.
-
-   In lower speed mode, our host driver will scan the delay line.
-   It will select and test multiple sampling points, other than testing
-   only single sampling point.
-
-   If a sampling point fails to transfer cmd/data, our host driver will
-   move to test next sampling point, until we find out a group of successful
-   sampling points which can transfer cmd/data. At last we will select
-   a perfect one from them.
-
-   Thank you.
-
-Best regards,
-Hu Ziji
- 
->>
->>    Thus our host needs a valid command in PHY setting adjustment. Tuning command
->>    can be borrowed to complete this task in SD SDR50. But for other speed mode,
->>    we have to find out a valid command.
-> 
-> I thought we agreed on this wasn't necessary? Please see my upper response.
-> 
-> Kind regards
-> Uffe
-> 
+>
+> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+> index b18e852..d173902 100644
+> --- a/arch/arm64/include/asm/kvm_hyp.h
+> +++ b/arch/arm64/include/asm/kvm_hyp.h
+> @@ -121,6 +121,17 @@ typeof(orig) * __hyp_text fname(void)                                      \
+>         return val;                                                     \
+>  }
+>
+> +#define hyp_alternate_select_const(fname, orig, alt, cond)             \
+> +inline const typeof(orig) __hyp_text fname(void)                       \
+> +{                                                                      \
+> +       typeof(alt) val = orig;                                         \
+> +       asm volatile(ALTERNATIVE("nop           \n",                    \
+> +                                "mov   %0, %1  \n",                    \
+> +                                cond)                                  \
+> +                    : "+r" (val) : "r" (alt));                         \
+> +       return val;                                                     \
+> +}
+> +
+>  void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
+>  void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+>  int __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu);
+> diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
+> index 798866a..7a783af 100644
+> --- a/virt/kvm/arm/hyp/timer-sr.c
+> +++ b/virt/kvm/arm/hyp/timer-sr.c
+> @@ -21,11 +21,29 @@
+>
+>  #include <asm/kvm_hyp.h>
+>
+> +#ifdef CONFIG_ARM64
+> +static hyp_alternate_select_const(cnthclt_shift, 0, 10,
+> +                                 ARM64_HAS_VIRT_HOST_EXTN)
+> +
+> +#else
+> +#define cnthclt_shift()                (0)
+> +#endif
+> +
+> +static inline void __hyp_text cnthctl_rmw(u32 clr, u32 set)
+> +{
+> +       u32 val;
+> +       int shift = cnthclt_shift();
+> +
+> +       val = read_sysreg(cnthctl_el2);
+> +       val &= ~(clr << shift);
+> +       val |= set << shift;
+> +       write_sysreg(val, cnthctl_el2);
+> +}
+> +
+>  /* vcpu is already in the HYP VA space */
+>  void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
+>  {
+>         struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> -       u64 val;
+>
+>         if (timer->enabled) {
+>                 timer->cntv_ctl = read_sysreg_el0(cntv_ctl);
+> @@ -36,9 +54,7 @@ void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
+>         write_sysreg_el0(0, cntv_ctl);
+>
+>         /* Allow physical timer/counter access for the host */
+> -       val = read_sysreg(cnthctl_el2);
+> -       val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
+> -       write_sysreg(val, cnthctl_el2);
+> +       cnthctl_rmw(0, CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN);
+>
+>         /* Clear cntvoff for the host */
+>         write_sysreg(0, cntvoff_el2);
+> @@ -48,16 +64,12 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
+>  {
+>         struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+>         struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> -       u64 val;
+>
+>         /*
+>          * Disallow physical timer access for the guest
+>          * Physical counter access is allowed
+>          */
+> -       val = read_sysreg(cnthctl_el2);
+> -       val &= ~CNTHCTL_EL1PCEN;
+> -       val |= CNTHCTL_EL1PCTEN;
+> -       write_sysreg(val, cnthctl_el2);
+> +       cnthctl_rmw(CNTHCTL_EL1PCEN, CNTHCTL_EL1PCTEN);
+>
+>         if (timer->enabled) {
+>                 write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
+>
