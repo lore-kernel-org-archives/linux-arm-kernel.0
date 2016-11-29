@@ -1,87 +1,40 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 29 Nov 2016 17:40:39 -0600
-Subject: [PATCH V6 1/1] ARM64/PCI: Manage controller-specific information
- on the host controller basis
-In-Reply-To: <1479985523-10006-1-git-send-email-tn@semihalf.com>
-References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
- <1479985523-10006-1-git-send-email-tn@semihalf.com>
-Message-ID: <20161129234039.GB7375@bhelgaas-glaptop.roam.corp.google.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 29 Nov 2016 17:47:12 -0600
+Subject: question about irq_enter()/irq_exit() calling policy
+Message-ID: <22d0d991-bbe2-ce10-5202-3cdf97a9ecf2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2016 at 12:05:23PM +0100, Tomasz Nowicki wrote:
-> Currently we use one shared global acpi_pci_root_ops structure to keep
-> controller-specific ops. Then its pointer is passed to acpi_pci_root_create()
-> and associated with host bridge instance for good. Such design implies
-> serious drawback. Any potential manipulation on the single system-wide
-> acpi_pci_root_ops leads to kernel crash. The structure content is not
-> really changing even across multiple host bridges creation thus it was not
-> the issue so far.
-> 
-> In preparation for adding ECAM quirks mechanism (where controller-specific
-> PCI ops may be different for each host bridge) allocate new
-> acpi_pci_root_ops and fill in with data for each bridge. Now it is safe
-> to have different controller-specific info. As a consequence free
-> acpi_pci_root_ops when host bridge is released.
-> 
-> No functional changes in this patch.
-> 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+Hi All,
 
-Applied to pci/ecam for v4.10, thanks, Tomasz!
+Sorry for the may be dumb question, but what is the calling policy for irq_enter()/irq_exit()?
 
-> ---
->  arch/arm64/kernel/pci.c | 17 ++++++++++-------
->  1 file changed, 10 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index fb439c7..5c08baf 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -152,33 +152,36 @@ static void pci_acpi_generic_release_info(struct acpi_pci_root_info *ci)
->  
->  	ri = container_of(ci, struct acpi_pci_generic_root_info, common);
->  	pci_ecam_free(ri->cfg);
-> +	kfree(ci->ops);
->  	kfree(ri);
->  }
->  
-> -static struct acpi_pci_root_ops acpi_pci_root_ops = {
-> -	.release_info = pci_acpi_generic_release_info,
-> -};
-> -
->  /* Interface called from ACPI code to setup PCI host controller */
->  struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  {
->  	int node = acpi_get_node(root->device->handle);
->  	struct acpi_pci_generic_root_info *ri;
->  	struct pci_bus *bus, *child;
-> +	struct acpi_pci_root_ops *root_ops;
->  
->  	ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
->  	if (!ri)
->  		return NULL;
->  
-> +	root_ops = kzalloc_node(sizeof(*root_ops), GFP_KERNEL, node);
-> +	if (!root_ops)
-> +		return NULL;
-> +
->  	ri->cfg = pci_acpi_setup_ecam_mapping(root);
->  	if (!ri->cfg) {
->  		kfree(ri);
-> +		kfree(root_ops);
->  		return NULL;
->  	}
->  
-> -	acpi_pci_root_ops.pci_ops = &ri->cfg->ops->pci_ops;
-> -	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, &ri->common,
-> -				   ri->cfg);
-> +	root_ops->release_info = pci_acpi_generic_release_info;
-> +	root_ops->pci_ops = &ri->cfg->ops->pci_ops;
-> +	bus = acpi_pci_root_create(root, root_ops, &ri->common, ri->cfg);
->  	if (!bus)
->  		return NULL;
->  
-> -- 
-> 2.7.4
-> 
+1) Should these function be called each time system enter/exit IRQ context?
+
+HW IRQ:
+ switch (IRQ mode)
+  ...
+  irq_enter()
+	handle irq - execute hw_irq_hadler
+  irq_exit()
+  ...
+ switch
+
+2) Should these function be called for each processed irq?
+
+
+HW IRQ:
+ switch (IRQ mode)
+  ...
+  while (irq = get_pending_irq()) {
+  	...
+  	irq_enter()
+		handle(irq) - execute hw_irq_hadler
+  	irq_exit()
+ }
+ ...
+ switch
+
+-- 
+regards,
+-grygorii
