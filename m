@@ -1,94 +1,84 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 29 Nov 2016 18:22:11 +0100
-Subject: [PATCH v2] phy: phy-sun4i-usb: Add log when probing
-Message-ID: <20161129172211.21388-1-quentin.schulz@free-electrons.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Nov 2016 17:22:35 +0000
+Subject: [RFC v2 PATCH 23/23] ARM: Allow ARCH_MULTIPLATFORM to be
+ selected for NOMMU
+In-Reply-To: <1480423205-48436-24-git-send-email-vladimir.murzin@arm.com>
+References: <1480423205-48436-1-git-send-email-vladimir.murzin@arm.com>
+ <1480423205-48436-24-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20161129172234.GY14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When phy-sun4i-usb's probing fails, it does not print the reason in
-kernel log, forcing the developer to edit this driver to add info logs.
-This commit makes the kernel print the reason of phy-sun4i-usb's probing
-failure or a success message.
+On Tue, Nov 29, 2016 at 12:40:05PM +0000, Vladimir Murzin wrote:
+> With this patch applied potentially any platform can be built in NOMMU
+> configurations if CONFIG_EXPERT is selected. However, there is no
+> guaranty that platform can successfully run such Image. So the main
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
----
-Sorry for the delay, I completely forgot to send a v2.
+guarantee
 
-v2:
- - removing (from v1) debug message when devm_ioremap_resource fails,
- - changing dev_info to dev_dbg when driver is successfully loaded,
+> motivation behind of this patch:
+> - bring build coverage for NOMMU configurations
+> - allow known working NOMMU platforms (like R-class) to be used
+> - pave a way to add support for single address space (aka 1:1 mapping)
+>   for MMU platforms, so they can be usable in NOMMU configurations
+> 
+> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Alexander Shiyan <shc_work@mail.ru>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> ---
+>  arch/arm/Kconfig |   21 +++++++++++++++++++--
+>  1 file changed, 19 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index e78c822..bc6f406 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -327,9 +327,9 @@ choice
+>  
+>  config ARCH_MULTIPLATFORM
+>  	bool "Allow multiple platforms to be selected"
+> -	depends on MMU
+> +	depends on MMU || EXPERT
+>  	select ARM_HAS_SG_CHAIN
+> -	select ARM_PATCH_PHYS_VIRT
+> +	select ARM_PATCH_PHYS_VIRT if MMU
+>  	select AUTO_ZRELADDR
+>  	select CLKSRC_OF
+>  	select COMMON_CLK
+> @@ -339,6 +339,23 @@ config ARCH_MULTIPLATFORM
+>  	select PCI_DOMAINS if PCI
+>  	select SPARSE_IRQ
+>  	select USE_OF
+> +	help
+> +	  Please, read carefully if you've selected CONFIG_MMU=n!
+> +
+> +	  Multiplatform with !MMU configuration *is not* meant that
+> +	  kernel built to support every platform will boot on them. It
+> +	  is because physical address space layouts (particularly where
+> +	  RAM is located) are different between platforms and there is
+> +	  no MMU to work that around.
+> +
+> +	  You must specify where RAM start (via DRAM_BASE config
+> +	  option) and appropriate size of RAM (via DRAM_SIZE config
+> +	  option) which are valid for the platform you are building
+> +	  for.
+> +
+> +	  This feature is *EXPERIMENTAL*, please, consider building
+> +	  with CONFIG_MMU=y unless you know what you do or want to
+> +	  help with testing.
 
- drivers/phy/phy-sun4i-usb.c | 25 ++++++++++++++++++++-----
- 1 file changed, 20 insertions(+), 5 deletions(-)
+Do you actually see this help text anywhere?  I don't think multiple-choice
+options show help for individual choices.
 
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index fec34f5..f1b2848 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -632,19 +632,25 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 
- 	data->id_det_gpio = devm_gpiod_get_optional(dev, "usb0_id_det",
- 						    GPIOD_IN);
--	if (IS_ERR(data->id_det_gpio))
-+	if (IS_ERR(data->id_det_gpio)) {
-+		dev_err(dev, "Couldn't request ID GPIO\n");
- 		return PTR_ERR(data->id_det_gpio);
-+	}
- 
- 	data->vbus_det_gpio = devm_gpiod_get_optional(dev, "usb0_vbus_det",
- 						      GPIOD_IN);
--	if (IS_ERR(data->vbus_det_gpio))
-+	if (IS_ERR(data->vbus_det_gpio)) {
-+		dev_err(dev, "Couldn't request VBUS detect GPIO\n");
- 		return PTR_ERR(data->vbus_det_gpio);
-+	}
- 
- 	if (of_find_property(np, "usb0_vbus_power-supply", NULL)) {
- 		data->vbus_power_supply = devm_power_supply_get_by_phandle(dev,
- 						     "usb0_vbus_power-supply");
--		if (IS_ERR(data->vbus_power_supply))
-+		if (IS_ERR(data->vbus_power_supply)) {
-+			dev_err(dev, "Couldn't get the VBUS power supply\n");
- 			return PTR_ERR(data->vbus_power_supply);
-+		}
- 
- 		if (!data->vbus_power_supply)
- 			return -EPROBE_DEFER;
-@@ -653,8 +659,10 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 	data->dr_mode = of_usb_get_dr_mode_by_phy(np, 0);
- 
- 	data->extcon = devm_extcon_dev_allocate(dev, sun4i_usb_phy0_cable);
--	if (IS_ERR(data->extcon))
-+	if (IS_ERR(data->extcon)) {
-+		dev_err(dev, "Couldn't allocate our extcon device\n");
- 		return PTR_ERR(data->extcon);
-+	}
- 
- 	ret = devm_extcon_dev_register(dev, data->extcon);
- 	if (ret) {
-@@ -669,8 +677,13 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 		snprintf(name, sizeof(name), "usb%d_vbus", i);
- 		phy->vbus = devm_regulator_get_optional(dev, name);
- 		if (IS_ERR(phy->vbus)) {
--			if (PTR_ERR(phy->vbus) == -EPROBE_DEFER)
-+			if (PTR_ERR(phy->vbus) == -EPROBE_DEFER) {
-+				dev_err(dev,
-+					"Couldn't get regulator %s... Deferring probe\n",
-+					name);
- 				return -EPROBE_DEFER;
-+			}
-+
- 			phy->vbus = NULL;
- 		}
- 
-@@ -754,6 +767,8 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 		return PTR_ERR(phy_provider);
- 	}
- 
-+	dev_dbg(dev, "successfully loaded\n");
-+
- 	return 0;
- }
- 
 -- 
-2.9.3
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
