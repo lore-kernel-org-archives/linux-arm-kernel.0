@@ -1,341 +1,83 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 29 Nov 2016 09:47:15 -0700
-Subject: [PATCH 5/9] coresight: tmc: Cleanup operation mode handling
-In-Reply-To: <1480438039-24960-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1480438039-24960-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1480438039-24960-6-git-send-email-mathieu.poirier@linaro.org>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Tue, 29 Nov 2016 17:48:31 +0100
+Subject: [PATCH v2] ARM: davinci: da8xx: Fix sleeping function called from
+ invalid context
+Message-ID: <1480438111-11801-1-git-send-email-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Suzuki K. Poulose" <Suzuki.Poulose@arm.com>
+Everytime the usb20 phy is enabled, there is a
+"sleeping function called from invalid context" BUG.
 
-The mode of operation of the TMC tracked in drvdata->mode is defined
-as a local_t type. This is always checked and modified under the
-drvdata->spinlock and hence we don't need local_t for it and the
-unnecessary synchronisation instructions that comes with it. This
-change makes the code a bit more cleaner.
+clk_enable() from arch/arm/mach-davinci/clock.c uses spin_lock_irqsave()
+before to invoke the callback usb20_phy_clk_enable().
+usb20_phy_clk_enable() uses clk_get() and clk_enable_prepapre()
+which may sleep.
+Move clk_get() to da8xx_register_usb20_phy_clk() and
+replace clk_prepare_enable() by clk_enable().
 
-Also fixes the order in which we update the drvdata->mode to
-CS_MODE_DISABLED. i.e, in tmc_disable_etX_sink we change the
-mode to CS_MODE_DISABLED before invoking tmc_disable_etX_hw()
-which in turn depends on the mode to decide whether to dump the
-trace to a buffer.
-
-Applies on mathieu's coresight/next tree [1]
-
-https://git.linaro.org/kernel/coresight.git next
-
-Reported-by: Venkatesh Vivekanandan <venkatesh.vivekanandan@broadcom.com>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etf.c | 32 +++++++++++--------------
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 26 +++++++++-----------
- drivers/hwtracing/coresight/coresight-tmc.h     |  2 +-
- 3 files changed, 26 insertions(+), 34 deletions(-)
+ arch/arm/mach-davinci/usb-da8xx.c | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index d6941ea24d8d..e80a8f4cd12e 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -70,7 +70,7 @@ static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
- 	 * When operating in sysFS mode the content of the buffer needs to be
- 	 * read before the TMC is disabled.
- 	 */
--	if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
-+	if (drvdata->mode == CS_MODE_SYSFS)
- 		tmc_etb_dump_hw(drvdata);
- 	tmc_disable_hw(drvdata);
+diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
+index b010e5f..2baa0e1 100644
+--- a/arch/arm/mach-davinci/usb-da8xx.c
++++ b/arch/arm/mach-davinci/usb-da8xx.c
+@@ -156,23 +156,18 @@ int __init da8xx_register_usb_refclkin(int rate)
+ 	return 0;
+ }
  
-@@ -108,7 +108,6 @@ static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev, u32 mode)
- 	int ret = 0;
- 	bool used = false;
- 	char *buf = NULL;
--	long val;
- 	unsigned long flags;
- 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -138,13 +137,12 @@ static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev, u32 mode)
- 		goto out;
- 	}
- 
--	val = local_xchg(&drvdata->mode, mode);
- 	/*
- 	 * In sysFS mode we can have multiple writers per sink.  Since this
- 	 * sink is already enabled no memory is needed and the HW need not be
- 	 * touched.
- 	 */
--	if (val == CS_MODE_SYSFS)
-+	if (drvdata->mode == CS_MODE_SYSFS)
- 		goto out;
- 
- 	/*
-@@ -163,6 +161,7 @@ static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev, u32 mode)
- 		drvdata->buf = buf;
- 	}
- 
-+	drvdata->mode = CS_MODE_SYSFS;
- 	tmc_etb_enable_hw(drvdata);
- out:
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-@@ -180,7 +179,6 @@ static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev, u32 mode)
- static int tmc_enable_etf_sink_perf(struct coresight_device *csdev, u32 mode)
++static struct clk *usb20_clk;
++
+ static void usb20_phy_clk_enable(struct clk *clk)
  {
+-	struct clk *usb20_clk;
+ 	int err;
+ 	u32 val;
+ 	u32 timeout = 500000; /* 500 msec */
+ 
+ 	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+ 
+-	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
+-	if (IS_ERR(usb20_clk)) {
+-		pr_err("could not get usb20 clk: %ld\n", PTR_ERR(usb20_clk));
+-		return;
+-	}
+-
+ 	/* The USB 2.O PLL requires that the USB 2.O PSC is enabled as well. */
+-	err = clk_prepare_enable(usb20_clk);
++	err = clk_enable(usb20_clk);
+ 	if (err) {
+ 		pr_err("failed to enable usb20 clk: %d\n", err);
+ 		clk_put(usb20_clk);
+@@ -197,8 +192,7 @@ static void usb20_phy_clk_enable(struct clk *clk)
+ 
+ 	pr_err("Timeout waiting for USB 2.0 PHY clock good\n");
+ done:
+-	clk_disable_unprepare(usb20_clk);
+-	clk_put(usb20_clk);
++	clk_disable(usb20_clk);
+ }
+ 
+ static void usb20_phy_clk_disable(struct clk *clk)
+@@ -287,9 +281,15 @@ int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
+ 	struct clk *parent;
  	int ret = 0;
--	long val;
- 	unsigned long flags;
- 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
  
-@@ -194,17 +192,17 @@ static int tmc_enable_etf_sink_perf(struct coresight_device *csdev, u32 mode)
- 		goto out;
- 	}
- 
--	val = local_xchg(&drvdata->mode, mode);
- 	/*
- 	 * In Perf mode there can be only one writer per sink.  There
- 	 * is also no need to continue if the ETB/ETR is already operated
- 	 * from sysFS.
- 	 */
--	if (val != CS_MODE_DISABLED) {
-+	if (drvdata->mode != CS_MODE_DISABLED) {
- 		ret = -EINVAL;
- 		goto out;
- 	}
- 
-+	drvdata->mode = mode;
- 	tmc_etb_enable_hw(drvdata);
- out:
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-@@ -227,7 +225,6 @@ static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
- 
- static void tmc_disable_etf_sink(struct coresight_device *csdev)
- {
--	long val;
- 	unsigned long flags;
- 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -237,10 +234,11 @@ static void tmc_disable_etf_sink(struct coresight_device *csdev)
- 		return;
- 	}
- 
--	val = local_xchg(&drvdata->mode, CS_MODE_DISABLED);
- 	/* Disable the TMC only if it needs to */
--	if (val != CS_MODE_DISABLED)
-+	if (drvdata->mode != CS_MODE_DISABLED) {
- 		tmc_etb_disable_hw(drvdata);
-+		drvdata->mode = CS_MODE_DISABLED;
++	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
++	if (IS_ERR(usb20_clk))
++		return PTR_ERR(parent);
++
+ 	parent = clk_get(NULL, use_usb_refclkin ? "usb_refclkin" : "pll0_aux");
+-	if (IS_ERR(parent))
++	if (IS_ERR(parent)) {
++		clk_put(usb20_clk);
+ 		return PTR_ERR(parent);
 +	}
  
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
-@@ -260,7 +258,7 @@ static int tmc_enable_etf_link(struct coresight_device *csdev,
- 	}
- 
- 	tmc_etf_enable_hw(drvdata);
--	local_set(&drvdata->mode, CS_MODE_SYSFS);
-+	drvdata->mode = CS_MODE_SYSFS;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
- 	dev_info(drvdata->dev, "TMC-ETF enabled\n");
-@@ -280,7 +278,7 @@ static void tmc_disable_etf_link(struct coresight_device *csdev,
- 	}
- 
- 	tmc_etf_disable_hw(drvdata);
--	local_set(&drvdata->mode, CS_MODE_DISABLED);
-+	drvdata->mode = CS_MODE_DISABLED;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
- 	dev_info(drvdata->dev, "TMC disabled\n");
-@@ -383,7 +381,7 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
- 		return;
- 
- 	/* This shouldn't happen */
--	if (WARN_ON_ONCE(local_read(&drvdata->mode) != CS_MODE_PERF))
-+	if (WARN_ON_ONCE(drvdata->mode != CS_MODE_PERF))
- 		return;
- 
- 	CS_UNLOCK(drvdata->base);
-@@ -504,7 +502,6 @@ const struct coresight_ops tmc_etf_cs_ops = {
- 
- int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
- {
--	long val;
- 	enum tmc_mode mode;
- 	int ret = 0;
- 	unsigned long flags;
-@@ -528,9 +525,8 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
- 		goto out;
- 	}
- 
--	val = local_read(&drvdata->mode);
- 	/* Don't interfere if operated from Perf */
--	if (val == CS_MODE_PERF) {
-+	if (drvdata->mode == CS_MODE_PERF) {
- 		ret = -EINVAL;
- 		goto out;
- 	}
-@@ -542,7 +538,7 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
- 	}
- 
- 	/* Disable the TMC if need be */
--	if (val == CS_MODE_SYSFS)
-+	if (drvdata->mode == CS_MODE_SYSFS)
- 		tmc_etb_disable_hw(drvdata);
- 
- 	drvdata->reading = true;
-@@ -573,7 +569,7 @@ int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata)
- 	}
- 
- 	/* Re-enable the TMC if need be */
--	if (local_read(&drvdata->mode) == CS_MODE_SYSFS) {
-+	if (drvdata->mode == CS_MODE_SYSFS) {
- 		/*
- 		 * The trace run will continue with the same allocated trace
- 		 * buffer. As such zero-out the buffer so that we don't end
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index 886ea83c68e0..f23ef0c23303 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -86,7 +86,7 @@ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
- 	 * When operating in sysFS mode the content of the buffer needs to be
- 	 * read before the TMC is disabled.
- 	 */
--	if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
-+	if (drvdata->mode == CS_MODE_SYSFS)
- 		tmc_etr_dump_hw(drvdata);
- 	tmc_disable_hw(drvdata);
- 
-@@ -97,7 +97,6 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev, u32 mode)
- {
- 	int ret = 0;
- 	bool used = false;
--	long val;
- 	unsigned long flags;
- 	void __iomem *vaddr = NULL;
- 	dma_addr_t paddr;
-@@ -134,13 +133,12 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev, u32 mode)
- 		goto out;
- 	}
- 
--	val = local_xchg(&drvdata->mode, mode);
- 	/*
- 	 * In sysFS mode we can have multiple writers per sink.  Since this
- 	 * sink is already enabled no memory is needed and the HW need not be
- 	 * touched.
- 	 */
--	if (val == CS_MODE_SYSFS)
-+	if (drvdata->mode == CS_MODE_SYSFS)
- 		goto out;
- 
- 	/*
-@@ -157,6 +155,7 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev, u32 mode)
- 
- 	memset(drvdata->vaddr, 0, drvdata->size);
- 
-+	drvdata->mode = CS_MODE_SYSFS;
- 	tmc_etr_enable_hw(drvdata);
- out:
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-@@ -174,7 +173,6 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev, u32 mode)
- static int tmc_enable_etr_sink_perf(struct coresight_device *csdev, u32 mode)
- {
- 	int ret = 0;
--	long val;
- 	unsigned long flags;
- 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -188,17 +186,17 @@ static int tmc_enable_etr_sink_perf(struct coresight_device *csdev, u32 mode)
- 		goto out;
- 	}
- 
--	val = local_xchg(&drvdata->mode, mode);
- 	/*
- 	 * In Perf mode there can be only one writer per sink.  There
- 	 * is also no need to continue if the ETR is already operated
- 	 * from sysFS.
- 	 */
--	if (val != CS_MODE_DISABLED) {
-+	if (drvdata->mode != CS_MODE_DISABLED) {
- 		ret = -EINVAL;
- 		goto out;
- 	}
- 
-+	drvdata->mode = CS_MODE_PERF;
- 	tmc_etr_enable_hw(drvdata);
- out:
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-@@ -221,7 +219,6 @@ static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
- 
- static void tmc_disable_etr_sink(struct coresight_device *csdev)
- {
--	long val;
- 	unsigned long flags;
- 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -231,10 +228,11 @@ static void tmc_disable_etr_sink(struct coresight_device *csdev)
- 		return;
- 	}
- 
--	val = local_xchg(&drvdata->mode, CS_MODE_DISABLED);
- 	/* Disable the TMC only if it needs to */
--	if (val != CS_MODE_DISABLED)
-+	if (drvdata->mode != CS_MODE_DISABLED) {
- 		tmc_etr_disable_hw(drvdata);
-+		drvdata->mode = CS_MODE_DISABLED;
-+	}
- 
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
-@@ -253,7 +251,6 @@ const struct coresight_ops tmc_etr_cs_ops = {
- int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
- {
- 	int ret = 0;
--	long val;
- 	unsigned long flags;
- 
- 	/* config types are set a boot time and never change */
-@@ -266,9 +263,8 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
- 		goto out;
- 	}
- 
--	val = local_read(&drvdata->mode);
- 	/* Don't interfere if operated from Perf */
--	if (val == CS_MODE_PERF) {
-+	if (drvdata->mode == CS_MODE_PERF) {
- 		ret = -EINVAL;
- 		goto out;
- 	}
-@@ -280,7 +276,7 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
- 	}
- 
- 	/* Disable the TMC if need be */
--	if (val == CS_MODE_SYSFS)
-+	if (drvdata->mode == CS_MODE_SYSFS)
- 		tmc_etr_disable_hw(drvdata);
- 
- 	drvdata->reading = true;
-@@ -303,7 +299,7 @@ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
- 
- 	/* RE-enable the TMC if need be */
--	if (local_read(&drvdata->mode) == CS_MODE_SYSFS) {
-+	if (drvdata->mode == CS_MODE_SYSFS) {
- 		/*
- 		 * The trace run will continue with the same allocated trace
- 		 * buffer. The trace buffer is cleared in tmc_etr_enable_hw(),
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index 44b3ae346118..51c01851533e 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.h
-+++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -117,7 +117,7 @@ struct tmc_drvdata {
- 	void __iomem		*vaddr;
- 	u32			size;
- 	u32			len;
--	local_t			mode;
-+	u32			mode;
- 	enum tmc_config_type	config_type;
- 	enum tmc_mem_intf_width	memwidth;
- 	u32			trigger_cntr;
+ 	usb20_phy_clk.parent = parent;
+ 	ret = clk_register(&usb20_phy_clk);
 -- 
-2.7.4
+2.7.3
