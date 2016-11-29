@@ -1,66 +1,58 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Nov 2016 21:33 +0200
-Subject: [PATCH v7 4/8] drm/sunxi: Add DT bindings documentation of
- Allwinner HDMI
-In-Reply-To: <20161129202751.e94f72a1b9e2c2fb064e9933@free.fr>
-References: <cover.1480414715.git.moinejf@free.fr> <5996605.Gh0PjPIAcn@avalon>
- <20161129202751.e94f72a1b9e2c2fb064e9933@free.fr>
-Message-ID: <6356753.Ekaj7GdA0W@avalon>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 29 Nov 2016 11:39:44 -0800
+Subject: [PATCHv4 09/10] mm/usercopy: Switch to using lm_alias
+In-Reply-To: <1480445729-27130-10-git-send-email-labbott@redhat.com>
+References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
+ <1480445729-27130-10-git-send-email-labbott@redhat.com>
+Message-ID: <CAGXu5jKrBc6R9JYay1L6pd958Vm5-6p=37tiUYgg6uPeZb1HtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Fran?ois,
+On Tue, Nov 29, 2016 at 10:55 AM, Laura Abbott <labbott@redhat.com> wrote:
+>
+> The usercopy checking code currently calls __va(__pa(...)) to check for
+> aliases on symbols. Switch to using lm_alias instead.
+>
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
 
-On Tuesday 29 Nov 2016 20:27:51 Jean-Francois Moine wrote:
-> On Tue, 29 Nov 2016 20:46:22 +0200 Laurent Pinchart wrote:
-> [snip]
-> 
-> >> +Example:
-> >> +
-> >> +	hdmi: hdmi at 01ee0000 {
-> >> +		compatible = "allwinner,sun8i-a83t-hdmi";
-> >> +		reg = <0x01ee0000 0x20000>;
-> >> +		clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI>,
-> >> +			 <&ccu CLK_HDMI_DDC>;
-> >> +		clock-names = "bus", "clock", "ddc-clock";
-> >> +		resets = <&ccu RST_HDMI0>, <&ccu RST_HDMI1>;
-> >> +		reset-names = "hdmi0", "hdmi1";
-> >> +		pinctrl-names = "default";
-> >> +		pinctrl-0 = <&hdmi_pins_a>;
-> >> +		status = "disabled";
-> >> +		#address-cells = <1>;
-> >> +		#size-cells = <0>;
-> >> +		port at 0 {			/* video */
-> >> +			reg = <0>;
-> >> +			hdmi_tcon1: endpoint {
-> >> +				remote-endpoint = <&tcon1_hdmi>;
-> >> +			};
-> >> +		};
-> >> +		port at 1 {			/* audio */
-> >> +			reg = <1>;
-> >> +			hdmi_i2s2: endpoint {
-> >> +				remote-endpoint = <&i2s2_hdmi>;
-> >> +			};
-> >> +		};
-> > 
-> > You need a third port for the HDMI encoder output, connected to an HDMI
-> > connector DT node.
-> 
-> I don't see what you mean. The HDMI device is both the encoder
-> and connector (as the TDA998x):
+Acked-by: Kees Cook <keescook@chromium.org>
 
-The driver might create both an encoder and a connector, but I very much doubt 
-that the "allwinner,sun8i-a83t-hdmi" hardware contains a connector, unless the 
-SoC package has an HDMI connector coming out of it :-)
+I should probably add a corresponding alias test to lkdtm...
 
-> plane -> DE2 mixer ---> TCON -----> HDMI -----> display device
-> ----- plane ------    - CRTC -   - encoder  \
->                                    connector -- (HDMI cable)
->          audio-controller -   - audio-codec /
-> 
-> > > +	};
+-Kees
+
+> ---
+> Found when reviewing the kernel. Tested.
+> ---
+>  mm/usercopy.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/mm/usercopy.c b/mm/usercopy.c
+> index 3c8da0a..8345299 100644
+> --- a/mm/usercopy.c
+> +++ b/mm/usercopy.c
+> @@ -108,13 +108,13 @@ static inline const char *check_kernel_text_object(const void *ptr,
+>          * __pa() is not just the reverse of __va(). This can be detected
+>          * and checked:
+>          */
+> -       textlow_linear = (unsigned long)__va(__pa(textlow));
+> +       textlow_linear = (unsigned long)lm_alias(textlow);
+>         /* No different mapping: we're done. */
+>         if (textlow_linear == textlow)
+>                 return NULL;
+>
+>         /* Check the secondary mapping... */
+> -       texthigh_linear = (unsigned long)__va(__pa(texthigh));
+> +       texthigh_linear = (unsigned long)lm_alias(texthigh);
+>         if (overlaps(ptr, n, textlow_linear, texthigh_linear))
+>                 return "<linear kernel text>";
+>
+> --
+> 2.7.4
+>
+
+
 
 -- 
-Regards,
-
-Laurent Pinchart
+Kees Cook
+Nexus Security
