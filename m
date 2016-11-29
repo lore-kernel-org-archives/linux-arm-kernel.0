@@ -1,283 +1,47 @@
-From: shiju.jose@huawei.com (Shiju Jose)
-Date: Tue, 29 Nov 2016 11:29:20 +0000
-Subject: [PATCH V5 02/10] ras: acpi/apei: cper: generic error data entry
- v3 per ACPI 6.1
-In-Reply-To: <1479767763-27532-3-git-send-email-tbaicar@codeaurora.org>
-References: <1479767763-27532-1-git-send-email-tbaicar@codeaurora.org>
- <1479767763-27532-3-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <86258A5CC0A3704780874CF6004BA8A62DC87D66@lhreml502-mbb>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 29 Nov 2016 19:31:44 +0800
+Subject: [PATCH V7 0/3] irqchip: qcom: Add IRQ combiner driver
+In-Reply-To: <1479074375-2629-1-git-send-email-agustinv@codeaurora.org>
+References: <1479074375-2629-1-git-send-email-agustinv@codeaurora.org>
+Message-ID: <4126fa80-c8da-764f-9ea3-ec9966a19ea9@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-acpi-owner at vger.kernel.org [mailto:linux-acpi-
-> owner at vger.kernel.org] On Behalf Of Tyler Baicar
-> Sent: 21 November 2016 22:36
-> To: marc.zyngier at arm.com; pbonzini at redhat.com; rkrcmar at redhat.com;
-> linux at armlinux.org.uk; catalin.marinas at arm.com; will.deacon at arm.com;
-> rjw at rjwysocki.net; lenb at kernel.org; matt at codeblueprint.co.uk;
-> robert.moore at intel.com; lv.zheng at intel.com; nkaje at codeaurora.org;
-> zjzhang at codeaurora.org; mark.rutland at arm.com; james.morse at arm.com;
-> akpm at linux-foundation.org; eun.taik.lee at samsung.com;
-> sandeepa.s.prabhu at gmail.com; shijie.huang at arm.com;
-> rruigrok at codeaurora.org; paul.gortmaker at windriver.com;
-> tomasz.nowicki at linaro.org; fu.wei at linaro.org; rostedt at goodmis.org;
-> bristot at redhat.com; linux-arm-kernel at lists.infradead.org;
-> kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org; linux-
-> kernel at vger.kernel.org; linux-acpi at vger.kernel.org; linux-
-> efi at vger.kernel.org; Suzuki.Poulose at arm.com; punit.agrawal at arm.com;
-> astone at redhat.com; harba at codeaurora.org; hanjun.guo at linaro.org
-> Cc: Tyler Baicar
-> Subject: [PATCH V5 02/10] ras: acpi/apei: cper: generic error data
-> entry v3 per ACPI 6.1
-> 
-> Currently when a RAS error is reported it is not timestamped.
-> The ACPI 6.1 spec adds the timestamp field to the generic error data
-> entry v3 structure. The timestamp of when the firmware generated the
-> error is now being reported.
-> 
-> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Richard Ruigrok <rruigrok@codeaurora.org>
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
-> ---
->  drivers/acpi/apei/ghes.c    | 14 +++++++---
->  drivers/firmware/efi/cper.c | 62 +++++++++++++++++++++++++++++++++++--
-> --------
->  include/acpi/ghes.h         | 10 ++++++++
->  include/linux/cper.h        | 12 +++++++++
->  4 files changed, 80 insertions(+), 18 deletions(-)
-> 
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c index
-> b79abc5..9063d68 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -420,7 +420,8 @@ static void ghes_handle_memory_failure(struct
-> acpi_hest_generic_data *gdata, int
->  	int flags = -1;
->  	int sec_sev = ghes_severity(gdata->error_severity);
->  	struct cper_sec_mem_err *mem_err;
-> -	mem_err = (struct cper_sec_mem_err *)(gdata + 1);
-> +
-> +	mem_err = acpi_hest_generic_data_payload(gdata);
-> 
->  	if (!(mem_err->validation_bits & CPER_MEM_VALID_PA))
->  		return;
-> @@ -450,14 +451,18 @@ static void ghes_do_proc(struct ghes *ghes,  {
->  	int sev, sec_sev;
->  	struct acpi_hest_generic_data *gdata;
-> +	uuid_le sec_type;
-> 
->  	sev = ghes_severity(estatus->error_severity);
->  	apei_estatus_for_each_section(estatus, gdata) {
->  		sec_sev = ghes_severity(gdata->error_severity);
-> -		if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
-> +		sec_type = *(uuid_le *)gdata->section_type;
-> +
-> +		if (!uuid_le_cmp(sec_type,
->  				 CPER_SEC_PLATFORM_MEM)) {
->  			struct cper_sec_mem_err *mem_err;
-> -			mem_err = (struct cper_sec_mem_err *)(gdata+1);
-> +
-> +			mem_err = acpi_hest_generic_data_payload(gdata);
->  			ghes_edac_report_mem_error(ghes, sev, mem_err);
-> 
->  			arch_apei_report_mem_error(sev, mem_err); @@ -467,7
-> +472,8 @@ static void ghes_do_proc(struct ghes *ghes,
->  		else if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
->  				      CPER_SEC_PCIE)) {
->  			struct cper_sec_pcie *pcie_err;
-> -			pcie_err = (struct cper_sec_pcie *)(gdata+1);
-> +
-> +			pcie_err = acpi_hest_generic_data_payload(gdata);
->  			if (sev == GHES_SEV_RECOVERABLE &&
->  			    sec_sev == GHES_SEV_RECOVERABLE &&
->  			    pcie_err->validation_bits &
-> CPER_PCIE_VALID_DEVICE_ID && diff --git a/drivers/firmware/efi/cper.c
-> b/drivers/firmware/efi/cper.c index d425374..7e2439e 100644
-> --- a/drivers/firmware/efi/cper.c
-> +++ b/drivers/firmware/efi/cper.c
-> @@ -32,6 +32,9 @@
->  #include <linux/acpi.h>
->  #include <linux/pci.h>
->  #include <linux/aer.h>
-> +#include <linux/printk.h>
-> +#include <linux/bcd.h>
-> +#include <acpi/ghes.h>
-> 
->  #define INDENT_SP	" "
-> 
-> @@ -386,13 +389,37 @@ static void cper_print_pcie(const char *pfx,
-> const struct cper_sec_pcie *pcie,
->  	pfx, pcie->bridge.secondary_status, pcie->bridge.control);  }
-> 
-> +static void cper_estatus_print_section_v300(const char *pfx,
-> +	const struct acpi_hest_generic_data_v300 *gdata) {
-> +	__u8 hour, min, sec, day, mon, year, century, *timestamp;
-> +
-> +	if (gdata->validation_bits & ACPI_HEST_GEN_VALID_TIMESTAMP) {
-> +		timestamp = (__u8 *)&(gdata->time_stamp);
-> +		sec = bcd2bin(timestamp[0]);
-> +		min = bcd2bin(timestamp[1]);
-> +		hour = bcd2bin(timestamp[2]);
-> +		day = bcd2bin(timestamp[4]);
-> +		mon = bcd2bin(timestamp[5]);
-> +		year = bcd2bin(timestamp[6]);
-> +		century = bcd2bin(timestamp[7]);
-> +		printk("%stime: %7s %02d%02d-%02d-%02d %02d:%02d:%02d\n",
-> pfx,
-> +			0x01 & *(timestamp + 3) ? "precise" : "", century,
-> +			year, mon, day, hour, min, sec);
-> +	}
-> +}
-> +
->  static void cper_estatus_print_section(
-> -	const char *pfx, const struct acpi_hest_generic_data *gdata, int
-> sec_no)
-> +	const char *pfx, struct acpi_hest_generic_data *gdata, int sec_no)
->  {
->  	uuid_le *sec_type = (uuid_le *)gdata->section_type;
->  	__u16 severity;
->  	char newpfx[64];
-> 
-> +	if (acpi_hest_generic_data_version(gdata) >= 3)
-> +		cper_estatus_print_section_v300(pfx,
-> +			(const struct acpi_hest_generic_data_v300 *)gdata);
-> +
->  	severity = gdata->error_severity;
->  	printk("%s""Error %d, type: %s\n", pfx, sec_no,
->  	       cper_severity_str(severity));
-> @@ -403,14 +430,18 @@ static void cper_estatus_print_section(
-> 
->  	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
->  	if (!uuid_le_cmp(*sec_type, CPER_SEC_PROC_GENERIC)) {
-> -		struct cper_sec_proc_generic *proc_err = (void *)(gdata +
-> 1);
-> +		struct cper_sec_proc_generic *proc_err;
-> +
-> +		proc_err = acpi_hest_generic_data_payload(gdata);
->  		printk("%s""section_type: general processor error\n",
-> newpfx);
->  		if (gdata->error_data_length >= sizeof(*proc_err))
->  			cper_print_proc_generic(newpfx, proc_err);
->  		else
->  			goto err_section_too_small;
->  	} else if (!uuid_le_cmp(*sec_type, CPER_SEC_PLATFORM_MEM)) {
-> -		struct cper_sec_mem_err *mem_err = (void *)(gdata + 1);
-> +		struct cper_sec_mem_err *mem_err;
-> +
-> +		mem_err = acpi_hest_generic_data_payload(gdata);
->  		printk("%s""section_type: memory error\n", newpfx);
->  		if (gdata->error_data_length >=
->  		    sizeof(struct cper_sec_mem_err_old)) @@ -419,7 +450,9
-> @@ static void cper_estatus_print_section(
->  		else
->  			goto err_section_too_small;
->  	} else if (!uuid_le_cmp(*sec_type, CPER_SEC_PCIE)) {
-> -		struct cper_sec_pcie *pcie = (void *)(gdata + 1);
-> +		struct cper_sec_pcie *pcie;
-> +
-> +		pcie = acpi_hest_generic_data_payload(gdata);
->  		printk("%s""section_type: PCIe error\n", newpfx);
->  		if (gdata->error_data_length >= sizeof(*pcie))
->  			cper_print_pcie(newpfx, pcie, gdata); @@ -438,7
-> +471,7 @@ void cper_estatus_print(const char *pfx,
->  			const struct acpi_hest_generic_status *estatus)  {
->  	struct acpi_hest_generic_data *gdata;
-> -	unsigned int data_len, gedata_len;
-> +	unsigned int data_len;
->  	int sec_no = 0;
->  	char newpfx[64];
->  	__u16 severity;
-> @@ -451,12 +484,12 @@ void cper_estatus_print(const char *pfx,
->  	printk("%s""event severity: %s\n", pfx,
-> cper_severity_str(severity));
->  	data_len = estatus->data_length;
->  	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
-> +
->  	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
-> -	while (data_len >= sizeof(*gdata)) {
-> -		gedata_len = gdata->error_data_length;
-> +
-> +	while (data_len >= acpi_hest_generic_data_size(gdata)) {
->  		cper_estatus_print_section(newpfx, gdata, sec_no);
-> -		data_len -= gedata_len + sizeof(*gdata);
-> -		gdata = (void *)(gdata + 1) + gedata_len;
-> +		gdata = acpi_hest_generic_data_next(gdata);
->  		sec_no++;
->  	}
->  }
-Hi Tyler,
-Will the above while loop does not come out because data_len is not getting updated as it did in V4 patch?
-This is the behaviour seen when we tested on our platform. It worked fine when we update the data_len.     
-> @@ -486,12 +519,13 @@ int cper_estatus_check(const struct
-> acpi_hest_generic_status *estatus)
->  		return rc;
->  	data_len = estatus->data_length;
->  	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
-> -	while (data_len >= sizeof(*gdata)) {
-> -		gedata_len = gdata->error_data_length;
-> -		if (gedata_len > data_len - sizeof(*gdata))
-> +
-> +	while (data_len >= acpi_hest_generic_data_size(gdata)) {
-> +		gedata_len = acpi_hest_generic_data_error_length(gdata);
-> +		if (gedata_len > data_len -
-> acpi_hest_generic_data_size(gdata))
->  			return -EINVAL;
-> -		data_len -= gedata_len + sizeof(*gdata);
-> -		gdata = (void *)(gdata + 1) + gedata_len;
-> +		data_len -= gedata_len + acpi_hest_generic_data_size(gdata);
-> +		gdata = acpi_hest_generic_data_next(gdata);
->  	}
->  	if (data_len)
->  		return -EINVAL;
-> diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h index
-> 68f088a..56b9679 100644
-> --- a/include/acpi/ghes.h
-> +++ b/include/acpi/ghes.h
-> @@ -73,3 +73,13 @@ static inline void ghes_edac_unregister(struct ghes
-> *ghes)  {  }  #endif
-> +
-> +#define acpi_hest_generic_data_version(gdata)			\
-> +	(gdata->revision >> 8)
-> +
-> +static inline void *acpi_hest_generic_data_payload(struct
-> +acpi_hest_generic_data *gdata) {
-> +	return acpi_hest_generic_data_version(gdata) >= 3 ?
-> +		(void *)(((struct acpi_hest_generic_data_v300 *)(gdata)) +
-> 1) :
-> +		gdata + 1;
-> +}
-> diff --git a/include/linux/cper.h b/include/linux/cper.h index
-> dcacb1a..13ea41c 100644
-> --- a/include/linux/cper.h
-> +++ b/include/linux/cper.h
-> @@ -255,6 +255,18 @@ enum {
-> 
->  #define CPER_PCIE_SLOT_SHIFT			3
-> 
-> +#define acpi_hest_generic_data_error_length(gdata)	\
-> +	(((struct acpi_hest_generic_data *)(gdata))->error_data_length)
-> +#define acpi_hest_generic_data_size(gdata)		\
-> +	((acpi_hest_generic_data_version(gdata) >= 3) ?	\
-> +	sizeof(struct acpi_hest_generic_data_v300) :	\
-> +	sizeof(struct acpi_hest_generic_data))
-> +#define acpi_hest_generic_data_record_size(gdata)	\
-> +	(acpi_hest_generic_data_size(gdata) +		\
-> +	acpi_hest_generic_data_error_length(gdata))
-> +#define acpi_hest_generic_data_next(gdata)		\
-> +	((void *)(gdata) + acpi_hest_generic_data_record_size(gdata))
-> +
->  /*
->   * All tables and structs must be byte-packed to match CPER
->   * specification, since the tables are provided by the system BIOS
-> --
-> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-> Technologies, Inc.
-> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a
-> Linux Foundation Collaborative Project.
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi"
-> in the body of a message to majordomo at vger.kernel.org More majordomo
-> info at  http://vger.kernel.org/majordomo-info.html
+Hi Agustin,
+
+On 2016/11/14 5:59, Agustin Vega-Frias wrote:
+> Add support for IRQ combiners in the Top-level Control and Status
+> Registers (TCSR) hardware block in Qualcomm Technologies chips.
+>
+> The first patch fixes IRQ probe deferral by allowing platform_device
+> IRQ resources to be re-initialized if the ACPI core failed to find
+> the IRQ domain during ACPI bus scan.
+>
+> The second patch adds support for ResourceSource/IRQ domain mapping
+> when using Extended IRQ Resources with a specific ResourceSource.
+> These changes are conditional on the ACPI_GENERIC_GSI config.
+>
+> The third patch takes advantage of the new capabilities to implement
+> the driver for the IRQ combiners.
+>
+> Tested on top of v4.9-rc4.
+>
+> Changes V6 -> V7:
+> * Consolidate changes for ResourceSource/IRQ domain mapping to the same
+>   source file implementing the generic GSI support, making it conditional
+>   on CONFIG_ACPI_GENERIC_GSI.
+> * Eliminate some code duplication by implementing acpi_register_gsi in
+>   terms of the new acpi_register_irq API.
+
+I had a test on Hisilicon D03 which needs patch 1 and 2 in this patch
+set to enable the mbigen irqchip, and it works pretty good.
+
+Patch 1/3 can remove the device dependency for the irqchip and platform
+devices, and I removed my patch (ACPI: irq: introduce interrupt
+producer) then add your patch 2/3, devices such as SAS and native
+network works fine on my D03.
+
+I will comment on the patches later.
+
+Thanks
+Hanjun
