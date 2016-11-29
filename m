@@ -1,46 +1,94 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 29 Nov 2016 17:22:06 +0000
-Subject: [PATCH 15/22] arm64/cpuinfo: Make hotplug notifier symmetric
-In-Reply-To: <20161126231350.10321-16-bigeasy@linutronix.de>
-References: <20161126231350.10321-1-bigeasy@linutronix.de>
- <20161126231350.10321-16-bigeasy@linutronix.de>
-Message-ID: <758dd144-6634-a8ad-2af0-abe7478dd94f@arm.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Tue, 29 Nov 2016 18:22:11 +0100
+Subject: [PATCH v2] phy: phy-sun4i-usb: Add log when probing
+Message-ID: <20161129172211.21388-1-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/11/16 23:13, Sebastian Andrzej Siewior wrote:
-> From: Anna-Maria Gleixner <anna-maria@linutronix.de>
->
-> There is no requirement to keep the sysfs files around until the CPU is
-> completely dead. Remove them during the DOWN_PREPARE notification. This is
-> a preparatory patch for converting to the hotplug state machine.
->
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> ---
->  arch/arm64/kernel/cpuinfo.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> index b3d5b3e8fbcb..19aad7041e14 100644
-> --- a/arch/arm64/kernel/cpuinfo.c
-> +++ b/arch/arm64/kernel/cpuinfo.c
-> @@ -272,9 +272,10 @@ static int cpuid_callback(struct notifier_block *nb,
->
->  	switch (action & ~CPU_TASKS_FROZEN) {
->  	case CPU_ONLINE:
-> +	case CPU_DOWN_FAILED:
->  		rc = cpuid_add_regs(cpu);
->  		break;
-> -	case CPU_DEAD:
-> +	case CPU_DOWN_PREPARE:
->  		rc = cpuid_remove_regs(cpu);
->  		break;
->  	}
+When phy-sun4i-usb's probing fails, it does not print the reason in
+kernel log, forcing the developer to edit this driver to add info logs.
+This commit makes the kernel print the reason of phy-sun4i-usb's probing
+failure or a success message.
 
-Looks reasonable to me:
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+---
+Sorry for the delay, I completely forgot to send a v2.
 
-Reviewed-by : Suzuki K Poulose <suzuki.poulose@arm.com>
+v2:
+ - removing (from v1) debug message when devm_ioremap_resource fails,
+ - changing dev_info to dev_dbg when driver is successfully loaded,
+
+ drivers/phy/phy-sun4i-usb.c | 25 ++++++++++++++++++++-----
+ 1 file changed, 20 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index fec34f5..f1b2848 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -632,19 +632,25 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 
+ 	data->id_det_gpio = devm_gpiod_get_optional(dev, "usb0_id_det",
+ 						    GPIOD_IN);
+-	if (IS_ERR(data->id_det_gpio))
++	if (IS_ERR(data->id_det_gpio)) {
++		dev_err(dev, "Couldn't request ID GPIO\n");
+ 		return PTR_ERR(data->id_det_gpio);
++	}
+ 
+ 	data->vbus_det_gpio = devm_gpiod_get_optional(dev, "usb0_vbus_det",
+ 						      GPIOD_IN);
+-	if (IS_ERR(data->vbus_det_gpio))
++	if (IS_ERR(data->vbus_det_gpio)) {
++		dev_err(dev, "Couldn't request VBUS detect GPIO\n");
+ 		return PTR_ERR(data->vbus_det_gpio);
++	}
+ 
+ 	if (of_find_property(np, "usb0_vbus_power-supply", NULL)) {
+ 		data->vbus_power_supply = devm_power_supply_get_by_phandle(dev,
+ 						     "usb0_vbus_power-supply");
+-		if (IS_ERR(data->vbus_power_supply))
++		if (IS_ERR(data->vbus_power_supply)) {
++			dev_err(dev, "Couldn't get the VBUS power supply\n");
+ 			return PTR_ERR(data->vbus_power_supply);
++		}
+ 
+ 		if (!data->vbus_power_supply)
+ 			return -EPROBE_DEFER;
+@@ -653,8 +659,10 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 	data->dr_mode = of_usb_get_dr_mode_by_phy(np, 0);
+ 
+ 	data->extcon = devm_extcon_dev_allocate(dev, sun4i_usb_phy0_cable);
+-	if (IS_ERR(data->extcon))
++	if (IS_ERR(data->extcon)) {
++		dev_err(dev, "Couldn't allocate our extcon device\n");
+ 		return PTR_ERR(data->extcon);
++	}
+ 
+ 	ret = devm_extcon_dev_register(dev, data->extcon);
+ 	if (ret) {
+@@ -669,8 +677,13 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 		snprintf(name, sizeof(name), "usb%d_vbus", i);
+ 		phy->vbus = devm_regulator_get_optional(dev, name);
+ 		if (IS_ERR(phy->vbus)) {
+-			if (PTR_ERR(phy->vbus) == -EPROBE_DEFER)
++			if (PTR_ERR(phy->vbus) == -EPROBE_DEFER) {
++				dev_err(dev,
++					"Couldn't get regulator %s... Deferring probe\n",
++					name);
+ 				return -EPROBE_DEFER;
++			}
++
+ 			phy->vbus = NULL;
+ 		}
+ 
+@@ -754,6 +767,8 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 		return PTR_ERR(phy_provider);
+ 	}
+ 
++	dev_dbg(dev, "successfully loaded\n");
++
+ 	return 0;
+ }
+ 
+-- 
+2.9.3
