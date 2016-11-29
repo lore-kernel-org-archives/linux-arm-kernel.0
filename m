@@ -1,53 +1,39 @@
-From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
-Date: Tue, 29 Nov 2016 12:54:24 -0500
-Subject: [PATCH 2/2] net: dsa: mv88e6xxx: Add 88E6176 device tree support
-In-Reply-To: <2c59cc79-b6dc-9920-1725-a7785ff3b6bf@kleine-koenig.org>
-References: <1480280279-9552-1-git-send-email-afaerber@suse.de>
- <1480280279-9552-2-git-send-email-afaerber@suse.de>
- <20161127212709.GD13318@lunn.ch>
- <9500470d-09c3-3ecb-994b-3d108bffc99e@suse.de>
- <20161127220846.GH13318@lunn.ch>
- <e5d45b55-a4c1-3b5e-0bdc-a5e340b072d0@suse.de>
- <20161127231009.GA17704@lunn.ch>
- <20161128080939.ippqlytvojitefkp@perseus.defre.kleine-koenig.org>
- <20161128131735.GA4379@lunn.ch>
- <2c59cc79-b6dc-9920-1725-a7785ff3b6bf@kleine-koenig.org>
-Message-ID: <87oa0yb29b.fsf@ketchup.i-did-not-set--mail-host-address--so-tickle-me>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Nov 2016 17:59:20 +0000
+Subject: [PATCH 1/2] ARM: mm: fix set_memory_*() bounds checks
+In-Reply-To: <24932a5a-4cbf-dd84-2e87-de29b07da5b3@ti.com>
+References: <E1c8r91-0007wL-Fl@rmk-PC.armlinux.org.uk>
+ <24932a5a-4cbf-dd84-2e87-de29b07da5b3@ti.com>
+Message-ID: <20161129175920.GZ14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Nov 29, 2016 at 09:25:19AM -0600, Dave Gerlach wrote:
+> Hi,
+> On 11/21/2016 10:08 AM, Russell King wrote:
+> >+static bool in_range(unsigned long start, unsigned long size,
+> >+	unsigned long range_start, unsigned long range_end)
+> >+{
+> >+	return start >= range_start && start < range_end &&
+> >+		size <= range_end - start;
+> >+}
+> >+
+> > static int change_memory_common(unsigned long addr, int numpages,
+> > 				pgprot_t set_mask, pgprot_t clear_mask)
+> > {
+> >-	unsigned long start = addr;
+> >-	unsigned long size = PAGE_SIZE*numpages;
+> >-	unsigned long end = start + size;
+> >+	unsigned long start = addr & PAGE_SIZE;
+> 
+> This doesn't work as is, I believe 'start' should be set to
+> PAGE_ALIGN(addr), addr & PAGE_SIZE as it is doesn't make sense. If I make
+> this change this code works ok.
 
-Uwe Kleine-K?nig <uwe@kleine-koenig.org> writes:
+You're right, but we want to round 'addr' _down_, not up as PAGE_ALIGN()
+will do.  So that should've been PAGE_MASK.
 
-> Also it seems wrong to write "marvell,mv88e6085" (only) if I know the
-> hardware is really a "marvell,mv88e6176".
-
-I agree. It might be complex for a user to dig into the driver in order
-to figure out how the switch ID is read and which compatible to choose.
-
-I've sent a patch to change this https://lkml.org/lkml/2016/6/8/1198 but
-Andrew had a stronger opinion on compatible strings, which makes sense.
-
->> Linus has said he does not like ARM devices because of all the busses
->> which are not enumerable. Here we have a device which with a little
->> bit of help we can enumerate. So we should. 
->
-> If you write
->
-> 	compatible = "marvell,mv88e6176", "marvell,mv88e6085";
->
-> you can still enumerate in the same way as before.
-
-So we don't break the existing DTS files, I like this.
-
-The driver already prints info about the detected switch. Instead of
-failing at probe, which seems against the notion of compatible and
-breaks the existing behavior, it could report the eventual mismatch?
-
-We have examples for both usage, still I don't know what the best
-practices are. My _preference_ would go with enumerating them all.
-
-Thanks,
-
-        Vivien
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
