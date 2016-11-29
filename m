@@ -1,96 +1,62 @@
-From: ahaslam@baylibre.com (Axel Haslam)
-Date: Tue, 29 Nov 2016 17:36:05 +0100
-Subject: [PATCH] ARM: davinci: da8xx: Fix sleeping function called from
- invalid context
-In-Reply-To: <1a24c04b-8c7e-9e6c-eada-0c5a0a6c8881@lechnology.com>
-References: <1480350566-26225-1-git-send-email-abailon@baylibre.com>
- <36a2e5e1-e7b7-2ca0-0484-98636771ec65@ti.com>
- <b2ddb9ed-2cf8-da93-6aba-e77ea0eea006@baylibre.com>
- <aac017b2-fc5b-6773-46b3-fd797dc904a6@ti.com>
- <1a24c04b-8c7e-9e6c-eada-0c5a0a6c8881@lechnology.com>
-Message-ID: <CAKXjFTNbxB8gLRoSTeihL5OC8eWYgOibJyGMQ4FeCBviWdRSLQ@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 29 Nov 2016 10:43:06 -0600
+Subject: [PATCH 2/2] ARM: omap: timers: reduce rating of gp_timer
+ clocksource
+In-Reply-To: <1479968355-18860-2-git-send-email-j-keerthy@ti.com>
+References: <1479968355-18860-1-git-send-email-j-keerthy@ti.com>
+ <1479968355-18860-2-git-send-email-j-keerthy@ti.com>
+Message-ID: <d3a71d3d-3015-bb1f-80a4-4bb9adecaa4c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 5:22 PM, David Lechner <david@lechnology.com> wrote:
-> On 11/29/2016 06:34 AM, Sekhar Nori wrote:
->>
->> On Tuesday 29 November 2016 04:46 PM, Alexandre Bailon wrote:
->>>
->>> On 11/29/2016 11:48 AM, Sekhar Nori wrote:
->>>>
->>>> On Monday 28 November 2016 09:59 PM, Alexandre Bailon wrote:
->>>>>
->>>>> Everytime the usb20 phy is enabled, there is a
->>>>> "sleeping function called from invalid context" BUG.
->>>>
->>>>
->>>> Who calls PHY clk_enable() from non-preemptible context? Can you provide
->>>> the call stack?
->>>
->>> Actually, clk_enable() is called from preemptible context (from phy
->>> driver) but it disables interrupts before to call the clk_enable()
->>> callback.
->>> I attached the call stack that is probably more understandable than
->>> my explanation.
->>
->>
->> Thanks! So this happens due to spin_lock_irqsave() in clk_enable() in
->> arch/arm/mach-davinci/clock.c. Can you add reference to this in your
->> commit description.
->>
->> Also +David since this issue should have shown up since the time this
->> code was added.
->
->
-> I'm not trying to pass the blame, but it was actually Axel that added the
-> clk_get() code, so it will be good if he knows about the issue too. :-)
->
-> I don't think I have been building kernels with any of the kernel hacking
-> options turned on, so I will start doing this to make sure we catch bugs
-> like this.
->
-
-Yes, sorry i missed this. i did not have that option enabled, and did
-not catch this, thanks Alex!
 
 
->>
->>>>>                 pr_err("could not get usb20 clk: %ld\n",
->>>>> PTR_ERR(usb20_clk));
->>>>>                 return;
->>>>>         }
->>>>>
->>>>>         /* The USB 2.O PLL requires that the USB 2.O PSC is enabled as
->>>>> well. */
->>>>> -       err = clk_prepare_enable(usb20_clk);
->>>>> +       err = clk_enable(usb20_clk);
->>>>>         if (err) {
->>>>>                 pr_err("failed to enable usb20 clk: %d\n", err);
->>>>>                 clk_put(usb20_clk);
->>>>> @@ -197,8 +197,7 @@ static void usb20_phy_clk_enable(struct clk *clk)
->>>>>
->>>>>         pr_err("Timeout waiting for USB 2.0 PHY clock good\n");
->>>>>  done:
->>>>> -       clk_disable_unprepare(usb20_clk);
->>>>> -       clk_put(usb20_clk);
->>>>> +       clk_disable(usb20_clk);
->>>>
->>>>
->>>>
->>>> I noticed that we are missing clk_disable(usb20_clk) in
->>>> usb20_phy_clk_disable(). It will now be easier to do that after this
->>>> patch. Can you add that in a separate patch?
->>>>
->>> I don't think we need it.
->>> What we don't see in this patch is that usb20_clk is enabled and,
->>> it is disabled right after the PHY PLL is ready in
->>> usb20_phy_clk_enable().
->>
->>
->> Agreed.
->>
->> Thanks,
->> Sekhar
->>
+On 11/24/2016 12:19 AM, Keerthy wrote:
+> From: Grygorii Strashko <grygorii.strashko@ti.com>
 >
+> Now ARM Global timer (rating 300) will not be selected as clocksource,
+> because it's initialized after OMAP GP Timer (rating 300) and
+> Timekeeping core will not allow to replace clocksource with new one if
+> both of them have the same rating.
+>
+> Reduce rating of OMAP GP Timer (300->290) when it's used as
+> clocksource device - this will allow to select ARM Global timer (300)
+> as clocksource when enabled.
+>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+
+Unfortunately, this patch has dependency [1] and can't be used alone as
+it will cause ARM Global timer to be selected as clocksource
+always on am437x and this will kill cpuidle, because ARM Global timer
+is not in always_on domain.
+
+The intention of enabling ARM Global timer is only for non-pm aware use
+cases for RT-kernel latency improvement - where deep cpuidle states are 
+not enabled.
+
+[1] https://patchwork.kernel.org/patch/8940051/
+
+> ---
+>  arch/arm/mach-omap2/timer.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index b2f2448..a0dbb0b 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -376,7 +376,7 @@ static cycle_t clocksource_read_cycles(struct clocksource *cs)
+>  }
+>
+>  static struct clocksource clocksource_gpt = {
+> -	.rating		= 300,
+> +	.rating		= 290,
+>  	.read		= clocksource_read_cycles,
+>  	.mask		= CLOCKSOURCE_MASK(32),
+>  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+>
+
+-- 
+regards,
+-grygorii
