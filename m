@@ -1,94 +1,69 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Nov 2016 20:46:22 +0200
-Subject: [PATCH v7 4/8] drm/sunxi: Add DT bindings documentation of
- Allwinner HDMI
-In-Reply-To: <cd1caff75b6069af98680f78d672546748cb43c5.1480414715.git.moinejf@free.fr>
-References: <cover.1480414715.git.moinejf@free.fr>
- <cd1caff75b6069af98680f78d672546748cb43c5.1480414715.git.moinejf@free.fr>
-Message-ID: <5996605.Gh0PjPIAcn@avalon>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue, 29 Nov 2016 10:55:19 -0800
+Subject: [PATCHv4 00/10] CONFIG_DEBUG_VIRTUAL for arm64
+Message-ID: <1480445729-27130-1-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Fran?ois,
 
-Thank you for the patch.
+Hi,
 
-On Tuesday 29 Nov 2016 10:08:25 Jean-Francois Moine wrote:
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> ---
->  .../devicetree/bindings/display/sunxi/hdmi.txt     | 56 +++++++++++++++++++
->  1 file changed, 56 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/sunxi/hdmi.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/display/sunxi/hdmi.txt
-> b/Documentation/devicetree/bindings/display/sunxi/hdmi.txt new file mode
-> 100644
-> index 0000000..1e107cb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/sunxi/hdmi.txt
-> @@ -0,0 +1,56 @@
-> +Allwinner HDMI Transmitter
-> +==========================
-> +
-> +The Allwinner HDMI transmitters are included in the SoCs.
-> +They support audio and video.
-> +
-> +Required properties:
-> + - compatible : should be one of
-> +		"allwinner,sun8i-a83t-hdmi"
-> +		"allwinner,sun8i-h3-hdmi"
-> + - reg: base address and size of the I/O memory
-> + - clocks : phandles to the HDMI clocks as described in
-> +	Documentation/devicetree/bindings/clock/clock-bindings.txt
-> + - clock-names : must be
-> +		"bus" : bus gate
-> +		"clock" : streaming clock
-> +		"ddc-clock" : DDC clock
-> + - resets : One or two phandles to the HDMI resets
-> + - reset-names : when 2 phandles, must be
-> +		"hdmi0" and "hdmi1"
-> + - #address-cells : should be <1>
-> + - #size-cells : should be <0>
-> +
-> +Required nodes:
-> + - port: Audio and video input port nodes with endpoint definitions
-> +	as defined in Documentation/devicetree/bindings/graph.txt.
-> +	port at 0 is video and port at 1 is audio.
-> +
-> +Example:
-> +
-> +	hdmi: hdmi at 01ee0000 {
-> +		compatible = "allwinner,sun8i-a83t-hdmi";
-> +		reg = <0x01ee0000 0x20000>;
-> +		clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI>,
-> +			 <&ccu CLK_HDMI_DDC>;
-> +		clock-names = "bus", "clock", "ddc-clock";
-> +		resets = <&ccu RST_HDMI0>, <&ccu RST_HDMI1>;
-> +		reset-names = "hdmi0", "hdmi1";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&hdmi_pins_a>;
-> +		status = "disabled";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		port at 0 {			/* video */
-> +			reg = <0>;
-> +			hdmi_tcon1: endpoint {
-> +				remote-endpoint = <&tcon1_hdmi>;
-> +			};
-> +		};
-> +		port at 1 {			/* audio */
-> +			reg = <1>;
-> +			hdmi_i2s2: endpoint {
-> +				remote-endpoint = <&i2s2_hdmi>;
-> +			};
-> +		};
+This is v4 of the series to add CONFIG_DEBUG_VIRTUAL for arm64. This mostly
+expanded on __pa_symbol conversion with a few new sites found. There's also
+some reworking done to avoid calling __va too early. __va relies on having
+memstart_addr set so very early code in early_fixmap_init and early KASAN
+initialization can't just call __va(__Ipa_symbol(...)) to get the linear map
+alias. I found this while testing with DEBUG_VM.
 
-You need a third port for the HDMI encoder output, connected to an HDMI 
-connector DT node.
+All of this could use probably use more testing under more configurations.
+KVM, Xen, kexec, hibernate should all be tested.
 
-> +	};
+Thanks,
+Laura
+
+Laura Abbott (10):
+  lib/Kconfig.debug: Add ARCH_HAS_DEBUG_VIRTUAL
+  mm/cma: Cleanup highmem check
+  arm64: Move some macros under #ifndef __ASSEMBLY__
+  arm64: Add cast for virt_to_pfn
+  arm64: Use __pa_symbol for kernel symbols
+  xen: Switch to using __pa_symbol
+  kexec: Switch to __pa_symbol
+  mm/kasan: Switch to using __pa_symbol and lm_alias
+  mm/usercopy: Switch to using lm_alias
+  arm64: Add support for CONFIG_DEBUG_VIRTUAL
+
+ arch/arm64/Kconfig                        |  1 +
+ arch/arm64/include/asm/kvm_mmu.h          |  4 +-
+ arch/arm64/include/asm/memory.h           | 67 ++++++++++++++++++++++---------
+ arch/arm64/include/asm/mmu_context.h      |  6 +--
+ arch/arm64/include/asm/pgtable.h          |  2 +-
+ arch/arm64/kernel/acpi_parking_protocol.c |  2 +-
+ arch/arm64/kernel/cpu-reset.h             |  2 +-
+ arch/arm64/kernel/cpufeature.c            |  2 +-
+ arch/arm64/kernel/hibernate.c             | 13 +++---
+ arch/arm64/kernel/insn.c                  |  2 +-
+ arch/arm64/kernel/psci.c                  |  2 +-
+ arch/arm64/kernel/setup.c                 |  8 ++--
+ arch/arm64/kernel/smp_spin_table.c        |  2 +-
+ arch/arm64/kernel/vdso.c                  |  4 +-
+ arch/arm64/mm/Makefile                    |  2 +
+ arch/arm64/mm/init.c                      | 11 ++---
+ arch/arm64/mm/kasan_init.c                | 21 ++++++----
+ arch/arm64/mm/mmu.c                       | 32 +++++++++------
+ arch/arm64/mm/physaddr.c                  | 28 +++++++++++++
+ arch/x86/Kconfig                          |  1 +
+ drivers/firmware/psci.c                   |  2 +-
+ drivers/xen/xenbus/xenbus_dev_backend.c   |  2 +-
+ drivers/xen/xenfs/xenstored.c             |  2 +-
+ include/linux/mm.h                        |  4 ++
+ kernel/kexec_core.c                       |  2 +-
+ lib/Kconfig.debug                         |  5 ++-
+ mm/cma.c                                  | 15 +++----
+ mm/kasan/kasan_init.c                     | 12 +++---
+ mm/usercopy.c                             |  4 +-
+ 29 files changed, 167 insertions(+), 93 deletions(-)
+ create mode 100644 arch/arm64/mm/physaddr.c
 
 -- 
-Regards,
-
-Laurent Pinchart
+2.7.4
