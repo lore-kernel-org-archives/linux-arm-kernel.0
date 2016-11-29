@@ -1,69 +1,38 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 29 Nov 2016 15:03:43 +0100
-Subject: [PATCH] USB: OHCI: use module_platform_driver macro
-In-Reply-To: <1479822562-18719-1-git-send-email-csmanjuvijay@gmail.com>
-References: <1479822562-18719-1-git-send-email-csmanjuvijay@gmail.com>
-Message-ID: <20161129140343.GB3605@kroah.com>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Tue, 29 Nov 2016 17:05:19 +0300
+Subject: [PATCH] clocksource/arm_global_timer: reconfigure clockevents
+ after cpufreq change
+In-Reply-To: <alpine.DEB.2.20.1611291432290.4358@nanos>
+References: <1480421716-30782-1-git-send-email-al.kochet@gmail.com>
+ <1480421716-30782-2-git-send-email-al.kochet@gmail.com>
+ <alpine.DEB.2.20.1611291432290.4358@nanos>
+Message-ID: <2F6A5074-F54E-4B16-AB3D-DE7301E363FC@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2016 at 01:49:22PM +0000, csmanjuvijay at gmail.com wrote:
-> From: Manjunath Goudar <csmanjuvijay@gmail.com>
+Hello Thomas!
+
+> 29 ????. 2016 ?., ? 16:42, Thomas Gleixner <tglx@linutronix.de> ???????(?):
 > 
-> Use the module_platform_driver macro to do module init/exit.
-> This eliminates a lot of boilerplate.This also removes
-> checkpatch.pl errors.
+> The frequency change would not only affect the clockevent device, it also
+> would affect the clocksource. So the patch is incomplete, but see below.
+Looks like kernel disallow change clocksource and shed_clock rate at
+runtime. I haven?t found any function for that.
+
+> 29 ????. 2016 ?., ? 16:42, Thomas Gleixner <tglx@linutronix.de> ???????(?):
 > 
-> Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Vladimir Zapolskiy <vz@mleia.com>
-> Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-usb at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/usb/host/ohci-nxp.c | 38 ++++++++++++++------------------------
->  1 file changed, 14 insertions(+), 24 deletions(-)
-> 
-> diff --git a/drivers/usb/host/ohci-nxp.c b/drivers/usb/host/ohci-nxp.c
-> index b7d4756..9908647 100644
-> --- a/drivers/usb/host/ohci-nxp.c
-> +++ b/drivers/usb/host/ohci-nxp.c
-> @@ -56,8 +56,6 @@ static struct hc_driver __read_mostly ohci_nxp_hc_driver;
->  
->  static struct i2c_client *isp1301_i2c_client;
->  
-> -extern int usb_disabled(void);
-> -
->  static struct clk *usb_host_clk;
->  
->  static void isp1301_configure_lpc32xx(void)
-> @@ -127,6 +125,7 @@ static inline void isp1301_vbus_off(void)
->  static void ohci_nxp_start_hc(void)
->  {
->  	unsigned long tmp = __raw_readl(USB_OTG_STAT_CONTROL) | HOST_EN;
-> +
->  	__raw_writel(tmp, USB_OTG_STAT_CONTROL);
->  	isp1301_vbus_on();
->  }
-> @@ -134,6 +133,7 @@ static void ohci_nxp_start_hc(void)
->  static void ohci_nxp_stop_hc(void)
->  {
->  	unsigned long tmp;
-> +
->  	isp1301_vbus_off();
->  	tmp = __raw_readl(USB_OTG_STAT_CONTROL) & ~HOST_EN;
->  	__raw_writel(tmp, USB_OTG_STAT_CONTROL);
+> That's broken and the clk framework should keep the CORE_PERI clock at a
+> constant rate by reprogramming the divider of the CPU clock.
 
-Why make these last two changes?  They are just coding style "fixups"
-that have nothing to do with this patch :(
+Thank you for the hint.
 
-When you say "also" in a patch description, that's a huge flag that you
-should be splitting the patch up into multiple patches.  Please do so
-here.
+> Assumptions w/o real impact are a perfect reason not to apply that
+> patch. This want's a proper proof that the global timer really changes and
+> this hackery is required, which I seriously doubt.
 
-thanks,
+It really changes. It changes like it changes for smp-twd. I guess they are
+driven by same clock CORE_PERI.
 
-greg k-h
+Thank you for help.
+
+Alexander.
