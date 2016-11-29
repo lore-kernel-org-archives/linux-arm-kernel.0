@@ -1,47 +1,65 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Tue, 29 Nov 2016 16:08:08 +0100
-Subject: [PATCH 4/5] arm64: dts: marvell: Add definition of SPI controller
- for Armada 3700
-In-Reply-To: <20161129155129.6f3c76b6@free-electrons.com>
-References: <20161129143939.3191-1-romain.perier@free-electrons.com>
- <20161129143939.3191-5-romain.perier@free-electrons.com>
- <20161129155129.6f3c76b6@free-electrons.com>
-Message-ID: <0120e795-f1bb-6614-bdc7-22dbb9ab9f35@free-electrons.com>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Tue, 29 Nov 2016 10:14:22 -0500
+Subject: [PATCH V7 0/3] irqchip: qcom: Add IRQ combiner driver
+In-Reply-To: <4126fa80-c8da-764f-9ea3-ec9966a19ea9@linaro.org>
+References: <1479074375-2629-1-git-send-email-agustinv@codeaurora.org>
+ <4126fa80-c8da-764f-9ea3-ec9966a19ea9@linaro.org>
+Message-ID: <467d339ba4998e74d7951cf424c055e4@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Hanjun,
 
-Le 29/11/2016 ? 15:51, Thomas Petazzoni a ?crit :
+On 2016-11-29 06:31, Hanjun Guo wrote:
+> Hi Agustin,
+> 
+> On 2016/11/14 5:59, Agustin Vega-Frias wrote:
+>> Add support for IRQ combiners in the Top-level Control and Status
+>> Registers (TCSR) hardware block in Qualcomm Technologies chips.
+>> 
+>> The first patch fixes IRQ probe deferral by allowing platform_device
+>> IRQ resources to be re-initialized if the ACPI core failed to find
+>> the IRQ domain during ACPI bus scan.
+>> 
+>> The second patch adds support for ResourceSource/IRQ domain mapping
+>> when using Extended IRQ Resources with a specific ResourceSource.
+>> These changes are conditional on the ACPI_GENERIC_GSI config.
+>> 
+>> The third patch takes advantage of the new capabilities to implement
+>> the driver for the IRQ combiners.
+>> 
+>> Tested on top of v4.9-rc4.
+>> 
+>> Changes V6 -> V7:
+>> * Consolidate changes for ResourceSource/IRQ domain mapping to the 
+>> same
+>>   source file implementing the generic GSI support, making it 
+>> conditional
+>>   on CONFIG_ACPI_GENERIC_GSI.
+>> * Eliminate some code duplication by implementing acpi_register_gsi in
+>>   terms of the new acpi_register_irq API.
+> 
+> I had a test on Hisilicon D03 which needs patch 1 and 2 in this patch
+> set to enable the mbigen irqchip, and it works pretty good.
+> 
+> Patch 1/3 can remove the device dependency for the irqchip and platform
+> devices, and I removed my patch (ACPI: irq: introduce interrupt
+> producer) then add your patch 2/3, devices such as SAS and native
+> network works fine on my D03.
 
->
->> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
->> index e9bd587..84e4f57 100644
->> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
->> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
->> @@ -98,6 +98,19 @@
->>  			/* 32M internal register @ 0xd000_0000 */
->>  			ranges = <0x0 0x0 0xd0000000 0x2000000>;
->>
->> +			spi0: spi at 10600 {
->> +				compatible = "marvell,armada-3700-spi";
->> +				#address-cells = <1>;
->> +				#size-cells = <0>;
->> +				reg = <0x10600 0x5d>;
->> +				clocks = <&nb_periph_clk 7>;
->> +				clock-frequency = <200000000>;
->
-> This property.
->
->> +				interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
->> +				max-frequency = <66000000>;
->
-> And this one no longer exist in your DT binding, so I guess they should
-> be removed from here as well.
->
+Thanks for testing. I will submit V8 with some of the changes suggested
+by Lorenzo hopefully later today.
 
-Good point, I was pretty sure that I have removed these.
-I probably did something wrong with my rebase.
+Agustin
 
-Thanks,
-Romain
+> 
+> I will comment on the patches later.
+> 
+> Thanks
+> Hanjun
+
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+Linux Foundation Collaborative Project.
