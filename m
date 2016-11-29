@@ -1,41 +1,85 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 29 Nov 2016 17:26:02 +0000
-Subject: [PATCH 16/22] arm64/cpuinfo: Convert to hotplug state machine
-In-Reply-To: <20161126231350.10321-17-bigeasy@linutronix.de>
-References: <20161126231350.10321-1-bigeasy@linutronix.de>
- <20161126231350.10321-17-bigeasy@linutronix.de>
-Message-ID: <ca0da1d4-0034-c3cd-58d9-766df487a694@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 Nov 2016 17:28:22 +0000
+Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.10
+Message-ID: <20161129172822.GI30283@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/11/16 23:13, Sebastian Andrzej Siewior wrote:
-> From: Anna-Maria Gleixner <anna-maria@linutronix.de>
->
-> Install the callbacks via the state machine and let the core invoke
-> the callbacks on the already online CPUs.
->
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> ---
->  arch/arm64/kernel/cpuinfo.c | 37 +++++++++----------------------------
->  1 file changed, 9 insertions(+), 28 deletions(-)
->
-> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> index 19aad7041e14..7b7be71e87bf 100644
-> --- a/arch/arm64/kernel/cpuinfo.c
-> +++ b/arch/arm64/kernel/cpuinfo.c
-> @@ -227,7 +227,7 @@ static struct attribute_group cpuregs_attr_group = {
-...
-> +	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "arm64/cpuinfo:online",
-> +				cpuid_cpu_online, cpuid_cpu_offline);
-> +	if (ret < 0) {
-> +		pr_err("cpuinfo: failed to register hotplug callbacks.\n");
-> +		return ret;
-> +	}
->  	return 0;
->  }
+Hi Joerg,
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Please pull these arm-smmu updates for 4.10. The bulk of the changes here
+are the IORT support from Lorenzo, which also touches ACPI and PCI core
+code. Rafael and Bjorn have acked the relevant changes, but it makes sense
+to send it via you to avoid conflicts with the ARM SMMU drivers, which are
+modified to work with ACPI-based probing.
+
+The other changes are largely cosmetic (constification and cleanup), but
+the MMU-500 configuration change from Nipun results in a hefty performance
+boost in bypass mode.
+
+Thanks,
+
+Will
+
+--->8
+
+The following changes since commit a25f0944ba9b1d8a6813fd6f1a86f1bd59ac25a6:
+
+  Linux 4.9-rc5 (2016-11-13 10:32:32 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
+
+for you to fetch changes up to 643b8e4d86f8b1a62cf5cd9ea221e9bc0d531d18:
+
+  ACPI/IORT: Introduce iort_iommu_configure (2016-11-29 15:57:48 +0000)
+
+----------------------------------------------------------------
+Bhumika Goyal (3):
+      iommu/arm-smmu: Constify iommu_gather_ops structures
+      iommu/arm-smmu: Constify iommu_gather_ops structures
+      iommu/io-pgtable-arm: Use const and __initconst for iommu_gather_ops structures
+
+Kefeng Wang (1):
+      iommu/io-pgtable-arm: Use for_each_set_bit to simplify the code
+
+Lorenzo Pieralisi (16):
+      ACPI: Add FWNODE_ACPI_STATIC fwnode type
+      ACPI/IORT: Introduce linker section for IORT entries probing
+      ACPI/IORT: Add support for IOMMU fwnode registration
+      iommu: Make of_iommu_set/get_ops() DT agnostic
+      iommu/arm-smmu: Convert struct device of_node to fwnode usage
+      iommu/arm-smmu-v3: Convert struct device of_node to fwnode usage
+      ACPI: Implement acpi_dma_configure
+      ACPI/IORT: Add node match function
+      ACPI/IORT: Add support for ARM SMMU platform devices creation
+      iommu/arm-smmu-v3: Split probe functions into DT/generic portions
+      iommu/arm-smmu-v3: Add IORT configuration
+      iommu/arm-smmu: Split probe functions into DT/generic portions
+      iommu/arm-smmu: Add IORT configuration
+      ACPI/IORT: Replace rid map type with type mask
+      ACPI/IORT: Add single mapping function
+      ACPI/IORT: Introduce iort_iommu_configure
+
+Nipun Gupta (1):
+      iommu/arm-smmu: Set SMTNMB_TLBEN in ACR to enable caching of bypass entries
+
+ drivers/acpi/arm64/iort.c          | 585 ++++++++++++++++++++++++++++++++++++-
+ drivers/acpi/glue.c                |   4 +-
+ drivers/acpi/scan.c                |  45 +++
+ drivers/iommu/arm-smmu-v3.c        | 104 +++++--
+ drivers/iommu/arm-smmu.c           | 175 ++++++++---
+ drivers/iommu/io-pgtable-arm-v7s.c |   5 +-
+ drivers/iommu/io-pgtable-arm.c     |   7 +-
+ drivers/iommu/iommu.c              |  40 +++
+ drivers/iommu/of_iommu.c           |  39 ---
+ drivers/pci/probe.c                |   3 +-
+ include/acpi/acpi_bus.h            |   2 +
+ include/asm-generic/vmlinux.lds.h  |   1 +
+ include/linux/acpi.h               |  26 ++
+ include/linux/acpi_iort.h          |  14 +
+ include/linux/fwnode.h             |   3 +-
+ include/linux/iommu.h              |  14 +
+ include/linux/of_iommu.h           |  12 +-
+ 17 files changed, 955 insertions(+), 124 deletions(-)
