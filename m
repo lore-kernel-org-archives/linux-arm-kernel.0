@@ -1,109 +1,75 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Tue, 29 Nov 2016 19:14:49 +0300
-Subject: [PATCH v4 6/9] clocksource/drivers/rockchip_timer: split bc_timer
- into rk_timer and rk_clock_event_device
-In-Reply-To: <1480436092-10728-1-git-send-email-al.kochet@gmail.com>
-References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
- <1480436092-10728-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1480436092-10728-7-git-send-email-al.kochet@gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 29 Nov 2016 10:22:25 -0600
+Subject: [PATCH] ARM: davinci: da8xx: Fix sleeping function called from
+ invalid context
+In-Reply-To: <aac017b2-fc5b-6773-46b3-fd797dc904a6@ti.com>
+References: <1480350566-26225-1-git-send-email-abailon@baylibre.com>
+ <36a2e5e1-e7b7-2ca0-0484-98636771ec65@ti.com>
+ <b2ddb9ed-2cf8-da93-6aba-e77ea0eea006@baylibre.com>
+ <aac017b2-fc5b-6773-46b3-fd797dc904a6@ti.com>
+Message-ID: <1a24c04b-8c7e-9e6c-eada-0c5a0a6c8881@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch move ce field out of struct bc_timer into struct
-rk_clock_event_device and rename struct bc_timer to struct rk_timer.
+On 11/29/2016 06:34 AM, Sekhar Nori wrote:
+> On Tuesday 29 November 2016 04:46 PM, Alexandre Bailon wrote:
+>> On 11/29/2016 11:48 AM, Sekhar Nori wrote:
+>>> On Monday 28 November 2016 09:59 PM, Alexandre Bailon wrote:
+>>>> Everytime the usb20 phy is enabled, there is a
+>>>> "sleeping function called from invalid context" BUG.
+>>>
+>>> Who calls PHY clk_enable() from non-preemptible context? Can you provide
+>>> the call stack?
+>> Actually, clk_enable() is called from preemptible context (from phy
+>> driver) but it disables interrupts before to call the clk_enable()
+>> callback.
+>> I attached the call stack that is probably more understandable than
+>> my explanation.
+>
+> Thanks! So this happens due to spin_lock_irqsave() in clk_enable() in
+> arch/arm/mach-davinci/clock.c. Can you add reference to this in your
+> commit description.
+>
+> Also +David since this issue should have shown up since the time this
+> code was added.
 
-This is refactoring step without functional changes.
+I'm not trying to pass the blame, but it was actually Axel that added 
+the clk_get() code, so it will be good if he knows about the issue too. :-)
 
-Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
----
- drivers/clocksource/rockchip_timer.c |   33 ++++++++++++++++++++++-----------
- 1 file changed, 22 insertions(+), 11 deletions(-)
+I don't think I have been building kernels with any of the kernel 
+hacking options turned on, so I will start doing this to make sure we 
+catch bugs like this.
 
-diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
-index 23e267a..6d68d4c 100644
---- a/drivers/clocksource/rockchip_timer.c
-+++ b/drivers/clocksource/rockchip_timer.c
-@@ -29,18 +29,28 @@
- #define TIMER_MODE_USER_DEFINED_COUNT		(1 << 1)
- #define TIMER_INT_UNMASK			(1 << 2)
- 
--struct bc_timer {
--	struct clock_event_device ce;
-+struct rk_timer {
- 	void __iomem *base;
- 	void __iomem *ctrl;
- 	u32 freq;
- };
- 
--static struct bc_timer bc_timer;
-+struct rk_clock_event_device {
-+	struct clock_event_device ce;
-+	struct rk_timer timer;
-+};
-+
-+static struct rk_clock_event_device bc_timer;
-+
-+static inline struct rk_clock_event_device*
-+rk_clock_event_device(struct clock_event_device *ce)
-+{
-+	return container_of(ce, struct rk_clock_event_device, ce);
-+}
- 
--static inline struct bc_timer *rk_timer(struct clock_event_device *ce)
-+static inline struct rk_timer *rk_timer(struct clock_event_device *ce)
- {
--	return container_of(ce, struct bc_timer, ce);
-+	return &rk_clock_event_device(ce)->timer;
- }
- 
- static inline void __iomem *rk_base(struct clock_event_device *ce)
-@@ -116,16 +126,17 @@ static irqreturn_t rk_timer_interrupt(int irq, void *dev_id)
- static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
- {
- 	struct clock_event_device *ce = &bc_timer.ce;
-+	struct rk_timer *timer = &bc_timer.timer;
- 	struct clk *timer_clk;
- 	struct clk *pclk;
- 	int ret = -EINVAL, irq;
- 
--	bc_timer.base = of_iomap(np, 0);
--	if (!bc_timer.base) {
-+	timer->base = of_iomap(np, 0);
-+	if (!timer->base) {
- 		pr_err("Failed to get base address for '%s'\n", TIMER_NAME);
- 		return -ENXIO;
- 	}
--	bc_timer.ctrl = bc_timer.base + ctrl_reg;
-+	timer->ctrl = timer->base + ctrl_reg;
- 
- 	pclk = of_clk_get_by_name(np, "pclk");
- 	if (IS_ERR(pclk)) {
-@@ -153,7 +164,7 @@ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
- 		goto out_timer_clk;
- 	}
- 
--	bc_timer.freq = clk_get_rate(timer_clk);
-+	timer->freq = clk_get_rate(timer_clk);
- 
- 	irq = irq_of_parse_and_map(np, 0);
- 	if (!irq) {
-@@ -181,7 +192,7 @@ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
- 		goto out_irq;
- 	}
- 
--	clockevents_config_and_register(ce, bc_timer.freq, 1, UINT_MAX);
-+	clockevents_config_and_register(ce, timer->freq, 1, UINT_MAX);
- 
- 	return 0;
- 
-@@ -190,7 +201,7 @@ out_irq:
- out_timer_clk:
- 	clk_disable_unprepare(pclk);
- out_unmap:
--	iounmap(bc_timer.base);
-+	iounmap(timer->base);
- 
- 	return ret;
- }
--- 
-1.7.9.5
+>
+>>>>  		pr_err("could not get usb20 clk: %ld\n", PTR_ERR(usb20_clk));
+>>>>  		return;
+>>>>  	}
+>>>>
+>>>>  	/* The USB 2.O PLL requires that the USB 2.O PSC is enabled as well. */
+>>>> -	err = clk_prepare_enable(usb20_clk);
+>>>> +	err = clk_enable(usb20_clk);
+>>>>  	if (err) {
+>>>>  		pr_err("failed to enable usb20 clk: %d\n", err);
+>>>>  		clk_put(usb20_clk);
+>>>> @@ -197,8 +197,7 @@ static void usb20_phy_clk_enable(struct clk *clk)
+>>>>
+>>>>  	pr_err("Timeout waiting for USB 2.0 PHY clock good\n");
+>>>>  done:
+>>>> -	clk_disable_unprepare(usb20_clk);
+>>>> -	clk_put(usb20_clk);
+>>>> +	clk_disable(usb20_clk);
+>>>
+>>>
+>>> I noticed that we are missing clk_disable(usb20_clk) in
+>>> usb20_phy_clk_disable(). It will now be easier to do that after this
+>>> patch. Can you add that in a separate patch?
+>>>
+>> I don't think we need it.
+>> What we don't see in this patch is that usb20_clk is enabled and,
+>> it is disabled right after the PHY PLL is ready in usb20_phy_clk_enable().
+>
+> Agreed.
+>
+> Thanks,
+> Sekhar
+>
