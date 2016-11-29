@@ -1,124 +1,80 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 29 Nov 2016 10:52:55 +0000
-Subject: [PATCH V10 4/6] arm: arm64: pmu: Assign platform PMU CPU affinity
-In-Reply-To: <1478734793-6341-5-git-send-email-jeremy.linton@arm.com>
-References: <1478734793-6341-1-git-send-email-jeremy.linton@arm.com>
- <1478734793-6341-5-git-send-email-jeremy.linton@arm.com>
-Message-ID: <20161129105255.GD30283@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 29 Nov 2016 10:53:28 +0000
+Subject: [PATCH] KVM: arm/arm64: Access CNTHCTL_EL2 bit fields correctly
+In-Reply-To: <20161129104753.GA15346@cbox>
+References: <1480351570-11648-1-git-send-email-jintack@cs.columbia.edu>
+ <d04fd17e-9157-07fe-4daa-9dbab149b5e6@arm.com>
+ <799d03f5-a929-9547-1ae7-94026b76f116@arm.com> <20161128194221.GG18170@cbox>
+ <c75fe6ae-8ae0-285d-6f47-3e28c7e8f431@arm.com> <20161129104753.GA15346@cbox>
+Message-ID: <cc94fa75-b073-6600-e7b0-d72f4d7e8ca0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2016 at 05:39:51PM -0600, Jeremy Linton wrote:
-> On systems with multiple PMU types the PMU to CPU affinity
-> needs to be detected and set. The CPU to interrupt affinity
-> should also be set.
+On 29/11/16 10:47, Christoffer Dall wrote:
+> On Tue, Nov 29, 2016 at 09:37:07AM +0000, Marc Zyngier wrote:
+>> On 28/11/16 19:42, Christoffer Dall wrote:
+>>> On Mon, Nov 28, 2016 at 06:39:04PM +0000, Marc Zyngier wrote:
+>>>> On 28/11/16 17:43, Marc Zyngier wrote:
+>>>>> Hi Jintack,
+>>>>>
+>>>>> On 28/11/16 16:46, Jintack Lim wrote:
+>>>>>> Bit positions of CNTHCTL_EL2 are changing depending on HCR_EL2.E2H bit.
+>>>>>> EL1PCEN and EL1PCTEN are 1st and 0th bits when E2H is not set, but they
+>>>>>> are 11th and 10th bits respectively when E2H is set.  Current code is
+>>>>>> unintentionally setting wrong bits to CNTHCTL_EL2 with E2H set, which
+>>>>>> may allow guest OS to access physical timer. So, fix it.
+>>>>>>
+>>>>>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+>>>>>> ---
+>>>>>>  arch/arm/include/asm/kvm_timer.h     | 33 +++++++++++++++++++
+>>>>>>  arch/arm64/include/asm/kvm_timer.h   | 62 ++++++++++++++++++++++++++++++++++++
+>>>>>>  include/clocksource/arm_arch_timer.h |  6 ++--
+>>>>>>  virt/kvm/arm/hyp/timer-sr.c          |  8 ++---
+>>>>>>  4 files changed, 103 insertions(+), 6 deletions(-)
+>>>>>>  create mode 100644 arch/arm/include/asm/kvm_timer.h
+>>>>>>  create mode 100644 arch/arm64/include/asm/kvm_timer.h
+>>>>>>
+>>>>
+>>>> [...]
+>>>>
+>>>>> We could make it nicer (read "faster") by introducing a
+>>>>> hyp_alternate_select construct that only returns a value instead
+>>>>> of calling a function. I remember writing something like that
+>>>>> at some point, and dropping it...
+>>>>
+>>>> So here's what this could look like (warning, wacky code ahead,
+>>>> though I fixed a stupid bug that was present in the previous patch).
+>>>> The generated code is quite nice (no branch, only an extra mov
+>>>> instruction on the default path)... Of course, completely untested!
+>>>
+>>> Isn't this all about determining which bitmask to use, statically, once,
+>>> after the system has booted?
+>>>
+>>> How about a good old fashioned static variable, or global struct like
+>>> the global one we use for the VGIC, which sets the proper mit mask
+>>> during kvm init, and the world-switch code just uses a variable?
+>>
+>> We could indeed do that (I've been carried away with my tendency for
+>> weird and wonderful hacks).
+>>
+>> But as Jintack mentioned, there is a much better approach, which is to
+>> do nothing at all on the VHE path (we can set the permission bits once
+>> and for all). cntvoff_el2 also falls into the same category of things we
+>> should be able to only restore and not bother resetting (as it doesn't
+>> affect the EL2 virtual counter).
+>>
+>> Thoughts?
+>>
+> Yes, that sounds much better.
 > 
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->  drivers/perf/arm_pmu.c | 63 ++++++++++++++++++++++++++++++++++++++++++--------
->  1 file changed, 53 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> index b37b572..6008be9 100644
-> --- a/drivers/perf/arm_pmu.c
-> +++ b/drivers/perf/arm_pmu.c
-> @@ -11,6 +11,7 @@
->   */
->  #define pr_fmt(fmt) "hw perfevents: " fmt
->  
-> +#include <linux/acpi.h>
->  #include <linux/bitmap.h>
->  #include <linux/cpumask.h>
->  #include <linux/cpu_pm.h>
-> @@ -24,6 +25,7 @@
->  #include <linux/irq.h>
->  #include <linux/irqdesc.h>
->  
-> +#include <asm/cpu.h>
->  #include <asm/cputype.h>
->  #include <asm/irq_regs.h>
->  
-> @@ -889,25 +891,67 @@ static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
->  }
->  
->  /*
-> - * CPU PMU identification and probing.
-> + * CPU PMU identification and probing. Its possible to have
-> + * multiple CPU types in an ARM machine. Assure that we are
-> + * picking the right PMU types based on the CPU in question
->   */
-> -static int probe_current_pmu(struct arm_pmu *pmu,
-> -			     const struct pmu_probe_info *info)
-> +static int probe_plat_pmu(struct arm_pmu *pmu,
-> +			     const struct pmu_probe_info *info,
-> +			     unsigned int pmuid)
->  {
-> -	int cpu = get_cpu();
-> -	unsigned int cpuid = read_cpuid_id();
->  	int ret = -ENODEV;
-> +	int cpu;
-> +	int aff_ctr = 0;
-> +	static int duplicate_pmus;
-> +	struct platform_device *pdev = pmu->plat_device;
-> +	int irq = platform_get_irq(pdev, 0);
->  
-> -	pr_info("probing PMU on CPU %d\n", cpu);
-> +	if (irq >= 0 && !irq_is_percpu(irq)) {
-> +		pmu->irq_affinity = kcalloc(pdev->num_resources, sizeof(int),
-> +					    GFP_KERNEL);
-> +		if (!pmu->irq_affinity)
-> +			return -ENOMEM;
-> +	}
->  
-> +	for_each_possible_cpu(cpu) {
-> +		unsigned int cpuid = read_specific_cpuid(cpu);
-> +
-> +		if (cpuid == pmuid) {
-> +			cpumask_set_cpu(cpu, &pmu->supported_cpus);
-> +			if (pmu->irq_affinity) {
-> +				pmu->irq_affinity[aff_ctr] = cpu;
-> +				aff_ctr++;
-> +			}
-> +		}
-> +	}
-> +
-> +	/* find the type of PMU given the CPU */
->  	for (; info->init != NULL; info++) {
-> -		if ((cpuid & info->mask) != info->cpuid)
-> +		if ((pmuid & info->mask) != info->cpuid)
->  			continue;
->  		ret = info->init(pmu);
-> +		/*
-> +		 * if this pmu declaration is unspecified and we have
-> +		 * previously found a PMU on this platform then append
-> +		 * a PMU number to the pmu name. This avoids changing
-> +		 * the names of PMUs that are specific to a class of CPUs.
-> +		 * The assumption is that if we match a specific PMU in the
-> +		 * provided pmu_probe_info then it's unique, and another PMU
-> +		 * in the system will match a different entry rather than
-> +		 * needing the _number to assure its unique.
-> +		 */
-> +		if ((!info->cpuid) && (duplicate_pmus)) {
+> I have some patches to get rid of a lot of things, like cntvoff, during
+> the world-switch for VHE, so if Jintack just wants to focus on the
+> cnthctl I will catch cntvoff later.
 
-This is a bit grim: if you had a PMU with a non-zero info->cpuid, then you
-later found a PMU with a zeroed info->cpuid, the latter would get a
-redundant suffix. This doesn't happen in reality, because the ACPI case
-always has info->cpuid == 0, but if somebody extends armv8_pmu_probe_table
-then we'd get this and probably not realise.
+Sound good to me.
 
-I think the duplicate_pmus counter needs to be tied explicitly to the
-"default type" (i.e. when info->cpuid == 0, but see my next comment).
+Thanks,
 
-> +			pmu->name = kasprintf(GFP_KERNEL, "%s_%d",
-> +					    pmu->name, duplicate_pmus);
-> +			if (!pmu->name) {
-> +				kfree(pmu->irq_affinity);
-> +				ret = -ENOMEM;
-> +			}
-> +		}
-
-This code doesn't run for the device-tree probing case, but I think it would
-be useful to do the same numbering trick for e.g. systems with multiple PMUs
-that all end up matching on armv8_pmuv3.
-
-Will
+	M.
+-- 
+Jazz is not dead. It just smells funny...
