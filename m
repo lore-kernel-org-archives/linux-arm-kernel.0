@@ -1,126 +1,32 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 29 Nov 2016 11:12:15 +0100
-Subject: [PATCH v7 6/8] ARM: dts: sun8i-h3: add HDMI video nodes
-In-Reply-To: <cover.1480414715.git.moinejf@free.fr>
-References: <cover.1480414715.git.moinejf@free.fr>
-Message-ID: <431252931ed44a3bafaba80843bb4066ab73ed9e.1480414715.git.moinejf@free.fr>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 29 Nov 2016 11:37:32 +0000
+Subject: [PATCH v2] arm64: head.S: Fix CNTHCTL_EL2 access on VHE system
+In-Reply-To: <1480385582-24176-1-git-send-email-jintack@cs.columbia.edu>
+References: <1480385582-24176-1-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <20161129113732.GC13725@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
-Note 1:
- The DE clock is not set in the driver. Instead, it is set at system
- startup time by 'assigned-clocks', but there is a problem in sunxi-ng
- which uses readl_relaxed_poll_timeout(), and, as noticed by
- Ond??ej Jirman, this function is not available at startup time.
- The fix of this problem is not part of this patchset series.
-Note 2:
- The DE clock is set to a high enough rate (432MHz). It seems that
- this is needed to handle 4K video.
- But, as the proposed DE driver does not treat yet 4K video, the clock
- could be set to a lower rate. For example, the default rate for the A83T
- is 250MHz (no 4K video).
----
- arch/arm/boot/dts/sun8i-h3.dtsi | 65 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 65 insertions(+)
+On Mon, Nov 28, 2016 at 09:13:02PM -0500, Jintack Lim wrote:
+> From: Jintack <jintack@cs.columbia.edu>
+> 
+> Bit positions of CNTHCTL_EL2 are changing depending on HCR_EL2.E2H bit.
+> EL1PCEN and EL1PCTEN are 1st and 0th bits when E2H is not set, but they
+> are 11th and 10th bits respectively when E2H is set.  Current code is
+> unintentionally setting wrong bits to CNTHCTL_EL2 with E2H set.
+> 
+> In fact, we don't need to set those two bits, which allow EL1 and EL0 to
+> access physical timer and counter respectively, if E2H and TGE are set
+> for the host kernel. They will be configured later as necessary. First,
+> we don't need to configure those bits for EL1, since the host kernel
+> runs in EL2.  It is a hypervisor's responsibility to configure them
+> before entering a VM, which runs in EL0 and EL1. Second, EL0 accesses
+> are configured in the later stage of boot process.
+> 
+> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index fca66bf..1aa087d 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -140,6 +140,16 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		de: de-controller at 01000000 {
-+			compatible = "allwinner,sun8i-h3-display-engine";
-+			reg = <0x01000000 0x400000>;
-+			clocks = <&ccu CLK_BUS_DE>, <&ccu CLK_DE>;
-+			clock-names = "bus", "clock";
-+			resets = <&ccu RST_BUS_DE>;
-+			ports = <&tcon0_p>, <&tcon1_p>;
-+			status = "disabled";
-+		};
-+
- 		dma: dma-controller at 01c02000 {
- 			compatible = "allwinner,sun8i-h3-dma";
- 			reg = <0x01c02000 0x1000>;
-@@ -149,6 +159,37 @@
- 			#dma-cells = <1>;
- 		};
- 
-+		tcon0: lcd-controller at 01c0c000 {
-+			compatible = "allwinner,sun8i-a83t-tcon";
-+			reg = <0x01c0c000 0x400>;
-+			clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_TCON0>;
-+			clock-names = "bus", "clock";
-+			resets = <&ccu RST_BUS_TCON0>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			tcon0_p: port {
-+				tcon0_hdmi: endpoint {
-+					remote-endpoint = <&hdmi_tcon0>;
-+				};
-+			};
-+		};
-+
-+		/* not used */
-+		tcon1: lcd-controller at 01c0d000 {
-+			compatible = "allwinner,sun8i-h3-tcon";
-+			reg = <0x01c0d000 0x400>;
-+			clocks = <&ccu CLK_BUS_TCON1>,
-+				 <&ccu CLK_TCON0>;	/* no clock */
-+			clock-names = "bus", "clock";
-+			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			tcon1_p: port {
-+				endpoint {
-+					/* empty */
-+				};
-+			};
-+		};
-+
- 		mmc0: mmc at 01c0f000 {
- 			compatible = "allwinner,sun7i-a20-mmc";
- 			reg = <0x01c0f000 0x1000>;
-@@ -314,6 +355,11 @@
- 			clock-names = "hosc", "losc";
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
-+
-+			assigned-clocks = <&ccu CLK_PLL_DE>,
-+					  <&ccu CLK_DE>;
-+			assigned-clock-rates =  <864000000>,
-+						<432000000>;
- 		};
- 
- 		pio: pinctrl at 01c20800 {
-@@ -567,6 +613,25 @@
- 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
- 		};
- 
-+		hdmi: hdmi at 01ee0000 {
-+			compatible = "allwinner,sun8i-h3-hdmi";
-+			reg = <0x01ee0000 0x20000>;
-+			clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI>,
-+				 <&ccu CLK_HDMI_DDC>;
-+			clock-names = "bus", "clock", "ddc-clock";
-+			resets = <&ccu RST_BUS_HDMI0>, <&ccu RST_BUS_HDMI1>;
-+			reset-names = "hdmi0", "hdmi1";
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			port at 0 {			/* video */
-+				reg = <0>;
-+				hdmi_tcon0: endpoint {
-+					remote-endpoint = <&tcon0_hdmi>;
-+				};
-+			};
-+		};
-+
- 		rtc: rtc at 01f00000 {
- 			compatible = "allwinner,sun6i-a31-rtc";
- 			reg = <0x01f00000 0x54>;
+Queued for 4.10. Thanks.
+
 -- 
-2.10.2
+Catalin
