@@ -1,109 +1,69 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Tue, 29 Nov 2016 16:45:11 +0300
-Subject: [PATCH v3 06/13] clocksource/drivers/rockchip_timer: split bc_timer
- into rk_timer and rk_clock_event_device
-In-Reply-To: <1480427118-5126-1-git-send-email-al.kochet@gmail.com>
-References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
- <1480427118-5126-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1480427118-5126-7-git-send-email-al.kochet@gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 29 Nov 2016 15:03:43 +0100
+Subject: [PATCH] USB: OHCI: use module_platform_driver macro
+In-Reply-To: <1479822562-18719-1-git-send-email-csmanjuvijay@gmail.com>
+References: <1479822562-18719-1-git-send-email-csmanjuvijay@gmail.com>
+Message-ID: <20161129140343.GB3605@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch move ce field out of struct bc_timer into struct
-rk_clock_event_device and rename struct bc_timer to struct rk_timer.
+On Tue, Nov 22, 2016 at 01:49:22PM +0000, csmanjuvijay at gmail.com wrote:
+> From: Manjunath Goudar <csmanjuvijay@gmail.com>
+> 
+> Use the module_platform_driver macro to do module init/exit.
+> This eliminates a lot of boilerplate.This also removes
+> checkpatch.pl errors.
+> 
+> Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Vladimir Zapolskiy <vz@mleia.com>
+> Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-usb at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/usb/host/ohci-nxp.c | 38 ++++++++++++++------------------------
+>  1 file changed, 14 insertions(+), 24 deletions(-)
+> 
+> diff --git a/drivers/usb/host/ohci-nxp.c b/drivers/usb/host/ohci-nxp.c
+> index b7d4756..9908647 100644
+> --- a/drivers/usb/host/ohci-nxp.c
+> +++ b/drivers/usb/host/ohci-nxp.c
+> @@ -56,8 +56,6 @@ static struct hc_driver __read_mostly ohci_nxp_hc_driver;
+>  
+>  static struct i2c_client *isp1301_i2c_client;
+>  
+> -extern int usb_disabled(void);
+> -
+>  static struct clk *usb_host_clk;
+>  
+>  static void isp1301_configure_lpc32xx(void)
+> @@ -127,6 +125,7 @@ static inline void isp1301_vbus_off(void)
+>  static void ohci_nxp_start_hc(void)
+>  {
+>  	unsigned long tmp = __raw_readl(USB_OTG_STAT_CONTROL) | HOST_EN;
+> +
+>  	__raw_writel(tmp, USB_OTG_STAT_CONTROL);
+>  	isp1301_vbus_on();
+>  }
+> @@ -134,6 +133,7 @@ static void ohci_nxp_start_hc(void)
+>  static void ohci_nxp_stop_hc(void)
+>  {
+>  	unsigned long tmp;
+> +
+>  	isp1301_vbus_off();
+>  	tmp = __raw_readl(USB_OTG_STAT_CONTROL) & ~HOST_EN;
+>  	__raw_writel(tmp, USB_OTG_STAT_CONTROL);
 
-This is refactoring step without functional changes.
+Why make these last two changes?  They are just coding style "fixups"
+that have nothing to do with this patch :(
 
-Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
----
- drivers/clocksource/rockchip_timer.c |   33 ++++++++++++++++++++++-----------
- 1 file changed, 22 insertions(+), 11 deletions(-)
+When you say "also" in a patch description, that's a huge flag that you
+should be splitting the patch up into multiple patches.  Please do so
+here.
 
-diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
-index 23e267a..6d68d4c 100644
---- a/drivers/clocksource/rockchip_timer.c
-+++ b/drivers/clocksource/rockchip_timer.c
-@@ -29,18 +29,28 @@
- #define TIMER_MODE_USER_DEFINED_COUNT		(1 << 1)
- #define TIMER_INT_UNMASK			(1 << 2)
- 
--struct bc_timer {
--	struct clock_event_device ce;
-+struct rk_timer {
- 	void __iomem *base;
- 	void __iomem *ctrl;
- 	u32 freq;
- };
- 
--static struct bc_timer bc_timer;
-+struct rk_clock_event_device {
-+	struct clock_event_device ce;
-+	struct rk_timer timer;
-+};
-+
-+static struct rk_clock_event_device bc_timer;
-+
-+static inline struct rk_clock_event_device*
-+rk_clock_event_device(struct clock_event_device *ce)
-+{
-+	return container_of(ce, struct rk_clock_event_device, ce);
-+}
- 
--static inline struct bc_timer *rk_timer(struct clock_event_device *ce)
-+static inline struct rk_timer *rk_timer(struct clock_event_device *ce)
- {
--	return container_of(ce, struct bc_timer, ce);
-+	return &rk_clock_event_device(ce)->timer;
- }
- 
- static inline void __iomem *rk_base(struct clock_event_device *ce)
-@@ -116,16 +126,17 @@ static irqreturn_t rk_timer_interrupt(int irq, void *dev_id)
- static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
- {
- 	struct clock_event_device *ce = &bc_timer.ce;
-+	struct rk_timer *timer = &bc_timer.timer;
- 	struct clk *timer_clk;
- 	struct clk *pclk;
- 	int ret = -EINVAL, irq;
- 
--	bc_timer.base = of_iomap(np, 0);
--	if (!bc_timer.base) {
-+	timer->base = of_iomap(np, 0);
-+	if (!timer->base) {
- 		pr_err("Failed to get base address for '%s'\n", TIMER_NAME);
- 		return -ENXIO;
- 	}
--	bc_timer.ctrl = bc_timer.base + ctrl_reg;
-+	timer->ctrl = timer->base + ctrl_reg;
- 
- 	pclk = of_clk_get_by_name(np, "pclk");
- 	if (IS_ERR(pclk)) {
-@@ -153,7 +164,7 @@ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
- 		goto out_timer_clk;
- 	}
- 
--	bc_timer.freq = clk_get_rate(timer_clk);
-+	timer->freq = clk_get_rate(timer_clk);
- 
- 	irq = irq_of_parse_and_map(np, 0);
- 	if (!irq) {
-@@ -181,7 +192,7 @@ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
- 		goto out_irq;
- 	}
- 
--	clockevents_config_and_register(ce, bc_timer.freq, 1, UINT_MAX);
-+	clockevents_config_and_register(ce, timer->freq, 1, UINT_MAX);
- 
- 	return 0;
- 
-@@ -190,7 +201,7 @@ out_irq:
- out_timer_clk:
- 	clk_disable_unprepare(pclk);
- out_unmap:
--	iounmap(bc_timer.base);
-+	iounmap(timer->base);
- 
- 	return ret;
- }
--- 
-1.7.9.5
+thanks,
+
+greg k-h
