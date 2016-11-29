@@ -1,33 +1,36 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Tue, 29 Nov 2016 16:45:07 +0300
-Subject: [PATCH v3 02/13] ARM: dts: rockchip: update compatible property for
- rk3228 timer
-In-Reply-To: <1480427118-5126-1-git-send-email-al.kochet@gmail.com>
-References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
- <1480427118-5126-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1480427118-5126-3-git-send-email-al.kochet@gmail.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 29 Nov 2016 21:39:31 +0800
+Subject: [PATCH v4 03/11] ACPI: ARM64: IORT: add missing comment for
+ iort_dev_find_its_id()
+In-Reply-To: <1480426779-31387-1-git-send-email-guohanjun@huawei.com>
+References: <1480426779-31387-1-git-send-email-guohanjun@huawei.com>
+Message-ID: <1480426779-31387-4-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Property set to '"rockchip,rk3228-timer", "rockchip,rk3288-timer"'
-to match devicetree bindings.
+From: Hanjun Guo <hanjun.guo@linaro.org>
 
-Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+We are missing req_id's comment for iort_dev_find_its_id(),
+add it back.
+
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Tomasz Nowicki <tn@semihalf.com>
 ---
- arch/arm/boot/dts/rk3228-evb.dts |    4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/acpi/arm64/iort.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/rk3228-evb.dts b/arch/arm/boot/dts/rk3228-evb.dts
-index 904668e..38eab87 100644
---- a/arch/arm/boot/dts/rk3228-evb.dts
-+++ b/arch/arm/boot/dts/rk3228-evb.dts
-@@ -70,3 +70,7 @@
- &uart2 {
- 	status = "okay";
- };
-+
-+&timer {
-+	compatible = "rockchip,rk3228-timer", "rockchip,rk3288-timer";
-+};
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index a52fc7e..c1405e5 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -446,6 +446,7 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+ /**
+  * iort_dev_find_its_id() - Find the ITS identifier for a device
+  * @dev: The device.
++ * @req_id: Device's Requster ID
+  * @idx: Index of the ITS identifier list.
+  * @its_id: ITS identifier.
+  *
 -- 
-1.7.9.5
+1.7.12.4
