@@ -1,46 +1,44 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 29 Nov 2016 15:32:28 +0100 (CET)
-Subject: [PATCH] clocksource/arm_global_timer: reconfigure clockevents
- after cpufreq change
-In-Reply-To: <763a77c2-3d19-8d20-88df-27f0b8b80b8b@arm.com>
-References: <1480421716-30782-1-git-send-email-al.kochet@gmail.com>
- <1480421716-30782-2-git-send-email-al.kochet@gmail.com>
- <alpine.DEB.2.20.1611291432290.4358@nanos>
- <763a77c2-3d19-8d20-88df-27f0b8b80b8b@arm.com>
-Message-ID: <alpine.DEB.2.20.1611291529520.4358@nanos>
+From: romain.perier@free-electrons.com (Romain Perier)
+Date: Tue, 29 Nov 2016 15:39:38 +0100
+Subject: [PATCH 4/5] arm64: dts: marvell: Add definition of SPI controller for
+ Armada 3700
+In-Reply-To: <20161129143939.3191-1-romain.perier@free-electrons.com>
+References: <20161129143939.3191-1-romain.perier@free-electrons.com>
+Message-ID: <20161129143939.3191-5-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Nov 2016, Marc Zyngier wrote:
-> On 29/11/16 13:42, Thomas Gleixner wrote:
-> > Assumptions w/o real impact are a perfect reason not to apply that
-> > patch. This want's a proper proof that the global timer really changes and
-> > this hackery is required, which I seriously doubt.
-> 
-> Well, let's not underestimate the "creativity" [1] of A5/A9 when it
-> comes to the timer clocks, and it is a very sad fact that both the
-> global timer and the local timers are clocked by PERIPHCLK, which is
-> ticking at a fixed ratio N (N >= 2) of the main CPU clock (CLK):
-> 
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0407f/CIHGECHJ.html
-> 
-> I'm not sure how feasible it is to change this ratio (the TRM seems to
-> be very silent on the subject).
+Armada 3700 SoC has an SPI Controller, this commit adds the definition
+of the SPI device node at the SoC level.
 
-The CRU documentation of the RK3188 suggests that you can adjust it as it
-has a seperate divider, but who knows.
+Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-> So short of being able to reconfigure it on the fly, this will probably
-> need some surgery similar to what we already do for the TWD (which this
-> patch mimics).
->
-> Thankfully, we don't see that anymore on moderately recent HW (anything
-> since A15) and the advent of the arch timer, which is guaranteed to have
-> a fixed frequency.
-
-Can we just disable that global timer on affected SoCs and use something
-else instead?
-
-Thanks,
-
-	tglx
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index e9bd587..84e4f57 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -98,6 +98,19 @@
+ 			/* 32M internal register @ 0xd000_0000 */
+ 			ranges = <0x0 0x0 0xd0000000 0x2000000>;
+ 
++			spi0: spi at 10600 {
++				compatible = "marvell,armada-3700-spi";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0x10600 0x5d>;
++				clocks = <&nb_periph_clk 7>;
++				clock-frequency = <200000000>;
++				interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
++				max-frequency = <66000000>;
++				num-cs = <4>;
++				status = "disabled";
++			};
++
+ 			uart0: serial at 12000 {
+ 				compatible = "marvell,armada-3700-uart";
+ 				reg = <0x12000 0x400>;
+-- 
+2.9.3
