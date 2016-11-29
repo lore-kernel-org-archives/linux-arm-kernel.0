@@ -1,57 +1,47 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Tue, 29 Nov 2016 16:45:16 +0300
-Subject: [PATCH v3 11/13] clocksource/drivers/rockchip_timer: implement
- reading 64bit value from timer
-In-Reply-To: <1480427118-5126-1-git-send-email-al.kochet@gmail.com>
-References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
- <1480427118-5126-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1480427118-5126-12-git-send-email-al.kochet@gmail.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 29 Nov 2016 21:39:39 +0800
+Subject: [PATCH v4 11/11] msi: platform: make
+ platform_msi_create_device_domain() ACPI aware
+In-Reply-To: <1480426779-31387-1-git-send-email-guohanjun@huawei.com>
+References: <1480426779-31387-1-git-send-email-guohanjun@huawei.com>
+Message-ID: <1480426779-31387-12-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
----
- drivers/clocksource/rockchip_timer.c |   21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+From: Hanjun Guo <hanjun.guo@linaro.org>
 
-diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
-index c2b0454..6224aa9 100644
---- a/drivers/clocksource/rockchip_timer.c
-+++ b/drivers/clocksource/rockchip_timer.c
-@@ -19,6 +19,8 @@
+With the platform msi domain created for ITS, irqchip such as
+mbi-gen connecting ITS, which needs ctreate its own irqdomain.
+
+Fortunately with the platform msi support upstreamed by Marc,
+we just need to add minor code to make it run properly.
+
+platform_msi_create_device_domain() is almost ready for ACPI use
+except of_node_to_fwnode() is for dt only, make it ACPI aware then
+things will work in both DTS and ACPI.
+
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Greg KH <gregkh@linuxfoundation.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Greg KH <gregkh@linuxfoundation.org>
+---
+ drivers/base/platform-msi.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
+index be6a599..035ca3b 100644
+--- a/drivers/base/platform-msi.c
++++ b/drivers/base/platform-msi.c
+@@ -345,8 +345,7 @@ struct irq_domain *
  
- #define TIMER_LOAD_COUNT0	0x00
- #define TIMER_LOAD_COUNT1	0x04
-+#define TIMER_CURRENT_VALUE0	0x08
-+#define TIMER_CURRENT_VALUE1	0x0C
- #define TIMER_CONTROL_REG3288	0x10
- #define TIMER_CONTROL_REG3399	0x1c
- #define TIMER_INT_STATUS	0x18
-@@ -72,6 +74,25 @@ static void rk_timer_update_counter(u64 cycles, struct rk_timer *timer)
- 	writel_relaxed(upper, timer->base + TIMER_LOAD_COUNT1);
- }
+ 	data->host_data = host_data;
+ 	domain = irq_domain_create_hierarchy(dev->msi_domain, 0, nvec,
+-					     of_node_to_fwnode(dev->of_node),
+-					     ops, data);
++					     dev->fwnode, ops, data);
+ 	if (!domain)
+ 		goto free_priv;
  
-+static u64 rk_timer_counter_read(struct rk_timer *timer)
-+{
-+	u64 counter;
-+	u32 lower;
-+	u32 upper, old_upper;
-+
-+	upper = readl_relaxed(timer->base + TIMER_CURRENT_VALUE1);
-+	do {
-+		old_upper = upper;
-+		lower = readl_relaxed(timer->base + TIMER_CURRENT_VALUE0);
-+		upper = readl_relaxed(timer->base + TIMER_CURRENT_VALUE1);
-+	} while (upper != old_upper);
-+
-+	counter = upper;
-+	counter <<= 32;
-+	counter |= lower;
-+	return counter;
-+}
-+
- static void rk_timer_interrupt_clear(struct rk_timer *timer)
- {
- 	writel_relaxed(1, timer->base + TIMER_INT_STATUS);
 -- 
-1.7.9.5
+1.7.12.4
