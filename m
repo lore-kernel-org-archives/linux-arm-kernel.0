@@ -1,84 +1,38 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 29 Nov 2016 21:39:35 +0800
-Subject: [PATCH v4 07/11] irqchip: gicv3-its: platform-msi: scan MADT to
- create platform msi domain
-In-Reply-To: <1480426779-31387-1-git-send-email-guohanjun@huawei.com>
-References: <1480426779-31387-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1480426779-31387-8-git-send-email-guohanjun@huawei.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 29 Nov 2016 14:42:11 +0100 (CET)
+Subject: [PATCH] clocksource/arm_global_timer: reconfigure clockevents
+ after cpufreq change
+In-Reply-To: <1480421716-30782-2-git-send-email-al.kochet@gmail.com>
+References: <1480421716-30782-1-git-send-email-al.kochet@gmail.com>
+ <1480421716-30782-2-git-send-email-al.kochet@gmail.com>
+Message-ID: <alpine.DEB.2.20.1611291432290.4358@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+On Tue, 29 Nov 2016, Alexander Kochetkov wrote:
 
-With the introduction of its_pmsi_init_one(), we can add some code
-on top for ACPI support of platform MSI.
+> After a cpufreq transition, update the clockevent's frequency
+> by fetching the new clock rate from the clock framework and
+> reprogram the next clock event.
 
-We are scanning the MADT table to get the ITS entry(ies), then use
-the information to create the platform msi domain for devices connect
-to it, just like the PCI MSI for ITS did.
+The frequency change would not only affect the clockevent device, it also
+would affect the clocksource. So the patch is incomplete, but see below.
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Tested-by: Sinan Kaya <okaya@codeaurora.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Tomasz Nowicki <tn@semihalf.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
----
- drivers/irqchip/irq-gic-v3-its-platform-msi.c | 36 +++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+> The clock supplying the arm-global-timer on the rk3188 is coming
+> from the the cpu clock itself and thus changes its rate everytime
+> cpufreq adjusts the cpu frequency.
 
-diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-index ff72704..0be0437 100644
---- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-@@ -105,6 +105,41 @@ static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
- 	return 0;
- }
- 
-+#ifdef CONFIG_ACPI
-+static int __init
-+its_pmsi_parse_madt(struct acpi_subtable_header *header,
-+			const unsigned long end)
-+{
-+	struct acpi_madt_generic_translator *its_entry;
-+	struct fwnode_handle *domain_handle;
-+	const char *node_name;
-+	int err = -ENXIO;
-+
-+	its_entry = (struct acpi_madt_generic_translator *)header;
-+	node_name = kasprintf(GFP_KERNEL, "ITS at 0x%lx",
-+			      (long)its_entry->base_address);
-+	domain_handle = iort_find_domain_token(its_entry->translation_id);
-+	if (!domain_handle) {
-+		pr_err("%s: Unable to locate ITS domain handle\n", node_name);
-+		goto out;
-+	}
-+
-+	err = its_pmsi_init_one(domain_handle, node_name);
-+
-+out:
-+	kfree(node_name);
-+	return err;
-+}
-+
-+static void __init its_acpi_pmsi_init(void)
-+{
-+	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
-+			      its_pmsi_parse_madt, 0);
-+}
-+#else
-+static inline void its_acpi_pmsi_init(void) { }
-+#endif
-+
- static void __init its_pmsi_of_init(void)
- {
- 	struct device_node *np;
-@@ -121,6 +156,7 @@ static void __init its_pmsi_of_init(void)
- static int __init its_pmsi_init(void)
- {
- 	its_pmsi_of_init();
-+	its_acpi_pmsi_init();
- 	return 0;
- }
- early_initcall(its_pmsi_init);
--- 
-1.7.12.4
+That's broken and the clk framework should keep the CORE_PERI clock at a
+constant rate by reprogramming the divider of the CPU clock.
+
+> Found by code review, real impact not known. Assume what actual
+> HZ value will be different from expected on platforms using
+> arm-global-timer as clockevent.
+
+Assumptions w/o real impact are a perfect reason not to apply that
+patch. This want's a proper proof that the global timer really changes and
+this hackery is required, which I seriously doubt.
+
+Thanks,
+
+	tglx
