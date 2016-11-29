@@ -1,142 +1,190 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 29 Nov 2016 19:25:02 +0100
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
-Message-ID: <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 29 Nov 2016 20:41:30 +0200
+Subject: [PATCH v7 2/8] drm/sun8i: Add DT bindings documentation of
+ Allwinner DE2
+In-Reply-To: <92fc53084274d5ab04fe28f2dc0b16cf5d94481e.1480414715.git.moinejf@free.fr>
+References: <cover.1480414715.git.moinejf@free.fr>
+ <92fc53084274d5ab04fe28f2dc0b16cf5d94481e.1480414715.git.moinejf@free.fr>
+Message-ID: <36111311.d8ul9hQ2CU@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ Nothing new added below.
-  Vinod, was the description of my HW's quirks clear enough?
-  Is there a way to write a driver within the existing framework?
-  How can I get that HW block supported upstream?
-  Regards. ]
+Hi Jean-Fran?ois,
 
-On 25/11/2016 13:46, Mason wrote:
+Thank you for the patch.
 
-> On 25/11/2016 05:55, Vinod Koul wrote:
+On Monday 28 Nov 2016 19:02:39 Jean-Francois Moine wrote:
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+>  .../bindings/display/sunxi/sun8i-de2.txt           | 121 ++++++++++++++++++
+>  1 file changed, 121 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/display/sunxi/sun8i-de2.txt
 > 
->> On Wed, Nov 23, 2016 at 11:25:44AM +0100, Mason wrote:
->>
->>> On my platform, setting up a DMA transfer is a two-step process:
->>>
->>> 1) configure the "switch box" to connect a device to a memory channel
->>> 2) configure the transfer details (address, size, command)
->>>
->>> When the transfer is done, the sbox setup can be torn down,
->>> and the DMA driver can start another transfer.
->>>
->>> The current software architecture for my NFC (NAND Flash controller)
->>> driver is as follows (for one DMA transfer).
->>>
->>>   sg_init_one
->>>   dma_map_sg
->>>   dmaengine_prep_slave_sg
->>>   dmaengine_submit
->>>   dma_async_issue_pending
->>>   configure_NFC_transfer
->>>   wait_for_IRQ_from_DMA_engine // via DMA_PREP_INTERRUPT
->>>   wait_for_NFC_idle
->>>   dma_unmap_sg
->>
->> Looking at thread and discussion now, first thinking would be to ensure
->> the transaction is completed properly and then isr fired. You may need
->> to talk to your HW designers to find a way for that. It is quite common
->> that DMA controllers will fire and complete whereas the transaction is
->> still in flight.
-> 
-> It seems there is a disconnect between what Linux expects - an IRQ
-> when the transfer is complete - and the quirks of this HW :-(
-> 
-> On this system, there are MBUS "agents" connected via a "switch box".
-> An agent fires an IRQ when it has dealt with its *half* of the transfer.
-> 
-> SOURCE_AGENT <---> SBOX <---> DESTINATION_AGENT
-> 
-> Here are the steps for a transfer, in the general case:
-> 
-> 1) setup the sbox to connect SOURCE TO DEST
-> 2) configure source to send N bytes
-> 3) configure dest to receive N bytes
-> 
-> When SOURCE_AGENT has sent N bytes, it fires an IRQ
-> When DEST_AGENT has received N bytes, it fires an IRQ
-> The sbox connection can be torn down only when the destination
-> agent has received all bytes.
-> (And the twist is that some agents do not have an IRQ line.)
-> 
-> The system provides 3 RAM-to-sbox agents (read channels)
-> and 3 sbox-to-RAM agents (write channels).
-> 
-> The NAND Flash controller read and write agents do not have
-> IRQ lines.
-> 
-> So for a NAND-to-memory transfer (read from device)
-> - nothing happens when the NFC has finished sending N bytes to the sbox
-> - the write channel fires an IRQ when it has received N bytes
-> 
-> In that case, one IRQ fires when the transfer is complete,
-> like Linux expects.
-> 
-> For a memory-to-NAND transfer (write to device)
-> - the read channel fires an IRQ when it has sent N bytes
-> - the NFC driver is supposed to poll the NFC to determine
-> when the controller has finished writing N bytes
-> 
-> In that case, the IRQ does not indicate that the transfer
-> is complete, merely that the sending half has finished
-> its part.
-> 
-> For a memory-to-memory transfer (memcpy)
-> - the read channel fires an IRQ when it has sent N bytes
-> - the write channel fires an IRQ when it has received N bytes
-> 
-> So you actually get two IRQs in that case, which I don't
-> think Linux (or the current DMA driver) expects.
-> 
-> I'm not sure how we're supposed to handle this kind of HW
-> in Linux? (That's why I started this thread.)
-> 
-> 
->> If that is not doable, then since you claim this is custom part which
->> other vendors won't use (hope we are wrong down the line),
-> 
-> I'm not sure how to interpret "you claim this is custom part".
-> Do you mean I may be wrong, that it is not custom?
-> I don't know if other vendors may have HW with the same
-> quirky behavior. What do you mean about being wrong down
-> the line?
-> 
->> then we can have a custom api,
->>
->> foo_sbox_configure(bool enable, ...);
->>
->> This can be invoked from NFC driver when required for configuration and
->> teardown. For very specific cases where people need some specific
->> configuration we do allow custom APIs.
-> 
-> I don't think that would work. The fundamental issue is
-> that Linux expects a single IRQ to indicate "transfer
-> complete". And the driver (as written) starts a new
-> transfer as soon as the IRQ fires.
-> 
-> But the HW may generate 0, 1, or even 2 IRQs for a single
-> transfer. And when there is a single IRQ, it may not
-> indicate "transfer complete" (as seen above).
-> 
->> Only problem with that would be it wont be a generic solution
->> and you seem to be fine with that.
-> 
-> I think it is possible to have a generic solution:
-> Right now, the callback is called from tasklet context.
-> If we can have a new flag to have the callback invoked
-> directly from the ISR, then the driver for the client
-> device can do what is required.
-> 
-> For example, the NFC driver waits for the IRQ from the
-> memory agent, and then polls the controller itself.
-> 
-> I can whip up a proof-of-concept if it's better to
-> illustrate with a patch?
+> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun8i-de2.txt
+> b/Documentation/devicetree/bindings/display/sunxi/sun8i-de2.txt new file
+> mode 100644
+> index 0000000..edf38b8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/sunxi/sun8i-de2.txt
+> @@ -0,0 +1,121 @@
+> +Allwinner sun8i Display Engine 2 subsystem
+> +==========================================
+> +
+> +The Allwinner DE2 subsystem contains a display controller (DE2),
+> +one or two LCD controllers (Timing CONtrollers) and their external
+> +interfaces (encoders/connectors).
+> +
+> +          +-----------+
+> +          | DE2       |
+> +          |           |
+> +          | +-------+ |
+> +  plane --->|       | |   +------+
+> +          | | mixer |---->| TCON |---> encoder  ---> display
+> +  plane --->|       | |   +------+     connector     device
+> +          | +-------+ |
+> +          |           |
+> +          | +-------+ |
+> +  plane --->|       | |   +------+
+> +          | | mixer |---->| TCON |---> encoder  ---> display
+> +  plane --->|       | |   +------+     connector     device
+> +          | +-------+ |
+> +          +-----------+
+> +
+> +The DE2 contains a processor which mixes the input planes and creates
+> +the images which are sent to the TCONs.
+> +From the software point of vue, there are 2 independent real-time
+> +mixers, each one being statically associated to one TCON.
+> +
+> +The TCONs adjust the image format to the one of the display device.
+> +
+> +Display controller (DE2)
+> +========================
+> +
+> +Required properties:
+> +
+> +- compatible: value should be one of the following
+> +		"allwinner,sun8i-a83t-display-engine"
+> +		"allwinner,sun8i-h3-display-engine"
+> +
+> +- reg: base address and size of the I/O memory
+> +
+> +- clocks: must include clock specifiers corresponding to entries in the
+> +		clock-names property.
+> +
+> +- clock-names: must contain
+> +		"bus": bus gate
+> +		"clock": clock
+> +
+> +- resets: phandle to the reset of the device
+> +
+> +- ports: must contain a list of 2 phandles, indexed by mixer number,
+> +	and pointing to display interface ports of TCONs
+> +
+> +LCD controller (TCON)
+> +=====================
+> +
+> +Required properties:
+> +
+> +- compatible: should be
+> +		"allwinner,sun8i-a83t-tcon"
+> +
+> +- reg: base address and size of the I/O memory
+> +
+> +- clocks: must include clock specifiers corresponding to entries in the
+> +		clock-names property.
+> +
+> +- clock-names: must contain
+> +		"bus": bus gate
+> +		"clock": pixel clock
+> +
+> +- resets: phandle to the reset of the device
+> +
+> +- interrupts: interrupt number for the TCON
+> +
+> +- port: port node with endpoint definitions as defined in
+> +	Documentation/devicetree/bindings/media/video-interfaces.txt
+> +
+> +Example:
+> +
+> +	de: de-controller at 01000000 {
+> +		compatible = "allwinner,sun8i-h3-display-engine";
+> +		reg = <0x01000000 0x400000>;
+> +		clocks = <&ccu CLK_BUS_DE>, <&ccu CLK_DE>;
+> +		clock-names = "bus", "clock";
+> +		resets = <&ccu RST_BUS_DE>;
+> +		ports = <&tcon0_p>, <&tcon1_p>;
+
+This isn't how the OF graph DT bindings are used. You should instead have
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		port at 0 {
+			de_out_0: endpoint {
+				remote_endpoint = <&tcon0_hdmi>;
+			};
+		};
+		port at 1 {
+			/* No endpoint as the port is not connected */
+		};
+	};
+
+> +	};
+> +
+> +	tcon0: lcd-controller at 01c0c000 {
+> +		compatible = "allwinner,sun8i-a83t-tcon";
+> +		reg = <0x01c0c000 0x400>;
+> +		clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_TCON0>;
+> +		clock-names = "bus", "clock";
+> +		resets = <&ccu RST_BUS_TCON0>;
+> +		interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		tcon0_p: port {
+> +			tcon0_hdmi: endpoint {
+> +				remote-endpoint = <&hdmi_tcon0>;
+> +			};
+> +		};
+
+and here
+
+	port {
+		tcon0_hdmi: endpoint {
+			remote-endpoint = <&de_out_0>;
+		};
+	};
+
+> +	};
+> +
+> +	/* not used */
+> +	tcon1: lcd-controller at 01c0d000 {
+> +		compatible = "allwinner,sun8i-h3-tcon";
+> +		reg = <0x01c0d000 0x400>;
+> +		clocks = <&ccu CLK_BUS_TCON1>,
+> +			 <&ccu CLK_TCON0>;	/* no clock */
+> +		clock-names = "bus", "clock";
+> +		interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
+> +		status = "disabled";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		tcon1_p: port {
+> +			endpoint {
+> +				/* empty */
+> +			};
+> +		};
+
+and here
+
+	port {
+		/* No endpoint as the port is not connected */
+	};
+
+(although I'm not sure why you don't connect it)
+
+> +	};
+
+-- 
+Regards,
+
+Laurent Pinchart
