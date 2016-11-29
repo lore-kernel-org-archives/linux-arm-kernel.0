@@ -1,118 +1,91 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 29 Nov 2016 21:39:38 +0800
-Subject: [PATCH v4 10/11] ACPI: ARM64: IORT: rework iort_node_get_id() for
- NC->SMMU->ITS case
-In-Reply-To: <1480426779-31387-1-git-send-email-guohanjun@huawei.com>
-References: <1480426779-31387-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1480426779-31387-11-git-send-email-guohanjun@huawei.com>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Tue, 29 Nov 2016 16:45:05 +0300
+Subject: [PATCH v3 00/13] Implement clocksource for rockchip SoC using
+ rockchip timer
+In-Reply-To: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
+References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
+Message-ID: <1480427118-5126-1-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+Hello,
 
-iort_node_get_id() for now only support NC(named componant)->SMMU
-or NC->ITS cases, we also have other device topology such NC->
-SMMU->ITS, so rework iort_node_get_id() for those cases.
+This patch series contain:
+- devicetree bindings clarification for rockchip timers
+- dts files fixes for rk3228-evb, rk3229-evb and rk3188
+- implementation of clocksource for rockchip SoC
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- drivers/acpi/arm64/iort.c | 59 ++++++++++++++++++++++++++---------------------
- 1 file changed, 33 insertions(+), 26 deletions(-)
+The clock supplying the arm-global-timer on the rk3188 is coming from the
+the cpu clock itself and thus changes its rate everytime cpufreq adjusts
+the cpu frequency making this timer unsuitable as a stable clocksource.
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 8714f70..2e2d231 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -292,22 +292,28 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
- 	return status;
- }
- 
--static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
--		       u32 *rid_out)
-+static int iort_id_single_map(struct acpi_iort_id_mapping *map, u8 type,
-+			      u32 *rid_out)
- {
- 	/* Single mapping does not care for input id */
- 	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
- 		if (type == ACPI_IORT_NODE_NAMED_COMPONENT ||
- 		    type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
--			*rid_out = map->output_base;
-+			if (rid_out)
-+				*rid_out = map->output_base;
- 			return 0;
- 		}
- 
- 		pr_warn(FW_BUG "[map %p] SINGLE MAPPING flag not allowed for node type %d, skipping ID map\n",
- 			map, type);
--		return -ENXIO;
- 	}
- 
-+	return -ENXIO;
-+}
-+
-+static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
-+		       u32 *rid_out)
-+{
- 	if (rid_in < map->input_base ||
- 	    (rid_in >= map->input_base + map->id_count))
- 		return -ENXIO;
-@@ -324,33 +330,34 @@ struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
- 	struct acpi_iort_node *parent;
- 	struct acpi_iort_id_mapping *map;
- 
--	if (!node->mapping_offset || !node->mapping_count ||
--				     index >= node->mapping_count)
--		return NULL;
--
--	map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
--			   node->mapping_offset);
-+	while (node) {
-+		if (!node->mapping_offset || !node->mapping_count ||
-+					     index >= node->mapping_count)
-+			return NULL;
- 
--	/* Firmware bug! */
--	if (!map->output_reference) {
--		pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
--		       node, node->type);
--		return NULL;
--	}
-+		map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
-+				   node->mapping_offset);
- 
--	parent = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
--			       map->output_reference);
-+		/* Firmware bug! */
-+		if (!map->output_reference) {
-+			pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
-+			       node, node->type);
-+			return NULL;
-+		}
- 
--	if (!(IORT_TYPE_MASK(parent->type) & type_mask))
--		return NULL;
-+		parent = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
-+				      map->output_reference);
- 
--	if (map[index].flags & ACPI_IORT_ID_SINGLE_MAPPING) {
--		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
--		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
--			if (id_out)
--				*id_out = map[index].output_base;
--			return parent;
-+		/* go upstream to find its parent */
-+		if (!(IORT_TYPE_MASK(parent->type) & type_mask)) {
-+			node = parent;
-+			continue;
- 		}
-+
-+		if (iort_id_single_map(&map[index], node->type, id_out))
-+			break;
-+
-+		return parent;
- 	}
- 
- 	return NULL;
+The rk3188, rk3288 and following socs share a separate timer block already
+handled by the rockchip-timer driver. Therefore adapt this driver to also
+be able to act as clocksource on rk3188.
+
+In order to test clocksource you can run following commands and check
+how much time it take in real. On rk3188 it take about ~45 seconds.
+Such error cannot be fixed using NTP. Haven't test clocksource
+on rk3288 and onwards. Guess they can also have unstable clocksource.
+
+       cpufreq-set -f 1.6GHZ
+       date; sleep 60; date
+
+Regards,
+Alexander.
+
+Changes in v3:
+added patches:
+ARM: dts: rockchip: disable arm-global-timer for rk3188
+clocksource/drivers/rockchip_timer: Prevent ftrace recursion
+
+This is try 3. Please discard all v1 patches:
+
+devicetree:
+https://patchwork.ozlabs.org/patch/699019/
+https://patchwork.ozlabs.org/patch/699020/
+
+kernel:
+https://patchwork.kernel.org/patch/9443975/
+https://patchwork.kernel.org/patch/9443971/
+https://patchwork.kernel.org/patch/9443959/
+https://patchwork.kernel.org/patch/9443963/
+https://patchwork.kernel.org/patch/9443979/
+https://patchwork.kernel.org/patch/9443989/
+https://patchwork.kernel.org/patch/9443987/
+https://patchwork.kernel.org/patch/9443977/
+https://patchwork.kernel.org/patch/9443991/
+
+Old thread:
+http://lists.infradead.org/pipermail/linux-rockchip/2016-November/013147.html
+
+Alexander Kochetkov (13):
+  dt-bindings: clarify compatible property for rockchip timers
+  ARM: dts: rockchip: update compatible property for rk3228 timer
+  ARM: dts: rockchip: update compatible property for rk3229 timer
+  ARM: dts: rockchip: add timer entries to rk3188 dtsi
+  ARM: dts: rockchip: disable arm-global-timer for rk3188
+  clocksource/drivers/rockchip_timer: split bc_timer into rk_timer and
+    rk_clock_event_device
+  clocksource/drivers/rockchip_timer: low level routines take rk_timer
+    as parameter
+  clocksource/drivers/rockchip_timer: drop unused rk_base() and
+    rk_ctrl()
+  clocksource/drivers/rockchip_timer: move TIMER_INT_UNMASK out of
+    rk_timer_enable()
+  clocksource/drivers/rockchip_timer: implement loading 64bit value
+    into timer
+  clocksource/drivers/rockchip_timer: implement reading 64bit value
+    from timer
+  clocksource/drivers/rockchip_timer: implement clocksource timer
+  clocksource/drivers/rockchip_timer: Prevent ftrace recursion
+
+ .../bindings/timer/rockchip,rk-timer.txt           |   12 +-
+ arch/arm/boot/dts/rk3188.dtsi                      |   17 ++
+ arch/arm/boot/dts/rk3228-evb.dts                   |    4 +
+ arch/arm/boot/dts/rk3229-evb.dts                   |    4 +
+ drivers/clocksource/rockchip_timer.c               |  207 +++++++++++++++-----
+ 5 files changed, 190 insertions(+), 54 deletions(-)
+
 -- 
-1.7.12.4
+1.7.9.5
