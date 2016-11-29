@@ -1,124 +1,62 @@
 From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Tue, 29 Nov 2016 16:45:12 +0300
-Subject: [PATCH v3 07/13] clocksource/drivers/rockchip_timer: low level
- routines take rk_timer as parameter
+Date: Tue, 29 Nov 2016 16:45:18 +0300
+Subject: [PATCH v3 13/13] clocksource/drivers/rockchip_timer: Prevent ftrace
+ recursion
 In-Reply-To: <1480427118-5126-1-git-send-email-al.kochet@gmail.com>
 References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
  <1480427118-5126-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1480427118-5126-8-git-send-email-al.kochet@gmail.com>
+Message-ID: <1480427118-5126-14-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pass rk_timer instead of clock_event_device to low lever timer routines.
-So that code could be reused by clocksource implementation.
+Currently rockchip_timer can be used as a scheduler clock. We properly
+marked rk_timer_sched_clock_read() as notrace but we then call another
+function rk_timer_counter_read() that _wasn't_ notrace.
 
-This is refactoring step without functional changes.
+Having a traceable function in the sched_clock() path leads to a recursion
+within ftrace and a kernel crash.
+
+Fix this by adding an extra notrace function to keep other users of
+rk_timer_counter_read() traceable.
 
 Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
 ---
- drivers/clocksource/rockchip_timer.c |   47 +++++++++++++++++++---------------
- 1 file changed, 27 insertions(+), 20 deletions(-)
+ drivers/clocksource/rockchip_timer.c |    9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
-index 6d68d4c..aa9ccd1 100644
+index 1af80a0..a127822 100644
 --- a/drivers/clocksource/rockchip_timer.c
 +++ b/drivers/clocksource/rockchip_timer.c
-@@ -63,60 +63,67 @@ static inline void __iomem *rk_ctrl(struct clock_event_device *ce)
- 	return rk_timer(ce)->ctrl;
+@@ -87,7 +87,7 @@ static void rk_timer_update_counter(u64 cycles, struct rk_timer *timer)
+ 	writel_relaxed(upper, timer->base + TIMER_LOAD_COUNT1);
  }
  
--static inline void rk_timer_disable(struct clock_event_device *ce)
-+static inline void rk_timer_disable(struct rk_timer *timer)
+-static u64 rk_timer_counter_read(struct rk_timer *timer)
++static u64 notrace _rk_timer_counter_read(struct rk_timer *timer)
  {
--	writel_relaxed(TIMER_DISABLE, rk_ctrl(ce));
-+	writel_relaxed(TIMER_DISABLE, timer->ctrl);
+ 	u64 counter;
+ 	u32 lower;
+@@ -106,6 +106,11 @@ static u64 rk_timer_counter_read(struct rk_timer *timer)
+ 	return counter;
  }
  
--static inline void rk_timer_enable(struct clock_event_device *ce, u32 flags)
-+static inline void rk_timer_enable(struct rk_timer *timer, u32 flags)
- {
- 	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
--		       rk_ctrl(ce));
-+		       timer->ctrl);
- }
- 
- static void rk_timer_update_counter(unsigned long cycles,
--				    struct clock_event_device *ce)
-+				    struct rk_timer *timer)
- {
--	writel_relaxed(cycles, rk_base(ce) + TIMER_LOAD_COUNT0);
--	writel_relaxed(0, rk_base(ce) + TIMER_LOAD_COUNT1);
-+	writel_relaxed(cycles, timer->base + TIMER_LOAD_COUNT0);
-+	writel_relaxed(0, timer->base + TIMER_LOAD_COUNT1);
- }
- 
--static void rk_timer_interrupt_clear(struct clock_event_device *ce)
-+static void rk_timer_interrupt_clear(struct rk_timer *timer)
- {
--	writel_relaxed(1, rk_base(ce) + TIMER_INT_STATUS);
-+	writel_relaxed(1, timer->base + TIMER_INT_STATUS);
- }
- 
- static inline int rk_timer_set_next_event(unsigned long cycles,
- 					  struct clock_event_device *ce)
- {
--	rk_timer_disable(ce);
--	rk_timer_update_counter(cycles, ce);
--	rk_timer_enable(ce, TIMER_MODE_USER_DEFINED_COUNT);
-+	struct rk_timer *timer = rk_timer(ce);
++static u64 rk_timer_counter_read(struct rk_timer *timer)
++{
++	return _rk_timer_counter_read(timer);
++}
 +
-+	rk_timer_disable(timer);
-+	rk_timer_update_counter(cycles, timer);
-+	rk_timer_enable(timer, TIMER_MODE_USER_DEFINED_COUNT);
- 	return 0;
+ static void rk_timer_interrupt_clear(struct rk_timer *timer)
+ {
+ 	writel_relaxed(1, timer->base + TIMER_INT_STATUS);
+@@ -168,7 +173,7 @@ static u64 notrace rk_timer_sched_clock_read(void)
+ {
+ 	struct rk_clocksource *_cs = &cs_timer;
+ 
+-	return ~rk_timer_counter_read(&_cs->timer);
++	return ~_rk_timer_counter_read(&_cs->timer);
  }
  
- static int rk_timer_shutdown(struct clock_event_device *ce)
- {
--	rk_timer_disable(ce);
-+	struct rk_timer *timer = rk_timer(ce);
-+
-+	rk_timer_disable(timer);
- 	return 0;
- }
- 
- static int rk_timer_set_periodic(struct clock_event_device *ce)
- {
--	rk_timer_disable(ce);
--	rk_timer_update_counter(rk_timer(ce)->freq / HZ - 1, ce);
--	rk_timer_enable(ce, TIMER_MODE_FREE_RUNNING);
-+	struct rk_timer *timer = rk_timer(ce);
-+
-+	rk_timer_disable(timer);
-+	rk_timer_update_counter(timer->freq / HZ - 1, timer);
-+	rk_timer_enable(timer, TIMER_MODE_FREE_RUNNING);
- 	return 0;
- }
- 
- static irqreturn_t rk_timer_interrupt(int irq, void *dev_id)
- {
- 	struct clock_event_device *ce = dev_id;
-+	struct rk_timer *timer = rk_timer(ce);
- 
--	rk_timer_interrupt_clear(ce);
-+	rk_timer_interrupt_clear(timer);
- 
- 	if (clockevent_state_oneshot(ce))
--		rk_timer_disable(ce);
-+		rk_timer_disable(timer);
- 
- 	ce->event_handler(ce);
- 
-@@ -183,8 +190,8 @@ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
- 	ce->cpumask = cpu_possible_mask;
- 	ce->rating = 250;
- 
--	rk_timer_interrupt_clear(ce);
--	rk_timer_disable(ce);
-+	rk_timer_interrupt_clear(timer);
-+	rk_timer_disable(timer);
- 
- 	ret = request_irq(irq, rk_timer_interrupt, IRQF_TIMER, TIMER_NAME, ce);
- 	if (ret) {
+ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
 -- 
 1.7.9.5
