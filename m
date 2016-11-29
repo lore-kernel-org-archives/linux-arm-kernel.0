@@ -1,81 +1,309 @@
-From: vbabka@suse.cz (Vlastimil Babka)
-Date: Tue, 29 Nov 2016 11:50:37 +0100
-Subject: [PATCH V2 fix 5/6] mm: hugetlb: add a new function to allocate a
- new gigantic page
-In-Reply-To: <20161129090322.GB16569@sha-win-210.asiapac.arm.com>
-References: <1479107259-2011-6-git-send-email-shijie.huang@arm.com>
- <1479279304-31379-1-git-send-email-shijie.huang@arm.com>
- <f6fc93b4-5c1c-bbab-7c74-a0d60d4afc84@suse.cz>
- <20161129090322.GB16569@sha-win-210.asiapac.arm.com>
-Message-ID: <777f7e0c-c04b-77c3-b866-0787bad32aa8@suse.cz>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 29 Nov 2016 11:51:03 +0100
+Subject: [PATCH v9 06/11] arm/arm64: vgic: Implement VGICv3 CPU interface
+ access
+In-Reply-To: <CALicx6uK9kQ5fuW=SGnny7oerPbhGbVDw=MMi0Tna_B4XdJqeg@mail.gmail.com>
+References: <1479906118-15832-1-git-send-email-vijay.kilari@gmail.com>
+ <1479906118-15832-7-git-send-email-vijay.kilari@gmail.com>
+ <20161128193938.GF18170@cbox>
+ <CALicx6s4E0-VJMm6Ff5qu=sZgXu-mUnJdDCmaiZO0i3yzF8wxA@mail.gmail.com>
+ <20161129083747.GA9838@cbox>
+ <CALicx6uK9kQ5fuW=SGnny7oerPbhGbVDw=MMi0Tna_B4XdJqeg@mail.gmail.com>
+Message-ID: <20161129105103.GB15346@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2016 10:03 AM, Huang Shijie wrote:
-> On Mon, Nov 28, 2016 at 03:17:28PM +0100, Vlastimil Babka wrote:
->> On 11/16/2016 07:55 AM, Huang Shijie wrote:
->> > +static struct page *__hugetlb_alloc_gigantic_page(struct hstate *h,
->> > +		struct vm_area_struct *vma, unsigned long addr, int nid)
->> > +{
->> > +	NODEMASK_ALLOC(nodemask_t, nodes_allowed, GFP_KERNEL | __GFP_NORETRY);
->>
->> What if the allocation fails and nodes_allowed is NULL?
->> It might work fine now, but it's rather fragile, so I'd rather see an
-> Yes.
->
->> explicit check.
-> See the comment below.
->
->>
->> BTW same thing applies to __nr_hugepages_store_common().
->>
->> > +	struct page *page = NULL;
->> > +
->> > +	/* Not NUMA */
->> > +	if (!IS_ENABLED(CONFIG_NUMA)) {
->> > +		if (nid == NUMA_NO_NODE)
->> > +			nid = numa_mem_id();
->> > +
->> > +		page = alloc_gigantic_page(nid, huge_page_order(h));
->> > +		if (page)
->> > +			prep_compound_gigantic_page(page, huge_page_order(h));
->> > +
->> > +		NODEMASK_FREE(nodes_allowed);
->> > +		return page;
->> > +	}
->> > +
->> > +	/* NUMA && !vma */
->> > +	if (!vma) {
->> > +		if (nid == NUMA_NO_NODE) {
->> > +			if (!init_nodemask_of_mempolicy(nodes_allowed)) {
->> > +				NODEMASK_FREE(nodes_allowed);
->> > +				nodes_allowed = &node_states[N_MEMORY];
->> > +			}
->> > +		} else if (nodes_allowed) {
-> The check is here.
+On Tue, Nov 29, 2016 at 03:31:44PM +0530, Vijay Kilari wrote:
+> On Tue, Nov 29, 2016 at 2:07 PM, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+> > On Tue, Nov 29, 2016 at 01:08:26PM +0530, Vijay Kilari wrote:
+> >> On Tue, Nov 29, 2016 at 1:09 AM, Christoffer Dall
+> >> <christoffer.dall@linaro.org> wrote:
+> >> > On Wed, Nov 23, 2016 at 06:31:53PM +0530, vijay.kilari at gmail.com wrote:
+> >> >> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> >> >>
+> >> >> VGICv3 CPU interface registers are accessed using
+> >> >> KVM_DEV_ARM_VGIC_CPU_SYSREGS ioctl. These registers are accessed
+> >> >> as 64-bit. The cpu MPIDR value is passed along with register id.
+> >> >> is used to identify the cpu for registers access.
+> >> >>
+> >> >> The VM that supports SEIs expect it on destination machine to handle
+> >> >> guest aborts and hence checked for ICC_CTLR_EL1.SEIS compatibility.
+> >> >> Similarly, VM that supports Affinity Level 3 that is required for AArch64
+> >> >> mode, is required to be supported on destination machine. Hence checked
+> >> >> for ICC_CTLR_EL1.A3V compatibility.
+> >> >>
+> >> >> The CPU system register handling is spitted into two files
+> >> >
+> >> > spitted?  Did you mean 'split into' ?
+> >> >
+> >> >> vgic-sys-reg-common.c and vgic-sys-reg-v3.c.
+> >> >> The vgic-sys-reg-common.c handles read and write of VGIC CPU registers
+> >> >
+> >> > So this is weird because everything in virt/kvm/arm/ is exactly supposed
+> >> > to be common between arm and arm64 already.
+> >> >
+> >> > I would rather that you had a copy of vgic-sys-reg-v3.c in arch/arm/kvm/
+> >> > and in arch/arm64/kvm/ each taking care of its own architecture.
+> >> >
+> >> > But note that I didn't actually require that you implemented support for
+> >> > GICv3 migration on AArch32 hosts for these patches, I just didn't want
+> >> > thigns to silently break.
+> >> >
+> >> > If we cannot test the AArch32 implementation, we should potentially just
+> >> > make sure that is not supported yet, return a proper error to userspace
+> >> > and get the AArch64 host implementation correct.
+> >> >
+> >> > I suggest you move your:
+> >> >   virt/kvm/arm/vgic/vgic-sys-reg-v3.c to
+> >> >   arch/arm64/kvm/vgic-sys-reg-v3.c
+> >> >
+> >> > and rename
+> >> >   virt/kvm/arm/vgic/vgic-sys-reg-common.c to
+> >> >   virt/kvm/arm/vgic/vgic-sys-reg-v3.c
+> >> >
+> >> > And then wait with the AArch32 host side for now, but just make sure it
+> >> > compiles and returns an error as opposed to crashing the system if
+> >> > someone tries to excercise this interface on an AArch32 host.
+> >>
+> >> I will add arch/arm/kvm/vgic-coproc-v3.c (pls check if file name is ok or not?)
+> >
+> > I would call it vgic-v3-coproc.c
+> >
+> >> and return -ENXIO as shown below and update document accordingly.
+> >>
+> >> int vgic_v3_has_cpu_sysregs_attr(struct kvm_vcpu *vcpu, bool is_write, u64 id,
+> >>                                u64 *reg)
+> >> {
+> >>        /*
+> >>         * TODO: Implement for AArch32
+> >>         */
+> >>        return -ENXIO;
+> >> }
+> >>
+> >> int vgic_v3_cpu_sysregs_uaccess(struct kvm_vcpu *vcpu, bool is_write, u64 id,
+> >>                                u64 *reg)
+> >> {
+> >>        /*
+> >>         * TODO: Implement for AArch32
+> >>         */
+> >>        return -ENXIO;
+> >> }
+> >
+> >
+> >>
+> >> >
+> >> >> for both AArch64 and AArch32 mode. The vgic-sys-reg-v3.c handles AArch64
+> >> >> mode and is compiled only for AArch64 mode.
+> >> >>
+> >> >> Updated arch/arm/include/uapi/asm/kvm.h with new definitions
+> >> >> required to compile for AArch32.
+> >> >>
+> >> >> The version of VGIC v3 specification is define here
+> >> >> Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+> >> >>
+> >> >> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+> >> >> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> >> >> ---
+> >> [...]
+> >> >> +static bool access_gic_aprn(struct kvm_vcpu *vcpu, bool is_write, u8 apr,
+> >> >> +                         u8 idx, unsigned long *reg)
+> >> >> +{
+> >> >> +     struct vgic_cpu *vgic_v3_cpu = &vcpu->arch.vgic_cpu;
+> >> >> +
+> >> >> +     /* num_pri_bits are initialized with HW supported values.
+> >> >> +      * We can rely safely on num_pri_bits even if VM has not
+> >> >> +      * restored ICC_CTLR_EL1 before restoring APnR registers.
+> >> >> +      */
+> >> >
+> >> > nit: commenting style
+> >> ok
+> >> >
+> >> >> +     switch (vgic_v3_cpu->num_pri_bits) {
+> >> >> +     case 7:
+> >> >> +             vgic_v3_access_apr_reg(vcpu, is_write, apr, idx, reg);
+> >> >> +             break;
+> >> >> +     case 6:
+> >> >> +             if (idx > 1)
+> >> >> +                     goto err;
+> >> >> +             vgic_v3_access_apr_reg(vcpu, is_write, apr, idx, reg);
+> >> >> +             break;
+> >> >> +     default:
+> >> >> +             if (idx > 0)
+> >> >> +                     goto err;
+> >> >> +             vgic_v3_access_apr_reg(vcpu, is_write, apr, idx, reg);
+> >> >> +     }
+> >> >
+> >> > It looks to me like userspace can then program active priorities with
+> >> > higher numbers than what it will program num_pri_bits to later.  Is that
+> >> > not weird, or am I missing something?
+> >>
+> >> As long as it is within HW supported priorities it is safe.
+> >
+> > I know that it is safe on the hardware, but it is weird to define a VM
+> > with some max priority and still be able to set a higher active priority
+> > is it not?
+> 
+> In that case, we need to cache the highest active priorities updated
+> by a VM in a variable
+> when APnR is restored and later check against num_pri_bits when
+> ICC_CTLR_EL1 is updated.
+> If the value cached is greater than num_pri_bits restored then reject
+> ICC_CTLR_EL1 restore.
+> 
+> This variable should be initialized with value 5 ( min priority)
+> 
+> >
+> > On the other hand, if we cannot enforce this at runtime, it may not
+> > matter?
+> 
+> At VM runtime irrespective of VM's num_pri_bits all the APnR registers that
+> HW supports are saved and restored.
+> 
 
-It's below a possible usage of nodes_allowed as an argument of 
-init_nodemask_of_mempolicy(mask). Which does
+Yes, never mind my comment.  Since we cannot enforce this constraint
+once the VM runs, I don't think there's any concern here.
 
-         if (!(mask && current->mempolicy))
-                 return false;
+> >> >
+> >> >> +
+> >> >> +     return true;
+> >> >> +err:
+> >> >> +     if (!is_write)
+> >> >> +             *reg = 0;
+> >> >> +
+> >> >> +     return false;
+> >> >> +}
+> >> >> +
+> >> >> +bool access_gic_ap0r_reg(struct kvm_vcpu *vcpu, bool is_write, u8 idx,
+> >> >> +                      unsigned long *reg)
+> >> >> +{
+> >> >> +     return access_gic_aprn(vcpu, is_write, 0, idx, reg);
+> >> >> +}
+> >> >> +
+> >> >> +bool access_gic_ap1r_reg(struct kvm_vcpu *vcpu, bool is_write, u8 idx,
+> >> >> +                      unsigned long *reg)
+> >> >> +{
+> >> >> +     return access_gic_aprn(vcpu, is_write, 1, idx, reg);
+> >> >> +}
+> >> >> +
+> >> >> +bool access_gic_sre_reg(struct kvm_vcpu *vcpu, bool is_write,
+> >> >> +                     unsigned long *reg)
+> >> >> +{
+> >> >> +     struct vgic_v3_cpu_if *vgicv3 = &vcpu->arch.vgic_cpu.vgic_v3;
+> >> >> +
+> >> >> +     /* Validate SRE bit */
+> >> >> +     if (is_write) {
+> >> >> +             if (!(*reg & ICC_SRE_EL1_SRE))
+> >> >> +                     return false;
+> >> >> +     } else {
+> >> >> +             *reg = vgicv3->vgic_sre;
+> >> >> +     }
+> >> >> +
+> >> >> +     return true;
+> >> >> +}
+> >> >> diff --git a/virt/kvm/arm/vgic/vgic-sys-reg-v3.c b/virt/kvm/arm/vgic/vgic-sys-reg-v3.c
+> >> >> new file mode 100644
+> >> >> index 0000000..82c2f02
+> >> >> --- /dev/null
+> >> >> +++ b/virt/kvm/arm/vgic/vgic-sys-reg-v3.c
+> >> >> @@ -0,0 +1,142 @@
+> >> >> +/*
+> >> >> + * VGIC system registers handling functions
+> >> >> + *
+> >> >> + * This program is free software; you can redistribute it and/or modify
+> >> >> + * it under the terms of the GNU General Public License version 2 as
+> >> >> + * published by the Free Software Foundation.
+> >> >> + *
+> >> >> + * This program is distributed in the hope that it will be useful,
+> >> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> >> + * GNU General Public License for more details.
+> >> >> + */
+> >> >> +
+> >> >> +#include <linux/kvm.h>
+> >> >> +#include <linux/kvm_host.h>
+> >> >> +#include <asm/kvm_emulate.h>
+> >> >> +#include "vgic.h"
+> >> >> +#include "sys_regs.h"
+> >> >> +
+> >> >> +#define ACCESS_SYS_REG(REG)                                          \
+> >> >> +static bool access_gic_##REG##_sys_reg(struct kvm_vcpu *vcpu,                \
+> >> >> +                                 struct sys_reg_params *p,           \
+> >> >> +                                 const struct sys_reg_desc *r)       \
+> >> >> +{                                                                    \
+> >> >> +     unsigned long tmp;                                              \
+> >> >> +     bool ret;                                                       \
+> >> >> +                                                                     \
+> >> >> +     if (p->is_write)                                                \
+> >> >> +             tmp = p->regval;                                        \
+> >> >> +     ret = access_gic_##REG##_reg(vcpu, p->is_write, &tmp);          \
+> >> >> +     if (!p->is_write)                                               \
+> >> >> +             p->regval = tmp;                                        \
+> >> >> +                                                                     \
+> >> >> +     return ret;                                                     \
+> >> >> +}
+> >> >> +
+> >> >> +ACCESS_SYS_REG(ctlr)
+> >> >> +ACCESS_SYS_REG(pmr)
+> >> >> +ACCESS_SYS_REG(bpr0)
+> >> >> +ACCESS_SYS_REG(bpr1)
+> >> >> +ACCESS_SYS_REG(sre)
+> >> >> +ACCESS_SYS_REG(grpen0)
+> >> >> +ACCESS_SYS_REG(grpen1)
+> >> >> +
+> >> >> +#define ACCESS_APNR_SYS_REG(REG)                                     \
+> >> >> +static bool access_gic_##REG##_sys_reg(struct kvm_vcpu *vcpu,                \
+> >> >> +                                 struct sys_reg_params *p,           \
+> >> >> +                                 const struct sys_reg_desc *r)       \
+> >> >> +{                                                                    \
+> >> >> +     unsigned long tmp;                                              \
+> >> >> +     u8 idx = p->Op2 & 3;                                            \
+> >> >> +     bool ret;                                                       \
+> >> >> +                                                                     \
+> >> >> +     if (p->is_write)                                                \
+> >> >> +             tmp = p->regval;                                        \
+> >> >> +     ret = access_gic_##REG##_reg(vcpu, p->is_write, idx, &tmp);     \
+> >> >> +     if (!p->is_write)                                               \
+> >> >> +             p->regval = tmp;                                        \
+> >> >> +                                                                     \
+> >> >> +     return ret;                                                     \
+> >> >> +}
+> >> >> +
+> >> >> +ACCESS_APNR_SYS_REG(ap0r)
+> >> >> +ACCESS_APNR_SYS_REG(ap1r)
+> >> >
+> >> > I don't get these indirections.  Why can't you call the functions
+> >> > directly?
+> >>
+> >> The code is same for accessing the registers hence added this indirection.
+> >>
+> >
+> > That's not answering my question.
+> >
+> > What is the benefit of adding this indirection as opposed to having the
+> > functions called directly?
+> 
+> In sys_reg_desc the access function is of type
+> 
+>         bool (*access)(struct kvm_vcpu *,
+>                        struct sys_reg_params *,
+>                        const struct sys_reg_desc *);
+> 
+> Where as the each register access function is of type below to support
+> access to AArch32(later if not now).
+> 
+> bool access_gic_xxx(struct kvm_vcpu *vcpu, bool is_write, unsigned long *reg);
+> 
+> I can drop this macro and make function calls for each reg access.
+> 
 
-which itself looks like an error at first sight :)
+Please don't worry about the 32-bit side until we actually implement
+that.  And once we do, we can move things around in patches to support
+the 32-bit side so that it makes sense to the reader.
 
-> Do we really need to re-arrange the code here for the explicit check? :)
+So, for now, just have this one file, moved to arch/arm64/kvm/ where all
+the access functions are static in this file and called directly from
+the single dispatch function.
 
-We don't need it *now* to be correct, but I still find it fragile. Also it
-mixes up the semantic of NULL as a conscious "default" value, and NULL as
-a side-effect of memory allocation failure. Nothing good can come from that in 
-the long term :)
-
-> Thanks
-> Huang Shijie
->> > +			init_nodemask_of_node(nodes_allowed, nid);
->> > +		} else {
->> > +			nodes_allowed = &node_states[N_MEMORY];
->> > +		}
->> > +
->> > +		page = alloc_fresh_gigantic_page(h, nodes_allowed, true);
->> > +
->
+Thanks,
+-Christoffer
