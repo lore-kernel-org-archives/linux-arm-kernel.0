@@ -1,82 +1,54 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 29 Nov 2016 12:39:48 +0000
-Subject: [RFC v2 PATCH 06/23] ARM: NOMMU: relax restriction on MPU existence
+Date: Tue, 29 Nov 2016 12:39:49 +0000
+Subject: [RFC v2 PATCH 07/23] ARM: NOMMU: fix head-nommu build for pre-ARMv7
+ CPUs
 In-Reply-To: <1480423205-48436-1-git-send-email-vladimir.murzin@arm.com>
 References: <1480423205-48436-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1480423205-48436-7-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1480423205-48436-8-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MPU is must have if we run SMP configurations (since it sets Sharable
-attribute), but for UP we can progress further if MPU is not presented.
+While building for pre-ARMv7 CPUs with ARM_MPU enabled following error
+shows up:
 
-This patch changes setup_mpu to return error code which we ignore for
-boot cpu and only take into account for secondaries.
+  AS      arch/arm/kernel/head-nommu.o
+arch/arm/kernel/head-nommu.S: Assembler messages:
+arch/arm/kernel/head-nommu.S:223: Error: selected processor does not support ARM mode `isb'
+arch/arm/kernel/head-nommu.S:231: Error: selected processor does not support ARM mode `isb'
+arch/arm/kernel/head-nommu.S:235: Error: selected processor does not support ARM mode `isb'
+arch/arm/kernel/head-nommu.S:244: Error: selected processor does not support ARM mode `isb'
+arch/arm/kernel/head-nommu.S:248: Error: selected processor does not support ARM mode `isb'
+arch/arm/kernel/head-nommu.S:258: Error: selected processor does not support ARM mode `isb'
+arch/arm/kernel/head-nommu.S:265: Error: selected processor does not support ARM mode `isb'
+make[1]: *** [arch/arm/kernel/head-nommu.o] Error 1
+
+MPU setup code is available for ARMv7 only, but head-nommu.S is
+generic, so build head-nommu.S with -march=armv7-a (and armv7-m for
+M-calss to avoid "Conflicting architecture profiles M/A" link time)
+flag; in case pre-ARMv7 it detects there there is no MPU is avaliable,
+so it will never reach those instructions.
 
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/kernel/head-nommu.S |   15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ arch/arm/kernel/Makefile |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index 6b4eb27..7317554 100644
---- a/arch/arm/kernel/head-nommu.S
-+++ b/arch/arm/kernel/head-nommu.S
-@@ -13,6 +13,7 @@
-  */
- #include <linux/linkage.h>
- #include <linux/init.h>
-+#include <linux/errno.h>
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index ad325a8..6da8b04 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -84,6 +84,11 @@ endif
+ obj-$(CONFIG_PARAVIRT)	+= paravirt.o
  
- #include <asm/assembler.h>
- #include <asm/ptrace.h>
-@@ -112,6 +113,8 @@ ENTRY(secondary_startup)
- 	/* Use MPU region info supplied by __cpu_up */
- 	ldr	r6, [r7]			@ get secondary_data.mpu_szr
- 	bl      __setup_mpu			@ Initialize the MPU
-+	teq	r0, #0
-+	bne     __error_p
- #endif
+ head-y			:= head$(MMUEXT).o
++ifeq ($(CONFIG_CPU_V7M),y)
++AFLAGS_head-nommu.o     :=-Wa,-march=armv7-m
++else
++AFLAGS_head-nommu.o     :=-Wa,-march=armv7-a
++endif
+ obj-$(CONFIG_DEBUG_LL)	+= debug.o
+ obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
  
- 	badr	lr, 1f				@ return (PIC) address
-@@ -201,7 +204,8 @@ ENDPROC(__after_proc_init)
-  * Region 3: Normal, shared, inaccessible from PL0 to protect the vectors page
-  *
-  * r6: Value to be written to DRSR (and IRSR if required) for MPU_RAM_REGION
--*/
-+ * r0: non zero value indicates error
-+ */
- 
- ENTRY(__setup_mpu)
- 
-@@ -209,13 +213,13 @@ ENTRY(__setup_mpu)
- 	mrc	p15, 0, r0, c0, c1, 4		@ Read ID_MMFR0
- 	and	r0, r0, #(MMFR0_PMSA)		@ PMSA field
- 	teq	r0, #(MMFR0_PMSAv7)		@ PMSA v7
--	bne	__error_p			@ Fail: ARM_MPU on NOT v7 PMSA
-+	bne	__nompu
- 
- 	/* Determine whether the D/I-side memory map is unified. We set the
- 	 * flags here and continue to use them for the rest of this function */
- 	mrc	p15, 0, r0, c0, c0, 4		@ MPUIR
- 	ands	r5, r0, #MPUIR_DREGION_SZMASK	@ 0 size d region => No MPU
--	beq	__error_p			@ Fail: ARM_MPU and no MPU
-+	beq	__nompu
- 	tst	r0, #MPUIR_nU			@ MPUIR_nU = 0 for unified
- 
- 	/* Setup second region first to free up r6 */
-@@ -263,6 +267,11 @@ ENTRY(__setup_mpu)
- 	orr	r0, r0, #CR_M			@ Set SCTRL.M (MPU on)
- 	mcr	p15, 0, r0, c1, c0, 0		@ Enable MPU
- 	isb
-+
-+	mov	r0, #0
-+	ret	lr
-+__nompu:
-+	mov	r0, #-ENODEV
- 	ret	lr
- ENDPROC(__setup_mpu)
- #endif
 -- 
 1.7.9.5
