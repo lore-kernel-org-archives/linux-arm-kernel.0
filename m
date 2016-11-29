@@ -1,829 +1,118 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 29 Nov 2016 19:02:23 +0900
-Subject: [PATCH] extcon: Split out the extcon APIs for extcon provider driver
-Message-ID: <1480413743-13037-1-git-send-email-cw00.choi@samsung.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 29 Nov 2016 11:05:37 +0100
+Subject: [PATCH v3 net-next 0/6] Support Armada 37xx SoC (ARMv8 64-bits)
+ in mvneta driver
+In-Reply-To: <cover.a09aeaf5ba62853d595153626b6121ef52a3e9b4.1480412215.git-series.gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Tue, 29 Nov 2016 10:37:20 +0100")
+References: <cover.a09aeaf5ba62853d595153626b6121ef52a3e9b4.1480412215.git-series.gregory.clement@free-electrons.com>
+Message-ID: <871sxuha8e.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchs split out the extcon APIs of extcon provider driver in order to
-prevent the direct access of struct extcon_dev by extcon consumer driver.
-The extcon consumer driver don't need to handle the extcon provider APIs.
+Hi,
+ 
+ On mar., nov. 29 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-The extcon subsystem has two type of extcon drivers as following:
-- extcon provider driver
-: Detect the external connector and identify the state/property of
-  each external connector. And it send the notification to synchronize
-  the information between provider and consumer driver.
-- extcon consumer driver
-: Receive the notifcation from extcon provider driver. When receving the noti,
-  it can get the both state and property of specific external connector.
+> Hi,
+>
+> The Armada 37xx is a new ARMv8 SoC from Marvell using same network
+> controller as the older Armada 370/38x/XP SoCs. This series adapts the
+> driver in order to be able to use it on this new SoC. The main changes
+> are:
+>
+> - 64-bits support: the first patches allow using the driver on a 64-bit
+>   architecture.
+>
+> - MBUS support: the mbus configuration is different on Armada 37xx
+>   from the older SoCs.
+>
+> - per cpu interrupt: Armada 37xx do not support per cpu interrupt for
+>   the NETA IP, the non-per-CPU behavior was added back.
+>
+> The first item is solved by patches 1 to 3.
+> The 2 last items are solved by patch 4.
+> In patch 5 the dt support is added.
+>
+> Beside Armada 37xx, the series have been tested on Armada XP and
+> Armada 38x (with Hardware Buffer Management and with Software Buffer
+> Managment).
+>
+> Thanks,
+>
 
-Cc: Myungjoo Ham <myungjoo.ham@samsung.com>
-Cc: Chen-Yu Tsai <wens@csie.org>
-Cc: Krzysztof Kozlowski <krzk@kernel.org>
-Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Felipe Balbi <balbi@kernel.org>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Chris Zhong <zyw@rock-chips.com>
-Cc: Roger Quadros <rogerq@ti.com>
-Cc: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
-Cc: patches at opensource.wolfsonmicro.com
-Cc: linux-renesas-soc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-usb at vger.kernel.org
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
----
- drivers/extcon/devres.c                |   2 +-
- drivers/extcon/extcon-adc-jack.c       |   2 +-
- drivers/extcon/extcon-arizona.c        |   2 +-
- drivers/extcon/extcon-axp288.c         |   2 +-
- drivers/extcon/extcon-gpio.c           |   2 +-
- drivers/extcon/extcon-max14577.c       |   2 +-
- drivers/extcon/extcon-max3355.c        |   2 +-
- drivers/extcon/extcon-max77693.c       |   2 +-
- drivers/extcon/extcon-max77843.c       |   2 +-
- drivers/extcon/extcon-max8997.c        |   2 +-
- drivers/extcon/extcon-palmas.c         |   1 +
- drivers/extcon/extcon-qcom-spmi-misc.c |   2 +-
- drivers/extcon/extcon-rt8973a.c        |   2 +-
- drivers/extcon/extcon-sm5502.c         |   2 +-
- drivers/extcon/extcon-usb-gpio.c       |   2 +-
- drivers/extcon/extcon.c                |   2 +-
- drivers/phy/phy-rcar-gen3-usb2.c       |   2 +-
- drivers/phy/phy-sun4i-usb.c            |   2 +-
- drivers/power/supply/qcom_smbb.c       |   2 +-
- drivers/usb/phy/phy-tahvo.c            |   2 +-
- include/linux/extcon-provider.h        | 262 +++++++++++++++++++++++++++++++++
- include/linux/extcon.h                 | 168 +--------------------
- 22 files changed, 286 insertions(+), 183 deletions(-)
- create mode 100644 include/linux/extcon-provider.h
+I forgot to commit my cover with git series, so it was the old one. It
+should have been the following one:
 
-diff --git a/drivers/extcon/devres.c b/drivers/extcon/devres.c
-index e686acd1c459..1b7dce13b21b 100644
---- a/drivers/extcon/devres.c
-+++ b/drivers/extcon/devres.c
-@@ -14,7 +14,7 @@
-  * GNU General Public License for more details.
-  */
- 
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- 
- static int devm_extcon_dev_match(struct device *dev, void *res, void *data)
- {
-diff --git a/drivers/extcon/extcon-adc-jack.c b/drivers/extcon/extcon-adc-jack.c
-index bc538708c753..0882813a95f9 100644
---- a/drivers/extcon/extcon-adc-jack.c
-+++ b/drivers/extcon/extcon-adc-jack.c
-@@ -26,7 +26,7 @@
- #include <linux/workqueue.h>
- #include <linux/iio/consumer.h>
- #include <linux/extcon/extcon-adc-jack.h>
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- 
- /**
-  * struct adc_jack_data - internal data for adc_jack device driver
-diff --git a/drivers/extcon/extcon-arizona.c b/drivers/extcon/extcon-arizona.c
-index aeab47df9233..292878714ed9 100644
---- a/drivers/extcon/extcon-arizona.c
-+++ b/drivers/extcon/extcon-arizona.c
-@@ -27,7 +27,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/property.h>
- #include <linux/regulator/consumer.h>
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- 
- #include <sound/soc.h>
- 
-diff --git a/drivers/extcon/extcon-axp288.c b/drivers/extcon/extcon-axp288.c
-index 42f41e808292..f5b3687d29e8 100644
---- a/drivers/extcon/extcon-axp288.c
-+++ b/drivers/extcon/extcon-axp288.c
-@@ -23,7 +23,7 @@
- #include <linux/property.h>
- #include <linux/usb/phy.h>
- #include <linux/notifier.h>
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- #include <linux/regmap.h>
- #include <linux/gpio.h>
- #include <linux/gpio/consumer.h>
-diff --git a/drivers/extcon/extcon-gpio.c b/drivers/extcon/extcon-gpio.c
-index ebed22f22d75..ab770adcca7e 100644
---- a/drivers/extcon/extcon-gpio.c
-+++ b/drivers/extcon/extcon-gpio.c
-@@ -17,7 +17,7 @@
-  * GNU General Public License for more details.
-  */
- 
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- #include <linux/extcon/extcon-gpio.h>
- #include <linux/gpio.h>
- #include <linux/gpio/consumer.h>
-diff --git a/drivers/extcon/extcon-max14577.c b/drivers/extcon/extcon-max14577.c
-index 12e26c4e7763..9a7524ebf698 100644
---- a/drivers/extcon/extcon-max14577.c
-+++ b/drivers/extcon/extcon-max14577.c
-@@ -23,7 +23,7 @@
- #include <linux/platform_device.h>
- #include <linux/mfd/max14577.h>
- #include <linux/mfd/max14577-private.h>
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- 
- #define	DELAY_MS_DEFAULT		17000		/* unit: millisecond */
- 
-diff --git a/drivers/extcon/extcon-max3355.c b/drivers/extcon/extcon-max3355.c
-index 533e16a952b8..0aa410836f4e 100644
---- a/drivers/extcon/extcon-max3355.c
-+++ b/drivers/extcon/extcon-max3355.c
-@@ -9,7 +9,7 @@
-  * may be copied, distributed, and modified under those terms.
-  */
- 
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- #include <linux/gpio.h>
- #include <linux/gpio/consumer.h>
- #include <linux/interrupt.h>
-diff --git a/drivers/extcon/extcon-max77693.c b/drivers/extcon/extcon-max77693.c
-index 68dbcb814b2f..d49339591cb6 100644
---- a/drivers/extcon/extcon-max77693.c
-+++ b/drivers/extcon/extcon-max77693.c
-@@ -26,7 +26,7 @@
- #include <linux/mfd/max77693.h>
- #include <linux/mfd/max77693-common.h>
- #include <linux/mfd/max77693-private.h>
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- #include <linux/regmap.h>
- #include <linux/irqdomain.h>
- 
-diff --git a/drivers/extcon/extcon-max77843.c b/drivers/extcon/extcon-max77843.c
-index 5d11fdf36e94..ad288b6d475f 100644
---- a/drivers/extcon/extcon-max77843.c
-+++ b/drivers/extcon/extcon-max77843.c
-@@ -11,7 +11,7 @@
-  * (at your option) any later version.
-  */
- 
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- #include <linux/i2c.h>
- #include <linux/interrupt.h>
- #include <linux/kernel.h>
-diff --git a/drivers/extcon/extcon-max8997.c b/drivers/extcon/extcon-max8997.c
-index 4a0612fb9c07..8152790d72e1 100644
---- a/drivers/extcon/extcon-max8997.c
-+++ b/drivers/extcon/extcon-max8997.c
-@@ -25,7 +25,7 @@
- #include <linux/kobject.h>
- #include <linux/mfd/max8997.h>
- #include <linux/mfd/max8997-private.h>
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- #include <linux/irqdomain.h>
- 
- #define	DEV_NAME			"max8997-muic"
-diff --git a/drivers/extcon/extcon-palmas.c b/drivers/extcon/extcon-palmas.c
-index 634ba70782de..a093fc2a56e8 100644
---- a/drivers/extcon/extcon-palmas.c
-+++ b/drivers/extcon/extcon-palmas.c
-@@ -25,6 +25,7 @@
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/err.h>
-+#include <linux/extcon-provider.h>
- #include <linux/mfd/palmas.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
-diff --git a/drivers/extcon/extcon-qcom-spmi-misc.c b/drivers/extcon/extcon-qcom-spmi-misc.c
-index b8cde096a808..660bbf163bf5 100644
---- a/drivers/extcon/extcon-qcom-spmi-misc.c
-+++ b/drivers/extcon/extcon-qcom-spmi-misc.c
-@@ -15,7 +15,7 @@
-  * GNU General Public License for more details.
-  */
- 
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/kernel.h>
-diff --git a/drivers/extcon/extcon-rt8973a.c b/drivers/extcon/extcon-rt8973a.c
-index 174c388739ea..64442f236855 100644
---- a/drivers/extcon/extcon-rt8973a.c
-+++ b/drivers/extcon/extcon-rt8973a.c
-@@ -20,7 +20,7 @@
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
- #include <linux/slab.h>
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- 
- #include "extcon-rt8973a.h"
- 
-diff --git a/drivers/extcon/extcon-sm5502.c b/drivers/extcon/extcon-sm5502.c
-index b22325688503..9e2483e70533 100644
---- a/drivers/extcon/extcon-sm5502.c
-+++ b/drivers/extcon/extcon-sm5502.c
-@@ -19,7 +19,7 @@
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
- #include <linux/slab.h>
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- 
- #include "extcon-sm5502.h"
- 
-diff --git a/drivers/extcon/extcon-usb-gpio.c b/drivers/extcon/extcon-usb-gpio.c
-index d589c5feff3d..98e5e3eb5317 100644
---- a/drivers/extcon/extcon-usb-gpio.c
-+++ b/drivers/extcon/extcon-usb-gpio.c
-@@ -14,7 +14,7 @@
-  * GNU General Public License for more details.
-  */
- 
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- #include <linux/gpio.h>
- #include <linux/gpio/consumer.h>
- #include <linux/init.h>
-diff --git a/drivers/extcon/extcon.c b/drivers/extcon/extcon.c
-index 78298460d168..6eaeffe8bd88 100644
---- a/drivers/extcon/extcon.c
-+++ b/drivers/extcon/extcon.c
-@@ -30,7 +30,7 @@
- #include <linux/device.h>
- #include <linux/fs.h>
- #include <linux/err.h>
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- #include <linux/of.h>
- #include <linux/slab.h>
- #include <linux/sysfs.h>
-diff --git a/drivers/phy/phy-rcar-gen3-usb2.c b/drivers/phy/phy-rcar-gen3-usb2.c
-index 3d97eadd247d..bd2430d7339c 100644
---- a/drivers/phy/phy-rcar-gen3-usb2.c
-+++ b/drivers/phy/phy-rcar-gen3-usb2.c
-@@ -12,7 +12,7 @@
-  * published by the Free Software Foundation.
-  */
- 
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/module.h>
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index fec34f5213c4..eeda5134c777 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -24,7 +24,7 @@
- #include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/err.h>
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- #include <linux/io.h>
- #include <linux/interrupt.h>
- #include <linux/kernel.h>
-diff --git a/drivers/power/supply/qcom_smbb.c b/drivers/power/supply/qcom_smbb.c
-index b5896ba2a602..bb91a1c339bc 100644
---- a/drivers/power/supply/qcom_smbb.c
-+++ b/drivers/power/supply/qcom_smbb.c
-@@ -34,7 +34,7 @@
- #include <linux/power_supply.h>
- #include <linux/regmap.h>
- #include <linux/slab.h>
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- 
- #define SMBB_CHG_VMAX		0x040
- #define SMBB_CHG_VSAFE		0x041
-diff --git a/drivers/usb/phy/phy-tahvo.c b/drivers/usb/phy/phy-tahvo.c
-index ab5d364f6e8c..1343bff004eb 100644
---- a/drivers/usb/phy/phy-tahvo.c
-+++ b/drivers/usb/phy/phy-tahvo.c
-@@ -23,7 +23,7 @@
- #include <linux/io.h>
- #include <linux/clk.h>
- #include <linux/usb.h>
--#include <linux/extcon.h>
-+#include <linux/extcon-provider.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/usb/otg.h>
-diff --git a/include/linux/extcon-provider.h b/include/linux/extcon-provider.h
-new file mode 100644
-index 000000000000..e91dc028184b
---- /dev/null
-+++ b/include/linux/extcon-provider.h
-@@ -0,0 +1,262 @@
-+/*
-+ * linux/include/linux/extcon-provider.h
-+ *
-+ * Copyright (C) 2016 Samsung Electronics
-+ * Author: Chanwoo Choi <cw00.choi@samsung.com>
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __LINUX_EXTCON_PROVIDER_H__
-+#define __LINUX_EXTCON_PROVIDER_H__
-+
-+#include <linux/extcon.h>
-+
-+/**
-+ * struct extcon_dev - An extcon device represents one external connector.
-+ * @name:		The name of this extcon device. Parent device name is
-+ *			used if NULL.
-+ * @supported_cable:	Array of supported cable names ending with EXTCON_NONE.
-+ *			If supported_cable is NULL, cable name related APIs
-+ *			are disabled.
-+ * @mutually_exclusive:	Array of mutually exclusive set of cables that cannot
-+ *			be attached simultaneously. The array should be
-+ *			ending with NULL or be NULL (no mutually exclusive
-+ *			cables). For example, if it is { 0x7, 0x30, 0}, then,
-+ *			{0, 1}, {0, 1, 2}, {0, 2}, {1, 2}, or {4, 5} cannot
-+ *			be attached simulataneously. {0x7, 0} is equivalent to
-+ *			{0x3, 0x6, 0x5, 0}. If it is {0xFFFFFFFF, 0}, there
-+ *			can be no simultaneous connections.
-+ * @dev:		Device of this extcon.
-+ * @state:		Attach/detach state of this extcon. Do not provide at
-+ *			register-time.
-+ * @nh:			Notifier for the state change events from this extcon
-+ * @entry:		To support list of extcon devices so that users can
-+ *			search for extcon devices based on the extcon name.
-+ * @lock:
-+ * @max_supported:	Internal value to store the number of cables.
-+ * @extcon_dev_type:	Device_type struct to provide attribute_groups
-+ *			customized for each extcon device.
-+ * @cables:		Sysfs subdirectories. Each represents one cable.
-+ *
-+ * In most cases, users only need to provide "User initializing data" of
-+ * this struct when registering an extcon. In some exceptional cases,
-+ * optional callbacks may be needed. However, the values in "internal data"
-+ * are overwritten by register function.
-+ */
-+struct extcon_dev {
-+	/* Optional user initializing data */
-+	const char *name;
-+	const unsigned int *supported_cable;
-+	const u32 *mutually_exclusive;
-+
-+	/* Internal data. Please do not set. */
-+	struct device dev;
-+	struct raw_notifier_head *nh;
-+	struct list_head entry;
-+	int max_supported;
-+	spinlock_t lock;	/* could be called by irq handler */
-+	u32 state;
-+
-+	/* /sys/class/extcon/.../cable.n/... */
-+	struct device_type extcon_dev_type;
-+	struct extcon_cable *cables;
-+
-+	/* /sys/class/extcon/.../mutually_exclusive/... */
-+	struct attribute_group attr_g_muex;
-+	struct attribute **attrs_muex;
-+	struct device_attribute *d_attrs_muex;
-+};
-+
-+#if IS_ENABLED(CONFIG_EXTCON)
-+
-+/*
-+ * Following APIs are for notifiers or configurations.
-+ * Notifiers are the external port and connection devices.
-+ */
-+extern int extcon_dev_register(struct extcon_dev *edev);
-+extern void extcon_dev_unregister(struct extcon_dev *edev);
-+extern int devm_extcon_dev_register(struct device *dev,
-+				    struct extcon_dev *edev);
-+extern void devm_extcon_dev_unregister(struct device *dev,
-+				       struct extcon_dev *edev);
-+
-+/*
-+ * Following APIs control the memory of extcon device.
-+ */
-+extern struct extcon_dev *extcon_dev_allocate(const unsigned int *cable);
-+extern void extcon_dev_free(struct extcon_dev *edev);
-+extern struct extcon_dev *devm_extcon_dev_allocate(struct device *dev,
-+						   const unsigned int *cable);
-+extern void devm_extcon_dev_free(struct device *dev, struct extcon_dev *edev);
-+
-+/*
-+ * set_state access each bit of the 32b encoded state value.
-+ * They are used to access the status of each cable based on the cable id.
-+ */
-+extern int extcon_set_state(struct extcon_dev *edev, unsigned int id,
-+				   bool cable_state);
-+extern int extcon_set_state_sync(struct extcon_dev *edev, unsigned int id,
-+				bool cable_state);
-+
-+/*
-+ * Synchronize the state and property data for a specific external connector.
-+ */
-+extern int extcon_sync(struct extcon_dev *edev, unsigned int id);
-+
-+/*
-+ * set_property access the property value of each external connector.
-+ * They are used to access the property of each cable based on the property id.
-+ */
-+extern int extcon_set_property(struct extcon_dev *edev, unsigned int id,
-+				unsigned int prop,
-+				union extcon_property_value prop_val);
-+extern int extcon_set_property_sync(struct extcon_dev *edev, unsigned int id,
-+				unsigned int prop,
-+				union extcon_property_value prop_val);
-+
-+/*
-+ * set_property_capability set the capability of the property for each
-+ * external connector. They are used to set the capability of the property
-+ * of each external connector based on the id and property.
-+ */
-+extern int extcon_set_property_capability(struct extcon_dev *edev,
-+				unsigned int id, unsigned int prop);
-+
-+/*
-+ * Following APIs are to monitor every action of a notifier.
-+ * Registrar gets notified for every external port of a connection device.
-+ * Probably this could be used to debug an action of notifier; however,
-+ * we do not recommend to use this for normal 'notifiee' device drivers who
-+ * want to be notified by a specific external port of the notifier.
-+ */
-+extern int extcon_register_notifier(struct extcon_dev *edev, unsigned int id,
-+				    struct notifier_block *nb);
-+extern int extcon_unregister_notifier(struct extcon_dev *edev, unsigned int id,
-+				    struct notifier_block *nb);
-+extern int devm_extcon_register_notifier(struct device *dev,
-+				struct extcon_dev *edev, unsigned int id,
-+				struct notifier_block *nb);
-+extern void devm_extcon_unregister_notifier(struct device *dev,
-+				struct extcon_dev *edev, unsigned int id,
-+				struct notifier_block *nb);
-+
-+/*
-+ * Following API get the extcon device from devicetree.
-+ * This function use phandle of devicetree to get extcon device directly.
-+ */
-+extern struct extcon_dev *extcon_get_edev_by_phandle(struct device *dev,
-+						     int index);
-+
-+/* Following API to get information of extcon device */
-+extern const char *extcon_get_edev_name(struct extcon_dev *edev);
-+
-+
-+#else /* CONFIG_EXTCON */
-+static inline int extcon_dev_register(struct extcon_dev *edev)
-+{
-+	return 0;
-+}
-+
-+static inline void extcon_dev_unregister(struct extcon_dev *edev) { }
-+
-+static inline int devm_extcon_dev_register(struct device *dev,
-+					   struct extcon_dev *edev)
-+{
-+	return -EINVAL;
-+}
-+
-+static inline void devm_extcon_dev_unregister(struct device *dev,
-+					      struct extcon_dev *edev) { }
-+
-+static inline struct extcon_dev *extcon_dev_allocate(const unsigned int *cable)
-+{
-+	return ERR_PTR(-ENOSYS);
-+}
-+
-+static inline void extcon_dev_free(struct extcon_dev *edev) { }
-+
-+static inline struct extcon_dev *devm_extcon_dev_allocate(struct device *dev,
-+						const unsigned int *cable)
-+{
-+	return ERR_PTR(-ENOSYS);
-+}
-+
-+static inline void devm_extcon_dev_free(struct extcon_dev *edev) { }
-+
-+static inline int extcon_set_state(struct extcon_dev *edev, unsigned int id,
-+				bool cable_state)
-+{
-+	return 0;
-+}
-+
-+static inline int extcon_set_state_sync(struct extcon_dev *edev, unsigned int id,
-+				bool cable_state)
-+{
-+	return 0;
-+}
-+
-+static inline int extcon_sync(struct extcon_dev *edev, unsigned int id)
-+{
-+	return 0;
-+}
-+
-+static inline int extcon_set_property(struct extcon_dev *edev, unsigned int id,
-+					unsigned int prop,
-+					union extcon_property_value prop_val)
-+{
-+	return 0;
-+}
-+
-+static inline int extcon_set_property_sync(struct extcon_dev *edev,
-+					unsigned int id, unsigned int prop,
-+					union extcon_property_value prop_val)
-+{
-+	return 0;
-+}
-+
-+static inline int extcon_set_property_capability(struct extcon_dev *edev,
-+					unsigned int id, unsigned int prop)
-+{
-+	return 0;
-+}
-+
-+static inline int extcon_register_notifier(struct extcon_dev *edev,
-+					unsigned int id,
-+					struct notifier_block *nb)
-+{
-+	return 0;
-+}
-+
-+static inline int extcon_unregister_notifier(struct extcon_dev *edev,
-+					unsigned int id,
-+					struct notifier_block *nb)
-+{
-+	return 0;
-+}
-+
-+static inline int devm_extcon_register_notifier(struct device *dev,
-+				struct extcon_dev *edev, unsigned int id,
-+				struct notifier_block *nb)
-+{
-+	return -ENOSYS;
-+}
-+
-+static inline  void devm_extcon_unregister_notifier(struct device *dev,
-+				struct extcon_dev *edev, unsigned int id,
-+				struct notifier_block *nb) { }
-+#endif /* CONFIG_EXTCON */
-+
-+/*
-+ * Following API are deprecated. EXTCON remains the function definition
-+ * to prevent the build break.
-+ */
-+static inline int extcon_set_cable_state_(struct extcon_dev *edev, unsigned int id,
-+				   bool cable_state)
-+{
-+	return extcon_set_state_sync(edev, id, cable_state);
-+}
-+#endif /* __LINUX_EXTCON_PROVIDER_H__ */
-diff --git a/include/linux/extcon.h b/include/linux/extcon.h
-index b871c0cb1f02..8cb2ef6dcbe0 100644
---- a/include/linux/extcon.h
-+++ b/include/linux/extcon.h
-@@ -160,62 +160,7 @@
- };
- 
- struct extcon_cable;
--
--/**
-- * struct extcon_dev - An extcon device represents one external connector.
-- * @name:		The name of this extcon device. Parent device name is
-- *			used if NULL.
-- * @supported_cable:	Array of supported cable names ending with EXTCON_NONE.
-- *			If supported_cable is NULL, cable name related APIs
-- *			are disabled.
-- * @mutually_exclusive:	Array of mutually exclusive set of cables that cannot
-- *			be attached simultaneously. The array should be
-- *			ending with NULL or be NULL (no mutually exclusive
-- *			cables). For example, if it is { 0x7, 0x30, 0}, then,
-- *			{0, 1}, {0, 1, 2}, {0, 2}, {1, 2}, or {4, 5} cannot
-- *			be attached simulataneously. {0x7, 0} is equivalent to
-- *			{0x3, 0x6, 0x5, 0}. If it is {0xFFFFFFFF, 0}, there
-- *			can be no simultaneous connections.
-- * @dev:		Device of this extcon.
-- * @state:		Attach/detach state of this extcon. Do not provide at
-- *			register-time.
-- * @nh:			Notifier for the state change events from this extcon
-- * @entry:		To support list of extcon devices so that users can
-- *			search for extcon devices based on the extcon name.
-- * @lock:
-- * @max_supported:	Internal value to store the number of cables.
-- * @extcon_dev_type:	Device_type struct to provide attribute_groups
-- *			customized for each extcon device.
-- * @cables:		Sysfs subdirectories. Each represents one cable.
-- *
-- * In most cases, users only need to provide "User initializing data" of
-- * this struct when registering an extcon. In some exceptional cases,
-- * optional callbacks may be needed. However, the values in "internal data"
-- * are overwritten by register function.
-- */
--struct extcon_dev {
--	/* Optional user initializing data */
--	const char *name;
--	const unsigned int *supported_cable;
--	const u32 *mutually_exclusive;
--
--	/* Internal data. Please do not set. */
--	struct device dev;
--	struct raw_notifier_head *nh;
--	struct list_head entry;
--	int max_supported;
--	spinlock_t lock;	/* could be called by irq handler */
--	u32 state;
--
--	/* /sys/class/extcon/.../cable.n/... */
--	struct device_type extcon_dev_type;
--	struct extcon_cable *cables;
--
--	/* /sys/class/extcon/.../mutually_exclusive/... */
--	struct attribute_group attr_g_muex;
--	struct attribute **attrs_muex;
--	struct device_attribute *d_attrs_muex;
--};
-+struct extcon_dev;
- 
- #if IS_ENABLED(CONFIG_EXTCON)
- 
-@@ -223,60 +168,29 @@ struct extcon_dev {
-  * Following APIs are for notifiers or configurations.
-  * Notifiers are the external port and connection devices.
-  */
--extern int extcon_dev_register(struct extcon_dev *edev);
--extern void extcon_dev_unregister(struct extcon_dev *edev);
--extern int devm_extcon_dev_register(struct device *dev,
--				    struct extcon_dev *edev);
--extern void devm_extcon_dev_unregister(struct device *dev,
--				       struct extcon_dev *edev);
- extern struct extcon_dev *extcon_get_extcon_dev(const char *extcon_name);
- 
- /*
-- * Following APIs control the memory of extcon device.
-- */
--extern struct extcon_dev *extcon_dev_allocate(const unsigned int *cable);
--extern void extcon_dev_free(struct extcon_dev *edev);
--extern struct extcon_dev *devm_extcon_dev_allocate(struct device *dev,
--						   const unsigned int *cable);
--extern void devm_extcon_dev_free(struct device *dev, struct extcon_dev *edev);
--
--/*
-- * get/set_state access each bit of the 32b encoded state value.
-+ * get_state access each bit of the 32b encoded state value.
-  * They are used to access the status of each cable based on the cable id.
-  */
- extern int extcon_get_state(struct extcon_dev *edev, unsigned int id);
--extern int extcon_set_state(struct extcon_dev *edev, unsigned int id,
--				   bool cable_state);
--extern int extcon_set_state_sync(struct extcon_dev *edev, unsigned int id,
--				bool cable_state);
--/*
-- * Synchronize the state and property data for a specific external connector.
-- */
--extern int extcon_sync(struct extcon_dev *edev, unsigned int id);
- 
- /*
-- * get/set_property access the property value of each external connector.
-+ * get_property access the property value of each external connector.
-  * They are used to access the property of each cable based on the property id.
-  */
- extern int extcon_get_property(struct extcon_dev *edev, unsigned int id,
- 				unsigned int prop,
- 				union extcon_property_value *prop_val);
--extern int extcon_set_property(struct extcon_dev *edev, unsigned int id,
--				unsigned int prop,
--				union extcon_property_value prop_val);
--extern int extcon_set_property_sync(struct extcon_dev *edev, unsigned int id,
--				unsigned int prop,
--				union extcon_property_value prop_val);
- 
- /*
-- * get/set_property_capability set the capability of the property for each
-+ * get_property_capability set the capability of the property for each
-  * external connector. They are used to set the capability of the property
-  * of each external connector based on the id and property.
-  */
- extern int extcon_get_property_capability(struct extcon_dev *edev,
- 				unsigned int id, unsigned int prop);
--extern int extcon_set_property_capability(struct extcon_dev *edev,
--				unsigned int id, unsigned int prop);
- 
- /*
-  * Following APIs are to monitor every action of a notifier.
-@@ -306,81 +220,19 @@ extern struct extcon_dev *extcon_get_edev_by_phandle(struct device *dev,
- /* Following API to get information of extcon device */
- extern const char *extcon_get_edev_name(struct extcon_dev *edev);
- 
--
- #else /* CONFIG_EXTCON */
--static inline int extcon_dev_register(struct extcon_dev *edev)
--{
--	return 0;
--}
--
--static inline void extcon_dev_unregister(struct extcon_dev *edev) { }
--
--static inline int devm_extcon_dev_register(struct device *dev,
--					   struct extcon_dev *edev)
--{
--	return -EINVAL;
--}
--
--static inline void devm_extcon_dev_unregister(struct device *dev,
--					      struct extcon_dev *edev) { }
--
--static inline struct extcon_dev *extcon_dev_allocate(const unsigned int *cable)
--{
--	return ERR_PTR(-ENOSYS);
--}
--
--static inline void extcon_dev_free(struct extcon_dev *edev) { }
--
--static inline struct extcon_dev *devm_extcon_dev_allocate(struct device *dev,
--						const unsigned int *cable)
--{
--	return ERR_PTR(-ENOSYS);
--}
--
--static inline void devm_extcon_dev_free(struct extcon_dev *edev) { }
--
- 
- static inline int extcon_get_state(struct extcon_dev *edev, unsigned int id)
- {
- 	return 0;
- }
- 
--static inline int extcon_set_state(struct extcon_dev *edev, unsigned int id,
--				bool cable_state)
--{
--	return 0;
--}
--
--static inline int extcon_set_state_sync(struct extcon_dev *edev, unsigned int id,
--				bool cable_state)
--{
--	return 0;
--}
--
--static inline int extcon_sync(struct extcon_dev *edev, unsigned int id)
--{
--	return 0;
--}
--
- static inline int extcon_get_property(struct extcon_dev *edev, unsigned int id,
- 					unsigned int prop,
- 					union extcon_property_value *prop_val)
- {
- 	return 0;
- }
--static inline int extcon_set_property(struct extcon_dev *edev, unsigned int id,
--					unsigned int prop,
--					union extcon_property_value prop_val)
--{
--	return 0;
--}
--
--static inline int extcon_set_property_sync(struct extcon_dev *edev,
--					unsigned int id, unsigned int prop,
--					union extcon_property_value prop_val)
--{
--	return 0;
--}
- 
- static inline int extcon_get_property_capability(struct extcon_dev *edev,
- 					unsigned int id, unsigned int prop)
-@@ -388,12 +240,6 @@ static inline int extcon_get_property_capability(struct extcon_dev *edev,
- 	return 0;
- }
- 
--static inline int extcon_set_property_capability(struct extcon_dev *edev,
--					unsigned int id, unsigned int prop)
--{
--	return 0;
--}
--
- static inline struct extcon_dev *extcon_get_extcon_dev(const char *extcon_name)
- {
- 	return NULL;
-@@ -459,10 +305,4 @@ static inline int extcon_get_cable_state_(struct extcon_dev *edev, unsigned int
- {
- 	return extcon_get_state(edev, id);
- }
--
--static inline int extcon_set_cable_state_(struct extcon_dev *edev, unsigned int id,
--				   bool cable_state)
--{
--	return extcon_set_state_sync(edev, id, cable_state);
--}
- #endif /* __LINUX_EXTCON_H__ */
+Hi,
+
+The Armada 37xx is a new ARMv8 SoC from Marvell using same network
+controller as the older Armada 370/38x/XP SoCs. This series adapts the
+driver in order to be able to use it on this new SoC. The main changes
+are:
+
+- 64-bits support: the first patches allow using the driver on a 64-bit
+  architecture.
+
+- MBUS support: the mbus configuration is different on Armada 37xx
+  from the older SoCs.
+
+- per cpu interrupt: Armada 37xx do not support per cpu interrupt for
+  the NETA IP, the non-per-CPU behavior was added back.
+
+The first patch is an optimization in the rx path in swbm mode.
+The first item is solved by patches 2 to 3.
+The 2 last items are solved by patch 5.
+In patch 6 the dt support is added.
+
+Beside Armada 37xx, this new series have been again tested on Armada
+XP and Armada 38x (with Hardware Buffer Management and with Software
+Buffer Management).
+
+This is the 3th version of the series:
+
+- 1st version:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-November/469588.html
+
+- 2nd version:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-November/470476.html
+
+Changelog:
+v2 -> v3:
+
+ - Adding patch 1 "Optimize rx path for small frame"
+
+ - Fix the kbuild error by moving the "phys_addr += pp->rx_offset_correction;"
+  line from patch 2 to patch 3 where rx_offset_correction is introduced.
+
+ - Move the memory allocation of the buf_virt_addr of the rxq to be
+   called by the probe function in order to avoid a memory leak.
+
+
+> Gregory
+>
+> Gregory CLEMENT (4):
+>   net: mvneta: Optimize rx path for small frame
+>   net: mvneta: Use cacheable memory to store the rx buffer virtual address
+>   net: mvneta: Only disable mvneta_bm for 64-bits
+>   ARM64: dts: marvell: Add network support for Armada 3700
+>
+> Marcin Wojtas (2):
+>   net: mvneta: Convert to be 64 bits compatible
+>   net: mvneta: Add network support for Armada 3700 SoC
+>
+>  Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt |   7 +-
+>  arch/arm64/boot/dts/marvell/armada-3720-db.dts                    |  23 ++++-
+>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi                      |  23 ++++-
+>  drivers/net/ethernet/marvell/Kconfig                              |  10 +-
+>  drivers/net/ethernet/marvell/mvneta.c                             | 400 ++++++++++++++++++++++++++++++++++++++++++++++++++++++------------------
+>  5 files changed, 361 insertions(+), 102 deletions(-)
+>
+> base-commit: 436accebb53021ef7c63535f60bda410aa87c136
+> -- 
+> git-series 0.8.10
+
 -- 
-1.9.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
