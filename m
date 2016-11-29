@@ -1,52 +1,32 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 29 Nov 2016 22:10:01 +0200
-Subject: [PATCH v7 4/8] drm/sunxi: Add DT bindings documentation of
- Allwinner HDMI
-In-Reply-To: <20161129210455.d0c8450d3ceb83c1abe521b0@free.fr>
-References: <cover.1480414715.git.moinejf@free.fr> <6356753.Ekaj7GdA0W@avalon>
- <20161129210455.d0c8450d3ceb83c1abe521b0@free.fr>
-Message-ID: <4502748.8rUF7ESxa4@avalon>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Tue, 29 Nov 2016 14:45:10 -0600
+Subject: [PATCH] arm64: dts: juno: Correct PCI IO window
+Message-ID: <1480452310-29286-1-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Fran?ois,
+The PCIe root complex on Juno translates the MMIO mapped
+at 0x5f800000 to the PIO address range starting at 0
+(which is common because PIO addresses are generally < 64k).
+Correct the DT to reflect this.
 
-On Tuesday 29 Nov 2016 21:04:55 Jean-Francois Moine wrote:
-> On Tue, 29 Nov 2016 21:33 +0200 Laurent Pinchart wrote:
-> >>> You need a third port for the HDMI encoder output, connected to an
-> >>> HDMI connector DT node.
-> >> 
-> >> I don't see what you mean. The HDMI device is both the encoder
-> >> and connector (as the TDA998x):
-> >
-> > The driver might create both an encoder and a connector, but I very much
-> > doubt that the "allwinner,sun8i-a83t-hdmi" hardware contains a connector,
-> > unless the SoC package has an HDMI connector coming out of it :-)
-> > 
-> >> plane -> DE2 mixer ---> TCON -----> HDMI -----> display device
-> >> ----- plane ------    - CRTC -   - encoder  \
-> >>                                    connector -- (HDMI cable)
-> >>          audio-controller -   - audio-codec /
-> 
-> The schema is the same as the Dove Cubox: the TDA998x is just a chip
-> with some wires going out and the physical connector is supposed to be
-> at the end of the wires.
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I've missed the Dove Cubox DT bindings when they were submitted. Fortunately 
-(or unfortunately for you, depending on how you look at it ;-)) I've paid more 
-attention this time.
-
-> Here, the HDMI pins of the SoC go to a pure hardware chip and then to
-> the physical connector. Which software entity do you want to add?
-
-I don't want to add a software entity, I just want to model the connector in 
-DT as it's present in the system. Even though that's more common for other bus 
-types than HDMI (LVDS for instance) it wouldn't be inconceivable to connect 
-the HDMI signals to an on-board chim instead of an HDMI connector, so the HDMI 
-encoder output should be modelled by a port and connected to a connector DT 
-node in this case.
-
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+index 334271a..7d3a2ac 100644
+--- a/arch/arm64/boot/dts/arm/juno-base.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -393,7 +393,7 @@
+ 		#address-cells = <3>;
+ 		#size-cells = <2>;
+ 		dma-coherent;
+-		ranges = <0x01000000 0x00 0x5f800000 0x00 0x5f800000 0x0 0x00800000>,
++		ranges = <0x01000000 0x00 0x00000000 0x00 0x5f800000 0x0 0x00800000>,
+ 			 <0x02000000 0x00 0x50000000 0x00 0x50000000 0x0 0x08000000>,
+ 			 <0x42000000 0x40 0x00000000 0x40 0x00000000 0x1 0x00000000>;
+ 		#interrupt-cells = <1>;
 -- 
-Regards,
-
-Laurent Pinchart
+2.5.5
