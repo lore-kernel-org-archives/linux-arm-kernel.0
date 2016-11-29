@@ -1,56 +1,89 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 29 Nov 2016 10:37:20 +0100
-Subject: [PATCH v3 net-next 0/6] Support Armada 37xx SoC (ARMv8 64-bits) in
- mvneta driver
-Message-ID: <cover.a09aeaf5ba62853d595153626b6121ef52a3e9b4.1480412215.git-series.gregory.clement@free-electrons.com>
+Date: Tue, 29 Nov 2016 10:37:23 +0100
+Subject: [PATCH v3 net-next 3/6] net: mvneta: Convert to be 64 bits compatible
+In-Reply-To: <cover.a09aeaf5ba62853d595153626b6121ef52a3e9b4.1480412215.git-series.gregory.clement@free-electrons.com>
+References: <cover.a09aeaf5ba62853d595153626b6121ef52a3e9b4.1480412215.git-series.gregory.clement@free-electrons.com>
+Message-ID: <de4cb6627b56e4433bd732b17e58558206510d97.1480412215.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Marcin Wojtas <mw@semihalf.com>
 
-The Armada 37xx is a new ARMv8 SoC from Marvell using same network
-controller as the older Armada 370/38x/XP SoCs. This series adapts the
-driver in order to be able to use it on this new SoC. The main changes
-are:
+Prepare the mvneta driver in order to be usable on the 64 bits platform
+such as the Armada 3700.
 
-- 64-bits support: the first patches allow using the driver on a 64-bit
-  architecture.
+[gregory.clement at free-electrons.com]: this patch was extract from a larger
+one to ease review and maintenance.
 
-- MBUS support: the mbus configuration is different on Armada 37xx
-  from the older SoCs.
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/net/ethernet/marvell/mvneta.c | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
-- per cpu interrupt: Armada 37xx do not support per cpu interrupt for
-  the NETA IP, the non-per-CPU behavior was added back.
-
-The first item is solved by patches 1 to 3.
-The 2 last items are solved by patch 4.
-In patch 5 the dt support is added.
-
-Beside Armada 37xx, the series have been tested on Armada XP and
-Armada 38x (with Hardware Buffer Management and with Software Buffer
-Managment).
-
-Thanks,
-
-Gregory
-
-Gregory CLEMENT (4):
-  net: mvneta: Optimize rx path for small frame
-  net: mvneta: Use cacheable memory to store the rx buffer virtual address
-  net: mvneta: Only disable mvneta_bm for 64-bits
-  ARM64: dts: marvell: Add network support for Armada 3700
-
-Marcin Wojtas (2):
-  net: mvneta: Convert to be 64 bits compatible
-  net: mvneta: Add network support for Armada 3700 SoC
-
- Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt |   7 +-
- arch/arm64/boot/dts/marvell/armada-3720-db.dts                    |  23 ++++-
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi                      |  23 ++++-
- drivers/net/ethernet/marvell/Kconfig                              |  10 +-
- drivers/net/ethernet/marvell/mvneta.c                             | 400 ++++++++++++++++++++++++++++++++++++++++++++++++++++++------------------
- 5 files changed, 361 insertions(+), 102 deletions(-)
-
-base-commit: 436accebb53021ef7c63535f60bda410aa87c136
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 32b142d0e44e..a8bd0d83028f 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -296,6 +296,12 @@
+ /* descriptor aligned size */
+ #define MVNETA_DESC_ALIGNED_SIZE	32
+ 
++/* Number of bytes to be taken into account by HW when putting incoming data
++ * to the buffers. It is needed in case NET_SKB_PAD exceeds maximum packet
++ * offset supported in MVNETA_RXQ_CONFIG_REG(q) registers.
++ */
++#define MVNETA_RX_PKT_OFFSET_CORRECTION		64
++
+ #define MVNETA_RX_PKT_SIZE(mtu) \
+ 	ALIGN((mtu) + MVNETA_MH_SIZE + MVNETA_VLAN_TAG_LEN + \
+ 	      ETH_HLEN + ETH_FCS_LEN,			     \
+@@ -416,6 +422,7 @@ struct mvneta_port {
+ 	u64 ethtool_stats[ARRAY_SIZE(mvneta_statistics)];
+ 
+ 	u32 indir[MVNETA_RSS_LU_TABLE_SIZE];
++	u16 rx_offset_correction;
+ };
+ 
+ /* The mvneta_tx_desc and mvneta_rx_desc structures describe the
+@@ -1807,6 +1814,7 @@ static int mvneta_rx_refill(struct mvneta_port *pp,
+ 		return -ENOMEM;
+ 	}
+ 
++	phys_addr += pp->rx_offset_correction;
+ 	mvneta_rx_desc_fill(rx_desc, phys_addr, data, rxq);
+ 	return 0;
+ }
+@@ -2742,6 +2750,7 @@ static int mvneta_rx_hwbm_refill(struct mvneta_port *pp,
+ 		return -ENOMEM;
+ 	}
+ 
++	phys_addr += pp->rx_offset_correction;
+ 	rx_desc->buf_phys_addr = phys_addr;
+ 	rx_desc->buf_cookie = (uintptr_t)data;
+ 
+@@ -2837,7 +2846,7 @@ static int mvneta_rxq_init(struct mvneta_port *pp,
+ 	mvreg_write(pp, MVNETA_RXQ_SIZE_REG(rxq->id), rxq->size);
+ 
+ 	/* Set Offset */
+-	mvneta_rxq_offset_set(pp, rxq, NET_SKB_PAD);
++	mvneta_rxq_offset_set(pp, rxq, NET_SKB_PAD - pp->rx_offset_correction);
+ 
+ 	/* Set coalescing pkts and time */
+ 	mvneta_rx_pkts_coal_set(pp, rxq, rxq->pkts_coal);
+@@ -4088,6 +4097,13 @@ static int mvneta_probe(struct platform_device *pdev)
+ 
+ 	pp->rxq_def = rxq_def;
+ 
++	/* Set RX packet offset correction for platforms, whose
++	 * NET_SKB_PAD, exceeds 64B. It should be 64B for 64-bit
++	 * platforms and 0B for 32-bit ones.
++	 */
++	pp->rx_offset_correction =
++		max(0, NET_SKB_PAD - MVNETA_RX_PKT_OFFSET_CORRECTION);
++
+ 	pp->indir[0] = rxq_def;
+ 
+ 	pp->clk = devm_clk_get(&pdev->dev, "core");
 -- 
 git-series 0.8.10
