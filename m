@@ -1,39 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 29 Nov 2016 17:06:40 +0000
-Subject: [PATCH v7 04/16] drivers: iommu: make of_iommu_set/get_ops() DT
- agnostic
-In-Reply-To: <20161129160549.GH2078@8bytes.org>
-References: <20161111152248.GS2078@8bytes.org>
- <552e674a-f434-f08f-8e16-a94544ce8e6e@arm.com>
- <20161111162736.GV2078@8bytes.org>
- <33769e3c-265f-6e89-adf9-6d35b1e03579@arm.com>
- <20161114102654.GA1677@red-moon>
- <41e3eff1-9ce6-bcfb-5716-c65ef38add63@arm.com>
- <20161114155222.GZ2078@8bytes.org>
- <313844ca-d948-1297-84b2-669f3a7d57d2@arm.com>
- <20161116095615.GA25656@red-moon>
- <20161129160549.GH2078@8bytes.org>
-Message-ID: <20161129170639.GH30283@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Nov 2016 17:11:45 +0000
+Subject: [RFC v2 PATCH 11/23] ARM: sleep: allow it to be build for R-class
+In-Reply-To: <1480423205-48436-12-git-send-email-vladimir.murzin@arm.com>
+References: <1480423205-48436-1-git-send-email-vladimir.murzin@arm.com>
+ <1480423205-48436-12-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20161129171145.GW14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 05:05:49PM +0100, Joerg Roedel wrote:
-> On Wed, Nov 16, 2016 at 09:56:15AM +0000, Lorenzo Pieralisi wrote:
-> > I can easily make the changes Robin suggests above, I need to know
-> > what to do with this patch it is the last blocking point for this
-> > series and time is running out I can revert to using dev->bus to
-> > retrieve iommu_ops (even though I do not think it makes sense given
-> > what Robin outlines below) but I need to know please, we can't gate
-> > an entire series for this patch that is just syntactic sugar.
-> 
-> Well, I didn't really object to the approach per-se, I just wanted to
-> know the rationale behind the need for the iommu-ops pointer. So through
-> which tree should this series be merged?
+On Tue, Nov 29, 2016 at 12:39:53PM +0000, Vladimir Murzin wrote:
+> Dependency on MMU is quite strict and prevent R-class from being built -
+> relax this condition and guard against M-class only
 
-I was just about to send a pull request to you, since it conflicts with
-my ARM SMMU patches and the PCI/ACPI bits are acked by Rafael and Bjorn.
+I thought I'd already commented on some of this change, but it seems
+not.
 
-My for-joerg/arm-smmu/updates is ready to go; just need to write the
-pull request.
+> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+> index 0f6c100..0e7fddf 100644
+> --- a/arch/arm/kernel/sleep.S
+> +++ b/arch/arm/kernel/sleep.S
+> @@ -119,14 +119,12 @@ ENDPROC(cpu_resume_after_mmu)
+>  	.text
+>  	.align
+>  
+> -#ifdef CONFIG_MMU
+>  	.arm
+>  ENTRY(cpu_resume_arm)
+>   THUMB(	badr	r9, 1f		)	@ Kernel is entered in ARM.
+>   THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
+>   THUMB(	.thumb			)	@ switch to Thumb now.
+>   THUMB(1:			)
+> -#endif
+>  
+>  ENTRY(cpu_resume)
+>  ARM_BE8(setend be)			@ ensure we are in BE mode
+> @@ -160,9 +158,7 @@ THUMB(	mov	sp, r2			)
+>  THUMB(	bx	r3			)
+>  ENDPROC(cpu_resume)
+>  
+> -#ifdef CONFIG_MMU
+>  ENDPROC(cpu_resume_arm)
+> -#endif
 
-Will
+These ifdefs were introduced to fix EFM32.  The commit description needs
+to state why it's safe to remove them now (presumably because of the
+dependency on !CPU_V7M).  However, it also needs to explain why it's
+not going to cause a regression for EFM32 - EFM32 _was_ capable of
+building this code.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
