@@ -1,76 +1,120 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 29 Nov 2016 12:40:05 +0000
-Subject: [RFC v2 PATCH 23/23] ARM: Allow ARCH_MULTIPLATFORM to be selected for
- NOMMU
+Date: Tue, 29 Nov 2016 12:39:58 +0000
+Subject: [RFC v2 PATCH 16/23] ARM: sa1100: move CPU specific copy code under
+ its own config
 In-Reply-To: <1480423205-48436-1-git-send-email-vladimir.murzin@arm.com>
 References: <1480423205-48436-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1480423205-48436-24-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1480423205-48436-17-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With this patch applied potentially any platform can be built in NOMMU
-configurations if CONFIG_EXPERT is selected. However, there is no
-guaranty that platform can successfully run such Image. So the main
-motivation behind of this patch:
-- bring build coverage for NOMMU configurations
-- allow known working NOMMU platforms (like R-class) to be used
-- pave a way to add support for single address space (aka 1:1 mapping)
-  for MMU platforms, so they can be usable in NOMMU configurations
+By now there is no way to limit sa1100 specific copy code to MMU only
+builds and that leads to the following error when built for NOMMU
 
-Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <rmallon@gmail.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Alexander Shiyan <shc_work@mail.ru>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
+arch/arm/mm/copypage-v4mc.c:26:35: error: 'L_PTE_PRESENT' undeclared (first use in this function)
+ #define minicache_pgprot __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | \
+                                   ^
+./arch/arm/include/asm/page-nommu.h:41:26: note: in definition of macro '__pgprot'
+ #define __pgprot(x)     (x)
+                          ^
+arch/arm/mm/copypage-v4mc.c:77:47: note: in expansion of macro 'minicache_pgprot'
+  set_top_pte(COPYPAGE_MINICACHE, mk_pte(from, minicache_pgprot));
+                                               ^
+arch/arm/mm/copypage-v4mc.c:26:51: error: 'L_PTE_YOUNG' undeclared (first use in this function)
+ #define minicache_pgprot __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | \
+                                                   ^
+./arch/arm/include/asm/page-nommu.h:41:26: note: in definition of macro '__pgprot'
+ #define __pgprot(x)     (x)
+                          ^
+arch/arm/mm/copypage-v4mc.c:77:47: note: in expansion of macro 'minicache_pgprot'
+  set_top_pte(COPYPAGE_MINICACHE, mk_pte(from, minicache_pgprot));
+                                               ^
+arch/arm/mm/copypage-v4mc.c:27:7: error: 'L_PTE_MT_MINICACHE' undeclared (first use in this function)
+       L_PTE_MT_MINICACHE)
+       ^
+./arch/arm/include/asm/page-nommu.h:41:26: note: in definition of macro '__pgprot'
+ #define __pgprot(x)     (x)
+                          ^
+arch/arm/mm/copypage-v4mc.c:77:47: note: in expansion of macro 'minicache_pgprot'
+  set_top_pte(COPYPAGE_MINICACHE, mk_pte(from, minicache_pgprot));
+                                               ^
+arch/arm/mm/copypage-v4mc.c: At top level:
+arch/arm/mm/copypage-v4mc.c:112:8: error: variable 'v4_mc_user_fns' has initializer but incomplete type
+ struct cpu_user_fns v4_mc_user_fns __initdata = {
+        ^
+arch/arm/mm/copypage-v4mc.c:113:2: error: unknown field 'cpu_clear_user_highpage' specified in initializer
+  .cpu_clear_user_highpage = v4_mc_clear_user_highpage,
+  ^
+arch/arm/mm/copypage-v4mc.c:113:2: warning: excess elements in struct initializer
+arch/arm/mm/copypage-v4mc.c:113:2: warning: (near initialization for 'v4_mc_user_fns')
+arch/arm/mm/copypage-v4mc.c:114:2: error: unknown field 'cpu_copy_user_highpage' specified in initializer
+  .cpu_copy_user_highpage = v4_mc_copy_user_highpage,
+  ^
+arch/arm/mm/copypage-v4mc.c:114:2: warning: excess elements in struct initializer
+arch/arm/mm/copypage-v4mc.c:114:2: warning: (near initialization for 'v4_mc_user_fns')
+cc1: some warnings being treated as errors
+make[1]: *** [arch/arm/mm/copypage-v4mc.o] Error 1
+make: *** [arch/arm/mm] Error 2
+
+Move that code under CPU_COPY_V4MC config option which we can guard
+against NOMMU configuration.
+
 Cc: Russell King <linux@armlinux.org.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/Kconfig |   21 +++++++++++++++++++--
- 1 file changed, 19 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/page.h |    2 +-
+ arch/arm/mm/Kconfig         |    4 ++++
+ arch/arm/mm/Makefile        |    2 +-
+ 3 files changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e78c822..bc6f406 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -327,9 +327,9 @@ choice
+diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
+index 4355f0e..6ec7bb6 100644
+--- a/arch/arm/include/asm/page.h
++++ b/arch/arm/include/asm/page.h
+@@ -75,7 +75,7 @@
+ # endif
+ #endif
  
- config ARCH_MULTIPLATFORM
- 	bool "Allow multiple platforms to be selected"
--	depends on MMU
-+	depends on MMU || EXPERT
- 	select ARM_HAS_SG_CHAIN
--	select ARM_PATCH_PHYS_VIRT
-+	select ARM_PATCH_PHYS_VIRT if MMU
- 	select AUTO_ZRELADDR
- 	select CLKSRC_OF
- 	select COMMON_CLK
-@@ -339,6 +339,23 @@ config ARCH_MULTIPLATFORM
- 	select PCI_DOMAINS if PCI
- 	select SPARSE_IRQ
- 	select USE_OF
-+	help
-+	  Please, read carefully if you've selected CONFIG_MMU=n!
-+
-+	  Multiplatform with !MMU configuration *is not* meant that
-+	  kernel built to support every platform will boot on them. It
-+	  is because physical address space layouts (particularly where
-+	  RAM is located) are different between platforms and there is
-+	  no MMU to work that around.
-+
-+	  You must specify where RAM start (via DRAM_BASE config
-+	  option) and appropriate size of RAM (via DRAM_SIZE config
-+	  option) which are valid for the platform you are building
-+	  for.
-+
-+	  This feature is *EXPERIMENTAL*, please, consider building
-+	  with CONFIG_MMU=y unless you know what you do or want to
-+	  help with testing.
+-#ifdef CONFIG_CPU_SA1100
++#ifdef CONFIG_CPU_COPY_V4MC
+ # ifdef _USER
+ #  define MULTI_USER 1
+ # else
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index c1799dd..6dffbe4 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -290,6 +290,7 @@ config CPU_SA1100
+ 	select CPU_ABRT_EV4
+ 	select CPU_CACHE_V4WB
+ 	select CPU_CACHE_VIVT
++	select CPU_COPY_V4MC if MMU
+ 	select CPU_CP15_MMU
+ 	select CPU_PABRT_LEGACY
+ 	select CPU_TLB_V4WB if MMU
+@@ -524,6 +525,9 @@ config CPU_CACHE_V7M
  
- config ARM_SINGLE_ARMV7M
- 	bool "ARMv7-M based platforms (Cortex-M0/M3/M4)"
+ if MMU
+ # The copy-page model
++config CPU_COPY_V4MC
++	bool
++
+ config CPU_COPY_V4WT
+ 	bool
+ 
+diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+index e869824..2ac7988 100644
+--- a/arch/arm/mm/Makefile
++++ b/arch/arm/mm/Makefile
+@@ -53,7 +53,7 @@ obj-$(CONFIG_CPU_COPY_V4WT)	+= copypage-v4wt.o
+ obj-$(CONFIG_CPU_COPY_V4WB)	+= copypage-v4wb.o
+ obj-$(CONFIG_CPU_COPY_FEROCEON)	+= copypage-feroceon.o
+ obj-$(CONFIG_CPU_COPY_V6)	+= copypage-v6.o context.o
+-obj-$(CONFIG_CPU_SA1100)	+= copypage-v4mc.o
++obj-$(CONFIG_CPU_COPY_V4MC)	+= copypage-v4mc.o
+ obj-$(CONFIG_CPU_XSCALE)	+= copypage-xscale.o
+ obj-$(CONFIG_CPU_XSC3)		+= copypage-xsc3.o
+ obj-$(CONFIG_CPU_COPY_FA)	+= copypage-fa.o
 -- 
 1.7.9.5
