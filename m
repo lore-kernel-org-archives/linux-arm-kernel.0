@@ -1,30 +1,23 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 29 Nov 2016 20:14:41 +0800
-Subject: [PATCH v9 08/16] drivers: acpi: iort: add node match function
-In-Reply-To: <20161121100148.24769-9-lorenzo.pieralisi@arm.com>
-References: <20161121100148.24769-1-lorenzo.pieralisi@arm.com>
- <20161121100148.24769-9-lorenzo.pieralisi@arm.com>
-Message-ID: <07ed6a31-c791-8832-530c-42ac58806848@linaro.org>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Tue, 29 Nov 2016 15:15:15 +0300
+Subject: [PATCH] clocksource/arm_global_timer: reconfigure clockevents after
+ cpufreq change
+Message-ID: <1480421716-30782-1-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/11/21 18:01, Lorenzo Pieralisi wrote:
-> Device drivers (eg ARM SMMU) need to know if a specific component
-> is part of the IORT table, so that kernel data structures are not
-> initialized at initcalls time if the respective component is not
-> part of the IORT table.
->
-> To this end, this patch adds a trivial function that allows detecting
-> if a given IORT node type is present or not in the ACPI table, providing
-> an ACPI IORT equivalent for of_find_matching_node().
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Reviewed-by: Tomasz Nowicki <tn@semihalf.com>
-> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Tomasz Nowicki <tn@semihalf.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Hello,
 
-Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+I found what arm-global-timer doesn't update clockevent's frequency
+after cpufreq change. So I've backported two patches from
+local-timer (smp_twd) to implement clockevent frequency adjustment.
 
-Thanks
-Hanjun
+Alexander Kochetkov (1):
+  clocksource/arm_global_timer: reconfigure clockevents after cpufreq
+    change
+
+ drivers/clocksource/arm_global_timer.c |   93 +++++++++++++++++++++++++++++++-
+ 1 file changed, 92 insertions(+), 1 deletion(-)
+
+-- 
+1.7.9.5
