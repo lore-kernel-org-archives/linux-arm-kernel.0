@@ -1,62 +1,43 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Tue, 29 Nov 2016 15:39:39 +0100
-Subject: [PATCH 5/5] arm64: dts: marvell: Enable spi0 on the board
- Armada-3720-db
-In-Reply-To: <20161129143939.3191-1-romain.perier@free-electrons.com>
-References: <20161129143939.3191-1-romain.perier@free-electrons.com>
-Message-ID: <20161129143939.3191-6-romain.perier@free-electrons.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 29 Nov 2016 11:40:51 -0300
+Subject: [RESEND PATCH] drm/exynos: Use VIDEO_SAMSUNG_EXYNOS_GSC=n as GSC
+ Kconfig dependency
+Message-ID: <1480430451-26957-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit enables the device node spi0 on the official development
-board for the Marvell Armada 3700. It also adds sub-node for the 128Mb
-SPI-NOR present on the board.
+Commit aeefb36832e5 ("drm/exynos: gsc: add device tree support and remove
+usage of static mappings") made the DRM_EXYNOS_GSC Kconfig symbol to only
+be selectable if the exynos-gsc V4L2 driver isn't enabled, since both use
+the same HW IP block.
 
-Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+But added the dependency as depends on !VIDEO_SAMSUNG_EXYNOS_GSC which is
+not correct since Kconfig expressions are not boolean but tristate. So it
+will only evaluate to 'n' if VIDEO_SAMSUNG_EXYNOS_GSC=y but will evaluate
+to 'm' if VIDEO_SAMSUNG_EXYNOS_GSC=m.
+
+This means that both the V4L2 and DRM drivers can be enabled if the former
+is enabled as a module, which isn't what we want since otherwise 2 drivers
+could attempt to use the hardware at the same time.
+
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
- arch/arm64/boot/dts/marvell/armada-3720-db.dts | 30 ++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-index 1372e9a6..0c4eb98 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-@@ -67,6 +67,36 @@
- 	status = "okay";
- };
+ drivers/gpu/drm/exynos/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/exynos/Kconfig b/drivers/gpu/drm/exynos/Kconfig
+index 465d344f3391..d706ca4e2f02 100644
+--- a/drivers/gpu/drm/exynos/Kconfig
++++ b/drivers/gpu/drm/exynos/Kconfig
+@@ -114,7 +114,7 @@ config DRM_EXYNOS_ROTATOR
  
-+&spi0 {
-+	status = "okay";
-+
-+	m25p80 at 0 {
-+		compatible = "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <108000000>;
-+		spi-rx-bus-width = <4>;
-+		spi-tx-bus-width = <4>;
-+
-+		partitions {
-+			compatible = "fixed-partitions";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			partition at 0 {
-+				label = "bootloader";
-+				reg = <0x0 0x200000>;
-+			};
-+			partition at 200000 {
-+				label = "U-boot Env";
-+				reg = <0x200000 0x10000>;
-+			};
-+			partition at 210000 {
-+				label = "Linux";
-+				reg = <0x210000 0xDF0000>;
-+			};
-+		};
-+	};
-+};
-+
- /* Exported on the micro USB connector CON32 through an FTDI */
- &uart0 {
- 	status = "okay";
+ config DRM_EXYNOS_GSC
+ 	bool "GScaler"
+-	depends on DRM_EXYNOS_IPP && ARCH_EXYNOS5 && !VIDEO_SAMSUNG_EXYNOS_GSC
++	depends on DRM_EXYNOS_IPP && ARCH_EXYNOS5 && VIDEO_SAMSUNG_EXYNOS_GSC=n
+ 	help
+ 	  Choose this option if you want to use Exynos GSC for DRM.
+ 
 -- 
-2.9.3
+2.7.4
