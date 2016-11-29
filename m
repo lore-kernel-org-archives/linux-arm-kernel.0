@@ -1,42 +1,45 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 29 Nov 2016 21:39:36 +0800
-Subject: [PATCH v4 08/11] ACPI: ARM64: IORT: rework iort_node_get_id()
+Date: Tue, 29 Nov 2016 21:39:30 +0800
+Subject: [PATCH v4 02/11] irqchip: gic-v3-its: keep the head file include in
+ alphabetic order
 In-Reply-To: <1480426779-31387-1-git-send-email-guohanjun@huawei.com>
 References: <1480426779-31387-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1480426779-31387-9-git-send-email-guohanjun@huawei.com>
+Message-ID: <1480426779-31387-3-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-iort_node_get_id() has two output, one is the mapped ids,
-the other is the referenced parent node which is returned
-from the function.
-
-For now we need a API just return its parent node for
-single mapping, so just update this function slightly then
-reuse it later.
+The head file is strictly in alphabetic order now, so let's
+be the rule breaker. As acpi_iort.h includes acpi.h so remove
+the duplidate acpi.h inclusion as well.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Tomasz Nowicki <tn@semihalf.com>
 ---
- drivers/acpi/arm64/iort.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/irqchip/irq-gic-v3-its.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 7b78282a..788f445 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -347,7 +347,8 @@ struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
- 	if (map[index].flags & ACPI_IORT_ID_SINGLE_MAPPING) {
- 		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
- 		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
--			*id_out = map[index].output_base;
-+			if (id_out)
-+				*id_out = map[index].output_base;
- 			return parent;
- 		}
- 	}
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index c5dee30..1508bf4 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -15,14 +15,13 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+-#include <linux/acpi.h>
++#include <linux/acpi_iort.h>
+ #include <linux/bitmap.h>
+ #include <linux/cpu.h>
+ #include <linux/delay.h>
+ #include <linux/dma-iommu.h>
+ #include <linux/interrupt.h>
+ #include <linux/irqdomain.h>
+-#include <linux/acpi_iort.h>
+ #include <linux/log2.h>
+ #include <linux/mm.h>
+ #include <linux/msi.h>
 -- 
 1.7.12.4
