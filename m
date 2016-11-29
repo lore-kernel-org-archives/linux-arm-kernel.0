@@ -1,45 +1,30 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 29 Nov 2016 16:03:30 +0100
-Subject: [PATCH v3 08/13] clocksource/drivers/rockchip_timer: drop unused
- rk_base() and rk_ctrl()
-In-Reply-To: <1480427118-5126-9-git-send-email-al.kochet@gmail.com>
-References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
- <1480427118-5126-1-git-send-email-al.kochet@gmail.com>
- <1480427118-5126-9-git-send-email-al.kochet@gmail.com>
-Message-ID: <4764744.Q8IDkmDPk7@diego>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Tue, 29 Nov 2016 18:04:06 +0300
+Subject: [PATCH] clocksource/arm_global_timer: reconfigure clockevents
+ after cpufreq change
+In-Reply-To: <54233c9e-d136-4b85-b2db-bf8658a164e7@arm.com>
+References: <1480421716-30782-1-git-send-email-al.kochet@gmail.com>
+ <1480421716-30782-2-git-send-email-al.kochet@gmail.com>
+ <alpine.DEB.2.20.1611291432290.4358@nanos>
+ <763a77c2-3d19-8d20-88df-27f0b8b80b8b@arm.com>
+ <alpine.DEB.2.20.1611291529520.4358@nanos>
+ <54233c9e-d136-4b85-b2db-bf8658a164e7@arm.com>
+Message-ID: <51F052D4-7A19-40FE-8EC2-CE33684383A4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 29. November 2016, 16:45:13 schrieb Alexander Kochetkov:
-> Use of functions has been ceased by previous commit.
 
-Then why do you need another patch to remove them and don't do that in the 
-patch removing their respective usage?
+> 29 ????. 2016 ?., ? 17:51, Marc Zyngier <marc.zyngier@arm.com> ???????(?):
+> 
+> That'd be my preferred course of action. I've located some documentation
+> over there [1], and page 1126 seems to indicate a profusion of
+> additional timers, some of which are in an always-on domain. Seems like
+> a much better use of someone's time...
 
-> 
-> Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
-> ---
->  drivers/clocksource/rockchip_timer.c |   10 ----------
->  1 file changed, 10 deletions(-)
-> 
-> diff --git a/drivers/clocksource/rockchip_timer.c
-> b/drivers/clocksource/rockchip_timer.c index aa9ccd1..a17dc61 100644
-> --- a/drivers/clocksource/rockchip_timer.c
-> +++ b/drivers/clocksource/rockchip_timer.c
-> @@ -53,16 +53,6 @@ static inline struct rk_timer *rk_timer(struct
-> clock_event_device *ce) return &rk_clock_event_device(ce)->timer;
->  }
-> 
-> -static inline void __iomem *rk_base(struct clock_event_device *ce)
-> -{
-> -	return rk_timer(ce)->base;
-> -}
-> -
-> -static inline void __iomem *rk_ctrl(struct clock_event_device *ce)
-> -{
-> -	return rk_timer(ce)->ctrl;
-> -}
-> -
->  static inline void rk_timer_disable(struct rk_timer *timer)
->  {
->  	writel_relaxed(TIMER_DISABLE, timer->ctrl);
+Thank you very much :)
+And thank you for great explanation of core problem.
+
+In general, I no longer insist on the inclusion the patch in the kernel.
+Thank you guys for the help.
+
+Alexander.
