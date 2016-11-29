@@ -1,59 +1,50 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 29 Nov 2016 10:22:12 +0100
-Subject: [PATCH v5 8/8] iommu/rockchip: Enable Rockchip IOMMU on ARM64
-In-Reply-To: <20161129004225.GA109697@google.com>
-References: <1466734413-7453-9-git-send-email-zhengsq@rock-chips.com>
- <20161129004225.GA109697@google.com>
-Message-ID: <4463584.aXlFKgYRXe@diego>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Tue, 29 Nov 2016 11:24:20 +0200
+Subject: [PATCH v2] drm: tilcdc: fix parsing of some DT properties
+In-Reply-To: <1480333043-1292-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1480333043-1292-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <e54f3479-b849-4195-07c7-72d97c40883d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 28. November 2016, 16:42:27 schrieb Brian Norris:
-> Hi,
+On 11/28/16 13:37, Bartosz Golaszewski wrote:
+> The DT binding for tildc is not consistent with the driver code: there
+> are two options - 'max-width' and 'max-pixelclock' specified in the
+> documentation which are parsed as 'ti,max-width' and
+> 'ti'max-pixelclock' respectively.
 > 
-> On Fri, Jun 24, 2016 at 10:13:33AM +0800, Shunqian Zheng wrote:
-> > From: Simon Xue <xxm@rock-chips.com>
-> > 
-> > This patch makes it possible to compile the rockchip-iommu driver on
-> > ARM64, so that it can be used with 64-bit SoCs equipped with this type
-> > of IOMMU.
-> > 
-> > Signed-off-by: Simon Xue <xxm@rock-chips.com>
-> > Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
-> > Signed-off-by: Tomasz Figa <tfiga@chromium.org>
-> > ---
-> > 
-> >  drivers/iommu/Kconfig | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> > index ad08603..5572621 100644
-> > --- a/drivers/iommu/Kconfig
-> > +++ b/drivers/iommu/Kconfig
-> > @@ -218,7 +218,7 @@ config OMAP_IOMMU_DEBUG
-> > 
-> >  config ROCKCHIP_IOMMU
-> >  
-> >  	bool "Rockchip IOMMU Support"
-> > 
-> > -	depends on ARM
-> > +	depends on ARM || ARM64
-> > 
-> >  	depends on ARCH_ROCKCHIP || COMPILE_TEST
-> >  	select IOMMU_API
-> >  	select ARM_DMA_USE_IOMMU
+> Make the driver code consistent with the binding.
 > 
-> Whatever happened with the rest of this series? Some of the IOMMU bits
-> made it, but the DRM fixes never did, and so this didn't get applied.
-> This leaves the whole DRM stack unusable on ARM64 Rockchip systems.
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+
+Reviewed-by: Jyri Sarha <jsarha@ti.com>
+
+I'll pick this up for a pull request that I'll send shortly.
+
+> ---
+> v1 -> v2:
+> - fix max-pixelclock too
 > 
-> The patch context has changed a bit on patch 7 (and maybe 6?), so
-> somebody will need to refresh those on the latest upstream.
-
-I've tried forward-porting these when going through Caesars VOP dts patches, 
-but was somewhat unsucessful in my small attempt at the time - see [0].
-
-
-Heiko
-
-[0] https://lkml.org/lkml/2016/11/14/519
+>  drivers/gpu/drm/tilcdc/tilcdc_drv.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/tilcdc/tilcdc_drv.c b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
+> index 5efb369..bd0a3bd 100644
+> --- a/drivers/gpu/drm/tilcdc/tilcdc_drv.c
+> +++ b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
+> @@ -296,12 +296,12 @@ static int tilcdc_init(struct drm_driver *ddrv, struct device *dev)
+>  
+>  	DBG("Maximum Bandwidth Value %d", priv->max_bandwidth);
+>  
+> -	if (of_property_read_u32(node, "ti,max-width", &priv->max_width))
+> +	if (of_property_read_u32(node, "max-width", &priv->max_width))
+>  		priv->max_width = TILCDC_DEFAULT_MAX_WIDTH;
+>  
+>  	DBG("Maximum Horizontal Pixel Width Value %dpixels", priv->max_width);
+>  
+> -	if (of_property_read_u32(node, "ti,max-pixelclock",
+> +	if (of_property_read_u32(node, "max-pixelclock",
+>  					&priv->max_pixelclock))
+>  		priv->max_pixelclock = TILCDC_DEFAULT_MAX_PIXELCLOCK;
+>  
+> 
