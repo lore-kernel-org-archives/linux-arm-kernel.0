@@ -1,136 +1,243 @@
 From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Tue, 29 Nov 2016 19:14:50 +0300
-Subject: [PATCH v4 7/9] clocksource/drivers/rockchip_timer: low level routines
- take rk_timer as parameter
+Date: Tue, 29 Nov 2016 19:14:52 +0300
+Subject: [PATCH v4 9/9] clocksource/drivers/rockchip_timer: implement
+ clocksource timer
 In-Reply-To: <1480436092-10728-1-git-send-email-al.kochet@gmail.com>
 References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
  <1480436092-10728-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1480436092-10728-8-git-send-email-al.kochet@gmail.com>
+Message-ID: <1480436092-10728-10-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pass rk_timer instead of clock_event_device to low lever timer routines.
-So that code could be reused by clocksource implementation.
+The clock supplying the arm-global-timer on the rk3188 is coming from the
+the cpu clock itself and thus changes its rate everytime cpufreq adjusts
+the cpu frequency making this timer unsuitable as a stable clocksource
+and sched clock.
 
-Drop rk_base() and rk_ctrl().
+The rk3188, rk3288 and following socs share a separate timer block already
+handled by the rockchip-timer driver. Therefore adapt this driver to also
+be able to act as clocksource and sched clock on rk3188.
 
-This is refactoring step without functional changes.
+In order to test clocksource you can run following commands and check
+how much time it take in real. On rk3188 it take about ~45 seconds.
+
+    cpufreq-set -f 1.6GHZ
+    date; sleep 60; date
+
+In order to use the patch you need to declare two timers in the dts
+file. The first timer will be initialized as clockevent provider
+and the second one as clocksource. The clockevent must be from
+alive subsystem as it used as backup for the local timers at sleep
+time.
+
+The patch does not break compatibility with older device tree files.
+The older device tree files contain only one timer. The timer
+will be initialized as clockevent, as expected.
+
+rk3288 (and probably anything newer) is irrelevant to this patch,
+as it has the arch timer interface. This patch may be usefull
+for Cortex-A9/A5 based parts.
 
 Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
 ---
- drivers/clocksource/rockchip_timer.c |   57 ++++++++++++++++------------------
- 1 file changed, 27 insertions(+), 30 deletions(-)
+ drivers/clocksource/rockchip_timer.c |  137 +++++++++++++++++++++++++++++-----
+ 1 file changed, 117 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
-index 6d68d4c..a17dc61 100644
+index 61c3bb1..a127822 100644
 --- a/drivers/clocksource/rockchip_timer.c
 +++ b/drivers/clocksource/rockchip_timer.c
-@@ -53,70 +53,67 @@ static inline struct rk_timer *rk_timer(struct clock_event_device *ce)
- 	return &rk_clock_event_device(ce)->timer;
- }
+@@ -11,6 +11,7 @@
+ #include <linux/clockchips.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
++#include <linux/sched_clock.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+@@ -19,6 +20,8 @@
  
--static inline void __iomem *rk_base(struct clock_event_device *ce)
-+static inline void rk_timer_disable(struct rk_timer *timer)
- {
--	return rk_timer(ce)->base;
-+	writel_relaxed(TIMER_DISABLE, timer->ctrl);
- }
+ #define TIMER_LOAD_COUNT0	0x00
+ #define TIMER_LOAD_COUNT1	0x04
++#define TIMER_CURRENT_VALUE0	0x08
++#define TIMER_CURRENT_VALUE1	0x0C
+ #define TIMER_CONTROL_REG3288	0x10
+ #define TIMER_CONTROL_REG3399	0x1c
+ #define TIMER_INT_STATUS	0x18
+@@ -40,7 +43,19 @@ struct rk_clock_event_device {
+ 	struct rk_timer timer;
+ };
  
--static inline void __iomem *rk_ctrl(struct clock_event_device *ce)
--{
--	return rk_timer(ce)->ctrl;
--}
--
--static inline void rk_timer_disable(struct clock_event_device *ce)
--{
--	writel_relaxed(TIMER_DISABLE, rk_ctrl(ce));
--}
--
--static inline void rk_timer_enable(struct clock_event_device *ce, u32 flags)
-+static inline void rk_timer_enable(struct rk_timer *timer, u32 flags)
- {
- 	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
--		       rk_ctrl(ce));
-+		       timer->ctrl);
- }
- 
- static void rk_timer_update_counter(unsigned long cycles,
--				    struct clock_event_device *ce)
-+				    struct rk_timer *timer)
- {
--	writel_relaxed(cycles, rk_base(ce) + TIMER_LOAD_COUNT0);
--	writel_relaxed(0, rk_base(ce) + TIMER_LOAD_COUNT1);
-+	writel_relaxed(cycles, timer->base + TIMER_LOAD_COUNT0);
-+	writel_relaxed(0, timer->base + TIMER_LOAD_COUNT1);
- }
- 
--static void rk_timer_interrupt_clear(struct clock_event_device *ce)
-+static void rk_timer_interrupt_clear(struct rk_timer *timer)
- {
--	writel_relaxed(1, rk_base(ce) + TIMER_INT_STATUS);
-+	writel_relaxed(1, timer->base + TIMER_INT_STATUS);
- }
- 
- static inline int rk_timer_set_next_event(unsigned long cycles,
- 					  struct clock_event_device *ce)
- {
--	rk_timer_disable(ce);
--	rk_timer_update_counter(cycles, ce);
--	rk_timer_enable(ce, TIMER_MODE_USER_DEFINED_COUNT);
-+	struct rk_timer *timer = rk_timer(ce);
++struct rk_clocksource {
++	struct clocksource cs;
++	struct rk_timer timer;
++};
 +
-+	rk_timer_disable(timer);
-+	rk_timer_update_counter(cycles, timer);
-+	rk_timer_enable(timer, TIMER_MODE_USER_DEFINED_COUNT);
- 	return 0;
- }
- 
- static int rk_timer_shutdown(struct clock_event_device *ce)
- {
--	rk_timer_disable(ce);
-+	struct rk_timer *timer = rk_timer(ce);
++enum {
++	ROCKCHIP_CLKSRC_CLOCKEVENT = 0,
++	ROCKCHIP_CLKSRC_CLOCKSOURCE = 1,
++};
 +
-+	rk_timer_disable(timer);
- 	return 0;
+ static struct rk_clock_event_device bc_timer;
++static struct rk_clocksource cs_timer;
++static int rk_next_clksrc = ROCKCHIP_CLKSRC_CLOCKEVENT;
+ 
+ static inline struct rk_clock_event_device*
+ rk_clock_event_device(struct clock_event_device *ce)
+@@ -63,11 +78,37 @@ static inline void rk_timer_enable(struct rk_timer *timer, u32 flags)
+ 	writel_relaxed(TIMER_ENABLE | flags, timer->ctrl);
  }
  
- static int rk_timer_set_periodic(struct clock_event_device *ce)
- {
--	rk_timer_disable(ce);
--	rk_timer_update_counter(rk_timer(ce)->freq / HZ - 1, ce);
--	rk_timer_enable(ce, TIMER_MODE_FREE_RUNNING);
-+	struct rk_timer *timer = rk_timer(ce);
+-static void rk_timer_update_counter(unsigned long cycles,
+-				    struct rk_timer *timer)
++static void rk_timer_update_counter(u64 cycles, struct rk_timer *timer)
++{
++	u32 lower = cycles & 0xFFFFFFFF;
++	u32 upper = (cycles >> 32) & 0xFFFFFFFF;
 +
-+	rk_timer_disable(timer);
-+	rk_timer_update_counter(timer->freq / HZ - 1, timer);
-+	rk_timer_enable(timer, TIMER_MODE_FREE_RUNNING);
- 	return 0;
++	writel_relaxed(lower, timer->base + TIMER_LOAD_COUNT0);
++	writel_relaxed(upper, timer->base + TIMER_LOAD_COUNT1);
++}
++
++static u64 notrace _rk_timer_counter_read(struct rk_timer *timer)
+ {
+-	writel_relaxed(cycles, timer->base + TIMER_LOAD_COUNT0);
+-	writel_relaxed(0, timer->base + TIMER_LOAD_COUNT1);
++	u64 counter;
++	u32 lower;
++	u32 upper, old_upper;
++
++	upper = readl_relaxed(timer->base + TIMER_CURRENT_VALUE1);
++	do {
++		old_upper = upper;
++		lower = readl_relaxed(timer->base + TIMER_CURRENT_VALUE0);
++		upper = readl_relaxed(timer->base + TIMER_CURRENT_VALUE1);
++	} while (upper != old_upper);
++
++	counter = upper;
++	counter <<= 32;
++	counter |= lower;
++	return counter;
++}
++
++static u64 rk_timer_counter_read(struct rk_timer *timer)
++{
++	return _rk_timer_counter_read(timer);
  }
  
- static irqreturn_t rk_timer_interrupt(int irq, void *dev_id)
+ static void rk_timer_interrupt_clear(struct rk_timer *timer)
+@@ -120,13 +161,46 @@ static irqreturn_t rk_timer_interrupt(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
++static cycle_t rk_timer_clocksource_read(struct clocksource *cs)
++{
++	struct rk_clocksource *_cs =
++		container_of(cs, struct rk_clocksource, cs);
++
++	return ~rk_timer_counter_read(&_cs->timer);
++}
++
++static u64 notrace rk_timer_sched_clock_read(void)
++{
++	struct rk_clocksource *_cs = &cs_timer;
++
++	return ~_rk_timer_counter_read(&_cs->timer);
++}
++
+ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
  {
- 	struct clock_event_device *ce = dev_id;
-+	struct rk_timer *timer = rk_timer(ce);
+-	struct clock_event_device *ce = &bc_timer.ce;
+-	struct rk_timer *timer = &bc_timer.timer;
++	struct clock_event_device *ce = NULL;
++	struct clocksource *cs = NULL;
++	struct rk_timer *timer = NULL;
+ 	struct clk *timer_clk;
+ 	struct clk *pclk;
+ 	int ret = -EINVAL, irq;
++	int clksrc;
++
++	clksrc = rk_next_clksrc;
++	rk_next_clksrc++;
++
++	switch (clksrc) {
++	case ROCKCHIP_CLKSRC_CLOCKEVENT:
++		ce = &bc_timer.ce;
++		timer = &bc_timer.timer;
++		break;
++	case ROCKCHIP_CLKSRC_CLOCKSOURCE:
++		cs = &cs_timer.cs;
++		timer = &cs_timer.timer;
++		break;
++	default:
++		return -ENODEV;
++	}
  
--	rk_timer_interrupt_clear(ce);
-+	rk_timer_interrupt_clear(timer);
+ 	timer->base = of_iomap(np, 0);
+ 	if (!timer->base) {
+@@ -170,26 +244,49 @@ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
+ 		goto out_irq;
+ 	}
  
- 	if (clockevent_state_oneshot(ce))
--		rk_timer_disable(ce);
-+		rk_timer_disable(timer);
+-	ce->name = TIMER_NAME;
+-	ce->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+-		       CLOCK_EVT_FEAT_DYNIRQ;
+-	ce->set_next_event = rk_timer_set_next_event;
+-	ce->set_state_shutdown = rk_timer_shutdown;
+-	ce->set_state_periodic = rk_timer_set_periodic;
+-	ce->irq = irq;
+-	ce->cpumask = cpu_possible_mask;
+-	ce->rating = 250;
++	if (ce) {
++		ce->name = TIMER_NAME;
++		ce->features = CLOCK_EVT_FEAT_PERIODIC |
++			       CLOCK_EVT_FEAT_ONESHOT |
++			       CLOCK_EVT_FEAT_DYNIRQ;
++		ce->set_next_event = rk_timer_set_next_event;
++		ce->set_state_shutdown = rk_timer_shutdown;
++		ce->set_state_periodic = rk_timer_set_periodic;
++		ce->irq = irq;
++		ce->cpumask = cpu_possible_mask;
++		ce->rating = 250;
++	}
++
++	if (cs) {
++		cs->name = TIMER_NAME;
++		cs->flags = CLOCK_SOURCE_IS_CONTINUOUS;
++		cs->mask = CLOCKSOURCE_MASK(64);
++		cs->read = rk_timer_clocksource_read;
++		cs->rating = 250;
++	}
  
- 	ce->event_handler(ce);
+ 	rk_timer_interrupt_clear(timer);
+ 	rk_timer_disable(timer);
  
-@@ -183,8 +180,8 @@ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
- 	ce->cpumask = cpu_possible_mask;
- 	ce->rating = 250;
+-	ret = request_irq(irq, rk_timer_interrupt, IRQF_TIMER, TIMER_NAME, ce);
+-	if (ret) {
+-		pr_err("Failed to initialize '%s': %d\n", TIMER_NAME, ret);
+-		goto out_irq;
++	if (ce) {
++		ret = request_irq(irq, rk_timer_interrupt, IRQF_TIMER,
++				  TIMER_NAME, ce);
++		if (ret) {
++			pr_err("Failed to initialize '%s': %d\n",
++				TIMER_NAME, ret);
++			goto out_irq;
++		}
++
++		clockevents_config_and_register(ce, timer->freq, 1, UINT_MAX);
+ 	}
  
--	rk_timer_interrupt_clear(ce);
--	rk_timer_disable(ce);
-+	rk_timer_interrupt_clear(timer);
-+	rk_timer_disable(timer);
+-	clockevents_config_and_register(ce, timer->freq, 1, UINT_MAX);
++	if (cs) {
++		rk_timer_update_counter(U64_MAX, timer);
++		rk_timer_enable(timer, 0);
++		clocksource_register_hz(cs, timer->freq);
++		sched_clock_register(rk_timer_sched_clock_read, 64,
++				     timer->freq);
++	}
  
- 	ret = request_irq(irq, rk_timer_interrupt, IRQF_TIMER, TIMER_NAME, ce);
- 	if (ret) {
+ 	return 0;
+ 
 -- 
 1.7.9.5
