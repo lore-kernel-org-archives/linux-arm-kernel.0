@@ -1,84 +1,64 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 29 Nov 2016 14:54:48 +0530
-Subject: [PATCH 2/2] ARM: dts: dra7-evm: add pinmux configuration for mmc1/2
-In-Reply-To: <cover.1480411308.git.nsekhar@ti.com>
-References: <cover.1480411308.git.nsekhar@ti.com>
-Message-ID: <9c70d6fb2e28cf2c74ed5928dff3932a49d11918.1480411308.git.nsekhar@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 29 Nov 2016 09:36:58 +0000
+Subject: [PATCH] KVM: arm/arm64: Access CNTHCTL_EL2 bit fields correctly
+In-Reply-To: <CAHyh4xhXoFWsbnNNePthWp2-ZAOtCuUVmLn-JKRe4sc=nqrYNw@mail.gmail.com>
+References: <1480351570-11648-1-git-send-email-jintack@cs.columbia.edu>
+ <d04fd17e-9157-07fe-4daa-9dbab149b5e6@arm.com>
+ <799d03f5-a929-9547-1ae7-94026b76f116@arm.com>
+ <CAHyh4xhXoFWsbnNNePthWp2-ZAOtCuUVmLn-JKRe4sc=nqrYNw@mail.gmail.com>
+Message-ID: <0a475329-6f50-42ae-3244-f0767c56ce09@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kishon Vijay Abraham I <kishon@ti.com>
+On 29/11/16 03:28, Jintack Lim wrote:
+> On Mon, Nov 28, 2016 at 1:39 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 28/11/16 17:43, Marc Zyngier wrote:
+>>> Hi Jintack,
+> 
+> Hi Marc,
+> 
+>>>
+>>> On 28/11/16 16:46, Jintack Lim wrote:
+>>>> Bit positions of CNTHCTL_EL2 are changing depending on HCR_EL2.E2H bit.
+>>>> EL1PCEN and EL1PCTEN are 1st and 0th bits when E2H is not set, but they
+>>>> are 11th and 10th bits respectively when E2H is set.  Current code is
+>>>> unintentionally setting wrong bits to CNTHCTL_EL2 with E2H set, which
+>>>> may allow guest OS to access physical timer. So, fix it.
+>>>>
+>>>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+>>>> ---
+>>>>  arch/arm/include/asm/kvm_timer.h     | 33 +++++++++++++++++++
+>>>>  arch/arm64/include/asm/kvm_timer.h   | 62 ++++++++++++++++++++++++++++++++++++
+>>>>  include/clocksource/arm_arch_timer.h |  6 ++--
+>>>>  virt/kvm/arm/hyp/timer-sr.c          |  8 ++---
+>>>>  4 files changed, 103 insertions(+), 6 deletions(-)
+>>>>  create mode 100644 arch/arm/include/asm/kvm_timer.h
+>>>>  create mode 100644 arch/arm64/include/asm/kvm_timer.h
+>>>>
+>>
+>> [...]
+>>
+>>> We could make it nicer (read "faster") by introducing a
+>>> hyp_alternate_select construct that only returns a value instead
+>>> of calling a function. I remember writing something like that
+>>> at some point, and dropping it...
+>>
+>> So here's what this could look like (warning, wacky code ahead,
+>> though I fixed a stupid bug that was present in the previous patch).
+>> The generated code is quite nice (no branch, only an extra mov
+>> instruction on the default path)... Of course, completely untested!
+> 
+> This looks much cleaner than my patch.
+> While we are at it, is it worth to consider that we just need to set
+> those bits once for VHE case, not for every world switch as an
+> optimization?
 
-Add pinmux configuration for SD card slot and eMMC device
-found on TI's DRA74x EVM.
+Ah! That's a much better idea indeed! And we could stop messing with
+cntvoff_el2 as well, as it doesn't need to be restored to zero on exit.
+Could you try and respin something along those lines?
 
-Only the default modes are supported. For higher speed modes
-(UHS and HS200) to function, we need full fledged IODelay support
-in kernel. IODelay support is yet to be added.
+Thanks,
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-[nsekhar at ti.com: rebase to mainline/master, use IOPAD() macro,
-		 update commit message]
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/boot/dts/dra7-evm.dts | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
-
-diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
-index a1efd4efed6d..1fc29ed636c9 100644
---- a/arch/arm/boot/dts/dra7-evm.dts
-+++ b/arch/arm/boot/dts/dra7-evm.dts
-@@ -164,6 +164,33 @@
- 			DRA7XX_CORE_IOPAD(0x3818, MUX_MODE15 | PULL_UP)	/* wakeup0.off */
- 		>;
- 	};
-+
-+	mmc1_pins_default: mmc1_pins_default {
-+		pinctrl-single,pins = <
-+			DRA7XX_CORE_IOPAD(0x376c, PIN_INPUT | MUX_MODE14)	/* mmc1sdcd.gpio219 */
-+			DRA7XX_CORE_IOPAD(0x3754, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_clk.clk */
-+			DRA7XX_CORE_IOPAD(0x3758, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_cmd.cmd */
-+			DRA7XX_CORE_IOPAD(0x375c, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat0.dat0 */
-+			DRA7XX_CORE_IOPAD(0x3760, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat1.dat1 */
-+			DRA7XX_CORE_IOPAD(0x3764, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat2.dat2 */
-+			DRA7XX_CORE_IOPAD(0x3768, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat3.dat3 */
-+		>;
-+	};
-+
-+	mmc2_pins_default: mmc2_pins_default {
-+		pinctrl-single,pins = <
-+			DRA7XX_CORE_IOPAD(0x349c, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a23.mmc2_clk */
-+			DRA7XX_CORE_IOPAD(0x34b0, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_cs1.mmc2_cmd */
-+			DRA7XX_CORE_IOPAD(0x34a0, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a24.mmc2_dat0 */
-+			DRA7XX_CORE_IOPAD(0x34a4, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a25.mmc2_dat1 */
-+			DRA7XX_CORE_IOPAD(0x34a8, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a26.mmc2_dat2 */
-+			DRA7XX_CORE_IOPAD(0x34ac, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a27.mmc2_dat3 */
-+			DRA7XX_CORE_IOPAD(0x348c, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a19.mmc2_dat4 */
-+			DRA7XX_CORE_IOPAD(0x3490, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a20.mmc2_dat5 */
-+			DRA7XX_CORE_IOPAD(0x3494, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a21.mmc2_dat6 */
-+			DRA7XX_CORE_IOPAD(0x3498, PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_a22.mmc2_dat7 */
-+		>;
-+	};
- };
- 
- &i2c1 {
-@@ -402,6 +429,8 @@
- 
- &mmc1 {
- 	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins_default>;
- 	vmmc-supply = <&evm_3v3_sd>;
- 	vmmc_aux-supply = <&ldo1_reg>;
- 	bus-width = <4>;
-@@ -414,6 +443,8 @@
- 
- &mmc2 {
- 	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins_default>;
- 	vmmc-supply = <&evm_3v3_sw>;
- 	bus-width = <8>;
- };
+	M.
 -- 
-2.9.0
+Jazz is not dead. It just smells funny...
