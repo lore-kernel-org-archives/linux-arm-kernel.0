@@ -1,39 +1,52 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 29 Nov 2016 12:39:46 +0000
-Subject: [RFC v2 PATCH 04/23] ARM: NOMMU: define dummy user structure for
- feroceon
+Date: Tue, 29 Nov 2016 12:39:43 +0000
+Subject: [RFC v2 PATCH 01/23] ARM: NOMMU: define stubs for fixup
 In-Reply-To: <1480423205-48436-1-git-send-email-vladimir.murzin@arm.com>
 References: <1480423205-48436-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1480423205-48436-5-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1480423205-48436-2-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While building for NOMMU the following link time error shows up:
+When build for NOMMU following errors show up:
 
-arch/arm/mm/built-in.o:(.proc.info.init+0x2c): undefined reference to `feroceon_user_fns'
-arch/arm/mm/built-in.o:(.proc.info.init+0x60): undefined reference to `feroceon_user_fns'
-arch/arm/mm/built-in.o:(.proc.info.init+0x94): undefined reference to `feroceon_user_fns'
-arch/arm/mm/built-in.o:(.proc.info.init+0xc8): undefined reference to `feroceon_user_fns'
+arch/arm/kernel/patch.c: In function 'patch_map':
+arch/arm/kernel/patch.c:39:2: error: implicit declaration of function 'set_fixmap' [-Werror=implicit-function-declaration]
+  set_fixmap(fixmap, page_to_phys(page));
+  ^
+arch/arm/kernel/patch.c:41:2: error: implicit declaration of function '__fix_to_virt' [-Werror=implicit-function-declaration]
+  return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
+  ^
+arch/arm/kernel/patch.c: In function 'patch_unmap':
+arch/arm/kernel/patch.c:47:2: error: implicit declaration of function 'clear_fixmap' [-Werror=implicit-function-declaration]
+  clear_fixmap(fixmap);
+  ^
+cc1: some warnings being treated as errors
 
-Define dummy feroceon_user_fns for !MMU.
+Fixup does not make much sense in NOMMU configurations, so provide
+stub definitions.
 
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/include/asm/pgtable-nommu.h |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/include/asm/fixmap.h |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/include/asm/pgtable-nommu.h b/arch/arm/include/asm/pgtable-nommu.h
-index 9115801..bc1f6aa 100644
---- a/arch/arm/include/asm/pgtable-nommu.h
-+++ b/arch/arm/include/asm/pgtable-nommu.h
-@@ -113,6 +113,7 @@
- #define v4wt_user_fns	(0)
- #define v6_user_fns	(0)
- #define xscale_mc_user_fns (0)
-+#define feroceon_user_fns (0)
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 5c17d2d..0bfc2e3 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -59,6 +59,12 @@ enum fixed_addresses {
  
- #endif /*__ASSEMBLY__*/
+ #else
  
++#define set_fixmap(idx, phys)
++#define clear_fixmap(idx)
++
++#define __fix_to_virt(x)	(x)
++#define __virt_to_fix(x)	(x)
++
+ static inline void early_fixmap_init(void) { }
+ 
+ #endif
 -- 
 1.7.9.5
