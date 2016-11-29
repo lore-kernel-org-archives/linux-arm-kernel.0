@@ -1,47 +1,53 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 29 Nov 2016 09:47:11 -0700
-Subject: [PATCH 1/9] coresight: stm: return error code instead of zero in
- .packet()
-In-Reply-To: <1480438039-24960-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1480438039-24960-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1480438039-24960-2-git-send-email-mathieu.poirier@linaro.org>
+Date: Tue, 29 Nov 2016 09:47:10 -0700
+Subject: [PATCH 0/9] coresight: next v4.9-rc7 
+Message-ID: <1480438039-24960-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chunyan Zhang <zhang.chunyan@linaro.org>
+Hi Greg,
 
-In STM framework driver, the trace data writing loop would keep running
-until it received a negative return value or the whole trace packet has
-been written to STM device.  So if the .packet() of STM device always
-returns zero since the device is not enabled or the parameter isn't
-supported, STM framework driver will stall into a dead loop.
+These are the patches I'd like you to consider for inclusion in the 
+4.10 cycle.  They were sent earlier this month [1] but I haven't received
+the usual automated acknowledgment, hence sending again.  Everything
+applies cleanly on your 'char-misc-next' branch (38d1790644ef).
 
-Returning -EACCES (Permission denied) in .packet() if the device is
-disabled makes more sense, and this is the same for returning -EINVAL
-if the channel passed into is not supported.
+Thanks,
+Mathieu
 
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/hwtracing/coresight/coresight-stm.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+[1]. https://www.spinics.net/lists/kernel/msg2380312.html
 
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index 49e0f1b925a5..d397849c2c6a 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -419,10 +419,10 @@ static ssize_t stm_generic_packet(struct stm_data *stm_data,
- 						   struct stm_drvdata, stm);
- 
- 	if (!(drvdata && local_read(&drvdata->mode)))
--		return 0;
-+		return -EACCES;
- 
- 	if (channel >= drvdata->numsp)
--		return 0;
-+		return -EINVAL;
- 
- 	ch_addr = (unsigned long)stm_channel_addr(drvdata, channel);
- 
+Chunyan Zhang (1):
+  coresight: stm: return error code instead of zero in .packet()
+
+Mathieu Poirier (1):
+  coresight: reset "enable_sink" flag when need be
+
+Muhammad Abdul WAHAB (2):
+  coresight: etm3x: indentation fix (extra space removed)
+  coresight: etm3x: Adding missing features of Coresight PTM components
+
+Quentin Lambert (1):
+  coresight: perf: Add a missing call to etm_free_aux
+
+Suzuki K Poulose (1):
+  coresight: Add support for ARM Coresight STM-500
+
+Suzuki K. Poulose (3):
+  coresight: tmc: Cleanup operation mode handling
+  coresight: tmc: Get rid of mode parameter for helper routines
+  coresight: tmc: Remove duplicate memset
+
+ drivers/hwtracing/coresight/coresight-etm-perf.c   | 31 ++++-----
+ drivers/hwtracing/coresight/coresight-etm.h        |  5 ++
+ .../hwtracing/coresight/coresight-etm3x-sysfs.c    | 12 +++-
+ drivers/hwtracing/coresight/coresight-priv.h       |  4 +-
+ drivers/hwtracing/coresight/coresight-stm.c        |  9 ++-
+ drivers/hwtracing/coresight/coresight-tmc-etf.c    | 48 ++++++--------
+ drivers/hwtracing/coresight/coresight-tmc-etr.c    | 43 +++++--------
+ drivers/hwtracing/coresight/coresight-tmc.h        |  2 +-
+ drivers/hwtracing/coresight/coresight.c            | 74 ++++++++++++++++++++--
+ 9 files changed, 144 insertions(+), 84 deletions(-)
+
 -- 
 2.7.4
