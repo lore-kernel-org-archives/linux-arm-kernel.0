@@ -1,305 +1,829 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Tue, 29 Nov 2016 15:31:44 +0530
-Subject: [PATCH v9 06/11] arm/arm64: vgic: Implement VGICv3 CPU interface
- access
-In-Reply-To: <20161129083747.GA9838@cbox>
-References: <1479906118-15832-1-git-send-email-vijay.kilari@gmail.com>
- <1479906118-15832-7-git-send-email-vijay.kilari@gmail.com>
- <20161128193938.GF18170@cbox>
- <CALicx6s4E0-VJMm6Ff5qu=sZgXu-mUnJdDCmaiZO0i3yzF8wxA@mail.gmail.com>
- <20161129083747.GA9838@cbox>
-Message-ID: <CALicx6uK9kQ5fuW=SGnny7oerPbhGbVDw=MMi0Tna_B4XdJqeg@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 29 Nov 2016 19:02:23 +0900
+Subject: [PATCH] extcon: Split out the extcon APIs for extcon provider driver
+Message-ID: <1480413743-13037-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 2:07 PM, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Tue, Nov 29, 2016 at 01:08:26PM +0530, Vijay Kilari wrote:
->> On Tue, Nov 29, 2016 at 1:09 AM, Christoffer Dall
->> <christoffer.dall@linaro.org> wrote:
->> > On Wed, Nov 23, 2016 at 06:31:53PM +0530, vijay.kilari at gmail.com wrote:
->> >> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
->> >>
->> >> VGICv3 CPU interface registers are accessed using
->> >> KVM_DEV_ARM_VGIC_CPU_SYSREGS ioctl. These registers are accessed
->> >> as 64-bit. The cpu MPIDR value is passed along with register id.
->> >> is used to identify the cpu for registers access.
->> >>
->> >> The VM that supports SEIs expect it on destination machine to handle
->> >> guest aborts and hence checked for ICC_CTLR_EL1.SEIS compatibility.
->> >> Similarly, VM that supports Affinity Level 3 that is required for AArch64
->> >> mode, is required to be supported on destination machine. Hence checked
->> >> for ICC_CTLR_EL1.A3V compatibility.
->> >>
->> >> The CPU system register handling is spitted into two files
->> >
->> > spitted?  Did you mean 'split into' ?
->> >
->> >> vgic-sys-reg-common.c and vgic-sys-reg-v3.c.
->> >> The vgic-sys-reg-common.c handles read and write of VGIC CPU registers
->> >
->> > So this is weird because everything in virt/kvm/arm/ is exactly supposed
->> > to be common between arm and arm64 already.
->> >
->> > I would rather that you had a copy of vgic-sys-reg-v3.c in arch/arm/kvm/
->> > and in arch/arm64/kvm/ each taking care of its own architecture.
->> >
->> > But note that I didn't actually require that you implemented support for
->> > GICv3 migration on AArch32 hosts for these patches, I just didn't want
->> > thigns to silently break.
->> >
->> > If we cannot test the AArch32 implementation, we should potentially just
->> > make sure that is not supported yet, return a proper error to userspace
->> > and get the AArch64 host implementation correct.
->> >
->> > I suggest you move your:
->> >   virt/kvm/arm/vgic/vgic-sys-reg-v3.c to
->> >   arch/arm64/kvm/vgic-sys-reg-v3.c
->> >
->> > and rename
->> >   virt/kvm/arm/vgic/vgic-sys-reg-common.c to
->> >   virt/kvm/arm/vgic/vgic-sys-reg-v3.c
->> >
->> > And then wait with the AArch32 host side for now, but just make sure it
->> > compiles and returns an error as opposed to crashing the system if
->> > someone tries to excercise this interface on an AArch32 host.
->>
->> I will add arch/arm/kvm/vgic-coproc-v3.c (pls check if file name is ok or not?)
->
-> I would call it vgic-v3-coproc.c
->
->> and return -ENXIO as shown below and update document accordingly.
->>
->> int vgic_v3_has_cpu_sysregs_attr(struct kvm_vcpu *vcpu, bool is_write, u64 id,
->>                                u64 *reg)
->> {
->>        /*
->>         * TODO: Implement for AArch32
->>         */
->>        return -ENXIO;
->> }
->>
->> int vgic_v3_cpu_sysregs_uaccess(struct kvm_vcpu *vcpu, bool is_write, u64 id,
->>                                u64 *reg)
->> {
->>        /*
->>         * TODO: Implement for AArch32
->>         */
->>        return -ENXIO;
->> }
->
->
->>
->> >
->> >> for both AArch64 and AArch32 mode. The vgic-sys-reg-v3.c handles AArch64
->> >> mode and is compiled only for AArch64 mode.
->> >>
->> >> Updated arch/arm/include/uapi/asm/kvm.h with new definitions
->> >> required to compile for AArch32.
->> >>
->> >> The version of VGIC v3 specification is define here
->> >> Documentation/virtual/kvm/devices/arm-vgic-v3.txt
->> >>
->> >> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
->> >> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
->> >> ---
->> [...]
->> >> +static bool access_gic_aprn(struct kvm_vcpu *vcpu, bool is_write, u8 apr,
->> >> +                         u8 idx, unsigned long *reg)
->> >> +{
->> >> +     struct vgic_cpu *vgic_v3_cpu = &vcpu->arch.vgic_cpu;
->> >> +
->> >> +     /* num_pri_bits are initialized with HW supported values.
->> >> +      * We can rely safely on num_pri_bits even if VM has not
->> >> +      * restored ICC_CTLR_EL1 before restoring APnR registers.
->> >> +      */
->> >
->> > nit: commenting style
->> ok
->> >
->> >> +     switch (vgic_v3_cpu->num_pri_bits) {
->> >> +     case 7:
->> >> +             vgic_v3_access_apr_reg(vcpu, is_write, apr, idx, reg);
->> >> +             break;
->> >> +     case 6:
->> >> +             if (idx > 1)
->> >> +                     goto err;
->> >> +             vgic_v3_access_apr_reg(vcpu, is_write, apr, idx, reg);
->> >> +             break;
->> >> +     default:
->> >> +             if (idx > 0)
->> >> +                     goto err;
->> >> +             vgic_v3_access_apr_reg(vcpu, is_write, apr, idx, reg);
->> >> +     }
->> >
->> > It looks to me like userspace can then program active priorities with
->> > higher numbers than what it will program num_pri_bits to later.  Is that
->> > not weird, or am I missing something?
->>
->> As long as it is within HW supported priorities it is safe.
->
-> I know that it is safe on the hardware, but it is weird to define a VM
-> with some max priority and still be able to set a higher active priority
-> is it not?
+This patchs split out the extcon APIs of extcon provider driver in order to
+prevent the direct access of struct extcon_dev by extcon consumer driver.
+The extcon consumer driver don't need to handle the extcon provider APIs.
 
-In that case, we need to cache the highest active priorities updated
-by a VM in a variable
-when APnR is restored and later check against num_pri_bits when
-ICC_CTLR_EL1 is updated.
-If the value cached is greater than num_pri_bits restored then reject
-ICC_CTLR_EL1 restore.
+The extcon subsystem has two type of extcon drivers as following:
+- extcon provider driver
+: Detect the external connector and identify the state/property of
+  each external connector. And it send the notification to synchronize
+  the information between provider and consumer driver.
+- extcon consumer driver
+: Receive the notifcation from extcon provider driver. When receving the noti,
+  it can get the both state and property of specific external connector.
 
-This variable should be initialized with value 5 ( min priority)
+Cc: Myungjoo Ham <myungjoo.ham@samsung.com>
+Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: Krzysztof Kozlowski <krzk@kernel.org>
+Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Felipe Balbi <balbi@kernel.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Chris Zhong <zyw@rock-chips.com>
+Cc: Roger Quadros <rogerq@ti.com>
+Cc: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+Cc: patches at opensource.wolfsonmicro.com
+Cc: linux-renesas-soc at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-usb at vger.kernel.org
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+ drivers/extcon/devres.c                |   2 +-
+ drivers/extcon/extcon-adc-jack.c       |   2 +-
+ drivers/extcon/extcon-arizona.c        |   2 +-
+ drivers/extcon/extcon-axp288.c         |   2 +-
+ drivers/extcon/extcon-gpio.c           |   2 +-
+ drivers/extcon/extcon-max14577.c       |   2 +-
+ drivers/extcon/extcon-max3355.c        |   2 +-
+ drivers/extcon/extcon-max77693.c       |   2 +-
+ drivers/extcon/extcon-max77843.c       |   2 +-
+ drivers/extcon/extcon-max8997.c        |   2 +-
+ drivers/extcon/extcon-palmas.c         |   1 +
+ drivers/extcon/extcon-qcom-spmi-misc.c |   2 +-
+ drivers/extcon/extcon-rt8973a.c        |   2 +-
+ drivers/extcon/extcon-sm5502.c         |   2 +-
+ drivers/extcon/extcon-usb-gpio.c       |   2 +-
+ drivers/extcon/extcon.c                |   2 +-
+ drivers/phy/phy-rcar-gen3-usb2.c       |   2 +-
+ drivers/phy/phy-sun4i-usb.c            |   2 +-
+ drivers/power/supply/qcom_smbb.c       |   2 +-
+ drivers/usb/phy/phy-tahvo.c            |   2 +-
+ include/linux/extcon-provider.h        | 262 +++++++++++++++++++++++++++++++++
+ include/linux/extcon.h                 | 168 +--------------------
+ 22 files changed, 286 insertions(+), 183 deletions(-)
+ create mode 100644 include/linux/extcon-provider.h
 
->
-> On the other hand, if we cannot enforce this at runtime, it may not
-> matter?
-
-At VM runtime irrespective of VM's num_pri_bits all the APnR registers that
-HW supports are saved and restored.
-
->
-> Hint: I'd like for you to actually think about these constraints and
-> make sure the sematics of the emulated VM environment remain intact
-> across migrations.
->
->> >
->> >> +
->> >> +     return true;
->> >> +err:
->> >> +     if (!is_write)
->> >> +             *reg = 0;
->> >> +
->> >> +     return false;
->> >> +}
->> >> +
->> >> +bool access_gic_ap0r_reg(struct kvm_vcpu *vcpu, bool is_write, u8 idx,
->> >> +                      unsigned long *reg)
->> >> +{
->> >> +     return access_gic_aprn(vcpu, is_write, 0, idx, reg);
->> >> +}
->> >> +
->> >> +bool access_gic_ap1r_reg(struct kvm_vcpu *vcpu, bool is_write, u8 idx,
->> >> +                      unsigned long *reg)
->> >> +{
->> >> +     return access_gic_aprn(vcpu, is_write, 1, idx, reg);
->> >> +}
->> >> +
->> >> +bool access_gic_sre_reg(struct kvm_vcpu *vcpu, bool is_write,
->> >> +                     unsigned long *reg)
->> >> +{
->> >> +     struct vgic_v3_cpu_if *vgicv3 = &vcpu->arch.vgic_cpu.vgic_v3;
->> >> +
->> >> +     /* Validate SRE bit */
->> >> +     if (is_write) {
->> >> +             if (!(*reg & ICC_SRE_EL1_SRE))
->> >> +                     return false;
->> >> +     } else {
->> >> +             *reg = vgicv3->vgic_sre;
->> >> +     }
->> >> +
->> >> +     return true;
->> >> +}
->> >> diff --git a/virt/kvm/arm/vgic/vgic-sys-reg-v3.c b/virt/kvm/arm/vgic/vgic-sys-reg-v3.c
->> >> new file mode 100644
->> >> index 0000000..82c2f02
->> >> --- /dev/null
->> >> +++ b/virt/kvm/arm/vgic/vgic-sys-reg-v3.c
->> >> @@ -0,0 +1,142 @@
->> >> +/*
->> >> + * VGIC system registers handling functions
->> >> + *
->> >> + * This program is free software; you can redistribute it and/or modify
->> >> + * it under the terms of the GNU General Public License version 2 as
->> >> + * published by the Free Software Foundation.
->> >> + *
->> >> + * This program is distributed in the hope that it will be useful,
->> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> >> + * GNU General Public License for more details.
->> >> + */
->> >> +
->> >> +#include <linux/kvm.h>
->> >> +#include <linux/kvm_host.h>
->> >> +#include <asm/kvm_emulate.h>
->> >> +#include "vgic.h"
->> >> +#include "sys_regs.h"
->> >> +
->> >> +#define ACCESS_SYS_REG(REG)                                          \
->> >> +static bool access_gic_##REG##_sys_reg(struct kvm_vcpu *vcpu,                \
->> >> +                                 struct sys_reg_params *p,           \
->> >> +                                 const struct sys_reg_desc *r)       \
->> >> +{                                                                    \
->> >> +     unsigned long tmp;                                              \
->> >> +     bool ret;                                                       \
->> >> +                                                                     \
->> >> +     if (p->is_write)                                                \
->> >> +             tmp = p->regval;                                        \
->> >> +     ret = access_gic_##REG##_reg(vcpu, p->is_write, &tmp);          \
->> >> +     if (!p->is_write)                                               \
->> >> +             p->regval = tmp;                                        \
->> >> +                                                                     \
->> >> +     return ret;                                                     \
->> >> +}
->> >> +
->> >> +ACCESS_SYS_REG(ctlr)
->> >> +ACCESS_SYS_REG(pmr)
->> >> +ACCESS_SYS_REG(bpr0)
->> >> +ACCESS_SYS_REG(bpr1)
->> >> +ACCESS_SYS_REG(sre)
->> >> +ACCESS_SYS_REG(grpen0)
->> >> +ACCESS_SYS_REG(grpen1)
->> >> +
->> >> +#define ACCESS_APNR_SYS_REG(REG)                                     \
->> >> +static bool access_gic_##REG##_sys_reg(struct kvm_vcpu *vcpu,                \
->> >> +                                 struct sys_reg_params *p,           \
->> >> +                                 const struct sys_reg_desc *r)       \
->> >> +{                                                                    \
->> >> +     unsigned long tmp;                                              \
->> >> +     u8 idx = p->Op2 & 3;                                            \
->> >> +     bool ret;                                                       \
->> >> +                                                                     \
->> >> +     if (p->is_write)                                                \
->> >> +             tmp = p->regval;                                        \
->> >> +     ret = access_gic_##REG##_reg(vcpu, p->is_write, idx, &tmp);     \
->> >> +     if (!p->is_write)                                               \
->> >> +             p->regval = tmp;                                        \
->> >> +                                                                     \
->> >> +     return ret;                                                     \
->> >> +}
->> >> +
->> >> +ACCESS_APNR_SYS_REG(ap0r)
->> >> +ACCESS_APNR_SYS_REG(ap1r)
->> >
->> > I don't get these indirections.  Why can't you call the functions
->> > directly?
->>
->> The code is same for accessing the registers hence added this indirection.
->>
->
-> That's not answering my question.
->
-> What is the benefit of adding this indirection as opposed to having the
-> functions called directly?
-
-In sys_reg_desc the access function is of type
-
-        bool (*access)(struct kvm_vcpu *,
-                       struct sys_reg_params *,
-                       const struct sys_reg_desc *);
-
-Where as the each register access function is of type below to support
-access to AArch32(later if not now).
-
-bool access_gic_xxx(struct kvm_vcpu *vcpu, bool is_write, unsigned long *reg);
-
-I can drop this macro and make function calls for each reg access.
-
->
-> To make my point clear:  I hate this kind of preprocessor macro fun, and
-> I think it should only ever be used when there's a huge benefit in terms
-> of code reuse or simplicity of some sort.  I don't see anything like
-> that in this case.
->
-> Thanks,
-> -Christoffer
+diff --git a/drivers/extcon/devres.c b/drivers/extcon/devres.c
+index e686acd1c459..1b7dce13b21b 100644
+--- a/drivers/extcon/devres.c
++++ b/drivers/extcon/devres.c
+@@ -14,7 +14,7 @@
+  * GNU General Public License for more details.
+  */
+ 
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ 
+ static int devm_extcon_dev_match(struct device *dev, void *res, void *data)
+ {
+diff --git a/drivers/extcon/extcon-adc-jack.c b/drivers/extcon/extcon-adc-jack.c
+index bc538708c753..0882813a95f9 100644
+--- a/drivers/extcon/extcon-adc-jack.c
++++ b/drivers/extcon/extcon-adc-jack.c
+@@ -26,7 +26,7 @@
+ #include <linux/workqueue.h>
+ #include <linux/iio/consumer.h>
+ #include <linux/extcon/extcon-adc-jack.h>
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ 
+ /**
+  * struct adc_jack_data - internal data for adc_jack device driver
+diff --git a/drivers/extcon/extcon-arizona.c b/drivers/extcon/extcon-arizona.c
+index aeab47df9233..292878714ed9 100644
+--- a/drivers/extcon/extcon-arizona.c
++++ b/drivers/extcon/extcon-arizona.c
+@@ -27,7 +27,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/property.h>
+ #include <linux/regulator/consumer.h>
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ 
+ #include <sound/soc.h>
+ 
+diff --git a/drivers/extcon/extcon-axp288.c b/drivers/extcon/extcon-axp288.c
+index 42f41e808292..f5b3687d29e8 100644
+--- a/drivers/extcon/extcon-axp288.c
++++ b/drivers/extcon/extcon-axp288.c
+@@ -23,7 +23,7 @@
+ #include <linux/property.h>
+ #include <linux/usb/phy.h>
+ #include <linux/notifier.h>
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ #include <linux/regmap.h>
+ #include <linux/gpio.h>
+ #include <linux/gpio/consumer.h>
+diff --git a/drivers/extcon/extcon-gpio.c b/drivers/extcon/extcon-gpio.c
+index ebed22f22d75..ab770adcca7e 100644
+--- a/drivers/extcon/extcon-gpio.c
++++ b/drivers/extcon/extcon-gpio.c
+@@ -17,7 +17,7 @@
+  * GNU General Public License for more details.
+  */
+ 
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ #include <linux/extcon/extcon-gpio.h>
+ #include <linux/gpio.h>
+ #include <linux/gpio/consumer.h>
+diff --git a/drivers/extcon/extcon-max14577.c b/drivers/extcon/extcon-max14577.c
+index 12e26c4e7763..9a7524ebf698 100644
+--- a/drivers/extcon/extcon-max14577.c
++++ b/drivers/extcon/extcon-max14577.c
+@@ -23,7 +23,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/mfd/max14577.h>
+ #include <linux/mfd/max14577-private.h>
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ 
+ #define	DELAY_MS_DEFAULT		17000		/* unit: millisecond */
+ 
+diff --git a/drivers/extcon/extcon-max3355.c b/drivers/extcon/extcon-max3355.c
+index 533e16a952b8..0aa410836f4e 100644
+--- a/drivers/extcon/extcon-max3355.c
++++ b/drivers/extcon/extcon-max3355.c
+@@ -9,7 +9,7 @@
+  * may be copied, distributed, and modified under those terms.
+  */
+ 
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ #include <linux/gpio.h>
+ #include <linux/gpio/consumer.h>
+ #include <linux/interrupt.h>
+diff --git a/drivers/extcon/extcon-max77693.c b/drivers/extcon/extcon-max77693.c
+index 68dbcb814b2f..d49339591cb6 100644
+--- a/drivers/extcon/extcon-max77693.c
++++ b/drivers/extcon/extcon-max77693.c
+@@ -26,7 +26,7 @@
+ #include <linux/mfd/max77693.h>
+ #include <linux/mfd/max77693-common.h>
+ #include <linux/mfd/max77693-private.h>
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ #include <linux/regmap.h>
+ #include <linux/irqdomain.h>
+ 
+diff --git a/drivers/extcon/extcon-max77843.c b/drivers/extcon/extcon-max77843.c
+index 5d11fdf36e94..ad288b6d475f 100644
+--- a/drivers/extcon/extcon-max77843.c
++++ b/drivers/extcon/extcon-max77843.c
+@@ -11,7 +11,7 @@
+  * (at your option) any later version.
+  */
+ 
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ #include <linux/i2c.h>
+ #include <linux/interrupt.h>
+ #include <linux/kernel.h>
+diff --git a/drivers/extcon/extcon-max8997.c b/drivers/extcon/extcon-max8997.c
+index 4a0612fb9c07..8152790d72e1 100644
+--- a/drivers/extcon/extcon-max8997.c
++++ b/drivers/extcon/extcon-max8997.c
+@@ -25,7 +25,7 @@
+ #include <linux/kobject.h>
+ #include <linux/mfd/max8997.h>
+ #include <linux/mfd/max8997-private.h>
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ #include <linux/irqdomain.h>
+ 
+ #define	DEV_NAME			"max8997-muic"
+diff --git a/drivers/extcon/extcon-palmas.c b/drivers/extcon/extcon-palmas.c
+index 634ba70782de..a093fc2a56e8 100644
+--- a/drivers/extcon/extcon-palmas.c
++++ b/drivers/extcon/extcon-palmas.c
+@@ -25,6 +25,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ #include <linux/err.h>
++#include <linux/extcon-provider.h>
+ #include <linux/mfd/palmas.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
+diff --git a/drivers/extcon/extcon-qcom-spmi-misc.c b/drivers/extcon/extcon-qcom-spmi-misc.c
+index b8cde096a808..660bbf163bf5 100644
+--- a/drivers/extcon/extcon-qcom-spmi-misc.c
++++ b/drivers/extcon/extcon-qcom-spmi-misc.c
+@@ -15,7 +15,7 @@
+  * GNU General Public License for more details.
+  */
+ 
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/kernel.h>
+diff --git a/drivers/extcon/extcon-rt8973a.c b/drivers/extcon/extcon-rt8973a.c
+index 174c388739ea..64442f236855 100644
+--- a/drivers/extcon/extcon-rt8973a.c
++++ b/drivers/extcon/extcon-rt8973a.c
+@@ -20,7 +20,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/regmap.h>
+ #include <linux/slab.h>
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ 
+ #include "extcon-rt8973a.h"
+ 
+diff --git a/drivers/extcon/extcon-sm5502.c b/drivers/extcon/extcon-sm5502.c
+index b22325688503..9e2483e70533 100644
+--- a/drivers/extcon/extcon-sm5502.c
++++ b/drivers/extcon/extcon-sm5502.c
+@@ -19,7 +19,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/regmap.h>
+ #include <linux/slab.h>
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ 
+ #include "extcon-sm5502.h"
+ 
+diff --git a/drivers/extcon/extcon-usb-gpio.c b/drivers/extcon/extcon-usb-gpio.c
+index d589c5feff3d..98e5e3eb5317 100644
+--- a/drivers/extcon/extcon-usb-gpio.c
++++ b/drivers/extcon/extcon-usb-gpio.c
+@@ -14,7 +14,7 @@
+  * GNU General Public License for more details.
+  */
+ 
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ #include <linux/gpio.h>
+ #include <linux/gpio/consumer.h>
+ #include <linux/init.h>
+diff --git a/drivers/extcon/extcon.c b/drivers/extcon/extcon.c
+index 78298460d168..6eaeffe8bd88 100644
+--- a/drivers/extcon/extcon.c
++++ b/drivers/extcon/extcon.c
+@@ -30,7 +30,7 @@
+ #include <linux/device.h>
+ #include <linux/fs.h>
+ #include <linux/err.h>
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ #include <linux/of.h>
+ #include <linux/slab.h>
+ #include <linux/sysfs.h>
+diff --git a/drivers/phy/phy-rcar-gen3-usb2.c b/drivers/phy/phy-rcar-gen3-usb2.c
+index 3d97eadd247d..bd2430d7339c 100644
+--- a/drivers/phy/phy-rcar-gen3-usb2.c
++++ b/drivers/phy/phy-rcar-gen3-usb2.c
+@@ -12,7 +12,7 @@
+  * published by the Free Software Foundation.
+  */
+ 
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index fec34f5213c4..eeda5134c777 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -24,7 +24,7 @@
+ #include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/err.h>
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ #include <linux/io.h>
+ #include <linux/interrupt.h>
+ #include <linux/kernel.h>
+diff --git a/drivers/power/supply/qcom_smbb.c b/drivers/power/supply/qcom_smbb.c
+index b5896ba2a602..bb91a1c339bc 100644
+--- a/drivers/power/supply/qcom_smbb.c
++++ b/drivers/power/supply/qcom_smbb.c
+@@ -34,7 +34,7 @@
+ #include <linux/power_supply.h>
+ #include <linux/regmap.h>
+ #include <linux/slab.h>
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ 
+ #define SMBB_CHG_VMAX		0x040
+ #define SMBB_CHG_VSAFE		0x041
+diff --git a/drivers/usb/phy/phy-tahvo.c b/drivers/usb/phy/phy-tahvo.c
+index ab5d364f6e8c..1343bff004eb 100644
+--- a/drivers/usb/phy/phy-tahvo.c
++++ b/drivers/usb/phy/phy-tahvo.c
+@@ -23,7 +23,7 @@
+ #include <linux/io.h>
+ #include <linux/clk.h>
+ #include <linux/usb.h>
+-#include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/usb/otg.h>
+diff --git a/include/linux/extcon-provider.h b/include/linux/extcon-provider.h
+new file mode 100644
+index 000000000000..e91dc028184b
+--- /dev/null
++++ b/include/linux/extcon-provider.h
+@@ -0,0 +1,262 @@
++/*
++ * linux/include/linux/extcon-provider.h
++ *
++ * Copyright (C) 2016 Samsung Electronics
++ * Author: Chanwoo Choi <cw00.choi@samsung.com>
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __LINUX_EXTCON_PROVIDER_H__
++#define __LINUX_EXTCON_PROVIDER_H__
++
++#include <linux/extcon.h>
++
++/**
++ * struct extcon_dev - An extcon device represents one external connector.
++ * @name:		The name of this extcon device. Parent device name is
++ *			used if NULL.
++ * @supported_cable:	Array of supported cable names ending with EXTCON_NONE.
++ *			If supported_cable is NULL, cable name related APIs
++ *			are disabled.
++ * @mutually_exclusive:	Array of mutually exclusive set of cables that cannot
++ *			be attached simultaneously. The array should be
++ *			ending with NULL or be NULL (no mutually exclusive
++ *			cables). For example, if it is { 0x7, 0x30, 0}, then,
++ *			{0, 1}, {0, 1, 2}, {0, 2}, {1, 2}, or {4, 5} cannot
++ *			be attached simulataneously. {0x7, 0} is equivalent to
++ *			{0x3, 0x6, 0x5, 0}. If it is {0xFFFFFFFF, 0}, there
++ *			can be no simultaneous connections.
++ * @dev:		Device of this extcon.
++ * @state:		Attach/detach state of this extcon. Do not provide at
++ *			register-time.
++ * @nh:			Notifier for the state change events from this extcon
++ * @entry:		To support list of extcon devices so that users can
++ *			search for extcon devices based on the extcon name.
++ * @lock:
++ * @max_supported:	Internal value to store the number of cables.
++ * @extcon_dev_type:	Device_type struct to provide attribute_groups
++ *			customized for each extcon device.
++ * @cables:		Sysfs subdirectories. Each represents one cable.
++ *
++ * In most cases, users only need to provide "User initializing data" of
++ * this struct when registering an extcon. In some exceptional cases,
++ * optional callbacks may be needed. However, the values in "internal data"
++ * are overwritten by register function.
++ */
++struct extcon_dev {
++	/* Optional user initializing data */
++	const char *name;
++	const unsigned int *supported_cable;
++	const u32 *mutually_exclusive;
++
++	/* Internal data. Please do not set. */
++	struct device dev;
++	struct raw_notifier_head *nh;
++	struct list_head entry;
++	int max_supported;
++	spinlock_t lock;	/* could be called by irq handler */
++	u32 state;
++
++	/* /sys/class/extcon/.../cable.n/... */
++	struct device_type extcon_dev_type;
++	struct extcon_cable *cables;
++
++	/* /sys/class/extcon/.../mutually_exclusive/... */
++	struct attribute_group attr_g_muex;
++	struct attribute **attrs_muex;
++	struct device_attribute *d_attrs_muex;
++};
++
++#if IS_ENABLED(CONFIG_EXTCON)
++
++/*
++ * Following APIs are for notifiers or configurations.
++ * Notifiers are the external port and connection devices.
++ */
++extern int extcon_dev_register(struct extcon_dev *edev);
++extern void extcon_dev_unregister(struct extcon_dev *edev);
++extern int devm_extcon_dev_register(struct device *dev,
++				    struct extcon_dev *edev);
++extern void devm_extcon_dev_unregister(struct device *dev,
++				       struct extcon_dev *edev);
++
++/*
++ * Following APIs control the memory of extcon device.
++ */
++extern struct extcon_dev *extcon_dev_allocate(const unsigned int *cable);
++extern void extcon_dev_free(struct extcon_dev *edev);
++extern struct extcon_dev *devm_extcon_dev_allocate(struct device *dev,
++						   const unsigned int *cable);
++extern void devm_extcon_dev_free(struct device *dev, struct extcon_dev *edev);
++
++/*
++ * set_state access each bit of the 32b encoded state value.
++ * They are used to access the status of each cable based on the cable id.
++ */
++extern int extcon_set_state(struct extcon_dev *edev, unsigned int id,
++				   bool cable_state);
++extern int extcon_set_state_sync(struct extcon_dev *edev, unsigned int id,
++				bool cable_state);
++
++/*
++ * Synchronize the state and property data for a specific external connector.
++ */
++extern int extcon_sync(struct extcon_dev *edev, unsigned int id);
++
++/*
++ * set_property access the property value of each external connector.
++ * They are used to access the property of each cable based on the property id.
++ */
++extern int extcon_set_property(struct extcon_dev *edev, unsigned int id,
++				unsigned int prop,
++				union extcon_property_value prop_val);
++extern int extcon_set_property_sync(struct extcon_dev *edev, unsigned int id,
++				unsigned int prop,
++				union extcon_property_value prop_val);
++
++/*
++ * set_property_capability set the capability of the property for each
++ * external connector. They are used to set the capability of the property
++ * of each external connector based on the id and property.
++ */
++extern int extcon_set_property_capability(struct extcon_dev *edev,
++				unsigned int id, unsigned int prop);
++
++/*
++ * Following APIs are to monitor every action of a notifier.
++ * Registrar gets notified for every external port of a connection device.
++ * Probably this could be used to debug an action of notifier; however,
++ * we do not recommend to use this for normal 'notifiee' device drivers who
++ * want to be notified by a specific external port of the notifier.
++ */
++extern int extcon_register_notifier(struct extcon_dev *edev, unsigned int id,
++				    struct notifier_block *nb);
++extern int extcon_unregister_notifier(struct extcon_dev *edev, unsigned int id,
++				    struct notifier_block *nb);
++extern int devm_extcon_register_notifier(struct device *dev,
++				struct extcon_dev *edev, unsigned int id,
++				struct notifier_block *nb);
++extern void devm_extcon_unregister_notifier(struct device *dev,
++				struct extcon_dev *edev, unsigned int id,
++				struct notifier_block *nb);
++
++/*
++ * Following API get the extcon device from devicetree.
++ * This function use phandle of devicetree to get extcon device directly.
++ */
++extern struct extcon_dev *extcon_get_edev_by_phandle(struct device *dev,
++						     int index);
++
++/* Following API to get information of extcon device */
++extern const char *extcon_get_edev_name(struct extcon_dev *edev);
++
++
++#else /* CONFIG_EXTCON */
++static inline int extcon_dev_register(struct extcon_dev *edev)
++{
++	return 0;
++}
++
++static inline void extcon_dev_unregister(struct extcon_dev *edev) { }
++
++static inline int devm_extcon_dev_register(struct device *dev,
++					   struct extcon_dev *edev)
++{
++	return -EINVAL;
++}
++
++static inline void devm_extcon_dev_unregister(struct device *dev,
++					      struct extcon_dev *edev) { }
++
++static inline struct extcon_dev *extcon_dev_allocate(const unsigned int *cable)
++{
++	return ERR_PTR(-ENOSYS);
++}
++
++static inline void extcon_dev_free(struct extcon_dev *edev) { }
++
++static inline struct extcon_dev *devm_extcon_dev_allocate(struct device *dev,
++						const unsigned int *cable)
++{
++	return ERR_PTR(-ENOSYS);
++}
++
++static inline void devm_extcon_dev_free(struct extcon_dev *edev) { }
++
++static inline int extcon_set_state(struct extcon_dev *edev, unsigned int id,
++				bool cable_state)
++{
++	return 0;
++}
++
++static inline int extcon_set_state_sync(struct extcon_dev *edev, unsigned int id,
++				bool cable_state)
++{
++	return 0;
++}
++
++static inline int extcon_sync(struct extcon_dev *edev, unsigned int id)
++{
++	return 0;
++}
++
++static inline int extcon_set_property(struct extcon_dev *edev, unsigned int id,
++					unsigned int prop,
++					union extcon_property_value prop_val)
++{
++	return 0;
++}
++
++static inline int extcon_set_property_sync(struct extcon_dev *edev,
++					unsigned int id, unsigned int prop,
++					union extcon_property_value prop_val)
++{
++	return 0;
++}
++
++static inline int extcon_set_property_capability(struct extcon_dev *edev,
++					unsigned int id, unsigned int prop)
++{
++	return 0;
++}
++
++static inline int extcon_register_notifier(struct extcon_dev *edev,
++					unsigned int id,
++					struct notifier_block *nb)
++{
++	return 0;
++}
++
++static inline int extcon_unregister_notifier(struct extcon_dev *edev,
++					unsigned int id,
++					struct notifier_block *nb)
++{
++	return 0;
++}
++
++static inline int devm_extcon_register_notifier(struct device *dev,
++				struct extcon_dev *edev, unsigned int id,
++				struct notifier_block *nb)
++{
++	return -ENOSYS;
++}
++
++static inline  void devm_extcon_unregister_notifier(struct device *dev,
++				struct extcon_dev *edev, unsigned int id,
++				struct notifier_block *nb) { }
++#endif /* CONFIG_EXTCON */
++
++/*
++ * Following API are deprecated. EXTCON remains the function definition
++ * to prevent the build break.
++ */
++static inline int extcon_set_cable_state_(struct extcon_dev *edev, unsigned int id,
++				   bool cable_state)
++{
++	return extcon_set_state_sync(edev, id, cable_state);
++}
++#endif /* __LINUX_EXTCON_PROVIDER_H__ */
+diff --git a/include/linux/extcon.h b/include/linux/extcon.h
+index b871c0cb1f02..8cb2ef6dcbe0 100644
+--- a/include/linux/extcon.h
++++ b/include/linux/extcon.h
+@@ -160,62 +160,7 @@
+ };
+ 
+ struct extcon_cable;
+-
+-/**
+- * struct extcon_dev - An extcon device represents one external connector.
+- * @name:		The name of this extcon device. Parent device name is
+- *			used if NULL.
+- * @supported_cable:	Array of supported cable names ending with EXTCON_NONE.
+- *			If supported_cable is NULL, cable name related APIs
+- *			are disabled.
+- * @mutually_exclusive:	Array of mutually exclusive set of cables that cannot
+- *			be attached simultaneously. The array should be
+- *			ending with NULL or be NULL (no mutually exclusive
+- *			cables). For example, if it is { 0x7, 0x30, 0}, then,
+- *			{0, 1}, {0, 1, 2}, {0, 2}, {1, 2}, or {4, 5} cannot
+- *			be attached simulataneously. {0x7, 0} is equivalent to
+- *			{0x3, 0x6, 0x5, 0}. If it is {0xFFFFFFFF, 0}, there
+- *			can be no simultaneous connections.
+- * @dev:		Device of this extcon.
+- * @state:		Attach/detach state of this extcon. Do not provide at
+- *			register-time.
+- * @nh:			Notifier for the state change events from this extcon
+- * @entry:		To support list of extcon devices so that users can
+- *			search for extcon devices based on the extcon name.
+- * @lock:
+- * @max_supported:	Internal value to store the number of cables.
+- * @extcon_dev_type:	Device_type struct to provide attribute_groups
+- *			customized for each extcon device.
+- * @cables:		Sysfs subdirectories. Each represents one cable.
+- *
+- * In most cases, users only need to provide "User initializing data" of
+- * this struct when registering an extcon. In some exceptional cases,
+- * optional callbacks may be needed. However, the values in "internal data"
+- * are overwritten by register function.
+- */
+-struct extcon_dev {
+-	/* Optional user initializing data */
+-	const char *name;
+-	const unsigned int *supported_cable;
+-	const u32 *mutually_exclusive;
+-
+-	/* Internal data. Please do not set. */
+-	struct device dev;
+-	struct raw_notifier_head *nh;
+-	struct list_head entry;
+-	int max_supported;
+-	spinlock_t lock;	/* could be called by irq handler */
+-	u32 state;
+-
+-	/* /sys/class/extcon/.../cable.n/... */
+-	struct device_type extcon_dev_type;
+-	struct extcon_cable *cables;
+-
+-	/* /sys/class/extcon/.../mutually_exclusive/... */
+-	struct attribute_group attr_g_muex;
+-	struct attribute **attrs_muex;
+-	struct device_attribute *d_attrs_muex;
+-};
++struct extcon_dev;
+ 
+ #if IS_ENABLED(CONFIG_EXTCON)
+ 
+@@ -223,60 +168,29 @@ struct extcon_dev {
+  * Following APIs are for notifiers or configurations.
+  * Notifiers are the external port and connection devices.
+  */
+-extern int extcon_dev_register(struct extcon_dev *edev);
+-extern void extcon_dev_unregister(struct extcon_dev *edev);
+-extern int devm_extcon_dev_register(struct device *dev,
+-				    struct extcon_dev *edev);
+-extern void devm_extcon_dev_unregister(struct device *dev,
+-				       struct extcon_dev *edev);
+ extern struct extcon_dev *extcon_get_extcon_dev(const char *extcon_name);
+ 
+ /*
+- * Following APIs control the memory of extcon device.
+- */
+-extern struct extcon_dev *extcon_dev_allocate(const unsigned int *cable);
+-extern void extcon_dev_free(struct extcon_dev *edev);
+-extern struct extcon_dev *devm_extcon_dev_allocate(struct device *dev,
+-						   const unsigned int *cable);
+-extern void devm_extcon_dev_free(struct device *dev, struct extcon_dev *edev);
+-
+-/*
+- * get/set_state access each bit of the 32b encoded state value.
++ * get_state access each bit of the 32b encoded state value.
+  * They are used to access the status of each cable based on the cable id.
+  */
+ extern int extcon_get_state(struct extcon_dev *edev, unsigned int id);
+-extern int extcon_set_state(struct extcon_dev *edev, unsigned int id,
+-				   bool cable_state);
+-extern int extcon_set_state_sync(struct extcon_dev *edev, unsigned int id,
+-				bool cable_state);
+-/*
+- * Synchronize the state and property data for a specific external connector.
+- */
+-extern int extcon_sync(struct extcon_dev *edev, unsigned int id);
+ 
+ /*
+- * get/set_property access the property value of each external connector.
++ * get_property access the property value of each external connector.
+  * They are used to access the property of each cable based on the property id.
+  */
+ extern int extcon_get_property(struct extcon_dev *edev, unsigned int id,
+ 				unsigned int prop,
+ 				union extcon_property_value *prop_val);
+-extern int extcon_set_property(struct extcon_dev *edev, unsigned int id,
+-				unsigned int prop,
+-				union extcon_property_value prop_val);
+-extern int extcon_set_property_sync(struct extcon_dev *edev, unsigned int id,
+-				unsigned int prop,
+-				union extcon_property_value prop_val);
+ 
+ /*
+- * get/set_property_capability set the capability of the property for each
++ * get_property_capability set the capability of the property for each
+  * external connector. They are used to set the capability of the property
+  * of each external connector based on the id and property.
+  */
+ extern int extcon_get_property_capability(struct extcon_dev *edev,
+ 				unsigned int id, unsigned int prop);
+-extern int extcon_set_property_capability(struct extcon_dev *edev,
+-				unsigned int id, unsigned int prop);
+ 
+ /*
+  * Following APIs are to monitor every action of a notifier.
+@@ -306,81 +220,19 @@ extern struct extcon_dev *extcon_get_edev_by_phandle(struct device *dev,
+ /* Following API to get information of extcon device */
+ extern const char *extcon_get_edev_name(struct extcon_dev *edev);
+ 
+-
+ #else /* CONFIG_EXTCON */
+-static inline int extcon_dev_register(struct extcon_dev *edev)
+-{
+-	return 0;
+-}
+-
+-static inline void extcon_dev_unregister(struct extcon_dev *edev) { }
+-
+-static inline int devm_extcon_dev_register(struct device *dev,
+-					   struct extcon_dev *edev)
+-{
+-	return -EINVAL;
+-}
+-
+-static inline void devm_extcon_dev_unregister(struct device *dev,
+-					      struct extcon_dev *edev) { }
+-
+-static inline struct extcon_dev *extcon_dev_allocate(const unsigned int *cable)
+-{
+-	return ERR_PTR(-ENOSYS);
+-}
+-
+-static inline void extcon_dev_free(struct extcon_dev *edev) { }
+-
+-static inline struct extcon_dev *devm_extcon_dev_allocate(struct device *dev,
+-						const unsigned int *cable)
+-{
+-	return ERR_PTR(-ENOSYS);
+-}
+-
+-static inline void devm_extcon_dev_free(struct extcon_dev *edev) { }
+-
+ 
+ static inline int extcon_get_state(struct extcon_dev *edev, unsigned int id)
+ {
+ 	return 0;
+ }
+ 
+-static inline int extcon_set_state(struct extcon_dev *edev, unsigned int id,
+-				bool cable_state)
+-{
+-	return 0;
+-}
+-
+-static inline int extcon_set_state_sync(struct extcon_dev *edev, unsigned int id,
+-				bool cable_state)
+-{
+-	return 0;
+-}
+-
+-static inline int extcon_sync(struct extcon_dev *edev, unsigned int id)
+-{
+-	return 0;
+-}
+-
+ static inline int extcon_get_property(struct extcon_dev *edev, unsigned int id,
+ 					unsigned int prop,
+ 					union extcon_property_value *prop_val)
+ {
+ 	return 0;
+ }
+-static inline int extcon_set_property(struct extcon_dev *edev, unsigned int id,
+-					unsigned int prop,
+-					union extcon_property_value prop_val)
+-{
+-	return 0;
+-}
+-
+-static inline int extcon_set_property_sync(struct extcon_dev *edev,
+-					unsigned int id, unsigned int prop,
+-					union extcon_property_value prop_val)
+-{
+-	return 0;
+-}
+ 
+ static inline int extcon_get_property_capability(struct extcon_dev *edev,
+ 					unsigned int id, unsigned int prop)
+@@ -388,12 +240,6 @@ static inline int extcon_get_property_capability(struct extcon_dev *edev,
+ 	return 0;
+ }
+ 
+-static inline int extcon_set_property_capability(struct extcon_dev *edev,
+-					unsigned int id, unsigned int prop)
+-{
+-	return 0;
+-}
+-
+ static inline struct extcon_dev *extcon_get_extcon_dev(const char *extcon_name)
+ {
+ 	return NULL;
+@@ -459,10 +305,4 @@ static inline int extcon_get_cable_state_(struct extcon_dev *edev, unsigned int
+ {
+ 	return extcon_get_state(edev, id);
+ }
+-
+-static inline int extcon_set_cable_state_(struct extcon_dev *edev, unsigned int id,
+-				   bool cable_state)
+-{
+-	return extcon_set_state_sync(edev, id, cable_state);
+-}
+ #endif /* __LINUX_EXTCON_H__ */
+-- 
+1.9.1
