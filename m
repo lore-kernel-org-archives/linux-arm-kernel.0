@@ -1,145 +1,110 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 28 Nov 2016 19:02:39 +0100
-Subject: [PATCH v7 2/8] drm/sun8i: Add DT bindings documentation of Allwinner
- DE2
-In-Reply-To: <cover.1480414715.git.moinejf@free.fr>
-References: <cover.1480414715.git.moinejf@free.fr>
-Message-ID: <92fc53084274d5ab04fe28f2dc0b16cf5d94481e.1480414715.git.moinejf@free.fr>
+Date: Tue, 29 Nov 2016 11:18:35 +0100
+Subject: [PATCH v7 0/8] drm: sun8i: Add DE2 HDMI video support
+Message-ID: <cover.1480414715.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
- .../bindings/display/sunxi/sun8i-de2.txt           | 121 +++++++++++++++++++++
- 1 file changed, 121 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/sunxi/sun8i-de2.txt
+This patchset series adds HDMI video support to the Allwinner
+sun8i SoCs which include the display engine 2 (DE2).
+The driver contains the code for the A83T and H3 SoCs, and
+some H3 boards, but it could be used/extended for other SoCs
+(A64, H2, H5) and boards (Banana PIs, Orange PIs).
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun8i-de2.txt b/Documentation/devicetree/bindings/display/sunxi/sun8i-de2.txt
-new file mode 100644
-index 0000000..edf38b8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun8i-de2.txt
-@@ -0,0 +1,121 @@
-+Allwinner sun8i Display Engine 2 subsystem
-+==========================================
-+
-+The Allwinner DE2 subsystem contains a display controller (DE2),
-+one or two LCD controllers (Timing CONtrollers) and their external
-+interfaces (encoders/connectors).
-+
-+          +-----------+
-+          | DE2       |
-+          |           |
-+          | +-------+ |
-+  plane --->|       | |   +------+
-+          | | mixer |---->| TCON |---> encoder  ---> display
-+  plane --->|       | |   +------+     connector     device
-+          | +-------+ |
-+          |           |
-+          | +-------+ |
-+  plane --->|       | |   +------+
-+          | | mixer |---->| TCON |---> encoder  ---> display
-+  plane --->|       | |   +------+     connector     device
-+          | +-------+ |
-+          +-----------+
-+
-+The DE2 contains a processor which mixes the input planes and creates
-+the images which are sent to the TCONs.
-+From the software point of vue, there are 2 independent real-time
-+mixers, each one being statically associated to one TCON.
-+
-+The TCONs adjust the image format to the one of the display device.
-+
-+Display controller (DE2)
-+========================
-+
-+Required properties:
-+
-+- compatible: value should be one of the following
-+		"allwinner,sun8i-a83t-display-engine"
-+		"allwinner,sun8i-h3-display-engine"
-+
-+- reg: base address and size of the I/O memory
-+
-+- clocks: must include clock specifiers corresponding to entries in the
-+		clock-names property.
-+
-+- clock-names: must contain
-+		"bus": bus gate
-+		"clock": clock
-+
-+- resets: phandle to the reset of the device
-+
-+- ports: must contain a list of 2 phandles, indexed by mixer number,
-+	and pointing to display interface ports of TCONs
-+
-+LCD controller (TCON)
-+=====================
-+
-+Required properties:
-+
-+- compatible: should be
-+		"allwinner,sun8i-a83t-tcon"
-+
-+- reg: base address and size of the I/O memory
-+
-+- clocks: must include clock specifiers corresponding to entries in the
-+		clock-names property.
-+
-+- clock-names: must contain
-+		"bus": bus gate
-+		"clock": pixel clock
-+
-+- resets: phandle to the reset of the device
-+
-+- interrupts: interrupt number for the TCON
-+
-+- port: port node with endpoint definitions as defined in
-+	Documentation/devicetree/bindings/media/video-interfaces.txt
-+
-+Example:
-+
-+	de: de-controller at 01000000 {
-+		compatible = "allwinner,sun8i-h3-display-engine";
-+		reg = <0x01000000 0x400000>;
-+		clocks = <&ccu CLK_BUS_DE>, <&ccu CLK_DE>;
-+		clock-names = "bus", "clock";
-+		resets = <&ccu RST_BUS_DE>;
-+		ports = <&tcon0_p>, <&tcon1_p>;
-+	};
-+
-+	tcon0: lcd-controller at 01c0c000 {
-+		compatible = "allwinner,sun8i-a83t-tcon";
-+		reg = <0x01c0c000 0x400>;
-+		clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_TCON0>;
-+		clock-names = "bus", "clock";
-+		resets = <&ccu RST_BUS_TCON0>;
-+		interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		tcon0_p: port {
-+			tcon0_hdmi: endpoint {
-+				remote-endpoint = <&hdmi_tcon0>;
-+			};
-+		};
-+	};
-+
-+	/* not used */
-+	tcon1: lcd-controller at 01c0d000 {
-+		compatible = "allwinner,sun8i-h3-tcon";
-+		reg = <0x01c0d000 0x400>;
-+		clocks = <&ccu CLK_BUS_TCON1>,
-+			 <&ccu CLK_TCON0>;	/* no clock */
-+		clock-names = "bus", "clock";
-+		interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		tcon1_p: port {
-+			endpoint {
-+				/* empty */
-+			};
-+		};
-+	};
+v7:
+	- more explanations about the DE2 in the DT documentation
+	- separate patches for DT documentation (Rob Herring)
+	- show all properties in DT examples (Rob Herring)
+	- use drm_of_component_probe()
+	- use the index of the DE 'ports' in the DT as
+	  the DE mixer number (no alias needed anymore)
+	- change some 'lcd' to 'tcon' in the DT
+	- add HDMI module parameter for DVI mode when screen overscan
+	  problems
+	- fall back to some CEA modes in case of EDID read failure
+	- fix some settings (interlace) and simplify code
+	- fix bug in start of A83T HDMI
+	- fix lack of CLK_PLL_DE definition in the DT include
+	  (Icenowy Zheng)
+v6:
+	- remove audio support (other patchset to come)
+	- use DRM modeset data for HDMI configuration
+		(thanks to Jernej ??krabec)
+	- more meaningfull register names
+	- use a mutex for DE I/O protection
+	- merge DE and plane into one file
+	- don't activate the video hardware when video not started
+		(Maxime Ripard)
+	- remove 'type = "video" in DT graph ports
+		(Rob Herring)
+	- change the I/O accesses by #define instead of struct
+		(Maxime Ripard, Andr?? Przywara)
+	- remove pm functions (Maxime Ripard)
+	- set the pll-de/de clocks in the DT (Maxime Ripard)
+	- use platform_get_irq instead of irq_of_parse_and_map
+		(Maxime Ripard)
+	- rename sunxi to sun8i (Maxime Ripard)
+	- fix coding style errors (Maxime Ripard)
+	- subclass the drm structure in private data (Daniel Vetter)
+	- move drm_dev_register at end of init (Daniel Vetter)
+v5:
+	- add overlay plane
+	- add audio support
+	- add support for the A83T
+	- add back the HDMI driver
+	- many bug fixes
+v4: 
+	- drivers/clk/sunxi/Makefile was missing (Emil Velikov)
+v3:
+	- add the hardware cursor
+	- simplify and fix the DE2 init sequences
+	- generation for all SUNXI SoCs (Andre Przywara)
+v2:
+	- remove the HDMI driver
+	- remarks from Chen-Yu Tsai and Russell King
+	- DT documentation added
+
+Jean-Francois Moine (8):
+  drm: sun8i: Add a basic DRM driver for Allwinner DE2
+  drm/sun8i: Add DT bindings documentation of Allwinner DE2
+  drm: sun8i: add HDMI video support to A83T and H3
+  drm/sunxi: Add DT bindings documentation of Allwinner HDMI
+  clk: sunxi-ng: define the PLL DE clock
+  ARM: dts: sun8i-h3: add HDMI video nodes
+  ARM: dts: sun8i-h3: Add HDMI video to the Banana Pi M2+
+  ARM: dts: sun8i-h3: Add HDMI video to the Orange PI 2
+
+ .../devicetree/bindings/display/sunxi/hdmi.txt     |  56 ++
+ .../bindings/display/sunxi/sun8i-de2.txt           | 121 +++
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    |  12 +
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          |  12 +
+ arch/arm/boot/dts/sun8i-h3.dtsi                    |  65 ++
+ drivers/gpu/drm/Kconfig                            |   2 +
+ drivers/gpu/drm/Makefile                           |   1 +
+ drivers/gpu/drm/sun8i/Kconfig                      |  26 +
+ drivers/gpu/drm/sun8i/Makefile                     |   9 +
+ drivers/gpu/drm/sun8i/de2_crtc.c                   | 449 +++++++++++
+ drivers/gpu/drm/sun8i/de2_crtc.h                   |  52 ++
+ drivers/gpu/drm/sun8i/de2_drv.c                    | 317 ++++++++
+ drivers/gpu/drm/sun8i/de2_drv.h                    |  48 ++
+ drivers/gpu/drm/sun8i/de2_hdmi.c                   | 440 +++++++++++
+ drivers/gpu/drm/sun8i/de2_hdmi.h                   |  51 ++
+ drivers/gpu/drm/sun8i/de2_hdmi_io.c                | 842 +++++++++++++++++++++
+ drivers/gpu/drm/sun8i/de2_plane.c                  | 734 ++++++++++++++++++
+ include/dt-bindings/clock/sun8i-h3-ccu.h           |   1 +
+ 18 files changed, 3238 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/sunxi/hdmi.txt
+ create mode 100644 Documentation/devicetree/bindings/display/sunxi/sun8i-de2.txt
+ create mode 100644 drivers/gpu/drm/sun8i/Kconfig
+ create mode 100644 drivers/gpu/drm/sun8i/Makefile
+ create mode 100644 drivers/gpu/drm/sun8i/de2_crtc.c
+ create mode 100644 drivers/gpu/drm/sun8i/de2_crtc.h
+ create mode 100644 drivers/gpu/drm/sun8i/de2_drv.c
+ create mode 100644 drivers/gpu/drm/sun8i/de2_drv.h
+ create mode 100644 drivers/gpu/drm/sun8i/de2_hdmi.c
+ create mode 100644 drivers/gpu/drm/sun8i/de2_hdmi.h
+ create mode 100644 drivers/gpu/drm/sun8i/de2_hdmi_io.c
+ create mode 100644 drivers/gpu/drm/sun8i/de2_plane.c
+
 -- 
 2.10.2
