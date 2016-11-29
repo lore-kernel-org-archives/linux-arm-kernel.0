@@ -1,63 +1,72 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 28 Nov 2016 17:34:37 -0800
-Subject: [PATCH V8 2/6] thermal: bcm2835: add thermal driver for bcm2835
- soc
-In-Reply-To: <87twarz6s1.fsf@eliezer.anholt.net>
-References: <1478081906-12009-1-git-send-email-kernel@martin.sperl.org>
- <1478081906-12009-3-git-send-email-kernel@martin.sperl.org>
- <20161117021107.GA2647@localhost.localdomain>
- <766e1b70-d83a-eb52-fa2b-aec435e85673@martin.sperl.org>
- <20161117151019.GA3115@localhost.localdomain>
- <7957B3CC-0E18-4B27-82EB-EF88B7695E28@martin.sperl.org>
- <20161119042224.GA25063@localhost.localdomain>
- <28F93ABE-8210-4389-AE77-4D5E830E669B@martin.sperl.org>
- <20161125052008.GA8342@localhost.localdomain>
- <87twarz6s1.fsf@eliezer.anholt.net>
-Message-ID: <20161129013436.GA3080@localhost.localdomain>
+From: jintack@cs.columbia.edu (Jintack Lim)
+Date: Mon, 28 Nov 2016 21:12:17 -0500
+Subject: [PATCH] arm64: head.S: Fix CNTHCTL_EL2 access on VHE system
+In-Reply-To: <871868f8-563c-98a1-e3f7-f3ac9457265e@arm.com>
+References: <1480351438-11548-1-git-send-email-jintack@cs.columbia.edu>
+ <871868f8-563c-98a1-e3f7-f3ac9457265e@arm.com>
+Message-ID: <CAHyh4xhPW=QFc6k98cry51Neh7W9XGuWUu88fxUFEk32AEGBhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Eric, Martin,
+On Mon, Nov 28, 2016 at 11:56 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 28/11/16 16:43, Jintack Lim wrote:
+>> From: Jintack <jintack@cs.columbia.edu>
+>>
+>> Bit positions of CNTHCTL_EL2 are changing depending on HCR_EL2.E2H bit.
+>> EL1PCEN and EL1PCTEN are 1st and 0th bits when E2H is not set, but they
+>> are 11th and 10th bits respectively when E2H is set.  Current code is
+>> unintentionally setting wrong bits to CNTHCTL_EL2 with E2H set.
+>>
+>> In fact, we don't need to set those two bits, which allow EL1 and EL0 to
+>> access physical timer and counter respectively, if E2H and TGE are set
+>> for the host kernel. They will be configured later as necessary. First,
+>> we don't need to configure those bits for EL1, since the host kernel
+>> runs in EL2.  It is a hypervisor's responsibility to configure them
+>> before entering a VM, which runs in EL0 and EL1. Second, EL0 accesses
+>> are configured in the later stage of boot process.
+>>
+>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+>> ---
+>>  arch/arm64/kernel/head.S | 8 +++++++-
+>>  1 file changed, 7 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+>> index 332e331..bc3d2db 100644
+>> --- a/arch/arm64/kernel/head.S
+>> +++ b/arch/arm64/kernel/head.S
+>> @@ -524,10 +524,16 @@ set_hcr:
+>>       msr     hcr_el2, x0
+>>       isb
+>>
+>> -     /* Generic timers. */
+>> +     /*
+>> +      * Allow Non-secure EL1 and EL0 to access physical timer and counter.
+>> +      * This is not necessary for VHE, since the host kernel runs in EL2,
+>> +      * and EL0 accesses are configured in the later stage of boot process.
+>> +      */
+>> +     cbnz    x2, 1f
+>>       mrs     x0, cnthctl_el2
+>>       orr     x0, x0, #3                      // Enable EL1 physical timers
+>>       msr     cnthctl_el2, x0
+>> +1:
+>>       msr     cntvoff_el2, xzr                // Clear virtual offset
+>>
+>>  #ifdef CONFIG_ARM_GIC_V3
+>>
+>
+> Nice catch. It may be worth documenting that when HCR_EL2.E2H == 1,
+> CNTHCTL_EL2 has the same bit layout as CNTKCTL_EL1, allowing the kernel
+> designed to run at EL1 to transparently mess with the EL0 bits (as
+> CNTHCTL_EL2 and CNTKCTL_EL1 are the same register in this configuration).
 
-On Mon, Nov 28, 2016 at 12:30:38PM -0800, Eric Anholt wrote:
-> Eduardo Valentin <edubezval@gmail.com> writes:
-> 
+Hi Marc, thanks for the review. I'll add this comment and send out v2.
 
-<cut> 
-
-> The firmware today always initializes thermal.  I suggested adding the
-> init code because we (myself and the Pi Foundation) would like to reduce
-> how much closed firmware code is required in the platform, and the Linux
-> driver doing this would help make that possible in the future.
-
-Oh I see. Backup code for future chips/firmware.
-
-> 
-> >> > Who has the ownership of this device?
-> >> 
-> >> Joined ownership I suppose...
-> >> 
-> >
-> > with no synchronization mechanism?
-> 
-> Correct, because none is necessary.
-> 
-
-
-
-<cut>
-
-> 
-> Either the device was initialized by the firmware before handing off to
-> ARM (today's firmware) or it never will be (potential future firmware).
-
-And do you have a way to check if the firmware has the initialization
-code or not? By firmware version, for example. Or even, chip version,
-maybe?
-
-If the current firmware will always initialize the chip, I would say,
-ARM should simply read the registers, no initialization, unless it is
-known that the firmware intentionally left the device uninitialized.
-
-Again, just trying to avoid obscure misbehavior, when running into a
-faulty state, and running silently broken.
+>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
+>
