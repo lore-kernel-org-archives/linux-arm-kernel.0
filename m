@@ -1,118 +1,51 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 29 Nov 2016 11:05:37 +0100
-Subject: [PATCH v3 net-next 0/6] Support Armada 37xx SoC (ARMv8 64-bits)
- in mvneta driver
-In-Reply-To: <cover.a09aeaf5ba62853d595153626b6121ef52a3e9b4.1480412215.git-series.gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Tue, 29 Nov 2016 10:37:20 +0100")
-References: <cover.a09aeaf5ba62853d595153626b6121ef52a3e9b4.1480412215.git-series.gregory.clement@free-electrons.com>
-Message-ID: <871sxuha8e.fsf@free-electrons.com>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Tue, 29 Nov 2016 10:10:58 +0000
+Subject: [PATCH] extcon: Split out the extcon APIs for extcon provider
+ driver
+In-Reply-To: <1480413743-13037-1-git-send-email-cw00.choi@samsung.com>
+References: <1480413743-13037-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <20161129101058.GG1867@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On mar., nov. 29 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+On Tue, Nov 29, 2016 at 07:02:23PM +0900, Chanwoo Choi wrote:
+> This patchs split out the extcon APIs of extcon provider driver in order to
+> prevent the direct access of struct extcon_dev by extcon consumer driver.
+> The extcon consumer driver don't need to handle the extcon provider APIs.
+> 
+> The extcon subsystem has two type of extcon drivers as following:
+> - extcon provider driver
+> : Detect the external connector and identify the state/property of
+>   each external connector. And it send the notification to synchronize
+>   the information between provider and consumer driver.
+> - extcon consumer driver
+> : Receive the notifcation from extcon provider driver. When receving the noti,
+>   it can get the both state and property of specific external connector.
+> 
+> Cc: Myungjoo Ham <myungjoo.ham@samsung.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Felipe Balbi <balbi@kernel.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Chris Zhong <zyw@rock-chips.com>
+> Cc: Roger Quadros <rogerq@ti.com>
+> Cc: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+> Cc: patches at opensource.wolfsonmicro.com
+> Cc: linux-renesas-soc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-usb at vger.kernel.org
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+>  drivers/extcon/devres.c                |   2 +-
+>  drivers/extcon/extcon-adc-jack.c       |   2 +-
+>  drivers/extcon/extcon-arizona.c        |   2 +-
 
-> Hi,
->
-> The Armada 37xx is a new ARMv8 SoC from Marvell using same network
-> controller as the older Armada 370/38x/XP SoCs. This series adapts the
-> driver in order to be able to use it on this new SoC. The main changes
-> are:
->
-> - 64-bits support: the first patches allow using the driver on a 64-bit
->   architecture.
->
-> - MBUS support: the mbus configuration is different on Armada 37xx
->   from the older SoCs.
->
-> - per cpu interrupt: Armada 37xx do not support per cpu interrupt for
->   the NETA IP, the non-per-CPU behavior was added back.
->
-> The first item is solved by patches 1 to 3.
-> The 2 last items are solved by patch 4.
-> In patch 5 the dt support is added.
->
-> Beside Armada 37xx, the series have been tested on Armada XP and
-> Armada 38x (with Hardware Buffer Management and with Software Buffer
-> Managment).
->
-> Thanks,
->
+For the Arizona bit:
 
-I forgot to commit my cover with git series, so it was the old one. It
-should have been the following one:
+Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
 
-Hi,
-
-The Armada 37xx is a new ARMv8 SoC from Marvell using same network
-controller as the older Armada 370/38x/XP SoCs. This series adapts the
-driver in order to be able to use it on this new SoC. The main changes
-are:
-
-- 64-bits support: the first patches allow using the driver on a 64-bit
-  architecture.
-
-- MBUS support: the mbus configuration is different on Armada 37xx
-  from the older SoCs.
-
-- per cpu interrupt: Armada 37xx do not support per cpu interrupt for
-  the NETA IP, the non-per-CPU behavior was added back.
-
-The first patch is an optimization in the rx path in swbm mode.
-The first item is solved by patches 2 to 3.
-The 2 last items are solved by patch 5.
-In patch 6 the dt support is added.
-
-Beside Armada 37xx, this new series have been again tested on Armada
-XP and Armada 38x (with Hardware Buffer Management and with Software
-Buffer Management).
-
-This is the 3th version of the series:
-
-- 1st version:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-November/469588.html
-
-- 2nd version:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-November/470476.html
-
-Changelog:
-v2 -> v3:
-
- - Adding patch 1 "Optimize rx path for small frame"
-
- - Fix the kbuild error by moving the "phys_addr += pp->rx_offset_correction;"
-  line from patch 2 to patch 3 where rx_offset_correction is introduced.
-
- - Move the memory allocation of the buf_virt_addr of the rxq to be
-   called by the probe function in order to avoid a memory leak.
-
-
-> Gregory
->
-> Gregory CLEMENT (4):
->   net: mvneta: Optimize rx path for small frame
->   net: mvneta: Use cacheable memory to store the rx buffer virtual address
->   net: mvneta: Only disable mvneta_bm for 64-bits
->   ARM64: dts: marvell: Add network support for Armada 3700
->
-> Marcin Wojtas (2):
->   net: mvneta: Convert to be 64 bits compatible
->   net: mvneta: Add network support for Armada 3700 SoC
->
->  Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt |   7 +-
->  arch/arm64/boot/dts/marvell/armada-3720-db.dts                    |  23 ++++-
->  arch/arm64/boot/dts/marvell/armada-37xx.dtsi                      |  23 ++++-
->  drivers/net/ethernet/marvell/Kconfig                              |  10 +-
->  drivers/net/ethernet/marvell/mvneta.c                             | 400 ++++++++++++++++++++++++++++++++++++++++++++++++++++++------------------
->  5 files changed, 361 insertions(+), 102 deletions(-)
->
-> base-commit: 436accebb53021ef7c63535f60bda410aa87c136
-> -- 
-> git-series 0.8.10
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks,
+Charles
