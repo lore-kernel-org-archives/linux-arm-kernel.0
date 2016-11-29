@@ -1,148 +1,90 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 29 Nov 2016 15:57:10 -0800
-Subject: [PATCH v4 2/4] [media] davinci: VPIF: add basic support for DT init
+Date: Tue, 29 Nov 2016 15:57:12 -0800
+Subject: [PATCH v4 4/4] [media] dt-bindings: add TI VPIF documentation
 In-Reply-To: <20161129235712.29846-1-khilman@baylibre.com>
 References: <20161129235712.29846-1-khilman@baylibre.com>
-Message-ID: <20161129235712.29846-3-khilman@baylibre.com>
+Message-ID: <20161129235712.29846-5-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic support for initialization via DT.
-
-Because existing capture and display devices are implemented as separate
-platform_devices, and in order to preserve that legacy support, during
-DT boot, manually create capture and display platform devices to
-initialize capture and display support.
-
 Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 ---
- drivers/media/platform/davinci/vpif.c         | 48 ++++++++++++++++++++++++++-
- drivers/media/platform/davinci/vpif_capture.c |  6 ++++
- drivers/media/platform/davinci/vpif_display.c |  6 ++++
- 3 files changed, 59 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/media/ti,da850-vpif.txt    | 67 ++++++++++++++++++++++
+ 1 file changed, 67 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/ti,da850-vpif.txt
 
-diff --git a/drivers/media/platform/davinci/vpif.c b/drivers/media/platform/davinci/vpif.c
-index 0380cf2e5775..528b30d52208 100644
---- a/drivers/media/platform/davinci/vpif.c
-+++ b/drivers/media/platform/davinci/vpif.c
-@@ -420,7 +420,8 @@ EXPORT_SYMBOL(vpif_channel_getfid);
- 
- static int vpif_probe(struct platform_device *pdev)
- {
--	static struct resource	*res;
-+	static struct resource	*res, *res_irq;
-+	struct platform_device *pdev_capture, *pdev_display;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	vpif_base = devm_ioremap_resource(&pdev->dev, res);
-@@ -432,6 +433,42 @@ static int vpif_probe(struct platform_device *pdev)
- 
- 	spin_lock_init(&vpif_lock);
- 	dev_info(&pdev->dev, "vpif probe success\n");
+diff --git a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+new file mode 100644
+index 000000000000..fa06dfdb6898
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+@@ -0,0 +1,67 @@
++Texas Instruments VPIF
++----------------------
 +
-+	if (!pdev->dev.of_node)
-+		return 0;
++The TI Video Port InterFace (VPIF) is the primary component for video
++capture and display on the DA850/AM18x family of TI DaVinci/Sitara
++SoCs.
 +
-+	/*
-+	 * For DT platforms, manually create platform_devices for
-+	 * capture/display drivers.
-+	 */
-+	res_irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-+	if (!res_irq) {
-+		dev_warn(&pdev->dev, "Missing IRQ resource.\n");
-+		return -EINVAL;
-+	}
++TI Document reference: SPRUH82C, Chapter 35
++http://www.ti.com/lit/pdf/spruh82
 +
-+	pdev_capture = devm_kzalloc(&pdev->dev, sizeof(*pdev_capture),
-+				    GFP_KERNEL);
-+	pdev_capture->name = "vpif_capture";
-+	pdev_capture->id = -1;
-+	pdev_capture->resource = res_irq;
-+	pdev_capture->num_resources = 1;
-+	pdev_capture->dev.dma_mask = pdev->dev.dma_mask;
-+	pdev_capture->dev.coherent_dma_mask = pdev->dev.coherent_dma_mask;
-+	pdev_capture->dev.parent = &pdev->dev;
-+	platform_device_register(pdev_capture);
++Required properties:
++- compatible: must be "ti,da850-vpif"
++- reg: physical base address and length of the registers set for the device;
++- interrupts: should contain IRQ line for the VPIF
 +
-+	pdev_display = devm_kzalloc(&pdev->dev, sizeof(*pdev_display),
-+				    GFP_KERNEL);
-+	pdev_display->name = "vpif_display";
-+	pdev_display->id = -1;
-+	pdev_display->resource = res_irq;
-+	pdev_display->num_resources = 1;
-+	pdev_display->dev.dma_mask = pdev->dev.dma_mask;
-+	pdev_display->dev.coherent_dma_mask = pdev->dev.coherent_dma_mask;
-+	pdev_display->dev.parent = &pdev->dev;
-+	platform_device_register(pdev_display);
++Video Capture:
 +
- 	return 0;
- }
- 
-@@ -464,8 +501,17 @@ static const struct dev_pm_ops vpif_pm = {
- #define vpif_pm_ops NULL
- #endif
- 
-+#if IS_ENABLED(CONFIG_OF)
-+static const struct of_device_id vpif_of_match[] = {
-+	{ .compatible = "ti,da850-vpif", },
-+	{ /* sentinel */ },
++VPIF has a 16-bit parallel bus input, supporting 2 8-bit channels or a
++single 16-bit channel.  It should contain at least one port child node
++with child 'endpoint' node. Please refer to the bindings defined in
++Documentation/devicetree/bindings/media/video-interfaces.txt.
++
++Example using 2 8-bit input channels, one of which is connected to an
++I2C-connected TVP5147 decoder:
++
++	vpif: vpif at 217000 {
++		compatible = "ti,da850-vpif";
++		reg = <0x217000 0x1000>;
++		interrupts = <92>;
++
++		port {
++			vpif_ch0: endpoint at 0 {
++				  reg = <0>;
++				  bus-width = <8>;
++				  remote-endpoint = <&composite>;
++			};
++
++			vpif_ch1: endpoint at 1 {
++				  reg = <1>;
++				  bus-width = <8>;
++				  data-shift = <8>;
++			};
++		};
++	};
++
++[ ... ]
++
++&i2c0 {
++
++	tvp5147 at 5d {
++		compatible = "ti,tvp5147";
++		reg = <0x5d>;
++		status = "okay";
++
++		port {
++			composite: endpoint {
++				hsync-active = <1>;
++				vsync-active = <1>;
++				pclk-sample = <0>;
++
++				/* VPIF channel 0 (lower 8-bits) */
++				remote-endpoint = <&vpif_ch0>;
++				bus-width = <8>;
++			};
++		};
++	};
 +};
-+MODULE_DEVICE_TABLE(of, vpif_of_match);
-+#endif
-+
- static struct platform_driver vpif_driver = {
- 	.driver = {
-+		.of_match_table = of_match_ptr(vpif_of_match),
- 		.name	= "vpif",
- 		.pm	= vpif_pm_ops,
- 	},
-diff --git a/drivers/media/platform/davinci/vpif_capture.c b/drivers/media/platform/davinci/vpif_capture.c
-index 9f8f41c0f251..a83df07e4051 100644
---- a/drivers/media/platform/davinci/vpif_capture.c
-+++ b/drivers/media/platform/davinci/vpif_capture.c
-@@ -45,6 +45,7 @@ module_param(debug, int, 0644);
- MODULE_PARM_DESC(debug, "Debug level 0-1");
- 
- #define VPIF_DRIVER_NAME	"vpif_capture"
-+MODULE_ALIAS("platform:" VPIF_DRIVER_NAME);
- 
- /* global variables */
- static struct vpif_device vpif_obj = { {NULL} };
-@@ -1438,6 +1439,11 @@ static __init int vpif_probe(struct platform_device *pdev)
- 	int res_idx = 0;
- 	int i, err;
- 
-+	if (!pdev->dev.platform_data) {
-+		dev_warn(&pdev->dev, "Missing platform data.  Giving up.\n");
-+		return -EINVAL;
-+	}
-+
- 	vpif_dev = &pdev->dev;
- 
- 	err = initialize_vpif();
-diff --git a/drivers/media/platform/davinci/vpif_display.c b/drivers/media/platform/davinci/vpif_display.c
-index 75b27233ec2f..7f632b757d32 100644
---- a/drivers/media/platform/davinci/vpif_display.c
-+++ b/drivers/media/platform/davinci/vpif_display.c
-@@ -42,6 +42,7 @@ module_param(debug, int, 0644);
- MODULE_PARM_DESC(debug, "Debug level 0-1");
- 
- #define VPIF_DRIVER_NAME	"vpif_display"
-+MODULE_ALIAS("platform:" VPIF_DRIVER_NAME);
- 
- /* Is set to 1 in case of SDTV formats, 2 in case of HDTV formats. */
- static int ycmux_mode;
-@@ -1249,6 +1250,11 @@ static __init int vpif_probe(struct platform_device *pdev)
- 	int res_idx = 0;
- 	int i, err;
- 
-+	if (!pdev->dev.platform_data) {
-+		dev_warn(&pdev->dev, "Missing platform data.  Giving up.\n");
-+		return -EINVAL;
-+	}
-+
- 	vpif_dev = &pdev->dev;
- 	err = initialize_vpif();
- 
 -- 
 2.9.3
