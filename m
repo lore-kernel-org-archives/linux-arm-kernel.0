@@ -1,42 +1,53 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Tue, 29 Nov 2016 10:30:02 -0700
-Subject: [PATCH V5 02/10] ras: acpi/apei: cper: generic error data entry
- v3 per ACPI 6.1
-In-Reply-To: <86258A5CC0A3704780874CF6004BA8A62DC87D66@lhreml502-mbb>
-References: <1479767763-27532-1-git-send-email-tbaicar@codeaurora.org>
- <1479767763-27532-3-git-send-email-tbaicar@codeaurora.org>
- <86258A5CC0A3704780874CF6004BA8A62DC87D66@lhreml502-mbb>
-Message-ID: <9cec3193-74b4-4e27-670b-3d6d36ee27a5@codeaurora.org>
+From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
+Date: Tue, 29 Nov 2016 12:54:24 -0500
+Subject: [PATCH 2/2] net: dsa: mv88e6xxx: Add 88E6176 device tree support
+In-Reply-To: <2c59cc79-b6dc-9920-1725-a7785ff3b6bf@kleine-koenig.org>
+References: <1480280279-9552-1-git-send-email-afaerber@suse.de>
+ <1480280279-9552-2-git-send-email-afaerber@suse.de>
+ <20161127212709.GD13318@lunn.ch>
+ <9500470d-09c3-3ecb-994b-3d108bffc99e@suse.de>
+ <20161127220846.GH13318@lunn.ch>
+ <e5d45b55-a4c1-3b5e-0bdc-a5e340b072d0@suse.de>
+ <20161127231009.GA17704@lunn.ch>
+ <20161128080939.ippqlytvojitefkp@perseus.defre.kleine-koenig.org>
+ <20161128131735.GA4379@lunn.ch>
+ <2c59cc79-b6dc-9920-1725-a7785ff3b6bf@kleine-koenig.org>
+Message-ID: <87oa0yb29b.fsf@ketchup.i-did-not-set--mail-host-address--so-tickle-me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2016 4:29 AM, Shiju Jose wrote:
->> @@ -451,12 +484,12 @@ void cper_estatus_print(const char *pfx,
->>   	printk("%s""event severity: %s\n", pfx,
->> cper_severity_str(severity));
->>   	data_len = estatus->data_length;
->>   	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
->> +
->>   	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
->> -	while (data_len >= sizeof(*gdata)) {
->> -		gedata_len = gdata->error_data_length;
->> +
->> +	while (data_len >= acpi_hest_generic_data_size(gdata)) {
->>   		cper_estatus_print_section(newpfx, gdata, sec_no);
->> -		data_len -= gedata_len + sizeof(*gdata);
->> -		gdata = (void *)(gdata + 1) + gedata_len;
->> +		gdata = acpi_hest_generic_data_next(gdata);
->>   		sec_no++;
->>   	}
->>   }
-> Hi Tyler,
-> Will the above while loop does not come out because data_len is not getting updated as it did in V4 patch?
-> This is the behaviour seen when we tested on our platform. It worked fine when we update the data_len.
+Hi,
 
-Hello Shiju,
+Uwe Kleine-K?nig <uwe@kleine-koenig.org> writes:
 
-Thank you for testing, and you're right...looks like I got a little too excited at this code simplification. :)
-I'll add the data_len update in the next patchset.
+> Also it seems wrong to write "marvell,mv88e6085" (only) if I know the
+> hardware is really a "marvell,mv88e6176".
+
+I agree. It might be complex for a user to dig into the driver in order
+to figure out how the switch ID is read and which compatible to choose.
+
+I've sent a patch to change this https://lkml.org/lkml/2016/6/8/1198 but
+Andrew had a stronger opinion on compatible strings, which makes sense.
+
+>> Linus has said he does not like ARM devices because of all the busses
+>> which are not enumerable. Here we have a device which with a little
+>> bit of help we can enumerate. So we should. 
+>
+> If you write
+>
+> 	compatible = "marvell,mv88e6176", "marvell,mv88e6085";
+>
+> you can still enumerate in the same way as before.
+
+So we don't break the existing DTS files, I like this.
+
+The driver already prints info about the detected switch. Instead of
+failing at probe, which seems against the notion of compatible and
+breaks the existing behavior, it could report the eventual mismatch?
+
+We have examples for both usage, still I don't know what the best
+practices are. My _preference_ would go with enumerating them all.
 
 Thanks,
-Tyler
+
+        Vivien
