@@ -1,268 +1,44 @@
-From: shiju.jose@huawei.com (Shiju Jose)
-Date: Tue, 29 Nov 2016 12:26:24 +0000
-Subject: [PATCH V5 02/10] ras: acpi/apei: cper: generic error data entry
- v3 per ACPI 6.1
-In-Reply-To: <1479767763-27532-3-git-send-email-tbaicar@codeaurora.org>
-References: <1479767763-27532-1-git-send-email-tbaicar@codeaurora.org>
- <1479767763-27532-3-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <86258A5CC0A3704780874CF6004BA8A62DC87E3A@lhreml502-mbb>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 29 Nov 2016 20:29:16 +0800
+Subject: [PATCH v9 14/16] drivers: acpi: iort: replace rid map type with
+ type mask
+In-Reply-To: <20161121100148.24769-15-lorenzo.pieralisi@arm.com>
+References: <20161121100148.24769-1-lorenzo.pieralisi@arm.com>
+ <20161121100148.24769-15-lorenzo.pieralisi@arm.com>
+Message-ID: <300db741-2ad9-3a44-13b3-03980ce3713c@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
-
-Please find the following comment.
-
-Thanks,
-Shiju 
-
-> 
-> Currently when a RAS error is reported it is not timestamped.
-> The ACPI 6.1 spec adds the timestamp field to the generic error data
-> entry v3 structure. The timestamp of when the firmware generated the
-> error is now being reported.
-> 
-> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Richard Ruigrok <rruigrok@codeaurora.org>
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+On 2016/11/21 18:01, Lorenzo Pieralisi wrote:
+> IORT tables provide data that allow the kernel to carry out
+> device ID mappings between endpoints and system components
+> (eg interrupt controllers, IOMMUs). When the mapping for a
+> given device ID is carried out, the translation mechanism
+> is done on a per-subsystem basis rather than a component
+> subtype (ie the IOMMU kernel layer will look for mappings
+> from a device to all IORT node types corresponding to IOMMU
+> components), therefore the corresponding mapping API should
+> work on a range (ie mask) of IORT node types corresponding
+> to a common set of components (eg IOMMUs) rather than a
+> specific node type.
+>
+> Upgrade the IORT iort_node_map_rid() API to work with a
+> type mask instead of a single node type so that it can
+> be used for mappings that span multiple components types
+> (ie IOMMUs).
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Reviewed-by: Tomasz Nowicki <tn@semihalf.com>
+> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Tested-by: Tomasz Nowicki <tn@semihalf.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Tomasz Nowicki <tn@semihalf.com>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 > ---
->  drivers/acpi/apei/ghes.c    | 14 +++++++---
->  drivers/firmware/efi/cper.c | 62 +++++++++++++++++++++++++++++++++++--
-> --------
->  include/acpi/ghes.h         | 10 ++++++++
->  include/linux/cper.h        | 12 +++++++++
->  4 files changed, 80 insertions(+), 18 deletions(-)
-> 
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c index
-> b79abc5..9063d68 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -420,7 +420,8 @@ static void ghes_handle_memory_failure(struct
-> acpi_hest_generic_data *gdata, int
->  	int flags = -1;
->  	int sec_sev = ghes_severity(gdata->error_severity);
->  	struct cper_sec_mem_err *mem_err;
-> -	mem_err = (struct cper_sec_mem_err *)(gdata + 1);
-> +
-> +	mem_err = acpi_hest_generic_data_payload(gdata);
-> 
->  	if (!(mem_err->validation_bits & CPER_MEM_VALID_PA))
->  		return;
-> @@ -450,14 +451,18 @@ static void ghes_do_proc(struct ghes *ghes,  {
->  	int sev, sec_sev;
->  	struct acpi_hest_generic_data *gdata;
-> +	uuid_le sec_type;
-> 
->  	sev = ghes_severity(estatus->error_severity);
->  	apei_estatus_for_each_section(estatus, gdata) {
->  		sec_sev = ghes_severity(gdata->error_severity);
-> -		if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
-> +		sec_type = *(uuid_le *)gdata->section_type;
-> +
-> +		if (!uuid_le_cmp(sec_type,
->  				 CPER_SEC_PLATFORM_MEM)) {
->  			struct cper_sec_mem_err *mem_err;
-> -			mem_err = (struct cper_sec_mem_err *)(gdata+1);
-> +
-> +			mem_err = acpi_hest_generic_data_payload(gdata);
->  			ghes_edac_report_mem_error(ghes, sev, mem_err);
-> 
->  			arch_apei_report_mem_error(sev, mem_err); @@ -467,7
-> +472,8 @@ static void ghes_do_proc(struct ghes *ghes,
->  		else if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
->  				      CPER_SEC_PCIE)) {
->  			struct cper_sec_pcie *pcie_err;
-> -			pcie_err = (struct cper_sec_pcie *)(gdata+1);
-> +
-> +			pcie_err = acpi_hest_generic_data_payload(gdata);
->  			if (sev == GHES_SEV_RECOVERABLE &&
->  			    sec_sev == GHES_SEV_RECOVERABLE &&
->  			    pcie_err->validation_bits &
-> CPER_PCIE_VALID_DEVICE_ID && diff --git a/drivers/firmware/efi/cper.c
-> b/drivers/firmware/efi/cper.c index d425374..7e2439e 100644
-> --- a/drivers/firmware/efi/cper.c
-> +++ b/drivers/firmware/efi/cper.c
-> @@ -32,6 +32,9 @@
->  #include <linux/acpi.h>
->  #include <linux/pci.h>
->  #include <linux/aer.h>
-> +#include <linux/printk.h>
-> +#include <linux/bcd.h>
-> +#include <acpi/ghes.h>
-> 
->  #define INDENT_SP	" "
-> 
-> @@ -386,13 +389,37 @@ static void cper_print_pcie(const char *pfx,
-> const struct cper_sec_pcie *pcie,
->  	pfx, pcie->bridge.secondary_status, pcie->bridge.control);  }
-> 
-> +static void cper_estatus_print_section_v300(const char *pfx,
-> +	const struct acpi_hest_generic_data_v300 *gdata) {
-> +	__u8 hour, min, sec, day, mon, year, century, *timestamp;
-> +
-> +	if (gdata->validation_bits & ACPI_HEST_GEN_VALID_TIMESTAMP) {
-> +		timestamp = (__u8 *)&(gdata->time_stamp);
-> +		sec = bcd2bin(timestamp[0]);
-> +		min = bcd2bin(timestamp[1]);
-> +		hour = bcd2bin(timestamp[2]);
-> +		day = bcd2bin(timestamp[4]);
-> +		mon = bcd2bin(timestamp[5]);
-> +		year = bcd2bin(timestamp[6]);
-> +		century = bcd2bin(timestamp[7]);
-> +		printk("%stime: %7s %02d%02d-%02d-%02d %02d:%02d:%02d\n",
-> pfx,
-> +			0x01 & *(timestamp + 3) ? "precise" : "", century,
-> +			year, mon, day, hour, min, sec);
-> +	}
-> +}
-> +
->  static void cper_estatus_print_section(
-> -	const char *pfx, const struct acpi_hest_generic_data *gdata, int
-> sec_no)
-> +	const char *pfx, struct acpi_hest_generic_data *gdata, int sec_no)
->  {
->  	uuid_le *sec_type = (uuid_le *)gdata->section_type;
->  	__u16 severity;
->  	char newpfx[64];
-> 
-> +	if (acpi_hest_generic_data_version(gdata) >= 3)
-> +		cper_estatus_print_section_v300(pfx,
-> +			(const struct acpi_hest_generic_data_v300 *)gdata);
-> +
->  	severity = gdata->error_severity;
->  	printk("%s""Error %d, type: %s\n", pfx, sec_no,
->  	       cper_severity_str(severity));
-> @@ -403,14 +430,18 @@ static void cper_estatus_print_section(
-> 
->  	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
->  	if (!uuid_le_cmp(*sec_type, CPER_SEC_PROC_GENERIC)) {
-> -		struct cper_sec_proc_generic *proc_err = (void *)(gdata +
-> 1);
-> +		struct cper_sec_proc_generic *proc_err;
-> +
-> +		proc_err = acpi_hest_generic_data_payload(gdata);
->  		printk("%s""section_type: general processor error\n",
-> newpfx);
->  		if (gdata->error_data_length >= sizeof(*proc_err))
->  			cper_print_proc_generic(newpfx, proc_err);
->  		else
->  			goto err_section_too_small;
->  	} else if (!uuid_le_cmp(*sec_type, CPER_SEC_PLATFORM_MEM)) {
-> -		struct cper_sec_mem_err *mem_err = (void *)(gdata + 1);
-> +		struct cper_sec_mem_err *mem_err;
-> +
-> +		mem_err = acpi_hest_generic_data_payload(gdata);
->  		printk("%s""section_type: memory error\n", newpfx);
->  		if (gdata->error_data_length >=
->  		    sizeof(struct cper_sec_mem_err_old)) @@ -419,7 +450,9
-> @@ static void cper_estatus_print_section(
->  		else
->  			goto err_section_too_small;
->  	} else if (!uuid_le_cmp(*sec_type, CPER_SEC_PCIE)) {
-> -		struct cper_sec_pcie *pcie = (void *)(gdata + 1);
-> +		struct cper_sec_pcie *pcie;
-> +
-> +		pcie = acpi_hest_generic_data_payload(gdata);
->  		printk("%s""section_type: PCIe error\n", newpfx);
->  		if (gdata->error_data_length >= sizeof(*pcie))
->  			cper_print_pcie(newpfx, pcie, gdata); @@ -438,7
-> +471,7 @@ void cper_estatus_print(const char *pfx,
->  			const struct acpi_hest_generic_status *estatus)  {
->  	struct acpi_hest_generic_data *gdata;
-> -	unsigned int data_len, gedata_len;
-> +	unsigned int data_len;
->  	int sec_no = 0;
->  	char newpfx[64];
->  	__u16 severity;
-> @@ -451,12 +484,12 @@ void cper_estatus_print(const char *pfx,
->  	printk("%s""event severity: %s\n", pfx,
-> cper_severity_str(severity));
->  	data_len = estatus->data_length;
->  	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
-> +
->  	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
-> -	while (data_len >= sizeof(*gdata)) {
-> -		gedata_len = gdata->error_data_length;
-> +
-> +	while (data_len >= acpi_hest_generic_data_size(gdata)) {
->  		cper_estatus_print_section(newpfx, gdata, sec_no);
-> -		data_len -= gedata_len + sizeof(*gdata);
-> -		gdata = (void *)(gdata + 1) + gedata_len;
-> +		gdata = acpi_hest_generic_data_next(gdata);
->  		sec_no++;
->  	}
->  }
-Will the above while loop does not come out because data_len is not getting updated as it did in V4 patch?
-This is the behaviour seen when we tested on our platform. It worked fine when we update the data_len.     
-> @@ -486,12 +519,13 @@ int cper_estatus_check(const struct
-> acpi_hest_generic_status *estatus)
->  		return rc;
->  	data_len = estatus->data_length;
->  	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
-> -	while (data_len >= sizeof(*gdata)) {
-> -		gedata_len = gdata->error_data_length;
-> -		if (gedata_len > data_len - sizeof(*gdata))
-> +
-> +	while (data_len >= acpi_hest_generic_data_size(gdata)) {
-> +		gedata_len = acpi_hest_generic_data_error_length(gdata);
-> +		if (gedata_len > data_len -
-> acpi_hest_generic_data_size(gdata))
->  			return -EINVAL;
-> -		data_len -= gedata_len + sizeof(*gdata);
-> -		gdata = (void *)(gdata + 1) + gedata_len;
-> +		data_len -= gedata_len + acpi_hest_generic_data_size(gdata);
-> +		gdata = acpi_hest_generic_data_next(gdata);
->  	}
->  	if (data_len)
->  		return -EINVAL;
-> diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h index
-> 68f088a..56b9679 100644
-> --- a/include/acpi/ghes.h
-> +++ b/include/acpi/ghes.h
-> @@ -73,3 +73,13 @@ static inline void ghes_edac_unregister(struct ghes
-> *ghes)  {  }  #endif
-> +
-> +#define acpi_hest_generic_data_version(gdata)			\
-> +	(gdata->revision >> 8)
-> +
-> +static inline void *acpi_hest_generic_data_payload(struct
-> +acpi_hest_generic_data *gdata) {
-> +	return acpi_hest_generic_data_version(gdata) >= 3 ?
-> +		(void *)(((struct acpi_hest_generic_data_v300 *)(gdata)) +
-> 1) :
-> +		gdata + 1;
-> +}
-> diff --git a/include/linux/cper.h b/include/linux/cper.h index
-> dcacb1a..13ea41c 100644
-> --- a/include/linux/cper.h
-> +++ b/include/linux/cper.h
-> @@ -255,6 +255,18 @@ enum {
-> 
->  #define CPER_PCIE_SLOT_SHIFT			3
-> 
-> +#define acpi_hest_generic_data_error_length(gdata)	\
-> +	(((struct acpi_hest_generic_data *)(gdata))->error_data_length)
-> +#define acpi_hest_generic_data_size(gdata)		\
-> +	((acpi_hest_generic_data_version(gdata) >= 3) ?	\
-> +	sizeof(struct acpi_hest_generic_data_v300) :	\
-> +	sizeof(struct acpi_hest_generic_data))
-> +#define acpi_hest_generic_data_record_size(gdata)	\
-> +	(acpi_hest_generic_data_size(gdata) +		\
-> +	acpi_hest_generic_data_error_length(gdata))
-> +#define acpi_hest_generic_data_next(gdata)		\
-> +	((void *)(gdata) + acpi_hest_generic_data_record_size(gdata))
-> +
->  /*
->   * All tables and structs must be byte-packed to match CPER
->   * specification, since the tables are provided by the system BIOS
-> --
-> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-> Technologies, Inc.
-> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a
-> Linux Foundation Collaborative Project.
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi"
-> in the body of a message to majordomo at vger.kernel.org More majordomo
-> info at  http://vger.kernel.org/majordomo-info.html
+>  drivers/acpi/arm64/iort.c | 11 +++++++----
+>  1 file changed, 7 insertions(+), 4 deletions(-)
+
+Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+Thanks
+Hanjun
