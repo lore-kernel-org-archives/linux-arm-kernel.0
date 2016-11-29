@@ -1,96 +1,56 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 29 Nov 2016 16:18:03 +0530
-Subject: [PATCH] ARM: davinci: da8xx: Fix sleeping function called from
- invalid context
-In-Reply-To: <1480350566-26225-1-git-send-email-abailon@baylibre.com>
-References: <1480350566-26225-1-git-send-email-abailon@baylibre.com>
-Message-ID: <36a2e5e1-e7b7-2ca0-0484-98636771ec65@ti.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Nov 2016 10:46:18 +0000
+Subject: [PATCH V10 2/6] arm: arm64: Add routine to determine cpuid of
+ other cpus
+In-Reply-To: <20161129103112.GC30283@arm.com>
+References: <1478734793-6341-1-git-send-email-jeremy.linton@arm.com>
+ <1478734793-6341-3-git-send-email-jeremy.linton@arm.com>
+ <20161129103112.GC30283@arm.com>
+Message-ID: <20161129104617.GV14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 November 2016 09:59 PM, Alexandre Bailon wrote:
-> Everytime the usb20 phy is enabled, there is a
-> "sleeping function called from invalid context" BUG.
-
-Who calls PHY clk_enable() from non-preemptible context? Can you provide
-the call stack?
-
-> usb20_phy_clk_enable(), called with the irq disabled uses
-> clk_get() and clk_enable_prepapre() which may sleep.
-> Move clk_get() to da8xx_register_usb20_phy_clk() and
-> replace clk_prepare_enable() by clk_enable().
+On Tue, Nov 29, 2016 at 10:31:12AM +0000, Will Deacon wrote:
+> [adding Russell]
 > 
-> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
-> ---
->  arch/arm/mach-davinci/usb-da8xx.c | 15 +++++++++------
->  1 file changed, 9 insertions(+), 6 deletions(-)
+> On Wed, Nov 09, 2016 at 05:39:49PM -0600, Jeremy Linton wrote:
+> > It is helpful if we can read the cpuid/midr of other CPUs
+> > in the system independent of arm/arm64.
+> > 
+> > Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> > ---
+> >  arch/arm/include/asm/cputype.h   | 2 ++
+> >  arch/arm64/include/asm/cputype.h | 3 +++
+> >  2 files changed, 5 insertions(+)
+> > 
+> > diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+> > index 522b5fe..31fb273 100644
+> > --- a/arch/arm/include/asm/cputype.h
+> > +++ b/arch/arm/include/asm/cputype.h
+> > @@ -235,6 +235,8 @@ static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
+> >  #define cpu_is_sa1100() (read_cpuid_part() == ARM_CPU_PART_SA1100)
+> >  #define cpu_is_sa1110() (read_cpuid_part() == ARM_CPU_PART_SA1110)
+> >  
+> > +#define read_specific_cpuid(cpu_num) per_cpu_ptr(&cpu_data, cpu_num)->cpuid
+> > +
+> >  /*
+> >   * Intel's XScale3 core supports some v6 features (supersections, L2)
+> >   * but advertises itself as v5 as it does not support the v6 ISA.  For
 > 
-> diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
-> index b010e5f..c9b5cd4 100644
-> --- a/arch/arm/mach-davinci/usb-da8xx.c
-> +++ b/arch/arm/mach-davinci/usb-da8xx.c
-> @@ -156,23 +156,23 @@ int __init da8xx_register_usb_refclkin(int rate)
->  	return 0;
->  }
->  
-> +static struct clk *usb20_clk;
-> +
->  static void usb20_phy_clk_enable(struct clk *clk)
->  {
-> -	struct clk *usb20_clk;
->  	int err;
->  	u32 val;
->  	u32 timeout = 500000; /* 500 msec */
->  
->  	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
->  
-> -	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
-> -	if (IS_ERR(usb20_clk)) {
-> +	if (!usb20_clk || IS_ERR(usb20_clk)) {
+> Russell -- are you ok with adding this macro to arch/arm/? It will get used
+> by the CPU PMU driver, which needs a portable (i.e. between arm and arm64)
+> way to convert a logical CPU ID into the MIDR register for that CPU.
 
-NULL is a valid clock handle. There is no way clock enable of
-usb20_phy_clk can be invoked if its not registered. So, you can assume
-that usb20_clk is valid if you get here.
+No, because we don't set the cpuid member in uniprocessor configurations,
+so it's going to be a fragile macro - it'll return zero for kernels
+configured without SMP support.
 
->  		pr_err("could not get usb20 clk: %ld\n", PTR_ERR(usb20_clk));
->  		return;
->  	}
->  
->  	/* The USB 2.O PLL requires that the USB 2.O PSC is enabled as well. */
-> -	err = clk_prepare_enable(usb20_clk);
-> +	err = clk_enable(usb20_clk);
->  	if (err) {
->  		pr_err("failed to enable usb20 clk: %d\n", err);
->  		clk_put(usb20_clk);
-> @@ -197,8 +197,7 @@ static void usb20_phy_clk_enable(struct clk *clk)
->  
->  	pr_err("Timeout waiting for USB 2.0 PHY clock good\n");
->  done:
-> -	clk_disable_unprepare(usb20_clk);
-> -	clk_put(usb20_clk);
-> +	clk_disable(usb20_clk);
+I'd ideally like cpuid for the boot CPU to be set early, so that we can
+get rid of many ifdefs in this area, but haven't convinced myself that
+it's safe to do so in all configurations with the percpu stuff not being
+up and running in setup_arch().
 
-
-I noticed that we are missing clk_disable(usb20_clk) in
-usb20_phy_clk_disable(). It will now be easier to do that after this
-patch. Can you add that in a separate patch?
-
->  }
->  
->  static void usb20_phy_clk_disable(struct clk *clk)
-> @@ -287,6 +286,10 @@ int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
->  	struct clk *parent;
->  	int ret = 0;
->  
-> +	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
-> +	if (IS_ERR(usb20_clk))
-> +		return PTR_ERR(parent);
-> +
->  	parent = clk_get(NULL, use_usb_refclkin ? "usb_refclkin" : "pll0_aux");
->  	if (IS_ERR(parent))
->  		return PTR_ERR(parent);
-
-clk_put(usb20_clk) should be called here on failure path.
-
-Thanks,
-Sekhar
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
