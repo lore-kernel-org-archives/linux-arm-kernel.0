@@ -1,421 +1,111 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Tue, 29 Nov 2016 19:06:16 +0100
-Subject: [LINUX RFC v4 3/4] mtd: spi-nor: add stripe support
-In-Reply-To: <1480235616-34038-1-git-send-email-nagasure@xilinx.com>
-References: <1480235616-34038-1-git-send-email-nagasure@xilinx.com>
-Message-ID: <68ca0f19-e534-3361-11f0-6566626380fe@atmel.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 29 Nov 2016 12:19:27 -0600
+Subject: [PATCH] PCI: Add information about describing PCI in ACPI
+In-Reply-To: <20161123150632.GA16033@bhelgaas-glaptop.roam.corp.google.com>
+References: <20161117175938.17465.45820.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu_xW+7KAC8fHquEwHynYzpy6OoO1ZjEm5mVKMo1S8j4Nw@mail.gmail.com>
+ <20161123010600.GF4832@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu-TW__+eZFS2p=1ZLN7fBs7pqQ+SitbEX46Z4JiS64egA@mail.gmail.com>
+ <20161123150632.GA16033@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20161129181927.GB17112@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Naga,
-
-I have not finished to review the whole series yet but here some first
-comments:
-
-Le 27/11/2016 ? 09:33, Naga Sureshkumar Relli a ?crit :
-> This patch adds stripe support and it is needed for GQSPI parallel
-> configuration mode by:
+On Wed, Nov 23, 2016 at 09:06:33AM -0600, Bjorn Helgaas wrote:
+> On Wed, Nov 23, 2016 at 07:28:12AM +0000, Ard Biesheuvel wrote:
+> > On 23 November 2016 at 01:06, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> > > On Tue, Nov 22, 2016 at 10:09:50AM +0000, Ard Biesheuvel wrote:
+> > >> On 17 November 2016 at 17:59, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> > >
+> > >> > +PCI host bridges are PNP0A03 or PNP0A08 devices.  Their _CRS should
+> > >> > +describe all the address space they consume.  In principle, this would
+> > >> > +be all the windows they forward down to the PCI bus, as well as the
+> > >> > +bridge registers themselves.  The bridge registers include things like
+> > >> > +secondary/subordinate bus registers that determine the bus range below
+> > >> > +the bridge, window registers that describe the apertures, etc.  These
+> > >> > +are all device-specific, non-architected things, so the only way a
+> > >> > +PNP0A03/PNP0A08 driver can manage them is via _PRS/_CRS/_SRS, which
+> > >> > +contain the device-specific details.  These bridge registers also
+> > >> > +include ECAM space, since it is consumed by the bridge.
+> > >> > +
+> > >> > +ACPI defined a Producer/Consumer bit that was intended to distinguish
+> > >> > +the bridge apertures from the bridge registers [4, 5].  However,
+> > >> > +BIOSes didn't use that bit correctly, and the result is that OSes have
+> > >> > +to assume that everything in a PCI host bridge _CRS is a window.  That
+> > >> > +leaves no way to describe the bridge registers in the PNP0A03/PNP0A08
+> > >> > +device itself.
+> > >>
+> > >> Is that universally true? Or is it still possible to do the right
+> > >> thing here on new ACPI architectures such as arm64?
+> > >
+> > > That's a very good question.  I had thought that the ACPI spec had
+> > > given up on Consumer/Producer completely, but I was wrong.  In the 6.0
+> > > spec, the Consumer/Producer bit is still documented in the Extended
+> > > Address Space Descriptor (sec 6.4.3.5.4).  It is documented as
+> > > "ignored" in the QWord, DWord, and Word descriptors (sec 6.4.3.5.1,2,3).
+> > >
+> > > Linux looks at the producer_consumer bit in acpi_decode_space(), which
+> > > I think is used for all these descriptors (QWord, DWord, Word, and
+> > > Extended).  This doesn't quite follow the spec -- we probably should
+> > > ignore it except for Extended.  In any event, acpi_decode_space() sets
+> > > IORESOURCE_WINDOW for Producer descriptors, but we don't test
+> > > IORESOURCE_WINDOW in the PCI host bridge code.
+> > >
+> > > x86 and ia64 supply their own pci_acpi_root_prepare_resources()
+> > > functions that call acpi_pci_probe_root_resources(), which parses _CRS
+> > > and looks at producer_consumer.  Then they do a little arch-specific
+> > > stuff on the result.
+> > >
+> > > On arm64 we use acpi_pci_probe_root_resources() directly, with no
+> > > arch-specific stuff.
+> > >
+> > > On all three arches, we ignore the Consumer/Producer bit, so all the
+> > > resources are treated as Producers, e.g., as bridge windows.
+> > >
+> > > I think we *could* implement an arm64 version of
+> > > pci_acpi_root_prepare_resources() that would pay attention to the
+> > > Consumer/Producer bit by checking IORESOURCE_WINDOW.  To be spec
+> > > compliant, we would have to use Extended descriptors for all bridge
+> > > windows, even if they would fit in a DWord or QWord.
+> > >
+> > > Should we do that?  I dunno.  I'd like to hear your opinion(s).
+> > >
+> > 
+> > Yes, I think we should. If the spec allows for a way for a PNP0A03
+> > device to describe all of its resources unambiguously, we should not
+> > be relying on workarounds that were designed for another architecture
+> > in another decade (for, presumably, another OS)
+> > 
+> > Just for my understanding, we will need to use extended descriptors
+> > for all consumed *and* produced regions, even though dword/qword are
+> > implicitly produced-only, due to the fact that the bit is ignored?
 > 
-> - Adding required parameters like stripe and shift to spi_nor
->   structure.
-> - Initializing all added parameters in spi_nor_scan()
-> - Updating read_sr() and read_fsr() for getting status from both
->   flashes
-> - Increasing page_size, sector_size, erase_size and toatal flash
->   size as and when required.
-> - Dividing address by 2
-> - Updating spi->master->flags for qspi driver to change CS
+> From an ACPI spec point of view, I would say QWord/DWord/Word
+> descriptors are implicitly *consumer*-only because ResourceConsumer
+> is the default and they don't have a bit to indicate otherwise.
 > 
-> Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
-> ---
-> Changes for v4:
->  - rename isparallel to stripe
-> Changes for v3:
->  - No change
-> Changes for v2:
->  - Splitted to separate MTD layer changes from SPI core changes
-> ---
->  drivers/mtd/spi-nor/spi-nor.c | 130 ++++++++++++++++++++++++++++++++----------
->  include/linux/mtd/spi-nor.h   |   2 +
->  2 files changed, 103 insertions(+), 29 deletions(-)
+> The current code assumes all PNP0A03 resources are producers.  If we
+> implement an arm64 pci_acpi_root_prepare_resources() that pays
+> attention to the Consumer/Producer bit, we would have to:
 > 
-> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-> index d0fc165..4252239 100644
-> --- a/drivers/mtd/spi-nor/spi-nor.c
-> +++ b/drivers/mtd/spi-nor/spi-nor.c
-> @@ -22,6 +22,7 @@
->  #include <linux/of_platform.h>
->  #include <linux/spi/flash.h>
->  #include <linux/mtd/spi-nor.h>
-> +#include <linux/spi/spi.h>
->  
->  /* Define max times to check status register before we give up. */
->  
-> @@ -89,15 +90,24 @@ static const struct flash_info *spi_nor_match_id(const char *name);
->  static int read_sr(struct spi_nor *nor)
->  {
->  	int ret;
-> -	u8 val;
-> +	u8 val[2];
->  
-> -	ret = nor->read_reg(nor, SPINOR_OP_RDSR, &val, 1);
-> -	if (ret < 0) {
-> -		pr_err("error %d reading SR\n", (int) ret);
-> -		return ret;
-> +	if (nor->stripe) {
-> +		ret = nor->read_reg(nor, SPINOR_OP_RDSR, &val[0], 2);
-> +		if (ret < 0) {
-> +			pr_err("error %d reading SR\n", (int) ret);
-> +			return ret;
-> +		}
-> +		val[0] |= val[1];
-Why '|' rather than '&' ?
-I guess because of the 'Write In Progress/Busy' bit: when called by
-spi_nor_sr_ready(), you want to be sure that this 'BUSY' bit is cleared on
-both memories.
-
-But what about when the Status Register is read for purpose other than
-checking the state of the 'BUSY' bit?
-
-What about SPI controllers supporting more than 2 memories in parallel?
-
-This solution might fit the ZynqMP controller but doesn't look so generic.
-
-> +	} else {
-> +		ret = nor->read_reg(nor, SPINOR_OP_RDSR, &val[0], 1);
-> +		if (ret < 0) {
-> +			pr_err("error %d reading SR\n", (int) ret);
-> +			return ret;
-> +		}
->  	}
->  
-> -	return val;
-> +	return val[0];
->  }
->  
->  /*
-> @@ -108,15 +118,24 @@ static int read_sr(struct spi_nor *nor)
->  static int read_fsr(struct spi_nor *nor)
->  {
->  	int ret;
-> -	u8 val;
-> +	u8 val[2];
->  
-> -	ret = nor->read_reg(nor, SPINOR_OP_RDFSR, &val, 1);
-> -	if (ret < 0) {
-> -		pr_err("error %d reading FSR\n", ret);
-> -		return ret;
-> +	if (nor->stripe) {
-> +		ret = nor->read_reg(nor, SPINOR_OP_RDFSR, &val[0], 2);
-> +		if (ret < 0) {
-> +			pr_err("error %d reading FSR\n", ret);
-> +			return ret;
-> +		}
-> +		val[0] &= val[1];
-Same comment here: why '&' rather than '|'?
-Surely because of the the 'READY' bit which should be set for both memories.
-
-> +	} else {
-> +		ret = nor->read_reg(nor, SPINOR_OP_RDFSR, &val[0], 1);
-> +		if (ret < 0) {
-> +			pr_err("error %d reading FSR\n", ret);
-> +			return ret;
-> +		}
->  	}
->  
-> -	return val;
-> +	return val[0];
->  }
->  
->  /*
-> @@ -290,9 +309,16 @@ static int spi_nor_wait_till_ready(struct spi_nor *nor)
->   */
->  static int erase_chip(struct spi_nor *nor)
->  {
-> +	u32 ret;
-> +
->  	dev_dbg(nor->dev, " %lldKiB\n", (long long)(nor->mtd.size >> 10));
->  
-> -	return nor->write_reg(nor, SPINOR_OP_CHIP_ERASE, NULL, 0);
-> +	ret = nor->write_reg(nor, SPINOR_OP_CHIP_ERASE, NULL, 0);
-> +	if (ret)
-> +		return ret;
-> +
-> +	return ret;
-> +
-
-	if (ret)
-		return ret;
-	else
-		return ret;
-
-This chunk should be removed, it doesn't ease the patch review ;)
-
->  }
->  
->  static int spi_nor_lock_and_prep(struct spi_nor *nor, enum spi_nor_ops ops)
-> @@ -349,7 +375,7 @@ static int spi_nor_erase_sector(struct spi_nor *nor, u32 addr)
->  static int spi_nor_erase(struct mtd_info *mtd, struct erase_info *instr)
->  {
->  	struct spi_nor *nor = mtd_to_spi_nor(mtd);
-> -	u32 addr, len;
-> +	u32 addr, len, offset;
->  	uint32_t rem;
->  	int ret;
->  
-> @@ -399,9 +425,13 @@ static int spi_nor_erase(struct mtd_info *mtd, struct erase_info *instr)
->  	/* "sector"-at-a-time erase */
->  	} else {
->  		while (len) {
-> +
->  			write_enable(nor);
-> +			offset = addr;
-> +			if (nor->stripe)
-> +				offset /= 2;
-
-I guess this should be /= 4 for controllers supporting 4 memories in parallel.
-Shouldn't you use nor->shift and define shift as an unsigned int instead of a
-bool?
-offset >>= nor->shift;
-
-Anyway, by tuning the address here in spi-nor.c rather than in the SPI
-controller driver, you impose a model to support parallel memories that might
-not be suited to other controllers.
-
->  
-> -			ret = spi_nor_erase_sector(nor, addr);
-> +			ret = spi_nor_erase_sector(nor, offset);
->  			if (ret)
->  				goto erase_err;
->  
-> @@ -525,6 +555,8 @@ static int stm_lock(struct spi_nor *nor, loff_t ofs, uint64_t len)
->  	bool use_top;
->  	int ret;
->  
-> +	ofs = ofs >> nor->shift;
-> +
->  	status_old = read_sr(nor);
->  	if (status_old < 0)
->  		return status_old;
-> @@ -610,6 +642,8 @@ static int stm_unlock(struct spi_nor *nor, loff_t ofs, uint64_t len)
->  	bool use_top;
->  	int ret;
->  
-> +	ofs = ofs >> nor->shift;
-> +
->  	status_old = read_sr(nor);
->  	if (status_old < 0)
->  		return status_old;
-> @@ -709,6 +743,8 @@ static int spi_nor_lock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
->  	if (ret)
->  		return ret;
->  
-> +	ofs = ofs >> nor->shift;
-> +
->  	ret = nor->flash_lock(nor, ofs, len);
->  
->  	spi_nor_unlock_and_unprep(nor, SPI_NOR_OPS_UNLOCK);
-> @@ -724,6 +760,8 @@ static int spi_nor_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
->  	if (ret)
->  		return ret;
->  
-> +	ofs = ofs >> nor->shift;
-> +
->  	ret = nor->flash_unlock(nor, ofs, len);
->  
->  	spi_nor_unlock_and_unprep(nor, SPI_NOR_OPS_LOCK);
-> @@ -1018,6 +1056,9 @@ static const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
->  	u8			id[SPI_NOR_MAX_ID_LEN];
->  	const struct flash_info	*info;
->  
-> +	nor->spi->master->flags &= ~(SPI_MASTER_BOTH_CS |
-> +					SPI_MASTER_DATA_STRIPE);
-> +
->  	tmp = nor->read_reg(nor, SPINOR_OP_RDID, id, SPI_NOR_MAX_ID_LEN);
->  	if (tmp < 0) {
->  		dev_dbg(nor->dev, "error %d reading JEDEC ID\n", tmp);
-> @@ -1041,6 +1082,7 @@ static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
->  {
->  	struct spi_nor *nor = mtd_to_spi_nor(mtd);
->  	int ret;
-> +	u32 offset = from;
->  
->  	dev_dbg(nor->dev, "from 0x%08x, len %zd\n", (u32)from, len);
->  
-> @@ -1049,7 +1091,13 @@ static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
->  		return ret;
->  
->  	while (len) {
-> -		ret = nor->read(nor, from, len, buf);
-> +
-> +		offset = from;
-> +
-> +		if (nor->stripe)
-> +			offset /= 2;
-> +
-> +		ret = nor->read(nor, offset, len, buf);
->  		if (ret == 0) {
->  			/* We shouldn't see 0-length reads */
->  			ret = -EIO;
-> @@ -1161,6 +1209,7 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
->  	struct spi_nor *nor = mtd_to_spi_nor(mtd);
->  	size_t page_offset, page_remain, i;
->  	ssize_t ret;
-> +	u32 offset;
->  
->  	dev_dbg(nor->dev, "to 0x%08x, len %zd\n", (u32)to, len);
->  
-> @@ -1178,9 +1227,13 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
->  		/* the size of data remaining on the first page */
->  		page_remain = min_t(size_t,
->  				    nor->page_size - page_offset, len - i);
-> +		offset = (to + i);
-> +
-> +		if (nor->stripe)
-> +			offset /= 2;
->  
->  		write_enable(nor);
-> -		ret = nor->write(nor, to + i, page_remain, buf + i);
-> +		ret = nor->write(nor, (offset), page_remain, buf + i);
->  		if (ret < 0)
->  			goto write_err;
->  		written = ret;
-> @@ -1302,22 +1355,22 @@ static int spi_nor_check(struct spi_nor *nor)
->  
->  int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
->  {
-> -	const struct flash_info *info = NULL;
-> +	struct flash_info *info = NULL;
-
-You should not remove the const and should not try to modify members of *info.
-
->  	struct device *dev = nor->dev;
->  	struct mtd_info *mtd = &nor->mtd;
->  	struct device_node *np = spi_nor_get_flash_node(nor);
-> -	int ret;
-> -	int i;
-> +	struct device_node *np_spi;
-> +	int ret, i, xlnx_qspi_mode;
->  
->  	ret = spi_nor_check(nor);
->  	if (ret)
->  		return ret;
->  
->  	if (name)
-> -		info = spi_nor_match_id(name);
-> +		info = (struct flash_info *)spi_nor_match_id(name);
->  	/* Try to auto-detect if chip name wasn't specified or not found */
->  	if (!info)
-> -		info = spi_nor_read_id(nor);
-> +		info = (struct flash_info *)spi_nor_read_id(nor);
->  	if (IS_ERR_OR_NULL(info))
->  		return -ENOENT;
->
-Both spi_nor_match_id() and spi_nor_read_id(), when they succeed, return a
-pointer to an entry of the spi_nor_ids[] array, which is located in a
-read-only memory area.
-
-Since your patch doesn't remove the const attribute of the spi_nor_ids[],
-I wonder whether it has been tested. I expect it not to work on most
-architecture.
-
-Anyway spi_nor_ids[] should remain const. Let's take the case of eXecution
-In Place (XIP) from an external memory: if spi_nor_ids[] is const, it can be
-read directly from this external (read-only) memory and we never need to copy
-the array in RAM, so we save some KB of RAM.
-This is just an example but I guess we can find other reasons to keep this
-array const.
-  
-> @@ -1341,7 +1394,7 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
->  			 */
->  			dev_warn(dev, "found %s, expected %s\n",
->  				 jinfo->name, info->name);
-> -			info = jinfo;
-> +			info = (struct flash_info *)jinfo;
->  		}
->  	}
->  
-> @@ -1370,6 +1423,27 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
->  	mtd->size = info->sector_size * info->n_sectors;
->  	mtd->_erase = spi_nor_erase;
->  	mtd->_read = spi_nor_read;
-> +#ifdef CONFIG_OF
-> +	np_spi = of_get_next_parent(np);
-> +
-> +	if (of_property_read_u32(np_spi, "xlnx,qspi-mode",
-> +				&xlnx_qspi_mode) < 0) {
-This really looks controller specific so should not be placed in the
-generic spi-nor.c file.
-
-> +		nor->shift = 0;
-> +		nor->stripe = 0;
-> +	} else if (xlnx_qspi_mode == 2) {
-> +		nor->shift = 1;
-> +		info->sector_size <<= nor->shift;
-> +		info->page_size <<= nor->shift;
-Just don't modify *info members! :)
-
-
-> +		mtd->size <<= nor->shift;
-> +		nor->stripe = 1;
-> +		nor->spi->master->flags |= (SPI_MASTER_BOTH_CS |
-> +						SPI_MASTER_DATA_STRIPE);
-> +	}
-> +#else
-> +	/* Default to single */
-> +	nor->shift = 0;
-> +	nor->stripe = 0;
-> +#endif
->  
->  	/* NOR protection support for STmicro/Micron chips and similar */
->  	if (JEDEC_MFR(info) == SNOR_MFR_MICRON ||
-> @@ -1400,10 +1474,10 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
->  	/* prefer "small sector" erase if possible */
->  	if (info->flags & SECT_4K) {
->  		nor->erase_opcode = SPINOR_OP_BE_4K;
-> -		mtd->erasesize = 4096;
-> +		mtd->erasesize = 4096 << nor->shift;
->  	} else if (info->flags & SECT_4K_PMC) {
->  		nor->erase_opcode = SPINOR_OP_BE_4K_PMC;
-> -		mtd->erasesize = 4096;
-> +		mtd->erasesize = 4096 << nor->shift;
->  	} else
->  #endif
->  	{
-> @@ -1508,16 +1582,14 @@ int spi_nor_scan(struct spi_nor *nor, const char *name, enum read_mode mode)
->  	dev_info(dev, "%s (%lld Kbytes)\n", info->name,
->  			(long long)mtd->size >> 10);
->  
-> -	dev_dbg(dev,
-> -		"mtd .name = %s, .size = 0x%llx (%lldMiB), "
-> +	dev_dbg(dev, "mtd .name = %s, .size = 0x%llx (%lldMiB), "
->  		".erasesize = 0x%.8x (%uKiB) .numeraseregions = %d\n",
->  		mtd->name, (long long)mtd->size, (long long)(mtd->size >> 20),
->  		mtd->erasesize, mtd->erasesize / 1024, mtd->numeraseregions);
->  
->  	if (mtd->numeraseregions)
->  		for (i = 0; i < mtd->numeraseregions; i++)
-> -			dev_dbg(dev,
-> -				"mtd.eraseregions[%d] = { .offset = 0x%llx, "
-> +			dev_dbg(dev, "mtd.eraseregions[%d] = { .offset = 0x%llx, "
->  				".erasesize = 0x%.8x (%uKiB), "
->  				".numblocks = %d }\n",
->  				i, (long long)mtd->eraseregions[i].offset,
-> diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
-> index 84f3ce5..673ec68 100644
-> --- a/include/linux/mtd/spi-nor.h
-> +++ b/include/linux/mtd/spi-nor.h
-> @@ -165,6 +165,8 @@ struct spi_nor {
->  	u8			read_dummy;
->  	u8			program_opcode;
->  	enum read_mode		flash_read;
-> +	bool			shift;
-> +	bool			stripe;
->  	bool			sst_write_second;
->  	u32			flags;
->  	u8			cmd_buf[SPI_NOR_MAX_CMD_SIZE];
+>   - Reserve all producer regions in the iomem/ioport trees.  This is
+>     already done via pci_acpi_root_add_resources(), but we might need
+>     a new check to handle consumers differently.
 > 
+>   - Reserve all consumer regions.  This corresponds to what
+>     pnp/system.c does for PNP0C02 devices.  This is similar to the
+>     producer regions, but I think the consumer ones should be marked
+>     IORESOURCE_BUSY.
+> 
+>   - Use every producer (IORESOURCE_WINDOW) as a host bridge window.
+> 
+> I think it's a bug that acpi_decode_space() looks at producer_consumer
+> for QWord/DWord/Word descriptors, but I think QWord/DWord/Word
+> descriptors for consumed regions should be safe, as long as they don't
+> set the Consumer/Producer bit.
 
-Best regards,
+I'm going to post a couple very lightly-tested patches that should
+make us ignore the Consumer/Producer bit for QWord/DWord/Word.  I'd
+appreciate any discussion about whether that's the right approach.
 
-Cyrille
+Bjorn
