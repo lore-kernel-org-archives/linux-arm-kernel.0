@@ -1,41 +1,70 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 29 Nov 2016 14:12:46 -0800
-Subject: [PATCH V8 2/6] thermal: bcm2835: add thermal driver for bcm2835
- soc
-In-Reply-To: <20161129013436.GA3080@localhost.localdomain>
-References: <1478081906-12009-1-git-send-email-kernel@martin.sperl.org>
- <1478081906-12009-3-git-send-email-kernel@martin.sperl.org>
- <20161117021107.GA2647@localhost.localdomain>
- <766e1b70-d83a-eb52-fa2b-aec435e85673@martin.sperl.org>
- <20161117151019.GA3115@localhost.localdomain>
- <7957B3CC-0E18-4B27-82EB-EF88B7695E28@martin.sperl.org>
- <20161119042224.GA25063@localhost.localdomain>
- <28F93ABE-8210-4389-AE77-4D5E830E669B@martin.sperl.org>
- <20161125052008.GA8342@localhost.localdomain>
- <87twarz6s1.fsf@eliezer.anholt.net>
- <20161129013436.GA3080@localhost.localdomain>
-Message-ID: <87lgw2lyu9.fsf@eliezer.anholt.net>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Tue, 29 Nov 2016 23:13:08 +0100
+Subject: [PATCH RESEND 2/2] gpio: axp209: add pinctrl support
+In-Reply-To: <CACRpkdb8cej=AMs2kO1Vks-WYeae+CtAW2YOCc+Pz3E49mcrDQ@mail.gmail.com>
+References: <20161123141151.25315-1-quentin.schulz@free-electrons.com>
+ <20161123141151.25315-3-quentin.schulz@free-electrons.com>
+ <CACRpkdb8cej=AMs2kO1Vks-WYeae+CtAW2YOCc+Pz3E49mcrDQ@mail.gmail.com>
+Message-ID: <f46c89f2-478b-93b8-5a66-12d1307d4514@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eduardo Valentin <edubezval@gmail.com> writes:
+Hi Linus,
 
-> Hello Eric, Martin,
->
-> On Mon, Nov 28, 2016 at 12:30:38PM -0800, Eric Anholt wrote:
->> Either the device was initialized by the firmware before handing off to
->> ARM (today's firmware) or it never will be (potential future firmware).
->
-> And do you have a way to check if the firmware has the initialization
-> code or not? By firmware version, for example. Or even, chip version,
-> maybe?
+On 24/11/2016 15:17, Linus Walleij wrote:
+> On Wed, Nov 23, 2016 at 3:11 PM, Quentin Schulz
+> <quentin.schulz@free-electrons.com> wrote:
+> 
+>> The GPIOs present in the AXP209 PMIC have multiple functions. They
+>> typically allow a pin to be used as GPIO input or output and can also be
+>> used as ADC or regulator for example.[1]
+>>
+>> This adds the possibility to use all functions of the GPIOs present in
+>> the AXP209 PMIC thanks to pinctrl subsystem.
+>>
+>> [1] see registers 90H, 92H and 93H at
+>>     http://dl.linux-sunxi.org/AXP/AXP209_Datasheet_v1.0en.pdf
+>>
+>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> 
+> I need Maxime's review on this patch.
+> 
+>>  .../devicetree/bindings/gpio/gpio-axp209.txt       |  28 +-
+> 
+> Also move the bindings to pinctrl/pinctrl-axp209.txt
+> 
+>>  drivers/gpio/gpio-axp209.c                         | 551 ++++++++++++++++++---
+> 
+> Combined drivers should be in drivers/pinctrl/*.
+> 
+> Make a separate patch moving the driver to
+> drivers/pinctrl/pinctrl-axp209.c (remember -M to git format-patch)
+> augment Kconfig and Makefile in both subsystems and make
+> these patches on top of that.
+> 
 
-We would know if it's not present because the register would be in its
-power-on reset state, which is what the code is checking for.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161129/63bdda2f/attachment.sig>
+So basically:
+
+ - first patch for adding pinctrl to the existing driver
+ - second patch for moving the driver and binding from gpio to pinctrl
+subsystem
+ - third patch for both removing Kconfig entry and Makefile rule from
+gpio subsystem, and adding a Kconfig entry and a Makefile rule in
+pinctrl subsystem
+
+Is that what you want?
+
+Thanks,
+Quentin
+
+> I will deal with cross-merging the result between the GPIO
+> and pin control trees.
+> 
+> Yours,
+> Linus Walleij
+> 
+
+-- 
+Quentin Schulz, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
