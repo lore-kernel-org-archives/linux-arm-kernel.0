@@ -1,22 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 30 Nov 2016 15:25:16 -0600
-Subject: [PATCH] dt-bindings: clarify compatible field usage for rockchip
- timers
-In-Reply-To: <1480025455-6797-1-git-send-email-al.kochet@gmail.com>
-References: <1480025455-6797-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <20161130212516.rky3h7io2cmp3eot@rob-hp-laptop>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 30 Nov 2016 22:27:47 +0100
+Subject: [PATCH v4 net-next 3/7] net: mvneta: Use cacheable memory to
+ store the rx buffer virtual address
+In-Reply-To: <20161130.135725.407314756675613303.davem@davemloft.net> (David
+ Miller's message of "Wed, 30 Nov 2016 13:57:25 -0500 (EST)")
+References: <cover.654978388d6811b943dd58ecb9a9d9b6cceeaee3.1480431285.git-series.gregory.clement@free-electrons.com>
+ <cover.654978388d6811b943dd58ecb9a9d9b6cceeaee3.1480431285.git-series.gregory.clement@free-electrons.com>
+ <bb2f1a61e9b912905f8390f7a06c36f9f1e7ab66.1480431285.git-series.gregory.clement@free-electrons.com>
+ <20161130.135725.407314756675613303.davem@davemloft.net>
+Message-ID: <87k2bklkto.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 25, 2016 at 01:10:55AM +0300, Alexander Kochetkov wrote:
-> rk3036 dtsi file already use compatible field as
-> "rockchip,rk3036-timer", "rockchip,rk3288-timer".
-> 
-> The patch clearly shows how that filed should be used on other chips.
-> 
-> Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
-> ---
->  .../bindings/timer/rockchip,rk-timer.txt           |   12 +++++++++---
->  1 file changed, 9 insertions(+), 3 deletions(-)
+Hi David,
+ 
+ On mer., nov. 30 2016, David Miller <davem@davemloft.net> wrote:
 
-Acked-by: Rob Herring <robh@kernel.org>
+> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Date: Tue, 29 Nov 2016 15:55:21 +0100
+>
+>> +	/* Virtual address of the RX buffer */
+>> +	void  **buf_virt_addr;
+>> +
+>>  	/* Virtual address of the RX DMA descriptors array */
+>>  	struct mvneta_rx_desc *descs;
+>>  
+>  ...
+>> +		data = (unsigned char *)rxq->buf_virt_addr[index];
+>
+> This cast is unnecessary, please remove it.
+
+OK I am doing it now.
+
+Thanks,
+
+Gregory
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
