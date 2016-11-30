@@ -1,58 +1,56 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 Nov 2016 13:27:35 +0000
-Subject: [PATCH 1/1] mach-omap2: fixing wrong strcat for Non-NULL
- terminated string
-In-Reply-To: <1480502428-19509-1-git-send-email-maninder1.s@samsung.com>
-References: <1480502428-19509-1-git-send-email-maninder1.s@samsung.com>
-Message-ID: <20161130132735.GH23750@n2100.armlinux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 30 Nov 2016 13:31:43 +0000
+Subject: [PATCH] KVM: arm/arm64: Access CNTHCTL_EL2 bit fields correctly
+In-Reply-To: <CAHyh4xi2oq8m2B_3oZu+BNeyk-++L2ziMY66+XZ+SDRjOHDN6A@mail.gmail.com>
+References: <1480351570-11648-1-git-send-email-jintack@cs.columbia.edu>
+ <d04fd17e-9157-07fe-4daa-9dbab149b5e6@arm.com>
+ <799d03f5-a929-9547-1ae7-94026b76f116@arm.com>
+ <CAHyh4xhXoFWsbnNNePthWp2-ZAOtCuUVmLn-JKRe4sc=nqrYNw@mail.gmail.com>
+ <0a475329-6f50-42ae-3244-f0767c56ce09@arm.com>
+ <ee2dacff-691c-7548-ff71-3a992f399333@arm.com>
+ <CAHyh4xi2oq8m2B_3oZu+BNeyk-++L2ziMY66+XZ+SDRjOHDN6A@mail.gmail.com>
+Message-ID: <129e316b-0a05-9114-f29f-c8935144720c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2016 at 04:10:28PM +0530, Maninder Singh wrote:
-> variable name can have Non NULL terminated string after cropping
-> which may result strcat to fail, and cropping is not
-> required if (strlen(oh->name) + 8 < MOD_CLK_MAX_NAME_LEN).
+On 29/11/16 21:05, Jintack Lim wrote:
+> On Tue, Nov 29, 2016 at 11:53 AM, Suzuki K Poulose
+> <suzuki.poulose@arm.com> wrote:
+>> On 29/11/16 09:36, Marc Zyngier wrote:
+>>>
+>>> On 29/11/16 03:28, Jintack Lim wrote:
+>>>>
+>>>> On Mon, Nov 28, 2016 at 1:39 PM, Marc Zyngier <marc.zyngier@arm.com>
+>>>> wrote:
+>>>>>
+>>>>> On 28/11/16 17:43, Marc Zyngier wrote:
+>>>>
+>>>> This looks much cleaner than my patch.
+>>>> While we are at it, is it worth to consider that we just need to set
+>>>> those bits once for VHE case, not for every world switch as an
+>>>> optimization?
+>>>
+>>>
+>>> Ah! That's a much better idea indeed! And we could stop messing with
+>>> cntvoff_el2 as well, as it doesn't need to be restored to zero on exit.
+>>> Could you try and respin something along those lines?
+>>>
+>>
+>> fyi, we have a static_key based cpus_have_const_cap() for Constant cap
+>> checking (like this case) available in linux-next. May be you could make use
+>> of that instead of alternatives.
 > 
-> Issue caught with static analysis tool:
-> "Dangerous usage of 'name' (strncpy doesn't always 0-terminate it)"
+> Thanks Suzuki. This looks very useful.
+> 
+> Marc, can I write a patch based on linux-next? The commit which has
+> cpus_have_const_cap() is not in master and next branch in kvm/arm
+> repo.
 
-Maybe switch to strlcpy() ?
+You can. It is just that I won't be able to apply it immediately (I'll
+wait for -rc1 to be out, and send it as a fix).
 
-> 
-> Signed-off-by: Vaneet Narang <v.narang@samsung.com>
-> Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 759e1d4..8adf272 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -742,12 +742,15 @@ static int _init_main_clk(struct omap_hwmod *oh)
->  	char name[MOD_CLK_MAX_NAME_LEN];
->  	struct clk *clk;
->  
-> -	/* +7 magic comes from '_mod_ck' suffix */
-> -	if (strlen(oh->name) + 7 > MOD_CLK_MAX_NAME_LEN)
-> +	/* +8 magic comes from strlen("_mod_ck") added as suffix */
-> +	if (strlen(oh->name) + 8 > MOD_CLK_MAX_NAME_LEN) {
->  		pr_warn("%s: warning: cropping name for %s\n", __func__,
->  			oh->name);
-> +		strncpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - 8);
-> +		name[MOD_CLK_MAX_NAME_LEN - 8] = '\0';
-> +	} else
-> +		strcpy(name, oh->name);
->  
-> -	strncpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - 7);
->  	strcat(name, "_mod_ck");
->  
->  	clk = clk_get(NULL, name);
-> -- 
-> 1.9.1
-> 
+Thanks,
 
+	M.
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Jazz is not dead. It just smells funny...
