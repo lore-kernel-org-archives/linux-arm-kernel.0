@@ -1,7 +1,9 @@
 From: sw0312.kim@samsung.com (Seung-Woo Kim)
-Date: Wed, 30 Nov 2016 13:27:42 +0900
-Subject: [PATCH] arm64: dts: exynos: Add flash led dt node for TM2 board
-Message-ID: <1480480062-3472-1-git-send-email-sw0312.kim@samsung.com>
+Date: Wed, 30 Nov 2016 13:48:57 +0900
+Subject: [PATCH v2] arm64: dts: exynos: Add flash led dt node for TM2 board
+In-Reply-To: <1480480062-3472-1-git-send-email-sw0312.kim@samsung.com>
+References: <1480480062-3472-1-git-send-email-sw0312.kim@samsung.com>
+Message-ID: <1480481337-3941-1-git-send-email-sw0312.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,11 +14,14 @@ This patch adds Kinetic ktd2692 flash led device node for TM2 board.
 Signed-off-by: Ingi Kim <ingi2.kim@samsung.com>
 Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
 ---
+Change from v1:
+- gpio active value is set with defined macro instead of value.
+---
  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts |   13 +++++++++++++
  1 files changed, 13 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-index f21bdc2..3ba305f 100644
+index f21bdc2..0d454aa 100644
 --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
 +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
 @@ -58,6 +58,19 @@
@@ -25,8 +30,8 @@ index f21bdc2..3ba305f 100644
  
 +	camera-flash {
 +		compatible = "kinetic,ktd2692";
-+		ctrl-gpios = <&gpc0 1 0>;
-+		aux-gpios = <&gpc0 2 0>;
++		ctrl-gpios = <&gpc0 1 GPIO_ACTIVE_HIGH>;
++		aux-gpios = <&gpc0 2 GPIO_ACTIVE_HIGH>;
 +
 +		flash-led {
 +			label = "ktd2692-flash";
