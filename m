@@ -1,68 +1,123 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 30 Nov 2016 12:07:45 +0000
-Subject: [PATCH V3 0/8] IOMMU probe deferral support
-In-Reply-To: <00c901d24aa1$7d851730$788f4590$@codeaurora.org>
-References: <421e2b14-0231-d376-02a0-097423120b3d@arm.com>
- <006f01d236ae$61751c40$245f54c0$@codeaurora.org>
- <9f36244f-62d4-08e3-d64a-2b04ad4dc2e0@arm.com>
- <002b01d24340$5d56e730$1804b590$@codeaurora.org>
- <918128b9-cdb0-1454-000a-146cee7a05ea@arm.com>
- <004401d2466d$5b8b2170$12a16450$@codeaurora.org>
- <f2ad6976-0f8f-d116-bc43-37337dd9f41f@arm.com>
- <000001d2499e$df7f2d80$9e7d8880$@codeaurora.org>
- <20161128181339.GA32078@red-moon>
- <00c901d24aa1$7d851730$788f4590$@codeaurora.org>
-Message-ID: <20161130120745.GA14225@red-moon>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 30 Nov 2016 12:06:54 +0000
+Subject: [RFC PATCH 00/29] arm64: Scalable Vector Extension core support
+In-Reply-To: <7a35d1ae-73df-03a5-c9d6-1a52754acf25@redhat.com>
+ <CAH=s-POegNL2HLV3EGPt=b-jrJ4OOwpBFTfysMaX0TNgSw=3Hg@mail.gmail.com>
+Message-ID: <20161130120654.GJ1574@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan,
-
-On Wed, Nov 30, 2016 at 06:04:13AM +0530, Sricharan wrote:
-> Hi Lorenzo,
+On Wed, Nov 30, 2016 at 11:08:50AM +0100, Florian Weimer wrote:
+> On 11/25/2016 08:38 PM, Dave Martin wrote:
+> >The Scalable Vector Extension (SVE) [1] is an extension to AArch64 which
+> >adds extra SIMD functionality and supports much larger vectors.
+> >
+> >This series implements core Linux support for SVE.
+> >
+> >Recipents not copied on the whole series can find the rest of the
+> >patches in the linux-arm-kernel archives [2].
+> >
+> >
+> >The first 5 patches "arm64: signal: ..." factor out the allocation and
+> >placement of state information in the signal frame.  The first three
+> >are prerequisites for the SVE support patches.
+> >
+> >Patches 04-05 implement expansion of the signal frame, and may remain
+> >controversial due to ABI break issues:
+> >
+> > * Discussion is needed on how userspace should detect/negotiate signal
+> >   frame size in order for this expansion mechanism to be workable.
 > 
-> >-----Original Message-----
-> >From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Lorenzo Pieralisi
-> >Sent: Monday, November 28, 2016 11:44 PM
-> >To: Sricharan <sricharan@codeaurora.org>
-> >Cc: linux-arm-msm at vger.kernel.org; joro at 8bytes.org; will.deacon at arm.com; tfiga at chromium.org; iommu at lists.linux-
-> >foundation.org; srinivas.kandagatla at linaro.org; laurent.pinchart at ideasonboard.com; 'Robin Murphy' <robin.murphy@arm.com>;
-> >linux-arm-kernel at lists.infradead.org; m.szyprowski at samsung.com
-> >Subject: Re: [PATCH V3 0/8] IOMMU probe deferral support
-> >
-> >On Mon, Nov 28, 2016 at 11:12:08PM +0530, Sricharan wrote:
-> >
-> >[...]
-> >
-> >> >Cool. We're rather hoping that the ACPI stuff is good to go for 4.10
-> >> >now, so it's probably worth pulling the rest of that in (beyond the one
-> >> >patch I picked) to make sure the of_dma_configure/acpi_dma_configure
-> >> >paths don't inadvertently diverge.
-> >> >
-> >>
-> >> I rebased and was testing your branch with Lorenzo's series. One thing
-> >> i am still trying to get right is the acpi_dma_configure call. With your
-> >> series dma_configure calls pci_dma/of_dma configure, so i am just adding
-> >> acpi_dma_configure call there for non-pci ACPI devices as well. I see that
-> >> acpi_dma_configure right now is called from acpi_bind_one and
-> >> iort_add_smmu_platform_device, both go through the really_probe function
-> >> path, so moving acpi_dma_configure from the above the two functions
-> >> to dma_configure. I remember we discussed this on another thread, so
-> >> hopefully it is correct. I do not have an platform to test the ACPI though.
-> >> I will take some testing help on V4 for this.
-> >
-> >I am happy to test it for you please just send me a pointer at your v4
-> >code.
-> >
->  I posted the v4 and CCed you there. So i am little skeptical about the acpi
-> changes that i have posted. I was checking for a function equivalent 
-> in acpi as of_match_node in DT, to figure out if the iommu_spec.np that
-> the master device is pointing to is there in the iommu_of_table and based
-> on that we can decide if to defer the probe. I was seeing iort_scan_node
-> was its equivalent. But if that is not correct, then last patch has to be reworked.
-> Anyways will be good to know your feedback on this.
+> I'm leaning towards a simple increase in the glibc headers (despite the ABI
+> risk), plus a personality flag to disable really wide vector registers in
+> case this causes problems with old binaries.
 
-Sure I will test it asap, thanks for putting it together.
+I'm concerned here that there may be no sensible fixed size for the
+signal frame.  We would make it ridiculously large in order to minimise
+the chance of hitting this problem again -- but then it would be
+ridiculously large, which is a potential problem for massively threaded
+workloads.
 
-Thanks,
-Lorenzo
+Or we could be more conservative, but risk a re-run of similar ABI
+breaks in the future.
+
+A personality flag may also discourage use of larger vectors, even
+though the vast majority of software will work fine with them.
+
+> A more elaborate mechanism will likely introduce more bugs than it makes
+> existing applications working, due to its complexity.
+
+Yes, I was a bit concerned about this when I tried to sketch something
+out.
+
+[...]
+
+> > * No independent SVE vector length configuration per thread.  This is
+> >   planned, but will follow as a separate add-on series.
+> 
+> Per-thread register widths will likely make coroutine switching (setcontext)
+> and C++ resumable functions/executors quite challenging.
+> 
+> Can you detail your plans in this area?
+> 
+> Thanks,
+> Florian
+
+I'll also respond to Yao's question here, since it's closely related:
+
+On Wed, Nov 30, 2016 at 09:56:14AM +0000, Yao Qi wrote:
+
+[...]
+
+> If I read "independent SVE vector length configuration per thread"
+> correctly, SVE vector length can be different in each thread, so the
+> size of vector registers is different too.  In GDB, we describe registers
+> by "target description" which is per process, not per thread.
+> 
+> -- 
+> Yao (??)
+
+So, my key goal is to support _per-process_ vector length control.
+
+>From the kernel perspective, it is easiest to achieve this by providing
+per-thread control since that is the unit that context switching acts
+on.
+
+How useful it really is to have threads with different VLs in the same
+process is an open question.  It's theoretically useful for runtime
+environments, which may want to dispatch code optimised for different
+VLs -- changing the VL on-the-fly within a single thread is not
+something I want to encourage, due to overhead and ABI issues, but
+switching between threads of different VLs would be more manageable.
+
+However, I expect mixing different VLs within a single process to be
+very much a special case -- it's not something I'd expect to work with
+general-purpose code.
+
+Since the need for indepent VLs per thread is not proven, we could
+
+ * forbid it -- i.e., only a thread-group leader with no children is
+permitted to change the VL, which is then inherited by any child threads
+that are subsequently created
+
+ * permit it only if a special flag is specified when requesting the VL
+change
+
+ * permit it and rely on userspace to be sensible -- easiest option for
+the kernel.
+
+
+For setcontext/setjmp, we don't save/restore any SVE state due to the
+caller-save status of SVE, and I would not consider it necessary to
+save/restore VL itself because of the no-change-on-the-fly policy for
+this.
+
+I'm not familiar with resumable functions/executors -- are these in
+the C++ standards yet (not that that would cause me to be familiar
+with them... ;)  Any implementation of coroutines (i.e.,
+cooperative switching) is likely to fall under the "setcontext"
+argument above.
+
+Thoughts?
+
+---Dave
