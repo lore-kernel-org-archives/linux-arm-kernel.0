@@ -1,146 +1,181 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Wed, 30 Nov 2016 05:52:22 +0530
-Subject: [PATCH 08/10] iommu/arm-smmu: Clean up early-probing workarounds
+Date: Wed, 30 Nov 2016 05:52:21 +0530
+Subject: [PATCH 07/10] arm64: dma-mapping: Remove the notifier trick to handle
+ early setting of dma_ops
 In-Reply-To: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
 References: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1480465344-11862-9-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1480465344-11862-8-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robin Murphy <robin.murphy@arm.com>
+With arch_setup_dma_ops now being called late during device's probe after the
+device's iommu is probed, the notifier trick required to handle the early
+setup of dma_ops before the iommu group gets created is not required.
+So removing the notifier's here.
 
-Now that the appropriate ordering is enforced via profe-deferral of
-masters in core code, rip it all out and bask in the simplicity.
-
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-[sricharan: Rebased on top of ACPI IORT SMMU series]
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+[rm: clean up even more]
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
-[v4] Removed arm_smmu_acpi_init function and let the
-     module_platform_driver to take care of the driver
-     registration.
+ arch/arm64/mm/dma-mapping.c | 132 ++++----------------------------------------
+ 1 file changed, 12 insertions(+), 120 deletions(-)
 
- drivers/iommu/arm-smmu-v3.c | 35 ++--------------------------
- drivers/iommu/arm-smmu.c    | 56 ++++++++-------------------------------------
- 2 files changed, 11 insertions(+), 80 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index d22c428..257a6a3 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -2729,40 +2729,9 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
- 	.probe	= arm_smmu_device_probe,
- 	.remove	= arm_smmu_device_remove,
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index aa6c8f8..401f79a 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -800,140 +800,32 @@ static void __iommu_unmap_sg_attrs(struct device *dev,
+ 	.mapping_error = iommu_dma_mapping_error,
  };
-+module_platform_driver(arm_smmu_driver);
  
--static int __init arm_smmu_init(void)
--{
--	static bool registered;
--	int ret = 0;
+-/*
+- * TODO: Right now __iommu_setup_dma_ops() gets called too early to do
+- * everything it needs to - the device is only partially created and the
+- * IOMMU driver hasn't seen it yet, so it can't have a group. Thus we
+- * need this delayed attachment dance. Once IOMMU probe ordering is sorted
+- * to move the arch_setup_dma_ops() call later, all the notifier bits below
+- * become unnecessary, and will go away.
+- */
+-struct iommu_dma_notifier_data {
+-	struct list_head list;
+-	struct device *dev;
+-	const struct iommu_ops *ops;
+-	u64 dma_base;
+-	u64 size;
+-};
+-static LIST_HEAD(iommu_dma_masters);
+-static DEFINE_MUTEX(iommu_dma_notifier_lock);
 -
--	if (!registered) {
--		ret = platform_driver_register(&arm_smmu_driver);
--		registered = !ret;
+-static bool do_iommu_attach(struct device *dev, const struct iommu_ops *ops,
+-			   u64 dma_base, u64 size)
+-{
+-	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+-
+-	/*
+-	 * If the IOMMU driver has the DMA domain support that we require,
+-	 * then the IOMMU core will have already configured a group for this
+-	 * device, and allocated the default domain for that group.
+-	 */
+-	if (!domain || iommu_dma_init_domain(domain, dma_base, size, dev)) {
+-		pr_warn("Failed to set up IOMMU for device %s; retaining platform DMA ops\n",
+-			dev_name(dev));
+-		return false;
+-	}
+-
+-	dev->archdata.dma_ops = &iommu_dma_ops;
+-	return true;
+-}
+-
+-static void queue_iommu_attach(struct device *dev, const struct iommu_ops *ops,
+-			      u64 dma_base, u64 size)
+-{
+-	struct iommu_dma_notifier_data *iommudata;
+-
+-	iommudata = kzalloc(sizeof(*iommudata), GFP_KERNEL);
+-	if (!iommudata)
+-		return;
+-
+-	iommudata->dev = dev;
+-	iommudata->ops = ops;
+-	iommudata->dma_base = dma_base;
+-	iommudata->size = size;
+-
+-	mutex_lock(&iommu_dma_notifier_lock);
+-	list_add(&iommudata->list, &iommu_dma_masters);
+-	mutex_unlock(&iommu_dma_notifier_lock);
+-}
+-
+-static int __iommu_attach_notifier(struct notifier_block *nb,
+-				   unsigned long action, void *data)
+-{
+-	struct iommu_dma_notifier_data *master, *tmp;
+-
+-	if (action != BUS_NOTIFY_BIND_DRIVER)
+-		return 0;
+-
+-	mutex_lock(&iommu_dma_notifier_lock);
+-	list_for_each_entry_safe(master, tmp, &iommu_dma_masters, list) {
+-		if (data == master->dev && do_iommu_attach(master->dev,
+-				master->ops, master->dma_base, master->size)) {
+-			list_del(&master->list);
+-			kfree(master);
+-			break;
+-		}
+-	}
+-	mutex_unlock(&iommu_dma_notifier_lock);
+-	return 0;
+-}
+-
+-static int __init register_iommu_dma_ops_notifier(struct bus_type *bus)
+-{
+-	struct notifier_block *nb = kzalloc(sizeof(*nb), GFP_KERNEL);
+-	int ret;
+-
+-	if (!nb)
+-		return -ENOMEM;
+-
+-	nb->notifier_call = __iommu_attach_notifier;
+-
+-	ret = bus_register_notifier(bus, nb);
+-	if (ret) {
+-		pr_warn("Failed to register DMA domain notifier; IOMMU DMA ops unavailable on bus '%s'\n",
+-			bus->name);
+-		kfree(nb);
 -	}
 -	return ret;
 -}
 -
--static void __exit arm_smmu_exit(void)
--{
--	return platform_driver_unregister(&arm_smmu_driver);
--}
+ static int __init __iommu_dma_init(void)
+ {
+-	int ret;
 -
--subsys_initcall(arm_smmu_init);
--module_exit(arm_smmu_exit);
--
--static int __init arm_smmu_of_init(struct device_node *np)
--{
--	int ret = arm_smmu_init();
--
--	if (ret)
--		return ret;
--
--	if (!of_platform_device_create(np, NULL, platform_bus_type.dev_root))
--		return -ENODEV;
--
--	return 0;
--}
--IOMMU_OF_DECLARE(arm_smmuv3, "arm,smmu-v3", arm_smmu_of_init);
-+IOMMU_OF_DECLARE(arm_smmuv3, "arm,smmu-v3", NULL);
- 
- #ifdef CONFIG_ACPI
- static int __init acpi_smmu_v3_init(struct acpi_table_header *table)
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 8e66b16..eaa8f44 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -2127,57 +2127,19 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
- 	.probe	= arm_smmu_device_probe,
- 	.remove	= arm_smmu_device_remove,
- };
--
--static int __init arm_smmu_init(void)
--{
--	static bool registered;
--	int ret = 0;
--
--	if (!registered) {
--		ret = platform_driver_register(&arm_smmu_driver);
--		registered = !ret;
--	}
+-	ret = iommu_dma_init();
+-	if (!ret)
+-		ret = register_iommu_dma_ops_notifier(&platform_bus_type);
+-	if (!ret)
+-		ret = register_iommu_dma_ops_notifier(&amba_bustype);
+-#ifdef CONFIG_PCI
+-	if (!ret)
+-		ret = register_iommu_dma_ops_notifier(&pci_bus_type);
+-#endif
 -	return ret;
--}
--
--static void __exit arm_smmu_exit(void)
--{
--	return platform_driver_unregister(&arm_smmu_driver);
--}
--
--subsys_initcall(arm_smmu_init);
--module_exit(arm_smmu_exit);
--
--static int __init arm_smmu_of_init(struct device_node *np)
--{
--	int ret = arm_smmu_init();
--
--	if (ret)
--		return ret;
--
--	if (!of_platform_device_create(np, NULL, platform_bus_type.dev_root))
--		return -ENODEV;
--
--	return 0;
--}
--IOMMU_OF_DECLARE(arm_smmuv1, "arm,smmu-v1", arm_smmu_of_init);
--IOMMU_OF_DECLARE(arm_smmuv2, "arm,smmu-v2", arm_smmu_of_init);
--IOMMU_OF_DECLARE(arm_mmu400, "arm,mmu-400", arm_smmu_of_init);
--IOMMU_OF_DECLARE(arm_mmu401, "arm,mmu-401", arm_smmu_of_init);
--IOMMU_OF_DECLARE(arm_mmu500, "arm,mmu-500", arm_smmu_of_init);
--IOMMU_OF_DECLARE(cavium_smmuv2, "cavium,smmu-v2", arm_smmu_of_init);
-+module_platform_driver(arm_smmu_driver);
++	return iommu_dma_init();
+ }
+ arch_initcall(__iommu_dma_init);
  
- #ifdef CONFIG_ACPI
--static int __init arm_smmu_acpi_init(struct acpi_table_header *table)
--{
--	if (iort_node_match(ACPI_IORT_NODE_SMMU))
--		return arm_smmu_init();
--
--	return 0;
--}
--IORT_ACPI_DECLARE(arm_smmu, ACPI_SIG_IORT, arm_smmu_acpi_init);
-+IORT_ACPI_DECLARE(arm_smmu, ACPI_SIG_IORT, NULL);
- #endif
+ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 				  const struct iommu_ops *ops)
+ {
+-	struct iommu_group *group;
++	struct iommu_domain *domain;
  
-+IOMMU_OF_DECLARE(arm_smmuv1, "arm,smmu-v1", NULL);
-+IOMMU_OF_DECLARE(arm_smmuv2, "arm,smmu-v2", NULL);
-+IOMMU_OF_DECLARE(arm_mmu400, "arm,mmu-400", NULL);
-+IOMMU_OF_DECLARE(arm_mmu401, "arm,mmu-401", NULL);
-+IOMMU_OF_DECLARE(arm_mmu500, "arm,mmu-500", NULL);
-+IOMMU_OF_DECLARE(cavium_smmuv2, "cavium,smmu-v2", NULL);
+ 	if (!ops)
+ 		return;
 +
- MODULE_DESCRIPTION("IOMMU API for ARM architected SMMU implementations");
- MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
- MODULE_LICENSE("GPL v2");
+ 	/*
+-	 * TODO: As a concession to the future, we're ready to handle being
+-	 * called both early and late (i.e. after bus_add_device). Once all
+-	 * the platform bus code is reworked to call us late and the notifier
+-	 * junk above goes away, move the body of do_iommu_attach here.
++	 * The IOMMU core code allocates the default DMA domain, which the
++	 * underlying IOMMU driver needs to support via the dma-iommu layer.
+ 	 */
+-	group = iommu_group_get(dev);
+-	if (group) {
+-		do_iommu_attach(dev, ops, dma_base, size);
+-		iommu_group_put(group);
+-	} else {
+-		queue_iommu_attach(dev, ops, dma_base, size);
++	domain = iommu_get_domain_for_dev(dev);
++	if (!domain || iommu_dma_init_domain(domain, dma_base, size, dev)) {
++		pr_warn("Failed to set up IOMMU for device %s; retaining platform DMA ops\n",
++			dev_name(dev));
++		return;
+ 	}
++
++	dev->archdata.dma_ops = &iommu_dma_ops;
+ }
+ 
+ void arch_teardown_dma_ops(struct device *dev)
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
