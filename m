@@ -1,43 +1,32 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 30 Nov 2016 10:32:09 +0530
-Subject: [RFC3 nowrap: PATCH v7 00/18] ILP32 for ARM64
-In-Reply-To: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <20161130050209.GB18796@yury-N73SV>
+From: raviteja.garimella@broadcom.com (Raviteja Garimella)
+Date: Wed, 30 Nov 2016 11:25:35 +0530
+Subject: [PATCH 0/3] Support for USB DRD Phy driver for NS2 
+Message-ID: <1480485338-23451-1-git-send-email-raviteja.garimella@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2016 at 11:32:59PM +0300, Yury Norov wrote:
-> This series enables aarch64 with ilp32 mode, and as supporting work,
-> introduces ARCH_32BIT_OFF_T configuration option that is enabled for
-> existing 32-bit architectures but disabled for new arches (so 64-bit
-> off_t is is used by new userspace).
-> 
-> This version is based on kernel v4.9-rc1.  It works with glibc-2.24,
-> and tested with LTP.
-> 
-> This version contains ABI changes, and should be used with new glibc
-> version. See links below.
-> 
-> This is RFC because there is still no solid understanding what type
-> of registers top-halves delousing we prefer and it affects ABI. In
-> this patchset, w0-w7 are cleared for each syscall in assembler entry.
-> 
-> The alternative approach is in introducing compat wrappers which is
-> little faster for natively routed syscalls (~2.6% for syscall with
-> no payload) but much more complicated.
+This patch adds support for USB Dual Role Device Phy for Broadcom
+Northstar2 SoC. Apart from the new phy driver, this patchset contains
+changes to Kconfig, Makefile, and Device tree files.
 
-Hi all,
+This patchset is tested on Broadcom NS2 BCM958712K reference board.
 
-Steve Ellcey submitted glibc patches for ILP32:
-https://www.sourceware.org/ml/libc-alpha/2016-11/msg01071.html
-It implicitly assumes that kernel clears top halves of registers for
-all syscalls in assembly entry. That patches are going to be taken.
-It it happens, we will have no choice on kernel side how to clear top
-halves anymore.
+Repo: https://github.com/Broadcom/arm64-linux.git
+Branch: ns2_drdphy
 
-For me current version is OK, and I see no problems with it. I just
-write this email to remind that it's still RFC, and this is the last
-chance to get back to wrappers. 
+Raviteja Garimella (3):
+  Add DT bindings documentation for NS2 USB DRD phy
+  Broadcom USB DRD Phy driver for Northstar2
+  DT nodes for Broadcom Northstar2 USB DRD Phy
 
-Yury.
+ .../devicetree/bindings/phy/brcm,ns2-drd-phy.txt   |  40 ++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |  14 +
+ drivers/phy/Kconfig                                |  13 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-bcm-ns2-usbdrd.c                   | 587 +++++++++++++++++++++
+ 5 files changed, 655 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt
+ create mode 100644 drivers/phy/phy-bcm-ns2-usbdrd.c
+
+-- 
+2.1.0
