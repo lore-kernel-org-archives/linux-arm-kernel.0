@@ -1,27 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Nov 2016 12:46:19 +0000
-Subject: [PATCH 3/5] dt-bindings: spi: Add documentation for the Armada
- 3700 SPI Controller
-In-Reply-To: <20161129143939.3191-4-romain.perier@free-electrons.com>
-References: <20161129143939.3191-1-romain.perier@free-electrons.com>
- <20161129143939.3191-4-romain.perier@free-electrons.com>
-Message-ID: <20161130124619.n7h7koij4ps4sltn@sirena.org.uk>
+From: peda@axentia.se (Peter Rosin)
+Date: Wed, 30 Nov 2016 13:48:20 +0100
+Subject: [PATCH v3 0/2] Support for Axentia TSE-850
+Message-ID: <1480510102-24587-1-git-send-email-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 03:39:37PM +0100, Romain Perier wrote:
-> This adds the devicetree bindings documentation for the SPI controller
-> present in the Marvell Armada 3700 SoCs.
+Hi!
 
-Please submit patches using subject lines reflecting the style for the
-subsystem.  This makes it easier for people to identify relevant
-patches.  Look at what existing commits in the area you're changing are
-doing and make sure your subject lines visually resemble what they're
-doing.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161130/48fcfac2/attachment.sig>
+changes v2 -> v3
+- document the new compatible strings prefixed with "axentia,".
+
+changes v1 -> v2
+- squash the fixup into the correct patch, sorry for the noise.
+
+After finally having all essintial drivers upstreamed (the
+last ones are currently in -next) I would like to have the
+dts and the defconfig also upstreamed.
+
+Cheers,
+Peter
+
+Peter Rosin (2):
+  ARM: dts: add devicetree for the Axentia TSE-850
+  ARM: tse850_defconfig: add Axentia TSE-850
+
+ Documentation/devicetree/bindings/arm/axentia.txt |  19 ++
+ MAINTAINERS                                       |   8 +
+ arch/arm/boot/dts/Makefile                        |   1 +
+ arch/arm/boot/dts/axentia-linea.dtsi              |  53 +++++
+ arch/arm/boot/dts/axentia-tse850-3.dts            | 276 ++++++++++++++++++++++
+ arch/arm/configs/tse850_defconfig                 | 223 +++++++++++++++++
+ 6 files changed, 580 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/axentia.txt
+ create mode 100644 arch/arm/boot/dts/axentia-linea.dtsi
+ create mode 100644 arch/arm/boot/dts/axentia-tse850-3.dts
+ create mode 100644 arch/arm/configs/tse850_defconfig
+
+-- 
+2.1.4
