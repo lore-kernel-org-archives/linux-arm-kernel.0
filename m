@@ -1,65 +1,74 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 30 Nov 2016 14:41:55 +0000
-Subject: [RFC v3 00/10] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
- reserved regions
-In-Reply-To: <1899e46c-7b06-01d6-6cff-eb0985a4f11d@redhat.com>
-References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
- <6c9012fd-070b-6218-48e7-69b37f2559dd@redhat.com>
- <20161130103713.GB2724@arm.com>
- <1899e46c-7b06-01d6-6cff-eb0985a4f11d@redhat.com>
-Message-ID: <7fca514b-53fd-ce58-687b-f6f65240f210@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 30 Nov 2016 15:55:29 +0100
+Subject: [PATCH v2 4/5] arm64: dts: marvell: Add definition of SPI
+ controller for Armada 3700
+In-Reply-To: <20161130094351.2748-5-romain.perier@free-electrons.com> (Romain
+ Perier's message of "Wed, 30 Nov 2016 10:43:50 +0100")
+References: <20161130094351.2748-1-romain.perier@free-electrons.com>
+ <20161130094351.2748-5-romain.perier@free-electrons.com>
+Message-ID: <877f7lm2zi.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/11/16 14:08, Auger Eric wrote:
-> Hi Will,
-> 
-> On 30/11/2016 11:37, Will Deacon wrote:
->> On Wed, Nov 30, 2016 at 10:49:33AM +0100, Auger Eric wrote:
->>> On 15/11/2016 14:09, Eric Auger wrote:
->>>> Following LPC discussions, we now report reserved regions through
->>>> iommu-group sysfs reserved_regions attribute file.
->>>>
->>>> Reserved regions are populated through the IOMMU get_resv_region callback
->>>> (former get_dm_regions), now implemented by amd-iommu, intel-iommu and
->>>> arm-smmu.
->>>>
->>>> The intel-iommu reports the [FEE0_0000h - FEF0_000h] MSI window as an
->>>> IOMMU_RESV_NOMAP reserved region.
->>>>
->>>> arm-smmu reports the MSI window (arbitrarily located at 0x8000000 and
->>>> 1MB large) and the PCI host bridge windows.
->>>>
->>>> The series integrates a not officially posted patch from Robin:
->>>> "iommu/dma: Allow MSI-only cookies".
->>>>
->>>> This series currently does not address IRQ safety assessment.
->>>
->>> I will respin this series taking into account Joerg's comment. Does
->>> anyone have additional comments or want to put forward some conceptual
->>> issues with the current direction and with this implementation?
->>>
->>> As for the IRQ safety assessment, in a first step I would propose to
->>> remove the IOMMU_CAP_INTR_REMAP from arm-smmus and consider the
->>> assignment as unsafe. Any objection?
->>
->> Well, yeah, because it's perfectly safe with GICv3.
-> 
-> Well except if you have an MSI controller in-between the device and the
-> sMMU (typically embedded in the host bridge). Detecting this situation
-> is not straightforward; hence my proposal.
+Hi Romain,
+ 
+ On mer., nov. 30 2016, Romain Perier <romain.perier@free-electrons.com> wrote:
 
-That's not the GICv3 (ITS) case, though, and either way it's irrelevant
-to the "safety" aspect in question; the fact that writes to the ITS
-carry sideband signals which disambiguate and isolate MSIs has nothing
-to do with whether that write undergoes address translation along the way.
+> Armada 3700 SoC has an SPI Controller, this commit adds the definition
+> of the SPI device node at the SoC level.
+>
+> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+> ---
+>
+> Changes in v2:
+>  - Removed properties max-frequency and clock-frequency, it is no
+>    longer required and not used by the DT-bindings.
+>
+>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> index e9bd587..63c2002 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> @@ -98,6 +98,17 @@
+>  			/* 32M internal register @ 0xd000_0000 */
+>  			ranges = <0x0 0x0 0xd0000000 0x2000000>;
+>  
+> +			spi0: spi at 10600 {
+> +				compatible = "marvell,armada-3700-spi";
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				reg = <0x10600 0x5d>;
 
-It's also not legacy INTx, and the fact that we have to pretend the SMMU
-provides MSI isolation in order to make things work with INTx is an
-entirely separate piece of brokenness I've raised several times before.
-I more than anyone would love to remove IOMMU_CAP_INTR_REMAP from the
-SMMU drivers yesterday, but doing so breaks the existing use-case on ARM
-unless we actually fix that aspect of VFIO first (I did look into it
-once, but it seemed way beyond my comprehension at the time).
+The last register is at the offset 0x1065C but according tot he
+datasheet the range address associated to this IP is from 0x10600 to
+0x10FFF.
 
-Robin.
+In the first case the size of the register set should be 0x60 (each
+register is 32-bits). But I prefer that we register the full range so a
+size of 0xA00.
+
+Thanks,
+
+Gregory
+
+
+> +				clocks = <&nb_periph_clk 7>;
+> +				interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+> +				num-cs = <4>;
+> +				status = "disabled";
+> +			};
+> +
+>  			uart0: serial at 12000 {
+>  				compatible = "marvell,armada-3700-uart";
+>  				reg = <0x12000 0x400>;
+> -- 
+> 2.9.3
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
