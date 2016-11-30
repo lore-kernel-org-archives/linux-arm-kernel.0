@@ -1,27 +1,62 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 30 Nov 2016 08:29:11 +0000
-Subject: [PATCH v9 07/11] arm/arm64: vgic: Implement
- KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
-In-Reply-To: <20161130082411.GA6647@cbox>
-References: <1479906118-15832-1-git-send-email-vijay.kilari@gmail.com>
- <1479906118-15832-8-git-send-email-vijay.kilari@gmail.com>
- <20161128195028.GH18170@cbox>
- <CALicx6uW5RmjsPPBKB5wLW4TzNmcdc9ZADqp=M2ZJe9Cd+keZg@mail.gmail.com>
- <20161129210901.GC15346@cbox>
- <CAFEAcA_1i7-ti_H_RZrTbCW2DmFPvYudKn_WFs=_XRoyKKsnbQ@mail.gmail.com>
- <20161130082411.GA6647@cbox>
-Message-ID: <CAFEAcA-z=+K2ceRhLFMt7VXWD=RQyDKzS68SsO_pG3p=578wTg@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 30 Nov 2016 10:32:33 +0200
+Subject: [PATCH v4 1/4] [media] davinci: vpif_capture: don't lock over
+ s_stream
+In-Reply-To: <20161129235712.29846-2-khilman@baylibre.com>
+References: <20161129235712.29846-1-khilman@baylibre.com>
+ <20161129235712.29846-2-khilman@baylibre.com>
+Message-ID: <4747860.QGGHSuFRpz@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 November 2016 at 08:24, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> (Peter, I thought you once argued that it was important for user space
-> to be able to save/restore the state without any ordering requirements,
-> but I may have misunderstood.  It is still the option to add something
-> like the above to the docs but also do our best to allow any ordering of
-> level/config, but it becomes slightly more invasive.)
+Hi Kevin,
 
-Hmm; perhaps I should think about this a bit more.
+Thank you for the patch.
 
--- PMM
+On Tuesday 29 Nov 2016 15:57:09 Kevin Hilman wrote:
+> Video capture subdevs may be over I2C and may sleep during xfer, so we
+> cannot do IRQ-disabled locking when calling the subdev.
+> 
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> ---
+>  drivers/media/platform/davinci/vpif_capture.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/media/platform/davinci/vpif_capture.c
+> b/drivers/media/platform/davinci/vpif_capture.c index
+> 5104cc0ee40e..9f8f41c0f251 100644
+> --- a/drivers/media/platform/davinci/vpif_capture.c
+> +++ b/drivers/media/platform/davinci/vpif_capture.c
+> @@ -193,7 +193,10 @@ static int vpif_start_streaming(struct vb2_queue *vq,
+> unsigned int count) }
+>  	}
+> 
+> +	spin_unlock_irqrestore(&common->irqlock, flags);
+>  	ret = v4l2_subdev_call(ch->sd, video, s_stream, 1);
+> +	spin_lock_irqsave(&common->irqlock, flags);
+
+I always get anxious when I see a spinlock being released randomly with an 
+operation in the middle of a protected section. Looking at the code it looks 
+like the spinlock is abused here. irqlock should only protect the dma_queue 
+and should thus only be taken around the following code:
+
+spin_lock_irqsave(&common->irqlock, flags);
+/* Get the next frame from the buffer queue */
+common->cur_frm = common->next_frm = list_entry(common->dma_queue.next,
+                            struct vpif_cap_buffer, list);
+/* Remove buffer from the buffer queue */
+list_del(&common->cur_frm->list);
+spin_unlock_irqrestore(&common->irqlock, flags);
+
+The code that is currently protected by the lock in the start and stop 
+streaming functions should be protected by a mutex instead.
+
+> +
+>  	if (ret && ret != -ENOIOCTLCMD && ret != -ENODEV) {
+>  		vpif_dbg(1, debug, "stream on failed in subdev\n");
+>  		goto err;
+
+-- 
+Regards,
+
+Laurent Pinchart
