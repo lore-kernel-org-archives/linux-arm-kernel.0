@@ -1,134 +1,173 @@
-From: ping.bai@nxp.com (Bai Ping)
-Date: Wed, 30 Nov 2016 11:04:58 +0800
-Subject: [PATCH 2/2] ARM: imx: Add speed grading check for imx6ul
-In-Reply-To: <1480475098-2037-1-git-send-email-ping.bai@nxp.com>
-References: <1480475098-2037-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <1480475098-2037-2-git-send-email-ping.bai@nxp.com>
+From: rick.chang@mediatek.com (Rick Chang)
+Date: Wed, 30 Nov 2016 11:08:56 +0800
+Subject: [PATCH v8 0/4] Add Mediatek JPEG Decoder
+Message-ID: <1480475340-21893-1-git-send-email-rick.chang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On i.MX6UL, it has two type of part, the difference
-is the max ARM frequency that can run at(528MHz/700MHz).
-The part can be identified by part marking for speed grading
-fuse. This patch add speed grading check to disable the unsupported
-OPP dynamically.
+This series of patches provide a v4l2 driver to control Mediatek JPEG decoder
+for decoding JPEG image and Motion JPEG bitstream.
 
-Signed-off-by: Bai Ping <ping.bai@nxp.com>
----
- arch/arm/mach-imx/mach-imx6ul.c | 78 ++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 77 insertions(+), 1 deletion(-)
+changes since v7:
+- Update MAINTAINERS
 
-diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
-index 6cb8a22..bf86530 100644
---- a/arch/arm/mach-imx/mach-imx6ul.c
-+++ b/arch/arm/mach-imx/mach-imx6ul.c
-@@ -9,14 +9,17 @@
- #include <linux/mfd/syscon.h>
- #include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
- #include <linux/micrel_phy.h>
-+#include <linux/of_address.h>
- #include <linux/of_platform.h>
- #include <linux/phy.h>
-+#include <linux/pm_opp.h>
- #include <linux/regmap.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- 
- #include "common.h"
- #include "cpuidle.h"
-+#include "hardware.h"
- 
- static void __init imx6ul_enet_clk_init(void)
- {
-@@ -57,6 +60,76 @@ static inline void imx6ul_enet_init(void)
- 	imx6ul_enet_phy_init();
- }
- 
-+#define OCOTP_CFG3			0x440
-+#define OCOTP_CFG3_SPEED_SHIFT		16
-+#define OCOTP_CFG3_SPEED_696MHZ		0x2
-+
-+static void __init imx6ul_opp_check_speed_grading(struct device *cpu_dev)
-+{
-+	struct device_node *np;
-+	void __iomem *base;
-+	u32 val;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx6ul-ocotp");
-+	if (!np) {
-+		pr_warn("failed to find ocotp node\n");
-+		return;
-+	}
-+
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		pr_warn("failed to map ocotp\n");
-+		goto put_node;
-+	}
-+
-+	/*
-+	 * Speed GRADING[1:0] defines the max speed of ARM:
-+	 * 2b'00: Reserved;
-+	 * 2b'01: 528000000Hz;
-+	 * 2b'10: 700000000Hz;
-+	 * 2b'11: Reserved;
-+	 * We need to set the max speed of ARM according to fuse map.
-+	 */
-+	val = readl_relaxed(base + OCOTP_CFG3);
-+	val >>= OCOTP_CFG3_SPEED_SHIFT;
-+	val &= 0x3;
-+
-+	if (val != OCOTP_CFG3_SPEED_696MHZ) {
-+		if (dev_pm_opp_disable(cpu_dev, 696000000))
-+			pr_warn("Failed to disable 696MHz OPP\n");
-+	}
-+	iounmap(base);
-+
-+put_node:
-+	of_node_put(np);
-+}
-+
-+static void __init imx6ul_opp_init(void)
-+{
-+	struct device_node *np;
-+	struct device *cpu_dev = get_cpu_device(0);
-+
-+	if (!cpu_dev) {
-+		pr_warn("failed to get cpu0 device\n");
-+		return;
-+	}
-+	np = of_node_get(cpu_dev->of_node);
-+	if (!np) {
-+		pr_warn("failed to find cpu0 node\n");
-+		return;
-+	}
-+
-+	if (dev_pm_opp_of_add_table(cpu_dev)) {
-+		pr_warn("failed to init OPP table\n");
-+		goto put_node;
-+	}
-+
-+	imx6ul_opp_check_speed_grading(cpu_dev);
-+
-+put_node:
-+	of_node_put(np);
-+}
-+
- static void __init imx6ul_init_machine(void)
- {
- 	struct device *parent;
-@@ -83,8 +156,11 @@ static void __init imx6ul_init_late(void)
- {
- 	imx6sx_cpuidle_init();
- 
--	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
-+	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ)) {
-+		if (cpu_is_imx6ul())
-+			imx6ul_opp_init();
- 		platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
-+	}
- }
- 
- static const char * const imx6ul_dt_compat[] __initconst = {
+changes since v6:
+- fix kbuild test fail
+- Add patch for MAINTAINERS
+
+changes since v5:
+- remove redundant name from struct mtk_jpeg_fmt
+- Set state of all buffers to VB2_BUF_STATE_QUEUED if fail in start streaming
+- Remove VB2_USERPTR
+- Add check for buffer index
+
+changes since v4:
+- Change file name of binding documentation
+- Revise DT binding documentation
+- Revise compatible string
+
+changes since v3:
+- Revise DT binding documentation
+- Revise compatible string
+
+changes since v2:
+- Revise DT binding documentation 
+
+changes since v1:
+- Rebase for v4.9-rc1.
+- Update Compliance test version and result
+- Remove redundant path in Makefile
+- Fix potential build error without CONFIG_PM_RUNTIME and CONFIG_PM_SLEEP
+- Fix warnings from patch check and smatch check
+
+* Dependency
+The patch "arm: dts: mt2701: Add node for JPEG decoder" depends on: 
+  CCF "Add clock support for Mediatek MT2701"[1]
+  iommu and smi "Add the dtsi node of iommu and smi for mt2701"[2]
+
+[1] http://lists.infradead.org/pipermail/linux-mediatek/2016-October/007271.html
+[2] https://patchwork.kernel.org/patch/9164013/
+
+* Compliance test
+v4l2-compliance SHA   : 4ad7174b908a36c4f315e3fe2efa7e2f8a6f375a
+
+Driver Info:
+        Driver name   : mtk-jpeg decode
+        Card type     : mtk-jpeg decoder
+        Bus info      : platform:15004000.jpegdec
+        Driver version: 4.9.0
+        Capabilities  : 0x84204000
+                Video Memory-to-Memory Multiplanar
+                Streaming
+                Extended Pix Format
+                Device Capabilities
+        Device Caps   : 0x04204000
+                Video Memory-to-Memory Multiplanar
+                Streaming
+                Extended Pix Format
+
+Compliance test for device /dev/video3 (not using libv4l2):
+
+Required ioctls:
+        test VIDIOC_QUERYCAP: OK
+
+Allow for multiple opens:
+        test second video open: OK
+        test VIDIOC_QUERYCAP: OK
+        test VIDIOC_G/S_PRIORITY: OK
+        test for unlimited opens: OK
+
+Debug ioctls:
+        test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
+        test VIDIOC_LOG_STATUS: OK (Not Supported)
+
+Input ioctls:
+        test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
+        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+        test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
+        test VIDIOC_ENUMAUDIO: OK (Not Supported)
+        test VIDIOC_G/S/ENUMINPUT: OK (Not Supported)
+        test VIDIOC_G/S_AUDIO: OK (Not Supported)
+        Inputs: 0 Audio Inputs: 0 Tuners: 0
+
+Output ioctls:
+        test VIDIOC_G/S_MODULATOR: OK (Not Supported)
+        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+        test VIDIOC_ENUMAUDOUT: OK (Not Supported)
+        test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
+        test VIDIOC_G/S_AUDOUT: OK (Not Supported)
+        Outputs: 0 Audio Outputs: 0 Modulators: 0
+
+Input/Output configuration ioctls:
+        test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+        test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+        test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+        test VIDIOC_G/S_EDID: OK (Not Supported)
+
+        Control ioctls:
+                test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
+                test VIDIOC_QUERYCTRL: OK (Not Supported)
+                test VIDIOC_G/S_CTRL: OK (Not Supported)
+                test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
+                test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
+                test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+                Standard Controls: 0 Private Controls: 0
+
+        Format ioctls:
+                test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+                test VIDIOC_G/S_PARM: OK (Not Supported)
+                test VIDIOC_G_FBUF: OK (Not Supported)
+                test VIDIOC_G_FMT: OK
+                test VIDIOC_TRY_FMT: OK
+                test VIDIOC_S_FMT: OK
+                test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
+                test Cropping: OK (Not Supported)
+                test Composing: OK
+                test Scaling: OK
+
+        Codec ioctls:
+                test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
+                test VIDIOC_G_ENC_INDEX: OK (Not Supported)
+                test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
+
+        Buffer ioctls:
+                test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+                test VIDIOC_EXPBUF: OK
+
+Test input 0:
+
+
+Total: 43, Succeeded: 43, Failed: 0, Warnings: 0
+
+Rick Chang (4):
+  dt-bindings: mediatek: Add a binding for Mediatek JPEG Decoder
+  vcodec: mediatek: Add Mediatek JPEG Decoder Driver
+  arm: dts: mt2701: Add node for Mediatek JPEG Decoder
+  vcodec: mediatek: Add Maintainers entry for Mediatek JPEG driver
+
+ .../bindings/media/mediatek-jpeg-decoder.txt       |   37 +
+ MAINTAINERS                                        |    7 +
+ arch/arm/boot/dts/mt2701.dtsi                      |   14 +
+ drivers/media/platform/Kconfig                     |   15 +
+ drivers/media/platform/Makefile                    |    2 +
+ drivers/media/platform/mtk-jpeg/Makefile           |    2 +
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c    | 1302 ++++++++++++++++++++
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_core.h    |  139 +++
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_hw.c      |  417 +++++++
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_hw.h      |   91 ++
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_parse.c   |  160 +++
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_parse.h   |   25 +
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_reg.h     |   58 +
+ 13 files changed, 2269 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/mediatek-jpeg-decoder.txt
+ create mode 100644 drivers/media/platform/mtk-jpeg/Makefile
+ create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
+ create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_core.h
+ create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_hw.c
+ create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_hw.h
+ create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_parse.c
+ create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_parse.h
+ create mode 100644 drivers/media/platform/mtk-jpeg/mtk_jpeg_reg.h
+
 -- 
 1.9.1
