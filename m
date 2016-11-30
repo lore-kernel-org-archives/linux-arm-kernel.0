@@ -1,56 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 30 Nov 2016 13:31:43 +0000
-Subject: [PATCH] KVM: arm/arm64: Access CNTHCTL_EL2 bit fields correctly
-In-Reply-To: <CAHyh4xi2oq8m2B_3oZu+BNeyk-++L2ziMY66+XZ+SDRjOHDN6A@mail.gmail.com>
-References: <1480351570-11648-1-git-send-email-jintack@cs.columbia.edu>
- <d04fd17e-9157-07fe-4daa-9dbab149b5e6@arm.com>
- <799d03f5-a929-9547-1ae7-94026b76f116@arm.com>
- <CAHyh4xhXoFWsbnNNePthWp2-ZAOtCuUVmLn-JKRe4sc=nqrYNw@mail.gmail.com>
- <0a475329-6f50-42ae-3244-f0767c56ce09@arm.com>
- <ee2dacff-691c-7548-ff71-3a992f399333@arm.com>
- <CAHyh4xi2oq8m2B_3oZu+BNeyk-++L2ziMY66+XZ+SDRjOHDN6A@mail.gmail.com>
-Message-ID: <129e316b-0a05-9114-f29f-c8935144720c@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 30 Nov 2016 13:36:02 +0000
+Subject: [PATCH] crypto: arm/aesbs - fix brokenness after skcipher
+ conversion
+In-Reply-To: <20161130131921.GD4126@gondor.apana.org.au>
+References: <1480440216-341-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20161130131921.GD4126@gondor.apana.org.au>
+Message-ID: <53AA8DFA-2420-40D6-A9C2-90B184344819@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/11/16 21:05, Jintack Lim wrote:
-> On Tue, Nov 29, 2016 at 11:53 AM, Suzuki K Poulose
-> <suzuki.poulose@arm.com> wrote:
->> On 29/11/16 09:36, Marc Zyngier wrote:
->>>
->>> On 29/11/16 03:28, Jintack Lim wrote:
->>>>
->>>> On Mon, Nov 28, 2016 at 1:39 PM, Marc Zyngier <marc.zyngier@arm.com>
->>>> wrote:
->>>>>
->>>>> On 28/11/16 17:43, Marc Zyngier wrote:
->>>>
->>>> This looks much cleaner than my patch.
->>>> While we are at it, is it worth to consider that we just need to set
->>>> those bits once for VHE case, not for every world switch as an
->>>> optimization?
->>>
->>>
->>> Ah! That's a much better idea indeed! And we could stop messing with
->>> cntvoff_el2 as well, as it doesn't need to be restored to zero on exit.
->>> Could you try and respin something along those lines?
->>>
->>
->> fyi, we have a static_key based cpus_have_const_cap() for Constant cap
->> checking (like this case) available in linux-next. May be you could make use
->> of that instead of alternatives.
+
+
+> On 30 Nov 2016, at 13:19, Herbert Xu <herbert@gondor.apana.org.au> wrote:
 > 
-> Thanks Suzuki. This looks very useful.
+>> On Tue, Nov 29, 2016 at 05:23:36PM +0000, Ard Biesheuvel wrote:
+>> The CBC encryption routine should use the encryption round keys, not
+>> the decryption round keys.
+>> 
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > 
-> Marc, can I write a patch based on linux-next? The commit which has
-> cpus_have_const_cap() is not in master and next branch in kvm/arm
-> repo.
+> Patch applied.  Thanks.
+> 
+>> Another fix for the queued changes, this time for 32-bit ARM.
+>> 
+>> I must say, I'm not impressed with the level of testing that has been
+>> carried out after applying these changes. If you had cc'd me on these
+>> patches, I would have been happy to test/review.
+> 
+> Sorry.  I'll make sure you're CCed for ARM patches in future.
 
-You can. It is just that I won't be able to apply it immediately (I'll
-wait for -rc1 to be out, and send it as a fix).
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Cheers,
+Ard.
