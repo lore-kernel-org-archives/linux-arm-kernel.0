@@ -1,48 +1,43 @@
-From: sw0312.kim@samsung.com (Seung-Woo Kim)
-Date: Wed, 30 Nov 2016 13:48:57 +0900
-Subject: [PATCH v2] arm64: dts: exynos: Add flash led dt node for TM2 board
-In-Reply-To: <1480480062-3472-1-git-send-email-sw0312.kim@samsung.com>
-References: <1480480062-3472-1-git-send-email-sw0312.kim@samsung.com>
-Message-ID: <1480481337-3941-1-git-send-email-sw0312.kim@samsung.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 30 Nov 2016 10:32:09 +0530
+Subject: [RFC3 nowrap: PATCH v7 00/18] ILP32 for ARM64
+In-Reply-To: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20161130050209.GB18796@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ingi Kim <ingi2.kim@samsung.com>
+On Fri, Oct 21, 2016 at 11:32:59PM +0300, Yury Norov wrote:
+> This series enables aarch64 with ilp32 mode, and as supporting work,
+> introduces ARCH_32BIT_OFF_T configuration option that is enabled for
+> existing 32-bit architectures but disabled for new arches (so 64-bit
+> off_t is is used by new userspace).
+> 
+> This version is based on kernel v4.9-rc1.  It works with glibc-2.24,
+> and tested with LTP.
+> 
+> This version contains ABI changes, and should be used with new glibc
+> version. See links below.
+> 
+> This is RFC because there is still no solid understanding what type
+> of registers top-halves delousing we prefer and it affects ABI. In
+> this patchset, w0-w7 are cleared for each syscall in assembler entry.
+> 
+> The alternative approach is in introducing compat wrappers which is
+> little faster for natively routed syscalls (~2.6% for syscall with
+> no payload) but much more complicated.
 
-This patch adds Kinetic ktd2692 flash led device node for TM2 board.
+Hi all,
 
-Signed-off-by: Ingi Kim <ingi2.kim@samsung.com>
-Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
----
-Change from v1:
-- gpio active value is set with defined macro instead of value.
----
- arch/arm64/boot/dts/exynos/exynos5433-tm2.dts |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+Steve Ellcey submitted glibc patches for ILP32:
+https://www.sourceware.org/ml/libc-alpha/2016-11/msg01071.html
+It implicitly assumes that kernel clears top halves of registers for
+all syscalls in assembly entry. That patches are going to be taken.
+It it happens, we will have no choice on kernel side how to clear top
+halves anymore.
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-index f21bdc2..0d454aa 100644
---- a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-+++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-@@ -58,6 +58,19 @@
- 		reg = <0x0 0x20000000 0x0 0xc0000000>;
- 	};
- 
-+	camera-flash {
-+		compatible = "kinetic,ktd2692";
-+		ctrl-gpios = <&gpc0 1 GPIO_ACTIVE_HIGH>;
-+		aux-gpios = <&gpc0 2 GPIO_ACTIVE_HIGH>;
-+
-+		flash-led {
-+			label = "ktd2692-flash";
-+			led-max-microamp = <300000>;
-+			flash-max-microamp = <1500000>;
-+			flash-max-timeout-us = <1835000>;
-+		};
-+	};
-+
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 
--- 
-1.7.4.1
+For me current version is OK, and I see no problems with it. I just
+write this email to remind that it's still RFC, and this is the last
+chance to get back to wrappers. 
+
+Yury.
