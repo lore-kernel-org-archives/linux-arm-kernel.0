@@ -1,44 +1,23 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 30 Nov 2016 22:27:47 +0100
-Subject: [PATCH v4 net-next 3/7] net: mvneta: Use cacheable memory to
- store the rx buffer virtual address
-In-Reply-To: <20161130.135725.407314756675613303.davem@davemloft.net> (David
- Miller's message of "Wed, 30 Nov 2016 13:57:25 -0500 (EST)")
-References: <cover.654978388d6811b943dd58ecb9a9d9b6cceeaee3.1480431285.git-series.gregory.clement@free-electrons.com>
- <cover.654978388d6811b943dd58ecb9a9d9b6cceeaee3.1480431285.git-series.gregory.clement@free-electrons.com>
- <bb2f1a61e9b912905f8390f7a06c36f9f1e7ab66.1480431285.git-series.gregory.clement@free-electrons.com>
- <20161130.135725.407314756675613303.davem@davemloft.net>
-Message-ID: <87k2bklkto.fsf@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Nov 2016 22:27:30 +0100
+Subject: [GIT PULL 2/6] Broadcom devicetree changes for 4.10
+In-Reply-To: <20161122054824.16974-2-f.fainelli@gmail.com>
+References: <20161122054824.16974-1-f.fainelli@gmail.com>
+ <20161122054824.16974-2-f.fainelli@gmail.com>
+Message-ID: <5860941.fbiBeiJIy7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
- 
- On mer., nov. 30 2016, David Miller <davem@davemloft.net> wrote:
+On Monday, November 21, 2016 9:48:20 PM CET Florian Fainelli wrote:
+>  34 files changed, 1440 insertions(+), 29 deletions(-)
 
-> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Date: Tue, 29 Nov 2016 15:55:21 +0100
->
->> +	/* Virtual address of the RX buffer */
->> +	void  **buf_virt_addr;
->> +
->>  	/* Virtual address of the RX DMA descriptors array */
->>  	struct mvneta_rx_desc *descs;
->>  
->  ...
->> +		data = (unsigned char *)rxq->buf_virt_addr[index];
->
-> This cast is unnecessary, please remove it.
+One follow-up: as this was a relatively big branch, it would have
+been nice to get parts of it a little earlier. I see that the
+raspberry-pi changes make up about half of it and came fairly
+late, but the rest apparently was ready much earlier.
 
-OK I am doing it now.
+If you have the choice between waiting a little longer to
+send all the changes at once, and sending off a good chunk
+a little earlier, better send multiple sets of pull requests.
 
-Thanks,
-
-Gregory
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
