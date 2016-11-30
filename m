@@ -1,44 +1,104 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 30 Nov 2016 14:57:30 +0900
-Subject: [PATCH 02/12] phy: sun4i-usb: Replace the deprecated extcon API
+Date: Wed, 30 Nov 2016 14:57:33 +0900
+Subject: [PATCH 05/12] usb: chipdata: Replace the extcon API
 In-Reply-To: <1480485460-2663-1-git-send-email-cw00.choi@samsung.com>
 References: <1480485460-2663-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1480485460-2663-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1480485460-2663-6-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch replaces the deprecated extcon API as following:
-- extcon_set_cable_state_() -> extcon_set_state_sync()
+This patch uses the resource-managed extcon API for extcon_register_notifier()
+and replaces the deprecated extcon API as following:
+- extcon_get_cable_state_() -> extcon_get_state()
 
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- drivers/phy/phy-sun4i-usb.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/usb/chipidea/core.c | 30 ++++++------------------------
+ 1 file changed, 6 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index eeda5134c777..95cdb08c339f 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -528,7 +528,7 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
- 	mutex_unlock(&phy0->mutex);
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 69426e644d17..a5b44963eaea 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -742,7 +742,7 @@ static int ci_get_platdata(struct device *dev,
+ 	cable->edev = ext_vbus;
  
- 	if (id_notify) {
--		extcon_set_cable_state_(data->extcon, EXTCON_USB_HOST,
-+		extcon_set_state_sync(data->extcon, EXTCON_USB_HOST,
- 					!id_det);
- 		/* When leaving host mode force end the session here */
- 		if (force_session_end && id_det == 1) {
-@@ -541,7 +541,7 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 	if (!IS_ERR(ext_vbus)) {
+-		ret = extcon_get_cable_state_(cable->edev, EXTCON_USB);
++		ret = extcon_get_state(cable->edev, EXTCON_USB);
+ 		if (ret)
+ 			cable->state = true;
+ 		else
+@@ -754,7 +754,7 @@ static int ci_get_platdata(struct device *dev,
+ 	cable->edev = ext_id;
+ 
+ 	if (!IS_ERR(ext_id)) {
+-		ret = extcon_get_cable_state_(cable->edev, EXTCON_USB_HOST);
++		ret = extcon_get_state(cable->edev, EXTCON_USB_HOST);
+ 		if (ret)
+ 			cable->state = false;
+ 		else
+@@ -771,8 +771,8 @@ static int ci_extcon_register(struct ci_hdrc *ci)
+ 	id = &ci->platdata->id_extcon;
+ 	id->ci = ci;
+ 	if (!IS_ERR(id->edev)) {
+-		ret = extcon_register_notifier(id->edev, EXTCON_USB_HOST,
+-					       &id->nb);
++		ret = devm_extcon_register_notifier(ci->dev, id->edev,
++						EXTCON_USB_HOST, &id->nb);
+ 		if (ret < 0) {
+ 			dev_err(ci->dev, "register ID failed\n");
+ 			return ret;
+@@ -782,11 +782,9 @@ static int ci_extcon_register(struct ci_hdrc *ci)
+ 	vbus = &ci->platdata->vbus_extcon;
+ 	vbus->ci = ci;
+ 	if (!IS_ERR(vbus->edev)) {
+-		ret = extcon_register_notifier(vbus->edev, EXTCON_USB,
+-					       &vbus->nb);
++		ret = devm_extcon_register_notifier(ci->dev, vbus->edev,
++						EXTCON_USB, &vbus->nb);
+ 		if (ret < 0) {
+-			extcon_unregister_notifier(id->edev, EXTCON_USB_HOST,
+-						   &id->nb);
+ 			dev_err(ci->dev, "register VBUS failed\n");
+ 			return ret;
+ 		}
+@@ -795,20 +793,6 @@ static int ci_extcon_register(struct ci_hdrc *ci)
+ 	return 0;
+ }
+ 
+-static void ci_extcon_unregister(struct ci_hdrc *ci)
+-{
+-	struct ci_hdrc_cable *cable;
+-
+-	cable = &ci->platdata->id_extcon;
+-	if (!IS_ERR(cable->edev))
+-		extcon_unregister_notifier(cable->edev, EXTCON_USB_HOST,
+-					   &cable->nb);
+-
+-	cable = &ci->platdata->vbus_extcon;
+-	if (!IS_ERR(cable->edev))
+-		extcon_unregister_notifier(cable->edev, EXTCON_USB, &cable->nb);
+-}
+-
+ static DEFINE_IDA(ci_ida);
+ 
+ struct platform_device *ci_hdrc_add_device(struct device *dev,
+@@ -1053,7 +1037,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+ 	if (!ret)
+ 		return 0;
+ 
+-	ci_extcon_unregister(ci);
+ stop:
+ 	ci_role_destroy(ci);
+ deinit_phy:
+@@ -1073,7 +1056,6 @@ static int ci_hdrc_remove(struct platform_device *pdev)
  	}
  
- 	if (vbus_notify)
--		extcon_set_cable_state_(data->extcon, EXTCON_USB, vbus_det);
-+		extcon_set_state_sync(data->extcon, EXTCON_USB, vbus_det);
- 
- 	if (sun4i_usb_phy0_poll(data))
- 		queue_delayed_work(system_wq, &data->detect, POLL_TIME);
+ 	dbg_remove_files(ci);
+-	ci_extcon_unregister(ci);
+ 	ci_role_destroy(ci);
+ 	ci_hdrc_enter_lpm(ci, true);
+ 	ci_usb_phy_exit(ci);
 -- 
 1.9.1
