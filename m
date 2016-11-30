@@ -1,94 +1,54 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 30 Nov 2016 20:37:24 +0100
-Subject: [linux-sunxi] Re: [RFC PATCH] ARM: dts: sun8i: add simplefb
- node for H3
-In-Reply-To: <2717236.xBNAaGdqdc@jernej-laptop>
-References: <20161130220324.3Kg4VPEw@smtp1m.mail.yandex.net>
- <2717236.xBNAaGdqdc@jernej-laptop>
-Message-ID: <20161130203724.a390595df0199ed19069f91d@free.fr>
+From: rob.rice@broadcom.com (Rob Rice)
+Date: Wed, 30 Nov 2016 15:07:30 -0500
+Subject: [PATCH 0/3] Add Broadcom SPU Crypto Driver
+Message-ID: <1480536453-24781-1-git-send-email-rob.rice@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Nov 2016 20:14:11 +0100
-Jernej ?krabec <jernej.skrabec@gmail.com> wrote:
+The Broadcom SPU crypto driver provides access to SPU hardware
+for symmetric crypto offload. The driver supports ablkcipher,
+ahash, and aead operations. The driver supports several
+Broadcom SoCs with different revisions of the SPU hardware.
+The driver supports SPU-M and SPU2 hardware revisions, and
+a couple versions of each hw revision, each version with minor
+differences.
 
-> Dne ?etrtek, 01. december 2016 ob 03:03:14 CET je Icenowy Zheng napisal(a):
-> > 2016?12?1? 02:49? Jernej Skrabec <jernej.skrabec@gmail.com>???
-> > 
-> > > Hi Jean-Fran?ois,
-> > > 
-> > > Dne sreda, 30. november 2016 10.35.08 UTC+1 je oseba Jean-Fran?ois Moine 
-> napisala:
-> > >> On Tue, 29 Nov 2016 22:59:32 +0100
-> > >> 
-> > >> Maxime Ripard <maxime...@free-electrons.com> wrote:
-> > >> > > > I'm still not sure which pipeline should I use.
-> > >> > > > 
-> > >> > > > And, it seems that HDMI Slow Clock is not needed?
-> > >> > > > 
-> > >> > > > (seems that it's only for EDID, but simplefb won't use EDID)
-> > >> > > 
-> > >> > > So, I don't see how this may work.
-> > >> > > How can the u-boot know the resolutions of the HDMI display device?
-> > >> > > 
-> > >> > > In other words: I have a new H3 board with the last u-boot and
-> > >> > > kernel.
-> > >> > > I plug my (rather old or brand new) HDMI display device.
-> > >> > > After powering on the system, I hope to get something on the screen.
-> > >> > > How?
-> > >> > 
-> > >> > If it works like the driver for the first display engine in U-Boot, it
-> > >> > will use the preferred mode reported by the EDID, and will fallback to
-> > >> > 1024x768 if it cannot access it.
-> > >> 
-> > >> Icenowy wrote: "simplefb won't use EDID"
-> > >> 
-> > >> Then, if it is like in the kernel, the 1024x768 mode is VGA. It does
-> > >> not work with HDMI (different timings).
-> > > 
-> > > U-Boot driver now accept any timings recommended by EDID. So far it
-> > > was tested with at least following resolutions:
-> > > - 1920x1080 @ 60 Hz
-> > > - 1280x1024 @ 60 Hz
-> > > - 1280x800 @ 60 Hz (slight clock difference)
-> > > - 800x480 (not sure about frame rate)
-> > > - 3840x2160 @ 30 Hz (4K)
-> > 
-> > I tested on 1024x600 (If my memory is right, it's @ 60Hz)
-> > 
-> > > and nobody complained so far. I'm pretty sure 1024x768 would work.
+The device tree entries for the SPU depends on device tree entries
+for the Broadcom PDC driver. The PDC DT entries have been accepted
+upstream, but are not yet included in the crypto repo. See commit
+e79249143f468f8d3365dbbd1642c045bdcc98c5.
 
-Check the timings offered by the DRM core.
+Rob Rice (3):
+  crypto: brcm: DT documentation for Broadcom SPU driver
+  crypto: brcm: Add Broadcom SPU driver
+  crypto: brcm: Add Broadcom SPU driver DT entry.
 
-> > > 
-> > >> > Maybe it would be worth exchanging on the EDID code that has been done
-> > >> > for the u-boot driver too, so that it can be fixed in your driver.
-> > >> 
-> > >> The u-boot got my code, and, up to now, I could not fix the random or
-> > >> permanent failures of EDID reading in some boards.
-> > > 
-> > > I only have one OPi2, but as I said, EDID always worked for me.
+ .../devicetree/bindings/crypto/brcm,spu-crypto.txt |   25 +
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |   12 +
+ drivers/crypto/Kconfig                             |   10 +
+ drivers/crypto/Makefile                            |    1 +
+ drivers/crypto/bcm/Makefile                        |   15 +
+ drivers/crypto/bcm/cipher.c                        | 4943 ++++++++++++++++++++
+ drivers/crypto/bcm/cipher.h                        |  472 ++
+ drivers/crypto/bcm/spu.c                           | 1252 +++++
+ drivers/crypto/bcm/spu.h                           |  288 ++
+ drivers/crypto/bcm/spu2.c                          | 1402 ++++++
+ drivers/crypto/bcm/spu2.h                          |  228 +
+ drivers/crypto/bcm/spum.h                          |  174 +
+ drivers/crypto/bcm/util.c                          |  584 +++
+ drivers/crypto/bcm/util.h                          |  117 +
+ 14 files changed, 9523 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
+ create mode 100644 drivers/crypto/bcm/Makefile
+ create mode 100644 drivers/crypto/bcm/cipher.c
+ create mode 100644 drivers/crypto/bcm/cipher.h
+ create mode 100644 drivers/crypto/bcm/spu.c
+ create mode 100644 drivers/crypto/bcm/spu.h
+ create mode 100644 drivers/crypto/bcm/spu2.c
+ create mode 100644 drivers/crypto/bcm/spu2.h
+ create mode 100644 drivers/crypto/bcm/spum.h
+ create mode 100644 drivers/crypto/bcm/util.c
+ create mode 100644 drivers/crypto/bcm/util.h
 
-Happy guy!
-
-> > > The only
-> > > code left from you is for DE2. HDMI stuff is basically copied from Rockhip
-> > > driver (including EDID reading), TCON code is now reverted to the same as
-> > > it is in sunxi_display.c. I think it is worth to take a look at EDID code
-> > > and compare it.
-> > 
-> > So is the TCON of DE 2.0 identical to the original TCON?
-> > 
-> > If so, we should reuse sun4i-tcon ...
-> 
-> Well, TCON is splitted in two parts (two base addresses), one for HDMI and one 
-> for TV. However, register offsets are same as before, so I guess driver 
-> reusage make sense. I think that there are few additional registers, but they 
-> can be ignored for simplefb.
-
-The TCON1 of the H3 is not usable (no ckock). Analog TV has its own
-clock and I/O area.
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+--
+2.1.0
