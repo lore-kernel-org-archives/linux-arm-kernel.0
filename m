@@ -1,44 +1,46 @@
-From: weo@reccoware.de (Wolfgang Ocker)
-Date: Wed, 30 Nov 2016 11:16:21 +0100
-Subject: [PATCH] serial: mxs-auart: support CMSPAR termios cflag
-Message-ID: <20161130101621.12571-1-weo@reccoware.de>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 30 Nov 2016 10:21:34 +0000
+Subject: question about irq_enter()/irq_exit() calling policy
+In-Reply-To: <22d0d991-bbe2-ce10-5202-3cdf97a9ecf2@ti.com>
+References: <22d0d991-bbe2-ce10-5202-3cdf97a9ecf2@ti.com>
+Message-ID: <20161130102134.GB14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CMSPAR is set in the c_cflag of termios, "stick" parity is enabled.
+On Tue, Nov 29, 2016 at 05:47:12PM -0600, Grygorii Strashko wrote:
+> 2) Should these function be called for each processed irq?
+> 
+> 
+> HW IRQ:
+>  switch (IRQ mode)
+>   ...
+>   while (irq = get_pending_irq()) {
+>   	...
+>   	irq_enter()
+> 		handle(irq) - execute hw_irq_hadler
+>   	irq_exit()
+>  }
+>  ...
+>  switch
 
-Tested on an i.MX28 system
+We tend to do (2) as a general rule, which isn't much different from what
+other architectures do - even if they have a method to directly enter
+through vectors (eg, x86) the effect of two pending interrupts is that one
+will run after each other, and there will be an intervening exit -> entry.
 
-Signed-off-by: Wolfgang Ocker <weo@reccoware.de>
----
- drivers/tty/serial/mxs-auart.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+In the case of ARM CPUs, if the interrupt signal is active, you vector
+back to the interrupt handler as soon as you exit back to the parent
+context without executing any parent context instructions.
 
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 770454e0dfa3..9d344f734d44 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -95,6 +95,7 @@
- #define AUART_LINECTRL_BAUD_DIVFRAC_SHIFT	8
- #define AUART_LINECTRL_BAUD_DIVFRAC_MASK	0x00003f00
- #define AUART_LINECTRL_BAUD_DIVFRAC(v)		(((v) & 0x3f) << 8)
-+#define AUART_LINECTRL_SPS			(1 << 7)
- #define AUART_LINECTRL_WLEN_MASK		0x00000060
- #define AUART_LINECTRL_WLEN(v)			(((v) & 0x3) << 5)
- #define AUART_LINECTRL_FEN			(1 << 4)
-@@ -1010,10 +1011,12 @@ static void mxs_auart_settermios(struct uart_port *u,
- 	ctrl |= AUART_LINECTRL_WLEN(bm);
- 
- 	/* parity */
--	if (cflag & PARENB) {
-+	if (cflag & (PARENB|CMSPAR)) {
- 		ctrl |= AUART_LINECTRL_PEN;
- 		if ((cflag & PARODD) == 0)
- 			ctrl |= AUART_LINECTRL_EPS;
-+		if (cflag & CMSPAR)
-+			ctrl |= AUART_LINECTRL_SPS;
- 	}
- 
- 	u->read_status_mask = 0;
+So, we have the choice of going through all the IRQ entry code, processing
+one interrupt, and returning only to then re-vector back through the IRQ
+entry code, or we can process all the pending IRQs that we can see at that
+time.
+
+The former method wastes all the CPU cycles getting from the parent context
+to the IRQ context for each and every interrupt.
+
 -- 
-2.10.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
