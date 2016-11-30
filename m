@@ -1,53 +1,64 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Tue, 29 Nov 2016 22:39:51 -0800
-Subject: [PATCH V8 2/6] thermal: bcm2835: add thermal driver for bcm2835
- soc
-In-Reply-To: <87lgw2lyu9.fsf@eliezer.anholt.net>
-References: <20161117021107.GA2647@localhost.localdomain>
- <766e1b70-d83a-eb52-fa2b-aec435e85673@martin.sperl.org>
- <20161117151019.GA3115@localhost.localdomain>
- <7957B3CC-0E18-4B27-82EB-EF88B7695E28@martin.sperl.org>
- <20161119042224.GA25063@localhost.localdomain>
- <28F93ABE-8210-4389-AE77-4D5E830E669B@martin.sperl.org>
- <20161125052008.GA8342@localhost.localdomain>
- <87twarz6s1.fsf@eliezer.anholt.net>
- <20161129013436.GA3080@localhost.localdomain>
- <87lgw2lyu9.fsf@eliezer.anholt.net>
-Message-ID: <20161130063951.GA28700@localhost.localdomain>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Wed, 30 Nov 2016 14:42:39 +0800
+Subject: [PATCH v10 02/13] drm/mediatek: add *driver_data for different
+ hardware settings
+In-Reply-To: <1480070076-6196-3-git-send-email-yt.shen@mediatek.com>
+References: <1480070076-6196-1-git-send-email-yt.shen@mediatek.com>
+ <1480070076-6196-3-git-send-email-yt.shen@mediatek.com>
+Message-ID: <CAGS+omDmMq7AEnyDzo4Oih_f+g4DE1Jz6xiV=+_3JGtSAfd+-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, Nov 29, 2016 at 02:12:46PM -0800, Eric Anholt wrote:
-> Eduardo Valentin <edubezval@gmail.com> writes:
-> 
-> > Hello Eric, Martin,
-> >
-> > On Mon, Nov 28, 2016 at 12:30:38PM -0800, Eric Anholt wrote:
-> >> Either the device was initialized by the firmware before handing off to
-> >> ARM (today's firmware) or it never will be (potential future firmware).
-> >
-> > And do you have a way to check if the firmware has the initialization
-> > code or not? By firmware version, for example. Or even, chip version,
-> > maybe?
-> 
-> We would know if it's not present because the register would be in its
-> power-on reset state, which is what the code is checking for.
-
-This just looks odd for a driver, in its probe, to check if device is in
-reset state, only then initializes it. if not, it assumes everything is fine.
-
-Besides that, as described in the code, sounds like a quirk.
-
-+        * right now the FW does set up the HW-block, so we are not
-+        * touching the configuration registers.
-+        * But if the HW is not enabled, then set it up
-+        * using "sane" values used by the firmware right now.
+Hi YT,
 
 
-And based on what you are describing now, it is not a quirk, but it is by  design (??)
+On Fri, Nov 25, 2016 at 6:34 PM, YT Shen <yt.shen@mediatek.com> wrote:
+>
+> There are some hardware settings changed, between MT8173 & MT2701:
+> DISP_OVL address offset changed, color format definition changed.
+> DISP_RDMA fifo size changed.
+> DISP_COLOR offset changed.
+> MIPI_TX pll setting changed.
+> And add prefix for mtk_ddp_main & mtk_ddp_ext & mutex_mod.
 
-Again, does it hurt to always initialize the device to a *sane* config?
+Sorry, I have not had time to thoroughly review the new patch set, but
+one quick comment:
 
-BR,
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> index 22a33ee..cfaa760 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> @@ -78,6 +78,10 @@ struct mtk_ddp_comp_funcs {
+>                           struct drm_crtc_state *state);
+>  };
+>
+> +struct mtk_ddp_comp_driver_data {
+> +       unsigned int color_offset;
+> +};
+> +
+>  struct mtk_ddp_comp {
+>         struct clk *clk;
+>         void __iomem *regs;
+> @@ -85,6 +89,7 @@ struct mtk_ddp_comp {
+>         struct device *larb_dev;
+>         enum mtk_ddp_comp_id id;
+>         const struct mtk_ddp_comp_funcs *funcs;
+> +       const struct mtk_ddp_comp_driver_data *data;
+
+I want to avoid adding this generic pointer here to all mtk_ddp_comp,
+since this is only used by the color component.
+Instead, define color specific types:
+
+struct mtk_disp_color_data {
+       unsigned int offset;
+};
+
+struct mtk_disp_color {
+       struct mtk_ddp_comp             ddp_comp;
+       const struct mtk_disp_color_data *data;
+};
+
+Then, add another comp_type check and fetch the dev data in
+mtk_drm_probe()  or maybe mtk_ddp_comp_init().
+
+-Dan
