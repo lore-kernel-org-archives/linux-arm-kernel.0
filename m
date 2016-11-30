@@ -1,23 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Nov 2016 22:22:42 +0100
-Subject: [GIT PULL 5/6] Broadcom defconfig changes for 4.10
-In-Reply-To: <20161122054824.16974-5-f.fainelli@gmail.com>
+Date: Wed, 30 Nov 2016 22:23:54 +0100
+Subject: [GIT PULL 6/6] Broadcom defconfig-arm64 changes for 4.10
+In-Reply-To: <20161122054824.16974-6-f.fainelli@gmail.com>
 References: <20161122054824.16974-1-f.fainelli@gmail.com>
- <20161122054824.16974-5-f.fainelli@gmail.com>
-Message-ID: <5546697.pehGK9X1AI@wuerfel>
+ <20161122054824.16974-6-f.fainelli@gmail.com>
+Message-ID: <5169145.yiI3Dl3Z7s@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 21, 2016 9:48:23 PM CET Florian Fainelli wrote:
-> This pull request contains Broadcom ARM-based defconfig changes for 4.10, please
-> pull the following:
+On Monday, November 21, 2016 9:48:24 PM CET Florian Fainelli wrote:
+> This pull request contains Broadcom ARM64-based SoCs defconfig changes for 4.10,
+> please pull the following changes:
 > 
-> - Florian updates the multi_v7_defconfig with the relevant basic drivers needed
->   for the Broadcom BCM5301x (Northstar) SoCs to reboot, have PCIe, and Ethernet
+> - Eric updates the ARMv8 defconfig to contain everything that is needed to run
+>   a 64-bit kernel on the Raspberry Pi 3
 > 
-> - Martin enables the Raspberry Pi thermal driver in bcm2835_defconfig
+> - Scott enables the standard AT25 EEPROM driver as module for the ARM64 defconfig
+> 
+> - Martin enables the Raspberry Pi Thermal driver in the ARM64 defconfig
 > 
 
-Pulled into next/defconfig, thanks!
+Pulled into next/arm64, thanks!
 
 	Arnd
