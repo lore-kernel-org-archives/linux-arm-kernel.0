@@ -1,32 +1,65 @@
 From: raviteja.garimella@broadcom.com (Raviteja Garimella)
-Date: Wed, 30 Nov 2016 11:25:35 +0530
-Subject: [PATCH 0/3] Support for USB DRD Phy driver for NS2 
-Message-ID: <1480485338-23451-1-git-send-email-raviteja.garimella@broadcom.com>
+Date: Wed, 30 Nov 2016 11:25:36 +0530
+Subject: [PATCH 1/3] Add DT bindings documentation for NS2 USB DRD phy
+In-Reply-To: <1480485338-23451-1-git-send-email-raviteja.garimella@broadcom.com>
+References: <1480485338-23451-1-git-send-email-raviteja.garimella@broadcom.com>
+Message-ID: <1480485338-23451-2-git-send-email-raviteja.garimella@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for USB Dual Role Device Phy for Broadcom
-Northstar2 SoC. Apart from the new phy driver, this patchset contains
-changes to Kconfig, Makefile, and Device tree files.
+This patch adds documentation for NS2 DRD Phy driver DT bindings
 
-This patchset is tested on Broadcom NS2 BCM958712K reference board.
-
-Repo: https://github.com/Broadcom/arm64-linux.git
-Branch: ns2_drdphy
-
-Raviteja Garimella (3):
-  Add DT bindings documentation for NS2 USB DRD phy
-  Broadcom USB DRD Phy driver for Northstar2
-  DT nodes for Broadcom Northstar2 USB DRD Phy
-
- .../devicetree/bindings/phy/brcm,ns2-drd-phy.txt   |  40 ++
- arch/arm64/boot/dts/broadcom/ns2.dtsi              |  14 +
- drivers/phy/Kconfig                                |  13 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-bcm-ns2-usbdrd.c                   | 587 +++++++++++++++++++++
- 5 files changed, 655 insertions(+)
+Signed-off-by: Raviteja Garimella <raviteja.garimella@broadcom.com>
+---
+ .../devicetree/bindings/phy/brcm,ns2-drd-phy.txt   | 40 ++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt
- create mode 100644 drivers/phy/phy-bcm-ns2-usbdrd.c
 
+diff --git a/Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt b/Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt
+new file mode 100644
+index 0000000..5857f99
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt
+@@ -0,0 +1,40 @@
++BROADCOM NORTHSTAR2 USB2 (DUAL ROLE DEVICE) PHY
++
++Required properties:
++ - compatible: brcm,ns2-drd-phy
++ - reg: offset and length of the NS2 PHY related registers.
++ - reg-names
++   The below registers must be provided.
++   icfg - for DRD ICFG configurations
++   rst-ctrl - for DRD IDM reset
++   crmu-ctrl - for CRMU core vdd, PHY and PHY PLL reset
++   usb2-strap - for port over current polarity reversal
++ - #phy-cells: Must be 0. No args required.
++ - vbus-gpios: vbus gpio binding
++ - id-gpios: id gpio binding
++
++Refer to phy/phy-bindings.txt for the generic PHY binding properties
++
++Example:
++	gpio_g: gpio at 660a0000 {
++			compatible = "brcm,iproc-gpio";
++			reg = <0x660a0000 0x50>;
++			ngpios = <32>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			interrupt-controller;
++			interrupts = <GIC_SPI 400 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
++	usbdrd_phy: phy at 66000960 {
++			#phy-cells = <0>;
++			compatible = "brcm,ns2-drd-phy";
++			reg = <0x66000960 0x24>,
++			      <0x67012800 0x4>,
++			      <0x6501d148 0x4>,
++			      <0x664d0700 0x4>;
++			reg-names = "icfg", "rst-ctrl",
++				    "crmu-ctrl", "usb2-strap";
++			id-gpios = <&gpio_g 30 0>;
++			vbus-gpios = <&gpio_g 31 0>;
++	};
 -- 
 2.1.0
