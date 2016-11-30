@@ -1,240 +1,260 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 30 Nov 2016 08:54:55 +0100
-Subject: [PATCH 06/10] iommu: of: Handle IOMMU lookup failure with deferred
- probing or error
-In-Reply-To: <1480465344-11862-7-git-send-email-sricharan@codeaurora.org>
-References: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
- <CGME20161130002345epcas1p2486d2d61930d132210d9cb7d19bcbb48@epcas1p2.samsung.com>
- <1480465344-11862-7-git-send-email-sricharan@codeaurora.org>
-Message-ID: <8e91ce72-9d37-f4be-9224-856a1a4c3e1d@samsung.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Wed, 30 Nov 2016 15:58:48 +0800
+Subject: [PATCH v10 12/13] drm/mediatek: update DSI sub driver flow for
+ sending commands to panel
+In-Reply-To: <1480070076-6196-13-git-send-email-yt.shen@mediatek.com>
+References: <1480070076-6196-1-git-send-email-yt.shen@mediatek.com>
+ <1480070076-6196-13-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1480492728.32217.20.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan and Robin,
+Hi, YT:
 
+some comments inline.
 
-On 2016-11-30 01:22, Sricharan R wrote:
-> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
->
-> Failures to look up an IOMMU when parsing the DT iommus property need to
-> be handled separately from the .of_xlate() failures to support deferred
-> probing.
->
-> The lack of a registered IOMMU can be caused by the lack of a driver for
-> the IOMMU, the IOMMU device probe not having been performed yet, having
-> been deferred, or having failed.
->
-> The first case occurs when the device tree describes the bus master and
-> IOMMU topology correctly but no device driver exists for the IOMMU yet
-> or the device driver has not been compiled in. Return NULL, the caller
-> will configure the device without an IOMMU.
->
-> The second and third cases are handled by deferring the probe of the bus
-> master device which will eventually get reprobed after the IOMMU.
->
-> The last case is currently handled by deferring the probe of the bus
-> master device as well. A mechanism to either configure the bus master
-> device without an IOMMU or to fail the bus master device probe depending
-> on whether the IOMMU is optional or mandatory would be a good
-> enhancement.
->
-> Signed-off-by: Laurent Pichart <laurent.pinchart+renesas@ideasonboard.com>
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> [rm: massive PCI hacks]
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+On Fri, 2016-11-25 at 18:34 +0800, YT Shen wrote:
+> This patch update enable/disable flow of DSI module.
+> Original flow works on there is a bridge chip: DSI -> bridge -> panel.
+> In this case: DSI -> panel, the DSI sub driver flow should be updated.
+> We need to initialize DSI first so that we can send commands to panel.
+> 
+> Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
+> Signed-off-by: YT Shen <yt.shen@mediatek.com>
 > ---
->   drivers/base/dma-mapping.c | 4 ++--
->   drivers/iommu/dma-iommu.c  | 1 +
->   drivers/iommu/of_iommu.c   | 5 +++--
->   drivers/of/device.c        | 9 +++++++--
->   drivers/pci/probe.c        | 6 ++++--
->   include/linux/of_device.h  | 9 ++++++---
->   include/linux/pci.h        | 4 ++--
->   7 files changed, 25 insertions(+), 13 deletions(-)
->
-> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-> index b2a5629..576fdfb 100644
-> --- a/drivers/base/dma-mapping.c
-> +++ b/drivers/base/dma-mapping.c
-> @@ -351,9 +351,9 @@ void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
->   int dma_configure(struct device *dev)
->   {
->   	if (dev_is_pci(dev))
-> -		pci_dma_configure(dev);
-> +		return pci_dma_configure(dev);
->   	else if (dev->of_node)
-> -		of_dma_configure(dev, dev->of_node);
-> +		return of_dma_configure(dev, dev->of_node);
->   	return 0;
->   }
->   
-> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-> index c5ab866..d2a7a46 100644
-> --- a/drivers/iommu/dma-iommu.c
-> +++ b/drivers/iommu/dma-iommu.c
-> @@ -148,6 +148,7 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
->   	base_pfn = max_t(unsigned long, 1, base >> order);
->   	end_pfn = (base + size - 1) >> order;
->   
-> +	dev_info(dev, "0x%llx 0x%llx, 0x%llx 0x%llx, 0x%llx 0x%llx\n", base, size, domain->geometry.aperture_start, domain->geometry.aperture_end,
+>  drivers/gpu/drm/mediatek/mtk_dsi.c | 101 +++++++++++++++++++++++++++++--------
+>  1 file changed, 80 insertions(+), 21 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
+> index ded4202..0569f2e 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
+> @@ -126,6 +126,10 @@
+>  #define CLK_HS_POST			(0xff << 8)
+>  #define CLK_HS_EXIT			(0xff << 16)
+>  
+> +#define DSI_VM_CMD_CON		0x130
+> +#define VM_CMD_EN			BIT(0)
+> +#define TS_VFP_EN			BIT(5)
+> +
+>  #define DSI_CMDQ0		0x180
+>  #define CONFIG				(0xff << 0)
+>  #define SHORT_PACKET			0
+> @@ -249,7 +253,9 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
+>  	 * mipi_ratio is mipi clk coefficient for balance the pixel clk in mipi.
+>  	 * we set mipi_ratio is 1.05.
+>  	 */
+> -	dsi->data_rate = dsi->vm.pixelclock * 3 * 21 / (1 * 1000 * 10);
+> +	dsi->data_rate = dsi->vm.pixelclock * 12 * 21;
+> +	dsi->data_rate /= (dsi->lanes * 1000 * 10);
 
-This causes a NULL pointer dereference if caller passes NULL device pointer.
-There is such caller in drivers/gpu/drm/exynos/exynos_drm_iommu.h.
-Trivial to fix as it looks like a leftover from developement or 
-debugging stage.
+This looks like a bug fix that use lanes to calculate data rate.
 
-> *dev->dma_mask, dev->coherent_dma_mask);
->   	/* Check the domain allows at least some access to the device... */
->   	if (domain->geometry.force_aperture) {
->   		if (base > domain->geometry.aperture_end ||
-> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> index 349bd1d..9529d6c 100644
-> --- a/drivers/iommu/of_iommu.c
-> +++ b/drivers/iommu/of_iommu.c
-> @@ -23,6 +23,7 @@
->   #include <linux/of.h>
->   #include <linux/of_iommu.h>
->   #include <linux/of_pci.h>
-> +#include <linux/pci.h>
->   #include <linux/slab.h>
->   
->   static const struct of_device_id __iommu_of_table_sentinel
-> @@ -223,7 +224,7 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
->   			ops = ERR_PTR(err);
->   	}
->   
-> -	return IS_ERR(ops) ? NULL : ops;
-> +	return ops;
->   }
->   
->   static int __init of_iommu_init(void)
-> @@ -234,7 +235,7 @@ static int __init of_iommu_init(void)
->   	for_each_matching_node_and_match(np, matches, &match) {
->   		const of_iommu_init_fn init_fn = match->data;
->   
-> -		if (init_fn(np))
-> +		if (init_fn && init_fn(np))
->   			pr_err("Failed to initialise IOMMU %s\n",
->   				of_node_full_name(np));
->   	}
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index 1c843e2..d58595c 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -82,7 +82,7 @@ int of_device_add(struct platform_device *ofdev)
->    * can use a platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE events
->    * to fix up DMA configuration.
->    */
-> -void of_dma_configure(struct device *dev, struct device_node *np)
-> +int of_dma_configure(struct device *dev, struct device_node *np)
->   {
->   	u64 dma_addr, paddr, size;
->   	int ret;
-> @@ -107,7 +107,7 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->   	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
->   	if (ret < 0) {
->   		dma_addr = offset = 0;
-> -		size = dev->coherent_dma_mask + 1;
-> +		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
->   	} else {
->   		offset = PFN_DOWN(paddr - dma_addr);
->   		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
-> @@ -129,10 +129,15 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->   		coherent ? " " : " not ");
->   
->   	iommu = of_iommu_configure(dev, np);
-> +	if (IS_ERR(iommu))
-> +		return PTR_ERR(iommu);
-> +
->   	dev_dbg(dev, "device is%sbehind an iommu\n",
->   		iommu ? " " : " not ");
->   
->   	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
-> +
-> +	return 0;
->   }
->   EXPORT_SYMBOL_GPL(of_dma_configure);
->   
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 04af770..6316cae 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -1724,13 +1724,14 @@ static void pci_set_msi_domain(struct pci_dev *dev)
->    * Function to update PCI devices's DMA configuration using the same
->    * info from the OF node or ACPI node of host bridge's parent (if any).
->    */
-> -void pci_dma_configure(struct device *dev)
-> +int pci_dma_configure(struct device *dev)
->   {
->   	struct device *bridge = pci_get_host_bridge_device(to_pci_dev(dev));
-> +	int ret = 0;
->   
->   	if (IS_ENABLED(CONFIG_OF) &&
->   	    bridge->parent && bridge->parent->of_node) {
-> -		of_dma_configure(dev, bridge->parent->of_node);
-> +		ret = of_dma_configure(dev, bridge->parent->of_node);
->   	} else if (has_acpi_companion(bridge)) {
->   		struct acpi_device *adev = to_acpi_device_node(bridge->fwnode);
->   		enum dev_dma_attr attr = acpi_get_dma_attr(adev);
-> @@ -1742,6 +1743,7 @@ void pci_dma_configure(struct device *dev)
->   	}
->   
->   	pci_put_host_bridge_device(bridge);
-> +	return ret;
->   }
->   
->   void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
-> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-> index d20a31a..6dca65c 100644
-> --- a/include/linux/of_device.h
-> +++ b/include/linux/of_device.h
-> @@ -55,7 +55,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
->   	return of_node_get(cpu_dev->of_node);
->   }
->   
-> -void of_dma_configure(struct device *dev, struct device_node *np);
-> +int of_dma_configure(struct device *dev, struct device_node *np);
->   void of_dma_deconfigure(struct device *dev);
->   #else /* CONFIG_OF */
->   
-> @@ -99,8 +99,11 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
->   {
->   	return NULL;
->   }
-> -static inline void of_dma_configure(struct device *dev, struct device_node *np)
-> -{}
-> +
-> +static inline int of_dma_configure(struct device *dev, struct device_node *np)
+> +	DRM_DEBUG_DRIVER("set mipitx's data rate: %dMHz\n", dsi->data_rate);
+>  
+>  	ret = clk_set_rate(dsi->hs_clk, dsi->data_rate * 1000000);
+>  	if (ret < 0) {
+> @@ -333,16 +339,23 @@ static void mtk_dsi_set_mode(struct mtk_dsi *dsi)
+>  	u32 vid_mode = CMD_MODE;
+>  
+>  	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO) {
+> -		vid_mode = SYNC_PULSE_MODE;
+> -
+> -		if ((dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) &&
+> -		    !(dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE))
+> +		if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
+>  			vid_mode = BURST_MODE;
+> +		else if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE)
+> +			vid_mode = SYNC_PULSE_MODE;
+> +		else
+> +			vid_mode = SYNC_EVENT_MODE;
+>  	}
+>  
+>  	writel(vid_mode, dsi->regs + DSI_MODE_CTRL);
+>  }
+>  
+> +static void mtk_dsi_set_vm_cmd(struct mtk_dsi *dsi)
 > +{
-> +	return 0;
+> +	mtk_dsi_mask(dsi, DSI_VM_CMD_CON, VM_CMD_EN, VM_CMD_EN);
+> +	mtk_dsi_mask(dsi, DSI_VM_CMD_CON, TS_VFP_EN, TS_VFP_EN);
 > +}
->   static inline void of_dma_deconfigure(struct device *dev)
->   {}
->   #endif /* CONFIG_OF */
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index d04f651..989ca44 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -870,7 +870,7 @@ struct resource *pci_find_parent_resource(const struct pci_dev *dev,
->   #define dev_is_pf(d) ((dev_is_pci(d) ? to_pci_dev(d)->is_physfn : false))
->   #define dev_num_vf(d) ((dev_is_pci(d) ? pci_num_vf(to_pci_dev(d)) : 0))
->   
-> -void pci_dma_configure(struct device *dev);
-> +int pci_dma_configure(struct device *dev);
->   
->   /* Generic PCI functions exported to card drivers */
->   
-> @@ -1604,7 +1604,7 @@ static inline struct pci_dev *pci_get_bus_and_slot(unsigned int bus,
->   #define dev_is_pf(d) (false)
->   #define dev_num_vf(d) (0)
->   
-> -static inline void pci_dma_configure(struct device *dev) { }
-> +static inline int pci_dma_configure(struct device *dev) { return 0; }
->   
->   #endif /* CONFIG_PCI */
->   
+> +
+>  static void mtk_dsi_ps_control_vact(struct mtk_dsi *dsi)
+>  {
+>  	struct videomode *vm = &dsi->vm;
+> @@ -480,6 +493,16 @@ static void mtk_dsi_start(struct mtk_dsi *dsi)
+>  	writel(1, dsi->regs + DSI_START);
+>  }
+>  
+> +static void mtk_dsi_stop(struct mtk_dsi *dsi)
+> +{
+> +	writel(0, dsi->regs + DSI_START);
+> +}
+> +
+> +static void mtk_dsi_set_cmd_mode(struct mtk_dsi *dsi)
+> +{
+> +	writel(CMD_MODE, dsi->regs + DSI_MODE_CTRL);
+> +}
+> +
+>  static void mtk_dsi_set_interrupt_enable(struct mtk_dsi *dsi)
+>  {
+>  	u32 inten = LPRX_RD_RDY_INT_FLAG | CMD_DONE_INT_FLAG | VM_DONE_INT_FLAG;
+> @@ -538,6 +561,19 @@ static irqreturn_t mtk_dsi_irq(int irq, void *dev_id)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> +static s32 mtk_dsi_switch_to_cmd_mode(struct mtk_dsi *dsi, u8 irq_flag, u32 t)
+> +{
+> +	mtk_dsi_irq_data_clear(dsi, irq_flag);
+> +	mtk_dsi_set_cmd_mode(dsi);
+> +
+> +	if (!mtk_dsi_wait_for_irq_done(dsi, irq_flag, t)) {
+> +		DRM_ERROR("failed to switch cmd mode\n");
+> +		return -ETIME;
+> +	} else {
+> +		return 0;
+> +	}
+> +}
+> +
+>  static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
+>  {
+>  	if (WARN_ON(dsi->refcount == 0))
+> @@ -546,11 +582,6 @@ static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
+>  	if (--dsi->refcount != 0)
+>  		return;
+>  
+> -	mtk_dsi_lane0_ulp_mode_enter(dsi);
+> -	mtk_dsi_clk_ulp_mode_enter(dsi);
+> -
+> -	mtk_dsi_disable(dsi);
+> -
+>  	clk_disable_unprepare(dsi->engine_clk);
+>  	clk_disable_unprepare(dsi->digital_clk);
+>  
+> @@ -564,13 +595,6 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi)
+>  	if (dsi->enabled)
+>  		return;
+>  
+> -	if (dsi->panel) {
+> -		if (drm_panel_prepare(dsi->panel)) {
+> -			DRM_ERROR("failed to setup the panel\n");
+> -			return;
+> -		}
+> -	}
+> -
+>  	ret = mtk_dsi_poweron(dsi);
+>  	if (ret < 0) {
+>  		DRM_ERROR("failed to power on dsi\n");
+> @@ -578,21 +602,43 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi)
+>  	}
+>  
+>  	mtk_dsi_rxtx_control(dsi);
+> +	mtk_dsi_ps_control_vact(dsi);
+> +	mtk_dsi_set_vm_cmd(dsi);
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Even though dsi does not directly connect to panel, you newly set vm cmd
+here. This looks like a bug fix.
+
+> +	mtk_dsi_config_vdo_timing(dsi);
+> +	mtk_dsi_set_interrupt_enable(dsi);
+>  
+>  	mtk_dsi_clk_ulp_mode_leave(dsi);
+>  	mtk_dsi_lane0_ulp_mode_leave(dsi);
+>  	mtk_dsi_clk_hs_mode(dsi, 0);
+> -	mtk_dsi_set_mode(dsi);
+>  
+> -	mtk_dsi_ps_control_vact(dsi);
+> -	mtk_dsi_config_vdo_timing(dsi);
+> -	mtk_dsi_set_interrupt_enable(dsi);
+> +	if (dsi->panel) {
+> +		if (drm_panel_prepare(dsi->panel)) {
+> +			DRM_ERROR("failed to prepare the panel\n");
+> +
+> +			mtk_dsi_stop(dsi);
+
+You never start dsi before here, why do you stop dsi here?
+
+> +			mtk_dsi_poweroff(dsi);
+
+Refer to next comment, you may goto undo item in bottom of this
+function.
+
+> +			return;
+> +		}
+> +	}
+>  
+>  	mtk_dsi_set_mode(dsi);
+>  	mtk_dsi_clk_hs_mode(dsi, 1);
+>  
+>  	mtk_dsi_start(dsi);
+>  
+> +	if (dsi->panel) {
+> +		if (drm_panel_enable(dsi->panel)) {
+> +			DRM_ERROR("failed to enable the panel\n");
+> +
+> +			if (drm_panel_unprepare(dsi->panel))
+> +				DRM_ERROR("failed to unprepare the panel\n");
+> +
+> +			mtk_dsi_stop(dsi);
+
+I think you should stop dsi before panel unprepare. Otherwise, why not
+move these undo item to the bottom of this function. For example:
+
+		if (drm_panel_enable(dsi->panel)) {
+			DRM_ERROR("failed to enable the panel\n");
+			goto stop_dsi;
+
+...
+
+	dsi->enabled = true;
+	return;
+
+stop_dsi:
+	mtk_dsi_stop(dsi);
+	if (drm_panel_unprepare(dsi->panel))
+		DRM_ERROR("failed to unprepare the panel\n");
+poweroff_dsi:
+	mtk_dsi_poweroff(dsi);
+	return;
+
+> +			mtk_dsi_poweroff(dsi);
+> +			return;
+> +		}
+> +	}
+> +
+>  	dsi->enabled = true;
+>  }
+>  
+> @@ -608,6 +654,19 @@ static void mtk_output_dsi_disable(struct mtk_dsi *dsi)
+>  		}
+>  	}
+>  
+> +	mtk_dsi_stop(dsi);
+
+Even though dsi does not directly connect to panel, you newly stop dsi
+here. This looks like a bug fix.
+
+> +	if (!mtk_dsi_switch_to_cmd_mode(dsi, VM_DONE_INT_FLAG, 500)) {
+
+ditto.
+
+> +		if (dsi->panel) {
+> +			if (drm_panel_unprepare(dsi->panel))
+> +				DRM_ERROR("failed to unprepare the panel\n");
+> +		}
+> +	}
+> +
+> +	mtk_dsi_reset_engine(dsi);
+
+ditto.
+
+> +	mtk_dsi_lane0_ulp_mode_enter(dsi);
+> +	mtk_dsi_clk_ulp_mode_enter(dsi);
+> +	mtk_dsi_disable(dsi);
+> +
+>  	mtk_dsi_poweroff(dsi);
+>  
+>  	dsi->enabled = false;
+
+Regards,
+CK
