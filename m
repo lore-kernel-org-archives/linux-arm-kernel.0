@@ -1,38 +1,35 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Wed, 30 Nov 2016 11:03:42 +0800
-Subject: [PATCH v2 1/6] mm: hugetlb: rename some allocation functions
-In-Reply-To: <d28b825d-1026-1e91-fa4e-395df3e1be86@suse.cz>
-References: <1479107259-2011-1-git-send-email-shijie.huang@arm.com>
- <1479107259-2011-2-git-send-email-shijie.huang@arm.com>
- <52b661c9-f4b0-3d94-cf9b-a0ffd5ecb723@suse.cz>
- <20161129085349.GA16569@sha-win-210.asiapac.arm.com>
- <d28b825d-1026-1e91-fa4e-395df3e1be86@suse.cz>
-Message-ID: <20161130030341.GB18502@sha-win-210.asiapac.arm.com>
+From: ping.bai@nxp.com (Bai Ping)
+Date: Wed, 30 Nov 2016 11:04:57 +0800
+Subject: [PATCH 1/2] ARM: dts: imx: Add 696MHz setpoint for imx6ul
+Message-ID: <1480475098-2037-1-git-send-email-ping.bai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 11:44:23AM +0100, Vlastimil Babka wrote:
-> On 11/29/2016 09:53 AM, Huang Shijie wrote:
-> > On Mon, Nov 28, 2016 at 02:29:03PM +0100, Vlastimil Babka wrote:
-> > > On 11/14/2016 08:07 AM, Huang Shijie wrote:
-> > > >  static inline bool gigantic_page_supported(void) { return true; }
-> > > >  #else
-> > > > +static inline struct page *alloc_gigantic_page(int nid, unsigned int order)
-> > > > +{
-> > > > +	return NULL;
-> > > > +}
-> > > 
-> > > This hunk is not explained by the description. Could belong to a later
-> > > patch?
-> > > 
-> > 
-> > Okay, I can create an extra patch to add the description for the
-> > alloc_gigantic_page().
-> 
-> Not sure about extra patch, just move it to an existing later patch that
-> relies on it?
-The whole patch set has been merged to Andrew's tree, so an extra patch
-is better. :)
+Add 696MHz setpoint support for i.MX6UL.
 
-Thanks
-Huang Shijie
+Signed-off-by: Bai Ping <ping.bai@nxp.com>
+---
+ arch/arm/boot/dts/imx6ul.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index 612827d..3ade04e 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -60,12 +60,14 @@
+ 			clock-latency = <61036>; /* two CLK32 periods */
+ 			operating-points = <
+ 				/* kHz	uV */
++				696000	1275000
+ 				528000	1175000
+ 				396000	1025000
+ 				198000	950000
+ 			>;
+ 			fsl,soc-operating-points = <
+ 				/* KHz	uV */
++				696000	1275000
+ 				528000	1175000
+ 				396000	1175000
+ 				198000	1175000
+-- 
+1.9.1
