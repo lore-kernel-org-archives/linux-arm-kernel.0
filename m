@@ -1,52 +1,48 @@
-From: kilobyte@angband.pl (Adam Borowski)
-Date: Wed, 30 Nov 2016 07:52:53 +0100
-Subject: [RFC3 nowrap: PATCH v7 00/18] ILP32 for ARM64
-In-Reply-To: <20161130050209.GB18796@yury-N73SV>
-References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
- <20161130050209.GB18796@yury-N73SV>
-Message-ID: <20161130065253.GA21237@angband.pl>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Wed, 30 Nov 2016 07:10:51 +0000
+Subject: [PATCH v9 07/11] arm/arm64: vgic: Implement
+ KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
+In-Reply-To: <20161129210901.GC15346@cbox>
+References: <1479906118-15832-1-git-send-email-vijay.kilari@gmail.com>
+ <1479906118-15832-8-git-send-email-vijay.kilari@gmail.com>
+ <20161128195028.GH18170@cbox>
+ <CALicx6uW5RmjsPPBKB5wLW4TzNmcdc9ZADqp=M2ZJe9Cd+keZg@mail.gmail.com>
+ <20161129210901.GC15346@cbox>
+Message-ID: <CAFEAcA_1i7-ti_H_RZrTbCW2DmFPvYudKn_WFs=_XRoyKKsnbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2016 at 10:32:09AM +0530, Yury Norov wrote:
-> On Fri, Oct 21, 2016 at 11:32:59PM +0300, Yury Norov wrote:
-> > This series enables aarch64 with ilp32 mode, and as supporting work,
-> > introduces ARCH_32BIT_OFF_T configuration option that is enabled for
-> > existing 32-bit architectures but disabled for new arches (so 64-bit
-> > off_t is is used by new userspace).
-> 
-> Hi all,
-> 
-> Steve Ellcey submitted glibc patches for ILP32:
-> https://www.sourceware.org/ml/libc-alpha/2016-11/msg01071.html
-> It implicitly assumes that kernel clears top halves of registers for
-> all syscalls in assembly entry. That patches are going to be taken.
-> It it happens, we will have no choice on kernel side how to clear top
-> halves anymore.
+On 29 November 2016 at 21:09, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> Actually, I'm not sure what the semantics of the line level ioctl should
+> be for edge-triggered interrupts?  My inclination is that it shouldn't
+> have any effect at this point, but that would mean that at this point we
+> should only set the pending variable and try to queue the interrupt if
+> the config is level.  But that also means that when we set the config
+> later, we need to try to queue the interrupt, which we don't do
+> currently, because we rely on the guest not fiddling with the config of
+> an enabled interrupt.
+>
+> Could it be considered an error if user space tries to set the level for
+> an edge-triggered interrupt and therefore something we can just ignore
+> and assume that the corresponing interrupt will be configured as a
+> level-triggered one later?
 
-Since a while ago, there's a package "arch-test" in Debian that empirically
-enumerates architectures executable by the running kernel (and loaded
-binfmts), by trying small test programs for each.  The list of architectures
-it knows does include arm64ilp32.
+Userspace will always read the line-level values out and write
+them back for migration, and I'd rather not make it have to
+do cross-checks against whether the interrupt is edge or level
+triggered to see whether it should write the level values into
+the kernel. Telling the kernel the level for an edge-triggered
+interrupt should be a no-op because it doesn't have any effect
+on pending status.
 
-For most archs the test is just {write(1, "ok\n"); _exit(0);} unless there's
-some difference from baseline that should be checked for, like dmb (ARMv7)
-on armhf or mtvsrd (POWER8) on ppc64el.  I could scribble in the top half of
-a register to test the delousing, but it's not like alternate versions of
-the ABI are expected in the wild...
+> In any case we probably need to clarify the ABI in terms of this
+> particular KVM_DEV_AR_VGIC_GRP_LEVEL_INFO group and how it relates to
+> the config of edge vs. level of interrupts and ordering on restore...
 
+IIRC the QEMU code restores the config first. (There's a similar
+ordering thing for GICv2 where we have to restore GICD_ICFGRn before
+GICD_ISPENDRn.)
 
-There's another issue: name.  A stalled request to add it to dpkg's cputable
-(https://bugs.debian.org/824742) uses "arm64ilp32" and "arm64ilp32be" which
-are unwieldy.  Even the discussion uses "ilp32" -- probably too generic. 
-https://wiki.linaro.org/Platform/arm64-ilp32 mentions both.  I've heard
-"a32" somewhere.  I have no stake here (I'm on the CC list as a x32 not arm
-porter...), but if you want to choose a color for this bikeshed, the time
-is now.
-
-
-Meow!
--- 
-The bill declaring Jesus as the King of Poland fails to specify whether
-the addition is at the top or end of the list of kings.  What should the
-historians do?
+thanks
+-- PMM
