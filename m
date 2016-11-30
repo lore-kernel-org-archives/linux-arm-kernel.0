@@ -1,39 +1,41 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 30 Nov 2016 11:09:03 -0600
-Subject: [PATCH v2] soc: ti: qmss: fix the case when !SMP
-In-Reply-To: <20161130165351.1154-1-grygorii.strashko@ti.com>
-References: <20161130165351.1154-1-grygorii.strashko@ti.com>
-Message-ID: <d26f37e6-657f-ff42-2d9d-343fa47c2e5d@ti.com>
+Date: Wed, 30 Nov 2016 11:10:51 -0600
+Subject: [PATCH] soc: ti: qmss: fix the case when !SMP
+In-Reply-To: <2531f769-dd28-dfbd-0ed7-b209ef6ae98d@oracle.com>
+References: <20161129221508.10551-1-grygorii.strashko@ti.com>
+ <5501170.dgvo5UdPBX@wuerfel>
+ <2531f769-dd28-dfbd-0ed7-b209ef6ae98d@oracle.com>
+Message-ID: <0a2d9284-d1e3-c848-42a4-66b06babba80@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Santosh Shilimkar <santosh.shilimkar@oracle.com>
 
-On 11/30/2016 10:53 AM, Grygorii Strashko wrote:
-> The irq_set_affinity_hint() will always fail when !SMP and
-> Networking will fail on Keystone 2 devices in this case.
-> Hence, fix by ignoring IRQ affinity settings when !SMP.
+Hi Santosh,
+
+On 11/30/2016 11:01 AM, Santosh Shilimkar wrote:
+> Hi Grygorii,
 >
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
->  drivers/soc/ti/knav_qmss_queue.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> On 11/30/2016 3:37 AM, Arnd Bergmann wrote:
+>> On Tuesday, November 29, 2016 4:15:08 PM CET Grygorii Strashko wrote:
+>>>                 range->num_irqs++;
+>>>
+>>> -               if (oirq.args_count == 3)
+>>> +               if (IS_ENABLED(SMP) && oirq.args_count == 3)
+>>>                         range->irqs[i].cpu_map =
+>>>                                 (oirq.args[2] & 0x0000ff00) >> 8;
+>>>
+>>
+>> I think you mean CONFIG_SMP, not SMP. With the change above, the
+>> code will never be executed.
+>>
+> Is that the full patch ? Can you post updated patch wit above fixed
+> and copy me. I will pick it up.
 >
-> diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
-> index b73e353..eacad57 100644
-> --- a/drivers/soc/ti/knav_qmss_queue.c
-> +++ b/drivers/soc/ti/knav_qmss_queue.c
-> @@ -1228,7 +1228,7 @@ static int knav_setup_queue_range(struct knav_device *kdev,
->
->  		range->num_irqs++;
->
-> -		if (oirq.args_count == 3)
-> +		if (IS_ENABLED(CONFIG_SMP) && oirq.args_count == 3)
->  			range->irqs[i].cpu_map =
->  				(oirq.args[2] & 0x0000ff00) >> 8;
->  	}
->
+
+I've sent v2.
+
+For some reason you e-email is not working - delivery failure
+ssantosh at kernel.org
 
 -- 
 regards,
