@@ -1,63 +1,25 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 30 Nov 2016 21:17:24 +0800
-Subject: [PATCH 3/4] crypto: arm64/aes-ce-ccm - fix decrypt path with new
- skcipher interface
-In-Reply-To: <20161130131407.GA3958@gondor.apana.org.au>
+Date: Wed, 30 Nov 2016 21:18:28 +0800
+Subject: [PATCH 1/4] crypto: arm/aes-ce: fix broken monolithic build
+In-Reply-To: <1480424733-10797-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1480424733-10797-1-git-send-email-ard.biesheuvel@linaro.org>
- <1480424733-10797-3-git-send-email-ard.biesheuvel@linaro.org>
- <20161130131407.GA3958@gondor.apana.org.au>
-Message-ID: <20161130131723.GA4064@gondor.apana.org.au>
+Message-ID: <20161130131827.GB4126@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2016 at 09:14:07PM +0800, Herbert Xu wrote:
-> On Tue, Nov 29, 2016 at 01:05:32PM +0000, Ard Biesheuvel wrote:
-> > The new skcipher walk interface does not take into account whether we
-> > are encrypting or decrypting. In the latter case, the walk should
-> > disregard the MAC. Fix this in the arm64 CE driver.
-> > 
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Tue, Nov 29, 2016 at 01:05:30PM +0000, Ard Biesheuvel wrote:
+> When building the arm64 kernel with both CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
+> and CONFIG_CRYPTO_AES_ARM64_NEON_BLK=y configured, the build breaks with
+> the following error:
 > 
-> Thanks for the patch.  I'm going to build this into the AEAD walker
-> instead, by providing separate entry points for encryption and
-> decryption.  Like this,
+> arch/arm64/crypto/aes-neon-blk.o:(.bss+0x0): multiple definition of `aes_simd_algs'
+> arch/arm64/crypto/aes-ce-blk.o:(.bss+0x0): first defined here
 > 
-> Subject: crypto: skcipher - Add separate walker for AEAD decryption
+> Fix this by making aes_simd_algs 'static'.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
----8<---
-Subject: crypto: arm64/aes-ce-ccm - Fix AEAD decryption length
-
-This patch fixes the ARM64 CE CCM implementation decryption by
-using skcipher_walk_aead_decrypt instead of skcipher_walk_aead,
-which ensures the correct length is used when doing the walk.
-
-Fixes: cf2c0fe74084 ("crypto: aes-ce-ccm - Use skcipher walk interface")
-Reported-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Herbert Xu <herbert@gondor.apana.org.au>
-
-diff --git a/arch/arm64/crypto/aes-ce-ccm-glue.c b/arch/arm64/crypto/aes-ce-ccm-glue.c
-index d4f3568..cc5515d 100644
---- a/arch/arm64/crypto/aes-ce-ccm-glue.c
-+++ b/arch/arm64/crypto/aes-ce-ccm-glue.c
-@@ -167,7 +167,7 @@ static int ccm_encrypt(struct aead_request *req)
- 	/* preserve the original iv for the final round */
- 	memcpy(buf, req->iv, AES_BLOCK_SIZE);
- 
--	err = skcipher_walk_aead(&walk, req, true);
-+	err = skcipher_walk_aead_encrypt(&walk, req, true);
- 
- 	while (walk.nbytes) {
- 		u32 tail = walk.nbytes % AES_BLOCK_SIZE;
-@@ -219,7 +219,7 @@ static int ccm_decrypt(struct aead_request *req)
- 	/* preserve the original iv for the final round */
- 	memcpy(buf, req->iv, AES_BLOCK_SIZE);
- 
--	err = skcipher_walk_aead(&walk, req, true);
-+	err = skcipher_walk_aead_decrypt(&walk, req, true);
- 
- 	while (walk.nbytes) {
- 		u32 tail = walk.nbytes % AES_BLOCK_SIZE;
-
+Patches 1,2 and 4 applied.  Thanks.
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
