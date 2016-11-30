@@ -1,34 +1,139 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Nov 2016 14:56:32 +0100
-Subject: [GIT PULL 4/4] DaVinci defconfig updates for v4.10 (part 2)
-In-Reply-To: <20161120134038.14998-4-nsekhar@ti.com>
-References: <20161120134038.14998-1-nsekhar@ti.com>
- <20161120134038.14998-4-nsekhar@ti.com>
-Message-ID: <5631177.bAIffrK0pv@wuerfel>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 30 Nov 2016 13:57:22 +0000
+Subject: [RFC v3 00/10] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
+ reserved regions
+In-Reply-To: <CAFpQJXVqStQwRkm9F=e+8UFxWsddcwgB=AyfnZXSSaOw3eyBUA@mail.gmail.com>
+References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
+ <6c9012fd-070b-6218-48e7-69b37f2559dd@redhat.com>
+ <CAFpQJXWp5BfsxU5nkWm7hrq5wp6=b-6iYVHjBQYhmkWN_kSSzg@mail.gmail.com>
+ <3d0ddb50-6e63-3fe2-55c0-ce49579905c9@redhat.com>
+ <CAFpQJXVqStQwRkm9F=e+8UFxWsddcwgB=AyfnZXSSaOw3eyBUA@mail.gmail.com>
+Message-ID: <9e83990c-8f09-e21b-c86b-500e5e5c0f75@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, November 20, 2016 7:10:38 PM CET Sekhar Nori wrote:
-> The following changes since commit 6e9be8608771192851a3adf59f0ba9240e3f802c:
+On 30/11/16 10:52, Ganapatrao Kulkarni wrote:
+> On Wed, Nov 30, 2016 at 3:44 PM, Auger Eric <eric.auger@redhat.com> wrote:
+>> Hi Ganapat,
+>>
+>> On 30/11/2016 11:04, Ganapatrao Kulkarni wrote:
+>>> Hi Eric,
+>>>
+>>> in you repo "https://github.com/eauger/linux/tree/v4.9-rc5-reserved-rfc-v3"
+>>> there is 11th patch "pci: Enable overrides for missing ACS capabilities"
+>>> is this patch part of some other series?
+>>
+>> Actually this is a very old patch from Alex aimed at working around lack
+>> of PCIe ACS support: https://lkml.org/lkml/2013/5/30/513
+>>
 > 
->   ARM: davinci_all_defconfig: enable LED default-on trigger (2016-11-01 11:42:54 +0530)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git davinci-for-v4.10/defconfig-2
-> 
-> for you to fetch changes up to a652baa06413a4beacc09425883e518c5f1ed100:
-> 
->   ARM: davinci_all_defconfig: add missing options for systemd (2016-11-15 15:44:52 +0530)
-> 
-> ----------------------------------------------------------------
-> Enables newly introduced DDR controller and
-> master priority setting drivers in kernel.
-> 
-> Also, update defconfig to boot latest systemd
-> based filesystems on DA850.
-> 
+> i have tried this patchset on thunderx-83xx for vfio and it works for me!
+> i was wondering is this patch required? i guess not.
 
-I pulled part 3 first, which contained this.
+If your system and devices actually support and properly advertise ACS
+then there's nothing to override. Conversely, if you're happy assigning
+everything behind a single RC to the same guest then ACS doesn't really
+matter. It's only the in-between case - when the host still wants to
+keep control of one or more devices, but they all get grouped together
+due to lack of ACS - that warrants working around.
 
-	Arnd
+Robin.
+
+> 
+> please cc me when you respin this patchset.
+> 
+> thanks
+> Ganapat
+> 
+>> Thanks
+>>
+>> Eric
+>>>
+>>> thanks
+>>> Ganapat
+>>>
+>>> On Wed, Nov 30, 2016 at 3:19 PM, Auger Eric <eric.auger@redhat.com> wrote:
+>>>> Hi,
+>>>>
+>>>> On 15/11/2016 14:09, Eric Auger wrote:
+>>>>> Following LPC discussions, we now report reserved regions through
+>>>>> iommu-group sysfs reserved_regions attribute file.
+>>>>>
+>>>>> Reserved regions are populated through the IOMMU get_resv_region callback
+>>>>> (former get_dm_regions), now implemented by amd-iommu, intel-iommu and
+>>>>> arm-smmu.
+>>>>>
+>>>>> The intel-iommu reports the [FEE0_0000h - FEF0_000h] MSI window as an
+>>>>> IOMMU_RESV_NOMAP reserved region.
+>>>>>
+>>>>> arm-smmu reports the MSI window (arbitrarily located at 0x8000000 and
+>>>>> 1MB large) and the PCI host bridge windows.
+>>>>>
+>>>>> The series integrates a not officially posted patch from Robin:
+>>>>> "iommu/dma: Allow MSI-only cookies".
+>>>>>
+>>>>> This series currently does not address IRQ safety assessment.
+>>>>
+>>>> I will respin this series taking into account Joerg's comment. Does
+>>>> anyone have additional comments or want to put forward some conceptual
+>>>> issues with the current direction and with this implementation?
+>>>>
+>>>> As for the IRQ safety assessment, in a first step I would propose to
+>>>> remove the IOMMU_CAP_INTR_REMAP from arm-smmus and consider the
+>>>> assignment as unsafe. Any objection?
+>>>>
+>>>> Thanks
+>>>>
+>>>> Eric
+>>>>
+>>>>
+>>>>> Best Regards
+>>>>>
+>>>>> Eric
+>>>>>
+>>>>> Git: complete series available at
+>>>>> https://github.com/eauger/linux/tree/v4.9-rc5-reserved-rfc-v3
+>>>>>
+>>>>> History:
+>>>>> RFC v2 -> v3:
+>>>>> - switch to an iommu-group sysfs API
+>>>>> - use new dummy allocator provided by Robin
+>>>>> - dummy allocator initialized by vfio-iommu-type1 after enumerating
+>>>>>   the reserved regions
+>>>>> - at the moment ARM MSI base address/size is left unchanged compared
+>>>>>   to v2
+>>>>> - we currently report reserved regions and not usable IOVA regions as
+>>>>>   requested by Alex
+>>>>>
+>>>>> RFC v1 -> v2:
+>>>>> - fix intel_add_reserved_regions
+>>>>> - add mutex lock/unlock in vfio_iommu_type1
+>>>>>
+>>>>>
+>>>>> Eric Auger (10):
+>>>>>   iommu/dma: Allow MSI-only cookies
+>>>>>   iommu: Rename iommu_dm_regions into iommu_resv_regions
+>>>>>   iommu: Add new reserved IOMMU attributes
+>>>>>   iommu: iommu_alloc_resv_region
+>>>>>   iommu: Do not map reserved regions
+>>>>>   iommu: iommu_get_group_resv_regions
+>>>>>   iommu: Implement reserved_regions iommu-group sysfs file
+>>>>>   iommu/vt-d: Implement reserved region get/put callbacks
+>>>>>   iommu/arm-smmu: Implement reserved region get/put callbacks
+>>>>>   vfio/type1: Get MSI cookie
+>>>>>
+>>>>>  drivers/iommu/amd_iommu.c       |  20 +++---
+>>>>>  drivers/iommu/arm-smmu.c        |  52 +++++++++++++++
+>>>>>  drivers/iommu/dma-iommu.c       | 116 ++++++++++++++++++++++++++-------
+>>>>>  drivers/iommu/intel-iommu.c     |  50 ++++++++++----
+>>>>>  drivers/iommu/iommu.c           | 141 ++++++++++++++++++++++++++++++++++++----
+>>>>>  drivers/vfio/vfio_iommu_type1.c |  26 ++++++++
+>>>>>  include/linux/dma-iommu.h       |   7 ++
+>>>>>  include/linux/iommu.h           |  49 ++++++++++----
+>>>>>  8 files changed, 391 insertions(+), 70 deletions(-)
+>>>>>
+>>>>
+>>>> _______________________________________________
+>>>> linux-arm-kernel mailing list
+>>>> linux-arm-kernel at lists.infradead.org
+>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
