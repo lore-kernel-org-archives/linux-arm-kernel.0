@@ -1,73 +1,58 @@
-From: maninder1.s@samsung.com (Maninder Singh)
-Date: Wed, 30 Nov 2016 13:33:56 +0530
-Subject: [PATCH 1/2] arm64: Correcting format specifier for printin 64 bit
- addresses
-Message-ID: <1480493036-47334-1-git-send-email-maninder1.s@samsung.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Wed, 30 Nov 2016 09:12:08 +0100
+Subject: [PATCH v7 4/8] drm/sunxi: Add DT bindings documentation of
+ Allwinner HDMI
+In-Reply-To: <4502748.8rUF7ESxa4@avalon>
+References: <cover.1480414715.git.moinejf@free.fr> <6356753.Ekaj7GdA0W@avalon>
+ <20161129210455.d0c8450d3ceb83c1abe521b0@free.fr>
+ <4502748.8rUF7ESxa4@avalon>
+Message-ID: <20161130091208.f38cd79f1cc5d27b27f3b130@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch corrects format specifier for printing 64 bit addresses.
+On Tue, 29 Nov 2016 22:10:01 +0200
+Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
 
-Before Patch
-============
-[   68.251603] Unable to handle kernel NULL pointer dereference at virtual address 00000000
-[   68.251673] pgd = ffffffc013950000
-[   68.251782] [00000000] *pgd=0000000093e19003, *pud=0000000093e19003, *pmd=0000000000000000
+> Hi Jean-Fran?ois,
+> 
+> On Tuesday 29 Nov 2016 21:04:55 Jean-Francois Moine wrote:
+> > On Tue, 29 Nov 2016 21:33 +0200 Laurent Pinchart wrote:
+> > >>> You need a third port for the HDMI encoder output, connected to an
+> > >>> HDMI connector DT node.
+> > >> 
+> > >> I don't see what you mean. The HDMI device is both the encoder
+> > >> and connector (as the TDA998x):
+> > >
+> > > The driver might create both an encoder and a connector, but I very much
+> > > doubt that the "allwinner,sun8i-a83t-hdmi" hardware contains a connector,
+> > > unless the SoC package has an HDMI connector coming out of it :-)
+> > > 
+> > >> plane -> DE2 mixer ---> TCON -----> HDMI -----> display device
+> > >> ----- plane ------    - CRTC -   - encoder  \
+> > >>                                    connector -- (HDMI cable)
+> > >>          audio-controller -   - audio-codec /
+> > 
+> > The schema is the same as the Dove Cubox: the TDA998x is just a chip
+> > with some wires going out and the physical connector is supposed to be
+> > at the end of the wires.
+> 
+> I've missed the Dove Cubox DT bindings when they were submitted. Fortunately 
+> (or unfortunately for you, depending on how you look at it ;-)) I've paid more 
+> attention this time.
+> 
+> > Here, the HDMI pins of the SoC go to a pure hardware chip and then to
+> > the physical connector. Which software entity do you want to add?
+> 
+> I don't want to add a software entity, I just want to model the connector in 
+> DT as it's present in the system. Even though that's more common for other bus 
+> types than HDMI (LVDS for instance) it wouldn't be inconceivable to connect 
+> the HDMI signals to an on-board chim instead of an HDMI connector, so the HDMI 
+> encoder output should be modelled by a port and connected to a connector DT 
+> node in this case.
 
-After patch
-===========
-[    8.565030] Unable to handle kernel NULL pointer dereference at virtual address 0000000000000000
-[    8.565389] pgd = ffffffc013872000
-[    8.565553] [0000000000000000] *pgd=0000000093874003, *pud=0000000093874003, *pmd=0000000000000000
+Well, I don't see what this connector can be.
+May you give me a DT example?
 
-and same for user space fault.
-
-Signed-off-by: Vaneet Narang <v.narang@samsung.com>
-Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
----
- arch/arm64/mm/fault.c | 16 +++++++++++-----
- 1 file changed, 11 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index a78a5c4..8cb5c93 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -77,7 +77,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
- 
- 	pr_alert("pgd = %p\n", mm->pgd);
- 	pgd = pgd_offset(mm, addr);
--	pr_alert("[%08lx] *pgd=%016llx", addr, pgd_val(*pgd));
-+	pr_alert("[%016lx] *pgd=%016llx", addr, pgd_val(*pgd));
- 
- 	do {
- 		pud_t *pud;
-@@ -177,7 +177,7 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
- 	 * No handler, we'll have to terminate things with extreme prejudice.
- 	 */
- 	bust_spinlocks(1);
--	pr_alert("Unable to handle kernel %s at virtual address %08lx\n",
-+	pr_alert("Unable to handle kernel %s at virtual address %016lx\n",
- 		 (addr < PAGE_SIZE) ? "NULL pointer dereference" :
- 		 "paging request", addr);
- 
-@@ -198,9 +198,15 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
- 	struct siginfo si;
- 
- 	if (unhandled_signal(tsk, sig) && show_unhandled_signals_ratelimited()) {
--		pr_info("%s[%d]: unhandled %s (%d)@0x%08lx, esr 0x%03x\n",
--			tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
--			addr, esr);
-+		if (compat_user_mode(regs))
-+			pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x\n",
-+				tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
-+				addr, esr);
-+		else
-+			pr_info("%s[%d]: unhandled %s (%d) at 0x%016lx, esr 0x%03x\n",
-+				tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
-+				addr, esr);
-+
- 		show_pte(tsk->mm, addr);
- 		show_regs(regs);
- 	}
 -- 
-1.9.1
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
