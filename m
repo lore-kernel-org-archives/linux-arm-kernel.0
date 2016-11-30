@@ -1,30 +1,51 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Wed, 30 Nov 2016 09:01:14 -0800
-Subject: [PATCH] soc: ti: qmss: fix the case when !SMP
-In-Reply-To: <5501170.dgvo5UdPBX@wuerfel>
-References: <20161129221508.10551-1-grygorii.strashko@ti.com>
- <5501170.dgvo5UdPBX@wuerfel>
-Message-ID: <2531f769-dd28-dfbd-0ed7-b209ef6ae98d@oracle.com>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Wed, 30 Nov 2016 18:07:41 +0100
+Subject: [PATCH v3 2/5] i2c: Add STM32F4 I2C driver
+In-Reply-To: <20161130162353.GC1441@katana>
+References: <1466439771-2741-1-git-send-email-cedric.madianga@gmail.com>
+ <1466439771-2741-3-git-send-email-cedric.madianga@gmail.com>
+ <20160722070219.GB1605@katana>
+ <CAOAejn0BZNH82kY_7UR1EjV7M1G+9jGihGb4-uCs9=XiPHUYxQ@mail.gmail.com>
+ <20161130162353.GC1441@katana>
+Message-ID: <CAOAejn2UDbsLRLmthOitTtkWOcN97WYhg93r9nyxQdBzGGegcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grygorii,
+Hi,
 
-On 11/30/2016 3:37 AM, Arnd Bergmann wrote:
-> On Tuesday, November 29, 2016 4:15:08 PM CET Grygorii Strashko wrote:
->>                 range->num_irqs++;
->>
->> -               if (oirq.args_count == 3)
->> +               if (IS_ENABLED(SMP) && oirq.args_count == 3)
->>                         range->irqs[i].cpu_map =
->>                                 (oirq.args[2] & 0x0000ff00) >> 8;
->>
->
-> I think you mean CONFIG_SMP, not SMP. With the change above, the
-> code will never be executed.
->
-Is that the full patch ? Can you post updated patch wit above fixed
-and copy me. I will pick it up.
 
-Regards,
-Santosh
+2016-11-30 17:23 GMT+01:00 Wolfram Sang <wsa-dev@sang-engineering.com>:
+> Hi,
+>
+>> I was too busy in another project but now I am ready to complete the
+>> upstream of the STM32F4 I2C driver.
+>
+> Nice.
+>
+>> >> +static void stm32f4_i2c_set_periph_clk_freq(struct stm32f4_i2c_dev *i2c_dev)
+>> >> +{
+>> >> +     u32 clk_rate, cr2, freq;
+>> >> +
+>> >> +     cr2 = readl_relaxed(i2c_dev->base + STM32F4_I2C_CR2);
+>> >> +     cr2 &= ~STM32F4_I2C_CR2_FREQ_MASK;
+>> >> +
+>> >> +     clk_rate = clk_get_rate(i2c_dev->clk);
+>> >> +     freq = clk_rate / MHZ_TO_HZ;
+>> >> +
+>> >> +     if (freq > STM32F4_I2C_MAX_FREQ)
+>> >> +             freq = STM32F4_I2C_MAX_FREQ;
+>> >> +     if (freq < STM32F4_I2C_MIN_FREQ)
+>> >> +             freq = STM32F4_I2C_MIN_FREQ;
+>> >
+>> > clamp() to enforce the range?
+>> Sorry but what do you mean by "clamp()" ?
+>
+> The kernel has a clamp() function which would fit this purpose, I think.
+Ok I got it. I will fix it in the V4.
+Thanks
+
+>
+> Regards,
+>
+>    Wolfram
+>
