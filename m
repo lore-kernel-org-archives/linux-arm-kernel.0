@@ -1,31 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Nov 2016 16:50:20 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC Match Updates for v4.10
-In-Reply-To: <cover.1479928995.git.horms+renesas@verge.net.au>
-References: <cover.1479928995.git.horms+renesas@verge.net.au>
-Message-ID: <6791283.iMDbrK21lt@wuerfel>
+Date: Wed, 30 Nov 2016 16:51:46 +0100
+Subject: [GIT PULL v2] Second Round of Renesas ARM64 Based SoC DT Updates
+ for v4.10
+In-Reply-To: <cover.1479726397.git.horms+renesas@verge.net.au>
+References: <cover.1479726397.git.horms+renesas@verge.net.au>
+Message-ID: <32671064.T5t2sAOe36@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 23, 2016 9:13:31 PM CET Simon Horman wrote:
-> This pull request is based on the pull request "soc_device_match()
-> interface for matching against soc_bus attributes" sent by Geert
-> Uytterhoeven which corresponds to the soc-device-match-tag1 tag in his
-> renesas-driver's tree. It provides infrastructure used by changes in this
-> pull request.
+On Monday, November 21, 2016 1:05:10 PM CET Simon Horman wrote:
+> Second Round of Renesas ARM64 Based SoC DT Updates for v4.10
 > 
-> This pull request is broken out of an earlier pull request,
-> "Second Round of Renesas ARM Based SoC Drivers Updates for v4.10".
-> The motivation for breaking up the pull request is to provide
-> branches with minimal dependencies.
+> Enhancements:
+> * Add device nodes for PRR
+> * Add m3ulcb board
+> * Enable I2C on r8a7796/salvator-x board
+> * Enable SDHI0 on h3ulcb board
 > 
-> This pull request is targeted at the next/drivers branch of the arm-soc tree.
-> 
-> It introduces some minor merge conflicts in drivers/soc/renesas/Makefile.
-> The resolution is to take both sides.  A sample merge resolution is
-> provided in the renesas-next-20161123v2-v4.9-rc1 tag of the renesas tree.
 > 
 
-Pulled into next/drivers, thanks!
+Pulled into next/dt64, thanks!
 
 	Arnd
