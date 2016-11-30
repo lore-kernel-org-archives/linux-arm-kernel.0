@@ -1,181 +1,94 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Wed, 30 Nov 2016 05:52:21 +0530
-Subject: [PATCH 07/10] arm64: dma-mapping: Remove the notifier trick to handle
- early setting of dma_ops
+Date: Wed, 30 Nov 2016 05:52:23 +0530
+Subject: [PATCH 09/10] drivers: acpi: Configure acpi devices dma operation at
+ probe time
 In-Reply-To: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
 References: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1480465344-11862-8-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1480465344-11862-10-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With arch_setup_dma_ops now being called late during device's probe after the
-device's iommu is probed, the notifier trick required to handle the early
-setup of dma_ops before the iommu group gets created is not required.
-So removing the notifier's here.
+With all the DT based devices getting their dma ops configured
+during probe time to have the right iommu setup, let us do the
+same for acpi based devices as well.
+
+Configuring DMA ops at probe time will allow deferring device probe when
+the IOMMU isn't available yet. The dma_configure for the device is now called
+from the generic device_attach callback just before the bus/driver probe
+is called. This way, configuring the DMA ops for the device would be called
+at the same place for all bus_types, hence the deferred probing mechanism
+should work for all buses as well.
 
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-[rm: clean up even more]
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm64/mm/dma-mapping.c | 132 ++++----------------------------------------
- 1 file changed, 12 insertions(+), 120 deletions(-)
+ drivers/acpi/glue.c        |  6 ------
+ drivers/base/dma-mapping.c | 12 ++++++++++++
+ 2 files changed, 12 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index aa6c8f8..401f79a 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -800,140 +800,32 @@ static void __iommu_unmap_sg_attrs(struct device *dev,
- 	.mapping_error = iommu_dma_mapping_error,
- };
+diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
+index f8d6564..458445f 100644
+--- a/drivers/acpi/glue.c
++++ b/drivers/acpi/glue.c
+@@ -168,7 +168,6 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
+ 	struct list_head *physnode_list;
+ 	unsigned int node_id;
+ 	int retval = -EINVAL;
+-	enum dev_dma_attr attr;
  
--/*
-- * TODO: Right now __iommu_setup_dma_ops() gets called too early to do
-- * everything it needs to - the device is only partially created and the
-- * IOMMU driver hasn't seen it yet, so it can't have a group. Thus we
-- * need this delayed attachment dance. Once IOMMU probe ordering is sorted
-- * to move the arch_setup_dma_ops() call later, all the notifier bits below
-- * become unnecessary, and will go away.
-- */
--struct iommu_dma_notifier_data {
--	struct list_head list;
--	struct device *dev;
--	const struct iommu_ops *ops;
--	u64 dma_base;
--	u64 size;
--};
--static LIST_HEAD(iommu_dma_masters);
--static DEFINE_MUTEX(iommu_dma_notifier_lock);
+ 	if (has_acpi_companion(dev)) {
+ 		if (acpi_dev) {
+@@ -225,10 +224,6 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
+ 	if (!has_acpi_companion(dev))
+ 		ACPI_COMPANION_SET(dev, acpi_dev);
+ 
+-	attr = acpi_get_dma_attr(acpi_dev);
+-	if (attr != DEV_DMA_NOT_SUPPORTED)
+-		acpi_dma_configure(dev, attr);
 -
--static bool do_iommu_attach(struct device *dev, const struct iommu_ops *ops,
--			   u64 dma_base, u64 size)
--{
--	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
--
--	/*
--	 * If the IOMMU driver has the DMA domain support that we require,
--	 * then the IOMMU core will have already configured a group for this
--	 * device, and allocated the default domain for that group.
--	 */
--	if (!domain || iommu_dma_init_domain(domain, dma_base, size, dev)) {
--		pr_warn("Failed to set up IOMMU for device %s; retaining platform DMA ops\n",
--			dev_name(dev));
--		return false;
--	}
--
--	dev->archdata.dma_ops = &iommu_dma_ops;
--	return true;
--}
--
--static void queue_iommu_attach(struct device *dev, const struct iommu_ops *ops,
--			      u64 dma_base, u64 size)
--{
--	struct iommu_dma_notifier_data *iommudata;
--
--	iommudata = kzalloc(sizeof(*iommudata), GFP_KERNEL);
--	if (!iommudata)
--		return;
--
--	iommudata->dev = dev;
--	iommudata->ops = ops;
--	iommudata->dma_base = dma_base;
--	iommudata->size = size;
--
--	mutex_lock(&iommu_dma_notifier_lock);
--	list_add(&iommudata->list, &iommu_dma_masters);
--	mutex_unlock(&iommu_dma_notifier_lock);
--}
--
--static int __iommu_attach_notifier(struct notifier_block *nb,
--				   unsigned long action, void *data)
--{
--	struct iommu_dma_notifier_data *master, *tmp;
--
--	if (action != BUS_NOTIFY_BIND_DRIVER)
--		return 0;
--
--	mutex_lock(&iommu_dma_notifier_lock);
--	list_for_each_entry_safe(master, tmp, &iommu_dma_masters, list) {
--		if (data == master->dev && do_iommu_attach(master->dev,
--				master->ops, master->dma_base, master->size)) {
--			list_del(&master->list);
--			kfree(master);
--			break;
--		}
--	}
--	mutex_unlock(&iommu_dma_notifier_lock);
--	return 0;
--}
--
--static int __init register_iommu_dma_ops_notifier(struct bus_type *bus)
--{
--	struct notifier_block *nb = kzalloc(sizeof(*nb), GFP_KERNEL);
--	int ret;
--
--	if (!nb)
--		return -ENOMEM;
--
--	nb->notifier_call = __iommu_attach_notifier;
--
--	ret = bus_register_notifier(bus, nb);
--	if (ret) {
--		pr_warn("Failed to register DMA domain notifier; IOMMU DMA ops unavailable on bus '%s'\n",
--			bus->name);
--		kfree(nb);
--	}
--	return ret;
--}
--
- static int __init __iommu_dma_init(void)
+ 	acpi_physnode_link_name(physical_node_name, node_id);
+ 	retval = sysfs_create_link(&acpi_dev->dev.kobj, &dev->kobj,
+ 				   physical_node_name);
+@@ -250,7 +245,6 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
+ 	return 0;
+ 
+  err:
+-	acpi_dma_deconfigure(dev);
+ 	ACPI_COMPANION_SET(dev, NULL);
+ 	put_device(dev);
+ 	put_device(&acpi_dev->dev);
+diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
+index 576fdfb..2ec4dae 100644
+--- a/drivers/base/dma-mapping.c
++++ b/drivers/base/dma-mapping.c
+@@ -347,17 +347,29 @@ void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
+  * Common configuration to enable DMA API use for a device
+  */
+ #include <linux/pci.h>
++#include <linux/acpi.h>
+ 
+ int dma_configure(struct device *dev)
  {
--	int ret;
--
--	ret = iommu_dma_init();
--	if (!ret)
--		ret = register_iommu_dma_ops_notifier(&platform_bus_type);
--	if (!ret)
--		ret = register_iommu_dma_ops_notifier(&amba_bustype);
--#ifdef CONFIG_PCI
--	if (!ret)
--		ret = register_iommu_dma_ops_notifier(&pci_bus_type);
--#endif
--	return ret;
-+	return iommu_dma_init();
- }
- arch_initcall(__iommu_dma_init);
- 
- static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 				  const struct iommu_ops *ops)
- {
--	struct iommu_group *group;
-+	struct iommu_domain *domain;
- 
- 	if (!ops)
- 		return;
++	struct acpi_device *adev;
++	enum dev_dma_attr attr;
 +
- 	/*
--	 * TODO: As a concession to the future, we're ready to handle being
--	 * called both early and late (i.e. after bus_add_device). Once all
--	 * the platform bus code is reworked to call us late and the notifier
--	 * junk above goes away, move the body of do_iommu_attach here.
-+	 * The IOMMU core code allocates the default DMA domain, which the
-+	 * underlying IOMMU driver needs to support via the dma-iommu layer.
- 	 */
--	group = iommu_group_get(dev);
--	if (group) {
--		do_iommu_attach(dev, ops, dma_base, size);
--		iommu_group_put(group);
--	} else {
--		queue_iommu_attach(dev, ops, dma_base, size);
-+	domain = iommu_get_domain_for_dev(dev);
-+	if (!domain || iommu_dma_init_domain(domain, dma_base, size, dev)) {
-+		pr_warn("Failed to set up IOMMU for device %s; retaining platform DMA ops\n",
-+			dev_name(dev));
-+		return;
- 	}
+ 	if (dev_is_pci(dev))
+ 		return pci_dma_configure(dev);
+ 	else if (dev->of_node)
+ 		return of_dma_configure(dev, dev->of_node);
++	else if (has_acpi_companion(dev)) {
++		adev = to_acpi_device_node(dev->fwnode);
++		attr = acpi_get_dma_attr(adev);
++		if (attr != DEV_DMA_NOT_SUPPORTED)
++			return acpi_dma_configure(dev, attr);
++	}
 +
-+	dev->archdata.dma_ops = &iommu_dma_ops;
+ 	return 0;
  }
  
- void arch_teardown_dma_ops(struct device *dev)
+ void dma_deconfigure(struct device *dev)
+ {
+ 	of_dma_deconfigure(dev);
++	acpi_dma_deconfigure(dev);
+ }
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
