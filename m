@@ -1,44 +1,51 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 30 Nov 2016 18:47:04 +0800
-Subject: [PATCH v10 11/13] drm/mediatek: add dsi rxtx control
-In-Reply-To: <1480070076-6196-12-git-send-email-yt.shen@mediatek.com>
-References: <1480070076-6196-1-git-send-email-yt.shen@mediatek.com>
- <1480070076-6196-12-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1480502824.13978.8.camel@mtksdaap41>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 30 Nov 2016 10:50:52 +0000
+Subject: [PATCH 1/2] arm64: Correcting format specifier for printin 64
+ bit addresses
+In-Reply-To: <1480493036-47334-1-git-send-email-maninder1.s@samsung.com>
+References: <1480493036-47334-1-git-send-email-maninder1.s@samsung.com>
+Message-ID: <20161130105052.GC2724@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, YT:
-
-On Fri, 2016-11-25 at 18:34 +0800, YT Shen wrote:
-> add non-continuous clock mode and EOT packet control for dsi
+On Wed, Nov 30, 2016 at 01:33:56PM +0530, Maninder Singh wrote:
+> This patch corrects format specifier for printing 64 bit addresses.
 > 
-
-I think commit title should be 'drm/mediatek: add non-continuous clock
-mode and EOT packet control for dsi', and commit message should describe
-more information about this modification. For example, what is the
-difference between with and without this patch. Does it fix any problem?
-
-Regards,
-CK
-
-> Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
-> Signed-off-by: YT Shen <yt.shen@mediatek.com>
+> Before Patch
+> ============
+> [   68.251603] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> [   68.251673] pgd = ffffffc013950000
+> [   68.251782] [00000000] *pgd=0000000093e19003, *pud=0000000093e19003, *pmd=0000000000000000
+> 
+> After patch
+> ===========
+> [    8.565030] Unable to handle kernel NULL pointer dereference at virtual address 0000000000000000
+> [    8.565389] pgd = ffffffc013872000
+> [    8.565553] [0000000000000000] *pgd=0000000093874003, *pud=0000000093874003, *pmd=0000000000000000
+> 
+> and same for user space fault.
+> 
+> Signed-off-by: Vaneet Narang <v.narang@samsung.com>
+> Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
 > ---
->  drivers/gpu/drm/mediatek/mtk_dsi.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-> index 01df829..ded4202 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-> @@ -399,6 +399,9 @@ static void mtk_dsi_rxtx_control(struct mtk_dsi *dsi)
->  		break;
->  	}
->  
-> +	tmp_reg |= (dsi->mode_flags & MIPI_DSI_CLOCK_NON_CONTINUOUS) << 6;
-> +	tmp_reg |= (dsi->mode_flags & MIPI_DSI_MODE_EOT_PACKET) >> 3;
-> +
->  	writel(tmp_reg, dsi->regs + DSI_TXRX_CTRL);
->  }
->  
+>  arch/arm64/mm/fault.c | 16 +++++++++++-----
+>  1 file changed, 11 insertions(+), 5 deletions(-)
+
+There are a bunch of these you haven't caught:
+
+arch/arm64/kernel/signal.c:             pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
+arch/arm64/kernel/signal32.c:           pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
+arch/arm64/kernel/signal32.c:           pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
+arch/arm64/kvm/sys_regs.c:      kvm_err("Unsupported guest CP%d access at: %08lx\n",
+arch/arm64/kvm/trace.h: TP_printk("guest executed wf%c at: 0x%08lx",
+arch/arm64/kvm/trace.h: TP_printk("HVC at 0x%08lx (r0: 0x%08lx, imm: 0x%lx)",
+arch/arm64/kvm/trace.h: TP_printk("%s %s reg %d (0x%08llx)", __entry->fn,  __entry->is_write?"write to":"read from", __entry->reg, __entry->write_value)
+arch/arm64/mm/fault.c:  pr_alert("[%08lx] *pgd=%016llx", addr, pgd_val(*pgd));
+arch/arm64/mm/fault.c:  pr_alert("Unable to handle kernel %s at virtual address %08lx\n",
+arch/arm64/mm/fault.c:          pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x\n",
+arch/arm64/mm/mmu.c:            pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
+arch/arm64/mm/mmu.c:            pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
+
+so it would probably make sense to fix these to be consistent.
+
+Will
