@@ -1,98 +1,89 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 30 Nov 2016 10:47:26 +0100
-Subject: [PATCH net-next v4 0/4] Fix OdroidC2 Gigabit Tx link issue
-In-Reply-To: <049b1efc-3bad-92e0-45ef-0563dc5d81de@gmail.com>
-References: <1480348229-25672-1-git-send-email-jbrunet@baylibre.com>
- <049b1efc-3bad-92e0-45ef-0563dc5d81de@gmail.com>
-Message-ID: <1480499246.17538.208.camel@baylibre.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 30 Nov 2016 10:49:33 +0100
+Subject: [RFC v3 00/10] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
+ reserved regions
+In-Reply-To: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
+References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <6c9012fd-070b-6218-48e7-69b37f2559dd@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-11-28 at 09:54 -0800, Florian Fainelli wrote:
-> On 11/28/2016 07:50 AM, Jerome Brunet wrote:
-> > 
-> > This patchset fixes an issue with the OdroidC2 board (DWMAC +
-> > RTL8211F).
-> > The platform seems to enter LPI on the Rx path too often while
-> > performing
-> > relatively high TX transfer. This eventually break the link (both
-> > Tx and
-> > Rx), and require to bring the interface down and up again to get
-> > the Rx
-> > path working again.
-> > 
-> > The root cause of this issue is not fully understood yet but
-> > disabling EEE
-> > advertisement on the PHY prevent this feature to be negotiated.
-> > With this change, the link is stable and reliable, with the
-> > expected
-> > throughput performance.
-> > 
-> > The patchset adds options in the generic phy driver to disable EEE
-> > advertisement, through device tree. The way it is done is very
-> > similar
-> > to the handling of the max-speed property.
-> > 
-> > Patch 4 is provided here for testing purpose only. Please don't
-> > merge
-> > patch 4, this change will go through the amlogic's tree.
+Hi,
+
+On 15/11/2016 14:09, Eric Auger wrote:
+> Following LPC discussions, we now report reserved regions through
+> iommu-group sysfs reserved_regions attribute file.
 > 
-> Sorry, but I really don't like the route this is going, and I should
-> have made myself clearer before on that, I really think utilizing a
-> PHY
-> fixup is more appropriate here than an extremely generic DT property.
-> The fixup code can be in the affected PHY driver, or it can be
-> somewhere
-> else, your call. There is no shortage of option on how to implement
-> it,
-> and this would be something easy to enable/disable for known good
-> configurations (ala PCI/USB fixups).
+> Reserved regions are populated through the IOMMU get_resv_region callback
+> (former get_dm_regions), now implemented by amd-iommu, intel-iommu and
+> arm-smmu.
 > 
-> If we start supporting generic "enable", "disable" type of properties
-> with values that map directly to register definitions of the HW, we
-> leave too much room for these properties to be utilized to implement
-> a
-> specific policy, and this is not acceptable.
+> The intel-iommu reports the [FEE0_0000h - FEF0_000h] MSI window as an
+> IOMMU_RESV_NOMAP reserved region.
+> 
+> arm-smmu reports the MSI window (arbitrarily located at 0x8000000 and
+> 1MB large) and the PCI host bridge windows.
+> 
+> The series integrates a not officially posted patch from Robin:
+> "iommu/dma: Allow MSI-only cookies".
+> 
+> This series currently does not address IRQ safety assessment.
 
-Florian,?
+I will respin this series taking into account Joerg's comment. Does
+anyone have additional comments or want to put forward some conceptual
+issues with the current direction and with this implementation?
 
-I agree that DT should not be used to setup a policy, but to describe
-what the HW is.
+As for the IRQ safety assessment, in a first step I would propose to
+remove the IOMMU_CAP_INTR_REMAP from arm-smmus and consider the
+assignment as unsafe. Any objection?
 
-I tried to implement it the way you suggested, using phy fixup, too see
-what it looks like.
-There is 2 places in the code that seems (remotely) linked to the
-issue:?
-- meson8b_dwmac driver : if the mac, regardless of the board/platform,
-?could not tolerate to have EEE activated, it would make sense to have
-the fixup here. It can provide a C callback for such case.
-- realtek phy driver: philosophy is kind of the same
+Thanks
 
-To be clear, it is doable and it works that way, but I don't think
-embedding this directly in the code is the right way to do it. It seems
-we are hiding an information specific about the board inside a generic
-driver.
+Eric
 
-We have several amlogic's design with the same MAC, sometimes with the
-same PHY, which have no problem with EEE at all. The issue is really
-about the board design.
 
-What I propose is not an enable/disable configuration switch, but to
-clearly state that a particular mode of operation is broken. Like the
-"max-speed" property, it setup a restriction. IMO, this is a
-description of what the HW is and is capable of, and as such it should
-be part of the DT.
-
-Yes the property directly map to a register, but it does let you
-directly manipulate it (you can't pass the value you want to write in
-the register). Having it this way just makes the code simple on both
-ends (user and driver).
-
-Yes people could start abusing this to setup policy. In the end, it is
-our responsibility, as community, to make sure APIs are used in a
-proper way, and not let it be used that way.
-
-I'm open to suggestion on how improve the solution, maybe something
-which could bring more confidence that property won't be misused.
-
-Jerome
+> Best Regards
+> 
+> Eric
+> 
+> Git: complete series available at
+> https://github.com/eauger/linux/tree/v4.9-rc5-reserved-rfc-v3
+> 
+> History:
+> RFC v2 -> v3:
+> - switch to an iommu-group sysfs API
+> - use new dummy allocator provided by Robin
+> - dummy allocator initialized by vfio-iommu-type1 after enumerating
+>   the reserved regions
+> - at the moment ARM MSI base address/size is left unchanged compared
+>   to v2
+> - we currently report reserved regions and not usable IOVA regions as
+>   requested by Alex
+> 
+> RFC v1 -> v2:
+> - fix intel_add_reserved_regions
+> - add mutex lock/unlock in vfio_iommu_type1
+> 
+> 
+> Eric Auger (10):
+>   iommu/dma: Allow MSI-only cookies
+>   iommu: Rename iommu_dm_regions into iommu_resv_regions
+>   iommu: Add new reserved IOMMU attributes
+>   iommu: iommu_alloc_resv_region
+>   iommu: Do not map reserved regions
+>   iommu: iommu_get_group_resv_regions
+>   iommu: Implement reserved_regions iommu-group sysfs file
+>   iommu/vt-d: Implement reserved region get/put callbacks
+>   iommu/arm-smmu: Implement reserved region get/put callbacks
+>   vfio/type1: Get MSI cookie
+> 
+>  drivers/iommu/amd_iommu.c       |  20 +++---
+>  drivers/iommu/arm-smmu.c        |  52 +++++++++++++++
+>  drivers/iommu/dma-iommu.c       | 116 ++++++++++++++++++++++++++-------
+>  drivers/iommu/intel-iommu.c     |  50 ++++++++++----
+>  drivers/iommu/iommu.c           | 141 ++++++++++++++++++++++++++++++++++++----
+>  drivers/vfio/vfio_iommu_type1.c |  26 ++++++++
+>  include/linux/dma-iommu.h       |   7 ++
+>  include/linux/iommu.h           |  49 ++++++++++----
+>  8 files changed, 391 insertions(+), 70 deletions(-)
+> 
