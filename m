@@ -1,60 +1,37 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 30 Nov 2016 15:08:17 +0100
-Subject: [RFC v3 00/10] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
- reserved regions
-In-Reply-To: <20161130103713.GB2724@arm.com>
-References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
- <6c9012fd-070b-6218-48e7-69b37f2559dd@redhat.com>
- <20161130103713.GB2724@arm.com>
-Message-ID: <1899e46c-7b06-01d6-6cff-eb0985a4f11d@redhat.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 30 Nov 2016 14:10:11 +0000
+Subject: [RFC PATCH 00/29] arm64: Scalable Vector Extension core support
+In-Reply-To: <583EC488.9010906@arm.com>
+References: <20161130120654.GJ1574@e103592.cambridge.arm.com>
+ <583EC488.9010906@arm.com>
+Message-ID: <20161130141011.GM1574@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On 30/11/2016 11:37, Will Deacon wrote:
-> On Wed, Nov 30, 2016 at 10:49:33AM +0100, Auger Eric wrote:
->> On 15/11/2016 14:09, Eric Auger wrote:
->>> Following LPC discussions, we now report reserved regions through
->>> iommu-group sysfs reserved_regions attribute file.
->>>
->>> Reserved regions are populated through the IOMMU get_resv_region callback
->>> (former get_dm_regions), now implemented by amd-iommu, intel-iommu and
->>> arm-smmu.
->>>
->>> The intel-iommu reports the [FEE0_0000h - FEF0_000h] MSI window as an
->>> IOMMU_RESV_NOMAP reserved region.
->>>
->>> arm-smmu reports the MSI window (arbitrarily located at 0x8000000 and
->>> 1MB large) and the PCI host bridge windows.
->>>
->>> The series integrates a not officially posted patch from Robin:
->>> "iommu/dma: Allow MSI-only cookies".
->>>
->>> This series currently does not address IRQ safety assessment.
->>
->> I will respin this series taking into account Joerg's comment. Does
->> anyone have additional comments or want to put forward some conceptual
->> issues with the current direction and with this implementation?
->>
->> As for the IRQ safety assessment, in a first step I would propose to
->> remove the IOMMU_CAP_INTR_REMAP from arm-smmus and consider the
->> assignment as unsafe. Any objection?
+On Wed, Nov 30, 2016 at 12:22:32PM +0000, Szabolcs Nagy wrote:
+> On 30/11/16 12:06, Dave Martin wrote:
+> > For setcontext/setjmp, we don't save/restore any SVE state due to the
+> > caller-save status of SVE, and I would not consider it necessary to
+> > save/restore VL itself because of the no-change-on-the-fly policy for
+> > this.
 > 
-> Well, yeah, because it's perfectly safe with GICv3.
-
-Well except if you have an MSI controller in-between the device and the
-sMMU (typically embedded in the host bridge). Detecting this situation
-is not straightforward; hence my proposal.
-
-Thanks
-
-Eric
+> the problem is not changing VL within a thread,
+> but that setcontext can resume a context of a
+> different thread which had different VL and there
+> might be SVE regs spilled on the stack according
+> to that.
 > 
-> Will
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> (i consider this usage undefined, but at least
+> the gccgo runtime does this)
+
+Understood -- which is part of the reason for the argument that although
+the kernel may permit different threads to have different VLs, whether
+this actually works usefully also depends on your userspace runtime
+environment.
+
+This again leads me to the conclusion that the request to create threads
+with different VLs within a single process should be explicit, in order
+to avoid accidents.
+
+Cheers
+---Dave
