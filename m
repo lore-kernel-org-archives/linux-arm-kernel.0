@@ -1,55 +1,93 @@
 From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Tue, 29 Nov 2016 17:11:02 -0800
-Subject: [PATCH v3 0/3] Altera Cyclone Passive Serial SPI FPGA Manager
-Message-ID: <cover.1480467185.git.stillcompiling@gmail.com>
+Date: Tue, 29 Nov 2016 17:11:03 -0800
+Subject: [PATCH v3 1/3] lib: add bitrev8x4()
+In-Reply-To: <cover.1480467185.git.stillcompiling@gmail.com>
+References: <cover.1480467185.git.stillcompiling@gmail.com>
+Message-ID: <bc92eb1507448731163ae67fc888668d327f9168.1480467185.git.stillcompiling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds an FPGA manager for Altera cyclone FPGAs
-that can program them using an spi port and a couple of gpios, using
-Alteras passive serial protocol.
+Add a function to reverse bytes within a 32 bit word.
+This function is more efficient than using the 8 bit version when
+iterating over an array
 
-Changes from v2:
+Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+---
+ arch/arm/include/asm/bitrev.h |  5 +++++
+ include/linux/bitrev.h        | 26 ++++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+)
 
-- Merged patch 3 and 4 as suggested in review by Moritz Fischer
-- Changed FPGA_MIN_DELAY from 250 to 50 ms is the time advertized by
-  Altera. This now works, as we don't assume it is done
-
-Changes from v1:
-- Changed the name from cyclone-spi-fpga-mgr to cyclone-ps-spi-fpga-mgr
-  This name change was requested by Alan Tull, to be specific about which
-  programming method is being employed on the fpga.
-- Changed the name of the reset-gpio to config-gpio to closer match the
-  way the pins are described in the Altera manual
-- Moved MODULE_LICENCE, _AUTHOR, and _DESCRIPTION to the bottom
-
-- Added a bitrev8x4() function to the bitrev headers and implemented ARM
- const, runtime, and ARM specific faster versions (This may end up
- needing to be a standalone patch)
-
-- Moved the bitswapping into cyclonespi_write(), as requested.
-  This falls short of my desired generic lsb first spi support, but is a step
-  in that direction.
-
-- Fixed whitespace problems introduced during refactoring
-
-- Replaced magic number for initial delay with a descriptive macro
-- Poll the fpga to see when it is ready rather than a fixed 1 ms sleep
-
-Joshua Clayton (3):
-  lib: add bitrev8x4()
-  doc: dt: add cyclone-spi binding document
-  fpga manager: Add cyclone-ps-spi driver for Altera FPGAs
-
- .../bindings/fpga/cyclone-ps-spi-fpga-mgr.txt      |  23 +++
- arch/arm/include/asm/bitrev.h                      |   5 +
- drivers/fpga/Kconfig                               |   7 +
- drivers/fpga/Makefile                              |   1 +
- drivers/fpga/cyclone-ps-spi.c                      | 176 +++++++++++++++++++++
- include/linux/bitrev.h                             |  26 +++
- 6 files changed, 238 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fpga/cyclone-ps-spi-fpga-mgr.txt
- create mode 100644 drivers/fpga/cyclone-ps-spi.c
-
+diff --git a/arch/arm/include/asm/bitrev.h b/arch/arm/include/asm/bitrev.h
+index ec291c3..6d2e9ca 100644
+--- a/arch/arm/include/asm/bitrev.h
++++ b/arch/arm/include/asm/bitrev.h
+@@ -17,4 +17,9 @@ static __always_inline __attribute_const__ u8 __arch_bitrev8(u8 x)
+ 	return __arch_bitrev32((u32)x) >> 24;
+ }
+ 
++static __always_inline __attribute_const__ u32 __arch_bitrev8x4(u32 x)
++{
++	__asm__ ("rbit %0, %1; rev %0, %0" : "=r" (x) : "r" (x));
++}
++
+ #endif
+diff --git a/include/linux/bitrev.h b/include/linux/bitrev.h
+index fb790b8..b1cfa1a 100644
+--- a/include/linux/bitrev.h
++++ b/include/linux/bitrev.h
+@@ -9,6 +9,7 @@
+ #define __bitrev32 __arch_bitrev32
+ #define __bitrev16 __arch_bitrev16
+ #define __bitrev8 __arch_bitrev8
++#define __bitrev8x4 __arch_bitrev8x4
+ 
+ #else
+ extern u8 const byte_rev_table[256];
+@@ -27,6 +28,14 @@ static inline u32 __bitrev32(u32 x)
+ 	return (__bitrev16(x & 0xffff) << 16) | __bitrev16(x >> 16);
+ }
+ 
++static inline u32 __bitrev8x4(u32 x)
++{
++	return(__bitrev8(x & 0xff) |
++	       (__bitrev8((x >> 8)  & 0xff) << 8) |
++	       (__bitrev8((x >> 16)  & 0xff) << 16) |
++	       (__bitrev8((x >> 24)  & 0xff) << 24));
++}
++
+ #endif /* CONFIG_HAVE_ARCH_BITREVERSE */
+ 
+ #define __constant_bitrev32(x)	\
+@@ -50,6 +59,15 @@ static inline u32 __bitrev32(u32 x)
+ 	__x;								\
+ })
+ 
++#define __constant_bitrev8x4(x) \
++({			\
++	u32 __x = x;	\
++	__x = ((__x & (u32)0xF0F0F0F0UL) >> 4) | ((__x & (u32)0x0F0F0F0FUL) << 4);	\
++	__x = ((__x & (u32)0xCCCCCCCCUL) >> 2) | ((__x & (u32)0x33333333UL) << 2);	\
++	__x = ((__x & (u32)0xAAAAAAAAUL) >> 1) | ((__x & (u32)0x55555555UL) << 1);	\
++	__x;								\
++})
++
+ #define __constant_bitrev8(x)	\
+ ({					\
+ 	u8 __x = x;			\
+@@ -75,6 +93,14 @@ static inline u32 __bitrev32(u32 x)
+ 	__bitrev16(__x);				\
+  })
+ 
++#define bitrev8x4(x) \
++({			\
++	u32 __x = x;	\
++	__builtin_constant_p(__x) ?	\
++	__constant_bitrev8x4(__x) :			\
++	__bitrev8x4(__x);				\
++})
++
+ #define bitrev8(x) \
+ ({			\
+ 	u8 __x = x;	\
 -- 
 2.9.3
