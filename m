@@ -1,33 +1,27 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 30 Nov 2016 10:17:30 -0600
-Subject: [PATCH v2] PCI: Add information about describing PCI in ACPI
-In-Reply-To: <CAADWXX_ipJ+pVmV5s2oLCKBrC5qUDASOZf=tpBfJWELExam+hQ@mail.gmail.com>
-References: <20161129212816.15663.28100.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <CAADWXX_ipJ+pVmV5s2oLCKBrC5qUDASOZf=tpBfJWELExam+hQ@mail.gmail.com>
-Message-ID: <20161130161730.GB13411@bhelgaas-glaptop.roam.corp.google.com>
+From: wsa-dev@sang-engineering.com (Wolfram Sang)
+Date: Wed, 30 Nov 2016 17:18:50 +0100
+Subject: [PATCH v5 1/3] i2c: pxa: Add support for the I2C units found in
+ Armada 3700
+In-Reply-To: <e5c36597-d917-0555-89cd-35f68087c1c5@free-electrons.com>
+References: <20161121133247.29889-1-romain.perier@free-electrons.com>
+ <20161121133247.29889-2-romain.perier@free-electrons.com>
+ <20161129211716.GA15594@katana>
+ <e5c36597-d917-0555-89cd-35f68087c1c5@free-electrons.com>
+Message-ID: <20161130161850.GA1441@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 03:39:11PM -0800, Linus Torvalds wrote:
-> Bjorn, this email was marked as spam, because:
-> 
->   It has a from address in google.com but has failed google.com's
-> required tests for authentication
-> 
-> in particular, it looks like you used a non-google smtp server
-> (kernel.org) to send the email, so there is no DKIM hash (or perhaps
-> google just uses some other non-standard marker for "this actually
-> came from google"). So gmail marks it as spam because dmarc fails:
-> 
->        dmarc=fail (p=REJECT dis=NONE) header.from=google.com
-> 
-> Just to let you know. If you use your google.com email, you do need to
-> go through the google smtp server.
-> 
-> This may or may not be new - I didn't go and look at old messages of
-> yours, but it is possible that google.com enabled dmarc/dkim recently.
 
-Argh, thanks for letting me know.  Looks like I've had this broken for a
-long time, but I didn't notice.  I think I have it fixed so git will record
-the author as bhelgaas at google.com, but git/stgit will send email from
-helgaas at kernel.org via the kernel.org smtp server.
+> What do you prefer everything in one commit or two seperated commit ? (one
+> including the new fields for fm_mask and another one to add support for
+> a3700-i2c).
+
+One commit is fine!
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161130/0fcbc15f/attachment-0001.sig>
