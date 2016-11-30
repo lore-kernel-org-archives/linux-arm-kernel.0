@@ -1,39 +1,51 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 30 Nov 2016 02:59:29 -0800
-Subject: [PATCH] watchdog: meson: Remove unneeded platform MODULE_ALIAS
-In-Reply-To: <d7149198-b513-4022-5fbc-10067d420191@osg.samsung.com>
-References: <1476906582-14241-1-git-send-email-javier@osg.samsung.com>
- <20161020222833.GA27421@roeck-us.net>
- <d7149198-b513-4022-5fbc-10067d420191@osg.samsung.com>
-Message-ID: <66487a0e-1d20-519f-6cbf-645f8bfd33da@roeck-us.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 30 Nov 2016 11:04:56 +0000
+Subject: [PATCH 5/9] arm64: cpufeature: Define helpers for sys_reg id
+In-Reply-To: <1479994809-9081-6-git-send-email-suzuki.poulose@arm.com>
+References: <1479994809-9081-1-git-send-email-suzuki.poulose@arm.com>
+ <1479994809-9081-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20161130110455.GD2724@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2016 06:57 AM, Javier Martinez Canillas wrote:
-> Hello Wim,
->
-> On 10/20/2016 07:28 PM, Guenter Roeck wrote:
->> On Wed, Oct 19, 2016 at 04:49:42PM -0300, Javier Martinez Canillas wrote:
->>> The Amlogic Meson is a DT-only platform, which means the devices are
->>> registered via OF and not using the legacy platform devices support.
->>>
->>> So there's no need to have a MODULE_ALIAS("platform:meson-gxbb-wdt")
->>> since the reported uevent MODALIAS to user-space will be the OF one.
->>>
->>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>
->> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
->>
->
-> Any comments about this patch? There are other two similar fixes for
-> watchdog drivers that were also reviewed by Guenter but never picked:
->
-> https://lkml.org/lkml/2016/10/14/412
-> https://lkml.org/lkml/2016/10/14/413
->
-> Best regards,
->
-The patches are all in my watchdog-next branch, so Wim will hopefully
-pick them up for the next release.
+On Thu, Nov 24, 2016 at 01:40:05PM +0000, Suzuki K Poulose wrote:
+> Define helper macros to extract op0, op1, CRn, CRm & op2
+> for a given sys_reg id.
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/include/asm/sysreg.h | 21 ++++++++++++++++++++-
+>  1 file changed, 20 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index 6c80b36..488b939 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -34,8 +34,27 @@
+>   *	[11-8]  : CRm
+>   *	[7-5]   : Op2
+>   */
+> +#define Op0_shift	19
+> +#define Op0_mask	0x3
+> +#define Op1_shift	16
+> +#define Op1_mask	0x7
+> +#define CRn_shift	12
+> +#define CRn_mask	0xf
+> +#define CRm_shift	8
+> +#define CRm_mask	0xf
+> +#define Op2_shift	5
+> +#define Op2_mask	0x7
+> +
+>  #define sys_reg(op0, op1, crn, crm, op2) \
+> -	((((op0)&3)<<19)|((op1)<<16)|((crn)<<12)|((crm)<<8)|((op2)<<5))
+> +	((((op0) & Op0_mask) << Op0_shift) | \
+> +	 ((op1) << Op1_shift) | ((crn) << CRn_shift) | \
+> +	 ((crm) << CRm_shift) | ((op2) << Op2_shift))
 
-Guenter
+You're preserving the current behaviour here, but why do we care so much
+about masking op0 but then not bother masking any of the other fields?
+
+Will
