@@ -1,130 +1,62 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 30 Nov 2016 11:41:00 +0000
-Subject: [PATCH 9/9] arm64: Documentation - Expose CPU feature registers
-In-Reply-To: <20161124184436.GG7452@e104818-lin.cambridge.arm.com>
-References: <1479994809-9081-1-git-send-email-suzuki.poulose@arm.com>
- <1479994809-9081-10-git-send-email-suzuki.poulose@arm.com>
- <20161124184436.GG7452@e104818-lin.cambridge.arm.com>
-Message-ID: <f0dfe659-2487-3afb-eeb3-d5219d09332c@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 30 Nov 2016 11:48:37 +0000
+Subject: Unable to use perf in VM
+In-Reply-To: <70374841-ecb1-a6c3-ed43-0f39e2d5fec2@riken.jp>
+References: <70374841-ecb1-a6c3-ed43-0f39e2d5fec2@riken.jp>
+Message-ID: <8b2a3cfd-57a0-70ac-ef50-672f8040291d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/11/16 18:44, Catalin Marinas wrote:
-> Hi Suzuki,
->
-> On Thu, Nov 24, 2016 at 01:40:09PM +0000, Suzuki K. Poulose wrote:
->> --- /dev/null
->> +++ b/Documentation/arm64/cpu-feature-registers.txt
->> @@ -0,0 +1,198 @@
->> +		ARM64 CPU Feature Registers
->> +		===========================
->> +
->> +Author: Suzuki K Poulose <suzuki.poulose@arm.com>
->> +
->> +
->> +This file describes the API for exporting the AArch64 CPU ID/feature
->> +registers to userspace. The availability of this API is advertised
->> +via the HWCAP_CPUID in HWCAPs.
->
-> s/API/ABI/ maybe?
++ Shannon
 
-Sure
+On 29/11/16 22:04, Itaru Kitayama wrote:
+> Hi,
+> 
+> In a VM (virsh controlled, KVM acceleration enabled) on a recent
+> kvmarm kernel host, I find I am unable to use perf to obtain
+> performance statistics for a complex task like kernel build.
+> (I've verified this is seen with a Fedora 25 VM and host combination
+> as well)
+> APM folks CC'ed think this might be caused by a bug in the core PMU 
+> framework code, thus I'd like to have experts opinion on this issue.
+> 
+> [root at localhost linux]# perf stat -B make
+>    CHK     include/config/kernel.release
+> [  119.617684] git[1144]: undefined instruction: pc=fffffc000808ff30
+> [  119.623040] Code: 51000442 92401042 d51b9ca2 d5033fdf (d53b9d40)
+> [  119.627607] Internal error: undefined instruction: 0 [#1] SMP
 
->
->> +
->> +1. Motivation
->> +---------------
->> +
->> +The ARM architecture defines a set of feature registers, which describe
->> +the capabilities of the CPU/system. Access to these system registers is
->> +restricted from EL0 and there is no reliable way for an application to
->> +extract this information to make better decisions at runtime. There is
->> +limited information available to the application via HWCAPs, however
->> +there are some issues with their usage.
->> +
->> + a) Any change to the HWCAPs requires an update to userspace (e.g libc)
->> +    to detect the new changes, which can take a long time to appear in
->> +    distributions. Exposing the registers allows applications to get the
->> +    information without requiring updates to the toolchains.
->> +
->> + b) Access to HWCAPs is sometimes limited (e.g prior to libc, or
->> +    when ld is initialised at startup time).
->> +
->> + c) HWCAPs cannot represent non-boolean information effectively. The
->> +    architecture defines a canonical format for representing features
->> +    in the ID registers; this is well defined and is capable of
->> +    representing all valid architecture variations. Exposing the ID
->> +    registers avoids having to come up with HWCAP representations and
->> +    parsing code.
->
-> For point (c) above, we don't (yet?) have an actual case on AArch64
-> where HWCAP needs more than a boolean value.
->
-> And just to clarify my position: I consider that we should continue to
-> expose HWCAP for new features (e.g. SVE) in parallel with the CPUID
-> access emulation. There are different use-cases for them (i.e. dynamic
-> loader uses HWCAP for the ifunc resolver).
+[...]
 
-Ok. So would you like to have the point (c) removed ? Or should I just add,
-that we don't have such a feature yet.
+In a VM running mainline hosted on an AMD Seattle box:
 
->
->> +3. Implementation
->> +--------------------
->> +
->> +The infrastructure is built on the emulation of the 'MRS' instruction.
->> +Accessing a restricted system register from an application generates an
->> +exception and ends up in SIGILL being delivered to the process.
->> +The infrastructure hooks into the exception handler and emulates the
->> +operation if the source belongs to the supported system register space.
->> +
->> +The infrastructure emulates only the following system register space:
->> +	Op0=3, Op1=0, CRn=0
->> +
->> +(See Table C5-6 'System instruction encodings for non-Debug System
->> +register accesses' in ARMv8 ARM DDI 0487A.h, for the list of
->> +registers).
->> +
->> +
->> +The following rules are applied to the value returned by the
->> +infrastructure:
->> +
->> + a) The value of an 'IMPLEMENTATION DEFINED' field is set to 0.
->> + b) The value of a reserved field is populated with the reserved
->> +    value as defined by the architecture.
->> + c) The value of a field marked as not 'visible', is set to indicate
->> +    the feature is missing (as defined by the architecture).
->
-> I don't understand point (c) above. If it is marked as not 'visible', it
-> is always reported to user as 0. The above could be misinterpreted as
-> reporting missing architecture features.
->
+ Performance counter stats for 'make':
 
-Part of the reason is that, 0 may be unsafe or undefined by architecture for some fields.
-e.g, ID_AA64PFR0_EL1: EL1/EL0 : 0 is undefined. We choose 0x1, which indicates
-EL1/EL0 both only have AArch64.
+    1526089.499304      task-clock:u (msec)       #    0.932 CPUs utilized          
+                 0      context-switches:u        #    0.000 K/sec                  
+                 0      cpu-migrations:u          #    0.000 K/sec                  
+          29527793      page-faults:u             #    0.019 M/sec                  
+     2913174122673      cycles:u                  #    1.909 GHz                    
+     2365040892322      instructions:u            #    0.81  insn per cycle         
+   <not supported>      branches:u                                                  
+       32049215378      branch-misses:u           #    0.00% of all branches        
 
-So, we always fall back to the safe value for that particular feature,
-which happens to be 0 for most, but not all.
+    1637.531444837 seconds time elapsed
 
+Running the same host kernel on a Mustang system, the guest explodes
+in the way you reported. The failing instruction always seems to be
+an access to pmxevcntr_el0 (I've seen both reads and writes).
 
-> [...]
->> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->> index 94c188f..fb331de 100644
->> --- a/arch/arm64/kernel/cpufeature.c
->> +++ b/arch/arm64/kernel/cpufeature.c
->> @@ -81,6 +81,10 @@ static bool __maybe_unused
->>  cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused);
->>
->>
->> +/*
->> + * NOTE: Any changes to the visibility of features should be kept in
->> + * sync with the documentation of the CPU feature register API.
->
-> s/API/ABI/
->
+Funnily enough, it dies if you try any HW event other than cycles
+("perf stat -e cycles ls" works, and "perf stat -e instructions ls"
+explodes). Which would tend to indicate that we're screwing up
+the counter selection, but I have no proof of that (specially that
+the Seattle guest is working just as expected).
 
-Sure, will make changes everywhere.
+Shannon, any idea?
 
-Thanks
-Suzuki
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
