@@ -1,22 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Nov 2016 17:10:43 +0100
-Subject: [GIT PULL 10/10] arm64: tegra: Default configuration updates for
- v4.10-rc1
-In-Reply-To: <20161118161719.24153-10-thierry.reding@gmail.com>
-References: <20161118161719.24153-1-thierry.reding@gmail.com>
- <20161118161719.24153-10-thierry.reding@gmail.com>
-Message-ID: <6706502.us21ohNYZA@wuerfel>
+Date: Wed, 30 Nov 2016 17:12:19 +0100
+Subject: [GIT PULL v2] firmware: SCPI updates for v4.10
+In-Reply-To: <20161118115615.GB14913@e107155-lin>
+References: <20161028112920.GB12241@e107155-lin>
+ <20161118115615.GB14913@e107155-lin>
+Message-ID: <19910715.4bRSNc9FGE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, November 18, 2016 5:17:19 PM CET Thierry Reding wrote:
-> arm64: tegra: Default configuration updates for v4.10-rc1
+On Friday, November 18, 2016 11:56:15 AM CET Sudeep Holla wrote:
+> Hi ARM-SoC Team,
 > 
-> Enable Tegra186 support.
+> I have decoupled the platform specific binding from generic SCPI. Also
+> I have renamed "arm,legacy-scpi" to "arm,scpi-pre-1.0". Since I haven't
+> heard back any objections from Olof/Rob for my response, I am sending
+> the pull request now.
 > 
 
-This was already in next/arm64 (but I didn't see a notification),
-and with the arm64-dt branch now merged as well, we should have
-everything you sent.
+Pulled into next/drivers now, sorry for the delay.
 
 	Arnd
