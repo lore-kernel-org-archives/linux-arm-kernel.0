@@ -1,43 +1,35 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Wed, 30 Nov 2016 09:14:52 -0800
-Subject: [PATCH] soc: ti: qmss: fix the case when !SMP
-In-Reply-To: <0a2d9284-d1e3-c848-42a4-66b06babba80@ti.com>
-References: <20161129221508.10551-1-grygorii.strashko@ti.com>
- <5501170.dgvo5UdPBX@wuerfel>
- <2531f769-dd28-dfbd-0ed7-b209ef6ae98d@oracle.com>
- <0a2d9284-d1e3-c848-42a4-66b06babba80@ti.com>
-Message-ID: <b6c6e9c3-6534-9f20-73bb-84c4e31de5e5@oracle.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 30 Nov 2016 17:17:13 +0000
+Subject: [PATCHv4 05/10] arm64: Use __pa_symbol for kernel symbols
+In-Reply-To: <1480445729-27130-6-git-send-email-labbott@redhat.com>
+References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
+ <1480445729-27130-6-git-send-email-labbott@redhat.com>
+Message-ID: <20161130171713.GE4439@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2016 9:10 AM, Grygorii Strashko wrote:
->
-> Hi Santosh,
->
-> On 11/30/2016 11:01 AM, Santosh Shilimkar wrote:
->> Hi Grygorii,
->>
->> On 11/30/2016 3:37 AM, Arnd Bergmann wrote:
->>> On Tuesday, November 29, 2016 4:15:08 PM CET Grygorii Strashko wrote:
->>>>                 range->num_irqs++;
->>>>
->>>> -               if (oirq.args_count == 3)
->>>> +               if (IS_ENABLED(SMP) && oirq.args_count == 3)
->>>>                         range->irqs[i].cpu_map =
->>>>                                 (oirq.args[2] & 0x0000ff00) >> 8;
->>>>
->>>
->>> I think you mean CONFIG_SMP, not SMP. With the change above, the
->>> code will never be executed.
->>>
->> Is that the full patch ? Can you post updated patch wit above fixed
->> and copy me. I will pick it up.
->>
->
-> I've sent v2.
->
-> For some reason you e-email is not working - delivery failure
-> ssantosh at kernel.org
->
-Weird. I was getting all the emails. Thanks for bouncing the thread.
-I will check.
+On Tue, Nov 29, 2016 at 10:55:24AM -0800, Laura Abbott wrote:
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -205,6 +205,8 @@ static inline void *phys_to_virt(phys_addr_t x)
+>  #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
+>  #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
+>  #define virt_to_pfn(x)      __phys_to_pfn(__virt_to_phys((unsigned long)(x)))
+> +#define sym_to_pfn(x)	    __phys_to_pfn(__pa_symbol(x))
+> +#define lm_alias(x)		__va(__pa_symbol(x))
+[...]
+> --- a/include/linux/mm.h
+> +++ b/include/linux/mm.h
+> @@ -76,6 +76,10 @@ extern int mmap_rnd_compat_bits __read_mostly;
+>  #define page_to_virt(x)	__va(PFN_PHYS(page_to_pfn(x)))
+>  #endif
+>  
+> +#ifndef lm_alias
+> +#define lm_alias(x)	__va(__pa_symbol(x))
+> +#endif
+
+You can drop the arm64-specific lm_alias macro as it's the same as the
+generic one you introduced in the same patch.
+
+-- 
+Catalin
