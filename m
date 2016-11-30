@@ -1,113 +1,94 @@
-From: atull@opensource.altera.com (atull)
-Date: Wed, 30 Nov 2016 13:23:06 -0600
-Subject: [PATCH v3 3/3] fpga manager: Add cyclone-ps-spi driver for Altera
- FPGAs
-In-Reply-To: <6989b2ee-9caf-81b3-2328-9d4e287794cb@gmail.com>
-References: <cover.1480467185.git.stillcompiling@gmail.com>
- <e193572d7746e6f6b8666da7ac0f54031fed5214.1480467185.git.stillcompiling@gmail.com>
- <alpine.DEB.2.10.1611301122470.2617@atull-730U3E-740U3E>
- <6989b2ee-9caf-81b3-2328-9d4e287794cb@gmail.com>
-Message-ID: <alpine.DEB.2.10.1611301320440.2617@atull-730U3E-740U3E>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Wed, 30 Nov 2016 20:37:24 +0100
+Subject: [linux-sunxi] Re: [RFC PATCH] ARM: dts: sun8i: add simplefb
+ node for H3
+In-Reply-To: <2717236.xBNAaGdqdc@jernej-laptop>
+References: <20161130220324.3Kg4VPEw@smtp1m.mail.yandex.net>
+ <2717236.xBNAaGdqdc@jernej-laptop>
+Message-ID: <20161130203724.a390595df0199ed19069f91d@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Nov 2016, Joshua Clayton wrote:
+On Wed, 30 Nov 2016 20:14:11 +0100
+Jernej ?krabec <jernej.skrabec@gmail.com> wrote:
 
-Hi Joshua,
+> Dne ?etrtek, 01. december 2016 ob 03:03:14 CET je Icenowy Zheng napisal(a):
+> > 2016?12?1? 02:49? Jernej Skrabec <jernej.skrabec@gmail.com>???
+> > 
+> > > Hi Jean-Fran?ois,
+> > > 
+> > > Dne sreda, 30. november 2016 10.35.08 UTC+1 je oseba Jean-Fran?ois Moine 
+> napisala:
+> > >> On Tue, 29 Nov 2016 22:59:32 +0100
+> > >> 
+> > >> Maxime Ripard <maxime...@free-electrons.com> wrote:
+> > >> > > > I'm still not sure which pipeline should I use.
+> > >> > > > 
+> > >> > > > And, it seems that HDMI Slow Clock is not needed?
+> > >> > > > 
+> > >> > > > (seems that it's only for EDID, but simplefb won't use EDID)
+> > >> > > 
+> > >> > > So, I don't see how this may work.
+> > >> > > How can the u-boot know the resolutions of the HDMI display device?
+> > >> > > 
+> > >> > > In other words: I have a new H3 board with the last u-boot and
+> > >> > > kernel.
+> > >> > > I plug my (rather old or brand new) HDMI display device.
+> > >> > > After powering on the system, I hope to get something on the screen.
+> > >> > > How?
+> > >> > 
+> > >> > If it works like the driver for the first display engine in U-Boot, it
+> > >> > will use the preferred mode reported by the EDID, and will fallback to
+> > >> > 1024x768 if it cannot access it.
+> > >> 
+> > >> Icenowy wrote: "simplefb won't use EDID"
+> > >> 
+> > >> Then, if it is like in the kernel, the 1024x768 mode is VGA. It does
+> > >> not work with HDMI (different timings).
+> > > 
+> > > U-Boot driver now accept any timings recommended by EDID. So far it
+> > > was tested with at least following resolutions:
+> > > - 1920x1080 @ 60 Hz
+> > > - 1280x1024 @ 60 Hz
+> > > - 1280x800 @ 60 Hz (slight clock difference)
+> > > - 800x480 (not sure about frame rate)
+> > > - 3840x2160 @ 30 Hz (4K)
+> > 
+> > I tested on 1024x600 (If my memory is right, it's @ 60Hz)
+> > 
+> > > and nobody complained so far. I'm pretty sure 1024x768 would work.
 
-> Hi Alan,
+Check the timings offered by the DRM core.
+
+> > > 
+> > >> > Maybe it would be worth exchanging on the EDID code that has been done
+> > >> > for the u-boot driver too, so that it can be fixed in your driver.
+> > >> 
+> > >> The u-boot got my code, and, up to now, I could not fix the random or
+> > >> permanent failures of EDID reading in some boards.
+> > > 
+> > > I only have one OPi2, but as I said, EDID always worked for me.
+
+Happy guy!
+
+> > > The only
+> > > code left from you is for DE2. HDMI stuff is basically copied from Rockhip
+> > > driver (including EDID reading), TCON code is now reverted to the same as
+> > > it is in sunxi_display.c. I think it is worth to take a look at EDID code
+> > > and compare it.
+> > 
+> > So is the TCON of DE 2.0 identical to the original TCON?
+> > 
+> > If so, we should reuse sun4i-tcon ...
 > 
-> On 11/30/2016 09:45 AM, atull wrote:
-> > On Wed, 30 Nov 2016, Joshua Clayton wrote:
-> >
-> > Hi Clayton,
-> >
-> > I just have a few minor one line changes below.  Only one
-> > is operational, I should have caught that earlier.
-> >
-> Thanks for the speedy review.
-> >> +};
-> >> +MODULE_DEVICE_TABLE(of, of_ef_match);
-> >> +
-> >> +static enum fpga_mgr_states cyclonespi_state(struct fpga_manager *mgr)
-> >> +{
-> >> +	return mgr->state;
-> >> +}
-> > This function gets called once to initialize mgr->state in
-> > fpga_mgr_register().  So it should at least return the state the FPGA
-> > is at then.  If it is unknown, it can just return
-> > FPGA_MGR_STATE_UNKNOWN.
-> >
-> I guess I didn't understand the purpose of this function.
-> The driver has access to the status pin at this phase, so I can return
-> FPGA_MGR_STATE_UNKNOWN or FPGA_MGR_STATE_RESET depending
-> on the state of that pin.
-> 
-> >> +
-> >> +static int cyclonespi_write_init(struct fpga_manager *mgr, u32 flags,
-> >> +				 const char *buf, size_t count)
-> > Minor, but please fix the indentation of 'const' to match that of
-> > 'struct' above.  checkpatch.pl is probably issuing warnings
-> > about that.
-> I double checked. The indentation is correct here. It only has
-> The appearance of being off by one due to the diff format.
+> Well, TCON is splitted in two parts (two base addresses), one for HDMI and one 
+> for TV. However, register offsets are same as before, so I guess driver 
+> reusage make sense. I think that there are few additional registers, but they 
+> can be ignored for simplefb.
 
-Yes, I understand.
+The TCON1 of the H3 is not usable (no ckock). Analog TV has its own
+clock and I/O area.
 
-> >> +{
-> >> +	struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
-> >> +	int i;
-> >> +
-> >> +	if (flags & FPGA_MGR_PARTIAL_RECONFIG) {
-> >> +		dev_err(&mgr->dev, "Partial reconfiguration not supported.\n");
-> >> +		return -EINVAL;
-> >> +	}
-> >> +
-> >> +	gpiod_set_value(conf->config, 0);
-> >> +	usleep_range(FPGA_RESET_TIME, FPGA_RESET_TIME + 20);
-> >> +	if (gpiod_get_value(conf->status) == 1) {
-> >> +		dev_err(&mgr->dev, "Status pin should be low.\n");
-> >> +		return -EIO;
-> >> +	}
-> >> +
-> >> +	gpiod_set_value(conf->config, 1);
-> >> +	for (i = 0; i < (FPGA_MAX_DELAY / FPGA_MIN_DELAY); i++) {
-> >> +		usleep_range(FPGA_MIN_DELAY, FPGA_MIN_DELAY + 20);
-> >> +		if (gpiod_get_value(conf->status))
-> >> +			return 0;
-> >> +	}
-> >> +
-> >> +	dev_err(&mgr->dev, "Status pin not ready.\n");
-> >> +	return -EIO;
-> >> +}
-> >> +
-> >> +static void rev_buf(void *buf, size_t len)
-> >> +{
-> >> +	u32 *fw32 = (u32 *)buf;
-> >> +	const u32 *fw_end = (u32 *)(buf + len);
-> >> +
-> >> +	/* set buffer to lsb first */
-> >> +	while (fw32 < fw_end) {
-> >> +		*fw32 = bitrev8x4(*fw32);
-> >> +		fw32++;
-> >> +	}
-> >> +}
-> >> +
-> >> +static int cyclonespi_write(struct fpga_manager *mgr, const char *buf,
-> >> +			    size_t count)
-> > Please fix alignment here also.
-> Same as above. Indentation is OK.
-> 
-> 
-> I'll get a v4 turned around soon.
-
-No rush since the other two patches need acks from
-their respective maintainers and this won't be able
-to go in without them.  But with that one change
-it looks good to me.
-
-Alan
-
-> Thanks,
-> Joshua
-> 
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
