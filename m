@@ -1,31 +1,22 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 30 Nov 2016 10:10:24 -0600
-Subject: [PATCH] soc: ti: qmss: fix the case when !SMP
-In-Reply-To: <5501170.dgvo5UdPBX@wuerfel>
-References: <20161129221508.10551-1-grygorii.strashko@ti.com>
- <5501170.dgvo5UdPBX@wuerfel>
-Message-ID: <a76f3e4e-6148-b1b6-2e33-aa4fead15aee@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Nov 2016 17:10:43 +0100
+Subject: [GIT PULL 10/10] arm64: tegra: Default configuration updates for
+ v4.10-rc1
+In-Reply-To: <20161118161719.24153-10-thierry.reding@gmail.com>
+References: <20161118161719.24153-1-thierry.reding@gmail.com>
+ <20161118161719.24153-10-thierry.reding@gmail.com>
+Message-ID: <6706502.us21ohNYZA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Friday, November 18, 2016 5:17:19 PM CET Thierry Reding wrote:
+> arm64: tegra: Default configuration updates for v4.10-rc1
+> 
+> Enable Tegra186 support.
+> 
 
+This was already in next/arm64 (but I didn't see a notification),
+and with the arm64-dt branch now merged as well, we should have
+everything you sent.
 
-On 11/30/2016 05:37 AM, Arnd Bergmann wrote:
-> On Tuesday, November 29, 2016 4:15:08 PM CET Grygorii Strashko wrote:
->>                 range->num_irqs++;
->>
->> -               if (oirq.args_count == 3)
->> +               if (IS_ENABLED(SMP) && oirq.args_count == 3)
->>                         range->irqs[i].cpu_map =
->>                                 (oirq.args[2] & 0x0000ff00) >> 8;
->>
->
-> I think you mean CONFIG_SMP, not SMP. With the change above, the
-> code will never be executed.
->
-
-Thanks. I'll resend.
-
--- 
-regards,
--grygorii
+	Arnd
