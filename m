@@ -1,62 +1,79 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 30 Nov 2016 11:48:37 +0000
-Subject: Unable to use perf in VM
-In-Reply-To: <70374841-ecb1-a6c3-ed43-0f39e2d5fec2@riken.jp>
-References: <70374841-ecb1-a6c3-ed43-0f39e2d5fec2@riken.jp>
-Message-ID: <8b2a3cfd-57a0-70ac-ef50-672f8040291d@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 30 Nov 2016 12:04:25 +0000
+Subject: [PATCH 2/2] ACPI: Ignore Consumer/Producer for QWord/DWord/Word
+ Address Space
+In-Reply-To: <20161129184334.7618.5495.stgit@bhelgaas-glaptop.roam.corp.google.com>
+References: <20161129182415.7618.99129.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <20161129184334.7618.5495.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20161130120425.GA13765@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Shannon
-
-On 29/11/16 22:04, Itaru Kitayama wrote:
-> Hi,
+On Tue, Nov 29, 2016 at 12:43:34PM -0600, Bjorn Helgaas wrote:
+> Per ACPI spec r6.0, sec 6.4.3.5.1, 2, 3, Bit [0] of General Flags (the
+> Consumer/Producer bit) should be ignored for QWord/DWord/Word Address Space
+> descriptors.  The Consumer/Producer bit is defined only for the Extended
+> Address Space descriptor.
 > 
-> In a VM (virsh controlled, KVM acceleration enabled) on a recent
-> kvmarm kernel host, I find I am unable to use perf to obtain
-> performance statistics for a complex task like kernel build.
-> (I've verified this is seen with a Fedora 25 VM and host combination
-> as well)
-> APM folks CC'ed think this might be caused by a bug in the core PMU 
-> framework code, thus I'd like to have experts opinion on this issue.
+> Ignore Consumer/Producer except for Extended Address Space descriptors.
 > 
-> [root at localhost linux]# perf stat -B make
->    CHK     include/config/kernel.release
-> [  119.617684] git[1144]: undefined instruction: pc=fffffc000808ff30
-> [  119.623040] Code: 51000442 92401042 d51b9ca2 d5033fdf (d53b9d40)
-> [  119.627607] Internal error: undefined instruction: 0 [#1] SMP
+> Note that for QWord/DWord/Word descriptors, we previously applied the
+> translation offset (_TRA) only when the Consumer/Producer bit was set.
 
-[...]
+"..Consumer/Producer bit was clear" ? If that bit was set:
 
-In a VM running mainline hosted on an AMD Seattle box:
+struct acpi_resource_address->producer_consumer == ACPI_CONSUMER
 
- Performance counter stats for 'make':
-
-    1526089.499304      task-clock:u (msec)       #    0.932 CPUs utilized          
-                 0      context-switches:u        #    0.000 K/sec                  
-                 0      cpu-migrations:u          #    0.000 K/sec                  
-          29527793      page-faults:u             #    0.019 M/sec                  
-     2913174122673      cycles:u                  #    1.909 GHz                    
-     2365040892322      instructions:u            #    0.81  insn per cycle         
-   <not supported>      branches:u                                                  
-       32049215378      branch-misses:u           #    0.00% of all branches        
-
-    1637.531444837 seconds time elapsed
-
-Running the same host kernel on a Mustang system, the guest explodes
-in the way you reported. The failing instruction always seems to be
-an access to pmxevcntr_el0 (I've seen both reads and writes).
-
-Funnily enough, it dies if you try any HW event other than cycles
-("perf stat -e cycles ls" works, and "perf stat -e instructions ls"
-explodes). Which would tend to indicate that we're screwing up
-the counter selection, but I have no proof of that (specially that
-the Seattle guest is working just as expected).
-
-Shannon, any idea?
+and we are not applying the _TRA offset in that case, right ?
 
 Thanks,
+Lorenzo
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> This patch changes that: for those descriptors, we ignore Consumer/Producer
+> and always apply the translation offset.
+> 
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> ---
+>  drivers/acpi/resource.c |   16 +++++++++++-----
+>  1 file changed, 11 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
+> index 2732d39e..b45cd8f 100644
+> --- a/drivers/acpi/resource.c
+> +++ b/drivers/acpi/resource.c
+> @@ -261,11 +261,16 @@ bool acpi_dev_resource_address_space(struct acpi_resource *ares,
+>  	 * primary side. Non-bridge devices must list 0 for all Address
+>  	 * Translation offset bits.
+>  	 */
+> -	if (addr->producer_consumer == ACPI_PRODUCER)
+> +	if (ares->type == ACPI_RESOURCE_TYPE_EXTENDED_ADDRESS64) {
+> +		if (addr->producer_consumer == ACPI_PRODUCER)
+> +			offset = attr->translation_offset;
+> +		else if (attr->translation_offset)
+> +			pr_debug("ACPI: translation_offset(%lld) is invalid for non-bridge device.\n",
+> +				 attr->translation_offset);
+> +	} else {
+>  		offset = attr->translation_offset;
+> -	else if (attr->translation_offset)
+> -		pr_debug("ACPI: translation_offset(%lld) is invalid for non-bridge device.\n",
+> -			 attr->translation_offset);
+> +	}
+> +
+>  	start = attr->minimum + offset;
+>  	end = attr->maximum + offset;
+>  
+> @@ -294,7 +299,8 @@ bool acpi_dev_resource_address_space(struct acpi_resource *ares,
+>  		return false;
+>  	}
+>  
+> -	if (addr->producer_consumer == ACPI_PRODUCER)
+> +	if (ares->type == ACPI_RESOURCE_TYPE_EXTENDED_ADDRESS64 &&
+> +	    addr->producer_consumer == ACPI_PRODUCER)
+>  		res->flags |= IORESOURCE_WINDOW;
+>  
+>  	if (addr->info.mem.caching == ACPI_PREFETCHABLE_MEMORY)
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
