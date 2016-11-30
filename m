@@ -1,35 +1,27 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 30 Nov 2016 14:44:05 -0600
-Subject: [PATCH v28 9/9] Documentation: dt: chosen properties for arm64
- kdump
-In-Reply-To: <20161124171413.GE7452@e104818-lin.cambridge.arm.com>
-References: <20161124095523.6972-1-takahiro.akashi@linaro.org>
- <20161124095944.7167-1-takahiro.akashi@linaro.org>
- <20161124171413.GE7452@e104818-lin.cambridge.arm.com>
-Message-ID: <20161130204405.a4k54zrhe36dpdlp@rob-hp-laptop>
+Date: Wed, 30 Nov 2016 14:47:13 -0600
+Subject: [PATCH v2 1/9] clk: stm32f4: Update DT bindings documentation
+In-Reply-To: <1479998749-20358-2-git-send-email-gabriel.fernandez@st.com>
+References: <1479998749-20358-1-git-send-email-gabriel.fernandez@st.com>
+ <1479998749-20358-2-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <20161130204713.bu6ig3z6n6dx47z7@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2016 at 05:14:13PM +0000, Catalin Marinas wrote:
-> On Thu, Nov 24, 2016 at 06:59:44PM +0900, AKASHI Takahiro wrote:
-> > From: James Morse <james.morse@arm.com>
-> > 
-> > Add documentation for
-> > 	linux,crashkernel-base and crashkernel-size,
-> > 	linux,usable-memory-range
-> > 	linux,elfcorehdr
-> > used by arm64 kdump to decribe the kdump reserved area, and
-> > the elfcorehdr's location within it.
-> > 
-> > Signed-off-by: James Morse <james.morse@arm.com>
-> > [takahiro.akashi at linaro.org: added "linux,crashkernel-base" and "-size" ]
-> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > Cc: devicetree at vger.kernel.org
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
+On Thu, Nov 24, 2016 at 03:45:41PM +0100, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
 > 
-> Rob, Mark, are you ok with this patch?
+> Creation of dt include file for specific stm32f4 clocks.
+> These specific clocks are not derived from system clock (SYSCLOCK)
+> We should use index 1 to use these clocks in DT.
+> e.g. <&rcc 1 CLK_LSI>
+> 
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> ---
+>  .../devicetree/bindings/clock/st,stm32-rcc.txt     |  8 ++++++
+>  drivers/clk/clk-stm32f4.c                          |  9 +++++--
+>  include/dt-bindings/clock/stm32f4-clock.h          | 31 ++++++++++++++++++++++
+>  3 files changed, 46 insertions(+), 2 deletions(-)
+>  create mode 100644 include/dt-bindings/clock/stm32f4-clock.h
 
-I'm leaving this one to Mark.
-
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
