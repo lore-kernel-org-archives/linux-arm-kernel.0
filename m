@@ -1,33 +1,20 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 30 Nov 2016 09:45:03 +0100
-Subject: [PATCH 07/12] usb: sunxi: Uses the resource-managed extcon API
- when registering extcon notifier
-In-Reply-To: <1480485460-2663-8-git-send-email-cw00.choi@samsung.com>
-References: <1480485460-2663-1-git-send-email-cw00.choi@samsung.com>
- <1480485460-2663-8-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20161130084503.v5klzl6silp6323s@lukather>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 30 Nov 2016 03:50:21 -0500
+Subject: [PATCH 0/3] fix modversion for symbol exported from asm code 
+Message-ID: <1480495824-4151-1-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2016 at 02:57:35PM +0900, Chanwoo Choi wrote:
-> This patch just uses the resource-managed extcon API when registering
-> the extcon notifier.
-> 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+This is my alternative to asm-prototypes.h for fixing modversion with
+assembly symbols. This preserves the goal of not having a central list
+of symbols that may get out of sync wrt the actual code.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+An example usage is provided for ARM.
 
-Thanks!
-Maxime
+The asm-prototypes.h method is still available for those who might
+prefer it.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161130/bc452c58/attachment.sig>
+Given that modversion is currently broken, I'd advocate for the first
+2 patches to go into mainline now even if v4.9 is imminent. That can't
+make things any worse than they are, and with this in place people may
+start fixing their own architecture.
