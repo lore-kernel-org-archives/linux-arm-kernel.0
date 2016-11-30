@@ -1,62 +1,51 @@
-From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Wed, 30 Nov 2016 08:41:43 -0500
-Subject: [PATCH] KVM: arm/arm64: Access CNTHCTL_EL2 bit fields correctly
-In-Reply-To: <129e316b-0a05-9114-f29f-c8935144720c@arm.com>
-References: <1480351570-11648-1-git-send-email-jintack@cs.columbia.edu>
- <d04fd17e-9157-07fe-4daa-9dbab149b5e6@arm.com>
- <799d03f5-a929-9547-1ae7-94026b76f116@arm.com>
- <CAHyh4xhXoFWsbnNNePthWp2-ZAOtCuUVmLn-JKRe4sc=nqrYNw@mail.gmail.com>
- <0a475329-6f50-42ae-3244-f0767c56ce09@arm.com>
- <ee2dacff-691c-7548-ff71-3a992f399333@arm.com>
- <CAHyh4xi2oq8m2B_3oZu+BNeyk-++L2ziMY66+XZ+SDRjOHDN6A@mail.gmail.com>
- <129e316b-0a05-9114-f29f-c8935144720c@arm.com>
-Message-ID: <CAHyh4xjibTX4ESxtxXk0+Z-q6JOXH9=Xcpopd+4FgYHsAZQ=RA@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 30 Nov 2016 14:41:23 +0100
+Subject: [PATCH 1/1] usb: return error code when platform_get_irq fails
+In-Reply-To: <1480424255-25059-1-git-send-email-bianpan2016@163.com>
+References: <1480424255-25059-1-git-send-email-bianpan2016@163.com>
+Message-ID: <52a774c0-9bca-6d1b-a470-f07caefa5d3a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2016 at 8:31 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 29/11/16 21:05, Jintack Lim wrote:
->> On Tue, Nov 29, 2016 at 11:53 AM, Suzuki K Poulose
->> <suzuki.poulose@arm.com> wrote:
->>> On 29/11/16 09:36, Marc Zyngier wrote:
->>>>
->>>> On 29/11/16 03:28, Jintack Lim wrote:
->>>>>
->>>>> On Mon, Nov 28, 2016 at 1:39 PM, Marc Zyngier <marc.zyngier@arm.com>
->>>>> wrote:
->>>>>>
->>>>>> On 28/11/16 17:43, Marc Zyngier wrote:
->>>>>
->>>>> This looks much cleaner than my patch.
->>>>> While we are at it, is it worth to consider that we just need to set
->>>>> those bits once for VHE case, not for every world switch as an
->>>>> optimization?
->>>>
->>>>
->>>> Ah! That's a much better idea indeed! And we could stop messing with
->>>> cntvoff_el2 as well, as it doesn't need to be restored to zero on exit.
->>>> Could you try and respin something along those lines?
->>>>
->>>
->>> fyi, we have a static_key based cpus_have_const_cap() for Constant cap
->>> checking (like this case) available in linux-next. May be you could make use
->>> of that instead of alternatives.
->>
->> Thanks Suzuki. This looks very useful.
->>
->> Marc, can I write a patch based on linux-next? The commit which has
->> cpus_have_const_cap() is not in master and next branch in kvm/arm
->> repo.
->
-> You can. It is just that I won't be able to apply it immediately (I'll
-> wait for -rc1 to be out, and send it as a fix).
 
-Ok. Thanks!. I'll send out v2.
 
+On 29/11/16 13:57, Pan Bian wrote:
+> In function xhci_mtk_probe(), variable ret takes the return value. Its
+> value should be negative on failures. However, when the call to function
+> platform_get_irq() fails, it does not set the error code, and 0 will be
+> returned. 0 indicates no error. As a result, the callers of function
+> xhci_mtk_probe() will not be able to detect the error. This patch fixes
+> the bug by assigning the return value of platform_get_irq() to variable
+> ret if it fails.
 >
-> Thanks,
+> Signed-off-by: Pan Bian <bianpan2016@163.com>
+> ---
+>  drivers/usb/host/xhci-mtk.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
 >
->         M.
-> --
-> Jazz is not dead. It just smells funny...
+> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+> index 79959f1..f2365a4 100644
+> --- a/drivers/usb/host/xhci-mtk.c
+> +++ b/drivers/usb/host/xhci-mtk.c
+> @@ -560,8 +560,10 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+>  		goto disable_ldos;
 >
+>  	irq = platform_get_irq(pdev, 0);
+> -	if (irq < 0)
+> +	if (irq < 0) {
+> +		ret = irq;
+>  		goto disable_clk;
+> +	}
+>
+>  	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
+>  	ret = dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
+>
+
+
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+
+Next time please make sure to send the patch to all relevant lists and 
+people (get_maintainer.pl).
+
+Regards,
+Matthias
