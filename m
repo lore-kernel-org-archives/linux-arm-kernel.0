@@ -1,9 +1,9 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 30 Nov 2016 14:57:33 +0900
-Subject: [PATCH 05/12] usb: chipdata: Replace the extcon API
+Date: Wed, 30 Nov 2016 14:57:36 +0900
+Subject: [PATCH 08/12] usb: phy: msm: Replace the extcon API
 In-Reply-To: <1480485460-2663-1-git-send-email-cw00.choi@samsung.com>
 References: <1480485460-2663-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1480485460-2663-6-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1480485460-2663-9-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,92 +13,104 @@ and replaces the deprecated extcon API as following:
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- drivers/usb/chipidea/core.c | 30 ++++++------------------------
- 1 file changed, 6 insertions(+), 24 deletions(-)
+ drivers/usb/phy/phy-msm-usb.c | 33 +++++++++++----------------------
+ 1 file changed, 11 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 69426e644d17..a5b44963eaea 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -742,7 +742,7 @@ static int ci_get_platdata(struct device *dev,
- 	cable->edev = ext_vbus;
- 
+diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
+index 8a34759727bb..a15a89d4235d 100644
+--- a/drivers/usb/phy/phy-msm-usb.c
++++ b/drivers/usb/phy/phy-msm-usb.c
+@@ -1742,14 +1742,14 @@ static int msm_otg_read_dt(struct platform_device *pdev, struct msm_otg *motg)
  	if (!IS_ERR(ext_vbus)) {
--		ret = extcon_get_cable_state_(cable->edev, EXTCON_USB);
-+		ret = extcon_get_state(cable->edev, EXTCON_USB);
- 		if (ret)
- 			cable->state = true;
- 		else
-@@ -754,7 +754,7 @@ static int ci_get_platdata(struct device *dev,
- 	cable->edev = ext_id;
- 
- 	if (!IS_ERR(ext_id)) {
--		ret = extcon_get_cable_state_(cable->edev, EXTCON_USB_HOST);
-+		ret = extcon_get_state(cable->edev, EXTCON_USB_HOST);
- 		if (ret)
- 			cable->state = false;
- 		else
-@@ -771,8 +771,8 @@ static int ci_extcon_register(struct ci_hdrc *ci)
- 	id = &ci->platdata->id_extcon;
- 	id->ci = ci;
- 	if (!IS_ERR(id->edev)) {
--		ret = extcon_register_notifier(id->edev, EXTCON_USB_HOST,
--					       &id->nb);
-+		ret = devm_extcon_register_notifier(ci->dev, id->edev,
-+						EXTCON_USB_HOST, &id->nb);
+ 		motg->vbus.extcon = ext_vbus;
+ 		motg->vbus.nb.notifier_call = msm_otg_vbus_notifier;
+-		ret = extcon_register_notifier(ext_vbus, EXTCON_USB,
+-						&motg->vbus.nb);
++		ret = devm_extcon_register_notifier(&pdev->dev, ext_vbus,
++						EXTCON_USB, &motg->vbus.nb);
  		if (ret < 0) {
- 			dev_err(ci->dev, "register ID failed\n");
- 			return ret;
-@@ -782,11 +782,9 @@ static int ci_extcon_register(struct ci_hdrc *ci)
- 	vbus = &ci->platdata->vbus_extcon;
- 	vbus->ci = ci;
- 	if (!IS_ERR(vbus->edev)) {
--		ret = extcon_register_notifier(vbus->edev, EXTCON_USB,
--					       &vbus->nb);
-+		ret = devm_extcon_register_notifier(ci->dev, vbus->edev,
-+						EXTCON_USB, &vbus->nb);
- 		if (ret < 0) {
--			extcon_unregister_notifier(id->edev, EXTCON_USB_HOST,
--						   &id->nb);
- 			dev_err(ci->dev, "register VBUS failed\n");
+ 			dev_err(&pdev->dev, "register VBUS notifier failed\n");
  			return ret;
  		}
-@@ -795,20 +793,6 @@ static int ci_extcon_register(struct ci_hdrc *ci)
- 	return 0;
- }
  
--static void ci_extcon_unregister(struct ci_hdrc *ci)
--{
--	struct ci_hdrc_cable *cable;
--
--	cable = &ci->platdata->id_extcon;
--	if (!IS_ERR(cable->edev))
--		extcon_unregister_notifier(cable->edev, EXTCON_USB_HOST,
--					   &cable->nb);
--
--	cable = &ci->platdata->vbus_extcon;
--	if (!IS_ERR(cable->edev))
--		extcon_unregister_notifier(cable->edev, EXTCON_USB, &cable->nb);
--}
--
- static DEFINE_IDA(ci_ida);
+-		ret = extcon_get_cable_state_(ext_vbus, EXTCON_USB);
++		ret = extcon_get_state(ext_vbus, EXTCON_USB);
+ 		if (ret)
+ 			set_bit(B_SESS_VLD, &motg->inputs);
+ 		else
+@@ -1759,16 +1759,14 @@ static int msm_otg_read_dt(struct platform_device *pdev, struct msm_otg *motg)
+ 	if (!IS_ERR(ext_id)) {
+ 		motg->id.extcon = ext_id;
+ 		motg->id.nb.notifier_call = msm_otg_id_notifier;
+-		ret = extcon_register_notifier(ext_id, EXTCON_USB_HOST,
+-						&motg->id.nb);
++		ret = devm_extcon_register_notifier(&pdev->dev, ext_id,
++						EXTCON_USB_HOST, &motg->id.nb);
+ 		if (ret < 0) {
+ 			dev_err(&pdev->dev, "register ID notifier failed\n");
+-			extcon_unregister_notifier(motg->vbus.extcon,
+-						   EXTCON_USB, &motg->vbus.nb);
+ 			return ret;
+ 		}
  
- struct platform_device *ci_hdrc_add_device(struct device *dev,
-@@ -1053,7 +1037,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
- 	if (!ret)
- 		return 0;
- 
--	ci_extcon_unregister(ci);
- stop:
- 	ci_role_destroy(ci);
- deinit_phy:
-@@ -1073,7 +1056,6 @@ static int ci_hdrc_remove(struct platform_device *pdev)
+-		ret = extcon_get_cable_state_(ext_id, EXTCON_USB_HOST);
++		ret = extcon_get_state(ext_id, EXTCON_USB_HOST);
+ 		if (ret)
+ 			clear_bit(ID, &motg->inputs);
+ 		else
+@@ -1883,10 +1881,9 @@ static int msm_otg_probe(struct platform_device *pdev)
+ 	 */
+ 	if (motg->phy_number) {
+ 		phy_select = devm_ioremap_nocache(&pdev->dev, USB2_PHY_SEL, 4);
+-		if (!phy_select) {
+-			ret = -ENOMEM;
+-			goto unregister_extcon;
+-		}
++		if (!phy_select)
++			return -ENOMEM;
++
+ 		/* Enable second PHY with the OTG port */
+ 		writel(0x1, phy_select);
+ 	}
+@@ -1897,7 +1894,7 @@ static int msm_otg_probe(struct platform_device *pdev)
+ 	if (motg->irq < 0) {
+ 		dev_err(&pdev->dev, "platform_get_irq failed\n");
+ 		ret = motg->irq;
+-		goto unregister_extcon;
++		return motg->irq;
  	}
  
- 	dbg_remove_files(ci);
--	ci_extcon_unregister(ci);
- 	ci_role_destroy(ci);
- 	ci_hdrc_enter_lpm(ci, true);
- 	ci_usb_phy_exit(ci);
+ 	regs[0].supply = "vddcx";
+@@ -1906,7 +1903,7 @@ static int msm_otg_probe(struct platform_device *pdev)
+ 
+ 	ret = devm_regulator_bulk_get(motg->phy.dev, ARRAY_SIZE(regs), regs);
+ 	if (ret)
+-		goto unregister_extcon;
++		return ret;
+ 
+ 	motg->vddcx = regs[0].consumer;
+ 	motg->v3p3  = regs[1].consumer;
+@@ -2003,11 +2000,6 @@ static int msm_otg_probe(struct platform_device *pdev)
+ 	clk_disable_unprepare(motg->clk);
+ 	if (!IS_ERR(motg->core_clk))
+ 		clk_disable_unprepare(motg->core_clk);
+-unregister_extcon:
+-	extcon_unregister_notifier(motg->id.extcon,
+-				   EXTCON_USB_HOST, &motg->id.nb);
+-	extcon_unregister_notifier(motg->vbus.extcon,
+-				   EXTCON_USB, &motg->vbus.nb);
+ 
+ 	return ret;
+ }
+@@ -2029,9 +2021,6 @@ static int msm_otg_remove(struct platform_device *pdev)
+ 	 */
+ 	gpiod_set_value_cansleep(motg->switch_gpio, 0);
+ 
+-	extcon_unregister_notifier(motg->id.extcon, EXTCON_USB_HOST, &motg->id.nb);
+-	extcon_unregister_notifier(motg->vbus.extcon, EXTCON_USB, &motg->vbus.nb);
+-
+ 	msm_otg_debugfs_cleanup();
+ 	cancel_delayed_work_sync(&motg->chg_work);
+ 	cancel_work_sync(&motg->sm_work);
 -- 
 1.9.1
