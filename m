@@ -1,87 +1,131 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 30 Nov 2016 15:14:54 +0000
-Subject: [PATCH v2 3/9] arm64: cpufeature: Cleanup feature bit tables
+Date: Wed, 30 Nov 2016 15:14:53 +0000
+Subject: [PATCH v2 2/9] arm64: cpufeature: remove explicit RAZ fields
 In-Reply-To: <1480518901-18544-1-git-send-email-suzuki.poulose@arm.com>
 References: <1480518901-18544-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1480518901-18544-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1480518901-18544-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch does the following clean ups :
+From: Mark Rutland <mark.rutland@arm.com>
 
-1) All undescribed fields of a register are now treated as "strict"
-   with a safe value of 0. Hence we could leave an empty table for
-   describing registers which are RAZ.
+We currently have some RAZ fields described explicitly in our
+arm64_ftr_bits arrays. These are inconsistently commented, grouped,
+and/or applied, and maintaining these is error-prone.
 
-2) ID_AA64DFR1_EL1 is RAZ and should use the table for RAZ register.
+Luckily, we don't need these at all. We'll never need to inspect RAZ
+fields to determine feature support, and init_cpu_ftr_reg() will ensure
+that any bits without a corresponding arm64_ftr_bits entry are treated
+as RES0 with strict matching requirements. In check_update_ftr_reg()
+we'll then compare these bits from the relevant cpuinfo_arm64
+structures, and need not store them in a arm64_ftr_reg.
 
-3) ftr_generic32 is used to represent a register with a 32bit feature
-   value. Rename this to ftr_singl32 to make it more obvious. Since
-   we don't have a 64bit singe feature register, kill ftr_generic.
+This patch removes the unnecessary arm64_ftr_bits entries for RES0 bits.
 
-Based on a patch by Mark Rutland.
-
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c | 19 +++++++------------
- 1 file changed, 7 insertions(+), 12 deletions(-)
+ arch/arm64/kernel/cpufeature.c | 15 ---------------
+ 1 file changed, 15 deletions(-)
 
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index aaf3cba..67e6935 100644
+index a6ecf51..aaf3cba 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -246,18 +246,13 @@ static const struct arm64_ftr_bits ftr_generic_32bits[] = {
+@@ -80,21 +80,16 @@ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
+ 
+ 
+ static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 24, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_CRC32_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA2_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_SHA1_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_AES_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 4, 0),	/* RAZ */
  	ARM64_FTR_END,
  };
  
--static const struct arm64_ftr_bits ftr_generic[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 64, 0),
--	ARM64_FTR_END,
--};
--
--static const struct arm64_ftr_bits ftr_generic32[] = {
-+/* Table for a single 32bit feature value */
-+static const struct arm64_ftr_bits ftr_single32[] = {
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 32, 0),
+ static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 28, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64PFR0_GIC_SHIFT, 4, 0),
+ 	S_ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
+ 	S_ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
+@@ -107,7 +102,6 @@ static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
+ };
+ 
+ static const struct arm64_ftr_bits ftr_id_aa64mmfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
+ 	S_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN4_SHIFT, 4, ID_AA64MMFR0_TGRAN4_NI),
+ 	S_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN64_SHIFT, 4, ID_AA64MMFR0_TGRAN64_NI),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR0_TGRAN16_SHIFT, 4, ID_AA64MMFR0_TGRAN16_NI),
+@@ -125,7 +119,6 @@ static const struct arm64_ftr_bits ftr_id_aa64mmfr0[] = {
+ };
+ 
+ static const struct arm64_ftr_bits ftr_id_aa64mmfr1[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR1_PAN_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_LOR_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR1_HPD_SHIFT, 4, 0),
+@@ -146,7 +139,6 @@ static const struct arm64_ftr_bits ftr_id_aa64mmfr2[] = {
+ 
+ static const struct arm64_ftr_bits ftr_ctr[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 31, 1, 1),	/* RAO */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 28, 3, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_HIGHER_SAFE, 24, 4, 0),	/* CWG */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),	/* ERG */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
+@@ -156,7 +148,6 @@ static const struct arm64_ftr_bits ftr_ctr[] = {
+ 	 * If we have differing I-cache policies, report it as the weakest - AIVIVT.
+ 	 */
+ 	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, 14, 2, ICACHE_POLICY_AIVIVT),	/* L1Ip */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 10, 0),	/* RAZ */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* IminLine */
+ 	ARM64_FTR_END,
+ };
+@@ -190,14 +181,12 @@ static const struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
+ };
+ 
+ static const struct arm64_ftr_bits ftr_mvfr2[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 8, 24, 0),	/* RAZ */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 4, 0),		/* FPMisc */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 4, 0),		/* SIMDMisc */
  	ARM64_FTR_END,
  };
  
--static const struct arm64_ftr_bits ftr_aa64raz[] = {
--	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 64, 0),
-+static const struct arm64_ftr_bits ftr_raz[] = {
+ static const struct arm64_ftr_bits ftr_dczid[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 5, 27, 0),	/* RAZ */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 1, 1),		/* DZP */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* BS */
+ 	ARM64_FTR_END,
+@@ -206,7 +195,6 @@ static const struct arm64_ftr_bits ftr_dczid[] = {
+ 
+ static const struct arm64_ftr_bits ftr_id_isar5[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_RDM_SHIFT, 4, 0),
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 20, 4, 0),	/* RAZ */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_CRC32_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_SHA2_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_ISAR5_SHA1_SHIFT, 4, 0),
+@@ -216,14 +204,11 @@ static const struct arm64_ftr_bits ftr_id_isar5[] = {
+ };
+ 
+ static const struct arm64_ftr_bits ftr_id_mmfr4[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 8, 24, 0),	/* RAZ */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 4, 0),		/* ac2 */
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 4, 0),		/* RAZ */
  	ARM64_FTR_END,
  };
  
-@@ -298,15 +293,15 @@ static const struct __ftr_reg_entry {
- 
- 	/* Op1 = 0, CRn = 0, CRm = 4 */
- 	ARM64_FTR_REG(SYS_ID_AA64PFR0_EL1, ftr_id_aa64pfr0),
--	ARM64_FTR_REG(SYS_ID_AA64PFR1_EL1, ftr_aa64raz),
-+	ARM64_FTR_REG(SYS_ID_AA64PFR1_EL1, ftr_raz),
- 
- 	/* Op1 = 0, CRn = 0, CRm = 5 */
- 	ARM64_FTR_REG(SYS_ID_AA64DFR0_EL1, ftr_id_aa64dfr0),
--	ARM64_FTR_REG(SYS_ID_AA64DFR1_EL1, ftr_generic),
-+	ARM64_FTR_REG(SYS_ID_AA64DFR1_EL1, ftr_raz),
- 
- 	/* Op1 = 0, CRn = 0, CRm = 6 */
- 	ARM64_FTR_REG(SYS_ID_AA64ISAR0_EL1, ftr_id_aa64isar0),
--	ARM64_FTR_REG(SYS_ID_AA64ISAR1_EL1, ftr_aa64raz),
-+	ARM64_FTR_REG(SYS_ID_AA64ISAR1_EL1, ftr_raz),
- 
- 	/* Op1 = 0, CRn = 0, CRm = 7 */
- 	ARM64_FTR_REG(SYS_ID_AA64MMFR0_EL1, ftr_id_aa64mmfr0),
-@@ -318,7 +313,7 @@ static const struct __ftr_reg_entry {
- 	ARM64_FTR_REG(SYS_DCZID_EL0, ftr_dczid),
- 
- 	/* Op1 = 3, CRn = 14, CRm = 0 */
--	ARM64_FTR_REG(SYS_CNTFRQ_EL0, ftr_generic32),
-+	ARM64_FTR_REG(SYS_CNTFRQ_EL0, ftr_single32),
- };
- 
- static int search_cmp_ftr_reg(const void *id, const void *regp)
+ static const struct arm64_ftr_bits ftr_id_pfr0[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 16, 16, 0),	/* RAZ */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 12, 4, 0),	/* State3 */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 8, 4, 0),		/* State2 */
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 4, 0),		/* State1 */
 -- 
 2.7.4
