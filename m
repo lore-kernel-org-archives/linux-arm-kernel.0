@@ -1,72 +1,113 @@
-From: wei@redhat.com (Wei Huang)
-Date: Wed, 30 Nov 2016 13:17:55 -0600
-Subject: Unable to use perf in VM
-In-Reply-To: <a81f82da-322a-a52b-de0e-316b7ce5f463@arm.com>
-References: <70374841-ecb1-a6c3-ed43-0f39e2d5fec2@riken.jp>
- <8b2a3cfd-57a0-70ac-ef50-672f8040291d@arm.com>
- <a81f82da-322a-a52b-de0e-316b7ce5f463@arm.com>
-Message-ID: <56fd35f8-76ba-3d5d-f1e0-7df5ff8d396a@redhat.com>
+From: atull@opensource.altera.com (atull)
+Date: Wed, 30 Nov 2016 13:23:06 -0600
+Subject: [PATCH v3 3/3] fpga manager: Add cyclone-ps-spi driver for Altera
+ FPGAs
+In-Reply-To: <6989b2ee-9caf-81b3-2328-9d4e287794cb@gmail.com>
+References: <cover.1480467185.git.stillcompiling@gmail.com>
+ <e193572d7746e6f6b8666da7ac0f54031fed5214.1480467185.git.stillcompiling@gmail.com>
+ <alpine.DEB.2.10.1611301122470.2617@atull-730U3E-740U3E>
+ <6989b2ee-9caf-81b3-2328-9d4e287794cb@gmail.com>
+Message-ID: <alpine.DEB.2.10.1611301320440.2617@atull-730U3E-740U3E>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 30 Nov 2016, Joshua Clayton wrote:
 
+Hi Joshua,
 
-On 11/30/2016 07:37 AM, Marc Zyngier wrote:
-> On 30/11/16 11:48, Marc Zyngier wrote:
->> + Shannon
->>
->> On 29/11/16 22:04, Itaru Kitayama wrote:
->>> Hi,
->>>
->>> In a VM (virsh controlled, KVM acceleration enabled) on a recent
->>> kvmarm kernel host, I find I am unable to use perf to obtain
->>> performance statistics for a complex task like kernel build.
->>> (I've verified this is seen with a Fedora 25 VM and host combination
->>> as well)
->>> APM folks CC'ed think this might be caused by a bug in the core PMU 
->>> framework code, thus I'd like to have experts opinion on this issue.
->>>
->>> [root at localhost linux]# perf stat -B make
->>>    CHK     include/config/kernel.release
->>> [  119.617684] git[1144]: undefined instruction: pc=fffffc000808ff30
->>> [  119.623040] Code: 51000442 92401042 d51b9ca2 d5033fdf (d53b9d40)
->>> [  119.627607] Internal error: undefined instruction: 0 [#1] SMP
->>
->> [...]
->>
->> In a VM running mainline hosted on an AMD Seattle box:
->>
->>  Performance counter stats for 'make':
->>
->>     1526089.499304      task-clock:u (msec)       #    0.932 CPUs utilized          
->>                  0      context-switches:u        #    0.000 K/sec                  
->>                  0      cpu-migrations:u          #    0.000 K/sec                  
->>           29527793      page-faults:u             #    0.019 M/sec                  
->>      2913174122673      cycles:u                  #    1.909 GHz                    
->>      2365040892322      instructions:u            #    0.81  insn per cycle         
->>    <not supported>      branches:u                                                  
->>        32049215378      branch-misses:u           #    0.00% of all branches        
->>
->>     1637.531444837 seconds time elapsed
->>
->> Running the same host kernel on a Mustang system, the guest explodes
->> in the way you reported. The failing instruction always seems to be
->> an access to pmxevcntr_el0 (I've seen both reads and writes).
->>
->> Funnily enough, it dies if you try any HW event other than cycles
->> ("perf stat -e cycles ls" works, and "perf stat -e instructions ls"
->> explodes). Which would tend to indicate that we're screwing up
->> the counter selection, but I have no proof of that (specially that
->> the Seattle guest is working just as expected).
+> Hi Alan,
 > 
-> It turns out that we *don't* inject an undef. It seems to be generated
-> locally at EL1.
+> On 11/30/2016 09:45 AM, atull wrote:
+> > On Wed, 30 Nov 2016, Joshua Clayton wrote:
+> >
+> > Hi Clayton,
+> >
+> > I just have a few minor one line changes below.  Only one
+> > is operational, I should have caught that earlier.
+> >
+> Thanks for the speedy review.
+> >> +};
+> >> +MODULE_DEVICE_TABLE(of, of_ef_match);
+> >> +
+> >> +static enum fpga_mgr_states cyclonespi_state(struct fpga_manager *mgr)
+> >> +{
+> >> +	return mgr->state;
+> >> +}
+> > This function gets called once to initialize mgr->state in
+> > fpga_mgr_register().  So it should at least return the state the FPGA
+> > is at then.  If it is unknown, it can just return
+> > FPGA_MGR_STATE_UNKNOWN.
+> >
+> I guess I didn't understand the purpose of this function.
+> The driver has access to the status pin at this phase, so I can return
+> FPGA_MGR_STATE_UNKNOWN or FPGA_MGR_STATE_RESET depending
+> on the state of that pin.
 > 
-> Still digging.
+> >> +
+> >> +static int cyclonespi_write_init(struct fpga_manager *mgr, u32 flags,
+> >> +				 const char *buf, size_t count)
+> > Minor, but please fix the indentation of 'const' to match that of
+> > 'struct' above.  checkpatch.pl is probably issuing warnings
+> > about that.
+> I double checked. The indentation is correct here. It only has
+> The appearance of being off by one due to the diff format.
 
-Just FYI: I saw it on Mustang before. My initial thought was HW related,
-but without proof. I am interested to see your findings...
+Yes, I understand.
 
+> >> +{
+> >> +	struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
+> >> +	int i;
+> >> +
+> >> +	if (flags & FPGA_MGR_PARTIAL_RECONFIG) {
+> >> +		dev_err(&mgr->dev, "Partial reconfiguration not supported.\n");
+> >> +		return -EINVAL;
+> >> +	}
+> >> +
+> >> +	gpiod_set_value(conf->config, 0);
+> >> +	usleep_range(FPGA_RESET_TIME, FPGA_RESET_TIME + 20);
+> >> +	if (gpiod_get_value(conf->status) == 1) {
+> >> +		dev_err(&mgr->dev, "Status pin should be low.\n");
+> >> +		return -EIO;
+> >> +	}
+> >> +
+> >> +	gpiod_set_value(conf->config, 1);
+> >> +	for (i = 0; i < (FPGA_MAX_DELAY / FPGA_MIN_DELAY); i++) {
+> >> +		usleep_range(FPGA_MIN_DELAY, FPGA_MIN_DELAY + 20);
+> >> +		if (gpiod_get_value(conf->status))
+> >> +			return 0;
+> >> +	}
+> >> +
+> >> +	dev_err(&mgr->dev, "Status pin not ready.\n");
+> >> +	return -EIO;
+> >> +}
+> >> +
+> >> +static void rev_buf(void *buf, size_t len)
+> >> +{
+> >> +	u32 *fw32 = (u32 *)buf;
+> >> +	const u32 *fw_end = (u32 *)(buf + len);
+> >> +
+> >> +	/* set buffer to lsb first */
+> >> +	while (fw32 < fw_end) {
+> >> +		*fw32 = bitrev8x4(*fw32);
+> >> +		fw32++;
+> >> +	}
+> >> +}
+> >> +
+> >> +static int cyclonespi_write(struct fpga_manager *mgr, const char *buf,
+> >> +			    size_t count)
+> > Please fix alignment here also.
+> Same as above. Indentation is OK.
 > 
-> 	M.
+> 
+> I'll get a v4 turned around soon.
+
+No rush since the other two patches need acks from
+their respective maintainers and this won't be able
+to go in without them.  But with that one change
+it looks good to me.
+
+Alan
+
+> Thanks,
+> Joshua
 > 
