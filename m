@@ -1,242 +1,76 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 30 Nov 2016 15:15:00 +0000
-Subject: [PATCH v2 9/9] arm64: Documentation - Expose CPU feature registers
+Date: Wed, 30 Nov 2016 15:14:57 +0000
+Subject: [PATCH v2 6/9] arm64: Add helper to decode register from instruction
 In-Reply-To: <1480518901-18544-1-git-send-email-suzuki.poulose@arm.com>
 References: <1480518901-18544-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1480518901-18544-10-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1480518901-18544-7-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Documentation for the infrastructure to expose CPU feature
-register by emulating MRS.
+Add a helper to extract the register field from a given
+instruction.
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Dave Martin <dave.martin@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- Documentation/arm64/cpu-feature-registers.txt | 196 ++++++++++++++++++++++++++
- arch/arm64/kernel/cpufeature.c                |   4 +
- 2 files changed, 200 insertions(+)
- create mode 100644 Documentation/arm64/cpu-feature-registers.txt
+ arch/arm64/include/asm/insn.h |  2 ++
+ arch/arm64/kernel/insn.c      | 29 +++++++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+)
 
-diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
-new file mode 100644
-index 0000000..a7b73cb
---- /dev/null
-+++ b/Documentation/arm64/cpu-feature-registers.txt
-@@ -0,0 +1,196 @@
-+		ARM64 CPU Feature Registers
-+		===========================
-+
-+Author: Suzuki K Poulose <suzuki.poulose@arm.com>
-+
-+
-+This file describes the ABI for exporting the AArch64 CPU ID/feature
-+registers to userspace. The availability of this ABI is advertised
-+via the HWCAP_CPUID in HWCAPs.
-+
-+1. Motivation
-+---------------
-+
-+The ARM architecture defines a set of feature registers, which describe
-+the capabilities of the CPU/system. Access to these system registers is
-+restricted from EL0 and there is no reliable way for an application to
-+extract this information to make better decisions at runtime. There is
-+limited information available to the application via HWCAPs, however
-+there are some issues with their usage.
-+
-+ a) Any change to the HWCAPs requires an update to userspace (e.g libc)
-+    to detect the new changes, which can take a long time to appear in
-+    distributions. Exposing the registers allows applications to get the
-+    information without requiring updates to the toolchains.
-+
-+ b) Access to HWCAPs is sometimes limited (e.g prior to libc, or
-+    when ld is initialised at startup time).
-+
-+ c) HWCAPs cannot represent non-boolean information effectively. The
-+    architecture defines a canonical format for representing features
-+    in the ID registers; this is well defined and is capable of
-+    representing all valid architecture variations.
-+
-+
-+2. Requirements
-+-----------------
-+
-+ a) Safety :
-+    Applications should be able to use the information provided by the
-+    infrastructure to run safely across the system. This has greater
-+    implications on a system with heterogeneous CPUs.
-+    The infrastructure exports a value that is safe across all the
-+    available CPU on the system.
-+
-+    e.g, If at least one CPU doesn't implement CRC32 instructions, while
-+    others do, we should report that the CRC32 is not implemented.
-+    Otherwise an application could crash when scheduled on the CPU
-+    which doesn't support CRC32.
-+
-+ b) Security :
-+    Applications should only be able to receive information that is
-+    relevant to the normal operation in userspace. Hence, some of the
-+    fields are masked out and the values of the fields are set to
-+    indicate the feature is 'not supported' (See the 'visible' field in
-+    the table in Section 4). Also, the kernel may manipulate the fields
-+    based on what it supports. e.g, If FP is not supported by the
-+    kernel, the values could indicate that the FP is not available
-+    (even when the CPU provides it).
-+
-+ c) Implementation Defined Features
-+    The infrastructure doesn't expose any register which is
-+    IMPLEMENTATION DEFINED as per ARMv8-A Architecture.
-+
-+ d) CPU Identification :
-+    MIDR_EL1 is exposed to help identify the processor. On a
-+    heterogeneous system, this could be racy (just like getcpu()). The
-+    process could be migrated to another CPU by the time it uses the
-+    register value, unless the CPU affinity is set. Hence, there is no
-+    guarantee that the value reflects the processor that it is
-+    currently executing on. The REVIDR is not exposed due to this
-+    constraint, as REVIDR makes sense only in conjunction with the
-+    MIDR. Alternately, MIDR_EL1 and REVIDR_EL1 are exposed via sysfs
-+    at:
-+
-+	/sys/devices/system/cpu/cpu$ID/regs/identification/
-+	                                              \- midr
-+	                                              \- revidr
-+
-+The list of supported registers and the attributes of individual
-+feature bits are listed in section 4. Unless there is absolute
-+necessity, we don't encourage the addition of new feature registers to
-+the list. In any case, it should comply to the requirements listed
-+above.
-+
-+3. Implementation
-+--------------------
-+
-+The infrastructure is built on the emulation of the 'MRS' instruction.
-+Accessing a restricted system register from an application generates an
-+exception and ends up in SIGILL being delivered to the process.
-+The infrastructure hooks into the exception handler and emulates the
-+operation if the source belongs to the supported system register space.
-+
-+The infrastructure emulates only the following system register space:
-+	Op0=3, Op1=0, CRn=0, CRm=0,4,5,6,7
-+
-+(See Table C5-6 'System instruction encodings for non-Debug System
-+register accesses' in ARMv8 ARM DDI 0487A.h, for the list of
-+registers).
-+
-+
-+The following rules are applied to the value returned by the
-+infrastructure:
-+
-+ a) The value of an 'IMPLEMENTATION DEFINED' field is set to 0.
-+ b) The value of a reserved field is populated with the reserved
-+    value as defined by the architecture.
-+ c) The value of a field marked as not 'visible', is set to indicate
-+    the feature is missing (as defined by the architecture).
-+ d) The value of a 'visible' field holds the system wide safe value
-+    for the particular feature(except for MIDR_EL1, see section 4).
-+    See Appendix I for more information on safe value.
-+
-+There are only a few registers visible to the userspace. See Section 4,
-+for the list of 'visible' registers.
-+
-+All others are emulated as having 'invisible' features.
-+
-+4. List of exposed registers
-+-----------------------------
-+
-+  1) ID_AA64ISAR0_EL1 - Instruction Set Attribute Register 0
-+     x--------------------------------------------------x
-+     | Name                         |  bits   | visible |
-+     |--------------------------------------------------|
-+     | RES0                         | [63-24] |    y    |
-+     |--------------------------------------------------|
-+     | ATOMICS                      | [20-23] |    y    |
-+     |--------------------------------------------------|
-+     | CRC32                        | [19-16] |    y    |
-+     |--------------------------------------------------|
-+     | SHA2                         | [15-12] |    y    |
-+     |--------------------------------------------------|
-+     | SHA1                         | [11-8]  |    y    |
-+     |--------------------------------------------------|
-+     | AES                          | [7-4]   |    y    |
-+     |--------------------------------------------------|
-+     | RES0                         | [3-0]   |    y    |
-+     x--------------------------------------------------x
-+
-+  2) ID_AA64ISAR1_EL1 - Instruction Set Attribute Register 1
-+     x--------------------------------------------------x
-+     | Name                         |  bits   | visible |
-+     |--------------------------------------------------|
-+     | RES0                         | [63-0]  |    y    |
-+     x--------------------------------------------------x
-+
-+  3) ID_AA64PFR0_EL1 - Processor Feature Register 0
-+     x--------------------------------------------------x
-+     | Name                         |  bits   | visible |
-+     |--------------------------------------------------|
-+     | RES0                         | [63-28] |    y    |
-+     |--------------------------------------------------|
-+     | GIC                          | [27-24] |    n    |
-+     |--------------------------------------------------|
-+     | AdvSIMD                      | [23-20] |    y    |
-+     |--------------------------------------------------|
-+     | FP                           | [19-16] |    y    |
-+     |--------------------------------------------------|
-+     | EL3                          | [15-12] |    n    |
-+     |--------------------------------------------------|
-+     | EL2                          | [11-8]  |    n    |
-+     |--------------------------------------------------|
-+     | EL1                          | [7-4]   |    n    |
-+     |--------------------------------------------------|
-+     | EL0                          | [3-0]   |    n    |
-+     x--------------------------------------------------x
-+
-+  4) ID_AA64PFR1_EL1 - Processor Feature Register 1
-+     x--------------------------------------------------x
-+     | Name                         |  bits   | visible |
-+     |--------------------------------------------------|
-+     | RES0                         | [63-0]  |    y    |
-+     x--------------------------------------------------x
-+
-+  5) MIDR_EL1 - Main ID Register
-+     x--------------------------------------------------x
-+     | Name                         |  bits   | visible |
-+     |--------------------------------------------------|
-+     | RES0                         | [63-32] |    y    |
-+     |--------------------------------------------------|
-+     | Implementer                  | [31-24] |    y    |
-+     |--------------------------------------------------|
-+     | Variant                      | [23-20] |    y    |
-+     |--------------------------------------------------|
-+     | Architecture                 | [19-16] |    y    |
-+     |--------------------------------------------------|
-+     | PartNum                      | [15-4]  |    y    |
-+     |--------------------------------------------------|
-+     | Revision                     | [3-0]   |    y    |
-+     x--------------------------------------------------x
-+
-+   NOTE: The 'visible' fields of MIDR_EL1 will contain the value
-+   as available on the CPU where it is fetched and is not a system
-+   wide safe value.
-+
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index fa52042..524848f 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -81,6 +81,10 @@ static bool __maybe_unused
- cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused);
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index bc85366..aecc07e 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -332,6 +332,8 @@ bool aarch64_insn_is_branch(u32 insn);
+ u64 aarch64_insn_decode_immediate(enum aarch64_insn_imm_type type, u32 insn);
+ u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+ 				  u32 insn, u64 imm);
++u32 aarch64_insn_decode_register(enum aarch64_insn_register_type type,
++					 u32 insn);
+ u32 aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
+ 				enum aarch64_insn_branch_type type);
+ u32 aarch64_insn_gen_comp_branch_imm(unsigned long pc, unsigned long addr,
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 6f2ac4f..755b3dd 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -418,6 +418,35 @@ u32 __kprobes aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+ 	return insn;
+ }
  
- 
-+/*
-+ * NOTE: Any changes to the visibility of features should be kept in
-+ * sync with the documentation of the CPU feature register ABI.
-+ */
- static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
- 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64ISAR0_RDM_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR0_ATOMICS_SHIFT, 4, 0),
++u32 aarch64_insn_decode_register(enum aarch64_insn_register_type type,
++					u32 insn)
++{
++	int shift;
++
++	switch (type) {
++	case AARCH64_INSN_REGTYPE_RT:
++	case AARCH64_INSN_REGTYPE_RD:
++		shift = 0;
++		break;
++	case AARCH64_INSN_REGTYPE_RN:
++		shift = 5;
++		break;
++	case AARCH64_INSN_REGTYPE_RT2:
++	case AARCH64_INSN_REGTYPE_RA:
++		shift = 10;
++		break;
++	case AARCH64_INSN_REGTYPE_RM:
++		shift = 16;
++		break;
++	default:
++		pr_err("%s: unknown register type encoding %d\n", __func__,
++		       type);
++		return 0;
++	}
++
++	return (insn >> shift) & GENMASK(4, 0);
++}
++
+ static u32 aarch64_insn_encode_register(enum aarch64_insn_register_type type,
+ 					u32 insn,
+ 					enum aarch64_insn_register reg)
 -- 
 2.7.4
