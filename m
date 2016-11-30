@@ -1,34 +1,34 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Thu, 1 Dec 2016 00:40:22 +0300
-Subject: [PATCH] dt-bindings: document how to setup rockchip timers as
- clocksource
-In-Reply-To: <20161130213006.p6totahjga7546s6@rob-hp-laptop>
-References: <1480025536-6837-1-git-send-email-al.kochet@gmail.com>
- <20161130213006.p6totahjga7546s6@rob-hp-laptop>
-Message-ID: <F0C2F3CA-7A29-46B5-B420-A672696236BF@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu,  1 Dec 2016 00:47:59 +0100
+Subject: [PATCH] crypto: arm/aesbs - Select SIMD in Kconfig
+Message-ID: <20161130234826.854879-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Commit 585b5fa63da9 ("crypto: arm/aes - Select SIMD in Kconfig") added
+the dependency for CRYPTO_AES_ARM_CE, but missed the same change
+for CRYPTO_AES_ARM_BS:
 
-> 1 ???. 2016 ?., ? 0:30, Rob Herring <robh@kernel.org> ???????(?):
-> 
-> 1st and 2nd are ambiguous. Plus this is an OS implementation detail that 
-> doesn't belong in the binding.
-> 
->> +If you want to bind specific timer as clockevent (i.e. one from alive subsystem)
->> +and specific timer as clocksource, you can number the timers in "aliases" node.
-> 
-> No. 
-> 
-> Use and/or describe what are the features of a timer to make the 
-> decision. There has to be some reason you care which one. One has an 
-> interrupt and the other doesn't. One is always on. Etc.
+arch/arm/crypto/aes-arm-bs.o: In function `aesbs_mod_init':
+aesbs-glue.c:(.init.text+0x38): undefined reference to `simd_skcipher_create_compat'
 
-Thank you, Rob.
+Fixes: 211f41af534a ("crypto: aesbs - Convert to skcipher")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/crypto/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Eventually I abandoned this decision.
-I left only one patch, which you confirmed recently.
-
-And sorry for making noise with duplicate patches.
-
-Alexander.
+diff --git a/arch/arm/crypto/Kconfig b/arch/arm/crypto/Kconfig
+index 81348883450d..3251d385fddb 100644
+--- a/arch/arm/crypto/Kconfig
++++ b/arch/arm/crypto/Kconfig
+@@ -91,6 +91,7 @@ config CRYPTO_AES_ARM_BS
+ 	select CRYPTO_ALGAPI
+ 	select CRYPTO_AES_ARM
+ 	select CRYPTO_ABLK_HELPER
++	select CRYPTO_SIMD
+ 	help
+ 	  Use a faster and more secure NEON based implementation of AES in CBC,
+ 	  CTR and XTS modes
+-- 
+2.9.0
