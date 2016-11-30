@@ -1,51 +1,18 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 30 Nov 2016 14:41:23 +0100
-Subject: [PATCH 1/1] usb: return error code when platform_get_irq fails
-In-Reply-To: <1480424255-25059-1-git-send-email-bianpan2016@163.com>
-References: <1480424255-25059-1-git-send-email-bianpan2016@163.com>
-Message-ID: <52a774c0-9bca-6d1b-a470-f07caefa5d3a@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Nov 2016 14:49:05 +0100
+Subject: [GIT PULL 1/4] DaVinci cleanups for v4.10 (part 2)
+In-Reply-To: <20161120134038.14998-1-nsekhar@ti.com>
+References: <20161120134038.14998-1-nsekhar@ti.com>
+Message-ID: <6527230.ys0tP3vEGV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sunday, November 20, 2016 7:10:35 PM CET Sekhar Nori wrote:
+> mach-davinci cleanup to make it easy to add PM support
+> for DT-boot.
+> 
+> 
 
+Pulled into next/soc, thanks!
 
-On 29/11/16 13:57, Pan Bian wrote:
-> In function xhci_mtk_probe(), variable ret takes the return value. Its
-> value should be negative on failures. However, when the call to function
-> platform_get_irq() fails, it does not set the error code, and 0 will be
-> returned. 0 indicates no error. As a result, the callers of function
-> xhci_mtk_probe() will not be able to detect the error. This patch fixes
-> the bug by assigning the return value of platform_get_irq() to variable
-> ret if it fails.
->
-> Signed-off-by: Pan Bian <bianpan2016@163.com>
-> ---
->  drivers/usb/host/xhci-mtk.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-> index 79959f1..f2365a4 100644
-> --- a/drivers/usb/host/xhci-mtk.c
-> +++ b/drivers/usb/host/xhci-mtk.c
-> @@ -560,8 +560,10 @@ static int xhci_mtk_probe(struct platform_device *pdev)
->  		goto disable_ldos;
->
->  	irq = platform_get_irq(pdev, 0);
-> -	if (irq < 0)
-> +	if (irq < 0) {
-> +		ret = irq;
->  		goto disable_clk;
-> +	}
->
->  	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
->  	ret = dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
->
-
-
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
-
-Next time please make sure to send the patch to all relevant lists and 
-people (get_maintainer.pl).
-
-Regards,
-Matthias
+	Arnd
