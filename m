@@ -1,33 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Nov 2016 22:11:04 +0100
-Subject: [PATCH v2] soc: ti: qmss: fix the case when !SMP
-In-Reply-To: <92af0586-7deb-9e94-a0e7-377337ebfb9e@oracle.com>
-References: <20161130165351.1154-1-grygorii.strashko@ti.com>
- <d26f37e6-657f-ff42-2d9d-343fa47c2e5d@ti.com>
- <92af0586-7deb-9e94-a0e7-377337ebfb9e@oracle.com>
-Message-ID: <5412220.B6fgWRlPCm@wuerfel>
+Date: Wed, 30 Nov 2016 22:12:29 +0100
+Subject: [GIT PULL 10/10] arm64: tegra: Default configuration updates for
+ v4.10-rc1
+In-Reply-To: <20161130163929.GA20246@ulmo.ba.sec>
+References: <20161118161719.24153-1-thierry.reding@gmail.com>
+ <6706502.us21ohNYZA@wuerfel> <20161130163929.GA20246@ulmo.ba.sec>
+Message-ID: <7208806.V3QfrVgnLS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 30, 2016 9:13:44 AM CET Santosh Shilimkar wrote:
+On Wednesday, November 30, 2016 5:39:29 PM CET Thierry Reding wrote:
+> On Wed, Nov 30, 2016 at 05:10:43PM +0100, Arnd Bergmann wrote:
+> > On Friday, November 18, 2016 5:17:19 PM CET Thierry Reding wrote:
+> > > arm64: tegra: Default configuration updates for v4.10-rc1
+> > > 
+> > > Enable Tegra186 support.
+> > > 
+> > 
+> > This was already in next/arm64 (but I didn't see a notification),
+> > and with the arm64-dt branch now merged as well, we should have
+> > everything you sent.
 > 
-> Can you apply this to your non critical fixes queue ?
-> 
-> On 11/30/2016 9:09 AM, Grygorii Strashko wrote:
-> > + Santosh Shilimkar <santosh.shilimkar@oracle.com>
-> >
-> > On 11/30/2016 10:53 AM, Grygorii Strashko wrote:
-> >> The irq_set_affinity_hint() will always fail when !SMP and
-> >> Networking will fail on Keystone 2 devices in this case.
-> >> Hence, fix by ignoring IRQ affinity settings when !SMP.
-> >>
-> >> Cc: Arnd Bergmann <arnd@arndb.de>
-> >> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> >> ---
-> Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
-> 
-> 
+> I had also sent a couple of individual patches that seemed to not have
+> it made into v4.9 and v4.8 for some reason (they were part of the pull
+> requests, as far as I can tell). Do you think you could pull those in
+> as well?
 
-Applied, thanks!
+Most likely yes, but I have trouble finding them right now. Can you
+just resend them?
 
 	Arnd
