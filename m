@@ -1,20 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Nov 2016 22:20:45 +0100
-Subject: [GIT PULL 4/6] Broadcom maintainers-arm64 changes for 4.10
-In-Reply-To: <20161122054824.16974-4-f.fainelli@gmail.com>
-References: <20161122054824.16974-1-f.fainelli@gmail.com>
- <20161122054824.16974-4-f.fainelli@gmail.com>
-Message-ID: <7084357.LhofNmhDMd@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 30 Nov 2016 15:20:55 -0600
+Subject: [PATCH v2 3/7] PWM: add pwm-stm32 DT bindings
+In-Reply-To: <1480000463-9625-4-git-send-email-benjamin.gaignard@st.com>
+References: <1480000463-9625-1-git-send-email-benjamin.gaignard@st.com>
+ <1480000463-9625-4-git-send-email-benjamin.gaignard@st.com>
+Message-ID: <20161130212055.b57qkqy66j5gg57q@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 21, 2016 9:48:22 PM CET Florian Fainelli wrote:
-> This pull request contains MAINTAINERS file updates for Broadcom ARM64 entries,
-> please pull:
+On Thu, Nov 24, 2016 at 04:14:19PM +0100, Benjamin Gaignard wrote:
+> Define bindings for pwm-stm32
 > 
-> - Jayachandran updates his email address for the Broadcom Vulcan entry
+> version 2:
+> - use parameters instead of compatible of handle the hardware configuration
 > 
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> ---
+>  .../devicetree/bindings/pwm/pwm-stm32.txt          | 37 ++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+> new file mode 100644
+> index 0000000..36263f0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+> @@ -0,0 +1,37 @@
+> +STMicroelectronics PWM driver bindings for STM32
+> +
+> +Must be a sub-node of STM32 general purpose timer driver
+> +
+> +Required parameters:
+> +- compatible:		Must be "st,stm32-pwm"
+> +- pinctrl-names: 	Set to "default".
+> +- pinctrl-0: 		List of phandles pointing to pin configuration nodes
+> +			for PWM module.
+> +			For Pinctrl properties, please refer to [1].
+> +
+> +Optional parameters:
+> +- st,breakinput:	Set if the hardware have break input capabilities
+> +- st,breakinput-polarity: Set break input polarity. Default is 0
+> +			 The value define the active polarity:
+> +			  - 0 (active LOW)
+> +			  - 1 (active HIGH)
+> +- st,pwm-num-chan:	Number of available PWM channels.  Default is 0.
+> +- st,32bits-counter:	Set if the hardware have a 32 bits counter
+> +- st,complementary:	Set if the hardware have complementary output channels
 
-Pulled into next/arm64, thanks!
+What does complementary mean here?
 
-	Arnd
+> +
+> +[1] Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+> +
+> +Example:
+> +	gptimer1: gptimer1 at 40010000 {
+
+timer at ...
+
+> +		compatible = "st,stm32-gptimer";
+> +		reg = <0x40010000 0x400>;
+> +		clocks = <&rcc 0 160>;
+> +		clock-names = "clk_int";
+> +
+> +		pwm1 at 0 {
+
+pwm {
+
+Is there more than one?
+
+> +			compatible = "st,stm32-pwm";
+> +			st,pwm-num-chan = <4>;
+> +			st,breakinput;
+> +			st,complementary;
+> +		};
+> +	};
+> -- 
+> 1.9.1
+> 
