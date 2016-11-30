@@ -1,113 +1,33 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 30 Nov 2016 16:17:23 +0000
-Subject: [PATCH 02/10] iommu/of: Prepare for deferred IOMMU configuration
-In-Reply-To: <1480465344-11862-3-git-send-email-sricharan@codeaurora.org>
-References: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
- <1480465344-11862-3-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20161130161723.GA9042@red-moon>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 30 Nov 2016 10:17:30 -0600
+Subject: [PATCH v2] PCI: Add information about describing PCI in ACPI
+In-Reply-To: <CAADWXX_ipJ+pVmV5s2oLCKBrC5qUDASOZf=tpBfJWELExam+hQ@mail.gmail.com>
+References: <20161129212816.15663.28100.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <CAADWXX_ipJ+pVmV5s2oLCKBrC5qUDASOZf=tpBfJWELExam+hQ@mail.gmail.com>
+Message-ID: <20161130161730.GB13411@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sricharan, Robin,
-
-I gave this series a go on ACPI and apart from an SMMU v3 fix-up
-it seems to work, more thorough testing required though.
-
-A key question below.
-
-On Wed, Nov 30, 2016 at 05:52:16AM +0530, Sricharan R wrote:
-> From: Robin Murphy <robin.murphy@arm.com>
+On Tue, Nov 29, 2016 at 03:39:11PM -0800, Linus Torvalds wrote:
+> Bjorn, this email was marked as spam, because:
 > 
-> IOMMU configuration represents unchanging properties of the hardware,
-> and as such should only need happen once in a device's lifetime, but
-> the necessary interaction with the IOMMU device and driver complicates
-> exactly when that point should be.
+>   It has a from address in google.com but has failed google.com's
+> required tests for authentication
 > 
-> Since the only reasonable tool available for handling the inter-device
-> dependency is probe deferral, we need to prepare of_iommu_configure()
-> to run later than it is currently called (i.e. at driver probe rather
-> than device creation), to handle being retried, and to tell whether a
-> not-yet present IOMMU should be waited for or skipped (by virtue of
-> having declared a built-in driver or not).
+> in particular, it looks like you used a non-google smtp server
+> (kernel.org) to send the email, so there is no DKIM hash (or perhaps
+> google just uses some other non-standard marker for "this actually
+> came from google"). So gmail marks it as spam because dmarc fails:
 > 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/iommu/of_iommu.c | 30 +++++++++++++++++++++++++++++-
->  1 file changed, 29 insertions(+), 1 deletion(-)
+>        dmarc=fail (p=REJECT dis=NONE) header.from=google.com
 > 
-> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> index ee49081..349bd1d 100644
-> --- a/drivers/iommu/of_iommu.c
-> +++ b/drivers/iommu/of_iommu.c
-> @@ -104,12 +104,20 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
->  	int err;
->  
->  	ops = iommu_get_instance(fwnode);
-> -	if (!ops || !ops->of_xlate)
-> +	if ((ops && !ops->of_xlate) ||
-> +	    (!ops && !of_match_node(&__iommu_of_table, iommu_spec->np)))
+> Just to let you know. If you use your google.com email, you do need to
+> go through the google smtp server.
+> 
+> This may or may not be new - I didn't go and look at old messages of
+> yours, but it is possible that google.com enabled dmarc/dkim recently.
 
-IIUC of_match_node() here is there to check there is a driver compiled
-in for this device_node (aka compatible string in OF world), correct ?
-If that's the case (and I think that's what Sricharan was referring to
-in his ACPI query) I need to cook-up something on the ACPI side to
-emulate the OF linker table behaviour (or anyway to detect a driver is
-actually in the kernel), it is not that difficult but it is key to know,
-I will give it some thought to make it as clean as possible.
-
-Thanks,
-Lorenzo
-
->  		return NULL;
->  
->  	err = iommu_fwspec_init(dev, &iommu_spec->np->fwnode, ops);
->  	if (err)
->  		return ERR_PTR(err);
-> +	/*
-> +	 * The otherwise-empty fwspec handily serves to indicate the specific
-> +	 * IOMMU device we're waiting for, which will be useful if we ever get
-> +	 * a proper probe-ordering dependency mechanism in future.
-> +	 */
-> +	if (!ops)
-> +		return ERR_PTR(-EPROBE_DEFER);
->  
->  	err = ops->of_xlate(dev, iommu_spec);
->  	if (err)
-> @@ -186,14 +194,34 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
->  					   struct device_node *master_np)
->  {
->  	const struct iommu_ops *ops;
-> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
->  
->  	if (!master_np)
->  		return NULL;
->  
-> +	if (fwspec) {
-> +		if (fwspec->ops)
-> +			return fwspec->ops;
-> +
-> +		/* In the deferred case, start again from scratch */
-> +		iommu_fwspec_free(dev);
-> +	}
-> +
->  	if (dev_is_pci(dev))
->  		ops = of_pci_iommu_init(to_pci_dev(dev), master_np);
->  	else
->  		ops = of_platform_iommu_init(dev, master_np);
-> +	/*
-> +	 * If we have reason to believe the IOMMU driver missed the initial
-> +	 * add_device callback for dev, replay it to get things in order.
-> +	 */
-> +	if (!IS_ERR_OR_NULL(ops) && ops->add_device &&
-> +	    dev->bus && !dev->iommu_group) {
-> +		int err = ops->add_device(dev);
-> +
-> +		if (err)
-> +			ops = ERR_PTR(err);
-> +	}
->  
->  	return IS_ERR(ops) ? NULL : ops;
->  }
-> -- 
-> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
-> 
+Argh, thanks for letting me know.  Looks like I've had this broken for a
+long time, but I didn't notice.  I think I have it fixed so git will record
+the author as bhelgaas at google.com, but git/stgit will send email from
+helgaas at kernel.org via the kernel.org smtp server.
