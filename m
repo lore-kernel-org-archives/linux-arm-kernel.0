@@ -1,125 +1,116 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 30 Nov 2016 12:12:55 +0200
-Subject: [PATCH v7 0/8] drm: sun8i: Add DE2 HDMI video support
-In-Reply-To: <20161130100545.44546ed28896cdb9768f68cd@free.fr>
-References: <cover.1480414715.git.moinejf@free.fr>
- <20161129213650.uqcgekodq77wlmxs@lukather>
- <20161130100545.44546ed28896cdb9768f68cd@free.fr>
-Message-ID: <2039137.LtCOH6bs2I@avalon>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 30 Nov 2016 11:14:22 +0100
+Subject: [RFC v3 00/10] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
+ reserved regions
+In-Reply-To: <CAFpQJXWp5BfsxU5nkWm7hrq5wp6=b-6iYVHjBQYhmkWN_kSSzg@mail.gmail.com>
+References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
+ <6c9012fd-070b-6218-48e7-69b37f2559dd@redhat.com>
+ <CAFpQJXWp5BfsxU5nkWm7hrq5wp6=b-6iYVHjBQYhmkWN_kSSzg@mail.gmail.com>
+Message-ID: <3d0ddb50-6e63-3fe2-55c0-ce49579905c9@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Fran?ois,
+Hi Ganapat,
 
-On Wednesday 30 Nov 2016 10:05:45 Jean-Francois Moine wrote:
-> On Tue, 29 Nov 2016 22:36:50 +0100 Maxime Ripard wrote:
-> > On Tue, Nov 29, 2016 at 11:18:35AM +0100, Jean-Francois Moine wrote:
-> > > This patchset series adds HDMI video support to the Allwinner
-> > > sun8i SoCs which include the display engine 2 (DE2).
-> > > The driver contains the code for the A83T and H3 SoCs, and
-> > > some H3 boards, but it could be used/extended for other SoCs
-> > > (A64, H2, H5) and boards (Banana PIs, Orange PIs).
-> > 
-> > Honestly, I'm getting a bit worried by the fact that you ignore
-> > reviews.
-> > 
-> > On the important reviews that you got that are to be seen as major
-> > 
-> > issues that block the inclusion, we have:
-> >   - The fact that the HDMI driver is actually just a designware IP,
-> >     and while you should use the driver that already exists, you just
-> >     duplicated all that code.
+On 30/11/2016 11:04, Ganapatrao Kulkarni wrote:
+> Hi Eric,
 > 
-> The DW registers in the A83T and H3 are obfuscated, so, the code in
-> bridge/DW cannot be used as it is. There should be either a translation
-> table or a function to compute the register addresses.
+> in you repo "https://github.com/eauger/linux/tree/v4.9-rc5-reserved-rfc-v3"
+> there is 11th patch "pci: Enable overrides for missing ACS capabilities"
+> is this patch part of some other series?
 
-Jernej mentioned there could be a way to restore the original Synopsys memory 
-map. If that works then using the dw-hdmi could be an option.
+Actually this is a very old patch from Alex aimed at working around lack
+of PCIe ACS support: https://lkml.org/lkml/2013/5/30/513
 
-> More, it is not sure that the bridge/DW code would work with Allwinner's
-> SoCs.
+Thanks
 
-If it doesn't work and can't be made to work in a non-invasive way they it 
-should certainly not be used :-)
-
-> It seems that they got some schematics from DesignWare, but, is it really
-> the same hardware?
-
-That's not really relevant, as long as the hardware is compatible, it doesn't 
-matter if it's a Synopsys IP or a custom implementation of the HDMI TX with a 
-compatible interface.
-
-> Also, if some changes had to be done in the bridge code, I could not check
-> if this would break or not the other SoCs.
-
-Nothing new here, all drivers that support multiple SoCs have the same 
-problem. That's why we have maintainers, testers and board farms to try and 
-catch issues as early as possible.
-
-> Eventually, I went the same way as omap/hdmi5: different driver.
-
-I might try to fix that for OMAP5 at some point, we'll see.
-
-> >   - The fact that you ignored Rob (v6) and I (v5) comment on using OF
-> >     graph to model the connection between the display engine and the
-> >     TCON. Something that Laurent also pointed out in this version.
+Eric
 > 
-> I simply use the drm function drm_of_component_probe().
-> If this one is in the DRM core, why should I not use it?
-> If it must not be used, it would be nice to mark it as deprecated and
-> to update the code of the drivers which are using it.
-
-I haven't used that function so I can't comment here, except for the fact that 
-DT bindings are not designed based on a given OS implementation. It should be 
-the other way around, the bindings should be designed to clearly describe the 
-hardware in a clean and consistent way that can be used by any host software, 
-and the Linux helper functions should then be developed based on those 
-bindings.
-
-> >   - The fact that you ignored that you needed an HDMI connector node
-> >     as a child of the HDMI controller. This has been reported by Rob
-> >     (v6) and yet again in this version by Laurent.
+> thanks
+> Ganapat
 > 
-> As I don't know what is a DT 'connector', I cannot go further.
-> I hope Laurent will give me clearer explanations and a real example.
-
-Done, we can discuss this in that part of the mail thread.
-
-> >   - And finally the fact that we can't have several display engine in
-> >     parallel, if needs be. This has happened in the past already on
-> >     Allwinner SoCs, so it's definitely something we should consider in
-> >     the DT bindings, since we can't break them.
-> 
-> IIRC, I proposed my driver before yours, and the DE2 is completely
-> different from the other display engines.
-> What you are telling is "add more code to already complex code and have
-> a big driver for all SoCs in each kernels".
-> I think it should be better to have small modules, each one treating
-> specific hardware, and to let only the needed code in the kernel memory
-> at startup time.
-> 
-> > Until those are fixed, I cannot see how this driver can be merged,
-> > unfortunately.
-> 
-> No problem. I just wanted to help people by giving the job I did on the
-> boards I have. My boards are working for almost one year, fine enough
-> for I use them as daily desktop computers. I don't want to spend one
-> more year for having my code in the Linux kernel: there are so much
-> other exciting things to do...
-
-And you're certainly welcome to contribute drivers to the kernel, that's 
-always appreciated. Of course, to ensure a reasonable level of quality and 
-consistency between drivers, the review process often requires changes to be 
-made to the code being submitted. When it comes to drivers I mostly pay 
-attention to DT bindings, userspace APIs and modification to common code. 
-Driver code itself, as long as it's reasonably clean and doesn't impede 
-development of other drivers or impact system security in an adverse way, is 
-still important but maybe slightly less so. I'll defer to Maxime to come to an 
-agreement on the multiple display engines in parallel problem as I'm not 
-familiar with it for the Allwinner platforms.
-
--- 
-Regards,
-
-Laurent Pinchart
+> On Wed, Nov 30, 2016 at 3:19 PM, Auger Eric <eric.auger@redhat.com> wrote:
+>> Hi,
+>>
+>> On 15/11/2016 14:09, Eric Auger wrote:
+>>> Following LPC discussions, we now report reserved regions through
+>>> iommu-group sysfs reserved_regions attribute file.
+>>>
+>>> Reserved regions are populated through the IOMMU get_resv_region callback
+>>> (former get_dm_regions), now implemented by amd-iommu, intel-iommu and
+>>> arm-smmu.
+>>>
+>>> The intel-iommu reports the [FEE0_0000h - FEF0_000h] MSI window as an
+>>> IOMMU_RESV_NOMAP reserved region.
+>>>
+>>> arm-smmu reports the MSI window (arbitrarily located at 0x8000000 and
+>>> 1MB large) and the PCI host bridge windows.
+>>>
+>>> The series integrates a not officially posted patch from Robin:
+>>> "iommu/dma: Allow MSI-only cookies".
+>>>
+>>> This series currently does not address IRQ safety assessment.
+>>
+>> I will respin this series taking into account Joerg's comment. Does
+>> anyone have additional comments or want to put forward some conceptual
+>> issues with the current direction and with this implementation?
+>>
+>> As for the IRQ safety assessment, in a first step I would propose to
+>> remove the IOMMU_CAP_INTR_REMAP from arm-smmus and consider the
+>> assignment as unsafe. Any objection?
+>>
+>> Thanks
+>>
+>> Eric
+>>
+>>
+>>> Best Regards
+>>>
+>>> Eric
+>>>
+>>> Git: complete series available at
+>>> https://github.com/eauger/linux/tree/v4.9-rc5-reserved-rfc-v3
+>>>
+>>> History:
+>>> RFC v2 -> v3:
+>>> - switch to an iommu-group sysfs API
+>>> - use new dummy allocator provided by Robin
+>>> - dummy allocator initialized by vfio-iommu-type1 after enumerating
+>>>   the reserved regions
+>>> - at the moment ARM MSI base address/size is left unchanged compared
+>>>   to v2
+>>> - we currently report reserved regions and not usable IOVA regions as
+>>>   requested by Alex
+>>>
+>>> RFC v1 -> v2:
+>>> - fix intel_add_reserved_regions
+>>> - add mutex lock/unlock in vfio_iommu_type1
+>>>
+>>>
+>>> Eric Auger (10):
+>>>   iommu/dma: Allow MSI-only cookies
+>>>   iommu: Rename iommu_dm_regions into iommu_resv_regions
+>>>   iommu: Add new reserved IOMMU attributes
+>>>   iommu: iommu_alloc_resv_region
+>>>   iommu: Do not map reserved regions
+>>>   iommu: iommu_get_group_resv_regions
+>>>   iommu: Implement reserved_regions iommu-group sysfs file
+>>>   iommu/vt-d: Implement reserved region get/put callbacks
+>>>   iommu/arm-smmu: Implement reserved region get/put callbacks
+>>>   vfio/type1: Get MSI cookie
+>>>
+>>>  drivers/iommu/amd_iommu.c       |  20 +++---
+>>>  drivers/iommu/arm-smmu.c        |  52 +++++++++++++++
+>>>  drivers/iommu/dma-iommu.c       | 116 ++++++++++++++++++++++++++-------
+>>>  drivers/iommu/intel-iommu.c     |  50 ++++++++++----
+>>>  drivers/iommu/iommu.c           | 141 ++++++++++++++++++++++++++++++++++++----
+>>>  drivers/vfio/vfio_iommu_type1.c |  26 ++++++++
+>>>  include/linux/dma-iommu.h       |   7 ++
+>>>  include/linux/iommu.h           |  49 ++++++++++----
+>>>  8 files changed, 391 insertions(+), 70 deletions(-)
+>>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
