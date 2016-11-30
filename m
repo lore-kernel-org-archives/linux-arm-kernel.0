@@ -1,25 +1,28 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 30 Nov 2016 21:18:28 +0800
-Subject: [PATCH 1/4] crypto: arm/aes-ce: fix broken monolithic build
-In-Reply-To: <1480424733-10797-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1480424733-10797-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20161130131827.GB4126@gondor.apana.org.au>
+Date: Wed, 30 Nov 2016 21:19:22 +0800
+Subject: [PATCH] crypto: arm/aesbs - fix brokenness after skcipher
+ conversion
+In-Reply-To: <1480440216-341-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1480440216-341-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20161130131921.GD4126@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 01:05:30PM +0000, Ard Biesheuvel wrote:
-> When building the arm64 kernel with both CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
-> and CONFIG_CRYPTO_AES_ARM64_NEON_BLK=y configured, the build breaks with
-> the following error:
-> 
-> arch/arm64/crypto/aes-neon-blk.o:(.bss+0x0): multiple definition of `aes_simd_algs'
-> arch/arm64/crypto/aes-ce-blk.o:(.bss+0x0): first defined here
-> 
-> Fix this by making aes_simd_algs 'static'.
+On Tue, Nov 29, 2016 at 05:23:36PM +0000, Ard Biesheuvel wrote:
+> The CBC encryption routine should use the encryption round keys, not
+> the decryption round keys.
 > 
 > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Patches 1,2 and 4 applied.  Thanks.
+Patch applied.  Thanks.
+ 
+> Another fix for the queued changes, this time for 32-bit ARM.
+> 
+> I must say, I'm not impressed with the level of testing that has been
+> carried out after applying these changes. If you had cc'd me on these
+> patches, I would have been happy to test/review.
+
+Sorry.  I'll make sure you're CCed for ARM patches in future.
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
