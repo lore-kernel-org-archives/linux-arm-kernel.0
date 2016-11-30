@@ -1,74 +1,51 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 30 Nov 2016 15:55:29 +0100
-Subject: [PATCH v2 4/5] arm64: dts: marvell: Add definition of SPI
- controller for Armada 3700
-In-Reply-To: <20161130094351.2748-5-romain.perier@free-electrons.com> (Romain
- Perier's message of "Wed, 30 Nov 2016 10:43:50 +0100")
-References: <20161130094351.2748-1-romain.perier@free-electrons.com>
- <20161130094351.2748-5-romain.perier@free-electrons.com>
-Message-ID: <877f7lm2zi.fsf@free-electrons.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 30 Nov 2016 15:14:51 +0000
+Subject: [PATCH v2 0/9] arm64: Expose CPUID registers via emulation
+Message-ID: <1480518901-18544-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
- 
- On mer., nov. 30 2016, Romain Perier <romain.perier@free-electrons.com> wrote:
+This series adds a new ABI to expose the CPU feature registers
+to the user space via emulation of MRS instruction. The system exposes
+only a limited set of feature values (See the documentation patch)
+from the cpufeature infrastructure. The feature bits that are not
+exposed are set to the 'safe value' which implies 'not supported'.
 
-> Armada 3700 SoC has an SPI Controller, this commit adds the definition
-> of the SPI device node at the SoC level.
->
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
-> ---
->
-> Changes in v2:
->  - Removed properties max-frequency and clock-frequency, it is no
->    longer required and not used by the DT-bindings.
->
->  arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 11 +++++++++++
->  1 file changed, 11 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> index e9bd587..63c2002 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-> @@ -98,6 +98,17 @@
->  			/* 32M internal register @ 0xd000_0000 */
->  			ranges = <0x0 0x0 0xd0000000 0x2000000>;
->  
-> +			spi0: spi at 10600 {
-> +				compatible = "marvell,armada-3700-spi";
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				reg = <0x10600 0x5d>;
+Apart from the selected feature registers, we expose MIDR_EL1 (Main
+ID Register). The user should be aware that, reading MIDR_EL1 can be
+tricky on a heterogeneous system (just like getcpu()). We export the
+value of the current CPU where 'MRS' is executed.
 
-The last register is at the offset 0x1065C but according tot he
-datasheet the range address associated to this IP is from 0x10600 to
-0x10FFF.
+Changes since V1:
+  - Drop mask for Op0 in sys_reg()
+  - Fix documentation
+  - Change safe value of MPIDR to drop MT support
+  - Do not emulate AArch32 ID registers
 
-In the first case the size of the register set should be 0x60 (each
-register is 32-bits). But I prefer that we register the full range so a
-size of 0xA00.
+Mark Rutland (2):
+  arm64: cpufeature: treat unknown fields as RES0
+  arm64: cpufeature: remove explicit RAZ fields
 
-Thanks,
+Suzuki K Poulose (7):
+  arm64: cpufeature: Cleanup feature bit tables
+  arm64: cpufeature: Document the rules of safe value for features
+  arm64: cpufeature: Define helpers for sys_reg id
+  arm64: Add helper to decode register from instruction
+  arm64: cpufeature: Track user visible fields
+  arm64: cpufeature: Expose CPUID registers by emulation
+  arm64: Documentation - Expose CPU feature registers
 
-Gregory
-
-
-> +				clocks = <&nb_periph_clk 7>;
-> +				interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
-> +				num-cs = <4>;
-> +				status = "disabled";
-> +			};
-> +
->  			uart0: serial at 12000 {
->  				compatible = "marvell,armada-3700-uart";
->  				reg = <0x12000 0x400>;
-> -- 
-> 2.9.3
->
+ Documentation/arm64/cpu-feature-registers.txt | 196 +++++++++++++++
+ arch/arm64/include/asm/cpufeature.h           |  27 +-
+ arch/arm64/include/asm/insn.h                 |   2 +
+ arch/arm64/include/asm/sysreg.h               |  25 +-
+ arch/arm64/include/uapi/asm/hwcap.h           |   1 +
+ arch/arm64/kernel/cpufeature.c                | 340 +++++++++++++++++---------
+ arch/arm64/kernel/cpuinfo.c                   |   1 +
+ arch/arm64/kernel/insn.c                      |  29 +++
+ arch/arm64/kernel/traps.c                     |   2 +-
+ 9 files changed, 502 insertions(+), 121 deletions(-)
+ create mode 100644 Documentation/arm64/cpu-feature-registers.txt
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.7.4
