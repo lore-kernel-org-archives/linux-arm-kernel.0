@@ -1,81 +1,138 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 30 Nov 2016 09:24:11 +0100
-Subject: [PATCH v9 07/11] arm/arm64: vgic: Implement
- KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
-In-Reply-To: <CAFEAcA_1i7-ti_H_RZrTbCW2DmFPvYudKn_WFs=_XRoyKKsnbQ@mail.gmail.com>
-References: <1479906118-15832-1-git-send-email-vijay.kilari@gmail.com>
- <1479906118-15832-8-git-send-email-vijay.kilari@gmail.com>
- <20161128195028.GH18170@cbox>
- <CALicx6uW5RmjsPPBKB5wLW4TzNmcdc9ZADqp=M2ZJe9Cd+keZg@mail.gmail.com>
- <20161129210901.GC15346@cbox>
- <CAFEAcA_1i7-ti_H_RZrTbCW2DmFPvYudKn_WFs=_XRoyKKsnbQ@mail.gmail.com>
-Message-ID: <20161130082411.GA6647@cbox>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Wed, 30 Nov 2016 16:26:18 +0800
+Subject: [PATCH] arm64: dts: add zx296718's topcrm node
+In-Reply-To: <1480491237-5169-1-git-send-email-baoyou.xie@linaro.org>
+References: <1480491237-5169-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <CABymUCPMDqcfKQOtfj6gHWs69sh3HXaErDjE740xq6UQh_DFow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2016 at 07:10:51AM +0000, Peter Maydell wrote:
-> On 29 November 2016 at 21:09, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
-> > Actually, I'm not sure what the semantics of the line level ioctl should
-> > be for edge-triggered interrupts?  My inclination is that it shouldn't
-> > have any effect at this point, but that would mean that at this point we
-> > should only set the pending variable and try to queue the interrupt if
-> > the config is level.  But that also means that when we set the config
-> > later, we need to try to queue the interrupt, which we don't do
-> > currently, because we rely on the guest not fiddling with the config of
-> > an enabled interrupt.
-> >
-> > Could it be considered an error if user space tries to set the level for
-> > an edge-triggered interrupt and therefore something we can just ignore
-> > and assume that the corresponing interrupt will be configured as a
-> > level-triggered one later?
-> 
-> Userspace will always read the line-level values out and write
-> them back for migration, and I'd rather not make it have to
-> do cross-checks against whether the interrupt is edge or level
-> triggered to see whether it should write the level values into
-> the kernel. Telling the kernel the level for an edge-triggered
-> interrupt should be a no-op because it doesn't have any effect
-> on pending status.
-> 
-> > In any case we probably need to clarify the ABI in terms of this
-> > particular KVM_DEV_AR_VGIC_GRP_LEVEL_INFO group and how it relates to
-> > the config of edge vs. level of interrupts and ordering on restore...
-> 
-> IIRC the QEMU code restores the config first. (There's a similar
-> ordering thing for GICv2 where we have to restore GICD_ICFGRn before
-> GICD_ISPENDRn.)
-> 
+2016-11-30 15:33 GMT+08:00 Baoyou Xie <baoyou.xie@linaro.org>:
+> Enable topcrm clock node for zx296718, which is used for
+> CPU's frequency change.
 
-So it sounds to me that we should add a note in the Documentation like
-this:
+Please follow general rule, such as
+arm64: dts: zx: brief title of your changes
 
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-index 9348b3c..7bac20a 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-@@ -193,6 +193,11 @@ Groups:
- 
- 	Bit[n] indicates the status for interrupt vINTID + n.
- 
-+	Getting or setting the level info for an edge-triggered interrupt is
-+	not guaranteed to work.  To restore the complete state of the VGIC, the
-+	configuration (edge/level) of interrupts must be restored before
-+	restoring the level.
-+
-     SGIs and any interrupt with a higher ID than the number of interrupts
-     supported, will be RAZ/WI.  LPIs are always edge-triggered and are
-     therefore not supported by this interface.
+>
+> Furthermore, this patch adds the CPU clock phandle in CPU's node
+> and uses operating-points-v2 to register operating points.
+>
+> So it can be used by cpufreq-dt driver.
 
-Vijay, this means that the first block in your if-statement should only
-set pending and queue the interrupt if the interrupt is a level
-triggered one.
+Suggest to split clock nodes and cpu-freq nodes changes into different patches.
 
-(Peter, I thought you once argued that it was important for user space
-to be able to save/restore the state without any ordering requirements,
-but I may have misunderstood.  It is still the option to add something
-like the above to the docs but also do our best to allow any ordering of
-level/config, but it becomes slightly more invasive.)
+>
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> ---
+>  arch/arm64/boot/dts/zte/zx296718.dtsi | 48 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 48 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/zte/zx296718.dtsi b/arch/arm64/boot/dts/zte/zx296718.dtsi
+> index 6b239a3..f9eb37d 100644
+> --- a/arch/arm64/boot/dts/zte/zx296718.dtsi
+> +++ b/arch/arm64/boot/dts/zte/zx296718.dtsi
+> @@ -44,6 +44,7 @@
+>  #include <dt-bindings/input/input.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/clock/zx296718-clock.h>
+>
+>  / {
+>         compatible = "zte,zx296718";
+> @@ -81,6 +82,8 @@
+>                         compatible = "arm,cortex-a53","arm,armv8";
+>                         reg = <0x0 0x0>;
+>                         enable-method = "psci";
+> +                       clocks = <&topcrm A53_GATE>;
+> +                       operating-points-v2 = <&cluster0_opp>;
+>                 };
+>
+>                 cpu1: cpu at 1 {
+> @@ -88,6 +91,7 @@
+>                         compatible = "arm,cortex-a53","arm,armv8";
+>                         reg = <0x0 0x1>;
+>                         enable-method = "psci";
+> +                       operating-points-v2 = <&cluster0_opp>;
+>                 };
+>
+>                 cpu2: cpu at 2 {
+> @@ -95,6 +99,7 @@
+>                         compatible = "arm,cortex-a53","arm,armv8";
+>                         reg = <0x0 0x2>;
+>                         enable-method = "psci";
+> +                       operating-points-v2 = <&cluster0_opp>;
+>                 };
+>
+>                 cpu3: cpu at 3 {
+> @@ -102,6 +107,43 @@
+>                         compatible = "arm,cortex-a53","arm,armv8";
+>                         reg = <0x0 0x3>;
+>                         enable-method = "psci";
+> +                       operating-points-v2 = <&cluster0_opp>;
+> +               };
+> +       };
+> +
+> +       cluster0_opp: opp_table0 {
+> +               compatible = "operating-points-v2";
+> +               opp-shared;
+> +
+> +               opp at 1000000000 {
+> +                       opp-hz = /bits/ 64 <500000000>;
 
-Thanks,
--Christoffer
+Why frequency in opp name differ with opp-hz value?
+
+> +                       opp-microvolt = <857000>;
+> +                       clock-latency-ns = <500000>;
+> +               };
+> +               opp at 1100000000 {
+> +                       opp-hz = /bits/ 64 <648000000>;
+> +                       opp-microvolt = <857000>;
+> +                       clock-latency-ns = <500000>;
+> +               };
+> +               opp at 1200000000 {
+> +                       opp-hz = /bits/ 64 <800000000>;
+> +                       opp-microvolt = <882000>;
+> +                       clock-latency-ns = <500000>;
+> +               };
+> +               opp at 1300000000 {
+> +                       opp-hz = /bits/ 64 <1000000000>;
+> +                       opp-microvolt = <892000>;
+> +                       clock-latency-ns = <500000>;
+> +               };
+> +               opp at 1400000000 {
+> +                       opp-hz = /bits/ 64 <1188000000>;
+> +                       opp-microvolt = <1009000>;
+> +                       clock-latency-ns = <500000>;
+> +               };
+> +               opp at 1500000000 {
+> +                       opp-hz = /bits/ 64 <1312000000>;
+> +                       opp-microvolt = <1052000>;
+> +                       clock-latency-ns = <500000>;
+>                 };
+
+I did not see frequency 1500000000 or 1312000000 in clock drivers for
+A53. Please confirm whether clock driver need update or your need
+revise your patch.
+
+>         };
+>
+> @@ -279,6 +321,12 @@
+>                         dma-requests = <32>;
+>                 };
+>
+> +               topcrm: clock-controller at 01461000 {
+
+Removing heading 0 in address of name.
+
+> +                       compatible = "zte,zx296718-topcrm";
+> +                       reg = <0x01461000 0x1000>;
+> +                       #clock-cells = <1>;
+> +               };
+> +
+>                 sysctrl: sysctrl at 1463000 {
+>                         compatible = "zte,zx296718-sysctrl", "syscon";
+>                         reg = <0x1463000 0x1000>;
+> --
+> 2.7.4
+>
