@@ -1,68 +1,110 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Wed, 30 Nov 2016 15:00:14 +0100
-Subject: [PATCH v6 1/4] i2c: pxa: Add definition of fast and high speed modes
- via the regs layout
-In-Reply-To: <20161130140017.26307-1-romain.perier@free-electrons.com>
-References: <20161130140017.26307-1-romain.perier@free-electrons.com>
-Message-ID: <20161130140017.26307-2-romain.perier@free-electrons.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Wed, 30 Nov 2016 19:31:10 +0530
+Subject: [PATCH 06/10] iommu: of: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <5043bd01-2fc3-851d-2d6f-ba5fea96c774@arm.com>
+References: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
+ <CGME20161130002345epcas1p2486d2d61930d132210d9cb7d19bcbb48@epcas1p2.samsung.com>
+ <1480465344-11862-7-git-send-email-sricharan@codeaurora.org>
+ <8e91ce72-9d37-f4be-9224-856a1a4c3e1d@samsung.com>
+ <5043bd01-2fc3-851d-2d6f-ba5fea96c774@arm.com>
+Message-ID: <001601d24b12$384b7710$a8e26530$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, the bit masks for the fast and high speed mode were statically
-defined. Some IP blocks might use different bits for these modes.
+Hi Robin,
 
-This commit introduces new fields in order to enable the definition of
-different bit masks for these features. If these fields are undefined,
-ICR_FM and ICR_HS are selected to preserve backward compatibility with
-other IPs.
+>On 30/11/16 07:54, Marek Szyprowski wrote:
+>> Hi Sricharan and Robin,
+>>
+>>
+>> On 2016-11-30 01:22, Sricharan R wrote:
+>>> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+>>>
+>>> Failures to look up an IOMMU when parsing the DT iommus property need to
+>>> be handled separately from the .of_xlate() failures to support deferred
+>>> probing.
+>>>
+>>> The lack of a registered IOMMU can be caused by the lack of a driver for
+>>> the IOMMU, the IOMMU device probe not having been performed yet, having
+>>> been deferred, or having failed.
+>>>
+>>> The first case occurs when the device tree describes the bus master and
+>>> IOMMU topology correctly but no device driver exists for the IOMMU yet
+>>> or the device driver has not been compiled in. Return NULL, the caller
+>>> will configure the device without an IOMMU.
+>>>
+>>> The second and third cases are handled by deferring the probe of the bus
+>>> master device which will eventually get reprobed after the IOMMU.
+>>>
+>>> The last case is currently handled by deferring the probe of the bus
+>>> master device as well. A mechanism to either configure the bus master
+>>> device without an IOMMU or to fail the bus master device probe depending
+>>> on whether the IOMMU is optional or mandatory would be a good
+>>> enhancement.
+>>>
+>>> Signed-off-by: Laurent Pichart
+>>> <laurent.pinchart+renesas@ideasonboard.com>
+>>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>>> [rm: massive PCI hacks]
+>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>>> ---
+>>>   drivers/base/dma-mapping.c | 4 ++--
+>>>   drivers/iommu/dma-iommu.c  | 1 +
+>>>   drivers/iommu/of_iommu.c   | 5 +++--
+>>>   drivers/of/device.c        | 9 +++++++--
+>>>   drivers/pci/probe.c        | 6 ++++--
+>>>   include/linux/of_device.h  | 9 ++++++---
+>>>   include/linux/pci.h        | 4 ++--
+>>>   7 files changed, 25 insertions(+), 13 deletions(-)
+>>>
+>>> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
+>>> index b2a5629..576fdfb 100644
+>>> --- a/drivers/base/dma-mapping.c
+>>> +++ b/drivers/base/dma-mapping.c
+>>> @@ -351,9 +351,9 @@ void dma_common_free_remap(void *cpu_addr, size_t
+>>> size, unsigned long vm_flags)
+>>>   int dma_configure(struct device *dev)
+>>>   {
+>>>       if (dev_is_pci(dev))
+>>> -        pci_dma_configure(dev);
+>>> +        return pci_dma_configure(dev);
+>>>       else if (dev->of_node)
+>>> -        of_dma_configure(dev, dev->of_node);
+>>> +        return of_dma_configure(dev, dev->of_node);
+>>>       return 0;
+>>>   }
+>>>   diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+>>> index c5ab866..d2a7a46 100644
+>>> --- a/drivers/iommu/dma-iommu.c
+>>> +++ b/drivers/iommu/dma-iommu.c
+>>> @@ -148,6 +148,7 @@ int iommu_dma_init_domain(struct iommu_domain
+>>> *domain, dma_addr_t base,
+>>>       base_pfn = max_t(unsigned long, 1, base >> order);
+>>>       end_pfn = (base + size - 1) >> order;
+>>>   +    dev_info(dev, "0x%llx 0x%llx, 0x%llx 0x%llx, 0x%llx 0x%llx\n",
+>>> base, size, domain->geometry.aperture_start,
+>>> domain->geometry.aperture_end,
+>>
+>> This causes a NULL pointer dereference if caller passes NULL device
+>> pointer.
+>> There is such caller in drivers/gpu/drm/exynos/exynos_drm_iommu.h.
+>> Trivial to fix as it looks like a leftover from developement or
+>> debugging stage.
+>
+>Yes, this is some development crap which was never intended to go
+>upstream. Hence "massive PCI hacks" ;)
+>
+>Other than the first two patches, the rest of the stuff from me here was
+>just an experiment which I'm not entirely convinced by the outcome of -
+>I don't particularly like the resulting fragmentation of having
+>pci_dma_configure() awkwardly floating around on its own in pci.c.
 
-Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
----
- drivers/i2c/busses/i2c-pxa.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+Ha, sorry looks like that i have misunderstood that then. I thought that
+the V3 changes that i had for pci was hacky and the reworked patches
+in your latest branch were correct. So do you suggest that the
+pci_dma_configure gets removed and the pci related changes gets handled
+in of_iommu_configure /acpi_dma_configure itself ?
 
-diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index e28b825..dc9d0a6 100644
---- a/drivers/i2c/busses/i2c-pxa.c
-+++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -48,6 +48,8 @@ struct pxa_reg_layout {
- 	u32 isar;
- 	u32 ilcr;
- 	u32 iwcr;
-+	u32 fm;
-+	u32 hs;
- };
- 
- enum pxa_i2c_types {
-@@ -193,6 +195,8 @@ struct pxa_i2c {
- 	unsigned char		master_code;
- 	unsigned long		rate;
- 	bool			highmode_enter;
-+	u32			fm_mask;
-+	u32			hs_mask;
- };
- 
- #define _IBMR(i2c)	((i2c)->reg_ibmr)
-@@ -503,8 +507,8 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
- 		writel(i2c->slave_addr, _ISAR(i2c));
- 
- 	/* set control register values */
--	writel(I2C_ICR_INIT | (i2c->fast_mode ? ICR_FM : 0), _ICR(i2c));
--	writel(readl(_ICR(i2c)) | (i2c->high_mode ? ICR_HS : 0), _ICR(i2c));
-+	writel(I2C_ICR_INIT | (i2c->fast_mode ? i2c->fm_mask : 0), _ICR(i2c));
-+	writel(readl(_ICR(i2c)) | (i2c->high_mode ? i2c->hs_mask : 0), _ICR(i2c));
- 
- #ifdef CONFIG_I2C_PXA_SLAVE
- 	dev_info(&i2c->adap.dev, "Enabling slave mode\n");
-@@ -1234,6 +1238,9 @@ static int i2c_pxa_probe(struct platform_device *dev)
- 	i2c->reg_idbr = i2c->reg_base + pxa_reg_layout[i2c_type].idbr;
- 	i2c->reg_icr = i2c->reg_base + pxa_reg_layout[i2c_type].icr;
- 	i2c->reg_isr = i2c->reg_base + pxa_reg_layout[i2c_type].isr;
-+	i2c->fm_mask = pxa_reg_layout[i2c_type].fm ? pxa_reg_layout[i2c_type].fm : ICR_FM;
-+	i2c->hs_mask = pxa_reg_layout[i2c_type].hs ? pxa_reg_layout[i2c_type].hs : ICR_HS;
-+
- 	if (i2c_type != REGS_CE4100)
- 		i2c->reg_isar = i2c->reg_base + pxa_reg_layout[i2c_type].isar;
- 
--- 
-2.9.3
+Regards,
+Sricharan
