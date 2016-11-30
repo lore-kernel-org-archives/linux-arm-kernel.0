@@ -1,35 +1,78 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 30 Nov 2016 17:17:13 +0000
-Subject: [PATCHv4 05/10] arm64: Use __pa_symbol for kernel symbols
-In-Reply-To: <1480445729-27130-6-git-send-email-labbott@redhat.com>
-References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
- <1480445729-27130-6-git-send-email-labbott@redhat.com>
-Message-ID: <20161130171713.GE4439@e104818-lin.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 30 Nov 2016 18:36:29 +0100
+Subject: [PATCH 1/2] ARM: dts: at91: sama5d4: change DMA allocation for secure
+ peripherals
+Message-ID: <20161130173630.11944-1-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 10:55:24AM -0800, Laura Abbott wrote:
-> --- a/arch/arm64/include/asm/memory.h
-> +++ b/arch/arm64/include/asm/memory.h
-> @@ -205,6 +205,8 @@ static inline void *phys_to_virt(phys_addr_t x)
->  #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
->  #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
->  #define virt_to_pfn(x)      __phys_to_pfn(__virt_to_phys((unsigned long)(x)))
-> +#define sym_to_pfn(x)	    __phys_to_pfn(__pa_symbol(x))
-> +#define lm_alias(x)		__va(__pa_symbol(x))
-[...]
-> --- a/include/linux/mm.h
-> +++ b/include/linux/mm.h
-> @@ -76,6 +76,10 @@ extern int mmap_rnd_compat_bits __read_mostly;
->  #define page_to_virt(x)	__va(PFN_PHYS(page_to_pfn(x)))
->  #endif
->  
-> +#ifndef lm_alias
-> +#define lm_alias(x)	__va(__pa_symbol(x))
-> +#endif
+Some peripherals are "Programmable Secure" but left as "Secure" by default.
+If tried to be connected to Non-Secure DMA controller, the possibility to
+leak secure data is prevented so using these peripherals with DMA1 is not
+possible with this default configuration (MATRIX_SPSELR registers setup by
+bootloader).
+Move them to DMA0 which is an "Always-Secure" DMA controller.
 
-You can drop the arm64-specific lm_alias macro as it's the same as the
-generic one you introduced in the same patch.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/sama5d4.dtsi | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
+diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+index 4f60c1b7b137..d3889c9d25a9 100644
+--- a/arch/arm/boot/dts/sama5d4.dtsi
++++ b/arch/arm/boot/dts/sama5d4.dtsi
+@@ -854,10 +854,10 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf8004000 0x100>;
+ 				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 5>;
+-				dmas = <&dma1
++				dmas = <&dma0
+ 					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
+ 					| AT91_XDMAC_DT_PERID(22))>,
+-				       <&dma1
++				       <&dma0
+ 					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
+ 					| AT91_XDMAC_DT_PERID(23))>;
+ 				dma-names = "tx", "rx";
+@@ -938,10 +938,10 @@
+ 				compatible = "atmel,sama5d4-i2c";
+ 				reg = <0xf8018000 0x4000>;
+ 				interrupts = <33 IRQ_TYPE_LEVEL_HIGH 6>;
+-				dmas = <&dma1
++				dmas = <&dma0
+ 					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
+ 					| AT91_XDMAC_DT_PERID(4))>,
+-				       <&dma1
++				       <&dma0
+ 					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
+ 					| AT91_XDMAC_DT_PERID(5))>;
+ 				dma-names = "tx", "rx";
+@@ -1055,10 +1055,10 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfc004000 0x100>;
+ 				interrupts = <28 IRQ_TYPE_LEVEL_HIGH 5>;
+-				dmas = <&dma1
++				dmas = <&dma0
+ 					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
+ 					| AT91_XDMAC_DT_PERID(24))>,
+-				       <&dma1
++				       <&dma0
+ 					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
+ 					| AT91_XDMAC_DT_PERID(25))>;
+ 				dma-names = "tx", "rx";
+@@ -1167,10 +1167,10 @@
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xfc01c000 0x100>;
+ 				interrupts = <39 IRQ_TYPE_LEVEL_HIGH 3>;
+-				dmas = <&dma1
++				dmas = <&dma0
+ 					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
+ 					| AT91_XDMAC_DT_PERID(14))>,
+-				       <&dma1
++				       <&dma0
+ 					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
+ 					| AT91_XDMAC_DT_PERID(15))>;
+ 				dma-names = "tx", "rx";
 -- 
-Catalin
+2.9.0
