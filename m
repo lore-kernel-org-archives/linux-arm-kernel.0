@@ -1,574 +1,192 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 30 Nov 2016 16:15:32 +0100
-Subject: [PATCH v2 2/5] spi: armada-3700: Add support for the FIFO mode
-In-Reply-To: <20161130094351.2748-3-romain.perier@free-electrons.com> (Romain
- Perier's message of "Wed, 30 Nov 2016 10:43:48 +0100")
-References: <20161130094351.2748-1-romain.perier@free-electrons.com>
- <20161130094351.2748-3-romain.perier@free-electrons.com>
-Message-ID: <871sxtm223.fsf@free-electrons.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 30 Nov 2016 15:14:59 +0000
+Subject: [PATCH v2 8/9] arm64: cpufeature: Expose CPUID registers by emulation
+In-Reply-To: <1480518901-18544-1-git-send-email-suzuki.poulose@arm.com>
+References: <1480518901-18544-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1480518901-18544-9-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
+This patch adds the hook for emulating MRS instruction to
+export the 'user visible' value of supported system registers.
+We emulate only the following id space for system registers:
+
+ Op0=3, Op1=0, CRn=0, CRm=[0, 4-7]
+
+The rest will fall back to SIGILL. This capability is also
+advertised via a new HWCAP_CPUID.
+
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/include/asm/sysreg.h     |   4 ++
+ arch/arm64/include/uapi/asm/hwcap.h |   1 +
+ arch/arm64/kernel/cpufeature.c      | 101 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/cpuinfo.c         |   1 +
+ 4 files changed, 107 insertions(+)
+
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index c94a56f..7d00ce21 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -239,6 +239,10 @@
+ #define ID_AA64MMFR0_TGRAN_SUPPORTED	ID_AA64MMFR0_TGRAN64_SUPPORTED
+ #endif
  
- On mer., nov. 30 2016, Romain Perier <romain.perier@free-electrons.com> wrote:
-
-> In FIFO mode, dedicated registers are used to store the instruction,
-> the address, the read mode and the data. Write and Read FIFO are used
-> to store the outcoming or incoming data. The CPU no longer has to assert
-> each byte. The data FIFOs are accessible via DMA or by the CPU.
->
-> This commit adds support for the FIFO mode with the CPU.
->
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
-> ---
->
-> Changes in v2:
->  - Removed a3700_spi_bytelen_set from the setup function, it was accidentally
->    let here and not required, as it is configured in the prepare callback now
->    (defaults to 4 for fifo mode). It solves unrecognized spi-nor flash memory
->    detection with jedec.
->
->  drivers/spi/spi-armada-3700.c | 409 ++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 399 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/spi/spi-armada-3700.c b/drivers/spi/spi-armada-3700.c
-> index cc9e1b2..72f1818 100644
-> --- a/drivers/spi/spi-armada-3700.c
-> +++ b/drivers/spi/spi-armada-3700.c
-> @@ -99,19 +99,28 @@
->  /* A3700_SPI_IF_TIME_REG */
->  #define A3700_SPI_CLK_CAPT_EDGE		BIT(7)
->  
-> +/* Flags and macros for struct a3700_spi */
-> +#define HAS_FIFO			BIT(0)
-> +#define A3700_INSTR_CNT			1
-> +#define A3700_ADDR_CNT			3
-> +#define A3700_DUMMY_CNT			1
-> +
->  struct a3700_spi {
->  	struct spi_master *master;
->  	void __iomem *base;
->  	struct clk *clk;
->  	unsigned int irq;
->  	unsigned int flags;
-> -	bool last_xfer;
-> +	bool xmit_data;
->  	const u8 *tx_buf;
->  	u8 *rx_buf;
->  	size_t buf_len;
->  	u8 byte_len;
->  	u32 wait_mask;
->  	struct completion done;
-> +	u32 addr_cnt;
-> +	u32 instr_cnt;
-> +	size_t hdr_cnt;
->  };
->  
->  static u32 spireg_read(struct a3700_spi *a3700_spi, u32 offset)
-> @@ -180,12 +189,15 @@ static int a3700_spi_pin_mode_set(struct a3700_spi *a3700_spi,
->  	return 0;
->  }
->  
-> -static void a3700_spi_fifo_mode_unset(struct a3700_spi *a3700_spi)
-> +static void a3700_spi_fifo_mode_set(struct a3700_spi *a3700_spi)
->  {
->  	u32 val;
->  
->  	val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
-> -	val &= ~A3700_SPI_FIFO_MODE;
-> +	if (a3700_spi->flags & HAS_FIFO)
-> +		val |= A3700_SPI_FIFO_MODE;
-> +	else
-> +		val &= ~A3700_SPI_FIFO_MODE;
->  	spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
->  }
->  
-> @@ -255,11 +267,30 @@ static void a3700_spi_bytelen_set(struct a3700_spi *a3700_spi, unsigned int len)
->  	a3700_spi->byte_len = len;
->  }
->  
-> +static int a3700_spi_fifo_flush(struct a3700_spi *a3700_spi)
-> +{
-> +	int timeout = A3700_SPI_TIMEOUT;
-> +	u32 val;
-> +
-> +	val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
-> +	val |= A3700_SPI_FIFO_FLUSH;
-> +	spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
-> +
-> +	while (--timeout) {
-> +		val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
-> +		if (!(val & A3700_SPI_FIFO_FLUSH))
-> +			return 0;
-> +		udelay(1);
-> +	}
-> +
-> +	return -ETIMEDOUT;
-> +}
-> +
->  static int a3700_spi_init(struct a3700_spi *a3700_spi)
->  {
->  	struct spi_master *master = a3700_spi->master;
->  	u32 val;
-> -	int i;
-> +	int i, ret = 0;
->  
->  	/* Reset SPI unit */
->  	val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
-> @@ -278,10 +309,8 @@ static int a3700_spi_init(struct a3700_spi *a3700_spi)
->  	for (i = 0; i < master->num_chipselect; i++)
->  		a3700_spi_deactivate_cs(a3700_spi, i);
->  
-> -	a3700_spi_pin_mode_set(a3700_spi, 0);
-> -
-> -	/* Be sure that FIFO mode is disabled */
-> -	a3700_spi_fifo_mode_unset(a3700_spi);
-> +	/* Enable FIFO mode */
-> +	a3700_spi_fifo_mode_set(a3700_spi);
->  
->  	/* Set SPI mode */
->  	a3700_spi_mode_set(a3700_spi, master->mode_bits);
-> @@ -294,7 +323,7 @@ static int a3700_spi_init(struct a3700_spi *a3700_spi)
->  	spireg_write(a3700_spi, A3700_SPI_INT_MASK_REG, 0);
->  	spireg_write(a3700_spi, A3700_SPI_INT_STAT_REG, ~0U);
->  
-> -	return 0;
-> +	return ret;
->  }
->  
->  static irqreturn_t a3700_spi_interrupt(int irq, void *dev_id)
-> @@ -380,14 +409,34 @@ static bool a3700_spi_transfer_wait(struct spi_device *spi,
->  	return a3700_spi_wait_completion(spi);
->  }
->  
-> +static void a3700_spi_fifo_thres_set(struct a3700_spi *a3700_spi,
-> +				     unsigned int bytes)
-> +{
-> +	u32 val;
-> +
-> +	if (a3700_spi->flags & HAS_FIFO) {
-> +		val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
-> +		val &= ~(A3700_SPI_FIFO_THRS_MASK << A3700_SPI_RFIFO_THRS_BIT);
-> +		val |= (bytes - 1) << A3700_SPI_RFIFO_THRS_BIT;
-> +		val &= ~(A3700_SPI_FIFO_THRS_MASK << A3700_SPI_WFIFO_THRS_BIT);
-> +		val |= (7 - bytes) << A3700_SPI_WFIFO_THRS_BIT;
-> +		spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
-> +	}
-> +}
-> +
->  static void a3700_spi_transfer_setup(struct spi_device *spi,
->  				    struct spi_transfer *xfer)
->  {
->  	struct a3700_spi *a3700_spi;
-> +	unsigned int byte_len;
->  
->  	a3700_spi = spi_master_get_devdata(spi->master);
->  
->  	a3700_spi_clock_set(a3700_spi, xfer->speed_hz, spi->mode);
-> +
-> +	byte_len = xfer->bits_per_word >> 3;
-> +
-> +	a3700_spi_fifo_thres_set(a3700_spi, byte_len);
->  }
->  
->  static int a3700_spi_read_data(struct a3700_spi *a3700_spi)
-> @@ -447,6 +496,168 @@ static void a3700_spi_set_cs(struct spi_device *spi, bool enable)
->  		a3700_spi_deactivate_cs(a3700_spi, spi->chip_select);
->  }
->  
-> +static void a3700_spi_header_set(struct a3700_spi *a3700_spi)
-> +{
-> +	u32 instr_cnt = 0, addr_cnt = 0, dummy_cnt = 0;
-> +	u32 val = 0;
-> +
-> +	/* Clear the header registers */
-> +	spireg_write(a3700_spi, A3700_SPI_IF_INST_REG, 0);
-> +	spireg_write(a3700_spi, A3700_SPI_IF_ADDR_REG, 0);
-> +	spireg_write(a3700_spi, A3700_SPI_IF_RMODE_REG, 0);
-> +
-> +	/* Set header counters */
-> +	if (a3700_spi->tx_buf) {
-> +		if (a3700_spi->buf_len <= a3700_spi->instr_cnt) {
-> +			instr_cnt = a3700_spi->buf_len;
-> +		} else if (a3700_spi->buf_len <= (a3700_spi->instr_cnt +
-> +						  a3700_spi->addr_cnt)) {
-> +			instr_cnt = a3700_spi->instr_cnt;
-> +			addr_cnt = a3700_spi->buf_len - instr_cnt;
-> +		} else if (a3700_spi->buf_len <= a3700_spi->hdr_cnt) {
-> +			instr_cnt = a3700_spi->instr_cnt;
-> +			addr_cnt = a3700_spi->addr_cnt;
-> +			/* Need to handle the normal write case with 1 byte
-> +			 * data
-> +			 */
-> +			if (!a3700_spi->tx_buf[instr_cnt + addr_cnt])
-> +				dummy_cnt = a3700_spi->buf_len - instr_cnt -
-> +					    addr_cnt;
-> +		}
-> +		val |= ((instr_cnt & A3700_SPI_INSTR_CNT_MASK)
-> +			<< A3700_SPI_INSTR_CNT_BIT);
-> +		val |= ((addr_cnt & A3700_SPI_ADDR_CNT_MASK)
-> +			<< A3700_SPI_ADDR_CNT_BIT);
-> +		val |= ((dummy_cnt & A3700_SPI_DUMMY_CNT_MASK)
-> +			<< A3700_SPI_DUMMY_CNT_BIT);
-> +	}
-> +	spireg_write(a3700_spi, A3700_SPI_IF_HDR_CNT_REG, val);
-> +
-> +	/* Update the buffer length to be transferred */
-> +	a3700_spi->buf_len -= (instr_cnt + addr_cnt + dummy_cnt);
-> +
-> +	/* Set Instruction */
-> +	val = 0;
-> +	while (instr_cnt--) {
-> +		val = (val << 8) | a3700_spi->tx_buf[0];
-> +		a3700_spi->tx_buf++;
-> +	}
-> +	spireg_write(a3700_spi, A3700_SPI_IF_INST_REG, val);
-> +
-> +	/* Set Address */
-> +	val = 0;
-> +	while (addr_cnt--) {
-> +		val = (val << 8) | a3700_spi->tx_buf[0];
-> +		a3700_spi->tx_buf++;
-> +	}
-> +	spireg_write(a3700_spi, A3700_SPI_IF_ADDR_REG, val);
-> +}
-> +
-> +static int a3700_is_wfifo_full(struct a3700_spi *a3700_spi)
-> +{
-> +	u32 val;
-> +
-> +	val = spireg_read(a3700_spi, A3700_SPI_IF_CTRL_REG);
-> +	return (val & A3700_SPI_WFIFO_FULL);
-> +}
-> +
-> +static int a3700_spi_fifo_write(struct a3700_spi *a3700_spi)
-> +{
-> +	u32 val;
-> +	int i = 0;
-> +
-> +	while (!a3700_is_wfifo_full(a3700_spi) && a3700_spi->buf_len) {
-> +		val = 0;
-> +		if (a3700_spi->buf_len >= 4) {
-> +			val = cpu_to_le32(*(u32 *)a3700_spi->tx_buf);
-> +			spireg_write(a3700_spi, A3700_SPI_DATA_OUT_REG, val);
-> +
-> +			a3700_spi->buf_len -= 4;
-> +			a3700_spi->tx_buf += 4;
-> +		} else {
-> +			/*
-> +			 * If the remained buffer length is less than 4-bytes,
-> +			 * we should pad the write buffer with all ones. So that
-> +			 * it avoids overwrite the unexpected bytes following
-> +			 * the last one.
-> +			 */
-> +			val = GENMASK(31, 0);
-> +			while (a3700_spi->buf_len) {
-> +				val &= ~(0xff << (8 * i));
-> +				val |= *a3700_spi->tx_buf++ << (8 * i);
-> +				i++;
-> +				a3700_spi->buf_len--;
-> +
-> +				spireg_write(a3700_spi, A3700_SPI_DATA_OUT_REG,
-> +					     val);
-> +			}
-> +			break;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int a3700_is_rfifo_empty(struct a3700_spi *a3700_spi)
-> +{
-> +	u32 val = spireg_read(a3700_spi, A3700_SPI_IF_CTRL_REG);
-> +
-> +	return (val & A3700_SPI_RFIFO_EMPTY);
-> +}
-> +
-> +static int a3700_spi_fifo_read(struct a3700_spi *a3700_spi)
-> +{
-> +	u32 val;
-> +
-> +	while (!a3700_is_rfifo_empty(a3700_spi) && a3700_spi->buf_len) {
-> +		val = spireg_read(a3700_spi, A3700_SPI_DATA_IN_REG);
-> +		if (a3700_spi->buf_len >= 4) {
-> +			u32 data = le32_to_cpu(val);
-> +			memcpy(a3700_spi->rx_buf, &data, 4);
-> +
-> +			a3700_spi->buf_len -= 4;
-> +			a3700_spi->rx_buf += 4;
-> +		} else {
-> +			/*
-> +			 * When remain bytes is not larger than 4, we should
-> +			 * avoid memory overwriting and just write the left rx
-> +			 * buffer bytes.
-> +			 */
-> +			while (a3700_spi->buf_len) {
-> +				*a3700_spi->rx_buf = val & 0xff;
-> +				val >>= 8;
-> +
-> +				a3700_spi->buf_len--;
-> +				a3700_spi->rx_buf++;
-> +			}
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static void a3700_spi_transfer_abort_fifo(struct a3700_spi *a3700_spi)
-> +{
-> +	int timeout = A3700_SPI_TIMEOUT;
-> +	u32 val;
-> +
-> +	val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
-> +	val |= A3700_SPI_XFER_STOP;
-> +	spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
-> +
-> +	while (--timeout) {
-> +		val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
-> +		if (!(val & A3700_SPI_XFER_START))
-> +			break;
-> +		udelay(1);
-> +	}
-> +
-> +	a3700_spi_fifo_flush(a3700_spi);
-> +
-> +	val &= ~A3700_SPI_XFER_STOP;
-> +	spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
-> +}
-> +
->  static int a3700_spi_prepare_message(struct spi_master *master,
->  				     struct spi_message *message)
->  {
-> @@ -463,12 +674,28 @@ static int a3700_spi_prepare_message(struct spi_master *master,
->  	return 0;
->  }
->  
-> +static int a3700_spi_prepare_fifo_message(struct spi_master *master,
-> +					  struct spi_message *message)
-> +{
-> +	struct a3700_spi *a3700_spi = spi_master_get_devdata(master);
-> +	int ret;
-> +
-> +	/* Flush the FIFOs */
-> +	ret = a3700_spi_fifo_flush(a3700_spi);
-> +	if (ret)
-> +		return ret;
-> +
-> +	a3700_spi_bytelen_set(a3700_spi, 4);
-> +
-> +	return 0;
-> +}
-> +
->  static int a3700_spi_transfer_one(struct spi_master *master,
->  				  struct spi_device *spi,
->  				  struct spi_transfer *xfer)
->  {
->  	struct a3700_spi *a3700_spi = spi_master_get_devdata(master);
-> -	int ret = 0;
-> +	int ret;
->  
->  	a3700_spi_transfer_setup(spi, xfer);
->  
-> @@ -505,6 +732,151 @@ static int a3700_spi_transfer_one(struct spi_master *master,
->  	return ret;
->  }
->  
-> +static int a3700_spi_fifo_transfer_one(struct spi_master *master,
-> +				       struct spi_device *spi,
-> +				       struct spi_transfer *xfer)
-> +{
-> +	struct a3700_spi *a3700_spi = spi_master_get_devdata(master);
-> +	int ret = 0, timeout = A3700_SPI_TIMEOUT;
-> +	unsigned int nbits = 0;
-> +	u32 val;
-> +
-> +	a3700_spi_transfer_setup(spi, xfer);
-> +
-> +	a3700_spi->tx_buf  = xfer->tx_buf;
-> +	a3700_spi->rx_buf  = xfer->rx_buf;
-> +	a3700_spi->buf_len = xfer->len;
-> +
-> +	/* SPI transfer headers */
-> +	a3700_spi_header_set(a3700_spi);
-> +
-> +	if (xfer->tx_buf)
-> +		nbits = xfer->tx_nbits;
-> +	else if (xfer->rx_buf)
-> +		nbits = xfer->rx_nbits;
-> +
-> +	a3700_spi_pin_mode_set(a3700_spi, nbits);
-> +
-> +	if (xfer->rx_buf) {
-> +		/* Set read data length */
-> +		spireg_write(a3700_spi, A3700_SPI_IF_DIN_CNT_REG,
-> +			     a3700_spi->buf_len);
-> +		/* Start READ transfer */
-> +		val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
-> +		val &= ~A3700_SPI_RW_EN;
-> +		val |= A3700_SPI_XFER_START;
-> +		spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
-> +	} else if (xfer->tx_buf) {
-> +		/* Start Write transfer */
-> +		val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
-> +		val |= (A3700_SPI_XFER_START | A3700_SPI_RW_EN);
-> +		spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
-> +
-> +		/*
-> +		 * If there are data to be written to the SPI device, xmit_data
-> +		 * flag is set true; otherwise the instruction in SPI_INSTR does
-> +		 * not require data to be written to the SPI device, then
-> +		 * xmit_data flag is set false.
-> +		 */
-> +		a3700_spi->xmit_data = (a3700_spi->buf_len != 0);
-> +	}
-> +
-> +	while (a3700_spi->buf_len) {
-> +		if (a3700_spi->tx_buf) {
-> +			/* Wait wfifo ready */
-> +			if (!a3700_spi_transfer_wait(spi,
-> +						     A3700_SPI_WFIFO_RDY)) {
-> +				dev_err(&spi->dev,
-> +					"wait wfifo ready timed out\n");
-> +				ret = -ETIMEDOUT;
-> +				goto error;
-> +			}
-> +			/* Fill up the wfifo */
-> +			ret = a3700_spi_fifo_write(a3700_spi);
-> +			if (ret)
-> +				goto error;
-> +		} else if (a3700_spi->rx_buf) {
-> +			/* Wait rfifo ready */
-> +			if (!a3700_spi_transfer_wait(spi,
-> +						     A3700_SPI_RFIFO_RDY)) {
-> +				dev_err(&spi->dev,
-> +					"wait rfifo ready timed out\n");
-> +				ret = -ETIMEDOUT;
-> +				goto error;
-> +			}
-> +			/* Drain out the rfifo */
-> +			ret = a3700_spi_fifo_read(a3700_spi);
-> +			if (ret)
-> +				goto error;
-> +		}
-> +	}
-> +
-> +	/*
-> +	 * Stop a write transfer in fifo mode:
-> +	 *	- wait all the bytes in wfifo to be shifted out
-> +	 *	 - set XFER_STOP bit
-> +	 *	- wait XFER_START bit clear
-> +	 *	- clear XFER_STOP bit
-> +	 * Stop a read transfer in fifo mode:
-> +	 *	- the hardware is to reset the XFER_START bit
-> +	 *	   after the number of bytes indicated in DIN_CNT
-> +	 *	   register
-> +	 *	- just wait XFER_START bit clear
-> +	 */
-> +	if (a3700_spi->tx_buf) {
-> +		if (a3700_spi->xmit_data) {
-> +			/*
-> +			 * If there are data written to the SPI device, wait
-> +			 * until SPI_WFIFO_EMPTY is 1 to wait for all data to
-> +			 * transfer out of write FIFO.
-> +			 */
-> +			if (!a3700_spi_transfer_wait(spi,
-> +						     A3700_SPI_WFIFO_EMPTY)) {
-> +				dev_err(&spi->dev, "wait wfifo empty timed out\n");
-> +				return -ETIMEDOUT;
-> +			}
-> +		} else {
-> +			/*
-> +			 * If the instruction in SPI_INSTR does not require data
-> +			 * to be written to the SPI device, wait until SPI_RDY
-> +			 * is 1 for the SPI interface to be in idle.
-> +			 */
-> +			if (!a3700_spi_transfer_wait(spi, A3700_SPI_XFER_RDY)) {
-> +				dev_err(&spi->dev, "wait xfer ready timed out\n");
-> +				return -ETIMEDOUT;
-> +			}
-> +		}
-> +
-> +		val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
-> +		val |= A3700_SPI_XFER_STOP;
-> +		spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
-> +	}
-> +
-> +	while (--timeout) {
-> +		val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
-> +		if (!(val & A3700_SPI_XFER_START))
-> +			break;
-> +		udelay(1);
-> +	}
-> +
-> +	if (timeout == 0) {
-> +		dev_err(&spi->dev, "wait transfer start clear timed out\n");
-> +		ret = -ETIMEDOUT;
-> +		goto error;
-> +	}
-> +
-> +	val &= ~A3700_SPI_XFER_STOP;
-> +	spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
-> +	goto out;
-> +
-> +error:
-> +	a3700_spi_transfer_abort_fifo(a3700_spi);
-> +out:
-> +	spi_finalize_current_transfer(master);
-> +
-> +	return ret;
-> +}
-> +
->  static int a3700_spi_unprepare_message(struct spi_master *master,
->  				       struct spi_message *message)
->  {
-> @@ -592,6 +964,23 @@ static int a3700_spi_probe(struct platform_device *pdev)
->  		goto error;
->  	}
->  
-> +	if (of_device_is_compatible(of_node, "marvell,armada-3700-spi"))
-> {
-I don't understand this test. Given the a3700_spi_dt_ids value, the
-probe can only be called if the compatible is
-"marvell,armada-3700-spi". So this test seems not needed and the "else"
-part is never reached.
-
-It seems you wanted to make the FIFO feature optional. But is there any
-drawback with FIFO mode ? If not you can just make it the default mode
-and remove the 3 functions: a3700_spi_prepare_message(),
-a3700_spi_transfer_one() and a3700_spi_unprepare_message(). And if there
-is an interest to have the non-FIFO mode then you should use a module
-parameter for it.
-
-Gregory
-
-> +		master->prepare_message =  a3700_spi_prepare_fifo_message;
-> +		master->transfer_one = a3700_spi_fifo_transfer_one;
-> +
-> +		spi->flags |= HAS_FIFO;
-> +		spi->instr_cnt = A3700_INSTR_CNT;
-> +		spi->addr_cnt = A3700_ADDR_CNT;
-> +		spi->hdr_cnt = A3700_INSTR_CNT + A3700_ADDR_CNT +
-> +			       A3700_DUMMY_CNT;
-> +		master->mode_bits |= (SPI_RX_DUAL | SPI_RX_DUAL |
-> +				      SPI_RX_QUAD | SPI_TX_QUAD);
-> +	} else {
-> +		master->prepare_message =  a3700_spi_prepare_message;
-> +		master->transfer_one = a3700_spi_transfer_one;
-> +		master->unprepare_message = a3700_spi_unprepare_message;
-> +	}
-> +
->  	ret = a3700_spi_init(spi);
->  	if (ret)
->  		goto error_clk;
-> -- 
-> 2.9.3
->
-
++
++/* Safe value for MPIDR_EL1: Bit31:RES1, Bit30:U:0, Bit24:MT:0 */
++#define SYS_MPIDR_SAFE_VAL		((1UL<<31))
++
+ #ifdef __ASSEMBLY__
+ 
+ 	.irp	num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30
+diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
+index a739287..773c90b 100644
+--- a/arch/arm64/include/uapi/asm/hwcap.h
++++ b/arch/arm64/include/uapi/asm/hwcap.h
+@@ -30,5 +30,6 @@
+ #define HWCAP_ATOMICS		(1 << 8)
+ #define HWCAP_FPHP		(1 << 9)
+ #define HWCAP_ASIMDHP		(1 << 10)
++#define HWCAP_CPUID		(1 << 11)
+ 
+ #endif /* _UAPI__ASM_HWCAP_H */
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index a7532dd..fa52042 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -29,6 +29,7 @@
+ #include <asm/mmu_context.h>
+ #include <asm/processor.h>
+ #include <asm/sysreg.h>
++#include <asm/traps.h>
+ #include <asm/virt.h>
+ 
+ unsigned long elf_hwcap __read_mostly;
+@@ -916,6 +917,8 @@ static bool cpus_have_elf_hwcap(const struct arm64_cpu_capabilities *cap)
+ 
+ static void __init setup_elf_hwcaps(const struct arm64_cpu_capabilities *hwcaps)
+ {
++	/* We support emulation of accesses to CPU ID feature registers */
++	elf_hwcap |= HWCAP_CPUID;
+ 	for (; hwcaps->matches; hwcaps++)
+ 		if (hwcaps->matches(hwcaps, hwcaps->def_scope))
+ 			cap_set_elf_hwcap(hwcaps);
+@@ -1103,3 +1106,101 @@ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
+ {
+ 	return (cpus_have_cap(ARM64_HAS_PAN) && !cpus_have_cap(ARM64_HAS_UAO));
+ }
++
++/*
++ * We emulate only the following system register space.
++ * Op0 = 0x3, CRn = 0x0, Op1 = 0x0, CRm = [0, 4 - 7]
++ * See Table C5-6 System instruction encodings for System register accesses,
++ * ARMv8 ARM(ARM DDI 0487A.f) for more details.
++ */
++static inline bool __attribute_const__ is_emulated(u32 id)
++{
++	return (sys_reg_Op0(id) == 0x3 &&
++		sys_reg_CRn(id) == 0x0 &&
++		sys_reg_Op1(id) == 0x0 &&
++		(sys_reg_CRm(id) == 0 ||
++		 ((sys_reg_CRm(id) >= 4) && (sys_reg_CRm(id) <= 7))));
++}
++
++/*
++ * With CRm == 0, reg should be one of :
++ * MIDR_EL1, MPIDR_EL1 or REVIDR_EL1.
++ */
++static inline int emulate_id_reg(u32 id, u64 *valp)
++{
++	switch(id) {
++	case SYS_MIDR_EL1:
++		*valp = read_cpuid_id();
++		break;
++	case SYS_MPIDR_EL1:
++		*valp = SYS_MPIDR_SAFE_VAL;
++		break;
++	case SYS_REVIDR_EL1:
++		/* IMPLEMENTATION DEFINED values are emulated with 0 */
++		*valp = 0;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static int emulate_sys_reg(u32 id, u64 *valp)
++{
++	struct arm64_ftr_reg *regp;
++
++	if (!is_emulated(id))
++		return -EINVAL;
++
++	if (sys_reg_CRm(id) == 0)
++		return emulate_id_reg(id, valp);
++
++	regp = get_arm64_ftr_reg(id);
++	if (regp)
++		*valp = arm64_ftr_reg_user_value(regp);
++	else
++		/*
++		 * The untracked registers are either IMPLEMENTATION DEFINED
++		 * (e.g, ID_AFR0_EL1) or reserved RAZ.
++		 */
++		*valp = 0;
++	return 0;
++}
++
++static int emulate_mrs(struct pt_regs *regs, u32 insn)
++{
++	int rc;
++	u32 sys_reg, dst;
++	u64 val;
++
++	/*
++	 * sys_reg values are defined as used in mrs/msr instruction.
++	 * shift the imm value to get the encoding.
++	 */
++	sys_reg = (u32)aarch64_insn_decode_immediate(AARCH64_INSN_IMM_16, insn) << 5;
++	rc = emulate_sys_reg(sys_reg, &val);
++	if (!rc) {
++		dst = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RT, insn);
++		regs->user_regs.regs[dst] = val;
++		regs->pc += 4;
++	}
++
++	return rc;
++}
++
++static struct undef_hook mrs_hook = {
++	.instr_mask = 0xfff00000,
++	.instr_val  = 0xd5300000,
++	.pstate_mask = COMPAT_PSR_MODE_MASK,
++	.pstate_val = PSR_MODE_EL0t,
++	.fn = emulate_mrs,
++};
++
++int __init enable_mrs_emulation(void)
++{
++	register_undef_hook(&mrs_hook);
++	return 0;
++}
++
++late_initcall(enable_mrs_emulation);
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index b3d5b3e..ef8406f 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -63,6 +63,7 @@ static const char *const hwcap_str[] = {
+ 	"atomics",
+ 	"fphp",
+ 	"asimdhp",
++	"cpuid",
+ 	NULL
+ };
+ 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.7.4
