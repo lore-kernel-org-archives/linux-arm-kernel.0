@@ -1,62 +1,71 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 30 Nov 2016 14:57:35 +0900
-Subject: [PATCH 07/12] usb: sunxi: Uses the resource-managed extcon API when
- registering extcon notifier
+Date: Wed, 30 Nov 2016 14:57:37 +0900
+Subject: [PATCH 09/12] usb: phy: omap-otg: Replace the extcon API
 In-Reply-To: <1480485460-2663-1-git-send-email-cw00.choi@samsung.com>
 References: <1480485460-2663-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1480485460-2663-8-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1480485460-2663-10-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch just uses the resource-managed extcon API when registering
-the extcon notifier.
+This patch uses the resource-managed extcon API for extcon_register_notifier()
+and replaces the deprecated extcon API as following:
+- extcon_get_cable_state_() -> extcon_get_state()
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- drivers/usb/musb/sunxi.c | 12 +++---------
- 1 file changed, 3 insertions(+), 9 deletions(-)
+ drivers/usb/phy/phy-omap-otg.c | 24 ++++++------------------
+ 1 file changed, 6 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-index 1408245be18e..4b531551e49d 100644
---- a/drivers/usb/musb/sunxi.c
-+++ b/drivers/usb/musb/sunxi.c
-@@ -261,14 +261,14 @@ static int sunxi_musb_init(struct musb *musb)
- 	writeb(SUNXI_MUSB_VEND0_PIO_MODE, musb->mregs + SUNXI_MUSB_VEND0);
+diff --git a/drivers/usb/phy/phy-omap-otg.c b/drivers/usb/phy/phy-omap-otg.c
+index 6523af4f8f93..800d1d90753d 100644
+--- a/drivers/usb/phy/phy-omap-otg.c
++++ b/drivers/usb/phy/phy-omap-otg.c
+@@ -118,19 +118,19 @@ static int omap_otg_probe(struct platform_device *pdev)
+ 	otg_dev->id_nb.notifier_call = omap_otg_id_notifier;
+ 	otg_dev->vbus_nb.notifier_call = omap_otg_vbus_notifier;
  
- 	/* Register notifier before calling phy_init() */
--	ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
--				       &glue->host_nb);
-+	ret = devm_extcon_register_notifier(glue->dev, glue->extcon,
-+					EXTCON_USB_HOST, &glue->host_nb);
+-	ret = extcon_register_notifier(extcon, EXTCON_USB_HOST, &otg_dev->id_nb);
++	ret = devm_extcon_register_notifier(&pdev->dev, extcon,
++					EXTCON_USB_HOST, &otg_dev->id_nb);
  	if (ret)
- 		goto error_reset_assert;
+ 		return ret;
  
- 	ret = phy_init(glue->phy);
- 	if (ret)
--		goto error_unregister_notifier;
-+		goto error_reset_assert;
+-	ret = extcon_register_notifier(extcon, EXTCON_USB, &otg_dev->vbus_nb);
++	ret = devm_extcon_register_notifier(&pdev->dev, extcon,
++					EXTCON_USB, &otg_dev->vbus_nb);
+ 	if (ret) {
+-		extcon_unregister_notifier(extcon, EXTCON_USB_HOST,
+-					&otg_dev->id_nb);
+ 		return ret;
+ 	}
  
- 	musb->isr = sunxi_musb_interrupt;
+-	otg_dev->id = extcon_get_cable_state_(extcon, EXTCON_USB_HOST);
+-	otg_dev->vbus = extcon_get_cable_state_(extcon, EXTCON_USB);
++	otg_dev->id = extcon_get_state(extcon, EXTCON_USB_HOST);
++	otg_dev->vbus = extcon_get_state(extcon, EXTCON_USB);
+ 	omap_otg_set_mode(otg_dev);
  
-@@ -277,9 +277,6 @@ static int sunxi_musb_init(struct musb *musb)
- 
+ 	rev = readl(otg_dev->base);
+@@ -145,20 +145,8 @@ static int omap_otg_probe(struct platform_device *pdev)
  	return 0;
+ }
  
--error_unregister_notifier:
--	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
--				   &glue->host_nb);
- error_reset_assert:
- 	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
- 		reset_control_assert(glue->rst);
-@@ -303,9 +300,6 @@ static int sunxi_musb_exit(struct musb *musb)
- 
- 	phy_exit(glue->phy);
- 
--	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
--				   &glue->host_nb);
+-static int omap_otg_remove(struct platform_device *pdev)
+-{
+-	struct otg_device *otg_dev = platform_get_drvdata(pdev);
+-	struct extcon_dev *edev = otg_dev->extcon;
 -
- 	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
- 		reset_control_assert(glue->rst);
- 
+-	extcon_unregister_notifier(edev, EXTCON_USB_HOST, &otg_dev->id_nb);
+-	extcon_unregister_notifier(edev, EXTCON_USB, &otg_dev->vbus_nb);
+-
+-	return 0;
+-}
+-
+ static struct platform_driver omap_otg_driver = {
+ 	.probe		= omap_otg_probe,
+-	.remove		= omap_otg_remove,
+ 	.driver		= {
+ 		.name	= "omap_otg",
+ 	},
 -- 
 1.9.1
