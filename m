@@ -1,111 +1,138 @@
-From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Wed, 30 Nov 2016 17:50:18 +0800
-Subject: [PATCH v2] arm64: dts: zx: add zx296718's topcrm node
-Message-ID: <1480499418-13905-1-git-send-email-baoyou.xie@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 30 Nov 2016 11:52:25 +0200
+Subject: [PATCH v7 4/8] drm/sunxi: Add DT bindings documentation of
+ Allwinner HDMI
+In-Reply-To: <20161130102757.9eec1f7f3377d0f4787e3829@free.fr>
+References: <cover.1480414715.git.moinejf@free.fr> <4614815.L3DQhhBy6d@avalon>
+ <20161130102757.9eec1f7f3377d0f4787e3829@free.fr>
+Message-ID: <3478036.d2UQM8n6lv@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable topcrm clock node for zx296718, which is used for
-CPU's frequency change.
+Hi Jean-Fran?ois,
 
-Furthermore, this patch adds the CPU clock phandle in CPU's node
-and uses operating-points-v2 to register operating points.
+On Wednesday 30 Nov 2016 10:27:57 Jean-Francois Moine wrote:
+> On Wed, 30 Nov 2016 10:20:21 +0200 Laurent Pinchart wrote:
+> >> Well, I don't see what this connector can be.
+> >> May you give me a DT example?
+> > 
+> > Sure.
+> > 
+> > arch/arm/boot/dts/r8a7791-koelsch.dts
+> > 
+> >         /* HDMI encoder */
+> >         
+> >         hdmi at 39 {
+> >                 compatible = "adi,adv7511w";
+> >                 reg = <0x39>;
+> >                 interrupt-parent = <&gpio3>;
+> >                 interrupts = <29 IRQ_TYPE_LEVEL_LOW>;
+> >                 
+> >                 adi,input-depth = <8>;
+> >                 adi,input-colorspace = "rgb";
+> >                 adi,input-clock = "1x";
+> >                 adi,input-style = <1>;
+> >                 adi,input-justification = "evenly";
+> >                 
+> >                 ports {
+> >                         #address-cells = <1>;
+> >                         #size-cells = <0>;
+> >                         
+> >                         port at 0 {
+> >                                 reg = <0>;
+> >                                 adv7511_in: endpoint {
+> >                                         remote-endpoint = <&du_out_rgb>;
+> >                                 };
+> >                         };
+> >                         
+> >                         port at 1 {
+> >                                 reg = <1>;
+> >                                 adv7511_out: endpoint {
+> >                                         remote-endpoint = <&hdmi_con>;
+> >                                 };
+> >                         };
+> >                 };
+> >         
+> >         };
+> >         
+> >         /* HDMI connector */
+> >         
+> >         hdmi-out {
+> >                 compatible = "hdmi-connector";
+> >                 type = "a";
+> >                 
+> >                 port {
+> >                         hdmi_con: endpoint {
+> >                                 remote-endpoint = <&adv7511_out>;
+> >                         };
+> >                 };
+> >         };
+> 
+> Hi Laurent,
+> 
+> Sorry for I don't see the interest:
+> - it is obvious that the HDMI connector is a 'hdmi-connector'!
 
-So it can be used by cpufreq-dt driver.
+It still has to be told to the drivers, they don't know how to identify a 
+connector by looking at it :-)
 
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
----
- arch/arm64/boot/dts/zte/zx296718.dtsi | 43 +++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+> - the physical connector type may be changed on any board by a soldering
+>   iron or a connector to connector cable.
 
-diff --git a/arch/arm64/boot/dts/zte/zx296718.dtsi b/arch/arm64/boot/dts/zte/zx296718.dtsi
-index 6b239a3..992158a 100644
---- a/arch/arm64/boot/dts/zte/zx296718.dtsi
-+++ b/arch/arm64/boot/dts/zte/zx296718.dtsi
-@@ -44,6 +44,7 @@
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/clock/zx296718-clock.h>
- 
- / {
- 	compatible = "zte,zx296718";
-@@ -81,6 +82,8 @@
- 			compatible = "arm,cortex-a53","arm,armv8";
- 			reg = <0x0 0x0>;
- 			enable-method = "psci";
-+			clocks = <&topcrm A53_GATE>;
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
- 
- 		cpu1: cpu at 1 {
-@@ -88,6 +91,7 @@
- 			compatible = "arm,cortex-a53","arm,armv8";
- 			reg = <0x0 0x1>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
- 
- 		cpu2: cpu at 2 {
-@@ -95,6 +99,7 @@
- 			compatible = "arm,cortex-a53","arm,armv8";
- 			reg = <0x0 0x2>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
- 
- 		cpu3: cpu at 3 {
-@@ -102,6 +107,38 @@
- 			compatible = "arm,cortex-a53","arm,armv8";
- 			reg = <0x0 0x3>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cluster0_opp>;
-+		};
-+	};
-+
-+	cluster0_opp: opp_table0 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 500000000 {
-+			opp-hz = /bits/ 64 <500000000>;
-+			opp-microvolt = <857000>;
-+			clock-latency-ns = <500000>;
-+		};
-+		opp at 648000000 {
-+			opp-hz = /bits/ 64 <648000000>;
-+			opp-microvolt = <857000>;
-+			clock-latency-ns = <500000>;
-+		};
-+		opp at 800000000 {
-+			opp-hz = /bits/ 64 <800000000>;
-+			opp-microvolt = <882000>;
-+			clock-latency-ns = <500000>;
-+		};
-+		opp at 1000000000 {
-+			opp-hz = /bits/ 64 <1000000000>;
-+			opp-microvolt = <892000>;
-+			clock-latency-ns = <500000>;
-+		};
-+		opp at 1188000000 {
-+			opp-hz = /bits/ 64 <1188000000>;
-+			opp-microvolt = <1009000>;
-+			clock-latency-ns = <500000>;
- 		};
- 	};
- 
-@@ -279,6 +316,12 @@
- 			dma-requests = <32>;
- 		};
- 
-+		topcrm: clock-controller at 1461000 {
-+			compatible = "zte,zx296718-topcrm";
-+			reg = <0x01461000 0x1000>;
-+			#clock-cells = <1>;
-+		};
-+
- 		sysctrl: sysctrl at 1463000 {
- 			compatible = "zte,zx296718-sysctrl", "syscon";
- 			reg = <0x1463000 0x1000>;
+Which is also true for any other component on the board. DT (and for that 
+matter any firmware description of the platform) isn't soldering-proof.
+
+> - what does the software do with the connector type?
+
+That's up to the software to decide, the DT bindings should describe the 
+hardware in the most accurate and usable way for the OS as possible. One of my 
+longer term goals is to add connector drivers to handle DDC and HPD when 
+they're not handled by the encoder (they are in the above example).
+
+If the DDC was connected to a general-purpose I2C bus of the SoC, and the HPD 
+to a GPIO, we would have
+
+	hdmi-out {
+		compatible = "hdmi-connector";
+		type = "a";
+		/* I2C bus and GPIO references are made up for the example */
+		ddc-i2c-bus = <&i2c4>;
+		hpd-gpios = <&gpio4 7 GPIO_ACTIVE_HIGH>
+
+		port {
+			hdmi_con: endpoint {
+				remote-endpoint = <&adv7511_out>;
+			};
+		};
+	};
+
+and both HPD and EDID reading should be handled by the connector driver.
+
+> - why not to put the connector information in the HDMI device?
+
+Because the connector is separate from the encoder. It's not uncommon 
+(depending on the encoder type) to have the encoder output connected to a non-
+connector entity such as another chained encoder.
+
+For example most LVDS encoders are connected to a panel, but I have a board 
+with the following encoders chain.
+
+CRTC -- parallel RGB --> on-SoC LVDS encoder -- LVDS --> on-board LVDS decoder 
+-- parallel RGB --> HDMI encoder -- HDMI --> HDMI connector
+
+I can't support that if the LVDS encoder driver hardcodes the assumption that 
+the encoder output is connected to a panel. This kind of usage might be less 
+common for HDMI but is certainly not inconceivable.
+
+> And, if I follow you, the graph of ports could also be used to describe
+> the way the various parts of the SoCs are powered, to describe the pin
+> connections, to describe the USB connectors, to describe the board
+> internal hubs and bridges...
+
+It should be used where applicable, it's not meant as the only possible 
+hardware description for all pieces of the system.
+
 -- 
-2.7.4
+Regards,
+
+Laurent Pinchart
