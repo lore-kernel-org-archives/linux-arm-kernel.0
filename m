@@ -1,86 +1,22 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 30 Nov 2016 22:42:52 +0100
-Subject: [PATCH v5 net-next 7/7] ARM64: dts: marvell: Add network support for
- Armada 3700
-In-Reply-To: <cover.0270f6d2413a709521fe2c8c17fbebea6f2e78d1.1480542157.git-series.gregory.clement@free-electrons.com>
-References: <cover.0270f6d2413a709521fe2c8c17fbebea6f2e78d1.1480542157.git-series.gregory.clement@free-electrons.com>
-Message-ID: <f205231e640a2324b8f007073cf54b166a263ed4.1480542157.git-series.gregory.clement@free-electrons.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 30 Nov 2016 15:53:31 -0600
+Subject: [PATCH 1/2] dt-bindings: usb: add DT binding for s3c2410 USB
+ OHCI controller
+In-Reply-To: <1480085249-25014-2-git-send-email-sergio.prado@e-labworks.com>
+References: <1480085249-25014-1-git-send-email-sergio.prado@e-labworks.com>
+ <1480085249-25014-2-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <20161130215331.v3mcm4zyojlagynz@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add neta nodes for network support both in device tree for the SoC and
-the board.
+On Fri, Nov 25, 2016 at 12:47:28PM -0200, Sergio Prado wrote:
+> Adds the device tree bindings description for Samsung S3C2410 and
+> compatible USB OHCI controller.
+> 
+> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+> ---
+>  .../devicetree/bindings/usb/s3c2410-usb.txt        | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/s3c2410-usb.txt
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-3720-db.dts | 23 +++++++++++++++++++-
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 23 +++++++++++++++++++-
- 2 files changed, 46 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-index 1372e9a6aaa4..c8b82e4145de 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-@@ -81,3 +81,26 @@
- &pcie0 {
- 	status = "okay";
- };
-+
-+&mdio {
-+	status = "okay";
-+	phy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&eth0 {
-+	phy-mode = "rgmii-id";
-+	phy = <&phy0>;
-+	status = "okay";
-+};
-+
-+&eth1 {
-+	phy-mode = "rgmii-id";
-+	phy = <&phy1>;
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index e9bd58793464..3b8eb45bdc76 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -140,6 +140,29 @@
- 				};
- 			};
- 
-+			eth0: ethernet at 30000 {
-+				   compatible = "marvell,armada-3700-neta";
-+				   reg = <0x30000 0x4000>;
-+				   interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
-+				   clocks = <&sb_periph_clk 8>;
-+				   status = "disabled";
-+			};
-+
-+			mdio: mdio at 32004 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "marvell,orion-mdio";
-+				reg = <0x32004 0x4>;
-+			};
-+
-+			eth1: ethernet at 40000 {
-+				compatible = "marvell,armada-3700-neta";
-+				reg = <0x40000 0x4000>;
-+				interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&sb_periph_clk 7>;
-+				status = "disabled";
-+			};
-+
- 			usb3: usb at 58000 {
- 				compatible = "marvell,armada3700-xhci",
- 				"generic-xhci";
--- 
-git-series 0.8.10
+Acked-by: Rob Herring <robh@kernel.org>
