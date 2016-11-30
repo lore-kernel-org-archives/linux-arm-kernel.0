@@ -1,52 +1,53 @@
-From: fweimer@redhat.com (Florian Weimer)
-Date: Wed, 30 Nov 2016 13:38:28 +0100
-Subject: [RFC PATCH 00/29] arm64: Scalable Vector Extension core support
-In-Reply-To: <20161130120654.GJ1574@e103592.cambridge.arm.com>
-References: <20161130120654.GJ1574@e103592.cambridge.arm.com>
-Message-ID: <3e8afc5a-1ba9-6369-462b-4f5a707d8b8a@redhat.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 30 Nov 2016 09:41:32 -0300
+Subject: [PATCH] watchdog: meson: Remove unneeded platform MODULE_ALIAS
+In-Reply-To: <66487a0e-1d20-519f-6cbf-645f8bfd33da@roeck-us.net>
+References: <1476906582-14241-1-git-send-email-javier@osg.samsung.com>
+ <20161020222833.GA27421@roeck-us.net>
+ <d7149198-b513-4022-5fbc-10067d420191@osg.samsung.com>
+ <66487a0e-1d20-519f-6cbf-645f8bfd33da@roeck-us.net>
+Message-ID: <ef0f36c3-a36b-b01d-f4ef-07f89f3320c3@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2016 01:06 PM, Dave Martin wrote:
+Hello Guenter,
 
-> I'm concerned here that there may be no sensible fixed size for the
-> signal frame.  We would make it ridiculously large in order to minimise
-> the chance of hitting this problem again -- but then it would be
-> ridiculously large, which is a potential problem for massively threaded
-> workloads.
+On 11/30/2016 07:59 AM, Guenter Roeck wrote:
+> On 11/29/2016 06:57 AM, Javier Martinez Canillas wrote:
+>> Hello Wim,
+>>
+>> On 10/20/2016 07:28 PM, Guenter Roeck wrote:
+>>> On Wed, Oct 19, 2016 at 04:49:42PM -0300, Javier Martinez Canillas wrote:
+>>>> The Amlogic Meson is a DT-only platform, which means the devices are
+>>>> registered via OF and not using the legacy platform devices support.
+>>>>
+>>>> So there's no need to have a MODULE_ALIAS("platform:meson-gxbb-wdt")
+>>>> since the reported uevent MODALIAS to user-space will be the OF one.
+>>>>
+>>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>>
+>>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+>>>
+>>
+>> Any comments about this patch? There are other two similar fixes for
+>> watchdog drivers that were also reviewed by Guenter but never picked:
+>>
+>> https://lkml.org/lkml/2016/10/14/412
+>> https://lkml.org/lkml/2016/10/14/413
+>>
+>> Best regards,
+>>
+> The patches are all in my watchdog-next branch, so Wim will hopefully
+> pick them up for the next release.
+>
 
-What's ridiculously large?
+Great, thanks a lot for the info.
+ 
+> Guenter
+> 
 
-We could add a system call to get the right stack size.  But as it 
-depends on VL, I'm not sure what it looks like.  Particularly if you 
-need determine the stack size before creating a thread that uses a 
-specific VL setting.
-
-> For setcontext/setjmp, we don't save/restore any SVE state due to the
-> caller-save status of SVE, and I would not consider it necessary to
-> save/restore VL itself because of the no-change-on-the-fly policy for
-> this.
-
-Okay, so we'd potentially set it on thread creation only?  That might 
-not be too bad.
-
-I really want to avoid a repeat of the setxid fiasco, where we need to 
-run code on all threads to get something that approximates the 
-POSIX-mandated behavior (process attribute) from what the kernel 
-provides (thread/task attribute).
-
-> I'm not familiar with resumable functions/executors -- are these in
-> the C++ standards yet (not that that would cause me to be familiar
-> with them... ;)  Any implementation of coroutines (i.e.,
-> cooperative switching) is likely to fall under the "setcontext"
-> argument above.
-
-There are different ways to implement coroutines.  Stack switching (like 
-setcontext) is obviously impacted by non-uniform register sizes.  But 
-even the most conservative variant, rather similar to switch-based 
-emulation you sometimes see in C coroutine implementations, might have 
-trouble restoring the state if it just cannot restore the saved state 
-due to register size reductions.
-
-Thanks,
-Florian
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
