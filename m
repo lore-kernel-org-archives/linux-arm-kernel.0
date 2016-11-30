@@ -1,82 +1,419 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 30 Nov 2016 10:05:45 +0100
-Subject: [PATCH v7 0/8] drm: sun8i: Add DE2 HDMI video support
-In-Reply-To: <20161129213650.uqcgekodq77wlmxs@lukather>
-References: <cover.1480414715.git.moinejf@free.fr>
- <20161129213650.uqcgekodq77wlmxs@lukather>
-Message-ID: <20161130100545.44546ed28896cdb9768f68cd@free.fr>
+From: naga.sureshkumar.relli@xilinx.com (Naga Sureshkumar Relli)
+Date: Wed, 30 Nov 2016 09:17:14 +0000
+Subject: [LINUX RFC v4 3/4] mtd: spi-nor: add stripe support
+In-Reply-To: <68ca0f19-e534-3361-11f0-6566626380fe@atmel.com>
+References: <1480235616-34038-1-git-send-email-nagasure@xilinx.com>
+ <68ca0f19-e534-3361-11f0-6566626380fe@atmel.com>
+Message-ID: <DA6901612C71B84D91459DE817C418AE26E0B5E2@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Nov 2016 22:36:50 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+Hi Cyrille,
 
-> On Tue, Nov 29, 2016 at 11:18:35AM +0100, Jean-Francois Moine wrote:
-> > This patchset series adds HDMI video support to the Allwinner
-> > sun8i SoCs which include the display engine 2 (DE2).
-> > The driver contains the code for the A83T and H3 SoCs, and
-> > some H3 boards, but it could be used/extended for other SoCs
-> > (A64, H2, H5) and boards (Banana PIs, Orange PIs).
+> I have not finished to review the whole series yet but here some first
+> comments:
+
+Thanks for reviewing these patch series.
+
 > 
-> Honestly, I'm getting a bit worried by the fact that you ignore
-> reviews.
+> Le 27/11/2016 ? 09:33, Naga Sureshkumar Relli a ?crit :
+> > This patch adds stripe support and it is needed for GQSPI parallel
+> > configuration mode by:
+> >
+> > - Adding required parameters like stripe and shift to spi_nor
+> >   structure.
+> > - Initializing all added parameters in spi_nor_scan()
+> > - Updating read_sr() and read_fsr() for getting status from both
+> >   flashes
+> > - Increasing page_size, sector_size, erase_size and toatal flash
+> >   size as and when required.
+> > - Dividing address by 2
+> > - Updating spi->master->flags for qspi driver to change CS
+> >
+> > Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
+> > ---
+> > Changes for v4:
+> >  - rename isparallel to stripe
+> > Changes for v3:
+> >  - No change
+> > Changes for v2:
+> >  - Splitted to separate MTD layer changes from SPI core changes
+> > ---
+> >  drivers/mtd/spi-nor/spi-nor.c | 130
+> ++++++++++++++++++++++++++++++++----------
+> >  include/linux/mtd/spi-nor.h   |   2 +
+> >  2 files changed, 103 insertions(+), 29 deletions(-)
+> >
+> > diff --git a/drivers/mtd/spi-nor/spi-nor.c
+> > b/drivers/mtd/spi-nor/spi-nor.c index d0fc165..4252239 100644
+> > --- a/drivers/mtd/spi-nor/spi-nor.c
+> > +++ b/drivers/mtd/spi-nor/spi-nor.c
+> > @@ -22,6 +22,7 @@
+> >  #include <linux/of_platform.h>
+> >  #include <linux/spi/flash.h>
+> >  #include <linux/mtd/spi-nor.h>
+> > +#include <linux/spi/spi.h>
+> >
+> >  /* Define max times to check status register before we give up. */
+> >
+> > @@ -89,15 +90,24 @@ static const struct flash_info
+> > *spi_nor_match_id(const char *name);  static int read_sr(struct
+> > spi_nor *nor)  {
+> >  	int ret;
+> > -	u8 val;
+> > +	u8 val[2];
+> >
+> > -	ret = nor->read_reg(nor, SPINOR_OP_RDSR, &val, 1);
+> > -	if (ret < 0) {
+> > -		pr_err("error %d reading SR\n", (int) ret);
+> > -		return ret;
+> > +	if (nor->stripe) {
+> > +		ret = nor->read_reg(nor, SPINOR_OP_RDSR, &val[0], 2);
+> > +		if (ret < 0) {
+> > +			pr_err("error %d reading SR\n", (int) ret);
+> > +			return ret;
+> > +		}
+> > +		val[0] |= val[1];
+> Why '|' rather than '&' ?
+> I guess because of the 'Write In Progress/Busy' bit: when called by
+> spi_nor_sr_ready(), you want to be sure that this 'BUSY' bit is cleared on
+> both memories.
 > 
-> On the important reviews that you got that are to be seen as major
-> issues that block the inclusion, we have:
->   - The fact that the HDMI driver is actually just a designware IP,
->     and while you should use the driver that already exists, you just
->     duplicated all that code.
+> But what about when the Status Register is read for purpose other than
+> checking the state of the 'BUSY' bit?
+> 
+Yes you are correct, I will change this.
 
-The DW registers in the A83T and H3 are obfuscated, so, the code in
-bridge/DW cannot be used as it is. There should be either a translation
-table or a function to compute the register addresses.
+> What about SPI controllers supporting more than 2 memories in parallel?
+> 
+> This solution might fit the ZynqMP controller but doesn't look so generic.
+> 
+> > +	} else {
+> > +		ret = nor->read_reg(nor, SPINOR_OP_RDSR, &val[0], 1);
+> > +		if (ret < 0) {
+> > +			pr_err("error %d reading SR\n", (int) ret);
+> > +			return ret;
+> > +		}
+> >  	}
+> >
+> > -	return val;
+> > +	return val[0];
+> >  }
+> >
+> >  /*
+> > @@ -108,15 +118,24 @@ static int read_sr(struct spi_nor *nor)  static
+> > int read_fsr(struct spi_nor *nor)  {
+> >  	int ret;
+> > -	u8 val;
+> > +	u8 val[2];
+> >
+> > -	ret = nor->read_reg(nor, SPINOR_OP_RDFSR, &val, 1);
+> > -	if (ret < 0) {
+> > -		pr_err("error %d reading FSR\n", ret);
+> > -		return ret;
+> > +	if (nor->stripe) {
+> > +		ret = nor->read_reg(nor, SPINOR_OP_RDFSR, &val[0], 2);
+> > +		if (ret < 0) {
+> > +			pr_err("error %d reading FSR\n", ret);
+> > +			return ret;
+> > +		}
+> > +		val[0] &= val[1];
+> Same comment here: why '&' rather than '|'?
+> Surely because of the the 'READY' bit which should be set for both memories.
+I will update this also.
+> 
+> > +	} else {
+> > +		ret = nor->read_reg(nor, SPINOR_OP_RDFSR, &val[0], 1);
+> > +		if (ret < 0) {
+> > +			pr_err("error %d reading FSR\n", ret);
+> > +			return ret;
+> > +		}
+> >  	}
+> >
+> > -	return val;
+> > +	return val[0];
+> >  }
+> >
+> >  /*
+> > @@ -290,9 +309,16 @@ static int spi_nor_wait_till_ready(struct spi_nor
+> *nor)
+> >   */
+> >  static int erase_chip(struct spi_nor *nor)  {
+> > +	u32 ret;
+> > +
+> >  	dev_dbg(nor->dev, " %lldKiB\n", (long long)(nor->mtd.size >> 10));
+> >
+> > -	return nor->write_reg(nor, SPINOR_OP_CHIP_ERASE, NULL, 0);
+> > +	ret = nor->write_reg(nor, SPINOR_OP_CHIP_ERASE, NULL, 0);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	return ret;
+> > +
+> 
+> 	if (ret)
+> 		return ret;
+> 	else
+> 		return ret;
+> 
+> This chunk should be removed, it doesn't ease the patch review ;)
+Ok, I will remove.
+> 
+> >  }
+> >
+> >  static int spi_nor_lock_and_prep(struct spi_nor *nor, enum
+> > spi_nor_ops ops) @@ -349,7 +375,7 @@ static int
+> > spi_nor_erase_sector(struct spi_nor *nor, u32 addr)  static int
+> > spi_nor_erase(struct mtd_info *mtd, struct erase_info *instr)  {
+> >  	struct spi_nor *nor = mtd_to_spi_nor(mtd);
+> > -	u32 addr, len;
+> > +	u32 addr, len, offset;
+> >  	uint32_t rem;
+> >  	int ret;
+> >
+> > @@ -399,9 +425,13 @@ static int spi_nor_erase(struct mtd_info *mtd,
+> struct erase_info *instr)
+> >  	/* "sector"-at-a-time erase */
+> >  	} else {
+> >  		while (len) {
+> > +
+> >  			write_enable(nor);
+> > +			offset = addr;
+> > +			if (nor->stripe)
+> > +				offset /= 2;
+> 
+> I guess this should be /= 4 for controllers supporting 4 memories in parallel.
+> Shouldn't you use nor->shift and define shift as an unsigned int instead of a
+> bool?
+> offset >>= nor->shift;
+> 
+Yes we can use this shift, I will update
 
-More, it is not sure that the bridge/DW code would work with
-Allwinner's SoCs. It seems that they got some schematics from
-DesignWare, but, is it really the same hardware? Also, if some changes
-had to be done in the bridge code, I could not check if this would
-break or not the other SoCs.
+> Anyway, by tuning the address here in spi-nor.c rather than in the SPI
+> controller driver, you impose a model to support parallel memories that
+> might not be suited to other controllers.
 
-Eventually, I went the same way as omap/hdmi5: different driver.
+For this ZynqMP GQSPI controller parallel configuration, globally spi-nor should know about this stripe feature
+And based on that address has to change.
+As I mentioned in cover letter, this controller in parallel configuration will work with even addresses only.
+i.e. Before creating address format(m25p_addr2cmd) in mtd layer, spi-nor should change that address based on stripe option.
 
->   - The fact that you ignored Rob (v6) and I (v5) comment on using OF
->     graph to model the connection between the display engine and the
->     TCON. Something that Laurent also pointed out in this version.
+I am updating this offset based on stripe option, and stripe option will update by reading dt property in nor_scan().
+So the controller which doesn't support, then the stripe will be zero.
+Or Can you please suggest any other way?
 
-I simply use the drm function drm_of_component_probe().
-If this one is in the DRM core, why should I not use it?
-If it must not be used, it would be nice to mark it as deprecated and
-to update the code of the drivers which are using it.
+> 
+> >
+> > -			ret = spi_nor_erase_sector(nor, addr);
+> > +			ret = spi_nor_erase_sector(nor, offset);
+> >  			if (ret)
+> >  				goto erase_err;
+> >
+> > @@ -525,6 +555,8 @@ static int stm_lock(struct spi_nor *nor, loff_t ofs,
+> uint64_t len)
+> >  	bool use_top;
+> >  	int ret;
+> >
+> > +	ofs = ofs >> nor->shift;
+> > +
+> >  	status_old = read_sr(nor);
+> >  	if (status_old < 0)
+> >  		return status_old;
+> > @@ -610,6 +642,8 @@ static int stm_unlock(struct spi_nor *nor, loff_t ofs,
+> uint64_t len)
+> >  	bool use_top;
+> >  	int ret;
+> >
+> > +	ofs = ofs >> nor->shift;
+> > +
+> >  	status_old = read_sr(nor);
+> >  	if (status_old < 0)
+> >  		return status_old;
+> > @@ -709,6 +743,8 @@ static int spi_nor_lock(struct mtd_info *mtd, loff_t
+> ofs, uint64_t len)
+> >  	if (ret)
+> >  		return ret;
+> >
+> > +	ofs = ofs >> nor->shift;
+> > +
+> >  	ret = nor->flash_lock(nor, ofs, len);
+> >
+> >  	spi_nor_unlock_and_unprep(nor, SPI_NOR_OPS_UNLOCK); @@ -
+> 724,6 +760,8
+> > @@ static int spi_nor_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t
+> len)
+> >  	if (ret)
+> >  		return ret;
+> >
+> > +	ofs = ofs >> nor->shift;
+> > +
+> >  	ret = nor->flash_unlock(nor, ofs, len);
+> >
+> >  	spi_nor_unlock_and_unprep(nor, SPI_NOR_OPS_LOCK); @@ -
+> 1018,6 +1056,9
+> > @@ static const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
+> >  	u8			id[SPI_NOR_MAX_ID_LEN];
+> >  	const struct flash_info	*info;
+> >
+> > +	nor->spi->master->flags &= ~(SPI_MASTER_BOTH_CS |
+> > +					SPI_MASTER_DATA_STRIPE);
+> > +
+> >  	tmp = nor->read_reg(nor, SPINOR_OP_RDID, id,
+> SPI_NOR_MAX_ID_LEN);
+> >  	if (tmp < 0) {
+> >  		dev_dbg(nor->dev, "error %d reading JEDEC ID\n", tmp);
+> @@ -1041,6
+> > +1082,7 @@ static int spi_nor_read(struct mtd_info *mtd, loff_t from,
+> > size_t len,  {
+> >  	struct spi_nor *nor = mtd_to_spi_nor(mtd);
+> >  	int ret;
+> > +	u32 offset = from;
+> >
+> >  	dev_dbg(nor->dev, "from 0x%08x, len %zd\n", (u32)from, len);
+> >
+> > @@ -1049,7 +1091,13 @@ static int spi_nor_read(struct mtd_info *mtd,
+> loff_t from, size_t len,
+> >  		return ret;
+> >
+> >  	while (len) {
+> > -		ret = nor->read(nor, from, len, buf);
+> > +
+> > +		offset = from;
+> > +
+> > +		if (nor->stripe)
+> > +			offset /= 2;
+> > +
+> > +		ret = nor->read(nor, offset, len, buf);
+> >  		if (ret == 0) {
+> >  			/* We shouldn't see 0-length reads */
+> >  			ret = -EIO;
+> > @@ -1161,6 +1209,7 @@ static int spi_nor_write(struct mtd_info *mtd,
+> loff_t to, size_t len,
+> >  	struct spi_nor *nor = mtd_to_spi_nor(mtd);
+> >  	size_t page_offset, page_remain, i;
+> >  	ssize_t ret;
+> > +	u32 offset;
+> >
+> >  	dev_dbg(nor->dev, "to 0x%08x, len %zd\n", (u32)to, len);
+> >
+> > @@ -1178,9 +1227,13 @@ static int spi_nor_write(struct mtd_info *mtd,
+> loff_t to, size_t len,
+> >  		/* the size of data remaining on the first page */
+> >  		page_remain = min_t(size_t,
+> >  				    nor->page_size - page_offset, len - i);
+> > +		offset = (to + i);
+> > +
+> > +		if (nor->stripe)
+> > +			offset /= 2;
+> >
+> >  		write_enable(nor);
+> > -		ret = nor->write(nor, to + i, page_remain, buf + i);
+> > +		ret = nor->write(nor, (offset), page_remain, buf + i);
+> >  		if (ret < 0)
+> >  			goto write_err;
+> >  		written = ret;
+> > @@ -1302,22 +1355,22 @@ static int spi_nor_check(struct spi_nor *nor)
+> >
+> >  int spi_nor_scan(struct spi_nor *nor, const char *name, enum
+> > read_mode mode)  {
+> > -	const struct flash_info *info = NULL;
+> > +	struct flash_info *info = NULL;
+> 
+> You should not remove the const and should not try to modify members of
+> *info.
+> 
+> >  	struct device *dev = nor->dev;
+> >  	struct mtd_info *mtd = &nor->mtd;
+> >  	struct device_node *np = spi_nor_get_flash_node(nor);
+> > -	int ret;
+> > -	int i;
+> > +	struct device_node *np_spi;
+> > +	int ret, i, xlnx_qspi_mode;
+> >
+> >  	ret = spi_nor_check(nor);
+> >  	if (ret)
+> >  		return ret;
+> >
+> >  	if (name)
+> > -		info = spi_nor_match_id(name);
+> > +		info = (struct flash_info *)spi_nor_match_id(name);
+> >  	/* Try to auto-detect if chip name wasn't specified or not found */
+> >  	if (!info)
+> > -		info = spi_nor_read_id(nor);
+> > +		info = (struct flash_info *)spi_nor_read_id(nor);
+> >  	if (IS_ERR_OR_NULL(info))
+> >  		return -ENOENT;
+> >
+> Both spi_nor_match_id() and spi_nor_read_id(), when they succeed, return
+> a pointer to an entry of the spi_nor_ids[] array, which is located in a read-
+> only memory area.
+> 
+> Since your patch doesn't remove the const attribute of the spi_nor_ids[], I
+> wonder whether it has been tested. I expect it not to work on most
+> architecture.
+> 
+> Anyway spi_nor_ids[] should remain const. Let's take the case of eXecution
+> In Place (XIP) from an external memory: if spi_nor_ids[] is const, it can be
+> read directly from this external (read-only) memory and we never need to
+> copy the array in RAM, so we save some KB of RAM.
+> This is just an example but I guess we can find other reasons to keep this
+> array const.
+> 
+> > @@ -1341,7 +1394,7 @@ int spi_nor_scan(struct spi_nor *nor, const char
+> *name, enum read_mode mode)
+> >  			 */
+> >  			dev_warn(dev, "found %s, expected %s\n",
+> >  				 jinfo->name, info->name);
+> > -			info = jinfo;
+> > +			info = (struct flash_info *)jinfo;
+> >  		}
+> >  	}
+> >
+> > @@ -1370,6 +1423,27 @@ int spi_nor_scan(struct spi_nor *nor, const char
+> *name, enum read_mode mode)
+> >  	mtd->size = info->sector_size * info->n_sectors;
+> >  	mtd->_erase = spi_nor_erase;
+> >  	mtd->_read = spi_nor_read;
+> > +#ifdef CONFIG_OF
+> > +	np_spi = of_get_next_parent(np);
+> > +
+> > +	if (of_property_read_u32(np_spi, "xlnx,qspi-mode",
+> > +				&xlnx_qspi_mode) < 0) {
+> This really looks controller specific so should not be placed in the generic spi-
+> nor.c file.
 
->   - The fact that you ignored that you needed an HDMI connector node
->     as a child of the HDMI controller. This has been reported by Rob
->     (v6) and yet again in this version by Laurent.
+Const is removed in info struct, because to update info members based parallel configuration.
+As I mentioned above,  for this parallel configuration, mtd and spi-nor should know the details like
+mtd->size, info->sectors, sector_size and page_size.
+So during spi_nor_scan only mtd will update all these details, that's why I have added controller specific check to update those.
 
-As I don't know what is a DT 'connector', I cannot go further.
-I hope Laurent will give me clearer explanations and a real example.
+Can you please suggest, any other way to let mtd and spi-nor to know about this configuration without touching the core layers?
 
->   - And finally the fact that we can't have several display engine in
->     parallel, if needs be. This has happened in the past already on
->     Allwinner SoCs, so it's definitely something we should consider in
->     the DT bindings, since we can't break them.
+Please let me know, if I missed providing any required info.
 
-IIRC, I proposed my driver before yours, and the DE2 is completely
-different from the other display engines.
-What you are telling is "add more code to already complex code and have
-a big driver for all SoCs in each kernels".
-I think it should be better to have small modules, each one treating
-specific hardware, and to let only the needed code in the kernel memory
-at startup time.
+> 
+> > +		nor->shift = 0;
+> > +		nor->stripe = 0;
+> > +	} else if (xlnx_qspi_mode == 2) {
+> > +		nor->shift = 1;
+> > +		info->sector_size <<= nor->shift;
+> > +		info->page_size <<= nor->shift;
+> Just don't modify *info members! :)
+> 
+> 
+> > +		mtd->size <<= nor->shift;
+> > +		nor->stripe = 1;
+> > +		nor->spi->master->flags |= (SPI_MASTER_BOTH_CS |
+> > +						SPI_MASTER_DATA_STRIPE);
+> > +	}
+> > +#else
+> > +	/* Default to single */
+> > +	nor->shift = 0;
+> > +	nor->stripe = 0;
+> > +#endif
+> Best regards,
+> 
+> Cyrille
 
-> Until those are fixed, I cannot see how this driver can be merged,
-> unfortunately.
-
-No problem. I just wanted to help people by giving the job I did on the
-boards I have. My boards are working for almost one year, fine enough
-for I use them as daily desktop computers. I don't want to spend one
-more year for having my code in the Linux kernel: there are so much
-other exciting things to do...
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Thanks,
+Naga Sureshkumar Relli
