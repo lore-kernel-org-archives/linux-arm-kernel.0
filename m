@@ -1,81 +1,78 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 30 Nov 2016 19:59:26 +0200
-Subject: [GIT PULL] ARM: keystone: add TI SCI protocol support for v4.10
-In-Reply-To: <9563335.412haHXOPG@wuerfel>
-References: <e6b04eeb-ebfb-2da0-834b-1da440a35783@ti.com>
- <d685444b-4275-e6e6-aae6-214a41776a28@ti.com> <9563335.412haHXOPG@wuerfel>
-Message-ID: <6f67f67f-7489-6d62-c2c2-9bba440cfabc@ti.com>
+From: atull@opensource.altera.com (atull)
+Date: Wed, 30 Nov 2016 12:01:45 -0600
+Subject: [PATCH v3 0/3] Altera Cyclone Passive Serial SPI FPGA Manager
+In-Reply-To: <cover.1480467185.git.stillcompiling@gmail.com>
+References: <cover.1480467185.git.stillcompiling@gmail.com>
+Message-ID: <alpine.DEB.2.10.1611301150270.2617@atull-730U3E-740U3E>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/11/16 18:43, Arnd Bergmann wrote:
-> On Monday, November 28, 2016 6:42:41 PM CET Tero Kristo wrote:
->> Gentle ping on this, is anybody going to pull this one?
->>
->> -Tero
->>
->> On 27/10/16 12:30, Tero Kristo wrote:
->>> Hi Arnd, Olof, Kevin,
->>>
->>> This pull introduces the TI SCI protocol support for keystone family of
->>> devices, targeted for v4.10 merge window. We discussed with Santosh
->>> (keystone maintainer) that it would probably be better that I'll be
->>> sending the pull requests for this directly, avoiding one extra step of
->>> merges.
->>
->
-> Sorry for the delay. I just saw this pull request in the backlog
-> and had to take a closer look first. I probably would have commented
-> on a few details in a proper review, but overall this seems harmless
-> enough, so I've merged it into next/drivers in the end.
->
-> There was no branch description in
->  https://github.com/t-kristo/linux-pm.git for-4.10-ti-sci-base
-> and I ended up taking something from the wiki. This is now the
-> commit I ended up with:
+On Wed, 30 Nov 2016, Joshua Clayton wrote:
 
-Thanks Arnd, that looks good to me.
+Hi Joshua,
 
-I'll figure out how to add branch description next time when I am going 
-to be sending a pull-request directly to you guys.
+The DT bindings will need Rob Herring's ack.  The bitrev.h
+changes will need Russell King's ack.
 
--Tero
+I've made some comments on patch 3/3 but it looks good to me
+besides that.
 
->
-> commit ba9cb7b9ffa4a4056158bc8570f1a851e4a6a8ae
-> Merge: e7541f9 912cffb
-> Author: Arnd Bergmann <arnd@arndb.de>
-> Date:   Wed Nov 30 17:13:13 2016 +0100
->
->     Merge branch 'for-4.10-ti-sci-base' of https://github.com/t-kristo/linux-pm into next/drivers
->
->     Merge "ARM: keystone: add TI SCI protocol support for v4.10" from
->     Tero Kristo:
->
->     [description taken from http://processors.wiki.ti.com/index.php/TISCI
->
->     Texas Instruments' Keystone generation System on Chips (SoC) starting
->     with 66AK2G02, now include a dedicated SoC System Control entity called
->     PMMC(Power Management Micro Controller) in line with ARM architecture
->     recommendations. The function of this module is to integrate all system
->     operations in a centralized location. Communication with the SoC System
->     Control entity from various processing units like ARM/DSP occurs over
->     Message Manager hardware block.
->
->     ...
->
->     Texas Instruments' System Control Interface defines the communication
->     protocol between various processing entities to the System Control Entity
->     on TI SoCs. This is a set of message formats and sequence of operations
->     required to communicate and get system services processed from System
->     Control entity in the SoC.]
->
->     * 'for-4.10-ti-sci-base' of https://github.com/t-kristo/linux-pm:
->       firmware: ti_sci: Add support for reboot core service
->       firmware: ti_sci: Add support for Clock control
->       firmware: ti_sci: Add support for Device control
->       firmware: Add basic support for TI System Control Interface (TI-SCI) protocol
->       Documentation: Add support for TI System Control Interface (TI-SCI) protocol
->
-> 	Arnd
->
+Once we have those other acks, please submit your v4 including fixes
+for my comments and whatever else comes up.  I'm hoping it will be
+minor and with that done, v4 can go in.
+
+When you send in v4, please also cc our new mailing list that Moritz
+made: linux-fpga at vger.kernel.org
+
+Alan
+
+> This series adds an FPGA manager for Altera cyclone FPGAs
+> that can program them using an spi port and a couple of gpios, using
+> Alteras passive serial protocol.
+> 
+> Changes from v2:
+> 
+> - Merged patch 3 and 4 as suggested in review by Moritz Fischer
+> - Changed FPGA_MIN_DELAY from 250 to 50 ms is the time advertized by
+>   Altera. This now works, as we don't assume it is done
+> 
+> Changes from v1:
+> - Changed the name from cyclone-spi-fpga-mgr to cyclone-ps-spi-fpga-mgr
+>   This name change was requested by Alan Tull, to be specific about which
+>   programming method is being employed on the fpga.
+> - Changed the name of the reset-gpio to config-gpio to closer match the
+>   way the pins are described in the Altera manual
+> - Moved MODULE_LICENCE, _AUTHOR, and _DESCRIPTION to the bottom
+> 
+> - Added a bitrev8x4() function to the bitrev headers and implemented ARM
+>  const, runtime, and ARM specific faster versions (This may end up
+>  needing to be a standalone patch)
+> 
+> - Moved the bitswapping into cyclonespi_write(), as requested.
+>   This falls short of my desired generic lsb first spi support, but is a step
+>   in that direction.
+> 
+> - Fixed whitespace problems introduced during refactoring
+> 
+> - Replaced magic number for initial delay with a descriptive macro
+> - Poll the fpga to see when it is ready rather than a fixed 1 ms sleep
+> 
+> Joshua Clayton (3):
+>   lib: add bitrev8x4()
+>   doc: dt: add cyclone-spi binding document
+>   fpga manager: Add cyclone-ps-spi driver for Altera FPGAs
+> 
+>  .../bindings/fpga/cyclone-ps-spi-fpga-mgr.txt      |  23 +++
+>  arch/arm/include/asm/bitrev.h                      |   5 +
+>  drivers/fpga/Kconfig                               |   7 +
+>  drivers/fpga/Makefile                              |   1 +
+>  drivers/fpga/cyclone-ps-spi.c                      | 176 +++++++++++++++++++++
+>  include/linux/bitrev.h                             |  26 +++
+>  6 files changed, 238 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/fpga/cyclone-ps-spi-fpga-mgr.txt
+>  create mode 100644 drivers/fpga/cyclone-ps-spi.c
+> 
+> -- 
+> 2.9.3
+> 
+> 
