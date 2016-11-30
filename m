@@ -1,109 +1,21 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 30 Nov 2016 15:38:54 -0600
-Subject: [PATCH 2/2] dt-bindings: Add DT bindings info for FlexRM mailbox
- driver
-In-Reply-To: <1480048551-3285-3-git-send-email-anup.patel@broadcom.com>
-References: <1480048551-3285-1-git-send-email-anup.patel@broadcom.com>
- <1480048551-3285-3-git-send-email-anup.patel@broadcom.com>
-Message-ID: <20161130213854.jmjwcis2zid6busv@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Nov 2016 22:39:33 +0100
+Subject: [GIT PULL 2/3] ARM: dts: exynos: DT for v4.10, second round
+In-Reply-To: <1479967709-6619-3-git-send-email-krzk@kernel.org>
+References: <1479967709-6619-1-git-send-email-krzk@kernel.org>
+ <1479967709-6619-3-git-send-email-krzk@kernel.org>
+Message-ID: <11958890.lcXspUHVSR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 25, 2016 at 10:05:51AM +0530, Anup Patel wrote:
-> This patch adds device tree bindings document for the FlexRM
-> mailbox driver.
+On Thursday, November 24, 2016 8:08:28 AM CET Krzysztof Kozlowski wrote:
 
-Bindings document h/w, not drivers.
+> ----------------------------------------------------------------
+> Samsung DeviceTree second update for v4.10:
+> 1. Cleanups in MSHC nodes.
+> 2. Enable ADC on Odroid boards.
+> 3. Fix interrupt flags on recently added DMA sound nodes in Exynos5410.
 
-> 
-> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> ---
->  .../bindings/mailbox/brcm,flexrm-mbox.txt          | 60 ++++++++++++++++++++++
->  1 file changed, 60 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,flexrm-mbox.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mailbox/brcm,flexrm-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,flexrm-mbox.txt
-> new file mode 100644
-> index 0000000..7969b1c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/brcm,flexrm-mbox.txt
-> @@ -0,0 +1,60 @@
-> +Broadcom FlexRM Mailbox Driver
+Pulled into next/dt, thanks!
 
-h/w
-
-> +===============================
-> +The Broadcom FlexRM ring manager provides a set of rings which can be
-> +used to submit work to offload engines. An SoC may have multiple FlexRM
-> +hardware blocks. There is one device tree entry per block. The FlexRM
-> +mailbox drivers creates a mailbox instance using FlexRM rings where
-> +each mailbox channel is a separate FlexRM ring.
-> +
-> +Required properties:
-> +--------------------
-> +- compatible:	Should be "brcm,flexrm-mbox"
-
-Sounds generic. Add SoC specific compatible strings please.
-
-> +- reg:		Specifies base physical address and size of the FlexRM
-> +		ring registers
-> +- msi-parent:	Phandles (and potential Device IDs) to MSI controllers
-> +		The FlexRM engine will send MSIs (instead of wired
-> +		interrupts) to CPU. There is one MSI for each FlexRM ring.
-
-One ring is one h/w block, right? How many instances is not really 
-relevant.
-
-> +		Refer devicetree/bindings/interrupt-controller/msi.txt
-> +- #mbox-cells:	Specifies the number of cells needed to encode a mailbox
-> +		channel. This should be 3.
-> +
-> +		The 1st cell is the mailbox channel number.
-> +
-> +		The 2nd cell contains MSI completion threshold. This is the
-> +		number of completion messages for which FlexRM will inject
-> +		one MSI interrupt to CPU.
-> +
-> +		The 3nd cell contains MSI timer value representing time for
-> +		which FlexRM will wait to accumulate N completion messages
-> +		where N is the value specified by 2nd cell above. If FlexRM
-> +		does not get required number of completion messages in time
-> +		specified by this cell then it will inject one MSI interrupt
-> +		to CPU provided atleast one completion message is available.
-> +
-> +Optional properties:
-> +--------------------
-> +- dma-coherent:	Present if DMA operations made by the FlexRM engine (such
-> +		as DMA descriptor access, access to buffers pointed by DMA
-> +		descriptors and read/write pointer updates to DDR) are
-> +		cache coherent with the CPU.
-> +
-> +Example:
-> +--------
-> +crypto_mbox: mbox at 67000000 {
-> +	compatible = "brcm,flexrm-mbox";
-> +	reg = <0x67000000 0x200000>;
-> +	msi-parent = <&gic_its 0x7f00>;
-> +	#mbox-cells = <3>;
-> +};
-> +
-> +crypto_client {
-
-Is this a h/w block or purely a driver on top of the mailbox? The latter 
-doesn't belong in DT.
-
-> +	...
-> +	mboxes = <&crypto_mbox 0 0x1 0xffff>,
-> +		 <&crypto_mbox 1 0x1 0xffff>,
-> +		 <&crypto_mbox 16 0x1 0xffff>,
-> +		 <&crypto_mbox 17 0x1 0xffff>,
-> +		 <&crypto_mbox 30 0x1 0xffff>,
-> +		 <&crypto_mbox 31 0x1 0xffff>;
-> +	};
-> +	...
-> +};
-> -- 
-> 2.7.4
-> 
+	Arnd
