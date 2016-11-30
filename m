@@ -1,118 +1,91 @@
-From: rrichter@cavium.com (Robert Richter)
-Date: Wed, 30 Nov 2016 19:21:31 +0100
-Subject: [PATCH v2] arm64: mm: Fix memmap to be initialized for the entire
- section
-Message-ID: <1480530091-1092-1-git-send-email-rrichter@cavium.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 30 Nov 2016 10:28:55 -0800
+Subject: [PATCH net-next v4 0/4] Fix OdroidC2 Gigabit Tx link issue
+In-Reply-To: <1480499246.17538.208.camel@baylibre.com>
+References: <1480348229-25672-1-git-send-email-jbrunet@baylibre.com>
+ <049b1efc-3bad-92e0-45ef-0563dc5d81de@gmail.com>
+ <1480499246.17538.208.camel@baylibre.com>
+Message-ID: <6bcad1c0-2c98-9f91-3437-a5d889677860@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ThunderX systems with certain memory configurations we see the
-following BUG_ON():
+On 11/30/2016 01:47 AM, Jerome Brunet wrote:
+>> If we start supporting generic "enable", "disable" type of properties
+>> with values that map directly to register definitions of the HW, we
+>> leave too much room for these properties to be utilized to implement
+>> a
+>> specific policy, and this is not acceptable.
+> 
+> Florian, 
+> 
+> I agree that DT should not be used to setup a policy, but to describe
+> what the HW is.
+> 
+> I tried to implement it the way you suggested, using phy fixup, too see
+> what it looks like.
+> There is 2 places in the code that seems (remotely) linked to the
+> issue: 
+> - meson8b_dwmac driver : if the mac, regardless of the board/platform,
+>  could not tolerate to have EEE activated, it would make sense to have
+> the fixup here. It can provide a C callback for such case.
+> - realtek phy driver: philosophy is kind of the same
+> 
+> To be clear, it is doable and it works that way, but I don't think
+> embedding this directly in the code is the right way to do it. It seems
+> we are hiding an information specific about the board inside a generic
+> driver.
 
- kernel BUG at mm/page_alloc.c:1848!
+So there are a few things about that:
 
-This happens for some configs with 64k page size enabled. The BUG_ON()
-checks if start and end page of a memmap range belongs to the same
-zone.
+- if we were not on ARM64, there would be possibly a remote chance of
+having some concept of a board file which would be where such a PHY
+fixup, or fixup of any kind would reside
 
-The BUG_ON() check fails if a memory zone contains NOMAP regions. In
-this case the node information of those pages is not initialized. This
-causes an inconsistency of the page links with wrong zone and node
-information for that pages. NOMAP pages from node 1 still point to the
-mem zone from node 0 and have the wrong nid assigned.
+- having the PHY fixup in the PHY driver gated by both an exact match on
+the PHY OUI *and* the specific affected board makes it reasonably easy
+to locate it
 
-The reason for the mis-configuration is a change in pfn_valid() which
-reports pages marked NOMAP as invalid:
+> 
+> We have several amlogic's design with the same MAC, sometimes with the
+> same PHY, which have no problem with EEE at all. The issue is really
+> about the board design.
 
- 68709f45385a arm64: only consider memblocks with NOMAP cleared for linear mapping
+OK, not a problem then: of_machine_is_compatible() should help you here?
 
-This causes pages marked as nomap being no long reassigned to the new
-zone in memmap_init_zone() by calling __init_single_pfn().
+> 
+> What I propose is not an enable/disable configuration switch, but to
+> clearly state that a particular mode of operation is broken. Like the
+> "max-speed" property, it setup a restriction. IMO, this is a
+> description of what the HW is and is capable of, and as such it should
+> be part of the DT.
 
-Fixing this by restoring the old behavior of pfn_valid() to use
-memblock_is_memory(). Also changing users of pfn_valid() in arm64 code
-to use memblock_is_map_memory() where necessary. This only affects
-code in ioremap.c. The code in mmu.c still can use the new version of
-pfn_valid().
+Sure, there is a fine line between describing what's broken, and being
+able to use that to actually configure non-broken hardware the way you want.
 
-As a consequence, pfn_valid() can not be used to check if a physical
-page is RAM. It just checks if there is an underlying memmap with a
-valid struct page. Moreover, for performance reasons the whole memmap
-(with pageblock_nr_pages number of pages) has valid pfns (SPARSEMEM
-config). The memory range is extended to fit the alignment of the
-memmap. Thus, pfn_valid() may return true for pfns that do not map to
-physical memory. Those pages are simply not reported to the mm, they
-are not marked reserved nor added to the list of free pages. Other
-functions such a page_is_ram() or memblock_is_map_ memory() must be
-used to check for memory and if the page can be mapped with the linear
-mapping.
+> 
+> Yes the property directly map to a register, but it does let you
+> directly manipulate it (you can't pass the value you want to write in
+> the register). Having it this way just makes the code simple on both
+> ends (user and driver).
 
-Since NOMAP mem ranges may need to be mapped with different mem
-attributes (e.g. read-only or non-caching) we can not use linear
-mapping here. The use of memblock_is_memory() in pfn_valid() may not
-break this behaviour. Since commit:
+That's exactly the part that is giving me the creeps, any property that
+directly maps to a register value has a chance of a) leading to hard to
+debug problem if mis-configured, and b) being used as a policy as
+opposed to purely describing what is going on with the HW.
 
- e7cd190385d1 arm64: mark reserved memblock regions explicitly in iomem
+> 
+> Yes people could start abusing this to setup policy. In the end, it is
+> our responsibility, as community, to make sure APIs are used in a
+> proper way, and not let it be used that way.
+> 
+> I'm open to suggestion on how improve the solution, maybe something
+> which could bring more confidence that property won't be misused.
 
-NOMAP mem resources are no longer marked as system RAM (IORESOURCE_
-SYSTEM_RAM). Now page_is_ram() and region_intersects() (see
-memremap()) do not detect NOMAP mem as system ram and NOMAP mem is not
-added to the linear mapping as system RAM is.
-
-v2:
-
- * Added Ack
- * updated description to reflect the discussion
-
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- arch/arm64/mm/init.c    | 2 +-
- arch/arm64/mm/ioremap.c | 5 +++--
- 2 files changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 212c4d1e2f26..166911f4a2e6 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -147,7 +147,7 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
- #ifdef CONFIG_HAVE_ARCH_PFN_VALID
- int pfn_valid(unsigned long pfn)
- {
--	return memblock_is_map_memory(pfn << PAGE_SHIFT);
-+	return memblock_is_memory(pfn << PAGE_SHIFT);
- }
- EXPORT_SYMBOL(pfn_valid);
- #endif
-diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-index 01e88c8bcab0..c17c220b0c48 100644
---- a/arch/arm64/mm/ioremap.c
-+++ b/arch/arm64/mm/ioremap.c
-@@ -21,6 +21,7 @@
-  */
- 
- #include <linux/export.h>
-+#include <linux/memblock.h>
- #include <linux/mm.h>
- #include <linux/vmalloc.h>
- #include <linux/io.h>
-@@ -55,7 +56,7 @@ static void __iomem *__ioremap_caller(phys_addr_t phys_addr, size_t size,
- 	/*
- 	 * Don't allow RAM to be mapped.
- 	 */
--	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
-+	if (WARN_ON(memblock_is_map_memory(phys_addr)))
- 		return NULL;
- 
- 	area = get_vm_area_caller(size, VM_IOREMAP, caller);
-@@ -96,7 +97,7 @@ EXPORT_SYMBOL(__iounmap);
- void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
- {
- 	/* For normal memory we already have a cacheable mapping. */
--	if (pfn_valid(__phys_to_pfn(phys_addr)))
-+	if (memblock_is_map_memory(phys_addr))
- 		return (void __iomem *)__phys_to_virt(phys_addr);
- 
- 	return __ioremap_caller(phys_addr, size, __pgprot(PROT_NORMAL),
+Once the binding lands in the kernel, there is absolutely zero guarantee
+nor visibility in how people end-up using in e.g: DT aware bootloader,
+and I am one of these people. Since there is a binding, there is
+consumer code in the kernel that needs to behave properly with respect
+to how the binding is defined. This is the same problem as with any kind
+of ABI, and a diverse range of consumers.
 -- 
-2.1.4
+Florian
