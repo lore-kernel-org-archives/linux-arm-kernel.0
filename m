@@ -1,21 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Nov 2016 17:08:31 +0100
-Subject: [GIT PULL v2 9/10] arm64: tegra: Device tree changes for v4.10-rc1
-In-Reply-To: <20161121102312.19968-1-thierry.reding@gmail.com>
-References: <20161118161719.24153-9-thierry.reding@gmail.com>
- <20161121102312.19968-1-thierry.reding@gmail.com>
-Message-ID: <5723548.MnkR8m7p6u@wuerfel>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 30 Nov 2016 10:10:24 -0600
+Subject: [PATCH] soc: ti: qmss: fix the case when !SMP
+In-Reply-To: <5501170.dgvo5UdPBX@wuerfel>
+References: <20161129221508.10551-1-grygorii.strashko@ti.com>
+ <5501170.dgvo5UdPBX@wuerfel>
+Message-ID: <a76f3e4e-6148-b1b6-2e33-aa4fead15aee@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 21, 2016 11:23:12 AM CET Thierry Reding wrote:
-> arm64: tegra: Device tree changes for v4.10-rc1
-> 
-> This adds initial support for Tegra186, the P3310 processor module as
-> well as the P2771 development board. Not much is functional, but there
-> is enough to boot to an initial ramdisk with debug serial output.
-> 
 
-Pulled into next/dt64, thanks!
 
-	Arnd
+On 11/30/2016 05:37 AM, Arnd Bergmann wrote:
+> On Tuesday, November 29, 2016 4:15:08 PM CET Grygorii Strashko wrote:
+>>                 range->num_irqs++;
+>>
+>> -               if (oirq.args_count == 3)
+>> +               if (IS_ENABLED(SMP) && oirq.args_count == 3)
+>>                         range->irqs[i].cpu_map =
+>>                                 (oirq.args[2] & 0x0000ff00) >> 8;
+>>
+>
+> I think you mean CONFIG_SMP, not SMP. With the change above, the
+> code will never be executed.
+>
+
+Thanks. I'll resend.
+
+-- 
+regards,
+-grygorii
