@@ -1,28 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Nov 2016 16:45:24 +0100
-Subject: [GIT PULL v2] Second Round of Renesas ARM Based SoC DT Updates
- for v4.10
-In-Reply-To: <cover.1479931686.git.horms+renesas@verge.net.au>
-References: <cover.1479931686.git.horms+renesas@verge.net.au>
-Message-ID: <6048589.rSbvWcLf7m@wuerfel>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 30 Nov 2016 16:49:38 +0100
+Subject: [PATCH v6 1/4] i2c: pxa: Add definition of fast and high speed
+ modes via the regs layout
+In-Reply-To: <20161130140017.26307-2-romain.perier@free-electrons.com>
+References: <20161130140017.26307-1-romain.perier@free-electrons.com>
+ <20161130140017.26307-2-romain.perier@free-electrons.com>
+Message-ID: <20161130164938.32ba768f@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 23, 2016 9:14:33 PM CET Simon Horman wrote:
-> Second Round of Renesas ARM Based SoC DT Updates for v4.10
-> 
-> Enhancements:
-> * Add device nodes for PRR
-> * Add r8a7745 SoC and sk-rzg1e board
-> * Add r8a7743 SoC and sk-rzg1m board
-> * Enable SDR-104 and I2C demuxer on alt, koelsch and lager boards
-> 
-> Corrections:
-> * Use SYSC "always-on" PM Domain for sound on r8a7794 SoC
-> * Correct hsusb parent clock on r8a7794 SoC
-> * Correct PFC names for DU on alt board
-> 
+Hello,
 
-Pulled into next/dt, thanks!
+On Wed, 30 Nov 2016 15:00:14 +0100, Romain Perier wrote:
 
-	Arnd
+>  #ifdef CONFIG_I2C_PXA_SLAVE
+>  	dev_info(&i2c->adap.dev, "Enabling slave mode\n");
+> @@ -1234,6 +1238,9 @@ static int i2c_pxa_probe(struct platform_device *dev)
+>  	i2c->reg_idbr = i2c->reg_base + pxa_reg_layout[i2c_type].idbr;
+>  	i2c->reg_icr = i2c->reg_base + pxa_reg_layout[i2c_type].icr;
+>  	i2c->reg_isr = i2c->reg_base + pxa_reg_layout[i2c_type].isr;
+> +	i2c->fm_mask = pxa_reg_layout[i2c_type].fm ? pxa_reg_layout[i2c_type].fm : ICR_FM;
+> +	i2c->hs_mask = pxa_reg_layout[i2c_type].hs ? pxa_reg_layout[i2c_type].hs : ICR_HS;
+
+These lines are too long according to checkpatch. What about using what
+Wolfram originally suggested, i.e:
+
+	i2c->fm_mask = pxa_reg_layout[i2c_type].fm ?: ICR_FM;
+
+which does exactly the same, but fits within 80 characters ?
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
