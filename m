@@ -1,32 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Nov 2016 22:12:29 +0100
-Subject: [GIT PULL 10/10] arm64: tegra: Default configuration updates for
- v4.10-rc1
-In-Reply-To: <20161130163929.GA20246@ulmo.ba.sec>
-References: <20161118161719.24153-1-thierry.reding@gmail.com>
- <6706502.us21ohNYZA@wuerfel> <20161130163929.GA20246@ulmo.ba.sec>
-Message-ID: <7208806.V3QfrVgnLS@wuerfel>
+Date: Wed, 30 Nov 2016 22:20:45 +0100
+Subject: [GIT PULL 4/6] Broadcom maintainers-arm64 changes for 4.10
+In-Reply-To: <20161122054824.16974-4-f.fainelli@gmail.com>
+References: <20161122054824.16974-1-f.fainelli@gmail.com>
+ <20161122054824.16974-4-f.fainelli@gmail.com>
+Message-ID: <7084357.LhofNmhDMd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 30, 2016 5:39:29 PM CET Thierry Reding wrote:
-> On Wed, Nov 30, 2016 at 05:10:43PM +0100, Arnd Bergmann wrote:
-> > On Friday, November 18, 2016 5:17:19 PM CET Thierry Reding wrote:
-> > > arm64: tegra: Default configuration updates for v4.10-rc1
-> > > 
-> > > Enable Tegra186 support.
-> > > 
-> > 
-> > This was already in next/arm64 (but I didn't see a notification),
-> > and with the arm64-dt branch now merged as well, we should have
-> > everything you sent.
+On Monday, November 21, 2016 9:48:22 PM CET Florian Fainelli wrote:
+> This pull request contains MAINTAINERS file updates for Broadcom ARM64 entries,
+> please pull:
 > 
-> I had also sent a couple of individual patches that seemed to not have
-> it made into v4.9 and v4.8 for some reason (they were part of the pull
-> requests, as far as I can tell). Do you think you could pull those in
-> as well?
+> - Jayachandran updates his email address for the Broadcom Vulcan entry
+> 
 
-Most likely yes, but I have trouble finding them right now. Can you
-just resend them?
+Pulled into next/arm64, thanks!
 
 	Arnd
