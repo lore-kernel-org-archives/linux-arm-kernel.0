@@ -1,31 +1,46 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Wed, 30 Nov 2016 12:43:39 +0200
-Subject: [PATCH 12/12] usb: renesas_usbhs: Replace the deprecated extcon
- API
-In-Reply-To: <1480485460-2663-13-git-send-email-cw00.choi@samsung.com>
-References: <1480485460-2663-1-git-send-email-cw00.choi@samsung.com>
- <1480485460-2663-13-git-send-email-cw00.choi@samsung.com>
-Message-ID: <87poldmen8.fsf@linux.intel.com>
+From: maninder1.s@samsung.com (Maninder Singh)
+Date: Wed, 30 Nov 2016 16:10:28 +0530
+Subject: [PATCH 1/1] mach-omap2: fixing wrong strcat for Non-NULL terminated
+ string
+Message-ID: <1480502428-19509-1-git-send-email-maninder1.s@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+variable name can have Non NULL terminated string after cropping
+which may result strcat to fail, and cropping is not
+required if (strlen(oh->name) + 8 < MOD_CLK_MAX_NAME_LEN).
 
-Hi,
+Issue caught with static analysis tool:
+"Dangerous usage of 'name' (strncpy doesn't always 0-terminate it)"
 
-Chanwoo Choi <cw00.choi@samsung.com> writes:
-> This patch replaces the deprecated extcon API as following:
-> - extcon_get_cable_state_() -> extcon_get_state()
->
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Signed-off-by: Vaneet Narang <v.narang@samsung.com>
+Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
-
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 759e1d4..8adf272 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -742,12 +742,15 @@ static int _init_main_clk(struct omap_hwmod *oh)
+ 	char name[MOD_CLK_MAX_NAME_LEN];
+ 	struct clk *clk;
+ 
+-	/* +7 magic comes from '_mod_ck' suffix */
+-	if (strlen(oh->name) + 7 > MOD_CLK_MAX_NAME_LEN)
++	/* +8 magic comes from strlen("_mod_ck") added as suffix */
++	if (strlen(oh->name) + 8 > MOD_CLK_MAX_NAME_LEN) {
+ 		pr_warn("%s: warning: cropping name for %s\n", __func__,
+ 			oh->name);
++		strncpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - 8);
++		name[MOD_CLK_MAX_NAME_LEN - 8] = '\0';
++	} else
++		strcpy(name, oh->name);
+ 
+-	strncpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - 7);
+ 	strcat(name, "_mod_ck");
+ 
+ 	clk = clk_get(NULL, name);
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161130/85910a19/attachment.sig>
+1.9.1
