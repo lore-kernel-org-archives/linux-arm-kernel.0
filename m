@@ -1,51 +1,65 @@
-From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Wed, 30 Nov 2016 18:07:41 +0100
-Subject: [PATCH v3 2/5] i2c: Add STM32F4 I2C driver
-In-Reply-To: <20161130162353.GC1441@katana>
-References: <1466439771-2741-1-git-send-email-cedric.madianga@gmail.com>
- <1466439771-2741-3-git-send-email-cedric.madianga@gmail.com>
- <20160722070219.GB1605@katana>
- <CAOAejn0BZNH82kY_7UR1EjV7M1G+9jGihGb4-uCs9=XiPHUYxQ@mail.gmail.com>
- <20161130162353.GC1441@katana>
-Message-ID: <CAOAejn2UDbsLRLmthOitTtkWOcN97WYhg93r9nyxQdBzGGegcg@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 30 Nov 2016 11:07:49 -0600
+Subject: question about irq_enter()/irq_exit() calling policy
+In-Reply-To: <20161130102134.GB14217@n2100.armlinux.org.uk>
+References: <22d0d991-bbe2-ce10-5202-3cdf97a9ecf2@ti.com>
+ <20161130102134.GB14217@n2100.armlinux.org.uk>
+Message-ID: <9c334b42-6b22-397f-93f6-e19e9163a17c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Russell,
 
+On 11/30/2016 04:21 AM, Russell King - ARM Linux wrote:
+> On Tue, Nov 29, 2016 at 05:47:12PM -0600, Grygorii Strashko wrote:
+>> 2) Should these function be called for each processed irq?
+>>
+>>
+>> HW IRQ:
+>>  switch (IRQ mode)
+>>   ...
+>>   while (irq = get_pending_irq()) {
+>>   	...
+>>   	irq_enter()
+>> 		handle(irq) - execute hw_irq_hadler
+>>   	irq_exit()
+>>  }
+>>  ...
+>>  switch
+> 
+> We tend to do (2) as a general rule, which isn't much different from what
+> other architectures do - even if they have a method to directly enter
+> through vectors (eg, x86) the effect of two pending interrupts is that one
+> will run after each other, and there will be an intervening exit -> entry.
+> 
+> In the case of ARM CPUs, if the interrupt signal is active, you vector
+> back to the interrupt handler as soon as you exit back to the parent
+> context without executing any parent context instructions.
+> 
+> So, we have the choice of going through all the IRQ entry code, processing
+> one interrupt, and returning only to then re-vector back through the IRQ
+> entry code, or we can process all the pending IRQs that we can see at that
+> time.
+> 
+> The former method wastes all the CPU cycles getting from the parent context
+> to the IRQ context for each and every interrupt.
+> 
 
-2016-11-30 17:23 GMT+01:00 Wolfram Sang <wsa-dev@sang-engineering.com>:
-> Hi,
->
->> I was too busy in another project but now I am ready to complete the
->> upstream of the STM32F4 I2C driver.
->
-> Nice.
->
->> >> +static void stm32f4_i2c_set_periph_clk_freq(struct stm32f4_i2c_dev *i2c_dev)
->> >> +{
->> >> +     u32 clk_rate, cr2, freq;
->> >> +
->> >> +     cr2 = readl_relaxed(i2c_dev->base + STM32F4_I2C_CR2);
->> >> +     cr2 &= ~STM32F4_I2C_CR2_FREQ_MASK;
->> >> +
->> >> +     clk_rate = clk_get_rate(i2c_dev->clk);
->> >> +     freq = clk_rate / MHZ_TO_HZ;
->> >> +
->> >> +     if (freq > STM32F4_I2C_MAX_FREQ)
->> >> +             freq = STM32F4_I2C_MAX_FREQ;
->> >> +     if (freq < STM32F4_I2C_MIN_FREQ)
->> >> +             freq = STM32F4_I2C_MIN_FREQ;
->> >
->> > clamp() to enforce the range?
->> Sorry but what do you mean by "clamp()" ?
->
-> The kernel has a clamp() function which would fit this purpose, I think.
-Ok I got it. I will fix it in the V4.
-Thanks
+Thanks a lot for your detailed explanation.
+When I've asked this question my intention was to understand possibility of calling 
+irq_enter()/irq_exit() only once for the case (2), like:
+ HW IRQ:
+  switch (IRQ mode)
+   ...
+  irq_enter()
+   while (irq = get_pending_irq()) {
+   	...
+ 	handle(irq) - execute hw_irq_hadler
+  }
+  irq_exit()
+  ...
+  switch
 
->
-> Regards,
->
->    Wolfram
->
+-- 
+regards,
+-grygorii
