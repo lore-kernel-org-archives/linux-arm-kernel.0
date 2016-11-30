@@ -1,25 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Nov 2016 17:52:20 +0100
-Subject: [GIT PULL 1/6] Broadcom soc changes for 4.10
-In-Reply-To: <20161122054824.16974-1-f.fainelli@gmail.com>
-References: <20161122054824.16974-1-f.fainelli@gmail.com>
-Message-ID: <23121827.vnVDrZQAeV@wuerfel>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 30 Nov 2016 10:53:51 -0600
+Subject: [PATCH v2] soc: ti: qmss: fix the case when !SMP
+Message-ID: <20161130165351.1154-1-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 21, 2016 9:48:19 PM CET Florian Fainelli wrote:
-> This pull request contains Broadcom ARM-based SoC changes for 4.10, please pull
-> the following:
-> 
-> - Rafal adds back the abort handler hook on BCM5301x which is required to silence
->   errors forwared from the PCIe controller that cannot be silenced at the PCIe RC level
-> 
+The irq_set_affinity_hint() will always fail when !SMP and
+Networking will fail on Keystone 2 devices in this case.
+Hence, fix by ignoring IRQ affinity settings when !SMP.
 
-Pulled into next/soc.
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ drivers/soc/ti/knav_qmss_queue.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-It's unclear to me whether we want this to be backported to stable kernels,
-can you clarify?
-
-Thanks,
-
-	Arnd
+diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
+index b73e353..eacad57 100644
+--- a/drivers/soc/ti/knav_qmss_queue.c
++++ b/drivers/soc/ti/knav_qmss_queue.c
+@@ -1228,7 +1228,7 @@ static int knav_setup_queue_range(struct knav_device *kdev,
+ 
+ 		range->num_irqs++;
+ 
+-		if (oirq.args_count == 3)
++		if (IS_ENABLED(CONFIG_SMP) && oirq.args_count == 3)
+ 			range->irqs[i].cpu_map =
+ 				(oirq.args[2] & 0x0000ff00) >> 8;
+ 	}
+-- 
+2.10.1
