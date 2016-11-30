@@ -1,51 +1,78 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 30 Nov 2016 15:14:51 +0000
-Subject: [PATCH v2 0/9] arm64: Expose CPUID registers via emulation
-Message-ID: <1480518901-18544-1-git-send-email-suzuki.poulose@arm.com>
+Date: Wed, 30 Nov 2016 15:14:52 +0000
+Subject: [PATCH v2 1/9] arm64: cpufeature: treat unknown fields as RES0
+In-Reply-To: <1480518901-18544-1-git-send-email-suzuki.poulose@arm.com>
+References: <1480518901-18544-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1480518901-18544-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds a new ABI to expose the CPU feature registers
-to the user space via emulation of MRS instruction. The system exposes
-only a limited set of feature values (See the documentation patch)
-from the cpufeature infrastructure. The feature bits that are not
-exposed are set to the 'safe value' which implies 'not supported'.
+From: Mark Rutland <mark.rutland@arm.com>
 
-Apart from the selected feature registers, we expose MIDR_EL1 (Main
-ID Register). The user should be aware that, reading MIDR_EL1 can be
-tricky on a heterogeneous system (just like getcpu()). We export the
-value of the current CPU where 'MRS' is executed.
+Any fields not defined in an arm64_ftr_bits entry are propagated to the
+system-wide register value in init_cpu_ftr_reg(), and while we require
+that these strictly match for the sanity checks, we don't update them in
+update_cpu_ftr_reg().
 
-Changes since V1:
-  - Drop mask for Op0 in sys_reg()
-  - Fix documentation
-  - Change safe value of MPIDR to drop MT support
-  - Do not emulate AArch32 ID registers
+Generally, the lack of an arm64_ftr_bits entry indicates that the bits
+are currently RES0 (as is the case for the upper 32 bits of all
+supposedly 32-bit registers).
 
-Mark Rutland (2):
-  arm64: cpufeature: treat unknown fields as RES0
-  arm64: cpufeature: remove explicit RAZ fields
+A better default would be to use zero for the system-wide value of
+unallocated bits, making all register checking consistent, and allowing
+for subsequent simplifications to the arm64_ftr_bits arrays.
 
-Suzuki K Poulose (7):
-  arm64: cpufeature: Cleanup feature bit tables
-  arm64: cpufeature: Document the rules of safe value for features
-  arm64: cpufeature: Define helpers for sys_reg id
-  arm64: Add helper to decode register from instruction
-  arm64: cpufeature: Track user visible fields
-  arm64: cpufeature: Expose CPUID registers by emulation
-  arm64: Documentation - Expose CPU feature registers
+This patch updates init_cpu_ftr_reg() to treat unallocated bits as RES0
+for the purpose of the system-wide safe value. These bits will still be
+sanity checked with strict match requirements, as is currently the case.
 
- Documentation/arm64/cpu-feature-registers.txt | 196 +++++++++++++++
- arch/arm64/include/asm/cpufeature.h           |  27 +-
- arch/arm64/include/asm/insn.h                 |   2 +
- arch/arm64/include/asm/sysreg.h               |  25 +-
- arch/arm64/include/uapi/asm/hwcap.h           |   1 +
- arch/arm64/kernel/cpufeature.c                | 340 +++++++++++++++++---------
- arch/arm64/kernel/cpuinfo.c                   |   1 +
- arch/arm64/kernel/insn.c                      |  29 +++
- arch/arm64/kernel/traps.c                     |   2 +-
- 9 files changed, 502 insertions(+), 121 deletions(-)
- create mode 100644 Documentation/arm64/cpu-feature-registers.txt
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/kernel/cpufeature.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index c02504e..a6ecf51 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -409,23 +409,33 @@ static void __init sort_ftr_regs(void)
+ /*
+  * Initialise the CPU feature register from Boot CPU values.
+  * Also initiliases the strict_mask for the register.
++ * Any bits that are not covered by an arm64_ftr_bits entry are considered
++ * RES0 for the system-wide value, and must strictly match.
+  */
+ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
+ {
+ 	u64 val = 0;
+ 	u64 strict_mask = ~0x0ULL;
++	u64 valid_mask = 0;
++
+ 	const struct arm64_ftr_bits *ftrp;
+ 	struct arm64_ftr_reg *reg = get_arm64_ftr_reg(sys_reg);
+ 
+ 	BUG_ON(!reg);
+ 
+ 	for (ftrp  = reg->ftr_bits; ftrp->width; ftrp++) {
++		u64 ftr_mask = arm64_ftr_mask(ftrp);
+ 		s64 ftr_new = arm64_ftr_value(ftrp, new);
+ 
+ 		val = arm64_ftr_set_value(ftrp, val, ftr_new);
++
++		valid_mask |= ftr_mask;
+ 		if (!ftrp->strict)
+-			strict_mask &= ~arm64_ftr_mask(ftrp);
++			strict_mask &= ~ftr_mask;
+ 	}
++
++	val &= valid_mask;
++
+ 	reg->sys_val = val;
+ 	reg->strict_mask = strict_mask;
+ }
 -- 
 2.7.4
