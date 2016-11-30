@@ -1,78 +1,87 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 30 Nov 2016 15:14:52 +0000
-Subject: [PATCH v2 1/9] arm64: cpufeature: treat unknown fields as RES0
+Date: Wed, 30 Nov 2016 15:14:54 +0000
+Subject: [PATCH v2 3/9] arm64: cpufeature: Cleanup feature bit tables
 In-Reply-To: <1480518901-18544-1-git-send-email-suzuki.poulose@arm.com>
 References: <1480518901-18544-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1480518901-18544-2-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1480518901-18544-4-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+This patch does the following clean ups :
 
-Any fields not defined in an arm64_ftr_bits entry are propagated to the
-system-wide register value in init_cpu_ftr_reg(), and while we require
-that these strictly match for the sanity checks, we don't update them in
-update_cpu_ftr_reg().
+1) All undescribed fields of a register are now treated as "strict"
+   with a safe value of 0. Hence we could leave an empty table for
+   describing registers which are RAZ.
 
-Generally, the lack of an arm64_ftr_bits entry indicates that the bits
-are currently RES0 (as is the case for the upper 32 bits of all
-supposedly 32-bit registers).
+2) ID_AA64DFR1_EL1 is RAZ and should use the table for RAZ register.
 
-A better default would be to use zero for the system-wide value of
-unallocated bits, making all register checking consistent, and allowing
-for subsequent simplifications to the arm64_ftr_bits arrays.
+3) ftr_generic32 is used to represent a register with a 32bit feature
+   value. Rename this to ftr_singl32 to make it more obvious. Since
+   we don't have a 64bit singe feature register, kill ftr_generic.
 
-This patch updates init_cpu_ftr_reg() to treat unallocated bits as RES0
-for the purpose of the system-wide safe value. These bits will still be
-sanity checked with strict match requirements, as is currently the case.
+Based on a patch by Mark Rutland.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/cpufeature.c | 19 +++++++------------
+ 1 file changed, 7 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index c02504e..a6ecf51 100644
+index aaf3cba..67e6935 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -409,23 +409,33 @@ static void __init sort_ftr_regs(void)
- /*
-  * Initialise the CPU feature register from Boot CPU values.
-  * Also initiliases the strict_mask for the register.
-+ * Any bits that are not covered by an arm64_ftr_bits entry are considered
-+ * RES0 for the system-wide value, and must strictly match.
-  */
- static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
- {
- 	u64 val = 0;
- 	u64 strict_mask = ~0x0ULL;
-+	u64 valid_mask = 0;
-+
- 	const struct arm64_ftr_bits *ftrp;
- 	struct arm64_ftr_reg *reg = get_arm64_ftr_reg(sys_reg);
+@@ -246,18 +246,13 @@ static const struct arm64_ftr_bits ftr_generic_32bits[] = {
+ 	ARM64_FTR_END,
+ };
  
- 	BUG_ON(!reg);
+-static const struct arm64_ftr_bits ftr_generic[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 64, 0),
+-	ARM64_FTR_END,
+-};
+-
+-static const struct arm64_ftr_bits ftr_generic32[] = {
++/* Table for a single 32bit feature value */
++static const struct arm64_ftr_bits ftr_single32[] = {
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 32, 0),
+ 	ARM64_FTR_END,
+ };
  
- 	for (ftrp  = reg->ftr_bits; ftrp->width; ftrp++) {
-+		u64 ftr_mask = arm64_ftr_mask(ftrp);
- 		s64 ftr_new = arm64_ftr_value(ftrp, new);
+-static const struct arm64_ftr_bits ftr_aa64raz[] = {
+-	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 0, 64, 0),
++static const struct arm64_ftr_bits ftr_raz[] = {
+ 	ARM64_FTR_END,
+ };
  
- 		val = arm64_ftr_set_value(ftrp, val, ftr_new);
-+
-+		valid_mask |= ftr_mask;
- 		if (!ftrp->strict)
--			strict_mask &= ~arm64_ftr_mask(ftrp);
-+			strict_mask &= ~ftr_mask;
- 	}
-+
-+	val &= valid_mask;
-+
- 	reg->sys_val = val;
- 	reg->strict_mask = strict_mask;
- }
+@@ -298,15 +293,15 @@ static const struct __ftr_reg_entry {
+ 
+ 	/* Op1 = 0, CRn = 0, CRm = 4 */
+ 	ARM64_FTR_REG(SYS_ID_AA64PFR0_EL1, ftr_id_aa64pfr0),
+-	ARM64_FTR_REG(SYS_ID_AA64PFR1_EL1, ftr_aa64raz),
++	ARM64_FTR_REG(SYS_ID_AA64PFR1_EL1, ftr_raz),
+ 
+ 	/* Op1 = 0, CRn = 0, CRm = 5 */
+ 	ARM64_FTR_REG(SYS_ID_AA64DFR0_EL1, ftr_id_aa64dfr0),
+-	ARM64_FTR_REG(SYS_ID_AA64DFR1_EL1, ftr_generic),
++	ARM64_FTR_REG(SYS_ID_AA64DFR1_EL1, ftr_raz),
+ 
+ 	/* Op1 = 0, CRn = 0, CRm = 6 */
+ 	ARM64_FTR_REG(SYS_ID_AA64ISAR0_EL1, ftr_id_aa64isar0),
+-	ARM64_FTR_REG(SYS_ID_AA64ISAR1_EL1, ftr_aa64raz),
++	ARM64_FTR_REG(SYS_ID_AA64ISAR1_EL1, ftr_raz),
+ 
+ 	/* Op1 = 0, CRn = 0, CRm = 7 */
+ 	ARM64_FTR_REG(SYS_ID_AA64MMFR0_EL1, ftr_id_aa64mmfr0),
+@@ -318,7 +313,7 @@ static const struct __ftr_reg_entry {
+ 	ARM64_FTR_REG(SYS_DCZID_EL0, ftr_dczid),
+ 
+ 	/* Op1 = 3, CRn = 14, CRm = 0 */
+-	ARM64_FTR_REG(SYS_CNTFRQ_EL0, ftr_generic32),
++	ARM64_FTR_REG(SYS_CNTFRQ_EL0, ftr_single32),
+ };
+ 
+ static int search_cmp_ftr_reg(const void *id, const void *regp)
 -- 
 2.7.4
