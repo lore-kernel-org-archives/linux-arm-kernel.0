@@ -1,131 +1,71 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 30 Nov 2016 16:42:27 +0000
-Subject: [PATCH 02/10] iommu/of: Prepare for deferred IOMMU configuration
-In-Reply-To: <20161130161723.GA9042@red-moon>
-References: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
- <1480465344-11862-3-git-send-email-sricharan@codeaurora.org>
- <20161130161723.GA9042@red-moon>
-Message-ID: <c89825aa-c75f-8493-fe92-7cc97f525bc7@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Nov 2016 17:43:37 +0100
+Subject: [GIT PULL] ARM: keystone: add TI SCI protocol support for v4.10
+In-Reply-To: <d685444b-4275-e6e6-aae6-214a41776a28@ti.com>
+References: <e6b04eeb-ebfb-2da0-834b-1da440a35783@ti.com>
+ <d685444b-4275-e6e6-aae6-214a41776a28@ti.com>
+Message-ID: <9563335.412haHXOPG@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/11/16 16:17, Lorenzo Pieralisi wrote:
-> Sricharan, Robin,
+On Monday, November 28, 2016 6:42:41 PM CET Tero Kristo wrote:
+> Gentle ping on this, is anybody going to pull this one?
 > 
-> I gave this series a go on ACPI and apart from an SMMU v3 fix-up
-> it seems to work, more thorough testing required though.
+> -Tero
 > 
-> A key question below.
+> On 27/10/16 12:30, Tero Kristo wrote:
+> > Hi Arnd, Olof, Kevin,
+> >
+> > This pull introduces the TI SCI protocol support for keystone family of
+> > devices, targeted for v4.10 merge window. We discussed with Santosh
+> > (keystone maintainer) that it would probably be better that I'll be
+> > sending the pull requests for this directly, avoiding one extra step of
+> > merges.
 > 
-> On Wed, Nov 30, 2016 at 05:52:16AM +0530, Sricharan R wrote:
->> From: Robin Murphy <robin.murphy@arm.com>
->>
->> IOMMU configuration represents unchanging properties of the hardware,
->> and as such should only need happen once in a device's lifetime, but
->> the necessary interaction with the IOMMU device and driver complicates
->> exactly when that point should be.
->>
->> Since the only reasonable tool available for handling the inter-device
->> dependency is probe deferral, we need to prepare of_iommu_configure()
->> to run later than it is currently called (i.e. at driver probe rather
->> than device creation), to handle being retried, and to tell whether a
->> not-yet present IOMMU should be waited for or skipped (by virtue of
->> having declared a built-in driver or not).
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>  drivers/iommu/of_iommu.c | 30 +++++++++++++++++++++++++++++-
->>  1 file changed, 29 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
->> index ee49081..349bd1d 100644
->> --- a/drivers/iommu/of_iommu.c
->> +++ b/drivers/iommu/of_iommu.c
->> @@ -104,12 +104,20 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
->>  	int err;
->>  
->>  	ops = iommu_get_instance(fwnode);
->> -	if (!ops || !ops->of_xlate)
->> +	if ((ops && !ops->of_xlate) ||
->> +	    (!ops && !of_match_node(&__iommu_of_table, iommu_spec->np)))
-> 
-> IIUC of_match_node() here is there to check there is a driver compiled
-> in for this device_node (aka compatible string in OF world), correct ?
 
-Yes - specifically, it's checking the magic table for a matching
-IOMMU_OF_DECLARE entry.
+Sorry for the delay. I just saw this pull request in the backlog
+and had to take a closer look first. I probably would have commented
+on a few details in a proper review, but overall this seems harmless
+enough, so I've merged it into next/drivers in the end.
 
-> If that's the case (and I think that's what Sricharan was referring to
-> in his ACPI query) I need to cook-up something on the ACPI side to
-> emulate the OF linker table behaviour (or anyway to detect a driver is
-> actually in the kernel), it is not that difficult but it is key to know,
-> I will give it some thought to make it as clean as possible.
+There was no branch description in
+ https://github.com/t-kristo/linux-pm.git for-4.10-ti-sci-base
+and I ended up taking something from the wiki. This is now the
+commit I ended up with:
 
-I didn't think this would be a concern for ACPI, since IORT works much
-the same way the current of_iommu_init_fn/of_platform_device_create()
-bodges in drivers so for DT. If you can only discover SMMUs from IORT,
-then iort_init_platform_devices() will have already created every SMMU
-that's going to exist before discovering other devices from wherever
-they come from, thus you could never get into the situation of probing a
-device without its SMMU being ready (if it's ever going to be). Is that
-not right?
+commit ba9cb7b9ffa4a4056158bc8570f1a851e4a6a8ae
+Merge: e7541f9 912cffb
+Author: Arnd Bergmann <arnd@arndb.de>
+Date:   Wed Nov 30 17:13:13 2016 +0100
 
-Robin.
+    Merge branch 'for-4.10-ti-sci-base' of https://github.com/t-kristo/linux-pm into next/drivers
+    
+    Merge "ARM: keystone: add TI SCI protocol support for v4.10" from
+    Tero Kristo:
+    
+    [description taken from http://processors.wiki.ti.com/index.php/TISCI
+    
+    Texas Instruments' Keystone generation System on Chips (SoC) starting
+    with 66AK2G02, now include a dedicated SoC System Control entity called
+    PMMC(Power Management Micro Controller) in line with ARM architecture
+    recommendations. The function of this module is to integrate all system
+    operations in a centralized location. Communication with the SoC System
+    Control entity from various processing units like ARM/DSP occurs over
+    Message Manager hardware block.
+    
+    ...
+    
+    Texas Instruments' System Control Interface defines the communication
+    protocol between various processing entities to the System Control Entity
+    on TI SoCs. This is a set of message formats and sequence of operations
+    required to communicate and get system services processed from System
+    Control entity in the SoC.]
+    
+    * 'for-4.10-ti-sci-base' of https://github.com/t-kristo/linux-pm:
+      firmware: ti_sci: Add support for reboot core service
+      firmware: ti_sci: Add support for Clock control
+      firmware: ti_sci: Add support for Device control
+      firmware: Add basic support for TI System Control Interface (TI-SCI) protocol
+      Documentation: Add support for TI System Control Interface (TI-SCI) protocol
 
-> 
-> Thanks,
-> Lorenzo
-> 
->>  		return NULL;
->>  
->>  	err = iommu_fwspec_init(dev, &iommu_spec->np->fwnode, ops);
->>  	if (err)
->>  		return ERR_PTR(err);
->> +	/*
->> +	 * The otherwise-empty fwspec handily serves to indicate the specific
->> +	 * IOMMU device we're waiting for, which will be useful if we ever get
->> +	 * a proper probe-ordering dependency mechanism in future.
->> +	 */
->> +	if (!ops)
->> +		return ERR_PTR(-EPROBE_DEFER);
->>  
->>  	err = ops->of_xlate(dev, iommu_spec);
->>  	if (err)
->> @@ -186,14 +194,34 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
->>  					   struct device_node *master_np)
->>  {
->>  	const struct iommu_ops *ops;
->> +	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
->>  
->>  	if (!master_np)
->>  		return NULL;
->>  
->> +	if (fwspec) {
->> +		if (fwspec->ops)
->> +			return fwspec->ops;
->> +
->> +		/* In the deferred case, start again from scratch */
->> +		iommu_fwspec_free(dev);
->> +	}
->> +
->>  	if (dev_is_pci(dev))
->>  		ops = of_pci_iommu_init(to_pci_dev(dev), master_np);
->>  	else
->>  		ops = of_platform_iommu_init(dev, master_np);
->> +	/*
->> +	 * If we have reason to believe the IOMMU driver missed the initial
->> +	 * add_device callback for dev, replay it to get things in order.
->> +	 */
->> +	if (!IS_ERR_OR_NULL(ops) && ops->add_device &&
->> +	    dev->bus && !dev->iommu_group) {
->> +		int err = ops->add_device(dev);
->> +
->> +		if (err)
->> +			ops = ERR_PTR(err);
->> +	}
->>  
->>  	return IS_ERR(ops) ? NULL : ops;
->>  }
->> -- 
->> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
->>
+	Arnd
