@@ -1,259 +1,118 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Nov 2016 18:07:22 +0000
-Subject: Applied "ASoC: sun4i-codec: Add support for A23 codec" to the asoc
- tree
-In-Reply-To: <20161112064648.26779-5-wens@csie.org>
-Message-ID: <E1cC9Hu-0008Ab-AA@debutante>
+From: rrichter@cavium.com (Robert Richter)
+Date: Wed, 30 Nov 2016 19:21:31 +0100
+Subject: [PATCH v2] arm64: mm: Fix memmap to be initialized for the entire
+ section
+Message-ID: <1480530091-1092-1-git-send-email-rrichter@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On ThunderX systems with certain memory configurations we see the
+following BUG_ON():
 
-   ASoC: sun4i-codec: Add support for A23 codec
+ kernel BUG at mm/page_alloc.c:1848!
 
-has been applied to the asoc tree at
+This happens for some configs with 64k page size enabled. The BUG_ON()
+checks if start and end page of a memmap range belongs to the same
+zone.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+The BUG_ON() check fails if a memory zone contains NOMAP regions. In
+this case the node information of those pages is not initialized. This
+causes an inconsistency of the page links with wrong zone and node
+information for that pages. NOMAP pages from node 1 still point to the
+mem zone from node 0 and have the wrong nid assigned.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+The reason for the mis-configuration is a change in pfn_valid() which
+reports pages marked NOMAP as invalid:
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+ 68709f45385a arm64: only consider memblocks with NOMAP cleared for linear mapping
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+This causes pages marked as nomap being no long reassigned to the new
+zone in memmap_init_zone() by calling __init_single_pfn().
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+Fixing this by restoring the old behavior of pfn_valid() to use
+memblock_is_memory(). Also changing users of pfn_valid() in arm64 code
+to use memblock_is_map_memory() where necessary. This only affects
+code in ioremap.c. The code in mmu.c still can use the new version of
+pfn_valid().
 
-Thanks,
-Mark
+As a consequence, pfn_valid() can not be used to check if a physical
+page is RAM. It just checks if there is an underlying memmap with a
+valid struct page. Moreover, for performance reasons the whole memmap
+(with pageblock_nr_pages number of pages) has valid pfns (SPARSEMEM
+config). The memory range is extended to fit the alignment of the
+memmap. Thus, pfn_valid() may return true for pfns that do not map to
+physical memory. Those pages are simply not reported to the mm, they
+are not marked reserved nor added to the list of free pages. Other
+functions such a page_is_ram() or memblock_is_map_ memory() must be
+used to check for memory and if the page can be mapped with the linear
+mapping.
 
->From dac5f86bc9e60eae87a28512f025362d1e2574e3 Mon Sep 17 00:00:00 2001
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Fri, 25 Nov 2016 20:34:36 +0800
-Subject: [PATCH] ASoC: sun4i-codec: Add support for A23 codec
+Since NOMAP mem ranges may need to be mapped with different mem
+attributes (e.g. read-only or non-caching) we can not use linear
+mapping here. The use of memblock_is_memory() in pfn_valid() may not
+break this behaviour. Since commit:
 
-The codec in the A23 is similar to the one found on the A31. One key
-difference is the analog path controls are routed through the PRCM
-block. This is supported by the sun8i-codec-analog driver, and tied
-into this codec driver with the audio card's aux_dev.
+ e7cd190385d1 arm64: mark reserved memblock regions explicitly in iomem
 
-In addition, the A23 does not have LINEOUT, and it does not support
-headset jack detection or buttons.
+NOMAP mem resources are no longer marked as system RAM (IORESOURCE_
+SYSTEM_RAM). Now page_is_ram() and region_intersects() (see
+memremap()) do not detect NOMAP mem as system ram and NOMAP mem is not
+added to the linear mapping as system RAM is.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+v2:
+
+ * Added Ack
+ * updated description to reflect the discussion
+
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Robert Richter <rrichter@cavium.com>
 ---
- .../devicetree/bindings/sound/sun4i-codec.txt      |  11 ++-
- sound/soc/sunxi/sun4i-codec.c                      | 108 +++++++++++++++++++++
- 2 files changed, 117 insertions(+), 2 deletions(-)
+ arch/arm64/mm/init.c    | 2 +-
+ arch/arm64/mm/ioremap.c | 5 +++--
+ 2 files changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/sun4i-codec.txt b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-index d91a95377f49..f7a548b604fc 100644
---- a/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-+++ b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-@@ -5,6 +5,7 @@ Required properties:
- 		- "allwinner,sun4i-a10-codec"
- 		- "allwinner,sun6i-a31-codec"
- 		- "allwinner,sun7i-a20-codec"
-+		- "allwinner,sun8i-a23-codec"
- - reg: must contain the registers location and length
- - interrupts: must contain the codec interrupt
- - dmas: DMA channels for tx and rx dma. See the DMA client binding,
-@@ -21,6 +22,7 @@ Optional properties:
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 212c4d1e2f26..166911f4a2e6 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -147,7 +147,7 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
+ #ifdef CONFIG_HAVE_ARCH_PFN_VALID
+ int pfn_valid(unsigned long pfn)
+ {
+-	return memblock_is_map_memory(pfn << PAGE_SHIFT);
++	return memblock_is_memory(pfn << PAGE_SHIFT);
+ }
+ EXPORT_SYMBOL(pfn_valid);
+ #endif
+diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
+index 01e88c8bcab0..c17c220b0c48 100644
+--- a/arch/arm64/mm/ioremap.c
++++ b/arch/arm64/mm/ioremap.c
+@@ -21,6 +21,7 @@
+  */
  
- Required properties for the following compatibles:
- 		- "allwinner,sun6i-a31-codec"
-+		- "allwinner,sun8i-a23-codec"
- - resets: phandle to the reset control for this device
- - allwinner,audio-routing: A list of the connections between audio components.
- 			   Each entry is a pair of strings, the first being the
-@@ -31,10 +33,10 @@ Required properties for the following compatibles:
- 			   "HP"
- 			   "HPCOM"
- 			   "LINEIN"
--			   "LINEOUT"
-+			   "LINEOUT"	(not on sun8i-a23)
- 			   "MIC1"
- 			   "MIC2"
--			   "MIC3"
-+			   "MIC3"	(sun6i-a31 only)
+ #include <linux/export.h>
++#include <linux/memblock.h>
+ #include <linux/mm.h>
+ #include <linux/vmalloc.h>
+ #include <linux/io.h>
+@@ -55,7 +56,7 @@ static void __iomem *__ioremap_caller(phys_addr_t phys_addr, size_t size,
+ 	/*
+ 	 * Don't allow RAM to be mapped.
+ 	 */
+-	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
++	if (WARN_ON(memblock_is_map_memory(phys_addr)))
+ 		return NULL;
  
- 			   Microphone biases from the SoC:
- 			   "HBIAS"
-@@ -48,6 +50,11 @@ Required properties for the following compatibles:
- 			   "Mic"
- 			   "Speaker"
+ 	area = get_vm_area_caller(size, VM_IOREMAP, caller);
+@@ -96,7 +97,7 @@ EXPORT_SYMBOL(__iounmap);
+ void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
+ {
+ 	/* For normal memory we already have a cacheable mapping. */
+-	if (pfn_valid(__phys_to_pfn(phys_addr)))
++	if (memblock_is_map_memory(phys_addr))
+ 		return (void __iomem *)__phys_to_virt(phys_addr);
  
-+Required properties for the following compatibles:
-+		- "allwinner,sun8i-a23-codec"
-+- allwinner,codec-analog-controls: A phandle to the codec analog controls
-+				   block in the PRCM.
-+
- Example:
- codec: codec at 01c22c00 {
- 	#sound-dai-cells = <0>;
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 092fdcf6de95..ada5fa055950 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -213,6 +213,10 @@
- 
- /* TODO sun6i DAP (Digital Audio Processing) bits */
- 
-+/* FIFO counters moved on A23 */
-+#define SUN8I_A23_CODEC_DAC_TXCNT		(0x1c)
-+#define SUN8I_A23_CODEC_ADC_RXCNT		(0x20)
-+
- struct sun4i_codec {
- 	struct device	*dev;
- 	struct regmap	*regmap;
-@@ -1067,6 +1071,32 @@ static struct snd_soc_codec_driver sun6i_codec_codec = {
- 	},
- };
- 
-+/* sun8i A23 codec */
-+static const struct snd_kcontrol_new sun8i_a23_codec_codec_controls[] = {
-+	SOC_SINGLE_TLV("DAC Playback Volume", SUN4I_CODEC_DAC_DPC,
-+		       SUN4I_CODEC_DAC_DPC_DVOL, 0x3f, 1,
-+		       sun6i_codec_dvol_scale),
-+};
-+
-+static const struct snd_soc_dapm_widget sun8i_a23_codec_codec_widgets[] = {
-+	/* Digital parts of the ADCs */
-+	SND_SOC_DAPM_SUPPLY("ADC Enable", SUN6I_CODEC_ADC_FIFOC,
-+			    SUN6I_CODEC_ADC_FIFOC_EN_AD, 0, NULL, 0),
-+	/* Digital parts of the DACs */
-+	SND_SOC_DAPM_SUPPLY("DAC Enable", SUN4I_CODEC_DAC_DPC,
-+			    SUN4I_CODEC_DAC_DPC_EN_DA, 0, NULL, 0),
-+
-+};
-+
-+static struct snd_soc_codec_driver sun8i_a23_codec_codec = {
-+	.component_driver = {
-+		.controls		= sun8i_a23_codec_codec_controls,
-+		.num_controls		= ARRAY_SIZE(sun8i_a23_codec_codec_controls),
-+		.dapm_widgets		= sun8i_a23_codec_codec_widgets,
-+		.num_dapm_widgets	= ARRAY_SIZE(sun8i_a23_codec_codec_widgets),
-+	},
-+};
-+
- static const struct snd_soc_component_driver sun4i_codec_component = {
- 	.name = "sun4i-codec",
- };
-@@ -1206,6 +1236,63 @@ static struct snd_soc_card *sun6i_codec_create_card(struct device *dev)
- 	return card;
- };
- 
-+/* Connect digital side enables to analog side widgets */
-+static const struct snd_soc_dapm_route sun8i_codec_card_routes[] = {
-+	/* ADC Routes */
-+	{ "Left ADC", NULL, "ADC Enable" },
-+	{ "Right ADC", NULL, "ADC Enable" },
-+	{ "Codec Capture", NULL, "Left ADC" },
-+	{ "Codec Capture", NULL, "Right ADC" },
-+
-+	/* DAC Routes */
-+	{ "Left DAC", NULL, "DAC Enable" },
-+	{ "Right DAC", NULL, "DAC Enable" },
-+	{ "Left DAC", NULL, "Codec Playback" },
-+	{ "Right DAC", NULL, "Codec Playback" },
-+};
-+
-+static struct snd_soc_aux_dev aux_dev = {
-+	.name = "Codec Analog Controls",
-+};
-+
-+static struct snd_soc_card *sun8i_a23_codec_create_card(struct device *dev)
-+{
-+	struct snd_soc_card *card;
-+	int ret;
-+
-+	card = devm_kzalloc(dev, sizeof(*card), GFP_KERNEL);
-+	if (!card)
-+		return ERR_PTR(-ENOMEM);
-+
-+	aux_dev.codec_of_node = of_parse_phandle(dev->of_node,
-+						 "allwinner,codec-analog-controls",
-+						 0);
-+	if (!aux_dev.codec_of_node) {
-+		dev_err(dev, "Can't find analog controls for codec.\n");
-+		return ERR_PTR(-EINVAL);
-+	};
-+
-+	card->dai_link = sun4i_codec_create_link(dev, &card->num_links);
-+	if (!card->dai_link)
-+		return ERR_PTR(-ENOMEM);
-+
-+	card->dev		= dev;
-+	card->name		= "A23 Audio Codec";
-+	card->dapm_widgets	= sun6i_codec_card_dapm_widgets;
-+	card->num_dapm_widgets	= ARRAY_SIZE(sun6i_codec_card_dapm_widgets);
-+	card->dapm_routes	= sun8i_codec_card_routes;
-+	card->num_dapm_routes	= ARRAY_SIZE(sun8i_codec_card_routes);
-+	card->aux_dev		= &aux_dev;
-+	card->num_aux_devs	= 1;
-+	card->fully_routed	= true;
-+
-+	ret = snd_soc_of_parse_audio_routing(card, "allwinner,audio-routing");
-+	if (ret)
-+		dev_warn(dev, "failed to parse audio-routing: %d\n", ret);
-+
-+	return card;
-+};
-+
- static const struct regmap_config sun4i_codec_regmap_config = {
- 	.reg_bits	= 32,
- 	.reg_stride	= 4,
-@@ -1227,6 +1314,13 @@ static const struct regmap_config sun7i_codec_regmap_config = {
- 	.max_register	= SUN7I_CODEC_AC_MIC_PHONE_CAL,
- };
- 
-+static const struct regmap_config sun8i_a23_codec_regmap_config = {
-+	.reg_bits	= 32,
-+	.reg_stride	= 4,
-+	.val_bits	= 32,
-+	.max_register	= SUN8I_A23_CODEC_ADC_RXCNT,
-+};
-+
- struct sun4i_codec_quirks {
- 	const struct regmap_config *regmap_config;
- 	const struct snd_soc_codec_driver *codec;
-@@ -1265,6 +1359,16 @@ static const struct sun4i_codec_quirks sun7i_codec_quirks = {
- 	.reg_adc_rxdata	= SUN4I_CODEC_ADC_RXDATA,
- };
- 
-+static const struct sun4i_codec_quirks sun8i_a23_codec_quirks = {
-+	.regmap_config	= &sun8i_a23_codec_regmap_config,
-+	.codec		= &sun8i_a23_codec_codec,
-+	.create_card	= sun8i_a23_codec_create_card,
-+	.reg_adc_fifoc	= REG_FIELD(SUN6I_CODEC_ADC_FIFOC, 0, 31),
-+	.reg_dac_txdata	= SUN4I_CODEC_DAC_TXDATA,
-+	.reg_adc_rxdata	= SUN6I_CODEC_ADC_RXDATA,
-+	.has_reset	= true,
-+};
-+
- static const struct of_device_id sun4i_codec_of_match[] = {
- 	{
- 		.compatible = "allwinner,sun4i-a10-codec",
-@@ -1278,6 +1382,10 @@ static const struct of_device_id sun4i_codec_of_match[] = {
- 		.compatible = "allwinner,sun7i-a20-codec",
- 		.data = &sun7i_codec_quirks,
- 	},
-+	{
-+		.compatible = "allwinner,sun8i-a23-codec",
-+		.data = &sun8i_a23_codec_quirks,
-+	},
- 	{}
- };
- MODULE_DEVICE_TABLE(of, sun4i_codec_of_match);
+ 	return __ioremap_caller(phys_addr, size, __pgprot(PROT_NORMAL),
 -- 
-2.10.2
+2.1.4
