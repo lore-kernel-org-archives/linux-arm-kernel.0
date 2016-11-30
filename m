@@ -1,27 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Nov 2016 22:09:04 +0100
-Subject: [GIT PULL] ARM: keystone: add TI SCI protocol support for v4.10
-In-Reply-To: <6f67f67f-7489-6d62-c2c2-9bba440cfabc@ti.com>
-References: <e6b04eeb-ebfb-2da0-834b-1da440a35783@ti.com>
- <9563335.412haHXOPG@wuerfel> <6f67f67f-7489-6d62-c2c2-9bba440cfabc@ti.com>
-Message-ID: <5602219.0b9asep0uZ@wuerfel>
+Date: Wed, 30 Nov 2016 22:11:04 +0100
+Subject: [PATCH v2] soc: ti: qmss: fix the case when !SMP
+In-Reply-To: <92af0586-7deb-9e94-a0e7-377337ebfb9e@oracle.com>
+References: <20161130165351.1154-1-grygorii.strashko@ti.com>
+ <d26f37e6-657f-ff42-2d9d-343fa47c2e5d@ti.com>
+ <92af0586-7deb-9e94-a0e7-377337ebfb9e@oracle.com>
+Message-ID: <5412220.B6fgWRlPCm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 30, 2016 7:59:26 PM CET Tero Kristo wrote:
+On Wednesday, November 30, 2016 9:13:44 AM CET Santosh Shilimkar wrote:
 > 
-> Thanks Arnd, that looks good to me.
+> Can you apply this to your non critical fixes queue ?
 > 
-> I'll figure out how to add branch description next time when I am going 
-> to be sending a pull-request directly to you guys.
+> On 11/30/2016 9:09 AM, Grygorii Strashko wrote:
+> > + Santosh Shilimkar <santosh.shilimkar@oracle.com>
+> >
+> > On 11/30/2016 10:53 AM, Grygorii Strashko wrote:
+> >> The irq_set_affinity_hint() will always fail when !SMP and
+> >> Networking will fail on Keystone 2 devices in this case.
+> >> Hence, fix by ignoring IRQ affinity settings when !SMP.
+> >>
+> >> Cc: Arnd Bergmann <arnd@arndb.de>
+> >> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> >> ---
+> Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
 > 
 > 
 
-You should get a prompt when you sign the tag.
-
-Actually my preference would be for you to forward this to Santosh:
-There are a lot of little details to know about the submission
-process to for arm-soc, and it's easier for us if fewer people
-have to be aware of them.
+Applied, thanks!
 
 	Arnd
