@@ -1,62 +1,60 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 30 Nov 2016 14:06:32 +0000
-Subject: [RFC PATCH 00/29] arm64: Scalable Vector Extension core support
-In-Reply-To: <583EB285.5050305@arm.com>
-References: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
- <7a35d1ae-73df-03a5-c9d6-1a52754acf25@redhat.com>
- <583EB285.5050305@arm.com>
-Message-ID: <20161130140632.GL1574@e103592.cambridge.arm.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 30 Nov 2016 15:08:17 +0100
+Subject: [RFC v3 00/10] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
+ reserved regions
+In-Reply-To: <20161130103713.GB2724@arm.com>
+References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
+ <6c9012fd-070b-6218-48e7-69b37f2559dd@redhat.com>
+ <20161130103713.GB2724@arm.com>
+Message-ID: <1899e46c-7b06-01d6-6cff-eb0985a4f11d@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2016 at 11:05:41AM +0000, Szabolcs Nagy wrote:
-> On 30/11/16 10:08, Florian Weimer wrote:
-> > On 11/25/2016 08:38 PM, Dave Martin wrote:
+Hi Will,
 
-[...]
-
-> >>  * Discussion is needed on how userspace should detect/negotiate signal
-> >>    frame size in order for this expansion mechanism to be workable.
-> > 
-> > I'm leaning towards a simple increase in the glibc headers (despite the ABI risk), plus a personality flag to
-> > disable really wide vector registers in case this causes problems with old binaries.
-> > 
+On 30/11/2016 11:37, Will Deacon wrote:
+> On Wed, Nov 30, 2016 at 10:49:33AM +0100, Auger Eric wrote:
+>> On 15/11/2016 14:09, Eric Auger wrote:
+>>> Following LPC discussions, we now report reserved regions through
+>>> iommu-group sysfs reserved_regions attribute file.
+>>>
+>>> Reserved regions are populated through the IOMMU get_resv_region callback
+>>> (former get_dm_regions), now implemented by amd-iommu, intel-iommu and
+>>> arm-smmu.
+>>>
+>>> The intel-iommu reports the [FEE0_0000h - FEF0_000h] MSI window as an
+>>> IOMMU_RESV_NOMAP reserved region.
+>>>
+>>> arm-smmu reports the MSI window (arbitrarily located at 0x8000000 and
+>>> 1MB large) and the PCI host bridge windows.
+>>>
+>>> The series integrates a not officially posted patch from Robin:
+>>> "iommu/dma: Allow MSI-only cookies".
+>>>
+>>> This series currently does not address IRQ safety assessment.
+>>
+>> I will respin this series taking into account Joerg's comment. Does
+>> anyone have additional comments or want to put forward some conceptual
+>> issues with the current direction and with this implementation?
+>>
+>> As for the IRQ safety assessment, in a first step I would propose to
+>> remove the IOMMU_CAP_INTR_REMAP from arm-smmus and consider the
+>> assignment as unsafe. Any objection?
 > 
-> if the kernel does not increase the size and libc
-> does not add size checks then old binaries would
-> work with new libc just fine..
-> but that's non-conforming, posix requires the check.
+> Well, yeah, because it's perfectly safe with GICv3.
+
+Well except if you have an MSI controller in-between the device and the
+sMMU (typically embedded in the host bridge). Detecting this situation
+is not straightforward; hence my proposal.
+
+Thanks
+
+Eric
 > 
-> if the kernel increases the size then it has to be
-> changed in bionic and musl as well and old binaries
-> may break.
-
-Or we need a personality flag or similar to distinguish the two cases.
-
-[...]
-
-> > A more elaborate mechanism will likely introduce more bugs than it makes existing applications working, due to
-> > its complexity.
-> > 
-> >> The remaining patches implement initial SVE support for Linux, with the
-> >> following limitations:
-> >>
-> >>  * No KVM/virtualisation support for guests.
-> >>
-> >>  * No independent SVE vector length configuration per thread.  This is
-> >>    planned, but will follow as a separate add-on series.
-> > 
-> > Per-thread register widths will likely make coroutine switching (setcontext) and C++ resumable
-> > functions/executors quite challenging.
-> > 
+> Will
 > 
-> i'd assume it's undefined to context switch to a different
-> thread or to resume a function on a different thread
-> (because the implementation can cache thread local state
-> on the stack: e.g. errno pointer).. of course this does
-> not stop ppl from doing it, but the practice is questionable.
-
-I don't have a view on this.
-
-Cheers
----Dave
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
