@@ -1,109 +1,81 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 30 Nov 2016 10:20:21 +0200
-Subject: [PATCH v7 4/8] drm/sunxi: Add DT bindings documentation of
- Allwinner HDMI
-In-Reply-To: <20161130091208.f38cd79f1cc5d27b27f3b130@free.fr>
-References: <cover.1480414715.git.moinejf@free.fr> <4502748.8rUF7ESxa4@avalon>
- <20161130091208.f38cd79f1cc5d27b27f3b130@free.fr>
-Message-ID: <4614815.L3DQhhBy6d@avalon>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 30 Nov 2016 09:24:11 +0100
+Subject: [PATCH v9 07/11] arm/arm64: vgic: Implement
+ KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
+In-Reply-To: <CAFEAcA_1i7-ti_H_RZrTbCW2DmFPvYudKn_WFs=_XRoyKKsnbQ@mail.gmail.com>
+References: <1479906118-15832-1-git-send-email-vijay.kilari@gmail.com>
+ <1479906118-15832-8-git-send-email-vijay.kilari@gmail.com>
+ <20161128195028.GH18170@cbox>
+ <CALicx6uW5RmjsPPBKB5wLW4TzNmcdc9ZADqp=M2ZJe9Cd+keZg@mail.gmail.com>
+ <20161129210901.GC15346@cbox>
+ <CAFEAcA_1i7-ti_H_RZrTbCW2DmFPvYudKn_WFs=_XRoyKKsnbQ@mail.gmail.com>
+Message-ID: <20161130082411.GA6647@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Fran?ois,
-
-On Wednesday 30 Nov 2016 09:12:08 Jean-Francois Moine wrote:
-> On Tue, 29 Nov 2016 22:10:01 +0200 Laurent Pinchart wrote:
-> > On Tuesday 29 Nov 2016 21:04:55 Jean-Francois Moine wrote:
-> >> On Tue, 29 Nov 2016 21:33 +0200 Laurent Pinchart wrote:
-> >>>>> You need a third port for the HDMI encoder output, connected to an
-> >>>>> HDMI connector DT node.
-> >>>> 
-> >>>> I don't see what you mean. The HDMI device is both the encoder
-> >>> 
-> >>>> and connector (as the TDA998x):
-> >>> The driver might create both an encoder and a connector, but I very
-> >>> much doubt that the "allwinner,sun8i-a83t-hdmi" hardware contains a
-> >>> connector, unless the SoC package has an HDMI connector coming out of
-> >>> it :-)
-> >>> 
-> >>>> plane -> DE2 mixer ---> TCON -----> HDMI -----> display device
-> >>>> ----- plane ------    - CRTC -   - encoder  \
-> >>>>                                    connector -- (HDMI cable)
-> >>>>          audio-controller -   - audio-codec /
-> >> 
-> >> The schema is the same as the Dove Cubox: the TDA998x is just a chip
-> >> with some wires going out and the physical connector is supposed to be
-> >> at the end of the wires.
-> > 
-> > I've missed the Dove Cubox DT bindings when they were submitted.
-> > Fortunately (or unfortunately for you, depending on how you look at it
-> > ;-)) I've paid more attention this time.
-> > 
-> >> Here, the HDMI pins of the SoC go to a pure hardware chip and then to
-> >> the physical connector. Which software entity do you want to add?
-> > 
-> > I don't want to add a software entity, I just want to model the connector
-> > in DT as it's present in the system. Even though that's more common for
-> > other bus types than HDMI (LVDS for instance) it wouldn't be
-> > inconceivable to connect the HDMI signals to an on-board chim instead of
-> > an HDMI connector, so the HDMI encoder output should be modelled by a
-> > port and connected to a connector DT node in this case.
+On Wed, Nov 30, 2016 at 07:10:51AM +0000, Peter Maydell wrote:
+> On 29 November 2016 at 21:09, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+> > Actually, I'm not sure what the semantics of the line level ioctl should
+> > be for edge-triggered interrupts?  My inclination is that it shouldn't
+> > have any effect at this point, but that would mean that at this point we
+> > should only set the pending variable and try to queue the interrupt if
+> > the config is level.  But that also means that when we set the config
+> > later, we need to try to queue the interrupt, which we don't do
+> > currently, because we rely on the guest not fiddling with the config of
+> > an enabled interrupt.
+> >
+> > Could it be considered an error if user space tries to set the level for
+> > an edge-triggered interrupt and therefore something we can just ignore
+> > and assume that the corresponing interrupt will be configured as a
+> > level-triggered one later?
 > 
-> Well, I don't see what this connector can be.
-> May you give me a DT example?
+> Userspace will always read the line-level values out and write
+> them back for migration, and I'd rather not make it have to
+> do cross-checks against whether the interrupt is edge or level
+> triggered to see whether it should write the level values into
+> the kernel. Telling the kernel the level for an edge-triggered
+> interrupt should be a no-op because it doesn't have any effect
+> on pending status.
+> 
+> > In any case we probably need to clarify the ABI in terms of this
+> > particular KVM_DEV_AR_VGIC_GRP_LEVEL_INFO group and how it relates to
+> > the config of edge vs. level of interrupts and ordering on restore...
+> 
+> IIRC the QEMU code restores the config first. (There's a similar
+> ordering thing for GICv2 where we have to restore GICD_ICFGRn before
+> GICD_ISPENDRn.)
+> 
 
-Sure.
+So it sounds to me that we should add a note in the Documentation like
+this:
 
-arch/arm/boot/dts/r8a7791-koelsch.dts
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+index 9348b3c..7bac20a 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+@@ -193,6 +193,11 @@ Groups:
+ 
+ 	Bit[n] indicates the status for interrupt vINTID + n.
+ 
++	Getting or setting the level info for an edge-triggered interrupt is
++	not guaranteed to work.  To restore the complete state of the VGIC, the
++	configuration (edge/level) of interrupts must be restored before
++	restoring the level.
++
+     SGIs and any interrupt with a higher ID than the number of interrupts
+     supported, will be RAZ/WI.  LPIs are always edge-triggered and are
+     therefore not supported by this interface.
 
-        /* HDMI encoder */
+Vijay, this means that the first block in your if-statement should only
+set pending and queue the interrupt if the interrupt is a level
+triggered one.
 
-        hdmi at 39 {
-                compatible = "adi,adv7511w";
-                reg = <0x39>;
-                interrupt-parent = <&gpio3>;
-                interrupts = <29 IRQ_TYPE_LEVEL_LOW>;
+(Peter, I thought you once argued that it was important for user space
+to be able to save/restore the state without any ordering requirements,
+but I may have misunderstood.  It is still the option to add something
+like the above to the docs but also do our best to allow any ordering of
+level/config, but it becomes slightly more invasive.)
 
-                adi,input-depth = <8>;
-                adi,input-colorspace = "rgb";
-                adi,input-clock = "1x";
-                adi,input-style = <1>;
-                adi,input-justification = "evenly";
-
-                ports {
-                        #address-cells = <1>;
-                        #size-cells = <0>;
-
-                        port at 0 {
-                                reg = <0>;
-                                adv7511_in: endpoint {
-                                        remote-endpoint = <&du_out_rgb>;
-                                };
-                        };
-
-                        port at 1 {
-                                reg = <1>;
-                                adv7511_out: endpoint {
-                                        remote-endpoint = <&hdmi_con>;
-                                };
-                        };
-                };
-        };
-
-        /* HDMI connector */
-
-        hdmi-out {
-                compatible = "hdmi-connector";
-                type = "a";
-
-                port {
-                        hdmi_con: endpoint {
-                                remote-endpoint = <&adv7511_out>;
-                        };
-                };
-        };
-
--- 
-Regards,
-
-Laurent Pinchart
+Thanks,
+-Christoffer
