@@ -1,139 +1,82 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 30 Nov 2016 16:59:43 +0800
-Subject: [PATCH v10 00/13] MT2701 DRM support
-In-Reply-To: <1480070076-6196-1-git-send-email-yt.shen@mediatek.com>
-References: <1480070076-6196-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1480496383.13978.3.camel@mtksdaap41>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Wed, 30 Nov 2016 10:05:45 +0100
+Subject: [PATCH v7 0/8] drm: sun8i: Add DE2 HDMI video support
+In-Reply-To: <20161129213650.uqcgekodq77wlmxs@lukather>
+References: <cover.1480414715.git.moinejf@free.fr>
+ <20161129213650.uqcgekodq77wlmxs@lukather>
+Message-ID: <20161130100545.44546ed28896cdb9768f68cd@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, YT:
+On Tue, 29 Nov 2016 22:36:50 +0100
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-On Fri, 2016-11-25 at 18:34 +0800, YT Shen wrote:
-> This is MT2701 DRM support PATCH v10, based on 4.9-rc1.
-> We add DSI interrupt control, transfer function for MIPI DSI panel support.
-> Most codes are the same, except some register changed.
+> On Tue, Nov 29, 2016 at 11:18:35AM +0100, Jean-Francois Moine wrote:
+> > This patchset series adds HDMI video support to the Allwinner
+> > sun8i SoCs which include the display engine 2 (DE2).
+> > The driver contains the code for the A83T and H3 SoCs, and
+> > some H3 boards, but it could be used/extended for other SoCs
+> > (A64, H2, H5) and boards (Banana PIs, Orange PIs).
 > 
-> For example:
->  - DISP_OVL address offset changed, color format definition changed.
->  - DISP_RDMA fifo size changed.
->  - DISP_COLOR offset changed.
->  - MIPI_TX setting changed.
+> Honestly, I'm getting a bit worried by the fact that you ignore
+> reviews.
 > 
-> We add a new component DDP_COMPONENT_BLS, and the connections are updated.
-> OVL -> RDMA -> COLOR -> BLS -> DSI
-> RDMA -> DPI
-> And we have shadow register support in MT2701.
-> 
-> We remove dts patch from the patch series, which depends on MT2701 CCF and scpsys.
-> 
+> On the important reviews that you got that are to be seen as major
+> issues that block the inclusion, we have:
+>   - The fact that the HDMI driver is actually just a designware IP,
+>     and while you should use the driver that already exists, you just
+>     duplicated all that code.
 
-Some patches in this series conflict with Linux 4.9-rc7.
-Once you send next patches, please base on Linux 4.9-rc7 or later
-version.
+The DW registers in the A83T and H3 are obfuscated, so, the code in
+bridge/DW cannot be used as it is. There should be either a translation
+table or a function to compute the register addresses.
 
-Regards,
-CK
+More, it is not sure that the bridge/DW code would work with
+Allwinner's SoCs. It seems that they got some schematics from
+DesignWare, but, is it really the same hardware? Also, if some changes
+had to be done in the bridge code, I could not check if this would
+break or not the other SoCs.
 
-> Changes since v9:
-> - Split DSI patches into smaller parts
-> - Use a real linux errno for return value
-> - Add error handling in mtk_output_dsi_enable()
-> - Remove unused changes and redundant delays
-> - Add helpers and macros for configuration
-> - Combine "drm/mediatek: rename macros, add chip prefix" and "drm/mediatek: add *driver_data for different hardware setting"
-> 
-> Changes since v8:
-> - enable 3 DSI interrupts only
-> - move mtk_dsi_wait_for_irq_done() to the patch of irq control
-> - use the name BLS in DRM driver part
-> - move BLS declaration to a separate patch
-> - update mtk_dsi_switch_to_cmd_mode()
-> - update mtk_output_dsi_enable() and mtk_output_dsi_disable()
-> 
-> Changes since v7:
-> - Remove redundant codes
-> - Move the definition of DDP_COMPONENT_BLS to patch of "drm/mediatek: update display module connections"
-> - Move _dsi_irq_wait_queue into platform driver data
-> - Move mtk_dsi_irq_data_clear() to patch of "drm/mediatek: add dsi interrupt control"
-> - Add more descriptions in the commit messages
-> 
-> Changes since v6:
-> - Change data type of irq_data to u32
-> - Rewrite mtk_dsi_host_transfer() for simplify
-> - Move some MIPI_TX config to patch of "drm/mediatek: add *driver_data for different hardware settings".
-> - Remove device tree from this patch series
-> 
-> Changes since v5:
-> - Remove DPI device tree and compatible string
-> - Use one wait queue to handle interrupt status
-> - Update the interrupt check flow and DSI_INT_ALL_BITS
-> - Use same function for host read/write command
-> - various fixes
-> 
-> Changes since v4:
-> - Add messages when timeout in mtk_disp_mutex_acquire()
-> - Add descriptions for DISP_REG_MUTEX registers
-> - Move connection settings for display modules to a separate patch
-> - Remove 'mt2701-disp-wdma' because it is unused
-> - Move cleaning up and renaming to a separate patch
-> - Use wait_event_interruptible_timeout() to replace polling
-> - Remove irq_num from mtk_dsi structure
-> - Remove redundant and debug codes
-> 
-> Changes since v3:
-> - Add DSI support for MIPI DSI panels
-> - Update BLS binding to PWM nodes
-> - Remove ufoe device nodes
-> - Remove redundant parentheses
-> - Remove global variable initialization
-> 
-> Changes since v2:
-> - Rename mtk_ddp_mux_sel to mtk_ddp_sout_sel
-> - Update mt2701_mtk_ddp_ext components
-> - Changed to prefix naming
-> - Reorder the patch series
-> - Use of_device_get_match_data() to get driver private data
-> - Use iopoll macros to implement mtk_disp_mutex_acquire()
-> - Removed empty device tree nodes
-> 
-> Changes since v1:
-> - Removed BLS bindings and codes, which belong to pwm driver
-> - Moved mtk_disp_mutex_acquire() just before mtk_crtc_ddp_config()
-> - Split patch into smaller parts
-> - Added const keyword to constant structure
-> - Removed codes for special memory align
-> 
-> Thanks,
-> yt.shen
-> 
-> YT Shen (11):
->   drm/mediatek: add helpers for coverting from the generic components
->   drm/mediatek: add *driver_data for different hardware settings
->   drm/mediatek: add shadow register support
->   drm/mediatek: add BLS component
->   drm/mediatek: update display module connections
->   drm/mediatek: cleaning up and refine
->   drm/mediatek: add mipi_tx data rate check
->   drm/mediatek: add dsi ulp mode control
->   drm/mediatek: add dsi rxtx control
->   drm/mediatek: update DSI sub driver flow for sending commands to panel
->   drm/mediatek: add support for Mediatek SoC MT2701
-> 
-> shaoming chen (2):
->   drm/mediatek: add dsi interrupt control
->   drm/mediatek: add dsi transfer function
-> 
->  drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |  64 +++--
->  drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |  39 ++-
->  drivers/gpu/drm/mediatek/mtk_drm_crtc.c     |  76 +++--
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c      | 138 ++++++---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.h      |   2 +
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |  41 ++-
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |   7 +
->  drivers/gpu/drm/mediatek/mtk_drm_drv.c      |  54 +++-
->  drivers/gpu/drm/mediatek/mtk_drm_drv.h      |   9 +
->  drivers/gpu/drm/mediatek/mtk_dsi.c          | 430 ++++++++++++++++++++++++----
->  drivers/gpu/drm/mediatek/mtk_mipi_tx.c      |  42 ++-
->  11 files changed, 737 insertions(+), 165 deletions(-)
-> 
+Eventually, I went the same way as omap/hdmi5: different driver.
+
+>   - The fact that you ignored Rob (v6) and I (v5) comment on using OF
+>     graph to model the connection between the display engine and the
+>     TCON. Something that Laurent also pointed out in this version.
+
+I simply use the drm function drm_of_component_probe().
+If this one is in the DRM core, why should I not use it?
+If it must not be used, it would be nice to mark it as deprecated and
+to update the code of the drivers which are using it.
+
+>   - The fact that you ignored that you needed an HDMI connector node
+>     as a child of the HDMI controller. This has been reported by Rob
+>     (v6) and yet again in this version by Laurent.
+
+As I don't know what is a DT 'connector', I cannot go further.
+I hope Laurent will give me clearer explanations and a real example.
+
+>   - And finally the fact that we can't have several display engine in
+>     parallel, if needs be. This has happened in the past already on
+>     Allwinner SoCs, so it's definitely something we should consider in
+>     the DT bindings, since we can't break them.
+
+IIRC, I proposed my driver before yours, and the DE2 is completely
+different from the other display engines.
+What you are telling is "add more code to already complex code and have
+a big driver for all SoCs in each kernels".
+I think it should be better to have small modules, each one treating
+specific hardware, and to let only the needed code in the kernel memory
+at startup time.
+
+> Until those are fixed, I cannot see how this driver can be merged,
+> unfortunately.
+
+No problem. I just wanted to help people by giving the job I did on the
+boards I have. My boards are working for almost one year, fine enough
+for I use them as daily desktop computers. I don't want to spend one
+more year for having my code in the Linux kernel: there are so much
+other exciting things to do...
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
