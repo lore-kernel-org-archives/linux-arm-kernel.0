@@ -1,64 +1,52 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Wed, 30 Nov 2016 14:42:39 +0800
-Subject: [PATCH v10 02/13] drm/mediatek: add *driver_data for different
- hardware settings
-In-Reply-To: <1480070076-6196-3-git-send-email-yt.shen@mediatek.com>
-References: <1480070076-6196-1-git-send-email-yt.shen@mediatek.com>
- <1480070076-6196-3-git-send-email-yt.shen@mediatek.com>
-Message-ID: <CAGS+omDmMq7AEnyDzo4Oih_f+g4DE1Jz6xiV=+_3JGtSAfd+-Q@mail.gmail.com>
+From: kilobyte@angband.pl (Adam Borowski)
+Date: Wed, 30 Nov 2016 07:52:53 +0100
+Subject: [RFC3 nowrap: PATCH v7 00/18] ILP32 for ARM64
+In-Reply-To: <20161130050209.GB18796@yury-N73SV>
+References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+ <20161130050209.GB18796@yury-N73SV>
+Message-ID: <20161130065253.GA21237@angband.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi YT,
+On Wed, Nov 30, 2016 at 10:32:09AM +0530, Yury Norov wrote:
+> On Fri, Oct 21, 2016 at 11:32:59PM +0300, Yury Norov wrote:
+> > This series enables aarch64 with ilp32 mode, and as supporting work,
+> > introduces ARCH_32BIT_OFF_T configuration option that is enabled for
+> > existing 32-bit architectures but disabled for new arches (so 64-bit
+> > off_t is is used by new userspace).
+> 
+> Hi all,
+> 
+> Steve Ellcey submitted glibc patches for ILP32:
+> https://www.sourceware.org/ml/libc-alpha/2016-11/msg01071.html
+> It implicitly assumes that kernel clears top halves of registers for
+> all syscalls in assembly entry. That patches are going to be taken.
+> It it happens, we will have no choice on kernel side how to clear top
+> halves anymore.
+
+Since a while ago, there's a package "arch-test" in Debian that empirically
+enumerates architectures executable by the running kernel (and loaded
+binfmts), by trying small test programs for each.  The list of architectures
+it knows does include arm64ilp32.
+
+For most archs the test is just {write(1, "ok\n"); _exit(0);} unless there's
+some difference from baseline that should be checked for, like dmb (ARMv7)
+on armhf or mtvsrd (POWER8) on ppc64el.  I could scribble in the top half of
+a register to test the delousing, but it's not like alternate versions of
+the ABI are expected in the wild...
 
 
-On Fri, Nov 25, 2016 at 6:34 PM, YT Shen <yt.shen@mediatek.com> wrote:
->
-> There are some hardware settings changed, between MT8173 & MT2701:
-> DISP_OVL address offset changed, color format definition changed.
-> DISP_RDMA fifo size changed.
-> DISP_COLOR offset changed.
-> MIPI_TX pll setting changed.
-> And add prefix for mtk_ddp_main & mtk_ddp_ext & mutex_mod.
+There's another issue: name.  A stalled request to add it to dpkg's cputable
+(https://bugs.debian.org/824742) uses "arm64ilp32" and "arm64ilp32be" which
+are unwieldy.  Even the discussion uses "ilp32" -- probably too generic. 
+https://wiki.linaro.org/Platform/arm64-ilp32 mentions both.  I've heard
+"a32" somewhere.  I have no stake here (I'm on the CC list as a x32 not arm
+porter...), but if you want to choose a color for this bikeshed, the time
+is now.
 
-Sorry, I have not had time to thoroughly review the new patch set, but
-one quick comment:
 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> index 22a33ee..cfaa760 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> @@ -78,6 +78,10 @@ struct mtk_ddp_comp_funcs {
->                           struct drm_crtc_state *state);
->  };
->
-> +struct mtk_ddp_comp_driver_data {
-> +       unsigned int color_offset;
-> +};
-> +
->  struct mtk_ddp_comp {
->         struct clk *clk;
->         void __iomem *regs;
-> @@ -85,6 +89,7 @@ struct mtk_ddp_comp {
->         struct device *larb_dev;
->         enum mtk_ddp_comp_id id;
->         const struct mtk_ddp_comp_funcs *funcs;
-> +       const struct mtk_ddp_comp_driver_data *data;
-
-I want to avoid adding this generic pointer here to all mtk_ddp_comp,
-since this is only used by the color component.
-Instead, define color specific types:
-
-struct mtk_disp_color_data {
-       unsigned int offset;
-};
-
-struct mtk_disp_color {
-       struct mtk_ddp_comp             ddp_comp;
-       const struct mtk_disp_color_data *data;
-};
-
-Then, add another comp_type check and fetch the dev data in
-mtk_drm_probe()  or maybe mtk_ddp_comp_init().
-
--Dan
+Meow!
+-- 
+The bill declaring Jesus as the King of Poland fails to specify whether
+the addition is at the top or end of the list of kings.  What should the
+historians do?
