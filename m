@@ -1,54 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Nov 2016 18:00:23 +0100
-Subject: [GIT PULL 3/6] Broadcom devicetree-arm64 changes for 4.10
-In-Reply-To: <20161122054824.16974-3-f.fainelli@gmail.com>
-References: <20161122054824.16974-1-f.fainelli@gmail.com>
- <20161122054824.16974-3-f.fainelli@gmail.com>
-Message-ID: <6243216.EMKdABgK8f@wuerfel>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Wed, 30 Nov 2016 09:01:14 -0800
+Subject: [PATCH] soc: ti: qmss: fix the case when !SMP
+In-Reply-To: <5501170.dgvo5UdPBX@wuerfel>
+References: <20161129221508.10551-1-grygorii.strashko@ti.com>
+ <5501170.dgvo5UdPBX@wuerfel>
+Message-ID: <2531f769-dd28-dfbd-0ed7-b209ef6ae98d@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 21, 2016 9:48:21 PM CET Florian Fainelli wrote:
-> This pull request contains Broadcom ARM64 based SoC Device Tree changes for
-> 4.10, please pull the following:
-> 
-> - Robin updates the Northstart 2 DTS to use the generic IOMMU binding
-> 
-> - Scott renames the Broadcom Northstar 2 binding document to use a standard name
->   including the brcm vendor prefix
-> 
-> - Kamal adds the QSPI Device Tree node to the Northstar 2 SoC and updates the
->   Northstar 2 SVK reference board DTS file with it enabled.
-> 
-> - Rob adds the Device Tree node for the Broadcom PDC (mailbox) hardware to the
->   Northstar 2 SoC
-> 
-> - Jon enables the SDIO1 block and adds proper PCIe PHYs Device Tree nodes to the
->   Northstar 2 SoC
-> 
-> - Ray adds required properties NAND controller properties to make NAND work on
->   the Northstar 2 SVK board, this was submitted as a 4.9 fixes and is included
->   here to resolve DTS file merges
-> 
-> - Andrea removes an incorrect power LED from the Raspberry Pi 3 DTS
-> 
-> - Andreas fixes the compatible string for the BCM2837 (Raspberry Pi 3)
-> 
-> - Eric defines standard pinctrl groups in the BCM2835 GPIO node
-> 
-> - Gerd adds definitions for the pinctrl groups and updates the PWM, I2C and SDHCI nodes
->   to use their appropriate pinctrl functions
-> 
-> - Linus adds names for the Raspberry Pi GPIO lines based on the datasheet
-> 
-> - Martin adds the DT binding and nodes for the Raspberry Pi firmware thermal block
-> 
-> - Stefan fixes a few typos with respect to the BCM2835 mailbox binding example and
->   Device Tree nodes he also uses the proper DTSI file to define the USB host mode
->   for the USB Device Tree nodes
-> 
-> 
+Hi Grygorii,
 
-Pulled into next/dt64, thanks!
+On 11/30/2016 3:37 AM, Arnd Bergmann wrote:
+> On Tuesday, November 29, 2016 4:15:08 PM CET Grygorii Strashko wrote:
+>>                 range->num_irqs++;
+>>
+>> -               if (oirq.args_count == 3)
+>> +               if (IS_ENABLED(SMP) && oirq.args_count == 3)
+>>                         range->irqs[i].cpu_map =
+>>                                 (oirq.args[2] & 0x0000ff00) >> 8;
+>>
+>
+> I think you mean CONFIG_SMP, not SMP. With the change above, the
+> code will never be executed.
+>
+Is that the full patch ? Can you post updated patch wit above fixed
+and copy me. I will pick it up.
 
-	Arnd
+Regards,
+Santosh
