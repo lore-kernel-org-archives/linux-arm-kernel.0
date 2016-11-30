@@ -1,37 +1,44 @@
-From: rick.chang@mediatek.com (Rick Chang)
-Date: Wed, 30 Nov 2016 11:09:00 +0800
-Subject: [PATCH v8 4/4] vcodec: mediatek: Add Maintainers entry for Mediatek
- JPEG driver
-In-Reply-To: <1480475340-21893-1-git-send-email-rick.chang@mediatek.com>
-References: <1480475340-21893-1-git-send-email-rick.chang@mediatek.com>
-Message-ID: <1480475340-21893-5-git-send-email-rick.chang@mediatek.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 30 Nov 2016 11:22:42 +0800
+Subject: [PATCH v9 15/16] drivers: acpi: iort: add single mapping function
+In-Reply-To: <20161121100148.24769-16-lorenzo.pieralisi@arm.com>
+References: <20161121100148.24769-1-lorenzo.pieralisi@arm.com>
+ <20161121100148.24769-16-lorenzo.pieralisi@arm.com>
+Message-ID: <dad19582-43ce-3882-1592-c99ee96d07fb@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rick Chang <rick.chang@mediatek.com>
-Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-Signed-off-by: Bin Liu <bin.liu@mediatek.com>
----
- MAINTAINERS | 7 +++++++
- 1 file changed, 7 insertions(+)
+On 2016/11/21 18:01, Lorenzo Pieralisi wrote:
+> The current IORT id mapping API requires components to provide
+> an input requester ID (a Bus-Device-Function (BDF) identifier for
+> PCI devices) to translate an input identifier to an output
+> identifier through an IORT range mapping.
+>
+> Named components do not have an identifiable source ID therefore
+> their respective input/output mapping can only be defined in
+> IORT tables through single mappings, that provide a translation
+> that does not require any input identifier.
+>
+> Current IORT interface for requester id mappings (iort_node_map_rid())
+> is not suitable for components that do not provide a requester id,
+> so it cannot be used for IORT named components.
+>
+> Add an interface to the IORT API to enable retrieval of id
+> by allowing an indexed walk of the single mappings array for
+> a given component, therefore completing the IORT mapping API.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Reviewed-by: Tomasz Nowicki <tn@semihalf.com>
+> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Tested-by: Tomasz Nowicki <tn@semihalf.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Tomasz Nowicki <tn@semihalf.com>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> ---
+>  drivers/acpi/arm64/iort.c | 39 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 93e9f42..6f68fb6 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7818,6 +7818,13 @@ L:	netdev at vger.kernel.org
- S:	Maintained
- F:	drivers/net/ethernet/mediatek/
- 
-+MEDIATEK JPEG DRIVER
-+M:	Rick Chang <rick.chang@mediatek.com>
-+M:	Bin Liu <bin.liu@mediatek.com>
-+S:	Supported
-+F:	drivers/media/platform/mtk-jpeg/
-+F:	Documentation/devicetree/bindings/media/mediatek-jpeg-decoder.txt
-+
- MEDIATEK MEDIA DRIVER
- M:	Tiffany Lin <tiffany.lin@mediatek.com>
- M:	Andrew-CT Chen <andrew-ct.chen@mediatek.com>
--- 
-1.9.1
+Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+Thanks
+Hanjun
