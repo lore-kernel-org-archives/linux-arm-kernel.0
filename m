@@ -1,164 +1,310 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 30 Nov 2016 17:30:47 -0600
-Subject: [PATCH 1/3] of: Support parsing phandle argument lists through a
- nexus node
-In-Reply-To: <20161124102529.20212-2-stephen.boyd@linaro.org>
-References: <20161124102529.20212-1-stephen.boyd@linaro.org>
- <20161124102529.20212-2-stephen.boyd@linaro.org>
-Message-ID: <CAL_JsqKZ_Ohcdi0n6XU+5=3o6OwC=r_5Cv1=gx7mytUUVd2dzA@mail.gmail.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Wed, 30 Nov 2016 15:42:53 -0800
+Subject: [PATCH v3] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe controller
+Message-ID: <1480549373-2123-1-git-send-email-dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2016 at 4:25 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
-> Platforms like 96boards have a standardized connector/expansion
-> slot that exposes signals like GPIOs to expansion boards in an
-> SoC agnostic way. We'd like the DT overlays for the expansion
-> boards to be written once without knowledge of the SoC on the
-> other side of the connector. This avoids the unscalable
-> combinatorial explosion of a different DT overlay for each
-> expansion board and SoC pair.
->
-> We need a way to describe the GPIOs routed through the connector
-> in an SoC agnostic way. Let's introduce nexus property parsing
-> into the OF core to do this. This is largely based on the
-> interrupt nexus support we already have. This allows us to remap
-> a phandle list in a consumer node (e.g. reset-gpios) through a
-> connector in a generic way (e.g. via gpio-map). Do this in a
-> generic routine so that we can remap any sort of variable length
-> phandle list.
->
-> Taking GPIOs as an example, the connector would be a GPIO nexus,
-> supporting the remapping of a GPIO specifier space to multiple
-> GPIO providers on the SoC. DT would look as shown below, where
-> 'soc_gpio1' and 'soc_gpio2' are inside the SoC, 'connector' is an
-> expansion port where boards can be plugged in, and
-> 'expansion_device' is a device on the expansion board.
->
->         soc {
->                 soc_gpio1: gpio-controller1 {
->                         #gpio-cells = <2>;
->                 };
->
->                 soc_gpio2: gpio-controller2 {
->                         #gpio-cells = <2>;
->                 };
->         };
->
->         connector: connector {
->                 #gpio-cells = <2>;
->                 gpio-map = <0 GPIO_ACTIVE_LOW &soc_gpio1 1 GPIO_ACTIVE_LOW>,
->                            <1 GPIO_ACTIVE_LOW &soc_gpio2 4 GPIO_ACTIVE_LOW>,
->                            <2 GPIO_ACTIVE_LOW &soc_gpio1 3 GPIO_ACTIVE_LOW>,
->                            <3 GPIO_ACTIVE_LOW &soc_gpio2 2 GPIO_ACTIVE_LOW>;
->                 gpio-map-mask = <0xf 0x1>;
+PCIe controllers in X-Gene SoCs is not ECAM compliant: software
+needs to configure additional controller's register to address
+device at bus:dev:function.
 
-I think the common case is something more like this:
+The quirk will only be applied for X-Gene PCIe MCFG table with
+OEM revison 1, 2, 3 or 4 (PCIe controller v1 and v2 on X-Gene SoCs).
 
-                 gpio-map = <0 0 &soc_gpio1 1 0>,
-                            <1 0 &soc_gpio2 4 0>,
-                            <2 0 &soc_gpio1 3 0>,
-                            <3 0 &soc_gpio2 2 0>;
-                 gpio-map-mask = <0xf 0>;
+The quirk declares the X-Gene PCIe controller register space as 64KB
+fixed memory resource with name "PCIe CSR". This name will be showed
+next to the resource range in the output of "cat /proc/iomem".
 
-where we want to pass the 2nd cell of the consumer (e.g. reset-gpios)
-thru. So here the GPIO_ACTIVE_LOW flag below needs to pass thru to
-&soc_gpio1. Otherwise, the gpio-map is has to enumerate every possible
-combination or it will be specific to the daughterboard's usage.
+Signed-off-by: Duc Dang <dhdang@apm.com>
+---
+v3:
+  - Rebase on top of pci/ecam-v6 tree.
+  - Use DEFINE_RES_MEM_NAMED to declare controller register space
+  with name "PCIe CSR"
+v2:
+  RFC v2: https://patchwork.ozlabs.org/patch/686846/
+v1:
+  RFC v1: https://patchwork.kernel.org/patch/9337115/
 
-Also, GPIO cells are pretty well standardized, but some cases may need
-a translation function which I guess would be part of a connector
-driver. I don't think that affects the binding nor needs to be solved
-now, but just want to raise that possibility.
+ drivers/acpi/pci_mcfg.c      |  31 ++++++++
+ drivers/pci/host/pci-xgene.c | 165 ++++++++++++++++++++++++++++++++++++++++++-
+ include/linux/pci-ecam.h     |   7 ++
+ 3 files changed, 200 insertions(+), 3 deletions(-)
 
->         };
->
->         expansion_device {
->                 reset-gpios = <&connector 2 GPIO_ACTIVE_LOW>;
->         };
->
-> The GPIO core would use of_parse_phandle_with_args_map() instead
-> of of_parse_phandle_with_args() and arrive at the same type of
-> result, a phandle and argument list. The difference is that the
-> phandle and arguments will be remapped through the nexus node to
-> the underlying SoC GPIO controller node. In the example above,
-> we would remap 'reset-gpios' from <&connector 2 GPIO_ACTIVE_LOW>
-> to <&soc_gpio1 3 GPIO_ACTIVE_LOW>.
-
-GPIOs also are interrupts frequently, so we need to make sure
-interrupt translation works too. It's a bit tricky as interrupt-map
-depends on #address-cells and #interrupt-cells. I think we just set
-the #address-cells to 0 on the connector node and it will be fine. We
-may need the same pass thru of flags though.
-
->
-> Cc: Pantelis Antoniou <pantelis.antoniou@konsulko.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Mark Brown <broonie@kernel.org>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
->  drivers/of/base.c  | 146 +++++++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of.h |  14 +++++
->  2 files changed, 160 insertions(+)
->
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index d687e6de24a0..693b73f33675 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -1772,6 +1772,152 @@ int of_parse_phandle_with_args(const struct device_node *np, const char *list_na
->  EXPORT_SYMBOL(of_parse_phandle_with_args);
->
->  /**
-> + * of_parse_phandle_with_args_map() - Find a node pointed by phandle in a list and remap it
-> + * @np:                pointer to a device tree node containing a list
-> + * @list_name: property name that contains a list
-> + * @cells_name:        property name that specifies phandles' arguments count
-> + * @index:     index of a phandle to parse out
-> + * @out_args:  optional pointer to output arguments structure (will be filled)
-> + *
-> + * This function is useful to parse lists of phandles and their arguments.
-> + * Returns 0 on success and fills out_args, on error returns appropriate
-> + * errno value.
-> + *
-> + * Caller is responsible to call of_node_put() on the returned out_args->np
-> + * pointer.
-> + *
-> + * Example:
-> + *
-> + * phandle1: node1 {
-> + *     #list-cells = <2>;
-> + * }
-> + *
-> + * phandle2: node2 {
-> + *     #list-cells = <1>;
-> + * }
-> + *
-> + * phandle3: node3 {
-> + *     #list-cells = <1>;
-> + *     list-map = <0 &phandle2 3>,
-> + *                <1 &phandle2 2>,
-> + *                <2 &phandle1 5 1>;
-> + *     list-map-mask = <0x3>;
-> + * };
-> + *
-> + * node4 {
-> + *     list = <&phandle1 1 2 &phandle3 0>;
-> + * }
-> + *
-> + * To get a device_node of the `node2' node you may call this:
-> + * of_parse_phandle_with_args(node4, "list", "#list-cells", "list-map",
-> + *                           "list-map-mask", 1, &args);
-> + */
-> +int of_parse_phandle_with_args_map(const struct device_node *np,
-> +                                  const char *list_name,
-> +                                  const char *cells_name,
-> +                                  const char *map_name,
-> +                                  const char *mask_name,
-
-Perhaps these 3 could be just a single base name (e.g. "gpio")?
-Doesn't really buy much other than enforce we don't mix 'gpios' and
-'gpio'. That could never happen. ;)
-
-> +                                  int index, struct of_phandle_args *out_args)
-> +{
-
-Rob
+diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+index ac21db3..eb6125b 100644
+--- a/drivers/acpi/pci_mcfg.c
++++ b/drivers/acpi/pci_mcfg.c
+@@ -57,6 +57,37 @@ struct mcfg_fixup {
+ 	{ "QCOM  ", "QDF2432 ", 1, 5, MCFG_BUS_ANY, &pci_32b_ops },
+ 	{ "QCOM  ", "QDF2432 ", 1, 6, MCFG_BUS_ANY, &pci_32b_ops },
+ 	{ "QCOM  ", "QDF2432 ", 1, 7, MCFG_BUS_ANY, &pci_32b_ops },
++
++#ifdef CONFIG_PCI_XGENE
++#define XGENE_V1_ECAM_MCFG(rev, seg) \
++	{"APM   ", "XGENE   ", rev, seg, MCFG_BUS_ANY, \
++		&xgene_v1_pcie_ecam_ops }
++#define XGENE_V2_1_ECAM_MCFG(rev, seg) \
++	{"APM   ", "XGENE   ", rev, seg, MCFG_BUS_ANY, \
++		&xgene_v2_1_pcie_ecam_ops }
++#define XGENE_V2_2_ECAM_MCFG(rev, seg) \
++	{"APM   ", "XGENE   ", rev, seg, MCFG_BUS_ANY, \
++		&xgene_v2_2_pcie_ecam_ops }
++
++	/* X-Gene SoC with v1 PCIe controller */
++	XGENE_V1_ECAM_MCFG(1, 0),
++	XGENE_V1_ECAM_MCFG(1, 1),
++	XGENE_V1_ECAM_MCFG(1, 2),
++	XGENE_V1_ECAM_MCFG(1, 3),
++	XGENE_V1_ECAM_MCFG(1, 4),
++	XGENE_V1_ECAM_MCFG(2, 0),
++	XGENE_V1_ECAM_MCFG(2, 1),
++	XGENE_V1_ECAM_MCFG(2, 2),
++	XGENE_V1_ECAM_MCFG(2, 3),
++	XGENE_V1_ECAM_MCFG(2, 4),
++	/* X-Gene SoC with v2.1 PCIe controller */
++	XGENE_V2_1_ECAM_MCFG(3, 0),
++	XGENE_V2_1_ECAM_MCFG(3, 1),
++	/* X-Gene SoC with v2.2 PCIe controller */
++	XGENE_V2_2_ECAM_MCFG(4, 0),
++	XGENE_V2_2_ECAM_MCFG(4, 1),
++	XGENE_V2_2_ECAM_MCFG(4, 2),
++#endif
+ };
+ 
+ static char mcfg_oem_id[ACPI_OEM_ID_SIZE];
+diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+index 1de23d7..43d7c69 100644
+--- a/drivers/pci/host/pci-xgene.c
++++ b/drivers/pci/host/pci-xgene.c
+@@ -27,6 +27,8 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_pci.h>
+ #include <linux/pci.h>
++#include <linux/pci-acpi.h>
++#include <linux/pci-ecam.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ 
+@@ -64,6 +66,7 @@
+ /* PCIe IP version */
+ #define XGENE_PCIE_IP_VER_UNKN		0
+ #define XGENE_PCIE_IP_VER_1		1
++#define XGENE_PCIE_IP_VER_2		2
+ 
+ struct xgene_pcie_port {
+ 	struct device_node	*node;
+@@ -97,7 +100,15 @@ static inline u32 pcie_bar_low_val(u32 addr, u32 flags)
+  */
+ static void __iomem *xgene_pcie_get_cfg_base(struct pci_bus *bus)
+ {
+-	struct xgene_pcie_port *port = bus->sysdata;
++	struct pci_config_window *cfg;
++	struct xgene_pcie_port *port;
++
++	if (acpi_disabled)
++		port = bus->sysdata;
++	else {
++		cfg = bus->sysdata;
++		port = cfg->priv;
++	}
+ 
+ 	if (bus->number >= (bus->primary + 1))
+ 		return port->cfg_base + AXI_EP_CFG_ACCESS;
+@@ -111,10 +122,18 @@ static void __iomem *xgene_pcie_get_cfg_base(struct pci_bus *bus)
+  */
+ static void xgene_pcie_set_rtdid_reg(struct pci_bus *bus, uint devfn)
+ {
+-	struct xgene_pcie_port *port = bus->sysdata;
++	struct pci_config_window *cfg;
++	struct xgene_pcie_port *port;
+ 	unsigned int b, d, f;
+ 	u32 rtdid_val = 0;
+ 
++	if (acpi_disabled)
++		port = bus->sysdata;
++	else {
++		cfg = bus->sysdata;
++		port = cfg->priv;
++	}
++
+ 	b = bus->number;
+ 	d = PCI_SLOT(devfn);
+ 	f = PCI_FUNC(devfn);
+@@ -158,7 +177,15 @@ static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+ static int xgene_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
+ 				    int where, int size, u32 *val)
+ {
+-	struct xgene_pcie_port *port = bus->sysdata;
++	struct pci_config_window *cfg;
++	struct xgene_pcie_port *port;
++
++	if (acpi_disabled)
++		port = bus->sysdata;
++	else {
++		cfg = bus->sysdata;
++		port = cfg->priv;
++	}
+ 
+ 	if (pci_generic_config_read32(bus, devfn, where & ~0x3, 4, val) !=
+ 	    PCIBIOS_SUCCESSFUL)
+@@ -189,6 +216,138 @@ static int xgene_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
+ 	.write = pci_generic_config_write32,
+ };
+ 
++#ifdef CONFIG_ACPI
++static struct resource xgene_v1_csr_res[] = {
++	[0] = DEFINE_RES_MEM_NAMED(0x1f2b0000UL, SZ_64K, "PCIe CSR"),
++	[1] = DEFINE_RES_MEM_NAMED(0x1f2c0000UL, SZ_64K, "PCIe CSR"),
++	[2] = DEFINE_RES_MEM_NAMED(0x1f2d0000UL, SZ_64K, "PCIe CSR"),
++	[3] = DEFINE_RES_MEM_NAMED(0x1f500000UL, SZ_64K, "PCIe CSR"),
++	[4] = DEFINE_RES_MEM_NAMED(0x1f510000UL, SZ_64K, "PCIe CSR"),
++};
++
++static int xgene_v1_pcie_ecam_init(struct pci_config_window *cfg)
++{
++	struct acpi_device *adev = to_acpi_device(cfg->parent);
++	struct acpi_pci_root *root = acpi_driver_data(adev);
++	struct device *dev = cfg->parent;
++	struct xgene_pcie_port *port;
++	struct resource *csr;
++
++	port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
++	if (!port)
++		return -ENOMEM;
++
++	csr = &xgene_v1_csr_res[root->segment];
++	port->csr_base = devm_ioremap_resource(dev, csr);
++	if (IS_ERR(port->csr_base)) {
++		kfree(port);
++		return -ENOMEM;
++	}
++
++	port->cfg_base = cfg->win;
++	port->version = XGENE_PCIE_IP_VER_1;
++
++	cfg->priv = port;
++
++	return 0;
++}
++
++struct pci_ecam_ops xgene_v1_pcie_ecam_ops = {
++	.bus_shift      = 16,
++	.init           = xgene_v1_pcie_ecam_init,
++	.pci_ops        = {
++		.map_bus        = xgene_pcie_map_bus,
++		.read           = xgene_pcie_config_read32,
++		.write          = pci_generic_config_write,
++	}
++};
++
++static struct resource xgene_v2_1_csr_res[] = {
++	[0] = DEFINE_RES_MEM_NAMED(0x1f2b0000UL, SZ_64K, "PCIe CSR"),
++	[1] = DEFINE_RES_MEM_NAMED(0x1f2c0000UL, SZ_64K, "PCIe CSR"),
++};
++
++static int xgene_v2_1_pcie_ecam_init(struct pci_config_window *cfg)
++{
++	struct acpi_device *adev = to_acpi_device(cfg->parent);
++	struct acpi_pci_root *root = acpi_driver_data(adev);
++	struct device *dev = cfg->parent;
++	struct xgene_pcie_port *port;
++	struct resource *csr;
++
++	port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
++	if (!port)
++		return -ENOMEM;
++
++	csr = &xgene_v2_1_csr_res[root->segment];
++	port->csr_base = devm_ioremap_resource(dev, csr);
++	if (IS_ERR(port->csr_base)) {
++		kfree(port);
++		return -ENOMEM;
++	}
++
++	port->cfg_base = cfg->win;
++	port->version = XGENE_PCIE_IP_VER_2;
++
++	cfg->priv = port;
++
++	return 0;
++}
++
++struct pci_ecam_ops xgene_v2_1_pcie_ecam_ops = {
++	.bus_shift      = 16,
++	.init           = xgene_v2_1_pcie_ecam_init,
++	.pci_ops        = {
++		.map_bus        = xgene_pcie_map_bus,
++		.read           = xgene_pcie_config_read32,
++		.write          = pci_generic_config_write,
++	}
++};
++
++static struct resource xgene_v2_2_csr_res[] = {
++	[0] = DEFINE_RES_MEM_NAMED(0x1f2b0000UL, SZ_64K, "PCIe CSR"),
++	[1] = DEFINE_RES_MEM_NAMED(0x1f500000UL, SZ_64K, "PCIe CSR"),
++	[2] = DEFINE_RES_MEM_NAMED(0x1f2d0000UL, SZ_64K, "PCIe CSR"),
++};
++
++static int xgene_v2_2_pcie_ecam_init(struct pci_config_window *cfg)
++{
++	struct acpi_device *adev = to_acpi_device(cfg->parent);
++	struct acpi_pci_root *root = acpi_driver_data(adev);
++	struct device *dev = cfg->parent;
++	struct xgene_pcie_port *port;
++	struct resource *csr;
++
++	port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
++	if (!port)
++		return -ENOMEM;
++
++	csr = &xgene_v2_2_csr_res[root->segment];
++	port->csr_base = devm_ioremap_resource(dev, csr);
++	if (IS_ERR(port->csr_base)) {
++		kfree(port);
++		return -ENOMEM;
++	}
++
++	port->cfg_base = cfg->win;
++	port->version = XGENE_PCIE_IP_VER_2;
++
++	cfg->priv = port;
++
++	return 0;
++}
++
++struct pci_ecam_ops xgene_v2_2_pcie_ecam_ops = {
++	.bus_shift      = 16,
++	.init           = xgene_v2_2_pcie_ecam_init,
++	.pci_ops        = {
++		.map_bus        = xgene_pcie_map_bus,
++		.read           = xgene_pcie_config_read32,
++		.write          = pci_generic_config_write,
++	}
++};
++#endif
++
+ static u64 xgene_pcie_set_ib_mask(struct xgene_pcie_port *port, u32 addr,
+ 				  u32 flags, u64 size)
+ {
+diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
+index f5740b7..47ab947 100644
+--- a/include/linux/pci-ecam.h
++++ b/include/linux/pci-ecam.h
+@@ -62,6 +62,13 @@ void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
+ /* ops for buggy ECAM that supports only 32-bit accesses */
+ extern struct pci_ecam_ops pci_32b_ops;
+ 
++/* ECAM ops for known quirks */
++#ifdef CONFIG_PCI_XGENE
++extern struct pci_ecam_ops xgene_v1_pcie_ecam_ops;
++extern struct pci_ecam_ops xgene_v2_1_pcie_ecam_ops;
++extern struct pci_ecam_ops xgene_v2_2_pcie_ecam_ops;
++#endif
++
+ #ifdef CONFIG_PCI_HOST_GENERIC
+ /* for DT-based PCI controllers that support ECAM */
+ int pci_host_common_probe(struct platform_device *pdev,
+-- 
+1.9.1
