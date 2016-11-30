@@ -1,67 +1,68 @@
 From: romain.perier@free-electrons.com (Romain Perier)
-Date: Wed, 30 Nov 2016 15:00:16 +0100
-Subject: [PATCH v6 3/4] arm64: dts: marvell: Add I2C definitions for the
- Armada 3700
+Date: Wed, 30 Nov 2016 15:00:14 +0100
+Subject: [PATCH v6 1/4] i2c: pxa: Add definition of fast and high speed modes
+ via the regs layout
 In-Reply-To: <20161130140017.26307-1-romain.perier@free-electrons.com>
 References: <20161130140017.26307-1-romain.perier@free-electrons.com>
-Message-ID: <20161130140017.26307-4-romain.perier@free-electrons.com>
+Message-ID: <20161130140017.26307-2-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 3700 has two i2c bus interface units, this commit adds the
-definitions of the corresponding device nodes. It also enables the node
-on the development board for this SoC.
+So far, the bit masks for the fast and high speed mode were statically
+defined. Some IP blocks might use different bits for these modes.
+
+This commit introduces new fields in order to enable the definition of
+different bit masks for these features. If these fields are undefined,
+ICR_FM and ICR_HS are selected to preserve backward compatibility with
+other IPs.
 
 Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-3720-db.dts |  4 ++++
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 18 ++++++++++++++++++
- 2 files changed, 22 insertions(+)
+ drivers/i2c/busses/i2c-pxa.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-index 1372e9a6..16d84af 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-@@ -62,6 +62,10 @@
- 	};
+diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+index e28b825..dc9d0a6 100644
+--- a/drivers/i2c/busses/i2c-pxa.c
++++ b/drivers/i2c/busses/i2c-pxa.c
+@@ -48,6 +48,8 @@ struct pxa_reg_layout {
+ 	u32 isar;
+ 	u32 ilcr;
+ 	u32 iwcr;
++	u32 fm;
++	u32 hs;
  };
  
-+&i2c0 {
-+	status = "okay";
-+};
-+
- /* CON3 */
- &sata {
- 	status = "okay";
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index e9bd587..1b0fd21 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -98,6 +98,24 @@
- 			/* 32M internal register @ 0xd000_0000 */
- 			ranges = <0x0 0x0 0xd0000000 0x2000000>;
+ enum pxa_i2c_types {
+@@ -193,6 +195,8 @@ struct pxa_i2c {
+ 	unsigned char		master_code;
+ 	unsigned long		rate;
+ 	bool			highmode_enter;
++	u32			fm_mask;
++	u32			hs_mask;
+ };
  
-+			i2c0: i2c at 11000 {
-+				compatible = "marvell,armada-3700-i2c";
-+				reg = <0x11000 0x24>;
-+				clocks = <&nb_periph_clk 10>;
-+				interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-+				mrvl,i2c-fast-mode;
-+				status = "disabled";
-+			};
+ #define _IBMR(i2c)	((i2c)->reg_ibmr)
+@@ -503,8 +507,8 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
+ 		writel(i2c->slave_addr, _ISAR(i2c));
+ 
+ 	/* set control register values */
+-	writel(I2C_ICR_INIT | (i2c->fast_mode ? ICR_FM : 0), _ICR(i2c));
+-	writel(readl(_ICR(i2c)) | (i2c->high_mode ? ICR_HS : 0), _ICR(i2c));
++	writel(I2C_ICR_INIT | (i2c->fast_mode ? i2c->fm_mask : 0), _ICR(i2c));
++	writel(readl(_ICR(i2c)) | (i2c->high_mode ? i2c->hs_mask : 0), _ICR(i2c));
+ 
+ #ifdef CONFIG_I2C_PXA_SLAVE
+ 	dev_info(&i2c->adap.dev, "Enabling slave mode\n");
+@@ -1234,6 +1238,9 @@ static int i2c_pxa_probe(struct platform_device *dev)
+ 	i2c->reg_idbr = i2c->reg_base + pxa_reg_layout[i2c_type].idbr;
+ 	i2c->reg_icr = i2c->reg_base + pxa_reg_layout[i2c_type].icr;
+ 	i2c->reg_isr = i2c->reg_base + pxa_reg_layout[i2c_type].isr;
++	i2c->fm_mask = pxa_reg_layout[i2c_type].fm ? pxa_reg_layout[i2c_type].fm : ICR_FM;
++	i2c->hs_mask = pxa_reg_layout[i2c_type].hs ? pxa_reg_layout[i2c_type].hs : ICR_HS;
 +
-+			i2c1: i2c at 11080 {
-+				compatible = "marvell,armada-3700-i2c";
-+				reg = <0x11080 0x24>;
-+				clocks = <&nb_periph_clk 9>;
-+				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
-+				mrvl,i2c-fast-mode;
-+				status = "disabled";
-+			};
-+
- 			uart0: serial at 12000 {
- 				compatible = "marvell,armada-3700-uart";
- 				reg = <0x12000 0x400>;
+ 	if (i2c_type != REGS_CE4100)
+ 		i2c->reg_isar = i2c->reg_base + pxa_reg_layout[i2c_type].isar;
+ 
 -- 
 2.9.3
