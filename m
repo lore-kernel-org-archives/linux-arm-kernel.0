@@ -1,120 +1,58 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Nov 2016 13:24:37 +0000
-Subject: [PATCH 3/4] crypto: arm64/aes-ce-ccm - fix decrypt path with new
- skcipher interface
-In-Reply-To: <20161130131407.GA3958@gondor.apana.org.au>
-References: <1480424733-10797-1-git-send-email-ard.biesheuvel@linaro.org>
- <1480424733-10797-3-git-send-email-ard.biesheuvel@linaro.org>
- <20161130131407.GA3958@gondor.apana.org.au>
-Message-ID: <CAKv+Gu-K7v8KwwH5eOkNsvaFSRsayA72mLiYEhQ5Q_Ur9kPZgQ@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 30 Nov 2016 13:27:35 +0000
+Subject: [PATCH 1/1] mach-omap2: fixing wrong strcat for Non-NULL
+ terminated string
+In-Reply-To: <1480502428-19509-1-git-send-email-maninder1.s@samsung.com>
+References: <1480502428-19509-1-git-send-email-maninder1.s@samsung.com>
+Message-ID: <20161130132735.GH23750@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 November 2016 at 13:14, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> On Tue, Nov 29, 2016 at 01:05:32PM +0000, Ard Biesheuvel wrote:
->> The new skcipher walk interface does not take into account whether we
->> are encrypting or decrypting. In the latter case, the walk should
->> disregard the MAC. Fix this in the arm64 CE driver.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> Thanks for the patch.  I'm going to build this into the AEAD walker
-> instead, by providing separate entry points for encryption and
-> decryption.  Like this,
->
+On Wed, Nov 30, 2016 at 04:10:28PM +0530, Maninder Singh wrote:
+> variable name can have Non NULL terminated string after cropping
+> which may result strcat to fail, and cropping is not
+> required if (strlen(oh->name) + 8 < MOD_CLK_MAX_NAME_LEN).
+> 
+> Issue caught with static analysis tool:
+> "Dangerous usage of 'name' (strncpy doesn't always 0-terminate it)"
 
-Yes, that's better, thanks
+Maybe switch to strlcpy() ?
 
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> 
+> Signed-off-by: Vaneet Narang <v.narang@samsung.com>
+> Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod.c | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 759e1d4..8adf272 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -742,12 +742,15 @@ static int _init_main_clk(struct omap_hwmod *oh)
+>  	char name[MOD_CLK_MAX_NAME_LEN];
+>  	struct clk *clk;
+>  
+> -	/* +7 magic comes from '_mod_ck' suffix */
+> -	if (strlen(oh->name) + 7 > MOD_CLK_MAX_NAME_LEN)
+> +	/* +8 magic comes from strlen("_mod_ck") added as suffix */
+> +	if (strlen(oh->name) + 8 > MOD_CLK_MAX_NAME_LEN) {
+>  		pr_warn("%s: warning: cropping name for %s\n", __func__,
+>  			oh->name);
+> +		strncpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - 8);
+> +		name[MOD_CLK_MAX_NAME_LEN - 8] = '\0';
+> +	} else
+> +		strcpy(name, oh->name);
+>  
+> -	strncpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - 7);
+>  	strcat(name, "_mod_ck");
+>  
+>  	clk = clk_get(NULL, name);
+> -- 
+> 1.9.1
+> 
 
-> ---8<---
-> Subject: crypto: skcipher - Add separate walker for AEAD decryption
->
-> The AEAD decrypt interface includes the authentication tag in
-> req->cryptlen.  Therefore we need to exlucde that when doing
-> a walk over it.
->
-> This patch adds separate walker functions for AEAD encryption
-> and decryption.
->
-> Signed-off-by: Herbert Xu <herbert@gondor.apana.org.au>
->
-> diff --git a/crypto/skcipher.c b/crypto/skcipher.c
-> index 5367f81..aca07c6 100644
-> --- a/crypto/skcipher.c
-> +++ b/crypto/skcipher.c
-> @@ -500,8 +500,8 @@ int skcipher_walk_async(struct skcipher_walk *walk,
->  }
->  EXPORT_SYMBOL_GPL(skcipher_walk_async);
->
-> -int skcipher_walk_aead(struct skcipher_walk *walk, struct aead_request *req,
-> -                      bool atomic)
-> +static int skcipher_walk_aead_common(struct skcipher_walk *walk,
-> +                                    struct aead_request *req, bool atomic)
->  {
->         struct crypto_aead *tfm = crypto_aead_reqtfm(req);
->         int err;
-> @@ -514,7 +514,6 @@ int skcipher_walk_aead(struct skcipher_walk *walk, struct aead_request *req,
->         scatterwalk_copychunks(NULL, &walk->in, req->assoclen, 2);
->         scatterwalk_copychunks(NULL, &walk->out, req->assoclen, 2);
->
-> -       walk->total = req->cryptlen;
->         walk->iv = req->iv;
->         walk->oiv = req->iv;
->
-> @@ -535,8 +534,36 @@ int skcipher_walk_aead(struct skcipher_walk *walk, struct aead_request *req,
->
->         return err;
->  }
-> +
-> +int skcipher_walk_aead(struct skcipher_walk *walk, struct aead_request *req,
-> +                      bool atomic)
-> +{
-> +       walk->total = req->cryptlen;
-> +
-> +       return skcipher_walk_aead_common(walk, req, atomic);
-> +}
->  EXPORT_SYMBOL_GPL(skcipher_walk_aead);
->
-> +int skcipher_walk_aead_encrypt(struct skcipher_walk *walk,
-> +                              struct aead_request *req, bool atomic)
-> +{
-> +       walk->total = req->cryptlen;
-> +
-> +       return skcipher_walk_aead_common(walk, req, atomic);
-> +}
-> +EXPORT_SYMBOL_GPL(skcipher_walk_aead_encrypt);
-> +
-> +int skcipher_walk_aead_decrypt(struct skcipher_walk *walk,
-> +                              struct aead_request *req, bool atomic)
-> +{
-> +       struct crypto_aead *tfm = crypto_aead_reqtfm(req);
-> +
-> +       walk->total = req->cryptlen - crypto_aead_authsize(tfm);
-> +
-> +       return skcipher_walk_aead_common(walk, req, atomic);
-> +}
-> +EXPORT_SYMBOL_GPL(skcipher_walk_aead_decrypt);
-> +
->  static unsigned int crypto_skcipher_extsize(struct crypto_alg *alg)
->  {
->         if (alg->cra_type == &crypto_blkcipher_type)
-> diff --git a/include/crypto/internal/skcipher.h b/include/crypto/internal/skcipher.h
-> index d55041f..8735979 100644
-> --- a/include/crypto/internal/skcipher.h
-> +++ b/include/crypto/internal/skcipher.h
-> @@ -149,6 +149,10 @@ int skcipher_walk_async(struct skcipher_walk *walk,
->                         struct skcipher_request *req);
->  int skcipher_walk_aead(struct skcipher_walk *walk, struct aead_request *req,
->                        bool atomic);
-> +int skcipher_walk_aead_encrypt(struct skcipher_walk *walk,
-> +                              struct aead_request *req, bool atomic);
-> +int skcipher_walk_aead_decrypt(struct skcipher_walk *walk,
-> +                              struct aead_request *req, bool atomic);
->  void skcipher_walk_complete(struct skcipher_walk *walk, int err);
->
->  static inline void ablkcipher_request_complete(struct ablkcipher_request *req,
-> --
-> Email: Herbert Xu <herbert@gondor.apana.org.au>
-> Home Page: http://gondor.apana.org.au/~herbert/
-> PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
