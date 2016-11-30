@@ -1,46 +1,42 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 30 Nov 2016 10:21:34 +0000
-Subject: question about irq_enter()/irq_exit() calling policy
-In-Reply-To: <22d0d991-bbe2-ce10-5202-3cdf97a9ecf2@ti.com>
-References: <22d0d991-bbe2-ce10-5202-3cdf97a9ecf2@ti.com>
-Message-ID: <20161130102134.GB14217@n2100.armlinux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 30 Nov 2016 10:37:14 +0000
+Subject: [RFC v3 00/10] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
+ reserved regions
+In-Reply-To: <6c9012fd-070b-6218-48e7-69b37f2559dd@redhat.com>
+References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
+ <6c9012fd-070b-6218-48e7-69b37f2559dd@redhat.com>
+Message-ID: <20161130103713.GB2724@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 05:47:12PM -0600, Grygorii Strashko wrote:
-> 2) Should these function be called for each processed irq?
+On Wed, Nov 30, 2016 at 10:49:33AM +0100, Auger Eric wrote:
+> On 15/11/2016 14:09, Eric Auger wrote:
+> > Following LPC discussions, we now report reserved regions through
+> > iommu-group sysfs reserved_regions attribute file.
+> > 
+> > Reserved regions are populated through the IOMMU get_resv_region callback
+> > (former get_dm_regions), now implemented by amd-iommu, intel-iommu and
+> > arm-smmu.
+> > 
+> > The intel-iommu reports the [FEE0_0000h - FEF0_000h] MSI window as an
+> > IOMMU_RESV_NOMAP reserved region.
+> > 
+> > arm-smmu reports the MSI window (arbitrarily located at 0x8000000 and
+> > 1MB large) and the PCI host bridge windows.
+> > 
+> > The series integrates a not officially posted patch from Robin:
+> > "iommu/dma: Allow MSI-only cookies".
+> > 
+> > This series currently does not address IRQ safety assessment.
 > 
+> I will respin this series taking into account Joerg's comment. Does
+> anyone have additional comments or want to put forward some conceptual
+> issues with the current direction and with this implementation?
 > 
-> HW IRQ:
->  switch (IRQ mode)
->   ...
->   while (irq = get_pending_irq()) {
->   	...
->   	irq_enter()
-> 		handle(irq) - execute hw_irq_hadler
->   	irq_exit()
->  }
->  ...
->  switch
+> As for the IRQ safety assessment, in a first step I would propose to
+> remove the IOMMU_CAP_INTR_REMAP from arm-smmus and consider the
+> assignment as unsafe. Any objection?
 
-We tend to do (2) as a general rule, which isn't much different from what
-other architectures do - even if they have a method to directly enter
-through vectors (eg, x86) the effect of two pending interrupts is that one
-will run after each other, and there will be an intervening exit -> entry.
+Well, yeah, because it's perfectly safe with GICv3.
 
-In the case of ARM CPUs, if the interrupt signal is active, you vector
-back to the interrupt handler as soon as you exit back to the parent
-context without executing any parent context instructions.
-
-So, we have the choice of going through all the IRQ entry code, processing
-one interrupt, and returning only to then re-vector back through the IRQ
-entry code, or we can process all the pending IRQs that we can see at that
-time.
-
-The former method wastes all the CPU cycles getting from the parent context
-to the IRQ context for each and every interrupt.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Will
