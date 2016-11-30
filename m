@@ -1,50 +1,106 @@
-From: wsa-dev@sang-engineering.com (Wolfram Sang)
-Date: Wed, 30 Nov 2016 17:23:53 +0100
-Subject: [PATCH v3 2/5] i2c: Add STM32F4 I2C driver
-In-Reply-To: <CAOAejn0BZNH82kY_7UR1EjV7M1G+9jGihGb4-uCs9=XiPHUYxQ@mail.gmail.com>
-References: <1466439771-2741-1-git-send-email-cedric.madianga@gmail.com>
- <1466439771-2741-3-git-send-email-cedric.madianga@gmail.com>
- <20160722070219.GB1605@katana>
- <CAOAejn0BZNH82kY_7UR1EjV7M1G+9jGihGb4-uCs9=XiPHUYxQ@mail.gmail.com>
-Message-ID: <20161130162353.GC1441@katana>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 30 Nov 2016 16:27:22 +0000
+Subject: [sample] A sample program for MRS emulation
+In-Reply-To: <1480518901-18544-11-git-send-email-suzuki.poulose@arm.com>
+References: <1480518901-18544-1-git-send-email-suzuki.poulose@arm.com>
+ <1480518901-18544-11-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20161130162720.GN1574@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Nov 30, 2016 at 03:15:01PM +0000, Suzuki K Poulose wrote:
+> Here is a sample program which demonstrates how to use mrs
+> emulation to fetch the ID registers.
 
-> I was too busy in another project but now I am ready to complete the
-> upstream of the STM32F4 I2C driver.
+Are we planning to add this in Documentation/?  If so, we might want
+some tweaks (noted below).
 
-Nice.
+> 
+> ----8>----
+> /*
+>  * Sample program to demonstrate the MRS emulation
+>  * ABI.
 
-> >> +static void stm32f4_i2c_set_periph_clk_freq(struct stm32f4_i2c_dev *i2c_dev)
-> >> +{
-> >> +     u32 clk_rate, cr2, freq;
-> >> +
-> >> +     cr2 = readl_relaxed(i2c_dev->base + STM32F4_I2C_CR2);
-> >> +     cr2 &= ~STM32F4_I2C_CR2_FREQ_MASK;
-> >> +
-> >> +     clk_rate = clk_get_rate(i2c_dev->clk);
-> >> +     freq = clk_rate / MHZ_TO_HZ;
-> >> +
-> >> +     if (freq > STM32F4_I2C_MAX_FREQ)
-> >> +             freq = STM32F4_I2C_MAX_FREQ;
-> >> +     if (freq < STM32F4_I2C_MIN_FREQ)
-> >> +             freq = STM32F4_I2C_MIN_FREQ;
-> >
-> > clamp() to enforce the range?
-> Sorry but what do you mean by "clamp()" ?
+overwrapped?
 
-The kernel has a clamp() function which would fit this purpose, I think.
+>  * Copyright (C) 2015-2016, ARM Ltd
+>  *
+>  * Author: Suzuki K Poulose <suzuki.poulose@arm.com>
+>  *
+>  * This program is free software; you can redistribute it and/or modify
+>  * it under the terms of the GNU General Public License version 2 as
+>  * published by the Free Software Foundation.
+>  *
+>  * This program is distributed in the hope that it will be useful,
+>  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>  * GNU General Public License for more details.
+>  * This program is free software; you can redistribute it and/or modify
+>  * it under the terms of the GNU General Public License version 2 as
+>  * published by the Free Software Foundation.
+>  *
+>  * This program is distributed in the hope that it will be useful,
+>  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>  * GNU General Public License for more details.
+>  */
+> 
+> #include <stdio.h>
+> 
+> #define get_cpu_ftr(id) ({					\
+> 		unsigned long long __val;			\
+> 		asm("mrs %0, "#id : "=r" (__val));		\
+> 		printf("%-20s: 0x%016lx\n", #id, __val);	\
+> 	})
+> 
+> int main()
 
-Regards,
+(void)
 
-   Wolfram
+> {
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161130/e13dca49/attachment.sig>
+We don't wan't people using the MRS emulation without checking for its
+availability first.
+
+Something like this may work (untested), with the caveat that getauxval()
+is a GNU libc extension, and other environments may require a different
+mechanism to obtain the hwcaps.
+
+--8<--
+
+#include <sys/auxv.h>
+#include <asm/hwcap.h>
+
+/* ... */
+
+	if (!getauxval(AT_HWCAP) & HWCAP_CPUID) {
+		fputs("CPUID registers unavailable\n", stderr);
+		return 1;
+	}
+
+-->8--
+
+Cheers
+---Dave
+
+> 
+> 	get_cpu_ftr(ID_AA64ISAR0_EL1);
+> 	get_cpu_ftr(ID_AA64ISAR1_EL1);
+> 	get_cpu_ftr(ID_AA64MMFR0_EL1);
+> 	get_cpu_ftr(ID_AA64MMFR1_EL1);
+> 	get_cpu_ftr(ID_AA64PFR0_EL1);
+> 	get_cpu_ftr(ID_AA64PFR1_EL1);
+> 	get_cpu_ftr(ID_AA64DFR0_EL1);
+> 	get_cpu_ftr(ID_AA64DFR1_EL1);
+> 
+> 	get_cpu_ftr(MIDR_EL1);
+> 	get_cpu_ftr(MPIDR_EL1);
+> 	get_cpu_ftr(REVIDR_EL1);
+> 	return 0;
+> }
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
