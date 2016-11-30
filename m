@@ -1,35 +1,50 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 29 Nov 2016 20:02:29 -0500 (EST)
-Subject: [PATCH net v2 1/1] net: macb: fix the RX queue reset in macb_rx()
-In-Reply-To: <80ebb550eb6155e3b882cab1fb8d78a7385f8227.1480339901.git.cyrille.pitchen@atmel.com>
-References: <80ebb550eb6155e3b882cab1fb8d78a7385f8227.1480339901.git.cyrille.pitchen@atmel.com>
-Message-ID: <20161129.200229.2088117281049539695.davem@davemloft.net>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Wed, 30 Nov 2016 01:08:20 +0000
+Subject: [alsa-devel] [PATCH v2] clkdev: add devm_of_clk_get()
+In-Reply-To: <20161129210556.GC6095@codeaurora.org>
+References: <87ziptixv7.wl%kuninori.morimoto.gx@renesas.com>
+ <20160707122636.GP1041@n2100.armlinux.org.uk>
+ <8760shgfzu.wl%kuninori.morimoto.gx@renesas.com>
+ <146794140875.73491.7115209079607438738@resonance>
+ <871t34hlin.wl%kuninori.morimoto.gx@renesas.com>
+ <878twndi54.wl%kuninori.morimoto.gx@renesas.com>
+ <8737isvwc6.wl%kuninori.morimoto.gx@renesas.com>
+ <20161123191037.GE25626@codeaurora.org>
+ <87a8cpejn5.wl%kuninori.morimoto.gx@renesas.com>
+ <87y409cw71.wl%kuninori.morimoto.gx@renesas.com>
+ <20161129210556.GC6095@codeaurora.org>
+Message-ID: <874m2pbwsn.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-Date: Mon, 28 Nov 2016 14:40:55 +0100
 
-> On macb only (not gem), when a RX queue corruption was detected from
-> macb_rx(), the RX queue was reset: during this process the RX ring
-> buffer descriptor was initialized by macb_init_rx_ring() but we forgot
-> to also set bp->rx_tail to 0.
-> 
-> Indeed, when processing the received frames, bp->rx_tail provides the
-> macb driver with the index in the RX ring buffer of the next buffer to
-> process. So when the whole ring buffer is reset we must also reset
-> bp->rx_tail so the driver is synchronized again with the hardware.
-> 
-> Since macb_init_rx_ring() is called from many locations, currently from
-> macb_rx() and macb_init_rings(), we'd rather add the "bp->rx_tail = 0;"
-> line inside macb_init_rx_ring() than add the very same line after each
-> call of this function.
-> 
-> Without this fix, the rx queue is not reset properly to recover from
-> queue corruption and connection drop may occur.
-> 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> Fixes: 9ba723b081a2 ("net: macb: remove BUG_ON() and reset the queue to handle RX errors")
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Hi Stephen
 
-Applied and queued up for -stable, thanks.
+Thank you for your feedback.
+
+> > > >  	sound_soc {
+> > > > 		clocks = <&xxx>, <&xxx>;
+> > > > 		clock-names = "cpu", "codec";
+> > > >  		...
+> > > >  		cpu {
+> > > >  			...
+> > > >  		};
+> > > >  		codec {
+> > > >  			...
+> > > >  		};
+> > > >  	};
+(snip)
+> The problem is that it encourages the use of of_clk_get() when
+> clk_get() is more desirable. Ideally of_clk_get() is never used
+> when a device exists. In this case, it seems like we need to
+> support it though, hence the suggestion of having a
+> devm_get_clk_from_child() API, that explicitly reads as "get a
+> clock from a child node of this device". The distinction is
+> important, because of_clk_get() should rarely be used.
+
+I understand your point, but I think devm_get_clk_from_child()
+needs new DT setings, and it can't keep compatibility, or
+it makes driver complex.
+I think it is nice to have. but, I want to keep current style.
+Thus, I will try to use current of_clk_get() as-is, and
+call clk_free() somehow in this driver.
