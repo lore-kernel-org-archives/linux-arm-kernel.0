@@ -1,30 +1,113 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 30 Nov 2016 14:01:48 +0100
-Subject: [PATCH v2 3/3] ARM: dts: da850: Add node for pullup/pulldown
- pinconf
-In-Reply-To: <1480351226-3332-4-git-send-email-david@lechnology.com>
-References: <1480351226-3332-1-git-send-email-david@lechnology.com>
- <1480351226-3332-4-git-send-email-david@lechnology.com>
-Message-ID: <CACRpkdZOxZRRUGkso_b0hLta4OWkeAgX2khcJxFc8EETFKiiXw@mail.gmail.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 30 Nov 2016 21:14:07 +0800
+Subject: [PATCH 3/4] crypto: arm64/aes-ce-ccm - fix decrypt path with new
+ skcipher interface
+In-Reply-To: <1480424733-10797-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1480424733-10797-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1480424733-10797-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20161130131407.GA3958@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2016 at 5:40 PM, David Lechner <david@lechnology.com> wrote:
+On Tue, Nov 29, 2016 at 01:05:32PM +0000, Ard Biesheuvel wrote:
+> The new skcipher walk interface does not take into account whether we
+> are encrypting or decrypting. In the latter case, the walk should
+> disregard the MAC. Fix this in the arm64 CE driver.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-> This SoC has a separate pin controller for configuring pullup/pulldown
-> bias on groups of pins.
->
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
->
-> v2 changes:
-> * Moved pin-controller at 22c00c device node after gpio at 226000 (there seem to be
->   more nodes in proper order here compared to the i2c at 228000 node suggested by
->   Sekhar)
+Thanks for the patch.  I'm going to build this into the AEAD walker
+instead, by providing separate entry points for encryption and
+decryption.  Like this,
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+---8<---
+Subject: crypto: skcipher - Add separate walker for AEAD decryption
 
-Take this through the ARM SoC tree.
+The AEAD decrypt interface includes the authentication tag in
+req->cryptlen.  Therefore we need to exlucde that when doing
+a walk over it.
 
-Yours,
-Linus Walleij
+This patch adds separate walker functions for AEAD encryption
+and decryption.
+
+Signed-off-by: Herbert Xu <herbert@gondor.apana.org.au>
+
+diff --git a/crypto/skcipher.c b/crypto/skcipher.c
+index 5367f81..aca07c6 100644
+--- a/crypto/skcipher.c
++++ b/crypto/skcipher.c
+@@ -500,8 +500,8 @@ int skcipher_walk_async(struct skcipher_walk *walk,
+ }
+ EXPORT_SYMBOL_GPL(skcipher_walk_async);
+ 
+-int skcipher_walk_aead(struct skcipher_walk *walk, struct aead_request *req,
+-		       bool atomic)
++static int skcipher_walk_aead_common(struct skcipher_walk *walk,
++				     struct aead_request *req, bool atomic)
+ {
+ 	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
+ 	int err;
+@@ -514,7 +514,6 @@ int skcipher_walk_aead(struct skcipher_walk *walk, struct aead_request *req,
+ 	scatterwalk_copychunks(NULL, &walk->in, req->assoclen, 2);
+ 	scatterwalk_copychunks(NULL, &walk->out, req->assoclen, 2);
+ 
+-	walk->total = req->cryptlen;
+ 	walk->iv = req->iv;
+ 	walk->oiv = req->iv;
+ 
+@@ -535,8 +534,36 @@ int skcipher_walk_aead(struct skcipher_walk *walk, struct aead_request *req,
+ 
+ 	return err;
+ }
++
++int skcipher_walk_aead(struct skcipher_walk *walk, struct aead_request *req,
++		       bool atomic)
++{
++	walk->total = req->cryptlen;
++
++	return skcipher_walk_aead_common(walk, req, atomic);
++}
+ EXPORT_SYMBOL_GPL(skcipher_walk_aead);
+ 
++int skcipher_walk_aead_encrypt(struct skcipher_walk *walk,
++			       struct aead_request *req, bool atomic)
++{
++	walk->total = req->cryptlen;
++
++	return skcipher_walk_aead_common(walk, req, atomic);
++}
++EXPORT_SYMBOL_GPL(skcipher_walk_aead_encrypt);
++
++int skcipher_walk_aead_decrypt(struct skcipher_walk *walk,
++			       struct aead_request *req, bool atomic)
++{
++	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
++
++	walk->total = req->cryptlen - crypto_aead_authsize(tfm);
++
++	return skcipher_walk_aead_common(walk, req, atomic);
++}
++EXPORT_SYMBOL_GPL(skcipher_walk_aead_decrypt);
++
+ static unsigned int crypto_skcipher_extsize(struct crypto_alg *alg)
+ {
+ 	if (alg->cra_type == &crypto_blkcipher_type)
+diff --git a/include/crypto/internal/skcipher.h b/include/crypto/internal/skcipher.h
+index d55041f..8735979 100644
+--- a/include/crypto/internal/skcipher.h
++++ b/include/crypto/internal/skcipher.h
+@@ -149,6 +149,10 @@ int skcipher_walk_async(struct skcipher_walk *walk,
+ 			struct skcipher_request *req);
+ int skcipher_walk_aead(struct skcipher_walk *walk, struct aead_request *req,
+ 		       bool atomic);
++int skcipher_walk_aead_encrypt(struct skcipher_walk *walk,
++			       struct aead_request *req, bool atomic);
++int skcipher_walk_aead_decrypt(struct skcipher_walk *walk,
++			       struct aead_request *req, bool atomic);
+ void skcipher_walk_complete(struct skcipher_walk *walk, int err);
+ 
+ static inline void ablkcipher_request_complete(struct ablkcipher_request *req,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
