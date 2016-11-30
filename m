@@ -1,33 +1,65 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Nov 2016 13:36:02 +0000
-Subject: [PATCH] crypto: arm/aesbs - fix brokenness after skcipher
- conversion
-In-Reply-To: <20161130131921.GD4126@gondor.apana.org.au>
-References: <1480440216-341-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161130131921.GD4126@gondor.apana.org.au>
-Message-ID: <53AA8DFA-2420-40D6-A9C2-90B184344819@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 30 Nov 2016 13:37:04 +0000
+Subject: Unable to use perf in VM
+In-Reply-To: <8b2a3cfd-57a0-70ac-ef50-672f8040291d@arm.com>
+References: <70374841-ecb1-a6c3-ed43-0f39e2d5fec2@riken.jp>
+ <8b2a3cfd-57a0-70ac-ef50-672f8040291d@arm.com>
+Message-ID: <a81f82da-322a-a52b-de0e-316b7ce5f463@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 30/11/16 11:48, Marc Zyngier wrote:
+> + Shannon
+> 
+> On 29/11/16 22:04, Itaru Kitayama wrote:
+>> Hi,
+>>
+>> In a VM (virsh controlled, KVM acceleration enabled) on a recent
+>> kvmarm kernel host, I find I am unable to use perf to obtain
+>> performance statistics for a complex task like kernel build.
+>> (I've verified this is seen with a Fedora 25 VM and host combination
+>> as well)
+>> APM folks CC'ed think this might be caused by a bug in the core PMU 
+>> framework code, thus I'd like to have experts opinion on this issue.
+>>
+>> [root at localhost linux]# perf stat -B make
+>>    CHK     include/config/kernel.release
+>> [  119.617684] git[1144]: undefined instruction: pc=fffffc000808ff30
+>> [  119.623040] Code: 51000442 92401042 d51b9ca2 d5033fdf (d53b9d40)
+>> [  119.627607] Internal error: undefined instruction: 0 [#1] SMP
+> 
+> [...]
+> 
+> In a VM running mainline hosted on an AMD Seattle box:
+> 
+>  Performance counter stats for 'make':
+> 
+>     1526089.499304      task-clock:u (msec)       #    0.932 CPUs utilized          
+>                  0      context-switches:u        #    0.000 K/sec                  
+>                  0      cpu-migrations:u          #    0.000 K/sec                  
+>           29527793      page-faults:u             #    0.019 M/sec                  
+>      2913174122673      cycles:u                  #    1.909 GHz                    
+>      2365040892322      instructions:u            #    0.81  insn per cycle         
+>    <not supported>      branches:u                                                  
+>        32049215378      branch-misses:u           #    0.00% of all branches        
+> 
+>     1637.531444837 seconds time elapsed
+> 
+> Running the same host kernel on a Mustang system, the guest explodes
+> in the way you reported. The failing instruction always seems to be
+> an access to pmxevcntr_el0 (I've seen both reads and writes).
+> 
+> Funnily enough, it dies if you try any HW event other than cycles
+> ("perf stat -e cycles ls" works, and "perf stat -e instructions ls"
+> explodes). Which would tend to indicate that we're screwing up
+> the counter selection, but I have no proof of that (specially that
+> the Seattle guest is working just as expected).
 
+It turns out that we *don't* inject an undef. It seems to be generated
+locally at EL1.
 
-> On 30 Nov 2016, at 13:19, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> 
->> On Tue, Nov 29, 2016 at 05:23:36PM +0000, Ard Biesheuvel wrote:
->> The CBC encryption routine should use the encryption round keys, not
->> the decryption round keys.
->> 
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> 
-> Patch applied.  Thanks.
-> 
->> Another fix for the queued changes, this time for 32-bit ARM.
->> 
->> I must say, I'm not impressed with the level of testing that has been
->> carried out after applying these changes. If you had cc'd me on these
->> patches, I would have been happy to test/review.
-> 
-> Sorry.  I'll make sure you're CCed for ARM patches in future.
+Still digging.
 
-Cheers,
-Ard.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
