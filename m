@@ -1,69 +1,64 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 30 Nov 2016 14:17:10 +0100
-Subject: arasan,sdhci.txt "compatibility" DT binding
-In-Reply-To: <648bd95b-5be0-b39f-a956-af741c6407e4@laposte.net>
-References: <56B07BA5.4060407@free.fr>
- <a20b2b4f-15d4-3c29-324c-1ced5dbcc67f@xilinx.com> <583C50E7.6030400@free.fr>
- <14771688.Q8f97gHC2H@wuerfel> <583C60CC.2020408@free.fr>
- <CAFd313zQHmFQ61Y4UEvQAvhhVeNFe=nNyjXUKfYXiTKnvm9VWQ@mail.gmail.com>
- <648bd95b-5be0-b39f-a956-af741c6407e4@laposte.net>
-Message-ID: <215d077d-cba8-3c95-eb36-9d5a7afb9bcd@xilinx.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 30 Nov 2016 21:17:24 +0800
+Subject: [PATCH 3/4] crypto: arm64/aes-ce-ccm - fix decrypt path with new
+ skcipher interface
+In-Reply-To: <20161130131407.GA3958@gondor.apana.org.au>
+References: <1480424733-10797-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1480424733-10797-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20161130131407.GA3958@gondor.apana.org.au>
+Message-ID: <20161130131723.GA4064@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.11.2016 11:51, Sebastian Frias wrote:
-> On 29/11/16 08:29, Rameshwar Sahu wrote:
->> Hi Mason,
->>
->> Nowhere in the documentation do they specify an "IP version".
->> Some documents do provide a revision number, but that's just
->> a *documentation* revision number, e.g.
->>
->> changes in version 3.6 : fix typos
->> changes in version 9.1a : update company logo
->>
->> That's why Xilinx used "arasan,sdhci-8.9a" and APM used
->> "arasan,sdhci-4.9a". These are documentation revisions.
->> In my opinion, that information is mostly worthless.
->>
+On Wed, Nov 30, 2016 at 09:14:07PM +0800, Herbert Xu wrote:
+> On Tue, Nov 29, 2016 at 01:05:32PM +0000, Ard Biesheuvel wrote:
+> > The new skcipher walk interface does not take into account whether we
+> > are encrypting or decrypting. In the latter case, the walk should
+> > disregard the MAC. Fix this in the arm64 CE driver.
+> > 
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > 
-> For the record, the important information conveyed by Rameshwar's
-> email is the following:
+> Thanks for the patch.  I'm going to build this into the AEAD walker
+> instead, by providing separate entry points for encryption and
+> decryption.  Like this,
 > 
-> Arasan SD/SDIO/eMMC IP has a register which tells about the SD
-> specification version and  Vendor version number
-> Reg Name: Host controller version register (offset 0FEh)
-> bit [15:8] is for vendor version number,
-> But, I have seen that Arasaan vendor version number is same as
-> document revision number.
-> 
-> (At first I had ignored the email because it repeated Mason's email
-> without quoting, but then I realised it contained some information)
-> 
-> 
+> Subject: crypto: skcipher - Add separate walker for AEAD decryption
 
-Values on real HW.
+---8<---
+Subject: crypto: arm64/aes-ce-ccm - Fix AEAD decryption length
 
-ZynqMP device
-xsdb% mrd 0xFF1600FC
-FF1600FC:   10020000
+This patch fixes the ARM64 CE CCM implementation decryption by
+using skcipher_walk_aead_decrypt instead of skcipher_walk_aead,
+which ensures the correct length is used when doing the walk.
 
-Zynq device:
-xsdb% mrd 0xE01000FC
-E01000FC:   89010000
+Fixes: cf2c0fe74084 ("crypto: aes-ce-ccm - Use skcipher walk interface")
+Reported-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Herbert Xu <herbert@gondor.apana.org.au>
 
-Based on docs I have access to.
+diff --git a/arch/arm64/crypto/aes-ce-ccm-glue.c b/arch/arm64/crypto/aes-ce-ccm-glue.c
+index d4f3568..cc5515d 100644
+--- a/arch/arm64/crypto/aes-ce-ccm-glue.c
++++ b/arch/arm64/crypto/aes-ce-ccm-glue.c
+@@ -167,7 +167,7 @@ static int ccm_encrypt(struct aead_request *req)
+ 	/* preserve the original iv for the final round */
+ 	memcpy(buf, req->iv, AES_BLOCK_SIZE);
+ 
+-	err = skcipher_walk_aead(&walk, req, true);
++	err = skcipher_walk_aead_encrypt(&walk, req, true);
+ 
+ 	while (walk.nbytes) {
+ 		u32 tail = walk.nbytes % AES_BLOCK_SIZE;
+@@ -219,7 +219,7 @@ static int ccm_decrypt(struct aead_request *req)
+ 	/* preserve the original iv for the final round */
+ 	memcpy(buf, req->iv, AES_BLOCK_SIZE);
+ 
+-	err = skcipher_walk_aead(&walk, req, true);
++	err = skcipher_walk_aead_decrypt(&walk, req, true);
+ 
+ 	while (walk.nbytes) {
+ 		u32 tail = walk.nbytes % AES_BLOCK_SIZE;
 
-Specification_Version_Number (bits:23:16)
-00 - SD Host Specification version 1.0
-01 - SD Host Specification version 2.00 including only the feature of
-the Test Register
-02 - SD Host Specification version 3.00
-
-
-Vendor_Version_Number 	31:24
-
-with 32bit access from FC
-
-Thanks,
-Michal
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
