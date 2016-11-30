@@ -1,76 +1,62 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 30 Nov 2016 15:03:04 +0100
-Subject: [PATCH v10 13/13] drm/mediatek: add support for Mediatek SoC
- MT2701
-In-Reply-To: <1480070076-6196-14-git-send-email-yt.shen@mediatek.com>
-References: <1480070076-6196-1-git-send-email-yt.shen@mediatek.com>
- <1480070076-6196-14-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1be9b66b-eff2-4232-fe17-5d1735999d0b@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 30 Nov 2016 14:06:32 +0000
+Subject: [RFC PATCH 00/29] arm64: Scalable Vector Extension core support
+In-Reply-To: <583EB285.5050305@arm.com>
+References: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
+ <7a35d1ae-73df-03a5-c9d6-1a52754acf25@redhat.com>
+ <583EB285.5050305@arm.com>
+Message-ID: <20161130140632.GL1574@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 25/11/16 11:34, YT Shen wrote:
-
->  static const struct of_device_id mtk_disp_rdma_driver_dt_match[] = {
-> +	{ .compatible = "mediatek,mt2701-disp-rdma",
-> +	  .data = &mt2701_rdma_driver_data},
->  	{ .compatible = "mediatek,mt8173-disp-rdma",
->  	  .data = &mt8173_rdma_driver_data},
->  	{},
+On Wed, Nov 30, 2016 at 11:05:41AM +0000, Szabolcs Nagy wrote:
+> On 30/11/16 10:08, Florian Weimer wrote:
+> > On 11/25/2016 08:38 PM, Dave Martin wrote:
 
 [...]
 
->  static const struct of_device_id ddp_driver_dt_match[] = {
-> +	{ .compatible = "mediatek,mt2701-disp-mutex", .data = mt2701_mutex_mod},
->  	{ .compatible = "mediatek,mt8173-disp-mutex", .data = mt8173_mutex_mod},
->  	{},
->  };
+> >>  * Discussion is needed on how userspace should detect/negotiate signal
+> >>    frame size in order for this expansion mechanism to be workable.
+> > 
+> > I'm leaning towards a simple increase in the glibc headers (despite the ABI risk), plus a personality flag to
+> > disable really wide vector registers in case this causes problems with old binaries.
+> > 
+> 
+> if the kernel does not increase the size and libc
+> does not add size checks then old binaries would
+> work with new libc just fine..
+> but that's non-conforming, posix requires the check.
+> 
+> if the kernel increases the size then it has to be
+> changed in bionic and musl as well and old binaries
+> may break.
+
+Or we need a personality flag or similar to distinguish the two cases.
 
 [...]
 
->
->  static const struct of_device_id mtk_disp_color_driver_dt_match[] = {
-> +	{ .compatible = "mediatek,mt2701-disp-color",
-> +	  .data = &mt2701_color_driver_data},
->  	{ .compatible = "mediatek,mt8173-disp-color",
->  	  .data = &mt8173_color_driver_data},
->  	{},
+> > A more elaborate mechanism will likely introduce more bugs than it makes existing applications working, due to
+> > its complexity.
+> > 
+> >> The remaining patches implement initial SVE support for Linux, with the
+> >> following limitations:
+> >>
+> >>  * No KVM/virtualisation support for guests.
+> >>
+> >>  * No independent SVE vector length configuration per thread.  This is
+> >>    planned, but will follow as a separate add-on series.
+> > 
+> > Per-thread register widths will likely make coroutine switching (setcontext) and C++ resumable
+> > functions/executors quite challenging.
+> > 
+> 
+> i'd assume it's undefined to context switch to a different
+> thread or to resume a function on a different thread
+> (because the implementation can cache thread local state
+> on the stack: e.g. errno pointer).. of course this does
+> not stop ppl from doing it, but the practice is questionable.
 
-[...]
+I don't have a view on this.
 
->  static const struct of_device_id mtk_drm_of_ids[] = {
-> +	{ .compatible = "mediatek,mt2701-mmsys",
-> +	  .data = &mt2701_mmsys_driver_data},
->  	{ .compatible = "mediatek,mt8173-mmsys",
->  	  .data = &mt8173_mmsys_driver_data},
->  	{ }
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-> index 0569f2e..f63cc91 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-> @@ -1203,6 +1203,7 @@ static int mtk_dsi_remove(struct platform_device *pdev)
->  }
->
->  static const struct of_device_id mtk_dsi_of_match[] = {
-> +	{ .compatible = "mediatek,mt2701-dsi" },
->  	{ .compatible = "mediatek,mt8173-dsi" },
->  	{ },
->  };
-
-[...]
-
->
->  static const struct of_device_id mtk_mipi_tx_match[] = {
-> +	{ .compatible = "mediatek,mt2701-mipi-tx",
-> +	  .data = &mt2701_mipitx_data },
->  	{ .compatible = "mediatek,mt8173-mipi-tx",
->  	  .data = &mt8173_mipitx_data },
->  	{},
-
-I'm not sure if I missed some, but you should update the binding 
-description for newly added bindings.
-
-Thanks a lot,
-Matthias
+Cheers
+---Dave
