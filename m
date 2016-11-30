@@ -1,21 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Nov 2016 22:39:33 +0100
-Subject: [GIT PULL 2/3] ARM: dts: exynos: DT for v4.10, second round
-In-Reply-To: <1479967709-6619-3-git-send-email-krzk@kernel.org>
-References: <1479967709-6619-1-git-send-email-krzk@kernel.org>
- <1479967709-6619-3-git-send-email-krzk@kernel.org>
-Message-ID: <11958890.lcXspUHVSR@wuerfel>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 30 Nov 2016 22:42:47 +0100
+Subject: [PATCH v5 net-next 2/7] net: mvneta: Do not allocate buffer in rxq
+ init with HWBM
+In-Reply-To: <cover.0270f6d2413a709521fe2c8c17fbebea6f2e78d1.1480542157.git-series.gregory.clement@free-electrons.com>
+References: <cover.0270f6d2413a709521fe2c8c17fbebea6f2e78d1.1480542157.git-series.gregory.clement@free-electrons.com>
+Message-ID: <bbbf71fd39c93227248df0ec91fabfb29ba0e778.1480542157.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 24, 2016 8:08:28 AM CET Krzysztof Kozlowski wrote:
+For HWBM all buffers are allocated in mvneta_bm_construct() and in runtime
+they are put into descriptors by hardware. There is no need to fill them
+at this point.
 
-> ----------------------------------------------------------------
-> Samsung DeviceTree second update for v4.10:
-> 1. Cleanups in MSHC nodes.
-> 2. Enable ADC on Odroid boards.
-> 3. Fix interrupt flags on recently added DMA sound nodes in Exynos5410.
+Suggested-by: Marcin Wojtas <mw@semihalf.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/net/ethernet/marvell/mvneta.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Pulled into next/dt, thanks!
-
-	Arnd
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 1b84f746d748..f5319c50f8d9 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -2784,14 +2784,14 @@ static int mvneta_rxq_init(struct mvneta_port *pp,
+ 		mvneta_rxq_buf_size_set(pp, rxq,
+ 					MVNETA_RX_BUF_SIZE(pp->pkt_size));
+ 		mvneta_rxq_bm_disable(pp, rxq);
++		mvneta_rxq_fill(pp, rxq, rxq->size);
+ 	} else {
+ 		mvneta_rxq_bm_enable(pp, rxq);
+ 		mvneta_rxq_long_pool_set(pp, rxq);
+ 		mvneta_rxq_short_pool_set(pp, rxq);
++		mvneta_rxq_non_occup_desc_add(pp, rxq, rxq->size);
+ 	}
+ 
+-	mvneta_rxq_fill(pp, rxq, rxq->size);
+-
+ 	return 0;
+ }
+ 
+-- 
+git-series 0.8.10
