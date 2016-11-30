@@ -1,36 +1,43 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 30 Nov 2016 11:26:38 +0800
-Subject: [PATCH v9 16/16] drivers: acpi: iort: introduce
- iort_iommu_configure
-In-Reply-To: <20161121100148.24769-17-lorenzo.pieralisi@arm.com>
-References: <20161121100148.24769-1-lorenzo.pieralisi@arm.com>
- <20161121100148.24769-17-lorenzo.pieralisi@arm.com>
-Message-ID: <af73cb66-6da9-1457-4333-78e7866326fd@linaro.org>
+From: sw0312.kim@samsung.com (Seung-Woo Kim)
+Date: Wed, 30 Nov 2016 13:27:42 +0900
+Subject: [PATCH] arm64: dts: exynos: Add flash led dt node for TM2 board
+Message-ID: <1480480062-3472-1-git-send-email-sw0312.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/11/21 18:01, Lorenzo Pieralisi wrote:
-> DT based systems have a generic kernel API to configure IOMMUs
-> for devices (ie of_iommu_configure()).
->
-> On ARM based ACPI systems, the of_iommu_configure() equivalent can
-> be implemented atop ACPI IORT kernel API, with the corresponding
-> functions to map device identifiers to IOMMUs and retrieve the
-> corresponding IOMMU operations necessary for DMA operations set-up.
->
-> By relying on the iommu_fwspec generic kernel infrastructure,
-> implement the IORT based IOMMU configuration for ARM ACPI systems
-> and hook it up in the ACPI kernel layer that implements DMA
-> configuration for a device.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com> [ACPI core]
-> Reviewed-by: Tomasz Nowicki <tn@semihalf.com>
-> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Tomasz Nowicki <tn@semihalf.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+From: Ingi Kim <ingi2.kim@samsung.com>
 
-Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+This patch adds Kinetic ktd2692 flash led device node for TM2 board.
 
-Thanks
-Hanjun
+Signed-off-by: Ingi Kim <ingi2.kim@samsung.com>
+Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+---
+ arch/arm64/boot/dts/exynos/exynos5433-tm2.dts |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+index f21bdc2..3ba305f 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
++++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+@@ -58,6 +58,19 @@
+ 		reg = <0x0 0x20000000 0x0 0xc0000000>;
+ 	};
+ 
++	camera-flash {
++		compatible = "kinetic,ktd2692";
++		ctrl-gpios = <&gpc0 1 0>;
++		aux-gpios = <&gpc0 2 0>;
++
++		flash-led {
++			label = "ktd2692-flash";
++			led-max-microamp = <300000>;
++			flash-max-microamp = <1500000>;
++			flash-max-timeout-us = <1835000>;
++		};
++	};
++
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
+ 
+-- 
+1.7.4.1
