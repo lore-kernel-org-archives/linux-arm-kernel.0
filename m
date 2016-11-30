@@ -1,44 +1,27 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 30 Nov 2016 14:53:33 -0600
-Subject: [PATCH v2 4/9] clk: stm32f4: Add lcd-tft clock
-In-Reply-To: <1479998749-20358-5-git-send-email-gabriel.fernandez@st.com>
-References: <1479998749-20358-1-git-send-email-gabriel.fernandez@st.com>
- <1479998749-20358-5-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <20161130205333.tiukcjbspuqmedgw@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 30 Nov 2016 22:09:04 +0100
+Subject: [GIT PULL] ARM: keystone: add TI SCI protocol support for v4.10
+In-Reply-To: <6f67f67f-7489-6d62-c2c2-9bba440cfabc@ti.com>
+References: <e6b04eeb-ebfb-2da0-834b-1da440a35783@ti.com>
+ <9563335.412haHXOPG@wuerfel> <6f67f67f-7489-6d62-c2c2-9bba440cfabc@ti.com>
+Message-ID: <5602219.0b9asep0uZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2016 at 03:45:44PM +0100, gabriel.fernandez at st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+On Wednesday, November 30, 2016 7:59:26 PM CET Tero Kristo wrote:
 > 
-> This patch introduces lcd-tft clock for stm32f4 soc.
+> Thanks Arnd, that looks good to me.
 > 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-> ---
->  .../devicetree/bindings/clock/st,stm32-rcc.txt     |   1 +
->  drivers/clk/clk-stm32f4.c                          | 118 +++++++++++++++++++++
->  include/dt-bindings/clock/stm32f4-clock.h          |   3 +-
->  3 files changed, 121 insertions(+), 1 deletion(-)
+> I'll figure out how to add branch description next time when I am going 
+> to be sending a pull-request directly to you guys.
+> 
+> 
 
+You should get a prompt when you sign the tag.
 
-> diff --git a/include/dt-bindings/clock/stm32f4-clock.h b/include/dt-bindings/clock/stm32f4-clock.h
-> index 56b8e10..1be4a3a 100644
-> --- a/include/dt-bindings/clock/stm32f4-clock.h
-> +++ b/include/dt-bindings/clock/stm32f4-clock.h
-> @@ -27,7 +27,8 @@
->  #define CLK_RTC			5
->  #define PLL_VCO_I2S		6
->  #define PLL_VCO_SAI		7
-> +#define CLK_LCD			8
->  
-> -#define END_PRIMARY_CLK		8
-> +#define END_PRIMARY_CLK		9
+Actually my preference would be for you to forward this to Santosh:
+There are a lot of little details to know about the submission
+process to for arm-soc, and it's easier for us if fewer people
+have to be aware of them.
 
-Do you really need this? Having this change could cause compatibility 
-problems between dtb and kernel versions.
-
-Please restructure the patch series and put all of the binding changes 
-including this header into a single patch. Incrementally add s/w 
-features, not h/w.
-
-Rob
+	Arnd
