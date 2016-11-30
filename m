@@ -1,259 +1,249 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Wed, 30 Nov 2016 13:48:22 +0100
-Subject: [PATCH v3 2/2] ARM: tse850_defconfig: add Axentia TSE-850
-In-Reply-To: <1480510102-24587-1-git-send-email-peda@axentia.se>
-References: <1480510102-24587-1-git-send-email-peda@axentia.se>
-Message-ID: <1480510102-24587-3-git-send-email-peda@axentia.se>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 30 Nov 2016 12:57:23 +0000
+Subject: [PATCH 06/10] iommu: of: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <8e91ce72-9d37-f4be-9224-856a1a4c3e1d@samsung.com>
+References: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
+ <CGME20161130002345epcas1p2486d2d61930d132210d9cb7d19bcbb48@epcas1p2.samsung.com>
+ <1480465344-11862-7-git-send-email-sricharan@codeaurora.org>
+ <8e91ce72-9d37-f4be-9224-856a1a4c3e1d@samsung.com>
+Message-ID: <5043bd01-2fc3-851d-2d6f-ba5fea96c774@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
- MAINTAINERS                       |   1 +
- arch/arm/configs/tse850_defconfig | 223 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 224 insertions(+)
- create mode 100644 arch/arm/configs/tse850_defconfig
+On 30/11/16 07:54, Marek Szyprowski wrote:
+> Hi Sricharan and Robin,
+> 
+> 
+> On 2016-11-30 01:22, Sricharan R wrote:
+>> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+>>
+>> Failures to look up an IOMMU when parsing the DT iommus property need to
+>> be handled separately from the .of_xlate() failures to support deferred
+>> probing.
+>>
+>> The lack of a registered IOMMU can be caused by the lack of a driver for
+>> the IOMMU, the IOMMU device probe not having been performed yet, having
+>> been deferred, or having failed.
+>>
+>> The first case occurs when the device tree describes the bus master and
+>> IOMMU topology correctly but no device driver exists for the IOMMU yet
+>> or the device driver has not been compiled in. Return NULL, the caller
+>> will configure the device without an IOMMU.
+>>
+>> The second and third cases are handled by deferring the probe of the bus
+>> master device which will eventually get reprobed after the IOMMU.
+>>
+>> The last case is currently handled by deferring the probe of the bus
+>> master device as well. A mechanism to either configure the bus master
+>> device without an IOMMU or to fail the bus master device probe depending
+>> on whether the IOMMU is optional or mandatory would be a good
+>> enhancement.
+>>
+>> Signed-off-by: Laurent Pichart
+>> <laurent.pinchart+renesas@ideasonboard.com>
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> [rm: massive PCI hacks]
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>   drivers/base/dma-mapping.c | 4 ++--
+>>   drivers/iommu/dma-iommu.c  | 1 +
+>>   drivers/iommu/of_iommu.c   | 5 +++--
+>>   drivers/of/device.c        | 9 +++++++--
+>>   drivers/pci/probe.c        | 6 ++++--
+>>   include/linux/of_device.h  | 9 ++++++---
+>>   include/linux/pci.h        | 4 ++--
+>>   7 files changed, 25 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
+>> index b2a5629..576fdfb 100644
+>> --- a/drivers/base/dma-mapping.c
+>> +++ b/drivers/base/dma-mapping.c
+>> @@ -351,9 +351,9 @@ void dma_common_free_remap(void *cpu_addr, size_t
+>> size, unsigned long vm_flags)
+>>   int dma_configure(struct device *dev)
+>>   {
+>>       if (dev_is_pci(dev))
+>> -        pci_dma_configure(dev);
+>> +        return pci_dma_configure(dev);
+>>       else if (dev->of_node)
+>> -        of_dma_configure(dev, dev->of_node);
+>> +        return of_dma_configure(dev, dev->of_node);
+>>       return 0;
+>>   }
+>>   diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+>> index c5ab866..d2a7a46 100644
+>> --- a/drivers/iommu/dma-iommu.c
+>> +++ b/drivers/iommu/dma-iommu.c
+>> @@ -148,6 +148,7 @@ int iommu_dma_init_domain(struct iommu_domain
+>> *domain, dma_addr_t base,
+>>       base_pfn = max_t(unsigned long, 1, base >> order);
+>>       end_pfn = (base + size - 1) >> order;
+>>   +    dev_info(dev, "0x%llx 0x%llx, 0x%llx 0x%llx, 0x%llx 0x%llx\n",
+>> base, size, domain->geometry.aperture_start,
+>> domain->geometry.aperture_end,
+> 
+> This causes a NULL pointer dereference if caller passes NULL device
+> pointer.
+> There is such caller in drivers/gpu/drm/exynos/exynos_drm_iommu.h.
+> Trivial to fix as it looks like a leftover from developement or
+> debugging stage.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 9dfe877f47e0..d8eb3843dbd4 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2345,6 +2345,7 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	Documentation/devicetree/bindings/arm/axentia.txt
- F:	arch/arm/boot/dts/axentia-*
-+F:	arch/arm/configs/tse850_defconfig
- 
- AZ6007 DVB DRIVER
- M:	Mauro Carvalho Chehab <mchehab@s-opensource.com>
-diff --git a/arch/arm/configs/tse850_defconfig b/arch/arm/configs/tse850_defconfig
-new file mode 100644
-index 000000000000..f6076e7e1669
---- /dev/null
-+++ b/arch/arm/configs/tse850_defconfig
-@@ -0,0 +1,223 @@
-+# CONFIG_LOCALVERSION_AUTO is not set
-+# CONFIG_SWAP is not set
-+CONFIG_SYSVIPC=y
-+# CONFIG_FHANDLE is not set
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_BLK_DEV_INITRD=y
-+# CONFIG_RD_BZIP2 is not set
-+# CONFIG_RD_LZMA is not set
-+# CONFIG_RD_XZ is not set
-+# CONFIG_RD_LZO is not set
-+# CONFIG_RD_LZ4 is not set
-+CONFIG_EMBEDDED=y
-+CONFIG_SLAB=y
-+# CONFIG_LBDAF is not set
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_IOSCHED_DEADLINE is not set
-+# CONFIG_IOSCHED_CFQ is not set
-+CONFIG_ARCH_AT91=y
-+CONFIG_SOC_SAMA5D3=y
-+# CONFIG_CACHE_L2X0 is not set
-+CONFIG_AEABI=y
-+CONFIG_UACCESS_WITH_MEMCPY=y
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_CMDLINE="console=ttyS0,115200 initrd=0x21100000,25165824 root=/dev/ram0 rw"
-+CONFIG_KEXEC=y
-+CONFIG_VFP=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_PACKET_DIAG=y
-+CONFIG_UNIX=y
-+CONFIG_UNIX_DIAG=y
-+CONFIG_XFRM_USER=y
-+CONFIG_INET=y
-+CONFIG_IP_MULTICAST=y
-+CONFIG_IP_ADVANCED_ROUTER=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_IP_PNP_BOOTP=y
-+CONFIG_IP_PNP_RARP=y
-+CONFIG_NET_IPGRE_DEMUX=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+CONFIG_INET_UDP_DIAG=y
-+# CONFIG_INET6_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET6_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET6_XFRM_MODE_BEET is not set
-+CONFIG_IPV6_SIT_6RD=y
-+CONFIG_NETFILTER=y
-+CONFIG_NF_CONNTRACK=y
-+# CONFIG_NF_CONNTRACK_PROCFS is not set
-+CONFIG_NF_CONNTRACK_SNMP=y
-+CONFIG_NF_TABLES=y
-+CONFIG_NF_TABLES_INET=y
-+CONFIG_NF_TABLES_NETDEV=y
-+CONFIG_NFT_EXTHDR=y
-+CONFIG_NFT_META=y
-+CONFIG_NFT_NUMGEN=y
-+CONFIG_NFT_CT=y
-+CONFIG_NFT_SET_RBTREE=y
-+CONFIG_NFT_SET_HASH=y
-+CONFIG_NFT_COUNTER=y
-+CONFIG_NFT_LOG=y
-+CONFIG_NFT_LIMIT=y
-+CONFIG_NFT_QUOTA=y
-+CONFIG_NFT_REJECT=y
-+CONFIG_NFT_HASH=y
-+# CONFIG_WIRELESS is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+# CONFIG_STANDALONE is not set
-+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
-+CONFIG_MTD=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_ATMEL=y
-+CONFIG_MTD_UBI=y
-+CONFIG_MTD_UBI_GLUEBI=y
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_COUNT=4
-+CONFIG_BLK_DEV_RAM_SIZE=8192
-+CONFIG_ATMEL_TCLIB=y
-+CONFIG_ATMEL_SSC=y
-+CONFIG_EEPROM_AT24=y
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
-+# CONFIG_SCSI_LOWLEVEL is not set
-+CONFIG_NETDEVICES=y
-+# CONFIG_NET_VENDOR_ARC is not set
-+CONFIG_MACB=y
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_CIRRUS is not set
-+# CONFIG_NET_VENDOR_EZCHIP is not set
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_HISILICON is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+# CONFIG_NET_VENDOR_MARVELL is not set
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+# CONFIG_NET_VENDOR_QUALCOMM is not set
-+# CONFIG_NET_VENDOR_RENESAS is not set
-+# CONFIG_NET_VENDOR_ROCKER is not set
-+# CONFIG_NET_VENDOR_SAMSUNG is not set
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+# CONFIG_NET_VENDOR_SMSC is not set
-+# CONFIG_NET_VENDOR_STMICRO is not set
-+# CONFIG_NET_VENDOR_SYNOPSYS is not set
-+# CONFIG_NET_VENDOR_VIA is not set
-+# CONFIG_NET_VENDOR_WIZNET is not set
-+CONFIG_MICREL_PHY=y
-+# CONFIG_USB_NET_DRIVERS is not set
-+# CONFIG_WLAN is not set
-+# CONFIG_INPUT_LEDS is not set
-+# CONFIG_INPUT_MOUSEDEV is not set
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_SERIO is not set
-+CONFIG_VT_HW_CONSOLE_BINDING=y
-+CONFIG_LEGACY_PTY_COUNT=4
-+CONFIG_SERIAL_ATMEL=y
-+CONFIG_SERIAL_ATMEL_CONSOLE=y
-+CONFIG_I2C=y
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_AT91=y
-+CONFIG_GPIO_SYSFS=y
-+CONFIG_POWER_RESET=y
-+CONFIG_SENSORS_JC42=y
-+CONFIG_WATCHDOG=y
-+CONFIG_AT91SAM9X_WATCHDOG=y
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_REGULATOR_PWM=y
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+CONFIG_SND_PCM_OSS=y
-+# CONFIG_SND_DRIVERS is not set
-+# CONFIG_SND_ARM is not set
-+# CONFIG_SND_USB is not set
-+CONFIG_SND_SOC=y
-+CONFIG_SND_ATMEL_SOC=y
-+CONFIG_SND_ATMEL_SOC_TSE850_PCM5142=y
-+# CONFIG_HID_GENERIC is not set
-+CONFIG_USB=y
-+CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_OHCI_HCD=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_USB_STORAGE_REALTEK=y
-+CONFIG_USB_STORAGE_DATAFAB=y
-+CONFIG_USB_STORAGE_FREECOM=y
-+CONFIG_USB_STORAGE_ISD200=y
-+CONFIG_USB_STORAGE_USBAT=y
-+CONFIG_USB_STORAGE_SDDR09=y
-+CONFIG_USB_STORAGE_SDDR55=y
-+CONFIG_USB_STORAGE_JUMPSHOT=y
-+CONFIG_USB_STORAGE_ALAUDA=y
-+CONFIG_USB_STORAGE_ONETOUCH=y
-+CONFIG_USB_STORAGE_KARMA=y
-+CONFIG_USB_STORAGE_CYPRESS_ATACB=y
-+CONFIG_USB_STORAGE_ENE_UB6250=y
-+CONFIG_USB_UAS=y
-+CONFIG_USB_GADGET=y
-+CONFIG_USB_ATMEL_USBA=y
-+CONFIG_USB_G_SERIAL=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_TIMER=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_GPIO=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_AT91RM9200=y
-+CONFIG_DMADEVICES=y
-+CONFIG_AT_HDMAC=y
-+# CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_IIO=y
-+CONFIG_AT91_ADC=y
-+CONFIG_ENVELOPE_DETECTOR=y
-+CONFIG_DPOT_DAC=y
-+CONFIG_MCP4531=y
-+CONFIG_PWM=y
-+CONFIG_PWM_ATMEL=y
-+CONFIG_PWM_ATMEL_TCB=y
-+CONFIG_EXT4_FS=y
-+CONFIG_FANOTIFY=y
-+CONFIG_OVERLAY_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_UBIFS_FS=y
-+CONFIG_UBIFS_FS_ADVANCED_COMPR=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_CODEPAGE_850=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_NLS_UTF8=y
-+CONFIG_PRINTK_TIME=y
-+CONFIG_DYNAMIC_DEBUG=y
-+CONFIG_DEBUG_INFO=y
-+CONFIG_STRIP_ASM_SYMS=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_DEBUG_MEMORY_INIT=y
-+CONFIG_LOCKUP_DETECTOR=y
-+CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC=y
-+# CONFIG_DETECT_HUNG_TASK is not set
-+# CONFIG_SCHED_DEBUG is not set
-+# CONFIG_FTRACE is not set
-+CONFIG_DEBUG_USER=y
-+CONFIG_CRYPTO_CCM=y
-+CONFIG_CRYPTO_GCM=y
-+CONFIG_CRYPTO_CBC=y
-+CONFIG_CRYPTO_ECB=y
-+CONFIG_CRYPTO_SHA1=y
-+CONFIG_CRYPTO_SHA512=y
-+CONFIG_CRYPTO_ARC4=y
-+CONFIG_CRYPTO_DEV_ATMEL_AES=y
-+CONFIG_CRYPTO_DEV_ATMEL_TDES=y
-+CONFIG_CRYPTO_DEV_ATMEL_SHA=y
--- 
-2.1.4
+Yes, this is some development crap which was never intended to go
+upstream. Hence "massive PCI hacks" ;)
+
+Other than the first two patches, the rest of the stuff from me here was
+just an experiment which I'm not entirely convinced by the outcome of -
+I don't particularly like the resulting fragmentation of having
+pci_dma_configure() awkwardly floating around on its own in pci.c.
+
+Robin.
+
+>> *dev->dma_mask, dev->coherent_dma_mask);
+>>       /* Check the domain allows at least some access to the device... */
+>>       if (domain->geometry.force_aperture) {
+>>           if (base > domain->geometry.aperture_end ||
+>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>> index 349bd1d..9529d6c 100644
+>> --- a/drivers/iommu/of_iommu.c
+>> +++ b/drivers/iommu/of_iommu.c
+>> @@ -23,6 +23,7 @@
+>>   #include <linux/of.h>
+>>   #include <linux/of_iommu.h>
+>>   #include <linux/of_pci.h>
+>> +#include <linux/pci.h>
+>>   #include <linux/slab.h>
+>>     static const struct of_device_id __iommu_of_table_sentinel
+>> @@ -223,7 +224,7 @@ const struct iommu_ops *of_iommu_configure(struct
+>> device *dev,
+>>               ops = ERR_PTR(err);
+>>       }
+>>   -    return IS_ERR(ops) ? NULL : ops;
+>> +    return ops;
+>>   }
+>>     static int __init of_iommu_init(void)
+>> @@ -234,7 +235,7 @@ static int __init of_iommu_init(void)
+>>       for_each_matching_node_and_match(np, matches, &match) {
+>>           const of_iommu_init_fn init_fn = match->data;
+>>   -        if (init_fn(np))
+>> +        if (init_fn && init_fn(np))
+>>               pr_err("Failed to initialise IOMMU %s\n",
+>>                   of_node_full_name(np));
+>>       }
+>> diff --git a/drivers/of/device.c b/drivers/of/device.c
+>> index 1c843e2..d58595c 100644
+>> --- a/drivers/of/device.c
+>> +++ b/drivers/of/device.c
+>> @@ -82,7 +82,7 @@ int of_device_add(struct platform_device *ofdev)
+>>    * can use a platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE
+>> events
+>>    * to fix up DMA configuration.
+>>    */
+>> -void of_dma_configure(struct device *dev, struct device_node *np)
+>> +int of_dma_configure(struct device *dev, struct device_node *np)
+>>   {
+>>       u64 dma_addr, paddr, size;
+>>       int ret;
+>> @@ -107,7 +107,7 @@ void of_dma_configure(struct device *dev, struct
+>> device_node *np)
+>>       ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+>>       if (ret < 0) {
+>>           dma_addr = offset = 0;
+>> -        size = dev->coherent_dma_mask + 1;
+>> +        size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
+>>       } else {
+>>           offset = PFN_DOWN(paddr - dma_addr);
+>>           dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+>> @@ -129,10 +129,15 @@ void of_dma_configure(struct device *dev, struct
+>> device_node *np)
+>>           coherent ? " " : " not ");
+>>         iommu = of_iommu_configure(dev, np);
+>> +    if (IS_ERR(iommu))
+>> +        return PTR_ERR(iommu);
+>> +
+>>       dev_dbg(dev, "device is%sbehind an iommu\n",
+>>           iommu ? " " : " not ");
+>>         arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
+>> +
+>> +    return 0;
+>>   }
+>>   EXPORT_SYMBOL_GPL(of_dma_configure);
+>>   diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+>> index 04af770..6316cae 100644
+>> --- a/drivers/pci/probe.c
+>> +++ b/drivers/pci/probe.c
+>> @@ -1724,13 +1724,14 @@ static void pci_set_msi_domain(struct pci_dev
+>> *dev)
+>>    * Function to update PCI devices's DMA configuration using the same
+>>    * info from the OF node or ACPI node of host bridge's parent (if any).
+>>    */
+>> -void pci_dma_configure(struct device *dev)
+>> +int pci_dma_configure(struct device *dev)
+>>   {
+>>       struct device *bridge =
+>> pci_get_host_bridge_device(to_pci_dev(dev));
+>> +    int ret = 0;
+>>         if (IS_ENABLED(CONFIG_OF) &&
+>>           bridge->parent && bridge->parent->of_node) {
+>> -        of_dma_configure(dev, bridge->parent->of_node);
+>> +        ret = of_dma_configure(dev, bridge->parent->of_node);
+>>       } else if (has_acpi_companion(bridge)) {
+>>           struct acpi_device *adev = to_acpi_device_node(bridge->fwnode);
+>>           enum dev_dma_attr attr = acpi_get_dma_attr(adev);
+>> @@ -1742,6 +1743,7 @@ void pci_dma_configure(struct device *dev)
+>>       }
+>>         pci_put_host_bridge_device(bridge);
+>> +    return ret;
+>>   }
+>>     void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+>> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+>> index d20a31a..6dca65c 100644
+>> --- a/include/linux/of_device.h
+>> +++ b/include/linux/of_device.h
+>> @@ -55,7 +55,7 @@ static inline struct device_node
+>> *of_cpu_device_node_get(int cpu)
+>>       return of_node_get(cpu_dev->of_node);
+>>   }
+>>   -void of_dma_configure(struct device *dev, struct device_node *np);
+>> +int of_dma_configure(struct device *dev, struct device_node *np);
+>>   void of_dma_deconfigure(struct device *dev);
+>>   #else /* CONFIG_OF */
+>>   @@ -99,8 +99,11 @@ static inline struct device_node
+>> *of_cpu_device_node_get(int cpu)
+>>   {
+>>       return NULL;
+>>   }
+>> -static inline void of_dma_configure(struct device *dev, struct
+>> device_node *np)
+>> -{}
+>> +
+>> +static inline int of_dma_configure(struct device *dev, struct
+>> device_node *np)
+>> +{
+>> +    return 0;
+>> +}
+>>   static inline void of_dma_deconfigure(struct device *dev)
+>>   {}
+>>   #endif /* CONFIG_OF */
+>> diff --git a/include/linux/pci.h b/include/linux/pci.h
+>> index d04f651..989ca44 100644
+>> --- a/include/linux/pci.h
+>> +++ b/include/linux/pci.h
+>> @@ -870,7 +870,7 @@ struct resource *pci_find_parent_resource(const
+>> struct pci_dev *dev,
+>>   #define dev_is_pf(d) ((dev_is_pci(d) ? to_pci_dev(d)->is_physfn :
+>> false))
+>>   #define dev_num_vf(d) ((dev_is_pci(d) ? pci_num_vf(to_pci_dev(d)) : 0))
+>>   -void pci_dma_configure(struct device *dev);
+>> +int pci_dma_configure(struct device *dev);
+>>     /* Generic PCI functions exported to card drivers */
+>>   @@ -1604,7 +1604,7 @@ static inline struct pci_dev
+>> *pci_get_bus_and_slot(unsigned int bus,
+>>   #define dev_is_pf(d) (false)
+>>   #define dev_num_vf(d) (0)
+>>   -static inline void pci_dma_configure(struct device *dev) { }
+>> +static inline int pci_dma_configure(struct device *dev) { return 0; }
+>>     #endif /* CONFIG_PCI */
+>>   
+> 
+> Best regards
