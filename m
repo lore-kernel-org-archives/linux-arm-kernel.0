@@ -1,30 +1,94 @@
-From: sid@reserved-bit.com (Siddhesh Poyarekar)
-Date: Wed, 30 Nov 2016 16:44:52 +0530
-Subject: [PATCH 9/9] arm64: Documentation - Expose CPU feature registers
-In-Reply-To: <1479994809-9081-10-git-send-email-suzuki.poulose@arm.com>
-References: <1479994809-9081-1-git-send-email-suzuki.poulose@arm.com>
- <1479994809-9081-10-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <e2f9a241-8453-0b2c-25db-e603b89acf46@reserved-bit.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Wed, 30 Nov 2016 16:57:33 +0530
+Subject: [PATCH 06/10] iommu: of: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <8e91ce72-9d37-f4be-9224-856a1a4c3e1d@samsung.com>
+References: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
+ <CGME20161130002345epcas1p2486d2d61930d132210d9cb7d19bcbb48@epcas1p2.samsung.com>
+ <1480465344-11862-7-git-send-email-sricharan@codeaurora.org>
+ <8e91ce72-9d37-f4be-9224-856a1a4c3e1d@samsung.com>
+Message-ID: <000001d24afc$c2ef91a0$48ceb4e0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 24 November 2016 07:10 PM, Suzuki K Poulose wrote:
-> + d) CPU Identification :
-> +    MIDR_EL1 is exposed to help identify the processor. On a
-> +    heterogeneous system, this could be racy (just like getcpu()). The
-> +    process could be migrated to another CPU by the time it uses the
-> +    register value, unless the CPU affinity is set. Hence, there is no
-> +    guarantee that the value reflects the processor that it is
-> +    currently executing on. The REVIDR is not exposed due to this
-> +    constraint, as REVIDR makes sense only in conjunction with the
-> +    MIDR. Alternately, MIDR_EL1 and REVIDR_EL1 are exposed via sysfs
-> +    at:
-> +
-> +	/sys/devices/system/cpu/cpu$ID/regs/identification/
-> +	                                              \- midr
-> +	                                              \- revidr
-> +
+Hi,
 
-This doesn't seem to be implemented in this patchset.
+>Hi Sricharan and Robin,
+>
+>
+>On 2016-11-30 01:22, Sricharan R wrote:
+>> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+>>
+>> Failures to look up an IOMMU when parsing the DT iommus property need to
+>> be handled separately from the .of_xlate() failures to support deferred
+>> probing.
+>>
+>> The lack of a registered IOMMU can be caused by the lack of a driver for
+>> the IOMMU, the IOMMU device probe not having been performed yet, having
+>> been deferred, or having failed.
+>>
+>> The first case occurs when the device tree describes the bus master and
+>> IOMMU topology correctly but no device driver exists for the IOMMU yet
+>> or the device driver has not been compiled in. Return NULL, the caller
+>> will configure the device without an IOMMU.
+>>
+>> The second and third cases are handled by deferring the probe of the bus
+>> master device which will eventually get reprobed after the IOMMU.
+>>
+>> The last case is currently handled by deferring the probe of the bus
+>> master device as well. A mechanism to either configure the bus master
+>> device without an IOMMU or to fail the bus master device probe depending
+>> on whether the IOMMU is optional or mandatory would be a good
+>> enhancement.
+>>
+>> Signed-off-by: Laurent Pichart <laurent.pinchart+renesas@ideasonboard.com>
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> [rm: massive PCI hacks]
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>   drivers/base/dma-mapping.c | 4 ++--
+>>   drivers/iommu/dma-iommu.c  | 1 +
+>>   drivers/iommu/of_iommu.c   | 5 +++--
+>>   drivers/of/device.c        | 9 +++++++--
+>>   drivers/pci/probe.c        | 6 ++++--
+>>   include/linux/of_device.h  | 9 ++++++---
+>>   include/linux/pci.h        | 4 ++--
+>>   7 files changed, 25 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
+>> index b2a5629..576fdfb 100644
+>> --- a/drivers/base/dma-mapping.c
+>> +++ b/drivers/base/dma-mapping.c
+>> @@ -351,9 +351,9 @@ void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
+>>   int dma_configure(struct device *dev)
+>>   {
+>>   	if (dev_is_pci(dev))
+>> -		pci_dma_configure(dev);
+>> +		return pci_dma_configure(dev);
+>>   	else if (dev->of_node)
+>> -		of_dma_configure(dev, dev->of_node);
+>> +		return of_dma_configure(dev, dev->of_node);
+>>   	return 0;
+>>   }
+>>
+>> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+>> index c5ab866..d2a7a46 100644
+>> --- a/drivers/iommu/dma-iommu.c
+>> +++ b/drivers/iommu/dma-iommu.c
+>> @@ -148,6 +148,7 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
+>>   	base_pfn = max_t(unsigned long, 1, base >> order);
+>>   	end_pfn = (base + size - 1) >> order;
+>>
+>> +	dev_info(dev, "0x%llx 0x%llx, 0x%llx 0x%llx, 0x%llx 0x%llx\n", base, size, domain->geometry.aperture_start, domain-
+>>geometry.aperture_end,
+>
+>This causes a NULL pointer dereference if caller passes NULL device pointer.
+>There is such caller in drivers/gpu/drm/exynos/exynos_drm_iommu.h.
+>Trivial to fix as it looks like a leftover from developement or
+>debugging stage.
+>
+My bad, i should have removed it before posting. Noticed this, but missed to remove it.
+Will do so.
 
-Siddhesh
+Regards,
+ Sricharan
