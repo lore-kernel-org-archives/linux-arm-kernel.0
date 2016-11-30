@@ -1,264 +1,81 @@
-From: atull@opensource.altera.com (atull)
-Date: Wed, 30 Nov 2016 11:45:05 -0600
-Subject: [PATCH v3 3/3] fpga manager: Add cyclone-ps-spi driver for Altera
- FPGAs
-In-Reply-To: <e193572d7746e6f6b8666da7ac0f54031fed5214.1480467185.git.stillcompiling@gmail.com>
-References: <cover.1480467185.git.stillcompiling@gmail.com>
- <e193572d7746e6f6b8666da7ac0f54031fed5214.1480467185.git.stillcompiling@gmail.com>
-Message-ID: <alpine.DEB.2.10.1611301122470.2617@atull-730U3E-740U3E>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 30 Nov 2016 19:59:26 +0200
+Subject: [GIT PULL] ARM: keystone: add TI SCI protocol support for v4.10
+In-Reply-To: <9563335.412haHXOPG@wuerfel>
+References: <e6b04eeb-ebfb-2da0-834b-1da440a35783@ti.com>
+ <d685444b-4275-e6e6-aae6-214a41776a28@ti.com> <9563335.412haHXOPG@wuerfel>
+Message-ID: <6f67f67f-7489-6d62-c2c2-9bba440cfabc@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Nov 2016, Joshua Clayton wrote:
+On 30/11/16 18:43, Arnd Bergmann wrote:
+> On Monday, November 28, 2016 6:42:41 PM CET Tero Kristo wrote:
+>> Gentle ping on this, is anybody going to pull this one?
+>>
+>> -Tero
+>>
+>> On 27/10/16 12:30, Tero Kristo wrote:
+>>> Hi Arnd, Olof, Kevin,
+>>>
+>>> This pull introduces the TI SCI protocol support for keystone family of
+>>> devices, targeted for v4.10 merge window. We discussed with Santosh
+>>> (keystone maintainer) that it would probably be better that I'll be
+>>> sending the pull requests for this directly, avoiding one extra step of
+>>> merges.
+>>
+>
+> Sorry for the delay. I just saw this pull request in the backlog
+> and had to take a closer look first. I probably would have commented
+> on a few details in a proper review, but overall this seems harmless
+> enough, so I've merged it into next/drivers in the end.
+>
+> There was no branch description in
+>  https://github.com/t-kristo/linux-pm.git for-4.10-ti-sci-base
+> and I ended up taking something from the wiki. This is now the
+> commit I ended up with:
 
-Hi Clayton,
+Thanks Arnd, that looks good to me.
 
-I just have a few minor one line changes below.  Only one
-is operational, I should have caught that earlier.
+I'll figure out how to add branch description next time when I am going 
+to be sending a pull-request directly to you guys.
 
-> cyclone-ps-spi loads FPGA firmware over spi, using the "passive serial"
-> interface on Altera Cyclone FPGAS.
-> 
-> This is one of the simpler ways to set up an FPGA at runtime.
-> The signal interface is close to unidirectional spi with lsb first.
-> 
-> Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-> ---
->  drivers/fpga/Kconfig          |   7 ++
->  drivers/fpga/Makefile         |   1 +
->  drivers/fpga/cyclone-ps-spi.c | 176 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 184 insertions(+)
->  create mode 100644 drivers/fpga/cyclone-ps-spi.c
-> 
-> diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
-> index cd84934..2462707 100644
-> --- a/drivers/fpga/Kconfig
-> +++ b/drivers/fpga/Kconfig
-> @@ -13,6 +13,13 @@ config FPGA
->  
->  if FPGA
->  
-> +config FPGA_MGR_CYCLONE_PS_SPI
-> +	tristate "Altera Cyclone FPGA Passive Serial over SPI"
-> +	depends on SPI
-> +	help
-> +	  FPGA manager driver support for Altera Cyclone using the
-> +	  passive serial interface over SPI
-> +
->  config FPGA_MGR_SOCFPGA
->  	tristate "Altera SOCFPGA FPGA Manager"
->  	depends on ARCH_SOCFPGA
-> diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
-> index 8d83fc6..8f93930 100644
-> --- a/drivers/fpga/Makefile
-> +++ b/drivers/fpga/Makefile
-> @@ -6,5 +6,6 @@
->  obj-$(CONFIG_FPGA)			+= fpga-mgr.o
->  
->  # FPGA Manager Drivers
-> +obj-$(CONFIG_FPGA_MGR_CYCLONE_PS_SPI)	+= cyclone-ps-spi.o
->  obj-$(CONFIG_FPGA_MGR_SOCFPGA)		+= socfpga.o
->  obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
-> diff --git a/drivers/fpga/cyclone-ps-spi.c b/drivers/fpga/cyclone-ps-spi.c
-> new file mode 100644
-> index 0000000..57a520d
-> --- /dev/null
-> +++ b/drivers/fpga/cyclone-ps-spi.c
-> @@ -0,0 +1,176 @@
-> +/**
-> + * Copyright (c) 2015 United Western Technologies, Corporation
-> + *
-> + * Joshua Clayton <stillcompiling@gmail.com>
-> + *
-> + * Manage Altera fpga firmware that is loaded over spi.
-> + * Firmware must be in binary "rbf" format.
-> + * Works on Cyclone V. Should work on cyclone series.
-> + * May work on other Altera fpgas.
-> + *
-> + */
-> +
-> +#include <linux/bitrev.h>
-> +#include <linux/delay.h>
-> +#include <linux/fpga/fpga-mgr.h>
-> +#include <linux/gpio/consumer.h>
-> +#include <linux/module.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/spi/spi.h>
-> +#include <linux/sizes.h>
-> +
-> +#define FPGA_RESET_TIME		50   /* time in usecs to trigger FPGA config */
-> +#define FPGA_MIN_DELAY		50   /* min usecs to wait for config status */
-> +#define FPGA_MAX_DELAY		1000 /* max usecs to wait for config status */
-> +
-> +struct cyclonespi_conf {
-> +	struct gpio_desc *config;
-> +	struct gpio_desc *status;
-> +	struct spi_device *spi;
-> +};
-> +
-> +static const struct of_device_id of_ef_match[] = {
-> +	{ .compatible = "altr,cyclone-ps-spi-fpga-mgr", },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, of_ef_match);
-> +
-> +static enum fpga_mgr_states cyclonespi_state(struct fpga_manager *mgr)
-> +{
-> +	return mgr->state;
-> +}
+-Tero
 
-This function gets called once to initialize mgr->state in
-fpga_mgr_register().  So it should at least return the state the FPGA
-is at then.  If it is unknown, it can just return
-FPGA_MGR_STATE_UNKNOWN.
-
-> +
-> +static int cyclonespi_write_init(struct fpga_manager *mgr, u32 flags,
-> +				 const char *buf, size_t count)
-
-Minor, but please fix the indentation of 'const' to match that of
-'struct' above.  checkpatch.pl is probably issuing warnings
-about that.
-
-> +{
-> +	struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
-> +	int i;
-> +
-> +	if (flags & FPGA_MGR_PARTIAL_RECONFIG) {
-> +		dev_err(&mgr->dev, "Partial reconfiguration not supported.\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	gpiod_set_value(conf->config, 0);
-> +	usleep_range(FPGA_RESET_TIME, FPGA_RESET_TIME + 20);
-> +	if (gpiod_get_value(conf->status) == 1) {
-> +		dev_err(&mgr->dev, "Status pin should be low.\n");
-> +		return -EIO;
-> +	}
-> +
-> +	gpiod_set_value(conf->config, 1);
-> +	for (i = 0; i < (FPGA_MAX_DELAY / FPGA_MIN_DELAY); i++) {
-> +		usleep_range(FPGA_MIN_DELAY, FPGA_MIN_DELAY + 20);
-> +		if (gpiod_get_value(conf->status))
-> +			return 0;
-> +	}
-> +
-> +	dev_err(&mgr->dev, "Status pin not ready.\n");
-> +	return -EIO;
-> +}
-> +
-> +static void rev_buf(void *buf, size_t len)
-> +{
-> +	u32 *fw32 = (u32 *)buf;
-> +	const u32 *fw_end = (u32 *)(buf + len);
-> +
-> +	/* set buffer to lsb first */
-> +	while (fw32 < fw_end) {
-> +		*fw32 = bitrev8x4(*fw32);
-> +		fw32++;
-> +	}
-> +}
-> +
-> +static int cyclonespi_write(struct fpga_manager *mgr, const char *buf,
-> +			    size_t count)
-
-Please fix alignment here also.
-
-> +{
-> +	struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
-> +	const char *fw_data = buf;
-> +	const char *fw_data_end = fw_data + count;
-> +
-> +	while (fw_data < fw_data_end) {
-> +		int ret;
-> +		size_t stride = min(fw_data_end - fw_data, SZ_4K);
-> +
-> +		rev_buf((void *)fw_data, stride);
-> +		ret = spi_write(conf->spi, fw_data, stride);
-> +		if (ret) {
-> +			dev_err(&mgr->dev, "spi error in firmware write: %d\n",
-> +				ret);
-> +			return ret;
-> +		}
-> +		fw_data += stride;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int cyclonespi_write_complete(struct fpga_manager *mgr, u32 flags)
-> +{
-> +	struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
-> +
-> +	if (gpiod_get_value(conf->status) == 0) {
-> +		dev_err(&mgr->dev, "Error during configuration.\n");
-> +		return -EIO;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct fpga_manager_ops cyclonespi_ops = {
-> +	.state = cyclonespi_state,
-> +	.write_init = cyclonespi_write_init,
-> +	.write = cyclonespi_write,
-> +	.write_complete = cyclonespi_write_complete,
-> +};
-> +
-> +static int cyclonespi_probe(struct spi_device *spi)
-> +{
-> +	struct cyclonespi_conf *conf = devm_kzalloc(&spi->dev, sizeof(*conf),
-> +						GFP_KERNEL);
-> +
-> +	if (!conf)
-> +		return -ENOMEM;
-> +
-> +	conf->spi = spi;
-> +	conf->config = devm_gpiod_get(&spi->dev, "config", GPIOD_OUT_LOW);
-> +	if (IS_ERR(conf->config)) {
-> +		dev_err(&spi->dev, "Failed to get config gpio: %ld\n",
-> +			PTR_ERR(conf->config));
-> +		return PTR_ERR(conf->config);
-> +	}
-> +
-> +	conf->status = devm_gpiod_get(&spi->dev, "status", GPIOD_IN);
-> +	if (IS_ERR(conf->status)) {
-> +		dev_err(&spi->dev, "Failed to get status gpio: %ld\n",
-> +			PTR_ERR(conf->status));
-> +		return PTR_ERR(conf->status);
-> +	}
-> +
-> +	return fpga_mgr_register(&spi->dev,
-> +				 "Altera Cyclone PS SPI FPGA Manager",
-> +				 &cyclonespi_ops, conf);
-> +}
-> +
-> +static int cyclonespi_remove(struct spi_device *spi)
-> +{
-> +	fpga_mgr_unregister(&spi->dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct spi_driver cyclonespi_driver = {
-> +	.driver = {
-> +		.name   = "cyclone-ps-spi",
-> +		.owner  = THIS_MODULE,
-> +		.of_match_table = of_match_ptr(of_ef_match),
-> +	},
-> +	.probe  = cyclonespi_probe,
-> +	.remove = cyclonespi_remove,
-> +};
-> +
-> +module_spi_driver(cyclonespi_driver)
-> +
-> +MODULE_LICENSE("GPL");
-> +MODULE_AUTHOR("Joshua Clayton <stillcompiling@gmail.com>");
-> +MODULE_DESCRIPTION("Module to load Altera FPGA firmware over spi");
-> -- 
-> 2.9.3
-> 
-> 
-
-Thanks,
-Alan
+>
+> commit ba9cb7b9ffa4a4056158bc8570f1a851e4a6a8ae
+> Merge: e7541f9 912cffb
+> Author: Arnd Bergmann <arnd@arndb.de>
+> Date:   Wed Nov 30 17:13:13 2016 +0100
+>
+>     Merge branch 'for-4.10-ti-sci-base' of https://github.com/t-kristo/linux-pm into next/drivers
+>
+>     Merge "ARM: keystone: add TI SCI protocol support for v4.10" from
+>     Tero Kristo:
+>
+>     [description taken from http://processors.wiki.ti.com/index.php/TISCI
+>
+>     Texas Instruments' Keystone generation System on Chips (SoC) starting
+>     with 66AK2G02, now include a dedicated SoC System Control entity called
+>     PMMC(Power Management Micro Controller) in line with ARM architecture
+>     recommendations. The function of this module is to integrate all system
+>     operations in a centralized location. Communication with the SoC System
+>     Control entity from various processing units like ARM/DSP occurs over
+>     Message Manager hardware block.
+>
+>     ...
+>
+>     Texas Instruments' System Control Interface defines the communication
+>     protocol between various processing entities to the System Control Entity
+>     on TI SoCs. This is a set of message formats and sequence of operations
+>     required to communicate and get system services processed from System
+>     Control entity in the SoC.]
+>
+>     * 'for-4.10-ti-sci-base' of https://github.com/t-kristo/linux-pm:
+>       firmware: ti_sci: Add support for reboot core service
+>       firmware: ti_sci: Add support for Clock control
+>       firmware: ti_sci: Add support for Device control
+>       firmware: Add basic support for TI System Control Interface (TI-SCI) protocol
+>       Documentation: Add support for TI System Control Interface (TI-SCI) protocol
+>
+> 	Arnd
+>
