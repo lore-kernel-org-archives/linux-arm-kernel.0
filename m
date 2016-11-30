@@ -1,89 +1,111 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 30 Nov 2016 10:49:33 +0100
-Subject: [RFC v3 00/10] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
- reserved regions
-In-Reply-To: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
-References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <6c9012fd-070b-6218-48e7-69b37f2559dd@redhat.com>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Wed, 30 Nov 2016 17:50:18 +0800
+Subject: [PATCH v2] arm64: dts: zx: add zx296718's topcrm node
+Message-ID: <1480499418-13905-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Enable topcrm clock node for zx296718, which is used for
+CPU's frequency change.
 
-On 15/11/2016 14:09, Eric Auger wrote:
-> Following LPC discussions, we now report reserved regions through
-> iommu-group sysfs reserved_regions attribute file.
-> 
-> Reserved regions are populated through the IOMMU get_resv_region callback
-> (former get_dm_regions), now implemented by amd-iommu, intel-iommu and
-> arm-smmu.
-> 
-> The intel-iommu reports the [FEE0_0000h - FEF0_000h] MSI window as an
-> IOMMU_RESV_NOMAP reserved region.
-> 
-> arm-smmu reports the MSI window (arbitrarily located at 0x8000000 and
-> 1MB large) and the PCI host bridge windows.
-> 
-> The series integrates a not officially posted patch from Robin:
-> "iommu/dma: Allow MSI-only cookies".
-> 
-> This series currently does not address IRQ safety assessment.
+Furthermore, this patch adds the CPU clock phandle in CPU's node
+and uses operating-points-v2 to register operating points.
 
-I will respin this series taking into account Joerg's comment. Does
-anyone have additional comments or want to put forward some conceptual
-issues with the current direction and with this implementation?
+So it can be used by cpufreq-dt driver.
 
-As for the IRQ safety assessment, in a first step I would propose to
-remove the IOMMU_CAP_INTR_REMAP from arm-smmus and consider the
-assignment as unsafe. Any objection?
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+---
+ arch/arm64/boot/dts/zte/zx296718.dtsi | 43 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-Thanks
-
-Eric
-
-
-> Best Regards
-> 
-> Eric
-> 
-> Git: complete series available at
-> https://github.com/eauger/linux/tree/v4.9-rc5-reserved-rfc-v3
-> 
-> History:
-> RFC v2 -> v3:
-> - switch to an iommu-group sysfs API
-> - use new dummy allocator provided by Robin
-> - dummy allocator initialized by vfio-iommu-type1 after enumerating
->   the reserved regions
-> - at the moment ARM MSI base address/size is left unchanged compared
->   to v2
-> - we currently report reserved regions and not usable IOVA regions as
->   requested by Alex
-> 
-> RFC v1 -> v2:
-> - fix intel_add_reserved_regions
-> - add mutex lock/unlock in vfio_iommu_type1
-> 
-> 
-> Eric Auger (10):
->   iommu/dma: Allow MSI-only cookies
->   iommu: Rename iommu_dm_regions into iommu_resv_regions
->   iommu: Add new reserved IOMMU attributes
->   iommu: iommu_alloc_resv_region
->   iommu: Do not map reserved regions
->   iommu: iommu_get_group_resv_regions
->   iommu: Implement reserved_regions iommu-group sysfs file
->   iommu/vt-d: Implement reserved region get/put callbacks
->   iommu/arm-smmu: Implement reserved region get/put callbacks
->   vfio/type1: Get MSI cookie
-> 
->  drivers/iommu/amd_iommu.c       |  20 +++---
->  drivers/iommu/arm-smmu.c        |  52 +++++++++++++++
->  drivers/iommu/dma-iommu.c       | 116 ++++++++++++++++++++++++++-------
->  drivers/iommu/intel-iommu.c     |  50 ++++++++++----
->  drivers/iommu/iommu.c           | 141 ++++++++++++++++++++++++++++++++++++----
->  drivers/vfio/vfio_iommu_type1.c |  26 ++++++++
->  include/linux/dma-iommu.h       |   7 ++
->  include/linux/iommu.h           |  49 ++++++++++----
->  8 files changed, 391 insertions(+), 70 deletions(-)
-> 
+diff --git a/arch/arm64/boot/dts/zte/zx296718.dtsi b/arch/arm64/boot/dts/zte/zx296718.dtsi
+index 6b239a3..992158a 100644
+--- a/arch/arm64/boot/dts/zte/zx296718.dtsi
++++ b/arch/arm64/boot/dts/zte/zx296718.dtsi
+@@ -44,6 +44,7 @@
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/clock/zx296718-clock.h>
+ 
+ / {
+ 	compatible = "zte,zx296718";
+@@ -81,6 +82,8 @@
+ 			compatible = "arm,cortex-a53","arm,armv8";
+ 			reg = <0x0 0x0>;
+ 			enable-method = "psci";
++			clocks = <&topcrm A53_GATE>;
++			operating-points-v2 = <&cluster0_opp>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+@@ -88,6 +91,7 @@
+ 			compatible = "arm,cortex-a53","arm,armv8";
+ 			reg = <0x0 0x1>;
+ 			enable-method = "psci";
++			operating-points-v2 = <&cluster0_opp>;
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+@@ -95,6 +99,7 @@
+ 			compatible = "arm,cortex-a53","arm,armv8";
+ 			reg = <0x0 0x2>;
+ 			enable-method = "psci";
++			operating-points-v2 = <&cluster0_opp>;
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+@@ -102,6 +107,38 @@
+ 			compatible = "arm,cortex-a53","arm,armv8";
+ 			reg = <0x0 0x3>;
+ 			enable-method = "psci";
++			operating-points-v2 = <&cluster0_opp>;
++		};
++	};
++
++	cluster0_opp: opp_table0 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 500000000 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <857000>;
++			clock-latency-ns = <500000>;
++		};
++		opp at 648000000 {
++			opp-hz = /bits/ 64 <648000000>;
++			opp-microvolt = <857000>;
++			clock-latency-ns = <500000>;
++		};
++		opp at 800000000 {
++			opp-hz = /bits/ 64 <800000000>;
++			opp-microvolt = <882000>;
++			clock-latency-ns = <500000>;
++		};
++		opp at 1000000000 {
++			opp-hz = /bits/ 64 <1000000000>;
++			opp-microvolt = <892000>;
++			clock-latency-ns = <500000>;
++		};
++		opp at 1188000000 {
++			opp-hz = /bits/ 64 <1188000000>;
++			opp-microvolt = <1009000>;
++			clock-latency-ns = <500000>;
+ 		};
+ 	};
+ 
+@@ -279,6 +316,12 @@
+ 			dma-requests = <32>;
+ 		};
+ 
++		topcrm: clock-controller at 1461000 {
++			compatible = "zte,zx296718-topcrm";
++			reg = <0x01461000 0x1000>;
++			#clock-cells = <1>;
++		};
++
+ 		sysctrl: sysctrl at 1463000 {
+ 			compatible = "zte,zx296718-sysctrl", "syscon";
+ 			reg = <0x1463000 0x1000>;
+-- 
+2.7.4
