@@ -1,63 +1,71 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Thu, 1 Dec 2016 13:33:52 +0100
-Subject: [PATCH v5 net-next 4/7] net: mvneta: Convert to be 64 bits
- compatible
-In-Reply-To: <20161201201648.6a50b442@xhacker>
-References: <cover.0270f6d2413a709521fe2c8c17fbebea6f2e78d1.1480542157.git-series.gregory.clement@free-electrons.com>
- <6b4d20a85b05e93d254e265eb07569dd1285d303.1480542157.git-series.gregory.clement@free-electrons.com>
- <20161201192604.07ed9516@xhacker>
- <CAPv3WKeJBL7_V_7QPVNDAd9H4bgeLcSF8enuD96sgEmecuRkRA@mail.gmail.com>
- <20161201200205.46dec339@xhacker> <20161201201648.6a50b442@xhacker>
-Message-ID: <CAPv3WKftV+=CmpG6oN_86UytV+VVa3ZdkEmOcxGqmGZOqUwxHg@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Dec 2016 12:40:15 +0000
+Subject: [PATCH v2] mach-omap2: fixing wrong strcat for Non-NULL
+ terminated string
+In-Reply-To: <1480589913-8839-1-git-send-email-maninder1.s@samsung.com>
+References: <1480589913-8839-1-git-send-email-maninder1.s@samsung.com>
+Message-ID: <20161201124015.GI23750@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
+On Thu, Dec 01, 2016 at 04:28:33PM +0530, Maninder Singh wrote:
+> variable name can have Non NULL terminated string after cropping
+> which may result strcat to fail, and cropping is not
+> required if (strlen(oh->name) + 8 < MOD_CLK_MAX_NAME_LEN).
+> 
+> Issue caught with static analysis tool:
+> "Dangerous usage of 'name' (strncpy doesn't always 0-terminate it)"
+> 
+> Signed-off-by: Vaneet Narang <v.narang@samsung.com>
+> Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
+> ---
+> v1 -> v2: changed strncpy to strlcpy
+>  arch/arm/mach-omap2/omap_hwmod.c | 8 +++++---
+>  1 file changed, 5 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 759e1d4..582b95a 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -742,12 +742,14 @@ static int _init_main_clk(struct omap_hwmod *oh)
+>  	char name[MOD_CLK_MAX_NAME_LEN];
+>  	struct clk *clk;
+>  
+> -	/* +7 magic comes from '_mod_ck' suffix */
+> -	if (strlen(oh->name) + 7 > MOD_CLK_MAX_NAME_LEN)
+> +	/* +8 magic comes from strlen("_mod_ck") added as suffix */
+> +	if (strlen(oh->name) + 8 > MOD_CLK_MAX_NAME_LEN) {
+>  		pr_warn("%s: warning: cropping name for %s\n", __func__,
+>  			oh->name);
+> +		strlcpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - 7);
+> +	} else
+> +		strcpy(name, oh->name);
+>  
+> -	strncpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - 7);
+>  	strcat(name, "_mod_ck");
+>  
+>  	clk = clk_get(NULL, name);
+> -- 
+> 1.9.1
+> 
 
-2016-12-01 13:16 GMT+01:00 Jisheng Zhang <jszhang@marvell.com>:
-> On Thu, 1 Dec 2016 20:02:05 +0800 Jisheng Zhang wrote:
->
->> Hi Marcin,
->>
->> On Thu, 1 Dec 2016 12:48:39 +0100 Marcin Wojtas wrote:
->>
->> > Hi Jisheng,
->> >
->> > Which baseline do you use?
->> >
->> > It took me really lot of time to catch why RX broke after rebase from
->> > LKv4.1 to LKv4.4. Between those two, in commit:
->> > 97303480753e ("arm64: Increase the max granular size")
->> > L1_CACHE_BYTES for all ARMv8 platforms was increased to 128B and so
->> > did NET_SKB_PAD.
->> >
->> > And 128 is more than the maximum that can fit into packet offset
->> > [11:8]@0x1400. In such case this correction is needed. Did it answer
->> > your doubts?
->>
->> That's key! Thanks a lot. In my repo, we don't have commit 97303480753e
->> ("arm64: Increase the max granular size")
->>
->> I think it would be great if this information can be added into the commit
->> msg.
->>
->> IIRC, arm64 maintainers considered to let L1_CACHE_BYTES the _minimum_ of
->> cache line sizes of arm64. If that's implemented and merged, then we can
->
-> I just searched and found the email.
->
-> "We may have to revisit this logic and consider L1_CACHE_BYTES the
-> _minimum_ of cache line sizes in arm64 systems supported by the kernel.
-> Do you have any benchmarks on Cavium boards that would show significant
-> degradation with 64-byte L1_CACHE_BYTES vs 128?"
->
-> https://patchwork.kernel.org/patch/8634481/
->
->
+Simpler, clearer, and less error-prone:
 
-Thank you for the information. I debugged it before the discussion. In
-future we would be able to revert it, however afair packet offset may
-be needed by A3700 Buffer Management.
+	static const char modck[] = "_mod_ck";
 
-Best regards,
-Marcin
+	if (strlen(oh->name) >= MOD_CLK_MAX_NAME_LEN - strlen(modck))
+		pr_warn("%s: warning: cropping name for %s\n", __func__,
+			oh->name);
+
+	strlcpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - strlen(modck));
+	strlcat(name, modck, MOD_CLK_MAX_NAME_LEN);
+
+Note that the length argument to strlcpy _includes_ the NUL terminator.
+Also note the use of strlcat() which ensures that it won't overflow the
+buffer.
+
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
