@@ -1,57 +1,48 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 01 Dec 2016 11:28:45 +0200
-Subject: How should we group related devices in DT ? (was Re: [PATCH v7 0/8]
- drm: sun8i: Add DE2 HDMI video support)
-In-Reply-To: <20161201091313.th7nucjmvtuolqza@lukather>
-References: <cover.1480414715.git.moinejf@free.fr> <2039137.LtCOH6bs2I@avalon>
- <20161201091313.th7nucjmvtuolqza@lukather>
-Message-ID: <2679960.kPaBMLjofm@avalon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 1 Dec 2016 10:36:19 +0100
+Subject: [PATCH v2 2/3] ARM: dts: sunxi: add support for Orange Pi Zero
+ board
+In-Reply-To: <cdfd3c65-d473-badb-ea6a-035f7ab79217@arm.com>
+References: <20161121162421.800-1-icenowy@aosc.xyz>
+ <20161121162421.800-2-icenowy@aosc.xyz>
+ <5373671480239408@web31m.yandex.ru>
+ <cdfd3c65-d473-badb-ea6a-035f7ab79217@arm.com>
+Message-ID: <20161201093619.gs6lmoxtlptp2jr6@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thursday 01 Dec 2016 10:13:13 Maxime Ripard wrote:
-
-[snip]
-
-> The earlier Allwinner SoCs (with the old display engine), we had some
-> SoCs with multiple instances of the display engine and TCON (the
-> display engine roughly implementing the planes, the TCON the
-> CRTC. Roughly.). However, those were sharing some encoders (HDMI,
-> DSI) after that.
+On Mon, Nov 28, 2016 at 12:29:07AM +0000, Andr? Przywara wrote:
+> > Something more interesting happened.
+> > 
+> > Xunlong made a add-on board for Orange Pi Zero, which exposes the
+> > two USB Controllers exported at expansion bus as USB Type-A
+> > connectors.
+> > 
+> > Also it exposes a analog A/V jack and a microphone.
+> > 
+> > Should I enable {e,o}hci{2.3} in the device tree?
 > 
-> So we need to have a single DRM device taking care of the multiple
-> display engines, which essentialy means that we have to decouple the
-> DRM device from the display engine. This was done in the earlier
-> designs using an additional node with a list of phandles to the
-> display engines in the system, and obviously, I'd prefer to have some
-> consistency and reuse the same thing.
+> Actually we should do this regardless of this extension board. The USB
+> pins are not multiplexed and are exposed on user accessible pins (just
+> not soldered, but that's a detail), so I think they qualify for DT
+> enablement. And even if a user can't use them, it doesn't hurt to have
+> them (since they are not multiplexed).
 
-I believe this problem isn't limited to sunxi and should be addressed in a 
-more generic way. How should we describe in the device tree that multiple 
-instances of a device unrelated from a control point of view are related at 
-the hardware level ? There are multiple reasons why we need this, and here are 
-a few.
+My main concern about this is that we'll leave regulators enabled by
+default, for a minority of users. And that minority will prevent to do
+a proper power management when the times come since we'll have to keep
+that behaviour forever.
 
-- As described above, unrelated display controller instances that share 
-encoders at their output need to be exposed to userspace as a single DRM 
-device. This is also the case on Renesas platforms (where the display engines 
-are independent except for the "small" detail that output routing is 
-controlled through the first display engine).
-
-- On Renesas platforms again a radio-related SPI receiver has multiple 
-independent channels that each have their own registers, clocks and 
-interrupts, but share the same physical clock and sync pins. They are used to 
-receive multiple channels of the same data stream and must be exposed as a 
-single V4L2 device to userspace. A generic DT binding RFC is available at 
-http://www.spinics.net/lists/devicetree/msg152414.html.
-
-> But the current approach doesn't work and will require some DT
-> modifications if that case happens again, which we can't do because of
-> the DT ABI.
+Maxime
 
 -- 
-Regards,
-
-Laurent Pinchart
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161201/6200cc6b/attachment.sig>
