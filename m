@@ -1,39 +1,37 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 1 Dec 2016 12:30:09 +0100
-Subject: [linux-sunxi] Re: [PATCH v7 4/8] drm/sunxi: Add DT bindings
- documentation of Allwinner HDMI
-In-Reply-To: <5021537.YAZCMeDTSh@avalon>
-References: <cover.1480414715.git.moinejf@free.fr>
- <1971681480527210@web5g.yandex.ru>
- <20161201085520.tk2kdi33rn6fyld2@lukather>
- <5021537.YAZCMeDTSh@avalon>
-Message-ID: <20161201123009.d2b4d9d389070200c54138ee@free.fr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 1 Dec 2016 11:30:32 +0000
+Subject: [bug report v4.8] fs/locks.c: kernel oops during posix lock
+ stress test
+In-Reply-To: <CACVXFVPsHjh3CWjdUrKB_r6=hkXK=qS3wpykbacdKe1rzz1H8Q@mail.gmail.com>
+References: <CACVXFVPsHjh3CWjdUrKB_r6=hkXK=qS3wpykbacdKe1rzz1H8Q@mail.gmail.com>
+Message-ID: <20161201113031.GB5813@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 01 Dec 2016 12:41:20 +0200
-Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
-
-> > > If a DVI connector instead of a HDMI connector is soldered, how
-> > > should such a device tree be written?
-> > 
-> > Use a dvi-connector instead :)
+On Mon, Nov 28, 2016 at 11:10:14AM +0800, Ming Lei wrote:
+> When I run stress-ng via the following steps on one ARM64 dual
+> socket system(Cavium Thunder), the kernel oops[1] can often be
+> triggered after running the stress test for several hours(sometimes
+> it may take longer):
 > 
-> The HDMI encoder DT node doesn't (and certainly shouldn't) report what type of 
-> connector is mounted on the board. Having a connector node in DT makes the 
-> connector type available to the system, allowing the DRM driver to expose the 
-> right connector type to userspace (it would be confusing for the user to 
-> report DRM_MODE_CONNECTOR_HDMIA for a DVI connector).
+> - git clone git://kernel.ubuntu.com/cking/stress-ng.git
+> - apply the attachment patch which just makes the posix file
+> lock stress test more aggressive
+> - run the test via '~/git/stress-ng$./stress-ng --lockf 128 --aggressive'
+> 
+> 
+> From the oops log, looks one garbage file_lock node is got
+> from the linked list of 'ctx->flc_posix' when the issue happens.
+> 
+> BTW, the issue isn't observed on single socket Cavium Thunder yet,
+> and the same issue can be seen on Ubuntu Xenial(v4.4 based kernel)
+> too.
 
-The connector type, HDMI or DVI, is known by the EDID.
-The user is not interested by the software indication of the connector
-type: (s)he knows it because (s)he connected him/herself the display
-device.
-And the DRM driver does not do anything from the knowledge of the
-connector type in the DT. Only the EDID may tell if the display device
-may do audio streaming (direct HDMI with audio capability) or not
-(direct HDMI without audio, HDMI to DVI cable, DVI physical connector).
+FWIW, I've been running this on Seattle for 24 hours with your patch applied
+and not seen any problems yet. That said, Thomas did just fix an rt_mutex
+race which only seemed to pop up on Thunder, so you could give those
+patches a try.
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+  https://lkml.kernel.org/r/20161130205431.629977871 at linutronix.de
+
+Will
