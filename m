@@ -1,127 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 1 Dec 2016 16:45:39 +0000
-Subject: [PATCH v2] arm64: mm: Fix memmap to be initialized for the
- entire section
-In-Reply-To: <1480530091-1092-1-git-send-email-rrichter@cavium.com>
-References: <1480530091-1092-1-git-send-email-rrichter@cavium.com>
-Message-ID: <20161201164538.GB1236@arm.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Thu, 1 Dec 2016 10:46:11 -0600
+Subject: 4.9-rc7 nouveau fails on arm64 64k page kernel but works with 4k
+Message-ID: <042c54f3-e52b-6658-18c7-9c19492485a4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2016 at 07:21:31PM +0100, Robert Richter wrote:
-> On ThunderX systems with certain memory configurations we see the
-> following BUG_ON():
-> 
->  kernel BUG at mm/page_alloc.c:1848!
-> 
-> This happens for some configs with 64k page size enabled. The BUG_ON()
-> checks if start and end page of a memmap range belongs to the same
-> zone.
-> 
-> The BUG_ON() check fails if a memory zone contains NOMAP regions. In
-> this case the node information of those pages is not initialized. This
-> causes an inconsistency of the page links with wrong zone and node
-> information for that pages. NOMAP pages from node 1 still point to the
-> mem zone from node 0 and have the wrong nid assigned.
-> 
-> The reason for the mis-configuration is a change in pfn_valid() which
-> reports pages marked NOMAP as invalid:
-> 
->  68709f45385a arm64: only consider memblocks with NOMAP cleared for linear mapping
-> 
-> This causes pages marked as nomap being no long reassigned to the new
-> zone in memmap_init_zone() by calling __init_single_pfn().
-> 
-> Fixing this by restoring the old behavior of pfn_valid() to use
-> memblock_is_memory(). Also changing users of pfn_valid() in arm64 code
-> to use memblock_is_map_memory() where necessary. This only affects
-> code in ioremap.c. The code in mmu.c still can use the new version of
-> pfn_valid().
-> 
-> As a consequence, pfn_valid() can not be used to check if a physical
-> page is RAM. It just checks if there is an underlying memmap with a
-> valid struct page. Moreover, for performance reasons the whole memmap
-> (with pageblock_nr_pages number of pages) has valid pfns (SPARSEMEM
-> config). The memory range is extended to fit the alignment of the
-> memmap. Thus, pfn_valid() may return true for pfns that do not map to
-> physical memory. Those pages are simply not reported to the mm, they
-> are not marked reserved nor added to the list of free pages. Other
-> functions such a page_is_ram() or memblock_is_map_ memory() must be
-> used to check for memory and if the page can be mapped with the linear
-> mapping.
-> 
-> Since NOMAP mem ranges may need to be mapped with different mem
-> attributes (e.g. read-only or non-caching) we can not use linear
-> mapping here. The use of memblock_is_memory() in pfn_valid() may not
-> break this behaviour. Since commit:
-> 
->  e7cd190385d1 arm64: mark reserved memblock regions explicitly in iomem
-> 
-> NOMAP mem resources are no longer marked as system RAM (IORESOURCE_
-> SYSTEM_RAM). Now page_is_ram() and region_intersects() (see
-> memremap()) do not detect NOMAP mem as system ram and NOMAP mem is not
-> added to the linear mapping as system RAM is.
-> 
-> v2:
-> 
->  * Added Ack
->  * updated description to reflect the discussion
-> 
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
-> ---
->  arch/arm64/mm/init.c    | 2 +-
->  arch/arm64/mm/ioremap.c | 5 +++--
->  2 files changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 212c4d1e2f26..166911f4a2e6 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -147,7 +147,7 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
->  #ifdef CONFIG_HAVE_ARCH_PFN_VALID
->  int pfn_valid(unsigned long pfn)
->  {
-> -	return memblock_is_map_memory(pfn << PAGE_SHIFT);
-> +	return memblock_is_memory(pfn << PAGE_SHIFT);
->  }
->  EXPORT_SYMBOL(pfn_valid);
->  #endif
-> diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-> index 01e88c8bcab0..c17c220b0c48 100644
-> --- a/arch/arm64/mm/ioremap.c
-> +++ b/arch/arm64/mm/ioremap.c
-> @@ -21,6 +21,7 @@
->   */
->  
->  #include <linux/export.h>
-> +#include <linux/memblock.h>
->  #include <linux/mm.h>
->  #include <linux/vmalloc.h>
->  #include <linux/io.h>
-> @@ -55,7 +56,7 @@ static void __iomem *__ioremap_caller(phys_addr_t phys_addr, size_t size,
->  	/*
->  	 * Don't allow RAM to be mapped.
->  	 */
-> -	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
-> +	if (WARN_ON(memblock_is_map_memory(phys_addr)))
->  		return NULL;
->  
->  	area = get_vm_area_caller(size, VM_IOREMAP, caller);
-> @@ -96,7 +97,7 @@ EXPORT_SYMBOL(__iounmap);
->  void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
->  {
->  	/* For normal memory we already have a cacheable mapping. */
-> -	if (pfn_valid(__phys_to_pfn(phys_addr)))
-> +	if (memblock_is_map_memory(phys_addr))
->  		return (void __iomem *)__phys_to_virt(phys_addr);
+Hi,
 
-Thanks for sending out the new patch. Whilst I'm still a bit worried about
-changing pfn_valid like this, I guess we'll just have to fix up any callers
-which suffer from this change.
+I placed a 9600GT in a softiron 3k running fedora 25, and the nouveau 
+driver failed to claim the device with :
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+[drm] Initialized
+nouveau 0000:01:00.0: NVIDIA G94 (094100a1)
+nouveau 0000:01:00.0: bios: version 62.94.0d.00.04
+nouveau: probe of 0000:01:00.0 failed with error -22
 
-I'd like to see this sit in -next for a bit before we send it further.
+Which with a little bit of debugging seems to be a failure in:
 
-Will
+[77216.692605] [<ffff000001404120>] ttm_bo_validate+0xb0/0x1e8 [ttm]
+[77216.698697] [<ffff0000014045ac>] ttm_bo_init+0x354/0x410 [ttm]
+[77216.704706] [<ffff0000019d7bd0>] nouveau_bo_new+0x1f4/0x314 [nouveau]
+[77216.711308] [<ffff0000019e4620>] nv50_display_create+0x10c/0xa1c 
+[nouveau]
+[77216.718340] [<ffff0000019df898>] nouveau_display_create+0x50c/0x59c 
+[nouveau]
+[77216.725632] [<ffff0000019d3e24>] nouveau_drm_load+0x22c/0x8c0 [nouveau]
+[77216.732286] [<ffff00000137a1a0>] drm_dev_register+0xc0/0xf0 [drm]
+[77216.738409] [<ffff00000137b8a4>] drm_get_pci_dev+0xbc/0x188 [drm]
+[77216.744663] [<ffff0000019d35e8>] nouveau_drm_probe+0x180/0x208 [nouveau]
+[77216.751354] [<ffff0000084c30dc>] local_pci_probe+0x50/0xb4
+[77216.756827] [<ffff0000084c3e40>] pci_device_probe+0xf8/0x148
+[77216.762474] [<ffff0000085b6a10>] driver_probe_device+0x284/0x420
+[77216.768467] [<ffff0000085b6ccc>] __driver_attach+0x120/0x124
+[77216.774115] [<ffff0000085b446c>] bus_for_each_dev+0x6c/0xac
+[77216.779673] [<ffff0000085b6204>] driver_attach+0x2c/0x34
+[77216.784972] [<ffff0000085b5cb4>] bus_add_driver+0x244/0x2b0
+[77216.790531] [<ffff0000085b78e4>] driver_register+0x68/0xfc
+[77216.796004] [<ffff0000084c29a8>] __pci_register_driver+0x60/0x6c
+[77216.802047] [<ffff00000137bcb8>] drm_pci_init+0x108/0x138 [drm]
+[77216.808146] [<ffff000001530158>] nouveau_drm_init+0x158/0x10000 [nouveau]
+[77216.814922] [<ffff0000080831a8>] do_one_initcall+0x44/0x128
+[77216.820483] [<ffff0000081cad6c>] do_init_module+0x68/0x1e0
+[77216.825957] [<ffff000008150d84>] load_module+0xfac/0x12bc
+[77216.831343] [<ffff00000815132c>] SyS_finit_module+0xe4/0xf0
+[77216.836902] [<ffff000008082b70>] el0_svc_naked+0x24/0x28
+
+By default fedora is using a 64k page kernel, switching to a mainline 
+4.9-rc7 kernel using the same configuration the same problem exists 
+(there are a couple others, mentioned briefly in the defect). Changing 
+the mainline kernel from 64k to 4k pages corrects the problem and a 
+terminal display can be seen.
+
+The fedora defect is:
+https://bugzilla.redhat.com/show_bug.cgi?id=1400623
+
+
+Thanks,
