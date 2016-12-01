@@ -1,82 +1,144 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  1 Dec 2016 18:03:07 +0100
-Subject: [PATCH v6 net-next 4/7] net: mvneta: Convert to be 64 bits compatible
+Date: Thu,  1 Dec 2016 18:03:06 +0100
+Subject: [PATCH v6 net-next 3/7] net: mvneta: Use cacheable memory to store
+ the rx buffer virtual address
 In-Reply-To: <cover.dd374b7aaa358be0211d7ead81129a399fa692f4.1480611779.git-series.gregory.clement@free-electrons.com>
 References: <cover.dd374b7aaa358be0211d7ead81129a399fa692f4.1480611779.git-series.gregory.clement@free-electrons.com>
-Message-ID: <602540618cb1b9a586c8397233d4e97acaccdda1.1480611779.git-series.gregory.clement@free-electrons.com>
+Message-ID: <f7a7b88aa55aa1c43d4bfaf3d984d5138713ddb1.1480611779.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcin Wojtas <mw@semihalf.com>
+Until now the virtual address of the received buffer were stored in the
+cookie field of the rx descriptor. However, this field is 32-bits only
+which prevents to use the driver on a 64-bits architecture.
 
-Prepare the mvneta driver in order to be usable on the 64 bits platform
-such as the Armada 3700.
+With this patch the virtual address is stored in an array not shared with
+the hardware (no more need to use the DMA API). Thanks to this, it is
+possible to use cache contrary to the access of the rx descriptor member.
 
-[gregory.clement at free-electrons.com]: this patch was extract from a larger
-one to ease review and maintenance.
+The change is done in the swbm path only because the hwbm uses the cookie
+field, this also means that currently the hwbm is not usable in 64-bits.
 
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Reviewed-by: Jisheng Zhang <jszhang@marvell.com>
 Tested-by: Marcin Wojtas <mw@semihalf.com>
 ---
- drivers/net/ethernet/marvell/mvneta.c | 17 ++++++++++++++++-
- 1 file changed, 16 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/marvell/mvneta.c | 34 +++++++++++++++++++---------
+ 1 file changed, 24 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 92b9af14c352..8ef03fb69bcd 100644
+index f5319c50f8d9..92b9af14c352 100644
 --- a/drivers/net/ethernet/marvell/mvneta.c
 +++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -296,6 +296,12 @@
- /* descriptor aligned size */
- #define MVNETA_DESC_ALIGNED_SIZE	32
+@@ -561,6 +561,9 @@ struct mvneta_rx_queue {
+ 	u32 pkts_coal;
+ 	u32 time_coal;
  
-+/* Number of bytes to be taken into account by HW when putting incoming data
-+ * to the buffers. It is needed in case NET_SKB_PAD exceeds maximum packet
-+ * offset supported in MVNETA_RXQ_CONFIG_REG(q) registers.
-+ */
-+#define MVNETA_RX_PKT_OFFSET_CORRECTION		64
++	/* Virtual address of the RX buffer */
++	void  **buf_virt_addr;
 +
- #define MVNETA_RX_PKT_SIZE(mtu) \
- 	ALIGN((mtu) + MVNETA_MH_SIZE + MVNETA_VLAN_TAG_LEN + \
- 	      ETH_HLEN + ETH_FCS_LEN,			     \
-@@ -416,6 +422,7 @@ struct mvneta_port {
- 	u64 ethtool_stats[ARRAY_SIZE(mvneta_statistics)];
+ 	/* Virtual address of the RX DMA descriptors array */
+ 	struct mvneta_rx_desc *descs;
  
- 	u32 indir[MVNETA_RSS_LU_TABLE_SIZE];
-+	u16 rx_offset_correction;
- };
+@@ -1573,10 +1576,14 @@ static void mvneta_tx_done_pkts_coal_set(struct mvneta_port *pp,
  
- /* The mvneta_tx_desc and mvneta_rx_desc structures describe the
-@@ -1807,6 +1814,7 @@ static int mvneta_rx_refill(struct mvneta_port *pp,
+ /* Handle rx descriptor fill by setting buf_cookie and buf_phys_addr */
+ static void mvneta_rx_desc_fill(struct mvneta_rx_desc *rx_desc,
+-				u32 phys_addr, u32 cookie)
++				u32 phys_addr, void *virt_addr,
++				struct mvneta_rx_queue *rxq)
+ {
+-	rx_desc->buf_cookie = cookie;
++	int i;
++
+ 	rx_desc->buf_phys_addr = phys_addr;
++	i = rx_desc - rxq->descs;
++	rxq->buf_virt_addr[i] = virt_addr;
+ }
+ 
+ /* Decrement sent descriptors counter */
+@@ -1781,7 +1788,8 @@ EXPORT_SYMBOL_GPL(mvneta_frag_free);
+ 
+ /* Refill processing for SW buffer management */
+ static int mvneta_rx_refill(struct mvneta_port *pp,
+-			    struct mvneta_rx_desc *rx_desc)
++			    struct mvneta_rx_desc *rx_desc,
++			    struct mvneta_rx_queue *rxq)
+ 
+ {
+ 	dma_addr_t phys_addr;
+@@ -1799,7 +1807,7 @@ static int mvneta_rx_refill(struct mvneta_port *pp,
  		return -ENOMEM;
  	}
  
-+	phys_addr += pp->rx_offset_correction;
- 	mvneta_rx_desc_fill(rx_desc, phys_addr, data, rxq);
+-	mvneta_rx_desc_fill(rx_desc, phys_addr, (u32)data);
++	mvneta_rx_desc_fill(rx_desc, phys_addr, data, rxq);
  	return 0;
  }
-@@ -2782,7 +2790,7 @@ static int mvneta_rxq_init(struct mvneta_port *pp,
- 	mvreg_write(pp, MVNETA_RXQ_SIZE_REG(rxq->id), rxq->size);
  
- 	/* Set Offset */
--	mvneta_rxq_offset_set(pp, rxq, NET_SKB_PAD);
-+	mvneta_rxq_offset_set(pp, rxq, NET_SKB_PAD - pp->rx_offset_correction);
+@@ -1861,7 +1869,7 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
  
- 	/* Set coalescing pkts and time */
- 	mvneta_rx_pkts_coal_set(pp, rxq, rxq->pkts_coal);
-@@ -4033,6 +4041,13 @@ static int mvneta_probe(struct platform_device *pdev)
+ 	for (i = 0; i < rxq->size; i++) {
+ 		struct mvneta_rx_desc *rx_desc = rxq->descs + i;
+-		void *data = (void *)rx_desc->buf_cookie;
++		void *data = rxq->buf_virt_addr[i];
  
- 	pp->rxq_def = rxq_def;
+ 		dma_unmap_single(pp->dev->dev.parent, rx_desc->buf_phys_addr,
+ 				 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
+@@ -1894,12 +1902,13 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
+ 		unsigned char *data;
+ 		dma_addr_t phys_addr;
+ 		u32 rx_status, frag_size;
+-		int rx_bytes, err;
++		int rx_bytes, err, index;
  
-+	/* Set RX packet offset correction for platforms, whose
-+	 * NET_SKB_PAD, exceeds 64B. It should be 64B for 64-bit
-+	 * platforms and 0B for 32-bit ones.
-+	 */
-+	pp->rx_offset_correction =
-+		max(0, NET_SKB_PAD - MVNETA_RX_PKT_OFFSET_CORRECTION);
-+
- 	pp->indir[0] = rxq_def;
+ 		rx_done++;
+ 		rx_status = rx_desc->status;
+ 		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
+-		data = (unsigned char *)rx_desc->buf_cookie;
++		index = rx_desc - rxq->descs;
++		data = rxq->buf_virt_addr[index];
+ 		phys_addr = rx_desc->buf_phys_addr;
  
- 	pp->clk = devm_clk_get(&pdev->dev, "core");
+ 		if (!mvneta_rxq_desc_is_first_last(rx_status) ||
+@@ -1938,7 +1947,7 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
+ 		}
+ 
+ 		/* Refill processing */
+-		err = mvneta_rx_refill(pp, rx_desc);
++		err = mvneta_rx_refill(pp, rx_desc, rxq);
+ 		if (err) {
+ 			netdev_err(dev, "Linux processing - Can't refill\n");
+ 			rxq->missed++;
+@@ -2020,7 +2029,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
+ 		rx_done++;
+ 		rx_status = rx_desc->status;
+ 		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
+-		data = (unsigned char *)rx_desc->buf_cookie;
++		data = (u8 *)(uintptr_t)rx_desc->buf_cookie;
+ 		phys_addr = rx_desc->buf_phys_addr;
+ 		pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc);
+ 		bm_pool = &pp->bm_priv->bm_pools[pool_id];
+@@ -2716,7 +2725,7 @@ static int mvneta_rxq_fill(struct mvneta_port *pp, struct mvneta_rx_queue *rxq,
+ 
+ 	for (i = 0; i < num; i++) {
+ 		memset(rxq->descs + i, 0, sizeof(struct mvneta_rx_desc));
+-		if (mvneta_rx_refill(pp, rxq->descs + i) != 0) {
++		if (mvneta_rx_refill(pp, rxq->descs + i, rxq) != 0) {
+ 			netdev_err(pp->dev, "%s:rxq %d, %d of %d buffs  filled\n",
+ 				__func__, rxq->id, i, num);
+ 			break;
+@@ -3865,6 +3874,11 @@ static int mvneta_init(struct device *dev, struct mvneta_port *pp)
+ 		rxq->size = pp->rx_ring_size;
+ 		rxq->pkts_coal = MVNETA_RX_COAL_PKTS;
+ 		rxq->time_coal = MVNETA_RX_COAL_USEC;
++		rxq->buf_virt_addr = devm_kmalloc(pp->dev->dev.parent,
++						  rxq->size * sizeof(void *),
++						  GFP_KERNEL);
++		if (!rxq->buf_virt_addr)
++			return -ENOMEM;
+ 	}
+ 
+ 	return 0;
 -- 
 git-series 0.8.10
