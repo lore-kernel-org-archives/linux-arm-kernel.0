@@ -1,25 +1,28 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 1 Dec 2016 20:56:16 +0800
-Subject: [PATCH] crypto: arm/aesbs - Select SIMD in Kconfig
-In-Reply-To: <20161130234826.854879-1-arnd@arndb.de>
-References: <20161130234826.854879-1-arnd@arndb.de>
-Message-ID: <20161201125616.GB2249@gondor.apana.org.au>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 1 Dec 2016 12:57:53 +0000
+Subject: [PATCH] KVM: arm/arm64: vgic: Don't notify EOI for non-SPIs
+In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA81747812F@lhreml504-mbs>
+References: <1480584341-32340-1-git-send-email-marc.zyngier@arm.com>
+ <1480584341-32340-2-git-send-email-marc.zyngier@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA817475F7E@lhreml504-mbs>
+ <be0586f4-57b7-b732-f97e-34798f57e066@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA81747812F@lhreml504-mbs>
+Message-ID: <0c69099a-06b4-cf84-9578-138350c0d5ba@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2016 at 12:47:59AM +0100, Arnd Bergmann wrote:
-> Commit 585b5fa63da9 ("crypto: arm/aes - Select SIMD in Kconfig") added
-> the dependency for CRYPTO_AES_ARM_CE, but missed the same change
-> for CRYPTO_AES_ARM_BS:
-> 
-> arch/arm/crypto/aes-arm-bs.o: In function `aesbs_mod_init':
-> aesbs-glue.c:(.init.text+0x38): undefined reference to `simd_skcipher_create_compat'
-> 
-> Fixes: 211f41af534a ("crypto: aesbs - Convert to skcipher")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On 01/12/16 12:15, Shameerali Kolothum Thodi wrote:
 
-Thanks Arnd.  This should already be fixed by 6fdf436fd854.
+>> For these interrupts, which are purely virtual, there is absolutely
+>> nothing to do at the physical distributor level anyway. Furthermore,
+>> kvm_notify_acked_irq doesn't know about per-cpu interrupt, which is why
+>> we cannot notify them.
+> 
+> Just to confirm, that means for any phys interrupt(PPI/SPI) to be injected
+> to the Guest, the mapping bit has(HW bit set) to be used.
+
+Yup.
+
+	M.
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Jazz is not dead. It just smells funny...
