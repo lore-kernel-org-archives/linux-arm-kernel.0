@@ -1,46 +1,168 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 1 Dec 2016 09:45:11 +0000
-Subject: [PATCH v3 2/3] powerpc/reloc64: add support for 32-bit CRC
- pseudo-symbols
-In-Reply-To: <874m2ooumq.fsf@concordia.ellerman.id.au>
-References: <1477585631-18574-1-git-send-email-ard.biesheuvel@linaro.org>
- <1477585631-18574-3-git-send-email-ard.biesheuvel@linaro.org>
- <87oa13ssqq.fsf@concordia.ellerman.id.au>
- <CAKv+Gu8g=qgOg0Q5J7tFu0uBUFTUXdVQ+84N45oZseG3vTm0Bg@mail.gmail.com>
- <874m2ooumq.fsf@concordia.ellerman.id.au>
-Message-ID: <CAKv+Gu_nPdQXxBnEYhYVt02SFbYx_bYtfU9LE8OkL5o0P5suOA@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 1 Dec 2016 10:51:36 +0100
+Subject: [PATCH 1/4] mmc: mediatek: Fix CMD6 timeout issue
+In-Reply-To: <1478585341-6749-2-git-send-email-yong.mao@mediatek.com>
+References: <1478585341-6749-1-git-send-email-yong.mao@mediatek.com>
+ <1478585341-6749-2-git-send-email-yong.mao@mediatek.com>
+Message-ID: <CAPDyKFosQkxaFAKo0dm0TajgXqKG7XqRM1tTqR2vTsHzVrocfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 December 2016 at 09:39, Michael Ellerman <mpe@ellerman.id.au> wrote:
-> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
->> On 25 November 2016 at 11:29, Michael Ellerman <mpe@ellerman.id.au> wrote:
->>> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
->>>
->>> [    7.607687] kvm: disagrees about version of symbol module_layout
->>> [    7.846799] virtio: disagrees about version of symbol module_layout
->>> [   22.012615] crc32c_vpmsum: disagrees about version of symbol module_layout
->>> [   22.012959] libcrc32c: disagrees about version of symbol module_layout
->>>
->>
->> Sigh. I suppose your modversions fixes are queued for v4.10? It's
->> probably best to revisit this after the v4.10 merge window closes
->> then, just to make sure I'm not aiming for a moving target.
+On 8 November 2016 at 07:08, Yong Mao <yong.mao@mediatek.com> wrote:
+> From: yong mao <yong.mao@mediatek.com>
 >
-> Actually they were merged into 4.9-rc7 ish.
+> When initializing EMMC, after switch to HS400,
+> it will issue CMD6 to change ext_csd, if first CMD6 got CRC
+> error, the repeat CMD6 may get timeout, that's
+> because SDCBSY was cleared by msdc_reset_hw()
+
+Sorry for the delay!
+
+We have recently been re-working the sequence for how to deal more
+properly with CMD6 in the mmc core.
+
+The changes done so far should mostly concern switches to HS and HS
+DDR, but I think you should run a re-test to make sure you still hit
+the same problems.
+
 >
-> But I'm still seeing the same as above with this series rebased on top
-> of that, and I'm a bit short on time to debug it ATM.
+> Signed-off-by: Yong Mao <yong.mao@mediatek.com>
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> ---
+>  drivers/mmc/host/mtk-sd.c |   77 ++++++++++++++++++++++++++++++---------------
+>  1 file changed, 51 insertions(+), 26 deletions(-)
 >
-> So during the 4.10 cycle is probably the best we can hope for, sorry.
+> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+> index 84e9afc..b29683b 100644
+> --- a/drivers/mmc/host/mtk-sd.c
+> +++ b/drivers/mmc/host/mtk-sd.c
+> @@ -826,6 +826,15 @@ static bool msdc_cmd_done(struct msdc_host *host, int events,
+>         return true;
+>  }
+>
+> +static int msdc_card_busy(struct mmc_host *mmc)
+> +{
+> +       struct msdc_host *host = mmc_priv(mmc);
+> +       u32 status = readl(host->base + MSDC_PS);
+> +
+> +       /* check if data0 is low */
+> +       return !(status & BIT(16));
+> +}
+> +
+>  /* It is the core layer's responsibility to ensure card status
+>   * is correct before issue a request. but host design do below
+>   * checks recommended.
+
+Hmm. Why?
+
+I think you should rely on the mmc core to invoke the ->card_busy()
+ops instead. The core knows better when it's needed.
+
+Perhaps that may also resolve some of these issues for you!?
+
+> @@ -835,10 +844,20 @@ static inline bool msdc_cmd_is_ready(struct msdc_host *host,
+>  {
+>         /* The max busy time we can endure is 20ms */
+>         unsigned long tmo = jiffies + msecs_to_jiffies(20);
+> +       u32 count = 0;
+> +
+> +       if (in_interrupt()) {
+> +               while ((readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) &&
+> +                      (count < 1000)) {
+> +                       udelay(1);
+> +                       count++;
+
+This seems like a bad idea, "busy-wait" in irq context is never a good idea.
+
+> +               }
+> +       } else {
+> +               while ((readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) &&
+> +                      time_before(jiffies, tmo))
+> +                       cpu_relax();
+> +       }
+>
+> -       while ((readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) &&
+> -                       time_before(jiffies, tmo))
+> -               cpu_relax();
+>         if (readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) {
+>                 dev_err(host->dev, "CMD bus busy detected\n");
+>                 host->error |= REQ_CMD_BUSY;
+> @@ -846,17 +865,35 @@ static inline bool msdc_cmd_is_ready(struct msdc_host *host,
+>                 return false;
+>         }
+>
+> -       if (mmc_resp_type(cmd) == MMC_RSP_R1B || cmd->data) {
+> -               tmo = jiffies + msecs_to_jiffies(20);
+> -               /* R1B or with data, should check SDCBUSY */
+> -               while ((readl(host->base + SDC_STS) & SDC_STS_SDCBUSY) &&
+> -                               time_before(jiffies, tmo))
+> -                       cpu_relax();
+> -               if (readl(host->base + SDC_STS) & SDC_STS_SDCBUSY) {
+> -                       dev_err(host->dev, "Controller busy detected\n");
+> -                       host->error |= REQ_CMD_BUSY;
+> -                       msdc_cmd_done(host, MSDC_INT_CMDTMO, mrq, cmd);
+> -                       return false;
+> +       if (cmd->opcode != MMC_SEND_STATUS) {
+> +               count = 0;
+> +               /* Consider that CMD6 crc error before card was init done,
+> +                * mmc_retune() will return directly as host->card is null.
+> +                * and CMD6 will retry 3 times, must ensure card is in transfer
+> +                * state when retry.
+> +                */
+> +               tmo = jiffies + msecs_to_jiffies(60 * 1000);
+> +               while (1) {
+> +                       if (msdc_card_busy(host->mmc)) {
+> +                               if (in_interrupt()) {
+> +                                       udelay(1);
+> +                                       count++;
+> +                               } else {
+> +                                       msleep_interruptible(10);
+> +                               }
+> +                       } else {
+> +                               break;
+> +                       }
+> +                       /* Timeout if the device never
+> +                        * leaves the program state.
+> +                        */
+> +                       if (count > 1000 || time_after(jiffies, tmo)) {
+> +                               pr_err("%s: Card stuck in programming state! %s\n",
+> +                                      mmc_hostname(host->mmc), __func__);
+> +                               host->error |= REQ_CMD_BUSY;
+> +                               msdc_cmd_done(host, MSDC_INT_CMDTMO, mrq, cmd);
+> +                               return false;
+> +                       }
+
+This hole new code is a hack, that shouldn't be needed in the host driver.
+
+I think we need to investigate and fix the issue in the mmc core
+layer, to make this work for your host driver. That instead of doing a
+work around in the host.
+
+>                 }
+>         }
+>         return true;
+> @@ -1070,18 +1107,6 @@ static int msdc_ops_switch_volt(struct mmc_host *mmc, struct mmc_ios *ios)
+>         return ret;
+>  }
+>
+> -static int msdc_card_busy(struct mmc_host *mmc)
+> -{
+> -       struct msdc_host *host = mmc_priv(mmc);
+> -       u32 status = readl(host->base + MSDC_PS);
+> -
+> -       /* check if any pin between dat[0:3] is low */
+> -       if (((status >> 16) & 0xf) != 0xf)
+> -               return 1;
+> -
+> -       return 0;
+> -}
+> -
+>  static void msdc_request_timeout(struct work_struct *work)
+>  {
+>         struct msdc_host *host = container_of(work, struct msdc_host,
+> --
+> 1.7.9.5
 >
 
-Not a problem. The only question is whether 1/3 of this series fixes
-an actual bug or not, given that the CONFIG_RELOCATABLE workaround has
-been made ppc64 only.
-
-But for the remaining patches, I'm happy to respin after the v4.10
-merge window closes, and get something queued for v4.11
-
--- 
-Ard.
+Kind regards
+Uffe
