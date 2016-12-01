@@ -1,28 +1,51 @@
-From: wsa-dev@sang-engineering.com (Wolfram Sang)
-Date: Thu, 1 Dec 2016 23:37:19 +0100
-Subject: [PATCH v7 3/4] arm64: dts: marvell: Add I2C definitions for the
- Armada 3700
-In-Reply-To: <20161201110440.27530-4-romain.perier@free-electrons.com>
-References: <20161201110440.27530-1-romain.perier@free-electrons.com>
- <20161201110440.27530-4-romain.perier@free-electrons.com>
-Message-ID: <20161201223719.GD19261@katana>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 01 Dec 2016 23:37:39 +0100
+Subject: [PATCH v2] PCI: Add information about describing PCI in ACPI
+In-Reply-To: <20161201223604.GC15867@bhelgaas-glaptop.roam.corp.google.com>
+References: <20161129212816.15663.28100.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <20161201223604.GC15867@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <47776378.8X3TnsHd3Q@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2016 at 12:04:39PM +0100, Romain Perier wrote:
-> The Armada 3700 has two i2c bus interface units, this commit adds the
-> definitions of the corresponding device nodes. It also enables the node
-> on the development board for this SoC.
+On Thursday, December 01, 2016 04:36:04 PM Bjorn Helgaas wrote:
+> On Tue, Nov 29, 2016 at 03:39:48PM -0600, Bjorn Helgaas wrote:
+> > Here's another stab at this writeup.  I'd appreciate any comments!
+> > 
+> > Changes from v1 to v2:
+> >   - Consumer/Producer is defined for Extended Address Space descriptors;
+> >     should be ignored for QWord/DWord/Word Address Space descriptors
+> >   - New arches may use Extended Address Space descriptors in PNP0A03 for
+> >     bridge registers, including ECAM (if the arch adds support for this)
+> >   - Add more details about MCFG and _CBA (Lv's suggestion)
+> >   - Incorporate Rafael's suggestions
+> > 
+> > ---
+> > 
+> > Bjorn Helgaas (1):
+> >       PCI: Add information about describing PCI in ACPI
+> > 
+> > 
+> >  Documentation/PCI/00-INDEX      |    2 
+> >  Documentation/PCI/acpi-info.txt |  180 +++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 182 insertions(+)
+> >  create mode 100644 Documentation/PCI/acpi-info.txt
 > 
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> It's very late in the cycle, but I'm considering trying to squeeze
+> this into v4.9 on the grounds that:
+> 
+>   - It's only a documentation change and can't break anything, and
+> 
+>   - Distributing it more widely may help the arm64 firmware ecosystem
+> 
+> But I don't want to disseminate misleading or incorrect information,
+> so if it needs clarification or wordsmithing, or even just maturation,
+> I'll wait until v4.10.
+> 
+> The Consumer/Producer stuff, in particular, doesn't seem 100% settled
+> yet.  Your thoughts, and especially your improvements, are welcome!
 
-This needs to go via arm-soc.
+Well, what's the drawback if it doesn't go into 4.9?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161201/1638dc2e/attachment.sig>
+Thanks,
+Rafael
