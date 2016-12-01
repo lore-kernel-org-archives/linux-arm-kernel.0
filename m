@@ -1,104 +1,67 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 1 Dec 2016 11:47:20 -0600
-Subject: [PATCH v3] ARM: davinci: da8xx: Fix sleeping function called from
- invalid context
-In-Reply-To: <1480612342-23614-1-git-send-email-abailon@baylibre.com>
-References: <1480612342-23614-1-git-send-email-abailon@baylibre.com>
-Message-ID: <76e7853b-8235-173a-7214-c450487751c6@lechnology.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 1 Dec 2016 11:52:12 -0600
+Subject: [PATCH V1 1/2] PCI: thunder: Enable ACPI PCI controller for
+ ThunderX pass2.x silicon version
+In-Reply-To: <20161201145450.GA10353@red-moon>
+References: <1479201298-25494-1-git-send-email-tn@semihalf.com>
+ <1479201298-25494-2-git-send-email-tn@semihalf.com>
+ <20161201002812.GB9409@bhelgaas-glaptop.roam.corp.google.com>
+ <eba92ea8-bdab-9a3a-7b18-caaeac15db5d@semihalf.com>
+ <20161201135549.GP2213@rric.localdomain>
+ <20161201145450.GA10353@red-moon>
+Message-ID: <20161201175212.GC30746@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/2016 11:12 AM, Alexandre Bailon wrote:
-> Everytime the usb20 phy is enabled, there is a
+On Thu, Dec 01, 2016 at 02:54:50PM +0000, Lorenzo Pieralisi wrote:
+> On Thu, Dec 01, 2016 at 02:55:49PM +0100, Robert Richter wrote:
+> > Tomasz, Bjorn,
+> > 
+> > On 01.12.16 09:49:51, Tomasz Nowicki wrote:
+> > > I put the picture together here (on top of your pci/ecam branch):
+> > > [1] https://github.com/semihalf-nowicki-tomasz/linux/commits/pci-quirks-thunderx-v2
+> > 
+> > please note that acpi_* functions must be protected with acpi_disabled
+> > or something else to make sure an acpi enabled kernel does not break
+> > dt. See the crash below with above branch.
+> 
+> You could use struct device.of_node, or just move the MCFG check to ACPI
+> code that probes the root bus in arm64 before calling pci_ecam_create()
+> which will save you some ifdeffery too while at it.
 
-Every time is two words
+Oh, I like that idea even better!  I took the acpi_disabled check back out
+of acpi_resource_consumer() and moved the call to
+pci_acpi_setup_ecam_mapping().  Thanks!
 
-> "sleeping function called from invalid context" BUG.
->
-> clk_enable() from arch/arm/mach-davinci/clock.c uses spin_lock_irqsave()
-> before to invoke the callback usb20_phy_clk_enable().
-> usb20_phy_clk_enable() uses clk_get() and clk_enable_prepapre()
-> which may sleep.
-> Move clk_get() to da8xx_register_usb20_phy_clk() and
-> replace clk_prepare_enable() by clk_enable().
->
-> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
-> ---
->  arch/arm/mach-davinci/usb-da8xx.c | 23 ++++++++++++-----------
->  1 file changed, 12 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
-> index b010e5f..bfb55b9 100644
-> --- a/arch/arm/mach-davinci/usb-da8xx.c
-> +++ b/arch/arm/mach-davinci/usb-da8xx.c
-> @@ -156,23 +156,18 @@ int __init da8xx_register_usb_refclkin(int rate)
->  	return 0;
->  }
->
-> +static struct clk *usb20_clk;
-
-Not a serious issue, but I would rather have the global variable 
-declared at the beginning of the file to make it more obvious there is a 
-global variable.
-
-> +
->  static void usb20_phy_clk_enable(struct clk *clk)
->  {
-> -	struct clk *usb20_clk;
->  	int err;
->  	u32 val;
->  	u32 timeout = 500000; /* 500 msec */
->
->  	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
->
-> -	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
-> -	if (IS_ERR(usb20_clk)) {
-> -		pr_err("could not get usb20 clk: %ld\n", PTR_ERR(usb20_clk));
-> -		return;
-> -	}
-> -
->  	/* The USB 2.O PLL requires that the USB 2.O PSC is enabled as well. */
-> -	err = clk_prepare_enable(usb20_clk);
-> +	err = clk_enable(usb20_clk);
->  	if (err) {
->  		pr_err("failed to enable usb20 clk: %d\n", err);
->  		clk_put(usb20_clk);
-> @@ -197,8 +192,7 @@ static void usb20_phy_clk_enable(struct clk *clk)
->
->  	pr_err("Timeout waiting for USB 2.0 PHY clock good\n");
->  done:
-> -	clk_disable_unprepare(usb20_clk);
-> -	clk_put(usb20_clk);
-> +	clk_disable(usb20_clk);
->  }
->
->  static void usb20_phy_clk_disable(struct clk *clk)
-> @@ -287,9 +281,16 @@ int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
->  	struct clk *parent;
->  	int ret = 0;
-
-No longer need to initialize ret here.
-
->
-> +	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
-> +	ret = PTR_ERR_OR_ZERO(usb20_clk);
-> +	if (ret)
-> +		return ret;
-> +
->  	parent = clk_get(NULL, use_usb_refclkin ? "usb_refclkin" : "pll0_aux");
-> -	if (IS_ERR(parent))
-> +	if (IS_ERR(parent)) {
-
-why not use ret = PTR_ERR_OR_ZERO(parent) pattern here too?
-
-> +		clk_put(usb20_clk);
-
-The global usb20_clk is no longer valid after this. Should we set it to 
-NULL here?
-
->  		return PTR_ERR(parent);
-> +	}
->
->  	usb20_phy_clk.parent = parent;
->  	ret = clk_register(&usb20_phy_clk);
->
+> > [   12.493028] Unable to handle kernel NULL pointer dereference at virtual address 00000018
+> > [   12.501113] pgd = ffff0000090a0000
+> > [   12.504511] [00000018] *pgd=0000010fffef0003[   12.508602] , *pud=0000010fffef0003
+> > , *pmd=0000010fffee0003[   12.514093] , *pte=0000000000000000
+> > [   12.517575]
+> > [   12.519064] Internal error: Oops: 96000005 [#1] SMP
+> > [   12.523933] Modules linked in:
+> > [   12.526987] CPU: 73 PID: 1 Comm: swapper/0 Tainted: G        W       4.9.0-rc6.0.vanilla10-00019-g09abd2b6bbeb #135
+> > [   12.537409] Hardware name: Cavium ThunderX CRB/To be filled by O.E.M., BIOS 5.11 12/12/2012
+> > [   12.545748] task: ffff800fe85b8000 task.stack: ffff800ff4288000
+> > [   12.551674] PC is at acpi_ns_walk_namespace+0x68/0x1d4
+> > [   12.556803] LR is at acpi_get_devices+0x6c/0x94
+> > ...
+> > [   13.124920] [<ffff0000084dc5a0>] acpi_ns_walk_namespace+0x68/0x1d4
+> > [   13.131090] [<ffff0000084dcadc>] acpi_get_devices+0x6c/0x94
+> > [   13.136663] [<ffff0000084c0aec>] acpi_resource_consumer+0x34/0x44
+> > [   13.142752] [<ffff000008496bc0>] pci_ecam_create+0x80/0x228
+> > [   13.148314] [<ffff000008498e64>] pci_host_common_probe+0x294/0x348
+> > [   13.154486] [<ffff00000849bf3c>] thunder_ecam_probe+0x2c/0x38
+> > [   13.160226] [<ffff0000085880b8>] platform_drv_probe+0x60/0xc8
+> > [   13.165970] [<ffff000008585a04>] driver_probe_device+0x26c/0x420
+> > [   13.171966] [<ffff000008585cdc>] __driver_attach+0x124/0x128
+> > [   13.177615] [<ffff000008583238>] bus_for_each_dev+0x70/0xb0
+> > [   13.183177] [<ffff000008585060>] driver_attach+0x30/0x40
+> > [   13.188478] [<ffff000008584a98>] bus_add_driver+0x200/0x2b8
+> > [   13.194041] [<ffff000008586860>] driver_register+0x68/0x100
+> > [   13.199602] [<ffff000008587fdc>] __platform_driver_register+0x54/0x60
+> > [   13.206038] [<ffff000008c39b98>] thunder_ecam_driver_init+0x18/0x20
+> > [   13.212296] [<ffff000008082d94>] do_one_initcall+0x44/0x138
+> > [   13.217862] [<ffff000008c00d0c>] kernel_init_freeable+0x1ac/0x24c
+> > [   13.223950] [<ffff0000088605f0>] kernel_init+0x18/0x110
+> > [   13.229165] [<ffff000008082b30>] ret_from_fork+0x10/0x20
