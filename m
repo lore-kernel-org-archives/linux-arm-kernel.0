@@ -1,154 +1,64 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 1 Dec 2016 10:10:00 -0600
-Subject: [PATCH 4/5] regulator: Add support for TI TWL6032
-In-Reply-To: <20161126181326.14951-5-Nicolae_Rosia@mentor.com>
-References: <20161126181326.14951-1-Nicolae_Rosia@mentor.com>
- <20161126181326.14951-5-Nicolae_Rosia@mentor.com>
-Message-ID: <20161201161000.3g3eqi2xuch62lwy@rob-hp-laptop>
+Date: Thu, 1 Dec 2016 10:13:43 -0600
+Subject: [PATCH 1/2] Documentation: sample averaging for imx6ul_tsc
+In-Reply-To: <1480232698-23075-1-git-send-email-guy.shapiro@mobi-wize.com>
+References: <1480232698-23075-1-git-send-email-guy.shapiro@mobi-wize.com>
+Message-ID: <20161201161343.g7p2maxiatp4m5di@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 26, 2016 at 08:13:25PM +0200, Nicolae Rosia wrote:
-> The TWL6032 PMIC is similar to TWL6030, has different
-> output names, and regulator control logic.
-> It is used on Barnes & Noble Nook HD and HD+.
+On Sun, Nov 27, 2016 at 09:44:57AM +0200, Guy Shapiro wrote:
+> The i.MX6UL internal touchscreen controller contains an option to
+> average upon samples. This feature reduces noise from the produced
+> touch locations.
 > 
-> Signed-off-by: Nicolae Rosia <Nicolae_Rosia@mentor.com>
+> This patch introduces a new device tree optional property for this
+> feature. It provides control over the amount of averaged samples per
+> touch event.
+> 
+> The property was inspired by a similar property on the
+> "brcm,iproc-touchscreen" binding.
+> 
+> Signed-off-by: Guy Shapiro <guy.shapiro@mobi-wize.com>
 > ---
->  .../bindings/regulator/twl6032-regulator.txt       | 109 ++++
->  drivers/regulator/Kconfig                          |   7 +
->  drivers/regulator/Makefile                         |   1 +
->  drivers/regulator/twl6032-regulator.c              | 582 +++++++++++++++++++++
->  4 files changed, 699 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/regulator/twl6032-regulator.txt
->  create mode 100644 drivers/regulator/twl6032-regulator.c
+>  .../devicetree/bindings/input/touchscreen/imx6ul_tsc.txt          | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/regulator/twl6032-regulator.txt b/Documentation/devicetree/bindings/regulator/twl6032-regulator.txt
-> new file mode 100644
-> index 0000000..323f5a9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/regulator/twl6032-regulator.txt
-> @@ -0,0 +1,109 @@
-> +TWL6032 PMIC Voltage Regulator Bindings
-> +
-> +The parent node must be MFD TWL Core, ti,twl6032.
-> +
-> +Required properties:
-> +- compatible: "ti,twl6032"
-> +
-> +Optional properties:
-> +- regulators node containing regulator childs.
+> diff --git a/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt b/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
+> index 853dff9..a66069f 100644
+> --- a/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
+> +++ b/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
+> @@ -17,6 +17,13 @@ Optional properties:
+>    This value depends on the touch screen.
+>  - pre-charge-time: the touch screen need some time to precharge.
+>    This value depends on the touch screen.
+> +- average-samples: Number of data samples which are averaged for each read.
+> +	Valid values 0-4
+> +	0 =  1 sample
+> +	1 =  4 samples
+> +	2 =  8 samples
+> +	3 = 16 samples
+> +	4 = 32 samples
 
-s/childs/children/
+Either this needs a vendor prefix or should be documented as a generic 
+property. In the latter case, you should use actual number of samples 
+(1-32) for the values.
 
-regulators node is not a property.
-
-> +
-> +The child regulators  must be named after their hardware
-
-extra space             ^
-
-> +counterparts: LDO[1-6], LDOLN, LDOUSB and VANA.
-> +
-> +Each regulator is defined using the standard binding
-> +for regulators as described in ./regulator.txt
-> +
-> +Example:
-> +twl {
-> +	compatible = "ti,twl6032";
-> +
-> +	[...]
-> +
-> +	pmic {
-> +		compatible = "ti,twl6032-regulator";
-
-Not documented.
-
-> +
-> +		regulators {
-
-Do you really need pmic node and regulators node?
-
-> +			ldo1: LDO1 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <2500000>;
-> +
-> +				regulator-state-mem {
-> +					regulator-off-in-suspend;
-> +				};
-> +			};
-> +
-> +			ldo2: LDO2 {
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <3000000>;
-> +
-> +				regulator-state-mem {
-> +					regulator-off-in-suspend;
-> +				};
-> +			};
-> +
-> +			ldo3: LDO3 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-boot-on;
-> +
-> +				regulator-state-mem {
-> +					regulator-off-in-suspend;
-> +				};
-> +			};
-> +
-> +			ldo4: LDO4 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +
-> +				regulator-state-mem {
-> +					regulator-off-in-suspend;
-> +				};
-> +			};
-> +
-> +			ldo5: LDO5 {
-> +				regulator-min-microvolt = <1200000>;
-> +				regulator-max-microvolt = <3000000>;
-> +
-> +				regulator-state-mem {
-> +					regulator-off-in-suspend;
-> +				};
-> +			};
-> +
-> +			ldo6: LDO6 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-always-on;
-> +
-> +				regulator-state-mem {
-> +					regulator-off-in-suspend;
-> +				};
-> +			};
-> +
-> +			ldo7: LDO7 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldoln: LDOLN {
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <3000000>;
-> +			};
-> +
-> +			ldousb: LDOUSB {
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <3000000>;
-> +			};
-> +
-> +			vana: VANA {
-> +				regulator-min-microvolt = <2100000>;
-> +				regulator-max-microvolt = <2100000>;
-> +				regulator-always-on;
-> +			};
-> +		};
-> +	};
-> +
-> +	[...]
-> +};
+>  
+>  Example:
+>  	tsc: tsc at 02040000 {
+> @@ -32,5 +39,6 @@ Example:
+>  		xnur-gpio = <&gpio1 3 GPIO_ACTIVE_LOW>;
+>  		measure-delay-time = <0xfff>;
+>  		pre-charge-time = <0xffff>;
+> +		average-samples = <4>;
+>  		status = "okay";
+>  	};
+> -- 
+> 2.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
