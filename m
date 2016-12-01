@@ -1,67 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  1 Dec 2016 09:25:41 +0000
-Subject: [PATCH] KVM: arm/arm64: vgic: Don't notify EOI for non-SPIs
-In-Reply-To: <1480584341-32340-1-git-send-email-marc.zyngier@arm.com>
-References: <1480584341-32340-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1480584341-32340-2-git-send-email-marc.zyngier@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 01 Dec 2016 11:28:45 +0200
+Subject: How should we group related devices in DT ? (was Re: [PATCH v7 0/8]
+ drm: sun8i: Add DE2 HDMI video support)
+In-Reply-To: <20161201091313.th7nucjmvtuolqza@lukather>
+References: <cover.1480414715.git.moinejf@free.fr> <2039137.LtCOH6bs2I@avalon>
+ <20161201091313.th7nucjmvtuolqza@lukather>
+Message-ID: <2679960.kPaBMLjofm@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we inject a level triggerered interrupt (and unless it
-is backed by the physical distributor - timer style), we request
-a maintenance interrupt. Part of the processing for that interrupt
-is to feed to the rest of KVM (and to the eventfd subsystem) the
-information that the interrupt has been EOIed.
+Hello,
 
-But that notification only makes sense for SPIs, and not PPIs
-(such as the PMU interrupt). Skip over the notification if
-the interrupt is not an SPI.
+On Thursday 01 Dec 2016 10:13:13 Maxime Ripard wrote:
 
-Cc: stable at vger.kernel.org # 4.7+
-Fixes: 140b086dd197 ("KVM: arm/arm64: vgic-new: Add GICv2 world switch backend")
-Fixes: 59529f69f504 ("KVM: arm/arm64: vgic-new: Add GICv3 world switch backend")
-Reported-by: Catalin Marinas <catalin.marinas@arm.com>
-Tested-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic/vgic-v2.c | 6 ++++--
- virt/kvm/arm/vgic/vgic-v3.c | 6 ++++--
- 2 files changed, 8 insertions(+), 4 deletions(-)
+[snip]
 
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 0a063af..9bab867 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -50,8 +50,10 @@ void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu)
- 
- 			WARN_ON(cpuif->vgic_lr[lr] & GICH_LR_STATE);
- 
--			kvm_notify_acked_irq(vcpu->kvm, 0,
--					     intid - VGIC_NR_PRIVATE_IRQS);
-+			/* Only SPIs require notification */
-+			if (vgic_valid_spi(vcpu->kvm, intid))
-+				kvm_notify_acked_irq(vcpu->kvm, 0,
-+						     intid - VGIC_NR_PRIVATE_IRQS);
- 		}
- 	}
- 
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 9f0dae3..5c9f974 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -41,8 +41,10 @@ void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
- 
- 			WARN_ON(cpuif->vgic_lr[lr] & ICH_LR_STATE);
- 
--			kvm_notify_acked_irq(vcpu->kvm, 0,
--					     intid - VGIC_NR_PRIVATE_IRQS);
-+			/* Only SPIs require notification */
-+			if (vgic_valid_spi(vcpu->kvm, intid))
-+				kvm_notify_acked_irq(vcpu->kvm, 0,
-+						     intid - VGIC_NR_PRIVATE_IRQS);
- 		}
- 
- 		/*
+> The earlier Allwinner SoCs (with the old display engine), we had some
+> SoCs with multiple instances of the display engine and TCON (the
+> display engine roughly implementing the planes, the TCON the
+> CRTC. Roughly.). However, those were sharing some encoders (HDMI,
+> DSI) after that.
+> 
+> So we need to have a single DRM device taking care of the multiple
+> display engines, which essentialy means that we have to decouple the
+> DRM device from the display engine. This was done in the earlier
+> designs using an additional node with a list of phandles to the
+> display engines in the system, and obviously, I'd prefer to have some
+> consistency and reuse the same thing.
+
+I believe this problem isn't limited to sunxi and should be addressed in a 
+more generic way. How should we describe in the device tree that multiple 
+instances of a device unrelated from a control point of view are related at 
+the hardware level ? There are multiple reasons why we need this, and here are 
+a few.
+
+- As described above, unrelated display controller instances that share 
+encoders at their output need to be exposed to userspace as a single DRM 
+device. This is also the case on Renesas platforms (where the display engines 
+are independent except for the "small" detail that output routing is 
+controlled through the first display engine).
+
+- On Renesas platforms again a radio-related SPI receiver has multiple 
+independent channels that each have their own registers, clocks and 
+interrupts, but share the same physical clock and sync pins. They are used to 
+receive multiple channels of the same data stream and must be exposed as a 
+single V4L2 device to userspace. A generic DT binding RFC is available at 
+http://www.spinics.net/lists/devicetree/msg152414.html.
+
+> But the current approach doesn't work and will require some DT
+> modifications if that case happens again, which we can't do because of
+> the DT ABI.
+
 -- 
-2.1.4
+Regards,
+
+Laurent Pinchart
