@@ -1,32 +1,18 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  1 Dec 2016 10:07:26 +0100
-Subject: [PATCH] arm64: dts: h3ulcb: Provide sd0_uhs node
-Message-ID: <1480583246-6707-1-git-send-email-horms+renesas@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 01 Dec 2016 10:11:27 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC Match Updates for v4.10
+In-Reply-To: <20161201084758.GC18042@verge.net.au>
+References: <cover.1479928995.git.horms+renesas@verge.net.au>
+ <6791283.iMDbrK21lt@wuerfel> <20161201084758.GC18042@verge.net.au>
+Message-ID: <44164466.K5fMVnHjtX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide separaate sd0 and sd0_uhs nodes rather than duplicate sd0 nodes.
+On Thursday, December 1, 2016 9:47:58 AM CET Simon Horman wrote:
 
-Cc: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Fixes: 93373c309a70 ("arm64: dts: h3ulcb: rename SDHI0 pins")
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Thanks for pulling this and other outstanding pull requests from Geert and
+> myself. I don't think we have anything more outstanding at this time.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-index 6ffb0517421a..dbea2c3d8f0c 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-@@ -169,7 +169,7 @@
- 		power-source = <3300>;
- 	};
- 
--	sdhi0_pins_uhs: sd0 {
-+	sdhi0_pins_uhs: sd0_uhs {
- 		groups = "sdhi0_data4", "sdhi0_ctrl";
- 		function = "sdhi0";
- 		power-source = <1800>;
--- 
-2.7.0.rc3.207.g0ac5344
+Ok, thanks for the confirmation!
+
+	Arnd
