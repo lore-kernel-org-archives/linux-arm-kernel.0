@@ -1,54 +1,140 @@
-From: kevin.brodsky@arm.com (Kevin Brodsky)
-Date: Thu, 1 Dec 2016 14:27:40 +0000
-Subject: [RFC PATCH v2 4/8] arm64: compat: Add a 32-bit vDSO
-In-Reply-To: <20161121184414.GC28723@e104818-lin.cambridge.arm.com>
-References: <20161027163058.12156-1-kevin.brodsky@arm.com>
- <20161027163058.12156-5-kevin.brodsky@arm.com>
- <20161028110926.0176e0ea@xhacker>
- <22ae46f6-f881-63ec-388d-8a7f6cf9934d@arm.com>
- <20161104200321.li3gzztg6p6xkwuh@localhost>
- <f5ff1b88-aba3-2c3a-f65f-66a2e00f4764@arm.com>
- <20161121184414.GC28723@e104818-lin.cambridge.arm.com>
-Message-ID: <70668250-d51b-a879-8ebf-66a07c178718@arm.com>
+From: csmanjuvijay@gmail.com (csmanjuvijay at gmail.com)
+Date: Thu,  1 Dec 2016 14:46:30 +0000
+Subject: [PATCH v2] USB: OHCI: ohci-s3c2410: remove useless functions
+In-Reply-To: <1480542166-7032-1-git-send-email-csmanjuvijay@gmail.com>
+References: <1480542166-7032-1-git-send-email-csmanjuvijay@gmail.com>
+Message-ID: <1480603590-23924-1-git-send-email-csmanjuvijay@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/11/16 18:44, Catalin Marinas wrote:
-> On Mon, Nov 21, 2016 at 03:45:55PM +0000, Kevin Brodsky wrote:
->> On 04/11/16 20:03, Catalin Marinas wrote:
->>> On Fri, Oct 28, 2016 at 11:20:07AM +0100, Kevin Brodsky wrote:
->>>> On 28/10/16 04:09, Jisheng Zhang wrote:
->>>>> On Thu, 27 Oct 2016 17:30:54 +0100 Kevin Brodsky wrote:
->>>>>> +# Force -O2 to avoid libgcc dependencies
->>>>>> +VDSO_CFLAGS := -march=armv8-a -O2
->>>>> For completeness, bringing 32bit compiler need to check whether the 32bit
->>>>> toolchain support some options. IIRC, armv8-a support isn't enabled until
->>>>> gcc 4.8, so old toolchains such gcc-4.7 will complain:
->>>>>    error: unrecognized argument in option ?-march=armv8-a?
->>>> That's a fair point. I guess -march=armv8-a is not strictly necessary and
->>>> the produced vDSO should be fine if arch/arm/vdso also compiles fine.
->>>> However we would still need to pass -march=armv7-a. I'm not sure what to do
->>>> between:
->>>> * Checking that the compiler supports -march=armv8-a when inspecting
->>>> CROSS_COMPILE_ARM32, and if it doesn't vdso32 will not be built.
->>>> * Checking whether -march=armv8-a is available here, and if it is not fall
->>>> back to -march=armv7-a.
->>> Does v8 vs v7 make any difference in the generated code? If not, we
->>> could just stick to armv7-a permanently.
->> I've just tried compiling with -march=armv7-a, and in fact it doesn't
->> compile at all. It turns out vgettimeofday.c uses smp_rmb(), which expands
->> to dmb ishld on arm64, and ishld doesn't exist in ARMv7. We could possibly
->> work around that, but I think requiring GCC 4.8 is reasonable.
-> Since vgettimeofday.c is meant to be compiled for AArch32, it wouldn't
-> look too bad to define its own barriers rather than relying on the
-> AArch64 ones. So you could define v7_smp_rmb/v7_smp_wmb and use them in
-> this file. Alternatively, replace smp_rmb() with smp_mb() in this file
-> but with a big comment about ARMv7 compilation requirement and "ishld"
-> not being available.
+From: Manjunath Goudar <csmanjuvijay@gmail.com>
 
-Fair enough. I'll add AArch32 barrier macros and compile with -march=armv7-a if the 
-compiler doesn't support armv8-a. It's true that using arm64 barrier macros in 32-bit 
-code is a bit dodgy anyway.
+The ohci_hcd_s3c2410_drv_probe and ohci_hcd_s3c2410_drv_remove
+functions are removed as these are useless functions except calling
+usb_hcd_s3c2410_probe and usb_hcd_s3c2410_remove functions.
 
-Cheers,
-Kevin
+The usb_hcd_s3c2410_probe function renamed to ohci_hcd_s3c2410_drv_probe
+and usb_hcd_s3c2410_remove function renamed to ohci_hcd_s3c2410_drv_remove
+for proper naming.
+
+Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <krzk@kernel.org>
+Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: linux-usb at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+
+---
+Changelog v1 -> v2:
+Removed checkpatch.pl warnings and errors cleanup code which is not related
+to this patch.
+ 
+ drivers/usb/host/ohci-s3c2410.c | 39 ++++++++++++++-------------------------
+ 1 file changed, 14 insertions(+), 25 deletions(-)
+
+diff --git a/drivers/usb/host/ohci-s3c2410.c b/drivers/usb/host/ohci-s3c2410.c
+index d8e03a8..b006b93 100644
+--- a/drivers/usb/host/ohci-s3c2410.c
++++ b/drivers/usb/host/ohci-s3c2410.c
+@@ -43,6 +43,8 @@ static const char hcd_name[] = "ohci-s3c2410";
+ static struct clk *clk;
+ static struct clk *usb_clk;
+ 
++static struct hc_driver __read_mostly ohci_s3c2410_hc_driver;
++
+ /* forward definitions */
+ 
+ static void s3c2410_hcd_oc(struct s3c2410_hcd_info *info, int port_oc);
+@@ -321,26 +323,29 @@ static void s3c2410_hcd_oc(struct s3c2410_hcd_info *info, int port_oc)
+ /* may be called with controller, bus, and devices active */
+ 
+ /*
+- * usb_hcd_s3c2410_remove - shutdown processing for HCD
++ * ohci_hcd_s3c2410_remove - shutdown processing for HCD
+  * @dev: USB Host Controller being removed
+  * Context: !in_interrupt()
+  *
+- * Reverses the effect of usb_hcd_3c2410_probe(), first invoking
++ * Reverses the effect of ohci_hcd_3c2410_probe(), first invoking
+  * the HCD's stop() method.  It is always called from a thread
+  * context, normally "rmmod", "apmd", or something similar.
+  *
+ */
+ 
+-static void
+-usb_hcd_s3c2410_remove(struct usb_hcd *hcd, struct platform_device *dev)
++static int
++ohci_hcd_s3c2410_remove(struct platform_device *dev)
+ {
++	struct usb_hcd *hcd = platform_get_drvdata(dev);
++
+ 	usb_remove_hcd(hcd);
+ 	s3c2410_stop_hc(dev);
+ 	usb_put_hcd(hcd);
++	return 0;
+ }
+ 
+ /**
+- * usb_hcd_s3c2410_probe - initialize S3C2410-based HCDs
++ * ohci_hcd_s3c2410_probe - initialize S3C2410-based HCDs
+  * Context: !in_interrupt()
+  *
+  * Allocates basic resources for this USB host controller, and
+@@ -348,8 +353,7 @@ usb_hcd_s3c2410_remove(struct usb_hcd *hcd, struct platform_device *dev)
+  * through the hotplug entry's driver_data.
+  *
+  */
+-static int usb_hcd_s3c2410_probe(const struct hc_driver *driver,
+-				  struct platform_device *dev)
++static int ohci_hcd_s3c2410_probe(struct platform_device *dev)
+ {
+ 	struct usb_hcd *hcd = NULL;
+ 	struct s3c2410_hcd_info *info = dev_get_platdata(&dev->dev);
+@@ -358,7 +362,7 @@ static int usb_hcd_s3c2410_probe(const struct hc_driver *driver,
+ 	s3c2410_usb_set_power(info, 1, 1);
+ 	s3c2410_usb_set_power(info, 2, 1);
+ 
+-	hcd = usb_create_hcd(driver, &dev->dev, "s3c24xx");
++	hcd = usb_create_hcd(&ohci_s3c2410_hc_driver, &dev->dev, "s3c24xx");
+ 	if (hcd == NULL)
+ 		return -ENOMEM;
+ 
+@@ -404,21 +408,6 @@ static int usb_hcd_s3c2410_probe(const struct hc_driver *driver,
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+-static struct hc_driver __read_mostly ohci_s3c2410_hc_driver;
+-
+-static int ohci_hcd_s3c2410_drv_probe(struct platform_device *pdev)
+-{
+-	return usb_hcd_s3c2410_probe(&ohci_s3c2410_hc_driver, pdev);
+-}
+-
+-static int ohci_hcd_s3c2410_drv_remove(struct platform_device *pdev)
+-{
+-	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+-
+-	usb_hcd_s3c2410_remove(hcd, pdev);
+-	return 0;
+-}
+-
+ #ifdef CONFIG_PM
+ static int ohci_hcd_s3c2410_drv_suspend(struct device *dev)
+ {
+@@ -465,8 +454,8 @@ static const struct of_device_id ohci_hcd_s3c2410_dt_ids[] = {
+ MODULE_DEVICE_TABLE(of, ohci_hcd_s3c2410_dt_ids);
+ 
+ static struct platform_driver ohci_hcd_s3c2410_driver = {
+-	.probe		= ohci_hcd_s3c2410_drv_probe,
+-	.remove		= ohci_hcd_s3c2410_drv_remove,
++	.probe		= ohci_hcd_s3c2410_probe,
++	.remove		= ohci_hcd_s3c2410_remove,
+ 	.shutdown	= usb_hcd_platform_shutdown,
+ 	.driver		= {
+ 		.name	= "s3c2410-ohci",
+-- 
+2.7.4
