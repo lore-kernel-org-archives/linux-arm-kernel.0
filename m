@@ -1,158 +1,313 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 01 Dec 2016 17:26:55 +0000
-Subject: [PATCH v2] arm64: mm: Fix memmap to be initialized for the entire
- section
-In-Reply-To: <20161201164538.GB1236@arm.com>
-References: <1480530091-1092-1-git-send-email-rrichter@cavium.com>
- <20161201164538.GB1236@arm.com>
-Message-ID: <58405D5F.90805@arm.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Thu,  1 Dec 2016 18:40:51 +0100
+Subject: [PATCH dt V2] ARM: BCM5301X: Enable UART by default for BCM4708(1),
+ BCM4709(4) & BCM53012
+In-Reply-To: <20161128140134.25128-1-zajec5@gmail.com>
+References: <20161128140134.25128-1-zajec5@gmail.com>
+Message-ID: <20161201174051.4965-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert, Will,
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-On 01/12/16 16:45, Will Deacon wrote:
-> On Wed, Nov 30, 2016 at 07:21:31PM +0100, Robert Richter wrote:
->> On ThunderX systems with certain memory configurations we see the
->> following BUG_ON():
->>
->>  kernel BUG at mm/page_alloc.c:1848!
->>
->> This happens for some configs with 64k page size enabled. The BUG_ON()
->> checks if start and end page of a memmap range belongs to the same
->> zone.
->>
->> The BUG_ON() check fails if a memory zone contains NOMAP regions. In
->> this case the node information of those pages is not initialized. This
->> causes an inconsistency of the page links with wrong zone and node
->> information for that pages. NOMAP pages from node 1 still point to the
->> mem zone from node 0 and have the wrong nid assigned.
->>
->> The reason for the mis-configuration is a change in pfn_valid() which
->> reports pages marked NOMAP as invalid:
->>
->>  68709f45385a arm64: only consider memblocks with NOMAP cleared for linear mapping
->>
->> This causes pages marked as nomap being no long reassigned to the new
->> zone in memmap_init_zone() by calling __init_single_pfn().
->>
->> Fixing this by restoring the old behavior of pfn_valid() to use
->> memblock_is_memory(). Also changing users of pfn_valid() in arm64 code
->> to use memblock_is_map_memory() where necessary. This only affects
->> code in ioremap.c. The code in mmu.c still can use the new version of
->> pfn_valid().
->>
->> As a consequence, pfn_valid() can not be used to check if a physical
->> page is RAM. It just checks if there is an underlying memmap with a
->> valid struct page. Moreover, for performance reasons the whole memmap
->> (with pageblock_nr_pages number of pages) has valid pfns (SPARSEMEM
->> config). The memory range is extended to fit the alignment of the
->> memmap. Thus, pfn_valid() may return true for pfns that do not map to
->> physical memory. Those pages are simply not reported to the mm, they
->> are not marked reserved nor added to the list of free pages. Other
->> functions such a page_is_ram() or memblock_is_map_ memory() must be
->> used to check for memory and if the page can be mapped with the linear
->> mapping.
+Every device tested so far got UART0 (at 0x18000300) working as serial
+console. It's most likely part of reference design and all vendors use
+it that way.
 
-[...]
+It seems to be easier to enable it by default and just disable it if we
+ever see a device with different hardware design.
 
-> Thanks for sending out the new patch. Whilst I'm still a bit worried about
-> changing pfn_valid like this, I guess we'll just have to fix up any callers
-> which suffer from this change.
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+---
+V2: Update bcm94708.dts bcm94709.dts bcm953012er.dts & bcm953012k.dts
+---
+ arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  | 4 ----
+ arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts       | 4 ----
+ arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts       | 4 ----
+ arch/arm/boot/dts/bcm4708-netgear-r6250.dts        | 4 ----
+ arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts      | 4 ----
+ arch/arm/boot/dts/bcm4708.dtsi                     | 4 ++++
+ arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 4 ----
+ arch/arm/boot/dts/bcm47081.dtsi                    | 4 ++++
+ arch/arm/boot/dts/bcm4709-netgear-r7000.dts        | 4 ----
+ arch/arm/boot/dts/bcm4709-netgear-r8000.dts        | 4 ----
+ arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts  | 4 ----
+ arch/arm/boot/dts/bcm4709.dtsi                     | 1 +
+ arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts      | 4 ----
+ arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts      | 4 ----
+ arch/arm/boot/dts/bcm47094-netgear-r8500.dts       | 4 ----
+ arch/arm/boot/dts/bcm47094.dtsi                    | 1 +
+ arch/arm/boot/dts/bcm94708.dts                     | 4 ----
+ arch/arm/boot/dts/bcm94709.dts                     | 4 ----
+ arch/arm/boot/dts/bcm953012er.dts                  | 4 ----
+ arch/arm/boot/dts/bcm953012k.dts                   | 1 -
+ 20 files changed, 10 insertions(+), 61 deletions(-)
 
-Hibernate's core code falls foul of this. This patch causes a panic when copying
-memory to build the 'image'[0].
-saveable_page() in kernel/power/snapshot.c broadly assumes that pfn_valid()
-pages can be accessed.
-
-Fortunately the core code exposes pfn_is_nosave() which we can extend to catch
-'nomap' pages, but only if they are also marked as PageReserved().
-
-Are there any side-effects of marking all the nomap regions with
-mark_page_reserved()? (it doesn't appear to be the case today).
-
-
-Patches incoming...
-
-
-Thanks,
-
-James
-
-
-[0] panic trace
-root at juno-r1:~# echo disk > /sys/power/state
-[   56.914184] PM: Syncing filesystems ... [   56.918853] done.
-[   56.920826] Freezing user space processes ... (elapsed 0.001 seconds) done.
-[   56.930383] PM: Preallocating image memory... done (allocated 97481 pages)
-[   60.566084] PM: Allocated 389924 kbytes in 3.62 seconds (107.71 MB/s)
-[   60.572576] Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
-[   60.604877] PM: freeze of devices complete after 23.146 msecs
-[   60.611230] PM: late freeze of devices complete after 0.578 msecs
-[   60.618609] PM: noirq freeze of devices complete after 1.247 msecs
-[   60.624833] Disabling non-boot CPUs ...
-[   60.649112] CPU1: shutdown
-[   60.651823] psci: CPU1 killed.
-[   60.701055] CPU2: shutdown
-[   60.703766] psci: CPU2 killed.
-[   60.745002] IRQ11 no longer affine to CPU3
-[   60.745043] CPU3: shutdown
-[   60.751890] psci: CPU3 killed.
-[   60.784966] CPU4: shutdown
-[   60.787676] psci: CPU4 killed.
-[   60.824916] IRQ8 no longer affine to CPU5
-[   60.824920] IRQ9 no longer affine to CPU5
-[   60.824927] IRQ18 no longer affine to CPU5
-[   60.824931] IRQ20 no longer affine to CPU5
-[   60.824951] CPU5: shutdown
-[   60.843975] psci: CPU5 killed.
-[   60.857989] PM: Creating hibernation image:
-[   60.857989] PM: Need to copy 96285 pages
-[   60.857989] Unable to handle kernel paging request at virtual address
-ffff8000794a0000
-[   60.857989] pgd = ffff800975190000
-[   60.857989] [ffff8000794a0000] *pgd=0000000000000000[   60.857989]
-[   60.857989] Internal error: Oops: 96000007 [#1] PREEMPT SMP
-[   60.857989] Modules linked in:
-[   60.857989] CPU: 0 PID: 2366 Comm: bash Not tainted
-4.9.0-rc7-00001-gecf7c47af54d #6346
-[   60.857989] Hardware name: ARM Juno development board (r1) (DT)
-[   60.857989] task: ffff8009766d3200 task.stack: ffff800975fec000
-[   60.857989] PC is at swsusp_save+0x250/0x2c8
-[   60.857989] LR is at swsusp_save+0x214/0x2c8
-[   60.857989] pc : [<ffff000008100bd0>] lr : [<ffff000008100b94>] pstate: 200003c5
-[   60.857989] sp : ffff800975fefb50
-[   60.857989] x29: ffff800975fefb50 x28: ffff800975fec000
-[   60.857989] x27: ffff0000088c2000 x26: 0000000000000040
-[   60.857989] x25: 00000000000f94a0 x24: ffff000008e437e8
-[   60.857989] x23: 000000000001781d x22: ffff000008bee000
-[   60.857989] x21: ffff000008e437f8 x20: ffff000008e43878
-[   60.857989] x19: ffff7e0000000000 x18: 0000000000000006
-[   60.857989] x17: 0000000000000000 x16: 00000000000005d0
-[   60.857989] x15: ffff000008e43e95 x14: 00000000000001d9
-[   60.857989] x13: 0000000000000001 x12: ffff7e0000000000
-[   60.857989] x11: ffff7e0025ffffc0 x10: 0000000025ffffc0
-[   60.857989] x9 : 000000000000012f x8 : ffff80096cd04ce0
-[   60.857989] x7 : 0000000000978000 x6 : 0000000000000076
-[   60.857989] x5 : fffffffffffffff8 x4 : 0000000000080000
-[   60.857989] x3 : ffff8000794a0000 x2 : ffff800959d83000
-[   60.857989] x1 : 0000000000000000 x0 : ffff7e0001e52800
-
-[   60.857989] Process bash (pid: 2366, stack limit = 0xffff800975fec020)
-[   60.857989] Stack: (0xffff800975fefb50 to 0xffff800975ff0000)
-[   60.857989] Call trace:
-[   60.857989] [<ffff000008100bd0>] swsusp_save+0x250/0x2c8
-[   60.857989] [<ffff0000080936ec>] swsusp_arch_suspend+0xb4/0x100
-[   60.857989] [<ffff0000080fe670>] hibernation_snapshot+0x278/0x318
-[   60.857989] [<ffff0000080fef10>] hibernate+0x1d0/0x268
-[   60.857989] [<ffff0000080fc954>] state_store+0xdc/0x100
-[   60.857989] [<ffff00000838419c>] kobj_attr_store+0x14/0x28
-[   60.857989] [<ffff00000825be68>] sysfs_kf_write+0x48/0x58
-[   60.857989] [<ffff00000825b1f8>] kernfs_fop_write+0xb0/0x1d8
-[   60.857989] [<ffff0000081e2ddc>] __vfs_write+0x1c/0x110
-[   60.857989] [<ffff0000081e3bd8>] vfs_write+0xa0/0x1b8
-[   60.857989] [<ffff0000081e4f44>] SyS_write+0x44/0xa0
-[   60.857989] [<ffff000008082ef0>] el0_svc_naked+0x24/0x28
-[   60.857989] Code: d37ae442 d37ae463 b2514042 b2514063 (f8636820)
-[   60.857989] ---[ end trace d0265b757c9dd571 ]---
-[   60.857989] ------------[ cut here ]------------
+diff --git a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
+index 9cb186e..d49afec0 100644
+--- a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
++++ b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
+@@ -136,10 +136,6 @@
+ 	};
+ };
+ 
+-&uart0 {
+-	status = "okay";
+-};
+-
+ &usb2 {
+ 	vcc-gpio = <&chipcommon 9 GPIO_ACTIVE_HIGH>;
+ };
+diff --git a/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+index 35e6ed6..f591b0f 100644
+--- a/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
++++ b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+@@ -55,10 +55,6 @@
+ 	};
+ };
+ 
+-&uart0 {
+-	status = "okay";
+-};
+-
+ &spi_nor {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+index 1c7e53d..50d65d8 100644
+--- a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
++++ b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+@@ -56,10 +56,6 @@
+ 	};
+ };
+ 
+-&uart0 {
+-	status = "okay";
+-};
+-
+ &spi_nor {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+index 8ce39d5..8519548 100644
+--- a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
++++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+@@ -83,10 +83,6 @@
+ 	};
+ };
+ 
+-&uart0 {
+-	status = "okay";
+-};
+-
+ &usb3 {
+ 	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
+ };
+diff --git a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+index 70f4bb9..74cfcd3 100644
+--- a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
++++ b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+@@ -119,10 +119,6 @@
+ 	};
+ };
+ 
+-&uart0 {
+-	status = "okay";
+-};
+-
+ &spi_nor {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/bcm4708.dtsi b/arch/arm/boot/dts/bcm4708.dtsi
+index eed4dd1..d0eec09 100644
+--- a/arch/arm/boot/dts/bcm4708.dtsi
++++ b/arch/arm/boot/dts/bcm4708.dtsi
+@@ -34,3 +34,7 @@
+ 	};
+ 
+ };
++
++&uart0 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+index a9c8def..2922536 100644
+--- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
++++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+@@ -122,7 +122,3 @@
+ 		};
+ 	};
+ };
+-
+-&uart0 {
+-	status = "okay";
+-};
+diff --git a/arch/arm/boot/dts/bcm47081.dtsi b/arch/arm/boot/dts/bcm47081.dtsi
+index f720012..c5f7619 100644
+--- a/arch/arm/boot/dts/bcm47081.dtsi
++++ b/arch/arm/boot/dts/bcm47081.dtsi
+@@ -24,3 +24,7 @@
+ 		};
+ 	};
+ };
++
++&uart0 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+index fd38d2a..0225d82 100644
+--- a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
++++ b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+@@ -100,7 +100,3 @@
+ 		};
+ 	};
+ };
+-
+-&uart0 {
+-	status = "okay";
+-};
+diff --git a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+index 92f8a72..56d38a3 100644
+--- a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
++++ b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+@@ -107,10 +107,6 @@
+ 	};
+ };
+ 
+-&uart0 {
+-	status = "okay";
+-};
+-
+ &usb2 {
+ 	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
+ };
+diff --git a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
+index 9a92c24..c67bfaa 100644
+--- a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
++++ b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
+@@ -97,10 +97,6 @@
+ 	};
+ };
+ 
+-&uart0 {
+-	status = "okay";
+-};
+-
+ &usb2 {
+ 	vcc-gpio = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
+ };
+diff --git a/arch/arm/boot/dts/bcm4709.dtsi b/arch/arm/boot/dts/bcm4709.dtsi
+index f039765..c645fea 100644
+--- a/arch/arm/boot/dts/bcm4709.dtsi
++++ b/arch/arm/boot/dts/bcm4709.dtsi
+@@ -8,4 +8,5 @@
+ 
+ &uart0 {
+ 	clock-frequency = <125000000>;
++	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+index 661348d..7fb9270 100644
+--- a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
++++ b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+@@ -105,10 +105,6 @@
+ 	};
+ };
+ 
+-&uart0 {
+-	status = "okay";
+-};
+-
+ &usb3 {
+ 	vcc-gpio = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
+ };
+diff --git a/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts b/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
+index 169b35f..2f4a651 100644
+--- a/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
++++ b/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
+@@ -98,10 +98,6 @@
+ 	};
+ };
+ 
+-&uart0 {
+-	status = "okay";
+-};
+-
+ &usb3 {
+ 	vcc-gpio = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
+ };
+diff --git a/arch/arm/boot/dts/bcm47094-netgear-r8500.dts b/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
+index 521b415..7ecd57c 100644
+--- a/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
++++ b/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
+@@ -97,7 +97,3 @@
+ 		};
+ 	};
+ };
+-
+-&uart0 {
+-	status = "okay";
+-};
+diff --git a/arch/arm/boot/dts/bcm47094.dtsi b/arch/arm/boot/dts/bcm47094.dtsi
+index 4f09aa0..4840a78 100644
+--- a/arch/arm/boot/dts/bcm47094.dtsi
++++ b/arch/arm/boot/dts/bcm47094.dtsi
+@@ -14,4 +14,5 @@
+ 
+ &uart0 {
+ 	clock-frequency = <125000000>;
++	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/bcm94708.dts b/arch/arm/boot/dts/bcm94708.dts
+index 251a486..42855a7 100644
+--- a/arch/arm/boot/dts/bcm94708.dts
++++ b/arch/arm/boot/dts/bcm94708.dts
+@@ -50,7 +50,3 @@
+ 		reg = <0x00000000 0x08000000>;
+ 	};
+ };
+-
+-&uart0 {
+-	status = "okay";
+-};
+diff --git a/arch/arm/boot/dts/bcm94709.dts b/arch/arm/boot/dts/bcm94709.dts
+index b16cac9..95e8be6 100644
+--- a/arch/arm/boot/dts/bcm94709.dts
++++ b/arch/arm/boot/dts/bcm94709.dts
+@@ -50,7 +50,3 @@
+ 		reg = <0x00000000 0x08000000>;
+ 	};
+ };
+-
+-&uart0 {
+-	status = "okay";
+-};
+diff --git a/arch/arm/boot/dts/bcm953012er.dts b/arch/arm/boot/dts/bcm953012er.dts
+index 0a9abec..decd86b 100644
+--- a/arch/arm/boot/dts/bcm953012er.dts
++++ b/arch/arm/boot/dts/bcm953012er.dts
+@@ -70,10 +70,6 @@
+ 	};
+ };
+ 
+-&uart0 {
+-	status = "okay";
+-};
+-
+ &spi_nor {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/bcm953012k.dts b/arch/arm/boot/dts/bcm953012k.dts
+index 05a985a..bfd9230 100644
+--- a/arch/arm/boot/dts/bcm953012k.dts
++++ b/arch/arm/boot/dts/bcm953012k.dts
+@@ -54,7 +54,6 @@
+ 
+ &uart0 {
+ 	clock-frequency = <62499840>;
+-	status = "okay";
+ };
+ 
+ &uart1 {
+-- 
+2.10.1
