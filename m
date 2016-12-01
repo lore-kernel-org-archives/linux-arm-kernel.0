@@ -1,213 +1,136 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  1 Dec 2016 10:05:58 +0100
-Subject: [PATCH v3 2/4] ARM64: dts: meson-gx: Add Graphic Controller nodes
+Date: Thu,  1 Dec 2016 10:05:59 +0100
+Subject: [PATCH v3 3/4] dt-bindings: display: add Amlogic Meson DRM Bindings
 In-Reply-To: <1480583160-31806-1-git-send-email-narmstrong@baylibre.com>
 References: <1480583160-31806-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1480583160-31806-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1480583160-31806-4-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Add Video Processing Unit and CVBS Output nodes, and enable CVBS on selected
-boards.
 
 Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi              | 16 ++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts | 16 ++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi       | 16 ++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi            |  4 ++++
- arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts  | 16 ++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi             |  4 ++++
- arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts    | 16 ++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxm.dtsi             |  4 ++++
- 8 files changed, 92 insertions(+)
+ .../bindings/display/amlogic,meson-vpu.txt         | 112 +++++++++++++++++++++
+ 1 file changed, 112 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-index fc033c0..eada0b5 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-@@ -356,5 +356,21 @@
- 				status = "disabled";
- 			};
- 		};
+diff --git a/Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt b/Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt
+new file mode 100644
+index 0000000..00f74ba
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt
+@@ -0,0 +1,112 @@
++Amlogic Meson Display Controller
++================================
 +
-+		vpu: vpu at d0100000 {
-+			compatible = "amlogic,meson-gx-vpu";
-+			reg = <0x0 0xd0100000 0x0 0x100000>,
-+			      <0x0 0xc883c000 0x0 0x1000>,
-+			      <0x0 0xc8838000 0x0 0x1000>;
-+			reg-names = "vpu", "hhi", "dmc";
-+			interrupts = <GIC_SPI 3 IRQ_TYPE_EDGE_RISING>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++The Amlogic Meson Display controller is composed of several components
++that are going to be documented below:
 +
-+			/* CVBS VDAC output port */
-+			cvbs_vdac_port: port at 0 {
-+				reg = <0>;
-+			};
-+		};
- 	};
- };
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-index 9696820..4cbd626 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-@@ -142,6 +142,16 @@
- 		clocks = <&wifi32k>;
- 		clock-names = "ext_clock";
- 	};
++DMC|---------------VPU (Video Processing Unit)----------------|------HHI------|
++   | vd1   _______     _____________    _________________     |               |
++D  |-------|      |----|            |   |                |    |   HDMI PLL    |
++D  | vd2   | VIU  |    | Video Post |   | Video Encoders |<---|-----VCLK      |
++R  |-------|      |----| Processing |   |                |    |               |
++   | osd2  |      |    |            |---| Enci ----------|----|-----VDAC------|
++R  |-------| CSC  |----| Scalers    |   | Encp ----------|----|----HDMI-TX----|
++A  | osd1  |      |    | Blenders   |   | Encl ----------|----|---------------|
++M  |-------|______|----|____________|   |________________|    |               |
++___|__________________________________________________________|_______________|
 +
-+	cvbs-connector {
-+		compatible = "composite-video-connector";
 +
-+		port {
-+			cvbs_connector_in: endpoint {
-+				remote-endpoint = <&cvbs_vdac_out>;
-+			};
-+		};
-+	};
- };
- 
- &uart_AO {
-@@ -229,3 +239,9 @@
- 	clocks = <&clkc CLKID_FCLK_DIV4>;
- 	clock-names = "clkin0";
- };
++VIU: Video Input Unit
++---------------------
 +
-+&cvbs_vdac_port {
-+	cvbs_vdac_out: endpoint {
-+		remote-endpoint = <&cvbs_connector_in>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-index 203be28..4a96e0f 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-@@ -125,6 +125,16 @@
- 		clocks = <&wifi32k>;
- 		clock-names = "ext_clock";
- 	};
++The Video Input Unit is in charge of the pixel scanout from the DDR memory.
++It fetches the frames addresses, stride and parameters from the "Canvas" memory.
++This part is also in charge of the CSC (Colorspace Conversion).
++It can handle 2 OSD Planes and 2 Video Planes.
 +
-+	cvbs-connector {
-+		compatible = "composite-video-connector";
++VPP: Video Post Processing
++--------------------------
 +
-+		port {
-+			cvbs_connector_in: endpoint {
-+				remote-endpoint = <&cvbs_vdac_out>;
-+			};
-+		};
-+	};
- };
- 
- /* This UART is brought out to the DB9 connector */
-@@ -234,3 +244,9 @@
- 	clocks = <&clkc CLKID_FCLK_DIV4>;
- 	clock-names = "clkin0";
- };
++The Video Post Processing is in charge of the scaling and blending of the
++various planes into a single pixel stream.
++There is a special "pre-blending" used by the video planes with a dedicated
++scaler and a "post-blending" to merge with the OSD Planes.
++The OSD planes also have a dedicated scaler for one of the OSD.
 +
-+&cvbs_vdac_port {
-+	cvbs_vdac_out: endpoint {
-+		remote-endpoint = <&cvbs_connector_in>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index ac5ad3b..5353a20 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -506,3 +506,7 @@
- 		 <&clkc CLKID_FCLK_DIV2>;
- 	clock-names = "core", "clkin0", "clkin1";
- };
++VENC: Video Encoders
++--------------------
 +
-+&vpu {
-+	compatible = "amlogic,meson-gxbb-vpu", "amlogic,meson-gx-vpu";
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts
-index e99101a..cea4a3e 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts
-@@ -117,6 +117,16 @@
- 		clocks = <&wifi32k>;
- 		clock-names = "ext_clock";
- 	};
++The VENC is composed of the multiple pixel encoders :
++ - ENCI : Interlace Video encoder for CVBS and Interlace HDMI
++ - ENCP : Progressive Video Encoder for HDMI
++ - ENCL : LCD LVDS Encoder
++The VENC Unit gets a Pixel Clocks (VCLK) from a dedicated HDMI PLL and clock
++tree and provides the scanout clock to the VPP and VIU.
++The ENCI is connected to a single VDAC for Composite Output.
++The ENCI and ENCP are connected to an on-chip HDMI Transceiver.
 +
-+	cvbs-connector {
-+		compatible = "composite-video-connector";
++Device Tree Bindings:
++---------------------
 +
-+		port {
-+			cvbs_connector_in: endpoint {
-+				remote-endpoint = <&cvbs_vdac_out>;
-+			};
++VPU: Video Processing Unit
++--------------------------
++
++Required properties:
++- compatible: value should be different for each SoC family as :
++	- GXBB (S905) : "amlogic,meson-gxbb-vpu"
++	- GXL (S905X, S905D) : "amlogic,meson-gxl-vpu"
++	- GXM (S912) : "amlogic,meson-gxm-vpu"
++	followed by the common "amlogic,meson-gx-vpu"
++- reg: base address and size of he following memory-mapped regions :
++	- vpu
++	- hhi
++	- dmc
++- reg-names: should contain the names of the previous memory regions
++- interrupts: should contain the VENC Vsync interrupt number
++
++Required nodes:
++
++The connections to the VPU output video ports are modeled using the OF graph
++bindings specified in Documentation/devicetree/bindings/graph.txt.
++
++The following table lists for each supported model the port number
++corresponding to each VPU output.
++
++		Port 0		Port 1
++-----------------------------------------
++ S905 (GXBB)	CVBS VDAC	HDMI-TX
++ S905X (GXL)	CVBS VDAC	HDMI-TX
++ S905D (GXL)	CVBS VDAC	HDMI-TX
++ S912 (GXM)	CVBS VDAC	HDMI-TX
++
++Example:
++
++tv-connector {
++	compatible = "composite-video-connector";
++
++	port {
++		tv_connector_in: endpoint {
++			remote-endpoint = <&cvbs_vdac_out>;
 +		};
 +	};
- };
- 
- &uart_AO {
-@@ -203,3 +213,9 @@
- 	clocks = <&clkc CLKID_FCLK_DIV4>;
- 	clock-names = "clkin0";
- };
-+
-+&cvbs_vdac_port {
-+	cvbs_vdac_out: endpoint {
-+		remote-endpoint = <&cvbs_connector_in>;
-+	};
 +};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index 9f89b99..5c7a8fa 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -299,3 +299,7 @@
- 		 <&clkc CLKID_FCLK_DIV2>;
- 	clock-names = "core", "clkin0", "clkin1";
- };
 +
-+&vpu {
-+	compatible = "amlogic,meson-gxl-vpu", "amlogic,meson-gx-vpu";
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-index d320727..f2d0861 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-@@ -90,6 +90,16 @@
- 		compatible = "mmc-pwrseq-emmc";
- 		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
- 	};
++vpu: vpu at d0100000 {
++	compatible = "amlogic,meson-gxbb-vpu";
++	reg = <0x0 0xd0100000 0x0 0x100000>,
++	      <0x0 0xc883c000 0x0 0x1000>,
++	      <0x0 0xc8838000 0x0 0x1000>;
++	reg-names = "vpu", "hhi", "dmc";
++	interrupts = <GIC_SPI 3 IRQ_TYPE_EDGE_RISING>;
++	#address-cells = <1>;
++	#size-cells = <0>;
 +
-+	cvbs-connector {
-+		compatible = "composite-video-connector";
++	/* CVBS VDAC output port */
++	port at 0 {
++		reg = <0>;
 +
-+		port {
-+			cvbs_connector_in: endpoint {
-+				remote-endpoint = <&cvbs_vdac_out>;
-+			};
++		cvbs_vdac_out: endpoint {
++			remote-endpoint = <&tv_connector_in>;
 +		};
 +	};
- };
- 
- /* This UART is brought out to the DB9 connector */
-@@ -167,3 +177,9 @@
- 		max-speed = <1000>;
- 	};
- };
-+
-+&cvbs_vdac_port {
-+	cvbs_vdac_out: endpoint {
-+		remote-endpoint = <&cvbs_connector_in>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
-index c1974bb..eb2f0c3 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
-@@ -112,3 +112,7 @@
- 		};
- 	};
- };
-+
-+&vpu {
-+	compatible = "amlogic,meson-gxm-vpu", "amlogic,meson-gx-vpu";
 +};
 -- 
 1.9.1
