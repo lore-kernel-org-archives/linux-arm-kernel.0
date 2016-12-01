@@ -1,60 +1,56 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu,  1 Dec 2016 15:55:13 +0000
-Subject: [PATCH] arm64: smp: Prevent raw_smp_processor_id() recursion
-Message-ID: <bb132e9abf4d256e40ad311b106b05d724b290fb.1480607460.git.robin.murphy@arm.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Thu, 1 Dec 2016 17:05:28 +0100
+Subject: [PATCH v5 net-next 7/7] ARM64: dts: marvell: Add network support
+ for Armada 3700
+In-Reply-To: <f205231e640a2324b8f007073cf54b166a263ed4.1480542157.git-series.gregory.clement@free-electrons.com>
+References: <cover.0270f6d2413a709521fe2c8c17fbebea6f2e78d1.1480542157.git-series.gregory.clement@free-electrons.com>
+ <f205231e640a2324b8f007073cf54b166a263ed4.1480542157.git-series.gregory.clement@free-electrons.com>
+Message-ID: <CAPv3WKfZ=v7CG+tb504bt4=afdy4q8gFW3db10ORq=K+OYQbZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Under CONFIG_DEBUG_PREEMPT=y, this_cpu_ptr() ends up calling back into
-raw_smp_processor_id(), resulting in some hilariously catastrophic
-infinite recursion. In the normal case, we have:
+Hi Gregory,
 
-  #define this_cpu_ptr(ptr) raw_cpu_ptr(ptr)
+2016-11-30 22:42 GMT+01:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
+> Add neta nodes for network support both in device tree for the SoC and
+> the board.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm64/boot/dts/marvell/armada-3720-db.dts | 23 +++++++++++++++++++-
+>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 23 +++++++++++++++++++-
+>  2 files changed, 46 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+> index 1372e9a6aaa4..c8b82e4145de 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+> @@ -81,3 +81,26 @@
+>  &pcie0 {
+>         status = "okay";
+>  };
+> +
+> +&mdio {
+> +       status = "okay";
+> +       phy0: ethernet-phy at 0 {
+> +               reg = <0>;
+> +       };
+> +
+> +       phy1: ethernet-phy at 1 {
+> +               reg = <1>;
+> +       };
+> +};
+> +
+> +&eth0 {
+> +       phy-mode = "rgmii-id";
+> +       phy = <&phy0>;
+> +       status = "okay";
+> +};
+> +
+> +&eth1 {
+> +       phy-mode = "rgmii-id";
 
-and everything is dandy. However for CONFIG_DEBUG_PREEMPT, this_cpu_ptr()
-is defined in terms of my_cpu_offset, wherein the fun begins:
+Should be "sgmii".
 
-  #define my_cpu_offset per_cpu_offset(smp_processor_id())
-  ...
-  #define smp_processor_id() debug_smp_processor_id()
-  ...
-  notrace unsigned int debug_smp_processor_id(void)
-  {
-  	return check_preemption_disabled("smp_processor_id", "");
-  ...
-  notrace static unsigned int check_preemption_disabled(const char *what1,
-  							const char *what2)
-  {
-  	int this_cpu = raw_smp_processor_id();
-
-and bang. Use raw_cpu_ptr() directly to avoid that.
-
-Reported-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
-
-Since I just reproduced this locally to verify Will's suggestion, it
-seemed I might as well just write it up as a patch :)
-
- arch/arm64/include/asm/smp.h | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-index a62db952ffcb..d050d720a1b4 100644
---- a/arch/arm64/include/asm/smp.h
-+++ b/arch/arm64/include/asm/smp.h
-@@ -41,8 +41,10 @@ DECLARE_PER_CPU_READ_MOSTLY(int, cpu_number);
-  * We don't use this_cpu_read(cpu_number) as that has implicit writes to
-  * preempt_count, and associated (compiler) barriers, that we'd like to avoid
-  * the expense of. If we're preemptible, the value can be stale at use anyway.
-+ * And we can't use this_cpu_ptr() either, as that winds up recursing back
-+ * here under CONFIG_DEBUG_PREEMPT=y.
-  */
--#define raw_smp_processor_id() (*this_cpu_ptr(&cpu_number))
-+#define raw_smp_processor_id() (*raw_cpu_ptr(&cpu_number))
- 
- struct seq_file;
- 
--- 
-2.10.2.dirty
+Best regards,
+Marcin
