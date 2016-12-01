@@ -1,121 +1,321 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 1 Dec 2016 20:34:04 +0200
-Subject: [GIT PULL 1/3] ARM: exynos: Soc/mach for v4.10
-In-Reply-To: <1479967709-6619-2-git-send-email-krzk@kernel.org>
-References: <1479967709-6619-1-git-send-email-krzk@kernel.org>
- <1479967709-6619-2-git-send-email-krzk@kernel.org>
-Message-ID: <20161201183404.GA2134@kozik-lap>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Thu, 1 Dec 2016 13:59:36 -0500
+Subject: [PATCH dt V2] ARM: BCM5301X: Enable UART by default for
+ BCM4708(1), BCM4709(4) & BCM53012
+In-Reply-To: <20161201174051.4965-1-zajec5@gmail.com>
+References: <20161128140134.25128-1-zajec5@gmail.com>
+ <20161201174051.4965-1-zajec5@gmail.com>
+Message-ID: <20161201185914.GA4149@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 24, 2016 at 08:08:27AM +0200, Krzysztof Kozlowski wrote:
-> Hi,
+On Thu, Dec 01, 2016 at 06:40:51PM +0100, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
 > 
-> This contains previous dts branch because SCU node in dts is needed
-> prior to removing it from mach code.
+> Every device tested so far got UART0 (at 0x18000300) working as serial
+> console. It's most likely part of reference design and all vendors use
+> it that way.
 > 
-> Below you will find full pull request and one stripped from dependency.
+> It seems to be easier to enable it by default and just disable it if we
+> ever see a device with different hardware design.
 > 
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Hi Arnd, Kevin and Olof,
+Looks good to me!
 
-What about this pull from the set?
+Acked-by: Jon Mason <jon.mason@broadcom.com>
 
-Best regards,
-Krzysztof
-
-
-> Best regards,
-> Krzysztof
+> ---
+> V2: Update bcm94708.dts bcm94709.dts bcm953012er.dts & bcm953012k.dts
+> ---
+>  arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  | 4 ----
+>  arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts       | 4 ----
+>  arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts       | 4 ----
+>  arch/arm/boot/dts/bcm4708-netgear-r6250.dts        | 4 ----
+>  arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts      | 4 ----
+>  arch/arm/boot/dts/bcm4708.dtsi                     | 4 ++++
+>  arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 4 ----
+>  arch/arm/boot/dts/bcm47081.dtsi                    | 4 ++++
+>  arch/arm/boot/dts/bcm4709-netgear-r7000.dts        | 4 ----
+>  arch/arm/boot/dts/bcm4709-netgear-r8000.dts        | 4 ----
+>  arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts  | 4 ----
+>  arch/arm/boot/dts/bcm4709.dtsi                     | 1 +
+>  arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts      | 4 ----
+>  arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts      | 4 ----
+>  arch/arm/boot/dts/bcm47094-netgear-r8500.dts       | 4 ----
+>  arch/arm/boot/dts/bcm47094.dtsi                    | 1 +
+>  arch/arm/boot/dts/bcm94708.dts                     | 4 ----
+>  arch/arm/boot/dts/bcm94709.dts                     | 4 ----
+>  arch/arm/boot/dts/bcm953012er.dts                  | 4 ----
+>  arch/arm/boot/dts/bcm953012k.dts                   | 1 -
+>  20 files changed, 10 insertions(+), 61 deletions(-)
 > 
-> 
-> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-> 
->   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-4.10
-> 
-> for you to fetch changes up to c689de56c0a7c8387ea00509f94fa483ae61d979:
-> 
->   ARM: Drop fixed 200 Hz timer requirement from Samsung platforms (2016-11-23 19:34:55 +0200)
-> 
-> ----------------------------------------------------------------
-> Samsung mach/soc update for v4.10:
-> 1. Use SCU mapping from Device Tree instead of statically mapped one.
-> 2. Drop fixed requirement for HZ=200 on Samsung platforms.
-> 
-> ----------------------------------------------------------------
-> Javier Martinez Canillas (1):
->       ARM: dts: exynos: Document eMMC/SD/SDIO devices in Snow and Peach boards
-> 
-> Krzysztof Kozlowski (3):
->       ARM: dts: exynos: Remove exynos4415.dtsi
->       Merge tag 'samsung-dt-4.10' into next/soc
->       ARM: Drop fixed 200 Hz timer requirement from Samsung platforms
-> 
-> Pankaj Dubey (4):
->       ARM: EXYNOS: Remove smp_init_cpus hook from platsmp.c
->       ARM: dts: exynos: Add SCU device node to exynos4.dtsi
->       ARM: EXYNOS: Remove static mapping of SCU SFR
->       ARM: EXYNOS: Remove unused soc_is_exynos{4,5}
-> 
-> Randy Li (2):
->       ARM: dts: exynos: Add TOPEET itop core board SCP package version
->       ARM: dts: exynos: Add TOPEET itop elite based board
-> 
-> Sylwester Nawrocki (3):
->       ARM: dts: exynos: Remove "simple-bus" compatible from fimc-is node
->       ARM: dts: exynos: Add entries for sound support on Odroid-XU board
->       ARM: S3C24XX: Add DMA slave maps for remaining s3c24xx SoCs
-> 
->  .../bindings/arm/samsung/samsung-boards.txt        |   3 +
->  arch/arm/Kconfig                                   |   3 +-
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/exynos4.dtsi                     |   5 +
->  arch/arm/boot/dts/exynos4412-itop-elite.dts        | 240 ++++++++
->  arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi    | 501 ++++++++++++++++
->  arch/arm/boot/dts/exynos4415-pinctrl.dtsi          | 575 ------------------
->  arch/arm/boot/dts/exynos4415.dtsi                  | 650 ---------------------
->  arch/arm/boot/dts/exynos4x12.dtsi                  |   2 +-
->  arch/arm/boot/dts/exynos5250-snow-common.dtsi      |   4 +
->  arch/arm/boot/dts/exynos5410-odroidxu.dts          |  69 +++
->  arch/arm/boot/dts/exynos5410-pinctrl.dtsi          |   9 +
->  arch/arm/boot/dts/exynos5410.dtsi                  |  59 ++
->  arch/arm/boot/dts/exynos5420-peach-pit.dts         |   3 +
->  arch/arm/boot/dts/exynos5800-peach-pi.dts          |   3 +
->  arch/arm/mach-exynos/common.h                      |   6 +-
->  arch/arm/mach-exynos/exynos.c                      |  22 -
->  arch/arm/mach-exynos/include/mach/map.h            |   2 -
->  arch/arm/mach-exynos/platsmp.c                     |  65 +--
->  arch/arm/mach-exynos/pm.c                          |   4 +-
->  arch/arm/mach-exynos/suspend.c                     |   4 +-
->  arch/arm/mach-s3c24xx/common.c                     |  76 +++
->  arch/arm/plat-samsung/include/plat/map-s5p.h       |   4 -
->  23 files changed, 1004 insertions(+), 1306 deletions(-)
->  create mode 100644 arch/arm/boot/dts/exynos4412-itop-elite.dts
->  create mode 100644 arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
->  delete mode 100644 arch/arm/boot/dts/exynos4415-pinctrl.dtsi
->  delete mode 100644 arch/arm/boot/dts/exynos4415.dtsi
-> 
-> 
-> Pull request details for Soc only:
-> ##################################
-> ----------------------------------------------------------------
-> Samsung mach/soc update for v4.10:
-> 1. Use SCU mapping from Device Tree instead of statically mapped one.
-> 2. Drop fixed requirement for HZ=200 on Samsung platforms.
-> 
-> ----------------------------------------------------------------
-> Krzysztof Kozlowski (1):
->       ARM: Drop fixed 200 Hz timer requirement from Samsung platforms
-> 
-> Pankaj Dubey (3):
->       ARM: EXYNOS: Remove static mapping of SCU SFR
->       ARM: EXYNOS: Remove unused soc_is_exynos{4,5}
->       ARM: EXYNOS: Remove smp_init_cpus hook from platsmp.c
-> 
-> Sylwester Nawrocki (1):
->       ARM: S3C24XX: Add DMA slave maps for remaining s3c24xx SoCs
+> diff --git a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
+> index 9cb186e..d49afec0 100644
+> --- a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
+> +++ b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
+> @@ -136,10 +136,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &usb2 {
+>  	vcc-gpio = <&chipcommon 9 GPIO_ACTIVE_HIGH>;
+>  };
+> diff --git a/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+> index 35e6ed6..f591b0f 100644
+> --- a/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+> +++ b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+> @@ -55,10 +55,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &spi_nor {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+> index 1c7e53d..50d65d8 100644
+> --- a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+> +++ b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+> @@ -56,10 +56,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &spi_nor {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+> index 8ce39d5..8519548 100644
+> --- a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+> +++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+> @@ -83,10 +83,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &usb3 {
+>  	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
+>  };
+> diff --git a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+> index 70f4bb9..74cfcd3 100644
+> --- a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+> +++ b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+> @@ -119,10 +119,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &spi_nor {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/bcm4708.dtsi b/arch/arm/boot/dts/bcm4708.dtsi
+> index eed4dd1..d0eec09 100644
+> --- a/arch/arm/boot/dts/bcm4708.dtsi
+> +++ b/arch/arm/boot/dts/bcm4708.dtsi
+> @@ -34,3 +34,7 @@
+>  	};
+>  
+>  };
+> +
+> +&uart0 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+> index a9c8def..2922536 100644
+> --- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+> +++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+> @@ -122,7 +122,3 @@
+>  		};
+>  	};
+>  };
+> -
+> -&uart0 {
+> -	status = "okay";
+> -};
+> diff --git a/arch/arm/boot/dts/bcm47081.dtsi b/arch/arm/boot/dts/bcm47081.dtsi
+> index f720012..c5f7619 100644
+> --- a/arch/arm/boot/dts/bcm47081.dtsi
+> +++ b/arch/arm/boot/dts/bcm47081.dtsi
+> @@ -24,3 +24,7 @@
+>  		};
+>  	};
+>  };
+> +
+> +&uart0 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+> index fd38d2a..0225d82 100644
+> --- a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+> +++ b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+> @@ -100,7 +100,3 @@
+>  		};
+>  	};
+>  };
+> -
+> -&uart0 {
+> -	status = "okay";
+> -};
+> diff --git a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+> index 92f8a72..56d38a3 100644
+> --- a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+> +++ b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+> @@ -107,10 +107,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &usb2 {
+>  	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
+>  };
+> diff --git a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
+> index 9a92c24..c67bfaa 100644
+> --- a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
+> +++ b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
+> @@ -97,10 +97,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &usb2 {
+>  	vcc-gpio = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
+>  };
+> diff --git a/arch/arm/boot/dts/bcm4709.dtsi b/arch/arm/boot/dts/bcm4709.dtsi
+> index f039765..c645fea 100644
+> --- a/arch/arm/boot/dts/bcm4709.dtsi
+> +++ b/arch/arm/boot/dts/bcm4709.dtsi
+> @@ -8,4 +8,5 @@
+>  
+>  &uart0 {
+>  	clock-frequency = <125000000>;
+> +	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+> index 661348d..7fb9270 100644
+> --- a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+> +++ b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+> @@ -105,10 +105,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &usb3 {
+>  	vcc-gpio = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
+>  };
+> diff --git a/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts b/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
+> index 169b35f..2f4a651 100644
+> --- a/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
+> +++ b/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
+> @@ -98,10 +98,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &usb3 {
+>  	vcc-gpio = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
+>  };
+> diff --git a/arch/arm/boot/dts/bcm47094-netgear-r8500.dts b/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
+> index 521b415..7ecd57c 100644
+> --- a/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
+> +++ b/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
+> @@ -97,7 +97,3 @@
+>  		};
+>  	};
+>  };
+> -
+> -&uart0 {
+> -	status = "okay";
+> -};
+> diff --git a/arch/arm/boot/dts/bcm47094.dtsi b/arch/arm/boot/dts/bcm47094.dtsi
+> index 4f09aa0..4840a78 100644
+> --- a/arch/arm/boot/dts/bcm47094.dtsi
+> +++ b/arch/arm/boot/dts/bcm47094.dtsi
+> @@ -14,4 +14,5 @@
+>  
+>  &uart0 {
+>  	clock-frequency = <125000000>;
+> +	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/bcm94708.dts b/arch/arm/boot/dts/bcm94708.dts
+> index 251a486..42855a7 100644
+> --- a/arch/arm/boot/dts/bcm94708.dts
+> +++ b/arch/arm/boot/dts/bcm94708.dts
+> @@ -50,7 +50,3 @@
+>  		reg = <0x00000000 0x08000000>;
+>  	};
+>  };
+> -
+> -&uart0 {
+> -	status = "okay";
+> -};
+> diff --git a/arch/arm/boot/dts/bcm94709.dts b/arch/arm/boot/dts/bcm94709.dts
+> index b16cac9..95e8be6 100644
+> --- a/arch/arm/boot/dts/bcm94709.dts
+> +++ b/arch/arm/boot/dts/bcm94709.dts
+> @@ -50,7 +50,3 @@
+>  		reg = <0x00000000 0x08000000>;
+>  	};
+>  };
+> -
+> -&uart0 {
+> -	status = "okay";
+> -};
+> diff --git a/arch/arm/boot/dts/bcm953012er.dts b/arch/arm/boot/dts/bcm953012er.dts
+> index 0a9abec..decd86b 100644
+> --- a/arch/arm/boot/dts/bcm953012er.dts
+> +++ b/arch/arm/boot/dts/bcm953012er.dts
+> @@ -70,10 +70,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &spi_nor {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/bcm953012k.dts b/arch/arm/boot/dts/bcm953012k.dts
+> index 05a985a..bfd9230 100644
+> --- a/arch/arm/boot/dts/bcm953012k.dts
+> +++ b/arch/arm/boot/dts/bcm953012k.dts
+> @@ -54,7 +54,6 @@
+>  
+>  &uart0 {
+>  	clock-frequency = <62499840>;
+> -	status = "okay";
+>  };
+>  
+>  &uart1 {
+> -- 
+> 2.10.1
 > 
