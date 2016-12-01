@@ -1,56 +1,75 @@
-From: fweimer@redhat.com (Florian Weimer)
-Date: Thu, 1 Dec 2016 10:21:03 +0100
-Subject: [RFC PATCH 00/29] arm64: Scalable Vector Extension core support
-In-Reply-To: <20161130135631.GK1574@e103592.cambridge.arm.com>
-References: <20161130120654.GJ1574@e103592.cambridge.arm.com>
- <3e8afc5a-1ba9-6369-462b-4f5a707d8b8a@redhat.com>
- <20161130135631.GK1574@e103592.cambridge.arm.com>
-Message-ID: <dbcd545f-1358-6a80-5a9f-3e4a3c93189a@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 1 Dec 2016 10:21:50 +0100
+Subject: [PATCH] ARM: dts: sunxi: Add num-cs for A20 spi nodes
+In-Reply-To: <20161125220752.c989c85e01ed202be0485c78@bidouilliste.com>
+References: <20161122170616.29557-1-manu@bidouilliste.com>
+ <20161124195517.qrq7briu3pwjnp4n@lukather>
+ <20161124210509.be743aae84c26c6c2e666c6e@bidouilliste.com>
+ <20161125152047.oadxi2xbgm4kdd7q@lukather>
+ <20161125220752.c989c85e01ed202be0485c78@bidouilliste.com>
+Message-ID: <20161201092150.rlo5skxd6elovlgq@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2016 02:56 PM, Dave Martin wrote:
+Hi Emmanuel,
 
-> If we do have distinct "set process VL" and "set thread VL" interfaces,
-> then my view is that the former should fail if there are already
-> multiple threads, rather than just setting the VL of a single thread or
-> (worse) asynchronously changing the VL of threads other than the
-> caller...
+On Fri, Nov 25, 2016 at 10:07:52PM +0100, Emmanuel Vadot wrote:
+> On Fri, 25 Nov 2016 16:20:47 +0100
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > On Thu, Nov 24, 2016 at 09:05:09PM +0100, Emmanuel Vadot wrote:
+> > > On Thu, 24 Nov 2016 20:55:17 +0100
+> > > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> > > 
+> > > > On Tue, Nov 22, 2016 at 06:06:16PM +0100, Emmanuel Vadot wrote:
+> > > > > The spi0 controller on the A20 have up to 4 CS (Chip Select) while the
+> > > > > others three only have 1.
+> > > > > Add the num-cs property to each node.
+> > > > > 
+> > > > > Signed-off-by: Emmanuel Vadot <manu@bidouilliste.com>
+> > > > 
+> > > > I don't think we have any code that uses it at the moment. What is the
+> > > > rationale behind this patch?
+> > > > 
+> > > > Thanks!
+> > > > Maxime
+> > > > 
+> > > > -- 
+> > > > Maxime Ripard, Free Electrons
+> > > > Embedded Linux and Kernel engineering
+> > > > http://free-electrons.com
+> > > 
+> > >  Hi Maxime,
+> > > 
+> > >  If num-cs isn't present nothing prevent to start a transfer with a
+> > > non-valid CS pin, resulting in an error.
+> > >  num-cs are default property especially made for this and a SPI driver
+> > > should try to get the property at probe/attach time.
+> > 
+> > Yes, but as far as I know, our driver doesn't. I'm all in for having
+> > support for that in our driver, but without it, that patch is kind of
+> > useless.
+> 
+>  Yes the Linux driver doesn't use it but my upcoming one for FreeBSD
+> uses it. So it is not useless for downstream user of DTS.
 
-Yes, looks feasible to me.
+Ah, I didn't know this was for FreeBSD. So you started to use our DTs,
+or do you have some modifications to it? How does that work?
 
->>> I'm not familiar with resumable functions/executors -- are these in
->>> the C++ standards yet (not that that would cause me to be familiar
->>> with them... ;)  Any implementation of coroutines (i.e.,
->>> cooperative switching) is likely to fall under the "setcontext"
->>> argument above.
->>
->> There are different ways to implement coroutines.  Stack switching (like
->> setcontext) is obviously impacted by non-uniform register sizes.  But even
->> the most conservative variant, rather similar to switch-based emulation you
->> sometimes see in C coroutine implementations, might have trouble restoring
->> the state if it just cannot restore the saved state due to register size
->> reductions.
->
-> Which is not a problem if the variably-sized state is not part of the
-> switched context?
+Anyway, the fact that it isn't used by our driver at the moment and
+that it's meant for other OSes should be mentionned in the commit log.
 
-The VL value is implicitly thread-local data, and the encoded state may 
-have an implicit dependency on it, although it does not contain vector 
-registers as such.
+Thanks!
+Maxime
 
-> Because the SVE procedure call standard determines that the SVE
-> registers are caller-save,
-
-By the way, how is this implemented?  Some of them overlap existing 
-callee-saved registers.
-
-> they are not live at any external function
-> boundary -- so in cooperative switching it is useless to save/restore
-> this state unless the coroutine framework is defined to have a special
-> procedure call standard.
-
-It can use the standard calling convention, but it may have selected a 
-particular implementation based on the VL value before suspension.
-
-Florian
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161201/b66af5d5/attachment-0001.sig>
