@@ -1,35 +1,47 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Thu, 01 Dec 2016 20:39:57 +1100
-Subject: [PATCH v3 2/3] powerpc/reloc64: add support for 32-bit CRC
- pseudo-symbols
-In-Reply-To: <CAKv+Gu8g=qgOg0Q5J7tFu0uBUFTUXdVQ+84N45oZseG3vTm0Bg@mail.gmail.com>
-References: <1477585631-18574-1-git-send-email-ard.biesheuvel@linaro.org>
- <1477585631-18574-3-git-send-email-ard.biesheuvel@linaro.org>
- <87oa13ssqq.fsf@concordia.ellerman.id.au>
- <CAKv+Gu8g=qgOg0Q5J7tFu0uBUFTUXdVQ+84N45oZseG3vTm0Bg@mail.gmail.com>
-Message-ID: <874m2ooumq.fsf@concordia.ellerman.id.au>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 1 Dec 2016 10:42:18 +0100
+Subject: [PATCH v7 0/8] drm: sun8i: Add DE2 HDMI video support
+In-Reply-To: <2084988.kISO4Quil7@avalon>
+References: <cover.1480414715.git.moinejf@free.fr> <2039137.LtCOH6bs2I@avalon>
+ <20161201091313.th7nucjmvtuolqza@lukather>
+ <2084988.kISO4Quil7@avalon>
+Message-ID: <20161201094218.6snkyrsxex3hpwwi@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
-> On 25 November 2016 at 11:29, Michael Ellerman <mpe@ellerman.id.au> wrote:
->> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
->>
->> [    7.607687] kvm: disagrees about version of symbol module_layout
->> [    7.846799] virtio: disagrees about version of symbol module_layout
->> [   22.012615] crc32c_vpmsum: disagrees about version of symbol module_layout
->> [   22.012959] libcrc32c: disagrees about version of symbol module_layout
->>
->
-> Sigh. I suppose your modversions fixes are queued for v4.10? It's
-> probably best to revisit this after the v4.10 merge window closes
-> then, just to make sure I'm not aiming for a moving target.
+On Thu, Dec 01, 2016 at 11:19:56AM +0200, Laurent Pinchart wrote:
+> Hi Maxime,
+> 
+> On Thursday 01 Dec 2016 10:13:13 Maxime Ripard wrote:
+> > On Wed, Nov 30, 2016 at 12:12:55PM +0200, Laurent Pinchart wrote:
+> > >> More, it is not sure that the bridge/DW code would work with Allwinner's
+> > >> SoCs.
+> > > 
+> > > If it doesn't work and can't be made to work in a non-invasive way they it
+> > > should certainly not be used :-)
+> > 
+> > Even if the register layout is completely scrambled, as long as the
+> > bits themselves aren't (and by comparing the two drivers it looks like
+> > they haven't changed), you can easily deal with that using the
+> > regmap_fields, with the two implementations (the original one and the
+> > scrambled one) providing their register map that way, and the driver
+> > code using whatever has been provided.
+> 
+> Looking at https://linux-sunxi.org/DWC_HDMI_Controller#DWC_HDMI_Controller it 
+> seems that an address remapping function could be used.
 
-Actually they were merged into 4.9-rc7 ish.
+Even better.
 
-But I'm still seeing the same as above with this series rebased on top
-of that, and I'm a bit short on time to debug it ATM.
+Maxime
 
-So during the 4.10 cycle is probably the best we can hope for, sorry.
-
-cheers
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161201/79cf80f8/attachment.sig>
