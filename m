@@ -1,36 +1,32 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 1 Dec 2016 10:11:24 +0000
-Subject: [PATCH 2/2] arm64: dts: juno: fix cluster sleep state entry
- latency on all SoC versions
-In-Reply-To: <1479317491-7435-2-git-send-email-sudeep.holla@arm.com>
-References: <1479317491-7435-1-git-send-email-sudeep.holla@arm.com>
- <1479317491-7435-2-git-send-email-sudeep.holla@arm.com>
-Message-ID: <ed75f674-feaf-9c4b-a995-3e815054918d@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu,  1 Dec 2016 11:26:56 +0100
+Subject: [PATCH] usb: gadget: udc: atmel: used managed kasprintf
+Message-ID: <20161201102656.29041-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Use devm_kasprintf instead of simple kasprintf to free the allocated memory
+when needed.
 
+Suggested-by: Peter Rosin <peda@axentia.se>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-On 16/11/16 17:31, Sudeep Holla wrote:
-> The core and the cluster sleep state entry latencies can't be same as
-> cluster sleep involves more work compared to core level e.g. shared
-> cache maintenance.
->
-> Experiments have shown on an average about 100us more latency for the
-> cluster sleep state compared to the core level sleep. This patch fixes
-> the entry latency for the cluster sleep state.
->
-> Fixes: 28e10a8f3a03 ("arm64: dts: juno: Add idle-states to device tree")
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: "Jon Medhurst (Tixy)" <tixy@linaro.org>
-> Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-
-You missed to pick up this, I posted this along with vexpress config bus
-fix. Sorry for the confusion, I feel pull request are better/easier to
-track than single patches. I will send PR from next time if also prefer
-that. Let me know.
-
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index 45bc997d0711..aec72fe8273c 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -1978,7 +1978,8 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+ 			dev_err(&pdev->dev, "of_probe: name error(%d)\n", ret);
+ 			goto err;
+ 		}
+-		ep->ep.name = kasprintf(GFP_KERNEL, "ep%d", ep->index);
++		ep->ep.name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "ep%d",
++					     ep->index);
+ 
+ 		ep->ep_regs = udc->regs + USBA_EPT_BASE(i);
+ 		ep->dma_regs = udc->regs + USBA_DMA_BASE(i);
 -- 
-Regards,
-Sudeep
+2.10.2
