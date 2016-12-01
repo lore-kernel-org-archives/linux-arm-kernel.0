@@ -1,32 +1,40 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  1 Dec 2016 22:00:18 +0100
-Subject: [PATCH 0/2] clk: bcm2835: Propage rate change to PLLH
-Message-ID: <1480626020-20031-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Thu,  1 Dec 2016 22:00:20 +0100
+Subject: [PATCH 2/2] clk: bcm: Allow rate change propagation to PLLH_AUX on
+ VEC clock
+In-Reply-To: <1480626020-20031-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1480626020-20031-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1480626020-20031-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The VEC clock requires needs to be set at exactly 108MHz. Allow rate
+change propagation on PLLH_AUX to match this requirement wihtout
+impacting other IPs (PLLH is currently only used by the HDMI encoder,
+which cannot be enabled when the VEC encoder is enabled).
 
-The VEC (Video EnCoder) clock needs to be running at precisely 108Mhz
-for the VEC IP to work properly.
-Unfortunately, the current implementation does not propate peripheral
-clock rate change to their parents, which prevents us from getting
-the 108Mhz rate unless the PLLH and PLLH_AUX clocks are already
-configured (by the bootloader) to a multiple of 108Mhz.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/clk/bcm/clk-bcm2835.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-This series adds support for optional per-periph-clk rate change
-propagation and enables this feature on the VEC clock.
-
-Regards,
-
-Boris
-
-Boris Brezillon (2):
-  clk: bcm: Support rate change propagation on bcm2835 clocks
-  clk: bcm: Allow rate change propagation to PLLH_AUX on VEC clock
-
- drivers/clk/bcm/clk-bcm2835.c | 74 ++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 69 insertions(+), 5 deletions(-)
-
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index df96fe6dadab..eaf82f49dede 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -1861,7 +1861,12 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.ctl_reg = CM_VECCTL,
+ 		.div_reg = CM_VECDIV,
+ 		.int_bits = 4,
+-		.frac_bits = 0),
++		.frac_bits = 0,
++		/*
++		 * Allow rate change propagation only on PLLH_AUX which is
++		 * assigned index 7 in the parent array.
++		 */
++		.set_rate_parent = BIT(7)),
+ 
+ 	/* dsi clocks */
+ 	[BCM2835_CLOCK_DSI0E]	= REGISTER_PER_CLK(
 -- 
 2.7.4
