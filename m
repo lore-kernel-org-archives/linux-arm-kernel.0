@@ -1,48 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 01 Dec 2016 12:35:23 +0100
-Subject: [GIT PULL 1/6] Broadcom soc changes for 4.10
-In-Reply-To: <fa48be7a336e97c850b226d0c54c9b96@milecki.pl>
-References: <20161122054824.16974-1-f.fainelli@gmail.com>
- <23121827.vnVDrZQAeV@wuerfel> <fa48be7a336e97c850b226d0c54c9b96@milecki.pl>
-Message-ID: <3443450.WBdaUHjCv8@wuerfel>
+From: aryabinin@virtuozzo.com (Andrey Ryabinin)
+Date: Thu, 1 Dec 2016 14:36:05 +0300
+Subject: [PATCHv4 08/10] mm/kasan: Switch to using __pa_symbol and lm_alias
+In-Reply-To: <1480445729-27130-9-git-send-email-labbott@redhat.com>
+References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
+ <1480445729-27130-9-git-send-email-labbott@redhat.com>
+Message-ID: <2f3ac043-c4cc-5c5a-8ac7-1396b6bb193f@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 1, 2016 12:18:26 PM CET Rafa? Mi?ecki wrote:
-> On 2016-11-30 17:52, Arnd Bergmann wrote:
-> > On Monday, November 21, 2016 9:48:19 PM CET Florian Fainelli wrote:
-> >> This pull request contains Broadcom ARM-based SoC changes for 4.10, 
-> >> please pull
-> >> the following:
-> >> 
-> >> - Rafal adds back the abort handler hook on BCM5301x which is required 
-> >> to silence
-> >>   errors forwared from the PCIe controller that cannot be silenced at 
-> >> the PCIe RC level
-> >> 
-> > 
-> > Pulled into next/soc.
-> > 
-> > It's unclear to me whether we want this to be backported to stable 
-> > kernels,
-> > can you clarify?
-> 
-> It took me/us so much time to get an agreement on this patch I totally 
-> forgot
-> about backporting it to stable.
-> 
-> To be clear it indeed fixes a regression. Commit 937b12306ea79 ("ARM: 
-> BCM5301X:
-> remove workaround imprecise abort fault handler") went into 4.5, so this 
-> one
-> could be backported to 4.5+.
-> 
-> As this has been already pulled, I think I'll wait for it to appear in 
-> Linus's
-> tree and just e-mail stable guys manually (unless someone objects). 
-> Thanks for
-> bringing my attention to this.
+On 11/29/2016 09:55 PM, Laura Abbott wrote:
+> __pa_symbol is the correct API to find the physical address of symbols.
+> Switch to it to allow for debugging APIs to work correctly.
 
-Ok, sounds good. Thanks!
+But __pa() is correct for symbols. I see how __pa_symbol() might be a little
+faster than __pa(), but there is nothing wrong in using __pa() on symbols.
 
-	Arnd
+> Other
+> functions such as p*d_populate may call __pa internally. Ensure that the
+> address passed is in the linear region by calling lm_alias.
+
+Why it should be linear mapping address? __pa() translates kernel image address just fine.
+This lm_alias() only obfuscates source code. Generated code is probably worse too.
