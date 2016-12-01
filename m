@@ -1,32 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 01 Dec 2016 15:59:17 +0100
-Subject: [PATCH v2] ARM: davinci: da8xx: Fix sleeping function called from
- invalid context
-In-Reply-To: <ed09fc5e-395a-5e72-4928-5e85cdc7f2c3@ti.com>
-References: <1480438111-11801-1-git-send-email-abailon@baylibre.com>
- <ed09fc5e-395a-5e72-4928-5e85cdc7f2c3@ti.com>
-Message-ID: <2968058.oO7jkWYDV8@wuerfel>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 01 Dec 2016 16:00:07 +0100
+Subject: [PATCH/RFC] ARM64: use this_cpu_read in raw_smp_processor_id()
+Message-ID: <1480604407-6022-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 1, 2016 7:47:12 PM CET Sekhar Nori wrote:
-> 
-> > @@ -287,9 +281,15 @@ int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
-> >       struct clk *parent;
-> >       int ret = 0;
-> >  
-> > +     usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
-> > +     if (IS_ERR(usb20_clk))
-> > +             return PTR_ERR(parent);
-> 
-> Typo here. Should be PTR_ERR(usb20_clk)
+Direct access to cpu_number entry in per-cpu variables causes boot
+failure on Exynos5433, so replace it with this_cpu_read() macro.
+This approach is also used on x86_64.
 
-I found that doing
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+This change is needed to get linux-next to boot on Exynos5433, otherwise it
+hangs somewhere in early init. There is even no message on the earlycon.
 
-		err = PTR_ERR_OR_ZERO(usb20_clk);
-		if (err)
-			return err;
+This issue appeared first on linux-next from 14.11.2016. The tree from
+11.11.2016 is the last one, which boots on Exynos5433. I've tried to
+debug a bit this issue, but I ran out of ideas.
 
-is less error-prone and leads to better object code.
+Any comments or suggestions are welcome.
 
-	Arnd
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
+---
+ arch/arm64/include/asm/smp.h | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
+
+diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+index a62db952ffcb..d514383d6219 100644
+--- a/arch/arm64/include/asm/smp.h
++++ b/arch/arm64/include/asm/smp.h
+@@ -37,12 +37,7 @@
+ 
+ DECLARE_PER_CPU_READ_MOSTLY(int, cpu_number);
+ 
+-/*
+- * We don't use this_cpu_read(cpu_number) as that has implicit writes to
+- * preempt_count, and associated (compiler) barriers, that we'd like to avoid
+- * the expense of. If we're preemptible, the value can be stale at use anyway.
+- */
+-#define raw_smp_processor_id() (*this_cpu_ptr(&cpu_number))
++#define raw_smp_processor_id() (this_cpu_read(cpu_number))
+ 
+ struct seq_file;
+ 
+-- 
+1.9.1
