@@ -1,40 +1,18 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Fri,  2 Dec 2016 00:11:12 +0900
-Subject: [PATCH] ARM: dts: orion5x: fix number of sata port for linkstation
- ls-gl
-Message-ID: <20161201151112.930-1-rogershimizu@gmail.com>
+From: rkrcmar@redhat.com (Radim =?utf-8?B?S3LEjW3DocWZ?=)
+Date: Thu, 1 Dec 2016 16:15:04 +0100
+Subject: [PULL] KVM/ARM updates for 4.9-rc7
+In-Reply-To: <1480584341-32340-1-git-send-email-marc.zyngier@arm.com>
+References: <1480584341-32340-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20161201151504.GI1682@potion>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bug report from Debian [0] shows there's minor changed model of
-Linkstation LS-GL that uses the 2nd SATA port of the SoC.
-So it's necessary to enable two SATA ports, though for that specific
-model only the 2nd one is used.
+2016-12-01 09:25+0000, Marc Zyngier:
+> Paolo, Radim,
+> 
+> Hopefully, this is the last update for 4.9. This time, a single patch
+> that prevents bogus acknoledgement of interrupts.
+> 
+> It'd be great if this could make it into v4.9-final
 
-[0] https://bugs.debian.org/845611
-
-Fixes: b1742ffa9ddb ("ARM: dts: orion5x: add device tree for buffalo linkstation ls-gl")
-Reported-by: Ryan Tandy <ryan@nardis.ca>
-Tested-by: Ryan Tandy <ryan@nardis.ca>
-Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
----
- arch/arm/boot/dts/orion5x-linkstation-lsgl.dts | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/orion5x-linkstation-lsgl.dts b/arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
-index 1cf644b..51dc734 100644
---- a/arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
-+++ b/arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
-@@ -82,6 +82,10 @@
- 	gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
- };
- 
-+&sata {
-+	nr-ports = <2>;
-+};
-+
- &ehci1 {
- 	status = "okay";
- };
--- 
-2.10.2
+Pulled, thanks.
