@@ -1,21 +1,41 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 1 Dec 2016 15:13:46 +0100
-Subject: [PATCH] arm: kprobe: replace patch_lock to raw lock
-In-Reply-To: <1478823475-15087-1-git-send-email-yang.shi@linaro.org>
-References: <1478823475-15087-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <20161201141345.4xlceuchfkxyel75@linutronix.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 1 Dec 2016 19:47:12 +0530
+Subject: [PATCH v2] ARM: davinci: da8xx: Fix sleeping function called from
+ invalid context
+In-Reply-To: <1480438111-11801-1-git-send-email-abailon@baylibre.com>
+References: <1480438111-11801-1-git-send-email-abailon@baylibre.com>
+Message-ID: <ed09fc5e-395a-5e72-4928-5e85cdc7f2c3@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-11-10 16:17:55 [-0800], Yang Shi wrote:
+On Tuesday 29 November 2016 10:18 PM, Alexandre Bailon wrote:
+> Everytime the usb20 phy is enabled, there is a
+> "sleeping function called from invalid context" BUG.
 > 
-> Since patch_text_stop_machine() is called in stop_machine() which disables IRQ,
-> sleepable lock should be not used in this atomic context, so replace patch_lock
-> to raw lock.
+> clk_enable() from arch/arm/mach-davinci/clock.c uses spin_lock_irqsave()
+> before to invoke the callback usb20_phy_clk_enable().
+
+"before invocation of the callback"? (doesn't read right otherwise)
+
+> usb20_phy_clk_enable() uses clk_get() and clk_enable_prepapre()
+
+clk_prepare_enable()
+
+> which may sleep.
+> Move clk_get() to da8xx_register_usb20_phy_clk() and
+> replace clk_prepare_enable() by clk_enable().
 > 
-> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
 
-This can also go upstream.
-Acked-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> @@ -287,9 +281,15 @@ int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
+>  	struct clk *parent;
+>  	int ret = 0;
+>  
+> +	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
+> +	if (IS_ERR(usb20_clk))
+> +		return PTR_ERR(parent);
 
-Sebastian
+Typo here. Should be PTR_ERR(usb20_clk)
+
+Thanks,
+Sekhar
