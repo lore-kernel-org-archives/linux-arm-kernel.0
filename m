@@ -1,46 +1,31 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 1 Dec 2016 16:36:04 -0600
-Subject: [PATCH v2] PCI: Add information about describing PCI in ACPI
-In-Reply-To: <20161129212816.15663.28100.stgit@bhelgaas-glaptop.roam.corp.google.com>
-References: <20161129212816.15663.28100.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20161201223604.GC15867@bhelgaas-glaptop.roam.corp.google.com>
+From: wsa-dev@sang-engineering.com (Wolfram Sang)
+Date: Thu, 1 Dec 2016 23:36:15 +0100
+Subject: [PATCH v7 1/4] i2c: pxa: Add definition of fast and high speed
+ modes via the regs layout
+In-Reply-To: <20161201110440.27530-2-romain.perier@free-electrons.com>
+References: <20161201110440.27530-1-romain.perier@free-electrons.com>
+ <20161201110440.27530-2-romain.perier@free-electrons.com>
+Message-ID: <20161201223615.GB19261@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 03:39:48PM -0600, Bjorn Helgaas wrote:
-> Here's another stab at this writeup.  I'd appreciate any comments!
+On Thu, Dec 01, 2016 at 12:04:37PM +0100, Romain Perier wrote:
+> So far, the bit masks for the fast and high speed mode were statically
+> defined. Some IP blocks might use different bits for these modes.
 > 
-> Changes from v1 to v2:
->   - Consumer/Producer is defined for Extended Address Space descriptors;
->     should be ignored for QWord/DWord/Word Address Space descriptors
->   - New arches may use Extended Address Space descriptors in PNP0A03 for
->     bridge registers, including ECAM (if the arch adds support for this)
->   - Add more details about MCFG and _CBA (Lv's suggestion)
->   - Incorporate Rafael's suggestions
+> This commit introduces new fields in order to enable the definition of
+> different bit masks for these features. If these fields are undefined,
+> ICR_FM and ICR_HS are selected to preserve backward compatibility with
+> other IPs.
 > 
-> ---
-> 
-> Bjorn Helgaas (1):
->       PCI: Add information about describing PCI in ACPI
-> 
-> 
->  Documentation/PCI/00-INDEX      |    2 
->  Documentation/PCI/acpi-info.txt |  180 +++++++++++++++++++++++++++++++++++++++
->  2 files changed, 182 insertions(+)
->  create mode 100644 Documentation/PCI/acpi-info.txt
+> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
 
-It's very late in the cycle, but I'm considering trying to squeeze
-this into v4.9 on the grounds that:
+Applied to for-next, thanks!
 
-  - It's only a documentation change and can't break anything, and
-
-  - Distributing it more widely may help the arm64 firmware ecosystem
-
-But I don't want to disseminate misleading or incorrect information,
-so if it needs clarification or wordsmithing, or even just maturation,
-I'll wait until v4.10.
-
-The Consumer/Producer stuff, in particular, doesn't seem 100% settled
-yet.  Your thoughts, and especially your improvements, are welcome!
-
-Bjorn
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161201/a419650d/attachment.sig>
