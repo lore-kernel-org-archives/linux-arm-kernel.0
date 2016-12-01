@@ -1,109 +1,60 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Thu,  1 Dec 2016 12:04:38 +0100
-Subject: [PATCH v7 2/4] i2c: pxa: Add support for the I2C units found in
- Armada 3700
-In-Reply-To: <20161201110440.27530-1-romain.perier@free-electrons.com>
-References: <20161201110440.27530-1-romain.perier@free-electrons.com>
-Message-ID: <20161201110440.27530-3-romain.perier@free-electrons.com>
+From: amakarov.linux@gmail.com (Aleksey Makarov)
+Date: Thu, 1 Dec 2016 17:12:17 +0600
+Subject: [PATCH v3 11/14] ACPI: irq: introduce interrupt producer
+In-Reply-To: <1477408169-22217-12-git-send-email-guohanjun@huawei.com>
+References: <1477408169-22217-1-git-send-email-guohanjun@huawei.com>
+ <1477408169-22217-12-git-send-email-guohanjun@huawei.com>
+Message-ID: <04573e29-6222-24f0-82f4-381367ee8bf0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 3700 has two I2C controllers that is compliant with the I2C
-Bus Specificiation 2.1, supports multi-master and different bus speed:
-Standard mode (up to 100 KHz), Fast mode (up to 400 KHz),
-High speed mode (up to 3.4 Mhz).
 
-This IP block has a lot of similarity with the PXA, except some register
-offsets and bitfield. This commits adds a basic support for this I2C
-unit.
+Hi Hanjun,
 
-Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
+On 10/25/2016 09:09 PM, Hanjun Guo wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
+>
+> In ACPI 6.1 spec, section 19.6.62, Interrupt Resource Descriptor Macro,
 
-Changes in v6:
- - Revert back A3700_REGS, as asked by Wolfram and define fm_mask
-   and hs_mask in the register layout. I moved the generic code
-   for fm_mask and hs_mask to a seperated commit (1/4)
+[ ... ]
 
-Changes in v5:
- - Don't define registers for armada-3700, we can re-use the ones
-   for PXA3XX.
- - Define registers mask when OF is not used, in probe_pdata. 
+> ---
+>  drivers/acpi/gsi.c      | 10 ++++--
+>  drivers/acpi/resource.c | 85 ++++++++++++++++++++++++++++++++++---------------
+>  include/acpi/acpi_bus.h |  1 +
+>  3 files changed, 68 insertions(+), 28 deletions(-)
+>
+> diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
+> index ee9e0f2..29ee547 100644
+> --- a/drivers/acpi/gsi.c
+> +++ b/drivers/acpi/gsi.c
+> @@ -55,13 +55,19 @@ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
+>  		      int polarity)
+>  {
+>  	struct irq_fwspec fwspec;
+> +	struct acpi_device *adev = dev ? to_acpi_device(dev) : NULL;
 
-Changes in v4:
- - Replaced the type of hs_mask and fm_mask by u32, instead of
-   unsigned int, As writel() take an u32 as first argument...
+Why are you sure dev is always an acpi device?
+Look for example at drivers/acpi/pci_irq.c:377 where this function
+is called for a PCI device
 
-Changes in v3:
- - Replaced the type of hs_mask and fm_mask by unsigned int,
-   instead of unsigned long.
+>
+> -	if (WARN_ON(!acpi_gsi_domain_id)) {
+> +	if (adev && &adev->fwnode && adev->interrupt_producer)
 
- drivers/i2c/busses/Kconfig   |  2 +-
- drivers/i2c/busses/i2c-pxa.c | 15 +++++++++++++++
- 2 files changed, 16 insertions(+), 1 deletion(-)
+&adev->fwnode is always true
 
-diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-index d252276..2f56a26 100644
---- a/drivers/i2c/busses/Kconfig
-+++ b/drivers/i2c/busses/Kconfig
-@@ -763,7 +763,7 @@ config I2C_PUV3
- 
- config I2C_PXA
- 	tristate "Intel PXA2XX I2C adapter"
--	depends on ARCH_PXA || ARCH_MMP || (X86_32 && PCI && OF)
-+	depends on ARCH_PXA || ARCH_MMP || ARCH_MVEBU || (X86_32 && PCI && OF)
- 	help
- 	  If you have devices in the PXA I2C bus, say yes to this option.
- 	  This driver can also be built as a module.  If so, the module
-diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index b4ac235..6cf333e 100644
---- a/drivers/i2c/busses/i2c-pxa.c
-+++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -57,8 +57,12 @@ enum pxa_i2c_types {
- 	REGS_PXA3XX,
- 	REGS_CE4100,
- 	REGS_PXA910,
-+	REGS_A3700,
- };
- 
-+#define ICR_BUSMODE_FM	(1 << 16)	   /* shifted fast mode for armada-3700 */
-+#define ICR_BUSMODE_HS	(1 << 17)	   /* shifted high speed mode for armada-3700 */
-+
- /*
-  * I2C registers definitions
-  */
-@@ -93,6 +97,15 @@ static struct pxa_reg_layout pxa_reg_layout[] = {
- 		.ilcr = 0x28,
- 		.iwcr = 0x30,
- 	},
-+	[REGS_A3700] = {
-+		.ibmr =	0x00,
-+		.idbr =	0x04,
-+		.icr =	0x08,
-+		.isr =	0x0c,
-+		.isar =	0x10,
-+		.fm = ICR_BUSMODE_FM,
-+		.hs = ICR_BUSMODE_HS,
-+	},
- };
- 
- static const struct platform_device_id i2c_pxa_id_table[] = {
-@@ -100,6 +113,7 @@ static const struct platform_device_id i2c_pxa_id_table[] = {
- 	{ "pxa3xx-pwri2c",	REGS_PXA3XX },
- 	{ "ce4100-i2c",		REGS_CE4100 },
- 	{ "pxa910-i2c",		REGS_PXA910 },
-+	{ "armada-3700-i2c",	REGS_A3700  },
- 	{ },
- };
- MODULE_DEVICE_TABLE(platform, i2c_pxa_id_table);
-@@ -1141,6 +1155,7 @@ static const struct of_device_id i2c_pxa_dt_ids[] = {
- 	{ .compatible = "mrvl,pxa-i2c", .data = (void *)REGS_PXA2XX },
- 	{ .compatible = "mrvl,pwri2c", .data = (void *)REGS_PXA3XX },
- 	{ .compatible = "mrvl,mmp-twsi", .data = (void *)REGS_PXA910 },
-+	{ .compatible = "marvell,armada-3700-i2c", .data = (void *)REGS_A3700 },
- 	{}
- };
- MODULE_DEVICE_TABLE(of, i2c_pxa_dt_ids);
--- 
-2.9.3
+> +		/* devices in DSDT connecting to spefic interrupt producer */
+> +		fwspec.fwnode = adev->interrupt_producer;
+> +	else if (acpi_gsi_domain_id)
+> +		/* devices connecting to gicd in default */
+> +		fwspec.fwnode = acpi_gsi_domain_id;
+> +	else {
+>  		pr_warn("GSI: No registered irqchip, giving up\n");
+>  		return -EINVAL;
+>  	}
+
+[ ... ]
+
+All the best
+Aleksey Makarov
