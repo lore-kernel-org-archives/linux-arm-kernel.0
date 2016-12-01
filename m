@@ -1,43 +1,41 @@
-From: rafal@milecki.pl (=?UTF-8?Q?Rafa=C5=82_Mi=C5=82ecki?=)
-Date: Thu, 01 Dec 2016 12:18:26 +0100
-Subject: [GIT PULL 1/6] Broadcom soc changes for 4.10
-In-Reply-To: <23121827.vnVDrZQAeV@wuerfel>
-References: <20161122054824.16974-1-f.fainelli@gmail.com>
- <23121827.vnVDrZQAeV@wuerfel>
-Message-ID: <fa48be7a336e97c850b226d0c54c9b96@milecki.pl>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 1 Dec 2016 12:20:10 +0100
+Subject: [PATCH] usb: gadget: udc: atmel: used managed kasprintf
+In-Reply-To: <20161201102656.29041-1-alexandre.belloni@free-electrons.com>
+References: <20161201102656.29041-1-alexandre.belloni@free-electrons.com>
+Message-ID: <5a02d413-6620-3777-366f-e45e713deb49@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-11-30 17:52, Arnd Bergmann wrote:
-> On Monday, November 21, 2016 9:48:19 PM CET Florian Fainelli wrote:
->> This pull request contains Broadcom ARM-based SoC changes for 4.10, 
->> please pull
->> the following:
->> 
->> - Rafal adds back the abort handler hook on BCM5301x which is required 
->> to silence
->>   errors forwared from the PCIe controller that cannot be silenced at 
->> the PCIe RC level
->> 
+Le 01/12/2016 ? 11:26, Alexandre Belloni a ?crit :
+> Use devm_kasprintf instead of simple kasprintf to free the allocated memory
+> when needed.
 > 
-> Pulled into next/soc.
+> Suggested-by: Peter Rosin <peda@axentia.se>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+> ---
+>  drivers/usb/gadget/udc/atmel_usba_udc.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> It's unclear to me whether we want this to be backported to stable 
-> kernels,
-> can you clarify?
+> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> index 45bc997d0711..aec72fe8273c 100644
+> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
+> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> @@ -1978,7 +1978,8 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+>  			dev_err(&pdev->dev, "of_probe: name error(%d)\n", ret);
+>  			goto err;
+>  		}
+> -		ep->ep.name = kasprintf(GFP_KERNEL, "ep%d", ep->index);
+> +		ep->ep.name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "ep%d",
+> +					     ep->index);
+>  
+>  		ep->ep_regs = udc->regs + USBA_EPT_BASE(i);
+>  		ep->dma_regs = udc->regs + USBA_DMA_BASE(i);
+> 
 
-It took me/us so much time to get an agreement on this patch I totally 
-forgot
-about backporting it to stable.
 
-To be clear it indeed fixes a regression. Commit 937b12306ea79 ("ARM: 
-BCM5301X:
-remove workaround imprecise abort fault handler") went into 4.5, so this 
-one
-could be backported to 4.5+.
-
-As this has been already pulled, I think I'll wait for it to appear in 
-Linus's
-tree and just e-mail stable guys manually (unless someone objects). 
-Thanks for
-bringing my attention to this.
+-- 
+Nicolas Ferre
