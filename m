@@ -1,67 +1,38 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Thu, 1 Dec 2016 19:53:47 +0800
-Subject: [PATCH v14] acpi, apei, arm64: APEI initial support for aarch64.
-In-Reply-To: <20161201114137.herpemkbg3rqxrc4@pd.tnic>
-References: <1470834168-1780-1-git-send-email-fu.wei@linaro.org>
- <20161201114137.herpemkbg3rqxrc4@pd.tnic>
-Message-ID: <CADyBb7vYzFnJjQvbMvGkqDvfBWL4jofMDhjPCvwS6u0S-yw3sw@mail.gmail.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Thu, 1 Dec 2016 12:59:07 +0100
+Subject: [PATCH 0/2] register atmel-ssc as sound DAI w/o platform driver
+Message-ID: <1480593549-6464-1-git-send-email-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Borislav,
+Hi!
 
-On 1 December 2016 at 19:41, Borislav Petkov <bp@suse.de> wrote:
-> On Wed, Aug 10, 2016 at 09:02:48PM +0800, fu.wei at linaro.org wrote:
->> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>
->> This patch provides APEI arch-specific bits for aarch64
->>
->> Meanwhile,
->> (1)move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
->> a generic place.
->> (2)select HAVE_ACPI_APEI when EFI and ACPI is set on ARM64,
->> because arch_apei_get_mem_attribute is using efi_mem_attributes on ARM64.
->
-> ...
->
->> @@ -110,8 +111,27 @@ static inline const char *acpi_get_enable_method(int cpu)
->>  }
->>
->>  #ifdef       CONFIG_ACPI_APEI
->> +/*
->> + * acpi_disable_cmcff is used in drivers/acpi/apei/hest.c for disabling
->> + * IA-32 Architecture Corrected Machine Check (CMC) Firmware-First mode by
->> + * boot parameter(acpi=nocmcff). But we don't have this IA-32 specific
->
-> Make that
->
-> "... with a kernel command line parameter "acpi=nocmcoff"."
->
-> Please fix that up when applying.
->
-> With that:
->
-> Reviewed-by: Borislav Petkov <bp@suse.de>
+The Atmel SSC is currently not usable as an audio DAI unless someone
+registers it with ASoC. This is currently delegated to a platform
+driver for every possible audio use, and prevents the SSC from being
+used as a cpu DAI with the simple-audio-card driver.
 
-Great thanks for your rapidly feedback :-)
+The first patch fixes this.
 
-will send v15 with that fix  immediately
+The second patch simplifies one of these platform drivers, since it
+can now rely on the SSC to register itself with ASoC. However, this
+may not be a possible simplification for other, older, drivers since
+it also requires device tree changes.
 
->
-> Thanks!
->
-> --
-> Regards/Gruss,
->     Boris.
->
-> SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
-> --
+Cheers,
+Peter
 
+Peter Rosin (2):
+  misc: atmel-ssc: register as sound DAI if #sound-dai-cells is present
+  ASoC: atmel: tse850: rely on the ssc to register as a cpu dai by
+    itself
 
+ .../devicetree/bindings/misc/atmel-ssc.txt         |  2 +
+ .../bindings/sound/axentia,tse850-pcm5142.txt      |  5 +--
+ drivers/misc/atmel-ssc.c                           | 50 ++++++++++++++++++++++
+ include/linux/atmel-ssc.h                          |  1 +
+ sound/soc/atmel/tse850-pcm5142.c                   | 23 ++--------
+ 5 files changed, 58 insertions(+), 23 deletions(-)
 
 -- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+2.1.4
