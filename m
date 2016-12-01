@@ -1,62 +1,242 @@
 From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Thu,  1 Dec 2016 09:04:49 -0800
-Subject: [PATCH v4 0/3] Altera Cyclone Passive Serial SPI FPGA Manager
-Message-ID: <cover.1480551148.git.stillcompiling@gmail.com>
+Date: Thu,  1 Dec 2016 09:04:52 -0800
+Subject: [PATCH v4 3/3] fpga manager: Add cyclone-ps-spi driver for Altera
+ FPGAs
+In-Reply-To: <cover.1480551148.git.stillcompiling@gmail.com>
+References: <cover.1480551148.git.stillcompiling@gmail.com>
+Message-ID: <535b1b519979bb1b0af6cadb0b040dd9a21a9b34.1480551148.git.stillcompiling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds an FPGA manager for Altera cyclone FPGAs
-that can program them using an spi port and a couple of gpios, using
-Alteras passive serial protocol.
+cyclone-ps-spi loads FPGA firmware over spi, using the "passive serial"
+interface on Altera Cyclone FPGAS.
 
-Changes from v3:
-- Fixed up the state() function to return the state of the status pin
-  reqested by Alan Tull
-- Switched the pin to ACTIVE_LOW and coresponding logic level, and updated
-  the corresponding documentation. Thanks Rob Herring for pointing out my
-  mistake.
-- Per Rob Herring, switched from "gpio" to "gpios" in dts
+This is one of the simpler ways to set up an FPGA at runtime.
+The signal interface is close to unidirectional spi with lsb first.
 
-Changes from v2:
-- Merged patch 3 and 4 as suggested in review by Moritz Fischer
-- Changed FPGA_MIN_DELAY from 250 to 50 ms is the time advertized by
-  Altera. This now works, as we don't assume it is done
-
-Changes from v1:
-- Changed the name from cyclone-spi-fpga-mgr to cyclone-ps-spi-fpga-mgr
-  This name change was requested by Alan Tull, to be specific about which
-  programming method is being employed on the fpga.
-- Changed the name of the reset-gpio to config-gpio to closer match the
-  way the pins are described in the Altera manual
-- Moved MODULE_LICENCE, _AUTHOR, and _DESCRIPTION to the bottom
-
-- Added a bitrev8x4() function to the bitrev headers and implemented ARM
- const, runtime, and ARM specific faster versions (This may end up
- needing to be a standalone patch)
-
-- Moved the bitswapping into cyclonespi_write(), as requested.
-  This falls short of my desired generic lsb first spi support, but is a step
-  in that direction.
-
-- Fixed whitespace problems introduced during refactoring
-
-- Replaced magic number for initial delay with a descriptive macro
-- Poll the fpga to see when it is ready rather than a fixed 1 ms sleep
-
-Joshua Clayton (3):
-  lib: add bitrev8x4()
-  doc: dt: add cyclone-spi binding document
-  fpga manager: Add cyclone-ps-spi driver for Altera FPGAs
-
- .../bindings/fpga/cyclone-ps-spi-fpga-mgr.txt      |  25 +++
- arch/arm/include/asm/bitrev.h                      |   5 +
- drivers/fpga/Kconfig                               |   7 +
- drivers/fpga/Makefile                              |   1 +
- drivers/fpga/cyclone-ps-spi.c                      | 181 +++++++++++++++++++++
- include/linux/bitrev.h                             |  26 +++
- 6 files changed, 245 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fpga/cyclone-ps-spi-fpga-mgr.txt
+Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+---
+ drivers/fpga/Kconfig          |   7 ++
+ drivers/fpga/Makefile         |   1 +
+ drivers/fpga/cyclone-ps-spi.c | 181 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 189 insertions(+)
  create mode 100644 drivers/fpga/cyclone-ps-spi.c
 
+diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
+index cd84934..2462707 100644
+--- a/drivers/fpga/Kconfig
++++ b/drivers/fpga/Kconfig
+@@ -13,6 +13,13 @@ config FPGA
+ 
+ if FPGA
+ 
++config FPGA_MGR_CYCLONE_PS_SPI
++	tristate "Altera Cyclone FPGA Passive Serial over SPI"
++	depends on SPI
++	help
++	  FPGA manager driver support for Altera Cyclone using the
++	  passive serial interface over SPI
++
+ config FPGA_MGR_SOCFPGA
+ 	tristate "Altera SOCFPGA FPGA Manager"
+ 	depends on ARCH_SOCFPGA
+diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
+index 8d83fc6..8f93930 100644
+--- a/drivers/fpga/Makefile
++++ b/drivers/fpga/Makefile
+@@ -6,5 +6,6 @@
+ obj-$(CONFIG_FPGA)			+= fpga-mgr.o
+ 
+ # FPGA Manager Drivers
++obj-$(CONFIG_FPGA_MGR_CYCLONE_PS_SPI)	+= cyclone-ps-spi.o
+ obj-$(CONFIG_FPGA_MGR_SOCFPGA)		+= socfpga.o
+ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
+diff --git a/drivers/fpga/cyclone-ps-spi.c b/drivers/fpga/cyclone-ps-spi.c
+new file mode 100644
+index 0000000..82a754a
+--- /dev/null
++++ b/drivers/fpga/cyclone-ps-spi.c
+@@ -0,0 +1,181 @@
++/**
++ * Copyright (c) 2015 United Western Technologies, Corporation
++ *
++ * Joshua Clayton <stillcompiling@gmail.com>
++ *
++ * Manage Altera fpga firmware that is loaded over spi.
++ * Firmware must be in binary "rbf" format.
++ * Works on Cyclone V. Should work on cyclone series.
++ * May work on other Altera fpgas.
++ *
++ */
++
++#include <linux/bitrev.h>
++#include <linux/delay.h>
++#include <linux/fpga/fpga-mgr.h>
++#include <linux/gpio/consumer.h>
++#include <linux/module.h>
++#include <linux/of_gpio.h>
++#include <linux/spi/spi.h>
++#include <linux/sizes.h>
++
++#define FPGA_RESET_TIME		50   /* time in usecs to trigger FPGA config */
++#define FPGA_MIN_DELAY		50   /* min usecs to wait for config status */
++#define FPGA_MAX_DELAY		1000 /* max usecs to wait for config status */
++
++struct cyclonespi_conf {
++	struct gpio_desc *config;
++	struct gpio_desc *status;
++	struct spi_device *spi;
++};
++
++static const struct of_device_id of_ef_match[] = {
++	{ .compatible = "altr,cyclone-ps-spi-fpga-mgr", },
++	{}
++};
++MODULE_DEVICE_TABLE(of, of_ef_match);
++
++static enum fpga_mgr_states cyclonespi_state(struct fpga_manager *mgr)
++{
++	struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
++
++	if (gpiod_get_value(conf->status))
++		return FPGA_MGR_STATE_RESET;
++
++	return FPGA_MGR_STATE_UNKNOWN;
++}
++
++static int cyclonespi_write_init(struct fpga_manager *mgr, u32 flags,
++				 const char *buf, size_t count)
++{
++	struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
++	int i;
++
++	if (flags & FPGA_MGR_PARTIAL_RECONFIG) {
++		dev_err(&mgr->dev, "Partial reconfiguration not supported.\n");
++		return -EINVAL;
++	}
++
++	gpiod_set_value(conf->config, 1);
++	usleep_range(FPGA_RESET_TIME, FPGA_RESET_TIME + 20);
++	if (!gpiod_get_value(conf->status)) {
++		dev_err(&mgr->dev, "Status pin should be low.\n");
++		return -EIO;
++	}
++
++	gpiod_set_value(conf->config, 0);
++	for (i = 0; i < (FPGA_MAX_DELAY / FPGA_MIN_DELAY); i++) {
++		usleep_range(FPGA_MIN_DELAY, FPGA_MIN_DELAY + 20);
++		if (!gpiod_get_value(conf->status))
++			return 0;
++	}
++
++	dev_err(&mgr->dev, "Status pin not ready.\n");
++	return -EIO;
++}
++
++static void rev_buf(void *buf, size_t len)
++{
++	u32 *fw32 = (u32 *)buf;
++	const u32 *fw_end = (u32 *)(buf + len);
++
++	/* set buffer to lsb first */
++	while (fw32 < fw_end) {
++		*fw32 = bitrev8x4(*fw32);
++		fw32++;
++	}
++}
++
++static int cyclonespi_write(struct fpga_manager *mgr, const char *buf,
++			    size_t count)
++{
++	struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
++	const char *fw_data = buf;
++	const char *fw_data_end = fw_data + count;
++
++	while (fw_data < fw_data_end) {
++		int ret;
++		size_t stride = min(fw_data_end - fw_data, SZ_4K);
++
++		rev_buf((void *)fw_data, stride);
++		ret = spi_write(conf->spi, fw_data, stride);
++		if (ret) {
++			dev_err(&mgr->dev, "spi error in firmware write: %d\n",
++				ret);
++			return ret;
++		}
++		fw_data += stride;
++	}
++
++	return 0;
++}
++
++static int cyclonespi_write_complete(struct fpga_manager *mgr, u32 flags)
++{
++	struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
++
++	if (gpiod_get_value(conf->status)) {
++		dev_err(&mgr->dev, "Error during configuration.\n");
++		return -EIO;
++	}
++
++	return 0;
++}
++
++static const struct fpga_manager_ops cyclonespi_ops = {
++	.state = cyclonespi_state,
++	.write_init = cyclonespi_write_init,
++	.write = cyclonespi_write,
++	.write_complete = cyclonespi_write_complete,
++};
++
++static int cyclonespi_probe(struct spi_device *spi)
++{
++	struct cyclonespi_conf *conf = devm_kzalloc(&spi->dev, sizeof(*conf),
++						GFP_KERNEL);
++
++	if (!conf)
++		return -ENOMEM;
++
++	conf->spi = spi;
++	conf->config = devm_gpiod_get(&spi->dev, "config", GPIOD_OUT_HIGH);
++	if (IS_ERR(conf->config)) {
++		dev_err(&spi->dev, "Failed to get config gpio: %ld\n",
++			PTR_ERR(conf->config));
++		return PTR_ERR(conf->config);
++	}
++
++	conf->status = devm_gpiod_get(&spi->dev, "status", GPIOD_IN);
++	if (IS_ERR(conf->status)) {
++		dev_err(&spi->dev, "Failed to get status gpio: %ld\n",
++			PTR_ERR(conf->status));
++		return PTR_ERR(conf->status);
++	}
++
++	return fpga_mgr_register(&spi->dev,
++				 "Altera Cyclone PS SPI FPGA Manager",
++				 &cyclonespi_ops, conf);
++}
++
++static int cyclonespi_remove(struct spi_device *spi)
++{
++	fpga_mgr_unregister(&spi->dev);
++
++	return 0;
++}
++
++static struct spi_driver cyclonespi_driver = {
++	.driver = {
++		.name   = "cyclone-ps-spi",
++		.owner  = THIS_MODULE,
++		.of_match_table = of_match_ptr(of_ef_match),
++	},
++	.probe  = cyclonespi_probe,
++	.remove = cyclonespi_remove,
++};
++
++module_spi_driver(cyclonespi_driver)
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Joshua Clayton <stillcompiling@gmail.com>");
++MODULE_DESCRIPTION("Module to load Altera FPGA firmware over spi");
 -- 
 2.9.3
