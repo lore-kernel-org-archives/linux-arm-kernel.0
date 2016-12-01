@@ -1,53 +1,67 @@
 From: romain.perier@free-electrons.com (Romain Perier)
-Date: Thu,  1 Dec 2016 11:27:18 +0100
-Subject: [PATCH v3 4/5] arm64: dts: marvell: Add definition of SPI controller
- for Armada 3700
+Date: Thu,  1 Dec 2016 11:27:19 +0100
+Subject: [PATCH v3 5/5] arm64: dts: marvell: Enable spi0 on the board
+ Armada-3720-db
 In-Reply-To: <20161201102719.4291-1-romain.perier@free-electrons.com>
 References: <20161201102719.4291-1-romain.perier@free-electrons.com>
-Message-ID: <20161201102719.4291-5-romain.perier@free-electrons.com>
+Message-ID: <20161201102719.4291-6-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Armada 3700 SoC has an SPI Controller, this commit adds the definition
-of the SPI device node at the SoC level.
+This commit enables the device node spi0 on the official development
+board for the Marvell Armada 3700. It also adds sub-node for the 128Mb
+SPI-NOR present on the board.
 
 Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
 Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
 
 Changes in v3:
- - Fixed wrong register size for spi0, as suggested by the maintainer
-   on the ML.
  - Added tag "Tested-by" by Gregory
 
-Changes in v2:
- - Removed properties max-frequency and clock-frequency, it is no
-   longer required and not used by the DT-bindings.
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts | 30 ++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index e9bd587..fcef9a5 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -98,6 +98,17 @@
- 			/* 32M internal register @ 0xd000_0000 */
- 			ranges = <0x0 0x0 0xd0000000 0x2000000>;
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+index 1372e9a6..0c4eb98 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+@@ -67,6 +67,36 @@
+ 	status = "okay";
+ };
  
-+			spi0: spi at 10600 {
-+				compatible = "marvell,armada-3700-spi";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0x10600 0xA00>;
-+				clocks = <&nb_periph_clk 7>;
-+				interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
-+				num-cs = <4>;
-+				status = "disabled";
-+			};
++&spi0 {
++	status = "okay";
 +
- 			uart0: serial at 12000 {
- 				compatible = "marvell,armada-3700-uart";
- 				reg = <0x12000 0x400>;
++	m25p80 at 0 {
++		compatible = "jedec,spi-nor";
++		reg = <0>;
++		spi-max-frequency = <108000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
++
++		partitions {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			partition at 0 {
++				label = "bootloader";
++				reg = <0x0 0x200000>;
++			};
++			partition at 200000 {
++				label = "U-boot Env";
++				reg = <0x200000 0x10000>;
++			};
++			partition at 210000 {
++				label = "Linux";
++				reg = <0x210000 0xDF0000>;
++			};
++		};
++	};
++};
++
+ /* Exported on the micro USB connector CON32 through an FTDI */
+ &uart0 {
+ 	status = "okay";
 -- 
 2.9.3
