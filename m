@@ -1,148 +1,95 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 1 Dec 2016 20:02:05 +0800
-Subject: [PATCH v5 net-next 4/7] net: mvneta: Convert to be 64 bits
- compatible
-In-Reply-To: <CAPv3WKeJBL7_V_7QPVNDAd9H4bgeLcSF8enuD96sgEmecuRkRA@mail.gmail.com>
-References: <cover.0270f6d2413a709521fe2c8c17fbebea6f2e78d1.1480542157.git-series.gregory.clement@free-electrons.com>
- <6b4d20a85b05e93d254e265eb07569dd1285d303.1480542157.git-series.gregory.clement@free-electrons.com>
- <20161201192604.07ed9516@xhacker>
- <CAPv3WKeJBL7_V_7QPVNDAd9H4bgeLcSF8enuD96sgEmecuRkRA@mail.gmail.com>
-Message-ID: <20161201200205.46dec339@xhacker>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Thu,  1 Dec 2016 20:08:55 +0800
+Subject: arm64: dts: zx: support cpu-freq for zx296718
+Message-ID: <1480594135-27273-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
+This patch adds the CPU clock phandle in CPU's node
+and uses operating-points-v2 to register operating points.
 
-On Thu, 1 Dec 2016 12:48:39 +0100 Marcin Wojtas wrote:
+So it can be used by cpufreq-dt driver.
 
-> Hi Jisheng,
-> 
-> Which baseline do you use?
-> 
-> It took me really lot of time to catch why RX broke after rebase from
-> LKv4.1 to LKv4.4. Between those two, in commit:
-> 97303480753e ("arm64: Increase the max granular size")
-> L1_CACHE_BYTES for all ARMv8 platforms was increased to 128B and so
-> did NET_SKB_PAD.
-> 
-> And 128 is more than the maximum that can fit into packet offset
-> [11:8]@0x1400. In such case this correction is needed. Did it answer
-> your doubts?
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+---
+ arch/arm64/boot/dts/zte/zx296718.dtsi | 37 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-That's key! Thanks a lot. In my repo, we don't have commit 97303480753e
-("arm64: Increase the max granular size")
-
-I think it would be great if this information can be added into the commit
-msg.
-
-IIRC, arm64 maintainers considered to let L1_CACHE_BYTES the _minimum_ of
-cache line sizes of arm64. If that's implemented and merged, then we can
-revert this patch later.
-
-Thanks,
-Jisheng
-
-> 
-> Best regards,
-> Marcin
-> 
-> 
-> 
-> 2016-12-01 12:26 GMT+01:00 Jisheng Zhang <jszhang@marvell.com>:
-> > Hi Gregory, Marcin,
-> >
-> > On Wed, 30 Nov 2016 22:42:49 +0100 Gregory CLEMENT wrote:
-> >  
-> >> From: Marcin Wojtas <mw@semihalf.com>
-> >>
-> >> Prepare the mvneta driver in order to be usable on the 64 bits platform
-> >> such as the Armada 3700.
-> >>
-> >> [gregory.clement at free-electrons.com]: this patch was extract from a larger
-> >> one to ease review and maintenance.
-> >>
-> >> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >> ---
-> >>  drivers/net/ethernet/marvell/mvneta.c | 17 ++++++++++++++++-
-> >>  1 file changed, 16 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> >> index 92b9af14c352..8ef03fb69bcd 100644
-> >> --- a/drivers/net/ethernet/marvell/mvneta.c
-> >> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> >> @@ -296,6 +296,12 @@
-> >>  /* descriptor aligned size */
-> >>  #define MVNETA_DESC_ALIGNED_SIZE     32
-> >>
-> >> +/* Number of bytes to be taken into account by HW when putting incoming data
-> >> + * to the buffers. It is needed in case NET_SKB_PAD exceeds maximum packet
-> >> + * offset supported in MVNETA_RXQ_CONFIG_REG(q) registers.  
-> >
-> > We also brought up this driver on 64bit platforms, we doesn't have this
-> > patch. Maybe I'm wrong, I'm trying to understand why we need this
-> > modification. Let's assume the NET_SKB_PAD is 64B, we call
-> > mvneta_rxq_offset_set(pp, rxq, 64),
-> >
-> > {
-> >         u32 val;
-> >
-> >         val = mvreg_read(pp, MVNETA_RXQ_CONFIG_REG(rxq->id));
-> >         val &= ~MVNETA_RXQ_PKT_OFFSET_ALL_MASK;
-> >
-> >         /* Offset is in */
-> >         val |= MVNETA_RXQ_PKT_OFFSET_MASK(offset >> 3);
-> > // then this will be "val |= 8;" it doesn't exceeds the max offset of
-> > MVNETA_RXQ_CONFIG_REG(q) register.
-> >
-> > Could you please kindly point out where I am wrong?
-> >  
-> >> + */
-> >> +#define MVNETA_RX_PKT_OFFSET_CORRECTION              64
-> >> +
-> >>  #define MVNETA_RX_PKT_SIZE(mtu) \
-> >>       ALIGN((mtu) + MVNETA_MH_SIZE + MVNETA_VLAN_TAG_LEN + \
-> >>             ETH_HLEN + ETH_FCS_LEN,                        \
-> >> @@ -416,6 +422,7 @@ struct mvneta_port {
-> >>       u64 ethtool_stats[ARRAY_SIZE(mvneta_statistics)];
-> >>
-> >>       u32 indir[MVNETA_RSS_LU_TABLE_SIZE];
-> >> +     u16 rx_offset_correction;
-> >>  };
-> >>
-> >>  /* The mvneta_tx_desc and mvneta_rx_desc structures describe the
-> >> @@ -1807,6 +1814,7 @@ static int mvneta_rx_refill(struct mvneta_port *pp,
-> >>               return -ENOMEM;
-> >>       }
-> >>
-> >> +     phys_addr += pp->rx_offset_correction;
-> >>       mvneta_rx_desc_fill(rx_desc, phys_addr, data, rxq);
-> >>       return 0;
-> >>  }
-> >> @@ -2782,7 +2790,7 @@ static int mvneta_rxq_init(struct mvneta_port *pp,
-> >>       mvreg_write(pp, MVNETA_RXQ_SIZE_REG(rxq->id), rxq->size);
-> >>
-> >>       /* Set Offset */
-> >> -     mvneta_rxq_offset_set(pp, rxq, NET_SKB_PAD);
-> >> +     mvneta_rxq_offset_set(pp, rxq, NET_SKB_PAD - pp->rx_offset_correction);
-> >>
-> >>       /* Set coalescing pkts and time */
-> >>       mvneta_rx_pkts_coal_set(pp, rxq, rxq->pkts_coal);
-> >> @@ -4033,6 +4041,13 @@ static int mvneta_probe(struct platform_device *pdev)
-> >>
-> >>       pp->rxq_def = rxq_def;
-> >>
-> >> +     /* Set RX packet offset correction for platforms, whose
-> >> +      * NET_SKB_PAD, exceeds 64B. It should be 64B for 64-bit
-> >> +      * platforms and 0B for 32-bit ones.  
-> >
-> > Even we need this patch, I'm not sure this last comment is correct or not.
-> > NET_SKB_PAD is defined as:
-> >
-> > #define NET_SKB_PAD     max(32, L1_CACHE_BYTES)
-> >
-> > we have 64B cacheline 32bit platforms, on this platforms, the NET_SKB_PAD
-> > should be 64B as well.
-> >
-> > Thanks,
-> > Jisheng  
+diff --git a/arch/arm64/boot/dts/zte/zx296718.dtsi b/arch/arm64/boot/dts/zte/zx296718.dtsi
+index 7a1aed7..16f7d5e 100644
+--- a/arch/arm64/boot/dts/zte/zx296718.dtsi
++++ b/arch/arm64/boot/dts/zte/zx296718.dtsi
+@@ -44,6 +44,7 @@
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/clock/zx296718-clock.h>
+ 
+ / {
+ 	compatible = "zte,zx296718";
+@@ -81,6 +82,8 @@
+ 			compatible = "arm,cortex-a53","arm,armv8";
+ 			reg = <0x0 0x0>;
+ 			enable-method = "psci";
++			clocks = <&topcrm A53_GATE>;
++			operating-points-v2 = <&cluster0_opp>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+@@ -88,6 +91,7 @@
+ 			compatible = "arm,cortex-a53","arm,armv8";
+ 			reg = <0x0 0x1>;
+ 			enable-method = "psci";
++			operating-points-v2 = <&cluster0_opp>;
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+@@ -95,6 +99,7 @@
+ 			compatible = "arm,cortex-a53","arm,armv8";
+ 			reg = <0x0 0x2>;
+ 			enable-method = "psci";
++			operating-points-v2 = <&cluster0_opp>;
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+@@ -102,6 +107,38 @@
+ 			compatible = "arm,cortex-a53","arm,armv8";
+ 			reg = <0x0 0x3>;
+ 			enable-method = "psci";
++			operating-points-v2 = <&cluster0_opp>;
++		};
++	};
++
++	cluster0_opp: opp_table0 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 500000000 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <857000>;
++			clock-latency-ns = <500000>;
++		};
++		opp at 648000000 {
++			opp-hz = /bits/ 64 <648000000>;
++			opp-microvolt = <857000>;
++			clock-latency-ns = <500000>;
++		};
++		opp at 800000000 {
++			opp-hz = /bits/ 64 <800000000>;
++			opp-microvolt = <882000>;
++			clock-latency-ns = <500000>;
++		};
++		opp at 1000000000 {
++			opp-hz = /bits/ 64 <1000000000>;
++			opp-microvolt = <892000>;
++			clock-latency-ns = <500000>;
++		};
++		opp at 1188000000 {
++			opp-hz = /bits/ 64 <1188000000>;
++			opp-microvolt = <1009000>;
++			clock-latency-ns = <500000>;
+ 		};
+ 	};
+ 
+-- 
+2.7.4
