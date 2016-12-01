@@ -1,42 +1,36 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 1 Dec 2016 11:49:47 +0100
-Subject: [PATCH 1/3] ARM: dts: at91: add dma1 definition to sama5d2
-Message-ID: <20161201104949.23985-1-nicolas.ferre@atmel.com>
+Date: Thu, 1 Dec 2016 11:49:48 +0100
+Subject: [PATCH 2/3] ARM: dts: at91: sama5d2: move UART3 to DMA1
+In-Reply-To: <20161201104949.23985-1-nicolas.ferre@atmel.com>
+References: <20161201104949.23985-1-nicolas.ferre@atmel.com>
+Message-ID: <20161201104949.23985-2-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sama5d2 SoC has a second DMA controller and can be used just like DMA0.
-By default both DMA controllers are configured as "Secure" in
-MATRIX_SPSELR so we can use whichever we want in a "single Secure World"
-configuration.
-Surprisingly the DMA1 has a lower address than DMA0. To avoid confusion
-place it after DMA0 node anyway.
+Now that DMA1 is defined, use it to distribute channel usage among the two
+controllers.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/boot/dts/sama5d2.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/sama5d2.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index ceb9783ff7e1..c791ce9c750c 100644
+index c791ce9c750c..5b69eff523d9 100644
 --- a/arch/arm/boot/dts/sama5d2.dtsi
 +++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -395,6 +395,16 @@
- 				clock-names = "dma_clk";
- 			};
- 
-+			/* Place dma1 here despite its address */
-+			dma1: dma-controller at f0004000 {
-+				compatible = "atmel,sama5d4-dma";
-+				reg = <0xf0004000 0x1000>;
-+				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 0>;
-+				#dma-cells = <1>;
-+				clocks = <&dma1_clk>;
-+				clock-names = "dma_clk";
-+			};
-+
- 			pmc: pmc at f0014000 {
- 				compatible = "atmel,sama5d2-pmc", "syscon";
- 				reg = <0xf0014000 0x160>;
+@@ -1151,10 +1151,10 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfc008000 0x100>;
+ 				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 7>;
+-				dmas = <&dma0
++				dmas = <&dma1
+ 					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
+ 					 AT91_XDMAC_DT_PERID(41))>,
+-				       <&dma0
++				       <&dma1
+ 					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
+ 					 AT91_XDMAC_DT_PERID(42))>;
+ 				dma-names = "tx", "rx";
 -- 
 2.9.0
