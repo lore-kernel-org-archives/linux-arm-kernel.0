@@ -1,16 +1,15 @@
 From: romain.perier@free-electrons.com (Romain Perier)
-Date: Thu,  1 Dec 2016 11:27:19 +0100
-Subject: [PATCH v3 5/5] arm64: dts: marvell: Enable spi0 on the board
- Armada-3720-db
+Date: Thu,  1 Dec 2016 11:27:17 +0100
+Subject: [PATCH v3 3/5] spi: armada-3700: Add documentation for the Armada
+ 3700 SPI Controller
 In-Reply-To: <20161201102719.4291-1-romain.perier@free-electrons.com>
 References: <20161201102719.4291-1-romain.perier@free-electrons.com>
-Message-ID: <20161201102719.4291-6-romain.perier@free-electrons.com>
+Message-ID: <20161201102719.4291-4-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit enables the device node spi0 on the official development
-board for the Marvell Armada 3700. It also adds sub-node for the 128Mb
-SPI-NOR present on the board.
+This adds the devicetree bindings documentation for the SPI controller
+present in the Marvell Armada 3700 SoCs.
 
 Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
 Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
@@ -18,50 +17,42 @@ Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 Changes in v3:
  - Added tag "Tested-by" by Gregory
+ - Fixed commit title, as requested by Mark Brown
 
- arch/arm64/boot/dts/marvell/armada-3720-db.dts | 30 ++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ .../devicetree/bindings/spi/spi-armada-3700.txt    | 25 ++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi-armada-3700.txt
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-index 1372e9a6..0c4eb98 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-@@ -67,6 +67,36 @@
- 	status = "okay";
- };
- 
-+&spi0 {
-+	status = "okay";
+diff --git a/Documentation/devicetree/bindings/spi/spi-armada-3700.txt b/Documentation/devicetree/bindings/spi/spi-armada-3700.txt
+new file mode 100644
+index 0000000..1564aa8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/spi/spi-armada-3700.txt
+@@ -0,0 +1,25 @@
++* Marvell Armada 3700 SPI Controller
 +
-+	m25p80 at 0 {
-+		compatible = "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <108000000>;
-+		spi-rx-bus-width = <4>;
-+		spi-tx-bus-width = <4>;
++Required Properties:
 +
-+		partitions {
-+			compatible = "fixed-partitions";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			partition at 0 {
-+				label = "bootloader";
-+				reg = <0x0 0x200000>;
-+			};
-+			partition at 200000 {
-+				label = "U-boot Env";
-+				reg = <0x200000 0x10000>;
-+			};
-+			partition at 210000 {
-+				label = "Linux";
-+				reg = <0x210000 0xDF0000>;
-+			};
-+		};
++- compatible: should be "marvell,armada-3700-spi"
++- reg: physical base address of the controller and length of memory mapped
++       region.
++- interrupts: The interrupt number. The interrupt specifier format depends on
++	      the interrupt controller and of its driver.
++- clocks: Must contain the clock source, usually from the North Bridge clocks.
++- num-cs: The number of chip selects that is supported by this SPI Controller
++- #address-cells: should be 1.
++- #size-cells: should be 0.
++
++Example:
++
++	spi0: spi at 10600 {
++		compatible = "marvell,armada-3700-spi";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x10600 0x5d>;
++		clocks = <&nb_perih_clk 7>;
++		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
++		num-cs = <4>;
 +	};
-+};
-+
- /* Exported on the micro USB connector CON32 through an FTDI */
- &uart0 {
- 	status = "okay";
 -- 
 2.9.3
