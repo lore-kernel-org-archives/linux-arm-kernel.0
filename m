@@ -1,313 +1,56 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Thu,  1 Dec 2016 18:40:51 +0100
-Subject: [PATCH dt V2] ARM: BCM5301X: Enable UART by default for BCM4708(1),
- BCM4709(4) & BCM53012
-In-Reply-To: <20161128140134.25128-1-zajec5@gmail.com>
-References: <20161128140134.25128-1-zajec5@gmail.com>
-Message-ID: <20161201174051.4965-1-zajec5@gmail.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Thu, 1 Dec 2016 09:41:29 -0800
+Subject: [PATCH v4 2/3] doc: dt: add cyclone-spi binding document
+In-Reply-To: <137f03de76e5f865430b17ca247e8f73e3315c8d.1480551148.git.stillcompiling@gmail.com>
+References: <cover.1480551148.git.stillcompiling@gmail.com>
+ <137f03de76e5f865430b17ca247e8f73e3315c8d.1480551148.git.stillcompiling@gmail.com>
+Message-ID: <CAAtXAHd_krKPpXRw5NxWhS6kcQ_fJcuyZYDOretRfNn+Cpkn2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+On Thu, Dec 1, 2016 at 9:04 AM, Joshua Clayton <stillcompiling@gmail.com> wrote:
+> Describe a cyclonei-ps-spi devicetree entry, required features
+>
+> Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+Acked-by: Moritz Fischer <moritz.fischer@ettus.com>
 
-Every device tested so far got UART0 (at 0x18000300) working as serial
-console. It's most likely part of reference design and all vendors use
-it that way.
-
-It seems to be easier to enable it by default and just disable it if we
-ever see a device with different hardware design.
-
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
----
-V2: Update bcm94708.dts bcm94709.dts bcm953012er.dts & bcm953012k.dts
----
- arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  | 4 ----
- arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts       | 4 ----
- arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts       | 4 ----
- arch/arm/boot/dts/bcm4708-netgear-r6250.dts        | 4 ----
- arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts      | 4 ----
- arch/arm/boot/dts/bcm4708.dtsi                     | 4 ++++
- arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 4 ----
- arch/arm/boot/dts/bcm47081.dtsi                    | 4 ++++
- arch/arm/boot/dts/bcm4709-netgear-r7000.dts        | 4 ----
- arch/arm/boot/dts/bcm4709-netgear-r8000.dts        | 4 ----
- arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts  | 4 ----
- arch/arm/boot/dts/bcm4709.dtsi                     | 1 +
- arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts      | 4 ----
- arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts      | 4 ----
- arch/arm/boot/dts/bcm47094-netgear-r8500.dts       | 4 ----
- arch/arm/boot/dts/bcm47094.dtsi                    | 1 +
- arch/arm/boot/dts/bcm94708.dts                     | 4 ----
- arch/arm/boot/dts/bcm94709.dts                     | 4 ----
- arch/arm/boot/dts/bcm953012er.dts                  | 4 ----
- arch/arm/boot/dts/bcm953012k.dts                   | 1 -
- 20 files changed, 10 insertions(+), 61 deletions(-)
-
-diff --git a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-index 9cb186e..d49afec0 100644
---- a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-+++ b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-@@ -136,10 +136,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &usb2 {
- 	vcc-gpio = <&chipcommon 9 GPIO_ACTIVE_HIGH>;
- };
-diff --git a/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
-index 35e6ed6..f591b0f 100644
---- a/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
-+++ b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
-@@ -55,10 +55,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &spi_nor {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
-index 1c7e53d..50d65d8 100644
---- a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
-+++ b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
-@@ -56,10 +56,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &spi_nor {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-index 8ce39d5..8519548 100644
---- a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-+++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-@@ -83,10 +83,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &usb3 {
- 	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
- };
-diff --git a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-index 70f4bb9..74cfcd3 100644
---- a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-+++ b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-@@ -119,10 +119,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &spi_nor {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/bcm4708.dtsi b/arch/arm/boot/dts/bcm4708.dtsi
-index eed4dd1..d0eec09 100644
---- a/arch/arm/boot/dts/bcm4708.dtsi
-+++ b/arch/arm/boot/dts/bcm4708.dtsi
-@@ -34,3 +34,7 @@
- 	};
- 
- };
-+
-+&uart0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-index a9c8def..2922536 100644
---- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-+++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-@@ -122,7 +122,3 @@
- 		};
- 	};
- };
--
--&uart0 {
--	status = "okay";
--};
-diff --git a/arch/arm/boot/dts/bcm47081.dtsi b/arch/arm/boot/dts/bcm47081.dtsi
-index f720012..c5f7619 100644
---- a/arch/arm/boot/dts/bcm47081.dtsi
-+++ b/arch/arm/boot/dts/bcm47081.dtsi
-@@ -24,3 +24,7 @@
- 		};
- 	};
- };
-+
-+&uart0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
-index fd38d2a..0225d82 100644
---- a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
-+++ b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
-@@ -100,7 +100,3 @@
- 		};
- 	};
- };
--
--&uart0 {
--	status = "okay";
--};
-diff --git a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-index 92f8a72..56d38a3 100644
---- a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-+++ b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-@@ -107,10 +107,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &usb2 {
- 	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
- };
-diff --git a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
-index 9a92c24..c67bfaa 100644
---- a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
-+++ b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
-@@ -97,10 +97,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &usb2 {
- 	vcc-gpio = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
- };
-diff --git a/arch/arm/boot/dts/bcm4709.dtsi b/arch/arm/boot/dts/bcm4709.dtsi
-index f039765..c645fea 100644
---- a/arch/arm/boot/dts/bcm4709.dtsi
-+++ b/arch/arm/boot/dts/bcm4709.dtsi
-@@ -8,4 +8,5 @@
- 
- &uart0 {
- 	clock-frequency = <125000000>;
-+	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-index 661348d..7fb9270 100644
---- a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-+++ b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-@@ -105,10 +105,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &usb3 {
- 	vcc-gpio = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
- };
-diff --git a/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts b/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
-index 169b35f..2f4a651 100644
---- a/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
-+++ b/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
-@@ -98,10 +98,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &usb3 {
- 	vcc-gpio = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
- };
-diff --git a/arch/arm/boot/dts/bcm47094-netgear-r8500.dts b/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
-index 521b415..7ecd57c 100644
---- a/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
-+++ b/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
-@@ -97,7 +97,3 @@
- 		};
- 	};
- };
--
--&uart0 {
--	status = "okay";
--};
-diff --git a/arch/arm/boot/dts/bcm47094.dtsi b/arch/arm/boot/dts/bcm47094.dtsi
-index 4f09aa0..4840a78 100644
---- a/arch/arm/boot/dts/bcm47094.dtsi
-+++ b/arch/arm/boot/dts/bcm47094.dtsi
-@@ -14,4 +14,5 @@
- 
- &uart0 {
- 	clock-frequency = <125000000>;
-+	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/bcm94708.dts b/arch/arm/boot/dts/bcm94708.dts
-index 251a486..42855a7 100644
---- a/arch/arm/boot/dts/bcm94708.dts
-+++ b/arch/arm/boot/dts/bcm94708.dts
-@@ -50,7 +50,3 @@
- 		reg = <0x00000000 0x08000000>;
- 	};
- };
--
--&uart0 {
--	status = "okay";
--};
-diff --git a/arch/arm/boot/dts/bcm94709.dts b/arch/arm/boot/dts/bcm94709.dts
-index b16cac9..95e8be6 100644
---- a/arch/arm/boot/dts/bcm94709.dts
-+++ b/arch/arm/boot/dts/bcm94709.dts
-@@ -50,7 +50,3 @@
- 		reg = <0x00000000 0x08000000>;
- 	};
- };
--
--&uart0 {
--	status = "okay";
--};
-diff --git a/arch/arm/boot/dts/bcm953012er.dts b/arch/arm/boot/dts/bcm953012er.dts
-index 0a9abec..decd86b 100644
---- a/arch/arm/boot/dts/bcm953012er.dts
-+++ b/arch/arm/boot/dts/bcm953012er.dts
-@@ -70,10 +70,6 @@
- 	};
- };
- 
--&uart0 {
--	status = "okay";
--};
--
- &spi_nor {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/bcm953012k.dts b/arch/arm/boot/dts/bcm953012k.dts
-index 05a985a..bfd9230 100644
---- a/arch/arm/boot/dts/bcm953012k.dts
-+++ b/arch/arm/boot/dts/bcm953012k.dts
-@@ -54,7 +54,6 @@
- 
- &uart0 {
- 	clock-frequency = <62499840>;
--	status = "okay";
- };
- 
- &uart1 {
--- 
-2.10.1
+> ---
+>
+>  .../bindings/fpga/cyclone-ps-spi-fpga-mgr.txt      | 25 ++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/fpga/cyclone-ps-spi-fpga-mgr.txt
+>
+> diff --git a/Documentation/devicetree/bindings/fpga/cyclone-ps-spi-fpga-mgr.txt b/Documentation/devicetree/bindings/fpga/cyclone-ps-spi-fpga-mgr.txt
+> new file mode 100644
+> index 0000000..3f515c7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/fpga/cyclone-ps-spi-fpga-mgr.txt
+> @@ -0,0 +1,25 @@
+> +Altera Cyclone Passive Serial SPI FPGA Manager
+> +
+> +Altera Cyclone FPGAs support a method of loading the bitstream over what is
+> +referred to as "passive serial".
+> +The passive serial link is not technically spi, and might require extra
+> +circuits in order to play nicely with other spi slaves on the same bus.
+> +
+> +See https://www.altera.com/literature/hb/cyc/cyc_c51013.pdf
+> +
+> +Required properties:
+> +- compatible  : should contain "altr,cyclone-ps-spi-fpga-mgr"
+> +- reg         : spi slave id of the fpga
+> +- config-gpios : config pin (referred to as nCONFIG in the cyclone manual)
+> +- status-gpios : status pin (referred to as nSTATUS in the cyclone manual)
+> +
+> +both gpio pins are normally active low open drain.
+> +
+> +Example:
+> +       fpga_spi: evi-fpga-spi at 0 {
+> +               compatible = "altr,cyclone-ps-spi-fpga-mgr";
+> +               spi-max-frequency = <20000000>;
+> +               reg = <0>;
+> +               config-gpios = <&gpio4 9 GPIO_ACTIVE_LOW>;
+> +               status-gpios = <&gpio4 11 GPIO_ACTIVE_LOW>;
+> +       };
+> --
+> 2.9.3
+>
