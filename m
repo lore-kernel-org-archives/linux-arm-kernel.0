@@ -1,67 +1,161 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 1 Dec 2016 11:52:12 -0600
-Subject: [PATCH V1 1/2] PCI: thunder: Enable ACPI PCI controller for
- ThunderX pass2.x silicon version
-In-Reply-To: <20161201145450.GA10353@red-moon>
-References: <1479201298-25494-1-git-send-email-tn@semihalf.com>
- <1479201298-25494-2-git-send-email-tn@semihalf.com>
- <20161201002812.GB9409@bhelgaas-glaptop.roam.corp.google.com>
- <eba92ea8-bdab-9a3a-7b18-caaeac15db5d@semihalf.com>
- <20161201135549.GP2213@rric.localdomain>
- <20161201145450.GA10353@red-moon>
-Message-ID: <20161201175212.GC30746@bhelgaas-glaptop.roam.corp.google.com>
+Date: Thu, 1 Dec 2016 12:33:50 -0600
+Subject: [PATCH v3] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe
+ controller
+In-Reply-To: <1480549373-2123-1-git-send-email-dhdang@apm.com>
+References: <1480549373-2123-1-git-send-email-dhdang@apm.com>
+Message-ID: <20161201183350.GF30746@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2016 at 02:54:50PM +0000, Lorenzo Pieralisi wrote:
-> On Thu, Dec 01, 2016 at 02:55:49PM +0100, Robert Richter wrote:
-> > Tomasz, Bjorn,
-> > 
-> > On 01.12.16 09:49:51, Tomasz Nowicki wrote:
-> > > I put the picture together here (on top of your pci/ecam branch):
-> > > [1] https://github.com/semihalf-nowicki-tomasz/linux/commits/pci-quirks-thunderx-v2
-> > 
-> > please note that acpi_* functions must be protected with acpi_disabled
-> > or something else to make sure an acpi enabled kernel does not break
-> > dt. See the crash below with above branch.
+Hi Duc,
+
+On Wed, Nov 30, 2016 at 03:42:53PM -0800, Duc Dang wrote:
+> PCIe controllers in X-Gene SoCs is not ECAM compliant: software
+> needs to configure additional controller's register to address
+> device at bus:dev:function.
 > 
-> You could use struct device.of_node, or just move the MCFG check to ACPI
-> code that probes the root bus in arm64 before calling pci_ecam_create()
-> which will save you some ifdeffery too while at it.
+> The quirk will only be applied for X-Gene PCIe MCFG table with
+> OEM revison 1, 2, 3 or 4 (PCIe controller v1 and v2 on X-Gene SoCs).
+> 
+> The quirk declares the X-Gene PCIe controller register space as 64KB
+> fixed memory resource with name "PCIe CSR". This name will be showed
+> next to the resource range in the output of "cat /proc/iomem".
+> 
+> Signed-off-by: Duc Dang <dhdang@apm.com>
+> ---
+> v3:
+>   - Rebase on top of pci/ecam-v6 tree.
+>   - Use DEFINE_RES_MEM_NAMED to declare controller register space
+>   with name "PCIe CSR"
+> v2:
+>   RFC v2: https://patchwork.ozlabs.org/patch/686846/
+> v1:
+>   RFC v1: https://patchwork.kernel.org/patch/9337115/
+> 
+>  drivers/acpi/pci_mcfg.c      |  31 ++++++++
+>  drivers/pci/host/pci-xgene.c | 165 ++++++++++++++++++++++++++++++++++++++++++-
+>  include/linux/pci-ecam.h     |   7 ++
+>  3 files changed, 200 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+> index ac21db3..eb6125b 100644
+> --- a/drivers/acpi/pci_mcfg.c
+> +++ b/drivers/acpi/pci_mcfg.c
+> @@ -57,6 +57,37 @@ struct mcfg_fixup {
+>  	{ "QCOM  ", "QDF2432 ", 1, 5, MCFG_BUS_ANY, &pci_32b_ops },
+>  	{ "QCOM  ", "QDF2432 ", 1, 6, MCFG_BUS_ANY, &pci_32b_ops },
+>  	{ "QCOM  ", "QDF2432 ", 1, 7, MCFG_BUS_ANY, &pci_32b_ops },
+> +
+> +#ifdef CONFIG_PCI_XGENE
 
-Oh, I like that idea even better!  I took the acpi_disabled check back out
-of acpi_resource_consumer() and moved the call to
-pci_acpi_setup_ecam_mapping().  Thanks!
+As you've no doubt noticed, I'm proposing to add these quirks without
+CONFIG_PCI_XGENE, so we don't have to select each device when building
+a generic ACPI kernel.
 
-> > [   12.493028] Unable to handle kernel NULL pointer dereference at virtual address 00000018
-> > [   12.501113] pgd = ffff0000090a0000
-> > [   12.504511] [00000018] *pgd=0000010fffef0003[   12.508602] , *pud=0000010fffef0003
-> > , *pmd=0000010fffee0003[   12.514093] , *pte=0000000000000000
-> > [   12.517575]
-> > [   12.519064] Internal error: Oops: 96000005 [#1] SMP
-> > [   12.523933] Modules linked in:
-> > [   12.526987] CPU: 73 PID: 1 Comm: swapper/0 Tainted: G        W       4.9.0-rc6.0.vanilla10-00019-g09abd2b6bbeb #135
-> > [   12.537409] Hardware name: Cavium ThunderX CRB/To be filled by O.E.M., BIOS 5.11 12/12/2012
-> > [   12.545748] task: ffff800fe85b8000 task.stack: ffff800ff4288000
-> > [   12.551674] PC is at acpi_ns_walk_namespace+0x68/0x1d4
-> > [   12.556803] LR is at acpi_get_devices+0x6c/0x94
-> > ...
-> > [   13.124920] [<ffff0000084dc5a0>] acpi_ns_walk_namespace+0x68/0x1d4
-> > [   13.131090] [<ffff0000084dcadc>] acpi_get_devices+0x6c/0x94
-> > [   13.136663] [<ffff0000084c0aec>] acpi_resource_consumer+0x34/0x44
-> > [   13.142752] [<ffff000008496bc0>] pci_ecam_create+0x80/0x228
-> > [   13.148314] [<ffff000008498e64>] pci_host_common_probe+0x294/0x348
-> > [   13.154486] [<ffff00000849bf3c>] thunder_ecam_probe+0x2c/0x38
-> > [   13.160226] [<ffff0000085880b8>] platform_drv_probe+0x60/0xc8
-> > [   13.165970] [<ffff000008585a04>] driver_probe_device+0x26c/0x420
-> > [   13.171966] [<ffff000008585cdc>] __driver_attach+0x124/0x128
-> > [   13.177615] [<ffff000008583238>] bus_for_each_dev+0x70/0xb0
-> > [   13.183177] [<ffff000008585060>] driver_attach+0x30/0x40
-> > [   13.188478] [<ffff000008584a98>] bus_add_driver+0x200/0x2b8
-> > [   13.194041] [<ffff000008586860>] driver_register+0x68/0x100
-> > [   13.199602] [<ffff000008587fdc>] __platform_driver_register+0x54/0x60
-> > [   13.206038] [<ffff000008c39b98>] thunder_ecam_driver_init+0x18/0x20
-> > [   13.212296] [<ffff000008082d94>] do_one_initcall+0x44/0x138
-> > [   13.217862] [<ffff000008c00d0c>] kernel_init_freeable+0x1ac/0x24c
-> > [   13.223950] [<ffff0000088605f0>] kernel_init+0x18/0x110
-> > [   13.229165] [<ffff000008082b30>] ret_from_fork+0x10/0x20
+I'm also proposing some Kconfig and Makefile changes so we don't build
+the platform driver part in a generic ACPI kernel (unless we *also*
+explicitly select the platform driver).
+
+Here's an example:
+https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/ecam&id=f80edf4d6c05
+
+> +#define XGENE_V1_ECAM_MCFG(rev, seg) \
+> +	{"APM   ", "XGENE   ", rev, seg, MCFG_BUS_ANY, \
+> +		&xgene_v1_pcie_ecam_ops }
+> +#define XGENE_V2_1_ECAM_MCFG(rev, seg) \
+> +	{"APM   ", "XGENE   ", rev, seg, MCFG_BUS_ANY, \
+> +		&xgene_v2_1_pcie_ecam_ops }
+> +#define XGENE_V2_2_ECAM_MCFG(rev, seg) \
+> +	{"APM   ", "XGENE   ", rev, seg, MCFG_BUS_ANY, \
+> +		&xgene_v2_2_pcie_ecam_ops }
+> +
+> +	/* X-Gene SoC with v1 PCIe controller */
+> +	XGENE_V1_ECAM_MCFG(1, 0),
+> +	XGENE_V1_ECAM_MCFG(1, 1),
+
+> @@ -64,6 +66,7 @@
+>  /* PCIe IP version */
+>  #define XGENE_PCIE_IP_VER_UNKN		0
+>  #define XGENE_PCIE_IP_VER_1		1
+> +#define XGENE_PCIE_IP_VER_2		2
+
+This isn't used anywhere, which makes me wonder whether it's worth
+keeping it.
+
+>  static void __iomem *xgene_pcie_get_cfg_base(struct pci_bus *bus)
+>  {
+> -	struct xgene_pcie_port *port = bus->sysdata;
+> +	struct pci_config_window *cfg;
+> +	struct xgene_pcie_port *port;
+> +
+> +	if (acpi_disabled)
+> +		port = bus->sysdata;
+> +	else {
+> +		cfg = bus->sysdata;
+> +		port = cfg->priv;
+> +	}
+
+I would really, really like to figure out a way to get rid of these
+"if (acpi_disabled)" checks sprinkled through here.  Is there any way
+we can set up bus->sysdata to be the same, regardless of whether we're
+using this as a platform driver or an ACPI quirk?
+
+> +#ifdef CONFIG_ACPI
+
+You've probably noticed that I've been using
+
+  #if defined(CONFIG_ACPI) && defined(CONFIG_PCI_QUIRKS)
+
+in this situation, mostly to make it clear that this is part of a
+workaround.  I don't want people to blindly copy this stuff without
+realizing that it's a workaround for a hardware issue.
+
+> +static struct resource xgene_v1_csr_res[] = {
+> +	[0] = DEFINE_RES_MEM_NAMED(0x1f2b0000UL, SZ_64K, "PCIe CSR"),
+> +	[1] = DEFINE_RES_MEM_NAMED(0x1f2c0000UL, SZ_64K, "PCIe CSR"),
+> +	[2] = DEFINE_RES_MEM_NAMED(0x1f2d0000UL, SZ_64K, "PCIe CSR"),
+> +	[3] = DEFINE_RES_MEM_NAMED(0x1f500000UL, SZ_64K, "PCIe CSR"),
+> +	[4] = DEFINE_RES_MEM_NAMED(0x1f510000UL, SZ_64K, "PCIe CSR"),
+
+I assume these ranges are not the actual ECAM space, right?
+If they *were* ECAM, I assume you would have included them in the
+quirk itself in the mcfg_quirks[] table.
+
+> +static int xgene_v1_pcie_ecam_init(struct pci_config_window *cfg)
+> +{
+> +	struct acpi_device *adev = to_acpi_device(cfg->parent);
+> +	struct acpi_pci_root *root = acpi_driver_data(adev);
+> +	struct device *dev = cfg->parent;
+> +	struct xgene_pcie_port *port;
+> +	struct resource *csr;
+> +
+> +	port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
+> +	if (!port)
+> +		return -ENOMEM;
+> +
+> +	csr = &xgene_v1_csr_res[root->segment];
+
+This makes me nervous because root->segment comes from the ACPI _SEG,
+and if firmware gives us junk in _SEG, we will reference something in
+the weeds.
+
+> +	port->csr_base = devm_ioremap_resource(dev, csr);
+> +	if (IS_ERR(port->csr_base)) {
+> +		kfree(port);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	port->cfg_base = cfg->win;
+> +	port->version = XGENE_PCIE_IP_VER_1;
+> +
+> +	cfg->priv = port;
+
+All these init functions are almost identical.  Can we factor this out
+by having wrappers that do nothing more than pass in the table and
+version, and put the kzalloc and ioremap in a shared back-end?
+
+We're so close I can taste it!  I can't wait to see all this work come
+to fruition.
+
+Bjorn
