@@ -1,24 +1,32 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 01 Dec 2016 12:47:35 -0800
-Subject: [PATCH v2 7/7] ARM: bcm/dt: Enable the VEC IP on all RaspeberryPi
- boards
-In-Reply-To: <1480622970-8714-8-git-send-email-boris.brezillon@free-electrons.com>
-References: <1480622970-8714-1-git-send-email-boris.brezillon@free-electrons.com>
- <1480622970-8714-8-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <87polbfkbc.fsf@eliezer.anholt.net>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu,  1 Dec 2016 22:00:18 +0100
+Subject: [PATCH 0/2] clk: bcm2835: Propage rate change to PLLH
+Message-ID: <1480626020-20031-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boris Brezillon <boris.brezillon@free-electrons.com> writes:
+Hello,
 
-> Enable the VEC IP on all RaspeberryPi boards.
+The VEC (Video EnCoder) clock needs to be running at precisely 108Mhz
+for the VEC IP to work properly.
+Unfortunately, the current implementation does not propate peripheral
+clock rate change to their parents, which prevents us from getting
+the 108Mhz rate unless the PLLH and PLLH_AUX clocks are already
+configured (by the bootloader) to a multiple of 108Mhz.
 
-Typo in the subject and body, "Raspberry".  Don't worry about resending
-for that, though.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161201/373b2a31/attachment.sig>
+This series adds support for optional per-periph-clk rate change
+propagation and enables this feature on the VEC clock.
+
+Regards,
+
+Boris
+
+Boris Brezillon (2):
+  clk: bcm: Support rate change propagation on bcm2835 clocks
+  clk: bcm: Allow rate change propagation to PLLH_AUX on VEC clock
+
+ drivers/clk/bcm/clk-bcm2835.c | 74 ++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 69 insertions(+), 5 deletions(-)
+
+-- 
+2.7.4
