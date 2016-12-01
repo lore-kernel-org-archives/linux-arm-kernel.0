@@ -1,66 +1,38 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Thu, 1 Dec 2016 14:26:29 -0500
-Subject: [PATCH v3] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe
- controller
-In-Reply-To: <1480620053.4751.30.camel@redhat.com>
-References: <1480549373-2123-1-git-send-email-dhdang@apm.com>
- <20161201183350.GF30746@bhelgaas-glaptop.roam.corp.google.com>
- <1480620053.4751.30.camel@redhat.com>
-Message-ID: <0e7e7181-94f5-0d09-b571-61fb71537f02@redhat.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu,  1 Dec 2016 20:27:21 +0100
+Subject: [PATCH] clk: bcm2835: Avoid overwriting the div info when disabling a
+ pll_div clk
+Message-ID: <1480620441-5442-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/2016 02:20 PM, Mark Salter wrote:
-> On Thu, 2016-12-01 at 12:33 -0600, Bjorn Helgaas wrote:
+bcm2835_pll_divider_off() is resetting the divider field in the A2W reg
+to zero when disabling the clock.
 
->>> +	csr = &xgene_v1_csr_res[root->segment];
->> This makes me nervous because root->segment comes from the ACPI _SEG,
->> and if firmware gives us junk in _SEG, we will reference something in
->> the weeds.
-> 
-> The SoC provide some number of RC bridges, each with a different base
-> for some mmio registers. Even if segment is legitimate in MCFG, there
-> is still a problem if a platform doesn't use the segment ordering
-> implied by the code. But the PNP0A03 _CRS does have this base address
-> as the first memory resource, so we could get it from there and not
-> have hard-coded addresses and implied ording in the quirk code.
-> 
-> I have tested a modified version of these quirks using this to
-> get the CSR base and it works on the 3 different platforms I have
-> access to.
-> 
-> static int xgene_pcie_get_csr(struct device *dev, struct resource *r)
-> {
-> 	struct acpi_device *adev = to_acpi_device(dev);
-> 	unsigned long flags;
-> 	struct list_head list;
-> 	struct resource_entry *entry;
-> 	int ret;
-> 
-> 	INIT_LIST_HEAD(&list);
-> 	flags = IORESOURCE_MEM;
-> 	ret = acpi_dev_get_resources(adev, &list,
-> 				     acpi_dev_filter_resource_type_cb,
-> 				     (void *)flags);
-> 	if (ret < 0) {
-> 		dev_err(dev, "failed to parse _CRS, error: %d\n", ret);
-> 		return ret;
-> 	} else if (ret == 0) {
-> 		dev_err(dev, "no memory resources present in _CRS\n");
-> 		return -EINVAL;
-> 	}
-> 
-> 	entry = list_first_entry(&list, struct resource_entry, node);
-> 	*r = *entry->res;
-> 	acpi_dev_free_resource_list(&list);
-> 	return 0;
-> }
+Make sure we preserve this value by reading the previous a2w_reg value
+first and ORing the result with A2W_PLL_CHANNEL_DISABLE.
 
-This seems a lot safer. At some point trusting firmware to provide the
-correct _CRS for the RC in use is better than hard coding for every
-possible implementation configuration of an X-Gene SoC.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the audio domain clocks")
+Cc: <stable@vger.kernel.org>
+---
+ drivers/clk/bcm/clk-bcm2835.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Jon.
-
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index 836d07550be3..2acaa77ad482 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -751,7 +751,9 @@ static void bcm2835_pll_divider_off(struct clk_hw *hw)
+ 	cprman_write(cprman, data->cm_reg,
+ 		     (cprman_read(cprman, data->cm_reg) &
+ 		      ~data->load_mask) | data->hold_mask);
+-	cprman_write(cprman, data->a2w_reg, A2W_PLL_CHANNEL_DISABLE);
++	cprman_write(cprman, data->a2w_reg,
++		     cprman_read(cprman, data->a2w_reg) |
++		     A2W_PLL_CHANNEL_DISABLE);
+ 	spin_unlock(&cprman->regs_lock);
+ }
+ 
 -- 
-Computer Architect | Sent from my Fedora powered laptop
+2.7.4
