@@ -1,310 +1,263 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Wed, 30 Nov 2016 15:42:53 -0800
-Subject: [PATCH v3] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe controller
-Message-ID: <1480549373-2123-1-git-send-email-dhdang@apm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 30 Nov 2016 18:28:12 -0600
+Subject: [PATCH V1 1/2] PCI: thunder: Enable ACPI PCI controller for
+ ThunderX pass2.x silicon version
+In-Reply-To: <1479201298-25494-2-git-send-email-tn@semihalf.com>
+References: <1479201298-25494-1-git-send-email-tn@semihalf.com>
+ <1479201298-25494-2-git-send-email-tn@semihalf.com>
+Message-ID: <20161201002812.GB9409@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCIe controllers in X-Gene SoCs is not ECAM compliant: software
-needs to configure additional controller's register to address
-device at bus:dev:function.
+Hi Tomasz,
 
-The quirk will only be applied for X-Gene PCIe MCFG table with
-OEM revison 1, 2, 3 or 4 (PCIe controller v1 and v2 on X-Gene SoCs).
+On Tue, Nov 15, 2016 at 10:14:57AM +0100, Tomasz Nowicki wrote:
+> ThunderX PCIe controller to off-chip devices (so-called PEM) is not fully
+> compliant with ECAM standard. It uses non-standard configuration space
+> accessors (see pci_thunder_pem_ops) and custom configuration space granulation
+> (see bus_shift = 24). In order to access configuration space and
+> probe PEM as ACPI based PCI host controller we need to add MCFG quirk
+> infrastructure. This involves:
+> 1. thunder_pem_init() ACPI extension so that we can probe PEM-specific
+>    register ranges analogously to DT
+> 2. Export PEM pci_thunder_pem_ops structure so it is visible to MCFG quirk
+>    code.
+> 3. New quirk entries for each PEM segment. Each contains platform IDs,
+>    mentioned pci_thunder_pem_ops and CFG resources.
+> 
+> Quirk is considered for ThunderX silicon pass2.x only which is identified
+> via MCFG revision 1.
+> 
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> ---
+>  drivers/acpi/pci_mcfg.c            |  20 +++++++
+>  drivers/pci/host/pci-thunder-pem.c | 107 ++++++++++++++++++++++++++++++++-----
+>  include/linux/pci-ecam.h           |   4 ++
+>  3 files changed, 117 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+> index ac21db3..e4e2b9b 100644
+> --- a/drivers/acpi/pci_mcfg.c
+> +++ b/drivers/acpi/pci_mcfg.c
+> @@ -57,6 +57,26 @@ static struct mcfg_fixup mcfg_quirks[] = {
+>  	{ "QCOM  ", "QDF2432 ", 1, 5, MCFG_BUS_ANY, &pci_32b_ops },
+>  	{ "QCOM  ", "QDF2432 ", 1, 6, MCFG_BUS_ANY, &pci_32b_ops },
+>  	{ "QCOM  ", "QDF2432 ", 1, 7, MCFG_BUS_ANY, &pci_32b_ops },
+> +#ifdef CONFIG_PCI_HOST_THUNDER_PEM
+> +#define THUNDER_MCFG_RES(addr, node) \
+> +	DEFINE_RES_MEM(addr + (node << 44), 0x39 * SZ_16M)
+> +#define THUNDER_MCFG_QUIRK(rev, node) \
+> +	{ "CAVIUM", "THUNDERX", rev, 4 + (10 * node), MCFG_BUS_ANY, \
+> +	  &pci_thunder_pem_ops, THUNDER_MCFG_RES(0x88001f000000UL, node) }, \
+> +	{ "CAVIUM", "THUNDERX", rev, 5 + (10 * node), MCFG_BUS_ANY, \
+> +	  &pci_thunder_pem_ops, THUNDER_MCFG_RES(0x884057000000UL, node) }, \
+> +	{ "CAVIUM", "THUNDERX", rev, 6 + (10 * node), MCFG_BUS_ANY, \
+> +	  &pci_thunder_pem_ops, THUNDER_MCFG_RES(0x88808f000000UL, node) }, \
+> +	{ "CAVIUM", "THUNDERX", rev, 7 + (10 * node), MCFG_BUS_ANY, \
+> +	  &pci_thunder_pem_ops, THUNDER_MCFG_RES(0x89001f000000UL, node) }, \
+> +	{ "CAVIUM", "THUNDERX", rev, 8 + (10 * node), MCFG_BUS_ANY, \
+> +	  &pci_thunder_pem_ops, THUNDER_MCFG_RES(0x894057000000UL, node) }, \
+> +	{ "CAVIUM", "THUNDERX", rev, 9 + (10 * node), MCFG_BUS_ANY, \
+> +	  &pci_thunder_pem_ops, THUNDER_MCFG_RES(0x89808f000000UL, node) }
+> +	/* SoC pass2.x */
+> +	THUNDER_MCFG_QUIRK(1, 0UL),
+> +	THUNDER_MCFG_QUIRK(1, 1UL),
+> +#endif
 
-The quirk declares the X-Gene PCIe controller register space as 64KB
-fixed memory resource with name "PCIe CSR". This name will be showed
-next to the resource range in the output of "cat /proc/iomem".
+I want all these quirks to work without having to enable
+device-specific config options like CONFIG_PCI_HOST_THUNDER_PEM.
 
-Signed-off-by: Duc Dang <dhdang@apm.com>
----
-v3:
-  - Rebase on top of pci/ecam-v6 tree.
-  - Use DEFINE_RES_MEM_NAMED to declare controller register space
-  with name "PCIe CSR"
-v2:
-  RFC v2: https://patchwork.ozlabs.org/patch/686846/
-v1:
-  RFC v1: https://patchwork.kernel.org/patch/9337115/
+I tweaked the preceding MCFG quirk support to wrap it in
+CONFIG_PCI_QUIRKS.  I also tweaked the qualcomm and hisi patches to
+move the meat of them to pci/quirks.c.  My work-in-progress is on
+pci/ecam, but I can't easily build for arm64, so there are likely some
+issues to be resolved.
 
- drivers/acpi/pci_mcfg.c      |  31 ++++++++
- drivers/pci/host/pci-xgene.c | 165 ++++++++++++++++++++++++++++++++++++++++++-
- include/linux/pci-ecam.h     |   7 ++
- 3 files changed, 200 insertions(+), 3 deletions(-)
+I'm hoping to end up with something like this:
+https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/ecam&id=51ad4df79a9b7f2a66b346a46b21a785a2937469
 
-diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
-index ac21db3..eb6125b 100644
---- a/drivers/acpi/pci_mcfg.c
-+++ b/drivers/acpi/pci_mcfg.c
-@@ -57,6 +57,37 @@ struct mcfg_fixup {
- 	{ "QCOM  ", "QDF2432 ", 1, 5, MCFG_BUS_ANY, &pci_32b_ops },
- 	{ "QCOM  ", "QDF2432 ", 1, 6, MCFG_BUS_ANY, &pci_32b_ops },
- 	{ "QCOM  ", "QDF2432 ", 1, 7, MCFG_BUS_ANY, &pci_32b_ops },
-+
-+#ifdef CONFIG_PCI_XGENE
-+#define XGENE_V1_ECAM_MCFG(rev, seg) \
-+	{"APM   ", "XGENE   ", rev, seg, MCFG_BUS_ANY, \
-+		&xgene_v1_pcie_ecam_ops }
-+#define XGENE_V2_1_ECAM_MCFG(rev, seg) \
-+	{"APM   ", "XGENE   ", rev, seg, MCFG_BUS_ANY, \
-+		&xgene_v2_1_pcie_ecam_ops }
-+#define XGENE_V2_2_ECAM_MCFG(rev, seg) \
-+	{"APM   ", "XGENE   ", rev, seg, MCFG_BUS_ANY, \
-+		&xgene_v2_2_pcie_ecam_ops }
-+
-+	/* X-Gene SoC with v1 PCIe controller */
-+	XGENE_V1_ECAM_MCFG(1, 0),
-+	XGENE_V1_ECAM_MCFG(1, 1),
-+	XGENE_V1_ECAM_MCFG(1, 2),
-+	XGENE_V1_ECAM_MCFG(1, 3),
-+	XGENE_V1_ECAM_MCFG(1, 4),
-+	XGENE_V1_ECAM_MCFG(2, 0),
-+	XGENE_V1_ECAM_MCFG(2, 1),
-+	XGENE_V1_ECAM_MCFG(2, 2),
-+	XGENE_V1_ECAM_MCFG(2, 3),
-+	XGENE_V1_ECAM_MCFG(2, 4),
-+	/* X-Gene SoC with v2.1 PCIe controller */
-+	XGENE_V2_1_ECAM_MCFG(3, 0),
-+	XGENE_V2_1_ECAM_MCFG(3, 1),
-+	/* X-Gene SoC with v2.2 PCIe controller */
-+	XGENE_V2_2_ECAM_MCFG(4, 0),
-+	XGENE_V2_2_ECAM_MCFG(4, 1),
-+	XGENE_V2_2_ECAM_MCFG(4, 2),
-+#endif
- };
- 
- static char mcfg_oem_id[ACPI_OEM_ID_SIZE];
-diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-index 1de23d7..43d7c69 100644
---- a/drivers/pci/host/pci-xgene.c
-+++ b/drivers/pci/host/pci-xgene.c
-@@ -27,6 +27,8 @@
- #include <linux/of_irq.h>
- #include <linux/of_pci.h>
- #include <linux/pci.h>
-+#include <linux/pci-acpi.h>
-+#include <linux/pci-ecam.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- 
-@@ -64,6 +66,7 @@
- /* PCIe IP version */
- #define XGENE_PCIE_IP_VER_UNKN		0
- #define XGENE_PCIE_IP_VER_1		1
-+#define XGENE_PCIE_IP_VER_2		2
- 
- struct xgene_pcie_port {
- 	struct device_node	*node;
-@@ -97,7 +100,15 @@ static inline u32 pcie_bar_low_val(u32 addr, u32 flags)
-  */
- static void __iomem *xgene_pcie_get_cfg_base(struct pci_bus *bus)
- {
--	struct xgene_pcie_port *port = bus->sysdata;
-+	struct pci_config_window *cfg;
-+	struct xgene_pcie_port *port;
-+
-+	if (acpi_disabled)
-+		port = bus->sysdata;
-+	else {
-+		cfg = bus->sysdata;
-+		port = cfg->priv;
-+	}
- 
- 	if (bus->number >= (bus->primary + 1))
- 		return port->cfg_base + AXI_EP_CFG_ACCESS;
-@@ -111,10 +122,18 @@ static void __iomem *xgene_pcie_get_cfg_base(struct pci_bus *bus)
-  */
- static void xgene_pcie_set_rtdid_reg(struct pci_bus *bus, uint devfn)
- {
--	struct xgene_pcie_port *port = bus->sysdata;
-+	struct pci_config_window *cfg;
-+	struct xgene_pcie_port *port;
- 	unsigned int b, d, f;
- 	u32 rtdid_val = 0;
- 
-+	if (acpi_disabled)
-+		port = bus->sysdata;
-+	else {
-+		cfg = bus->sysdata;
-+		port = cfg->priv;
-+	}
-+
- 	b = bus->number;
- 	d = PCI_SLOT(devfn);
- 	f = PCI_FUNC(devfn);
-@@ -158,7 +177,15 @@ static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
- static int xgene_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
- 				    int where, int size, u32 *val)
- {
--	struct xgene_pcie_port *port = bus->sysdata;
-+	struct pci_config_window *cfg;
-+	struct xgene_pcie_port *port;
-+
-+	if (acpi_disabled)
-+		port = bus->sysdata;
-+	else {
-+		cfg = bus->sysdata;
-+		port = cfg->priv;
-+	}
- 
- 	if (pci_generic_config_read32(bus, devfn, where & ~0x3, 4, val) !=
- 	    PCIBIOS_SUCCESSFUL)
-@@ -189,6 +216,138 @@ static int xgene_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
- 	.write = pci_generic_config_write32,
- };
- 
-+#ifdef CONFIG_ACPI
-+static struct resource xgene_v1_csr_res[] = {
-+	[0] = DEFINE_RES_MEM_NAMED(0x1f2b0000UL, SZ_64K, "PCIe CSR"),
-+	[1] = DEFINE_RES_MEM_NAMED(0x1f2c0000UL, SZ_64K, "PCIe CSR"),
-+	[2] = DEFINE_RES_MEM_NAMED(0x1f2d0000UL, SZ_64K, "PCIe CSR"),
-+	[3] = DEFINE_RES_MEM_NAMED(0x1f500000UL, SZ_64K, "PCIe CSR"),
-+	[4] = DEFINE_RES_MEM_NAMED(0x1f510000UL, SZ_64K, "PCIe CSR"),
-+};
-+
-+static int xgene_v1_pcie_ecam_init(struct pci_config_window *cfg)
-+{
-+	struct acpi_device *adev = to_acpi_device(cfg->parent);
-+	struct acpi_pci_root *root = acpi_driver_data(adev);
-+	struct device *dev = cfg->parent;
-+	struct xgene_pcie_port *port;
-+	struct resource *csr;
-+
-+	port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
-+	if (!port)
-+		return -ENOMEM;
-+
-+	csr = &xgene_v1_csr_res[root->segment];
-+	port->csr_base = devm_ioremap_resource(dev, csr);
-+	if (IS_ERR(port->csr_base)) {
-+		kfree(port);
-+		return -ENOMEM;
-+	}
-+
-+	port->cfg_base = cfg->win;
-+	port->version = XGENE_PCIE_IP_VER_1;
-+
-+	cfg->priv = port;
-+
-+	return 0;
-+}
-+
-+struct pci_ecam_ops xgene_v1_pcie_ecam_ops = {
-+	.bus_shift      = 16,
-+	.init           = xgene_v1_pcie_ecam_init,
-+	.pci_ops        = {
-+		.map_bus        = xgene_pcie_map_bus,
-+		.read           = xgene_pcie_config_read32,
-+		.write          = pci_generic_config_write,
-+	}
-+};
-+
-+static struct resource xgene_v2_1_csr_res[] = {
-+	[0] = DEFINE_RES_MEM_NAMED(0x1f2b0000UL, SZ_64K, "PCIe CSR"),
-+	[1] = DEFINE_RES_MEM_NAMED(0x1f2c0000UL, SZ_64K, "PCIe CSR"),
-+};
-+
-+static int xgene_v2_1_pcie_ecam_init(struct pci_config_window *cfg)
-+{
-+	struct acpi_device *adev = to_acpi_device(cfg->parent);
-+	struct acpi_pci_root *root = acpi_driver_data(adev);
-+	struct device *dev = cfg->parent;
-+	struct xgene_pcie_port *port;
-+	struct resource *csr;
-+
-+	port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
-+	if (!port)
-+		return -ENOMEM;
-+
-+	csr = &xgene_v2_1_csr_res[root->segment];
-+	port->csr_base = devm_ioremap_resource(dev, csr);
-+	if (IS_ERR(port->csr_base)) {
-+		kfree(port);
-+		return -ENOMEM;
-+	}
-+
-+	port->cfg_base = cfg->win;
-+	port->version = XGENE_PCIE_IP_VER_2;
-+
-+	cfg->priv = port;
-+
-+	return 0;
-+}
-+
-+struct pci_ecam_ops xgene_v2_1_pcie_ecam_ops = {
-+	.bus_shift      = 16,
-+	.init           = xgene_v2_1_pcie_ecam_init,
-+	.pci_ops        = {
-+		.map_bus        = xgene_pcie_map_bus,
-+		.read           = xgene_pcie_config_read32,
-+		.write          = pci_generic_config_write,
-+	}
-+};
-+
-+static struct resource xgene_v2_2_csr_res[] = {
-+	[0] = DEFINE_RES_MEM_NAMED(0x1f2b0000UL, SZ_64K, "PCIe CSR"),
-+	[1] = DEFINE_RES_MEM_NAMED(0x1f500000UL, SZ_64K, "PCIe CSR"),
-+	[2] = DEFINE_RES_MEM_NAMED(0x1f2d0000UL, SZ_64K, "PCIe CSR"),
-+};
-+
-+static int xgene_v2_2_pcie_ecam_init(struct pci_config_window *cfg)
-+{
-+	struct acpi_device *adev = to_acpi_device(cfg->parent);
-+	struct acpi_pci_root *root = acpi_driver_data(adev);
-+	struct device *dev = cfg->parent;
-+	struct xgene_pcie_port *port;
-+	struct resource *csr;
-+
-+	port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
-+	if (!port)
-+		return -ENOMEM;
-+
-+	csr = &xgene_v2_2_csr_res[root->segment];
-+	port->csr_base = devm_ioremap_resource(dev, csr);
-+	if (IS_ERR(port->csr_base)) {
-+		kfree(port);
-+		return -ENOMEM;
-+	}
-+
-+	port->cfg_base = cfg->win;
-+	port->version = XGENE_PCIE_IP_VER_2;
-+
-+	cfg->priv = port;
-+
-+	return 0;
-+}
-+
-+struct pci_ecam_ops xgene_v2_2_pcie_ecam_ops = {
-+	.bus_shift      = 16,
-+	.init           = xgene_v2_2_pcie_ecam_init,
-+	.pci_ops        = {
-+		.map_bus        = xgene_pcie_map_bus,
-+		.read           = xgene_pcie_config_read32,
-+		.write          = pci_generic_config_write,
-+	}
-+};
-+#endif
-+
- static u64 xgene_pcie_set_ib_mask(struct xgene_pcie_port *port, u32 addr,
- 				  u32 flags, u64 size)
- {
-diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
-index f5740b7..47ab947 100644
---- a/include/linux/pci-ecam.h
-+++ b/include/linux/pci-ecam.h
-@@ -62,6 +62,13 @@ void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
- /* ops for buggy ECAM that supports only 32-bit accesses */
- extern struct pci_ecam_ops pci_32b_ops;
- 
-+/* ECAM ops for known quirks */
-+#ifdef CONFIG_PCI_XGENE
-+extern struct pci_ecam_ops xgene_v1_pcie_ecam_ops;
-+extern struct pci_ecam_ops xgene_v2_1_pcie_ecam_ops;
-+extern struct pci_ecam_ops xgene_v2_2_pcie_ecam_ops;
-+#endif
-+
- #ifdef CONFIG_PCI_HOST_GENERIC
- /* for DT-based PCI controllers that support ECAM */
- int pci_host_common_probe(struct platform_device *pdev,
--- 
-1.9.1
+The problem with ThunderX is that the config accessors are much bigger
+and I don't really want to duplicate them in both pci/quirks.c and
+pci-thunder-pem.c.
+
+Actually, that raises a question for qualcomm and hisi: in the DT
+model, we use non-ECAM config accessors in the driver, but in the ACPI
+model, we use ECAM accessors.  It seems like the accessors should be
+the same regardless of whether we discover the bridge via DT or ACPI.
+
+Anyway, it's almost like we want to build pci-thunder-pem.o if
+CONFIG_PCI_HOST_THUNDER_PEM || (CONFIG_PCI_QUIRKS && CONFIG_ARM64).
+I don't know how to express that nicely.
+
+I was trying to avoid adding an ecam-quirks.c, but maybe we need to
+add it and collect all the different accessors there and add #ifdefs
+inside.
+
+Sorry, this is only half-baked, but I just wanted to throw this out in
+case you have any ideas.
+
+>  };
+>  
+>  static char mcfg_oem_id[ACPI_OEM_ID_SIZE];
+> diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+> index 6abaf80..7bdc4cd 100644
+> --- a/drivers/pci/host/pci-thunder-pem.c
+> +++ b/drivers/pci/host/pci-thunder-pem.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/init.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_pci.h>
+> +#include <linux/pci-acpi.h>
+>  #include <linux/pci-ecam.h>
+>  #include <linux/platform_device.h>
+>  
+> @@ -284,6 +285,84 @@ static int thunder_pem_config_write(struct pci_bus *bus, unsigned int devfn,
+>  	return pci_generic_config_write(bus, devfn, where, size, val);
+>  }
+>  
+> +#ifdef CONFIG_ACPI
+> +
+> +/*
+> + * Retrieve PEM bridge register base and size from PNP0C02 sub-device under
+> + * the RC.
+> + *
+> + * Device (RES0)
+> + * {
+> + *	Name (_HID, "THRX0002")
+> + *	Name (_CID, "PNP0C02")
+> + *	Name (_CRS, ResourceTemplate () {
+> + *		// Device specific registers range
+> + *		QWordMemory(ResourceConsumer, PosDecode, MinFixed,
+> + *		MaxFixed, Cacheable, ReadWrite, 0,
+> + *		0x87e0c2000000, 0x87E0C2FFFFFF, 0, 0x1000000)
+> + *	})
+> + * }
+> + */
+> +
+> +static const struct acpi_device_id thunder_pem_reg_ids[] = {
+> +	{"THRX0002", 0},
+> +	{"", 0},
+> +};
+> +
+> +static struct resource *thunder_pem_acpi_res(struct pci_config_window *cfg)
+> +{
+> +	struct device *dev = cfg->parent;
+> +	struct acpi_device *adev = to_acpi_device(dev);
+> +	struct acpi_device *child_adev;
+> +	struct resource *res_pem;
+> +
+> +	res_pem = devm_kzalloc(dev, sizeof(*res_pem), GFP_KERNEL);
+> +	if (!res_pem) {
+> +		dev_err(dev, "failed to allocate PEM resource\n");
+> +		return NULL;
+> +	}
+> +
+> +	list_for_each_entry(child_adev, &adev->children, node) {
+> +		struct resource_entry *entry;
+> +		struct list_head list;
+> +		unsigned long flags;
+> +		int ret;
+> +
+> +		ret = acpi_match_device_ids(child_adev, thunder_pem_reg_ids);
+> +		if (ret)
+> +			continue;
+> +
+> +		INIT_LIST_HEAD(&list);
+> +		flags = IORESOURCE_MEM;
+> +		ret = acpi_dev_get_resources(child_adev, &list,
+> +					     acpi_dev_filter_resource_type_cb,
+> +					     (void *)flags);
+> +		if (ret < 0) {
+> +			dev_err(&child_adev->dev,
+> +				"failed to parse _CRS method, error code %d\n",
+> +				ret);
+> +			return NULL;
+> +		} else if (ret == 0) {
+> +			dev_err(&child_adev->dev,
+> +				"no memory resources present in _CRS\n");
+> +			return NULL;
+> +		}
+> +
+> +		entry = list_first_entry(&list, struct resource_entry, node);
+> +		*res_pem = *entry->res;
+> +		acpi_dev_free_resource_list(&list);
+> +		return res_pem;
+> +	}
+> +
+> +	return NULL;
+> +}
+> +#else
+> +static struct resource *thunder_pem_acpi_res(struct pci_config_window *cfg)
+> +{
+> +	return NULL;
+> +}
+> +#endif
+> +
+>  static int thunder_pem_init(struct pci_config_window *cfg)
+>  {
+>  	struct device *dev = cfg->parent;
+> @@ -292,24 +371,24 @@ static int thunder_pem_init(struct pci_config_window *cfg)
+>  	struct thunder_pem_pci *pem_pci;
+>  	struct platform_device *pdev;
+>  
+> -	/* Only OF support for now */
+> -	if (!dev->of_node)
+> -		return -EINVAL;
+> -
+>  	pem_pci = devm_kzalloc(dev, sizeof(*pem_pci), GFP_KERNEL);
+>  	if (!pem_pci)
+>  		return -ENOMEM;
+>  
+> -	pdev = to_platform_device(dev);
+> -
+> -	/*
+> -	 * The second register range is the PEM bridge to the PCIe
+> -	 * bus.  It has a different config access method than those
+> -	 * devices behind the bridge.
+> -	 */
+> -	res_pem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +	if (acpi_disabled) {
+> +		pdev = to_platform_device(dev);
+> +
+> +		/*
+> +		 * The second register range is the PEM bridge to the PCIe
+> +		 * bus.  It has a different config access method than those
+> +		 * devices behind the bridge.
+> +		 */
+> +		res_pem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +	} else {
+> +		res_pem = thunder_pem_acpi_res(cfg);
+> +	}
+>  	if (!res_pem) {
+> -		dev_err(dev, "missing \"reg[1]\"property\n");
+> +		dev_err(dev, "missing configuration region\n");
+>  		return -EINVAL;
+>  	}
+>  
+> @@ -332,7 +411,7 @@ static int thunder_pem_init(struct pci_config_window *cfg)
+>  	return 0;
+>  }
+>  
+> -static struct pci_ecam_ops pci_thunder_pem_ops = {
+> +struct pci_ecam_ops pci_thunder_pem_ops = {
+>  	.bus_shift	= 24,
+>  	.init		= thunder_pem_init,
+>  	.pci_ops	= {
+> diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
+> index f5740b7..3f2a98f 100644
+> --- a/include/linux/pci-ecam.h
+> +++ b/include/linux/pci-ecam.h
+> @@ -58,6 +58,10 @@ void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
+>  			       int where);
+>  /* default ECAM ops */
+>  extern struct pci_ecam_ops pci_generic_ecam_ops;
+> +/* ECAM ops for known quirks */
+> +#ifdef CONFIG_PCI_HOST_THUNDER_PEM
+> +extern struct pci_ecam_ops pci_thunder_pem_ops;
+> +#endif
+>  
+>  /* ops for buggy ECAM that supports only 32-bit accesses */
+>  extern struct pci_ecam_ops pci_32b_ops;
+> -- 
+> 2.7.4
+> 
