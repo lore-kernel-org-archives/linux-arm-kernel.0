@@ -1,28 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 01 Dec 2016 14:43:00 +0100
-Subject: [PATCH] crypto: arm/aesbs - Select SIMD in Kconfig
-In-Reply-To: <20161201125616.GB2249@gondor.apana.org.au>
-References: <20161130234826.854879-1-arnd@arndb.de>
- <20161201125616.GB2249@gondor.apana.org.au>
-Message-ID: <3127384.oX3XkmieGV@wuerfel>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 1 Dec 2016 13:48:08 +0000
+Subject: [PATCH 1/5] gpio: pl061: use local state for parent IRQ storage
+In-Reply-To: <1480068564-9447-1-git-send-email-linus.walleij@linaro.org>
+References: <1480068564-9447-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <be5a081a-24d7-ff50-d8c5-01e02e64a5dc@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 1, 2016 8:56:16 PM CET Herbert Xu wrote:
-> On Thu, Dec 01, 2016 at 12:47:59AM +0100, Arnd Bergmann wrote:
-> > Commit 585b5fa63da9 ("crypto: arm/aes - Select SIMD in Kconfig") added
-> > the dependency for CRYPTO_AES_ARM_CE, but missed the same change
-> > for CRYPTO_AES_ARM_BS:
-> > 
-> > arch/arm/crypto/aes-arm-bs.o: In function `aesbs_mod_init':
-> > aesbs-glue.c:(.init.text+0x38): undefined reference to `simd_skcipher_create_compat'
-> > 
-> > Fixes: 211f41af534a ("crypto: aesbs - Convert to skcipher")
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Thanks Arnd.  This should already be fixed by 6fdf436fd854.
 
-Right. I have discarded my patch on today's linux-next and I
-get no more link errors.
 
-	Arnd
+On 25/11/16 10:09, Linus Walleij wrote:
+> The driver is poking around in the struct gpio_chip internals,
+> which is a no-no. Use a variable in the local state container.
+>
+
+The entire series looks good to me. I also gave it a spin on my Juno. So,
+
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+Tested-by: Sudeep Holla <sudeep.holla@arm.com>
+
+-- 
+Regards,
+Sudeep
