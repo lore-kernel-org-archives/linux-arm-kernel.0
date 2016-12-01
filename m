@@ -1,56 +1,104 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Thu, 1 Dec 2016 09:41:29 -0800
-Subject: [PATCH v4 2/3] doc: dt: add cyclone-spi binding document
-In-Reply-To: <137f03de76e5f865430b17ca247e8f73e3315c8d.1480551148.git.stillcompiling@gmail.com>
-References: <cover.1480551148.git.stillcompiling@gmail.com>
- <137f03de76e5f865430b17ca247e8f73e3315c8d.1480551148.git.stillcompiling@gmail.com>
-Message-ID: <CAAtXAHd_krKPpXRw5NxWhS6kcQ_fJcuyZYDOretRfNn+Cpkn2A@mail.gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 1 Dec 2016 11:47:20 -0600
+Subject: [PATCH v3] ARM: davinci: da8xx: Fix sleeping function called from
+ invalid context
+In-Reply-To: <1480612342-23614-1-git-send-email-abailon@baylibre.com>
+References: <1480612342-23614-1-git-send-email-abailon@baylibre.com>
+Message-ID: <76e7853b-8235-173a-7214-c450487751c6@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 1, 2016 at 9:04 AM, Joshua Clayton <stillcompiling@gmail.com> wrote:
-> Describe a cyclonei-ps-spi devicetree entry, required features
->
-> Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-Acked-by: Moritz Fischer <moritz.fischer@ettus.com>
+On 12/01/2016 11:12 AM, Alexandre Bailon wrote:
+> Everytime the usb20 phy is enabled, there is a
 
+Every time is two words
+
+> "sleeping function called from invalid context" BUG.
+>
+> clk_enable() from arch/arm/mach-davinci/clock.c uses spin_lock_irqsave()
+> before to invoke the callback usb20_phy_clk_enable().
+> usb20_phy_clk_enable() uses clk_get() and clk_enable_prepapre()
+> which may sleep.
+> Move clk_get() to da8xx_register_usb20_phy_clk() and
+> replace clk_prepare_enable() by clk_enable().
+>
+> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
 > ---
+>  arch/arm/mach-davinci/usb-da8xx.c | 23 ++++++++++++-----------
+>  1 file changed, 12 insertions(+), 11 deletions(-)
 >
->  .../bindings/fpga/cyclone-ps-spi-fpga-mgr.txt      | 25 ++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/fpga/cyclone-ps-spi-fpga-mgr.txt
+> diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
+> index b010e5f..bfb55b9 100644
+> --- a/arch/arm/mach-davinci/usb-da8xx.c
+> +++ b/arch/arm/mach-davinci/usb-da8xx.c
+> @@ -156,23 +156,18 @@ int __init da8xx_register_usb_refclkin(int rate)
+>  	return 0;
+>  }
 >
-> diff --git a/Documentation/devicetree/bindings/fpga/cyclone-ps-spi-fpga-mgr.txt b/Documentation/devicetree/bindings/fpga/cyclone-ps-spi-fpga-mgr.txt
-> new file mode 100644
-> index 0000000..3f515c7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/fpga/cyclone-ps-spi-fpga-mgr.txt
-> @@ -0,0 +1,25 @@
-> +Altera Cyclone Passive Serial SPI FPGA Manager
+> +static struct clk *usb20_clk;
+
+Not a serious issue, but I would rather have the global variable 
+declared at the beginning of the file to make it more obvious there is a 
+global variable.
+
 > +
-> +Altera Cyclone FPGAs support a method of loading the bitstream over what is
-> +referred to as "passive serial".
-> +The passive serial link is not technically spi, and might require extra
-> +circuits in order to play nicely with other spi slaves on the same bus.
+>  static void usb20_phy_clk_enable(struct clk *clk)
+>  {
+> -	struct clk *usb20_clk;
+>  	int err;
+>  	u32 val;
+>  	u32 timeout = 500000; /* 500 msec */
+>
+>  	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+>
+> -	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
+> -	if (IS_ERR(usb20_clk)) {
+> -		pr_err("could not get usb20 clk: %ld\n", PTR_ERR(usb20_clk));
+> -		return;
+> -	}
+> -
+>  	/* The USB 2.O PLL requires that the USB 2.O PSC is enabled as well. */
+> -	err = clk_prepare_enable(usb20_clk);
+> +	err = clk_enable(usb20_clk);
+>  	if (err) {
+>  		pr_err("failed to enable usb20 clk: %d\n", err);
+>  		clk_put(usb20_clk);
+> @@ -197,8 +192,7 @@ static void usb20_phy_clk_enable(struct clk *clk)
+>
+>  	pr_err("Timeout waiting for USB 2.0 PHY clock good\n");
+>  done:
+> -	clk_disable_unprepare(usb20_clk);
+> -	clk_put(usb20_clk);
+> +	clk_disable(usb20_clk);
+>  }
+>
+>  static void usb20_phy_clk_disable(struct clk *clk)
+> @@ -287,9 +281,16 @@ int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
+>  	struct clk *parent;
+>  	int ret = 0;
+
+No longer need to initialize ret here.
+
+>
+> +	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
+> +	ret = PTR_ERR_OR_ZERO(usb20_clk);
+> +	if (ret)
+> +		return ret;
 > +
-> +See https://www.altera.com/literature/hb/cyc/cyc_c51013.pdf
-> +
-> +Required properties:
-> +- compatible  : should contain "altr,cyclone-ps-spi-fpga-mgr"
-> +- reg         : spi slave id of the fpga
-> +- config-gpios : config pin (referred to as nCONFIG in the cyclone manual)
-> +- status-gpios : status pin (referred to as nSTATUS in the cyclone manual)
-> +
-> +both gpio pins are normally active low open drain.
-> +
-> +Example:
-> +       fpga_spi: evi-fpga-spi at 0 {
-> +               compatible = "altr,cyclone-ps-spi-fpga-mgr";
-> +               spi-max-frequency = <20000000>;
-> +               reg = <0>;
-> +               config-gpios = <&gpio4 9 GPIO_ACTIVE_LOW>;
-> +               status-gpios = <&gpio4 11 GPIO_ACTIVE_LOW>;
-> +       };
-> --
-> 2.9.3
+>  	parent = clk_get(NULL, use_usb_refclkin ? "usb_refclkin" : "pll0_aux");
+> -	if (IS_ERR(parent))
+> +	if (IS_ERR(parent)) {
+
+why not use ret = PTR_ERR_OR_ZERO(parent) pattern here too?
+
+> +		clk_put(usb20_clk);
+
+The global usb20_clk is no longer valid after this. Should we set it to 
+NULL here?
+
+>  		return PTR_ERR(parent);
+> +	}
+>
+>  	usb20_phy_clk.parent = parent;
+>  	ret = clk_register(&usb20_phy_clk);
 >
