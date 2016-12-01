@@ -1,37 +1,51 @@
-From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Wed, 30 Nov 2016 16:45:57 -0800
-Subject: [RESEND PATCH] pinctrl: mt8173: set GPIO16 to usb iddig mode
-In-Reply-To: <1480472491-4644-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1480472491-4644-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1480553157.29122.8.camel@mussux00>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 30 Nov 2016 20:00:12 -0500
+Subject: [PATCH V1 1/2] PCI: thunder: Enable ACPI PCI controller for
+ ThunderX pass2.x silicon version
+In-Reply-To: <20161201002812.GB9409@bhelgaas-glaptop.roam.corp.google.com>
+References: <1479201298-25494-1-git-send-email-tn@semihalf.com>
+ <1479201298-25494-2-git-send-email-tn@semihalf.com>
+ <20161201002812.GB9409@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <19e244f2-22f9-be94-0929-a9d96844b801@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-11-30 at 10:21 +0800, Chunfeng Yun wrote:
-> the default mode of GPIO16 pin is gpio, when set EINT16 to
-> IRQ_TYPE_LEVEL_HIGH, no interrupt is triggered, it can be
-> fixed when set its default mode as usb iddig.
-> 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->  drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
-> index 13e5b68..9b018fd 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
-> @@ -201,7 +201,7 @@
->  	MTK_PIN(
->  		PINCTRL_PIN(16, "IDDIG"),
->  		NULL, "mt8173",
-> -		MTK_EINT_FUNCTION(0, 16),
-> +		MTK_EINT_FUNCTION(1, 16),
->  		MTK_FUNCTION(0, "GPIO16"),
->  		MTK_FUNCTION(1, "IDDIG"),
->  		MTK_FUNCTION(2, "CMFLASH"),
+Hi Bjorn,
 
-Acked-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+On 11/30/2016 7:28 PM, Bjorn Helgaas wrote:
+> Actually, that raises a question for qualcomm and hisi: in the DT
+> model, we use non-ECAM config accessors in the driver, but in the ACPI
+> model, we use ECAM accessors.  It seems like the accessors should be
+> the same regardless of whether we discover the bridge via DT or ACPI.
 
-Thanks,
-Hongzhou
+For servers, we are only setting up the PCIe controller in ECAM mode in FW.
+If somebody wants to use DT with QCOM Server (unsupported but possible),
+they need to use pci-host-ecam-generic driver.
+
+Here is an example:
+
+	pcie3 {
+		compatible = "pci-host-ecam-generic";
+		device_type = "pci";
+		#address-cells = <3>;
+		#size-cells = <2>;
+		bus-range = <0x0 0xff>;
+		linux,pci-domain = <3>;
+
+		// CPU_PHYSICAL(2)  SIZE(2)
+		reg = <0xC00 0x00000000  0x0 0x10000000>;
+ 	...
+	}
+
+I think you are referring to this driver here.
+
+obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
+
+This driver is only in use by the mobile products.
+
+Sinan
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
