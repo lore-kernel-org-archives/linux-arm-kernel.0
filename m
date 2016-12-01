@@ -1,20 +1,26 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 1 Dec 2016 19:52:41 +0530
-Subject: [PATCH] ARM: davinci_all_defconfig: Enable the da8xx usb otg
-In-Reply-To: <1480350654-26284-1-git-send-email-abailon@baylibre.com>
-References: <1480350654-26284-1-git-send-email-abailon@baylibre.com>
-Message-ID: <0b412617-fdd0-eb69-e69f-f529b169079f@ti.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu,  1 Dec 2016 15:25:50 +0100
+Subject: [PATCH 0/4] ARM, arm64: dts: Use usb-phy fallback bindings
+Message-ID: <1480602354-1446-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 November 2016 10:00 PM, Alexandre Bailon wrote:
-> The musb driver is enabled but the phy and the glue
-> for the da8xx are not enabled.
-> Enable them.
-> 
-> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+Hi,
 
-Applied to v4.10/defconfig
+this short series makes use of fallback bindings for Renesas R-Car PHY
+drivers in the DT of SoCs which already use those drivers.
 
-Thanks,
-Sekhar
+Simon Horman (4):
+  ARM: dts: r8a7790: Use renesas,rcar-gen2-usb-phy fallback binding
+  ARM: dts: r8a7791: Use renesas,rcar-gen2-usb-phy fallback binding
+  ARM: dts: r8a7794: Use renesas,rcar-gen2-usb-phy fallback binding
+  arm64: dts: r8a7795: Use renesas,rcar-gen3-usb2-phy fallback binding
+
+ arch/arm/boot/dts/r8a7790.dtsi           | 3 ++-
+ arch/arm/boot/dts/r8a7791.dtsi           | 3 ++-
+ arch/arm/boot/dts/r8a7794.dtsi           | 3 ++-
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 9 ++++++---
+ 4 files changed, 12 insertions(+), 6 deletions(-)
+
+-- 
+2.7.0.rc3.207.g0ac5344
