@@ -1,57 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 1 Dec 2016 10:57:38 +0000
-Subject: [PATCH] KVM: arm/arm64: vgic: Don't notify EOI for non-SPIs
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA817475F7E@lhreml504-mbs>
-References: <1480584341-32340-1-git-send-email-marc.zyngier@arm.com>
- <1480584341-32340-2-git-send-email-marc.zyngier@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA817475F7E@lhreml504-mbs>
-Message-ID: <be0586f4-57b7-b732-f97e-34798f57e066@arm.com>
+From: maninder1.s@samsung.com (Maninder Singh)
+Date: Thu, 01 Dec 2016 16:28:33 +0530
+Subject: [PATCH v2] mach-omap2: fixing wrong strcat for Non-NULL terminated
+ string
+Message-ID: <1480589913-8839-1-git-send-email-maninder1.s@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/16 10:28, Shameerali Kolothum Thodi wrote:
-> Hi Marc,
-> 
->> -----Original Message-----
->> From: kvmarm-bounces at lists.cs.columbia.edu [mailto:kvmarm-
->> bounces at lists.cs.columbia.edu] On Behalf Of Marc Zyngier
->> Sent: Thursday, December 01, 2016 9:26 AM
->> To: Paolo Bonzini; Radim Kr?m??
->> Cc: Catalin Marinas; kvmarm at lists.cs.columbia.edu; linux-arm-
->> kernel at lists.infradead.org; kvm at vger.kernel.org
->> Subject: [PATCH] KVM: arm/arm64: vgic: Don't notify EOI for non-SPIs
->>
->> When we inject a level triggerered interrupt (and unless it is backed
->> by the physical distributor - timer style), we request a maintenance
->> interrupt. Part of the processing for that interrupt is to feed to the
->> rest of KVM (and to the eventfd subsystem) the information that the
->> interrupt has been EOIed.
->>
->> But that notification only makes sense for SPIs, and not PPIs (such as
->> the PMU interrupt). Skip over the notification if the interrupt is not
->> an SPI.
-> 
-> Just to clarify my understanding, the maintenance interrupt is generated 
-> for cases where there is no mapping of virt to phys interrupts
-> (ie, ICH_LR HW bit is not set). And I was under the impression that
-> kvm_notify_acked_irq will eventually deactivate the interrupt on distributor
-> for such cases. Its not clear to me how the deactivation is done
-> otherwise.
-> 
-> Could you please help me to understand this better.
+variable name can have Non NULL terminated string after cropping
+which may result strcat to fail, and cropping is not
+required if (strlen(oh->name) + 8 < MOD_CLK_MAX_NAME_LEN).
 
-kvm_notify_acked_irq() doesn't do *anything* at the distributor level,
-ever (it has no idea of anything GIC-specific anyway). It's sole job is
-to signal the rest of the stack that an interrupt has been EOIed in the
-guest.
+Issue caught with static analysis tool:
+"Dangerous usage of 'name' (strncpy doesn't always 0-terminate it)"
 
-For these interrupts, which are purely virtual, there is absolutely
-nothing to do at the physical distributor level anyway. Furthermore,
-kvm_notify_acked_irq doesn't know about per-cpu interrupt, which is why
-we cannot notify them.
+Signed-off-by: Vaneet Narang <v.narang@samsung.com>
+Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
+---
+v1 -> v2: changed strncpy to strlcpy
+ arch/arm/mach-omap2/omap_hwmod.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-Thanks,
-
-	M.
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 759e1d4..582b95a 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -742,12 +742,14 @@ static int _init_main_clk(struct omap_hwmod *oh)
+ 	char name[MOD_CLK_MAX_NAME_LEN];
+ 	struct clk *clk;
+ 
+-	/* +7 magic comes from '_mod_ck' suffix */
+-	if (strlen(oh->name) + 7 > MOD_CLK_MAX_NAME_LEN)
++	/* +8 magic comes from strlen("_mod_ck") added as suffix */
++	if (strlen(oh->name) + 8 > MOD_CLK_MAX_NAME_LEN) {
+ 		pr_warn("%s: warning: cropping name for %s\n", __func__,
+ 			oh->name);
++		strlcpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - 7);
++	} else
++		strcpy(name, oh->name);
+ 
+-	strncpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - 7);
+ 	strcat(name, "_mod_ck");
+ 
+ 	clk = clk_get(NULL, name);
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
