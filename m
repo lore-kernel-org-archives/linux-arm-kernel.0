@@ -1,86 +1,50 @@
-From: manu@bidouilliste.com (Emmanuel Vadot)
-Date: Thu, 1 Dec 2016 11:24:14 +0100
-Subject: [PATCH] ARM: dts: sunxi: Add num-cs for A20 spi nodes
-In-Reply-To: <20161201092150.rlo5skxd6elovlgq@lukather>
-References: <20161122170616.29557-1-manu@bidouilliste.com>
- <20161124195517.qrq7briu3pwjnp4n@lukather>
- <20161124210509.be743aae84c26c6c2e666c6e@bidouilliste.com>
- <20161125152047.oadxi2xbgm4kdd7q@lukather>
- <20161125220752.c989c85e01ed202be0485c78@bidouilliste.com>
- <20161201092150.rlo5skxd6elovlgq@lukather>
-Message-ID: <20161201112414.62f9b351186115f62c8998a9@bidouilliste.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 01 Dec 2016 12:41:20 +0200
+Subject: [linux-sunxi] Re: [PATCH v7 4/8] drm/sunxi: Add DT bindings
+ documentation of Allwinner HDMI
+In-Reply-To: <20161201085520.tk2kdi33rn6fyld2@lukather>
+References: <cover.1480414715.git.moinejf@free.fr>
+ <1971681480527210@web5g.yandex.ru> <20161201085520.tk2kdi33rn6fyld2@lukather>
+Message-ID: <5021537.YAZCMeDTSh@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
- Hi Maxime,
-
-On Thu, 1 Dec 2016 10:21:50 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-
-> Hi Emmanuel,
-> 
-> On Fri, Nov 25, 2016 at 10:07:52PM +0100, Emmanuel Vadot wrote:
-> > On Fri, 25 Nov 2016 16:20:47 +0100
-> > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On Thursday 01 Dec 2016 09:55:20 Maxime Ripard wrote:
+> On Thu, Dec 01, 2016 at 01:33:30AM +0800, Icenowy Zheng wrote:
+> >>>          hdmi-out {
+> >>>                  compatible = "hdmi-connector";
+> >>>                  type = "a";
+> >>>                  /* I2C bus and GPIO references are made up for the
+> >>> example */ ddc-i2c-bus = <&i2c4>;
+> >>>                  hpd-gpios = <&gpio4 7 GPIO_ACTIVE_HIGH>
+> >> 
+> >> the "hdmi-connector" is a big piece of software. It must handle a lot
+> >> of more and more exotic connectors.
+> >> So, I hope that you have written a "simple-hdmi-connector" which does
+> >> nothing but setting the connector type.
+> >> Where is it?
 > > 
-> > > On Thu, Nov 24, 2016 at 09:05:09PM +0100, Emmanuel Vadot wrote:
-> > > > On Thu, 24 Nov 2016 20:55:17 +0100
-> > > > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> > > > 
-> > > > > On Tue, Nov 22, 2016 at 06:06:16PM +0100, Emmanuel Vadot wrote:
-> > > > > > The spi0 controller on the A20 have up to 4 CS (Chip Select) while the
-> > > > > > others three only have 1.
-> > > > > > Add the num-cs property to each node.
-> > > > > > 
-> > > > > > Signed-off-by: Emmanuel Vadot <manu@bidouilliste.com>
-> > > > > 
-> > > > > I don't think we have any code that uses it at the moment. What is the
-> > > > > rationale behind this patch?
-> > > > > 
-> > > > > Thanks!
-> > > > > Maxime
-> > > > > 
-> > > > > -- 
-> > > > > Maxime Ripard, Free Electrons
-> > > > > Embedded Linux and Kernel engineering
-> > > > > http://free-electrons.com
-> > > > 
-> > > >  Hi Maxime,
-> > > > 
-> > > >  If num-cs isn't present nothing prevent to start a transfer with a
-> > > > non-valid CS pin, resulting in an error.
-> > > >  num-cs are default property especially made for this and a SPI driver
-> > > > should try to get the property at probe/attach time.
-> > > 
-> > > Yes, but as far as I know, our driver doesn't. I'm all in for having
-> > > support for that in our driver, but without it, that patch is kind of
-> > > useless.
+> > I suddenly thought about something...
 > > 
-> >  Yes the Linux driver doesn't use it but my upcoming one for FreeBSD
-> > uses it. So it is not useless for downstream user of DTS.
+> > If a DVI connector instead of a HDMI connector is soldered, how
+> > should such a device tree be written?
 > 
-> Ah, I didn't know this was for FreeBSD. So you started to use our DTs,
-> or do you have some modifications to it? How does that work?
+> Use a dvi-connector instead :)
 
- Yes we use the DTS from linux from quite some times now. We're
-currently synced with 4.7-ish.
- We either use them directly or modify them according to our needs and
-driver support.
+The HDMI encoder DT node doesn't (and certainly shouldn't) report what type of 
+connector is mounted on the board. Having a connector node in DT makes the 
+connector type available to the system, allowing the DRM driver to expose the 
+right connector type to userspace (it would be confusing for the user to 
+report DRM_MODE_CONNECTOR_HDMIA for a DVI connector).
 
-> Anyway, the fact that it isn't used by our driver at the moment and
-> that it's meant for other OSes should be mentionned in the commit log.
-
- Yeah I understand, I'll send a v2 with this in the commit log.
-
-> Thanks!
-> Maxime
+> > How about solder a HDMI-to-VGA bridge on the board? (Maybe there
+> > should be "dumb-hdmi-dvi-bridge" and "dumb-hdmi-vga-bridge"
+> > drivers?)
 > 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
-
+> It probably wouldn't be dumb, but yeah, it would definitely be a
+> bridge instead of the connector.
 
 -- 
-Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
+Regards,
+
+Laurent Pinchart
