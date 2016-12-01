@@ -1,52 +1,60 @@
-From: dennis.chen@arm.com (Dennis Chen)
-Date: Thu, 1 Dec 2016 10:15:04 +0800
-Subject: [PATCH] PCI:MSI Return -ENOSPC when requested vectors is not enough
-Message-ID: <1480558504-18691-1-git-send-email-dennis.chen@arm.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Thu, 1 Dec 2016 10:41:03 +0800
+Subject: [PATCHv4 07/10] kexec: Switch to __pa_symbol
+In-Reply-To: <1480445729-27130-8-git-send-email-labbott@redhat.com>
+References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
+ <1480445729-27130-8-git-send-email-labbott@redhat.com>
+Message-ID: <20161201024103.GA32438@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The __pci_enable_msi_range() should return -ENOSPC instead of -EINVAL
-when the device doesn't have enough vectors as required, just as the 
-MSI-X vector allocator does in __pci_enable_msix_range(). Otherwise, 
-some drivers depending on that return value will probably fallback to
-the legacy interrupt directly, for example, in commit 17a51f12cfbd2814
-("ahci: only try to use multi-MSI mode if there is more than 1 port"), the
-ahci driver will fallback to single MSI mode only when the return value
-is -ENOSPC in case of required vectors is not enough, else the driver will
-use legacy interrupt which has been observed on a x86 box with 6-port SATA
-controller.
+Hi, Laura
+On 11/29/16 at 10:55am, Laura Abbott wrote:
+> 
+> __pa_symbol is the correct api to get the physical address of kernel
+> symbols. Switch to it to allow for better debug checking.
+> 
 
-With this patch, when a MSI-capable device doesn't have enough MSI
-vectors as requested, it will fallback to single MSI mode while not
-legacy interrupt.
+I assume __pa_symbol is faster than __pa, but it still need some testing
+on all arches which support kexec.
 
-Signed-off-by: Dennis Chen <dennis.chen@arm.com>
-Cc: Tejun Heo <tj@kernel.org>
-Cc: Christoph Hellwig <hch@lst.de>
-Cc: Tom Long Nguyen <tom.l.nguyen@intel.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Steve Capper <steve.capper@arm.com>
-Cc: linux-ide at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- drivers/pci/msi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+But seems long long ago there is a commit e3ebadd95cb in the commit log
+I see below from:
+"we should deprecate __pa_symbol(), and preferably __pa() too - and
+ just use "virt_to_phys()" instead, which is is more readable and has
+ nicer semantics."
 
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index ad70507..da37113 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -1084,7 +1084,7 @@ static int __pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec,
- 	if (nvec < 0)
- 		return nvec;
- 	if (nvec < minvec)
--		return -EINVAL;
-+		return -ENOSPC;
- 
- 	if (nvec > maxvec)
- 		nvec = maxvec;
--- 
-2.7.4
+But maybe in modern code __pa_symbol is prefered I may miss background.
+virt_to_phys still sounds more readable now for me though.
+
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> Found during review of the kernel. Untested.
+> ---
+>  kernel/kexec_core.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/kernel/kexec_core.c b/kernel/kexec_core.c
+> index 5616755..e1b625e 100644
+> --- a/kernel/kexec_core.c
+> +++ b/kernel/kexec_core.c
+> @@ -1397,7 +1397,7 @@ void __weak arch_crash_save_vmcoreinfo(void)
+>  
+>  phys_addr_t __weak paddr_vmcoreinfo_note(void)
+>  {
+> -	return __pa((unsigned long)(char *)&vmcoreinfo_note);
+> +	return __pa_symbol((unsigned long)(char *)&vmcoreinfo_note);
+>  }
+>  
+>  static int __init crash_save_vmcoreinfo_init(void)
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> kexec mailing list
+> kexec at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/kexec
+
+Thanks
+Dave
