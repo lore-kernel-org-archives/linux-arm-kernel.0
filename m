@@ -1,39 +1,24 @@
-From: ahaslam@baylibre.com (Axel Haslam)
-Date: Thu,  1 Dec 2016 15:10:41 +0100
-Subject: [PATCH] ARM: dts: da850: enable high speed for mmc
-Message-ID: <20161201141041.31386-1-ahaslam@baylibre.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 1 Dec 2016 15:11:39 +0100
+Subject: [PATCH] arm: kprobe: replace patch_lock to raw lock
+In-Reply-To: <1478823475-15087-1-git-send-email-yang.shi@linaro.org>
+References: <1478823475-15087-1-git-send-email-yang.shi@linaro.org>
+Message-ID: <20161201141138.css266nzcutzfapw@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mmc controller in da850 supports high speed modes
-so add cap-sd-highspeed and cap-mmc-highspeed.
+On 2016-11-10 16:17:55 [-0800], Yang Shi wrote:
+> 
+> Since patch_text_stop_machine() is called in stop_machine() which disables IRQ,
+> sleepable lock should be not used in this atomic context, so replace patch_lock
+> to raw lock.
 
-Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
----
- arch/arm/boot/dts/da850.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+I am taking this one. Thank you.
+We have jump_labels() deactivated on ARM because stop_machine() may
+cause latencies at runtime. kprobe and kgdb is used by the user on
+purpose (and not because he changed some sched setting) I think we are
+fine. I am going to document this.
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index ffc6e1a..0bfb1c0 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -316,6 +316,8 @@
- 		mmc0: mmc at 40000 {
- 			compatible = "ti,da830-mmc";
- 			reg = <0x40000 0x1000>;
-+			cap-sd-highspeed;
-+			cap-mmc-highspeed;
- 			interrupts = <16>;
- 			dmas = <&edma0 16 0>, <&edma0 17 0>;
- 			dma-names = "rx", "tx";
-@@ -324,6 +326,8 @@
- 		mmc1: mmc at 21b000 {
- 			compatible = "ti,da830-mmc";
- 			reg = <0x21b000 0x1000>;
-+			cap-sd-highspeed;
-+			cap-mmc-highspeed;
- 			interrupts = <72>;
- 			dmas = <&edma1 28 0>, <&edma1 29 0>;
- 			dma-names = "rx", "tx";
--- 
-2.9.3
+> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+
+Sebastian
