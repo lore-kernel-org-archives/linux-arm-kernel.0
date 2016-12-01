@@ -1,78 +1,63 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 1 Dec 2016 13:29:26 +0100
-Subject: arasan,sdhci.txt "compatibility" DT binding
-In-Reply-To: <f64ea0f8-31be-c5b5-3a43-a30abd8aec30@rock-chips.com>
-References: <56B07BA5.4060407@free.fr> <56B166F1.5080605@rock-chips.com>
- <56B1AA44.1010108@xilinx.com> <56B1BAF8.2050907@free.fr>
- <56B1CF40.1030203@xilinx.com> <20160203152104.GP4215@xsjsorenbubuntu>
- <56B21DDB.6050708@free.fr> <582ED9E0.5090506@free.fr>
- <CAFd313x6MJeO90_+rxditdPn762g7TqZc0_D6ojGTKmtGJKjPA@mail.gmail.com>
- <582EF744.8090307@free.fr> <a20b2b4f-15d4-3c29-324c-1ced5dbcc67f@xilinx.com>
- <583C50E7.6030400@free.fr>
- <f64ea0f8-31be-c5b5-3a43-a30abd8aec30@rock-chips.com>
-Message-ID: <584017A6.3000301@free.fr>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Thu, 1 Dec 2016 13:33:52 +0100
+Subject: [PATCH v5 net-next 4/7] net: mvneta: Convert to be 64 bits
+ compatible
+In-Reply-To: <20161201201648.6a50b442@xhacker>
+References: <cover.0270f6d2413a709521fe2c8c17fbebea6f2e78d1.1480542157.git-series.gregory.clement@free-electrons.com>
+ <6b4d20a85b05e93d254e265eb07569dd1285d303.1480542157.git-series.gregory.clement@free-electrons.com>
+ <20161201192604.07ed9516@xhacker>
+ <CAPv3WKeJBL7_V_7QPVNDAd9H4bgeLcSF8enuD96sgEmecuRkRA@mail.gmail.com>
+ <20161201200205.46dec339@xhacker> <20161201201648.6a50b442@xhacker>
+Message-ID: <CAPv3WKftV+=CmpG6oN_86UytV+VVa3ZdkEmOcxGqmGZOqUwxHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2016 05:09, Shawn Lin wrote:
+Hi Jisheng,
 
-> On 2016/11/28 23:44, Mason wrote:
+2016-12-01 13:16 GMT+01:00 Jisheng Zhang <jszhang@marvell.com>:
+> On Thu, 1 Dec 2016 20:02:05 +0800 Jisheng Zhang wrote:
 >
->> Shawn Lin, could you take a look below and tell me exactly
->> which IP core(s) Rockchip is using in its SoCs?
-> 
-> From the Host Controller version register (0xfe)
-> bit[7:0]: 0x2 : specification version number is 3.00
-> bit[15:8]: 0x10: Vendor version number is 1.0
-> 
-> Command Queueing version register (0x200)
-> bit[11:8]: 0x5  eMMC Major version number
-> bit[7:4]: 0x1 eMMC manor version number
-> bit[3:0]: 0x0 eMMC version suffix
-> 
-> User guide "eMMC 5.1/SD3.0/SDIO3.0 Host Controller"
-> Revision number: 1.14
-> Released on Dec. 2014
+>> Hi Marcin,
+>>
+>> On Thu, 1 Dec 2016 12:48:39 +0100 Marcin Wojtas wrote:
+>>
+>> > Hi Jisheng,
+>> >
+>> > Which baseline do you use?
+>> >
+>> > It took me really lot of time to catch why RX broke after rebase from
+>> > LKv4.1 to LKv4.4. Between those two, in commit:
+>> > 97303480753e ("arm64: Increase the max granular size")
+>> > L1_CACHE_BYTES for all ARMv8 platforms was increased to 128B and so
+>> > did NET_SKB_PAD.
+>> >
+>> > And 128 is more than the maximum that can fit into packet offset
+>> > [11:8]@0x1400. In such case this correction is needed. Did it answer
+>> > your doubts?
+>>
+>> That's key! Thanks a lot. In my repo, we don't have commit 97303480753e
+>> ("arm64: Increase the max granular size")
+>>
+>> I think it would be great if this information can be added into the commit
+>> msg.
+>>
+>> IIRC, arm64 maintainers considered to let L1_CACHE_BYTES the _minimum_ of
+>> cache line sizes of arm64. If that's implemented and merged, then we can
+>
+> I just searched and found the email.
+>
+> "We may have to revisit this logic and consider L1_CACHE_BYTES the
+> _minimum_ of cache line sizes in arm64 systems supported by the kernel.
+> Do you have any benchmarks on Cavium boards that would show significant
+> degradation with 64-byte L1_CACHE_BYTES vs 128?"
+>
+> https://patchwork.kernel.org/patch/8634481/
+>
+>
 
-Wow! Yet another HW revision I wasn't aware of :-)
+Thank you for the information. I debugged it before the discussion. In
+future we would be able to revert it, however afair packet offset may
+be needed by A3700 Buffer Management.
 
-For the record, I think the 0x200 register was introduced fairly
-recently, as it's not documented in any of the user guides I have
-access to.
-
-
-To summarize the situation, Arasan has made (at least) the
-following versions of the HW block:
-
-  SD_2.0_SDIO_2.0__MMC_3.31_Host_Controller
-  SD_3.0_SDIO_3.0_eMMC_4.4__Host_Controller
-  SD_3.0_SDIO_3.0_eMMC_4.41_Host_Controller
-  SD_3.0_SDIO_3.0_eMMC_4.5__Host_Controller
-  SD_3.0_SDIO_3.0_eMMC_4.51_Host_Controller
-  SD_3.0_SDIO_3.0_eMMC_5.1__Host Controller
-  SD_4.1_SDIO_4.1_eMMC_4.51_Host_Controller
-  SD_4.1_SDIO_4.1_eMMC_5.1__Host_Controller
-
-
-Xilinx = "arasan,sdhci-8.9a" compat string
-SD2.0 / SDIO2.0 /  MMC3.31 (in Zynq)
-SD3.0 / SDIO3.0 / eMMC4.51 (in ZynqMP)
-Vendor version 0x89 (Zynq, from 8.9a) and 0x10 (ZynqMP)
-
-Sigma = no compat string yet
-SD3.0 / SDIO3.0 / eMMC4.4  (in SMP87xx)
-Vendor version 0x99 (not related to document revision)
-
-APM = "arasan,sdhci-4.9a"
-SD3.0 / SDIO3.0 / eMMC4.41
-Vendor version unknown
-
-Rockchip = "arasan,sdhci-5.1"
-SD3.0 / SDIO3.0 / eMMC 5.1
-Vendor version 0x10
-
-Conclusion, it doesn't look like the "Vendor version" field
-contains dependable information, considering the duplicate
-0x10 in different HW revisions.
-
-Regards.
+Best regards,
+Marcin
