@@ -1,195 +1,93 @@
-From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Thu,  1 Dec 2016 14:32:05 -0500
-Subject: [PATCH v3] KVM: arm/arm64: Access CNTHCTL_EL2 bit fields correctly
-Message-ID: <1480620725-9864-1-git-send-email-jintack@cs.columbia.edu>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 1 Dec 2016 13:41:14 -0600
+Subject: [PATCH v3] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe
+ controller
+In-Reply-To: <1480620053.4751.30.camel@redhat.com>
+References: <1480549373-2123-1-git-send-email-dhdang@apm.com>
+ <20161201183350.GF30746@bhelgaas-glaptop.roam.corp.google.com>
+ <1480620053.4751.30.camel@redhat.com>
+Message-ID: <20161201194114.GA8263@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current KVM world switch code is unintentionally setting wrong bits to
-CNTHCTL_EL2 when E2H == 1, which may allow guest OS to access physical
-timer.  Bit positions of CNTHCTL_EL2 are changing depending on
-HCR_EL2.E2H bit.  EL1PCEN and EL1PCTEN are 1st and 0th bits when E2H is
-not set, but they are 11th and 10th bits respectively when E2H is set.
+On Thu, Dec 01, 2016 at 02:20:53PM -0500, Mark Salter wrote:
+> On Thu, 2016-12-01 at 12:33 -0600, Bjorn Helgaas wrote:
+> > On Wed, Nov 30, 2016 at 03:42:53PM -0800, Duc Dang wrote:
 
-In fact, on VHE we only need to set those bits once, not for every world
-switch. This is because the host kernel runs in EL2 with HCR_EL2.TGE ==
-1, which makes those bits have no effect for the host kernel execution.
-So we just set those bits once for guests, and that's it.
+> > > +static struct resource xgene_v1_csr_res[] = {
+> > > +	[0] = DEFINE_RES_MEM_NAMED(0x1f2b0000UL, SZ_64K, "PCIe CSR"),
+> > > +	[1] = DEFINE_RES_MEM_NAMED(0x1f2c0000UL, SZ_64K, "PCIe CSR"),
+> > > +	[2] = DEFINE_RES_MEM_NAMED(0x1f2d0000UL, SZ_64K, "PCIe CSR"),
+> > > +	[3] = DEFINE_RES_MEM_NAMED(0x1f500000UL, SZ_64K, "PCIe CSR"),
+> > > +	[4] = DEFINE_RES_MEM_NAMED(0x1f510000UL, SZ_64K, "PCIe CSR"),
+> > I assume these ranges are not the actual ECAM space, right?
+> > If they *were* ECAM, I assume you would have included them in the
+> > quirk itself in the mcfg_quirks[] table.
+> 
+> These are base addresses for some RC mmio registers.
+> > 
+> > > 
+> > > +static int xgene_v1_pcie_ecam_init(struct pci_config_window *cfg)
+> > > +{
+> > > +	struct acpi_device *adev = to_acpi_device(cfg->parent);
+> > > +	struct acpi_pci_root *root = acpi_driver_data(adev);
+> > > +	struct device *dev = cfg->parent;
+> > > +	struct xgene_pcie_port *port;
+> > > +	struct resource *csr;
+> > > +
+> > > +	port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
+> > > +	if (!port)
+> > > +		return -ENOMEM;
+> > > +
+> > > +	csr = &xgene_v1_csr_res[root->segment];
+> > This makes me nervous because root->segment comes from the ACPI _SEG,
+> > and if firmware gives us junk in _SEG, we will reference something in
+> > the weeds.
+> 
+> The SoC provide some number of RC bridges, each with a different base
+> for some mmio registers. Even if segment is legitimate in MCFG, there
+> is still a problem if a platform doesn't use the segment ordering
+> implied by the code. But the PNP0A03 _CRS does have this base address
+> as the first memory resource, so we could get it from there and not
+> have hard-coded addresses and implied ording in the quirk code.
 
-Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
----
-v2->v3: 
-- Perform the initialization including CPU hotplug case.
-- Move has_vhe() to asm/virt.h
+I'm confused.  Doesn't the current code treat every item in PNP0A03
+_CRS as a window?  Do you mean the first resource is handled
+differently somehow?  The Consumer/Producer bit could allow us to do
+this by marking the RC MMIO space as "Consumer", but I didn't think
+that strategy was quite working yet.
 
-v1->v2: 
-- Skip configuring cnthctl_el2 in world switch path on VHE system.
-- Write patch based on linux-next.
----
- arch/arm/include/asm/virt.h   |  5 +++++
- arch/arm/kvm/arm.c            |  3 +++
- arch/arm64/include/asm/virt.h | 10 ++++++++++
- include/kvm/arm_arch_timer.h  |  1 +
- virt/kvm/arm/arch_timer.c     | 23 +++++++++++++++++++++++
- virt/kvm/arm/hyp/timer-sr.c   | 33 +++++++++++++++++++++------------
- 6 files changed, 63 insertions(+), 12 deletions(-)
+> I have tested a modified version of these quirks using this to
+> get the CSR base and it works on the 3 different platforms I have
+> access to.
+> 
+> static int xgene_pcie_get_csr(struct device *dev, struct resource *r)
+> {
+> 	struct acpi_device *adev = to_acpi_device(dev);
+> 	unsigned long flags;
+> 	struct list_head list;
+> 	struct resource_entry *entry;
+> 	int ret;
+> 
+> 	INIT_LIST_HEAD(&list);
+> 	flags = IORESOURCE_MEM;
+> 	ret = acpi_dev_get_resources(adev, &list,
+> 				?????acpi_dev_filter_resource_type_cb,
+> 				?????(void *)flags);
+> 	if (ret < 0) {
+> 		dev_err(dev, "failed to parse _CRS, error: %d\n", ret);
+> 		return ret;
+> 	} else if (ret == 0) {
+> 		dev_err(dev, "no memory resources present in _CRS\n");
+> 		return -EINVAL;
+> 	}
+> 
+> 	entry = list_first_entry(&list, struct resource_entry, node);
+> 	*r = *entry->res;
+> 	acpi_dev_free_resource_list(&list);
+> 	return 0;
+> }
 
-diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-index a2e75b8..6dae195 100644
---- a/arch/arm/include/asm/virt.h
-+++ b/arch/arm/include/asm/virt.h
-@@ -80,6 +80,11 @@ static inline bool is_kernel_in_hyp_mode(void)
- 	return false;
- }
- 
-+static inline bool has_vhe(void)
-+{
-+	return false;
-+}
-+
- /* The section containing the hypervisor idmap text */
- extern char __hyp_idmap_text_start[];
- extern char __hyp_idmap_text_end[];
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 8f92efa..13e54e8 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1099,6 +1099,9 @@ static void cpu_init_hyp_mode(void *dummy)
- 	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
- 	__cpu_init_stage2();
- 
-+	if (is_kernel_in_hyp_mode())
-+		kvm_timer_init_vhe();
-+
- 	kvm_arm_init_debug();
- }
- 
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index fea1073..b043cfd 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -47,6 +47,7 @@
- #include <asm/ptrace.h>
- #include <asm/sections.h>
- #include <asm/sysreg.h>
-+#include <asm/cpufeature.h>
- 
- /*
-  * __boot_cpu_mode records what mode CPUs were booted in.
-@@ -80,6 +81,15 @@ static inline bool is_kernel_in_hyp_mode(void)
- 	return read_sysreg(CurrentEL) == CurrentEL_EL2;
- }
- 
-+static inline bool has_vhe(void)
-+{
-+#ifdef CONFIG_ARM64_VHE
-+	if (cpus_have_const_cap(ARM64_HAS_VIRT_HOST_EXTN))
-+		return true;
-+#endif
-+	return false;
-+}
-+
- #ifdef CONFIG_ARM64_VHE
- extern void verify_cpu_run_el(void);
- #else
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index dda39d8..2d54903 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -76,4 +76,5 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- 
- void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
- 
-+void kvm_timer_init_vhe(void);
- #endif
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 17b8fa5..c7c3bfd 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -24,6 +24,7 @@
- 
- #include <clocksource/arm_arch_timer.h>
- #include <asm/arch_timer.h>
-+#include <asm/kvm_hyp.h>
- 
- #include <kvm/arm_vgic.h>
- #include <kvm/arm_arch_timer.h>
-@@ -507,3 +508,25 @@ void kvm_timer_init(struct kvm *kvm)
- {
- 	kvm->arch.timer.cntvoff = kvm_phys_timer_read();
- }
-+
-+/*
-+ * On VHE system, we only need to configure trap on physical timer and counter
-+ * accesses in EL0 and EL1 once, not for every world switch.
-+ * The host kernel runs at EL2 with HCR_EL2.TGE == 1,
-+ * and this makes those bits have no effect for the host kernel execution.
-+ */
-+void kvm_timer_init_vhe(void)
-+{
-+	/* When HCR_EL2.E2H ==1, EL1PCEN and EL1PCTEN are shifted by 10 */
-+	u32 cnthctl_shift = 10;
-+	u64 val;
-+
-+	/*
-+	 * Disallow physical timer access for the guest.
-+	 * Physical counter access is allowed.
-+	 */
-+	val = read_sysreg(cnthctl_el2);
-+	val &= ~(CNTHCTL_EL1PCEN << cnthctl_shift);
-+	val |= (CNTHCTL_EL1PCTEN << cnthctl_shift);
-+	write_sysreg(val, cnthctl_el2);
-+}
-diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
-index 798866a..63e28dd 100644
---- a/virt/kvm/arm/hyp/timer-sr.c
-+++ b/virt/kvm/arm/hyp/timer-sr.c
-@@ -35,10 +35,16 @@ void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
- 	/* Disable the virtual timer */
- 	write_sysreg_el0(0, cntv_ctl);
- 
--	/* Allow physical timer/counter access for the host */
--	val = read_sysreg(cnthctl_el2);
--	val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
--	write_sysreg(val, cnthctl_el2);
-+	/*
-+	 * We don't need to do this for VHE since the host kernel runs in EL2
-+	 * with HCR_EL2.TGE ==1, which makes those bits have no impact.
-+	 */
-+	if (!has_vhe()) {
-+		/* Allow physical timer/counter access for the host */
-+		val = read_sysreg(cnthctl_el2);
-+		val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
-+		write_sysreg(val, cnthctl_el2);
-+	}
- 
- 	/* Clear cntvoff for the host */
- 	write_sysreg(0, cntvoff_el2);
-@@ -50,14 +56,17 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	u64 val;
- 
--	/*
--	 * Disallow physical timer access for the guest
--	 * Physical counter access is allowed
--	 */
--	val = read_sysreg(cnthctl_el2);
--	val &= ~CNTHCTL_EL1PCEN;
--	val |= CNTHCTL_EL1PCTEN;
--	write_sysreg(val, cnthctl_el2);
-+	/* Those bits are already configured at boot on VHE-system */
-+	if (!has_vhe()) {
-+		/*
-+		 * Disallow physical timer access for the guest
-+		 * Physical counter access is allowed
-+		 */
-+		val = read_sysreg(cnthctl_el2);
-+		val &= ~CNTHCTL_EL1PCEN;
-+		val |= CNTHCTL_EL1PCTEN;
-+		write_sysreg(val, cnthctl_el2);
-+	}
- 
- 	if (timer->enabled) {
- 		write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
--- 
-1.9.1
+The code above is identical to acpi_get_rc_addr(), which is used in
+the acpi_get_rc_resources() path by the other quirks.  Can you use
+that path, too, instead of reimplementing it here?
