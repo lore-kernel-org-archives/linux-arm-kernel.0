@@ -1,97 +1,84 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Thu,  1 Dec 2016 09:04:50 -0800
-Subject: [PATCH v4 1/3] lib: add bitrev8x4()
-In-Reply-To: <cover.1480551148.git.stillcompiling@gmail.com>
-References: <cover.1480551148.git.stillcompiling@gmail.com>
-Message-ID: <bc92eb1507448731163ae67fc888668d327f9168.1480551148.git.stillcompiling@gmail.com>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Thu,  1 Dec 2016 18:12:22 +0100
+Subject: [PATCH v3] ARM: davinci: da8xx: Fix sleeping function called from
+ invalid context
+Message-ID: <1480612342-23614-1-git-send-email-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a function to reverse bytes within a 32 bit word.
-This function is more efficient than using the 8 bit version when
-iterating over an array
+Everytime the usb20 phy is enabled, there is a
+"sleeping function called from invalid context" BUG.
 
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+clk_enable() from arch/arm/mach-davinci/clock.c uses spin_lock_irqsave()
+before to invoke the callback usb20_phy_clk_enable().
+usb20_phy_clk_enable() uses clk_get() and clk_enable_prepapre()
+which may sleep.
+Move clk_get() to da8xx_register_usb20_phy_clk() and
+replace clk_prepare_enable() by clk_enable().
+
+Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
 ---
+ arch/arm/mach-davinci/usb-da8xx.c | 23 ++++++++++++-----------
+ 1 file changed, 12 insertions(+), 11 deletions(-)
 
-Looking for an ACK from Russell King on this patch (or at least 
-the arm specific implementation)
-
- arch/arm/include/asm/bitrev.h |  5 +++++
- include/linux/bitrev.h        | 26 ++++++++++++++++++++++++++
- 2 files changed, 31 insertions(+)
-
-diff --git a/arch/arm/include/asm/bitrev.h b/arch/arm/include/asm/bitrev.h
-index ec291c3..6d2e9ca 100644
---- a/arch/arm/include/asm/bitrev.h
-+++ b/arch/arm/include/asm/bitrev.h
-@@ -17,4 +17,9 @@ static __always_inline __attribute_const__ u8 __arch_bitrev8(u8 x)
- 	return __arch_bitrev32((u32)x) >> 24;
+diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
+index b010e5f..bfb55b9 100644
+--- a/arch/arm/mach-davinci/usb-da8xx.c
++++ b/arch/arm/mach-davinci/usb-da8xx.c
+@@ -156,23 +156,18 @@ int __init da8xx_register_usb_refclkin(int rate)
+ 	return 0;
  }
  
-+static __always_inline __attribute_const__ u32 __arch_bitrev8x4(u32 x)
-+{
-+	__asm__ ("rbit %0, %1; rev %0, %0" : "=r" (x) : "r" (x));
-+}
++static struct clk *usb20_clk;
 +
- #endif
-diff --git a/include/linux/bitrev.h b/include/linux/bitrev.h
-index fb790b8..b1cfa1a 100644
---- a/include/linux/bitrev.h
-+++ b/include/linux/bitrev.h
-@@ -9,6 +9,7 @@
- #define __bitrev32 __arch_bitrev32
- #define __bitrev16 __arch_bitrev16
- #define __bitrev8 __arch_bitrev8
-+#define __bitrev8x4 __arch_bitrev8x4
+ static void usb20_phy_clk_enable(struct clk *clk)
+ {
+-	struct clk *usb20_clk;
+ 	int err;
+ 	u32 val;
+ 	u32 timeout = 500000; /* 500 msec */
  
- #else
- extern u8 const byte_rev_table[256];
-@@ -27,6 +28,14 @@ static inline u32 __bitrev32(u32 x)
- 	return (__bitrev16(x & 0xffff) << 16) | __bitrev16(x >> 16);
+ 	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+ 
+-	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
+-	if (IS_ERR(usb20_clk)) {
+-		pr_err("could not get usb20 clk: %ld\n", PTR_ERR(usb20_clk));
+-		return;
+-	}
+-
+ 	/* The USB 2.O PLL requires that the USB 2.O PSC is enabled as well. */
+-	err = clk_prepare_enable(usb20_clk);
++	err = clk_enable(usb20_clk);
+ 	if (err) {
+ 		pr_err("failed to enable usb20 clk: %d\n", err);
+ 		clk_put(usb20_clk);
+@@ -197,8 +192,7 @@ static void usb20_phy_clk_enable(struct clk *clk)
+ 
+ 	pr_err("Timeout waiting for USB 2.0 PHY clock good\n");
+ done:
+-	clk_disable_unprepare(usb20_clk);
+-	clk_put(usb20_clk);
++	clk_disable(usb20_clk);
  }
  
-+static inline u32 __bitrev8x4(u32 x)
-+{
-+	return(__bitrev8(x & 0xff) |
-+	       (__bitrev8((x >> 8)  & 0xff) << 8) |
-+	       (__bitrev8((x >> 16)  & 0xff) << 16) |
-+	       (__bitrev8((x >> 24)  & 0xff) << 24));
-+}
-+
- #endif /* CONFIG_HAVE_ARCH_BITREVERSE */
+ static void usb20_phy_clk_disable(struct clk *clk)
+@@ -287,9 +281,16 @@ int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
+ 	struct clk *parent;
+ 	int ret = 0;
  
- #define __constant_bitrev32(x)	\
-@@ -50,6 +59,15 @@ static inline u32 __bitrev32(u32 x)
- 	__x;								\
- })
- 
-+#define __constant_bitrev8x4(x) \
-+({			\
-+	u32 __x = x;	\
-+	__x = ((__x & (u32)0xF0F0F0F0UL) >> 4) | ((__x & (u32)0x0F0F0F0FUL) << 4);	\
-+	__x = ((__x & (u32)0xCCCCCCCCUL) >> 2) | ((__x & (u32)0x33333333UL) << 2);	\
-+	__x = ((__x & (u32)0xAAAAAAAAUL) >> 1) | ((__x & (u32)0x55555555UL) << 1);	\
-+	__x;								\
-+})
++	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
++	ret = PTR_ERR_OR_ZERO(usb20_clk);
++	if (ret)
++		return ret;
 +
- #define __constant_bitrev8(x)	\
- ({					\
- 	u8 __x = x;			\
-@@ -75,6 +93,14 @@ static inline u32 __bitrev32(u32 x)
- 	__bitrev16(__x);				\
-  })
+ 	parent = clk_get(NULL, use_usb_refclkin ? "usb_refclkin" : "pll0_aux");
+-	if (IS_ERR(parent))
++	if (IS_ERR(parent)) {
++		clk_put(usb20_clk);
+ 		return PTR_ERR(parent);
++	}
  
-+#define bitrev8x4(x) \
-+({			\
-+	u32 __x = x;	\
-+	__builtin_constant_p(__x) ?	\
-+	__constant_bitrev8x4(__x) :			\
-+	__bitrev8x4(__x);				\
-+})
-+
- #define bitrev8(x) \
- ({			\
- 	u8 __x = x;	\
+ 	usb20_phy_clk.parent = parent;
+ 	ret = clk_register(&usb20_phy_clk);
 -- 
-2.9.3
+2.7.3
