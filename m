@@ -1,60 +1,43 @@
-From: amakarov.linux@gmail.com (Aleksey Makarov)
-Date: Thu, 1 Dec 2016 17:12:17 +0600
-Subject: [PATCH v3 11/14] ACPI: irq: introduce interrupt producer
-In-Reply-To: <1477408169-22217-12-git-send-email-guohanjun@huawei.com>
-References: <1477408169-22217-1-git-send-email-guohanjun@huawei.com>
- <1477408169-22217-12-git-send-email-guohanjun@huawei.com>
-Message-ID: <04573e29-6222-24f0-82f4-381367ee8bf0@gmail.com>
+From: rafal@milecki.pl (=?UTF-8?Q?Rafa=C5=82_Mi=C5=82ecki?=)
+Date: Thu, 01 Dec 2016 12:18:26 +0100
+Subject: [GIT PULL 1/6] Broadcom soc changes for 4.10
+In-Reply-To: <23121827.vnVDrZQAeV@wuerfel>
+References: <20161122054824.16974-1-f.fainelli@gmail.com>
+ <23121827.vnVDrZQAeV@wuerfel>
+Message-ID: <fa48be7a336e97c850b226d0c54c9b96@milecki.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2016-11-30 17:52, Arnd Bergmann wrote:
+> On Monday, November 21, 2016 9:48:19 PM CET Florian Fainelli wrote:
+>> This pull request contains Broadcom ARM-based SoC changes for 4.10, 
+>> please pull
+>> the following:
+>> 
+>> - Rafal adds back the abort handler hook on BCM5301x which is required 
+>> to silence
+>>   errors forwared from the PCIe controller that cannot be silenced at 
+>> the PCIe RC level
+>> 
+> 
+> Pulled into next/soc.
+> 
+> It's unclear to me whether we want this to be backported to stable 
+> kernels,
+> can you clarify?
 
-Hi Hanjun,
+It took me/us so much time to get an agreement on this patch I totally 
+forgot
+about backporting it to stable.
 
-On 10/25/2016 09:09 PM, Hanjun Guo wrote:
-> From: Hanjun Guo <hanjun.guo@linaro.org>
->
-> In ACPI 6.1 spec, section 19.6.62, Interrupt Resource Descriptor Macro,
+To be clear it indeed fixes a regression. Commit 937b12306ea79 ("ARM: 
+BCM5301X:
+remove workaround imprecise abort fault handler") went into 4.5, so this 
+one
+could be backported to 4.5+.
 
-[ ... ]
-
-> ---
->  drivers/acpi/gsi.c      | 10 ++++--
->  drivers/acpi/resource.c | 85 ++++++++++++++++++++++++++++++++++---------------
->  include/acpi/acpi_bus.h |  1 +
->  3 files changed, 68 insertions(+), 28 deletions(-)
->
-> diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
-> index ee9e0f2..29ee547 100644
-> --- a/drivers/acpi/gsi.c
-> +++ b/drivers/acpi/gsi.c
-> @@ -55,13 +55,19 @@ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
->  		      int polarity)
->  {
->  	struct irq_fwspec fwspec;
-> +	struct acpi_device *adev = dev ? to_acpi_device(dev) : NULL;
-
-Why are you sure dev is always an acpi device?
-Look for example at drivers/acpi/pci_irq.c:377 where this function
-is called for a PCI device
-
->
-> -	if (WARN_ON(!acpi_gsi_domain_id)) {
-> +	if (adev && &adev->fwnode && adev->interrupt_producer)
-
-&adev->fwnode is always true
-
-> +		/* devices in DSDT connecting to spefic interrupt producer */
-> +		fwspec.fwnode = adev->interrupt_producer;
-> +	else if (acpi_gsi_domain_id)
-> +		/* devices connecting to gicd in default */
-> +		fwspec.fwnode = acpi_gsi_domain_id;
-> +	else {
->  		pr_warn("GSI: No registered irqchip, giving up\n");
->  		return -EINVAL;
->  	}
-
-[ ... ]
-
-All the best
-Aleksey Makarov
+As this has been already pulled, I think I'll wait for it to appear in 
+Linus's
+tree and just e-mail stable guys manually (unless someone objects). 
+Thanks for
+bringing my attention to this.
