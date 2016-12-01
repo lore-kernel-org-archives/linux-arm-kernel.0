@@ -1,55 +1,53 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 1 Dec 2016 09:55:20 +0100
-Subject: [linux-sunxi] Re: [PATCH v7 4/8] drm/sunxi: Add DT bindings
- documentation of Allwinner HDMI
-In-Reply-To: <1971681480527210@web5g.yandex.ru>
-References: <cover.1480414715.git.moinejf@free.fr> <4614815.L3DQhhBy6d@avalon>
- <20161130102757.9eec1f7f3377d0f4787e3829@free.fr>
- <3478036.d2UQM8n6lv@avalon>
- <20161130114415.2280151e2965280733a629e5@free.fr>
- <1971681480527210@web5g.yandex.ru>
-Message-ID: <20161201085520.tk2kdi33rn6fyld2@lukather>
+From: gabriel.fernandez@st.com (Gabriel Fernandez)
+Date: Thu, 1 Dec 2016 09:58:22 +0100
+Subject: [PATCH v2 4/9] clk: stm32f4: Add lcd-tft clock
+In-Reply-To: <20161130205333.tiukcjbspuqmedgw@rob-hp-laptop>
+References: <1479998749-20358-1-git-send-email-gabriel.fernandez@st.com>
+ <1479998749-20358-5-git-send-email-gabriel.fernandez@st.com>
+ <20161130205333.tiukcjbspuqmedgw@rob-hp-laptop>
+Message-ID: <ec824a37-b90c-05a1-a4cf-048fb66e8ae8@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2016 at 01:33:30AM +0800, Icenowy Zheng wrote:
-> >> ?????????hdmi-out {
-> >> ?????????????????compatible = "hdmi-connector";
-> >> ?????????????????type = "a";
-> >> ?????????????????/* I2C bus and GPIO references are made up for the example */
-> >> ?????????????????ddc-i2c-bus = <&i2c4>;
-> >> ?????????????????hpd-gpios = <&gpio4 7 GPIO_ACTIVE_HIGH>
-> >
-> > the "hdmi-connector" is a big piece of software. It must handle a lot
-> > of more and more exotic connectors.
-> > So, I hope that you have written a "simple-hdmi-connector" which does
-> > nothing but setting the connector type.
-> > Where is it?
-> 
-> I suddenly thought about something...
-> 
-> If a DVI connector instead of a HDMI connector is soldered, how
-> should such a device tree be written?
+Hi Rob,
 
-Use a dvi-connector instead :)
+Thanks for reviewing
 
-> How about solder a HDMI-to-VGA bridge on the board? (Maybe there
-> should be "dumb-hdmi-dvi-bridge" and "dumb-hdmi-vga-bridge"
-> drivers?)
+On 11/30/2016 09:53 PM, Rob Herring wrote:
+> On Thu, Nov 24, 2016 at 03:45:44PM +0100, gabriel.fernandez at st.com wrote:
+>> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>
+>> This patch introduces lcd-tft clock for stm32f4 soc.
+>>
+>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+>> ---
+>>   .../devicetree/bindings/clock/st,stm32-rcc.txt     |   1 +
+>>   drivers/clk/clk-stm32f4.c                          | 118 +++++++++++++++++++++
+>>   include/dt-bindings/clock/stm32f4-clock.h          |   3 +-
+>>   3 files changed, 121 insertions(+), 1 deletion(-)
+>
+>> diff --git a/include/dt-bindings/clock/stm32f4-clock.h b/include/dt-bindings/clock/stm32f4-clock.h
+>> index 56b8e10..1be4a3a 100644
+>> --- a/include/dt-bindings/clock/stm32f4-clock.h
+>> +++ b/include/dt-bindings/clock/stm32f4-clock.h
+>> @@ -27,7 +27,8 @@
+>>   #define CLK_RTC			5
+>>   #define PLL_VCO_I2S		6
+>>   #define PLL_VCO_SAI		7
+>> +#define CLK_LCD			8
+>>   
+>> -#define END_PRIMARY_CLK		8
+>> +#define END_PRIMARY_CLK		9
+> Do you really need this? Having this change could cause compatibility
+> problems between dtb and kernel versions.
+>
+> Please restructure the patch series and put all of the binding changes
+> including this header into a single patch. Incrementally add s/w
+> features, not h/w.
+>
+> Rob
+Okay
 
-It probably wouldn't be dumb, but yeah, it would definitely be a
-bridge instead of the connector.
+Best Regards
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161201/1f559ca4/attachment.sig>
+Gabriel
