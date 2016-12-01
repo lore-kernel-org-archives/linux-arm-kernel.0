@@ -1,221 +1,98 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Thu, 1 Dec 2016 12:02:14 +0800
-Subject: [Linaro-acpi] [PATCH v14] acpi, apei, arm64: APEI initial support
- for aarch64.
-In-Reply-To: <1470834168-1780-1-git-send-email-fu.wei@linaro.org>
-References: <1470834168-1780-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <CADyBb7sC=-ywEtHFS2x4dTp=75piOHuSr7AD5HxikEoYWkwAGQ@mail.gmail.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Thu, 1 Dec 2016 12:09:17 +0800
+Subject: arasan,sdhci.txt "compatibility" DT binding
+In-Reply-To: <583C50E7.6030400@free.fr>
+References: <56B07BA5.4060407@free.fr> <56B166F1.5080605@rock-chips.com>
+ <56B1AA44.1010108@xilinx.com> <56B1BAF8.2050907@free.fr>
+ <56B1CF40.1030203@xilinx.com> <20160203152104.GP4215@xsjsorenbubuntu>
+ <56B21DDB.6050708@free.fr> <582ED9E0.5090506@free.fr>
+ <CAFd313x6MJeO90_+rxditdPn762g7TqZc0_D6ojGTKmtGJKjPA@mail.gmail.com>
+ <582EF744.8090307@free.fr> <a20b2b4f-15d4-3c29-324c-1ced5dbcc67f@xilinx.com>
+ <583C50E7.6030400@free.fr>
+Message-ID: <f64ea0f8-31be-c5b5-3a43-a30abd8aec30@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Borislav, Rafael,
+On 2016/11/28 23:44, Mason wrote:
+> Hello,
+>
+> @Shawn Lin, could you take a look below and tell me exactly
+> which IP core(s) Rockchip is using in its SoCs?
+>
 
-any comment or suggestion for this patch?
-I wonder if there is anything I need to improve for it?
-Or will it be accepted ?
+ From the Host Controller version register (0xfe)
+bit[7:0]: 0x2 : specification version number is 3.00
+bit[15:8]: 0x10: Vendor version number is 1.0
 
-Great thanks for your attention.
 
-On 10 August 2016 at 21:02,  <fu.wei@linaro.org> wrote:
-> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+Command Queueing version register (0x200)
+bit[11:8]: 0x5  eMMC Major version number
+bit[7:4]: 0x1 eMMC manor version number
+bit[3:0]: 0x0 eMMC version suffix
+
+User guide "eMMC 5.1/SD3.0/SDIO3.0 Host Controller"
+Revision number: 1.14
+Released on Dec. 2014
+
+> Based on the feedback I received, here is an updated list of
+> compatible strings and controller versions dealt with by the
+> drivers/mmc/host/sdhci-of-arasan.c code.
 >
-> This patch provides APEI arch-specific bits for aarch64
 >
-> Meanwhile,
-> (1)move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
-> a generic place.
-> (2)select HAVE_ACPI_APEI when EFI and ACPI is set on ARM64,
-> because arch_apei_get_mem_attribute is using efi_mem_attributes on ARM64.
+> Xilinx Zynq:
+> "SD2.0 / SDIO2.0 / MMC3.31 AHB Host Controller"
+> "arasan,sdhci-8.9a"
+> NB: 8.9a is the documentation revision (dated 2011-10-19)
+> subsequent tweaks labeled 9.0a, 9.1a, 9.2a
 >
-> [Fu Wei: improve && upstream]
+> Xilinx ZynqMP:
+> "SD3.0 / SDIO3.0 / eMMC4.51 AHB Host Controller"
+> "arasan,sdhci-8.9a"
+> NB: using the same compatible string as Zynq
 >
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> Tested-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> ---
-> This patchset has been tested on the following platforms:
->     (1)ARM Foundation v8 model
+> Sigma SMP87xx
+> "SD3.0 / SDIO3.0 / eMMC4.4 AHB Host Controller"
+> no compatible string yet, platform-specific init required
 >
-> Changelog:
-> v14:https://lkml.org/lkml/2016/8/10/
->     Delete hest_ia32_init().
->     Fix a comment typo for acpi_disable_cmcff.
->     Rebase to 4.8.0-rc1-ge6c4d92
+> APM:
+> "SD3.0 / SDIO3.0 / eMMC4.41 AHB Host Controller"
+> "arasan,sdhci-4.9a"
+> NB: 4.9a appears to be the documentation revision
+> no functional diff with "arasan,sdhci-8.9a"
 >
-> v13:https://lkml.org/lkml/2016/8/10/
->     Fix a comment problem(add a "end").
->     Add a comment for the definition of acpi_disable_cmcff.
->     Rebase to 4.8.0-rc1-g372734a
+> Rockchip
+> Exact IP unknown, waiting for Shawn's answer
+> "arasan,sdhci-5.1"
+> NB: 5.1 appears to refer to the eMMC standard supported
 >
-> v12:https://lkml.org/lkml/2016/7/29/97
->     Fix a comment problem(redundant "with").
->     Rebase to 4.7.0-g680eee2.
 >
-> v11:https://lkml.org/lkml/2016/7/27/427
->     Rebase to v4.7-0e06f5c0.
+> On a final note, there are many variations of the Arasan IP.
+> I've tracked down at least the following:
 >
-> v10:https://lkml.org/lkml/2016/4/14
->     Fix the Alphabetical order problem in arch/arm64/Kconfig.
+> SD_2.0_SDIO_2.0__MMC_3.31_AHB_Host_Controller.pdf
+> SD_3.0_SDIO_3.0_eMMC_4.41_OCP_Host_Controller.pdf
+> SD_3.0_SDIO_3.0_eMMC_4.4__AHB_Host_Controller.pdf
+> SD_3.0_SDIO_3.0_eMMC_4.51_Host_Controller.pdf
+> SD_3.0_SDIO_3.0_eMMC_4.5__Host_Controller.pdf
+> SD_4.1_SDIO_4.1_eMMC_4.51_Host_Controller.pdf
+> SD_4.1_SDIO_4.1_eMMC_5.1__Host_Controller.pdf
 >
-> v9: https://lkml.org/lkml/2016/4/5/522
->     Improve the comment for arch_apei_flush_tlb_one.
->     Using select "HAVE_ACPI_APEI if (ACPI && EFI)" to fix the EFI dependence
->     problem.
+> It seems to me the compatible string should specify
+> the SD/SDIO version AND the eMMC version, since it
+> seems many combinations are allowed, e.g. eMMC 4.51
+> has two possible SD versions.
 >
-> v8: https://lkml.org/lkml/2016/3/29/132
->     Fix a "undefined reference" bug by selecting EFI when ACPI_APEI is set
->     on ARM64.
+> What do you think?
 >
-> v7: https://lkml.org/lkml/2016/3/17/183
->     Add comment for arch_apei_flush_tlb_one in arch/arm64/include/asm/acpi.h.
+> Regards.
 >
-> v6: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006644.html
->     Move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
->     a generic place.
->     Delete HAVE_ACPI_APEI_HEST_IA32.
->
-> v5: https://lkml.org/lkml/2015/12/10/131
->     Add "HAVE_ACPI_APEI_HEST_IA32" instead of
->     "#if defined(__i386__) || defined(__x86_64__)".
->
-> v4: https://lkml.org/lkml/2015/12/8/188
->     Rebase to latest kernel version(4.4-rc4).
->     Move arch_apei_flush_tlb_one into header file as a inline function
->     Add a new subfunction "hest_ia_init" for "acpi_disable_cmcff".
->
-> v3: https://lkml.org/lkml/2015/12/3/521
->     Remove "acpi_disable_cmcff" from arm64 code,
->     and wrap it in hest.c by "#if defined(__i386__) || defined(__x86_64__)"
->
-> v2: https://lkml.org/lkml/2015/12/2/432
->     Rebase to latest kernel version(4.4-rc3).
->     Move arch_apei_flush_tlb_one() to arch/arm64/kernel/acpi.c
->
-> v1: https://lkml.org/lkml/2015/8/14/199
->     Move arch_apei_flush_tlb_one() to arch/arm64/include/asm/apci.h.
->     Delete arch/arm64/kernel/apei.c.
->     Add "#ifdef CONFIG_ACPI_APEI" for "acpi_disable_cmcff".
->
->  arch/arm64/Kconfig            |  1 +
->  arch/arm64/include/asm/acpi.h | 22 +++++++++++++++++++++-
->  arch/x86/kernel/acpi/apei.c   |  3 ---
->  drivers/acpi/apei/hest.c      | 13 ++++++++++---
->  4 files changed, 32 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index bc3f00f..385cf13 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -51,6 +51,7 @@ config ARM64
->         select GENERIC_TIME_VSYSCALL
->         select HANDLE_DOMAIN_IRQ
->         select HARDIRQS_SW_RESEND
-> +       select HAVE_ACPI_APEI if (ACPI && EFI)
->         select HAVE_ALIGNED_STRUCT_PAGE if SLUB
->         select HAVE_ARCH_AUDITSYSCALL
->         select HAVE_ARCH_BITREVERSE
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index 5420cb0..f435967 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -17,6 +17,7 @@
->
->  #include <asm/cputype.h>
->  #include <asm/smp_plat.h>
-> +#include <asm/tlbflush.h>
->
->  /* Macros for consistency checks of the GICC subtable of MADT */
->  #define ACPI_MADT_GICC_LENGTH  \
-> @@ -110,8 +111,27 @@ static inline const char *acpi_get_enable_method(int cpu)
->  }
->
->  #ifdef CONFIG_ACPI_APEI
-> +/*
-> + * acpi_disable_cmcff is used in drivers/acpi/apei/hest.c for disabling
-> + * IA-32 Architecture Corrected Machine Check (CMC) Firmware-First mode by
-> + * boot parameter(acpi=nocmcff). But we don't have this IA-32 specific
-> + * feature on ARM64, this definition is only for compatibility.
-> + */
-> +#define acpi_disable_cmcff 1
->  pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
-> -#endif
-> +
-> +/*
-> + * Despite its name, this function must still broadcast the TLB
-> + * invalidation in order to ensure other CPUs don't end up with junk
-> + * entries as a result of speculation. Unusually, its also called in
-> + * IRQ context (ghes_iounmap_irq) so if we ever need to use IPIs for
-> + * TLB broadcasting, then we're in trouble here.
-> + */
-> +static inline void arch_apei_flush_tlb_one(unsigned long addr)
-> +{
-> +       flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
-> +}
-> +#endif /* CONFIG_ACPI_APEI */
->
->  #ifdef CONFIG_ACPI_NUMA
->  int arm64_acpi_numa_init(void);
-> diff --git a/arch/x86/kernel/acpi/apei.c b/arch/x86/kernel/acpi/apei.c
-> index c280df6..ea3046e 100644
-> --- a/arch/x86/kernel/acpi/apei.c
-> +++ b/arch/x86/kernel/acpi/apei.c
-> @@ -24,9 +24,6 @@ int arch_apei_enable_cmcff(struct acpi_hest_header *hest_hdr, void *data)
->         struct acpi_hest_ia_corrected *cmc;
->         struct acpi_hest_ia_error_bank *mc_bank;
->
-> -       if (hest_hdr->type != ACPI_HEST_TYPE_IA32_CORRECTED_CHECK)
-> -               return 0;
-> -
->         cmc = (struct acpi_hest_ia_corrected *)hest_hdr;
->         if (!cmc->enabled)
->                 return 0;
-> diff --git a/drivers/acpi/apei/hest.c b/drivers/acpi/apei/hest.c
-> index 20b3fcf..8f2a98e 100644
-> --- a/drivers/acpi/apei/hest.c
-> +++ b/drivers/acpi/apei/hest.c
-> @@ -123,7 +123,13 @@ EXPORT_SYMBOL_GPL(apei_hest_parse);
->   */
->  static int __init hest_parse_cmc(struct acpi_hest_header *hest_hdr, void *data)
->  {
-> -       return arch_apei_enable_cmcff(hest_hdr, data);
-> +       if (hest_hdr->type != ACPI_HEST_TYPE_IA32_CORRECTED_CHECK)
-> +               return 0;
-> +
-> +       if (!acpi_disable_cmcff)
-> +               return !arch_apei_enable_cmcff(hest_hdr, data);
-> +
-> +       return 0;
->  }
->
->  struct ghes_arr {
-> @@ -232,8 +238,9 @@ void __init acpi_hest_init(void)
->                 goto err;
->         }
->
-> -       if (!acpi_disable_cmcff)
-> -               apei_hest_parse(hest_parse_cmc, NULL);
-> +       rc = apei_hest_parse(hest_parse_cmc, NULL);
-> +       if (rc)
-> +               goto err;
->
->         if (!ghes_disable) {
->                 rc = apei_hest_parse(hest_parse_ghes_count, &ghes_count);
 > --
-> 2.5.5
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >
-> _______________________________________________
-> Linaro-acpi mailing list
-> Linaro-acpi at lists.linaro.org
-> https://lists.linaro.org/mailman/listinfo/linaro-acpi
-
 
 
 -- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+Best Regards
+Shawn Lin
