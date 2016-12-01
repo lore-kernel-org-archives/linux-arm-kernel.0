@@ -1,287 +1,152 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 1 Dec 2016 22:57:24 +0100
-Subject: [PATCH v10 2/8] power: add power sequence library
-In-Reply-To: <20161122035324.GA7497@b29397-desktop>
-References: <1479087359-7547-1-git-send-email-peter.chen@nxp.com>
- <1479087359-7547-3-git-send-email-peter.chen@nxp.com>
- <CAJZ5v0i-_pHS+N-k7QVuc_0StT+BaFB+2fuHJpCfngtQV5z76w@mail.gmail.com>
- <20161122035324.GA7497@b29397-desktop>
-Message-ID: <CAJZ5v0g9rrJ-pLk4bF9XO_0BndGcduncPU0Tamm2m0UvN9X08A@mail.gmail.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Thu, 1 Dec 2016 14:10:10 -0800
+Subject: [PATCH v3] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe
+ controller
+In-Reply-To: <20161201194114.GA8263@bhelgaas-glaptop.roam.corp.google.com>
+References: <1480549373-2123-1-git-send-email-dhdang@apm.com>
+ <20161201183350.GF30746@bhelgaas-glaptop.roam.corp.google.com>
+ <1480620053.4751.30.camel@redhat.com>
+ <20161201194114.GA8263@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <CADaLNDkVPRPSg0aU-sxHsiJbVvEn=LxcekDt6gfXBBhc+fzhjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 22, 2016 at 4:53 AM, Peter Chen <hzpeterchen@gmail.com> wrote:
-> On Tue, Nov 22, 2016 at 03:23:12AM +0100, Rafael J. Wysocki wrote:
->> > @@ -0,0 +1,237 @@
->> > +/*
->> > + * core.c      power sequence core file
->> > + *
->> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
->> > + * Author: Peter Chen <peter.chen@nxp.com>
->> > + *
->> > + * This program is free software: you can redistribute it and/or modify
->> > + * it under the terms of the GNU General Public License version 2  of
->> > + * the License as published by the Free Software Foundation.
->> > + *
->> > + * This program is distributed in the hope that it will be useful,
->> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> > + * GNU General Public License for more details.
->> > + *
->> > + * You should have received a copy of the GNU General Public License
->> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+On Thu, Dec 1, 2016 at 11:41 AM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> On Thu, Dec 01, 2016 at 02:20:53PM -0500, Mark Salter wrote:
+>> On Thu, 2016-12-01 at 12:33 -0600, Bjorn Helgaas wrote:
+>> > On Wed, Nov 30, 2016 at 03:42:53PM -0800, Duc Dang wrote:
+>
+>> > > +static struct resource xgene_v1_csr_res[] = {
+>> > > + [0] = DEFINE_RES_MEM_NAMED(0x1f2b0000UL, SZ_64K, "PCIe CSR"),
+>> > > + [1] = DEFINE_RES_MEM_NAMED(0x1f2c0000UL, SZ_64K, "PCIe CSR"),
+>> > > + [2] = DEFINE_RES_MEM_NAMED(0x1f2d0000UL, SZ_64K, "PCIe CSR"),
+>> > > + [3] = DEFINE_RES_MEM_NAMED(0x1f500000UL, SZ_64K, "PCIe CSR"),
+>> > > + [4] = DEFINE_RES_MEM_NAMED(0x1f510000UL, SZ_64K, "PCIe CSR"),
+>> > I assume these ranges are not the actual ECAM space, right?
+>> > If they *were* ECAM, I assume you would have included them in the
+>> > quirk itself in the mcfg_quirks[] table.
 >>
->> The last paragraph is not necessary AFAICS.
+>> These are base addresses for some RC mmio registers.
+>> >
+>> > >
+>> > > +static int xgene_v1_pcie_ecam_init(struct pci_config_window *cfg)
+>> > > +{
+>> > > + struct acpi_device *adev = to_acpi_device(cfg->parent);
+>> > > + struct acpi_pci_root *root = acpi_driver_data(adev);
+>> > > + struct device *dev = cfg->parent;
+>> > > + struct xgene_pcie_port *port;
+>> > > + struct resource *csr;
+>> > > +
+>> > > + port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
+>> > > + if (!port)
+>> > > +         return -ENOMEM;
+>> > > +
+>> > > + csr = &xgene_v1_csr_res[root->segment];
+>> > This makes me nervous because root->segment comes from the ACPI _SEG,
+>> > and if firmware gives us junk in _SEG, we will reference something in
+>> > the weeds.
+>>
+>> The SoC provide some number of RC bridges, each with a different base
+>> for some mmio registers. Even if segment is legitimate in MCFG, there
+>> is still a problem if a platform doesn't use the segment ordering
+>> implied by the code. But the PNP0A03 _CRS does have this base address
+>> as the first memory resource, so we could get it from there and not
+>> have hard-coded addresses and implied ording in the quirk code.
 >
-> I just copy it from:
->
-> https://www.gnu.org/licenses/gpl-howto.en.html
->
-> If you are concerns about it, I can delete it.
+> I'm confused.  Doesn't the current code treat every item in PNP0A03
+> _CRS as a window?  Do you mean the first resource is handled
+> differently somehow?  The Consumer/Producer bit could allow us to do
+> this by marking the RC MMIO space as "Consumer", but I didn't think
+> that strategy was quite working yet.
 
-It is redundant, so yes, please.
+The first resource is defined like below. It was introduced long time
+ago to use with older version of X-Gene ECAM quirks.
+Memory32Fixed(ReadWrite, 0x1F2B0000, 0x10000, )
 
->> > +
->> > +static struct pwrseq *pwrseq_find_available_instance(struct device_node *np)
->> > +{
->> > +       struct pwrseq *pwrseq;
->> > +
->> > +       list_for_each_entry(pwrseq, &pwrseq_list, node) {
->> > +               if (pwrseq->used)
->> > +                       continue;
->> > +
->> > +               /* compare compatible string for pwrseq node */
->> > +               if (of_match_node(pwrseq->pwrseq_of_match_table, np)) {
->> > +                       pwrseq->used = true;
->> > +                       return pwrseq;
->> > +               }
->> > +
->> > +               /* return generic pwrseq instance */
->> > +               if (!strcmp(pwrseq->pwrseq_of_match_table->compatible,
->> > +                               "generic")) {
->> > +                       pr_debug("using generic pwrseq instance for %s\n",
->> > +                               np->full_name);
->> > +                       pwrseq->used = true;
->> > +                       return pwrseq;
->> > +               }
->> > +       }
->> > +       pr_warn("Can't find any pwrseq instances for %s\n", np->full_name);
->>
->> pr_debug() ?
->
-> If there is no pwrseq instance for that node, the power sequence on routine will
-> return fail, so I think an warning message is useful for user.
-
-Useful in what way?  How is the user supposed to know what happened
-from this message?
-
->>
->> > +
->> > +       return NULL;
->> > +}
->> > +
->> > +/**
->> > + * of_pwrseq_on: do power sequence on for device node
->>
->> of_pwrseq_on - Carry out power sequence on for device node
->>
->> Argument description should follow this line.
->>
->> > + *
->> > + * This API is used to power on single device, if the host
->> > + * controller only needs to handle one child device (this device
->> > + * node points to), use this API. If multiply devices are needed
->> > + * to handle on bus, use of_pwrseq_on_list.
->>
->> That's unclear.
->>
->> What about "Carry out a single device power on.  If multiple devices
->> need to be handled, use of_pwrseq_on_list() instead."
->>
->> > + *
->> > + * @np: the device node would like to power on
->> > + *
->> > + * On successful, it returns pwrseq instance, otherwise an error value.
->>
->> "Return a pointer to the power sequence instance on success, or an
->> error code otherwise."
->>
->
-> Ok, will change.
->
->> > + */
->> > +struct pwrseq *of_pwrseq_on(struct device_node *np)
->> > +{
->> > +       struct pwrseq *pwrseq;
->> > +       int ret;
->> > +
->> > +       pwrseq = pwrseq_find_available_instance(np);
->>
->> What does guarantee the integrity of ths list at this point?
->
-> Once the use selects the specific pwrseq library, the library will
-> create an empty one instance during the initialization, and it
-> will be called at postcore_initcall, the device driver has not
-> probed yet.
-
-Which doesn't matter really, because the list is global and some other
-driver using it might have been probed already.
-
-You have a mutex here and it is used for add/remove.  Why isn't it
-used for list browsing?
+The resource discovered during booting will be like following:
+[    0.728117] ACPI: MCFG table detected, 1 entries
+[    0.735330] ACPI: Power Resource [SCVR] (on)
+[    0.767478] ACPI: PCI Root Bridge [PCI0] (domain 0000 [bus 00-ff])
+[    0.774013] acpi PNP0A08:00: _OSC: OS supports [ExtendedConfig ASPM
+ClockPM Segments MSI]
+[    0.782864] acpi PNP0A08:00: _OSC: OS now controls [PCIeHotplug PME
+AER PCIeCapability]
+[    0.791331] acpi PNP0A08:00: MCFG quirk: ECAM at [mem
+0xe0d0000000-0xe0dfffffff] for [bus 00-ff] with xgene_v1_pcie_ecam_ops
+[    0.803207] acpi PNP0A08:00: ECAM at [mem
+0xe0d0000000-0xe0dfffffff] for [bus 00-ff]
+[    0.811399] Remapped I/O 0x000000e010000000 to [io  0x0000-0xffff window]
+[    0.818678] PCI host bridge to bus 0000:00
+[    0.822990] pci_bus 0000:00: root bus resource [mem 0x1f2b0000-0x1f2bffff]
+[    0.830257] pci_bus 0000:00: root bus resource [io  0x0000-0xffff
+window] (bus address [0x10000000-0x1000ffff])
+[    0.840917] pci_bus 0000:00: root bus resource [mem
+0xe040000000-0xe07fffffff window] (bus address
+[0x40000000-0x7fffffff])
+[    0.852675] pci_bus 0000:00: root bus resource [mem
+0xf000000000-0xffffffffff window]
+[    0.860950] pci_bus 0000:00: root bus resource [bus 00-ff]
+[    0.866761] pci 0000:00:00.0: [10e8:e004] type 01 class 0x060400
+[    0.873175] pci 0000:00:00.0: supports D1 D2
+[    0.877980] pci 0000:01:00.0: [15b3:1003] type 00 class 0x020000
+[    0.884597] pci 0000:01:00.0: reg 0x10: [mem 0xe040000000-0xe0400fffff 64bit]
+[    0.892337] pci 0000:01:00.0: reg 0x18: [mem
+0xe042000000-0xe043ffffff 64bit pref]
+[    0.900694] pci 0000:01:00.0: reg 0x30: [mem 0xfff00000-0xffffffff pref]
+[    0.923853] pci_bus 0000:00: on NUMA node 0
+[    0.928269] pci 0000:00:00.0: BAR 15: assigned [mem
+0xf000000000-0xf001ffffff 64bit pref]
+[    0.936908] pci 0000:00:00.0: BAR 14: assigned [mem
+0xe040000000-0xe0401fffff]
+[    0.944539] pci 0000:01:00.0: BAR 2: assigned [mem
+0xf000000000-0xf001ffffff 64bit pref]
+[    0.953210] pci 0000:01:00.0: BAR 0: assigned [mem
+0xe040000000-0xe0400fffff 64bit]
+[    0.961430] pci 0000:01:00.0: BAR 6: assigned [mem
+0xe040100000-0xe0401fffff pref]
+[    0.969438] pci 0000:00:00.0: PCI bridge to [bus 01]
+[    0.974690] pci 0000:00:00.0:   bridge window [mem 0xe040000000-0xe0401fffff]
+[    0.982231] pci 0000:00:00.0:   bridge window [mem
+0xf000000000-0xf001ffffff 64bit pref]
 
 >
+>> I have tested a modified version of these quirks using this to
+>> get the CSR base and it works on the 3 different platforms I have
+>> access to.
 >>
->> > +       if (!pwrseq)
->> > +               return ERR_PTR(-ENONET);
+>> static int xgene_pcie_get_csr(struct device *dev, struct resource *r)
+>> {
+>>       struct acpi_device *adev = to_acpi_device(dev);
+>>       unsigned long flags;
+>>       struct list_head list;
+>>       struct resource_entry *entry;
+>>       int ret;
 >>
->> ENOENT I suppose?
+>>       INIT_LIST_HEAD(&list);
+>>       flags = IORESOURCE_MEM;
+>>       ret = acpi_dev_get_resources(adev, &list,
+>>                                    acpi_dev_filter_resource_type_cb,
+>>                                    (void *)flags);
+>>       if (ret < 0) {
+>>               dev_err(dev, "failed to parse _CRS, error: %d\n", ret);
+>>               return ret;
+>>       } else if (ret == 0) {
+>>               dev_err(dev, "no memory resources present in _CRS\n");
+>>               return -EINVAL;
+>>       }
 >>
+>>       entry = list_first_entry(&list, struct resource_entry, node);
+>>       *r = *entry->res;
+>>       acpi_dev_free_resource_list(&list);
+>>       return 0;
+>> }
 >
-> Good catch, thanks.
->
->> > +/**
->> > + * of_pwrseq_off: do power sequence off for this pwrseq instance
->> > + *
->> > + * This API is used to power off single device, it is the opposite
->> > + * operation for of_pwrseq_on.
->> > + *
->> > + * @pwrseq: the pwrseq instance which related device would like to be off
->> > + */
->> > +void of_pwrseq_off(struct pwrseq *pwrseq)
->> > +{
->> > +       pwrseq_off(pwrseq);
->> > +       pwrseq_put(pwrseq);
->> > +}
->> > +EXPORT_SYMBOL_GPL(of_pwrseq_off);
->>
->> What happens if two code paths attempt to turn the same power sequence
->> off in parallel?  Can it ever happen?  If not, then why not?
->>
->
-> I don't think the same pwrseq instance off will be called at the same
-> time, the of_pwrseq_off is supposed to be only called at error path
-> during power-on and at device power-off routine, and only the power-on is
-> successful, the device can be created, if the device is not created,
-> its power-off routine is not supposed to be called.
->
->> > +
->> > +/**
->> > + * of_pwrseq_on_list: do power sequence on for list
->> > + *
->> > + * This API is used to power on multiple devices at single bus.
->> > + * If there are several devices on bus (eg, USB bus), uses this
->> > + * this API. Otherwise, use of_pwrseq_on. After the device
->> > + * is powered on successfully, it will be added to pwrseq list for
->> > + * this bus.
->> > + *
->> > + * @np: the device node would like to power on
->> > + * @head: the list head for pwrseq list on this bus
->> > + *
->> > + * On successful, it returns 0, otherwise an error value.
->>
->> Please format the kerneldoc comment in a usual way.
->>
->
-> Ok.
->
->> > + */
->> > +int of_pwrseq_on_list(struct device_node *np, struct list_head *head)
->> > +{
->> > +       struct pwrseq *pwrseq;
->> > +       struct pwrseq_list_per_dev *pwrseq_list_node;
->> > +
->> > +       pwrseq = of_pwrseq_on(np);
->> > +       if (IS_ERR(pwrseq))
->> > +               return PTR_ERR(pwrseq);
->> > +
->> > +       pwrseq_list_node = kzalloc(sizeof(*pwrseq_list_node), GFP_KERNEL);
->>
->> Why don't you allocate memory before turning the power sequence on?
->>
->
-> This list is only for power sequence on instance, if I allocate memory before
-> power sequence on, I need to free it if power sequence on is failed.
+> The code above is identical to acpi_get_rc_addr(), which is used in
+> the acpi_get_rc_resources() path by the other quirks.  Can you use
+> that path, too, instead of reimplementing it here?
 
-So why is that a problem?
+I will post a new version using acpi_get_rc_resources and includes
+other changes that you suggested.
 
->> > +       if (!pwrseq_list_node) {
->> > +               of_pwrseq_off(pwrseq);
->> > +               return -ENOMEM;
->> > +       }
->> > +       pwrseq_list_node->pwrseq = pwrseq;
->> > +       list_add(&pwrseq_list_node->list, head);
->> > +
->> > +       return 0;
->> > +}
->> > +EXPORT_SYMBOL_GPL(of_pwrseq_on_list);
->>
->> So the caller is supposed to provide a list head of the list to put
->> the power sequence object into on success, right?
->
-> Yes
->
->>
->> Can you explain to me what the idea here is, please?
->>
->
-> Taking USB devices as an example, there is one power sequence on list
-> per bus, and there are several USB devices on the bus. Using a list,
-> we can record which device is powered sequence on, and only powers
-> sequence off which has already powered sequence on at error path, and
-> power sequence off all devices on the bus when the bus (eg, USB HUB)
-> is removed. (eg, when the bus driver is removed)
-
-Well, I'm not sure I understand this correctly.
-
-What about system suspend/resume and such, for instance?
-
-> Usually, the power sequence is only needed for hard-wired devices,
-> the power sequence on is carried out during the bus driver probed,
-> and off if carried out during the bus driver is removed,
-> of_pwrseq_on_list/of_powerseq_off_list is not supposed to be
-> called during the other bus driver life cycles.
->
->> Also, what's the protection of the list against concurrent access?
->>
->
-> I will add comment that the list creator needs to take consideration
-> of concurrent access if exists.
->
->> > +
->> > +/**
->> > + * of_pwrseq_off_list: do power sequence off for the list
->> > + *
->> > + * This API is used to power off all devices on this bus, it is
->> > + * the opposite operation for of_pwrseq_on_list.
->> > + *
->> > + * @head: the list head for pwrseq instance list on this bus
->> > + */
->> > +void of_pwrseq_off_list(struct list_head *head)
->> > +{
->> > +       struct pwrseq *pwrseq;
->> > +       struct pwrseq_list_per_dev *pwrseq_list_node, *tmp_node;
->> > +
->> > +       list_for_each_entry_safe(pwrseq_list_node, tmp_node, head, list) {
->> > +               pwrseq = pwrseq_list_node->pwrseq;
->> > +               of_pwrseq_off(pwrseq);
->> > +               list_del(&pwrseq_list_node->list);
->> > +               kfree(pwrseq_list_node);
->> > +       }
->> > +}
->> > +EXPORT_SYMBOL_GPL(of_pwrseq_off_list);
->>
->> This looks horribly inefficient.
->>
->> Is the user expected to create the list from scratch every time things
->> are turned on?
->>
->
-> Like I explained above, the power sequence is for hard-wired device on
-> board, the list creation and remove are only carried out on driver's
-> probe and remove.
-
-Which driver exactly are you referring to?
-
-Thanks,
-Rafael
+Regards,
+Duc Dang.
