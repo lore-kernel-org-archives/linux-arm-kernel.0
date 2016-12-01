@@ -1,64 +1,49 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 1 Dec 2016 10:13:43 -0600
-Subject: [PATCH 1/2] Documentation: sample averaging for imx6ul_tsc
-In-Reply-To: <1480232698-23075-1-git-send-email-guy.shapiro@mobi-wize.com>
-References: <1480232698-23075-1-git-send-email-guy.shapiro@mobi-wize.com>
-Message-ID: <20161201161343.g7p2maxiatp4m5di@rob-hp-laptop>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 1 Dec 2016 16:28:32 +0000
+Subject: [PATCH v3 2/3] powerpc/reloc64: add support for 32-bit CRC
+ pseudo-symbols
+In-Reply-To: <CAKv+Gu_nPdQXxBnEYhYVt02SFbYx_bYtfU9LE8OkL5o0P5suOA@mail.gmail.com>
+References: <1477585631-18574-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1477585631-18574-3-git-send-email-ard.biesheuvel@linaro.org>
+ <87oa13ssqq.fsf@concordia.ellerman.id.au>
+ <CAKv+Gu8g=qgOg0Q5J7tFu0uBUFTUXdVQ+84N45oZseG3vTm0Bg@mail.gmail.com>
+ <874m2ooumq.fsf@concordia.ellerman.id.au>
+ <CAKv+Gu_nPdQXxBnEYhYVt02SFbYx_bYtfU9LE8OkL5o0P5suOA@mail.gmail.com>
+Message-ID: <CAKv+Gu_6hGpZA6G7cmvDG9R7dW3Yt_CebzwFfWzO1UebBOhk3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 27, 2016 at 09:44:57AM +0200, Guy Shapiro wrote:
-> The i.MX6UL internal touchscreen controller contains an option to
-> average upon samples. This feature reduces noise from the produced
-> touch locations.
-> 
-> This patch introduces a new device tree optional property for this
-> feature. It provides control over the amount of averaged samples per
-> touch event.
-> 
-> The property was inspired by a similar property on the
-> "brcm,iproc-touchscreen" binding.
-> 
-> Signed-off-by: Guy Shapiro <guy.shapiro@mobi-wize.com>
-> ---
->  .../devicetree/bindings/input/touchscreen/imx6ul_tsc.txt          | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt b/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
-> index 853dff9..a66069f 100644
-> --- a/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
-> @@ -17,6 +17,13 @@ Optional properties:
->    This value depends on the touch screen.
->  - pre-charge-time: the touch screen need some time to precharge.
->    This value depends on the touch screen.
-> +- average-samples: Number of data samples which are averaged for each read.
-> +	Valid values 0-4
-> +	0 =  1 sample
-> +	1 =  4 samples
-> +	2 =  8 samples
-> +	3 = 16 samples
-> +	4 = 32 samples
+On 1 December 2016 at 09:45, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 1 December 2016 at 09:39, Michael Ellerman <mpe@ellerman.id.au> wrote:
+>> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
+>>> On 25 November 2016 at 11:29, Michael Ellerman <mpe@ellerman.id.au> wrote:
+>>>> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
+>>>>
+>>>> [    7.607687] kvm: disagrees about version of symbol module_layout
+>>>> [    7.846799] virtio: disagrees about version of symbol module_layout
+>>>> [   22.012615] crc32c_vpmsum: disagrees about version of symbol module_layout
+>>>> [   22.012959] libcrc32c: disagrees about version of symbol module_layout
+>>>>
+>>>
+>>> Sigh. I suppose your modversions fixes are queued for v4.10? It's
+>>> probably best to revisit this after the v4.10 merge window closes
+>>> then, just to make sure I'm not aiming for a moving target.
+>>
+>> Actually they were merged into 4.9-rc7 ish.
+>>
+>> But I'm still seeing the same as above with this series rebased on top
+>> of that, and I'm a bit short on time to debug it ATM.
+>>
+>> So during the 4.10 cycle is probably the best we can hope for, sorry.
+>>
+>
+> Not a problem. The only question is whether 1/3 of this series fixes
+> an actual bug or not, given that the CONFIG_RELOCATABLE workaround has
+> been made ppc64 only.
+>
+> But for the remaining patches, I'm happy to respin after the v4.10
+> merge window closes, and get something queued for v4.11
+>
 
-Either this needs a vendor prefix or should be documented as a generic 
-property. In the latter case, you should use actual number of samples 
-(1-32) for the values.
-
->  
->  Example:
->  	tsc: tsc at 02040000 {
-> @@ -32,5 +39,6 @@ Example:
->  		xnur-gpio = <&gpio1 3 GPIO_ACTIVE_LOW>;
->  		measure-delay-time = <0xfff>;
->  		pre-charge-time = <0xffff>;
-> +		average-samples = <4>;
->  		status = "okay";
->  	};
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Actually, given the uncertain fate of modversions in general, we may
+no longer have to bother by the time the v4.11 merge window opens ...
