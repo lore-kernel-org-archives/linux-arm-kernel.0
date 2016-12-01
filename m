@@ -1,98 +1,84 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Thu, 1 Dec 2016 12:09:17 +0800
-Subject: arasan,sdhci.txt "compatibility" DT binding
-In-Reply-To: <583C50E7.6030400@free.fr>
-References: <56B07BA5.4060407@free.fr> <56B166F1.5080605@rock-chips.com>
- <56B1AA44.1010108@xilinx.com> <56B1BAF8.2050907@free.fr>
- <56B1CF40.1030203@xilinx.com> <20160203152104.GP4215@xsjsorenbubuntu>
- <56B21DDB.6050708@free.fr> <582ED9E0.5090506@free.fr>
- <CAFd313x6MJeO90_+rxditdPn762g7TqZc0_D6ojGTKmtGJKjPA@mail.gmail.com>
- <582EF744.8090307@free.fr> <a20b2b4f-15d4-3c29-324c-1ced5dbcc67f@xilinx.com>
- <583C50E7.6030400@free.fr>
-Message-ID: <f64ea0f8-31be-c5b5-3a43-a30abd8aec30@rock-chips.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Thu, 1 Dec 2016 12:27:03 +0800
+Subject: [PATCHv4 07/10] kexec: Switch to __pa_symbol
+In-Reply-To: <87polc7357.fsf@xmission.com>
+References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
+ <1480445729-27130-8-git-send-email-labbott@redhat.com>
+ <20161201024103.GA32438@dhcp-128-65.nay.redhat.com>
+ <87polc7357.fsf@xmission.com>
+Message-ID: <20161201042703.GA13113@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/11/28 23:44, Mason wrote:
-> Hello,
->
-> @Shawn Lin, could you take a look below and tell me exactly
-> which IP core(s) Rockchip is using in its SoCs?
->
+On 11/30/16 at 09:13pm, Eric W. Biederman wrote:
+> Dave Young <dyoung@redhat.com> writes:
+> 
+> > Hi, Laura
+> > On 11/29/16 at 10:55am, Laura Abbott wrote:
+> >> 
+> >> __pa_symbol is the correct api to get the physical address of kernel
+> >> symbols. Switch to it to allow for better debug checking.
+> >> 
+> >
+> > I assume __pa_symbol is faster than __pa, but it still need some testing
+> > on all arches which support kexec.
+> >
+> > But seems long long ago there is a commit e3ebadd95cb in the commit log
+> > I see below from:
+> > "we should deprecate __pa_symbol(), and preferably __pa() too - and
+> >  just use "virt_to_phys()" instead, which is is more readable and has
+> >  nicer semantics."
+> >
+> > But maybe in modern code __pa_symbol is prefered I may miss background.
+> > virt_to_phys still sounds more readable now for me though.
+> 
+> There has been a lot of history with the various definitions.
+> __pa_symbol used to be x86 specific.
+> 
+> Now what we have is that __pa_symbol is just __pa(RELOC_HIDE(x));
+> 
+> Now arguably that whole reloc hide thing should happen by architectures
+> having a non-inline version of __pa as was done in the commit you
+> mention.  But at this point there appears to be nothing wrong with
+> changing a __pa to a __pa_symbol it might make things a tad more
+> reliable depending on the implementation of __pa.
 
- From the Host Controller version register (0xfe)
-bit[7:0]: 0x2 : specification version number is 3.00
-bit[15:8]: 0x10: Vendor version number is 1.0
+Then it is safe and reasonable, thanks for the clarification. 
 
-
-Command Queueing version register (0x200)
-bit[11:8]: 0x5  eMMC Major version number
-bit[7:4]: 0x1 eMMC manor version number
-bit[3:0]: 0x0 eMMC version suffix
-
-User guide "eMMC 5.1/SD3.0/SDIO3.0 Host Controller"
-Revision number: 1.14
-Released on Dec. 2014
-
-> Based on the feedback I received, here is an updated list of
-> compatible strings and controller versions dealt with by the
-> drivers/mmc/host/sdhci-of-arasan.c code.
->
->
-> Xilinx Zynq:
-> "SD2.0 / SDIO2.0 / MMC3.31 AHB Host Controller"
-> "arasan,sdhci-8.9a"
-> NB: 8.9a is the documentation revision (dated 2011-10-19)
-> subsequent tweaks labeled 9.0a, 9.1a, 9.2a
->
-> Xilinx ZynqMP:
-> "SD3.0 / SDIO3.0 / eMMC4.51 AHB Host Controller"
-> "arasan,sdhci-8.9a"
-> NB: using the same compatible string as Zynq
->
-> Sigma SMP87xx
-> "SD3.0 / SDIO3.0 / eMMC4.4 AHB Host Controller"
-> no compatible string yet, platform-specific init required
->
-> APM:
-> "SD3.0 / SDIO3.0 / eMMC4.41 AHB Host Controller"
-> "arasan,sdhci-4.9a"
-> NB: 4.9a appears to be the documentation revision
-> no functional diff with "arasan,sdhci-8.9a"
->
-> Rockchip
-> Exact IP unknown, waiting for Shawn's answer
-> "arasan,sdhci-5.1"
-> NB: 5.1 appears to refer to the eMMC standard supported
->
->
-> On a final note, there are many variations of the Arasan IP.
-> I've tracked down at least the following:
->
-> SD_2.0_SDIO_2.0__MMC_3.31_AHB_Host_Controller.pdf
-> SD_3.0_SDIO_3.0_eMMC_4.41_OCP_Host_Controller.pdf
-> SD_3.0_SDIO_3.0_eMMC_4.4__AHB_Host_Controller.pdf
-> SD_3.0_SDIO_3.0_eMMC_4.51_Host_Controller.pdf
-> SD_3.0_SDIO_3.0_eMMC_4.5__Host_Controller.pdf
-> SD_4.1_SDIO_4.1_eMMC_4.51_Host_Controller.pdf
-> SD_4.1_SDIO_4.1_eMMC_5.1__Host_Controller.pdf
->
-> It seems to me the compatible string should specify
-> the SD/SDIO version AND the eMMC version, since it
-> seems many combinations are allowed, e.g. eMMC 4.51
-> has two possible SD versions.
->
-> What do you think?
->
-> Regards.
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-
-
--- 
-Best Regards
-Shawn Lin
+> 
+> Acked-by: "Eric W. Biederman" <ebiederm@xmission.com>
+> 
+> 
+> Eric
+> 
+> >> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> >> ---
+> >> Found during review of the kernel. Untested.
+> >> ---
+> >>  kernel/kexec_core.c | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >> 
+> >> diff --git a/kernel/kexec_core.c b/kernel/kexec_core.c
+> >> index 5616755..e1b625e 100644
+> >> --- a/kernel/kexec_core.c
+> >> +++ b/kernel/kexec_core.c
+> >> @@ -1397,7 +1397,7 @@ void __weak arch_crash_save_vmcoreinfo(void)
+> >>  
+> >>  phys_addr_t __weak paddr_vmcoreinfo_note(void)
+> >>  {
+> >> -	return __pa((unsigned long)(char *)&vmcoreinfo_note);
+> >> +	return __pa_symbol((unsigned long)(char *)&vmcoreinfo_note);
+> >>  }
+> >>  
+> >>  static int __init crash_save_vmcoreinfo_init(void)
+> >> -- 
+> >> 2.7.4
+> >> 
+> >> 
+> >> _______________________________________________
+> >> kexec mailing list
+> >> kexec at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/kexec
+> >
+> > Thanks
+> > Dave
