@@ -1,129 +1,103 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Thu, 1 Dec 2016 12:48:39 +0100
-Subject: [PATCH v5 net-next 4/7] net: mvneta: Convert to be 64 bits
- compatible
-In-Reply-To: <20161201192604.07ed9516@xhacker>
-References: <cover.0270f6d2413a709521fe2c8c17fbebea6f2e78d1.1480542157.git-series.gregory.clement@free-electrons.com>
- <6b4d20a85b05e93d254e265eb07569dd1285d303.1480542157.git-series.gregory.clement@free-electrons.com>
- <20161201192604.07ed9516@xhacker>
-Message-ID: <CAPv3WKeJBL7_V_7QPVNDAd9H4bgeLcSF8enuD96sgEmecuRkRA@mail.gmail.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Thu, 1 Dec 2016 17:20:22 +0530
+Subject: [PATCH 02/10] iommu/of: Prepare for deferred IOMMU configuration
+In-Reply-To: <20161201112917.GA9680@red-moon>
+References: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
+ <1480465344-11862-3-git-send-email-sricharan@codeaurora.org>
+ <20161130161723.GA9042@red-moon>
+ <c89825aa-c75f-8493-fe92-7cc97f525bc7@arm.com>
+ <20161201112917.GA9680@red-moon>
+Message-ID: <003901d24bc9$1c564050$5502c0f0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
+Hi Robin,Lorenzo,
 
-Which baseline do you use?
+>On Wed, Nov 30, 2016 at 04:42:27PM +0000, Robin Murphy wrote:
+>> On 30/11/16 16:17, Lorenzo Pieralisi wrote:
+>> > Sricharan, Robin,
+>> >
+>> > I gave this series a go on ACPI and apart from an SMMU v3 fix-up
+>> > it seems to work, more thorough testing required though.
+>> >
+>> > A key question below.
+>> >
+>> > On Wed, Nov 30, 2016 at 05:52:16AM +0530, Sricharan R wrote:
+>> >> From: Robin Murphy <robin.murphy@arm.com>
+>> >>
+>> >> IOMMU configuration represents unchanging properties of the hardware,
+>> >> and as such should only need happen once in a device's lifetime, but
+>> >> the necessary interaction with the IOMMU device and driver complicates
+>> >> exactly when that point should be.
+>> >>
+>> >> Since the only reasonable tool available for handling the inter-device
+>> >> dependency is probe deferral, we need to prepare of_iommu_configure()
+>> >> to run later than it is currently called (i.e. at driver probe rather
+>> >> than device creation), to handle being retried, and to tell whether a
+>> >> not-yet present IOMMU should be waited for or skipped (by virtue of
+>> >> having declared a built-in driver or not).
+>> >>
+>> >> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> >> ---
+>> >>  drivers/iommu/of_iommu.c | 30 +++++++++++++++++++++++++++++-
+>> >>  1 file changed, 29 insertions(+), 1 deletion(-)
+>> >>
+>> >> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>> >> index ee49081..349bd1d 100644
+>> >> --- a/drivers/iommu/of_iommu.c
+>> >> +++ b/drivers/iommu/of_iommu.c
+>> >> @@ -104,12 +104,20 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+>> >>  	int err;
+>> >>
+>> >>  	ops = iommu_get_instance(fwnode);
+>> >> -	if (!ops || !ops->of_xlate)
+>> >> +	if ((ops && !ops->of_xlate) ||
+>> >> +	    (!ops && !of_match_node(&__iommu_of_table, iommu_spec->np)))
+>> >
+>> > IIUC of_match_node() here is there to check there is a driver compiled
+>> > in for this device_node (aka compatible string in OF world), correct ?
+>>
+>> Yes - specifically, it's checking the magic table for a matching
+>> IOMMU_OF_DECLARE entry.
+>>
+>> > If that's the case (and I think that's what Sricharan was referring to
+>> > in his ACPI query) I need to cook-up something on the ACPI side to
+>> > emulate the OF linker table behaviour (or anyway to detect a driver is
+>> > actually in the kernel), it is not that difficult but it is key to know,
+>> > I will give it some thought to make it as clean as possible.
+>>
+>> I didn't think this would be a concern for ACPI, since IORT works much
+>> the same way the current of_iommu_init_fn/of_platform_device_create()
+>> bodges in drivers so for DT. If you can only discover SMMUs from IORT,
+>> then iort_init_platform_devices() will have already created every SMMU
+>> that's going to exist before discovering other devices from wherever
+>> they come from, thus you could never get into the situation of probing a
+>> device without its SMMU being ready (if it's ever going to be). Is that
+>> not right?
+>
+>It is right, my point and question is: we are probing a device and we
+>have to know whether it is worth deferring its IOMMU DMA setup. On DT,
+>through of_match_node(&__iommu_of_table, iommu_device_node) we check at
+>once that:
+>
+>1 - A device for the IOMMU exists
+>
+>AND
+>
+>2 - A driver for the IOMMU is compiled in the kernel
+>
+>Is this correct ? As you said (1) is not a concern on ACPI IORT (because
+>we create the IOMMU device before _any_ other device so either the IOMMU
+>device is there or it will never be by the time master devices are
+>probed), but for (2) I need to slightly change how the IORT linker entry
+>work to make sure we can detect a driver is actually compiled in the
+>kernel, it is easy, I was just asking if my understanding was correct
+>and I think that was what Sricharan was referring to in his query.
+>
 
-It took me really lot of time to catch why RX broke after rebase from
-LKv4.1 to LKv4.4. Between those two, in commit:
-97303480753e ("arm64: Increase the max granular size")
-L1_CACHE_BYTES for all ARMv8 platforms was increased to 128B and so
-did NET_SKB_PAD.
+Yes right, this was what i was looking for in the ACPI case and putting this
+in the iort_iommu_xlate was needed to return EPROBE_DEFER when the
+driver is not yet been probed.
 
-And 128 is more than the maximum that can fit into packet offset
-[11:8]@0x1400. In such case this correction is needed. Did it answer
-your doubts?
-
-Best regards,
-Marcin
-
-
-
-2016-12-01 12:26 GMT+01:00 Jisheng Zhang <jszhang@marvell.com>:
-> Hi Gregory, Marcin,
->
-> On Wed, 30 Nov 2016 22:42:49 +0100 Gregory CLEMENT wrote:
->
->> From: Marcin Wojtas <mw@semihalf.com>
->>
->> Prepare the mvneta driver in order to be usable on the 64 bits platform
->> such as the Armada 3700.
->>
->> [gregory.clement at free-electrons.com]: this patch was extract from a larger
->> one to ease review and maintenance.
->>
->> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  drivers/net/ethernet/marvell/mvneta.c | 17 ++++++++++++++++-
->>  1 file changed, 16 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
->> index 92b9af14c352..8ef03fb69bcd 100644
->> --- a/drivers/net/ethernet/marvell/mvneta.c
->> +++ b/drivers/net/ethernet/marvell/mvneta.c
->> @@ -296,6 +296,12 @@
->>  /* descriptor aligned size */
->>  #define MVNETA_DESC_ALIGNED_SIZE     32
->>
->> +/* Number of bytes to be taken into account by HW when putting incoming data
->> + * to the buffers. It is needed in case NET_SKB_PAD exceeds maximum packet
->> + * offset supported in MVNETA_RXQ_CONFIG_REG(q) registers.
->
-> We also brought up this driver on 64bit platforms, we doesn't have this
-> patch. Maybe I'm wrong, I'm trying to understand why we need this
-> modification. Let's assume the NET_SKB_PAD is 64B, we call
-> mvneta_rxq_offset_set(pp, rxq, 64),
->
-> {
->         u32 val;
->
->         val = mvreg_read(pp, MVNETA_RXQ_CONFIG_REG(rxq->id));
->         val &= ~MVNETA_RXQ_PKT_OFFSET_ALL_MASK;
->
->         /* Offset is in */
->         val |= MVNETA_RXQ_PKT_OFFSET_MASK(offset >> 3);
-> // then this will be "val |= 8;" it doesn't exceeds the max offset of
-> MVNETA_RXQ_CONFIG_REG(q) register.
->
-> Could you please kindly point out where I am wrong?
->
->> + */
->> +#define MVNETA_RX_PKT_OFFSET_CORRECTION              64
->> +
->>  #define MVNETA_RX_PKT_SIZE(mtu) \
->>       ALIGN((mtu) + MVNETA_MH_SIZE + MVNETA_VLAN_TAG_LEN + \
->>             ETH_HLEN + ETH_FCS_LEN,                        \
->> @@ -416,6 +422,7 @@ struct mvneta_port {
->>       u64 ethtool_stats[ARRAY_SIZE(mvneta_statistics)];
->>
->>       u32 indir[MVNETA_RSS_LU_TABLE_SIZE];
->> +     u16 rx_offset_correction;
->>  };
->>
->>  /* The mvneta_tx_desc and mvneta_rx_desc structures describe the
->> @@ -1807,6 +1814,7 @@ static int mvneta_rx_refill(struct mvneta_port *pp,
->>               return -ENOMEM;
->>       }
->>
->> +     phys_addr += pp->rx_offset_correction;
->>       mvneta_rx_desc_fill(rx_desc, phys_addr, data, rxq);
->>       return 0;
->>  }
->> @@ -2782,7 +2790,7 @@ static int mvneta_rxq_init(struct mvneta_port *pp,
->>       mvreg_write(pp, MVNETA_RXQ_SIZE_REG(rxq->id), rxq->size);
->>
->>       /* Set Offset */
->> -     mvneta_rxq_offset_set(pp, rxq, NET_SKB_PAD);
->> +     mvneta_rxq_offset_set(pp, rxq, NET_SKB_PAD - pp->rx_offset_correction);
->>
->>       /* Set coalescing pkts and time */
->>       mvneta_rx_pkts_coal_set(pp, rxq, rxq->pkts_coal);
->> @@ -4033,6 +4041,13 @@ static int mvneta_probe(struct platform_device *pdev)
->>
->>       pp->rxq_def = rxq_def;
->>
->> +     /* Set RX packet offset correction for platforms, whose
->> +      * NET_SKB_PAD, exceeds 64B. It should be 64B for 64-bit
->> +      * platforms and 0B for 32-bit ones.
->
-> Even we need this patch, I'm not sure this last comment is correct or not.
-> NET_SKB_PAD is defined as:
->
-> #define NET_SKB_PAD     max(32, L1_CACHE_BYTES)
->
-> we have 64B cacheline 32bit platforms, on this platforms, the NET_SKB_PAD
-> should be 64B as well.
->
-> Thanks,
-> Jisheng
+Regards,
+ Sricharan
