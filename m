@@ -1,51 +1,80 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 30 Nov 2016 20:00:12 -0500
-Subject: [PATCH V1 1/2] PCI: thunder: Enable ACPI PCI controller for
- ThunderX pass2.x silicon version
-In-Reply-To: <20161201002812.GB9409@bhelgaas-glaptop.roam.corp.google.com>
-References: <1479201298-25494-1-git-send-email-tn@semihalf.com>
- <1479201298-25494-2-git-send-email-tn@semihalf.com>
- <20161201002812.GB9409@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <19e244f2-22f9-be94-0929-a9d96844b801@codeaurora.org>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Wed, 30 Nov 2016 21:13:24 -0600
+Subject: [PATCHv4 07/10] kexec: Switch to __pa_symbol
+In-Reply-To: <20161201024103.GA32438@dhcp-128-65.nay.redhat.com> (Dave Young's
+ message of "Thu, 1 Dec 2016 10:41:03 +0800")
+References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
+ <1480445729-27130-8-git-send-email-labbott@redhat.com>
+ <20161201024103.GA32438@dhcp-128-65.nay.redhat.com>
+Message-ID: <87polc7357.fsf@xmission.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Dave Young <dyoung@redhat.com> writes:
 
-On 11/30/2016 7:28 PM, Bjorn Helgaas wrote:
-> Actually, that raises a question for qualcomm and hisi: in the DT
-> model, we use non-ECAM config accessors in the driver, but in the ACPI
-> model, we use ECAM accessors.  It seems like the accessors should be
-> the same regardless of whether we discover the bridge via DT or ACPI.
+> Hi, Laura
+> On 11/29/16 at 10:55am, Laura Abbott wrote:
+>> 
+>> __pa_symbol is the correct api to get the physical address of kernel
+>> symbols. Switch to it to allow for better debug checking.
+>> 
+>
+> I assume __pa_symbol is faster than __pa, but it still need some testing
+> on all arches which support kexec.
+>
+> But seems long long ago there is a commit e3ebadd95cb in the commit log
+> I see below from:
+> "we should deprecate __pa_symbol(), and preferably __pa() too - and
+>  just use "virt_to_phys()" instead, which is is more readable and has
+>  nicer semantics."
+>
+> But maybe in modern code __pa_symbol is prefered I may miss background.
+> virt_to_phys still sounds more readable now for me though.
 
-For servers, we are only setting up the PCIe controller in ECAM mode in FW.
-If somebody wants to use DT with QCOM Server (unsupported but possible),
-they need to use pci-host-ecam-generic driver.
+There has been a lot of history with the various definitions.
+__pa_symbol used to be x86 specific.
 
-Here is an example:
+Now what we have is that __pa_symbol is just __pa(RELOC_HIDE(x));
 
-	pcie3 {
-		compatible = "pci-host-ecam-generic";
-		device_type = "pci";
-		#address-cells = <3>;
-		#size-cells = <2>;
-		bus-range = <0x0 0xff>;
-		linux,pci-domain = <3>;
+Now arguably that whole reloc hide thing should happen by architectures
+having a non-inline version of __pa as was done in the commit you
+mention.  But at this point there appears to be nothing wrong with
+changing a __pa to a __pa_symbol it might make things a tad more
+reliable depending on the implementation of __pa.
 
-		// CPU_PHYSICAL(2)  SIZE(2)
-		reg = <0xC00 0x00000000  0x0 0x10000000>;
- 	...
-	}
+Acked-by: "Eric W. Biederman" <ebiederm@xmission.com>
 
-I think you are referring to this driver here.
 
-obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
+Eric
 
-This driver is only in use by the mobile products.
-
-Sinan
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>> Signed-off-by: Laura Abbott <labbott@redhat.com>
+>> ---
+>> Found during review of the kernel. Untested.
+>> ---
+>>  kernel/kexec_core.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> 
+>> diff --git a/kernel/kexec_core.c b/kernel/kexec_core.c
+>> index 5616755..e1b625e 100644
+>> --- a/kernel/kexec_core.c
+>> +++ b/kernel/kexec_core.c
+>> @@ -1397,7 +1397,7 @@ void __weak arch_crash_save_vmcoreinfo(void)
+>>  
+>>  phys_addr_t __weak paddr_vmcoreinfo_note(void)
+>>  {
+>> -	return __pa((unsigned long)(char *)&vmcoreinfo_note);
+>> +	return __pa_symbol((unsigned long)(char *)&vmcoreinfo_note);
+>>  }
+>>  
+>>  static int __init crash_save_vmcoreinfo_init(void)
+>> -- 
+>> 2.7.4
+>> 
+>> 
+>> _______________________________________________
+>> kexec mailing list
+>> kexec at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/kexec
+>
+> Thanks
+> Dave
