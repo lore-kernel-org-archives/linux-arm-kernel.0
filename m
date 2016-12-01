@@ -1,108 +1,48 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 1 Dec 2016 19:26:04 +0800
-Subject: [PATCH v5 net-next 4/7] net: mvneta: Convert to be 64 bits
- compatible
-In-Reply-To: <6b4d20a85b05e93d254e265eb07569dd1285d303.1480542157.git-series.gregory.clement@free-electrons.com>
-References: <cover.0270f6d2413a709521fe2c8c17fbebea6f2e78d1.1480542157.git-series.gregory.clement@free-electrons.com>
- <6b4d20a85b05e93d254e265eb07569dd1285d303.1480542157.git-series.gregory.clement@free-electrons.com>
-Message-ID: <20161201192604.07ed9516@xhacker>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 01 Dec 2016 12:35:23 +0100
+Subject: [GIT PULL 1/6] Broadcom soc changes for 4.10
+In-Reply-To: <fa48be7a336e97c850b226d0c54c9b96@milecki.pl>
+References: <20161122054824.16974-1-f.fainelli@gmail.com>
+ <23121827.vnVDrZQAeV@wuerfel> <fa48be7a336e97c850b226d0c54c9b96@milecki.pl>
+Message-ID: <3443450.WBdaUHjCv8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory, Marcin,
-
-On Wed, 30 Nov 2016 22:42:49 +0100 Gregory CLEMENT wrote:
-
-> From: Marcin Wojtas <mw@semihalf.com>
+On Thursday, December 1, 2016 12:18:26 PM CET Rafa? Mi?ecki wrote:
+> On 2016-11-30 17:52, Arnd Bergmann wrote:
+> > On Monday, November 21, 2016 9:48:19 PM CET Florian Fainelli wrote:
+> >> This pull request contains Broadcom ARM-based SoC changes for 4.10, 
+> >> please pull
+> >> the following:
+> >> 
+> >> - Rafal adds back the abort handler hook on BCM5301x which is required 
+> >> to silence
+> >>   errors forwared from the PCIe controller that cannot be silenced at 
+> >> the PCIe RC level
+> >> 
+> > 
+> > Pulled into next/soc.
+> > 
+> > It's unclear to me whether we want this to be backported to stable 
+> > kernels,
+> > can you clarify?
 > 
-> Prepare the mvneta driver in order to be usable on the 64 bits platform
-> such as the Armada 3700.
+> It took me/us so much time to get an agreement on this patch I totally 
+> forgot
+> about backporting it to stable.
 > 
-> [gregory.clement at free-electrons.com]: this patch was extract from a larger
-> one to ease review and maintenance.
+> To be clear it indeed fixes a regression. Commit 937b12306ea79 ("ARM: 
+> BCM5301X:
+> remove workaround imprecise abort fault handler") went into 4.5, so this 
+> one
+> could be backported to 4.5+.
 > 
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  drivers/net/ethernet/marvell/mvneta.c | 17 ++++++++++++++++-
->  1 file changed, 16 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index 92b9af14c352..8ef03fb69bcd 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -296,6 +296,12 @@
->  /* descriptor aligned size */
->  #define MVNETA_DESC_ALIGNED_SIZE	32
->  
-> +/* Number of bytes to be taken into account by HW when putting incoming data
-> + * to the buffers. It is needed in case NET_SKB_PAD exceeds maximum packet
-> + * offset supported in MVNETA_RXQ_CONFIG_REG(q) registers.
+> As this has been already pulled, I think I'll wait for it to appear in 
+> Linus's
+> tree and just e-mail stable guys manually (unless someone objects). 
+> Thanks for
+> bringing my attention to this.
 
-We also brought up this driver on 64bit platforms, we doesn't have this
-patch. Maybe I'm wrong, I'm trying to understand why we need this
-modification. Let's assume the NET_SKB_PAD is 64B, we call
-mvneta_rxq_offset_set(pp, rxq, 64),
+Ok, sounds good. Thanks!
 
-{
-        u32 val;
-
-        val = mvreg_read(pp, MVNETA_RXQ_CONFIG_REG(rxq->id));
-        val &= ~MVNETA_RXQ_PKT_OFFSET_ALL_MASK;
-
-        /* Offset is in */
-        val |= MVNETA_RXQ_PKT_OFFSET_MASK(offset >> 3);
-// then this will be "val |= 8;" it doesn't exceeds the max offset of
-MVNETA_RXQ_CONFIG_REG(q) register.
-
-Could you please kindly point out where I am wrong?
-
-> + */
-> +#define MVNETA_RX_PKT_OFFSET_CORRECTION		64
-> +
->  #define MVNETA_RX_PKT_SIZE(mtu) \
->  	ALIGN((mtu) + MVNETA_MH_SIZE + MVNETA_VLAN_TAG_LEN + \
->  	      ETH_HLEN + ETH_FCS_LEN,			     \
-> @@ -416,6 +422,7 @@ struct mvneta_port {
->  	u64 ethtool_stats[ARRAY_SIZE(mvneta_statistics)];
->  
->  	u32 indir[MVNETA_RSS_LU_TABLE_SIZE];
-> +	u16 rx_offset_correction;
->  };
->  
->  /* The mvneta_tx_desc and mvneta_rx_desc structures describe the
-> @@ -1807,6 +1814,7 @@ static int mvneta_rx_refill(struct mvneta_port *pp,
->  		return -ENOMEM;
->  	}
->  
-> +	phys_addr += pp->rx_offset_correction;
->  	mvneta_rx_desc_fill(rx_desc, phys_addr, data, rxq);
->  	return 0;
->  }
-> @@ -2782,7 +2790,7 @@ static int mvneta_rxq_init(struct mvneta_port *pp,
->  	mvreg_write(pp, MVNETA_RXQ_SIZE_REG(rxq->id), rxq->size);
->  
->  	/* Set Offset */
-> -	mvneta_rxq_offset_set(pp, rxq, NET_SKB_PAD);
-> +	mvneta_rxq_offset_set(pp, rxq, NET_SKB_PAD - pp->rx_offset_correction);
->  
->  	/* Set coalescing pkts and time */
->  	mvneta_rx_pkts_coal_set(pp, rxq, rxq->pkts_coal);
-> @@ -4033,6 +4041,13 @@ static int mvneta_probe(struct platform_device *pdev)
->  
->  	pp->rxq_def = rxq_def;
->  
-> +	/* Set RX packet offset correction for platforms, whose
-> +	 * NET_SKB_PAD, exceeds 64B. It should be 64B for 64-bit
-> +	 * platforms and 0B for 32-bit ones.
-
-Even we need this patch, I'm not sure this last comment is correct or not.
-NET_SKB_PAD is defined as:
-
-#define NET_SKB_PAD     max(32, L1_CACHE_BYTES)
-
-we have 64B cacheline 32bit platforms, on this platforms, the NET_SKB_PAD
-should be 64B as well.
-
-Thanks,
-Jisheng
+	Arnd
