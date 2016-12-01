@@ -1,53 +1,52 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Thu, 1 Dec 2016 11:58:12 -0800
-Subject: [PATCH v3] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe
- controller
-In-Reply-To: <f4b949c0-f992-b0fb-5f23-f71cb1f9713e@redhat.com>
-References: <1480549373-2123-1-git-send-email-dhdang@apm.com>
- <1480604901.4751.17.camel@redhat.com>
- <f4b949c0-f992-b0fb-5f23-f71cb1f9713e@redhat.com>
-Message-ID: <CADaLNDnZfob-4p5U-estW8mGCDhma_vJqxS3zbDdq8brvokhAA@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu,  1 Dec 2016 21:09:25 +0100
+Subject: [PATCH v2 2/7] drm: Turn DRM_MODE_SUBCONNECTOR_xx definitions into an
+ enum
+In-Reply-To: <1480622970-8714-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1480622970-8714-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1480622970-8714-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 1, 2016 at 11:17 AM, Jon Masters <jcm@redhat.com> wrote:
-> On 12/01/2016 10:08 AM, Mark Salter wrote:
->> On Wed, 2016-11-30 at 15:42 -0800, Duc Dang wrote:
->
->>> +static int xgene_v1_pcie_ecam_init(struct pci_config_window *cfg)
->>> +{
->>> +    struct acpi_device *adev = to_acpi_device(cfg->parent);
->>> +    struct acpi_pci_root *root = acpi_driver_data(adev);
->>> +    struct device *dev = cfg->parent;
->>> +    struct xgene_pcie_port *port;
->>> +    struct resource *csr;
->>> +
->>> +    port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
->>> +    if (!port)
->>> +            return -ENOMEM;
->>> +
->>> +    csr = &xgene_v1_csr_res[root->segment];
->>
->> This hard-coded assumption that segment N uses controller N breaks
->> for m400 where segment 0 is using controller 3.
+List of values like the DRM_MODE_SUBCONNECTOR_xx ones are better
+represented with enums.
 
-I think the latest firmware released from us a few months back use
-segment 3 for PCIe controller 3 in MCFG table.
->
-> This seems very fragile. So in addition to Bjorn's comment about not
-> trusting firmware provided data for the segment offset in the CSR list,
-> you will want to also determine the controller from the ACPI tree. The
-> existing code walks the ACPI hierarchy and finds the CSR that way.
-> Obviously, the goal is to avoid that in the latest incarnation, but you
-> could still determine which controller matches a given device.
+Turn the DRM_MODE_SUBCONNECTOR_xx macros into an enum.
 
-Yes, I will look into that more.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Suggested-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+---
+ include/uapi/drm/drm_mode.h | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
 
->
-> Jon.
->
-> --
-> Computer Architect | Sent from my Fedora powered laptop
->
-Regards,
-Duc Dang.
+diff --git a/include/uapi/drm/drm_mode.h b/include/uapi/drm/drm_mode.h
+index df0e3504c349..970bfc0d7107 100644
+--- a/include/uapi/drm/drm_mode.h
++++ b/include/uapi/drm/drm_mode.h
+@@ -220,14 +220,16 @@ struct drm_mode_get_encoder {
+ 
+ /* This is for connectors with multiple signal types. */
+ /* Try to match DRM_MODE_CONNECTOR_X as closely as possible. */
+-#define DRM_MODE_SUBCONNECTOR_Automatic	0
+-#define DRM_MODE_SUBCONNECTOR_Unknown	0
+-#define DRM_MODE_SUBCONNECTOR_DVID	3
+-#define DRM_MODE_SUBCONNECTOR_DVIA	4
+-#define DRM_MODE_SUBCONNECTOR_Composite	5
+-#define DRM_MODE_SUBCONNECTOR_SVIDEO	6
+-#define DRM_MODE_SUBCONNECTOR_Component	8
+-#define DRM_MODE_SUBCONNECTOR_SCART	9
++enum drm_mode_subconnector {
++	DRM_MODE_SUBCONNECTOR_Automatic = 0,
++	DRM_MODE_SUBCONNECTOR_Unknown = 0,
++	DRM_MODE_SUBCONNECTOR_DVID = 3,
++	DRM_MODE_SUBCONNECTOR_DVIA = 4,
++	DRM_MODE_SUBCONNECTOR_Composite = 5,
++	DRM_MODE_SUBCONNECTOR_SVIDEO = 6,
++	DRM_MODE_SUBCONNECTOR_Component = 8,
++	DRM_MODE_SUBCONNECTOR_SCART = 9,
++};
+ 
+ #define DRM_MODE_CONNECTOR_Unknown	0
+ #define DRM_MODE_CONNECTOR_VGA		1
+-- 
+2.7.4
