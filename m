@@ -1,101 +1,77 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Thu, 1 Dec 2016 10:28:45 +0000
-Subject: [PATCH] KVM: arm/arm64: vgic: Don't notify EOI for non-SPIs
-In-Reply-To: <1480584341-32340-2-git-send-email-marc.zyngier@arm.com>
-References: <1480584341-32340-1-git-send-email-marc.zyngier@arm.com>
- <1480584341-32340-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA817475F7E@lhreml504-mbs>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 1 Dec 2016 10:30:51 +0000
+Subject: [RFC PATCH 00/29] arm64: Scalable Vector Extension core support
+In-Reply-To: <dbcd545f-1358-6a80-5a9f-3e4a3c93189a@redhat.com>
+References: <20161130120654.GJ1574@e103592.cambridge.arm.com>
+ <3e8afc5a-1ba9-6369-462b-4f5a707d8b8a@redhat.com>
+ <20161130135631.GK1574@e103592.cambridge.arm.com>
+ <dbcd545f-1358-6a80-5a9f-3e4a3c93189a@redhat.com>
+Message-ID: <20161201103048.GO1574@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Thu, Dec 01, 2016 at 10:21:03AM +0100, Florian Weimer wrote:
+> On 11/30/2016 02:56 PM, Dave Martin wrote:
+> 
+> >If we do have distinct "set process VL" and "set thread VL" interfaces,
+> >then my view is that the former should fail if there are already
+> >multiple threads, rather than just setting the VL of a single thread or
+> >(worse) asynchronously changing the VL of threads other than the
+> >caller...
+> 
+> Yes, looks feasible to me.
 
-> -----Original Message-----
-> From: kvmarm-bounces at lists.cs.columbia.edu [mailto:kvmarm-
-> bounces at lists.cs.columbia.edu] On Behalf Of Marc Zyngier
-> Sent: Thursday, December 01, 2016 9:26 AM
-> To: Paolo Bonzini; Radim Kr?m??
-> Cc: Catalin Marinas; kvmarm at lists.cs.columbia.edu; linux-arm-
-> kernel at lists.infradead.org; kvm at vger.kernel.org
-> Subject: [PATCH] KVM: arm/arm64: vgic: Don't notify EOI for non-SPIs
-> 
-> When we inject a level triggerered interrupt (and unless it is backed
-> by the physical distributor - timer style), we request a maintenance
-> interrupt. Part of the processing for that interrupt is to feed to the
-> rest of KVM (and to the eventfd subsystem) the information that the
-> interrupt has been EOIed.
-> 
-> But that notification only makes sense for SPIs, and not PPIs (such as
-> the PMU interrupt). Skip over the notification if the interrupt is not
-> an SPI.
+OK, I'll try to hack up something along these lines.
 
-Just to clarify my understanding, the maintenance interrupt is generated 
-for cases where there is no mapping of virt to phys interrupts
-(ie, ICH_LR HW bit is not set). And I was under the impression that
-kvm_notify_acked_irq will eventually deactivate the interrupt on distributor
-for such cases. Its not clear to me how the deactivation is done
-otherwise.
+> >>>I'm not familiar with resumable functions/executors -- are these in
+> >>>the C++ standards yet (not that that would cause me to be familiar
+> >>>with them... ;)  Any implementation of coroutines (i.e.,
+> >>>cooperative switching) is likely to fall under the "setcontext"
+> >>>argument above.
+> >>
+> >>There are different ways to implement coroutines.  Stack switching (like
+> >>setcontext) is obviously impacted by non-uniform register sizes.  But even
+> >>the most conservative variant, rather similar to switch-based emulation you
+> >>sometimes see in C coroutine implementations, might have trouble restoring
+> >>the state if it just cannot restore the saved state due to register size
+> >>reductions.
+> >
+> >Which is not a problem if the variably-sized state is not part of the
+> >switched context?
+> 
+> The VL value is implicitly thread-local data, and the encoded state may have
+> an implicit dependency on it, although it does not contain vector registers
+> as such.
 
-Could you please help me to understand this better.
+This doesn't sound like an absolute requirement to me.
 
-Thanks,
-Shameer
+If we presume that the SVE registers never need to get saved or
+restored, what stops the context data format being VL-independent?
 
+The setcontext()/getcontext() implementation for example will not change
+at all for SVE.
 
-> Cc: stable at vger.kernel.org # 4.7+
-> Fixes: 140b086dd197 ("KVM: arm/arm64: vgic-new: Add GICv2 world switch
-> backend")
-> Fixes: 59529f69f504 ("KVM: arm/arm64: vgic-new: Add GICv3 world switch
-> backend")
-> Reported-by: Catalin Marinas <catalin.marinas@arm.com>
-> Tested-by: Catalin Marinas <catalin.marinas@arm.com>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic-v2.c | 6 ++++--
->  virt/kvm/arm/vgic/vgic-v3.c | 6 ++++--
->  2 files changed, 8 insertions(+), 4 deletions(-)
+> >Because the SVE procedure call standard determines that the SVE
+> >registers are caller-save,
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-> index 0a063af..9bab867 100644
-> --- a/virt/kvm/arm/vgic/vgic-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-v2.c
-> @@ -50,8 +50,10 @@ void vgic_v2_process_maintenance(struct kvm_vcpu
-> *vcpu)
+> By the way, how is this implemented?  Some of them overlap existing
+> callee-saved registers.
+
+Basically, all the *new* state is caller-save.
+
+The Neon/FPSIMD regs V8-V15 are callee-save, so in the SVE view
+Zn[bits 127:0] is callee-save for all n = 8..15.
+
+> >they are not live at any external function
+> >boundary -- so in cooperative switching it is useless to save/restore
+> >this state unless the coroutine framework is defined to have a special
+> >procedure call standard.
 > 
->  			WARN_ON(cpuif->vgic_lr[lr] & GICH_LR_STATE);
-> 
-> -			kvm_notify_acked_irq(vcpu->kvm, 0,
-> -					     intid - VGIC_NR_PRIVATE_IRQS);
-> +			/* Only SPIs require notification */
-> +			if (vgic_valid_spi(vcpu->kvm, intid))
-> +				kvm_notify_acked_irq(vcpu->kvm, 0,
-> +						     intid - VGIC_NR_PRIVATE_IRQS);
->  		}
->  	}
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index 9f0dae3..5c9f974 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -41,8 +41,10 @@ void vgic_v3_process_maintenance(struct kvm_vcpu
-> *vcpu)
-> 
->  			WARN_ON(cpuif->vgic_lr[lr] & ICH_LR_STATE);
-> 
-> -			kvm_notify_acked_irq(vcpu->kvm, 0,
-> -					     intid - VGIC_NR_PRIVATE_IRQS);
-> +			/* Only SPIs require notification */
-> +			if (vgic_valid_spi(vcpu->kvm, intid))
-> +				kvm_notify_acked_irq(vcpu->kvm, 0,
-> +						     intid - VGIC_NR_PRIVATE_IRQS);
->  		}
-> 
->  		/*
-> --
-> 2.1.4
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> It can use the standard calling convention, but it may have selected a
+> particular implementation based on the VL value before suspension.
+
+If the save/restore logic doesn't touch SVE, which would its
+implementation be VL-dependent?
+
+Cheers
+---Dave	
