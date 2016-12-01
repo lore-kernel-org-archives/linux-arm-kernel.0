@@ -1,37 +1,108 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 1 Dec 2016 11:30:32 +0000
-Subject: [bug report v4.8] fs/locks.c: kernel oops during posix lock
- stress test
-In-Reply-To: <CACVXFVPsHjh3CWjdUrKB_r6=hkXK=qS3wpykbacdKe1rzz1H8Q@mail.gmail.com>
-References: <CACVXFVPsHjh3CWjdUrKB_r6=hkXK=qS3wpykbacdKe1rzz1H8Q@mail.gmail.com>
-Message-ID: <20161201113031.GB5813@arm.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 1 Dec 2016 19:26:04 +0800
+Subject: [PATCH v5 net-next 4/7] net: mvneta: Convert to be 64 bits
+ compatible
+In-Reply-To: <6b4d20a85b05e93d254e265eb07569dd1285d303.1480542157.git-series.gregory.clement@free-electrons.com>
+References: <cover.0270f6d2413a709521fe2c8c17fbebea6f2e78d1.1480542157.git-series.gregory.clement@free-electrons.com>
+ <6b4d20a85b05e93d254e265eb07569dd1285d303.1480542157.git-series.gregory.clement@free-electrons.com>
+Message-ID: <20161201192604.07ed9516@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2016 at 11:10:14AM +0800, Ming Lei wrote:
-> When I run stress-ng via the following steps on one ARM64 dual
-> socket system(Cavium Thunder), the kernel oops[1] can often be
-> triggered after running the stress test for several hours(sometimes
-> it may take longer):
-> 
-> - git clone git://kernel.ubuntu.com/cking/stress-ng.git
-> - apply the attachment patch which just makes the posix file
-> lock stress test more aggressive
-> - run the test via '~/git/stress-ng$./stress-ng --lockf 128 --aggressive'
-> 
-> 
-> From the oops log, looks one garbage file_lock node is got
-> from the linked list of 'ctx->flc_posix' when the issue happens.
-> 
-> BTW, the issue isn't observed on single socket Cavium Thunder yet,
-> and the same issue can be seen on Ubuntu Xenial(v4.4 based kernel)
-> too.
+Hi Gregory, Marcin,
 
-FWIW, I've been running this on Seattle for 24 hours with your patch applied
-and not seen any problems yet. That said, Thomas did just fix an rt_mutex
-race which only seemed to pop up on Thunder, so you could give those
-patches a try.
+On Wed, 30 Nov 2016 22:42:49 +0100 Gregory CLEMENT wrote:
 
-  https://lkml.kernel.org/r/20161130205431.629977871 at linutronix.de
+> From: Marcin Wojtas <mw@semihalf.com>
+> 
+> Prepare the mvneta driver in order to be usable on the 64 bits platform
+> such as the Armada 3700.
+> 
+> [gregory.clement at free-electrons.com]: this patch was extract from a larger
+> one to ease review and maintenance.
+> 
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/net/ethernet/marvell/mvneta.c | 17 ++++++++++++++++-
+>  1 file changed, 16 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index 92b9af14c352..8ef03fb69bcd 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -296,6 +296,12 @@
+>  /* descriptor aligned size */
+>  #define MVNETA_DESC_ALIGNED_SIZE	32
+>  
+> +/* Number of bytes to be taken into account by HW when putting incoming data
+> + * to the buffers. It is needed in case NET_SKB_PAD exceeds maximum packet
+> + * offset supported in MVNETA_RXQ_CONFIG_REG(q) registers.
 
-Will
+We also brought up this driver on 64bit platforms, we doesn't have this
+patch. Maybe I'm wrong, I'm trying to understand why we need this
+modification. Let's assume the NET_SKB_PAD is 64B, we call
+mvneta_rxq_offset_set(pp, rxq, 64),
+
+{
+        u32 val;
+
+        val = mvreg_read(pp, MVNETA_RXQ_CONFIG_REG(rxq->id));
+        val &= ~MVNETA_RXQ_PKT_OFFSET_ALL_MASK;
+
+        /* Offset is in */
+        val |= MVNETA_RXQ_PKT_OFFSET_MASK(offset >> 3);
+// then this will be "val |= 8;" it doesn't exceeds the max offset of
+MVNETA_RXQ_CONFIG_REG(q) register.
+
+Could you please kindly point out where I am wrong?
+
+> + */
+> +#define MVNETA_RX_PKT_OFFSET_CORRECTION		64
+> +
+>  #define MVNETA_RX_PKT_SIZE(mtu) \
+>  	ALIGN((mtu) + MVNETA_MH_SIZE + MVNETA_VLAN_TAG_LEN + \
+>  	      ETH_HLEN + ETH_FCS_LEN,			     \
+> @@ -416,6 +422,7 @@ struct mvneta_port {
+>  	u64 ethtool_stats[ARRAY_SIZE(mvneta_statistics)];
+>  
+>  	u32 indir[MVNETA_RSS_LU_TABLE_SIZE];
+> +	u16 rx_offset_correction;
+>  };
+>  
+>  /* The mvneta_tx_desc and mvneta_rx_desc structures describe the
+> @@ -1807,6 +1814,7 @@ static int mvneta_rx_refill(struct mvneta_port *pp,
+>  		return -ENOMEM;
+>  	}
+>  
+> +	phys_addr += pp->rx_offset_correction;
+>  	mvneta_rx_desc_fill(rx_desc, phys_addr, data, rxq);
+>  	return 0;
+>  }
+> @@ -2782,7 +2790,7 @@ static int mvneta_rxq_init(struct mvneta_port *pp,
+>  	mvreg_write(pp, MVNETA_RXQ_SIZE_REG(rxq->id), rxq->size);
+>  
+>  	/* Set Offset */
+> -	mvneta_rxq_offset_set(pp, rxq, NET_SKB_PAD);
+> +	mvneta_rxq_offset_set(pp, rxq, NET_SKB_PAD - pp->rx_offset_correction);
+>  
+>  	/* Set coalescing pkts and time */
+>  	mvneta_rx_pkts_coal_set(pp, rxq, rxq->pkts_coal);
+> @@ -4033,6 +4041,13 @@ static int mvneta_probe(struct platform_device *pdev)
+>  
+>  	pp->rxq_def = rxq_def;
+>  
+> +	/* Set RX packet offset correction for platforms, whose
+> +	 * NET_SKB_PAD, exceeds 64B. It should be 64B for 64-bit
+> +	 * platforms and 0B for 32-bit ones.
+
+Even we need this patch, I'm not sure this last comment is correct or not.
+NET_SKB_PAD is defined as:
+
+#define NET_SKB_PAD     max(32, L1_CACHE_BYTES)
+
+we have 64B cacheline 32bit platforms, on this platforms, the NET_SKB_PAD
+should be 64B as well.
+
+Thanks,
+Jisheng
