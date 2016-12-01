@@ -1,116 +1,146 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 1 Dec 2016 12:59:09 +0100
-Subject: [PATCH 2/2] ASoC: atmel: tse850: rely on the ssc to register as a cpu
- dai by itself
-In-Reply-To: <1480593549-6464-1-git-send-email-peda@axentia.se>
-References: <1480593549-6464-1-git-send-email-peda@axentia.se>
-Message-ID: <1480593549-6464-3-git-send-email-peda@axentia.se>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 01 Dec 2016 13:01:20 +0100
+Subject: [PATCH v5 net-next 4/7] net: mvneta: Convert to be 64 bits
+ compatible
+In-Reply-To: <CAPv3WKeJBL7_V_7QPVNDAd9H4bgeLcSF8enuD96sgEmecuRkRA@mail.gmail.com>
+ (Marcin Wojtas's message of "Thu, 1 Dec 2016 12:48:39 +0100")
+References: <cover.0270f6d2413a709521fe2c8c17fbebea6f2e78d1.1480542157.git-series.gregory.clement@free-electrons.com>
+ <6b4d20a85b05e93d254e265eb07569dd1285d303.1480542157.git-series.gregory.clement@free-electrons.com>
+ <20161201192604.07ed9516@xhacker>
+ <CAPv3WKeJBL7_V_7QPVNDAd9H4bgeLcSF8enuD96sgEmecuRkRA@mail.gmail.com>
+Message-ID: <874m2nluy7.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
- .../bindings/sound/axentia,tse850-pcm5142.txt      |  5 ++---
- sound/soc/atmel/tse850-pcm5142.c                   | 23 +++-------------------
- 2 files changed, 5 insertions(+), 23 deletions(-)
+Hi Jisheng,
+ 
+ On jeu., d?c. 01 2016, Marcin Wojtas <mw@semihalf.com> wrote:
 
-diff --git a/Documentation/devicetree/bindings/sound/axentia,tse850-pcm5142.txt b/Documentation/devicetree/bindings/sound/axentia,tse850-pcm5142.txt
-index 5b9b38f578bb..fd12ecb35b5c 100644
---- a/Documentation/devicetree/bindings/sound/axentia,tse850-pcm5142.txt
-+++ b/Documentation/devicetree/bindings/sound/axentia,tse850-pcm5142.txt
-@@ -2,8 +2,7 @@ Devicetree bindings for the Axentia TSE-850 audio complex
- 
- Required properties:
-   - compatible: "axentia,tse850-pcm5142"
--  - axentia,ssc-controller: The phandle of the atmel SSC controller used as
--    cpu dai.
-+  - axentia,cpu-dai: The phandle of the cpu dai.
-   - axentia,audio-codec: The phandle of the PCM5142 codec.
-   - axentia,add-gpios: gpio specifier that controls the mixer.
-   - axentia,loop1-gpios: gpio specifier that controls loop relays on channel 1.
-@@ -77,7 +76,7 @@ Example:
- 	sound {
- 		compatible = "axentia,tse850-pcm5142";
- 
--		axentia,ssc-controller = <&ssc0>;
-+		axentia,cpu-dai = <&ssc0>;
- 		axentia,audio-codec = <&codec>;
- 
- 		axentia,add-gpios = <&pioA 8 GPIO_ACTIVE_LOW>;
-diff --git a/sound/soc/atmel/tse850-pcm5142.c b/sound/soc/atmel/tse850-pcm5142.c
-index ac6a814c8ecf..a72c7d642026 100644
---- a/sound/soc/atmel/tse850-pcm5142.c
-+++ b/sound/soc/atmel/tse850-pcm5142.c
-@@ -51,11 +51,7 @@
- #include <sound/soc.h>
- #include <sound/pcm_params.h>
- 
--#include "atmel_ssc_dai.h"
--
- struct tse850_priv {
--	int ssc_id;
--
- 	struct gpio_desc *add;
- 	struct gpio_desc *loop1;
- 	struct gpio_desc *loop2;
-@@ -329,23 +325,20 @@ static int tse850_dt_init(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
- 	struct device_node *codec_np, *cpu_np;
--	struct snd_soc_card *card = &tse850_card;
- 	struct snd_soc_dai_link *dailink = &tse850_dailink;
--	struct tse850_priv *tse850 = snd_soc_card_get_drvdata(card);
- 
- 	if (!np) {
- 		dev_err(&pdev->dev, "only device tree supported\n");
- 		return -EINVAL;
- 	}
- 
--	cpu_np = of_parse_phandle(np, "axentia,ssc-controller", 0);
-+	cpu_np = of_parse_phandle(np, "axentia,cpu-dai", 0);
- 	if (!cpu_np) {
--		dev_err(&pdev->dev, "failed to get dai and pcm info\n");
-+		dev_err(&pdev->dev, "failed to get cpu dai\n");
- 		return -EINVAL;
- 	}
- 	dailink->cpu_of_node = cpu_np;
- 	dailink->platform_of_node = cpu_np;
--	tse850->ssc_id = of_alias_get_id(cpu_np, "ssc");
- 	of_node_put(cpu_np);
- 
- 	codec_np = of_parse_phandle(np, "axentia,audio-codec", 0);
-@@ -415,23 +408,14 @@ static int tse850_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	ret = atmel_ssc_set_audio(tse850->ssc_id);
--	if (ret != 0) {
--		dev_err(dev,
--			"failed to set SSC %d for audio\n", tse850->ssc_id);
--		goto err_disable_ana;
--	}
--
- 	ret = snd_soc_register_card(card);
- 	if (ret) {
- 		dev_err(dev, "snd_soc_register_card failed\n");
--		goto err_put_audio;
-+		goto err_disable_ana;
- 	}
- 
- 	return 0;
- 
--err_put_audio:
--	atmel_ssc_put_audio(tse850->ssc_id);
- err_disable_ana:
- 	regulator_disable(tse850->ana);
- 	return ret;
-@@ -443,7 +427,6 @@ static int tse850_remove(struct platform_device *pdev)
- 	struct tse850_priv *tse850 = snd_soc_card_get_drvdata(card);
- 
- 	snd_soc_unregister_card(card);
--	atmel_ssc_put_audio(tse850->ssc_id);
- 	regulator_disable(tse850->ana);
- 
- 	return 0;
+> Hi Jisheng,
+>
+> Which baseline do you use?
+>
+> It took me really lot of time to catch why RX broke after rebase from
+> LKv4.1 to LKv4.4. Between those two, in commit:
+> 97303480753e ("arm64: Increase the max granular size")
+> L1_CACHE_BYTES for all ARMv8 platforms was increased to 128B and so
+> did NET_SKB_PAD.
+>
+> And 128 is more than the maximum that can fit into packet offset
+> [11:8]@0x1400. In such case this correction is needed. Did it answer
+> your doubts?
+
+I can confirm also that without this patch it just doesn't work.
+
+Gregory
+
+>
+> Best regards,
+> Marcin
+>
+>
+>
+> 2016-12-01 12:26 GMT+01:00 Jisheng Zhang <jszhang@marvell.com>:
+>> Hi Gregory, Marcin,
+>>
+>> On Wed, 30 Nov 2016 22:42:49 +0100 Gregory CLEMENT wrote:
+>>
+>>> From: Marcin Wojtas <mw@semihalf.com>
+>>>
+>>> Prepare the mvneta driver in order to be usable on the 64 bits platform
+>>> such as the Armada 3700.
+>>>
+>>> [gregory.clement at free-electrons.com]: this patch was extract from a larger
+>>> one to ease review and maintenance.
+>>>
+>>> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>> ---
+>>>  drivers/net/ethernet/marvell/mvneta.c | 17 ++++++++++++++++-
+>>>  1 file changed, 16 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+>>> index 92b9af14c352..8ef03fb69bcd 100644
+>>> --- a/drivers/net/ethernet/marvell/mvneta.c
+>>> +++ b/drivers/net/ethernet/marvell/mvneta.c
+>>> @@ -296,6 +296,12 @@
+>>>  /* descriptor aligned size */
+>>>  #define MVNETA_DESC_ALIGNED_SIZE     32
+>>>
+>>> +/* Number of bytes to be taken into account by HW when putting incoming data
+>>> + * to the buffers. It is needed in case NET_SKB_PAD exceeds maximum packet
+>>> + * offset supported in MVNETA_RXQ_CONFIG_REG(q) registers.
+>>
+>> We also brought up this driver on 64bit platforms, we doesn't have this
+>> patch. Maybe I'm wrong, I'm trying to understand why we need this
+>> modification. Let's assume the NET_SKB_PAD is 64B, we call
+>> mvneta_rxq_offset_set(pp, rxq, 64),
+>>
+>> {
+>>         u32 val;
+>>
+>>         val = mvreg_read(pp, MVNETA_RXQ_CONFIG_REG(rxq->id));
+>>         val &= ~MVNETA_RXQ_PKT_OFFSET_ALL_MASK;
+>>
+>>         /* Offset is in */
+>>         val |= MVNETA_RXQ_PKT_OFFSET_MASK(offset >> 3);
+>> // then this will be "val |= 8;" it doesn't exceeds the max offset of
+>> MVNETA_RXQ_CONFIG_REG(q) register.
+>>
+>> Could you please kindly point out where I am wrong?
+>>
+>>> + */
+>>> +#define MVNETA_RX_PKT_OFFSET_CORRECTION              64
+>>> +
+>>>  #define MVNETA_RX_PKT_SIZE(mtu) \
+>>>       ALIGN((mtu) + MVNETA_MH_SIZE + MVNETA_VLAN_TAG_LEN + \
+>>>             ETH_HLEN + ETH_FCS_LEN,                        \
+>>> @@ -416,6 +422,7 @@ struct mvneta_port {
+>>>       u64 ethtool_stats[ARRAY_SIZE(mvneta_statistics)];
+>>>
+>>>       u32 indir[MVNETA_RSS_LU_TABLE_SIZE];
+>>> +     u16 rx_offset_correction;
+>>>  };
+>>>
+>>>  /* The mvneta_tx_desc and mvneta_rx_desc structures describe the
+>>> @@ -1807,6 +1814,7 @@ static int mvneta_rx_refill(struct mvneta_port *pp,
+>>>               return -ENOMEM;
+>>>       }
+>>>
+>>> +     phys_addr += pp->rx_offset_correction;
+>>>       mvneta_rx_desc_fill(rx_desc, phys_addr, data, rxq);
+>>>       return 0;
+>>>  }
+>>> @@ -2782,7 +2790,7 @@ static int mvneta_rxq_init(struct mvneta_port *pp,
+>>>       mvreg_write(pp, MVNETA_RXQ_SIZE_REG(rxq->id), rxq->size);
+>>>
+>>>       /* Set Offset */
+>>> -     mvneta_rxq_offset_set(pp, rxq, NET_SKB_PAD);
+>>> +     mvneta_rxq_offset_set(pp, rxq, NET_SKB_PAD - pp->rx_offset_correction);
+>>>
+>>>       /* Set coalescing pkts and time */
+>>>       mvneta_rx_pkts_coal_set(pp, rxq, rxq->pkts_coal);
+>>> @@ -4033,6 +4041,13 @@ static int mvneta_probe(struct platform_device *pdev)
+>>>
+>>>       pp->rxq_def = rxq_def;
+>>>
+>>> +     /* Set RX packet offset correction for platforms, whose
+>>> +      * NET_SKB_PAD, exceeds 64B. It should be 64B for 64-bit
+>>> +      * platforms and 0B for 32-bit ones.
+>>
+>> Even we need this patch, I'm not sure this last comment is correct or not.
+>> NET_SKB_PAD is defined as:
+>>
+>> #define NET_SKB_PAD     max(32, L1_CACHE_BYTES)
+>>
+>> we have 64B cacheline 32bit platforms, on this platforms, the NET_SKB_PAD
+>> should be 64B as well.
+>>
+>> Thanks,
+>> Jisheng
+
 -- 
-2.1.4
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
