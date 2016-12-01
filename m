@@ -1,99 +1,81 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 1 Dec 2016 10:13:13 +0100
-Subject: [PATCH v7 0/8] drm: sun8i: Add DE2 HDMI video support
-In-Reply-To: <2039137.LtCOH6bs2I@avalon>
-References: <cover.1480414715.git.moinejf@free.fr>
- <20161129213650.uqcgekodq77wlmxs@lukather>
- <20161130100545.44546ed28896cdb9768f68cd@free.fr>
- <2039137.LtCOH6bs2I@avalon>
-Message-ID: <20161201091313.th7nucjmvtuolqza@lukather>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 1 Dec 2016 09:16:44 +0000
+Subject: Unable to use perf in VM
+In-Reply-To: <56fd35f8-76ba-3d5d-f1e0-7df5ff8d396a@redhat.com>
+References: <70374841-ecb1-a6c3-ed43-0f39e2d5fec2@riken.jp>
+ <8b2a3cfd-57a0-70ac-ef50-672f8040291d@arm.com>
+ <a81f82da-322a-a52b-de0e-316b7ce5f463@arm.com>
+ <56fd35f8-76ba-3d5d-f1e0-7df5ff8d396a@redhat.com>
+Message-ID: <d2ede07c-d987-467f-79ad-4de7b33ed6d9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On Wed, Nov 30, 2016 at 12:12:55PM +0200, Laurent Pinchart wrote:
-> > More, it is not sure that the bridge/DW code would work with Allwinner's
-> > SoCs.
+On 30/11/16 19:17, Wei Huang wrote:
 > 
-> If it doesn't work and can't be made to work in a non-invasive way they it 
-> should certainly not be used :-)
-
-Even if the register layout is completely scrambled, as long as the
-bits themselves aren't (and by comparing the two drivers it looks like
-they haven't changed), you can easily deal with that using the
-regmap_fields, with the two implementations (the original one and the
-scrambled one) providing their register map that way, and the driver
-code using whatever has been provided.
-
-> > Eventually, I went the same way as omap/hdmi5: different driver.
 > 
-> I might try to fix that for OMAP5 at some point, we'll see.
-
-For complex drivers that have already a driver written and a lot of
-testing that already happened, I don't think duplication is a smart
-move.
-
-> > >   - And finally the fact that we can't have several display engine in
-> > >     parallel, if needs be. This has happened in the past already on
-> > >     Allwinner SoCs, so it's definitely something we should consider in
-> > >     the DT bindings, since we can't break them.
-> > 
-> > IIRC, I proposed my driver before yours, and the DE2 is completely
-> > different from the other display engines.
-> > What you are telling is "add more code to already complex code and have
-> > a big driver for all SoCs in each kernels".
-> > I think it should be better to have small modules, each one treating
-> > specific hardware, and to let only the needed code in the kernel memory
-> > at startup time.
-> > 
-> > > Until those are fixed, I cannot see how this driver can be merged,
-> > > unfortunately.
-> > 
-> > No problem. I just wanted to help people by giving the job I did on the
-> > boards I have. My boards are working for almost one year, fine enough
-> > for I use them as daily desktop computers. I don't want to spend one
-> > more year for having my code in the Linux kernel: there are so much
-> > other exciting things to do...
+> On 11/30/2016 07:37 AM, Marc Zyngier wrote:
+>> On 30/11/16 11:48, Marc Zyngier wrote:
+>>> + Shannon
+>>>
+>>> On 29/11/16 22:04, Itaru Kitayama wrote:
+>>>> Hi,
+>>>>
+>>>> In a VM (virsh controlled, KVM acceleration enabled) on a recent
+>>>> kvmarm kernel host, I find I am unable to use perf to obtain
+>>>> performance statistics for a complex task like kernel build.
+>>>> (I've verified this is seen with a Fedora 25 VM and host combination
+>>>> as well)
+>>>> APM folks CC'ed think this might be caused by a bug in the core PMU 
+>>>> framework code, thus I'd like to have experts opinion on this issue.
+>>>>
+>>>> [root at localhost linux]# perf stat -B make
+>>>>    CHK     include/config/kernel.release
+>>>> [  119.617684] git[1144]: undefined instruction: pc=fffffc000808ff30
+>>>> [  119.623040] Code: 51000442 92401042 d51b9ca2 d5033fdf (d53b9d40)
+>>>> [  119.627607] Internal error: undefined instruction: 0 [#1] SMP
+>>>
+>>> [...]
+>>>
+>>> In a VM running mainline hosted on an AMD Seattle box:
+>>>
+>>>  Performance counter stats for 'make':
+>>>
+>>>     1526089.499304      task-clock:u (msec)       #    0.932 CPUs utilized          
+>>>                  0      context-switches:u        #    0.000 K/sec                  
+>>>                  0      cpu-migrations:u          #    0.000 K/sec                  
+>>>           29527793      page-faults:u             #    0.019 M/sec                  
+>>>      2913174122673      cycles:u                  #    1.909 GHz                    
+>>>      2365040892322      instructions:u            #    0.81  insn per cycle         
+>>>    <not supported>      branches:u                                                  
+>>>        32049215378      branch-misses:u           #    0.00% of all branches        
+>>>
+>>>     1637.531444837 seconds time elapsed
+>>>
+>>> Running the same host kernel on a Mustang system, the guest explodes
+>>> in the way you reported. The failing instruction always seems to be
+>>> an access to pmxevcntr_el0 (I've seen both reads and writes).
+>>>
+>>> Funnily enough, it dies if you try any HW event other than cycles
+>>> ("perf stat -e cycles ls" works, and "perf stat -e instructions ls"
+>>> explodes). Which would tend to indicate that we're screwing up
+>>> the counter selection, but I have no proof of that (specially that
+>>> the Seattle guest is working just as expected).
+>>
+>> It turns out that we *don't* inject an undef. It seems to be generated
+>> locally at EL1.
+>>
+>> Still digging.
 > 
-> And you're certainly welcome to contribute drivers to the kernel, that's 
-> always appreciated. Of course, to ensure a reasonable level of quality and 
-> consistency between drivers, the review process often requires changes to be 
-> made to the code being submitted. When it comes to drivers I mostly pay 
-> attention to DT bindings, userspace APIs and modification to common code. 
-> Driver code itself, as long as it's reasonably clean and doesn't impede 
-> development of other drivers or impact system security in an adverse way, is 
-> still important but maybe slightly less so. I'll defer to Maxime to come to an 
-> agreement on the multiple display engines in parallel problem as I'm not 
-> familiar with it for the Allwinner platforms.
+> Just FYI: I saw it on Mustang before. My initial thought was HW related,
+> but without proof. I am interested to see your findings...
 
-The earlier Allwinner SoCs (with the old display engine), we had some
-SoCs with multiple instances of the display engine and TCON (the
-display engine roughly implementing the planes, the TCON the
-CRTC. Roughly.). However, those were sharing some encoders (HDMI,
-DSI) after that.
+It would have been good to report it earlier. Anyway, I've identified
+the root issue, which seems to boil down to how you interpret a small
+corner of the PMU architecture. I've raised it with the architecture
+team here, and I should have a workaround/fix shortly.
 
-So we need to have a single DRM device taking care of the multiple
-display engines, which essentialy means that we have to decouple the
-DRM device from the display engine. This was done in the earlier
-designs using an additional node with a list of phandles to the
-display engines in the system, and obviously, I'd prefer to have some
-consistency and reuse the same thing.
+Thanks,
 
-But the current approach doesn't work and will require some DT
-modifications if that case happens again, which we can't do because of
-the DT ABI.
-
-Maxime
-
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161201/edd95cf1/attachment.sig>
+Jazz is not dead. It just smells funny...
