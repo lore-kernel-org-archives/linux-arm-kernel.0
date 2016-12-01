@@ -1,71 +1,50 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 1 Dec 2016 18:23:20 +0100
-Subject: [PATCH] ARM: BCM5301X: Enable UART by default for BCM4708(1) and
- BCM4709(4)
-In-Reply-To: <CAC3K-4o3-eSDU5JvjkgohtWLUmZqQViHvX1h2zfdPAGe+qbCOg@mail.gmail.com>
-References: <20161128140134.25128-1-zajec5@gmail.com>
- <CAC3K-4o3-eSDU5JvjkgohtWLUmZqQViHvX1h2zfdPAGe+qbCOg@mail.gmail.com>
-Message-ID: <CACna6rygrQuZqaViTVQM5P8ieA2Gh-h-zrEZETAQrHHT9cnrWA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 1 Dec 2016 17:27:20 +0000
+Subject: [PATCH] arm64: smp: Prevent raw_smp_processor_id() recursion
+In-Reply-To: <2bd54897-df2e-a20e-d748-07966642b850@arm.com>
+References: <bb132e9abf4d256e40ad311b106b05d724b290fb.1480607460.git.robin.murphy@arm.com>
+ <2bd54897-df2e-a20e-d748-07966642b850@arm.com>
+Message-ID: <20161201172720.GB9191@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 December 2016 at 18:14, Jon Mason <jon.mason@broadcom.com> wrote:
-> On Mon, Nov 28, 2016 at 9:01 AM, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
->>
->> From: Rafa? Mi?ecki <rafal@milecki.pl>
->>
->> Every device tested so far got UART0 (at 0x18000300) working as serial
->> console. It's most likely part of reference design and all vendors use
->> it that way.
->>
->> It seems to be easier to enable it by default and just disable it if we
->> ever see a device with different hardware design.
->>
->> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
->> ---
->>  arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  | 4 ----
->>  arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts       | 4 ----
->>  arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts       | 4 ----
->>  arch/arm/boot/dts/bcm4708-netgear-r6250.dts        | 4 ----
->>  arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts      | 4 ----
->>  arch/arm/boot/dts/bcm4708.dtsi                     | 4 ++++
->>  arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 4 ----
->>  arch/arm/boot/dts/bcm47081.dtsi                    | 4 ++++
->>  arch/arm/boot/dts/bcm4709-netgear-r7000.dts        | 4 ----
->>  arch/arm/boot/dts/bcm4709-netgear-r8000.dts        | 4 ----
->>  arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts  | 4 ----
->>  arch/arm/boot/dts/bcm4709.dtsi                     | 1 +
->>  arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts      | 4 ----
->>  arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts      | 4 ----
->>  arch/arm/boot/dts/bcm47094-netgear-r8500.dts       | 4 ----
->>  arch/arm/boot/dts/bcm47094.dtsi                    | 1 +
->
->
-> I think there are a few missing here.  A quick grep shows
->
-> $ grep -rI '#include "bcm470[89].dtsi"'  arch/arm/boot/dts/*.dts
-> arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts:#include "bcm4708.dtsi"
-> arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts:#include "bcm4708.dtsi"
-> arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts:#include "bcm4708.dtsi"
-> arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts:#include "bcm4708.dtsi"
-> arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts:#include "bcm4708.dtsi"
-> arch/arm/boot/dts/bcm4708-netgear-r6250.dts:#include "bcm4708.dtsi"
-> arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts:#include "bcm4708.dtsi"
-> arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts:#include "bcm4708.dtsi"
-> arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts:#include "bcm4709.dtsi"
-> arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts:#include "bcm4709.dtsi"
-> arch/arm/boot/dts/bcm4709-netgear-r7000.dts:#include "bcm4709.dtsi"
-> arch/arm/boot/dts/bcm4709-netgear-r8000.dts:#include "bcm4709.dtsi"
-> arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts:#include "bcm4709.dtsi"
-> arch/arm/boot/dts/bcm94708.dts:#include "bcm4708.dtsi"
-> arch/arm/boot/dts/bcm94709.dts:#include "bcm4708.dtsi"
-> arch/arm/boot/dts/bcm953012er.dts:#include "bcm4708.dtsi"
-> arch/arm/boot/dts/bcm953012k.dts:#include "bcm4708.dtsi"
->
-> I specifically care about the last 4 :)
+On Thu, Dec 01, 2016 at 05:16:50PM +0000, Robin Murphy wrote:
+> On 01/12/16 15:55, Robin Murphy wrote:
+> > Under CONFIG_DEBUG_PREEMPT=y, this_cpu_ptr() ends up calling back into
+> > raw_smp_processor_id(), resulting in some hilariously catastrophic
+> > infinite recursion. In the normal case, we have:
+> > 
+> >   #define this_cpu_ptr(ptr) raw_cpu_ptr(ptr)
+> > 
+> > and everything is dandy. However for CONFIG_DEBUG_PREEMPT, this_cpu_ptr()
+> > is defined in terms of my_cpu_offset, wherein the fun begins:
+> > 
+> >   #define my_cpu_offset per_cpu_offset(smp_processor_id())
+> >   ...
+> >   #define smp_processor_id() debug_smp_processor_id()
+> >   ...
+> >   notrace unsigned int debug_smp_processor_id(void)
+> >   {
+> >   	return check_preemption_disabled("smp_processor_id", "");
+> >   ...
+> >   notrace static unsigned int check_preemption_disabled(const char *what1,
+> >   							const char *what2)
+> >   {
+> >   	int this_cpu = raw_smp_processor_id();
+> > 
+> > and bang. Use raw_cpu_ptr() directly to avoid that.
+> > 
+> > Reported-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Acked-by: Will Deacon <will.deacon@arm.com>
+> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> 
+> I wasn't sure whether commit IDs on for-next/core are stable, but if
+> they are, this could also have:
+> 
+> Fixes: 57c82954e77f ("arm64: make cpu number a percpu variable")
 
-Actually the only missing ones are the last 4. Other ones (e.g.
-bcm4709-buffalo-wxr-1900dhp.dts) never got uart0 enabled so I just
-didn't need to modify these files.
+It depends on which branch is pulled into next. I keep the for-next/core
+stable at this stage, so I'll include the Fixes like as well. Thanks.
 
-I'll send V2 updating last 4 ones as well. Thanks for catching this.
+-- 
+Catalin
