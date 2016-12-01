@@ -1,136 +1,40 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  1 Dec 2016 10:05:59 +0100
-Subject: [PATCH v3 3/4] dt-bindings: display: add Amlogic Meson DRM Bindings
+Date: Thu,  1 Dec 2016 10:06:00 +0100
+Subject: [PATCH v3 4/4] MAINTAINERS: add entry for Amlogic DRM drivers
 In-Reply-To: <1480583160-31806-1-git-send-email-narmstrong@baylibre.com>
 References: <1480583160-31806-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1480583160-31806-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1480583160-31806-5-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Add myself as maintainer for Amlogic DRM drivers.
+
+Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- .../bindings/display/amlogic,meson-vpu.txt         | 112 +++++++++++++++++++++
- 1 file changed, 112 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt
+ MAINTAINERS | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt b/Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt
-new file mode 100644
-index 0000000..00f74ba
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt
-@@ -0,0 +1,112 @@
-+Amlogic Meson Display Controller
-+================================
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 1cd38a7..b1ad45b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -4078,6 +4078,15 @@ S:	Supported
+ F:	drivers/gpu/drm/sun4i/
+ F:	Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+ 
++DRM DRIVERS FOR AMLOGIC SOCS
++M:	Neil Armstrong <narmstrong@baylibre.com>
++L:	dri-devel at lists.freedesktop.org
++L:	linux-amlogic at lists.infradead.org
++W:	http://linux-meson.com/
++S:	Supported
++F:	drivers/gpu/drm/meson/
++F:	Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt
 +
-+The Amlogic Meson Display controller is composed of several components
-+that are going to be documented below:
-+
-+DMC|---------------VPU (Video Processing Unit)----------------|------HHI------|
-+   | vd1   _______     _____________    _________________     |               |
-+D  |-------|      |----|            |   |                |    |   HDMI PLL    |
-+D  | vd2   | VIU  |    | Video Post |   | Video Encoders |<---|-----VCLK      |
-+R  |-------|      |----| Processing |   |                |    |               |
-+   | osd2  |      |    |            |---| Enci ----------|----|-----VDAC------|
-+R  |-------| CSC  |----| Scalers    |   | Encp ----------|----|----HDMI-TX----|
-+A  | osd1  |      |    | Blenders   |   | Encl ----------|----|---------------|
-+M  |-------|______|----|____________|   |________________|    |               |
-+___|__________________________________________________________|_______________|
-+
-+
-+VIU: Video Input Unit
-+---------------------
-+
-+The Video Input Unit is in charge of the pixel scanout from the DDR memory.
-+It fetches the frames addresses, stride and parameters from the "Canvas" memory.
-+This part is also in charge of the CSC (Colorspace Conversion).
-+It can handle 2 OSD Planes and 2 Video Planes.
-+
-+VPP: Video Post Processing
-+--------------------------
-+
-+The Video Post Processing is in charge of the scaling and blending of the
-+various planes into a single pixel stream.
-+There is a special "pre-blending" used by the video planes with a dedicated
-+scaler and a "post-blending" to merge with the OSD Planes.
-+The OSD planes also have a dedicated scaler for one of the OSD.
-+
-+VENC: Video Encoders
-+--------------------
-+
-+The VENC is composed of the multiple pixel encoders :
-+ - ENCI : Interlace Video encoder for CVBS and Interlace HDMI
-+ - ENCP : Progressive Video Encoder for HDMI
-+ - ENCL : LCD LVDS Encoder
-+The VENC Unit gets a Pixel Clocks (VCLK) from a dedicated HDMI PLL and clock
-+tree and provides the scanout clock to the VPP and VIU.
-+The ENCI is connected to a single VDAC for Composite Output.
-+The ENCI and ENCP are connected to an on-chip HDMI Transceiver.
-+
-+Device Tree Bindings:
-+---------------------
-+
-+VPU: Video Processing Unit
-+--------------------------
-+
-+Required properties:
-+- compatible: value should be different for each SoC family as :
-+	- GXBB (S905) : "amlogic,meson-gxbb-vpu"
-+	- GXL (S905X, S905D) : "amlogic,meson-gxl-vpu"
-+	- GXM (S912) : "amlogic,meson-gxm-vpu"
-+	followed by the common "amlogic,meson-gx-vpu"
-+- reg: base address and size of he following memory-mapped regions :
-+	- vpu
-+	- hhi
-+	- dmc
-+- reg-names: should contain the names of the previous memory regions
-+- interrupts: should contain the VENC Vsync interrupt number
-+
-+Required nodes:
-+
-+The connections to the VPU output video ports are modeled using the OF graph
-+bindings specified in Documentation/devicetree/bindings/graph.txt.
-+
-+The following table lists for each supported model the port number
-+corresponding to each VPU output.
-+
-+		Port 0		Port 1
-+-----------------------------------------
-+ S905 (GXBB)	CVBS VDAC	HDMI-TX
-+ S905X (GXL)	CVBS VDAC	HDMI-TX
-+ S905D (GXL)	CVBS VDAC	HDMI-TX
-+ S912 (GXM)	CVBS VDAC	HDMI-TX
-+
-+Example:
-+
-+tv-connector {
-+	compatible = "composite-video-connector";
-+
-+	port {
-+		tv_connector_in: endpoint {
-+			remote-endpoint = <&cvbs_vdac_out>;
-+		};
-+	};
-+};
-+
-+vpu: vpu at d0100000 {
-+	compatible = "amlogic,meson-gxbb-vpu";
-+	reg = <0x0 0xd0100000 0x0 0x100000>,
-+	      <0x0 0xc883c000 0x0 0x1000>,
-+	      <0x0 0xc8838000 0x0 0x1000>;
-+	reg-names = "vpu", "hhi", "dmc";
-+	interrupts = <GIC_SPI 3 IRQ_TYPE_EDGE_RISING>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	/* CVBS VDAC output port */
-+	port at 0 {
-+		reg = <0>;
-+
-+		cvbs_vdac_out: endpoint {
-+			remote-endpoint = <&tv_connector_in>;
-+		};
-+	};
-+};
+ DRM DRIVERS FOR EXYNOS
+ M:	Inki Dae <inki.dae@samsung.com>
+ M:	Joonyoung Shim <jy0922.shim@samsung.com>
 -- 
 1.9.1
