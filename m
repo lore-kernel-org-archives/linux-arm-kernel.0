@@ -1,46 +1,52 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 1 Dec 2016 01:51:59 +0100
-Subject: [rtc-linux] Re: [RFC PATCH 2/3] rtc: Add Amlogic Virtual Wake RTC
-In-Reply-To: <20161103153647.GD25852@remoulade>
-References: <1478183365-23708-1-git-send-email-narmstrong@baylibre.com>
- <1478183365-23708-3-git-send-email-narmstrong@baylibre.com>
- <20161103153647.GD25852@remoulade>
-Message-ID: <20161201005159.l54yo4kspgrb75ev@piout.net>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Thu, 1 Dec 2016 09:10:40 +0800
+Subject: [PATCH v10 10/13] drm/mediatek: add dsi ulp mode control
+In-Reply-To: <1480070076-6196-11-git-send-email-yt.shen@mediatek.com>
+References: <1480070076-6196-1-git-send-email-yt.shen@mediatek.com>
+ <1480070076-6196-11-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1480554640.25380.4.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2016 at 15:36:48 +0000, Mark Rutland wrote :
-> > In order to be able to reuse the RTC wakealarm feature, this
-> > driver implements a fake RTC device which uses the system time
-> > to deduce a suspend delay.
-> 
-> This sounds like an always-on oneshot timer device, not an RTC.
-> 
-> > +static int meson_vrtc_read_time(struct device *dev, struct rtc_time *tm)
-> > +{
-> > +	unsigned long local_time;
-> > +	struct timeval time;
-> > +
-> > +	do_gettimeofday(&time);
-> > +	local_time = time.tv_sec - (sys_tz.tz_minuteswest * 60);
-> > +	rtc_time_to_tm(local_time, tm);
-> > +
-> > +	return 0;
-> > +}
-> 
-> ... if this were a timer, you wouldn't need this hack.
+Hi, YT:
+
+On Fri, 2016-11-25 at 18:34 +0800, YT Shen wrote:
+> modify dsi enter ultra low power mode method
 > 
 
-The main issue I think is that the clockevents are not able to wakeup a
-platform so it doesn't really fit as a timer inside the kernel.
+This looks like a power-saving patch. I think without this, MT2701 could
+still work correctly. The commit message is too simple, please describe
+why this patch is related to MT2701. If it is not related to MT2701,
+move this patch out of MT2701 series and send it independently.
 
-I think it may be fine to handle that in the RTC subsystem for now.
+Regards,
+CK
 
-The same issue can be seen with the flextimer on LS1021A:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/365597.html
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
+> Signed-off-by: YT Shen <yt.shen@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_dsi.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
+> index d03a0f1..01df829 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
+> @@ -289,7 +289,7 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
+>  static void mtk_dsi_clk_ulp_mode_enter(struct mtk_dsi *dsi)
+>  {
+>  	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_HS_TX_EN, 0);
+> -	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_ULPM_EN, 0);
+> +	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_ULPM_EN, LC_ULPM_EN);
+>  }
+>  
+>  static void mtk_dsi_clk_ulp_mode_leave(struct mtk_dsi *dsi)
+> @@ -302,7 +302,7 @@ static void mtk_dsi_clk_ulp_mode_leave(struct mtk_dsi *dsi)
+>  static void mtk_dsi_lane0_ulp_mode_enter(struct mtk_dsi *dsi)
+>  {
+>  	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_HS_TX_EN, 0);
+> -	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_ULPM_EN, 0);
+> +	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_ULPM_EN, LD0_ULPM_EN);
+>  }
+>  
+>  static void mtk_dsi_lane0_ulp_mode_leave(struct mtk_dsi *dsi)
