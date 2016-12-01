@@ -1,37 +1,36 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  1 Dec 2016 21:09:29 +0100
-Subject: [PATCH v2 6/7] ARM: bcm/dt: Add VEC node in bcm283x.dtsi
-In-Reply-To: <1480622970-8714-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1480622970-8714-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1480622970-8714-7-git-send-email-boris.brezillon@free-electrons.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Thu, 1 Dec 2016 20:11:30 +0000
+Subject: [RFC v2 PATCH 23/23] ARM: Allow ARCH_MULTIPLATFORM to be selected
+ for NOMMU
+In-Reply-To: <583EA390.7000705@arm.com>
+References: <1480423205-48436-1-git-send-email-vladimir.murzin@arm.com>
+ <1480423205-48436-24-git-send-email-vladimir.murzin@arm.com>
+ <20161129172234.GY14217@n2100.armlinux.org.uk> <583EA390.7000705@arm.com>
+Message-ID: <SG2PR06MB116568255B0E7CBF5AE474038A8F0@SG2PR06MB1165.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the VEC (Video EnCoder) node definition in bcm283x.dtsi.
+On 11/29/2016, Vladimir Murzin wrote:
+> >> motivation behind of this patch:
+> >> - bring build coverage for NOMMU configurations
+> >> - allow known working NOMMU platforms (like R-class) to be used
+> >> - pave a way to add support for single address space (aka 1:1 mapping)
+> >>   for MMU platforms, so they can be usable in NOMMU configurations
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- arch/arm/boot/dts/bcm283x.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index 46d46d894a44..44a9c0539437 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -266,6 +266,14 @@
- 			status = "disabled";
- 		};
- 
-+		vec: vec at 7e806000 {
-+			compatible = "brcm,bcm2835-vec";
-+			reg = <0x7e806000 0x1000>;
-+			clocks = <&clocks BCM2835_CLOCK_VEC>;
-+			interrupts = <2 27>;
-+			status = "disabled";
-+		};
-+
- 		pixelvalve at 7e807000 {
- 			compatible = "brcm,bcm2835-pixelvalve2";
- 			reg = <0x7e807000 0x100>;
--- 
-2.7.4
+I use XIP_KERNEL with a MMU platform (Renesas RZ/A1, Cortex A9) which is
+also ARCH_MULTIPLATFORM.
+
+So I also have to hack the Kconfig to get it to build.
+
+I had proposed this patch to allow you to select which multiplatform
+devices are XIP capable, but it never made it in.
+
+https://patchwork.kernel.org/patch/8395661/
+
+
+Maybe you can do the same idea for !MMU platforms as well (just
+say whether the device can do XIP regardless of MMU or !MMU)
+
+
+Chris
