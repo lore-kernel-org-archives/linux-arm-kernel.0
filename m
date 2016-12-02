@@ -1,262 +1,142 @@
 From: jcm@redhat.com (Jon Masters)
-Date: Fri, 2 Dec 2016 03:08:34 -0500 (EST)
-Subject: [PATCH v3] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe
+Date: Fri, 2 Dec 2016 03:11:54 -0500 (EST)
+Subject: [PATCH v4 1/1] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe
  controller
-In-Reply-To: <CADaLND=fYXf-NOw7qm-KbDX3U3YrtAXRyQ+aj=CMcwmEaNHmpQ@mail.gmail.com>
-References: <1480549373-2123-1-git-send-email-dhdang@apm.com>
- <20161201183350.GF30746@bhelgaas-glaptop.roam.corp.google.com>
- <1480620053.4751.30.camel@redhat.com>
- <20161201194114.GA8263@bhelgaas-glaptop.roam.corp.google.com>
- <CADaLNDkVPRPSg0aU-sxHsiJbVvEn=LxcekDt6gfXBBhc+fzhjw@mail.gmail.com>
- <20161201230736.GA17948@bhelgaas-glaptop.roam.corp.google.com>
- <CADaLND=Ss8d-jv7wffbrtytrjj=SUnjDn9bognKUszhKguRV1A@mail.gmail.com>
- <d77e403c-81e9-114e-6ec6-bbffaa4ac36f@redhat.com>
- <cc77fe88-b36e-bb36-b5df-2934a88bea3c@redhat.com>
- <CADaLND=fYXf-NOw7qm-KbDX3U3YrtAXRyQ+aj=CMcwmEaNHmpQ@mail.gmail.com>
-Message-ID: <879A81F2-E6AF-4FA2-9752-EEE7018B54D9@redhat.com>
+In-Reply-To: <CADaLNDkyCrheZLNG3_9BVgvGBW8WrA-VPWOCezz3U-g+nt5W9w@mail.gmail.com>
+References: <20161201183350.GF30746@bhelgaas-glaptop.roam.corp.google.com>
+ <f18738b7096fb06a5865214ddc299ce99630673b.1480644928.git.dhdang@apm.com>
+ <6d593615-e97f-8738-42be-1f8f4906d2f4@redhat.com>
+ <CADaLNDkyCrheZLNG3_9BVgvGBW8WrA-VPWOCezz3U-g+nt5W9w@mail.gmail.com>
+Message-ID: <175F32B0-C73F-4250-9E60-3CE7409F0B0C@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quick reply - sorry for top posting (it's 3am...) - I would favor keeping the existing Fixed32Memory _CRS but switching over to prefer the PNP entry as a good citizen. The trouble is that it would be unfortunate if existing distros stopped working on newer firmware and it would lead to IMO more pain than it is worth. Hopefully for this reason Bjorn will take your v4 as-is for now and let us all figure out the cleanest long term cleanup later.
+You're welcome.
+
+(Unrelated) Note that I added a console= and earlycon in my test (and got the baud rate wrong for the console but nevermind...was ssh'd in after the earlycon output I cared about anyway) because of some other cleanup work for the SPCR parsing that apparently is still not quite fixed for upstream, or rather, there is a need to match on the 32-bit access required for the UART and that isn't happening so it's not getting setup. Folks are tracking that one and fixing it though.
 
 -- 
 Computer Architect | Sent from my 64-bit #ARM Powered phone
 
-> On Dec 2, 2016, at 02:34, Duc Dang <dhdang@apm.com> wrote:
+> On Dec 2, 2016, at 02:37, Duc Dang <dhdang@apm.com> wrote:
 > 
->> On Thu, Dec 1, 2016 at 10:31 PM, Jon Masters <jcm@redhat.com> wrote:
->> Bjorn,
+>> On Thu, Dec 1, 2016 at 11:12 PM, Jon Masters <jcm@redhat.com> wrote:
+>>> On 12/01/2016 09:27 PM, Duc Dang wrote:
+>>> PCIe controllers in X-Gene SoCs is not ECAM compliant: software
+>>> needs to configure additional controller's register to address
+>>> device at bus:dev:function.
+>>> 
+>>> The quirk will discover controller MMIO register space and configure
+>>> controller registers to select and address the target secondary device.
+>>> 
+>>> The quirk will only be applied for X-Gene PCIe MCFG table with
+>>> OEM revison 1, 2, 3 or 4 (PCIe controller v1 and v2 on X-Gene SoCs).
+>>> 
+>>> Signed-off-by: Duc Dang <dhdang@apm.com>
 >> 
->> Although I think the below still applies (that we need to leave that
->> Memory32Fixed for existing deployments, and this is going to result
->> in /proc/iomem polution), I've done some more reading of your ecam
->> tree and the implementation of acpi_get_rc_resources you mentioned,
->> and in particular how the PNP0C02 devices actually get wired up.
+>> So far I've tested this on an HPE ProLiant m400 (Moonshot) cartridge
+>> and will test it on some other reference platforms soon. Bootlog for
+>> the m400 attached in case Bjorn wants to see the output. Here's
+>> what I see in /proc/iomem btw on that platform:
 >> 
->> I would like to be able to boot upstream on existing shipping and
->> deployed machines that are in the field (not to mention our labs), but
->> there's no reason we can't *also* get APM to add a new vendor specific
->> PNP0C02 to the ACPI namespace in future firmware updates (for at least
->> their own Mustang reference boards) matching segment to CSR, as in the
->> case of the HiSi patches. That might then allow for some later
->> preference to use that for the CSR rather than getting it from the RC
->> device. Still, it would be ideal to boot on machines that are shipping
->> from HPE and others at this moment, so I am still hopeful you'll
->> at least allow the approach from Duc's v4 for now (4.10).
-> 
-> APM X-Gene 1 and X-Gene 2 ACPI tables will absolutely have PNP0C02
-> nodes (in upcoming firmware release). I hope to have a solution that
-> works for both old buggy firmware and the future improved firmware. So
-> I am thinking the CSR discovery will be like this:
-> 
-> (1) Use  acpi_get_rc_resources() to discover CSR resource by checking
-> PNP0C02 nodes
-> (2) (1) should succeed with the new firmware
-> (3) If (1) fails, we can fall back to approach on v4 patch: calling
-> xgene_get_csr_resource() to discover the CSR described by
-> Memory32Fixed macro.
-> 
-> How do you feel about this? The drawback is the new firmware that does
-> not have the CSR space described with Memory32Fixed macro will fail on
-> the distro version that uses the old quirk (that relies on this
-> Memory32Fixed macro).
-> 
+>> # cat /proc/iomem
+>> 10520000-10523fff : APMC0D18:00
+>>  10520000-10523fff : APMC0D18:00
+>> 10524000-10527fff : APMC0D17:00
+>> 10540000-1054a0ff : APMC0D01:00
+>>  10546000-10546fff : APMC0D50:00
+>>  1054a000-1054a00f : APMC0D12:03
+>>    1054a000-1054a00f : APMC0D12:02
+>>      1054a000-1054a00f : APMC0D12:01
+>>        1054a000-1054a00f : APMC0D12:00
+>> 17000000-17000fff : APMC0D01:00
+>> 17001000-17001fff : APMC0D01:00
+>>  17001000-170013ff : APMC0D15:00
+>>    17001000-170013ff : APMC0D15:00
+>> 1701c000-1701cfff : APMC0D14:00
+>> 1a800000-1a800fff : APMC0D0D:00
+>>  1a800000-1a800fff : APMC0D0D:00
+>> 1c000200-1c0002ff : APMC0D06:00
+>> 1c021000-1c0210ff : APMC0D08:00
+>>  1c021000-1c02101f : serial
+>> 1c024000-1c024fff : APMC0D07:00
+>> 1f230000-1f230fff : APMC0D0D:00
+>>  1f230000-1f230fff : APMC0D0D:00
+>> 1f23d000-1f23dfff : APMC0D0D:00
+>>  1f23d000-1f23dfff : APMC0D0D:00
+>> 1f23e000-1f23efff : APMC0D0D:00
+>>  1f23e000-1f23efff : APMC0D0D:00
+>> 1f2a0000-1f31ffff : APMC0D06:00
+>> 1f500000-1f50ffff : PCI Bus 0000:00
+>>  1f500000-1f50ffff : PNP0A08:00
+>> 78800000-78800fff : APMC0D13:00
+>>  78800000-78800fff : APMC0D12:03
+>>    78800000-78800fff : APMC0D12:02
+>>      78800000-78800fff : APMC0D12:01
+>>        78800000-78800fff : APMC0D12:00
+>>          78800000-78800fff : APMC0D11:00
+>>          78800000-78800fff : APMC0D10:03
+>>          78800000-78800fff : APMC0D10:02
+>>          78800000-78800fff : APMC0D10:01
+>>          78800000-78800fff : APMC0D10:00
+>> 79000000-798fffff : APMC0D0E:00
+>> 7c000000-7c1fffff : APMC0D12:00
+>> 7c200000-7c3fffff : APMC0D12:01
+>> 7c400000-7c5fffff : APMC0D12:02
+>> 7c600000-7c7fffff : APMC0D12:03
+>> 7e000000-7e000fff : APMC0D13:00
+>> 7e200000-7e200fff : APMC0D10:03
+>>  7e200000-7e200fff : APMC0D10:02
+>>    7e200000-7e200fff : APMC0D10:01
+>>      7e200000-7e200fff : APMC0D10:00
+>> 7e600000-7e600fff : APMC0D11:00
+>> 7e700000-7e700fff : APMC0D10:03
+>>  7e700000-7e700fff : APMC0D10:02
+>>    7e700000-7e700fff : APMC0D10:01
+>>      7e700000-7e700fff : APMC0D10:00
+>> 7e720000-7e720fff : APMC0D10:03
+>>  7e720000-7e720fff : APMC0D10:02
+>>    7e720000-7e720fff : APMC0D10:01
+>>      7e720000-7e720fff : APMC0D10:00
+>> 7e800000-7e800fff : APMC0D10:00
+>> 7e840000-7e840fff : APMC0D10:01
+>> 7e880000-7e880fff : APMC0D10:02
+>> 7e8c0000-7e8c0fff : APMC0D10:03
+>> 7e930000-7e930fff : APMC0D13:00
+>> 4000000000-4001ffffff : System RAM
+>>  4000080000-4000c3ffff : Kernel code
+>>  4000db0000-400165ffff : Kernel data
+>> 40023a0000-4ff733ffff : System RAM
+>> 4ff7340000-4ff77cffff : reserved
+>> 4ff77d0000-4ff79cffff : System RAM
+>> 4ff79d0000-4ff7e7ffff : reserved
+>> 4ff7e80000-4ff7e8ffff : System RAM
+>> 4ff7e90000-4ff7efffff : reserved
+>> 4ff7f10000-4ff800ffff : reserved
+>> 4ff8010000-4fffffffff : System RAM
+>> a020000000-a03fffffff : PCI Bus 0000:00
+>>  a020000000-a0201fffff : PCI Bus 0000:01
+>>    a020000000-a0200fffff : 0000:01:00.0
+>>      a020000000-a0200fffff : mlx4_core
+>>    a020100000-a0201fffff : 0000:01:00.0
+>> a060000000-a07fffffff : PCI Bus 0000:00
+>> a0d0000000-a0dfffffff : PCI ECAM
+>> a110000000-a14fffffff : PCI Bus 0000:00
+>>  a110000000-a121ffffff : PCI Bus 0000:01
+>>    a110000000-a111ffffff : 0000:01:00.0
+>>      a110000000-a111ffffff : mlx4_core
+>>    a112000000-a121ffffff : 0000:01:00.0
 >> 
->> Another nasty option for later consideration could then be having
->> the kernel fake up any missing PNP0C02 on existing machines, but
->> it would need special knowledge of the platform to generate that
->> so as to handle the problem Mark flagged earlier (segment vs
->> controller mismatch on some platforms). That could be done with a
->> DMI quirk that matched on a specific (e.g. HPE) machine. It would
->> only be needed on "broken" existing machines, and could be added
->> post-4.10 to clean this up if you really want to do that.
-> 
-> Bjorn suggested similar approach (have a PNP quirk to fabricate a
-> PNP0C02 device and decleare all the required resources there) on
-> another thread. But as you said, this approach does not scale, it can
-> only applicable for a specific machine (by checking DMI information to
-> apply the PNP quirk).
-> 
+>> Adding a Tested-by for the record:
 >> 
->> That's all very nasty...
+>> Tested-by: Jon Masters <jcm@redhat.com>
+> 
+> Thanks a lot for testing this, Jon.
 >> 
 >> Jon.
 >> 
->>> On 12/01/2016 11:08 PM, Jon Masters wrote:
->>> Hi Bjorn, Duc, Mark,
->>> 
->>> I switched my brain to the on mode and went and read some specs, and a few
->>> tables, so here's my 2 cents on this...
->>> 
->>>> On 12/01/2016 06:22 PM, Duc Dang wrote:
->>>>> On Thu, Dec 1, 2016 at 3:07 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
->>>>> On Thu, Dec 01, 2016 at 02:10:10PM -0800, Duc Dang wrote:
->>> 
->>>>>>>> The SoC provide some number of RC bridges, each with a different base
->>>>>>>> for some mmio registers. Even if segment is legitimate in MCFG, there
->>>>>>>> is still a problem if a platform doesn't use the segment ordering
->>>>>>>> implied by the code. But the PNP0A03 _CRS does have this base address
->>>>>>>> as the first memory resource, so we could get it from there and not
->>>>>>>> have hard-coded addresses and implied ording in the quirk code.
->>>>>>> 
->>>>>>> I'm confused.  Doesn't the current code treat every item in PNP0A03
->>>>>>> _CRS as a window?  Do you mean the first resource is handled
->>>>>>> differently somehow?  The Consumer/Producer bit could allow us to do
->>>>>>> this by marking the RC MMIO space as "Consumer", but I didn't think
->>>>>>> that strategy was quite working yet.
->>> 
->>> Let's see if I summarized this correctly...
->>> 
->>> 1. The MMIO registers for the host bridge itself need to be described
->>>   somewhere, especially if we need to find those in a quirk and poke
->>>   them. Since those registers are very much part of the bridge device,
->>>   it makes sense for them to be in the _CRS for PNP0A08/PNP0A03.
->>> 
->>> 2. The address space covering these registers MUST be described as a
->>>   ResourceConsumer in order to avoid accidentally exposing them as
->>>   available for use by downstream devices on the PCI bus.
->>> 
->>> 3. The ACPI specification allows for resources of the type "Memory32Fixed".
->>>   This is a macro that doesn't have the notion of a producer or consumer.
->>>   HOWEVER various interpretations seem to be that this could/should
->>>   default to being interpreted as a consumed region.
->>> 
->>> 4. At one point, a regression was added to the kernel:
->>> 
->>>   63f1789ec716 ("x86/PCI/ACPI: Ignore resources consumed by
->>>   host bridge itself")
->>> 
->>>   Which lead to a series on conversations about what should happen
->>>   for bridge resources (e.g. https://lkml.org/lkml/2015/3/24/962 )
->>> 
->>> 5. This resulted in the following commit reverting point 4:
->>> 
->>>   2c62e8492ed7 ("x86/PCI/ACPI: Make all resources except [io 0xcf8-0xcff]
->>>   available on PCI bus")
->>> 
->>>   Which also stated that:
->>> 
->>>   "This solution will also ease the way to consolidate ACPI PCI host
->>>    bridge common code from x86, ia64 and ARM64"
->>> 
->>> End of summary.
->>> 
->>> So it seems that generally there is an aversion to having bridge resources
->>> be described in this manner and you would like to require that they be
->>> described e.g. using QWordMemory with a ResourceConsumer type?
->>> 
->>> BUT if we were to do that, it would break existing shipping systems since
->>> there are quirks out there that use this form to find the base CSR:
->>> 
->>>       if (acpi_res->type == ACPI_RESOURCE_TYPE_FIXED_MEMORY32) {
->>>                fixed32 = &acpi_res->data.fixed_memory32;
->>>                port->csr_base = ioremap(fixed32->address,
->>>                                         fixed32->address_length);
->>>                return AE_CTRL_TERMINATE;
->>>        }
->>> 
->>> That's what's shipping in at least RHEL(SA) today, and probably in other
->>> distros. So if we get vendors to take that out, existing stuff will break,
->>> which will have the downside that customers will have to choose between
->>> whether to run a given distro or be able to use upstream kernels. In
->>> that sense, to me, there are shipping platforms out there, which may well
->>> be doing the "wrong" thing, but they are deployed and they are doing it.
->>> 
->>> Which makes me wonder a couple of things (I think should NOT be done):
->>> 
->>> 1. What would happen if we had both. A FixedMemory32 and the same region
->>>   described again using the longer form as a consumed region. I doubt
->>>   that's legal, and the current code would still add the region if it
->>>   saw the FixedMemory32 first when walking the tree. I don't like it,
->>>   but I'm mentioning it in case that leads to some helpful thinking.
->>> 
->>> 2. What would happen if we had a difference policy on arm64 for such
->>>   resources. x86 has an "exception" for accessing the config space
->>>   using IO port 0xCF8-0xCFF (a fairly reasonable exception!) and
->>>   we can make the rules for a new platform (i.e. actually prescribe
->>>   exactly what the behavior is, rather than have it not be defined).
->>>   This is of course terrible in that existing BIOS vendors and so on
->>>   won't necessarily know this when working on ARM ACPI later on.
->>> 
->>> I don't like either of these obviously. I'm hoping there's some way we
->>> can say that this is tolerated in this one quirk (allow the use of
->>> FixedMemory32 in this case) on the grounds that the driver claims
->>> this bridge region and can be annotated to explain such.
->>> 
->>> Once you let us know what you prefer, we will go and update the ARM
->>> SBBR to spell out that future platforms should not make this mistake
->>> again. We can prescribe whatever you'd like in terms of how bridge
->>> resources consumed by the bridge are exposed. I have spoken about
->>> this kind of situation within MS in the past, but they didn't have
->>> specific guidance since they don't really tolerate such quirks. I
->>> can, however, consult them before we change the SBBR as well.
->>> 
->>>>>> The first resource is defined like below. It was introduced long time
->>>>>> ago to use with older version of X-Gene ECAM quirks.
->>>>>> Memory32Fixed(ReadWrite, 0x1F2B0000, 0x10000, )
->>> 
->>> Indeed. And in the case of m400, it is currently this in shipping systems:
->>> 
->>>               Memory32Fixed (ReadWrite,
->>>                    0x1F500000,         // Address Base
->>>                    0x00010000,         // Address Length
->>>                    )
->>> 
->>> The spec isn't clear on whether these are produced or consumed but the
->>> implication is that these are consumed resources in most cases. Not that
->>> this changes any of the above, but one can understand why it happened.
->>> 
->>>>>> [    0.822990] pci_bus 0000:00: root bus resource [mem 0x1f2b0000-0x1f2bffff]
->>>>> 
->>>>> I think this is wrong.  The PCI core thinks [mem 0x1f2b0000-0x1f2bffff]
->>>>> is available for use by devices on bus 0000:00, but I think you're
->>>>> saying it is consumed by the bridge itself, not forwarded down to PCI.
->>> 
->>> Indeed.
->>> 
->>>>> What's in your /proc/iomem?  I see that your quirks do call
->>>>> devm_ioremap_resource(), which calls devm_request_mem_region()
->>>>> internally, so the driver does at least request that region, which
->>>>> should keep us from assigning it to PCI devices.
->>> 
->>> I'm hoping you can grant an exception on the grounds that the quirk will
->>> keep the region from actually being used. And then somehow we document
->>> this in the driver.
->>> 
->>>>> But it still isn't quite right to tell the PCI core that the region is
->>>>> available on the root bus.
->>>> 
->>>> This is /proc/iomem output on my Mustang board. The 64K "PCIe CSR"
->>>> region is consumed completely.
->>>> 1f2b0000-1f2bffff : PCI Bus 0000:00
->>>>  1f2b0000-1f2bffff : PCIe CSR
->>>> 
->>>> e040000000-e07fffffff : PCI Bus 0000:00
->>>>  e040000000-e0401fffff : PCI Bus 0000:01
->>>>    e040000000-e0400fffff : 0000:01:00.0
->>>>      e040000000-e0400fffff : mlx4_core
->>>>    e040100000-e0401fffff : 0000:01:00.0
->>>> e0d0000000-e0dfffffff : PCI ECAM
->>>> f000000000-ffffffffff : PCI Bus 0000:00
->>>>  f000000000-f001ffffff : PCI Bus 0000:01
->>>>    f000000000-f001ffffff : 0000:01:00.0
->>>>      f000000000-f001ffffff : mlx4_core
->>>> 
->>>> Using hard-coded resources for mmio space make the quirk rely on the
->>>> segment number passing from the firmware. Using Mark's method or
->>>> acpi_get_rc_resource can discover the mmio space and consume all of
->>>> the space, but as you mentioned, it leaves the defect that PCI core
->>>> considers the mmio space as available resource for secondary devices
->>>> although it will never allocate the mmio space to secondary devices as
->>>> the RC already reserves and consumes all of the space.
->>> 
->>> Indeed. It's not clean, but perhaps we can get away with it on the
->>> grounds that there are existing systems out there and this won't
->>> be allowed to happen again in the future :)
->>> 
->>> Jon.
->>> 
->> 
->> 
 >> --
 >> Computer Architect | Sent from my Fedora powered laptop
+>> 
+> Regards,
+> Duc Dang.
