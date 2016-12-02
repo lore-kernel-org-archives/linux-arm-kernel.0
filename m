@@ -1,91 +1,97 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 2 Dec 2016 16:10:46 +0000
-Subject: [PATCH v2 2/3] ARM: dts: sunxi: add support for Orange Pi Zero
- board
-In-Reply-To: <11535601480689127@web2g.yandex.ru>
-References: <20161121162421.800-1-icenowy@aosc.xyz>
- <20161121162421.800-2-icenowy@aosc.xyz> <5373671480239408@web31m.yandex.ru>
- <cdfd3c65-d473-badb-ea6a-035f7ab79217@arm.com>
- <20161201093619.gs6lmoxtlptp2jr6@lukather>
- <11498641480688550@web2g.yandex.ru>
- <efb30303-b9bb-7a7c-4478-af485991dd86@redhat.com>
- <11535601480689127@web2g.yandex.ru>
-Message-ID: <324c8820-aeea-3fad-0e02-1bdb8f675677@arm.com>
+From: gary.bisson@boundarydevices.com (Gary Bisson)
+Date: Fri, 2 Dec 2016 17:13:59 +0100
+Subject: [PATCH] imx_v6_v7_defconfig: enable SPIDEV module
+In-Reply-To: <CABxcv=nSUfDT-bqHBm2e0XY55Qp4nH+66PriMqnix2RTsN0BNQ@mail.gmail.com>
+References: <20161202145631.19292-1-gary.bisson@boundarydevices.com>
+ <CAOMZO5C8OH6obRn_8zh5HA9zoanRXUpoqk=vEBx+fW3wraNS6Q@mail.gmail.com>
+ <20161202152718.o4xv2ru5r7xw7t5e@t450s.lan>
+ <CABxcv=nSUfDT-bqHBm2e0XY55Qp4nH+66PriMqnix2RTsN0BNQ@mail.gmail.com>
+Message-ID: <20161202161359.y3mzvdxsfb2dyok7@t450s.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Javier,
 
-On 02/12/16 14:32, Icenowy Zheng wrote:
+Thanks for the quick feedback on the matter.
+
+On Fri, Dec 02, 2016 at 12:44:42PM -0300, Javier Martinez Canillas wrote:
+> Hello Gary,
 > 
+> On Fri, Dec 2, 2016 at 12:27 PM, Gary Bisson
+> <gary.bisson@boundarydevices.com> wrote:
+> > Hi Fabio,
+> >
+> > On Fri, Dec 02, 2016 at 01:18:42PM -0200, Fabio Estevam wrote:
+> >> Hi Gary,
+> >>
+> >> On Fri, Dec 2, 2016 at 12:56 PM, Gary Bisson
+> >> <gary.bisson@boundarydevices.com> wrote:
+> >> > Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+> >> > ---
+> >> > Hi,
+> >> >
+> >> > Seems that this configuration is missing, especially since many
+> >> > device trees are already using "spidev" nodes.
+> >>
 > 
-> 02.12.2016, 22:30, "Hans de Goede" <hdegoede@redhat.com>:
->> Hi,
->>
->> On 02-12-16 15:22, Icenowy Zheng wrote:
->>>  01.12.2016, 17:36, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
->>>>  On Mon, Nov 28, 2016 at 12:29:07AM +0000, Andr? Przywara wrote:
->>>>>   > Something more interesting happened.
->>>>>   >
->>>>>   > Xunlong made a add-on board for Orange Pi Zero, which exposes the
->>>>>   > two USB Controllers exported at expansion bus as USB Type-A
->>>>>   > connectors.
->>>>>   >
->>>>>   > Also it exposes a analog A/V jack and a microphone.
->>>>>   >
->>>>>   > Should I enable {e,o}hci{2.3} in the device tree?
->>>>>
->>>>>   Actually we should do this regardless of this extension board. The USB
->>>>>   pins are not multiplexed and are exposed on user accessible pins (just
->>>>>   not soldered, but that's a detail), so I think they qualify for DT
->>>>>   enablement. And even if a user can't use them, it doesn't hurt to have
->>>>>   them (since they are not multiplexed).
->>>>
->>>>  My main concern about this is that we'll leave regulators enabled by
->>>>  default, for a minority of users. And that minority will prevent to do
->>>>  a proper power management when the times come since we'll have to keep
->>>>  that behaviour forever.
->>>
->>>  I think these users can add a 'fdt set /xxx/xxx status "disabled" ' .
->>
->> I don't think that will be necessary I'm pretty sure these extra usb
->> ports do not have a regulator for the Vbus, they just hook directly
->> to the 5V rail, can someone with a schematic check ?
+> This seems to have been added just because people weren't looking that
+> closer to DT patches at the beginning, but now is forbidden. That's
+> why the kernel now warns about it.
 > 
-> We seems to have still no schematics for the add-on board.
-
->From looking at the picture of that expansion board on the Aliexpress
-page and chasing the tracks, there is clearly no voltage regulator on
-there, it's just passive components. The 5V pin from the headers is
-routed forth and back between the two layers via some vias directly to
-the 5V pins of the USB sockets.
-
-> But something is sure is that there's no any regulator-related pins
-> on the add-on pinout. There's only USB DM and DP pins.
+> >> Then they will trigger the following warning below (from the spidev
+> >> probe function):
+> >>
+> >> /*
+> >> * spidev should never be referenced in DT without a specific
+> >> * compatible string, it is a Linux implementation thing
+> >> * rather than a description of the hardware.
+> >> */
+> >> if (spi->dev.of_node && !of_match_device(spidev_dt_ids, &spi->dev)) {
+> >>     dev_err(&spi->dev, "buggy DT: spidev listed directly in DT\n");
+> >>     WARN_ON(spi->dev.of_node &&
+> >>                        !of_match_device(spidev_dt_ids, &spi->dev));
+> >> }
+> >
+> > Yes I've seen this WARN_ON when doing the dt-overlay testing. But is
+> > disabling the SPIDEV configuration a solution?
+> >
+> > To be honest I disagree with that WARN_ON. Ok it means that the hardware
+> > isn't fully described in the device tree but for development platforms
+> > (such as ours or any rpi-like boards) the user can design his own
+> > daugher board with whatever SPI device on it. Then using the spidev
+> > interface is very convenient, so I don't understand what we are trying
+> > to forbid here.
+> >
 > 
-> So the Vbus must be directly connected to +5V.
+> AFAICT, what we are trying to forbid is to have a Linux implementation
+> detail to creep into a Device Tree.
+> 
+> It's OK to use the spidev interface but that's orthogonal on how the
+> device is instantiated from the DT. If you want to do that, the
+> correct approach is AFAIU to add a OF device ID entry in
+> drivers/spi/spidev.c and use that compatible string in your DT.
 
-So yes, it is.
+I understand that the device tree isn't supposed to describe such
+generic "spidev" concept.
 
-But I think the question is moot anyways, since we don't provide DT
-support for that add-on board at that point anyways.
-One could imagine another board, though, which has regulators switched
-by GPIOs, but that would be their problem and they would have regulators
-specified in their specific DT snippet, then.
+And that argument to me is ok for final products where the hardware is
+fully defined. However I still believe that for development platforms
+this cannot be applied. My customers want to use the SPI bus to connect
+any device they want, and most of those customers don't want to mess
+with the kernel. For them, having a spidev node, just like it exists for
+i2cdev nodes, is ideal.
 
-So to summarize:
-- For that specific Orange Pi Zero board which we discuss the DT for
-there is no regulator support for the additional USB ports. Thus nothing
-we could turn off to save power.
-- A user could just take these USB brackets with pin headers that are so
-common in PCs to connect additional USB ports to the back of the box.
-One just needs to re-sort the pins, which is a matter of a minute.
-- As long as we don't provide any easy way of handling DT changes, we
-should enable the USB ports for the sake of the users of either those
-brackets or the expansion board. Any more sophisticated USB expansion
-board with regulators would need to amend the DT anyway.
+> That way, the DT will describe the hardware instead of just a "spidev"
+> but you could use the spidev interface to access your SPI device.
 
-Does that make sense?
+But then aren't you afraid that the person will use the first compatible
+that shows up (let's say "rohm,dh2228fv") and use it for all his spidev?
+In that case the driver is happy although the fact remains that any hw
+will be plugged behind. Or at the opposite, if everybody that uses
+spidev adds its own compatible I'm not sure it will benefit the drive
+code.
 
-Cheers,
-Andre.
+Anyway, I appreciate your feedback.
+
+Regards,
+Gary
