@@ -1,354 +1,75 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Thu,  1 Dec 2016 16:41:42 -0800
-Subject: [PATCH net-next 6/8] drivers: net: xgene: Add flow control
- configuration
-In-Reply-To: <1480639304-18757-1-git-send-email-isubramanian@apm.com>
-References: <1480639304-18757-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1480639304-18757-7-git-send-email-isubramanian@apm.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 02 Dec 2016 09:48:45 +0900
+Subject: [PATCH 1/2] dt-bindings: mmc: add DT binding for S3C24XX
+ MMC/SD/SDIO controller
+In-Reply-To: <1480637665-6325-2-git-send-email-sergio.prado@e-labworks.com>
+References: <1480637665-6325-1-git-send-email-sergio.prado@e-labworks.com>
+ <CGME20161202001621epcas3p2fcc946ce070dfcc594e4b89729e149d7@epcas3p2.samsung.com>
+ <1480637665-6325-2-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <054a65d8-8606-eeb0-e028-1b85dbf1c8ba@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds functions to configure mac, when flow control
-and pause frame settings change.
+On 12/02/2016 09:14 AM, Sergio Prado wrote:
+> Adds the device tree bindings description for Samsung S3C24XX
+> MMC/SD/SDIO controller, used as a connectivity interface with external
+> MMC, SD and SDIO storage mediums.
+> 
+> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+> ---
+>  .../devicetree/bindings/mmc/samsung,s3cmci.txt     | 38 ++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt b/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
+> new file mode 100644
+> index 000000000000..3f044076e69a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
+> @@ -0,0 +1,38 @@
+> +* Samsung's S3C24XX MMC/SD/SDIO controller device tree bindings
+> +
+> +Samsung's S3C24XX MMC/SD/SDIO controller is used as a connectivity interface
+> +with external MMC, SD and SDIO storage mediums.
+> +
+> +This file documents differences between the core mmc properties described by
+> +mmc.txt and the properties used by the Samsung S3C24XX MMC/SD/SDIO controller
+> +implementation.
+> +
+> +Required SoC Specific Properties:
+> +- compatible: should be one of the following
+> +  - "samsung,s3c2410-sdi": for controllers compatible with s3c2410
+> +  - "samsung,s3c2412-sdi": for controllers compatible with s3c2412
+> +  - "samsung,s3c2440-sdi": for controllers compatible with s3c2440
+> +- clocks: Should reference the controller clock
+> +- clock-names: Should contain "sdi"
+> +
+> +Required Board Specific Properties:
+> +- pinctrl-0: Should specify pin control groups used for this controller.
+> +- pinctrl-names: Should contain only one value - "default".
 
-Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-Signed-off-by: Quan Nguyen <qnguyen@apm.com>
----
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.c    | 48 +++++++++++++++++
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.h    |  6 +++
- drivers/net/ethernet/apm/xgene/xgene_enet_main.h  |  6 +++
- drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c | 64 ++++++++++++++++------
- drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c | 66 ++++++++++++++++++++++-
- drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h |  2 +
- 6 files changed, 176 insertions(+), 16 deletions(-)
+I'm not sure but i think this description doesn't need at here.
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-index 92cc7e5..23a0175 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-@@ -509,6 +509,51 @@ static void xgene_enet_set_frame_size(struct xgene_enet_pdata *pdata, int size)
- 	xgene_enet_wr_mcx_mac(pdata, MAX_FRAME_LEN_ADDR, size);
- }
- 
-+static void xgene_gmac_enable_tx_pause(struct xgene_enet_pdata *pdata,
-+				       bool enable)
-+{
-+	u32 data;
-+
-+	xgene_enet_rd_mcx_csr(pdata, CSR_ECM_CFG_0_ADDR, &data);
-+
-+	if (enable)
-+		data |= MULTI_DPF_AUTOCTRL | PAUSE_XON_EN;
-+	else
-+		data &= ~(MULTI_DPF_AUTOCTRL | PAUSE_XON_EN);
-+
-+	xgene_enet_wr_mcx_csr(pdata, CSR_ECM_CFG_0_ADDR, data);
-+}
-+
-+static void xgene_gmac_flowctl_tx(struct xgene_enet_pdata *pdata, bool enable)
-+{
-+	u32 data;
-+
-+	xgene_enet_rd_mcx_mac(pdata, MAC_CONFIG_1_ADDR, &data);
-+
-+	if (enable)
-+		data |= TX_FLOW_EN;
-+	else
-+		data &= ~TX_FLOW_EN;
-+
-+	xgene_enet_wr_mcx_mac(pdata, MAC_CONFIG_1_ADDR, data);
-+
-+	pdata->mac_ops->enable_tx_pause(pdata, enable);
-+}
-+
-+static void xgene_gmac_flowctl_rx(struct xgene_enet_pdata *pdata, bool enable)
-+{
-+	u32 data;
-+
-+	xgene_enet_rd_mcx_mac(pdata, MAC_CONFIG_1_ADDR, &data);
-+
-+	if (enable)
-+		data |= RX_FLOW_EN;
-+	else
-+		data &= ~RX_FLOW_EN;
-+
-+	xgene_enet_wr_mcx_mac(pdata, MAC_CONFIG_1_ADDR, data);
-+}
-+
- static void xgene_gmac_init(struct xgene_enet_pdata *pdata)
- {
- 	u32 value;
-@@ -909,6 +954,9 @@ void xgene_enet_mdio_remove(struct xgene_enet_pdata *pdata)
- 	.set_speed = xgene_gmac_set_speed,
- 	.set_mac_addr = xgene_gmac_set_mac_addr,
- 	.set_framesize = xgene_enet_set_frame_size,
-+	.enable_tx_pause = xgene_gmac_enable_tx_pause,
-+	.flowctl_tx     = xgene_gmac_flowctl_tx,
-+	.flowctl_rx     = xgene_gmac_flowctl_rx,
- };
- 
- const struct xgene_port_ops xgene_gport_ops = {
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-index bd6cb6c..7ba649d 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-@@ -170,6 +170,10 @@ enum xgene_enet_rm {
- #define CFG_WAITASYNCRD_SET(dst, val)		xgene_set_bits(dst, val, 0, 16)
- #define CFG_CLE_DSTQID0(val)		((val) & GENMASK(11, 0))
- #define CFG_CLE_FPSEL0(val)		(((val) << 16) & GENMASK(19, 16))
-+#define CSR_ECM_CFG_0_ADDR		0x0220
-+#define CSR_ECM_CFG_1_ADDR		0x0224
-+#define PAUSE_XON_EN			BIT(30)
-+#define MULTI_DPF_AUTOCTRL		BIT(28)
- #define CFG_CLE_NXTFPSEL0(val)		(((val) << 20) & GENMASK(23, 20))
- #define ICM_CONFIG0_REG_0_ADDR		0x0400
- #define ICM_CONFIG2_REG_0_ADDR		0x0410
-@@ -198,6 +202,8 @@ enum xgene_enet_rm {
- #define SOFT_RESET1			BIT(31)
- #define TX_EN				BIT(0)
- #define RX_EN				BIT(2)
-+#define TX_FLOW_EN			BIT(4)
-+#define RX_FLOW_EN			BIT(5)
- #define ENET_LHD_MODE			BIT(25)
- #define ENET_GHD_MODE			BIT(26)
- #define FULL_DUPLEX2			BIT(0)
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-index 61aa987..5257174 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-@@ -159,6 +159,9 @@ struct xgene_mac_ops {
- 	void (*set_framesize)(struct xgene_enet_pdata *pdata, int framesize);
- 	void (*set_mss)(struct xgene_enet_pdata *pdata, u16 mss, u8 index);
- 	void (*link_state)(struct work_struct *work);
-+	void (*enable_tx_pause)(struct xgene_enet_pdata *pdata, bool enable);
-+	void (*flowctl_rx)(struct xgene_enet_pdata *pdata, bool enable);
-+	void (*flowctl_tx)(struct xgene_enet_pdata *pdata, bool enable);
- };
- 
- struct xgene_port_ops {
-@@ -234,6 +237,9 @@ struct xgene_enet_pdata {
- 	bool mdio_driver;
- 	struct gpio_desc *sfp_rdy;
- 	bool sfp_gpio_en;
-+	u32 pause_autoneg;
-+	bool tx_pause;
-+	bool rx_pause;
- };
- 
- struct xgene_indirect_ctl {
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
-index 6283f2b..1c9b8ba 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
-@@ -365,6 +365,32 @@ static void xgene_sgmii_enable_autoneg(struct xgene_enet_pdata *p)
- 		netdev_err(p->ndev, "Auto-negotiation failed\n");
- }
- 
-+static void xgene_sgmac_rxtx(struct xgene_enet_pdata *p, u32 bits, bool set)
-+{
-+	u32 data;
-+
-+	data = xgene_enet_rd_mac(p, MAC_CONFIG_1_ADDR);
-+
-+	if (set)
-+		data |= bits;
-+	else
-+		data &= ~bits;
-+
-+	xgene_enet_wr_mac(p, MAC_CONFIG_1_ADDR, data);
-+}
-+
-+static void xgene_sgmac_flowctl_tx(struct xgene_enet_pdata *p, bool enable)
-+{
-+	xgene_sgmac_rxtx(p, TX_FLOW_EN, enable);
-+
-+	p->mac_ops->enable_tx_pause(p, enable);
-+}
-+
-+static void xgene_sgmac_flowctl_rx(struct xgene_enet_pdata *pdata, bool enable)
-+{
-+	xgene_sgmac_rxtx(pdata, RX_FLOW_EN, enable);
-+}
-+
- static void xgene_sgmac_init(struct xgene_enet_pdata *p)
- {
- 	u32 enet_spare_cfg_reg, rsif_config_reg;
-@@ -411,20 +437,6 @@ static void xgene_sgmac_init(struct xgene_enet_pdata *p)
- 	xgene_enet_wr_mcx_csr(p, rx_dv_gate_reg, RESUME_RX0);
- }
- 
--static void xgene_sgmac_rxtx(struct xgene_enet_pdata *p, u32 bits, bool set)
--{
--	u32 data;
--
--	data = xgene_enet_rd_mac(p, MAC_CONFIG_1_ADDR);
--
--	if (set)
--		data |= bits;
--	else
--		data &= ~bits;
--
--	xgene_enet_wr_mac(p, MAC_CONFIG_1_ADDR, data);
--}
--
- static void xgene_sgmac_rx_enable(struct xgene_enet_pdata *p)
- {
- 	xgene_sgmac_rxtx(p, RX_EN, true);
-@@ -591,6 +603,25 @@ static void xgene_enet_link_state(struct work_struct *work)
- 	schedule_delayed_work(&p->link_work, poll_interval);
- }
- 
-+static void xgene_sgmac_enable_tx_pause(struct xgene_enet_pdata *p, bool enable)
-+{
-+	u32 data, ecm_cfg_addr;
-+
-+	if (p->enet_id == XGENE_ENET1) {
-+		ecm_cfg_addr = (!(p->port_id % 2)) ? CSR_ECM_CFG_0_ADDR :
-+				CSR_ECM_CFG_1_ADDR;
-+	} else {
-+		ecm_cfg_addr = XG_MCX_ECM_CFG_0_ADDR;
-+	}
-+
-+	data = xgene_enet_rd_mcx_csr(p, ecm_cfg_addr);
-+	if (enable)
-+		data |= MULTI_DPF_AUTOCTRL | PAUSE_XON_EN;
-+	else
-+		data &= ~(MULTI_DPF_AUTOCTRL | PAUSE_XON_EN);
-+	xgene_enet_wr_mcx_csr(p, ecm_cfg_addr, data);
-+}
-+
- const struct xgene_mac_ops xgene_sgmac_ops = {
- 	.init		= xgene_sgmac_init,
- 	.reset		= xgene_sgmac_reset,
-@@ -601,7 +632,10 @@ static void xgene_enet_link_state(struct work_struct *work)
- 	.set_speed	= xgene_sgmac_set_speed,
- 	.set_mac_addr	= xgene_sgmac_set_mac_addr,
- 	.set_framesize  = xgene_sgmac_set_frame_size,
--	.link_state	= xgene_enet_link_state
-+	.link_state	= xgene_enet_link_state,
-+	.enable_tx_pause = xgene_sgmac_enable_tx_pause,
-+	.flowctl_tx     = xgene_sgmac_flowctl_tx,
-+	.flowctl_rx     = xgene_sgmac_flowctl_rx
- };
- 
- const struct xgene_port_ops xgene_sgport_ops = {
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
-index 2a9761b..727ef4b 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
-@@ -101,6 +101,14 @@ static void xgene_enet_wr_pcs(struct xgene_enet_pdata *pdata,
- 			   wr_addr);
- }
- 
-+static void xgene_enet_wr_axg_csr(struct xgene_enet_pdata *pdata,
-+				  u32 offset, u32 val)
-+{
-+	void __iomem *addr = pdata->mcx_mac_csr_addr + offset;
-+
-+	iowrite32(val, addr);
-+}
-+
- static void xgene_enet_rd_csr(struct xgene_enet_pdata *pdata,
- 			      u32 offset, u32 *val)
- {
-@@ -174,6 +182,14 @@ static bool xgene_enet_rd_pcs(struct xgene_enet_pdata *pdata,
- 	return success;
- }
- 
-+static void xgene_enet_rd_axg_csr(struct xgene_enet_pdata *pdata,
-+				  u32 offset, u32 *val)
-+{
-+	void __iomem *addr = pdata->mcx_mac_csr_addr + offset;
-+
-+	*val = ioread32(addr);
-+}
-+
- static int xgene_enet_ecc_init(struct xgene_enet_pdata *pdata)
- {
- 	struct net_device *ndev = pdata->ndev;
-@@ -265,6 +281,51 @@ static u32 xgene_enet_link_status(struct xgene_enet_pdata *pdata)
- 	return data;
- }
- 
-+static void xgene_xgmac_enable_tx_pause(struct xgene_enet_pdata *pdata,
-+					bool enable)
-+{
-+	u32 data;
-+
-+	xgene_enet_rd_axg_csr(pdata, XGENET_CSR_ECM_CFG_0_ADDR, &data);
-+
-+	if (enable)
-+		data |= MULTI_DPF_AUTOCTRL | PAUSE_XON_EN;
-+	else
-+		data &= ~(MULTI_DPF_AUTOCTRL | PAUSE_XON_EN);
-+
-+	xgene_enet_wr_axg_csr(pdata, XGENET_CSR_ECM_CFG_0_ADDR, data);
-+}
-+
-+static void xgene_xgmac_flowctl_tx(struct xgene_enet_pdata *pdata, bool enable)
-+{
-+	u32 data;
-+
-+	xgene_enet_rd_mac(pdata, AXGMAC_CONFIG_1, &data);
-+
-+	if (enable)
-+		data |= HSTTCTLEN;
-+	else
-+		data &= ~HSTTCTLEN;
-+
-+	xgene_enet_wr_mac(pdata, AXGMAC_CONFIG_1, data);
-+
-+	pdata->mac_ops->enable_tx_pause(pdata, enable);
-+}
-+
-+static void xgene_xgmac_flowctl_rx(struct xgene_enet_pdata *pdata, bool enable)
-+{
-+	u32 data;
-+
-+	xgene_enet_rd_mac(pdata, AXGMAC_CONFIG_1, &data);
-+
-+	if (enable)
-+		data |= HSTRCTLEN;
-+	else
-+		data &= ~HSTRCTLEN;
-+
-+	xgene_enet_wr_mac(pdata, AXGMAC_CONFIG_1, data);
-+}
-+
- static void xgene_xgmac_init(struct xgene_enet_pdata *pdata)
- {
- 	u32 data;
-@@ -482,7 +543,10 @@ static void xgene_enet_link_state(struct work_struct *work)
- 	.set_mac_addr = xgene_xgmac_set_mac_addr,
- 	.set_framesize = xgene_xgmac_set_frame_size,
- 	.set_mss = xgene_xgmac_set_mss,
--	.link_state = xgene_enet_link_state
-+	.link_state = xgene_enet_link_state,
-+	.enable_tx_pause = xgene_xgmac_enable_tx_pause,
-+	.flowctl_rx = xgene_xgmac_flowctl_rx,
-+	.flowctl_tx = xgene_xgmac_flowctl_tx
- };
- 
- const struct xgene_port_ops xgene_xgport_ops = {
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h
-index 360ccbd..9d75020 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h
-@@ -59,6 +59,7 @@
- #define HSTMAXFRAME_LENGTH_ADDR		0x0020
- 
- #define XG_MCX_RX_DV_GATE_REG_0_ADDR	0x0004
-+#define XG_MCX_ECM_CFG_0_ADDR		0x0074
- #define XG_RSIF_CONFIG_REG_ADDR		0x00a0
- #define XCLE_BYPASS_REG0_ADDR           0x0160
- #define XCLE_BYPASS_REG1_ADDR           0x0164
-@@ -70,6 +71,7 @@
- #define XG_ENET_SPARE_CFG_REG_ADDR	0x040c
- #define XG_ENET_SPARE_CFG_REG_1_ADDR	0x0410
- #define XGENET_RX_DV_GATE_REG_0_ADDR	0x0804
-+#define XGENET_CSR_ECM_CFG_0_ADDR	0x0880
- #define XG_MCX_ICM_CONFIG0_REG_0_ADDR	0x00e0
- #define XG_MCX_ICM_CONFIG2_REG_0_ADDR	0x00e8
- 
--- 
-1.9.1
+> +
+> +Example:
+> +	sdi: sdi at 5a000000 {
+
+I think it needs to use "mmc0: sdi at 5a000000" instead of "sdi: sdi at 5a000000"
+Because mmc is more clear than sdi.
+
+> +		compatible = "samsung,s3c2440-sdi";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&sdi_pins>;
+> +		reg = <0x5a000000 0x100000>;
+> +		interrupts = <0 0 21 3>;
+> +		clocks = <&clocks PCLK_SDI>;
+> +		clock-names = "sdi";
+> +		bus-width = <4>;
+> +		cd-gpios = <&gpg 8 GPIO_ACTIVE_LOW>;
+> +		wp-gpios = <&gph 8 GPIO_ACTIVE_LOW>;
+> +	};
+> +
+> +	Note: This example shows both SoC specific and board specific properties
+> +	in a single device node. The properties can be actually be separated
+> +	into SoC specific node and board specific node.
+> 
