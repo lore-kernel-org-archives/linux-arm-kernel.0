@@ -1,22 +1,37 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 2 Dec 2016 13:13:54 +0530
-Subject: [PATCH v3] ARM: davinci: da8xx: Fix sleeping function called from
- invalid context
-In-Reply-To: <76e7853b-8235-173a-7214-c450487751c6@lechnology.com>
-References: <1480612342-23614-1-git-send-email-abailon@baylibre.com>
- <76e7853b-8235-173a-7214-c450487751c6@lechnology.com>
-Message-ID: <c3f07191-d542-ca5e-21f2-87fd0ea06990@ti.com>
+From: agust@denx.de (Anatolij Gustschin)
+Date: Fri, 2 Dec 2016 08:51:57 +0100
+Subject: [PATCH v4 1/3] lib: add bitrev8x4()
+In-Reply-To: <8fb2f1c2-c39c-b74f-d5c8-d6731cbd67c8@gmail.com>
+References: <cover.1480551148.git.stillcompiling@gmail.com>
+ <bc92eb1507448731163ae67fc888668d327f9168.1480551148.git.stillcompiling@gmail.com>
+ <20161201234523.3bed63dc@crub>
+ <8fb2f1c2-c39c-b74f-d5c8-d6731cbd67c8@gmail.com>
+Message-ID: <20161202085157.1a6ec811@crub>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 December 2016 11:17 PM, David Lechner wrote:
-> 
->> +        clk_put(usb20_clk);
-> 
-> The global usb20_clk is no longer valid after this. Should we set it to
-> NULL here?
+Hi Joshua,
 
-No need of this. Also, NULL is valid clock handle.
+On Thu, 1 Dec 2016 16:04:09 -0800
+Joshua Clayton stillcompiling at gmail.com wrote:
+...
+>>> +static __always_inline __attribute_const__ u32 __arch_bitrev8x4(u32 x)
+>>> +{
+>>> +	__asm__ ("rbit %0, %1; rev %0, %0" : "=r" (x) : "r" (x));  
+>> 	return x;  
+>Oops thats a little embarrassing;
+>I'll add a return.
+>>> +}  
+>> otherwise you get
+>>
+>> In function '__arch_bitrev8x4':
+>> warning: no return statement in function returning non-void [-Wreturn-type]
+>>
+>
+>I wonder why I do not see this warning when compiling. The inlining, maybe?
 
-Thanks,
-Sekhar
+do you have CONFIG_HAVE_ARCH_BITREVERSE=y in your .config?
+Probably not optimized code is used, otherwise you will send wrong
+data to FPGA (due to wrong return values from __arch_bitrev8x4).
+
+Anatolij
