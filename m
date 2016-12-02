@@ -1,81 +1,76 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Fri,  2 Dec 2016 16:38:54 +0100
-Subject: [PATCH v2 3/3] ARM: da850: fix da850_set_pll0rate()
-In-Reply-To: <1480693134-31324-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1480693134-31324-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1480693134-31324-4-git-send-email-bgolaszewski@baylibre.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 2 Dec 2016 12:44:42 -0300
+Subject: [PATCH] imx_v6_v7_defconfig: enable SPIDEV module
+In-Reply-To: <20161202152718.o4xv2ru5r7xw7t5e@t450s.lan>
+References: <20161202145631.19292-1-gary.bisson@boundarydevices.com>
+ <CAOMZO5C8OH6obRn_8zh5HA9zoanRXUpoqk=vEBx+fW3wraNS6Q@mail.gmail.com>
+ <20161202152718.o4xv2ru5r7xw7t5e@t450s.lan>
+Message-ID: <CABxcv=nSUfDT-bqHBm2e0XY55Qp4nH+66PriMqnix2RTsN0BNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function is broken - its second argument is an index to the freq
-table, not the requested clock rate in Hz. It leads to an oops when
-called from clk_set_rate() since this argument isn't bounds checked
-either.
+Hello Gary,
 
-Fix it by iterating over the array of supported frequencies and
-selecting a one that matches or returning -EINVAL for unsupported
-rates.
+On Fri, Dec 2, 2016 at 12:27 PM, Gary Bisson
+<gary.bisson@boundarydevices.com> wrote:
+> Hi Fabio,
+>
+> On Fri, Dec 02, 2016 at 01:18:42PM -0200, Fabio Estevam wrote:
+>> Hi Gary,
+>>
+>> On Fri, Dec 2, 2016 at 12:56 PM, Gary Bisson
+>> <gary.bisson@boundarydevices.com> wrote:
+>> > Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+>> > ---
+>> > Hi,
+>> >
+>> > Seems that this configuration is missing, especially since many
+>> > device trees are already using "spidev" nodes.
+>>
 
-Also: update the davinci cpufreq driver. It's the only user of this
-clock and currently it passes the cpufreq table index to
-clk_set_rate(), which is confusing. Make it pass the requested clock
-rate in Hz.
+This seems to have been added just because people weren't looking that
+closer to DT patches at the beginning, but now is forbidden. That's
+why the kernel now warns about it.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/da850.c     | 22 ++++++++++++++++++----
- drivers/cpufreq/davinci-cpufreq.c |  2 +-
- 2 files changed, 19 insertions(+), 5 deletions(-)
+>> Then they will trigger the following warning below (from the spidev
+>> probe function):
+>>
+>> /*
+>> * spidev should never be referenced in DT without a specific
+>> * compatible string, it is a Linux implementation thing
+>> * rather than a description of the hardware.
+>> */
+>> if (spi->dev.of_node && !of_match_device(spidev_dt_ids, &spi->dev)) {
+>>     dev_err(&spi->dev, "buggy DT: spidev listed directly in DT\n");
+>>     WARN_ON(spi->dev.of_node &&
+>>                        !of_match_device(spidev_dt_ids, &spi->dev));
+>> }
+>
+> Yes I've seen this WARN_ON when doing the dt-overlay testing. But is
+> disabling the SPIDEV configuration a solution?
+>
+> To be honest I disagree with that WARN_ON. Ok it means that the hardware
+> isn't fully described in the device tree but for development platforms
+> (such as ours or any rpi-like boards) the user can design his own
+> daugher board with whatever SPI device on it. Then using the spidev
+> interface is very convenient, so I don't understand what we are trying
+> to forbid here.
+>
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index a55101c..92e3303 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -1179,14 +1179,28 @@ static int da850_set_armrate(struct clk *clk, unsigned long index)
- 	return clk_set_rate(pllclk, index);
- }
- 
--static int da850_set_pll0rate(struct clk *clk, unsigned long index)
-+static int da850_set_pll0rate(struct clk *clk, unsigned long rate)
- {
--	unsigned int prediv, mult, postdiv;
--	struct da850_opp *opp;
- 	struct pll_data *pll = clk->pll_data;
-+	struct cpufreq_frequency_table *freq;
-+	unsigned int prediv, mult, postdiv;
-+	struct da850_opp *opp = NULL;
- 	int ret;
- 
--	opp = (struct da850_opp *) cpufreq_info.freq_table[index].driver_data;
-+	for (freq = da850_freq_table;
-+	     freq->frequency != CPUFREQ_TABLE_END; freq++) {
-+		/* requested_rate is in Hz, freq->frequency is in KHz */
-+		unsigned long freq_rate = freq->frequency * 1000;
-+
-+		if (freq_rate == rate) {
-+			opp = (struct da850_opp *)freq->driver_data;
-+			break;
-+		}
-+	}
-+
-+	if (opp == NULL)
-+		return -EINVAL;
-+
- 	prediv = opp->prediv;
- 	mult = opp->mult;
- 	postdiv = opp->postdiv;
-diff --git a/drivers/cpufreq/davinci-cpufreq.c b/drivers/cpufreq/davinci-cpufreq.c
-index b95a872..d54a27c 100644
---- a/drivers/cpufreq/davinci-cpufreq.c
-+++ b/drivers/cpufreq/davinci-cpufreq.c
-@@ -55,7 +55,7 @@ static int davinci_target(struct cpufreq_policy *policy, unsigned int idx)
- 			return ret;
- 	}
- 
--	ret = clk_set_rate(armclk, idx);
-+	ret = clk_set_rate(armclk, new_freq * 1000);
- 	if (ret)
- 		return ret;
- 
--- 
-2.9.3
+AFAICT, what we are trying to forbid is to have a Linux implementation
+detail to creep into a Device Tree.
+
+It's OK to use the spidev interface but that's orthogonal on how the
+device is instantiated from the DT. If you want to do that, the
+correct approach is AFAIU to add a OF device ID entry in
+drivers/spi/spidev.c and use that compatible string in your DT.
+
+That way, the DT will describe the hardware instead of just a "spidev"
+but you could use the spidev interface to access your SPI device.
+
+> Regards,
+> Gary
+>
+
+Best regards,
+Javier
