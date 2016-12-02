@@ -1,32 +1,63 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Fri,  2 Dec 2016 16:38:51 +0100
-Subject: [PATCH v2 0/3] ARM: da850: fix pll0 rate setting
-Message-ID: <1480693134-31324-1-git-send-email-bgolaszewski@baylibre.com>
+Date: Fri,  2 Dec 2016 16:38:52 +0100
+Subject: [PATCH v2 1/3] ARM: da850: fix infinite loop in clk_set_rate()
+In-Reply-To: <1480693134-31324-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1480693134-31324-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1480693134-31324-2-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While trying to set the pll0 rate from the kernel I noticed there are
-two issues with da850 clocks. The first patch fixes an infinite loop
-in propagate_rate(). The third fixes an oops in da850_set_pll0rate().
-The second patch is just a coding style fix, while we're at it.
+The aemif clock is added twice to the lookup table in da850.c. This
+breaks the children list of pll0_sysclk3 as we're using the same list
+links in struct clk. When calling clk_set_rate(), we get stuck in
+propagate_rate().
 
-v1 -> v2:
-- change the approach in 1/3: create a new clock for nand inheriting
-  the rate from the aemif clock (verified that nand still works on
-  da850-lcdk)
-- patch 3/3: also update the davinci_cpufreq driver - the only
-  (indirect) user of da850_set_pll0rate()
-- s/requested_rate/rate in 3/3
+Create a separate clock for nand, inheriting the rate of the aemif
+clock and retrieve it in the davinci_nand module.
 
-Bartosz Golaszewski (3):
-  ARM: da850: fix infinite loop in clk_set_rate()
-  ARM: da850: coding style fix
-  ARM: da850: fix da850_set_pll0rate()
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ arch/arm/mach-davinci/da850.c   | 7 ++++++-
+ drivers/mtd/nand/davinci_nand.c | 2 +-
+ 2 files changed, 7 insertions(+), 2 deletions(-)
 
- arch/arm/mach-davinci/da850.c     | 31 +++++++++++++++++++++++++------
- drivers/cpufreq/davinci-cpufreq.c |  2 +-
- drivers/mtd/nand/davinci_nand.c   |  2 +-
- 3 files changed, 27 insertions(+), 8 deletions(-)
-
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index e770c97..1fcc986 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -367,6 +367,11 @@ static struct clk aemif_clk = {
+ 	.flags		= ALWAYS_ENABLED,
+ };
+ 
++static struct clk nand_clk = {
++	.name		= "nand",
++	.parent		= &aemif_clk,
++};
++
+ static struct clk usb11_clk = {
+ 	.name		= "usb11",
+ 	.parent		= &pll0_sysclk4,
+@@ -537,7 +542,7 @@ static struct clk_lookup da850_clks[] = {
+ 	CLK("da830-mmc.0",	NULL,		&mmcsd0_clk),
+ 	CLK("da830-mmc.1",	NULL,		&mmcsd1_clk),
+ 	CLK("ti-aemif",		NULL,		&aemif_clk),
+-	CLK(NULL,		"aemif",	&aemif_clk),
++	CLK(NULL,		"nand",		&nand_clk),
+ 	CLK("ohci-da8xx",	"usb11",	&usb11_clk),
+ 	CLK("musb-da8xx",	"usb20",	&usb20_clk),
+ 	CLK("spi_davinci.0",	NULL,		&spi0_clk),
+diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+index 27fa8b8..5857d06 100644
+--- a/drivers/mtd/nand/davinci_nand.c
++++ b/drivers/mtd/nand/davinci_nand.c
+@@ -694,7 +694,7 @@ static int nand_davinci_probe(struct platform_device *pdev)
+ 
+ 	ret = -EINVAL;
+ 
+-	info->clk = devm_clk_get(&pdev->dev, "aemif");
++	info->clk = devm_clk_get(&pdev->dev, "nand");
+ 	if (IS_ERR(info->clk)) {
+ 		ret = PTR_ERR(info->clk);
+ 		dev_dbg(&pdev->dev, "unable to get AEMIF clock, err %d\n", ret);
 -- 
 2.9.3
