@@ -1,82 +1,71 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri,  2 Dec 2016 15:05:25 +0000
-Subject: [RFC v3 PATCH 07/25] ARM: NOMMU: relax restriction on MPU existence
+Date: Fri,  2 Dec 2016 15:05:24 +0000
+Subject: [RFC v3 PATCH 06/25] ARM: NOMMU: define __arm_ioremap_exec and
+ pci_ioremap functions
 In-Reply-To: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
 References: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1480691143-19845-8-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1480691143-19845-7-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MPU is must have if we run SMP configurations (since it sets Sharable
-attribute), but for UP we can progress further if MPU is not presented.
-
-This patch changes setup_mpu to return error code which we ignore for
-boot cpu and only take into account for secondaries.
+Define __arm_ioremap_exec and pci_ioremap* functions fallowing pattern
+for other ioremap functions.
 
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/kernel/head-nommu.S |   15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ arch/arm/mm/nommu.c |   35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index 6b4eb27..7317554 100644
---- a/arch/arm/kernel/head-nommu.S
-+++ b/arch/arm/kernel/head-nommu.S
-@@ -13,6 +13,7 @@
-  */
- #include <linux/linkage.h>
- #include <linux/init.h>
-+#include <linux/errno.h>
+diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+index 2740967..681cec8 100644
+--- a/arch/arm/mm/nommu.c
++++ b/arch/arm/mm/nommu.c
+@@ -19,6 +19,7 @@
+ #include <asm/cputype.h>
+ #include <asm/mpu.h>
+ #include <asm/procinfo.h>
++#include <asm/mach/map.h>
  
- #include <asm/assembler.h>
- #include <asm/ptrace.h>
-@@ -112,6 +113,8 @@ ENTRY(secondary_startup)
- 	/* Use MPU region info supplied by __cpu_up */
- 	ldr	r6, [r7]			@ get secondary_data.mpu_szr
- 	bl      __setup_mpu			@ Initialize the MPU
-+	teq	r0, #0
-+	bne     __error_p
- #endif
+ #include "mm.h"
  
- 	badr	lr, 1f				@ return (PIC) address
-@@ -201,7 +204,8 @@ ENDPROC(__after_proc_init)
-  * Region 3: Normal, shared, inaccessible from PL0 to protect the vectors page
-  *
-  * r6: Value to be written to DRSR (and IRSR if required) for MPU_RAM_REGION
--*/
-+ * r0: non zero value indicates error
-+ */
- 
- ENTRY(__setup_mpu)
- 
-@@ -209,13 +213,13 @@ ENTRY(__setup_mpu)
- 	mrc	p15, 0, r0, c0, c1, 4		@ Read ID_MMFR0
- 	and	r0, r0, #(MMFR0_PMSA)		@ PMSA field
- 	teq	r0, #(MMFR0_PMSAv7)		@ PMSA v7
--	bne	__error_p			@ Fail: ARM_MPU on NOT v7 PMSA
-+	bne	__nompu
- 
- 	/* Determine whether the D/I-side memory map is unified. We set the
- 	 * flags here and continue to use them for the rest of this function */
- 	mrc	p15, 0, r0, c0, c0, 4		@ MPUIR
- 	ands	r5, r0, #MPUIR_DREGION_SZMASK	@ 0 size d region => No MPU
--	beq	__error_p			@ Fail: ARM_MPU and no MPU
-+	beq	__nompu
- 	tst	r0, #MPUIR_nU			@ MPUIR_nU = 0 for unified
- 
- 	/* Setup second region first to free up r6 */
-@@ -263,6 +267,11 @@ ENTRY(__setup_mpu)
- 	orr	r0, r0, #CR_M			@ Set SCTRL.M (MPU on)
- 	mcr	p15, 0, r0, c1, c0, 0		@ Enable MPU
- 	isb
+@@ -401,3 +402,37 @@ void iounmap(volatile void __iomem *addr)
+ {
+ }
+ EXPORT_SYMBOL(iounmap);
 +
-+	mov	r0, #0
-+	ret	lr
-+__nompu:
-+	mov	r0, #-ENODEV
- 	ret	lr
- ENDPROC(__setup_mpu)
- #endif
++void __iomem *
++__arm_ioremap_exec(phys_addr_t phys_addr, size_t size, bool cached)
++{
++	unsigned int mtype;
++
++	if (cached)
++		mtype = MT_MEMORY_RWX;
++	else
++		mtype = MT_MEMORY_RWX_NONCACHED;
++
++	return __arm_ioremap_caller(phys_addr, size, mtype,
++			__builtin_return_address(0));
++}
++
++#ifdef CONFIG_PCI
++static int pci_ioremap_mem_type = MT_DEVICE;
++
++void pci_ioremap_set_mem_type(int mem_type)
++{
++	pci_ioremap_mem_type = mem_type;
++}
++
++int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
++{
++	BUG_ON(offset + SZ_64K > IO_SPACE_LIMIT);
++
++	return ioremap_page_range(PCI_IO_VIRT_BASE + offset,
++				  PCI_IO_VIRT_BASE + offset + SZ_64K,
++				  phys_addr,
++				  MT_DEVICE);
++}
++EXPORT_SYMBOL_GPL(pci_ioremap_io);
++#endif
 -- 
 1.7.9.5
