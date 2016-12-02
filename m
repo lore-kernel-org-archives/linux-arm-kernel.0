@@ -1,26 +1,59 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 2 Dec 2016 11:42:08 +0100
-Subject: XHCI controller does not detect USB key insertion
-In-Reply-To: <58414BC5.109@free.fr>
-References: <584134D9.5000404@free.fr> <87inr2vh2l.fsf@linux.intel.com>
- <58414BC5.109@free.fr>
-Message-ID: <20161202104208.GA8736@kroah.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Fri, 2 Dec 2016 11:45:00 +0100
+Subject: [Linaro-acpi] [PATCH V1 1/2] PCI: thunder: Enable ACPI PCI
+ controller for ThunderX pass2.x silicon version
+In-Reply-To: <30ad6c65-4a4a-6346-00f6-11250133a251@semihalf.com>
+References: <1479201298-25494-1-git-send-email-tn@semihalf.com>
+ <1479201298-25494-2-git-send-email-tn@semihalf.com>
+ <20161201002812.GB9409@bhelgaas-glaptop.roam.corp.google.com>
+ <e5b1f09c-ca4c-fbf0-e9d7-c943ad0df2ff@redhat.com>
+ <CADaLNDm8Zp_kAqVvSd0po9S3j2rSXxtUJ1M33dW7gLZzvueweQ@mail.gmail.com>
+ <30ad6c65-4a4a-6346-00f6-11250133a251@semihalf.com>
+Message-ID: <20161202104500.GE10776@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 11:24:05AM +0100, Mason wrote:
-> >> # lsusb -v
-> >> Bus 001 Device 001: ID 1d6b:0002
-> >> Bus 002 Device 001: ID 1d6b:0003
+On 02.12.16 11:06:24, Tomasz Nowicki wrote:
+> On 02.12.2016 07:42, Duc Dang wrote:
+
+> >@@ -98,16 +98,16 @@ struct mcfg_fixup {
+> >        { "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,                 \
+> >        &pci_thunder_ecam_ops }
+> >        /* SoC pass1.x */
+> >-   THUNDER_PEM_QUIRK(2,  0),       /* off-chip devices */
+> >-   THUNDER_PEM_QUIRK(2,  1),       /* off-chip devices */
+> >-   THUNDER_ECAM_QUIRK(2,  0),
+> >-   THUNDER_ECAM_QUIRK(2,  1),
+> >-   THUNDER_ECAM_QUIRK(2,  2),
+> >-   THUNDER_ECAM_QUIRK(2,  3),
+> >-   THUNDER_ECAM_QUIRK(2, 10),
+> >-   THUNDER_ECAM_QUIRK(2, 11),
+> >-   THUNDER_ECAM_QUIRK(2, 12),
+> >-   THUNDER_ECAM_QUIRK(2, 13),
+> >+ THUNDER_PEM_QUIRK(2, 0UL),  /* off-chip devices */
+> >+ THUNDER_PEM_QUIRK(2, 1UL),  /* off-chip devices */
+> >+ THUNDER_ECAM_QUIRK(2, 0UL),
+> >+ THUNDER_ECAM_QUIRK(2, 1UL),
+> >+ THUNDER_ECAM_QUIRK(2, 2UL),
+> >+ THUNDER_ECAM_QUIRK(2, 3UL),
+> >+ THUNDER_ECAM_QUIRK(2, 10UL),
+> >+ THUNDER_ECAM_QUIRK(2, 11UL),
+> >+ THUNDER_ECAM_QUIRK(2, 12UL),
+> >+ THUNDER_ECAM_QUIRK(2, 13UL),
+> >
 > 
-> Isn't lsusb verbose supposed to print much more than that?
+> The UL suffix is needed for *THUNDER_PEM_QUIRK* only. THUNDER_ECAM_QUIRK is
+> fine.
 
-Yes, if you are using the usbutils version of 'lsusb', odds are this is
-busybox, right?
+We should better make the type cast part of the macro.
 
-And these are just the root hubs, that the USB controller driver creates
-as "virtual" USB devices, they are not "real" USB devices on your bus.
++ this:
 
-hope this helps,
+---
+#define THUNDER_MCFG_RES(addr, node) \
+       DEFINE_RES_MEM(addr + (node << 44), 0x39 * SZ_16M)
+---
 
-greg k-h
+The args in the macro need parentheses.
+
+-Robert
