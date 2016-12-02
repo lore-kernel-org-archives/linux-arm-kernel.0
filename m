@@ -1,53 +1,86 @@
 From: briannorris@chromium.org (Brian Norris)
-Date: Thu,  1 Dec 2016 18:27:25 -0800
-Subject: [PATCH 1/9] arm64: dts: Add symlinks for cros-ec-keyboard and
- cros-ec-sbs
-In-Reply-To: <1480645653-36943-1-git-send-email-briannorris@chromium.org>
-References: <1480645653-36943-1-git-send-email-briannorris@chromium.org>
-Message-ID: <1480645653-36943-2-git-send-email-briannorris@chromium.org>
+Date: Thu,  1 Dec 2016 18:27:24 -0800
+Subject: [PATCH 0/9] arm64: dts: rockchip: support Google Kevin
+Message-ID: <1480645653-36943-1-git-send-email-briannorris@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Douglas Anderson <dianders@chromium.org>
+Hi,
 
-We'd like to be able to use the cros-ec-keyboard.dtsi and
-cros-ec-sbs.dtsi snippets for arm64 devices.  Currently those files live
-in the arm/boot/dts directory.
+This series adds basic support for Google Kevin, a board in the Gru device
+family. I do not add a leaf .dts board file for Gru, but I have retained the
+split between "things that apply to the Gru family" (rk3399-gru.dtsi) and
+"things that apply to Kevin only" (rk3399-gru-kevin.dtsi).
 
-Let's follow the convention set by commit 8ee57b8182c4 ("ARM64: dts:
-vexpress: Use a symlink to vexpress-v2m-rs1.dtsi from arch=arm") and use
-a symlink.  Note that in this case we put the files in a new
-"include/common" directory since these snippets may need to be
-referenced by dts files in many different subdirectories.
+I've included resends of two patches (adding cros-ec*.dtsi symlinks, and adding
+RK3399 DWC3). The former is unmodified, but the latter is rewritten to match
+current upstream bindings better, and to allow it to function w/o extcon
+support (USB2 only).
 
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
-Signed-off-by: Brian Norris <briannorris@chromium.org>
-Reviewed-by: Heiko Stueber <heiko@sntech.de>
-Tested-by: Heiko Stuebner <heiko@sntech.de>
----
-This was submitted months ago but had no users
+AFAICT, all these bindings are in -next, except for the root node compatible
+property (added doc in this series) and some of the HID digitizer bindings (see
+patch 9; bindings were sent separately).
 
- arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi | 1 +
- arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi      | 1 +
- 2 files changed, 2 insertions(+)
+I elaborate on what's working/not working below, but one of the big missing
+pieces is cpufreq support. We still need some more work on getting good
+bindings and driver support upstream for the PWM regulator + OVP circuit on
+these boards. See patch 8 for more info.
+
+Working and tested (to some extent):
+ * EC support -- including keyboard, battery, PWM, and probably more
+ * UART / console
+ * Thermal
+ * Touchscreen
+ * Touchpad
+ * Digitizer (regulator still WIP)
+ * PCIe / Wifi
+ * Bluetooth / Webcam
+ * SD card
+ * eMMC
+ * USB2 on TypeC
+   - This works much of the time, but USB3 devices may or may not detect
+     properly. Waiting on proper extcon support for USB3 over TypeC.
+   - Depends on XHCI/DWC3 fixes for ARM64 that still haven't landed
+ * Backlight
+
+Not working:
+ * CPUFreq -- relies on special OVP support for our PWM regulator
+   circuits
+ * EC / extcon support -- and with it, USB3/TypeC/DP
+ * DRM -- won't even build on ARM64, so all display, eDP, etc. is not
+   enabled
+
+Not tested:
+ * Audio
+
+
+Brian Norris (8):
+  arm64: dts: rockchip: add rk3399 thermal_zones phandle
+  arm64: dts: rockchip: add rk3399 eDP HPD pinctrl
+  arm64: dts: rockchip: support dwc3 USB for rk3399
+  arm64: dts: rockchip: add rk3399 OPPs
+  dt-bindings: Document rk3399 Gru/Kevin
+  arm64: dts: rockchip: add Gru/Kevin DTS
+  arm64: dts: rockchip: partially describe PWM regulators for Gru
+  arm64: dts: rockchip: add regulator info for Kevin digitizer
+
+Douglas Anderson (1):
+  arm64: dts: Add symlinks for cros-ec-keyboard and cros-ec-sbs
+
+ Documentation/devicetree/bindings/arm/rockchip.txt |   20 +
+ .../boot/dts/include/common/cros-ec-keyboard.dtsi  |    1 +
+ .../arm64/boot/dts/include/common/cros-ec-sbs.dtsi |    1 +
+ arch/arm64/boot/dts/rockchip/Makefile              |    1 +
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts  |  315 ++++++
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       | 1152 ++++++++++++++++++++
+ arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi       |  145 +++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |   70 +-
+ 8 files changed, 1704 insertions(+), 1 deletion(-)
  create mode 120000 arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi
  create mode 120000 arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
 
-diff --git a/arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi b/arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi
-new file mode 120000
-index 000000000000..1c1889f0a791
---- /dev/null
-+++ b/arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi
-@@ -0,0 +1 @@
-+../../../../../arm/boot/dts/cros-ec-keyboard.dtsi
-\ No newline at end of file
-diff --git a/arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi b/arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi
-new file mode 120000
-index 000000000000..3d7ae9c88bcd
---- /dev/null
-+++ b/arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi
-@@ -0,0 +1 @@
-+../../../../../arm/boot/dts/cros-ec-sbs.dtsi
-\ No newline at end of file
 -- 
 2.8.0.rc3.226.g39d4020
