@@ -1,56 +1,121 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 Dec 2016 17:38:01 +0100
-Subject: [PATCH v2 1/2] arm64: dts: zx: Fix gic GICR property
-In-Reply-To: <CAAQ0ZWQkU6T=Fm4oZ1R5-zJEzErjroYAAJqU2TeNHfz=3UhYrg@mail.gmail.com>
-References: <1476361881-19685-1-git-send-email-jun.nie@linaro.org>
- <2953810.EeueujTjSC@wuerfel>
- <CAAQ0ZWQkU6T=Fm4oZ1R5-zJEzErjroYAAJqU2TeNHfz=3UhYrg@mail.gmail.com>
-Message-ID: <6379358.TRgYEOKGM8@wuerfel>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 2 Dec 2016 13:41:11 -0300
+Subject: [PATCH] imx_v6_v7_defconfig: enable SPIDEV module
+In-Reply-To: <20161202161359.y3mzvdxsfb2dyok7@t450s.lan>
+References: <20161202145631.19292-1-gary.bisson@boundarydevices.com>
+ <CAOMZO5C8OH6obRn_8zh5HA9zoanRXUpoqk=vEBx+fW3wraNS6Q@mail.gmail.com>
+ <20161202152718.o4xv2ru5r7xw7t5e@t450s.lan>
+ <CABxcv=nSUfDT-bqHBm2e0XY55Qp4nH+66PriMqnix2RTsN0BNQ@mail.gmail.com>
+ <20161202161359.y3mzvdxsfb2dyok7@t450s.lan>
+Message-ID: <CABxcv=nVVW9=i61JmKA-Texn8BUkGTGpuPY+54pMoR394PY5Nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 28, 2016 10:08:18 PM CET Shawn Guo wrote:
-> On Sat, Nov 26, 2016 at 6:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday, October 17, 2016 1:49:19 PM CET Olof Johansson wrote:
-> >> On Thu, Oct 13, 2016 at 08:31:20PM +0800, Jun Nie wrote:
-> >> > GICR for multiple CPU can be described with start address and stride,
-> >> > or with multiple address. Current multiple address and stride are
-> >> > both used. Fix it.
-> >> >
-> >> > vmalloc patch 727a7f5a9 triggered this bug:
-> >> > [    0.097146] Unable to handle kernel paging request at virtual address ffff000008060008
-> >> > [    0.097150] pgd = ffff000008602000
-> >> > [    0.097160] [ffff000008060008] *pgd=000000007fffe003, *pud=000000007fffd003, *pmd=000000007fffc003, *pte=0000000000000000
-> >> > [    0.097165] Internal error: Oops: 96000007 [#1] PREEMPT SMP
-> >> > [    0.097170] Modules linked in:
-> >> > [    0.097177] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0+ #1474
-> >> > [    0.097179] Hardware name: ZTE zx296718 evaluation board (DT)
-> >> > [    0.097183] task: ffff80003e8c8b80 task.stack: ffff80003e8d0000
-> >> > [    0.097197] PC is at gic_populate_rdist+0x74/0x15c
-> >> > [    0.097202] LR is at gic_starting_cpu+0xc/0x20
-> >> > [    0.097206] pc : [<ffff0000082b1b18>] lr : [<ffff0000082b26e0>] pstate: 600001c5
-> >> >
-> >> > Signed-off-by: Jun Nie <jun.nie@linaro.org>
-> >>
-> >> A Fixes: tag would be useful on a patch like this, to tell what patch
-> >> introduced the problem. Please consider using them in the future.
-> >>
-> >> I've applied this one to fixes now.
-> >
-> > Hi Olof,
-> >
-> > I happened to still have this one in my todo folder as I must have
-> > missed your reply, and I stumbled over it while looking for things
-> > that may have gone missing.
-> >
-> > I don't see it in v4.9-rc6, did it get dropped accidentally?
-> 
-> Please help get this into v4.9 if possible, as it is required to get
-> v4.9 kernel boot up on ZTE ZX296718 SoC.  Thanks.
-> 
-> Shawn
-> 
+Hello Gary,
 
-Ok, applied both. Thanks,
+On Fri, Dec 2, 2016 at 1:13 PM, Gary Bisson
+<gary.bisson@boundarydevices.com> wrote:
+> Hi Javier,
+>
+> Thanks for the quick feedback on the matter.
+>
 
-	Arnd
+You are welcome.
+
+> On Fri, Dec 02, 2016 at 12:44:42PM -0300, Javier Martinez Canillas wrote:
+>> Hello Gary,
+>>
+>> On Fri, Dec 2, 2016 at 12:27 PM, Gary Bisson
+>> <gary.bisson@boundarydevices.com> wrote:
+>> > Hi Fabio,
+>> >
+>> > On Fri, Dec 02, 2016 at 01:18:42PM -0200, Fabio Estevam wrote:
+>> >> Hi Gary,
+>> >>
+>> >> On Fri, Dec 2, 2016 at 12:56 PM, Gary Bisson
+>> >> <gary.bisson@boundarydevices.com> wrote:
+>> >> > Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+>> >> > ---
+>> >> > Hi,
+>> >> >
+>> >> > Seems that this configuration is missing, especially since many
+>> >> > device trees are already using "spidev" nodes.
+>> >>
+>>
+>> This seems to have been added just because people weren't looking that
+>> closer to DT patches at the beginning, but now is forbidden. That's
+>> why the kernel now warns about it.
+>>
+>> >> Then they will trigger the following warning below (from the spidev
+>> >> probe function):
+>> >>
+>> >> /*
+>> >> * spidev should never be referenced in DT without a specific
+>> >> * compatible string, it is a Linux implementation thing
+>> >> * rather than a description of the hardware.
+>> >> */
+>> >> if (spi->dev.of_node && !of_match_device(spidev_dt_ids, &spi->dev)) {
+>> >>     dev_err(&spi->dev, "buggy DT: spidev listed directly in DT\n");
+>> >>     WARN_ON(spi->dev.of_node &&
+>> >>                        !of_match_device(spidev_dt_ids, &spi->dev));
+>> >> }
+>> >
+>> > Yes I've seen this WARN_ON when doing the dt-overlay testing. But is
+>> > disabling the SPIDEV configuration a solution?
+>> >
+>> > To be honest I disagree with that WARN_ON. Ok it means that the hardware
+>> > isn't fully described in the device tree but for development platforms
+>> > (such as ours or any rpi-like boards) the user can design his own
+>> > daugher board with whatever SPI device on it. Then using the spidev
+>> > interface is very convenient, so I don't understand what we are trying
+>> > to forbid here.
+>> >
+>>
+>> AFAICT, what we are trying to forbid is to have a Linux implementation
+>> detail to creep into a Device Tree.
+>>
+>> It's OK to use the spidev interface but that's orthogonal on how the
+>> device is instantiated from the DT. If you want to do that, the
+>> correct approach is AFAIU to add a OF device ID entry in
+>> drivers/spi/spidev.c and use that compatible string in your DT.
+>
+> I understand that the device tree isn't supposed to describe such
+> generic "spidev" concept.
+>
+> And that argument to me is ok for final products where the hardware is
+> fully defined. However I still believe that for development platforms
+> this cannot be applied. My customers want to use the SPI bus to connect
+> any device they want, and most of those customers don't want to mess
+> with the kernel. For them, having a spidev node, just like it exists for
+> i2cdev nodes, is ideal.
+>
+
+Yes, they are free to do it in their vendor tree DTBs. They just
+shouldn't try to post their DTS for mainline inclusion :)
+
+>> That way, the DT will describe the hardware instead of just a "spidev"
+>> but you could use the spidev interface to access your SPI device.
+>
+> But then aren't you afraid that the person will use the first compatible
+> that shows up (let's say "rohm,dh2228fv") and use it for all his spidev?
+> In that case the driver is happy although the fact remains that any hw
+> will be plugged behind. Or at the opposite, if everybody that uses
+> spidev adds its own compatible I'm not sure it will benefit the drive
+> code.
+>
+
+I agree with you that people adding random compatible strings to the
+spidev OF device ID table will not scale either. I don't really have
+an answer to that, I just mentioned what the SPI maintainers told me
+last time I tried to do something similar for a different platform a
+couple of years ago:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/303348.html
+
+> Anyway, I appreciate your feedback.
+>
+> Regards,
+> Gary
+
+Best regards,
+Javier
