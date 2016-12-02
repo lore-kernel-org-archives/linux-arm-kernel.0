@@ -1,57 +1,34 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri,  2 Dec 2016 20:25:08 +0530
-Subject: [RESEND PATCH V6 5/6] dmaengine: pl330: Make sure microcode is
- privileged
-In-Reply-To: <1480690509-13490-1-git-send-email-sricharan@codeaurora.org>
-References: <1480690509-13490-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1480690509-13490-6-git-send-email-sricharan@codeaurora.org>
+From: gary.bisson@boundarydevices.com (Gary Bisson)
+Date: Fri,  2 Dec 2016 15:56:31 +0100
+Subject: [PATCH] imx_v6_v7_defconfig: enable SPIDEV module
+Message-ID: <20161202145631.19292-1-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mitchel Humpherys <mitchelh@codeaurora.org>
-
-The PL330 performs privileged instruction fetches.  This can result in
-SMMU permission faults on SMMUs that implement the ARMv8 VMSA, which
-specifies that mappings that are writeable at one execution level shall
-not be executable at any higher-privileged level.  Fix this by using the
-DMA_ATTR_PRIVILEGED attribute, which will ensure that the microcode
-IOMMU mapping is only accessible to the privileged level.
-
-Cc: Dan Williams <dan.j.williams@intel.com>
-Cc: Vinod Koul <vinod.koul@intel.com>
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-Tested-by: Robin Murphy <robin.murphy@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
 ---
+Hi,
 
-[V6] No change
+Seems that this configuration is missing, especially since many
+device trees are already using "spidev" nodes.
 
- drivers/dma/pl330.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+Regards,
+Gary
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 030fe05..1a8bac2 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -1854,14 +1854,16 @@ static int dmac_alloc_resources(struct pl330_dmac *pl330)
- {
- 	int chans = pl330->pcfg.num_chan;
- 	int ret;
-+	unsigned long dma_attrs = DMA_ATTR_PRIVILEGED;
- 
- 	/*
- 	 * Alloc MicroCode buffer for 'chans' Channel threads.
- 	 * A channel's buffer offset is (Channel_Id * MCODE_BUFF_PERCHAN)
- 	 */
--	pl330->mcode_cpu = dma_alloc_coherent(pl330->ddma.dev,
-+	pl330->mcode_cpu = dma_alloc_attrs(pl330->ddma.dev,
- 				chans * pl330->mcbufsz,
--				&pl330->mcode_bus, GFP_KERNEL);
-+				&pl330->mcode_bus, GFP_KERNEL,
-+				dma_attrs);
- 	if (!pl330->mcode_cpu) {
- 		dev_err(pl330->ddma.dev, "%s:%d Can't allocate memory!\n",
- 			__func__, __LINE__);
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index cd81bd0..f208ad5 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -192,6 +192,7 @@ CONFIG_I2C_IMX=y
+ CONFIG_SPI=y
+ CONFIG_SPI_IMX=y
+ CONFIG_SPI_FSL_DSPI=y
++CONFIG_SPI_SPIDEV=m
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_MC9S08DZ60=y
+ CONFIG_GPIO_PCA953X=y
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+2.9.3
