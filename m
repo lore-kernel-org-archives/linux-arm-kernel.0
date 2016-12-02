@@ -1,40 +1,98 @@
 From: jcm@redhat.com (Jon Masters)
-Date: Fri, 2 Dec 2016 00:13:45 -0500
-Subject: [Linaro-acpi] ACPI namespace details for ARM64
-In-Reply-To: <98c9564d-17f9-f549-6dd4-5c6abc1ba1a3@codeaurora.org>
-References: <20161109220506.GN14322@bhelgaas-glaptop.roam.corp.google.com>
- <a0829be4-6324-758b-2fe6-a274f715a3a9@linaro.org>
- <98c9564d-17f9-f549-6dd4-5c6abc1ba1a3@codeaurora.org>
-Message-ID: <4b5371a5-007e-ad78-054c-9a075ed3ba71@redhat.com>
+Date: Fri, 2 Dec 2016 00:50:47 -0500
+Subject: [PATCH V1 1/2] PCI: thunder: Enable ACPI PCI controller for
+ ThunderX pass2.x silicon version
+In-Reply-To: <20161201002812.GB9409@bhelgaas-glaptop.roam.corp.google.com>
+References: <1479201298-25494-1-git-send-email-tn@semihalf.com>
+ <1479201298-25494-2-git-send-email-tn@semihalf.com>
+ <20161201002812.GB9409@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <e5b1f09c-ca4c-fbf0-e9d7-c943ad0df2ff@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2016 09:24 AM, Sinan Kaya wrote:
-> On 11/10/2016 6:18 PM, Al Stone wrote:
->> On 11/09/2016 03:05 PM, Bjorn Helgaas wrote:
->>> Hi all,
->>>
->>> We've been working through the details of getting ACPI to work on
->>> arm64, and there have been lots of questions about what this means for
->>> PCI.  I've outlined this for several people individually, but I'm
->>> going to send this separately, apart from a specific patch series, to
->>> make sure we're all on the same page.  Please correct my errors and
->>> misunderstandings.
->>>
->>> Bjorn
->>>
->>> [snip....]
->>
->> A big +1 to all of this.  This also looks like something that should
->> be added to either PCI, ACPI or arm64 documentation (or even all three).
->> What do you think?
-> 
-> 
-> I agree. In order to have compliant systems, we have to make PNP0C02 required
-> in the PCIe appendix of the SBSA specification.
+On 11/30/2016 07:28 PM, Bjorn Helgaas wrote:
 
-We're ramping up for a "Constitutional Convention" on the SBBR between a
-few of the vendors and we'll make sure this is covered.
+> I'm hoping to end up with something like this:
+> https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/ecam&id=51ad4df79a9b7f2a66b346a46b21a785a2937469
+
+The following build warnings happen using your branch on RHELSA7.3:
+
+drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+  THUNDER_PEM_QUIRK(2,  0), /* off-chip devices */
+  ^
+drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[44].cfgres.start?) [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[44].cfgres.end?) [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[45].cfgres.start?) [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[45].cfgres.end?) [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[46].cfgres.start?) [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[46].cfgres.end?) [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[47].cfgres.start?) [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[47].cfgres.end?) [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[48].cfgres.start?) [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[48].cfgres.end?) [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[49].cfgres.start?) [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[49].cfgres.end?) [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+  THUNDER_PEM_QUIRK(2,  1), /* off-chip devices */
+  ^
+drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[50].cfgres.start?) [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[50].cfgres.end?) [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[51].cfgres.start?) [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[51].cfgres.end?) [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[52].cfgres.start?) [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[52].cfgres.end?) [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[53].cfgres.start?) [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[53].cfgres.end?) [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[54].cfgres.start?) [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[54].cfgres.end?) [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[55].cfgres.start?) [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[55].cfgres.end?) [enabled by default]
 
 Jon.
 
