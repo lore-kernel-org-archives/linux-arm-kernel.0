@@ -1,81 +1,98 @@
 From: ping.bai@nxp.com (Bai Ping)
-Date: Fri, 2 Dec 2016 14:39:30 +0800
-Subject: [PATCH 07/11] ARM: debug: Add low level debug support for imx6sll
+Date: Fri, 2 Dec 2016 14:39:31 +0800
+Subject: [PATCH 08/11] ARM: imx: Add suspend/resume support for imx6sll
 In-Reply-To: <1480660774-25055-1-git-send-email-ping.bai@nxp.com>
 References: <1480660774-25055-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <1480660774-25055-8-git-send-email-ping.bai@nxp.com>
+Message-ID: <1480660774-25055-9-git-send-email-ping.bai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add low level debug support for i.MX6SLL.
+Add suspend/resume support for imx6sll.
 
 Signed-off-by: Bai Ping <ping.bai@nxp.com>
 ---
- arch/arm/Kconfig.debug            |  9 +++++++++
- arch/arm/include/debug/imx-uart.h | 10 ++++++++++
- 2 files changed, 19 insertions(+)
+ arch/arm/mach-imx/pm-imx6.c | 32 +++++++++++++++++++++++++++-----
+ 1 file changed, 27 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 408540f..d52d48c 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -405,6 +405,13 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on i.MX6SL.
+diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+index 1515e49..2ed4316 100644
+--- a/arch/arm/mach-imx/pm-imx6.c
++++ b/arch/arm/mach-imx/pm-imx6.c
+@@ -145,6 +145,13 @@ struct imx6_pm_socdata {
+ 	0x494, 0x4b0,	            /* MODE_CTL, MODE, */
+ };
  
-+	config DEBUG_IMX6SLL_UART
-+		bool "i.MX6SLL Debug UART"
-+		depends on SOC_IMX6SLL
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on i.MX6SLL.
++static const u32 imx6sll_mmdc_io_offset[] __initconst = {
++	0x294, 0x298, 0x29c, 0x2a0, /* DQM0 ~ DQM3 */
++	0x544, 0x54c, 0x554, 0x558, /* GPR_B0DS ~ GPR_B3DS */
++	0x530, 0x540, 0x2ac, 0x52c, /* MODE_CTL, MODE, SDCLK_0, GPR_ADDDS */
++	0x2a4, 0x2a8,		    /* SDCKE0, SDCKE1*/
++};
 +
- 	config DEBUG_IMX6SX_UART
- 		bool "i.MX6SX Debug UART"
- 		depends on SOC_IMX6SX
-@@ -1374,6 +1381,7 @@ config DEBUG_IMX_UART_PORT
- 						DEBUG_IMX53_UART || \
- 						DEBUG_IMX6Q_UART || \
- 						DEBUG_IMX6SL_UART || \
-+						DEBUG_IMX6SLL_UART || \
- 						DEBUG_IMX6SX_UART || \
- 						DEBUG_IMX6UL_UART || \
- 						DEBUG_IMX7D_UART
-@@ -1428,6 +1436,7 @@ config DEBUG_LL_INCLUDE
- 				 DEBUG_IMX53_UART ||\
- 				 DEBUG_IMX6Q_UART || \
- 				 DEBUG_IMX6SL_UART || \
-+				 DEBUG_IMX6SLL_UART || \
- 				 DEBUG_IMX6SX_UART || \
- 				 DEBUG_IMX6UL_UART || \
- 				 DEBUG_IMX7D_UART
-diff --git a/arch/arm/include/debug/imx-uart.h b/arch/arm/include/debug/imx-uart.h
-index bce58e9..24e60ce 100644
---- a/arch/arm/include/debug/imx-uart.h
-+++ b/arch/arm/include/debug/imx-uart.h
-@@ -81,6 +81,14 @@
- #define IMX6SL_UART_BASE_ADDR(n) IMX6SL_UART##n##_BASE_ADDR
- #define IMX6SL_UART_BASE(n)	IMX6SL_UART_BASE_ADDR(n)
+ static const struct imx6_pm_socdata imx6q_pm_data __initconst = {
+ 	.mmdc_compat = "fsl,imx6q-mmdc",
+ 	.src_compat = "fsl,imx6q-src",
+@@ -195,6 +202,15 @@ struct imx6_pm_socdata {
+ 	.mmdc_io_offset = imx6ul_mmdc_io_offset,
+ };
  
-+#define IMX6SLL_UART1_BASE_ADDR 0x02020000
-+#define IMX6SLL_UART2_BASE_ADDR 0x02024000
-+#define IMX6SLL_UART3_BASE_ADDR 0x02034000
-+#define IMX6SLL_UART4_BASE_ADDR 0x02018000
-+#define IMX6SLL_UART5_BASE_ADDR 0x021f4000
-+#define IMX6SLL_UART_BASE_ADDR(n) IMX6SLL_UART##n##_BASE_ADDR
-+#define IMX6SLL_UART_BASE(n)	IMX6SLL_UART_BASE_ADDR(n)
++static const struct imx6_pm_socdata imx6sll_pm_data __initconst = {
++	.mmdc_compat = "fsl,imx6sll-mmdc",
++	.src_compat = "fsl,imx6sll-src",
++	.iomuxc_compat = "fsl,imx6sll-iomuxc",
++	.gpc_compat = "fsl,imx6sll-gpc",
++	.pl310_compat = "arm,pl310-cache",
++	.mmdc_io_num = ARRAY_SIZE(imx6sll_mmdc_io_offset),
++	.mmdc_io_offset = imx6sll_mmdc_io_offset,
++};
+ /*
+  * This structure is for passing necessary data for low level ocram
+  * suspend code(arch/arm/mach-imx/suspend-imx6.S), if this struct
+@@ -293,9 +309,10 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
+ 		val |= 0x2 << BP_CLPCR_LPM;
+ 		val &= ~BM_CLPCR_VSTBY;
+ 		val &= ~BM_CLPCR_SBYOS;
+-		if (cpu_is_imx6sl())
++		if (cpu_is_imx6sl() || cpu_is_imx6sll())
+ 			val |= BM_CLPCR_BYPASS_PMIC_READY;
+-		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
++		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul() ||
++			cpu_is_imx6sll())
+ 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
+ 		else
+ 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
+@@ -310,9 +327,10 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
+ 		val |= 0x3 << BP_CLPCR_STBY_COUNT;
+ 		val |= BM_CLPCR_VSTBY;
+ 		val |= BM_CLPCR_SBYOS;
+-		if (cpu_is_imx6sl() || cpu_is_imx6sx())
++		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6sll())
+ 			val |= BM_CLPCR_BYPASS_PMIC_READY;
+-		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
++		if (cpu_is_imx6sl() || cpu_is_imx6sx() ||
++		    cpu_is_imx6ul() || cpu_is_imx6sll())
+ 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
+ 		else
+ 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
+@@ -373,6 +391,7 @@ static int imx6q_pm_enter(suspend_state_t state)
+ 			imx6sl_set_wait_clk(true);
+ 		/* Zzz ... */
+ 		cpu_do_idle();
 +
- #define IMX6SX_UART1_BASE_ADDR	0x02020000
- #define IMX6SX_UART2_BASE_ADDR	0x021e8000
- #define IMX6SX_UART3_BASE_ADDR	0x021ec000
-@@ -133,6 +141,8 @@
- #define UART_PADDR	IMX_DEBUG_UART_BASE(IMX6Q)
- #elif defined(CONFIG_DEBUG_IMX6SL_UART)
- #define UART_PADDR	IMX_DEBUG_UART_BASE(IMX6SL)
-+#elif defined(CONFIG_DEBUG_IMX6SLL_UART)
-+#define UART_PADDR	IMX_DEBUG_UART_BASE(IMX6SLL)
- #elif defined(CONFIG_DEBUG_IMX6SX_UART)
- #define UART_PADDR	IMX_DEBUG_UART_BASE(IMX6SX)
- #elif defined(CONFIG_DEBUG_IMX6UL_UART)
+ 		if (cpu_is_imx6sl())
+ 			imx6sl_set_wait_clk(false);
+ 		imx_gpc_post_resume();
+@@ -632,7 +651,10 @@ void __init imx6dl_pm_init(void)
+ 
+ void __init imx6sl_pm_init(void)
+ {
+-	imx6_pm_common_init(&imx6sl_pm_data);
++	if (cpu_is_imx6sl())
++		imx6_pm_common_init(&imx6sl_pm_data);
++	else
++		imx6_pm_common_init(&imx6sll_pm_data);
+ }
+ 
+ void __init imx6sx_pm_init(void)
 -- 
 1.9.1
