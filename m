@@ -1,44 +1,50 @@
 From: d.schultz@phytec.de (Daniel Schultz)
-Date: Fri, 2 Dec 2016 15:45:49 +0100
-Subject: [PATCH 3/3] nvmem: imx-ocotp: Fix wrong register size
-In-Reply-To: <1480689949-17957-1-git-send-email-d.schultz@phytec.de>
-References: <1480689949-17957-1-git-send-email-d.schultz@phytec.de>
-Message-ID: <1480689949-17957-3-git-send-email-d.schultz@phytec.de>
+Date: Fri, 2 Dec 2016 15:45:47 +0100
+Subject: [PATCH 1/3] nvmem: imx-ocotp: Add support for i.MX6UL
+Message-ID: <1480689949-17957-1-git-send-email-d.schultz@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All i.MX6 SoCs have an OCOTP Controller with 4kbit fuses. The i.MX6SL is
-an exception and has only 2kbit fuses.
-
-In the TRM for the i.MX6DQ (IMX6QDRM - Rev 2, 06/2014) the fuses size is
-described in chapter 46.1.1 with:
-"32-bit word restricted program and read to 4Kbits of eFuse OTP(512x8)."
-
-In the TRM for the i.MX6SL (IMX6SLRM - Rev 2, 06/2015) the fuses size is
-described in chapter 34.1.1 with:
-"32-bit word restricted program and read to 2 kbit of eFuse OTP(128x8)."
-
-Since the Freescale Linux kernel OCOTP driver works with a fuses size of
-2 kbit for the i.MX6SL, it looks like the TRM is wrong and the formula
-to calculate the correct fuses size has to be 256x8.
+This patch adds OCOTP support for the i.MX6UL SoC.
 
 Signed-off-by: Daniel Schultz <d.schultz@phytec.de>
 ---
- drivers/nvmem/imx-ocotp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/nvmem/imx-ocotp.txt | 5 +++--
+ drivers/nvmem/imx-ocotp.c                             | 1 +
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt b/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
+index 383d588..fcb1a48 100644
+--- a/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
++++ b/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
+@@ -1,13 +1,14 @@
+ Freescale i.MX6 On-Chip OTP Controller (OCOTP) device tree bindings
+ 
+ This binding represents the on-chip eFuse OTP controller found on
+-i.MX6Q/D, i.MX6DL/S, i.MX6SL, and i.MX6SX SoCs.
++i.MX6Q/D, i.MX6DL/S, i.MX6SL, i.MX6SX and i.MX6UL SoCs.
+ 
+ Required properties:
+ - compatible: should be one of
+ 	"fsl,imx6q-ocotp" (i.MX6Q/D/DL/S),
+ 	"fsl,imx6sl-ocotp" (i.MX6SL), or
+-	"fsl,imx6sx-ocotp" (i.MX6SX), followed by "syscon".
++	"fsl,imx6sx-ocotp" (i.MX6SX), or
++	"fsl,imx6ul-ocotp" (i.MX6UL), followed by "syscon".
+ - reg: Should contain the register base and length.
+ - clocks: Should contain a phandle pointing to the gated peripheral clock.
+ 
 diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
-index d2f78d3..8482c53 100644
+index ac27b9b..d2f78d3 100644
 --- a/drivers/nvmem/imx-ocotp.c
 +++ b/drivers/nvmem/imx-ocotp.c
-@@ -72,7 +72,7 @@ static int imx_ocotp_read(void *context, unsigned int offset,
+@@ -71,6 +71,7 @@ static int imx_ocotp_read(void *context, unsigned int offset,
+ 
  static const struct of_device_id imx_ocotp_dt_ids[] = {
  	{ .compatible = "fsl,imx6q-ocotp",  (void *)128 },
- 	{ .compatible = "fsl,imx6ul-ocotp", (void *)128 },
--	{ .compatible = "fsl,imx6sl-ocotp", (void *)32 },
-+	{ .compatible = "fsl,imx6sl-ocotp", (void *)64 },
++	{ .compatible = "fsl,imx6ul-ocotp", (void *)128 },
+ 	{ .compatible = "fsl,imx6sl-ocotp", (void *)32 },
  	{ .compatible = "fsl,imx6sx-ocotp", (void *)128 },
  	{ },
- };
 -- 
 1.9.1
