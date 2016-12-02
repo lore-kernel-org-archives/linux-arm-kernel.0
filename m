@@ -1,49 +1,78 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Fri, 2 Dec 2016 08:21:33 +0800
-Subject: [resend v2: PATCH 1/2] dt-bindings: Document the hi3660 reset
- bindings
-In-Reply-To: <3900806.3NUubBDb0Q@wuerfel>
-References: <1480553321-17400-1-git-send-email-zhangfei.gao@linaro.org>
- <1480553321-17400-2-git-send-email-zhangfei.gao@linaro.org>
- <3900806.3NUubBDb0Q@wuerfel>
-Message-ID: <e15e76e2-b32d-a4d0-eb8b-850626a3946a@linaro.org>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Fri, 2 Dec 2016 01:28:50 +0100
+Subject: [PATCH v2] PCI: Add information about describing PCI in ACPI
+In-Reply-To: <20161201232732.GB17948@bhelgaas-glaptop.roam.corp.google.com>
+References: <20161129212816.15663.28100.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <20161201223604.GC15867@bhelgaas-glaptop.roam.corp.google.com>
+ <47776378.8X3TnsHd3Q@aspire.rjw.lan>
+ <20161201232732.GB17948@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <CAJZ5v0gtG6++GqyOb_B=o-=R4YuFia8PH6W3NFiCZuay=pV7TA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Arnd
-
-On 2016?12?01? 20:05, Arnd Bergmann wrote:
-> On Thursday, December 1, 2016 8:48:40 AM CET Zhangfei Gao wrote:
->> +               hisi,reset-bits = <0x20 0x8             /* 0: i2c0 */
->> +                                  0x20 0x10            /* 1: i2c1 */
->> +                                  0x20 0x20            /* 2: i2c2 */
->> +                                  0x20 0x8000000>;     /* 3: i2c6 */
->> +       };
->> +
->> +Specifying reset lines connected to IP modules
->> +==============================================
->> +example:
->> +
->> +        i2c0: i2c at ..... {
->> +                ...
->> +               resets = <&iomcu_rst 0>;
->> +                ...
->> +        };
-> I don't really like this approach, since now the information is
-> in two places. Why not put the data into the reset specifier
-> directly when it is used?
-Any example, still not understand.
-They are consumer and provider.
+On Fri, Dec 2, 2016 at 12:27 AM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> On Thu, Dec 01, 2016 at 11:37:39PM +0100, Rafael J. Wysocki wrote:
+>> On Thursday, December 01, 2016 04:36:04 PM Bjorn Helgaas wrote:
+>> > On Tue, Nov 29, 2016 at 03:39:48PM -0600, Bjorn Helgaas wrote:
+>> > > Here's another stab at this writeup.  I'd appreciate any comments!
+>> > >
+>> > > Changes from v1 to v2:
+>> > >   - Consumer/Producer is defined for Extended Address Space descriptors;
+>> > >     should be ignored for QWord/DWord/Word Address Space descriptors
+>> > >   - New arches may use Extended Address Space descriptors in PNP0A03 for
+>> > >     bridge registers, including ECAM (if the arch adds support for this)
+>> > >   - Add more details about MCFG and _CBA (Lv's suggestion)
+>> > >   - Incorporate Rafael's suggestions
+>> > >
+>> > > ---
+>> > >
+>> > > Bjorn Helgaas (1):
+>> > >       PCI: Add information about describing PCI in ACPI
+>> > >
+>> > >
+>> > >  Documentation/PCI/00-INDEX      |    2
+>> > >  Documentation/PCI/acpi-info.txt |  180 +++++++++++++++++++++++++++++++++++++++
+>> > >  2 files changed, 182 insertions(+)
+>> > >  create mode 100644 Documentation/PCI/acpi-info.txt
+>> >
+>> > It's very late in the cycle, but I'm considering trying to squeeze
+>> > this into v4.9 on the grounds that:
+>> >
+>> >   - It's only a documentation change and can't break anything, and
+>> >
+>> >   - Distributing it more widely may help the arm64 firmware ecosystem
+>> >
+>> > But I don't want to disseminate misleading or incorrect information,
+>> > so if it needs clarification or wordsmithing, or even just maturation,
+>> > I'll wait until v4.10.
+>> >
+>> > The Consumer/Producer stuff, in particular, doesn't seem 100% settled
+>> > yet.  Your thoughts, and especially your improvements, are welcome!
+>>
+>> Well, what's the drawback if it doesn't go into 4.9?
 >
-> Also the format seems a little too close to the actual register
-> layout and could be a little more abstract, using bit numbers instead
-> of a bitmask and register numbers instead of offsets.
-We use bit numbers first.
-But in the developing process, we found several bits may be required for 
-one driver.
-And they may not be continuous as the bits may already be occupied.
-Directly using offset, we can set several bits together for simple, to 
-give more flexibility.
-So after discussion, we directly use offset.
+> Only that it's not as easily accessible.  ARM64 ACPI firmware is brand
+> new.  Neither the firmware nor the kernel developers, nor even the
+> hardware designers, have the benefit of all the x86/ia64 history, so I
+> wrote this to try to come to a common understanding of what Linux
+> expects.
+>
+> The first generation of ARM64 hardware is already in the field, and it
+> has teething problems in hardware, firmware, and kernel.  For example,
+> the current MCFG quirk situation: the ECAM hardware doesn't work quite
+> per spec, the ACPI firmware doesn't describe the address space
+> completely, and we don't really have consensus on how the firmware
+> should communicate register space to the kernel.
+>
+> We're hoping the second generation can fix some of these problems, and
+> I think this is the time to try to influence that.
 
-Thanks
+Well, I would be super-careful if I were you, then. :-)
+
+I'm not sure if squeezing it into 4.9.0 buys you anything here.  If
+you get it into 4.10-rc, you can request -stable to pick it up (at
+least in principle) and then it will show up in 4.9.y at one point
+which should suffice I suppose?
+
+Thanks,
+Rafael
