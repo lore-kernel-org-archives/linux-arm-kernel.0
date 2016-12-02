@@ -1,57 +1,141 @@
-From: m.bielski@virtualopensystems.com (Maciej Bielski)
-Date: Fri, 2 Dec 2016 10:13:43 +0100
-Subject: [RFC PATCH 0/2] arm64: memory-hotplug: Add Memory Hotplug support
-In-Reply-To: <1480637999-4320-1-git-send-email-scott.branden@broadcom.com>
-References: <1480637999-4320-1-git-send-email-scott.branden@broadcom.com>
-Message-ID: <18021c70-a4a0-3007-c861-82ede74f965e@virtualopensystems.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Fri, 2 Dec 2016 11:06:24 +0100
+Subject: [Linaro-acpi] [PATCH V1 1/2] PCI: thunder: Enable ACPI PCI
+ controller for ThunderX pass2.x silicon version
+In-Reply-To: <CADaLNDm8Zp_kAqVvSd0po9S3j2rSXxtUJ1M33dW7gLZzvueweQ@mail.gmail.com>
+References: <1479201298-25494-1-git-send-email-tn@semihalf.com>
+ <1479201298-25494-2-git-send-email-tn@semihalf.com>
+ <20161201002812.GB9409@bhelgaas-glaptop.roam.corp.google.com>
+ <e5b1f09c-ca4c-fbf0-e9d7-c943ad0df2ff@redhat.com>
+ <CADaLNDm8Zp_kAqVvSd0po9S3j2rSXxtUJ1M33dW7gLZzvueweQ@mail.gmail.com>
+Message-ID: <30ad6c65-4a4a-6346-00f6-11250133a251@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 02.12.2016 07:42, Duc Dang wrote:
+> On Thu, Dec 1, 2016 at 9:50 PM, Jon Masters <jcm@redhat.com> wrote:
+>> On 11/30/2016 07:28 PM, Bjorn Helgaas wrote:
+>>
+>>> I'm hoping to end up with something like this:
+>>> https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/ecam&id=51ad4df79a9b7f2a66b346a46b21a785a2937469
+>>
+>> The following build warnings happen using your branch on RHELSA7.3:
+>>
+>> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+>>   THUNDER_PEM_QUIRK(2,  0), /* off-chip devices */
+>>   ^
+>> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[44].cfgres.start?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[44].cfgres.end?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[45].cfgres.start?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[45].cfgres.end?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[46].cfgres.start?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[46].cfgres.end?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[47].cfgres.start?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[47].cfgres.end?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[48].cfgres.start?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[48].cfgres.end?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[49].cfgres.start?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[49].cfgres.end?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+>>   THUNDER_PEM_QUIRK(2,  1), /* off-chip devices */
+>>   ^
+>> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[50].cfgres.start?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[50].cfgres.end?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[51].cfgres.start?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[51].cfgres.end?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[52].cfgres.start?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[52].cfgres.end?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[53].cfgres.start?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[53].cfgres.end?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[54].cfgres.start?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[54].cfgres.end?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[55].cfgres.start?) [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
+>> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[55].cfgres.end?) [enabled by default]
+>
+> I saw this too. It can be fixed by changes below:
+>
+> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+> index 7319188..3d7c5cc 100644
+> --- a/drivers/acpi/pci_mcfg.c
+> +++ b/drivers/acpi/pci_mcfg.c
+> @@ -98,16 +98,16 @@ struct mcfg_fixup {
+>         { "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,                 \
+>         &pci_thunder_ecam_ops }
+>         /* SoC pass1.x */
+> -   THUNDER_PEM_QUIRK(2,  0),       /* off-chip devices */
+> -   THUNDER_PEM_QUIRK(2,  1),       /* off-chip devices */
+> -   THUNDER_ECAM_QUIRK(2,  0),
+> -   THUNDER_ECAM_QUIRK(2,  1),
+> -   THUNDER_ECAM_QUIRK(2,  2),
+> -   THUNDER_ECAM_QUIRK(2,  3),
+> -   THUNDER_ECAM_QUIRK(2, 10),
+> -   THUNDER_ECAM_QUIRK(2, 11),
+> -   THUNDER_ECAM_QUIRK(2, 12),
+> -   THUNDER_ECAM_QUIRK(2, 13),
+> + THUNDER_PEM_QUIRK(2, 0UL),  /* off-chip devices */
+> + THUNDER_PEM_QUIRK(2, 1UL),  /* off-chip devices */
+> + THUNDER_ECAM_QUIRK(2, 0UL),
+> + THUNDER_ECAM_QUIRK(2, 1UL),
+> + THUNDER_ECAM_QUIRK(2, 2UL),
+> + THUNDER_ECAM_QUIRK(2, 3UL),
+> + THUNDER_ECAM_QUIRK(2, 10UL),
+> + THUNDER_ECAM_QUIRK(2, 11UL),
+> + THUNDER_ECAM_QUIRK(2, 12UL),
+> + THUNDER_ECAM_QUIRK(2, 13UL),
+>
 
-Recently we have announced our effort on that:
-https://lkml.org/lkml/2016/11/17/49
+The UL suffix is needed for *THUNDER_PEM_QUIRK* only. THUNDER_ECAM_QUIRK 
+is fine.
 
-For now we have a working solution for hotplug and we are performing
-code cleanup to push the patches soon.
+-   THUNDER_PEM_QUIRK(2,  0),       /* off-chip devices */
+-   THUNDER_PEM_QUIRK(2,  1),       /* off-chip devices */
++   THUNDER_PEM_QUIRK(2, 0UL),  /* off-chip devices */
++   THUNDER_PEM_QUIRK(2, 1UL),  /* off-chip devices */
 
-BR,
-
-On 02/12/2016 01:19, Scott Branden wrote:
-> This patchset is sent for comment to add memory hotplug support for ARM64
-> based platforms.  It follows hotplug code added for other architectures
-> in the linux kernel.
-> 
-> I tried testing the memory hotplug feature following documentation from
-> Documentation/memory-hotplug.txt.  I don't think it is working as expected
-> - see below:
-> 
-> To add memory to the system I did the following:
-> echo 0x400000000 > /sys/devices/system/memory/probe
-> 
-> The memory is displayed as system ram:
-> cat /proc/iomem:
-> 74000000-77ffffff : System RAM
->   74080000-748dffff : Kernel code
->   74950000-749d2fff : Kernel data
-> 400000000-43fffffff : System RAM
-> 
-> But does not seem to be added to the kernel memory.
-> /proc/meminfo did not change.
-> 
-> What else needs to be done so the memory is added to the kernel memory
-> pool for normal allocation?
-> 
-> Scott Branden (2):
->   arm64: memory-hotplug: Add MEMORY_HOTPLUG, MEMORY_HOTREMOVE,
->     MEMORY_PROBE
->   arm64: defconfig: enable MEMORY_HOTPLUG config options
-> 
->  arch/arm64/Kconfig           | 10 ++++++++++
->  arch/arm64/configs/defconfig |  3 +++
->  arch/arm64/mm/init.c         | 42 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 55 insertions(+)
-> 
-
--- 
-Maciej Bielski
+Tomasz
