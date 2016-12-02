@@ -1,40 +1,54 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri,  2 Dec 2016 15:05:27 +0000
-Subject: [RFC v3 PATCH 09/25] ARM: NOMMU: fix load of CONFIG_VECTORS_BASE
+Date: Fri,  2 Dec 2016 15:05:26 +0000
+Subject: [RFC v3 PATCH 08/25] ARM: NOMMU: fix head-nommu build for pre-ARMv7
+ CPUs
 In-Reply-To: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
 References: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1480691143-19845-10-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1480691143-19845-9-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While running randconfig with NOMMU enabled following error shows up:
+While building for pre-ARMv7 CPUs with ARM_MPU enabled following error
+shows up:
 
+  AS      arch/arm/kernel/head-nommu.o
 arch/arm/kernel/head-nommu.S: Assembler messages:
-arch/arm/kernel/head-nommu.S:265: Error: invalid constant (ffffffffffff0000) after fixup
+arch/arm/kernel/head-nommu.S:223: Error: selected processor does not support ARM mode `isb'
+arch/arm/kernel/head-nommu.S:231: Error: selected processor does not support ARM mode `isb'
+arch/arm/kernel/head-nommu.S:235: Error: selected processor does not support ARM mode `isb'
+arch/arm/kernel/head-nommu.S:244: Error: selected processor does not support ARM mode `isb'
+arch/arm/kernel/head-nommu.S:248: Error: selected processor does not support ARM mode `isb'
+arch/arm/kernel/head-nommu.S:258: Error: selected processor does not support ARM mode `isb'
+arch/arm/kernel/head-nommu.S:265: Error: selected processor does not support ARM mode `isb'
 make[1]: *** [arch/arm/kernel/head-nommu.o] Error 1
 
-That happens because CONFIG_VECTORS_BASE it is out of range of the mov
-instruction. So use ldr pseudo instruction instead and let assembler
-to figure out how to deal with that.
+MPU setup code is available for ARMv7 only, but head-nommu.S is
+generic, so build head-nommu.S with -march=armv7-a (and armv7-m for
+M-calss to avoid "Conflicting architecture profiles M/A" link time)
+flag; in case pre-ARMv7 it detects there there is no MPU is avaliable,
+so it will never reach those instructions.
 
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/kernel/head-nommu.S |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/kernel/Makefile |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index 7317554..ae80c71 100644
---- a/arch/arm/kernel/head-nommu.S
-+++ b/arch/arm/kernel/head-nommu.S
-@@ -251,7 +251,7 @@ ENTRY(__setup_mpu)
- 	set_region_nr r0, #MPU_VECTORS_REGION
- 	isb
- 	/* Shared, inaccessible to PL0, rw PL1 */
--	mov	r0, #CONFIG_VECTORS_BASE	@ Cover from VECTORS_BASE
-+	ldr	r0, =CONFIG_VECTORS_BASE	@ Cover from VECTORS_BASE
- 	ldr	r5,=(MPU_AP_PL1RW_PL0NA | MPU_RGN_NORMAL)
- 	/* Writing N to bits 5:1 (RSR_SZ) --> region size 2^N+1 */
- 	mov	r6, #(((2 * PAGE_SHIFT - 1) << MPU_RSR_SZ) | 1 << MPU_RSR_EN)
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index ad325a8..6da8b04 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -84,6 +84,11 @@ endif
+ obj-$(CONFIG_PARAVIRT)	+= paravirt.o
+ 
+ head-y			:= head$(MMUEXT).o
++ifeq ($(CONFIG_CPU_V7M),y)
++AFLAGS_head-nommu.o     :=-Wa,-march=armv7-m
++else
++AFLAGS_head-nommu.o     :=-Wa,-march=armv7-a
++endif
+ obj-$(CONFIG_DEBUG_LL)	+= debug.o
+ obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
+ 
 -- 
 1.7.9.5
