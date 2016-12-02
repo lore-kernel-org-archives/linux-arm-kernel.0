@@ -1,38 +1,75 @@
-From: dennis.chen@arm.com (Dennis Chen)
-Date: Fri, 2 Dec 2016 14:04:41 +0800
-Subject: [PATCH] PCI:MSI Return -ENOSPC when requested vectors is not
- enough
-In-Reply-To: <20161201085243.GA24684@lst.de>
-References: <1480558504-18691-1-git-send-email-dennis.chen@arm.com>
- <20161201085243.GA24684@lst.de>
-Message-ID: <20161202060440.GA16167@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 02 Dec 2016 07:31:22 +0100
+Subject: [PATCH] arm64: smp: Prevent raw_smp_processor_id() recursion
+In-Reply-To: <bb132e9abf4d256e40ad311b106b05d724b290fb.1480607460.git.robin.murphy@arm.com>
+References: <CGME20161201155519epcas2p28dc6c3f466f1455bed3b13cbb20e25e6@epcas2p2.samsung.com>
+ <bb132e9abf4d256e40ad311b106b05d724b290fb.1480607460.git.robin.murphy@arm.com>
+Message-ID: <7c48fb35-bebd-3aa3-9d80-b6feec044eb4@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2016 at 09:52:43AM +0100, Christoph Hellwig wrote:
-> Hi Dennis,
-> 
-> I've fixed ahci to treat all errors the same in the meantime, please
-> try latest Linux tree.  That being said I don't like the different
-> error returns from __pci_enable_msi_range (and __pci_enable_msix_range),
-> but they have been there for a while.
+Hi Robin,
 
-Ah, I've noticed that you have the fix recently which is somehow to weaken
-the necessary of the change. But, that also being said that I don't like we insist
-at least the inconsistent either just because something has been there *for a while*.
-Both below comments from cpi_alloc_irq_vectors_affinity() and the logic itself
-leads us to think that the correct return value is -NOSPC:
-/**
- *...
- *Return the number of vectors allocated,
- * (which might be smaller than @max_vecs) if successful, or a negative
- * error code on error. If less than @min_vecs interrupt vectors are
- * available for @dev the function will fail with -ENOSPC.
- * ...
-*/
 
-People maybe argue that almost has no device drivers depending on the different
-return value, then why we still need to do that?
+On 2016-12-01 16:55, Robin Murphy wrote:
+> Under CONFIG_DEBUG_PREEMPT=y, this_cpu_ptr() ends up calling back into
+> raw_smp_processor_id(), resulting in some hilariously catastrophic
+> infinite recursion. In the normal case, we have:
+>
+>    #define this_cpu_ptr(ptr) raw_cpu_ptr(ptr)
+>
+> and everything is dandy. However for CONFIG_DEBUG_PREEMPT, this_cpu_ptr()
+> is defined in terms of my_cpu_offset, wherein the fun begins:
+>
+>    #define my_cpu_offset per_cpu_offset(smp_processor_id())
+>    ...
+>    #define smp_processor_id() debug_smp_processor_id()
+>    ...
+>    notrace unsigned int debug_smp_processor_id(void)
+>    {
+>    	return check_preemption_disabled("smp_processor_id", "");
+>    ...
+>    notrace static unsigned int check_preemption_disabled(const char *what1,
+>    							const char *what2)
+>    {
+>    	int this_cpu = raw_smp_processor_id();
+>
+> and bang. Use raw_cpu_ptr() directly to avoid that.
+>
+> Reported-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-Thanks,
-Dennis 
+Works fine now. Thanks for the proper fix.
+
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
+> ---
+>
+> Since I just reproduced this locally to verify Will's suggestion, it
+> seemed I might as well just write it up as a patch :)
+>
+>   arch/arm64/include/asm/smp.h | 4 +++-
+>   1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+> index a62db952ffcb..d050d720a1b4 100644
+> --- a/arch/arm64/include/asm/smp.h
+> +++ b/arch/arm64/include/asm/smp.h
+> @@ -41,8 +41,10 @@ DECLARE_PER_CPU_READ_MOSTLY(int, cpu_number);
+>    * We don't use this_cpu_read(cpu_number) as that has implicit writes to
+>    * preempt_count, and associated (compiler) barriers, that we'd like to avoid
+>    * the expense of. If we're preemptible, the value can be stale at use anyway.
+> + * And we can't use this_cpu_ptr() either, as that winds up recursing back
+> + * here under CONFIG_DEBUG_PREEMPT=y.
+>    */
+> -#define raw_smp_processor_id() (*this_cpu_ptr(&cpu_number))
+> +#define raw_smp_processor_id() (*raw_cpu_ptr(&cpu_number))
+>   
+>   struct seq_file;
+>   
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
