@@ -1,51 +1,94 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri,  2 Dec 2016 14:49:09 +0000
-Subject: [PATCH 2/2] arm64: hibernate: report nomap regions as being pfn_nosave
-In-Reply-To: <20161202144909.18405-1-james.morse@arm.com>
-References: <20161202144909.18405-1-james.morse@arm.com>
-Message-ID: <20161202144909.18405-3-james.morse@arm.com>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Fri,  2 Dec 2016 15:53:00 +0100
+Subject: [PATCH v4] ARM: davinci: da8xx: Fix sleeping function called from
+ invalid context
+Message-ID: <1480690380-13216-1-git-send-email-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pfn_valid() needs to be changed so that all struct pages in a numa
-node have the same node-id. Currently 'nomap' pages are skipped, and
-retain their pre-numa node-ids, which leads to a later BUG_ON().
+Everytime the usb20 phy is enabled, there is a
+"sleeping function called from invalid context" BUG.
 
-Once this change happens, hibernate's code code will try and
-save/restore the nomap pages.
+clk_enable() from arch/arm/mach-davinci/clock.c uses spin_lock_irqsave()
+before to invoke the callback usb20_phy_clk_enable().
+usb20_phy_clk_enable() uses clk_get() and clk_enable_prepapre()
+which may sleep.
+Move clk_get() to da8xx_register_usb20_phy_clk() and
+replace clk_prepare_enable() by clk_enable().
 
-Add the memblock nomap regions to the ranges reported as being
-'pfn_nosave' to the hibernate core code. This only works if all
-pages in the nomap region are also marked with PG_reserved.
-
-Signed-off-by: James Morse <james.morse@arm.com>
+Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
 ---
- arch/arm64/kernel/hibernate.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/mach-davinci/usb-da8xx.c | 28 +++++++++++++++-------------
+ 1 file changed, 15 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-index d55a7b09959b..9e901658a123 100644
---- a/arch/arm64/kernel/hibernate.c
-+++ b/arch/arm64/kernel/hibernate.c
-@@ -17,6 +17,7 @@
- #define pr_fmt(x) "hibernate: " x
- #include <linux/cpu.h>
- #include <linux/kvm_host.h>
-+#include <linux/memblock.h>
- #include <linux/mm.h>
- #include <linux/pm.h>
- #include <linux/sched.h>
-@@ -105,7 +106,10 @@ int pfn_is_nosave(unsigned long pfn)
- 	unsigned long nosave_begin_pfn = virt_to_pfn(&__nosave_begin);
- 	unsigned long nosave_end_pfn = virt_to_pfn(&__nosave_end - 1);
+diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
+index b010e5f..704f506 100644
+--- a/arch/arm/mach-davinci/usb-da8xx.c
++++ b/arch/arm/mach-davinci/usb-da8xx.c
+@@ -22,6 +22,8 @@
+ #define DA8XX_USB0_BASE		0x01e00000
+ #define DA8XX_USB1_BASE		0x01e25000
  
--	return (pfn >= nosave_begin_pfn) && (pfn <= nosave_end_pfn);
-+	if ((pfn >= nosave_begin_pfn) && (pfn <= nosave_end_pfn))
-+		return 1;
++static struct clk *usb20_clk;
 +
-+	return !memblock_is_map_memory(pfn << PAGE_SHIFT);
+ static struct platform_device da8xx_usb_phy = {
+ 	.name		= "da8xx-usb-phy",
+ 	.id		= -1,
+@@ -158,21 +160,14 @@ int __init da8xx_register_usb_refclkin(int rate)
+ 
+ static void usb20_phy_clk_enable(struct clk *clk)
+ {
+-	struct clk *usb20_clk;
+ 	int err;
+ 	u32 val;
+ 	u32 timeout = 500000; /* 500 msec */
+ 
+ 	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+ 
+-	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
+-	if (IS_ERR(usb20_clk)) {
+-		pr_err("could not get usb20 clk: %ld\n", PTR_ERR(usb20_clk));
+-		return;
+-	}
+-
+ 	/* The USB 2.O PLL requires that the USB 2.O PSC is enabled as well. */
+-	err = clk_prepare_enable(usb20_clk);
++	err = clk_enable(usb20_clk);
+ 	if (err) {
+ 		pr_err("failed to enable usb20 clk: %d\n", err);
+ 		clk_put(usb20_clk);
+@@ -197,8 +192,7 @@ static void usb20_phy_clk_enable(struct clk *clk)
+ 
+ 	pr_err("Timeout waiting for USB 2.0 PHY clock good\n");
+ done:
+-	clk_disable_unprepare(usb20_clk);
+-	clk_put(usb20_clk);
++	clk_disable(usb20_clk);
  }
  
- void notrace save_processor_state(void)
+ static void usb20_phy_clk_disable(struct clk *clk)
+@@ -285,11 +279,19 @@ static struct clk_lookup usb20_phy_clk_lookup =
+ int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
+ {
+ 	struct clk *parent;
+-	int ret = 0;
++	int ret;
++
++	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
++	ret = PTR_ERR_OR_ZERO(usb20_clk);
++	if (ret)
++		return ret;
+ 
+ 	parent = clk_get(NULL, use_usb_refclkin ? "usb_refclkin" : "pll0_aux");
+-	if (IS_ERR(parent))
+-		return PTR_ERR(parent);
++	ret = PTR_ERR_OR_ZERO(parent);
++	if (ret) {
++		clk_put(usb20_clk);
++		return ret;
++	}
+ 
+ 	usb20_phy_clk.parent = parent;
+ 	ret = clk_register(&usb20_phy_clk);
 -- 
-2.10.1
+2.7.3
