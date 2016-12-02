@@ -1,65 +1,51 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri,  2 Dec 2016 14:49:08 +0000
-Subject: [PATCH 1/2] arm64: mm: Mark nomap regions with the PG_reserved flag
+Date: Fri,  2 Dec 2016 14:49:09 +0000
+Subject: [PATCH 2/2] arm64: hibernate: report nomap regions as being pfn_nosave
 In-Reply-To: <20161202144909.18405-1-james.morse@arm.com>
 References: <20161202144909.18405-1-james.morse@arm.com>
-Message-ID: <20161202144909.18405-2-james.morse@arm.com>
+Message-ID: <20161202144909.18405-3-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-linux/page-flags.h has a flag for describing special pages:
-> PG_reserved is set for special pages, which can never be swapped out.
-> Some of them might not even exist (eg empty_bad_page)...
+pfn_valid() needs to be changed so that all struct pages in a numa
+node have the same node-id. Currently 'nomap' pages are skipped, and
+retain their pre-numa node-ids, which leads to a later BUG_ON().
 
-memblock nomap pages fall in the 'might not even exist' category,
-set this bit on all the struct pages in the nomap regions.
+Once this change happens, hibernate's code code will try and
+save/restore the nomap pages.
 
-This gives pfn walkers the necessary hint that the page might not
-be accessible, allowing pfn_valid()s meaning to change slightly.
+Add the memblock nomap regions to the ranges reported as being
+'pfn_nosave' to the hibernate core code. This only works if all
+pages in the nomap region are also marked with PG_reserved.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/mm/init.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm64/kernel/hibernate.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 166911f4a2e6..5da9ff7d20f5 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -31,6 +31,7 @@
- #include <linux/memblock.h>
- #include <linux/sort.h>
- #include <linux/of_fdt.h>
-+#include <linux/page-flags.h>
- #include <linux/dma-mapping.h>
- #include <linux/dma-contiguous.h>
- #include <linux/efi.h>
-@@ -401,6 +402,8 @@ static void __init free_unused_memmap(void)
-  */
- void __init mem_init(void)
- {
-+	struct memblock_region *region;
-+
- 	if (swiotlb_force || max_pfn > (arm64_dma_phys_limit >> PAGE_SHIFT))
- 		swiotlb_init(1);
+diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+index d55a7b09959b..9e901658a123 100644
+--- a/arch/arm64/kernel/hibernate.c
++++ b/arch/arm64/kernel/hibernate.c
+@@ -17,6 +17,7 @@
+ #define pr_fmt(x) "hibernate: " x
+ #include <linux/cpu.h>
+ #include <linux/kvm_host.h>
++#include <linux/memblock.h>
+ #include <linux/mm.h>
+ #include <linux/pm.h>
+ #include <linux/sched.h>
+@@ -105,7 +106,10 @@ int pfn_is_nosave(unsigned long pfn)
+ 	unsigned long nosave_begin_pfn = virt_to_pfn(&__nosave_begin);
+ 	unsigned long nosave_end_pfn = virt_to_pfn(&__nosave_end - 1);
  
-@@ -479,6 +482,17 @@ void __init mem_init(void)
- 		 */
- 		sysctl_overcommit_memory = OVERCOMMIT_ALWAYS;
- 	}
+-	return (pfn >= nosave_begin_pfn) && (pfn <= nosave_end_pfn);
++	if ((pfn >= nosave_begin_pfn) && (pfn <= nosave_end_pfn))
++		return 1;
 +
-+	/* Mark struct pages for the memblock:nomap regions as reserved */
-+	for_each_memblock(memory, region) {
-+		u64 pfn;
-+		u64 start_pfn = memblock_region_memory_base_pfn(region);
-+		u64 end_pfn = memblock_region_memory_end_pfn(region);
-+
-+		if (memblock_is_nomap(region))
-+			for (pfn = start_pfn; pfn < end_pfn; pfn++)
-+				SetPageReserved(pfn_to_page(pfn));
-+	}
++	return !memblock_is_map_memory(pfn << PAGE_SHIFT);
  }
  
- void free_initmem(void)
+ void notrace save_processor_state(void)
 -- 
 2.10.1
