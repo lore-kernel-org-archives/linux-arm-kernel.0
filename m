@@ -1,40 +1,189 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 2 Dec 2016 16:30:14 +0530
-Subject: [PATCH 1/3] ARM: da850: fix infinite loop in clk_set_rate()
-In-Reply-To: <1480612516-18853-2-git-send-email-bgolaszewski@baylibre.com>
-References: <1480612516-18853-1-git-send-email-bgolaszewski@baylibre.com>
- <1480612516-18853-2-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <bf382533-c0d0-2ed0-dedd-9ea617775a6e@ti.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 2 Dec 2016 12:08:21 +0100
+Subject: XHCI controller does not detect USB key insertion
+In-Reply-To: <20161202104208.GA8736@kroah.com>
+References: <584134D9.5000404@free.fr> <87inr2vh2l.fsf@linux.intel.com>
+ <58414BC5.109@free.fr> <20161202104208.GA8736@kroah.com>
+Message-ID: <58415625.3020703@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartosz,
+On 02/12/2016 11:42, Greg KH wrote:
 
-On Thursday 01 December 2016 10:45 PM, Bartosz Golaszewski wrote:
-> The aemif clock is added twice to the lookup table in da850.c. This
-> breaks the children list of pll0_sysclk3 as we're using the same list
-> links in struct clk. When calling clk_set_rate(), we get stuck in
-> propagate_rate().
+> On Fri, Dec 02, 2016 at 11:24:05AM +0100, Mason wrote:
 > 
-> Simply add the clock once, but specify both the con_id and dev_id in
-> the lookup entry.
+>> # lsusb -v
+>> Bus 001 Device 001: ID 1d6b:0002
+>> Bus 002 Device 001: ID 1d6b:0003
+>>
+>> Isn't lsusb verbose supposed to print much more than that?
 > 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> Yes, if you are using the usbutils version of 'lsusb', odds are this is
+> busybox, right?
 
-The issue is real, but the fix is not going to be this simple, I am
-afraid. This will break NAND on all da850 boards including LCDK.
+Right. (You win a digital cookie.)
 
-The aemif clock is accessed in two ways. One by the
-drivers/memory/ti-aemif.c, using ti-aemif as the device name and NULL
-connection id. Second by drivers/mtd/nand/davinci_nand.c and
-arch/arm/mach-davinci/aemif.c using davinci-nand as device id and with
-"aemif" as the connection id.
+cd buildroot && make menuconfig
+Drop BR2_PACKAGE_USBMOUNT (maybe it causes unexpected issues)
+ Add BR2_PACKAGE_USBUTILS (I want the real deal)
 
-We will need to match both. The only way to fix this without breaking
-anything is to create two clocks for the two lookups above. Both cannot
-be PSC clocks for the same PSC module as that would be racy. Instead
-just create a new nand clock node which is a child of the aemif node and
-inherits parent's clock rate.
+> And these are just the root hubs, that the USB controller driver creates
+> as "virtual" USB devices, they are not "real" USB devices on your bus.
 
-Thanks,
-Sekhar
+# lsusb --version
+lsusb (usbutils) 007
+I see there's a 008 version.
+Am I missing out on important diagnostics?
+
+# lsusb -v
+
+Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Device Descriptor:
+  bLength                18
+  bDescriptorType         1
+  bcdUSB               3.00
+  bDeviceClass            9 Hub
+  bDeviceSubClass         0 Unused
+  bDeviceProtocol         3 
+  bMaxPacketSize0         9
+  idVendor           0x1d6b Linux Foundation
+  idProduct          0x0003 3.0 root hub
+  bcdDevice            4.07
+  iManufacturer           3 Linux 4.7.0-rc6 xhci-hcd
+  iProduct                2 xHCI Host Controller
+  iSerial                 1 30040000.usb3
+  bNumConfigurations      1
+  Configuration Descriptor:
+    bLength                 9
+    bDescriptorType         2
+    wTotalLength           31
+    bNumInterfaces          1
+    bConfigurationValue     1
+    iConfiguration          0 
+    bmAttributes         0xe0
+      Self Powered
+      Remote Wakeup
+    MaxPower                0mA
+    Interface Descriptor:
+      bLength                 9
+      bDescriptorType         4
+      bInterfaceNumber        0
+      bAlternateSetting       0
+      bNumEndpoints           1
+      bInterfaceClass         9 Hub
+      bInterfaceSubClass      0 Unused
+      bInterfaceProtocol      0 Full speed (or root) hub
+      iInterface              0 
+      Endpoint Descriptor:
+        bLength                 7
+        bDescriptorType         5
+        bEndpointAddress     0x81  EP 1 IN
+        bmAttributes            3
+          Transfer Type            Interrupt
+          Synch Type               None
+          Usage Type               Data
+        wMaxPacketSize     0x0004  1x 4 bytes
+        bInterval              12
+        bMaxBurst               0
+Hub Descriptor:
+  bLength              12
+  bDescriptorType      42
+  nNbrPorts             1
+  wHubCharacteristic 0x000a
+    No power switching (usb 1.0)
+    Per-port overcurrent protection
+  bPwrOn2PwrGood       10 * 2 milli seconds
+  bHubContrCurrent      0 milli Ampere
+  bHubDecLat          0.0 micro seconds
+  wHubDelay             0 nano seconds
+  DeviceRemovable    0x00
+ Hub Port Status:
+   Port 1: 0000.02a0 5Gbps power Rx.Detect
+Binary Object Store Descriptor:
+  bLength                 5
+  bDescriptorType        15
+  wTotalLength           15
+  bNumDeviceCaps          1
+  SuperSpeed USB Device Capability:
+    bLength                10
+    bDescriptorType        16
+    bDevCapabilityType      3
+    bmAttributes         0x00
+    wSpeedsSupported   0x0008
+      Device can operate at SuperSpeed (5Gbps)
+    bFunctionalitySupport   3
+      Lowest fully-functional device speed is SuperSpeed (5Gbps)
+    bU1DevExitLat           0 micro seconds
+    bU2DevExitLat           0 micro seconds
+Device Status:     0x0001
+  Self Powered
+
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Device Descriptor:
+  bLength                18
+  bDescriptorType         1
+  bcdUSB               2.00
+  bDeviceClass            9 Hub
+  bDeviceSubClass         0 Unused
+  bDeviceProtocol         1 Single TT
+  bMaxPacketSize0        64
+  idVendor           0x1d6b Linux Foundation
+  idProduct          0x0002 2.0 root hub
+  bcdDevice            4.07
+  iManufacturer           3 Linux 4.7.0-rc6 xhci-hcd
+  iProduct                2 xHCI Host Controller
+  iSerial                 1 30040000.usb3
+  bNumConfigurations      1
+  Configuration Descriptor:
+    bLength                 9
+    bDescriptorType         2
+    wTotalLength           25
+    bNumInterfaces          1
+    bConfigurationValue     1
+    iConfiguration          0 
+    bmAttributes         0xe0
+      Self Powered
+      Remote Wakeup
+    MaxPower                0mA
+    Interface Descriptor:
+      bLength                 9
+      bDescriptorType         4
+      bInterfaceNumber        0
+      bAlternateSetting       0
+      bNumEndpoints           1
+      bInterfaceClass         9 Hub
+      bInterfaceSubClass      0 Unused
+      bInterfaceProtocol      0 Full speed (or root) hub
+      iInterface              0 
+      Endpoint Descriptor:
+        bLength                 7
+        bDescriptorType         5
+        bEndpointAddress     0x81  EP 1 IN
+        bmAttributes            3
+          Transfer Type            Interrupt
+          Synch Type               None
+          Usage Type               Data
+        wMaxPacketSize     0x0004  1x 4 bytes
+        bInterval              12
+Hub Descriptor:
+  bLength               9
+  bDescriptorType      41
+  nNbrPorts             1
+  wHubCharacteristic 0x000a
+    No power switching (usb 1.0)
+    Per-port overcurrent protection
+    TT think time 8 FS bits
+  bPwrOn2PwrGood       10 * 2 milli seconds
+  bHubContrCurrent      0 milli Ampere
+  DeviceRemovable    0x00
+  PortPwrCtrlMask    0xff
+ Hub Port Status:
+   Port 1: 0000.0100 power
+Device Status:     0x0001
+  Self Powered
+
+
+Does everything look normal?
+Or are there any investigation-worthy nuggets?
+
+Regards.
