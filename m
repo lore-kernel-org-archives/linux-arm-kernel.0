@@ -1,127 +1,98 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 2 Dec 2016 10:36:29 +0800
-Subject: arm64: dts: zx: support cpu-freq for zx296718
-In-Reply-To: <1480594135-27273-1-git-send-email-baoyou.xie@linaro.org>
-References: <1480594135-27273-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20161202023627.GA6657@dragon>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Thu, 1 Dec 2016 18:38:46 -0800
+Subject: [RFC PATCH 0/2] arm64: memory-hotplug: Add Memory Hotplug support
+In-Reply-To: <5840D333.9050801@huawei.com>
+References: <1480637999-4320-1-git-send-email-scott.branden@broadcom.com>
+ <5840D333.9050801@huawei.com>
+Message-ID: <9cfa95ca-a9e9-299d-d020-7e565562dcf5@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Viresh, the author of the bindings.
+Hi Xishi,
 
-On Thu, Dec 01, 2016 at 08:08:55PM +0800, Baoyou Xie wrote:
-> This patch adds the CPU clock phandle in CPU's node
-> and uses operating-points-v2 to register operating points.
-> 
-> So it can be used by cpufreq-dt driver.
-> 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+Thanks for the reply - please see comments below.
 
-Just out of curiosity, why is there no '[PATCH]' prefix in the subject?
+On 16-12-01 05:49 PM, Xishi Qiu wrote:
+> On 2016/12/2 8:19, Scott Branden wrote:
+>
+>> This patchset is sent for comment to add memory hotplug support for ARM64
+>> based platforms.  It follows hotplug code added for other architectures
+>> in the linux kernel.
+>>
+>> I tried testing the memory hotplug feature following documentation from
+>> Documentation/memory-hotplug.txt.  I don't think it is working as expected
+>> - see below:
+>>
+>> To add memory to the system I did the following:
+>> echo 0x400000000 > /sys/devices/system/memory/probe
+>>
+>> The memory is displayed as system ram:
+>> cat /proc/iomem:
+>> 74000000-77ffffff : System RAM
+>>   74080000-748dffff : Kernel code
+>>   74950000-749d2fff : Kernel data
+>> 400000000-43fffffff : System RAM
+>>
+>> But does not seem to be added to the kernel memory.
+>> /proc/meminfo did not change.
+>>
+>> What else needs to be done so the memory is added to the kernel memory
+>> pool for normal allocation?
+>>
+>
+> Hi Scott,
+>
+> Do you mean it still don't support hod-add after apply this patchset?
 
-> ---
->  arch/arm64/boot/dts/zte/zx296718.dtsi | 37 +++++++++++++++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/zte/zx296718.dtsi b/arch/arm64/boot/dts/zte/zx296718.dtsi
-> index 7a1aed7..16f7d5e 100644
-> --- a/arch/arm64/boot/dts/zte/zx296718.dtsi
-> +++ b/arch/arm64/boot/dts/zte/zx296718.dtsi
-> @@ -44,6 +44,7 @@
->  #include <dt-bindings/input/input.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  #include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/clock/zx296718-clock.h>
->  
->  / {
->  	compatible = "zte,zx296718";
-> @@ -81,6 +82,8 @@
->  			compatible = "arm,cortex-a53","arm,armv8";
->  			reg = <0x0 0x0>;
->  			enable-method = "psci";
-> +			clocks = <&topcrm A53_GATE>;
-> +			operating-points-v2 = <&cluster0_opp>;
->  		};
->  
->  		cpu1: cpu at 1 {
-> @@ -88,6 +91,7 @@
->  			compatible = "arm,cortex-a53","arm,armv8";
->  			reg = <0x0 0x1>;
->  			enable-method = "psci";
-> +			operating-points-v2 = <&cluster0_opp>;
->  		};
->  
->  		cpu2: cpu at 2 {
-> @@ -95,6 +99,7 @@
->  			compatible = "arm,cortex-a53","arm,armv8";
->  			reg = <0x0 0x2>;
->  			enable-method = "psci";
-> +			operating-points-v2 = <&cluster0_opp>;
->  		};
->  
->  		cpu3: cpu at 3 {
-> @@ -102,6 +107,38 @@
->  			compatible = "arm,cortex-a53","arm,armv8";
->  			reg = <0x0 0x3>;
->  			enable-method = "psci";
-> +			operating-points-v2 = <&cluster0_opp>;
-> +		};
-> +	};
-> +
-> +	cluster0_opp: opp_table0 {
+After applying the patch it appears to partially support hot-add. 
+Please let me know if you think it is working as expected?
 
-I know this is how examples in the bindings doc written, but it's
-recommended to use hyphen rather than underscore in node name.  That
-said, the following naming form is better.
+The memory probe functions in that the memory is registered with the 
+system and shows up in /proc/iomem.  But, the memory is not available in 
+/proc/meminfo.  Do you think something else needs to be adjusted for 
+ARM64 to hotadd the memory
 
-	cluster0_opp: opp-table0
+I just found another clue:
+under /sys/devices/system/memory I only see one memory entry (before or 
+after I try to hotadd additional memory).
 
-> +		compatible = "operating-points-v2";
-> +		opp-shared;
-> +
-> +		opp at 500000000 {
-> +			opp-hz = /bits/ 64 <500000000>;
-> +			opp-microvolt = <857000>;
-> +			clock-latency-ns = <500000>;
-> +		};
+/sys/devices/system/memory # ls
+auto_online_blocks  memory0            uevent
+block_size_bytes    probe
 
-We prefer to have a newline between nodes.
+In arch/arm64/include/asm/sparsemem.h if I change SECTION_SIZE_BITS from 
+30 to 28 and recompile I get the following:
+/sys/devices/system/memory # ls
+auto_online_blocks  memory7            uevent
+block_size_bytes    probe
 
-> +		opp at 648000000 {
-> +			opp-hz = /bits/ 64 <648000000>;
-> +			opp-microvolt = <857000>;
-> +			clock-latency-ns = <500000>;
-> +		};
-> +		opp at 800000000 {
-> +			opp-hz = /bits/ 64 <800000000>;
-> +			opp-microvolt = <882000>;
-> +			clock-latency-ns = <500000>;
-> +		};
-> +		opp at 1000000000 {
-> +			opp-hz = /bits/ 64 <1000000000>;
-> +			opp-microvolt = <892000>;
-> +			clock-latency-ns = <500000>;
-> +		};
-> +		opp at 1188000000 {
-> +			opp-hz = /bits/ 64 <1188000000>;
-> +			opp-microvolt = <1009000>;
 
-So we have 5 setpoints with different frequency-voltage pair.  I have
-seen 'clocks' specified in cpu0 node and understand how frequency
-scaling works.  But what about voltage scaling?  There is no
-'cpu-supply' defined, and how does voltage scale among these
-opp-microvolt settings?
+In arch/arm64/include/asm/sparsemem.h if I change SECTION_SIZE_BITS from 
+30 to 27 and recompile I get the following:
+/sys/devices/system/memory # ls
+auto_online_blocks  memory14            uevent
+block_size_bytes    probe
 
-Another related question: if we do not support voltage scaling for now,
-what's the actually voltage when system is up running?  Is that voltage
-safe for cpu to run at all those 5 frequencies?
+If looks to me like something is not working properly in the ARM64 
+implementation.  I should expect to see multiple memoryX entries under 
+/sys/devices/system/memory?
 
-Shawn
 
-> +			clock-latency-ns = <500000>;
->  		};
->  	};
->  
-> -- 
-> 2.7.4
-> 
+
+>
+> Thanks,
+> Xishi Qiu
+>
+>> Scott Branden (2):
+>>   arm64: memory-hotplug: Add MEMORY_HOTPLUG, MEMORY_HOTREMOVE,
+>>     MEMORY_PROBE
+>>   arm64: defconfig: enable MEMORY_HOTPLUG config options
+>>
+>>  arch/arm64/Kconfig           | 10 ++++++++++
+>>  arch/arm64/configs/defconfig |  3 +++
+>>  arch/arm64/mm/init.c         | 42 ++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 55 insertions(+)
+>>
+>
+>
+>
