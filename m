@@ -1,36 +1,32 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Fri, 2 Dec 2016 15:09:58 +0100
-Subject: [PATCH 5/8] ARM: dts: stm32: enable RTC on stm32f429-disco
+Date: Fri, 2 Dec 2016 15:10:01 +0100
+Subject: [PATCH 8/8] ARM: configs: stm32: Add STM32 RTC support in STM32
+ defconfig
 In-Reply-To: <1480687801-19525-2-git-send-email-amelie.delaunay@st.com>
 References: <1480687801-19525-2-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1480687801-19525-7-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1480687801-19525-10-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables RTC on stm32f429-disco with LSI as clock source because
-X2 crystal for LSE is not fitted by default.
+This patch adds STM32 RTC support in stm32_defconfig file.
 
 Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 ---
- arch/arm/boot/dts/stm32f429-disco.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/configs/stm32_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stm32f429-disco.dts b/arch/arm/boot/dts/stm32f429-disco.dts
-index b6e63d8..49eddf6 100644
---- a/arch/arm/boot/dts/stm32f429-disco.dts
-+++ b/arch/arm/boot/dts/stm32f429-disco.dts
-@@ -94,6 +94,12 @@
- 	clock-frequency = <8000000>;
- };
- 
-+&rtc {
-+	assigned-clocks = <&rcc 1 CLK_RTC>;
-+	assigned-clock-parents = <&rcc 1 CLK_LSI>;
-+	status = "okay";
-+};
-+
- &usart1 {
- 	pinctrl-0 = <&usart1_pins_a>;
- 	pinctrl-names = "default";
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index e7b56d4..71f9787 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -59,6 +59,8 @@ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_STM32=y
+ CONFIG_DMADEVICES=y
+ CONFIG_STM32_DMA=y
+ # CONFIG_FILE_LOCKING is not set
 -- 
 1.9.1
