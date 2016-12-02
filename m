@@ -1,80 +1,53 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 1 Dec 2016 20:18:48 -0600
-Subject: [PATCH v2] PCI: Add information about describing PCI in ACPI
-In-Reply-To: <CAJZ5v0gtG6++GqyOb_B=o-=R4YuFia8PH6W3NFiCZuay=pV7TA@mail.gmail.com>
-References: <20161129212816.15663.28100.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20161201223604.GC15867@bhelgaas-glaptop.roam.corp.google.com>
- <47776378.8X3TnsHd3Q@aspire.rjw.lan>
- <20161201232732.GB17948@bhelgaas-glaptop.roam.corp.google.com>
- <CAJZ5v0gtG6++GqyOb_B=o-=R4YuFia8PH6W3NFiCZuay=pV7TA@mail.gmail.com>
-Message-ID: <20161202021848.GA26714@bhelgaas-glaptop.roam.corp.google.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Thu,  1 Dec 2016 18:27:25 -0800
+Subject: [PATCH 1/9] arm64: dts: Add symlinks for cros-ec-keyboard and
+ cros-ec-sbs
+In-Reply-To: <1480645653-36943-1-git-send-email-briannorris@chromium.org>
+References: <1480645653-36943-1-git-send-email-briannorris@chromium.org>
+Message-ID: <1480645653-36943-2-git-send-email-briannorris@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 01:28:50AM +0100, Rafael J. Wysocki wrote:
-> On Fri, Dec 2, 2016 at 12:27 AM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> > On Thu, Dec 01, 2016 at 11:37:39PM +0100, Rafael J. Wysocki wrote:
-> >> On Thursday, December 01, 2016 04:36:04 PM Bjorn Helgaas wrote:
-> >> > On Tue, Nov 29, 2016 at 03:39:48PM -0600, Bjorn Helgaas wrote:
-> >> > > Here's another stab at this writeup.  I'd appreciate any comments!
-> >> > >
-> >> > > Changes from v1 to v2:
-> >> > >   - Consumer/Producer is defined for Extended Address Space descriptors;
-> >> > >     should be ignored for QWord/DWord/Word Address Space descriptors
-> >> > >   - New arches may use Extended Address Space descriptors in PNP0A03 for
-> >> > >     bridge registers, including ECAM (if the arch adds support for this)
-> >> > >   - Add more details about MCFG and _CBA (Lv's suggestion)
-> >> > >   - Incorporate Rafael's suggestions
-> >> > >
-> >> > > ---
-> >> > >
-> >> > > Bjorn Helgaas (1):
-> >> > >       PCI: Add information about describing PCI in ACPI
-> >> > >
-> >> > >
-> >> > >  Documentation/PCI/00-INDEX      |    2
-> >> > >  Documentation/PCI/acpi-info.txt |  180 +++++++++++++++++++++++++++++++++++++++
-> >> > >  2 files changed, 182 insertions(+)
-> >> > >  create mode 100644 Documentation/PCI/acpi-info.txt
-> >> >
-> >> > It's very late in the cycle, but I'm considering trying to squeeze
-> >> > this into v4.9 on the grounds that:
-> >> >
-> >> >   - It's only a documentation change and can't break anything, and
-> >> >
-> >> >   - Distributing it more widely may help the arm64 firmware ecosystem
-> >> >
-> >> > But I don't want to disseminate misleading or incorrect information,
-> >> > so if it needs clarification or wordsmithing, or even just maturation,
-> >> > I'll wait until v4.10.
-> >> >
-> >> > The Consumer/Producer stuff, in particular, doesn't seem 100% settled
-> >> > yet.  Your thoughts, and especially your improvements, are welcome!
-> >>
-> >> Well, what's the drawback if it doesn't go into 4.9?
-> >
-> > Only that it's not as easily accessible.  ARM64 ACPI firmware is brand
-> > new.  Neither the firmware nor the kernel developers, nor even the
-> > hardware designers, have the benefit of all the x86/ia64 history, so I
-> > wrote this to try to come to a common understanding of what Linux
-> > expects.
-> >
-> > The first generation of ARM64 hardware is already in the field, and it
-> > has teething problems in hardware, firmware, and kernel.  For example,
-> > the current MCFG quirk situation: the ECAM hardware doesn't work quite
-> > per spec, the ACPI firmware doesn't describe the address space
-> > completely, and we don't really have consensus on how the firmware
-> > should communicate register space to the kernel.
-> >
-> > We're hoping the second generation can fix some of these problems, and
-> > I think this is the time to try to influence that.
-> 
-> Well, I would be super-careful if I were you, then. :-)
-> 
-> I'm not sure if squeezing it into 4.9.0 buys you anything here.  If
-> you get it into 4.10-rc, you can request -stable to pick it up (at
-> least in principle) and then it will show up in 4.9.y at one point
-> which should suffice I suppose?
+From: Douglas Anderson <dianders@chromium.org>
 
-You're right, there's no real hurry, and the rate of change is a good
-indication that we need to let things settle out for a while.
+We'd like to be able to use the cros-ec-keyboard.dtsi and
+cros-ec-sbs.dtsi snippets for arm64 devices.  Currently those files live
+in the arm/boot/dts directory.
+
+Let's follow the convention set by commit 8ee57b8182c4 ("ARM64: dts:
+vexpress: Use a symlink to vexpress-v2m-rs1.dtsi from arch=arm") and use
+a symlink.  Note that in this case we put the files in a new
+"include/common" directory since these snippets may need to be
+referenced by dts files in many different subdirectories.
+
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+Signed-off-by: Brian Norris <briannorris@chromium.org>
+Reviewed-by: Heiko Stueber <heiko@sntech.de>
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+---
+This was submitted months ago but had no users
+
+ arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi | 1 +
+ arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi      | 1 +
+ 2 files changed, 2 insertions(+)
+ create mode 120000 arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi
+ create mode 120000 arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi
+
+diff --git a/arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi b/arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi
+new file mode 120000
+index 000000000000..1c1889f0a791
+--- /dev/null
++++ b/arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi
+@@ -0,0 +1 @@
++../../../../../arm/boot/dts/cros-ec-keyboard.dtsi
+\ No newline at end of file
+diff --git a/arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi b/arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi
+new file mode 120000
+index 000000000000..3d7ae9c88bcd
+--- /dev/null
++++ b/arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi
+@@ -0,0 +1 @@
++../../../../../arm/boot/dts/cros-ec-sbs.dtsi
+\ No newline at end of file
+-- 
+2.8.0.rc3.226.g39d4020
