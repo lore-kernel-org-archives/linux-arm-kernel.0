@@ -1,91 +1,48 @@
-From: mhocko@suse.com (Michal Hocko)
-Date: Fri, 2 Dec 2016 14:56:43 +0100
-Subject: [PATCH v2 3/6] mm: hugetlb: change the return type for
- alloc_fresh_gigantic_page
-In-Reply-To: <1479107259-2011-4-git-send-email-shijie.huang@arm.com>
-References: <1479107259-2011-1-git-send-email-shijie.huang@arm.com>
- <1479107259-2011-4-git-send-email-shijie.huang@arm.com>
-Message-ID: <20161202135643.GK6830@dhcp22.suse.cz>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri,  2 Dec 2016 14:57:11 +0100
+Subject: [RFC PATCH 0/5] ARM: at91: sama5d2_xplained: Put the PMIC a proper
+ suspend state
+Message-ID: <1480687036-5037-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 14-11-16 15:07:36, Huang Shijie wrote:
-> This patch changes the return type to "struct page*" for
-> alloc_fresh_gigantic_page().
+Mark, Raphael,
 
-OK, this makes somme sense. Other hugetlb allocation function (and page
-allocator in general) return struct page as well. Besides that int would
-make sense if we wanted to convey an error code but 0 vs. 1 just doesn't
-make any sense.
+This is just an attempt at solving the suspend/resume issue I have on
+an atmel platform: the PMIC is only supporting partial "suspend state"
+definition (enable/disable output), and we need to setup the remaining
+parts (voltage and mode) at runtime.
 
-But if you are changing that then alloc_fresh_huge_page should be
-changed as well.
+Mark, this patch is trying to implement what I understood of our
+discussion on IRC a few days back. As you might have noticed, I'm not
+yet understanding all the subtleties of the PM hooks, or how they are
+implemented in the regulator framework.
+This patch is clearly not meant to be applied as is, it's more something
+to start a discussion, so feel free to point my misunderstanding or the
+flaws in my approach.
 
-> This patch makes preparation for later patch.
-> 
-> Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+Thanks,
 
-Acked-by: Michal Hocko <mhocko@suse.com>
+Boris
 
-> ---
->  mm/hugetlb.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-> index db0177b..6995087 100644
-> --- a/mm/hugetlb.c
-> +++ b/mm/hugetlb.c
-> @@ -1142,7 +1142,7 @@ static struct page *alloc_fresh_gigantic_page_node(struct hstate *h,
->  	return page;
->  }
->  
-> -static int alloc_fresh_gigantic_page(struct hstate *h,
-> +static struct page *alloc_fresh_gigantic_page(struct hstate *h,
->  				nodemask_t *nodes_allowed, bool no_init)
->  {
->  	struct page *page = NULL;
-> @@ -1151,10 +1151,10 @@ static int alloc_fresh_gigantic_page(struct hstate *h,
->  	for_each_node_mask_to_alloc(h, nr_nodes, node, nodes_allowed) {
->  		page = alloc_fresh_gigantic_page_node(h, node, no_init);
->  		if (page)
-> -			return 1;
-> +			return page;
->  	}
->  
-> -	return 0;
-> +	return NULL;
->  }
->  
->  static inline bool gigantic_page_supported(void) { return true; }
-> @@ -1167,8 +1167,8 @@ static inline bool gigantic_page_supported(void) { return false; }
->  static inline void free_gigantic_page(struct page *page, unsigned int order) { }
->  static inline void destroy_compound_gigantic_page(struct page *page,
->  						unsigned int order) { }
-> -static inline int alloc_fresh_gigantic_page(struct hstate *h,
-> -		nodemask_t *nodes_allowed, bool no_init) { return 0; }
-> +static inline struct page *alloc_fresh_gigantic_page(struct hstate *h,
-> +		nodemask_t *nodes_allowed, bool no_init) { return NULL; }
->  #endif
->  
->  static void update_and_free_page(struct hstate *h, struct page *page)
-> @@ -2315,7 +2315,7 @@ static unsigned long set_max_huge_pages(struct hstate *h, unsigned long count,
->  		cond_resched();
->  
->  		if (hstate_is_gigantic(h))
-> -			ret = alloc_fresh_gigantic_page(h, nodes_allowed,
-> +			ret = !!alloc_fresh_gigantic_page(h, nodes_allowed,
->  							false);
->  		else
->  			ret = alloc_fresh_huge_page(h, nodes_allowed);
-> -- 
-> 2.5.5
-> 
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+Boris Brezillon (5):
+  regulator: Extend the power-management APIs
+  regulator: Document the regulator-allow-changes-at-runtime DT property
+  ARM: at91: Call regulator_suspend_{begin, end}() in the platform pm
+    ops
+  regulator: act8945: Implement PM functionalities
+  ARM: at91/dt: sama5d2_xplained: Add proper regulator states for
+    suspend-to-mem
+
+ .../devicetree/bindings/regulator/regulator.txt    |   5 +
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts        |  32 +++
+ arch/arm/mach-at91/pm.c                            |   4 +-
+ drivers/regulator/act8945a-regulator.c             | 255 +++++++++++++++++-
+ drivers/regulator/core.c                           | 291 +++++++++++++++++++++
+ drivers/regulator/of_regulator.c                   |   4 +
+ include/linux/regulator/driver.h                   |  29 ++
+ include/linux/regulator/machine.h                  |  13 +
+ 8 files changed, 631 insertions(+), 2 deletions(-)
 
 -- 
-Michal Hocko
-SUSE Labs
+2.7.4
