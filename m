@@ -1,176 +1,124 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 2 Dec 2016 09:18:36 +0100
-Subject: [PATCH 1/2] Add crypto driver support for some MediaTek chips
-In-Reply-To: <1480649205-52695-2-git-send-email-ryder.lee@mediatek.com>
-References: <1480649205-52695-1-git-send-email-ryder.lee@mediatek.com>
- <1480649205-52695-2-git-send-email-ryder.lee@mediatek.com>
-Message-ID: <20161202081836.GA20128@Red>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 2 Dec 2016 10:19:39 +0200
+Subject: [PATCH 1/3] Documentation: dt: Add TI SCI clock driver
+In-Reply-To: <0fe81866-8bfd-f3a7-d808-9cb23841f504@ti.com>
+References: <1477053961-27128-1-git-send-email-t-kristo@ti.com>
+ <1477053961-27128-2-git-send-email-t-kristo@ti.com>
+ <20161030204121.qvb5d33dh65awwzx@rob-hp-laptop>
+ <41c58712-bc00-ed05-9d1d-42e31397a70c@ti.com>
+ <CAL_JsqLtSs6ifnMdEOsfXpGoWnmXuGAx83+ziB9yU+zurvob+A@mail.gmail.com>
+ <0fe81866-8bfd-f3a7-d808-9cb23841f504@ti.com>
+Message-ID: <8579b123-f214-22f1-0236-e5b98ab51597@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+On 21/11/16 10:14, Tero Kristo wrote:
+> On 18/11/16 19:20, Rob Herring wrote:
+>> On Mon, Oct 31, 2016 at 7:50 AM, Tero Kristo <t-kristo@ti.com> wrote:
+>>> On 30/10/16 22:41, Rob Herring wrote:
+>>>>
+>>>> On Fri, Oct 21, 2016 at 03:45:59PM +0300, Tero Kristo wrote:
+>>>>>
+>>>>> Add a clock implementation, TI SCI clock, that will hook to the common
+>>>>> clock framework, and allow each clock to be controlled via TI SCI
+>>>>> protocol.
+>>>>>
+>>>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>>>>> ---
+>>>>>  .../devicetree/bindings/clock/ti,sci-clk.txt       | 37
+>>>>> ++++++++++++++++++++++
+>>>>>  MAINTAINERS                                        |  1 +
+>>>>>  2 files changed, 38 insertions(+)
+>>>>>  create mode 100644
+>>>>> Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+>>>>> b/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+>>>>> new file mode 100644
+>>>>> index 0000000..bfc3ca4
+>>>>> --- /dev/null
+>>>>> +++ b/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+>>>>> @@ -0,0 +1,37 @@
+>>>>> +Texas Instruments TI-SCI Clocks
+>>>>> +===============================
+>>>>> +
+>>>>> +All clocks on Texas Instruments' SoCs that contain a System
+>>>>> Controller,
+>>>>> +are only controlled by this entity. Communication between a host
+>>>>> processor
+>>>>> +running an OS and the System Controller happens through a protocol
+>>>>> known
+>>>>> +as TI-SCI[1]. This clock implementation plugs into the common clock
+>>>>> +framework and makes use of the TI-SCI protocol on clock API requests.
+>>>>> +
+>>>>> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+>>>>> +
+>>>>> +Required properties:
+>>>>> +-------------------
+>>>>> +- compatible: Must be "ti,k2g-sci-clk"
+>>>>> +- #clock-cells: Shall be 2.
+>>>>> +  In clock consumers, this cell represents the device ID and clock ID
+>>>>> +  exposed by the PM firmware. The assignments can be found in the
+>>>>> header
+>>>>> +  files <dt-bindings/genpd/<soc>.h> (which covers the device IDs) and
+>>>>> +  <dt-bindings/clock/<soc>.h> (which covers the clock IDs), where
+>>>>> <soc>
+>>>>> +  is the SoC involved, for example 'k2g'.
+>>>>> +
+>>>>> +Examples:
+>>>>> +--------
+>>>>> +
+>>>>> +pmmc: pmmc {
+>>>>> +       compatible = "ti,k2g-sci";
+>>>>> +
+>>>>> +       k2g_clks: k2g_clks {
+>>>>
+>>>>
+>>>> Use "clocks" for node name instead.
+>>>>
+>>>>> +               compatible = "ti,k2g-sci-clk";
+>>>>
+>>>>
+>>>> I'm starting to think all these child nodes for SCI are pointless. Is
+>>>> there any reason why the parent node can't be the clock provider (along
+>>>> with all the other providers it acks as)?
+>>>
+>>>
+>>> I believe the only reason to keep them separate is to have kernel
+>>> side of
+>>> things modular. If we have separate nodes, the drivers can be probed
+>>> separately.
+>>>
+>>> If not, we need to build one huge blob with all the features in it,
+>>> so the
+>>> main driver can probe everything in one go, with annoying back-and-forth
+>>> callbacks in place (assuming we still want to keep stuff somehow
+>>> modular.)
+>>
+>> Since when is DT the only way to create a device? The main driver can
+>> create devices for all the sub-functions like clocks. This is the same
+>> as MFDs which have been done both ways.
+>
+> Yes obviously this can be done, my main point was that it will require
+> building some sort of infra within the driver to handle this. With
+> separate nodes, none of this is going to be needed. Also, we will lose
+> any kind of configurability via DT if we don't have separate nodes; now
+> we can select the available clocks / genpds via the compatible string of
+> the clocks/genpd nodes themselves (this isn't clearly evident as of now
+> as we only support a grand total of one device, which is k2g-evm.)
+> Otherwise we need to probe against the main node and add a separate
+> compatible string for every device, and carry this information to the
+> sibling devices also somehow. It is just so much simpler if we can just
+> keep separate nodes for them.
+>
+> Also, plenty of things are doing this kind of stuff already in
+> DT/kernel, having a parent node in place and sub-functions added
+> separately for ease of use, with apparently no visible point for having
+> the nodes within the DT.
 
-I have some minor comment inline
+Rob, any response on this one? I see you have acked the reset part of 
+the bindings which is doing pretty much the same thing as the clock part 
+is doing here, namely adding child node under the main SCI node. Is it 
+okay to do this same for other parts of the TI SCI?
 
-On Fri, Dec 02, 2016 at 11:26:44AM +0800, Ryder Lee wrote:
-> This adds support for the MediaTek hardware accelerator on
-> mt7623/mt2701/mt8521p SoC.
-> 
-> This driver currently implement:
-> - SHA1 and SHA2 family(HMAC) hash alogrithms.
-> - AES block cipher in CBC/ECB mode with 128/196/256 bits keys.
-
-I see also a PRNG but is seems not really used.
-
-> 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  drivers/crypto/Kconfig                 |   17 +
->  drivers/crypto/Makefile                |    1 +
->  drivers/crypto/mediatek/Makefile       |    2 +
->  drivers/crypto/mediatek/mtk-aes.c      |  734 +++++++++++++++++
->  drivers/crypto/mediatek/mtk-platform.c |  575 +++++++++++++
->  drivers/crypto/mediatek/mtk-platform.h |  230 ++++++
->  drivers/crypto/mediatek/mtk-regs.h     |  194 +++++
->  drivers/crypto/mediatek/mtk-sha.c      | 1384 ++++++++++++++++++++++++++++++++
->  8 files changed, 3137 insertions(+)
->  create mode 100644 drivers/crypto/mediatek/Makefile
->  create mode 100644 drivers/crypto/mediatek/mtk-aes.c
->  create mode 100644 drivers/crypto/mediatek/mtk-platform.c
->  create mode 100644 drivers/crypto/mediatek/mtk-platform.h
->  create mode 100644 drivers/crypto/mediatek/mtk-regs.h
->  create mode 100644 drivers/crypto/mediatek/mtk-sha.c
-> 
-> diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-> index 4d2b81f..5d9c803 100644
-> --- a/drivers/crypto/Kconfig
-> +++ b/drivers/crypto/Kconfig
-> @@ -553,6 +553,23 @@ config CRYPTO_DEV_ROCKCHIP
->  	  This driver interfaces with the hardware crypto accelerator.
->  	  Supporting cbc/ecb chainmode, and aes/des/des3_ede cipher mode.
->  
-> +config CRYPTO_DEV_MEDIATEK
-> +	tristate "MediaTek's Cryptographic Engine driver"
-> +	depends on ARM && ARCH_MEDIATEK
-> +	select NEON
-> +	select KERNEL_MODE_NEON
-> +	select ARM_CRYPTO
-> +	select CRYPTO_AES
-> +	select CRYPTO_BLKCIPHER
-> +	select CRYPTO_SHA1_ARM_NEON
-> +	select CRYPTO_SHA256_ARM
-> +	select CRYPTO_SHA512_ARM
-> +	select CRYPTO_HMAC
-
-Why do you select accelerated algos ?
-Adding COMPILE_TEST could be helpfull also.
-
-[...]
-> +
-> +#include <linux/dma-mapping.h>
-> +#include <linux/scatterlist.h>
-> +#include <crypto/scatterwalk.h>
-> +#include <crypto/algapi.h>
-> +#include <crypto/aes.h>
-> +#include "mtk-platform.h"
-> +#include "mtk-regs.h"
-> +
-
-Sort headers in alphabetical order
-
-[...]
-> +
-> +	mtk_aes_unregister_algs();
-> +	mtk_aes_record_free(cryp);
-> +}
-> +EXPORT_SYMBOL(mtk_cipher_alg_release);
-
-Why not EXPORT_SYMBOL_GPL ?
-Furthermore do you really need it to be exported ?
-
-[...]
-> +
-> +#include <linux/init.h>
-> +#include <linux/module.h>
-> +#include <linux/kernel.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/pm_runtime.h>
-> +#include <linux/clk.h>
-> +#include <linux/platform_device.h>
-> +#include "mtk-platform.h"
-> +#include "mtk-regs.h"
-> +
-
-Sort headers in alphabetical order
-
-[...]
-> +
-> +static void mtk_prng_reseed(struct mtk_cryp *cryp)
-> +{
-> +	/* 8 words to seed the PRNG to provide IVs */
-> +	void __iomem *base = cryp->base;
-> +	const u32 prng_key[8] = {0x48c24cfd, 0x6c07f742,
-> +				0xaee75681, 0x0f27c239,
-> +				0x79947198, 0xe2991275,
-> +				0x21ac3c7c, 0xd008c4b4};
-
-Why do you seed with thoses constant ?
-
-[...]
-> +
-> +static int mtk_accelerator_init(struct mtk_cryp *cryp)
-> +{
-> +	int i, err;
-> +
-> +	/* Initialize advanced interrupt controller(AIC) */
-> +	for (i = 0; i < 5; i++) {
-
-I see this 5 for interrupt away, so perhaps a define could be used
-
-[...]
-
-here 
-
-> +	for (i = 0; i < 5; i++) {
-> +		cryp->irq[i] = platform_get_irq(pdev, i);
-> +		if (cryp->irq[i] < 0) {
-> +			dev_err(cryp->dev, "no IRQ:%d resource info\n", i);
-> +			return -ENXIO;
-> +		}
-> +	}
-[...]
-
-> +#ifndef __MTK_PLATFORM_H_
-> +#define __MTK_PLATFORM_H_
-> +
-> +#include <linux/crypto.h>
-> +#include <crypto/internal/hash.h>
-> +#include <linux/interrupt.h>
-
-Sort headers in alphabetical order
-
-[...]
-> +#define MTK_DESC_FIRST		BIT(23)
-> +#define MTK_DESC_BUF_LEN(x)	((x) & 0x1ffff)
-> +#define MTK_DESC_CT_LEN(x)	(((x) & 0xff) << 24)
-> +
-> +#define WORD(x)			((x) >> 2)
-
-dangerous and ambigous define
-
-[...]
-> +
-> +#include <linux/dma-mapping.h>
-> +#include <linux/scatterlist.h>
-> +#include <linux/crypto.h>
-> +#include <crypto/scatterwalk.h>
-> +#include <crypto/algapi.h>
-> +#include <crypto/sha.h>
-> +#include <crypto/internal/hash.h>
-
-Sort headers in alphabetical order
-[...]
-
-Generally more function comment could be helpfull.
-
-Regards
+-Tero
