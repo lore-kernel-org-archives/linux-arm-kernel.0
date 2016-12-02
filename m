@@ -1,91 +1,71 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Fri, 02 Dec 2016 14:33:41 -0800
-Subject: [PATCHv4 11/15] clk: ti: clockdomain: add clock provider support
- to clockdomains
-In-Reply-To: <20161028235448.57squdf6cu2wxxvm@atomide.com>
-References: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
- <1476805568-19264-12-git-send-email-t-kristo@ti.com>
- <20161028005047.GQ26139@codeaurora.org>
- <cd32a554-ba0a-33cd-c15c-121524ce679b@ti.com>
- <20161028125112.xfyrx7l7m64z6cu6@atomide.com>
- <20161028233617.GP16026@codeaurora.org>
- <20161028235448.57squdf6cu2wxxvm@atomide.com>
-Message-ID: <148071802182.32158.11479184984645880313@resonance>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Fri, 2 Dec 2016 23:54:53 +0100
+Subject: [PATCH] SCPI (pre-v1.0): fix reading sensor value
+In-Reply-To: <CAFBinCD3EE0z+Omboo-pUugs1He7ce9bT5Lo4wgvZUJKbctSKA@mail.gmail.com>
+References: <20161124001845.20830-1-martin.blumenstingl@googlemail.com>
+ <f3d6f39e-ec45-7c62-22d4-fd7b0952b499@arm.com>
+ <CAFBinCDP4PwXnUux=Wd9XJkNJef7qN3EOZm0Q8sg-B4gXqsjcA@mail.gmail.com>
+ <CAFBinCD3EE0z+Omboo-pUugs1He7ce9bT5Lo4wgvZUJKbctSKA@mail.gmail.com>
+Message-ID: <CAFBinCD4RexWZPTm2hKjk6hqcmuCHiGoBDhwzgtx+0ns6sE70A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tony Lindgren (2016-10-28 16:54:48)
-> * Stephen Boyd <sboyd@codeaurora.org> [161028 16:37]:
-> > On 10/28, Tony Lindgren wrote:
-> > > * Tero Kristo <t-kristo@ti.com> [161028 00:43]:
-> > > > On 28/10/16 03:50, Stephen Boyd wrote:
-> > > > > I suppose a PRCM is
-> > > > > like an MFD that has clocks and resets under it? On other
-> > > > > platforms we've combined that all into one node and just had
-> > > > > #clock-cells and #reset-cells in that node. Is there any reason
-> > > > > we can't do that here?
-> > > > 
-> > > > For OMAPs, there are typically multiple instances of the PRCM around; OMAP4
-> > > > for example has:
-> > > > 
-> > > > cm1 @ 0x4a004000 (clocks + clockdomains)
-> > > > cm2 @ 0x4a008000 (clocks + clockdomains)
-> > > > prm @ 0x4a306000 (few clocks + resets + power state handling)
-> > > > scrm @ 0x4a30a000 (few external clocks + plenty of misc stuff)
-> > > > 
-> > > > These instances are also under different power/voltage domains which means
-> > > > their PM behavior is different.
-> > > > 
-> > > > The idea behind having a clockdomain as a provider was mostly to have the
-> > > > topology visible : prcm-instance -> clockdomain -> clocks
-> > > 
-> > > Yeah that's needed to get the interconnect hierarchy right for
-> > > genpd :)
-> > > 
-> > > > ... but basically I think it would be possible to drop the clockdomain
-> > > > representation and just mark the prcm-instance as a clock provider. Tony,
-> > > > any thoughts on that?
-> > > 
-> > > No let's not drop the clockdomains as those will be needed when we
-> > > move things into proper hierarchy within the interconnect instances.
-> > > This will then help with getting things right with genpd.
-> > > 
-> > > In the long run we just want to specify clockdomain and the offset of
-> > > the clock instance within the clockdomain in the dts files.
-> > > 
-> > 
-> > Sorry, I have very little idea how OMAP hardware works. Do you
-> > mean that you will have different nodes for each clockdomain so
-> > that genpd can map 1:1 to the node in dts? But in hardware
-> > there's a prcm that allows us to control many clock domains
-> > through register read/writes? How is the interconnect involved?
-> 
-> There are multiple clockdomains, at least one for each interconnect
-> instance. Once a clockdomain is idle, the related interconnect can
-> idle too. So yeah genpd pretty much maps 1:1 with the clockdomains.
-> 
-> There's more info in for example omap4 TRM section "3.4.1 Device
-> Power-Management Layout" that shows the voltage/power/clock domains.
-> The interconnect instances are mostly named there too looking at
-> the L4/L3 naming.
+Hello Sudeep,
 
-I'm confused on two points:
+On Fri, Nov 25, 2016 at 1:56 AM, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> On Thu, Nov 24, 2016 at 12:15 PM, Martin Blumenstingl
+> <martin.blumenstingl@googlemail.com> wrote:
+>> On Thu, Nov 24, 2016 at 11:47 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>
+>>>
+>>> On 24/11/16 00:18, Martin Blumenstingl wrote:
+>>>>
+>>>> I observed the following "strange" value when trying to read the SCPI
+>>>> temperature sensor on my Amlogic GXM S912 device:
+>>>> $ cat /sys/class/hwmon/hwmon0/temp1_input
+>>>> 6875990994467160116
+>>>>
+>>>> The value reported by the original kernel (Amlogic vendor kernel, after
+>>>> a reboot obviously) was 53C.
+>>>> The Amlogic SCPI driver only uses a single 32bit value to read the
+>>>> sensor value, instead of two. After stripping the upper 32bits from
+>>>> above value gives "52" as result, which is basically identical to
+>>>> what the vendor kernel reports.
+>>>
+>>>
+>>> Can you check why the upper 32-bit is not set to 0 ?
+>>>
+>>> In scpi_process_cmd, we memset extra rx_buf length by 0 and that should
+>>> take care. Neil had mentioned that works but now I doubt if firmware
+>>> returns 8 instead of 4 in the size which is wrong as it supports only
+>>> 32-bit.
+>> according to the code "RX Length is not replied by the legacy
+>> Firmware", so for legacy firmwares the "if (match->rx_len > len)"
+>> condition will never be true (because both values are always equal).
+>> in the sensor case we then go and copy 8 byte from mem->payload to
+>> match->rx_buf, but SCPI firmware only wrote 4 bytes to mem->payload.
+>> This means we are simply reading 4 byte (hi_val) of uninitialized
+>> memory - which may be all zeroes if we're lucky - but in my case I got
+>> "garbage" (I guess it's the second byte from the *previous* command
+>> which are leaking here).
+>>
+>> while writing this I see a second (more generic) approach which might
+>> work as well:
+>> scpi_chan does not hold any information about rx_payload/tx_payload
+>> sizes (these are calculated in scpi_probe but not stored anywhere).
+>> (for now, let's assume we had the rx_payload_size available)
+>> we could then go ahead and memset(rx_payload, 0, rx_payload_size) in
+>> scpi_tx_prepare or scpi_send_message.
+>> However, I am not sure if that would have any side-effects (for
+>> example on newer SCPI implementations).
+> I simply tried implementing this solution and I find it better than
+> the old one. However, I am still not sure if there are any
+> side-effects. maybe you can simply review v2 of this series which
+> implements the described approach (the result is the same as with v1:
+> temp1_input contains the correct value).
+did you have time to review this yet?
 
-1) why are the clkdm's acting as clock providers? I've always hated the
-name "clock domain" since those bits are for managing module state, not
-clock state. The PRM, CM1 and CM2 provide the clocks, not the
-clockdomains.
-
-2) why aren't the clock domains modeled as genpds with their associated
-devices attached to them? Note that it is possible to "nest" genpd
-objects. This would also allow for the "Clockdomain Dependency"
-relationships to be properly modeled (see section 3.1.1.1.7 Clock Domain
-Dependency in the OMAP4 TRM).
 
 Regards,
-Mike
-
-> 
-> Regards,
-> 
-> Tony
+Martin
