@@ -1,53 +1,75 @@
-From: qiuxishi@huawei.com (Xishi Qiu)
-Date: Fri, 2 Dec 2016 09:49:39 +0800
-Subject: [RFC PATCH 0/2] arm64: memory-hotplug: Add Memory Hotplug support
-In-Reply-To: <1480637999-4320-1-git-send-email-scott.branden@broadcom.com>
-References: <1480637999-4320-1-git-send-email-scott.branden@broadcom.com>
-Message-ID: <5840D333.9050801@huawei.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Fri, 2 Dec 2016 10:06:39 +0800
+Subject: [PATCH] arm: dts: mt2701: Sort DT nodes by register address
+Message-ID: <1480644399-14865-1-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/12/2 8:19, Scott Branden wrote:
+This patch rearrange MT2701 DT nodes to keep them in ascending order.
 
-> This patchset is sent for comment to add memory hotplug support for ARM64
-> based platforms.  It follows hotplug code added for other architectures
-> in the linux kernel.
-> 
-> I tried testing the memory hotplug feature following documentation from
-> Documentation/memory-hotplug.txt.  I don't think it is working as expected
-> - see below:
-> 
-> To add memory to the system I did the following:
-> echo 0x400000000 > /sys/devices/system/memory/probe
-> 
-> The memory is displayed as system ram:
-> cat /proc/iomem:
-> 74000000-77ffffff : System RAM
->   74080000-748dffff : Kernel code
->   74950000-749d2fff : Kernel data
-> 400000000-43fffffff : System RAM
-> 
-> But does not seem to be added to the kernel memory.
-> /proc/meminfo did not change.
-> 
-> What else needs to be done so the memory is added to the kernel memory
-> pool for normal allocation?
-> 
+Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+---
+This patch is based on latest v4.9-next/dts branch of [1], to fix MT2701
+DT nodes ordering.
 
-Hi Scott,
+[1] https://github.com/mbgg/linux-mediatek/tree/v4.9-next/dts
 
-Do you mean it still don't support hod-add after apply this patchset?
+ arch/arm/boot/dts/mt2701.dtsi | 36 ++++++++++++++++++------------------
+ 1 file changed, 18 insertions(+), 18 deletions(-)
 
-Thanks,
-Xishi Qiu
-
-> Scott Branden (2):
->   arm64: memory-hotplug: Add MEMORY_HOTPLUG, MEMORY_HOTREMOVE,
->     MEMORY_PROBE
->   arm64: defconfig: enable MEMORY_HOTPLUG config options
-> 
->  arch/arm64/Kconfig           | 10 ++++++++++
->  arch/arm64/configs/defconfig |  3 +++
->  arch/arm64/mm/init.c         | 42 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 55 insertions(+)
-> 
+diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+index 7eab6f4..73f4b7c 100644
+--- a/arch/arm/boot/dts/mt2701.dtsi
++++ b/arch/arm/boot/dts/mt2701.dtsi
+@@ -96,24 +96,6 @@
+ 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 	};
+ 
+-	pio: pinctrl at 10005000 {
+-		compatible = "mediatek,mt2701-pinctrl";
+-		reg = <0 0x1000b000 0 0x1000>;
+-		mediatek,pctl-regmap = <&syscfg_pctl_a>;
+-		pins-are-numbered;
+-		gpio-controller;
+-		#gpio-cells = <2>;
+-		interrupt-controller;
+-		#interrupt-cells = <2>;
+-		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
+-	};
+-
+-	syscfg_pctl_a: syscfg at 10005000 {
+-		compatible = "mediatek,mt2701-pctl-a-syscfg", "syscon";
+-		reg = <0 0x10005000 0 0x1000>;
+-	};
+-
+ 	topckgen: syscon at 10000000 {
+ 		compatible = "mediatek,mt2701-topckgen", "syscon";
+ 		reg = <0 0x10000000 0 0x1000>;
+@@ -134,6 +116,24 @@
+ 		#reset-cells = <1>;
+ 	};
+ 
++	pio: pinctrl at 10005000 {
++		compatible = "mediatek,mt2701-pinctrl";
++		reg = <0 0x1000b000 0 0x1000>;
++		mediatek,pctl-regmap = <&syscfg_pctl_a>;
++		pins-are-numbered;
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
++	syscfg_pctl_a: syscfg at 10005000 {
++		compatible = "mediatek,mt2701-pctl-a-syscfg", "syscon";
++		reg = <0 0x10005000 0 0x1000>;
++	};
++
+ 	watchdog: watchdog at 10007000 {
+ 		compatible = "mediatek,mt2701-wdt",
+ 			     "mediatek,mt6589-wdt";
+-- 
+1.9.1
