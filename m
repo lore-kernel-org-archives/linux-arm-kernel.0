@@ -1,38 +1,54 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 2 Dec 2016 23:07:54 +0200
-Subject: [PATCH 1/3] Documentation: dt: Add TI SCI clock driver
-In-Reply-To: <5f146fb6-ec88-b7ee-ef5b-a5ad32c54a74@codeaurora.org>
-References: <1477053961-27128-1-git-send-email-t-kristo@ti.com>
- <1477053961-27128-2-git-send-email-t-kristo@ti.com>
- <20161030204121.qvb5d33dh65awwzx@rob-hp-laptop>
- <41c58712-bc00-ed05-9d1d-42e31397a70c@ti.com>
- <CAL_JsqLtSs6ifnMdEOsfXpGoWnmXuGAx83+ziB9yU+zurvob+A@mail.gmail.com>
- <0fe81866-8bfd-f3a7-d808-9cb23841f504@ti.com>
- <8579b123-f214-22f1-0236-e5b98ab51597@ti.com>
- <CAL_JsqKox9WVXh=i1jSCijJDTACC35uiNtS-bg9fdyDrX0svRQ@mail.gmail.com>
- <5f146fb6-ec88-b7ee-ef5b-a5ad32c54a74@codeaurora.org>
-Message-ID: <76fca1ab-fbae-07ed-7585-cd9ba1230a19@ti.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 02 Dec 2016 13:13:35 -0800
+Subject: [PATCH 1/2] clk: bcm: Support rate change propagation on bcm2835
+ clocks
+In-Reply-To: <20161202205021.074fd441@bbrezillon>
+References: <1480626020-20031-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1480626020-20031-2-git-send-email-boris.brezillon@free-electrons.com>
+ <87lgvyf956.fsf@eliezer.anholt.net> <20161202205021.074fd441@bbrezillon>
+Message-ID: <87y3zynif4.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/16 20:58, Stephen Boyd wrote:
-> On 12/02/2016 10:45 AM, Rob Herring wrote:
->> On Fri, Dec 2, 2016 at 2:19 AM, Tero Kristo <t-kristo@ti.com> wrote:
->>>
->>> Rob, any response on this one? I see you have acked the reset part of the
->>> bindings which is doing pretty much the same thing as the clock part is
->>> doing here, namely adding child node under the main SCI node. Is it okay to
->>> do this same for other parts of the TI SCI?
->> Yes. It would be silly to allow for one and not others...
->>
+Boris Brezillon <boris.brezillon@free-electrons.com> writes:
+
+> On Fri, 02 Dec 2016 11:01:09 -0800
+> Eric Anholt <eric@anholt.net> wrote:
 >
-> I'm expecting a respin for the node name (clocks or clock-controller).
-> I'll also make a review pass on patch 3 today so please don't respin
-> until after that.
+>> Boris Brezillon <boris.brezillon@free-electrons.com> writes:
+>> 
+>> > Some peripheral clocks, like the VEC (Video EnCoder) clock need to be set
+>> > to a precise rate (in our case 108MHz). With the current implementation,
+>> > where peripheral clocks are not allowed to forward rate change requests
+>> > to their parents, it is impossible to match this requirement unless the
+>> > bootloader has configured things correctly, or a specific rate has been
+>> > assigned through the DT (with the assigned-clk-rates property).
+>> >
+>> > Add a new field to struct bcm2835_clock_data to specify which parent
+>> > clocks accept rate change propagation, and support set rate propagation
+>> > in bcm2835_clock_determine_rate().
+>> >
+>> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>  
+>> 
+>> A possible simplification would be to limit VEC to only PLLH_AUX, since
+>> that was how the HW designers intended it to be used.  Then you could
+>> just have SET_RATE_PARENT flag, rather than the bitfield.
+>> 
+>
+> I can rework the patches to do that if you prefer.
 
-Yeah, I need to fix that and re-send. This series will be most likely 
-delayed until 4.11 though seeing its very late in 4.9-rc already (and 
-the genpd part dependency is still not ready either) so we are not in a 
-rush right now.
+I'm fine with the patches as is, just throwing the idea out there.
 
--Tero
+In general, I think the only automatic parent switching I've heard of
+being useful in the platform is I2S's clock being able to get a
+non-MASHed clock when the rate divides evenly off of something.  Other
+than that, automatic parent switching seems to just get us in trouble
+(we've had bugs with PLLC, and we wouldn't want any non-VEC clock to end
+up on PLLH_AUX either).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161202/32e5bcae/attachment.sig>
