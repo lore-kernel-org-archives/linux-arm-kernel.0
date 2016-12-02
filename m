@@ -1,48 +1,50 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri,  2 Dec 2016 14:57:11 +0100
-Subject: [RFC PATCH 0/5] ARM: at91: sama5d2_xplained: Put the PMIC a proper
- suspend state
-Message-ID: <1480687036-5037-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Fri,  2 Dec 2016 14:57:14 +0100
+Subject: [RFC PATCH 3/5] ARM: at91: Call regulator_suspend_{begin,
+ end}() in the platform pm ops
+In-Reply-To: <1480687036-5037-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1480687036-5037-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1480687036-5037-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark, Raphael,
+Call regulator_suspend_begin() and regulator_suspend_end() in the
+->begin() and ->end() PM ops to inform the regulator framework that
+a suspend sequence is beginning/ending.
 
-This is just an attempt at solving the suspend/resume issue I have on
-an atmel platform: the PMIC is only supporting partial "suspend state"
-definition (enable/disable output), and we need to setup the remaining
-parts (voltage and mode) at runtime.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ arch/arm/mach-at91/pm.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Mark, this patch is trying to implement what I understood of our
-discussion on IRC a few days back. As you might have noticed, I'm not
-yet understanding all the subtleties of the PM hooks, or how they are
-implemented in the regulator framework.
-This patch is clearly not meant to be applied as is, it's more something
-to start a discussion, so feel free to point my misunderstanding or the
-flaws in my approach.
-
-Thanks,
-
-Boris
-
-Boris Brezillon (5):
-  regulator: Extend the power-management APIs
-  regulator: Document the regulator-allow-changes-at-runtime DT property
-  ARM: at91: Call regulator_suspend_{begin, end}() in the platform pm
-    ops
-  regulator: act8945: Implement PM functionalities
-  ARM: at91/dt: sama5d2_xplained: Add proper regulator states for
-    suspend-to-mem
-
- .../devicetree/bindings/regulator/regulator.txt    |   5 +
- arch/arm/boot/dts/at91-sama5d2_xplained.dts        |  32 +++
- arch/arm/mach-at91/pm.c                            |   4 +-
- drivers/regulator/act8945a-regulator.c             | 255 +++++++++++++++++-
- drivers/regulator/core.c                           | 291 +++++++++++++++++++++
- drivers/regulator/of_regulator.c                   |   4 +
- include/linux/regulator/driver.h                   |  29 ++
- include/linux/regulator/machine.h                  |  13 +
- 8 files changed, 631 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 65e2d5f6a1c9..699125f16356 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -22,6 +22,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/of_address.h>
+ #include <linux/platform_device.h>
++#include <linux/regulator/machine.h>
+ #include <linux/io.h>
+ #include <linux/clk/at91_pmc.h>
+ 
+@@ -95,7 +96,7 @@ static suspend_state_t target_state;
+ static int at91_pm_begin(suspend_state_t state)
+ {
+ 	target_state = state;
+-	return 0;
++	return regulator_suspend_begin(target_state);
+ }
+ 
+ /*
+@@ -240,6 +241,7 @@ static int at91_pm_enter(suspend_state_t state)
+ static void at91_pm_end(void)
+ {
+ 	target_state = PM_SUSPEND_ON;
++	regulator_suspend_end();
+ }
+ 
+ 
 -- 
 2.7.4
