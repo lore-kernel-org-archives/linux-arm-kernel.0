@@ -1,54 +1,27 @@
-From: qiyaoltc@gmail.com (Yao Qi)
-Date: Fri, 2 Dec 2016 21:56:46 +0000
-Subject: [RFC PATCH 00/29] arm64: Scalable Vector Extension core support
-In-Reply-To: <20161130120654.GJ1574@e103592.cambridge.arm.com>
-References: <7a35d1ae-73df-03a5-c9d6-1a52754acf25@redhat.com>
- <CAH=s-POegNL2HLV3EGPt=b-jrJ4OOwpBFTfysMaX0TNgSw=3Hg@mail.gmail.com>
- <20161130120654.GJ1574@e103592.cambridge.arm.com>
-Message-ID: <20161202215646.s2xymph6d6jlyrv3@localhost>
+From: joseph@codesourcery.com (Joseph Myers)
+Date: Fri, 2 Dec 2016 21:56:49 +0000
+Subject: [RFC PATCH 00/29] arm64: Scalable Vector Extension core
+ support
+In-Reply-To: <20161202182126.GS1574@e103592.cambridge.arm.com>
+References: <20161130120654.GJ1574@e103592.cambridge.arm.com>
+ <3e8afc5a-1ba9-6369-462b-4f5a707d8b8a@redhat.com>
+ <20161202114850.GQ1574@e103592.cambridge.arm.com>
+ <faabab1d-fafb-2bd1-200f-b0e3ba17e1d5@redhat.com>
+ <alpine.DEB.2.20.1612021648580.16956@digraph.polyomino.org.uk>
+ <20161202182126.GS1574@e103592.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.20.1612022154530.1078@digraph.polyomino.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16-11-30 12:06:54, Dave Martin wrote:
-> So, my key goal is to support _per-process_ vector length control.
-> 
-> From the kernel perspective, it is easiest to achieve this by providing
-> per-thread control since that is the unit that context switching acts
-> on.
->
+On Fri, 2 Dec 2016, Dave Martin wrote:
 
-Hi, Dave,
-Thanks for the explanation.
+> Presumably the C language specs specify that fenv manipulations cannot
+> be reordered with respect to evaluation or floating-point expressions?
 
-> How useful it really is to have threads with different VLs in the same
-> process is an open question.  It's theoretically useful for runtime
-> environments, which may want to dispatch code optimised for different
-> VLs -- changing the VL on-the-fly within a single thread is not
-> something I want to encourage, due to overhead and ABI issues, but
-> switching between threads of different VLs would be more manageable.
-
-This is a weird programming model.
-
-> However, I expect mixing different VLs within a single process to be
-> very much a special case -- it's not something I'd expect to work with
-> general-purpose code.
-> 
-> Since the need for indepent VLs per thread is not proven, we could
-> 
->  * forbid it -- i.e., only a thread-group leader with no children is
-> permitted to change the VL, which is then inherited by any child threads
-> that are subsequently created
-> 
->  * permit it only if a special flag is specified when requesting the VL
-> change
-> 
->  * permit it and rely on userspace to be sensible -- easiest option for
-> the kernel.
-
-Both the first and the third one is reasonable to me, but the first one
-fit well in existing GDB design.  I don't know how useful it is to have
-per-thread VL, there may be some workloads can be implemented that way.
-GDB needs some changes to support "per-thread" target description.
+Yes (in the context of #pragma STDC FENV_ACCESS ON).  And you need to 
+presume that an arbitrary function call might manipulate the environment 
+unless you know it doesn't.
 
 -- 
-Yao 
+Joseph S. Myers
+joseph at codesourcery.com
