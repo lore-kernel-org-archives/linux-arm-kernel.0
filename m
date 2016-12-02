@@ -1,46 +1,89 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri,  2 Dec 2016 10:08:54 +0530
-Subject: [PATCH v2 0/2] Broadcom FlexRM ring manager support
-Message-ID: <1480653536-5551-1-git-send-email-anup.patel@broadcom.com>
+Date: Fri,  2 Dec 2016 10:08:56 +0530
+Subject: [PATCH v2 2/2] dt-bindings: Add DT bindings info for FlexRM ring
+ manager
+In-Reply-To: <1480653536-5551-1-git-send-email-anup.patel@broadcom.com>
+References: <1480653536-5551-1-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1480653536-5551-3-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Broadcom FlexRM ring manager provides producer-consumer style
-ring interface for offload engines on Broadcom iProc SoCs. We can
-have one or more instances of Broadcom FlexRM ring manager in a SoC.
+This patch adds device tree bindings document for the FlexRM
+ring manager found on Broadcom iProc SoCs.
 
-This patchset adds a mailbox driver for Broadcom FlexRM ring manager
-which can be used by offload engine drivers as mailbox clients.
-
-The Broadcom FlexRM mailbox driver is feature complete for RAID and
-Crypto offload engines. We will have incremental patches in-future
-for ring-level statistics using debugfs and minor optimizations.
-
-This patchset is based on Linux-4.9-rc7 and it is also available
-at flexrm-v2 branch of https://github.com/Broadcom/arm64-linux.git
-
-Changes since v1:
- - Use compatile string as brcm,iproc-flexrm-mbox
- - Rephrase commit message and text in DT bindings patch
-
-Anup Patel (2):
-  mailbox: Add driver for Broadcom FlexRM ring manager
-  dt-bindings: Add DT bindings info for FlexRM ring manager
-
- .../bindings/mailbox/brcm,iproc-flexrm-mbox.txt    |  60 ++
- drivers/mailbox/Kconfig                            |  11 +
- drivers/mailbox/Makefile                           |   2 +
- drivers/mailbox/mailbox-flexrm/Makefile            |   6 +
- drivers/mailbox/mailbox-flexrm/flexrm-desc.c       | 764 +++++++++++++++++++
- drivers/mailbox/mailbox-flexrm/flexrm-desc.h       |  47 ++
- drivers/mailbox/mailbox-flexrm/flexrm-main.c       | 829 +++++++++++++++++++++
- include/linux/mailbox/brcm-message.h               |  14 +-
- 8 files changed, 1729 insertions(+), 4 deletions(-)
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+---
+ .../bindings/mailbox/brcm,iproc-flexrm-mbox.txt    | 60 ++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
- create mode 100644 drivers/mailbox/mailbox-flexrm/Makefile
- create mode 100644 drivers/mailbox/mailbox-flexrm/flexrm-desc.c
- create mode 100644 drivers/mailbox/mailbox-flexrm/flexrm-desc.h
- create mode 100644 drivers/mailbox/mailbox-flexrm/flexrm-main.c
 
+diff --git a/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
+new file mode 100644
+index 0000000..e81f116
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
+@@ -0,0 +1,60 @@
++Broadcom FlexRM Ring Manager
++============================
++The Broadcom FlexRM ring manager provides a set of rings which can be
++used to submit work to offload engines. An SoC may have multiple FlexRM
++hardware blocks. There is one device tree entry per FlexRM block. The
++FlexRM driver will create a mailbox-controller instance for given FlexRM
++hardware block where each mailbox channel is a separate FlexRM ring.
++
++Required properties:
++--------------------
++- compatible:	Should be "brcm,iproc-flexrm-mbox"
++- reg:		Specifies base physical address and size of the FlexRM
++		ring registers
++- msi-parent:	Phandles (and potential Device IDs) to MSI controllers
++		The FlexRM engine will send MSIs (instead of wired
++		interrupts) to CPU. There is one MSI for each FlexRM ring.
++		Refer devicetree/bindings/interrupt-controller/msi.txt
++- #mbox-cells:	Specifies the number of cells needed to encode a mailbox
++		channel. This should be 3.
++
++		The 1st cell is the mailbox channel number.
++
++		The 2nd cell contains MSI completion threshold. This is the
++		number of completion messages for which FlexRM will inject
++		one MSI interrupt to CPU.
++
++		The 3nd cell contains MSI timer value representing time for
++		which FlexRM will wait to accumulate N completion messages
++		where N is the value specified by 2nd cell above. If FlexRM
++		does not get required number of completion messages in time
++		specified by this cell then it will inject one MSI interrupt
++		to CPU provided atleast one completion message is available.
++
++Optional properties:
++--------------------
++- dma-coherent:	Present if DMA operations made by the FlexRM engine (such
++		as DMA descriptor access, access to buffers pointed by DMA
++		descriptors and read/write pointer updates to DDR) are
++		cache coherent with the CPU.
++
++Example:
++--------
++crypto_mbox: mbox at 67000000 {
++	compatible = "brcm,flexrm-mbox";
++	reg = <0x67000000 0x200000>;
++	msi-parent = <&gic_its 0x7f00>;
++	#mbox-cells = <3>;
++};
++
++crypto_client {
++	...
++	mboxes = <&crypto_mbox 0 0x1 0xffff>,
++		 <&crypto_mbox 1 0x1 0xffff>,
++		 <&crypto_mbox 16 0x1 0xffff>,
++		 <&crypto_mbox 17 0x1 0xffff>,
++		 <&crypto_mbox 30 0x1 0xffff>,
++		 <&crypto_mbox 31 0x1 0xffff>;
++	};
++	...
++};
 -- 
 2.7.4
