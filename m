@@ -1,194 +1,54 @@
-From: ryder.lee@mediatek.com (mtk09577)
-Date: Fri, 2 Dec 2016 19:39:32 +0800
-Subject: [PATCH 1/2] Add crypto driver support for some MediaTek chips
-In-Reply-To: <20161202081836.GA20128@Red>
-References: <1480649205-52695-1-git-send-email-ryder.lee@mediatek.com>
- <1480649205-52695-2-git-send-email-ryder.lee@mediatek.com>
- <20161202081836.GA20128@Red>
-Message-ID: <1480678772.15580.21.camel@mtkswgap22>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 2 Dec 2016 11:48:51 +0000
+Subject: [RFC PATCH 00/29] arm64: Scalable Vector Extension core support
+In-Reply-To: <3e8afc5a-1ba9-6369-462b-4f5a707d8b8a@redhat.com>
+References: <20161130120654.GJ1574@e103592.cambridge.arm.com>
+ <3e8afc5a-1ba9-6369-462b-4f5a707d8b8a@redhat.com>
+Message-ID: <20161202114850.GQ1574@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Nov 30, 2016 at 01:38:28PM +0100, Florian Weimer wrote:
 
-Hello,
+[...]
 
-On Fri, 2016-12-02 at 09:18 +0100, Corentin Labbe wrote:
-> Hello
-> 
-> I have some minor comment inline
-> 
-> On Fri, Dec 02, 2016 at 11:26:44AM +0800, Ryder Lee wrote:
-> > This adds support for the MediaTek hardware accelerator on
-> > mt7623/mt2701/mt8521p SoC.
-> > 
-> > This driver currently implement:
-> > - SHA1 and SHA2 family(HMAC) hash alogrithms.
-> > - AES block cipher in CBC/ECB mode with 128/196/256 bits keys.
-> 
-> I see also a PRNG but is seems not really used.
+> We could add a system call to get the right stack size.  But as it depends
+> on VL, I'm not sure what it looks like.  Particularly if you need determine
+> the stack size before creating a thread that uses a specific VL setting.
 
-Yes, PRNG is not implemented yet, i will remove it temporarily.
+I missed this point previously -- apologies for that.
 
-> > 
-> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> > ---
-> >  drivers/crypto/Kconfig                 |   17 +
-> >  drivers/crypto/Makefile                |    1 +
-> >  drivers/crypto/mediatek/Makefile       |    2 +
-> >  drivers/crypto/mediatek/mtk-aes.c      |  734 +++++++++++++++++
-> >  drivers/crypto/mediatek/mtk-platform.c |  575 +++++++++++++
-> >  drivers/crypto/mediatek/mtk-platform.h |  230 ++++++
-> >  drivers/crypto/mediatek/mtk-regs.h     |  194 +++++
-> >  drivers/crypto/mediatek/mtk-sha.c      | 1384 ++++++++++++++++++++++++++++++++
-> >  8 files changed, 3137 insertions(+)
-> >  create mode 100644 drivers/crypto/mediatek/Makefile
-> >  create mode 100644 drivers/crypto/mediatek/mtk-aes.c
-> >  create mode 100644 drivers/crypto/mediatek/mtk-platform.c
-> >  create mode 100644 drivers/crypto/mediatek/mtk-platform.h
-> >  create mode 100644 drivers/crypto/mediatek/mtk-regs.h
-> >  create mode 100644 drivers/crypto/mediatek/mtk-sha.c
-> > 
-> > diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-> > index 4d2b81f..5d9c803 100644
-> > --- a/drivers/crypto/Kconfig
-> > +++ b/drivers/crypto/Kconfig
-> > @@ -553,6 +553,23 @@ config CRYPTO_DEV_ROCKCHIP
-> >  	  This driver interfaces with the hardware crypto accelerator.
-> >  	  Supporting cbc/ecb chainmode, and aes/des/des3_ede cipher mode.
-> >  
-> > +config CRYPTO_DEV_MEDIATEK
-> > +	tristate "MediaTek's Cryptographic Engine driver"
-> > +	depends on ARM && ARCH_MEDIATEK
-> > +	select NEON
-> > +	select KERNEL_MODE_NEON
-> > +	select ARM_CRYPTO
-> > +	select CRYPTO_AES
-> > +	select CRYPTO_BLKCIPHER
-> > +	select CRYPTO_SHA1_ARM_NEON
-> > +	select CRYPTO_SHA256_ARM
-> > +	select CRYPTO_SHA512_ARM
-> > +	select CRYPTO_HMAC
-> 
-> Why do you select accelerated algos ?
-> Adding COMPILE_TEST could be helpfull also.
+What would you think of:
 
-Our Hardware has complex procedure on calculate HMAC, and it get a bad
-performance.... So i decide to use ARM NEON instruction as fallback to
-speedup it.
-I will add COMPILE_TEST.
+	set_vl(vl_for_new_thread);
+	minsigstksz = get_minsigstksz();
+	set_vl(my_vl);
 
-> [...]
-> > +
-> > +#include <linux/dma-mapping.h>
-> > +#include <linux/scatterlist.h>
-> > +#include <crypto/scatterwalk.h>
-> > +#include <crypto/algapi.h>
-> > +#include <crypto/aes.h>
-> > +#include "mtk-platform.h"
-> > +#include "mtk-regs.h"
-> > +
-> 
-> Sort headers in alphabetical order
-> 
-> [...]
-> > +
-> > +	mtk_aes_unregister_algs();
-> > +	mtk_aes_record_free(cryp);
-> > +}
-> > +EXPORT_SYMBOL(mtk_cipher_alg_release);
-> 
-> Why not EXPORT_SYMBOL_GPL ?
-> Furthermore do you really need it to be exported ?
+This avoids get_minsigstksz() requiring parameters -- which is mainly a
+concern because the parameters tomorrow might be different from the
+parameters today.
 
-My mistake. I will remove it.
+If it is possible to create the new thread without any SVE-dependent code,
+then we could
 
-> [...]
-> > +
-> > +#include <linux/init.h>
-> > +#include <linux/module.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/mfd/syscon.h>
-> > +#include <linux/pm_runtime.h>
-> > +#include <linux/clk.h>
-> > +#include <linux/platform_device.h>
-> > +#include "mtk-platform.h"
-> > +#include "mtk-regs.h"
-> > +
-> 
-> Sort headers in alphabetical order
-> 
-> [...]
-> > +
-> > +static void mtk_prng_reseed(struct mtk_cryp *cryp)
-> > +{
-> > +	/* 8 words to seed the PRNG to provide IVs */
-> > +	void __iomem *base = cryp->base;
-> > +	const u32 prng_key[8] = {0x48c24cfd, 0x6c07f742,
-> > +				0xaee75681, 0x0f27c239,
-> > +				0x79947198, 0xe2991275,
-> > +				0x21ac3c7c, 0xd008c4b4};
-> 
-> Why do you seed with thoses constant ?
-> 
-> [...]
-> > +
-> > +static int mtk_accelerator_init(struct mtk_cryp *cryp)
-> > +{
-> > +	int i, err;
-> > +
-> > +	/* Initialize advanced interrupt controller(AIC) */
-> > +	for (i = 0; i < 5; i++) {
-> 
-> I see this 5 for interrupt away, so perhaps a define could be used
-> 
-> [...]
-> 
-> here 
-> 
-> > +	for (i = 0; i < 5; i++) {
-> > +		cryp->irq[i] = platform_get_irq(pdev, i);
-> > +		if (cryp->irq[i] < 0) {
-> > +			dev_err(cryp->dev, "no IRQ:%d resource info\n", i);
-> > +			return -ENXIO;
-> > +		}
-> > +	}
-> [...]
+	set_vl(vl_for_new_thread);
+	new_thread_stack = malloc(get_minsigstksz());
+	new_thread = create_thread(..., new_thread_stack);
+	set_vl(my_vl);
 
-> > +#ifndef __MTK_PLATFORM_H_
-> > +#define __MTK_PLATFORM_H_
-> > +
-> > +#include <linux/crypto.h>
-> > +#include <crypto/internal/hash.h>
-> > +#include <linux/interrupt.h>
-> 
-> Sort headers in alphabetical order
-> 
-> [...]
-> > +#define MTK_DESC_FIRST		BIT(23)
-> > +#define MTK_DESC_BUF_LEN(x)	((x) & 0x1ffff)
-> > +#define MTK_DESC_CT_LEN(x)	(((x) & 0xff) << 24)
-> > +
-> > +#define WORD(x)			((x) >> 2)
-> 
-> dangerous and ambigous define
+which has the nice property that the new thread directly inherits the
+configuration that was used for get_minsigstksz().
 
-I will define a IRQ_NUM and modify ambiguous definition.
+However, it would be necessary to prevent GCC from moving any code
+across these statements -- in particular, SVE code that access VL-
+dependent data spilled on the stack is liable to go wrong if reordered
+with the above.  So the sequence would need to go in an external
+function (or a single asm...)
 
-> [...]
-> > +
-> > +#include <linux/dma-mapping.h>
-> > +#include <linux/scatterlist.h>
-> > +#include <linux/crypto.h>
-> > +#include <crypto/scatterwalk.h>
-> > +#include <crypto/algapi.h>
-> > +#include <crypto/sha.h>
-> > +#include <crypto/internal/hash.h>
-> 
-> Sort headers in alphabetical order
-> [...]
-> Generally more function comment could be helpfull.
+Failing that, we could maybe define some extensible struct to
+get_minsigstksz().
 
-I will sort all header and add more function comment.
-Thanks for your review.
+Thoughts?
 
-> Regards
+Cheers
+---Dave
