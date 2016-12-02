@@ -1,48 +1,34 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 2 Dec 2016 17:19:21 +0100
-Subject: [PATCH] usb: gadget: udc: atmel: used managed kasprintf
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DB0232C0D@AcuExch.aculab.com>
-References: <20161201102656.29041-1-alexandre.belloni@free-electrons.com>
- <063D6719AE5E284EB5DD2968C1650D6DB0232C0D@AcuExch.aculab.com>
-Message-ID: <20161202161921.ace5rolitlxjhr6i@piout.net>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 2 Dec 2016 10:21:01 -0600
+Subject: ACPI namespace details for ARM64
+In-Reply-To: <1d7424da-f9f8-68e3-5571-b9fc46f13a7f@redhat.com>
+References: <20161109220506.GN14322@bhelgaas-glaptop.roam.corp.google.com>
+ <1d7424da-f9f8-68e3-5571-b9fc46f13a7f@redhat.com>
+Message-ID: <20161202162101.GA9903@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/2016 at 15:59:57 +0000, David Laight wrote :
-> From: Alexandre Belloni
-> > Sent: 01 December 2016 10:27
-> > Use devm_kasprintf instead of simple kasprintf to free the allocated memory
-> > when needed.
-> 
-> s/when needed/when the device is freed/
-> 
-> > Suggested-by: Peter Rosin <peda@axentia.se>
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > ---
-> >  drivers/usb/gadget/udc/atmel_usba_udc.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> > index 45bc997d0711..aec72fe8273c 100644
-> > --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-> > +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> > @@ -1978,7 +1978,8 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
-> >  			dev_err(&pdev->dev, "of_probe: name error(%d)\n", ret);
-> >  			goto err;
-> >  		}
-> > -		ep->ep.name = kasprintf(GFP_KERNEL, "ep%d", ep->index);
-> > +		ep->ep.name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "ep%d",
-> > +					     ep->index);
-> 
-> Acually why bother mallocing such a small string at all.
-> The maximum length is 12 bytes even if 'index' are unrestricted.
->  
+On Thu, Dec 01, 2016 at 11:52:00PM -0500, Jon Masters wrote:
+> On 11/09/2016 05:05 PM, Bjorn Helgaas wrote:
 
-IIRC, using statically allocated string is failing somewhere is the USB
-core but I don't remember all the details.
+> > The basic requirement is that the ACPI namespace should describe
+> > *everything* that consumes address space unless there's another
+> > standard way for the OS to find it [1, 2].
+> 
+> ...and by the way, this was a key lesson for me, too. I had not
+> fully internalized before that you don't just want to describe the
+> ECAM region in the MCFG but you also need to ensure it's properly
+> described in the ACPI namespace. Lots of good things learned.
 
+I wish the ACPI spec contained explicit language to this effect, but
+if it does, I haven't found it.  There might be firmware people who
+would disagree with it.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+My rationale is that the OS may receive a device with no address
+space assigned, and for the OS to safely assign space, it has to know
+everything to avoid.  The devil's advocate might argue that the OS
+doesn't need full knowledge as long as firmware constrains every
+device's _PRS to avoid the possibility of conflict.  But that seems
+like it would be impractical for non-trivial systems.
+
+Bjorn
