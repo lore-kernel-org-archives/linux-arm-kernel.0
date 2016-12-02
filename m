@@ -1,78 +1,42 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Fri, 2 Dec 2016 01:28:50 +0100
-Subject: [PATCH v2] PCI: Add information about describing PCI in ACPI
-In-Reply-To: <20161201232732.GB17948@bhelgaas-glaptop.roam.corp.google.com>
-References: <20161129212816.15663.28100.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20161201223604.GC15867@bhelgaas-glaptop.roam.corp.google.com>
- <47776378.8X3TnsHd3Q@aspire.rjw.lan>
- <20161201232732.GB17948@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CAJZ5v0gtG6++GqyOb_B=o-=R4YuFia8PH6W3NFiCZuay=pV7TA@mail.gmail.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Thu,  1 Dec 2016 16:41:36 -0800
+Subject: [PATCH net-next 0/8] drivers: net: xgene: Add Jumbo and Pause frame
+ support
+Message-ID: <1480639304-18757-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 2, 2016 at 12:27 AM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Thu, Dec 01, 2016 at 11:37:39PM +0100, Rafael J. Wysocki wrote:
->> On Thursday, December 01, 2016 04:36:04 PM Bjorn Helgaas wrote:
->> > On Tue, Nov 29, 2016 at 03:39:48PM -0600, Bjorn Helgaas wrote:
->> > > Here's another stab at this writeup.  I'd appreciate any comments!
->> > >
->> > > Changes from v1 to v2:
->> > >   - Consumer/Producer is defined for Extended Address Space descriptors;
->> > >     should be ignored for QWord/DWord/Word Address Space descriptors
->> > >   - New arches may use Extended Address Space descriptors in PNP0A03 for
->> > >     bridge registers, including ECAM (if the arch adds support for this)
->> > >   - Add more details about MCFG and _CBA (Lv's suggestion)
->> > >   - Incorporate Rafael's suggestions
->> > >
->> > > ---
->> > >
->> > > Bjorn Helgaas (1):
->> > >       PCI: Add information about describing PCI in ACPI
->> > >
->> > >
->> > >  Documentation/PCI/00-INDEX      |    2
->> > >  Documentation/PCI/acpi-info.txt |  180 +++++++++++++++++++++++++++++++++++++++
->> > >  2 files changed, 182 insertions(+)
->> > >  create mode 100644 Documentation/PCI/acpi-info.txt
->> >
->> > It's very late in the cycle, but I'm considering trying to squeeze
->> > this into v4.9 on the grounds that:
->> >
->> >   - It's only a documentation change and can't break anything, and
->> >
->> >   - Distributing it more widely may help the arm64 firmware ecosystem
->> >
->> > But I don't want to disseminate misleading or incorrect information,
->> > so if it needs clarification or wordsmithing, or even just maturation,
->> > I'll wait until v4.10.
->> >
->> > The Consumer/Producer stuff, in particular, doesn't seem 100% settled
->> > yet.  Your thoughts, and especially your improvements, are welcome!
->>
->> Well, what's the drawback if it doesn't go into 4.9?
->
-> Only that it's not as easily accessible.  ARM64 ACPI firmware is brand
-> new.  Neither the firmware nor the kernel developers, nor even the
-> hardware designers, have the benefit of all the x86/ia64 history, so I
-> wrote this to try to come to a common understanding of what Linux
-> expects.
->
-> The first generation of ARM64 hardware is already in the field, and it
-> has teething problems in hardware, firmware, and kernel.  For example,
-> the current MCFG quirk situation: the ECAM hardware doesn't work quite
-> per spec, the ACPI firmware doesn't describe the address space
-> completely, and we don't really have consensus on how the firmware
-> should communicate register space to the kernel.
->
-> We're hoping the second generation can fix some of these problems, and
-> I think this is the time to try to influence that.
+This patch set adds,
 
-Well, I would be super-careful if I were you, then. :-)
+1. Jumbo frame support
+2. Pause frame based flow control
 
-I'm not sure if squeezing it into 4.9.0 buys you anything here.  If
-you get it into 4.10-rc, you can request -stable to pick it up (at
-least in principle) and then it will show up in 4.9.y at one point
-which should suffice I suppose?
+and fixes RSS for non-TCP/UDP packets.
 
-Thanks,
-Rafael
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+---
+Iyappan Subramanian (8):
+  drivers: net: xgene: Add helper function
+  drivers: net: xgene: Configure classifier with pagepool
+  drivers: net: xgene: Add support for Jumbo frame
+  drivers: net: xgene: Add change_mtu function
+  drivers: net: xgene: fix: RSS for non-TCP/UDP
+  drivers: net: xgene: Add flow control configuration
+  drivers: net: xgene: Add flow control initialization
+  drivers: net: xgene: ethtool: Add get/set_pauseparam
+
+ drivers/net/ethernet/apm/xgene/xgene_enet_cle.c    | 110 ++++++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_cle.h    |   3 +
+ .../net/ethernet/apm/xgene/xgene_enet_ethtool.c    |  70 +++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c     | 140 ++++++++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h     |  27 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c   | 336 +++++++++++++++++++--
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h   |  30 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_ring2.c  |   1 +
+ drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c  | 146 +++++++--
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c  | 121 +++++++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h  |   9 +
+ 11 files changed, 895 insertions(+), 98 deletions(-)
+
+-- 
+1.9.1
