@@ -1,38 +1,46 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 2 Dec 2016 07:42:59 +0800
-Subject: [PATCH 2/3] crypto: brcm: Add Broadcom SPU driver
-In-Reply-To: <1480536453-24781-3-git-send-email-rob.rice@broadcom.com>
-Message-ID: <201612020712.jOw8Bkt1%fengguang.wu@intel.com>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Thu, 1 Dec 2016 16:04:09 -0800
+Subject: [PATCH v4 1/3] lib: add bitrev8x4()
+In-Reply-To: <20161201234523.3bed63dc@crub>
+References: <cover.1480551148.git.stillcompiling@gmail.com>
+ <bc92eb1507448731163ae67fc888668d327f9168.1480551148.git.stillcompiling@gmail.com>
+ <20161201234523.3bed63dc@crub>
+Message-ID: <8fb2f1c2-c39c-b74f-d5c8-d6731cbd67c8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hello Anatolij,
 
-[auto build test ERROR on cryptodev/master]
-[also build test ERROR on v4.9-rc7 next-20161201]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Thanks for the review.
 
-url:    https://github.com/0day-ci/linux/commits/Rob-Rice/crypto-brcm-DT-documentation-for-Broadcom-SPU-driver/20161202-010038
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/herbert/cryptodev-2.6.git master
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+On 12/01/2016 02:45 PM, Anatolij Gustschin wrote:
+> On Thu,  1 Dec 2016 09:04:50 -0800
+> Joshua Clayton stillcompiling at gmail.com wrote:
+> ...
+>> diff --git a/arch/arm/include/asm/bitrev.h b/arch/arm/include/asm/bitrev.h
+>> index ec291c3..6d2e9ca 100644
+>> --- a/arch/arm/include/asm/bitrev.h
+>> +++ b/arch/arm/include/asm/bitrev.h
+>> @@ -17,4 +17,9 @@ static __always_inline __attribute_const__ u8 __arch_bitrev8(u8 x)
+>> 	return __arch_bitrev32((u32)x) >> 24;
+>> }
+>>
+>> +static __always_inline __attribute_const__ u32 __arch_bitrev8x4(u32 x)
+>> +{
+>> +	__asm__ ("rbit %0, %1; rev %0, %0" : "=r" (x) : "r" (x));
+> 	return x;
+Oops thats a little embarrassing;
+I'll add a return.
+>> +}
+> otherwise you get
+>
+> In function '__arch_bitrev8x4':
+> warning: no return statement in function returning non-void [-Wreturn-type]
+>
+> --
+> Anatolij
 
-All errors (new ones prefixed by >>):
+I wonder why I do not see this warning when compiling. The inlining, maybe?
 
->> ERROR: "des_ekey" [drivers/crypto/bcm/bcm_crypto_spu.ko] undefined!
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 31957 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161202/f5e756e2/attachment-0001.gz>
+Joshua
