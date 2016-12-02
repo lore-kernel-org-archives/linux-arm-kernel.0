@@ -1,57 +1,21 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 2 Dec 2016 17:02:28 +0000
-Subject: [PATCH v2 1/2] arm64: dts: zx: Fix gic GICR property
-In-Reply-To: <1476361881-19685-2-git-send-email-jun.nie@linaro.org>
-References: <1476361881-19685-1-git-send-email-jun.nie@linaro.org>
- <1476361881-19685-2-git-send-email-jun.nie@linaro.org>
-Message-ID: <a243d381-f7ab-abed-ca21-f0951abb04fd@arm.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 2 Dec 2016 18:23:21 +0100
+Subject: [stable:PATCH 0/3] PAN fixes backport for v4.4.35
+In-Reply-To: <20161202164247.19496-1-james.morse@arm.com>
+References: <20161202164247.19496-1-james.morse@arm.com>
+Message-ID: <20161202172321.GA25426@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just noticed this.
-
-On 13/10/16 13:31, Jun Nie wrote:
-> GICR for multiple CPU can be described with start address and stride,
-> or with multiple address. Current multiple address and stride are
-> both used. Fix it.
+On Fri, Dec 02, 2016 at 04:42:44PM +0000, James Morse wrote:
+> Hi linux-stable,
 > 
-> vmalloc patch 727a7f5a9 triggered this bug:
-> [    0.097146] Unable to handle kernel paging request at virtual address ffff000008060008
-> [    0.097150] pgd = ffff000008602000
-> [    0.097160] [ffff000008060008] *pgd=000000007fffe003, *pud=000000007fffd003, *pmd=000000007fffc003, *pte=0000000000000000
-> [    0.097165] Internal error: Oops: 96000007 [#1] PREEMPT SMP
-> [    0.097170] Modules linked in:
-> [    0.097177] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0+ #1474
-> [    0.097179] Hardware name: ZTE zx296718 evaluation board (DT)
-> [    0.097183] task: ffff80003e8c8b80 task.stack: ffff80003e8d0000
-> [    0.097197] PC is at gic_populate_rdist+0x74/0x15c
-> [    0.097202] LR is at gic_starting_cpu+0xc/0x20
-> [    0.097206] pc : [<ffff0000082b1b18>] lr : [<ffff0000082b26e0>] pstate: 600001c5
-> 
-> Signed-off-by: Jun Nie <jun.nie@linaro.org>
-> ---
->  arch/arm64/boot/dts/zte/zx296718.dtsi | 11 +++--------
->  1 file changed, 3 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/zte/zx296718.dtsi b/arch/arm64/boot/dts/zte/zx296718.dtsi
-> index a223066..6b239a3 100644
-> --- a/arch/arm64/boot/dts/zte/zx296718.dtsi
-> +++ b/arch/arm64/boot/dts/zte/zx296718.dtsi
-> @@ -239,16 +239,11 @@
->  		compatible = "arm,gic-v3";
->  		#interrupt-cells = <3>;
->  		#address-cells = <0>;
-> -		#redistributor-regions = <6>;
-> -		redistributor-stride = <0x0 0x40000>;
-> +		#redistributor-regions = <1>;
-> +		redistributor-stride = <0x20000>;
+> This is the backport of the recent PAN fixes series for v4.4.35.
+> Original series:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-October/461806.html
 
-Why is that stride specified? Is the GIC implementation so busted that
-the GICR_TYPER do not report a GICv3 redistributor, which implies a
-128kB stride?
+Why just 4.4-stable?  What about 4.8-stable?
 
-Thanks,
+thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+greg k-h
