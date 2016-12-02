@@ -1,54 +1,66 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 02 Dec 2016 13:13:35 -0800
-Subject: [PATCH 1/2] clk: bcm: Support rate change propagation on bcm2835
- clocks
-In-Reply-To: <20161202205021.074fd441@bbrezillon>
-References: <1480626020-20031-1-git-send-email-boris.brezillon@free-electrons.com>
- <1480626020-20031-2-git-send-email-boris.brezillon@free-electrons.com>
- <87lgvyf956.fsf@eliezer.anholt.net> <20161202205021.074fd441@bbrezillon>
-Message-ID: <87y3zynif4.fsf@eliezer.anholt.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 02 Dec 2016 22:22:44 +0100
+Subject: [GIT PULL] ARM: SoC fixes for v4.9
+Message-ID: <2721179.8qhQrQsmQ2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boris Brezillon <boris.brezillon@free-electrons.com> writes:
+The following changes since commit 9c763584b7c8911106bb77af7e648bef09af9d80:
 
-> On Fri, 02 Dec 2016 11:01:09 -0800
-> Eric Anholt <eric@anholt.net> wrote:
->
->> Boris Brezillon <boris.brezillon@free-electrons.com> writes:
->> 
->> > Some peripheral clocks, like the VEC (Video EnCoder) clock need to be set
->> > to a precise rate (in our case 108MHz). With the current implementation,
->> > where peripheral clocks are not allowed to forward rate change requests
->> > to their parents, it is impossible to match this requirement unless the
->> > bootloader has configured things correctly, or a specific rate has been
->> > assigned through the DT (with the assigned-clk-rates property).
->> >
->> > Add a new field to struct bcm2835_clock_data to specify which parent
->> > clocks accept rate change propagation, and support set rate propagation
->> > in bcm2835_clock_determine_rate().
->> >
->> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>  
->> 
->> A possible simplification would be to limit VEC to only PLLH_AUX, since
->> that was how the HW designers intended it to be used.  Then you could
->> just have SET_RATE_PARENT flag, rather than the bitfield.
->> 
->
-> I can rework the patches to do that if you prefer.
+  Linux 4.9-rc6 (2016-11-20 13:52:19 -0800)
 
-I'm fine with the patches as is, just throwing the idea out there.
+are available in the git repository at:
 
-In general, I think the only automatic parent switching I've heard of
-being useful in the platform is I2S's clock being able to get a
-non-MASHed clock when the rate divides evenly off of something.  Other
-than that, automatic parent switching seems to just get us in trouble
-(we've had bugs with PLLC, and we wouldn't want any non-VEC clock to end
-up on PLLH_AUX either).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161202/32e5bcae/attachment.sig>
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+
+for you to fetch changes up to 909e481e2467f202b97d42beef246e8829416a85:
+
+  arm64: dts: juno: fix cluster sleep state entry latency on all SoC versions (2016-12-02 17:28:17 +0100)
+
+----------------------------------------------------------------
+ARM: SoC fixes for v4.9
+
+This should be the last set of bugfixes for arm-soc in v4.9.
+None of these are critical regressions, but it would be nice
+to still get them merged.
+
+- On the Juno platform, the idle latency was described wrong,
+  leading to suboptimal cpuidle tuning.
+
+- Also on the same platform, PCI I/O space was set up incorrectly
+  and could not work.
+
+- On the sti platform, a syntactically incorrect DT entry caused
+  warnings.
+
+- The newly added 'gr8' platform has somewhat confusing file
+  names, which we rename for consistency.
+
+----------------------------------------------------------------
+Arnd Bergmann (2):
+      Merge tag 'sunxi-fixes-for-4.9-2' of https://git.kernel.org/.../mripard/linux into fixes
+      Merge tag 'sti-dt-for-v4.9-rc-round2' of git://git.kernel.org/.../pchotard/sti into fixes
+
+Jeremy Linton (1):
+      arm64: dts: juno: Correct PCI IO window
+
+Loic Pallardy (1):
+      ARM: dts: STiH407-family: fix i2c nodes
+
+Maxime Ripard (1):
+      ARM: gr8: Rename the DTSI and relevant DTS
+
+Sudeep Holla (1):
+      arm64: dts: juno: fix cluster sleep state entry latency on all SoC versions
+
+ arch/arm/boot/dts/Makefile                               |  2 +-
+ arch/arm/boot/dts/stih407-family.dtsi                    | 16 ++++++++++++++++
+ arch/arm/boot/dts/{ntc-gr8-evb.dts => sun5i-gr8-evb.dts} |  2 +-
+ arch/arm/boot/dts/{ntc-gr8.dtsi => sun5i-gr8.dtsi}       |  0
+ arch/arm64/boot/dts/arm/juno-base.dtsi                   |  2 +-
+ arch/arm64/boot/dts/arm/juno-r1.dts                      |  2 +-
+ arch/arm64/boot/dts/arm/juno-r2.dts                      |  2 +-
+ arch/arm64/boot/dts/arm/juno.dts                         |  2 +-
+ 8 files changed, 22 insertions(+), 6 deletions(-)
+ rename arch/arm/boot/dts/{ntc-gr8-evb.dts => sun5i-gr8-evb.dts} (99%)
+ rename arch/arm/boot/dts/{ntc-gr8.dtsi => sun5i-gr8.dtsi} (100%)
