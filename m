@@ -1,76 +1,58 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri,  2 Dec 2016 15:05:43 +0000
-Subject: [RFC v3 PATCH 25/25] ARM: Allow ARCH_MULTIPLATFORM to be selected for
- NOMMU
+Date: Fri,  2 Dec 2016 15:05:28 +0000
+Subject: [RFC v3 PATCH 10/25] ARM: NOMMU: implement secondary_startup_arm
 In-Reply-To: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
 References: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1480691143-19845-26-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1480691143-19845-11-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With this patch applied potentially any platform can be built in NOMMU
-configurations if CONFIG_EXPERT is selected. However, there is no
-guarantee that platform can successfully run such Image. So the main
-motivation behind of this patch:
-- bring build coverage for NOMMU configurations
-- allow known working NOMMU platforms (like R-class) to be used
-- pave a way to add support for single address space (aka 1:1 mapping)
-  for MMU platforms, so they can be usable in NOMMU configurations
+Mediatek's and Qualcomm's platform code has reference to
+secondary_startup_arm and that breaks NOMMU build.
 
-Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <rmallon@gmail.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Alexander Shiyan <shc_work@mail.ru>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Since head-nommu.S is common, we need to take extra care of M-class
+platforms since there are no ARM instructions avaliable there. Even
+though secondary_startup_arm is build it in SMP configuration only
+(which is not supported by M-class) it'd be better to be on the safe
+side and handle Thumb-only case there - keep in Thumb mode and fall
+through to secondary_startup.
+
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/Kconfig |   21 +++++++++++++++++++--
- 1 file changed, 19 insertions(+), 2 deletions(-)
+ arch/arm/kernel/head-nommu.S |   13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b3fa6e9..9c90b81 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -327,9 +327,9 @@ choice
+diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+index ae80c71..f5bb554 100644
+--- a/arch/arm/kernel/head-nommu.S
++++ b/arch/arm/kernel/head-nommu.S
+@@ -88,7 +88,17 @@ ENTRY(stext)
+ ENDPROC(stext)
  
- config ARCH_MULTIPLATFORM
- 	bool "Allow multiple platforms to be selected"
--	depends on MMU
-+	depends on MMU || EXPERT
- 	select ARM_HAS_SG_CHAIN
--	select ARM_PATCH_PHYS_VIRT
-+	select ARM_PATCH_PHYS_VIRT if MMU
- 	select AUTO_ZRELADDR
- 	select CLKSRC_OF
- 	select COMMON_CLK
-@@ -339,6 +339,23 @@ config ARCH_MULTIPLATFORM
- 	select PCI_DOMAINS if PCI
- 	select SPARSE_IRQ
- 	select USE_OF
-+	help
-+	  Please, read carefully if you've selected CONFIG_MMU=n!
-+
-+	  Multiplatform with !MMU configuration *is not* meant that
-+	  kernel built to support every platform will boot on them. It
-+	  is because physical address space layouts (particularly where
-+	  RAM is located) are different between platforms and there is
-+	  no MMU to work that around.
-+
-+	  You must specify where RAM start (via DRAM_BASE config
-+	  option) and appropriate size of RAM (via DRAM_SIZE config
-+	  option) which are valid for the platform you are building
-+	  for.
-+
-+	  This feature is *EXPERIMENTAL*, please, consider building
-+	  with CONFIG_MMU=y unless you know what you do or want to
-+	  help with testing.
+ #ifdef CONFIG_SMP
+-	.text
++#ifdef CONFIG_CPU_THUMBONLY
++	.thumb
++ENTRY(secondary_startup_arm)
++#else
++	.arm
++ENTRY(secondary_startup_arm)
++	THUMB(	badr	r9, 1f		)	@ Kernel is entered in ARM.
++	THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
++	THUMB(	.thumb			)	@ switch to Thumb now.
++	THUMB(1:			)
++#endif
+ ENTRY(secondary_startup)
+ 	/*
+ 	 * Common entry point for secondary CPUs.
+@@ -126,6 +136,7 @@ ENTRY(secondary_startup)
+ 	mov	fp, #0
+ 	b	secondary_start_kernel
+ ENDPROC(secondary_startup)
++ENDPROC(secondary_startup_arm)
  
- config ARM_SINGLE_ARMV7M
- 	bool "ARMv7-M based platforms (Cortex-M0/M3/M4)"
+ 	.type	__secondary_data, %object
+ __secondary_data:
 -- 
 1.7.9.5
