@@ -1,76 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Dec 2016 08:47:14 -0800
-Subject: [PATCH 2/2] ARM: omap: timers: reduce rating of gp_timer
- clocksource
-In-Reply-To: <d3a71d3d-3015-bb1f-80a4-4bb9adecaa4c@ti.com>
-References: <1479968355-18860-1-git-send-email-j-keerthy@ti.com>
- <1479968355-18860-2-git-send-email-j-keerthy@ti.com>
- <d3a71d3d-3015-bb1f-80a4-4bb9adecaa4c@ti.com>
-Message-ID: <20161202164714.GB4705@atomide.com>
+From: joseph@codesourcery.com (Joseph Myers)
+Date: Fri, 2 Dec 2016 16:59:27 +0000
+Subject: [RFC PATCH 00/29] arm64: Scalable Vector Extension core
+ support
+In-Reply-To: <faabab1d-fafb-2bd1-200f-b0e3ba17e1d5@redhat.com>
+References: <20161130120654.GJ1574@e103592.cambridge.arm.com>
+ <3e8afc5a-1ba9-6369-462b-4f5a707d8b8a@redhat.com>
+ <20161202114850.GQ1574@e103592.cambridge.arm.com>
+ <faabab1d-fafb-2bd1-200f-b0e3ba17e1d5@redhat.com>
+Message-ID: <alpine.DEB.2.20.1612021648580.16956@digraph.polyomino.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [161129 08:43]:
-> 
-> 
-> On 11/24/2016 12:19 AM, Keerthy wrote:
-> > From: Grygorii Strashko <grygorii.strashko@ti.com>
-> > 
-> > Now ARM Global timer (rating 300) will not be selected as clocksource,
-> > because it's initialized after OMAP GP Timer (rating 300) and
-> > Timekeeping core will not allow to replace clocksource with new one if
-> > both of them have the same rating.
-> > 
-> > Reduce rating of OMAP GP Timer (300->290) when it's used as
-> > clocksource device - this will allow to select ARM Global timer (300)
-> > as clocksource when enabled.
-> > 
-> > Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> > Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> > Signed-off-by: Keerthy <j-keerthy@ti.com>
-> 
-> Unfortunately, this patch has dependency [1] and can't be used alone as
-> it will cause ARM Global timer to be selected as clocksource
-> always on am437x and this will kill cpuidle, because ARM Global timer
-> is not in always_on domain.
-> 
-> The intention of enabling ARM Global timer is only for non-pm aware use
-> cases for RT-kernel latency improvement - where deep cpuidle states are not
-> enabled.
+On Fri, 2 Dec 2016, Florian Weimer wrote:
 
-Yeah we need to fix up things to be able to change the clocksource
-in addition to clockevent. However, currently only cpuidle_coupled
-knows when the whole system is idle, so quite a bit of work is
-needed to do that in a sane way.
-
-What about the first patch in this series?
-
-Regards,
-
-Tony
-
-
-> [1] https://patchwork.kernel.org/patch/8940051/
+> > However, it would be necessary to prevent GCC from moving any code
+> > across these statements -- in particular, SVE code that access VL-
+> > dependent data spilled on the stack is liable to go wrong if reordered
+> > with the above.  So the sequence would need to go in an external
+> > function (or a single asm...)
 > 
-> > ---
-> >  arch/arm/mach-omap2/timer.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> > index b2f2448..a0dbb0b 100644
-> > --- a/arch/arm/mach-omap2/timer.c
-> > +++ b/arch/arm/mach-omap2/timer.c
-> > @@ -376,7 +376,7 @@ static cycle_t clocksource_read_cycles(struct clocksource *cs)
-> >  }
-> > 
-> >  static struct clocksource clocksource_gpt = {
-> > -	.rating		= 300,
-> > +	.rating		= 290,
-> >  	.read		= clocksource_read_cycles,
-> >  	.mask		= CLOCKSOURCE_MASK(32),
-> >  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
-> > 
-> 
-> -- 
-> regards,
-> -grygorii
+> I would talk to GCC folks?we have similar issues with changing the FPU
+> rounding mode, I assume.
+
+In general, GCC doesn't track the implicit uses of thread-local state 
+involved in floating-point exceptions and rounding modes, and so doesn't 
+avoid moving code across manipulations of such state; there are various 
+open bugs in this area (though many of the open bugs are for local rather 
+than global issues with code generation or local optimizations not 
+respecting exceptions and rounding modes, which are easier to fix).  Hence 
+glibc using various macros such as math_opt_barrier and math_force_eval 
+which use asms to prevent such motion.
+
+I'm not familiar enough with the optimizers to judge the right way to 
+address such issues with implicit use of thread-local state.  And I 
+haven't thought much yet about how to implement TS 18661-1 constant 
+rounding modes, which would involve the compiler implicitly inserting 
+rounding modes changes, though I think it would be fairly straightforward 
+given underlying support for avoiding inappropriate code motion.
+
+-- 
+Joseph S. Myers
+joseph at codesourcery.com
