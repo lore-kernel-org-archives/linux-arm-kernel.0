@@ -1,139 +1,228 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Fri, 2 Dec 2016 01:45:59 -0500
-Subject: [Linaro-acpi] [PATCH V1 1/2] PCI: thunder: Enable ACPI PCI
- controller for ThunderX pass2.x silicon version
-In-Reply-To: <CADaLNDm8Zp_kAqVvSd0po9S3j2rSXxtUJ1M33dW7gLZzvueweQ@mail.gmail.com>
-References: <1479201298-25494-1-git-send-email-tn@semihalf.com>
- <1479201298-25494-2-git-send-email-tn@semihalf.com>
- <20161201002812.GB9409@bhelgaas-glaptop.roam.corp.google.com>
- <e5b1f09c-ca4c-fbf0-e9d7-c943ad0df2ff@redhat.com>
- <CADaLNDm8Zp_kAqVvSd0po9S3j2rSXxtUJ1M33dW7gLZzvueweQ@mail.gmail.com>
-Message-ID: <35d2f3b3-7337-f763-86be-2426d6041251@redhat.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 2 Dec 2016 14:51:54 +0800
+Subject: [PATCH v10 2/8] power: add power sequence library
+In-Reply-To: <CAJZ5v0g9rrJ-pLk4bF9XO_0BndGcduncPU0Tamm2m0UvN9X08A@mail.gmail.com>
+References: <1479087359-7547-1-git-send-email-peter.chen@nxp.com>
+ <1479087359-7547-3-git-send-email-peter.chen@nxp.com>
+ <CAJZ5v0i-_pHS+N-k7QVuc_0StT+BaFB+2fuHJpCfngtQV5z76w@mail.gmail.com>
+ <20161122035324.GA7497@b29397-desktop>
+ <CAJZ5v0g9rrJ-pLk4bF9XO_0BndGcduncPU0Tamm2m0UvN9X08A@mail.gmail.com>
+Message-ID: <20161202065154.GA23234@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2016 01:42 AM, Duc Dang wrote:
-> On Thu, Dec 1, 2016 at 9:50 PM, Jon Masters <jcm@redhat.com> wrote:
->> On 11/30/2016 07:28 PM, Bjorn Helgaas wrote:
->>
->>> I'm hoping to end up with something like this:
->>> https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/ecam&id=51ad4df79a9b7f2a66b346a46b21a785a2937469
->>
->> The following build warnings happen using your branch on RHELSA7.3:
->>
->> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
->>   THUNDER_PEM_QUIRK(2,  0), /* off-chip devices */
->>   ^
->> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[44].cfgres.start?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[44].cfgres.end?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[45].cfgres.start?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[45].cfgres.end?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[46].cfgres.start?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[46].cfgres.end?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[47].cfgres.start?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[47].cfgres.end?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[48].cfgres.start?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[48].cfgres.end?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[49].cfgres.start?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:101:2: warning: (near initialization for ?mcfg_quirks[49].cfgres.end?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
->>   THUNDER_PEM_QUIRK(2,  1), /* off-chip devices */
->>   ^
->> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[50].cfgres.start?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[50].cfgres.end?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[51].cfgres.start?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[51].cfgres.end?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[52].cfgres.start?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[52].cfgres.end?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[53].cfgres.start?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[53].cfgres.end?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[54].cfgres.start?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[54].cfgres.end?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[55].cfgres.start?) [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: left shift count >= width of type [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: initializer element is not a constant expression [enabled by default]
->> drivers/acpi/pci_mcfg.c:102:2: warning: (near initialization for ?mcfg_quirks[55].cfgres.end?) [enabled by default]
+On Thu, Dec 01, 2016 at 10:57:24PM +0100, Rafael J. Wysocki wrote:
+> On Tue, Nov 22, 2016 at 4:53 AM, Peter Chen <hzpeterchen@gmail.com> wrote:
+> > On Tue, Nov 22, 2016 at 03:23:12AM +0100, Rafael J. Wysocki wrote:
+> >> > @@ -0,0 +1,237 @@
+> >> > +/*
+> >> > + * core.c      power sequence core file
+> >> > + *
+> >> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> >> > + * Author: Peter Chen <peter.chen@nxp.com>
+> >> > + *
+> >> > + * This program is free software: you can redistribute it and/or modify
+> >> > + * it under the terms of the GNU General Public License version 2  of
+> >> > + * the License as published by the Free Software Foundation.
+> >> > + *
+> >> > + * This program is distributed in the hope that it will be useful,
+> >> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> > + * GNU General Public License for more details.
+> >> > + *
+> >> > + * You should have received a copy of the GNU General Public License
+> >> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> >>
+> >> The last paragraph is not necessary AFAICS.
+> >
+> > I just copy it from:
+> >
+> > https://www.gnu.org/licenses/gpl-howto.en.html
+> >
+> > If you are concerns about it, I can delete it.
 > 
-> I saw this too. It can be fixed by changes below:
-> 
-> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
-> index 7319188..3d7c5cc 100644
-> --- a/drivers/acpi/pci_mcfg.c
-> +++ b/drivers/acpi/pci_mcfg.c
-> @@ -98,16 +98,16 @@ struct mcfg_fixup {
->         { "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,                 \
->         &pci_thunder_ecam_ops }
->         /* SoC pass1.x */
-> -   THUNDER_PEM_QUIRK(2,  0),       /* off-chip devices */
-> -   THUNDER_PEM_QUIRK(2,  1),       /* off-chip devices */
-> -   THUNDER_ECAM_QUIRK(2,  0),
-> -   THUNDER_ECAM_QUIRK(2,  1),
-> -   THUNDER_ECAM_QUIRK(2,  2),
-> -   THUNDER_ECAM_QUIRK(2,  3),
-> -   THUNDER_ECAM_QUIRK(2, 10),
-> -   THUNDER_ECAM_QUIRK(2, 11),
-> -   THUNDER_ECAM_QUIRK(2, 12),
-> -   THUNDER_ECAM_QUIRK(2, 13),
-> + THUNDER_PEM_QUIRK(2, 0UL),  /* off-chip devices */
-> + THUNDER_PEM_QUIRK(2, 1UL),  /* off-chip devices */
-> + THUNDER_ECAM_QUIRK(2, 0UL),
-> + THUNDER_ECAM_QUIRK(2, 1UL),
-> + THUNDER_ECAM_QUIRK(2, 2UL),
-> + THUNDER_ECAM_QUIRK(2, 3UL),
-> + THUNDER_ECAM_QUIRK(2, 10UL),
-> + THUNDER_ECAM_QUIRK(2, 11UL),
-> + THUNDER_ECAM_QUIRK(2, 12UL),
-> + THUNDER_ECAM_QUIRK(2, 13UL),
-> 
->  #define XGENE_V1_ECAM_MCFG(rev, seg) \
->         {"APM   ", "XGENE   ", rev, seg, MCFG_BUS_ANY, \
+> It is redundant, so yes, please.
 
-...which reminds me to followup on that project to get an Intel-style
-0-day test service running for arm64. It's been kicking around too long.
+ok.
+
+> 
+> >> > +
+> >> > +static struct pwrseq *pwrseq_find_available_instance(struct device_node *np)
+> >> > +{
+> >> > +       struct pwrseq *pwrseq;
+> >> > +
+> >> > +       list_for_each_entry(pwrseq, &pwrseq_list, node) {
+> >> > +               if (pwrseq->used)
+> >> > +                       continue;
+> >> > +
+> >> > +               /* compare compatible string for pwrseq node */
+> >> > +               if (of_match_node(pwrseq->pwrseq_of_match_table, np)) {
+> >> > +                       pwrseq->used = true;
+> >> > +                       return pwrseq;
+> >> > +               }
+> >> > +
+> >> > +               /* return generic pwrseq instance */
+> >> > +               if (!strcmp(pwrseq->pwrseq_of_match_table->compatible,
+> >> > +                               "generic")) {
+> >> > +                       pr_debug("using generic pwrseq instance for %s\n",
+> >> > +                               np->full_name);
+> >> > +                       pwrseq->used = true;
+> >> > +                       return pwrseq;
+> >> > +               }
+> >> > +       }
+> >> > +       pr_warn("Can't find any pwrseq instances for %s\n", np->full_name);
+> >>
+> >> pr_debug() ?
+> >
+> > If there is no pwrseq instance for that node, the power sequence on routine will
+> > return fail, so I think an warning message is useful for user.
+> 
+> Useful in what way?  How is the user supposed to know what happened
+> from this message?
+
+Ok, I will change it to debug message.
+
+> >> > + */
+> >> > +struct pwrseq *of_pwrseq_on(struct device_node *np)
+> >> > +{
+> >> > +       struct pwrseq *pwrseq;
+> >> > +       int ret;
+> >> > +
+> >> > +       pwrseq = pwrseq_find_available_instance(np);
+> >>
+> >> What does guarantee the integrity of ths list at this point?
+> >
+> > Once the use selects the specific pwrseq library, the library will
+> > create an empty one instance during the initialization, and it
+> > will be called at postcore_initcall, the device driver has not
+> > probed yet.
+> 
+> Which doesn't matter really, because the list is global and some other
+> driver using it might have been probed already.
+> 
+> You have a mutex here and it is used for add/remove.  Why isn't it
+> used for list browsing?
+
+I will add mutex for it, thanks.
+
+> >
+> >> > + */
+> >> > +int of_pwrseq_on_list(struct device_node *np, struct list_head *head)
+> >> > +{
+> >> > +       struct pwrseq *pwrseq;
+> >> > +       struct pwrseq_list_per_dev *pwrseq_list_node;
+> >> > +
+> >> > +       pwrseq = of_pwrseq_on(np);
+> >> > +       if (IS_ERR(pwrseq))
+> >> > +               return PTR_ERR(pwrseq);
+> >> > +
+> >> > +       pwrseq_list_node = kzalloc(sizeof(*pwrseq_list_node), GFP_KERNEL);
+> >>
+> >> Why don't you allocate memory before turning the power sequence on?
+> >>
+> >
+> > This list is only for power sequence on instance, if I allocate memory before
+> > power sequence on, I need to free it if power sequence on is failed.
+> 
+> So why is that a problem?
+> 
+
+Not any problems, I will follow your comments.
+
+> >> > +       if (!pwrseq_list_node) {
+> >> > +               of_pwrseq_off(pwrseq);
+> >> > +               return -ENOMEM;
+> >> > +       }
+> >> > +       pwrseq_list_node->pwrseq = pwrseq;
+> >> > +       list_add(&pwrseq_list_node->list, head);
+> >> > +
+> >> > +       return 0;
+> >> > +}
+> >> > +EXPORT_SYMBOL_GPL(of_pwrseq_on_list);
+> >>
+> >> So the caller is supposed to provide a list head of the list to put
+> >> the power sequence object into on success, right?
+> >
+> > Yes
+> >
+> >>
+> >> Can you explain to me what the idea here is, please?
+> >>
+> >
+> > Taking USB devices as an example, there is one power sequence on list
+> > per bus, and there are several USB devices on the bus. Using a list,
+> > we can record which device is powered sequence on, and only powers
+> > sequence off which has already powered sequence on at error path, and
+> > power sequence off all devices on the bus when the bus (eg, USB HUB)
+> > is removed. (eg, when the bus driver is removed)
+> 
+> Well, I'm not sure I understand this correctly.
+> 
+> What about system suspend/resume and such, for instance?
+
+Thanks, yes, we need to consider PM.
+
+The initial idea for this library is only for power on/off. It does not
+take power management into consideration. As an enhancement, we need
+to consider PM, and implement pwrseq_suspend/resume accordingly (will
+consider concurrent issue). I will add related APIs at pwrseq_generic.c
+at next version, and only call clock operations at it (reset gpio
+is not needed for PM).
+
+> 
+> > Usually, the power sequence is only needed for hard-wired devices,
+> > the power sequence on is carried out during the bus driver probed,
+> > and off if carried out during the bus driver is removed,
+> > of_pwrseq_on_list/of_powerseq_off_list is not supposed to be
+> > called during the other bus driver life cycles.
+> >
+> >> Also, what's the protection of the list against concurrent access?
+> >>
+> >
+> > I will add comment that the list creator needs to take consideration
+> > of concurrent access if exists.
+> >
+> >> > +
+> >> > +/**
+> >> > + * of_pwrseq_off_list: do power sequence off for the list
+> >> > + *
+> >> > + * This API is used to power off all devices on this bus, it is
+> >> > + * the opposite operation for of_pwrseq_on_list.
+> >> > + *
+> >> > + * @head: the list head for pwrseq instance list on this bus
+> >> > + */
+> >> > +void of_pwrseq_off_list(struct list_head *head)
+> >> > +{
+> >> > +       struct pwrseq *pwrseq;
+> >> > +       struct pwrseq_list_per_dev *pwrseq_list_node, *tmp_node;
+> >> > +
+> >> > +       list_for_each_entry_safe(pwrseq_list_node, tmp_node, head, list) {
+> >> > +               pwrseq = pwrseq_list_node->pwrseq;
+> >> > +               of_pwrseq_off(pwrseq);
+> >> > +               list_del(&pwrseq_list_node->list);
+> >> > +               kfree(pwrseq_list_node);
+> >> > +       }
+> >> > +}
+> >> > +EXPORT_SYMBOL_GPL(of_pwrseq_off_list);
+> >>
+> >> This looks horribly inefficient.
+> >>
+> >> Is the user expected to create the list from scratch every time things
+> >> are turned on?
+> >>
+> >
+> > Like I explained above, the power sequence is for hard-wired device on
+> > board, the list creation and remove are only carried out on driver's
+> > probe and remove.
+> 
+> Which driver exactly are you referring to?
+> 
+
+For system PM, the list is still existed. It calls of_pwrseq_suspend/resume
+accordingly. The first user for this pwrseq library is USB HUB.
+(drivers/usb/core/hub.c).
 
 -- 
-Computer Architect | Sent from my Fedora powered laptop
+
+Best Regards,
+Peter Chen
