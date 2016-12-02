@@ -1,34 +1,63 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 2 Dec 2016 10:21:01 -0600
-Subject: ACPI namespace details for ARM64
-In-Reply-To: <1d7424da-f9f8-68e3-5571-b9fc46f13a7f@redhat.com>
-References: <20161109220506.GN14322@bhelgaas-glaptop.roam.corp.google.com>
- <1d7424da-f9f8-68e3-5571-b9fc46f13a7f@redhat.com>
-Message-ID: <20161202162101.GA9903@bhelgaas-glaptop.roam.corp.google.com>
+Date: Fri, 2 Dec 2016 10:27:43 -0600
+Subject: [Linaro-acpi] [PATCH V1 1/2] PCI: thunder: Enable ACPI PCI
+ controller for ThunderX pass2.x silicon version
+In-Reply-To: <20161202104500.GE10776@rric.localdomain>
+References: <1479201298-25494-1-git-send-email-tn@semihalf.com>
+ <1479201298-25494-2-git-send-email-tn@semihalf.com>
+ <20161201002812.GB9409@bhelgaas-glaptop.roam.corp.google.com>
+ <e5b1f09c-ca4c-fbf0-e9d7-c943ad0df2ff@redhat.com>
+ <CADaLNDm8Zp_kAqVvSd0po9S3j2rSXxtUJ1M33dW7gLZzvueweQ@mail.gmail.com>
+ <30ad6c65-4a4a-6346-00f6-11250133a251@semihalf.com>
+ <20161202104500.GE10776@rric.localdomain>
+Message-ID: <20161202162743.GB9903@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2016 at 11:52:00PM -0500, Jon Masters wrote:
-> On 11/09/2016 05:05 PM, Bjorn Helgaas wrote:
-
-> > The basic requirement is that the ACPI namespace should describe
-> > *everything* that consumes address space unless there's another
-> > standard way for the OS to find it [1, 2].
+On Fri, Dec 02, 2016 at 11:45:00AM +0100, Robert Richter wrote:
+> On 02.12.16 11:06:24, Tomasz Nowicki wrote:
+> > On 02.12.2016 07:42, Duc Dang wrote:
 > 
-> ...and by the way, this was a key lesson for me, too. I had not
-> fully internalized before that you don't just want to describe the
-> ECAM region in the MCFG but you also need to ensure it's properly
-> described in the ACPI namespace. Lots of good things learned.
+> > >@@ -98,16 +98,16 @@ struct mcfg_fixup {
+> > >        { "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,                 \
+> > >        &pci_thunder_ecam_ops }
+> > >        /* SoC pass1.x */
+> > >-   THUNDER_PEM_QUIRK(2,  0),       /* off-chip devices */
+> > >-   THUNDER_PEM_QUIRK(2,  1),       /* off-chip devices */
+> > >-   THUNDER_ECAM_QUIRK(2,  0),
+> > >-   THUNDER_ECAM_QUIRK(2,  1),
+> > >-   THUNDER_ECAM_QUIRK(2,  2),
+> > >-   THUNDER_ECAM_QUIRK(2,  3),
+> > >-   THUNDER_ECAM_QUIRK(2, 10),
+> > >-   THUNDER_ECAM_QUIRK(2, 11),
+> > >-   THUNDER_ECAM_QUIRK(2, 12),
+> > >-   THUNDER_ECAM_QUIRK(2, 13),
+> > >+ THUNDER_PEM_QUIRK(2, 0UL),  /* off-chip devices */
+> > >+ THUNDER_PEM_QUIRK(2, 1UL),  /* off-chip devices */
+> > >+ THUNDER_ECAM_QUIRK(2, 0UL),
+> > >+ THUNDER_ECAM_QUIRK(2, 1UL),
+> > >+ THUNDER_ECAM_QUIRK(2, 2UL),
+> > >+ THUNDER_ECAM_QUIRK(2, 3UL),
+> > >+ THUNDER_ECAM_QUIRK(2, 10UL),
+> > >+ THUNDER_ECAM_QUIRK(2, 11UL),
+> > >+ THUNDER_ECAM_QUIRK(2, 12UL),
+> > >+ THUNDER_ECAM_QUIRK(2, 13UL),
+> > >
+> > 
+> > The UL suffix is needed for *THUNDER_PEM_QUIRK* only. THUNDER_ECAM_QUIRK is
+> > fine.
+> 
+> We should better make the type cast part of the macro.
+> 
+> + this:
+> 
+> ---
+> #define THUNDER_MCFG_RES(addr, node) \
+>        DEFINE_RES_MEM(addr + (node << 44), 0x39 * SZ_16M)
+> ---
+> 
+> The args in the macro need parentheses.
 
-I wish the ACPI spec contained explicit language to this effect, but
-if it does, I haven't found it.  There might be firmware people who
-would disagree with it.
-
-My rationale is that the OS may receive a device with no address
-space assigned, and for the OS to safely assign space, it has to know
-everything to avoid.  The devil's advocate might argue that the OS
-doesn't need full knowledge as long as firmware constrains every
-device's _PRS to avoid the possibility of conflict.  But that seems
-like it would be impractical for non-trivial systems.
-
-Bjorn
+Would you mind sending me a little incremental patch doing what you
+want?  I could try myself, but since I don't have an arm64 cross-build
+setup, I'm working in the dark.
