@@ -1,34 +1,91 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 2 Dec 2016 14:17:02 -0800
-Subject: [PATCH] arm64: Add CMDLINE_EXTEND
-Message-ID: <61060b44-64a9-d628-4faf-3a7ae06048aa@infradead.org>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Fri, 02 Dec 2016 14:33:41 -0800
+Subject: [PATCHv4 11/15] clk: ti: clockdomain: add clock provider support
+ to clockdomains
+In-Reply-To: <20161028235448.57squdf6cu2wxxvm@atomide.com>
+References: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
+ <1476805568-19264-12-git-send-email-t-kristo@ti.com>
+ <20161028005047.GQ26139@codeaurora.org>
+ <cd32a554-ba0a-33cd-c15c-121524ce679b@ti.com>
+ <20161028125112.xfyrx7l7m64z6cu6@atomide.com>
+ <20161028233617.GP16026@codeaurora.org>
+ <20161028235448.57squdf6cu2wxxvm@atomide.com>
+Message-ID: <148071802182.32158.11479184984645880313@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device tree code already supports CMDLINE_EXTEND,
-so add the config option to make it available on arm64.
+Quoting Tony Lindgren (2016-10-28 16:54:48)
+> * Stephen Boyd <sboyd@codeaurora.org> [161028 16:37]:
+> > On 10/28, Tony Lindgren wrote:
+> > > * Tero Kristo <t-kristo@ti.com> [161028 00:43]:
+> > > > On 28/10/16 03:50, Stephen Boyd wrote:
+> > > > > I suppose a PRCM is
+> > > > > like an MFD that has clocks and resets under it? On other
+> > > > > platforms we've combined that all into one node and just had
+> > > > > #clock-cells and #reset-cells in that node. Is there any reason
+> > > > > we can't do that here?
+> > > > 
+> > > > For OMAPs, there are typically multiple instances of the PRCM around; OMAP4
+> > > > for example has:
+> > > > 
+> > > > cm1 @ 0x4a004000 (clocks + clockdomains)
+> > > > cm2 @ 0x4a008000 (clocks + clockdomains)
+> > > > prm @ 0x4a306000 (few clocks + resets + power state handling)
+> > > > scrm @ 0x4a30a000 (few external clocks + plenty of misc stuff)
+> > > > 
+> > > > These instances are also under different power/voltage domains which means
+> > > > their PM behavior is different.
+> > > > 
+> > > > The idea behind having a clockdomain as a provider was mostly to have the
+> > > > topology visible : prcm-instance -> clockdomain -> clocks
+> > > 
+> > > Yeah that's needed to get the interconnect hierarchy right for
+> > > genpd :)
+> > > 
+> > > > ... but basically I think it would be possible to drop the clockdomain
+> > > > representation and just mark the prcm-instance as a clock provider. Tony,
+> > > > any thoughts on that?
+> > > 
+> > > No let's not drop the clockdomains as those will be needed when we
+> > > move things into proper hierarchy within the interconnect instances.
+> > > This will then help with getting things right with genpd.
+> > > 
+> > > In the long run we just want to specify clockdomain and the offset of
+> > > the clock instance within the clockdomain in the dts files.
+> > > 
+> > 
+> > Sorry, I have very little idea how OMAP hardware works. Do you
+> > mean that you will have different nodes for each clockdomain so
+> > that genpd can map 1:1 to the node in dts? But in hardware
+> > there's a prcm that allows us to control many clock domains
+> > through register read/writes? How is the interconnect involved?
+> 
+> There are multiple clockdomains, at least one for each interconnect
+> instance. Once a clockdomain is idle, the related interconnect can
+> idle too. So yeah genpd pretty much maps 1:1 with the clockdomains.
+> 
+> There's more info in for example omap4 TRM section "3.4.1 Device
+> Power-Management Layout" that shows the voltage/power/clock domains.
+> The interconnect instances are mostly named there too looking at
+> the L4/L3 naming.
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
----
- arch/arm64/Kconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+I'm confused on two points:
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 969ef88..51f7545 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -949,6 +949,12 @@ config CMDLINE
- 	  entering them here. As a minimum, you should specify the the
- 	  root device (e.g. root=/dev/nfs).
- 
-+config CMDLINE_EXTEND
-+	bool "Extend bootloader kernel arguments"
-+	help
-+	  The command-line arguments provided by the boot loader will be
-+	  appended to the default kernel command string.
-+
- config CMDLINE_FORCE
- 	bool "Always use the default kernel command string"
- 	help
--- 
-2.9.3
+1) why are the clkdm's acting as clock providers? I've always hated the
+name "clock domain" since those bits are for managing module state, not
+clock state. The PRM, CM1 and CM2 provide the clocks, not the
+clockdomains.
+
+2) why aren't the clock domains modeled as genpds with their associated
+devices attached to them? Note that it is possible to "nest" genpd
+objects. This would also allow for the "Clockdomain Dependency"
+relationships to be properly modeled (see section 3.1.1.1.7 Clock Domain
+Dependency in the OMAP4 TRM).
+
+Regards,
+Mike
+
+> 
+> Regards,
+> 
+> Tony
