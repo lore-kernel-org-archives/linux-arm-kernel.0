@@ -1,125 +1,57 @@
-From: qiuxishi@huawei.com (Xishi Qiu)
-Date: Fri, 2 Dec 2016 11:11:21 +0800
-Subject: [RFC PATCH 0/2] arm64: memory-hotplug: Add Memory Hotplug support
-In-Reply-To: <9cfa95ca-a9e9-299d-d020-7e565562dcf5@broadcom.com>
-References: <1480637999-4320-1-git-send-email-scott.branden@broadcom.com>
- <5840D333.9050801@huawei.com>
- <9cfa95ca-a9e9-299d-d020-7e565562dcf5@broadcom.com>
-Message-ID: <5840E659.6000104@huawei.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Fri, 2 Dec 2016 11:26:45 +0800
+Subject: [PATCH 2/2] crypto: mediatek - add DT bindings documentation
+In-Reply-To: <1480649205-52695-1-git-send-email-ryder.lee@mediatek.com>
+References: <1480649205-52695-1-git-send-email-ryder.lee@mediatek.com>
+Message-ID: <1480649205-52695-3-git-send-email-ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/12/2 10:38, Scott Branden wrote:
+Add DT bindings documentation for the crypto driver
 
-> Hi Xishi,
-> 
-> Thanks for the reply - please see comments below.
-> 
-> On 16-12-01 05:49 PM, Xishi Qiu wrote:
->> On 2016/12/2 8:19, Scott Branden wrote:
->>
->>> This patchset is sent for comment to add memory hotplug support for ARM64
->>> based platforms.  It follows hotplug code added for other architectures
->>> in the linux kernel.
->>>
->>> I tried testing the memory hotplug feature following documentation from
->>> Documentation/memory-hotplug.txt.  I don't think it is working as expected
->>> - see below:
->>>
->>> To add memory to the system I did the following:
->>> echo 0x400000000 > /sys/devices/system/memory/probe
->>>
->>> The memory is displayed as system ram:
->>> cat /proc/iomem:
->>> 74000000-77ffffff : System RAM
->>>   74080000-748dffff : Kernel code
->>>   74950000-749d2fff : Kernel data
->>> 400000000-43fffffff : System RAM
->>>
->>> But does not seem to be added to the kernel memory.
->>> /proc/meminfo did not change.
->>>
->>> What else needs to be done so the memory is added to the kernel memory
->>> pool for normal allocation?
->>>
->>
->> Hi Scott,
->>
->> Do you mean it still don't support hod-add after apply this patchset?
-> 
-> After applying the patch it appears to partially support hot-add. Please let me know if you think it is working as expected?
-> 
-> The memory probe functions in that the memory is registered with the system and shows up in /proc/iomem.  But, the memory is not available in /proc/meminfo.  Do you think something else needs to be adjusted for ARM64 to hotadd the memory
-> 
-> I just found another clue:
-> under /sys/devices/system/memory I only see one memory entry (before or after I try to hotadd additional memory).
-> 
-> /sys/devices/system/memory # ls
-> auto_online_blocks  memory0            uevent
-> block_size_bytes    probe
-> 
-> In arch/arm64/include/asm/sparsemem.h if I change SECTION_SIZE_BITS from 30 to 28 and recompile I get the following:
-> /sys/devices/system/memory # ls
-> auto_online_blocks  memory7            uevent
-> block_size_bytes    probe
-> 
-> 
-> In arch/arm64/include/asm/sparsemem.h if I change SECTION_SIZE_BITS from 30 to 27 and recompile I get the following:
-> /sys/devices/system/memory # ls
-> auto_online_blocks  memory14            uevent
-> block_size_bytes    probe
-> 
-> If looks to me like something is not working properly in the ARM64 implementation.  I should expect to see multiple memoryX entries under /sys/devices/system/memory?
-> 
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+ .../devicetree/bindings/crypto/mediatek-crypto.txt | 32 ++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/crypto/mediatek-crypto.txt
 
-Hi Scott,
-
-1. Do you enable the following configs?
-CONFIG_SPARSEMEM
-MEMORY_HOTPLUG
-CONFIG_MEMORY_HOTPLUG_DEFAULT_ONLINE
-
-2. I find you missed create mapping in arch_add_memory(), and x86 has it.
-
-3. We will add memblock first, so pfn_valid() maybe always return true(in the
-following function), and this will lead __add_section() failed. Please check
-it.
-
-int pfn_valid(unsigned long pfn)
-{
-	return (pfn & PFN_MASK) == pfn && memblock_is_memory(pfn << PAGE_SHIFT);
-}
-
-add_memory
-  add_memory_resource
-    memblock_add_node
-      arch_add_memory
-        __add_pages
-          __add_section
-            pfn_valid
-
-Thanks,
-Xishi Qiu
-
-> 
-> 
->>
->> Thanks,
->> Xishi Qiu
->>
->>> Scott Branden (2):
->>>   arm64: memory-hotplug: Add MEMORY_HOTPLUG, MEMORY_HOTREMOVE,
->>>     MEMORY_PROBE
->>>   arm64: defconfig: enable MEMORY_HOTPLUG config options
->>>
->>>  arch/arm64/Kconfig           | 10 ++++++++++
->>>  arch/arm64/configs/defconfig |  3 +++
->>>  arch/arm64/mm/init.c         | 42 ++++++++++++++++++++++++++++++++++++++++++
->>>  3 files changed, 55 insertions(+)
->>>
->>
->>
->>
-> 
-> .
-> 
+diff --git a/Documentation/devicetree/bindings/crypto/mediatek-crypto.txt b/Documentation/devicetree/bindings/crypto/mediatek-crypto.txt
+new file mode 100644
+index 0000000..8b1db08
+--- /dev/null
++++ b/Documentation/devicetree/bindings/crypto/mediatek-crypto.txt
+@@ -0,0 +1,32 @@
++MediaTek cryptographic accelerators
++
++Required properties:
++- compatible: Should be "mediatek,mt7623-crypto"
++- reg: Address and length of the register set for the device
++- interrupts: Should contain the five crypto engines interrupts in numeric
++	order. These are global system and four descriptor rings.
++- clocks: the clock used by the core
++- clock-names: the names of the clock listed in the clocks property. These are
++	"ethif", "cryp"
++- power-domains: Must contain a reference to the PM domain.
++
++
++Optional properties:
++- interrupt-parent: Should be the phandle for the interrupt controller
++  that services interrupts for this device
++
++
++Example:
++	crypto: crypto at 1b240000 {
++		compatible = "mediatek,mt7623-crypto";
++		reg = <0 0x1b240000 0 0x20000>;
++		interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 83 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 84 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 97 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
++			 <&ethsys CLK_ETHSYS_CRYPTO>;
++		clock-names = "ethif","cryp";
++		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
++	};
+-- 
+1.9.1
