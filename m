@@ -1,125 +1,85 @@
-From: mhocko@suse.com (Michal Hocko)
-Date: Fri, 2 Dec 2016 14:58:46 +0100
-Subject: [PATCH V2 fix 4/6] mm: mempolicy: intruduce a helper
- huge_nodemask()
-In-Reply-To: <1479279182-31294-1-git-send-email-shijie.huang@arm.com>
-References: <1479107259-2011-5-git-send-email-shijie.huang@arm.com>
- <1479279182-31294-1-git-send-email-shijie.huang@arm.com>
-Message-ID: <20161202135845.GL6830@dhcp22.suse.cz>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Fri, 2 Dec 2016 14:57:01 +0100
+Subject: [PATCH 2/3] ARM: dts: stm32: Add ADC support to stm32f429
+In-Reply-To: <1480687022-12851-1-git-send-email-fabrice.gasnier@st.com>
+References: <1480687022-12851-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1480687022-12851-3-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 16-11-16 14:53:02, Huang Shijie wrote:
-> This patch intruduces a new helper huge_nodemask(),
-> we can use it to get the node mask.
-> 
-> This idea of the function is from the init_nodemask_of_mempolicy():
->    Return true if we can succeed in extracting the node_mask
-> for 'bind' or 'interleave' policy or initializing the node_mask
-> to contain the single node for 'preferred' or 'local' policy.
+Add ADC support & pinctrl analog phandle (adc3_in8) to stm32f429.
 
-It is absolutely unclear how this is going to be used from this patch.
-Please make sure to also use a newly added function in the same patch.
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ arch/arm/boot/dts/stm32f429.dtsi | 49 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
-> 
-> Signed-off-by: Huang Shijie <shijie.huang@arm.com>
-> ---
-> The previous version does not treat the MPOL_PREFERRED/MPOL_INTERLEAVE cases.
-> This patch adds the code to set proper node mask for
-> MPOL_PREFERRED/MPOL_INTERLEAVE.
-> ---
->  include/linux/mempolicy.h |  8 ++++++++
->  mm/mempolicy.c            | 47 +++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 55 insertions(+)
-> 
-> diff --git a/include/linux/mempolicy.h b/include/linux/mempolicy.h
-> index 5e5b296..7796a40 100644
-> --- a/include/linux/mempolicy.h
-> +++ b/include/linux/mempolicy.h
-> @@ -145,6 +145,8 @@ extern void mpol_rebind_task(struct task_struct *tsk, const nodemask_t *new,
->  				enum mpol_rebind_step step);
->  extern void mpol_rebind_mm(struct mm_struct *mm, nodemask_t *new);
->  
-> +extern bool huge_nodemask(struct vm_area_struct *vma,
-> +				unsigned long addr, nodemask_t *mask);
->  extern struct zonelist *huge_zonelist(struct vm_area_struct *vma,
->  				unsigned long addr, gfp_t gfp_flags,
->  				struct mempolicy **mpol, nodemask_t **nodemask);
-> @@ -261,6 +263,12 @@ static inline void mpol_rebind_mm(struct mm_struct *mm, nodemask_t *new)
->  {
->  }
->  
-> +static inline bool huge_nodemask(struct vm_area_struct *vma,
-> +				unsigned long addr, nodemask_t *mask)
-> +{
-> +	return false;
-> +}
-> +
->  static inline struct zonelist *huge_zonelist(struct vm_area_struct *vma,
->  				unsigned long addr, gfp_t gfp_flags,
->  				struct mempolicy **mpol, nodemask_t **nodemask)
-> diff --git a/mm/mempolicy.c b/mm/mempolicy.c
-> index 6d3639e..5063a69 100644
-> --- a/mm/mempolicy.c
-> +++ b/mm/mempolicy.c
-> @@ -1800,6 +1800,53 @@ static inline unsigned interleave_nid(struct mempolicy *pol,
->  
->  #ifdef CONFIG_HUGETLBFS
->  /*
-> + * huge_nodemask(@vma, @addr, @mask)
-> + * @vma: virtual memory area whose policy is sought
-> + * @addr: address in @vma
-> + * @mask: a nodemask pointer
-> + *
-> + * Return true if we can succeed in extracting the policy nodemask
-> + * for 'bind' or 'interleave' policy into the argument @mask, or
-> + * initializing the argument @mask to contain the single node for
-> + * 'preferred' or 'local' policy.
-> + */
-> +bool huge_nodemask(struct vm_area_struct *vma, unsigned long addr,
-> +			nodemask_t *mask)
-> +{
-> +	struct mempolicy *mpol;
-> +	bool ret = true;
-> +	int nid;
-> +
-> +	if (!mask)
-> +		return false;
-> +
-> +	mpol = get_vma_policy(vma, addr);
-> +
-> +	switch (mpol->mode) {
-> +	case MPOL_PREFERRED:
-> +		if (mpol->flags & MPOL_F_LOCAL)
-> +			nid = numa_node_id();
-> +		else
-> +			nid = mpol->v.preferred_node;
-> +		init_nodemask_of_node(mask, nid);
-> +		break;
-> +
-> +	case MPOL_BIND:
-> +		/* Fall through */
-> +	case MPOL_INTERLEAVE:
-> +		*mask = mpol->v.nodes;
-> +		break;
-> +
-> +	default:
-> +		ret = false;
-> +		break;
-> +	}
-> +	mpol_cond_put(mpol);
-> +
-> +	return ret;
-> +}
-> +
-> +/*
->   * huge_zonelist(@vma, @addr, @gfp_flags, @mpol)
->   * @vma: virtual memory area whose policy is sought
->   * @addr: address in @vma for shared policy lookup and interleave policy
-> -- 
-> 2.5.5
-> 
-
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index 3dd47eb..be1d970 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -172,6 +172,49 @@
+ 			status = "disabled";
+ 		};
+ 
++		adc: adc at 40012000 {
++			compatible = "st,stm32f4-adc-core";
++			reg = <0x40012000 0x400>;
++			interrupts = <18>;
++			clocks = <&rcc 0 168>;
++			clock-names = "adc";
++			interrupt-controller;
++			#interrupt-cells = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++
++			adc1: adc at 0 {
++				compatible = "st,stm32f4-adc";
++				#io-channel-cells = <1>;
++				reg = <0x0>;
++				clocks = <&rcc 0 168>;
++				interrupt-parent = <&adc>;
++				interrupts = <0>;
++				status = "disabled";
++			};
++
++			adc2: adc at 100 {
++				compatible = "st,stm32f4-adc";
++				#io-channel-cells = <1>;
++				reg = <0x100>;
++				clocks = <&rcc 0 169>;
++				interrupt-parent = <&adc>;
++				interrupts = <1>;
++				status = "disabled";
++			};
++
++			adc3: adc at 200 {
++				compatible = "st,stm32f4-adc";
++				#io-channel-cells = <1>;
++				reg = <0x200>;
++				clocks = <&rcc 0 170>;
++				interrupt-parent = <&adc>;
++				interrupts = <2>;
++				status = "disabled";
++			};
++		};
++
+ 		syscfg: system-config at 40013800 {
+ 			compatible = "syscon";
+ 			reg = <0x40013800 0x400>;
+@@ -334,6 +377,12 @@
+ 					slew-rate = <2>;
+ 				};
+ 			};
++
++			adc3_in8_pin: adc at 200 {
++				pins {
++					pinmux = <STM32F429_PF10_FUNC_ANALOG>;
++				};
++			};
+ 		};
+ 
+ 		rcc: rcc at 40023810 {
 -- 
-Michal Hocko
-SUSE Labs
+1.9.1
