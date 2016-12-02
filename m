@@ -1,46 +1,53 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri,  2 Dec 2016 14:48:06 +0100
-Subject: [RESEND PATCH v2 0/7] drm/vc4: VEC (SDTV) output support
-Message-ID: <1480686493-4813-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Fri,  2 Dec 2016 14:48:08 +0100
+Subject: [RESEND PATCH v2 2/7] drm: Turn DRM_MODE_SUBCONNECTOR_xx definitions
+ into an enum
+In-Reply-To: <1480686493-4813-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1480686493-4813-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1480686493-4813-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for the noise, but I forgot to Cc the DT maintainers.
+List of values like the DRM_MODE_SUBCONNECTOR_xx ones are better
+represented with enums.
 
-Here is the 2nd version of the VC4/VEC series.
+Turn the DRM_MODE_SUBCONNECTOR_xx macros into an enum.
 
-We still miss the two clock patches mentioned by Eric in the first
-version to make the encoder work no matter the setting applied by the
-bootloader.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Suggested-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+---
+ include/uapi/drm/drm_mode.h | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
 
-Regards,
-
-Boris
-
-Boris Brezillon (7):
-  drm/vc4: Fix ->clock_select setting for the VEC encoder
-  drm: Turn DRM_MODE_SUBCONNECTOR_xx definitions into an enum
-  drm: Add TV connector states to drm_connector_state
-  drm/vc4: Add support for the VEC (Video Encoder) IP
-  drm/vc4: Document VEC DT binding
-  ARM: bcm/dt: Add VEC node in bcm283x.dtsi
-  ARM: bcm/dt: Enable the VEC IP on all RaspeberryPi boards
-
- .../devicetree/bindings/display/brcm,bcm-vc4.txt   |  14 +
- arch/arm/boot/dts/bcm2835-rpi.dtsi                 |   5 +
- arch/arm/boot/dts/bcm283x.dtsi                     |   8 +
- drivers/gpu/drm/drm_atomic.c                       |  50 ++
- drivers/gpu/drm/vc4/Makefile                       |   1 +
- drivers/gpu/drm/vc4/vc4_crtc.c                     |  38 +-
- drivers/gpu/drm/vc4/vc4_debugfs.c                  |   1 +
- drivers/gpu/drm/vc4/vc4_drv.c                      |   1 +
- drivers/gpu/drm/vc4/vc4_drv.h                      |   6 +
- drivers/gpu/drm/vc4/vc4_regs.h                     |   3 +-
- drivers/gpu/drm/vc4/vc4_vec.c                      | 657 +++++++++++++++++++++
- include/drm/drm_connector.h                        |  32 +
- include/uapi/drm/drm_mode.h                        |  18 +-
- 13 files changed, 810 insertions(+), 24 deletions(-)
- create mode 100644 drivers/gpu/drm/vc4/vc4_vec.c
-
+diff --git a/include/uapi/drm/drm_mode.h b/include/uapi/drm/drm_mode.h
+index df0e3504c349..970bfc0d7107 100644
+--- a/include/uapi/drm/drm_mode.h
++++ b/include/uapi/drm/drm_mode.h
+@@ -220,14 +220,16 @@ struct drm_mode_get_encoder {
+ 
+ /* This is for connectors with multiple signal types. */
+ /* Try to match DRM_MODE_CONNECTOR_X as closely as possible. */
+-#define DRM_MODE_SUBCONNECTOR_Automatic	0
+-#define DRM_MODE_SUBCONNECTOR_Unknown	0
+-#define DRM_MODE_SUBCONNECTOR_DVID	3
+-#define DRM_MODE_SUBCONNECTOR_DVIA	4
+-#define DRM_MODE_SUBCONNECTOR_Composite	5
+-#define DRM_MODE_SUBCONNECTOR_SVIDEO	6
+-#define DRM_MODE_SUBCONNECTOR_Component	8
+-#define DRM_MODE_SUBCONNECTOR_SCART	9
++enum drm_mode_subconnector {
++	DRM_MODE_SUBCONNECTOR_Automatic = 0,
++	DRM_MODE_SUBCONNECTOR_Unknown = 0,
++	DRM_MODE_SUBCONNECTOR_DVID = 3,
++	DRM_MODE_SUBCONNECTOR_DVIA = 4,
++	DRM_MODE_SUBCONNECTOR_Composite = 5,
++	DRM_MODE_SUBCONNECTOR_SVIDEO = 6,
++	DRM_MODE_SUBCONNECTOR_Component = 8,
++	DRM_MODE_SUBCONNECTOR_SCART = 9,
++};
+ 
+ #define DRM_MODE_CONNECTOR_Unknown	0
+ #define DRM_MODE_CONNECTOR_VGA		1
 -- 
 2.7.4
