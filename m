@@ -1,63 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 Dec 2016 21:28:58 +0100
-Subject: [PATCH v2 1/2] arm64: dts: zx: Fix gic GICR property
-In-Reply-To: <a243d381-f7ab-abed-ca21-f0951abb04fd@arm.com>
-References: <1476361881-19685-1-git-send-email-jun.nie@linaro.org>
- <1476361881-19685-2-git-send-email-jun.nie@linaro.org>
- <a243d381-f7ab-abed-ca21-f0951abb04fd@arm.com>
-Message-ID: <3937871.l5gZt4hBke@wuerfel>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 2 Dec 2016 23:07:54 +0200
+Subject: [PATCH 1/3] Documentation: dt: Add TI SCI clock driver
+In-Reply-To: <5f146fb6-ec88-b7ee-ef5b-a5ad32c54a74@codeaurora.org>
+References: <1477053961-27128-1-git-send-email-t-kristo@ti.com>
+ <1477053961-27128-2-git-send-email-t-kristo@ti.com>
+ <20161030204121.qvb5d33dh65awwzx@rob-hp-laptop>
+ <41c58712-bc00-ed05-9d1d-42e31397a70c@ti.com>
+ <CAL_JsqLtSs6ifnMdEOsfXpGoWnmXuGAx83+ziB9yU+zurvob+A@mail.gmail.com>
+ <0fe81866-8bfd-f3a7-d808-9cb23841f504@ti.com>
+ <8579b123-f214-22f1-0236-e5b98ab51597@ti.com>
+ <CAL_JsqKox9WVXh=i1jSCijJDTACC35uiNtS-bg9fdyDrX0svRQ@mail.gmail.com>
+ <5f146fb6-ec88-b7ee-ef5b-a5ad32c54a74@codeaurora.org>
+Message-ID: <76fca1ab-fbae-07ed-7585-cd9ba1230a19@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, December 2, 2016 5:02:28 PM CET Marc Zyngier wrote:
-> On 13/10/16 13:31, Jun Nie wrote:
-> > GICR for multiple CPU can be described with start address and stride,
-> > or with multiple address. Current multiple address and stride are
-> > both used. Fix it.
-> > 
-> > vmalloc patch 727a7f5a9 triggered this bug:
-> > [    0.097146] Unable to handle kernel paging request at virtual address ffff000008060008
-> > [    0.097150] pgd = ffff000008602000
-> > [    0.097160] [ffff000008060008] *pgd=000000007fffe003, *pud=000000007fffd003, *pmd=000000007fffc003, *pte=0000000000000000
-> > [    0.097165] Internal error: Oops: 96000007 [#1] PREEMPT SMP
-> > [    0.097170] Modules linked in:
-> > [    0.097177] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0+ #1474
-> > [    0.097179] Hardware name: ZTE zx296718 evaluation board (DT)
-> > [    0.097183] task: ffff80003e8c8b80 task.stack: ffff80003e8d0000
-> > [    0.097197] PC is at gic_populate_rdist+0x74/0x15c
-> > [    0.097202] LR is at gic_starting_cpu+0xc/0x20
-> > [    0.097206] pc : [<ffff0000082b1b18>] lr : [<ffff0000082b26e0>] pstate: 600001c5
-> > 
-> > Signed-off-by: Jun Nie <jun.nie@linaro.org>
-> > ---
-> >  arch/arm64/boot/dts/zte/zx296718.dtsi | 11 +++--------
-> >  1 file changed, 3 insertions(+), 8 deletions(-)
-> > 
-> > diff --git a/arch/arm64/boot/dts/zte/zx296718.dtsi b/arch/arm64/boot/dts/zte/zx296718.dtsi
-> > index a223066..6b239a3 100644
-> > --- a/arch/arm64/boot/dts/zte/zx296718.dtsi
-> > +++ b/arch/arm64/boot/dts/zte/zx296718.dtsi
-> > @@ -239,16 +239,11 @@
-> >               compatible = "arm,gic-v3";
-> >               #interrupt-cells = <3>;
-> >               #address-cells = <0>;
-> > -             #redistributor-regions = <6>;
-> > -             redistributor-stride = <0x0 0x40000>;
-> > +             #redistributor-regions = <1>;
-> > +             redistributor-stride = <0x20000>;
-> 
-> Why is that stride specified? Is the GIC implementation so busted that
-> the GICR_TYPER do not report a GICv3 redistributor, which implies a
-> 128kB stride?
+On 02/12/16 20:58, Stephen Boyd wrote:
+> On 12/02/2016 10:45 AM, Rob Herring wrote:
+>> On Fri, Dec 2, 2016 at 2:19 AM, Tero Kristo <t-kristo@ti.com> wrote:
+>>>
+>>> Rob, any response on this one? I see you have acked the reset part of the
+>>> bindings which is doing pretty much the same thing as the clock part is
+>>> doing here, namely adding child node under the main SCI node. Is it okay to
+>>> do this same for other parts of the TI SCI?
+>> Yes. It would be silly to allow for one and not others...
+>>
+>
+> I'm expecting a respin for the node name (clocks or clock-controller).
+> I'll also make a review pass on patch 3 today so please don't respin
+> until after that.
 
-Given that there is any concern about the patch now, and the merge
-window is almost open, I'm moving both patches to the
-next/fixes-non-critical branch and will merge it for v4.10 instead
-of sending it for v4.9.
+Yeah, I need to fix that and re-send. This series will be most likely 
+delayed until 4.11 though seeing its very late in 4.9-rc already (and 
+the genpd part dependency is still not ready either) so we are not in a 
+rush right now.
 
-If you end up deciding that the patch is wrong, please follow up
-with a fix on top. Once the situation is resolved and the patch
-merged upstream, feel free to ask stable at vger.kernel.org for a
-backport to stable kernels to get it into v4.9.x.
-
-	Arnd
+-Tero
