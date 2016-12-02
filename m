@@ -1,33 +1,57 @@
-From: itaru.kitayama@riken.jp (Itaru Kitayama)
-Date: Sat, 3 Dec 2016 06:28:07 +0900
-Subject: [PATCH 0/2] arm64: PMU: Sanitize usage of PMSELR_EL0.SEL
-In-Reply-To: <1480693859-27249-1-git-send-email-marc.zyngier@arm.com>
-References: <1480693859-27249-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <d27d50ad-c61e-28a6-c8e5-5714b1530c4d@riken.jp>
+From: rob.rice@broadcom.com (Rob Rice)
+Date: Fri,  2 Dec 2016 16:34:56 -0500
+Subject: [PATCH v2 0/3] Add Broadcom SPU Crypto Driver
+Message-ID: <1480714499-1476-1-git-send-email-rob.rice@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Successfully verified them on a Rev B0 CPU. Thank you for quickly 
-providing the fix.
+Change in v2:
+- select CRYPTO_DES in Kconfig
 
-On 2016/12/03 0:50, Marc Zyngier wrote:
-> An ugly interaction between the use of PMSELR_EL0 in a host kernel and
-> the use of PMXEVCNTR_EL0 in a guest has recently come to light [1],
-> leading to the guest taking an UNDEF exception in EL1 when using the
-> PMU.
->
-> The fix is pretty simple ("don't do that!"), making the PMU useable on
-> X-Gene, which seems to have a stricter (but nonetheless valid)
-> interpretation of the architecture.
->
-> Patches against 4.9-rc6.
->
-> [1] https://lists.cs.columbia.edu/pipermail/kvmarm/2016-November/022545.html
->
-> Marc Zyngier (2):
->   arm64: PMU: Do not use PMSELR_EL0 to access PMCCFILTR_EL0
->   arm64: PMU: Reset PMSELR_EL0 to a sane value at boot time
->
->  arch/arm64/kernel/perf_event.c | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
->
+The Broadcom SPU crypto driver provides access to SPU hardware
+for symmetric crypto offload. The driver supports ablkcipher,
+ahash, and aead operations. The driver supports several
+Broadcom SoCs with different revisions of the SPU hardware.
+The driver supports SPU-M and SPU2 hardware revisions, and
+a couple versions of each hw revision, each version with minor
+differences.
+
+The device tree entries for the SPU depends on device tree entries
+for the Broadcom PDC driver. The PDC DT entries have been accepted
+upstream, but are not yet included in the crypto repo. See commit
+e79249143f468f8d3365dbbd1642c045bdcc98c5.
+
+Rob Rice (3):
+  crypto: brcm: DT documentation for Broadcom SPU driver
+  crypto: brcm: Add Broadcom SPU driver
+  crypto: brcm: Add Broadcom SPU driver DT entry.
+
+ .../devicetree/bindings/crypto/brcm,spu-crypto.txt |   25 +
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |   12 +
+ drivers/crypto/Kconfig                             |   11 +
+ drivers/crypto/Makefile                            |    1 +
+ drivers/crypto/bcm/Makefile                        |   15 +
+ drivers/crypto/bcm/cipher.c                        | 4943 ++++++++++++++++++++
+ drivers/crypto/bcm/cipher.h                        |  472 ++
+ drivers/crypto/bcm/spu.c                           | 1252 +++++
+ drivers/crypto/bcm/spu.h                           |  288 ++
+ drivers/crypto/bcm/spu2.c                          | 1402 ++++++
+ drivers/crypto/bcm/spu2.h                          |  228 +
+ drivers/crypto/bcm/spum.h                          |  174 +
+ drivers/crypto/bcm/util.c                          |  584 +++
+ drivers/crypto/bcm/util.h                          |  117 +
+ 14 files changed, 9524 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
+ create mode 100644 drivers/crypto/bcm/Makefile
+ create mode 100644 drivers/crypto/bcm/cipher.c
+ create mode 100644 drivers/crypto/bcm/cipher.h
+ create mode 100644 drivers/crypto/bcm/spu.c
+ create mode 100644 drivers/crypto/bcm/spu.h
+ create mode 100644 drivers/crypto/bcm/spu2.c
+ create mode 100644 drivers/crypto/bcm/spu2.h
+ create mode 100644 drivers/crypto/bcm/spum.h
+ create mode 100644 drivers/crypto/bcm/util.c
+ create mode 100644 drivers/crypto/bcm/util.h
+
+-- 
+2.1.0
