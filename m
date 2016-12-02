@@ -1,37 +1,36 @@
-From: agust@denx.de (Anatolij Gustschin)
-Date: Fri, 2 Dec 2016 08:51:57 +0100
-Subject: [PATCH v4 1/3] lib: add bitrev8x4()
-In-Reply-To: <8fb2f1c2-c39c-b74f-d5c8-d6731cbd67c8@gmail.com>
-References: <cover.1480551148.git.stillcompiling@gmail.com>
- <bc92eb1507448731163ae67fc888668d327f9168.1480551148.git.stillcompiling@gmail.com>
- <20161201234523.3bed63dc@crub>
- <8fb2f1c2-c39c-b74f-d5c8-d6731cbd67c8@gmail.com>
-Message-ID: <20161202085157.1a6ec811@crub>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 02 Dec 2016 16:52:40 +0900
+Subject: [PATCH 06/12] usb: dwc3: omap: Replace the extcon API
+In-Reply-To: <877f7lntjq.fsf@linux.intel.com>
+References: <1480485460-2663-1-git-send-email-cw00.choi@samsung.com>
+ <1480485460-2663-7-git-send-email-cw00.choi@samsung.com>
+ <CGME20161130103827epcas4p268ee1cbc6b7b2ace7c987dd7baba82d4@epcas4p2.samsung.com>
+ <877f7lntjq.fsf@linux.intel.com>
+Message-ID: <58412848.5070209@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joshua,
+Hi Felipe,
 
-On Thu, 1 Dec 2016 16:04:09 -0800
-Joshua Clayton stillcompiling at gmail.com wrote:
-...
->>> +static __always_inline __attribute_const__ u32 __arch_bitrev8x4(u32 x)
->>> +{
->>> +	__asm__ ("rbit %0, %1; rev %0, %0" : "=r" (x) : "r" (x));  
->> 	return x;  
->Oops thats a little embarrassing;
->I'll add a return.
->>> +}  
->> otherwise you get
+On 2016? 11? 30? 19:36, Felipe Balbi wrote:
+> 
+> Hi,
+> 
+> Chanwoo Choi <cw00.choi@samsung.com> writes:
+>> This patch uses the resource-managed extcon API for extcon_register_notifier()
+>> and replaces the deprecated extcon API as following:
+>> - extcon_get_cable_state_() -> extcon_get_state()
 >>
->> In function '__arch_bitrev8x4':
->> warning: no return statement in function returning non-void [-Wreturn-type]
->>
->
->I wonder why I do not see this warning when compiling. The inlining, maybe?
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> 
+> Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
+> 
 
-do you have CONFIG_HAVE_ARCH_BITREVERSE=y in your .config?
-Probably not optimized code is used, otherwise you will send wrong
-data to FPGA (due to wrong return values from __arch_bitrev8x4).
+Thanks for your review.
 
-Anatolij
+Each patch has no any dependency among patches.
+So, If possible, could you pick the patch6/8/9/10/11/12 on your tree?
+
+-- 
+Best Regards,
+Chanwoo Choi
