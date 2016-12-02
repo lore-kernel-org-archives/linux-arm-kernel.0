@@ -1,10 +1,10 @@
 From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Fri,  2 Dec 2016 10:08:39 +0100
-Subject: [PATCH 1/5] ARM: dts: imx6qdl-nit6xlite: remove hardcoded LVDS bus
- format
+Date: Fri,  2 Dec 2016 10:08:41 +0100
+Subject: [PATCH 3/5] ARM: dts: imx6qdl-nitrogen6_som2: remove hardcoded LVDS
+ bus format
 In-Reply-To: <20161202090843.22613-1-gary.bisson@boundarydevices.com>
 References: <20161202090843.22613-1-gary.bisson@boundarydevices.com>
-Message-ID: <20161202090843.22613-2-gary.bisson@boundarydevices.com>
+Message-ID: <20161202090843.22613-4-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,14 +13,14 @@ information.
 
 Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
 ---
- arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi | 2 --
+ arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi | 2 --
  1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi b/arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi
-index 63acd54..a784593 100644
---- a/arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi
-@@ -515,8 +515,6 @@
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi
+index d80f21a..0521986 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi
+@@ -640,8 +640,6 @@
  	status = "okay";
  
  	lvds-channel at 0 {
