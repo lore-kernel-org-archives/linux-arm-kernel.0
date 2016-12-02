@@ -1,48 +1,97 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Fri, 02 Dec 2016 22:22:30 +0800
-Subject: [PATCH v2 2/3] ARM: dts: sunxi: add support for Orange Pi Zero
- board
-In-Reply-To: <20161201093619.gs6lmoxtlptp2jr6@lukather>
-References: <20161121162421.800-1-icenowy@aosc.xyz>
- <20161121162421.800-2-icenowy@aosc.xyz>
- <5373671480239408@web31m.yandex.ru>
- <cdfd3c65-d473-badb-ea6a-035f7ab79217@arm.com>
- <20161201093619.gs6lmoxtlptp2jr6@lukather>
-Message-ID: <11498641480688550@web2g.yandex.ru>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Fri, 2 Dec 2016 15:23:31 +0100
+Subject: [PATCH v3 5/7] IIO: add bindings for stm32 timer trigger driver
+In-Reply-To: <20161202135904.GN2683@dell>
+References: <1480673842-20804-1-git-send-email-benjamin.gaignard@st.com>
+ <1480673842-20804-6-git-send-email-benjamin.gaignard@st.com>
+ <20161202135904.GN2683@dell>
+Message-ID: <CA+M3ks7GhvApJwZVFK7KAbbvbAhp40sdOVvhkyZWBHZXpLfZDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-01.12.2016, 17:36, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> On Mon, Nov 28, 2016 at 12:29:07AM +0000, Andr? Przywara wrote:
->> ?> Something more interesting happened.
->> ?>
->> ?> Xunlong made a add-on board for Orange Pi Zero, which exposes the
->> ?> two USB Controllers exported at expansion bus as USB Type-A
->> ?> connectors.
->> ?>
->> ?> Also it exposes a analog A/V jack and a microphone.
->> ?>
->> ?> Should I enable {e,o}hci{2.3} in the device tree?
+2016-12-02 14:59 GMT+01:00 Lee Jones <lee.jones@linaro.org>:
+> On Fri, 02 Dec 2016, Benjamin Gaignard wrote:
+>
+>> Define bindings for stm32 timer trigger
 >>
->> ?Actually we should do this regardless of this extension board. The USB
->> ?pins are not multiplexed and are exposed on user accessible pins (just
->> ?not soldered, but that's a detail), so I think they qualify for DT
->> ?enablement. And even if a user can't use them, it doesn't hurt to have
->> ?them (since they are not multiplexed).
+>> version 3:
+>> - change file name
+>> - add cross reference with mfd bindings
+>>
+>> version 2:
+>> - only keep one compatible
+>> - add DT parameters to set lists of the triggers:
+>>   one list describe the triggers created by the device
+>>   another one give the triggers accepted by the device
+>>
+>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>> ---
+>>  .../bindings/iio/timer/stm32-timer-trigger.txt     | 39 ++++++++++++++++++++++
+>>  1 file changed, 39 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+>> new file mode 100644
+>> index 0000000..858816d
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+>> @@ -0,0 +1,39 @@
+>> +timer trigger bindings for STM32
+>> +
+>> +Must be a sub-node of STM32 general purpose timer driver
+>> +Parent node properties are describe in ../mfd/stm32-general-purpose-timer.txt
+>> +
+>> +Required parameters:
+>> +- compatible:                must be "st,stm32-iio-timer"
+>> +- interrupts:                Interrupt for this device
+>> +                     See ../interrupt-controller/st,stm32-exti.txt
+>> +
+>> +Optional parameters:
+>> +- st,input-triggers-names:   List of the possible input triggers for
+>> +                             the device
+>> +- st,output-triggers-names:  List of the possible output triggers for
+>> +                             the device
+>> +
+>> +Possible triggers are defined in include/dt-bindings/iio/timer/st,stm32-timer-trigger.h
+>> +
+>> +Example:
+>> +     gptimer1: gptimer1 at 40010000 {
+>> +             compatible = "st,stm32-gptimer";
+>> +             reg = <0x40010000 0x400>;
+>> +             clocks = <&rcc 0 160>;
+>> +             clock-names = "clk_int";
+>> +
+>> +             timer1 at 0 {
+>> +                     compatible = "st,stm32-timer-trigger";
+>> +                     interrupts = <27>;
+>> +                     st,input-triggers-names = TIM5_TRGO,
+>> +                                               TIM2_TRGO,
+>> +                                               TIM4_TRGO,
+>> +                                               TIM3_TRGO;
+>> +                     st,output-triggers-names = TIM1_TRGO,
+>> +                                                TIM1_CH1,
+>> +                                                TIM1_CH2,
+>> +                                                TIM1_CH3,
+>> +                                                TIM1_CH4;
 >
-> My main concern about this is that we'll leave regulators enabled by
-> default, for a minority of users. And that minority will prevent to do
-> a proper power management when the times come since we'll have to keep
-> that behaviour forever.
+> I see why you've done it like this now ... because it makes things
+> easier for you in the driver, since the IIO subsystem matches on names
+> such as these.
+>
+> BUT, this is a Linux-implementation-ism.  Just use pairs of integers
+> and create the Linux-ism strings in the driver.
 
-I think these users can add a 'fdt set /xxx/xxx status "disabled" ' .
+The goal is not to make things easier in driver but to be able to share
+the triggers names with other drivers like DAC or ADC.
+If each driver have to create it own triggers names it will more difficult
+to keep them coherent than it they share the same definitions
 
 >
-> Maxime
+>> +             };
+>> +     };
 >
 > --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
