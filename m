@@ -1,67 +1,76 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri,  2 Dec 2016 16:42:46 +0000
-Subject: [stable:PATCH 2/3] arm64: mm: Set PSTATE.PAN from the
- cpu_enable_pan() call [v4.4]
-In-Reply-To: <20161202164247.19496-1-james.morse@arm.com>
-References: <20161202164247.19496-1-james.morse@arm.com>
-Message-ID: <20161202164247.19496-3-james.morse@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 2 Dec 2016 08:47:14 -0800
+Subject: [PATCH 2/2] ARM: omap: timers: reduce rating of gp_timer
+ clocksource
+In-Reply-To: <d3a71d3d-3015-bb1f-80a4-4bb9adecaa4c@ti.com>
+References: <1479968355-18860-1-git-send-email-j-keerthy@ti.com>
+ <1479968355-18860-2-git-send-email-j-keerthy@ti.com>
+ <d3a71d3d-3015-bb1f-80a4-4bb9adecaa4c@ti.com>
+Message-ID: <20161202164714.GB4705@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 7209c868600bd8926e37c10b9aae83124ccc1dd8 upstream.
+* Grygorii Strashko <grygorii.strashko@ti.com> [161129 08:43]:
+> 
+> 
+> On 11/24/2016 12:19 AM, Keerthy wrote:
+> > From: Grygorii Strashko <grygorii.strashko@ti.com>
+> > 
+> > Now ARM Global timer (rating 300) will not be selected as clocksource,
+> > because it's initialized after OMAP GP Timer (rating 300) and
+> > Timekeeping core will not allow to replace clocksource with new one if
+> > both of them have the same rating.
+> > 
+> > Reduce rating of OMAP GP Timer (300->290) when it's used as
+> > clocksource device - this will allow to select ARM Global timer (300)
+> > as clocksource when enabled.
+> > 
+> > Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> > Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> > Signed-off-by: Keerthy <j-keerthy@ti.com>
+> 
+> Unfortunately, this patch has dependency [1] and can't be used alone as
+> it will cause ARM Global timer to be selected as clocksource
+> always on am437x and this will kill cpuidle, because ARM Global timer
+> is not in always_on domain.
+> 
+> The intention of enabling ARM Global timer is only for non-pm aware use
+> cases for RT-kernel latency improvement - where deep cpuidle states are not
+> enabled.
 
-Commit 338d4f49d6f7 ("arm64: kernel: Add support for Privileged Access
-Never") enabled PAN by enabling the 'SPAN' feature-bit in SCTLR_EL1.
-This means the PSTATE.PAN bit won't be set until the next return to the
-kernel from userspace. On a preemptible kernel we may schedule work that
-accesses userspace on a CPU before it has done this.
+Yeah we need to fix up things to be able to change the clocksource
+in addition to clockevent. However, currently only cpuidle_coupled
+knows when the whole system is idle, so quite a bit of work is
+needed to do that in a sane way.
 
-Now that cpufeature enable() calls are scheduled via stop_machine(), we
-can set PSTATE.PAN from the cpu_enable_pan() call.
+What about the first patch in this series?
 
-Add WARN_ON_ONCE(in_interrupt()) to check the PSTATE value we updated
-is not immediately discarded.
+Regards,
 
-Reported-by: Tony Thompson <anthony.thompson@arm.com>
-Reported-by: Vladimir Murzin <vladimir.murzin@arm.com>
-Signed-off-by: James Morse <james.morse@arm.com>
-[will: fixed typo in comment]
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Tony
 
-Signed-off-by: James Morse <james.morse@arm.com>
-Cc: <stable@vger.kernel.org> # 4.4.35
----
- arch/arm64/mm/fault.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index d4634e6942ca..247bae758e1e 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -29,7 +29,9 @@
- #include <linux/sched.h>
- #include <linux/highmem.h>
- #include <linux/perf_event.h>
-+#include <linux/preempt.h>
- 
-+#include <asm/bug.h>
- #include <asm/cpufeature.h>
- #include <asm/exception.h>
- #include <asm/debug-monitors.h>
-@@ -608,7 +610,14 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
- #ifdef CONFIG_ARM64_PAN
- int cpu_enable_pan(void *__unused)
- {
-+	/*
-+	 * We modify PSTATE. This won't work from irq context as the PSTATE
-+	 * is discarded once we return from the exception.
-+	 */
-+	WARN_ON_ONCE(in_interrupt());
-+
- 	config_sctlr_el1(SCTLR_EL1_SPAN, 0);
-+	asm(SET_PSTATE_PAN(1));
- 	return 0;
- }
- #endif /* CONFIG_ARM64_PAN */
--- 
-2.10.1
+> [1] https://patchwork.kernel.org/patch/8940051/
+> 
+> > ---
+> >  arch/arm/mach-omap2/timer.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> > index b2f2448..a0dbb0b 100644
+> > --- a/arch/arm/mach-omap2/timer.c
+> > +++ b/arch/arm/mach-omap2/timer.c
+> > @@ -376,7 +376,7 @@ static cycle_t clocksource_read_cycles(struct clocksource *cs)
+> >  }
+> > 
+> >  static struct clocksource clocksource_gpt = {
+> > -	.rating		= 300,
+> > +	.rating		= 290,
+> >  	.read		= clocksource_read_cycles,
+> >  	.mask		= CLOCKSOURCE_MASK(32),
+> >  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+> > 
+> 
+> -- 
+> regards,
+> -grygorii
