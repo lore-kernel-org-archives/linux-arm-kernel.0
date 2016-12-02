@@ -1,32 +1,33 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Fri, 2 Dec 2016 15:10:01 +0100
-Subject: [PATCH 8/8] ARM: configs: stm32: Add STM32 RTC support in STM32
- defconfig
+Date: Fri, 2 Dec 2016 15:10:00 +0100
+Subject: [PATCH 7/8] ARM: dts: stm32: enable RTC on stm32429i-eval
 In-Reply-To: <1480687801-19525-2-git-send-email-amelie.delaunay@st.com>
 References: <1480687801-19525-2-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1480687801-19525-10-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1480687801-19525-9-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds STM32 RTC support in stm32_defconfig file.
+This patch enables RTC on stm32429i-eval with default LSE clock source.
 
 Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 ---
- arch/arm/configs/stm32_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/stm32429i-eval.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-index e7b56d4..71f9787 100644
---- a/arch/arm/configs/stm32_defconfig
-+++ b/arch/arm/configs/stm32_defconfig
-@@ -59,6 +59,8 @@ CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
- CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_STM32=y
- CONFIG_DMADEVICES=y
- CONFIG_STM32_DMA=y
- # CONFIG_FILE_LOCKING is not set
+diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
+index 8b158f9..5007da9 100644
+--- a/arch/arm/boot/dts/stm32429i-eval.dts
++++ b/arch/arm/boot/dts/stm32429i-eval.dts
+@@ -134,6 +134,10 @@
+ 	};
+ };
+ 
++&rtc {
++	status = "okay";
++};
++
+ &usart1 {
+ 	pinctrl-0 = <&usart1_pins_a>;
+ 	pinctrl-names = "default";
 -- 
 1.9.1
