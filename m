@@ -1,37 +1,27 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat, 3 Dec 2016 00:52:14 +0100
-Subject: [PATCH v2 0/7] stmmac: dwmac-meson8b: configurable RGMII TX delay
-In-Reply-To: <20161127.203324.1634866862730391239.davem@davemloft.net>
-References: <20161124143417.10178-1-martin.blumenstingl@googlemail.com>
- <20161125130156.17879-1-martin.blumenstingl@googlemail.com>
- <20161127.203324.1634866862730391239.davem@davemloft.net>
-Message-ID: <CAFBinCDHHT-eWoYmsVQyihcbrvoW=qP9MnG8hRfMfk4VRekS2w@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 02 Dec 2016 15:59:11 -0800
+Subject: [RESEND PATCH v2 0/7] drm/vc4: VEC (SDTV) output support
+In-Reply-To: <1480686493-4813-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1480686493-4813-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <877f7hrigg.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 28, 2016 at 2:33 AM, David Miller <davem@davemloft.net> wrote:
-> From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> Date: Fri, 25 Nov 2016 14:01:49 +0100
+Boris Brezillon <boris.brezillon@free-electrons.com> writes:
+
+> Sorry for the noise, but I forgot to Cc the DT maintainers.
 >
->> Currently the dwmac-meson8b stmmac glue driver uses a hardcoded 1/4
->> cycle TX clock delay. This seems to work fine for many boards (for
->> example Odroid-C2 or Amlogic's reference boards) but there are some
->> others where TX traffic is simply broken.
->> There are probably multiple reasons why it's working on some boards
->> while it's broken on others:
->> - some of Amlogic's reference boards are using a Micrel PHY
->> - hardware circuit design
->> - maybe more...
+> Here is the 2nd version of the VC4/VEC series.
 >
-> The ARM arch file changes do not apply cleanly to net-next, you probably
-> want to merge them via the ARM tree instead of mine, and respin this series
-> to be without the .dts file changes.
-done, v3 contains only the net-next changes while the dts changes can
-be found here: [0]
+> We still miss the two clock patches mentioned by Eric in the first
+> version to make the encoder work no matter the setting applied by the
+> bootloader.
 
-
-Regards,
-Martin
-
-
-[0] http://lists.infradead.org/pipermail/linux-amlogic/2016-December/001836.html
+I'm happy with the series and I'm just waiting for the DT ack.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161202/77c81c09/attachment.sig>
