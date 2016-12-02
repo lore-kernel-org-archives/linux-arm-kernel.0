@@ -1,32 +1,43 @@
 From: scott.branden@broadcom.com (Scott Branden)
-Date: Thu,  1 Dec 2016 16:19:59 -0800
-Subject: [RFC PATCH 2/2] arm64: defconfig: enable MEMORY_HOTPLUG config options
-In-Reply-To: <1480637999-4320-1-git-send-email-scott.branden@broadcom.com>
-References: <1480637999-4320-1-git-send-email-scott.branden@broadcom.com>
-Message-ID: <1480637999-4320-3-git-send-email-scott.branden@broadcom.com>
+Date: Thu,  1 Dec 2016 16:19:57 -0800
+Subject: [RFC PATCH 0/2] arm64: memory-hotplug: Add Memory Hotplug support
+Message-ID: <1480637999-4320-1-git-send-email-scott.branden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable memory hotplug config options to add/remove memory.
+This patchset is sent for comment to add memory hotplug support for ARM64
+based platforms.  It follows hotplug code added for other architectures
+in the linux kernel.
 
-Signed-off-by: Scott Branden <scott.branden@broadcom.com>
----
- arch/arm64/configs/defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+I tried testing the memory hotplug feature following documentation from
+Documentation/memory-hotplug.txt.  I don't think it is working as expected
+- see below:
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index dab2cb0..e801b37 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -73,6 +73,9 @@ CONFIG_PCIE_ARMADA_8K=y
- CONFIG_ARM64_VA_BITS_48=y
- CONFIG_SCHED_MC=y
- CONFIG_PREEMPT=y
-+CONFIG_MEMORY_HOTPLUG=y
-+CONFIG_MEMORY_HOTPLUG_DEFAULT_ONLINE=y
-+CONFIG_MEMORY_HOTREMOVE=y
- CONFIG_KSM=y
- CONFIG_TRANSPARENT_HUGEPAGE=y
- CONFIG_CMA=y
+To add memory to the system I did the following:
+echo 0x400000000 > /sys/devices/system/memory/probe
+
+The memory is displayed as system ram:
+cat /proc/iomem:
+74000000-77ffffff : System RAM
+  74080000-748dffff : Kernel code
+  74950000-749d2fff : Kernel data
+400000000-43fffffff : System RAM
+
+But does not seem to be added to the kernel memory.
+/proc/meminfo did not change.
+
+What else needs to be done so the memory is added to the kernel memory
+pool for normal allocation?
+
+Scott Branden (2):
+  arm64: memory-hotplug: Add MEMORY_HOTPLUG, MEMORY_HOTREMOVE,
+    MEMORY_PROBE
+  arm64: defconfig: enable MEMORY_HOTPLUG config options
+
+ arch/arm64/Kconfig           | 10 ++++++++++
+ arch/arm64/configs/defconfig |  3 +++
+ arch/arm64/mm/init.c         | 42 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 55 insertions(+)
+
 -- 
 2.5.0
