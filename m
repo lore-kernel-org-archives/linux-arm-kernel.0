@@ -1,60 +1,26 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Fri, 2 Dec 2016 14:57:02 +0100
-Subject: [PATCH 3/3] ARM: dts: stm32: enable ADC on stm32f429i-eval board
-In-Reply-To: <1480687022-12851-1-git-send-email-fabrice.gasnier@st.com>
-References: <1480687022-12851-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1480687022-12851-4-git-send-email-fabrice.gasnier@st.com>
+Date: Fri, 2 Dec 2016 14:56:59 +0100
+Subject: [PATCH 0/3] Enable ADC on STM32
+Message-ID: <1480687022-12851-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable analog to digital converter on stm32f429i-eval board.
-It has on-board potentimeter wired to ADC3 in8 analog pin and
-uses fixed regulator to provide reference voltage.
+Enable minimal configuration and device tree to support ADC on STM32,
+using ADC driver: https://lwn.net/Articles/706445/
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- arch/arm/boot/dts/stm32429i-eval.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+Simple test on stm32f429i-eval board, using on-board potentiometer:
+- cd /sys/bus/iio/devices/iio\:device0/
+- cat in_voltage8_raw
 
-diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
-index 13c7cd2..6be0a24 100644
---- a/arch/arm/boot/dts/stm32429i-eval.dts
-+++ b/arch/arm/boot/dts/stm32429i-eval.dts
-@@ -65,6 +65,20 @@
- 		serial0 = &usart1;
- 	};
- 
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_vref: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			regulator-name = "vref";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+		};
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 		green {
-@@ -123,3 +137,14 @@
- 	pinctrl-names = "default";
- 	status = "okay";
- };
-+
-+&adc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&adc3_in8_pin>;
-+	vref-supply = <&reg_vref>;
-+	status = "okay";
-+	adc3: adc at 200 {
-+		st,adc-channels = <8>;
-+		status = "okay";
-+	};
-+};
+Fabrice Gasnier (3):
+  ARM: configs: stm32: enable ADC driver
+  ARM: dts: stm32: Add ADC support to stm32f429
+  ARM: dts: stm32: enable ADC on stm32f429i-eval board
+
+ arch/arm/boot/dts/stm32429i-eval.dts | 25 ++++++++++++++++++
+ arch/arm/boot/dts/stm32f429.dtsi     | 49 ++++++++++++++++++++++++++++++++++++
+ arch/arm/configs/stm32_defconfig     |  5 ++++
+ 3 files changed, 79 insertions(+)
+
 -- 
 1.9.1
