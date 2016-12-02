@@ -1,124 +1,96 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 2 Dec 2016 10:19:39 +0200
-Subject: [PATCH 1/3] Documentation: dt: Add TI SCI clock driver
-In-Reply-To: <0fe81866-8bfd-f3a7-d808-9cb23841f504@ti.com>
-References: <1477053961-27128-1-git-send-email-t-kristo@ti.com>
- <1477053961-27128-2-git-send-email-t-kristo@ti.com>
- <20161030204121.qvb5d33dh65awwzx@rob-hp-laptop>
- <41c58712-bc00-ed05-9d1d-42e31397a70c@ti.com>
- <CAL_JsqLtSs6ifnMdEOsfXpGoWnmXuGAx83+ziB9yU+zurvob+A@mail.gmail.com>
- <0fe81866-8bfd-f3a7-d808-9cb23841f504@ti.com>
-Message-ID: <8579b123-f214-22f1-0236-e5b98ab51597@ti.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 2 Dec 2016 09:46:17 +0100
+Subject: XHCI controller does not detect USB key insertion
+Message-ID: <584134D9.5000404@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/11/16 10:14, Tero Kristo wrote:
-> On 18/11/16 19:20, Rob Herring wrote:
->> On Mon, Oct 31, 2016 at 7:50 AM, Tero Kristo <t-kristo@ti.com> wrote:
->>> On 30/10/16 22:41, Rob Herring wrote:
->>>>
->>>> On Fri, Oct 21, 2016 at 03:45:59PM +0300, Tero Kristo wrote:
->>>>>
->>>>> Add a clock implementation, TI SCI clock, that will hook to the common
->>>>> clock framework, and allow each clock to be controlled via TI SCI
->>>>> protocol.
->>>>>
->>>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>>>> ---
->>>>>  .../devicetree/bindings/clock/ti,sci-clk.txt       | 37
->>>>> ++++++++++++++++++++++
->>>>>  MAINTAINERS                                        |  1 +
->>>>>  2 files changed, 38 insertions(+)
->>>>>  create mode 100644
->>>>> Documentation/devicetree/bindings/clock/ti,sci-clk.txt
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
->>>>> b/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
->>>>> new file mode 100644
->>>>> index 0000000..bfc3ca4
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
->>>>> @@ -0,0 +1,37 @@
->>>>> +Texas Instruments TI-SCI Clocks
->>>>> +===============================
->>>>> +
->>>>> +All clocks on Texas Instruments' SoCs that contain a System
->>>>> Controller,
->>>>> +are only controlled by this entity. Communication between a host
->>>>> processor
->>>>> +running an OS and the System Controller happens through a protocol
->>>>> known
->>>>> +as TI-SCI[1]. This clock implementation plugs into the common clock
->>>>> +framework and makes use of the TI-SCI protocol on clock API requests.
->>>>> +
->>>>> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
->>>>> +
->>>>> +Required properties:
->>>>> +-------------------
->>>>> +- compatible: Must be "ti,k2g-sci-clk"
->>>>> +- #clock-cells: Shall be 2.
->>>>> +  In clock consumers, this cell represents the device ID and clock ID
->>>>> +  exposed by the PM firmware. The assignments can be found in the
->>>>> header
->>>>> +  files <dt-bindings/genpd/<soc>.h> (which covers the device IDs) and
->>>>> +  <dt-bindings/clock/<soc>.h> (which covers the clock IDs), where
->>>>> <soc>
->>>>> +  is the SoC involved, for example 'k2g'.
->>>>> +
->>>>> +Examples:
->>>>> +--------
->>>>> +
->>>>> +pmmc: pmmc {
->>>>> +       compatible = "ti,k2g-sci";
->>>>> +
->>>>> +       k2g_clks: k2g_clks {
->>>>
->>>>
->>>> Use "clocks" for node name instead.
->>>>
->>>>> +               compatible = "ti,k2g-sci-clk";
->>>>
->>>>
->>>> I'm starting to think all these child nodes for SCI are pointless. Is
->>>> there any reason why the parent node can't be the clock provider (along
->>>> with all the other providers it acks as)?
->>>
->>>
->>> I believe the only reason to keep them separate is to have kernel
->>> side of
->>> things modular. If we have separate nodes, the drivers can be probed
->>> separately.
->>>
->>> If not, we need to build one huge blob with all the features in it,
->>> so the
->>> main driver can probe everything in one go, with annoying back-and-forth
->>> callbacks in place (assuming we still want to keep stuff somehow
->>> modular.)
->>
->> Since when is DT the only way to create a device? The main driver can
->> create devices for all the sub-functions like clocks. This is the same
->> as MFDs which have been done both ways.
->
-> Yes obviously this can be done, my main point was that it will require
-> building some sort of infra within the driver to handle this. With
-> separate nodes, none of this is going to be needed. Also, we will lose
-> any kind of configurability via DT if we don't have separate nodes; now
-> we can select the available clocks / genpds via the compatible string of
-> the clocks/genpd nodes themselves (this isn't clearly evident as of now
-> as we only support a grand total of one device, which is k2g-evm.)
-> Otherwise we need to probe against the main node and add a separate
-> compatible string for every device, and carry this information to the
-> sibling devices also somehow. It is just so much simpler if we can just
-> keep separate nodes for them.
->
-> Also, plenty of things are doing this kind of stuff already in
-> DT/kernel, having a parent node in place and sub-functions added
-> separately for ease of use, with apparently no visible point for having
-> the nodes within the DT.
+Hello everyone,
 
-Rob, any response on this one? I see you have acked the reset part of 
-the bindings which is doing pretty much the same thing as the clock part 
-is doing here, namely adding child node under the main SCI node. Is it 
-okay to do this same for other parts of the TI SCI?
+I'm trying out a SoC with a brand new USB controller, which is (supposedly)
+a standard XHCI controller. In theory, I would just need to build the right
+driver, and everything would auto-magically work, right?
 
--Tero
+
+So my defconfig contains:
+
+CONFIG_USB=y
+CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+CONFIG_USB_XHCI_HCD=y
+CONFIG_USB_XHCI_PLATFORM=y
+CONFIG_USB_STORAGE=y
+CONFIG_USB_STORAGE_DEBUG=y
+
+
+And my device tree contains:
+
+	usb3 at 30040000 {
+		compatible = "generic-xhci";
+		reg = <0x30040000 0x10000>;
+		interrupts = <SIGMA_HWIRQ 67 IRQ_TYPE_LEVEL_HIGH>;
+	};
+
+
+The boot messages I get:
+
+[    1.618214] xhci-hcd 30040000.usb3: xHCI Host Controller
+[    1.623611] xhci-hcd 30040000.usb3: new USB bus registered, assigned bus number 1
+[    1.631181] reset function is xhci_plat_setup
+[    1.635588] xhci_plat_setup from usb_add_hcd
+[    1.640109] xhci-hcd 30040000.usb3: hcc params 0x30003192 hci version 0x100 quirks 0x00010010
+[    1.648766] xhci-hcd 30040000.usb3: irq 22, io mem 0x30040000
+[    1.654572] xhci_plat_start from usb_add_hcd
+[    1.659086] usb usb1: New USB device found, idVendor=1d6b, idProduct=0002
+[    1.665943] usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[    1.673228] usb usb1: Product: xHCI Host Controller
+[    1.678154] usb usb1: Manufacturer: Linux 4.7.0-rc6 xhci-hcd
+[    1.683865] usb usb1: SerialNumber: 30040000.usb3
+[    1.689391] hub 1-0:1.0: USB hub found
+[    1.693227] hub 1-0:1.0: 1 port detected
+[    1.697601] xhci-hcd 30040000.usb3: xHCI Host Controller
+[    1.702983] xhci-hcd 30040000.usb3: new USB bus registered, assigned bus number 2
+[    1.710545] reset function is xhci_plat_setup
+[    1.714950] xhci_plat_setup from usb_add_hcd
+[    1.719265] xhci_plat_start from usb_add_hcd
+[    1.723653] usb usb2: We don't know the algorithms for LPM for this host, disabling LPM.
+[    1.731956] usb usb2: New USB device found, idVendor=1d6b, idProduct=0003
+[    1.738814] usb usb2: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[    1.746100] usb usb2: Product: xHCI Host Controller
+[    1.751025] usb usb2: Manufacturer: Linux 4.7.0-rc6 xhci-hcd
+[    1.756736] usb usb2: SerialNumber: 30040000.usb3
+[    1.762195] hub 2-0:1.0: USB hub found
+[    1.766027] hub 2-0:1.0: 1 port detected
+[    1.770661] usbcore: registered new interface driver usb-storage
+[    1.784584] usbcore: registered new interface driver usbhid
+[    1.790213] usbhid: USB HID core driver
+
+Which looks encouraging, right?
+
+
+Am I supposed to have had USB interrupts at that point?
+
+# cat /proc/interrupts 
+           CPU0       CPU1       CPU2       CPU3       
+  20:        609        365        393        356     GIC-0  29 Edge      twd
+  21:        101          0          0          0      INTC   1 Level     serial
+  22:          0          0          0          0      INTC  67 Level     xhci-hcd:usb1
+IPI0:          0          0          0          0  CPU wakeup interrupts
+IPI1:          0          0          0          0  Timer broadcast interrupts
+IPI2:        794        620       1223       1045  Rescheduling interrupts
+IPI3:          0         37         37         37  Function call interrupts
+IPI4:          0          0          0          0  CPU stop interrupts
+IPI5:          0          0          0          0  IRQ work interrupts
+IPI6:          0          0          0          0  completion interrupts
+ Err:          0
+
+
+When I insert a USB key, nothing happens :-(
+
+# lsusb -v
+Bus 001 Device 001: ID 1d6b:0002
+Bus 002 Device 001: ID 1d6b:0003
+
+
+I'd like to hear suggestions about what I can tweak to fix the problem.
+
+Regards.
