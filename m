@@ -1,39 +1,64 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 02 Dec 2016 13:52:27 -0500 (EST)
-Subject: [PATCH v6 net-next 0/7] Support Armada 37xx SoC (ARMv8
- 64-bits) in mvneta driver
-In-Reply-To: <cover.dd374b7aaa358be0211d7ead81129a399fa692f4.1480611779.git-series.gregory.clement@free-electrons.com>
-References: <cover.dd374b7aaa358be0211d7ead81129a399fa692f4.1480611779.git-series.gregory.clement@free-electrons.com>
-Message-ID: <20161202.135227.1138440285760115646.davem@davemloft.net>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri,  2 Dec 2016 12:55:56 -0600
+Subject: [PATCH v11 2/7] arm: arm64: Add routine to determine cpuid of other
+ cpus
+In-Reply-To: <1480704961-6910-1-git-send-email-jeremy.linton@arm.com>
+References: <1480704961-6910-1-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1480704961-6910-3-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Date: Thu,  1 Dec 2016 18:03:03 +0100
+It is helpful if we can read the cpuid/midr of other CPUs
+in the system independent of arm/arm64.
 
-> The Armada 37xx is a new ARMv8 SoC from Marvell using same network
-> controller as the older Armada 370/38x/XP SoCs. This series adapts the
-> driver in order to be able to use it on this new SoC. The main changes
-> are:
-> 
-> - 64-bits support: the first patches allow using the driver on a 64-bit
->   architecture.
-> 
-> - MBUS support: the mbus configuration is different on Armada 37xx
->   from the older SoCs.
-> 
-> - per cpu interrupt: Armada 37xx do not support per cpu interrupt for
->   the NETA IP, the non-per-CPU behavior was added back.
-> 
-> The first patch is an optimization in the rx path in swbm mode.
-> The second patch remove unnecessary allocation for HWBM.
-> The first item is solved by patches 4 and 5.
-> The 2 last items are solved by patch 6.
-> In patch 7 the dt support is added.
-> 
-> Beside Armada 37xx, this series have been again tested on Armada XP
-> and Armada 38x (with Hardware Buffer Management and with Software
-> Buffer Management).
- ...
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ arch/arm/include/asm/cputype.h   | 4 ++++
+ arch/arm/kernel/setup.c          | 2 +-
+ arch/arm64/include/asm/cputype.h | 3 +++
+ 3 files changed, 8 insertions(+), 1 deletion(-)
 
-Series applied, thanks.
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index 522b5fe..1e87d06 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -235,6 +235,10 @@ static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
+ #define cpu_is_sa1100() (read_cpuid_part() == ARM_CPU_PART_SA1100)
+ #define cpu_is_sa1110() (read_cpuid_part() == ARM_CPU_PART_SA1110)
+ 
++#define read_specific_cpuid(cpu_num) (is_smp() ? \
++				      per_cpu_ptr(&cpu_data, cpu_num)->cpuid \
++				      : read_cpuid_id())
++
+ /*
+  * Intel's XScale3 core supports some v6 features (supersections, L2)
+  * but advertises itself as v5 as it does not support the v6 ISA.  For
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 34e3f3c..d443c97 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -1217,7 +1217,7 @@ static int c_show(struct seq_file *m, void *v)
+ 		 * "processor".  Give glibc what it expects.
+ 		 */
+ 		seq_printf(m, "processor\t: %d\n", i);
+-		cpuid = is_smp() ? per_cpu(cpu_data, i).cpuid : read_cpuid_id();
++		cpuid = read_specific_cpuid(i);
+ 		seq_printf(m, "model name\t: %s rev %d (%s)\n",
+ 			   cpu_name, cpuid & 15, elf_platform);
+ 
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 26a68dd..a6d26e1 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -124,6 +124,9 @@ static inline u32 __attribute_const__ read_cpuid_cachetype(void)
+ {
+ 	return read_cpuid(CTR_EL0);
+ }
++
++#define read_specific_cpuid(cpu_num) per_cpu_ptr(&cpu_data, cpu_num)->reg_midr
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif
+-- 
+2.5.5
