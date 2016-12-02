@@ -1,61 +1,212 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Fri, 02 Dec 2016 22:32:07 +0800
-Subject: [PATCH v2 2/3] ARM: dts: sunxi: add support for Orange Pi Zero
- board
-In-Reply-To: <efb30303-b9bb-7a7c-4478-af485991dd86@redhat.com>
-References: <20161121162421.800-1-icenowy@aosc.xyz>
- <20161121162421.800-2-icenowy@aosc.xyz> <5373671480239408@web31m.yandex.ru>
- <cdfd3c65-d473-badb-ea6a-035f7ab79217@arm.com>
- <20161201093619.gs6lmoxtlptp2jr6@lukather>
- <11498641480688550@web2g.yandex.ru>
- <efb30303-b9bb-7a7c-4478-af485991dd86@redhat.com>
-Message-ID: <11535601480689127@web2g.yandex.ru>
+From: christopher.spinrath@rwth-aachen.de (christopher.spinrath at rwth-aachen.de)
+Date: Fri, 2 Dec 2016 15:37:22 +0100
+Subject: [PATCH] ARM: dts: imx6q-utilite-pro: enable 2nd display pipeline
+Message-ID: <ec9676f344eb4786a28a3c7b969f0e94@rwthex-s1-b.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 
+Apart from the already enabled Designware HDMI port, the Utilite Pro
+has a second display pipeline which has the following shape:
 
-02.12.2016, 22:30, "Hans de Goede" <hdegoede@redhat.com>:
-> Hi,
->
-> On 02-12-16 15:22, Icenowy Zheng wrote:
->> ?01.12.2016, 17:36, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
->>> ?On Mon, Nov 28, 2016 at 12:29:07AM +0000, Andr? Przywara wrote:
->>>> ??> Something more interesting happened.
->>>> ??>
->>>> ??> Xunlong made a add-on board for Orange Pi Zero, which exposes the
->>>> ??> two USB Controllers exported at expansion bus as USB Type-A
->>>> ??> connectors.
->>>> ??>
->>>> ??> Also it exposes a analog A/V jack and a microphone.
->>>> ??>
->>>> ??> Should I enable {e,o}hci{2.3} in the device tree?
->>>>
->>>> ??Actually we should do this regardless of this extension board. The USB
->>>> ??pins are not multiplexed and are exposed on user accessible pins (just
->>>> ??not soldered, but that's a detail), so I think they qualify for DT
->>>> ??enablement. And even if a user can't use them, it doesn't hurt to have
->>>> ??them (since they are not multiplexed).
->>>
->>> ?My main concern about this is that we'll leave regulators enabled by
->>> ?default, for a minority of users. And that minority will prevent to do
->>> ?a proper power management when the times come since we'll have to keep
->>> ?that behaviour forever.
->>
->> ?I think these users can add a 'fdt set /xxx/xxx status "disabled" ' .
->
-> I don't think that will be necessary I'm pretty sure these extra usb
-> ports do not have a regulator for the Vbus, they just hook directly
-> to the 5V rail, can someone with a schematic check ?
+  IPU1 DI0 --> Parallel display --> tfp410 rgb24 to DVI encoder
+                                --> HDMI connector.
+Enable support for it.
 
-We seems to have still no schematics for the add-on board.
+In addition, since this pipeline is hardwired to IPU1, sever the link
+between IPU1 and the SoC-internal Designware HDMI encoder forcing the
+latter to be connected to IPU2 instead of IPU1. Otherwise, it is not
+possible to drive both displays at high resolution due to the bandwidth
+limitations of a single IPU.
 
-But something is sure is that there's no any regulator-related pins
-on the add-on pinout. There's only USB DM and DP pins.
+Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+---
 
-So the Vbus must be directly connected to +5V.
+Hi all,
 
->
-> Regards,
->
-> Hans
+the removal of the link between IPU1 and the Designware HDMI encoder is the
+result of a discussion I had with Philipp Zabel:
+
+  https://lists.freedesktop.org/archives/dri-devel/2016-November/125399.html .
+
+Altough it is not possible to connect anything else to IPU1 on the Utilite, this
+approach has at least one disadvantage: if the resolution is low enough such 
+that a single IPU can handle both displays then muxing both displays to IPU1
+would reduce the power consumption.
+
+However, IMHO omitting the link IPU1 <--> DW HDMI is still the preferrable
+solution since I'm not aware of any OS/driver that is capable of switching IPUs
+or can handle the bandwidth limitation in a sane way. In particular, Linux is
+unusable when both displays are supposed to be driven at high resolution and
+both muxing options for the DW HDMI are available (this is not a userspace
+issue; the system becomes almost unresponsive as soon as the kernel sets the
+initial resolution).
+
+Cheers,
+Christopher
+
+P.S.: this patch depends on the tfp410 bridge driver which has recently been
+merged into drm-next.
+
+ arch/arm/boot/dts/imx6q-utilite-pro.dts | 115 ++++++++++++++++++++++++++++++++
+ 1 file changed, 115 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+index 2200994..69bdd82 100644
+--- a/arch/arm/boot/dts/imx6q-utilite-pro.dts
++++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+@@ -59,6 +59,33 @@
+ 		rtc1 = &snvs_rtc;
+ 	};
+ 
++	encoder {
++		compatible = "ti,tfp410";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++
++				tfp410_in: endpoint {
++					remote-endpoint = <&parallel_display_out>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++
++				tfp410_out: endpoint {
++					remote-endpoint = <&hdmi_connector_in>;
++				};
++			};
++		};
++	};
++
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
+ 		pinctrl-names = "default";
+@@ -72,6 +99,19 @@
+ 		};
+ 	};
+ 
++	hdmi-connector {
++		compatible = "hdmi-connector";
++
++		type = "a";
++		ddc-i2c-bus = <&i2c_dvi_ddc>;
++
++		port {
++			hdmi_connector_in: endpoint {
++				remote-endpoint = <&tfp410_out>;
++			};
++		};
++	};
++
+ 	i2cmux {
+ 		compatible = "i2c-mux-gpio";
+ 		pinctrl-names = "default";
+@@ -105,8 +145,46 @@
+ 			#size-cells = <0>;
+ 		};
+ 	};
++
++	parallel-display {
++		compatible = "fsl,imx-parallel-display";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_ipu1>;
++
++		interface-pix-fmt = "rgb24";
++
++		port at 0 {
++			reg = <0>;
++
++			parallel_display_in: endpoint {
++				remote-endpoint = <&ipu1_di0_disp0>;
++			};
++		};
++
++		port at 1 {
++			reg = <1>;
++
++			parallel_display_out: endpoint {
++				remote-endpoint = <&tfp410_in>;
++			};
++		};
++	};
+ };
+ 
++/*
++ * A single IPU is not able to drive both display interfaces available on the
++ * Utilite Pro at high resolution due to its bandwidth limitation. Since the
++ * tfp410 encoder is wired up to IPU1, sever the link between IPU1 and the
++ * SoC-internal Designware HDMI encoder forcing the latter to be connected to
++ * IPU2 instead of IPU1.
++ */
++/delete-node/&ipu1_di0_hdmi;
++/delete-node/&hdmi_mux_0;
++/delete-node/&ipu1_di1_hdmi;
++/delete-node/&hdmi_mux_1;
++
+ &hdmi {
+ 	ddc-i2c-bus = <&i2c2>;
+ 	status = "okay";
+@@ -151,6 +229,39 @@
+ 		>;
+ 	};
+ 
++	pinctrl_ipu1: ipu1grp {
++		fsl,pins = <
++			MX6QDL_PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK 0x38
++			MX6QDL_PAD_DI0_PIN15__IPU1_DI0_PIN15       0x38
++			MX6QDL_PAD_DI0_PIN2__IPU1_DI0_PIN02        0x38
++			MX6QDL_PAD_DI0_PIN3__IPU1_DI0_PIN03        0x38
++			MX6QDL_PAD_DISP0_DAT0__IPU1_DISP0_DATA00   0x38
++			MX6QDL_PAD_DISP0_DAT1__IPU1_DISP0_DATA01   0x38
++			MX6QDL_PAD_DISP0_DAT2__IPU1_DISP0_DATA02   0x38
++			MX6QDL_PAD_DISP0_DAT3__IPU1_DISP0_DATA03   0x38
++			MX6QDL_PAD_DISP0_DAT4__IPU1_DISP0_DATA04   0x38
++			MX6QDL_PAD_DISP0_DAT5__IPU1_DISP0_DATA05   0x38
++			MX6QDL_PAD_DISP0_DAT6__IPU1_DISP0_DATA06   0x38
++			MX6QDL_PAD_DISP0_DAT7__IPU1_DISP0_DATA07   0x38
++			MX6QDL_PAD_DISP0_DAT8__IPU1_DISP0_DATA08   0x38
++			MX6QDL_PAD_DISP0_DAT9__IPU1_DISP0_DATA09   0x38
++			MX6QDL_PAD_DISP0_DAT10__IPU1_DISP0_DATA10  0x38
++			MX6QDL_PAD_DISP0_DAT11__IPU1_DISP0_DATA11  0x38
++			MX6QDL_PAD_DISP0_DAT12__IPU1_DISP0_DATA12  0x38
++			MX6QDL_PAD_DISP0_DAT13__IPU1_DISP0_DATA13  0x38
++			MX6QDL_PAD_DISP0_DAT14__IPU1_DISP0_DATA14  0x38
++			MX6QDL_PAD_DISP0_DAT15__IPU1_DISP0_DATA15  0x38
++			MX6QDL_PAD_DISP0_DAT16__IPU1_DISP0_DATA16  0x38
++			MX6QDL_PAD_DISP0_DAT17__IPU1_DISP0_DATA17  0x38
++			MX6QDL_PAD_DISP0_DAT18__IPU1_DISP0_DATA18  0x38
++			MX6QDL_PAD_DISP0_DAT19__IPU1_DISP0_DATA19  0x38
++			MX6QDL_PAD_DISP0_DAT20__IPU1_DISP0_DATA20  0x38
++			MX6QDL_PAD_DISP0_DAT21__IPU1_DISP0_DATA21  0x38
++			MX6QDL_PAD_DISP0_DAT22__IPU1_DISP0_DATA22  0x38
++			MX6QDL_PAD_DISP0_DAT23__IPU1_DISP0_DATA23  0x38
++		>;
++	};
++
+ 	pinctrl_uart2: uart2grp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_GPIO_7__UART2_TX_DATA 0x1b0b1
+@@ -194,6 +305,10 @@
+ 	};
+ };
+ 
++&ipu1_di0_disp0 {
++	remote-endpoint = <&parallel_display_in>;
++};
++
+ &pcie {
+ 	pcie at 0,0 {
+ 		reg = <0x000000 0 0 0 0>;
+-- 
+2.10.2
