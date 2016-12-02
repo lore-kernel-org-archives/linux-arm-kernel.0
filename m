@@ -1,847 +1,262 @@
-From: songjun.wu@microchip.com (Songjun Wu)
-Date: Fri, 2 Dec 2016 16:06:06 +0800
-Subject: [RFC][PATCH] [media] atmel-isc: add the isc pipeline function
-Message-ID: <1480665966-12588-1-git-send-email-songjun.wu@microchip.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Fri, 2 Dec 2016 03:08:34 -0500 (EST)
+Subject: [PATCH v3] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe
+ controller
+In-Reply-To: <CADaLND=fYXf-NOw7qm-KbDX3U3YrtAXRyQ+aj=CMcwmEaNHmpQ@mail.gmail.com>
+References: <1480549373-2123-1-git-send-email-dhdang@apm.com>
+ <20161201183350.GF30746@bhelgaas-glaptop.roam.corp.google.com>
+ <1480620053.4751.30.camel@redhat.com>
+ <20161201194114.GA8263@bhelgaas-glaptop.roam.corp.google.com>
+ <CADaLNDkVPRPSg0aU-sxHsiJbVvEn=LxcekDt6gfXBBhc+fzhjw@mail.gmail.com>
+ <20161201230736.GA17948@bhelgaas-glaptop.roam.corp.google.com>
+ <CADaLND=Ss8d-jv7wffbrtytrjj=SUnjDn9bognKUszhKguRV1A@mail.gmail.com>
+ <d77e403c-81e9-114e-6ec6-bbffaa4ac36f@redhat.com>
+ <cc77fe88-b36e-bb36-b5df-2934a88bea3c@redhat.com>
+ <CADaLND=fYXf-NOw7qm-KbDX3U3YrtAXRyQ+aj=CMcwmEaNHmpQ@mail.gmail.com>
+Message-ID: <879A81F2-E6AF-4FA2-9752-EEE7018B54D9@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Image Sensor Controller has an internal image processor.
-It can convert raw format to the other formats, like
-RGB565, YUV420P. A module parameter 'sensor_preferred'
-is used to enable or disable the pipeline function.
-Some v4l2 controls are added to tuning the image when
-the pipeline function is enabled.
+Quick reply - sorry for top posting (it's 3am...) - I would favor keeping the existing Fixed32Memory _CRS but switching over to prefer the PNP entry as a good citizen. The trouble is that it would be unfortunate if existing distros stopped working on newer firmware and it would lead to IMO more pain than it is worth. Hopefully for this reason Bjorn will take your v4 as-is for now and let us all figure out the cleanest long term cleanup later.
 
-Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
----
-
- drivers/media/platform/atmel/atmel-isc-regs.h |  77 ++++-
- drivers/media/platform/atmel/atmel-isc.c      | 460 +++++++++++++++++++++-----
- 2 files changed, 449 insertions(+), 88 deletions(-)
-
-diff --git a/drivers/media/platform/atmel/atmel-isc-regs.h b/drivers/media/platform/atmel/atmel-isc-regs.h
-index 00c4497..7d83342 100644
---- a/drivers/media/platform/atmel/atmel-isc-regs.h
-+++ b/drivers/media/platform/atmel/atmel-isc-regs.h
-@@ -72,30 +72,98 @@
- /* ISC White Balance Configuration Register */
- #define ISC_WB_CFG      0x0000005c
- 
-+/* ISC White Balance Offset for R, GR Register */
-+#define ISC_WB_O_RGR	0x00000060
-+
-+/* ISC White Balance Offset for B, GB Register */
-+#define ISC_WB_O_BGR	0x00000064
-+
-+/* ISC White Balance Gain for R, GR Register */
-+#define ISC_WB_G_RGR	0x00000068
-+
-+/* ISC White Balance Gain for B, GB Register */
-+#define ISC_WB_G_BGR	0x0000006c
-+
- /* ISC Color Filter Array Control Register */
- #define ISC_CFA_CTRL    0x00000070
- 
- /* ISC Color Filter Array Configuration Register */
- #define ISC_CFA_CFG     0x00000074
-+#define ISC_CFA_CFG_EITPOL	BIT(4)
- 
- #define ISC_BAY_CFG_GRGR	0x0
- #define ISC_BAY_CFG_RGRG	0x1
- #define ISC_BAY_CFG_GBGB	0x2
- #define ISC_BAY_CFG_BGBG	0x3
--#define ISC_BAY_CFG_MASK	GENMASK(1, 0)
- 
- /* ISC Color Correction Control Register */
- #define ISC_CC_CTRL     0x00000078
- 
-+/* ISC Color Correction RR RG Register */
-+#define ISC_CC_RR_RG	0x0000007c
-+
-+/* ISC Color Correction RB OR Register */
-+#define ISC_CC_RB_OR	0x00000080
-+
-+/* ISC Color Correction GR GG Register */
-+#define ISC_CC_GR_GG	0x00000084
-+
-+/* ISC Color Correction GB OG Register */
-+#define ISC_CC_GB_OG	0x00000088
-+
-+/* ISC Color Correction BR BG Register */
-+#define ISC_CC_BR_BG	0x0000008c
-+
-+/* ISC Color Correction BB OB Register */
-+#define ISC_CC_BB_OB	0x00000090
-+
- /* ISC Gamma Correction Control Register */
- #define ISC_GAM_CTRL    0x00000094
- 
-+/* ISC_Gamma Correction Blue Entry Register */
-+#define ISC_GAM_BENTRY	0x00000098
-+
-+/* ISC_Gamma Correction Green Entry Register */
-+#define ISC_GAM_GENTRY	0x00000198
-+
-+/* ISC_Gamma Correction Green Entry Register */
-+#define ISC_GAM_RENTRY	0x00000298
-+
- /* Color Space Conversion Control Register */
- #define ISC_CSC_CTRL    0x00000398
- 
-+/* Color Space Conversion YR YG Register */
-+#define ISC_CSC_YR_YG	0x0000039c
-+
-+/* Color Space Conversion YB OY Register */
-+#define ISC_CSC_YB_OY	0x000003a0
-+
-+/* Color Space Conversion CBR CBG Register */
-+#define ISC_CSC_CBR_CBG	0x000003a4
-+
-+/* Color Space Conversion CBB OCB Register */
-+#define ISC_CSC_CBB_OCB	0x000003a8
-+
-+/* Color Space Conversion CRR CRG Register */
-+#define ISC_CSC_CRR_CRG	0x000003ac
-+
-+/* Color Space Conversion CRB OCR Register */
-+#define ISC_CSC_CRB_OCR	0x000003b0
-+
- /* Contrast And Brightness Control Register */
- #define ISC_CBC_CTRL    0x000003b4
- 
-+/* Contrast And Brightness Configuration Register */
-+#define ISC_CBC_CFG	0x000003b8
-+
-+/* Brightness Register */
-+#define ISC_CBC_BRIGHT	0x000003bc
-+#define ISC_CBC_BRIGHT_MASK	GENMASK(10, 0)
-+
-+/* Contrast Register */
-+#define ISC_CBC_CONTRAST	0x000003c0
-+#define ISC_CBC_CONTRAST_MASK	GENMASK(11, 0)
-+
- /* Subsampling 4:4:4 to 4:2:2 Control Register */
- #define ISC_SUB422_CTRL 0x000003c4
- 
-@@ -159,7 +227,10 @@
- /* DMA Address 0 Register */
- #define ISC_DAD0        0x000003ec
- 
--/* DMA Stride 0 Register */
--#define ISC_DST0        0x000003f0
-+/* DMA Address 1 Register */
-+#define ISC_DAD1        0x000003f4
-+
-+/* DMA Address 2 Register */
-+#define ISC_DAD2        0x000003fc
- 
- #endif
-diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
-index fa68fe9..b06cbf6 100644
---- a/drivers/media/platform/atmel/atmel-isc.c
-+++ b/drivers/media/platform/atmel/atmel-isc.c
-@@ -36,7 +36,9 @@
- #include <linux/regmap.h>
- #include <linux/videodev2.h>
- 
-+#include <media/v4l2-ctrls.h>
- #include <media/v4l2-device.h>
-+#include <media/v4l2-event.h>
- #include <media/v4l2-image-sizes.h>
- #include <media/v4l2-ioctl.h>
- #include <media/v4l2-of.h>
-@@ -89,10 +91,12 @@ struct isc_subdev_entity {
-  * struct isc_format - ISC media bus format information
-  * @fourcc:		Fourcc code for this format
-  * @mbus_code:		V4L2 media bus format code.
-- * @bpp:		Bytes per pixel (when stored in memory)
-+ * @bpp:		Bits per pixel (when stored in memory)
-  * @reg_bps:		reg value for bits per sample
-  *			(when transferred over a bus)
-- * @support:		Indicates format supported by subdev
-+ * @pipeline:		pipeline switch
-+ * @sd_support:		Subdev supports this format
-+ * @isc_support:	ISC can convert raw format to this format
-  */
- struct isc_format {
- 	u32	fourcc;
-@@ -100,11 +104,19 @@ struct isc_format {
- 	u8	bpp;
- 
- 	u32	reg_bps;
-+	u32	reg_bay_cfg;
- 	u32	reg_rlp_mode;
- 	u32	reg_dcfg_imode;
- 	u32	reg_dctrl_dview;
- 
--	bool	support;
-+	u32	pipeline;
-+
-+	bool	sd_support;
-+	bool	isc_support;
-+};
-+
-+struct isc_ctrls {
-+	struct v4l2_ctrl_handler handler;
- };
- 
- #define ISC_PIPE_LINE_NODE_NUM	11
-@@ -131,6 +143,9 @@ struct isc_device {
- 	struct isc_format	**user_formats;
- 	unsigned int		num_user_formats;
- 	const struct isc_format	*current_fmt;
-+	const struct isc_format	*raw_fmt;
-+
-+	struct isc_ctrls	ctrls;
- 
- 	struct mutex		lock;
- 
-@@ -140,51 +155,134 @@ struct isc_device {
- 	struct list_head		subdev_entities;
- };
- 
-+#define RAW_FMT_INDEX_START	0
-+#define RAW_FMT_INDEX_END	11
-+#define ISC_FMT_INDEX_START	12
-+#define ISC_FMT_INDEX_END	14
-+
- static struct isc_format isc_formats[] = {
--	{ V4L2_PIX_FMT_SBGGR8, MEDIA_BUS_FMT_SBGGR8_1X8,
--	  1, ISC_PFE_CFG0_BPS_EIGHT, ISC_RLP_CFG_MODE_DAT8,
--	  ISC_DCFG_IMODE_PACKED8, ISC_DCTRL_DVIEW_PACKED, false },
--	{ V4L2_PIX_FMT_SGBRG8, MEDIA_BUS_FMT_SGBRG8_1X8,
--	  1, ISC_PFE_CFG0_BPS_EIGHT, ISC_RLP_CFG_MODE_DAT8,
--	  ISC_DCFG_IMODE_PACKED8, ISC_DCTRL_DVIEW_PACKED, false },
--	{ V4L2_PIX_FMT_SGRBG8, MEDIA_BUS_FMT_SGRBG8_1X8,
--	  1, ISC_PFE_CFG0_BPS_EIGHT, ISC_RLP_CFG_MODE_DAT8,
--	  ISC_DCFG_IMODE_PACKED8, ISC_DCTRL_DVIEW_PACKED, false },
--	{ V4L2_PIX_FMT_SRGGB8, MEDIA_BUS_FMT_SRGGB8_1X8,
--	  1, ISC_PFE_CFG0_BPS_EIGHT, ISC_RLP_CFG_MODE_DAT8,
--	  ISC_DCFG_IMODE_PACKED8, ISC_DCTRL_DVIEW_PACKED, false },
--
--	{ V4L2_PIX_FMT_SBGGR10, MEDIA_BUS_FMT_SBGGR10_1X10,
--	  2, ISC_PFG_CFG0_BPS_TEN, ISC_RLP_CFG_MODE_DAT10,
--	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, false },
--	{ V4L2_PIX_FMT_SGBRG10, MEDIA_BUS_FMT_SGBRG10_1X10,
--	  2, ISC_PFG_CFG0_BPS_TEN, ISC_RLP_CFG_MODE_DAT10,
--	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, false },
--	{ V4L2_PIX_FMT_SGRBG10, MEDIA_BUS_FMT_SGRBG10_1X10,
--	  2, ISC_PFG_CFG0_BPS_TEN, ISC_RLP_CFG_MODE_DAT10,
--	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, false },
--	{ V4L2_PIX_FMT_SRGGB10, MEDIA_BUS_FMT_SRGGB10_1X10,
--	  2, ISC_PFG_CFG0_BPS_TEN, ISC_RLP_CFG_MODE_DAT10,
--	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, false },
--
--	{ V4L2_PIX_FMT_SBGGR12, MEDIA_BUS_FMT_SBGGR12_1X12,
--	  2, ISC_PFG_CFG0_BPS_TWELVE, ISC_RLP_CFG_MODE_DAT12,
--	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, false },
--	{ V4L2_PIX_FMT_SGBRG12, MEDIA_BUS_FMT_SGBRG12_1X12,
--	  2, ISC_PFG_CFG0_BPS_TWELVE, ISC_RLP_CFG_MODE_DAT12,
--	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, false },
--	{ V4L2_PIX_FMT_SGRBG12, MEDIA_BUS_FMT_SGRBG12_1X12,
--	  2, ISC_PFG_CFG0_BPS_TWELVE, ISC_RLP_CFG_MODE_DAT12,
--	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, false },
--	{ V4L2_PIX_FMT_SRGGB12, MEDIA_BUS_FMT_SRGGB12_1X12,
--	  2, ISC_PFG_CFG0_BPS_TWELVE, ISC_RLP_CFG_MODE_DAT12,
--	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, false },
--
--	{ V4L2_PIX_FMT_YUYV, MEDIA_BUS_FMT_YUYV8_2X8,
--	  2, ISC_PFE_CFG0_BPS_EIGHT, ISC_RLP_CFG_MODE_DAT8,
--	  ISC_DCFG_IMODE_PACKED8, ISC_DCTRL_DVIEW_PACKED, false },
-+	{ V4L2_PIX_FMT_SBGGR8, MEDIA_BUS_FMT_SBGGR8_1X8, 8,
-+	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_DAT8,
-+	  ISC_DCFG_IMODE_PACKED8, ISC_DCTRL_DVIEW_PACKED, 0x0,
-+	  false, false },
-+	{ V4L2_PIX_FMT_SGBRG8, MEDIA_BUS_FMT_SGBRG8_1X8, 8,
-+	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_GBGB, ISC_RLP_CFG_MODE_DAT8,
-+	  ISC_DCFG_IMODE_PACKED8, ISC_DCTRL_DVIEW_PACKED, 0x0,
-+	  false, false },
-+	{ V4L2_PIX_FMT_SGRBG8, MEDIA_BUS_FMT_SGRBG8_1X8, 8,
-+	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_GRGR, ISC_RLP_CFG_MODE_DAT8,
-+	  ISC_DCFG_IMODE_PACKED8, ISC_DCTRL_DVIEW_PACKED, 0x0,
-+	  false, false },
-+	{ V4L2_PIX_FMT_SRGGB8, MEDIA_BUS_FMT_SRGGB8_1X8, 8,
-+	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_RGRG, ISC_RLP_CFG_MODE_DAT8,
-+	  ISC_DCFG_IMODE_PACKED8, ISC_DCTRL_DVIEW_PACKED, 0x0,
-+	  false, false },
-+
-+	{ V4L2_PIX_FMT_SBGGR10, MEDIA_BUS_FMT_SBGGR10_1X10, 16,
-+	  ISC_PFG_CFG0_BPS_TEN, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_DAT10,
-+	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x0,
-+	  false, false },
-+	{ V4L2_PIX_FMT_SGBRG10, MEDIA_BUS_FMT_SGBRG10_1X10, 16,
-+	  ISC_PFG_CFG0_BPS_TEN, ISC_BAY_CFG_GBGB, ISC_RLP_CFG_MODE_DAT10,
-+	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x0,
-+	  false, false },
-+	{ V4L2_PIX_FMT_SGRBG10, MEDIA_BUS_FMT_SGRBG10_1X10, 16,
-+	  ISC_PFG_CFG0_BPS_TEN, ISC_BAY_CFG_GRGR, ISC_RLP_CFG_MODE_DAT10,
-+	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x0,
-+	  false, false },
-+	{ V4L2_PIX_FMT_SRGGB10, MEDIA_BUS_FMT_SRGGB10_1X10, 16,
-+	  ISC_PFG_CFG0_BPS_TEN, ISC_BAY_CFG_RGRG, ISC_RLP_CFG_MODE_DAT10,
-+	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x0,
-+	  false, false },
-+
-+	{ V4L2_PIX_FMT_SBGGR12, MEDIA_BUS_FMT_SBGGR12_1X12, 16,
-+	  ISC_PFG_CFG0_BPS_TWELVE, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_DAT12,
-+	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x0,
-+	  false, false },
-+	{ V4L2_PIX_FMT_SGBRG12, MEDIA_BUS_FMT_SGBRG12_1X12, 16,
-+	  ISC_PFG_CFG0_BPS_TWELVE, ISC_BAY_CFG_GBGB, ISC_RLP_CFG_MODE_DAT12,
-+	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x0,
-+	  false, false },
-+	{ V4L2_PIX_FMT_SGRBG12, MEDIA_BUS_FMT_SGRBG12_1X12, 16,
-+	  ISC_PFG_CFG0_BPS_TWELVE, ISC_BAY_CFG_GRGR, ISC_RLP_CFG_MODE_DAT12,
-+	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x0,
-+	  false, false },
-+	{ V4L2_PIX_FMT_SRGGB12, MEDIA_BUS_FMT_SRGGB12_1X12, 16,
-+	  ISC_PFG_CFG0_BPS_TWELVE, ISC_BAY_CFG_RGRG, ISC_RLP_CFG_MODE_DAT12,
-+	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x0,
-+	  false, false },
-+
-+	{ V4L2_PIX_FMT_YUV420, 0x0, 12,
-+	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_YYCC,
-+	  ISC_DCFG_IMODE_YC420P | ISC_DCFG_YMBSIZE_BEATS8 |
-+	  ISC_DCFG_CMBSIZE_BEATS8, ISC_DCTRL_DVIEW_PLANAR, 0x7fb,
-+	  false, false },
-+	{ V4L2_PIX_FMT_YUV422P, 0x0, 16,
-+	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_YYCC,
-+	  ISC_DCFG_IMODE_YC422P | ISC_DCFG_YMBSIZE_BEATS8 |
-+	  ISC_DCFG_CMBSIZE_BEATS8, ISC_DCTRL_DVIEW_PLANAR, 0x3fb,
-+	  false, false },
-+	{ V4L2_PIX_FMT_RGB565, MEDIA_BUS_FMT_RGB565_2X8_LE, 16,
-+	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_RGB565,
-+	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x7b,
-+	  false, false },
-+
-+	{ V4L2_PIX_FMT_YUYV, MEDIA_BUS_FMT_YUYV8_2X8, 16,
-+	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_DAT8,
-+	  ISC_DCFG_IMODE_PACKED8, ISC_DCTRL_DVIEW_PACKED, 0x0,
-+	  false, false },
- };
- 
-+#define GAMMA_MAX	3
-+#define GAMMA_ENTRIES	64
-+
-+/* Gamma table with gamma 1/2.2 */
-+static const u32 isc_gamma_table[GAMMA_MAX][GAMMA_ENTRIES] = {
-+	/* 0 --> gamma 1/1.8 */
-+	{      0x65,  0x66002F,  0x950025,  0xBB0020,  0xDB001D,  0xF8001A,
-+	  0x1130018, 0x12B0017, 0x1420016, 0x1580014, 0x16D0013, 0x1810012,
-+	  0x1940012, 0x1A60012, 0x1B80011, 0x1C90010, 0x1DA0010, 0x1EA000F,
-+	  0x1FA000F, 0x209000F, 0x218000F, 0x227000E, 0x235000E, 0x243000E,
-+	  0x251000E, 0x25F000D, 0x26C000D, 0x279000D, 0x286000D, 0x293000C,
-+	  0x2A0000C, 0x2AC000C, 0x2B8000C, 0x2C4000C, 0x2D0000B, 0x2DC000B,
-+	  0x2E7000B, 0x2F3000B, 0x2FE000B, 0x309000B, 0x314000B, 0x31F000A,
-+	  0x32A000A, 0x334000B, 0x33F000A, 0x349000A, 0x354000A, 0x35E000A,
-+	  0x368000A, 0x372000A, 0x37C000A, 0x386000A, 0x3900009, 0x399000A,
-+	  0x3A30009, 0x3AD0009, 0x3B60009, 0x3BF000A, 0x3C90009, 0x3D20009,
-+	  0x3DB0009, 0x3E40009, 0x3ED0009, 0x3F60009 },
-+
-+	/* 1 --> gamma 1/2 */
-+	{      0x7F,  0x800034,  0xB50028,  0xDE0021, 0x100001E, 0x11E001B,
-+	  0x1390019, 0x1520017, 0x16A0015, 0x1800014, 0x1940014, 0x1A80013,
-+	  0x1BB0012, 0x1CD0011, 0x1DF0010, 0x1EF0010, 0x200000F, 0x20F000F,
-+	  0x21F000E, 0x22D000F, 0x23C000E, 0x24A000E, 0x258000D, 0x265000D,
-+	  0x273000C, 0x27F000D, 0x28C000C, 0x299000C, 0x2A5000C, 0x2B1000B,
-+	  0x2BC000C, 0x2C8000B, 0x2D3000C, 0x2DF000B, 0x2EA000A, 0x2F5000A,
-+	  0x2FF000B, 0x30A000A, 0x314000B, 0x31F000A, 0x329000A, 0x333000A,
-+	  0x33D0009, 0x3470009, 0x350000A, 0x35A0009, 0x363000A, 0x36D0009,
-+	  0x3760009, 0x37F0009, 0x3880009, 0x3910009, 0x39A0009, 0x3A30009,
-+	  0x3AC0008, 0x3B40009, 0x3BD0008, 0x3C60008, 0x3CE0008, 0x3D60009,
-+	  0x3DF0008, 0x3E70008, 0x3EF0008, 0x3F70008 },
-+
-+	/* 2 --> gamma 1/2.2 */
-+	{      0x99,  0x9B0038,  0xD4002A,  0xFF0023, 0x122001F, 0x141001B,
-+	  0x15D0019, 0x1760017, 0x18E0015, 0x1A30015, 0x1B80013, 0x1CC0012,
-+	  0x1DE0011, 0x1F00010, 0x2010010, 0x2110010, 0x221000F, 0x230000F,
-+	  0x23F000E, 0x24D000E, 0x25B000D, 0x269000C, 0x276000C, 0x283000C,
-+	  0x28F000C, 0x29B000C, 0x2A7000C, 0x2B3000B, 0x2BF000B, 0x2CA000B,
-+	  0x2D5000B, 0x2E0000A, 0x2EB000A, 0x2F5000A, 0x2FF000A, 0x30A000A,
-+	  0x3140009, 0x31E0009, 0x327000A, 0x3310009, 0x33A0009, 0x3440009,
-+	  0x34D0009, 0x3560009, 0x35F0009, 0x3680008, 0x3710008, 0x3790009,
-+	  0x3820008, 0x38A0008, 0x3930008, 0x39B0008, 0x3A30008, 0x3AB0008,
-+	  0x3B30008, 0x3BB0008, 0x3C30008, 0x3CB0007, 0x3D20008, 0x3DA0007,
-+	  0x3E20007, 0x3E90007, 0x3F00008, 0x3F80007 },
-+};
-+
-+static unsigned int sensor_preferred = 1;
-+module_param(sensor_preferred, uint, 0644);
-+MODULE_PARM_DESC(sensor_preferred,
-+		 "Sensor is preferred to output the specified format (1-on 0-off), default 1");
-+
- static int isc_clk_enable(struct clk_hw *hw)
- {
- 	struct isc_clk *isc_clk = to_isc_clk(hw);
-@@ -447,27 +545,95 @@ static int isc_buffer_prepare(struct vb2_buffer *vb)
- 	return 0;
- }
- 
--static inline void isc_start_dma(struct regmap *regmap,
--				  struct isc_buffer *frm, u32 dview)
-+static inline bool sensor_is_preferred(const struct isc_format *isc_fmt)
-+{
-+	if ((sensor_preferred && isc_fmt->sd_support) ||
-+	    !isc_fmt->isc_support)
-+		return true;
-+	else
-+		return false;
-+}
-+
-+static inline void isc_start_dma(struct isc_device *isc)
- {
--	dma_addr_t addr;
-+	struct regmap *regmap = isc->regmap;
-+	struct v4l2_pix_format *pixfmt = &isc->fmt.fmt.pix;
-+	u32 sizeimage = pixfmt->sizeimage;
-+	u32 dctrl_dview;
-+	dma_addr_t addr0;
-+
-+	addr0 = vb2_dma_contig_plane_dma_addr(&isc->cur_frm->vb.vb2_buf, 0);
-+	regmap_write(regmap, ISC_DAD0, addr0);
-+
-+	switch (pixfmt->pixelformat) {
-+	case V4L2_PIX_FMT_YUV420:
-+		regmap_write(regmap, ISC_DAD1, addr0 + (sizeimage*2)/3);
-+		regmap_write(regmap, ISC_DAD2, addr0 + (sizeimage*5)/6);
-+		break;
-+	case V4L2_PIX_FMT_YUV422P:
-+		regmap_write(regmap, ISC_DAD1, addr0 + sizeimage/2);
-+		regmap_write(regmap, ISC_DAD2, addr0 + (sizeimage*3)/4);
-+		break;
-+	}
- 
--	addr = vb2_dma_contig_plane_dma_addr(&frm->vb.vb2_buf, 0);
-+	if (sensor_is_preferred(isc->current_fmt))
-+		dctrl_dview = ISC_DCTRL_DVIEW_PACKED;
-+	else
-+		dctrl_dview = isc->current_fmt->reg_dctrl_dview;
- 
--	regmap_write(regmap, ISC_DCTRL, dview | ISC_DCTRL_IE_IS);
--	regmap_write(regmap, ISC_DAD0, addr);
-+	regmap_write(regmap, ISC_DCTRL, dctrl_dview | ISC_DCTRL_IE_IS);
- 	regmap_write(regmap, ISC_CTRLEN, ISC_CTRL_CAPTURE);
- }
- 
- static void isc_set_pipeline(struct isc_device *isc, u32 pipeline)
- {
--	u32 val;
-+	struct regmap *regmap = isc->regmap;
-+	u32 val, bay_cfg;
- 	unsigned int i;
- 
-+	/* WB-->CFA-->CC-->GAM-->CSC-->CBC-->SUB422-->SUB420 */
- 	for (i = 0; i < ISC_PIPE_LINE_NODE_NUM; i++) {
- 		val = pipeline & BIT(i) ? 1 : 0;
- 		regmap_field_write(isc->pipeline[i], val);
- 	}
-+
-+	if (!pipeline)
-+		return;
-+
-+	bay_cfg = isc->raw_fmt->reg_bay_cfg;
-+
-+	regmap_write(regmap, ISC_WB_CFG, bay_cfg);
-+	regmap_write(regmap, ISC_CFA_CFG, bay_cfg | ISC_CFA_CFG_EITPOL);
-+
-+	/* Convert RGB to YUV */
-+	regmap_write(regmap, ISC_CSC_YR_YG, 0x42 | (0x81 << 16));
-+	regmap_write(regmap, ISC_CSC_YB_OY, 0x19 | (0x10 << 16));
-+	regmap_write(regmap, ISC_CSC_CBR_CBG, 0xFDA | (0xFB6 << 16));
-+	regmap_write(regmap, ISC_CSC_CBB_OCB, 0x70 | (0x80 << 16));
-+	regmap_write(regmap, ISC_CSC_CRR_CRG, 0x70 | (0xFA2 << 16));
-+	regmap_write(regmap, ISC_CSC_CRB_OCR, 0xFEE | (0x80 << 16));
-+}
-+
-+static inline void isc_get_param(const struct isc_format *fmt,
-+				     u32 *rlp_mode, u32 *dcfg_imode)
-+{
-+	switch (fmt->fourcc) {
-+	case V4L2_PIX_FMT_SBGGR10:
-+	case V4L2_PIX_FMT_SGBRG10:
-+	case V4L2_PIX_FMT_SGRBG10:
-+	case V4L2_PIX_FMT_SRGGB10:
-+	case V4L2_PIX_FMT_SBGGR12:
-+	case V4L2_PIX_FMT_SGBRG12:
-+	case V4L2_PIX_FMT_SGRBG12:
-+	case V4L2_PIX_FMT_SRGGB12:
-+		*rlp_mode = fmt->reg_rlp_mode;
-+		*dcfg_imode = fmt->reg_dcfg_imode;
-+		break;
-+	default:
-+		*rlp_mode = ISC_RLP_CFG_MODE_DAT8;
-+		*dcfg_imode = ISC_DCFG_IMODE_PACKED8;
-+		break;
-+	}
- }
- 
- static int isc_configure(struct isc_device *isc)
-@@ -475,33 +641,42 @@ static int isc_configure(struct isc_device *isc)
- 	struct regmap *regmap = isc->regmap;
- 	const struct isc_format *current_fmt = isc->current_fmt;
- 	struct isc_subdev_entity *subdev = isc->current_subdev;
--	u32 val, mask;
--	int counter = 10;
-+	u32 pfe_cfg0, rlp_mode, dcfg_imode, sr, mask, pipeline;
-+	int counter = 100;
-+
-+	if (sensor_is_preferred(current_fmt)) {
-+		pfe_cfg0 = current_fmt->reg_bps;
-+		pipeline = 0x0;
-+		isc_get_param(current_fmt, &rlp_mode, &dcfg_imode);
-+	} else {
-+		pfe_cfg0  = isc->raw_fmt->reg_bps;
-+		pipeline = current_fmt->pipeline;
-+		rlp_mode = current_fmt->reg_rlp_mode;
-+		dcfg_imode = current_fmt->reg_dcfg_imode;
-+	}
- 
--	val = current_fmt->reg_bps | subdev->pfe_cfg0 |
--	      ISC_PFE_CFG0_MODE_PROGRESSIVE;
-+	pfe_cfg0  |= subdev->pfe_cfg0 | ISC_PFE_CFG0_MODE_PROGRESSIVE;
- 	mask = ISC_PFE_CFG0_BPS_MASK | ISC_PFE_CFG0_HPOL_LOW |
- 	       ISC_PFE_CFG0_VPOL_LOW | ISC_PFE_CFG0_PPOL_LOW |
- 	       ISC_PFE_CFG0_MODE_MASK;
- 
--	regmap_update_bits(regmap, ISC_PFE_CFG0, mask, val);
-+	regmap_update_bits(regmap, ISC_PFE_CFG0, mask, pfe_cfg0);
- 
- 	regmap_update_bits(regmap, ISC_RLP_CFG, ISC_RLP_CFG_MODE_MASK,
--			   current_fmt->reg_rlp_mode);
-+			   rlp_mode);
- 
--	regmap_update_bits(regmap, ISC_DCFG, ISC_DCFG_IMODE_MASK,
--			   current_fmt->reg_dcfg_imode);
-+	regmap_update_bits(regmap, ISC_DCFG, ISC_DCFG_IMODE_MASK, dcfg_imode);
- 
--	/* Disable the pipeline */
--	isc_set_pipeline(isc, 0x0);
-+	/* Set the pipeline */
-+	isc_set_pipeline(isc, pipeline);
- 
- 	/* Update profile */
- 	regmap_write(regmap, ISC_CTRLEN, ISC_CTRL_UPPRO);
- 
--	regmap_read(regmap, ISC_CTRLSR, &val);
--	while ((val & ISC_CTRL_UPPRO) && counter--) {
-+	regmap_read(regmap, ISC_CTRLSR, &sr);
-+	while ((sr & ISC_CTRL_UPPRO) && counter--) {
- 		usleep_range(1000, 2000);
--		regmap_read(regmap, ISC_CTRLSR, &val);
-+		regmap_read(regmap, ISC_CTRLSR, &sr);
- 	}
- 
- 	if (counter < 0)
-@@ -551,7 +726,7 @@ static int isc_start_streaming(struct vb2_queue *vq, unsigned int count)
- 					struct isc_buffer, list);
- 	list_del(&isc->cur_frm->list);
- 
--	isc_start_dma(regmap, isc->cur_frm, isc->current_fmt->reg_dctrl_dview);
-+	isc_start_dma(isc);
- 
- 	spin_unlock_irqrestore(&isc->dma_queue_lock, flags);
- 
-@@ -620,8 +795,7 @@ static void isc_buffer_queue(struct vb2_buffer *vb)
- 	if (!isc->cur_frm && list_empty(&isc->dma_queue) &&
- 		vb2_is_streaming(vb->vb2_queue)) {
- 		isc->cur_frm = buf;
--		isc_start_dma(isc->regmap, isc->cur_frm,
--			isc->current_fmt->reg_dctrl_dview);
-+		isc_start_dma(isc);
- 	} else
- 		list_add_tail(&buf->list, &isc->dma_queue);
- 	spin_unlock_irqrestore(&isc->dma_queue_lock, flags);
-@@ -691,13 +865,14 @@ static struct isc_format *find_format_by_fourcc(struct isc_device *isc,
- }
- 
- static int isc_try_fmt(struct isc_device *isc, struct v4l2_format *f,
--			struct isc_format **current_fmt)
-+			struct isc_format **current_fmt, u32 *code)
- {
- 	struct isc_format *isc_fmt;
- 	struct v4l2_pix_format *pixfmt = &f->fmt.pix;
- 	struct v4l2_subdev_format format = {
- 		.which = V4L2_SUBDEV_FORMAT_TRY,
- 	};
-+	u32 mbus_code;
- 	int ret;
- 
- 	if (f->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
-@@ -717,7 +892,12 @@ static int isc_try_fmt(struct isc_device *isc, struct v4l2_format *f,
- 	if (pixfmt->height > ISC_MAX_SUPPORT_HEIGHT)
- 		pixfmt->height = ISC_MAX_SUPPORT_HEIGHT;
- 
--	v4l2_fill_mbus_format(&format.format, pixfmt, isc_fmt->mbus_code);
-+	if (sensor_is_preferred(isc_fmt))
-+		mbus_code = isc_fmt->mbus_code;
-+	else
-+		mbus_code = isc->raw_fmt->mbus_code;
-+
-+	v4l2_fill_mbus_format(&format.format, pixfmt, mbus_code);
- 	ret = v4l2_subdev_call(isc->current_subdev->sd, pad, set_fmt,
- 			       isc->current_subdev->config, &format);
- 	if (ret < 0)
-@@ -726,12 +906,15 @@ static int isc_try_fmt(struct isc_device *isc, struct v4l2_format *f,
- 	v4l2_fill_pix_format(pixfmt, &format.format);
- 
- 	pixfmt->field = V4L2_FIELD_NONE;
--	pixfmt->bytesperline = pixfmt->width * isc_fmt->bpp;
-+	pixfmt->bytesperline = (pixfmt->width * isc_fmt->bpp) >> 3;
- 	pixfmt->sizeimage = pixfmt->bytesperline * pixfmt->height;
- 
- 	if (current_fmt)
- 		*current_fmt = isc_fmt;
- 
-+	if (code)
-+		*code = mbus_code;
-+
- 	return 0;
- }
- 
-@@ -741,14 +924,14 @@ static int isc_set_fmt(struct isc_device *isc, struct v4l2_format *f)
- 		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
- 	};
- 	struct isc_format *current_fmt;
-+	u32 mbus_code;
- 	int ret;
- 
--	ret = isc_try_fmt(isc, f, &current_fmt);
-+	ret = isc_try_fmt(isc, f, &current_fmt, &mbus_code);
- 	if (ret)
- 		return ret;
- 
--	v4l2_fill_mbus_format(&format.format, &f->fmt.pix,
--			      current_fmt->mbus_code);
-+	v4l2_fill_mbus_format(&format.format, &f->fmt.pix, mbus_code);
- 	ret = v4l2_subdev_call(isc->current_subdev->sd, pad,
- 			       set_fmt, NULL, &format);
- 	if (ret < 0)
-@@ -776,7 +959,7 @@ static int isc_try_fmt_vid_cap(struct file *file, void *priv,
- {
- 	struct isc_device *isc = video_drvdata(file);
- 
--	return isc_try_fmt(isc, f, NULL);
-+	return isc_try_fmt(isc, f, NULL, NULL);
- }
- 
- static int isc_enum_input(struct file *file, void *priv,
-@@ -842,7 +1025,10 @@ static int isc_enum_framesizes(struct file *file, void *fh,
- 	if (!isc_fmt)
- 		return -EINVAL;
- 
--	fse.code = isc_fmt->mbus_code;
-+	if (sensor_is_preferred(isc_fmt))
-+		fse.code = isc_fmt->mbus_code;
-+	else
-+		fse.code = isc->raw_fmt->mbus_code;
- 
- 	ret = v4l2_subdev_call(isc->current_subdev->sd, pad, enum_frame_size,
- 			       NULL, &fse);
-@@ -873,7 +1059,10 @@ static int isc_enum_frameintervals(struct file *file, void *fh,
- 	if (!isc_fmt)
- 		return -EINVAL;
- 
--	fie.code = isc_fmt->mbus_code;
-+	if (sensor_is_preferred(isc_fmt))
-+		fie.code = isc_fmt->mbus_code;
-+	else
-+		fie.code = isc->raw_fmt->mbus_code;
- 
- 	ret = v4l2_subdev_call(isc->current_subdev->sd, pad,
- 			       enum_frame_interval, NULL, &fie);
-@@ -911,6 +1100,10 @@ static const struct v4l2_ioctl_ops isc_ioctl_ops = {
- 	.vidioc_s_parm			= isc_s_parm,
- 	.vidioc_enum_framesizes		= isc_enum_framesizes,
- 	.vidioc_enum_frameintervals	= isc_enum_frameintervals,
-+
-+	.vidioc_log_status		= v4l2_ctrl_log_status,
-+	.vidioc_subscribe_event		= v4l2_ctrl_subscribe_event,
-+	.vidioc_unsubscribe_event	= v4l2_event_unsubscribe,
- };
- 
- static int isc_open(struct file *file)
-@@ -1007,8 +1200,7 @@ static irqreturn_t isc_interrupt(int irq, void *dev_id)
- 						     struct isc_buffer, list);
- 			list_del(&isc->cur_frm->list);
- 
--			isc_start_dma(regmap, isc->cur_frm,
--				      isc->current_fmt->reg_dctrl_dview);
-+			isc_start_dma(isc);
- 		}
- 
- 		if (isc->stop)
-@@ -1051,6 +1243,7 @@ static void isc_async_unbind(struct v4l2_async_notifier *notifier,
- 	video_unregister_device(&isc->video_dev);
- 	if (isc->current_subdev->config)
- 		v4l2_subdev_free_pad_config(isc->current_subdev->config);
-+	v4l2_ctrl_handler_free(&isc->ctrls.handler);
- }
- 
- static struct isc_format *find_format_by_code(unsigned int code, int *index)
-@@ -1081,7 +1274,9 @@ static int isc_formats_init(struct isc_device *isc)
- 
- 	fmt = &isc_formats[0];
- 	for (i = 0; i < ARRAY_SIZE(isc_formats); i++) {
--		fmt->support = false;
-+		fmt->isc_support = false;
-+		fmt->sd_support = false;
-+
- 		fmt++;
- 	}
- 
-@@ -1092,8 +1287,22 @@ static int isc_formats_init(struct isc_device *isc)
- 		if (!fmt)
- 			continue;
- 
--		fmt->support = true;
--		num_fmts++;
-+		fmt->sd_support = true;
-+
-+		if (i <= RAW_FMT_INDEX_END) {
-+			for (j = ISC_FMT_INDEX_START;
-+			     j <= ISC_FMT_INDEX_END; j++)
-+				isc_formats[j].isc_support = true;
-+
-+			isc->raw_fmt = fmt;
-+		}
-+	}
-+
-+	for (i = 0, num_fmts = 0; i < ARRAY_SIZE(isc_formats); i++) {
-+		if (fmt->isc_support || fmt->sd_support)
-+			num_fmts++;
-+
-+		fmt++;
- 	}
- 
- 	if (!num_fmts)
-@@ -1110,7 +1319,7 @@ static int isc_formats_init(struct isc_device *isc)
- 
- 	fmt = &isc_formats[0];
- 	for (i = 0, j = 0; i < ARRAY_SIZE(isc_formats); i++) {
--		if (fmt->support)
-+		if (fmt->isc_support || fmt->sd_support)
- 			isc->user_formats[j++] = fmt;
- 
- 		fmt++;
-@@ -1132,7 +1341,7 @@ static int isc_set_default_fmt(struct isc_device *isc)
- 	};
- 	int ret;
- 
--	ret = isc_try_fmt(isc, &f, NULL);
-+	ret = isc_try_fmt(isc, &f, NULL, NULL);
- 	if (ret)
- 		return ret;
- 
-@@ -1142,6 +1351,73 @@ static int isc_set_default_fmt(struct isc_device *isc)
- 	return 0;
- }
- 
-+static void isc_set_gamma(struct isc_device *isc, u32 index)
-+{
-+	const u32 *gamma = &isc_gamma_table[index][0];
-+	struct regmap *regmap = isc->regmap;
-+
-+	regmap_bulk_write(regmap, ISC_GAM_BENTRY, gamma, GAMMA_ENTRIES);
-+	regmap_bulk_write(regmap, ISC_GAM_GENTRY, gamma, GAMMA_ENTRIES);
-+	regmap_bulk_write(regmap, ISC_GAM_RENTRY, gamma, GAMMA_ENTRIES);
-+}
-+
-+static int isc_s_ctrl(struct v4l2_ctrl *ctrl)
-+{
-+	struct isc_device *isc = container_of(ctrl->handler,
-+					     struct isc_device, ctrls.handler);
-+
-+	switch (ctrl->id) {
-+	case V4L2_CID_BRIGHTNESS:
-+		regmap_write(isc->regmap, ISC_CBC_BRIGHT,
-+			     ctrl->val & ISC_CBC_BRIGHT_MASK);
-+		break;
-+	case V4L2_CID_CONTRAST:
-+		regmap_write(isc->regmap, ISC_CBC_CONTRAST,
-+			     (ctrl->val << 8) & ISC_CBC_CONTRAST_MASK);
-+		break;
-+	case V4L2_CID_GAMMA:
-+		isc_set_gamma(isc, ctrl->val);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct v4l2_ctrl_ops isc_ctrl_ops = {
-+	.s_ctrl	= isc_s_ctrl,
-+};
-+
-+static int isc_ctrl_init(struct isc_device *isc)
-+{
-+	const struct v4l2_ctrl_ops *ops = &isc_ctrl_ops;
-+	struct v4l2_ctrl_handler *hdl = &isc->ctrls.handler;
-+	int ret;
-+
-+	ret = v4l2_ctrl_handler_init(hdl, 3);
-+	if (ret < 0)
-+		return ret;
-+
-+	v4l2_ctrl_new_std(hdl, ops, V4L2_CID_BRIGHTNESS, -1024, 1023, 1, 0);
-+	v4l2_ctrl_new_std(hdl, ops, V4L2_CID_CONTRAST, -8, 7, 1, 1);
-+	v4l2_ctrl_new_std(hdl, ops, V4L2_CID_GAMMA, 0, GAMMA_MAX - 1, 1, 2);
-+
-+	v4l2_ctrl_handler_setup(hdl);
-+
-+	return 0;
-+}
-+
-+static void isc_regs_init(struct isc_device *isc)
-+{
-+	struct regmap *regmap = isc->regmap;
-+
-+	regmap_write(regmap, ISC_WB_O_RGR, 0x0);
-+	regmap_write(regmap, ISC_WB_O_BGR, 0x0);
-+	regmap_write(regmap, ISC_WB_G_RGR, 0x200 | (0x200 << 16));
-+	regmap_write(regmap, ISC_WB_G_BGR, 0x200 | (0x200 << 16));
-+}
-+
- static int isc_async_complete(struct v4l2_async_notifier *notifier)
- {
- 	struct isc_device *isc = container_of(notifier->v4l2_dev,
-@@ -1151,6 +1427,12 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
- 	struct vb2_queue *q = &isc->vb2_vidq;
- 	int ret;
- 
-+	ret = v4l2_device_register_subdev_nodes(&isc->v4l2_dev);
-+	if (ret < 0) {
-+		v4l2_err(&isc->v4l2_dev, "Failed to register subdev nodes\n");
-+		return ret;
-+	}
-+
- 	isc->current_subdev = container_of(notifier,
- 					   struct isc_subdev_entity, notifier);
- 	sd_entity = isc->current_subdev;
-@@ -1198,6 +1480,14 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
- 		return ret;
- 	}
- 
-+	ret = isc_ctrl_init(isc);
-+	if (ret) {
-+		v4l2_err(&isc->v4l2_dev, "Init isc ctrols failed: %d\n", ret);
-+		return ret;
-+	}
-+
-+	isc_regs_init(isc);
-+
- 	/* Register video device */
- 	strlcpy(vdev->name, ATMEL_ISC_NAME, sizeof(vdev->name));
- 	vdev->release		= video_device_release_empty;
-@@ -1207,7 +1497,7 @@ static int isc_async_complete(struct v4l2_async_notifier *notifier)
- 	vdev->vfl_dir		= VFL_DIR_RX;
- 	vdev->queue		= q;
- 	vdev->lock		= &isc->lock;
--	vdev->ctrl_handler	= isc->current_subdev->sd->ctrl_handler;
-+	vdev->ctrl_handler	= &isc->ctrls.handler;
- 	vdev->device_caps	= V4L2_CAP_STREAMING | V4L2_CAP_VIDEO_CAPTURE;
- 	video_set_drvdata(vdev, isc);
- 
 -- 
-2.7.4
+Computer Architect | Sent from my 64-bit #ARM Powered phone
+
+> On Dec 2, 2016, at 02:34, Duc Dang <dhdang@apm.com> wrote:
+> 
+>> On Thu, Dec 1, 2016 at 10:31 PM, Jon Masters <jcm@redhat.com> wrote:
+>> Bjorn,
+>> 
+>> Although I think the below still applies (that we need to leave that
+>> Memory32Fixed for existing deployments, and this is going to result
+>> in /proc/iomem polution), I've done some more reading of your ecam
+>> tree and the implementation of acpi_get_rc_resources you mentioned,
+>> and in particular how the PNP0C02 devices actually get wired up.
+>> 
+>> I would like to be able to boot upstream on existing shipping and
+>> deployed machines that are in the field (not to mention our labs), but
+>> there's no reason we can't *also* get APM to add a new vendor specific
+>> PNP0C02 to the ACPI namespace in future firmware updates (for at least
+>> their own Mustang reference boards) matching segment to CSR, as in the
+>> case of the HiSi patches. That might then allow for some later
+>> preference to use that for the CSR rather than getting it from the RC
+>> device. Still, it would be ideal to boot on machines that are shipping
+>> from HPE and others at this moment, so I am still hopeful you'll
+>> at least allow the approach from Duc's v4 for now (4.10).
+> 
+> APM X-Gene 1 and X-Gene 2 ACPI tables will absolutely have PNP0C02
+> nodes (in upcoming firmware release). I hope to have a solution that
+> works for both old buggy firmware and the future improved firmware. So
+> I am thinking the CSR discovery will be like this:
+> 
+> (1) Use  acpi_get_rc_resources() to discover CSR resource by checking
+> PNP0C02 nodes
+> (2) (1) should succeed with the new firmware
+> (3) If (1) fails, we can fall back to approach on v4 patch: calling
+> xgene_get_csr_resource() to discover the CSR described by
+> Memory32Fixed macro.
+> 
+> How do you feel about this? The drawback is the new firmware that does
+> not have the CSR space described with Memory32Fixed macro will fail on
+> the distro version that uses the old quirk (that relies on this
+> Memory32Fixed macro).
+> 
+>> 
+>> Another nasty option for later consideration could then be having
+>> the kernel fake up any missing PNP0C02 on existing machines, but
+>> it would need special knowledge of the platform to generate that
+>> so as to handle the problem Mark flagged earlier (segment vs
+>> controller mismatch on some platforms). That could be done with a
+>> DMI quirk that matched on a specific (e.g. HPE) machine. It would
+>> only be needed on "broken" existing machines, and could be added
+>> post-4.10 to clean this up if you really want to do that.
+> 
+> Bjorn suggested similar approach (have a PNP quirk to fabricate a
+> PNP0C02 device and decleare all the required resources there) on
+> another thread. But as you said, this approach does not scale, it can
+> only applicable for a specific machine (by checking DMI information to
+> apply the PNP quirk).
+> 
+>> 
+>> That's all very nasty...
+>> 
+>> Jon.
+>> 
+>>> On 12/01/2016 11:08 PM, Jon Masters wrote:
+>>> Hi Bjorn, Duc, Mark,
+>>> 
+>>> I switched my brain to the on mode and went and read some specs, and a few
+>>> tables, so here's my 2 cents on this...
+>>> 
+>>>> On 12/01/2016 06:22 PM, Duc Dang wrote:
+>>>>> On Thu, Dec 1, 2016 at 3:07 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+>>>>> On Thu, Dec 01, 2016 at 02:10:10PM -0800, Duc Dang wrote:
+>>> 
+>>>>>>>> The SoC provide some number of RC bridges, each with a different base
+>>>>>>>> for some mmio registers. Even if segment is legitimate in MCFG, there
+>>>>>>>> is still a problem if a platform doesn't use the segment ordering
+>>>>>>>> implied by the code. But the PNP0A03 _CRS does have this base address
+>>>>>>>> as the first memory resource, so we could get it from there and not
+>>>>>>>> have hard-coded addresses and implied ording in the quirk code.
+>>>>>>> 
+>>>>>>> I'm confused.  Doesn't the current code treat every item in PNP0A03
+>>>>>>> _CRS as a window?  Do you mean the first resource is handled
+>>>>>>> differently somehow?  The Consumer/Producer bit could allow us to do
+>>>>>>> this by marking the RC MMIO space as "Consumer", but I didn't think
+>>>>>>> that strategy was quite working yet.
+>>> 
+>>> Let's see if I summarized this correctly...
+>>> 
+>>> 1. The MMIO registers for the host bridge itself need to be described
+>>>   somewhere, especially if we need to find those in a quirk and poke
+>>>   them. Since those registers are very much part of the bridge device,
+>>>   it makes sense for them to be in the _CRS for PNP0A08/PNP0A03.
+>>> 
+>>> 2. The address space covering these registers MUST be described as a
+>>>   ResourceConsumer in order to avoid accidentally exposing them as
+>>>   available for use by downstream devices on the PCI bus.
+>>> 
+>>> 3. The ACPI specification allows for resources of the type "Memory32Fixed".
+>>>   This is a macro that doesn't have the notion of a producer or consumer.
+>>>   HOWEVER various interpretations seem to be that this could/should
+>>>   default to being interpreted as a consumed region.
+>>> 
+>>> 4. At one point, a regression was added to the kernel:
+>>> 
+>>>   63f1789ec716 ("x86/PCI/ACPI: Ignore resources consumed by
+>>>   host bridge itself")
+>>> 
+>>>   Which lead to a series on conversations about what should happen
+>>>   for bridge resources (e.g. https://lkml.org/lkml/2015/3/24/962 )
+>>> 
+>>> 5. This resulted in the following commit reverting point 4:
+>>> 
+>>>   2c62e8492ed7 ("x86/PCI/ACPI: Make all resources except [io 0xcf8-0xcff]
+>>>   available on PCI bus")
+>>> 
+>>>   Which also stated that:
+>>> 
+>>>   "This solution will also ease the way to consolidate ACPI PCI host
+>>>    bridge common code from x86, ia64 and ARM64"
+>>> 
+>>> End of summary.
+>>> 
+>>> So it seems that generally there is an aversion to having bridge resources
+>>> be described in this manner and you would like to require that they be
+>>> described e.g. using QWordMemory with a ResourceConsumer type?
+>>> 
+>>> BUT if we were to do that, it would break existing shipping systems since
+>>> there are quirks out there that use this form to find the base CSR:
+>>> 
+>>>       if (acpi_res->type == ACPI_RESOURCE_TYPE_FIXED_MEMORY32) {
+>>>                fixed32 = &acpi_res->data.fixed_memory32;
+>>>                port->csr_base = ioremap(fixed32->address,
+>>>                                         fixed32->address_length);
+>>>                return AE_CTRL_TERMINATE;
+>>>        }
+>>> 
+>>> That's what's shipping in at least RHEL(SA) today, and probably in other
+>>> distros. So if we get vendors to take that out, existing stuff will break,
+>>> which will have the downside that customers will have to choose between
+>>> whether to run a given distro or be able to use upstream kernels. In
+>>> that sense, to me, there are shipping platforms out there, which may well
+>>> be doing the "wrong" thing, but they are deployed and they are doing it.
+>>> 
+>>> Which makes me wonder a couple of things (I think should NOT be done):
+>>> 
+>>> 1. What would happen if we had both. A FixedMemory32 and the same region
+>>>   described again using the longer form as a consumed region. I doubt
+>>>   that's legal, and the current code would still add the region if it
+>>>   saw the FixedMemory32 first when walking the tree. I don't like it,
+>>>   but I'm mentioning it in case that leads to some helpful thinking.
+>>> 
+>>> 2. What would happen if we had a difference policy on arm64 for such
+>>>   resources. x86 has an "exception" for accessing the config space
+>>>   using IO port 0xCF8-0xCFF (a fairly reasonable exception!) and
+>>>   we can make the rules for a new platform (i.e. actually prescribe
+>>>   exactly what the behavior is, rather than have it not be defined).
+>>>   This is of course terrible in that existing BIOS vendors and so on
+>>>   won't necessarily know this when working on ARM ACPI later on.
+>>> 
+>>> I don't like either of these obviously. I'm hoping there's some way we
+>>> can say that this is tolerated in this one quirk (allow the use of
+>>> FixedMemory32 in this case) on the grounds that the driver claims
+>>> this bridge region and can be annotated to explain such.
+>>> 
+>>> Once you let us know what you prefer, we will go and update the ARM
+>>> SBBR to spell out that future platforms should not make this mistake
+>>> again. We can prescribe whatever you'd like in terms of how bridge
+>>> resources consumed by the bridge are exposed. I have spoken about
+>>> this kind of situation within MS in the past, but they didn't have
+>>> specific guidance since they don't really tolerate such quirks. I
+>>> can, however, consult them before we change the SBBR as well.
+>>> 
+>>>>>> The first resource is defined like below. It was introduced long time
+>>>>>> ago to use with older version of X-Gene ECAM quirks.
+>>>>>> Memory32Fixed(ReadWrite, 0x1F2B0000, 0x10000, )
+>>> 
+>>> Indeed. And in the case of m400, it is currently this in shipping systems:
+>>> 
+>>>               Memory32Fixed (ReadWrite,
+>>>                    0x1F500000,         // Address Base
+>>>                    0x00010000,         // Address Length
+>>>                    )
+>>> 
+>>> The spec isn't clear on whether these are produced or consumed but the
+>>> implication is that these are consumed resources in most cases. Not that
+>>> this changes any of the above, but one can understand why it happened.
+>>> 
+>>>>>> [    0.822990] pci_bus 0000:00: root bus resource [mem 0x1f2b0000-0x1f2bffff]
+>>>>> 
+>>>>> I think this is wrong.  The PCI core thinks [mem 0x1f2b0000-0x1f2bffff]
+>>>>> is available for use by devices on bus 0000:00, but I think you're
+>>>>> saying it is consumed by the bridge itself, not forwarded down to PCI.
+>>> 
+>>> Indeed.
+>>> 
+>>>>> What's in your /proc/iomem?  I see that your quirks do call
+>>>>> devm_ioremap_resource(), which calls devm_request_mem_region()
+>>>>> internally, so the driver does at least request that region, which
+>>>>> should keep us from assigning it to PCI devices.
+>>> 
+>>> I'm hoping you can grant an exception on the grounds that the quirk will
+>>> keep the region from actually being used. And then somehow we document
+>>> this in the driver.
+>>> 
+>>>>> But it still isn't quite right to tell the PCI core that the region is
+>>>>> available on the root bus.
+>>>> 
+>>>> This is /proc/iomem output on my Mustang board. The 64K "PCIe CSR"
+>>>> region is consumed completely.
+>>>> 1f2b0000-1f2bffff : PCI Bus 0000:00
+>>>>  1f2b0000-1f2bffff : PCIe CSR
+>>>> 
+>>>> e040000000-e07fffffff : PCI Bus 0000:00
+>>>>  e040000000-e0401fffff : PCI Bus 0000:01
+>>>>    e040000000-e0400fffff : 0000:01:00.0
+>>>>      e040000000-e0400fffff : mlx4_core
+>>>>    e040100000-e0401fffff : 0000:01:00.0
+>>>> e0d0000000-e0dfffffff : PCI ECAM
+>>>> f000000000-ffffffffff : PCI Bus 0000:00
+>>>>  f000000000-f001ffffff : PCI Bus 0000:01
+>>>>    f000000000-f001ffffff : 0000:01:00.0
+>>>>      f000000000-f001ffffff : mlx4_core
+>>>> 
+>>>> Using hard-coded resources for mmio space make the quirk rely on the
+>>>> segment number passing from the firmware. Using Mark's method or
+>>>> acpi_get_rc_resource can discover the mmio space and consume all of
+>>>> the space, but as you mentioned, it leaves the defect that PCI core
+>>>> considers the mmio space as available resource for secondary devices
+>>>> although it will never allocate the mmio space to secondary devices as
+>>>> the RC already reserves and consumes all of the space.
+>>> 
+>>> Indeed. It's not clean, but perhaps we can get away with it on the
+>>> grounds that there are existing systems out there and this won't
+>>> be allowed to happen again in the future :)
+>>> 
+>>> Jon.
+>>> 
+>> 
+>> 
+>> --
+>> Computer Architect | Sent from my Fedora powered laptop
