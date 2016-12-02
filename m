@@ -1,97 +1,30 @@
-From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Fri,  2 Dec 2016 13:52:36 +0800
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 2 Dec 2016 11:30:00 +0530
 Subject: [PATCH v2] arm64: dts: zx: support cpu-freq for zx296718
-Message-ID: <1480657956-8140-1-git-send-email-baoyou.xie@linaro.org>
+In-Reply-To: <CA+DQWkzGOzn1TRa9041Jjksj-=509XWXS_U1uaaJXNydB8Apow@mail.gmail.com>
+References: <1480657956-8140-1-git-send-email-baoyou.xie@linaro.org>
+ <CA+DQWkzGOzn1TRa9041Jjksj-=509XWXS_U1uaaJXNydB8Apow@mail.gmail.com>
+Message-ID: <20161202060000.GE7682@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the CPU clock phandle in CPU's node
-and uses operating-points-v2 to register operating points.
+On 02-12-16, 13:58, Baoyou Xie wrote:
+> + Viresh, the author of the bindings.
+> 
+> On 2 December 2016 at 13:52, Baoyou Xie <baoyou.xie@linaro.org> wrote:
+> 
+> > This patch adds the CPU clock phandle in CPU's node
+> > and uses operating-points-v2 to register operating points.
+> >
+> > So it can be used by cpufreq-dt driver.
+> >
+> > Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> > ---
+> >  arch/arm64/boot/dts/zte/zx296718.dtsi | 39 ++++++++++++++++++++++++++++++
+> > +++++
+> >  1 file changed, 39 insertions(+)
 
-So it can be used by cpufreq-dt driver.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
----
- arch/arm64/boot/dts/zte/zx296718.dtsi | 39 +++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/zte/zx296718.dtsi b/arch/arm64/boot/dts/zte/zx296718.dtsi
-index 7a1aed7..b44d1d1 100644
---- a/arch/arm64/boot/dts/zte/zx296718.dtsi
-+++ b/arch/arm64/boot/dts/zte/zx296718.dtsi
-@@ -44,6 +44,7 @@
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/clock/zx296718-clock.h>
- 
- / {
- 	compatible = "zte,zx296718";
-@@ -81,6 +82,8 @@
- 			compatible = "arm,cortex-a53","arm,armv8";
- 			reg = <0x0 0x0>;
- 			enable-method = "psci";
-+			clocks = <&topcrm A53_GATE>;
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
- 
- 		cpu1: cpu at 1 {
-@@ -88,6 +91,8 @@
- 			compatible = "arm,cortex-a53","arm,armv8";
- 			reg = <0x0 0x1>;
- 			enable-method = "psci";
-+			clocks = <&topcrm A53_GATE>;
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
- 
- 		cpu2: cpu at 2 {
-@@ -95,6 +100,8 @@
- 			compatible = "arm,cortex-a53","arm,armv8";
- 			reg = <0x0 0x2>;
- 			enable-method = "psci";
-+			clocks = <&topcrm A53_GATE>;
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
- 
- 		cpu3: cpu at 3 {
-@@ -102,6 +109,38 @@
- 			compatible = "arm,cortex-a53","arm,armv8";
- 			reg = <0x0 0x3>;
- 			enable-method = "psci";
-+			clocks = <&topcrm A53_GATE>;
-+			operating-points-v2 = <&cluster0_opp>;
-+		};
-+	};
-+
-+	cluster0_opp: opp-table0 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 500000000 {
-+			opp-hz = /bits/ 64 <500000000>;
-+			clock-latency-ns = <500000>;
-+		};
-+
-+		opp at 648000000 {
-+			opp-hz = /bits/ 64 <648000000>;
-+			clock-latency-ns = <500000>;
-+		};
-+
-+		opp at 800000000 {
-+			opp-hz = /bits/ 64 <800000000>;
-+			clock-latency-ns = <500000>;
-+		};
-+
-+		opp at 1000000000 {
-+			opp-hz = /bits/ 64 <1000000000>;
-+			clock-latency-ns = <500000>;
-+		};
-+
-+		opp at 1188000000 {
-+			opp-hz = /bits/ 64 <1188000000>;
-+			clock-latency-ns = <500000>;
- 		};
- 	};
- 
 -- 
-2.7.4
+viresh
