@@ -1,58 +1,55 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri,  2 Dec 2016 15:05:28 +0000
-Subject: [RFC v3 PATCH 10/25] ARM: NOMMU: implement secondary_startup_arm
+Date: Fri,  2 Dec 2016 15:05:31 +0000
+Subject: [RFC v3 PATCH 13/25] ARM: sleep: allow it to be build for R-class
 In-Reply-To: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
 References: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1480691143-19845-11-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1480691143-19845-14-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mediatek's and Qualcomm's platform code has reference to
-secondary_startup_arm and that breaks NOMMU build.
+cpu_resume_arm was guarded with CONFIG_MMU in 2678bb9fa13 (ARM: fix
+EFM32 build breakage caused by cpu_resume_arm) in response to broken
+build for EFM32 platform which has M-class cpu. It turned out that
+this dependency on MMU is quite strict and prevent R-class from being
+built.
 
-Since head-nommu.S is common, we need to take extra care of M-class
-platforms since there are no ARM instructions avaliable there. Even
-though secondary_startup_arm is build it in SMP configuration only
-(which is not supported by M-class) it'd be better to be on the safe
-side and handle Thumb-only case there - keep in Thumb mode and fall
-through to secondary_startup.
+The root cause of build breakage for M-class is that there is no ARM
+instructions supported there. So instead of limiting cpu_resume_arm to
+MMU only build, lets handle M-class case properly - keep in Thumb mode
+and fall through to cpu_resume.
 
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/kernel/head-nommu.S |   13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+ arch/arm/kernel/sleep.S |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index ae80c71..f5bb554 100644
---- a/arch/arm/kernel/head-nommu.S
-+++ b/arch/arm/kernel/head-nommu.S
-@@ -88,7 +88,17 @@ ENTRY(stext)
- ENDPROC(stext)
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index 0f6c100..41b512d 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -119,7 +119,10 @@ ENDPROC(cpu_resume_after_mmu)
+ 	.text
+ 	.align
  
- #ifdef CONFIG_SMP
--	.text
+-#ifdef CONFIG_MMU
 +#ifdef CONFIG_CPU_THUMBONLY
 +	.thumb
-+ENTRY(secondary_startup_arm)
++ENTRY(cpu_resume_arm)
 +#else
-+	.arm
-+ENTRY(secondary_startup_arm)
-+	THUMB(	badr	r9, 1f		)	@ Kernel is entered in ARM.
-+	THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
-+	THUMB(	.thumb			)	@ switch to Thumb now.
-+	THUMB(1:			)
-+#endif
- ENTRY(secondary_startup)
- 	/*
- 	 * Common entry point for secondary CPUs.
-@@ -126,6 +136,7 @@ ENTRY(secondary_startup)
- 	mov	fp, #0
- 	b	secondary_start_kernel
- ENDPROC(secondary_startup)
-+ENDPROC(secondary_startup_arm)
+ 	.arm
+ ENTRY(cpu_resume_arm)
+  THUMB(	badr	r9, 1f		)	@ Kernel is entered in ARM.
+@@ -159,10 +162,7 @@ THUMB(	ldmia	r0!, {r1, r2, r3}	)
+ THUMB(	mov	sp, r2			)
+ THUMB(	bx	r3			)
+ ENDPROC(cpu_resume)
+-
+-#ifdef CONFIG_MMU
+ ENDPROC(cpu_resume_arm)
+-#endif
  
- 	.type	__secondary_data, %object
- __secondary_data:
+ 	.align 2
+ _sleep_save_sp:
 -- 
 1.7.9.5
