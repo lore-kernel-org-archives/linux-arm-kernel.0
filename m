@@ -1,89 +1,91 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 2 Dec 2016 13:59:04 +0000
-Subject: [PATCH v3 5/7] IIO: add bindings for stm32 timer trigger driver
-In-Reply-To: <1480673842-20804-6-git-send-email-benjamin.gaignard@st.com>
-References: <1480673842-20804-1-git-send-email-benjamin.gaignard@st.com>
- <1480673842-20804-6-git-send-email-benjamin.gaignard@st.com>
-Message-ID: <20161202135904.GN2683@dell>
+From: mhocko@suse.com (Michal Hocko)
+Date: Fri, 2 Dec 2016 14:56:43 +0100
+Subject: [PATCH v2 3/6] mm: hugetlb: change the return type for
+ alloc_fresh_gigantic_page
+In-Reply-To: <1479107259-2011-4-git-send-email-shijie.huang@arm.com>
+References: <1479107259-2011-1-git-send-email-shijie.huang@arm.com>
+ <1479107259-2011-4-git-send-email-shijie.huang@arm.com>
+Message-ID: <20161202135643.GK6830@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 02 Dec 2016, Benjamin Gaignard wrote:
+On Mon 14-11-16 15:07:36, Huang Shijie wrote:
+> This patch changes the return type to "struct page*" for
+> alloc_fresh_gigantic_page().
 
-> Define bindings for stm32 timer trigger
+OK, this makes somme sense. Other hugetlb allocation function (and page
+allocator in general) return struct page as well. Besides that int would
+make sense if we wanted to convey an error code but 0 vs. 1 just doesn't
+make any sense.
+
+But if you are changing that then alloc_fresh_huge_page should be
+changed as well.
+
+> This patch makes preparation for later patch.
 > 
-> version 3:
-> - change file name
-> - add cross reference with mfd bindings
-> 
-> version 2:
-> - only keep one compatible
-> - add DT parameters to set lists of the triggers:
->   one list describe the triggers created by the device
->   another one give the triggers accepted by the device
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+
+Acked-by: Michal Hocko <mhocko@suse.com>
+
 > ---
->  .../bindings/iio/timer/stm32-timer-trigger.txt     | 39 ++++++++++++++++++++++
->  1 file changed, 39 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+>  mm/hugetlb.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
-> new file mode 100644
-> index 0000000..858816d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
-> @@ -0,0 +1,39 @@
-> +timer trigger bindings for STM32
-> +
-> +Must be a sub-node of STM32 general purpose timer driver
-> +Parent node properties are describe in ../mfd/stm32-general-purpose-timer.txt
-> +
-> +Required parameters:
-> +- compatible:		must be "st,stm32-iio-timer"
-> +- interrupts:		Interrupt for this device
-> +			See ../interrupt-controller/st,stm32-exti.txt
-> +
-> +Optional parameters:
-> +- st,input-triggers-names:	List of the possible input triggers for
-> +				the device
-> +- st,output-triggers-names:	List of the possible output triggers for
-> +				the device
-> +
-> +Possible triggers are defined in include/dt-bindings/iio/timer/st,stm32-timer-trigger.h
-> +
-> +Example:
-> +	gptimer1: gptimer1 at 40010000 {
-> +		compatible = "st,stm32-gptimer";
-> +		reg = <0x40010000 0x400>;
-> +		clocks = <&rcc 0 160>;
-> +		clock-names = "clk_int";
-> +
-> +		timer1 at 0 {
-> +			compatible = "st,stm32-timer-trigger";
-> +			interrupts = <27>;
-> +			st,input-triggers-names = TIM5_TRGO,
-> +						  TIM2_TRGO,
-> +						  TIM4_TRGO,
-> +						  TIM3_TRGO;
-> +			st,output-triggers-names = TIM1_TRGO,
-> +						   TIM1_CH1,
-> +						   TIM1_CH2,
-> +						   TIM1_CH3,
-> +						   TIM1_CH4;
-
-I see why you've done it like this now ... because it makes things
-easier for you in the driver, since the IIO subsystem matches on names
-such as these.
-
-BUT, this is a Linux-implementation-ism.  Just use pairs of integers
-and create the Linux-ism strings in the driver.
-
-> +		};
-> +	};
+> diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+> index db0177b..6995087 100644
+> --- a/mm/hugetlb.c
+> +++ b/mm/hugetlb.c
+> @@ -1142,7 +1142,7 @@ static struct page *alloc_fresh_gigantic_page_node(struct hstate *h,
+>  	return page;
+>  }
+>  
+> -static int alloc_fresh_gigantic_page(struct hstate *h,
+> +static struct page *alloc_fresh_gigantic_page(struct hstate *h,
+>  				nodemask_t *nodes_allowed, bool no_init)
+>  {
+>  	struct page *page = NULL;
+> @@ -1151,10 +1151,10 @@ static int alloc_fresh_gigantic_page(struct hstate *h,
+>  	for_each_node_mask_to_alloc(h, nr_nodes, node, nodes_allowed) {
+>  		page = alloc_fresh_gigantic_page_node(h, node, no_init);
+>  		if (page)
+> -			return 1;
+> +			return page;
+>  	}
+>  
+> -	return 0;
+> +	return NULL;
+>  }
+>  
+>  static inline bool gigantic_page_supported(void) { return true; }
+> @@ -1167,8 +1167,8 @@ static inline bool gigantic_page_supported(void) { return false; }
+>  static inline void free_gigantic_page(struct page *page, unsigned int order) { }
+>  static inline void destroy_compound_gigantic_page(struct page *page,
+>  						unsigned int order) { }
+> -static inline int alloc_fresh_gigantic_page(struct hstate *h,
+> -		nodemask_t *nodes_allowed, bool no_init) { return 0; }
+> +static inline struct page *alloc_fresh_gigantic_page(struct hstate *h,
+> +		nodemask_t *nodes_allowed, bool no_init) { return NULL; }
+>  #endif
+>  
+>  static void update_and_free_page(struct hstate *h, struct page *page)
+> @@ -2315,7 +2315,7 @@ static unsigned long set_max_huge_pages(struct hstate *h, unsigned long count,
+>  		cond_resched();
+>  
+>  		if (hstate_is_gigantic(h))
+> -			ret = alloc_fresh_gigantic_page(h, nodes_allowed,
+> +			ret = !!alloc_fresh_gigantic_page(h, nodes_allowed,
+>  							false);
+>  		else
+>  			ret = alloc_fresh_huge_page(h, nodes_allowed);
+> -- 
+> 2.5.5
+> 
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Michal Hocko
+SUSE Labs
