@@ -1,36 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 02 Dec 2016 17:30:24 +0100
-Subject: [PATCH 2/2] arm64: dts: juno: fix cluster sleep state entry
- latency on all SoC versions
-In-Reply-To: <ed75f674-feaf-9c4b-a995-3e815054918d@arm.com>
-References: <1479317491-7435-1-git-send-email-sudeep.holla@arm.com>
- <1479317491-7435-2-git-send-email-sudeep.holla@arm.com>
- <ed75f674-feaf-9c4b-a995-3e815054918d@arm.com>
-Message-ID: <2147537.n9PO7PDDnn@wuerfel>
+From: fweimer@redhat.com (Florian Weimer)
+Date: Fri, 2 Dec 2016 17:34:33 +0100
+Subject: [RFC PATCH 00/29] arm64: Scalable Vector Extension core support
+In-Reply-To: <20161202114850.GQ1574@e103592.cambridge.arm.com>
+References: <20161130120654.GJ1574@e103592.cambridge.arm.com>
+ <3e8afc5a-1ba9-6369-462b-4f5a707d8b8a@redhat.com>
+ <20161202114850.GQ1574@e103592.cambridge.arm.com>
+Message-ID: <faabab1d-fafb-2bd1-200f-b0e3ba17e1d5@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 1, 2016 10:11:24 AM CET Sudeep Holla wrote:
-> On 16/11/16 17:31, Sudeep Holla wrote:
-> > The core and the cluster sleep state entry latencies can't be same as
-> > cluster sleep involves more work compared to core level e.g. shared
-> > cache maintenance.
-> >
-> > Experiments have shown on an average about 100us more latency for the
-> > cluster sleep state compared to the core level sleep. This patch fixes
-> > the entry latency for the cluster sleep state.
-> >
-> > Fixes: 28e10a8f3a03 ("arm64: dts: juno: Add idle-states to device tree")
-> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: "Jon Medhurst (Tixy)" <tixy@linaro.org>
-> > Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> 
-> You missed to pick up this, I posted this along with vexpress config bus
-> fix. Sorry for the confusion, I feel pull request are better/easier to
-> track than single patches. I will send PR from next time if also prefer
-> that. Let me know.
+On 12/02/2016 12:48 PM, Dave Martin wrote:
+> On Wed, Nov 30, 2016 at 01:38:28PM +0100, Florian Weimer wrote:
+>
+> [...]
+>
+>> We could add a system call to get the right stack size.  But as it depends
+>> on VL, I'm not sure what it looks like.  Particularly if you need determine
+>> the stack size before creating a thread that uses a specific VL setting.
+>
+> I missed this point previously -- apologies for that.
+>
+> What would you think of:
+>
+> 	set_vl(vl_for_new_thread);
+> 	minsigstksz = get_minsigstksz();
+> 	set_vl(my_vl);
+>
+> This avoids get_minsigstksz() requiring parameters -- which is mainly a
+> concern because the parameters tomorrow might be different from the
+> parameters today.
+>
+> If it is possible to create the new thread without any SVE-dependent code,
+> then we could
+>
+> 	set_vl(vl_for_new_thread);
+> 	new_thread_stack = malloc(get_minsigstksz());
+> 	new_thread = create_thread(..., new_thread_stack);
+> 	set_vl(my_vl);
+>
+> which has the nice property that the new thread directly inherits the
+> configuration that was used for get_minsigstksz().
 
-Ok, I've applied that to the 4.9-fixes branch. Thanks for double-checking.
+Because all SVE registers are caller-saved, it's acceptable to 
+temporarily reduce the VL value, I think.  So this should work.
 
-	Arnd
+One complication is that both the kernel and the libc need to reserve 
+stack space, so the kernel-returned value and the one which has to be 
+used in reality will be different.
+
+> However, it would be necessary to prevent GCC from moving any code
+> across these statements -- in particular, SVE code that access VL-
+> dependent data spilled on the stack is liable to go wrong if reordered
+> with the above.  So the sequence would need to go in an external
+> function (or a single asm...)
+
+I would talk to GCC folks?we have similar issues with changing the FPU 
+rounding mode, I assume.
+
+Thanks,
+Florian
