@@ -1,47 +1,196 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 2 Dec 2016 11:51:26 +0000
-Subject: [RFC PATCH] PCI: designware: add host_init() error handling
-In-Reply-To: <f2c8ebba-e51a-5f47-2d96-c75f7e086c0e@synopsys.com>
-References: <1480593077-15402-1-git-send-email-srinivas.kandagatla@linaro.org>
- <f2c8ebba-e51a-5f47-2d96-c75f7e086c0e@synopsys.com>
-Message-ID: <d416f9b3-20d9-0339-a4d2-9a4ba0669633@linaro.org>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Fri, 2 Dec 2016 20:11:26 +0800
+Subject: [PATCH 1/2] Add crypto driver support for some MediaTek chips
+In-Reply-To: <20161202081836.GA20128@Red>
+References: <1480649205-52695-1-git-send-email-ryder.lee@mediatek.com>
+ <1480649205-52695-2-git-send-email-ryder.lee@mediatek.com>
+ <20161202081836.GA20128@Red>
+Message-ID: <1480680686.15580.27.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
+On Fri, 2016-12-02 at 09:18 +0100, Corentin Labbe wrote:
+> Hello
+> 
+> I have some minor comment inline
+> 
+> On Fri, Dec 02, 2016 at 11:26:44AM +0800, Ryder Lee wrote:
+> > This adds support for the MediaTek hardware accelerator on
+> > mt7623/mt2701/mt8521p SoC.
+> > 
+> > This driver currently implement:
+> > - SHA1 and SHA2 family(HMAC) hash alogrithms.
+> > - AES block cipher in CBC/ECB mode with 128/196/256 bits keys.
+> 
+> I see also a PRNG but is seems not really used.
 
-On 02/12/16 10:32, Joao Pinto wrote:
->
-> Hi Srinivas,
->
-> ?s 11:51 AM de 12/1/2016, Srinivas Kandagatla escreveu:
->>  drivers/pci/host/pci-dra7xx.c           |  4 +++-
->>  drivers/pci/host/pci-exynos.c           |  4 +++-
->>  drivers/pci/host/pci-imx6.c             |  4 +++-
->>  drivers/pci/host/pci-keystone.c         |  4 +++-
->>  drivers/pci/host/pci-layerscape.c       | 12 ++++++++----
->>  drivers/pci/host/pcie-armada8k.c        |  4 +++-
->>  drivers/pci/host/pcie-designware-plat.c |  4 +++-
->>  drivers/pci/host/pcie-designware.c      |  4 +++-
->>  drivers/pci/host/pcie-designware.h      |  2 +-
->>  drivers/pci/host/pcie-qcom.c            |  6 ++++--
->>  drivers/pci/host/pcie-spear13xx.c       |  4 +++-
->>  11 files changed, 37 insertions(+), 15 deletions(-)
->>
->
-> Thanks for the patch!
->
-> In my opinion your idea is good but only qcom driver is able to detect failure
-> in the specific host init routine, all others have a 'return 0' even if
-> something not well init. I would recomend that we take this issue a bit further
-> and add the error checking to all specific pci drivers in order to make them as
-> robust as qcom'.
-I totally agree with you, I can give this a go in next version.
+Yes, PRNG is not implemented yet, i will remove it temporarily.
 
-Thanks,
-srini
+> > 
+> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> > ---
+> >  drivers/crypto/Kconfig                 |   17 +
+> >  drivers/crypto/Makefile                |    1 +
+> >  drivers/crypto/mediatek/Makefile       |    2 +
+> >  drivers/crypto/mediatek/mtk-aes.c      |  734 +++++++++++++++++
+> >  drivers/crypto/mediatek/mtk-platform.c |  575 +++++++++++++
+> >  drivers/crypto/mediatek/mtk-platform.h |  230 ++++++
+> >  drivers/crypto/mediatek/mtk-regs.h     |  194 +++++
+> >  drivers/crypto/mediatek/mtk-sha.c      | 1384
+++++++++++++++++++++++++++++++++
+> >  8 files changed, 3137 insertions(+)
+> >  create mode 100644 drivers/crypto/mediatek/Makefile
+> >  create mode 100644 drivers/crypto/mediatek/mtk-aes.c
+> >  create mode 100644 drivers/crypto/mediatek/mtk-platform.c
+> >  create mode 100644 drivers/crypto/mediatek/mtk-platform.h
+> >  create mode 100644 drivers/crypto/mediatek/mtk-regs.h
+> >  create mode 100644 drivers/crypto/mediatek/mtk-sha.c
+> > 
+> > diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+> > index 4d2b81f..5d9c803 100644
+> > --- a/drivers/crypto/Kconfig
+> > +++ b/drivers/crypto/Kconfig
+> > @@ -553,6 +553,23 @@ config CRYPTO_DEV_ROCKCHIP
+> >       This driver interfaces with the hardware crypto accelerator.
+> >       Supporting cbc/ecb chainmode, and aes/des/des3_ede cipher
+mode.
+> >  
+> > +config CRYPTO_DEV_MEDIATEK
+> > +   tristate "MediaTek's Cryptographic Engine driver"
+> > +   depends on ARM && ARCH_MEDIATEK
+> > +   select NEON
+> > +   select KERNEL_MODE_NEON
+> > +   select ARM_CRYPTO
+> > +   select CRYPTO_AES
+> > +   select CRYPTO_BLKCIPHER
+> > +   select CRYPTO_SHA1_ARM_NEON
+> > +   select CRYPTO_SHA256_ARM
+> > +   select CRYPTO_SHA512_ARM
+> > +   select CRYPTO_HMAC
+> 
+> Why do you select accelerated algos ?
+> Adding COMPILE_TEST could be helpfull also.
 
->
-> Thanks,
-> Joao
->
+Our Hardware has complex procedure on calculate HMAC, and it get a bad
+performance.... So i decide to use ARM NEON instruction as fallback to
+speedup it.
+I will add COMPILE_TEST.
+
+> [...]
+> > +
+> > +#include <linux/dma-mapping.h>
+> > +#include <linux/scatterlist.h>
+> > +#include <crypto/scatterwalk.h>
+> > +#include <crypto/algapi.h>
+> > +#include <crypto/aes.h>
+> > +#include "mtk-platform.h"
+> > +#include "mtk-regs.h"
+> > +
+> 
+> Sort headers in alphabetical order
+> 
+> [...]
+> > +
+> > +   mtk_aes_unregister_algs();
+> > +   mtk_aes_record_free(cryp);
+> > +}
+> > +EXPORT_SYMBOL(mtk_cipher_alg_release);
+> 
+> Why not EXPORT_SYMBOL_GPL ?
+> Furthermore do you really need it to be exported ?
+
+My mistake. I will remove it.
+
+> [...]
+> > +
+> > +#include <linux/init.h>
+> > +#include <linux/module.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/mfd/syscon.h>
+> > +#include <linux/pm_runtime.h>
+> > +#include <linux/clk.h>
+> > +#include <linux/platform_device.h>
+> > +#include "mtk-platform.h"
+> > +#include "mtk-regs.h"
+> > +
+> 
+> Sort headers in alphabetical order
+> 
+> [...]
+> > +
+> > +static void mtk_prng_reseed(struct mtk_cryp *cryp)
+> > +{
+> > +   /* 8 words to seed the PRNG to provide IVs */
+> > +   void __iomem *base = cryp->base;
+> > +   const u32 prng_key[8] = {0x48c24cfd, 0x6c07f742,
+> > +                           0xaee75681, 0x0f27c239,
+> > +                           0x79947198, 0xe2991275,
+> > +                           0x21ac3c7c, 0xd008c4b4};
+> 
+> Why do you seed with thoses constant ?
+> 
+> [...]
+> > +
+> > +static int mtk_accelerator_init(struct mtk_cryp *cryp)
+> > +{
+> > +   int i, err;
+> > +
+> > +   /* Initialize advanced interrupt controller(AIC) */
+> > +   for (i = 0; i < 5; i++) {
+> 
+> I see this 5 for interrupt away, so perhaps a define could be used
+> 
+> [...]
+> 
+> here 
+> 
+> > +   for (i = 0; i < 5; i++) {
+> > +           cryp->irq[i] = platform_get_irq(pdev, i);
+> > +           if (cryp->irq[i] < 0) {
+> > +                   dev_err(cryp->dev, "no IRQ:%d resource info\n",
+i);
+> > +                   return -ENXIO;
+> > +           }
+> > +   }
+> [...]
+
+> > +#ifndef __MTK_PLATFORM_H_
+> > +#define __MTK_PLATFORM_H_
+> > +
+> > +#include <linux/crypto.h>
+> > +#include <crypto/internal/hash.h>
+> > +#include <linux/interrupt.h>
+> 
+> Sort headers in alphabetical order
+> 
+> [...]
+> > +#define MTK_DESC_FIRST             BIT(23)
+> > +#define MTK_DESC_BUF_LEN(x)        ((x) & 0x1ffff)
+> > +#define MTK_DESC_CT_LEN(x) (((x) & 0xff) << 24)
+> > +
+> > +#define WORD(x)                    ((x) >> 2)
+> 
+> dangerous and ambigous define
+
+I will define a IRQ_NUM and modify ambiguous definition.
+
+> [...]
+> > +
+> > +#include <linux/dma-mapping.h>
+> > +#include <linux/scatterlist.h>
+> > +#include <linux/crypto.h>
+> > +#include <crypto/scatterwalk.h>
+> > +#include <crypto/algapi.h>
+> > +#include <crypto/sha.h>
+> > +#include <crypto/internal/hash.h>
+> 
+> Sort headers in alphabetical order
+> [...]
+> Generally more function comment could be helpfull.
+
+I will sort all header and add more function comment.
+Thanks for your review.
+
+> Regards
