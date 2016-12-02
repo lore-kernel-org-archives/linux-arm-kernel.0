@@ -1,97 +1,118 @@
-From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Fri, 2 Dec 2016 17:13:59 +0100
-Subject: [PATCH] imx_v6_v7_defconfig: enable SPIDEV module
-In-Reply-To: <CABxcv=nSUfDT-bqHBm2e0XY55Qp4nH+66PriMqnix2RTsN0BNQ@mail.gmail.com>
-References: <20161202145631.19292-1-gary.bisson@boundarydevices.com>
- <CAOMZO5C8OH6obRn_8zh5HA9zoanRXUpoqk=vEBx+fW3wraNS6Q@mail.gmail.com>
- <20161202152718.o4xv2ru5r7xw7t5e@t450s.lan>
- <CABxcv=nSUfDT-bqHBm2e0XY55Qp4nH+66PriMqnix2RTsN0BNQ@mail.gmail.com>
-Message-ID: <20161202161359.y3mzvdxsfb2dyok7@t450s.lan>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 2 Dec 2016 16:16:39 +0000
+Subject: [RESEND PATCH V6 0/6] Add support for privileged mappings
+In-Reply-To: <1480690509-13490-1-git-send-email-sricharan@codeaurora.org>
+References: <1480690509-13490-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <e7e05493-e216-d744-b828-351d2c70150d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+Hi Sricharan,
 
-Thanks for the quick feedback on the matter.
+On 02/12/16 14:55, Sricharan R wrote:
+> This series is a resend of the V5 that Mitch sent sometime back [2]
+> All the patches are the same and i have just rebased. Not sure why this
+> finally did not make it last time. The last patch in the previous
+> series does not apply now [3], so just redid that. Also Copied the tags
+> that he had from last time as well.
 
-On Fri, Dec 02, 2016 at 12:44:42PM -0300, Javier Martinez Canillas wrote:
-> Hello Gary,
+Heh, I was assuming this would be down to me to pick up. Vinod did have
+some complaints last time about the commit message on the PL330 patch -
+I did get as far as rewriting that and reworking onto my SMMU
+changes[1], I just hadn't got round to sending it, so it fell onto the
+"after the next merge window" pile.
+
+I'd give some review comments, but they'd essentially be a diff against
+that branch :)
+
+Robin.
+
+[1]:http://www.linux-arm.org/git?p=linux-rm.git;a=shortlog;h=refs/heads/mh/dma-priv
+
+> The following patch to the ARM SMMU driver:
 > 
-> On Fri, Dec 2, 2016 at 12:27 PM, Gary Bisson
-> <gary.bisson@boundarydevices.com> wrote:
-> > Hi Fabio,
-> >
-> > On Fri, Dec 02, 2016 at 01:18:42PM -0200, Fabio Estevam wrote:
-> >> Hi Gary,
-> >>
-> >> On Fri, Dec 2, 2016 at 12:56 PM, Gary Bisson
-> >> <gary.bisson@boundarydevices.com> wrote:
-> >> > Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
-> >> > ---
-> >> > Hi,
-> >> >
-> >> > Seems that this configuration is missing, especially since many
-> >> > device trees are already using "spidev" nodes.
-> >>
+>     commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
+>     Author: Robin Murphy <robin.murphy@arm.com>
+>     Date:   Tue Jan 26 18:06:34 2016 +0000
+>     
+>         iommu/arm-smmu: Treat all device transactions as unprivileged
 > 
-> This seems to have been added just because people weren't looking that
-> closer to DT patches at the beginning, but now is forbidden. That's
-> why the kernel now warns about it.
+> started forcing all SMMU transactions to come through as "unprivileged".
+> The rationale given was that:
 > 
-> >> Then they will trigger the following warning below (from the spidev
-> >> probe function):
-> >>
-> >> /*
-> >> * spidev should never be referenced in DT without a specific
-> >> * compatible string, it is a Linux implementation thing
-> >> * rather than a description of the hardware.
-> >> */
-> >> if (spi->dev.of_node && !of_match_device(spidev_dt_ids, &spi->dev)) {
-> >>     dev_err(&spi->dev, "buggy DT: spidev listed directly in DT\n");
-> >>     WARN_ON(spi->dev.of_node &&
-> >>                        !of_match_device(spidev_dt_ids, &spi->dev));
-> >> }
-> >
-> > Yes I've seen this WARN_ON when doing the dt-overlay testing. But is
-> > disabling the SPIDEV configuration a solution?
-> >
-> > To be honest I disagree with that WARN_ON. Ok it means that the hardware
-> > isn't fully described in the device tree but for development platforms
-> > (such as ours or any rpi-like boards) the user can design his own
-> > daugher board with whatever SPI device on it. Then using the spidev
-> > interface is very convenient, so I don't understand what we are trying
-> > to forbid here.
-> >
+>   (1) There is no way in the IOMMU API to even request privileged
+>       mappings.
 > 
-> AFAICT, what we are trying to forbid is to have a Linux implementation
-> detail to creep into a Device Tree.
+>   (2) It's difficult to implement a DMA mapper that correctly models the
+>       ARM VMSAv8 behavior of unprivileged-writeable =>
+>       privileged-execute-never.
 > 
-> It's OK to use the spidev interface but that's orthogonal on how the
-> device is instantiated from the DT. If you want to do that, the
-> correct approach is AFAIU to add a OF device ID entry in
-> drivers/spi/spidev.c and use that compatible string in your DT.
-
-I understand that the device tree isn't supposed to describe such
-generic "spidev" concept.
-
-And that argument to me is ok for final products where the hardware is
-fully defined. However I still believe that for development platforms
-this cannot be applied. My customers want to use the SPI bus to connect
-any device they want, and most of those customers don't want to mess
-with the kernel. For them, having a spidev node, just like it exists for
-i2cdev nodes, is ideal.
-
-> That way, the DT will describe the hardware instead of just a "spidev"
-> but you could use the spidev interface to access your SPI device.
-
-But then aren't you afraid that the person will use the first compatible
-that shows up (let's say "rohm,dh2228fv") and use it for all his spidev?
-In that case the driver is happy although the fact remains that any hw
-will be plugged behind. Or at the opposite, if everybody that uses
-spidev adds its own compatible I'm not sure it will benefit the drive
-code.
-
-Anyway, I appreciate your feedback.
-
-Regards,
-Gary
+> This series rectifies (1) by introducing an IOMMU API for privileged
+> mappings and implements it in io-pgtable-arm.
+> 
+> This series rectifies (2) by introducing a new dma attribute
+> (DMA_ATTR_PRIVILEGED) for users of the DMA API that need privileged
+> mappings which are inaccessible to lesser-privileged execution levels, and
+> implements it in the arm64 IOMMU DMA mapper.  The one known user (pl330.c)
+> is converted over to the new attribute.
+> 
+> Jordan and Jeremy can provide more info on the use case if needed, but the
+> high level is that it's a security feature to prevent attacks such as [1].
+> 
+> [1] https://github.com/robclark/kilroy
+> [2] https://lkml.org/lkml/2016/7/27/590
+> [3] https://patchwork.kernel.org/patch/9250493/
+> 
+> Changelog:
+> 
+>  v5..v6
+>     - Rebased all the patches and redid 6/6 as it does not apply in
+>       this code base. 
+> 
+>  v4..v5
+> 
+>     - Simplified patch 4/6 (suggested by Robin Murphy).
+> 
+>   v3..v4
+> 
+>     - Rebased and reworked on linux next due to the dma attrs rework going
+>       on over there.  Patches changed: 3/6, 4/6, and 5/6.
+> 
+>   v2..v3
+> 
+>     - Incorporated feedback from Robin:
+>       * Various comments and re-wordings.
+>       * Use existing bit definitions for IOMMU_PRIV implementation
+>         in io-pgtable-arm.
+>       * Renamed and redocumented dma_direction_to_prot.
+>       * Don't worry about executability in new DMA attr.
+> 
+>   v1..v2
+> 
+>     - Added a new DMA attribute to make executable privileged mappings
+>       work, and use that in the pl330 driver (suggested by Will).
+> 
+> Jeremy Gebben (1):
+>   iommu/io-pgtable-arm: add support for the IOMMU_PRIV flag
+> 
+> Mitchel Humpherys (4):
+>   iommu: add IOMMU_PRIV attribute
+>   common: DMA-mapping: add DMA_ATTR_PRIVILEGED attribute
+>   arm64/dma-mapping: Implement DMA_ATTR_PRIVILEGED
+>   dmaengine: pl330: Make sure microcode is privileged
+> 
+> Sricharan R (1):
+>   iommu/arm-smmu: Set privileged attribute to 'default' instead of
+>     'unprivileged'
+> 
+>  Documentation/DMA-attributes.txt | 10 ++++++++++
+>  arch/arm64/mm/dma-mapping.c      |  6 +++---
+>  drivers/dma/pl330.c              |  6 ++++--
+>  drivers/iommu/arm-smmu.c         |  2 +-
+>  drivers/iommu/dma-iommu.c        | 10 ++++++++--
+>  drivers/iommu/io-pgtable-arm.c   |  5 ++++-
+>  include/linux/dma-iommu.h        |  3 ++-
+>  include/linux/dma-mapping.h      |  7 +++++++
+>  include/linux/iommu.h            |  1 +
+>  9 files changed, 40 insertions(+), 10 deletions(-)
+> 
