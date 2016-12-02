@@ -1,33 +1,49 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 2 Dec 2016 13:18:42 -0200
-Subject: [PATCH] imx_v6_v7_defconfig: enable SPIDEV module
-In-Reply-To: <20161202145631.19292-1-gary.bisson@boundarydevices.com>
-References: <20161202145631.19292-1-gary.bisson@boundarydevices.com>
-Message-ID: <CAOMZO5C8OH6obRn_8zh5HA9zoanRXUpoqk=vEBx+fW3wraNS6Q@mail.gmail.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Fri,  2 Dec 2016 23:19:12 +0800
+Subject: [PATCH 1/2] arm: dts: sun8i: add uart1 node to reference design tablet
+Message-ID: <20161202151913.38892-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gary,
+In the A23/A33 tablet reference design, the UART1 at PG is used to
+connect to the UART-connected bluetooth.
 
-On Fri, Dec 2, 2016 at 12:56 PM, Gary Bisson
-<gary.bisson@boundarydevices.com> wrote:
-> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
-> ---
-> Hi,
->
-> Seems that this configuration is missing, especially since many
-> device trees are already using "spidev" nodes.
+Add a disabled uart1 node for it in the reference design tablet dtsi,
+contains the pinctrl info.
 
-Then they will trigger the following warning below (from the spidev
-probe function):
+If a tablet uses the UART bluetooth, simply set the status of this node
+to "okay".
 
-/*
-* spidev should never be referenced in DT without a specific
-* compatible string, it is a Linux implementation thing
-* rather than a description of the hardware.
-*/
-if (spi->dev.of_node && !of_match_device(spidev_dt_ids, &spi->dev)) {
-    dev_err(&spi->dev, "buggy DT: spidev listed directly in DT\n");
-    WARN_ON(spi->dev.of_node &&
-                       !of_match_device(spidev_dt_ids, &spi->dev));
-}
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+ arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
+index 08cd001..2d9cf0d 100644
+--- a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
++++ b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
+@@ -46,6 +46,7 @@
+ / {
+ 	aliases {
+ 		serial0 = &r_uart;
++		serial1 = &uart1;
+ 	};
+ 
+ 	backlight: backlight {
+@@ -223,6 +224,13 @@
+ 	vcc-lcd-supply = <&reg_dc1sw>;
+ };
+ 
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins_a>,
++		    <&uart1_pins_cts_rts_a>;
++	status = "disabled";
++};
++
+ &usb_otg {
+ 	dr_mode = "otg";
+ 	status = "okay";
+-- 
+2.10.2
