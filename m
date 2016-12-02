@@ -1,122 +1,35 @@
 From: mhocko@suse.com (Michal Hocko)
-Date: Fri, 2 Dec 2016 15:03:30 +0100
-Subject: [PATCH V2 fix 5/6] mm: hugetlb: add a new function to allocate a
- new gigantic page
-In-Reply-To: <1479279304-31379-1-git-send-email-shijie.huang@arm.com>
-References: <1479107259-2011-6-git-send-email-shijie.huang@arm.com>
- <1479279304-31379-1-git-send-email-shijie.huang@arm.com>
-Message-ID: <20161202140325.GM6830@dhcp22.suse.cz>
+Date: Fri, 2 Dec 2016 15:05:57 +0100
+Subject: [PATCH v2 0/6] mm: fix the "counter.sh" failure for libhugetlbfs
+In-Reply-To: <1479107259-2011-1-git-send-email-shijie.huang@arm.com>
+References: <1479107259-2011-1-git-send-email-shijie.huang@arm.com>
+Message-ID: <20161202140556.GN6830@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 16-11-16 14:55:04, Huang Shijie wrote:
-> There are three ways we can allocate a new gigantic page:
+On Mon 14-11-16 15:07:33, Huang Shijie wrote:
+> (1) Background
+>    For the arm64, the hugetlb page size can be 32M (PMD + Contiguous bit).
+>    In the 4K page environment, the max page order is 10 (max_order - 1),
+>    so 32M page is the gigantic page.    
 > 
-> 1. When the NUMA is not enabled, use alloc_gigantic_page() to get
->    the gigantic page.
+>    The arm64 MMU supports a Contiguous bit which is a hint that the TTE
+>    is one of a set of contiguous entries which can be cached in a single
+>    TLB entry.  Please refer to the arm64v8 mannul :
+>        DDI0487A_f_armv8_arm.pdf (in page D4-1811)
 > 
-> 2. The NUMA is enabled, but the vma is NULL.
->    There is no memory policy we can refer to.
->    So create a @nodes_allowed, initialize it with init_nodemask_of_mempolicy()
->    or init_nodemask_of_node(). Then use alloc_fresh_gigantic_page() to get
->    the gigantic page.
+> (2) The bug   
+>    After I tested the libhugetlbfs, I found the test case "counter.sh"
+>    will fail with the gigantic page (32M page in arm64 board).
 > 
-> 3. The NUMA is enabled, and the vma is valid.
->    We can follow the memory policy of the @vma.
-> 
->    Get @nodes_allowed by huge_nodemask(), and use alloc_fresh_gigantic_page()
->    to get the gigantic page.
+>    This patch set adds support for gigantic surplus hugetlb pages,
+>    allowing the counter.sh unit test to pass.   
 
-Again __hugetlb_alloc_gigantic_page is not used and it is hard to deduce
-its usage from this commit. The above shouldn't be really much different from
-what we do in alloc_pages_vma so please make sure to check it before
-coming up with something hugetlb specific.
-
-> Signed-off-by: Huang Shijie <shijie.huang@arm.com>
-> ---
-> Since the huge_nodemask() is changed, we have to change this function a little.
-> 
-> ---
->  mm/hugetlb.c | 63 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 63 insertions(+)
-> 
-> diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-> index 6995087..c33bddc 100644
-> --- a/mm/hugetlb.c
-> +++ b/mm/hugetlb.c
-> @@ -1502,6 +1502,69 @@ int dissolve_free_huge_pages(unsigned long start_pfn, unsigned long end_pfn)
->  
->  /*
->   * There are 3 ways this can get called:
-> + *
-> + * 1. When the NUMA is not enabled, use alloc_gigantic_page() to get
-> + *    the gigantic page.
-> + *
-> + * 2. The NUMA is enabled, but the vma is NULL.
-> + *    Create a @nodes_allowed, and use alloc_fresh_gigantic_page() to get
-> + *    the gigantic page.
-> + *
-> + * 3. The NUMA is enabled, and the vma is valid.
-> + *    Use the @vma's memory policy.
-> + *    Get @nodes_allowed by huge_nodemask(), and use alloc_fresh_gigantic_page()
-> + *    to get the gigantic page.
-> + */
-> +static struct page *__hugetlb_alloc_gigantic_page(struct hstate *h,
-> +		struct vm_area_struct *vma, unsigned long addr, int nid)
-> +{
-> +	NODEMASK_ALLOC(nodemask_t, nodes_allowed, GFP_KERNEL | __GFP_NORETRY);
-> +	struct page *page = NULL;
-> +
-> +	/* Not NUMA */
-> +	if (!IS_ENABLED(CONFIG_NUMA)) {
-> +		if (nid == NUMA_NO_NODE)
-> +			nid = numa_mem_id();
-> +
-> +		page = alloc_gigantic_page(nid, huge_page_order(h));
-> +		if (page)
-> +			prep_compound_gigantic_page(page, huge_page_order(h));
-> +
-> +		NODEMASK_FREE(nodes_allowed);
-> +		return page;
-> +	}
-> +
-> +	/* NUMA && !vma */
-> +	if (!vma) {
-> +		if (nid == NUMA_NO_NODE) {
-> +			if (!init_nodemask_of_mempolicy(nodes_allowed)) {
-> +				NODEMASK_FREE(nodes_allowed);
-> +				nodes_allowed = &node_states[N_MEMORY];
-> +			}
-> +		} else if (nodes_allowed) {
-> +			init_nodemask_of_node(nodes_allowed, nid);
-> +		} else {
-> +			nodes_allowed = &node_states[N_MEMORY];
-> +		}
-> +
-> +		page = alloc_fresh_gigantic_page(h, nodes_allowed, true);
-> +
-> +		if (nodes_allowed != &node_states[N_MEMORY])
-> +			NODEMASK_FREE(nodes_allowed);
-> +
-> +		return page;
-> +	}
-> +
-> +	/* NUMA && vma */
-> +	if (huge_nodemask(vma, addr, nodes_allowed))
-> +		page = alloc_fresh_gigantic_page(h, nodes_allowed, true);
-> +
-> +	NODEMASK_FREE(nodes_allowed);
-> +	return page;
-> +}
-> +
-> +/*
-> + * There are 3 ways this can get called:
->   * 1. With vma+addr: we use the VMA's memory policy
->   * 2. With !vma, but nid=NUMA_NO_NODE:  We try to allocate a huge
->   *    page from any node, and let the buddy allocator itself figure
-> -- 
-> 2.5.5
-> 
+Andrew, I have noticed that this patchset is sitting in the mmotm tree
+already. I have to say I am not really happy about the changes it is
+introducing. It is making a confused code base even more so. I have
+already commented on respective patches but in general I think it needs
+a deeper thought before it can be merged.
 
 -- 
 Michal Hocko
