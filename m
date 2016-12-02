@@ -1,64 +1,67 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri,  2 Dec 2016 16:42:47 +0000
-Subject: [stable:PATCH 3/3] arm64: suspend: Reconfigure PSTATE after resume
- from idle [v4.4]
+Date: Fri,  2 Dec 2016 16:42:46 +0000
+Subject: [stable:PATCH 2/3] arm64: mm: Set PSTATE.PAN from the
+ cpu_enable_pan() call [v4.4]
 In-Reply-To: <20161202164247.19496-1-james.morse@arm.com>
 References: <20161202164247.19496-1-james.morse@arm.com>
-Message-ID: <20161202164247.19496-4-james.morse@arm.com>
+Message-ID: <20161202164247.19496-3-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit d08544127d9fb4505635e3cb6871fd50a42947bd upstream.
+commit 7209c868600bd8926e37c10b9aae83124ccc1dd8 upstream.
 
-The suspend/resume path in kernel/sleep.S, as used by cpu-idle, does not
-save/restore PSTATE. As a result of this cpufeatures that were detected
-and have bits in PSTATE get lost when we resume from idle.
+Commit 338d4f49d6f7 ("arm64: kernel: Add support for Privileged Access
+Never") enabled PAN by enabling the 'SPAN' feature-bit in SCTLR_EL1.
+This means the PSTATE.PAN bit won't be set until the next return to the
+kernel from userspace. On a preemptible kernel we may schedule work that
+accesses userspace on a CPU before it has done this.
 
-PAN will be re-enabled next time we return from user-space, but on a
-preemptible kernel we may run work accessing user space before this point.
+Now that cpufeature enable() calls are scheduled via stop_machine(), we
+can set PSTATE.PAN from the cpu_enable_pan() call.
 
-Add code to re-enable this feature in __cpu_suspend_exit().
+Add WARN_ON_ONCE(in_interrupt()) to check the PSTATE value we updated
+is not immediately discarded.
 
+Reported-by: Tony Thompson <anthony.thompson@arm.com>
+Reported-by: Vladimir Murzin <vladimir.murzin@arm.com>
 Signed-off-by: James Morse <james.morse@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+[will: fixed typo in comment]
 Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-[Removed UAO hooks and commit-message references: this feature is not
- present in v4.4]
 
 Signed-off-by: James Morse <james.morse@arm.com>
 Cc: <stable@vger.kernel.org> # 4.4.35
 ---
- arch/arm64/kernel/suspend.c | 9 +++++++++
+ arch/arm64/mm/fault.c | 9 +++++++++
  1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
-index 1095aa483a1c..00c1372bf57b 100644
---- a/arch/arm64/kernel/suspend.c
-+++ b/arch/arm64/kernel/suspend.c
-@@ -1,7 +1,9 @@
- #include <linux/ftrace.h>
- #include <linux/percpu.h>
- #include <linux/slab.h>
-+#include <asm/alternative.h>
- #include <asm/cacheflush.h>
-+#include <asm/cpufeature.h>
- #include <asm/debug-monitors.h>
- #include <asm/pgtable.h>
- #include <asm/memory.h>
-@@ -111,6 +113,13 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
- 		set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index d4634e6942ca..247bae758e1e 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -29,7 +29,9 @@
+ #include <linux/sched.h>
+ #include <linux/highmem.h>
+ #include <linux/perf_event.h>
++#include <linux/preempt.h>
  
- 		/*
-+		 * PSTATE was not saved over suspend/resume, re-enable any
-+		 * detected features that might not have been set correctly.
-+		 */
-+		asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,
-+				CONFIG_ARM64_PAN));
++#include <asm/bug.h>
+ #include <asm/cpufeature.h>
+ #include <asm/exception.h>
+ #include <asm/debug-monitors.h>
+@@ -608,7 +610,14 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
+ #ifdef CONFIG_ARM64_PAN
+ int cpu_enable_pan(void *__unused)
+ {
++	/*
++	 * We modify PSTATE. This won't work from irq context as the PSTATE
++	 * is discarded once we return from the exception.
++	 */
++	WARN_ON_ONCE(in_interrupt());
 +
-+		/*
- 		 * Restore HW breakpoint registers to sane values
- 		 * before debug exceptions are possibly reenabled
- 		 * through local_dbg_restore.
+ 	config_sctlr_el1(SCTLR_EL1_SPAN, 0);
++	asm(SET_PSTATE_PAN(1));
+ 	return 0;
+ }
+ #endif /* CONFIG_ARM64_PAN */
 -- 
 2.10.1
