@@ -1,98 +1,122 @@
 From: ping.bai@nxp.com (Bai Ping)
-Date: Fri, 2 Dec 2016 14:39:31 +0800
-Subject: [PATCH 08/11] ARM: imx: Add suspend/resume support for imx6sll
+Date: Fri, 2 Dec 2016 14:39:32 +0800
+Subject: [PATCH 09/11] ARM: imx: correct i.mx6sll dram io low power mode
 In-Reply-To: <1480660774-25055-1-git-send-email-ping.bai@nxp.com>
 References: <1480660774-25055-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <1480660774-25055-9-git-send-email-ping.bai@nxp.com>
+Message-ID: <1480660774-25055-10-git-send-email-ping.bai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add suspend/resume support for imx6sll.
+i.MX6SLL has different DRAM IO offset, and it has no
+CAS/RAS/ODT/RESET pin now, correct the DRAM IO offset.
 
+To better support all different i.MX6 SoCs and different
+DRAM types, introduce a new column to store the low power
+settings for DRAM IO, then suspend asm code no need to check
+SoC or DRAM type, just get the DRAM IO's low power
+settings from OCRAM pm_info and set to each DRAM IO.
+
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 Signed-off-by: Bai Ping <ping.bai@nxp.com>
 ---
- arch/arm/mach-imx/pm-imx6.c | 32 +++++++++++++++++++++++++++-----
- 1 file changed, 27 insertions(+), 5 deletions(-)
+ arch/arm/mach-imx/pm-imx6.c      | 17 ++++++++++++++++-
+ arch/arm/mach-imx/suspend-imx6.S | 29 +++++++----------------------
+ 2 files changed, 23 insertions(+), 23 deletions(-)
 
 diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-index 1515e49..2ed4316 100644
+index 2ed4316..5fb78a9 100644
 --- a/arch/arm/mach-imx/pm-imx6.c
 +++ b/arch/arm/mach-imx/pm-imx6.c
-@@ -145,6 +145,13 @@ struct imx6_pm_socdata {
- 	0x494, 0x4b0,	            /* MODE_CTL, MODE, */
- };
+@@ -230,7 +230,7 @@ struct imx6_cpu_pm_info {
+ 	struct imx6_pm_base gpc_base;
+ 	struct imx6_pm_base l2_base;
+ 	u32 mmdc_io_num; /* Number of MMDC IOs which need saved/restored. */
+-	u32 mmdc_io_val[MX6_MAX_MMDC_IO_NUM][2]; /* To save offset and value */
++	u32 mmdc_io_val[MX6_MAX_MMDC_IO_NUM][3]; /* To save offset,value and low power setting */
+ } __aligned(8);
  
-+static const u32 imx6sll_mmdc_io_offset[] __initconst = {
-+	0x294, 0x298, 0x29c, 0x2a0, /* DQM0 ~ DQM3 */
-+	0x544, 0x54c, 0x554, 0x558, /* GPR_B0DS ~ GPR_B3DS */
-+	0x530, 0x540, 0x2ac, 0x52c, /* MODE_CTL, MODE, SDCLK_0, GPR_ADDDS */
-+	0x2a4, 0x2a8,		    /* SDCKE0, SDCKE1*/
-+};
+ void imx6_set_int_mem_clk_lpm(bool enable)
+@@ -570,6 +570,21 @@ static int __init imx6q_suspend_init(const struct imx6_pm_socdata *socdata)
+ 		pm_info->mmdc_io_val[i][1] =
+ 			readl_relaxed(pm_info->iomuxc_base.vbase +
+ 			mmdc_offset_array[i]);
++		pm_info->mmdc_io_val[i][2] = 0;
 +
- static const struct imx6_pm_socdata imx6q_pm_data __initconst = {
- 	.mmdc_compat = "fsl,imx6q-mmdc",
- 	.src_compat = "fsl,imx6q-src",
-@@ -195,6 +202,15 @@ struct imx6_pm_socdata {
- 	.mmdc_io_offset = imx6ul_mmdc_io_offset,
- };
- 
-+static const struct imx6_pm_socdata imx6sll_pm_data __initconst = {
-+	.mmdc_compat = "fsl,imx6sll-mmdc",
-+	.src_compat = "fsl,imx6sll-src",
-+	.iomuxc_compat = "fsl,imx6sll-iomuxc",
-+	.gpc_compat = "fsl,imx6sll-gpc",
-+	.pl310_compat = "arm,pl310-cache",
-+	.mmdc_io_num = ARRAY_SIZE(imx6sll_mmdc_io_offset),
-+	.mmdc_io_offset = imx6sll_mmdc_io_offset,
-+};
- /*
-  * This structure is for passing necessary data for low level ocram
-  * suspend code(arch/arm/mach-imx/suspend-imx6.S), if this struct
-@@ -293,9 +309,10 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
- 		val |= 0x2 << BP_CLPCR_LPM;
- 		val &= ~BM_CLPCR_VSTBY;
- 		val &= ~BM_CLPCR_SBYOS;
--		if (cpu_is_imx6sl())
-+		if (cpu_is_imx6sl() || cpu_is_imx6sll())
- 			val |= BM_CLPCR_BYPASS_PMIC_READY;
--		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
-+		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul() ||
-+			cpu_is_imx6sll())
- 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
- 		else
- 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
-@@ -310,9 +327,10 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
- 		val |= 0x3 << BP_CLPCR_STBY_COUNT;
- 		val |= BM_CLPCR_VSTBY;
- 		val |= BM_CLPCR_SBYOS;
--		if (cpu_is_imx6sl() || cpu_is_imx6sx())
-+		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6sll())
- 			val |= BM_CLPCR_BYPASS_PMIC_READY;
--		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
-+		if (cpu_is_imx6sl() || cpu_is_imx6sx() ||
-+		    cpu_is_imx6ul() || cpu_is_imx6sll())
- 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
- 		else
- 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
-@@ -373,6 +391,7 @@ static int imx6q_pm_enter(suspend_state_t state)
- 			imx6sl_set_wait_clk(true);
- 		/* Zzz ... */
- 		cpu_do_idle();
++	}
 +
- 		if (cpu_is_imx6sl())
- 			imx6sl_set_wait_clk(false);
- 		imx_gpc_post_resume();
-@@ -632,7 +651,10 @@ void __init imx6dl_pm_init(void)
++	/* i.MX6SLL has no DRAM RESET pin */
++	if (cpu_is_imx6sll()) {
++		pm_info->mmdc_io_val[pm_info->mmdc_io_num - 2][2] = 0x1000;
++		pm_info->mmdc_io_val[pm_info->mmdc_io_num - 1][2] = 0x1000;
++	} else {
++		if (pm_info->ddr_type == IMX_DDR_TYPE_LPDDR2) {
++			 /* for LPDDR2, CKE0/1 and RESET pin need special setting */
++			pm_info->mmdc_io_val[pm_info->mmdc_io_num - 3][2] = 0x1000;
++			pm_info->mmdc_io_val[pm_info->mmdc_io_num - 2][2] = 0x1000;
++			pm_info->mmdc_io_val[pm_info->mmdc_io_num - 1][2] = 0x80000;
++		}
+ 	}
  
- void __init imx6sl_pm_init(void)
- {
--	imx6_pm_common_init(&imx6sl_pm_data);
-+	if (cpu_is_imx6sl())
-+		imx6_pm_common_init(&imx6sl_pm_data);
-+	else
-+		imx6_pm_common_init(&imx6sll_pm_data);
- }
+ 	imx6_suspend_in_ocram_fn = fncpy(
+diff --git a/arch/arm/mach-imx/suspend-imx6.S b/arch/arm/mach-imx/suspend-imx6.S
+index 76ee2ce..c9a26f4 100644
+--- a/arch/arm/mach-imx/suspend-imx6.S
++++ b/arch/arm/mach-imx/suspend-imx6.S
+@@ -104,7 +104,7 @@
+ 	add	r7, r7, r0
+ 1:
+ 	ldr	r8, [r7], #0x4
+-	ldr	r9, [r7], #0x4
++	ldr	r9, [r7], #0x8
+ 	str	r9, [r11, r8]
+ 	subs	r6, r6, #0x1
+ 	bne	1b
+@@ -179,7 +179,6 @@ ENTRY(imx6_suspend)
+ 	ldr	r11, [r0, #PM_INFO_MX6Q_IOMUXC_V_OFFSET]
+ 	ldr	r6, [r11, #0x0]
  
- void __init imx6sx_pm_init(void)
+-	/* use r11 to store the IO address */
+ 	ldr	r11, [r0, #PM_INFO_MX6Q_SRC_V_OFFSET]
+ 	/* store physical resume addr and pm_info address. */
+ 	str	r9, [r11, #MX6Q_SRC_GPR1]
+@@ -207,32 +206,18 @@ poll_dvfs_set:
+ 	ands	r7, r7, #(1 << 25)
+ 	beq	poll_dvfs_set
+ 
++	/* use r11 to store the IO address */
+ 	ldr	r11, [r0, #PM_INFO_MX6Q_IOMUXC_V_OFFSET]
+-	ldr	r6, =0x0
+-	ldr	r7, [r0, #PM_INFO_MMDC_IO_NUM_OFFSET]
++	ldr	r6, [r0, #PM_INFO_MMDC_IO_NUM_OFFSET]
+ 	ldr	r8, =PM_INFO_MMDC_IO_VAL_OFFSET
+ 	add	r8, r8, r0
+-	/* LPDDR2's last 3 IOs need special setting */
+-	cmp	r3, #IMX_DDR_TYPE_LPDDR2
+-	subeq	r7, r7, #0x3
+ set_mmdc_io_lpm:
+-	ldr	r9, [r8], #0x8
+-	str	r6, [r11, r9]
+-	subs	r7, r7, #0x1
++	ldr	r7, [r8], #0x8
++	ldr	r9, [r8], #0x4
++	str	r9, [r11, r7]
++	subs	r6, r6, #0x1
+ 	bne	set_mmdc_io_lpm
+ 
+-	cmp 	r3, #IMX_DDR_TYPE_LPDDR2
+-	bne	set_mmdc_io_lpm_done
+-	ldr	r6, =0x1000
+-	ldr	r9, [r8], #0x8
+-	str	r6, [r11, r9]
+-	ldr	r9, [r8], #0x8
+-	str	r6, [r11, r9]
+-	ldr	r6, =0x80000
+-	ldr	r9, [r8]
+-	str	r6, [r11, r9]
+-set_mmdc_io_lpm_done:
+-
+ 	/*
+ 	 * mask all GPC interrupts before
+ 	 * enabling the RBC counters to
 -- 
 1.9.1
