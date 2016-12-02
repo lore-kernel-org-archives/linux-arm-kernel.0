@@ -1,41 +1,29 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  2 Dec 2016 15:50:59 +0000
-Subject: [PATCH 2/2] arm64: PMU: Reset PMSELR_EL0 to a sane value at boot time
-In-Reply-To: <1480693859-27249-1-git-send-email-marc.zyngier@arm.com>
-References: <1480693859-27249-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1480693859-27249-3-git-send-email-marc.zyngier@arm.com>
+Date: Fri,  2 Dec 2016 15:50:57 +0000
+Subject: [PATCH 0/2] arm64: PMU: Sanitize usage of PMSELR_EL0.SEL
+Message-ID: <1480693859-27249-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to avoid any ugly surprise, let's reset PMSELR_EL0 to the
-first valid value (avoiding the cycle counter which has been proven
-to be troublesome) at CPU boot time. This ensures that no guest will
-be faced with some odd value which it cannot modify (due to
-MDCR_EL2.TPM being set).
+An ugly interaction between the use of PMSELR_EL0 in a host kernel and
+the use of PMXEVCNTR_EL0 in a guest has recently come to light [1],
+leading to the guest taking an UNDEF exception in EL1 when using the
+PMU.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kernel/perf_event.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+The fix is pretty simple ("don't do that!"), making the PMU useable on
+X-Gene, which seems to have a stricter (but nonetheless valid)
+interpretation of the architecture.
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index a65b757..42d1840 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -910,6 +910,14 @@ static void armv8pmu_reset(void *info)
- 	 */
- 	armv8pmu_pmcr_write(ARMV8_PMU_PMCR_P | ARMV8_PMU_PMCR_C |
- 			    ARMV8_PMU_PMCR_LC);
-+
-+	/*
-+	 * If we have at least one available counter, reset to that
-+	 * one so that no illegal value is left in PMSELR_EL0, which
-+	 * could have an impact on a guest.
-+	 */
-+	if (armv8pmu_counter_valid(cpu_pmu, ARMV8_IDX_COUNTER0))
-+		armv8pmu_select_counter(ARMV8_IDX_COUNTER0);
- }
- 
- static int armv8_pmuv3_map_event(struct perf_event *event)
+Patches against 4.9-rc6.
+
+[1] https://lists.cs.columbia.edu/pipermail/kvmarm/2016-November/022545.html
+
+Marc Zyngier (2):
+  arm64: PMU: Do not use PMSELR_EL0 to access PMCCFILTR_EL0
+  arm64: PMU: Reset PMSELR_EL0 to a sane value at boot time
+
+ arch/arm64/kernel/perf_event.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
 -- 
 2.1.4
