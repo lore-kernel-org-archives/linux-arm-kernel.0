@@ -1,42 +1,46 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri,  2 Dec 2016 15:05:33 +0000
-Subject: [RFC v3 PATCH 15/25] ARM: kexec: disallow kexec for NOMMU builds
+Date: Fri,  2 Dec 2016 15:05:40 +0000
+Subject: [RFC v3 PATCH 22/25] IB: add dependency on MMU
 In-Reply-To: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
 References: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1480691143-19845-16-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1480691143-19845-23-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While building for NOMMU the following error shows up:
+While building for NOMMU several link time issues were seen:
 
-kernel/built-in.o: In function `kimage_free_entry':
-memremap.c:(.text+0x4dafc): undefined reference to `arch_phys_to_idmap_offset'
-memremap.c:(.text+0x4db04): undefined reference to `arch_phys_to_idmap_offset'
-kernel/built-in.o: In function `kimage_alloc_page':
-memremap.c:(.text+0x4dbc0): undefined reference to `arch_phys_to_idmap_offset'
-memremap.c:(.text+0x4dbc8): undefined reference to `arch_phys_to_idmap_offset'
-memremap.c:(.text+0x4dc1c): undefined reference to `arch_phys_to_idmap_offset'
+mm/built-in.o: In function `do_mmu_notifier_register':
+usercopy.c:(.text+0x34d10): undefined reference to `mm_take_all_locks'
+usercopy.c:(.text+0x34d9c): undefined reference to `mm_drop_all_locks'
+usercopy.c:(.text+0x34de4): undefined reference to `mm_take_all_locks'
+...
+ERROR: "zap_vma_ptes" [drivers/infiniband/hw/mlx5/mlx5_ib.ko] undefined!
+ERROR: "zap_vma_ptes" [drivers/infiniband/hw/mlx4/mlx4_ib.ko] undefined!
+ERROR: "can_do_mlock" [drivers/infiniband/core/ib_core.ko] undefined!
+...
+ERROR: "can_do_mlock" [drivers/infiniband/core/ib_core.ko] undefined!
+...
+ERROR: "zap_vma_ptes" [drivers/infiniband/hw/mlx4/mlx4_ib.ko] undefined!
 
-That comes from Kexec, add dependency on MMU there.
+It seems that Infiniband assumes that is it used in MMU configurations
+only, so add dependency on CONFUG_MMU.
 
-Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/infiniband/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b5d529f..90c91de 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2019,7 +2019,7 @@ config XIP_PHYS_ADDR
- config KEXEC
- 	bool "Kexec system call (EXPERIMENTAL)"
- 	depends on (!SMP || PM_SLEEP_SMP)
--	depends on !CPU_V7M
+diff --git a/drivers/infiniband/Kconfig b/drivers/infiniband/Kconfig
+index fb3fb89..5f17955 100644
+--- a/drivers/infiniband/Kconfig
++++ b/drivers/infiniband/Kconfig
+@@ -4,6 +4,7 @@ menuconfig INFINIBAND
+ 	depends on HAS_IOMEM
+ 	depends on NET
+ 	depends on INET
 +	depends on MMU
- 	select KEXEC_CORE
- 	help
- 	  kexec is a system call that implements the ability to shutdown your
+ 	depends on m || IPV6 != m
+ 	select IRQ_POLL
+ 	---help---
 -- 
 1.7.9.5
