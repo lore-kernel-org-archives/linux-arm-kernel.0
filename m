@@ -1,70 +1,61 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri,  2 Dec 2016 15:05:37 +0000
-Subject: [RFC v3 PATCH 19/25] ARM: sa11x0: assabet: add dependency on MMU
+Date: Fri,  2 Dec 2016 15:05:30 +0000
+Subject: [RFC v3 PATCH 12/25] ARM: tlbflush: drop dependency on CONFIG_SMP
 In-Reply-To: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
 References: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1480691143-19845-20-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1480691143-19845-13-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building for NOMMU configuration leads to following error:
+While building NOMMU and UP following errors show up:
 
-arch/arm/mach-sa1100/generic.c:350:24: warning: 'standard_io_desc' defined but not used [-Wunused-variable]
- static struct map_desc standard_io_desc[] __initdata = {
-                        ^
-arch/arm/mach-sa1100/assabet.c: In function 'map_sa1100_gpio_regs':
-arch/arm/mach-sa1100/assabet.c:496:38: error: 'PMD_MASK' undeclared (first use in this function)
-  unsigned long phys = __PREG(GPLR) & PMD_MASK;
-                                      ^
-arch/arm/mach-sa1100/assabet.c:496:38: note: each undeclared identifier is reported only once for each function it appears in
-In file included from ./include/linux/list.h:7:0,
-                 from ./include/linux/module.h:9,
-                 from arch/arm/mach-sa1100/assabet.c:14:
-./arch/arm/include/asm/pgtable-2level-hwdef.h:22:29: error: 'pmdval_t' undeclared (first use in this function)
- #define PMD_TYPE_SECT  (_AT(pmdval_t, 2) << 0)
-                             ^
-./include/uapi/linux/const.h:21:20: note: in definition of macro '_AT'
- #define _AT(T,X) ((T)(X))
-                    ^
-arch/arm/mach-sa1100/assabet.c:498:13: note: in expansion of macro 'PMD_TYPE_SECT'
-  int prot = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_DOMAIN(DOMAIN_IO);
-             ^
-arch/arm/mach-sa1100/assabet.c:503:2: error: implicit declaration of function 'flush_pmd_entry' [-Werror=implicit-function-declaration]
-  flush_pmd_entry(pmd);
+arch/arm/mach-mvebu/pmsu.c: In function 'armada_370_xp_pmsu_idle_enter':
+arch/arm/mach-mvebu/pmsu.c:291:2: error: implicit declaration of function 'local_flush_tlb_all' [-Werror=implicit-function-declaration]
+  local_flush_tlb_all();
   ^
-arch/arm/mach-sa1100/assabet.c:497:16: warning: unused variable 'virt' [-Wunused-variable]
-  unsigned long virt = (unsigned long)io_p2v(phys);
-                ^
-arch/arm/mach-sa1100/assabet.c: At top level:
-arch/arm/mach-sa1100/assabet.c:620:24: warning: 'assabet_io_desc' defined but not used [-Wunused-variable]
- static struct map_desc assabet_io_desc[] __initdata = {
-                        ^
+  CC      arch/arm/mach-omap2/control.o
 cc1: some warnings being treated as errors
-make[1]: *** [arch/arm/mach-sa1100/assabet.o] Error 1
-make[1]: *** Waiting for unfinished jobs....
-make: *** [arch/arm/mach-sa1100] Error 2
-make: *** Waiting for unfinished jobs....
+make[1]: *** [arch/arm/mach-mvebu/pmsu.o] Error 1
 
-The code there performs the manual selection of page flags which makes
-it dependant on MMU.
+...
+
+arch/arm/mach-imx/pm-imx5.c: In function 'mx5_suspend_enter':
+arch/arm/mach-imx/pm-imx5.c:227:3: error: implicit declaration of function 'local_flush_tlb_all' [-Werror=implicit-function-declaration]
+   local_flush_tlb_all();
+   ^
+cc1: some warnings being treated as errors
+make[1]: *** [arch/arm/mach-imx/pm-imx5.o] Error 1
+
+...
+
+arch/arm/mach-imx/pm-imx6.c: In function 'imx6q_suspend_finish':
+arch/arm/mach-imx/pm-imx6.c:354:3: error: implicit declaration of function 'local_flush_tlb_all' [-Werror=implicit-function-declaration]
+   local_flush_tlb_all();
+   ^
+cc1: some warnings being treated as errors
+make[1]: *** [arch/arm/mach-imx/pm-imx6.o] Error 1
+
+Make local_* stuff available for UP (even though it doesn't make
+sense) so build can progress.
 
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/mach-sa1100/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/include/asm/tlbflush.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-sa1100/Kconfig b/arch/arm/mach-sa1100/Kconfig
-index 36e3c79..af8cd56 100644
---- a/arch/arm/mach-sa1100/Kconfig
-+++ b/arch/arm/mach-sa1100/Kconfig
-@@ -4,6 +4,7 @@ menu "SA11x0 Implementations"
+diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+index def9e57..d9a6e2e 100644
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -641,7 +641,7 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
  
- config SA1100_ASSABET
- 	bool "Assabet"
-+	depends on MMU
- 	select ARM_SA1110_CPUFREQ
- 	help
- 	  Say Y here if you are using the Intel(R) StrongARM(R) SA-1110
+ #endif
+ 
+-#elif defined(CONFIG_SMP)	/* !CONFIG_MMU */
++#else /* !CONFIG_MMU */
+ 
+ #ifndef __ASSEMBLY__
+ 
 -- 
 1.7.9.5
