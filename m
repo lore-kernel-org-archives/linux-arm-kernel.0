@@ -1,92 +1,48 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 2 Dec 2016 14:23:02 +0000
-Subject: [PATCH v3 3/7] PWM: add pwm-stm32 DT bindings
-In-Reply-To: <1480673842-20804-4-git-send-email-benjamin.gaignard@st.com>
-References: <1480673842-20804-1-git-send-email-benjamin.gaignard@st.com>
- <1480673842-20804-4-git-send-email-benjamin.gaignard@st.com>
-Message-ID: <20161202142302.GO2683@dell>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Fri, 02 Dec 2016 22:22:30 +0800
+Subject: [PATCH v2 2/3] ARM: dts: sunxi: add support for Orange Pi Zero
+ board
+In-Reply-To: <20161201093619.gs6lmoxtlptp2jr6@lukather>
+References: <20161121162421.800-1-icenowy@aosc.xyz>
+ <20161121162421.800-2-icenowy@aosc.xyz>
+ <5373671480239408@web31m.yandex.ru>
+ <cdfd3c65-d473-badb-ea6a-035f7ab79217@arm.com>
+ <20161201093619.gs6lmoxtlptp2jr6@lukather>
+Message-ID: <11498641480688550@web2g.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 02 Dec 2016, Benjamin Gaignard wrote:
 
-> Define bindings for pwm-stm32
-> 
-> version 2:
-> - use parameters instead of compatible of handle the hardware configuration
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> ---
->  .../devicetree/bindings/pwm/pwm-stm32.txt          | 38 ++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> new file mode 100644
-> index 0000000..575b9fb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> @@ -0,0 +1,38 @@
-> +STMicroelectronics PWM driver bindings for STM32
-> +
-> +Must be a sub-node of STM32 general purpose timer driver
-> +Parent node properties are describe in ../mfd/stm32-general-purpose-timer.txt
-> +
-> +Required parameters:
-> +- compatible:		Must be "st,stm32-pwm"
-> +- pinctrl-names: 	Set to "default".
-> +- pinctrl-0: 		List of phandles pointing to pin configuration nodes
-> +			for PWM module.
-> +			For Pinctrl properties, please refer to [1].
-> +
-> +Optional parameters:
-> +- st,breakinput:	Set if the hardware have break input capabilities
-> +- st,breakinput-polarity: Set break input polarity. Default is 0
-> +			 The value define the active polarity:
-> +			  - 0 (active LOW)
-> +			  - 1 (active HIGH)
 
-> +- st,breakinput-polarity-high
+01.12.2016, 17:36, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> On Mon, Nov 28, 2016 at 12:29:07AM +0000, Andr? Przywara wrote:
+>> ?> Something more interesting happened.
+>> ?>
+>> ?> Xunlong made a add-on board for Orange Pi Zero, which exposes the
+>> ?> two USB Controllers exported at expansion bus as USB Type-A
+>> ?> connectors.
+>> ?>
+>> ?> Also it exposes a analog A/V jack and a microphone.
+>> ?>
+>> ?> Should I enable {e,o}hci{2.3} in the device tree?
+>>
+>> ?Actually we should do this regardless of this extension board. The USB
+>> ?pins are not multiplexed and are exposed on user accessible pins (just
+>> ?not soldered, but that's a detail), so I think they qualify for DT
+>> ?enablement. And even if a user can't use them, it doesn't hurt to have
+>> ?them (since they are not multiplexed).
+>
+> My main concern about this is that we'll leave regulators enabled by
+> default, for a minority of users. And that minority will prevent to do
+> a proper power management when the times come since we'll have to keep
+> that behaviour forever.
 
-Then assume the default if the property is not present.
+I think these users can add a 'fdt set /xxx/xxx status "disabled" ' .
 
-> +- st,pwm-num-chan:	Number of available PWM channels.  Default is 0.
-
-What's the point in having a PWM device with  no channels?
-
-Best to make this a compulsory property.
-
-> +- st,32bits-counter:	Set if the hardware have a 32 bits counter
-> +- st,complementary:	Set if the hardware have complementary output channels
-> +
-> +[1] Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-
-Use relative path.
-
-../pinctrl/pinctrl-bindings.txt
-
-> +Example:
-> +	gptimer1: gptimer1 at 40010000 {
-> +		compatible = "st,stm32-gptimer";
-> +		reg = <0x40010000 0x400>;
-> +		clocks = <&rcc 0 160>;
-> +		clock-names = "clk_int";
-> +
-> +		pwm1 at 0 {
-
-Don't number the node name.
-
-pwm at xx
-
-> +			compatible = "st,stm32-pwm";
-> +			st,pwm-num-chan = <4>;
-> +			st,breakinput;
-> +			st,complementary;
-> +		};
-> +	};
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
