@@ -1,47 +1,59 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 02 Dec 2016 16:18:04 +0900
-Subject: [PATCH 2/5] PM / devfreq: exynos-bus: Add the detailed correlation for
- Exynos5433
+Date: Fri, 02 Dec 2016 16:18:05 +0900
+Subject: [PATCH 3/5] arm64: dts: exynos5433: Add PPMU dt node
 In-Reply-To: <1480663087-4590-1-git-send-email-cw00.choi@samsung.com>
 References: <1480663087-4590-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1480663087-4590-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1480663087-4590-4-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the detailed corrleation between sub-blocks and VDD_INT power
-line for Exynos5433. VDD_INT provided the power source to INT (Internal) block.
+This patch adds PPMU (Platform Performance Monitoring Unit) Device-tree node
+to measure the utilization of each IP in Exynos SoC.
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: devicetree at vger.kernel.org
+- PPMU_D{0|1}_CPU are used to measure the utilization of MIF (Memory Interface)
+  block with VDD_MIF power source.
+- PPMU_D{0|1}_GENERAL are used to measure the utilization of INT(Internal)
+  block with VDD_INT power source.
+
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- Documentation/devicetree/bindings/devfreq/exynos-bus.txt | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
-index d3ec8e676b6b..d085ef90d27c 100644
---- a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
-+++ b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
-@@ -123,6 +123,20 @@ Detailed correlation between sub-blocks and power line according to Exynos SoC:
- 		|--- FSYS
- 		|--- FSYS2
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+index 64226d5ae471..8c4ee84d5232 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+@@ -599,6 +599,30 @@
+ 			clock-names = "fin_pll", "mct";
+ 		};
  
-+- In case of Exynos5433, there is VDD_INT power line as following:
-+	VDD_INT |--- G2D (parent device)
-+		|--- MSCL
-+		|--- GSCL
-+		|--- JPEG
-+		|--- MFC
-+		|--- HEVC
-+		|--- BUS0
-+		|--- BUS1
-+		|--- BUS2
-+		|--- PERIS (Fixed clock rate)
-+		|--- PERIC (Fixed clock rate)
-+		|--- FSYS  (Fixed clock rate)
++		ppmu_d0_cpu: ppmu at 10480000 {
++			compatible = "samsung,exynos-ppmu-v2";
++			reg = <0x10480000 0x2000>;
++			status = "disabled";
++		};
 +
- Example1:
- 	Show the AXI buses of Exynos3250 SoC. Exynos3250 divides the buses to
- 	power line (regulator). The MIF (Memory Interface) AXI bus is used to
++		ppmu_d0_general: ppmu at 10490000 {
++			compatible = "samsung,exynos-ppmu-v2";
++			reg = <0x10490000 0x2000>;
++			status = "disabled";
++		};
++
++		ppmu_d1_cpu: ppmu at 104b0000 {
++			compatible = "samsung,exynos-ppmu-v2";
++			reg = <0x104b0000 0x2000>;
++			status = "disabled";
++		};
++
++		ppmu_d1_general: ppmu at 104c0000 {
++			compatible = "samsung,exynos-ppmu-v2";
++			reg = <0x104c0000 0x2000>;
++			status = "disabled";
++		};
++
+ 		pinctrl_alive: pinctrl at 10580000 {
+ 			compatible = "samsung,exynos5433-pinctrl";
+ 			reg = <0x10580000 0x1a20>, <0x11090000 0x100>;
 -- 
 1.9.1
