@@ -1,267 +1,51 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 2 Dec 2016 14:29:31 +0000
-Subject: [PATCH v3 2/7] MFD: add stm32 general purpose timer driver
-In-Reply-To: <1480673842-20804-3-git-send-email-benjamin.gaignard@st.com>
-References: <1480673842-20804-1-git-send-email-benjamin.gaignard@st.com>
- <1480673842-20804-3-git-send-email-benjamin.gaignard@st.com>
-Message-ID: <20161202142931.GP2683@dell>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 2 Dec 2016 15:30:26 +0100
+Subject: [PATCH v2 2/3] ARM: dts: sunxi: add support for Orange Pi Zero
+ board
+In-Reply-To: <11498641480688550@web2g.yandex.ru>
+References: <20161121162421.800-1-icenowy@aosc.xyz>
+ <20161121162421.800-2-icenowy@aosc.xyz> <5373671480239408@web31m.yandex.ru>
+ <cdfd3c65-d473-badb-ea6a-035f7ab79217@arm.com>
+ <20161201093619.gs6lmoxtlptp2jr6@lukather>
+ <11498641480688550@web2g.yandex.ru>
+Message-ID: <efb30303-b9bb-7a7c-4478-af485991dd86@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 02 Dec 2016, Benjamin Gaignard wrote:
+Hi,
 
-> This hardware block could at used at same time for PWM generation
-> and IIO timer for other IPs like DAC, ADC or other timers.
-> PWM and IIO timer configuration are mixed in the same registers
-> so we need a multi fonction driver to be able to share those registers.
-> 
-> version 2:
-> - rename driver "stm32-gptimer" to be align with SoC documentation
-> - only keep one compatible
-> - use of_platform_populate() instead of devm_mfd_add_devices()
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> ---
->  drivers/mfd/Kconfig               | 10 ++++++
->  drivers/mfd/Makefile              |  2 ++
->  drivers/mfd/stm32-gptimer.c       | 73 +++++++++++++++++++++++++++++++++++++++
->  include/linux/mfd/stm32-gptimer.h | 62 +++++++++++++++++++++++++++++++++
->  4 files changed, 147 insertions(+)
->  create mode 100644 drivers/mfd/stm32-gptimer.c
->  create mode 100644 include/linux/mfd/stm32-gptimer.h
-> 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index c6df644..e75abcb 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -1607,6 +1607,15 @@ config MFD_STW481X
->  	  in various ST Microelectronics and ST-Ericsson embedded
->  	  Nomadik series.
->  
-> +config MFD_STM32_GP_TIMER
-> +	tristate "Support for STM32 General Purpose Timer"
-> +	select MFD_CORE
-> +	select REGMAP
-> +	depends on ARCH_STM32
-> +	depends on OF
+On 02-12-16 15:22, Icenowy Zheng wrote:
+>
+>
+> 01.12.2016, 17:36, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>> On Mon, Nov 28, 2016 at 12:29:07AM +0000, Andr? Przywara wrote:
+>>>  > Something more interesting happened.
+>>>  >
+>>>  > Xunlong made a add-on board for Orange Pi Zero, which exposes the
+>>>  > two USB Controllers exported at expansion bus as USB Type-A
+>>>  > connectors.
+>>>  >
+>>>  > Also it exposes a analog A/V jack and a microphone.
+>>>  >
+>>>  > Should I enable {e,o}hci{2.3} in the device tree?
+>>>
+>>>  Actually we should do this regardless of this extension board. The USB
+>>>  pins are not multiplexed and are exposed on user accessible pins (just
+>>>  not soldered, but that's a detail), so I think they qualify for DT
+>>>  enablement. And even if a user can't use them, it doesn't hurt to have
+>>>  them (since they are not multiplexed).
+>>
+>> My main concern about this is that we'll leave regulators enabled by
+>> default, for a minority of users. And that minority will prevent to do
+>> a proper power management when the times come since we'll have to keep
+>> that behaviour forever.
+>
+> I think these users can add a 'fdt set /xxx/xxx status "disabled" ' .
 
-"|| COMPILE_TEST"?
+I don't think that will be necessary I'm pretty sure these extra usb
+ports do not have a regulator for the Vbus, they just hook directly
+to the 5V rail, can someone with a schematic check ?
 
-> +	help
-> +	  Select this option to enable stm32 general purpose timer
+Regards,
 
-I can see that.  Tell us more about the device and what it does.
-
-s/stm32/STM32/
-
->  menu "Multimedia Capabilities Port drivers"
->  	depends on ARCH_SA1100
->  
-> @@ -1644,4 +1653,5 @@ config MFD_VEXPRESS_SYSREG
->  	  on the ARM Ltd. Versatile Express board.
->  
->  endmenu
-> +
-
-Please remove this change.  It has nothing to do with the set.
-
->  endif
-> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> index 9834e66..86353b9 100644
-> --- a/drivers/mfd/Makefile
-> +++ b/drivers/mfd/Makefile
-> @@ -211,3 +211,5 @@ obj-$(CONFIG_INTEL_SOC_PMIC)	+= intel-soc-pmic.o
->  obj-$(CONFIG_MFD_MT6397)	+= mt6397-core.o
->  
->  obj-$(CONFIG_MFD_ALTERA_A10SR)	+= altera-a10sr.o
-> +
-> +obj-$(CONFIG_MFD_STM32_GP_TIMER) 	+= stm32-gptimer.o
-> diff --git a/drivers/mfd/stm32-gptimer.c b/drivers/mfd/stm32-gptimer.c
-> new file mode 100644
-> index 0000000..54fb95c
-> --- /dev/null
-> +++ b/drivers/mfd/stm32-gptimer.c
-> @@ -0,0 +1,73 @@
-> +/*
-> + * stm32-gptimer.c
-
-Swap this out for a description.
-
-> + * Copyright (C) STMicroelectronics 2016
-
-'\n'
-
-> + * Author: Benjamin Gaignard <benjamin.gaignard@st.com> for STMicroelectronics.
-> + * License terms:  GNU General Public License (GPL), version 2
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/reset.h>
-> +
-> +#include <linux/mfd/stm32-gptimer.h>
-> +
-> +static const struct regmap_config stm32_gptimer_regmap_cfg = {
-> +	.reg_bits = 32,
-> +	.val_bits = 32,
-> +	.reg_stride = sizeof(u32),
-> +	.max_register = 0x400,
-> +	.fast_io = true,
-> +};
-> +
-> +static int stm32_gptimer_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct stm32_gptimer_dev *mfd;
-
-s/mfd/ddata/
-
-> +	struct resource *res;
-> +	void __iomem *mmio;
-> +
-> +	mfd = devm_kzalloc(dev, sizeof(*mfd), GFP_KERNEL);
-> +	if (!mfd)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res)
-> +		return -ENOMEM;
-> +
-
-Remove this 3 lines.
-
-devm_ioremap_resource() does the checking and error printing for you.
-
-> +	mmio = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(mmio))
-> +		return PTR_ERR(mmio);
-> +
-> +	mfd->regmap = devm_regmap_init_mmio_clk(dev, "clk_int", mmio,
-> +						&stm32_gptimer_regmap_cfg);
-> +	if (IS_ERR(mfd->regmap))
-> +		return PTR_ERR(mfd->regmap);
-> +
-> +	mfd->clk = devm_clk_get(dev, NULL);
-> +	if (IS_ERR(mfd->clk))
-> +		return PTR_ERR(mfd->clk);
-> +
-> +	platform_set_drvdata(pdev, mfd);
-> +
-> +	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
-> +}
-> +
-> +static const struct of_device_id stm32_gptimer_of_match[] = {
-> +	{
-> +		.compatible = "st,stm32-gptimer",
-> +	},
-
-One line:
-
-    { .compatible = "st,stm32-gptimer" },
-
-> +};
-> +MODULE_DEVICE_TABLE(of, stm32_gptimer_of_match);
-> +
-> +static struct platform_driver stm32_gptimer_driver = {
-> +	.probe		= stm32_gptimer_probe,
-> +	.driver	= {
-> +		.name	= "stm32-gptimer",
-> +		.of_match_table = stm32_gptimer_of_match,
-> +	},
-
-Remove tabs before the '='s.
-
-> +module_platform_driver(stm32_gptimer_driver);
-> +
-> +MODULE_DESCRIPTION("STMicroelectronics STM32 general purpose timer");
-
-"General Purpose Timer"
-
-> +MODULE_LICENSE("GPL");
-
-
-"GPL v2"
-> diff --git a/include/linux/mfd/stm32-gptimer.h b/include/linux/mfd/stm32-gptimer.h
-> new file mode 100644
-> index 0000000..f8c92de
-> --- /dev/null
-> +++ b/include/linux/mfd/stm32-gptimer.h
-> @@ -0,0 +1,62 @@
-> +/*
-> + * stm32-gptimer.h
-> + *
-> + * Copyright (C) STMicroelectronics 2016
-> + * Author: Benjamin Gaignard <benjamin.gaignard@st.com> for STMicroelectronics.
-> + * License terms:  GNU General Public License (GPL), version 2
-> + */
-
-Same comments as before.
-
-> +#ifndef _LINUX_STM32_GPTIMER_H_
-> +#define _LINUX_STM32_GPTIMER_H_
-> +
-> +#include <linux/clk.h>
-> +#include <linux/regmap.h>
-> +
-> +#define TIM_CR1		0x00	/* Control Register 1      */
-> +#define TIM_CR2		0x04	/* Control Register 2      */
-> +#define TIM_SMCR	0x08	/* Slave mode control reg  */
-> +#define TIM_DIER	0x0C	/* DMA/interrupt register  */
-> +#define TIM_SR		0x10	/* Status register	   */
-> +#define TIM_EGR		0x14	/* Event Generation Reg    */
-> +#define TIM_CCMR1	0x18	/* Capt/Comp 1 Mode Reg    */
-> +#define TIM_CCMR2	0x1C	/* Capt/Comp 2 Mode Reg    */
-> +#define TIM_CCER	0x20	/* Capt/Comp Enable Reg    */
-> +#define TIM_PSC		0x28	/* Prescaler               */
-> +#define TIM_ARR		0x2c	/* Auto-Reload Register    */
-> +#define TIM_CCR1	0x34	/* Capt/Comp Register 1    */
-> +#define TIM_CCR2	0x38	/* Capt/Comp Register 2    */
-> +#define TIM_CCR3	0x3C	/* Capt/Comp Register 3    */
-> +#define TIM_CCR4	0x40	/* Capt/Comp Register 4    */
-> +#define TIM_BDTR	0x44	/* Break and Dead-Time Reg */
-> +
-> +#define TIM_CR1_CEN	BIT(0)	/* Counter Enable	   */
-> +#define TIM_CR1_ARPE	BIT(7)	/* Auto-reload Preload Ena */
-> +#define TIM_CR2_MMS	(BIT(4) | BIT(5) | BIT(6)) /* Master mode selection */
-> +#define TIM_SMCR_SMS	(BIT(0) | BIT(1) | BIT(2)) /* Slave mode selection */
-> +#define TIM_SMCR_TS	(BIT(4) | BIT(5) | BIT(6)) /* Trigger selection */
-> +#define TIM_DIER_UIE	BIT(0)	/* Update interrupt	   */
-> +#define TIM_SR_UIF	BIT(0)	/* Update interrupt flag   */
-> +#define TIM_EGR_UG	BIT(0)	/* Update Generation       */
-> +#define TIM_CCMR_PE	BIT(3)	/* Channel Preload Enable  */
-> +#define TIM_CCMR_M1	(BIT(6) | BIT(5))  /* Channel PWM Mode 1 */
-> +#define TIM_CCER_CC1E	BIT(0)	/* Capt/Comp 1  out Ena    */
-> +#define TIM_CCER_CC1P	BIT(1)	/* Capt/Comp 1  Polarity   */
-> +#define TIM_CCER_CC1NE	BIT(2)	/* Capt/Comp 1N out Ena    */
-> +#define TIM_CCER_CC1NP	BIT(3)	/* Capt/Comp 1N Polarity   */
-> +#define TIM_CCER_CCXE	(BIT(0) | BIT(4) | BIT(8) | BIT(12))
-> +#define TIM_BDTR_BKE	BIT(12) /* Break input enable	   */
-> +#define TIM_BDTR_BKP	BIT(13) /* Break input polarity	   */
-> +#define TIM_BDTR_AOE	BIT(14)	/* Automatic Output Enable */
-> +#define TIM_BDTR_MOE	BIT(15)	/* Main Output Enable      */
-> +
-> +#define MAX_TIM_PSC		0xFFFF
-> +
-> +struct stm32_gptimer_dev {
-
-Drop the "_dev" or replace with ddata.
-
-> +	/* Device data */
-
-No need for this.
-> +	struct clk *clk;
-> +
-> +	/* Registers mapping */
-
-No need for this.
-
-> +	struct regmap *regmap;
-> +};
-> +
-> +#endif
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Hans
