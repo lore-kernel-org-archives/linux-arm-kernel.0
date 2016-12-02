@@ -1,43 +1,57 @@
-From: joseph@codesourcery.com (Joseph Myers)
-Date: Fri, 2 Dec 2016 16:59:27 +0000
-Subject: [RFC PATCH 00/29] arm64: Scalable Vector Extension core
- support
-In-Reply-To: <faabab1d-fafb-2bd1-200f-b0e3ba17e1d5@redhat.com>
-References: <20161130120654.GJ1574@e103592.cambridge.arm.com>
- <3e8afc5a-1ba9-6369-462b-4f5a707d8b8a@redhat.com>
- <20161202114850.GQ1574@e103592.cambridge.arm.com>
- <faabab1d-fafb-2bd1-200f-b0e3ba17e1d5@redhat.com>
-Message-ID: <alpine.DEB.2.20.1612021648580.16956@digraph.polyomino.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 2 Dec 2016 17:02:28 +0000
+Subject: [PATCH v2 1/2] arm64: dts: zx: Fix gic GICR property
+In-Reply-To: <1476361881-19685-2-git-send-email-jun.nie@linaro.org>
+References: <1476361881-19685-1-git-send-email-jun.nie@linaro.org>
+ <1476361881-19685-2-git-send-email-jun.nie@linaro.org>
+Message-ID: <a243d381-f7ab-abed-ca21-f0951abb04fd@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2 Dec 2016, Florian Weimer wrote:
+Just noticed this.
 
-> > However, it would be necessary to prevent GCC from moving any code
-> > across these statements -- in particular, SVE code that access VL-
-> > dependent data spilled on the stack is liable to go wrong if reordered
-> > with the above.  So the sequence would need to go in an external
-> > function (or a single asm...)
+On 13/10/16 13:31, Jun Nie wrote:
+> GICR for multiple CPU can be described with start address and stride,
+> or with multiple address. Current multiple address and stride are
+> both used. Fix it.
 > 
-> I would talk to GCC folks?we have similar issues with changing the FPU
-> rounding mode, I assume.
+> vmalloc patch 727a7f5a9 triggered this bug:
+> [    0.097146] Unable to handle kernel paging request at virtual address ffff000008060008
+> [    0.097150] pgd = ffff000008602000
+> [    0.097160] [ffff000008060008] *pgd=000000007fffe003, *pud=000000007fffd003, *pmd=000000007fffc003, *pte=0000000000000000
+> [    0.097165] Internal error: Oops: 96000007 [#1] PREEMPT SMP
+> [    0.097170] Modules linked in:
+> [    0.097177] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0+ #1474
+> [    0.097179] Hardware name: ZTE zx296718 evaluation board (DT)
+> [    0.097183] task: ffff80003e8c8b80 task.stack: ffff80003e8d0000
+> [    0.097197] PC is at gic_populate_rdist+0x74/0x15c
+> [    0.097202] LR is at gic_starting_cpu+0xc/0x20
+> [    0.097206] pc : [<ffff0000082b1b18>] lr : [<ffff0000082b26e0>] pstate: 600001c5
+> 
+> Signed-off-by: Jun Nie <jun.nie@linaro.org>
+> ---
+>  arch/arm64/boot/dts/zte/zx296718.dtsi | 11 +++--------
+>  1 file changed, 3 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/zte/zx296718.dtsi b/arch/arm64/boot/dts/zte/zx296718.dtsi
+> index a223066..6b239a3 100644
+> --- a/arch/arm64/boot/dts/zte/zx296718.dtsi
+> +++ b/arch/arm64/boot/dts/zte/zx296718.dtsi
+> @@ -239,16 +239,11 @@
+>  		compatible = "arm,gic-v3";
+>  		#interrupt-cells = <3>;
+>  		#address-cells = <0>;
+> -		#redistributor-regions = <6>;
+> -		redistributor-stride = <0x0 0x40000>;
+> +		#redistributor-regions = <1>;
+> +		redistributor-stride = <0x20000>;
 
-In general, GCC doesn't track the implicit uses of thread-local state 
-involved in floating-point exceptions and rounding modes, and so doesn't 
-avoid moving code across manipulations of such state; there are various 
-open bugs in this area (though many of the open bugs are for local rather 
-than global issues with code generation or local optimizations not 
-respecting exceptions and rounding modes, which are easier to fix).  Hence 
-glibc using various macros such as math_opt_barrier and math_force_eval 
-which use asms to prevent such motion.
+Why is that stride specified? Is the GIC implementation so busted that
+the GICR_TYPER do not report a GICv3 redistributor, which implies a
+128kB stride?
 
-I'm not familiar enough with the optimizers to judge the right way to 
-address such issues with implicit use of thread-local state.  And I 
-haven't thought much yet about how to implement TS 18661-1 constant 
-rounding modes, which would involve the compiler implicitly inserting 
-rounding modes changes, though I think it would be fairly straightforward 
-given underlying support for avoiding inappropriate code motion.
+Thanks,
 
+	M.
 -- 
-Joseph S. Myers
-joseph at codesourcery.com
+Jazz is not dead. It just smells funny...
