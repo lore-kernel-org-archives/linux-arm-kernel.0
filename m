@@ -1,78 +1,54 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 2 Dec 2016 12:16:56 +0100
-Subject: XHCI controller does not detect USB key insertion
-In-Reply-To: <58415625.3020703@free.fr>
-References: <584134D9.5000404@free.fr> <87inr2vh2l.fsf@linux.intel.com>
- <58414BC5.109@free.fr> <20161202104208.GA8736@kroah.com>
- <58415625.3020703@free.fr>
-Message-ID: <20161202111656.GA11509@kroah.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 2 Dec 2016 16:50:55 +0530
+Subject: [PATCH 3/3] ARM: da850: fix da850_set_pll0rate()
+In-Reply-To: <1480612516-18853-4-git-send-email-bgolaszewski@baylibre.com>
+References: <1480612516-18853-1-git-send-email-bgolaszewski@baylibre.com>
+ <1480612516-18853-4-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <4b1d65f7-d9a6-6d4e-00f5-2835b728661c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 12:08:21PM +0100, Mason wrote:
-> On 02/12/2016 11:42, Greg KH wrote:
+On Thursday 01 December 2016 10:45 PM, Bartosz Golaszewski wrote:
+> This function is broken - its second argument is an index to the freq
+> table, not the requested clock rate in Hz. It leads to an oops when
+> called from clk_set_rate() since this argument isn't bounds checked
+> either.
 > 
-> > On Fri, Dec 02, 2016 at 11:24:05AM +0100, Mason wrote:
-> > 
-> >> # lsusb -v
-> >> Bus 001 Device 001: ID 1d6b:0002
-> >> Bus 002 Device 001: ID 1d6b:0003
-> >>
-> >> Isn't lsusb verbose supposed to print much more than that?
-> > 
-> > Yes, if you are using the usbutils version of 'lsusb', odds are this is
-> > busybox, right?
+> Fix it by iterating over the array of supported frequencies and
+> selecting a one that matches or returning -EINVAL for unsupported
+> rates.
 > 
-> Right. (You win a digital cookie.)
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Yeah!
+When this function was written, it was written for speed. The only user
+of setting pll0 rate is drivers/cpufreq/davinci-cpufreq.c (not sure how
+you were trying to set pll0 rate). And that driver directly passes the
+table index to the set_rate() function.
 
-{munch munch}
+The idea was to optimize for speed in cpufreq driver and quickly index
+into the pll data instead of searching through it.
 
-> cd buildroot && make menuconfig
-> Drop BR2_PACKAGE_USBMOUNT (maybe it causes unexpected issues)
->  Add BR2_PACKAGE_USBUTILS (I want the real deal)
+But I agree, it is confusing and we are better off with maintainable
+code. So, no problem with the patch, but this needs to be done along
+with updates to cpufreq driver.
+
+> ---
+>  arch/arm/mach-davinci/da850.c | 22 ++++++++++++++++++----
+>  1 file changed, 18 insertions(+), 4 deletions(-)
 > 
-> > And these are just the root hubs, that the USB controller driver creates
-> > as "virtual" USB devices, they are not "real" USB devices on your bus.
-> 
-> # lsusb --version
-> lsusb (usbutils) 007
-> I see there's a 008 version.
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index 855b720..1c0f296 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+> @@ -1173,14 +1173,28 @@ static int da850_set_armrate(struct clk *clk, unsigned long index)
+>  	return clk_set_rate(pllclk, index);
+>  }
+>  
+> -static int da850_set_pll0rate(struct clk *clk, unsigned long index)
+> +static int da850_set_pll0rate(struct clk *clk, unsigned long requested_rate)
 
-Wow, 008 was released in 2014, what type of old repo are you using that
-has 007 as the "latest"?
+Calling it just 'rate' is fine, IMO. The name of the function is enough
+to suggest that its the rate to be set to.
 
-And I really should go do a new update, lots of bug fixes have happened
-since 2014...
-
-> Am I missing out on important diagnostics?
-
-Not really, if you are not doing a lot of USB 3-only device specific
-work, which is where the majority of the changes have happened in the
-past 2 years in the tool.
-
-> 
-> # lsusb -v
-> 
-> Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
-
-<snip>
-
-> Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
-
-<snip>
-
-> Does everything look normal?
-
-Yes, two internal "virtual" hubs.
-
-> Or are there any investigation-worthy nuggets?
-
-You need to figure out why the driver isn't getting interrupts, that's
-the main problem for your hardware at the moment, lsusb isn't going to
-help you out at all with that...
-
-good luck!
-
-greg k-h
+Thanks,
+Sekhar
