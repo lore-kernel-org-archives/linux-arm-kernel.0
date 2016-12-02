@@ -1,61 +1,38 @@
 From: jcm@redhat.com (Jon Masters)
-Date: Thu, 1 Dec 2016 23:52:00 -0500
-Subject: ACPI namespace details for ARM64
-In-Reply-To: <20161109220506.GN14322@bhelgaas-glaptop.roam.corp.google.com>
-References: <20161109220506.GN14322@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <1d7424da-f9f8-68e3-5571-b9fc46f13a7f@redhat.com>
+Date: Thu, 1 Dec 2016 23:58:52 -0500
+Subject: [PATCHv2] PCI: QDF2432 32 bit config space accessors
+In-Reply-To: <20161103140058.GA31142@bhelgaas-glaptop.roam.corp.google.com>
+References: <20160921173129.GA20006@localhost>
+ <20160921223805.21652-1-cov@codeaurora.org>
+ <20161031214833.GB14603@bhelgaas-glaptop.roam.corp.google.com>
+ <dbf40b73baa71155f39e13d6e51073aa@codeaurora.org>
+ <20161102160820.GA6568@bhelgaas-glaptop.roam.corp.google.com>
+ <3fd26a0d-a5c2-c385-866e-b957dffb7dda@codeaurora.org>
+ <20161103140058.GA31142@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <3a386ce0-33df-fb88-33df-88b9ca8816c7@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/2016 05:05 PM, Bjorn Helgaas wrote:
+On 11/03/2016 10:00 AM, Bjorn Helgaas wrote:
 
-> We've been working through the details of getting ACPI to work on
-> arm64, and there have been lots of questions about what this means for
-> PCI.  I've outlined this for several people individually, but I'm
-> going to send this separately, apart from a specific patch series, to
-> make sure we're all on the same page.  Please correct my errors and
-> misunderstandings.
+> It turns out that we can't use the _CRS of host bridges because of the
+> Producer/Consumer bit screwup [1].  So the fallback is to include the
+> ECAM space in the _CRS of a PNP0C02 device.  This is what the PCI
+> Firmware spec r3.0, Table 4-2, footnote 2 is talking about.
+> 
+> Bjorn
+> 
+> [1] The original ACPI spec intent was that Consumer resources would be
+> space like ECAM that is consumed directly by the bridge, and Producer
+> resources would be the windows forwarded down to PCI.  But BIOSes
+> didn't use the Producer/Consumer bit consistently, so we have to
+> assume that all resources in host bridge _CRS are windows, which
+> leaves us no way to describe the Consumer resources.
 
-Thanks so much again for writing this.
-
-When we originally created the SBBR (Server Base Boot Requirements) we
-were very vague about things like PCI. On x86, it "just worked", and so
-we said generic things about MCFG tables and implementing PCI correctly,
-but we didn't think of all of the many ways it might be done badly. In
-that respect, Intel and AMD have spoiled us over the years (thanks!) :)
-
-Since then, we've had a lot of opportunity to learn about buggy IP
-that's out there and we've done a lot to have it fixed, and to get
-all of the vendors to take care of these problems before their next
-generation silicon lands. Indeed, we're doing a lot more on the pre
-silicon front as well these days, but that's for another time.
-
-And of course, once you have all the Linux distros and other OSes out
-there, it's easier for the next wave to come along anyway. It will
-either boot for them, or it won't. And if it doesn't boot, the
-vendors will have two choices: upstream a fix and get every distro to
-pick it up at some future point (and wait until then because you won't
-even be able to boot the installation media to install an update) or
-don't make the mistake in the first place and fix it pre-silicon.
-
-What I would like to get out of this experience is not only the
-summary you've written, which we will point people to as a living
-document, but also a more useful update to the ARM SBBR that spells
-out the many actual requirements and expectations. I want to go a
-lot further and start prescribing lots of other things in the next
-major update to the SBBR (everything from "you will map your RAM at
-zero", and you will implement your SMMU topology in this way...")
-that were too hand wavy before, but definitely want a giant section
-on how to do PCI right. So we'll come ping you for input on that :)
-
-> The basic requirement is that the ACPI namespace should describe
-> *everything* that consumes address space unless there's another
-> standard way for the OS to find it [1, 2].
-
-...and by the way, this was a key lesson for me, too. I had not
-fully internalized before that you don't just want to describe the
-ECAM region in the MCFG but you also need to ensure it's properly
-described in the ACPI namespace. Lots of good things learned.
+Aside - and now I realize you'd called this out as recently as last
+month. Alas the HPE m400 I reference on the other thread about the
+APM quirks doesn't have the motherboard resource entry so we're
+stuck with exactly the situation you describe above there.
 
 Jon.
 
