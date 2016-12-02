@@ -1,248 +1,258 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Thu,  1 Dec 2016 16:41:37 -0800
-Subject: [PATCH net-next 1/8] drivers: net: xgene: Add helper function
+Date: Thu,  1 Dec 2016 16:41:38 -0800
+Subject: [PATCH net-next 2/8] drivers: net: xgene: Configure classifier with
+ pagepool
 In-Reply-To: <1480639304-18757-1-git-send-email-isubramanian@apm.com>
 References: <1480639304-18757-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1480639304-18757-2-git-send-email-isubramanian@apm.com>
+Message-ID: <1480639304-18757-3-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a prepartion patch and adds xgene_enet_get_fpsel() helper
-function to get buffer pool number.
+This patch configures classifier with the pagepool information.
 
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 Signed-off-by: Quan Nguyen <qnguyen@apm.com>
 ---
- drivers/net/ethernet/apm/xgene/xgene_enet_cle.c   |  4 ++--
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.c    | 19 +++++++------------
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.h    |  8 ++++++++
- drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c | 20 +++++++-------------
- drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c | 20 +++++++-------------
- 5 files changed, 31 insertions(+), 40 deletions(-)
+ drivers/net/ethernet/apm/xgene/xgene_enet_cle.c   | 16 ++++++++++++++--
+ drivers/net/ethernet/apm/xgene/xgene_enet_cle.h   |  2 ++
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c    |  7 +++++--
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h    |  6 ++++--
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c  | 11 +++++++++--
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h  |  3 ++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c |  9 ++++++---
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c |  7 +++++--
+ 8 files changed, 47 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_cle.c b/drivers/net/ethernet/apm/xgene/xgene_enet_cle.c
-index 23d72af..7aac0fb 100644
+index 7aac0fb..caa55bd 100644
 --- a/drivers/net/ethernet/apm/xgene/xgene_enet_cle.c
 +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_cle.c
-@@ -346,7 +346,7 @@ static int xgene_cle_set_rss_idt(struct xgene_enet_pdata *pdata)
- 	for (i = 0; i < XGENE_CLE_IDT_ENTRIES; i++) {
- 		idx = i % pdata->rxq_cnt;
- 		pool_id = pdata->rx_ring[idx]->buf_pool->id;
--		fpsel = xgene_enet_ring_bufnum(pool_id) - 0x20;
-+		fpsel = xgene_enet_get_fpsel(pool_id);
+@@ -52,6 +52,7 @@ static void xgene_cle_dbptr_to_hw(struct xgene_enet_pdata *pdata,
+ {
+ 	buf[0] = SET_VAL(CLE_DROP, dbptr->drop);
+ 	buf[4] = SET_VAL(CLE_FPSEL, dbptr->fpsel) |
++		 SET_VAL(CLE_NFPSEL, dbptr->nxtfpsel) |
+ 		 SET_VAL(CLE_DSTQIDL, dbptr->dstqid);
+ 
+ 	buf[5] = SET_VAL(CLE_DSTQIDH, (u32)dbptr->dstqid >> CLE_DSTQIDL_LEN) |
+@@ -349,8 +350,12 @@ static int xgene_cle_set_rss_idt(struct xgene_enet_pdata *pdata)
+ 		fpsel = xgene_enet_get_fpsel(pool_id);
  		dstqid = xgene_enet_dst_ring_num(pdata->rx_ring[idx]);
  		nfpsel = 0;
- 		idt_reg = 0;
-@@ -706,7 +706,7 @@ static int xgene_enet_cle_init(struct xgene_enet_pdata *pdata)
+-		idt_reg = 0;
++		if (pdata->rx_ring[idx]->page_pool) {
++			pool_id = pdata->rx_ring[idx]->page_pool->id;
++			nfpsel = xgene_enet_get_fpsel(pool_id);
++		}
  
++		idt_reg = 0;
+ 		xgene_cle_idt_to_hw(pdata, dstqid, fpsel, nfpsel, &idt_reg);
+ 		ret = xgene_cle_dram_wr(&pdata->cle, &idt_reg, 1, i,
+ 					RSS_IDT, CLE_CMD_WR);
+@@ -400,9 +405,9 @@ static int xgene_cle_setup_rss(struct xgene_enet_pdata *pdata)
+ static int xgene_enet_cle_init(struct xgene_enet_pdata *pdata)
+ {
+ 	struct xgene_enet_cle *enet_cle = &pdata->cle;
++	u32 def_qid, def_fpsel, def_nxtfpsel, pool_id;
+ 	struct xgene_cle_dbptr dbptr[DB_MAX_PTRS];
+ 	struct xgene_cle_ptree_branch *br;
+-	u32 def_qid, def_fpsel, pool_id;
+ 	struct xgene_cle_ptree *ptree;
+ 	struct xgene_cle_ptree_kn kn;
+ 	int ret;
+@@ -707,13 +712,20 @@ static int xgene_enet_cle_init(struct xgene_enet_pdata *pdata)
  	def_qid = xgene_enet_dst_ring_num(pdata->rx_ring[0]);
  	pool_id = pdata->rx_ring[0]->buf_pool->id;
--	def_fpsel = xgene_enet_ring_bufnum(pool_id) - 0x20;
-+	def_fpsel = xgene_enet_get_fpsel(pool_id);
+ 	def_fpsel = xgene_enet_get_fpsel(pool_id);
++	def_nxtfpsel = 0;
++	if (pdata->rx_ring[0]->page_pool) {
++		pool_id = pdata->rx_ring[0]->page_pool->id;
++		def_nxtfpsel = xgene_enet_get_fpsel(pool_id);
++	}
  
  	memset(dbptr, 0, sizeof(struct xgene_cle_dbptr) * DB_MAX_PTRS);
  	dbptr[DB_RES_ACCEPT].fpsel =  def_fpsel;
++	dbptr[DB_RES_ACCEPT].nxtfpsel = def_nxtfpsel;
+ 	dbptr[DB_RES_ACCEPT].dstqid = def_qid;
+ 	dbptr[DB_RES_ACCEPT].cle_priority = 1;
+ 
+ 	dbptr[DB_RES_DEF].fpsel = def_fpsel;
++	dbptr[DB_RES_DEF].nxtfpsel = def_nxtfpsel;
+ 	dbptr[DB_RES_DEF].dstqid = def_qid;
+ 	dbptr[DB_RES_DEF].cle_priority = 7;
+ 	xgene_cle_setup_def_dbptr(pdata, enet_cle, &dbptr[DB_RES_DEF],
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_cle.h b/drivers/net/ethernet/apm/xgene/xgene_enet_cle.h
+index 9ac9f8e..903be0c 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_cle.h
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_cle.h
+@@ -91,6 +91,8 @@
+ #define CLE_DSTQIDH_LEN		5
+ #define CLE_FPSEL_POS		21
+ #define CLE_FPSEL_LEN		4
++#define CLE_NFPSEL_POS		17
++#define CLE_NFPSEL_LEN		4
+ #define CLE_PRIORITY_POS	5
+ #define CLE_PRIORITY_LEN	3
+ 
 diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-index 5390ae8..1007074 100644
+index 1007074..c395df3 100644
 --- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
 +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-@@ -555,7 +555,7 @@ static void xgene_enet_cle_bypass(struct xgene_enet_pdata *pdata,
- 	u32 cb;
- 	u32 fpsel;
+@@ -550,12 +550,14 @@ static void xgene_enet_config_ring_if_assoc(struct xgene_enet_pdata *pdata)
+ }
  
--	fpsel = xgene_enet_ring_bufnum(bufpool_id) - 0x20;
-+	fpsel = xgene_enet_get_fpsel(bufpool_id);
+ static void xgene_enet_cle_bypass(struct xgene_enet_pdata *pdata,
+-				  u32 dst_ring_num, u16 bufpool_id)
++				  u32 dst_ring_num, u16 bufpool_id,
++				  u16 nxtbufpool_id)
+ {
+ 	u32 cb;
+-	u32 fpsel;
++	u32 fpsel, nxtfpsel;
+ 
+ 	fpsel = xgene_enet_get_fpsel(bufpool_id);
++	nxtfpsel = xgene_enet_get_fpsel(nxtbufpool_id);
  
  	xgene_enet_rd_csr(pdata, CLE_BYPASS_REG0_0_ADDR, &cb);
  	cb |= CFG_CLE_BYPASS_EN0;
-@@ -652,16 +652,14 @@ static int xgene_enet_reset(struct xgene_enet_pdata *pdata)
- static void xgene_enet_clear(struct xgene_enet_pdata *pdata,
- 			     struct xgene_enet_desc_ring *ring)
- {
--	u32 addr, val, data;
--
--	val = xgene_enet_ring_bufnum(ring->id);
-+	u32 addr, data;
- 
- 	if (xgene_enet_is_bufpool(ring->id)) {
- 		addr = ENET_CFGSSQMIFPRESET_ADDR;
--		data = BIT(val - 0x20);
-+		data = BIT(xgene_enet_get_fpsel(ring->id));
- 	} else {
- 		addr = ENET_CFGSSQMIWQRESET_ADDR;
--		data = BIT(val);
-+		data = BIT(xgene_enet_ring_bufnum(ring->id));
- 	}
- 
- 	xgene_enet_wr_ring_if(pdata, addr, data);
-@@ -671,24 +669,21 @@ static void xgene_gport_shutdown(struct xgene_enet_pdata *pdata)
- {
- 	struct device *dev = &pdata->pdev->dev;
- 	struct xgene_enet_desc_ring *ring;
--	u32 pb, val;
-+	u32 pb;
- 	int i;
- 
- 	pb = 0;
- 	for (i = 0; i < pdata->rxq_cnt; i++) {
- 		ring = pdata->rx_ring[i]->buf_pool;
-+		pb |= BIT(xgene_enet_get_fpsel(ring->id));
- 
--		val = xgene_enet_ring_bufnum(ring->id);
--		pb |= BIT(val - 0x20);
- 	}
- 	xgene_enet_wr_ring_if(pdata, ENET_CFGSSQMIFPRESET_ADDR, pb);
- 
- 	pb = 0;
- 	for (i = 0; i < pdata->txq_cnt; i++) {
- 		ring = pdata->tx_ring[i];
--
--		val = xgene_enet_ring_bufnum(ring->id);
--		pb |= BIT(val);
-+		pb |= BIT(xgene_enet_ring_bufnum(ring->id));
- 	}
- 	xgene_enet_wr_ring_if(pdata, ENET_CFGSSQMIWQRESET_ADDR, pb);
+@@ -565,6 +567,7 @@ static void xgene_enet_cle_bypass(struct xgene_enet_pdata *pdata,
+ 	xgene_enet_rd_csr(pdata, CLE_BYPASS_REG1_0_ADDR, &cb);
+ 	CFG_CLE_DSTQID0_SET(&cb, dst_ring_num);
+ 	CFG_CLE_FPSEL0_SET(&cb, fpsel);
++	CFG_CLE_NXTFPSEL0_SET(&cb, nxtfpsel);
+ 	xgene_enet_wr_csr(pdata, CLE_BYPASS_REG1_0_ADDR, cb);
+ }
  
 diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-index 06e598c..e73cbb1 100644
+index e73cbb1..bd6cb6c 100644
 --- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
 +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-@@ -346,6 +346,14 @@ static inline bool xgene_enet_is_bufpool(u16 id)
- 	return ((id & RING_BUFNUM_MASK) >= 0x20) ? true : false;
- }
- 
-+static inline u8 xgene_enet_get_fpsel(u16 id)
-+{
-+	if (xgene_enet_is_bufpool(id))
-+		return xgene_enet_ring_bufnum(id) - RING_BUFNUM_BUFPOOL;
-+
-+	return 0;
-+}
-+
- static inline u16 xgene_enet_get_numslots(u16 id, u32 size)
+@@ -165,10 +165,12 @@ enum xgene_enet_rm {
+ #define CFG_CLE_IP_PROTOCOL0_SET(dst, val)	xgene_set_bits(dst, val, 16, 2)
+ #define CFG_CLE_DSTQID0_SET(dst, val)		xgene_set_bits(dst, val, 0, 12)
+ #define CFG_CLE_FPSEL0_SET(dst, val)		xgene_set_bits(dst, val, 16, 4)
++#define CFG_CLE_NXTFPSEL0_SET(dst, val)		xgene_set_bits(dst, val, 20, 4)
+ #define CFG_MACMODE_SET(dst, val)		xgene_set_bits(dst, val, 18, 2)
+ #define CFG_WAITASYNCRD_SET(dst, val)		xgene_set_bits(dst, val, 0, 16)
+-#define CFG_CLE_DSTQID0(val)		(val & GENMASK(11, 0))
+-#define CFG_CLE_FPSEL0(val)		((val << 16) & GENMASK(19, 16))
++#define CFG_CLE_DSTQID0(val)		((val) & GENMASK(11, 0))
++#define CFG_CLE_FPSEL0(val)		(((val) << 16) & GENMASK(19, 16))
++#define CFG_CLE_NXTFPSEL0(val)		(((val) << 20) & GENMASK(23, 20))
+ #define ICM_CONFIG0_REG_0_ADDR		0x0400
+ #define ICM_CONFIG2_REG_0_ADDR		0x0410
+ #define RX_DV_GATE_REG_0_ADDR		0x05fc
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+index 1352b52..c89acf5 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+@@ -1518,9 +1518,10 @@ static int xgene_enet_get_resources(struct xgene_enet_pdata *pdata)
+ static int xgene_enet_init_hw(struct xgene_enet_pdata *pdata)
  {
- 	bool is_bufpool = xgene_enet_is_bufpool(id);
+ 	struct xgene_enet_cle *enet_cle = &pdata->cle;
++	struct xgene_enet_desc_ring *page_pool;
+ 	struct net_device *ndev = pdata->ndev;
+ 	struct xgene_enet_desc_ring *buf_pool;
+-	u16 dst_ring_num;
++	u16 dst_ring_num, ring_id;
+ 	int i, ret;
+ 
+ 	ret = pdata->port_ops->reset(pdata);
+@@ -1558,8 +1559,14 @@ static int xgene_enet_init_hw(struct xgene_enet_pdata *pdata)
+ 			netdev_err(ndev, "Preclass Tree init error\n");
+ 			goto err;
+ 		}
++
+ 	} else {
+-		pdata->port_ops->cle_bypass(pdata, dst_ring_num, buf_pool->id);
++		dst_ring_num = xgene_enet_dst_ring_num(pdata->rx_ring[0]);
++		buf_pool = pdata->rx_ring[0]->buf_pool;
++		page_pool = pdata->rx_ring[0]->page_pool;
++		ring_id = (page_pool) ? page_pool->id : 0;
++		pdata->port_ops->cle_bypass(pdata, dst_ring_num,
++					    buf_pool->id, ring_id);
+ 	}
+ 
+ 	pdata->phy_speed = SPEED_UNKNOWN;
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
+index 011965b..1fe3942 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
+@@ -115,6 +115,7 @@ struct xgene_enet_desc_ring {
+ 	enum xgene_enet_ring_cfgsize cfgsize;
+ 	struct xgene_enet_desc_ring *cp_ring;
+ 	struct xgene_enet_desc_ring *buf_pool;
++	struct xgene_enet_desc_ring *page_pool;
+ 	struct napi_struct napi;
+ 	union {
+ 		void *desc_addr;
+@@ -152,7 +153,7 @@ struct xgene_port_ops {
+ 	void (*clear)(struct xgene_enet_pdata *pdata,
+ 		      struct xgene_enet_desc_ring *ring);
+ 	void (*cle_bypass)(struct xgene_enet_pdata *pdata,
+-			   u32 dst_ring_num, u16 bufpool_id);
++			   u32 dst_ring_num, u16 bufpool_id, u16 nxtbufpool_id);
+ 	void (*shutdown)(struct xgene_enet_pdata *pdata);
+ };
+ 
 diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
-index d12e9cb..8e4209c 100644
+index 8e4209c..82b7a5e 100644
 --- a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
 +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
-@@ -501,7 +501,7 @@ static void xgene_enet_cle_bypass(struct xgene_enet_pdata *p,
- 	data = CFG_CLE_BYPASS_EN0;
+@@ -484,11 +484,12 @@ static int xgene_enet_reset(struct xgene_enet_pdata *p)
+ }
+ 
+ static void xgene_enet_cle_bypass(struct xgene_enet_pdata *p,
+-				  u32 dst_ring_num, u16 bufpool_id)
++				  u32 dst_ring_num, u16 bufpool_id,
++				  u16 nxtbufpool_id)
+ {
+-	u32 data, fpsel;
+ 	u32 cle_bypass_reg0, cle_bypass_reg1;
+ 	u32 offset = p->port_id * MAC_OFFSET;
++	u32 data, fpsel, nxtfpsel;
+ 
+ 	if (p->enet_id == XGENE_ENET1) {
+ 		cle_bypass_reg0 = CLE_BYPASS_REG0_0_ADDR;
+@@ -502,7 +503,9 @@ static void xgene_enet_cle_bypass(struct xgene_enet_pdata *p,
  	xgene_enet_wr_csr(p, cle_bypass_reg0 + offset, data);
  
--	fpsel = xgene_enet_ring_bufnum(bufpool_id) - 0x20;
-+	fpsel = xgene_enet_get_fpsel(bufpool_id);
- 	data = CFG_CLE_DSTQID0(dst_ring_num) | CFG_CLE_FPSEL0(fpsel);
+ 	fpsel = xgene_enet_get_fpsel(bufpool_id);
+-	data = CFG_CLE_DSTQID0(dst_ring_num) | CFG_CLE_FPSEL0(fpsel);
++	nxtfpsel = xgene_enet_get_fpsel(nxtbufpool_id);
++	data = CFG_CLE_DSTQID0(dst_ring_num) | CFG_CLE_FPSEL0(fpsel) |
++	       CFG_CLE_NXTFPSEL0(nxtfpsel);
  	xgene_enet_wr_csr(p, cle_bypass_reg1 + offset, data);
  }
-@@ -509,16 +509,14 @@ static void xgene_enet_cle_bypass(struct xgene_enet_pdata *p,
- static void xgene_enet_clear(struct xgene_enet_pdata *pdata,
- 			     struct xgene_enet_desc_ring *ring)
- {
--	u32 addr, val, data;
--
--	val = xgene_enet_ring_bufnum(ring->id);
-+	u32 addr, data;
- 
- 	if (xgene_enet_is_bufpool(ring->id)) {
- 		addr = ENET_CFGSSQMIFPRESET_ADDR;
--		data = BIT(val - 0x20);
-+		data = BIT(xgene_enet_get_fpsel(ring->id));
- 	} else {
- 		addr = ENET_CFGSSQMIWQRESET_ADDR;
--		data = BIT(val);
-+		data = BIT(xgene_enet_ring_bufnum(ring->id));
- 	}
- 
- 	xgene_enet_wr_ring_if(pdata, addr, data);
-@@ -528,24 +526,20 @@ static void xgene_enet_shutdown(struct xgene_enet_pdata *p)
- {
- 	struct device *dev = &p->pdev->dev;
- 	struct xgene_enet_desc_ring *ring;
--	u32 pb, val;
-+	u32 pb;
- 	int i;
- 
- 	pb = 0;
- 	for (i = 0; i < p->rxq_cnt; i++) {
- 		ring = p->rx_ring[i]->buf_pool;
--
--		val = xgene_enet_ring_bufnum(ring->id);
--		pb |= BIT(val - 0x20);
-+		pb |= BIT(xgene_enet_get_fpsel(ring->id));
- 	}
- 	xgene_enet_wr_ring_if(p, ENET_CFGSSQMIFPRESET_ADDR, pb);
- 
- 	pb = 0;
- 	for (i = 0; i < p->txq_cnt; i++) {
- 		ring = p->tx_ring[i];
--
--		val = xgene_enet_ring_bufnum(ring->id);
--		pb |= BIT(val);
-+		pb |= BIT(xgene_enet_ring_bufnum(ring->id));
- 	}
- 	xgene_enet_wr_ring_if(p, ENET_CFGSSQMIWQRESET_ADDR, pb);
  
 diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
-index d1758b0..f97e599 100644
+index f97e599..e4adba6 100644
 --- a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
 +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
-@@ -359,7 +359,7 @@ static void xgene_enet_xgcle_bypass(struct xgene_enet_pdata *pdata,
- 	CFG_CLE_IP_PROTOCOL0_SET(&cb, 3);
+@@ -350,9 +350,10 @@ static int xgene_enet_reset(struct xgene_enet_pdata *pdata)
+ }
+ 
+ static void xgene_enet_xgcle_bypass(struct xgene_enet_pdata *pdata,
+-				    u32 dst_ring_num, u16 bufpool_id)
++				    u32 dst_ring_num, u16 bufpool_id,
++				    u16 nxtbufpool_id)
+ {
+-	u32 cb, fpsel;
++	u32 cb, fpsel, nxtfpsel;
+ 
+ 	xgene_enet_rd_csr(pdata, XCLE_BYPASS_REG0_ADDR, &cb);
+ 	cb |= CFG_CLE_BYPASS_EN0;
+@@ -360,9 +361,11 @@ static void xgene_enet_xgcle_bypass(struct xgene_enet_pdata *pdata,
  	xgene_enet_wr_csr(pdata, XCLE_BYPASS_REG0_ADDR, cb);
  
--	fpsel = xgene_enet_ring_bufnum(bufpool_id) - 0x20;
-+	fpsel = xgene_enet_get_fpsel(bufpool_id);
+ 	fpsel = xgene_enet_get_fpsel(bufpool_id);
++	nxtfpsel = xgene_enet_get_fpsel(nxtbufpool_id);
  	xgene_enet_rd_csr(pdata, XCLE_BYPASS_REG1_ADDR, &cb);
  	CFG_CLE_DSTQID0_SET(&cb, dst_ring_num);
  	CFG_CLE_FPSEL0_SET(&cb, fpsel);
-@@ -370,24 +370,20 @@ static void xgene_enet_shutdown(struct xgene_enet_pdata *pdata)
- {
- 	struct device *dev = &pdata->pdev->dev;
- 	struct xgene_enet_desc_ring *ring;
--	u32 pb, val;
-+	u32 pb;
- 	int i;
++	CFG_CLE_NXTFPSEL0_SET(&cb, nxtfpsel);
+ 	xgene_enet_wr_csr(pdata, XCLE_BYPASS_REG1_ADDR, cb);
+ }
  
- 	pb = 0;
- 	for (i = 0; i < pdata->rxq_cnt; i++) {
- 		ring = pdata->rx_ring[i]->buf_pool;
--
--		val = xgene_enet_ring_bufnum(ring->id);
--		pb |= BIT(val - 0x20);
-+		pb |= BIT(xgene_enet_get_fpsel(ring->id));
- 	}
- 	xgene_enet_wr_ring_if(pdata, ENET_CFGSSQMIFPRESET_ADDR, pb);
- 
- 	pb = 0;
- 	for (i = 0; i < pdata->txq_cnt; i++) {
- 		ring = pdata->tx_ring[i];
--
--		val = xgene_enet_ring_bufnum(ring->id);
--		pb |= BIT(val);
-+		pb |= BIT(xgene_enet_ring_bufnum(ring->id));
- 	}
- 	xgene_enet_wr_ring_if(pdata, ENET_CFGSSQMIWQRESET_ADDR, pb);
- 
-@@ -400,16 +396,14 @@ static void xgene_enet_shutdown(struct xgene_enet_pdata *pdata)
- static void xgene_enet_clear(struct xgene_enet_pdata *pdata,
- 			     struct xgene_enet_desc_ring *ring)
- {
--	u32 addr, val, data;
--
--	val = xgene_enet_ring_bufnum(ring->id);
-+	u32 addr, data;
- 
- 	if (xgene_enet_is_bufpool(ring->id)) {
- 		addr = ENET_CFGSSQMIFPRESET_ADDR;
--		data = BIT(val - 0x20);
-+		data = BIT(xgene_enet_get_fpsel(ring->id));
- 	} else {
- 		addr = ENET_CFGSSQMIWQRESET_ADDR;
--		data = BIT(val);
-+		data = BIT(xgene_enet_ring_bufnum(ring->id));
- 	}
- 
- 	xgene_enet_wr_ring_if(pdata, addr, data);
 -- 
 1.9.1
