@@ -1,67 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Dec 2016 10:31:40 -0800
-Subject: [PATCH 2/2] ARM: omap: timers: reduce rating of gp_timer
- clocksource
-In-Reply-To: <14878d85-1b08-5df1-4e67-6f982ba72019@ti.com>
-References: <1479968355-18860-1-git-send-email-j-keerthy@ti.com>
- <1479968355-18860-2-git-send-email-j-keerthy@ti.com>
- <d3a71d3d-3015-bb1f-80a4-4bb9adecaa4c@ti.com>
- <20161202164714.GB4705@atomide.com>
- <14878d85-1b08-5df1-4e67-6f982ba72019@ti.com>
-Message-ID: <20161202183139.GF4705@atomide.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 02 Dec 2016 13:33:11 -0500 (EST)
+Subject: [PATCH net-next v2] net: thunderx: Fix transmit queue timeout
+ issue
+In-Reply-To: <1480596868-17693-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1480596868-17693-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <20161202.133311.494383963195952738.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [161202 10:02]:
+From: sunil.kovvuri@gmail.com
+Date: Thu,  1 Dec 2016 18:24:28 +0530
+
+> From: Sunil Goutham <sgoutham@cavium.com>
 > 
+> Transmit queue timeout issue is seen in two cases
+> - Due to a race condition btw setting stop_queue at xmit()
+>   and checking for stopped_queue in NAPI poll routine, at times
+>   transmission from a SQ comes to a halt. This is fixed
+>   by using barriers and also added a check for SQ free descriptors,
+>   incase SQ is stopped and there are only CQE_RX i.e no CQE_TX.
+> - Contrary to an assumption, a HW errata where HW doesn't stop transmission
+>   even though there are not enough CQEs available for a CQE_TX is
+>   not fixed in T88 pass 2.x. This results in a Qset error with
+>   'CQ_WR_FULL' stalling transmission. This is fixed by adjusting
+>   RXQ's  RED levels for CQ level such that there is always enough
+>   space left for CQE_TXs.
 > 
-> On 12/02/2016 10:47 AM, Tony Lindgren wrote:
-> > * Grygorii Strashko <grygorii.strashko@ti.com> [161129 08:43]:
-> > > 
-> > > 
-> > > On 11/24/2016 12:19 AM, Keerthy wrote:
-> > > > From: Grygorii Strashko <grygorii.strashko@ti.com>
-> > > > 
-> > > > Now ARM Global timer (rating 300) will not be selected as clocksource,
-> > > > because it's initialized after OMAP GP Timer (rating 300) and
-> > > > Timekeeping core will not allow to replace clocksource with new one if
-> > > > both of them have the same rating.
-> > > > 
-> > > > Reduce rating of OMAP GP Timer (300->290) when it's used as
-> > > > clocksource device - this will allow to select ARM Global timer (300)
-> > > > as clocksource when enabled.
-> > > > 
-> > > > Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> > > > Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> > > > Signed-off-by: Keerthy <j-keerthy@ti.com>
-> > > 
-> > > Unfortunately, this patch has dependency [1] and can't be used alone as
-> > > it will cause ARM Global timer to be selected as clocksource
-> > > always on am437x and this will kill cpuidle, because ARM Global timer
-> > > is not in always_on domain.
-> > > 
-> > > The intention of enabling ARM Global timer is only for non-pm aware use
-> > > cases for RT-kernel latency improvement - where deep cpuidle states are not
-> > > enabled.
-> > 
-> > Yeah we need to fix up things to be able to change the clocksource
-> > in addition to clockevent. However, currently only cpuidle_coupled
-> > knows when the whole system is idle, so quite a bit of work is
-> > needed to do that in a sane way.
-> 
-> Also sched_clock and timer_delay ;)
+> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+> ---
+> v2: As suggested by David, replaced netif_tx_start_queue with 
+>     netif_tx_wake_queue.
 
-Yeah sched_clock would need something to save and restore it..
-Not nice :)
-
-> > What about the first patch in this series?
-> > 
-> 
-> Fist one is ok. It was originally posted long time ago.
-
-OK so can you please resend that one more time with proper
-Fixes tag on it?
-
-Regards,
-
-Tony
+Applied, thanks.
