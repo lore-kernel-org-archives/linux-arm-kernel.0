@@ -1,94 +1,39 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Fri,  2 Dec 2016 15:53:00 +0100
-Subject: [PATCH v4] ARM: davinci: da8xx: Fix sleeping function called from
- invalid context
-Message-ID: <1480690380-13216-1-git-send-email-abailon@baylibre.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Fri,  2 Dec 2016 20:25:04 +0530
+Subject: [RESEND PATCH V6 1/6] iommu: add IOMMU_PRIV attribute
+In-Reply-To: <1480690509-13490-1-git-send-email-sricharan@codeaurora.org>
+References: <1480690509-13490-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1480690509-13490-2-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Everytime the usb20 phy is enabled, there is a
-"sleeping function called from invalid context" BUG.
+From: Mitchel Humpherys <mitchelh@codeaurora.org>
 
-clk_enable() from arch/arm/mach-davinci/clock.c uses spin_lock_irqsave()
-before to invoke the callback usb20_phy_clk_enable().
-usb20_phy_clk_enable() uses clk_get() and clk_enable_prepapre()
-which may sleep.
-Move clk_get() to da8xx_register_usb20_phy_clk() and
-replace clk_prepare_enable() by clk_enable().
+Add the IOMMU_PRIV attribute, which is used to indicate privileged
+mappings.
 
-Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Tested-by: Robin Murphy <robin.murphy@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
 ---
- arch/arm/mach-davinci/usb-da8xx.c | 28 +++++++++++++++-------------
- 1 file changed, 15 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
-index b010e5f..704f506 100644
---- a/arch/arm/mach-davinci/usb-da8xx.c
-+++ b/arch/arm/mach-davinci/usb-da8xx.c
-@@ -22,6 +22,8 @@
- #define DA8XX_USB0_BASE		0x01e00000
- #define DA8XX_USB1_BASE		0x01e25000
+[V6] No change
+
+ include/linux/iommu.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index f2960e4..bf22131 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -31,6 +31,7 @@
+ #define IOMMU_CACHE	(1 << 2) /* DMA cache coherency */
+ #define IOMMU_NOEXEC	(1 << 3)
+ #define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
++#define IOMMU_PRIV	(1 << 5) /* privileged */
  
-+static struct clk *usb20_clk;
-+
- static struct platform_device da8xx_usb_phy = {
- 	.name		= "da8xx-usb-phy",
- 	.id		= -1,
-@@ -158,21 +160,14 @@ int __init da8xx_register_usb_refclkin(int rate)
- 
- static void usb20_phy_clk_enable(struct clk *clk)
- {
--	struct clk *usb20_clk;
- 	int err;
- 	u32 val;
- 	u32 timeout = 500000; /* 500 msec */
- 
- 	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
- 
--	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
--	if (IS_ERR(usb20_clk)) {
--		pr_err("could not get usb20 clk: %ld\n", PTR_ERR(usb20_clk));
--		return;
--	}
--
- 	/* The USB 2.O PLL requires that the USB 2.O PSC is enabled as well. */
--	err = clk_prepare_enable(usb20_clk);
-+	err = clk_enable(usb20_clk);
- 	if (err) {
- 		pr_err("failed to enable usb20 clk: %d\n", err);
- 		clk_put(usb20_clk);
-@@ -197,8 +192,7 @@ static void usb20_phy_clk_enable(struct clk *clk)
- 
- 	pr_err("Timeout waiting for USB 2.0 PHY clock good\n");
- done:
--	clk_disable_unprepare(usb20_clk);
--	clk_put(usb20_clk);
-+	clk_disable(usb20_clk);
- }
- 
- static void usb20_phy_clk_disable(struct clk *clk)
-@@ -285,11 +279,19 @@ static struct clk_lookup usb20_phy_clk_lookup =
- int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
- {
- 	struct clk *parent;
--	int ret = 0;
-+	int ret;
-+
-+	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
-+	ret = PTR_ERR_OR_ZERO(usb20_clk);
-+	if (ret)
-+		return ret;
- 
- 	parent = clk_get(NULL, use_usb_refclkin ? "usb_refclkin" : "pll0_aux");
--	if (IS_ERR(parent))
--		return PTR_ERR(parent);
-+	ret = PTR_ERR_OR_ZERO(parent);
-+	if (ret) {
-+		clk_put(usb20_clk);
-+		return ret;
-+	}
- 
- 	usb20_phy_clk.parent = parent;
- 	ret = clk_register(&usb20_phy_clk);
+ struct iommu_ops;
+ struct iommu_group;
 -- 
-2.7.3
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
