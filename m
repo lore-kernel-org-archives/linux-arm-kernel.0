@@ -1,38 +1,34 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri,  2 Dec 2016 15:05:34 +0000
-Subject: [RFC v3 PATCH 16/25] ARM: ep93xx: select ARM_PATCH_PHYS_VIRT for MMU
- builds only
+Date: Fri,  2 Dec 2016 15:05:39 +0000
+Subject: [RFC v3 PATCH 21/25] PCI: tegra: limit to MMU build only
 In-Reply-To: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
 References: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1480691143-19845-17-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1480691143-19845-22-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building in NOMMU configurations lead to the following splat:
+This driver rely on MMU for virtual address space optimisations (see
+comment around tegra_pcie_bus_alloc()) and breaks NOMMU build, thus
+add dependency on MMU.
 
-warning: (ARCH_INTEGRATOR && ARCH_MULTIPLATFORM && ARCH_EP93XX) selects ARM_PATCH_PHYS_VIRT which has unmet direct dependencies (!XIP_KERNEL && MMU)
-
-Make sure ARM_PATCH_PHYS_VIRT is selected for MMU builds only.
-
-Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <rmallon@gmail.com>
+Cc: Thierry Reding <thierry.reding@gmail.com>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/Kconfig |    2 +-
+ drivers/pci/host/Kconfig |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 90c91de..b3fa6e9 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -380,7 +380,7 @@ config ARCH_EP93XX
- 	bool "EP93xx-based"
- 	select ARCH_HAS_HOLES_MEMORYMODEL
- 	select ARM_AMBA
--	select ARM_PATCH_PHYS_VIRT
-+	select ARM_PATCH_PHYS_VIRT if MMU
- 	select ARM_VIC
- 	select AUTO_ZRELADDR
- 	select CLKDEV_LOOKUP
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index d7e7c0a..836fa02 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -69,7 +69,7 @@ config PCI_IMX6
+ 
+ config PCI_TEGRA
+ 	bool "NVIDIA Tegra PCIe controller"
+-	depends on ARCH_TEGRA && !ARM64
++	depends on ARCH_TEGRA && !ARM64 && MMU
+ 	help
+ 	  Say Y here if you want support for the PCIe host controller found
+ 	  on NVIDIA Tegra SoCs.
 -- 
 1.7.9.5
