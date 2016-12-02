@@ -1,61 +1,94 @@
-From: fweimer@redhat.com (Florian Weimer)
-Date: Fri, 2 Dec 2016 17:34:33 +0100
-Subject: [RFC PATCH 00/29] arm64: Scalable Vector Extension core support
-In-Reply-To: <20161202114850.GQ1574@e103592.cambridge.arm.com>
-References: <20161130120654.GJ1574@e103592.cambridge.arm.com>
- <3e8afc5a-1ba9-6369-462b-4f5a707d8b8a@redhat.com>
- <20161202114850.GQ1574@e103592.cambridge.arm.com>
-Message-ID: <faabab1d-fafb-2bd1-200f-b0e3ba17e1d5@redhat.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 3 Dec 2016 00:37:34 +0800
+Subject: [PATCH v2 2/3] ARM: dts: sunxi: add support for Orange Pi Zero
+ board
+In-Reply-To: <324c8820-aeea-3fad-0e02-1bdb8f675677@arm.com>
+References: <20161121162421.800-1-icenowy@aosc.xyz>
+ <20161121162421.800-2-icenowy@aosc.xyz>
+ <5373671480239408@web31m.yandex.ru>
+ <cdfd3c65-d473-badb-ea6a-035f7ab79217@arm.com>
+ <20161201093619.gs6lmoxtlptp2jr6@lukather> <11498641480688550@web2g.yandex.ru>
+ <efb30303-b9bb-7a7c-4478-af485991dd86@redhat.com>
+ <11535601480689127@web2g.yandex.ru>
+ <324c8820-aeea-3fad-0e02-1bdb8f675677@arm.com>
+Message-ID: <CAGb2v64be0yUxn19A1qhR8J6xhZwLoZnWNmfXESsbu_Bv=8czg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2016 12:48 PM, Dave Martin wrote:
-> On Wed, Nov 30, 2016 at 01:38:28PM +0100, Florian Weimer wrote:
+On Sat, Dec 3, 2016 at 12:10 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+> Hi,
 >
-> [...]
+> On 02/12/16 14:32, Icenowy Zheng wrote:
+>>
+>>
+>> 02.12.2016, 22:30, "Hans de Goede" <hdegoede@redhat.com>:
+>>> Hi,
+>>>
+>>> On 02-12-16 15:22, Icenowy Zheng wrote:
+>>>>  01.12.2016, 17:36, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>>>>>  On Mon, Nov 28, 2016 at 12:29:07AM +0000, Andr? Przywara wrote:
+>>>>>>   > Something more interesting happened.
+>>>>>>   >
+>>>>>>   > Xunlong made a add-on board for Orange Pi Zero, which exposes the
+>>>>>>   > two USB Controllers exported at expansion bus as USB Type-A
+>>>>>>   > connectors.
+>>>>>>   >
+>>>>>>   > Also it exposes a analog A/V jack and a microphone.
+>>>>>>   >
+>>>>>>   > Should I enable {e,o}hci{2.3} in the device tree?
+>>>>>>
+>>>>>>   Actually we should do this regardless of this extension board. The USB
+>>>>>>   pins are not multiplexed and are exposed on user accessible pins (just
+>>>>>>   not soldered, but that's a detail), so I think they qualify for DT
+>>>>>>   enablement. And even if a user can't use them, it doesn't hurt to have
+>>>>>>   them (since they are not multiplexed).
+>>>>>
+>>>>>  My main concern about this is that we'll leave regulators enabled by
+>>>>>  default, for a minority of users. And that minority will prevent to do
+>>>>>  a proper power management when the times come since we'll have to keep
+>>>>>  that behaviour forever.
+>>>>
+>>>>  I think these users can add a 'fdt set /xxx/xxx status "disabled" ' .
+>>>
+>>> I don't think that will be necessary I'm pretty sure these extra usb
+>>> ports do not have a regulator for the Vbus, they just hook directly
+>>> to the 5V rail, can someone with a schematic check ?
+>>
+>> We seems to have still no schematics for the add-on board.
 >
->> We could add a system call to get the right stack size.  But as it depends
->> on VL, I'm not sure what it looks like.  Particularly if you need determine
->> the stack size before creating a thread that uses a specific VL setting.
+> From looking at the picture of that expansion board on the Aliexpress
+> page and chasing the tracks, there is clearly no voltage regulator on
+> there, it's just passive components. The 5V pin from the headers is
+> routed forth and back between the two layers via some vias directly to
+> the 5V pins of the USB sockets.
 >
-> I missed this point previously -- apologies for that.
+>> But something is sure is that there's no any regulator-related pins
+>> on the add-on pinout. There's only USB DM and DP pins.
+>>
+>> So the Vbus must be directly connected to +5V.
 >
-> What would you think of:
+> So yes, it is.
 >
-> 	set_vl(vl_for_new_thread);
-> 	minsigstksz = get_minsigstksz();
-> 	set_vl(my_vl);
+> But I think the question is moot anyways, since we don't provide DT
+> support for that add-on board at that point anyways.
+> One could imagine another board, though, which has regulators switched
+> by GPIOs, but that would be their problem and they would have regulators
+> specified in their specific DT snippet, then.
 >
-> This avoids get_minsigstksz() requiring parameters -- which is mainly a
-> concern because the parameters tomorrow might be different from the
-> parameters today.
+> So to summarize:
+> - For that specific Orange Pi Zero board which we discuss the DT for
+> there is no regulator support for the additional USB ports. Thus nothing
+> we could turn off to save power.
+> - A user could just take these USB brackets with pin headers that are so
+> common in PCs to connect additional USB ports to the back of the box.
+> One just needs to re-sort the pins, which is a matter of a minute.
+> - As long as we don't provide any easy way of handling DT changes, we
+> should enable the USB ports for the sake of the users of either those
+> brackets or the expansion board. Any more sophisticated USB expansion
+> board with regulators would need to amend the DT anyway.
 >
-> If it is possible to create the new thread without any SVE-dependent code,
-> then we could
->
-> 	set_vl(vl_for_new_thread);
-> 	new_thread_stack = malloc(get_minsigstksz());
-> 	new_thread = create_thread(..., new_thread_stack);
-> 	set_vl(my_vl);
->
-> which has the nice property that the new thread directly inherits the
-> configuration that was used for get_minsigstksz().
+> Does that make sense?
 
-Because all SVE registers are caller-saved, it's acceptable to 
-temporarily reduce the VL value, I think.  So this should work.
+Sounds good to me.
 
-One complication is that both the kernel and the libc need to reserve 
-stack space, so the kernel-returned value and the one which has to be 
-used in reality will be different.
-
-> However, it would be necessary to prevent GCC from moving any code
-> across these statements -- in particular, SVE code that access VL-
-> dependent data spilled on the stack is liable to go wrong if reordered
-> with the above.  So the sequence would need to go in an external
-> function (or a single asm...)
-
-I would talk to GCC folks?we have similar issues with changing the FPU 
-rounding mode, I assume.
-
-Thanks,
-Florian
+ChenYu
