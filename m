@@ -1,247 +1,352 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Thu,  1 Dec 2016 16:41:43 -0800
-Subject: [PATCH net-next 7/8] drivers: net: xgene: Add flow control
- initialization
+Date: Thu,  1 Dec 2016 16:41:42 -0800
+Subject: [PATCH net-next 6/8] drivers: net: xgene: Add flow control
+ configuration
 In-Reply-To: <1480639304-18757-1-git-send-email-isubramanian@apm.com>
 References: <1480639304-18757-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1480639304-18757-8-git-send-email-isubramanian@apm.com>
+Message-ID: <1480639304-18757-7-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds flow control/pause frame initialization and
-advertising capabilities.
+This patch adds functions to configure mac, when flow control
+and pause frame settings change.
 
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 Signed-off-by: Quan Nguyen <qnguyen@apm.com>
 ---
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.c    | 57 +++++++++++++++++++++++
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.h    |  7 +++
- drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c | 44 ++++++++++++++++-
- drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c | 17 +++++++
- drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h |  7 +++
- 5 files changed, 131 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c    | 48 +++++++++++++++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h    |  6 +++
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h  |  6 +++
+ drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c | 64 ++++++++++++++++------
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c | 66 ++++++++++++++++++++++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h |  2 +
+ 6 files changed, 176 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-index 23a0175..06e6816 100644
+index 92cc7e5..23a0175 100644
 --- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
 +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-@@ -577,6 +577,17 @@ static void xgene_gmac_init(struct xgene_enet_pdata *pdata)
- 	/* Rtype should be copied from FP */
- 	xgene_enet_wr_csr(pdata, RSIF_RAM_DBG_REG0_ADDR, 0);
- 
-+	/* Configure HW pause frame generation */
-+	xgene_enet_rd_mcx_csr(pdata, CSR_MULTI_DPF0_ADDR, &value);
-+	value = (DEF_QUANTA << 16) | (value & 0xFFFF);
-+	xgene_enet_wr_mcx_csr(pdata, CSR_MULTI_DPF0_ADDR, value);
-+
-+	xgene_enet_wr_csr(pdata, RXBUF_PAUSE_THRESH, DEF_PAUSE_THRES);
-+	xgene_enet_wr_csr(pdata, RXBUF_PAUSE_OFF_THRESH, DEF_PAUSE_OFF_THRES);
-+
-+	xgene_gmac_flowctl_tx(pdata, pdata->tx_pause);
-+	xgene_gmac_flowctl_rx(pdata, pdata->rx_pause);
-+
- 	/* Rx-Tx traffic resume */
- 	xgene_enet_wr_csr(pdata, CFG_LINK_AGGR_RESUME_0_ADDR, TX_PORT0);
- 
-@@ -749,6 +760,48 @@ static void xgene_gport_shutdown(struct xgene_enet_pdata *pdata)
- 	}
+@@ -509,6 +509,51 @@ static void xgene_enet_set_frame_size(struct xgene_enet_pdata *pdata, int size)
+ 	xgene_enet_wr_mcx_mac(pdata, MAX_FRAME_LEN_ADDR, size);
  }
  
-+static u32 xgene_enet_flowctrl_cfg(struct net_device *ndev)
++static void xgene_gmac_enable_tx_pause(struct xgene_enet_pdata *pdata,
++				       bool enable)
 +{
-+	struct xgene_enet_pdata *pdata = netdev_priv(ndev);
-+	struct phy_device *phydev = ndev->phydev;
-+	u16 lcladv, rmtadv = 0;
-+	u32 rx_pause, tx_pause;
-+	u8 flowctl = 0;
++	u32 data;
 +
-+	if (!phydev->duplex || !pdata->pause_autoneg)
-+		return 0;
++	xgene_enet_rd_mcx_csr(pdata, CSR_ECM_CFG_0_ADDR, &data);
 +
-+	if (pdata->tx_pause)
-+		flowctl |= FLOW_CTRL_TX;
++	if (enable)
++		data |= MULTI_DPF_AUTOCTRL | PAUSE_XON_EN;
++	else
++		data &= ~(MULTI_DPF_AUTOCTRL | PAUSE_XON_EN);
 +
-+	if (pdata->rx_pause)
-+		flowctl |= FLOW_CTRL_RX;
-+
-+	lcladv = mii_advertise_flowctrl(flowctl);
-+
-+	if (phydev->pause)
-+		rmtadv = LPA_PAUSE_CAP;
-+
-+	if (phydev->asym_pause)
-+		rmtadv |= LPA_PAUSE_ASYM;
-+
-+	flowctl = mii_resolve_flowctrl_fdx(lcladv, rmtadv);
-+	tx_pause = !!(flowctl & FLOW_CTRL_TX);
-+	rx_pause = !!(flowctl & FLOW_CTRL_RX);
-+
-+	if (tx_pause != pdata->tx_pause) {
-+		pdata->tx_pause = tx_pause;
-+		pdata->mac_ops->flowctl_tx(pdata, pdata->tx_pause);
-+	}
-+
-+	if (rx_pause != pdata->rx_pause) {
-+		pdata->rx_pause = rx_pause;
-+		pdata->mac_ops->flowctl_rx(pdata, pdata->rx_pause);
-+	}
-+
-+	return 0;
++	xgene_enet_wr_mcx_csr(pdata, CSR_ECM_CFG_0_ADDR, data);
 +}
 +
- static void xgene_enet_adjust_link(struct net_device *ndev)
- {
- 	struct xgene_enet_pdata *pdata = netdev_priv(ndev);
-@@ -763,6 +816,8 @@ static void xgene_enet_adjust_link(struct net_device *ndev)
- 			mac_ops->tx_enable(pdata);
- 			phy_print_status(phydev);
- 		}
++static void xgene_gmac_flowctl_tx(struct xgene_enet_pdata *pdata, bool enable)
++{
++	u32 data;
 +
-+		xgene_enet_flowctrl_cfg(ndev);
- 	} else {
- 		mac_ops->rx_disable(pdata);
- 		mac_ops->tx_disable(pdata);
-@@ -836,6 +891,8 @@ int xgene_enet_phy_connect(struct net_device *ndev)
- 	phy_dev->supported &= ~SUPPORTED_10baseT_Half &
- 			      ~SUPPORTED_100baseT_Half &
- 			      ~SUPPORTED_1000baseT_Half;
-+	phy_dev->supported |= SUPPORTED_Pause |
-+			      SUPPORTED_Asym_Pause;
- 	phy_dev->advertising = phy_dev->supported;
++	xgene_enet_rd_mcx_mac(pdata, MAC_CONFIG_1_ADDR, &data);
++
++	if (enable)
++		data |= TX_FLOW_EN;
++	else
++		data &= ~TX_FLOW_EN;
++
++	xgene_enet_wr_mcx_mac(pdata, MAC_CONFIG_1_ADDR, data);
++
++	pdata->mac_ops->enable_tx_pause(pdata, enable);
++}
++
++static void xgene_gmac_flowctl_rx(struct xgene_enet_pdata *pdata, bool enable)
++{
++	u32 data;
++
++	xgene_enet_rd_mcx_mac(pdata, MAC_CONFIG_1_ADDR, &data);
++
++	if (enable)
++		data |= RX_FLOW_EN;
++	else
++		data &= ~RX_FLOW_EN;
++
++	xgene_enet_wr_mcx_mac(pdata, MAC_CONFIG_1_ADDR, data);
++}
++
+ static void xgene_gmac_init(struct xgene_enet_pdata *pdata)
+ {
+ 	u32 value;
+@@ -909,6 +954,9 @@ void xgene_enet_mdio_remove(struct xgene_enet_pdata *pdata)
+ 	.set_speed = xgene_gmac_set_speed,
+ 	.set_mac_addr = xgene_gmac_set_mac_addr,
+ 	.set_framesize = xgene_enet_set_frame_size,
++	.enable_tx_pause = xgene_gmac_enable_tx_pause,
++	.flowctl_tx     = xgene_gmac_flowctl_tx,
++	.flowctl_rx     = xgene_gmac_flowctl_rx,
+ };
  
- 	return 0;
+ const struct xgene_port_ops xgene_gport_ops = {
 diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-index 7ba649d..5f83037 100644
+index bd6cb6c..7ba649d 100644
 --- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
 +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-@@ -172,6 +172,13 @@ enum xgene_enet_rm {
+@@ -170,6 +170,10 @@ enum xgene_enet_rm {
+ #define CFG_WAITASYNCRD_SET(dst, val)		xgene_set_bits(dst, val, 0, 16)
+ #define CFG_CLE_DSTQID0(val)		((val) & GENMASK(11, 0))
  #define CFG_CLE_FPSEL0(val)		(((val) << 16) & GENMASK(19, 16))
- #define CSR_ECM_CFG_0_ADDR		0x0220
- #define CSR_ECM_CFG_1_ADDR		0x0224
-+#define CSR_MULTI_DPF0_ADDR		0x0230
-+#define RXBUF_PAUSE_THRESH		0x0534
-+#define RXBUF_PAUSE_OFF_THRESH		0x0540
-+#define DEF_PAUSE_THRES			0x7d
-+#define DEF_PAUSE_OFF_THRES		0x6d
-+#define DEF_QUANTA			0x8000
-+#define NORM_PAUSE_OPCODE		0x0001
- #define PAUSE_XON_EN			BIT(30)
- #define MULTI_DPF_AUTOCTRL		BIT(28)
++#define CSR_ECM_CFG_0_ADDR		0x0220
++#define CSR_ECM_CFG_1_ADDR		0x0224
++#define PAUSE_XON_EN			BIT(30)
++#define MULTI_DPF_AUTOCTRL		BIT(28)
  #define CFG_CLE_NXTFPSEL0(val)		(((val) << 20) & GENMASK(23, 20))
+ #define ICM_CONFIG0_REG_0_ADDR		0x0400
+ #define ICM_CONFIG2_REG_0_ADDR		0x0410
+@@ -198,6 +202,8 @@ enum xgene_enet_rm {
+ #define SOFT_RESET1			BIT(31)
+ #define TX_EN				BIT(0)
+ #define RX_EN				BIT(2)
++#define TX_FLOW_EN			BIT(4)
++#define RX_FLOW_EN			BIT(5)
+ #define ENET_LHD_MODE			BIT(25)
+ #define ENET_GHD_MODE			BIT(26)
+ #define FULL_DUPLEX2			BIT(0)
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
+index 61aa987..5257174 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
+@@ -159,6 +159,9 @@ struct xgene_mac_ops {
+ 	void (*set_framesize)(struct xgene_enet_pdata *pdata, int framesize);
+ 	void (*set_mss)(struct xgene_enet_pdata *pdata, u16 mss, u8 index);
+ 	void (*link_state)(struct work_struct *work);
++	void (*enable_tx_pause)(struct xgene_enet_pdata *pdata, bool enable);
++	void (*flowctl_rx)(struct xgene_enet_pdata *pdata, bool enable);
++	void (*flowctl_tx)(struct xgene_enet_pdata *pdata, bool enable);
+ };
+ 
+ struct xgene_port_ops {
+@@ -234,6 +237,9 @@ struct xgene_enet_pdata {
+ 	bool mdio_driver;
+ 	struct gpio_desc *sfp_rdy;
+ 	bool sfp_gpio_en;
++	u32 pause_autoneg;
++	bool tx_pause;
++	bool rx_pause;
+ };
+ 
+ struct xgene_indirect_ctl {
 diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
-index 1c9b8ba..a8e063b 100644
+index 6283f2b..1c9b8ba 100644
 --- a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
 +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
-@@ -393,9 +393,11 @@ static void xgene_sgmac_flowctl_rx(struct xgene_enet_pdata *pdata, bool enable)
- 
- static void xgene_sgmac_init(struct xgene_enet_pdata *p)
- {
-+	u32 pause_thres_reg, pause_off_thres_reg;
- 	u32 enet_spare_cfg_reg, rsif_config_reg;
- 	u32 cfg_bypass_reg, rx_dv_gate_reg;
--	u32 data, offset;
-+	u32 data, data1, data2, offset;
-+	u32 multi_dpf_reg;
- 
- 	if (!(p->enet_id == XGENE_ENET2 && p->mdio_driver))
- 		xgene_sgmac_reset(p);
-@@ -431,6 +433,46 @@ static void xgene_sgmac_init(struct xgene_enet_pdata *p)
- 	data |= CFG_RSIF_FPBUFF_TIMEOUT_EN;
- 	xgene_enet_wr_csr(p, rsif_config_reg, data);
- 
-+	/* Configure HW pause frame generation */
-+	multi_dpf_reg = (p->enet_id == XGENE_ENET1) ? CSR_MULTI_DPF0_ADDR :
-+			 XG_MCX_MULTI_DPF0_ADDR;
-+	data = xgene_enet_rd_mcx_csr(p, multi_dpf_reg);
-+	data = (DEF_QUANTA << 16) | (data & 0xffff);
-+	xgene_enet_wr_mcx_csr(p, multi_dpf_reg, data);
-+
-+	if (p->enet_id != XGENE_ENET1) {
-+		data = xgene_enet_rd_mcx_csr(p, XG_MCX_MULTI_DPF1_ADDR);
-+		data =  (NORM_PAUSE_OPCODE << 16) | (data & 0xFFFF);
-+		xgene_enet_wr_mcx_csr(p, XG_MCX_MULTI_DPF1_ADDR, data);
-+	}
-+
-+	pause_thres_reg = (p->enet_id == XGENE_ENET1) ? RXBUF_PAUSE_THRESH :
-+			   XG_RXBUF_PAUSE_THRESH;
-+	pause_off_thres_reg = (p->enet_id == XGENE_ENET1) ?
-+			       RXBUF_PAUSE_OFF_THRESH : 0;
-+
-+	if (p->enet_id == XGENE_ENET1) {
-+		data1 = xgene_enet_rd_csr(p, pause_thres_reg);
-+		data2 = xgene_enet_rd_csr(p, pause_off_thres_reg);
-+
-+		if (!(p->port_id % 2)) {
-+			data1 = (data1 & 0xffff0000) | DEF_PAUSE_THRES;
-+			data2 = (data2 & 0xffff0000) | DEF_PAUSE_OFF_THRES;
-+		} else {
-+			data1 = (data1 & 0xffff) | (DEF_PAUSE_THRES << 16);
-+			data2 = (data2 & 0xffff) | (DEF_PAUSE_OFF_THRES << 16);
-+		}
-+
-+		xgene_enet_wr_csr(p, pause_thres_reg, data1);
-+		xgene_enet_wr_csr(p, pause_off_thres_reg, data2);
-+	} else {
-+		data = (DEF_PAUSE_OFF_THRES << 16) | DEF_PAUSE_THRES;
-+		xgene_enet_wr_csr(p, pause_thres_reg, data);
-+	}
-+
-+	xgene_sgmac_flowctl_tx(p, p->tx_pause);
-+	xgene_sgmac_flowctl_rx(p, p->rx_pause);
-+
- 	/* Bypass traffic gating */
- 	xgene_enet_wr_csr(p, XG_ENET_SPARE_CFG_REG_1_ADDR, 0x84);
- 	xgene_enet_wr_csr(p, cfg_bypass_reg, RESUME_TX);
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
-index 727ef4b..ece19e6 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
-@@ -349,6 +349,23 @@ static void xgene_xgmac_init(struct xgene_enet_pdata *pdata)
- 	xgene_enet_wr_csr(pdata, XG_ENET_SPARE_CFG_REG_1_ADDR, 0x82);
- 	xgene_enet_wr_csr(pdata, XGENET_RX_DV_GATE_REG_0_ADDR, 0);
- 	xgene_enet_wr_csr(pdata, XG_CFG_BYPASS_ADDR, RESUME_TX);
-+
-+	/* Configure HW pause frame generation */
-+	xgene_enet_rd_axg_csr(pdata, XGENET_CSR_MULTI_DPF0_ADDR, &data);
-+	data = (DEF_QUANTA << 16) | (data & 0xFFFF);
-+	xgene_enet_wr_axg_csr(pdata, XGENET_CSR_MULTI_DPF0_ADDR, data);
-+
-+	if (pdata->enet_id != XGENE_ENET1) {
-+		xgene_enet_rd_axg_csr(pdata, XGENET_CSR_MULTI_DPF1_ADDR, &data);
-+		data = (NORM_PAUSE_OPCODE << 16) | (data & 0xFFFF);
-+		xgene_enet_wr_axg_csr(pdata, XGENET_CSR_MULTI_DPF1_ADDR, data);
-+	}
-+
-+	data = (XG_DEF_PAUSE_OFF_THRES << 16) | XG_DEF_PAUSE_THRES;
-+	xgene_enet_wr_csr(pdata, XG_RXBUF_PAUSE_THRESH, data);
-+
-+	xgene_xgmac_flowctl_tx(pdata, pdata->tx_pause);
-+	xgene_xgmac_flowctl_rx(pdata, pdata->rx_pause);
+@@ -365,6 +365,32 @@ static void xgene_sgmii_enable_autoneg(struct xgene_enet_pdata *p)
+ 		netdev_err(p->ndev, "Auto-negotiation failed\n");
  }
  
- static void xgene_xgmac_rx_enable(struct xgene_enet_pdata *pdata)
++static void xgene_sgmac_rxtx(struct xgene_enet_pdata *p, u32 bits, bool set)
++{
++	u32 data;
++
++	data = xgene_enet_rd_mac(p, MAC_CONFIG_1_ADDR);
++
++	if (set)
++		data |= bits;
++	else
++		data &= ~bits;
++
++	xgene_enet_wr_mac(p, MAC_CONFIG_1_ADDR, data);
++}
++
++static void xgene_sgmac_flowctl_tx(struct xgene_enet_pdata *p, bool enable)
++{
++	xgene_sgmac_rxtx(p, TX_FLOW_EN, enable);
++
++	p->mac_ops->enable_tx_pause(p, enable);
++}
++
++static void xgene_sgmac_flowctl_rx(struct xgene_enet_pdata *pdata, bool enable)
++{
++	xgene_sgmac_rxtx(pdata, RX_FLOW_EN, enable);
++}
++
+ static void xgene_sgmac_init(struct xgene_enet_pdata *p)
+ {
+ 	u32 enet_spare_cfg_reg, rsif_config_reg;
+@@ -411,20 +437,6 @@ static void xgene_sgmac_init(struct xgene_enet_pdata *p)
+ 	xgene_enet_wr_mcx_csr(p, rx_dv_gate_reg, RESUME_RX0);
+ }
+ 
+-static void xgene_sgmac_rxtx(struct xgene_enet_pdata *p, u32 bits, bool set)
+-{
+-	u32 data;
+-
+-	data = xgene_enet_rd_mac(p, MAC_CONFIG_1_ADDR);
+-
+-	if (set)
+-		data |= bits;
+-	else
+-		data &= ~bits;
+-
+-	xgene_enet_wr_mac(p, MAC_CONFIG_1_ADDR, data);
+-}
+-
+ static void xgene_sgmac_rx_enable(struct xgene_enet_pdata *p)
+ {
+ 	xgene_sgmac_rxtx(p, RX_EN, true);
+@@ -591,6 +603,25 @@ static void xgene_enet_link_state(struct work_struct *work)
+ 	schedule_delayed_work(&p->link_work, poll_interval);
+ }
+ 
++static void xgene_sgmac_enable_tx_pause(struct xgene_enet_pdata *p, bool enable)
++{
++	u32 data, ecm_cfg_addr;
++
++	if (p->enet_id == XGENE_ENET1) {
++		ecm_cfg_addr = (!(p->port_id % 2)) ? CSR_ECM_CFG_0_ADDR :
++				CSR_ECM_CFG_1_ADDR;
++	} else {
++		ecm_cfg_addr = XG_MCX_ECM_CFG_0_ADDR;
++	}
++
++	data = xgene_enet_rd_mcx_csr(p, ecm_cfg_addr);
++	if (enable)
++		data |= MULTI_DPF_AUTOCTRL | PAUSE_XON_EN;
++	else
++		data &= ~(MULTI_DPF_AUTOCTRL | PAUSE_XON_EN);
++	xgene_enet_wr_mcx_csr(p, ecm_cfg_addr, data);
++}
++
+ const struct xgene_mac_ops xgene_sgmac_ops = {
+ 	.init		= xgene_sgmac_init,
+ 	.reset		= xgene_sgmac_reset,
+@@ -601,7 +632,10 @@ static void xgene_enet_link_state(struct work_struct *work)
+ 	.set_speed	= xgene_sgmac_set_speed,
+ 	.set_mac_addr	= xgene_sgmac_set_mac_addr,
+ 	.set_framesize  = xgene_sgmac_set_frame_size,
+-	.link_state	= xgene_enet_link_state
++	.link_state	= xgene_enet_link_state,
++	.enable_tx_pause = xgene_sgmac_enable_tx_pause,
++	.flowctl_tx     = xgene_sgmac_flowctl_tx,
++	.flowctl_rx     = xgene_sgmac_flowctl_rx
+ };
+ 
+ const struct xgene_port_ops xgene_sgport_ops = {
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
+index 2a9761b..727ef4b 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
+@@ -101,6 +101,14 @@ static void xgene_enet_wr_pcs(struct xgene_enet_pdata *pdata,
+ 			   wr_addr);
+ }
+ 
++static void xgene_enet_wr_axg_csr(struct xgene_enet_pdata *pdata,
++				  u32 offset, u32 val)
++{
++	void __iomem *addr = pdata->mcx_mac_csr_addr + offset;
++
++	iowrite32(val, addr);
++}
++
+ static void xgene_enet_rd_csr(struct xgene_enet_pdata *pdata,
+ 			      u32 offset, u32 *val)
+ {
+@@ -174,6 +182,14 @@ static bool xgene_enet_rd_pcs(struct xgene_enet_pdata *pdata,
+ 	return success;
+ }
+ 
++static void xgene_enet_rd_axg_csr(struct xgene_enet_pdata *pdata,
++				  u32 offset, u32 *val)
++{
++	void __iomem *addr = pdata->mcx_mac_csr_addr + offset;
++
++	*val = ioread32(addr);
++}
++
+ static int xgene_enet_ecc_init(struct xgene_enet_pdata *pdata)
+ {
+ 	struct net_device *ndev = pdata->ndev;
+@@ -265,6 +281,51 @@ static u32 xgene_enet_link_status(struct xgene_enet_pdata *pdata)
+ 	return data;
+ }
+ 
++static void xgene_xgmac_enable_tx_pause(struct xgene_enet_pdata *pdata,
++					bool enable)
++{
++	u32 data;
++
++	xgene_enet_rd_axg_csr(pdata, XGENET_CSR_ECM_CFG_0_ADDR, &data);
++
++	if (enable)
++		data |= MULTI_DPF_AUTOCTRL | PAUSE_XON_EN;
++	else
++		data &= ~(MULTI_DPF_AUTOCTRL | PAUSE_XON_EN);
++
++	xgene_enet_wr_axg_csr(pdata, XGENET_CSR_ECM_CFG_0_ADDR, data);
++}
++
++static void xgene_xgmac_flowctl_tx(struct xgene_enet_pdata *pdata, bool enable)
++{
++	u32 data;
++
++	xgene_enet_rd_mac(pdata, AXGMAC_CONFIG_1, &data);
++
++	if (enable)
++		data |= HSTTCTLEN;
++	else
++		data &= ~HSTTCTLEN;
++
++	xgene_enet_wr_mac(pdata, AXGMAC_CONFIG_1, data);
++
++	pdata->mac_ops->enable_tx_pause(pdata, enable);
++}
++
++static void xgene_xgmac_flowctl_rx(struct xgene_enet_pdata *pdata, bool enable)
++{
++	u32 data;
++
++	xgene_enet_rd_mac(pdata, AXGMAC_CONFIG_1, &data);
++
++	if (enable)
++		data |= HSTRCTLEN;
++	else
++		data &= ~HSTRCTLEN;
++
++	xgene_enet_wr_mac(pdata, AXGMAC_CONFIG_1, data);
++}
++
+ static void xgene_xgmac_init(struct xgene_enet_pdata *pdata)
+ {
+ 	u32 data;
+@@ -482,7 +543,10 @@ static void xgene_enet_link_state(struct work_struct *work)
+ 	.set_mac_addr = xgene_xgmac_set_mac_addr,
+ 	.set_framesize = xgene_xgmac_set_frame_size,
+ 	.set_mss = xgene_xgmac_set_mss,
+-	.link_state = xgene_enet_link_state
++	.link_state = xgene_enet_link_state,
++	.enable_tx_pause = xgene_xgmac_enable_tx_pause,
++	.flowctl_rx = xgene_xgmac_flowctl_rx,
++	.flowctl_tx = xgene_xgmac_flowctl_tx
+ };
+ 
+ const struct xgene_port_ops xgene_xgport_ops = {
 diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h
-index 9d75020..03b847a 100644
+index 360ccbd..9d75020 100644
 --- a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h
 +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h
-@@ -60,6 +60,10 @@
+@@ -59,6 +59,7 @@
+ #define HSTMAXFRAME_LENGTH_ADDR		0x0020
  
  #define XG_MCX_RX_DV_GATE_REG_0_ADDR	0x0004
- #define XG_MCX_ECM_CFG_0_ADDR		0x0074
-+#define XG_MCX_MULTI_DPF0_ADDR		0x007c
-+#define XG_MCX_MULTI_DPF1_ADDR		0x0080
-+#define XG_DEF_PAUSE_THRES		0x390
-+#define XG_DEF_PAUSE_OFF_THRES		0x2c0
++#define XG_MCX_ECM_CFG_0_ADDR		0x0074
  #define XG_RSIF_CONFIG_REG_ADDR		0x00a0
  #define XCLE_BYPASS_REG0_ADDR           0x0160
  #define XCLE_BYPASS_REG1_ADDR           0x0164
-@@ -72,6 +76,9 @@
+@@ -70,6 +71,7 @@
+ #define XG_ENET_SPARE_CFG_REG_ADDR	0x040c
  #define XG_ENET_SPARE_CFG_REG_1_ADDR	0x0410
  #define XGENET_RX_DV_GATE_REG_0_ADDR	0x0804
- #define XGENET_CSR_ECM_CFG_0_ADDR	0x0880
-+#define XGENET_CSR_MULTI_DPF0_ADDR	0x0888
-+#define XGENET_CSR_MULTI_DPF1_ADDR	0x088c
-+#define XG_RXBUF_PAUSE_THRESH		0x0020
++#define XGENET_CSR_ECM_CFG_0_ADDR	0x0880
  #define XG_MCX_ICM_CONFIG0_REG_0_ADDR	0x00e0
  #define XG_MCX_ICM_CONFIG2_REG_0_ADDR	0x00e8
  
