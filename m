@@ -1,121 +1,31 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 2 Dec 2016 13:41:11 -0300
-Subject: [PATCH] imx_v6_v7_defconfig: enable SPIDEV module
-In-Reply-To: <20161202161359.y3mzvdxsfb2dyok7@t450s.lan>
-References: <20161202145631.19292-1-gary.bisson@boundarydevices.com>
- <CAOMZO5C8OH6obRn_8zh5HA9zoanRXUpoqk=vEBx+fW3wraNS6Q@mail.gmail.com>
- <20161202152718.o4xv2ru5r7xw7t5e@t450s.lan>
- <CABxcv=nSUfDT-bqHBm2e0XY55Qp4nH+66PriMqnix2RTsN0BNQ@mail.gmail.com>
- <20161202161359.y3mzvdxsfb2dyok7@t450s.lan>
-Message-ID: <CABxcv=nVVW9=i61JmKA-Texn8BUkGTGpuPY+54pMoR394PY5Nw@mail.gmail.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Fri, 2 Dec 2016 08:41:28 -0800
+Subject: [PATCH] soc: ti: qmss: fix the case when !SMP
+In-Reply-To: <b6c6e9c3-6534-9f20-73bb-84c4e31de5e5@oracle.com>
+References: <20161129221508.10551-1-grygorii.strashko@ti.com>
+ <5501170.dgvo5UdPBX@wuerfel>
+ <2531f769-dd28-dfbd-0ed7-b209ef6ae98d@oracle.com>
+ <0a2d9284-d1e3-c848-42a4-66b06babba80@ti.com>
+ <b6c6e9c3-6534-9f20-73bb-84c4e31de5e5@oracle.com>
+Message-ID: <c1ba6591-9b2c-73ef-2e65-c4eedd33113e@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Gary,
-
-On Fri, Dec 2, 2016 at 1:13 PM, Gary Bisson
-<gary.bisson@boundarydevices.com> wrote:
-> Hi Javier,
->
-> Thanks for the quick feedback on the matter.
->
-
-You are welcome.
-
-> On Fri, Dec 02, 2016 at 12:44:42PM -0300, Javier Martinez Canillas wrote:
->> Hello Gary,
+On 11/30/2016 9:14 AM, Santosh Shilimkar wrote:
+> On 11/30/2016 9:10 AM, Grygorii Strashko wrote:
 >>
->> On Fri, Dec 2, 2016 at 12:27 PM, Gary Bisson
->> <gary.bisson@boundarydevices.com> wrote:
->> > Hi Fabio,
->> >
->> > On Fri, Dec 02, 2016 at 01:18:42PM -0200, Fabio Estevam wrote:
->> >> Hi Gary,
->> >>
->> >> On Fri, Dec 2, 2016 at 12:56 PM, Gary Bisson
->> >> <gary.bisson@boundarydevices.com> wrote:
->> >> > Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
->> >> > ---
->> >> > Hi,
->> >> >
->> >> > Seems that this configuration is missing, especially since many
->> >> > device trees are already using "spidev" nodes.
->> >>
+
+[...]
+
 >>
->> This seems to have been added just because people weren't looking that
->> closer to DT patches at the beginning, but now is forbidden. That's
->> why the kernel now warns about it.
+>> For some reason you e-email is not working - delivery failure
+>> ssantosh at kernel.org
 >>
->> >> Then they will trigger the following warning below (from the spidev
->> >> probe function):
->> >>
->> >> /*
->> >> * spidev should never be referenced in DT without a specific
->> >> * compatible string, it is a Linux implementation thing
->> >> * rather than a description of the hardware.
->> >> */
->> >> if (spi->dev.of_node && !of_match_device(spidev_dt_ids, &spi->dev)) {
->> >>     dev_err(&spi->dev, "buggy DT: spidev listed directly in DT\n");
->> >>     WARN_ON(spi->dev.of_node &&
->> >>                        !of_match_device(spidev_dt_ids, &spi->dev));
->> >> }
->> >
->> > Yes I've seen this WARN_ON when doing the dt-overlay testing. But is
->> > disabling the SPIDEV configuration a solution?
->> >
->> > To be honest I disagree with that WARN_ON. Ok it means that the hardware
->> > isn't fully described in the device tree but for development platforms
->> > (such as ours or any rpi-like boards) the user can design his own
->> > daugher board with whatever SPI device on it. Then using the spidev
->> > interface is very convenient, so I don't understand what we are trying
->> > to forbid here.
->> >
->>
->> AFAICT, what we are trying to forbid is to have a Linux implementation
->> detail to creep into a Device Tree.
->>
->> It's OK to use the spidev interface but that's orthogonal on how the
->> device is instantiated from the DT. If you want to do that, the
->> correct approach is AFAIU to add a OF device ID entry in
->> drivers/spi/spidev.c and use that compatible string in your DT.
+> Weird. I was getting all the emails. Thanks for bouncing the thread.
+> I will check.
 >
-> I understand that the device tree isn't supposed to describe such
-> generic "spidev" concept.
->
-> And that argument to me is ok for final products where the hardware is
-> fully defined. However I still believe that for development platforms
-> this cannot be applied. My customers want to use the SPI bus to connect
-> any device they want, and most of those customers don't want to mess
-> with the kernel. For them, having a spidev node, just like it exists for
-> i2cdev nodes, is ideal.
->
+Seems like there was issue with kernel.org mail host which I have
+been told fixed now. You shouldn't see those bouncing anymore.
 
-Yes, they are free to do it in their vendor tree DTBs. They just
-shouldn't try to post their DTS for mainline inclusion :)
-
->> That way, the DT will describe the hardware instead of just a "spidev"
->> but you could use the spidev interface to access your SPI device.
->
-> But then aren't you afraid that the person will use the first compatible
-> that shows up (let's say "rohm,dh2228fv") and use it for all his spidev?
-> In that case the driver is happy although the fact remains that any hw
-> will be plugged behind. Or at the opposite, if everybody that uses
-> spidev adds its own compatible I'm not sure it will benefit the drive
-> code.
->
-
-I agree with you that people adding random compatible strings to the
-spidev OF device ID table will not scale either. I don't really have
-an answer to that, I just mentioned what the SPI maintainers told me
-last time I tried to do something similar for a different platform a
-couple of years ago:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/303348.html
-
-> Anyway, I appreciate your feedback.
->
-> Regards,
-> Gary
-
-Best regards,
-Javier
+Regards,
+Santosh
