@@ -1,39 +1,46 @@
-From: stefan@datenfreihafen.org (Stefan Schmidt)
-Date: Sat,  3 Dec 2016 22:59:57 +0100
-Subject: [PATCH] arm: MAINTAINERS: transfer maintainership for the EZX platform
-Message-ID: <1480802397-25575-1-git-send-email-stefan@datenfreihafen.org>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Sat,  3 Dec 2016 14:30:17 -0800
+Subject: [PATCH v2 1/3] ARM: dts: vf610-zii-dev-rev-b: Remove leftover PWM
+ pingroup
+Message-ID: <1480804219-12596-1-git-send-email-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neither Daniel, Harald or myself are looking into this anymore.
-Robert thankfully agreed to handle the maintenance from now on.
-Also remove the outdated entries for website, git tree and
-mailing list.
+Remove pwm0grp since it is:
 
-Signed-off-by: Stefan Schmidt <stefan@datenfreihafen.org>
+	a) Not referenced anywhere in the DTS file (unlike Tower board it
+	is based on, this board does not use/expose FTM0)
+
+	b) Configures PTB2 and PTB3 in a way that contradicts
+	pinctrl-mdio-mux
+
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- MAINTAINERS | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 2dd40c5..661af76 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1203,13 +1203,9 @@ S:	Maintained
- N:	efm32
+No changes since v1
+
+ arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 9 ---------
+ 1 file changed, 9 deletions(-)
+
+diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+index fa19cfd..2210811 100644
+--- a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
++++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+@@ -677,15 +677,6 @@
+ 		>;
+ 	};
  
- ARM/EZX SMARTPHONES (A780, A910, A1200, E680, ROKR E2 and ROKR E6)
--M:	Daniel Ribeiro <drwyrm@gmail.com>
--M:	Stefan Schmidt <stefan@openezx.org>
--M:	Harald Welte <laforge@openezx.org>
--L:	openezx-devel at lists.openezx.org (moderated for non-subscribers)
--W:	http://www.openezx.org/
-+M:	Robert Jarzmik <robert.jarzmik@free.fr>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
--T:	topgit git://git.openezx.org/openezx.git
- F:	arch/arm/mach-pxa/ezx.c
- 
- ARM/FARADAY FA526 PORT
+-	pinctrl_pwm0: pwm0grp {
+-		fsl,pins = <
+-			VF610_PAD_PTB0__FTM0_CH0	0x1582
+-			VF610_PAD_PTB1__FTM0_CH1	0x1582
+-			VF610_PAD_PTB2__FTM0_CH2	0x1582
+-			VF610_PAD_PTB3__FTM0_CH3	0x1582
+-		>;
+-	};
+-
+ 	pinctrl_qspi0: qspi0grp {
+ 		fsl,pins = <
+ 			VF610_PAD_PTD7__QSPI0_B_QSCK	0x31c3
 -- 
 2.5.5
