@@ -1,160 +1,164 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Dec 2016 16:18:52 -0800
-Subject: [PATCHv4 11/15] clk: ti: clockdomain: add clock provider support
- to clockdomains
-In-Reply-To: <148072274164.32158.6012452044533845688@resonance>
-References: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
- <1476805568-19264-12-git-send-email-t-kristo@ti.com>
- <20161028005047.GQ26139@codeaurora.org>
- <cd32a554-ba0a-33cd-c15c-121524ce679b@ti.com>
- <20161028125112.xfyrx7l7m64z6cu6@atomide.com>
- <20161028233617.GP16026@codeaurora.org>
- <20161028235448.57squdf6cu2wxxvm@atomide.com>
- <148071802182.32158.11479184984645880313@resonance>
- <20161202231240.GH4705@atomide.com>
- <148072274164.32158.6012452044533845688@resonance>
-Message-ID: <20161203001852.GI4705@atomide.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Fri, 2 Dec 2016 19:33:46 -0500
+Subject: [PATCH v3] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe
+ controller
+In-Reply-To: <20161202233943.GF9903@bhelgaas-glaptop.roam.corp.google.com>
+References: <1480549373-2123-1-git-send-email-dhdang@apm.com>
+ <20161201183350.GF30746@bhelgaas-glaptop.roam.corp.google.com>
+ <1480620053.4751.30.camel@redhat.com>
+ <20161201194114.GA8263@bhelgaas-glaptop.roam.corp.google.com>
+ <CADaLNDkVPRPSg0aU-sxHsiJbVvEn=LxcekDt6gfXBBhc+fzhjw@mail.gmail.com>
+ <20161201230736.GA17948@bhelgaas-glaptop.roam.corp.google.com>
+ <CADaLND=Ss8d-jv7wffbrtytrjj=SUnjDn9bognKUszhKguRV1A@mail.gmail.com>
+ <d77e403c-81e9-114e-6ec6-bbffaa4ac36f@redhat.com>
+ <20161202233943.GF9903@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <62dd5462-4d68-b89f-2b45-0d58bbd96bcd@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Michael Turquette <mturquette@baylibre.com> [161202 15:52]:
-> Quoting Tony Lindgren (2016-12-02 15:12:40)
-> > * Michael Turquette <mturquette@baylibre.com> [161202 14:34]:
-> > > Quoting Tony Lindgren (2016-10-28 16:54:48)
-> > > > * Stephen Boyd <sboyd@codeaurora.org> [161028 16:37]:
-> > > > > On 10/28, Tony Lindgren wrote:
-> > > > > > * Tero Kristo <t-kristo@ti.com> [161028 00:43]:
-> > > > > > > On 28/10/16 03:50, Stephen Boyd wrote:
-> > > > > > > > I suppose a PRCM is
-> > > > > > > > like an MFD that has clocks and resets under it? On other
-> > > > > > > > platforms we've combined that all into one node and just had
-> > > > > > > > #clock-cells and #reset-cells in that node. Is there any reason
-> > > > > > > > we can't do that here?
-> > > > > > > 
-> > > > > > > For OMAPs, there are typically multiple instances of the PRCM around; OMAP4
-> > > > > > > for example has:
-> > > > > > > 
-> > > > > > > cm1 @ 0x4a004000 (clocks + clockdomains)
-> > > > > > > cm2 @ 0x4a008000 (clocks + clockdomains)
-> > > > > > > prm @ 0x4a306000 (few clocks + resets + power state handling)
-> > > > > > > scrm @ 0x4a30a000 (few external clocks + plenty of misc stuff)
-> > > > > > > 
-> > > > > > > These instances are also under different power/voltage domains which means
-> > > > > > > their PM behavior is different.
-> > > > > > > 
-> > > > > > > The idea behind having a clockdomain as a provider was mostly to have the
-> > > > > > > topology visible : prcm-instance -> clockdomain -> clocks
-> > > > > > 
-> > > > > > Yeah that's needed to get the interconnect hierarchy right for
-> > > > > > genpd :)
-> > > > > > 
-> > > > > > > ... but basically I think it would be possible to drop the clockdomain
-> > > > > > > representation and just mark the prcm-instance as a clock provider. Tony,
-> > > > > > > any thoughts on that?
-> > > > > > 
-> > > > > > No let's not drop the clockdomains as those will be needed when we
-> > > > > > move things into proper hierarchy within the interconnect instances.
-> > > > > > This will then help with getting things right with genpd.
-> > > > > > 
-> > > > > > In the long run we just want to specify clockdomain and the offset of
-> > > > > > the clock instance within the clockdomain in the dts files.
-> > > > > > 
-> > > > > 
-> > > > > Sorry, I have very little idea how OMAP hardware works. Do you
-> > > > > mean that you will have different nodes for each clockdomain so
-> > > > > that genpd can map 1:1 to the node in dts? But in hardware
-> > > > > there's a prcm that allows us to control many clock domains
-> > > > > through register read/writes? How is the interconnect involved?
-> > > > 
-> > > > There are multiple clockdomains, at least one for each interconnect
-> > > > instance. Once a clockdomain is idle, the related interconnect can
-> > > > idle too. So yeah genpd pretty much maps 1:1 with the clockdomains.
-> > > > 
-> > > > There's more info in for example omap4 TRM section "3.4.1 Device
-> > > > Power-Management Layout" that shows the voltage/power/clock domains.
-> > > > The interconnect instances are mostly named there too looking at
-> > > > the L4/L3 naming.
-> > > 
-> > > I'm confused on two points:
-> > > 
-> > > 1) why are the clkdm's acting as clock providers? I've always hated the
-> > > name "clock domain" since those bits are for managing module state, not
-> > > clock state. The PRM, CM1 and CM2 provide the clocks, not the
-> > > clockdomains.
-> > 
-> > The clock domains have multiple clock inputs that are routed to multiple
-> > child clocks. So it is a clock :)
-> > 
-> > See for example omap4430 TRM "3.6.4 CD_WKUP Clock Domain" on page
-> > 393 in my revision here.
-> > 
-> > On that page "Figure 3-48" shows CD_WKUP with the four input clocks.
-> > And then "Table 3-84. CD_WKUP Control and Status Parameters" shows
-> > the CD_WKUP clock domain specific registers. These registers show
-> > the status, I think they are all read-only registers. Then CD_WKUP
-> > has multiple child clocks with configurable registers.
-> > 
-> > From hardware register point of view, each clock domain has:
-> > 
-> > - Read-only clockdomain status registers in the beginning of
-> >   the address space
-> > 
-> > - Multiple similar clock instances register instances each
-> >   mapping to a specific interconnect target module
-> > 
-> > These are documented in "3.11.16.1 WKUP_CM Register Summary".
+On 12/02/2016 06:39 PM, Bjorn Helgaas wrote:
+> On Thu, Dec 01, 2016 at 11:08:23PM -0500, Jon Masters wrote:
+
+>> Let's see if I summarized this correctly...
+>>
+>> 1. The MMIO registers for the host bridge itself need to be described
+>>    somewhere, especially if we need to find those in a quirk and poke
+>>    them. Since those registers are very much part of the bridge device,
+>>    it makes sense for them to be in the _CRS for PNP0A08/PNP0A03.
+>>
+>> 2. The address space covering these registers MUST be described as a
+>>    ResourceConsumer in order to avoid accidentally exposing them as
+>>    available for use by downstream devices on the PCI bus.
+>>
+>> 3. The ACPI specification allows for resources of the type "Memory32Fixed".
+>>    This is a macro that doesn't have the notion of a producer or consumer.
+>>    HOWEVER various interpretations seem to be that this could/should
+>>    default to being interpreted as a consumed region.
 > 
-> Oh, this is because you are treating the MODULEMODE bits like gate
-> clocks. I never really figured out if this was the best way to model
-> those bits since they do more than control a line toggling at a rate.
-> For instance this bit will affect the master/slave IDLE protocol between
-> the module and the PRCM.
+> I agree; I think that per spec, Memory24, Memory32, Memory32Fixed, IO,
+> and FixedIO should all be for consumed resources, not for bridge
+> windows, since they don't have the notion of producer.
 
-Yes seems like there is some negotiation going on there with the
-target module. But from practical point of view the CLKCTRL
-register is the gate for a module functional clock.
+Ok. If we ultimately codify this somewhere as the general Linux kernel
+consensus (Rafael?) then we can also go and get the various ARM server
+specs updated to reflect this in (for e.g.) reference firmware builds.
 
-> > From hardware point of view, we ideally want to map interconnect
-> > target modules to the clock instance offset from the clock domain
-> > for that interconnect segment. For example gptimer1 clocks would
-> > be just:
-> > 
-> > clocks = <&cd_wkup 0x40>;
-> > 
-> > > 2) why aren't the clock domains modeled as genpds with their associated
-> > > devices attached to them? Note that it is possible to "nest" genpd
-> > > objects. This would also allow for the "Clockdomain Dependency"
-> > > relationships to be properly modeled (see section 3.1.1.1.7 Clock Domain
-> > > Dependency in the OMAP4 TRM).
-> > 
-> > Clock domains only route clocks to child clocks. Power domains
-> > are different registers. The power domains map roughly to
-> > interconnect instances, there we have registers to disable the
-> > whole interconnect when idle.
+> I'm pretty sure there's x86 firmware in the field that uses these for
+> windows, so I think we have to accept that usage, at least on x86.
+
+Ok. I was pondering how to even go about finding that out, but even if
+I scheduled a job across RH's infra to look, that would be a drop in
+the bucket of possible machines that might be out there doing this.
+
+<snip>
+
+> Per spec, we should ignore the Consumer/Producer bit in Word/DWord/QWord
+> descriptors.  In bridge devices on x86, I think we have to treat them as
+> producers (windows) because that's how they've been typically used.  
+
+Ok.
+
+>> BUT if we were to do that, it would break existing shipping systems since
+>> there are quirks out there that use this form to find the base CSR:
+>>
+>>        if (acpi_res->type == ACPI_RESOURCE_TYPE_FIXED_MEMORY32) {
+>>                 fixed32 = &acpi_res->data.fixed_memory32;
+>>                 port->csr_base = ioremap(fixed32->address,
+>>                                          fixed32->address_length);
+>>                 return AE_CTRL_TERMINATE;
+>>         }
 > 
-> I'm not talking about power islands at all, but the genpd object in
-> Linux. For instance, if we treat each clock domain like a clock
-> provider, how could the functional dependency between clkdm_A and
-> clkdm_B be asserted?
+> I think this is a valid usage of FixedMemory32 in terms of the spec.
+> Linux currently handles this as a window if it appears in a PNP0A03
+> device because some x86 firmware used it that way.
+> 
+> We might be able to handle it differently on arm64, e.g., by making an
+> arm64 version of pci_acpi_root_prepare_resources() that checks for
+> IORESOURCE_WINDOW.
 
-To me it seems that some output of a clockdomain is just a input
-of another clockdomain? So it's just the usual parent child
-relationship once we treat a clockdomain just as a clock. Tero
-probably has some input here.
+This is something we should figure out the consensus on and codify.
 
-> There is certainly no API for that in the clock framework, but for genpd
-> your runtime_pm_get() callback for clkdm_A could call runtime_pm_get
-> against clkdm_B, which would satisfy the requirement. See section
-> 3.1.1.1.7 Clock Domain Dependency in the OMAP4 TRM, version AB.
+>> 2. What would happen if we had a difference policy on arm64 for such
+>>    resources. x86 has an "exception" for accessing the config space
+>>    using IO port 0xCF8-0xCFF (a fairly reasonable exception!) and
+>>    we can make the rules for a new platform (i.e. actually prescribe
+>>    exactly what the behavior is, rather than have it not be defined).
+>>    This is of course terrible in that existing BIOS vendors and so on
+>>    won't necessarily know this when working on ARM ACPI later on.
+> 
+>> Indeed. And in the case of m400, it is currently this in shipping systems:
+>>
+>>                Memory32Fixed (ReadWrite,
+>>                     0x1F500000,         // Address Base
+>>                     0x00010000,         // Address Length
+>>                     )
+> 
+>>>>> [    0.822990] pci_bus 0000:00: root bus resource [mem 0x1f2b0000-0x1f2bffff]
+>>>>
+>>>> I think this is wrong.  The PCI core thinks [mem 0x1f2b0000-0x1f2bffff]
+>>>> is available for use by devices on bus 0000:00, but I think you're
+>>>> saying it is consumed by the bridge itself, not forwarded down to PCI.
+> 
+> I think this ASL is perfectly spec-compliant, and what's wrong is the
+> way Linux is interpreting it.
+> 
+> I'm not clear on what's terrible about idea 2.  I think it's basically
+> what I suggested above, i.e., something like the patch below, which I
+> think (hope) would keep us from thinking that region is a window.
 
-To me it seems the API is just clk_get() :) Do you have some
-specific example we can use to check? My guess is that the
-TRM "Clock Domain Dependency" is just the usual parent child
-relationship between clocks that are the clockdomains..
+I was guarded because I like harmony between architectures (where it
+makes sense). But that said, there is nothing to prevent having a
+different interpretation on ARM, as long as everyone agrees on it.
 
-If there is something more magical there certainly that should
-be considered though.
+> Even without this patch, I don't think it's a show-stopper to have
+> Linux mistakenly thinking this region is routed to PCI, because the
+> driver does reserve it and the PCI core will never try to use it.
 
-Regards,
+Ok. So are you happy with pulling in Duc's v4 patch and retaining
+status quo on the bridge resources for 4.10? We can continue to
+discuss this and ultimately set a direction for the spec, as well
+as clean up existing and future designs (certainly the latter) to
+ensure all possible resources used by a platform are described
+and consumed correctly, and hopefully live with the slightly
+odd little bit of address space eaten up for that RC CSR :)
 
-Tony
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> index 8a177a1..a16fc8e 100644
+> --- a/arch/arm64/kernel/pci.c
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -114,6 +114,19 @@ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+>  	return 0;
+>  }
+>  
+> +static int pci_acpi_root_prepare_resources(struct acpi_pci_root_info *ci)
+> +{
+> +	struct resource_entry *entry, *tmp;
+> +	int status;
+> +
+> +	status = acpi_pci_probe_root_resources(ci);
+> +	resource_list_for_each_entry_safe(entry, tmp, &ci->resources) {
+> +		if (!(entry->res->flags & IORESOURCE_WINDOW))
+> +			resource_list_destroy_entry(entry);
+> +	}
+> +	return status;
+> +}
+> +
+>  /*
+>   * Lookup the bus range for the domain in MCFG, and set up config space
+>   * mapping.
+> @@ -190,6 +203,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>  	}
+>  
+>  	root_ops->release_info = pci_acpi_generic_release_info;
+> +	root_ops->prepare_resources = pci_acpi_root_prepare_resources;
+>  	root_ops->pci_ops = &ri->cfg->ops->pci_ops;
+>  	bus = acpi_pci_root_create(root, root_ops, &ri->common, ri->cfg);
+>  	if (!bus)
+> 
+
+I can give this patch a quick boot test a bit later.
+
+Jon.
+
+-- 
+Computer Architect | Sent from my Fedora powered laptop
