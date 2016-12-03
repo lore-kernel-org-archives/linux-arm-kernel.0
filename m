@@ -1,37 +1,20 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Sat, 3 Dec 2016 21:56:48 +0100
-Subject: [PATCH] ARM: OMAP2+: PRM: Delete an error message for a failed memory
- allocation
-Message-ID: <6212b730-8e09-bf87-2a6b-23df9bc43e2d@users.sourceforge.net>
+From: robh@kernel.org (Rob Herring)
+Date: Sat, 3 Dec 2016 15:33:20 -0600
+Subject: [PATCH 1/3][v2] dt-bindings: Add compatible for LS2088A QDS and
+ RDB boards
+In-Reply-To: <1480325824-14649-2-git-send-email-abhimanyu.saini@nxp.com>
+References: <1480325824-14649-1-git-send-email-abhimanyu.saini@nxp.com>
+ <1480325824-14649-2-git-send-email-abhimanyu.saini@nxp.com>
+Message-ID: <20161203213320.suh5letdmdhwshrn@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Sat, 3 Dec 2016 21:46:02 +0100
+On Mon, Nov 28, 2016 at 03:07:02PM +0530, Abhimanyu Saini wrote:
+> Signed-off-by: Abhimanyu Saini <abhimanyu.saini@nxp.com>
+> Signed-off-by: Priyanka Jain <priyanka.jain@nxp.com>
+> Signed-off-by: Ashish Kumar <ashish.kumar@nxp.com>
+> ---
+>  Documentation/devicetree/bindings/arm/fsl.txt | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
 
-Omit an extra message for a memory allocation failure in this function.
-
-Link: http://events.linuxfoundation.org/sites/events/files/slides/LCJ16-Refactor_Strings-WSang_0.pdf
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- arch/arm/mach-omap2/prm_common.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index 5b2f5138d938..2b138b65129a 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -295,10 +295,8 @@ int omap_prcm_register_chain_handler(struct omap_prcm_irq_setup *irq_setup)
- 		GFP_KERNEL);
- 
- 	if (!prcm_irq_chips || !prcm_irq_setup->saved_mask ||
--	    !prcm_irq_setup->priority_mask) {
--		pr_err("PRCM: kzalloc failed\n");
-+	    !prcm_irq_setup->priority_mask)
- 		goto err;
--	}
- 
- 	memset(mask, 0, sizeof(mask));
- 
--- 
-2.11.0
+Acked-by: Rob Herring <robh@kernel.org>
