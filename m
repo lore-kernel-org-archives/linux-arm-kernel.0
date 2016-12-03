@@ -1,114 +1,106 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Sat, 03 Dec 2016 12:15:08 -0500
-Subject: [SPCR] mmio32 iotype access requirements for X-Gene 8250(_dw) UART
-In-Reply-To: <7fa523de-3fbb-1566-f521-927143f73d1e@redhat.com>
-References: <20161201183350.GF30746@bhelgaas-glaptop.roam.corp.google.com>
- <f18738b7096fb06a5865214ddc299ce99630673b.1480644928.git.dhdang@apm.com>
- <6d593615-e97f-8738-42be-1f8f4906d2f4@redhat.com>
- <CADaLNDkyCrheZLNG3_9BVgvGBW8WrA-VPWOCezz3U-g+nt5W9w@mail.gmail.com>
- <175F32B0-C73F-4250-9E60-3CE7409F0B0C@redhat.com>
- <CADaLNDmWRn+UKzF8PH2LmYCSF+NhHaw26RTN+QoaByh1wS7jfQ@mail.gmail.com>
- <7fa523de-3fbb-1566-f521-927143f73d1e@redhat.com>
-Message-ID: <1480785308.4751.41.camel@redhat.com>
+From: stefan@datenfreihafen.org (Stefan Schmidt)
+Date: Sat, 3 Dec 2016 19:49:24 +0100
+Subject: [PATCH] ARM: pxa: ezx: fix a910 camera data
+In-Reply-To: <20161203175513.499a3affbb3e4a0640997f82@ao2.it>
+References: <20161124162955.3887066-1-arnd@arndb.de>
+ <e0bdf159-93f2-5ed7-1e28-7fb80707d6c7@datenfreihafen.org>
+ <87eg1zqqub.fsf@belgarion.home>
+ <df32cbf6-e897-56d9-89d8-c65af06323a8@datenfreihafen.org>
+ <20161203175513.499a3affbb3e4a0640997f82@ao2.it>
+Message-ID: <08f2cefa-451e-d608-6242-bf1d578c1fc5@datenfreihafen.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2016-12-03 at 05:06 -0500, Jon Masters wrote:
-> Hi Duc, all,
-> 
-> (and changing the subject and trimming/adjusting the CC)
-> 
-> On 12/02/2016 02:39 PM, Duc Dang wrote:
-> > 
-> > On Fri, Dec 2, 2016 at 12:11 AM, Jon Masters <jcm@redhat.com> wrote:
-> > > 
-> > > You're welcome.
-> > > 
-> > > (Unrelated) Note that I added a console= and earlycon in my test (and
-> > > got the baud rate wrong for the console but nevermind...was ssh'd in
-> > > after the earlycon output I cared about anyway) because of some other
-> > > cleanup work for the SPCR parsing that apparently is still not quite
-> > > fixed for upstream, or rather, there is a need to match on the 32-bit
-> > > access required for the UART and that isn't happening so it's not
-> > > getting setup. Folks are tracking that one and fixing it though.
-> > 
-> > I don't see this console issue on X-Gene1 (Mustang board). I tried
-> > with X-Gene 2 as well. I used both console=ttyS0,115200 and
-> > earlycon=uart8250,mmio32,0x1c020000. Are you setting baudrate to
-> > 115200 or something else?
-> Let me clarify. What I meant above is that when I generated the boot
-> log, I had specified earlycon and console parameters, but had fat
-> fingered the baud rate (m400 uses 9600, mustang uses 115200 baud).
-> That's what I was referring to in the original text above.
-> 
-> HOWEVER...
-> 
-> There is a broader problem with X-Gene SPCR support. The problem is
-> that the 16550 UART in X-Gene requires the 32-bit access quirk (the
-> iotype is set to UPIO_MEM32 for the APMC0D08 device). This means
-> that when univ8250_console_match runs later, it will compare the
-> iotype (MEM32) with the type previously registered with the
-> kernel when the earlycon setup the preferred console.
+Hello.
 
-Linaro has a kernel patch which looks at the bit_width field of the
-port address:
+On 03.12.2016 17:55, Antonio Ospite wrote:
+> On Sat, 26 Nov 2016 00:30:52 +0100
+> Stefan Schmidt <stefan@datenfreihafen.org> wrote:
+> 
+>> Hello.
+>>
+> 
+> Hi everyone,
+> 
+>> On 25.11.2016 20:53, Robert Jarzmik wrote:
+>>> Stefan Schmidt <stefan@datenfreihafen.org> writes:
+>>>
+>>>> Hello.
+>>>>
+>>>> On 24.11.2016 17:29, Arnd Bergmann wrote:
+>>>>> The camera_supply_dummy_device definition is shared between a780 and a910,
+>>>>> but only provided when the first is enabled and fails to build for a
+>>>>> configuration with only a910:
+>>>>>
+>>>>> arch/arm/mach-pxa/ezx.c:1097:3: error: 'camera_supply_dummy_device' undeclared here (not in a function)
+>>>>>
+>>>>> This moves the definition into its own section.
+>>>>>
+>>>>> Fixes: 6c1b417adc8f ("ARM: pxa: ezx: use the new pxa_camera platform_data")
+>>>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>>>> ---
+>>>>>  arch/arm/mach-pxa/ezx.c | 56 ++++++++++++++++++++++++++-----------------------
+>>>>
+>>>> I wonder what we should do with ezx.c.
+>>>>
+>>>> As far as I know neither Daniel nor Harald or myself are doing anything
+>>>> with this devices anymore. Besides a basic compile test having an ack or
+>>>> reviewed by from our side is a bit worthless. :/
+>>>>
+>>>> I should still have some of these phones around in a box somewhere. If
+>>>> there is someone with a good motivation and time to take over on this
+>>>> platform we will find a way to get the person this devices.
+>>>>
+>>>> Any takers? Robert? I guess you are already overloaded but you might
+>>>> also have an interest. Worth asking :)
+>>> Oh yes, I'm very interested in your box. Besides I really like old platforms
+>>> :)
+>>
+>>
+>> Great! I should have at least 3 or 4 different devices from the EZX
+>> platform around. I will go and search for the box over the weekend :)
+>>
+>>>> In the case nobody wants to pick up here what would you consider the
+>>>> bets way forward? I could send a patch removing ezx platform support
+>>>> from the kernel (basically ezx.c plus build support) or I can send a
+>>>> patch marking it at least orphan in MAINTAINERS. Let me know what you think.
+>>>>
+>>>> Daniel, Harald, if one of you is still interested in these and what to
+>>>> pick up the work again, please speak up now. :)
+>>> Unless another maintainer steps in, you can submit a patch to transfer the
+>>> maintainance onto me, and we'll see off mailing lists how we could arange the
+>>> boards transfer.
+>>
+>> I cc'ed another developer who did a lot of work regarding EZX.
+>>
+>> Antonio, as you can see from the mail above we are pondering what who
+>> will maintain the ezx platform in the kernel going forward. Neither
+>> Daniel, Harald or me is going to do so. If you have time, interest and
+>> motivation to do so please speak up. I know life moved on and you ahve
+>> other projects and interests so do not feel pressured here. Just say no
+>> if you have no interest. Robert already agreed to act as a fallback so
+>> we would still be safe. :)
+>>
+> 
+> I still use a Motorola A1200 with the original EZX stack as my main
+> phone (and that tells something about how much I use a phone...)
 
-Author: Aleksey Makarov <aleksey.makarov@linaro.org>
-Date:???Thu Apr 28 19:52:38 2016 +0300
+hehe :)
 
-????serial: SPCR: check bit width for the 16550 UART
+> however I haven't touched any OpenEZX stuff in a while.
+> 
+> I don't think I am going to play with these devices anytime soon, but I
+> can provide Robert any info he may need about OpenEZX, the development
+> tools and the out-of-tree patches required to make the phones somewhat
+> usable.
 
-The SPCR in 3.06.25 firmware has a bit_width field set to 32 and with the
-above patch, I don't need to use console=. But HP firmware on m400 sets
-bit width to 8 so that needs a firmware fix to work with above.
 
+Great. I think this will be a great help for Robert when he tries to get
+things going. Thanks a lot!
 
-> 
-> The earlycon preferred console will parse the SPCR and find:
-> 
-> ????????iotype = table->serial_port.space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY ?
-> ????????????????????????"mmio" : "io";
-> 
-> Which sets it to "mmio" (not "mmio32"). There is a DBG2 (the table
-> referenced by the SPCR that provides the actual port types for all
-> modern revisions of the SPCR with revision2+, as required by Linux)
-> port subtype for non-compliant SBSA ARM Generic UARTs that require
-> 32-bit accesses, and this is ACPI_DBG2_ARM_SBSA_32BIT (type 0xd).
-> 
-> However that only applies for "pl011" devices, and doesn't provide
-> for 16550 UARTs that require 32-bit accessors.
-> 
-> So you'll end up with Linux thinking it's registering a non-32-bit
-> mmio preferred console during earlycon setup and then never match
-> against that later in the 8250_core/8250_dw match function by
-> virtue of the fact that these differ.
-> 
-> There are a couple of possibilities:
-> 
-> 1). Perhaps (for some reason) the IP actually does support sub-32-bit
-> ????access and the iotype simply needs to be changed to reflect this.
-> ????That would be the easiest option. But it's been this way for a
-> ????long time in various codebases, so I would be pleasantly
-> ????surprised if this were the case. Let me/us know :)
-> 
-> 2). We find some way during SPCR setup to quirk for X-Gene as a non
-> ????standard 16550 and set it up as an mmio32 iotype.
-> 
-> 3). We get the DBG2 table updated to add a subtype of the 16650
-> ????called something like "(deprecated) 16550 subset supporting
-> ????only 32-bit accesses". Then we add this to Linux and get
-> ????the firmware updated on systems to switch to this type. We
-> ????would probably still want to quirk for existing machines.
-> 
-> Perhaps I'm missing something. I would love for that to be true,
-> but I don't think it is. I think we need a subtype of the 16550
-> defined that encapsulates this mmio32 requirement properly. To
-> that end, I've preemptively asked some friends at MS for a
-> favor to look into adding a new subtype for this.
-> 
-> Let me know what you think is the best path... :)
-> 
-> Thanks,
-> 
-> Jon.
-> 
+Robert, please send me your address details off list so we can arrange
+for the device shipping. I will send a patch transferring the
+maintainership for the EZX platform over to you in the next days.
+
+regards
+Stefan Schmidt
