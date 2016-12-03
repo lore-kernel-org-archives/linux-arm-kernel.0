@@ -1,19 +1,33 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Sat, 3 Dec 2016 15:00:12 +0100
-Subject: ARM: topology: Checking for a failed kcalloc() in parse_dt_topology()?
-Message-ID: <d28439db-9915-e0d9-9bfc-3436c943cbd4@users.sourceforge.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat,  3 Dec 2016 14:05:37 +0000
+Subject: [PATCH 1/2] arm64: Remove reference to asm/opcodes.h
+In-Reply-To: <20161203140538.23525-1-marc.zyngier@arm.com>
+References: <20161203140538.23525-1-marc.zyngier@arm.com>
+Message-ID: <20161203140538.23525-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The asm/opcodes.h file is now gone, but probes.h still references it
+for not obvious reason. Removing the #include directive fixes
+the compilation.
 
-Another run of a small script for the semantic patch language (Coccinelle)
-pointed the implementation of the function ?parse_dt_topology? out for
-further considerations.
-https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm/kernel/topology.c?id=e05f574a0bb1f4502a4b2264fdb0ef6419cf3772#n285
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/probes.h | 2 --
+ 1 file changed, 2 deletions(-)
 
-Would it be useful to check the return value from a call of the
-function ?kcalloc? also there?
-
-Regards,
-Markus
+diff --git a/arch/arm64/include/asm/probes.h b/arch/arm64/include/asm/probes.h
+index e175a82..6a5b289 100644
+--- a/arch/arm64/include/asm/probes.h
++++ b/arch/arm64/include/asm/probes.h
+@@ -15,8 +15,6 @@
+ #ifndef _ARM_PROBES_H
+ #define _ARM_PROBES_H
+ 
+-#include <asm/opcodes.h>
+-
+ typedef u32 probe_opcode_t;
+ typedef void (probes_handler_t) (u32 opcode, long addr, struct pt_regs *);
+ 
+-- 
+2.10.2
