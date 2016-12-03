@@ -1,64 +1,63 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 3 Dec 2016 18:55:37 +0800
-Subject: [PATCH v2 1/2] arm64: dts: zx: Fix gic GICR property
-In-Reply-To: <6379358.TRgYEOKGM8@wuerfel>
-References: <1476361881-19685-1-git-send-email-jun.nie@linaro.org>
- <2953810.EeueujTjSC@wuerfel>
- <CAAQ0ZWQkU6T=Fm4oZ1R5-zJEzErjroYAAJqU2TeNHfz=3UhYrg@mail.gmail.com>
- <6379358.TRgYEOKGM8@wuerfel>
-Message-ID: <20161203105533.GB17375@dragon>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Sat,  3 Dec 2016 19:59:14 +0800
+Subject: [PATCH] arm64: dts: zx: add pcu_domain node for zx296718
+Message-ID: <1480766354-25168-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 05:38:01PM +0100, Arnd Bergmann wrote:
-> On Monday, November 28, 2016 10:08:18 PM CET Shawn Guo wrote:
-> > On Sat, Nov 26, 2016 at 6:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Monday, October 17, 2016 1:49:19 PM CET Olof Johansson wrote:
-> > >> On Thu, Oct 13, 2016 at 08:31:20PM +0800, Jun Nie wrote:
-> > >> > GICR for multiple CPU can be described with start address and stride,
-> > >> > or with multiple address. Current multiple address and stride are
-> > >> > both used. Fix it.
-> > >> >
-> > >> > vmalloc patch 727a7f5a9 triggered this bug:
-> > >> > [    0.097146] Unable to handle kernel paging request at virtual address ffff000008060008
-> > >> > [    0.097150] pgd = ffff000008602000
-> > >> > [    0.097160] [ffff000008060008] *pgd=000000007fffe003, *pud=000000007fffd003, *pmd=000000007fffc003, *pte=0000000000000000
-> > >> > [    0.097165] Internal error: Oops: 96000007 [#1] PREEMPT SMP
-> > >> > [    0.097170] Modules linked in:
-> > >> > [    0.097177] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0+ #1474
-> > >> > [    0.097179] Hardware name: ZTE zx296718 evaluation board (DT)
-> > >> > [    0.097183] task: ffff80003e8c8b80 task.stack: ffff80003e8d0000
-> > >> > [    0.097197] PC is at gic_populate_rdist+0x74/0x15c
-> > >> > [    0.097202] LR is at gic_starting_cpu+0xc/0x20
-> > >> > [    0.097206] pc : [<ffff0000082b1b18>] lr : [<ffff0000082b26e0>] pstate: 600001c5
-> > >> >
-> > >> > Signed-off-by: Jun Nie <jun.nie@linaro.org>
-> > >>
-> > >> A Fixes: tag would be useful on a patch like this, to tell what patch
-> > >> introduced the problem. Please consider using them in the future.
-> > >>
-> > >> I've applied this one to fixes now.
-> > >
-> > > Hi Olof,
-> > >
-> > > I happened to still have this one in my todo folder as I must have
-> > > missed your reply, and I stumbled over it while looking for things
-> > > that may have gone missing.
-> > >
-> > > I don't see it in v4.9-rc6, did it get dropped accidentally?
-> > 
-> > Please help get this into v4.9 if possible, as it is required to get
-> > v4.9 kernel boot up on ZTE ZX296718 SoC.  Thanks.
-> > 
-> > Shawn
-> > 
-> 
-> Ok, applied both. Thanks,
+This patch adds the pcu_domain node, so it can be used
+by zte-soc's power domain driver.
 
-Patch 2/2 already went to you in the pull request[1]:
+Furthermore, it adds the document of the node.
 
-[GIT PULL] ZTE arm64 device tree updates for 4.10
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+---
+ Documentation/devicetree/bindings/arm/zte.txt | 11 +++++++++++
+ arch/arm64/boot/dts/zte/zx296718.dtsi         |  7 +++++++
+ 2 files changed, 18 insertions(+)
 
-Shawn
-
-[1] http://www.spinics.net/lists/arm-kernel/msg545640.html
+diff --git a/Documentation/devicetree/bindings/arm/zte.txt b/Documentation/devicetree/bindings/arm/zte.txt
+index 83369785..19a7e1b 100644
+--- a/Documentation/devicetree/bindings/arm/zte.txt
++++ b/Documentation/devicetree/bindings/arm/zte.txt
+@@ -27,6 +27,9 @@ System management required properties:
+       - compatible = "zte,zx296718-aon-sysctrl"
+       - compatible = "zte,zx296718-sysctrl"
+ 
++Low power management required properties:
++      - compatible = "zte,zx296718-pcu"
++
+ Example:
+ aon_sysctrl: aon-sysctrl at 116000 {
+ 	compatible = "zte,zx296718-aon-sysctrl", "syscon";
+@@ -37,3 +40,11 @@ sysctrl: sysctrl at 1463000 {
+ 	compatible = "zte,zx296718-sysctrl", "syscon";
+ 	reg = <0x1463000 0x1000>;
+ };
++
++pcu_domain: pcu at 0x00117000 {
++        compatible = "zte,zx296718-pcu";
++        reg = <0x00117000 0x1000>;
++        #power-domain-cells = <1>;
++        status = "ok";
++};
++
+diff --git a/arch/arm64/boot/dts/zte/zx296718.dtsi b/arch/arm64/boot/dts/zte/zx296718.dtsi
+index b44d1d1..39e70c7 100644
+--- a/arch/arm64/boot/dts/zte/zx296718.dtsi
++++ b/arch/arm64/boot/dts/zte/zx296718.dtsi
+@@ -351,5 +351,12 @@
+ 			reg = <0x01480000 0x1000>;
+ 			#clock-cells = <1>;
+ 		};
++
++		pcu_domain: pcu at 0x00117000 {
++			compatible = "zte,zx296718-pcu";
++			reg = <0x00117000 0x1000>;
++			#power-domain-cells = <1>;
++			status = "ok";
++		};
+ 	};
+ };
+-- 
+2.7.4
