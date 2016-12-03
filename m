@@ -1,106 +1,49 @@
-From: stefan@datenfreihafen.org (Stefan Schmidt)
-Date: Sat, 3 Dec 2016 19:49:24 +0100
-Subject: [PATCH] ARM: pxa: ezx: fix a910 camera data
-In-Reply-To: <20161203175513.499a3affbb3e4a0640997f82@ao2.it>
-References: <20161124162955.3887066-1-arnd@arndb.de>
- <e0bdf159-93f2-5ed7-1e28-7fb80707d6c7@datenfreihafen.org>
- <87eg1zqqub.fsf@belgarion.home>
- <df32cbf6-e897-56d9-89d8-c65af06323a8@datenfreihafen.org>
- <20161203175513.499a3affbb3e4a0640997f82@ao2.it>
-Message-ID: <08f2cefa-451e-d608-6242-bf1d578c1fc5@datenfreihafen.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 3 Dec 2016 21:15:10 +0100
+Subject: [PATCH v5] PM/devfreq: add suspend frequency support
+In-Reply-To: <1478599598-26015-1-git-send-email-hl@rock-chips.com>
+References: <1478599598-26015-1-git-send-email-hl@rock-chips.com>
+Message-ID: <20161203201509.GB13417@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi!
 
-On 03.12.2016 17:55, Antonio Ospite wrote:
-> On Sat, 26 Nov 2016 00:30:52 +0100
-> Stefan Schmidt <stefan@datenfreihafen.org> wrote:
-> 
->> Hello.
->>
-> 
-> Hi everyone,
-> 
->> On 25.11.2016 20:53, Robert Jarzmik wrote:
->>> Stefan Schmidt <stefan@datenfreihafen.org> writes:
->>>
->>>> Hello.
->>>>
->>>> On 24.11.2016 17:29, Arnd Bergmann wrote:
->>>>> The camera_supply_dummy_device definition is shared between a780 and a910,
->>>>> but only provided when the first is enabled and fails to build for a
->>>>> configuration with only a910:
->>>>>
->>>>> arch/arm/mach-pxa/ezx.c:1097:3: error: 'camera_supply_dummy_device' undeclared here (not in a function)
->>>>>
->>>>> This moves the definition into its own section.
->>>>>
->>>>> Fixes: 6c1b417adc8f ("ARM: pxa: ezx: use the new pxa_camera platform_data")
->>>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>>>> ---
->>>>>  arch/arm/mach-pxa/ezx.c | 56 ++++++++++++++++++++++++++-----------------------
->>>>
->>>> I wonder what we should do with ezx.c.
->>>>
->>>> As far as I know neither Daniel nor Harald or myself are doing anything
->>>> with this devices anymore. Besides a basic compile test having an ack or
->>>> reviewed by from our side is a bit worthless. :/
->>>>
->>>> I should still have some of these phones around in a box somewhere. If
->>>> there is someone with a good motivation and time to take over on this
->>>> platform we will find a way to get the person this devices.
->>>>
->>>> Any takers? Robert? I guess you are already overloaded but you might
->>>> also have an interest. Worth asking :)
->>> Oh yes, I'm very interested in your box. Besides I really like old platforms
->>> :)
->>
->>
->> Great! I should have at least 3 or 4 different devices from the EZX
->> platform around. I will go and search for the box over the weekend :)
->>
->>>> In the case nobody wants to pick up here what would you consider the
->>>> bets way forward? I could send a patch removing ezx platform support
->>>> from the kernel (basically ezx.c plus build support) or I can send a
->>>> patch marking it at least orphan in MAINTAINERS. Let me know what you think.
->>>>
->>>> Daniel, Harald, if one of you is still interested in these and what to
->>>> pick up the work again, please speak up now. :)
->>> Unless another maintainer steps in, you can submit a patch to transfer the
->>> maintainance onto me, and we'll see off mailing lists how we could arange the
->>> boards transfer.
->>
->> I cc'ed another developer who did a lot of work regarding EZX.
->>
->> Antonio, as you can see from the mail above we are pondering what who
->> will maintain the ezx platform in the kernel going forward. Neither
->> Daniel, Harald or me is going to do so. If you have time, interest and
->> motivation to do so please speak up. I know life moved on and you ahve
->> other projects and interests so do not feel pressured here. Just say no
->> if you have no interest. Robert already agreed to act as a fallback so
->> we would still be safe. :)
->>
-> 
-> I still use a Motorola A1200 with the original EZX stack as my main
-> phone (and that tells something about how much I use a phone...)
+> diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
+> index 98c6993..8567153 100644
+> --- a/include/linux/devfreq.h
+> +++ b/include/linux/devfreq.h
+> @@ -172,6 +172,7 @@ struct devfreq {
+>  	struct delayed_work work;
+>  
+>  	unsigned long previous_freq;
+> +	unsigned long suspend_freq;
+>  	struct devfreq_dev_status last_status;
+>  
+>  	void *data; /* private data for governors */
+> @@ -179,6 +180,7 @@ struct devfreq {
+>  	unsigned long min_freq;
+>  	unsigned long max_freq;
+>  	bool stop_polling;
+> +	bool suspend_flag;
+>  
+>  	/* information for device frequency transition */
+>  	unsigned int total_trans;
 
-hehe :)
+It would be nice to comment what "suspend_flag" is... plus... Would it
+be possible to rename suspend_freq or suspend_flag? They are really
+really similar visually...
 
-> however I haven't touched any OpenEZX stuff in a while.
-> 
-> I don't think I am going to play with these devices anytime soon, but I
-> can provide Robert any info he may need about OpenEZX, the development
-> tools and the out-of-tree patches required to make the phones somewhat
-> usable.
+Thanks.
+								Pavel
 
-
-Great. I think this will be a great help for Robert when he tries to get
-things going. Thanks a lot!
-
-Robert, please send me your address details off list so we can arrange
-for the device shipping. I will send a patch transferring the
-maintainership for the EZX platform over to you in the next days.
-
-regards
-Stefan Schmidt
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161203/6d21481d/attachment.sig>
