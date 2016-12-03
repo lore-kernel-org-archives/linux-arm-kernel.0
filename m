@@ -1,66 +1,114 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 3 Dec 2016 19:03:47 +0200
-Subject: [GIT PULL 1/3] ARM: exynos: Soc/mach for v4.10
-In-Reply-To: <57568492.9hbg5JCdec@wuerfel>
-References: <1479967709-6619-1-git-send-email-krzk@kernel.org>
- <1479967709-6619-2-git-send-email-krzk@kernel.org>
- <20161201183404.GA2134@kozik-lap> <57568492.9hbg5JCdec@wuerfel>
-Message-ID: <20161203170347.GA3553@kozik-lap>
+From: msalter@redhat.com (Mark Salter)
+Date: Sat, 03 Dec 2016 12:15:08 -0500
+Subject: [SPCR] mmio32 iotype access requirements for X-Gene 8250(_dw) UART
+In-Reply-To: <7fa523de-3fbb-1566-f521-927143f73d1e@redhat.com>
+References: <20161201183350.GF30746@bhelgaas-glaptop.roam.corp.google.com>
+ <f18738b7096fb06a5865214ddc299ce99630673b.1480644928.git.dhdang@apm.com>
+ <6d593615-e97f-8738-42be-1f8f4906d2f4@redhat.com>
+ <CADaLNDkyCrheZLNG3_9BVgvGBW8WrA-VPWOCezz3U-g+nt5W9w@mail.gmail.com>
+ <175F32B0-C73F-4250-9E60-3CE7409F0B0C@redhat.com>
+ <CADaLNDmWRn+UKzF8PH2LmYCSF+NhHaw26RTN+QoaByh1wS7jfQ@mail.gmail.com>
+ <7fa523de-3fbb-1566-f521-927143f73d1e@redhat.com>
+Message-ID: <1480785308.4751.41.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 10:52:57PM +0100, Arnd Bergmann wrote:
-> On Thursday, December 1, 2016 8:34:04 PM CET Krzysztof Kozlowski wrote:
-> > On Thu, Nov 24, 2016 at 08:08:27AM +0200, Krzysztof Kozlowski wrote:
-> > > Hi,
-> > > 
-> > > This contains previous dts branch because SCU node in dts is needed
-> > > prior to removing it from mach code.
-> > > 
-> > > Below you will find full pull request and one stripped from dependency.
-> > > 
+On Sat, 2016-12-03 at 05:06 -0500, Jon Masters wrote:
+> Hi Duc, all,
+> 
+> (and changing the subject and trimming/adjusting the CC)
+> 
+> On 12/02/2016 02:39 PM, Duc Dang wrote:
 > > 
-> > Hi Arnd, Kevin and Olof,
+> > On Fri, Dec 2, 2016 at 12:11 AM, Jon Masters <jcm@redhat.com> wrote:
+> > > 
+> > > You're welcome.
+> > > 
+> > > (Unrelated) Note that I added a console= and earlycon in my test (and
+> > > got the baud rate wrong for the console but nevermind...was ssh'd in
+> > > after the earlycon output I cared about anyway) because of some other
+> > > cleanup work for the SPCR parsing that apparently is still not quite
+> > > fixed for upstream, or rather, there is a need to match on the 32-bit
+> > > access required for the UART and that isn't happening so it's not
+> > > getting setup. Folks are tracking that one and fixing it though.
 > > 
-> > What about this pull from the set?
-> > 
+> > I don't see this console issue on X-Gene1 (Mustang board). I tried
+> > with X-Gene 2 as well. I used both console=ttyS0,115200 and
+> > earlycon=uart8250,mmio32,0x1c020000. Are you setting baudrate to
+> > 115200 or something else?
+> Let me clarify. What I meant above is that when I generated the boot
+> log, I had specified earlycon and console parameters, but had fat
+> fingered the baud rate (m400 uses 9600, mustang uses 115200 baud).
+> That's what I was referring to in the original text above.
 > 
-> Sorry, I initially deferred it and then didn't get back to it.
+> HOWEVER...
 > 
-> The dependency on the .dts changes made me a bit nervous about
-> taking it, mostly because the changelog fails to explain the
-> exact dependencies.
+> There is a broader problem with X-Gene SPCR support. The problem is
+> that the 16550 UART in X-Gene requires the 32-bit access quirk (the
+> iotype is set to UPIO_MEM32 for the APMC0D08 device). This means
+> that when univ8250_console_match runs later, it will compare the
+> iotype (MEM32) with the type previously registered with the
+> kernel when the earlycon setup the preferred console.
+
+Linaro has a kernel patch which looks at the bit_width field of the
+port address:
+
+Author: Aleksey Makarov <aleksey.makarov@linaro.org>
+Date:???Thu Apr 28 19:52:38 2016 +0300
+
+????serial: SPCR: check bit width for the 16550 UART
+
+The SPCR in 3.06.25 firmware has a bit_width field set to 32 and with the
+above patch, I don't need to use console=. But HP firmware on m400 sets
+bit width to 8 so that needs a firmware fix to work with above.
+
+
 > 
-> This breaks compatibility with existing .dtb files, right?
-
-No, strictly speaking not. There was no dt-bindings change here, no DT
-properties for SCU before. We are converting our drivers to DTB so this
-is the same as before when switching for pinctrl, clocks or all other
-drivers to DT.
-
-We are not braking DTB ABI because there was no ABI around it before.
-Otherwise, one would say that lack of SCU DT node was an ABI. That is
-wrong, because DT should describe the hardware and SCU is in hardware.
-
-> What I'd like to see here is an explanation about:
+> The earlycon preferred console will parse the SPCR and find:
 > 
-> - what the upside of breaking compatibility is
-
-DTBs which do not have SCU are not proper because they skip that part of
-hardware. However we are breaking them in the way the SMP won't work
-there. It is not an ABI break, as I mentioned above.
-
-> - what exactly stops working with an old dtb
-> - why we don't keep a fallback for handling old dtb files
-
-What is the point for it? This is not an ABI break. Even if it was,
-Samsung guys don't care for ABI breaks at all (and in fact we wanted to
-mark the platform experimental...).
-
-> It would also be helpful to have a separate pull request for
-> the commits require the new dtb, and the stuff that is unrelated.
-
-I can do that but the pull will be small.
-
-Best regards,
-Krzysztof
+> ????????iotype = table->serial_port.space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY ?
+> ????????????????????????"mmio" : "io";
+> 
+> Which sets it to "mmio" (not "mmio32"). There is a DBG2 (the table
+> referenced by the SPCR that provides the actual port types for all
+> modern revisions of the SPCR with revision2+, as required by Linux)
+> port subtype for non-compliant SBSA ARM Generic UARTs that require
+> 32-bit accesses, and this is ACPI_DBG2_ARM_SBSA_32BIT (type 0xd).
+> 
+> However that only applies for "pl011" devices, and doesn't provide
+> for 16550 UARTs that require 32-bit accessors.
+> 
+> So you'll end up with Linux thinking it's registering a non-32-bit
+> mmio preferred console during earlycon setup and then never match
+> against that later in the 8250_core/8250_dw match function by
+> virtue of the fact that these differ.
+> 
+> There are a couple of possibilities:
+> 
+> 1). Perhaps (for some reason) the IP actually does support sub-32-bit
+> ????access and the iotype simply needs to be changed to reflect this.
+> ????That would be the easiest option. But it's been this way for a
+> ????long time in various codebases, so I would be pleasantly
+> ????surprised if this were the case. Let me/us know :)
+> 
+> 2). We find some way during SPCR setup to quirk for X-Gene as a non
+> ????standard 16550 and set it up as an mmio32 iotype.
+> 
+> 3). We get the DBG2 table updated to add a subtype of the 16650
+> ????called something like "(deprecated) 16550 subset supporting
+> ????only 32-bit accesses". Then we add this to Linux and get
+> ????the firmware updated on systems to switch to this type. We
+> ????would probably still want to quirk for existing machines.
+> 
+> Perhaps I'm missing something. I would love for that to be true,
+> but I don't think it is. I think we need a subtype of the 16550
+> defined that encapsulates this mmio32 requirement properly. To
+> that end, I've preemptively asked some friends at MS for a
+> favor to look into adding a new subtype for this.
+> 
+> Let me know what you think is the best path... :)
+> 
+> Thanks,
+> 
+> Jon.
+> 
