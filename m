@@ -1,39 +1,81 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 4 Dec 2016 07:10:31 +0800
-Subject: [PATCH] ARM: dts: sunxi: Add num-cs for A20 spi nodes
-In-Reply-To: <20161122170616.29557-1-manu@bidouilliste.com>
-Message-ID: <201612040715.8tcXuP1g%fengguang.wu@intel.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 3 Dec 2016 21:25:08 -0800
+Subject: [GIT PULL 1/10] mailbox: Add Tegra HSP driver
+In-Reply-To: <20161121081752.GC25171@ulmo.ba.sec>
+References: <20161118161719.24153-1-thierry.reding@gmail.com>
+ <20161119022742.GK2543@localhost>
+ <20161121081752.GC25171@ulmo.ba.sec>
+Message-ID: <20161204052508.GC4995@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emmanuel,
+On Mon, Nov 21, 2016 at 09:17:52AM +0100, Thierry Reding wrote:
+> On Fri, Nov 18, 2016 at 06:27:42PM -0800, Olof Johansson wrote:
+> > Hi,
+> > 
+> > On Fri, Nov 18, 2016 at 05:17:10PM +0100, Thierry Reding wrote:
+> > > Hi ARM SoC maintainers,
+> > > 
+> > > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+> > > 
+> > >   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.10-mailbox
+> > > 
+> > > for you to fetch changes up to 68050eb6c611527232fe5574c7306e97e47499ef:
+> > > 
+> > >   mailbox: tegra-hsp: Use after free in tegra_hsp_remove_doorbells() (2016-11-18 14:32:13 +0100)
+> > > 
+> > > Thanks,
+> > > Thierry
+> > > 
+> > > ----------------------------------------------------------------
+> > > mailbox: Add Tegra HSP driver
+> > > 
+> > > This contains the device tree bindings and a driver for the Tegra HSP, a
+> > > hardware block that provides hardware synchronization primitives and is
+> > > the foundation for inter-processor communication between CPU and BPMP.
+> > > 
+> > > ----------------------------------------------------------------
+> > > Dan Carpenter (1):
+> > >       mailbox: tegra-hsp: Use after free in tegra_hsp_remove_doorbells()
+> > > 
+> > > Joseph Lo (2):
+> > >       soc/tegra: Add Tegra186 support
+> > 
+> > I don't think you really needed to merge this in here, since all you need it
+> > for is to fulfill the kconfig dependency and enable the driver, right? That'd
+> > happen when the driver and soc branch is merged at the toplevel anyway.
+> 
+> The reason I did this is that I wanted each branch to be buildable as a
+> way to confirm that the dependencies are correct. In order to do that I
+> need the Kconfig symbol to enable the driver.
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.9-rc7 next-20161202]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Good point, but that's more of a local setup thing for you, and not something
+that necessarily needs to go upstream.
 
-url:    https://github.com/0day-ci/linux/commits/Emmanuel-Vadot/ARM-dts-sunxi-Add-num-cs-for-A20-spi-nodes/20161123-034323
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm-vexpress_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+> I suppose there are other ways I could've done that, though. Maybe in
+> the future new SoC Kconfig symbols should just be introduced way ahead
+> of time, so that they're already in a release or two before actual code
+> starts to emerge.
 
-All errors (new ones prefixed by >>):
+That'd work too!
 
->> Error: arch/arm/boot/dts/sun7i-a20.dtsi:874.13-14 syntax error
->> FATAL ERROR: Unable to parse input tree
+> > Anyhow, no damage done, I've merged this in. I would say that it'd be a little
+> > more logical to send the SoC branch before the driver branch given this
+> > dependency though.
+> 
+> The reason that the SoC branch was sent after is because only the first
+> commit in that branch was pulled into the mailbox branch.
+> 
+> In retrospect, I think perhaps a better approach would've been to have a
+> separate branch with only the Kconfig symbol addition and pull that in
+> where needed.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 18504 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161204/e19a77b4/attachment-0001.gz>
+That could work, but the whole branch-merge-features-then-enable it workflow is
+quite acceptable as well.
+
+
+-Olof
