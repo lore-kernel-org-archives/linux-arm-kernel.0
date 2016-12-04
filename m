@@ -1,47 +1,33 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun,  4 Dec 2016 11:54:01 +0000
-Subject: [PATCH v2 0/6] crypto: ARM/arm64 CRC-T10DIF/CRC32/CRC32C roundup
-Message-ID: <1480852447-25082-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Sun,  4 Dec 2016 11:54:02 +0000
+Subject: [PATCH v2 1/6] crypto: testmgr - avoid overlap in chunked tests
+In-Reply-To: <1480852447-25082-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1480852447-25082-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1480852447-25082-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This v2 combines the CRC-T10DIF and CRC32 implementations for both ARM and
-arm64 that I sent out a couple of weeks ago, and adds support to the latter
-for CRC32C.
+The IDXn offsets are chosen such that tap values (which may go up to
+255) end up overlapping in the xbuf allocation. In particular, IDX1
+and IDX3 are too close together, so update IDX3 to avoid this issue.
 
-Ard Biesheuvel (6):
-  crypto: testmgr - avoid overlap in chunked tests
-  crypto: testmgr - add/enhance test cases for CRC-T10DIF
-  crypto: arm64/crct10dif - port x86 SSE implementation to arm64
-  crypto: arm/crct10dif - port x86 SSE implementation to ARM
-  crypto: arm64/crc32 - accelerated support based on x86 SSE
-    implementation
-  crypto: arm/crc32 - accelerated support based on x86 SSE
-    implementation
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ crypto/testmgr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/crypto/Kconfig               |  10 +
- arch/arm/crypto/Makefile              |   4 +
- arch/arm/crypto/crc32-ce-core.S       | 306 +++++++++++++++++
- arch/arm/crypto/crc32-ce-glue.c       | 195 +++++++++++
- arch/arm/crypto/crct10dif-ce-core.S   | 349 ++++++++++++++++++++
- arch/arm/crypto/crct10dif-ce-glue.c   |  95 ++++++
- arch/arm64/crypto/Kconfig             |  11 +
- arch/arm64/crypto/Makefile            |   6 +
- arch/arm64/crypto/crc32-ce-core.S     | 266 +++++++++++++++
- arch/arm64/crypto/crc32-ce-glue.c     | 188 +++++++++++
- arch/arm64/crypto/crct10dif-ce-core.S | 317 ++++++++++++++++++
- arch/arm64/crypto/crct10dif-ce-glue.c |  91 +++++
- crypto/testmgr.c                      |   2 +-
- crypto/testmgr.h                      |  70 ++--
- 14 files changed, 1881 insertions(+), 29 deletions(-)
- create mode 100644 arch/arm/crypto/crc32-ce-core.S
- create mode 100644 arch/arm/crypto/crc32-ce-glue.c
- create mode 100644 arch/arm/crypto/crct10dif-ce-core.S
- create mode 100644 arch/arm/crypto/crct10dif-ce-glue.c
- create mode 100644 arch/arm64/crypto/crc32-ce-core.S
- create mode 100644 arch/arm64/crypto/crc32-ce-glue.c
- create mode 100644 arch/arm64/crypto/crct10dif-ce-core.S
- create mode 100644 arch/arm64/crypto/crct10dif-ce-glue.c
-
+diff --git a/crypto/testmgr.c b/crypto/testmgr.c
+index ded50b67c757..670893bcf361 100644
+--- a/crypto/testmgr.c
++++ b/crypto/testmgr.c
+@@ -63,7 +63,7 @@ int alg_test(const char *driver, const char *alg, u32 type, u32 mask)
+  */
+ #define IDX1		32
+ #define IDX2		32400
+-#define IDX3		1
++#define IDX3		511
+ #define IDX4		8193
+ #define IDX5		22222
+ #define IDX6		17101
 -- 
 2.7.4
