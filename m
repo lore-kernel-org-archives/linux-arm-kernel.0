@@ -1,37 +1,319 @@
-From: jorik@kippendief.biz (jorik at kippendief.biz)
-Date: Sun,  4 Dec 2016 13:29:48 +0100
-Subject: [PATCH] dts: sun8i-h3: correct UART3 pin definitions
-Message-ID: <20161204122948.11921-1-jorik@kippendief.biz>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Sun, 4 Dec 2016 20:08:08 +0100
+Subject: [PATCH dt V2] ARM: BCM5301X: Enable UART by default for
+ BCM4708(1), BCM4709(4) & BCM53012
+In-Reply-To: <20161201174051.4965-1-zajec5@gmail.com>
+References: <20161128140134.25128-1-zajec5@gmail.com>
+ <20161201174051.4965-1-zajec5@gmail.com>
+Message-ID: <afb75857-b0eb-8660-3b10-32d445c81b96@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jorik Jonker <jorik@kippendief.biz>
+On 12/01/2016 06:40 PM, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
+> 
+> Every device tested so far got UART0 (at 0x18000300) working as serial
+> console. It's most likely part of reference design and all vendors use
+> it that way.
 
-In a previous commit, I made a copy/paste error in the pinmux
-definitions of UART3: PG{13,14} instead of PA{13,14}. This commit takes
-care of that. I have tested this commit on Orange Pi PC and Orange Pi
-Plus, and it works for these boards.
+I think the last 4 boards are some of the reference boards. ;-)
 
-Fixes: e3d11d3c45c5 ("dts: sun8i-h3: add pinmux definitions for
-UART2-3")
+> It seems to be easier to enable it by default and just disable it if we
+> ever see a device with different hardware design.
+> 
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
----
- arch/arm/boot/dts/sun8i-h3.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 75a8654..f4ba088 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -410,7 +410,7 @@
- 			};
- 
- 			uart3_pins: uart3 {
--				allwinner,pins = "PG13", "PG14";
-+				allwinner,pins = "PA13", "PA14";
- 				allwinner,function = "uart3";
- 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--- 
-2.9.3
+> ---
+> V2: Update bcm94708.dts bcm94709.dts bcm953012er.dts & bcm953012k.dts
+> ---
+>  arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  | 4 ----
+>  arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts       | 4 ----
+>  arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts       | 4 ----
+>  arch/arm/boot/dts/bcm4708-netgear-r6250.dts        | 4 ----
+>  arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts      | 4 ----
+>  arch/arm/boot/dts/bcm4708.dtsi                     | 4 ++++
+>  arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 4 ----
+>  arch/arm/boot/dts/bcm47081.dtsi                    | 4 ++++
+>  arch/arm/boot/dts/bcm4709-netgear-r7000.dts        | 4 ----
+>  arch/arm/boot/dts/bcm4709-netgear-r8000.dts        | 4 ----
+>  arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts  | 4 ----
+>  arch/arm/boot/dts/bcm4709.dtsi                     | 1 +
+>  arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts      | 4 ----
+>  arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts      | 4 ----
+>  arch/arm/boot/dts/bcm47094-netgear-r8500.dts       | 4 ----
+>  arch/arm/boot/dts/bcm47094.dtsi                    | 1 +
+>  arch/arm/boot/dts/bcm94708.dts                     | 4 ----
+>  arch/arm/boot/dts/bcm94709.dts                     | 4 ----
+>  arch/arm/boot/dts/bcm953012er.dts                  | 4 ----
+>  arch/arm/boot/dts/bcm953012k.dts                   | 1 -
+>  20 files changed, 10 insertions(+), 61 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
+> index 9cb186e..d49afec0 100644
+> --- a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
+> +++ b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
+> @@ -136,10 +136,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &usb2 {
+>  	vcc-gpio = <&chipcommon 9 GPIO_ACTIVE_HIGH>;
+>  };
+> diff --git a/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+> index 35e6ed6..f591b0f 100644
+> --- a/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+> +++ b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+> @@ -55,10 +55,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &spi_nor {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+> index 1c7e53d..50d65d8 100644
+> --- a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+> +++ b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+> @@ -56,10 +56,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &spi_nor {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+> index 8ce39d5..8519548 100644
+> --- a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+> +++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+> @@ -83,10 +83,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &usb3 {
+>  	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
+>  };
+> diff --git a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+> index 70f4bb9..74cfcd3 100644
+> --- a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+> +++ b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+> @@ -119,10 +119,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &spi_nor {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/bcm4708.dtsi b/arch/arm/boot/dts/bcm4708.dtsi
+> index eed4dd1..d0eec09 100644
+> --- a/arch/arm/boot/dts/bcm4708.dtsi
+> +++ b/arch/arm/boot/dts/bcm4708.dtsi
+> @@ -34,3 +34,7 @@
+>  	};
+>  
+>  };
+> +
+> +&uart0 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+> index a9c8def..2922536 100644
+> --- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+> +++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+> @@ -122,7 +122,3 @@
+>  		};
+>  	};
+>  };
+> -
+> -&uart0 {
+> -	status = "okay";
+> -};
+> diff --git a/arch/arm/boot/dts/bcm47081.dtsi b/arch/arm/boot/dts/bcm47081.dtsi
+> index f720012..c5f7619 100644
+> --- a/arch/arm/boot/dts/bcm47081.dtsi
+> +++ b/arch/arm/boot/dts/bcm47081.dtsi
+> @@ -24,3 +24,7 @@
+>  		};
+>  	};
+>  };
+> +
+> +&uart0 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+> index fd38d2a..0225d82 100644
+> --- a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+> +++ b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+> @@ -100,7 +100,3 @@
+>  		};
+>  	};
+>  };
+> -
+> -&uart0 {
+> -	status = "okay";
+> -};
+> diff --git a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+> index 92f8a72..56d38a3 100644
+> --- a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+> +++ b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+> @@ -107,10 +107,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &usb2 {
+>  	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
+>  };
+> diff --git a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
+> index 9a92c24..c67bfaa 100644
+> --- a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
+> +++ b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
+> @@ -97,10 +97,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &usb2 {
+>  	vcc-gpio = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
+>  };
+> diff --git a/arch/arm/boot/dts/bcm4709.dtsi b/arch/arm/boot/dts/bcm4709.dtsi
+> index f039765..c645fea 100644
+> --- a/arch/arm/boot/dts/bcm4709.dtsi
+> +++ b/arch/arm/boot/dts/bcm4709.dtsi
+> @@ -8,4 +8,5 @@
+>  
+>  &uart0 {
+>  	clock-frequency = <125000000>;
+> +	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+> index 661348d..7fb9270 100644
+> --- a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+> +++ b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+> @@ -105,10 +105,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &usb3 {
+>  	vcc-gpio = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
+>  };
+> diff --git a/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts b/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
+> index 169b35f..2f4a651 100644
+> --- a/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
+> +++ b/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
+> @@ -98,10 +98,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &usb3 {
+>  	vcc-gpio = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
+>  };
+> diff --git a/arch/arm/boot/dts/bcm47094-netgear-r8500.dts b/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
+> index 521b415..7ecd57c 100644
+> --- a/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
+> +++ b/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
+> @@ -97,7 +97,3 @@
+>  		};
+>  	};
+>  };
+> -
+> -&uart0 {
+> -	status = "okay";
+> -};
+> diff --git a/arch/arm/boot/dts/bcm47094.dtsi b/arch/arm/boot/dts/bcm47094.dtsi
+> index 4f09aa0..4840a78 100644
+> --- a/arch/arm/boot/dts/bcm47094.dtsi
+> +++ b/arch/arm/boot/dts/bcm47094.dtsi
+> @@ -14,4 +14,5 @@
+>  
+>  &uart0 {
+>  	clock-frequency = <125000000>;
+> +	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/bcm94708.dts b/arch/arm/boot/dts/bcm94708.dts
+> index 251a486..42855a7 100644
+> --- a/arch/arm/boot/dts/bcm94708.dts
+> +++ b/arch/arm/boot/dts/bcm94708.dts
+> @@ -50,7 +50,3 @@
+>  		reg = <0x00000000 0x08000000>;
+>  	};
+>  };
+> -
+> -&uart0 {
+> -	status = "okay";
+> -};
+> diff --git a/arch/arm/boot/dts/bcm94709.dts b/arch/arm/boot/dts/bcm94709.dts
+> index b16cac9..95e8be6 100644
+> --- a/arch/arm/boot/dts/bcm94709.dts
+> +++ b/arch/arm/boot/dts/bcm94709.dts
+> @@ -50,7 +50,3 @@
+>  		reg = <0x00000000 0x08000000>;
+>  	};
+>  };
+> -
+> -&uart0 {
+> -	status = "okay";
+> -};
+> diff --git a/arch/arm/boot/dts/bcm953012er.dts b/arch/arm/boot/dts/bcm953012er.dts
+> index 0a9abec..decd86b 100644
+> --- a/arch/arm/boot/dts/bcm953012er.dts
+> +++ b/arch/arm/boot/dts/bcm953012er.dts
+> @@ -70,10 +70,6 @@
+>  	};
+>  };
+>  
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+>  &spi_nor {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/bcm953012k.dts b/arch/arm/boot/dts/bcm953012k.dts
+> index 05a985a..bfd9230 100644
+> --- a/arch/arm/boot/dts/bcm953012k.dts
+> +++ b/arch/arm/boot/dts/bcm953012k.dts
+> @@ -54,7 +54,6 @@
+>  
+>  &uart0 {
+>  	clock-frequency = <62499840>;
+> -	status = "okay";
+>  };
+>  
+>  &uart1 {
+> 
