@@ -1,44 +1,62 @@
-From: sramana@codeaurora.org (Srinivas Ramana)
-Date: Sun, 04 Dec 2016 14:06:23 +0530
-Subject: [PATCH] trace: extend trace_clock to support arch_arm clock
- counter
-In-Reply-To: <20161202110845.GC8266@arm.com>
-References: <1480666495-26536-1-git-send-email-sramana@codeaurora.org>
- <20161202110845.GC8266@arm.com>
-Message-ID: <5843D587.5010407@codeaurora.org>
+From: dhdang@apm.com (Duc Dang)
+Date: Sun, 4 Dec 2016 02:35:28 -0800
+Subject: [SPCR] mmio32 iotype access requirements for X-Gene 8250(_dw) UART
+In-Reply-To: <c6a0c134-2fde-21c2-03fb-6e1961161a26@redhat.com>
+References: <20161201183350.GF30746@bhelgaas-glaptop.roam.corp.google.com>
+ <f18738b7096fb06a5865214ddc299ce99630673b.1480644928.git.dhdang@apm.com>
+ <6d593615-e97f-8738-42be-1f8f4906d2f4@redhat.com>
+ <CADaLNDkyCrheZLNG3_9BVgvGBW8WrA-VPWOCezz3U-g+nt5W9w@mail.gmail.com>
+ <175F32B0-C73F-4250-9E60-3CE7409F0B0C@redhat.com>
+ <CADaLNDmWRn+UKzF8PH2LmYCSF+NhHaw26RTN+QoaByh1wS7jfQ@mail.gmail.com>
+ <7fa523de-3fbb-1566-f521-927143f73d1e@redhat.com>
+ <1480785308.4751.41.camel@redhat.com>
+ <c6a0c134-2fde-21c2-03fb-6e1961161a26@redhat.com>
+Message-ID: <CADaLNDnTFYhJK76DhRNvxb5eAEQGtaJtag1CoyLb73iweUkMGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2016 04:38 PM, Will Deacon wrote:
-> On Fri, Dec 02, 2016 at 01:44:55PM +0530, Srinivas Ramana wrote:
->> Extend the trace_clock to support the arch timer cycle
->> counter so that we can get the monotonic cycle count
->> in the traces. This will help in correlating the traces with the
->> timestamps/events in other subsystems in the soc which share
->> this common counter for driving their timers.
+On Sat, Dec 3, 2016 at 12:33 PM, Jon Masters <jcm@redhat.com> wrote:
+> Hi Mark,
 >
-> I'm not sure I follow this reasoning. What's wrong with nanoseconds? In
-> particular, the "perf" trace_clock hangs off sched_clock, which should
-> be backed by the architected counter anyway. What does the cycle counter in
-> isolation tell you, given that the frequency isn't architected?
+> On 12/03/2016 12:15 PM, Mark Salter wrote:
+>> On Sat, 2016-12-03 at 05:06 -0500, Jon Masters wrote:
 >
-> I think I'm missing something here.
->
-> Will
->
+>>> There is a broader problem with X-Gene SPCR support. The problem is
+>>> that the 16550 UART in X-Gene requires the 32-bit access quirk (the
+>>> iotype is set to UPIO_MEM32 for the APMC0D08 device). This means
+>>> that when univ8250_console_match runs later, it will compare the
+>>> iotype (MEM32) with the type previously registered with the
+>>> kernel when the earlycon setup the preferred console.
+>>
+>> Linaro has a kernel patch which looks at the bit_width field of the
+>> port address:
+>>
+>> Author: Aleksey Makarov <aleksey.makarov@linaro.org>
+>> Date:   Thu Apr 28 19:52:38 2016 +0300
+>>
+>>     serial: SPCR: check bit width for the 16550 UART
+>>
+>> The SPCR in 3.06.25 firmware has a bit_width field set to 32 and with the
+>> above patch, I don't need to use console=. But HP firmware on m400 sets
+>> bit width to 8 so that needs a firmware fix to work with above.
 
-Having cycle counter would help in the cases where we want to correlate 
-the time with other subsystems which are outside cpu subsystem. 
-local_clock or even the perf track_clock uses sched_clock which gets 
-suspended during system suspend. Yes, they are backed up by the 
-architected counter but they ignore the cycles spent in suspend. so, 
-when comparing with monotonically increasing cycle counter, other clocks 
-doesn't help. It seems X86 uses the TSC counter to help such cases.
+Will this patch be posted for upstream?
 
-Thanks,
--- Srinivas R
+>
+> Indeed, thanks. Graeme also mentioned that last night. I think this
+> a good solution for the moment, but still that it makes sense to
+> have a new 16650 UART type defined in the DBG2 spec for those
+> requiring 32-bit access (to mirror the type D for pl011). I
+> heard back from Microsoft this morning that they're looking.
 
--- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center, 
-Inc.,
-is a member of Code Aurora Forum, a Linux Foundation Collaborative Project.
+Yes, thanks, Jon. It will be nice to have a new 16550 UART type for
+those requiring 32-bit access.
+
+>
+> Jon.
+>
+> --
+> Computer Architect | Sent from my Fedora powered laptop
+>
+Regards,
+Duc Dang.
