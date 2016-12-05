@@ -1,55 +1,87 @@
-From: Joao.Pinto@synopsys.com (Joao Pinto)
-Date: Mon, 5 Dec 2016 10:24:33 +0000
-Subject: [RFC PATCH] PCI: designware: add host_init() error handling
-In-Reply-To: <d416f9b3-20d9-0339-a4d2-9a4ba0669633@linaro.org>
-References: <1480593077-15402-1-git-send-email-srinivas.kandagatla@linaro.org>
- <f2c8ebba-e51a-5f47-2d96-c75f7e086c0e@synopsys.com>
- <d416f9b3-20d9-0339-a4d2-9a4ba0669633@linaro.org>
-Message-ID: <05a1f59e-b5da-7a6a-149e-7e9037deb7bd@synopsys.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 5 Dec 2016 08:25:40 -0200
+Subject: [PATCH 06/11] ARM: dts: imx: Add imx6sll EVK board dts support
+In-Reply-To: <1480660774-25055-7-git-send-email-ping.bai@nxp.com>
+References: <1480660774-25055-1-git-send-email-ping.bai@nxp.com>
+ <1480660774-25055-7-git-send-email-ping.bai@nxp.com>
+Message-ID: <CAOMZO5C5-tq-OWTYcmzJt=_57wOyXzNMUes1mctwwyoegwzJyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?s 11:51 AM de 12/2/2016, Srinivas Kandagatla escreveu:
-> 
-> 
-> On 02/12/16 10:32, Joao Pinto wrote:
->>
->> Hi Srinivas,
->>
->> ?s 11:51 AM de 12/1/2016, Srinivas Kandagatla escreveu:
->>>  drivers/pci/host/pci-dra7xx.c           |  4 +++-
->>>  drivers/pci/host/pci-exynos.c           |  4 +++-
->>>  drivers/pci/host/pci-imx6.c             |  4 +++-
->>>  drivers/pci/host/pci-keystone.c         |  4 +++-
->>>  drivers/pci/host/pci-layerscape.c       | 12 ++++++++----
->>>  drivers/pci/host/pcie-armada8k.c        |  4 +++-
->>>  drivers/pci/host/pcie-designware-plat.c |  4 +++-
->>>  drivers/pci/host/pcie-designware.c      |  4 +++-
->>>  drivers/pci/host/pcie-designware.h      |  2 +-
->>>  drivers/pci/host/pcie-qcom.c            |  6 ++++--
->>>  drivers/pci/host/pcie-spear13xx.c       |  4 +++-
->>>  11 files changed, 37 insertions(+), 15 deletions(-)
->>>
->>
->> Thanks for the patch!
->>
->> In my opinion your idea is good but only qcom driver is able to detect failure
->> in the specific host init routine, all others have a 'return 0' even if
->> something not well init. I would recomend that we take this issue a bit further
->> and add the error checking to all specific pci drivers in order to make them as
->> robust as qcom'.
-> I totally agree with you, I can give this a go in next version.
+On Fri, Dec 2, 2016 at 4:39 AM, Bai Ping <ping.bai@nxp.com> wrote:
+> Add basic dts support for imx6sll EVK baoard.
 
-Sure, but I think it would be better to finish now since we are on top of the
-task. I can help you if you need.
+s/baord/board
 
-Thanks Joao
+> +       battery: max8903 at 0 {
+> +               compatible = "fsl,max8903-charger";
+> +               pinctrl-names = "default";
+> +               dok_input = <&gpio4 13 1>;
+> +               uok_input = <&gpio4 13 1>;
+> +               chg_input = <&gpio4 15 1>;
+> +               flt_input = <&gpio4 14 1>;
+> +               fsl,dcm_always_high;
+> +               fsl,dc_valid;
+> +               fsl,adc_disable;
 
-> 
-> Thanks,
-> srini
-> 
->>
->> Thanks,
->> Joao
->>
+These properties do not exist in mainline, please remove them.
+
+
+> +               status = "okay";
+> +       };
+> +
+> +       pxp_v4l2_out {
+> +               compatible = "fsl,imx6sl-pxp-v4l2";
+> +               status = "okay";
+> +       };
+
+We don't have pxp support in mainline kernel, please remove it.
+
+> +
+> +       regulators {
+> +               compatible = "simple-bus";
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+
+
+Please remove it and place the regulator nodes directly as below:
+
+
+> +
+> +               reg_usb_otg1_vbus: regulator at 0 {
+> +                       compatible = "regulator-fixed";
+> +                       reg = <0>;
+> +                       regulator-name = "usb_otg1_vbus";
+> +                       regulator-min-microvolt = <5000000>;
+> +                       regulator-max-microvolt = <5000000>;
+> +                       gpio = <&gpio4 0 GPIO_ACTIVE_HIGH>;
+> +                       enable-active-high;
+> +               };
+
+    reg_usb_otg1_vbus: regulator-usb-otg1-vbus {
+          compatible = "regulator-fixed";
+          regulator-name = "usb_otg1_vbus";
+          regulator-min-microvolt = <5000000>;
+          regulator-max-microvolt = <5000000>;
+          gpio = <&gpio4 0 GPIO_ACTIVE_HIGH>;
+          enable-active-high;
+    };
+
+> +&cpu0 {
+> +       arm-supply = <&sw1a_reg>;
+> +       soc-supply = <&sw1c_reg>;
+> +};
+
+This is only for LDO bypass mode, right? We don't support LDO-bypass
+in mainline.
+
+> +&gpc {
+> +       fsl,ldo-bypass = <1>;
+
+We don't support ldo-bypass in mainline, please remove it.
+
+> +&pxp {
+> +       status = "okay";
+> +};
+
+We don't support PXP in mainline, please remove it.
