@@ -1,102 +1,50 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 5 Dec 2016 07:53:50 +0100
-Subject: [PATCH v3 3/7] PWM: add pwm-stm32 DT bindings
-In-Reply-To: <1480673842-20804-4-git-send-email-benjamin.gaignard@st.com>
-References: <1480673842-20804-1-git-send-email-benjamin.gaignard@st.com>
- <1480673842-20804-4-git-send-email-benjamin.gaignard@st.com>
-Message-ID: <20161205065350.GA18069@ulmo.ba.sec>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Mon, 5 Dec 2016 15:01:22 +0800
+Subject: [PATCH v1 0/2] Add MediaTek crypto acclelrator driver
+Message-ID: <1480921284-45827-1-git-send-email-ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 11:17:18AM +0100, Benjamin Gaignard wrote:
-> Define bindings for pwm-stm32
-> 
-> version 2:
-> - use parameters instead of compatible of handle the hardware configuration
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> ---
->  .../devicetree/bindings/pwm/pwm-stm32.txt          | 38 ++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> new file mode 100644
-> index 0000000..575b9fb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> @@ -0,0 +1,38 @@
-> +STMicroelectronics PWM driver bindings for STM32
+Hello,
 
-Technically this bindings describe devices, so "driver binding" is a
-somewhat odd wording. Perhaps:
+This adds support for the MediaTek hardware accelerator on 
+mt7623 SoC.
 
-	STMicroelectronics STM32 General Purpose Timer PWM bindings
+This driver currently implement: 
+- SHA1 and SHA2 family(HMAC) hash alogrithms.
+- AES block cipher in CBC/ECB mode with 128/196/256 bits keys.
 
-?
+Changes since v1:
+- remove EXPORT_SYMBOL
+- remove unused PRNG setting
+- sort headers in alphabetical order
+- add a definition for IRQ unmber
+- replace ambiguous definition
+- add more annotation and function comment
+- add COMPILE_TEST in Kconfig
 
-> +
-> +Must be a sub-node of STM32 general purpose timer driver
-> +Parent node properties are describe in ../mfd/stm32-general-purpose-timer.txt
 
-Again, "driver parent node" is odd. Perhaps:
+Ryder Lee (2):
+  Add crypto driver support for some MediaTek chips
+  crypto: mediatek - add DT bindings documentation
 
-	Must be a sub-node of an STM32 General Purpose Timer device tree
-	node. See ../mfd/stm32-general-purpose-timer.txt for details about
-	the parent node.
+ .../devicetree/bindings/crypto/mediatek-crypto.txt |   32 +
+ drivers/crypto/Kconfig                             |   17 +
+ drivers/crypto/Makefile                            |    1 +
+ drivers/crypto/mediatek/Makefile                   |    2 +
+ drivers/crypto/mediatek/mtk-aes.c                  |  763 +++++++++++
+ drivers/crypto/mediatek/mtk-platform.c             |  580 ++++++++
+ drivers/crypto/mediatek/mtk-platform.h             |  235 ++++
+ drivers/crypto/mediatek/mtk-regs.h                 |  194 +++
+ drivers/crypto/mediatek/mtk-sha.c                  | 1423 ++++++++++++++++++++
+ 9 files changed, 3247 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/crypto/mediatek-crypto.txt
+ create mode 100644 drivers/crypto/mediatek/Makefile
+ create mode 100644 drivers/crypto/mediatek/mtk-aes.c
+ create mode 100644 drivers/crypto/mediatek/mtk-platform.c
+ create mode 100644 drivers/crypto/mediatek/mtk-platform.h
+ create mode 100644 drivers/crypto/mediatek/mtk-regs.h
+ create mode 100644 drivers/crypto/mediatek/mtk-sha.c
 
-?
-
-> +Required parameters:
-> +- compatible:		Must be "st,stm32-pwm"
-> +- pinctrl-names: 	Set to "default".
-> +- pinctrl-0: 		List of phandles pointing to pin configuration nodes
-> +			for PWM module.
-> +			For Pinctrl properties, please refer to [1].
-
-Your indentation and capitalization are inconsistent. Also, please refer
-to the pinctrl bindings by relative path and inline, rather than as a
-footnote reference.
-
-> +
-> +Optional parameters:
-> +- st,breakinput:	Set if the hardware have break input capabilities
-> +- st,breakinput-polarity: Set break input polarity. Default is 0
-> +			 The value define the active polarity:
-> +			  - 0 (active LOW)
-> +			  - 1 (active HIGH)
-
-Could we fold these into a single property? If st,breakinput-polarity is
-not present it could simply mean that there is no break input, and if it
-is present you don't have to rely on a default.
-
-> +- st,pwm-num-chan:	Number of available PWM channels.  Default is 0.
-
-The pwm- prefix is rather redundant since the node is already named pwm.
-Why not simply st,channels? Or simply channels, since it's not really
-anything specific to this hardware.
-
-Come to think of it, might be worth having a discussion with our DT
-gurus about what their stance is on using the # as prefix for numbers
-(such as in #address-cells or #size-cells). This could be #channels to
-mark it more explicitly as representing a count.
-
-> +- st,32bits-counter:	Set if the hardware have a 32 bits counter
-> +- st,complementary:	Set if the hardware have complementary output channels
-
-"hardware has" and also maybe mention explicitly that this is a boolean
-property. Otherwise people might be left wondering what it should be set
-to. Or maybe word this differently to imply that it's boolean:
-
-	- st,32bits-counter: if present, the hardware has a 32 bit counter
-	- st,complementary: if present, the hardware has a complementary
-	                    output channel
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161205/23d337b3/attachment.sig>
+-- 
+1.9.1
