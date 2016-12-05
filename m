@@ -1,133 +1,338 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon,  5 Dec 2016 12:26:19 +0000
-Subject: [PATCH] ACPI/IORT: Make dma masks set-up IORT specific
-Message-ID: <20161205122619.25045-1-lorenzo.pieralisi@arm.com>
+From: sf84@laposte.net (Sebastian Frias)
+Date: Mon, 5 Dec 2016 13:28:04 +0100
+Subject: Adding a .platform_init callback to sdhci_arasan_ops
+In-Reply-To: <CAD=FV=XrJHFbpbhsJZAEE-HLMe47Ov=BgvHw8ZtfCazzT75pKQ@mail.gmail.com>
+References: <d50dcd8a-2489-4e82-1dc7-13e93e38d5ff@laposte.net>
+ <982d633b-e9c4-0f10-052b-e324f094d0f5@xilinx.com>
+ <2a949ade-edd7-4690-cd6a-434ae1e663dc@intel.com>
+ <66751ab5-59a4-ec30-07cd-44ca03694723@laposte.net>
+ <d1801c1e-cd74-b79c-0280-8fb5dc377c91@intel.com>
+ <e32d2a01-ba3c-6127-51ba-a1fd4176e32c@laposte.net>
+ <485a747c-47e3-bc0e-093a-4ec9ab719987@laposte.net>
+ <CAD=FV=XrJHFbpbhsJZAEE-HLMe47Ov=BgvHw8ZtfCazzT75pKQ@mail.gmail.com>
+Message-ID: <305f6531-3102-d0f5-cb22-bdd965e39519@laposte.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The introduction of acpi_dma_configure() allows to configure DMA
-and related IOMMU for any device that is DMA capable. To achieve
-that goal it ensures DMA masks are set-up to sane default values
-before proceeding with IOMMU and DMA ops configuration.
+Hi Doug,
 
-On x86/ia64 systems, through acpi_bind_one(), acpi_dma_configure() is
-called for every device that has an ACPI companion, in that every device
-is considered DMA capable on x86/ia64 systems (ie acpi_get_dma_attr() API),
-which has the side effect of initializing dma masks also for
-pseudo-devices (eg CPUs and memory nodes) and potentially for devices
-whose dma masks were not set-up before the acpi_dma_configure() API was
-introduced, which may have noxious side effects.
+On 28/11/16 18:46, Doug Anderson wrote:
+> Hi,
+> 
+> On Mon, Nov 28, 2016 at 6:39 AM, Sebastian Frias <sf84@laposte.net> wrote:
+>>> I will try to send another patch with what a different approach
+>>>
+>>
+>> Here's a different approach (I just tested that it built, because I don't have the
+>> rk3399 platform):
+>>
+>> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+>> index 410a55b..5be6e67 100644
+>> --- a/drivers/mmc/host/sdhci-of-arasan.c
+>> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+>> @@ -382,22 +382,6 @@ static int sdhci_arasan_resume(struct device *dev)
+>>  static SIMPLE_DEV_PM_OPS(sdhci_arasan_dev_pm_ops, sdhci_arasan_suspend,
+>>                          sdhci_arasan_resume);
+>>
+>> -static const struct of_device_id sdhci_arasan_of_match[] = {
+>> -       /* SoC-specific compatible strings w/ soc_ctl_map */
+>> -       {
+>> -               .compatible = "rockchip,rk3399-sdhci-5.1",
+>> -               .data = &rk3399_soc_ctl_map,
+>> -       },
+>> -
+>> -       /* Generic compatible below here */
+>> -       { .compatible = "arasan,sdhci-8.9a" },
+>> -       { .compatible = "arasan,sdhci-5.1" },
+>> -       { .compatible = "arasan,sdhci-4.9a" },
+>> -
+>> -       { /* sentinel */ }
+>> -};
+>> -MODULE_DEVICE_TABLE(of, sdhci_arasan_of_match);
+>> -
+>>  /**
+>>   * sdhci_arasan_sdcardclk_recalc_rate - Return the card clock rate
+>>   *
+>> @@ -578,28 +562,18 @@ static void sdhci_arasan_unregister_sdclk(struct device *dev)
+>>         of_clk_del_provider(dev->of_node);
+>>  }
+>>
+>> -static int sdhci_arasan_probe(struct platform_device *pdev)
+>> +static int sdhci_rockchip_platform_init(struct sdhci_host *host,
+>> +                                       struct platform_device *pdev)
+>>  {
+>>         int ret;
+>> -       const struct of_device_id *match;
+>>         struct device_node *node;
+>> -       struct clk *clk_xin;
+>> -       struct sdhci_host *host;
+>>         struct sdhci_pltfm_host *pltfm_host;
+>>         struct sdhci_arasan_data *sdhci_arasan;
+>> -       struct device_node *np = pdev->dev.of_node;
+>> -
+>> -       host = sdhci_pltfm_init(pdev, &sdhci_arasan_pdata,
+>> -                               sizeof(*sdhci_arasan));
+>> -       if (IS_ERR(host))
+>> -               return PTR_ERR(host);
+>>
+>>         pltfm_host = sdhci_priv(host);
+>>         sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+>> -       sdhci_arasan->host = host;
+>>
+>> -       match = of_match_node(sdhci_arasan_of_match, pdev->dev.of_node);
+>> -       sdhci_arasan->soc_ctl_map = match->data;
+>> +       sdhci_arasan->soc_ctl_map = &rk3399_soc_ctl_map;
+>>
+>>         node = of_parse_phandle(pdev->dev.of_node, "arasan,soc-ctl-syscon", 0);
+>>         if (node) {
+>> @@ -611,10 +585,107 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>>                         if (ret != -EPROBE_DEFER)
+>>                                 dev_err(&pdev->dev, "Can't get syscon: %d\n",
+>>                                         ret);
+>> -                       goto err_pltfm_free;
+>> +                       return -1;
+>>                 }
+>>         }
+>>
+>> +       if (of_property_read_bool(pdev->dev.of_node, "xlnx,fails-without-test-cd"))
+>> +               sdhci_arasan->quirks |= SDHCI_ARASAN_QUIRK_FORCE_CDTEST;
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static int sdhci_rockchip_clock_init(struct sdhci_host *host,
+>> +                                       struct platform_device *pdev)
+>> +{
+>> +       struct sdhci_pltfm_host *pltfm_host;
+>> +       struct sdhci_arasan_data *sdhci_arasan;
+>> +
+>> +       pltfm_host = sdhci_priv(host);
+>> +       sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+>> +
+>> +       if (of_device_is_compatible(pdev->dev.of_node,
+>> +                                   "rockchip,rk3399-sdhci-5.1"))
+>> +               sdhci_arasan_update_clockmultiplier(host, 0x0);
+> 
+> This _does_ belong in a Rockchip-specific init function, for now.
 
-Therefore, in preparation for IORT firmware specific DMA masks set-up,
-wrap the default DMA masks set-up in acpi_dma_configure() inside an IORT
-specific wrapper that reverts to a NOP on x86/ia64 systems, restoring the
-default expected behaviour on x86/ia64 systems and keeping DMA default
-masks set-up on IORT based (ie ARM) arch configurations.
+I'm not sure I understood. Are you saying that you agree to put this
+into a specific function? Essentially agreeing with the concept the
+patch is putting forward?
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Tomasz Nowicki <tn@semihalf.com>
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Sricharan R <sricharan@codeaurora.org>
----
-Joerg,
+Note, I'm more interested in the concept (i.e.: init functions) and less
+in knowing if my patch (which was a quick and dirty thing) properly moved
+the functions into the said init functions. For example, I did not move
+the code dealing with "arasan,sdhci-5.1", but it could go into another
+callback.
 
-pending Rafael's ACK on it, given the 4.10 release timing and that the
-series is queued via the IOMMU tree please consider applying this patch to
-your arm/smmu branch for 4.10, it is not fixing a bug but it is modifying
-the x86/ia64 code path; I prefer preventing any issue related to default
-dma masks on x86/ia64 so I hope it can get merged along with the rest of
-the ACPI IORT SMMU series.
+Right now there are no "chip-specific" functions.
+Just a code in sdhci_arasan_probe() that by checking various compatible
+strings and the presence of other specific properties, acts as a way of
+"chip-specific" initialisation, because it calls or not some functions.
+(or the functions do nothing if some DT properties are not there).
 
-Thanks a lot and apologies,
-Lorenzo
+The proposed patch is an attempt to clean up sdhci_arasan_probe() from
+all those checks and move them into separate functions, for clarity and
+maintainability reasons.
 
- drivers/acpi/arm64/iort.c | 22 ++++++++++++++++++++++
- drivers/acpi/scan.c       | 14 +-------------
- include/linux/acpi_iort.h |  2 ++
- 3 files changed, 25 insertions(+), 13 deletions(-)
+What are your thoughts in that regard?
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 47bace8..e0d2e6e 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -547,6 +547,28 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
- }
- 
- /**
-+ * iort_set_dma_mask - Set-up dma mask for a device.
-+ *
-+ * @dev: device to configure
-+ */
-+void iort_set_dma_mask(struct device *dev)
-+{
-+	/*
-+	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
-+	 * setup the correct supported mask.
-+	 */
-+	if (!dev->coherent_dma_mask)
-+		dev->coherent_dma_mask = DMA_BIT_MASK(32);
-+
-+	/*
-+	 * Set it to coherent_dma_mask by default if the architecture
-+	 * code has not set it.
-+	 */
-+	if (!dev->dma_mask)
-+		dev->dma_mask = &dev->coherent_dma_mask;
-+}
-+
-+/**
-  * iort_iommu_configure - Set-up IOMMU configuration for a device.
-  *
-  * @dev: device to configure
-diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-index 80698d3..93b00cf 100644
---- a/drivers/acpi/scan.c
-+++ b/drivers/acpi/scan.c
-@@ -1380,19 +1380,7 @@ void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
- {
- 	const struct iommu_ops *iommu;
- 
--	/*
--	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
--	 * setup the correct supported mask.
--	 */
--	if (!dev->coherent_dma_mask)
--		dev->coherent_dma_mask = DMA_BIT_MASK(32);
--
--	/*
--	 * Set it to coherent_dma_mask by default if the architecture
--	 * code has not set it.
--	 */
--	if (!dev->dma_mask)
--		dev->dma_mask = &dev->coherent_dma_mask;
-+	iort_set_dma_mask(dev);
- 
- 	iommu = iort_iommu_configure(dev);
- 
-diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-index dcb2b60..77e0809 100644
---- a/include/linux/acpi_iort.h
-+++ b/include/linux/acpi_iort.h
-@@ -35,6 +35,7 @@ bool iort_node_match(u8 type);
- u32 iort_msi_map_rid(struct device *dev, u32 req_id);
- struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
- /* IOMMU interface */
-+void iort_set_dma_mask(struct device *dev);
- const struct iommu_ops *iort_iommu_configure(struct device *dev);
- #else
- static inline void acpi_iort_init(void) { }
-@@ -45,6 +46,7 @@ static inline struct irq_domain *iort_get_device_domain(struct device *dev,
- 							u32 req_id)
- { return NULL; }
- /* IOMMU interface */
-+static inline void iort_set_dma_mask(struct device *dev) { }
- static inline
- const struct iommu_ops *iort_iommu_configure(struct device *dev)
- { return NULL; }
--- 
-2.10.0
+>From what I've seen in other drivers, for example drivers/net/ethernet/aurora/nb8800.c
+One matches the compatible string to get a (likely) chip-specific set of
+callbacks to use in the 'probe' function.
+
+Then, adding support for other chips is just a matter of replacing some
+of those callbacks with others adapted to a given platform.
+
+> Other platforms might want different values for
+> corecfg_clockmultiplier, I think.
+> 
+> If it becomes common to need to set this, it wouldn't be hard to make
+> it generic by putting it in the data matched by the device tree, then
+> generically call sdhci_arasan_update_clockmultiplier() in cases where
+> it is needed.  sdhci_arasan_update_clockmultiplier() itself should be
+> generic enough to handle it.
+> 
+> 
+>> +
+>> +       sdhci_arasan_update_baseclkfreq(host);
+> 
+> If you make soc_ctl_map always part of "struct sdhci_arasan_cs_ops"
+> then other platforms will be able to use it.
+
+I thought that soc_ctl_map was specific and for a given platform.
+For what is worth, I don't know which of these calls are or can be made
+generic or not.
+
+Indeed, I'm not an expert in this code; However, I think that given the
+amount of checks for specific properties, probably part of this is chip-
+specific, and as such, it would benefit from some re-factoring so that
+the chip-specific parts are clearly separated from the rest, instead of
+being mixed together inside the probe function.
+
+> 
+> As argued in my original patch the field "corecfg_baseclkfreq" is
+> documented in the generic Arasan document
+> <https://arasan.com/wp-content/media/eMMC-5-1-Total-Solution_Rev-1-3.pdf>
+> and thus is unlikely to be Rockchip specific.  It is entirely possible
+> that not everyone who integrates this IP block will need this register
+> set, but in that case they can set an offset as "-1" and they'll be
+> fine.
+> 
+> Said another way: the concept of whether or not to set "baseclkfreq"
+> doesn't need to be tired to whether or not we're on Rockchip.
+> 
+
+I see.
+For what is worth, the documentation for 'sdhci_arasan_update_baseclkfreq()'
+says something like:
+
+ *   Many existing devices don't seem to do this and work fine.  To keep
+ *   compatibility for old hardware where the device tree doesn't provide a
+ *   register map, this function is a noop if a soc_ctl_map hasn't been provided
+ *   for this platform.
+
+> 
+>> +
+>> +       return sdhci_arasan_register_sdclk(sdhci_arasan, pltfm_host->clk, &pdev->dev);
+> 
+> This is documented in "bindings/mmc/arasan,sdhci.txt" to be available
+> to all people using this driver, not just Rockchip.  You should do it
+> always.  If you don't specify "#clock-cells" in the device tree it
+> will be a no-op anyway.
+
+I see, thanks for the explanation.
+
+> 
+> 
+>> +}
+>> +
+>> +static int sdhci_tango_platform_init(struct sdhci_host *host,
+>> +                                    struct platform_device *pdev)
+>> +{
+>> +       return 0;
+> 
+> I'll comment in your other patch where you actually had an
+> implementation for this.
+> 
+
+Sounds good. I will reply to you there because now I have a more
+complete set of register writes.
+
+Best regards,
+
+Sebastian
+
+> 
+>> +}
+>> +
+>> +/* Chip-specific ops */
+>> +struct sdhci_arasan_cs_ops {
+>> +       int (*platform_init)(struct sdhci_host *host,
+>> +                            struct platform_device *pdev);
+>> +       int (*clock_init)(struct sdhci_host *host,
+>> +                         struct platform_device *pdev);
+>> +};
+> 
+> I really think it's a good idea to add the "soc_ctl_map" into this structure.
+> 
+> If nothing else when the next Rockchip SoC comes out that uses this
+> then we won't have to do a second level of matching for Rockchip SoCs.
+> I'm also a firm believer that others will need "soc_ctl_map" at some
+> point in time, but obviously I can't predict the future.
+> 
+> 
+>> +
+>> +static const struct sdhci_arasan_cs_ops sdhci_rockchip_cs_ops = {
+>> +       .platform_init = sdhci_rockchip_platform_init,
+>> +       .clock_init = sdhci_rockchip_clock_init,
+>> +};
+>> +
+>> +static const struct sdhci_arasan_cs_ops sdhci_tango_cs_ops = {
+>> +       .platform_init = sdhci_tango_platform_init,
+>> +};
+>> +
+>> +static const struct of_device_id sdhci_arasan_of_match[] = {
+>> +       /* SoC-specific compatible strings */
+>> +       {
+>> +               .compatible = "rockchip,rk3399-sdhci-5.1",
+>> +               .data = &sdhci_rockchip_cs_ops,
+>> +       },
+>> +       {
+>> +               .compatible = "sigma,sdio-v1",
+>> +               .data = &sdhci_tango_cs_ops,
+>> +       },
+>> +
+>> +       /* Generic compatible below here */
+>> +       { .compatible = "arasan,sdhci-8.9a" },
+>> +       { .compatible = "arasan,sdhci-5.1" },
+>> +       { .compatible = "arasan,sdhci-4.9a" },
+>> +
+>> +       { /* sentinel */ }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, sdhci_arasan_of_match);
+>> +
+>> +static int sdhci_arasan_probe(struct platform_device *pdev)
+>> +{
+>> +       int ret;
+>> +       const struct of_device_id *match;
+>> +       struct clk *clk_xin;
+>> +       struct sdhci_host *host;
+>> +       struct sdhci_pltfm_host *pltfm_host;
+>> +       struct sdhci_arasan_data *sdhci_arasan;
+>> +       const struct sdhci_arasan_cs_ops *cs_ops;
+>> +
+>> +       host = sdhci_pltfm_init(pdev, &sdhci_arasan_pdata,
+>> +                               sizeof(*sdhci_arasan));
+>> +       if (IS_ERR(host))
+>> +               return PTR_ERR(host);
+>> +
+>> +       pltfm_host = sdhci_priv(host);
+>> +       sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+>> +       sdhci_arasan->host = host;
+>> +
+>> +       match = of_match_device(sdhci_arasan_of_match, &pdev->dev);
+>> +       if (match)
+>> +               cs_ops = match->data;
+>> +
+>> +       /* SoC-specific platform init */
+>> +       if (cs_ops && cs_ops->platform_init) {
+>> +               ret = cs_ops->platform_init(host, pdev);
+>> +               if (ret)
+>> +                       goto err_pltfm_free;
+>> +       }
+>> +
+>>         sdhci_arasan->clk_ahb = devm_clk_get(&pdev->dev, "clk_ahb");
+>>         if (IS_ERR(sdhci_arasan->clk_ahb)) {
+>>                 dev_err(&pdev->dev, "clk_ahb clock not found.\n");
+>> @@ -642,21 +713,14 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>>         }
+>>
+>>         sdhci_get_of_property(pdev);
+>> -
+>> -       if (of_property_read_bool(np, "xlnx,fails-without-test-cd"))
+>> -               sdhci_arasan->quirks |= SDHCI_ARASAN_QUIRK_FORCE_CDTEST;
+>> -
+>>         pltfm_host->clk = clk_xin;
+>>
+>> -       if (of_device_is_compatible(pdev->dev.of_node,
+>> -                                   "rockchip,rk3399-sdhci-5.1"))
+>> -               sdhci_arasan_update_clockmultiplier(host, 0x0);
+>> -
+>> -       sdhci_arasan_update_baseclkfreq(host);
+>> -
+>> -       ret = sdhci_arasan_register_sdclk(sdhci_arasan, clk_xin, &pdev->dev);
+>> -       if (ret)
+>> -               goto clk_disable_all;
+>> +       /* SoC-specific clock init */
+>> +       if (cs_ops && cs_ops->clock_init) {
+>> +               ret = cs_ops->clock_init(host, pdev);
+>> +               if (ret)
+>> +                       goto clk_disable_all;
+>> +       }
+>>
+>>         ret = mmc_of_parse(host->mmc);
+>>         if (ret) {
+>>
+>>
+>> If you are ok with it I can clean it up to submit it properly.
