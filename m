@@ -1,92 +1,221 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 5 Dec 2016 11:16:41 +0800
-Subject: [PATCH] arm64: dts: zx: add pcu_domain node for zx296718
-In-Reply-To: <1480766354-25168-1-git-send-email-baoyou.xie@linaro.org>
-References: <1480766354-25168-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20161205031639.GB2667@dragon>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Mon, 5 Dec 2016 11:27:09 +0800
+Subject: [PATCH 2/2] soc: zte: pm_domains: Add support for zx296718 driver
+In-Reply-To: <1480774291-6211-2-git-send-email-baoyou.xie@linaro.org>
+References: <1480774291-6211-1-git-send-email-baoyou.xie@linaro.org>
+ <1480774291-6211-2-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <CABymUCPuA-wwEcF8XZVpPpFOkgqOJ7Zs_DyXsBSXY6hRPDX5WA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 03, 2016 at 07:59:14PM +0800, Baoyou Xie wrote:
-> This patch adds the pcu_domain node, so it can be used
-> by zte-soc's power domain driver.
-> 
-> Furthermore, it adds the document of the node.
-> 
+2016-12-03 22:11 GMT+08:00 Baoyou Xie <baoyou.xie@linaro.org>:
+> This patch introduces the power domain driver of zx296718
+> which belongs to zte's 2967 family.
+>
 > Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 > ---
->  Documentation/devicetree/bindings/arm/zte.txt | 11 +++++++++++
+>  drivers/soc/zte/Makefile              |   3 +
+>  drivers/soc/zte/zx296718_pm_domains.c | 162 ++++++++++++++++++++++++++++++++++
+>  2 files changed, 165 insertions(+)
+>  create mode 100644 drivers/soc/zte/zx296718_pm_domains.c
+>
+> diff --git a/drivers/soc/zte/Makefile b/drivers/soc/zte/Makefile
+> index 97ac8ea..a6e7bfe 100644
+> --- a/drivers/soc/zte/Makefile
+> +++ b/drivers/soc/zte/Makefile
+> @@ -2,3 +2,6 @@
+>  # zx SOC drivers
+>  #
+>  obj-$(CONFIG_ZX_PM_DOMAINS) += pm_domains.o
+> +ifeq ($(CONFIG_ZX_PM_DOMAINS), y)
+> +       obj-y += zx296718_pm_domains.o
+> +endif
 
-DT bindings doc should be a separate patch, and goes together with
-driver changes using the bindings through subsystem maintainers, rather
-than dts patches.
+Follow unified style for Makefile:
+obj-$(CONFIG_ZX_PM_DOMAINS) += zx296718_pm_domains.o
 
->  arch/arm64/boot/dts/zte/zx296718.dtsi         |  7 +++++++
->  2 files changed, 18 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/zte.txt b/Documentation/devicetree/bindings/arm/zte.txt
-> index 83369785..19a7e1b 100644
-> --- a/Documentation/devicetree/bindings/arm/zte.txt
-> +++ b/Documentation/devicetree/bindings/arm/zte.txt
-> @@ -27,6 +27,9 @@ System management required properties:
->        - compatible = "zte,zx296718-aon-sysctrl"
->        - compatible = "zte,zx296718-sysctrl"
->  
-> +Low power management required properties:
-> +      - compatible = "zte,zx296718-pcu"
+> diff --git a/drivers/soc/zte/zx296718_pm_domains.c b/drivers/soc/zte/zx296718_pm_domains.c
+> new file mode 100644
+> index 0000000..fc16dfd
+> --- /dev/null
+> +++ b/drivers/soc/zte/zx296718_pm_domains.c
+> @@ -0,0 +1,162 @@
+> +/*
+> + * Copyright (C) 2015 ZTE Ltd.
+> + *
+> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
+> + * License terms: GNU General Public License (GPL) version 2
+> + */
+> +#include "pm_domains.h"
 > +
->  Example:
->  aon_sysctrl: aon-sysctrl at 116000 {
->  	compatible = "zte,zx296718-aon-sysctrl", "syscon";
-> @@ -37,3 +40,11 @@ sysctrl: sysctrl at 1463000 {
->  	compatible = "zte,zx296718-sysctrl", "syscon";
->  	reg = <0x1463000 0x1000>;
->  };
-> +
-> +pcu_domain: pcu at 0x00117000 {
-> +        compatible = "zte,zx296718-pcu";
-> +        reg = <0x00117000 0x1000>;
-> +        #power-domain-cells = <1>;
-> +        status = "ok";
+> +enum {
+> +       PCU_DM_VOU = 0,
+> +       PCU_DM_SAPPU,
+> +       PCU_DM_VDE,
+> +       PCU_DM_VCE,
+> +       PCU_DM_HDE,
+> +       PCU_DM_VIU,
+> +       PCU_DM_USB20,
+> +       PCU_DM_USB21,
+> +       PCU_DM_USB30,
+> +       PCU_DM_HSIC,
+> +       PCU_DM_GMAC,
+> +       PCU_DM_TS,
 > +};
 > +
-
-I think we should have a separate bindings doc for PCU power domain
-block in Documentation/devicetree/bindings/soc/zte.
-
-> diff --git a/arch/arm64/boot/dts/zte/zx296718.dtsi b/arch/arm64/boot/dts/zte/zx296718.dtsi
-> index b44d1d1..39e70c7 100644
-> --- a/arch/arm64/boot/dts/zte/zx296718.dtsi
-> +++ b/arch/arm64/boot/dts/zte/zx296718.dtsi
-> @@ -351,5 +351,12 @@
->  			reg = <0x01480000 0x1000>;
->  			#clock-cells = <1>;
->  		};
+> +static struct zx_pm_domain vou_domain = {
+> +       .dm = {
+> +               .name           = "vou_domain",
+> +               .power_off      = zx_normal_power_off,
+> +               .power_on       = zx_normal_power_on,
+> +       },
+> +       .bit = PCU_DM_VOU,
+> +};
+> +static struct zx_pm_domain sappu_domain = {
+> +       .dm = {
+> +               .name           = "sappu_domain",
+> +               .power_off      = zx_normal_power_off,
+> +               .power_on       = zx_normal_power_on,
+> +       },
+> +       .bit = PCU_DM_SAPPU,
+> +};
+> +static struct zx_pm_domain vde_domain = {
+> +       .dm = {
+> +               .name           = "vde_domain",
+> +               .power_off      = zx_normal_power_off,
+> +               .power_on       = zx_normal_power_on,
+> +       },
+> +       .bit = PCU_DM_VDE,
+> +};
+> +static struct zx_pm_domain vce_domain = {
+> +       .dm = {
+> +               .name           = "vce_domain",
+> +               .power_off      = zx_normal_power_off,
+> +               .power_on       = zx_normal_power_on,
+> +       },
+> +       .bit = PCU_DM_VCE,
+> +};
+> +static struct zx_pm_domain hde_domain = {
+> +       .dm = {
+> +               .name           = "hde_domain",
+> +               .power_off      = zx_normal_power_off,
+> +               .power_on       = zx_normal_power_on,
+> +       },
+> +       .bit = PCU_DM_HDE,
+> +};
 > +
-> +		pcu_domain: pcu at 0x00117000 {
+> +static struct zx_pm_domain viu_domain = {
+> +       .dm = {
+> +               .name           = "viu_domain",
+> +               .power_off      = zx_normal_power_off,
+> +               .power_on       = zx_normal_power_on,
+> +       },
+> +       .bit = PCU_DM_VIU,
+> +};
+> +static struct zx_pm_domain usb20_domain = {
+> +       .dm = {
+> +               .name           = "usb20_domain",
+> +               .power_off      = zx_normal_power_off,
+> +               .power_on       = zx_normal_power_on,
+> +       },
+> +       .bit = PCU_DM_USB20,
+> +};
+> +static struct zx_pm_domain usb21_domain = {
+> +       .dm = {
+> +               .name           = "usb21_domain",
+> +               .power_off      = zx_normal_power_off,
+> +               .power_on       = zx_normal_power_on,
+> +       },
+> +       .bit = PCU_DM_USB21,
+> +};
+> +static struct zx_pm_domain usb30_domain = {
+> +       .dm = {
+> +               .name           = "usb30_domain",
+> +               .power_off      = zx_normal_power_off,
+> +               .power_on       = zx_normal_power_on,
+> +       },
+> +       .bit = PCU_DM_USB30,
+> +};
+> +static struct zx_pm_domain hsic_domain = {
+> +       .dm = {
+> +               .name           = "hsic_domain",
+> +               .power_off      = zx_normal_power_off,
+> +               .power_on       = zx_normal_power_on,
+> +       },
+> +       .bit = PCU_DM_HSIC,
+> +};
+> +static struct zx_pm_domain gmac_domain = {
+> +       .dm = {
+> +               .name           = "gmac_domain",
+> +               .power_off      = zx_normal_power_off,
+> +               .power_on       = zx_normal_power_on,
+> +       },
+> +       .bit = PCU_DM_GMAC,
+> +};
+> +static struct zx_pm_domain ts_domain = {
+> +       .dm = {
+> +               .name           = "ts_domain",
+> +               .power_off      = zx_normal_power_off,
+> +               .power_on       = zx_normal_power_on,
+> +       },
+> +       .bit = PCU_DM_TS,
+> +};
+> +struct generic_pm_domain *zx296718_pm_domains[] = {
+> +       //&vou_domain.dm,
+Remove this line.
 
-Please drop the 0x and leading zeros in unit-address after node name.
-That said, the node name should be written like below:
+> +       &sappu_domain.dm,
 
-	pcu at 117000 {
+If you can add an index and add the index definition in devicetree
+header file, it will be more convenient when binding power domain to
+device in DT file. such as
+         [ZX296718_PM_VDE] = &vde_domain.dm,
 
-Also, please sort the node with unit-address in order of the address.
-That means that pcu node should be put after aon-sysctrl at 116000.
+> +       &vde_domain.dm,
+> +       &vce_domain.dm,
+> +       &hde_domain.dm,
+> +       &viu_domain.dm,
+> +       &usb20_domain.dm,
+> +       &usb21_domain.dm,
+> +       &usb30_domain.dm,
+> +       &hsic_domain.dm,
+> +       &gmac_domain.dm,
+> +       &ts_domain.dm,
+> +       &vou_domain.dm,
+> +};
+> +
+> +static int zx296718_pd_probe(struct platform_device *pdev)
+> +{
+> +       return zx_pd_probe(pdev,
+> +                         zx296718_pm_domains,
+> +                         ARRAY_SIZE(zx296718_pm_domains));
+> +}
+> +
+> +static const struct of_device_id zx296718_pm_domain_matches[] = {
+> +       { .compatible = "zte,zx296718-pcu", },
 
-> +			compatible = "zte,zx296718-pcu";
-> +			reg = <0x00117000 0x1000>;
-> +			#power-domain-cells = <1>;
-> +			status = "ok";
+Suggest to rename probe function and of_device_id to a generic zx
+name, then add compatible data so that probe function can be shared.
+Probe function can find SoC specific data via comparing compatible
+string and initialize device accordingly.
 
-The property 'status' is generally used to enable devices that have
-board-level pin-out or configuration in board dts.  It's not really
-necessary for pcu here.
-
-Shawn
-
-> +		};
->  	};
->  };
-> -- 
+> +       { },
+> +};
+> +
+> +static struct platform_driver zx296718_pd_driver = {
+> +       .driver = {
+> +               .name = "zx-powerdomain",
+> +               .owner = THIS_MODULE,
+> +               .of_match_table = zx296718_pm_domain_matches,
+> +       },
+> +       .probe = zx296718_pd_probe,
+> +};
+> +
+> +static int __init zx296718_pd_init(void)
+> +{
+> +       return platform_driver_register(&zx296718_pd_driver);
+> +}
+> +subsys_initcall(zx296718_pd_init);
+> --
 > 2.7.4
-> 
+>
