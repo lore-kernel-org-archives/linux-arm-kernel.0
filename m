@@ -1,34 +1,52 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Mon, 5 Dec 2016 10:16:37 -0800
-Subject: [PATCH] arm: kprobe: replace patch_lock to raw lock
-In-Reply-To: <20161201141345.4xlceuchfkxyel75@linutronix.de>
-References: <1478823475-15087-1-git-send-email-yang.shi@linaro.org>
- <20161201141345.4xlceuchfkxyel75@linutronix.de>
-Message-ID: <06234a80-1908-996e-d134-3ac7d6ad5284@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon,  5 Dec 2016 18:42:22 +0000
+Subject: [PATCH v3 0/6] crypto: ARM/arm64 CRC-T10DIF/CRC32/CRC32C roundup
+Message-ID: <1480963348-24203-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/1/2016 6:13 AM, Sebastian Andrzej Siewior wrote:
-> On 2016-11-10 16:17:55 [-0800], Yang Shi wrote:
->>
->> Since patch_text_stop_machine() is called in stop_machine() which disables IRQ,
->> sleepable lock should be not used in this atomic context, so replace patch_lock
->> to raw lock.
->>
->> Signed-off-by: Yang Shi <yang.shi@linaro.org>
->
-> This can also go upstream.
-> Acked-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+This v3 combines the CRC-T10DIF and CRC32 implementations for both ARM and
+arm64 that I sent out a couple of weeks ago, and adds support to the latter
+for CRC32C.
 
-Yes, thanks for acking.
+Changes since v2:
+- fix a couple of big-endian bugs in CRC32/CRC32C
+- add back handling to the CRC-T10DIF routines of buffers that are not a
+  multiple of 16 bytes (but they still must be 16 byte aligned)
 
-Russell,
+Ard Biesheuvel (6):
+  crypto: testmgr - avoid overlap in chunked tests
+  crypto: testmgr - add/enhance test cases for CRC-T10DIF
+  crypto: arm64/crct10dif - port x86 SSE implementation to arm64
+  crypto: arm/crct10dif - port x86 SSE implementation to ARM
+  crypto: arm64/crc32 - accelerated support based on x86 SSE
+    implementation
+  crypto: arm/crc32 - accelerated support based on x86 SSE
+    implementation
 
-Could you please consider this patch?
+ arch/arm/crypto/Kconfig               |  10 +
+ arch/arm/crypto/Makefile              |   4 +
+ arch/arm/crypto/crc32-ce-core.S       | 306 ++++++++++++++
+ arch/arm/crypto/crc32-ce-glue.c       | 242 +++++++++++
+ arch/arm/crypto/crct10dif-ce-core.S   | 427 ++++++++++++++++++++
+ arch/arm/crypto/crct10dif-ce-glue.c   | 101 +++++
+ arch/arm64/crypto/Kconfig             |  11 +
+ arch/arm64/crypto/Makefile            |   6 +
+ arch/arm64/crypto/crc32-ce-core.S     | 266 ++++++++++++
+ arch/arm64/crypto/crc32-ce-glue.c     | 212 ++++++++++
+ arch/arm64/crypto/crct10dif-ce-core.S | 392 ++++++++++++++++++
+ arch/arm64/crypto/crct10dif-ce-glue.c |  95 +++++
+ crypto/testmgr.c                      |   2 +-
+ crypto/testmgr.h                      |  70 ++--
+ 14 files changed, 2115 insertions(+), 29 deletions(-)
+ create mode 100644 arch/arm/crypto/crc32-ce-core.S
+ create mode 100644 arch/arm/crypto/crc32-ce-glue.c
+ create mode 100644 arch/arm/crypto/crct10dif-ce-core.S
+ create mode 100644 arch/arm/crypto/crct10dif-ce-glue.c
+ create mode 100644 arch/arm64/crypto/crc32-ce-core.S
+ create mode 100644 arch/arm64/crypto/crc32-ce-glue.c
+ create mode 100644 arch/arm64/crypto/crct10dif-ce-core.S
+ create mode 100644 arch/arm64/crypto/crct10dif-ce-glue.c
 
-Thanks,
-Yang
-
->
-> Sebastian
->
+-- 
+2.7.4
