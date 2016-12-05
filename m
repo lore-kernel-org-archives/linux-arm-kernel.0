@@ -1,48 +1,31 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 5 Dec 2016 11:06:30 +0100
-Subject: [PATCH 2/8] dt-bindings: document the STM32 RTC bindings
-In-Reply-To: <1480687801-19525-4-git-send-email-amelie.delaunay@st.com>
-References: <1480687801-19525-2-git-send-email-amelie.delaunay@st.com>
- <1480687801-19525-4-git-send-email-amelie.delaunay@st.com>
-Message-ID: <20161205100630.n3gldznf524pucjm@piout.net>
+From: david.wu@rock-chips.com (David Wu)
+Date: Mon,  5 Dec 2016 16:02:59 +0800
+Subject: [PATCH] i2c: rk3x: keep i2c irq ON in suspend
+Message-ID: <1480924979-13450-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+During suspend there may still be some i2c access happening.
+And if we don't keep i2c irq ON, there may be i2c access timeout if
+i2c is in irq mode of operation.
 
-On 02/12/2016 at 15:09:55 +0100, Amelie Delaunay wrote :
-> This patch adds documentation of device tree bindings for the STM32 RTC.
-> 
-> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
-> ---
->  .../devicetree/bindings/rtc/st,stm32-rtc.txt       | 31 ++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt b/Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt
-> new file mode 100644
-> index 0000000..4578838
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt
-> @@ -0,0 +1,31 @@
-> +STM32 Real Time Clock
-> +
-> +Required properties:
-> +- compatible: "st,stm32-rtc".
-> +- reg: address range of rtc register set.
-> +- clocks: reference to the clock entry ck_rtc.
-> +- clock-names: name of the clock used. Should be "ck_rtc".
+Signed-off-by: David Wu <david.wu@rock-chips.com>
+---
+ drivers/i2c/busses/i2c-rk3x.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Is this name really useful?
-
-> +- interrupt-parent: phandle for the interrupt controller.
-> +- interrupts: rtc alarm interrupt.
-> +- interrupt-names: rtc alarm interrupt name, should be "alarm".
-
-Same comment, is this name really useful?
-
-
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index df22066..67af32a 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -1261,7 +1261,7 @@ static int rk3x_i2c_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	ret = devm_request_irq(&pdev->dev, irq, rk3x_i2c_irq,
+-			       0, dev_name(&pdev->dev), i2c);
++			       IRQF_NO_SUSPEND, dev_name(&pdev->dev), i2c);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "cannot request IRQ\n");
+ 		return ret;
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
