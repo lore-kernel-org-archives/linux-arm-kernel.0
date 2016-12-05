@@ -1,51 +1,62 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon, 5 Dec 2016 09:52:20 +0100
-Subject: [PATCH v1 1/2] Add crypto driver support for some MediaTek chips
-In-Reply-To: <1480921284-45827-2-git-send-email-ryder.lee@mediatek.com>
-References: <1480921284-45827-1-git-send-email-ryder.lee@mediatek.com>
- <1480921284-45827-2-git-send-email-ryder.lee@mediatek.com>
-Message-ID: <20161205085220.GA333@Red>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 5 Dec 2016 09:52:55 +0100
+Subject: [PATCH v2 2/3] ARM: dts: sunxi: add support for Orange Pi Zero
+ board
+In-Reply-To: <11498641480688550@web2g.yandex.ru>
+References: <20161121162421.800-1-icenowy@aosc.xyz>
+ <20161121162421.800-2-icenowy@aosc.xyz>
+ <5373671480239408@web31m.yandex.ru>
+ <cdfd3c65-d473-badb-ea6a-035f7ab79217@arm.com>
+ <20161201093619.gs6lmoxtlptp2jr6@lukather>
+ <11498641480688550@web2g.yandex.ru>
+Message-ID: <20161205085255.ij3du3if2ss3q3h5@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
-
-I have two minor comment.
-
-On Mon, Dec 05, 2016 at 03:01:23PM +0800, Ryder Lee wrote:
-> This adds support for the MediaTek hardware accelerator on
-> mt7623/mt2701/mt8521p SoC.
+On Fri, Dec 02, 2016 at 10:22:30PM +0800, Icenowy Zheng wrote:
 > 
-> This driver currently implement:
-> - SHA1 and SHA2 family(HMAC) hash alogrithms.
+> 
+> 01.12.2016, 17:36, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> > On Mon, Nov 28, 2016 at 12:29:07AM +0000, Andr? Przywara wrote:
+> >> ?> Something more interesting happened.
+> >> ?>
+> >> ?> Xunlong made a add-on board for Orange Pi Zero, which exposes the
+> >> ?> two USB Controllers exported at expansion bus as USB Type-A
+> >> ?> connectors.
+> >> ?>
+> >> ?> Also it exposes a analog A/V jack and a microphone.
+> >> ?>
+> >> ?> Should I enable {e,o}hci{2.3} in the device tree?
+> >>
+> >> ?Actually we should do this regardless of this extension board. The USB
+> >> ?pins are not multiplexed and are exposed on user accessible pins (just
+> >> ?not soldered, but that's a detail), so I think they qualify for DT
+> >> ?enablement. And even if a user can't use them, it doesn't hurt to have
+> >> ?them (since they are not multiplexed).
+> >
+> > My main concern about this is that we'll leave regulators enabled by
+> > default, for a minority of users. And that minority will prevent to do
+> > a proper power management when the times come since we'll have to keep
+> > that behaviour forever.
+> 
+> I think these users can add a 'fdt set /xxx/xxx status "disabled" ' .
 
-There is a typo for algorithms.
+You can't ask that from the majority of users. These users will take
+debian or fedora, install it, and expect everything to work
+properly. I would make the opposite argument actually. If someone is
+knowledgeable enough to solder the USB pins a connector, then (s)he'll
+be able to make that u-boot call.
 
-[...]
-> +/**
-> + * struct mtk_desc - DMA descriptor
-> + * @hdr:	the descriptor control header
-> + * @buf:	DMA address of input buffer segment
-> + * @ct:		DMA address of command token that control operation flow
-> + * @ct_hdr:	the command token control header
-> + * @tag:	the user-defined field
-> + * @tfm:	DMA address of transform state
-> + * @bound:	align descriptors offset boundary
-> + *
-> + * Structure passed to the crypto engine to describe where source
-> + * data needs to be fetched and how it needs to be processed.
-> + */
-> +struct mtk_desc {
-> +	u32 hdr;
-> +	u32 buf;
-> +	u32 ct;
-> +	u32 ct_hdr;
-> +	u32 tag;
-> +	u32 tfm;
-> +	u32 bound[2];
-> +};
+Maxime
 
-Do you have tested this descriptor with BE/LE kernel ?
-
-Regards
-Corentin Labbe
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161205/41c61333/attachment.sig>
