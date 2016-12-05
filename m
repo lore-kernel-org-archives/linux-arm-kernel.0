@@ -1,29 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 5 Dec 2016 17:20:55 +0000
-Subject: next-20161205 build: 3 failures 4 warnings (next-20161205)
-In-Reply-To: <7b3daf13-dbab-5acf-cd5f-2414141500b3@arm.com>
-References: <E1cDo86-0008IX-9W@optimist>
- <20161205112043.pyzcbhtu7bklioas@sirena.org.uk>
- <7b3daf13-dbab-5acf-cd5f-2414141500b3@arm.com>
-Message-ID: <20161205172055.nfid7v4vu3v7ik3q@sirena.org.uk>
+From: geoff@infradead.org (Geoff Levand)
+Date: Mon, 5 Dec 2016 09:41:06 -0800
+Subject: [PATCH] arm64: Add CMDLINE_EXTEND
+In-Reply-To: <20161205120842.GA14429@e104818-lin.cambridge.arm.com>
+References: <61060b44-64a9-d628-4faf-3a7ae06048aa@infradead.org>
+ <20161205120842.GA14429@e104818-lin.cambridge.arm.com>
+Message-ID: <b958f2b6-73fd-e4f5-4fa5-6d2f8330da8f@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2016 at 03:44:30PM +0000, Marc Zyngier wrote:
+Hi Catalin,
 
-> Old and broken gas. I have a workaround stashed there:
+On 12/05/2016 04:08 AM, Catalin Marinas wrote:
+> On Fri, Dec 02, 2016 at 02:17:02PM -0800, Geoff Levand wrote:
+>> The device tree code already supports CMDLINE_EXTEND,
+>> so add the config option to make it available on arm64.
+> 
+> What's your use-case for this patch? Note that both CMDLINE_FORCE and
+> CMDLINE_EXTEND (if we introduce it) are ignored by the EFI stub.
+> However, we don't seem to have stated this anywhere.
 
-> http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/commit/?h=arm64/standalone.h&id=559f97365362ed9e96f594200020379df46630d8
+I use this in CoreOS, where we need to set "acpi=force" for
+arm64.  CoreOS uses a proper UEFI + grub.
 
-> At least binutils 2.24 and 2.25 are affected, while 2.27 is not.
+See: 
 
-Not that old - this is the Linaro 2015.10 toolchain which wasn't super
-new but not exactly from the mists of time either.  Anyway, I updated to
-2016.11 (GCC 6.2.1, GAS 2.27)...  let's see what the fallout is like.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161205/1f2213ac/attachment.sig>
+  https://github.com/coreos/scripts/pull/610
+  https://github.com/coreos/coreos-overlay/pull/2298
+
+I can add a comment for EFI stub, either in the Kconfig
+options, and/or in Documentation/efi-stub.txt.  Just let
+me know.
+
+-Geoff
+ 
