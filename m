@@ -1,57 +1,39 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 5 Dec 2016 15:04:55 +0000
-Subject: [RFC PATCH 00/29] arm64: Scalable Vector Extension core support
-In-Reply-To: <0293f7d3-b3d3-1a68-5b99-75db195eb796@redhat.com>
-References: <20161130120654.GJ1574@e103592.cambridge.arm.com>
- <3e8afc5a-1ba9-6369-462b-4f5a707d8b8a@redhat.com>
- <20161130135631.GK1574@e103592.cambridge.arm.com>
- <dbcd545f-1358-6a80-5a9f-3e4a3c93189a@redhat.com>
- <20161201103048.GO1574@e103592.cambridge.arm.com>
- <0293f7d3-b3d3-1a68-5b99-75db195eb796@redhat.com>
-Message-ID: <20161205150452.GT1574@e103592.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 5 Dec 2016 15:10:19 +0000
+Subject: [PATCH 09/18] arm64: introduce binfmt_elf32.c
+In-Reply-To: <1477081997-4770-10-git-send-email-ynorov@caviumnetworks.com>
+References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+ <1477081997-4770-10-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20161205151018.GD14429@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2016 at 11:44:38AM +0100, Florian Weimer wrote:
-> On 12/01/2016 11:30 AM, Dave Martin wrote:
-> 
-> >>The VL value is implicitly thread-local data, and the encoded state may have
-> >>an implicit dependency on it, although it does not contain vector registers
-> >>as such.
-> >
-> >This doesn't sound like an absolute requirement to me.
-> >
-> >If we presume that the SVE registers never need to get saved or
-> >restored, what stops the context data format being VL-independent?
-> 
-> I'm concerned the suspended computation has code which has been selected to
-> fit a particular VL value.
-> 
-> > If the save/restore logic doesn't touch SVE, which would its
-> > implementation be VL-dependent?
-> 
-> Because it has been optimized for a certain vector length?
+On Fri, Oct 21, 2016 at 11:33:08PM +0300, Yury Norov wrote:
+> As we support more than one compat formats, it looks more reasonable
+> to not use fs/compat_binfmt.c. Custom binfmt_elf32.c allows to move aarch32
+> specific definitions there and make code more maintainable and readable.
 
-I'll respond to these via Szabolcs' reply.
+Can you remind me why we need this patch (rather than using the default
+fs/compat_binfmt_elf.c which you include here anyway)?
 
-> >>>Because the SVE procedure call standard determines that the SVE
-> >>>registers are caller-save,
-> >>
-> >>By the way, how is this implemented?  Some of them overlap existing
-> >>callee-saved registers.
-> >
-> >Basically, all the *new* state is caller-save.
-> >
-> >The Neon/FPSIMD regs V8-V15 are callee-save, so in the SVE view
-> >Zn[bits 127:0] is callee-save for all n = 8..15.
-> 
-> Are the extension parts of registers v8 to v15 used for argument passing?
+> --- /dev/null
+> +++ b/arch/arm64/kernel/binfmt_elf32.c
+> @@ -0,0 +1,31 @@
+> +/*
+> + * Support for AArch32 Linux ELF binaries.
+> + */
+> +
+> +/* AArch32 EABI. */
+> +#define EF_ARM_EABI_MASK		0xff000000
+> +
+> +#define compat_start_thread		compat_start_thread
+> +#define COMPAT_SET_PERSONALITY(ex)		\
+> +do {						\
+> +	clear_thread_flag(TIF_32BIT_AARCH64);	\
+> +	set_thread_flag(TIF_32BIT);		\
+> +} while (0)
 
-No -- the idea is to be directly compatible with the existing PCS.
+You introduce this here but it seems to still be present in asm/elf.h.
 
-> If not, we should be able to use the existing dynamic linker trampoline.
-
-Yes, I believe so.
-
-Cheers
----Dave
+-- 
+Catalin
