@@ -1,49 +1,97 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 5 Dec 2016 14:13:12 +0000
-Subject: ILP32 for ARM64 - testing with lmbench
-In-Reply-To: <0adfca97-1624-8eac-8149-da447525ad65@huawei.com>
-References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
- <20161028124659.GA24131@yury-N73SV>
- <cdf5cdf2-43af-6d7f-9e0c-72675fb83224@huawei.com>
- <266952F2-53F5-4D5E-83F0-6C8203092F67@linaro.org>
- <120041af-f4e9-5b6f-36dc-7d3535a1f01c@huawei.com>
- <0adfca97-1624-8eac-8149-da447525ad65@huawei.com>
-Message-ID: <20161205141312.GC14429@e104818-lin.cambridge.arm.com>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Mon,  5 Dec 2016 15:13:44 +0100
+Subject: [PATCH v5] ARM: davinci: da8xx: Fix sleeping function called from
+ invalid context
+Message-ID: <1480947224-26222-1-git-send-email-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2016 at 06:16:09PM +0800, Zhangjian (Bamvor) wrote:
-> Do you have suggestion of next move of upstreaming ILP32?
+Everytime the usb20 phy is enabled, there is a
+"sleeping function called from invalid context" BUG.
 
-I mentioned the steps a few time before. I'm pasting them again here:
+clk_enable() from arch/arm/mach-davinci/clock.c uses spin_lock_irqsave()
+before to invoke the callback usb20_phy_clk_enable().
+usb20_phy_clk_enable() uses clk_get() and clk_enable_prepapre()
+which may sleep.
+Move clk_get() to da8xx_register_usb20_phy_clk() and
+replace clk_prepare_enable() by clk_enable().
 
-1. Complete the review of the Linux patches and ABI (no merge yet)
-2. Review the corresponding glibc patches (no merge yet)
-3. Ask (Linaro, Cavium) for toolchain + filesystem (pre-built and more
-   than just busybox) to be able to reproduce the testing in ARM
-4. More testing (LTP, trinity, performance regressions etc.)
-5. Move the ILP32 PCS out of beta (based on the results from 4)
-6. Check the market again to see if anyone still needs ILP32
-7. Based on 6, decide whether to merge the kernel and glibc patches
+Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+---
+ arch/arm/mach-davinci/usb-da8xx.c | 29 +++++++++++++++--------------
+ 1 file changed, 15 insertions(+), 14 deletions(-)
 
-What's not explicitly mentioned in step 4 is glibc testing. Point 5 is
-ARM's responsibility (toolchain folk).
-
-> There are already the test results of lmbench and specint. Do you they
-> are ok or need more data to prove no regression?
-
-I would need to reproduce the tests myself, see step 3.
-
-> I have also noticed that there are ILP32 failures in glibc testsuite.
-> Is it the only blocker for merge ILP32(in technology part)?
-
-It's probably not the only blocker but I have to review the kernel
-patches again to make sure. I'd also like to see whether the libc-alpha
-community is ok with the glibc counterpart (but don't merge the patches
-until the ABI is agreed on both sides).
-
-On performance, I want to make sure there are no regressions on
-AArch32/compat and AArch64/LP64.
-
+diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
+index b010e5f..f62f9c2 100644
+--- a/arch/arm/mach-davinci/usb-da8xx.c
++++ b/arch/arm/mach-davinci/usb-da8xx.c
+@@ -22,6 +22,8 @@
+ #define DA8XX_USB0_BASE		0x01e00000
+ #define DA8XX_USB1_BASE		0x01e25000
+ 
++static struct clk *usb20_clk;
++
+ static struct platform_device da8xx_usb_phy = {
+ 	.name		= "da8xx-usb-phy",
+ 	.id		= -1,
+@@ -158,24 +160,16 @@ int __init da8xx_register_usb_refclkin(int rate)
+ 
+ static void usb20_phy_clk_enable(struct clk *clk)
+ {
+-	struct clk *usb20_clk;
+ 	int err;
+ 	u32 val;
+ 	u32 timeout = 500000; /* 500 msec */
+ 
+ 	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+ 
+-	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
+-	if (IS_ERR(usb20_clk)) {
+-		pr_err("could not get usb20 clk: %ld\n", PTR_ERR(usb20_clk));
+-		return;
+-	}
+-
+ 	/* The USB 2.O PLL requires that the USB 2.O PSC is enabled as well. */
+-	err = clk_prepare_enable(usb20_clk);
++	err = clk_enable(usb20_clk);
+ 	if (err) {
+ 		pr_err("failed to enable usb20 clk: %d\n", err);
+-		clk_put(usb20_clk);
+ 		return;
+ 	}
+ 
+@@ -197,8 +191,7 @@ static void usb20_phy_clk_enable(struct clk *clk)
+ 
+ 	pr_err("Timeout waiting for USB 2.0 PHY clock good\n");
+ done:
+-	clk_disable_unprepare(usb20_clk);
+-	clk_put(usb20_clk);
++	clk_disable(usb20_clk);
+ }
+ 
+ static void usb20_phy_clk_disable(struct clk *clk)
+@@ -285,11 +278,19 @@ static struct clk_lookup usb20_phy_clk_lookup =
+ int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
+ {
+ 	struct clk *parent;
+-	int ret = 0;
++	int ret;
++
++	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
++	ret = PTR_ERR_OR_ZERO(usb20_clk);
++	if (ret)
++		return ret;
+ 
+ 	parent = clk_get(NULL, use_usb_refclkin ? "usb_refclkin" : "pll0_aux");
+-	if (IS_ERR(parent))
+-		return PTR_ERR(parent);
++	ret = PTR_ERR_OR_ZERO(parent);
++	if (ret) {
++		clk_put(usb20_clk);
++		return ret;
++	}
+ 
+ 	usb20_phy_clk.parent = parent;
+ 	ret = clk_register(&usb20_phy_clk);
 -- 
-Catalin
+2.7.3
