@@ -1,73 +1,35 @@
-From: aik@ozlabs.ru (Alexey Kardashevskiy)
-Date: Mon, 5 Dec 2016 13:27:17 +1100
-Subject: [PATCH v3 -next 1/2] ARM: sunxi: add support for H2+ SoC
-In-Reply-To: <20161202150513.34691-1-icenowy@aosc.xyz>
-References: <20161202150513.34691-1-icenowy@aosc.xyz>
-Message-ID: <4a4fe484-27c0-73cb-ffb6-13192182d748@ozlabs.ru>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Mon, 5 Dec 2016 10:35:28 +0800
+Subject: [PATCH v2] arm64: dts: zx: support cpu-freq for zx296718
+In-Reply-To: <20161202060000.GE7682@vireshk-i7>
+References: <1480657956-8140-1-git-send-email-baoyou.xie@linaro.org>
+ <CA+DQWkzGOzn1TRa9041Jjksj-=509XWXS_U1uaaJXNydB8Apow@mail.gmail.com>
+ <20161202060000.GE7682@vireshk-i7>
+Message-ID: <CABymUCPezri5__SOmgx4M_B3W0nDFGw7ZTTSu7TP3LXvXgEJLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/16 02:05, Icenowy Zheng wrote:
-> Allwinner H2+ is a quad-core Cortex-A7 SoC.
-> 
-> It is very like H3, that they share the same SoC ID (0x1680), and H3
-> memory maps as well as drivers works well on the SoC.
+2016-12-02 14:00 GMT+08:00 Viresh Kumar <viresh.kumar@linaro.org>:
+> On 02-12-16, 13:58, Baoyou Xie wrote:
+>> + Viresh, the author of the bindings.
+>>
+>> On 2 December 2016 at 13:52, Baoyou Xie <baoyou.xie@linaro.org> wrote:
+>>
+>> > This patch adds the CPU clock phandle in CPU's node
+>> > and uses operating-points-v2 to register operating points.
+>> >
+>> > So it can be used by cpufreq-dt driver.
+>> >
+>> > Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+>> > ---
+>> >  arch/arm64/boot/dts/zte/zx296718.dtsi | 39 ++++++++++++++++++++++++++++++
+>> > +++++
+>> >  1 file changed, 39 insertions(+)
 
+Reviewed-by: Jun Nie <jun.nie@linaro.org>
 
-What git tree is this made against of? Thanks.
-
-
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
-> Changes since v2:
-> - Changed compatible from allwinner,sun8i-h2plus to allwinner,sun8i-h2-plus.
->  Documentation/arm/sunxi/README                  | 4 ++++
->  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
->  arch/arm/mach-sunxi/sunxi.c                     | 1 +
->  3 files changed, 6 insertions(+)
-> 
-> diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
-> index cd02433..1fe4d99c 100644
-> --- a/Documentation/arm/sunxi/README
-> +++ b/Documentation/arm/sunxi/README
-> @@ -63,6 +63,10 @@ SunXi family
->          + User Manual
->            http://dl.linux-sunxi.org/A33/A33%20user%20manual%20release%201.1.pdf
->  
-> +      - Allwinner H2+ (sun8i)
-> +        + No document available now, but is known to be working properly with
-> +          H3 drivers and memory map.
-> +
->        - Allwinner H3 (sun8i)
->          + Datasheet
->            http://dl.linux-sunxi.org/H3/Allwinner_H3_Datasheet_V1.0.pdf
-> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-> index 4d6467c..59b143f 100644
-> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-> @@ -13,6 +13,7 @@ using one of the following compatible strings:
->    allwinner,sun8i-a33
->    allwinner,sun8i-a83t
->    allwinner,sun8i-h3
-> +  allwinner,sun8i-h2-plus
->    allwinner,sun9i-a80
->    allwinner,sun50i-a64
->    nextthing,gr8
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> index 2e2bde2..320d2af 100644
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -63,6 +63,7 @@ static const char * const sun8i_board_dt_compat[] = {
->  	"allwinner,sun8i-a23",
->  	"allwinner,sun8i-a33",
->  	"allwinner,sun8i-a83t",
-> +	"allwinner,sun8i-h2-plus",
->  	"allwinner,sun8i-h3",
->  	NULL,
->  };
-> 
-
-
--- 
-Alexey
+>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>
+> --
+> viresh
