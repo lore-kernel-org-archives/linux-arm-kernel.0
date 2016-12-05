@@ -1,221 +1,90 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Mon, 5 Dec 2016 11:27:09 +0800
-Subject: [PATCH 2/2] soc: zte: pm_domains: Add support for zx296718 driver
-In-Reply-To: <1480774291-6211-2-git-send-email-baoyou.xie@linaro.org>
-References: <1480774291-6211-1-git-send-email-baoyou.xie@linaro.org>
- <1480774291-6211-2-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <CABymUCPuA-wwEcF8XZVpPpFOkgqOJ7Zs_DyXsBSXY6hRPDX5WA@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 5 Dec 2016 09:04:31 +0530
+Subject: [PATCH v2 3/3] ARM: da850: fix da850_set_pll0rate()
+In-Reply-To: <1480693134-31324-4-git-send-email-bgolaszewski@baylibre.com>
+References: <1480693134-31324-1-git-send-email-bgolaszewski@baylibre.com>
+ <1480693134-31324-4-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <20161205033431.GD29595@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-12-03 22:11 GMT+08:00 Baoyou Xie <baoyou.xie@linaro.org>:
-> This patch introduces the power domain driver of zx296718
-> which belongs to zte's 2967 family.
->
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+Good to see you again Bartosz :)
+
+On 02-12-16, 16:38, Bartosz Golaszewski wrote:
+> This function is broken - its second argument is an index to the freq
+> table, not the requested clock rate in Hz. It leads to an oops when
+> called from clk_set_rate() since this argument isn't bounds checked
+> either.
+> 
+> Fix it by iterating over the array of supported frequencies and
+> selecting a one that matches or returning -EINVAL for unsupported
+> rates.
+> 
+> Also: update the davinci cpufreq driver. It's the only user of this
+> clock and currently it passes the cpufreq table index to
+> clk_set_rate(), which is confusing. Make it pass the requested clock
+> rate in Hz.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
->  drivers/soc/zte/Makefile              |   3 +
->  drivers/soc/zte/zx296718_pm_domains.c | 162 ++++++++++++++++++++++++++++++++++
->  2 files changed, 165 insertions(+)
->  create mode 100644 drivers/soc/zte/zx296718_pm_domains.c
->
-> diff --git a/drivers/soc/zte/Makefile b/drivers/soc/zte/Makefile
-> index 97ac8ea..a6e7bfe 100644
-> --- a/drivers/soc/zte/Makefile
-> +++ b/drivers/soc/zte/Makefile
-> @@ -2,3 +2,6 @@
->  # zx SOC drivers
->  #
->  obj-$(CONFIG_ZX_PM_DOMAINS) += pm_domains.o
-> +ifeq ($(CONFIG_ZX_PM_DOMAINS), y)
-> +       obj-y += zx296718_pm_domains.o
-> +endif
-
-Follow unified style for Makefile:
-obj-$(CONFIG_ZX_PM_DOMAINS) += zx296718_pm_domains.o
-
-> diff --git a/drivers/soc/zte/zx296718_pm_domains.c b/drivers/soc/zte/zx296718_pm_domains.c
-> new file mode 100644
-> index 0000000..fc16dfd
-> --- /dev/null
-> +++ b/drivers/soc/zte/zx296718_pm_domains.c
-> @@ -0,0 +1,162 @@
-> +/*
-> + * Copyright (C) 2015 ZTE Ltd.
-> + *
-> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
-> + * License terms: GNU General Public License (GPL) version 2
-> + */
-> +#include "pm_domains.h"
+>  arch/arm/mach-davinci/da850.c     | 22 ++++++++++++++++++----
+>  drivers/cpufreq/davinci-cpufreq.c |  2 +-
+>  2 files changed, 19 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index a55101c..92e3303 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+> @@ -1179,14 +1179,28 @@ static int da850_set_armrate(struct clk *clk, unsigned long index)
+>  	return clk_set_rate(pllclk, index);
+>  }
+>  
+> -static int da850_set_pll0rate(struct clk *clk, unsigned long index)
+> +static int da850_set_pll0rate(struct clk *clk, unsigned long rate)
+>  {
+> -	unsigned int prediv, mult, postdiv;
+> -	struct da850_opp *opp;
+>  	struct pll_data *pll = clk->pll_data;
+> +	struct cpufreq_frequency_table *freq;
+> +	unsigned int prediv, mult, postdiv;
+> +	struct da850_opp *opp = NULL;
+>  	int ret;
+>  
+> -	opp = (struct da850_opp *) cpufreq_info.freq_table[index].driver_data;
+> +	for (freq = da850_freq_table;
+> +	     freq->frequency != CPUFREQ_TABLE_END; freq++) {
+> +		/* requested_rate is in Hz, freq->frequency is in KHz */
+> +		unsigned long freq_rate = freq->frequency * 1000;
 > +
-> +enum {
-> +       PCU_DM_VOU = 0,
-> +       PCU_DM_SAPPU,
-> +       PCU_DM_VDE,
-> +       PCU_DM_VCE,
-> +       PCU_DM_HDE,
-> +       PCU_DM_VIU,
-> +       PCU_DM_USB20,
-> +       PCU_DM_USB21,
-> +       PCU_DM_USB30,
-> +       PCU_DM_HSIC,
-> +       PCU_DM_GMAC,
-> +       PCU_DM_TS,
-> +};
+> +		if (freq_rate == rate) {
+> +			opp = (struct da850_opp *)freq->driver_data;
+> +			break;
+> +		}
+> +	}
 > +
-> +static struct zx_pm_domain vou_domain = {
-> +       .dm = {
-> +               .name           = "vou_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_VOU,
-> +};
-> +static struct zx_pm_domain sappu_domain = {
-> +       .dm = {
-> +               .name           = "sappu_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_SAPPU,
-> +};
-> +static struct zx_pm_domain vde_domain = {
-> +       .dm = {
-> +               .name           = "vde_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_VDE,
-> +};
-> +static struct zx_pm_domain vce_domain = {
-> +       .dm = {
-> +               .name           = "vce_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_VCE,
-> +};
-> +static struct zx_pm_domain hde_domain = {
-> +       .dm = {
-> +               .name           = "hde_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_HDE,
-> +};
+> +	if (opp == NULL)
+> +		return -EINVAL;
 > +
-> +static struct zx_pm_domain viu_domain = {
-> +       .dm = {
-> +               .name           = "viu_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_VIU,
-> +};
-> +static struct zx_pm_domain usb20_domain = {
-> +       .dm = {
-> +               .name           = "usb20_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_USB20,
-> +};
-> +static struct zx_pm_domain usb21_domain = {
-> +       .dm = {
-> +               .name           = "usb21_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_USB21,
-> +};
-> +static struct zx_pm_domain usb30_domain = {
-> +       .dm = {
-> +               .name           = "usb30_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_USB30,
-> +};
-> +static struct zx_pm_domain hsic_domain = {
-> +       .dm = {
-> +               .name           = "hsic_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_HSIC,
-> +};
-> +static struct zx_pm_domain gmac_domain = {
-> +       .dm = {
-> +               .name           = "gmac_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_GMAC,
-> +};
-> +static struct zx_pm_domain ts_domain = {
-> +       .dm = {
-> +               .name           = "ts_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_TS,
-> +};
-> +struct generic_pm_domain *zx296718_pm_domains[] = {
-> +       //&vou_domain.dm,
-Remove this line.
+>  	prediv = opp->prediv;
+>  	mult = opp->mult;
+>  	postdiv = opp->postdiv;
+> diff --git a/drivers/cpufreq/davinci-cpufreq.c b/drivers/cpufreq/davinci-cpufreq.c
+> index b95a872..d54a27c 100644
+> --- a/drivers/cpufreq/davinci-cpufreq.c
+> +++ b/drivers/cpufreq/davinci-cpufreq.c
+> @@ -55,7 +55,7 @@ static int davinci_target(struct cpufreq_policy *policy, unsigned int idx)
+>  			return ret;
+>  	}
+>  
+> -	ret = clk_set_rate(armclk, idx);
+> +	ret = clk_set_rate(armclk, new_freq * 1000);
+>  	if (ret)
+>  		return ret;
 
-> +       &sappu_domain.dm,
+I haven't checked the internal of davinci or the way rate is changed now, but
+from cpufreq's perspective, fee free to add my:
 
-If you can add an index and add the index definition in devicetree
-header file, it will be more convenient when binding power domain to
-device in DT file. such as
-         [ZX296718_PM_VDE] = &vde_domain.dm,
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-> +       &vde_domain.dm,
-> +       &vce_domain.dm,
-> +       &hde_domain.dm,
-> +       &viu_domain.dm,
-> +       &usb20_domain.dm,
-> +       &usb21_domain.dm,
-> +       &usb30_domain.dm,
-> +       &hsic_domain.dm,
-> +       &gmac_domain.dm,
-> +       &ts_domain.dm,
-> +       &vou_domain.dm,
-> +};
-> +
-> +static int zx296718_pd_probe(struct platform_device *pdev)
-> +{
-> +       return zx_pd_probe(pdev,
-> +                         zx296718_pm_domains,
-> +                         ARRAY_SIZE(zx296718_pm_domains));
-> +}
-> +
-> +static const struct of_device_id zx296718_pm_domain_matches[] = {
-> +       { .compatible = "zte,zx296718-pcu", },
-
-Suggest to rename probe function and of_device_id to a generic zx
-name, then add compatible data so that probe function can be shared.
-Probe function can find SoC specific data via comparing compatible
-string and initialize device accordingly.
-
-> +       { },
-> +};
-> +
-> +static struct platform_driver zx296718_pd_driver = {
-> +       .driver = {
-> +               .name = "zx-powerdomain",
-> +               .owner = THIS_MODULE,
-> +               .of_match_table = zx296718_pm_domain_matches,
-> +       },
-> +       .probe = zx296718_pd_probe,
-> +};
-> +
-> +static int __init zx296718_pd_init(void)
-> +{
-> +       return platform_driver_register(&zx296718_pd_driver);
-> +}
-> +subsys_initcall(zx296718_pd_init);
-> --
-> 2.7.4
->
+-- 
+viresh
