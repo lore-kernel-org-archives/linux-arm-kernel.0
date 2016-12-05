@@ -1,10 +1,10 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  5 Dec 2016 18:42:26 +0000
-Subject: [PATCH v3 4/6] crypto: arm/crct10dif - port x86 SSE implementation to
- ARM
+Date: Mon,  5 Dec 2016 18:42:25 +0000
+Subject: [PATCH v3 3/6] crypto: arm64/crct10dif - port x86 SSE implementation
+ to arm64
 In-Reply-To: <1480963348-24203-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1480963348-24203-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1480963348-24203-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1480963348-24203-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,54 +15,50 @@ operate on buffers that are 16 byte aligned (but of any size)
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/crypto/Kconfig             |   5 +
- arch/arm/crypto/Makefile            |   2 +
- arch/arm/crypto/crct10dif-ce-core.S | 427 ++++++++++++++++++++
- arch/arm/crypto/crct10dif-ce-glue.c | 101 +++++
- 4 files changed, 535 insertions(+)
+ arch/arm64/crypto/Kconfig             |   5 +
+ arch/arm64/crypto/Makefile            |   3 +
+ arch/arm64/crypto/crct10dif-ce-core.S | 392 ++++++++++++++++++++
+ arch/arm64/crypto/crct10dif-ce-glue.c |  95 +++++
+ 4 files changed, 495 insertions(+)
 
-diff --git a/arch/arm/crypto/Kconfig b/arch/arm/crypto/Kconfig
-index 27ed1b1cd1d7..fce801fa52a1 100644
---- a/arch/arm/crypto/Kconfig
-+++ b/arch/arm/crypto/Kconfig
-@@ -120,4 +120,9 @@ config CRYPTO_GHASH_ARM_CE
- 	  that uses the 64x64 to 128 bit polynomial multiplication (vmull.p64)
- 	  that is part of the ARMv8 Crypto Extensions
+diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
+index 2cf32e9887e1..d773c0659202 100644
+--- a/arch/arm64/crypto/Kconfig
++++ b/arch/arm64/crypto/Kconfig
+@@ -23,6 +23,11 @@ config CRYPTO_GHASH_ARM64_CE
+ 	depends on ARM64 && KERNEL_MODE_NEON
+ 	select CRYPTO_HASH
  
-+config CRYPTO_CRCT10DIF_ARM_CE
++config CRYPTO_CRCT10DIF_ARM64_CE
 +	tristate "CRCT10DIF digest algorithm using PMULL instructions"
 +	depends on KERNEL_MODE_NEON && CRC_T10DIF
 +	select CRYPTO_HASH
 +
- endif
-diff --git a/arch/arm/crypto/Makefile b/arch/arm/crypto/Makefile
-index fc5150702b64..fc77265014b7 100644
---- a/arch/arm/crypto/Makefile
-+++ b/arch/arm/crypto/Makefile
-@@ -13,6 +13,7 @@ ce-obj-$(CONFIG_CRYPTO_AES_ARM_CE) += aes-arm-ce.o
- ce-obj-$(CONFIG_CRYPTO_SHA1_ARM_CE) += sha1-arm-ce.o
- ce-obj-$(CONFIG_CRYPTO_SHA2_ARM_CE) += sha2-arm-ce.o
- ce-obj-$(CONFIG_CRYPTO_GHASH_ARM_CE) += ghash-arm-ce.o
-+ce-obj-$(CONFIG_CRYPTO_CRCT10DIF_ARM_CE) += crct10dif-arm-ce.o
+ config CRYPTO_AES_ARM64_CE
+ 	tristate "AES core cipher using ARMv8 Crypto Extensions"
+ 	depends on ARM64 && KERNEL_MODE_NEON
+diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
+index abb79b3cfcfe..36fd3eb4201b 100644
+--- a/arch/arm64/crypto/Makefile
++++ b/arch/arm64/crypto/Makefile
+@@ -17,6 +17,9 @@ sha2-ce-y := sha2-ce-glue.o sha2-ce-core.o
+ obj-$(CONFIG_CRYPTO_GHASH_ARM64_CE) += ghash-ce.o
+ ghash-ce-y := ghash-ce-glue.o ghash-ce-core.o
  
- ifneq ($(ce-obj-y)$(ce-obj-m),)
- ifeq ($(call as-instr,.fpu crypto-neon-fp-armv8,y,n),y)
-@@ -36,6 +37,7 @@ sha1-arm-ce-y	:= sha1-ce-core.o sha1-ce-glue.o
- sha2-arm-ce-y	:= sha2-ce-core.o sha2-ce-glue.o
- aes-arm-ce-y	:= aes-ce-core.o aes-ce-glue.o
- ghash-arm-ce-y	:= ghash-ce-core.o ghash-ce-glue.o
-+crct10dif-arm-ce-y	:= crct10dif-ce-core.o crct10dif-ce-glue.o
++obj-$(CONFIG_CRYPTO_CRCT10DIF_ARM64_CE) += crct10dif-ce.o
++crct10dif-ce-y := crct10dif-ce-core.o crct10dif-ce-glue.o
++
+ obj-$(CONFIG_CRYPTO_AES_ARM64_CE) += aes-ce-cipher.o
+ CFLAGS_aes-ce-cipher.o += -march=armv8-a+crypto
  
- quiet_cmd_perl = PERL    $@
-       cmd_perl = $(PERL) $(<) > $(@)
-diff --git a/arch/arm/crypto/crct10dif-ce-core.S b/arch/arm/crypto/crct10dif-ce-core.S
+diff --git a/arch/arm64/crypto/crct10dif-ce-core.S b/arch/arm64/crypto/crct10dif-ce-core.S
 new file mode 100644
-index 000000000000..ce45ba0c0687
+index 000000000000..d5b5a8c038c8
 --- /dev/null
-+++ b/arch/arm/crypto/crct10dif-ce-core.S
-@@ -0,0 +1,427 @@
++++ b/arch/arm64/crypto/crct10dif-ce-core.S
+@@ -0,0 +1,392 @@
 +//
-+// Accelerated CRC-T10DIF using ARM NEON and Crypto Extensions instructions
++// Accelerated CRC-T10DIF using arm64 NEON and Crypto Extensions instructions
 +//
 +// Copyright (C) 2016 Linaro Ltd <ard.biesheuvel@linaro.org>
 +//
@@ -134,40 +130,17 @@ index 000000000000..ce45ba0c0687
 +#include <linux/linkage.h>
 +#include <asm/assembler.h>
 +
-+#ifdef CONFIG_CPU_ENDIAN_BE8
-+#define CPU_LE(code...)
-+#else
-+#define CPU_LE(code...)		code
-+#endif
-+
 +	.text
-+	.fpu		crypto-neon-fp-armv8
++	.cpu		generic+crypto
 +
-+	arg1_low32	.req	r0
-+	arg2		.req	r1
-+	arg3		.req	r2
++	arg1_low32	.req	w0
++	arg2		.req	x1
++	arg3		.req	x2
 +
-+	qzr		.req	q13
-+
-+	q0l		.req	d0
-+	q0h		.req	d1
-+	q1l		.req	d2
-+	q1h		.req	d3
-+	q2l		.req	d4
-+	q2h		.req	d5
-+	q3l		.req	d6
-+	q3h		.req	d7
-+	q4l		.req	d8
-+	q4h		.req	d9
-+	q5l		.req	d10
-+	q5h		.req	d11
-+	q6l		.req	d12
-+	q6h		.req	d13
-+	q7l		.req	d14
-+	q7h		.req	d15
++	vzr		.req	v13
 +
 +ENTRY(crc_t10dif_pmull)
-+	vmov.i8		qzr, #0			// init zero register
++	movi		vzr.16b, #0		// init zero register
 +
 +	// adjust the 16-bit initial_crc value, scale it to 32 bits
 +	lsl		arg1_low32, arg1_low32, #16
@@ -176,44 +149,47 @@ index 000000000000..ce45ba0c0687
 +	cmp		arg3, #256
 +
 +	// for sizes less than 128, we can't fold 64B at a time...
-+	blt		_less_than_128
++	b.lt		_less_than_128
 +
 +	// load the initial crc value
 +	// crc value does not need to be byte-reflected, but it needs
 +	// to be moved to the high part of the register.
 +	// because data will be byte-reflected and will align with
 +	// initial crc at correct place.
-+	vmov		s0, arg1_low32		// initial crc
-+	vext.8		q10, qzr, q0, #4
++	movi		v10.16b, #0
++	mov		v10.s[3], arg1_low32		// initial crc
 +
 +	// receive the initial 64B data, xor the initial crc value
-+	vld1.64		{q0-q1}, [arg2, :128]!
-+	vld1.64		{q2-q3}, [arg2, :128]!
-+	vld1.64		{q4-q5}, [arg2, :128]!
-+	vld1.64		{q6-q7}, [arg2, :128]!
-+CPU_LE(	vrev64.8	q0, q0			)
-+CPU_LE(	vrev64.8	q1, q1			)
-+CPU_LE(	vrev64.8	q2, q2			)
-+CPU_LE(	vrev64.8	q3, q3			)
-+CPU_LE(	vrev64.8	q4, q4			)
-+CPU_LE(	vrev64.8	q5, q5			)
-+CPU_LE(	vrev64.8	q6, q6			)
-+CPU_LE(	vrev64.8	q7, q7			)
++	ldp		q0, q1, [arg2]
++	ldp		q2, q3, [arg2, #0x20]
++	ldp		q4, q5, [arg2, #0x40]
++	ldp		q6, q7, [arg2, #0x60]
++	add		arg2, arg2, #0x80
 +
-+	vswp		d0, d1
-+	vswp		d2, d3
-+	vswp		d4, d5
-+	vswp		d6, d7
-+	vswp		d8, d9
-+	vswp		d10, d11
-+	vswp		d12, d13
-+	vswp		d14, d15
++CPU_LE(	rev64		v0.16b, v0.16b			)
++CPU_LE(	rev64		v1.16b, v1.16b			)
++CPU_LE(	rev64		v2.16b, v2.16b			)
++CPU_LE(	rev64		v3.16b, v3.16b			)
++CPU_LE(	rev64		v4.16b, v4.16b			)
++CPU_LE(	rev64		v5.16b, v5.16b			)
++CPU_LE(	rev64		v6.16b, v6.16b			)
++CPU_LE(	rev64		v7.16b, v7.16b			)
++
++CPU_LE(	ext		v0.16b, v0.16b, v0.16b, #8	)
++CPU_LE(	ext		v1.16b, v1.16b, v1.16b, #8	)
++CPU_LE(	ext		v2.16b, v2.16b, v2.16b, #8	)
++CPU_LE(	ext		v3.16b, v3.16b, v3.16b, #8	)
++CPU_LE(	ext		v4.16b, v4.16b, v4.16b, #8	)
++CPU_LE(	ext		v5.16b, v5.16b, v5.16b, #8	)
++CPU_LE(	ext		v6.16b, v6.16b, v6.16b, #8	)
++CPU_LE(	ext		v7.16b, v7.16b, v7.16b, #8	)
 +
 +	// XOR the initial_crc value
-+	veor.8		q0, q0, q10
++	eor		v0.16b, v0.16b, v10.16b
 +
-+	adr		ip, rk3
-+	vld1.64		{q10}, [ip, :128]	// xmm10 has rk3 and rk4
++	ldr		q10, rk3	// xmm10 has rk3 and rk4
++					// type of pmull instruction
++					// will determine which constant to use
 +
 +	//
 +	// we subtract 256 instead of 128 to save one instruction from the loop
@@ -230,33 +206,35 @@ index 000000000000..ce45ba0c0687
 +_fold_64_B_loop:
 +
 +	.macro		fold64, reg1, reg2
-+	vld1.64		{q11-q12}, [arg2, :128]!
++	ldp		q11, q12, [arg2], #0x20
 +
-+	vmull.p64	q8, \reg1\()h, d21
-+	vmull.p64	\reg1, \reg1\()l, d20
-+	vmull.p64	q9, \reg2\()h, d21
-+	vmull.p64	\reg2, \reg2\()l, d20
++	pmull2		v8.1q, \reg1\().2d, v10.2d
++	pmull		\reg1\().1q, \reg1\().1d, v10.1d
 +
-+CPU_LE(	vrev64.8	q11, q11		)
-+CPU_LE(	vrev64.8	q12, q12		)
-+	vswp		d22, d23
-+	vswp		d24, d25
++CPU_LE(	rev64		v11.16b, v11.16b		)
++CPU_LE(	rev64		v12.16b, v12.16b		)
 +
-+	veor.8		\reg1, \reg1, q8
-+	veor.8		\reg2, \reg2, q9
-+	veor.8		\reg1, \reg1, q11
-+	veor.8		\reg2, \reg2, q12
++	pmull2		v9.1q, \reg2\().2d, v10.2d
++	pmull		\reg2\().1q, \reg2\().1d, v10.1d
++
++CPU_LE(	ext		v11.16b, v11.16b, v11.16b, #8	)
++CPU_LE(	ext		v12.16b, v12.16b, v12.16b, #8	)
++
++	eor		\reg1\().16b, \reg1\().16b, v8.16b
++	eor		\reg2\().16b, \reg2\().16b, v9.16b
++	eor		\reg1\().16b, \reg1\().16b, v11.16b
++	eor		\reg2\().16b, \reg2\().16b, v12.16b
 +	.endm
 +
-+	fold64		q0, q1
-+	fold64		q2, q3
-+	fold64		q4, q5
-+	fold64		q6, q7
++	fold64		v0, v1
++	fold64		v2, v3
++	fold64		v4, v5
++	fold64		v6, v7
 +
 +	subs		arg3, arg3, #128
 +
 +	// check if there is another 64B in the buffer to be able to fold
-+	bge		_fold_64_B_loop
++	b.ge		_fold_64_B_loop
 +
 +	// at this point, the buffer pointer is pointing at the last y Bytes
 +	// of the buffer the 64B of folded data is in 4 of the vector
@@ -265,52 +243,51 @@ index 000000000000..ce45ba0c0687
 +	// fold the 8 vector registers to 1 vector register with different
 +	// constants
 +
-+	adr		ip, rk9
-+	vld1.64		{q10}, [ip, :128]!
++	ldr		q10, rk9
 +
 +	.macro		fold16, reg, rk
-+	vmull.p64	q8, \reg\()l, d20
-+	vmull.p64	\reg, \reg\()h, d21
++	pmull		v8.1q, \reg\().1d, v10.1d
++	pmull2		\reg\().1q, \reg\().2d, v10.2d
 +	.ifnb		\rk
-+	vld1.64		{q10}, [ip, :128]!
++	ldr		q10, \rk
 +	.endif
-+	veor.8		q7, q7, q8
-+	veor.8		q7, q7, \reg
++	eor		v7.16b, v7.16b, v8.16b
++	eor		v7.16b, v7.16b, \reg\().16b
 +	.endm
 +
-+	fold16		q0, rk11
-+	fold16		q1, rk13
-+	fold16		q2, rk15
-+	fold16		q3, rk17
-+	fold16		q4, rk19
-+	fold16		q5, rk1
-+	fold16		q6
++	fold16		v0, rk11
++	fold16		v1, rk13
++	fold16		v2, rk15
++	fold16		v3, rk17
++	fold16		v4, rk19
++	fold16		v5, rk1
++	fold16		v6
 +
 +	// instead of 64, we add 48 to the loop counter to save 1 instruction
 +	// from the loop instead of a cmp instruction, we use the negative
 +	// flag with the jl instruction
 +	adds		arg3, arg3, #(128-16)
-+	blt		_final_reduction_for_128
++	b.lt		_final_reduction_for_128
 +
 +	// now we have 16+y bytes left to reduce. 16 Bytes is in register v7
 +	// and the rest is in memory. We can fold 16 bytes@a time if y>=16
 +	// continue folding 16B at a time
 +
 +_16B_reduction_loop:
-+	vmull.p64	q8, d14, d20
-+	vmull.p64	q7, d15, d21
-+	veor.8		q7, q7, q8
++	pmull		v8.1q, v7.1d, v10.1d
++	pmull2		v7.1q, v7.2d, v10.2d
++	eor		v7.16b, v7.16b, v8.16b
 +
-+	vld1.64		{q0}, [arg2, :128]!
-+CPU_LE(	vrev64.8	q0, q0		)
-+	vswp		d0, d1
-+	veor.8		q7, q7, q0
++	ldr		q0, [arg2], #16
++CPU_LE(	rev64		v0.16b, v0.16b			)
++CPU_LE(	ext		v0.16b, v0.16b, v0.16b, #8	)
++	eor		v7.16b, v7.16b, v0.16b
 +	subs		arg3, arg3, #16
 +
 +	// instead of a cmp instruction, we utilize the flags with the
 +	// jge instruction equivalent of: cmp arg3, 16-16
 +	// check if there is any more 16B in the buffer to be able to fold
-+	bge		_16B_reduction_loop
++	b.ge		_16B_reduction_loop
 +
 +	// now we have 16+z bytes left to reduce, where 0<= z < 16.
 +	// first, we reduce the data in the xmm7 register
@@ -319,7 +296,7 @@ index 000000000000..ce45ba0c0687
 +	// check if any more data to fold. If not, compute the CRC of
 +	// the final 128 bits
 +	adds		arg3, arg3, #16
-+	beq		_128_done
++	b.eq		_128_done
 +
 +	// here we are getting data that is less than 16 bytes.
 +	// since we know that there was data before the pointer, we can
@@ -327,106 +304,100 @@ index 000000000000..ce45ba0c0687
 +	// exactly 16 bytes. after that the registers need to be adjusted.
 +_get_last_two_regs:
 +	add		arg2, arg2, arg3
-+	sub		arg2, arg2, #16
-+	vld1.64		{q1}, [arg2]
-+CPU_LE(	vrev64.8	q1, q1			)
-+	vswp		d2, d3
++	ldr		q1, [arg2, #-16]
++CPU_LE(	rev64		v1.16b, v1.16b			)
++CPU_LE(	ext		v1.16b, v1.16b, v1.16b, #8	)
 +
 +	// get rid of the extra data that was loaded before
 +	// load the shift constant
-+	adr		ip, tbl_shf_table + 16
-+	sub		ip, ip, arg3
-+	vld1.8		{q0}, [ip]
++	adr		x4, tbl_shf_table + 16
++	sub		x4, x4, arg3
++	ld1		{v0.16b}, [x4]
 +
 +	// shift v2 to the left by arg3 bytes
-+	vtbl.8		d4, {d14-d15}, d0
-+	vtbl.8		d5, {d14-d15}, d1
++	tbl		v2.16b, {v7.16b}, v0.16b
 +
 +	// shift v7 to the right by 16-arg3 bytes
-+	vmov.i8		q9, #0x80
-+	veor.8		q0, q0, q9
-+	vtbl.8		d18, {d14-d15}, d0
-+	vtbl.8		d19, {d14-d15}, d1
++	movi		v9.16b, #0x80
++	eor		v0.16b, v0.16b, v9.16b
++	tbl		v7.16b, {v7.16b}, v0.16b
 +
 +	// blend
-+	vshr.s8		q0, q0, #7		// convert to 8-bit mask
-+	vbsl.8		q0, q2, q1
++	sshr		v0.16b, v0.16b, #7	// convert to 8-bit mask
++	bsl		v0.16b, v2.16b, v1.16b
 +
 +	// fold 16 Bytes
-+	vmull.p64	q8, d18, d20
-+	vmull.p64	q7, d19, d21
-+	veor.8		q7, q7, q8
-+	veor.8		q7, q7, q0
++	pmull		v8.1q, v7.1d, v10.1d
++	pmull2		v7.1q, v7.2d, v10.2d
++	eor		v7.16b, v7.16b, v8.16b
++	eor		v7.16b, v7.16b, v0.16b
 +
 +_128_done:
 +	// compute crc of a 128-bit value
-+	vldr		d20, rk5
-+	vldr		d21, rk6		// rk5 and rk6 in xmm10
++	ldr		q10, rk5		// rk5 and rk6 in xmm10
 +
 +	// 64b fold
-+	vext.8		q0, qzr, q7, #8
-+	vmull.p64	q7, d15, d20
-+	veor.8		q7, q7, q0
++	ext		v0.16b, vzr.16b, v7.16b, #8
++	mov		v7.d[0], v7.d[1]
++	pmull		v7.1q, v7.1d, v10.1d
++	eor		v7.16b, v7.16b, v0.16b
 +
 +	// 32b fold
-+	vext.8		q0, q7, qzr, #12
-+	vmov		s31, s3
-+	vmull.p64	q0, d0, d21
-+	veor.8		q7, q0, q7
++	ext		v0.16b, v7.16b, vzr.16b, #4
++	mov		v7.s[3], vzr.s[0]
++	pmull2		v0.1q, v0.2d, v10.2d
++	eor		v7.16b, v7.16b, v0.16b
 +
 +	// barrett reduction
 +_barrett:
-+	vldr		d20, rk7
-+	vldr		d21, rk8
++	ldr		q10, rk7
++	mov		v0.d[0], v7.d[1]
 +
-+	vmull.p64	q0, d15, d20
-+	vext.8		q0, qzr, q0, #12
-+	vmull.p64	q0, d1, d21
-+	vext.8		q0, qzr, q0, #12
-+	veor.8		q7, q7, q0
-+	vmov		r0, s29
++	pmull		v0.1q, v0.1d, v10.1d
++	ext		v0.16b, vzr.16b, v0.16b, #12
++	pmull2		v0.1q, v0.2d, v10.2d
++	ext		v0.16b, vzr.16b, v0.16b, #12
++	eor		v7.16b, v7.16b, v0.16b
++	mov		w0, v7.s[1]
 +
 +_cleanup:
 +	// scale the result back to 16 bits
-+	lsr		r0, r0, #16
-+	bx		lr
++	lsr		x0, x0, #16
++	ret
 +
 +_less_than_128:
-+	teq		arg3, #0
-+	beq		_cleanup
++	cbz		arg3, _cleanup
 +
-+	vmov.i8		q0, #0
-+	vmov		s3, arg1_low32		// get the initial crc value
++	movi		v0.16b, #0
++	mov		v0.s[3], arg1_low32	// get the initial crc value
 +
-+	vld1.64		{q7}, [arg2, :128]!
-+CPU_LE(	vrev64.8	q7, q7		)
-+	vswp		d14, d15
-+	veor.8		q7, q7, q0
++	ldr		q7, [arg2], #0x10
++CPU_LE(	rev64		v7.16b, v7.16b			)
++CPU_LE(	ext		v7.16b, v7.16b, v7.16b, #8	)
++	eor		v7.16b, v7.16b, v0.16b	// xor the initial crc value
 +
 +	cmp		arg3, #16
-+	beq		_128_done		// exactly 16 left
-+	blt		_less_than_16_left
++	b.eq		_128_done		// exactly 16 left
++	b.lt		_less_than_16_left
 +
-+	// now if there is, load the constants
-+	vldr		d20, rk1
-+	vldr		d21, rk2		// rk1 and rk2 in xmm10
++	ldr		q10, rk1		// rk1 and rk2 in xmm10
 +
-+	// check if there is enough buffer to be able to fold 16B at a time
++	// update the counter. subtract 32 instead of 16 to save one
++	// instruction from the loop
 +	subs		arg3, arg3, #32
-+	addlt		arg3, arg3, #16
-+	blt		_get_last_two_regs
-+	b		_16B_reduction_loop
++	b.ge		_16B_reduction_loop
++
++	add		arg3, arg3, #16
++	b		_get_last_two_regs
 +
 +_less_than_16_left:
 +	// shl r9, 4
-+	adr		ip, tbl_shf_table + 16
-+	sub		ip, ip, arg3
-+	vld1.8		{q0}, [ip]
-+	vmov.i8		q9, #0x80
-+	veor.8		q0, q0, q9
-+	vtbl.8		d18, {d14-d15}, d0
-+	vtbl.8		d15, {d14-d15}, d1
-+	vmov		d14, d18
++	adr		x0, tbl_shf_table + 16
++	sub		x0, x0, arg3
++	ld1		{v0.16b}, [x0]
++	movi		v9.16b, #0x80
++	eor		v0.16b, v0.16b, v9.16b
++	tbl		v7.16b, {v7.16b}, v0.16b
 +	b		_128_done
 +ENDPROC(crc_t10dif_pmull)
 +
@@ -444,26 +415,16 @@ index 000000000000..ce45ba0c0687
 +// rk7 = floor(2^64/Q)
 +// rk8 = Q
 +
-+rk3:	.quad		0x9d9d000000000000
-+rk4:	.quad		0x7cf5000000000000
-+rk5:	.quad		0x2d56000000000000
-+rk6:	.quad		0x1368000000000000
-+rk7:	.quad		0x00000001f65a57f8
-+rk8:	.quad		0x000000018bb70000
-+rk9:	.quad		0xceae000000000000
-+rk10:	.quad		0xbfd6000000000000
-+rk11:	.quad		0x1e16000000000000
-+rk12:	.quad		0x713c000000000000
-+rk13:	.quad		0xf7f9000000000000
-+rk14:	.quad		0x80a6000000000000
-+rk15:	.quad		0x044c000000000000
-+rk16:	.quad		0xe658000000000000
-+rk17:	.quad		0xad18000000000000
-+rk18:	.quad		0xa497000000000000
-+rk19:	.quad		0x6ee3000000000000
-+rk20:	.quad		0xe7b5000000000000
-+rk1:	.quad		0x2d56000000000000
-+rk2:	.quad		0x06df000000000000
++rk1:	.octa		0x06df0000000000002d56000000000000
++rk3:	.octa		0x7cf50000000000009d9d000000000000
++rk5:	.octa		0x13680000000000002d56000000000000
++rk7:	.octa		0x000000018bb7000000000001f65a57f8
++rk9:	.octa		0xbfd6000000000000ceae000000000000
++rk11:	.octa		0x713c0000000000001e16000000000000
++rk13:	.octa		0x80a6000000000000f7f9000000000000
++rk15:	.octa		0xe658000000000000044c000000000000
++rk17:	.octa		0xa497000000000000ad18000000000000
++rk19:	.octa		0xe7b50000000000006ee3000000000000
 +
 +tbl_shf_table:
 +// use these values for shift constants for the tbl/tbx instruction
@@ -488,14 +449,14 @@ index 000000000000..ce45ba0c0687
 +	.byte		0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f
 +	.byte		 0x0,  0x1,  0x2,  0x3,  0x4,  0x5,  0x6,  0x7
 +	.byte		 0x8,  0x9,  0xa,  0xb,  0xc,  0xd,  0xe , 0x0
-diff --git a/arch/arm/crypto/crct10dif-ce-glue.c b/arch/arm/crypto/crct10dif-ce-glue.c
+diff --git a/arch/arm64/crypto/crct10dif-ce-glue.c b/arch/arm64/crypto/crct10dif-ce-glue.c
 new file mode 100644
-index 000000000000..d428355cf38d
+index 000000000000..60cb590c2590
 --- /dev/null
-+++ b/arch/arm/crypto/crct10dif-ce-glue.c
-@@ -0,0 +1,101 @@
++++ b/arch/arm64/crypto/crct10dif-ce-glue.c
+@@ -0,0 +1,95 @@
 +/*
-+ * Accelerated CRC-T10DIF using ARM NEON and Crypto Extensions instructions
++ * Accelerated CRC-T10DIF using arm64 NEON and Crypto Extensions instructions
 + *
 + * Copyright (C) 2016 Linaro Ltd <ard.biesheuvel@linaro.org>
 + *
@@ -504,6 +465,7 @@ index 000000000000..d428355cf38d
 + * published by the Free Software Foundation.
 + */
 +
++#include <linux/cpufeature.h>
 +#include <linux/crc-t10dif.h>
 +#include <linux/init.h>
 +#include <linux/kernel.h>
@@ -513,11 +475,10 @@ index 000000000000..d428355cf38d
 +#include <crypto/internal/hash.h>
 +
 +#include <asm/neon.h>
-+#include <asm/simd.h>
 +
 +#define CRC_T10DIF_PMULL_CHUNK_SIZE	16U
 +
-+asmlinkage u16 crc_t10dif_pmull(u16 init_crc, const u8 buf[], u32 len);
++asmlinkage u16 crc_t10dif_pmull(u16 init_crc, const u8 buf[], u64 len);
 +
 +static int crct10dif_init(struct shash_desc *desc)
 +{
@@ -533,24 +494,22 @@ index 000000000000..d428355cf38d
 +	u16 *crc = shash_desc_ctx(desc);
 +	unsigned int l;
 +
-+	if (!may_use_simd()) {
-+		*crc = crc_t10dif_generic(*crc, data, length);
-+	} else {
-+		if (unlikely((u32)data % CRC_T10DIF_PMULL_CHUNK_SIZE)) {
-+			l = min_t(u32, length, CRC_T10DIF_PMULL_CHUNK_SIZE -
-+				  ((u32)data % CRC_T10DIF_PMULL_CHUNK_SIZE));
++	if (unlikely((u64)data % CRC_T10DIF_PMULL_CHUNK_SIZE)) {
++		l = min_t(u32, length, CRC_T10DIF_PMULL_CHUNK_SIZE -
++			  ((u64)data % CRC_T10DIF_PMULL_CHUNK_SIZE));
 +
-+			*crc = crc_t10dif_generic(*crc, data, l);
++		*crc = crc_t10dif_generic(*crc, data, l);
 +
-+			length -= l;
-+			data += l;
-+		}
-+		if (length > 0) {
-+			kernel_neon_begin();
-+			*crc = crc_t10dif_pmull(*crc, data, length);
-+			kernel_neon_end();
-+		}
++		length -= l;
++		data += l;
 +	}
++
++	if (length > 0) {
++		kernel_neon_begin_partial(14);
++		*crc = crc_t10dif_pmull(*crc, data, length);
++		kernel_neon_end();
++	}
++
 +	return 0;
 +}
 +
@@ -570,7 +529,7 @@ index 000000000000..d428355cf38d
 +	.descsize		= CRC_T10DIF_DIGEST_SIZE,
 +
 +	.base.cra_name		= "crct10dif",
-+	.base.cra_driver_name	= "crct10dif-arm-ce",
++	.base.cra_driver_name	= "crct10dif-arm64-ce",
 +	.base.cra_priority	= 200,
 +	.base.cra_blocksize	= CRC_T10DIF_BLOCK_SIZE,
 +	.base.cra_module	= THIS_MODULE,
@@ -578,9 +537,6 @@ index 000000000000..d428355cf38d
 +
 +static int __init crc_t10dif_mod_init(void)
 +{
-+	if (!(elf_hwcap2 & HWCAP2_PMULL))
-+		return -ENODEV;
-+
 +	return crypto_register_shash(&crc_t10dif_alg);
 +}
 +
@@ -589,11 +545,10 @@ index 000000000000..d428355cf38d
 +	crypto_unregister_shash(&crc_t10dif_alg);
 +}
 +
-+module_init(crc_t10dif_mod_init);
++module_cpu_feature_match(PMULL, crc_t10dif_mod_init);
 +module_exit(crc_t10dif_mod_exit);
 +
 +MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
 +MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS_CRYPTO("crct10dif");
 -- 
 2.7.4
