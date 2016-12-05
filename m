@@ -1,39 +1,119 @@
-From: szabolcs.nagy@arm.com (Szabolcs Nagy)
-Date: Mon, 5 Dec 2016 11:07:12 +0000
-Subject: [RFC PATCH 00/29] arm64: Scalable Vector Extension core support
-In-Reply-To: <0293f7d3-b3d3-1a68-5b99-75db195eb796@redhat.com>
-References: <20161130120654.GJ1574@e103592.cambridge.arm.com>
- <3e8afc5a-1ba9-6369-462b-4f5a707d8b8a@redhat.com>
- <20161130135631.GK1574@e103592.cambridge.arm.com>
- <dbcd545f-1358-6a80-5a9f-3e4a3c93189a@redhat.com>
- <20161201103048.GO1574@e103592.cambridge.arm.com>
- <0293f7d3-b3d3-1a68-5b99-75db195eb796@redhat.com>
-Message-ID: <58454A60.7000206@arm.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Mon, 5 Dec 2016 12:08:32 +0100
+Subject: [PATCH v3 3/7] PWM: add pwm-stm32 DT bindings
+In-Reply-To: <20161205065350.GA18069@ulmo.ba.sec>
+References: <1480673842-20804-1-git-send-email-benjamin.gaignard@st.com>
+ <1480673842-20804-4-git-send-email-benjamin.gaignard@st.com>
+ <20161205065350.GA18069@ulmo.ba.sec>
+Message-ID: <CA+M3ks4-JQNGYtdiXNj1J701x0njKD0_bf4yN1mLSjEcT2Z=6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/16 10:44, Florian Weimer wrote:
->>> By the way, how is this implemented?  Some of them overlap existing
->>> callee-saved registers.
+2016-12-05 7:53 GMT+01:00 Thierry Reding <thierry.reding@gmail.com>:
+> On Fri, Dec 02, 2016 at 11:17:18AM +0100, Benjamin Gaignard wrote:
+>> Define bindings for pwm-stm32
 >>
->> Basically, all the *new* state is caller-save.
+>> version 2:
+>> - use parameters instead of compatible of handle the hardware configuration
 >>
->> The Neon/FPSIMD regs V8-V15 are callee-save, so in the SVE view
->> Zn[bits 127:0] is callee-save for all n = 8..15.
-> 
-> Are the extension parts of registers v8 to v15 used for argument passing?
-> 
-> If not, we should be able to use the existing dynamic linker trampoline.
-> 
+>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>> ---
+>>  .../devicetree/bindings/pwm/pwm-stm32.txt          | 38 ++++++++++++++++++++++
+>>  1 file changed, 38 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+>> new file mode 100644
+>> index 0000000..575b9fb
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+>> @@ -0,0 +1,38 @@
+>> +STMicroelectronics PWM driver bindings for STM32
+>
+> Technically this bindings describe devices, so "driver binding" is a
+> somewhat odd wording. Perhaps:
+>
+>         STMicroelectronics STM32 General Purpose Timer PWM bindings
+>
+> ?
+ done
 
-if sve arguments are passed to a function then it
-has special call abi (which is probably not yet
-documented), this call abi requires that such a
-call does not go through plt to avoid requiring
-sve aware libc.
+>
+>> +
+>> +Must be a sub-node of STM32 general purpose timer driver
+>> +Parent node properties are describe in ../mfd/stm32-general-purpose-timer.txt
+>
+> Again, "driver parent node" is odd. Perhaps:
+>
+>         Must be a sub-node of an STM32 General Purpose Timer device tree
+>         node. See ../mfd/stm32-general-purpose-timer.txt for details about
+>         the parent node.
+>
+> ?
 
-same for tls access: the top part of sve regs have
-to be saved by the caller before accessing tls so
-the tlsdesc entry does not have to save them.
+done
 
-so current trampolines should be fine.
+>
+>> +Required parameters:
+>> +- compatible:                Must be "st,stm32-pwm"
+>> +- pinctrl-names:     Set to "default".
+>> +- pinctrl-0:                 List of phandles pointing to pin configuration nodes
+>> +                     for PWM module.
+>> +                     For Pinctrl properties, please refer to [1].
+>
+> Your indentation and capitalization are inconsistent. Also, please refer
+> to the pinctrl bindings by relative path and inline, rather than as a
+> footnote reference.
+
+OK
+
+>
+>> +
+>> +Optional parameters:
+>> +- st,breakinput:     Set if the hardware have break input capabilities
+>> +- st,breakinput-polarity: Set break input polarity. Default is 0
+>> +                      The value define the active polarity:
+>> +                       - 0 (active LOW)
+>> +                       - 1 (active HIGH)
+>
+> Could we fold these into a single property? If st,breakinput-polarity is
+> not present it could simply mean that there is no break input, and if it
+> is present you don't have to rely on a default.
+
+I need to know if I have to activate breakinput feature and on which level
+I will rewrite it like that:
+Optional parameters:
+- st,breakinput-polarity-high: Set if break input polarity is active
+on high level.
+- st,breakinput-polarity-high: Set if break input polarity is active
+on low level.
+
+>> +- st,pwm-num-chan:   Number of available PWM channels.  Default is 0.
+>
+> The pwm- prefix is rather redundant since the node is already named pwm.
+> Why not simply st,channels? Or simply channels, since it's not really
+> anything specific to this hardware.
+>
+> Come to think of it, might be worth having a discussion with our DT
+> gurus about what their stance is on using the # as prefix for numbers
+> (such as in #address-cells or #size-cells). This could be #channels to
+> mark it more explicitly as representing a count.
+>
+>> +- st,32bits-counter: Set if the hardware have a 32 bits counter
+>> +- st,complementary:  Set if the hardware have complementary output channels
+>
+> "hardware has" and also maybe mention explicitly that this is a boolean
+> property. Otherwise people might be left wondering what it should be set
+> to. Or maybe word this differently to imply that it's boolean:
+>
+>         - st,32bits-counter: if present, the hardware has a 32 bit counter
+>         - st,complementary: if present, the hardware has a complementary
+>                             output channel
+
+I found a way to detect, at probe time, the number of channels, counter size,
+break input capability and complementary channels so I will remove
+"st,breakinput", "st,32bits-counter", "st,complementary" and "st,pwm-num-chan"
+parameters
+
+>
+> Thierry
