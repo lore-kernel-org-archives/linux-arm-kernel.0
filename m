@@ -1,80 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Dec 2016 10:05:46 +0000
-Subject: [PATCH 2/2] arm64: alternatives: Work around NOP generation with
- broken assembler
-In-Reply-To: <20161203140538.23525-3-marc.zyngier@arm.com>
-References: <20161203140538.23525-1-marc.zyngier@arm.com>
- <20161203140538.23525-3-marc.zyngier@arm.com>
-Message-ID: <20161205100545.GA14058@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 5 Dec 2016 11:06:30 +0100
+Subject: [PATCH 2/8] dt-bindings: document the STM32 RTC bindings
+In-Reply-To: <1480687801-19525-4-git-send-email-amelie.delaunay@st.com>
+References: <1480687801-19525-2-git-send-email-amelie.delaunay@st.com>
+ <1480687801-19525-4-git-send-email-amelie.delaunay@st.com>
+Message-ID: <20161205100630.n3gldznf524pucjm@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 03, 2016 at 02:05:38PM +0000, Marc Zyngier wrote:
-> When compiling a .inst directive in an alternative clause with
-> a rather old version of gas (circa 2.24), and when used with
-> the alternative_else_nop_endif feature, the compilation fails
-> with a rather cryptic message such as:
-> 
-> arch/arm64/lib/clear_user.S:33: Error: bad or irreducible absolute expression
-> 
-> which is caused by the bug described in eb7c11ee3c5c ("arm64:
-> alternative: Work around .inst assembler bugs").
-> 
-> This effectively prevents the use of the "nops" macro, which
-> requires the number of instruction as a parameter (the assembler
-> is confused and unable to compute the difference between two labels).
-> 
-> As an alternative(!), use the .fill directive to output the number
-> of required NOPs (.fill has the good idea to output the fill pattern
-> in the endianness of the instruction stream).
+Hi,
 
-Are you sure about that? The gas docs say:
-
-`The contents of each repeat bytes is taken from an 8-byte number. The
- highest order 4 bytes are zero. The lowest order 4 bytes are value rendered
- in the byte-order of an integer on the computer as is assembling for.'
-
-and I'd expect "integer" to refer to data values, rather than instructions.
-
+On 02/12/2016 at 15:09:55 +0100, Amelie Delaunay wrote :
+> This patch adds documentation of device tree bindings for the STM32 RTC.
 > 
-> Fixes: 792d47379f4d ("arm64: alternative: add auto-nop infrastructure")
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 > ---
->  arch/arm64/include/asm/alternative.h | 12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
+>  .../devicetree/bindings/rtc/st,stm32-rtc.txt       | 31 ++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt
 > 
-> diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-> index 39feb85..39f8c98 100644
-> --- a/arch/arm64/include/asm/alternative.h
-> +++ b/arch/arm64/include/asm/alternative.h
-> @@ -159,9 +159,19 @@ void apply_alternatives(void *start, size_t length);
->   * of NOPs. The number of NOPs is chosen automatically to match the
->   * previous case.
->   */
+> diff --git a/Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt b/Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt
+> new file mode 100644
+> index 0000000..4578838
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rtc/st,stm32-rtc.txt
+> @@ -0,0 +1,31 @@
+> +STM32 Real Time Clock
 > +
-> +#define NOP_INST	0xd503201f
+> +Required properties:
+> +- compatible: "st,stm32-rtc".
+> +- reg: address range of rtc register set.
+> +- clocks: reference to the clock entry ck_rtc.
+> +- clock-names: name of the clock used. Should be "ck_rtc".
 
-If we define this, let's put it in insn.h or something. It could even be
-used in the vdso linker script, which open codes this constant.
+Is this name really useful?
 
-> +
->  .macro alternative_else_nop_endif
->  alternative_else
-> -	nops	(662b-661b) / AARCH64_INSN_SIZE
-> +	/*
-> +	 * The same assembler bug strikes again here if the first half
-> +	 * of the alternative sequence contains a .inst, leading to a
-> +	 * bizarre error message. Fortulately, .fill replaces the
+> +- interrupt-parent: phandle for the interrupt controller.
+> +- interrupts: rtc alarm interrupt.
+> +- interrupt-names: rtc alarm interrupt name, should be "alarm".
 
-Fortunately
+Same comment, is this name really useful?
 
-> +	 * "nops" macro by inserting padding with the target machine
-> +	 * endianness.
-> +	 */
-> +	.fill	(662b-661b) / AARCH64_INSN_SIZE, AARCH64_INSN_SIZE, NOP_INST
 
-Assuming we can get .fill to do the right thing, we should probably use
-it in __nops rather than open-coding it here. Or is the issue that we're
-unable to pass (662b-661b) / AARCH64_INSN_SIZE to any macro?
-
-Will
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
