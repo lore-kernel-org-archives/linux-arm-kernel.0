@@ -1,87 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 5 Dec 2016 08:25:40 -0200
-Subject: [PATCH 06/11] ARM: dts: imx: Add imx6sll EVK board dts support
-In-Reply-To: <1480660774-25055-7-git-send-email-ping.bai@nxp.com>
-References: <1480660774-25055-1-git-send-email-ping.bai@nxp.com>
- <1480660774-25055-7-git-send-email-ping.bai@nxp.com>
-Message-ID: <CAOMZO5C5-tq-OWTYcmzJt=_57wOyXzNMUes1mctwwyoegwzJyQ@mail.gmail.com>
+From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
+Date: Mon, 5 Dec 2016 18:24:11 +0800
+Subject: ILP32 for ARM64: testing with glibc testsuite
+In-Reply-To: <mvmeg1mn0yp.fsf@hawking.suse.de>
+References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+ <20161107082359.GA19666@yury-N73SV> <20161109095650.GA22804@yury-N73SV>
+ <CC4F99A7-1FD2-486A-BD66-ED06F1B8BF50@linaro.org>
+ <1479419136.908.90.camel@caviumnetworks.com>
+ <ff3b973b-3887-7ae8-5a27-4d1ad115055f@huawei.com>
+ <mvmeg1mn0yp.fsf@hawking.suse.de>
+Message-ID: <d4dedc32-b324-107d-7de1-d1e670ffc00a@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 2, 2016 at 4:39 AM, Bai Ping <ping.bai@nxp.com> wrote:
-> Add basic dts support for imx6sll EVK baoard.
-
-s/baord/board
-
-> +       battery: max8903 at 0 {
-> +               compatible = "fsl,max8903-charger";
-> +               pinctrl-names = "default";
-> +               dok_input = <&gpio4 13 1>;
-> +               uok_input = <&gpio4 13 1>;
-> +               chg_input = <&gpio4 15 1>;
-> +               flt_input = <&gpio4 14 1>;
-> +               fsl,dcm_always_high;
-> +               fsl,dc_valid;
-> +               fsl,adc_disable;
-
-These properties do not exist in mainline, please remove them.
 
 
-> +               status = "okay";
-> +       };
-> +
-> +       pxp_v4l2_out {
-> +               compatible = "fsl,imx6sl-pxp-v4l2";
-> +               status = "okay";
-> +       };
+On 2016/12/5 18:07, Andreas Schwab wrote:
+> On Dez 05 2016, "Zhangjian (Bamvor)" <bamvor.zhangjian@huawei.com> wrote:
+>
+>> Is there some progresses on it? We could collabrate to fix those issues.
+>
+> All the elf/nptl/rt fails should be fixed by the recent binutils fixes.
+Cool. How about the conform and other failures?
 
-We don't have pxp support in mainline kernel, please remove it.
+Regards
 
-> +
-> +       regulators {
-> +               compatible = "simple-bus";
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-
-
-Please remove it and place the regulator nodes directly as below:
-
-
-> +
-> +               reg_usb_otg1_vbus: regulator at 0 {
-> +                       compatible = "regulator-fixed";
-> +                       reg = <0>;
-> +                       regulator-name = "usb_otg1_vbus";
-> +                       regulator-min-microvolt = <5000000>;
-> +                       regulator-max-microvolt = <5000000>;
-> +                       gpio = <&gpio4 0 GPIO_ACTIVE_HIGH>;
-> +                       enable-active-high;
-> +               };
-
-    reg_usb_otg1_vbus: regulator-usb-otg1-vbus {
-          compatible = "regulator-fixed";
-          regulator-name = "usb_otg1_vbus";
-          regulator-min-microvolt = <5000000>;
-          regulator-max-microvolt = <5000000>;
-          gpio = <&gpio4 0 GPIO_ACTIVE_HIGH>;
-          enable-active-high;
-    };
-
-> +&cpu0 {
-> +       arm-supply = <&sw1a_reg>;
-> +       soc-supply = <&sw1c_reg>;
-> +};
-
-This is only for LDO bypass mode, right? We don't support LDO-bypass
-in mainline.
-
-> +&gpc {
-> +       fsl,ldo-bypass = <1>;
-
-We don't support ldo-bypass in mainline, please remove it.
-
-> +&pxp {
-> +       status = "okay";
-> +};
-
-We don't support PXP in mainline, please remove it.
+Bamvor
+>
+> Andreas.
+>
