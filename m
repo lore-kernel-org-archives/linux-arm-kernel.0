@@ -1,52 +1,81 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 5 Dec 2016 11:54:21 +0000
-Subject: [PATCH 2/2] arm64: alternatives: Work around NOP generation with
- broken assembler
-In-Reply-To: <c7de1968-7d50-a435-56ea-a7f3e9cb52da@arm.com>
-References: <20161203140538.23525-1-marc.zyngier@arm.com>
- <20161203140538.23525-3-marc.zyngier@arm.com>
- <20161205100545.GA14058@arm.com>
- <c7de1968-7d50-a435-56ea-a7f3e9cb52da@arm.com>
-Message-ID: <56b48421-8b97-16e2-526a-01ee0bb8bf53@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 5 Dec 2016 12:05:40 +0000
+Subject: [PATCH v3 1/5] spi: Add basic support for Armada 3700 SPI
+ Controller
+In-Reply-To: <20161201102719.4291-2-romain.perier@free-electrons.com>
+References: <20161201102719.4291-1-romain.perier@free-electrons.com>
+ <20161201102719.4291-2-romain.perier@free-electrons.com>
+Message-ID: <20161205120540.mvihgafelszitzhq@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/16 10:58, Marc Zyngier wrote:
-> On 05/12/16 10:05, Will Deacon wrote:
->> On Sat, Dec 03, 2016 at 02:05:38PM +0000, Marc Zyngier wrote:
->>> When compiling a .inst directive in an alternative clause with
->>> a rather old version of gas (circa 2.24), and when used with
->>> the alternative_else_nop_endif feature, the compilation fails
->>> with a rather cryptic message such as:
->>>
->>> arch/arm64/lib/clear_user.S:33: Error: bad or irreducible absolute expression
->>>
->>> which is caused by the bug described in eb7c11ee3c5c ("arm64:
->>> alternative: Work around .inst assembler bugs").
->>>
->>> This effectively prevents the use of the "nops" macro, which
->>> requires the number of instruction as a parameter (the assembler
->>> is confused and unable to compute the difference between two labels).
->>>
->>> As an alternative(!), use the .fill directive to output the number
->>> of required NOPs (.fill has the good idea to output the fill pattern
->>> in the endianness of the instruction stream).
->>
->> Are you sure about that? The gas docs say:
->>
->> `The contents of each repeat bytes is taken from an 8-byte number. The
->>  highest order 4 bytes are zero. The lowest order 4 bytes are value rendered
->>  in the byte-order of an integer on the computer as is assembling for.'
->>
->> and I'd expect "integer" to refer to data values, rather than instructions.
-> 
-> My tests on 2.24 and 2.25 seem to show that the output is always LE,
-> which could be another GAS issue. I've asked the binutils people for
-> information.
+On Thu, Dec 01, 2016 at 11:27:15AM +0100, Romain Perier wrote:
 
-Well, my testing was wrong, as objdump -d was lying to me by displaying
-something in little-endian form. Time for some more head scratching.
+> +config SPI_ARMADA_3700
+> +	tristate "Marvell Armada 3700 SPI Controller"
+> +	depends on ARCH_MVEBU && OF
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Why does this not have a COMPILE_TEST dependency?
+
+> +	/* Reset SPI unit */
+> +	val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
+> +	val |= A3700_SPI_SRST;
+> +	spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
+> +
+> +	for (i = 0; i < A3700_SPI_TIMEOUT; i++)
+> +		udelay(1);
+
+Why not just do a single udelay()?
+
+> +static irqreturn_t a3700_spi_interrupt(int irq, void *dev_id)
+> +{
+> +	struct spi_master *master = dev_id;
+> +	struct a3700_spi *a3700_spi;
+> +	u32 cause;
+> +
+> +	a3700_spi = spi_master_get_devdata(master);
+> +
+> +	/* Get interrupt causes */
+> +	cause = spireg_read(a3700_spi, A3700_SPI_INT_STAT_REG);
+> +
+> +	/* mask and acknowledge the SPI interrupts */
+> +	spireg_write(a3700_spi, A3700_SPI_INT_MASK_REG, 0);
+> +	spireg_write(a3700_spi, A3700_SPI_INT_STAT_REG, cause);
+> +
+> +	/* Wake up the transfer */
+> +	if (a3700_spi->wait_mask & cause)
+> +		complete(&a3700_spi->done);
+> +
+> +	return IRQ_HANDLED;
+> +}
+
+This reports that we handled an interrupt even if we did not in fact
+handle an interrupt.  It's also a bit dodgy that it doesn't check what
+the interrupt was but that's less serious.
+
+> +	master->bus_num = (pdev->id != -1) ? pdev->id : 0;
+
+At most this should be just setting the bus number to pdev->id like
+other drivers do.
+
+> +	ret = clk_prepare_enable(spi->clk);
+> +	if (ret) {
+> +		dev_err(dev, "could not prepare clk: %d\n", ret);
+> +		goto error;
+> +	}
+
+I'd expect the hardware prepare/unprepare to be managing the enable and
+disable of the clock in order to save a little power.
+
+> +	dev_info(dev, "Marvell Armada 3700 SPI Controller at 0x%08lx, irq %d\n",
+> +		 (unsigned long)res->start, spi->irq);
+
+This is just adding noise to the boot, remove it.  It's not telling us
+anything we read from the hardware or anything.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161205/bce7957d/attachment.sig>
