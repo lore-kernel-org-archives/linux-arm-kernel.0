@@ -1,32 +1,29 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Mon, 5 Dec 2016 09:38:52 +0800
-Subject: [v2, PATCH] pinctrl: mt8173: set GPIO16 to usb iddig mode
-Message-ID: <1480901933-6971-1-git-send-email-chunfeng.yun@mediatek.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Mon,  5 Dec 2016 03:42:36 +0200
+Subject: [PATCH 0/3] pwm: lpc32xx: switch driver to one phandle argument for
+ PWM consumers
+Message-ID: <20161205014237.1689-1-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the default mode of GPIO16 pin is gpio, when set EINT16 to
-IRQ_TYPE_LEVEL_HIGH, no interrupt is triggered, it can be
-fixed when set its default mode as usb iddig.
+The change adds private of_xlate() function to process one argument given
+along with a PWM phandle. LPC32xx SoCs have two independent single channel
+PWM controllers, the argument is used as a description of PWM output
+frequency, see previous discussion here:
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-Acked-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
----
- drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+  http://www.spinics.net/lists/arm-kernel/msg534068.html
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
-index 13e5b68..9b018fd 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
-@@ -201,7 +201,7 @@
- 	MTK_PIN(
- 		PINCTRL_PIN(16, "IDDIG"),
- 		NULL, "mt8173",
--		MTK_EINT_FUNCTION(0, 16),
-+		MTK_EINT_FUNCTION(1, 16),
- 		MTK_FUNCTION(0, "GPIO16"),
- 		MTK_FUNCTION(1, "IDDIG"),
- 		MTK_FUNCTION(2, "CMFLASH"),
+The changes on actual board dts files are not needed at the moment, because
+all LPC32xx boards in upstream don't describe any PWM consumers.
+
+Vladimir Zapolskiy (3):
+  dt: pwm: lpc32xx: add description of clocks and #pwm-cells properties
+  pwm: lpc32xx: switch driver to one phandle argument for PWM consumers
+  pwm: lpc32xx: remove handling of PWM channels
+
+ .../devicetree/bindings/pwm/lpc32xx-pwm.txt        |  7 +++++
+ drivers/pwm/pwm-lpc32xx.c                          | 36 +++++++++++++++-------
+ 2 files changed, 32 insertions(+), 11 deletions(-)
+
 -- 
-1.7.9.5
+2.10.2
