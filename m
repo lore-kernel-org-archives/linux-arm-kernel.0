@@ -1,30 +1,60 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Mon, 5 Dec 2016 18:24:11 +0800
-Subject: ILP32 for ARM64: testing with glibc testsuite
-In-Reply-To: <mvmeg1mn0yp.fsf@hawking.suse.de>
-References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
- <20161107082359.GA19666@yury-N73SV> <20161109095650.GA22804@yury-N73SV>
- <CC4F99A7-1FD2-486A-BD66-ED06F1B8BF50@linaro.org>
- <1479419136.908.90.camel@caviumnetworks.com>
- <ff3b973b-3887-7ae8-5a27-4d1ad115055f@huawei.com>
- <mvmeg1mn0yp.fsf@hawking.suse.de>
-Message-ID: <d4dedc32-b324-107d-7de1-d1e670ffc00a@huawei.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 5 Dec 2016 11:32:57 +0100
+Subject: [PATCH v3 1/3] ARM: da850: fix infinite loop in clk_set_rate()
+In-Reply-To: <689efaa1-d8d9-6937-5880-3ed7a1401268@ti.com>
+References: <1480932549-30811-1-git-send-email-bgolaszewski@baylibre.com>
+ <1480932549-30811-2-git-send-email-bgolaszewski@baylibre.com>
+ <689efaa1-d8d9-6937-5880-3ed7a1401268@ti.com>
+Message-ID: <CAMpxmJUYksWf-p3KMYZ_oxKWELit6MwAWd7i__6sQY0-_nKOyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2016/12/5 18:07, Andreas Schwab wrote:
-> On Dez 05 2016, "Zhangjian (Bamvor)" <bamvor.zhangjian@huawei.com> wrote:
+2016-12-05 11:15 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+> On Monday 05 December 2016 03:39 PM, Bartosz Golaszewski wrote:
+>> The aemif clock is added twice to the lookup table in da850.c. This
+>> breaks the children list of pll0_sysclk3 as we're using the same list
+>> links in struct clk. When calling clk_set_rate(), we get stuck in
+>> propagate_rate().
+>>
+>> Create a separate clock for nand, inheriting the rate of the aemif
+>> clock and retrieve it in the davinci_nand module.
+>>
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> ---
+>>  arch/arm/mach-davinci/da850.c | 7 ++++++-
+>>  1 file changed, 6 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+>> index e770c97..c008e5e 100644
+>> --- a/arch/arm/mach-davinci/da850.c
+>> +++ b/arch/arm/mach-davinci/da850.c
+>> @@ -367,6 +367,11 @@ static struct clk aemif_clk = {
+>>       .flags          = ALWAYS_ENABLED,
+>>  };
+>>
+>> +static struct clk aemif_nand_clk = {
+>> +     .name           = "nand",
+>> +     .parent         = &aemif_clk,
+>> +};
+>> +
+>>  static struct clk usb11_clk = {
+>>       .name           = "usb11",
+>>       .parent         = &pll0_sysclk4,
+>> @@ -537,7 +542,7 @@ static struct clk_lookup da850_clks[] = {
+>>       CLK("da830-mmc.0",      NULL,           &mmcsd0_clk),
+>>       CLK("da830-mmc.1",      NULL,           &mmcsd1_clk),
+>>       CLK("ti-aemif",         NULL,           &aemif_clk),
+>> -     CLK(NULL,               "aemif",        &aemif_clk),
+>> +     CLK(NULL,               "aemif",        &aemif_nand_clk),
 >
->> Is there some progresses on it? We could collabrate to fix those issues.
->
-> All the elf/nptl/rt fails should be fixed by the recent binutils fixes.
-Cool. How about the conform and other failures?
+> Why use a NULL device name here? Same question was asked on v2
 
-Regards
+Eek, sorry, I missed that.
 
-Bamvor
->
-> Andreas.
->
+> submission. Also, can you please make sure you are testing this in both
+> DT mode (da850-lcdk) and non-DT boot (da850-evm).
+
+Will do.
+
+Thanks,
+Bartosz
