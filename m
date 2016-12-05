@@ -1,62 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 5 Dec 2016 09:52:55 +0100
-Subject: [PATCH v2 2/3] ARM: dts: sunxi: add support for Orange Pi Zero
- board
-In-Reply-To: <11498641480688550@web2g.yandex.ru>
-References: <20161121162421.800-1-icenowy@aosc.xyz>
- <20161121162421.800-2-icenowy@aosc.xyz>
- <5373671480239408@web31m.yandex.ru>
- <cdfd3c65-d473-badb-ea6a-035f7ab79217@arm.com>
- <20161201093619.gs6lmoxtlptp2jr6@lukather>
- <11498641480688550@web2g.yandex.ru>
-Message-ID: <20161205085255.ij3du3if2ss3q3h5@lukather>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 5 Dec 2016 16:54:13 +0800
+Subject: [PATCH v2] arm64: dts: zx: add pcu_domain node for zx296718
+In-Reply-To: <1480925871-20855-1-git-send-email-baoyou.xie@linaro.org>
+References: <1480925871-20855-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20161205085411.GB2749@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 10:22:30PM +0800, Icenowy Zheng wrote:
+On Mon, Dec 05, 2016 at 04:17:51PM +0800, Baoyou Xie wrote:
+> This patch adds the pcu_domain node, so it can be used
+> by zte-soc's power domain driver.
 > 
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+
+I'm fine with the patch itself, but I need to wait the driver and
+bindings being accepted to apply it.
+
+Shawn
+
+> ---
+>  arch/arm64/boot/dts/zte/zx296718.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> 01.12.2016, 17:36, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> > On Mon, Nov 28, 2016 at 12:29:07AM +0000, Andr? Przywara wrote:
-> >> ?> Something more interesting happened.
-> >> ?>
-> >> ?> Xunlong made a add-on board for Orange Pi Zero, which exposes the
-> >> ?> two USB Controllers exported at expansion bus as USB Type-A
-> >> ?> connectors.
-> >> ?>
-> >> ?> Also it exposes a analog A/V jack and a microphone.
-> >> ?>
-> >> ?> Should I enable {e,o}hci{2.3} in the device tree?
-> >>
-> >> ?Actually we should do this regardless of this extension board. The USB
-> >> ?pins are not multiplexed and are exposed on user accessible pins (just
-> >> ?not soldered, but that's a detail), so I think they qualify for DT
-> >> ?enablement. And even if a user can't use them, it doesn't hurt to have
-> >> ?them (since they are not multiplexed).
-> >
-> > My main concern about this is that we'll leave regulators enabled by
-> > default, for a minority of users. And that minority will prevent to do
-> > a proper power management when the times come since we'll have to keep
-> > that behaviour forever.
+> diff --git a/arch/arm64/boot/dts/zte/zx296718.dtsi b/arch/arm64/boot/dts/zte/zx296718.dtsi
+> index b44d1d1..1aa0587 100644
+> --- a/arch/arm64/boot/dts/zte/zx296718.dtsi
+> +++ b/arch/arm64/boot/dts/zte/zx296718.dtsi
+> @@ -302,6 +302,11 @@
+>  			reg = <0x116000 0x1000>;
+>  		};
+>  
+> +		pcu_domain: pcu at 117000 {
+> +			compatible = "zte,zx296718-pcu";
+> +			reg = <0x00117000 0x1000>;
+> +		};
+> +
+>  		uart0: uart at 11f000 {
+>  			compatible = "arm,pl011", "arm,primecell";
+>  			arm,primecell-periphid = <0x001feffe>;
+> -- 
+> 2.7.4
 > 
-> I think these users can add a 'fdt set /xxx/xxx status "disabled" ' .
-
-You can't ask that from the majority of users. These users will take
-debian or fedora, install it, and expect everything to work
-properly. I would make the opposite argument actually. If someone is
-knowledgeable enough to solder the USB pins a connector, then (s)he'll
-be able to make that u-boot call.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161205/41c61333/attachment.sig>
