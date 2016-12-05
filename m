@@ -1,40 +1,27 @@
-From: sellcey@caviumnetworks.com (Steve Ellcey)
-Date: Mon, 5 Dec 2016 11:33:57 -0800
-Subject: ILP32 for ARM64: testing with glibc testsuite
-In-Reply-To: <mvmeg1mn0yp.fsf@hawking.suse.de>
-References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
- <20161107082359.GA19666@yury-N73SV> <20161109095650.GA22804@yury-N73SV>
- <CC4F99A7-1FD2-486A-BD66-ED06F1B8BF50@linaro.org>
- <1479419136.908.90.camel@caviumnetworks.com>
- <ff3b973b-3887-7ae8-5a27-4d1ad115055f@huawei.com>
- <mvmeg1mn0yp.fsf@hawking.suse.de>
-Message-ID: <1480966437.29811.23.camel@caviumnetworks.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 05 Dec 2016 12:29:39 -0800
+Subject: [PATCH] ARM: dts: imx7d: fix LCDIF clock assignment
+In-Reply-To: <20161205070609.a6t7hzh3m3l2t37s@pengutronix.de>
+References: <20161123004204.10851-1-stefan@agner.ch>
+ <CAOMZO5AqKupmmKb4biGfmy4v3ZwS-BFjPY=MLd8Rc0ZXL+vQvg@mail.gmail.com>
+ <7e4829f484f6c4425fc9d01bea1a094f@agner.ch>
+ <20161205070609.a6t7hzh3m3l2t37s@pengutronix.de>
+Message-ID: <533232ee44a8807c42cbd060fac75273@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-12-05 at 11:07 +0100, Andreas Schwab wrote:
-> On Dez 05 2016, "Zhangjian (Bamvor)" <bamvor.zhangjian@huawei.com>
-> wrote:
+On 2016-12-04 23:06, Uwe Kleine-K?nig wrote:
+> Hello Stefan,
 > 
-> > 
-> > Is there some progresses on it? We could collabrate to fix those
-> > issues.
-> All the elf/nptl/rt fails should be fixed by the recent binutils
-> fixes.
+> On Sun, Dec 04, 2016 at 05:26:58PM -0800, Stefan Agner wrote:
+>> Since this fixes a kernel freeze, is there a chance to get this still in
+>> 4.9?
 > 
-> Andreas.
+> a Fixes:-Line would be nice then.
 
-I am using binutils ToT and Yury's latest patch (https://sourceware.org
-/ml/binutils/2016-12/msg00039.html) and I am still seeing some nptl and
-rt failures in the glibc testsuite, specifically:
+Good point.
 
-FAIL: nptl/tst-cancel26
-FAIL: nptl/tst-cancel27
-FAIL: nptl/tst-stack4
-FAIL: rt/tst-mqueue1
-FAIL: rt/tst-mqueue2
-FAIL: rt/tst-mqueue4
-FAIL: rt/tst-mqueue7
+Fixes: e8ed73f691bd ("ARM: dts: imx7d: add lcdif support")
 
-Steve Ellcey
-sellcey at caviumnetworks.com
+--
+Stefan
