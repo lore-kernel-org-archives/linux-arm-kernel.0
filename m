@@ -1,133 +1,133 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 5 Dec 2016 13:21:24 +0100
-Subject: [PATCH v3 3/7] PWM: add pwm-stm32 DT bindings
-In-Reply-To: <CA+M3ks5j2e-EQEf74YSduboNnCiWC7+e_PD5aAz5XdFA1tGztQ@mail.gmail.com>
-References: <1480673842-20804-1-git-send-email-benjamin.gaignard@st.com>
- <1480673842-20804-4-git-send-email-benjamin.gaignard@st.com>
- <20161205065350.GA18069@ulmo.ba.sec>
- <CA+M3ks4-JQNGYtdiXNj1J701x0njKD0_bf4yN1mLSjEcT2Z=6A@mail.gmail.com>
- <20161205112347.GF19891@ulmo.ba.sec>
- <CA+M3ks5j2e-EQEf74YSduboNnCiWC7+e_PD5aAz5XdFA1tGztQ@mail.gmail.com>
-Message-ID: <20161205122124.GA20856@ulmo.ba.sec>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon,  5 Dec 2016 12:26:19 +0000
+Subject: [PATCH] ACPI/IORT: Make dma masks set-up IORT specific
+Message-ID: <20161205122619.25045-1-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2016 at 01:12:25PM +0100, Benjamin Gaignard wrote:
-> 2016-12-05 12:23 GMT+01:00 Thierry Reding <thierry.reding@gmail.com>:
-> > On Mon, Dec 05, 2016 at 12:08:32PM +0100, Benjamin Gaignard wrote:
-> >> 2016-12-05 7:53 GMT+01:00 Thierry Reding <thierry.reding@gmail.com>:
-> >> > On Fri, Dec 02, 2016 at 11:17:18AM +0100, Benjamin Gaignard wrote:
-> >> >> Define bindings for pwm-stm32
-> >> >>
-> >> >> version 2:
-> >> >> - use parameters instead of compatible of handle the hardware configuration
-> >> >>
-> >> >> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> >> >> ---
-> >> >>  .../devicetree/bindings/pwm/pwm-stm32.txt          | 38 ++++++++++++++++++++++
-> >> >>  1 file changed, 38 insertions(+)
-> >> >>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> >> >>
-> >> >> diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> >> >> new file mode 100644
-> >> >> index 0000000..575b9fb
-> >> >> --- /dev/null
-> >> >> +++ b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> >> >> @@ -0,0 +1,38 @@
-> >> >> +STMicroelectronics PWM driver bindings for STM32
-> >> >
-> >> > Technically this bindings describe devices, so "driver binding" is a
-> >> > somewhat odd wording. Perhaps:
-> >> >
-> >> >         STMicroelectronics STM32 General Purpose Timer PWM bindings
-> >> >
-> >> > ?
-> >>  done
-> >>
-> >> >
-> >> >> +
-> >> >> +Must be a sub-node of STM32 general purpose timer driver
-> >> >> +Parent node properties are describe in ../mfd/stm32-general-purpose-timer.txt
-> >> >
-> >> > Again, "driver parent node" is odd. Perhaps:
-> >> >
-> >> >         Must be a sub-node of an STM32 General Purpose Timer device tree
-> >> >         node. See ../mfd/stm32-general-purpose-timer.txt for details about
-> >> >         the parent node.
-> >> >
-> >> > ?
-> >>
-> >> done
-> >>
-> >> >
-> >> >> +Required parameters:
-> >> >> +- compatible:                Must be "st,stm32-pwm"
-> >> >> +- pinctrl-names:     Set to "default".
-> >> >> +- pinctrl-0:                 List of phandles pointing to pin configuration nodes
-> >> >> +                     for PWM module.
-> >> >> +                     For Pinctrl properties, please refer to [1].
-> >> >
-> >> > Your indentation and capitalization are inconsistent. Also, please refer
-> >> > to the pinctrl bindings by relative path and inline, rather than as a
-> >> > footnote reference.
-> >>
-> >> OK
-> >>
-> >> >
-> >> >> +
-> >> >> +Optional parameters:
-> >> >> +- st,breakinput:     Set if the hardware have break input capabilities
-> >> >> +- st,breakinput-polarity: Set break input polarity. Default is 0
-> >> >> +                      The value define the active polarity:
-> >> >> +                       - 0 (active LOW)
-> >> >> +                       - 1 (active HIGH)
-> >> >
-> >> > Could we fold these into a single property? If st,breakinput-polarity is
-> >> > not present it could simply mean that there is no break input, and if it
-> >> > is present you don't have to rely on a default.
-> >>
-> >> I need to know if I have to activate breakinput feature and on which level
-> >> I will rewrite it like that:
-> >> Optional parameters:
-> >> - st,breakinput-polarity-high: Set if break input polarity is active
-> >> on high level.
-> >> - st,breakinput-polarity-high: Set if break input polarity is active
-> >> on low level.
-> >
-> > How is that different from a single property:
-> >
-> >         Optional properties:
-> >         - st,breakinput-polarity: If present, a break input is available
-> >             for the channel. In that case the property value denotes the
-> >             polarity of the break input:
-> >             - 0: active low
-> >             - 1: active high
-> >
-> > ?
-> 
-> For break input feature I need two information: do I have to active it
-> and if activated
-> on which level.
-> I have two solutions:
-> - one parameter with a value (0 or 1) -> st,breakinput-polarity
-> - two parameters without value -> st,breakinput-active-high and
-> st,breakinput-active-low
-> 
-> By default break input feature is disabled
+The introduction of acpi_dma_configure() allows to configure DMA
+and related IOMMU for any device that is DMA capable. To achieve
+that goal it ensures DMA masks are set-up to sane default values
+before proceeding with IOMMU and DMA ops configuration.
 
-Right, what I was suggesting is that you use the first solution because
-it's the typical way to use for tristate options. It's also much easier
-to test for in practice because for the second solution you have to
-parse two properties before you know whether it is active or not.
+On x86/ia64 systems, through acpi_bind_one(), acpi_dma_configure() is
+called for every device that has an ACPI companion, in that every device
+is considered DMA capable on x86/ia64 systems (ie acpi_get_dma_attr() API),
+which has the side effect of initializing dma masks also for
+pseudo-devices (eg CPUs and memory nodes) and potentially for devices
+whose dma masks were not set-up before the acpi_dma_configure() API was
+introduced, which may have noxious side effects.
 
-The second is typically the solution for required properties where only
-one of the properties is used to override the default.
+Therefore, in preparation for IORT firmware specific DMA masks set-up,
+wrap the default DMA masks set-up in acpi_dma_configure() inside an IORT
+specific wrapper that reverts to a NOP on x86/ia64 systems, restoring the
+default expected behaviour on x86/ia64 systems and keeping DMA default
+masks set-up on IORT based (ie ARM) arch configurations.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161205/e3aed0cd/attachment-0001.sig>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Tomasz Nowicki <tn@semihalf.com>
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Sricharan R <sricharan@codeaurora.org>
+---
+Joerg,
+
+pending Rafael's ACK on it, given the 4.10 release timing and that the
+series is queued via the IOMMU tree please consider applying this patch to
+your arm/smmu branch for 4.10, it is not fixing a bug but it is modifying
+the x86/ia64 code path; I prefer preventing any issue related to default
+dma masks on x86/ia64 so I hope it can get merged along with the rest of
+the ACPI IORT SMMU series.
+
+Thanks a lot and apologies,
+Lorenzo
+
+ drivers/acpi/arm64/iort.c | 22 ++++++++++++++++++++++
+ drivers/acpi/scan.c       | 14 +-------------
+ include/linux/acpi_iort.h |  2 ++
+ 3 files changed, 25 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 47bace8..e0d2e6e 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -547,6 +547,28 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
+ }
+ 
+ /**
++ * iort_set_dma_mask - Set-up dma mask for a device.
++ *
++ * @dev: device to configure
++ */
++void iort_set_dma_mask(struct device *dev)
++{
++	/*
++	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
++	 * setup the correct supported mask.
++	 */
++	if (!dev->coherent_dma_mask)
++		dev->coherent_dma_mask = DMA_BIT_MASK(32);
++
++	/*
++	 * Set it to coherent_dma_mask by default if the architecture
++	 * code has not set it.
++	 */
++	if (!dev->dma_mask)
++		dev->dma_mask = &dev->coherent_dma_mask;
++}
++
++/**
+  * iort_iommu_configure - Set-up IOMMU configuration for a device.
+  *
+  * @dev: device to configure
+diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+index 80698d3..93b00cf 100644
+--- a/drivers/acpi/scan.c
++++ b/drivers/acpi/scan.c
+@@ -1380,19 +1380,7 @@ void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
+ {
+ 	const struct iommu_ops *iommu;
+ 
+-	/*
+-	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
+-	 * setup the correct supported mask.
+-	 */
+-	if (!dev->coherent_dma_mask)
+-		dev->coherent_dma_mask = DMA_BIT_MASK(32);
+-
+-	/*
+-	 * Set it to coherent_dma_mask by default if the architecture
+-	 * code has not set it.
+-	 */
+-	if (!dev->dma_mask)
+-		dev->dma_mask = &dev->coherent_dma_mask;
++	iort_set_dma_mask(dev);
+ 
+ 	iommu = iort_iommu_configure(dev);
+ 
+diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
+index dcb2b60..77e0809 100644
+--- a/include/linux/acpi_iort.h
++++ b/include/linux/acpi_iort.h
+@@ -35,6 +35,7 @@ bool iort_node_match(u8 type);
+ u32 iort_msi_map_rid(struct device *dev, u32 req_id);
+ struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
+ /* IOMMU interface */
++void iort_set_dma_mask(struct device *dev);
+ const struct iommu_ops *iort_iommu_configure(struct device *dev);
+ #else
+ static inline void acpi_iort_init(void) { }
+@@ -45,6 +46,7 @@ static inline struct irq_domain *iort_get_device_domain(struct device *dev,
+ 							u32 req_id)
+ { return NULL; }
+ /* IOMMU interface */
++static inline void iort_set_dma_mask(struct device *dev) { }
+ static inline
+ const struct iommu_ops *iort_iommu_configure(struct device *dev)
+ { return NULL; }
+-- 
+2.10.0
