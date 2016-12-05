@@ -1,55 +1,69 @@
-From: manu@bidouilliste.com (Emmanuel Vadot)
-Date: Mon, 5 Dec 2016 10:39:06 +0100
-Subject: [PATCH] ARM: dts: sunxi: Add num-cs for A20 spi nodes
-In-Reply-To: <20161205092821.m2fmqxnzalcignly@lukather>
-References: <20161122170616.29557-1-manu@bidouilliste.com>
- <20161124195517.qrq7briu3pwjnp4n@lukather>
- <20161124210509.be743aae84c26c6c2e666c6e@bidouilliste.com>
- <20161125152047.oadxi2xbgm4kdd7q@lukather>
- <20161125220752.c989c85e01ed202be0485c78@bidouilliste.com>
- <20161201092150.rlo5skxd6elovlgq@lukather>
- <20161201112414.62f9b351186115f62c8998a9@bidouilliste.com>
- <20161205092821.m2fmqxnzalcignly@lukather>
-Message-ID: <20161205103906.3f7ffc1c86a49825a9a1cbb1@bidouilliste.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 5 Dec 2016 10:40:23 +0100
+Subject: [PATCH v2 2/3] ARM: dts: sunxi: add support for Orange Pi Zero
+ board
+In-Reply-To: <20161205120021.0GBGtAl4@smtp3m.mail.yandex.net>
+References: <20161205120021.0GBGtAl4@smtp3m.mail.yandex.net>
+Message-ID: <20161205094023.mtymfvpmca4x3ohh@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 5 Dec 2016 10:28:21 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-
-> On Thu, Dec 01, 2016 at 11:24:14AM +0100, Emmanuel Vadot wrote:
-> > > > > >  If num-cs isn't present nothing prevent to start a transfer
-> > > > > > with a non-valid CS pin, resulting in an error.  num-cs are
-> > > > > > default property especially made for this and a SPI driver
-> > > > > > should try to get the property at probe/attach time.
-> > > > > 
-> > > > > Yes, but as far as I know, our driver doesn't. I'm all in for
-> > > > > having support for that in our driver, but without it, that
-> > > > > patch is kind of useless.
-> > > > 
-> > > >  Yes the Linux driver doesn't use it but my upcoming one for FreeBSD
-> > > > uses it. So it is not useless for downstream user of DTS.
+On Mon, Dec 05, 2016 at 04:59:44PM +0800, Icenowy Zheng wrote:
+> 
+> 2016?12?5? 16:52? Maxime Ripard <maxime.ripard@free-electrons.com>???
+> >
+> > On Fri, Dec 02, 2016 at 10:22:30PM +0800, Icenowy Zheng wrote: 
 > > > 
-> > > Ah, I didn't know this was for FreeBSD. So you started to use our DTs,
-> > > or do you have some modifications to it? How does that work?
-> > 
-> > Yes we use the DTS from linux from quite some times now. We're
-> > currently synced with 4.7-ish.  We either use them directly or
-> > modify them according to our needs and driver support.
+> > > 
+> > > 01.12.2016, 17:36, "Maxime Ripard" <maxime.ripard@free-electrons.com>: 
+> > > > On Mon, Nov 28, 2016 at 12:29:07AM +0000, Andr? Przywara wrote: 
+> > > >> ?> Something more interesting happened. 
+> > > >> ?> 
+> > > >> ?> Xunlong made a add-on board for Orange Pi Zero, which exposes the 
+> > > >> ?> two USB Controllers exported at expansion bus as USB Type-A 
+> > > >> ?> connectors. 
+> > > >> ?> 
+> > > >> ?> Also it exposes a analog A/V jack and a microphone. 
+> > > >> ?> 
+> > > >> ?> Should I enable {e,o}hci{2.3} in the device tree? 
+> > > >> 
+> > > >> ?Actually we should do this regardless of this extension board. The USB 
+> > > >> ?pins are not multiplexed and are exposed on user accessible pins (just 
+> > > >> ?not soldered, but that's a detail), so I think they qualify for DT 
+> > > >> ?enablement. And even if a user can't use them, it doesn't hurt to have 
+> > > >> ?them (since they are not multiplexed). 
+> > > > 
+> > > > My main concern about this is that we'll leave regulators enabled by 
+> > > > default, for a minority of users. And that minority will prevent to do 
+> > > > a proper power management when the times come since we'll have to keep 
+> > > > that behaviour forever. 
+> > > 
+> > > I think these users can add a 'fdt set /xxx/xxx status "disabled" ' . 
+> >
+> > You can't ask that from the majority of users. These users will take 
+> > debian or fedora, install it, and expect everything to work 
+> > properly. I would make the opposite argument actually. If someone is 
+> > knowledgeable enough to solder the USB pins a connector, then (s)he'll 
+> > be able to make that u-boot call. 
 > 
-> Do you have a link to those modifications?
+> Now (s)he do not need soldering.
 > 
-> Thanks,
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+> (S)he needs only paying $1.99 more to Xunlong to get the expansion
+> board, and insert it on the OPi Zero.
 
- Sure,
+Which is going to require an overlay anyway, so we could have the USB
+bits in there too.
 
- https://svnweb.freebsd.org/base/head/sys/boot/fdt/dts/arm/
+Maxime
 
 -- 
-Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161205/194dd5d6/attachment.sig>
