@@ -1,143 +1,73 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 5 Dec 2016 14:49:50 +0200
-Subject: [PATCH v3 1/2] ARM: dts: da850-lcdk: add the dumb-vga-dac node
-In-Reply-To: <1480420624-23544-2-git-send-email-bgolaszewski@baylibre.com>
-References: <1480420624-23544-1-git-send-email-bgolaszewski@baylibre.com>
- <1480420624-23544-2-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <a2159347-1cd7-18b1-626a-fe6a272ba85c@ti.com>
+From: yt.shen@mediatek.com (YT Shen)
+Date: Mon, 5 Dec 2016 20:50:41 +0800
+Subject: [PATCH v10 02/13] drm/mediatek: add *driver_data for different
+ hardware settings
+In-Reply-To: <CAGS+omDmMq7AEnyDzo4Oih_f+g4DE1Jz6xiV=+_3JGtSAfd+-Q@mail.gmail.com>
+References: <1480070076-6196-1-git-send-email-yt.shen@mediatek.com>
+ <1480070076-6196-3-git-send-email-yt.shen@mediatek.com>
+ <CAGS+omDmMq7AEnyDzo4Oih_f+g4DE1Jz6xiV=+_3JGtSAfd+-Q@mail.gmail.com>
+Message-ID: <1480942241.18661.10.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/11/16 13:57, Bartosz Golaszewski wrote:
-> Add the dumb-vga-dac node to the board DT together with corresponding
-> ports and vga connector. This allows to retrieve the edid info from
-> the display automatically.
+Hi Daniel,
+
+On Wed, 2016-11-30 at 14:42 +0800, Daniel Kurtz wrote:
+> Hi YT,
 > 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  arch/arm/boot/dts/da850-lcdk.dts | 58 ++++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/da850.dtsi     | 17 ++++++++++++
->  2 files changed, 75 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-> index 711b9ad..d864f11 100644
-> --- a/arch/arm/boot/dts/da850-lcdk.dts
-> +++ b/arch/arm/boot/dts/da850-lcdk.dts
-> @@ -50,6 +50,53 @@
->  			system-clock-frequency = <24576000>;
->  		};
->  	};
-> +
-> +	vga_bridge {
-> +		compatible = "dumb-vga-dac";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&lcd_pins>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			port at 0 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				reg = <0>;
-> +
-> +				vga_bridge_in: endpoint at 0 {
-> +					reg = <0>;
-> +					remote-endpoint = <&display_out_vga>;
-> +				};
-> +			};
-> +
-> +			port at 1 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				reg = <1>;
-> +
-> +				vga_bridge_out: endpoint at 0 {
-> +					reg = <0>;
-> +					remote-endpoint = <&vga_con_in>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +
-> +	vga {
-> +		compatible = "vga-connector";
-> +
-> +		ddc-i2c-bus = <&i2c0>;
-> +
-> +		port {
-> +			vga_con_in: endpoint {
-> +				remote-endpoint = <&vga_bridge_out>;
-> +			};
-> +		};
-> +	};
->  };
->  
->  &pmx_core {
-> @@ -235,3 +282,14 @@
->  &memctrl {
->  	status = "okay";
->  };
-> +
-> +&display {
-> +	status = "okay";
-> +};
-> +
-> +&display_out {
-> +	display_out_vga: endpoint at 0 {
-> +		reg = <0>;
-> +		remote-endpoint = <&vga_bridge_in>;
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> index 4070619..5f4ba2e 100644
-> --- a/arch/arm/boot/dts/da850.dtsi
-> +++ b/arch/arm/boot/dts/da850.dtsi
-> @@ -454,6 +454,23 @@
->  			reg = <0x213000 0x1000>;
->  			interrupts = <52>;
->  			status = "disabled";
-> +
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				display_in: port at 0 {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					reg = <0>;
-> +				};
-> +
-> +				display_out: port at 1 {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					reg = <1>;
-> +				};
-> +			};
->  		};
+> On Fri, Nov 25, 2016 at 6:34 PM, YT Shen <yt.shen@mediatek.com> wrote:
+> >
+> > There are some hardware settings changed, between MT8173 & MT2701:
+> > DISP_OVL address offset changed, color format definition changed.
+> > DISP_RDMA fifo size changed.
+> > DISP_COLOR offset changed.
+> > MIPI_TX pll setting changed.
+> > And add prefix for mtk_ddp_main & mtk_ddp_ext & mutex_mod.
+> 
+> Sorry, I have not had time to thoroughly review the new patch set, but
+> one quick comment:
+> 
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> > index 22a33ee..cfaa760 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> > @@ -78,6 +78,10 @@ struct mtk_ddp_comp_funcs {
+> >                           struct drm_crtc_state *state);
+> >  };
+> >
+> > +struct mtk_ddp_comp_driver_data {
+> > +       unsigned int color_offset;
+> > +};
+> > +
+> >  struct mtk_ddp_comp {
+> >         struct clk *clk;
+> >         void __iomem *regs;
+> > @@ -85,6 +89,7 @@ struct mtk_ddp_comp {
+> >         struct device *larb_dev;
+> >         enum mtk_ddp_comp_id id;
+> >         const struct mtk_ddp_comp_funcs *funcs;
+> > +       const struct mtk_ddp_comp_driver_data *data;
+> 
+> I want to avoid adding this generic pointer here to all mtk_ddp_comp,
+> since this is only used by the color component.
+> Instead, define color specific types:
+> 
+> struct mtk_disp_color_data {
+>        unsigned int offset;
+> };
+> 
+> struct mtk_disp_color {
+>        struct mtk_ddp_comp             ddp_comp;
+>        const struct mtk_disp_color_data *data;
+> };
+> 
+> Then, add another comp_type check and fetch the dev data in
+> mtk_drm_probe()  or maybe mtk_ddp_comp_init().
+> 
+> -Dan
+OK, we will remove the color data pointer from generic mtk_ddp_comp.
+Thanks.
 
-It's a bit difficult to follow this as there's been so many patches
-going around. But I take the above is the LCDC node in the base da850
-dtsi file? In that case, what is the display_in supposed to present?
-It's the first node in the "display chain", so it has no input.
-
-Also, don't touch da850.dtsi here, just add the "ports" node in the
-da850-lcdk.dts file.
-
-If the da850.dtsi has not been merged yet, I'd change the name of the
-lcdc node to something else than "display". It's rather vague. If it's
-named "lcdc", reading da850-lcdk.dts becomes much easier, as you'll
-refer to "lcdc".
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161205/8a7836a6/attachment.sig>
+Regards,
+yt.shen
