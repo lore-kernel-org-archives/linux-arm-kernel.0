@@ -1,8 +1,8 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 5 Dec 2016 15:21:41 -0600
+From: dhdang@apm.com (Duc Dang)
+Date: Mon, 5 Dec 2016 13:40:24 -0800
 Subject: [PATCH v3] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe
  controller
-In-Reply-To: <62dd5462-4d68-b89f-2b45-0d58bbd96bcd@redhat.com>
+In-Reply-To: <20161205212012.GA22455@bhelgaas-glaptop.roam.corp.google.com>
 References: <1480549373-2123-1-git-send-email-dhdang@apm.com>
  <20161201183350.GF30746@bhelgaas-glaptop.roam.corp.google.com>
  <1480620053.4751.30.camel@redhat.com>
@@ -12,64 +12,125 @@ References: <1480549373-2123-1-git-send-email-dhdang@apm.com>
  <CADaLND=Ss8d-jv7wffbrtytrjj=SUnjDn9bognKUszhKguRV1A@mail.gmail.com>
  <d77e403c-81e9-114e-6ec6-bbffaa4ac36f@redhat.com>
  <20161202233943.GF9903@bhelgaas-glaptop.roam.corp.google.com>
- <62dd5462-4d68-b89f-2b45-0d58bbd96bcd@redhat.com>
-Message-ID: <20161205212140.GA18259@bhelgaas-glaptop.roam.corp.google.com>
+ <CADaLNDk-cMW8k+bXqH3+yYCye_kHf6RXUYQ=eCCZ4FF2ZTjgkQ@mail.gmail.com>
+ <20161205212012.GA22455@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <CADaLND=4T82W8tGpZ2y4SaoG+Rr4uGkMbcDoD2LSAkBYihVpqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 07:33:46PM -0500, Jon Masters wrote:
-> On 12/02/2016 06:39 PM, Bjorn Helgaas wrote:
-> > On Thu, Dec 01, 2016 at 11:08:23PM -0500, Jon Masters wrote:
-> 
-> >> Let's see if I summarized this correctly...
-> >>
-> >> 1. The MMIO registers for the host bridge itself need to be described
-> >>    somewhere, especially if we need to find those in a quirk and poke
-> >>    them. Since those registers are very much part of the bridge device,
-> >>    it makes sense for them to be in the _CRS for PNP0A08/PNP0A03.
-> >>
-> >> 2. The address space covering these registers MUST be described as a
-> >>    ResourceConsumer in order to avoid accidentally exposing them as
-> >>    available for use by downstream devices on the PCI bus.
-> >>
-> >> 3. The ACPI specification allows for resources of the type "Memory32Fixed".
-> >>    This is a macro that doesn't have the notion of a producer or consumer.
-> >>    HOWEVER various interpretations seem to be that this could/should
-> >>    default to being interpreted as a consumed region.
-> > 
-> > I agree; I think that per spec, Memory24, Memory32, Memory32Fixed, IO,
-> > and FixedIO should all be for consumed resources, not for bridge
-> > windows, since they don't have the notion of producer.
-> 
-> Ok. If we ultimately codify this somewhere as the general Linux kernel
-> consensus (Rafael?) then we can also go and get the various ARM server
-> specs updated to reflect this in (for e.g.) reference firmware builds.
-> 
-> > I'm pretty sure there's x86 firmware in the field that uses these for
-> > windows, so I think we have to accept that usage, at least on x86.
-> 
-> Ok. I was pondering how to even go about finding that out, but even if
-> I scheduled a job across RH's infra to look, that would be a drop in
-> the bucket of possible machines that might be out there doing this.
+On Mon, Dec 5, 2016 at 1:20 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> On Fri, Dec 02, 2016 at 11:06:30PM -0800, Duc Dang wrote:
+>> On Fri, Dec 2, 2016 at 3:39 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+>
+>> > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+>> > index 8a177a1..a16fc8e 100644
+>> > --- a/arch/arm64/kernel/pci.c
+>> > +++ b/arch/arm64/kernel/pci.c
+>> > @@ -114,6 +114,19 @@ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+>> >         return 0;
+>> >  }
+>> >
+>> > +static int pci_acpi_root_prepare_resources(struct acpi_pci_root_info *ci)
+>> > +{
+>> > +       struct resource_entry *entry, *tmp;
+>> > +       int status;
+>> > +
+>> > +       status = acpi_pci_probe_root_resources(ci);
+>> > +       resource_list_for_each_entry_safe(entry, tmp, &ci->resources) {
+>> > +               if (!(entry->res->flags & IORESOURCE_WINDOW))
+>> > +                       resource_list_destroy_entry(entry);
+>> > +       }
+>> > +       return status;
+>> > +}
+>> > +
+>> >  /*
+>> >   * Lookup the bus range for the domain in MCFG, and set up config space
+>> >   * mapping.
+>> > @@ -190,6 +203,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>> >         }
+>> >
+>> >         root_ops->release_info = pci_acpi_generic_release_info;
+>> > +       root_ops->prepare_resources = pci_acpi_root_prepare_resources;
+>> >         root_ops->pci_ops = &ri->cfg->ops->pci_ops;
+>> >         bus = acpi_pci_root_create(root, root_ops, &ri->common, ri->cfg);
+>> >         if (!bus)
+>>
+>> I tried your patch above with my X-Gene ECAM v4 patch on Mustang, here
+>> is the kernel boot log and output of 'cat /proc/iomem'. The PCIe core
+>> does not print the MMIO space as a window (which is expected per your
+>> patch above).
+>
+> Thanks!
+>
+>> ACPI: PCI Root Bridge [PCI0] (domain 0000 [bus 00-ff])
+>> acpi PNP0A08:00: _OSC: OS supports [ExtendedConfig ASPM ClockPM Segments MSI]
+>> acpi PNP0A08:00: _OSC: OS now controls [PCIeHotplug PME AER PCIeCapability]
+>> acpi PNP0A08:00: MCFG quirk: ECAM at [mem 0xe0d0000000-0xe0dfffffff] for [bus 00-ff] with xgene_v1_pcie_ecam_ops
+>> acpi PNP0A08:00: [Firmware Bug]: ECAM area [mem 0xe0d0000000-0xe0dfffffff] not reserved in ACPI namespace
+>> acpi PNP0A08:00: ECAM at [mem 0xe0d0000000-0xe0dfffffff] for [bus 00-ff]
+>> Remapped I/O 0x000000e010000000 to [io  0x0000-0xffff window]
+>> PCI host bridge to bus 0000:00
+>> pci_bus 0000:00: root bus resource [io  0x0000-0xffff window] (bus address [0x10000000-0x1000ffff])
+>> pci_bus 0000:00: root bus resource [mem 0xe040000000-0xe07fffffff window] (bus address [0x40000000-0x7fffffff])
+>> pci_bus 0000:00: root bus resource [mem 0xf000000000-0xffffffffff window]
+>> pci_bus 0000:00: root bus resource [bus 00-ff]
+>
+> Yup, no bridge register space here; that's good.  I assume the bridge
+> registers are at [mem 0x1f2b0000-0x1f2bffff] as shown in /proc/iomem
+> below.
 
-Hmmm, when researching this, I thought I came across a change
-specifically for a machine that used Memory32Fixed this way, but I
-can't find it now.
+Yes,  the bridge registers are at [mem 0x1f2b0000-0x1f2bffff].
 
-The only thing I did find was some old experiments with Windows that
-showed it interpreting a Memory32Fixed region as a window and putting
-PCI devices in it: https://bugzilla.kernel.org/show_bug.cgi?id=15817
-But that was a synthetic example with qemu, not a real machine in the
-field.
+>
+>> [root@(none) ~]# cat /proc/io mem
+>> ...
+>> 19000000-19007fff : 808622B7:00
+>> 1900c100-190fffff : 808622B7:00
+>>   1900c100-190fffff : 808622B7:00
+>> 19800000-19807fff : 808622B7:01
+>> 1980c100-198fffff : 808622B7:01
+>>   1980c100-198fffff : 808622B7:01
+>> ...
+>> 1f280000-1f28ffff : 808622B7:00
+>> 1f290000-1f29ffff : 808622B7:01
+>
+> I'm curious what these "808622B7" devices are.  Per ACPI 6.0, sec
+> 6.1.5, that looks like a PCI vendor ID, which I guess is a valid ACPI
+> ID.  But these resources don't seem to have any connection with PCI
+> (they're not in any of the host bridge apertures).
 
-> > Even without this patch, I don't think it's a show-stopper to have
-> > Linux mistakenly thinking this region is routed to PCI, because the
-> > driver does reserve it and the PCI core will never try to use it.
-> 
-> Ok. So are you happy with pulling in Duc's v4 patch and retaining
-> status quo on the bridge resources for 4.10?
+These are DesignWare USB 3.0 controllers (DWC3). The ACPI ID is
+defined in drivers/usb/dwc3/core.c.
+>
+>> 1f2b0000-1f2bffff : PNP0A08:00
+>
+> Looks like the bridge register space; good.
 
-Yes, I think it looks good.  I'll finish packaging things up and
-repost the current series.
+Yes, it is.
 
-Bjorn
+>
+>> e040000000-e07fffffff : PCI Bus 0000:00
+>>   e040000000-e0401fffff : PCI Bus 0000:01
+>>     e040000000-e0400fffff : 0000:01:00.0
+>>       e040000000-e0400fffff : mlx4_core
+>>     e040100000-e0401fffff : 0000:01:00.0
+>
+>> e0d0000000-e0dfffffff : PCI ECAM
+>
+> This region should be described in either a PNP0C02 device or (if we
+> decide we can allow "consumer" descriptors) the PNP0A08 device.  I
+> assume you'll fix that in a future firmware release.
+
+Yes, future firmware will have PNP0C02 node that describes this ECAM
+space (or a new resource in PNP0A08 if we use 'consumer' descriptor).
+
+>
+> But I think this reservation from pci_ecam_create() is good enough for
+> now.
+>
+>> f000000000-ffffffffff : PCI Bus 0000:00
+>>   f000000000-f001ffffff : PCI Bus 0000:01
+>>     f000000000-f001ffffff : 0000:01:00.0
+>>       f000000000-f001ffffff : mlx4_core
+Regards,
+Duc Dang.
