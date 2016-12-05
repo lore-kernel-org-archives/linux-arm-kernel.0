@@ -1,63 +1,34 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 5 Dec 2016 14:15:39 +0530
-Subject: [PATCH v2 3/3] ARM: da850: fix da850_set_pll0rate()
-In-Reply-To: <1480693134-31324-4-git-send-email-bgolaszewski@baylibre.com>
-References: <1480693134-31324-1-git-send-email-bgolaszewski@baylibre.com>
- <1480693134-31324-4-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <130825f1-5c8f-f6bc-1f27-929ff591a9c3@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 5 Dec 2016 09:50:50 +0100
+Subject: [PATCH 2/2] arm: dts: sun8i: reuse the uart1 node of iNet D978
+ rev2 board
+In-Reply-To: <20161202151913.38892-2-icenowy@aosc.xyz>
+References: <20161202151913.38892-1-icenowy@aosc.xyz>
+ <20161202151913.38892-2-icenowy@aosc.xyz>
+Message-ID: <20161205085050.afgwdtbcxmpjaiwo@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 December 2016 09:08 PM, Bartosz Golaszewski wrote:
-> This function is broken - its second argument is an index to the freq
-> table, not the requested clock rate in Hz. It leads to an oops when
-> called from clk_set_rate() since this argument isn't bounds checked
-> either.
+On Fri, Dec 02, 2016 at 11:19:13PM +0800, Icenowy Zheng wrote:
+> As a uart1 node is added into sun8i-reference-design-tablet.dtsi, simply
+> use it in iNet D978 rev2 device tree.
 > 
-> Fix it by iterating over the array of supported frequencies and
-> selecting a one that matches or returning -EINVAL for unsupported
-> rates.
-> 
-> Also: update the davinci cpufreq driver. It's the only user of this
-> clock and currently it passes the cpufreq table index to
-> clk_set_rate(), which is confusing. Make it pass the requested clock
-> rate in Hz.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  arch/arm/mach-davinci/da850.c     | 22 ++++++++++++++++++----
->  drivers/cpufreq/davinci-cpufreq.c |  2 +-
->  2 files changed, 19 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-> index a55101c..92e3303 100644
-> --- a/arch/arm/mach-davinci/da850.c
-> +++ b/arch/arm/mach-davinci/da850.c
-> @@ -1179,14 +1179,28 @@ static int da850_set_armrate(struct clk *clk, unsigned long index)
->  	return clk_set_rate(pllclk, index);
->  }
->  
-> -static int da850_set_pll0rate(struct clk *clk, unsigned long index)
-> +static int da850_set_pll0rate(struct clk *clk, unsigned long rate)
->  {
-> -	unsigned int prediv, mult, postdiv;
-> -	struct da850_opp *opp;
->  	struct pll_data *pll = clk->pll_data;
-> +	struct cpufreq_frequency_table *freq;
-> +	unsigned int prediv, mult, postdiv;
-> +	struct da850_opp *opp = NULL;
->  	int ret;
->  
-> -	opp = (struct da850_opp *) cpufreq_info.freq_table[index].driver_data;
-> +	for (freq = da850_freq_table;
-> +	     freq->frequency != CPUFREQ_TABLE_END; freq++) {
-> +		/* requested_rate is in Hz, freq->frequency is in KHz */
-> +		unsigned long freq_rate = freq->frequency * 1000;
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-A small optimization here. Instead of multiplying potentially every
-frequency in the table by 1000, you could divide the incoming rate down
-to KHz. This will also avoid the need for 'freq_rate'. Should have
-noticed this earlier. Sorry about that.
+I'd like to see more consolidation before that change is needed. If we
+find more boards using that, it will make sense, but for a single
+board it's not worth it.
 
-Thanks,
-Sekhar
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161205/4aa6d997/attachment.sig>
