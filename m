@@ -1,10 +1,10 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Mon,  5 Dec 2016 03:42:37 +0200
-Subject: [PATCH 1/3] dt: pwm: lpc32xx: add description of clocks and
- #pwm-cells properties
+Date: Mon,  5 Dec 2016 03:43:07 +0200
+Subject: [PATCH 2/3] pwm: lpc32xx: switch driver to one phandle argument for
+ PWM consumers
 In-Reply-To: <20161205014237.1689-1-vz@mleia.com>
 References: <20161205014237.1689-1-vz@mleia.com>
-Message-ID: <20161205014237.1689-2-vz@mleia.com>
+Message-ID: <20161205014308.1741-1-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,41 +12,48 @@ NXP LPC32xx SoCs have two simple independent PWM controllers with a single
 output each, in this case there is no need to specify PWM channel argument
 on client side, one cell for setting PWM output frequency is sufficient.
 
-Another added to the description property 'clocks' has a standard meaning
-of a controller supply clock, in the LPC32xx User's Manual the clock is
-denoted as PWM1_CLK or PWM2_CLK clock.
+The change adds private of_xlate() handling of a single cell value given
+with a PWM phandle on client side, the handling is taken from the PXA PWM
+driver.
 
 Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
- Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/pwm/pwm-lpc32xx.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
-index 74b5bc5..523d796 100644
---- a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
-+++ b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
-@@ -3,15 +3,22 @@ LPC32XX PWM controller
- Required properties:
- - compatible: should be "nxp,lpc3220-pwm"
- - reg: physical base address and length of the controller's registers
-+- clocks: clock phandle and clock specifier pair
-+- #pwm-cells: should be 1, the cell is used to specify the period in
-+  nanoseconds.
+diff --git a/drivers/pwm/pwm-lpc32xx.c b/drivers/pwm/pwm-lpc32xx.c
+index a9b3cff..ce84181 100644
+--- a/drivers/pwm/pwm-lpc32xx.c
++++ b/drivers/pwm/pwm-lpc32xx.c
+@@ -92,6 +92,20 @@ static void lpc32xx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	clk_disable_unprepare(lpc32xx->clk);
+ }
  
- Examples:
++static struct pwm_device *lpc32xx_pwm_of_xlate(struct pwm_chip *pc,
++				       const struct of_phandle_args *args)
++{
++	struct pwm_device *pwm;
++
++	pwm = pwm_request_from_chip(pc, 0, NULL);
++	if (IS_ERR(pwm))
++		return pwm;
++
++	pwm->args.period = args->args[0];
++
++	return pwm;
++}
++
+ static const struct pwm_ops lpc32xx_pwm_ops = {
+ 	.config = lpc32xx_pwm_config,
+ 	.enable = lpc32xx_pwm_enable,
+@@ -123,6 +137,8 @@ static int lpc32xx_pwm_probe(struct platform_device *pdev)
+ 	lpc32xx->chip.ops = &lpc32xx_pwm_ops;
+ 	lpc32xx->chip.npwm = 1;
+ 	lpc32xx->chip.base = -1;
++	lpc32xx->chip.of_xlate = lpc32xx_pwm_of_xlate;
++	lpc32xx->chip.of_pwm_n_cells = 1;
  
- pwm at 4005c000 {
- 	compatible = "nxp,lpc3220-pwm";
- 	reg = <0x4005c000 0x4>;
-+	clocks = <&clk LPC32XX_CLK_PWM1>;
-+	#pwm-cells = <1>;
- };
- 
- pwm at 4005c004 {
- 	compatible = "nxp,lpc3220-pwm";
- 	reg = <0x4005c004 0x4>;
-+	clocks = <&clk LPC32XX_CLK_PWM2>;
-+	#pwm-cells = <1>;
- };
+ 	ret = pwmchip_add(&lpc32xx->chip);
+ 	if (ret < 0) {
 -- 
 2.10.2
