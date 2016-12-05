@@ -1,101 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 5 Dec 2016 10:58:01 +0000
-Subject: [PATCH 2/2] arm64: alternatives: Work around NOP generation with
- broken assembler
-In-Reply-To: <20161205100545.GA14058@arm.com>
-References: <20161203140538.23525-1-marc.zyngier@arm.com>
- <20161203140538.23525-3-marc.zyngier@arm.com>
- <20161205100545.GA14058@arm.com>
-Message-ID: <c7de1968-7d50-a435-56ea-a7f3e9cb52da@arm.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Mon, 05 Dec 2016 19:01:46 +0800
+Subject: [PATCH v2 2/3] ARM: dts: sunxi: add support for Orange Pi Zero
+ board
+In-Reply-To: <20161205094023.mtymfvpmca4x3ohh@lukather>
+References: <20161205120021.0GBGtAl4@smtp3m.mail.yandex.net>
+ <20161205094023.mtymfvpmca4x3ohh@lukather>
+Message-ID: <17819681480935706@web24g.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/16 10:05, Will Deacon wrote:
-> On Sat, Dec 03, 2016 at 02:05:38PM +0000, Marc Zyngier wrote:
->> When compiling a .inst directive in an alternative clause with
->> a rather old version of gas (circa 2.24), and when used with
->> the alternative_else_nop_endif feature, the compilation fails
->> with a rather cryptic message such as:
+
+
+05.12.2016, 17:40, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> On Mon, Dec 05, 2016 at 04:59:44PM +0800, Icenowy Zheng wrote:
+>> ?2016?12?5? 16:52? Maxime Ripard <maxime.ripard@free-electrons.com>???
+>> ?>
+>> ?> On Fri, Dec 02, 2016 at 10:22:30PM +0800, Icenowy Zheng wrote:
+>> ?> >
+>> ?> >
+>> ?> > 01.12.2016, 17:36, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>> ?> > > On Mon, Nov 28, 2016 at 12:29:07AM +0000, Andr? Przywara wrote:
+>> ?> > >> ?> Something more interesting happened.
+>> ?> > >> ?>
+>> ?> > >> ?> Xunlong made a add-on board for Orange Pi Zero, which exposes the
+>> ?> > >> ?> two USB Controllers exported at expansion bus as USB Type-A
+>> ?> > >> ?> connectors.
+>> ?> > >> ?>
+>> ?> > >> ?> Also it exposes a analog A/V jack and a microphone.
+>> ?> > >> ?>
+>> ?> > >> ?> Should I enable {e,o}hci{2.3} in the device tree?
+>> ?> > >>
+>> ?> > >> ?Actually we should do this regardless of this extension board. The USB
+>> ?> > >> ?pins are not multiplexed and are exposed on user accessible pins (just
+>> ?> > >> ?not soldered, but that's a detail), so I think they qualify for DT
+>> ?> > >> ?enablement. And even if a user can't use them, it doesn't hurt to have
+>> ?> > >> ?them (since they are not multiplexed).
+>> ?> > >
+>> ?> > > My main concern about this is that we'll leave regulators enabled by
+>> ?> > > default, for a minority of users. And that minority will prevent to do
+>> ?> > > a proper power management when the times come since we'll have to keep
+>> ?> > > that behaviour forever.
+>> ?> >
+>> ?> > I think these users can add a 'fdt set /xxx/xxx status "disabled" ' .
+>> ?>
+>> ?> You can't ask that from the majority of users. These users will take
+>> ?> debian or fedora, install it, and expect everything to work
+>> ?> properly. I would make the opposite argument actually. If someone is
+>> ?> knowledgeable enough to solder the USB pins a connector, then (s)he'll
+>> ?> be able to make that u-boot call.
 >>
->> arch/arm64/lib/clear_user.S:33: Error: bad or irreducible absolute expression
+>> ?Now (s)he do not need soldering.
 >>
->> which is caused by the bug described in eb7c11ee3c5c ("arm64:
->> alternative: Work around .inst assembler bugs").
->>
->> This effectively prevents the use of the "nops" macro, which
->> requires the number of instruction as a parameter (the assembler
->> is confused and unable to compute the difference between two labels).
->>
->> As an alternative(!), use the .fill directive to output the number
->> of required NOPs (.fill has the good idea to output the fill pattern
->> in the endianness of the instruction stream).
-> 
-> Are you sure about that? The gas docs say:
-> 
-> `The contents of each repeat bytes is taken from an 8-byte number. The
->  highest order 4 bytes are zero. The lowest order 4 bytes are value rendered
->  in the byte-order of an integer on the computer as is assembling for.'
-> 
-> and I'd expect "integer" to refer to data values, rather than instructions.
+>> ?(S)he needs only paying $1.99 more to Xunlong to get the expansion
+>> ?board, and insert it on the OPi Zero.
+>
+> Which is going to require an overlay anyway, so we could have the USB
+> bits in there too.
 
-My tests on 2.24 and 2.25 seem to show that the output is always LE,
-which could be another GAS issue. I've asked the binutils people for
-information.
+If so, I think the [PATCH -next v3 2/2] is ready to be merged ;-)
 
-> 
->>
->> Fixes: 792d47379f4d ("arm64: alternative: add auto-nop infrastructure")
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/include/asm/alternative.h | 12 +++++++++++-
->>  1 file changed, 11 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
->> index 39feb85..39f8c98 100644
->> --- a/arch/arm64/include/asm/alternative.h
->> +++ b/arch/arm64/include/asm/alternative.h
->> @@ -159,9 +159,19 @@ void apply_alternatives(void *start, size_t length);
->>   * of NOPs. The number of NOPs is chosen automatically to match the
->>   * previous case.
->>   */
->> +
->> +#define NOP_INST	0xd503201f
-> 
-> If we define this, let's put it in insn.h or something. It could even be
-> used in the vdso linker script, which open codes this constant.
-
-Sure.
-
-> 
->> +
->>  .macro alternative_else_nop_endif
->>  alternative_else
->> -	nops	(662b-661b) / AARCH64_INSN_SIZE
->> +	/*
->> +	 * The same assembler bug strikes again here if the first half
->> +	 * of the alternative sequence contains a .inst, leading to a
->> +	 * bizarre error message. Fortulately, .fill replaces the
-> 
-> Fortunately
-> 
->> +	 * "nops" macro by inserting padding with the target machine
->> +	 * endianness.
->> +	 */
->> +	.fill	(662b-661b) / AARCH64_INSN_SIZE, AARCH64_INSN_SIZE, NOP_INST
-> 
-> Assuming we can get .fill to do the right thing, we should probably use
-> it in __nops rather than open-coding it here. Or is the issue that we're
-> unable to pass (662b-661b) / AARCH64_INSN_SIZE to any macro?
-
-Having an intermediate macro seems to work (probably because this is not
-actually evaluated until it reaches .fill). I'll update the patch if I
-get confirmation of the validity of the workaround from the binutils people.
-
-Otherwise, we'll have to find another alternative, and maybe go back to
-not using the auto-nop for SET_PSTATE_PAN/UAO.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
