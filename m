@@ -1,449 +1,219 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 5 Dec 2016 17:09:04 +0100
-Subject: [PATCH v3 7/7] ARM: dts: stm32: add stm32 general purpose timer
- driver in DT
-In-Reply-To: <20161202132251.GL2683@dell>
-References: <1480673842-20804-1-git-send-email-benjamin.gaignard@st.com>
- <1480673842-20804-8-git-send-email-benjamin.gaignard@st.com>
- <20161202132251.GL2683@dell>
-Message-ID: <e15186cb-a93e-c2e7-13bb-6704be5e8949@st.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 5 Dec 2016 08:13:12 -0800
+Subject: Adding a .platform_init callback to sdhci_arasan_ops
+In-Reply-To: <305f6531-3102-d0f5-cb22-bdd965e39519@laposte.net>
+References: <d50dcd8a-2489-4e82-1dc7-13e93e38d5ff@laposte.net>
+ <982d633b-e9c4-0f10-052b-e324f094d0f5@xilinx.com>
+ <2a949ade-edd7-4690-cd6a-434ae1e663dc@intel.com>
+ <66751ab5-59a4-ec30-07cd-44ca03694723@laposte.net>
+ <d1801c1e-cd74-b79c-0280-8fb5dc377c91@intel.com>
+ <e32d2a01-ba3c-6127-51ba-a1fd4176e32c@laposte.net>
+ <485a747c-47e3-bc0e-093a-4ec9ab719987@laposte.net>
+ <CAD=FV=XrJHFbpbhsJZAEE-HLMe47Ov=BgvHw8ZtfCazzT75pKQ@mail.gmail.com>
+ <305f6531-3102-d0f5-cb22-bdd965e39519@laposte.net>
+Message-ID: <CAD=FV=VfVUETgDkgHRzVn8yGm4zuKuRTmmZgPKuq3sbwacHLQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 12/02/2016 02:22 PM, Lee Jones wrote:
-> On Fri, 02 Dec 2016, Benjamin Gaignard wrote:
+On Mon, Dec 5, 2016 at 4:28 AM, Sebastian Frias <sf84@laposte.net> wrote:
+> Hi Doug,
 >
->> Add general purpose timers and it sub-nodes into DT for stm32f4.
->> Define and enable pwm1 and pwm3 for stm32f469 discovery board
+> On 28/11/16 18:46, Doug Anderson wrote:
+>> Hi,
 >>
->> version 3:
->> - use "st,stm32-timer-trigger" in DT
+>> On Mon, Nov 28, 2016 at 6:39 AM, Sebastian Frias <sf84@laposte.net> wrote:
+>>>> I will try to send another patch with what a different approach
+>>>>
+>>>
+>>> Here's a different approach (I just tested that it built, because I don't have the
+>>> rk3399 platform):
+>>>
+>>> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+>>> index 410a55b..5be6e67 100644
+>>> --- a/drivers/mmc/host/sdhci-of-arasan.c
+>>> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+>>> @@ -382,22 +382,6 @@ static int sdhci_arasan_resume(struct device *dev)
+>>>  static SIMPLE_DEV_PM_OPS(sdhci_arasan_dev_pm_ops, sdhci_arasan_suspend,
+>>>                          sdhci_arasan_resume);
+>>>
+>>> -static const struct of_device_id sdhci_arasan_of_match[] = {
+>>> -       /* SoC-specific compatible strings w/ soc_ctl_map */
+>>> -       {
+>>> -               .compatible = "rockchip,rk3399-sdhci-5.1",
+>>> -               .data = &rk3399_soc_ctl_map,
+>>> -       },
+>>> -
+>>> -       /* Generic compatible below here */
+>>> -       { .compatible = "arasan,sdhci-8.9a" },
+>>> -       { .compatible = "arasan,sdhci-5.1" },
+>>> -       { .compatible = "arasan,sdhci-4.9a" },
+>>> -
+>>> -       { /* sentinel */ }
+>>> -};
+>>> -MODULE_DEVICE_TABLE(of, sdhci_arasan_of_match);
+>>> -
+>>>  /**
+>>>   * sdhci_arasan_sdcardclk_recalc_rate - Return the card clock rate
+>>>   *
+>>> @@ -578,28 +562,18 @@ static void sdhci_arasan_unregister_sdclk(struct device *dev)
+>>>         of_clk_del_provider(dev->of_node);
+>>>  }
+>>>
+>>> -static int sdhci_arasan_probe(struct platform_device *pdev)
+>>> +static int sdhci_rockchip_platform_init(struct sdhci_host *host,
+>>> +                                       struct platform_device *pdev)
+>>>  {
+>>>         int ret;
+>>> -       const struct of_device_id *match;
+>>>         struct device_node *node;
+>>> -       struct clk *clk_xin;
+>>> -       struct sdhci_host *host;
+>>>         struct sdhci_pltfm_host *pltfm_host;
+>>>         struct sdhci_arasan_data *sdhci_arasan;
+>>> -       struct device_node *np = pdev->dev.of_node;
+>>> -
+>>> -       host = sdhci_pltfm_init(pdev, &sdhci_arasan_pdata,
+>>> -                               sizeof(*sdhci_arasan));
+>>> -       if (IS_ERR(host))
+>>> -               return PTR_ERR(host);
+>>>
+>>>         pltfm_host = sdhci_priv(host);
+>>>         sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+>>> -       sdhci_arasan->host = host;
+>>>
+>>> -       match = of_match_node(sdhci_arasan_of_match, pdev->dev.of_node);
+>>> -       sdhci_arasan->soc_ctl_map = match->data;
+>>> +       sdhci_arasan->soc_ctl_map = &rk3399_soc_ctl_map;
+>>>
+>>>         node = of_parse_phandle(pdev->dev.of_node, "arasan,soc-ctl-syscon", 0);
+>>>         if (node) {
+>>> @@ -611,10 +585,107 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>>>                         if (ret != -EPROBE_DEFER)
+>>>                                 dev_err(&pdev->dev, "Can't get syscon: %d\n",
+>>>                                         ret);
+>>> -                       goto err_pltfm_free;
+>>> +                       return -1;
+>>>                 }
+>>>         }
+>>>
+>>> +       if (of_property_read_bool(pdev->dev.of_node, "xlnx,fails-without-test-cd"))
+>>> +               sdhci_arasan->quirks |= SDHCI_ARASAN_QUIRK_FORCE_CDTEST;
+>>> +
+>>> +       return 0;
+>>> +}
+>>> +
+>>> +static int sdhci_rockchip_clock_init(struct sdhci_host *host,
+>>> +                                       struct platform_device *pdev)
+>>> +{
+>>> +       struct sdhci_pltfm_host *pltfm_host;
+>>> +       struct sdhci_arasan_data *sdhci_arasan;
+>>> +
+>>> +       pltfm_host = sdhci_priv(host);
+>>> +       sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+>>> +
+>>> +       if (of_device_is_compatible(pdev->dev.of_node,
+>>> +                                   "rockchip,rk3399-sdhci-5.1"))
+>>> +               sdhci_arasan_update_clockmultiplier(host, 0x0);
 >>
->> version 2:
->> - use parameters to describe hardware capabilities
->> - do not use references for pwm and iio timer subnodes
->>
->> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
->> ---
->>  arch/arm/boot/dts/stm32f429.dtsi      | 333 +++++++++++++++++++++++++++++++++-
->>  arch/arm/boot/dts/stm32f469-disco.dts |  28 +++
->>  2 files changed, 360 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
->> index bca491d..8c50d03 100644
->> --- a/arch/arm/boot/dts/stm32f429.dtsi
->> +++ b/arch/arm/boot/dts/stm32f429.dtsi
->> @@ -48,7 +48,7 @@
->>  #include "skeleton.dtsi"
->>  #include "armv7-m.dtsi"
->>  #include <dt-bindings/pinctrl/stm32f429-pinfunc.h>
->> -
->> +#include <dt-bindings/iio/timer/st,stm32-timer-triggers.h>
->>  / {
->>  	clocks {
->>  		clk_hse: clk-hse {
->> @@ -355,6 +355,21 @@
->>  					slew-rate = <2>;
->>  				};
->>  			};
->> +
->> +			pwm1_pins: pwm at 1 {
->> +				pins {
->> +					pinmux = <STM32F429_PA8_FUNC_TIM1_CH1>,
->> +						 <STM32F429_PB13_FUNC_TIM1_CH1N>,
->> +						 <STM32F429_PB12_FUNC_TIM1_BKIN>;
->> +				};
->> +			};
->> +
->> +			pwm3_pins: pwm at 3 {
->> +				pins {
->> +					pinmux = <STM32F429_PB4_FUNC_TIM3_CH1>,
->> +						 <STM32F429_PB5_FUNC_TIM3_CH2>;
->> +				};
->> +			};
->>  		};
->>
->>  		rcc: rcc at 40023810 {
->> @@ -426,6 +441,322 @@
->>  			interrupts = <80>;
->>  			clocks = <&rcc 0 38>;
->>  		};
->> +
->> +		gptimer1: gptimer1 at 40010000 {
+>> This _does_ belong in a Rockchip-specific init function, for now.
 >
-> timer at xxxxxxx
+> I'm not sure I understood. Are you saying that you agree to put this
+> into a specific function? Essentially agreeing with the concept the
+> patch is putting forward?
 >
-> Node names should be generic and not numbered.
+> Note, I'm more interested in the concept (i.e.: init functions) and less
+> in knowing if my patch (which was a quick and dirty thing) properly moved
+> the functions into the said init functions. For example, I did not move
+> the code dealing with "arasan,sdhci-5.1", but it could go into another
+> callback.
 >
-> I suggest that this isn't actually a timer either.  Is contains a
-> timer (and a PWM), but in it's completeness it is not a timer per
-> say.
+> Right now there are no "chip-specific" functions.
+> Just a code in sdhci_arasan_probe() that by checking various compatible
+> strings and the presence of other specific properties, acts as a way of
+> "chip-specific" initialisation, because it calls or not some functions.
+> (or the functions do nothing if some DT properties are not there).
 >
->> +			compatible = "st,stm32-gptimer";
->> +			reg = <0x40010000 0x400>;
->> +			clocks = <&rcc 0 160>;
->> +			clock-names = "clk_int";
->> +			status = "disabled";
->> +
->> +			pwm1 at 0 {
->> +				compatible = "st,stm32-pwm";
->> +				st,pwm-num-chan = <4>;
->> +				st,breakinput;
->> +				st,complementary;
->> +				status = "disabled";
->> +			};
->> +
->> +			timer1 at 0 {
->> +				compatible = "st,stm32-timer-trigger";
->> +				interrupts = <27>;
->> +				st,input-triggers-names = TIM5_TRGO,
->> +							  TIM2_TRGO,
->> +							  TIM4_TRGO,
->> +							  TIM3_TRGO;
+> The proposed patch is an attempt to clean up sdhci_arasan_probe() from
+> all those checks and move them into separate functions, for clarity and
+> maintainability reasons.
 >
-> I'm still dubious with matching by strings.
+> What are your thoughts in that regard?
 >
-> I'll take a look at the C code to see what the alternatives could be.
->
->> +				st,output-triggers-names = TIM1_TRGO,
->> +							   TIM1_CH1,
->> +							   TIM1_CH2,
->> +							   TIM1_CH3,
->> +							   TIM1_CH4;
->> +				status = "disabled";
->> +			};
->> +		};
->> +
->> +		gptimer2: gptimer2 at 40000000 {
->> +			compatible = "st,stm32-gptimer";
->> +			reg = <0x40000000 0x400>;
->> +			clocks = <&rcc 0 128>;
->> +			clock-names = "clk_int";
->> +			status = "disabled";
->> +
->> +			pwm2 at 0 {
->> +				compatible = "st,stm32-pwm";
->> +				st,pwm-num-chan = <4>;
->> +				st,32bits-counter;
->> +				status = "disabled";
->> +			};
->> +
->> +			timer2 at 0 {
->> +				compatible = "st,stm32-timer-trigger";
->> +				interrupts = <28>;
->> +				st,input-triggers-names = TIM1_TRGO,
->> +							  TIM8_TRGO,
->> +							  TIM3_TRGO,
->> +							  TIM4_TRGO;
->> +				st,output-triggers-names = TIM2_TRGO,
->> +							   TIM2_CH1,
->> +							   TIM2_CH2,
->> +							   TIM2_CH3,
->> +							   TIM2_CH4;
->> +				status = "disabled";
->> +			};
->> +		};
->> +
->> +		gptimer3: gptimer3 at 40000400 {
->> +			compatible = "st,stm32-gptimer";
->> +			reg = <0x40000400 0x400>;
->> +			clocks = <&rcc 0 129>;
->> +			clock-names = "clk_int";
->> +			status = "disabled";
->> +
->> +			pwm3 at 0 {
->> +				compatible = "st,stm32-pwm";
->> +				st,pwm-num-chan = <4>;
->> +				status = "disabled";
->> +			};
->> +
->> +			timer3 at 0 {
->> +				compatible = "st,stm32-timer-trigger";
->> +				interrupts = <29>;
->> +				st,input-triggers-names = TIM1_TRGO,
->> +							  TIM8_TRGO,
->> +							  TIM5_TRGO,
->> +							  TIM4_TRGO;
->> +				st,output-triggers-names = TIM3_TRGO,
->> +							   TIM3_CH1,
->> +							   TIM3_CH2,
->> +							   TIM3_CH3,
->> +							   TIM3_CH4;
->> +				status = "disabled";
->> +			};
->> +		};
->> +
->> +		gptimer4: gptimer4 at 40000800 {
->> +			compatible = "st,stm32-gptimer";
->> +			reg = <0x40000800 0x400>;
->> +			clocks = <&rcc 0 130>;
->> +			clock-names = "clk_int";
->> +			status = "disabled";
->> +
->> +			pwm4 at 0 {
->> +				compatible = "st,stm32-pwm";
->> +				st,pwm-num-chan = <4>;
->> +				status = "disabled";
->> +			};
->> +
->> +			timer4 at 0 {
->> +				compatible = "st,stm32-timer-trigger";
->> +				interrupts = <30>;
->> +				st,input-triggers-names = TIM1_TRGO,
->> +							  TIM2_TRGO,
->> +							  TIM3_TRGO,
->> +							  TIM8_TRGO;
->> +				st,output-triggers-names = TIM4_TRGO,
->> +							   TIM4_CH1,
->> +							   TIM4_CH2,
->> +							   TIM4_CH3,
->> +							   TIM4_CH4;
->> +				status = "disabled";
->> +			};
->> +		};
->> +
->> +		gptimer5: gptimer5 at 40000C00 {
->> +			compatible = "st,stm32-gptimer";
->> +			reg = <0x40000C00 0x400>;
->> +			clocks = <&rcc 0 131>;
->> +			clock-names = "clk_int";
->> +			status = "disabled";
->> +
->> +			pwm5 at 0 {
->> +				compatible = "st,stm32-pwm";
->> +				st,pwm-num-chan = <4>;
->> +				st,32bits-counter;
->> +				status = "disabled";
->> +			};
->> +
->> +			timer5 at 0 {
->> +				compatible = "st,stm32-timer-trigger";
->> +				interrupts = <50>;
->> +				st,input-triggers-names = TIM2_TRGO,
->> +							  TIM3_TRGO,
->> +							  TIM4_TRGO,
->> +							  TIM8_TRGO;
->> +				st,output-triggers-names = TIM5_TRGO,
->> +							   TIM5_CH1,
->> +							   TIM5_CH2,
->> +							   TIM5_CH3,
->> +							   TIM5_CH4;
->> +				status = "disabled";
->> +			};
->> +		};
->> +
->> +		gptimer6: gptimer6 at 40001000 {
->> +			compatible = "st,stm32-gptimer";
->> +			reg = <0x40001000 0x400>;
->> +			clocks = <&rcc 0 132>;
->> +			clock-names = "clk_int";
->> +			status = "disabled";
->> +
->> +			timer6 at 0 {
->> +				compatible = "st,stm32-timer-trigger";
->> +				interrupts = <54>;
->> +				st,output-triggers-names = TIM6_TRGO;
->> +				status = "disabled";
->> +			};
->> +		};
->> +
->> +		gptimer7: gptimer7 at 40001400 {
->> +			compatible = "st,stm32-gptimer";
->> +			reg = <0x40001400 0x400>;
->> +			clocks = <&rcc 0 133>;
->> +			clock-names = "clk_int";
->> +			status = "disabled";
->> +
->> +			timer7 at 0 {
->> +				compatible = "st,stm32-timer-trigger";
->> +				interrupts = <55>;
->> +				st,output-triggers-names = TIM7_TRGO;
->> +				status = "disabled";
->> +			};
->> +		};
->> +
->> +		gptimer8: gptimer8 at 40010400 {
->> +			compatible = "st,stm32-gptimer";
->> +			reg = <0x40010400 0x400>;
->> +			clocks = <&rcc 0 161>;
->> +			clock-names = "clk_int";
->> +			status = "disabled";
->> +
->> +			pwm8 at 0 {
->> +				compatible = "st,stm32-pwm";
->> +				st,pwm-num-chan = <4>;
->> +				st,complementary;
->> +				st,breakinput;
->> +				status = "disabled";
->> +			};
->> +
->> +			timer8 at 0 {
->> +				compatible = "st,stm32-timer-trigger";
->> +				interrupts = <46>;
->> +				st,input-triggers-names = TIM1_TRGO,
->> +							  TIM2_TRGO,
->> +							  TIM4_TRGO,
->> +							  TIM5_TRGO;
->> +				st,output-triggers-names = TIM8_TRGO,
->> +							   TIM8_CH1,
->> +							   TIM8_CH2,
->> +							   TIM8_CH3,
->> +							   TIM8_CH4;
->> +				status = "disabled";
->> +			};
->> +		};
->> +
->> +		gptimer9: gptimer9 at 40014000 {
->> +			compatible = "st,stm32-gptimer";
->> +			reg = <0x40014000 0x400>;
->> +			clocks = <&rcc 0 176>;
->> +			clock-names = "clk_int";
->> +			status = "disabled";
->> +
->> +			pwm9 at 0 {
->> +				compatible = "st,stm32-pwm";
->> +				st,pwm-num-chan = <2>;
->> +				status = "disabled";
->> +			};
->> +
->> +			timer9 at 0 {
->> +				compatible = "st,stm32-timer-trigger";
->> +				interrupts = <24>;
->> +				st,input-triggers-names = TIM2_TRGO,
->> +							  TIM3_TRGO;
->> +				st,output-triggers-names = TIM9_TRGO,
->> +							   TIM9_CH1,
->> +							   TIM9_CH2;
->> +				status = "disabled";
->> +			};
->> +		};
->> +
->> +		gptimer10: gptimer10 at 40014400 {
->> +			compatible = "st,stm32-gptimer";
->> +			reg = <0x40014400 0x400>;
->> +			clocks = <&rcc 0 177>;
->> +			clock-names = "clk_int";
->> +			status = "disabled";
->> +
->> +			pwm10 at 0 {
->> +				compatible = "st,stm32-pwm";
->> +				st,pwm-num-chan = <1>;
->> +				status = "disabled";
->> +			};
->> +		};
->> +
->> +		gptimer11: gptimer11 at 40014800 {
->> +			compatible = "st,stm32-gptimer";
->> +			reg = <0x40014800 0x400>;
->> +			clocks = <&rcc 0 178>;
->> +			clock-names = "clk_int";
->> +			status = "disabled";
->> +
->> +			pwm11 at 0 {
->> +				compatible = "st,stm32-pwm";
->> +				st,pwm-num-chan = <1>;
->> +				status = "disabled";
->> +			};
->> +		};
->> +
->> +		gptimer12: gptimer12 at 40001800 {
->> +			compatible = "st,stm32-gptimer";
->> +			reg = <0x40001800 0x400>;
->> +			clocks = <&rcc 0 134>;
->> +			clock-names = "clk_int";
->> +			status = "disabled";
->> +
->> +			pwm12 at 0 {
->> +				compatible = "st,stm32-pwm";
->> +				st,pwm-num-chan = <2>;
->> +				status = "disabled";
->> +			};
->> +
->> +			timer12 at 0 {
->> +				compatible = "st,stm32-timer-trigger";
->> +				interrupts = <43>;
->> +				st,input-triggers-names = TIM4_TRGO,
->> +							  TIM5_TRGO;
->> +				st,output-triggers-names = TIM12_TRGO,
->> +							   TIM12_CH1,
->> +							   TIM12_CH2;
->> +				status = "disabled";
->> +			};
->> +		};
->> +
->> +		gptimer13: gptimer13 at 40001C00 {
->> +			compatible = "st,stm32-gptimer";
->> +			reg = <0x40001C00 0x400>;
->> +			clocks = <&rcc 0 135>;
->> +			clock-names = "clk_int";
->> +			status = "disabled";
->> +
->> +			pwm13 at 0 {
->> +				compatible = "st,stm32-pwm";
->> +				st,pwm-num-chan = <1>;
->> +				status = "disabled";
->> +			};
->> +		};
->> +
->> +		gptimer14: gptimer14 at 40002000 {
->> +			compatible = "st,stm32-gptimer";
->> +			reg = <0x40002000 0x400>;
->> +			clocks = <&rcc 0 136>;
->> +			clock-names = "clk_int";
->> +			status = "disabled";
->> +
->> +			pwm14 at 0 {
->> +				compatible = "st,stm32-pwm";
->> +				st,pwm-num-chan = <1>;
->> +				status = "disabled";
->> +			};
->> +		};
->>  	};
->>  };
->>
->> diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
->> index 8a163d7..df4ca7e 100644
->> --- a/arch/arm/boot/dts/stm32f469-disco.dts
->> +++ b/arch/arm/boot/dts/stm32f469-disco.dts
->> @@ -81,3 +81,31 @@
->>  &usart3 {
->>  	status = "okay";
->>  };
->> +
->> +&gptimer1 {
->> +	status = "okay";
->> +
->> +	pwm1 at 0 {
->> +		pinctrl-0	= <&pwm1_pins>;
->> +		pinctrl-names	= "default";
->> +		status = "okay";
->> +	};
->> +
->> +	timer1 at 0 {
->> +		status = "okay";
->> +	};
->> +};
->
-> This is a much *better* format than before.
->
-> I still don't like the '&' syntax though.
+> From what I've seen in other drivers, for example drivers/net/ethernet/aurora/nb8800.c
+> One matches the compatible string to get a (likely) chip-specific set of
+> callbacks to use in the 'probe' function.
 
-Please keep "&" format to match with existing nodes.
+I have no objections to chip-specific functions if they are needed.
+It's really just a cleaner way to avoid doing "if this chip then, else
+if this other chip then, else if this third chip them".
 
+The thing I worry about is that too much stuff will be jammed into
+chip-specific functions and that we'll end up solving the same thing
+more than one way.
+
+
+> Then, adding support for other chips is just a matter of replacing some
+> of those callbacks with others adapted to a given platform.
 >
->> +&gptimer3 {
->> +	status = "okay";
->> +
->> +	pwm3 at 0 {
->> +		pinctrl-0	= <&pwm3_pins>;
->> +		pinctrl-names	= "default";
->> +		status = "okay";
->> +	};
->> +
->> +	timer3 at 0 {
->> +		status = "okay";
->> +	};
->> +};
+>> Other platforms might want different values for
+>> corecfg_clockmultiplier, I think.
+>>
+>> If it becomes common to need to set this, it wouldn't be hard to make
+>> it generic by putting it in the data matched by the device tree, then
+>> generically call sdhci_arasan_update_clockmultiplier() in cases where
+>> it is needed.  sdhci_arasan_update_clockmultiplier() itself should be
+>> generic enough to handle it.
+>>
+>>
+>>> +
+>>> +       sdhci_arasan_update_baseclkfreq(host);
+>>
+>> If you make soc_ctl_map always part of "struct sdhci_arasan_cs_ops"
+>> then other platforms will be able to use it.
 >
+> I thought that soc_ctl_map was specific and for a given platform.
+
+I believe the soc_ctl_map will be used by more than one chip, mostly
+because I saw these same fields referenced in the generic
+(non-Rockchip) Arasan docs.  Obviously I have a very small view of the
+SDHCI-Arasan world though.
+
+
+> For what is worth, I don't know which of these calls are or can be made
+> generic or not.
+>
+> Indeed, I'm not an expert in this code; However, I think that given the
+> amount of checks for specific properties, probably part of this is chip-
+> specific, and as such, it would benefit from some re-factoring so that
+> the chip-specific parts are clearly separated from the rest, instead of
+> being mixed together inside the probe function.
+
+I believe the only chip-specific stuff was the part that is currently
+guarded by the "if rk3399" check.  Everything else seems like it ought
+to be applicable to other platforms using Arasan's SDHCI IP.
+
+
+>> As argued in my original patch the field "corecfg_baseclkfreq" is
+>> documented in the generic Arasan document
+>> <https://arasan.com/wp-content/media/eMMC-5-1-Total-Solution_Rev-1-3.pdf>
+>> and thus is unlikely to be Rockchip specific.  It is entirely possible
+>> that not everyone who integrates this IP block will need this register
+>> set, but in that case they can set an offset as "-1" and they'll be
+>> fine.
+>>
+>> Said another way: the concept of whether or not to set "baseclkfreq"
+>> doesn't need to be tired to whether or not we're on Rockchip.
+>>
+>
+> I see.
+> For what is worth, the documentation for 'sdhci_arasan_update_baseclkfreq()'
+> says something like:
+>
+>  *   Many existing devices don't seem to do this and work fine.  To keep
+>  *   compatibility for old hardware where the device tree doesn't provide a
+>  *   register map, this function is a noop if a soc_ctl_map hasn't been provided
+>  *   for this platform.
+
+Yup.  I wrote that.  See "git blame".
