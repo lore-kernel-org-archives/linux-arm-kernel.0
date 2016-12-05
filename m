@@ -1,136 +1,90 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Mon, 5 Dec 2016 13:40:24 -0800
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 5 Dec 2016 15:53:18 -0600
 Subject: [PATCH v3] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe
  controller
-In-Reply-To: <20161205212012.GA22455@bhelgaas-glaptop.roam.corp.google.com>
+In-Reply-To: <CADaLNDm6fPQ6ekQa85fveAamJtF3+HGeOvprmgGJ4gLnMhF2_w@mail.gmail.com>
 References: <1480549373-2123-1-git-send-email-dhdang@apm.com>
  <20161201183350.GF30746@bhelgaas-glaptop.roam.corp.google.com>
- <1480620053.4751.30.camel@redhat.com>
- <20161201194114.GA8263@bhelgaas-glaptop.roam.corp.google.com>
- <CADaLNDkVPRPSg0aU-sxHsiJbVvEn=LxcekDt6gfXBBhc+fzhjw@mail.gmail.com>
- <20161201230736.GA17948@bhelgaas-glaptop.roam.corp.google.com>
- <CADaLND=Ss8d-jv7wffbrtytrjj=SUnjDn9bognKUszhKguRV1A@mail.gmail.com>
- <d77e403c-81e9-114e-6ec6-bbffaa4ac36f@redhat.com>
- <20161202233943.GF9903@bhelgaas-glaptop.roam.corp.google.com>
- <CADaLNDk-cMW8k+bXqH3+yYCye_kHf6RXUYQ=eCCZ4FF2ZTjgkQ@mail.gmail.com>
- <20161205212012.GA22455@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CADaLND=4T82W8tGpZ2y4SaoG+Rr4uGkMbcDoD2LSAkBYihVpqg@mail.gmail.com>
+ <CADaLNDm6fPQ6ekQa85fveAamJtF3+HGeOvprmgGJ4gLnMhF2_w@mail.gmail.com>
+Message-ID: <20161205215318.GB22455@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 5, 2016 at 1:20 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Fri, Dec 02, 2016 at 11:06:30PM -0800, Duc Dang wrote:
->> On Fri, Dec 2, 2016 at 3:39 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
->
->> > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
->> > index 8a177a1..a16fc8e 100644
->> > --- a/arch/arm64/kernel/pci.c
->> > +++ b/arch/arm64/kernel/pci.c
->> > @@ -114,6 +114,19 @@ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
->> >         return 0;
->> >  }
->> >
->> > +static int pci_acpi_root_prepare_resources(struct acpi_pci_root_info *ci)
->> > +{
->> > +       struct resource_entry *entry, *tmp;
->> > +       int status;
->> > +
->> > +       status = acpi_pci_probe_root_resources(ci);
->> > +       resource_list_for_each_entry_safe(entry, tmp, &ci->resources) {
->> > +               if (!(entry->res->flags & IORESOURCE_WINDOW))
->> > +                       resource_list_destroy_entry(entry);
->> > +       }
->> > +       return status;
->> > +}
->> > +
->> >  /*
->> >   * Lookup the bus range for the domain in MCFG, and set up config space
->> >   * mapping.
->> > @@ -190,6 +203,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->> >         }
->> >
->> >         root_ops->release_info = pci_acpi_generic_release_info;
->> > +       root_ops->prepare_resources = pci_acpi_root_prepare_resources;
->> >         root_ops->pci_ops = &ri->cfg->ops->pci_ops;
->> >         bus = acpi_pci_root_create(root, root_ops, &ri->common, ri->cfg);
->> >         if (!bus)
->>
->> I tried your patch above with my X-Gene ECAM v4 patch on Mustang, here
->> is the kernel boot log and output of 'cat /proc/iomem'. The PCIe core
->> does not print the MMIO space as a window (which is expected per your
->> patch above).
->
-> Thanks!
->
->> ACPI: PCI Root Bridge [PCI0] (domain 0000 [bus 00-ff])
->> acpi PNP0A08:00: _OSC: OS supports [ExtendedConfig ASPM ClockPM Segments MSI]
->> acpi PNP0A08:00: _OSC: OS now controls [PCIeHotplug PME AER PCIeCapability]
->> acpi PNP0A08:00: MCFG quirk: ECAM at [mem 0xe0d0000000-0xe0dfffffff] for [bus 00-ff] with xgene_v1_pcie_ecam_ops
->> acpi PNP0A08:00: [Firmware Bug]: ECAM area [mem 0xe0d0000000-0xe0dfffffff] not reserved in ACPI namespace
->> acpi PNP0A08:00: ECAM at [mem 0xe0d0000000-0xe0dfffffff] for [bus 00-ff]
->> Remapped I/O 0x000000e010000000 to [io  0x0000-0xffff window]
->> PCI host bridge to bus 0000:00
->> pci_bus 0000:00: root bus resource [io  0x0000-0xffff window] (bus address [0x10000000-0x1000ffff])
->> pci_bus 0000:00: root bus resource [mem 0xe040000000-0xe07fffffff window] (bus address [0x40000000-0x7fffffff])
->> pci_bus 0000:00: root bus resource [mem 0xf000000000-0xffffffffff window]
->> pci_bus 0000:00: root bus resource [bus 00-ff]
->
-> Yup, no bridge register space here; that's good.  I assume the bridge
-> registers are at [mem 0x1f2b0000-0x1f2bffff] as shown in /proc/iomem
-> below.
+On Thu, Dec 01, 2016 at 06:52:23PM -0800, Duc Dang wrote:
+> On Thu, Dec 1, 2016 at 10:33 AM, Bjorn Helgaas <helgaas@kernel.org> wrote:
 
-Yes,  the bridge registers are at [mem 0x1f2b0000-0x1f2bffff].
+> I made similar changes in v4 patch. The ECAM quirk will be built when
+> ACPI and PCI_QUIRKS are enabled.
+> 
+> When building for DT only, the ECAM quirk won't be compiled.
 
->
->> [root@(none) ~]# cat /proc/io mem
->> ...
->> 19000000-19007fff : 808622B7:00
->> 1900c100-190fffff : 808622B7:00
->>   1900c100-190fffff : 808622B7:00
->> 19800000-19807fff : 808622B7:01
->> 1980c100-198fffff : 808622B7:01
->>   1980c100-198fffff : 808622B7:01
->> ...
->> 1f280000-1f28ffff : 808622B7:00
->> 1f290000-1f29ffff : 808622B7:01
->
-> I'm curious what these "808622B7" devices are.  Per ACPI 6.0, sec
-> 6.1.5, that looks like a PCI vendor ID, which I guess is a valid ACPI
-> ID.  But these resources don't seem to have any connection with PCI
-> (they're not in any of the host bridge apertures).
+Perfect.
 
-These are DesignWare USB 3.0 controllers (DWC3). The ACPI ID is
-defined in drivers/usb/dwc3/core.c.
->
->> 1f2b0000-1f2bffff : PNP0A08:00
->
-> Looks like the bridge register space; good.
+> >>  #define XGENE_PCIE_IP_VER_UNKN               0
+> >>  #define XGENE_PCIE_IP_VER_1          1
+> >> +#define XGENE_PCIE_IP_VER_2          2
+> >
+> > This isn't used anywhere, which makes me wonder whether it's worth
+> > keeping it.
+> 
+> V2 controller will use this XGENE_PCIE_IP_VER_2 (port->version =
+> XGENE_PCIE_IP_VER_2). This will be used to indicate that the
+> controller is V2, and to enable configuration request retry status
+> feature (by not disable it like V1 controller).
 
-Yes, it is.
+OK, I see.  You don't actually need XGENE_PCIE_IP_VER_2, you just need
+port->version to be something other than XGENE_PCIE_IP_VER_1.  So this
+is fine as it is.
 
->
->> e040000000-e07fffffff : PCI Bus 0000:00
->>   e040000000-e0401fffff : PCI Bus 0000:01
->>     e040000000-e0400fffff : 0000:01:00.0
->>       e040000000-e0400fffff : mlx4_core
->>     e040100000-e0401fffff : 0000:01:00.0
->
->> e0d0000000-e0dfffffff : PCI ECAM
->
-> This region should be described in either a PNP0C02 device or (if we
-> decide we can allow "consumer" descriptors) the PNP0A08 device.  I
-> assume you'll fix that in a future firmware release.
+> >>  static void __iomem *xgene_pcie_get_cfg_base(struct pci_bus *bus)
+> >>  {
+> >> -     struct xgene_pcie_port *port = bus->sysdata;
+> >> +     struct pci_config_window *cfg;
+> >> +     struct xgene_pcie_port *port;
+> >> +
+> >> +     if (acpi_disabled)
+> >> +             port = bus->sysdata;
+> >> +     else {
+> >> +             cfg = bus->sysdata;
+> >> +             port = cfg->priv;
+> >> +     }
+> >
+> > I would really, really like to figure out a way to get rid of these
+> > "if (acpi_disabled)" checks sprinkled through here.  Is there any way
+> > we can set up bus->sysdata to be the same, regardless of whether we're
+> > using this as a platform driver or an ACPI quirk?
+> 
+> Right now, I created a inline function to extract xgene_pcie_port from
+> pci_bus. In order to get rid of acpi_disabled, I will need to make
+> sysdata in DT case also point to pci_config_window structure, which
+> means I will need to convert and test the DT driver to use ecam ops.
+> It is a separate patch itself. So I think I should do it at later time
+> (after this ECAM quirk patch). I hope you are ok with this.
 
-Yes, future firmware will have PNP0C02 node that describes this ECAM
-space (or a new resource in PNP0A08 if we use 'consumer' descriptor).
+OK.  I did the simple-minded version of leaving the DT ops the same
+but making sysdata point to a dummy pci_config_window.  Your proposal
+of using ECAM for DT would be much better.
 
->
-> But I think this reservation from pci_ecam_create() is good enough for
-> now.
->
->> f000000000-ffffffffff : PCI Bus 0000:00
->>   f000000000-f001ffffff : PCI Bus 0000:01
->>     f000000000-f001ffffff : 0000:01:00.0
->>       f000000000-f001ffffff : mlx4_core
-Regards,
-Duc Dang.
+It's interesting that you actually already use the same accessors
+except that DT uses the 32-bit pci_generic_config_write32() and ACPI
+uses the regular pci_generic_config_write(). I guess that means the
+hardware actually *does* support sub-32 bit writes?
+
+> I need to define the function (xgene_get_csr_resource()) inside
+> pci-xgene.c to duplicate the code of acpi_get_rc_addr. The reason is
+> X-Gene firmware does not have a dedicate PNP0C02 node to declare the
+> resource, and if I use acpi_get_rc_resources() with "PNP0A08", I got
+> error due to acpi_bus_get_device() returns error.
+
+Looks good.
+
+> > All these init functions are almost identical.  Can we factor this out
+> > by having wrappers that do nothing more than pass in the table and
+> > version, and put the kzalloc and ioremap in a shared back-end?
+> 
+> I refactor-ed these .init functions. And as a result, there are only 2
+> ecam ops left: xgene_v1_pcie_ecam_ops and xgene_v2_pcie_ecam_ops.
+
+Looks good.
+
+Bjorn
