@@ -1,34 +1,33 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Mon, 5 Dec 2016 10:19:20 +0100
-Subject: [crypto] [marvell-cesa] Possible regression after Linux 4.7
-In-Reply-To: <4573998d-6c5b-03e4-e1fa-7516d5a9e276@free-electrons.com>
-References: <58174e5d.233ac20a.a4335.5656@mx.google.com>
- <4573998d-6c5b-03e4-e1fa-7516d5a9e276@free-electrons.com>
-Message-ID: <2b1fd86d-956c-398f-b644-cc9b1fd3d78c@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 5 Dec 2016 10:19:55 +0100
+Subject: [PATCH v3 -next 1/2] ARM: sunxi: add support for H2+ SoC
+In-Reply-To: <20161202150513.34691-1-icenowy@aosc.xyz>
+References: <20161202150513.34691-1-icenowy@aosc.xyz>
+Message-ID: <20161205091955.zkffyktw5trfocnx@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Dec 02, 2016 at 11:05:12PM +0800, Icenowy Zheng wrote:
+> Allwinner H2+ is a quad-core Cortex-A7 SoC.
+> 
+> It is very like H3, that they share the same SoC ID (0x1680), and H3
+> memory maps as well as drivers works well on the SoC.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-The issue is reproducible in STD mode too. We have found fixes.
-Could you test these patches in STD mode please ?
+Fixed the alphabetical order in the bindings doc, and applied.
 
-
-cover letter: 
-https://www.mail-archive.com/linux-crypto at vger.kernel.org/msg22143.html
-1/2: https://www.mail-archive.com/linux-crypto at vger.kernel.org/msg22142.html
-2/2: https://www.mail-archive.com/linux-crypto at vger.kernel.org/msg22141.html
-
-If you want to turn off DMA, open drivers/crypto/marvell/cesa.c and in 
-armada_xp_caps, change .has_tdma to false.  (assuming that you test on a 
-armada 38x).
-
-We're still investigating for regressions in DMA mode.
-
-Have a nice day,
-Romain
+Thanks!
+Maxime
 
 -- 
-Romain Perier, Free Electrons
+Maxime Ripard, Free Electrons
 Embedded Linux and Kernel engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161205/364dbd55/attachment.sig>
