@@ -1,8 +1,8 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Mon,  5 Dec 2016 03:47:10 +0200
-Subject: [PATCH] mtd: nand: lpc32xx: fix invalid error handling of a requested
- irq
-Message-ID: <20161205014710.2015-1-vz@mleia.com>
+Date: Mon,  5 Dec 2016 03:47:53 +0200
+Subject: [PATCH] Input: lpc32xx-keys - fix invalid error handling of a
+ requested irq
+Message-ID: <20161205014753.2092-1-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,25 +13,28 @@ the check of (irq >= NR_IRQ) to decide about an error code returned by
 platform_get_irq() is completely invalid, don't attempt to overrule
 irq subsystem in the driver.
 
-The change fixes LPC32xx NAND MLC driver initialization on boot.
+The change fixes lpc32xx_keys driver initialization on boot:
+
+  lpc32xx_keys 40050000.key: failed to get platform irq
+  lpc32xx_keys: probe of 40050000.key failed with error -22
 
 Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
- drivers/mtd/nand/lpc32xx_mlc.c | 2 +-
+ drivers/input/keyboard/lpc32xx-keys.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mtd/nand/lpc32xx_mlc.c b/drivers/mtd/nand/lpc32xx_mlc.c
-index 8523881..bc6e49a 100644
---- a/drivers/mtd/nand/lpc32xx_mlc.c
-+++ b/drivers/mtd/nand/lpc32xx_mlc.c
-@@ -776,7 +776,7 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
- 	init_completion(&host->comp_controller);
+diff --git a/drivers/input/keyboard/lpc32xx-keys.c b/drivers/input/keyboard/lpc32xx-keys.c
+index 265d641..632523d 100644
+--- a/drivers/input/keyboard/lpc32xx-keys.c
++++ b/drivers/input/keyboard/lpc32xx-keys.c
+@@ -182,7 +182,7 @@ static int lpc32xx_kscan_probe(struct platform_device *pdev)
+ 	}
  
- 	host->irq = platform_get_irq(pdev, 0);
--	if ((host->irq < 0) || (host->irq >= NR_IRQS)) {
-+	if (host->irq < 0) {
+ 	irq = platform_get_irq(pdev, 0);
+-	if (irq < 0 || irq >= NR_IRQS) {
++	if (irq < 0) {
  		dev_err(&pdev->dev, "failed to get platform irq\n");
- 		res = -EINVAL;
- 		goto err_exit3;
+ 		return -EINVAL;
+ 	}
 -- 
 2.10.2
