@@ -1,30 +1,34 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 5 Dec 2016 16:33:16 +0530
-Subject: [GIT PULL 2/2] DaVinci defconfig updates for v4.10 (part 4)
-In-Reply-To: <20161205110316.18514-1-nsekhar@ti.com>
-References: <20161205110316.18514-1-nsekhar@ti.com>
-Message-ID: <20161205110316.18514-2-nsekhar@ti.com>
+Date: Mon, 5 Dec 2016 16:33:15 +0530
+Subject: [GIT PULL 1/2] DaVinci DT updates for v4.10 (part 4)
+Message-ID: <20161205110316.18514-1-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 213971e7571e27f47b4e926904a9adf794925c51:
+The following changes since commit 878e908ad95637dc6567a9b5f6876a580ae90dfa:
 
-  ARM: davinci_all_defconfig: Enable OHCI as module (2016-11-22 20:50:46 +0530)
+  ARM: dts: da850: enable memctrl and mstpri nodes per board (2016-11-28 15:51:29 +0530)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.10/defconfig-4
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.10/dt-4
 
-for you to fetch changes up to 47d03e48efa572109229aec9436948d92f44b689:
+for you to fetch changes up to e4ce904d6289f2a72affd2a0f0a44da6e5d0cce4:
 
-  ARM: davinci_all_defconfig: Enable da8xx usb otg (2016-12-01 19:52:12 +0530)
-
-----------------------------------------------------------------
-Enable support for MUSB based USB OTG on DA850.
+  ARM: dts: da850: enable high speed for mmc (2016-12-05 14:20:44 +0530)
 
 ----------------------------------------------------------------
-Alexandre Bailon (1):
-      ARM: davinci_all_defconfig: Enable da8xx usb otg
+- Add device tree nodes for pin pull-up/pull-down
+bias control on DA850.
 
- arch/arm/configs/davinci_all_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+- Enable high speed support on DA850 MMC/SD
+
+----------------------------------------------------------------
+Axel Haslam (1):
+      ARM: dts: da850: enable high speed for mmc
+
+David Lechner (1):
+      ARM: dts: da850: Add node for pullup/pulldown pinconf
+
+ arch/arm/boot/dts/da850.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
