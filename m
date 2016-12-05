@@ -1,111 +1,70 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 5 Dec 2016 08:35:35 +0000
-Subject: [PATCH v3 3/7] PWM: add pwm-stm32 DT bindings
-In-Reply-To: <20161205065350.GA18069@ulmo.ba.sec>
-References: <1480673842-20804-1-git-send-email-benjamin.gaignard@st.com>
- <1480673842-20804-4-git-send-email-benjamin.gaignard@st.com>
- <20161205065350.GA18069@ulmo.ba.sec>
-Message-ID: <20161205083535.GB14004@dell>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 5 Dec 2016 14:08:12 +0530
+Subject: [PATCH v2 1/3] ARM: da850: fix infinite loop in clk_set_rate()
+In-Reply-To: <1480693134-31324-2-git-send-email-bgolaszewski@baylibre.com>
+References: <1480693134-31324-1-git-send-email-bgolaszewski@baylibre.com>
+ <1480693134-31324-2-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <34f9e4c4-917e-0472-72af-96fbc7e0c6db@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 05 Dec 2016, Thierry Reding wrote:
+On Friday 02 December 2016 09:08 PM, Bartosz Golaszewski wrote:
+> The aemif clock is added twice to the lookup table in da850.c. This
+> breaks the children list of pll0_sysclk3 as we're using the same list
+> links in struct clk. When calling clk_set_rate(), we get stuck in
+> propagate_rate().
+> 
+> Create a separate clock for nand, inheriting the rate of the aemif
+> clock and retrieve it in the davinci_nand module.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/arm/mach-davinci/da850.c   | 7 ++++++-
+>  drivers/mtd/nand/davinci_nand.c | 2 +-
+>  2 files changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index e770c97..1fcc986 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+> @@ -367,6 +367,11 @@ static struct clk aemif_clk = {
+>  	.flags		= ALWAYS_ENABLED,
+>  };
+>  
+> +static struct clk nand_clk = {
+> +	.name		= "nand",
+> +	.parent		= &aemif_clk,
+> +};
+> +
+>  static struct clk usb11_clk = {
+>  	.name		= "usb11",
+>  	.parent		= &pll0_sysclk4,
+> @@ -537,7 +542,7 @@ static struct clk_lookup da850_clks[] = {
+>  	CLK("da830-mmc.0",	NULL,		&mmcsd0_clk),
+>  	CLK("da830-mmc.1",	NULL,		&mmcsd1_clk),
+>  	CLK("ti-aemif",		NULL,		&aemif_clk),
+> -	CLK(NULL,		"aemif",	&aemif_clk),
+> +	CLK(NULL,		"nand",		&nand_clk),
 
-> On Fri, Dec 02, 2016 at 11:17:18AM +0100, Benjamin Gaignard wrote:
-> > Define bindings for pwm-stm32
-> > 
-> > version 2:
-> > - use parameters instead of compatible of handle the hardware configuration
-> > 
-> > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> > ---
-> >  .../devicetree/bindings/pwm/pwm-stm32.txt          | 38 ++++++++++++++++++++++
-> >  1 file changed, 38 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> > new file mode 100644
-> > index 0000000..575b9fb
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> > @@ -0,0 +1,38 @@
-> > +STMicroelectronics PWM driver bindings for STM32
-> 
-> Technically this bindings describe devices, so "driver binding" is a
-> somewhat odd wording. Perhaps:
-> 
-> 	STMicroelectronics STM32 General Purpose Timer PWM bindings
-> 
-> ?
-> 
-> > +
-> > +Must be a sub-node of STM32 general purpose timer driver
-> > +Parent node properties are describe in ../mfd/stm32-general-purpose-timer.txt
-> 
-> Again, "driver parent node" is odd. Perhaps:
-> 
-> 	Must be a sub-node of an STM32 General Purpose Timer device tree
-> 	node. See ../mfd/stm32-general-purpose-timer.txt for details about
-> 	the parent node.
-> 
-> ?
-> 
-> > +Required parameters:
-> > +- compatible:		Must be "st,stm32-pwm"
-> > +- pinctrl-names: 	Set to "default".
-> > +- pinctrl-0: 		List of phandles pointing to pin configuration nodes
-> > +			for PWM module.
-> > +			For Pinctrl properties, please refer to [1].
-> 
-> Your indentation and capitalization are inconsistent. Also, please refer
-> to the pinctrl bindings by relative path and inline, rather than as a
-> footnote reference.
-> 
-> > +
-> > +Optional parameters:
-> > +- st,breakinput:	Set if the hardware have break input capabilities
-> > +- st,breakinput-polarity: Set break input polarity. Default is 0
-> > +			 The value define the active polarity:
-> > +			  - 0 (active LOW)
-> > +			  - 1 (active HIGH)
-> 
-> Could we fold these into a single property? If st,breakinput-polarity is
-> not present it could simply mean that there is no break input, and if it
-> is present you don't have to rely on a default.
-> 
-> > +- st,pwm-num-chan:	Number of available PWM channels.  Default is 0.
-> 
-> The pwm- prefix is rather redundant since the node is already named pwm.
-> Why not simply st,channels? Or simply channels, since it's not really
-> anything specific to this hardware.
-> 
-> Come to think of it, might be worth having a discussion with our DT
-> gurus about what their stance is on using the # as prefix for numbers
-> (such as in #address-cells or #size-cells). This could be #channels to
-> mark it more explicitly as representing a count.
+Why use a NULL device name here?
 
-Unfortunately that ship has sailed.
+>  	CLK("ohci-da8xx",	"usb11",	&usb11_clk),
+>  	CLK("musb-da8xx",	"usb20",	&usb20_clk),
+>  	CLK("spi_davinci.0",	NULL,		&spi0_clk),
+> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+> index 27fa8b8..5857d06 100644
+> --- a/drivers/mtd/nand/davinci_nand.c
+> +++ b/drivers/mtd/nand/davinci_nand.c
+> @@ -694,7 +694,7 @@ static int nand_davinci_probe(struct platform_device *pdev)
+>  
+>  	ret = -EINVAL;
+>  
+> -	info->clk = devm_clk_get(&pdev->dev, "aemif");
+> +	info->clk = devm_clk_get(&pdev->dev, "nand");
 
-st,pwm-num-chan already exists (with your blessing).  It's usually
-suggested to reuse exiting properties when writing new bindings.
+This driver is used by keystone devices too. So just changing the
+connection id will likely break them. Why do you need to change the
+connection id?
 
-> > +- st,32bits-counter:	Set if the hardware have a 32 bits counter
-> > +- st,complementary:	Set if the hardware have complementary output channels
-> 
-> "hardware has" and also maybe mention explicitly that this is a boolean
-> property. Otherwise people might be left wondering what it should be set
-> to. Or maybe word this differently to imply that it's boolean:
-> 
-> 	- st,32bits-counter: if present, the hardware has a 32 bit counter
-> 	- st,complementary: if present, the hardware has a complementary
-> 	                    output channel
-> 
-> Thierry
-
-
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Sekhar
