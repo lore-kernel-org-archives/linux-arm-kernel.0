@@ -1,248 +1,521 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 5 Dec 2016 09:26:04 +0100
-Subject: XHCI controller does not detect USB key insertion
-In-Reply-To: <5841B6D1.4070507@free.fr>
-References: <584134D9.5000404@free.fr> <87inr2vh2l.fsf@linux.intel.com>
- <58414BC5.109@free.fr> <96d38b62-135e-9787-e8b5-1ac3e820c23b@baylibre.com>
- <5841B6D1.4070507@free.fr>
-Message-ID: <2b371baa-f5ed-df9b-0da8-552853b6cd79@baylibre.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 5 Dec 2016 08:31:55 +0000
+Subject: [PATCH v3 4/7] PWM: add pwm driver for stm32 plaftorm
+In-Reply-To: <20161205072357.GB18069@ulmo.ba.sec>
+References: <1480673842-20804-1-git-send-email-benjamin.gaignard@st.com>
+ <1480673842-20804-5-git-send-email-benjamin.gaignard@st.com>
+ <20161205072357.GB18069@ulmo.ba.sec>
+Message-ID: <20161205083155.GA14004@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mason,
+On Mon, 05 Dec 2016, Thierry Reding wrote:
 
-On 12/02/2016 07:00 PM, Mason wrote:
-> [ Fix incorrect address for Felipe ]
+> On Fri, Dec 02, 2016 at 11:17:19AM +0100, Benjamin Gaignard wrote:
+> > This driver add support for pwm driver on stm32 platform.
 > 
-> On 02/12/2016 14:46, Neil Armstrong wrote:
+> "adds". Also please use PWM in prose because it's an abbreviation.
 > 
->> On 12/02/2016 11:24 AM, Mason wrote:
->>
->>> (Sad face) All the documentation I have is in front of me, and nothing
->>> is ringing a bell. This is a Sigma Designs SoC, with a Pravega XHCI
->>> controller + Synopsys PHY.
->>>
->>> The documentation I have:
->>>
->>> Pravega_Dual_Mode_Datasheet_v10c.pdf (documents IP signals)
->>> Pravega_Dual_Mode_Controller_Programmers_Reference_manual_v1.pdf (documents IP registers)
->>> PHY databook (very low-level stuff)
->>> SoC register mapping (for how the SoC maps the IP signals to registers)
->>
->> You should have all the necessary bits to enable and configure the Embedded Synopsys PHY !
->>
->> You should have some register mapping of the PHY signals, or at least a way to write those registers.
->>
->> You should have a reset, clock gate and eventually a power regulator to enable in order to have the PHY running.
+> > The SoC have multiple instances of the hardware IP and each
+> > of them could have small differences: number of channels,
+> > complementary output, counter register size...
+> > Use DT parameters to handle those differentes configuration
 > 
-> I'll dump all the non-0 non-standard registers. Maybe someone
-> more experienced than me will spot an obvious mistake.
+> "different configurations"
 > 
-> host_usb30_0_config: 0x2e800
-> 	- host_usb30_0_fladj                                 0x20
-> 	- host_usb30_0_usb30_controller_cg_disable           0x0
-> 	- host_usb30_0_mode_select                           0x1
-> 	- host_usb30_0_device_reset_mode                     0x0
+> > 
+> > version 2:
+> > - only keep one comptatible
+> > - use DT paramaters to discover hardware block configuration
 > 
-> host_usb30_0_control: 0x2e804
-> 	- host_usb30_0_app_lfps_u3_wp                        0x0
-> 	- host_usb30_0_link_up                               0x1
-> 	- host_usb30_0_msi_msg_sent                          0x0
-> 	- host_usb30_0_usb3_p0_over_current                  0x0
-> 	- host_usb30_0_usb2_p0_over_current                  0x0
+> "parameters"
 > 
-> host_usb30_0_test: 0x2e808
-> 	- host_usb30_0_test_powerdown_hsp                    0x0
-> 	- host_usb30_0_test_powerdown_ssp                    0x0
-> 	- host_usb30_0_test_burnin                           0x0
-> 	- host_usb30_0_acjt_level                            0x14
-> 	- host_usb30_0_lane0_tx2rx_loopbk                    0x0
-> 	- host_usb30_0_rtune_req                             0x0
+> > 
+> > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> > ---
+> >  drivers/pwm/Kconfig     |   8 ++
+> >  drivers/pwm/Makefile    |   1 +
+> >  drivers/pwm/pwm-stm32.c | 285 ++++++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 294 insertions(+)
+> >  create mode 100644 drivers/pwm/pwm-stm32.c
+> > 
+> > diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+> > index bf01288..a89fdba 100644
+> > --- a/drivers/pwm/Kconfig
+> > +++ b/drivers/pwm/Kconfig
+> > @@ -388,6 +388,14 @@ config PWM_STI
+> >  	  To compile this driver as a module, choose M here: the module
+> >  	  will be called pwm-sti.
+> >  
+> > +config PWM_STM32
+> > +	bool "STMicroelectronics STM32 PWM"
+> > +	depends on ARCH_STM32
+> > +	depends on OF
+> > +	select MFD_STM32_GP_TIMER
 > 
-> host_usb30_0_status: 0x2e80c
-> 	- host_usb30_0_phystatus                             0x0
-> 	- host_usb30_0_usb2_p0_pp                            0x1
-> 	- host_usb30_0_usb3_p0_pp                            0x1
-> 	- host_usb30_0_usb3_sleep                            0x0
-> 	- host_usb30_0_rtune_ack                             0x0
+> Should that be a "depends on"?
 > 
-> host_usb30_0_clk_rst_0: 0x2e810
-> 	- host_usb30_0_commononn                             0x1
-> 	- host_usb30_0_portreset                             0x0
-> 	- host_usb30_0_refclksel                             0x2
-> 	- host_usb30_0_teneable                              0x1
-> 	- host_usb30_0_fsel                                  0x27
-> 	- host_usb30_0_mpll_multiplier                       0x19
-> 	- host_usb30_0_ref_clkdiv2                           0x0
-> 	- host_usb30_0_ref_ssp_en                            0x1
-> 	- host_usb30_0_ref_use_pad                           0x0
-> 	- host_usb30_0_ssc_en                                0x1
-> 	- host_usb30_0_ssc_range                             0x0
+> > +	help
+> > +	  Generic PWM framework driver for STM32 SoCs.
+> > +
+> >  config PWM_STMPE
+> >  	bool "STMPE expander PWM export"
+> >  	depends on MFD_STMPE
+> > diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+> > index 1194c54..5aa9308 100644
+> > --- a/drivers/pwm/Makefile
+> > +++ b/drivers/pwm/Makefile
+> > @@ -37,6 +37,7 @@ obj-$(CONFIG_PWM_ROCKCHIP)	+= pwm-rockchip.o
+> >  obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
+> >  obj-$(CONFIG_PWM_SPEAR)		+= pwm-spear.o
+> >  obj-$(CONFIG_PWM_STI)		+= pwm-sti.o
+> > +obj-$(CONFIG_PWM_STM32)		+= pwm-stm32.o
+> >  obj-$(CONFIG_PWM_STMPE)		+= pwm-stmpe.o
+> >  obj-$(CONFIG_PWM_SUN4I)		+= pwm-sun4i.o
+> >  obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
+> > diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
+> > new file mode 100644
+> > index 0000000..a362f63
+> > --- /dev/null
+> > +++ b/drivers/pwm/pwm-stm32.c
+> > @@ -0,0 +1,285 @@
+> > +/*
+> > + * Copyright (C) STMicroelectronics 2016
+> > + * Author:  Gerald Baeza <gerald.baeza@st.com>
 > 
-> host_usb30_0_clk_rst_1: 0x2e814
-> 	- host_usb30_0_ssc_ref_clk_sel                       0x88
-> 	- host_usb30_0_sleepm                                0x1
-> 	- host_usb30_0_vbusvldext                            0x1
+> Could use a blank line between the above. Also, please use a single
+> space after : for consistency.
 > 
-> host_usb30_0_param_0: 0x2e818
-> 	- host_usb30_0_compdistune                           0x4
-> 	- host_usb30_0_otgtune                               0x4
-> 	- host_usb30_0_sqrxtune                              0x3
-> 	- host_usb30_0_txfsltune                             0x3
-> 	- host_usb30_0_txhsxvtune                            0x3
-> 	- host_usb30_0_txpreempltune                         0x0
-> 	- host_usb30_0_txpreemppulsetune                     0x0
-> 	- host_usb30_0_txrestune                             0x1
-> 	- host_usb30_0_txrisetune                            0x2
-> 	- host_usb30_0_txvreftune                            0x4
+> > + * License terms:  GNU General Public License (GPL), version 2
 > 
-> host_usb30_0_param_1: 0x2e81c
-> 	- host_usb30_0_los_bias                              0x5
-> 	- host_usb30_0_los_level                             0xc
-> 	- host_usb30_0_pcs_rx_los_mask_val                   0xf0
-> 	- host_usb30_0_pcs_tx_deemph_3p5db                   0x18
-> 	- host_usb30_0_pcs_tx_deemph_6db                     0x21
+> Here too.
 > 
-> host_usb30_0_param_2: 0x2e820
-> 	- host_usb30_0_pcs_tx_swing_full                     0x73
-> 	- host_usb30_0_lane0_tx_term_offset                  0x0
-> 	- host_usb30_0_tx_vboost_lvl                         0x4
+> > + *
+> > + * Inspired by timer-stm32.c from Maxime Coquelin
+> > + *             pwm-atmel.c from Bo Shen
+> > + */
+> > +
+> > +#include <linux/of.h>
+> > +#include <linux/module.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/pwm.h>
 > 
-> host_usb30_0_SNPS_CR_ADD: 0x2e880
-> 	- host_usb30_0_snps_cr_add                           0xe03c
+> Please sort these alphabetically.
+> 
+> > +
+> > +#include <linux/mfd/stm32-gptimer.h>
+> > +
+> > +#define DRIVER_NAME "stm32-pwm"
+> > +
+> > +#define CAP_COMPLEMENTARY	BIT(0)
+> > +#define CAP_32BITS_COUNTER	BIT(1)
+> > +#define CAP_BREAKINPUT		BIT(2)
+> > +#define CAP_BREAKINPUT_POLARITY BIT(3)
+> 
+> Just make these boolean. Makes the conditionals a lot simpler to read.
+> 
+> > +
+> > +struct stm32_pwm_dev {
+> 
+> No need for the _dev suffix.
 
-This is obviously the PHY registers.
+I usually like ddata (short for device data, which is what it is).
 
-Commonly, the PHY from Synopsys does not have a register interface given by Synopsys, but it's in charge
-of the SoC integrator to add a register set to program all the PHY signals.
+I'll be asking for the same in the MFD driver too.
 
-Typically, those signal will contain some Clock selection, Enable Reset, Tunings and VBUS mode selection.
+> > +	struct device *dev;
+> > +	struct clk *clk;
+> > +	struct regmap *regmap;
+> > +	struct pwm_chip chip;
+> 
+> It's slightly more efficient to put this as first field because then
+> to_stm32_pwm() becomes a no-op.
 
-commononn seems top be an enable, but active low
-portreset seems to be used to reset the port
-refclksel seem to select the clock source (you should have either an external Xtal, SoX Xtal or a PLL output)
+Niiiice!
 
-And so on.
+> > +	int caps;
+> > +	int npwm;
+> 
+> unsigned int, please.
+> 
+> > +	u32 polarity;
+> 
+> Maybe use a prefix here to stress that it is the polarity of the
+> complementary output. Otherwise one might take it for the PWM signal's
+> polarity that's already part of the PWM state.
+> 
+> > +};
+> > +
+> > +#define to_stm32_pwm_dev(x) container_of(chip, struct stm32_pwm_dev, chip)
+> 
+> Please turn this into a static inline.
+> 
+> > +
+> > +static u32 __active_channels(struct stm32_pwm_dev *pwm_dev)
+> 
+> No need for a __ prefix.
+> 
+> > +{
+> > +	u32 ccer;
+> > +
+> > +	regmap_read(pwm_dev->regmap, TIM_CCER, &ccer);
+> > +
+> > +	return ccer & TIM_CCER_CCXE;
+> > +}
+> > +
+> > +static int write_ccrx(struct stm32_pwm_dev *dev, struct pwm_device *pwm,
+> > +		      u32 ccr)
+> 
+> u32 value, perhaps? I first mistook this to be a register offset.
+> 
+> > +{
+> > +	switch (pwm->hwpwm) {
+> > +	case 0:
+> > +		return regmap_write(dev->regmap, TIM_CCR1, ccr);
+> > +	case 1:
+> > +		return regmap_write(dev->regmap, TIM_CCR2, ccr);
+> > +	case 2:
+> > +		return regmap_write(dev->regmap, TIM_CCR3, ccr);
+> > +	case 3:
+> > +		return regmap_write(dev->regmap, TIM_CCR4, ccr);
+> > +	}
+> > +	return -EINVAL;
+> > +}
+> > +
+> > +static int stm32_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+> > +			    int duty_ns, int period_ns)
+> 
+> Please implement this as an atomic PWM driver, I don't want new drivers
+> to use the legacy callbacks.
+> 
+> > +{
+> > +	struct stm32_pwm_dev *dev = to_stm32_pwm_dev(chip);
+> 
+> I think something like "stm", or "priv" would be more appropriate here.
+> If you ever need access to a struct device, you'll be hard-pressed to
+> find a good name for it.
 
-Please look at your "PHY databook" how these signals should be configured.
-Be aware that some "tune" register should have been calibrated in fab somehow, so you should make sure the reset values are correct.
+See above.
 
-Neil
+> > +	unsigned long long prd, div, dty;
+> > +	int prescaler = 0;
+> 
+> If this can never be negative, please make it unsigned int.
+> 
+> > +	u32 max_arr = 0xFFFF, ccmr, mask, shift, bdtr;
+> > +
+> > +	if (dev->caps & CAP_32BITS_COUNTER)
+> > +		max_arr = 0xFFFFFFFF;
+> 
+> I prefer lower-case hexadecimal digits.
 
-> 
-> DEVICE_AND_PORT_000: 0x70050000
-> 	- sw_reset                                           0x0
-> 	- gen_resume                                         0x0
-> 	- ss_support                                         0x0
-> 	- revision_id                                        0x0
-> 	- vendor_id                                          0x3
-> 
-> DEVICE_AND_PORT_00C: 0x7005000c
-> 	- set_isoc_delay                                     0x0
-> 	- utmi_vstatus                                       0x0
-> 	- utmi_vcontrolloadm                                 0x1
-> 	- utmi_vcontrol                                      0x0
-> 	- config_dev_speed                                   0x1
-> 
-> ENDP_CONFIG_020: 0x70050020
-> 	- burst_size                                         0x1
-> 	- max_packet_size_7_0                                0x0
-> 	- rst_seq_num                                        0x0
-> 	- iso_xact_type                                      0x0
-> 	- stall                                              0x0
-> 	- max_pkt_size_10_8                                  0x2
-> 	- setup_reenable                                     0x0
-> 	- endp_enable                                        0x1
-> 	- endp_type                                          0x0
-> 	- endp_no                                            0x0
-> 
-> LTSSM_STATE_REGISTER: 0x70050220
-> 	- ltssm_state_status                                 0x4
-> 	- u1_enable                                          0x0
-> 	- u2_enable                                          0x0
-> 	- disable_scramble_lb                                0x1
-> 	- lfps_ux_exit                                       0x0
-> 	- disable_scramble_request                           0x0
-> 	- self_powered_device                                0x0
-> 	- host_device                                        0x1
-> 	- send_warm_reseti                                   0x0
-> 	- send_hot_reset                                     0x0
-> 	- reg_lgo_u3                                         0x0
-> 
-> PHY_TIMER_REGISTER: 0x70050410
-> 	- u2_inactivity_timeout                              0x0
-> 	- pending_hp_time_out                                0x2a
-> 	- recv_resume                                        0x0
-> 	- auto_resume                                        0x0
-> 	- credit_hp_timer                                    0x46
-> 	- usb3_clk_pulse_256us                               0x100
-> 
-> PM_LC_TIMER_REGISTER: 0x70050418
-> 	- cntr_pulse_pm_lc_timer                             0x2a
-> 	- cntr_pulse_pm_entry_timer                          0x54
-> 	- lup_timeout_value                                  0xa
-> 	- no_link_commands_timeout_value                     0xe
-> 	- pm_lc_timer_register_reserved                      0x6e
-> 
-> LTSSM_TIMER_REGISTER1: 0x7005041c
-> 	- u1_exit_timeout                                    0x54
-> 	- u2_exit_timeout                                    0x54
-> 	- reg_12_ms_timeout                                  0xa8
-> 
-> LTSSM_TIMER_REGISTER2: 0x70050420
-> 	- reg_360_ms_timeout                                 0x34
-> 	- pipe_width                                         0x3
-> 	- reg_2_ms_timeout                                   0x3c
-> 	- rxeq_timeout                                       0xffff
-> 
-> LTSSM_TIMER_REGISTER3: 0x70050424
-> 	- reg_6_ms_timeout                                   0x54
-> 	- reg_300_ms_timeout                                 0x149
-> 	- reg_100_ms_timeout                                 0x8c
-> 	- ltssm_timer_reg3_undef                             0x0
-> 
-> LOW_POWER_LFPS_SIGNALING_REGISTER: 0x70050434
-> 	- low_power_lfps_signaling_register_value            0x4e030303
-> 	- low_power_lfps_undef                               0x0
-> 
-> PING_POLLING_LFPS_SIGNALING_REGISTER: 0x70050440
-> 	- ping_polling_lfps_signaling_register               0x9f5beebc
-> 
-> WARM_RESET_LFPS_SIGNALING_REGISTER: 0x70050444
-> 	- lfps_rx_trepeat_polling                            0x5
-> 	- lfps_wr_undef                                      0x0
-> 	- lfps_wr_tresetdelay_min                            0x12
-> 	- lfps_wr_tresetdelay_max                            0x0
-> 	- lfps_wr_treset_total                               0x76
-> 
-> LOW_POWER_LFPS_SIGNALING_REGISTER1: 0x70050448
-> 	- lfp_rx_undef                                       0x0
-> 	- lfps_rx_u2_t13_t11                                 0x12
-> 	- lfps_rx_u3_t13_t11                                 0x62
-> 	- lfps_rx_u1_t13_t11                                 0x7
-> 	- lfps_tx_u1_t11_t10                                 0xe
-> 	- lfps_tx_u1_t12_t11                                 0x8
-> 	- lfps_tx_u1_t11_t10_7_4                             0x1
-> 
-> LOW_POWER_LFPS_SIGNALING_REGISTER2: 0x7005044c
-> 	- low_power_lfps_signaling_register2                 0xc34f07d0
-> 
-> LOW_POWER_LFPS_SIGNALING_REGISTER3: 0x70050450
-> 	- low_power_lfps_signaling_register3                 0xc34f07d0
-> 
-> TIMER_ENABLE_REGISTERS: 0x70050454
-> 	- pravega_counter_pulse_1us                          0x9
-> 	- pravega_counter_pulse_10us                         0x9
-> 	- pravega_counter_pulse_1ms                          0x9
-> 	- pravega_counter_pulse_100us                        0x9
-> 	- pravega_counter_pulse_10ms                         0x9
-> 	- counter_pulse_100ns                                0x14
-> 
+Even better to define the max values.
 
-These seems to be non-standard Prevaga XHCI registers.
+> > +
+> > +	/* Period and prescaler values depends of clock rate */
+> 
+> "depend on"
+> 
+> > +	div = (unsigned long long)clk_get_rate(dev->clk) * period_ns;
+> > +
+> > +	do_div(div, NSEC_PER_SEC);
+> > +	prd = div;
+> > +
+> > +	while (div > max_arr) {
+> > +		prescaler++;
+> > +		div = prd;
+> > +		do_div(div, (prescaler + 1));
+> > +	}
+> > +	prd = div;
+> 
+> Blank line after blocks, please.
 
+... unless directly related to the block, which I think this is.  It's
+the '\n' *before* the block which confuses me.
+
+> > +	if (prescaler > MAX_TIM_PSC) {
+> > +		dev_err(chip->dev, "prescaler exceeds the maximum value\n");
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	/* All channels share the same prescaler and counter so
+> > +	 * when two channels are active at the same we can't change them
+> > +	 */
 > 
-> I'll take a closer look on Monday.
+> This isn't proper block comment style. Also, please use all of the
+> columns at your disposal.
 > 
-> Regards.
+> > +	if (__active_channels(dev) & ~(1 << pwm->hwpwm * 4)) {
+> > +		u32 psc, arr;
+> > +
+> > +		regmap_read(dev->regmap, TIM_PSC, &psc);
+> > +		regmap_read(dev->regmap, TIM_ARR, &arr);
+> > +
+> > +		if ((psc != prescaler) || (arr != prd - 1))
+> > +			return -EINVAL;
 > 
+> Maybe -EBUSY to differentiate from other error cases?
+> 
+> > +	}
+> > +
+> > +	regmap_write(dev->regmap, TIM_PSC, prescaler);
+> > +	regmap_write(dev->regmap, TIM_ARR, prd - 1);
+> > +	regmap_update_bits(dev->regmap, TIM_CR1, TIM_CR1_ARPE, TIM_CR1_ARPE);
+> > +
+> > +	/* Calculate the duty cycles */
+> > +	dty = prd * duty_ns;
+> > +	do_div(dty, period_ns);
+> > +
+> > +	write_ccrx(dev, pwm, dty);
+> > +
+> > +	/* Configure output mode */
+> > +	shift = (pwm->hwpwm & 0x1) * 8;
+> > +	ccmr = (TIM_CCMR_PE | TIM_CCMR_M1) << shift;
+> > +	mask = 0xFF << shift;
+> > +
+> > +	if (pwm->hwpwm & 0x2)
+> 
+> This looks as though TIM_CCMR1 is used for channels 0 and 1, while
+> TIM_CCMR2 is used for channels 2 and 3. Wouldn't it be more natural to
+> make the conditional above:
+> 
+> 	if (pwm->hwpwm >= 2)
+> 
+> ? Or perhaps better yet:
+> 
+> 	if (pwm->hwpwm < 2)
+> 		/* update TIM_CCMR1 */
+> 	else
+> 		/* update TIM_CCMR2 */
+
+And please define the magic numbers.
+
+*_MASK
+*_SHIFT
+
+> The other alternative, which might make the code slightly more readable,
+> would be to get rid of all these conditionals by parameterizing the
+> offsets per PWM channel. The PWM subsystem has a means of storing per-
+> channel chip-specific data (see pwm_{set,get}_chip_data()). It might be
+> a little overkill for this particular driver, given that the number of
+> conditionals is fairly small.
+> 
+> > +		regmap_update_bits(dev->regmap, TIM_CCMR2, mask, ccmr);
+> > +	else
+> > +		regmap_update_bits(dev->regmap, TIM_CCMR1, mask, ccmr);
+> > +
+> > +	if (!(dev->caps & CAP_BREAKINPUT))
+> > +		return 0;
+> 
+> If you make these capabilities boolean, it becomes much more readable,
+> especially for negations:
+> 
+> 	if (!dev->has_breakinput)
+
++1
+
+> > +
+> > +	bdtr = TIM_BDTR_MOE | TIM_BDTR_AOE;
+> > +
+> > +	if (dev->caps & CAP_BREAKINPUT_POLARITY)
+> > +		bdtr |= TIM_BDTR_BKE;
+> > +
+> > +	if (dev->polarity)
+> > +		bdtr |= TIM_BDTR_BKP;
+> > +
+> > +	regmap_update_bits(dev->regmap, TIM_BDTR,
+> > +			   TIM_BDTR_MOE | TIM_BDTR_AOE |
+> > +			   TIM_BDTR_BKP | TIM_BDTR_BKE,
+> > +			   bdtr);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int stm32_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
+> > +				  enum pwm_polarity polarity)
+> > +{
+> > +	u32 mask;
+> > +	struct stm32_pwm_dev *dev = to_stm32_pwm_dev(chip);
+> > +
+> > +	mask = TIM_CCER_CC1P << (pwm->hwpwm * 4);
+> > +	if (dev->caps & CAP_COMPLEMENTARY)
+> > +		mask |= TIM_CCER_CC1NP << (pwm->hwpwm * 4);
+> > +
+> > +	regmap_update_bits(dev->regmap, TIM_CCER, mask,
+> > +			   polarity == PWM_POLARITY_NORMAL ? 0 : mask);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int stm32_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+> > +{
+> > +	u32 mask;
+> > +	struct stm32_pwm_dev *dev = to_stm32_pwm_dev(chip);
+> > +
+> > +	clk_enable(dev->clk);
+> > +
+> > +	/* Enable channel */
+> > +	mask = TIM_CCER_CC1E << (pwm->hwpwm * 4);
+> > +	if (dev->caps & CAP_COMPLEMENTARY)
+> > +		mask |= TIM_CCER_CC1NE << (pwm->hwpwm * 4);
+> > +
+> > +	regmap_update_bits(dev->regmap, TIM_CCER, mask, mask);
+> > +
+> > +	/* Make sure that registers are updated */
+> > +	regmap_update_bits(dev->regmap, TIM_EGR, TIM_EGR_UG, TIM_EGR_UG);
+> > +
+> > +	/* Enable controller */
+> > +	regmap_update_bits(dev->regmap, TIM_CR1, TIM_CR1_CEN, TIM_CR1_CEN);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static void stm32_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+> > +{
+> > +	u32 mask;
+> > +	struct stm32_pwm_dev *dev = to_stm32_pwm_dev(chip);
+> > +
+> > +	/* Disable channel */
+> > +	mask = TIM_CCER_CC1E << (pwm->hwpwm * 4);
+> > +	if (dev->caps & CAP_COMPLEMENTARY)
+> > +		mask |= TIM_CCER_CC1NE << (pwm->hwpwm * 4);
+> > +
+> > +	regmap_update_bits(dev->regmap, TIM_CCER, mask, 0);
+> > +
+> > +	/* When all channels are disabled, we can disable the controller */
+> > +	if (!__active_channels(dev))
+> > +		regmap_update_bits(dev->regmap, TIM_CR1, TIM_CR1_CEN, 0);
+> > +
+> > +	clk_disable(dev->clk);
+> > +}
+> 
+> All of the above can be folded into the ->apply() hook for atomic PWM
+> support.
+> 
+> Also, in the above you use clk_enable() in the ->enable() callback and
+> clk_disable() in ->disable(). If you need the clock to access registers
+> you'll have to enabled it in the others as well because there are no
+> guarantees that configuration will only happen between ->enable() and
+> ->disable(). Atomic PWM simplifies this a bit, but you still need to be
+> careful about when to enable the clock in your ->apply() hook.
+> 
+> > +
+> > +static const struct pwm_ops stm32pwm_ops = {
+> > +	.config = stm32_pwm_config,
+> > +	.set_polarity = stm32_pwm_set_polarity,
+> > +	.enable = stm32_pwm_enable,
+> > +	.disable = stm32_pwm_disable,
+> > +};
+> 
+> You need to set the .owner field as well.
+> 
+> > +
+> > +static int stm32_pwm_probe(struct platform_device *pdev)
+> > +{
+> > +	struct device *dev = &pdev->dev;
+> > +	struct device_node *np = dev->of_node;
+> > +	struct stm32_gptimer_dev *mfd = dev_get_drvdata(pdev->dev.parent);
+> > +	struct stm32_pwm_dev *pwm;
+
+pwm is okay.  Please also consider using ddata for consistency across
+the driver-set.
+
+> > +	int ret;
+> > +
+> > +	pwm = devm_kzalloc(dev, sizeof(*pwm), GFP_KERNEL);
+> > +	if (!pwm)
+> > +		return -ENOMEM;
+> > +
+> > +	pwm->regmap = mfd->regmap;
+> > +	pwm->clk = mfd->clk;
+> > +
+> > +	if (!pwm->regmap || !pwm->clk)
+> > +		return -EINVAL;
+> > +
+> > +	if (of_property_read_bool(np, "st,complementary"))
+> > +		pwm->caps |= CAP_COMPLEMENTARY;
+> > +
+> > +	if (of_property_read_bool(np, "st,32bits-counter"))
+> > +		pwm->caps |= CAP_32BITS_COUNTER;
+> > +
+> > +	if (of_property_read_bool(np, "st,breakinput"))
+> > +		pwm->caps |= CAP_BREAKINPUT;
+> > +
+> > +	if (!of_property_read_u32(np, "st,breakinput-polarity", &pwm->polarity))
+> > +		pwm->caps |= CAP_BREAKINPUT_POLARITY;
+> > +
+> > +	of_property_read_u32(np, "st,pwm-num-chan", &pwm->npwm);
+> > +
+> > +	pwm->chip.base = -1;
+> > +	pwm->chip.dev = dev;
+> > +	pwm->chip.ops = &stm32pwm_ops;
+> > +	pwm->chip.npwm = pwm->npwm;
+> > +
+> > +	ret = pwmchip_add(&pwm->chip);
+> > +	if (ret < 0)
+> > +		return ret;
+> > +
+> > +	platform_set_drvdata(pdev, pwm);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int stm32_pwm_remove(struct platform_device *pdev)
+> > +{
+> > +	struct stm32_pwm_dev *pwm = platform_get_drvdata(pdev);
+> > +	int i;
+> 
+> unsigned int, please.
+> 
+> > +
+> > +	for (i = 0; i < pwm->npwm; i++)
+> > +		pwm_disable(&pwm->chip.pwms[i]);
+> > +
+> > +	pwmchip_remove(&pwm->chip);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct of_device_id stm32_pwm_of_match[] = {
+> > +	{
+> > +		.compatible = "st,stm32-pwm",
+> > +	},
+> 
+> The above can be collapsed into a single line.
+
++1
+
+> > +};
+> > +MODULE_DEVICE_TABLE(of, stm32_pwm_of_match);
+> > +
+> > +static struct platform_driver stm32_pwm_driver = {
+> > +	.probe		= stm32_pwm_probe,
+> > +	.remove		= stm32_pwm_remove,
+> > +	.driver	= {
+> > +		.name	= DRIVER_NAME,
+> > +		.of_match_table = stm32_pwm_of_match,
+> > +	},
+> > +};
+> 
+> Please don't use tabs for padding within the structure definition since
+> it doesn't align properly anyway.
+
++1
+
+> > +module_platform_driver(stm32_pwm_driver);
+> > +
+> > +MODULE_ALIAS("platform:" DRIVER_NAME);
+> > +MODULE_DESCRIPTION("STMicroelectronics STM32 PWM driver");
+> > +MODULE_LICENSE("GPL");
+> 
+> According to the header comment this should be "GPL v2".
+
++1
+
+
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
