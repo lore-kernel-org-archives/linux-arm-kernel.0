@@ -1,47 +1,109 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 5 Dec 2016 09:09:32 +0100
-Subject: [PATCH 1/2] ARM: dts: sun8i: Specify memblock for Nano Pi M1
-In-Reply-To: <20161205020032.26586-1-woogyom.kim@gmail.com>
-References: <20161205020032.26586-1-woogyom.kim@gmail.com>
-Message-ID: <20161205080932.xaqyl2httgxgso67@lukather>
+From: maninder1.s@samsung.com (Maninder Singh)
+Date: Mon, 05 Dec 2016 13:36:54 +0530
+Subject: [PATCH 1/1] arm64: Correcting format specifier for printing 64 bit
+ addresses
+Message-ID: <1480925214-1597-1-git-send-email-maninder1.s@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2016 at 11:00:31AM +0900, Milo Kim wrote:
-> The board has DDR3 512MB. This patch helps scanning the memory and
-> adding memblock through the DT.
-> 
-> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
-> ---
->  arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
-> index ec63d10..be3668f 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
-> @@ -45,6 +45,11 @@
->  / {
->  	model = "FriendlyArm NanoPi M1";
->  	compatible = "friendlyarm,nanopi-m1", "allwinner,sun8i-h3";
-> +
-> +	memory at 40000000 {
-> +		device_type = "memory";
-> +		reg = <0x40000000 0x20000000>;
-> +	};
+This patch corrects format specifier for printing 64 bit addresses.
 
-U-boot will fill that up, so there's no need to put it there.
+Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
+Signed-off-by: Vaneet Narang <v.narang@samsung.com>
+---
+ arch/arm64/kernel/signal.c |  2 +-
+ arch/arm64/kvm/sys_regs.c  |  8 ++++++--
+ arch/arm64/mm/fault.c      | 15 ++++++++++-----
+ arch/arm64/mm/mmu.c        |  4 ++--
+ 4 files changed, 19 insertions(+), 10 deletions(-)
 
-Maxime
-
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index c7b6de6..c89d5fd 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -155,7 +155,7 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
+ 
+ badframe:
+ 	if (show_unhandled_signals)
+-		pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
++		pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%016llx sp=%016llx\n",
+ 				    current->comm, task_pid_nr(current), __func__,
+ 				    regs->pc, regs->sp);
+ 	force_sig(SIGSEGV, current);
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 87e7e66..89bf5c1 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -1554,8 +1554,12 @@ static void unhandled_cp_access(struct kvm_vcpu *vcpu,
+ 		WARN_ON(1);
+ 	}
+ 
+-	kvm_err("Unsupported guest CP%d access at: %08lx\n",
+-		cp, *vcpu_pc(vcpu));
++	if (params->is_32bit)
++		kvm_err("Unsupported guest CP%d access at: %08lx\n",
++			cp, *vcpu_pc(vcpu));
++	else
++		kvm_err("Unsupported guest CP%d access at: %016lx\n",
++			cp, *vcpu_pc(vcpu));
+ 	print_sys_reg_instr(params);
+ 	kvm_inject_undefined(vcpu);
+ }
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index a78a5c4..d96a42a 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -77,7 +77,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+ 
+ 	pr_alert("pgd = %p\n", mm->pgd);
+ 	pgd = pgd_offset(mm, addr);
+-	pr_alert("[%08lx] *pgd=%016llx", addr, pgd_val(*pgd));
++	pr_alert("[%016lx] *pgd=%016llx", addr, pgd_val(*pgd));
+ 
+ 	do {
+ 		pud_t *pud;
+@@ -177,7 +177,7 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
+ 	 * No handler, we'll have to terminate things with extreme prejudice.
+ 	 */
+ 	bust_spinlocks(1);
+-	pr_alert("Unable to handle kernel %s at virtual address %08lx\n",
++	pr_alert("Unable to handle kernel %s at virtual address %016lx\n",
+ 		 (addr < PAGE_SIZE) ? "NULL pointer dereference" :
+ 		 "paging request", addr);
+ 
+@@ -198,9 +198,14 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
+ 	struct siginfo si;
+ 
+ 	if (unhandled_signal(tsk, sig) && show_unhandled_signals_ratelimited()) {
+-		pr_info("%s[%d]: unhandled %s (%d)@0x%08lx, esr 0x%03x\n",
+-			tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
+-			addr, esr);
++		if (compat_user_mode(regs))
++			pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x\n",
++				tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
++				addr, esr);
++		else
++			pr_info("%s[%d]: unhandled %s (%d) at 0x%016lx, esr 0x%03x\n",
++				tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
++				addr, esr);
+ 		show_pte(tsk->mm, addr);
+ 		show_regs(regs);
+ 	}
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 17243e4..cbf444c 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -683,9 +683,9 @@ void __init early_fixmap_init(void)
+ 		pr_warn("pmd %p != %p, %p\n",
+ 			pmd, fixmap_pmd(fix_to_virt(FIX_BTMAP_BEGIN)),
+ 			fixmap_pmd(fix_to_virt(FIX_BTMAP_END)));
+-		pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
++		pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %016lx\n",
+ 			fix_to_virt(FIX_BTMAP_BEGIN));
+-		pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
++		pr_warn("fix_to_virt(FIX_BTMAP_END):   %016lx\n",
+ 			fix_to_virt(FIX_BTMAP_END));
+ 
+ 		pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161205/a219cc4b/attachment.sig>
+1.9.1
