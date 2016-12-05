@@ -1,100 +1,145 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Mon, 5 Dec 2016 14:09:12 -0800
-Subject: [PATCH v3] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe
- controller
-In-Reply-To: <20161205215318.GB22455@bhelgaas-glaptop.roam.corp.google.com>
-References: <1480549373-2123-1-git-send-email-dhdang@apm.com>
- <20161201183350.GF30746@bhelgaas-glaptop.roam.corp.google.com>
- <CADaLNDm6fPQ6ekQa85fveAamJtF3+HGeOvprmgGJ4gLnMhF2_w@mail.gmail.com>
- <20161205215318.GB22455@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CADaLND=wqO+dWJWgqqy5Wqd4zO1yRptpeq+6p_TEjSpb_7gMQQ@mail.gmail.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Mon, 5 Dec 2016 23:18:56 +0100
+Subject: [PATCH] ACPI/IORT: Make dma masks set-up IORT specific
+In-Reply-To: <20161205122619.25045-1-lorenzo.pieralisi@arm.com>
+References: <20161205122619.25045-1-lorenzo.pieralisi@arm.com>
+Message-ID: <CAJZ5v0hbc61=QCYDgHZ_KbxR7VkSSWrHVGvU47fG6hsQrSJKhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 5, 2016 at 1:53 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Thu, Dec 01, 2016 at 06:52:23PM -0800, Duc Dang wrote:
->> On Thu, Dec 1, 2016 at 10:33 AM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+On Mon, Dec 5, 2016 at 1:26 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> The introduction of acpi_dma_configure() allows to configure DMA
+> and related IOMMU for any device that is DMA capable. To achieve
+> that goal it ensures DMA masks are set-up to sane default values
+> before proceeding with IOMMU and DMA ops configuration.
 >
->> I made similar changes in v4 patch. The ECAM quirk will be built when
->> ACPI and PCI_QUIRKS are enabled.
->>
->> When building for DT only, the ECAM quirk won't be compiled.
+> On x86/ia64 systems, through acpi_bind_one(), acpi_dma_configure() is
+> called for every device that has an ACPI companion, in that every device
+> is considered DMA capable on x86/ia64 systems (ie acpi_get_dma_attr() API),
+> which has the side effect of initializing dma masks also for
+> pseudo-devices (eg CPUs and memory nodes) and potentially for devices
+> whose dma masks were not set-up before the acpi_dma_configure() API was
+> introduced, which may have noxious side effects.
 >
-> Perfect.
+> Therefore, in preparation for IORT firmware specific DMA masks set-up,
+> wrap the default DMA masks set-up in acpi_dma_configure() inside an IORT
+> specific wrapper that reverts to a NOP on x86/ia64 systems, restoring the
+> default expected behaviour on x86/ia64 systems and keeping DMA default
+> masks set-up on IORT based (ie ARM) arch configurations.
 >
->> >>  #define XGENE_PCIE_IP_VER_UNKN               0
->> >>  #define XGENE_PCIE_IP_VER_1          1
->> >> +#define XGENE_PCIE_IP_VER_2          2
->> >
->> > This isn't used anywhere, which makes me wonder whether it's worth
->> > keeping it.
->>
->> V2 controller will use this XGENE_PCIE_IP_VER_2 (port->version =
->> XGENE_PCIE_IP_VER_2). This will be used to indicate that the
->> controller is V2, and to enable configuration request retry status
->> feature (by not disable it like V1 controller).
->
-> OK, I see.  You don't actually need XGENE_PCIE_IP_VER_2, you just need
-> port->version to be something other than XGENE_PCIE_IP_VER_1.  So this
-> is fine as it is.
->
->> >>  static void __iomem *xgene_pcie_get_cfg_base(struct pci_bus *bus)
->> >>  {
->> >> -     struct xgene_pcie_port *port = bus->sysdata;
->> >> +     struct pci_config_window *cfg;
->> >> +     struct xgene_pcie_port *port;
->> >> +
->> >> +     if (acpi_disabled)
->> >> +             port = bus->sysdata;
->> >> +     else {
->> >> +             cfg = bus->sysdata;
->> >> +             port = cfg->priv;
->> >> +     }
->> >
->> > I would really, really like to figure out a way to get rid of these
->> > "if (acpi_disabled)" checks sprinkled through here.  Is there any way
->> > we can set up bus->sysdata to be the same, regardless of whether we're
->> > using this as a platform driver or an ACPI quirk?
->>
->> Right now, I created a inline function to extract xgene_pcie_port from
->> pci_bus. In order to get rid of acpi_disabled, I will need to make
->> sysdata in DT case also point to pci_config_window structure, which
->> means I will need to convert and test the DT driver to use ecam ops.
->> It is a separate patch itself. So I think I should do it at later time
->> (after this ECAM quirk patch). I hope you are ok with this.
->
-> OK.  I did the simple-minded version of leaving the DT ops the same
-> but making sysdata point to a dummy pci_config_window.  Your proposal
-> of using ECAM for DT would be much better.
->
-> It's interesting that you actually already use the same accessors
-> except that DT uses the 32-bit pci_generic_config_write32() and ACPI
-> uses the regular pci_generic_config_write(). I guess that means the
-> hardware actually *does* support sub-32 bit writes?
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Tomasz Nowicki <tn@semihalf.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Cc: Sricharan R <sricharan@codeaurora.org>
 
-Yes, the hardware does support sub-32 bit writes (and reads). This is
-another item in my TODO list for DT (which does not seem quite urgent
-now): switch to use pci_generic_config_write for DT. But, well, I will
-need to do that for read as well (for both ACPI and DT).
+Acked -by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 
+> ---
+> Joerg,
 >
->> I need to define the function (xgene_get_csr_resource()) inside
->> pci-xgene.c to duplicate the code of acpi_get_rc_addr. The reason is
->> X-Gene firmware does not have a dedicate PNP0C02 node to declare the
->> resource, and if I use acpi_get_rc_resources() with "PNP0A08", I got
->> error due to acpi_bus_get_device() returns error.
+> pending Rafael's ACK on it, given the 4.10 release timing and that the
+> series is queued via the IOMMU tree please consider applying this patch to
+> your arm/smmu branch for 4.10, it is not fixing a bug but it is modifying
+> the x86/ia64 code path; I prefer preventing any issue related to default
+> dma masks on x86/ia64 so I hope it can get merged along with the rest of
+> the ACPI IORT SMMU series.
 >
-> Looks good.
+> Thanks a lot and apologies,
+> Lorenzo
 >
->> > All these init functions are almost identical.  Can we factor this out
->> > by having wrappers that do nothing more than pass in the table and
->> > version, and put the kzalloc and ioremap in a shared back-end?
->>
->> I refactor-ed these .init functions. And as a result, there are only 2
->> ecam ops left: xgene_v1_pcie_ecam_ops and xgene_v2_pcie_ecam_ops.
+>  drivers/acpi/arm64/iort.c | 22 ++++++++++++++++++++++
+>  drivers/acpi/scan.c       | 14 +-------------
+>  include/linux/acpi_iort.h |  2 ++
+>  3 files changed, 25 insertions(+), 13 deletions(-)
 >
-> Looks good.
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index 47bace8..e0d2e6e 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -547,6 +547,28 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
+>  }
 >
-> Bjorn
-Regards,
-Duc Dang.
+>  /**
+> + * iort_set_dma_mask - Set-up dma mask for a device.
+> + *
+> + * @dev: device to configure
+> + */
+> +void iort_set_dma_mask(struct device *dev)
+> +{
+> +       /*
+> +        * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
+> +        * setup the correct supported mask.
+> +        */
+> +       if (!dev->coherent_dma_mask)
+> +               dev->coherent_dma_mask = DMA_BIT_MASK(32);
+> +
+> +       /*
+> +        * Set it to coherent_dma_mask by default if the architecture
+> +        * code has not set it.
+> +        */
+> +       if (!dev->dma_mask)
+> +               dev->dma_mask = &dev->coherent_dma_mask;
+> +}
+> +
+> +/**
+>   * iort_iommu_configure - Set-up IOMMU configuration for a device.
+>   *
+>   * @dev: device to configure
+> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+> index 80698d3..93b00cf 100644
+> --- a/drivers/acpi/scan.c
+> +++ b/drivers/acpi/scan.c
+> @@ -1380,19 +1380,7 @@ void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
+>  {
+>         const struct iommu_ops *iommu;
+>
+> -       /*
+> -        * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
+> -        * setup the correct supported mask.
+> -        */
+> -       if (!dev->coherent_dma_mask)
+> -               dev->coherent_dma_mask = DMA_BIT_MASK(32);
+> -
+> -       /*
+> -        * Set it to coherent_dma_mask by default if the architecture
+> -        * code has not set it.
+> -        */
+> -       if (!dev->dma_mask)
+> -               dev->dma_mask = &dev->coherent_dma_mask;
+> +       iort_set_dma_mask(dev);
+>
+>         iommu = iort_iommu_configure(dev);
+>
+> diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
+> index dcb2b60..77e0809 100644
+> --- a/include/linux/acpi_iort.h
+> +++ b/include/linux/acpi_iort.h
+> @@ -35,6 +35,7 @@ bool iort_node_match(u8 type);
+>  u32 iort_msi_map_rid(struct device *dev, u32 req_id);
+>  struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
+>  /* IOMMU interface */
+> +void iort_set_dma_mask(struct device *dev);
+>  const struct iommu_ops *iort_iommu_configure(struct device *dev);
+>  #else
+>  static inline void acpi_iort_init(void) { }
+> @@ -45,6 +46,7 @@ static inline struct irq_domain *iort_get_device_domain(struct device *dev,
+>                                                         u32 req_id)
+>  { return NULL; }
+>  /* IOMMU interface */
+> +static inline void iort_set_dma_mask(struct device *dev) { }
+>  static inline
+>  const struct iommu_ops *iort_iommu_configure(struct device *dev)
+>  { return NULL; }
+> --
+> 2.10.0
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
