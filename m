@@ -1,61 +1,34 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu, 8 Dec 2016 21:20:44 -0800
-Subject: [PATCH 3/3] iio: adc: add a driver for Qualcomm PM8xxx HK/XOADC
-In-Reply-To: <1481032279-27115-1-git-send-email-linus.walleij@linaro.org>
-References: <1481032279-27115-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20161209052044.GV30492@tuxbot>
+From: maninder1.s@samsung.com (=?UTF-8?B?TWFuaW5kZXIgU2luZ2g=?=)
+Date: Mon, 05 Dec 2016 08:18:03 +0000
+Subject: =?UTF-8?B?UkU6IFJlOiBbUEFUQ0ggMS8yXSBhcm02NDogQ29ycmVjdGlu?=
+ =?UTF-8?B?ZyBmb3JtYXQgc3BlY2lmaWVyIGZvciBwcmludGluIDY0IGJp?=
+ =?UTF-8?B?dCBhZGRyZXNzZXM=?=
+References: <1480493036-47334-1-git-send-email-maninder1.s@samsung.com>
+ <CGME20161130105054epcas2p2d8e6fbfc65564ff74c646e1ca00d3bf5@epcas2p2.samsung.com>
+Message-ID: <20161205081803epcms5p508a7587d144d706b7ce86ff611a833e4@epcms5p5>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 06 Dec 05:51 PST 2016, Linus Walleij wrote:
+?
+Hi Will,
 
-> +static struct pm8xxx_chan_info *
-> +pm8xxx_get_channel(struct pm8xxx_xoadc *adc, u8 chan)
-> +{
-> +	struct pm8xxx_chan_info *ch;
-> +	int i;
-> +
-> +	if (chan >= adc->nchans)
-> +		return NULL;
+>There are a bunch of these you haven't caught:
+>
+....
+>arch/arm64/mm/mmu.c:            pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
+>
+>so it would probably make sense to fix these to be consistent.
+>
+>Will
 
-nchans is the number of children and chan is the channel id, so this
-doesn't seem right (I think you should just drop this check).
+All changes are sent in new patch except kvm changes, because for kvm we don't not much idea.
 
-> +
-> +	for (i = 0; i < adc->nchans; i++) {
-> +		ch = &adc->chans[i];
-> +		if (ch->amux_channel == chan)
-> +			break;
-> +	}
-> +	if (i == adc->nchans)
-> +		return NULL;
-> +
-> +	return ch;
-> +}
-> +
-> +static int pm8xxx_read_channel_rsv(struct pm8xxx_xoadc *adc,
-> +				   const struct pm8xxx_chan_info *ch,
-> +				   u8 rsv, u16 *adc_code)
-> +{
-> +	int ret;
-> +	unsigned int val;
-> +	u8 rsvmask, rsvval;
-> +	u8 lsb, msb;
-> +
-> +	dev_dbg(adc->dev, "read channel \"%s\", amux %d, mpp %d, rsv %d\n",
-> +		ch->name, ch->amux_channel, ch->amux_mpp_channel, rsv);
-> +
-> +	/* Mux in this channel */
-> +	ret = regmap_write(adc->map, ADC_ARB_USRP_AMUX_CNTRL,
-> +			   ch->amux_channel << ADC_AMUX_SEL_SHIFT |
-> +			   ch->amux_mpp_channel << ADC_AMUX_PREMUX_SHIFT);
 
-Does this need synchronization to stop multiple clients to stomp on each
-other here?
+>arch/arm64/kernel/signal32.c:           pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
+>arch/arm64/kernel/signal32.c:           pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
 
-> +	if (ret)
-> +		return ret;
-> +
+and signal32 fiel changes are not required, because it meant only for 32 bit.
 
-Regards,
-Bjorn
+--------------------
+Thanks and Regards,
+Maninder Singh
