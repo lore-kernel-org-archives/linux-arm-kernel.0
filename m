@@ -1,28 +1,40 @@
-From: mhocko@suse.com (Michal Hocko)
-Date: Mon, 5 Dec 2016 10:31:01 +0100
-Subject: [PATCH v3 0/4] mm: fix the "counter.sh" failure for libhugetlbfs
-In-Reply-To: <1480929431-22348-1-git-send-email-shijie.huang@arm.com>
-References: <1480929431-22348-1-git-send-email-shijie.huang@arm.com>
-Message-ID: <20161205093100.GF30758@dhcp22.suse.cz>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon,  5 Dec 2016 10:32:11 +0100
+Subject: [PATCH] arm/arm64: KVM: Check for properly initialized timer on init
+Message-ID: <20161205093211.11870-1-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 05-12-16 17:17:07, Huang Shijie wrote:
-[...]
->    The failure is caused by:
->     1) kernel fails to allocate a gigantic page for the surplus case.
->        And the gather_surplus_pages() will return NULL in the end.
-> 
->     2) The condition checks for some functions are wrong:
->         return_unused_surplus_pages()
->         nr_overcommit_hugepages_store()
->         hugetlb_overcommit_handler()
+When the arch timer code fails to initialize (for example because the
+memory mapped timer doesn't work, which is currently seen with the AEM
+model), then KVM just continues happily with a final result that KVM
+eventually does a NULL pointer dereference of the uninitialized cycle
+counter.
 
-OK, so how is this any different from gigantic (1G) hugetlb pages on
-x86_64? Do we need the same functionality or is it just 32MB not being
-handled in the same way as 1G?
+Check directly for this in the init path and give the user a reasonable
+error in this case.
 
-Thanks!
+Cc: Shih-Wei Li <shihwei@cs.columbia.edu>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/arch_timer.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 27a1f63..5c12f53 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -425,6 +425,11 @@ int kvm_timer_hyp_init(void)
+ 	info = arch_timer_get_kvm_info();
+ 	timecounter = &info->timecounter;
+ 
++	if (!timecounter->cc) {
++		kvm_err("arch_timer: uninitialized timecounter\n");
++		return -ENODEV;
++	}
++
+ 	if (info->virtual_irq <= 0) {
+ 		kvm_err("kvm_arch_timer: invalid virtual timer IRQ: %d\n",
+ 			info->virtual_irq);
 -- 
-Michal Hocko
-SUSE Labs
+2.9.0
