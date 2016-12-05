@@ -1,34 +1,73 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 5 Dec 2016 10:24:53 +0800
-Subject: [PATCH v2 1/2] arm64: dts: zx: Fix gic GICR property
-In-Reply-To: <3937871.l5gZt4hBke@wuerfel>
-References: <1476361881-19685-1-git-send-email-jun.nie@linaro.org>
- <1476361881-19685-2-git-send-email-jun.nie@linaro.org>
- <a243d381-f7ab-abed-ca21-f0951abb04fd@arm.com>
- <3937871.l5gZt4hBke@wuerfel>
-Message-ID: <20161205022451.GA2749@dragon>
+From: aik@ozlabs.ru (Alexey Kardashevskiy)
+Date: Mon, 5 Dec 2016 13:27:17 +1100
+Subject: [PATCH v3 -next 1/2] ARM: sunxi: add support for H2+ SoC
+In-Reply-To: <20161202150513.34691-1-icenowy@aosc.xyz>
+References: <20161202150513.34691-1-icenowy@aosc.xyz>
+Message-ID: <4a4fe484-27c0-73cb-ffb6-13192182d748@ozlabs.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Fri, Dec 02, 2016 at 09:28:58PM +0100, Arnd Bergmann wrote:
-> Given that there is any concern about the patch now, and the merge
-> window is almost open, I'm moving both patches to the
-> next/fixes-non-critical branch and will merge it for v4.10 instead
-> of sending it for v4.9.
+On 03/12/16 02:05, Icenowy Zheng wrote:
+> Allwinner H2+ is a quad-core Cortex-A7 SoC.
 > 
-> If you end up deciding that the patch is wrong, please follow up
-> with a fix on top. Once the situation is resolved and the patch
-> merged upstream, feel free to ask stable at vger.kernel.org for a
-> backport to stable kernels to get it into v4.9.x.
+> It is very like H3, that they share the same SoC ID (0x1680), and H3
+> memory maps as well as drivers works well on the SoC.
 
-The patch is correct, though it can be cleaned up a bit further per
-Marc's suggestion.  Since we now have 4.9-rc8, I'm wondering if we can
-still get this into 4.9 to save the stable kernel backport.
 
-I sent you a cleanup patch on top of this one yesterday.  If you like,
-I can quickly resend the patch with the cleanup squashed.
+What git tree is this made against of? Thanks.
 
-Thanks,
-Shawn
+
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+> Changes since v2:
+> - Changed compatible from allwinner,sun8i-h2plus to allwinner,sun8i-h2-plus.
+>  Documentation/arm/sunxi/README                  | 4 ++++
+>  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+>  arch/arm/mach-sunxi/sunxi.c                     | 1 +
+>  3 files changed, 6 insertions(+)
+> 
+> diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+> index cd02433..1fe4d99c 100644
+> --- a/Documentation/arm/sunxi/README
+> +++ b/Documentation/arm/sunxi/README
+> @@ -63,6 +63,10 @@ SunXi family
+>          + User Manual
+>            http://dl.linux-sunxi.org/A33/A33%20user%20manual%20release%201.1.pdf
+>  
+> +      - Allwinner H2+ (sun8i)
+> +        + No document available now, but is known to be working properly with
+> +          H3 drivers and memory map.
+> +
+>        - Allwinner H3 (sun8i)
+>          + Datasheet
+>            http://dl.linux-sunxi.org/H3/Allwinner_H3_Datasheet_V1.0.pdf
+> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+> index 4d6467c..59b143f 100644
+> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+> @@ -13,6 +13,7 @@ using one of the following compatible strings:
+>    allwinner,sun8i-a33
+>    allwinner,sun8i-a83t
+>    allwinner,sun8i-h3
+> +  allwinner,sun8i-h2-plus
+>    allwinner,sun9i-a80
+>    allwinner,sun50i-a64
+>    nextthing,gr8
+> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> index 2e2bde2..320d2af 100644
+> --- a/arch/arm/mach-sunxi/sunxi.c
+> +++ b/arch/arm/mach-sunxi/sunxi.c
+> @@ -63,6 +63,7 @@ static const char * const sun8i_board_dt_compat[] = {
+>  	"allwinner,sun8i-a23",
+>  	"allwinner,sun8i-a33",
+>  	"allwinner,sun8i-a83t",
+> +	"allwinner,sun8i-h2-plus",
+>  	"allwinner,sun8i-h3",
+>  	NULL,
+>  };
+> 
+
+
+-- 
+Alexey
