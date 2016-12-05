@@ -1,72 +1,33 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 05 Dec 2016 16:41:43 +0100
-Subject: [PATCH] ARM: dts: orion5x: fix number of sata port for
- linkstation ls-gl
-In-Reply-To: <CAEQ9gEkp+bS10ZQ_0UJqvWMNgTkmtWGqcZviRZk0+pQaZFw_vA@mail.gmail.com>
- (Roger Shimizu's message of "Tue, 6 Dec 2016 00:39:27 +0900")
-References: <20161201151112.930-1-rogershimizu@gmail.com>
- <CAEQ9gEkp+bS10ZQ_0UJqvWMNgTkmtWGqcZviRZk0+pQaZFw_vA@mail.gmail.com>
-Message-ID: <87y3zugz7s.fsf@free-electrons.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 5 Dec 2016 15:42:14 +0000
+Subject: [PATCH 0/2] Hibernate fixes for 'Fix memmap to be initialized for
+ the entire section'
+In-Reply-To: <20161202144909.18405-1-james.morse@arm.com>
+References: <1480530091-1092-1-git-send-email-rrichter@cavium.com>
+ <20161202144909.18405-1-james.morse@arm.com>
+Message-ID: <CAKv+Gu9AVVPp+UM5pCeYCt4HE-Azijp0iUf0QZv6YKFgAuckYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
- 
- On lun., d?c. 05 2016, Roger Shimizu <rogershimizu@gmail.com> wrote:
-
-> [CC Arnd Bergmann]
+On 2 December 2016 at 14:49, James Morse <james.morse@arm.com> wrote:
+> Patch "arm64: mm: Fix memmap to be initialized for the entire section"
+> changes pfn_valid() in a way that breaks hibernate. These patches fix
+> hibernate, and provided struct page's are allocated for nomap pages,
+> can be applied before [0].
 >
-> On Fri, Dec 2, 2016 at 12:11 AM, Roger Shimizu <rogershimizu@gmail.com> wrote:
->> Bug report from Debian [0] shows there's minor changed model of
->> Linkstation LS-GL that uses the 2nd SATA port of the SoC.
->> So it's necessary to enable two SATA ports, though for that specific
->> model only the 2nd one is used.
->>
->> [0] https://bugs.debian.org/845611
->>
->> Fixes: b1742ffa9ddb ("ARM: dts: orion5x: add device tree for buffalo linkstation ls-gl")
->> Reported-by: Ryan Tandy <ryan@nardis.ca>
->> Tested-by: Ryan Tandy <ryan@nardis.ca>
->> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
->> ---
->>  arch/arm/boot/dts/orion5x-linkstation-lsgl.dts | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/orion5x-linkstation-lsgl.dts b/arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
->> index 1cf644b..51dc734 100644
->> --- a/arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
->> +++ b/arch/arm/boot/dts/orion5x-linkstation-lsgl.dts
->> @@ -82,6 +82,10 @@
->>         gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
->>  };
->>
->> +&sata {
->> +       nr-ports = <2>;
->> +};
->> +
->>  &ehci1 {
->>         status = "okay";
->>  };
->> --
->> 2.10.2
->>
+> Hibernate core code belives 'valid' to mean "I can access this". It
+> uses pfn_valid() to test the page if the page is 'valid'.
 >
-> Is there any chance to get this simple fix into v4.9 or next v4.10?
-> Thank you!
+> pfn_valid() needs to be changed so that all struct pages in a numa
+> node have the same node-id. Currently 'nomap' pages are skipped, and
+> retain their pre-numa node-ids, which leads to a later BUG_ON().
+>
+> These patches make hibernate's savable_page() take its escape route
+> via 'if (PageReserved(page) && pfn_is_nosave(pfn))'.
+>
 
-I can apply it on mvebu/fixes and make a pull request. But I don't know
-if Arnd or Olof will get it.
-
-Let's see ahow it goes.
-
-Gregory
-
-> -- 
-> Roger Shimizu, GMT +9 Tokyo
-> PGP/GPG: 4096R/6C6ACD6417B3ACB1
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+This makes me feel slightly uneasy. Robert makes a convincing point,
+but I wonder if we can expect more fallout from the ambiguity of
+pfn_valid(). Now we are not only forced to assign non-existing (as far
+as the OS is concerned) pages to the correct NUMA node, we also need
+to set certain page flags.
