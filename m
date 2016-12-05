@@ -1,67 +1,49 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 5 Dec 2016 16:13:42 +0530
-Subject: [PATCH v3 3/3] ARM: da850: fix da850_set_pll0rate()
-In-Reply-To: <1480932549-30811-4-git-send-email-bgolaszewski@baylibre.com>
-References: <1480932549-30811-1-git-send-email-bgolaszewski@baylibre.com>
- <1480932549-30811-4-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <d4214e68-19c7-3bcc-ec13-5615f52ee054@ti.com>
+From: fweimer@redhat.com (Florian Weimer)
+Date: Mon, 5 Dec 2016 11:44:38 +0100
+Subject: [RFC PATCH 00/29] arm64: Scalable Vector Extension core support
+In-Reply-To: <20161201103048.GO1574@e103592.cambridge.arm.com>
+References: <20161130120654.GJ1574@e103592.cambridge.arm.com>
+ <3e8afc5a-1ba9-6369-462b-4f5a707d8b8a@redhat.com>
+ <20161130135631.GK1574@e103592.cambridge.arm.com>
+ <dbcd545f-1358-6a80-5a9f-3e4a3c93189a@redhat.com>
+ <20161201103048.GO1574@e103592.cambridge.arm.com>
+Message-ID: <0293f7d3-b3d3-1a68-5b99-75db195eb796@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 December 2016 03:39 PM, Bartosz Golaszewski wrote:
-> This function is confusing - its second argument is an index to the
-> freq table, not the requested clock rate in Hz, but it's used as the
-> set_rate callback for the pll0 clock. It leads to an oops when the
-> caller doesn't know the internals and passes the rate in Hz as
-> argument instead of the cpufreq index since this argument isn't bounds
-> checked either.
-> 
-> Fix it by iterating over the array of supported frequencies and
-> selecting a one that matches or returning -EINVAL for unsupported
-> rates.
-> 
-> Also: update the davinci cpufreq driver. It's the only user of this
-> clock and currently it passes the cpufreq table index to
-> clk_set_rate(), which is confusing. Make it pass the requested clock
-> rate in Hz.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  arch/arm/mach-davinci/da850.c     | 20 ++++++++++++++++----
->  drivers/cpufreq/davinci-cpufreq.c |  2 +-
->  2 files changed, 17 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-> index 006ec56..9837541 100644
-> --- a/arch/arm/mach-davinci/da850.c
-> +++ b/arch/arm/mach-davinci/da850.c
-> @@ -1179,14 +1179,26 @@ static int da850_set_armrate(struct clk *clk, unsigned long index)
->  	return clk_set_rate(pllclk, index);
->  }
->  
-> -static int da850_set_pll0rate(struct clk *clk, unsigned long index)
-> +static int da850_set_pll0rate(struct clk *clk, unsigned long rate)
->  {
-> -	unsigned int prediv, mult, postdiv;
-> -	struct da850_opp *opp;
->  	struct pll_data *pll = clk->pll_data;
-> +	struct cpufreq_frequency_table *freq;
-> +	unsigned int prediv, mult, postdiv;
-> +	struct da850_opp *opp = NULL;
->  	int ret;
->  
-> -	opp = (struct da850_opp *) cpufreq_info.freq_table[index].driver_data;
-> +	for (freq = da850_freq_table;
-> +	     freq->frequency != CPUFREQ_TABLE_END; freq++) {
-> +		/* rate is in Hz, freq->frequency is in KHz */
-> +		if (freq->frequency == rate / 1000) {
+On 12/01/2016 11:30 AM, Dave Martin wrote:
 
-Or
-	rate = rate / 1000;
+>> The VL value is implicitly thread-local data, and the encoded state may have
+>> an implicit dependency on it, although it does not contain vector registers
+>> as such.
+>
+> This doesn't sound like an absolute requirement to me.
+>
+> If we presume that the SVE registers never need to get saved or
+> restored, what stops the context data format being VL-independent?
 
-before the loop begins? The idea behind my comment was mostly to reduce
-the amount of calculation in the loop.
+I'm concerned the suspended computation has code which has been selected 
+to fit a particular VL value.
+
+ > If the save/restore logic doesn't touch SVE, which would its
+ > implementation be VL-dependent?
+
+Because it has been optimized for a certain vector length?
+
+>>> Because the SVE procedure call standard determines that the SVE
+>>> registers are caller-save,
+>>
+>> By the way, how is this implemented?  Some of them overlap existing
+>> callee-saved registers.
+>
+> Basically, all the *new* state is caller-save.
+>
+> The Neon/FPSIMD regs V8-V15 are callee-save, so in the SVE view
+> Zn[bits 127:0] is callee-save for all n = 8..15.
+
+Are the extension parts of registers v8 to v15 used for argument passing?
+
+If not, we should be able to use the existing dynamic linker trampoline.
 
 Thanks,
-Sekhar
+Florian
