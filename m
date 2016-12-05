@@ -1,43 +1,48 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Mon, 5 Dec 2016 08:32:12 -0600
-Subject: [PATCH v3 1/2] ARM: dts: da850-lcdk: add the dumb-vga-dac node
-In-Reply-To: <1480420624-23544-2-git-send-email-bgolaszewski@baylibre.com>
-References: <1480420624-23544-1-git-send-email-bgolaszewski@baylibre.com>
- <1480420624-23544-2-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <CAL_Jsq+OKbSvu0bG8KNtw4tsLH46B2Vnb9ZampPafCum4xSZWA@mail.gmail.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Mon,  5 Dec 2016 06:38:34 -0800
+Subject: [PATCH v3 1/3] ARM: dts: vf610-zii-dev-rev-b: Remove leftover PWM
+ pingroup
+Message-ID: <1480948716-17744-1-git-send-email-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 5:57 AM, Bartosz Golaszewski
-<bgolaszewski@baylibre.com> wrote:
-> Add the dumb-vga-dac node to the board DT together with corresponding
-> ports and vga connector. This allows to retrieve the edid info from
-> the display automatically.
->
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  arch/arm/boot/dts/da850-lcdk.dts | 58 ++++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/da850.dtsi     | 17 ++++++++++++
->  2 files changed, 75 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-> index 711b9ad..d864f11 100644
-> --- a/arch/arm/boot/dts/da850-lcdk.dts
-> +++ b/arch/arm/boot/dts/da850-lcdk.dts
-> @@ -50,6 +50,53 @@
->                         system-clock-frequency = <24576000>;
->                 };
->         };
-> +
-> +       vga_bridge {
+Remove pwm0grp since it is:
 
-s/_/-/
+	a) Not referenced anywhere in the DTS file (unlike Tower board it
+	is based on, this board does not use/expose FTM0)
 
-> +               compatible = "dumb-vga-dac";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&lcd_pins>;
+	b) Configures PTB2 and PTB3 in a way that contradicts
+	pinctrl-mdio-mux
 
-Are these pins from the LCD controller? They should be part of the LCD
-controller node.
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
 
-Rob
+Changes since v2:
+
+	- None
+
+ arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 9 ---------
+ 1 file changed, 9 deletions(-)
+
+diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+index fa19cfd..2210811 100644
+--- a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
++++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+@@ -677,15 +677,6 @@
+ 		>;
+ 	};
+ 
+-	pinctrl_pwm0: pwm0grp {
+-		fsl,pins = <
+-			VF610_PAD_PTB0__FTM0_CH0	0x1582
+-			VF610_PAD_PTB1__FTM0_CH1	0x1582
+-			VF610_PAD_PTB2__FTM0_CH2	0x1582
+-			VF610_PAD_PTB3__FTM0_CH3	0x1582
+-		>;
+-	};
+-
+ 	pinctrl_qspi0: qspi0grp {
+ 		fsl,pins = <
+ 			VF610_PAD_PTD7__QSPI0_B_QSCK	0x31c3
+-- 
+2.5.5
