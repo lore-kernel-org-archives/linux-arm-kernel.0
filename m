@@ -1,39 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 5 Dec 2016 17:12:43 +0000
-Subject: [PATCH 11/18] arm64: ilp32: share aarch32 syscall handlers
-In-Reply-To: <1477081997-4770-12-git-send-email-ynorov@caviumnetworks.com>
-References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
- <1477081997-4770-12-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <20161205171242.GH14429@e104818-lin.cambridge.arm.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Mon, 5 Dec 2016 17:17:03 +0000
+Subject: [PATCH] usb: gadget: udc: atmel: used managed kasprintf
+In-Reply-To: <20161202161921.ace5rolitlxjhr6i@piout.net>
+References: <20161201102656.29041-1-alexandre.belloni@free-electrons.com>
+ <063D6719AE5E284EB5DD2968C1650D6DB0232C0D@AcuExch.aculab.com>
+ <20161202161921.ace5rolitlxjhr6i@piout.net>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6DB023508B@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2016 at 11:33:10PM +0300, Yury Norov wrote:
-> off_t is  passed in register pair just like in aarch32.
-> In this patch corresponding aarch32 handlers are shared to
-> ilp32 code.
-[...]
-> +/*
-> + * Note: off_4k (w5) is always in units of 4K. If we can't do the
-> + * requested offset because it is not page-aligned, we return -EINVAL.
-> + */
-> +ENTRY(compat_sys_mmap2_wrapper)
-> +#if PAGE_SHIFT > 12
-> +	tst	w5, #~PAGE_MASK >> 12
-> +	b.ne	1f
-> +	lsr	w5, w5, #PAGE_SHIFT - 12
-> +#endif
-> +	b	sys_mmap_pgoff
-> +1:	mov	x0, #-EINVAL
-> +	ret
-> +ENDPROC(compat_sys_mmap2_wrapper)
+From: Alexandre Belloni
+> Sent: 02 December 2016 16:19
+> On 02/12/2016 at 15:59:57 +0000, David Laight wrote :
+> > From: Alexandre Belloni
+> > > Sent: 01 December 2016 10:27
+> > > Use devm_kasprintf instead of simple kasprintf to free the allocated memory
+> > > when needed.
+> >
+> > s/when needed/when the device is freed/
+> >
+> > > Suggested-by: Peter Rosin <peda@axentia.se>
+> > > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > > ---
+> > >  drivers/usb/gadget/udc/atmel_usba_udc.c | 3 ++-
+> > >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > >
+> > > diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> > > index 45bc997d0711..aec72fe8273c 100644
+> > > --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
+> > > +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> > > @@ -1978,7 +1978,8 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+> > >  			dev_err(&pdev->dev, "of_probe: name error(%d)\n", ret);
+> > >  			goto err;
+> > >  		}
+> > > -		ep->ep.name = kasprintf(GFP_KERNEL, "ep%d", ep->index);
+> > > +		ep->ep.name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "ep%d",
+> > > +					     ep->index);
+> >
+> > Acually why bother mallocing such a small string at all.
+> > The maximum length is 12 bytes even if 'index' are unrestricted.
+> >
+> 
+> IIRC, using statically allocated string is failing somewhere is the USB
+> core but I don't remember all the details.
 
-For compat sys_mmap2, the pgoff argument is in multiples of 4K. This was
-traditionally used for architectures where off_t is 32-bit to allow
-mapping files to 2^44.
+I can't imagine that changing ep->ep.name from 'char *' to 'char [12]' would
+make any difference.
 
-Since off_t is 64-bit with AArch64/ILP32, should we just pass the off_t
-as a 64-bit value in two different registers (w5 and w6)?
-
--- 
-Catalin
+	David
