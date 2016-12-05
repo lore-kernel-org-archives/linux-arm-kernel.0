@@ -1,42 +1,32 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 04 Dec 2016 17:26:58 -0800
-Subject: [PATCH] ARM: dts: imx7d: fix LCDIF clock assignment
-In-Reply-To: <CAOMZO5AqKupmmKb4biGfmy4v3ZwS-BFjPY=MLd8Rc0ZXL+vQvg@mail.gmail.com>
-References: <20161123004204.10851-1-stefan@agner.ch>
- <CAOMZO5AqKupmmKb4biGfmy4v3ZwS-BFjPY=MLd8Rc0ZXL+vQvg@mail.gmail.com>
-Message-ID: <7e4829f484f6c4425fc9d01bea1a094f@agner.ch>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Mon, 5 Dec 2016 09:38:52 +0800
+Subject: [v2, PATCH] pinctrl: mt8173: set GPIO16 to usb iddig mode
+Message-ID: <1480901933-6971-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn
+the default mode of GPIO16 pin is gpio, when set EINT16 to
+IRQ_TYPE_LEVEL_HIGH, no interrupt is triggered, it can be
+fixed when set its default mode as usb iddig.
 
-On 2016-11-23 15:02, Fabio Estevam wrote:
-> On Tue, Nov 22, 2016 at 10:42 PM, Stefan Agner <stefan@agner.ch> wrote:
->> The eLCDIF IP of the i.MX 7 SoC knows multiple clocks and lists them
->> separately:
->>
->> Clock      Clock Root              Description
->> apb_clk    MAIN_AXI_CLK_ROOT       AXI clock
->> pix_clk    LCDIF_PIXEL_CLK_ROOT    Pixel clock
->> ipg_clk_s  MAIN_AXI_CLK_ROOT       Peripheral access clock
->>
->> All of them are switched by a single gate, which is part of the
->> IMX7D_LCDIF_PIXEL_ROOT_CLK clock. Hence using that clock also for
->> the AXI bus clock (clock-name "axi") makes sure the gate gets
->> enabled when accessing registers.
->>
->> There seem to be no separate AXI display clock, and the clock is
->> optional. Hence remove the dummy clock.
->>
->> This fixes kernel freezes when starting the X-Server (which
->> disables/re-enables the display controller).
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> 
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Acked-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+---
+ drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Since this fixes a kernel freeze, is there a chance to get this still in
-4.9?
-
---
-Stefan
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
+index 13e5b68..9b018fd 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
+@@ -201,7 +201,7 @@
+ 	MTK_PIN(
+ 		PINCTRL_PIN(16, "IDDIG"),
+ 		NULL, "mt8173",
+-		MTK_EINT_FUNCTION(0, 16),
++		MTK_EINT_FUNCTION(1, 16),
+ 		MTK_FUNCTION(0, "GPIO16"),
+ 		MTK_FUNCTION(1, "IDDIG"),
+ 		MTK_FUNCTION(2, "CMFLASH"),
+-- 
+1.7.9.5
