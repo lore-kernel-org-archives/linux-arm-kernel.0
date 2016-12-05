@@ -1,33 +1,104 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  5 Dec 2016 18:42:23 +0000
-Subject: [PATCH v3 1/6] crypto: testmgr - avoid overlap in chunked tests
+Date: Mon,  5 Dec 2016 18:42:24 +0000
+Subject: [PATCH v3 2/6] crypto: testmgr - add/enhance test cases for CRC-T10DIF
 In-Reply-To: <1480963348-24203-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1480963348-24203-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1480963348-24203-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1480963348-24203-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IDXn offsets are chosen such that tap values (which may go up to
-255) end up overlapping in the xbuf allocation. In particular, IDX1
-and IDX3 are too close together, so update IDX3 to avoid this issue.
+The existing test cases only exercise a small slice of the various
+possible code paths through the x86 SSE/PCLMULQDQ implementation,
+and the upcoming ports of it for arm64. So add one that exceeds 256
+bytes in size, and convert another to a chunked test.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- crypto/testmgr.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ crypto/testmgr.h | 70 ++++++++++++--------
+ 1 file changed, 42 insertions(+), 28 deletions(-)
 
-diff --git a/crypto/testmgr.c b/crypto/testmgr.c
-index ded50b67c757..670893bcf361 100644
---- a/crypto/testmgr.c
-+++ b/crypto/testmgr.c
-@@ -63,7 +63,7 @@ int alg_test(const char *driver, const char *alg, u32 type, u32 mask)
-  */
- #define IDX1		32
- #define IDX2		32400
--#define IDX3		1
-+#define IDX3		511
- #define IDX4		8193
- #define IDX5		22222
- #define IDX6		17101
+diff --git a/crypto/testmgr.h b/crypto/testmgr.h
+index e64a4ef9d8ca..9b656be7f52f 100644
+--- a/crypto/testmgr.h
++++ b/crypto/testmgr.h
+@@ -1334,36 +1334,50 @@ static struct hash_testvec rmd320_tv_template[] = {
+ 	}
+ };
+ 
+-#define CRCT10DIF_TEST_VECTORS	3
++#define CRCT10DIF_TEST_VECTORS	ARRAY_SIZE(crct10dif_tv_template)
+ static struct hash_testvec crct10dif_tv_template[] = {
+ 	{
+-		.plaintext = "abc",
+-		.psize  = 3,
+-#ifdef __LITTLE_ENDIAN
+-		.digest = "\x3b\x44",
+-#else
+-		.digest = "\x44\x3b",
+-#endif
+-	}, {
+-		.plaintext = "1234567890123456789012345678901234567890"
+-			     "123456789012345678901234567890123456789",
+-		.psize	= 79,
+-#ifdef __LITTLE_ENDIAN
+-		.digest	= "\x70\x4b",
+-#else
+-		.digest	= "\x4b\x70",
+-#endif
+-	}, {
+-		.plaintext =
+-		"abcddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+-		.psize  = 56,
+-#ifdef __LITTLE_ENDIAN
+-		.digest = "\xe3\x9c",
+-#else
+-		.digest = "\x9c\xe3",
+-#endif
+-		.np     = 2,
+-		.tap    = { 28, 28 }
++		.plaintext	= "abc",
++		.psize		= 3,
++		.digest		= (u8 *)(u16 []){ 0x443b },
++	}, {
++		.plaintext 	= "1234567890123456789012345678901234567890"
++				  "123456789012345678901234567890123456789",
++		.psize		= 79,
++		.digest 	= (u8 *)(u16 []){ 0x4b70 },
++		.np		= 2,
++		.tap		= { 63, 16 },
++	}, {
++		.plaintext	= "abcdddddddddddddddddddddddddddddddddddddddd"
++				  "ddddddddddddd",
++		.psize		= 56,
++		.digest		= (u8 *)(u16 []){ 0x9ce3 },
++		.np		= 8,
++		.tap		= { 1, 2, 28, 7, 6, 5, 4, 3 },
++	}, {
++		.plaintext 	= "1234567890123456789012345678901234567890"
++				  "1234567890123456789012345678901234567890"
++				  "1234567890123456789012345678901234567890"
++				  "1234567890123456789012345678901234567890"
++				  "1234567890123456789012345678901234567890"
++				  "1234567890123456789012345678901234567890"
++				  "1234567890123456789012345678901234567890"
++				  "123456789012345678901234567890123456789",
++		.psize		= 319,
++		.digest		= (u8 *)(u16 []){ 0x44c6 },
++	}, {
++		.plaintext 	= "1234567890123456789012345678901234567890"
++				  "1234567890123456789012345678901234567890"
++				  "1234567890123456789012345678901234567890"
++				  "1234567890123456789012345678901234567890"
++				  "1234567890123456789012345678901234567890"
++				  "1234567890123456789012345678901234567890"
++				  "1234567890123456789012345678901234567890"
++				  "123456789012345678901234567890123456789",
++		.psize		= 319,
++		.digest		= (u8 *)(u16 []){ 0x44c6 },
++		.np		= 4,
++		.tap		= { 1, 255, 57, 6 },
+ 	}
+ };
+ 
 -- 
 2.7.4
