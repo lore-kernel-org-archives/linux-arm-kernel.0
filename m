@@ -1,40 +1,55 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon,  5 Dec 2016 10:32:11 +0100
-Subject: [PATCH] arm/arm64: KVM: Check for properly initialized timer on init
-Message-ID: <20161205093211.11870-1-christoffer.dall@linaro.org>
+From: manu@bidouilliste.com (Emmanuel Vadot)
+Date: Mon, 5 Dec 2016 10:39:06 +0100
+Subject: [PATCH] ARM: dts: sunxi: Add num-cs for A20 spi nodes
+In-Reply-To: <20161205092821.m2fmqxnzalcignly@lukather>
+References: <20161122170616.29557-1-manu@bidouilliste.com>
+ <20161124195517.qrq7briu3pwjnp4n@lukather>
+ <20161124210509.be743aae84c26c6c2e666c6e@bidouilliste.com>
+ <20161125152047.oadxi2xbgm4kdd7q@lukather>
+ <20161125220752.c989c85e01ed202be0485c78@bidouilliste.com>
+ <20161201092150.rlo5skxd6elovlgq@lukather>
+ <20161201112414.62f9b351186115f62c8998a9@bidouilliste.com>
+ <20161205092821.m2fmqxnzalcignly@lukather>
+Message-ID: <20161205103906.3f7ffc1c86a49825a9a1cbb1@bidouilliste.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the arch timer code fails to initialize (for example because the
-memory mapped timer doesn't work, which is currently seen with the AEM
-model), then KVM just continues happily with a final result that KVM
-eventually does a NULL pointer dereference of the uninitialized cycle
-counter.
+On Mon, 5 Dec 2016 10:28:21 +0100
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-Check directly for this in the init path and give the user a reasonable
-error in this case.
+> On Thu, Dec 01, 2016 at 11:24:14AM +0100, Emmanuel Vadot wrote:
+> > > > > >  If num-cs isn't present nothing prevent to start a transfer
+> > > > > > with a non-valid CS pin, resulting in an error.  num-cs are
+> > > > > > default property especially made for this and a SPI driver
+> > > > > > should try to get the property at probe/attach time.
+> > > > > 
+> > > > > Yes, but as far as I know, our driver doesn't. I'm all in for
+> > > > > having support for that in our driver, but without it, that
+> > > > > patch is kind of useless.
+> > > > 
+> > > >  Yes the Linux driver doesn't use it but my upcoming one for FreeBSD
+> > > > uses it. So it is not useless for downstream user of DTS.
+> > > 
+> > > Ah, I didn't know this was for FreeBSD. So you started to use our DTs,
+> > > or do you have some modifications to it? How does that work?
+> > 
+> > Yes we use the DTS from linux from quite some times now. We're
+> > currently synced with 4.7-ish.  We either use them directly or
+> > modify them according to our needs and driver support.
+> 
+> Do you have a link to those modifications?
+> 
+> Thanks,
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
 
-Cc: Shih-Wei Li <shihwei@cs.columbia.edu>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- virt/kvm/arm/arch_timer.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ Sure,
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 27a1f63..5c12f53 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -425,6 +425,11 @@ int kvm_timer_hyp_init(void)
- 	info = arch_timer_get_kvm_info();
- 	timecounter = &info->timecounter;
- 
-+	if (!timecounter->cc) {
-+		kvm_err("arch_timer: uninitialized timecounter\n");
-+		return -ENODEV;
-+	}
-+
- 	if (info->virtual_irq <= 0) {
- 		kvm_err("kvm_arch_timer: invalid virtual timer IRQ: %d\n",
- 			info->virtual_irq);
+ https://svnweb.freebsd.org/base/head/sys/boot/fdt/dts/arm/
+
 -- 
-2.9.0
+Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
