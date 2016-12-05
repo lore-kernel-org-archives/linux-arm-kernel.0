@@ -1,37 +1,33 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Mon, 5 Dec 2016 09:50:34 +0800
-Subject: [v2, PATCH] pinctrl: mt8173: set GPIO16 to usb iddig mode
-In-Reply-To: <1480901933-6971-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1480901933-6971-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1480902634.6851.2.camel@mhfsdcap03>
+From: woogyom.kim@gmail.com (Milo Kim)
+Date: Mon,  5 Dec 2016 11:00:31 +0900
+Subject: [PATCH 1/2] ARM: dts: sun8i: Specify memblock for Nano Pi M1
+Message-ID: <20161205020032.26586-1-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Mon, 2016-12-05 at 09:38 +0800, Chunfeng Yun wrote:
-> the default mode of GPIO16 pin is gpio, when set EINT16 to
-> IRQ_TYPE_LEVEL_HIGH, no interrupt is triggered, it can be
-> fixed when set its default mode as usb iddig.
-> 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> Acked-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+The board has DDR3 512MB. This patch helps scanning the memory and
+adding memblock through the DT.
 
-Please ignore the v2 patch, just add Acked-by, sorry
+Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+---
+ arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-> ---
->  drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
-> index 13e5b68..9b018fd 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
-> @@ -201,7 +201,7 @@
->  	MTK_PIN(
->  		PINCTRL_PIN(16, "IDDIG"),
->  		NULL, "mt8173",
-> -		MTK_EINT_FUNCTION(0, 16),
-> +		MTK_EINT_FUNCTION(1, 16),
->  		MTK_FUNCTION(0, "GPIO16"),
->  		MTK_FUNCTION(1, "IDDIG"),
->  		MTK_FUNCTION(2, "CMFLASH"),
+diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
+index ec63d10..be3668f 100644
+--- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
++++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
+@@ -45,6 +45,11 @@
+ / {
+ 	model = "FriendlyArm NanoPi M1";
+ 	compatible = "friendlyarm,nanopi-m1", "allwinner,sun8i-h3";
++
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0x40000000 0x20000000>;
++	};
+ };
+ 
+ &ehci1 {
+-- 
+2.9.3
