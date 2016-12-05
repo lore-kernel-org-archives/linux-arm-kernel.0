@@ -1,28 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 5 Dec 2016 10:52:53 +0000
-Subject: next-20161205 build: 3 failures 4 warnings (next-20161205)
-In-Reply-To: <20161205104455.2m5ky3hgd5n2kb2w@sirena.org.uk>
-References: <E1cDo86-0008IX-9W@optimist>
- <20161205104455.2m5ky3hgd5n2kb2w@sirena.org.uk>
-Message-ID: <b8c4cce8-c114-b576-c073-7d14fd79f0f0@arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 05 Dec 2016 11:54:00 +0100
+Subject: [PATCH] i2c: rk3x: keep i2c irq ON in suspend
+In-Reply-To: <1480924979-13450-1-git-send-email-david.wu@rock-chips.com>
+References: <1480924979-13450-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1737869.ycGphUXI8X@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/16 10:44, Mark Brown wrote:
-> On Mon, Dec 05, 2016 at 07:56:06AM +0000, Build bot for Mark Brown wrote:
-> 
-> Today's -next fails to build an arm64 allmodconfig:  
-> 
->> 	arm64-allmodconfig
->> ../arch/arm64/include/asm/probes.h:18:25: fatal error: asm/opcodes.h: No such file or directory
-> 
-> due to bca8f17f57bd76d (arm64: Get rid of asm/opcodes.h) having missed
-> one reference to the header.
+Hi David,
 
-Fix on the list: https://www.spinics.net/lists/arm-kernel/msg546960.html
+Am Montag, 5. Dezember 2016, 16:02:59 CET schrieb David Wu:
+> During suspend there may still be some i2c access happening.
+> And if we don't keep i2c irq ON, there may be i2c access timeout if
+> i2c is in irq mode of operation.
 
-Thanks,
+can you describe the issue you're trying to fix a bit more please?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I.e. I'd think the i2c-core does suspend i2c-client devices first, so that
+these should be able to finish up their ongoing transfers and not start any
+new ones instead?
+
+Your irq can still happen slightly after the system started going to actually
+sleep, so to me it looks like you just widened the window where irqs can be
+handled. Especially as your irq could also just simply stem from the start
+state, so you cannot even be sure if your transaction actually is finished.
+
+So to me it looks like the i2c-connected device driver should be fixed instead?
+
+In the past I solved this for example in the zforce_ts driver [0] to
+prevent i2c transfers from happening during suspend.
+
+
+Heiko
+
+[0] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/input/touchscreen/zforce_ts.c
+
+
+> 
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> ---
+>  drivers/i2c/busses/i2c-rk3x.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+> index df22066..67af32a 100644
+> --- a/drivers/i2c/busses/i2c-rk3x.c
+> +++ b/drivers/i2c/busses/i2c-rk3x.c
+> @@ -1261,7 +1261,7 @@ static int rk3x_i2c_probe(struct platform_device
+> *pdev) }
+> 
+>  	ret = devm_request_irq(&pdev->dev, irq, rk3x_i2c_irq,
+> -			       0, dev_name(&pdev->dev), i2c);
+> +			       IRQF_NO_SUSPEND, dev_name(&pdev->dev), i2c);
+>  	if (ret < 0) {
+>  		dev_err(&pdev->dev, "cannot request IRQ\n");
+>  		return ret;
