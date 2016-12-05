@@ -1,55 +1,102 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 5 Dec 2016 12:02:38 +0530
-Subject: [PATCH v4] ARM: davinci: da8xx: Fix sleeping function called from
- invalid context
-In-Reply-To: <907a3c22-534f-80ce-daff-be84dd5e5cf8@lechnology.com>
-References: <1480690380-13216-1-git-send-email-abailon@baylibre.com>
- <907a3c22-534f-80ce-daff-be84dd5e5cf8@lechnology.com>
-Message-ID: <21fbc91f-5e85-86d0-dc97-4188bcafe5ad@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 5 Dec 2016 07:53:50 +0100
+Subject: [PATCH v3 3/7] PWM: add pwm-stm32 DT bindings
+In-Reply-To: <1480673842-20804-4-git-send-email-benjamin.gaignard@st.com>
+References: <1480673842-20804-1-git-send-email-benjamin.gaignard@st.com>
+ <1480673842-20804-4-git-send-email-benjamin.gaignard@st.com>
+Message-ID: <20161205065350.GA18069@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
-
-On Monday 05 December 2016 09:14 AM, David Lechner wrote:
-> I have just tried this patch with a bunch of kernel hacking options
-> enabled. I am getting the message show at the end of this email. We
-> still have the problem of nested spin locks due to nested calls to
-> clk_enable(). So, really, we need to use __clk_enable() and
-> __clk_disable() from arch/arm/mach-davinci/clock.c in
-> usb20_phy_clk_enable() above.
-
-Good catch. I noticed  that common clock framework uses a more elaborate
-mechanism to allow nested clock API calls (see clk_prepare_lock()), but
-we don't (yet) have that issue in mach-davinci since the recursive calls
-are still in mach-davinci and dont need the exported API to be
-recursively callable.
-
-> Applying the following patch on top of your patch fixed the recursive
-> lock message.
-
-The patch looks okay to me, except couple of minor adjustments.
-
+On Fri, Dec 02, 2016 at 11:17:18AM +0100, Benjamin Gaignard wrote:
+> Define bindings for pwm-stm32
 > 
+> version 2:
+> - use parameters instead of compatible of handle the hardware configuration
+> 
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 > ---
+>  .../devicetree/bindings/pwm/pwm-stm32.txt          | 38 ++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
 > 
-> diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
-> index df42c93..4fba579 100644
-> --- a/arch/arm/mach-davinci/clock.c
-> +++ b/arch/arm/mach-davinci/clock.c
-> @@ -31,7 +31,7 @@ static LIST_HEAD(clocks);
->  static DEFINE_MUTEX(clocks_mutex);
->  static DEFINE_SPINLOCK(clockfw_lock);
-> 
-> -static void __clk_enable(struct clk *clk)
-> +void __clk_enable(struct clk *clk)
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+> new file mode 100644
+> index 0000000..575b9fb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+> @@ -0,0 +1,38 @@
+> +STMicroelectronics PWM driver bindings for STM32
 
-Now that this function is going to be used outside of this file, lets
-drop the __ naming convention and call this davinci_clk_enable() in line
-with how other davinci-local clock APIs are named. Same thing for the
-disable counterpart.
+Technically this bindings describe devices, so "driver binding" is a
+somewhat odd wording. Perhaps:
 
-Also, the making these function non-static should be a patch of its own.
+	STMicroelectronics STM32 General Purpose Timer PWM bindings
 
-Thanks,
-Sekhar
+?
+
+> +
+> +Must be a sub-node of STM32 general purpose timer driver
+> +Parent node properties are describe in ../mfd/stm32-general-purpose-timer.txt
+
+Again, "driver parent node" is odd. Perhaps:
+
+	Must be a sub-node of an STM32 General Purpose Timer device tree
+	node. See ../mfd/stm32-general-purpose-timer.txt for details about
+	the parent node.
+
+?
+
+> +Required parameters:
+> +- compatible:		Must be "st,stm32-pwm"
+> +- pinctrl-names: 	Set to "default".
+> +- pinctrl-0: 		List of phandles pointing to pin configuration nodes
+> +			for PWM module.
+> +			For Pinctrl properties, please refer to [1].
+
+Your indentation and capitalization are inconsistent. Also, please refer
+to the pinctrl bindings by relative path and inline, rather than as a
+footnote reference.
+
+> +
+> +Optional parameters:
+> +- st,breakinput:	Set if the hardware have break input capabilities
+> +- st,breakinput-polarity: Set break input polarity. Default is 0
+> +			 The value define the active polarity:
+> +			  - 0 (active LOW)
+> +			  - 1 (active HIGH)
+
+Could we fold these into a single property? If st,breakinput-polarity is
+not present it could simply mean that there is no break input, and if it
+is present you don't have to rely on a default.
+
+> +- st,pwm-num-chan:	Number of available PWM channels.  Default is 0.
+
+The pwm- prefix is rather redundant since the node is already named pwm.
+Why not simply st,channels? Or simply channels, since it's not really
+anything specific to this hardware.
+
+Come to think of it, might be worth having a discussion with our DT
+gurus about what their stance is on using the # as prefix for numbers
+(such as in #address-cells or #size-cells). This could be #channels to
+mark it more explicitly as representing a count.
+
+> +- st,32bits-counter:	Set if the hardware have a 32 bits counter
+> +- st,complementary:	Set if the hardware have complementary output channels
+
+"hardware has" and also maybe mention explicitly that this is a boolean
+property. Otherwise people might be left wondering what it should be set
+to. Or maybe word this differently to imply that it's boolean:
+
+	- st,32bits-counter: if present, the hardware has a 32 bit counter
+	- st,complementary: if present, the hardware has a complementary
+	                    output channel
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161205/23d337b3/attachment.sig>
