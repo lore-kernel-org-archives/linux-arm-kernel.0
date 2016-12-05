@@ -1,34 +1,40 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  5 Dec 2016 17:28:39 -0200
-Subject: [PATCH] ARM: dts: imx6sx-udoo-neo: Pass the 'phy-reset-duration'
- property
-Message-ID: <1480966119-17350-1-git-send-email-festevam@gmail.com>
+From: sellcey@caviumnetworks.com (Steve Ellcey)
+Date: Mon, 5 Dec 2016 11:33:57 -0800
+Subject: ILP32 for ARM64: testing with glibc testsuite
+In-Reply-To: <mvmeg1mn0yp.fsf@hawking.suse.de>
+References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+ <20161107082359.GA19666@yury-N73SV> <20161109095650.GA22804@yury-N73SV>
+ <CC4F99A7-1FD2-486A-BD66-ED06F1B8BF50@linaro.org>
+ <1479419136.908.90.camel@caviumnetworks.com>
+ <ff3b973b-3887-7ae8-5a27-4d1ad115055f@huawei.com>
+ <mvmeg1mn0yp.fsf@hawking.suse.de>
+Message-ID: <1480966437.29811.23.camel@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On Mon, 2016-12-05 at 11:07 +0100, Andreas Schwab wrote:
+> On Dez 05 2016, "Zhangjian (Bamvor)" <bamvor.zhangjian@huawei.com>
+> wrote:
+> 
+> > 
+> > Is there some progresses on it? We could collabrate to fix those
+> > issues.
+> All the elf/nptl/rt fails should be fixed by the recent binutils
+> fixes.
+> 
+> Andreas.
 
-imx6sx-udoo-neo has a KSZ8091 Ethernet PHY, which requires the reset
-signal to be low for at least 10ms.
+I am using binutils ToT and Yury's latest patch (https://sourceware.org
+/ml/binutils/2016-12/msg00039.html) and I am still seeing some nptl and
+rt failures in the glibc testsuite, specifically:
 
-Pass the 'phy-reset-duration' property to reflect such requirement.
+FAIL: nptl/tst-cancel26
+FAIL: nptl/tst-cancel27
+FAIL: nptl/tst-stack4
+FAIL: rt/tst-mqueue1
+FAIL: rt/tst-mqueue2
+FAIL: rt/tst-mqueue4
+FAIL: rt/tst-mqueue7
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx6sx-udoo-neo.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
-index 2b65d26..d1ce9af 100644
---- a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
-+++ b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
-@@ -86,6 +86,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet1>;
- 	phy-mode = "rmii";
-+	phy-reset-duration = <10>;
- 	phy-reset-gpios = <&gpio2 1 GPIO_ACTIVE_LOW>;
- };
- 
--- 
-2.7.4
+Steve Ellcey
+sellcey at caviumnetworks.com
