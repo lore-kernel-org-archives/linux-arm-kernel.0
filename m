@@ -1,112 +1,80 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 5 Dec 2016 10:05:30 +0100
-Subject: [PATCH v2 2/3] ARM: dts: sunxi: add support for Orange Pi Zero
- board
-In-Reply-To: <324c8820-aeea-3fad-0e02-1bdb8f675677@arm.com>
-References: <20161121162421.800-1-icenowy@aosc.xyz>
- <20161121162421.800-2-icenowy@aosc.xyz>
- <5373671480239408@web31m.yandex.ru>
- <cdfd3c65-d473-badb-ea6a-035f7ab79217@arm.com>
- <20161201093619.gs6lmoxtlptp2jr6@lukather>
- <11498641480688550@web2g.yandex.ru>
- <efb30303-b9bb-7a7c-4478-af485991dd86@redhat.com>
- <11535601480689127@web2g.yandex.ru>
- <324c8820-aeea-3fad-0e02-1bdb8f675677@arm.com>
-Message-ID: <20161205090530.oleu2n3a7g4qtgta@lukather>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 5 Dec 2016 10:06:33 +0100
+Subject: [PATCH v2 1/3] ARM: da850: fix infinite loop in clk_set_rate()
+In-Reply-To: <34f9e4c4-917e-0472-72af-96fbc7e0c6db@ti.com>
+References: <1480693134-31324-1-git-send-email-bgolaszewski@baylibre.com>
+ <1480693134-31324-2-git-send-email-bgolaszewski@baylibre.com>
+ <34f9e4c4-917e-0472-72af-96fbc7e0c6db@ti.com>
+Message-ID: <CAMpxmJV7LgY4XhnALuNEaMaSUOzY1FUMAsPgEoK-QG+cO10KSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 04:10:46PM +0000, Andre Przywara wrote:
-> Hi,
-> 
-> On 02/12/16 14:32, Icenowy Zheng wrote:
-> > 
-> > 
-> > 02.12.2016, 22:30, "Hans de Goede" <hdegoede@redhat.com>:
-> >> Hi,
-> >>
-> >> On 02-12-16 15:22, Icenowy Zheng wrote:
-> >>>  01.12.2016, 17:36, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> >>>>  On Mon, Nov 28, 2016 at 12:29:07AM +0000, Andr? Przywara wrote:
-> >>>>>   > Something more interesting happened.
-> >>>>>   >
-> >>>>>   > Xunlong made a add-on board for Orange Pi Zero, which exposes the
-> >>>>>   > two USB Controllers exported at expansion bus as USB Type-A
-> >>>>>   > connectors.
-> >>>>>   >
-> >>>>>   > Also it exposes a analog A/V jack and a microphone.
-> >>>>>   >
-> >>>>>   > Should I enable {e,o}hci{2.3} in the device tree?
-> >>>>>
-> >>>>>   Actually we should do this regardless of this extension board. The USB
-> >>>>>   pins are not multiplexed and are exposed on user accessible pins (just
-> >>>>>   not soldered, but that's a detail), so I think they qualify for DT
-> >>>>>   enablement. And even if a user can't use them, it doesn't hurt to have
-> >>>>>   them (since they are not multiplexed).
-> >>>>
-> >>>>  My main concern about this is that we'll leave regulators enabled by
-> >>>>  default, for a minority of users. And that minority will prevent to do
-> >>>>  a proper power management when the times come since we'll have to keep
-> >>>>  that behaviour forever.
-> >>>
-> >>>  I think these users can add a 'fdt set /xxx/xxx status "disabled" ' .
-> >>
-> >> I don't think that will be necessary I'm pretty sure these extra usb
-> >> ports do not have a regulator for the Vbus, they just hook directly
-> >> to the 5V rail, can someone with a schematic check ?
-> > 
-> > We seems to have still no schematics for the add-on board.
-> 
-> From looking at the picture of that expansion board on the Aliexpress
-> page and chasing the tracks, there is clearly no voltage regulator on
-> there, it's just passive components. The 5V pin from the headers is
-> routed forth and back between the two layers via some vias directly to
-> the 5V pins of the USB sockets.
-> 
-> > But something is sure is that there's no any regulator-related pins
-> > on the add-on pinout. There's only USB DM and DP pins.
-> > 
-> > So the Vbus must be directly connected to +5V.
-> 
-> So yes, it is.
-> 
-> But I think the question is moot anyways, since we don't provide DT
-> support for that add-on board at that point anyways.
-> One could imagine another board, though, which has regulators switched
-> by GPIOs, but that would be their problem and they would have regulators
-> specified in their specific DT snippet, then.
-> 
-> So to summarize:
-> - For that specific Orange Pi Zero board which we discuss the DT for
-> there is no regulator support for the additional USB ports. Thus nothing
-> we could turn off to save power.
-> - A user could just take these USB brackets with pin headers that are so
-> common in PCs to connect additional USB ports to the back of the box.
-> One just needs to re-sort the pins, which is a matter of a minute.
-> - As long as we don't provide any easy way of handling DT changes, we
-> should enable the USB ports for the sake of the users of either those
-> brackets or the expansion board. Any more sophisticated USB expansion
-> board with regulators would need to amend the DT anyway.
+2016-12-05 9:38 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+> On Friday 02 December 2016 09:08 PM, Bartosz Golaszewski wrote:
+>> The aemif clock is added twice to the lookup table in da850.c. This
+>> breaks the children list of pll0_sysclk3 as we're using the same list
+>> links in struct clk. When calling clk_set_rate(), we get stuck in
+>> propagate_rate().
+>>
+>> Create a separate clock for nand, inheriting the rate of the aemif
+>> clock and retrieve it in the davinci_nand module.
+>>
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> ---
+>>  arch/arm/mach-davinci/da850.c   | 7 ++++++-
+>>  drivers/mtd/nand/davinci_nand.c | 2 +-
+>>  2 files changed, 7 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+>> index e770c97..1fcc986 100644
+>> --- a/arch/arm/mach-davinci/da850.c
+>> +++ b/arch/arm/mach-davinci/da850.c
+>> @@ -367,6 +367,11 @@ static struct clk aemif_clk = {
+>>       .flags          = ALWAYS_ENABLED,
+>>  };
+>>
+>> +static struct clk nand_clk = {
+>> +     .name           = "nand",
+>> +     .parent         = &aemif_clk,
+>> +};
+>> +
+>>  static struct clk usb11_clk = {
+>>       .name           = "usb11",
+>>       .parent         = &pll0_sysclk4,
+>> @@ -537,7 +542,7 @@ static struct clk_lookup da850_clks[] = {
+>>       CLK("da830-mmc.0",      NULL,           &mmcsd0_clk),
+>>       CLK("da830-mmc.1",      NULL,           &mmcsd1_clk),
+>>       CLK("ti-aemif",         NULL,           &aemif_clk),
+>> -     CLK(NULL,               "aemif",        &aemif_clk),
+>> +     CLK(NULL,               "nand",         &nand_clk),
+>
+> Why use a NULL device name here?
+>
+>>       CLK("ohci-da8xx",       "usb11",        &usb11_clk),
+>>       CLK("musb-da8xx",       "usb20",        &usb20_clk),
+>>       CLK("spi_davinci.0",    NULL,           &spi0_clk),
+>> diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
+>> index 27fa8b8..5857d06 100644
+>> --- a/drivers/mtd/nand/davinci_nand.c
+>> +++ b/drivers/mtd/nand/davinci_nand.c
+>> @@ -694,7 +694,7 @@ static int nand_davinci_probe(struct platform_device *pdev)
+>>
+>>       ret = -EINVAL;
+>>
+>> -     info->clk = devm_clk_get(&pdev->dev, "aemif");
+>> +     info->clk = devm_clk_get(&pdev->dev, "nand");
+>
+> This driver is used by keystone devices too. So just changing the
+> connection id will likely break them. Why do you need to change the
+> connection id?
+>
+> Thanks,
+> Sekhar
 
-I disagree with this. We already have different ways of changing the
-DT at runtime, and even if we didn't I'd still disagree. Once you add
-that, there's simply no going back. Saying "let's enable it and we'll
-figure it out later" doesn't work, and is essentially a "enable it".
+Thanks, I didn't know it.
 
-So what you're suggesting is to have those regulators enabled forever,
-which might be the case on that board anyway, but definitely shouldn't
-be policy.
+I thought it would make the purpose of the clock more obvious. I'll
+change it back to "aemif".
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161205/d728f143/attachment.sig>
+Best regards,
+Bartosz Golaszewski
