@@ -1,31 +1,49 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Mon,  5 Dec 2016 02:10:25 +0200
-Subject: [PATCH] dt: pwm: bcm2835: fix typo in clocks property name
-Message-ID: <20161205001025.13909-1-vz@mleia.com>
+From: woogyom.kim@gmail.com (Milo Kim)
+Date: Mon,  5 Dec 2016 10:07:26 +0900
+Subject: [PATCH 0/3] ARM: dts: imx6: Support Poslab Savageboard dual & quad
+Message-ID: <20161205010729.7047-1-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the examples of BCM2835 PWM device nodes there is a typo in
-'clocks' property name, which is a common property name on clock consumer
-side to store a phandle to an input clock.
+Poslab Savageboard is i.MX6 SoC base, but BSP code from the vendor is 
+not mainline u-boot and kernel. Personal reason of using this board is 
+testing etnaviv user-space driver, so I re-write device tree files based on
+mainline kernel for the first step.
 
-Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
----
- Documentation/devicetree/bindings/pwm/pwm-bcm2835.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This patchset includes common DT file, dual and quad board files.
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-bcm2835.txt b/Documentation/devicetree/bindings/pwm/pwm-bcm2835.txt
-index fb6fb31..cf573e8 100644
---- a/Documentation/devicetree/bindings/pwm/pwm-bcm2835.txt
-+++ b/Documentation/devicetree/bindings/pwm/pwm-bcm2835.txt
-@@ -3,7 +3,7 @@ BCM2835 PWM controller (Raspberry Pi controller)
- Required properties:
- - compatible: should be "brcm,bcm2835-pwm"
- - reg: physical base address and length of the controller's registers
--- clock: This clock defines the base clock frequency of the PWM hardware
-+- clocks: This clock defines the base clock frequency of the PWM hardware
-   system, the period and the duty_cycle of the PWM signal is a multiple of
-   the base period.
- - #pwm-cells: Should be 2. See pwm.txt in this directory for a description of
+Supported components are
+  - Display: HDMI and LVDS panel
+  - eMMC and SD card
+  - Ethernet
+  - Pinmux configuration
+  - SATA: only for Savageboard quad
+  - UART1 for debug console
+  - USB host
+
+Missing features are
+  - Audio (WM8903)
+  - USB OTG
+  - PMIC WM8326: default settings are used so no issue to bring-up the system
+  - MIPI DSI, CSI
+
+Patches are tested on the Savageboard quad but the dual version should work 
+because the only difference between dual and quad is SATA support.
+
+More information in http://www.savageboard.org
+
+Milo Kim (3):
+  ARM: dts: imx6: Add Savageboard common file
+  ARM: dts: imx6: Support Savageboard dual
+  ARM: dts: imx6: Support Savageboard quad
+
+ arch/arm/boot/dts/imx6dl-savageboard.dts   |  50 ++++++
+ arch/arm/boot/dts/imx6q-savageboard.dts    |  54 ++++++
+ arch/arm/boot/dts/imx6qdl-savageboard.dtsi | 271 +++++++++++++++++++++++++++++
+ 3 files changed, 375 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-savageboard.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-savageboard.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-savageboard.dtsi
+
 -- 
-2.10.2
+2.9.3
