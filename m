@@ -1,79 +1,53 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Mon, 5 Dec 2016 17:58:09 +0800
-Subject: ILP32 for ARM64: testing with glibc testsuite
-In-Reply-To: <1479419136.908.90.camel@caviumnetworks.com>
-References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
- <20161107082359.GA19666@yury-N73SV> <20161109095650.GA22804@yury-N73SV>
- <CC4F99A7-1FD2-486A-BD66-ED06F1B8BF50@linaro.org>
- <1479419136.908.90.camel@caviumnetworks.com>
-Message-ID: <ff3b973b-3887-7ae8-5a27-4d1ad115055f@huawei.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 5 Dec 2016 15:45:51 +0530
+Subject: [PATCH v3 1/3] ARM: da850: fix infinite loop in clk_set_rate()
+In-Reply-To: <1480932549-30811-2-git-send-email-bgolaszewski@baylibre.com>
+References: <1480932549-30811-1-git-send-email-bgolaszewski@baylibre.com>
+ <1480932549-30811-2-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <689efaa1-d8d9-6937-5880-3ed7a1401268@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Steve
+On Monday 05 December 2016 03:39 PM, Bartosz Golaszewski wrote:
+> The aemif clock is added twice to the lookup table in da850.c. This
+> breaks the children list of pll0_sysclk3 as we're using the same list
+> links in struct clk. When calling clk_set_rate(), we get stuck in
+> propagate_rate().
+> 
+> Create a separate clock for nand, inheriting the rate of the aemif
+> clock and retrieve it in the davinci_nand module.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/arm/mach-davinci/da850.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index e770c97..c008e5e 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+> @@ -367,6 +367,11 @@ static struct clk aemif_clk = {
+>  	.flags		= ALWAYS_ENABLED,
+>  };
+>  
+> +static struct clk aemif_nand_clk = {
+> +	.name		= "nand",
+> +	.parent		= &aemif_clk,
+> +};
+> +
+>  static struct clk usb11_clk = {
+>  	.name		= "usb11",
+>  	.parent		= &pll0_sysclk4,
+> @@ -537,7 +542,7 @@ static struct clk_lookup da850_clks[] = {
+>  	CLK("da830-mmc.0",	NULL,		&mmcsd0_clk),
+>  	CLK("da830-mmc.1",	NULL,		&mmcsd1_clk),
+>  	CLK("ti-aemif",		NULL,		&aemif_clk),
+> -	CLK(NULL,		"aemif",	&aemif_clk),
+> +	CLK(NULL,		"aemif",	&aemif_nand_clk),
 
-On 2016/11/18 5:45, Steve Ellcey wrote:
-> On Wed, 2016-11-16 at 15:22 +0400, Maxim Kuvyrkov wrote:
->>>
->>> On Nov 9, 2016, at 1:56 PM, Yury Norov <ynorov@caviumnetworks.com>
->>> wrote:
->>>
->>>>
->>>> Below is the results of glibc testsuite run for aarch64/lp64
->
-> I have been running the glibc testsuite as well.  I have only run it on
-> an ILP32 enabled kernel.  Using that kernel, top-of-tree glibc, and the
-> ILP32 glibc patches I have no LP64 regressions.  There are 5 failures
-> in LP64 mode but I get them with vanilla top-of-tree glibc sources too.
-> They are:
-> 	nptl/eintr1 (I actually don't run this because it kills the 'make check')
-> 	debug/tst-backtrace5
-> 	debug/tst-backtrace6
-> 	nptl/tst-stack4
-> 	nptl/tst-thread_local1
->
-> In ILP32 mode I get 33 failures, they include the above failures (minus
-> nptl/tst-thread_local1) plus:
->
-> 	c++-types-check
-> 	conform/ISO11/inttypes.h/conform
-> 	conform/ISO11/stdint.h/conform
-> 	conform/ISO99/inttypes.h/conform
-> 	conform/ISO99/stdint.h/conform
-> 	conform/POSIX2008/inttypes.h/conform
-> 	conform/POSIX2008/stdint.h/conform
-> 	conform/XOPEN2K/inttypes.h/conform
-> 	conform/XOPEN2K/stdint.h/conform
-> 	conform/XOPEN2K8/inttypes.h/conform
-> 	conform/XOPEN2K8/stdint.h/conform
-> 	elf/tst-tls1
-> 	elf/tst-tls1-static
-> 	elf/tst-tls2
-> 	elf/tst-tls2-static
-> 	elf/tst-tls3
-> 	math/check-abi-libm
-> 	math/test-double
-> 	math/test-double-finite
-> 	math/test-float
-> 	math/test-float-finite
-> 	misc/tst-sync_file_range
-> 	nptl/tst-cancel26
-> 	nptl/tst-cancel27
-> 	nptl/tst-sem3
-> 	rt/tst-mqueue1
-> 	rt/tst-mqueue2
-> 	rt/tst-mqueue4
-> 	rt/tst-mqueue7
-> 	stdlib/tst-makecontext3
->
-> I am currently looking at these ILP32 regressions (starting with the
-> tls failures) to see if I can figure out what is happening with them.
-Is there some progresses on it? We could collabrate to fix those issues.
+Why use a NULL device name here? Same question was asked on v2
+submission. Also, can you please make sure you are testing this in both
+DT mode (da850-lcdk) and non-DT boot (da850-evm).
 
-Regards
-
-Bamvor
->
-> Steve Ellcey
-> sellcey at caviumnetworks.com
->
+Thanks,
+Sekhar
