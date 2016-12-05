@@ -1,37 +1,143 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 5 Dec 2016 13:44:53 +0100
-Subject: [stable:PATCH 0/3] PAN fixes backport for v4.4.35
-In-Reply-To: <584538CC.50807@arm.com>
-References: <20161202164247.19496-1-james.morse@arm.com>
- <20161202172321.GA25426@kroah.com> <584538CC.50807@arm.com>
-Message-ID: <20161205124453.GA18874@kroah.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 5 Dec 2016 14:49:50 +0200
+Subject: [PATCH v3 1/2] ARM: dts: da850-lcdk: add the dumb-vga-dac node
+In-Reply-To: <1480420624-23544-2-git-send-email-bgolaszewski@baylibre.com>
+References: <1480420624-23544-1-git-send-email-bgolaszewski@baylibre.com>
+ <1480420624-23544-2-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <a2159347-1cd7-18b1-626a-fe6a272ba85c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2016 at 09:52:12AM +0000, James Morse wrote:
-> Hi Greg,
+On 29/11/16 13:57, Bartosz Golaszewski wrote:
+> Add the dumb-vga-dac node to the board DT together with corresponding
+> ports and vga connector. This allows to retrieve the edid info from
+> the display automatically.
 > 
-> On 02/12/16 17:23, Greg KH wrote:
-> > On Fri, Dec 02, 2016 at 04:42:44PM +0000, James Morse wrote:
-> >> Hi linux-stable,
-> >>
-> >> This is the backport of the recent PAN fixes series for v4.4.35.
-> >> Original series:
-> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-October/461806.html
-> > 
-> > Why just 4.4-stable?  What about 4.8-stable?
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/arm/boot/dts/da850-lcdk.dts | 58 ++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/da850.dtsi     | 17 ++++++++++++
+>  2 files changed, 75 insertions(+)
 > 
-> Patch 1 doesn't backport easily. I was going to do v4.8 next, but thought one at
-> a time would be the least confusing...
-> 
-> (I don't seem to be very good at predicting what is confusing!)
+> diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+> index 711b9ad..d864f11 100644
+> --- a/arch/arm/boot/dts/da850-lcdk.dts
+> +++ b/arch/arm/boot/dts/da850-lcdk.dts
+> @@ -50,6 +50,53 @@
+>  			system-clock-frequency = <24576000>;
+>  		};
+>  	};
+> +
+> +	vga_bridge {
+> +		compatible = "dumb-vga-dac";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&lcd_pins>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			port at 0 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				reg = <0>;
+> +
+> +				vga_bridge_in: endpoint at 0 {
+> +					reg = <0>;
+> +					remote-endpoint = <&display_out_vga>;
+> +				};
+> +			};
+> +
+> +			port at 1 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				reg = <1>;
+> +
+> +				vga_bridge_out: endpoint at 0 {
+> +					reg = <0>;
+> +					remote-endpoint = <&vga_con_in>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+> +	vga {
+> +		compatible = "vga-connector";
+> +
+> +		ddc-i2c-bus = <&i2c0>;
+> +
+> +		port {
+> +			vga_con_in: endpoint {
+> +				remote-endpoint = <&vga_bridge_out>;
+> +			};
+> +		};
+> +	};
+>  };
+>  
+>  &pmx_core {
+> @@ -235,3 +282,14 @@
+>  &memctrl {
+>  	status = "okay";
+>  };
+> +
+> +&display {
+> +	status = "okay";
+> +};
+> +
+> +&display_out {
+> +	display_out_vga: endpoint at 0 {
+> +		reg = <0>;
+> +		remote-endpoint = <&vga_bridge_in>;
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> index 4070619..5f4ba2e 100644
+> --- a/arch/arm/boot/dts/da850.dtsi
+> +++ b/arch/arm/boot/dts/da850.dtsi
+> @@ -454,6 +454,23 @@
+>  			reg = <0x213000 0x1000>;
+>  			interrupts = <52>;
+>  			status = "disabled";
+> +
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				display_in: port at 0 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +					reg = <0>;
+> +				};
+> +
+> +				display_out: port at 1 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +					reg = <1>;
+> +				};
+> +			};
+>  		};
 
-Adding a patch to an "old" stable kernel would be odd if the latest
-stable kernel also doesn't have it, right?  I need for it to be in 4.8
-before I can take it into 4.4, sorry.
+It's a bit difficult to follow this as there's been so many patches
+going around. But I take the above is the LCDC node in the base da850
+dtsi file? In that case, what is the display_in supposed to present?
+It's the first node in the "display chain", so it has no input.
 
-So I'll hold off on applying these until that happens.
+Also, don't touch da850.dtsi here, just add the "ports" node in the
+da850-lcdk.dts file.
 
-thanks,
+If the da850.dtsi has not been merged yet, I'd change the name of the
+lcdc node to something else than "display". It's rather vague. If it's
+named "lcdc", reading da850-lcdk.dts becomes much easier, as you'll
+refer to "lcdc".
 
-greg k-h
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161205/8a7836a6/attachment.sig>
