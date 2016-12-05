@@ -1,43 +1,112 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 5 Dec 2016 16:54:13 +0800
-Subject: [PATCH v2] arm64: dts: zx: add pcu_domain node for zx296718
-In-Reply-To: <1480925871-20855-1-git-send-email-baoyou.xie@linaro.org>
-References: <1480925871-20855-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20161205085411.GB2749@dragon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 5 Dec 2016 10:05:30 +0100
+Subject: [PATCH v2 2/3] ARM: dts: sunxi: add support for Orange Pi Zero
+ board
+In-Reply-To: <324c8820-aeea-3fad-0e02-1bdb8f675677@arm.com>
+References: <20161121162421.800-1-icenowy@aosc.xyz>
+ <20161121162421.800-2-icenowy@aosc.xyz>
+ <5373671480239408@web31m.yandex.ru>
+ <cdfd3c65-d473-badb-ea6a-035f7ab79217@arm.com>
+ <20161201093619.gs6lmoxtlptp2jr6@lukather>
+ <11498641480688550@web2g.yandex.ru>
+ <efb30303-b9bb-7a7c-4478-af485991dd86@redhat.com>
+ <11535601480689127@web2g.yandex.ru>
+ <324c8820-aeea-3fad-0e02-1bdb8f675677@arm.com>
+Message-ID: <20161205090530.oleu2n3a7g4qtgta@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2016 at 04:17:51PM +0800, Baoyou Xie wrote:
-> This patch adds the pcu_domain node, so it can be used
-> by zte-soc's power domain driver.
+On Fri, Dec 02, 2016 at 04:10:46PM +0000, Andre Przywara wrote:
+> Hi,
 > 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-
-I'm fine with the patch itself, but I need to wait the driver and
-bindings being accepted to apply it.
-
-Shawn
-
-> ---
->  arch/arm64/boot/dts/zte/zx296718.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
+> On 02/12/16 14:32, Icenowy Zheng wrote:
+> > 
+> > 
+> > 02.12.2016, 22:30, "Hans de Goede" <hdegoede@redhat.com>:
+> >> Hi,
+> >>
+> >> On 02-12-16 15:22, Icenowy Zheng wrote:
+> >>>  01.12.2016, 17:36, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> >>>>  On Mon, Nov 28, 2016 at 12:29:07AM +0000, Andr? Przywara wrote:
+> >>>>>   > Something more interesting happened.
+> >>>>>   >
+> >>>>>   > Xunlong made a add-on board for Orange Pi Zero, which exposes the
+> >>>>>   > two USB Controllers exported at expansion bus as USB Type-A
+> >>>>>   > connectors.
+> >>>>>   >
+> >>>>>   > Also it exposes a analog A/V jack and a microphone.
+> >>>>>   >
+> >>>>>   > Should I enable {e,o}hci{2.3} in the device tree?
+> >>>>>
+> >>>>>   Actually we should do this regardless of this extension board. The USB
+> >>>>>   pins are not multiplexed and are exposed on user accessible pins (just
+> >>>>>   not soldered, but that's a detail), so I think they qualify for DT
+> >>>>>   enablement. And even if a user can't use them, it doesn't hurt to have
+> >>>>>   them (since they are not multiplexed).
+> >>>>
+> >>>>  My main concern about this is that we'll leave regulators enabled by
+> >>>>  default, for a minority of users. And that minority will prevent to do
+> >>>>  a proper power management when the times come since we'll have to keep
+> >>>>  that behaviour forever.
+> >>>
+> >>>  I think these users can add a 'fdt set /xxx/xxx status "disabled" ' .
+> >>
+> >> I don't think that will be necessary I'm pretty sure these extra usb
+> >> ports do not have a regulator for the Vbus, they just hook directly
+> >> to the 5V rail, can someone with a schematic check ?
+> > 
+> > We seems to have still no schematics for the add-on board.
 > 
-> diff --git a/arch/arm64/boot/dts/zte/zx296718.dtsi b/arch/arm64/boot/dts/zte/zx296718.dtsi
-> index b44d1d1..1aa0587 100644
-> --- a/arch/arm64/boot/dts/zte/zx296718.dtsi
-> +++ b/arch/arm64/boot/dts/zte/zx296718.dtsi
-> @@ -302,6 +302,11 @@
->  			reg = <0x116000 0x1000>;
->  		};
->  
-> +		pcu_domain: pcu at 117000 {
-> +			compatible = "zte,zx296718-pcu";
-> +			reg = <0x00117000 0x1000>;
-> +		};
-> +
->  		uart0: uart at 11f000 {
->  			compatible = "arm,pl011", "arm,primecell";
->  			arm,primecell-periphid = <0x001feffe>;
-> -- 
-> 2.7.4
+> From looking at the picture of that expansion board on the Aliexpress
+> page and chasing the tracks, there is clearly no voltage regulator on
+> there, it's just passive components. The 5V pin from the headers is
+> routed forth and back between the two layers via some vias directly to
+> the 5V pins of the USB sockets.
 > 
+> > But something is sure is that there's no any regulator-related pins
+> > on the add-on pinout. There's only USB DM and DP pins.
+> > 
+> > So the Vbus must be directly connected to +5V.
+> 
+> So yes, it is.
+> 
+> But I think the question is moot anyways, since we don't provide DT
+> support for that add-on board at that point anyways.
+> One could imagine another board, though, which has regulators switched
+> by GPIOs, but that would be their problem and they would have regulators
+> specified in their specific DT snippet, then.
+> 
+> So to summarize:
+> - For that specific Orange Pi Zero board which we discuss the DT for
+> there is no regulator support for the additional USB ports. Thus nothing
+> we could turn off to save power.
+> - A user could just take these USB brackets with pin headers that are so
+> common in PCs to connect additional USB ports to the back of the box.
+> One just needs to re-sort the pins, which is a matter of a minute.
+> - As long as we don't provide any easy way of handling DT changes, we
+> should enable the USB ports for the sake of the users of either those
+> brackets or the expansion board. Any more sophisticated USB expansion
+> board with regulators would need to amend the DT anyway.
+
+I disagree with this. We already have different ways of changing the
+DT at runtime, and even if we didn't I'd still disagree. Once you add
+that, there's simply no going back. Saying "let's enable it and we'll
+figure it out later" doesn't work, and is essentially a "enable it".
+
+So what you're suggesting is to have those regulators enabled forever,
+which might be the case on that board anyway, but definitely shouldn't
+be policy.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161205/d728f143/attachment.sig>
