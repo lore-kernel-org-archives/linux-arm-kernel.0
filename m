@@ -1,33 +1,33 @@
 From: woogyom.kim@gmail.com (Milo Kim)
-Date: Mon,  5 Dec 2016 11:00:31 +0900
-Subject: [PATCH 1/2] ARM: dts: sun8i: Specify memblock for Nano Pi M1
-Message-ID: <20161205020032.26586-1-woogyom.kim@gmail.com>
+Date: Mon,  5 Dec 2016 11:00:32 +0900
+Subject: [PATCH 2/2] ARM: dts: sun8i: Specify memblock for Nano Pi Neo
+In-Reply-To: <20161205020032.26586-1-woogyom.kim@gmail.com>
+References: <20161205020032.26586-1-woogyom.kim@gmail.com>
+Message-ID: <20161205020032.26586-2-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The board has DDR3 512MB. This patch helps scanning the memory and
+The board has DDR3 256MB. This patch helps scanning the memory and
 adding memblock through the DT.
 
 Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts | 5 +++++
+ arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
-index ec63d10..be3668f 100644
---- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
-@@ -45,6 +45,11 @@
+diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
+index 8d2cc6e..433f55d 100644
+--- a/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
++++ b/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
+@@ -45,4 +45,9 @@
  / {
- 	model = "FriendlyArm NanoPi M1";
- 	compatible = "friendlyarm,nanopi-m1", "allwinner,sun8i-h3";
+ 	model = "FriendlyARM NanoPi NEO";
+ 	compatible = "friendlyarm,nanopi-neo", "allwinner,sun8i-h3";
 +
 +	memory at 40000000 {
 +		device_type = "memory";
-+		reg = <0x40000000 0x20000000>;
++		reg = <0x40000000 0x10000000>;
 +	};
  };
- 
- &ehci1 {
 -- 
 2.9.3
