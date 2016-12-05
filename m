@@ -1,50 +1,55 @@
-From: maninder1.s@samsung.com (Maninder Singh)
-Date: Mon, 05 Dec 2016 10:57:13 +0530
-Subject: [PATCH v3] mach-omap2: fixing wrong strcat for Non-NULL terminated
- string
-Message-ID: <1480915633-16284-1-git-send-email-maninder1.s@samsung.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 5 Dec 2016 12:02:38 +0530
+Subject: [PATCH v4] ARM: davinci: da8xx: Fix sleeping function called from
+ invalid context
+In-Reply-To: <907a3c22-534f-80ce-daff-be84dd5e5cf8@lechnology.com>
+References: <1480690380-13216-1-git-send-email-abailon@baylibre.com>
+ <907a3c22-534f-80ce-daff-be84dd5e5cf8@lechnology.com>
+Message-ID: <21fbc91f-5e85-86d0-dc97-4188bcafe5ad@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Issue caught with static analysis tool:
-"Dangerous usage of 'name' (strncpy doesn't always 0-terminate it)"
+Hi David,
 
-Use strlcpy _includes_ the NUL terminator, and  strlcat() which ensures 
-that it won't overflow the buffer.
+On Monday 05 December 2016 09:14 AM, David Lechner wrote:
+> I have just tried this patch with a bunch of kernel hacking options
+> enabled. I am getting the message show at the end of this email. We
+> still have the problem of nested spin locks due to nested calls to
+> clk_enable(). So, really, we need to use __clk_enable() and
+> __clk_disable() from arch/arm/mach-davinci/clock.c in
+> usb20_phy_clk_enable() above.
 
-Reported-by: Maninder Singh <maninder1.s@samsung.com>
-Signed-off-by: Vaneet Narang <v.narang@samsung.com>
-Signed-off-by: Russell King <linux@armlinux.org.uk>
----
-v1 -> v2: changed strncpy to strlcpy
-v2 -> v3: use of strlcat as suggested by Russell to
-	  make change clearer and simpler.
+Good catch. I noticed  that common clock framework uses a more elaborate
+mechanism to allow nested clock API calls (see clk_prepare_lock()), but
+we don't (yet) have that issue in mach-davinci since the recursive calls
+are still in mach-davinci and dont need the exported API to be
+recursively callable.
 
- arch/arm/mach-omap2/omap_hwmod.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+> Applying the following patch on top of your patch fixed the recursive
+> lock message.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 759e1d4..e8b9887 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -741,14 +741,14 @@ static int _init_main_clk(struct omap_hwmod *oh)
- 	int ret = 0;
- 	char name[MOD_CLK_MAX_NAME_LEN];
- 	struct clk *clk;
-+	static const char modck[] = "_mod_ck";
- 
--	/* +7 magic comes from '_mod_ck' suffix */
--	if (strlen(oh->name) + 7 > MOD_CLK_MAX_NAME_LEN)
-+	if (strlen(oh->name) >= MOD_CLK_MAX_NAME_LEN - strlen(modck))
- 		pr_warn("%s: warning: cropping name for %s\n", __func__,
- 			oh->name);
- 
--	strncpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - 7);
--	strcat(name, "_mod_ck");
-+	strlcpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - strlen(modck));
-+	strlcat(name, modck, MOD_CLK_MAX_NAME_LEN);
- 
- 	clk = clk_get(NULL, name);
- 	if (!IS_ERR(clk)) {
--- 
-1.9.1
+The patch looks okay to me, except couple of minor adjustments.
+
+> 
+> ---
+> 
+> diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
+> index df42c93..4fba579 100644
+> --- a/arch/arm/mach-davinci/clock.c
+> +++ b/arch/arm/mach-davinci/clock.c
+> @@ -31,7 +31,7 @@ static LIST_HEAD(clocks);
+>  static DEFINE_MUTEX(clocks_mutex);
+>  static DEFINE_SPINLOCK(clockfw_lock);
+> 
+> -static void __clk_enable(struct clk *clk)
+> +void __clk_enable(struct clk *clk)
+
+Now that this function is going to be used outside of this file, lets
+drop the __ naming convention and call this davinci_clk_enable() in line
+with how other davinci-local clock APIs are named. Same thing for the
+disable counterpart.
+
+Also, the making these function non-static should be a patch of its own.
+
+Thanks,
+Sekhar
