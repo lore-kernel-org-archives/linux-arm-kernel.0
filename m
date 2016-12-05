@@ -1,50 +1,29 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Mon, 5 Dec 2016 17:17:03 +0000
-Subject: [PATCH] usb: gadget: udc: atmel: used managed kasprintf
-In-Reply-To: <20161202161921.ace5rolitlxjhr6i@piout.net>
-References: <20161201102656.29041-1-alexandre.belloni@free-electrons.com>
- <063D6719AE5E284EB5DD2968C1650D6DB0232C0D@AcuExch.aculab.com>
- <20161202161921.ace5rolitlxjhr6i@piout.net>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DB023508B@AcuExch.aculab.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 5 Dec 2016 17:20:55 +0000
+Subject: next-20161205 build: 3 failures 4 warnings (next-20161205)
+In-Reply-To: <7b3daf13-dbab-5acf-cd5f-2414141500b3@arm.com>
+References: <E1cDo86-0008IX-9W@optimist>
+ <20161205112043.pyzcbhtu7bklioas@sirena.org.uk>
+ <7b3daf13-dbab-5acf-cd5f-2414141500b3@arm.com>
+Message-ID: <20161205172055.nfid7v4vu3v7ik3q@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandre Belloni
-> Sent: 02 December 2016 16:19
-> On 02/12/2016 at 15:59:57 +0000, David Laight wrote :
-> > From: Alexandre Belloni
-> > > Sent: 01 December 2016 10:27
-> > > Use devm_kasprintf instead of simple kasprintf to free the allocated memory
-> > > when needed.
-> >
-> > s/when needed/when the device is freed/
-> >
-> > > Suggested-by: Peter Rosin <peda@axentia.se>
-> > > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > > ---
-> > >  drivers/usb/gadget/udc/atmel_usba_udc.c | 3 ++-
-> > >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > >
-> > > diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> > > index 45bc997d0711..aec72fe8273c 100644
-> > > --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-> > > +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> > > @@ -1978,7 +1978,8 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
-> > >  			dev_err(&pdev->dev, "of_probe: name error(%d)\n", ret);
-> > >  			goto err;
-> > >  		}
-> > > -		ep->ep.name = kasprintf(GFP_KERNEL, "ep%d", ep->index);
-> > > +		ep->ep.name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "ep%d",
-> > > +					     ep->index);
-> >
-> > Acually why bother mallocing such a small string at all.
-> > The maximum length is 12 bytes even if 'index' are unrestricted.
-> >
-> 
-> IIRC, using statically allocated string is failing somewhere is the USB
-> core but I don't remember all the details.
+On Mon, Dec 05, 2016 at 03:44:30PM +0000, Marc Zyngier wrote:
 
-I can't imagine that changing ep->ep.name from 'char *' to 'char [12]' would
-make any difference.
+> Old and broken gas. I have a workaround stashed there:
 
-	David
+> http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/commit/?h=arm64/standalone.h&id=559f97365362ed9e96f594200020379df46630d8
+
+> At least binutils 2.24 and 2.25 are affected, while 2.27 is not.
+
+Not that old - this is the Linaro 2015.10 toolchain which wasn't super
+new but not exactly from the mists of time either.  Anyway, I updated to
+2016.11 (GCC 6.2.1, GAS 2.27)...  let's see what the fallout is like.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161205/1f2213ac/attachment.sig>
