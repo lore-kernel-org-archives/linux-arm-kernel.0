@@ -1,66 +1,45 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 06 Dec 2016 08:49:38 -0800
-Subject: [PATCH v4 1/4] [media] davinci: vpif_capture: don't lock over
- s_stream
-In-Reply-To: <4747860.QGGHSuFRpz@avalon> (Laurent Pinchart's message of "Wed,
- 30 Nov 2016 10:32:33 +0200")
-References: <20161129235712.29846-1-khilman@baylibre.com>
- <20161129235712.29846-2-khilman@baylibre.com>
- <4747860.QGGHSuFRpz@avalon>
-Message-ID: <m237i1gfz1.fsf@baylibre.com>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Tue, 6 Dec 2016 16:54:38 +0000
+Subject: [PATCH 1/4] serial: core: Add LED trigger support
+In-Reply-To: <9225f2da-c6c4-73c8-829a-1033716b4c71@gmail.com>
+References: <20161123100106.15969-1-s.hauer@pengutronix.de>
+ <20161123100106.15969-2-s.hauer@pengutronix.de>
+ <e9fc12b8-d4a7-067d-ef87-03f0aae39bd7@gmail.com>
+ <20161124081748.fx3xm5ww64ngn5it@pengutronix.de>
+ <9225f2da-c6c4-73c8-829a-1033716b4c71@gmail.com>
+Message-ID: <20161206165438.5e37504f@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Laurent Pinchart <laurent.pinchart@ideasonboard.com> writes:
+> > If we have different UART drivers, only one of them provides ttyS*, no?
+> > Other drivers will have to use another namespace.  
+> 
+> I remember this was a problem a couple of years ago last I tried, with
+> the 8250 driver being actually preventing other drivers from using
+> ttyS*, but if you don't have 8250 taking over the low ttyS numbers, you
+> may run into a case where several drivers successfully register their
+> character devices under a ttyS* numbering scheme.
+> 
+> Whether this is hypothetical or not nowadays, it may be nicer to provide
+> a more uniquely distinct name like what dev_name() returns, or
+> ttyS*-driver-tx for instance?
 
-> Hi Kevin,
->
-> Thank you for the patch.
->
-> On Tuesday 29 Nov 2016 15:57:09 Kevin Hilman wrote:
->> Video capture subdevs may be over I2C and may sleep during xfer, so we
->> cannot do IRQ-disabled locking when calling the subdev.
->> 
->> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
->> ---
->>  drivers/media/platform/davinci/vpif_capture.c | 3 +++
->>  1 file changed, 3 insertions(+)
->> 
->> diff --git a/drivers/media/platform/davinci/vpif_capture.c
->> b/drivers/media/platform/davinci/vpif_capture.c index
->> 5104cc0ee40e..9f8f41c0f251 100644
->> --- a/drivers/media/platform/davinci/vpif_capture.c
->> +++ b/drivers/media/platform/davinci/vpif_capture.c
->> @@ -193,7 +193,10 @@ static int vpif_start_streaming(struct vb2_queue *vq,
->> unsigned int count) }
->>  	}
->> 
->> +	spin_unlock_irqrestore(&common->irqlock, flags);
->>  	ret = v4l2_subdev_call(ch->sd, video, s_stream, 1);
->> +	spin_lock_irqsave(&common->irqlock, flags);
->
-> I always get anxious when I see a spinlock being released randomly with an 
-> operation in the middle of a protected section. Looking at the code it looks 
-> like the spinlock is abused here. irqlock should only protect the dma_queue 
-> and should thus only be taken around the following code:
->
-> spin_lock_irqsave(&common->irqlock, flags);
-> /* Get the next frame from the buffer queue */
-> common->cur_frm = common->next_frm = list_entry(common->dma_queue.next,
->                             struct vpif_cap_buffer, list);
-> /* Remove buffer from the buffer queue */
-> list_del(&common->cur_frm->list);
-> spin_unlock_irqrestore(&common->irqlock, flags);
+It needs to be at the tty layer anyway or you will break low end
+machines. On a low end system with a 16450A UART you've got something
+like 160 microseconds at 57600 baud before you must have exited the
+IRQ handler, re-entered it and be reading the data register again. The
+current proposed patches touching the 8250 IRQ path are almost certainly
+going to cause regressions on old machines.
 
-Yes, that looks correct.  Will update.
+So you need to hook receive at a point outside of the IRQ layer (eg when
+the workqueue starts feeding it into the ldisc), but on the tx side you
+need to hook the write method of the tty really, because tty_write sends
+data to the ldisc and what happens then is up to the ldisc.
 
-> The code that is currently protected by the lock in the start and stop 
-> streaming functions should be protected by a mutex instead.
+Even there though you have cases that are terribly latency dependant like
+some of the dumb programming tools that don't window. If you halve
+someones programming rate for microcontrollers you are going to get hate
+mail 8) For RX that can mostly be avoided by queuing the data then doing
+the LEDs, for TX I'm not clear you can easily hide the latency.
 
-I tried taking the mutex here, but lockdep pointed out a deadlock.  I
-may not be fully understanding the V4L2 internals here, but it seems
-that the ioctl is already taking a mutex, so taking it again in
-start/stop streaming is a deadlock.  Unless you think the locking should
-be nested here, it seems to me that the mutex isn't needed.
-
-Kevin
+Alan
