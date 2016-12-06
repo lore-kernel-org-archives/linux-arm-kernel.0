@@ -1,51 +1,36 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 6 Dec 2016 13:48:21 +0100
-Subject: [GIT PULL] ARM: Xilinx Zynq DT changes for v4.10
-In-Reply-To: <0eeda910-d585-d532-96c6-5c0cc634627c@monstr.eu>
-References: <0eeda910-d585-d532-96c6-5c0cc634627c@monstr.eu>
-Message-ID: <5df3c225-ea77-0472-4f86-735b9b8a9cb1@monstr.eu>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 6 Dec 2016 15:22:00 +0200
+Subject: [RFC PATCH 04/23] arm: use kconfig fragments for ARCH_ASPEED
+ defconfigs
+In-Reply-To: <1481027938-31831-5-git-send-email-b.zolnierkie@samsung.com>
+References: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
+ <1481027938-31831-5-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20161206132200.ruuegdzdv3t4ln2q@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Bartlomiej,
 
-On 6.12.2016 13:40, Michal Simek wrote:
-> Hi,
+On Tue, Dec 06, 2016 at 01:38:39PM +0100, Bartlomiej Zolnierkiewicz wrote:
+> Replace [acs5k,acs5k_tiny,ks8695]_defconfig-s with a Makefile target
+> using merge_config.
 > 
-> please add these changes to your arm-soc repo.
-> It fixes dtc warnings, small coding style changes and add support for
-> Microzed.
+> The patch was verified with doing:
 > 
-> Thanks,
-> Michal
+>     $ make [acs5k,acs5k_tiny,ks8695]_defconfig
+>     $ make savedefconfig
 > 
-> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-> 
->   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-dt-for-4.10
+> and comparing resulting defconfig files (before/after the patch).
 
+The subject is wrong. Ditto for the mmp/pxa patch.
 
-please ignore this one - patches are good but I used incorrect tag name
-here because this is for zynq not for zynqmp.
-Sorry for that will send v2.
+> Cc: Greg Ungerer <gerg@uclinux.org>
+> Cc: Cyril Bur <cyrilbur@gmail.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-Thanks,
-Michal
+baruch
+
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161206/bc941f7b/attachment.sig>
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
