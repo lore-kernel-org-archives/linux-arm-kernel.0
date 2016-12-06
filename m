@@ -1,42 +1,61 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Tue, 6 Dec 2016 16:23:57 +0900
-Subject: [PATCH 1/2] ARM: dts: sun8i: Specify memblock for Nano Pi M1
-In-Reply-To: <20161205080932.xaqyl2httgxgso67@lukather>
-References: <20161205020032.26586-1-woogyom.kim@gmail.com>
- <20161205080932.xaqyl2httgxgso67@lukather>
-Message-ID: <9607940c-1ca9-bb49-291e-ddc7e77546be@gmail.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Tue, 6 Dec 2016 13:02:57 +0530
+Subject: [PATCH 11/18] arm64: ilp32: share aarch32 syscall handlers
+In-Reply-To: <20161205171242.GH14429@e104818-lin.cambridge.arm.com>
+References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+ <1477081997-4770-12-git-send-email-ynorov@caviumnetworks.com>
+ <20161205171242.GH14429@e104818-lin.cambridge.arm.com>
+Message-ID: <20161206073257.GB18470@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2016 05:09 PM, Maxime Ripard wrote:
-> On Mon, Dec 05, 2016 at 11:00:31AM +0900, Milo Kim wrote:
->> The board has DDR3 512MB. This patch helps scanning the memory and
->> adding memblock through the DT.
->>
->> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
->> ---
->>  arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
->> index ec63d10..be3668f 100644
->> --- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
->> +++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
->> @@ -45,6 +45,11 @@
->>  / {
->>  	model = "FriendlyArm NanoPi M1";
->>  	compatible = "friendlyarm,nanopi-m1", "allwinner,sun8i-h3";
->> +
->> +	memory at 40000000 {
->> +		device_type = "memory";
->> +		reg = <0x40000000 0x20000000>;
->> +	};
->
-> U-boot will fill that up, so there's no need to put it there.
+On Mon, Dec 05, 2016 at 05:12:43PM +0000, Catalin Marinas wrote:
+> On Fri, Oct 21, 2016 at 11:33:10PM +0300, Yury Norov wrote:
+> > off_t is  passed in register pair just like in aarch32.
+> > In this patch corresponding aarch32 handlers are shared to
+> > ilp32 code.
+> [...]
+> > +/*
+> > + * Note: off_4k (w5) is always in units of 4K. If we can't do the
+> > + * requested offset because it is not page-aligned, we return -EINVAL.
+> > + */
+> > +ENTRY(compat_sys_mmap2_wrapper)
+> > +#if PAGE_SHIFT > 12
+> > +	tst	w5, #~PAGE_MASK >> 12
+> > +	b.ne	1f
+> > +	lsr	w5, w5, #PAGE_SHIFT - 12
+> > +#endif
+> > +	b	sys_mmap_pgoff
+> > +1:	mov	x0, #-EINVAL
+> > +	ret
+> > +ENDPROC(compat_sys_mmap2_wrapper)
+> 
+> For compat sys_mmap2, the pgoff argument is in multiples of 4K. This was
+> traditionally used for architectures where off_t is 32-bit to allow
+> mapping files to 2^44.
+> 
+> Since off_t is 64-bit with AArch64/ILP32, should we just pass the off_t
+> as a 64-bit value in two different registers (w5 and w6)?
 
-Right, my intention was adding memblock through the DT whether the 
-bootload does or not. However I'm not sure the situation (missing 
-memblock in u-boot) could really happen.
+Current glibc implementation becomes broken for 64-bit off_t if
+if I'll do what you want.
+sysdeps/unix/sysv/linux/generic/wordsize-32/mmap.c
+28 __ptr_t
+29 __mmap (__ptr_t addr, size_t len, int prot, int flags, int fd, off_t offset)
+30 {
+31   if (offset & (MMAP_PAGE_UNIT - 1))
+32     {
+33       __set_errno (EINVAL);
+34       return MAP_FAILED;
+35     }
+36   return (__ptr_t) INLINE_SYSCALL (mmap2, 6, addr, len, prot, flags, fd,
+37                                    offset / MMAP_PAGE_UNIT);
+38 }
+39 
+40 weak_alias (__mmap, mmap)
 
-Best regards,
-Milo
+So it requires changes both in glibc and in kernel. I can do it. But
+I'd like to collect opinions of kernel and glibc developers before
+starting it. 
+
+Yury
