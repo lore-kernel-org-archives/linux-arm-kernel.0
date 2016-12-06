@@ -1,137 +1,95 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue,  6 Dec 2016 14:20:11 +0000
-Subject: [PATCH v2] ACPI/IORT: Make dma masks set-up IORT specific
-Message-ID: <20161206142011.11859-1-lorenzo.pieralisi@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 6 Dec 2016 14:18:26 +0000
+Subject: [PATCH 2/3] crypto: brcm: Add Broadcom SPU driver
+In-Reply-To: <1480536453-24781-3-git-send-email-rob.rice@broadcom.com>
+References: <1480536453-24781-1-git-send-email-rob.rice@broadcom.com>
+ <1480536453-24781-3-git-send-email-rob.rice@broadcom.com>
+Message-ID: <20161206141826.GC24177@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The introduction of acpi_dma_configure() allows to configure DMA
-and related IOMMU for any device that is DMA capable. To achieve
-that goal it ensures DMA masks are set-up to sane default values
-before proceeding with IOMMU and DMA ops configuration.
+On Wed, Nov 30, 2016 at 03:07:32PM -0500, Rob Rice wrote:
+> +static const struct of_device_id bcm_spu_dt_ids[] = {
+> +	{
+> +		.compatible = "brcm,spum-crypto",
+> +		.data = &spum_ns2_types,
+> +	},
+> +	{
+> +		.compatible = "brcm,spum-nsp-crypto",
+> +		.data = &spum_nsp_types,
+> +	},
+> +	{
+> +		.compatible = "brcm,spu2-crypto",
+> +		.data = &spu2_types,
+> +	},
+> +	{
+> +		.compatible = "brcm,spu2-v2-crypto",
+> +		.data = &spu2_v2_types,
+> +	},
 
-On x86/ia64 systems, through acpi_bind_one(), acpi_dma_configure() is
-called for every device that has an ACPI companion, in that every device
-is considered DMA capable on x86/ia64 systems (ie acpi_get_dma_attr() API),
-which has the side effect of initializing dma masks also for
-pseudo-devices (eg CPUs and memory nodes) and potentially for devices
-whose dma masks were not set-up before the acpi_dma_configure() API was
-introduced, which may have noxious side effects.
+These last two weren't in the binding document.
 
-Therefore, in preparation for IORT firmware specific DMA masks set-up,
-wrap the default DMA masks set-up in acpi_dma_configure() inside an IORT
-specific wrapper that reverts to a NOP on x86/ia64 systems, restoring the
-default expected behaviour on x86/ia64 systems and keeping DMA default
-masks set-up on IORT based (ie ARM) arch configurations.
+> +	{ /* sentinel */ }
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, bcm_spu_dt_ids);
+> +
+> +static int spu_dt_read(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct spu_hw *spu = &iproc_priv.spu;
+> +	struct device_node *dn = pdev->dev.of_node;
+> +	struct resource *spu_ctrl_regs;
+> +	const struct of_device_id *match;
+> +	struct spu_type_subtype *matched_spu_type;
+> +	void __iomem *spu_reg_vbase[MAX_SPUS];
+> +	int i;
+> +	int err;
+> +
+> +	if (!of_device_is_available(dn)) {
+> +		dev_crit(dev, "SPU device not available");
+> +		return -ENODEV;
+> +	}
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Tomasz Nowicki <tn@semihalf.com>
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Sricharan R <sricharan@codeaurora.org>
----
-Hi Joerg,
+How can this happen?
 
-as discussed please apply it to your arm/smmu branch (and consequently
-to -next) in order to get this queued along with the rest of the ACPI IORT
-SMMU series for v4.10.
+> +	/* Count number of mailbox channels */
+> +	spu->num_chan = of_count_phandle_with_args(dn, "mboxes", "#mbox-cells");
+> +	dev_dbg(dev, "Device has %d SPU channels", spu->num_chan);
+> +
+> +	match = of_match_device(of_match_ptr(bcm_spu_dt_ids), dev);
+> +	matched_spu_type = (struct spu_type_subtype *)match->data;
 
-Thank you !
-Lorenzo
+This cast usn't necessary.
 
-v1 -> v2
-	- Added review tags
+> +	spu->spu_type = matched_spu_type->type;
+> +	spu->spu_subtype = matched_spu_type->subtype;
+> +
+> +	/* Read registers and count number of SPUs */
+> +	i = 0;
+> +	while ((i < MAX_SPUS) && ((spu_ctrl_regs =
+> +		platform_get_resource(pdev, IORESOURCE_MEM, i)) != NULL)) {
+> +		dev_dbg(dev,
+> +			"SPU %d control register region res.start = %#x, res.end = %#x",
+> +			i,
+> +			(unsigned int)spu_ctrl_regs->start,
+> +			(unsigned int)spu_ctrl_regs->end);
+> +
+> +		spu_reg_vbase[i] = devm_ioremap_resource(dev, spu_ctrl_regs);
+> +		if (IS_ERR(spu_reg_vbase[i])) {
+> +			err = PTR_ERR(spu_reg_vbase[i]);
+> +			dev_err(&pdev->dev, "Failed to map registers: %d\n",
+> +				err);
+> +			spu_reg_vbase[i] = NULL;
+> +			return err;
+> +		}
+> +		i++;
+> +	}
 
- drivers/acpi/arm64/iort.c | 22 ++++++++++++++++++++++
- drivers/acpi/scan.c       | 14 +-------------
- include/linux/acpi_iort.h |  2 ++
- 3 files changed, 25 insertions(+), 13 deletions(-)
+These *really* sound like independent devices. There are no shared
+registers, and each has its own mbox.
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 47bace8..e0d2e6e 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -547,6 +547,28 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
- }
- 
- /**
-+ * iort_set_dma_mask - Set-up dma mask for a device.
-+ *
-+ * @dev: device to configure
-+ */
-+void iort_set_dma_mask(struct device *dev)
-+{
-+	/*
-+	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
-+	 * setup the correct supported mask.
-+	 */
-+	if (!dev->coherent_dma_mask)
-+		dev->coherent_dma_mask = DMA_BIT_MASK(32);
-+
-+	/*
-+	 * Set it to coherent_dma_mask by default if the architecture
-+	 * code has not set it.
-+	 */
-+	if (!dev->dma_mask)
-+		dev->dma_mask = &dev->coherent_dma_mask;
-+}
-+
-+/**
-  * iort_iommu_configure - Set-up IOMMU configuration for a device.
-  *
-  * @dev: device to configure
-diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-index 80698d3..93b00cf 100644
---- a/drivers/acpi/scan.c
-+++ b/drivers/acpi/scan.c
-@@ -1380,19 +1380,7 @@ void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
- {
- 	const struct iommu_ops *iommu;
- 
--	/*
--	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
--	 * setup the correct supported mask.
--	 */
--	if (!dev->coherent_dma_mask)
--		dev->coherent_dma_mask = DMA_BIT_MASK(32);
--
--	/*
--	 * Set it to coherent_dma_mask by default if the architecture
--	 * code has not set it.
--	 */
--	if (!dev->dma_mask)
--		dev->dma_mask = &dev->coherent_dma_mask;
-+	iort_set_dma_mask(dev);
- 
- 	iommu = iort_iommu_configure(dev);
- 
-diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-index dcb2b60..77e0809 100644
---- a/include/linux/acpi_iort.h
-+++ b/include/linux/acpi_iort.h
-@@ -35,6 +35,7 @@ bool iort_node_match(u8 type);
- u32 iort_msi_map_rid(struct device *dev, u32 req_id);
- struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
- /* IOMMU interface */
-+void iort_set_dma_mask(struct device *dev);
- const struct iommu_ops *iort_iommu_configure(struct device *dev);
- #else
- static inline void acpi_iort_init(void) { }
-@@ -45,6 +46,7 @@ static inline struct irq_domain *iort_get_device_domain(struct device *dev,
- 							u32 req_id)
- { return NULL; }
- /* IOMMU interface */
-+static inline void iort_set_dma_mask(struct device *dev) { }
- static inline
- const struct iommu_ops *iort_iommu_configure(struct device *dev)
- { return NULL; }
--- 
-2.10.0
+Why do we group them like this?
+
+Thanks,
+Mark.
