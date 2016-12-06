@@ -1,148 +1,87 @@
 From: abelvesa@linux.com (Abel Vesa)
-Date: Tue,  6 Dec 2016 17:06:01 +0000
-Subject: [PATCH 1/7] arm: Add livepatch arch specific code
+Date: Tue,  6 Dec 2016 17:06:04 +0000
+Subject: [PATCH 4/7] arm: Add ftrace with regs support
 In-Reply-To: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
 References: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
-Message-ID: <1481043967-15602-2-git-send-email-abelvesa@linux.com>
+Message-ID: <1481043967-15602-5-git-send-email-abelvesa@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-klp_get_ftrace_location is used by ftrace to get the entry for a
-specific function from the mcount list. klp_arch_set_pc is used
-to set the pc from the regs passed as an argument to the
-ftrace_ops_no_ops function to the starting address of the patched
-function. klp_write_module_reloc is not doing anything at this
-moment.
+This adds __ftrace_regs_caller which, unlike __ftrace_caller,
+adds register saving/restoring and livepatch handling if
+the pc register gets modified by klp_ftrace_handler.
 
 Signed-off-by: Abel Vesa <abelvesa@linux.com>
 ---
- MAINTAINERS                      |  3 +++
- arch/arm/include/asm/livepatch.h | 46 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/livepatch.c      | 43 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 92 insertions(+)
- create mode 100644 arch/arm/include/asm/livepatch.h
- create mode 100644 arch/arm/kernel/livepatch.c
+ arch/arm/kernel/entry-ftrace.S | 49 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index bd182a1..d43b790 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7466,12 +7466,15 @@ M:	Josh Poimboeuf <jpoimboe@redhat.com>
- M:	Jessica Yu <jeyu@redhat.com>
- M:	Jiri Kosina <jikos@kernel.org>
- M:	Miroslav Benes <mbenes@suse.cz>
-+M:	Abel Vesa <abelvesa@linux.com>
- R:	Petr Mladek <pmladek@suse.com>
- S:	Maintained
- F:	kernel/livepatch/
- F:	include/linux/livepatch.h
- F:	arch/x86/include/asm/livepatch.h
- F:	arch/x86/kernel/livepatch.c
-+F:	arch/arm/include/asm/livepatch.h
-+F:	arch/arm/kernel/livepatch.c
- F:	Documentation/livepatch/
- F:	Documentation/ABI/testing/sysfs-kernel-livepatch
- F:	samples/livepatch/
-diff --git a/arch/arm/include/asm/livepatch.h b/arch/arm/include/asm/livepatch.h
-new file mode 100644
-index 0000000..d4e3ff0
---- /dev/null
-+++ b/arch/arm/include/asm/livepatch.h
-@@ -0,0 +1,46 @@
-+/*
-+ * livepatch.h - arm specific Kernel Live Patching Core
-+ *
-+ * Copyright (C) 2016 Abel Vesa <abelvesa@linux.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, see <http://www.gnu.org/licenses/>.
-+ */
+diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
+index c73c403..b6ada5c 100644
+--- a/arch/arm/kernel/entry-ftrace.S
++++ b/arch/arm/kernel/entry-ftrace.S
+@@ -92,6 +92,46 @@
+ 2:	mcount_exit
+ .endm
+ 
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
 +
-+#ifndef _ASM_ARM_LIVEPATCH_H
-+#define _ASM_ARM_LIVEPATCH_H
++.macro __ftrace_regs_caller suffix
 +
-+#include <asm/setup.h>
-+#include <linux/module.h>
-+#include <linux/ftrace.h>
++	stmdb	sp!, {r0-r15}
++	mov	r3, sp
 +
-+static inline int klp_check_compiler_support(void)
-+{
-+	return 0;
-+}
++	ldr	r10, [sp, #60]
 +
-+int klp_write_module_reloc(struct module *mod, unsigned long type,
-+			   unsigned long loc, unsigned long value);
++	mcount_get_lr   r1                      @ lr of instrumented func
++	mcount_adjust_addr	r0, lr		@ instrumented function
 +
-+static inline void klp_arch_set_pc(struct pt_regs *regs, unsigned long ip)
-+{
-+	regs->uregs[15] = ip;
-+}
++	.globl ftrace_regs_call\suffix
++ftrace_regs_call\suffix:
++	bl	ftrace_stub
 +
-+#define klp_get_ftrace_location klp_get_ftrace_location
-+static inline unsigned long klp_get_ftrace_location(unsigned long faddr)
-+{
-+	return ftrace_location_range(faddr, faddr + 24);
-+}
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++	.globl ftrace_regs_graph_call\suffix
++ftrace_regs_graph_call\suffix:
++	mov	r0, r0
++#endif
++#ifdef CONFIG_LIVEPATCH
++	ldr	r0, [sp, #60]
++	cmp	r0, r10
++	beq	ftrace_regs_caller_end
++	ldmia	sp!, {r0-r12}
++	add	sp, sp, #8
++	ldmia	sp!, {r11}
++	sub	sp, r12, #16
++	str	r11, [sp, #12]
++	ldmia	sp!, {r11, r12, lr, pc}
++#endif
++ftrace_regs_caller_end\suffix:
++	ldmia	sp!, {r0-r14}
++	add	sp, sp, #4
++	mov	pc, lr
++.endm
 +
-+#endif /* _ASM_ARM_LIVEPATCH_H */
-diff --git a/arch/arm/kernel/livepatch.c b/arch/arm/kernel/livepatch.c
-new file mode 100644
-index 0000000..0656cd6
---- /dev/null
-+++ b/arch/arm/kernel/livepatch.c
-@@ -0,0 +1,43 @@
-+/*
-+ * livepatch.c - arm specific Kernel Live Patching Core
-+ *
-+ * Copyright (C) 2016 Abel Vesa <abelvesa@linux.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, see <http://www.gnu.org/licenses/>.
-+ */
++#endif
 +
-+#include <linux/module.h>
-+#include <linux/uaccess.h>
-+#include <linux/ftrace.h>
-+#include <asm/elf.h>
-+#include <asm/livepatch.h>
-+#include <asm/insn.h>
-+#include <asm/ftrace.h>
+ .macro __ftrace_caller suffix
+ 	mcount_enter
+ 
+@@ -212,6 +252,15 @@ UNWIND(.fnstart)
+ 	__ftrace_caller
+ UNWIND(.fnend)
+ ENDPROC(ftrace_caller)
 +
-+/**
-+ * klp_write_module_reloc() - write a relocation in a module
-+ * @mod:	module in which the section to be modified is found
-+ * @type:	ELF relocation type (see asm/elf.h)
-+ * @loc:	address that the relocation should be written to
-+ * @value:	relocation value (sym address + addend)
-+ *
-+ * This function writes a relocation to the specified location for
-+ * a particular module.
-+ */
-+int klp_write_module_reloc(struct module *mod, unsigned long type,
-+			   unsigned long loc, unsigned long value)
-+{
-+	/* Not implemented yet */
-+	return 0;
-+}
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++ENTRY(ftrace_regs_caller)
++UNWIND(.fnstart)
++	__ftrace_regs_caller
++UNWIND(.fnend)
++ENDPROC(ftrace_regs_caller)
++#endif
++
+ #endif
+ 
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 -- 
 2.7.4
