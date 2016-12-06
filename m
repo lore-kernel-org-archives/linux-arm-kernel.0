@@ -1,55 +1,39 @@
 From: abelvesa@linux.com (Abel Vesa)
-Date: Tue,  6 Dec 2016 17:06:07 +0000
-Subject: [PATCH 7/7] arm: Add livepatch necessary arch selects into Kconfig
+Date: Tue,  6 Dec 2016 17:06:03 +0000
+Subject: [PATCH 3/7] arm: module: Add apply_relocate_add
 In-Reply-To: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
 References: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
-Message-ID: <1481043967-15602-8-git-send-email-abelvesa@linux.com>
+Message-ID: <1481043967-15602-4-git-send-email-abelvesa@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds HAVE_LIVEPATCH, MODULES_USE_ELF_RELA and HAVE_LIVEPATCH
-to arm Kconfig.
+It was only added to fix compiler error. It is not implemented
+yet.
 
 Signed-off-by: Abel Vesa <abelvesa@linux.com>
 ---
- arch/arm/Kconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/kernel/module.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 186c4c2..f4e9ace 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -50,6 +50,7 @@ config ARM
- 	select HAVE_DMA_API_DEBUG
- 	select HAVE_DMA_CONTIGUOUS if MMU
- 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
-+	select HAVE_DYNAMIC_FTRACE_WITH_REGS
- 	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
- 	select HAVE_EXIT_THREAD
- 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
-@@ -67,6 +68,7 @@ config ARM
- 	select HAVE_KERNEL_XZ
- 	select HAVE_KPROBES if !XIP_KERNEL && !CPU_ENDIAN_BE32 && !CPU_V7M
- 	select HAVE_KRETPROBES if (HAVE_KPROBES)
-+	select HAVE_LIVEPATCH
- 	select HAVE_MEMBLOCK
- 	select HAVE_MOD_ARCH_SPECIFIC
- 	select HAVE_NMI
-@@ -82,6 +84,7 @@ config ARM
- 	select HAVE_VIRT_CPU_ACCOUNTING_GEN
- 	select IRQ_FORCED_THREADING
- 	select MODULES_USE_ELF_REL
-+	select MODULES_USE_ELF_RELA
- 	select NO_BOOTMEM
- 	select OF_EARLY_FLATTREE if OF
- 	select OF_RESERVED_MEM if OF
-@@ -1841,6 +1844,7 @@ config XEN
- 	help
- 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index 4f14b5c..bf94922 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -52,6 +52,15 @@ void *module_alloc(unsigned long size)
+ #endif
  
-+source "kernel/livepatch/Kconfig"
- endmenu
- 
- menu "Boot options"
+ int
++apply_relocate_add(Elf32_Shdr *sechdrs, const char *strtab,
++		   unsigned int symindex, unsigned int relindex,
++		   struct module *module)
++{
++	/* Not implemented yet */
++	return 0;
++}
++
++int
+ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 	       unsigned int relindex, struct module *module)
+ {
 -- 
 2.7.4
