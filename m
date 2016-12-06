@@ -1,62 +1,77 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Tue,  6 Dec 2016 18:17:14 +0100
-Subject: [PATCH 5/5] ARM: BCM53573: Specify USB ports of on-SoC controllers
-In-Reply-To: <20161206171714.22738-1-zajec5@gmail.com>
-References: <20161206171714.22738-1-zajec5@gmail.com>
-Message-ID: <20161206171714.22738-5-zajec5@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 6 Dec 2016 17:17:52 +0000
+Subject: [PATCH v2] arm64: KVM: pmu: Reset PMSELR_EL0.SEL to a sane value
+ before entering the guest
+In-Reply-To: <20161206162918.GE4816@cbox>
+References: <1481036210-31816-1-git-send-email-marc.zyngier@arm.com>
+ <20161206162918.GE4816@cbox>
+Message-ID: <3b083cff-c031-0f1e-8281-cf7cf082945f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+On 06/12/16 16:29, Christoffer Dall wrote:
+> On Tue, Dec 06, 2016 at 02:56:50PM +0000, Marc Zyngier wrote:
+>> The ARMv8 architecture allows the cycle counter to be configured
+>> by setting PMSELR_EL0.SEL==0x1f and then accessing PMXEVTYPER_EL0,
+>> hence accessing PMCCFILTR_EL0. But it disallows the use of
+>> PMSELR_EL0.SEL==0x1f to access the cycle counter itself through
+>> PMXEVCNTR_EL0.
+>>
+>> Linux itself doesn't violate this rule, but we may end up with
+>> PMSELR_EL0.SEL being set to 0x1f when we enter a guest. If that
+>> guest accesses PMXEVCNTR_EL0, the access may UNDEF at EL1,
+>> despite the guest not having done anything wrong.
+>>
+>> In order to avoid this unfortunate course of events (haha!), let's
+> 
+> I actually did find this funny.
+> 
+>> sanitize PMSELR_EL0 on guest entry. This ensures that the guest
+>> won't explode unexpectedly.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>> This is another approach to fix this issue, this time nuking PMSELR_EL0
+>> on guest entry instead of relying on perf not to clobber the register.
+>>
+>> Tested on v4.9-rc8 with a Rev A3 X-Gene.
+>>
+>>  arch/arm64/kvm/hyp/switch.c | 8 +++++++-
+>>  1 file changed, 7 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+>> index 83037cd..3b7cfbd 100644
+>> --- a/arch/arm64/kvm/hyp/switch.c
+>> +++ b/arch/arm64/kvm/hyp/switch.c
+>> @@ -85,7 +85,13 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+>>  	write_sysreg(val, hcr_el2);
+>>  	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+>>  	write_sysreg(1 << 15, hstr_el2);
+>> -	/* Make sure we trap PMU access from EL0 to EL2 */
+>> +	/*
+>> +	 * Make sure we trap PMU access from EL0 to EL2. Also sanitize
+>> +	 * PMSELR_EL0 to make sure it never contains the cycle
+>> +	 * counter, which could make a PMXEVCNTR_EL0 access UNDEF.
+>> +	 */
+>> +	if (vcpu->arch.mdcr_el2 & MDCR_EL2_HPMN_MASK)
+>> +		write_sysreg(0, pmselr_el0);
+> 
+> I'm a bit confused about how we use the HPMN field.  This value is
+> always set to the full number of counters available on the system and
+> never modified by the guest, right?  So this is in essence a check that
+> says 'do you have any performance counters, then make sure accesses
+> don't undef to el1 instead of trapping to el2', but then my question is,
+> why not just set pmselr_el0 to zero unconditionally, because in the case
+> where (vcpu->arch.mdcr_el2 & MDCR_EL2_HPMN_MASK) == 0, it means we have
+> no counters, which we'll have exposed to the guest anyhow, and we should
+> undef at el1 in the guest, or did I get this completely wrong (like
+> everything else today)?
 
-Broadcom OHCI and EHCI controllers always have 2 ports each on the root
-hub. Describe them in DT to allow specifying extra info or referencing
-port nodes.
+Yeah, that's probably the best course of action. If the guest does
+something silly, tough. I'll drop the test and repost the thing.
 
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
----
- arch/arm/boot/dts/bcm53573.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+Thanks,
 
-diff --git a/arch/arm/boot/dts/bcm53573.dtsi b/arch/arm/boot/dts/bcm53573.dtsi
-index e2c496a..2da04d0 100644
---- a/arch/arm/boot/dts/bcm53573.dtsi
-+++ b/arch/arm/boot/dts/bcm53573.dtsi
-@@ -124,6 +124,17 @@
- 				reg = <0x4000 0x1000>;
- 				interrupt-parent = <&gic>;
- 				interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				ehci_port1: port at 1 {
-+					reg = <1>;
-+				};
-+
-+				ehci_port2: port at 2 {
-+					reg = <2>;
-+				};
- 			};
- 
- 			ohci: ohci at d000 {
-@@ -133,6 +144,17 @@
- 				reg = <0xd000 0x1000>;
- 				interrupt-parent = <&gic>;
- 				interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				ohci_port1: port at 1 {
-+					reg = <1>;
-+				};
-+
-+				ohci_port2: port at 2 {
-+					reg = <2>;
-+				};
- 			};
- 		};
- 
+	M.
 -- 
-2.10.1
+Jazz is not dead. It just smells funny...
