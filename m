@@ -1,127 +1,48 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 6 Dec 2016 21:24:50 +0200
-Subject: [PATCH 5/5] arm64: dts: exynos5433: Add support of bus frequency
- using VDD_INT on TM2
-In-Reply-To: <1480663087-4590-6-git-send-email-cw00.choi@samsung.com>
-References: <1480663087-4590-1-git-send-email-cw00.choi@samsung.com>
- <1480663087-4590-6-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20161206192450.GC12683@kozik-lap>
+Date: Tue, 6 Dec 2016 21:33:20 +0200
+Subject: [PATCH] exynos-gsc: Clean up file handle in open() error path.
+In-Reply-To: <1480653927-6850-1-git-send-email-shailendra.v@samsung.com>
+References: <1480653927-6850-1-git-send-email-shailendra.v@samsung.com>
+Message-ID: <20161206193320.GA14210@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 04:18:07PM +0900, Chanwoo Choi wrote:
-> This patch adds the bus Device-tree nodes for INT (Internal) block
-> to enable the bus frequency scaling.
+On Fri, Dec 02, 2016 at 10:15:27AM +0530, Shailendra Verma wrote:
+> The File handle is not yet added in the vfd list.So no need to call
+> v4l2_fh_del(&ctx->fh) if it fails to create control.
 > 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Shailendra Verma <shailendra.v@samsung.com>
 > ---
->  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts | 72 +++++++++++++++++++++++++++
->  1 file changed, 72 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-> index c08589970134..7b37aae336b1 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-> @@ -170,6 +170,58 @@
->  	};
->  };
->  
-> +&bus_g2d_400 {
-> +	devfreq-events = <&ppmu_event0_d0_general>, <&ppmu_event0_d1_general>;
-> +	vdd-supply = <&buck4_reg>;
-> +	exynos,saturation-ratio = <10>;
-> +	status = "okay";
-> +};
-> +
-> +&bus_mscl {
-> +	devfreq = <&bus_g2d_400>;
-> +	status = "okay";
-> +};
-> +
-> +&bus_jpeg {
+>  drivers/media/platform/exynos-gsc/gsc-m2m.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Except the first entry (which is a parent), are there any objections to
-order these nodes alphabetically? This also applies to the previously
-patch.
+I think I see this and exynos4-is patch for the third time...
+1. sent in a very short time-frame (usually resending is after 2 weeks),
+2. without any change log (should be after --- separator),
+3. with different subjects (really...),
+4. without versioning (use git format-patch -v2 etc).
 
-Beside that nit, looks good. I will have to wait anyway to next merge
-window, so for the reference:
-
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+Please, keep it a little bit more organized... Look at examples on
+mailing lists how (and when) people are sending patches.
 
 Best regards,
 Krzysztof
 
-
-> +	devfreq = <&bus_g2d_400>;
-> +	status = "okay";
-> +};
-> +
-> +&bus_mfc {
-> +	devfreq = <&bus_g2d_400>;
-> +	status = "okay";
-> +};
-> +
-> +&bus_g2d_266 {
-> +	devfreq = <&bus_g2d_400>;
-> +	status = "okay";
-> +};
-> +
-> +&bus_gscl {
-> +	devfreq = <&bus_g2d_400>;
-> +	status = "okay";
-> +};
-> +
-> +&bus_hevc {
-> +	devfreq = <&bus_g2d_400>;
-> +	status = "okay";
-> +};
-> +
-> +&bus_bus0 {
-> +	devfreq = <&bus_g2d_400>;
-> +	status = "okay";
-> +};
-> +
-> +&bus_bus1 {
-> +	devfreq = <&bus_g2d_400>;
-> +	status = "okay";
-> +};
-> +
-> +&bus_bus2 {
-> +	devfreq = <&bus_g2d_400>;
-> +	status = "okay";
-> +};
-> +
->  &cmu_aud {
->  	assigned-clocks = <&cmu_aud CLK_MOUT_AUD_PLL_USER>;
->  	assigned-clock-parents = <&cmu_top CLK_FOUT_AUD_PLL>;
-> @@ -794,6 +846,26 @@
->  	bus-width = <4>;
->  };
+> 
+> diff --git a/drivers/media/platform/exynos-gsc/gsc-m2m.c b/drivers/media/platform/exynos-gsc/gsc-m2m.c
+> index 9f03b79..5ea97c1 100644
+> --- a/drivers/media/platform/exynos-gsc/gsc-m2m.c
+> +++ b/drivers/media/platform/exynos-gsc/gsc-m2m.c
+> @@ -664,8 +664,8 @@ static int gsc_m2m_open(struct file *file)
 >  
-> +&ppmu_d0_general {
-> +	status = "okay";
-> +
-> +	events {
-> +		ppmu_event0_d0_general: ppmu-event0-d0-general {
-> +			event-name = "ppmu-event0-d0-general";
-> +		};
-> +	};
-> +};
-> +
-> +&ppmu_d1_general {
-> +	status = "okay";
-> +
-> +	events {
-> +		ppmu_event0_d1_general: ppmu-event0-d1-general {
-> +		       event-name = "ppmu-event0-d1-general";
-> +	       };
-> +       };
-> +};
-> +
->  &pinctrl_alive {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&initial_alive>;
+>  error_ctrls:
+>  	gsc_ctrls_delete(ctx);
+> -error_fh:
+>  	v4l2_fh_del(&ctx->fh);
+> +error_fh:
+>  	v4l2_fh_exit(&ctx->fh);
+>  	kfree(ctx);
+>  unlock:
 > -- 
-> 1.9.1
+> 1.7.9.5
 > 
