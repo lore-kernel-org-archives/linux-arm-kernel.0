@@ -1,57 +1,109 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 6 Dec 2016 13:46:01 +0100
-Subject: [GIT PULL] ARM: Xilinx Zynq SOC changes for v4.10
-Message-ID: <1ff060ae-b142-9e72-6fef-21b81a147614@monstr.eu>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 6 Dec 2016 12:54:10 +0000
+Subject: [PATCH v3 7/7] ARM: dts: stm32: add stm32 general purpose timer
+ driver in DT
+In-Reply-To: <8f881cf7-ba63-315f-b852-71869ad480f3@st.com>
+References: <1480673842-20804-1-git-send-email-benjamin.gaignard@st.com>
+ <1480673842-20804-8-git-send-email-benjamin.gaignard@st.com>
+ <20161202132251.GL2683@dell>
+ <e15186cb-a93e-c2e7-13bb-6704be5e8949@st.com>
+ <20161206094835.GB25385@dell.home>
+ <8f881cf7-ba63-315f-b852-71869ad480f3@st.com>
+Message-ID: <20161206125410.GE25385@dell.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 06 Dec 2016, Alexandre Torgue wrote:
+> On 12/06/2016 10:48 AM, Lee Jones wrote:
+> > On Mon, 05 Dec 2016, Alexandre Torgue wrote:
+> > > On 12/02/2016 02:22 PM, Lee Jones wrote:
+> > > > On Fri, 02 Dec 2016, Benjamin Gaignard wrote:
+> > > > 
+> > > > > Add general purpose timers and it sub-nodes into DT for stm32f4.
+> > > > > Define and enable pwm1 and pwm3 for stm32f469 discovery board
+> > > > > 
+> > > > > version 3:
+> > > > > - use "st,stm32-timer-trigger" in DT
+> > > > > 
+> > > > > version 2:
+> > > > > - use parameters to describe hardware capabilities
+> > > > > - do not use references for pwm and iio timer subnodes
+> > > > > 
+> > > > > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> > > > > ---
+> > > > >  arch/arm/boot/dts/stm32f429.dtsi      | 333 +++++++++++++++++++++++++++++++++-
+> > > > >  arch/arm/boot/dts/stm32f469-disco.dts |  28 +++
+> > > > >  2 files changed, 360 insertions(+), 1 deletion(-)
+> > 
+> > [...]
+> > 
+> > If you're only commenting on a little piece of the patch, it's always
+> > a good idea to trim the rest.
+> > 
+> > > > > diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
+> > > > > index 8a163d7..df4ca7e 100644
+> > > > > --- a/arch/arm/boot/dts/stm32f469-disco.dts
+> > > > > +++ b/arch/arm/boot/dts/stm32f469-disco.dts
+> > > > > @@ -81,3 +81,31 @@
+> > > > >  &usart3 {
+> > > > >  	status = "okay";
+> > > > >  };
+> > > > > +
+> > > > > +&gptimer1 {
+> > > > > +	status = "okay";
+> > > > > +
+> > > > > +	pwm1 at 0 {
+> > > > > +		pinctrl-0	= <&pwm1_pins>;
+> > > > > +		pinctrl-names	= "default";
+> > > > > +		status = "okay";
+> > > > > +	};
+> > > > > +
+> > > > > +	timer1 at 0 {
+> > > > > +		status = "okay";
+> > > > > +	};
+> > > > > +};
+> > > > 
+> > > > This is a much *better* format than before.
+> > > > 
+> > > > I still don't like the '&' syntax though.
+> > > 
+> > > Please keep "&" format to match with existing nodes.
+> > 
+> > Right.  I wasn't suggesting that he differs from the current format in
+> > *this* set.  I am suggesting that we change the format in a subsequent
+> > set though.
+> 
+> Why change? Looking at Linux ARM kernel patchwork, new DT board file
+> contains this format. Did you already discuss with Arnd or Olof about it ?
 
-please pull this fix to your tree.
+Because the syntax is horrible.  It removes any indication of
+hierarchy and insists all nodes include labels that would otherwise be
+unnecessary.
 
-Thanks,
-Michal
+The syntax is approved, so there is no issue with Arnd/Olof, nor the
+DT Maintainers.  The decision is left to the sub-arch maintainer to
+choose to use it or not.  My vote (which doesn't really count for
+anything in this scenario) is to not use it for the aforementioned
+reasons.
 
-
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-  https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-4.10
-
-for you to fetch changes up to 7a3cc2a7b2c723aa552028f4e66841cec183756d:
-
-  ARM: zynq: Reserve correct amount of non-DMA RAM (2016-11-14 16:07:58
-+0100)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq patches for v4.10
-
-- Fix dma issue
-
-----------------------------------------------------------------
-Kyle Roeschley (1):
-      ARM: zynq: Reserve correct amount of non-DMA RAM
-
- arch/arm/mach-zynq/common.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-
+> > > > > +&gptimer3 {
+> > > > > +	status = "okay";
+> > > > > +
+> > > > > +	pwm3 at 0 {
+> > > > > +		pinctrl-0	= <&pwm3_pins>;
+> > > > > +		pinctrl-names	= "default";
+> > > > > +		status = "okay";
+> > > > > +	};
+> > > > > +
+> > > > > +	timer3 at 0 {
+> > > > > +		status = "okay";
+> > > > > +	};
+> > > > > +};
+> > > > 
+> > 
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161206/773ac815/attachment-0001.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
