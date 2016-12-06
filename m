@@ -1,30 +1,84 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 6 Dec 2016 09:16:35 -0600
-Subject: [PATCH 1/2] misc: atmel-ssc: register as sound DAI if
- #sound-dai-cells is present
-In-Reply-To: <1480593549-6464-2-git-send-email-peda@axentia.se>
-References: <1480593549-6464-1-git-send-email-peda@axentia.se>
- <1480593549-6464-2-git-send-email-peda@axentia.se>
-Message-ID: <20161206151635.psckjlu2pyzjm7k6@rob-hp-laptop>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 06 Dec 2016 23:16:44 +0800
+Subject: [PATCH v2 2/3] ARM: dts: sunxi: add support for Orange Pi Zero
+ board
+In-Reply-To: <20161206080056.23jpd4e7eeuhuyiq@lukather>
+References: <20161205120021.0GBGtAl4@smtp3m.mail.yandex.net>
+ <20161205094023.mtymfvpmca4x3ohh@lukather>
+ <17819681480935706@web24g.yandex.ru>
+ <20161206080056.23jpd4e7eeuhuyiq@lukather>
+Message-ID: <289751481037404@web27m.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2016 at 12:59:08PM +0100, Peter Rosin wrote:
-> The SSC is currently not usable with the ASoC simple-audio-card, as
-> every SSC audio user has to build a platform driver that may do as
-> little as calling atmel_ssc_set_audio/atmel_ssc_put_audio (which
-> allocates the SSC and registers a DAI with the ASoC subsystem).
-> 
-> So, have that happen automatically, if the #sound-dai-cells property
-> is present in devicetree, which it has to be anyway for simple audio
-> card to work.
-> 
-> Signed-off-by: Peter Rosin <peda@axentia.se>
-> ---
->  .../devicetree/bindings/misc/atmel-ssc.txt         |  2 +
 
-Acked-by: Rob Herring <robh@kernel.org>
 
->  drivers/misc/atmel-ssc.c                           | 50 ++++++++++++++++++++++
->  include/linux/atmel-ssc.h                          |  1 +
->  3 files changed, 53 insertions(+)
+06.12.2016, 16:01, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> On Mon, Dec 05, 2016 at 07:01:46PM +0800, Icenowy Zheng wrote:
+>> ?05.12.2016, 17:40, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>> ?> On Mon, Dec 05, 2016 at 04:59:44PM +0800, Icenowy Zheng wrote:
+>> ?>> ?2016?12?5? 16:52? Maxime Ripard <maxime.ripard@free-electrons.com>???
+>> ?>> ?>
+>> ?>> ?> On Fri, Dec 02, 2016 at 10:22:30PM +0800, Icenowy Zheng wrote:
+>> ?>> ?> >
+>> ?>> ?> >
+>> ?>> ?> > 01.12.2016, 17:36, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>> ?>> ?> > > On Mon, Nov 28, 2016 at 12:29:07AM +0000, Andr? Przywara wrote:
+>> ?>> ?> > >> ?> Something more interesting happened.
+>> ?>> ?> > >> ?>
+>> ?>> ?> > >> ?> Xunlong made a add-on board for Orange Pi Zero, which exposes the
+>> ?>> ?> > >> ?> two USB Controllers exported at expansion bus as USB Type-A
+>> ?>> ?> > >> ?> connectors.
+>> ?>> ?> > >> ?>
+>> ?>> ?> > >> ?> Also it exposes a analog A/V jack and a microphone.
+>> ?>> ?> > >> ?>
+>> ?>> ?> > >> ?> Should I enable {e,o}hci{2.3} in the device tree?
+>> ?>> ?> > >>
+>> ?>> ?> > >> ?Actually we should do this regardless of this extension board. The USB
+>> ?>> ?> > >> ?pins are not multiplexed and are exposed on user accessible pins (just
+>> ?>> ?> > >> ?not soldered, but that's a detail), so I think they qualify for DT
+>> ?>> ?> > >> ?enablement. And even if a user can't use them, it doesn't hurt to have
+>> ?>> ?> > >> ?them (since they are not multiplexed).
+>> ?>> ?> > >
+>> ?>> ?> > > My main concern about this is that we'll leave regulators enabled by
+>> ?>> ?> > > default, for a minority of users. And that minority will prevent to do
+>> ?>> ?> > > a proper power management when the times come since we'll have to keep
+>> ?>> ?> > > that behaviour forever.
+>> ?>> ?> >
+>> ?>> ?> > I think these users can add a 'fdt set /xxx/xxx status "disabled" ' .
+>> ?>> ?>
+>> ?>> ?> You can't ask that from the majority of users. These users will take
+>> ?>> ?> debian or fedora, install it, and expect everything to work
+>> ?>> ?> properly. I would make the opposite argument actually. If someone is
+>> ?>> ?> knowledgeable enough to solder the USB pins a connector, then (s)he'll
+>> ?>> ?> be able to make that u-boot call.
+>> ?>>
+>> ?>> ?Now (s)he do not need soldering.
+>> ?>>
+>> ?>> ?(S)he needs only paying $1.99 more to Xunlong to get the expansion
+>> ?>> ?board, and insert it on the OPi Zero.
+>> ?>
+>> ?> Which is going to require an overlay anyway, so we could have the USB
+>> ?> bits in there too.
+>>
+>> ?If so, I think the [PATCH -next v3 2/2] is ready to be merged ;-)
+>
+> I meant enabling the USB in the overlay, you enabled it in the base DT.
+
+I enabled only usb1 in the base DT.
+
+The USBs on the expansion board is usb2/3, and usb1 is an onboard USB connector.
+
+It should of course be enabled ;-)
+
+And to mention: this usb's Vbus is also directly connected to DCIN.
+
+(There's no regulator at 5.0V on orange pi Zero)
+
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
