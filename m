@@ -1,82 +1,235 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Tue, 6 Dec 2016 09:28:33 -0800
-Subject: [PATCH 2/5] ARM: BCM5301X: Specify USB controllers in DT
-In-Reply-To: <20161206171714.22738-2-zajec5@gmail.com>
-References: <20161206171714.22738-1-zajec5@gmail.com>
- <20161206171714.22738-2-zajec5@gmail.com>
-Message-ID: <c721c71c-117f-185d-0544-954981dbcf04@broadcom.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 6 Dec 2016 17:30:16 +0000
+Subject: [RFC v3 02/10] iommu: Rename iommu_dm_regions into
+ iommu_resv_regions
+In-Reply-To: <1479215363-2898-3-git-send-email-eric.auger@redhat.com>
+References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
+ <1479215363-2898-3-git-send-email-eric.auger@redhat.com>
+Message-ID: <47215825-b9a3-d161-9eca-8326fe754d04@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 12/6/2016 9:17 AM, Rafa? Mi?ecki wrote:
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
+On 15/11/16 13:09, Eric Auger wrote:
+> We want to extend the callbacks used for dm regions and
+> use them for reserved regions. Reserved regions can be
+> - directly mapped regions
+> - regions that cannot be iommu mapped (PCI host bridge windows, ...)
+> - MSI regions (because they belong to another address space or because
+>   they are not translated by the IOMMU and need special handling)
 > 
-> There are 3 separated controllers, one per USB /standard/. With PHY
-> drivers in place they can be simply supported with generic drivers.
-> 
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> So let's rename the struct and also the callbacks.
+
+Acked-by: Robin Murphy <robin.murphy@arm.com>
+
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
 > ---
->  arch/arm/boot/dts/bcm5301x.dtsi | 33 ++++++++++++++++++++++++++++++++-
->  1 file changed, 32 insertions(+), 1 deletion(-)
+>  drivers/iommu/amd_iommu.c | 20 ++++++++++----------
+>  drivers/iommu/iommu.c     | 22 +++++++++++-----------
+>  include/linux/iommu.h     | 29 +++++++++++++++--------------
+>  3 files changed, 36 insertions(+), 35 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-> index f09a2bb..bfc98d19 100644
-> --- a/arch/arm/boot/dts/bcm5301x.dtsi
-> +++ b/arch/arm/boot/dts/bcm5301x.dtsi
-> @@ -248,8 +248,26 @@
+> diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
+> index 754595e..a6c351d 100644
+> --- a/drivers/iommu/amd_iommu.c
+> +++ b/drivers/iommu/amd_iommu.c
+> @@ -3159,8 +3159,8 @@ static bool amd_iommu_capable(enum iommu_cap cap)
+>  	return false;
+>  }
 >  
->  			#address-cells = <1>;
->  			#size-cells = <1>;
-> +			ranges;
+> -static void amd_iommu_get_dm_regions(struct device *dev,
+> -				     struct list_head *head)
+> +static void amd_iommu_get_resv_regions(struct device *dev,
+> +				       struct list_head *head)
+>  {
+>  	struct unity_map_entry *entry;
+>  	int devid;
+> @@ -3170,7 +3170,7 @@ static void amd_iommu_get_dm_regions(struct device *dev,
+>  		return;
 >  
-> -			phys = <&usb2_phy>;
-> +			interrupt-parent = <&gic>;
-> +
-> +			ohci: ohci at 21000 {
-> +				#usb-cells = <0>;
-> +
-> +				compatible = "generic-ohci";
-> +				reg = <0x00022000 0x1000>;
-
-Your label ohci at 21000 does not match the 'reg' at 0x22000.
-
-> +				interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +
-> +			ehci: ehci at 22000 {
-> +				#usb-cells = <0>;
-> +
-> +				compatible = "generic-ehci";
-> +				reg = <0x00021000 0x1000>;
-
-Looks like you got the label of ohci and ehci reversed?
-
-> +				interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-> +				phys = <&usb2_phy>;
-> +			};
->  		};
+>  	list_for_each_entry(entry, &amd_iommu_unity_map, list) {
+> -		struct iommu_dm_region *region;
+> +		struct iommu_resv_region *region;
 >  
->  		usb3: usb3 at 23000 {
-> @@ -257,6 +275,19 @@
+>  		if (devid < entry->devid_start || devid > entry->devid_end)
+>  			continue;
+> @@ -3193,18 +3193,18 @@ static void amd_iommu_get_dm_regions(struct device *dev,
+>  	}
+>  }
 >  
->  			#address-cells = <1>;
->  			#size-cells = <1>;
-> +			ranges;
-> +
-> +			interrupt-parent = <&gic>;
-> +
-> +			xhci: xhci at 23000 {
-> +				#usb-cells = <0>;
-> +
-> +				compatible = "generic-xhci";
-> +				reg = <0x00023000 0x1000>;
-> +				interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
-> +				phys = <&usb3_phy>;
-> +				phy-names = "usb";
-> +			};
->  		};
+> -static void amd_iommu_put_dm_regions(struct device *dev,
+> +static void amd_iommu_put_resv_regions(struct device *dev,
+>  				     struct list_head *head)
+>  {
+> -	struct iommu_dm_region *entry, *next;
+> +	struct iommu_resv_region *entry, *next;
 >  
->  		spi at 29000 {
+>  	list_for_each_entry_safe(entry, next, head, list)
+>  		kfree(entry);
+>  }
+>  
+> -static void amd_iommu_apply_dm_region(struct device *dev,
+> +static void amd_iommu_apply_resv_region(struct device *dev,
+>  				      struct iommu_domain *domain,
+> -				      struct iommu_dm_region *region)
+> +				      struct iommu_resv_region *region)
+>  {
+>  	struct dma_ops_domain *dma_dom = to_dma_ops_domain(to_pdomain(domain));
+>  	unsigned long start, end;
+> @@ -3228,9 +3228,9 @@ static void amd_iommu_apply_dm_region(struct device *dev,
+>  	.add_device = amd_iommu_add_device,
+>  	.remove_device = amd_iommu_remove_device,
+>  	.device_group = amd_iommu_device_group,
+> -	.get_dm_regions = amd_iommu_get_dm_regions,
+> -	.put_dm_regions = amd_iommu_put_dm_regions,
+> -	.apply_dm_region = amd_iommu_apply_dm_region,
+> +	.get_resv_regions = amd_iommu_get_resv_regions,
+> +	.put_resv_regions = amd_iommu_put_resv_regions,
+> +	.apply_resv_region = amd_iommu_apply_resv_region,
+>  	.pgsize_bitmap	= AMD_IOMMU_PGSIZES,
+>  };
+>  
+> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+> index 9a2f196..c7ed334 100644
+> --- a/drivers/iommu/iommu.c
+> +++ b/drivers/iommu/iommu.c
+> @@ -318,7 +318,7 @@ static int iommu_group_create_direct_mappings(struct iommu_group *group,
+>  					      struct device *dev)
+>  {
+>  	struct iommu_domain *domain = group->default_domain;
+> -	struct iommu_dm_region *entry;
+> +	struct iommu_resv_region *entry;
+>  	struct list_head mappings;
+>  	unsigned long pg_size;
+>  	int ret = 0;
+> @@ -331,14 +331,14 @@ static int iommu_group_create_direct_mappings(struct iommu_group *group,
+>  	pg_size = 1UL << __ffs(domain->pgsize_bitmap);
+>  	INIT_LIST_HEAD(&mappings);
+>  
+> -	iommu_get_dm_regions(dev, &mappings);
+> +	iommu_get_resv_regions(dev, &mappings);
+>  
+>  	/* We need to consider overlapping regions for different devices */
+>  	list_for_each_entry(entry, &mappings, list) {
+>  		dma_addr_t start, end, addr;
+>  
+> -		if (domain->ops->apply_dm_region)
+> -			domain->ops->apply_dm_region(dev, domain, entry);
+> +		if (domain->ops->apply_resv_region)
+> +			domain->ops->apply_resv_region(dev, domain, entry);
+>  
+>  		start = ALIGN(entry->start, pg_size);
+>  		end   = ALIGN(entry->start + entry->length, pg_size);
+> @@ -358,7 +358,7 @@ static int iommu_group_create_direct_mappings(struct iommu_group *group,
+>  	}
+>  
+>  out:
+> -	iommu_put_dm_regions(dev, &mappings);
+> +	iommu_put_resv_regions(dev, &mappings);
+>  
+>  	return ret;
+>  }
+> @@ -1546,20 +1546,20 @@ int iommu_domain_set_attr(struct iommu_domain *domain,
+>  }
+>  EXPORT_SYMBOL_GPL(iommu_domain_set_attr);
+>  
+> -void iommu_get_dm_regions(struct device *dev, struct list_head *list)
+> +void iommu_get_resv_regions(struct device *dev, struct list_head *list)
+>  {
+>  	const struct iommu_ops *ops = dev->bus->iommu_ops;
+>  
+> -	if (ops && ops->get_dm_regions)
+> -		ops->get_dm_regions(dev, list);
+> +	if (ops && ops->get_resv_regions)
+> +		ops->get_resv_regions(dev, list);
+>  }
+>  
+> -void iommu_put_dm_regions(struct device *dev, struct list_head *list)
+> +void iommu_put_resv_regions(struct device *dev, struct list_head *list)
+>  {
+>  	const struct iommu_ops *ops = dev->bus->iommu_ops;
+>  
+> -	if (ops && ops->put_dm_regions)
+> -		ops->put_dm_regions(dev, list);
+> +	if (ops && ops->put_resv_regions)
+> +		ops->put_resv_regions(dev, list);
+>  }
+>  
+>  /* Request that a device is direct mapped by the IOMMU */
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index 436dc21..7f6ebd0 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -118,13 +118,13 @@ enum iommu_attr {
+>  };
+>  
+>  /**
+> - * struct iommu_dm_region - descriptor for a direct mapped memory region
+> + * struct iommu_resv_region - descriptor for a reserved memory region
+>   * @list: Linked list pointers
+>   * @start: System physical start address of the region
+>   * @length: Length of the region in bytes
+>   * @prot: IOMMU Protection flags (READ/WRITE/...)
+>   */
+> -struct iommu_dm_region {
+> +struct iommu_resv_region {
+>  	struct list_head	list;
+>  	phys_addr_t		start;
+>  	size_t			length;
+> @@ -150,9 +150,9 @@ struct iommu_dm_region {
+>   * @device_group: find iommu group for a particular device
+>   * @domain_get_attr: Query domain attributes
+>   * @domain_set_attr: Change domain attributes
+> - * @get_dm_regions: Request list of direct mapping requirements for a device
+> - * @put_dm_regions: Free list of direct mapping requirements for a device
+> - * @apply_dm_region: Temporary helper call-back for iova reserved ranges
+> + * @get_resv_regions: Request list of reserved regions for a device
+> + * @put_resv_regions: Free list of reserved regions for a device
+> + * @apply_resv_region: Temporary helper call-back for iova reserved ranges
+>   * @domain_window_enable: Configure and enable a particular window for a domain
+>   * @domain_window_disable: Disable a particular window for a domain
+>   * @domain_set_windows: Set the number of windows for a domain
+> @@ -184,11 +184,12 @@ struct iommu_ops {
+>  	int (*domain_set_attr)(struct iommu_domain *domain,
+>  			       enum iommu_attr attr, void *data);
+>  
+> -	/* Request/Free a list of direct mapping requirements for a device */
+> -	void (*get_dm_regions)(struct device *dev, struct list_head *list);
+> -	void (*put_dm_regions)(struct device *dev, struct list_head *list);
+> -	void (*apply_dm_region)(struct device *dev, struct iommu_domain *domain,
+> -				struct iommu_dm_region *region);
+> +	/* Request/Free a list of reserved regions for a device */
+> +	void (*get_resv_regions)(struct device *dev, struct list_head *list);
+> +	void (*put_resv_regions)(struct device *dev, struct list_head *list);
+> +	void (*apply_resv_region)(struct device *dev,
+> +				  struct iommu_domain *domain,
+> +				  struct iommu_resv_region *region);
+>  
+>  	/* Window handling functions */
+>  	int (*domain_window_enable)(struct iommu_domain *domain, u32 wnd_nr,
+> @@ -233,8 +234,8 @@ extern size_t default_iommu_map_sg(struct iommu_domain *domain, unsigned long io
+>  extern void iommu_set_fault_handler(struct iommu_domain *domain,
+>  			iommu_fault_handler_t handler, void *token);
+>  
+> -extern void iommu_get_dm_regions(struct device *dev, struct list_head *list);
+> -extern void iommu_put_dm_regions(struct device *dev, struct list_head *list);
+> +extern void iommu_get_resv_regions(struct device *dev, struct list_head *list);
+> +extern void iommu_put_resv_regions(struct device *dev, struct list_head *list);
+>  extern int iommu_request_dm_for_dev(struct device *dev);
+>  
+>  extern int iommu_attach_group(struct iommu_domain *domain,
+> @@ -439,12 +440,12 @@ static inline void iommu_set_fault_handler(struct iommu_domain *domain,
+>  {
+>  }
+>  
+> -static inline void iommu_get_dm_regions(struct device *dev,
+> +static inline void iommu_get_resv_regions(struct device *dev,
+>  					struct list_head *list)
+>  {
+>  }
+>  
+> -static inline void iommu_put_dm_regions(struct device *dev,
+> +static inline void iommu_put_resv_regions(struct device *dev,
+>  					struct list_head *list)
+>  {
+>  }
 > 
