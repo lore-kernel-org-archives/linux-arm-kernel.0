@@ -1,206 +1,224 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 06 Dec 2016 13:38:38 +0100
-Subject: [RFC PATCH 03/23] arm: update defconfigs for ARCH_KS8695
-In-Reply-To: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1481027938-31831-4-git-send-email-b.zolnierkie@samsung.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Tue,  6 Dec 2016 13:38:44 +0100
+Subject: [PATCH v4 2/7] MFD: add STM32 General Purpose Timer driver
+In-Reply-To: <1481027929-13704-1-git-send-email-benjamin.gaignard@st.com>
+References: <1481027929-13704-1-git-send-email-benjamin.gaignard@st.com>
+Message-ID: <1481027929-13704-3-git-send-email-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update [acs5k,acs5k_tiny,ks8695]_defconfig-s against kernel v4.9-rc6.
+This hardware block could at used at same time for PWM generation
+and IIO timers.
+PWM and IIO timer configuration are mixed in the same registers
+so we need a multi fonction driver to be able to share those registers.
 
-The changes were obtained by doing:
+version 4:
+- add a function to detect Auto Reload Register (ARR) size
+- rename the structure shared with other drivers
 
-	$ make [acs5k,...]_defconfig
-	$ make savedefconfig
-	$ diff -u arch/arm/[acs5k,...]_defconfig defconfig
+version 2:
+- rename driver "stm32-gptimer" to be align with SoC documentation
+- only keep one compatible
+- use of_platform_populate() instead of devm_mfd_add_devices()
 
-Cc: Greg Ungerer <gerg@uclinux.org>
-Cc: Cyril Bur <cyrilbur@gmail.com>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 ---
- arch/arm/configs/acs5k_defconfig      | 12 ------------
- arch/arm/configs/acs5k_tiny_defconfig | 14 --------------
- arch/arm/configs/ks8695_defconfig     | 12 ------------
- 3 files changed, 38 deletions(-)
+ drivers/mfd/Kconfig               | 11 ++++++
+ drivers/mfd/Makefile              |  2 +
+ drivers/mfd/stm32-gptimer.c       | 82 +++++++++++++++++++++++++++++++++++++++
+ include/linux/mfd/stm32-gptimer.h | 63 ++++++++++++++++++++++++++++++
+ 4 files changed, 158 insertions(+)
+ create mode 100644 drivers/mfd/stm32-gptimer.c
+ create mode 100644 include/linux/mfd/stm32-gptimer.h
 
-diff --git a/arch/arm/configs/acs5k_defconfig b/arch/arm/configs/acs5k_defconfig
-index 92b0f90..8840d2c 100644
---- a/arch/arm/configs/acs5k_defconfig
-+++ b/arch/arm/configs/acs5k_defconfig
-@@ -1,9 +1,7 @@
--CONFIG_EXPERIMENTAL=y
- # CONFIG_SWAP is not set
- CONFIG_SYSVIPC=y
- CONFIG_POSIX_MQUEUE=y
- CONFIG_LOG_BUF_SHIFT=14
--CONFIG_SYSFS_DEPRECATED_V2=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_SLAB=y
- CONFIG_MODULES=y
-@@ -30,13 +28,9 @@ CONFIG_UNIX=y
- CONFIG_INET=y
- CONFIG_IP_PNP=y
- CONFIG_IP_PNP_DHCP=y
--# CONFIG_INET_LRO is not set
- # CONFIG_IPV6 is not set
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
--CONFIG_MTD_CONCAT=y
--CONFIG_MTD_PARTITIONS=y
--CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_JEDECPROBE=y
-@@ -47,10 +41,7 @@ CONFIG_MTD_PHYSMAP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=8192
- CONFIG_NETDEVICES=y
--CONFIG_NET_ETHERNET=y
- CONFIG_ARM_KS8695_ETHER=y
--# CONFIG_NETDEV_1000 is not set
--# CONFIG_NETDEV_10000 is not set
- CONFIG_PRISM54=m
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- # CONFIG_INPUT_KEYBOARD is not set
-@@ -65,11 +56,9 @@ CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_PCA953X=y
- CONFIG_WATCHDOG=y
- CONFIG_KS8695_WATCHDOG=y
--# CONFIG_VGA_CONSOLE is not set
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_PCF8563=y
- CONFIG_EXT2_FS=y
--CONFIG_INOTIFY=y
- CONFIG_TMPFS=y
- CONFIG_JFFS2_FS=y
- CONFIG_JFFS2_SUMMARY=y
-@@ -77,7 +66,6 @@ CONFIG_JFFS2_COMPRESSION_OPTIONS=y
- CONFIG_JFFS2_RUBIN=y
- CONFIG_CRAMFS=y
- CONFIG_NFS_FS=y
--CONFIG_NFS_V3=y
- CONFIG_ROOT_NFS=y
- CONFIG_DEBUG_KERNEL=y
- CONFIG_DEBUG_MUTEXES=y
-diff --git a/arch/arm/configs/acs5k_tiny_defconfig b/arch/arm/configs/acs5k_tiny_defconfig
-index 2a27a14..a8e115c 100644
---- a/arch/arm/configs/acs5k_tiny_defconfig
-+++ b/arch/arm/configs/acs5k_tiny_defconfig
-@@ -1,9 +1,7 @@
--CONFIG_EXPERIMENTAL=y
- # CONFIG_SWAP is not set
- CONFIG_SYSVIPC=y
- CONFIG_POSIX_MQUEUE=y
- CONFIG_LOG_BUF_SHIFT=14
--CONFIG_SYSFS_DEPRECATED_V2=y
- CONFIG_SLAB=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
-@@ -17,7 +15,6 @@ CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_CMDLINE="console=ttyAM0,115200 init=/bin/sh"
--CONFIG_FPE_NWFPE=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -25,13 +22,9 @@ CONFIG_INET=y
- # CONFIG_INET_XFRM_MODE_TRANSPORT is not set
- # CONFIG_INET_XFRM_MODE_TUNNEL is not set
- # CONFIG_INET_XFRM_MODE_BEET is not set
--# CONFIG_INET_LRO is not set
- # CONFIG_IPV6 is not set
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
--CONFIG_MTD_CONCAT=y
--CONFIG_MTD_PARTITIONS=y
--CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_JEDECPROBE=y
-@@ -40,12 +33,8 @@ CONFIG_MTD_CFI_INTELEXT=y
- CONFIG_MTD_CFI_AMDSTD=y
- CONFIG_MTD_PHYSMAP=y
- # CONFIG_BLK_DEV is not set
--# CONFIG_MISC_DEVICES is not set
- CONFIG_NETDEVICES=y
--CONFIG_NET_ETHERNET=y
- CONFIG_ARM_KS8695_ETHER=y
--# CONFIG_NETDEV_1000 is not set
--# CONFIG_NETDEV_10000 is not set
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- # CONFIG_INPUT_KEYBOARD is not set
- # CONFIG_INPUT_MOUSE is not set
-@@ -61,12 +50,9 @@ CONFIG_GPIO_PCA953X=y
- # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
- CONFIG_KS8695_WATCHDOG=y
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_HID_SUPPORT is not set
- # CONFIG_USB_SUPPORT is not set
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_PCF8563=y
--CONFIG_INOTIFY=y
- CONFIG_TMPFS=y
- CONFIG_JFFS2_FS=y
- CONFIG_JFFS2_SUMMARY=y
-diff --git a/arch/arm/configs/ks8695_defconfig b/arch/arm/configs/ks8695_defconfig
-index 47c4883..b5ef2b4 100644
---- a/arch/arm/configs/ks8695_defconfig
-+++ b/arch/arm/configs/ks8695_defconfig
-@@ -1,8 +1,6 @@
--CONFIG_EXPERIMENTAL=y
- # CONFIG_SWAP is not set
- CONFIG_SYSVIPC=y
- CONFIG_LOG_BUF_SHIFT=14
--CONFIG_SYSFS_DEPRECATED_V2=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_SLAB=y
- CONFIG_MODULES=y
-@@ -28,14 +26,11 @@ CONFIG_UNIX=y
- CONFIG_INET=y
- CONFIG_IP_PNP=y
- CONFIG_IP_PNP_DHCP=y
--# CONFIG_INET_LRO is not set
- # CONFIG_IPV6 is not set
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
--CONFIG_MTD_PARTITIONS=y
- CONFIG_MTD_REDBOOT_PARTS=y
- CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_JEDECPROBE=y
-@@ -44,10 +39,6 @@ CONFIG_MTD_PHYSMAP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=8192
- CONFIG_NETDEVICES=y
--CONFIG_NET_ETHERNET=y
--CONFIG_MII=y
--# CONFIG_NETDEV_1000 is not set
--# CONFIG_NETDEV_10000 is not set
- CONFIG_PRISM54=m
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- # CONFIG_INPUT_KEYBOARD is not set
-@@ -56,9 +47,7 @@ CONFIG_PRISM54=m
- CONFIG_SERIAL_KS8695=y
- CONFIG_SERIAL_KS8695_CONSOLE=y
- # CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
- CONFIG_EXT2_FS=y
--CONFIG_INOTIFY=y
- CONFIG_TMPFS=y
- CONFIG_JFFS2_FS=y
- CONFIG_JFFS2_SUMMARY=y
-@@ -66,7 +55,6 @@ CONFIG_JFFS2_COMPRESSION_OPTIONS=y
- CONFIG_JFFS2_RUBIN=y
- CONFIG_CRAMFS=y
- CONFIG_NFS_FS=y
--CONFIG_NFS_V3=y
- CONFIG_ROOT_NFS=y
- CONFIG_DEBUG_KERNEL=y
- CONFIG_DEBUG_MUTEXES=y
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index c6df644..a00f6b3 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -1607,6 +1607,17 @@ config MFD_STW481X
+ 	  in various ST Microelectronics and ST-Ericsson embedded
+ 	  Nomadik series.
+ 
++config MFD_STM32_GP_TIMER
++	tristate "Support for STM32 General Purpose Timer"
++	select MFD_CORE
++	select REGMAP
++	depends on ARCH_STM32 || COMPILE_TEST
++	depends on OF
++	help
++	  Select this option to enable STM32 general purpose timer
++	  driver used for PWM and IIO Timer. This driver allow to
++	  share the registers between the others drivers.
++
+ menu "Multimedia Capabilities Port drivers"
+ 	depends on ARCH_SA1100
+ 
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index 9834e66..86353b9 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -211,3 +211,5 @@ obj-$(CONFIG_INTEL_SOC_PMIC)	+= intel-soc-pmic.o
+ obj-$(CONFIG_MFD_MT6397)	+= mt6397-core.o
+ 
+ obj-$(CONFIG_MFD_ALTERA_A10SR)	+= altera-a10sr.o
++
++obj-$(CONFIG_MFD_STM32_GP_TIMER) 	+= stm32-gptimer.o
+diff --git a/drivers/mfd/stm32-gptimer.c b/drivers/mfd/stm32-gptimer.c
+new file mode 100644
+index 0000000..6747fcb
+--- /dev/null
++++ b/drivers/mfd/stm32-gptimer.c
+@@ -0,0 +1,82 @@
++/*
++ * Copyright (C) STMicroelectronics 2016
++ *
++ * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
++ * License terms:  GNU General Public License (GPL), version 2
++ */
++
++#include <linux/module.h>
++#include <linux/of_platform.h>
++#include <linux/reset.h>
++
++#include <linux/mfd/stm32-gptimer.h>
++
++static const struct regmap_config stm32_gptimer_regmap_cfg = {
++	.reg_bits = 32,
++	.val_bits = 32,
++	.reg_stride = sizeof(u32),
++	.max_register = 0x400,
++};
++
++static u32 stm32_gptimer_get_arr_size(struct regmap *regmap)
++{
++	u32 max_arr;
++
++	/* Only the available bits will be written so when readback
++	 * we get the maximum value of auto reload register
++	 */
++	regmap_write(regmap, TIM_ARR, ~0L);
++	regmap_read(regmap, TIM_ARR, &max_arr);
++	regmap_write(regmap, TIM_ARR, 0x0);
++
++	return max_arr;
++}
++
++static int stm32_gptimer_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct stm32_gptimer *ddata;
++	struct resource *res;
++	void __iomem *mmio;
++
++	ddata = devm_kzalloc(dev, sizeof(*ddata), GFP_KERNEL);
++	if (!ddata)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	mmio = devm_ioremap_resource(dev, res);
++	if (IS_ERR(mmio))
++		return PTR_ERR(mmio);
++
++	ddata->regmap = devm_regmap_init_mmio_clk(dev, "clk_int", mmio,
++						  &stm32_gptimer_regmap_cfg);
++	if (IS_ERR(ddata->regmap))
++		return PTR_ERR(ddata->regmap);
++
++	ddata->clk = devm_clk_get(dev, NULL);
++	if (IS_ERR(ddata->clk))
++		return PTR_ERR(ddata->clk);
++
++	ddata->max_arr = stm32_gptimer_get_arr_size(ddata->regmap);
++
++	platform_set_drvdata(pdev, ddata);
++
++	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
++}
++
++static const struct of_device_id stm32_gptimer_of_match[] = {
++	{ .compatible = "st,stm32-gptimer" },
++};
++MODULE_DEVICE_TABLE(of, stm32_gptimer_of_match);
++
++static struct platform_driver stm32_gptimer_driver = {
++	.probe = stm32_gptimer_probe,
++	.driver	= {
++		.name = "stm32-gptimer",
++		.of_match_table = stm32_gptimer_of_match,
++	},
++};
++module_platform_driver(stm32_gptimer_driver);
++
++MODULE_DESCRIPTION("STMicroelectronics STM32 General Purpose Timer");
++MODULE_LICENSE("GPL v2");
+diff --git a/include/linux/mfd/stm32-gptimer.h b/include/linux/mfd/stm32-gptimer.h
+new file mode 100644
+index 0000000..bf0a595
+--- /dev/null
++++ b/include/linux/mfd/stm32-gptimer.h
+@@ -0,0 +1,63 @@
++/*
++ * Copyright (C) STMicroelectronics 2016
++ *
++ * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
++ * License terms:  GNU General Public License (GPL), version 2
++ */
++
++#ifndef _LINUX_STM32_GPTIMER_H_
++#define _LINUX_STM32_GPTIMER_H_
++
++#include <linux/clk.h>
++#include <linux/regmap.h>
++
++#define TIM_CR1		0x00	/* Control Register 1      */
++#define TIM_CR2		0x04	/* Control Register 2      */
++#define TIM_SMCR	0x08	/* Slave mode control reg  */
++#define TIM_DIER	0x0C	/* DMA/interrupt register  */
++#define TIM_SR		0x10	/* Status register	   */
++#define TIM_EGR		0x14	/* Event Generation Reg    */
++#define TIM_CCMR1	0x18	/* Capt/Comp 1 Mode Reg    */
++#define TIM_CCMR2	0x1C	/* Capt/Comp 2 Mode Reg    */
++#define TIM_CCER	0x20	/* Capt/Comp Enable Reg    */
++#define TIM_PSC		0x28	/* Prescaler               */
++#define TIM_ARR		0x2c	/* Auto-Reload Register    */
++#define TIM_CCR1	0x34	/* Capt/Comp Register 1    */
++#define TIM_CCR2	0x38	/* Capt/Comp Register 2    */
++#define TIM_CCR3	0x3C	/* Capt/Comp Register 3    */
++#define TIM_CCR4	0x40	/* Capt/Comp Register 4    */
++#define TIM_BDTR	0x44	/* Break and Dead-Time Reg */
++
++#define TIM_CR1_CEN	BIT(0)	/* Counter Enable	   */
++#define TIM_CR1_ARPE	BIT(7)	/* Auto-reload Preload Ena */
++#define TIM_CR2_MMS	(BIT(4) | BIT(5) | BIT(6)) /* Master mode selection */
++#define TIM_SMCR_SMS	(BIT(0) | BIT(1) | BIT(2)) /* Slave mode selection */
++#define TIM_SMCR_TS	(BIT(4) | BIT(5) | BIT(6)) /* Trigger selection */
++#define TIM_DIER_UIE	BIT(0)	/* Update interrupt	   */
++#define TIM_SR_UIF	BIT(0)	/* Update interrupt flag   */
++#define TIM_EGR_UG	BIT(0)	/* Update Generation       */
++#define TIM_CCMR_PE	BIT(3)	/* Channel Preload Enable  */
++#define TIM_CCMR_M1	(BIT(6) | BIT(5))  /* Channel PWM Mode 1 */
++#define TIM_CCER_CC1E	BIT(0)	/* Capt/Comp 1  out Ena    */
++#define TIM_CCER_CC1P	BIT(1)	/* Capt/Comp 1  Polarity   */
++#define TIM_CCER_CC1NE	BIT(2)	/* Capt/Comp 1N out Ena    */
++#define TIM_CCER_CC1NP	BIT(3)	/* Capt/Comp 1N Polarity   */
++#define TIM_CCER_CC2E	BIT(4)	/* Capt/Comp 2  out Ena    */
++#define TIM_CCER_CC3E	BIT(8)	/* Capt/Comp 3  out Ena    */
++#define TIM_CCER_CC4E	BIT(12)	/* Capt/Comp 4  out Ena    */
++#define TIM_CCER_CCXE	(BIT(0) | BIT(4) | BIT(8) | BIT(12))
++#define TIM_BDTR_BKE	BIT(12) /* Break input enable	   */
++#define TIM_BDTR_BKP	BIT(13) /* Break input polarity	   */
++#define TIM_BDTR_AOE	BIT(14)	/* Automatic Output Enable */
++#define TIM_BDTR_MOE	BIT(15)	/* Main Output Enable      */
++
++#define MAX_TIM_PSC		0xFFFF
++#define TIM_CR2_MMS_SHIFT	4
++#define TIM_SMCR_TS_SHIFT	4
++
++struct stm32_gptimer {
++	struct clk *clk;
++	struct regmap *regmap;
++	u32 max_arr;
++};
++#endif
 -- 
 1.9.1
