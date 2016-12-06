@@ -1,46 +1,48 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue,  6 Dec 2016 13:38:45 +0100
-Subject: [PATCH v4 3/7] PWM: add pwm-stm32 DT bindings
+Date: Tue,  6 Dec 2016 13:38:47 +0100
+Subject: [PATCH v4 5/7] IIO: add bindings for STM32 timer trigger driver
 In-Reply-To: <1481027929-13704-1-git-send-email-benjamin.gaignard@st.com>
 References: <1481027929-13704-1-git-send-email-benjamin.gaignard@st.com>
-Message-ID: <1481027929-13704-4-git-send-email-benjamin.gaignard@st.com>
+Message-ID: <1481027929-13704-6-git-send-email-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define bindings for pwm-stm32
+Define bindings for STM32 timer trigger
+
+version 4:
+- remove triggers enumeration from DT
+- add reg parameter
+
+version 3:
+- change file name
+- add cross reference with mfd bindings
 
 version 2:
-- use parameters instead of compatible of handle the hardware configuration
+- only keep one compatible
+- add DT parameters to set lists of the triggers:
+  one list describe the triggers created by the device
+  another one give the triggers accepted by the device
 
 Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 ---
- .../devicetree/bindings/pwm/pwm-stm32.txt          | 33 ++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+ .../bindings/iio/timer/stm32-timer-trigger.txt     | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+diff --git a/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
 new file mode 100644
-index 0000000..c0cc246
+index 0000000..fbaeba9
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-@@ -0,0 +1,33 @@
-+STMicroelectronics STM32 General Purpose Timer PWM bindings
++++ b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+@@ -0,0 +1,23 @@
++STMicroelectronics STM32 General Purpose Timer IIO timer bindings
 +
 +Must be a sub-node of an STM32 General Purpose Timer device tree node.
 +See ../mfd/stm32-general-purpose-timer.txt for details about the parent node.
 +
 +Required parameters:
-+- compatible:		Must be "st,stm32-pwm".
-+- pinctrl-names: 	Set to "default".
-+- pinctrl-0: 		List of phandles pointing to pin configuration nodes for PWM module.
-+			For Pinctrl properties see ../pinctrl/pinctrl-bindings.txt
-+
-+Optional parameters:
-+- st,breakinput-polarity: If present, a break input is available
-+            for the channel. In that case the property value denotes the
-+            polarity of the break input:
-+            - 0: active low
-+            - 1: active high
++- compatible:	Must be "st,stm32-timer-trigger".
++- reg:		Define triggers configuration of the hardware IP.
 +
 +Example:
 +	gptimer at 40010000 {
@@ -51,10 +53,9 @@ index 0000000..c0cc246
 +		clocks = <&rcc 0 160>;
 +		clock-names = "clk_int";
 +
-+		pwm at 0 {
-+			compatible = "st,stm32-pwm";
-+			pinctrl-0	= <&pwm1_pins>;
-+			pinctrl-names	= "default";
++		timer at 0 {
++			compatible = "st,stm32-timer-trigger";
++			reg = <0>;
 +		};
 +	};
 -- 
