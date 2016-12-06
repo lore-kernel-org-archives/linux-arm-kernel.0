@@ -1,27 +1,33 @@
-From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
-Date: Tue, 6 Dec 2016 01:35:19 +0000
-Subject: [PATCH 12/12] usb: renesas_usbhs: Replace the deprecated extcon
- API
-In-Reply-To: <1480485460-2663-13-git-send-email-cw00.choi@samsung.com>
-References: <1480485460-2663-1-git-send-email-cw00.choi@samsung.com>
- <1480485460-2663-13-git-send-email-cw00.choi@samsung.com>
-Message-ID: <HK2PR06MB054887D913505E133A021D68D8820@HK2PR06MB0548.apcprd06.prod.outlook.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 5 Dec 2016 17:50:13 -0800
+Subject: [RESEND PATCH v2 4/7] drm/vc4: Add support for the VEC (Video
+ Encoder) IP
+In-Reply-To: <1480686493-4813-5-git-send-email-boris.brezillon@free-electrons.com>
+References: <1480686493-4813-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1480686493-4813-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <c1b904db-be3d-1e83-37bc-1f750ecfe224@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> From: Chanwoo Choi
-> Sent: Wednesday, November 30, 2016 2:58 PM
+On 12/02/2016 05:48 AM, Boris Brezillon wrote:
+> The VEC IP is a TV DAC, providing support for PAL and NTSC standards.
 > 
-> This patch replaces the deprecated extcon API as following:
-> - extcon_get_cable_state_() -> extcon_get_state()
-> 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
 
-Thank you for the patch!
+> diff --git a/drivers/gpu/drm/vc4/vc4_vec.c b/drivers/gpu/drm/vc4/vc4_vec.c
+> new file mode 100644
+> index 000000000000..2d4256fcc6f2
+> --- /dev/null
+> +++ b/drivers/gpu/drm/vc4/vc4_vec.c
+> @@ -0,0 +1,657 @@
+> +/*
+> + * Copyright (C) 2016 Broadcom Limited
 
-Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+The standard copyright template post acquisition is just Broadcom, not
+Broadcom Limited, nor Broadcom corporation. Can you audit your entire
+submission and fix this up accordingly?
 
-Best regards,
-Yoshihiro Shimoda
+Thanks!
+-- 
+Florian
