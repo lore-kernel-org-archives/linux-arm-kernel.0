@@ -1,22 +1,19 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 06 Dec 2016 13:38:53 +0100
-Subject: [RFC PATCH 18/23] arm: use kconfig fragments for ARCH_PXA defconfigs
- (part 2)
+Date: Tue, 06 Dec 2016 13:38:47 +0100
+Subject: [RFC PATCH 12/23] arm: update lubbock_defconfig
 In-Reply-To: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1481027938-31831-19-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1481027938-31831-13-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace [corgi,spitz]_defconfig-s with
-a Makefile target using merge_config.
+Update lubbock_defconfig against kernel v4.9-rc6.
 
-The patch was verified with doing:
+The changes were obtained by doing:
 
-    $ make [corgi,...]_defconfig
-    $ make savedefconfig
-
-and comparing resulting defconfig files (before/after the patch).
+	$ make lubbock_defconfig
+	$ make savedefconfig
+	$ diff -u arch/arm/lubbock_defconfig defconfig
 
 Cc: Daniel Mack <daniel@zonque.org>
 Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
@@ -24,363 +21,65 @@ Cc: Robert Jarzmik <robert.jarzmik@free.fr>
 Cc: Cyril Bur <cyrilbur@gmail.com>
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm/Makefile                                  |   8 +
- arch/arm/configs/corgi.config                      |  11 +
- .../{corgi_defconfig => pxa_basic2_defconfig}      |  11 -
- arch/arm/configs/spitz.config                      |  10 +
- arch/arm/configs/spitz_defconfig                   | 236 ---------------------
- 5 files changed, 29 insertions(+), 247 deletions(-)
- create mode 100644 arch/arm/configs/corgi.config
- rename arch/arm/configs/{corgi_defconfig => pxa_basic2_defconfig} (96%)
- create mode 100644 arch/arm/configs/spitz.config
- delete mode 100644 arch/arm/configs/spitz_defconfig
+ arch/arm/configs/lubbock_defconfig | 13 ++-----------
+ 1 file changed, 2 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 58890a9..d3ba1b7 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -422,6 +422,14 @@ PHONY += pxa255-idp_defconfig
- pxa255-idp_defconfig:
- 	$(call merge_into_defconfig,pxa_basic1_defconfig,pxa255-idp)
- 
-+PHONY += corgi_defconfig
-+corgi_defconfig:
-+	$(call merge_into_defconfig,pxa_basic2_defconfig,corgi)
-+
-+PHONY += spitz_defconfig
-+spitz_defconfig:
-+	$(call merge_into_defconfig,pxa_basic2_defconfig,spitz)
-+
- PHONY += vdso_install
- vdso_install:
- ifeq ($(CONFIG_VDSO),y)
-diff --git a/arch/arm/configs/corgi.config b/arch/arm/configs/corgi.config
-new file mode 100644
-index 0000000..c443e20
---- /dev/null
-+++ b/arch/arm/configs/corgi.config
-@@ -0,0 +1,11 @@
-+CONFIG_MACH_POODLE=y
-+CONFIG_MACH_CORGI=y
-+CONFIG_MACH_SHEPHERD=y
-+CONFIG_MACH_HUSKY=y
-+CONFIG_XFRM_USER=m
-+CONFIG_I2C=y
-+CONFIG_I2C_PXA=y
-+CONFIG_FB_W100=y
-+CONFIG_SOUND=y
-+CONFIG_SOUND_PRIME=y
-+CONFIG_USB_GADGET=y
-diff --git a/arch/arm/configs/corgi_defconfig b/arch/arm/configs/pxa_basic2_defconfig
-similarity index 96%
-rename from arch/arm/configs/corgi_defconfig
-rename to arch/arm/configs/pxa_basic2_defconfig
-index 511f6f3..d883ec2 100644
---- a/arch/arm/configs/corgi_defconfig
-+++ b/arch/arm/configs/pxa_basic2_defconfig
-@@ -11,10 +11,6 @@ CONFIG_MODULE_FORCE_UNLOAD=y
- CONFIG_PARTITION_ADVANCED=y
- CONFIG_ARCH_PXA=y
- CONFIG_PXA_SHARPSL=y
--CONFIG_MACH_POODLE=y
--CONFIG_MACH_CORGI=y
--CONFIG_MACH_SHEPHERD=y
--CONFIG_MACH_HUSKY=y
+diff --git a/arch/arm/configs/lubbock_defconfig b/arch/arm/configs/lubbock_defconfig
+index c4ba274..ca68a88 100644
+--- a/arch/arm/configs/lubbock_defconfig
++++ b/arch/arm/configs/lubbock_defconfig
+@@ -1,4 +1,3 @@
+-CONFIG_EXPERIMENTAL=y
+ CONFIG_SYSVIPC=y
+ CONFIG_LOG_BUF_SHIFT=14
+ CONFIG_MODULES=y
+@@ -7,8 +6,6 @@ CONFIG_ARCH_LUBBOCK=y
+ # CONFIG_ARM_THUMB is not set
  CONFIG_PCCARD=y
  CONFIG_PCMCIA_PXA2XX=y
- CONFIG_PREEMPT=y
-@@ -26,7 +22,6 @@ CONFIG_BINFMT_MISC=m
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
--CONFIG_XFRM_USER=m
- CONFIG_INET=y
- CONFIG_SYN_COOKIES=y
- CONFIG_INET6_AH=m
-@@ -118,18 +113,13 @@ CONFIG_SERIAL_8250=m
- CONFIG_SERIAL_8250_CS=m
+-CONFIG_LEDS=y
+-CONFIG_LEDS_CPU=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_CMDLINE="root=/dev/nfs ip=bootp console=ttyS0,115200 mem=64M"
+@@ -20,9 +17,7 @@ CONFIG_IP_PNP=y
+ CONFIG_IP_PNP_BOOTP=y
+ # CONFIG_IPV6 is not set
+ CONFIG_MTD=y
+-CONFIG_MTD_PARTITIONS=y
+ CONFIG_MTD_REDBOOT_PARTS=y
+-CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_ADV_OPTIONS=y
+@@ -30,16 +25,13 @@ CONFIG_MTD_CFI_GEOMETRY=y
+ # CONFIG_MTD_CFI_I1 is not set
+ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_NETDEVICES=y
+-CONFIG_NET_ETHERNET=y
+-CONFIG_SMC91X=y
+-CONFIG_NET_PCMCIA=y
+ CONFIG_PCMCIA_PCNET=y
++CONFIG_SMC91X=y
+ CONFIG_INPUT_EVDEV=y
+ # CONFIG_SERIO_SERPORT is not set
+ CONFIG_SERIO_SA1111=y
  CONFIG_SERIAL_PXA=y
  CONFIG_SERIAL_PXA_CONSOLE=y
--CONFIG_I2C=y
--CONFIG_I2C_PXA=y
- CONFIG_SPI_PXA2XX=y
- CONFIG_FB=y
--CONFIG_FB_W100=y
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_CORGI=y
- CONFIG_BACKLIGHT_CLASS_DEVICE=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
--CONFIG_SOUND=y
--CONFIG_SOUND_PRIME=y
- CONFIG_HID_A4TECH=m
- CONFIG_HID_APPLE=m
- CONFIG_HID_BELKIN=m
-@@ -188,7 +178,6 @@ CONFIG_USB_LEGOTOWER=m
- CONFIG_USB_LCD=m
- CONFIG_USB_CYTHERM=m
- CONFIG_USB_IDMOUSE=m
--CONFIG_USB_GADGET=y
- CONFIG_USB_ZERO=m
- CONFIG_USB_ETH=m
- CONFIG_USB_GADGETFS=m
-diff --git a/arch/arm/configs/spitz.config b/arch/arm/configs/spitz.config
-new file mode 100644
-index 0000000..fe163e8
---- /dev/null
-+++ b/arch/arm/configs/spitz.config
-@@ -0,0 +1,10 @@
-+CONFIG_MACH_AKITA=y
-+CONFIG_MACH_BORZOI=y
-+CONFIG_FB_PXA=y
-+CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
-+CONFIG_USB_OHCI_HCD=m
-+CONFIG_USB_GADGET=m
-+CONFIG_EXT2_FS_XATTR=y
-+CONFIG_EXT2_FS_POSIX_ACL=y
-+CONFIG_EXT2_FS_SECURITY=y
-+CONFIG_EXT3_FS=y
-diff --git a/arch/arm/configs/spitz_defconfig b/arch/arm/configs/spitz_defconfig
-deleted file mode 100644
-index 1388cde..0000000
---- a/arch/arm/configs/spitz_defconfig
-+++ /dev/null
-@@ -1,236 +0,0 @@
--CONFIG_SYSVIPC=y
--CONFIG_BSD_PROCESS_ACCT=y
--CONFIG_LOG_BUF_SHIFT=14
--CONFIG_EXPERT=y
--CONFIG_PROFILING=y
--CONFIG_OPROFILE=m
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--CONFIG_MODULE_FORCE_UNLOAD=y
--# CONFIG_BLK_DEV_BSG is not set
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_ARCH_PXA=y
--CONFIG_PXA_SHARPSL=y
--CONFIG_MACH_AKITA=y
--CONFIG_MACH_BORZOI=y
--CONFIG_PCCARD=y
--CONFIG_PCMCIA_PXA2XX=y
--CONFIG_PREEMPT=y
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="console=ttyS0,115200n8 console=tty1 noinitrd root=/dev/mtdblock2 rootfstype=jffs2   debug"
--CONFIG_FPE_NWFPE=y
--CONFIG_BINFMT_MISC=m
--CONFIG_NET=y
--CONFIG_PACKET=y
--CONFIG_UNIX=y
--CONFIG_INET=y
--CONFIG_SYN_COOKIES=y
--CONFIG_INET6_AH=m
--CONFIG_INET6_ESP=m
--CONFIG_INET6_IPCOMP=m
--CONFIG_IPV6_TUNNEL=m
--CONFIG_NETFILTER=y
--CONFIG_IP_NF_IPTABLES=m
--CONFIG_IP_NF_MATCH_ECN=m
--CONFIG_IP_NF_MATCH_TTL=m
--CONFIG_IP_NF_FILTER=m
--CONFIG_IP_NF_MANGLE=m
--CONFIG_IP_NF_RAW=m
--CONFIG_IP_NF_ARPTABLES=m
--CONFIG_IP_NF_ARPFILTER=m
--CONFIG_IP_NF_ARP_MANGLE=m
--CONFIG_IP6_NF_IPTABLES=m
--CONFIG_IP6_NF_MATCH_EUI64=m
--CONFIG_IP6_NF_MATCH_FRAG=m
--CONFIG_IP6_NF_MATCH_OPTS=m
--CONFIG_IP6_NF_MATCH_HL=m
--CONFIG_IP6_NF_MATCH_IPV6HEADER=m
--CONFIG_IP6_NF_MATCH_RT=m
--CONFIG_IP6_NF_FILTER=m
--CONFIG_IP6_NF_MANGLE=m
--CONFIG_IP6_NF_RAW=m
--CONFIG_IRDA=m
--CONFIG_IRLAN=m
--CONFIG_IRNET=m
--CONFIG_IRCOMM=m
--CONFIG_PXA_FICP=m
--CONFIG_BT=m
--CONFIG_BT_RFCOMM=m
--CONFIG_BT_RFCOMM_TTY=y
--CONFIG_BT_BNEP=m
--CONFIG_BT_BNEP_MC_FILTER=y
--CONFIG_BT_BNEP_PROTO_FILTER=y
--CONFIG_BT_HIDP=m
--CONFIG_BT_HCIUART=m
--CONFIG_BT_HCIUART_BCSP=y
--CONFIG_BT_HCIBCM203X=m
--CONFIG_BT_HCIBPA10X=m
--CONFIG_BT_HCIBFUSB=m
--CONFIG_BT_HCIDTL1=m
--CONFIG_BT_HCIBT3C=m
--CONFIG_BT_HCIBLUECARD=m
--CONFIG_BT_HCIBTUART=m
--CONFIG_BT_HCIVHCI=m
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_MTD=y
--CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_BLOCK=y
--CONFIG_MTD_ROM=y
--CONFIG_MTD_COMPLEX_MAPPINGS=y
--CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_SHARPSL=y
--CONFIG_BLK_DEV_LOOP=y
--CONFIG_IDE=y
--CONFIG_BLK_DEV_IDECS=y
--CONFIG_SCSI=m
--CONFIG_BLK_DEV_SD=m
--CONFIG_CHR_DEV_ST=m
--CONFIG_CHR_DEV_OSST=m
--CONFIG_BLK_DEV_SR=m
--CONFIG_CHR_DEV_SG=m
--CONFIG_NETDEVICES=y
--CONFIG_PCMCIA_PCNET=m
--CONFIG_PPP=m
--CONFIG_PPP_BSDCOMP=m
--CONFIG_PPP_ASYNC=m
--CONFIG_USB_CATC=m
--CONFIG_USB_KAWETH=m
--CONFIG_USB_PEGASUS=m
--CONFIG_USB_RTL8150=m
--CONFIG_USB_USBNET=m
--# CONFIG_USB_NET_CDC_SUBSET is not set
--CONFIG_INPUT_FF_MEMLESS=m
--# CONFIG_INPUT_MOUSEDEV is not set
--CONFIG_INPUT_EVDEV=y
--# CONFIG_KEYBOARD_ATKBD is not set
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_INPUT_TOUCHSCREEN=y
--CONFIG_TOUCHSCREEN_ADS7846=y
--CONFIG_INPUT_MISC=y
--CONFIG_INPUT_UINPUT=m
--# CONFIG_SERIO is not set
--# CONFIG_LEGACY_PTYS is not set
--CONFIG_SERIAL_8250=m
--CONFIG_SERIAL_8250_CS=m
--CONFIG_SERIAL_PXA=y
--CONFIG_SERIAL_PXA_CONSOLE=y
--CONFIG_SPI_PXA2XX=y
--CONFIG_FB=y
--CONFIG_FB_PXA=y
--CONFIG_BACKLIGHT_LCD_SUPPORT=y
--CONFIG_LCD_CLASS_DEVICE=y
--CONFIG_LCD_CORGI=y
--CONFIG_BACKLIGHT_CLASS_DEVICE=y
--CONFIG_FRAMEBUFFER_CONSOLE=y
--CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
--CONFIG_HID_A4TECH=m
--CONFIG_HID_APPLE=m
--CONFIG_HID_BELKIN=m
--CONFIG_HID_CHERRY=m
--CONFIG_HID_CHICONY=m
--CONFIG_HID_CYPRESS=m
--CONFIG_HID_EZKEY=m
--CONFIG_HID_GYRATION=m
--CONFIG_HID_LOGITECH=m
--CONFIG_HID_MICROSOFT=m
--CONFIG_HID_MONTEREY=m
--CONFIG_HID_PANTHERLORD=m
--CONFIG_HID_PETALYNX=m
--CONFIG_HID_SAMSUNG=m
--CONFIG_HID_SUNPLUS=m
--CONFIG_USB_KBD=m
--CONFIG_USB_MOUSE=m
--CONFIG_USB=m
--CONFIG_USB_MON=m
--CONFIG_USB_OHCI_HCD=m
--CONFIG_USB_SL811_HCD=m
--CONFIG_USB_SL811_CS=m
--CONFIG_USB_ACM=m
--CONFIG_USB_PRINTER=m
--CONFIG_USB_STORAGE=m
--CONFIG_USB_MDC800=m
--CONFIG_USB_MICROTEK=m
--CONFIG_USB_SERIAL=m
--CONFIG_USB_SERIAL_GENERIC=y
--CONFIG_USB_SERIAL_BELKIN=m
--CONFIG_USB_SERIAL_DIGI_ACCELEPORT=m
--CONFIG_USB_SERIAL_CYPRESS_M8=m
--CONFIG_USB_SERIAL_EMPEG=m
--CONFIG_USB_SERIAL_FTDI_SIO=m
--CONFIG_USB_SERIAL_VISOR=m
--CONFIG_USB_SERIAL_IPAQ=m
--CONFIG_USB_SERIAL_IR=m
--CONFIG_USB_SERIAL_EDGEPORT=m
--CONFIG_USB_SERIAL_EDGEPORT_TI=m
--CONFIG_USB_SERIAL_GARMIN=m
--CONFIG_USB_SERIAL_IPW=m
--CONFIG_USB_SERIAL_KEYSPAN_PDA=m
--CONFIG_USB_SERIAL_KEYSPAN=m
--CONFIG_USB_SERIAL_KLSI=m
--CONFIG_USB_SERIAL_KOBIL_SCT=m
--CONFIG_USB_SERIAL_MCT_U232=m
--CONFIG_USB_SERIAL_PL2303=m
--CONFIG_USB_SERIAL_SAFE=m
--CONFIG_USB_SERIAL_TI=m
--CONFIG_USB_SERIAL_CYBERJACK=m
--CONFIG_USB_SERIAL_XIRCOM=m
--CONFIG_USB_SERIAL_OMNINET=m
--CONFIG_USB_EMI62=m
--CONFIG_USB_EMI26=m
--CONFIG_USB_RIO500=m
--CONFIG_USB_LEGOTOWER=m
--CONFIG_USB_LCD=m
--CONFIG_USB_CYTHERM=m
--CONFIG_USB_IDMOUSE=m
--CONFIG_USB_GADGET=m
--CONFIG_USB_ZERO=m
--CONFIG_USB_ETH=m
--CONFIG_USB_GADGETFS=m
--CONFIG_USB_MASS_STORAGE=m
--CONFIG_USB_G_SERIAL=m
--CONFIG_MMC=y
--CONFIG_MMC_PXA=y
--CONFIG_EXT2_FS=y
--CONFIG_EXT2_FS_XATTR=y
--CONFIG_EXT2_FS_POSIX_ACL=y
--CONFIG_EXT2_FS_SECURITY=y
--CONFIG_EXT3_FS=y
--CONFIG_MSDOS_FS=y
--CONFIG_VFAT_FS=y
--CONFIG_TMPFS=y
--CONFIG_JFFS2_FS=y
--CONFIG_JFFS2_SUMMARY=y
--CONFIG_JFFS2_COMPRESSION_OPTIONS=y
--CONFIG_JFFS2_RUBIN=y
--CONFIG_CRAMFS=m
--CONFIG_NFS_FS=m
--CONFIG_NFS_V4=m
--CONFIG_NLS_DEFAULT="cp437"
--CONFIG_NLS_CODEPAGE_437=y
--CONFIG_NLS_ISO8859_1=y
--CONFIG_NLS_UTF8=y
--CONFIG_MAGIC_SYSRQ=y
--# CONFIG_DEBUG_PREEMPT is not set
--# CONFIG_FTRACE is not set
--CONFIG_DEBUG_LL=y
--CONFIG_CRYPTO_TEST=m
--CONFIG_CRYPTO_HMAC=y
--CONFIG_CRYPTO_MD4=m
--CONFIG_CRYPTO_MICHAEL_MIC=m
--CONFIG_CRYPTO_SHA512=m
--CONFIG_CRYPTO_WP512=m
--CONFIG_CRYPTO_ANUBIS=m
--CONFIG_CRYPTO_ARC4=m
--CONFIG_CRYPTO_BLOWFISH=m
--CONFIG_CRYPTO_CAST5=m
--CONFIG_CRYPTO_CAST6=m
--CONFIG_CRYPTO_KHAZAD=m
--CONFIG_CRYPTO_SERPENT=m
--CONFIG_CRYPTO_TEA=m
--CONFIG_CRYPTO_TWOFISH=m
--CONFIG_CRC_CCITT=y
--CONFIG_LIBCRC32C=m
--CONFIG_FONTS=y
--CONFIG_FONT_8x8=y
--CONFIG_FONT_8x16=y
+-# CONFIG_VGA_CONSOLE is not set
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_G_SERIAL=m
+ CONFIG_EXT2_FS=y
+@@ -48,9 +40,8 @@ CONFIG_JFFS2_FS=y
+ CONFIG_NFS_FS=y
+ CONFIG_ROOT_NFS=y
+ CONFIG_NLS_ISO8859_1=y
++CONFIG_DEBUG_INFO=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_KERNEL=y
+-CONFIG_DEBUG_INFO=y
+ CONFIG_DEBUG_USER=y
+-CONFIG_DEBUG_ERRORS=y
+ CONFIG_DEBUG_LL=y
 -- 
 1.9.1
