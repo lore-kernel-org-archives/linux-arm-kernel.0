@@ -1,181 +1,206 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 06 Dec 2016 13:38:37 +0100
-Subject: [RFC PATCH 02/23] arm: use kconfig fragments for ARCH_ASPEED
- defconfigs
+Date: Tue, 06 Dec 2016 13:38:38 +0100
+Subject: [RFC PATCH 03/23] arm: update defconfigs for ARCH_KS8695
 In-Reply-To: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1481027938-31831-3-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1481027938-31831-4-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace aspeed_g[45]_defconfig with a Makefile target using
-merge_config.
+Update [acs5k,acs5k_tiny,ks8695]_defconfig-s against kernel v4.9-rc6.
 
-The patch was verified by doing:
+The changes were obtained by doing:
 
-    $ make aspeed_g[45]_defconfig
-    $ make savedefconfig
+	$ make [acs5k,...]_defconfig
+	$ make savedefconfig
+	$ diff -u arch/arm/[acs5k,...]_defconfig defconfig
 
-and comparing resulting defconfig files (before/after the patch).
-
-Cc: Joel Stanley <joel@jms.id.au>
+Cc: Greg Ungerer <gerg@uclinux.org>
 Cc: Cyril Bur <cyrilbur@gmail.com>
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm/Makefile                                  |  8 ++
- ...{aspeed_g4_defconfig => aspeed_basic_defconfig} |  1 -
- arch/arm/configs/aspeed_g4.config                  |  1 +
- arch/arm/configs/aspeed_g5.config                  |  3 +
- arch/arm/configs/aspeed_g5_defconfig               | 88 ----------------------
- 5 files changed, 12 insertions(+), 89 deletions(-)
- rename arch/arm/configs/{aspeed_g4_defconfig => aspeed_basic_defconfig} (98%)
- create mode 100644 arch/arm/configs/aspeed_g4.config
- create mode 100644 arch/arm/configs/aspeed_g5.config
- delete mode 100644 arch/arm/configs/aspeed_g5_defconfig
+ arch/arm/configs/acs5k_defconfig      | 12 ------------
+ arch/arm/configs/acs5k_tiny_defconfig | 14 --------------
+ arch/arm/configs/ks8695_defconfig     | 12 ------------
+ 3 files changed, 38 deletions(-)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index f2c0683..abe8a60 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -354,6 +354,14 @@ define merge_into_defconfig
- 	+$(Q)$(MAKE) -f $(srctree)/Makefile olddefconfig
- endef
- 
-+PHONY += aspeed_g4_defconfig
-+aspeed_g4_defconfig:
-+	$(call merge_into_defconfig,aspeed_basic_defconfig,aspeed_g4)
-+
-+PHONY += aspeed_g5_defconfig
-+aspeed_g5_defconfig:
-+	$(call merge_into_defconfig,aspeed_basic_defconfig,aspeed_g5)
-+
- PHONY += vdso_install
- vdso_install:
- ifeq ($(CONFIG_VDSO),y)
-diff --git a/arch/arm/configs/aspeed_g4_defconfig b/arch/arm/configs/aspeed_basic_defconfig
-similarity index 98%
-rename from arch/arm/configs/aspeed_g4_defconfig
-rename to arch/arm/configs/aspeed_basic_defconfig
-index ca39c04..0846e85 100644
---- a/arch/arm/configs/aspeed_g4_defconfig
-+++ b/arch/arm/configs/aspeed_basic_defconfig
-@@ -24,7 +24,6 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLOCK is not set
- # CONFIG_ARCH_MULTI_V7 is not set
- CONFIG_ARCH_ASPEED=y
--CONFIG_MACH_ASPEED_G4=y
- CONFIG_DEBUG_RODATA=y
- CONFIG_AEABI=y
- CONFIG_UACCESS_WITH_MEMCPY=y
-diff --git a/arch/arm/configs/aspeed_g4.config b/arch/arm/configs/aspeed_g4.config
-new file mode 100644
-index 0000000..d9586c5
---- /dev/null
-+++ b/arch/arm/configs/aspeed_g4.config
-@@ -0,0 +1 @@
-+CONFIG_MACH_ASPEED_G4=y
-diff --git a/arch/arm/configs/aspeed_g5.config b/arch/arm/configs/aspeed_g5.config
-new file mode 100644
-index 0000000..7ca5bc1
---- /dev/null
-+++ b/arch/arm/configs/aspeed_g5.config
-@@ -0,0 +1,3 @@
-+CONFIG_ARCH_MULTI_V6=y
-+CONFIG_MACH_ASPEED_G5=y
-+CONFIG_UBSAN_ALIGNMENT=y
-diff --git a/arch/arm/configs/aspeed_g5_defconfig b/arch/arm/configs/aspeed_g5_defconfig
-deleted file mode 100644
-index 4f366b0..0000000
---- a/arch/arm/configs/aspeed_g5_defconfig
-+++ /dev/null
-@@ -1,88 +0,0 @@
--CONFIG_KERNEL_XZ=y
--CONFIG_SYSVIPC=y
--CONFIG_USELIB=y
--CONFIG_IRQ_DOMAIN_DEBUG=y
--CONFIG_NO_HZ_IDLE=y
--CONFIG_HIGH_RES_TIMERS=y
--CONFIG_LOG_BUF_SHIFT=14
--CONFIG_CGROUPS=y
--CONFIG_BLK_DEV_INITRD=y
--# CONFIG_RD_BZIP2 is not set
--# CONFIG_RD_LZMA is not set
--# CONFIG_RD_LZO is not set
--# CONFIG_RD_LZ4 is not set
--CONFIG_CC_OPTIMIZE_FOR_SIZE=y
--CONFIG_BPF_SYSCALL=y
--# CONFIG_SHMEM is not set
--# CONFIG_AIO is not set
--CONFIG_EMBEDDED=y
--# CONFIG_COMPAT_BRK is not set
--CONFIG_SLAB=y
--CONFIG_CC_STACKPROTECTOR_STRONG=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--# CONFIG_BLOCK is not set
--CONFIG_ARCH_MULTI_V6=y
--# CONFIG_ARCH_MULTI_V7 is not set
--CONFIG_ARCH_ASPEED=y
--CONFIG_MACH_ASPEED_G5=y
--CONFIG_DEBUG_RODATA=y
--CONFIG_AEABI=y
--CONFIG_UACCESS_WITH_MEMCPY=y
--CONFIG_SECCOMP=y
--# CONFIG_ATAGS is not set
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_ARM_APPENDED_DTB=y
--CONFIG_ARM_ATAG_DTB_COMPAT=y
--CONFIG_KEXEC=y
--# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_DEVTMPFS=y
--CONFIG_DEVTMPFS_MOUNT=y
--# CONFIG_PREVENT_FIRMWARE_BUILD is not set
--# CONFIG_INPUT is not set
--# CONFIG_SERIO is not set
--# CONFIG_VT is not set
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_DEVKMEM is not set
--CONFIG_SERIAL_8250=y
--# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
--CONFIG_SERIAL_8250_CONSOLE=y
--CONFIG_SERIAL_8250_NR_UARTS=6
--CONFIG_SERIAL_8250_RUNTIME_UARTS=6
--CONFIG_SERIAL_8250_EXTENDED=y
--CONFIG_SERIAL_8250_SHARE_IRQ=y
--CONFIG_SERIAL_OF_PLATFORM=y
--# CONFIG_HW_RANDOM is not set
--# CONFIG_USB_SUPPORT is not set
--# CONFIG_IOMMU_SUPPORT is not set
--CONFIG_FIRMWARE_MEMMAP=y
--CONFIG_FANOTIFY=y
--CONFIG_PRINTK_TIME=y
--CONFIG_DYNAMIC_DEBUG=y
--CONFIG_STRIP_ASM_SYMS=y
--CONFIG_PAGE_POISONING=y
--CONFIG_DEBUG_KMEMLEAK=y
--CONFIG_DEBUG_SHIRQ=y
--CONFIG_LOCKUP_DETECTOR=y
--CONFIG_WQ_WATCHDOG=y
--# CONFIG_SCHED_DEBUG is not set
--CONFIG_SCHED_STACK_END_CHECK=y
--CONFIG_DEBUG_RT_MUTEXES=y
--CONFIG_DEBUG_WW_MUTEX_SLOWPATH=y
--# CONFIG_FTRACE is not set
--CONFIG_MEMTEST=y
--CONFIG_UBSAN=y
--CONFIG_UBSAN_ALIGNMENT=y
--CONFIG_DEBUG_USER=y
--CONFIG_DEBUG_LL=y
--CONFIG_DEBUG_LL_UART_8250=y
--CONFIG_DEBUG_UART_PHYS=0x1e784000
--CONFIG_DEBUG_UART_VIRT=0xe8784000
--CONFIG_EARLY_PRINTK=y
--CONFIG_DEBUG_SET_MODULE_RONX=y
--# CONFIG_XZ_DEC_X86 is not set
--# CONFIG_XZ_DEC_POWERPC is not set
--# CONFIG_XZ_DEC_IA64 is not set
--# CONFIG_XZ_DEC_SPARC is not set
+diff --git a/arch/arm/configs/acs5k_defconfig b/arch/arm/configs/acs5k_defconfig
+index 92b0f90..8840d2c 100644
+--- a/arch/arm/configs/acs5k_defconfig
++++ b/arch/arm/configs/acs5k_defconfig
+@@ -1,9 +1,7 @@
+-CONFIG_EXPERIMENTAL=y
+ # CONFIG_SWAP is not set
+ CONFIG_SYSVIPC=y
+ CONFIG_POSIX_MQUEUE=y
+ CONFIG_LOG_BUF_SHIFT=14
+-CONFIG_SYSFS_DEPRECATED_V2=y
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_SLAB=y
+ CONFIG_MODULES=y
+@@ -30,13 +28,9 @@ CONFIG_UNIX=y
+ CONFIG_INET=y
+ CONFIG_IP_PNP=y
+ CONFIG_IP_PNP_DHCP=y
+-# CONFIG_INET_LRO is not set
+ # CONFIG_IPV6 is not set
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_MTD=y
+-CONFIG_MTD_CONCAT=y
+-CONFIG_MTD_PARTITIONS=y
+-CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_JEDECPROBE=y
+@@ -47,10 +41,7 @@ CONFIG_MTD_PHYSMAP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=8192
+ CONFIG_NETDEVICES=y
+-CONFIG_NET_ETHERNET=y
+ CONFIG_ARM_KS8695_ETHER=y
+-# CONFIG_NETDEV_1000 is not set
+-# CONFIG_NETDEV_10000 is not set
+ CONFIG_PRISM54=m
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+ # CONFIG_INPUT_KEYBOARD is not set
+@@ -65,11 +56,9 @@ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_PCA953X=y
+ CONFIG_WATCHDOG=y
+ CONFIG_KS8695_WATCHDOG=y
+-# CONFIG_VGA_CONSOLE is not set
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_PCF8563=y
+ CONFIG_EXT2_FS=y
+-CONFIG_INOTIFY=y
+ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
+ CONFIG_JFFS2_SUMMARY=y
+@@ -77,7 +66,6 @@ CONFIG_JFFS2_COMPRESSION_OPTIONS=y
+ CONFIG_JFFS2_RUBIN=y
+ CONFIG_CRAMFS=y
+ CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+ CONFIG_ROOT_NFS=y
+ CONFIG_DEBUG_KERNEL=y
+ CONFIG_DEBUG_MUTEXES=y
+diff --git a/arch/arm/configs/acs5k_tiny_defconfig b/arch/arm/configs/acs5k_tiny_defconfig
+index 2a27a14..a8e115c 100644
+--- a/arch/arm/configs/acs5k_tiny_defconfig
++++ b/arch/arm/configs/acs5k_tiny_defconfig
+@@ -1,9 +1,7 @@
+-CONFIG_EXPERIMENTAL=y
+ # CONFIG_SWAP is not set
+ CONFIG_SYSVIPC=y
+ CONFIG_POSIX_MQUEUE=y
+ CONFIG_LOG_BUF_SHIFT=14
+-CONFIG_SYSFS_DEPRECATED_V2=y
+ CONFIG_SLAB=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+@@ -17,7 +15,6 @@ CONFIG_AEABI=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_CMDLINE="console=ttyAM0,115200 init=/bin/sh"
+-CONFIG_FPE_NWFPE=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+@@ -25,13 +22,9 @@ CONFIG_INET=y
+ # CONFIG_INET_XFRM_MODE_TRANSPORT is not set
+ # CONFIG_INET_XFRM_MODE_TUNNEL is not set
+ # CONFIG_INET_XFRM_MODE_BEET is not set
+-# CONFIG_INET_LRO is not set
+ # CONFIG_IPV6 is not set
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_MTD=y
+-CONFIG_MTD_CONCAT=y
+-CONFIG_MTD_PARTITIONS=y
+-CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_JEDECPROBE=y
+@@ -40,12 +33,8 @@ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_CFI_AMDSTD=y
+ CONFIG_MTD_PHYSMAP=y
+ # CONFIG_BLK_DEV is not set
+-# CONFIG_MISC_DEVICES is not set
+ CONFIG_NETDEVICES=y
+-CONFIG_NET_ETHERNET=y
+ CONFIG_ARM_KS8695_ETHER=y
+-# CONFIG_NETDEV_1000 is not set
+-# CONFIG_NETDEV_10000 is not set
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+ # CONFIG_INPUT_KEYBOARD is not set
+ # CONFIG_INPUT_MOUSE is not set
+@@ -61,12 +50,9 @@ CONFIG_GPIO_PCA953X=y
+ # CONFIG_HWMON is not set
+ CONFIG_WATCHDOG=y
+ CONFIG_KS8695_WATCHDOG=y
+-# CONFIG_VGA_CONSOLE is not set
+-# CONFIG_HID_SUPPORT is not set
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_PCF8563=y
+-CONFIG_INOTIFY=y
+ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
+ CONFIG_JFFS2_SUMMARY=y
+diff --git a/arch/arm/configs/ks8695_defconfig b/arch/arm/configs/ks8695_defconfig
+index 47c4883..b5ef2b4 100644
+--- a/arch/arm/configs/ks8695_defconfig
++++ b/arch/arm/configs/ks8695_defconfig
+@@ -1,8 +1,6 @@
+-CONFIG_EXPERIMENTAL=y
+ # CONFIG_SWAP is not set
+ CONFIG_SYSVIPC=y
+ CONFIG_LOG_BUF_SHIFT=14
+-CONFIG_SYSFS_DEPRECATED_V2=y
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_SLAB=y
+ CONFIG_MODULES=y
+@@ -28,14 +26,11 @@ CONFIG_UNIX=y
+ CONFIG_INET=y
+ CONFIG_IP_PNP=y
+ CONFIG_IP_PNP_DHCP=y
+-# CONFIG_INET_LRO is not set
+ # CONFIG_IPV6 is not set
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_MTD=y
+-CONFIG_MTD_PARTITIONS=y
+ CONFIG_MTD_REDBOOT_PARTS=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+-CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_JEDECPROBE=y
+@@ -44,10 +39,6 @@ CONFIG_MTD_PHYSMAP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=8192
+ CONFIG_NETDEVICES=y
+-CONFIG_NET_ETHERNET=y
+-CONFIG_MII=y
+-# CONFIG_NETDEV_1000 is not set
+-# CONFIG_NETDEV_10000 is not set
+ CONFIG_PRISM54=m
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+ # CONFIG_INPUT_KEYBOARD is not set
+@@ -56,9 +47,7 @@ CONFIG_PRISM54=m
+ CONFIG_SERIAL_KS8695=y
+ CONFIG_SERIAL_KS8695_CONSOLE=y
+ # CONFIG_HWMON is not set
+-# CONFIG_VGA_CONSOLE is not set
+ CONFIG_EXT2_FS=y
+-CONFIG_INOTIFY=y
+ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
+ CONFIG_JFFS2_SUMMARY=y
+@@ -66,7 +55,6 @@ CONFIG_JFFS2_COMPRESSION_OPTIONS=y
+ CONFIG_JFFS2_RUBIN=y
+ CONFIG_CRAMFS=y
+ CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+ CONFIG_ROOT_NFS=y
+ CONFIG_DEBUG_KERNEL=y
+ CONFIG_DEBUG_MUTEXES=y
 -- 
 1.9.1
