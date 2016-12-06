@@ -1,38 +1,100 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Tue, 6 Dec 2016 09:39:11 +0100
-Subject: [PATCH 1/3] ARM: dts: STiH410-b2260: Identify the UART RTS line
-In-Reply-To: <20161202141146.31281-1-lee.jones@linaro.org>
-References: <20161202141146.31281-1-lee.jones@linaro.org>
-Message-ID: <8bda7a96-cd16-f245-f2d8-296816aaafb1@st.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 6 Dec 2016 09:13:10 +0000
+Subject: [PATCH 1/1] arm/module: maximum utilization of module area.
+In-Reply-To: <1481012975-44478-1-git-send-email-maninder1.s@samsung.com>
+References: <1481012975-44478-1-git-send-email-maninder1.s@samsung.com>
+Message-ID: <CAKv+Gu-jp6Sg0VuVCvYyZQf2c21uHkxA_YyfZeWtNbcE-RcaQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee
-
-Except the typo in patch 2
-
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
-
-Thanks
-
-On 12/02/2016 03:11 PM, Lee Jones wrote:
-> Configure the UART RTS line as a GPIO for manipulation within the UART driver.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On 6 December 2016 at 08:29, Maninder Singh <maninder1.s@samsung.com> wrote:
+> This patch defines new macro MODULE_START to ensure kernel text
+> and module remains within 32 MB of address range.
+>
+> Tried this patch by inserting 20 MB size module on 4.1 kernel:-
+>
+> Earlier:-
+> ==========
+> sh# insmod size.ko
+> ....
+> insmod: ERROR: could not insert module size.ko: Cannot allocate memory
+> sh#
+>
+> With this patch
+> ===============
+> sh# insmod size.ko
+> ...
+> sh# lsmod
+> Module                  Size  Used by
+> size                20972425  0
+>
+> Signed-off-by: Vaneet Narang <v.narang@samsung.com>
+> Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
+> Reviewed-by: Ajeet Yadav <ajeet.y@samsung.com>
 > ---
->  arch/arm/boot/dts/stih410-b2260.dts | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
-> index 7fb507f..f46603f 100644
-> --- a/arch/arm/boot/dts/stih410-b2260.dts
-> +++ b/arch/arm/boot/dts/stih410-b2260.dts
-> @@ -63,6 +63,7 @@
->  		uart0: serial at 9830000 {
->  			label = "LS-UART0";
->  			status = "okay";
-> +			rts-gpios = <&pio17 3 GPIO_ACTIVE_LOW>;
->  		};
->  
->  		/* Low speed expansion connector */
-> 
+>  arch/arm/include/asm/memory.h | 4 ++--
+>  arch/arm/kernel/module.c      | 9 ++++++++-
+>  2 files changed, 10 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index 76cbd9c..1a0a6e5 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -37,7 +37,7 @@
+>   * TASK_SIZE - the maximum size of a user space task.
+>   * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
+>   */
+> -#define TASK_SIZE              (UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
+> +#define TASK_SIZE              (UL(CONFIG_PAGE_OFFSET) - UL(SZ_32M))
+>  #define TASK_UNMAPPED_BASE     ALIGN(TASK_SIZE / 3, SZ_16M)
+>
+>  /*
+> @@ -50,7 +50,7 @@
+>   * and PAGE_OFFSET - it must be within 32MB of the kernel text.
+>   */
+>  #ifndef CONFIG_THUMB2_KERNEL
+> -#define MODULES_VADDR          (PAGE_OFFSET - SZ_16M)
+> +#define MODULES_VADDR          (PAGE_OFFSET - SZ_32M)
+>  #else
+>  /* smaller range for Thumb-2 symbols relocation (2^24)*/
+>  #define MODULES_VADDR          (PAGE_OFFSET - SZ_8M)
+> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+> index 4f14b5c..b8e1f9c 100644
+> --- a/arch/arm/kernel/module.c
+> +++ b/arch/arm/kernel/module.c
+> @@ -35,12 +35,19 @@
+>   */
+>  #undef MODULES_VADDR
+>  #define MODULES_VADDR  (((unsigned long)_exiprom + ~PMD_MASK) & PMD_MASK)
+> +#define MODULES_START MODULES_VADDR
+> +#else
+> +#ifndef CONFIG_THUMB2_KERNEL
+> +#define MODULES_START  ALIGN((unsigned long)_etext - SZ_32M, PAGE_SIZE)
+
+On a multi_v7_defconfig kernel, the text size is >8 MB, which means
+you are only adding ~7 MB to the module area, while consuming 16 MB of
+additional address space. Given that 20 MB modules are very uncommon,
+I think it is better to enable CONFIG_ARM_MODULE_PLTS instead. That
+way, there is no need to update these defaults for everyone.
+
+> +#else
+> +#define MODULES_START MODULES_VADDR
+> +#endif
+>  #endif
+>
+>  #ifdef CONFIG_MMU
+>  void *module_alloc(unsigned long size)
+>  {
+> -       void *p = __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
+> +       void *p = __vmalloc_node_range(size, 1, MODULES_START, MODULES_END,
+>                                 GFP_KERNEL, PAGE_KERNEL_EXEC, 0, NUMA_NO_NODE,
+>                                 __builtin_return_address(0));
+>         if (!IS_ENABLED(CONFIG_ARM_MODULE_PLTS) || p)
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
