@@ -1,41 +1,68 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 6 Dec 2016 15:31:43 +0100
-Subject: [PATCH] dts: sun8i-h3: correct UART3 pin definitions
-In-Reply-To: <20161206142710.6450-1-jorik@kippendief.biz>
-References: <20161206142710.6450-1-jorik@kippendief.biz>
-Message-ID: <20161206143143.yq3tqkcimrg45n6m@lukather>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 6 Dec 2016 14:32:17 +0000
+Subject: [PATCH 1/2] arm64: PMU: Do not use PMSELR_EL0 to access
+ PMCCFILTR_EL0
+In-Reply-To: <20161206135020.GI2498@arm.com>
+References: <1480693859-27249-1-git-send-email-marc.zyngier@arm.com>
+ <1480693859-27249-2-git-send-email-marc.zyngier@arm.com>
+ <20161206135020.GI2498@arm.com>
+Message-ID: <00b75c67-9d94-e9c3-6ae3-a706087bdd26@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
-
-On Tue, Dec 06, 2016 at 03:27:10PM +0100, jorik at kippendief.biz wrote:
-> From: Jorik Jonker <jorik@kippendief.biz>
+On 06/12/16 13:50, Will Deacon wrote:
+> On Fri, Dec 02, 2016 at 03:50:58PM +0000, Marc Zyngier wrote:
+>> The ARMv8 architecture allows the cycle counter to be configured
+>> by setting PMSELR_EL0.SEL==0x1f and then accessing PMXEVTYPER_EL0,
+>> hence accessing PMCCFILTR_EL0. But it disallows the use of
+>> PMSELR_EL0.SEL==0x1f to access the cycle counter itself through
+>> PMXEVCNTR_EL0.
+>>
+>> Linux itself doesn't violate this rule, but we may end up with
+>> PMSELR_EL0.SEL being set to 0x1f when we enter a guest. If that
+>> guest accesses PMXEVCNTR_EL0, the access may UNDEF at EL1,
+>> despite the guest not having done anything wrong.
+>>
+>> In order to avoid this unfortunate course of events (haha!), let's
+>> apply the same method armv8pmu_write_counter and co are using,
+>> explicitely checking for the cycle counter and writing to
+>> PMCCFILTR_EL0 directly. This prevents writing 0x1f to PMSELR_EL0,
+>> and saves a Linux guest an extra trap.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kernel/perf_event.c | 5 ++++-
+>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+>> index 57ae9d9..a65b757 100644
+>> --- a/arch/arm64/kernel/perf_event.c
+>> +++ b/arch/arm64/kernel/perf_event.c
+>> @@ -632,7 +632,10 @@ static inline void armv8pmu_write_counter(struct perf_event *event, u32 value)
+>>  
+>>  static inline void armv8pmu_write_evtype(int idx, u32 val)
+>>  {
+>> -	if (armv8pmu_select_counter(idx) == idx) {
+>> +	if (idx == ARMV8_IDX_CYCLE_COUNTER) {
+>> +		val &= ARMV8_PMU_EVTYPE_MASK & ~ARMV8_PMU_EVTYPE_EVENT;
+>> +		write_sysreg(val, pmccfiltr_el0);
+>> +	} else if (armv8pmu_select_counter(idx) == idx) {
 > 
-> In a previous commit, I made a copy/paste error in the pinmux
-> definitions of UART3: PG{13,14} instead of PA{13,14}. This commit takes
-> care of that. I have tested this commit on Orange Pi PC and Orange Pi
-> Plus, and it works for these boards.
+> If we go down this route, then we also have to "fix" the 32-bit code,
+> which uses PMSELR in a similar way. However, neither of the perf drivers
+> are actually doing anything wrong here -- the problem comes about because
+> the architecture doesn't guarantee that PMU accesses trap to EL2 unless
+> both MDCR.TPM=1 *and* PMSELR_EL0 is valid. So I think that this should
+> be handled together, in the KVM code that enables PMU traps.
 > 
-> Fixes: e3d11d3c45c5 ("dts: sun8i-h3: add pinmux definitions for
-> UART2-3")
-> 
-> Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
+> Given that the perf callbacks tend to run with preemption disabled, I
+> think you should be fine nuking PMSELR_EL0 to zero (i.e. no need to
+> save/restore).
 
-Could you please queue that patch for 4.9, with
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Fair enough. I'll respin another patch in a bit.
 
-Thanks!
-Maxime
+Thanks,
 
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161206/3bdb1410/attachment-0001.sig>
+Jazz is not dead. It just smells funny...
