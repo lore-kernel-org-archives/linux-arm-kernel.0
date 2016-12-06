@@ -1,108 +1,221 @@
-From: christopher.lee.bostic@gmail.com (christopher.lee.bostic at gmail.com)
-Date: Tue,  6 Dec 2016 09:01:14 -0600
-Subject: [PATCH 00/16] FSI device driver introduction
-Message-ID: <1481036474-49196-1-git-send-email-christopher.lee.bostic@gmail.com>
+From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
+Date: Tue, 6 Dec 2016 16:02:53 +0100
+Subject: [PATCH] ipmi: bt-bmc: Use a regmap for register access
+In-Reply-To: <20161206025715.2002-1-andrew@aj.id.au>
+References: <20161206025715.2002-1-andrew@aj.id.au>
+Message-ID: <36014e0c-82f8-eeaf-ee2a-6c1e413b957d@kaod.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Bostic <cbostic@us.ibm.com>
+[ this is a resend bc of some mailing list issues] 
 
-Introduction of the IBM 'Flexible Support Interface' (FSI) bus device
-driver. FSI is a high fan out serial bus consisting of a clock and a serial
-data line capable of running at speeds up to 166 MHz.
+On 12/06/2016 03:57 AM, Andrew Jeffery wrote:
+> The registers for the bt-bmc device live under the Aspeed LPC
+> controller. Devicetree bindings have recently been introduced for the
+> LPC controller where the "host" portion of the LPC register space is
+> described as a syscon device. Future devicetrees describing the bt-bmc
+> device should nest its node under the appropriate "simple-mfd", "syscon"
+> compatible node.
+> 
+> This change allows the bt-bmc driver to function with both syscon and
+> non-syscon- based devicetree descriptions by always using a regmap for
+> register access, either retrieved from the parent syscon device or
+> instantiated if none exists.
+> 
+> The patch has been tested on an OpenPOWER Palmetto machine, successfully
+> booting, rebooting and powering down the host.
+> 
+> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
 
-This set provides the basic framework to add FSI extensions to the
-Linux bus and device models. Master specific implementations are
-defined to utilize the core FSI function.
+It would be nice to have an example of the associated binding. 
+I did not see it. A part from that :
 
-In Linux, we have a core FSI "bus type", along with drivers for FSI
-masters and engines.
+Reviewed-by: C?dric Le Goater <clg@kaod.org>
 
-The FSI master drivers expose a read/write interface to the bus address
-space. The master drivers are under drivers/fsi/fsi-master-*.c.
+Thanks,
 
-The core handles probing and discovery of slaves and slave
-engines, using those read/write interfaces. It is responsible for
-creating the endpoint Linux devices corresponding to the discovered
-engines on each slave.
+C.
 
-Slave engines are identified by an 'engine' type, and an optional
-version. Engine, a.k.a. client, drivers are matched and bound to these
-engines during discovery.
-
-This patch set does not include extended FSI function such as:
-    *  Hub master support
-    *  Cascaded master support
-    *  Application layer hot plug notification
-    *  Application layer FSI bus status interface
-
-Common FSI terminology:
-
-* Master
-    Controller of the FSI bus.  Only the master is allowed to control the
-    clock line and is the initiator of all transactions on a bus.
-
-* Slave
-    The receiver or target of a master initiated transaction.  The slave
-    cannot initiate communications on a bus and must respond to any
-    master requests for data.
-
-* CFAM
-    Stands for Common Field replaceable unit Access Macro.  A CFAM is an
-    ASIC residing in any device requiring FSI communications. CFAMs
-    consist of an array of hardware 'engines' used for various purposes.
-    I2C masters, UARTs, General Purpose IO hardware are common types of
-    these engines.
-
-* Configuration Space / Table
-    A table contained at the beginning of each CFAM address space.
-    This table lists information such as the CFAM's ID, which engine types
-    and versions it has available, as well as its addressing range.
-
-* FSI Engine driver
-    A device driver that registers with the FSI core so that it can access
-    devices it owns on an FSI bus.
-
-
-Chris Bostic (5):
-  drivers/fsi: Set up links for slave communication
-  drivers/fsi: Set slave SMODE to init communication
-  drivers/fsi: Add master unscan
-  drivers/fsi: Add documentation for GPIO bindings
-  drivers/fsi: Add GPIO based FSI master
-
-Jeremy Kerr (11):
-  drivers/fsi: Add empty fsi bus definitions
-  drivers/fsi: Add device & driver definitions
-  drivers/fsi: add driver to device matches
-  drivers/fsi: Add fsi master definition
-  drivers/fsi: Add fake master driver
-  drivers/fsi: Add slave definition
-  drivers/fsi: Add empty master scan
-  drivers/fsi: Add crc4 helpers
-  drivers/fsi: Implement slave initialisation
-  drivers/fsi: scan slaves & register devices
-  drivers/fsi: Add device read/write/peek functions
-
- .../devicetree/bindings/fsi/fsi-master-gpio.txt    |  21 +
- drivers/Kconfig                                    |   2 +
- drivers/Makefile                                   |   1 +
- drivers/fsi/Kconfig                                |  29 ++
- drivers/fsi/Makefile                               |   4 +
- drivers/fsi/fsi-core.c                             | 514 +++++++++++++++++++
- drivers/fsi/fsi-master-fake.c                      |  95 ++++
- drivers/fsi/fsi-master-gpio.c                      | 552 +++++++++++++++++++++
- drivers/fsi/fsi-master.h                           |  62 +++
- include/linux/fsi.h                                |  60 +++
- 10 files changed, 1340 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
- create mode 100644 drivers/fsi/Kconfig
- create mode 100644 drivers/fsi/Makefile
- create mode 100644 drivers/fsi/fsi-core.c
- create mode 100644 drivers/fsi/fsi-master-fake.c
- create mode 100644 drivers/fsi/fsi-master-gpio.c
- create mode 100644 drivers/fsi/fsi-master.h
- create mode 100644 include/linux/fsi.h
-
--- 
-1.8.2.2
+> ---
+>  drivers/char/ipmi/Kconfig  |  1 +
+>  drivers/char/ipmi/bt-bmc.c | 82 ++++++++++++++++++++++++++++++++++------------
+>  2 files changed, 62 insertions(+), 21 deletions(-)
+> 
+> diff --git a/drivers/char/ipmi/Kconfig b/drivers/char/ipmi/Kconfig
+> index 7f816655cbbf..b5d48d9af124 100644
+> --- a/drivers/char/ipmi/Kconfig
+> +++ b/drivers/char/ipmi/Kconfig
+> @@ -79,6 +79,7 @@ endif # IPMI_HANDLER
+>  
+>  config ASPEED_BT_IPMI_BMC
+>  	depends on ARCH_ASPEED
+> +        depends on REGMAP && REGMAP_MMIO && MFD_SYSCON
+>  	tristate "BT IPMI bmc driver"
+>  	help
+>  	  Provides a driver for the BT (Block Transfer) IPMI interface
+> diff --git a/drivers/char/ipmi/bt-bmc.c b/drivers/char/ipmi/bt-bmc.c
+> index fc9e8891eae3..ca1e20f6c6c5 100644
+> --- a/drivers/char/ipmi/bt-bmc.c
+> +++ b/drivers/char/ipmi/bt-bmc.c
+> @@ -12,10 +12,13 @@
+>  #include <linux/errno.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/io.h>
+> +#include <linux/mfd/syscon.h>
+>  #include <linux/miscdevice.h>
+>  #include <linux/module.h>
+> +#include <linux/of.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/poll.h>
+> +#include <linux/regmap.h>
+>  #include <linux/sched.h>
+>  #include <linux/timer.h>
+>  
+> @@ -60,7 +63,8 @@
+>  struct bt_bmc {
+>  	struct device		dev;
+>  	struct miscdevice	miscdev;
+> -	void __iomem		*base;
+> +	struct regmap		*map;
+> +	int			offset;
+>  	int			irq;
+>  	wait_queue_head_t	queue;
+>  	struct timer_list	poll_timer;
+> @@ -69,14 +73,31 @@ struct bt_bmc {
+>  
+>  static atomic_t open_count = ATOMIC_INIT(0);
+>  
+> +static struct regmap_config bt_regmap_cfg = {
+> +	.reg_bits = 32,
+> +	.val_bits = 32,
+> +	.reg_stride = 4,
+> +};
+> +
+>  static u8 bt_inb(struct bt_bmc *bt_bmc, int reg)
+>  {
+> -	return ioread8(bt_bmc->base + reg);
+> +	uint32_t val = 0;
+> +	int rc;
+> +
+> +	rc = regmap_read(bt_bmc->map, bt_bmc->offset + reg, &val);
+> +	WARN(rc != 0, "%s:%d: regmap_read() failed: %d\n",
+> +			__FILE__, __LINE__, rc);
+> +
+> +	return rc == 0 ? (u8) val : 0;
+>  }
+>  
+>  static void bt_outb(struct bt_bmc *bt_bmc, u8 data, int reg)
+>  {
+> -	iowrite8(data, bt_bmc->base + reg);
+> +	int rc;
+> +
+> +	rc = regmap_write(bt_bmc->map, bt_bmc->offset + reg, data);
+> +	WARN(rc != 0, "%s:%d: regmap_write() failed: %d\n",
+> +			__FILE__, __LINE__, rc);
+>  }
+>  
+>  static void clr_rd_ptr(struct bt_bmc *bt_bmc)
+> @@ -367,14 +388,18 @@ static irqreturn_t bt_bmc_irq(int irq, void *arg)
+>  {
+>  	struct bt_bmc *bt_bmc = arg;
+>  	u32 reg;
+> +	int rc;
+> +
+> +	rc = regmap_read(bt_bmc->map, bt_bmc->offset + BT_CR2, &reg);
+> +	if (rc)
+> +		return IRQ_NONE;
+>  
+> -	reg = ioread32(bt_bmc->base + BT_CR2);
+>  	reg &= BT_CR2_IRQ_H2B | BT_CR2_IRQ_HBUSY;
+>  	if (!reg)
+>  		return IRQ_NONE;
+>  
+>  	/* ack pending IRQs */
+> -	iowrite32(reg, bt_bmc->base + BT_CR2);
+> +	regmap_write(bt_bmc->map, bt_bmc->offset + BT_CR2, reg);
+>  
+>  	wake_up(&bt_bmc->queue);
+>  	return IRQ_HANDLED;
+> @@ -384,7 +409,6 @@ static int bt_bmc_config_irq(struct bt_bmc *bt_bmc,
+>  			     struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> -	u32 reg;
+>  	int rc;
+>  
+>  	bt_bmc->irq = platform_get_irq(pdev, 0);
+> @@ -405,18 +429,17 @@ static int bt_bmc_config_irq(struct bt_bmc *bt_bmc,
+>  	 * will be cleared (along with B2H) when we can write the next
+>  	 * message to the BT buffer
+>  	 */
+> -	reg = ioread32(bt_bmc->base + BT_CR1);
+> -	reg |= BT_CR1_IRQ_H2B | BT_CR1_IRQ_HBUSY;
+> -	iowrite32(reg, bt_bmc->base + BT_CR1);
+> +	rc = regmap_update_bits(bt_bmc->map, bt_bmc->offset + BT_CR1,
+> +				(BT_CR1_IRQ_H2B | BT_CR1_IRQ_HBUSY),
+> +				(BT_CR1_IRQ_H2B | BT_CR1_IRQ_HBUSY));
+>  
+> -	return 0;
+> +	return rc;
+>  }
+>  
+>  static int bt_bmc_probe(struct platform_device *pdev)
+>  {
+>  	struct bt_bmc *bt_bmc;
+>  	struct device *dev;
+> -	struct resource *res;
+>  	int rc;
+>  
+>  	if (!pdev || !pdev->dev.of_node)
+> @@ -431,10 +454,27 @@ static int bt_bmc_probe(struct platform_device *pdev)
+>  
+>  	dev_set_drvdata(&pdev->dev, bt_bmc);
+>  
+> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	bt_bmc->base = devm_ioremap_resource(&pdev->dev, res);
+> -	if (IS_ERR(bt_bmc->base))
+> -		return PTR_ERR(bt_bmc->base);
+> +	bt_bmc->map = syscon_node_to_regmap(pdev->dev.parent->of_node);
+> +	if (IS_ERR(bt_bmc->map)) {
+> +		struct resource *res;
+> +		void __iomem *base;
+> +
+> +		/*
+> +		 * Assume it's not the MFD-based devicetree description, in
+> +		 * which case generate a regmap ourselves
+> +		 */
+> +		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +		base = devm_ioremap_resource(&pdev->dev, res);
+> +		if (IS_ERR(base))
+> +			return PTR_ERR(base);
+> +
+> +		bt_bmc->map = devm_regmap_init_mmio(dev, base, &bt_regmap_cfg);
+> +		bt_bmc->offset = 0;
+> +	} else {
+> +		rc = of_property_read_u32(dev->of_node, "reg", &bt_bmc->offset);
+> +		if (rc)
+> +			return rc;
+> +	}
+>  
+>  	mutex_init(&bt_bmc->mutex);
+>  	init_waitqueue_head(&bt_bmc->queue);
+> @@ -461,12 +501,12 @@ static int bt_bmc_probe(struct platform_device *pdev)
+>  		add_timer(&bt_bmc->poll_timer);
+>  	}
+>  
+> -	iowrite32((BT_IO_BASE << BT_CR0_IO_BASE) |
+> -		  (BT_IRQ << BT_CR0_IRQ) |
+> -		  BT_CR0_EN_CLR_SLV_RDP |
+> -		  BT_CR0_EN_CLR_SLV_WRP |
+> -		  BT_CR0_ENABLE_IBT,
+> -		  bt_bmc->base + BT_CR0);
+> +	regmap_write(bt_bmc->map, bt_bmc->offset + BT_CR0,
+> +		     (BT_IO_BASE << BT_CR0_IO_BASE) |
+> +		     (BT_IRQ << BT_CR0_IRQ) |
+> +		     BT_CR0_EN_CLR_SLV_RDP |
+> +		     BT_CR0_EN_CLR_SLV_WRP |
+> +		     BT_CR0_ENABLE_IBT);
+>  
+>  	clr_b_busy(bt_bmc);
+>  
+> 
