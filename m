@@ -1,224 +1,47 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Tue, 6 Dec 2016 19:14:21 +0800
-Subject: [PATCH v2 2/2] soc: zte: pm_domains: Add support for zx296718
- board
-In-Reply-To: <1480987828-20549-2-git-send-email-baoyou.xie@linaro.org>
-References: <1480987828-20549-1-git-send-email-baoyou.xie@linaro.org>
- <1480987828-20549-2-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <CABymUCPpNSnSttCD2PrZHS-aQv5uNac=J1kvUxjp50iJ6un-kg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 6 Dec 2016 11:13:53 +0000
+Subject: [PATCH 8/9] mfd: wm97xx-core: core support for wm97xx Codec
+In-Reply-To: <87y406ppjl.fsf@belgarion.home>
+References: <1477510907-23495-1-git-send-email-robert.jarzmik@free.fr>
+ <1477510907-23495-9-git-send-email-robert.jarzmik@free.fr>
+ <20161118165040.GB19884@dell.home> <87twb3r94s.fsf@belgarion.home>
+ <20161121101219.GB32509@dell> <87y406ppjl.fsf@belgarion.home>
+Message-ID: <20161206111353.fq5445yuzsy7li4i@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-12-06 9:30 GMT+08:00 Baoyou Xie <baoyou.xie@linaro.org>:
-> This patch introduces the power domain driver of zx296718
-> which belongs to zte's 2967 family.
->
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-> ---
->  drivers/soc/zte/Makefile              |   2 +-
->  drivers/soc/zte/zx296718_pm_domains.c | 182 ++++++++++++++++++++++++++++++++++
->  2 files changed, 183 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/soc/zte/zx296718_pm_domains.c
->
-> diff --git a/drivers/soc/zte/Makefile b/drivers/soc/zte/Makefile
-> index 97ac8ea..2d2a2cc 100644
-> --- a/drivers/soc/zte/Makefile
-> +++ b/drivers/soc/zte/Makefile
-> @@ -1,4 +1,4 @@
->  #
->  # zx SOC drivers
->  #
-> -obj-$(CONFIG_ZX_PM_DOMAINS) += pm_domains.o
-> +obj-$(CONFIG_ZX_PM_DOMAINS) += pm_domains.o zx296718_pm_domains.o
-> diff --git a/drivers/soc/zte/zx296718_pm_domains.c b/drivers/soc/zte/zx296718_pm_domains.c
-> new file mode 100644
-> index 0000000..ed18b33
-> --- /dev/null
-> +++ b/drivers/soc/zte/zx296718_pm_domains.c
-> @@ -0,0 +1,182 @@
-> +/*
-> + * Copyright (C) 2015 ZTE Ltd.
-> + *
-> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
-> + * License terms: GNU General Public License (GPL) version 2
-> + */
-> +#include <dt-bindings/arm/zte_pm_domains.h>
-> +#include "pm_domains.h"
-> +
-> +static u16 zx296718_offsets[REG_ARRAY_SIZE] = {
-> +       [REG_CLKEN] = 0x18,
-> +       [REG_ISOEN] = 0x1c,
-> +       [REG_RSTEN] = 0x20,
-> +       [REG_PWREN] = 0x24,
-> +       [REG_ACK_SYNC] = 0x28,
-> +};
-> +
-> +enum {
-> +       PCU_DM_VOU = 0,
-> +       PCU_DM_SAPPU,
-> +       PCU_DM_VDE,
-> +       PCU_DM_VCE,
-> +       PCU_DM_HDE,
-> +       PCU_DM_VIU,
-> +       PCU_DM_USB20,
-> +       PCU_DM_USB21,
-> +       PCU_DM_USB30,
-> +       PCU_DM_HSIC,
-> +       PCU_DM_GMAC,
-> +       PCU_DM_TS,
-> +};
-> +
-> +static struct zx_pm_domain vou_domain = {
-> +       .dm = {
-> +               .name           = "vou_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_VOU,
-> +       .reg_offset = zx296718_offsets,
-> +};
-> +static struct zx_pm_domain sappu_domain = {
-> +       .dm = {
-> +               .name           = "sappu_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_SAPPU,
-> +       .reg_offset = zx296718_offsets,
-> +};
-> +static struct zx_pm_domain vde_domain = {
-> +       .dm = {
-> +               .name           = "vde_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_VDE,
-> +       .reg_offset = zx296718_offsets,
-> +};
-> +static struct zx_pm_domain vce_domain = {
-> +       .dm = {
-> +               .name           = "vce_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_VCE,
-> +       .reg_offset = zx296718_offsets,
-> +};
-> +static struct zx_pm_domain hde_domain = {
-> +       .dm = {
-> +               .name           = "hde_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_HDE,
-> +       .reg_offset = zx296718_offsets,
-> +};
-> +
-> +static struct zx_pm_domain viu_domain = {
-> +       .dm = {
-> +               .name           = "viu_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_VIU,
-> +       .reg_offset = zx296718_offsets,
-> +};
-> +static struct zx_pm_domain usb20_domain = {
-> +       .dm = {
-> +               .name           = "usb20_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_USB20,
-> +       .reg_offset = zx296718_offsets,
-> +};
-> +static struct zx_pm_domain usb21_domain = {
-> +       .dm = {
-> +               .name           = "usb21_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_USB21,
-> +       .reg_offset = zx296718_offsets,
-> +};
-> +static struct zx_pm_domain usb30_domain = {
-> +       .dm = {
-> +               .name           = "usb30_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_USB30,
-> +       .reg_offset = zx296718_offsets,
-> +};
-> +static struct zx_pm_domain hsic_domain = {
-> +       .dm = {
-> +               .name           = "hsic_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_HSIC,
-> +       .reg_offset = zx296718_offsets,
-> +};
-> +static struct zx_pm_domain gmac_domain = {
-> +       .dm = {
-> +               .name           = "gmac_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_GMAC,
-> +       .reg_offset = zx296718_offsets,
-> +};
-> +static struct zx_pm_domain ts_domain = {
-> +       .dm = {
-> +               .name           = "ts_domain",
-> +               .power_off      = zx_normal_power_off,
-> +               .power_on       = zx_normal_power_on,
-> +       },
-> +       .bit = PCU_DM_TS,
-> +       .reg_offset = zx296718_offsets,
-> +};
-> +struct generic_pm_domain *zx296718_pm_domains[] = {
-> +       [DM_ZX296718_SAPPU] = &sappu_domain.dm,
-> +       [DM_ZX296718_VDE] = &vde_domain.dm,
-> +       [DM_ZX296718_VCE] = &vce_domain.dm,
-> +       [DM_ZX296718_HDE] = &hde_domain.dm,
-> +       [DM_ZX296718_VIU] = &viu_domain.dm,
-> +       [DM_ZX296718_USB20] = &usb20_domain.dm,
-> +       [DM_ZX296718_USB21] = &usb21_domain.dm,
-> +       [DM_ZX296718_USB30] = &usb30_domain.dm,
-> +       [DM_ZX296718_HSIC] = &hsic_domain.dm,
-> +       [DM_ZX296718_GMAC] = &gmac_domain.dm,
-> +       [DM_ZX296718_TS] = &ts_domain.dm,
-> +       [DM_ZX296718_VOU] = &vou_domain.dm,
-> +};
-> +
-> +static int zx296718_pd_probe(struct platform_device *pdev)
-> +{
-> +       return zx_pd_probe(pdev,
-> +                         zx296718_pm_domains,
-> +                         ARRAY_SIZE(zx296718_pm_domains));
-> +}
-> +
-> +static const struct of_device_id zx296718_pm_domain_matches[] = {
-> +       { .compatible = "zte,zx296718-pcu", },
-> +       { },
-> +};
-> +
-> +static struct platform_driver zx296718_pd_driver = {
-> +       .driver = {
-> +               .name = "zx-powerdomain",
-> +               .owner = THIS_MODULE,
-> +               .of_match_table = zx296718_pm_domain_matches,
-> +       },
-> +       .probe = zx296718_pd_probe,
-> +};
-> +
-> +static int __init zx296718_pd_init(void)
-> +{
-> +       return platform_driver_register(&zx296718_pd_driver);
-> +}
-> +subsys_initcall(zx296718_pd_init);
-> --
-> 2.7.4
->
-Reviewed-by: Jun Nie <jun.nie@linaro.org>
+On Sat, Nov 26, 2016 at 10:18:38AM +0100, Robert Jarzmik wrote:
+
+> >> >> +#define WM9705_VENDOR_ID 0x574d4c05
+> >> >> +#define WM9712_VENDOR_ID 0x574d4c12
+> >> >> +#define WM9713_VENDOR_ID 0x574d4c13
+> >> >> +#define WM97xx_VENDOR_ID_MASK 0xffffffff
+
+> >> > These are probably better represented as enums.
+> >> These are ids, just as devicetree ids, or PCI ids, I don't think an enum will
+> >> fit.
+
+> > That's fine.  We can use enums to simply group items of a similar
+> > type.  Representing these as enums would only serve to benefit code
+> > cleanliness.  What makes you think they won't fit?
+
+That would be like having all PCI or USB identifiers in an enum, it's
+doable but it means having one big table that all drivers need to
+modify.
+
+> >> >> +static int wm97xx_ac97_probe(struct ac97_codec_device *adev)
+
+> >> As for the "sound specific part", it's because AC97 bus is mainly used in sound
+> >> oriented drivers, but still the codec IPs provide more than just sound, as the
+> >> Wolfson codecs for instance.
+
+> > I'd like to get Mark Brown's opinion on this.
+
+I'm not sure what the question is, sorry.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161206/bb87a688/attachment.sig>
