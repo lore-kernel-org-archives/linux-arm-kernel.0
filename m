@@ -1,78 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 6 Dec 2016 09:00:56 +0100
-Subject: [PATCH v2 2/3] ARM: dts: sunxi: add support for Orange Pi Zero
- board
-In-Reply-To: <17819681480935706@web24g.yandex.ru>
-References: <20161205120021.0GBGtAl4@smtp3m.mail.yandex.net>
- <20161205094023.mtymfvpmca4x3ohh@lukather>
- <17819681480935706@web24g.yandex.ru>
-Message-ID: <20161206080056.23jpd4e7eeuhuyiq@lukather>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue,  6 Dec 2016 16:08:38 +0800
+Subject: [PATCH] ARM: dts: sun8i-q8-common: enable bluetooth on SDIO Wi-Fi
+Message-ID: <20161206080838.7523-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2016 at 07:01:46PM +0800, Icenowy Zheng wrote:
-> 
-> 
-> 05.12.2016, 17:40, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> > On Mon, Dec 05, 2016 at 04:59:44PM +0800, Icenowy Zheng wrote:
-> >> ?2016?12?5? 16:52? Maxime Ripard <maxime.ripard@free-electrons.com>???
-> >> ?>
-> >> ?> On Fri, Dec 02, 2016 at 10:22:30PM +0800, Icenowy Zheng wrote:
-> >> ?> >
-> >> ?> >
-> >> ?> > 01.12.2016, 17:36, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> >> ?> > > On Mon, Nov 28, 2016 at 12:29:07AM +0000, Andr? Przywara wrote:
-> >> ?> > >> ?> Something more interesting happened.
-> >> ?> > >> ?>
-> >> ?> > >> ?> Xunlong made a add-on board for Orange Pi Zero, which exposes the
-> >> ?> > >> ?> two USB Controllers exported at expansion bus as USB Type-A
-> >> ?> > >> ?> connectors.
-> >> ?> > >> ?>
-> >> ?> > >> ?> Also it exposes a analog A/V jack and a microphone.
-> >> ?> > >> ?>
-> >> ?> > >> ?> Should I enable {e,o}hci{2.3} in the device tree?
-> >> ?> > >>
-> >> ?> > >> ?Actually we should do this regardless of this extension board. The USB
-> >> ?> > >> ?pins are not multiplexed and are exposed on user accessible pins (just
-> >> ?> > >> ?not soldered, but that's a detail), so I think they qualify for DT
-> >> ?> > >> ?enablement. And even if a user can't use them, it doesn't hurt to have
-> >> ?> > >> ?them (since they are not multiplexed).
-> >> ?> > >
-> >> ?> > > My main concern about this is that we'll leave regulators enabled by
-> >> ?> > > default, for a minority of users. And that minority will prevent to do
-> >> ?> > > a proper power management when the times come since we'll have to keep
-> >> ?> > > that behaviour forever.
-> >> ?> >
-> >> ?> > I think these users can add a 'fdt set /xxx/xxx status "disabled" ' .
-> >> ?>
-> >> ?> You can't ask that from the majority of users. These users will take
-> >> ?> debian or fedora, install it, and expect everything to work
-> >> ?> properly. I would make the opposite argument actually. If someone is
-> >> ?> knowledgeable enough to solder the USB pins a connector, then (s)he'll
-> >> ?> be able to make that u-boot call.
-> >>
-> >> ?Now (s)he do not need soldering.
-> >>
-> >> ?(S)he needs only paying $1.99 more to Xunlong to get the expansion
-> >> ?board, and insert it on the OPi Zero.
-> >
-> > Which is going to require an overlay anyway, so we could have the USB
-> > bits in there too.
-> 
-> If so, I think the [PATCH -next v3 2/2] is ready to be merged ;-)
+Some SDIO Wi-Fi chips (such as RTL8703AS) have a UART bluetooth, which
+has a dedicated enable pin (PL8 in the reference design).
 
-I meant enabling the USB in the overlay, you enabled it in the base DT.
+Enable the pin in the same way as the WLAN enable pins.
 
-Maxime
+Tested on an A33 Q8 tablet with RTL8703AS.
 
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+
+This patch should be coupled with the uart1 node patch I send before:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/471997.html
+
+For RTL8703AS, the rtl8723bs bluetooth code is used, which can be retrieve from:
+https://github.com/lwfinger/rtl8723bs_bt
+
+ arch/arm/boot/dts/sun8i-q8-common.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
+index c676940..4aeb5bb 100644
+--- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
++++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
+@@ -88,7 +88,7 @@
+ 
+ &r_pio {
+ 	wifi_pwrseq_pin_q8: wifi_pwrseq_pin at 0 {
+-		pins = "PL6", "PL7", "PL11";
++		pins = "PL6", "PL7", "PL8", "PL11";
+ 		function = "gpio_in";
+ 		bias-pull-up;
+ 	};
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161206/efad492b/attachment.sig>
+2.10.2
