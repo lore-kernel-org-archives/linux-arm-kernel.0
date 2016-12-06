@@ -1,41 +1,42 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue,  6 Dec 2016 16:08:38 +0800
-Subject: [PATCH] ARM: dts: sun8i-q8-common: enable bluetooth on SDIO Wi-Fi
-Message-ID: <20161206080838.7523-1-icenowy@aosc.xyz>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 6 Dec 2016 15:55:40 +0800
+Subject: [PATCH] ACPI/IORT: Make dma masks set-up IORT specific
+In-Reply-To: <20161205122619.25045-1-lorenzo.pieralisi@arm.com>
+References: <20161205122619.25045-1-lorenzo.pieralisi@arm.com>
+Message-ID: <58466EFC.3070109@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some SDIO Wi-Fi chips (such as RTL8703AS) have a UART bluetooth, which
-has a dedicated enable pin (PL8 in the reference design).
+On 2016/12/5 20:26, Lorenzo Pieralisi wrote:
+> The introduction of acpi_dma_configure() allows to configure DMA
+> and related IOMMU for any device that is DMA capable. To achieve
+> that goal it ensures DMA masks are set-up to sane default values
+> before proceeding with IOMMU and DMA ops configuration.
+>
+> On x86/ia64 systems, through acpi_bind_one(), acpi_dma_configure() is
+> called for every device that has an ACPI companion, in that every device
+> is considered DMA capable on x86/ia64 systems (ie acpi_get_dma_attr() API),
+> which has the side effect of initializing dma masks also for
+> pseudo-devices (eg CPUs and memory nodes) and potentially for devices
+> whose dma masks were not set-up before the acpi_dma_configure() API was
+> introduced, which may have noxious side effects.
+>
+> Therefore, in preparation for IORT firmware specific DMA masks set-up,
+> wrap the default DMA masks set-up in acpi_dma_configure() inside an IORT
+> specific wrapper that reverts to a NOP on x86/ia64 systems, restoring the
+> default expected behaviour on x86/ia64 systems and keeping DMA default
+> masks set-up on IORT based (ie ARM) arch configurations.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
 
-Enable the pin in the same way as the WLAN enable pins.
+Add this patch on top of your v9 acpi smmu patchset,
+tested on Hisilicon D03 (ARM64), devices with SMMU
+enabled work fine,
 
-Tested on an A33 Q8 tablet with RTL8703AS.
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
-
-This patch should be coupled with the uart1 node patch I send before:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/471997.html
-
-For RTL8703AS, the rtl8723bs bluetooth code is used, which can be retrieve from:
-https://github.com/lwfinger/rtl8723bs_bt
-
- arch/arm/boot/dts/sun8i-q8-common.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-index c676940..4aeb5bb 100644
---- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
-+++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-@@ -88,7 +88,7 @@
- 
- &r_pio {
- 	wifi_pwrseq_pin_q8: wifi_pwrseq_pin at 0 {
--		pins = "PL6", "PL7", "PL11";
-+		pins = "PL6", "PL7", "PL8", "PL11";
- 		function = "gpio_in";
- 		bias-pull-up;
- 	};
--- 
-2.10.2
+Thanks
+Hanjun
