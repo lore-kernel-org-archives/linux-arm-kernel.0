@@ -1,61 +1,56 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Tue, 6 Dec 2016 13:02:57 +0530
-Subject: [PATCH 11/18] arm64: ilp32: share aarch32 syscall handlers
-In-Reply-To: <20161205171242.GH14429@e104818-lin.cambridge.arm.com>
-References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
- <1477081997-4770-12-git-send-email-ynorov@caviumnetworks.com>
- <20161205171242.GH14429@e104818-lin.cambridge.arm.com>
-Message-ID: <20161206073257.GB18470@yury-N73SV>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Tue,  6 Dec 2016 13:12:51 +0530
+Subject: [PATCH] media/platform/exynos4-is/fimc-is - Unmap region obtained by
+ of_iomap
+In-Reply-To: <y>
+References: <y>
+Message-ID: <1481010171-6247-1-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2016 at 05:12:43PM +0000, Catalin Marinas wrote:
-> On Fri, Oct 21, 2016 at 11:33:10PM +0300, Yury Norov wrote:
-> > off_t is  passed in register pair just like in aarch32.
-> > In this patch corresponding aarch32 handlers are shared to
-> > ilp32 code.
-> [...]
-> > +/*
-> > + * Note: off_4k (w5) is always in units of 4K. If we can't do the
-> > + * requested offset because it is not page-aligned, we return -EINVAL.
-> > + */
-> > +ENTRY(compat_sys_mmap2_wrapper)
-> > +#if PAGE_SHIFT > 12
-> > +	tst	w5, #~PAGE_MASK >> 12
-> > +	b.ne	1f
-> > +	lsr	w5, w5, #PAGE_SHIFT - 12
-> > +#endif
-> > +	b	sys_mmap_pgoff
-> > +1:	mov	x0, #-EINVAL
-> > +	ret
-> > +ENDPROC(compat_sys_mmap2_wrapper)
-> 
-> For compat sys_mmap2, the pgoff argument is in multiples of 4K. This was
-> traditionally used for architectures where off_t is 32-bit to allow
-> mapping files to 2^44.
-> 
-> Since off_t is 64-bit with AArch64/ILP32, should we just pass the off_t
-> as a 64-bit value in two different registers (w5 and w6)?
+Free memory mapping, if fimc_is_probe is not successful.
 
-Current glibc implementation becomes broken for 64-bit off_t if
-if I'll do what you want.
-sysdeps/unix/sysv/linux/generic/wordsize-32/mmap.c
-28 __ptr_t
-29 __mmap (__ptr_t addr, size_t len, int prot, int flags, int fd, off_t offset)
-30 {
-31   if (offset & (MMAP_PAGE_UNIT - 1))
-32     {
-33       __set_errno (EINVAL);
-34       return MAP_FAILED;
-35     }
-36   return (__ptr_t) INLINE_SYSCALL (mmap2, 6, addr, len, prot, flags, fd,
-37                                    offset / MMAP_PAGE_UNIT);
-38 }
-39 
-40 weak_alias (__mmap, mmap)
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+ drivers/media/platform/exynos4-is/fimc-is.c |    8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-So it requires changes both in glibc and in kernel. I can do it. But
-I'd like to collect opinions of kernel and glibc developers before
-starting it. 
-
-Yury
+diff --git a/drivers/media/platform/exynos4-is/fimc-is.c b/drivers/media/platform/exynos4-is/fimc-is.c
+index 32ca55f..10d98a5 100644
+--- a/drivers/media/platform/exynos4-is/fimc-is.c
++++ b/drivers/media/platform/exynos4-is/fimc-is.c
+@@ -818,12 +818,13 @@ static int fimc_is_probe(struct platform_device *pdev)
+ 	is->irq = irq_of_parse_and_map(dev->of_node, 0);
+ 	if (!is->irq) {
+ 		dev_err(dev, "no irq found\n");
+-		return -EINVAL;
++		ret = -EINVAL;
++		goto err_iounmap;
+ 	}
+ 
+ 	ret = fimc_is_get_clocks(is);
+ 	if (ret < 0)
+-		return ret;
++		goto err_iounmap;
+ 
+ 	platform_set_drvdata(pdev, is);
+ 
+@@ -877,6 +878,8 @@ err_irq:
+ 	free_irq(is->irq, is);
+ err_clk:
+ 	fimc_is_put_clocks(is);
++err_iounmap:
++	iounmap(is->pmu_regs);
+ 	return ret;
+ }
+ 
+@@ -932,6 +935,7 @@ static int fimc_is_remove(struct platform_device *pdev)
+ 	fimc_is_unregister_subdevs(is);
+ 	vb2_dma_contig_clear_max_seg_size(dev);
+ 	fimc_is_put_clocks(is);
++	iounmap(is->pmu_regs);
+ 	fimc_is_debugfs_remove(is);
+ 	release_firmware(is->fw.f_w);
+ 	fimc_is_free_cpu_memory(is);
+-- 
+1.7.9.5
