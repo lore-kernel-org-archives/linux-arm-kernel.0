@@ -1,53 +1,43 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 6 Dec 2016 15:02:18 +0100
-Subject: [PATCH v4 1/7] MFD: add bindings for STM32 General Purpose Timer
- driver
-In-Reply-To: <20161206130048.GH25385@dell.home>
-References: <1481027929-13704-1-git-send-email-benjamin.gaignard@st.com>
- <1481027929-13704-2-git-send-email-benjamin.gaignard@st.com>
- <20161206130048.GH25385@dell.home>
-Message-ID: <CA+M3ks7nUzbhUeKzi5VzJb0YhC2EWZU5k4gNCEKjHbpGrEWZtg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 6 Dec 2016 15:05:38 +0100
+Subject: [PATCH] dts: sun8i-h3: correct UART3 pin definitions
+In-Reply-To: <20161204122948.11921-1-jorik@kippendief.biz>
+References: <20161204122948.11921-1-jorik@kippendief.biz>
+Message-ID: <20161206140538.ag7nofyca2n5ror2@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[snip]
->
-> I'm not going to push too hard, but I still thing "advanced-control"
-> would suit better, since this is not *just* a timer.  In fact, the
-> parent device (the MFD) doesn't have any timer functionality.  That's
-> what "timer at 0" does.
->
-> The IP is called "Advanced Control" in the datasheet, no?
+Hi Jorik,
 
-In datasheet only timers 1 and 8 are called "advanced-control" timers
-Timers 2 to 5 and 9 to 14 are called "general purpose" timers.
-Timers 6 and 7 are named "basic" timers.
+On Sun, Dec 04, 2016 at 01:29:48PM +0100, jorik at kippendief.biz wrote:
+> From: Jorik Jonker <jorik@kippendief.biz>
+> 
+> In a previous commit, I made a copy/paste error in the pinmux
+> definitions of UART3: PG{13,14} instead of PA{13,14}. This commit takes
+> care of that. I have tested this commit on Orange Pi PC and Orange Pi
+> Plus, and it works for these boards.
+> 
+> Fixes: e3d11d3c45c5 ("dts: sun8i-h3: add pinmux definitions for
+> UART2-3")
+> 
+> Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
 
-I have ask around in ST and it seems that "general purpose" name was the
-best to describe all the timers, so I would like to keep using it.
+Thanks!
 
->
->> +             #address-cells = <1>;
->> +             #size-cells = <0>;
->> +             compatible = "st,stm32-gptimer";
->> +             reg = <0x40010000 0x400>;
->> +             clocks = <&rcc 0 160>;
->> +             clock-names = "clk_int";
->> +
->> +             pwm at 0 {
->> +                     compatible = "st,stm32-pwm";
->> +                     pinctrl-0       = <&pwm1_pins>;
->> +                     pinctrl-names   = "default";
->> +             };
->> +
->> +             timer at 0 {
->> +                     compatible = "st,stm32-timer-trigger";
->> +                     reg = <0>;
->> +             };
->> +     };
->
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+This looks like a late fix for the current release which comes to an
+end. Can you resend it with arm at kernel.org as a recipient, so that the
+ARM SoC maintainers can apply it directly?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161206/c8a8bd19/attachment.sig>
