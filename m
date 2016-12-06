@@ -1,35 +1,50 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Tue, 6 Dec 2016 10:51:05 +0100
-Subject: [PATCH v5] ARM: davinci: da8xx: Fix sleeping function called from
- invalid context
-In-Reply-To: <2fc7a4ef-02ad-fc15-66ea-9f75756086f8@ti.com>
-References: <1480947224-26222-1-git-send-email-abailon@baylibre.com>
- <2fc7a4ef-02ad-fc15-66ea-9f75756086f8@ti.com>
-Message-ID: <cbf4b99b-e453-acd5-d864-f709708fbab0@baylibre.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Tue, 6 Dec 2016 17:53:46 +0800
+Subject: [bug report v4.8] fs/locks.c: kernel oops during posix lock
+ stress test
+In-Reply-To: <20161201113031.GB5813@arm.com>
+References: <CACVXFVPsHjh3CWjdUrKB_r6=hkXK=qS3wpykbacdKe1rzz1H8Q@mail.gmail.com>
+ <20161201113031.GB5813@arm.com>
+Message-ID: <CACVXFVMyo98x7PF69TXMDKv53ag-3SjYL1FLNS=VSOA5Tje4EQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/2016 10:33 AM, Sekhar Nori wrote:
-> On Monday 05 December 2016 07:43 PM, Alexandre Bailon wrote:
->> Everytime the usb20 phy is enabled, there is a
->> "sleeping function called from invalid context" BUG.
+Hi Will,
+
+On Thu, Dec 1, 2016 at 7:30 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Nov 28, 2016 at 11:10:14AM +0800, Ming Lei wrote:
+>> When I run stress-ng via the following steps on one ARM64 dual
+>> socket system(Cavium Thunder), the kernel oops[1] can often be
+>> triggered after running the stress test for several hours(sometimes
+>> it may take longer):
 >>
->> clk_enable() from arch/arm/mach-davinci/clock.c uses spin_lock_irqsave()
->> before to invoke the callback usb20_phy_clk_enable().
->> usb20_phy_clk_enable() uses clk_get() and clk_enable_prepapre()
->> which may sleep.
->> Move clk_get() to da8xx_register_usb20_phy_clk() and
->> replace clk_prepare_enable() by clk_enable().
+>> - git clone git://kernel.ubuntu.com/cking/stress-ng.git
+>> - apply the attachment patch which just makes the posix file
+>> lock stress test more aggressive
+>> - run the test via '~/git/stress-ng$./stress-ng --lockf 128 --aggressive'
 >>
->> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
-> 
-> This will still cause the recursive locking problem reported by David.
-> Not sure what the point of sending this version was.
-> 
-> Thanks,
-> Sekhar
-> 
-What am I supposed to do ?
+>>
+>> From the oops log, looks one garbage file_lock node is got
+>> from the linked list of 'ctx->flc_posix' when the issue happens.
+>>
+>> BTW, the issue isn't observed on single socket Cavium Thunder yet,
+>> and the same issue can be seen on Ubuntu Xenial(v4.4 based kernel)
+>> too.
+>
+> FWIW, I've been running this on Seattle for 24 hours with your patch applied
+> and not seen any problems yet. That said, Thomas did just fix an rt_mutex
+> race which only seemed to pop up on Thunder, so you could give those
+> patches a try.
+>
+>   https://lkml.kernel.org/r/20161130205431.629977871 at linutronix.de
+
+I applied the patch against Ubuntu Yakkety kernel(v4.8 based), and run
+the test again on one dual-socket Cavium ThunderX system, and the
+issue can still be triggered.
+
+So looks not a same issue with David Daney's.
+
+Anyway, thank you for providing this input!
 
 Thanks,
-Alexandre
+Ming
