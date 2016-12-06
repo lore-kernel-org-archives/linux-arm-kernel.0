@@ -1,87 +1,55 @@
 From: abelvesa@linux.com (Abel Vesa)
-Date: Tue,  6 Dec 2016 17:06:04 +0000
-Subject: [PATCH 4/7] arm: Add ftrace with regs support
+Date: Tue,  6 Dec 2016 17:06:07 +0000
+Subject: [PATCH 7/7] arm: Add livepatch necessary arch selects into Kconfig
 In-Reply-To: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
 References: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
-Message-ID: <1481043967-15602-5-git-send-email-abelvesa@linux.com>
+Message-ID: <1481043967-15602-8-git-send-email-abelvesa@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds __ftrace_regs_caller which, unlike __ftrace_caller,
-adds register saving/restoring and livepatch handling if
-the pc register gets modified by klp_ftrace_handler.
+This adds HAVE_LIVEPATCH, MODULES_USE_ELF_RELA and HAVE_LIVEPATCH
+to arm Kconfig.
 
 Signed-off-by: Abel Vesa <abelvesa@linux.com>
 ---
- arch/arm/kernel/entry-ftrace.S | 49 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+ arch/arm/Kconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
-index c73c403..b6ada5c 100644
---- a/arch/arm/kernel/entry-ftrace.S
-+++ b/arch/arm/kernel/entry-ftrace.S
-@@ -92,6 +92,46 @@
- 2:	mcount_exit
- .endm
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 186c4c2..f4e9ace 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -50,6 +50,7 @@ config ARM
+ 	select HAVE_DMA_API_DEBUG
+ 	select HAVE_DMA_CONTIGUOUS if MMU
+ 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
++	select HAVE_DYNAMIC_FTRACE_WITH_REGS
+ 	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
+ 	select HAVE_EXIT_THREAD
+ 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+@@ -67,6 +68,7 @@ config ARM
+ 	select HAVE_KERNEL_XZ
+ 	select HAVE_KPROBES if !XIP_KERNEL && !CPU_ENDIAN_BE32 && !CPU_V7M
+ 	select HAVE_KRETPROBES if (HAVE_KPROBES)
++	select HAVE_LIVEPATCH
+ 	select HAVE_MEMBLOCK
+ 	select HAVE_MOD_ARCH_SPECIFIC
+ 	select HAVE_NMI
+@@ -82,6 +84,7 @@ config ARM
+ 	select HAVE_VIRT_CPU_ACCOUNTING_GEN
+ 	select IRQ_FORCED_THREADING
+ 	select MODULES_USE_ELF_REL
++	select MODULES_USE_ELF_RELA
+ 	select NO_BOOTMEM
+ 	select OF_EARLY_FLATTREE if OF
+ 	select OF_RESERVED_MEM if OF
+@@ -1841,6 +1844,7 @@ config XEN
+ 	help
+ 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
  
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+
-+.macro __ftrace_regs_caller suffix
-+
-+	stmdb	sp!, {r0-r15}
-+	mov	r3, sp
-+
-+	ldr	r10, [sp, #60]
-+
-+	mcount_get_lr   r1                      @ lr of instrumented func
-+	mcount_adjust_addr	r0, lr		@ instrumented function
-+
-+	.globl ftrace_regs_call\suffix
-+ftrace_regs_call\suffix:
-+	bl	ftrace_stub
-+
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	.globl ftrace_regs_graph_call\suffix
-+ftrace_regs_graph_call\suffix:
-+	mov	r0, r0
-+#endif
-+#ifdef CONFIG_LIVEPATCH
-+	ldr	r0, [sp, #60]
-+	cmp	r0, r10
-+	beq	ftrace_regs_caller_end
-+	ldmia	sp!, {r0-r12}
-+	add	sp, sp, #8
-+	ldmia	sp!, {r11}
-+	sub	sp, r12, #16
-+	str	r11, [sp, #12]
-+	ldmia	sp!, {r11, r12, lr, pc}
-+#endif
-+ftrace_regs_caller_end\suffix:
-+	ldmia	sp!, {r0-r14}
-+	add	sp, sp, #4
-+	mov	pc, lr
-+.endm
-+
-+#endif
-+
- .macro __ftrace_caller suffix
- 	mcount_enter
++source "kernel/livepatch/Kconfig"
+ endmenu
  
-@@ -212,6 +252,15 @@ UNWIND(.fnstart)
- 	__ftrace_caller
- UNWIND(.fnend)
- ENDPROC(ftrace_caller)
-+
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+ENTRY(ftrace_regs_caller)
-+UNWIND(.fnstart)
-+	__ftrace_regs_caller
-+UNWIND(.fnend)
-+ENDPROC(ftrace_regs_caller)
-+#endif
-+
- #endif
- 
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ menu "Boot options"
 -- 
 2.7.4
