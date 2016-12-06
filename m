@@ -1,85 +1,37 @@
-From: david.wu@rock-chips.com (David.Wu)
-Date: Tue, 6 Dec 2016 16:12:02 +0800
-Subject: [PATCH] i2c: rk3x: keep i2c irq ON in suspend
-In-Reply-To: <1737869.ycGphUXI8X@phil>
-References: <1480924979-13450-1-git-send-email-david.wu@rock-chips.com>
- <1737869.ycGphUXI8X@phil>
-Message-ID: <1d570232-af87-467e-e6f4-5b514d583a02@rock-chips.com>
+From: schwab@suse.de (Andreas Schwab)
+Date: Tue, 06 Dec 2016 09:31:27 +0100
+Subject: ILP32 for ARM64: testing with glibc testsuite
+In-Reply-To: <1480966437.29811.23.camel@caviumnetworks.com> (Steve Ellcey's
+ message of "Mon, 5 Dec 2016 11:33:57 -0800")
+References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+ <20161107082359.GA19666@yury-N73SV>
+ <20161109095650.GA22804@yury-N73SV>
+ <CC4F99A7-1FD2-486A-BD66-ED06F1B8BF50@linaro.org>
+ <1479419136.908.90.camel@caviumnetworks.com>
+ <ff3b973b-3887-7ae8-5a27-4d1ad115055f@huawei.com>
+ <mvmeg1mn0yp.fsf@hawking.suse.de>
+ <1480966437.29811.23.camel@caviumnetworks.com>
+Message-ID: <mvm37i1laqo.fsf@hawking.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Dez 05 2016, Steve Ellcey <sellcey@caviumnetworks.com> wrote:
 
-? 2016/12/5 18:54, Heiko Stuebner ??:
-> Hi David,
->
-> Am Montag, 5. Dezember 2016, 16:02:59 CET schrieb David Wu:
->> During suspend there may still be some i2c access happening.
->> And if we don't keep i2c irq ON, there may be i2c access timeout if
->> i2c is in irq mode of operation.
->
-> can you describe the issue you're trying to fix a bit more please?
+> FAIL: nptl/tst-cancel26
+> FAIL: nptl/tst-cancel27
 
-Sometimes we could see the i2c timeout errors during suspend/resume, 
-which makes the duration of suspend/resume too longer.
+> FAIL: rt/tst-mqueue1
+> FAIL: rt/tst-mqueue2
+> FAIL: rt/tst-mqueue4
+> FAIL: rt/tst-mqueue7
 
-[  484.171541] CPU4: Booted secondary processor [410fd082]
-[  485.172777] rk3x-i2c ff3c0000.i2c: timeout, ipd: 0x10, state: 1
-[  486.172760] rk3x-i2c ff3c0000.i2c: timeout, ipd: 0x10, state: 1
-[  487.172759] rk3x-i2c ff3c0000.i2c: timeout, ipd: 0x10, state: 1
-[  487.172840] cpu cpu4: _set_opp_voltage: failed to set voltage (800000 
-800000 800000 mV): -110
-[  487.172874] cpu cpu4: failed to set volt 800000
+I don't see these failures.  Maybe you need to rebuild libgcc?
 
->
-> I.e. I'd think the i2c-core does suspend i2c-client devices first, so that
-> these should be able to finish up their ongoing transfers and not start any
-> new ones instead?
->
-> Your irq can still happen slightly after the system started going to actually
-> sleep, so to me it looks like you just widened the window where irqs can be
-> handled. Especially as your irq could also just simply stem from the start
-> state, so you cannot even be sure if your transaction actually is finished.
+https://build.opensuse.org/package/live_build_log/devel:ARM:AArch64:ILP32/glibc-testsuite/standard/aarch64_ilp32
 
-Okay, you are right. I want to give it a double insurance at first, but 
-it may hide the unhappend issue.
+Andreas.
 
->
-> So to me it looks like the i2c-connected device driver should be fixed instead?
-
-I tell them to fix it in rk808 driver.
-
->
-> In the past I solved this for example in the zforce_ts driver [0] to
-> prevent i2c transfers from happening during suspend.
->
->
-> Heiko
->
-> [0] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/input/touchscreen/zforce_ts.c
->
->
->>
->> Signed-off-by: David Wu <david.wu@rock-chips.com>
->> ---
->>  drivers/i2c/busses/i2c-rk3x.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
->> index df22066..67af32a 100644
->> --- a/drivers/i2c/busses/i2c-rk3x.c
->> +++ b/drivers/i2c/busses/i2c-rk3x.c
->> @@ -1261,7 +1261,7 @@ static int rk3x_i2c_probe(struct platform_device
->> *pdev) }
->>
->>  	ret = devm_request_irq(&pdev->dev, irq, rk3x_i2c_irq,
->> -			       0, dev_name(&pdev->dev), i2c);
->> +			       IRQF_NO_SUSPEND, dev_name(&pdev->dev), i2c);
->>  	if (ret < 0) {
->>  		dev_err(&pdev->dev, "cannot request IRQ\n");
->>  		return ret;
->
->
->
->
->
+-- 
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
