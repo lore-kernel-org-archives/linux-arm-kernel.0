@@ -1,55 +1,22 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 6 Dec 2016 15:23:34 -0500
-Subject: [PATCH v3] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe
- controller
-In-Reply-To: <20161206201835.GA19700@bhelgaas-glaptop.roam.corp.google.com>
-References: <1480620053.4751.30.camel@redhat.com>
- <20161201194114.GA8263@bhelgaas-glaptop.roam.corp.google.com>
- <CADaLNDkVPRPSg0aU-sxHsiJbVvEn=LxcekDt6gfXBBhc+fzhjw@mail.gmail.com>
- <20161201230736.GA17948@bhelgaas-glaptop.roam.corp.google.com>
- <CADaLND=Ss8d-jv7wffbrtytrjj=SUnjDn9bognKUszhKguRV1A@mail.gmail.com>
- <d77e403c-81e9-114e-6ec6-bbffaa4ac36f@redhat.com>
- <20161202233943.GF9903@bhelgaas-glaptop.roam.corp.google.com>
- <62dd5462-4d68-b89f-2b45-0d58bbd96bcd@redhat.com>
- <20161205212140.GA18259@bhelgaas-glaptop.roam.corp.google.com>
- <aac9391d-8803-f5e8-f4e4-d7e56d54c05c@redhat.com>
- <20161206201835.GA19700@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <0a96dada-59de-157f-cbfd-daca229a736a@redhat.com>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 6 Dec 2016 21:24:24 +0100
+Subject: [stable:PATCH 0/3] PAN fixes backport for v4.8.12
+In-Reply-To: <20161206190454.19083-1-james.morse@arm.com>
+References: <20161206190454.19083-1-james.morse@arm.com>
+Message-ID: <20161206202424.GA23027@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/2016 03:18 PM, Bjorn Helgaas wrote:
-> On Tue, Dec 06, 2016 at 02:46:00PM -0500, Jon Masters wrote:
->> On 12/05/2016 04:21 PM, Bjorn Helgaas wrote:
->>> On Fri, Dec 02, 2016 at 07:33:46PM -0500, Jon Masters wrote:
->>
->>>>> Even without this patch, I don't think it's a show-stopper to have
->>>>> Linux mistakenly thinking this region is routed to PCI, because the
->>>>> driver does reserve it and the PCI core will never try to use it.
->>>>
->>>> Ok. So are you happy with pulling in Duc's v4 patch and retaining
->>>> status quo on the bridge resources for 4.10?
->>>
->>> Yes, I think it looks good.  I'll finish packaging things up and
->>> repost the current series.
->>
->> Ok, great. So you're still pretty confident we'll have "out of the box"
->> booting on these machines for 4.10? :)
+On Tue, Dec 06, 2016 at 07:04:51PM +0000, James Morse wrote:
+> Hi Greg, linux-stable,
 > 
-> I just merged pci/ecam into my "next" branch, so as long as tomorrow's
-> linux-next boots out of the box, we should be set.  I made the following
-> changes compared to v11:
+> This is the backport of the recent PAN fixes series for v4.8.
+> Original series:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-October/461806.html
 > 
->   - dropped the x86 change to use acpi_resource_consumer()
->   - added parens around macro args used in arithmetic expressions
->   - renamed "seg" to "node" in THUNDER_PEM_RES and THUNDER_PEM_QUIRK
->   - incorporated (u64) cast and dropped "UL" postfix for THUNDER_PEM_QUIRK
-> 
-> Let me know if you see any issues.
+> Next time I will remember to work backwards through stable versions.
+> Sorry for the confusion!
 
-Thanks - I'll test linux-next tomorrow.
+Not a problem, many thanks for these, all now queued up.
 
-Jon.
-
--- 
-Computer Architect | Sent from my Fedora powered laptop
+greg k-h
