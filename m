@@ -1,94 +1,586 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Tue, 06 Dec 2016 13:14:20 +0000
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <5846B237.8060409@free.fr> (Mason's message of "Tue, 6 Dec 2016
- 13:42:31 +0100")
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
- <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
- <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
-Message-ID: <yw1xwpfd2o9f.fsf@unicorn.mansr.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 6 Dec 2016 14:18:02 +0100
+Subject: [PATCH v9 02/11] arm/arm64: vgic: Add distributor and
+ redistributor access
+In-Reply-To: <20161128130825.GD18170@cbox>
+References: <1479906118-15832-1-git-send-email-vijay.kilari@gmail.com>
+ <1479906118-15832-3-git-send-email-vijay.kilari@gmail.com>
+ <20161128130825.GD18170@cbox>
+Message-ID: <b8fca5c3-a66a-10f2-f20a-d45639b1280e@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+Hi,
 
-> On 06/12/2016 06:12, Vinod Koul wrote:
->
->> On Tue, Nov 29, 2016 at 07:25:02PM +0100, Mason wrote:
->> 
->>> Is there a way to write a driver within the existing framework?
->> 
->> I think so, looking back at comments from Russell, I do tend to agree with
->> that. Is there a specific reason why sbox can't be tied to alloc and free
->> channels?
->
-> Here's a recap of the situation.
->
-> The "SBOX+MBUS" HW is used in several iterations of the tango SoC:
->
-> tango3
->   2 memory channels available
->   6 devices ("clients"?) may request an MBUS channel
->
-> tango4 (one more channel)
->   3 memory channels available
->   7 devices may request an MBUS channel :
->     NFC0, NFC1, SATA0, SATA1, memcpy, (IDE0, IDE1)
->
-> Notes:
-> The current NFC driver supports only one controller.
+On 28/11/2016 14:08, Christoffer Dall wrote:
+> On Wed, Nov 23, 2016 at 06:31:49PM +0530, vijay.kilari at gmail.com wrote:
+>> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>>
+>> VGICv3 Distributor and Redistributor registers are accessed using
+>> KVM_DEV_ARM_VGIC_GRP_DIST_REGS and KVM_DEV_ARM_VGIC_GRP_REDIST_REGS
+>> with KVM_SET_DEVICE_ATTR and KVM_GET_DEVICE_ATTR ioctls.
+>> These registers are accessed as 32-bit and cpu mpidr
+>> value passed along with register offset is used to identify the
+>> cpu for redistributor registers access.
+>>
+>> The version of VGIC v3 specification is define here
+s/define/defined
+>> Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+>>
+>> Also update arch/arm/include/uapi/asm/kvm.h to compile for
+>> AArch32 mode.
+>>
+>> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>> ---
+>>  arch/arm/include/uapi/asm/kvm.h     |   4 +
+>>  arch/arm64/include/uapi/asm/kvm.h   |   4 +
+>>  virt/kvm/arm/vgic/vgic-kvm-device.c | 144 ++++++++++++++++++++++++++++++++++--
+>>  virt/kvm/arm/vgic/vgic-mmio-v2.c    |  16 +---
+>>  virt/kvm/arm/vgic/vgic-mmio-v3.c    |  72 ++++++++++++++++++
+>>  virt/kvm/arm/vgic/vgic-mmio.c       |  22 ++++++
+>>  virt/kvm/arm/vgic/vgic-mmio.h       |   4 +
+>>  virt/kvm/arm/vgic/vgic.h            |  49 +++++++++++-
+>>  8 files changed, 292 insertions(+), 23 deletions(-)
+>>
+>> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+>> index af05f8e..0ae6035 100644
+>> --- a/arch/arm/include/uapi/asm/kvm.h
+>> +++ b/arch/arm/include/uapi/asm/kvm.h
+>> @@ -181,10 +181,14 @@ struct kvm_arch_memory_slot {
+>>  #define KVM_DEV_ARM_VGIC_GRP_CPU_REGS	2
+>>  #define   KVM_DEV_ARM_VGIC_CPUID_SHIFT	32
+>>  #define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
+>> +#define   KVM_DEV_ARM_VGIC_V3_MPIDR_SHIFT 32
+>> +#define   KVM_DEV_ARM_VGIC_V3_MPIDR_MASK \
+>> +			(0xffffffffULL << KVM_DEV_ARM_VGIC_V3_MPIDR_SHIFT)
+>>  #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
+>>  #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
+>>  #define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
+>>  #define KVM_DEV_ARM_VGIC_GRP_CTRL       4
+>> +#define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
+>>  #define   KVM_DEV_ARM_VGIC_CTRL_INIT    0
+>>  
+>>  /* KVM_IRQ_LINE irq field index values */
+>> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+>> index 3051f86..56dc08d 100644
+>> --- a/arch/arm64/include/uapi/asm/kvm.h
+>> +++ b/arch/arm64/include/uapi/asm/kvm.h
+>> @@ -201,10 +201,14 @@ struct kvm_arch_memory_slot {
+>>  #define KVM_DEV_ARM_VGIC_GRP_CPU_REGS	2
+>>  #define   KVM_DEV_ARM_VGIC_CPUID_SHIFT	32
+>>  #define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
+>> +#define   KVM_DEV_ARM_VGIC_V3_MPIDR_SHIFT 32
+>> +#define   KVM_DEV_ARM_VGIC_V3_MPIDR_MASK \
+>> +			(0xffffffffULL << KVM_DEV_ARM_VGIC_V3_MPIDR_SHIFT)
+>>  #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
+>>  #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
+>>  #define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
+>>  #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
+>> +#define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
+>>  #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
+>>  
+>>  /* Device Control API on vcpu fd */
+>> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+>> index fbe87a6..bc7de95 100644
+>> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
+>> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+>> @@ -235,7 +235,7 @@ struct vgic_reg_attr {
+>>  	gpa_t addr;
+>>  };
+>>  
+>> -static int parse_vgic_v2_attr(struct kvm_device *dev,
+>> +static int vgic_v2_parse_attr(struct kvm_device *dev,
+>>  			      struct kvm_device_attr *attr,
+>>  			      struct vgic_reg_attr *reg_attr)
+>>  {
+>> @@ -292,14 +292,14 @@ static bool lock_all_vcpus(struct kvm *kvm)
+>>  }
+>>  
+>>  /**
+>> - * vgic_attr_regs_access_v2 - allows user space to access VGIC v2 state
+>> + * vgic_v2_attr_regs_access - allows user space to access VGIC v2 state
+>>   *
+>>   * @dev:      kvm device handle
+>>   * @attr:     kvm device attribute
+>>   * @reg:      address the value is read or written
+>>   * @is_write: true if userspace is writing a register
+>>   */
+>> -static int vgic_attr_regs_access_v2(struct kvm_device *dev,
+>> +static int vgic_v2_attr_regs_access(struct kvm_device *dev,
+>>  				    struct kvm_device_attr *attr,
+>>  				    u32 *reg, bool is_write)
+>>  {
+>> @@ -308,7 +308,7 @@ static int vgic_attr_regs_access_v2(struct kvm_device *dev,
+>>  	struct kvm_vcpu *vcpu;
+>>  	int ret;
+>>  
+>> -	ret = parse_vgic_v2_attr(dev, attr, &reg_attr);
+>> +	ret = vgic_v2_parse_attr(dev, attr, &reg_attr);
+>>  	if (ret)
+>>  		return ret;
+>>  
+>> @@ -362,7 +362,7 @@ static int vgic_v2_set_attr(struct kvm_device *dev,
+>>  		if (get_user(reg, uaddr))
+>>  			return -EFAULT;
+>>  
+>> -		return vgic_attr_regs_access_v2(dev, attr, &reg, true);
+>> +		return vgic_v2_attr_regs_access(dev, attr, &reg, true);
+>>  	}
+>>  	}
+>>  
+>> @@ -384,7 +384,7 @@ static int vgic_v2_get_attr(struct kvm_device *dev,
+>>  		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+>>  		u32 reg = 0;
+>>  
+>> -		ret = vgic_attr_regs_access_v2(dev, attr, &reg, false);
+>> +		ret = vgic_v2_attr_regs_access(dev, attr, &reg, false);
+>>  		if (ret)
+>>  			return ret;
+>>  		return put_user(reg, uaddr);
+>> @@ -428,16 +428,141 @@ struct kvm_device_ops kvm_arm_vgic_v2_ops = {
+>>  	.has_attr = vgic_v2_has_attr,
+>>  };
+>>  
+>> +static int vgic_v3_parse_attr(struct kvm_device *dev,
+>> +			      struct kvm_device_attr *attr,
+>> +			      struct vgic_reg_attr *reg_attr)
+>> +{
+>> +	unsigned long vgic_mpidr, mpidr_reg;
+>> +
+>> +	vgic_mpidr = (attr->attr & KVM_DEV_ARM_VGIC_V3_MPIDR_MASK) >>
+>> +		      KVM_DEV_ARM_VGIC_V3_MPIDR_SHIFT;
+>> +
+>> +	mpidr_reg = VGIC_TO_MPIDR(vgic_mpidr);
+>> +	reg_attr->vcpu = kvm_mpidr_to_vcpu(dev->kvm, mpidr_reg);
+>> +	if (!reg_attr->vcpu)
+>> +		return -EINVAL;
+>> +
+>> +	reg_attr->addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +/*
+>> + * vgic_v3_attr_regs_access - allows user space to access VGIC v3 state
+>> + *
+>> + * @dev:      kvm device handle
+>> + * @attr:     kvm device attribute
+>> + * @reg:      address the value is read or written
+>> + * @is_write: true if userspace is writing a register
+>> + */
+>> +static int vgic_v3_attr_regs_access(struct kvm_device *dev,
+>> +				    struct kvm_device_attr *attr,
+>> +				    u64 *reg, bool is_write)
+>> +{
+>> +	struct vgic_reg_attr reg_attr;
+>> +	gpa_t addr;
+>> +	struct kvm_vcpu *vcpu;
+>> +	int ret;
+>> +	u32 tmp32;
+>> +
+>> +	ret = vgic_v3_parse_attr(dev, attr, &reg_attr);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	vcpu = reg_attr.vcpu;
+>> +	addr = reg_attr.addr;
+>> +
+>> +	mutex_lock(&dev->kvm->lock);
+>> +
+>> +	if (unlikely(!vgic_initialized(dev->kvm))) {
+>> +		ret = -EBUSY;
+>> +		goto out;
+>> +	}
+>> +
+>> +	if (!lock_all_vcpus(dev->kvm)) {
+>> +		ret = -EBUSY;
+>> +		goto out;
+>> +	}
+>> +
+>> +	switch (attr->group) {
+>> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+>> +		if (is_write)
+>> +			tmp32 = *reg;
+>> +
+>> +		ret = vgic_v3_dist_uaccess(vcpu, is_write, addr, &tmp32);
+>> +		if (!is_write)
+>> +			*reg = tmp32;
+>> +		break;
+>> +	case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS:
+>> +		if (is_write)
+>> +			tmp32 = *reg;
+>> +
+>> +		ret = vgic_v3_redist_uaccess(vcpu, is_write, addr, &tmp32);
+>> +		if (!is_write)
+>> +			*reg = tmp32;
+>> +		break;
+>> +	default:
+>> +		ret = -EINVAL;
+>> +		break;
+>> +	}
+>> +
+>> +	unlock_all_vcpus(dev->kvm);
+>> +out:
+>> +	mutex_unlock(&dev->kvm->lock);
+>> +	return ret;
+>> +}
+>> +
+>>  static int vgic_v3_set_attr(struct kvm_device *dev,
+>>  			    struct kvm_device_attr *attr)
+>>  {
+>> -	return vgic_set_common_attr(dev, attr);
+>> +	int ret;
+>> +
+>> +	ret = vgic_set_common_attr(dev, attr);
+>> +	if (ret != -ENXIO)
+>> +		return ret;
+>> +
+>> +	switch (attr->group) {
+>> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+>> +	case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS: {
+>> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+>> +		u32 tmp32;
+>> +		u64 reg;
+>> +
+>> +		if (get_user(tmp32, uaddr))
+>> +			return -EFAULT;
+>> +
+>> +		reg = tmp32;
+>> +		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
+>> +	}
+>> +	}
+>> +	return -ENXIO;
+>>  }
+>>  
+>>  static int vgic_v3_get_attr(struct kvm_device *dev,
+>>  			    struct kvm_device_attr *attr)
+>>  {
+>> -	return vgic_get_common_attr(dev, attr);
+>> +	int ret;
+>> +
+>> +	ret = vgic_get_common_attr(dev, attr);
+>> +	if (ret != -ENXIO)
+>> +		return ret;
+>> +
+>> +	switch (attr->group) {
+>> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+>> +	case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS: {
+>> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+>> +		u64 reg;
+>> +		u32 tmp32;
+>> +
+>> +		ret = vgic_v3_attr_regs_access(dev, attr, &reg, false);
+>> +		if (ret)
+>> +			return ret;
+>> +		tmp32 = reg;
+>> +		return put_user(tmp32, uaddr);
+>> +	}
+>> +	}
+>> +
+>> +	return -ENXIO;
+>>  }
+>>  
+>>  static int vgic_v3_has_attr(struct kvm_device *dev,
+>> @@ -451,6 +576,9 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+>>  			return 0;
+>>  		}
+>>  		break;
+>> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+>> +	case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS:
+>> +		return vgic_v3_has_attr_regs(dev, attr);
+>>  	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
+>>  		return 0;
+>>  	case KVM_DEV_ARM_VGIC_GRP_CTRL:
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>> index 0b32f40..2cb04b7 100644
+>> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>> @@ -368,10 +368,9 @@ unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev)
+>>  
+>>  int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
+>>  {
+>> -	int nr_irqs = dev->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
+>>  	const struct vgic_register_region *regions;
+>>  	gpa_t addr;
+>> -	int nr_regions, i, len;
+>> +	int nr_regions;
+>>  
+>>  	addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
+>>  
+>> @@ -392,18 +391,7 @@ int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
+>>  	if (addr & 3)
+>>  		return -ENXIO;
+>>  
+>> -	for (i = 0; i < nr_regions; i++) {
+>> -		if (regions[i].bits_per_irq)
+>> -			len = (regions[i].bits_per_irq * nr_irqs) / 8;
+>> -		else
+>> -			len = regions[i].len;
+>> -
+>> -		if (regions[i].reg_offset <= addr &&
+>> -		    regions[i].reg_offset + len > addr)
+>> -			return 0;
+>> -	}
+>> -
+>> -	return -ENXIO;
+>> +	return vgic_validate_mmio_region_addr(dev, regions, nr_regions, addr);
+>>  }
+>>  
+>>  int vgic_v2_cpuif_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> index 8e76d04..2a7cd62 100644
+>> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> @@ -18,6 +18,8 @@
+>>  #include <kvm/arm_vgic.h>
+>>  
+>>  #include <asm/kvm_emulate.h>
+>> +#include <asm/kvm_arm.h>
+>> +#include <asm/kvm_mmu.h>
+>>  
+>>  #include "vgic.h"
+>>  #include "vgic-mmio.h"
+>> @@ -439,6 +441,9 @@ static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
+>>  	REGISTER_DESC_WITH_LENGTH(GICD_CTLR,
+>>  		vgic_mmio_read_v3_misc, vgic_mmio_write_v3_misc, 16,
+>>  		VGIC_ACCESS_32bit),
+>> +	REGISTER_DESC_WITH_LENGTH(GICD_STATUSR,
+>> +		vgic_mmio_read_rao, vgic_mmio_write_wi, 4,
+>> +		VGIC_ACCESS_32bit),
+>>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGROUPR,
+>>  		vgic_mmio_read_rao, vgic_mmio_write_wi, NULL, NULL, 1,
+>>  		VGIC_ACCESS_32bit),
+>> @@ -486,12 +491,18 @@ static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
+>>  	REGISTER_DESC_WITH_LENGTH(GICR_CTLR,
+>>  		vgic_mmio_read_v3r_ctlr, vgic_mmio_write_v3r_ctlr, 4,
+>>  		VGIC_ACCESS_32bit),
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_STATUSR,
+>> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
+>> +		VGIC_ACCESS_32bit),
+>>  	REGISTER_DESC_WITH_LENGTH(GICR_IIDR,
+>>  		vgic_mmio_read_v3r_iidr, vgic_mmio_write_wi, 4,
+>>  		VGIC_ACCESS_32bit),
+>>  	REGISTER_DESC_WITH_LENGTH(GICR_TYPER,
+>>  		vgic_mmio_read_v3r_typer, vgic_mmio_write_wi, 8,
+>>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>> +	REGISTER_DESC_WITH_LENGTH(GICR_WAKER,
+>> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+4 ? WAKER is a 32b reg
+>> +		VGIC_ACCESS_32bit),
+>>  	REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
+>>  		vgic_mmio_read_propbase, vgic_mmio_write_propbase, 8,
+>>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>> @@ -612,6 +623,34 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
+>>  	return ret;
+>>  }
+>>  
+>> +int vgic_v3_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
+>> +{
+>> +	const struct vgic_register_region *regions;
+>> +	gpa_t addr;
+>> +	int nr_regions;
+>> +
+>> +	addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
+>> +
+>> +	switch (attr->group) {
+>> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+>> +		regions = vgic_v3_dist_registers;
+>> +		nr_regions = ARRAY_SIZE(vgic_v3_dist_registers);
+Couldn't you set
+	struct vgic_io_device dev = {
+		.regions = vgic_v3_dist_registers,
+		.nr_regions = ARRAY_SIZE(vgic_v3_dist_registers),
+	};
 
-I consider that a bug.
+and reuse:
+vgic_get_mmio_region(struct kvm_vcpu *vcpu, struct vgic_io_device
+*iodev, gpa_t addr, int len)?
 
-> IDE is mostly obsolete at this point.
->
-> tango5 (SATA gets own dedicated MBUS channel pair)
->   3 memory channels available
->   5 devices may request an MBUS channel :
->     NFC0, NFC1, memcpy, (IDE0, IDE1)
+In such a case is vgic_validate_mmio_region_addr() still mandated?
+>> +		break;
+>> +	case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS:{
+>> +		regions = vgic_v3_rdbase_registers;
+>> +		nr_regions = ARRAY_SIZE(vgic_v3_rdbase_registers);
+>> +		break;
+>> +	}
+>> +	default:
+>> +		return -ENXIO;
+>> +	}
+>> +
+>> +	/* We only support aligned 32-bit accesses. */
+>> +	if (addr & 3)
+>> +		return -ENXIO;
+>> +
+>> +	return vgic_validate_mmio_region_addr(dev, regions, nr_regions, addr);
+>> +}
+>>  /*
+>>   * Compare a given affinity (level 1-3 and a level 0 mask, from the SGI
+>>   * generation register ICC_SGI1R_EL1) with a given VCPU.
+>> @@ -718,3 +757,36 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
+>>  		vgic_put_irq(vcpu->kvm, irq);
+>>  	}
+>>  }
+>> +
+>> +int vgic_v3_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+>> +			 int offset, u32 *val)
+>> +{
+>> +	struct vgic_io_device dev = {
+>> +		.regions = vgic_v3_dist_registers,
+>> +		.nr_regions = ARRAY_SIZE(vgic_v3_dist_registers),
+>> +	};
+>> +
+>> +	return vgic_uaccess(vcpu, &dev, is_write, offset, val);
+>> +}
+>> +
+>> +int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+>> +			   int offset, u32 *val)
+>> +{
+>> +	struct vgic_io_device rd_dev = {
+>> +		.regions = vgic_v3_rdbase_registers,
+>> +		.nr_regions = ARRAY_SIZE(vgic_v3_rdbase_registers),
+>> +	};
+>> +
+>> +	struct vgic_io_device sgi_dev = {
+>> +		.regions = vgic_v3_sgibase_registers,
+>> +		.nr_regions = ARRAY_SIZE(vgic_v3_sgibase_registers),
+>> +	};
+>> +
+>> +	/* SGI_base is the next 64K frame after RD_base */
+>> +	if (offset >= SZ_64K)
+>> +		return vgic_uaccess(vcpu, &sgi_dev, is_write,
+>> +				    offset - SZ_64K, val);
+>> +	else
+>> +		return vgic_uaccess(vcpu, &rd_dev, is_write,
+>> +				    offset, val);
+>> +}
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+>> index d5f3ee2..0d1bc98 100644
+>> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+>> @@ -394,6 +394,28 @@ static int match_region(const void *key, const void *elt)
+>>  		       sizeof(region[0]), match_region);
+>>  }
+>>  
+>> +/* Check if address falls within the region */
+>> +int vgic_validate_mmio_region_addr(struct kvm_device *dev,
+>> +				   const struct vgic_register_region *regions,
+>> +				   int nr_regions, gpa_t addr)
+>> +{
+>> +	int i, len;
+>> +	int nr_irqs = dev->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
+>> +
+>> +	for (i = 0; i < nr_regions; i++) {
+>> +		if (regions[i].bits_per_irq)
+>> +			len = (regions[i].bits_per_irq * nr_irqs) / 8;
+>> +		else
+>> +			len = regions[i].len;
+>> +
+>> +		if (regions[i].reg_offset <= addr &&
+>> +		    regions[i].reg_offset + len > addr)
+>> +			return 0;
+>> +	}
+>> +
+>> +	return -ENXIO;
+>> +}
+>> +
+>>  /*
+>>   * kvm_mmio_read_buf() returns a value in a format where it can be converted
+>>   * to a byte array and be directly observed as the guest wanted it to appear
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+>> index 7b30296..1cc7faf 100644
+>> --- a/virt/kvm/arm/vgic/vgic-mmio.h
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
+>> @@ -177,6 +177,10 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+>>  int vgic_uaccess(struct kvm_vcpu *vcpu, struct vgic_io_device *dev,
+>>  		 bool is_write, int offset, u32 *val);
+>>  
+>> +int vgic_validate_mmio_region_addr(struct kvm_device *dev,
+>> +				   const struct vgic_register_region *regions,
+>> +				   int nr_regions, gpa_t addr);
+>> +
+>>  unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
+>>  
+>>  unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev);
+>> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+>> index 859f65c..91f58b2 100644
+>> --- a/virt/kvm/arm/vgic/vgic.h
+>> +++ b/virt/kvm/arm/vgic/vgic.h
+>> @@ -30,6 +30,49 @@
+>>  
+>>  #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
+>>  
+>> +#define VGIC_AFFINITY_0_SHIFT 0
+>> +#define VGIC_AFFINITY_0_MASK (0xffUL << VGIC_AFFINITY_0_SHIFT)
+>> +#define VGIC_AFFINITY_1_SHIFT 8
+>> +#define VGIC_AFFINITY_1_MASK (0xffUL << VGIC_AFFINITY_1_SHIFT)
+>> +#define VGIC_AFFINITY_2_SHIFT 16
+>> +#define VGIC_AFFINITY_2_MASK (0xffUL << VGIC_AFFINITY_2_SHIFT)
+>> +#define VGIC_AFFINITY_3_SHIFT 24
+>> +#define VGIC_AFFINITY_3_MASK (0xffUL << VGIC_AFFINITY_3_SHIFT)
+>> +
+>> +#define VGIC_AFFINITY_LEVEL(reg, level) \
+>> +	((((reg) & VGIC_AFFINITY_## level ##_MASK) \
+>> +	>> VGIC_AFFINITY_## level ##_SHIFT) << MPIDR_LEVEL_SHIFT(level))
+>> +
+>> +/*
+>> + * The Userspace encodes the affinity differently from the MPIDR,
+>> + * Below macro converts vgic userspace format to MPIDR reg format.
+>> + */
+>> +#define VGIC_TO_MPIDR(val) (VGIC_AFFINITY_LEVEL(val, 0) | \
+>> +			    VGIC_AFFINITY_LEVEL(val, 1) | \
+>> +			    VGIC_AFFINITY_LEVEL(val, 2) | \
+>> +			    VGIC_AFFINITY_LEVEL(val, 3))
+>> +
+>> +/*
+>> + * As per Documentation/virtual/kvm/devices/arm-vgic-v3.txt,
+>> + * below macros are defined for CPUREG encoding.
+>> + */
+>> +#define KVM_REG_ARM_VGIC_SYSREG_OP0_MASK   0x000000000000c000
+>> +#define KVM_REG_ARM_VGIC_SYSREG_OP0_SHIFT  14
+>> +#define KVM_REG_ARM_VGIC_SYSREG_OP1_MASK   0x0000000000003800
+>> +#define KVM_REG_ARM_VGIC_SYSREG_OP1_SHIFT  11
+>> +#define KVM_REG_ARM_VGIC_SYSREG_CRN_MASK   0x0000000000000780
+>> +#define KVM_REG_ARM_VGIC_SYSREG_CRN_SHIFT  7
+>> +#define KVM_REG_ARM_VGIC_SYSREG_CRM_MASK   0x0000000000000078
+>> +#define KVM_REG_ARM_VGIC_SYSREG_CRM_SHIFT  3
+>> +#define KVM_REG_ARM_VGIC_SYSREG_OP2_MASK   0x0000000000000007
+>> +#define KVM_REG_ARM_VGIC_SYSREG_OP2_SHIFT  0
+>> +
+>> +#define KVM_DEV_ARM_VGIC_SYSREG_MASK (KVM_REG_ARM_VGIC_SYSREG_OP0_MASK | \
+>> +				      KVM_REG_ARM_VGIC_SYSREG_OP1_MASK | \
+>> +				      KVM_REG_ARM_VGIC_SYSREG_CRN_MASK | \
+>> +				      KVM_REG_ARM_VGIC_SYSREG_CRM_MASK | \
+>> +				      KVM_REG_ARM_VGIC_SYSREG_OP2_MASK)
+nit: do those SYSREG defines relate to this patch?
 
-Some of the chip variants can also use this DMA engine for PCI devices.
+Thanks
 
-> If I understand the current DMA driver (written by Mans), client
-> drivers are instructed to use a specific channel in the DT, and
-> the DMA driver muxes access to that channel.
-
-Almost.  The DT indicates the sbox ID of each device.  The driver
-multiplexes requests from all devices across all channels.
-
-> The DMA driver manages a per-channel queue of outstanding DMA transfer
-> requests, and a new transfer is started friom within the DMA ISR
-> (modulo the fact that the interrupt does not signal completion of the
-> transfer, as explained else-thread).
-
-We need to somehow let the device driver signal the dma driver when a
-transfer has been fully completed.  Currently the only post-transfer
-interaction between the dma engine and the device driver is through the
-descriptor callback, which is not suitable for this purpose.
-
-This is starting to look like one of those situations where someone just
-needs to implement a solution, or we'll be forever bickering about
-hypotheticals.
-
-> What you're proposing, Vinod, is to make a channel exclusive
-> to a driver, as long as the driver has not explicitly released
-> the channel, via dma_release_channel(), right?
-
-That's not going to work very well.  Device drivers typically request
-dma channels in their probe functions or when the device is opened.
-This means that reserving one of the few channels there will inevitably
-make some other device fail to operate.
-
-Doing a request/release per transfer really doesn't fit with the
-intended usage of the dmaengine api.  For starters, what should a driver
-do if all the channels are currently busy?
-
-Since the hardware actually does support multiplexing the dma channels,
-I think it would be misguided to deliberately cripple the software
-support in order to shoehorn it into an incomplete model of how hardware
-ought to work.  While I agree it would be nicer if all hardware actually
-did work that way, this isn't the reality we're living in.
-
--- 
-M?ns Rullg?rd
+Eric
+>> +
+>>  struct vgic_vmcr {
+>>  	u32	ctlr;
+>>  	u32	abpr;
+>> @@ -89,7 +132,11 @@ static inline void vgic_get_irq_kref(struct vgic_irq *irq)
+>>  int kvm_vgic_register_its_device(void);
+>>  void vgic_enable_lpis(struct kvm_vcpu *vcpu);
+>>  int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi);
+>> -
+>> +int vgic_v3_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
+>> +int vgic_v3_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+>> +			 int offset, u32 *val);
+>> +int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+>> +			 int offset, u32 *val);
+>>  int kvm_register_vgic_device(unsigned long type);
+>>  int vgic_lazy_init(struct kvm *kvm);
+>>  int vgic_init(struct kvm *kvm);
+>> -- 
+>> 1.9.1
+>>
+> 
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
