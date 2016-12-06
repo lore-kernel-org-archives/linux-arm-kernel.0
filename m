@@ -1,67 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 6 Dec 2016 14:06:07 +0000
-Subject: [PATCH 1/3] crypto: brcm: DT documentation for Broadcom SPU driver
-In-Reply-To: <1480536453-24781-2-git-send-email-rob.rice@broadcom.com>
-References: <1480536453-24781-1-git-send-email-rob.rice@broadcom.com>
- <1480536453-24781-2-git-send-email-rob.rice@broadcom.com>
-Message-ID: <20161206140607.GB24177@leverpostej>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue,  6 Dec 2016 15:08:16 +0100
+Subject: [PATCH] pinctrl: meson: fix gpio request disabling other modes
+Message-ID: <20161206140817.11708-1-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2016 at 03:07:31PM -0500, Rob Rice wrote:
-> Device tree documentation for Broadcom Secure Processing Unit
-> (SPU) crypto driver.
-> 
-> Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
-> Signed-off-by: Rob Rice <rob.rice@broadcom.com>
-> ---
->  .../devicetree/bindings/crypto/brcm,spu-crypto.txt | 25 ++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt b/Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
-> new file mode 100644
-> index 0000000..e5fe942
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
-> @@ -0,0 +1,25 @@
-> +The Broadcom Secure Processing Unit (SPU) driver supports symmetric
-> +cryptographic offload for Broadcom SoCs with SPU hardware. A SoC may have
-> +multiple SPU hardware blocks.
+The pinctrl_gpio_request is called with the "full" gpio number, already
+containing the base, then meson_pmx_request_gpio is then called with the
+final pin number.
+Remove the base addition when calling meson_pmx_disable_other_groups.
 
-Bindings shound describe *hardware*, not *drivers*. Please drop mention
-of the driver, and just decribe the hardware.
+Fixes: 6ac730951104 ("pinctrl: add driver for Amlogic Meson SoCs")
+CC: Beniamino Galvani <b.galvani@gmail.com>
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/pinctrl/meson/pinctrl-meson.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> +Required properties:
-> +- compatible : Should be "brcm,spum-crypto" for devices with SPU-M hardware
-> +  (e.g., Northstar2) or "brcm,spum-nsp-crypto" for the Northstar Plus variant
-> +  of the SPU-M hardware.
-> +
-> +- reg: Should contain SPU registers location and length.
-> +- mboxes: A list of mailbox channels to be used by the kernel driver. Mailbox
-> +channels correspond to DMA rings on the device.
-> +
-> +Example:
-> +	spu-crypto at 612d0000 {
-> +		compatible = "brcm,spum-crypto";
-> +		reg = <0 0x612d0000 0 0x900>,    /* SPU 0 control regs */
-> +			<0 0x612f0000 0 0x900>,  /* SPU 1 control regs */
-> +			<0 0x61310000 0 0x900>,  /* SPU 2 control regs */
-> +			<0 0x61330000 0 0x900>;  /* SPU 3 control regs */
-
-The above didn't mention there were several register sets, and the
-comment beside each makes them sound like they're separate SPU
-instances, so I don't think it makes sense to group them as one node.
-
-What's going on here?
-
-> +		mboxes = <&pdc0 0>,
-> +			<&pdc1 0>,
-> +			<&pdc2 0>,
-> +			<&pdc3 0>;
-
-Does each mbox correspond to one of the SPUs above? Or is there a shared
-pool?
-
-Thanks,
-Mark.
+diff --git a/drivers/pinctrl/meson/pinctrl-meson.c b/drivers/pinctrl/meson/pinctrl-meson.c
+index a579126..620c231a 100644
+--- a/drivers/pinctrl/meson/pinctrl-meson.c
++++ b/drivers/pinctrl/meson/pinctrl-meson.c
+@@ -212,7 +212,7 @@ static int meson_pmx_request_gpio(struct pinctrl_dev *pcdev,
+ {
+ 	struct meson_pinctrl *pc = pinctrl_dev_get_drvdata(pcdev);
+ 
+-	meson_pmx_disable_other_groups(pc, range->pin_base + offset, -1);
++	meson_pmx_disable_other_groups(pc, offset, -1);
+ 
+ 	return 0;
+ }
+-- 
+2.7.0
