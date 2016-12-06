@@ -1,61 +1,65 @@
-From: abelvesa@linux.com (Abel Vesa)
-Date: Tue,  6 Dec 2016 17:06:02 +0000
-Subject: [PATCH 2/7] arm: ftrace: Add call modify mechanism
-In-Reply-To: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
-References: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
-Message-ID: <1481043967-15602-3-git-send-email-abelvesa@linux.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 6 Dec 2016 09:08:00 -0800
+Subject: [PATCH v3] mach-omap2: fixing wrong strcat for Non-NULL
+ terminated string
+In-Reply-To: <1480915633-16284-1-git-send-email-maninder1.s@samsung.com>
+References: <1480915633-16284-1-git-send-email-maninder1.s@samsung.com>
+Message-ID: <20161206170800.GB13181@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function ftrace_modify_call provides a way to replace ftrace_stub
-with the ftrace function. This helps the klp_ftrace_handler to be
-called via ftrace_ops_no_ops, which in turn will set the pc with
-the patched function's starting address. This is used for
-livepatching.
+* Maninder Singh <maninder1.s@samsung.com> [161204 21:32]:
+> Issue caught with static analysis tool:
+> "Dangerous usage of 'name' (strncpy doesn't always 0-terminate it)"
+> 
+> Use strlcpy _includes_ the NUL terminator, and  strlcat() which ensures 
+> that it won't overflow the buffer.
+> 
+> Reported-by: Maninder Singh <maninder1.s@samsung.com>
+> Signed-off-by: Vaneet Narang <v.narang@samsung.com>
+> Signed-off-by: Russell King <linux@armlinux.org.uk>
 
-Signed-off-by: Abel Vesa <abelvesa@linux.com>
----
- arch/arm/kernel/ftrace.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+I think the above should have been just:
 
-diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-index 3f17594..cb4543a 100644
---- a/arch/arm/kernel/ftrace.c
-+++ b/arch/arm/kernel/ftrace.c
-@@ -139,6 +139,15 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
- 
- 	ret = ftrace_modify_code(pc, 0, new, false);
- 
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+	if (!ret) {
-+		pc = (unsigned long)&ftrace_regs_call;
-+		new = ftrace_call_replace(pc, (unsigned long)func);
-+
-+		ret = ftrace_modify_code(pc, 0, new, false);
-+	}
-+#endif
-+
- #ifdef CONFIG_OLD_MCOUNT
- 	if (!ret) {
- 		pc = (unsigned long)&ftrace_call_old;
-@@ -151,6 +160,18 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
- 	return ret;
- }
- 
-+int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
-+	       unsigned long addr)
-+{
-+	unsigned long pc = rec->ip;
-+	u32 old, new;
-+
-+	old = arm_gen_branch(pc, old_addr);
-+	new = arm_gen_branch(pc, addr);
-+
-+	return ftrace_modify_code(pc, old, new, true);
-+}
-+
- int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
- {
- 	unsigned long new, old;
--- 
-2.7.4
+Cc: Russell King <linux@armlinux.org.uk>
+
+Can you please check and resend with Russell in Cc?
+
+Regards,
+
+Tony
+
+> ---
+> v1 -> v2: changed strncpy to strlcpy
+> v2 -> v3: use of strlcat as suggested by Russell to
+> 	  make change clearer and simpler.
+> 
+>  arch/arm/mach-omap2/omap_hwmod.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 759e1d4..e8b9887 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -741,14 +741,14 @@ static int _init_main_clk(struct omap_hwmod *oh)
+>  	int ret = 0;
+>  	char name[MOD_CLK_MAX_NAME_LEN];
+>  	struct clk *clk;
+> +	static const char modck[] = "_mod_ck";
+>  
+> -	/* +7 magic comes from '_mod_ck' suffix */
+> -	if (strlen(oh->name) + 7 > MOD_CLK_MAX_NAME_LEN)
+> +	if (strlen(oh->name) >= MOD_CLK_MAX_NAME_LEN - strlen(modck))
+>  		pr_warn("%s: warning: cropping name for %s\n", __func__,
+>  			oh->name);
+>  
+> -	strncpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - 7);
+> -	strcat(name, "_mod_ck");
+> +	strlcpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - strlen(modck));
+> +	strlcat(name, modck, MOD_CLK_MAX_NAME_LEN);
+>  
+>  	clk = clk_get(NULL, name);
+>  	if (!IS_ERR(clk)) {
+> -- 
+> 1.9.1
+> 
