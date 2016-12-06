@@ -1,46 +1,82 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 6 Dec 2016 17:28:08 +0000
-Subject: [RFC v3 03/10] iommu: Add new reserved IOMMU attributes
-In-Reply-To: <1479215363-2898-4-git-send-email-eric.auger@redhat.com>
-References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
- <1479215363-2898-4-git-send-email-eric.auger@redhat.com>
-Message-ID: <2b80e62b-5a1a-d2d0-eeb0-ad1d7ed0f44b@arm.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Tue, 6 Dec 2016 09:28:33 -0800
+Subject: [PATCH 2/5] ARM: BCM5301X: Specify USB controllers in DT
+In-Reply-To: <20161206171714.22738-2-zajec5@gmail.com>
+References: <20161206171714.22738-1-zajec5@gmail.com>
+ <20161206171714.22738-2-zajec5@gmail.com>
+Message-ID: <c721c71c-117f-185d-0544-954981dbcf04@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/11/16 13:09, Eric Auger wrote:
-> IOMMU_RESV_NOMAP is used to tag reserved IOVAs that are not
-> supposed to be IOMMU mapped. IOMMU_RESV_MSI tags IOVAs
-> corresponding to MSIs that need to be IOMMU mapped.
+
+
+On 12/6/2016 9:17 AM, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
 > 
-> IOMMU_RESV_MASK allows to check if the IOVA is reserved.
+> There are 3 separated controllers, one per USB /standard/. With PHY
+> drivers in place they can be simply supported with generic drivers.
 > 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 > ---
->  include/linux/iommu.h | 4 ++++
->  1 file changed, 4 insertions(+)
+>  arch/arm/boot/dts/bcm5301x.dtsi | 33 ++++++++++++++++++++++++++++++++-
+>  1 file changed, 32 insertions(+), 1 deletion(-)
 > 
-> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index 7f6ebd0..02cf565 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -32,6 +32,10 @@
->  #define IOMMU_NOEXEC	(1 << 3)
->  #define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
+> diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+> index f09a2bb..bfc98d19 100644
+> --- a/arch/arm/boot/dts/bcm5301x.dtsi
+> +++ b/arch/arm/boot/dts/bcm5301x.dtsi
+> @@ -248,8 +248,26 @@
 >  
-> +#define IOMMU_RESV_MASK		0x300 /* Reserved IOVA mask */
-> +#define IOMMU_RESV_NOMAP	(1 << 8) /* IOVA that cannot be mapped */
-> +#define IOMMU_RESV_MSI		(1 << 9) /* MSI region transparently mapped */
-
-It feels a bit grotty encoding these in prot - NOMAP sort of fits, but
-MSI really is something else entirely. On reflection I think a separate
-iommu_resv_region::type field would be better, particularly as it's
-something we might potentially want to expose via the sysfs entry.
-
-Robin.
-
+>  			#address-cells = <1>;
+>  			#size-cells = <1>;
+> +			ranges;
+>  
+> -			phys = <&usb2_phy>;
+> +			interrupt-parent = <&gic>;
 > +
->  struct iommu_ops;
->  struct iommu_group;
->  struct bus_type;
+> +			ohci: ohci at 21000 {
+> +				#usb-cells = <0>;
+> +
+> +				compatible = "generic-ohci";
+> +				reg = <0x00022000 0x1000>;
+
+Your label ohci at 21000 does not match the 'reg' at 0x22000.
+
+> +				interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +
+> +			ehci: ehci at 22000 {
+> +				#usb-cells = <0>;
+> +
+> +				compatible = "generic-ehci";
+> +				reg = <0x00021000 0x1000>;
+
+Looks like you got the label of ohci and ehci reversed?
+
+> +				interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
+> +				phys = <&usb2_phy>;
+> +			};
+>  		};
+>  
+>  		usb3: usb3 at 23000 {
+> @@ -257,6 +275,19 @@
+>  
+>  			#address-cells = <1>;
+>  			#size-cells = <1>;
+> +			ranges;
+> +
+> +			interrupt-parent = <&gic>;
+> +
+> +			xhci: xhci at 23000 {
+> +				#usb-cells = <0>;
+> +
+> +				compatible = "generic-xhci";
+> +				reg = <0x00023000 0x1000>;
+> +				interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
+> +				phys = <&usb3_phy>;
+> +				phy-names = "usb";
+> +			};
+>  		};
+>  
+>  		spi at 29000 {
 > 
