@@ -1,43 +1,67 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 6 Dec 2016 15:05:38 +0100
-Subject: [PATCH] dts: sun8i-h3: correct UART3 pin definitions
-In-Reply-To: <20161204122948.11921-1-jorik@kippendief.biz>
-References: <20161204122948.11921-1-jorik@kippendief.biz>
-Message-ID: <20161206140538.ag7nofyca2n5ror2@lukather>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 6 Dec 2016 14:06:07 +0000
+Subject: [PATCH 1/3] crypto: brcm: DT documentation for Broadcom SPU driver
+In-Reply-To: <1480536453-24781-2-git-send-email-rob.rice@broadcom.com>
+References: <1480536453-24781-1-git-send-email-rob.rice@broadcom.com>
+ <1480536453-24781-2-git-send-email-rob.rice@broadcom.com>
+Message-ID: <20161206140607.GB24177@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jorik,
-
-On Sun, Dec 04, 2016 at 01:29:48PM +0100, jorik at kippendief.biz wrote:
-> From: Jorik Jonker <jorik@kippendief.biz>
+On Wed, Nov 30, 2016 at 03:07:31PM -0500, Rob Rice wrote:
+> Device tree documentation for Broadcom Secure Processing Unit
+> (SPU) crypto driver.
 > 
-> In a previous commit, I made a copy/paste error in the pinmux
-> definitions of UART3: PG{13,14} instead of PA{13,14}. This commit takes
-> care of that. I have tested this commit on Orange Pi PC and Orange Pi
-> Plus, and it works for these boards.
+> Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
+> Signed-off-by: Rob Rice <rob.rice@broadcom.com>
+> ---
+>  .../devicetree/bindings/crypto/brcm,spu-crypto.txt | 25 ++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
 > 
-> Fixes: e3d11d3c45c5 ("dts: sun8i-h3: add pinmux definitions for
-> UART2-3")
-> 
-> Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
+> diff --git a/Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt b/Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
+> new file mode 100644
+> index 0000000..e5fe942
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
+> @@ -0,0 +1,25 @@
+> +The Broadcom Secure Processing Unit (SPU) driver supports symmetric
+> +cryptographic offload for Broadcom SoCs with SPU hardware. A SoC may have
+> +multiple SPU hardware blocks.
 
-Thanks!
+Bindings shound describe *hardware*, not *drivers*. Please drop mention
+of the driver, and just decribe the hardware.
 
-This looks like a late fix for the current release which comes to an
-end. Can you resend it with arm at kernel.org as a recipient, so that the
-ARM SoC maintainers can apply it directly?
+> +Required properties:
+> +- compatible : Should be "brcm,spum-crypto" for devices with SPU-M hardware
+> +  (e.g., Northstar2) or "brcm,spum-nsp-crypto" for the Northstar Plus variant
+> +  of the SPU-M hardware.
+> +
+> +- reg: Should contain SPU registers location and length.
+> +- mboxes: A list of mailbox channels to be used by the kernel driver. Mailbox
+> +channels correspond to DMA rings on the device.
+> +
+> +Example:
+> +	spu-crypto at 612d0000 {
+> +		compatible = "brcm,spum-crypto";
+> +		reg = <0 0x612d0000 0 0x900>,    /* SPU 0 control regs */
+> +			<0 0x612f0000 0 0x900>,  /* SPU 1 control regs */
+> +			<0 0x61310000 0 0x900>,  /* SPU 2 control regs */
+> +			<0 0x61330000 0 0x900>;  /* SPU 3 control regs */
 
-Maxime
+The above didn't mention there were several register sets, and the
+comment beside each makes them sound like they're separate SPU
+instances, so I don't think it makes sense to group them as one node.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161206/c8a8bd19/attachment.sig>
+What's going on here?
+
+> +		mboxes = <&pdc0 0>,
+> +			<&pdc1 0>,
+> +			<&pdc2 0>,
+> +			<&pdc3 0>;
+
+Does each mbox correspond to one of the SPUs above? Or is there a shared
+pool?
+
+Thanks,
+Mark.
