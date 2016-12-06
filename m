@@ -1,82 +1,58 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 6 Dec 2016 12:31:31 +0000
-Subject: [STLinux Kernel] [PATCH 2/3] serial: st-asc: Provide RTS
- functionality
-In-Reply-To: <5e652529-8dcb-568e-a748-0ec745099211@st.com>
-References: <20161202141146.31281-1-lee.jones@linaro.org>
- <20161202141146.31281-2-lee.jones@linaro.org>
- <5e652529-8dcb-568e-a748-0ec745099211@st.com>
-Message-ID: <20161206123131.GA15382@griffinp-ThinkPad-X1-Carbon-2nd>
+From: mpfj-list@newflow.co.uk (Mark Jackson)
+Date: Tue, 6 Dec 2016 12:33:10 +0000
+Subject: How do I define SRAM chip in GPMC device tree ?
+Message-ID: <3f98534e-2176-e03e-ac53-b60b8d0ead7c@newflow.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi
 
-On Mon, 05 Dec 2016, Patrice Chotard wrote:
+We have an existing board supported in Linux v4.1 (see am335x-nano.dts)
+and I was looking to update to a more recent kernel but have hit a stumbling
+block.
 
-> Hi Lee
-> 
-> On 12/02/2016 03:11 PM, Lee Jones wrote:
-> > Until this point, it has not been possible for serial applications
-> > to toggle the UART RTS line.  This can be useful with certain
-> > configurations. For example, when using a Mezzanine on a Linaro
-> > 96board, RTS line is used to take the the on-board microcontroller
-> 
-> typo "the the on"
-> 
-> > in and out of reset.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/tty/serial/st-asc.c | 14 ++++++++++++++
-> >  1 file changed, 14 insertions(+)
-> > 
-> > diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-> > index 379e5bd..ce46898 100644
-> > --- a/drivers/tty/serial/st-asc.c
-> > +++ b/drivers/tty/serial/st-asc.c
-> > @@ -30,6 +30,7 @@
-> >  #include <linux/of_platform.h>
-> >  #include <linux/serial_core.h>
-> >  #include <linux/clk.h>
-> > +#include <linux/gpio/consumer.h>
-> >  
-> >  #define DRIVER_NAME "st-asc"
-> >  #define ASC_SERIAL_NAME "ttyAS"
-> > @@ -38,6 +39,7 @@
-> >  
-> >  struct asc_port {
-> >  	struct uart_port port;
-> > +	struct gpio_desc *rts;
-> >  	struct clk *clk;
-> >  	unsigned int hw_flow_control:1;
-> >  	unsigned int force_m1:1;
-> > @@ -381,12 +383,16 @@ static unsigned int asc_tx_empty(struct uart_port *port)
-> >  
-> >  static void asc_set_mctrl(struct uart_port *port, unsigned int mctrl)
-> >  {
-> > +	struct asc_port *ascport = to_asc_port(port);
-> > +
-> >  	/*
-> >  	 * This routine is used for seting signals of: DTR, DCD, CTS/RTS
-> >  	 * We use ASC's hardware for CTS/RTS, so don't need any for that.
-> >  	 * Some boards have DTR and DCD implemented using PIO pins,
-> >  	 * code to do this should be hooked in here.
-> >  	 */
-> > +
-> > +	gpiod_set_value(ascport->rts, mctrl & TIOCM_RTS);
+Our unit has an SRAM device connected to CS1 and we currently rely on uboot
+to init the GPMC settings.
 
-This now puts the code and the comment above out of sync with each
-other.
+>From v4.2+ I now see that the GPMC code has been changed to reset all the
+GPMC settings when the kernel starts, so our SRAM is now inaccessible.
 
-However just checking the stih410 datasheet and I don't think this patch
-to control RTS via a GPIO is required anyway.
+I've tried the following to add an extra device to the GPMC, but no go:-
 
-The correct way of handling this is to add UART10_RTS and UART10_CTS pins
-to the pinctrl_serial0 group so they are properly configured for their cts/rts
-alternate function. Once the pins are correctly configured, the IP block should
-control the signals correctly like the comment says.
+	sram at 1,0 {
+		reg = <1 0x00000000 0x01000000>;
+		/*compatible = "mmio-sram";*/
+		bank-width = <2>;
 
-regards,
+		gpmc,mux-add-data = <2>;
 
-Peter.
+		gpmc,sync-clk-ps = <0>;
+		gpmc,cs-on-ns = <0>;
+		gpmc,cs-rd-off-ns = <160>;
+		gpmc,cs-wr-off-ns = <160>;
+		gpmc,adv-on-ns = <10>;
+		gpmc,adv-rd-off-ns = <30>;
+		gpmc,adv-wr-off-ns = <30>;
+		gpmc,oe-on-ns = <40>;
+		gpmc,oe-off-ns = <160>;
+		gpmc,we-on-ns = <40>;
+		gpmc,we-off-ns = <160>;
+		gpmc,rd-cycle-ns = <160>;
+		gpmc,wr-cycle-ns = <160>;
+		gpmc,access-ns = <150>;
+		gpmc,page-burst-access-ns = <10>;
+		gpmc,cycle2cycle-samecsen;
+		gpmc,cycle2cycle-delay-ns = <20>;
+		gpmc,wr-data-mux-bus-ns = <70>;
+		gpmc,wr-access-ns = <80>;
+	};
+
+Looking at drivers/memory/omap-gpmc.c, I can see that when the GPMC
+children are scanned, only the following are matched:-
+
+"nand","onenand","ethernet","nor","uart"
+
+So can anyone explain how to add a standard SRAM chip ?
+
+Cheers
+Mark J.
