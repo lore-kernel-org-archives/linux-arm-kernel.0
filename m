@@ -1,47 +1,49 @@
-From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Tue,  6 Dec 2016 08:21:51 +0800
-Subject: [PATCH] dt: bindings: zx: Add header for PM domains specifiers
-Message-ID: <1480983711-29955-1-git-send-email-baoyou.xie@linaro.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 06 Dec 2016 09:25:25 +0900
+Subject: [PATCH 01/12] phy: rcar-gen3-usb2: Replace the deprecated extcon
+ API
+In-Reply-To: <1480485460-2663-2-git-send-email-cw00.choi@samsung.com>
+References: <1480485460-2663-1-git-send-email-cw00.choi@samsung.com>
+ <CGME20161130055741epcas1p36e85f3cae0322b7382471a963a9b2bca@epcas1p3.samsung.com>
+ <1480485460-2663-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <58460575.8030008@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds header with values used for ZTE 2967
-SoC's power domain driver.
+Hi Kishon,
 
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
----
- include/dt-bindings/arm/zte_pm_domains.h | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 include/dt-bindings/arm/zte_pm_domains.h
+Could you review and pick the patch1/2 for phy driver?
 
-diff --git a/include/dt-bindings/arm/zte_pm_domains.h b/include/dt-bindings/arm/zte_pm_domains.h
-new file mode 100644
-index 0000000..1485e8d
---- /dev/null
-+++ b/include/dt-bindings/arm/zte_pm_domains.h
-@@ -0,0 +1,23 @@
-+/*
-+ * Copyright (C) 2015 Linaro Ltd.
-+ *
-+ * Author: Baoyou Xie <baoyou.xie@linaro.org>
-+ * License terms: GNU General Public License (GPL) version 2
-+ */
-+#ifndef _DT_BINDINGS_ARM_ZTE_PM_DOMAINS_H
-+#define _DT_BINDINGS_ARM_ZTE_PM_DOMAINS_H
-+
-+#define DM_ZX296718_SAPPU	0
-+#define DM_ZX296718_VDE		1  /*g1v6*/
-+#define DM_ZX296718_VCE		2  /*h1v6*/
-+#define DM_ZX296718_HDE		3  /*g2v2*/
-+#define DM_ZX296718_VIU		4
-+#define DM_ZX296718_USB20	5
-+#define DM_ZX296718_USB21	6
-+#define DM_ZX296718_USB30	7
-+#define DM_ZX296718_HSIC	8
-+#define DM_ZX296718_GMAC	9
-+#define DM_ZX296718_TS		10
-+#define DM_ZX296718_VOU		11
-+
-+#endif /* _DT_BINDINGS_ARM_ZTE_PM_DOMAINS_H */
--- 
-2.7.4
+Best Regards,
+Chanwoo Choi
+
+On 2016? 11? 30? 14:57, Chanwoo Choi wrote:
+> This patch replaces the deprecated extcon API as following:
+> - extcon_set_cable_state_() -> extcon_set_state_sync()
+> 
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+>  drivers/phy/phy-rcar-gen3-usb2.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/phy/phy-rcar-gen3-usb2.c b/drivers/phy/phy-rcar-gen3-usb2.c
+> index bd2430d7339c..7f8081f157f4 100644
+> --- a/drivers/phy/phy-rcar-gen3-usb2.c
+> +++ b/drivers/phy/phy-rcar-gen3-usb2.c
+> @@ -93,11 +93,11 @@ static void rcar_gen3_phy_usb2_work(struct work_struct *work)
+>  						 work);
+>  
+>  	if (ch->extcon_host) {
+> -		extcon_set_cable_state_(ch->extcon, EXTCON_USB_HOST, true);
+> -		extcon_set_cable_state_(ch->extcon, EXTCON_USB, false);
+> +		extcon_set_state_sync(ch->extcon, EXTCON_USB_HOST, true);
+> +		extcon_set_state_sync(ch->extcon, EXTCON_USB, false);
+>  	} else {
+> -		extcon_set_cable_state_(ch->extcon, EXTCON_USB_HOST, false);
+> -		extcon_set_cable_state_(ch->extcon, EXTCON_USB, true);
+> +		extcon_set_state_sync(ch->extcon, EXTCON_USB_HOST, false);
+> +		extcon_set_state_sync(ch->extcon, EXTCON_USB, true);
+>  	}
+>  }
+>  
+> 
