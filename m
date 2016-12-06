@@ -1,16 +1,17 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  6 Dec 2016 14:50:53 +0100
-Subject: [PATCH 1/3] iio: adc: add device tree bindings for Qualcomm PM8xxx
- ADCs
-Message-ID: <1481032253-27019-1-git-send-email-linus.walleij@linaro.org>
+Date: Tue,  6 Dec 2016 14:51:09 +0100
+Subject: [PATCH 2/3] iio: adc: break out common code from SPMI VADC
+Message-ID: <1481032269-27067-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the device tree bindings for the Qualcomm PM8xxx
-ADCs. This is based on the existing DT bindings for the
-SPMI ADC so there are hopefully no controversial features.
+The SPMI VADC and the earlier XOADC share a subset of
+common code, so to be able to use the same code in both
+drivers, we break out a separate file with the common code,
+prefix exported functions that are no longer static with
+qcom_* and bake an object qcom-vadc.o that contains both
+files: qcom-vadc-common.o and qcom-spmi-vadc.o.
 
-Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-arm-msm at vger.kernel.org
 Cc: Ivan T. Ivanov <iivanov.xz@gmail.com>
@@ -19,175 +20,276 @@ Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
 Cc: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- .../bindings/iio/adc/qcom,pm8xxx-xoadc.txt         | 160 +++++++++++++++++++++
- 1 file changed, 160 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/adc/qcom,pm8xxx-xoadc.txt
+ drivers/iio/adc/Makefile           |  3 +-
+ drivers/iio/adc/qcom-spmi-vadc.c   | 95 +++-----------------------------------
+ drivers/iio/adc/qcom-vadc-common.c | 38 +++++++++++++++
+ drivers/iio/adc/qcom-vadc-common.h | 69 +++++++++++++++++++++++++++
+ 4 files changed, 116 insertions(+), 89 deletions(-)
+ create mode 100644 drivers/iio/adc/qcom-vadc-common.c
+ create mode 100644 drivers/iio/adc/qcom-vadc-common.h
 
-diff --git a/Documentation/devicetree/bindings/iio/adc/qcom,pm8xxx-xoadc.txt b/Documentation/devicetree/bindings/iio/adc/qcom,pm8xxx-xoadc.txt
+diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
+index 7a40c04c311f..f9468d228b1e 100644
+--- a/drivers/iio/adc/Makefile
++++ b/drivers/iio/adc/Makefile
+@@ -38,7 +38,8 @@ obj-$(CONFIG_MXS_LRADC) += mxs-lradc.o
+ obj-$(CONFIG_NAU7802) += nau7802.o
+ obj-$(CONFIG_PALMAS_GPADC) += palmas_gpadc.o
+ obj-$(CONFIG_QCOM_SPMI_IADC) += qcom-spmi-iadc.o
+-obj-$(CONFIG_QCOM_SPMI_VADC) += qcom-spmi-vadc.o
++qcom-vadc-y := qcom-vadc-common.o
++obj-$(CONFIG_QCOM_SPMI_VADC) += qcom-vadc.o qcom-spmi-vadc.o
+ obj-$(CONFIG_ROCKCHIP_SARADC) += rockchip_saradc.o
+ obj-$(CONFIG_STX104) += stx104.o
+ obj-$(CONFIG_TI_ADC081C) += ti-adc081c.o
+diff --git a/drivers/iio/adc/qcom-spmi-vadc.c b/drivers/iio/adc/qcom-spmi-vadc.c
+index c2babe50a0d8..74d21afa34a9 100644
+--- a/drivers/iio/adc/qcom-spmi-vadc.c
++++ b/drivers/iio/adc/qcom-spmi-vadc.c
+@@ -28,6 +28,8 @@
+ 
+ #include <dt-bindings/iio/qcom,spmi-vadc.h>
+ 
++#include "qcom-vadc-common.h"
++
+ /* VADC register and bit definitions */
+ #define VADC_REVISION2				0x1
+ #define VADC_REVISION2_SUPPORTED_VADC		1
+@@ -75,69 +77,9 @@
+ 
+ #define VADC_DATA				0x60	/* 16 bits */
+ 
+-#define VADC_CONV_TIME_MIN_US			2000
+-#define VADC_CONV_TIME_MAX_US			2100
+-
+-/* Min ADC code represents 0V */
+-#define VADC_MIN_ADC_CODE			0x6000
+-/* Max ADC code represents full-scale range of 1.8V */
+-#define VADC_MAX_ADC_CODE			0xa800
+-
+-#define VADC_ABSOLUTE_RANGE_UV			625000
+-#define VADC_RATIOMETRIC_RANGE_UV		1800000
+-
+-#define VADC_DEF_PRESCALING			0 /* 1:1 */
+-#define VADC_DEF_DECIMATION			0 /* 512 */
+-#define VADC_DEF_HW_SETTLE_TIME			0 /* 0 us */
+-#define VADC_DEF_AVG_SAMPLES			0 /* 1 sample */
+-#define VADC_DEF_CALIB_TYPE			VADC_CALIB_ABSOLUTE
+-
+-#define VADC_DECIMATION_MIN			512
+-#define VADC_DECIMATION_MAX			4096
+-
+-#define VADC_HW_SETTLE_DELAY_MAX		10000
+-#define VADC_AVG_SAMPLES_MAX			512
+-
+-#define KELVINMIL_CELSIUSMIL			273150
+-
+ #define VADC_CHAN_MIN			VADC_USBIN
+ #define VADC_CHAN_MAX			VADC_LR_MUX3_BUF_PU1_PU2_XO_THERM
+ 
+-/*
+- * VADC_CALIB_ABSOLUTE: uses the 625mV and 1.25V as reference channels.
+- * VADC_CALIB_RATIOMETRIC: uses the reference voltage (1.8V) and GND for
+- * calibration.
+- */
+-enum vadc_calibration {
+-	VADC_CALIB_ABSOLUTE = 0,
+-	VADC_CALIB_RATIOMETRIC
+-};
+-
+-/**
+- * struct vadc_linear_graph - Represent ADC characteristics.
+- * @dy: numerator slope to calculate the gain.
+- * @dx: denominator slope to calculate the gain.
+- * @gnd: A/D word of the ground reference used for the channel.
+- *
+- * Each ADC device has different offset and gain parameters which are
+- * computed to calibrate the device.
+- */
+-struct vadc_linear_graph {
+-	s32 dy;
+-	s32 dx;
+-	s32 gnd;
+-};
+-
+-/**
+- * struct vadc_prescale_ratio - Represent scaling ratio for ADC input.
+- * @num: the inverse numerator of the gain applied to the input channel.
+- * @den: the inverse denominator of the gain applied to the input channel.
+- */
+-struct vadc_prescale_ratio {
+-	u32 num;
+-	u32 den;
+-};
+-
+ /**
+  * struct vadc_channel_prop - VADC channel property.
+  * @channel: channel number, refer to the channel list.
+@@ -471,33 +413,10 @@ static int vadc_measure_ref_points(struct vadc_priv *vadc)
+ static s32 vadc_calibrate(struct vadc_priv *vadc,
+ 			  const struct vadc_channel_prop *prop, u16 adc_code)
+ {
+-	const struct vadc_prescale_ratio *prescale;
+-	s64 voltage;
+-
+-	voltage = adc_code - vadc->graph[prop->calibration].gnd;
+-	voltage *= vadc->graph[prop->calibration].dx;
+-	voltage = div64_s64(voltage, vadc->graph[prop->calibration].dy);
+-
+-	if (prop->calibration == VADC_CALIB_ABSOLUTE)
+-		voltage += vadc->graph[prop->calibration].dx;
+-
+-	if (voltage < 0)
+-		voltage = 0;
+-
+-	prescale = &vadc_prescale_ratios[prop->prescale];
+-
+-	voltage = voltage * prescale->den;
+-
+-	return div64_s64(voltage, prescale->num);
+-}
+-
+-static int vadc_decimation_from_dt(u32 value)
+-{
+-	if (!is_power_of_2(value) || value < VADC_DECIMATION_MIN ||
+-	    value > VADC_DECIMATION_MAX)
+-		return -EINVAL;
+-
+-	return __ffs64(value / VADC_DECIMATION_MIN);
++	return qcom_vadc_calibrate(&vadc_prescale_ratios[prop->prescale],
++				   &vadc->graph[prop->calibration],
++				   (prop->calibration == VADC_CALIB_ABSOLUTE),
++				   adc_code);
+ }
+ 
+ static int vadc_prescaling_from_dt(u32 num, u32 den)
+@@ -752,7 +671,7 @@ static int vadc_get_dt_channel_data(struct device *dev,
+ 
+ 	ret = of_property_read_u32(node, "qcom,decimation", &value);
+ 	if (!ret) {
+-		ret = vadc_decimation_from_dt(value);
++		ret = qcom_vadc_decimation_from_dt(value);
+ 		if (ret < 0) {
+ 			dev_err(dev, "%02x invalid decimation %d\n",
+ 				chan, value);
+diff --git a/drivers/iio/adc/qcom-vadc-common.c b/drivers/iio/adc/qcom-vadc-common.c
 new file mode 100644
-index 000000000000..6e51e3e74b88
+index 000000000000..f67fc5e2a702
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/iio/adc/qcom,pm8xxx-xoadc.txt
-@@ -0,0 +1,160 @@
-+Qualcomm's PM8xxx voltage XOADC
++++ b/drivers/iio/adc/qcom-vadc-common.c
+@@ -0,0 +1,38 @@
++#include <linux/kernel.h>
++#include <linux/bitops.h>
++#include <linux/math64.h>
++#include <linux/log2.h>
++#include <linux/err.h>
 +
-+The Qualcomm PM8xxx PMICs contain a HK/XO ADC (Housekeeping/Chrystal
-+oscillator ADC) encompass PM8018, PM8038, PM8058, PM8917 and PM8921.
++#include "qcom-vadc-common.h"
 +
-+Required properties:
++s32 qcom_vadc_calibrate(const struct vadc_prescale_ratio *prescale,
++			const struct vadc_linear_graph *graph,
++			bool absolute,
++			u16 adc_code)
++{
++	s64 voltage;
 +
-+- compatible: should be one of:
-+  "qcom,pm8018-adc"
-+  "qcom,pm8038-adc"
-+  "qcom,pm8058-adc"
-+  "qcom,pm8917-adc"
-+  "qcom,pm8921-adc"
++	voltage = adc_code - graph->gnd;
++	voltage *= graph->dx;
++	voltage = div64_s64(voltage, graph->dy);
 +
-+- reg: should contain the ADC base address in the PMIC, typically
-+  0x197.
++	if (absolute)
++		voltage += graph->dx;
 +
-+The following required properties are standard for IO channels, see
-+iio-bindings.txt for more details:
++	if (voltage < 0)
++		voltage = 0;
 +
-+- #address-cells: should be set to <1>
++	voltage = voltage * prescale->den;
 +
-+- #size-cells: should be set to <0>
++	return div64_s64(voltage, prescale->num);
++}
 +
-+- #io-channel-cells: should be set to <1>
++int qcom_vadc_decimation_from_dt(u32 value)
++{
++	if (!is_power_of_2(value) || value < VADC_DECIMATION_MIN ||
++	    value > VADC_DECIMATION_MAX)
++		return -EINVAL;
 +
-+- interrupts: should refer to the parent PMIC interrupt controller
-+  and reference the proper ADC interrupt.
++	return __ffs64(value / VADC_DECIMATION_MIN);
++}
+diff --git a/drivers/iio/adc/qcom-vadc-common.h b/drivers/iio/adc/qcom-vadc-common.h
+new file mode 100644
+index 000000000000..b41cb501eef8
+--- /dev/null
++++ b/drivers/iio/adc/qcom-vadc-common.h
+@@ -0,0 +1,69 @@
++/*
++ * Code shared between the different Qualcomm PMIC voltage ADCs
++ */
 +
-+Required subnodes:
++#define VADC_CONV_TIME_MIN_US			2000
++#define VADC_CONV_TIME_MAX_US			2100
 +
-+The ADC channels are configured as subnodes of the ADC. Since some of
-+them are used for calibrating the ADC, these nodes are compulsory:
++/* Min ADC code represents 0V */
++#define VADC_MIN_ADC_CODE			0x6000
++/* Max ADC code represents full-scale range of 1.8V */
++#define VADC_MAX_ADC_CODE			0xa800
 +
-+ref_625mv {
-+	reg = <0x0c>;
++#define VADC_ABSOLUTE_RANGE_UV			625000
++#define VADC_RATIOMETRIC_RANGE_UV		1800000
++
++#define VADC_DEF_PRESCALING			0 /* 1:1 */
++#define VADC_DEF_DECIMATION			0 /* 512 */
++#define VADC_DEF_HW_SETTLE_TIME			0 /* 0 us */
++#define VADC_DEF_AVG_SAMPLES			0 /* 1 sample */
++#define VADC_DEF_CALIB_TYPE			VADC_CALIB_ABSOLUTE
++
++#define VADC_DECIMATION_MIN			512
++#define VADC_DECIMATION_MAX			4096
++
++#define VADC_HW_SETTLE_DELAY_MAX		10000
++#define VADC_AVG_SAMPLES_MAX			512
++
++#define KELVINMIL_CELSIUSMIL			273150
++
++/*
++ * VADC_CALIB_ABSOLUTE: uses the 625mV and 1.25V as reference channels.
++ * VADC_CALIB_RATIOMETRIC: uses the reference voltage (1.8V) and GND for
++ * calibration.
++ */
++enum vadc_calibration {
++	VADC_CALIB_ABSOLUTE = 0,
++	VADC_CALIB_RATIOMETRIC
 +};
 +
-+ref_1250mv {
-+	reg = <0x0d>;
++/**
++ * struct vadc_linear_graph - Represent ADC characteristics.
++ * @dy: numerator slope to calculate the gain.
++ * @dx: denominator slope to calculate the gain.
++ * @gnd: A/D word of the ground reference used for the channel.
++ *
++ * Each ADC device has different offset and gain parameters which are
++ * computed to calibrate the device.
++ */
++struct vadc_linear_graph {
++	s32 dy;
++	s32 dx;
++	s32 gnd;
 +};
 +
-+ref_muxoff {
-+	reg = <0x0f>;
++/**
++ * struct vadc_prescale_ratio - Represent scaling ratio for ADC input.
++ * @num: the inverse numerator of the gain applied to the input channel.
++ * @den: the inverse denominator of the gain applied to the input channel.
++ */
++struct vadc_prescale_ratio {
++	u32 num;
++	u32 den;
 +};
 +
-+These three nodes are used for absolute and ratiometric calibration
-+and only need to have these reg values: they are by hardware defined
-+to be 1:1 ratio converters that sample 625, 1250 and 0 V and create
-+an interpolation calibration for all other ADCs.
-+
-+Optional subnodes: any channels other than channel 0x0c, 0x0d and
-+0x0f are optional.
-+
-+Required channel node properties:
-+
-+- reg: should contain the hardware channel number in the range
-+  0 .. 0x0f (4 bits). The hardware only supports 16 channels.
-+
-+Optional channel node properties:
-+
-+- qcom,decimation:
-+  Value type: <u32>
-+  Definition: This parameter is used to decrease ADC sampling rate.
-+          Quicker measurements can be made by reducing decimation ratio.
-+          Valid values are 512, 1024, 2048, 4096.
-+          If property is not found, default value of 512 will be used.
-+
-+- qcom,ratiometric:
-+  Value type: <empty>
-+  Definition: Channel calibration type. If this property is specified
-+          VADC will use the VDD reference (1.8V) and GND for channel
-+          calibration. If property is not found, channel will be
-+          calibrated with 0.625V and 1.25V reference channels, also
-+          known as absolute calibration.
-+
-+- qcom,ratiometric-ref:
-+  Value type: <u32>
-+  Definition: The reference voltage pair when using ratiometric
-+          calibration:
-+	  0 = XO_IN/XOADC_GND
-+	  1 = PMIC_IN/XOADC_GND
-+	  2 = PMIC_IN/BMS_CSP
-+	  3 (invalid)
-+	  4 = XOADC_GND/XOADC_GND
-+	  5 = XOADC_VREF/XOADC_GND
-+
-+Example:
-+
-+xoadc: xoadc at 197 {
-+	compatible = "qcom,pm8058-adc";
-+	reg = <0x197>;
-+	interrupt-parent = <&pm8058>;
-+	interrupts = <76 1>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	#io-channel-cells = <1>;
-+
-+	vcoin {
-+		reg = <0x00>;
-+	};
-+	vbat {
-+		reg = <0x01>;
-+	};
-+	dcin {
-+		reg = <0x02>;
-+	};
-+	ichg {
-+		reg = <0x03>;
-+	};
-+	vph_pwr {
-+		reg = <0x04>;
-+	};
-+	mpp5 {
-+		reg = <0x05>;
-+	};
-+	mpp6 {
-+		reg = <0x06>;
-+	};
-+	mpp7 {
-+		reg = <0x07>;
-+	};
-+	mpp8 {
-+		reg = <0x08>;
-+	};
-+	mpp9 {
-+		reg = <0x09>;
-+	};
-+	usb_vbus {
-+		reg = <0x0a>;
-+	};
-+	die_temp {
-+		reg = <0x0b>;
-+	};
-+	ref_625mv {
-+		reg = <0x0c>;
-+	};
-+	ref_1250mv {
-+		reg = <0x0d>;
-+	};
-+	ref_325mv {
-+		reg = <0x0e>;
-+	};
-+	ref_muxoff {
-+		reg = <0x0f>;
-+	};
-+};
-+
-+
-+/* IIO client node */
-+iio-hwmon {
-+	compatible = "iio-hwmon";
-+	io-channels = <&xoadc 0x01>, /* Battery */
-+		    <&xoadc 0x02>, /* DC in (charger) */
-+		    <&xoadc 0x04>, /* VPH the main system voltage */
-+		    <&xoadc 0x0b>, /* Die temperature */
-+		    <&xoadc 0x0c>, /* Reference voltage 1.25V */
-+		    <&xoadc 0x0d>, /* Reference voltage 0.625V */
-+		    <&xoadc 0x0e>; /* Reference voltage 0.325V */
-+};
++s32 qcom_vadc_calibrate(const struct vadc_prescale_ratio *prescale,
++			const struct vadc_linear_graph *graph,
++			bool absolute,
++			u16 adc_code);
++int qcom_vadc_decimation_from_dt(u32 value);
 -- 
 2.7.4
