@@ -1,25 +1,98 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 6 Dec 2016 14:24:48 +0100
-Subject: [PATCH] ACPI/IORT: Make dma masks set-up IORT specific
-In-Reply-To: <20161206093710.GA4432@red-moon>
-References: <20161205122619.25045-1-lorenzo.pieralisi@arm.com>
- <CAJZ5v0hbc61=QCYDgHZ_KbxR7VkSSWrHVGvU47fG6hsQrSJKhw@mail.gmail.com>
- <20161206093710.GA4432@red-moon>
-Message-ID: <20161206132448.GA17255@8bytes.org>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 6 Dec 2016 14:27:01 +0100
+Subject: [PATCH v9 03/11] arm/arm64: vgic: Introduce find_reg_by_id()
+In-Reply-To: <1479906118-15832-4-git-send-email-vijay.kilari@gmail.com>
+References: <1479906118-15832-1-git-send-email-vijay.kilari@gmail.com>
+ <1479906118-15832-4-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <f8e4e42e-e298-f4ca-a958-3be48fb39736@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+Hi Vijay,
+On 23/11/2016 14:01, vijay.kilari at gmail.com wrote:
+> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> 
+> In order to implement vGICv3 CPU interface access, we will need to perform
+> table lookup of system registers. We would need both index_to_params() and
+> find_reg() exported for that purpose, but instead we export a single
+> function which combines them both.
+> 
+> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 22 +++++++++++++++-------
+>  arch/arm64/kvm/sys_regs.h |  4 ++++
+>  2 files changed, 19 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index f302fdb..1330d4c 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -1789,6 +1789,17 @@ static bool index_to_params(u64 id, struct sys_reg_params *params)
+>  	}
+>  }
+>  
+> +const struct sys_reg_desc *find_reg_by_id(u64 id,
+> +					  struct sys_reg_params *params,
+> +					  const struct sys_reg_desc table[],
+> +					  unsigned int num)
+> +{
+> +	if (!index_to_params(id, params))
+> +		return NULL;
+> +
+> +	return find_reg(params, table, num);
+> +}
+> +
+Can't you use find_reg_by_id in index_to_sys_reg_desc too?
 
-On Tue, Dec 06, 2016 at 09:37:10AM +0000, Lorenzo Pieralisi wrote:
-> I can apply Rafael and Hanjun's tags and resend a v2 to you if you
-> prefer, it would be great if you could apply this patch to your arm/smmu
-> branch for v4.10 as per description above, please let me know.
+Besides Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
-Yes, please collect all the tags and send me a v2 please. I'll apply it
-the right away.
+Thanks
 
-
-Thanks,
-
-	Joerg
+Eric
+>  /* Decode an index value, and find the sys_reg_desc entry. */
+>  static const struct sys_reg_desc *index_to_sys_reg_desc(struct kvm_vcpu *vcpu,
+>  						    u64 id)
+> @@ -1912,10 +1923,8 @@ static int get_invariant_sys_reg(u64 id, void __user *uaddr)
+>  	struct sys_reg_params params;
+>  	const struct sys_reg_desc *r;
+>  
+> -	if (!index_to_params(id, &params))
+> -		return -ENOENT;
+> -
+> -	r = find_reg(&params, invariant_sys_regs, ARRAY_SIZE(invariant_sys_regs));
+> +	r = find_reg_by_id(id, &params, invariant_sys_regs,
+> +			   ARRAY_SIZE(invariant_sys_regs));
+>  	if (!r)
+>  		return -ENOENT;
+>  
+> @@ -1929,9 +1938,8 @@ static int set_invariant_sys_reg(u64 id, void __user *uaddr)
+>  	int err;
+>  	u64 val = 0; /* Make sure high bits are 0 for 32-bit regs */
+>  
+> -	if (!index_to_params(id, &params))
+> -		return -ENOENT;
+> -	r = find_reg(&params, invariant_sys_regs, ARRAY_SIZE(invariant_sys_regs));
+> +	r = find_reg_by_id(id, &params, invariant_sys_regs,
+> +			   ARRAY_SIZE(invariant_sys_regs));
+>  	if (!r)
+>  		return -ENOENT;
+>  
+> diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
+> index dbbb01c..9c6ffd0 100644
+> --- a/arch/arm64/kvm/sys_regs.h
+> +++ b/arch/arm64/kvm/sys_regs.h
+> @@ -136,6 +136,10 @@ static inline int cmp_sys_reg(const struct sys_reg_desc *i1,
+>  	return i1->Op2 - i2->Op2;
+>  }
+>  
+> +const struct sys_reg_desc *find_reg_by_id(u64 id,
+> +					  struct sys_reg_params *params,
+> +					  const struct sys_reg_desc table[],
+> +					  unsigned int num);
+>  
+>  #define Op0(_x) 	.Op0 = _x
+>  #define Op1(_x) 	.Op1 = _x
+> 
