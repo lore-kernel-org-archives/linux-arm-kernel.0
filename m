@@ -1,77 +1,41 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 6 Dec 2016 13:51:45 +0100
-Subject: [GIT PULL v2] ARM: Xilinx Zynq DT changes for v4.10
-Message-ID: <78b672c5-2f17-f166-815f-47b05dba66e7@monstr.eu>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 6 Dec 2016 12:57:25 +0000
+Subject: [PATCH v4 7/7] ARM: dts: stm32: add STM32 General Purpose Timer
+ driver in DT
+In-Reply-To: <1481027929-13704-8-git-send-email-benjamin.gaignard@st.com>
+References: <1481027929-13704-1-git-send-email-benjamin.gaignard@st.com>
+ <1481027929-13704-8-git-send-email-benjamin.gaignard@st.com>
+Message-ID: <20161206125725.GG25385@dell.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 06 Dec 2016, Benjamin Gaignard wrote:
 
-please add these changes to your arm-soc repo.
-It fixes dtc warnings, small coding style changes and add support for
-Microzed.
+> Add General Purpose Timers and it sub-nodes into DT for stm32f4.
+> Define and enable pwm1 and pwm3 for stm32f469 discovery board
+> 
+> version 4:
+> - remove unwanted indexing in pwm@ and timer@ node name
+> - use "reg" instead of additional parameters to set timer
+>   configuration
+> 
+> version 3:
+> - use "st,stm32-timer-trigger" in DT
+> 
+> version 2:
+> - use parameters to describe hardware capabilities
+> - do not use references for pwm and iio timer subnodes
+> 
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> ---
+>  arch/arm/boot/dts/stm32f429.dtsi      | 276 +++++++++++++++++++++++++++++++++-
+>  arch/arm/boot/dts/stm32f469-disco.dts |  28 ++++
+>  2 files changed, 303 insertions(+), 1 deletion(-)
 
-Thanks,
-Michal
-
----
-v2: Use correct zynq-dt-for-4.10 tag instead of zynqmp-dt-for-4.10.
-
-
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-  https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-4.10
-
-for you to fetch changes up to df2f3c48b9cd51e2612a1598342769d09d849f39:
-
-  arm: dts: zynq: Add MicroZed board support (2016-12-06 13:17:39 +0100)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq dt patches for v4.10
-
-- Remove skeleton.dtsi
-- Fix DTC warnings
-- Coding style changes
-- Microzed support
-
-----------------------------------------------------------------
-Jagan Teki (1):
-      arm: dts: zynq: Add MicroZed board support
-
-Michal Simek (3):
-      ARM: zynq: Remove skeleton.dtsi
-      ARM: zynq: Fix W=1 dtc 1.4 warnings
-      ARM: zynq: Fix pmu register description coding style
-
- arch/arm/boot/dts/Makefile            |  1 +
- arch/arm/boot/dts/zynq-7000.dtsi      | 10 +++++---
- arch/arm/boot/dts/zynq-microzed.dts   | 96
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/zynq-parallella.dts |  2 +-
- arch/arm/boot/dts/zynq-zc702.dts      |  2 +-
- arch/arm/boot/dts/zynq-zc706.dts      |  2 +-
- arch/arm/boot/dts/zynq-zed.dts        |  2 +-
- arch/arm/boot/dts/zynq-zybo.dts       |  2 +-
- 8 files changed, 108 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/boot/dts/zynq-microzed.dts
-
+This now looks really neat.
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161206/76407ade/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
