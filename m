@@ -1,259 +1,115 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 6 Dec 2016 13:07:12 +0000
-Subject: [PATCH v4 2/7] MFD: add STM32 General Purpose Timer driver
-In-Reply-To: <1481027929-13704-3-git-send-email-benjamin.gaignard@st.com>
-References: <1481027929-13704-1-git-send-email-benjamin.gaignard@st.com>
- <1481027929-13704-3-git-send-email-benjamin.gaignard@st.com>
-Message-ID: <20161206130712.GI25385@dell.home>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 6 Dec 2016 13:09:26 +0000
+Subject: [PATCH v3] KVM: arm/arm64: Access CNTHCTL_EL2 bit fields correctly
+In-Reply-To: <20161206121617.GB3681@cbox>
+References: <1480620725-9864-1-git-send-email-jintack@cs.columbia.edu>
+ <49451f06-10a6-4921-eae6-c37a5510197a@arm.com> <20161206121221.GA3681@cbox>
+ <20161206121617.GB3681@cbox>
+Message-ID: <b2623eed-fd63-c8c6-fd66-428bd87759d9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is really starting to come together.
-
-Couple of nits to tend to and you'll be all set.
-
-> This hardware block could at used at same time for PWM generation
-> and IIO timers.
-> PWM and IIO timer configuration are mixed in the same registers
-> so we need a multi fonction driver to be able to share those registers.
+On 06/12/16 12:16, Christoffer Dall wrote:
+> On Tue, Dec 06, 2016 at 01:12:21PM +0100, Christoffer Dall wrote:
+>> On Tue, Dec 06, 2016 at 11:17:40AM +0000, Marc Zyngier wrote:
+>>> On 01/12/16 19:32, Jintack Lim wrote:
+>>>> Current KVM world switch code is unintentionally setting wrong bits to
+>>>> CNTHCTL_EL2 when E2H == 1, which may allow guest OS to access physical
+>>>> timer.  Bit positions of CNTHCTL_EL2 are changing depending on
+>>>> HCR_EL2.E2H bit.  EL1PCEN and EL1PCTEN are 1st and 0th bits when E2H is
+>>>> not set, but they are 11th and 10th bits respectively when E2H is set.
+>>>>
+>>>> In fact, on VHE we only need to set those bits once, not for every world
+>>>> switch. This is because the host kernel runs in EL2 with HCR_EL2.TGE ==
+>>>> 1, which makes those bits have no effect for the host kernel execution.
+>>>> So we just set those bits once for guests, and that's it.
+>>>>
+>>>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+>>>> ---
+>>>> v2->v3: 
+>>>> - Perform the initialization including CPU hotplug case.
+>>>> - Move has_vhe() to asm/virt.h
+>>>>
+>>>> v1->v2: 
+>>>> - Skip configuring cnthctl_el2 in world switch path on VHE system.
+>>>> - Write patch based on linux-next.
+>>>> ---
+>>>>  arch/arm/include/asm/virt.h   |  5 +++++
+>>>>  arch/arm/kvm/arm.c            |  3 +++
+>>>>  arch/arm64/include/asm/virt.h | 10 ++++++++++
+>>>>  include/kvm/arm_arch_timer.h  |  1 +
+>>>>  virt/kvm/arm/arch_timer.c     | 23 +++++++++++++++++++++++
+>>>>  virt/kvm/arm/hyp/timer-sr.c   | 33 +++++++++++++++++++++------------
+>>>>  6 files changed, 63 insertions(+), 12 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
+>>>> index a2e75b8..6dae195 100644
+>>>> --- a/arch/arm/include/asm/virt.h
+>>>> +++ b/arch/arm/include/asm/virt.h
+>>>> @@ -80,6 +80,11 @@ static inline bool is_kernel_in_hyp_mode(void)
+>>>>  	return false;
+>>>>  }
+>>>>  
+>>>> +static inline bool has_vhe(void)
+>>>> +{
+>>>> +	return false;
+>>>> +}
+>>>> +
+>>>>  /* The section containing the hypervisor idmap text */
+>>>>  extern char __hyp_idmap_text_start[];
+>>>>  extern char __hyp_idmap_text_end[];
+>>>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>>>> index 8f92efa..13e54e8 100644
+>>>> --- a/arch/arm/kvm/arm.c
+>>>> +++ b/arch/arm/kvm/arm.c
+>>>> @@ -1099,6 +1099,9 @@ static void cpu_init_hyp_mode(void *dummy)
+>>>>  	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
+>>>>  	__cpu_init_stage2();
+>>>>  
+>>>> +	if (is_kernel_in_hyp_mode())
+>>>> +		kvm_timer_init_vhe();
+>>>> +
+>>>>  	kvm_arm_init_debug();
+>>>>  }
+>>>>  
+>>>> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+>>>> index fea1073..b043cfd 100644
+>>>> --- a/arch/arm64/include/asm/virt.h
+>>>> +++ b/arch/arm64/include/asm/virt.h
+>>>> @@ -47,6 +47,7 @@
+>>>>  #include <asm/ptrace.h>
+>>>>  #include <asm/sections.h>
+>>>>  #include <asm/sysreg.h>
+>>>> +#include <asm/cpufeature.h>
+>>>>  
+>>>>  /*
+>>>>   * __boot_cpu_mode records what mode CPUs were booted in.
+>>>> @@ -80,6 +81,15 @@ static inline bool is_kernel_in_hyp_mode(void)
+>>>>  	return read_sysreg(CurrentEL) == CurrentEL_EL2;
+>>>>  }
+>>>>  
+>>>> +static inline bool has_vhe(void)
+>>>> +{
+>>>> +#ifdef CONFIG_ARM64_VHE
+>>>
+>>> Is there a particular reason why this should be guarded by a #ifdef? All
+>>> the symbols should always be available, and since this is a static key,
+>>> the overhead should be really insignificant (provided that you use a
+>>> non-prehistoric compiler...).
+>>>
+>>
+>> Isn't this code called from a file shared between 32-bit arm and arm64?
+>> Does the cpus_have_const_cap work on ARM64?
 > 
-> version 4:
-> - add a function to detect Auto Reload Register (ARR) size
-> - rename the structure shared with other drivers
-> 
-> version 2:
-> - rename driver "stm32-gptimer" to be align with SoC documentation
-> - only keep one compatible
-> - use of_platform_populate() instead of devm_mfd_add_devices()
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> ---
->  drivers/mfd/Kconfig               | 11 ++++++
->  drivers/mfd/Makefile              |  2 +
->  drivers/mfd/stm32-gptimer.c       | 82 +++++++++++++++++++++++++++++++++++++++
+> Duh, I meant on 32-bit arm of course.
 
-This is not a timer.
+Well, this is a pure 64bit file - 32bit has the canonical implementation
+that always returns false. So I can't really see how this can ever break
+32bit. Unless my lack of sleep is really showing, and I'm missing
+something terribly obvious?
 
->  include/linux/mfd/stm32-gptimer.h | 63 ++++++++++++++++++++++++++++++
->  4 files changed, 158 insertions(+)
->  create mode 100644 drivers/mfd/stm32-gptimer.c
->  create mode 100644 include/linux/mfd/stm32-gptimer.h
-> 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index c6df644..a00f6b3 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -1607,6 +1607,17 @@ config MFD_STW481X
->  	  in various ST Microelectronics and ST-Ericsson embedded
->  	  Nomadik series.
->  
-> +config MFD_STM32_GP_TIMER
-> +	tristate "Support for STM32 General Purpose Timer"
+Thanks,
 
-... but it's not though is it.  This is the parent device whose
-children are a PWM and a Timer.
-
-> +	select MFD_CORE
-> +	select REGMAP
-> +	depends on ARCH_STM32 || COMPILE_TEST
-> +	depends on OF
-
-Shouldn't this be:
-
-	depends on (ARCH_STM32 && OF) || COMPILE_TEST
-	
-> +	help
-> +	  Select this option to enable STM32 general purpose timer
-> +	  driver used for PWM and IIO Timer. This driver allow to
-> +	  share the registers between the others drivers.
-> +
->  menu "Multimedia Capabilities Port drivers"
->  	depends on ARCH_SA1100
->  
-> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> index 9834e66..86353b9 100644
-> --- a/drivers/mfd/Makefile
-> +++ b/drivers/mfd/Makefile
-> @@ -211,3 +211,5 @@ obj-$(CONFIG_INTEL_SOC_PMIC)	+= intel-soc-pmic.o
->  obj-$(CONFIG_MFD_MT6397)	+= mt6397-core.o
->  
->  obj-$(CONFIG_MFD_ALTERA_A10SR)	+= altera-a10sr.o
-> +
-> +obj-$(CONFIG_MFD_STM32_GP_TIMER) 	+= stm32-gptimer.o
-> diff --git a/drivers/mfd/stm32-gptimer.c b/drivers/mfd/stm32-gptimer.c
-> new file mode 100644
-> index 0000000..6747fcb
-> --- /dev/null
-> +++ b/drivers/mfd/stm32-gptimer.c
-> @@ -0,0 +1,82 @@
-> +/*
-> + * Copyright (C) STMicroelectronics 2016
-> + *
-> + * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
-
-Nit: '\n' here.
-
-> + * License terms:  GNU General Public License (GPL), version 2
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/reset.h>
-> +
-> +#include <linux/mfd/stm32-gptimer.h>
-
-Nit: Why does this need to be separate?
-
-> +static const struct regmap_config stm32_gptimer_regmap_cfg = {
-> +	.reg_bits = 32,
-> +	.val_bits = 32,
-> +	.reg_stride = sizeof(u32),
-> +	.max_register = 0x400,
-> +};
-> +
-> +static u32 stm32_gptimer_get_arr_size(struct regmap *regmap)
-> +{
-> +	u32 max_arr;
-> +
-> +	/* Only the available bits will be written so when readback
-> +	 * we get the maximum value of auto reload register
-> +	 */
-
-Incorrect format for a multi-line comment in Linux.
-
-> +	regmap_write(regmap, TIM_ARR, ~0L);
-> +	regmap_read(regmap, TIM_ARR, &max_arr);
-> +	regmap_write(regmap, TIM_ARR, 0x0);
-> +
-> +	return max_arr;
-> +}
-> +
-> +static int stm32_gptimer_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct stm32_gptimer *ddata;
-> +	struct resource *res;
-> +	void __iomem *mmio;
-> +
-> +	ddata = devm_kzalloc(dev, sizeof(*ddata), GFP_KERNEL);
-> +	if (!ddata)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	mmio = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(mmio))
-> +		return PTR_ERR(mmio);
-> +
-> +	ddata->regmap = devm_regmap_init_mmio_clk(dev, "clk_int", mmio,
-> +						  &stm32_gptimer_regmap_cfg);
-> +	if (IS_ERR(ddata->regmap))
-> +		return PTR_ERR(ddata->regmap);
-> +
-> +	ddata->clk = devm_clk_get(dev, NULL);
-> +	if (IS_ERR(ddata->clk))
-> +		return PTR_ERR(ddata->clk);
-> +
-> +	ddata->max_arr = stm32_gptimer_get_arr_size(ddata->regmap);
-
-Why don't you pass in ddata, then use regmap and populate max_arr
-inside the function.  Then make stm32_gptimer_get_arr_size() void.
-
-> +	platform_set_drvdata(pdev, ddata);
-> +
-> +	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
-> +}
-> +
-> +static const struct of_device_id stm32_gptimer_of_match[] = {
-> +	{ .compatible = "st,stm32-gptimer" },
-> +};
-> +MODULE_DEVICE_TABLE(of, stm32_gptimer_of_match);
-> +
-> +static struct platform_driver stm32_gptimer_driver = {
-> +	.probe = stm32_gptimer_probe,
-> +	.driver	= {
-> +		.name = "stm32-gptimer",
-> +		.of_match_table = stm32_gptimer_of_match,
-> +	},
-> +};
-> +module_platform_driver(stm32_gptimer_driver);
-> +
-> +MODULE_DESCRIPTION("STMicroelectronics STM32 General Purpose Timer");
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/include/linux/mfd/stm32-gptimer.h b/include/linux/mfd/stm32-gptimer.h
-> new file mode 100644
-> index 0000000..bf0a595
-> --- /dev/null
-> +++ b/include/linux/mfd/stm32-gptimer.h
-> @@ -0,0 +1,63 @@
-> +/*
-> + * Copyright (C) STMicroelectronics 2016
-> + *
-> + * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
-
-Nit: '\n'
-
-> + * License terms:  GNU General Public License (GPL), version 2
-> + */
-> +
-> +#ifndef _LINUX_STM32_GPTIMER_H_
-> +#define _LINUX_STM32_GPTIMER_H_
-> +
-> +#include <linux/clk.h>
-> +#include <linux/regmap.h>
-> +
-> +#define TIM_CR1		0x00	/* Control Register 1      */
-> +#define TIM_CR2		0x04	/* Control Register 2      */
-> +#define TIM_SMCR	0x08	/* Slave mode control reg  */
-> +#define TIM_DIER	0x0C	/* DMA/interrupt register  */
-> +#define TIM_SR		0x10	/* Status register	   */
-> +#define TIM_EGR		0x14	/* Event Generation Reg    */
-> +#define TIM_CCMR1	0x18	/* Capt/Comp 1 Mode Reg    */
-> +#define TIM_CCMR2	0x1C	/* Capt/Comp 2 Mode Reg    */
-> +#define TIM_CCER	0x20	/* Capt/Comp Enable Reg    */
-> +#define TIM_PSC		0x28	/* Prescaler               */
-> +#define TIM_ARR		0x2c	/* Auto-Reload Register    */
-> +#define TIM_CCR1	0x34	/* Capt/Comp Register 1    */
-> +#define TIM_CCR2	0x38	/* Capt/Comp Register 2    */
-> +#define TIM_CCR3	0x3C	/* Capt/Comp Register 3    */
-> +#define TIM_CCR4	0x40	/* Capt/Comp Register 4    */
-> +#define TIM_BDTR	0x44	/* Break and Dead-Time Reg */
-> +
-> +#define TIM_CR1_CEN	BIT(0)	/* Counter Enable	   */
-> +#define TIM_CR1_ARPE	BIT(7)	/* Auto-reload Preload Ena */
-> +#define TIM_CR2_MMS	(BIT(4) | BIT(5) | BIT(6)) /* Master mode selection */
-> +#define TIM_SMCR_SMS	(BIT(0) | BIT(1) | BIT(2)) /* Slave mode selection */
-> +#define TIM_SMCR_TS	(BIT(4) | BIT(5) | BIT(6)) /* Trigger selection */
-> +#define TIM_DIER_UIE	BIT(0)	/* Update interrupt	   */
-> +#define TIM_SR_UIF	BIT(0)	/* Update interrupt flag   */
-> +#define TIM_EGR_UG	BIT(0)	/* Update Generation       */
-> +#define TIM_CCMR_PE	BIT(3)	/* Channel Preload Enable  */
-> +#define TIM_CCMR_M1	(BIT(6) | BIT(5))  /* Channel PWM Mode 1 */
-> +#define TIM_CCER_CC1E	BIT(0)	/* Capt/Comp 1  out Ena    */
-> +#define TIM_CCER_CC1P	BIT(1)	/* Capt/Comp 1  Polarity   */
-> +#define TIM_CCER_CC1NE	BIT(2)	/* Capt/Comp 1N out Ena    */
-> +#define TIM_CCER_CC1NP	BIT(3)	/* Capt/Comp 1N Polarity   */
-> +#define TIM_CCER_CC2E	BIT(4)	/* Capt/Comp 2  out Ena    */
-> +#define TIM_CCER_CC3E	BIT(8)	/* Capt/Comp 3  out Ena    */
-> +#define TIM_CCER_CC4E	BIT(12)	/* Capt/Comp 4  out Ena    */
-> +#define TIM_CCER_CCXE	(BIT(0) | BIT(4) | BIT(8) | BIT(12))
-> +#define TIM_BDTR_BKE	BIT(12) /* Break input enable	   */
-> +#define TIM_BDTR_BKP	BIT(13) /* Break input polarity	   */
-> +#define TIM_BDTR_AOE	BIT(14)	/* Automatic Output Enable */
-> +#define TIM_BDTR_MOE	BIT(15)	/* Main Output Enable      */
-> +
-> +#define MAX_TIM_PSC		0xFFFF
-> +#define TIM_CR2_MMS_SHIFT	4
-> +#define TIM_SMCR_TS_SHIFT	4
-> +
-> +struct stm32_gptimer {
-> +	struct clk *clk;
-> +	struct regmap *regmap;
-> +	u32 max_arr;
-> +};
-> +#endif
-
+	M.
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Jazz is not dead. It just smells funny...
