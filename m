@@ -1,31 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 6 Dec 2016 11:03:34 -0800
-Subject: [RFC PATCH 00/23] arm: defconfigs: use kconfig fragments
-In-Reply-To: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <CAOesGMi6gqNLUZw_bQZE2foBts0c70z57bHcMVg1hVZ_E4easg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Dec 2016 19:03:59 +0000
+Subject: [PATCH] arm64: Add CMDLINE_EXTEND
+In-Reply-To: <52e471aa-9ad8-2a6a-efc4-0746b93ab37a@infradead.org>
+References: <61060b44-64a9-d628-4faf-3a7ae06048aa@infradead.org>
+ <20161205120842.GA14429@e104818-lin.cambridge.arm.com>
+ <b958f2b6-73fd-e4f5-4fa5-6d2f8330da8f@infradead.org>
+ <20161206122040.GH2498@arm.com>
+ <52e471aa-9ad8-2a6a-efc4-0746b93ab37a@infradead.org>
+Message-ID: <20161206190358.GY2498@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 6, 2016 at 4:38 AM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
-> Hi,
->
-> This RFC patchset starts convertion of ARM defconfigs to use kconfig
-> fragments and dynamically generate defconfigs.  The goals of this
-> work are to:
+On Tue, Dec 06, 2016 at 10:28:19AM -0800, Geoff Levand wrote:
+> On 12/06/2016 04:20 AM, Will Deacon wrote:
+> > On Mon, Dec 05, 2016 at 09:41:06AM -0800, Geoff Levand wrote:
+> >> On 12/05/2016 04:08 AM, Catalin Marinas wrote:
+> >>> On Fri, Dec 02, 2016 at 02:17:02PM -0800, Geoff Levand wrote:
+> >>>> The device tree code already supports CMDLINE_EXTEND,
+> >>>> so add the config option to make it available on arm64.
+> >>>
+> >>> What's your use-case for this patch? Note that both CMDLINE_FORCE and
+> >>> CMDLINE_EXTEND (if we introduce it) are ignored by the EFI stub.
+> >>> However, we don't seem to have stated this anywhere.
+> >>
+> >> I use this in CoreOS, where we need to set "acpi=force" for
+> >> arm64.  CoreOS uses a proper UEFI + grub.
+> > 
+> > So why can't you just set that in grub if you want to boot with ACPI?
+> 
+> That is how I originally did it, but it was suggested I
+> do it in the kernel config.  See:
+> 
+>   https://github.com/coreos/scripts/pull/610
+> 
+> Is there any reason why we don't want arm64 to have
+> CMDLINE_EXTEND?
 
-You don't provide any motivation as to why this is better. As far as I
-am concerned it'll just be a mess.
+I'm yet to see a good use-case for it.
 
-So:
-
-Nack. So much nack. I really don't want to see a proliferation of
-config fragments like this.
-
-I had a feeling it was a bad idea to pick up that one line config
-fragment before, since it opened the door for this kind of mess. :(
-
-
-
--Olof
+Will
