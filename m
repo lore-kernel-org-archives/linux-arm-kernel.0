@@ -1,87 +1,54 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 6 Dec 2016 17:44:44 +0000
-Subject: [PATCHv4 08/10] mm/kasan: Switch to using __pa_symbol and lm_alias
-In-Reply-To: <1480445729-27130-9-git-send-email-labbott@redhat.com>
-References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
- <1480445729-27130-9-git-send-email-labbott@redhat.com>
-Message-ID: <20161206174443.GG24177@leverpostej>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Tue, 6 Dec 2016 11:56:56 -0600
+Subject: [PATCH v11 7/7] arm: pmu: Add PMU definitions for cores not
+ initially online
+In-Reply-To: <20161206152118.GK2498@arm.com>
+References: <1480704961-6910-1-git-send-email-jeremy.linton@arm.com>
+ <1480704961-6910-8-git-send-email-jeremy.linton@arm.com>
+ <20161206152118.GK2498@arm.com>
+Message-ID: <457894f4-67f8-9d32-ee8b-5a34e9a21488@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 10:55:27AM -0800, Laura Abbott wrote:
-> __pa_symbol is the correct API to find the physical address of symbols.
-> Switch to it to allow for debugging APIs to work correctly. Other
-> functions such as p*d_populate may call __pa internally. Ensure that the
-> address passed is in the linear region by calling lm_alias.
+Hi,
 
-I've given this a go on Juno with CONFIG_KASAN_INLINE enabled, and
-everything seems happy.
+On 12/06/2016 09:21 AM, Will Deacon wrote:
+> On Fri, Dec 02, 2016 at 12:56:01PM -0600, Jeremy Linton wrote:
+>> ACPI CPUs aren't associated with a PMU until they have been put
+>> online. This means that we potentially have to update a PMU
+>> definition the first time a CPU is hot added to the machine.
+>>
+>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>> ---
+>>  drivers/perf/arm_pmu.c       | 38 ++++++++++++++++++++++++++++++++++++--
+>>  include/linux/perf/arm_pmu.h |  4 ++++
+>>  2 files changed, 40 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+>> index fa40294..4abb2fe 100644
+>> --- a/drivers/perf/arm_pmu.c
+>> +++ b/drivers/perf/arm_pmu.c
+>> @@ -711,6 +711,30 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+>>  	return 0;
+>>  }
+>>
+>> +static DEFINE_SPINLOCK(arm_pmu_resource_lock);
+>
+> Why do you need this spinlock? The hotplug notifiers are serialised afaik,
+> and you don't take it anywhere else.
 
-We'll need an include of <linux/mm.h> as that appears to be missing. I
-guess we're getting lucky with transitive includes. Otherwise this looks
-good to me.
+Well, I assumed they were serialized, but then I went looking for a 
+guarantee and couldn't find one specific to the notifiers, even though 
+the previous lock was removed. Admittedly, I didn't spend too long 
+looking, but there is a piece missing...
 
-With that fixed up:
+Which is the sync between the hotplug notification and perf start/stop. 
+By itself that extends this lock into the consumers of the resource 
+structure. Which might not be the right choice because even without 
+these ACPI specific bits, simply running a few cpus online/offline while 
+simultaneously doing something like `perf stat -e cache-misses ls &` in 
+a loop causes deadlocks/crashes.
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> Pointed out during review/testing of v3.
-> ---
->  mm/kasan/kasan_init.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/mm/kasan/kasan_init.c b/mm/kasan/kasan_init.c
-> index 3f9a41c..ff04721 100644
-> --- a/mm/kasan/kasan_init.c
-> +++ b/mm/kasan/kasan_init.c
-> @@ -49,7 +49,7 @@ static void __init zero_pte_populate(pmd_t *pmd, unsigned long addr,
->  	pte_t *pte = pte_offset_kernel(pmd, addr);
->  	pte_t zero_pte;
->  
-> -	zero_pte = pfn_pte(PFN_DOWN(__pa(kasan_zero_page)), PAGE_KERNEL);
-> +	zero_pte = pfn_pte(PFN_DOWN(__pa_symbol(kasan_zero_page)), PAGE_KERNEL);
->  	zero_pte = pte_wrprotect(zero_pte);
->  
->  	while (addr + PAGE_SIZE <= end) {
-> @@ -69,7 +69,7 @@ static void __init zero_pmd_populate(pud_t *pud, unsigned long addr,
->  		next = pmd_addr_end(addr, end);
->  
->  		if (IS_ALIGNED(addr, PMD_SIZE) && end - addr >= PMD_SIZE) {
-> -			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-> +			pmd_populate_kernel(&init_mm, pmd, lm_alias(kasan_zero_pte));
->  			continue;
->  		}
->  
-> @@ -94,7 +94,7 @@ static void __init zero_pud_populate(pgd_t *pgd, unsigned long addr,
->  
->  			pud_populate(&init_mm, pud, kasan_zero_pmd);
->  			pmd = pmd_offset(pud, addr);
-> -			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-> +			pmd_populate_kernel(&init_mm, pmd, lm_alias(kasan_zero_pte));
->  			continue;
->  		}
->  
-> @@ -135,11 +135,11 @@ void __init kasan_populate_zero_shadow(const void *shadow_start,
->  			 * puds,pmds, so pgd_populate(), pud_populate()
->  			 * is noops.
->  			 */
-> -			pgd_populate(&init_mm, pgd, kasan_zero_pud);
-> +			pgd_populate(&init_mm, pgd, lm_alias(kasan_zero_pud));
->  			pud = pud_offset(pgd, addr);
-> -			pud_populate(&init_mm, pud, kasan_zero_pmd);
-> +			pud_populate(&init_mm, pud, lm_alias(kasan_zero_pmd));
->  			pmd = pmd_offset(pud, addr);
-> -			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-> +			pmd_populate_kernel(&init_mm, pmd, lm_alias(kasan_zero_pte));
->  			continue;
->  		}
->  
-> -- 
-> 2.7.4
-> 
+That problem doesn't appear to be specific to the ACPI/PMU so I've 
+stayed away from it in this patch set, although potentially a larger fix 
+might cover this as well.
