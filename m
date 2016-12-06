@@ -1,40 +1,37 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 6 Dec 2016 14:46:00 -0500
-Subject: [PATCH v3] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe
- controller
-In-Reply-To: <20161205212140.GA18259@bhelgaas-glaptop.roam.corp.google.com>
-References: <1480549373-2123-1-git-send-email-dhdang@apm.com>
- <20161201183350.GF30746@bhelgaas-glaptop.roam.corp.google.com>
- <1480620053.4751.30.camel@redhat.com>
- <20161201194114.GA8263@bhelgaas-glaptop.roam.corp.google.com>
- <CADaLNDkVPRPSg0aU-sxHsiJbVvEn=LxcekDt6gfXBBhc+fzhjw@mail.gmail.com>
- <20161201230736.GA17948@bhelgaas-glaptop.roam.corp.google.com>
- <CADaLND=Ss8d-jv7wffbrtytrjj=SUnjDn9bognKUszhKguRV1A@mail.gmail.com>
- <d77e403c-81e9-114e-6ec6-bbffaa4ac36f@redhat.com>
- <20161202233943.GF9903@bhelgaas-glaptop.roam.corp.google.com>
- <62dd5462-4d68-b89f-2b45-0d58bbd96bcd@redhat.com>
- <20161205212140.GA18259@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <aac9391d-8803-f5e8-f4e4-d7e56d54c05c@redhat.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 6 Dec 2016 11:49:53 -0800
+Subject: [RFC PATCH 23/23] arm: use kconfig fragments for
+ tegra_defconfig/multi_v7_defconfig
+In-Reply-To: <1481027938-31831-24-git-send-email-b.zolnierkie@samsung.com>
+References: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
+ <1481027938-31831-24-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <CAOesGMgUnz3WMq_cfabMkFfkp-hvja2TegXubKxFXuMmVNHphQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2016 04:21 PM, Bjorn Helgaas wrote:
-> On Fri, Dec 02, 2016 at 07:33:46PM -0500, Jon Masters wrote:
+On Tue, Dec 6, 2016 at 4:38 AM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+> Replace [tegra,multi_v7]_defconfig-s with
+> a Makefile target using merge_config.
+>
+> The patch was verified with doing:
+>
+>     $ make [tegra,multi_v7]_defconfig
+>     $ make savedefconfig
+>
+> and comparing resulting defconfig files (before/after the patch).
+>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: linux-tegra at vger.kernel.org
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
->>> Even without this patch, I don't think it's a show-stopper to have
->>> Linux mistakenly thinking this region is routed to PCI, because the
->>> driver does reserve it and the PCI core will never try to use it.
->>
->> Ok. So are you happy with pulling in Duc's v4 patch and retaining
->> status quo on the bridge resources for 4.10?
-> 
-> Yes, I think it looks good.  I'll finish packaging things up and
-> repost the current series.
+I'll just reply to this one patch in addition to the cover letter (you
+sent the patches to more people than the cover letter, which means
+that most people who see these patches don't have full context).
 
-Ok, great. So you're still pretty confident we'll have "out of the box"
-booting on these machines for 4.10? :)
+NACK. See cover letter reply for motivation thereof.
 
-Jon.
 
--- 
-Computer Architect | Sent from my Fedora powered laptop
+-Olof
