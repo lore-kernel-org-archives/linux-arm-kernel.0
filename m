@@ -1,77 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 6 Dec 2016 17:17:52 +0000
-Subject: [PATCH v2] arm64: KVM: pmu: Reset PMSELR_EL0.SEL to a sane value
- before entering the guest
-In-Reply-To: <20161206162918.GE4816@cbox>
-References: <1481036210-31816-1-git-send-email-marc.zyngier@arm.com>
- <20161206162918.GE4816@cbox>
-Message-ID: <3b083cff-c031-0f1e-8281-cf7cf082945f@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 6 Dec 2016 17:25:12 +0000
+Subject: [PATCHv4 08/10] mm/kasan: Switch to using __pa_symbol and lm_alias
+In-Reply-To: <2f3ac043-c4cc-5c5a-8ac7-1396b6bb193f@virtuozzo.com>
+References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
+ <1480445729-27130-9-git-send-email-labbott@redhat.com>
+ <2f3ac043-c4cc-5c5a-8ac7-1396b6bb193f@virtuozzo.com>
+Message-ID: <20161206172512.GF24177@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/16 16:29, Christoffer Dall wrote:
-> On Tue, Dec 06, 2016 at 02:56:50PM +0000, Marc Zyngier wrote:
->> The ARMv8 architecture allows the cycle counter to be configured
->> by setting PMSELR_EL0.SEL==0x1f and then accessing PMXEVTYPER_EL0,
->> hence accessing PMCCFILTR_EL0. But it disallows the use of
->> PMSELR_EL0.SEL==0x1f to access the cycle counter itself through
->> PMXEVCNTR_EL0.
->>
->> Linux itself doesn't violate this rule, but we may end up with
->> PMSELR_EL0.SEL being set to 0x1f when we enter a guest. If that
->> guest accesses PMXEVCNTR_EL0, the access may UNDEF at EL1,
->> despite the guest not having done anything wrong.
->>
->> In order to avoid this unfortunate course of events (haha!), let's
+On Thu, Dec 01, 2016 at 02:36:05PM +0300, Andrey Ryabinin wrote:
+> On 11/29/2016 09:55 PM, Laura Abbott wrote:
+> > __pa_symbol is the correct API to find the physical address of symbols.
+> > Switch to it to allow for debugging APIs to work correctly.
 > 
-> I actually did find this funny.
-> 
->> sanitize PMSELR_EL0 on guest entry. This ensures that the guest
->> won't explode unexpectedly.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->> This is another approach to fix this issue, this time nuking PMSELR_EL0
->> on guest entry instead of relying on perf not to clobber the register.
->>
->> Tested on v4.9-rc8 with a Rev A3 X-Gene.
->>
->>  arch/arm64/kvm/hyp/switch.c | 8 +++++++-
->>  1 file changed, 7 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
->> index 83037cd..3b7cfbd 100644
->> --- a/arch/arm64/kvm/hyp/switch.c
->> +++ b/arch/arm64/kvm/hyp/switch.c
->> @@ -85,7 +85,13 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
->>  	write_sysreg(val, hcr_el2);
->>  	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
->>  	write_sysreg(1 << 15, hstr_el2);
->> -	/* Make sure we trap PMU access from EL0 to EL2 */
->> +	/*
->> +	 * Make sure we trap PMU access from EL0 to EL2. Also sanitize
->> +	 * PMSELR_EL0 to make sure it never contains the cycle
->> +	 * counter, which could make a PMXEVCNTR_EL0 access UNDEF.
->> +	 */
->> +	if (vcpu->arch.mdcr_el2 & MDCR_EL2_HPMN_MASK)
->> +		write_sysreg(0, pmselr_el0);
-> 
-> I'm a bit confused about how we use the HPMN field.  This value is
-> always set to the full number of counters available on the system and
-> never modified by the guest, right?  So this is in essence a check that
-> says 'do you have any performance counters, then make sure accesses
-> don't undef to el1 instead of trapping to el2', but then my question is,
-> why not just set pmselr_el0 to zero unconditionally, because in the case
-> where (vcpu->arch.mdcr_el2 & MDCR_EL2_HPMN_MASK) == 0, it means we have
-> no counters, which we'll have exposed to the guest anyhow, and we should
-> undef at el1 in the guest, or did I get this completely wrong (like
-> everything else today)?
+> But __pa() is correct for symbols. I see how __pa_symbol() might be a little
+> faster than __pa(), but there is nothing wrong in using __pa() on symbols.
 
-Yeah, that's probably the best course of action. If the guest does
-something silly, tough. I'll drop the test and repost the thing.
+While it's true today that __pa() works on symbols, this is for
+pragmatic reasons (allowing existing code to work until it is all
+cleaned up), and __pa_symbol() is the correct API to use.
+
+Relying on this means that __pa() can't be optimised for the (vastly
+common) case of translating linear map addresses.
+
+Consistent use of __pa_symbol() will allow for subsequent optimisation
+of __pa() in the common case, in adition to being necessary for arm64's
+DEBUG_VIRTUAL.
+
+> > Other functions such as p*d_populate may call __pa internally.
+> > Ensure that the address passed is in the linear region by calling
+> > lm_alias.
+> 
+> Why it should be linear mapping address? __pa() translates kernel
+> image address just fine.
+
+As above, while that's true today, but is something that we wish to
+change. 
+
+> Generated code is probably worse too.
+
+Even if that is the case, given this is code run once at boot on a debug
+build, I think it's outweighed by the gain from DEBUG_VIRTUAL, and as a
+step towards optimising __pa().
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Mark.
