@@ -1,59 +1,42 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 6 Dec 2016 20:56:52 +0100
-Subject: [PATCH] arm/arm64: KVM: Check for properly initialized timer on
- init
-In-Reply-To: <1ed187ba-965b-6087-f74f-68627f0d0504@arm.com>
-References: <20161205093211.11870-1-christoffer.dall@linaro.org>
- <1ed187ba-965b-6087-f74f-68627f0d0504@arm.com>
-Message-ID: <20161206195652.GF4816@cbox>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Tue, 6 Dec 2016 14:59:22 -0500
+Subject: [PATCH 3/5] ARM: BCM5301X: Set GPIO enabling USB power on
+ Netgear R7000
+In-Reply-To: <20161206171714.22738-3-zajec5@gmail.com>
+References: <20161206171714.22738-1-zajec5@gmail.com>
+ <20161206171714.22738-3-zajec5@gmail.com>
+Message-ID: <20161206195921.GA2768@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2016 at 11:25:42AM +0000, Marc Zyngier wrote:
-> On 05/12/16 09:32, Christoffer Dall wrote:
-> > When the arch timer code fails to initialize (for example because the
-> > memory mapped timer doesn't work, which is currently seen with the AEM
-> > model), then KVM just continues happily with a final result that KVM
-> > eventually does a NULL pointer dereference of the uninitialized cycle
-> > counter.
-> > 
-> > Check directly for this in the init path and give the user a reasonable
-> > error in this case.
-> > 
-> > Cc: Shih-Wei Li <shihwei@cs.columbia.edu>
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> >  virt/kvm/arm/arch_timer.c | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
-> > diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> > index 27a1f63..5c12f53 100644
-> > --- a/virt/kvm/arm/arch_timer.c
-> > +++ b/virt/kvm/arm/arch_timer.c
-> > @@ -425,6 +425,11 @@ int kvm_timer_hyp_init(void)
-> >  	info = arch_timer_get_kvm_info();
-> >  	timecounter = &info->timecounter;
-> >  
-> > +	if (!timecounter->cc) {
-> > +		kvm_err("arch_timer: uninitialized timecounter\n");
+On Tue, Dec 06, 2016 at 06:17:12PM +0100, Rafa? Mi?ecki wrote:
+> There is one GPIO controlling power for both USB ports.
 > 
-> For consistency, I'll change the error message to say "kvm_arch_timer",
-> just like the below case.
-> 
+> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 
-No objections, only problem is that the patch you queued uses
-kcm_arch_timer ;)
+Was the double Signed-off-by intentional?
 
-> > +		return -ENODEV;
-> > +	}
-> > +
-> >  	if (info->virtual_irq <= 0) {
-> >  		kvm_err("kvm_arch_timer: invalid virtual timer IRQ: %d\n",
-> >  			info->virtual_irq);
-> > 
+> ---
+>  arch/arm/boot/dts/bcm4709-netgear-r7000.dts | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> Otherwise looks good to me. I'll queue it now.
+> diff --git a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+> index 0225d82..7ab1176 100644
+> --- a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+> +++ b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+> @@ -100,3 +100,11 @@
+>  		};
+>  	};
+>  };
+> +
+> +&usb2 {
+> +	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
+> +};
+> +
+> +&usb3 {
+> +	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
+> +};
+> -- 
+> 2.10.1
 > 
-
-Thanks,
--Christoffer
