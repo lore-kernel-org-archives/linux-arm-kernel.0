@@ -1,41 +1,113 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 6 Dec 2016 16:37:48 +0800
-Subject: [PATCH 2/2] arm64: dts: NS2: add support for XMC form factor
-In-Reply-To: <1480979542-26871-3-git-send-email-jon.mason@broadcom.com>
-Message-ID: <201612061647.t3qcDWHR%fengguang.wu@intel.com>
+From: ping.bai@nxp.com (Jacky Bai)
+Date: Tue, 6 Dec 2016 08:39:06 +0000
+Subject: [PATCH 06/11] ARM: dts: imx: Add imx6sll EVK board dts support
+In-Reply-To: <CAOMZO5C5-tq-OWTYcmzJt=_57wOyXzNMUes1mctwwyoegwzJyQ@mail.gmail.com>
+References: <1480660774-25055-1-git-send-email-ping.bai@nxp.com>
+ <1480660774-25055-7-git-send-email-ping.bai@nxp.com>
+ <CAOMZO5C5-tq-OWTYcmzJt=_57wOyXzNMUes1mctwwyoegwzJyQ@mail.gmail.com>
+Message-ID: <AM3PR04MB5302514027B9CA75B15253287820@AM3PR04MB530.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+Hi Fabio,
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.9-rc8]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Please see below.
 
-url:    https://github.com/0day-ci/linux/commits/Jon-Mason/arm64-dts-NS2-reserve-memory-for-Nitro-firmware/20161206-125631
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+> Subject: Re: [PATCH 06/11] ARM: dts: imx: Add imx6sll EVK board dts support
+> 
+> On Fri, Dec 2, 2016 at 4:39 AM, Bai Ping <ping.bai@nxp.com> wrote:
+> > Add basic dts support for imx6sll EVK baoard.
+> 
+> s/baord/board
 
-All errors (new ones prefixed by >>):
+ok, I will fix this typo.
 
->> Error: arch/arm64/boot/dts/broadcom/ns2-xmc.dts:56.1-6 Label or path enet not found
->> Error: arch/arm64/boot/dts/broadcom/ns2-xmc.dts:132.1-7 Label or path pcie8 not found
->> Error: arch/arm64/boot/dts/broadcom/ns2-xmc.dts:148.1-6 Label or path qspi not found
->> FATAL ERROR: Syntax error parsing input tree
+> 
+> > +       battery: max8903 at 0 {
+> > +               compatible = "fsl,max8903-charger";
+> > +               pinctrl-names = "default";
+> > +               dok_input = <&gpio4 13 1>;
+> > +               uok_input = <&gpio4 13 1>;
+> > +               chg_input = <&gpio4 15 1>;
+> > +               flt_input = <&gpio4 14 1>;
+> > +               fsl,dcm_always_high;
+> > +               fsl,dc_valid;
+> > +               fsl,adc_disable;
+> 
+> These properties do not exist in mainline, please remove them.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 52465 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161206/fc197763/attachment-0001.gz>
+ok, thanks for you comment.
+> 
+> 
+> > +               status = "okay";
+> > +       };
+> > +
+> > +       pxp_v4l2_out {
+> > +               compatible = "fsl,imx6sl-pxp-v4l2";
+> > +               status = "okay";
+> > +       };
+> 
+> We don't have pxp support in mainline kernel, please remove it.
+
+Ok, I will remove it.
+
+> 
+> > +
+> > +       regulators {
+> > +               compatible = "simple-bus";
+> > +               #address-cells = <1>;
+> > +               #size-cells = <0>;
+> 
+> 
+> Please remove it and place the regulator nodes directly as below:
+
+ok, I will fix it.
+
+> 
+> 
+> > +
+> > +               reg_usb_otg1_vbus: regulator at 0 {
+> > +                       compatible = "regulator-fixed";
+> > +                       reg = <0>;
+> > +                       regulator-name = "usb_otg1_vbus";
+> > +                       regulator-min-microvolt = <5000000>;
+> > +                       regulator-max-microvolt = <5000000>;
+> > +                       gpio = <&gpio4 0 GPIO_ACTIVE_HIGH>;
+> > +                       enable-active-high;
+> > +               };
+> 
+>     reg_usb_otg1_vbus: regulator-usb-otg1-vbus {
+>           compatible = "regulator-fixed";
+>           regulator-name = "usb_otg1_vbus";
+>           regulator-min-microvolt = <5000000>;
+>           regulator-max-microvolt = <5000000>;
+>           gpio = <&gpio4 0 GPIO_ACTIVE_HIGH>;
+>           enable-active-high;
+>     };
+> 
+> > +&cpu0 {
+> > +       arm-supply = <&sw1a_reg>;
+> > +       soc-supply = <&sw1c_reg>;
+> > +};
+> 
+> This is only for LDO bypass mode, right? We don't support LDO-bypass in
+> mainline.
+> 
+
+On i.MX6SLL, no internal LDO for ARM and SOC.  We can only use external regulator for DVFS.
+
+> > +&gpc {
+> > +       fsl,ldo-bypass = <1>;
+> 
+> We don't support ldo-bypass in mainline, please remove it.
+> 
+> > +&pxp {
+> > +       status = "okay";
+> > +};
+> 
+> We don't support PXP in mainline, please remove it.
+
+ok I will remove it.
+
+BR
+Jacky Bai
