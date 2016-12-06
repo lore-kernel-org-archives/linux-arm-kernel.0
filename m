@@ -1,26 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Dec 2016 17:31:11 +0000
-Subject: [PATCH V6 6/6] iommu/arm-smmu: Set privileged attribute to
- 'default' instead of 'unprivileged'
-In-Reply-To: <1480690509-13490-7-git-send-email-sricharan@codeaurora.org>
-References: <1480690509-13490-1-git-send-email-sricharan@codeaurora.org>
- <1480690509-13490-7-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20161206173110.GT2498@arm.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Tue, 6 Dec 2016 18:31:52 +0100
+Subject: [PATCH 2/5] ARM: BCM5301X: Specify USB controllers in DT
+In-Reply-To: <c721c71c-117f-185d-0544-954981dbcf04@broadcom.com>
+References: <20161206171714.22738-1-zajec5@gmail.com>
+ <20161206171714.22738-2-zajec5@gmail.com>
+ <c721c71c-117f-185d-0544-954981dbcf04@broadcom.com>
+Message-ID: <CACna6rw4iY_xhEUyWkGrchs0SOn3nLBKYMuA7qa0UHAbxpGN0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 08:25:09PM +0530, Sricharan R wrote:
-> Currently the driver sets all the device transactions privileges
-> to UNPRIVILEGED, but there are cases where the iommu masters wants
-> to isolate privileged supervisor and unprivileged user.
-> So don't override the privileged setting to unprivileged, instead
-> set it to default as incoming and let it be controlled by the pagetable
-> settings.
-> 
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+On 6 December 2016 at 18:28, Ray Jui <ray.jui@broadcom.com> wrote:
+> On 12/6/2016 9:17 AM, Rafa? Mi?ecki wrote:
+>> From: Rafa? Mi?ecki <rafal@milecki.pl>
+>>
+>> There are 3 separated controllers, one per USB /standard/. With PHY
+>> drivers in place they can be simply supported with generic drivers.
+>>
+>> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+>> ---
+>>  arch/arm/boot/dts/bcm5301x.dtsi | 33 ++++++++++++++++++++++++++++++++-
+>>  1 file changed, 32 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+>> index f09a2bb..bfc98d19 100644
+>> --- a/arch/arm/boot/dts/bcm5301x.dtsi
+>> +++ b/arch/arm/boot/dts/bcm5301x.dtsi
+>> @@ -248,8 +248,26 @@
+>>
+>>                       #address-cells = <1>;
+>>                       #size-cells = <1>;
+>> +                     ranges;
+>>
+>> -                     phys = <&usb2_phy>;
+>> +                     interrupt-parent = <&gic>;
+>> +
+>> +                     ohci: ohci at 21000 {
+>> +                             #usb-cells = <0>;
+>> +
+>> +                             compatible = "generic-ohci";
+>> +                             reg = <0x00022000 0x1000>;
+>
+> Your label ohci at 21000 does not match the 'reg' at 0x22000.
+>
+>> +                             interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
+>> +                     };
+>> +
+>> +                     ehci: ehci at 22000 {
+>> +                             #usb-cells = <0>;
+>> +
+>> +                             compatible = "generic-ehci";
+>> +                             reg = <0x00021000 0x1000>;
+>
+> Looks like you got the label of ohci and ehci reversed?
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Nice catch, thanks! I'll fix it in V2 (just let me wait a day to see
+if there will be other comments).
 
-I'll let you and Robin sort out what you want to do with this series :)
-
-Will
+-- 
+Rafa?
