@@ -1,66 +1,55 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Tue, 6 Dec 2016 12:01:57 -0600
-Subject: [PATCH 1/2] arm: kernel: Add SMC structure parameter
-In-Reply-To: <20161206115507.GD2498@arm.com>
-References: <1480405463-23165-1-git-send-email-andy.gross@linaro.org>
- <1480405463-23165-2-git-send-email-andy.gross@linaro.org>
- <20161206115507.GD2498@arm.com>
-Message-ID: <20161206180157.GB2870@hector.attlocal.net>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 6 Dec 2016 10:10:50 -0800
+Subject: next-20161205 build: 3 failures 4 warnings (next-20161205)
+In-Reply-To: <7b3daf13-dbab-5acf-cd5f-2414141500b3@arm.com>
+References: <E1cDo86-0008IX-9W@optimist>
+ <20161205112043.pyzcbhtu7bklioas@sirena.org.uk>
+ <7b3daf13-dbab-5acf-cd5f-2414141500b3@arm.com>
+Message-ID: <20161206181050.GF30492@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2016 at 11:55:08AM +0000, Will Deacon wrote:
-> Hi Andy,
-> 
-> On Tue, Nov 29, 2016 at 01:44:22AM -0600, Andy Gross wrote:
-> > This patch adds a quirk parameter to the arm_smccc_smc call.  The quirk
-> > structure allows for specialized SMC operations due to SoC specific
-> > requirements.
-> > 
-> > This patch also fixes up all the current users of the arm_smccc_smc API.
-> > 
-> > This patch and partial implementation was suggested by Will Deacon.
-> > 
-> > Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> > ---
-> >  arch/arm/kernel/smccc-call.S         |  3 ++-
-> >  arch/arm/mach-artpec/board-artpec6.c |  2 +-
-> >  arch/arm64/kernel/asm-offsets.c      |  7 +++++--
-> >  arch/arm64/kernel/smccc-call.S       |  3 ++-
-> >  drivers/clk/rockchip/clk-ddr.c       |  6 +++---
-> >  drivers/devfreq/rk3399_dmc.c         |  6 +++---
-> >  drivers/firmware/meson/meson_sm.c    |  2 +-
-> >  drivers/firmware/psci.c              |  2 +-
-> >  drivers/firmware/qcom_scm-64.c       |  4 ++--
-> >  drivers/gpu/drm/mediatek/mtk_hdmi.c  |  2 +-
-> >  include/linux/arm-smccc.h            | 18 ++++++++++++++++--
-> >  11 files changed, 37 insertions(+), 18 deletions(-)
-> 
-> Thanks for respinning this; I'd forgotten about it!
-> 
-> > diff --git a/arch/arm/kernel/smccc-call.S b/arch/arm/kernel/smccc-call.S
-> > index 37669e7..e77950a 100644
-> > --- a/arch/arm/kernel/smccc-call.S
-> > +++ b/arch/arm/kernel/smccc-call.S
-> > @@ -47,7 +47,8 @@ UNWIND(	.fnend)
-> >  /*
-> >   * void smccc_smc(unsigned long a0, unsigned long a1, unsigned long a2,
-> >   *		  unsigned long a3, unsigned long a4, unsigned long a5,
-> > - *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
-> > + *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res,
-> > + *		  struct arm_smccc_quirk *quirk)
-> 
-> I'd not thought of doing it like this -- I envisaged embedding the quirk
-> structure into arm_smccc_res, but this works too. I wonder if we could avoid
-> having to pass NULL everywhere if we renamed arm_smccc_{hvc.smc} and added
-> a default wrapper around them?
-> 
-> For example, rename arm_smccc_smc to __arm_smccc_smc, add a macro called
-> arm_smccc_smc that passes a NULL argument for the quirk, then finally add
-> a macro arm_smccc_smc_quirk that takes the additional parameter?
+On Mon 05 Dec 07:44 PST 2016, Marc Zyngier wrote:
 
-This would work pretty well.  I'll send another version with this
-implementation.
+> On 05/12/16 11:20, Mark Brown wrote:
+> > On Mon, Dec 05, 2016 at 07:56:06AM +0000, Build bot for Mark Brown wrote:
+> > 
+> > Today's -next fails to build an arm64 allnodconfig and allmodconfig
+> > with:
+> > 
+> >> 	arm64-allnoconfig
+> >> ../arch/arm64/lib/clear_user.S:33: Error: bad or irreducible absolute expression
+> >> ../arch/arm64/lib/clear_user.S:53: Error: bad or irreducible absolute expression
+> >> ../arch/arm64/lib/clear_user.S:33: Error: attempt to move .org backwards
+> >> ../arch/arm64/lib/clear_user.S:53: Error: attempt to move .org backwards
+> >> ../arch/arm64/lib/copy_from_user.S:67: Error: bad or irreducible absolute expression
+> >> ../arch/arm64/lib/copy_from_user.S:70: Error: bad or irreducible absolute expression
+> >> ../arch/arm64/lib/copy_from_user.S:67: Error: attempt to move .org backwards
+> >> ../arch/arm64/lib/copy_from_user.S:70: Error: attempt to move .org backwards
+> >> ../arch/arm64/lib/copy_in_user.S:68: Error: bad or irreducible absolute expression
+> >> ../arch/arm64/lib/copy_in_user.S:71: Error: bad or irreducible absolute expression
+> >> ../arch/arm64/lib/copy_in_user.S:68: Error: attempt to move .org backwards
+> >> ../arch/arm64/lib/copy_in_user.S:71: Error: attempt to move .org backwards
+> >> ../arch/arm64/lib/copy_to_user.S:66: Error: bad or irreducible absolute expression
+> >> ../arch/arm64/lib/copy_to_user.S:69: Error: bad or irreducible absolute expression
+> >> ../arch/arm64/lib/copy_to_user.S:66: Error: attempt to move .org backwards
+> >> ../arch/arm64/lib/copy_to_user.S:69: Error: attempt to move .org backwards
+> > 
+> > This was triggered somehow by bca8f17f57bd7 (arm64: Get rid of
+> > asm/opcodes.h) though I didn't figure out how.
+> 
+> Old and broken gas. I have a workaround stashed there:
+> 
+> http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/commit/?h=arm64/standalone.h&id=559f97365362ed9e96f594200020379df46630d8
+> 
+> At least binutils 2.24 and 2.25 are affected, while 2.27 is not.
+> 
+
+Made me realize that the Ubuntu 15.10 release I'm on is deprecated.
+
+If I read the release notes for Ubuntu correctly the 14.04 LTS release
+is supported until April 2019, with binutils 2.24. So I would be
+surprised if this won't bite quite a bunch of people down the road.
 
 Regards,
-Andy
+Bjorn
