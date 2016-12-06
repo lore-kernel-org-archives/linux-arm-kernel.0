@@ -1,130 +1,55 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 6 Dec 2016 18:55:53 +0000
-Subject: [RFC v3 09/10] iommu/arm-smmu: Implement reserved region get/put
- callbacks
-In-Reply-To: <1479215363-2898-10-git-send-email-eric.auger@redhat.com>
-References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
- <1479215363-2898-10-git-send-email-eric.auger@redhat.com>
-Message-ID: <02c0ce15-fa67-e65f-3a4e-f543cc9fd3b8@arm.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 6 Dec 2016 12:56:13 -0600
+Subject: [PATCH v5] ARM: davinci: da8xx: Fix sleeping function called from
+ invalid context
+In-Reply-To: <c4e15855-b785-8bc7-5ef2-af4ec24354e6@ti.com>
+References: <1480947224-26222-1-git-send-email-abailon@baylibre.com>
+ <2fc7a4ef-02ad-fc15-66ea-9f75756086f8@ti.com>
+ <cbf4b99b-e453-acd5-d864-f709708fbab0@baylibre.com>
+ <c4e15855-b785-8bc7-5ef2-af4ec24354e6@ti.com>
+Message-ID: <22aec236-83f0-ea2d-8657-c99f95389611@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/11/16 13:09, Eric Auger wrote:
-> The get() populates the list with the PCI host bridge windows
-> and the MSI IOVA range.
-> 
-> At the moment an arbitray MSI IOVA window is set at 0x8000000
-> of size 1MB. This will allow to report those info in iommu-group
-> sysfs?
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
-> ---
-> 
-> RFC v2 -> v3:
-> - use existing get/put_resv_regions
-> 
-> RFC v1 -> v2:
-> - use defines for MSI IOVA base and length
-> ---
->  drivers/iommu/arm-smmu.c | 52 ++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 8f72814..81f1a83 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -278,6 +278,9 @@ enum arm_smmu_s2cr_privcfg {
->  
->  #define FSYNR0_WNR			(1 << 4)
->  
-> +#define MSI_IOVA_BASE			0x8000000
-> +#define MSI_IOVA_LENGTH			0x100000
-> +
->  static int force_stage;
->  module_param(force_stage, int, S_IRUGO);
->  MODULE_PARM_DESC(force_stage,
-> @@ -1545,6 +1548,53 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
->  	return iommu_fwspec_add_ids(dev, &fwid, 1);
->  }
->  
-> +static void arm_smmu_get_resv_regions(struct device *dev,
-> +				      struct list_head *head)
-> +{
-> +	struct iommu_resv_region *region;
-> +	struct pci_host_bridge *bridge;
-> +	struct resource_entry *window;
-> +
-> +	/* MSI region */
-> +	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
-> +					 IOMMU_RESV_MSI);
-> +	if (!region)
-> +		return;
-> +
-> +	list_add_tail(&region->list, head);
-> +
-> +	if (!dev_is_pci(dev))
-> +		return;
-> +
-> +	bridge = pci_find_host_bridge(to_pci_dev(dev)->bus);
-> +
-> +	resource_list_for_each_entry(window, &bridge->windows) {
-> +		phys_addr_t start;
-> +		size_t length;
-> +
-> +		if (resource_type(window->res) != IORESOURCE_MEM &&
-> +		    resource_type(window->res) != IORESOURCE_IO)
+On 12/06/2016 03:57 AM, Sekhar Nori wrote:
+> On Tuesday 06 December 2016 03:21 PM, Alexandre Bailon wrote:
+>> On 12/06/2016 10:33 AM, Sekhar Nori wrote:
+>>> On Monday 05 December 2016 07:43 PM, Alexandre Bailon wrote:
+>>>> Everytime the usb20 phy is enabled, there is a
+>>>> "sleeping function called from invalid context" BUG.
+>>>>
+>>>> clk_enable() from arch/arm/mach-davinci/clock.c uses spin_lock_irqsave()
+>>>> before to invoke the callback usb20_phy_clk_enable().
+>>>> usb20_phy_clk_enable() uses clk_get() and clk_enable_prepapre()
+>>>> which may sleep.
+>>>> Move clk_get() to da8xx_register_usb20_phy_clk() and
+>>>> replace clk_prepare_enable() by clk_enable().
+>>>>
+>>>> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+>>>
+>>> This will still cause the recursive locking problem reported by David.
+>>> Not sure what the point of sending this version was.
+>>>
+>>> Thanks,
+>>> Sekhar
+>>>
+>
+>> What am I supposed to do ?
+>
+> That needs to be resolved between you and David. Perhaps convert the fix
+> sent by David into a proper patch and base this patch on that. Or wait
+> for David to send it himself and let him also make the modifications
+> needed in this patch.
+>
+> David ?
+>
+> Thanks,
+> Sekhar
+>
 
-As Joerg commented elsewhere, considering anything other than memory
-resources isn't right (I appreciate you've merely copied my own mistake
-here). We need some other way to handle root complexes where the CPU
-MMIO views of PCI windows appear in PCI memory space - using the I/O
-address of I/O resources only works by chance on Juno, and it still
-doesn't account for config space. I suggest we just leave that out for
-the time being to make life easier (does it even apply to anything other
-than Juno?) and figure it out later.
+Alexandre, I was hoping that you would just squash my patch with your 
+patch and take Sekhar's suggestion about a separate patch to make the 
+private __clk_enable() public as davinci_clk_enable() when you re-submit.
 
-> +			continue;
-> +
-> +		start = window->res->start - window->offset;
-> +		length = window->res->end - window->res->start + 1;
-> +		region = iommu_alloc_resv_region(start, length,
-> +						 IOMMU_RESV_NOMAP);
-> +		if (!region)
-> +			return;
-> +		list_add_tail(&region->list, head);
-> +	}
-> +}
-
-Either way, there's nothing SMMU-specific about PCI windows. The fact
-that we'd have to copy-paste all of this into the SMMUv3 driver
-unchanged suggests it should go somewhere common (although I would be
-inclined to leave the insertion of the fake MSI region to driver-private
-wrappers). As I said before, the current iova_reserve_pci_windows()
-simply wants splitting into appropriate public callbacks for
-get_resv_regions and apply_resv_regions.
-
-Robin.
-
-> +static void arm_smmu_put_resv_regions(struct device *dev,
-> +				      struct list_head *head)
-> +{
-> +	struct iommu_resv_region *entry, *next;
-> +
-> +	list_for_each_entry_safe(entry, next, head, list)
-> +		kfree(entry);
-> +}
-> +
->  static struct iommu_ops arm_smmu_ops = {
->  	.capable		= arm_smmu_capable,
->  	.domain_alloc		= arm_smmu_domain_alloc,
-> @@ -1560,6 +1610,8 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
->  	.domain_get_attr	= arm_smmu_domain_get_attr,
->  	.domain_set_attr	= arm_smmu_domain_set_attr,
->  	.of_xlate		= arm_smmu_of_xlate,
-> +	.get_resv_regions	= arm_smmu_get_resv_regions,
-> +	.put_resv_regions	= arm_smmu_put_resv_regions,
->  	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
->  };
->  
-> 
+You can add "Suggested-By: David Lechner <david@lechnology.com>" to the 
+commit message if you would like to give me some credit for my ideas.
