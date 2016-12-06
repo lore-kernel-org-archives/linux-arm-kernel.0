@@ -1,39 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 6 Dec 2016 18:58:24 +0000
-Subject: [PATCHv4 10/10] arm64: Add support for CONFIG_DEBUG_VIRTUAL
-In-Reply-To: <1480445729-27130-11-git-send-email-labbott@redhat.com>
-References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
- <1480445729-27130-11-git-send-email-labbott@redhat.com>
-Message-ID: <20161206185823.GJ24177@leverpostej>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 6 Dec 2016 11:03:34 -0800
+Subject: [RFC PATCH 00/23] arm: defconfigs: use kconfig fragments
+In-Reply-To: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <CAOesGMi6gqNLUZw_bQZE2foBts0c70z57bHcMVg1hVZ_E4easg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 10:55:29AM -0800, Laura Abbott wrote:
-> 
-> +	WARN(!__is_lm_address(x),
-> +	     "virt_to_phys used for non-linear address :%pK\n", (void *)x);
+On Tue, Dec 6, 2016 at 4:38 AM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+> Hi,
+>
+> This RFC patchset starts convertion of ARM defconfigs to use kconfig
+> fragments and dynamically generate defconfigs.  The goals of this
+> work are to:
 
-Nit: s/ :/: /
+You don't provide any motivation as to why this is better. As far as I
+am concerned it'll just be a mess.
 
-It might be worth adding %pS too; i.e.
+So:
 
-	WARN(!__is_lm_address(x),
-	     "virt_to_phys used for non-linear address: %pK (%pS)\n",
-	     (void *)x, (void *)x);
+Nack. So much nack. I really don't want to see a proliferation of
+config fragments like this.
 
-... that way we might get a better idea before we have to resort to
-grepping objdump output.
+I had a feeling it was a bad idea to pick up that one line config
+fragment before, since it opened the door for this kind of mess. :(
 
-Other than that this looks good to me. This builds cleanly with and
-without DEBUG_VIRTUAL enabled, and boots happily with DEBUG_VIRTUAL
-disabled.
 
-With both DEBUG_VIRTUAL and KASAN, I'm hitting a sea of warnings from
-kasan_init at boot time, but I don't think that's a problem with this
-patch as such, so FWIW:
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
+-Olof
