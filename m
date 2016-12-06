@@ -1,251 +1,61 @@
-From: aik@ozlabs.ru (Alexey Kardashevskiy)
-Date: Wed, 7 Dec 2016 08:52:33 +1100
-Subject: [PATCH v3 -next 2/2] ARM: dts: sunxi: add support for Orange Pi
- Zero board
-In-Reply-To: <20161206104343.hb8GsYcB@smtp2j.mail.yandex.net>
-References: <20161206104343.hb8GsYcB@smtp2j.mail.yandex.net>
-Message-ID: <a7064585-cd8a-7eff-d037-4dddffe7c70a@ozlabs.ru>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue,  6 Dec 2016 22:59:43 +0100
+Subject: [PATCH] usb: gadget: udc: atmel: Fix check in usba_ep_enable()
+Message-ID: <1481061583-4727-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/16 18:43, Icenowy Zheng wrote:
-> 
-> 2016?12?6? 09:51? Alexey Kardashevskiy <aik@ozlabs.ru>???
->>
->> On 03/12/16 02:05, Icenowy Zheng wrote: 
->>> Orange Pi Zero is a board that came with the new Allwinner H2+ SoC and a 
->>> SDIO Wi-Fi chip by Allwinner (XR819). 
->>>
->>> Add a device tree file for it. 
->>>
->>> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz> 
->>> --- 
->>> Changes since v2: 
->>> - Merged SDIO Wi-Fi patch into it. 
->>> - SDIO Wi-Fi: add a ethernet1 alias to it, as it has no internal NVRAM. 
->>> - SDIO Wi-Fi: changed pinctrl binding to generic pinconf 
->>> - removed all gpio pinctrl nodes 
->>> - changed h2plus to h2-plus 
->>> Changes since v1: 
->>> - Convert to generic pinconf bindings. 
->>> - SDIO Wi-Fi: add patch. 
->>>
->>> Some notes: 
->>> - The uart1 and uart2 is available on the unsoldered gpio header. 
->>> - The onboard USB connector has its Vbus directly connected to DCIN-5V (the 
->>>    power jack) 
->>>
->>>   arch/arm/boot/dts/Makefile                        |   1 + 
->>>   arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 159 ++++++++++++++++++++++ 
->>>   2 files changed, 160 insertions(+) 
->>>   create mode 100644 arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts 
->>>
->>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile 
->>> index 6447abc..59f6e86 100644 
->>> --- a/arch/arm/boot/dts/Makefile 
->>> +++ b/arch/arm/boot/dts/Makefile 
->>> @@ -844,6 +844,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \ 
->>>   sun8i-a33-sinlinx-sina33.dtb \ 
->>>   sun8i-a83t-allwinner-h8homlet-v2.dtb \ 
->>>   sun8i-a83t-cubietruck-plus.dtb \ 
->>> + sun8i-h2-plus-orangepi-zero.dtb \ 
->>>   sun8i-h3-bananapi-m2-plus.dtb \ 
->>>   sun8i-h3-nanopi-neo.dtb \ 
->>>   sun8i-h3-orangepi-2.dtb \ 
->>> diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts 
->>> new file mode 100644 
->>> index 0000000..d18807f 
->>> --- /dev/null 
->>> +++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts 
->>> @@ -0,0 +1,159 @@ 
->>> +/* 
->>> + * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.xyz> 
->>> + * 
->>> + * Based on sun8i-h3-orangepi-one.dts, which is: 
->>> + *   Copyright (C) 2016 Hans de Goede <hdegoede@redhat.com> 
->>> + * 
->>> + * This file is dual-licensed: you can use it either under the terms 
->>> + * of the GPL or the X11 license, at your option. Note that this dual 
->>> + * licensing only applies to this file, and not this project as a 
->>> + * whole. 
->>> + * 
->>> + *  a) This file is free software; you can redistribute it and/or 
->>> + *     modify it under the terms of the GNU General Public License as 
->>> + *     published by the Free Software Foundation; either version 2 of the 
->>> + *     License, or (at your option) any later version. 
->>> + * 
->>> + *     This file is distributed in the hope that it will be useful, 
->>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of 
->>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
->>> + *     GNU General Public License for more details. 
->>> + * 
->>> + * Or, alternatively, 
->>> + * 
->>> + *  b) Permission is hereby granted, free of charge, to any person 
->>> + *     obtaining a copy of this software and associated documentation 
->>> + *     files (the "Software"), to deal in the Software without 
->>> + *     restriction, including without limitation the rights to use, 
->>> + *     copy, modify, merge, publish, distribute, sublicense, and/or 
->>> + *     sell copies of the Software, and to permit persons to whom the 
->>> + *     Software is furnished to do so, subject to the following 
->>> + *     conditions: 
->>> + * 
->>> + *     The above copyright notice and this permission notice shall be 
->>> + *     included in all copies or substantial portions of the Software. 
->>> + * 
->>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
->>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES 
->>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 
->>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT 
->>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
->>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
->>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR 
->>> + *     OTHER DEALINGS IN THE SOFTWARE. 
->>> + */ 
->>> + 
->>> +/dts-v1/; 
->>> +#include "sun8i-h3.dtsi" 
->>> +#include "sunxi-common-regulators.dtsi" 
->>> + 
->>> +#include <dt-bindings/gpio/gpio.h> 
->>> +#include <dt-bindings/input/input.h> 
->>> +#include <dt-bindings/pinctrl/sun4i-a10.h> 
->>> + 
->>> +/ { 
->>> + model = "Xunlong Orange Pi Zero"; 
->>> + compatible = "xunlong,orangepi-zero", "allwinner,sun8i-h2-plus"; 
->>> + 
->>> + aliases { 
->>> + serial0 = &uart0; 
->>> + /* ethernet0 is the H3 emac, defined in sun8i-h3.dtsi */ 
->>
->>
->> It is not defined there as for: 
->>
->> cef87e9 (tag: next-20161205) 20 hours ago Stephen Rothwell Add linux-next 
->> specific files for 20161205 
-> 
-> The driver of H3's obfuscated DesignWare MAC is not yet mainlined, so there won't be one ethernet0 now.
-> 
-> But it's reserved for the onboard Ethernet.
+desc->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK is not necessarily
+equal to ep->index and that's perfectly fine. The usba endpoint index is
+just an internal identifier used by the driver to know which registers
+to use for a USB endpoint.
 
+Enforcing this constraint is not only useless, but can also lead to
+errors since nothing guarantees that the endpoint number and index are
+matching when an endpoint is selected for a specific descriptor, thus
+leading to errors at ->enable() time when it's already too late to choose
+another endpoint.
 
-Could you please elaborate how you tested this patch (ideally some tree
-somewhere on github)? This patch added RX819, it assumes EMAC support is
-there, neither is there nor there is a way to test this... Thanks.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+Hi,
 
+I intentionally didn't add the Cc stable and Fixes tags because this
+bug dates back to the drivers creation, and I fear the index <->
+epnum constraint was actually required at that time.
 
-> 
->>
->>
->>
->>
->>
->>> + ethernet1 = &xr819; 
->>> + }; 
->>> + 
->>> + chosen { 
->>> + stdout-path = "serial0:115200n8"; 
->>> + }; 
->>> + 
->>> + leds { 
->>> + compatible = "gpio-leds"; 
->>> + 
->>> + pwr_led { 
->>> + label = "orangepi:green:pwr"; 
->>> + gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; 
->>> + default-state = "on"; 
->>> + }; 
->>> + 
->>> + status_led { 
->>> + label = "orangepi:red:status"; 
->>> + gpios = <&pio 0 17 GPIO_ACTIVE_HIGH>; 
->>> + }; 
->>> + }; 
->>> + 
->>> + reg_vcc_wifi: reg_vcc_wifi { 
->>> + compatible = "regulator-fixed"; 
->>> + regulator-min-microvolt = <3300000>; 
->>> + regulator-max-microvolt = <3300000>; 
->>> + regulator-name = "vcc-wifi"; 
->>> + enable-active-high; 
->>> + gpio = <&pio 0 20 GPIO_ACTIVE_HIGH>; 
->>> + }; 
->>> + 
->>> + wifi_pwrseq: wifi_pwrseq { 
->>> + compatible = "mmc-pwrseq-simple"; 
->>> + reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; 
->>> + }; 
->>> +}; 
->>> + 
->>> +&ehci1 { 
->>> + status = "okay"; 
->>> +}; 
->>> + 
->>> +&mmc0 { 
->>> + pinctrl-names = "default"; 
->>> + pinctrl-0 = <&mmc0_pins_a>; 
->>> + vmmc-supply = <&reg_vcc3v3>; 
->>> + bus-width = <4>; 
->>> + cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */ 
->>> + cd-inverted; 
->>> + status = "okay"; 
->>> +}; 
->>> + 
->>> +&mmc1 { 
->>> + pinctrl-names = "default"; 
->>> + pinctrl-0 = <&mmc1_pins_a>; 
->>> + vmmc-supply = <&reg_vcc_wifi>; 
->>> + mmc-pwrseq = <&wifi_pwrseq>; 
->>> + bus-width = <4>; 
->>> + non-removable; 
->>> + status = "okay"; 
->>> + 
->>> + /* 
->>> + * Explicitly define the sdio device, so that we can add an ethernet 
->>> + * alias for it (which e.g. makes u-boot set a mac-address). 
->>> + */ 
->>> + xr819: sdio_wifi at 1 { 
->>> + reg = <1>; 
->>> + }; 
->>> +}; 
->>> + 
->>> +&mmc1_pins_a { 
->>> + bias-pull-up; 
->>> +}; 
->>> + 
->>> +&ohci1 { 
->>> + status = "okay"; 
->>> +}; 
->>> + 
->>> +&uart0 { 
->>> + pinctrl-names = "default"; 
->>> + pinctrl-0 = <&uart0_pins_a>; 
->>> + status = "okay"; 
->>> +}; 
->>> + 
->>> +&uart1 { 
->>> + pinctrl-names = "default"; 
->>> + pinctrl-0 = <&uart1_pins>; 
->>> + status = "disabled"; 
->>> +}; 
->>> + 
->>> +&uart2 { 
->>> + pinctrl-names = "default"; 
->>> + pinctrl-0 = <&uart2_pins>; 
->>> + status = "disabled"; 
->>> +}; 
->>> + 
->>> +&usbphy { 
->>> + /* USB VBUS is always on */ 
->>> + status = "okay"; 
->>> +}; 
->>>
->>
->>
->> -- 
->> Alexey 
+Note that I discovered this bug thanks to the WARN_ON_ONCE() in
+usb_ep_queue() [1] which was introduced in 4.5.
+It might appear that this problem was silently ignored before that
+(with part of the usba_ep_enable() code being skipped without any
+notice).
 
+Regards,
 
+Boris
+
+[1]http://lxr.free-electrons.com/source/drivers/usb/gadget/udc/core.c#L264
+---
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index bb1f6c8f0f01..981d2639d413 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -531,11 +531,8 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
+ 
+ 	maxpacket = usb_endpoint_maxp(desc) & 0x7ff;
+ 
+-	if (((desc->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK) != ep->index)
+-			|| ep->index == 0
+-			|| desc->bDescriptorType != USB_DT_ENDPOINT
+-			|| maxpacket == 0
+-			|| maxpacket > ep->fifo_size) {
++	if (ep->index == 0 || desc->bDescriptorType != USB_DT_ENDPOINT ||
++	    maxpacket == 0 || maxpacket > ep->fifo_size) {
+ 		DBG(DBG_ERR, "ep_enable: Invalid argument");
+ 		return -EINVAL;
+ 	}
 -- 
-Alexey
+2.7.4
