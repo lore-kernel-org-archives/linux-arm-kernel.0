@@ -1,60 +1,44 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Tue, 6 Dec 2016 18:31:52 +0100
-Subject: [PATCH 2/5] ARM: BCM5301X: Specify USB controllers in DT
-In-Reply-To: <c721c71c-117f-185d-0544-954981dbcf04@broadcom.com>
-References: <20161206171714.22738-1-zajec5@gmail.com>
- <20161206171714.22738-2-zajec5@gmail.com>
- <c721c71c-117f-185d-0544-954981dbcf04@broadcom.com>
-Message-ID: <CACna6rw4iY_xhEUyWkGrchs0SOn3nLBKYMuA7qa0UHAbxpGN0A@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 6 Dec 2016 17:36:34 +0000
+Subject: [RFC v3 05/10] iommu: Do not map reserved regions
+In-Reply-To: <1479215363-2898-6-git-send-email-eric.auger@redhat.com>
+References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
+ <1479215363-2898-6-git-send-email-eric.auger@redhat.com>
+Message-ID: <fff44f65-d9a6-1e35-97cd-997b92d2fce3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 December 2016 at 18:28, Ray Jui <ray.jui@broadcom.com> wrote:
-> On 12/6/2016 9:17 AM, Rafa? Mi?ecki wrote:
->> From: Rafa? Mi?ecki <rafal@milecki.pl>
->>
->> There are 3 separated controllers, one per USB /standard/. With PHY
->> drivers in place they can be simply supported with generic drivers.
->>
->> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
->> ---
->>  arch/arm/boot/dts/bcm5301x.dtsi | 33 ++++++++++++++++++++++++++++++++-
->>  1 file changed, 32 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
->> index f09a2bb..bfc98d19 100644
->> --- a/arch/arm/boot/dts/bcm5301x.dtsi
->> +++ b/arch/arm/boot/dts/bcm5301x.dtsi
->> @@ -248,8 +248,26 @@
->>
->>                       #address-cells = <1>;
->>                       #size-cells = <1>;
->> +                     ranges;
->>
->> -                     phys = <&usb2_phy>;
->> +                     interrupt-parent = <&gic>;
->> +
->> +                     ohci: ohci at 21000 {
->> +                             #usb-cells = <0>;
->> +
->> +                             compatible = "generic-ohci";
->> +                             reg = <0x00022000 0x1000>;
->
-> Your label ohci at 21000 does not match the 'reg' at 0x22000.
->
->> +                             interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
->> +                     };
->> +
->> +                     ehci: ehci at 22000 {
->> +                             #usb-cells = <0>;
->> +
->> +                             compatible = "generic-ehci";
->> +                             reg = <0x00021000 0x1000>;
->
-> Looks like you got the label of ohci and ehci reversed?
+On 15/11/16 13:09, Eric Auger wrote:
+> As we introduced IOMMU_RESV_NOMAP and IOMMU_RESV_MSI regions,
+> let's prevent those new regions from being mapped.
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> ---
+>  drivers/iommu/iommu.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+> index 6ee529f..a4530ad 100644
+> --- a/drivers/iommu/iommu.c
+> +++ b/drivers/iommu/iommu.c
+> @@ -343,6 +343,9 @@ static int iommu_group_create_direct_mappings(struct iommu_group *group,
+>  		start = ALIGN(entry->start, pg_size);
+>  		end   = ALIGN(entry->start + entry->length, pg_size);
+>  
+> +		if (entry->prot & IOMMU_RESV_MASK)
 
-Nice catch, thanks! I'll fix it in V2 (just let me wait a day to see
-if there will be other comments).
+This seems to be the only place that this mask is used, and frankly I
+think it's less clear than simply "(IOMMU_RESV_NOMAP | IOMMU_RESV_MSI)"
+would be, at which point we may as well drop the mask and special value
+trickery altogether. Plus, per my previous comment, if it were to be "if
+(entry->type != <direct mapped type>)" instead, that's about as obvious
+as it can get.
 
--- 
-Rafa?
+Robin.
+
+> +			continue;
+> +
+>  		for (addr = start; addr < end; addr += pg_size) {
+>  			phys_addr_t phys_addr;
+>  
+> 
