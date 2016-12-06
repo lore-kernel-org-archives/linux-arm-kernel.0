@@ -1,84 +1,41 @@
-From: maninder1.s@samsung.com (Maninder Singh)
-Date: Tue, 06 Dec 2016 13:59:35 +0530
-Subject: [PATCH 1/1] arm/module: maximum utilization of module area.
-Message-ID: <1481012975-44478-1-git-send-email-maninder1.s@samsung.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 6 Dec 2016 16:37:48 +0800
+Subject: [PATCH 2/2] arm64: dts: NS2: add support for XMC form factor
+In-Reply-To: <1480979542-26871-3-git-send-email-jon.mason@broadcom.com>
+Message-ID: <201612061647.t3qcDWHR%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch defines new macro MODULE_START to ensure kernel text
-and module remains within 32 MB of address range.
+Hi Jon,
 
-Tried this patch by inserting 20 MB size module on 4.1 kernel:-
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.9-rc8]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Earlier:-
-==========
-sh# insmod size.ko
-....
-insmod: ERROR: could not insert module size.ko: Cannot allocate memory
-sh#
+url:    https://github.com/0day-ci/linux/commits/Jon-Mason/arm64-dts-NS2-reserve-memory-for-Nitro-firmware/20161206-125631
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-With this patch
-===============
-sh# insmod size.ko
-...
-sh# lsmod
-Module                  Size  Used by
-size                20972425  0
+All errors (new ones prefixed by >>):
 
-Signed-off-by: Vaneet Narang <v.narang@samsung.com>
-Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
-Reviewed-by: Ajeet Yadav <ajeet.y@samsung.com>
+>> Error: arch/arm64/boot/dts/broadcom/ns2-xmc.dts:56.1-6 Label or path enet not found
+>> Error: arch/arm64/boot/dts/broadcom/ns2-xmc.dts:132.1-7 Label or path pcie8 not found
+>> Error: arch/arm64/boot/dts/broadcom/ns2-xmc.dts:148.1-6 Label or path qspi not found
+>> FATAL ERROR: Syntax error parsing input tree
+
 ---
- arch/arm/include/asm/memory.h | 4 ++--
- arch/arm/kernel/module.c      | 9 ++++++++-
- 2 files changed, 10 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 76cbd9c..1a0a6e5 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -37,7 +37,7 @@
-  * TASK_SIZE - the maximum size of a user space task.
-  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area
-  */
--#define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_16M))
-+#define TASK_SIZE		(UL(CONFIG_PAGE_OFFSET) - UL(SZ_32M))
- #define TASK_UNMAPPED_BASE	ALIGN(TASK_SIZE / 3, SZ_16M)
- 
- /*
-@@ -50,7 +50,7 @@
-  * and PAGE_OFFSET - it must be within 32MB of the kernel text.
-  */
- #ifndef CONFIG_THUMB2_KERNEL
--#define MODULES_VADDR		(PAGE_OFFSET - SZ_16M)
-+#define MODULES_VADDR		(PAGE_OFFSET - SZ_32M)
- #else
- /* smaller range for Thumb-2 symbols relocation (2^24)*/
- #define MODULES_VADDR		(PAGE_OFFSET - SZ_8M)
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index 4f14b5c..b8e1f9c 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -35,12 +35,19 @@
-  */
- #undef MODULES_VADDR
- #define MODULES_VADDR	(((unsigned long)_exiprom + ~PMD_MASK) & PMD_MASK)
-+#define MODULES_START MODULES_VADDR
-+#else
-+#ifndef CONFIG_THUMB2_KERNEL
-+#define MODULES_START  ALIGN((unsigned long)_etext - SZ_32M, PAGE_SIZE)
-+#else
-+#define MODULES_START MODULES_VADDR
-+#endif
- #endif
- 
- #ifdef CONFIG_MMU
- void *module_alloc(unsigned long size)
- {
--	void *p = __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
-+	void *p = __vmalloc_node_range(size, 1, MODULES_START, MODULES_END,
- 				GFP_KERNEL, PAGE_KERNEL_EXEC, 0, NUMA_NO_NODE,
- 				__builtin_return_address(0));
- 	if (!IS_ENABLED(CONFIG_ARM_MODULE_PLTS) || p)
--- 
-1.9.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 52465 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161206/fc197763/attachment-0001.gz>
