@@ -1,38 +1,43 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 5 Dec 2016 16:50:33 -0800
-Subject: [PATCHv4 05/10] arm64: Use __pa_symbol for kernel symbols
-In-Reply-To: <1480445729-27130-6-git-send-email-labbott@redhat.com>
-References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
- <1480445729-27130-6-git-send-email-labbott@redhat.com>
-Message-ID: <72eb08c8-4f2c-6cb9-1e23-0860fd153a2e@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 5 Dec 2016 16:55:02 -0800
+Subject: [PATCH v2 1/2] arm64: dts: zx: Fix gic GICR property
+In-Reply-To: <20161205022451.GA2749@dragon>
+References: <1476361881-19685-1-git-send-email-jun.nie@linaro.org>
+ <1476361881-19685-2-git-send-email-jun.nie@linaro.org>
+ <a243d381-f7ab-abed-ca21-f0951abb04fd@arm.com>
+ <3937871.l5gZt4hBke@wuerfel> <20161205022451.GA2749@dragon>
+Message-ID: <CAOesGMhNJhOZDFvVzU3nVySZLf4N4Rk2mvjb3se_f_1_N=zk3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2016 10:55 AM, Laura Abbott wrote:
-> __pa_symbol is technically the marco that should be used for kernel
-> symbols. Switch to this as a pre-requisite for DEBUG_VIRTUAL which
-> will do bounds checking. As part of this, introduce lm_alias, a
-> macro which wraps the __va(__pa(...)) idiom used a few places to
-> get the alias.
-> 
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> v4: Stop calling __va early, conversion of a few more sites. I decided against
-> wrapping the __p*d_populate calls into new functions since the call sites
-> should be limited.
-> ---
+Hi Shawn,
+
+On Sun, Dec 4, 2016 at 6:24 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> Hi Arnd,
+>
+> On Fri, Dec 02, 2016 at 09:28:58PM +0100, Arnd Bergmann wrote:
+>> Given that there is any concern about the patch now, and the merge
+>> window is almost open, I'm moving both patches to the
+>> next/fixes-non-critical branch and will merge it for v4.10 instead
+>> of sending it for v4.9.
+>>
+>> If you end up deciding that the patch is wrong, please follow up
+>> with a fix on top. Once the situation is resolved and the patch
+>> merged upstream, feel free to ask stable at vger.kernel.org for a
+>> backport to stable kernels to get it into v4.9.x.
+>
+> The patch is correct, though it can be cleaned up a bit further per
+> Marc's suggestion.  Since we now have 4.9-rc8, I'm wondering if we can
+> still get this into 4.9 to save the stable kernel backport.
+>
+> I sent you a cleanup patch on top of this one yesterday.  If you like,
+> I can quickly resend the patch with the cleanup squashed.
+
+Since the patches have already been applied, an incremental patch to
+apply on top would work best here.
 
 
-> -	pud_populate(&init_mm, pud, bm_pmd);
-> +	if (pud_none(*pud))
-> +		__pud_populate(pud, __pa_symbol(bm_pmd), PMD_TYPE_TABLE);
->  	pmd = fixmap_pmd(addr);
-> -	pmd_populate_kernel(&init_mm, pmd, bm_pte);
-> +	__pmd_populate(pmd, __pa_symbol(bm_pte), PMD_TYPE_TABLE);
+Thanks!
 
-Is there a particular reason why pmd_populate_kernel() is not changed to
-use __pa_symbol() instead of using __pa()? The other users in the arm64
-kernel is arch/arm64/kernel/hibernate.c which seems to call this against
-kernel symbols as well?
--- 
-Florian
+
+-Olof
