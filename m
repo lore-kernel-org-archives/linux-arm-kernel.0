@@ -1,113 +1,78 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  6 Dec 2016 15:39:00 +0000
-Subject: [RFC PATCH] arm64: fpsimd: improve stacking logic in
- non-interruptible context
-Message-ID: <1481038740-11633-1-git-send-email-ard.biesheuvel@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 6 Dec 2016 15:42:03 +0000
+Subject: [PATCH v2] arm64: KVM: pmu: Reset PMSELR_EL0.SEL to a sane value
+ before entering the guest
+In-Reply-To: <20161206152708.GL2498@arm.com>
+References: <1481036210-31816-1-git-send-email-marc.zyngier@arm.com>
+ <20161206152708.GL2498@arm.com>
+Message-ID: <a1682776-d8c9-8fd1-1204-192ea7d8f3c2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, we allow kernel mode NEON in softirq or hardirq context by
-stacking and unstacking a slice of the NEON register file for each call
-to kernel_neon_begin() and kernel_neon_end(), respectively.
+On 06/12/16 15:27, Will Deacon wrote:
+> On Tue, Dec 06, 2016 at 02:56:50PM +0000, Marc Zyngier wrote:
+>> The ARMv8 architecture allows the cycle counter to be configured
+>> by setting PMSELR_EL0.SEL==0x1f and then accessing PMXEVTYPER_EL0,
+>> hence accessing PMCCFILTR_EL0. But it disallows the use of
+>> PMSELR_EL0.SEL==0x1f to access the cycle counter itself through
+>> PMXEVCNTR_EL0.
+>>
+>> Linux itself doesn't violate this rule, but we may end up with
+>> PMSELR_EL0.SEL being set to 0x1f when we enter a guest. If that
+>> guest accesses PMXEVCNTR_EL0, the access may UNDEF at EL1,
+>> despite the guest not having done anything wrong.
+>>
+>> In order to avoid this unfortunate course of events (haha!), let's
+>> sanitize PMSELR_EL0 on guest entry. This ensures that the guest
+>> won't explode unexpectedly.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>> This is another approach to fix this issue, this time nuking PMSELR_EL0
+>> on guest entry instead of relying on perf not to clobber the register.
+>>
+>> Tested on v4.9-rc8 with a Rev A3 X-Gene.
+>>
+>>  arch/arm64/kvm/hyp/switch.c | 8 +++++++-
+>>  1 file changed, 7 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+>> index 83037cd..3b7cfbd 100644
+>> --- a/arch/arm64/kvm/hyp/switch.c
+>> +++ b/arch/arm64/kvm/hyp/switch.c
+>> @@ -85,7 +85,13 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+>>  	write_sysreg(val, hcr_el2);
+>>  	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+>>  	write_sysreg(1 << 15, hstr_el2);
+>> -	/* Make sure we trap PMU access from EL0 to EL2 */
+>> +	/*
+>> +	 * Make sure we trap PMU access from EL0 to EL2. Also sanitize
+>> +	 * PMSELR_EL0 to make sure it never contains the cycle
+>> +	 * counter, which could make a PMXEVCNTR_EL0 access UNDEF.
+> 
+> "UNDEF at EL1, as opposed to trapping to EL2" might be clearer, but up to
+> you.
 
-Given that
-a) a CPU typically spends most of its time in userland, during which time
-   no kernel mode NEON in process context is in progress,
-b) a CPU spends most of its time in the kernel doing other things than
-   kernel mode NEON when it gets interrupted to perform kernel mode NEON
-   in softirq context
+Sure, that's a useful clarification.
 
-the stacking and subsequent unstacking is only necessary if we are
-interrupting a thread while it is performing kernel mode NEON in process
-context, which means that in all other cases, we can simply preserve the
-userland FPSIMD state once, and only restore it upon return to userland,
-even if we are being invoked from softirq or hardirq context.
+>> +	 */
+>> +	if (vcpu->arch.mdcr_el2 & MDCR_EL2_HPMN_MASK)
+>> +		write_sysreg(0, pmselr_el0);
+>>  	write_sysreg(ARMV8_PMU_USERENR_MASK, pmuserenr_el0);
+> 
+> Curious, but why do you check MDCR.HPMN for PMSELR_EL0, but not for
+> PMUSERENR_EL0?
 
-So instead of checking whether we are running in interrupt context, keep
-track of the level of nested kernel mode NEON calls in progress, and only
-perform the eager stack/unstack of the level exceeds 1.
+Why would PMUSERENR_EL0 be constrained by the number of counters
+available to the guest?
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/fpsimd.c | 40 +++++++++++++++++++++++++++-------------
- 1 file changed, 27 insertions(+), 13 deletions(-)
+> 
+> Anyway:
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 394c61db5566..2614a216ac5d 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -220,20 +220,31 @@ void fpsimd_flush_task_state(struct task_struct *t)
- 
- #ifdef CONFIG_KERNEL_MODE_NEON
- 
--static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
--static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
-+/*
-+ * Although unlikely, it is possible for three kernel mode NEON contexts to
-+ * be live at the same time: process context, softirq context and hardirq
-+ * context. So while the userland context is stashed in the thread's fpsimd
-+ * state structure, we need two additional levels of storage.
-+ */
-+static DEFINE_PER_CPU(struct fpsimd_partial_state, nested_fpsimdstate[2]);
-+static DEFINE_PER_CPU(int, kernel_neon_nesting_level);
- 
- /*
-  * Kernel-side NEON support functions
-  */
- void kernel_neon_begin_partial(u32 num_regs)
- {
--	if (in_interrupt()) {
--		struct fpsimd_partial_state *s = this_cpu_ptr(
--			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
-+	struct fpsimd_partial_state *s;
-+	int level;
-+
-+	preempt_disable();
-+
-+	level = this_cpu_read(kernel_neon_nesting_level);
-+	if (level > 0) {
-+		s = this_cpu_ptr(nested_fpsimdstate);
- 
- 		BUG_ON(num_regs > 32);
--		fpsimd_save_partial_state(s, roundup(num_regs, 2));
-+		fpsimd_save_partial_state(&s[level - 1], roundup(num_regs, 2));
- 	} else {
- 		/*
- 		 * Save the userland FPSIMD state if we have one and if we
-@@ -241,24 +252,27 @@ void kernel_neon_begin_partial(u32 num_regs)
- 		 * that there is no longer userland FPSIMD state in the
- 		 * registers.
- 		 */
--		preempt_disable();
- 		if (current->mm &&
- 		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
- 			fpsimd_save_state(&current->thread.fpsimd_state);
- 		this_cpu_write(fpsimd_last_state, NULL);
- 	}
-+	this_cpu_write(kernel_neon_nesting_level, level + 1);
- }
- EXPORT_SYMBOL(kernel_neon_begin_partial);
- 
- void kernel_neon_end(void)
- {
--	if (in_interrupt()) {
--		struct fpsimd_partial_state *s = this_cpu_ptr(
--			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
--		fpsimd_load_partial_state(s);
--	} else {
--		preempt_enable();
-+	struct fpsimd_partial_state *s;
-+	int level;
-+
-+	level = this_cpu_read(kernel_neon_nesting_level);
-+	if (level > 1) {
-+		s = this_cpu_ptr(nested_fpsimdstate);
-+		fpsimd_load_partial_state(&s[level - 2]);
- 	}
-+	this_cpu_write(kernel_neon_nesting_level, level - 1);
-+	preempt_enable();
- }
- EXPORT_SYMBOL(kernel_neon_end);
- 
+Thanks,
+
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
