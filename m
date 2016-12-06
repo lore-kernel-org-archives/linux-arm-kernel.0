@@ -1,44 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Dec 2016 17:38:11 +0000
-Subject: [PATCH 0/2] Hibernate fixes for 'Fix memmap to be initialized
- for the entire section'
-In-Reply-To: <CAKv+Gu9AVVPp+UM5pCeYCt4HE-Azijp0iUf0QZv6YKFgAuckYw@mail.gmail.com>
-References: <1480530091-1092-1-git-send-email-rrichter@cavium.com>
- <20161202144909.18405-1-james.morse@arm.com>
- <CAKv+Gu9AVVPp+UM5pCeYCt4HE-Azijp0iUf0QZv6YKFgAuckYw@mail.gmail.com>
-Message-ID: <20161206173810.GU2498@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 6 Dec 2016 17:38:54 +0000
+Subject: [PATCH v2 2/2] arm64: Work around broken .inst when defective
+ gas is detected
+In-Reply-To: <20161206162826.GW1574@e103592.cambridge.arm.com>
+References: <1481038065-32153-1-git-send-email-marc.zyngier@arm.com>
+ <1481038065-32153-4-git-send-email-marc.zyngier@arm.com>
+ <20161206162826.GW1574@e103592.cambridge.arm.com>
+Message-ID: <20161206173853.GZ1574@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2016 at 03:42:14PM +0000, Ard Biesheuvel wrote:
-> On 2 December 2016 at 14:49, James Morse <james.morse@arm.com> wrote:
-> > Patch "arm64: mm: Fix memmap to be initialized for the entire section"
-> > changes pfn_valid() in a way that breaks hibernate. These patches fix
-> > hibernate, and provided struct page's are allocated for nomap pages,
-> > can be applied before [0].
-> >
-> > Hibernate core code belives 'valid' to mean "I can access this". It
-> > uses pfn_valid() to test the page if the page is 'valid'.
-> >
-> > pfn_valid() needs to be changed so that all struct pages in a numa
-> > node have the same node-id. Currently 'nomap' pages are skipped, and
-> > retain their pre-numa node-ids, which leads to a later BUG_ON().
-> >
-> > These patches make hibernate's savable_page() take its escape route
-> > via 'if (PageReserved(page) && pfn_is_nosave(pfn))'.
-> >
+On Tue, Dec 06, 2016 at 04:28:26PM +0000, Dave Martin wrote:
+> On Tue, Dec 06, 2016 at 03:27:45PM +0000, Marc Zyngier wrote:
+> > .inst being largely broken with older binutils, it'd be better not
+> > to emit it altogether when detecting such configuration (as it
+> > leads to all kind of horrors when using alternatives).
 > 
-> This makes me feel slightly uneasy. Robert makes a convincing point,
-> but I wonder if we can expect more fallout from the ambiguity of
-> pfn_valid(). Now we are not only forced to assign non-existing (as far
-> as the OS is concerned) pages to the correct NUMA node, we also need
-> to set certain page flags.
+> GAS seems to provide few guarantees about the constantness of anything
+> other than an expression composed purely of literal constants.  So,
+> this may rather be lack of a useful feature rather than a bug per se.
+> 
+> > Generalize the __emit_inst macro and use it extensively in
+> > asm/sysreg.h, and make it generate a .long when a broken gas is
+> > detected. The disassembly will be crap, but at least we can write
+> > semi-sane code.
+> 
+> Don't know how much this helps, but if we want decent disassembly then
+> one option is to use macros instead of symbols, so that the argument to
+> .inst involves only literals after macro expansion.
 
-Yes, I really don't know how to proceed here. Playing whack-a-mole with
-pfn_valid() users doesn't sounds like an improvement on the current
-situation to me.
+[...]
 
-Robert -- if we leave pfn_valid() as it is, would a point-hack to
-memmap_init_zone help, or do you anticipate other problems?
+It seems that this doesn't solve your problem though ... oh well.
 
-Will
+Cheers
+---Dave
