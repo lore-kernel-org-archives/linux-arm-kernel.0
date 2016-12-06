@@ -1,44 +1,36 @@
-From: weo@reccoware.de (Wolfgang Ocker)
-Date: Tue, 06 Dec 2016 16:54:04 +0100
-Subject: [PATCH] serial: mxs-auart: support CMSPAR termios cflag
-In-Reply-To: <546f7a46-df39-778f-e148-75862f426ff2@i2se.com>
-References: <546f7a46-df39-778f-e148-75862f426ff2@i2se.com>
-Message-ID: <1481039644.3856.3.camel@reccoware.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 6 Dec 2016 10:57:21 -0500 (EST)
+Subject: [PATCH 1/1] arm/module: maximum utilization of module area.
+In-Reply-To: <1481012975-44478-1-git-send-email-maninder1.s@samsung.com>
+References: <1481012975-44478-1-git-send-email-maninder1.s@samsung.com>
+Message-ID: <alpine.LFD.2.20.1612061053470.1657@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-12-06 at 14:36 +0100, Stefan Wahren wrote:
-> Hi Wolfgang,
+On Tue, 6 Dec 2016, Maninder Singh wrote:
+
+> This patch defines new macro MODULE_START to ensure kernel text
+> and module remains within 32 MB of address range.
 > 
-> > --- a/drivers/tty/serial/mxs-auart.c
-> > +++ b/drivers/tty/serial/mxs-auart.c
-> > @@ -95,6 +95,7 @@
-> > ?#define AUART_LINECTRL_BAUD_DIVFRAC_SHIFT	8
-> > ?#define AUART_LINECTRL_BAUD_DIVFRAC_MASK	0x00003f00
-> > ?#define AUART_LINECTRL_BAUD_DIVFRAC(v)		(((v) & 0x3f) << 8)
-> > +#define AUART_LINECTRL_SPS			(1 << 7)
-> > ?#define AUART_LINECTRL_WLEN_MASK		0x00000060
-> > ?#define AUART_LINECTRL_WLEN(v)			(((v) & 0x3) << 5)
-> > ?#define AUART_LINECTRL_FEN			(1 << 4)
-> > @@ -1010,10 +1011,12 @@ static void mxs_auart_settermios(struct uart_port
-> > *u,
-> > 	ctrl |= AUART_LINECTRL_WLEN(bm);
-> > 
-> > 	/* parity */
-> > -	if (cflag & PARENB) {
-> > +	if (cflag & (PARENB|CMSPAR)) {
+> Tried this patch by inserting 20 MB size module on 4.1 kernel:-
 > 
-> does it make sense to enable stick parity in case parity is disabled?
+> Earlier:-
+> ==========
+> sh# insmod size.ko
+> ....
+> insmod: ERROR: could not insert module size.ko: Cannot allocate memory
+> sh#
 > 
-> The i.MX28 reference manual doesn't describe this case explicit.
+> With this patch
+> ===============
+> sh# insmod size.ko
+> ...
+> sh# lsmod
+> Module                  Size  Used by
+> size                20972425  0
 
-Thanks Stefan for the hint. I think it's okay on the hardware side since the
-PEN bit is always set and therefore it can not happen that SPS is set but not
-PEN.
+Could you please try enabling CONFIG_ARM_MODULE_PLTS instead of this 
+patch?
 
-But on the termios side it makes sense to require PARENB to be set in c_cflag
-if CMSPAR is requested.
 
-So I will provide an updated patch soon.
-
-Wolfgang
+Nicolas
