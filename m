@@ -1,60 +1,193 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Dec 2016 13:50:20 +0000
-Subject: [PATCH 1/2] arm64: PMU: Do not use PMSELR_EL0 to access
- PMCCFILTR_EL0
-In-Reply-To: <1480693859-27249-2-git-send-email-marc.zyngier@arm.com>
-References: <1480693859-27249-1-git-send-email-marc.zyngier@arm.com>
- <1480693859-27249-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20161206135020.GI2498@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue,  6 Dec 2016 14:50:53 +0100
+Subject: [PATCH 1/3] iio: adc: add device tree bindings for Qualcomm PM8xxx
+ ADCs
+Message-ID: <1481032253-27019-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 03:50:58PM +0000, Marc Zyngier wrote:
-> The ARMv8 architecture allows the cycle counter to be configured
-> by setting PMSELR_EL0.SEL==0x1f and then accessing PMXEVTYPER_EL0,
-> hence accessing PMCCFILTR_EL0. But it disallows the use of
-> PMSELR_EL0.SEL==0x1f to access the cycle counter itself through
-> PMXEVCNTR_EL0.
-> 
-> Linux itself doesn't violate this rule, but we may end up with
-> PMSELR_EL0.SEL being set to 0x1f when we enter a guest. If that
-> guest accesses PMXEVCNTR_EL0, the access may UNDEF at EL1,
-> despite the guest not having done anything wrong.
-> 
-> In order to avoid this unfortunate course of events (haha!), let's
-> apply the same method armv8pmu_write_counter and co are using,
-> explicitely checking for the cycle counter and writing to
-> PMCCFILTR_EL0 directly. This prevents writing 0x1f to PMSELR_EL0,
-> and saves a Linux guest an extra trap.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kernel/perf_event.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 57ae9d9..a65b757 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -632,7 +632,10 @@ static inline void armv8pmu_write_counter(struct perf_event *event, u32 value)
->  
->  static inline void armv8pmu_write_evtype(int idx, u32 val)
->  {
-> -	if (armv8pmu_select_counter(idx) == idx) {
-> +	if (idx == ARMV8_IDX_CYCLE_COUNTER) {
-> +		val &= ARMV8_PMU_EVTYPE_MASK & ~ARMV8_PMU_EVTYPE_EVENT;
-> +		write_sysreg(val, pmccfiltr_el0);
-> +	} else if (armv8pmu_select_counter(idx) == idx) {
+This adds the device tree bindings for the Qualcomm PM8xxx
+ADCs. This is based on the existing DT bindings for the
+SPMI ADC so there are hopefully no controversial features.
 
-If we go down this route, then we also have to "fix" the 32-bit code,
-which uses PMSELR in a similar way. However, neither of the perf drivers
-are actually doing anything wrong here -- the problem comes about because
-the architecture doesn't guarantee that PMU accesses trap to EL2 unless
-both MDCR.TPM=1 *and* PMSELR_EL0 is valid. So I think that this should
-be handled together, in the KVM code that enables PMU traps.
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-arm-msm at vger.kernel.org
+Cc: Ivan T. Ivanov <iivanov.xz@gmail.com>
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ .../bindings/iio/adc/qcom,pm8xxx-xoadc.txt         | 160 +++++++++++++++++++++
+ 1 file changed, 160 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/qcom,pm8xxx-xoadc.txt
 
-Given that the perf callbacks tend to run with preemption disabled, I
-think you should be fine nuking PMSELR_EL0 to zero (i.e. no need to
-save/restore).
-
-Will
+diff --git a/Documentation/devicetree/bindings/iio/adc/qcom,pm8xxx-xoadc.txt b/Documentation/devicetree/bindings/iio/adc/qcom,pm8xxx-xoadc.txt
+new file mode 100644
+index 000000000000..6e51e3e74b88
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iio/adc/qcom,pm8xxx-xoadc.txt
+@@ -0,0 +1,160 @@
++Qualcomm's PM8xxx voltage XOADC
++
++The Qualcomm PM8xxx PMICs contain a HK/XO ADC (Housekeeping/Chrystal
++oscillator ADC) encompass PM8018, PM8038, PM8058, PM8917 and PM8921.
++
++Required properties:
++
++- compatible: should be one of:
++  "qcom,pm8018-adc"
++  "qcom,pm8038-adc"
++  "qcom,pm8058-adc"
++  "qcom,pm8917-adc"
++  "qcom,pm8921-adc"
++
++- reg: should contain the ADC base address in the PMIC, typically
++  0x197.
++
++The following required properties are standard for IO channels, see
++iio-bindings.txt for more details:
++
++- #address-cells: should be set to <1>
++
++- #size-cells: should be set to <0>
++
++- #io-channel-cells: should be set to <1>
++
++- interrupts: should refer to the parent PMIC interrupt controller
++  and reference the proper ADC interrupt.
++
++Required subnodes:
++
++The ADC channels are configured as subnodes of the ADC. Since some of
++them are used for calibrating the ADC, these nodes are compulsory:
++
++ref_625mv {
++	reg = <0x0c>;
++};
++
++ref_1250mv {
++	reg = <0x0d>;
++};
++
++ref_muxoff {
++	reg = <0x0f>;
++};
++
++These three nodes are used for absolute and ratiometric calibration
++and only need to have these reg values: they are by hardware defined
++to be 1:1 ratio converters that sample 625, 1250 and 0 V and create
++an interpolation calibration for all other ADCs.
++
++Optional subnodes: any channels other than channel 0x0c, 0x0d and
++0x0f are optional.
++
++Required channel node properties:
++
++- reg: should contain the hardware channel number in the range
++  0 .. 0x0f (4 bits). The hardware only supports 16 channels.
++
++Optional channel node properties:
++
++- qcom,decimation:
++  Value type: <u32>
++  Definition: This parameter is used to decrease ADC sampling rate.
++          Quicker measurements can be made by reducing decimation ratio.
++          Valid values are 512, 1024, 2048, 4096.
++          If property is not found, default value of 512 will be used.
++
++- qcom,ratiometric:
++  Value type: <empty>
++  Definition: Channel calibration type. If this property is specified
++          VADC will use the VDD reference (1.8V) and GND for channel
++          calibration. If property is not found, channel will be
++          calibrated with 0.625V and 1.25V reference channels, also
++          known as absolute calibration.
++
++- qcom,ratiometric-ref:
++  Value type: <u32>
++  Definition: The reference voltage pair when using ratiometric
++          calibration:
++	  0 = XO_IN/XOADC_GND
++	  1 = PMIC_IN/XOADC_GND
++	  2 = PMIC_IN/BMS_CSP
++	  3 (invalid)
++	  4 = XOADC_GND/XOADC_GND
++	  5 = XOADC_VREF/XOADC_GND
++
++Example:
++
++xoadc: xoadc at 197 {
++	compatible = "qcom,pm8058-adc";
++	reg = <0x197>;
++	interrupt-parent = <&pm8058>;
++	interrupts = <76 1>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++	#io-channel-cells = <1>;
++
++	vcoin {
++		reg = <0x00>;
++	};
++	vbat {
++		reg = <0x01>;
++	};
++	dcin {
++		reg = <0x02>;
++	};
++	ichg {
++		reg = <0x03>;
++	};
++	vph_pwr {
++		reg = <0x04>;
++	};
++	mpp5 {
++		reg = <0x05>;
++	};
++	mpp6 {
++		reg = <0x06>;
++	};
++	mpp7 {
++		reg = <0x07>;
++	};
++	mpp8 {
++		reg = <0x08>;
++	};
++	mpp9 {
++		reg = <0x09>;
++	};
++	usb_vbus {
++		reg = <0x0a>;
++	};
++	die_temp {
++		reg = <0x0b>;
++	};
++	ref_625mv {
++		reg = <0x0c>;
++	};
++	ref_1250mv {
++		reg = <0x0d>;
++	};
++	ref_325mv {
++		reg = <0x0e>;
++	};
++	ref_muxoff {
++		reg = <0x0f>;
++	};
++};
++
++
++/* IIO client node */
++iio-hwmon {
++	compatible = "iio-hwmon";
++	io-channels = <&xoadc 0x01>, /* Battery */
++		    <&xoadc 0x02>, /* DC in (charger) */
++		    <&xoadc 0x04>, /* VPH the main system voltage */
++		    <&xoadc 0x0b>, /* Die temperature */
++		    <&xoadc 0x0c>, /* Reference voltage 1.25V */
++		    <&xoadc 0x0d>, /* Reference voltage 0.625V */
++		    <&xoadc 0x0e>; /* Reference voltage 0.325V */
++};
+-- 
+2.7.4
