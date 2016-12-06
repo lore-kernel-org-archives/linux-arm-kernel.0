@@ -1,83 +1,142 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Tue,  6 Dec 2016 15:50:55 -0800
-Subject: [PATCHv5 09/11] mm/kasan: Switch to using __pa_symbol and lm_alias
+Date: Tue,  6 Dec 2016 15:50:57 -0800
+Subject: [PATCHv5 11/11] arm64: Add support for CONFIG_DEBUG_VIRTUAL
 In-Reply-To: <1481068257-6367-1-git-send-email-labbott@redhat.com>
 References: <1481068257-6367-1-git-send-email-labbott@redhat.com>
-Message-ID: <1481068257-6367-10-git-send-email-labbott@redhat.com>
+Message-ID: <1481068257-6367-12-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-__pa_symbol is the correct API to find the physical address of symbols.
-Switch to it to allow for debugging APIs to work correctly. Other
-functions such as p*d_populate may call __pa internally. Ensure that the
-address passed is in the linear region by calling lm_alias.
+x86 has an option CONFIG_DEBUG_VIRTUAL to do additional checks
+on virt_to_phys calls. The goal is to catch users who are calling
+virt_to_phys on non-linear addresses immediately. This inclues callers
+using virt_to_phys on image addresses instead of __pa_symbol. As features
+such as CONFIG_VMAP_STACK get enabled for arm64, this becomes increasingly
+important. Add checks to catch bad virt_to_phys usage.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Laura Abbott <labbott@redhat.com>
 ---
-v5: Add missing lm_alias call
+v5: Tweak warning output slightly, acks
 ---
- mm/kasan/kasan_init.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ arch/arm64/Kconfig              |  1 +
+ arch/arm64/include/asm/memory.h | 31 ++++++++++++++++++++++++++++---
+ arch/arm64/mm/Makefile          |  2 ++
+ arch/arm64/mm/physaddr.c        | 30 ++++++++++++++++++++++++++++++
+ 4 files changed, 61 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm64/mm/physaddr.c
 
-diff --git a/mm/kasan/kasan_init.c b/mm/kasan/kasan_init.c
-index 3f9a41c..922f459 100644
---- a/mm/kasan/kasan_init.c
-+++ b/mm/kasan/kasan_init.c
-@@ -16,6 +16,7 @@
- #include <linux/kernel.h>
- #include <linux/memblock.h>
- #include <linux/pfn.h>
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 969ef88..83b95bc 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -6,6 +6,7 @@ config ARM64
+ 	select ACPI_MCFG if ACPI
+ 	select ACPI_SPCR_TABLE if ACPI
+ 	select ARCH_CLOCKSOURCE_DATA
++	select ARCH_HAS_DEBUG_VIRTUAL
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+ 	select ARCH_HAS_ACPI_TABLE_UPGRADE if ACPI
+ 	select ARCH_HAS_ELF_RANDOMIZE
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 041bce28..a405665 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -167,10 +167,33 @@ extern u64			kimage_voffset;
+  * private definitions which should NOT be used outside memory.h
+  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+  */
+-#define __virt_to_phys(x) ({						\
++
++
++/*
++ * The linear kernel range starts in the middle of the virtual adddress
++ * space. Testing the top bit for the start of the region is a
++ * sufficient check.
++ */
++#define __is_lm_address(addr)	(!!((addr) & BIT(VA_BITS - 1)))
++
++#define __lm_to_phys(addr)	(((addr) & ~PAGE_OFFSET) + PHYS_OFFSET)
++#define __kimg_to_phys(addr)	((addr) - kimage_voffset)
++
++#define __virt_to_phys_nodebug(x) ({					\
+ 	phys_addr_t __x = (phys_addr_t)(x);				\
+-	__x & BIT(VA_BITS - 1) ? (__x & ~PAGE_OFFSET) + PHYS_OFFSET :	\
+-				 (__x - kimage_voffset); })
++	__is_lm_address(__x) ? __lm_to_phys(__x) :			\
++			       __kimg_to_phys(__x);			\
++})
++
++#define __pa_symbol_nodebug(x)	__kimg_to_phys((phys_addr_t)(x))
++
++#ifdef CONFIG_DEBUG_VIRTUAL
++extern phys_addr_t __virt_to_phys(unsigned long x);
++extern phys_addr_t __phys_addr_symbol(unsigned long x);
++#else
++#define __virt_to_phys(x)	__virt_to_phys_nodebug(x)
++#define __phys_addr_symbol(x)	__pa_symbol_nodebug(x)
++#endif
+ 
+ #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET) | PAGE_OFFSET)
+ #define __phys_to_kimg(x)	((unsigned long)((x) + kimage_voffset))
+@@ -202,6 +225,8 @@ static inline void *phys_to_virt(phys_addr_t x)
+  * Drivers should NOT use these either.
+  */
+ #define __pa(x)			__virt_to_phys((unsigned long)(x))
++#define __pa_symbol(x)		__phys_addr_symbol(RELOC_HIDE((unsigned long)(x), 0))
++#define __pa_nodebug(x)		__virt_to_phys_nodebug((unsigned long)(x))
+ #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
+ #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
+ #define virt_to_pfn(x)      __phys_to_pfn(__virt_to_phys((unsigned long)(x)))
+diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
+index 54bb209..38d3811 100644
+--- a/arch/arm64/mm/Makefile
++++ b/arch/arm64/mm/Makefile
+@@ -5,6 +5,8 @@ obj-y				:= dma-mapping.o extable.o fault.o init.o \
+ obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
+ obj-$(CONFIG_ARM64_PTDUMP)	+= dump.o
+ obj-$(CONFIG_NUMA)		+= numa.o
++obj-$(CONFIG_DEBUG_VIRTUAL)	+= physaddr.o
++KASAN_SANITIZE_physaddr.o	+= n
+ 
+ obj-$(CONFIG_KASAN)		+= kasan_init.o
+ KASAN_SANITIZE_kasan_init.o	:= n
+diff --git a/arch/arm64/mm/physaddr.c b/arch/arm64/mm/physaddr.c
+new file mode 100644
+index 0000000..91371da
+--- /dev/null
++++ b/arch/arm64/mm/physaddr.c
+@@ -0,0 +1,30 @@
++#include <linux/bug.h>
++#include <linux/export.h>
++#include <linux/types.h>
++#include <linux/mmdebug.h>
 +#include <linux/mm.h>
- 
- #include <asm/page.h>
- #include <asm/pgalloc.h>
-@@ -49,7 +50,7 @@ static void __init zero_pte_populate(pmd_t *pmd, unsigned long addr,
- 	pte_t *pte = pte_offset_kernel(pmd, addr);
- 	pte_t zero_pte;
- 
--	zero_pte = pfn_pte(PFN_DOWN(__pa(kasan_zero_page)), PAGE_KERNEL);
-+	zero_pte = pfn_pte(PFN_DOWN(__pa_symbol(kasan_zero_page)), PAGE_KERNEL);
- 	zero_pte = pte_wrprotect(zero_pte);
- 
- 	while (addr + PAGE_SIZE <= end) {
-@@ -69,7 +70,7 @@ static void __init zero_pmd_populate(pud_t *pud, unsigned long addr,
- 		next = pmd_addr_end(addr, end);
- 
- 		if (IS_ALIGNED(addr, PMD_SIZE) && end - addr >= PMD_SIZE) {
--			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-+			pmd_populate_kernel(&init_mm, pmd, lm_alias(kasan_zero_pte));
- 			continue;
- 		}
- 
-@@ -92,9 +93,9 @@ static void __init zero_pud_populate(pgd_t *pgd, unsigned long addr,
- 		if (IS_ALIGNED(addr, PUD_SIZE) && end - addr >= PUD_SIZE) {
- 			pmd_t *pmd;
- 
--			pud_populate(&init_mm, pud, kasan_zero_pmd);
-+			pud_populate(&init_mm, pud, lm_alias(kasan_zero_pmd));
- 			pmd = pmd_offset(pud, addr);
--			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-+			pmd_populate_kernel(&init_mm, pmd, lm_alias(kasan_zero_pte));
- 			continue;
- 		}
- 
-@@ -135,11 +136,11 @@ void __init kasan_populate_zero_shadow(const void *shadow_start,
- 			 * puds,pmds, so pgd_populate(), pud_populate()
- 			 * is noops.
- 			 */
--			pgd_populate(&init_mm, pgd, kasan_zero_pud);
-+			pgd_populate(&init_mm, pgd, lm_alias(kasan_zero_pud));
- 			pud = pud_offset(pgd, addr);
--			pud_populate(&init_mm, pud, kasan_zero_pmd);
-+			pud_populate(&init_mm, pud, lm_alias(kasan_zero_pmd));
- 			pmd = pmd_offset(pud, addr);
--			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-+			pmd_populate_kernel(&init_mm, pmd, lm_alias(kasan_zero_pte));
- 			continue;
- 		}
- 
++
++#include <asm/memory.h>
++
++phys_addr_t __virt_to_phys(unsigned long x)
++{
++	WARN(!__is_lm_address(x),
++	     "virt_to_phys used for non-linear address: %pK (%pS)\n",
++	      (void *)x,
++	      (void *)x);
++
++	return __virt_to_phys_nodebug(x);
++}
++EXPORT_SYMBOL(__virt_to_phys);
++
++phys_addr_t __phys_addr_symbol(unsigned long x)
++{
++	/*
++	 * This is bounds checking against the kernel image only.
++	 * __pa_symbol should only be used on kernel symbol addresses.
++	 */
++	VIRTUAL_BUG_ON(x < (unsigned long) KERNEL_START ||
++		       x > (unsigned long) KERNEL_END);
++	return __pa_symbol_nodebug(x);
++}
++EXPORT_SYMBOL(__phys_addr_symbol);
 -- 
 2.7.4
