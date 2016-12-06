@@ -1,73 +1,36 @@
 From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Tue,  6 Dec 2016 18:17:11 +0100
-Subject: [PATCH 2/5] ARM: BCM5301X: Specify USB controllers in DT
+Date: Tue,  6 Dec 2016 18:17:12 +0100
+Subject: [PATCH 3/5] ARM: BCM5301X: Set GPIO enabling USB power on Netgear
+ R7000
 In-Reply-To: <20161206171714.22738-1-zajec5@gmail.com>
 References: <20161206171714.22738-1-zajec5@gmail.com>
-Message-ID: <20161206171714.22738-2-zajec5@gmail.com>
+Message-ID: <20161206171714.22738-3-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+There is one GPIO controlling power for both USB ports.
 
-There are 3 separated controllers, one per USB /standard/. With PHY
-drivers in place they can be simply supported with generic drivers.
-
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
 Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 ---
- arch/arm/boot/dts/bcm5301x.dtsi | 33 ++++++++++++++++++++++++++++++++-
- 1 file changed, 32 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/bcm4709-netgear-r7000.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index f09a2bb..bfc98d19 100644
---- a/arch/arm/boot/dts/bcm5301x.dtsi
-+++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -248,8 +248,26 @@
- 
- 			#address-cells = <1>;
- 			#size-cells = <1>;
-+			ranges;
- 
--			phys = <&usb2_phy>;
-+			interrupt-parent = <&gic>;
-+
-+			ohci: ohci at 21000 {
-+				#usb-cells = <0>;
-+
-+				compatible = "generic-ohci";
-+				reg = <0x00022000 0x1000>;
-+				interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			ehci: ehci at 22000 {
-+				#usb-cells = <0>;
-+
-+				compatible = "generic-ehci";
-+				reg = <0x00021000 0x1000>;
-+				interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-+				phys = <&usb2_phy>;
-+			};
+diff --git a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+index 0225d82..7ab1176 100644
+--- a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
++++ b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+@@ -100,3 +100,11 @@
  		};
- 
- 		usb3: usb3 at 23000 {
-@@ -257,6 +275,19 @@
- 
- 			#address-cells = <1>;
- 			#size-cells = <1>;
-+			ranges;
+ 	};
+ };
 +
-+			interrupt-parent = <&gic>;
++&usb2 {
++	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
++};
 +
-+			xhci: xhci at 23000 {
-+				#usb-cells = <0>;
-+
-+				compatible = "generic-xhci";
-+				reg = <0x00023000 0x1000>;
-+				interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
-+				phys = <&usb3_phy>;
-+				phy-names = "usb";
-+			};
- 		};
- 
- 		spi at 29000 {
++&usb3 {
++	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
++};
 -- 
 2.10.1
