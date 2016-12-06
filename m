@@ -1,152 +1,259 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 06 Dec 2016 13:38:42 +0100
-Subject: [RFC PATCH 07/23] arm: update defconfigs for PLAT_SPEAR
+Date: Tue, 06 Dec 2016 13:38:44 +0100
+Subject: [RFC PATCH 09/23] arm: update defconfigs for ARCH_W90X900
 In-Reply-To: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1481027938-31831-8-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1481027938-31831-10-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update spear[13,3,6]xx_defconfig-s against kernel v4.9-rc6.
+Update nuc9[1,5,6]0_defconfig-s against kernel v4.9-rc6.
 
 The changes were obtained by doing:
 
-	$ make spear[13,...]xx_defconfig
+	$ make nuc9[1,5,6]0_defconfig
 	$ make savedefconfig
-	$ diff -u arch/arm/spear[13,...]xx_defconfig defconfig
+	$ diff -u arch/arm/nuc9[1,5,6]0_defconfig defconfig
 
-Cc: Viresh Kumar <vireshk@kernel.org>
-Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
+Cc: Wan ZongShun <mcuos.com@gmail.com>
 Cc: Cyril Bur <cyrilbur@gmail.com>
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm/configs/spear13xx_defconfig | 10 ++--------
- arch/arm/configs/spear3xx_defconfig  |  9 ++-------
- arch/arm/configs/spear6xx_defconfig  |  8 ++------
- 3 files changed, 6 insertions(+), 21 deletions(-)
+ arch/arm/configs/nuc910_defconfig | 19 ++++---------------
+ arch/arm/configs/nuc950_defconfig | 27 +++++++--------------------
+ arch/arm/configs/nuc960_defconfig | 24 ++++++------------------
+ 3 files changed, 17 insertions(+), 53 deletions(-)
 
-diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
-index d271b26..7630748 100644
---- a/arch/arm/configs/spear13xx_defconfig
-+++ b/arch/arm/configs/spear13xx_defconfig
-@@ -1,4 +1,3 @@
+diff --git a/arch/arm/configs/nuc910_defconfig b/arch/arm/configs/nuc910_defconfig
+index 10180cf..45369c2 100644
+--- a/arch/arm/configs/nuc910_defconfig
++++ b/arch/arm/configs/nuc910_defconfig
+@@ -1,31 +1,24 @@
 -CONFIG_EXPERIMENTAL=y
+ # CONFIG_LOCALVERSION_AUTO is not set
  CONFIG_SYSVIPC=y
  CONFIG_BSD_PROCESS_ACCT=y
+-CONFIG_SYSFS_DEPRECATED_V2=y
+-CONFIG_RELAY=y
+ CONFIG_USER_NS=y
++CONFIG_RELAY=y
  CONFIG_BLK_DEV_INITRD=y
-@@ -10,7 +9,6 @@ CONFIG_PLAT_SPEAR=y
- CONFIG_ARCH_SPEAR13XX=y
- CONFIG_MACH_SPEAR1310=y
- CONFIG_MACH_SPEAR1340=y
--# CONFIG_SWP_EMULATE is not set
- CONFIG_PCI=y
- CONFIG_PCI_MSI=y
- CONFIG_PCIE_SPEAR13XX=y
-@@ -31,8 +29,6 @@ CONFIG_IP_PNP_BOOTP=y
- CONFIG_NET_IPIP=y
+-CONFIG_KALLSYMS_EXTRA_PASS=y
+ CONFIG_SLAB=y
++CONFIG_PARTITION_ADVANCED=y
+ CONFIG_ARCH_W90X900=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ CONFIG_CMDLINE="root=/dev/ram0 console=ttyS0,115200n8 rdinit=/sbin/init mem=64M"
+ CONFIG_KEXEC=y
+-CONFIG_FPE_NWFPE=y
  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
  CONFIG_MTD=y
--CONFIG_MTD_OF_PARTS=y
+-CONFIG_MTD_CONCAT=y
+-CONFIG_MTD_PARTITIONS=y
 -CONFIG_MTD_CHAR=y
  CONFIG_MTD_BLOCK=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_FSMC=y
-@@ -73,9 +69,7 @@ CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_PL061=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_AMDSTD=y
+ CONFIG_MTD_PHYSMAP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=16384
+-# CONFIG_MISC_DEVICES is not set
+ CONFIG_SCSI=y
+ # CONFIG_SCSI_PROC_FS is not set
+ CONFIG_BLK_DEV_SD=y
+@@ -34,15 +27,14 @@ CONFIG_BLK_DEV_SD=y
+ # CONFIG_INPUT_KEYBOARD is not set
+ # CONFIG_INPUT_MOUSE is not set
+ # CONFIG_SERIO is not set
++# CONFIG_LEGACY_PTYS is not set
+ # CONFIG_DEVKMEM is not set
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_NR_UARTS=1
+-# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_8250_RUNTIME_UARTS=1
+ # CONFIG_HW_RANDOM is not set
  # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
+-# CONFIG_VGA_CONSOLE is not set
 -# CONFIG_HID_SUPPORT is not set
  CONFIG_USB=y
--# CONFIG_USB_DEVICE_CLASS is not set
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_OHCI_HCD=y
+ CONFIG_USB_MON=y
  CONFIG_USB_STORAGE=y
-@@ -103,8 +97,8 @@ CONFIG_ROOT_NFS=y
- CONFIG_NLS_DEFAULT="utf8"
+@@ -50,11 +42,8 @@ CONFIG_USB_STORAGE=y
+ CONFIG_TMPFS=y
+ CONFIG_TMPFS_POSIX_ACL=y
+ CONFIG_ROMFS_FS=y
+-CONFIG_PARTITION_ADVANCED=y
  CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ASCII=m
--CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_INFO=y
+ CONFIG_NLS_ISO8859_1=y
+ # CONFIG_ENABLE_WARN_DEPRECATED is not set
+ # CONFIG_ENABLE_MUST_CHECK is not set
  CONFIG_DEBUG_FS=y
-+CONFIG_MAGIC_SYSRQ=y
- CONFIG_DEBUG_KERNEL=y
- CONFIG_DEBUG_SPINLOCK=y
--CONFIG_DEBUG_INFO=y
-diff --git a/arch/arm/configs/spear3xx_defconfig b/arch/arm/configs/spear3xx_defconfig
-index 7ff23a0..58e0046 100644
---- a/arch/arm/configs/spear3xx_defconfig
-+++ b/arch/arm/configs/spear3xx_defconfig
-@@ -1,4 +1,3 @@
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+-# CONFIG_CRC32 is not set
+diff --git a/arch/arm/configs/nuc950_defconfig b/arch/arm/configs/nuc950_defconfig
+index 27aa873..f30a14a 100644
+--- a/arch/arm/configs/nuc950_defconfig
++++ b/arch/arm/configs/nuc950_defconfig
+@@ -1,37 +1,29 @@
 -CONFIG_EXPERIMENTAL=y
+ # CONFIG_LOCALVERSION_AUTO is not set
  CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
  CONFIG_BSD_PROCESS_ACCT=y
+-CONFIG_SYSFS_DEPRECATED_V2=y
+-CONFIG_RELAY=y
+ CONFIG_USER_NS=y
++CONFIG_RELAY=y
  CONFIG_BLK_DEV_INITRD=y
-@@ -16,8 +15,6 @@ CONFIG_BINFMT_MISC=y
- CONFIG_NET=y
+-CONFIG_KALLSYMS_EXTRA_PASS=y
+ CONFIG_SLAB=y
++CONFIG_PARTITION_ADVANCED=y
+ CONFIG_ARCH_W90X900=y
+ # CONFIG_MACH_W90P910EVB is not set
+ CONFIG_MACH_W90P950EVB=y
+-CONFIG_NO_HZ=y
+-CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ CONFIG_CMDLINE="root=/dev/ram0 console=ttyS0,115200n8 rdinit=/sbin/init mem=64M"
+ CONFIG_KEXEC=y
+-CONFIG_FPE_NWFPE=y
+-CONFIG_BINFMT_AOUT=y
+ CONFIG_BINFMT_MISC=y
  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
  CONFIG_MTD=y
--CONFIG_MTD_OF_PARTS=y
+-CONFIG_MTD_CONCAT=y
+-CONFIG_MTD_PARTITIONS=y
 -CONFIG_MTD_CHAR=y
  CONFIG_MTD_BLOCK=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_FSMC=y
-@@ -56,9 +53,7 @@ CONFIG_WATCHDOG=y
- CONFIG_ARM_SP805_WATCHDOG=y
- CONFIG_FB=y
- CONFIG_FB_ARMCLCD=y
--# CONFIG_HID_SUPPORT is not set
- CONFIG_USB=y
--# CONFIG_USB_DEVICE_CLASS is not set
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_OHCI_HCD=y
- CONFIG_MMC=y
-@@ -82,8 +77,8 @@ CONFIG_JFFS2_FS=y
- CONFIG_NLS_DEFAULT="utf8"
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ASCII=m
--CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_INFO=y
- CONFIG_DEBUG_FS=y
-+CONFIG_MAGIC_SYSRQ=y
- CONFIG_DEBUG_KERNEL=y
- CONFIG_DEBUG_SPINLOCK=y
--CONFIG_DEBUG_INFO=y
-diff --git a/arch/arm/configs/spear6xx_defconfig b/arch/arm/configs/spear6xx_defconfig
-index 7822980..2db31d0 100644
---- a/arch/arm/configs/spear6xx_defconfig
-+++ b/arch/arm/configs/spear6xx_defconfig
-@@ -1,4 +1,3 @@
--CONFIG_EXPERIMENTAL=y
- CONFIG_SYSVIPC=y
- CONFIG_BSD_PROCESS_ACCT=y
- CONFIG_BLK_DEV_INITRD=y
-@@ -13,8 +12,6 @@ CONFIG_BINFMT_MISC=y
- CONFIG_NET=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
--CONFIG_MTD_OF_PARTS=y
--CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_FSMC=y
-@@ -49,7 +46,6 @@ CONFIG_GPIO_PL061=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_AMDSTD=y
+ CONFIG_MTD_PHYSMAP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=16384
+-# CONFIG_MISC_DEVICES is not set
+ CONFIG_SCSI=y
+ # CONFIG_SCSI_PROC_FS is not set
+ CONFIG_BLK_DEV_SD=y
+@@ -40,26 +32,22 @@ CONFIG_BLK_DEV_SD=y
+ # CONFIG_INPUT_KEYBOARD is not set
+ # CONFIG_INPUT_MOUSE is not set
+ # CONFIG_SERIO is not set
++# CONFIG_LEGACY_PTYS is not set
+ # CONFIG_DEVKMEM is not set
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_NR_UARTS=1
+-# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_8250_RUNTIME_UARTS=1
+ # CONFIG_HW_RANDOM is not set
  # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
- CONFIG_ARM_SP805_WATCHDOG=y
+ CONFIG_FB=y
+ CONFIG_FB_NUC900=y
+ CONFIG_GPM1040A0_320X240=y
+-CONFIG_FB_NUC900_DEBUG=y
+-# CONFIG_VGA_CONSOLE is not set
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
+-CONFIG_FONTS=y
+-CONFIG_FONT_8x16=y
+ CONFIG_LOGO=y
+ # CONFIG_LOGO_LINUX_MONO is not set
+ # CONFIG_LOGO_LINUX_VGA16 is not set
 -# CONFIG_HID_SUPPORT is not set
  CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_OHCI_HCD=y
-@@ -71,8 +67,8 @@ CONFIG_JFFS2_FS=y
- CONFIG_NLS_DEFAULT="utf8"
+ CONFIG_USB_MON=y
+ CONFIG_USB_STORAGE=y
+@@ -67,10 +55,9 @@ CONFIG_USB_STORAGE=y
+ CONFIG_TMPFS=y
+ CONFIG_TMPFS_POSIX_ACL=y
+ CONFIG_ROMFS_FS=y
+-CONFIG_PARTITION_ADVANCED=y
  CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ASCII=m
--CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_INFO=y
+ CONFIG_NLS_ISO8859_1=y
+ # CONFIG_ENABLE_WARN_DEPRECATED is not set
+ # CONFIG_ENABLE_MUST_CHECK is not set
  CONFIG_DEBUG_FS=y
-+CONFIG_MAGIC_SYSRQ=y
- CONFIG_DEBUG_KERNEL=y
- CONFIG_DEBUG_SPINLOCK=y
--CONFIG_DEBUG_INFO=y
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
++CONFIG_FONTS=y
+diff --git a/arch/arm/configs/nuc960_defconfig b/arch/arm/configs/nuc960_defconfig
+index 56fd7ad..c38c79f 100644
+--- a/arch/arm/configs/nuc960_defconfig
++++ b/arch/arm/configs/nuc960_defconfig
+@@ -1,37 +1,29 @@
+-CONFIG_EXPERIMENTAL=y
+ # CONFIG_LOCALVERSION_AUTO is not set
+ CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_BSD_PROCESS_ACCT=y
+-CONFIG_SYSFS_DEPRECATED_V2=y
+-CONFIG_RELAY=y
+ CONFIG_USER_NS=y
++CONFIG_RELAY=y
+ CONFIG_BLK_DEV_INITRD=y
+-CONFIG_KALLSYMS_EXTRA_PASS=y
+ CONFIG_SLAB=y
++CONFIG_PARTITION_ADVANCED=y
+ CONFIG_ARCH_W90X900=y
+ # CONFIG_MACH_W90P910EVB is not set
+ CONFIG_MACH_W90N960EVB=y
+-CONFIG_NO_HZ=y
+-CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ CONFIG_CMDLINE="root=/dev/ram0 console=ttyS0,115200n8 rdinit=/sbin/init mem=64M"
+ CONFIG_KEXEC=y
+-CONFIG_FPE_NWFPE=y
+-CONFIG_BINFMT_AOUT=y
+ CONFIG_BINFMT_MISC=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_MTD=y
+-CONFIG_MTD_CONCAT=y
+-CONFIG_MTD_PARTITIONS=y
+-CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_AMDSTD=y
+ CONFIG_MTD_PHYSMAP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=16384
+-# CONFIG_MISC_DEVICES is not set
+ CONFIG_SCSI=y
+ # CONFIG_SCSI_PROC_FS is not set
+ CONFIG_BLK_DEV_SD=y
+@@ -40,15 +32,14 @@ CONFIG_BLK_DEV_SD=y
+ # CONFIG_INPUT_KEYBOARD is not set
+ # CONFIG_INPUT_MOUSE is not set
+ # CONFIG_SERIO is not set
++# CONFIG_LEGACY_PTYS is not set
+ # CONFIG_DEVKMEM is not set
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_NR_UARTS=1
+-# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_8250_RUNTIME_UARTS=1
+ # CONFIG_HW_RANDOM is not set
+ # CONFIG_HWMON is not set
+-# CONFIG_VGA_CONSOLE is not set
+-# CONFIG_HID_SUPPORT is not set
+ CONFIG_USB=y
+ CONFIG_USB_MON=y
+ CONFIG_USB_STORAGE=y
+@@ -56,11 +47,8 @@ CONFIG_USB_STORAGE=y
+ CONFIG_TMPFS=y
+ CONFIG_TMPFS_POSIX_ACL=y
+ CONFIG_ROMFS_FS=y
+-CONFIG_PARTITION_ADVANCED=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
+ # CONFIG_ENABLE_WARN_DEPRECATED is not set
+ # CONFIG_ENABLE_MUST_CHECK is not set
+ CONFIG_DEBUG_FS=y
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+-# CONFIG_CRC32 is not set
 -- 
 1.9.1
