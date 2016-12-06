@@ -1,22 +1,49 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Tue, 6 Dec 2016 19:25:33 +0900
-Subject: [PATCH v2 0/3] ARM: dts: imx6: Support Poslab Savageboard dual &
- quad
-In-Reply-To: <CAOMZO5APWxuRmo5=QgNskxtmU-UN-P1pR1kFMZkHFMb2BPrJBQ@mail.gmail.com>
-References: <20161206070829.24098-1-woogyom.kim@gmail.com>
- <CAOMZO5APWxuRmo5=QgNskxtmU-UN-P1pR1kFMZkHFMb2BPrJBQ@mail.gmail.com>
-Message-ID: <f4e2d926-3f91-c751-67f3-b495dc0f0ba4@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 6 Dec 2016 11:55:57 +0100
+Subject: [RFC PATCH 0/3] clk: at91: audio PLL clock
+Message-ID: <cover.1481021115.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/2016 06:42 PM, Fabio Estevam wrote:
-> You missed to add imx6q-savageboard.dtb and imx6dl-savageboard.dtb
-> entries into arch/arm/boot/dts/Makefile
+This series covers the addition of the Audio PLL clock found on AT91 SoCs like
+the SAMA5D2.
+I also added the use of these clocks by the ClassD audi amplifier in both SoC
+and board DT.
 
-Oh, I didn't notice because I build the dtbs manually.
-Thanks for catching this.
+The Audio PLL is described in the sama5d2 datasheet chapter "29.8 Audio PLL".
 
-And do you think other patches look OK?
+Even if "it works" (!), note that I'm not satisfied with the current code and
+would need some advice from people more accustomed with the CCF and
+particularly composite audio PLL/clocks like these. For example, I do not take
+into account the limits of these clocks (as described in the datasheet) and the
+dependency between the PAD and the PMC child clocks.
+
+Thanks in advance for your inputs.
 
 Best regards,
-Milo
+  Nicolas
+
+
+Cyrille Pitchen (2):
+  ARM: dts: at91: sama5d2: add classd nodes
+  ARM: dts: at91: sama5d2_xplained: add pin muxing and enable classd
+
+Nicolas Ferre (1):
+  clk: at91: add audio pll clock driver
+
+ .../devicetree/bindings/clock/at91-clock.txt       |  10 +
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts        |  16 ++
+ arch/arm/boot/dts/sama5d2.dtsi                     |  39 +++-
+ arch/arm/mach-at91/Kconfig                         |   4 +
+ drivers/clk/at91/Makefile                          |   2 +
+ drivers/clk/at91/clk-audio-pll-pad.c               | 238 +++++++++++++++++++
+ drivers/clk/at91/clk-audio-pll-pmc.c               | 184 +++++++++++++++
+ drivers/clk/at91/clk-audio-pll.c                   | 253 +++++++++++++++++++++
+ include/linux/clk/at91_pmc.h                       |  25 ++
+ 9 files changed, 770 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/at91/clk-audio-pll-pad.c
+ create mode 100644 drivers/clk/at91/clk-audio-pll-pmc.c
+ create mode 100644 drivers/clk/at91/clk-audio-pll.c
+
+-- 
+2.9.0
