@@ -1,64 +1,88 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 6 Dec 2016 13:40:42 +0100
-Subject: [GIT PULL] ARM: Xilinx Zynq DT changes for v4.10
-Message-ID: <0eeda910-d585-d532-96c6-5c0cc634627c@monstr.eu>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 06 Dec 2016 13:38:48 +0100
+Subject: [RFC PATCH 13/23] arm: update pxa255-idp_defconfig
+In-Reply-To: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1481027938-31831-14-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Update pxa255-idp_defconfig against kernel v4.9-rc6.
 
-please add these changes to your arm-soc repo.
-It fixes dtc warnings, small coding style changes and add support for
-Microzed.
+The changes were obtained by doing:
 
-Thanks,
-Michal
+	$ make pxa255-idp_defconfig
+	$ make savedefconfig
+	$ diff -u arch/arm/pxa255-idp_defconfig defconfig
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+Cc: Daniel Mack <daniel@zonque.org>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Robert Jarzmik <robert.jarzmik@free.fr>
+Cc: Cyril Bur <cyrilbur@gmail.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ arch/arm/configs/pxa255-idp_defconfig | 16 ++++------------
+ 1 file changed, 4 insertions(+), 12 deletions(-)
 
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-  https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-dt-for-4.10
-
-for you to fetch changes up to df2f3c48b9cd51e2612a1598342769d09d849f39:
-
-  arm: dts: zynq: Add MicroZed board support (2016-12-06 13:17:39 +0100)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq dt patches for v4.10
-
-- Remove skeleton.dtsi
-- Fix DTC warnings
-- Coding style changes
-- Microzed support
-
-----------------------------------------------------------------
-Jagan Teki (1):
-      arm: dts: zynq: Add MicroZed board support
-
-Michal Simek (3):
-      ARM: zynq: Remove skeleton.dtsi
-      ARM: zynq: Fix W=1 dtc 1.4 warnings
-      ARM: zynq: Fix pmu register description coding style
-
- arch/arm/boot/dts/Makefile            |  1 +
- arch/arm/boot/dts/zynq-7000.dtsi      | 10 +++++---
- arch/arm/boot/dts/zynq-microzed.dts   | 96
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/zynq-parallella.dts |  2 +-
- arch/arm/boot/dts/zynq-zc702.dts      |  2 +-
- arch/arm/boot/dts/zynq-zc706.dts      |  2 +-
- arch/arm/boot/dts/zynq-zed.dts        |  2 +-
- arch/arm/boot/dts/zynq-zybo.dts       |  2 +-
- 8 files changed, 108 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/boot/dts/zynq-microzed.dts
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161206/e3325f57/attachment-0001.sig>
+diff --git a/arch/arm/configs/pxa255-idp_defconfig b/arch/arm/configs/pxa255-idp_defconfig
+index 088627a..4d71e2e 100644
+--- a/arch/arm/configs/pxa255-idp_defconfig
++++ b/arch/arm/configs/pxa255-idp_defconfig
+@@ -1,12 +1,9 @@
+-CONFIG_EXPERIMENTAL=y
+ CONFIG_SYSVIPC=y
+ CONFIG_LOG_BUF_SHIFT=14
+ CONFIG_MODULES=y
+ CONFIG_ARCH_PXA=y
+ CONFIG_ARCH_PXA_IDP=y
+ # CONFIG_ARM_THUMB is not set
+-CONFIG_LEDS=y
+-CONFIG_LEDS_CPU=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_CMDLINE="root=/dev/nfs ip=dhcp console=ttyS0,115200 mem=64M"
+@@ -18,8 +15,6 @@ CONFIG_IP_PNP=y
+ CONFIG_IP_PNP_DHCP=y
+ # CONFIG_IPV6 is not set
+ CONFIG_MTD=y
+-CONFIG_MTD_PARTITIONS=y
+-CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_ADV_OPTIONS=y
+@@ -29,7 +24,6 @@ CONFIG_MTD_CFI_GEOMETRY=y
+ # CONFIG_MTD_CFI_I1 is not set
+ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_NETDEVICES=y
+-CONFIG_NET_ETHERNET=y
+ CONFIG_SMC91X=y
+ CONFIG_INPUT_EVDEV=y
+ # CONFIG_INPUT_MOUSE is not set
+@@ -38,11 +32,7 @@ CONFIG_SERIAL_PXA=y
+ CONFIG_SERIAL_PXA_CONSOLE=y
+ CONFIG_FB=y
+ CONFIG_FB_PXA=y
+-# CONFIG_VGA_CONSOLE is not set
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+-CONFIG_FONTS=y
+-CONFIG_FONT_8x8=y
+-CONFIG_FONT_8x16=y
+ CONFIG_LOGO=y
+ CONFIG_EXT2_FS=y
+ CONFIG_MSDOS_FS=y
+@@ -50,9 +40,11 @@ CONFIG_JFFS2_FS=y
+ CONFIG_NFS_FS=y
+ CONFIG_ROOT_NFS=y
+ CONFIG_NLS_ISO8859_1=y
++CONFIG_DEBUG_INFO=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_KERNEL=y
+-CONFIG_DEBUG_INFO=y
+ CONFIG_DEBUG_USER=y
+-CONFIG_DEBUG_ERRORS=y
+ CONFIG_DEBUG_LL=y
++CONFIG_FONTS=y
++CONFIG_FONT_8x8=y
++CONFIG_FONT_8x16=y
+-- 
+1.9.1
