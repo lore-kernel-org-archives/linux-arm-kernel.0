@@ -1,112 +1,67 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 6 Dec 2016 23:55:49 +0100
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <yw1xshq12hr9.fsf@unicorn.mansr.com>
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
- <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
- <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
- <yw1xwpfd2o9f.fsf@unicorn.mansr.com> <5846D814.9010106@free.fr>
- <yw1xshq12hr9.fsf@unicorn.mansr.com>
-Message-ID: <40d34477-b10c-334a-135b-33f23318f2bc@free.fr>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 6 Dec 2016 17:13:18 -0600
+Subject: [PATCH 1/2] dt-bindings: mmc: add DT binding for S3C24XX
+ MMC/SD/SDIO controller
+In-Reply-To: <054a65d8-8606-eeb0-e028-1b85dbf1c8ba@samsung.com>
+References: <1480637665-6325-1-git-send-email-sergio.prado@e-labworks.com>
+ <CGME20161202001621epcas3p2fcc946ce070dfcc594e4b89729e149d7@epcas3p2.samsung.com>
+ <1480637665-6325-2-git-send-email-sergio.prado@e-labworks.com>
+ <054a65d8-8606-eeb0-e028-1b85dbf1c8ba@samsung.com>
+Message-ID: <20161206231318.m4oo2e6t5zk2txbx@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2016 16:34, M?ns Rullg?rd wrote:
-
-> Mason writes:
+On Fri, Dec 02, 2016 at 09:48:45AM +0900, Jaehoon Chung wrote:
+> On 12/02/2016 09:14 AM, Sergio Prado wrote:
+> > Adds the device tree bindings description for Samsung S3C24XX
+> > MMC/SD/SDIO controller, used as a connectivity interface with external
+> > MMC, SD and SDIO storage mediums.
+> > 
+> > Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+> > ---
+> >  .../devicetree/bindings/mmc/samsung,s3cmci.txt     | 38 ++++++++++++++++++++++
+> >  1 file changed, 38 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt b/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
+> > new file mode 100644
+> > index 000000000000..3f044076e69a
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
+> > @@ -0,0 +1,38 @@
+> > +* Samsung's S3C24XX MMC/SD/SDIO controller device tree bindings
+> > +
+> > +Samsung's S3C24XX MMC/SD/SDIO controller is used as a connectivity interface
+> > +with external MMC, SD and SDIO storage mediums.
+> > +
+> > +This file documents differences between the core mmc properties described by
+> > +mmc.txt and the properties used by the Samsung S3C24XX MMC/SD/SDIO controller
+> > +implementation.
+> > +
+> > +Required SoC Specific Properties:
+> > +- compatible: should be one of the following
+> > +  - "samsung,s3c2410-sdi": for controllers compatible with s3c2410
+> > +  - "samsung,s3c2412-sdi": for controllers compatible with s3c2412
+> > +  - "samsung,s3c2440-sdi": for controllers compatible with s3c2440
+> > +- clocks: Should reference the controller clock
+> > +- clock-names: Should contain "sdi"
+> > +
+> > +Required Board Specific Properties:
+> > +- pinctrl-0: Should specify pin control groups used for this controller.
+> > +- pinctrl-names: Should contain only one value - "default".
 > 
->> Meh. The two controller blocks share the I/O pins to the outside
->> world, so it's not possible to have two concurrent accesses.
+> I'm not sure but i think this description doesn't need at here.
 > 
-> OK, you failed to mention that part.  Why are there two controllers at
-> all if only one or the other can be used?
-
-I'd have to ask the HW designer what types of use-cases he had
-in mind. Perhaps looking at what is *not* shared provides clues.
-Configuration registers are duplicated, meaning it is possible
-to decide "channel A for chip0, channel B for chip1" if there
-are two NAND chips in the system (as is the case on dev boards).
-In that case, it is unnecessary to rewrite the chip parameters
-every time the driver switches chips. (I don't think the perf
-impact is even measurable.)
-
-The ECC engines are duplicated, but I don't know how long it
-takes to run the BCH algorithm in HW vs performing I/O over
-a slow 8-bit bus.
-
-
->> The callback is called from vchan_complete() right?
->> Is that running from interrupt context?
+> > +
+> > +Example:
+> > +	sdi: sdi at 5a000000 {
 > 
-> It runs from a tasklet which is almost the same thing.
+> I think it needs to use "mmc0: sdi at 5a000000" instead of "sdi: sdi at 5a000000"
+> Because mmc is more clear than sdi.
 
-I'll read up on tasklets tomorrow.
+The label doesn't matter much as it is not part of the dtb. The unit 
+name should be 'mmc' though.
 
+With that,
 
->> I can give that a shot (if you're busy with real work).
-> 
-> I have an idea I'd like to try out over the weekend.  If I don't come
-> back with something by next week, go for it.
-
-I do have my plate full this week, with XHCI and AHCI :-)
-
-
->> Why can't we queue channel requests the same way we queue
->> transfer requests?
-> 
-> That's in effect what we're doing.  Calling it by another name doesn't
-> really solve anything.
-
-Hmmm... the difference is that "tear down" would be explicit
-in the release function.
-
-Current implementation for single transfer:
-
-dmaengine_prep_slave_sg()
-dmaengine_submit()
-dma_async_issue_pending()	/* A */
-wait for read channel IRQ	/* B */
-spin until NFC idle		/* C */
-
-Setup SBOX route and program MBUS transfer happen in A.
-The SBOX route is torn down a little before B (thus before C).
-
-
-With the proposed implementation, where request_chan
-sets up the route and release_chan tears it down:
-
-request_chan()			/* X */
-dmaengine_prep_slave_sg()
-dmaengine_submit()
-dma_async_issue_pending()	/* A */
-wait for read channel IRQ	/* B */
-spin until NFC idle		/* C */
-release_chan()			/* Y */
-
-Now, the SBOX route is setup in X.
-(If no MBUS channel are available, thread is put to sleep
-until one becomes available.)
-Program MBUS transfer in A.
-When IRQ falls, cannot start new transfer yet.
-vchan_complete() will at some point run the client callback.
-The client driver can now spin however long until NFC idle.
-In Y, we release the channel, thus calling back into the
-DMA driver, at which point a new transfer can be started.
-
-What did I get wrong in this pseudo-code?
-
-
-I do see one problem with the approach:
-It's no big deal for me to convert the NFC driver to
-do it that way, but the Synopsys (I think) SATA driver
-in tango3 and tango4 is shared across multiple SoCs,
-and they probably call request_chan() only in the
-probe function, as you mentioned at some point.
-
-http://lxr.free-electrons.com/source/drivers/ata/sata_dwc_460ex.c#L366
-
-BTW, can someone explain what the DMA_CTRL_ACK flag means?
-
-
-Regards.
+Acked-by: Rob Herring <robh@kernel.org>
