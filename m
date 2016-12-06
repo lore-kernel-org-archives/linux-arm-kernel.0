@@ -1,382 +1,436 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 06 Dec 2016 13:38:39 +0100
-Subject: [RFC PATCH 04/23] arm: use kconfig fragments for ARCH_ASPEED
- defconfigs
-In-Reply-To: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1481027938-31831-5-git-send-email-b.zolnierkie@samsung.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Tue,  6 Dec 2016 13:38:46 +0100
+Subject: [PATCH v4 4/7] PWM: add PWM driver for STM32 plaftorm
+In-Reply-To: <1481027929-13704-1-git-send-email-benjamin.gaignard@st.com>
+References: <1481027929-13704-1-git-send-email-benjamin.gaignard@st.com>
+Message-ID: <1481027929-13704-5-git-send-email-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace [acs5k,acs5k_tiny,ks8695]_defconfig-s with a Makefile target
-using merge_config.
+This driver adds support for PWM driver on STM32 platform.
+The SoC have multiple instances of the hardware IP and each
+of them could have small differences: number of channels,
+complementary output, auto reload register size...
 
-The patch was verified with doing:
+version 4:
+- detect at probe time hardware capabilities
+- fix comments done on v2 and v3
+- use PWM atomic ops
 
-    $ make [acs5k,acs5k_tiny,ks8695]_defconfig
-    $ make savedefconfig
+version 2:
+- only keep one comptatible
+- use DT parameters to discover hardware block configuration
 
-and comparing resulting defconfig files (before/after the patch).
-
-Cc: Greg Ungerer <gerg@uclinux.org>
-Cc: Cyril Bur <cyrilbur@gmail.com>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 ---
- arch/arm/Makefile                                  | 12 ++++
- arch/arm/configs/acs5k.config                      | 32 ++++++++++
- arch/arm/configs/acs5k_defconfig                   | 74 ----------------------
- arch/arm/configs/acs5k_tiny.config                 | 24 +++++++
- arch/arm/configs/acs5k_tiny_defconfig              | 66 -------------------
- arch/arm/configs/ks8695.config                     | 21 ++++++
- .../{ks8695_defconfig => ks8695_basic_defconfig}   | 21 ------
- 7 files changed, 89 insertions(+), 161 deletions(-)
- create mode 100644 arch/arm/configs/acs5k.config
- delete mode 100644 arch/arm/configs/acs5k_defconfig
- create mode 100644 arch/arm/configs/acs5k_tiny.config
- delete mode 100644 arch/arm/configs/acs5k_tiny_defconfig
- create mode 100644 arch/arm/configs/ks8695.config
- rename arch/arm/configs/{ks8695_defconfig => ks8695_basic_defconfig} (67%)
+ drivers/pwm/Kconfig     |  11 ++
+ drivers/pwm/Makefile    |   1 +
+ drivers/pwm/pwm-stm32.c | 363 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 375 insertions(+)
+ create mode 100644 drivers/pwm/pwm-stm32.c
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index abe8a60..91eab72b 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -362,6 +362,18 @@ PHONY += aspeed_g5_defconfig
- aspeed_g5_defconfig:
- 	$(call merge_into_defconfig,aspeed_basic_defconfig,aspeed_g5)
+diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+index bf01288..95c9f04 100644
+--- a/drivers/pwm/Kconfig
++++ b/drivers/pwm/Kconfig
+@@ -388,6 +388,17 @@ config PWM_STI
+ 	  To compile this driver as a module, choose M here: the module
+ 	  will be called pwm-sti.
  
-+PHONY += acs5k_defconfig
-+acs5k_defconfig:
-+	$(call merge_into_defconfig,ks8695_basic_defconfig,acs5k)
++config PWM_STM32
++	bool "STMicroelectronics STM32 PWM"
++	depends on ARCH_STM32 || COMPILE_TEST
++	depends on OF
++	depends on MFD_STM32_GP_TIMER
++	help
++	  Generic PWM framework driver for STM32 SoCs.
 +
-+PHONY += acs5k_tiny_defconfig
-+acs5k_tiny_defconfig:
-+	$(call merge_into_defconfig,ks8695_basic_defconfig,acs5k_tiny)
++	  To compile this driver as a module, choose M here: the module
++	  will be called pwm-stm32.
 +
-+PHONY += ks8695_defconfig
-+ks8695_defconfig:
-+	$(call merge_into_defconfig,ks8695_basic_defconfig,ks8695)
+ config PWM_STMPE
+ 	bool "STMPE expander PWM export"
+ 	depends on MFD_STMPE
+diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+index 1194c54..5aa9308 100644
+--- a/drivers/pwm/Makefile
++++ b/drivers/pwm/Makefile
+@@ -37,6 +37,7 @@ obj-$(CONFIG_PWM_ROCKCHIP)	+= pwm-rockchip.o
+ obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
+ obj-$(CONFIG_PWM_SPEAR)		+= pwm-spear.o
+ obj-$(CONFIG_PWM_STI)		+= pwm-sti.o
++obj-$(CONFIG_PWM_STM32)		+= pwm-stm32.o
+ obj-$(CONFIG_PWM_STMPE)		+= pwm-stmpe.o
+ obj-$(CONFIG_PWM_SUN4I)		+= pwm-sun4i.o
+ obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
+diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
+new file mode 100644
+index 0000000..319fd77
+--- /dev/null
++++ b/drivers/pwm/pwm-stm32.c
+@@ -0,0 +1,363 @@
++/*
++ * Copyright (C) STMicroelectronics 2016
++ *
++ * Author: Gerald Baeza <gerald.baeza@st.com>
++ * License terms: GNU General Public License (GPL), version 2
++ *
++ * Inspired by timer-stm32.c from Maxime Coquelin
++ *             pwm-atmel.c from Bo Shen
++ */
 +
- PHONY += vdso_install
- vdso_install:
- ifeq ($(CONFIG_VDSO),y)
-diff --git a/arch/arm/configs/acs5k.config b/arch/arm/configs/acs5k.config
-new file mode 100644
-index 0000000..eb8c70e
---- /dev/null
-+++ b/arch/arm/configs/acs5k.config
-@@ -0,0 +1,32 @@
-+CONFIG_POSIX_MQUEUE=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_MACH_KS8695=y
-+CONFIG_MACH_DSM320=y
-+CONFIG_MACH_ACS5K=y
-+CONFIG_PCI=y
-+CONFIG_PCI_DEBUG=y
-+CONFIG_PCCARD=y
-+CONFIG_YENTA=y
-+CONFIG_CMDLINE="mem=32M console=ttyS0,115200 initrd=0x20410000,3145728 root=/dev/ram0 rw"
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_MTD_CFI_ADV_OPTIONS=y
-+CONFIG_MTD_CFI_AMDSTD=y
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_SIZE=8192
-+CONFIG_ARM_KS8695_ETHER=y
-+CONFIG_PRISM54=m
-+CONFIG_I2C=y
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_GPIO=y
-+CONFIG_GPIO_SYSFS=y
-+CONFIG_GPIO_PCA953X=y
-+CONFIG_WATCHDOG=y
-+CONFIG_KS8695_WATCHDOG=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_PCF8563=y
-+CONFIG_EXT2_FS=y
-+CONFIG_CRAMFS=y
-+CONFIG_NFS_FS=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_DEBUG_LL=y
-diff --git a/arch/arm/configs/acs5k_defconfig b/arch/arm/configs/acs5k_defconfig
-deleted file mode 100644
-index 8840d2c..0000000
---- a/arch/arm/configs/acs5k_defconfig
-+++ /dev/null
-@@ -1,74 +0,0 @@
--# CONFIG_SWAP is not set
--CONFIG_SYSVIPC=y
--CONFIG_POSIX_MQUEUE=y
--CONFIG_LOG_BUF_SHIFT=14
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_SLAB=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--# CONFIG_BLK_DEV_BSG is not set
--# CONFIG_IOSCHED_DEADLINE is not set
--# CONFIG_IOSCHED_CFQ is not set
--CONFIG_ARCH_KS8695=y
--CONFIG_MACH_KS8695=y
--CONFIG_MACH_DSM320=y
--CONFIG_MACH_ACS5K=y
--# CONFIG_ARM_THUMB is not set
--CONFIG_PCI=y
--CONFIG_PCI_DEBUG=y
--CONFIG_PCCARD=y
--CONFIG_YENTA=y
--CONFIG_AEABI=y
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="mem=32M console=ttyS0,115200 initrd=0x20410000,3145728 root=/dev/ram0 rw"
--CONFIG_NET=y
--CONFIG_PACKET=y
--CONFIG_UNIX=y
--CONFIG_INET=y
--CONFIG_IP_PNP=y
--CONFIG_IP_PNP_DHCP=y
--# CONFIG_IPV6 is not set
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_MTD=y
--CONFIG_MTD_BLOCK=y
--CONFIG_MTD_CFI=y
--CONFIG_MTD_JEDECPROBE=y
--CONFIG_MTD_CFI_ADV_OPTIONS=y
--CONFIG_MTD_CFI_INTELEXT=y
--CONFIG_MTD_CFI_AMDSTD=y
--CONFIG_MTD_PHYSMAP=y
--CONFIG_BLK_DEV_RAM=y
--CONFIG_BLK_DEV_RAM_SIZE=8192
--CONFIG_NETDEVICES=y
--CONFIG_ARM_KS8695_ETHER=y
--CONFIG_PRISM54=m
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--# CONFIG_SERIO is not set
--CONFIG_SERIAL_KS8695=y
--CONFIG_SERIAL_KS8695_CONSOLE=y
--CONFIG_I2C=y
--CONFIG_I2C_CHARDEV=y
--CONFIG_I2C_GPIO=y
--CONFIG_GPIO_SYSFS=y
--CONFIG_GPIO_PCA953X=y
--CONFIG_WATCHDOG=y
--CONFIG_KS8695_WATCHDOG=y
--CONFIG_RTC_CLASS=y
--CONFIG_RTC_DRV_PCF8563=y
--CONFIG_EXT2_FS=y
--CONFIG_TMPFS=y
--CONFIG_JFFS2_FS=y
--CONFIG_JFFS2_SUMMARY=y
--CONFIG_JFFS2_COMPRESSION_OPTIONS=y
--CONFIG_JFFS2_RUBIN=y
--CONFIG_CRAMFS=y
--CONFIG_NFS_FS=y
--CONFIG_ROOT_NFS=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_MUTEXES=y
--# CONFIG_FTRACE is not set
--CONFIG_DEBUG_USER=y
--CONFIG_DEBUG_LL=y
-diff --git a/arch/arm/configs/acs5k_tiny.config b/arch/arm/configs/acs5k_tiny.config
-new file mode 100644
-index 0000000..7d913e3
---- /dev/null
-+++ b/arch/arm/configs/acs5k_tiny.config
-@@ -0,0 +1,24 @@
-+CONFIG_POSIX_MQUEUE=y
-+CONFIG_MACH_ACS5K=y
-+CONFIG_CMDLINE="console=ttyAM0,115200 init=/bin/sh"
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+CONFIG_MTD_CFI_ADV_OPTIONS=y
-+CONFIG_MTD_CFI_AMDSTD=y
-+# CONFIG_BLK_DEV is not set
-+CONFIG_ARM_KS8695_ETHER=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_I2C=y
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_GPIO=y
-+CONFIG_GPIO_SYSFS=y
-+CONFIG_GPIO_PCA953X=y
-+# CONFIG_HWMON is not set
-+CONFIG_WATCHDOG=y
-+CONFIG_KS8695_WATCHDOG=y
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_PCF8563=y
-+CONFIG_SQUASHFS=y
-+# CONFIG_NETWORK_FILESYSTEMS is not set
-diff --git a/arch/arm/configs/acs5k_tiny_defconfig b/arch/arm/configs/acs5k_tiny_defconfig
-deleted file mode 100644
-index a8e115c..0000000
---- a/arch/arm/configs/acs5k_tiny_defconfig
-+++ /dev/null
-@@ -1,66 +0,0 @@
--# CONFIG_SWAP is not set
--CONFIG_SYSVIPC=y
--CONFIG_POSIX_MQUEUE=y
--CONFIG_LOG_BUF_SHIFT=14
--CONFIG_SLAB=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--# CONFIG_BLK_DEV_BSG is not set
--# CONFIG_IOSCHED_DEADLINE is not set
--# CONFIG_IOSCHED_CFQ is not set
--CONFIG_ARCH_KS8695=y
--CONFIG_MACH_ACS5K=y
--# CONFIG_ARM_THUMB is not set
--CONFIG_AEABI=y
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="console=ttyAM0,115200 init=/bin/sh"
--CONFIG_NET=y
--CONFIG_PACKET=y
--CONFIG_UNIX=y
--CONFIG_INET=y
--# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
--# CONFIG_INET_XFRM_MODE_TUNNEL is not set
--# CONFIG_INET_XFRM_MODE_BEET is not set
--# CONFIG_IPV6 is not set
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_MTD=y
--CONFIG_MTD_BLOCK=y
--CONFIG_MTD_CFI=y
--CONFIG_MTD_JEDECPROBE=y
--CONFIG_MTD_CFI_ADV_OPTIONS=y
--CONFIG_MTD_CFI_INTELEXT=y
--CONFIG_MTD_CFI_AMDSTD=y
--CONFIG_MTD_PHYSMAP=y
--# CONFIG_BLK_DEV is not set
--CONFIG_NETDEVICES=y
--CONFIG_ARM_KS8695_ETHER=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--# CONFIG_SERIO is not set
--CONFIG_SERIAL_KS8695=y
--CONFIG_SERIAL_KS8695_CONSOLE=y
--# CONFIG_HW_RANDOM is not set
--CONFIG_I2C=y
--CONFIG_I2C_CHARDEV=y
--CONFIG_I2C_GPIO=y
--CONFIG_GPIO_SYSFS=y
--CONFIG_GPIO_PCA953X=y
--# CONFIG_HWMON is not set
--CONFIG_WATCHDOG=y
--CONFIG_KS8695_WATCHDOG=y
--# CONFIG_USB_SUPPORT is not set
--CONFIG_RTC_CLASS=y
--CONFIG_RTC_DRV_PCF8563=y
--CONFIG_TMPFS=y
--CONFIG_JFFS2_FS=y
--CONFIG_JFFS2_SUMMARY=y
--CONFIG_JFFS2_COMPRESSION_OPTIONS=y
--CONFIG_JFFS2_RUBIN=y
--CONFIG_SQUASHFS=y
--# CONFIG_NETWORK_FILESYSTEMS is not set
--CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_MUTEXES=y
--# CONFIG_FTRACE is not set
--CONFIG_DEBUG_USER=y
-diff --git a/arch/arm/configs/ks8695.config b/arch/arm/configs/ks8695.config
-new file mode 100644
-index 0000000..58b6577
---- /dev/null
-+++ b/arch/arm/configs/ks8695.config
-@@ -0,0 +1,21 @@
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_MACH_KS8695=y
-+CONFIG_MACH_DSM320=y
-+CONFIG_PCI=y
-+CONFIG_PCI_DEBUG=y
-+CONFIG_PCCARD=y
-+CONFIG_YENTA=y
-+CONFIG_CMDLINE="mem=32M console=ttyS0,115200 initrd=0x20410000,3145728 root=/dev/ram0 rw"
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_MTD_REDBOOT_PARTS=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_SIZE=8192
-+CONFIG_PRISM54=m
-+# CONFIG_HWMON is not set
-+CONFIG_EXT2_FS=y
-+CONFIG_CRAMFS=y
-+CONFIG_NFS_FS=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_DEBUG_LL=y
-diff --git a/arch/arm/configs/ks8695_defconfig b/arch/arm/configs/ks8695_basic_defconfig
-similarity index 67%
-rename from arch/arm/configs/ks8695_defconfig
-rename to arch/arm/configs/ks8695_basic_defconfig
-index b5ef2b4..c9ee223 100644
---- a/arch/arm/configs/ks8695_defconfig
-+++ b/arch/arm/configs/ks8695_basic_defconfig
-@@ -1,7 +1,6 @@
- # CONFIG_SWAP is not set
- CONFIG_SYSVIPC=y
- CONFIG_LOG_BUF_SHIFT=14
--CONFIG_BLK_DEV_INITRD=y
- CONFIG_SLAB=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
-@@ -9,55 +8,35 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_IOSCHED_DEADLINE is not set
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_KS8695=y
--CONFIG_MACH_KS8695=y
--CONFIG_MACH_DSM320=y
- # CONFIG_ARM_THUMB is not set
--CONFIG_PCI=y
--CONFIG_PCI_DEBUG=y
--CONFIG_PCCARD=y
--CONFIG_YENTA=y
- CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="mem=32M console=ttyS0,115200 initrd=0x20410000,3145728 root=/dev/ram0 rw"
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
- CONFIG_INET=y
--CONFIG_IP_PNP=y
--CONFIG_IP_PNP_DHCP=y
- # CONFIG_IPV6 is not set
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
--CONFIG_MTD_REDBOOT_PARTS=y
--CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_JEDECPROBE=y
- CONFIG_MTD_CFI_INTELEXT=y
- CONFIG_MTD_PHYSMAP=y
--CONFIG_BLK_DEV_RAM=y
--CONFIG_BLK_DEV_RAM_SIZE=8192
- CONFIG_NETDEVICES=y
--CONFIG_PRISM54=m
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- # CONFIG_INPUT_KEYBOARD is not set
- # CONFIG_INPUT_MOUSE is not set
- # CONFIG_SERIO is not set
- CONFIG_SERIAL_KS8695=y
- CONFIG_SERIAL_KS8695_CONSOLE=y
--# CONFIG_HWMON is not set
--CONFIG_EXT2_FS=y
- CONFIG_TMPFS=y
- CONFIG_JFFS2_FS=y
- CONFIG_JFFS2_SUMMARY=y
- CONFIG_JFFS2_COMPRESSION_OPTIONS=y
- CONFIG_JFFS2_RUBIN=y
--CONFIG_CRAMFS=y
--CONFIG_NFS_FS=y
--CONFIG_ROOT_NFS=y
- CONFIG_DEBUG_KERNEL=y
- CONFIG_DEBUG_MUTEXES=y
- # CONFIG_FTRACE is not set
- CONFIG_DEBUG_USER=y
--CONFIG_DEBUG_LL=y
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/pwm.h>
++#include <linux/of.h>
++
++#include <linux/mfd/stm32-gptimer.h>
++
++#define CCMR_CHANNEL_SHIFT 8
++#define CCMR_CHANNEL_MASK  0xFF
++
++struct stm32_pwm {
++	struct pwm_chip chip;
++	struct device *dev;
++	struct clk *clk;
++	struct regmap *regmap;
++	unsigned int caps;
++	unsigned int npwm;
++	u32 breakinput_polarity;
++	u32 max_arr;
++	bool have_complementary_output;
++	bool have_breakinput;
++	bool use_breakinput;
++};
++
++#define to_stm32_pwm_dev(x) container_of(chip, struct stm32_pwm, chip)
++
++static u32 active_channels(struct stm32_pwm *dev)
++{
++	u32 ccer;
++
++	regmap_read(dev->regmap, TIM_CCER, &ccer);
++
++	return ccer & TIM_CCER_CCXE;
++}
++
++static int write_ccrx(struct stm32_pwm *dev, struct pwm_device *pwm,
++		      u32 value)
++{
++	switch (pwm->hwpwm) {
++	case 0:
++		return regmap_write(dev->regmap, TIM_CCR1, value);
++	case 1:
++		return regmap_write(dev->regmap, TIM_CCR2, value);
++	case 2:
++		return regmap_write(dev->regmap, TIM_CCR3, value);
++	case 3:
++		return regmap_write(dev->regmap, TIM_CCR4, value);
++	}
++	return -EINVAL;
++}
++
++static int stm32_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
++			    int duty_ns, int period_ns)
++{
++	struct stm32_pwm *priv = to_stm32_pwm_dev(chip);
++	unsigned long long prd, div, dty;
++	unsigned int prescaler = 0;
++	u32 ccmr, mask, shift, bdtr;
++
++	/* Period and prescaler values depends on clock rate */
++	div = (unsigned long long)clk_get_rate(priv->clk) * period_ns;
++
++	do_div(div, NSEC_PER_SEC);
++	prd = div;
++
++	while (div > priv->max_arr) {
++		prescaler++;
++		div = prd;
++		do_div(div, (prescaler + 1));
++	}
++
++	prd = div;
++
++	if (prescaler > MAX_TIM_PSC) {
++		dev_err(chip->dev, "prescaler exceeds the maximum value\n");
++		return -EINVAL;
++	}
++
++	/*
++	 * All channels share the same prescaler and counter so when two
++	 * channels are active at the same we can't change them
++	 */
++	if (active_channels(priv) & ~(1 << pwm->hwpwm * 4)) {
++		u32 psc, arr;
++
++		regmap_read(priv->regmap, TIM_PSC, &psc);
++		regmap_read(priv->regmap, TIM_ARR, &arr);
++
++		if ((psc != prescaler) || (arr != prd - 1))
++			return -EBUSY;
++	}
++
++	regmap_write(priv->regmap, TIM_PSC, prescaler);
++	regmap_write(priv->regmap, TIM_ARR, prd - 1);
++	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_ARPE, TIM_CR1_ARPE);
++
++	/* Calculate the duty cycles */
++	dty = prd * duty_ns;
++	do_div(dty, period_ns);
++
++	write_ccrx(priv, pwm, dty);
++
++	/* Configure output mode */
++	shift = (pwm->hwpwm & 0x1) * CCMR_CHANNEL_SHIFT;
++	ccmr = (TIM_CCMR_PE | TIM_CCMR_M1) << shift;
++	mask = CCMR_CHANNEL_MASK << shift;
++
++	if (pwm->hwpwm < 2)
++		regmap_update_bits(priv->regmap, TIM_CCMR1, mask, ccmr);
++	else
++		regmap_update_bits(priv->regmap, TIM_CCMR2, mask, ccmr);
++
++	if (!priv->have_breakinput)
++		return 0;
++
++	bdtr = TIM_BDTR_MOE | TIM_BDTR_AOE;
++
++	if (priv->use_breakinput)
++		bdtr |= TIM_BDTR_BKE;
++
++	if (priv->breakinput_polarity)
++		bdtr |= TIM_BDTR_BKP;
++
++	regmap_update_bits(priv->regmap, TIM_BDTR,
++			   TIM_BDTR_MOE | TIM_BDTR_AOE |
++			   TIM_BDTR_BKP | TIM_BDTR_BKE,
++			   bdtr);
++
++	return 0;
++}
++
++static int stm32_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
++				  enum pwm_polarity polarity)
++{
++	u32 mask;
++	struct stm32_pwm *priv = to_stm32_pwm_dev(chip);
++
++	mask = TIM_CCER_CC1P << (pwm->hwpwm * 4);
++	if (priv->have_complementary_output)
++		mask |= TIM_CCER_CC1NP << (pwm->hwpwm * 4);
++
++	regmap_update_bits(priv->regmap, TIM_CCER, mask,
++			   polarity == PWM_POLARITY_NORMAL ? 0 : mask);
++
++	return 0;
++}
++
++static int stm32_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	u32 mask;
++	struct stm32_pwm *priv = to_stm32_pwm_dev(chip);
++
++	clk_enable(priv->clk);
++
++	/* Enable channel */
++	mask = TIM_CCER_CC1E << (pwm->hwpwm * 4);
++	if (priv->have_complementary_output)
++		mask |= TIM_CCER_CC1NE << (pwm->hwpwm * 4);
++
++	regmap_update_bits(priv->regmap, TIM_CCER, mask, mask);
++
++	/* Make sure that registers are updated */
++	regmap_update_bits(priv->regmap, TIM_EGR, TIM_EGR_UG, TIM_EGR_UG);
++
++	/* Enable controller */
++	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, TIM_CR1_CEN);
++
++	return 0;
++}
++
++static void stm32_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
++{
++	u32 mask;
++	struct stm32_pwm *priv = to_stm32_pwm_dev(chip);
++
++	/* Disable channel */
++	mask = TIM_CCER_CC1E << (pwm->hwpwm * 4);
++	if (priv->have_complementary_output)
++		mask |= TIM_CCER_CC1NE << (pwm->hwpwm * 4);
++
++	regmap_update_bits(priv->regmap, TIM_CCER, mask, 0);
++
++	/* When all channels are disabled, we can disable the controller */
++	if (!active_channels(priv))
++		regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, 0);
++
++	clk_disable(priv->clk);
++}
++
++static int stm32_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
++			   struct pwm_state *state)
++{
++	struct pwm_state curstate;
++	bool enabled;
++	int ret;
++
++	pwm_get_state(pwm, &curstate);
++	enabled = curstate.enabled;
++
++	if (enabled && !state->enabled) {
++		stm32_pwm_disable(chip, pwm);
++		return 0;
++	}
++
++	if (state->polarity != curstate.polarity && enabled)
++		stm32_pwm_set_polarity(chip, pwm, state->polarity);
++
++	ret = stm32_pwm_config(chip, pwm, state->duty_cycle, state->period);
++	if (ret)
++		return ret;
++
++	if (!enabled && state->enabled)
++		ret = stm32_pwm_enable(chip, pwm);
++
++	return ret;
++}
++
++static const struct pwm_ops stm32pwm_ops = {
++	.owner = THIS_MODULE,
++	.apply = stm32_pwm_apply,
++};
++
++static bool stm32_pwm_detect_breakinput(struct regmap *regmap)
++{
++	u32 bdtr;
++
++	/*
++	 * If breakinput enable bit doesn't exist writing 1 will have no
++	 * effect so we can detect it.
++	 */
++	regmap_update_bits(regmap, TIM_BDTR, TIM_BDTR_BKE, TIM_BDTR_BKE);
++	regmap_read(regmap, TIM_BDTR, &bdtr);
++	regmap_update_bits(regmap, TIM_BDTR, TIM_BDTR_BKE, 0);
++
++	return (bdtr != 0);
++}
++
++static bool stm32_pwm_detect_complementary(struct regmap *regmap)
++{
++	u32 ccer;
++
++	/*
++	 * If complementary bit doesn't exist writing 1 will have no
++	 * effect so we can detect it.
++	 */
++	regmap_update_bits(regmap, TIM_CCER, TIM_CCER_CC1NE, TIM_CCER_CC1NE);
++	regmap_read(regmap, TIM_CCER, &ccer);
++	regmap_update_bits(regmap, TIM_CCER, TIM_CCER_CCXE, 0);
++
++	return (ccer != 0);
++}
++
++static int stm32_pwm_detect_channels(struct regmap *regmap)
++{
++	int channels = 0;
++	u32 ccer;
++
++	/*
++	 * If channels enable bits don't exist writing 1 will have no
++	 * effect so we can detect and count them.
++	 */
++	regmap_update_bits(regmap, TIM_CCER, TIM_CCER_CCXE, TIM_CCER_CCXE);
++	regmap_read(regmap, TIM_CCER, &ccer);
++	regmap_update_bits(regmap, TIM_CCER, TIM_CCER_CCXE, 0);
++
++	if (ccer & TIM_CCER_CC1E)
++		channels++;
++
++	if (ccer & TIM_CCER_CC2E)
++		channels++;
++
++	if (ccer & TIM_CCER_CC3E)
++		channels++;
++
++	if (ccer & TIM_CCER_CC4E)
++		channels++;
++
++	return channels;
++}
++
++static int stm32_pwm_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	struct stm32_gptimer *ddata = dev_get_drvdata(pdev->dev.parent);
++	struct stm32_pwm *priv;
++	int ret;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	priv->regmap = ddata->regmap;
++	priv->clk = ddata->clk;
++	priv->max_arr = ddata->max_arr;
++
++	if (!priv->regmap || !priv->clk)
++		return -EINVAL;
++
++	priv->have_breakinput = stm32_pwm_detect_breakinput(priv->regmap);
++	priv->have_complementary_output =
++		stm32_pwm_detect_complementary(priv->regmap);
++	priv->npwm = stm32_pwm_detect_channels(priv->regmap);
++
++	if (!of_property_read_u32(np, "st,breakinput-polarity",
++				  &priv->breakinput_polarity))
++		priv->use_breakinput = true;
++
++	priv->chip.base = -1;
++	priv->chip.dev = dev;
++	priv->chip.ops = &stm32pwm_ops;
++	priv->chip.npwm = priv->npwm;
++
++	ret = pwmchip_add(&priv->chip);
++	if (ret < 0)
++		return ret;
++
++	platform_set_drvdata(pdev, priv);
++
++	return 0;
++}
++
++static int stm32_pwm_remove(struct platform_device *pdev)
++{
++	struct stm32_pwm *priv = platform_get_drvdata(pdev);
++	unsigned int i;
++
++	for (i = 0; i < priv->npwm; i++)
++		pwm_disable(&priv->chip.pwms[i]);
++
++	pwmchip_remove(&priv->chip);
++
++	return 0;
++}
++
++static const struct of_device_id stm32_pwm_of_match[] = {
++	{ .compatible = "st,stm32-pwm",	}
++};
++MODULE_DEVICE_TABLE(of, stm32_pwm_of_match);
++
++static struct platform_driver stm32_pwm_driver = {
++	.probe	= stm32_pwm_probe,
++	.remove	= stm32_pwm_remove,
++	.driver	= {
++		.name = "stm32-pwm",
++		.of_match_table = stm32_pwm_of_match,
++	},
++};
++module_platform_driver(stm32_pwm_driver);
++
++MODULE_ALIAS("platform: stm32-pwm");
++MODULE_DESCRIPTION("STMicroelectronics STM32 PWM driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
