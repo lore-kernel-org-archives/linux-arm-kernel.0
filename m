@@ -1,89 +1,57 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 6 Dec 2016 12:48:08 +0000
-Subject: [STLinux Kernel] [PATCH 2/3] serial: st-asc: Provide RTS
- functionality
-In-Reply-To: <20161206124543.GC25385@dell.home>
-References: <20161202141146.31281-1-lee.jones@linaro.org>
- <20161202141146.31281-2-lee.jones@linaro.org>
- <5e652529-8dcb-568e-a748-0ec745099211@st.com>
- <20161206123131.GA15382@griffinp-ThinkPad-X1-Carbon-2nd>
- <20161206124543.GC25385@dell.home>
-Message-ID: <20161206124808.GD25385@dell.home>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 6 Dec 2016 13:46:01 +0100
+Subject: [GIT PULL] ARM: Xilinx Zynq SOC changes for v4.10
+Message-ID: <1ff060ae-b142-9e72-6fef-21b81a147614@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 06 Dec 2016, Lee Jones wrote:
+Hi,
 
-> On Tue, 06 Dec 2016, Peter Griffin wrote:
-> > On Mon, 05 Dec 2016, Patrice Chotard wrote:
-> > > On 12/02/2016 03:11 PM, Lee Jones wrote:
-> > > > Until this point, it has not been possible for serial applications
-> > > > to toggle the UART RTS line.  This can be useful with certain
-> > > > configurations. For example, when using a Mezzanine on a Linaro
-> > > > 96board, RTS line is used to take the the on-board microcontroller
-> > > 
-> > > typo "the the on"
-> > > 
-> > > > in and out of reset.
-> > > > 
-> > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > > ---
-> > > >  drivers/tty/serial/st-asc.c | 14 ++++++++++++++
-> > > >  1 file changed, 14 insertions(+)
-> > > > 
-> > > > diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-> > > > index 379e5bd..ce46898 100644
-> > > > --- a/drivers/tty/serial/st-asc.c
-> > > > +++ b/drivers/tty/serial/st-asc.c
-> > > > @@ -30,6 +30,7 @@
-> > > >  #include <linux/of_platform.h>
-> > > >  #include <linux/serial_core.h>
-> > > >  #include <linux/clk.h>
-> > > > +#include <linux/gpio/consumer.h>
-> > > >  
-> > > >  #define DRIVER_NAME "st-asc"
-> > > >  #define ASC_SERIAL_NAME "ttyAS"
-> > > > @@ -38,6 +39,7 @@
-> > > >  
-> > > >  struct asc_port {
-> > > >  	struct uart_port port;
-> > > > +	struct gpio_desc *rts;
-> > > >  	struct clk *clk;
-> > > >  	unsigned int hw_flow_control:1;
-> > > >  	unsigned int force_m1:1;
-> > > > @@ -381,12 +383,16 @@ static unsigned int asc_tx_empty(struct uart_port *port)
-> > > >  
-> > > >  static void asc_set_mctrl(struct uart_port *port, unsigned int mctrl)
-> > > >  {
-> > > > +	struct asc_port *ascport = to_asc_port(port);
-> > > > +
-> > > >  	/*
-> > > >  	 * This routine is used for seting signals of: DTR, DCD, CTS/RTS
-> > > >  	 * We use ASC's hardware for CTS/RTS, so don't need any for that.
-> > > >  	 * Some boards have DTR and DCD implemented using PIO pins,
-> > > >  	 * code to do this should be hooked in here.
-> > > >  	 */
-> > > > +
-> > > > +	gpiod_set_value(ascport->rts, mctrl & TIOCM_RTS);
-> > 
-> > This now puts the code and the comment above out of sync with each
-> > other.
-> > 
-> > However just checking the stih410 datasheet and I don't think this patch
-> > to control RTS via a GPIO is required anyway.
-> > 
-> > The correct way of handling this is to add UART10_RTS and UART10_CTS pins
-> > to the pinctrl_serial0 group so they are properly configured for their cts/rts
-> > alternate function. Once the pins are correctly configured, the IP block should
-> > control the signals correctly like the comment says.
-> 
-> That was the first thing I tried.  It didn't work.
+please pull this fix to your tree.
 
-       cts = <&pio17 2 ALT1 IN>;
-       rts = <&pio17 3 ALT1 OUT>;
+Thanks,
+Michal
+
+
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+
+are available in the git repository at:
+
+  https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-4.10
+
+for you to fetch changes up to 7a3cc2a7b2c723aa552028f4e66841cec183756d:
+
+  ARM: zynq: Reserve correct amount of non-DMA RAM (2016-11-14 16:07:58
++0100)
+
+----------------------------------------------------------------
+arm: Xilinx Zynq patches for v4.10
+
+- Fix dma issue
+
+----------------------------------------------------------------
+Kyle Roeschley (1):
+      ARM: zynq: Reserve correct amount of non-DMA RAM
+
+ arch/arm/mach-zynq/common.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161206/773ac815/attachment-0001.sig>
