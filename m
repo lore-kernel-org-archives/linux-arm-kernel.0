@@ -1,76 +1,115 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 6 Dec 2016 08:31:41 -0800
-Subject: [PATCH] i2c: rk3x: keep i2c irq ON in suspend
-In-Reply-To: <1d570232-af87-467e-e6f4-5b514d583a02@rock-chips.com>
-References: <1480924979-13450-1-git-send-email-david.wu@rock-chips.com>
- <1737869.ycGphUXI8X@phil>
- <1d570232-af87-467e-e6f4-5b514d583a02@rock-chips.com>
-Message-ID: <CAD=FV=VgGy5hA4+7nvLs4NPNRuopak+bTW34S6X6S_vWgtnkjg@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 6 Dec 2016 16:32:18 +0000
+Subject: [PATCH 1/1] arm64: Correcting format specifier for printing 64
+ bit addresses
+In-Reply-To: <20161206161116.GD4816@cbox>
+References: <1480925393-8386-1-git-send-email-maninder1.s@samsung.com>
+ <20161206161116.GD4816@cbox>
+Message-ID: <dbf5af31-2a36-5216-4544-13ade6dddd3a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 06/12/16 16:11, Christoffer Dall wrote:
+> On Mon, Dec 05, 2016 at 01:39:53PM +0530, Maninder Singh wrote:
+>> This patch corrects format specifier for printing 64 bit addresses.
+>>
+>> Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
+>> Signed-off-by: Vaneet Narang <v.narang@samsung.com>
+>> ---
+>>  arch/arm64/kernel/signal.c |  2 +-
+>>  arch/arm64/kvm/sys_regs.c  |  8 ++++++--
+>>  arch/arm64/mm/fault.c      | 15 ++++++++++-----
+>>  arch/arm64/mm/mmu.c        |  4 ++--
+>>  4 files changed, 19 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+>> index c7b6de6..c89d5fd 100644
+>> --- a/arch/arm64/kernel/signal.c
+>> +++ b/arch/arm64/kernel/signal.c
+>> @@ -155,7 +155,7 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
+>>  
+>>  badframe:
+>>  	if (show_unhandled_signals)
+>> -		pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
+>> +		pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%016llx sp=%016llx\n",
+>>  				    current->comm, task_pid_nr(current), __func__,
+>>  				    regs->pc, regs->sp);
+>>  	force_sig(SIGSEGV, current);
+>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+>> index 87e7e66..89bf5c1 100644
+>> --- a/arch/arm64/kvm/sys_regs.c
+>> +++ b/arch/arm64/kvm/sys_regs.c
+>> @@ -1554,8 +1554,12 @@ static void unhandled_cp_access(struct kvm_vcpu *vcpu,
+>>  		WARN_ON(1);
+>>  	}
+>>  
+>> -	kvm_err("Unsupported guest CP%d access at: %08lx\n",
+>> -		cp, *vcpu_pc(vcpu));
+>> +	if (params->is_32bit)
+>> +		kvm_err("Unsupported guest CP%d access at: %08lx\n",
+>> +			cp, *vcpu_pc(vcpu));
+>> +	else
+>> +		kvm_err("Unsupported guest CP%d access at: %016lx\n",
+>> +			cp, *vcpu_pc(vcpu));
+> 
+> It feels a bit much to me to have an if-statement to differentiate the
+> number of leading zeros, so if it's important to always have fixed
+> widths then I would just use %016lx in both cases.
 
-On Tue, Dec 6, 2016 at 12:12 AM, David.Wu <david.wu@rock-chips.com> wrote:
-> Hi Heiko,
->
-> ? 2016/12/5 18:54, Heiko Stuebner ??:
->>
->> Hi David,
->>
->> Am Montag, 5. Dezember 2016, 16:02:59 CET schrieb David Wu:
->>>
->>> During suspend there may still be some i2c access happening.
->>> And if we don't keep i2c irq ON, there may be i2c access timeout if
->>> i2c is in irq mode of operation.
->>
->>
->> can you describe the issue you're trying to fix a bit more please?
->
->
-> Sometimes we could see the i2c timeout errors during suspend/resume, which
-> makes the duration of suspend/resume too longer.
->
-> [  484.171541] CPU4: Booted secondary processor [410fd082]
-> [  485.172777] rk3x-i2c ff3c0000.i2c: timeout, ipd: 0x10, state: 1
-> [  486.172760] rk3x-i2c ff3c0000.i2c: timeout, ipd: 0x10, state: 1
-> [  487.172759] rk3x-i2c ff3c0000.i2c: timeout, ipd: 0x10, state: 1
-> [  487.172840] cpu cpu4: _set_opp_voltage: failed to set voltage (800000
-> 800000 800000 mV): -110
-> [  487.172874] cpu cpu4: failed to set volt 800000
->
->>
->> I.e. I'd think the i2c-core does suspend i2c-client devices first, so that
->> these should be able to finish up their ongoing transfers and not start
->> any
->> new ones instead?
->>
->> Your irq can still happen slightly after the system started going to
->> actually
->> sleep, so to me it looks like you just widened the window where irqs can
->> be
->> handled. Especially as your irq could also just simply stem from the start
->> state, so you cannot even be sure if your transaction actually is
->> finished.
->
->
-> Okay, you are right. I want to give it a double insurance at first, but it
-> may hide the unhappend issue.
->
->>
->> So to me it looks like the i2c-connected device driver should be fixed
->> instead?
->
->
-> I tell them to fix it in rk808 driver.
+Actually, it looks like vsnprintf does support the '*' field width
+specifier, so even if the format _is_ critical there's still no reason
+to have such duplicated code.
 
-To me it seems like perhaps cpufreq should not be changing frequencies
-until it is resumed properly.  Presumably if all the ordering is done
-right then cpufreq should be resumed _after_ the i2c regulator so you
-should be OK.  ...or am I somehow confused about that?
+Robin.
 
-Also note that previous i2c busses I worked with simply returned -EIO
-in the case where they were called when suspended.  See
-"i2c-exynos5.c" and "i2c-s3c2410.c".
-
--Doug
+>>  	print_sys_reg_instr(params);
+>>  	kvm_inject_undefined(vcpu);
+>>  }
+>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>> index a78a5c4..d96a42a 100644
+>> --- a/arch/arm64/mm/fault.c
+>> +++ b/arch/arm64/mm/fault.c
+>> @@ -77,7 +77,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+>>  
+>>  	pr_alert("pgd = %p\n", mm->pgd);
+>>  	pgd = pgd_offset(mm, addr);
+>> -	pr_alert("[%08lx] *pgd=%016llx", addr, pgd_val(*pgd));
+>> +	pr_alert("[%016lx] *pgd=%016llx", addr, pgd_val(*pgd));
+>>  
+>>  	do {
+>>  		pud_t *pud;
+>> @@ -177,7 +177,7 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
+>>  	 * No handler, we'll have to terminate things with extreme prejudice.
+>>  	 */
+>>  	bust_spinlocks(1);
+>> -	pr_alert("Unable to handle kernel %s at virtual address %08lx\n",
+>> +	pr_alert("Unable to handle kernel %s at virtual address %016lx\n",
+>>  		 (addr < PAGE_SIZE) ? "NULL pointer dereference" :
+>>  		 "paging request", addr);
+>>  
+>> @@ -198,9 +198,14 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
+>>  	struct siginfo si;
+>>  
+>>  	if (unhandled_signal(tsk, sig) && show_unhandled_signals_ratelimited()) {
+>> -		pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x\n",
+>> -			tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
+>> -			addr, esr);
+>> +		if (compat_user_mode(regs))
+>> +			pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x\n",
+>> +				tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
+>> +				addr, esr);
+>> +		else
+>> +			pr_info("%s[%d]: unhandled %s (%d) at 0x%016lx, esr 0x%03x\n",
+>> +				tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
+>> +				addr, esr);
+> 
+> same here.
+> 
+> Thanks,
+> -Christoffer
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
