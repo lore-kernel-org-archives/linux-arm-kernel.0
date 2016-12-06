@@ -1,50 +1,97 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Tue, 6 Dec 2016 17:53:46 +0800
-Subject: [bug report v4.8] fs/locks.c: kernel oops during posix lock
- stress test
-In-Reply-To: <20161201113031.GB5813@arm.com>
-References: <CACVXFVPsHjh3CWjdUrKB_r6=hkXK=qS3wpykbacdKe1rzz1H8Q@mail.gmail.com>
- <20161201113031.GB5813@arm.com>
-Message-ID: <CACVXFVMyo98x7PF69TXMDKv53ag-3SjYL1FLNS=VSOA5Tje4EQ@mail.gmail.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 6 Dec 2016 10:56:13 +0100
+Subject: [PATCH v3 7/7] ARM: dts: stm32: add stm32 general purpose timer
+ driver in DT
+In-Reply-To: <20161206094835.GB25385@dell.home>
+References: <1480673842-20804-1-git-send-email-benjamin.gaignard@st.com>
+ <1480673842-20804-8-git-send-email-benjamin.gaignard@st.com>
+ <20161202132251.GL2683@dell> <e15186cb-a93e-c2e7-13bb-6704be5e8949@st.com>
+ <20161206094835.GB25385@dell.home>
+Message-ID: <8f881cf7-ba63-315f-b852-71869ad480f3@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Lee,
 
-On Thu, Dec 1, 2016 at 7:30 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Nov 28, 2016 at 11:10:14AM +0800, Ming Lei wrote:
->> When I run stress-ng via the following steps on one ARM64 dual
->> socket system(Cavium Thunder), the kernel oops[1] can often be
->> triggered after running the stress test for several hours(sometimes
->> it may take longer):
->>
->> - git clone git://kernel.ubuntu.com/cking/stress-ng.git
->> - apply the attachment patch which just makes the posix file
->> lock stress test more aggressive
->> - run the test via '~/git/stress-ng$./stress-ng --lockf 128 --aggressive'
->>
->>
->> From the oops log, looks one garbage file_lock node is got
->> from the linked list of 'ctx->flc_posix' when the issue happens.
->>
->> BTW, the issue isn't observed on single socket Cavium Thunder yet,
->> and the same issue can be seen on Ubuntu Xenial(v4.4 based kernel)
->> too.
+On 12/06/2016 10:48 AM, Lee Jones wrote:
+> On Mon, 05 Dec 2016, Alexandre Torgue wrote:
+>> On 12/02/2016 02:22 PM, Lee Jones wrote:
+>>> On Fri, 02 Dec 2016, Benjamin Gaignard wrote:
+>>>
+>>>> Add general purpose timers and it sub-nodes into DT for stm32f4.
+>>>> Define and enable pwm1 and pwm3 for stm32f469 discovery board
+>>>>
+>>>> version 3:
+>>>> - use "st,stm32-timer-trigger" in DT
+>>>>
+>>>> version 2:
+>>>> - use parameters to describe hardware capabilities
+>>>> - do not use references for pwm and iio timer subnodes
+>>>>
+>>>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>>>> ---
+>>>>  arch/arm/boot/dts/stm32f429.dtsi      | 333 +++++++++++++++++++++++++++++++++-
+>>>>  arch/arm/boot/dts/stm32f469-disco.dts |  28 +++
+>>>>  2 files changed, 360 insertions(+), 1 deletion(-)
 >
-> FWIW, I've been running this on Seattle for 24 hours with your patch applied
-> and not seen any problems yet. That said, Thomas did just fix an rt_mutex
-> race which only seemed to pop up on Thunder, so you could give those
-> patches a try.
+> [...]
 >
->   https://lkml.kernel.org/r/20161130205431.629977871 at linutronix.de
+> If you're only commenting on a little piece of the patch, it's always
+> a good idea to trim the rest.
+>
+>>>> diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
+>>>> index 8a163d7..df4ca7e 100644
+>>>> --- a/arch/arm/boot/dts/stm32f469-disco.dts
+>>>> +++ b/arch/arm/boot/dts/stm32f469-disco.dts
+>>>> @@ -81,3 +81,31 @@
+>>>>  &usart3 {
+>>>>  	status = "okay";
+>>>>  };
+>>>> +
+>>>> +&gptimer1 {
+>>>> +	status = "okay";
+>>>> +
+>>>> +	pwm1 at 0 {
+>>>> +		pinctrl-0	= <&pwm1_pins>;
+>>>> +		pinctrl-names	= "default";
+>>>> +		status = "okay";
+>>>> +	};
+>>>> +
+>>>> +	timer1 at 0 {
+>>>> +		status = "okay";
+>>>> +	};
+>>>> +};
+>>>
+>>> This is a much *better* format than before.
+>>>
+>>> I still don't like the '&' syntax though.
+>>
+>> Please keep "&" format to match with existing nodes.
+>
+> Right.  I wasn't suggesting that he differs from the current format in
+> *this* set.  I am suggesting that we change the format in a subsequent
+> set though.
 
-I applied the patch against Ubuntu Yakkety kernel(v4.8 based), and run
-the test again on one dual-socket Cavium ThunderX system, and the
-issue can still be triggered.
+Why change? Looking at Linux ARM kernel patchwork, new DT board file 
+contains this format. Did you already discuss with Arnd or Olof about it 
+?
 
-So looks not a same issue with David Daney's.
+regards
+Alex
 
-Anyway, thank you for providing this input!
-
-Thanks,
-Ming
+>
+>>>> +&gptimer3 {
+>>>> +	status = "okay";
+>>>> +
+>>>> +	pwm3 at 0 {
+>>>> +		pinctrl-0	= <&pwm3_pins>;
+>>>> +		pinctrl-names	= "default";
+>>>> +		status = "okay";
+>>>> +	};
+>>>> +
+>>>> +	timer3 at 0 {
+>>>> +		status = "okay";
+>>>> +	};
+>>>> +};
+>>>
+>
