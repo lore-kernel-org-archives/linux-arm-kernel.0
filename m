@@ -1,90 +1,135 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 6 Dec 2016 19:18:20 +0000
-Subject: [PATCHv4 08/10] mm/kasan: Switch to using __pa_symbol and lm_alias
-In-Reply-To: <1480445729-27130-9-git-send-email-labbott@redhat.com>
-References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
- <1480445729-27130-9-git-send-email-labbott@redhat.com>
-Message-ID: <20161206191820.GK24177@leverpostej>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 6 Dec 2016 21:21:04 +0200
+Subject: [PATCH 4/5] arm64: dts: exynos5433: Add bus dt node using
+ VDD_INT for Exynos5433
+In-Reply-To: <1480663087-4590-5-git-send-email-cw00.choi@samsung.com>
+References: <1480663087-4590-1-git-send-email-cw00.choi@samsung.com>
+ <1480663087-4590-5-git-send-email-cw00.choi@samsung.com>
+Message-ID: <20161206192104.GB12683@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 10:55:27AM -0800, Laura Abbott wrote:
-> @@ -94,7 +94,7 @@ static void __init zero_pud_populate(pgd_t *pgd, unsigned long addr,
->  
->  			pud_populate(&init_mm, pud, kasan_zero_pmd);
+On Fri, Dec 02, 2016 at 04:18:06PM +0900, Chanwoo Choi wrote:
+> This patch adds the bus nodes using VDD_INT for Exynos5433 SoC.
+> Exynos5433 has the following AMBA AXI buses to translate data
+> between DRAM and sub-blocks.
+> 
+> Following list specify the detailed correlation between sub-block and clock:
+> - CLK_ACLK_G2D_{400|266}  : Bus clock for G2D
+> - CLK_ACLK_MSCL_400       : Bus clock for MSCL (Mobile Scaler)
+> - CLK_ACLK_GSCL_333       : Bus clock for GSCL (General Scaler)
+> - CLK_SCLK_JPEG_MSCL      : Bus clock for JPEG
+> - CLK_ACLK_MFC_400        : Bus clock for MFC (Multi Format Codec)
+> - CLK_ACLK_HEVC_400       : Bus clock for HEVC (High Effective Video Codec)
+> - CLK_ACLK_BUS0_400       : NoC(Network On Chip)'s bus clock for PERIC/PERIS/FSYS/MSCL
+> - CLK_ACLK_BUS1_400       : NoC's bus clock for MFC/HEVC/G3D
+> - CLK_ACLK_BUS2_400       : NoC's bus clock for GSCL/DISP/G2D/CAM0/CAM1/ISP
+> 
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+>  arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi | 208 +++++++++++++++++++++++++
+>  arch/arm64/boot/dts/exynos/exynos5433.dtsi     |   1 +
+>  2 files changed, 209 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi
+> 
+> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi
+> new file mode 100644
+> index 000000000000..b1e1d9c622e1
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi
+> @@ -0,0 +1,208 @@
+> +/*
+> + * Samsung's Exynos5433 SoC Memory interface and AMBA bus device tree source
+> + *
+> + * Copyright (c) 2016 Samsung Electronics Co., Ltd.
+> + * Chanwoo Choi <cw00.choi@samsung.com>
+> + *
+> + * Samsung's Exynos5433 SoC Memory interface and AMBA buses are listed
+> + * as device tree nodes are listed in this file.
 
-We also need to lm_alias()-ify kasan_zero_pmd here, or we'll get a
-stream of warnings at boot (example below).
+This duplicates the introduction line and does not make sense.
 
-I should have spotted that. :/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/ {
 
-With that fixed up, I'm able to boot Juno with both KASAN_INLINE and
-DEBUG_VIRTUAL, without issued. With that, my previous Reviewed-by and Tested-by
-stand.
+Shouldn't these be under soc node? It looks like property of SoC itself.
 
-Thanks,
-Mark.
+> +	/* INT (Internal) block using VDD_INT */
+> +	bus_g2d_400: bus_g2d_400 {
 
----->8----
+In node name, the dash '-' is preferred. The name should describe
+general class of device so probably this should be just "bus"... but I
+don't see a way how to do it reasonable anyway.
 
-[    0.000000] virt_to_phys used for non-linear address :ffff20000a367000
-[    0.000000] ------------[ cut here ]------------
-[    0.000000] WARNING: CPU: 0 PID: 0 at arch/arm64/mm/physaddr.c:13 __virt_to_phys+0x48/0x68
-[    0.000000] Modules linked in:
-[    0.000000] 
-[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 4.9.0-rc6-00012-gdcc0162-dirty #13
-[    0.000000] Hardware name: ARM Juno development board (r1) (DT)
-[    0.000000] task: ffff200009ec2200 task.stack: ffff200009eb0000
-[    0.000000] PC is at __virt_to_phys+0x48/0x68
-[    0.000000] LR is at __virt_to_phys+0x48/0x68
-[    0.000000] pc : [<ffff2000080af310>] lr : [<ffff2000080af310>] pstate: 600000c5
-[    0.000000] sp : ffff200009eb3c80
-[    0.000000] x29: ffff200009eb3c80 x28: ffff20000abdd000 
-[    0.000000] x27: ffff200009ce1000 x26: ffff047fffffffff 
-[    0.000000] x25: ffff200009ce1000 x24: ffff20000a366100 
-[    0.000000] x23: ffff048000000000 x22: ffff20000a366000 
-[    0.000000] x21: ffff040080000000 x20: ffff040040000000 
-[    0.000000] x19: ffff20000a367000 x18: 000000000000005c 
-[    0.000000] x17: 00000009ffec20e0 x16: 00000000fefff4b0 
-[    0.000000] x15: ffffffffffffffff x14: 302b646d705f6f72 
-[    0.000000] x13: 657a5f6e6173616b x12: 2820303030373633 
-[    0.000000] x11: ffff20000a376ca0 x10: 0000000000000010 
-[    0.000000] x9 : 646461207261656e x8 : 696c2d6e6f6e2072 
-[    0.000000] x7 : 6f66206465737520 x6 : ffff20000a3741e5 
-[    0.000000] x5 : 1fffe4000146ee0e x4 : 1fffe400013de704 
-[    0.000000] x3 : 1fffe400013d6003 x2 : 1fffe400013d6003 
-[    0.000000] x1 : 0000000000000000 x0 : 0000000000000056 
-[    0.000000] 
-[    0.000000] ---[ end trace 0000000000000000 ]---
-[    0.000000] Call trace:
-[    0.000000] Exception stack(0xffff200009eb3a50 to 0xffff200009eb3b80)
-[    0.000000] 3a40:                                   ffff20000a367000 0001000000000000
-[    0.000000] 3a60: ffff200009eb3c80 ffff2000080af310 00000000600000c5 000000000000003d
-[    0.000000] 3a80: ffff200009ce1000 ffff2000081c4720 0000000041b58ab3 ffff200009c6cd98
-[    0.000000] 3aa0: ffff2000080818a0 ffff20000a366000 ffff048000000000 ffff20000a366100
-[    0.000000] 3ac0: ffff200009ce1000 ffff047fffffffff ffff200009ce1000 ffff20000abdd000
-[    0.000000] 3ae0: ffff0400013e3ccf ffff20000a3766c0 0000000000000000 0000000000000000
-[    0.000000] 3b00: ffff200009eb3c80 ffff200009eb3c80 ffff200009eb3c40 00000000ffffffc8
-[    0.000000] 3b20: ffff200009eb3b50 ffff2000082cbd3c ffff200009eb3c80 ffff200009eb3c80
-[    0.000000] 3b40: ffff200009eb3c40 00000000ffffffc8 0000000000000056 0000000000000000
-[    0.000000] 3b60: 1fffe400013d6003 1fffe400013d6003 1fffe400013de704 1fffe4000146ee0e
-[    0.000000] [<ffff2000080af310>] __virt_to_phys+0x48/0x68
-[    0.000000] [<ffff200009d734e8>] zero_pud_populate+0x88/0x138
-[    0.000000] [<ffff200009d736f8>] kasan_populate_zero_shadow+0x160/0x18c
-[    0.000000] [<ffff200009d5a048>] kasan_init+0x1f8/0x408
-[    0.000000] [<ffff200009d54000>] setup_arch+0x314/0x948
-[    0.000000] [<ffff200009d50c64>] start_kernel+0xb4/0x54c
-[    0.000000] [<ffff200009d501e0>] __primary_switched+0x64/0x74
+> +		compatible = "samsung,exynos-bus";
+> +		clocks = <&cmu_top CLK_ACLK_G2D_400>;
+> +		clock-names = "bus";
+> +		operating-points-v2 = <&bus_g2d_400_opp_table>;
+> +		status ="disable";
 
-[mark at leverpostej:~/src/linux]% uselinaro 15.08 aarch64-linux-gnu-readelf -s vmlinux | grep ffff20000a367000
-108184: ffff20000a367000  4096 OBJECT  GLOBAL DEFAULT   25 kasan_zero_pmd
+Hm?
 
-[mark at leverpostej:~/src/linux]% uselinaro 15.08 aarch64-linux-gnu-addr2line -ife vmlinux ffff200009d734e8              
-set_pud
-/home/mark/src/linux/./arch/arm64/include/asm/pgtable.h:435
-__pud_populate
-/home/mark/src/linux/./arch/arm64/include/asm/pgalloc.h:47
-pud_populate
-/home/mark/src/linux/./arch/arm64/include/asm/pgalloc.h:52
-zero_pud_populate
-/home/mark/src/linux/mm/kasan/kasan_init.c:95
+
+> +	};
+> +
+> +	bus_mscl: bus_mscl {
+> +		compatible = "samsung,exynos-bus";
+> +		clocks = <&cmu_top CLK_ACLK_MSCL_400>;
+> +		clock-names = "bus";
+> +		operating-points-v2 = <&bus_g2d_400_opp_table>;
+> +		status ="disable";
+> +	};
+> +
+> +	bus_jpeg: bus_jpeg {
+> +		compatible = "samsung,exynos-bus";
+> +		clocks = <&cmu_top CLK_SCLK_JPEG_MSCL>;
+> +		clock-names = "bus";
+> +		operating-points-v2 = <&bus_g2d_400_opp_table>;
+> +		status ="disable";
+> +	};
+> +
+> +	bus_mfc: bus_mfc {
+> +		compatible = "samsung,exynos-bus";
+> +		clocks = <&cmu_top CLK_ACLK_MFC_400>;
+> +
+> +		clock-names = "bus";
+> +		operating-points-v2 = <&bus_g2d_400_opp_table>;
+> +		status ="disable";
+> +	};
+> +
+> +	bus_g2d_266: bus_g2d_266 {
+> +		compatible = "samsung,exynos-bus";
+> +		clocks = <&cmu_top CLK_ACLK_G2D_266>;
+> +		clock-names = "bus";
+> +		operating-points-v2 = <&bus_g2d_266_opp_table>;
+> +		status ="disable";
+> +	};
+> +
+> +	bus_gscl: bus_gscl {
+> +		compatible = "samsung,exynos-bus";
+> +		clocks = <&cmu_top CLK_ACLK_GSCL_333>;
+> +		clock-names = "bus";
+> +		operating-points-v2 = <&bus_gscl_opp_table>;
+> +		status ="disable";
+> +	};
+> +
+> +	bus_hevc: bus_hevc {
+> +		compatible = "samsung,exynos-bus";
+> +		clocks = <&cmu_top CLK_ACLK_HEVC_400>;
+> +		clock-names = "bus";
+> +		operating-points-v2 = <&bus_hevc_opp_table>;
+> +		status ="disable";
+> +	};
+> +
+> +	bus_bus0: bus_bus0 {
+
+bus, bus, bus, bus, jackpot! Let's try to find better name and label for
+these. :)
+
+Best regards,
+Krzysztof
