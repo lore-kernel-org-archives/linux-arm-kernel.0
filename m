@@ -1,52 +1,306 @@
 From: woogyom.kim@gmail.com (Milo Kim)
-Date: Tue,  6 Dec 2016 16:08:26 +0900
-Subject: [PATCH v2 0/3] ARM: dts: imx6: Support Poslab Savageboard dual & quad
-Message-ID: <20161206070829.24098-1-woogyom.kim@gmail.com>
+Date: Tue,  6 Dec 2016 16:08:27 +0900
+Subject: [PATCH v2 1/3] ARM: dts: imx6: Add Savageboard common file
+In-Reply-To: <20161206070829.24098-1-woogyom.kim@gmail.com>
+References: <20161206070829.24098-1-woogyom.kim@gmail.com>
+Message-ID: <20161206070829.24098-2-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Poslab Savageboard is i.MX6 SoC base, but BSP code from the vendor is 
-not mainline u-boot and kernel. Personal reason of using this board is 
-testing etnaviv user-space driver, so I re-write device tree files based on
-mainline kernel for the first step.
+* Memory
+  memblock for DDR3 1GB
 
-This patchset includes common DT file, dual and quad board files.
+* Regulator
+  3.3V for panel and backlight.
 
-Supported components are
-  - Display: HDMI and LVDS panel
-  - eMMC and SD card
-  - Ethernet
-  - Pinmux configuration
-  - SATA: only for Savageboard quad
-  - UART1 for debug console
-  - USB host
+* Display
+  Enable HDMI and LVDS panel. Savageboard supports AVIC TM097TDH02 panel
+  which is compatible with Hannstar HSD100PXN1, so reuse it.
 
-Missing features are
-  - Audio (WM8903)
-  - USB OTG
-  - PMIC WM8326: default settings are used so no issue to bring-up the system
-  - MIPI DSI, CSI
+* Clock
+  The commit d28be499c45e6 is applied to support LVDS and HDMI output
+  simultaneously.
 
-Patches are tested on the Savageboard quad but the dual version should work 
-because the only difference between dual and quad is SATA support.
+* Pinmux
+  eMMC, ethernet, HDMI, I2C, power button, PWM, SD card and UART.
 
-More information in http://www.savageboard.org
+* Others
+  Enable ethernet, UART1 debug, USB host, USDHC3 for microSD card and
+  USDHC4 for built-in eMMC storage.
 
-v2:
-  Fix DT node for regulator, phy-reset-gpios and iomuxc node.
-
-Milo Kim (3):
-  ARM: dts: imx6: Add Savageboard common file
-  ARM: dts: imx6: Support Savageboard dual
-  ARM: dts: imx6: Support Savageboard quad
-
- arch/arm/boot/dts/imx6dl-savageboard.dts   |  50 ++++++
- arch/arm/boot/dts/imx6q-savageboard.dts    |  54 ++++++
+Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+---
  arch/arm/boot/dts/imx6qdl-savageboard.dtsi | 262 +++++++++++++++++++++++++++++
- 3 files changed, 366 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6dl-savageboard.dts
- create mode 100644 arch/arm/boot/dts/imx6q-savageboard.dts
+ 1 file changed, 262 insertions(+)
  create mode 100644 arch/arm/boot/dts/imx6qdl-savageboard.dtsi
 
+diff --git a/arch/arm/boot/dts/imx6qdl-savageboard.dtsi b/arch/arm/boot/dts/imx6qdl-savageboard.dtsi
+new file mode 100644
+index 0000000..a7a7e1d
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qdl-savageboard.dtsi
+@@ -0,0 +1,262 @@
++/*
++ * Copyright (C) 2016 Milo Kim <woogyom.kim@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++
++/ {
++	chosen {
++		stdout-path = &uart1;
++	};
++
++	memory at 10000000 {
++		device_type = "memory";
++		reg = <0x10000000 0x40000000>;
++	};
++
++	backlight: panel_bl {
++		compatible = "pwm-backlight";
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <4>;
++		power-supply = <&reg_3p3v>;
++		pwms = <&pwm1 0 10000>;
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpio_keys>;
++
++		power {
++			gpios = <&gpio3 7 GPIO_ACTIVE_LOW>;
++			label = "Power Button";
++			linux,code = <KEY_POWER>;
++			wakeup-source;
++		};
++	};
++
++	panel {
++		compatible = "avic, tm097tdh02", "hannstar,hsd100pxn1";
++		backlight = <&backlight>;
++		power-supply = <&reg_3p3v>;
++
++		port {
++			panel_in: endpoint {
++				remote-endpoint = <&lvds0_out>;
++			};
++		};
++	};
++
++	reg_3p3v: regulator-3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++};
++
++&clks {
++	assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
++			  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
++	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
++				 <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
++};
++
++&fec {
++	phy-mode = "rgmii";
++	phy-reset-gpios = <&gpio1 25 GPIO_ACTIVE_LOW>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet>;
++	status = "okay";
++};
++
++&hdmi {
++	ddc-i2c-bus = <&i2c2>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hdmi_tx_cec>;
++	status = "okay";
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++};
++
++&ldb {
++	status = "okay";
++
++	lvds-channel at 0 {
++		reg = <0>;
++		status = "okay";
++
++		port at 4 {
++			reg = <4>;
++
++			lvds0_out: endpoint {
++				remote-endpoint = <&panel_in>;
++			};
++		};
++	};
++};
++
++&pwm1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm1>;
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	status = "okay";
++};
++
++&usbh1 {
++	status = "okay";
++};
++
++/* SD card */
++&usdhc3 {
++	bus-width = <4>;
++	cd-gpios = <&gpio2 0 GPIO_ACTIVE_LOW>;
++	no-1-8-v;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_sd>;
++	status = "okay";
++};
++
++/* eMMC */
++&usdhc4 {
++	bus-width = <8>;
++	keep-power-in-suspend;
++	no-1-8-v;
++	non-removable;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_emmc>;
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl_emmc: emmcgrp {
++		fsl,pins = <
++			MX6QDL_PAD_SD4_CMD__SD4_CMD		0x17059
++			MX6QDL_PAD_SD4_CLK__SD4_CLK		0x10059
++			MX6QDL_PAD_SD4_DAT0__SD4_DATA0		0x17059
++			MX6QDL_PAD_SD4_DAT1__SD4_DATA1		0x17059
++			MX6QDL_PAD_SD4_DAT2__SD4_DATA2		0x17059
++			MX6QDL_PAD_SD4_DAT3__SD4_DATA3		0x17059
++			MX6QDL_PAD_SD4_DAT4__SD4_DATA4		0x17059
++			MX6QDL_PAD_SD4_DAT5__SD4_DATA5		0x17059
++			MX6QDL_PAD_SD4_DAT6__SD4_DATA6		0x17059
++			MX6QDL_PAD_SD4_DAT7__SD4_DATA7		0x17059
++		>;
++	};
++
++	pinctrl_enet: enetgrp {
++		fsl,pins = <
++			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
++			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
++			MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b030
++			MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b030
++			MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b030
++			MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b030
++			MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b030
++			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b030
++			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
++			MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b030
++			MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b030
++			MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b030
++			MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b030
++			MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b030
++			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b030
++			/* PHY reset */
++			MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25	0x1b0b0
++		>;
++	};
++
++	pinctrl_hdmi_tx_cec: hdmitxcecgrp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE	0x1f8b0
++		>;
++	};
++
++	pinctrl_i2c2: i2c2grp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
++			MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
++		>;
++	};
++
++	pinctrl_gpio_keys: gpiokeysgrp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_DA7__GPIO3_IO07		0x1b0b1
++		>;
++	};
++
++	pinctrl_pwm1: pwm1grp {
++		fsl,pins = <
++			MX6QDL_PAD_SD1_DAT3__PWM1_OUT		0x1b0b1
++		>;
++	};
++
++	pinctrl_sd: sdgrp {
++		fsl,pins = <
++			MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17059
++			MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10059
++			MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17059
++			MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
++			MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
++			MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
++			/* CD pin */
++			MX6QDL_PAD_NANDF_D0__GPIO2_IO00		0x1b0b1
++		>;
++	};
++
++	pinctrl_uart1: uart1grp {
++		fsl,pins = <
++			MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
++			MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA	0x1b0b1
++		>;
++	};
++};
 -- 
 2.9.3
