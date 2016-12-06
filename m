@@ -1,28 +1,53 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 6 Dec 2016 15:01:09 +0100
-Subject: [PATCH renesas/devel 2/2] ARM: multi_v7_defconfig: Enable
- r8a774[35] SoCs
-In-Reply-To: <1481031173-18600-3-git-send-email-horms+renesas@verge.net.au>
-References: <1481031173-18600-1-git-send-email-horms+renesas@verge.net.au>
- <1481031173-18600-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXppuXOTq_VMW3v-_hmCM=1jysEyUM_1kcNtDq2qpv0vw@mail.gmail.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Tue, 6 Dec 2016 15:02:18 +0100
+Subject: [PATCH v4 1/7] MFD: add bindings for STM32 General Purpose Timer
+ driver
+In-Reply-To: <20161206130048.GH25385@dell.home>
+References: <1481027929-13704-1-git-send-email-benjamin.gaignard@st.com>
+ <1481027929-13704-2-git-send-email-benjamin.gaignard@st.com>
+ <20161206130048.GH25385@dell.home>
+Message-ID: <CA+M3ks7nUzbhUeKzi5VzJb0YhC2EWZU5k4gNCEKjHbpGrEWZtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 6, 2016 at 2:32 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> Enable recently added r8a7743 (RZ/G1M) and r8a7745 (RZ/G1E) SoCs.
+[snip]
 >
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> I'm not going to push too hard, but I still thing "advanced-control"
+> would suit better, since this is not *just* a timer.  In fact, the
+> parent device (the MFD) doesn't have any timer functionality.  That's
+> what "timer at 0" does.
+>
+> The IP is called "Advanced Control" in the datasheet, no?
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+In datasheet only timers 1 and 8 are called "advanced-control" timers
+Timers 2 to 5 and 9 to 14 are called "general purpose" timers.
+Timers 6 and 7 are named "basic" timers.
 
-Gr{oetje,eeting}s,
+I have ask around in ST and it seems that "general purpose" name was the
+best to describe all the timers, so I would like to keep using it.
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +             compatible = "st,stm32-gptimer";
+>> +             reg = <0x40010000 0x400>;
+>> +             clocks = <&rcc 0 160>;
+>> +             clock-names = "clk_int";
+>> +
+>> +             pwm at 0 {
+>> +                     compatible = "st,stm32-pwm";
+>> +                     pinctrl-0       = <&pwm1_pins>;
+>> +                     pinctrl-names   = "default";
+>> +             };
+>> +
+>> +             timer at 0 {
+>> +                     compatible = "st,stm32-timer-trigger";
+>> +                     reg = <0>;
+>> +             };
+>> +     };
+>
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
