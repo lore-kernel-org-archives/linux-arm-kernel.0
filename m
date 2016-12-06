@@ -1,60 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Dec 2016 11:55:08 +0000
-Subject: [PATCH 1/2] arm: kernel: Add SMC structure parameter
-In-Reply-To: <1480405463-23165-2-git-send-email-andy.gross@linaro.org>
-References: <1480405463-23165-1-git-send-email-andy.gross@linaro.org>
- <1480405463-23165-2-git-send-email-andy.gross@linaro.org>
-Message-ID: <20161206115507.GD2498@arm.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Tue, 6 Dec 2016 12:58:08 +0100
+Subject: [PATCH v3 1/3] ARM: da850: fix infinite loop in clk_set_rate()
+In-Reply-To: <689efaa1-d8d9-6937-5880-3ed7a1401268@ti.com>
+References: <1480932549-30811-1-git-send-email-bgolaszewski@baylibre.com>
+ <1480932549-30811-2-git-send-email-bgolaszewski@baylibre.com>
+ <689efaa1-d8d9-6937-5880-3ed7a1401268@ti.com>
+Message-ID: <CAMpxmJUCE86Y030jpLVD7=S6UThmRB2p-xS-oD3swnUSvMWe2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+2016-12-05 11:15 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+> On Monday 05 December 2016 03:39 PM, Bartosz Golaszewski wrote:
+>> The aemif clock is added twice to the lookup table in da850.c. This
+>> breaks the children list of pll0_sysclk3 as we're using the same list
+>> links in struct clk. When calling clk_set_rate(), we get stuck in
+>> propagate_rate().
+>>
+>> Create a separate clock for nand, inheriting the rate of the aemif
+>> clock and retrieve it in the davinci_nand module.
+>>
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> ---
+>>  arch/arm/mach-davinci/da850.c | 7 ++++++-
+>>  1 file changed, 6 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+>> index e770c97..c008e5e 100644
+>> --- a/arch/arm/mach-davinci/da850.c
+>> +++ b/arch/arm/mach-davinci/da850.c
+>> @@ -367,6 +367,11 @@ static struct clk aemif_clk = {
+>>       .flags          = ALWAYS_ENABLED,
+>>  };
+>>
+>> +static struct clk aemif_nand_clk = {
+>> +     .name           = "nand",
+>> +     .parent         = &aemif_clk,
+>> +};
+>> +
+>>  static struct clk usb11_clk = {
+>>       .name           = "usb11",
+>>       .parent         = &pll0_sysclk4,
+>> @@ -537,7 +542,7 @@ static struct clk_lookup da850_clks[] = {
+>>       CLK("da830-mmc.0",      NULL,           &mmcsd0_clk),
+>>       CLK("da830-mmc.1",      NULL,           &mmcsd1_clk),
+>>       CLK("ti-aemif",         NULL,           &aemif_clk),
+>> -     CLK(NULL,               "aemif",        &aemif_clk),
+>> +     CLK(NULL,               "aemif",        &aemif_nand_clk),
+>
+> Why use a NULL device name here?
 
-On Tue, Nov 29, 2016 at 01:44:22AM -0600, Andy Gross wrote:
-> This patch adds a quirk parameter to the arm_smccc_smc call.  The quirk
-> structure allows for specialized SMC operations due to SoC specific
-> requirements.
-> 
-> This patch also fixes up all the current users of the arm_smccc_smc API.
-> 
-> This patch and partial implementation was suggested by Will Deacon.
-> 
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> ---
->  arch/arm/kernel/smccc-call.S         |  3 ++-
->  arch/arm/mach-artpec/board-artpec6.c |  2 +-
->  arch/arm64/kernel/asm-offsets.c      |  7 +++++--
->  arch/arm64/kernel/smccc-call.S       |  3 ++-
->  drivers/clk/rockchip/clk-ddr.c       |  6 +++---
->  drivers/devfreq/rk3399_dmc.c         |  6 +++---
->  drivers/firmware/meson/meson_sm.c    |  2 +-
->  drivers/firmware/psci.c              |  2 +-
->  drivers/firmware/qcom_scm-64.c       |  4 ++--
->  drivers/gpu/drm/mediatek/mtk_hdmi.c  |  2 +-
->  include/linux/arm-smccc.h            | 18 ++++++++++++++++--
->  11 files changed, 37 insertions(+), 18 deletions(-)
+Hi Sekhar,
 
-Thanks for respinning this; I'd forgotten about it!
+there's an issue with this bit. I added an of_dev_auxdata entry to
+da8xx-dt.c for the nand node, but it didn't work (the nand driver
+could not get the clock). When I dug deeper, it turned out, the nand
+node is created from aemif_probe() instead of from
+da850_init_machine() and the lookup table is not passed as argument to
+of_platform_populate().
 
-> diff --git a/arch/arm/kernel/smccc-call.S b/arch/arm/kernel/smccc-call.S
-> index 37669e7..e77950a 100644
-> --- a/arch/arm/kernel/smccc-call.S
-> +++ b/arch/arm/kernel/smccc-call.S
-> @@ -47,7 +47,8 @@ UNWIND(	.fnend)
->  /*
->   * void smccc_smc(unsigned long a0, unsigned long a1, unsigned long a2,
->   *		  unsigned long a3, unsigned long a4, unsigned long a5,
-> - *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
-> + *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res,
-> + *		  struct arm_smccc_quirk *quirk)
+There are two solutions: one is using "620000000.nand" as dev_id in
+the clock lookup table, but that's ugly. The second is leaving dev_id
+as NULL - I verified that the nand driver works correctly having only
+the connector id. Please let me know which one you prefer or if you
+have other ideas.
 
-I'd not thought of doing it like this -- I envisaged embedding the quirk
-structure into arm_smccc_res, but this works too. I wonder if we could avoid
-having to pass NULL everywhere if we renamed arm_smccc_{hvc.smc} and added
-a default wrapper around them?
-
-For example, rename arm_smccc_smc to __arm_smccc_smc, add a macro called
-arm_smccc_smc that passes a NULL argument for the quirk, then finally add
-a macro arm_smccc_smc_quirk that takes the additional parameter?
-
-Will
+Best regards,
+Bartosz Golaszewski
