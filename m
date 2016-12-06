@@ -1,259 +1,134 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Tue, 6 Dec 2016 15:06:21 -0500
-Subject: [PATCH 4/5] ARM: BCM5301X: Specify all RAM by including extra
- block
-In-Reply-To: <20161206171714.22738-4-zajec5@gmail.com>
-References: <20161206171714.22738-1-zajec5@gmail.com>
- <20161206171714.22738-4-zajec5@gmail.com>
-Message-ID: <20161206200621.GB2768@broadcom.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 6 Dec 2016 12:10:50 -0800
+Subject: [PATCHv4 09/10] mm/usercopy: Switch to using lm_alias
+In-Reply-To: <20161206181859.GH24177@leverpostej>
+References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
+ <1480445729-27130-10-git-send-email-labbott@redhat.com>
+ <CAGXu5jKrBc6R9JYay1L6pd958Vm5-6p=37tiUYgg6uPeZb1HtQ@mail.gmail.com>
+ <20161206181859.GH24177@leverpostej>
+Message-ID: <CAGXu5jKTdZUbbHU91mbN+Qy80AGXRhpzdLNXr3oxxZyxAzmjmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2016 at 06:17:13PM +0100, Rafa? Mi?ecki wrote:
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
-> 
-> So far we were specifying only the first block which is always limited
-> up to 128 MiB. There are many devices with 256 MiB and few with 512 MiB.
+On Tue, Dec 6, 2016 at 10:18 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Nov 29, 2016 at 11:39:44AM -0800, Kees Cook wrote:
+>> On Tue, Nov 29, 2016 at 10:55 AM, Laura Abbott <labbott@redhat.com> wrote:
+>> >
+>> > The usercopy checking code currently calls __va(__pa(...)) to check for
+>> > aliases on symbols. Switch to using lm_alias instead.
+>> >
+>> > Signed-off-by: Laura Abbott <labbott@redhat.com>
+>>
+>> Acked-by: Kees Cook <keescook@chromium.org>
+>>
+>> I should probably add a corresponding alias test to lkdtm...
+>>
+>> -Kees
+>
+> Something like the below?
+>
+> It uses lm_alias(), so it depends on Laura's patches. We seem to do the
+> right thing, anyhow:
 
-Assuming that NS is like NSP (and I'm pretty sure it is), there are 2
-ways to access the first 128M of RAM, a proxy starting at address 0
-and the real address.  I think you are splitting RAM by accessing it
-both ways, when you really should just be accessing it at the real
-address.
+Cool, this looks good. What happens on systems without an alias?
 
-Thanks,
-Jon
+Laura, feel free to add this to your series:
 
-> 
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
-> ---
->  arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts        | 3 ++-
->  arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts        | 3 ++-
->  arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  | 3 ++-
->  arch/arm/boot/dts/bcm4708-netgear-r6250.dts        | 3 ++-
->  arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts     | 3 ++-
->  arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts      | 3 ++-
->  arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts        | 3 ++-
->  arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 3 ++-
->  arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts  | 3 ++-
->  arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts        | 3 ++-
->  arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts  | 3 ++-
->  arch/arm/boot/dts/bcm4709-netgear-r7000.dts        | 3 ++-
->  arch/arm/boot/dts/bcm4709-netgear-r8000.dts        | 3 ++-
->  arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts      | 3 ++-
->  arch/arm/boot/dts/bcm47094-netgear-r8500.dts       | 3 ++-
->  15 files changed, 30 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts b/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts
-> index 112a5a8..d241cee 100644
-> --- a/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts
-> +++ b/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts
-> @@ -21,7 +21,8 @@
->  	};
->  
->  	memory {
-> -		reg = <0x00000000 0x08000000>;
-> +		reg = <0x00000000 0x08000000
-> +		       0x88000000 0x08000000>;
->  	};
->  
->  	leds {
-> diff --git a/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts b/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
-> index 3600f56..b0e6204 100644
-> --- a/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
-> +++ b/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
-> @@ -21,7 +21,8 @@
->  	};
->  
->  	memory {
-> -		reg = <0x00000000 0x08000000>;
-> +		reg = <0x00000000 0x08000000
-> +		       0x88000000 0x08000000>;
->  	};
->  
->  	leds {
-> diff --git a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-> index d49afec0..c9ba6b9 100644
-> --- a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-> +++ b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-> @@ -21,7 +21,8 @@
->  	};
->  
->  	memory {
-> -		reg = <0x00000000 0x08000000>;
-> +		reg = <0x00000000 0x08000000
-> +		       0x88000000 0x18000000>;
->  	};
->  
->  	spi {
-> diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-> index 8519548..b9f66c0 100644
-> --- a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-> +++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-> @@ -21,7 +21,8 @@
->  	};
->  
->  	memory {
-> -		reg = <0x00000000 0x08000000>;
-> +		reg = <0x00000000 0x08000000
-> +		       0x88000000 0x08000000>;
->  	};
->  
->  	leds {
-> diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts b/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
-> index 6229ef2..ae0199f 100644
-> --- a/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
-> +++ b/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
-> @@ -21,7 +21,8 @@
->  	};
->  
->  	memory {
-> -		reg = <0x00000000 0x08000000>;
-> +		reg = <0x00000000 0x08000000
-> +		       0x88000000 0x08000000>;
->  	};
->  
->  	leds {
-> diff --git a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-> index 74cfcd3..36b628b1 100644
-> --- a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-> +++ b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-> @@ -21,7 +21,8 @@
->  	};
->  
->  	memory {
-> -		reg = <0x00000000 0x08000000>;
-> +		reg = <0x00000000 0x08000000
-> +		       0x88000000 0x08000000>;
->  	};
->  
->  	leds {
-> diff --git a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
-> index 71b98cf..db8608b 100644
-> --- a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
-> +++ b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
-> @@ -21,7 +21,8 @@
->  	};
->  
->  	memory {
-> -		reg = <0x00000000 0x08000000>;
-> +		reg = <0x00000000 0x08000000
-> +		       0x88000000 0x08000000>;
->  	};
->  
->  	leds {
-> diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-> index 2922536..d51586d 100644
-> --- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-> +++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-> @@ -21,7 +21,8 @@
->  	};
->  
->  	memory {
-> -		reg = <0x00000000 0x08000000>;
-> +		reg = <0x00000000 0x08000000
-> +		       0x88000000 0x08000000>;
->  	};
->  
->  	spi {
-> diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
-> index 184fd92..de041b8 100644
-> --- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
-> +++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
-> @@ -21,7 +21,8 @@
->  	};
->  
->  	memory {
-> -		reg = <0x00000000 0x08000000>;
-> +		reg = <0x00000000 0x08000000
-> +		       0x88000000 0x08000000>;
->  	};
->  
->  	gpio-keys {
-> diff --git a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
-> index eac0f52..eaca687 100644
-> --- a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
-> +++ b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
-> @@ -21,7 +21,8 @@
->  	};
->  
->  	memory {
-> -		reg = <0x00000000 0x08000000>;
-> +		reg = <0x00000000 0x08000000
-> +		       0x88000000 0x08000000>;
->  	};
->  
->  	leds {
-> diff --git a/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts b/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
-> index aab39c9..b32957c 100644
-> --- a/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
-> +++ b/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
-> @@ -21,7 +21,8 @@
->  	};
->  
->  	memory {
-> -		reg = <0x00000000 0x08000000>;
-> +		reg = <0x00000000 0x08000000
-> +		       0x88000000 0x18000000>;
->  	};
->  
->  	leds {
-> diff --git a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
-> index 7ab1176..f459a98 100644
-> --- a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
-> +++ b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
-> @@ -21,7 +21,8 @@
->  	};
->  
->  	memory {
-> -		reg = <0x00000000 0x08000000>;
-> +		reg = <0x00000000 0x08000000
-> +		       0x88000000 0x08000000>;
->  	};
->  
->  	leds {
-> diff --git a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-> index 56d38a3..cd13534 100644
-> --- a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-> +++ b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-> @@ -21,7 +21,8 @@
->  	};
->  
->  	memory {
-> -		reg = <0x00000000 0x08000000>;
-> +		reg = <0x00000000 0x08000000
-> +		       0x88000000 0x08000000>;
->  	};
->  
->  	leds {
-> diff --git a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-> index 7fb9270..64ded76 100644
-> --- a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-> +++ b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-> @@ -21,7 +21,8 @@
->  	};
->  
->  	memory {
-> -		reg = <0x00000000 0x08000000>;
-> +		reg = <0x00000000 0x08000000
-> +		       0x88000000 0x08000000>;
->  	};
->  
->  	nand: nand at 18028000 {
-> diff --git a/arch/arm/boot/dts/bcm47094-netgear-r8500.dts b/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
-> index 7ecd57c..600795e 100644
-> --- a/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
-> +++ b/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
-> @@ -18,7 +18,8 @@
->  	};
->  
->  	memory {
-> -		reg = <0x00000000 0x08000000>;
-> +		reg = <0x00000000 0x08000000
-> +		       0x88000000 0x18000000>;
->  	};
->  
->  	leds {
-> -- 
-> 2.10.1
-> 
+Acked-by: Kees Cook <keescook@chromium.org>
+
+-Kees
+
+>
+> root at ribbensteg:/home/nanook# echo USERCOPY_KERNEL_ALIAS > /sys/kernel/debug/provoke-crash/DIRECT
+> [   44.493400] usercopy: kernel memory exposure attempt detected from ffff80000031a730 (<linear kernel text>) (4096 bytes)
+> [   44.504263] kernel BUG at mm/usercopy.c:75!
+>
+> Thanks,
+> Mark.
+>
+> ---->8----
+> diff --git a/drivers/misc/lkdtm.h b/drivers/misc/lkdtm.h
+> index fdf954c..96d8d76 100644
+> --- a/drivers/misc/lkdtm.h
+> +++ b/drivers/misc/lkdtm.h
+> @@ -56,5 +56,6 @@
+>  void lkdtm_USERCOPY_STACK_FRAME_FROM(void);
+>  void lkdtm_USERCOPY_STACK_BEYOND(void);
+>  void lkdtm_USERCOPY_KERNEL(void);
+> +void lkdtm_USERCOPY_KERNEL_ALIAS(void);
+>
+>  #endif
+> diff --git a/drivers/misc/lkdtm_core.c b/drivers/misc/lkdtm_core.c
+> index f9154b8..f6bc6d6 100644
+> --- a/drivers/misc/lkdtm_core.c
+> +++ b/drivers/misc/lkdtm_core.c
+> @@ -228,6 +228,7 @@ struct crashtype crashtypes[] = {
+>         CRASHTYPE(USERCOPY_STACK_FRAME_FROM),
+>         CRASHTYPE(USERCOPY_STACK_BEYOND),
+>         CRASHTYPE(USERCOPY_KERNEL),
+> +       CRASHTYPE(USERCOPY_KERNEL_ALIAS),
+>  };
+>
+>
+> diff --git a/drivers/misc/lkdtm_usercopy.c b/drivers/misc/lkdtm_usercopy.c
+> index 1dd6114..955f2dc 100644
+> --- a/drivers/misc/lkdtm_usercopy.c
+> +++ b/drivers/misc/lkdtm_usercopy.c
+> @@ -279,9 +279,16 @@ void lkdtm_USERCOPY_STACK_BEYOND(void)
+>         do_usercopy_stack(true, false);
+>  }
+>
+> -void lkdtm_USERCOPY_KERNEL(void)
+> +static void do_usercopy_kernel(bool use_alias)
+>  {
+>         unsigned long user_addr;
+> +       const void *rodata = test_text;
+> +       void *text = vm_mmap;
+> +
+> +       if (use_alias) {
+> +               rodata = lm_alias(rodata);
+> +               text = lm_alias(text);
+> +       }
+>
+>         user_addr = vm_mmap(NULL, 0, PAGE_SIZE,
+>                             PROT_READ | PROT_WRITE | PROT_EXEC,
+> @@ -292,14 +299,14 @@ void lkdtm_USERCOPY_KERNEL(void)
+>         }
+>
+>         pr_info("attempting good copy_to_user from kernel rodata\n");
+> -       if (copy_to_user((void __user *)user_addr, test_text,
+> +       if (copy_to_user((void __user *)user_addr, rodata,
+>                          unconst + sizeof(test_text))) {
+>                 pr_warn("copy_to_user failed unexpectedly?!\n");
+>                 goto free_user;
+>         }
+>
+>         pr_info("attempting bad copy_to_user from kernel text\n");
+> -       if (copy_to_user((void __user *)user_addr, vm_mmap,
+> +       if (copy_to_user((void __user *)user_addr, text,
+>                          unconst + PAGE_SIZE)) {
+>                 pr_warn("copy_to_user failed, but lacked Oops\n");
+>                 goto free_user;
+> @@ -309,6 +316,16 @@ void lkdtm_USERCOPY_KERNEL(void)
+>         vm_munmap(user_addr, PAGE_SIZE);
+>  }
+>
+> +void lkdtm_USERCOPY_KERNEL(void)
+> +{
+> +       do_usercopy_kernel(false);
+> +}
+> +
+> +void lkdtm_USERCOPY_KERNEL_ALIAS(void)
+> +{
+> +       do_usercopy_kernel(true);
+> +}
+> +
+>  void __init lkdtm_usercopy_init(void)
+>  {
+>         /* Prepare cache that lacks SLAB_USERCOPY flag. */
+
+
+
+-- 
+Kees Cook
+Nexus Security
