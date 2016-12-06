@@ -1,67 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 6 Dec 2016 17:13:18 -0600
-Subject: [PATCH 1/2] dt-bindings: mmc: add DT binding for S3C24XX
- MMC/SD/SDIO controller
-In-Reply-To: <054a65d8-8606-eeb0-e028-1b85dbf1c8ba@samsung.com>
-References: <1480637665-6325-1-git-send-email-sergio.prado@e-labworks.com>
- <CGME20161202001621epcas3p2fcc946ce070dfcc594e4b89729e149d7@epcas3p2.samsung.com>
- <1480637665-6325-2-git-send-email-sergio.prado@e-labworks.com>
- <054a65d8-8606-eeb0-e028-1b85dbf1c8ba@samsung.com>
-Message-ID: <20161206231318.m4oo2e6t5zk2txbx@rob-hp-laptop>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 6 Dec 2016 15:16:42 -0800
+Subject: [PATCH] clk: uniphier: Fix build with gcc-4.4.
+In-Reply-To: <CAK7LNATeswNhoFsA90k=qF4Jock0ytNT-pPT6j+0b9MJFJwu9Q@mail.gmail.com>
+References: <1480725436-9628-1-git-send-email-vlee@freedesktop.org>
+ <CAK7LNATeswNhoFsA90k=qF4Jock0ytNT-pPT6j+0b9MJFJwu9Q@mail.gmail.com>
+Message-ID: <20161206231642.GA4388@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 09:48:45AM +0900, Jaehoon Chung wrote:
-> On 12/02/2016 09:14 AM, Sergio Prado wrote:
-> > Adds the device tree bindings description for Samsung S3C24XX
-> > MMC/SD/SDIO controller, used as a connectivity interface with external
-> > MMC, SD and SDIO storage mediums.
-> > 
-> > Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
-> > ---
-> >  .../devicetree/bindings/mmc/samsung,s3cmci.txt     | 38 ++++++++++++++++++++++
-> >  1 file changed, 38 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt b/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
-> > new file mode 100644
-> > index 000000000000..3f044076e69a
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
-> > @@ -0,0 +1,38 @@
-> > +* Samsung's S3C24XX MMC/SD/SDIO controller device tree bindings
-> > +
-> > +Samsung's S3C24XX MMC/SD/SDIO controller is used as a connectivity interface
-> > +with external MMC, SD and SDIO storage mediums.
-> > +
-> > +This file documents differences between the core mmc properties described by
-> > +mmc.txt and the properties used by the Samsung S3C24XX MMC/SD/SDIO controller
-> > +implementation.
-> > +
-> > +Required SoC Specific Properties:
-> > +- compatible: should be one of the following
-> > +  - "samsung,s3c2410-sdi": for controllers compatible with s3c2410
-> > +  - "samsung,s3c2412-sdi": for controllers compatible with s3c2412
-> > +  - "samsung,s3c2440-sdi": for controllers compatible with s3c2440
-> > +- clocks: Should reference the controller clock
-> > +- clock-names: Should contain "sdi"
-> > +
-> > +Required Board Specific Properties:
-> > +- pinctrl-0: Should specify pin control groups used for this controller.
-> > +- pinctrl-names: Should contain only one value - "default".
+On 12/03, Masahiro Yamada wrote:
+> Hi Vinson,
 > 
-> I'm not sure but i think this description doesn't need at here.
+> 2016-12-03 9:37 GMT+09:00 Vinson Lee <vlee@freedesktop.org>:
+> > gcc-4.4 has issues with anonymous unions in initializers.
+> >
+> >   CC      drivers/clk/uniphier/clk-uniphier-sys.o
+> > drivers/clk/uniphier/clk-uniphier-sys.c:45: error: unknown field ?factor? specified in initializer
+> >
+> > Fixes: 1574d5722636 ("clk: uniphier: remove unneeded member name for union")
+> > Signed-off-by: Vinson Lee <vlee@freedesktop.org>
 > 
-> > +
-> > +Example:
-> > +	sdi: sdi at 5a000000 {
 > 
-> I think it needs to use "mmc0: sdi at 5a000000" instead of "sdi: sdi at 5a000000"
-> Because mmc is more clear than sdi.
+> This driver has COMPILE_TEST option, but kbuild test robot
+> did not mention about this.
+> 
+> 
+> 
+> This is a bad way of fixing, I think.
+> (what if a new member is inserted before the union in the future?)
+> 
+> Rather, please revert the bad commit.
+> 
 
-The label doesn't matter much as it is not part of the dtb. The unit 
-name should be 'mmc' though.
+Reverting on top of clk-next will cause build failures though.
+Can you resend the patch series without this first patch please?
+I'll apply them then.
 
-With that,
+I'll go drop all three patches and wreck Andrew's merge of this
+patch to -mm.
 
-Acked-by: Rob Herring <robh@kernel.org>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
