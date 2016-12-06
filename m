@@ -1,45 +1,37 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 6 Dec 2016 15:27:32 +0530
-Subject: [PATCH v5] ARM: davinci: da8xx: Fix sleeping function called from
- invalid context
-In-Reply-To: <cbf4b99b-e453-acd5-d864-f709708fbab0@baylibre.com>
-References: <1480947224-26222-1-git-send-email-abailon@baylibre.com>
- <2fc7a4ef-02ad-fc15-66ea-9f75756086f8@ti.com>
- <cbf4b99b-e453-acd5-d864-f709708fbab0@baylibre.com>
-Message-ID: <c4e15855-b785-8bc7-5ef2-af4ec24354e6@ti.com>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Tue, 6 Dec 2016 18:03:59 +0800
+Subject: [PATCH v3 0/4] mm: fix the "counter.sh" failure for libhugetlbfs
+In-Reply-To: <20161205093100.GF30758@dhcp22.suse.cz>
+References: <1480929431-22348-1-git-send-email-shijie.huang@arm.com>
+ <20161205093100.GF30758@dhcp22.suse.cz>
+Message-ID: <20161206100358.GA4619@sha-win-210.asiapac.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 December 2016 03:21 PM, Alexandre Bailon wrote:
-> On 12/06/2016 10:33 AM, Sekhar Nori wrote:
->> On Monday 05 December 2016 07:43 PM, Alexandre Bailon wrote:
->>> Everytime the usb20 phy is enabled, there is a
->>> "sleeping function called from invalid context" BUG.
->>>
->>> clk_enable() from arch/arm/mach-davinci/clock.c uses spin_lock_irqsave()
->>> before to invoke the callback usb20_phy_clk_enable().
->>> usb20_phy_clk_enable() uses clk_get() and clk_enable_prepapre()
->>> which may sleep.
->>> Move clk_get() to da8xx_register_usb20_phy_clk() and
->>> replace clk_prepare_enable() by clk_enable().
->>>
->>> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
->>
->> This will still cause the recursive locking problem reported by David.
->> Not sure what the point of sending this version was.
->>
->> Thanks,
->> Sekhar
->>
+On Mon, Dec 05, 2016 at 05:31:01PM +0800, Michal Hocko wrote:
+> On Mon 05-12-16 17:17:07, Huang Shijie wrote:
+> [...]
+> >    The failure is caused by:
+> >     1) kernel fails to allocate a gigantic page for the surplus case.
+> >        And the gather_surplus_pages() will return NULL in the end.
+> > 
+> >     2) The condition checks for some functions are wrong:
+> >         return_unused_surplus_pages()
+> >         nr_overcommit_hugepages_store()
+> >         hugetlb_overcommit_handler()
+> 
+> OK, so how is this any different from gigantic (1G) hugetlb pages on
+I think there is no different from gigantic (1G) hugetlb pages on
+x86_64. Do anyone ever tested the 1G hugetlb pages in x86_64 with the "counter.sh"
+before? 
 
-> What am I supposed to do ?
+> x86_64? Do we need the same functionality or is it just 32MB not being
+> handled in the same way as 1G?
+Yes, we need this functionality for gigantic pages, no matter it is
+X86_64 or S390 or arm64, no matter it is 32MB or 1G. :)
 
-That needs to be resolved between you and David. Perhaps convert the fix
-sent by David into a proper patch and base this patch on that. Or wait
-for David to send it himself and let him also make the modifications
-needed in this patch.
+But anyway, I will try to find some machine and try the 1G gigantic page
+on ARM64.
 
-David ?
-
-Thanks,
-Sekhar
+Thanks
+Huang Shijie
