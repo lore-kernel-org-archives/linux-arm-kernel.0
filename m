@@ -1,54 +1,60 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Tue,  6 Dec 2016 13:53:19 +1100
-Subject: [PATCH v3 4/6] mfd: dt: Add bindings for the Aspeed LPC Host
- Controller (LHC)
+Date: Tue,  6 Dec 2016 13:53:21 +1100
+Subject: [PATCH v3 6/6] mfd: dt: Move syscon bindings to syscon subdirectory
 In-Reply-To: <20161206025321.1792-1-andrew@aj.id.au>
 References: <20161206025321.1792-1-andrew@aj.id.au>
-Message-ID: <20161206025321.1792-5-andrew@aj.id.au>
+Message-ID: <20161206025321.1792-7-andrew@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LPC bus pinmux configuration on fifth generation Aspeed SoCs depends
-on bits in both the System Control Unit and the LPC Host Controller.
-
-The Aspeed LPC Host Controller is described as a child node of the
-LPC host-range syscon device for arbitration of access by the host
-controller and pinmux drivers.
+The use of syscons is growing, lets collate them in their own part of
+the bindings tree.
 
 Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
 ---
- .../devicetree/bindings/mfd/aspeed-lpc.txt         | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ Documentation/devicetree/bindings/mfd/{ => syscon}/aspeed-scu.txt         | 0
+ Documentation/devicetree/bindings/mfd/{ => syscon}/atmel-gpbr.txt         | 0
+ Documentation/devicetree/bindings/mfd/{ => syscon}/atmel-matrix.txt       | 0
+ Documentation/devicetree/bindings/mfd/{ => syscon}/atmel-smc.txt          | 0
+ Documentation/devicetree/bindings/mfd/{ => syscon}/qcom,tcsr.txt          | 0
+ Documentation/devicetree/bindings/mfd/{ => syscon}/syscon.txt             | 0
+ .../devicetree/bindings/mfd/{ => syscon}/ti-keystone-devctrl.txt          | 0
+ 7 files changed, 0 insertions(+), 0 deletions(-)
+ rename Documentation/devicetree/bindings/mfd/{ => syscon}/aspeed-scu.txt (100%)
+ rename Documentation/devicetree/bindings/mfd/{ => syscon}/atmel-gpbr.txt (100%)
+ rename Documentation/devicetree/bindings/mfd/{ => syscon}/atmel-matrix.txt (100%)
+ rename Documentation/devicetree/bindings/mfd/{ => syscon}/atmel-smc.txt (100%)
+ rename Documentation/devicetree/bindings/mfd/{ => syscon}/qcom,tcsr.txt (100%)
+ rename Documentation/devicetree/bindings/mfd/{ => syscon}/syscon.txt (100%)
+ rename Documentation/devicetree/bindings/mfd/{ => syscon}/ti-keystone-devctrl.txt (100%)
 
-diff --git a/Documentation/devicetree/bindings/mfd/aspeed-lpc.txt b/Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
-index a97131aba446..9de318ef72da 100644
---- a/Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
-+++ b/Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
-@@ -109,3 +109,25 @@ lpc: lpc at 1e789000 {
- 	};
- };
- 
-+Host Node Children
-+==================
-+
-+LPC Host Controller
-+-------------------
-+
-+The Aspeed LPC Host Controller configures the Low Pin Count (LPC) bus behaviour
-+between the host and the baseboard management controller. The registers exist
-+in the "host" portion of the Aspeed LPC controller, which must be the parent of
-+the LPC host controller node.
-+
-+Required properties:
-+- compatible:		"aspeed,ast2500-lhc";
-+- reg:			contains offset/length value of the LHC memory
-+			region.
-+
-+Example:
-+
-+lhc: lhc at 20 {
-+	compatible = "aspeed,ast2500-lhc";
-+	reg = <0x20 0x24 0x48 0x8>;
-+};
+diff --git a/Documentation/devicetree/bindings/mfd/aspeed-scu.txt b/Documentation/devicetree/bindings/mfd/syscon/aspeed-scu.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/mfd/aspeed-scu.txt
+rename to Documentation/devicetree/bindings/mfd/syscon/aspeed-scu.txt
+diff --git a/Documentation/devicetree/bindings/mfd/atmel-gpbr.txt b/Documentation/devicetree/bindings/mfd/syscon/atmel-gpbr.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/mfd/atmel-gpbr.txt
+rename to Documentation/devicetree/bindings/mfd/syscon/atmel-gpbr.txt
+diff --git a/Documentation/devicetree/bindings/mfd/atmel-matrix.txt b/Documentation/devicetree/bindings/mfd/syscon/atmel-matrix.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/mfd/atmel-matrix.txt
+rename to Documentation/devicetree/bindings/mfd/syscon/atmel-matrix.txt
+diff --git a/Documentation/devicetree/bindings/mfd/atmel-smc.txt b/Documentation/devicetree/bindings/mfd/syscon/atmel-smc.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/mfd/atmel-smc.txt
+rename to Documentation/devicetree/bindings/mfd/syscon/atmel-smc.txt
+diff --git a/Documentation/devicetree/bindings/mfd/qcom,tcsr.txt b/Documentation/devicetree/bindings/mfd/syscon/qcom,tcsr.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/mfd/qcom,tcsr.txt
+rename to Documentation/devicetree/bindings/mfd/syscon/qcom,tcsr.txt
+diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon/syscon.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/mfd/syscon.txt
+rename to Documentation/devicetree/bindings/mfd/syscon/syscon.txt
+diff --git a/Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt b/Documentation/devicetree/bindings/mfd/syscon/ti-keystone-devctrl.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/mfd/ti-keystone-devctrl.txt
+rename to Documentation/devicetree/bindings/mfd/syscon/ti-keystone-devctrl.txt
 -- 
 2.9.3
