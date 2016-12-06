@@ -1,35 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Dec 2016 15:30:56 +0000
-Subject: [PATCH v2 0/2] arm64: Fix fallout of asm/opcodes.h removal
-In-Reply-To: <1481038065-32153-1-git-send-email-marc.zyngier@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 6 Dec 2016 15:34:32 +0000
+Subject: [PATCH v2] arm/arm64: xen: Move shared architecture headers to
+ include/xen/arm
+In-Reply-To: <1481038065-32153-3-git-send-email-marc.zyngier@arm.com>
 References: <1481038065-32153-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20161206153056.GN2498@arm.com>
+ <1481038065-32153-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <d39f3c15-e406-6c4c-b561-ce3e76ed67d8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2016 at 03:27:42PM +0000, Marc Zyngier wrote:
-> As part of the asm/opcodes.h removal, the SET_PSTATE_{PAN,UAO} macros
-> have been switch to using the .inst directive instead of .long (as
-> this has the advantage of providing a correct disassembly). This
-> had the side effect of bringing back an ugly gas bug that shows up
-> when .inst is used within alternative sequences.
+On 06/12/16 15:27, Marc Zyngier wrote:
+> ARM and arm64 Xen ports share a number of headers, leading to
+> packaging issues when these headers needs to be exported, as it
+> breaks the reasonable requirement that an architecture port
+> has self-contained headers.
 > 
-> This series works around the problem by:
-> - adding detection code for the broken binutils,
-> - work around the issue by falling back to .long when using a buggy
->   assembler.
+> Fix the issue by moving the 5 header files to include/xen/arm,
+> and keep local placeholders to include the relevant files.
 > 
-> This has been tested with both binutils 2.25 (broken) and 2.27
-> (fixed), with both LE and BE builds.
-> 
-> Marc Zyngier (2):
->   arm64: Add detection code for broken .inst support in binutils
->   arm64: Work around broken .inst when defective gas is detected
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> * From v1:
+>   - Move offending include files to include/xen/arm
 
-For the two patches (not the bonus xen one!):
+Duh. Apologies for the spurious resend, I messed up.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Thanks,
 
-Thanks for sticking with this...
-
-Will
+	M.
+-- 
+Jazz is not dead. It just smells funny...
