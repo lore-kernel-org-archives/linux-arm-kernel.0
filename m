@@ -1,34 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 6 Dec 2016 09:52:07 -0600
-Subject: [PATCH 2/2] ASoC: atmel: tse850: rely on the ssc to register as
- a cpu dai by itself
-In-Reply-To: <1480593549-6464-3-git-send-email-peda@axentia.se>
-References: <1480593549-6464-1-git-send-email-peda@axentia.se>
- <1480593549-6464-3-git-send-email-peda@axentia.se>
-Message-ID: <20161206155207.jmybycruwsyplabr@rob-hp-laptop>
+From: weo@reccoware.de (Wolfgang Ocker)
+Date: Tue, 06 Dec 2016 16:54:04 +0100
+Subject: [PATCH] serial: mxs-auart: support CMSPAR termios cflag
+In-Reply-To: <546f7a46-df39-778f-e148-75862f426ff2@i2se.com>
+References: <546f7a46-df39-778f-e148-75862f426ff2@i2se.com>
+Message-ID: <1481039644.3856.3.camel@reccoware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2016 at 12:59:09PM +0100, Peter Rosin wrote:
-> Signed-off-by: Peter Rosin <peda@axentia.se>
-> ---
->  .../bindings/sound/axentia,tse850-pcm5142.txt      |  5 ++---
->  sound/soc/atmel/tse850-pcm5142.c                   | 23 +++-------------------
->  2 files changed, 5 insertions(+), 23 deletions(-)
+On Tue, 2016-12-06 at 14:36 +0100, Stefan Wahren wrote:
+> Hi Wolfgang,
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/axentia,tse850-pcm5142.txt b/Documentation/devicetree/bindings/sound/axentia,tse850-pcm5142.txt
-> index 5b9b38f578bb..fd12ecb35b5c 100644
-> --- a/Documentation/devicetree/bindings/sound/axentia,tse850-pcm5142.txt
-> +++ b/Documentation/devicetree/bindings/sound/axentia,tse850-pcm5142.txt
-> @@ -2,8 +2,7 @@ Devicetree bindings for the Axentia TSE-850 audio complex
->  
->  Required properties:
->    - compatible: "axentia,tse850-pcm5142"
-> -  - axentia,ssc-controller: The phandle of the atmel SSC controller used as
-> -    cpu dai.
-> +  - axentia,cpu-dai: The phandle of the cpu dai.
+> > --- a/drivers/tty/serial/mxs-auart.c
+> > +++ b/drivers/tty/serial/mxs-auart.c
+> > @@ -95,6 +95,7 @@
+> > ?#define AUART_LINECTRL_BAUD_DIVFRAC_SHIFT	8
+> > ?#define AUART_LINECTRL_BAUD_DIVFRAC_MASK	0x00003f00
+> > ?#define AUART_LINECTRL_BAUD_DIVFRAC(v)		(((v) & 0x3f) << 8)
+> > +#define AUART_LINECTRL_SPS			(1 << 7)
+> > ?#define AUART_LINECTRL_WLEN_MASK		0x00000060
+> > ?#define AUART_LINECTRL_WLEN(v)			(((v) & 0x3) << 5)
+> > ?#define AUART_LINECTRL_FEN			(1 << 4)
+> > @@ -1010,10 +1011,12 @@ static void mxs_auart_settermios(struct uart_port
+> > *u,
+> > 	ctrl |= AUART_LINECTRL_WLEN(bm);
+> > 
+> > 	/* parity */
+> > -	if (cflag & PARENB) {
+> > +	if (cflag & (PARENB|CMSPAR)) {
+> 
+> does it make sense to enable stick parity in case parity is disabled?
+> 
+> The i.MX28 reference manual doesn't describe this case explicit.
 
-You are breaking backwards compatibility with old DTBs. You either need 
-to not do that or explain in the commit why that is okay.
+Thanks Stefan for the hint. I think it's okay on the hardware side since the
+PEN bit is always set and therefore it can not happen that SPS is set but not
+PEN.
 
-Rob
+But on the termios side it makes sense to require PARENB to be set in c_cflag
+if CMSPAR is requested.
+
+So I will provide an updated patch soon.
+
+Wolfgang
