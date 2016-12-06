@@ -1,37 +1,20 @@
-From: jorik@kippendief.biz (jorik at kippendief.biz)
-Date: Tue,  6 Dec 2016 15:27:10 +0100
-Subject: [PATCH] dts: sun8i-h3: correct UART3 pin definitions
-Message-ID: <20161206142710.6450-1-jorik@kippendief.biz>
+From: woogyom.kim@gmail.com (Milo Kim)
+Date: Tue, 6 Dec 2016 23:28:30 +0900
+Subject: [PATCH 1/2] ARM: dts: sun8i: Specify memblock for Nano Pi M1
+In-Reply-To: <20161206140025.hnlhnsouvohxweou@lukather>
+References: <20161205020032.26586-1-woogyom.kim@gmail.com>
+ <20161205080932.xaqyl2httgxgso67@lukather>
+ <9607940c-1ca9-bb49-291e-ddc7e77546be@gmail.com>
+ <20161206140025.hnlhnsouvohxweou@lukather>
+Message-ID: <519cb492-15bd-2e5b-7579-5787008db19b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jorik Jonker <jorik@kippendief.biz>
+On 12/06/2016 11:00 PM, Maxime Ripard wrote:
+> No, we need a recent U-Boot in order to boot, and such a uboot will
+> setup the memory node anyway.
 
-In a previous commit, I made a copy/paste error in the pinmux
-definitions of UART3: PG{13,14} instead of PA{13,14}. This commit takes
-care of that. I have tested this commit on Orange Pi PC and Orange Pi
-Plus, and it works for these boards.
+Got it. Thanks! Please just ignore my patches.
 
-Fixes: e3d11d3c45c5 ("dts: sun8i-h3: add pinmux definitions for
-UART2-3")
-
-Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
----
- arch/arm/boot/dts/sun8i-h3.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 75a8654..f4ba088 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -410,7 +410,7 @@
- 			};
- 
- 			uart3_pins: uart3 {
--				allwinner,pins = "PG13", "PG14";
-+				allwinner,pins = "PA13", "PA14";
- 				allwinner,function = "uart3";
- 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--- 
-2.9.3
+Best regards,
+Milo
