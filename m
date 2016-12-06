@@ -1,83 +1,58 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 6 Dec 2016 12:45:43 +0000
-Subject: [STLinux Kernel] [PATCH 2/3] serial: st-asc: Provide RTS
- functionality
-In-Reply-To: <20161206123131.GA15382@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <20161202141146.31281-1-lee.jones@linaro.org>
- <20161202141146.31281-2-lee.jones@linaro.org>
- <5e652529-8dcb-568e-a748-0ec745099211@st.com>
- <20161206123131.GA15382@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20161206124543.GC25385@dell.home>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 6 Dec 2016 13:42:31 +0100
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <20161206051222.GQ6408@localhost>
+References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
+ <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
+ <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
+ <20161206051222.GQ6408@localhost>
+Message-ID: <5846B237.8060409@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 06 Dec 2016, Peter Griffin wrote:
-> On Mon, 05 Dec 2016, Patrice Chotard wrote:
-> > On 12/02/2016 03:11 PM, Lee Jones wrote:
-> > > Until this point, it has not been possible for serial applications
-> > > to toggle the UART RTS line.  This can be useful with certain
-> > > configurations. For example, when using a Mezzanine on a Linaro
-> > > 96board, RTS line is used to take the the on-board microcontroller
-> > 
-> > typo "the the on"
-> > 
-> > > in and out of reset.
-> > > 
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  drivers/tty/serial/st-asc.c | 14 ++++++++++++++
-> > >  1 file changed, 14 insertions(+)
-> > > 
-> > > diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-> > > index 379e5bd..ce46898 100644
-> > > --- a/drivers/tty/serial/st-asc.c
-> > > +++ b/drivers/tty/serial/st-asc.c
-> > > @@ -30,6 +30,7 @@
-> > >  #include <linux/of_platform.h>
-> > >  #include <linux/serial_core.h>
-> > >  #include <linux/clk.h>
-> > > +#include <linux/gpio/consumer.h>
-> > >  
-> > >  #define DRIVER_NAME "st-asc"
-> > >  #define ASC_SERIAL_NAME "ttyAS"
-> > > @@ -38,6 +39,7 @@
-> > >  
-> > >  struct asc_port {
-> > >  	struct uart_port port;
-> > > +	struct gpio_desc *rts;
-> > >  	struct clk *clk;
-> > >  	unsigned int hw_flow_control:1;
-> > >  	unsigned int force_m1:1;
-> > > @@ -381,12 +383,16 @@ static unsigned int asc_tx_empty(struct uart_port *port)
-> > >  
-> > >  static void asc_set_mctrl(struct uart_port *port, unsigned int mctrl)
-> > >  {
-> > > +	struct asc_port *ascport = to_asc_port(port);
-> > > +
-> > >  	/*
-> > >  	 * This routine is used for seting signals of: DTR, DCD, CTS/RTS
-> > >  	 * We use ASC's hardware for CTS/RTS, so don't need any for that.
-> > >  	 * Some boards have DTR and DCD implemented using PIO pins,
-> > >  	 * code to do this should be hooked in here.
-> > >  	 */
-> > > +
-> > > +	gpiod_set_value(ascport->rts, mctrl & TIOCM_RTS);
-> 
-> This now puts the code and the comment above out of sync with each
-> other.
-> 
-> However just checking the stih410 datasheet and I don't think this patch
-> to control RTS via a GPIO is required anyway.
-> 
-> The correct way of handling this is to add UART10_RTS and UART10_CTS pins
-> to the pinctrl_serial0 group so they are properly configured for their cts/rts
-> alternate function. Once the pins are correctly configured, the IP block should
-> control the signals correctly like the comment says.
+On 06/12/2016 06:12, Vinod Koul wrote:
 
-That was the first thing I tried.  It didn't work.
+> On Tue, Nov 29, 2016 at 07:25:02PM +0100, Mason wrote:
+> 
+>> Is there a way to write a driver within the existing framework?
+> 
+> I think so, looking back at comments from Russell, I do tend to agree with
+> that. Is there a specific reason why sbox can't be tied to alloc and free
+> channels?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Here's a recap of the situation.
+
+The "SBOX+MBUS" HW is used in several iterations of the tango SoC:
+
+tango3
+  2 memory channels available
+  6 devices ("clients"?) may request an MBUS channel
+
+tango4 (one more channel)
+  3 memory channels available
+  7 devices may request an MBUS channel :
+    NFC0, NFC1, SATA0, SATA1, memcpy, (IDE0, IDE1)
+
+Notes:
+The current NFC driver supports only one controller.
+IDE is mostly obsolete at this point.
+
+tango5 (SATA gets own dedicated MBUS channel pair)
+  3 memory channels available
+  5 devices may request an MBUS channel :
+    NFC0, NFC1, memcpy, (IDE0, IDE1)
+
+
+If I understand the current DMA driver (written by Mans), client
+drivers are instructed to use a specific channel in the DT, and
+the DMA driver muxes access to that channel. The DMA driver
+manages a per-channel queue of outstanding DMA transfer requests,
+and a new transfer is started friom within the DMA ISR
+(modulo the fact that the interrupt does not signal completion
+of the transfer, as explained else-thread).
+
+What you're proposing, Vinod, is to make a channel exclusive
+to a driver, as long as the driver has not explicitly released
+the channel, via dma_release_channel(), right?
+
+Regards.
