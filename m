@@ -1,43 +1,83 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 5 Dec 2016 16:55:02 -0800
-Subject: [PATCH v2 1/2] arm64: dts: zx: Fix gic GICR property
-In-Reply-To: <20161205022451.GA2749@dragon>
-References: <1476361881-19685-1-git-send-email-jun.nie@linaro.org>
- <1476361881-19685-2-git-send-email-jun.nie@linaro.org>
- <a243d381-f7ab-abed-ca21-f0951abb04fd@arm.com>
- <3937871.l5gZt4hBke@wuerfel> <20161205022451.GA2749@dragon>
-Message-ID: <CAOesGMhNJhOZDFvVzU3nVySZLf4N4Rk2mvjb3se_f_1_N=zk3Q@mail.gmail.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Tue, 6 Dec 2016 09:10:59 +0800
+Subject: [resend v2: PATCH 1/2] dt-bindings: Document the hi3660 reset
+ bindings
+In-Reply-To: <5982682.vMJxVociDa@wuerfel>
+References: <1480553321-17400-1-git-send-email-zhangfei.gao@linaro.org>
+ <3900806.3NUubBDb0Q@wuerfel>
+ <e15e76e2-b32d-a4d0-eb8b-850626a3946a@linaro.org>
+ <5982682.vMJxVociDa@wuerfel>
+Message-ID: <a9db0c7f-7cd5-5cde-dfa9-77fa4ad55385@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi, Arnd
 
-On Sun, Dec 4, 2016 at 6:24 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> Hi Arnd,
->
-> On Fri, Dec 02, 2016 at 09:28:58PM +0100, Arnd Bergmann wrote:
->> Given that there is any concern about the patch now, and the merge
->> window is almost open, I'm moving both patches to the
->> next/fixes-non-critical branch and will merge it for v4.10 instead
->> of sending it for v4.9.
+
+On 2016?12?02? 20:32, Arnd Bergmann wrote:
+> On Friday, December 2, 2016 8:21:33 AM CET zhangfei wrote:
+>> Hi, Arnd
 >>
->> If you end up deciding that the patch is wrong, please follow up
->> with a fix on top. Once the situation is resolved and the patch
->> merged upstream, feel free to ask stable at vger.kernel.org for a
->> backport to stable kernels to get it into v4.9.x.
+>> On 2016?12?01? 20:05, Arnd Bergmann wrote:
+>>> On Thursday, December 1, 2016 8:48:40 AM CET Zhangfei Gao wrote:
+>>>> +               hisi,reset-bits = <0x20 0x8             /* 0: i2c0 */
+>>>> +                                  0x20 0x10            /* 1: i2c1 */
+>>>> +                                  0x20 0x20            /* 2: i2c2 */
+>>>> +                                  0x20 0x8000000>;     /* 3: i2c6 */
+>>>> +       };
+>>>> +
+>>>> +Specifying reset lines connected to IP modules
+>>>> +==============================================
+>>>> +example:
+>>>> +
+>>>> +        i2c0: i2c at ..... {
+>>>> +                ...
+>>>> +               resets = <&iomcu_rst 0>;
+>>>> +                ...
+>>>> +        };
+>>> I don't really like this approach, since now the information is
+>>> in two places. Why not put the data into the reset specifier
+>>> directly when it is used?
+>> Any example, still not understand.
+>> They are consumer and provider.
+> I mean in the i2c node, have
 >
-> The patch is correct, though it can be cleaned up a bit further per
-> Marc's suggestion.  Since we now have 4.9-rc8, I'm wondering if we can
-> still get this into 4.9 to save the stable kernel backport.
->
-> I sent you a cleanup patch on top of this one yesterday.  If you like,
-> I can quickly resend the patch with the cleanup squashed.
+> 	i2c0: i2c at ..... {
+> 		...
+> 		resets = <&iomcu_rst 0x20 0x8>;
+> 		...
+> }
+Got it.
+There is function of_xlate in reset_controller_dev can parse the dts
+when devm_reset_control_get
 
-Since the patches have already been applied, an incremental patch to
-apply on top would work best here.
+* @of_xlate: translation function to translate from specifier as found 
+in the
+*            device tree to id as given to the reset control ops
 
+Will use this instead.
 
-Thanks!
+>>> Also the format seems a little too close to the actual register
+>>> layout and could be a little more abstract, using bit numbers instead
+>>> of a bitmask and register numbers instead of offsets.
+>> We use bit numbers first.
+>> But in the developing process, we found several bits may be required for
+>> one driver.
+>> And they may not be continuous as the bits may already be occupied.
+>> Directly using offset, we can set several bits together for simple, to
+>> give more flexibility.
+>> So after discussion, we directly use offset.
+> Can you give an example for why this is needed? Is this different
+> from a device that has multiple reset lines?
+Yes, we can use multiple reset lines, which is also our original method.
+But it may have too many reset lines, like pcie driver will have 5 resets.
+So just thinking it can be optimized.
 
+However, when using of_xlate, parsing offset & bit to rstc->id (unsigned 
+int),
+It only support u32, so will use bit numbers again.
+rstc_id = rcdev->of_xlate(rcdev, &args);
 
--Olof
+Will update v3 patch, help take a look.
+
+Thanks
