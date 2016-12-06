@@ -1,32 +1,31 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  6 Dec 2016 14:32:53 +0100
-Subject: [PATCH renesas/devel 2/2] ARM: multi_v7_defconfig: Enable r8a774[35]
- SoCs
-In-Reply-To: <1481031173-18600-1-git-send-email-horms+renesas@verge.net.au>
-References: <1481031173-18600-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1481031173-18600-3-git-send-email-horms+renesas@verge.net.au>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 6 Dec 2016 14:36:16 +0100
+Subject: [PATCH] serial: mxs-auart: support CMSPAR termios cflag
+Message-ID: <546f7a46-df39-778f-e148-75862f426ff2@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable recently added r8a7743 (RZ/G1M) and r8a7745 (RZ/G1E) SoCs.
+Hi Wolfgang,
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/multi_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+> --- a/drivers/tty/serial/mxs-auart.c
+> +++ b/drivers/tty/serial/mxs-auart.c
+> @@ -95,6 +95,7 @@
+>  #define AUART_LINECTRL_BAUD_DIVFRAC_SHIFT	8
+>  #define AUART_LINECTRL_BAUD_DIVFRAC_MASK	0x00003f00
+>  #define AUART_LINECTRL_BAUD_DIVFRAC(v)		(((v) & 0x3f) << 8)
+> +#define AUART_LINECTRL_SPS			(1 << 7)
+>  #define AUART_LINECTRL_WLEN_MASK		0x00000060
+>  #define AUART_LINECTRL_WLEN(v)			(((v) & 0x3) << 5)
+>  #define AUART_LINECTRL_FEN			(1 << 4)
+> @@ -1010,10 +1011,12 @@ static void mxs_auart_settermios(struct uart_port *u,
+> 	ctrl |= AUART_LINECTRL_WLEN(bm);
+> 
+> 	/* parity */
+> -	if (cflag & PARENB) {
+> +	if (cflag & (PARENB|CMSPAR)) {
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 11f37ed1dbff..770e96d61a64 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -87,6 +87,8 @@ CONFIG_ARCH_EMEV2=y
- CONFIG_ARCH_R7S72100=y
- CONFIG_ARCH_R8A73A4=y
- CONFIG_ARCH_R8A7740=y
-+CONFIG_ARCH_R8A7743=y
-+CONFIG_ARCH_R8A7745=y
- CONFIG_ARCH_R8A7778=y
- CONFIG_ARCH_R8A7779=y
- CONFIG_ARCH_R8A7790=y
--- 
-2.7.0.rc3.207.g0ac5344
+does it make sense to enable stick parity in case parity is disabled?
+
+The i.MX28 reference manual doesn't describe this case explicit.
+
+Stefan
