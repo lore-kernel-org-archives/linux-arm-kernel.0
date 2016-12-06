@@ -1,85 +1,100 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Dec 2016 09:05:40 -0800
-Subject: How do I define SRAM chip in GPMC device tree ?
-In-Reply-To: <3f98534e-2176-e03e-ac53-b60b8d0ead7c@newflow.co.uk>
-References: <3f98534e-2176-e03e-ac53-b60b8d0ead7c@newflow.co.uk>
-Message-ID: <20161206170540.GA13181@atomide.com>
+From: abelvesa@linux.com (Abel Vesa)
+Date: Tue,  6 Dec 2016 17:06:00 +0000
+Subject: [PATCH 0/7] arm: Add livepatch support
+Message-ID: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This is just an idea I've been trying out for a while now. 
 
-* Mark Jackson <mpfj-list@newflow.co.uk> [161206 04:33]:
-> Hi
-> 
-> We have an existing board supported in Linux v4.1 (see am335x-nano.dts)
-> and I was looking to update to a more recent kernel but have hit a stumbling
-> block.
-> 
-> Our unit has an SRAM device connected to CS1 and we currently rely on uboot
-> to init the GPMC settings.
-> 
-> From v4.2+ I now see that the GPMC code has been changed to reset all the
-> GPMC settings when the kernel starts, so our SRAM is now inaccessible.
+Just in case somebody wants to play with it, this applies to linux-arm/for-next.
 
-Yes we've changed to use device tree to describe what's on the GPMC and
-refuse to probe it unless configured properly. This is because of the
-problems trying to use unknown bootloader configuration, such as kernel
-hangs if GPMC was accessed in some cases.
+Also please note that this was only tested in qemu, but I will do some testing 
+on some real hardware in the following days.
 
-If you enable CONFIG_OMAP_GPMC_DEBUG you should see the bootloader
-configured timings in mostly suitable format for adding to dts.
+FWICT, on this arch the compiler always generates a function prologue somewhere
+between these lines:
 
-> I've tried the following to add an extra device to the GPMC, but no go:-
-> 
-> 	sram at 1,0 {
-> 		reg = <1 0x00000000 0x01000000>;
-> 		/*compatible = "mmio-sram";*/
-> 		bank-width = <2>;
-> 
-> 		gpmc,mux-add-data = <2>;
-> 
-> 		gpmc,sync-clk-ps = <0>;
-> 		gpmc,cs-on-ns = <0>;
-> 		gpmc,cs-rd-off-ns = <160>;
-> 		gpmc,cs-wr-off-ns = <160>;
-> 		gpmc,adv-on-ns = <10>;
-> 		gpmc,adv-rd-off-ns = <30>;
-> 		gpmc,adv-wr-off-ns = <30>;
-> 		gpmc,oe-on-ns = <40>;
-> 		gpmc,oe-off-ns = <160>;
-> 		gpmc,we-on-ns = <40>;
-> 		gpmc,we-off-ns = <160>;
-> 		gpmc,rd-cycle-ns = <160>;
-> 		gpmc,wr-cycle-ns = <160>;
-> 		gpmc,access-ns = <150>;
-> 		gpmc,page-burst-access-ns = <10>;
-> 		gpmc,cycle2cycle-samecsen;
-> 		gpmc,cycle2cycle-delay-ns = <20>;
-> 		gpmc,wr-data-mux-bus-ns = <70>;
-> 		gpmc,wr-access-ns = <80>;
-> 	};
-> 
-> Looking at drivers/memory/omap-gpmc.c, I can see that when the GPMC
-> children are scanned, only the following are matched:-
-> 
-> "nand","onenand","ethernet","nor","uart"
+e1a0c00d        mov     ip, sp
+e92ddff0        push    {r4-r9, sl, fp, ip, lr, pc}
+e24cb004        sub     fp, ip, #4
+e24dd064        sub     sp, sp, #100    ; 0x64 <--- local variables
+e52de004        push    {lr}            ; (str lr, [sp, #-4]!)
+ebf9c2c9        bl      80110364 <__gnu_mcount_nc>
+....
 
-Those are to set up things for probing the device driver for the
-connected device. Some have both sync and async accaess to configure,
-so at least so far we have not been able to come up with a generic
-init.
+Every function that follows this pattern (the number of registers pushed and the
+sp subtraction for the local variables being the only acceptable exception) can
+be patched with this mechanism. IIRC, only the inline functions and notrace 
+functions do not follow this pattern.
 
-> So can anyone explain how to add a standard SRAM chip ?
+Considering that the function is livepatchable, when the time comes to call
+ftrace_call, the ftrace_regs_caller is called instead.
 
-Assuming you've verified that the dts configuration produces working
-timings for you, pobably gpmc_probe_generic_child() is the way to
-go for adding "sram" option. Note that we have similar interfaces
-already for onenand and ethernet for their buffers so you may want
-to take a look what the init does for those.
+Because this arch didn't have a ftrace with regs implementation, the
+ftrace_regs_caller was added.
 
-But yeah basically a little bit of new code is needed for that.
+This new function adds the regs saving/restoring part, plus the part necessary
+for the livepatch mechanism to work. After the regs are saved and the r3 is set
+to contain the sp's value, we're keeping the old pc into r10 in order to be
+checked later against the new pc.
 
-Regards,
+Next, the r1 and r0 are set for the ftrace_func, then, the ftrace_stub is called
+and the klp_ftrace_handler overwrites the old pc with the new one.
 
-Tony
+Here comes the tricky part. We're checking if the pc is still the old one, if it
+is we jump the whole livepatching and go ahead with restoring the saved regs.
+
+If the pc is modified, it means we're livepatching current function and we need
+to pop all regs from r1 through r12, jump over the next two regs saved on stack
+(we're not interested in those since we're trying to get the same regs context
+as it was at the point the function-to-be-patched was called) and put the new pc
+into r11.
+
+Since r12 contains the sp from when the function just got branched to, we need
+to set the sp back to that.
+
+Then we need to put the new pc on stack so that when we're popping r11 through 
+pc, we will actually jump to the first instruction from the new function.
+
+We don't need to worry about the returning phase since the epilogue of the new
+function will take care of that and from there on everything goes back to 
+normal.
+
+The whole advantage of this over adding compiler support is that we're not
+introducing nops at the beginning of the function. As a matter of fact, we're
+not changing anything between an image with livepatch and an image without it
+(except the ftrace_regs_call addition and the livepatch necessary code).
+
+As for the implementation of the ftrace_regs_caller, I still think there might
+be some unsafe stack handling since I'm getting some build warnings. Those are
+due to pushing/popping of a list of regs in which the sp resides. I'll try to 
+get around those in a next iteration (if necessary), but first I would like to
+hear some opinions about this work and if it's worth going forward.
+
+Everything else should be pretty straightforward, so I'll skip explaining that.
+
+Abel Vesa (7):
+  arm: Add livepatch arch specific code
+  arm: ftrace: Add call modify mechanism
+  arm: module: Add apply_relocate_add
+  arm: Add ftrace with regs support
+  arm: ftrace: Add ARCH_SUPPORTS_FTRACE_OPS for ftrace with regs
+  arm: Add livepatch to build if CONFIG_LIVEPATCH
+  arm: Add livepatch necessary arch selects into Kconfig
+
+ MAINTAINERS                      |  3 +++
+ arch/arm/Kconfig                 |  4 ++++
+ arch/arm/include/asm/ftrace.h    |  4 ++++
+ arch/arm/include/asm/livepatch.h | 46 +++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/Makefile         |  1 +
+ arch/arm/kernel/entry-ftrace.S   | 49 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/ftrace.c         | 21 +++++++++++++++++
+ arch/arm/kernel/livepatch.c      | 43 +++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/module.c         |  9 ++++++++
+ 9 files changed, 180 insertions(+)
+ create mode 100644 arch/arm/include/asm/livepatch.h
+ create mode 100644 arch/arm/kernel/livepatch.c
+
+-- 
+2.7.4
