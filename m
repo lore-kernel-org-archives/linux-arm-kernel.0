@@ -1,95 +1,115 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 6 Dec 2016 14:18:26 +0000
-Subject: [PATCH 2/3] crypto: brcm: Add Broadcom SPU driver
-In-Reply-To: <1480536453-24781-3-git-send-email-rob.rice@broadcom.com>
-References: <1480536453-24781-1-git-send-email-rob.rice@broadcom.com>
- <1480536453-24781-3-git-send-email-rob.rice@broadcom.com>
-Message-ID: <20161206141826.GC24177@leverpostej>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 6 Dec 2016 15:27:00 +0100
+Subject: [PATCH v3] KVM: arm/arm64: Access CNTHCTL_EL2 bit fields correctly
+In-Reply-To: <b2623eed-fd63-c8c6-fd66-428bd87759d9@arm.com>
+References: <1480620725-9864-1-git-send-email-jintack@cs.columbia.edu>
+ <49451f06-10a6-4921-eae6-c37a5510197a@arm.com>
+ <20161206121221.GA3681@cbox> <20161206121617.GB3681@cbox>
+ <b2623eed-fd63-c8c6-fd66-428bd87759d9@arm.com>
+Message-ID: <20161206142700.GB4816@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 30, 2016 at 03:07:32PM -0500, Rob Rice wrote:
-> +static const struct of_device_id bcm_spu_dt_ids[] = {
-> +	{
-> +		.compatible = "brcm,spum-crypto",
-> +		.data = &spum_ns2_types,
-> +	},
-> +	{
-> +		.compatible = "brcm,spum-nsp-crypto",
-> +		.data = &spum_nsp_types,
-> +	},
-> +	{
-> +		.compatible = "brcm,spu2-crypto",
-> +		.data = &spu2_types,
-> +	},
-> +	{
-> +		.compatible = "brcm,spu2-v2-crypto",
-> +		.data = &spu2_v2_types,
-> +	},
+On Tue, Dec 06, 2016 at 01:09:26PM +0000, Marc Zyngier wrote:
+> On 06/12/16 12:16, Christoffer Dall wrote:
+> > On Tue, Dec 06, 2016 at 01:12:21PM +0100, Christoffer Dall wrote:
+> >> On Tue, Dec 06, 2016 at 11:17:40AM +0000, Marc Zyngier wrote:
+> >>> On 01/12/16 19:32, Jintack Lim wrote:
+> >>>> Current KVM world switch code is unintentionally setting wrong bits to
+> >>>> CNTHCTL_EL2 when E2H == 1, which may allow guest OS to access physical
+> >>>> timer.  Bit positions of CNTHCTL_EL2 are changing depending on
+> >>>> HCR_EL2.E2H bit.  EL1PCEN and EL1PCTEN are 1st and 0th bits when E2H is
+> >>>> not set, but they are 11th and 10th bits respectively when E2H is set.
+> >>>>
+> >>>> In fact, on VHE we only need to set those bits once, not for every world
+> >>>> switch. This is because the host kernel runs in EL2 with HCR_EL2.TGE ==
+> >>>> 1, which makes those bits have no effect for the host kernel execution.
+> >>>> So we just set those bits once for guests, and that's it.
+> >>>>
+> >>>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+> >>>> ---
+> >>>> v2->v3: 
+> >>>> - Perform the initialization including CPU hotplug case.
+> >>>> - Move has_vhe() to asm/virt.h
+> >>>>
+> >>>> v1->v2: 
+> >>>> - Skip configuring cnthctl_el2 in world switch path on VHE system.
+> >>>> - Write patch based on linux-next.
+> >>>> ---
+> >>>>  arch/arm/include/asm/virt.h   |  5 +++++
+> >>>>  arch/arm/kvm/arm.c            |  3 +++
+> >>>>  arch/arm64/include/asm/virt.h | 10 ++++++++++
+> >>>>  include/kvm/arm_arch_timer.h  |  1 +
+> >>>>  virt/kvm/arm/arch_timer.c     | 23 +++++++++++++++++++++++
+> >>>>  virt/kvm/arm/hyp/timer-sr.c   | 33 +++++++++++++++++++++------------
+> >>>>  6 files changed, 63 insertions(+), 12 deletions(-)
+> >>>>
+> >>>> diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
+> >>>> index a2e75b8..6dae195 100644
+> >>>> --- a/arch/arm/include/asm/virt.h
+> >>>> +++ b/arch/arm/include/asm/virt.h
+> >>>> @@ -80,6 +80,11 @@ static inline bool is_kernel_in_hyp_mode(void)
+> >>>>  	return false;
+> >>>>  }
+> >>>>  
+> >>>> +static inline bool has_vhe(void)
+> >>>> +{
+> >>>> +	return false;
+> >>>> +}
+> >>>> +
+> >>>>  /* The section containing the hypervisor idmap text */
+> >>>>  extern char __hyp_idmap_text_start[];
+> >>>>  extern char __hyp_idmap_text_end[];
+> >>>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> >>>> index 8f92efa..13e54e8 100644
+> >>>> --- a/arch/arm/kvm/arm.c
+> >>>> +++ b/arch/arm/kvm/arm.c
+> >>>> @@ -1099,6 +1099,9 @@ static void cpu_init_hyp_mode(void *dummy)
+> >>>>  	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
+> >>>>  	__cpu_init_stage2();
+> >>>>  
+> >>>> +	if (is_kernel_in_hyp_mode())
+> >>>> +		kvm_timer_init_vhe();
+> >>>> +
+> >>>>  	kvm_arm_init_debug();
+> >>>>  }
+> >>>>  
+> >>>> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+> >>>> index fea1073..b043cfd 100644
+> >>>> --- a/arch/arm64/include/asm/virt.h
+> >>>> +++ b/arch/arm64/include/asm/virt.h
+> >>>> @@ -47,6 +47,7 @@
+> >>>>  #include <asm/ptrace.h>
+> >>>>  #include <asm/sections.h>
+> >>>>  #include <asm/sysreg.h>
+> >>>> +#include <asm/cpufeature.h>
+> >>>>  
+> >>>>  /*
+> >>>>   * __boot_cpu_mode records what mode CPUs were booted in.
+> >>>> @@ -80,6 +81,15 @@ static inline bool is_kernel_in_hyp_mode(void)
+> >>>>  	return read_sysreg(CurrentEL) == CurrentEL_EL2;
+> >>>>  }
+> >>>>  
+> >>>> +static inline bool has_vhe(void)
+> >>>> +{
+> >>>> +#ifdef CONFIG_ARM64_VHE
+> >>>
+> >>> Is there a particular reason why this should be guarded by a #ifdef? All
+> >>> the symbols should always be available, and since this is a static key,
+> >>> the overhead should be really insignificant (provided that you use a
+> >>> non-prehistoric compiler...).
+> >>>
+> >>
+> >> Isn't this code called from a file shared between 32-bit arm and arm64?
+> >> Does the cpus_have_const_cap work on ARM64?
+> > 
+> > Duh, I meant on 32-bit arm of course.
+> 
+> Well, this is a pure 64bit file - 32bit has the canonical implementation
+> that always returns false. So I can't really see how this can ever break
+> 32bit. Unless my lack of sleep is really showing, and I'm missing
+> something terribly obvious?
+> 
+No, I'm being an idiot, too many things at once and a lack of coffee.
 
-These last two weren't in the binding document.
-
-> +	{ /* sentinel */ }
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, bcm_spu_dt_ids);
-> +
-> +static int spu_dt_read(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct spu_hw *spu = &iproc_priv.spu;
-> +	struct device_node *dn = pdev->dev.of_node;
-> +	struct resource *spu_ctrl_regs;
-> +	const struct of_device_id *match;
-> +	struct spu_type_subtype *matched_spu_type;
-> +	void __iomem *spu_reg_vbase[MAX_SPUS];
-> +	int i;
-> +	int err;
-> +
-> +	if (!of_device_is_available(dn)) {
-> +		dev_crit(dev, "SPU device not available");
-> +		return -ENODEV;
-> +	}
-
-How can this happen?
-
-> +	/* Count number of mailbox channels */
-> +	spu->num_chan = of_count_phandle_with_args(dn, "mboxes", "#mbox-cells");
-> +	dev_dbg(dev, "Device has %d SPU channels", spu->num_chan);
-> +
-> +	match = of_match_device(of_match_ptr(bcm_spu_dt_ids), dev);
-> +	matched_spu_type = (struct spu_type_subtype *)match->data;
-
-This cast usn't necessary.
-
-> +	spu->spu_type = matched_spu_type->type;
-> +	spu->spu_subtype = matched_spu_type->subtype;
-> +
-> +	/* Read registers and count number of SPUs */
-> +	i = 0;
-> +	while ((i < MAX_SPUS) && ((spu_ctrl_regs =
-> +		platform_get_resource(pdev, IORESOURCE_MEM, i)) != NULL)) {
-> +		dev_dbg(dev,
-> +			"SPU %d control register region res.start = %#x, res.end = %#x",
-> +			i,
-> +			(unsigned int)spu_ctrl_regs->start,
-> +			(unsigned int)spu_ctrl_regs->end);
-> +
-> +		spu_reg_vbase[i] = devm_ioremap_resource(dev, spu_ctrl_regs);
-> +		if (IS_ERR(spu_reg_vbase[i])) {
-> +			err = PTR_ERR(spu_reg_vbase[i]);
-> +			dev_err(&pdev->dev, "Failed to map registers: %d\n",
-> +				err);
-> +			spu_reg_vbase[i] = NULL;
-> +			return err;
-> +		}
-> +		i++;
-> +	}
-
-These *really* sound like independent devices. There are no shared
-registers, and each has its own mbox.
-
-Why do we group them like this?
-
-Thanks,
-Mark.
+-Christoffer
