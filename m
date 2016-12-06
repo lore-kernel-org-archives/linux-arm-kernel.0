@@ -1,48 +1,46 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 6 Dec 2016 17:25:12 +0000
-Subject: [PATCHv4 08/10] mm/kasan: Switch to using __pa_symbol and lm_alias
-In-Reply-To: <2f3ac043-c4cc-5c5a-8ac7-1396b6bb193f@virtuozzo.com>
-References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
- <1480445729-27130-9-git-send-email-labbott@redhat.com>
- <2f3ac043-c4cc-5c5a-8ac7-1396b6bb193f@virtuozzo.com>
-Message-ID: <20161206172512.GF24177@leverpostej>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 6 Dec 2016 17:28:08 +0000
+Subject: [RFC v3 03/10] iommu: Add new reserved IOMMU attributes
+In-Reply-To: <1479215363-2898-4-git-send-email-eric.auger@redhat.com>
+References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
+ <1479215363-2898-4-git-send-email-eric.auger@redhat.com>
+Message-ID: <2b80e62b-5a1a-d2d0-eeb0-ad1d7ed0f44b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2016 at 02:36:05PM +0300, Andrey Ryabinin wrote:
-> On 11/29/2016 09:55 PM, Laura Abbott wrote:
-> > __pa_symbol is the correct API to find the physical address of symbols.
-> > Switch to it to allow for debugging APIs to work correctly.
+On 15/11/16 13:09, Eric Auger wrote:
+> IOMMU_RESV_NOMAP is used to tag reserved IOVAs that are not
+> supposed to be IOMMU mapped. IOMMU_RESV_MSI tags IOVAs
+> corresponding to MSIs that need to be IOMMU mapped.
 > 
-> But __pa() is correct for symbols. I see how __pa_symbol() might be a little
-> faster than __pa(), but there is nothing wrong in using __pa() on symbols.
-
-While it's true today that __pa() works on symbols, this is for
-pragmatic reasons (allowing existing code to work until it is all
-cleaned up), and __pa_symbol() is the correct API to use.
-
-Relying on this means that __pa() can't be optimised for the (vastly
-common) case of translating linear map addresses.
-
-Consistent use of __pa_symbol() will allow for subsequent optimisation
-of __pa() in the common case, in adition to being necessary for arm64's
-DEBUG_VIRTUAL.
-
-> > Other functions such as p*d_populate may call __pa internally.
-> > Ensure that the address passed is in the linear region by calling
-> > lm_alias.
+> IOMMU_RESV_MASK allows to check if the IOVA is reserved.
 > 
-> Why it should be linear mapping address? __pa() translates kernel
-> image address just fine.
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> ---
+>  include/linux/iommu.h | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index 7f6ebd0..02cf565 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -32,6 +32,10 @@
+>  #define IOMMU_NOEXEC	(1 << 3)
+>  #define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
+>  
+> +#define IOMMU_RESV_MASK		0x300 /* Reserved IOVA mask */
+> +#define IOMMU_RESV_NOMAP	(1 << 8) /* IOVA that cannot be mapped */
+> +#define IOMMU_RESV_MSI		(1 << 9) /* MSI region transparently mapped */
 
-As above, while that's true today, but is something that we wish to
-change. 
+It feels a bit grotty encoding these in prot - NOMAP sort of fits, but
+MSI really is something else entirely. On reflection I think a separate
+iommu_resv_region::type field would be better, particularly as it's
+something we might potentially want to expose via the sysfs entry.
 
-> Generated code is probably worse too.
+Robin.
 
-Even if that is the case, given this is code run once at boot on a debug
-build, I think it's outweighed by the gain from DEBUG_VIRTUAL, and as a
-step towards optimising __pa().
-
-Thanks,
-Mark.
+> +
+>  struct iommu_ops;
+>  struct iommu_group;
+>  struct bus_type;
+> 
