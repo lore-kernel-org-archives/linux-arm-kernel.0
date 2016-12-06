@@ -1,78 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 6 Dec 2016 15:42:03 +0000
-Subject: [PATCH v2] arm64: KVM: pmu: Reset PMSELR_EL0.SEL to a sane value
- before entering the guest
-In-Reply-To: <20161206152708.GL2498@arm.com>
-References: <1481036210-31816-1-git-send-email-marc.zyngier@arm.com>
- <20161206152708.GL2498@arm.com>
-Message-ID: <a1682776-d8c9-8fd1-1204-192ea7d8f3c2@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 6 Dec 2016 16:46:25 +0100
+Subject: [RFC PATCH v3 2/2] drm/panel: Add support for Chunghwa
+ CLAA070WP03XG panel
+In-Reply-To: <1474311771-23321-3-git-send-email-ayaka@soulik.info>
+References: <1474311771-23321-1-git-send-email-ayaka@soulik.info>
+ <1474311771-23321-3-git-send-email-ayaka@soulik.info>
+Message-ID: <20161206154625.GA28534@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/16 15:27, Will Deacon wrote:
-> On Tue, Dec 06, 2016 at 02:56:50PM +0000, Marc Zyngier wrote:
->> The ARMv8 architecture allows the cycle counter to be configured
->> by setting PMSELR_EL0.SEL==0x1f and then accessing PMXEVTYPER_EL0,
->> hence accessing PMCCFILTR_EL0. But it disallows the use of
->> PMSELR_EL0.SEL==0x1f to access the cycle counter itself through
->> PMXEVCNTR_EL0.
->>
->> Linux itself doesn't violate this rule, but we may end up with
->> PMSELR_EL0.SEL being set to 0x1f when we enter a guest. If that
->> guest accesses PMXEVCNTR_EL0, the access may UNDEF at EL1,
->> despite the guest not having done anything wrong.
->>
->> In order to avoid this unfortunate course of events (haha!), let's
->> sanitize PMSELR_EL0 on guest entry. This ensures that the guest
->> won't explode unexpectedly.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->> This is another approach to fix this issue, this time nuking PMSELR_EL0
->> on guest entry instead of relying on perf not to clobber the register.
->>
->> Tested on v4.9-rc8 with a Rev A3 X-Gene.
->>
->>  arch/arm64/kvm/hyp/switch.c | 8 +++++++-
->>  1 file changed, 7 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
->> index 83037cd..3b7cfbd 100644
->> --- a/arch/arm64/kvm/hyp/switch.c
->> +++ b/arch/arm64/kvm/hyp/switch.c
->> @@ -85,7 +85,13 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
->>  	write_sysreg(val, hcr_el2);
->>  	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
->>  	write_sysreg(1 << 15, hstr_el2);
->> -	/* Make sure we trap PMU access from EL0 to EL2 */
->> +	/*
->> +	 * Make sure we trap PMU access from EL0 to EL2. Also sanitize
->> +	 * PMSELR_EL0 to make sure it never contains the cycle
->> +	 * counter, which could make a PMXEVCNTR_EL0 access UNDEF.
+On Tue, Sep 20, 2016 at 03:02:51AM +0800, Randy Li wrote:
+> The Chunghwa CLAA070WP03XG is a 7" 1280x800 panel, which can be
+> supported by the simple panel driver.
 > 
-> "UNDEF at EL1, as opposed to trapping to EL2" might be clearer, but up to
-> you.
+> Signed-off-by: Randy Li <ayaka@soulik.info>
+> ---
+>  .../display/panel/chunghwa,claa070wp03xg.txt       |  7 ++++++
+>  drivers/gpu/drm/panel/panel-simple.c               | 27 ++++++++++++++++++++++
+>  2 files changed, 34 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/chunghwa,claa070wp03xg.txt
 
-Sure, that's a useful clarification.
+Applied, thanks.
 
->> +	 */
->> +	if (vcpu->arch.mdcr_el2 & MDCR_EL2_HPMN_MASK)
->> +		write_sysreg(0, pmselr_el0);
->>  	write_sysreg(ARMV8_PMU_USERENR_MASK, pmuserenr_el0);
-> 
-> Curious, but why do you check MDCR.HPMN for PMSELR_EL0, but not for
-> PMUSERENR_EL0?
-
-Why would PMUSERENR_EL0 be constrained by the number of counters
-available to the guest?
-
-> 
-> Anyway:
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161206/1e6499f1/attachment.sig>
