@@ -1,45 +1,134 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Tue,  6 Dec 2016 13:53:17 +1100
-Subject: [PATCH v3 2/6] mfd: dt: ranges,
- #address-cells and #size-cells as optional properties
+Date: Tue,  6 Dec 2016 13:53:18 +1100
+Subject: [PATCH v3 3/6] mfd: dt: Add Aspeed Low Pin Count Controller bindings
 In-Reply-To: <20161206025321.1792-1-andrew@aj.id.au>
 References: <20161206025321.1792-1-andrew@aj.id.au>
-Message-ID: <20161206025321.1792-3-andrew@aj.id.au>
+Message-ID: <20161206025321.1792-4-andrew@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whilst describing a device and not a bus, simple-mfd is modelled on
-simple-bus where child nodes are iterated and registered as platform
-devices. Some complex devices, e.g. the Aspeed LPC controller, can
-benefit from address space mapping such that child nodes can use the
-regs property to describe their resources within the multi-function
-device.
-
 Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
 ---
- Documentation/devicetree/bindings/mfd/mfd.txt | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ .../devicetree/bindings/mfd/aspeed-lpc.txt         | 111 +++++++++++++++++++++
+ 1 file changed, 111 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
 
-diff --git a/Documentation/devicetree/bindings/mfd/mfd.txt b/Documentation/devicetree/bindings/mfd/mfd.txt
-index f1fceeda12f1..bcb6abb9d413 100644
---- a/Documentation/devicetree/bindings/mfd/mfd.txt
-+++ b/Documentation/devicetree/bindings/mfd/mfd.txt
-@@ -25,6 +25,16 @@ Optional properties:
-   be used. In the latter case the child devices will be determined by the
-   operating system.
- 
-+- ranges: Describes the address mapping relationship to the parent. Should set
-+  the child's base address to 0, the physical address within parent's address
-+  space, and the length of the address map.
+diff --git a/Documentation/devicetree/bindings/mfd/aspeed-lpc.txt b/Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
+new file mode 100644
+index 000000000000..a97131aba446
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
+@@ -0,0 +1,111 @@
++======================================================================
++Device tree bindings for the Aspeed Low Pin Count (LPC) Bus Controller
++======================================================================
 +
-+- #address-cells: Specifies the number of cells used to represent physical base
-+  addresses. Must be present if ranges is used.
++The LPC bus is a means to bridge a host CPU to a number of low-bandwidth
++peripheral devices, replacing the use of the ISA bus in the age of PCI[0]. The
++primary use case of the Aspeed LPC controller is as a slave on the bus
++(typically in a Baseboard Management Controller SoC), but under certain
++conditions it can also take the role of bus master.
 +
-+- #size-cells: Specifies the number of cells used to represent the size of an
-+  address. Must be present if ranges is used.
++The LPC controller is represented as a multi-function device to account for the
++mix of functionality it provides. The principle split is between the register
++layout at the start of the I/O space which is, to quote the Aspeed datasheet,
++"basically compatible with the [LPC registers from the] popular BMC controller
++H8S/2168[1]", and everything else, where everything else is an eclectic
++collection of functions with a esoteric register layout. "Everything else",
++here labeled the "host" portion of the controller, includes, but is not limited
++to:
 +
- Example:
- 
- foo at 1000 {
++* An IPMI Block Transfer[2] Controller
++
++* An LPC Host Controller: Manages LPC functions such as host vs slave mode, the
++  physical properties of some LPC pins, configuration of serial IRQs, and
++  APB-to-LPC bridging amonst other functions.
++
++* An LPC Host Interface Controller: Manages functions exposed to the host such
++  as LPC firmware hub cycles, configuration of the LPC-to-AHB mapping, UART
++  management and bus snoop configuration.
++
++* A set of SuperIO[3] scratch registers: Enables implementation of e.g. custom
++  hardware management protocols for handover between the host and baseboard
++  management controller.
++
++Additionally the state of the LPC controller influences the pinmux
++configuration, therefore the host portion of the controller is exposed as a
++syscon as a means to arbitrate access.
++
++[0] http://www.intel.com/design/chipsets/industry/25128901.pdf
++[1] https://www.renesas.com/en-sg/doc/products/mpumcu/001/rej09b0078_h8s2168.pdf?key=7c88837454702128622bee53acbda8f4
++[2] http://www.intel.com/content/dam/www/public/us/en/documents/product-briefs/ipmi-second-gen-interface-spec-v2-rev1-1.pdf
++[3] https://en.wikipedia.org/wiki/Super_I/O
++
++Required properties
++===================
++
++- compatible:	One of:
++		"aspeed,ast2400-lpc", "simple-mfd"
++		"aspeed,ast2500-lpc", "simple-mfd"
++
++- reg:		contains the physical address and length values of the Aspeed
++                LPC memory region.
++
++- #address-cells: <1>
++- #size-cells:	<1>
++- ranges: 	Maps 0 to the physical address and length of the LPC memory
++                region
++
++Required LPC Child nodes
++========================
++
++BMC Node
++--------
++
++- compatible:	One of:
++		"aspeed,ast2400-lpc-bmc"
++		"aspeed,ast2500-lpc-bmc"
++
++- reg:		contains the physical address and length values of the
++                H8S/2168-compatible LPC controller memory region
++
++Host Node
++---------
++
++- compatible:   One of:
++		"aspeed,ast2400-lpc-host", "simple-mfd", "syscon"
++		"aspeed,ast2500-lpc-host", "simple-mfd", "syscon"
++
++- reg:		contains the address and length values of the host-related
++                register space for the Aspeed LPC controller
++
++- #address-cells: <1>
++- #size-cells:	<1>
++- ranges: 	Maps 0 to the address and length of the host-related LPC memory
++                region
++
++Example:
++
++lpc: lpc at 1e789000 {
++	compatible = "aspeed,ast2500-lpc", "simple-mfd";
++	reg = <0x1e789000 0x1000>;
++
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges = <0x0 0x1e789000 0x1000>;
++
++	lpc_bmc: lpc-bmc at 0 {
++		compatible = "aspeed,ast2500-lpc-bmc";
++		reg = <0x0 0x80>;
++	};
++
++	lpc_host: lpc-host at 80 {
++		compatible = "aspeed,ast2500-lpc-host", "simple-mfd", "syscon";
++		reg = <0x80 0x1e0>;
++		reg-io-width = <4>;
++
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0x0 0x80 0x1e0>;
++	};
++};
++
 -- 
 2.9.3
