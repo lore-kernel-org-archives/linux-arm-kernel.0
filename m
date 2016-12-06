@@ -1,96 +1,101 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 6 Dec 2016 16:08:00 +0000
-Subject: [PATCHv4 05/10] arm64: Use __pa_symbol for kernel symbols
-In-Reply-To: <584011CB.3050505@arm.com>
-References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
- <1480445729-27130-6-git-send-email-labbott@redhat.com>
- <584011CB.3050505@arm.com>
-Message-ID: <20161206160800.GD24177@leverpostej>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 6 Dec 2016 17:11:16 +0100
+Subject: [PATCH 1/1] arm64: Correcting format specifier for printing 64
+ bit addresses
+In-Reply-To: <1480925393-8386-1-git-send-email-maninder1.s@samsung.com>
+References: <1480925393-8386-1-git-send-email-maninder1.s@samsung.com>
+Message-ID: <20161206161116.GD4816@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2016 at 12:04:27PM +0000, James Morse wrote:
-> On 29/11/16 18:55, Laura Abbott wrote:
-> > diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-> > index d55a7b0..4f0c77d 100644
-> > --- a/arch/arm64/kernel/hibernate.c
-> > +++ b/arch/arm64/kernel/hibernate.c
-> > @@ -484,7 +481,7 @@ int swsusp_arch_resume(void)
-> >  	 * Since we only copied the linear map, we need to find restore_pblist's
-> >  	 * linear map address.
-> >  	 */
-> > -	lm_restore_pblist = LMADDR(restore_pblist);
-> > +	lm_restore_pblist = lm_alias(restore_pblist);
-> >  
-> >  	/*
-> >  	 * We need a zero page that is zero before & after resume in order to
+On Mon, Dec 05, 2016 at 01:39:53PM +0530, Maninder Singh wrote:
+> This patch corrects format specifier for printing 64 bit addresses.
 > 
-> This change causes resume from hibernate to panic in:
-> > VIRTUAL_BUG_ON(x < (unsigned long) KERNEL_START ||
-> > 		x > (unsigned long) KERNEL_END);
+> Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
+> Signed-off-by: Vaneet Narang <v.narang@samsung.com>
+> ---
+>  arch/arm64/kernel/signal.c |  2 +-
+>  arch/arm64/kvm/sys_regs.c  |  8 ++++++--
+>  arch/arm64/mm/fault.c      | 15 ++++++++++-----
+>  arch/arm64/mm/mmu.c        |  4 ++--
+>  4 files changed, 19 insertions(+), 10 deletions(-)
 > 
-> It looks like kaslr's relocation code has already fixed restore_pblist, so your
-> debug virtual check catches this doing the wrong thing. My bug.
-> 
-> readelf -s vmlinux | grep ...
-> > 103495: ffff000008080000     0 NOTYPE  GLOBAL DEFAULT    1 _text
-> >  92104: ffff000008e43860     8 OBJECT  GLOBAL DEFAULT   24 restore_pblist
-> > 105442: ffff000008e85000     0 NOTYPE  GLOBAL DEFAULT   24 _end
-> 
-> But restore_pblist == 0xffff800971b7f998 when passed to __phys_addr_symbol().
+> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+> index c7b6de6..c89d5fd 100644
+> --- a/arch/arm64/kernel/signal.c
+> +++ b/arch/arm64/kernel/signal.c
+> @@ -155,7 +155,7 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
+>  
+>  badframe:
+>  	if (show_unhandled_signals)
+> -		pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
+> +		pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%016llx sp=%016llx\n",
+>  				    current->comm, task_pid_nr(current), __func__,
+>  				    regs->pc, regs->sp);
+>  	force_sig(SIGSEGV, current);
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 87e7e66..89bf5c1 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -1554,8 +1554,12 @@ static void unhandled_cp_access(struct kvm_vcpu *vcpu,
+>  		WARN_ON(1);
+>  	}
+>  
+> -	kvm_err("Unsupported guest CP%d access at: %08lx\n",
+> -		cp, *vcpu_pc(vcpu));
+> +	if (params->is_32bit)
+> +		kvm_err("Unsupported guest CP%d access at: %08lx\n",
+> +			cp, *vcpu_pc(vcpu));
+> +	else
+> +		kvm_err("Unsupported guest CP%d access at: %016lx\n",
+> +			cp, *vcpu_pc(vcpu));
 
-I think KASLR's a red herring; it shouldn't change the distance between
-the restore_pblist symbol and {_text,_end}.
+It feels a bit much to me to have an if-statement to differentiate the
+number of leading zeros, so if it's important to always have fixed
+widths then I would just use %016lx in both cases.
 
-Above, ffff000008e43860 is the location of the pointer in the kernel
-image (i.e. it's &restore_pblist). 0xffff800971b7f998 is the pointer
-that was assigned to restore_pblist. For KASLR, the low bits (at least
-up to a page boundary) shouldn't change across relocation.
+>  	print_sys_reg_instr(params);
+>  	kvm_inject_undefined(vcpu);
+>  }
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index a78a5c4..d96a42a 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -77,7 +77,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+>  
+>  	pr_alert("pgd = %p\n", mm->pgd);
+>  	pgd = pgd_offset(mm, addr);
+> -	pr_alert("[%08lx] *pgd=%016llx", addr, pgd_val(*pgd));
+> +	pr_alert("[%016lx] *pgd=%016llx", addr, pgd_val(*pgd));
+>  
+>  	do {
+>  		pud_t *pud;
+> @@ -177,7 +177,7 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
+>  	 * No handler, we'll have to terminate things with extreme prejudice.
+>  	 */
+>  	bust_spinlocks(1);
+> -	pr_alert("Unable to handle kernel %s at virtual address %08lx\n",
+> +	pr_alert("Unable to handle kernel %s at virtual address %016lx\n",
+>  		 (addr < PAGE_SIZE) ? "NULL pointer dereference" :
+>  		 "paging request", addr);
+>  
+> @@ -198,9 +198,14 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
+>  	struct siginfo si;
+>  
+>  	if (unhandled_signal(tsk, sig) && show_unhandled_signals_ratelimited()) {
+> -		pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x\n",
+> -			tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
+> -			addr, esr);
+> +		if (compat_user_mode(regs))
+> +			pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x\n",
+> +				tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
+> +				addr, esr);
+> +		else
+> +			pr_info("%s[%d]: unhandled %s (%d) at 0x%016lx, esr 0x%03x\n",
+> +				tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
+> +				addr, esr);
 
-Assuming it's only ever assigned a dynamic allocation, which should fall
-in the linear map, the LMADDR() dance doesn't appear to be necessary.
-
-> This fixes the problem:
-> ----------------%<----------------
-> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-> index 4f0c77d2ff7a..8bed26a2d558 100644
-> --- a/arch/arm64/kernel/hibernate.c
-> +++ b/arch/arm64/kernel/hibernate.c
-> @@ -457,7 +457,6 @@ int swsusp_arch_resume(void)
->         void *zero_page;
->         size_t exit_size;
->         pgd_t *tmp_pg_dir;
-> -       void *lm_restore_pblist;
->         phys_addr_t phys_hibernate_exit;
->         void __noreturn (*hibernate_exit)(phys_addr_t, phys_addr_t, void *,
->                                           void *, phys_addr_t, phys_addr_t);
-> @@ -478,12 +477,6 @@ int swsusp_arch_resume(void)
->                 goto out;
-> 
->         /*
-> -        * Since we only copied the linear map, we need to find restore_pblist's
-> -        * linear map address.
-> -        */
-> -       lm_restore_pblist = lm_alias(restore_pblist);
-> -
-> -       /*
->          * We need a zero page that is zero before & after resume in order to
->          * to break before make on the ttbr1 page tables.
->          */
-> @@ -534,7 +527,7 @@ int swsusp_arch_resume(void)
->         }
-> 
->         hibernate_exit(virt_to_phys(tmp_pg_dir), resume_hdr.ttbr1_el1,
-> -                      resume_hdr.reenter_kernel, lm_restore_pblist,
-> +                      resume_hdr.reenter_kernel, restore_pblist,
->                        resume_hdr.__hyp_stub_vectors, virt_to_phys(zero_page));
-> 
->  out:
-> ----------------%<----------------
-
-Folding that in (or having it as a preparatory cleanup patch) makes
-sense to me. AFAICT the logic was valid (albeit confused) until now, so
-it's not strictly a fix.
+same here.
 
 Thanks,
-Mark.
+-Christoffer
