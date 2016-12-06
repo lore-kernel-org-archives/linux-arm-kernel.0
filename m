@@ -1,122 +1,69 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Tue, 06 Dec 2016 15:34:50 +0000
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <5846D814.9010106@free.fr> (Mason's message of "Tue, 6 Dec 2016
- 16:24:04 +0100")
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
- <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
- <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
- <yw1xwpfd2o9f.fsf@unicorn.mansr.com> <5846D814.9010106@free.fr>
-Message-ID: <yw1xshq12hr9.fsf@unicorn.mansr.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 6 Dec 2016 15:36:41 +0000
+Subject: [RFC PATCH 13/29] arm64/sve: Basic support for KERNEL_MODE_NEON
+In-Reply-To: <20161128122937.GI1574@e103592.cambridge.arm.com>
+References: <1480102762-23647-1-git-send-email-Dave.Martin@arm.com>
+ <1480102762-23647-14-git-send-email-Dave.Martin@arm.com>
+ <CAKv+Gu-MKdNHNrvSvMeoAoENdfscbAK0==NEMu6KJn8fjxz_tw@mail.gmail.com>
+ <20161126113038.GA86651@MBP.local>
+ <20161128114723.GG1574@e103592.cambridge.arm.com>
+ <20161128120623.GA17125@e104818-lin.cambridge.arm.com>
+ <20161128122937.GI1574@e103592.cambridge.arm.com>
+Message-ID: <CAKv+Gu_aZnhP43CC-GscorV94c2dB-gxgxJdvRw5ZY0MjAX8vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+On 28 November 2016 at 12:29, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Mon, Nov 28, 2016 at 12:06:24PM +0000, Catalin Marinas wrote:
+>> On Mon, Nov 28, 2016 at 11:47:26AM +0000, Dave P Martin wrote:
+>> > On Sat, Nov 26, 2016 at 11:30:42AM +0000, Catalin Marinas wrote:
+>> > > On Fri, Nov 25, 2016 at 08:45:02PM +0000, Ard Biesheuvel wrote:
+>> > > > On 25 November 2016 at 19:39, Dave Martin <Dave.Martin@arm.com> wrote:
+>> > > > > --- a/arch/arm64/kernel/fpsimd.c
+>> > > > > +++ b/arch/arm64/kernel/fpsimd.c
+>> > > > > @@ -282,11 +282,26 @@ static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
+>> > > > >   */
+>> > > > >  void kernel_neon_begin_partial(u32 num_regs)
+>> > > > >  {
+>> > > > > +       preempt_disable();
+>> > > > > +
+>> > > > > +       /*
+>> > > > > +        * For now, we have no special storage for SVE registers in
+>> > > > > +        * interrupt context, so always save the userland SVE state
+>> > > > > +        * if there is any, even for interrupts.
+>> > > > > +        */
+>> > > > > +       if (IS_ENABLED(CONFIG_ARM64_SVE) && (elf_hwcap & HWCAP_SVE) &&
+>> > > > > +           current->mm &&
+>> > > > > +           !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>> > > > > +               fpsimd_save_state(&current->thread.fpsimd_state);
+>> > > > > +               this_cpu_write(fpsimd_last_state, NULL);
+>> > > > > +       }
+>> > > > > +
+>> > > >
+>> > > > I am having trouble understanding why we need all of this if we don't
+>> > > > support SVE in the kernel. Could you elaborate?
+>> > >
+>> > > Dave knows all the details but a reason is that touching a Neon register
+>> > > zeros the upper SVE state in the same vector register. So we can't
+>> > > safely save/restore just the Neon part without corrupting the SVE state.
+>> >
+>> > This is right -- this also means that EFI services can trash the upper
+>> > bits of an SVE vector register (as a side-effect of FPSIMD/NEON usage).
+>> >
+>> > It's overkill to save/restore absolutely everything -- I ignore num_regs
+>> > for example -- but I wanted to keep things as simple as possible
+>> > initially.
+>>
 
-> On 06/12/2016 14:14, M?ns Rullg?rd wrote:
->
->> Mason wrote:
->> 
->>> On 06/12/2016 06:12, Vinod Koul wrote:
->>>
->>>> On Tue, Nov 29, 2016 at 07:25:02PM +0100, Mason wrote:
->>>>
->>>>> Is there a way to write a driver within the existing framework?
->>>>
->>>> I think so, looking back at comments from Russell, I do tend to agree with
->>>> that. Is there a specific reason why sbox can't be tied to alloc and free
->>>> channels?
->>>
->>> Here's a recap of the situation.
->>>
->>> The "SBOX+MBUS" HW is used in several iterations of the tango SoC:
->>>
->>> tango3
->>>   2 memory channels available
->>>   6 devices ("clients"?) may request an MBUS channel
->>>
->>> tango4 (one more channel)
->>>   3 memory channels available
->>>   7 devices may request an MBUS channel :
->>>     NFC0, NFC1, SATA0, SATA1, memcpy, (IDE0, IDE1)
->>>
->>> Notes:
->>> The current NFC driver supports only one controller.
->> 
->> I consider that a bug.
->
-> Meh. The two controller blocks share the I/O pins to the outside
-> world, so it's not possible to have two concurrent accesses.
+Actually, I think we could simplify this even further by always
+preserving the userland state, instead of having two copies of the
+statements above. The reason is that stacking and unstacking, as we do
+for softirq/hardirq context, is only required if we happen to be
+interrupting a thread while it is executing in the kernel *and* using
+the NEON, in all other cases we can simply preserve the userland
+context, and let the exit code take care of restoring the state upon
+exit to userland (unless we're interrupting kernel mode NEON executing
+in softirq context from an interrupt handler).
 
-OK, you failed to mention that part.  Why are there two controllers at
-all if only one or the other can be used?
-
->>> If I understand the current DMA driver (written by Mans), client
->>> drivers are instructed to use a specific channel in the DT, and
->>> the DMA driver muxes access to that channel.
->> 
->> Almost.  The DT indicates the sbox ID of each device.  The driver
->> multiplexes requests from all devices across all channels.
->
-> Thanks for pointing that out. I misremembered the DT.
-> So a client's DT node specifies the client's SBOX port.
-> And the DMA node specifies all available MBUS channels.
->
-> So when an interrupt fires, the DMA driver (re)uses that
-> channel for the next transfer in line?
-
-Correct.
-
->>> The DMA driver manages a per-channel queue of outstanding DMA transfer
->>> requests, and a new transfer is started from within the DMA ISR
->>> (modulo the fact that the interrupt does not signal completion of the
->>> transfer, as explained else-thread).
->> 
->> We need to somehow let the device driver signal the dma driver when a
->> transfer has been fully completed.  Currently the only post-transfer
->> interaction between the dma engine and the device driver is through the
->> descriptor callback, which is not suitable for this purpose.
->
-> The callback is called from vchan_complete() right?
-> Is that running from interrupt context?
-
-It runs from a tasklet which is almost the same thing.
-
-> What's the relationship between vchan_complete() and
-> tangox_dma_irq() -- does one call the other? Are they
-> asynchronous?
->
->> This is starting to look like one of those situations where someone just
->> needs to implement a solution, or we'll be forever bickering about
->> hypotheticals.
->
-> I can give that a shot (if you're busy with real work).
-
-I have an idea I'd like to try out over the weekend.  If I don't come
-back with something by next week, go for it.
-
->>> What you're proposing, Vinod, is to make a channel exclusive
->>> to a driver, as long as the driver has not explicitly released
->>> the channel, via dma_release_channel(), right?
->> 
->> That's not going to work very well.  Device drivers typically request
->> dma channels in their probe functions or when the device is opened.
->> This means that reserving one of the few channels there will inevitably
->> make some other device fail to operate.
->
-> This is true for tango3. Less so for tango4. And no longer
-> an issue for tango5.
->
->> Doing a request/release per transfer really doesn't fit with the
->> intended usage of the dmaengine api.  For starters, what should a driver
->> do if all the channels are currently busy?
->
-> Why can't we queue channel requests the same way we queue
-> transfer requests?
-
-That's in effect what we're doing.  Calling it by another name doesn't
-really solve anything.
-
--- 
-M?ns Rullg?rd
+i will send out a separate RFC with a proposal to optimize this, which
+I think will remove the need for this patch entirely.
