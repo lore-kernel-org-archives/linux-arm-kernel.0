@@ -1,63 +1,91 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Dec 2016 09:43:04 +0000
-Subject: [PATCH] ACPI/IORT: Make dma masks set-up IORT specific
-In-Reply-To: <20161205122619.25045-1-lorenzo.pieralisi@arm.com>
-References: <20161205122619.25045-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20161206094304.GA2498@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 6 Dec 2016 09:48:35 +0000
+Subject: [PATCH v3 7/7] ARM: dts: stm32: add stm32 general purpose timer
+ driver in DT
+In-Reply-To: <e15186cb-a93e-c2e7-13bb-6704be5e8949@st.com>
+References: <1480673842-20804-1-git-send-email-benjamin.gaignard@st.com>
+ <1480673842-20804-8-git-send-email-benjamin.gaignard@st.com>
+ <20161202132251.GL2683@dell>
+ <e15186cb-a93e-c2e7-13bb-6704be5e8949@st.com>
+Message-ID: <20161206094835.GB25385@dell.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2016 at 12:26:19PM +0000, Lorenzo Pieralisi wrote:
-> The introduction of acpi_dma_configure() allows to configure DMA
-> and related IOMMU for any device that is DMA capable. To achieve
-> that goal it ensures DMA masks are set-up to sane default values
-> before proceeding with IOMMU and DMA ops configuration.
-> 
-> On x86/ia64 systems, through acpi_bind_one(), acpi_dma_configure() is
-> called for every device that has an ACPI companion, in that every device
-> is considered DMA capable on x86/ia64 systems (ie acpi_get_dma_attr() API),
-> which has the side effect of initializing dma masks also for
-> pseudo-devices (eg CPUs and memory nodes) and potentially for devices
-> whose dma masks were not set-up before the acpi_dma_configure() API was
-> introduced, which may have noxious side effects.
-> 
-> Therefore, in preparation for IORT firmware specific DMA masks set-up,
-> wrap the default DMA masks set-up in acpi_dma_configure() inside an IORT
-> specific wrapper that reverts to a NOP on x86/ia64 systems, restoring the
-> default expected behaviour on x86/ia64 systems and keeping DMA default
-> masks set-up on IORT based (ie ARM) arch configurations.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Tomasz Nowicki <tn@semihalf.com>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Cc: Sricharan R <sricharan@codeaurora.org>
-> ---
-> Joerg,
-> 
-> pending Rafael's ACK on it, given the 4.10 release timing and that the
-> series is queued via the IOMMU tree please consider applying this patch to
-> your arm/smmu branch for 4.10, it is not fixing a bug but it is modifying
-> the x86/ia64 code path; I prefer preventing any issue related to default
-> dma masks on x86/ia64 so I hope it can get merged along with the rest of
-> the ACPI IORT SMMU series.
-> 
-> Thanks a lot and apologies,
-> Lorenzo
-> 
->  drivers/acpi/arm64/iort.c | 22 ++++++++++++++++++++++
->  drivers/acpi/scan.c       | 14 +-------------
->  include/linux/acpi_iort.h |  2 ++
->  3 files changed, 25 insertions(+), 13 deletions(-)
+On Mon, 05 Dec 2016, Alexandre Torgue wrote:
+> On 12/02/2016 02:22 PM, Lee Jones wrote:
+> > On Fri, 02 Dec 2016, Benjamin Gaignard wrote:
+> > 
+> > > Add general purpose timers and it sub-nodes into DT for stm32f4.
+> > > Define and enable pwm1 and pwm3 for stm32f469 discovery board
+> > > 
+> > > version 3:
+> > > - use "st,stm32-timer-trigger" in DT
+> > > 
+> > > version 2:
+> > > - use parameters to describe hardware capabilities
+> > > - do not use references for pwm and iio timer subnodes
+> > > 
+> > > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> > > ---
+> > >  arch/arm/boot/dts/stm32f429.dtsi      | 333 +++++++++++++++++++++++++++++++++-
+> > >  arch/arm/boot/dts/stm32f469-disco.dts |  28 +++
+> > >  2 files changed, 360 insertions(+), 1 deletion(-)
 
-Looks straightforward to me:
+[...]
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+If you're only commenting on a little piece of the patch, it's always
+a good idea to trim the rest.
 
-Joerg can probably just pick this on top of his queue.
+> > > diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
+> > > index 8a163d7..df4ca7e 100644
+> > > --- a/arch/arm/boot/dts/stm32f469-disco.dts
+> > > +++ b/arch/arm/boot/dts/stm32f469-disco.dts
+> > > @@ -81,3 +81,31 @@
+> > >  &usart3 {
+> > >  	status = "okay";
+> > >  };
+> > > +
+> > > +&gptimer1 {
+> > > +	status = "okay";
+> > > +
+> > > +	pwm1 at 0 {
+> > > +		pinctrl-0	= <&pwm1_pins>;
+> > > +		pinctrl-names	= "default";
+> > > +		status = "okay";
+> > > +	};
+> > > +
+> > > +	timer1 at 0 {
+> > > +		status = "okay";
+> > > +	};
+> > > +};
+> > 
+> > This is a much *better* format than before.
+> > 
+> > I still don't like the '&' syntax though.
+> 
+> Please keep "&" format to match with existing nodes.
 
-Will
+Right.  I wasn't suggesting that he differs from the current format in
+*this* set.  I am suggesting that we change the format in a subsequent
+set though.
+
+> > > +&gptimer3 {
+> > > +	status = "okay";
+> > > +
+> > > +	pwm3 at 0 {
+> > > +		pinctrl-0	= <&pwm3_pins>;
+> > > +		pinctrl-names	= "default";
+> > > +		status = "okay";
+> > > +	};
+> > > +
+> > > +	timer3 at 0 {
+> > > +		status = "okay";
+> > > +	};
+> > > +};
+> > 
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
