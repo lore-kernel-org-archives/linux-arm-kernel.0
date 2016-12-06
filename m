@@ -1,36 +1,83 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Tue,  6 Dec 2016 15:50:54 -0800
-Subject: [PATCHv5 08/11] kexec: Switch to __pa_symbol
+Date: Tue,  6 Dec 2016 15:50:55 -0800
+Subject: [PATCHv5 09/11] mm/kasan: Switch to using __pa_symbol and lm_alias
 In-Reply-To: <1481068257-6367-1-git-send-email-labbott@redhat.com>
 References: <1481068257-6367-1-git-send-email-labbott@redhat.com>
-Message-ID: <1481068257-6367-9-git-send-email-labbott@redhat.com>
+Message-ID: <1481068257-6367-10-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-__pa_symbol is the correct api to get the physical address of kernel
-symbols. Switch to it to allow for better debug checking.
+__pa_symbol is the correct API to find the physical address of symbols.
+Switch to it to allow for debugging APIs to work correctly. Other
+functions such as p*d_populate may call __pa internally. Ensure that the
+address passed is in the linear region by calling lm_alias.
 
-Acked-by: "Eric W. Biederman" <ebiederm@xmission.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Laura Abbott <labbott@redhat.com>
 ---
-v5: No changes, just acks
+v5: Add missing lm_alias call
 ---
- kernel/kexec_core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ mm/kasan/kasan_init.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/kernel/kexec_core.c b/kernel/kexec_core.c
-index 5616755..e1b625e 100644
---- a/kernel/kexec_core.c
-+++ b/kernel/kexec_core.c
-@@ -1397,7 +1397,7 @@ void __weak arch_crash_save_vmcoreinfo(void)
+diff --git a/mm/kasan/kasan_init.c b/mm/kasan/kasan_init.c
+index 3f9a41c..922f459 100644
+--- a/mm/kasan/kasan_init.c
++++ b/mm/kasan/kasan_init.c
+@@ -16,6 +16,7 @@
+ #include <linux/kernel.h>
+ #include <linux/memblock.h>
+ #include <linux/pfn.h>
++#include <linux/mm.h>
  
- phys_addr_t __weak paddr_vmcoreinfo_note(void)
- {
--	return __pa((unsigned long)(char *)&vmcoreinfo_note);
-+	return __pa_symbol((unsigned long)(char *)&vmcoreinfo_note);
- }
+ #include <asm/page.h>
+ #include <asm/pgalloc.h>
+@@ -49,7 +50,7 @@ static void __init zero_pte_populate(pmd_t *pmd, unsigned long addr,
+ 	pte_t *pte = pte_offset_kernel(pmd, addr);
+ 	pte_t zero_pte;
  
- static int __init crash_save_vmcoreinfo_init(void)
+-	zero_pte = pfn_pte(PFN_DOWN(__pa(kasan_zero_page)), PAGE_KERNEL);
++	zero_pte = pfn_pte(PFN_DOWN(__pa_symbol(kasan_zero_page)), PAGE_KERNEL);
+ 	zero_pte = pte_wrprotect(zero_pte);
+ 
+ 	while (addr + PAGE_SIZE <= end) {
+@@ -69,7 +70,7 @@ static void __init zero_pmd_populate(pud_t *pud, unsigned long addr,
+ 		next = pmd_addr_end(addr, end);
+ 
+ 		if (IS_ALIGNED(addr, PMD_SIZE) && end - addr >= PMD_SIZE) {
+-			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
++			pmd_populate_kernel(&init_mm, pmd, lm_alias(kasan_zero_pte));
+ 			continue;
+ 		}
+ 
+@@ -92,9 +93,9 @@ static void __init zero_pud_populate(pgd_t *pgd, unsigned long addr,
+ 		if (IS_ALIGNED(addr, PUD_SIZE) && end - addr >= PUD_SIZE) {
+ 			pmd_t *pmd;
+ 
+-			pud_populate(&init_mm, pud, kasan_zero_pmd);
++			pud_populate(&init_mm, pud, lm_alias(kasan_zero_pmd));
+ 			pmd = pmd_offset(pud, addr);
+-			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
++			pmd_populate_kernel(&init_mm, pmd, lm_alias(kasan_zero_pte));
+ 			continue;
+ 		}
+ 
+@@ -135,11 +136,11 @@ void __init kasan_populate_zero_shadow(const void *shadow_start,
+ 			 * puds,pmds, so pgd_populate(), pud_populate()
+ 			 * is noops.
+ 			 */
+-			pgd_populate(&init_mm, pgd, kasan_zero_pud);
++			pgd_populate(&init_mm, pgd, lm_alias(kasan_zero_pud));
+ 			pud = pud_offset(pgd, addr);
+-			pud_populate(&init_mm, pud, kasan_zero_pmd);
++			pud_populate(&init_mm, pud, lm_alias(kasan_zero_pmd));
+ 			pmd = pmd_offset(pud, addr);
+-			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
++			pmd_populate_kernel(&init_mm, pmd, lm_alias(kasan_zero_pte));
+ 			continue;
+ 		}
+ 
 -- 
 2.7.4
