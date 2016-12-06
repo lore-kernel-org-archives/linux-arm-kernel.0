@@ -1,45 +1,127 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Tue, 6 Dec 2016 16:54:38 +0000
-Subject: [PATCH 1/4] serial: core: Add LED trigger support
-In-Reply-To: <9225f2da-c6c4-73c8-829a-1033716b4c71@gmail.com>
-References: <20161123100106.15969-1-s.hauer@pengutronix.de>
- <20161123100106.15969-2-s.hauer@pengutronix.de>
- <e9fc12b8-d4a7-067d-ef87-03f0aae39bd7@gmail.com>
- <20161124081748.fx3xm5ww64ngn5it@pengutronix.de>
- <9225f2da-c6c4-73c8-829a-1033716b4c71@gmail.com>
-Message-ID: <20161206165438.5e37504f@lxorguk.ukuu.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 6 Dec 2016 17:02:22 +0000
+Subject: [PATCHv4 05/10] arm64: Use __pa_symbol for kernel symbols
+In-Reply-To: <1480445729-27130-6-git-send-email-labbott@redhat.com>
+References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
+ <1480445729-27130-6-git-send-email-labbott@redhat.com>
+Message-ID: <20161206170222.GE24177@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > If we have different UART drivers, only one of them provides ttyS*, no?
-> > Other drivers will have to use another namespace.  
-> 
-> I remember this was a problem a couple of years ago last I tried, with
-> the 8250 driver being actually preventing other drivers from using
-> ttyS*, but if you don't have 8250 taking over the low ttyS numbers, you
-> may run into a case where several drivers successfully register their
-> character devices under a ttyS* numbering scheme.
-> 
-> Whether this is hypothetical or not nowadays, it may be nicer to provide
-> a more uniquely distinct name like what dev_name() returns, or
-> ttyS*-driver-tx for instance?
+Hi,
 
-It needs to be at the tty layer anyway or you will break low end
-machines. On a low end system with a 16450A UART you've got something
-like 160 microseconds at 57600 baud before you must have exited the
-IRQ handler, re-entered it and be reading the data register again. The
-current proposed patches touching the 8250 IRQ path are almost certainly
-going to cause regressions on old machines.
+As a heads-up, it looks like this got mangled somewhere. In the hunk at
+arch/arm64/mm/kasan_init.c:68, 'do' in the context became 'edo'.
+Deleting the 'e' makes it apply.
 
-So you need to hook receive at a point outside of the IRQ layer (eg when
-the workqueue starts feeding it into the ldisc), but on the tx side you
-need to hook the write method of the tty really, because tty_write sends
-data to the ldisc and what happens then is up to the ldisc.
+I think this is almost there; other than James's hibernate bug I only
+see one real issue, and everything else is a minor nit.
 
-Even there though you have cases that are terribly latency dependant like
-some of the dumb programming tools that don't window. If you halve
-someones programming rate for microcontrollers you are going to get hate
-mail 8) For RX that can mostly be avoided by queuing the data then doing
-the LEDs, for TX I'm not clear you can easily hide the latency.
+On Tue, Nov 29, 2016 at 10:55:24AM -0800, Laura Abbott wrote:
+> __pa_symbol is technically the marco that should be used for kernel
+> symbols. Switch to this as a pre-requisite for DEBUG_VIRTUAL which
+> will do bounds checking. As part of this, introduce lm_alias, a
+> macro which wraps the __va(__pa(...)) idiom used a few places to
+> get the alias.
 
-Alan
+I think the addition of the lm_alias() macro under include/mm should be
+a separate preparatory patch. That way it's separate from the
+arm64-specific parts, and more obvious to !arm64 people reviewing the
+other parts.
+
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> v4: Stop calling __va early, conversion of a few more sites. I decided against
+> wrapping the __p*d_populate calls into new functions since the call sites
+> should be limited.
+> ---
+>  arch/arm64/include/asm/kvm_mmu.h          |  4 ++--
+>  arch/arm64/include/asm/memory.h           |  2 ++
+>  arch/arm64/include/asm/mmu_context.h      |  6 +++---
+>  arch/arm64/include/asm/pgtable.h          |  2 +-
+>  arch/arm64/kernel/acpi_parking_protocol.c |  2 +-
+>  arch/arm64/kernel/cpu-reset.h             |  2 +-
+>  arch/arm64/kernel/cpufeature.c            |  2 +-
+>  arch/arm64/kernel/hibernate.c             | 13 +++++--------
+>  arch/arm64/kernel/insn.c                  |  2 +-
+>  arch/arm64/kernel/psci.c                  |  2 +-
+>  arch/arm64/kernel/setup.c                 |  8 ++++----
+>  arch/arm64/kernel/smp_spin_table.c        |  2 +-
+>  arch/arm64/kernel/vdso.c                  |  4 ++--
+>  arch/arm64/mm/init.c                      | 11 ++++++-----
+>  arch/arm64/mm/kasan_init.c                | 21 +++++++++++++-------
+>  arch/arm64/mm/mmu.c                       | 32 +++++++++++++++++++------------
+>  drivers/firmware/psci.c                   |  2 +-
+>  include/linux/mm.h                        |  4 ++++
+>  18 files changed, 70 insertions(+), 51 deletions(-)
+
+It looks like we need to make sure these (directly) include <linux/mm.h>
+for __pa_symbol() and lm_alias(), or there's some fragility, e.g.
+
+[mark at leverpostej:~/src/linux]% uselinaro 15.08 make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j10 -s
+arch/arm64/kernel/psci.c: In function 'cpu_psci_cpu_boot':
+arch/arm64/kernel/psci.c:48:50: error: implicit declaration of function '__pa_symbol' [-Werror=implicit-function-declaration]
+  int err = psci_ops.cpu_on(cpu_logical_map(cpu), __pa_symbol(secondary_entry));
+                                                  ^
+cc1: some warnings being treated as errors
+make[1]: *** [arch/arm64/kernel/psci.o] Error 1
+make: *** [arch/arm64/kernel] Error 2
+make: *** Waiting for unfinished jobs....
+
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -205,6 +205,8 @@ static inline void *phys_to_virt(phys_addr_t x)
+>  #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
+>  #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
+>  #define virt_to_pfn(x)      __phys_to_pfn(__virt_to_phys((unsigned long)(x)))
+> +#define sym_to_pfn(x)	    __phys_to_pfn(__pa_symbol(x))
+> +#define lm_alias(x)		__va(__pa_symbol(x))
+
+As Catalin mentioned, we should be able to drop this copy of lm_alias(),
+given we have the same in the core headers.
+
+> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+> index a2c2478..79cd86b 100644
+> --- a/arch/arm64/kernel/vdso.c
+> +++ b/arch/arm64/kernel/vdso.c
+> @@ -140,11 +140,11 @@ static int __init vdso_init(void)
+>  		return -ENOMEM;
+>  
+>  	/* Grab the vDSO data page. */
+> -	vdso_pagelist[0] = pfn_to_page(PHYS_PFN(__pa(vdso_data)));
+> +	vdso_pagelist[0] = phys_to_page(__pa_symbol(vdso_data));
+>  
+>  	/* Grab the vDSO code pages. */
+>  	for (i = 0; i < vdso_pages; i++)
+> -		vdso_pagelist[i + 1] = pfn_to_page(PHYS_PFN(__pa(&vdso_start)) + i);
+> +		vdso_pagelist[i + 1] = pfn_to_page(PHYS_PFN(__pa_symbol(&vdso_start)) + i);
+
+I see you added sym_to_pfn(), which we can use here to keep this short
+and legible. It might also be worth using a temporary pfn_t, e.g.
+
+	pfn = sym_to_pfn(&vdso_start);
+
+	for (i = 0; i < vdso_pages; i++)
+		vdso_pagelist[i + 1] = pfn_to_page(pfn + i);
+
+> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> index 8263429..9defbe2 100644
+> --- a/drivers/firmware/psci.c
+> +++ b/drivers/firmware/psci.c
+> @@ -383,7 +383,7 @@ static int psci_suspend_finisher(unsigned long index)
+>  	u32 *state = __this_cpu_read(psci_power_state);
+>  
+>  	return psci_ops.cpu_suspend(state[index - 1],
+> -				    virt_to_phys(cpu_resume));
+> +				    __pa_symbol(cpu_resume));
+>  }
+>  
+>  int psci_cpu_suspend_enter(unsigned long index)
+
+This should probably be its own patch since it's not under arch/arm64/.
+
+I'm happy for this to go via the arm64 tree with the rest regardless
+(assuming Lorenzo has no objections).
+
+Thanks,
+Mark.
