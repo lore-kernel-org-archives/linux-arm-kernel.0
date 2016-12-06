@@ -1,92 +1,31 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  6 Dec 2016 15:27:45 +0000
-Subject: [PATCH v2 2/2] arm64: Work around broken .inst when defective gas is
- detected
-In-Reply-To: <1481038065-32153-1-git-send-email-marc.zyngier@arm.com>
-References: <1481038065-32153-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1481038065-32153-4-git-send-email-marc.zyngier@arm.com>
+Date: Tue,  6 Dec 2016 15:27:42 +0000
+Subject: [PATCH v2 0/2] arm64: Fix fallout of asm/opcodes.h removal
+Message-ID: <1481038065-32153-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-.inst being largely broken with older binutils, it'd be better not
-to emit it altogether when detecting such configuration (as it
-leads to all kind of horrors when using alternatives).
+As part of the asm/opcodes.h removal, the SET_PSTATE_{PAN,UAO} macros
+have been switch to using the .inst directive instead of .long (as
+this has the advantage of providing a correct disassembly). This
+had the side effect of bringing back an ugly gas bug that shows up
+when .inst is used within alternative sequences.
 
-Generalize the __emit_inst macro and use it extensively in
-asm/sysreg.h, and make it generate a .long when a broken gas is
-detected. The disassembly will be crap, but at least we can write
-semi-sane code.
+This series works around the problem by:
+- adding detection code for the broken binutils,
+- work around the issue by falling back to .long when using a buggy
+  assembler.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
+This has been tested with both binutils 2.25 (broken) and 2.27
+(fixed), with both LE and BE builds.
+
+Marc Zyngier (2):
+  arm64: Add detection code for broken .inst support in binutils
+  arm64: Work around broken .inst when defective gas is detected
+
+ arch/arm64/Makefile             | 10 ++++++++--
  arch/arm64/include/asm/sysreg.h | 29 +++++++++++++++++++++++++----
- 1 file changed, 25 insertions(+), 4 deletions(-)
+ 2 files changed, 33 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 9e16a18..98ae03f 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -35,12 +35,33 @@
- #define sys_reg(op0, op1, crn, crm, op2) \
- 	((((op0)&3)<<19)|((op1)<<16)|((crn)<<12)|((crm)<<8)|((op2)<<5))
- 
-+#ifndef CONFIG_BROKEN_GAS_INST
-+
- #ifdef __ASSEMBLY__
- #define __emit_inst(x)			.inst (x)
- #else
- #define __emit_inst(x)			".inst " __stringify((x)) "\n\t"
- #endif
- 
-+#else  /* CONFIG_BROKEN_GAS_INST */
-+
-+#ifndef CONFIG_CPU_BIG_ENDIAN
-+#define __INSTR_BSWAP(x)		(x)
-+#else  /* CONFIG_CPU_BIG_ENDIAN */
-+#define __INSTR_BSWAP(x)		((((x) << 24) & 0xff000000)	| \
-+					 (((x) <<  8) & 0x00ff0000)	| \
-+					 (((x) >>  8) & 0x0000ff00)	| \
-+					 (((x) >> 24) & 0x000000ff))
-+#endif	/* CONFIG_CPU_BIG_ENDIAN */
-+
-+#ifdef __ASSEMBLY__
-+#define __emit_inst(x)			.long __INSTR_BSWAP(x)
-+#else  /* __ASSEMBLY__ */
-+#define __emit_inst(x)			".long " __stringify(__INSTR_BSWAP(x)) "\n\t"
-+#endif	/* __ASSEMBLY__ */
-+
-+#endif	/* CONFIG_BROKEN_GAS_INST */
-+
- #define SYS_MIDR_EL1			sys_reg(3, 0, 0, 0, 0)
- #define SYS_MPIDR_EL1			sys_reg(3, 0, 0, 0, 5)
- #define SYS_REVIDR_EL1			sys_reg(3, 0, 0, 0, 6)
-@@ -232,11 +253,11 @@
- 	.equ	.L__reg_num_xzr, 31
- 
- 	.macro	mrs_s, rt, sreg
--	.inst	0xd5200000|(\sreg)|(.L__reg_num_\rt)
-+	 __emit_inst(0xd5200000|(\sreg)|(.L__reg_num_\rt))
- 	.endm
- 
- 	.macro	msr_s, sreg, rt
--	.inst	0xd5000000|(\sreg)|(.L__reg_num_\rt)
-+	__emit_inst(0xd5000000|(\sreg)|(.L__reg_num_\rt))
- 	.endm
- 
- #else
-@@ -250,11 +271,11 @@ asm(
- "	.equ	.L__reg_num_xzr, 31\n"
- "\n"
- "	.macro	mrs_s, rt, sreg\n"
--"	.inst	0xd5200000|(\\sreg)|(.L__reg_num_\\rt)\n"
-+	__emit_inst(0xd5200000|(\\sreg)|(.L__reg_num_\\rt))
- "	.endm\n"
- "\n"
- "	.macro	msr_s, sreg, rt\n"
--"	.inst	0xd5000000|(\\sreg)|(.L__reg_num_\\rt)\n"
-+	__emit_inst(0xd5000000|(\\sreg)|(.L__reg_num_\\rt))
- "	.endm\n"
- );
- 
 -- 
 2.1.4
