@@ -1,115 +1,321 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 6 Dec 2016 13:09:26 +0000
-Subject: [PATCH v3] KVM: arm/arm64: Access CNTHCTL_EL2 bit fields correctly
-In-Reply-To: <20161206121617.GB3681@cbox>
-References: <1480620725-9864-1-git-send-email-jintack@cs.columbia.edu>
- <49451f06-10a6-4921-eae6-c37a5510197a@arm.com> <20161206121221.GA3681@cbox>
- <20161206121617.GB3681@cbox>
-Message-ID: <b2623eed-fd63-c8c6-fd66-428bd87759d9@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 6 Dec 2016 13:16:35 +0000
+Subject: [PATCH v4 6/7] IIO: add STM32 timer trigger driver
+In-Reply-To: <1481027929-13704-7-git-send-email-benjamin.gaignard@st.com>
+References: <1481027929-13704-1-git-send-email-benjamin.gaignard@st.com>
+ <1481027929-13704-7-git-send-email-benjamin.gaignard@st.com>
+Message-ID: <20161206131635.GJ25385@dell.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/16 12:16, Christoffer Dall wrote:
-> On Tue, Dec 06, 2016 at 01:12:21PM +0100, Christoffer Dall wrote:
->> On Tue, Dec 06, 2016 at 11:17:40AM +0000, Marc Zyngier wrote:
->>> On 01/12/16 19:32, Jintack Lim wrote:
->>>> Current KVM world switch code is unintentionally setting wrong bits to
->>>> CNTHCTL_EL2 when E2H == 1, which may allow guest OS to access physical
->>>> timer.  Bit positions of CNTHCTL_EL2 are changing depending on
->>>> HCR_EL2.E2H bit.  EL1PCEN and EL1PCTEN are 1st and 0th bits when E2H is
->>>> not set, but they are 11th and 10th bits respectively when E2H is set.
->>>>
->>>> In fact, on VHE we only need to set those bits once, not for every world
->>>> switch. This is because the host kernel runs in EL2 with HCR_EL2.TGE ==
->>>> 1, which makes those bits have no effect for the host kernel execution.
->>>> So we just set those bits once for guests, and that's it.
->>>>
->>>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
->>>> ---
->>>> v2->v3: 
->>>> - Perform the initialization including CPU hotplug case.
->>>> - Move has_vhe() to asm/virt.h
->>>>
->>>> v1->v2: 
->>>> - Skip configuring cnthctl_el2 in world switch path on VHE system.
->>>> - Write patch based on linux-next.
->>>> ---
->>>>  arch/arm/include/asm/virt.h   |  5 +++++
->>>>  arch/arm/kvm/arm.c            |  3 +++
->>>>  arch/arm64/include/asm/virt.h | 10 ++++++++++
->>>>  include/kvm/arm_arch_timer.h  |  1 +
->>>>  virt/kvm/arm/arch_timer.c     | 23 +++++++++++++++++++++++
->>>>  virt/kvm/arm/hyp/timer-sr.c   | 33 +++++++++++++++++++++------------
->>>>  6 files changed, 63 insertions(+), 12 deletions(-)
->>>>
->>>> diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
->>>> index a2e75b8..6dae195 100644
->>>> --- a/arch/arm/include/asm/virt.h
->>>> +++ b/arch/arm/include/asm/virt.h
->>>> @@ -80,6 +80,11 @@ static inline bool is_kernel_in_hyp_mode(void)
->>>>  	return false;
->>>>  }
->>>>  
->>>> +static inline bool has_vhe(void)
->>>> +{
->>>> +	return false;
->>>> +}
->>>> +
->>>>  /* The section containing the hypervisor idmap text */
->>>>  extern char __hyp_idmap_text_start[];
->>>>  extern char __hyp_idmap_text_end[];
->>>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->>>> index 8f92efa..13e54e8 100644
->>>> --- a/arch/arm/kvm/arm.c
->>>> +++ b/arch/arm/kvm/arm.c
->>>> @@ -1099,6 +1099,9 @@ static void cpu_init_hyp_mode(void *dummy)
->>>>  	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
->>>>  	__cpu_init_stage2();
->>>>  
->>>> +	if (is_kernel_in_hyp_mode())
->>>> +		kvm_timer_init_vhe();
->>>> +
->>>>  	kvm_arm_init_debug();
->>>>  }
->>>>  
->>>> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
->>>> index fea1073..b043cfd 100644
->>>> --- a/arch/arm64/include/asm/virt.h
->>>> +++ b/arch/arm64/include/asm/virt.h
->>>> @@ -47,6 +47,7 @@
->>>>  #include <asm/ptrace.h>
->>>>  #include <asm/sections.h>
->>>>  #include <asm/sysreg.h>
->>>> +#include <asm/cpufeature.h>
->>>>  
->>>>  /*
->>>>   * __boot_cpu_mode records what mode CPUs were booted in.
->>>> @@ -80,6 +81,15 @@ static inline bool is_kernel_in_hyp_mode(void)
->>>>  	return read_sysreg(CurrentEL) == CurrentEL_EL2;
->>>>  }
->>>>  
->>>> +static inline bool has_vhe(void)
->>>> +{
->>>> +#ifdef CONFIG_ARM64_VHE
->>>
->>> Is there a particular reason why this should be guarded by a #ifdef? All
->>> the symbols should always be available, and since this is a static key,
->>> the overhead should be really insignificant (provided that you use a
->>> non-prehistoric compiler...).
->>>
->>
->> Isn't this code called from a file shared between 32-bit arm and arm64?
->> Does the cpus_have_const_cap work on ARM64?
+On Tue, 06 Dec 2016, Benjamin Gaignard wrote:
+
+> Timers IPs can be used to generate triggers for other IPs like
+> DAC, ADC or other timers.
+> Each trigger may result of timer internals signals like counter enable,
+> reset or edge, this configuration could be done through "master_mode"
+> device attribute.
 > 
-> Duh, I meant on 32-bit arm of course.
+> A timer device could be triggered by other timers, we use the trigger
+> name and is_stm32_iio_timer_trigger() function to distinguish them
+> and configure IP input switch.
+> 
+> Timer may also decide on which event (edge, level) they could
+> be activated by a trigger, this configuration is done by writing in
+> "slave_mode" device attribute.
+> 
+> Since triggers could also be used by DAC or ADC their names are defined
+> in include/ nux/iio/timer/stm32-timer-trigger.h so those IPs will be able
+> to configure themselves in valid_trigger function
+> 
+> Trigger have a "sampling_frequency" attribute which allow to configure
+> timer sampling frequency without using PWM interface
+> 
+> version 4:
+> - get triggers configuration from "reg" in DT
+> - add tables of triggers
+> - sampling frequency is enable/disable when writing in trigger
+>   sampling_frequency attribute
+> - no more use of interruptions
+> 
+> version 3:
+> - change compatible to "st,stm32-timer-trigger"
+> - fix attributes access right
+> - use string instead of int for master_mode and slave_mode
+> - document device attributes in sysfs-bus-iio-timer-stm32
+> 
+> version 2:
+> - keep only one compatible
+> - use st,input-triggers-names and st,output-triggers-names
+>   to know which triggers are accepted and/or create by the device
+> 
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> ---
+>  .../ABI/testing/sysfs-bus-iio-timer-stm32          |  55 +++
+>  drivers/iio/Kconfig                                |   2 +-
+>  drivers/iio/Makefile                               |   1 +
+>  drivers/iio/timer/Kconfig                          |  15 +
+>  drivers/iio/timer/Makefile                         |   1 +
+>  drivers/iio/timer/stm32-timer-trigger.c            | 526 +++++++++++++++++++++
+>  drivers/iio/trigger/Kconfig                        |   1 -
+>  include/linux/iio/timer/stm32-timer-trigger.h      |  61 +++
+>  8 files changed, 660 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-timer-stm32
+>  create mode 100644 drivers/iio/timer/Kconfig
+>  create mode 100644 drivers/iio/timer/Makefile
+>  create mode 100644 drivers/iio/timer/stm32-timer-trigger.c
+>  create mode 100644 include/linux/iio/timer/stm32-timer-trigger.h
+> 
+> diff --git a/Documentation/ABI/testing/sysfs-bus-iio-timer-stm32 b/Documentation/ABI/testing/sysfs-bus-iio-timer-stm32
+> new file mode 100644
+> index 0000000..26583dd
+> --- /dev/null
+> +++ b/Documentation/ABI/testing/sysfs-bus-iio-timer-stm32
+> @@ -0,0 +1,55 @@
+> +What:		/sys/bus/iio/devices/iio:deviceX/master_mode_available
+> +KernelVersion:	4.10
+> +Contact:	benjamin.gaignard at st.com
+> +Description:
+> +		Reading returns the list possible master modes which are:
+> +		- "reset"     :	The UG bit from the TIMx_EGR register is used as trigger output (TRGO).
+> +		- "enable"    : The Counter Enable signal CNT_EN is used as trigger output.
+> +		- "update"    : The update event is selected as trigger output.
+> +				For instance a master timer can then be used as a prescaler for a slave timer.
+> +		- "compare_pulse" : The trigger output send a positive pulse when the CC1IF flag is to be set.
+> +		- "OC1REF"    : OC1REF signal is used as trigger output.
+> +		- "OC2REF"    : OC2REF signal is used as trigger output.
+> +		- "OC3REF"    : OC3REF signal is used as trigger output.
+> +		- "OC4REF"    : OC4REF signal is used as trigger output.
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/master_mode
+> +KernelVersion:	4.10
+> +Contact:	benjamin.gaignard at st.com
+> +Description:
+> +		Reading returns the current master modes.
+> +		Writing set the master mode
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/slave_mode_available
+> +KernelVersion:	4.10
+> +Contact:	benjamin.gaignard at st.com
+> +Description:
+> +		Reading returns the list possible slave modes which are:
+> +		- "disabled"  : The prescaler is clocked directly by the internal clock.
+> +		- "encoder_1" : Counter counts up/down on TI2FP1 edge depending on TI1FP2 level.
+> +		- "encoder_2" : Counter counts up/down on TI1FP2 edge depending on TI2FP1 level.
+> +		- "encoder_3" : Counter counts up/down on both TI1FP1 and TI2FP2 edges depending
+> +				on the level of the other input.
+> +		- "reset"     : Rising edge of the selected trigger input reinitializes the counter
+> +				and generates an update of the registers.
+> +		- "gated"     : The counter clock is enabled when the trigger input is high.
+> +				The counter stops (but is not reset) as soon as the trigger becomes low.
+> +				Both start and stop of the counter are controlled.
+> +		- "trigger"   : The counter starts at a rising edge of the trigger TRGI (but it is not
+> +				reset). Only the start of the counter is controlled.
+> +		- "external_clock": Rising edges of the selected trigger (TRGI) clock the counter.
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/slave_mode
+> +KernelVersion:	4.10
+> +Contact:	benjamin.gaignard at st.com
+> +Description:
+> +		Reading returns the current slave mode.
+> +		Writing set the slave mode
+> +
+> +What:		/sys/bus/iio/devices/triggerX/sampling_frequency
+> +KernelVersion:	4.10
+> +Contact:	benjamin.gaignard at st.com
+> +Description:
+> +		Reading returns the current sampling frequency.
+> +		Writing an value different of 0 set and start sampling.
+> +		Writing 0 stop sampling.
+> diff --git a/drivers/iio/Kconfig b/drivers/iio/Kconfig
+> index 6743b18..2de2a80 100644
+> --- a/drivers/iio/Kconfig
+> +++ b/drivers/iio/Kconfig
+> @@ -90,5 +90,5 @@ source "drivers/iio/potentiometer/Kconfig"
+>  source "drivers/iio/pressure/Kconfig"
+>  source "drivers/iio/proximity/Kconfig"
+>  source "drivers/iio/temperature/Kconfig"
+> -
+> +source "drivers/iio/timer/Kconfig"
+>  endif # IIO
+> diff --git a/drivers/iio/Makefile b/drivers/iio/Makefile
+> index 87e4c43..b797c08 100644
+> --- a/drivers/iio/Makefile
+> +++ b/drivers/iio/Makefile
+> @@ -32,4 +32,5 @@ obj-y += potentiometer/
+>  obj-y += pressure/
+>  obj-y += proximity/
+>  obj-y += temperature/
+> +obj-y += timer/
+>  obj-y += trigger/
+> diff --git a/drivers/iio/timer/Kconfig b/drivers/iio/timer/Kconfig
+> new file mode 100644
+> index 0000000..3033869
+> --- /dev/null
+> +++ b/drivers/iio/timer/Kconfig
+> @@ -0,0 +1,15 @@
+> +#
+> +# Timers drivers
+> +
+> +menu "Timers"
+> +
+> +config IIO_STM32_TIMER_TRIGGER
+> +	tristate "STM32 Timer Trigger"
+> +	depends on ARCH_STM32 || COMPILE_TEST
+> +	depends on OF
+> +	depends on MFD_STM32_GP_TIMER
+> +	select IIO_TRIGGERED_EVENT
+> +	help
+> +	  Select this option to enable STM32 Timer Trigger
+> +
+> +endmenu
+> diff --git a/drivers/iio/timer/Makefile b/drivers/iio/timer/Makefile
+> new file mode 100644
+> index 0000000..4ad95ec9
+> --- /dev/null
+> +++ b/drivers/iio/timer/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_IIO_STM32_TIMER_TRIGGER) += stm32-timer-trigger.o
+> diff --git a/drivers/iio/timer/stm32-timer-trigger.c b/drivers/iio/timer/stm32-timer-trigger.c
+> new file mode 100644
+> index 0000000..58fba33
+> --- /dev/null
+> +++ b/drivers/iio/timer/stm32-timer-trigger.c
+> @@ -0,0 +1,526 @@
+> +/*
+> + * Copyright (C) STMicroelectronics 2016
+> + *
+> + * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
+> + * License terms:  GNU General Public License (GPL), version 2
+> + */
+> +
+> +#include <linux/iio/iio.h>
+> +#include <linux/iio/sysfs.h>
+> +#include <linux/iio/timer/stm32-timer-trigger.h>
+> +#include <linux/iio/trigger.h>
+> +#include <linux/iio/triggered_event.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/mfd/stm32-gptimer.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +
+> +static const char * const triggers0[] = {
+> +	TIM1_TRGO, TIM1_CH1, TIM1_CH2, TIM1_CH3, TIM1_CH4, NULL,
+> +};
+> +
+> +static const char * const triggers1[] = {
+> +	TIM2_TRGO, TIM2_CH1, TIM2_CH2, TIM2_CH3, TIM2_CH4, NULL,
+> +};
+> +
+> +static const char * const triggers2[] = {
+> +	TIM3_TRGO, TIM3_CH1, TIM3_CH2, TIM3_CH3, TIM3_CH4, NULL,
+> +};
+> +
+> +static const char * const triggers3[] = {
+> +	TIM4_TRGO, TIM4_CH1, TIM4_CH2, TIM4_CH3, TIM4_CH4, NULL,
+> +};
+> +
+> +static const char * const triggers4[] = {
+> +	TIM5_TRGO, TIM5_CH1, TIM5_CH2, TIM5_CH3, TIM5_CH4, NULL,
+> +};
+> +
+> +static const char * const triggers5[] = {
+> +	TIM6_TRGO, NULL,
+> +};
+> +
+> +static const char * const triggers6[] = {
+> +	TIM7_TRGO, NULL,
+> +};
+> +
+> +static const char * const triggers7[] = {
+> +	TIM8_TRGO, TIM8_CH1, TIM8_CH2, TIM8_CH3, TIM8_CH4, NULL,
+> +};
+> +
+> +static const char * const triggers8[] = {
+> +	TIM9_TRGO, TIM9_CH1, TIM9_CH2, NULL,
+> +};
+> +
+> +static const char * const triggers9[] = {
+> +	TIM12_TRGO, TIM12_CH1, TIM12_CH2, NULL,
+> +};
+> +
+> +static const void *triggers_table[] = {
+> +	triggers0,
+> +	triggers1,
+> +	triggers2,
+> +	triggers3,
+> +	triggers4,
+> +	triggers5,
+> +	triggers6,
+> +	triggers7,
+> +	triggers8,
+> +	triggers9,
+> +};
 
-Well, this is a pure 64bit file - 32bit has the canonical implementation
-that always returns false. So I can't really see how this can ever break
-32bit. Unless my lack of sleep is really showing, and I'm missing
-something terribly obvious?
+What about:
 
-Thanks,
+static const char * const triggers[][] = {
+	{ TIM1_TRGO, TIM1_CH1, TIM1_CH2, TIM1_CH3, TIM1_CH4, NULL },
+	{ TIM2_TRGO, TIM2_CH1, TIM2_CH2, TIM2_CH3, TIM2_CH4, NULL },
+	{ TIM3_TRGO, TIM3_CH1, TIM3_CH2, TIM3_CH3, TIM3_CH4, NULL },
+	{ TIM4_TRGO, TIM4_CH1, TIM4_CH2, TIM4_CH3, TIM4_CH4, NULL },
+	{ TIM5_TRGO, TIM5_CH1, TIM5_CH2, TIM5_CH3, TIM5_CH4, NULL },
+	{ TIM6_TRGO, NULL },
+	{ TIM7_TRGO, NULL },
+	{ TIM8_TRGO, TIM8_CH1, TIM8_CH2, TIM8_CH3, TIM8_CH4, NULL },
+	{ TIM9_TRGO, TIM9_CH1, TIM9_CH2, NULL },
+	{ TIM12_TRGO, TIM12_CH1, TIM12_CH2, NULL }
+};
 
-	M.
+> +static const char * const valids0[] = {
+> +	TIM5_TRGO, TIM2_TRGO, TIM4_TRGO, TIM3_TRGO, NULL,
+> +};
+> +
+> +static const char * const valids1[] = {
+> +	TIM1_TRGO, TIM8_TRGO, TIM3_TRGO, TIM4_TRGO, NULL,
+> +};
+> +
+> +static const char * const valids2[] = {
+> +	TIM1_TRGO, TIM8_TRGO, TIM5_TRGO, TIM4_TRGO, NULL,
+> +};
+> +
+> +static const char * const valids3[] = {
+> +	TIM1_TRGO, TIM2_TRGO, TIM3_TRGO, TIM8_TRGO, NULL,
+> +};
+> +
+> +static const char *const valids4[] = {
+> +	TIM2_TRGO, TIM3_TRGO, TIM4_TRGO, TIM8_TRGO, NULL,
+> +};
+> +
+> +static const char * const valids7[] = {
+> +	TIM1_TRGO, TIM2_TRGO, TIM4_TRGO, TIM5_TRGO, NULL,
+> +};
+> +
+> +static const char * const valids8[] = {
+> +	TIM2_TRGO, TIM3_TRGO, NULL,
+> +};
+> +
+> +static const char * const valids9[] = {
+> +	TIM4_TRGO, TIM5_TRGO, NULL,
+> +};
+> +
+> +static const void *valids_table[] = {
+> +	valids0,
+> +	valids1,
+> +	valids2,
+> +	valids3,
+> +	valids4,
+> +	NULL,
+> +	NULL,
+> +	valids7,
+> +	valids8,
+> +	valids9,
+> +};
+
+Same here.
+
 -- 
-Jazz is not dead. It just smells funny...
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
