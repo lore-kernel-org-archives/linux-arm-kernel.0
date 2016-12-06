@@ -1,134 +1,48 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 6 Dec 2016 12:10:50 -0800
-Subject: [PATCHv4 09/10] mm/usercopy: Switch to using lm_alias
-In-Reply-To: <20161206181859.GH24177@leverpostej>
-References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
- <1480445729-27130-10-git-send-email-labbott@redhat.com>
- <CAGXu5jKrBc6R9JYay1L6pd958Vm5-6p=37tiUYgg6uPeZb1HtQ@mail.gmail.com>
- <20161206181859.GH24177@leverpostej>
-Message-ID: <CAGXu5jKTdZUbbHU91mbN+Qy80AGXRhpzdLNXr3oxxZyxAzmjmQ@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 6 Dec 2016 14:18:35 -0600
+Subject: [PATCH v3] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe
+ controller
+In-Reply-To: <aac9391d-8803-f5e8-f4e4-d7e56d54c05c@redhat.com>
+References: <1480620053.4751.30.camel@redhat.com>
+ <20161201194114.GA8263@bhelgaas-glaptop.roam.corp.google.com>
+ <CADaLNDkVPRPSg0aU-sxHsiJbVvEn=LxcekDt6gfXBBhc+fzhjw@mail.gmail.com>
+ <20161201230736.GA17948@bhelgaas-glaptop.roam.corp.google.com>
+ <CADaLND=Ss8d-jv7wffbrtytrjj=SUnjDn9bognKUszhKguRV1A@mail.gmail.com>
+ <d77e403c-81e9-114e-6ec6-bbffaa4ac36f@redhat.com>
+ <20161202233943.GF9903@bhelgaas-glaptop.roam.corp.google.com>
+ <62dd5462-4d68-b89f-2b45-0d58bbd96bcd@redhat.com>
+ <20161205212140.GA18259@bhelgaas-glaptop.roam.corp.google.com>
+ <aac9391d-8803-f5e8-f4e4-d7e56d54c05c@redhat.com>
+Message-ID: <20161206201835.GA19700@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 6, 2016 at 10:18 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Nov 29, 2016 at 11:39:44AM -0800, Kees Cook wrote:
->> On Tue, Nov 29, 2016 at 10:55 AM, Laura Abbott <labbott@redhat.com> wrote:
->> >
->> > The usercopy checking code currently calls __va(__pa(...)) to check for
->> > aliases on symbols. Switch to using lm_alias instead.
->> >
->> > Signed-off-by: Laura Abbott <labbott@redhat.com>
->>
->> Acked-by: Kees Cook <keescook@chromium.org>
->>
->> I should probably add a corresponding alias test to lkdtm...
->>
->> -Kees
->
-> Something like the below?
->
-> It uses lm_alias(), so it depends on Laura's patches. We seem to do the
-> right thing, anyhow:
+On Tue, Dec 06, 2016 at 02:46:00PM -0500, Jon Masters wrote:
+> On 12/05/2016 04:21 PM, Bjorn Helgaas wrote:
+> > On Fri, Dec 02, 2016 at 07:33:46PM -0500, Jon Masters wrote:
+> 
+> >>> Even without this patch, I don't think it's a show-stopper to have
+> >>> Linux mistakenly thinking this region is routed to PCI, because the
+> >>> driver does reserve it and the PCI core will never try to use it.
+> >>
+> >> Ok. So are you happy with pulling in Duc's v4 patch and retaining
+> >> status quo on the bridge resources for 4.10?
+> > 
+> > Yes, I think it looks good.  I'll finish packaging things up and
+> > repost the current series.
+> 
+> Ok, great. So you're still pretty confident we'll have "out of the box"
+> booting on these machines for 4.10? :)
 
-Cool, this looks good. What happens on systems without an alias?
+I just merged pci/ecam into my "next" branch, so as long as tomorrow's
+linux-next boots out of the box, we should be set.  I made the following
+changes compared to v11:
 
-Laura, feel free to add this to your series:
+  - dropped the x86 change to use acpi_resource_consumer()
+  - added parens around macro args used in arithmetic expressions
+  - renamed "seg" to "node" in THUNDER_PEM_RES and THUNDER_PEM_QUIRK
+  - incorporated (u64) cast and dropped "UL" postfix for THUNDER_PEM_QUIRK
 
-Acked-by: Kees Cook <keescook@chromium.org>
+Let me know if you see any issues.
 
--Kees
-
->
-> root at ribbensteg:/home/nanook# echo USERCOPY_KERNEL_ALIAS > /sys/kernel/debug/provoke-crash/DIRECT
-> [   44.493400] usercopy: kernel memory exposure attempt detected from ffff80000031a730 (<linear kernel text>) (4096 bytes)
-> [   44.504263] kernel BUG at mm/usercopy.c:75!
->
-> Thanks,
-> Mark.
->
-> ---->8----
-> diff --git a/drivers/misc/lkdtm.h b/drivers/misc/lkdtm.h
-> index fdf954c..96d8d76 100644
-> --- a/drivers/misc/lkdtm.h
-> +++ b/drivers/misc/lkdtm.h
-> @@ -56,5 +56,6 @@
->  void lkdtm_USERCOPY_STACK_FRAME_FROM(void);
->  void lkdtm_USERCOPY_STACK_BEYOND(void);
->  void lkdtm_USERCOPY_KERNEL(void);
-> +void lkdtm_USERCOPY_KERNEL_ALIAS(void);
->
->  #endif
-> diff --git a/drivers/misc/lkdtm_core.c b/drivers/misc/lkdtm_core.c
-> index f9154b8..f6bc6d6 100644
-> --- a/drivers/misc/lkdtm_core.c
-> +++ b/drivers/misc/lkdtm_core.c
-> @@ -228,6 +228,7 @@ struct crashtype crashtypes[] = {
->         CRASHTYPE(USERCOPY_STACK_FRAME_FROM),
->         CRASHTYPE(USERCOPY_STACK_BEYOND),
->         CRASHTYPE(USERCOPY_KERNEL),
-> +       CRASHTYPE(USERCOPY_KERNEL_ALIAS),
->  };
->
->
-> diff --git a/drivers/misc/lkdtm_usercopy.c b/drivers/misc/lkdtm_usercopy.c
-> index 1dd6114..955f2dc 100644
-> --- a/drivers/misc/lkdtm_usercopy.c
-> +++ b/drivers/misc/lkdtm_usercopy.c
-> @@ -279,9 +279,16 @@ void lkdtm_USERCOPY_STACK_BEYOND(void)
->         do_usercopy_stack(true, false);
->  }
->
-> -void lkdtm_USERCOPY_KERNEL(void)
-> +static void do_usercopy_kernel(bool use_alias)
->  {
->         unsigned long user_addr;
-> +       const void *rodata = test_text;
-> +       void *text = vm_mmap;
-> +
-> +       if (use_alias) {
-> +               rodata = lm_alias(rodata);
-> +               text = lm_alias(text);
-> +       }
->
->         user_addr = vm_mmap(NULL, 0, PAGE_SIZE,
->                             PROT_READ | PROT_WRITE | PROT_EXEC,
-> @@ -292,14 +299,14 @@ void lkdtm_USERCOPY_KERNEL(void)
->         }
->
->         pr_info("attempting good copy_to_user from kernel rodata\n");
-> -       if (copy_to_user((void __user *)user_addr, test_text,
-> +       if (copy_to_user((void __user *)user_addr, rodata,
->                          unconst + sizeof(test_text))) {
->                 pr_warn("copy_to_user failed unexpectedly?!\n");
->                 goto free_user;
->         }
->
->         pr_info("attempting bad copy_to_user from kernel text\n");
-> -       if (copy_to_user((void __user *)user_addr, vm_mmap,
-> +       if (copy_to_user((void __user *)user_addr, text,
->                          unconst + PAGE_SIZE)) {
->                 pr_warn("copy_to_user failed, but lacked Oops\n");
->                 goto free_user;
-> @@ -309,6 +316,16 @@ void lkdtm_USERCOPY_KERNEL(void)
->         vm_munmap(user_addr, PAGE_SIZE);
->  }
->
-> +void lkdtm_USERCOPY_KERNEL(void)
-> +{
-> +       do_usercopy_kernel(false);
-> +}
-> +
-> +void lkdtm_USERCOPY_KERNEL_ALIAS(void)
-> +{
-> +       do_usercopy_kernel(true);
-> +}
-> +
->  void __init lkdtm_usercopy_init(void)
->  {
->         /* Prepare cache that lacks SLAB_USERCOPY flag. */
-
-
-
--- 
-Kees Cook
-Nexus Security
+Bjorn
