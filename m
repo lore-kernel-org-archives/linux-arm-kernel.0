@@ -1,68 +1,57 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 6 Dec 2016 12:58:08 +0100
-Subject: [PATCH v3 1/3] ARM: da850: fix infinite loop in clk_set_rate()
-In-Reply-To: <689efaa1-d8d9-6937-5880-3ed7a1401268@ti.com>
-References: <1480932549-30811-1-git-send-email-bgolaszewski@baylibre.com>
- <1480932549-30811-2-git-send-email-bgolaszewski@baylibre.com>
- <689efaa1-d8d9-6937-5880-3ed7a1401268@ti.com>
-Message-ID: <CAMpxmJUCE86Y030jpLVD7=S6UThmRB2p-xS-oD3swnUSvMWe2w@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 06 Dec 2016 13:04:35 +0100
+Subject: [PATCH] arm: MAINTAINERS: transfer maintainership for the EZX
+ platform
+In-Reply-To: <1480802397-25575-1-git-send-email-stefan@datenfreihafen.org>
+ (Stefan Schmidt's message of "Sat, 3 Dec 2016 22:59:57 +0100")
+References: <1480802397-25575-1-git-send-email-stefan@datenfreihafen.org>
+Message-ID: <87pol51cx8.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-12-05 11:15 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
-> On Monday 05 December 2016 03:39 PM, Bartosz Golaszewski wrote:
->> The aemif clock is added twice to the lookup table in da850.c. This
->> breaks the children list of pll0_sysclk3 as we're using the same list
->> links in struct clk. When calling clk_set_rate(), we get stuck in
->> propagate_rate().
->>
->> Create a separate clock for nand, inheriting the rate of the aemif
->> clock and retrieve it in the davinci_nand module.
->>
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> ---
->>  arch/arm/mach-davinci/da850.c | 7 ++++++-
->>  1 file changed, 6 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
->> index e770c97..c008e5e 100644
->> --- a/arch/arm/mach-davinci/da850.c
->> +++ b/arch/arm/mach-davinci/da850.c
->> @@ -367,6 +367,11 @@ static struct clk aemif_clk = {
->>       .flags          = ALWAYS_ENABLED,
->>  };
->>
->> +static struct clk aemif_nand_clk = {
->> +     .name           = "nand",
->> +     .parent         = &aemif_clk,
->> +};
->> +
->>  static struct clk usb11_clk = {
->>       .name           = "usb11",
->>       .parent         = &pll0_sysclk4,
->> @@ -537,7 +542,7 @@ static struct clk_lookup da850_clks[] = {
->>       CLK("da830-mmc.0",      NULL,           &mmcsd0_clk),
->>       CLK("da830-mmc.1",      NULL,           &mmcsd1_clk),
->>       CLK("ti-aemif",         NULL,           &aemif_clk),
->> -     CLK(NULL,               "aemif",        &aemif_clk),
->> +     CLK(NULL,               "aemif",        &aemif_nand_clk),
+Stefan Schmidt <stefan@datenfreihafen.org> writes:
+
+> Neither Daniel, Harald or myself are looking into this anymore.
+> Robert thankfully agreed to handle the maintenance from now on.
+> Also remove the outdated entries for website, git tree and
+> mailing list.
 >
-> Why use a NULL device name here?
+> Signed-off-by: Stefan Schmidt <stefan@datenfreihafen.org>
 
-Hi Sekhar,
+Daniel and Harald, could we have your acks please for [1] ?
 
-there's an issue with this bit. I added an of_dev_auxdata entry to
-da8xx-dt.c for the nand node, but it didn't work (the nand driver
-could not get the clock). When I dug deeper, it turned out, the nand
-node is created from aemif_probe() instead of from
-da850_init_machine() and the lookup table is not passed as argument to
-of_platform_populate().
+Cheers.
 
-There are two solutions: one is using "620000000.nand" as dev_id in
-the clock lookup table, but that's ugly. The second is leaving dev_id
-as NULL - I verified that the nand driver works correctly having only
-the connector id. Please let me know which one you prefer or if you
-have other ideas.
+--
+Robert
 
-Best regards,
-Bartosz Golaszewski
+[1] Stefan's patch
+---8>---
+Neither Daniel, Harald or myself are looking into this anymore.
+Robert thankfully agreed to handle the maintenance from now on.
+Also remove the outdated entries for website, git tree and
+mailing list.
+
+Signed-off-by: Stefan Schmidt <stefan@datenfreihafen.org>
+---
+ MAINTAINERS | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 2dd40c5..661af76 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1203,13 +1203,9 @@ S:	Maintained
+ N:	efm32
+ 
+ ARM/EZX SMARTPHONES (A780, A910, A1200, E680, ROKR E2 and ROKR E6)
+-M:	Daniel Ribeiro <drwyrm@gmail.com>
+-M:	Stefan Schmidt <stefan@openezx.org>
+-M:	Harald Welte <laforge@openezx.org>
+-L:	openezx-devel at lists.openezx.org (moderated for non-subscribers)
+-W:	http://www.openezx.org/
++M:	Robert Jarzmik <robert.jarzmik@free.fr>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+-T:	topgit git://git.openezx.org/openezx.git
+ F:	arch/arm/mach-pxa/ezx.c
