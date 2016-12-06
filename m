@@ -1,117 +1,141 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 6 Dec 2016 16:43:19 +0000
-Subject: [PATCH 1/1] arm64: Correcting format specifier for printing 64
- bit addresses
-In-Reply-To: <1480925393-8386-1-git-send-email-maninder1.s@samsung.com>
-References: <1480925393-8386-1-git-send-email-maninder1.s@samsung.com>
-Message-ID: <1b98f8e5-b450-5cfa-b217-ed88a4d8b278@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 6 Dec 2016 16:43:17 +0000
+Subject: [RFC PATCH] arm64: fpsimd: improve stacking logic in
+ non-interruptible context
+In-Reply-To: <1481038740-11633-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1481038740-11633-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20161206164317.GX1574@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/16 08:09, Maninder Singh wrote:
-> This patch corrects format specifier for printing 64 bit addresses.
+On Tue, Dec 06, 2016 at 03:39:00PM +0000, Ard Biesheuvel wrote:
+> Currently, we allow kernel mode NEON in softirq or hardirq context by
+> stacking and unstacking a slice of the NEON register file for each call
+> to kernel_neon_begin() and kernel_neon_end(), respectively.
 > 
-> Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
-> Signed-off-by: Vaneet Narang <v.narang@samsung.com>
+> Given that
+> a) a CPU typically spends most of its time in userland, during which time
+>    no kernel mode NEON in process context is in progress,
+> b) a CPU spends most of its time in the kernel doing other things than
+>    kernel mode NEON when it gets interrupted to perform kernel mode NEON
+>    in softirq context
+> 
+> the stacking and subsequent unstacking is only necessary if we are
+> interrupting a thread while it is performing kernel mode NEON in process
+> context, which means that in all other cases, we can simply preserve the
+> userland FPSIMD state once, and only restore it upon return to userland,
+> even if we are being invoked from softirq or hardirq context.
+> 
+> So instead of checking whether we are running in interrupt context, keep
+> track of the level of nested kernel mode NEON calls in progress, and only
+> perform the eager stack/unstack of the level exceeds 1.
+
+Looks reasonable, and this does avoid treating SVE as a special case.
+
+Later on, we may want to enable SVE use in the kernel too, in which case
+kernel_neon_{begin,end}_partial() and fpsimd_partial_state will need
+more changes -- but we don't need to address that right now.
+
+Minor comments below.
+
+Cheers
+---Dave
+
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
->  arch/arm64/kernel/signal.c |  2 +-
->  arch/arm64/kvm/sys_regs.c  |  8 ++++++--
->  arch/arm64/mm/fault.c      | 15 ++++++++++-----
->  arch/arm64/mm/mmu.c        |  4 ++--
->  4 files changed, 19 insertions(+), 10 deletions(-)
+>  arch/arm64/kernel/fpsimd.c | 40 +++++++++++++++++++++++++++-------------
+>  1 file changed, 27 insertions(+), 13 deletions(-)
 > 
-> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-> index c7b6de6..c89d5fd 100644
-> --- a/arch/arm64/kernel/signal.c
-> +++ b/arch/arm64/kernel/signal.c
-> @@ -155,7 +155,7 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 394c61db5566..2614a216ac5d 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -220,20 +220,31 @@ void fpsimd_flush_task_state(struct task_struct *t)
 >  
->  badframe:
->  	if (show_unhandled_signals)
-> -		pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
-> +		pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%016llx sp=%016llx\n",
->  				    current->comm, task_pid_nr(current), __func__,
->  				    regs->pc, regs->sp);
->  	force_sig(SIGSEGV, current);
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 87e7e66..89bf5c1 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -1554,8 +1554,12 @@ static void unhandled_cp_access(struct kvm_vcpu *vcpu,
->  		WARN_ON(1);
+>  #ifdef CONFIG_KERNEL_MODE_NEON
+>  
+> -static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
+> -static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
+> +/*
+> + * Although unlikely, it is possible for three kernel mode NEON contexts to
+> + * be live at the same time: process context, softirq context and hardirq
+> + * context. So while the userland context is stashed in the thread's fpsimd
+> + * state structure, we need two additional levels of storage.
+> + */
+> +static DEFINE_PER_CPU(struct fpsimd_partial_state, nested_fpsimdstate[2]);
+> +static DEFINE_PER_CPU(int, kernel_neon_nesting_level);
+>  
+>  /*
+>   * Kernel-side NEON support functions
+>   */
+>  void kernel_neon_begin_partial(u32 num_regs)
+>  {
+> -	if (in_interrupt()) {
+> -		struct fpsimd_partial_state *s = this_cpu_ptr(
+> -			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+> +	struct fpsimd_partial_state *s;
+> +	int level;
+> +
+> +	preempt_disable();
+> +
+> +	level = this_cpu_read(kernel_neon_nesting_level);
+> +	if (level > 0) {
+> +		s = this_cpu_ptr(nested_fpsimdstate);
+>  
+>  		BUG_ON(num_regs > 32);
+> -		fpsimd_save_partial_state(s, roundup(num_regs, 2));
+> +		fpsimd_save_partial_state(&s[level - 1], roundup(num_regs, 2));
+>  	} else {
+>  		/*
+>  		 * Save the userland FPSIMD state if we have one and if we
+> @@ -241,24 +252,27 @@ void kernel_neon_begin_partial(u32 num_regs)
+>  		 * that there is no longer userland FPSIMD state in the
+>  		 * registers.
+>  		 */
+> -		preempt_disable();
+>  		if (current->mm &&
+>  		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+>  			fpsimd_save_state(&current->thread.fpsimd_state);
+>  		this_cpu_write(fpsimd_last_state, NULL);
 >  	}
->  
-> -	kvm_err("Unsupported guest CP%d access at: %08lx\n",
-> -		cp, *vcpu_pc(vcpu));
-> +	if (params->is_32bit)
-> +		kvm_err("Unsupported guest CP%d access at: %08lx\n",
-> +			cp, *vcpu_pc(vcpu));
-> +	else
-> +		kvm_err("Unsupported guest CP%d access at: %016lx\n",
-> +			cp, *vcpu_pc(vcpu));
+> +	this_cpu_write(kernel_neon_nesting_level, level + 1);
 
-As with the other patch - use '%0*lx' in these cases rather than
-pointlessly duplicating everything.
+Should we BUG_ON overflow/underflow of the nesting level?  That Should
+Not Happen (tm), but we'll make a mess if it does.
 
-Robin.
+For the underflow case, perhaps DEBUG_PREEMPT is adequate for detecting
+this via preempt count underflow.
 
->  	print_sys_reg_instr(params);
->  	kvm_inject_undefined(vcpu);
 >  }
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index a78a5c4..d96a42a 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -77,7 +77,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+>  EXPORT_SYMBOL(kernel_neon_begin_partial);
 >  
->  	pr_alert("pgd = %p\n", mm->pgd);
->  	pgd = pgd_offset(mm, addr);
-> -	pr_alert("[%08lx] *pgd=%016llx", addr, pgd_val(*pgd));
-> +	pr_alert("[%016lx] *pgd=%016llx", addr, pgd_val(*pgd));
->  
->  	do {
->  		pud_t *pud;
-> @@ -177,7 +177,7 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
->  	 * No handler, we'll have to terminate things with extreme prejudice.
->  	 */
->  	bust_spinlocks(1);
-> -	pr_alert("Unable to handle kernel %s at virtual address %08lx\n",
-> +	pr_alert("Unable to handle kernel %s at virtual address %016lx\n",
->  		 (addr < PAGE_SIZE) ? "NULL pointer dereference" :
->  		 "paging request", addr);
->  
-> @@ -198,9 +198,14 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
->  	struct siginfo si;
->  
->  	if (unhandled_signal(tsk, sig) && show_unhandled_signals_ratelimited()) {
-> -		pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x\n",
-> -			tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
-> -			addr, esr);
-> +		if (compat_user_mode(regs))
-> +			pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x\n",
-> +				tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
-> +				addr, esr);
-> +		else
-> +			pr_info("%s[%d]: unhandled %s (%d) at 0x%016lx, esr 0x%03x\n",
-> +				tsk->comm, task_pid_nr(tsk), fault_name(esr), sig,
-> +				addr, esr);
->  		show_pte(tsk->mm, addr);
->  		show_regs(regs);
+>  void kernel_neon_end(void)
+>  {
+> -	if (in_interrupt()) {
+> -		struct fpsimd_partial_state *s = this_cpu_ptr(
+> -			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+> -		fpsimd_load_partial_state(s);
+> -	} else {
+> -		preempt_enable();
+> +	struct fpsimd_partial_state *s;
+> +	int level;
+> +
+> +	level = this_cpu_read(kernel_neon_nesting_level);
+> +	if (level > 1) {
+> +		s = this_cpu_ptr(nested_fpsimdstate);
+> +		fpsimd_load_partial_state(&s[level - 2]);
 >  	}
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 17243e4..cbf444c 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -683,9 +683,9 @@ void __init early_fixmap_init(void)
->  		pr_warn("pmd %p != %p, %p\n",
->  			pmd, fixmap_pmd(fix_to_virt(FIX_BTMAP_BEGIN)),
->  			fixmap_pmd(fix_to_virt(FIX_BTMAP_END)));
-> -		pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
-> +		pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %016lx\n",
->  			fix_to_virt(FIX_BTMAP_BEGIN));
-> -		pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
-> +		pr_warn("fix_to_virt(FIX_BTMAP_END):   %016lx\n",
->  			fix_to_virt(FIX_BTMAP_END));
+> +	this_cpu_write(kernel_neon_nesting_level, level - 1);
+> +	preempt_enable();
+>  }
+>  EXPORT_SYMBOL(kernel_neon_end);
 >  
->  		pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
+> -- 
+> 2.7.4
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
