@@ -1,83 +1,78 @@
-From: rob.rice@broadcom.com (Rob (William) Rice)
-Date: Wed, 7 Dec 2016 10:46:04 -0500
-Subject: [PATCH 1/3] crypto: brcm: DT documentation for Broadcom SPU driver
-In-Reply-To: <20161206140607.GB24177@leverpostej>
-References: <1480536453-24781-1-git-send-email-rob.rice@broadcom.com>
- <1480536453-24781-2-git-send-email-rob.rice@broadcom.com>
- <20161206140607.GB24177@leverpostej>
-Message-ID: <930dc7ae-42fe-8945-5b86-db3a4304aa96@broadcom.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 07 Dec 2016 17:47:59 +0200
+Subject: [PATCH v4 1/4] [media] davinci: vpif_capture: don't lock over
+ s_stream
+In-Reply-To: <m237i1gfz1.fsf@baylibre.com>
+References: <20161129235712.29846-1-khilman@baylibre.com>
+ <4747860.QGGHSuFRpz@avalon> <m237i1gfz1.fsf@baylibre.com>
+Message-ID: <4999781.kd7ueUSsQd@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+Hi Kevin,
 
-Thanks for your comments. Replies below.
+On Tuesday 06 Dec 2016 08:49:38 Kevin Hilman wrote:
+> Laurent Pinchart writes:
+> > On Tuesday 29 Nov 2016 15:57:09 Kevin Hilman wrote:
+> >> Video capture subdevs may be over I2C and may sleep during xfer, so we
+> >> cannot do IRQ-disabled locking when calling the subdev.
+> >> 
+> >> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> >> ---
+> >>  drivers/media/platform/davinci/vpif_capture.c | 3 +++
+> >>  1 file changed, 3 insertions(+)
+> >> 
+> >> diff --git a/drivers/media/platform/davinci/vpif_capture.c
+> >> b/drivers/media/platform/davinci/vpif_capture.c index
+> >> 5104cc0ee40e..9f8f41c0f251 100644
+> >> --- a/drivers/media/platform/davinci/vpif_capture.c
+> >> +++ b/drivers/media/platform/davinci/vpif_capture.c
+> >> @@ -193,7 +193,10 @@ static int vpif_start_streaming(struct vb2_queue
+> >> *vq, unsigned int count)
+> >>  		}
+> >>  	}
+> >> 
+> >> +	spin_unlock_irqrestore(&common->irqlock, flags);
+> >>  	ret = v4l2_subdev_call(ch->sd, video, s_stream, 1);
+> >> +	spin_lock_irqsave(&common->irqlock, flags);
+> > 
+> > I always get anxious when I see a spinlock being released randomly with an
+> > operation in the middle of a protected section. Looking at the code it
+> > looks like the spinlock is abused here. irqlock should only protect the
+> > dma_queue and should thus only be taken around the following code:
+> > 
+> > spin_lock_irqsave(&common->irqlock, flags);
+> > /* Get the next frame from the buffer queue */
+> > common->cur_frm = common->next_frm = list_entry(common->dma_queue.next,
+> >                             struct vpif_cap_buffer, list);
+> > 
+> > /* Remove buffer from the buffer queue */
+> > list_del(&common->cur_frm->list);
+> > spin_unlock_irqrestore(&common->irqlock, flags);
+> 
+> Yes, that looks correct.  Will update.
+> 
+> > The code that is currently protected by the lock in the start and stop
+> > streaming functions should be protected by a mutex instead.
+> 
+> I tried taking the mutex here, but lockdep pointed out a deadlock.  I
+> may not be fully understanding the V4L2 internals here, but it seems
+> that the ioctl is already taking a mutex, so taking it again in
+> start/stop streaming is a deadlock.  Unless you think the locking should
+> be nested here, it seems to me that the mutex isn't needed.
 
-Rob
+The V4L2 core can lock all ioctls using struct video_device::lock. For buffer-
+related ioctls, it can optionally use a separate lock from struct 
+vb2_queue::lock. See v4l2_ioctl_get_lock() in drivers/media/v4l2-core/v4l2-
+ioctl.c.
 
+The vpif-capture driver sets both the video_device and vb2_queue locks to the 
+same lock (which would have the same effect as leaving the vb2_queue lock 
+NULL). All ioctls are thus serialized. You would only need to handle locking 
+in start_streaming and stop_streaming manually if you didn't rely on the core 
+serializing the ioctls.
 
-On 12/6/2016 9:06 AM, Mark Rutland wrote:
-> On Wed, Nov 30, 2016 at 03:07:31PM -0500, Rob Rice wrote:
->> Device tree documentation for Broadcom Secure Processing Unit
->> (SPU) crypto driver.
->>
->> Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
->> Signed-off-by: Rob Rice <rob.rice@broadcom.com>
->> ---
->>   .../devicetree/bindings/crypto/brcm,spu-crypto.txt | 25 ++++++++++++++++++++++
->>   1 file changed, 25 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
->>
->> diff --git a/Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt b/Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
->> new file mode 100644
->> index 0000000..e5fe942
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
->> @@ -0,0 +1,25 @@
->> +The Broadcom Secure Processing Unit (SPU) driver supports symmetric
->> +cryptographic offload for Broadcom SoCs with SPU hardware. A SoC may have
->> +multiple SPU hardware blocks.
-> Bindings shound describe *hardware*, not *drivers*. Please drop mention
-> of the driver, and just decribe the hardware.
-Makes sense. I'll change it.
->
->> +Required properties:
->> +- compatible : Should be "brcm,spum-crypto" for devices with SPU-M hardware
->> +  (e.g., Northstar2) or "brcm,spum-nsp-crypto" for the Northstar Plus variant
->> +  of the SPU-M hardware.
->> +
->> +- reg: Should contain SPU registers location and length.
->> +- mboxes: A list of mailbox channels to be used by the kernel driver. Mailbox
->> +channels correspond to DMA rings on the device.
->> +
->> +Example:
->> +	spu-crypto at 612d0000 {
->> +		compatible = "brcm,spum-crypto";
->> +		reg = <0 0x612d0000 0 0x900>,    /* SPU 0 control regs */
->> +			<0 0x612f0000 0 0x900>,  /* SPU 1 control regs */
->> +			<0 0x61310000 0 0x900>,  /* SPU 2 control regs */
->> +			<0 0x61330000 0 0x900>;  /* SPU 3 control regs */
-> The above didn't mention there were several register sets, and the
-> comment beside each makes them sound like they're separate SPU
-> instances, so I don't think it makes sense to group them as one node.
->
-> What's going on here?
-That's right. For the SoC I used as the example, there are four SPU 
-hardware blocks. The driver round robins crypto requests to the hardware 
-blocks to handle requests in parallel and increase throughput. I want 
-one instance of the SPU driver that registers algos once with the crypto 
-API and manages all the mailbox channels. Maybe I can achieve that with 
-separate device tree entries for each SPU block, I'm not sure. I'll look 
-into it.
->
->> +		mboxes = <&pdc0 0>,
->> +			<&pdc1 0>,
->> +			<&pdc2 0>,
->> +			<&pdc3 0>;
-> Does each mbox correspond to one of the SPUs above? Or is there a shared
-> pool?
-Yes, each of these mailbox channels corresponds to a different SPU. PDC 
-is a DMA ring manager for DMAs to the SPUs.
->
-> Thanks,
-> Mark.
+-- 
+Regards,
+
+Laurent Pinchart
