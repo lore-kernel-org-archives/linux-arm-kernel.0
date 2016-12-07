@@ -1,66 +1,68 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 7 Dec 2016 16:04:51 +0530
-Subject: [Question] New mmap64 syscall?
-In-Reply-To: <3014428.VXGdOARdm1@wuerfel>
-References: <20161206185440.GA4654@yury-N73SV>
- <3014428.VXGdOARdm1@wuerfel>
-Message-ID: <20161207103451.GA869@yury-N73SV>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 7 Dec 2016 11:35:26 +0100
+Subject: [PATCH] usb: gadget: udc: atmel: Fix check in usba_ep_enable()
+In-Reply-To: <1481061583-4727-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1481061583-4727-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20161207113526.4fe857ac@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2016 at 10:20:20PM +0100, Arnd Bergmann wrote:
-> On Wednesday, December 7, 2016 12:24:40 AM CET Yury Norov wrote:
-> > 3. Introduce new mmap64() syscall like this:
-> > sys_mmap64(void *addr, size_t len, int prot, int flags, int fd, struct off_pair *off);
-> > (The pointer here because otherwise we have 7 args, if simply pass off_hi and
-> > off_lo in registers.)
+On Tue,  6 Dec 2016 22:59:43 +0100
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+
+> desc->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK is not necessarily
+> equal to ep->index and that's perfectly fine. The usba endpoint index is
+> just an internal identifier used by the driver to know which registers
+> to use for a USB endpoint.
 > 
-> This wouldn't have to be a pair, just a pointer to a 64-bit number.
+> Enforcing this constraint is not only useless, but can also lead to
+> errors since nothing guarantees that the endpoint number and index are
+> matching when an endpoint is selected for a specific descriptor, thus
+> leading to errors at ->enable() time when it's already too late to choose
+> another endpoint.
+
+Please ignore this patch. The real bug has been fixed in commit
+bbe097f092b0 ("usb: gadget: udc: atmel: fix endpoint name").
+
 > 
-> > With new 64-bit interface we can deprecate mmap2(), and generalize all
-> > implementations in kernel.
-> > 
-> > I think we can discuss it because 64-bit is the default size for off_t 
-> > in all new 32-bit architectures. So generic solution may take place.
-> > 
-> > The last question here is how important to support offsets bigger than
-> > 2^44 on 32-bit machines in practice? It may be a case for ARM64 servers,
-> > which are looking like main aarch64/ilp32 users. If no, we can leave
-> > things as is, and just do nothing.
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+> Hi,
 > 
-> If there is a use case for larger than 16TB offsets, we should add
-> the call on all architectures, probably using your approach 3. I don't
-> think that we should treat it as anything special for arm64 though.
-
->From this point of view, 16+TB offset is a matter of 16+TB storage,
-and it's more than real. The other consideration to add it is that
-we have 64-bit support for offsets in syscalls like sys_llseek().
-So mmap64() will simply extend this support.
-
-I can prepare this patch. Some implementation details I'd like to
-clarify:
-Syscall declaration:
-SYSCALL_DEFINE6(mmap64, unsigned long, addr, unsigned long, len,
-                unsigned long, prot, unsigned long, flags,
-                unsigned long, fd, unsigned long long *, offset);
-
-sys_mmap64() deprecates sys_mmap2(), and __ARCH_WANT_MMAP2 is
-introduced to keep it enabled for all existing architectures.
-All modern arches (aarch64/ilp32 is the first candidate) will have
-mmap64() only. The example is set/getrlimit() or renameat() drop
-patches (b0da6d44).
-                                
-On GLIBC side, __OFF_T_MATCHES_OFF64_t will wire mmap() from
-linux/generic/wordsize32/mmap.c to mmap64() from linux/mmap64.c. 
-
-mmap64() will first try __NR_mmap64, and if not defined, or ENOSYS
-is returned, __NR_mmap2 will be called. This is to let userspace that
-supports both mmap2() and mmap64() have full 64-bit offset support, not
-44-bit one.
-
-For __NR_mmap2 case, I'd also add the check against offsets more than
-2^44, and set errno to EOVERFLOW in that case.
-
-Any thoughts?
-
-Yury.
+> I intentionally didn't add the Cc stable and Fixes tags because this
+> bug dates back to the drivers creation, and I fear the index <->
+> epnum constraint was actually required at that time.
+> 
+> Note that I discovered this bug thanks to the WARN_ON_ONCE() in
+> usb_ep_queue() [1] which was introduced in 4.5.
+> It might appear that this problem was silently ignored before that
+> (with part of the usba_ep_enable() code being skipped without any
+> notice).
+> 
+> Regards,
+> 
+> Boris
+> 
+> [1]http://lxr.free-electrons.com/source/drivers/usb/gadget/udc/core.c#L264
+> ---
+>  drivers/usb/gadget/udc/atmel_usba_udc.c | 7 ++-----
+>  1 file changed, 2 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> index bb1f6c8f0f01..981d2639d413 100644
+> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
+> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> @@ -531,11 +531,8 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
+>  
+>  	maxpacket = usb_endpoint_maxp(desc) & 0x7ff;
+>  
+> -	if (((desc->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK) != ep->index)
+> -			|| ep->index == 0
+> -			|| desc->bDescriptorType != USB_DT_ENDPOINT
+> -			|| maxpacket == 0
+> -			|| maxpacket > ep->fifo_size) {
+> +	if (ep->index == 0 || desc->bDescriptorType != USB_DT_ENDPOINT ||
+> +	    maxpacket == 0 || maxpacket > ep->fifo_size) {
+>  		DBG(DBG_ERR, "ep_enable: Invalid argument");
+>  		return -EINVAL;
+>  	}
