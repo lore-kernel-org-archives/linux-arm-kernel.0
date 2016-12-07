@@ -1,62 +1,107 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 7 Dec 2016 19:48:16 +0800
-Subject: [PATCH] dt: bindings: zx: Add header for PM domains specifiers
-In-Reply-To: <1480983711-29955-1-git-send-email-baoyou.xie@linaro.org>
-References: <1480983711-29955-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20161207114814.GA17071@dragon>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 7 Dec 2016 11:58:24 +0000
+Subject: [PATCH 4/7] arm: Add ftrace with regs support
+In-Reply-To: <1481043967-15602-5-git-send-email-abelvesa@linux.com>
+References: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
+ <1481043967-15602-5-git-send-email-abelvesa@linux.com>
+Message-ID: <cf63d647-b5ce-a41b-31ee-6d14da60f541@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2016 at 08:21:51AM +0800, Baoyou Xie wrote:
-> This patch adds header with values used for ZTE 2967
-> SoC's power domain driver.
+Hi Abel,
+
+On 06/12/16 17:06, Abel Vesa wrote:
+> This adds __ftrace_regs_caller which, unlike __ftrace_caller,
+> adds register saving/restoring and livepatch handling if
+> the pc register gets modified by klp_ftrace_handler.
 > 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> Signed-off-by: Abel Vesa <abelvesa@linux.com>
 > ---
->  include/dt-bindings/arm/zte_pm_domains.h | 23 +++++++++++++++++++++++
-
-Considering that we are adding power domain drivers into
-drivers/soc/zte, it might be better to put the header into folder
-include/dt-bindings/soc/.
-
->  1 file changed, 23 insertions(+)
->  create mode 100644 include/dt-bindings/arm/zte_pm_domains.h
+>  arch/arm/kernel/entry-ftrace.S | 49 ++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 49 insertions(+)
 > 
-> diff --git a/include/dt-bindings/arm/zte_pm_domains.h b/include/dt-bindings/arm/zte_pm_domains.h
-> new file mode 100644
-> index 0000000..1485e8d
-> --- /dev/null
-> +++ b/include/dt-bindings/arm/zte_pm_domains.h
-> @@ -0,0 +1,23 @@
-> +/*
-> + * Copyright (C) 2015 Linaro Ltd.
-> + *
-> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
-> + * License terms: GNU General Public License (GPL) version 2
-> + */
-> +#ifndef _DT_BINDINGS_ARM_ZTE_PM_DOMAINS_H
-> +#define _DT_BINDINGS_ARM_ZTE_PM_DOMAINS_H
+> diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
+> index c73c403..b6ada5c 100644
+> --- a/arch/arm/kernel/entry-ftrace.S
+> +++ b/arch/arm/kernel/entry-ftrace.S
+> @@ -92,6 +92,46 @@
+>  2:	mcount_exit
+>  .endm
+>  
+> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
 > +
-> +#define DM_ZX296718_SAPPU	0
-> +#define DM_ZX296718_VDE		1  /*g1v6*/
-> +#define DM_ZX296718_VCE		2  /*h1v6*/
-> +#define DM_ZX296718_HDE		3  /*g2v2*/
-
-The single line comment should be /* blabla */.  Note there is space
-after and before *.
-
-Shawn
-
-> +#define DM_ZX296718_VIU		4
-> +#define DM_ZX296718_USB20	5
-> +#define DM_ZX296718_USB21	6
-> +#define DM_ZX296718_USB30	7
-> +#define DM_ZX296718_HSIC	8
-> +#define DM_ZX296718_GMAC	9
-> +#define DM_ZX296718_TS		10
-> +#define DM_ZX296718_VOU		11
+> +.macro __ftrace_regs_caller suffix
 > +
-> +#endif /* _DT_BINDINGS_ARM_ZTE_PM_DOMAINS_H */
-> -- 
-> 2.7.4
+> +	stmdb	sp!, {r0-r15}
+
+As the kbuild robot reported, you can't do this. For ARM, it's unknown
+what the value stored for r13 will be, and for a Thumb-2 kernel the
+whole instruction is flat out unpredictable (i.e. it might just undef or
+anything).
+
+> +	mov	r3, sp
+> +
+> +	ldr	r10, [sp, #60]
+> +
+> +	mcount_get_lr   r1                      @ lr of instrumented func
+> +	mcount_adjust_addr	r0, lr		@ instrumented function
+> +
+> +	.globl ftrace_regs_call\suffix
+> +ftrace_regs_call\suffix:
+> +	bl	ftrace_stub
+> +
+> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> +	.globl ftrace_regs_graph_call\suffix
+> +ftrace_regs_graph_call\suffix:
+> +	mov	r0, r0
+> +#endif
+> +#ifdef CONFIG_LIVEPATCH
+> +	ldr	r0, [sp, #60]
+> +	cmp	r0, r10
+> +	beq	ftrace_regs_caller_end
+> +	ldmia	sp!, {r0-r12}
+> +	add	sp, sp, #8
+> +	ldmia	sp!, {r11}
+> +	sub	sp, r12, #16
+> +	str	r11, [sp, #12]
+> +	ldmia	sp!, {r11, r12, lr, pc}
+> +#endif
+> +ftrace_regs_caller_end\suffix:
+> +	ldmia	sp!, {r0-r14}
+
+Again, the value of SP at this point is now unknown (regardless of
+whether what the value on memory was correct or not). Not good.
+
+Either use non-writeback addressing modes, or avoid saving/restoring SP
+at all (AFAICS it isn't necessary, since if the SP was changed in
+between, you then wouldn't know where to restore the saved registers
+from anyway).
+
+Robin.
+
+> +	add	sp, sp, #4
+> +	mov	pc, lr
+> +.endm
+> +
+> +#endif
+> +
+>  .macro __ftrace_caller suffix
+>  	mcount_enter
+>  
+> @@ -212,6 +252,15 @@ UNWIND(.fnstart)
+>  	__ftrace_caller
+>  UNWIND(.fnend)
+>  ENDPROC(ftrace_caller)
+> +
+> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+> +ENTRY(ftrace_regs_caller)
+> +UNWIND(.fnstart)
+> +	__ftrace_regs_caller
+> +UNWIND(.fnend)
+> +ENDPROC(ftrace_regs_caller)
+> +#endif
+> +
+>  #endif
+>  
+>  #ifdef CONFIG_FUNCTION_GRAPH_TRACER
 > 
