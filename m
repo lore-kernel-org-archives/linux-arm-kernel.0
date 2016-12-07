@@ -1,62 +1,43 @@
-From: uwe@kleine-koenig.org (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed,  7 Dec 2016 16:21:09 +0100
-Subject: [PATCH] ARM: dts: armada-{370, xp}: drop "marvell,
- orion-spi" from SPI controllers
-Message-ID: <20161207152109.17545-1-uwe@kleine-koenig.org>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Wed,  7 Dec 2016 16:22:14 +0100
+Subject: [PATCH v4 0/4] ARM: da850: fix pll0 rate setting
+Message-ID: <1481124138-27337-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+While trying to set the pll0 rate from the kernel I noticed there are
+two issues with da850 clocks. The first patch fixes an infinite loop
+in propagate_rate(). The third fixes an oops in da850_set_pll0rate().
+The second patch is just a coding style fix, while we're at it.
 
-The SPI controllers on Armada 370 and XP differ from the original Orion
-SPI controllers (at least) in the configuration of the baud rate. So
-it's wrong to claim compatibility which results in bogus baud rates.
+v1 -> v2:
+- change the approach in 1/3: create a new clock for nand inheriting
+  the rate from the aemif clock (verified that nand still works on
+  da850-lcdk)
+- patch 3/3: also update the davinci_cpufreq driver - the only
+  (indirect) user of da850_set_pll0rate()
+- s/requested_rate/rate in 3/3
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/boot/dts/armada-370.dtsi | 4 ++--
- arch/arm/boot/dts/armada-xp.dtsi  | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+v2 -> v3:
+- 1/3: keep the "aemif" connector id for the nand clock
+- 3/3: instead of multiplying freq->frequency, divide rate by 1000
+- retested both davinci_nand and clk_set_rate() for pll0
 
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index b4258105e91f..b9377c11b379 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -435,13 +435,13 @@
-  * board level if a different configuration is used.
-  */
- &spi0 {
--	compatible = "marvell,armada-370-spi", "marvell,orion-spi";
-+	compatible = "marvell,armada-370-spi";
- 	pinctrl-0 = <&spi0_pins1>;
- 	pinctrl-names = "default";
- };
- 
- &spi1 {
--	compatible = "marvell,armada-370-spi", "marvell,orion-spi";
-+	compatible = "marvell,armada-370-spi";
- 	pinctrl-0 = <&spi1_pins>;
- 	pinctrl-names = "default";
- };
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 4a5f99e65b51..3a416834d80b 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -367,13 +367,13 @@
- };
- 
- &spi0 {
--	compatible = "marvell,armada-xp-spi", "marvell,orion-spi";
-+	compatible = "marvell,armada-xp-spi";
- 	pinctrl-0 = <&spi0_pins>;
- 	pinctrl-names = "default";
- };
- 
- &spi1 {
--	compatible = "marvell,armada-xp-spi", "marvell,orion-spi";
-+	compatible = "marvell,armada-xp-spi";
- 	pinctrl-0 = <&spi1_pins>;
- 	pinctrl-names = "default";
- };
+v3 -> v4:
+- 1/4: add a comment explaining why we're leaving a NULL dev_id
+- 2/4: emac_clk is added twice to the clock lookup table too - fix it
+  and verify that davinci_mmdio gets a functional clock
+- 4/4: s/opp == NULL/!opp/
+
+Bartosz Golaszewski (4):
+  ARM: da850: fix infinite loop in clk_set_rate()
+  ARM: da850: don't add the emac clock to the clock lookup table twice
+  ARM: da850: coding style fix
+  ARM: da850: fix da850_set_pll0rate()
+
+ arch/arm/mach-davinci/da850.c     | 51 +++++++++++++++++++++++++++++++++------
+ drivers/cpufreq/davinci-cpufreq.c |  2 +-
+ 2 files changed, 45 insertions(+), 8 deletions(-)
+
 -- 
-2.10.2
+2.9.3
