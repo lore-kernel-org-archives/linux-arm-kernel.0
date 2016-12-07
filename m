@@ -1,46 +1,31 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Wed,  7 Dec 2016 16:22:16 +0100
-Subject: [PATCH v4 2/4] ARM: da850: don't add the emac clock to the clock
- lookup table twice
+Date: Wed,  7 Dec 2016 16:22:17 +0100
+Subject: [PATCH v4 3/4] ARM: da850: coding style fix
 In-Reply-To: <1481124138-27337-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1481124138-27337-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1481124138-27337-3-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1481124138-27337-4-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similarly to the aemif clock - this screws up the linked list of clock
-children. Create a separate clock for mdio inheriting the rate from
-emac_clk.
+Fix alignment of the clock lookup table entries.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/da850.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/mach-davinci/da850.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index e9d019c..6b1fbac 100644
+index 6b1fbac..5f8ffaa 100644
 --- a/arch/arm/mach-davinci/da850.c
 +++ b/arch/arm/mach-davinci/da850.c
-@@ -319,6 +319,11 @@ static struct clk emac_clk = {
- 	.gpsc		= 1,
- };
- 
-+static struct clk mdio_clk = {
-+	.name		= "mdio",
-+	.parent		= &emac_clk,
-+};
-+
- static struct clk mcasp_clk = {
- 	.name		= "mcasp",
- 	.parent		= &async3_clk,
-@@ -539,7 +544,7 @@ static struct clk_lookup da850_clks[] = {
- 	CLK(NULL,		"arm",		&arm_clk),
- 	CLK(NULL,		"rmii",		&rmii_clk),
- 	CLK("davinci_emac.1",	NULL,		&emac_clk),
--	CLK("davinci_mdio.0",	"fck",		&emac_clk),
-+	CLK("davinci_mdio.0",	"fck",		&mdio_clk),
- 	CLK("davinci-mcasp.0",	NULL,		&mcasp_clk),
- 	CLK("davinci-mcbsp.0",	NULL,		&mcbsp0_clk),
- 	CLK("davinci-mcbsp.1",	NULL,		&mcbsp1_clk),
+@@ -566,7 +566,7 @@ static struct clk_lookup da850_clks[] = {
+ 	CLK("spi_davinci.0",	NULL,		&spi0_clk),
+ 	CLK("spi_davinci.1",	NULL,		&spi1_clk),
+ 	CLK("vpif",		NULL,		&vpif_clk),
+-	CLK("ahci_da850",		NULL,		&sata_clk),
++	CLK("ahci_da850",	NULL,		&sata_clk),
+ 	CLK("davinci-rproc.0",	NULL,		&dsp_clk),
+ 	CLK(NULL,		NULL,		&ehrpwm_clk),
+ 	CLK("ehrpwm.0",		"fck",		&ehrpwm0_clk),
 -- 
 2.9.3
