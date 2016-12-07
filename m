@@ -1,232 +1,57 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed,  7 Dec 2016 10:32:32 +0900
-Subject: [PATCH v3 1/2] clk: uniphier: add CPU-gear change (cpufreq) support
-Message-ID: <1481074353-31535-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Wed, 7 Dec 2016 10:34:53 +0900
+Subject: [PATCH] clk: uniphier: Fix build with gcc-4.4.
+In-Reply-To: <20161206231642.GA4388@codeaurora.org>
+References: <1480725436-9628-1-git-send-email-vlee@freedesktop.org>
+ <CAK7LNATeswNhoFsA90k=qF4Jock0ytNT-pPT6j+0b9MJFJwu9Q@mail.gmail.com>
+ <20161206231642.GA4388@codeaurora.org>
+Message-ID: <CAK7LNARZvDJnZTVJP8kxvCoGf_HFyGi0A0Y4rBVeLft4Hj19ZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Core support code for CPU frequency changes, which will be used by
-the generic cpufreq driver.
+Hi Stephen,
 
-The register view is different from the generic clk-mux; it has
-a separate status register, and an update bit to load the register
-setting.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+2016-12-07 8:16 GMT+09:00 Stephen Boyd <sboyd@codeaurora.org>:
+> On 12/03, Masahiro Yamada wrote:
+>> Hi Vinson,
+>>
+>> 2016-12-03 9:37 GMT+09:00 Vinson Lee <vlee@freedesktop.org>:
+>> > gcc-4.4 has issues with anonymous unions in initializers.
+>> >
+>> >   CC      drivers/clk/uniphier/clk-uniphier-sys.o
+>> > drivers/clk/uniphier/clk-uniphier-sys.c:45: error: unknown field ?factor? specified in initializer
+>> >
+>> > Fixes: 1574d5722636 ("clk: uniphier: remove unneeded member name for union")
+>> > Signed-off-by: Vinson Lee <vlee@freedesktop.org>
+>>
+>>
+>> This driver has COMPILE_TEST option, but kbuild test robot
+>> did not mention about this.
+>>
+>>
+>>
+>> This is a bad way of fixing, I think.
+>> (what if a new member is inserted before the union in the future?)
+>>
+>> Rather, please revert the bad commit.
+>>
+>
+> Reverting on top of clk-next will cause build failures though.
+> Can you resend the patch series without this first patch please?
+> I'll apply them then.
+>
+> I'll go drop all three patches and wreck Andrew's merge of this
+> patch to -mm.
 
-Changes in v3:
-  - Do not use anonymous union.
 
-Changes in v2: None
+I dropped the first one
+and v3 (for the last two) is on the ML now.
 
- drivers/clk/uniphier/Makefile               |   3 +
- drivers/clk/uniphier/clk-uniphier-core.c    |   3 +
- drivers/clk/uniphier/clk-uniphier-cpugear.c | 115 ++++++++++++++++++++++++++++
- drivers/clk/uniphier/clk-uniphier.h         |  17 +++-
- 4 files changed, 136 insertions(+), 2 deletions(-)
- create mode 100644 drivers/clk/uniphier/clk-uniphier-cpugear.c
+Thanks a lot for taking care of this!
 
-diff --git a/drivers/clk/uniphier/Makefile b/drivers/clk/uniphier/Makefile
-index f27b3603..665d1d6 100644
---- a/drivers/clk/uniphier/Makefile
-+++ b/drivers/clk/uniphier/Makefile
-@@ -1,8 +1,11 @@
- obj-y	+= clk-uniphier-core.o
-+
-+obj-y	+= clk-uniphier-cpugear.o
- obj-y	+= clk-uniphier-fixed-factor.o
- obj-y	+= clk-uniphier-fixed-rate.o
- obj-y	+= clk-uniphier-gate.o
- obj-y	+= clk-uniphier-mux.o
-+
- obj-y	+= clk-uniphier-sys.o
- obj-y	+= clk-uniphier-mio.o
- obj-y	+= clk-uniphier-peri.o
-diff --git a/drivers/clk/uniphier/clk-uniphier-core.c b/drivers/clk/uniphier/clk-uniphier-core.c
-index 26c53f7..0007218 100644
---- a/drivers/clk/uniphier/clk-uniphier-core.c
-+++ b/drivers/clk/uniphier/clk-uniphier-core.c
-@@ -27,6 +27,9 @@ static struct clk_hw *uniphier_clk_register(struct device *dev,
- 					const struct uniphier_clk_data *data)
- {
- 	switch (data->type) {
-+	case UNIPHIER_CLK_TYPE_CPUGEAR:
-+		return uniphier_clk_register_cpugear(dev, regmap, data->name,
-+						     &data->data.cpugear);
- 	case UNIPHIER_CLK_TYPE_FIXED_FACTOR:
- 		return uniphier_clk_register_fixed_factor(dev, data->name,
- 							  &data->data.factor);
-diff --git a/drivers/clk/uniphier/clk-uniphier-cpugear.c b/drivers/clk/uniphier/clk-uniphier-cpugear.c
-new file mode 100644
-index 0000000..9bff26e
---- /dev/null
-+++ b/drivers/clk/uniphier/clk-uniphier-cpugear.c
-@@ -0,0 +1,115 @@
-+/*
-+ * Copyright (C) 2016 Socionext Inc.
-+ *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/delay.h>
-+#include <linux/device.h>
-+#include <linux/regmap.h>
-+
-+#include "clk-uniphier.h"
-+
-+#define UNIPHIER_CLK_CPUGEAR_STAT	0	/* status */
-+#define UNIPHIER_CLK_CPUGEAR_SET	4	/* set */
-+#define UNIPHIER_CLK_CPUGEAR_UPD	8	/* update */
-+#define   UNIPHIER_CLK_CPUGEAR_UPD_BIT	BIT(0)
-+
-+struct uniphier_clk_cpugear {
-+	struct clk_hw hw;
-+	struct regmap *regmap;
-+	unsigned int regbase;
-+	unsigned int mask;
-+};
-+
-+#define to_uniphier_clk_cpugear(_hw) \
-+			container_of(_hw, struct uniphier_clk_cpugear, hw)
-+
-+static int uniphier_clk_cpugear_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct uniphier_clk_cpugear *gear = to_uniphier_clk_cpugear(hw);
-+	int ret;
-+	unsigned int val;
-+
-+	ret = regmap_write_bits(gear->regmap,
-+				gear->regbase + UNIPHIER_CLK_CPUGEAR_SET,
-+				gear->mask, index);
-+	if (ret)
-+		return ret;
-+
-+	ret = regmap_write_bits(gear->regmap,
-+				gear->regbase + UNIPHIER_CLK_CPUGEAR_SET,
-+				UNIPHIER_CLK_CPUGEAR_UPD_BIT,
-+				UNIPHIER_CLK_CPUGEAR_UPD_BIT);
-+	if (ret)
-+		return ret;
-+
-+	return regmap_read_poll_timeout(gear->regmap,
-+				gear->regbase + UNIPHIER_CLK_CPUGEAR_UPD,
-+				val, !(val & UNIPHIER_CLK_CPUGEAR_UPD_BIT),
-+				0, 1);
-+}
-+
-+static u8 uniphier_clk_cpugear_get_parent(struct clk_hw *hw)
-+{
-+	struct uniphier_clk_cpugear *gear = to_uniphier_clk_cpugear(hw);
-+	int num_parents = clk_hw_get_num_parents(hw);
-+	int ret;
-+	unsigned int val;
-+
-+	ret = regmap_read(gear->regmap,
-+			  gear->regbase + UNIPHIER_CLK_CPUGEAR_STAT, &val);
-+	if (ret)
-+		return ret;
-+
-+	val &= gear->mask;
-+
-+	return val < num_parents ? val : -EINVAL;
-+}
-+
-+static const struct clk_ops uniphier_clk_cpugear_ops = {
-+	.determine_rate = __clk_mux_determine_rate,
-+	.set_parent = uniphier_clk_cpugear_set_parent,
-+	.get_parent = uniphier_clk_cpugear_get_parent,
-+};
-+
-+struct clk_hw *uniphier_clk_register_cpugear(struct device *dev,
-+					 struct regmap *regmap,
-+					 const char *name,
-+				const struct uniphier_clk_cpugear_data *data)
-+{
-+	struct uniphier_clk_cpugear *gear;
-+	struct clk_init_data init;
-+	int ret;
-+
-+	gear = devm_kzalloc(dev, sizeof(*gear), GFP_KERNEL);
-+	if (!gear)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init.name = name;
-+	init.ops = &uniphier_clk_cpugear_ops;
-+	init.flags = CLK_SET_RATE_PARENT;
-+	init.parent_names = data->parent_names;
-+	init.num_parents = data->num_parents,
-+
-+	gear->regmap = regmap;
-+	gear->regbase = data->regbase;
-+	gear->mask = data->mask;
-+	gear->hw.init = &init;
-+
-+	ret = devm_clk_hw_register(dev, &gear->hw);
-+	if (ret)
-+		return ERR_PTR(ret);
-+
-+	return &gear->hw;
-+}
-diff --git a/drivers/clk/uniphier/clk-uniphier.h b/drivers/clk/uniphier/clk-uniphier.h
-index 0244dba..9707b0f 100644
---- a/drivers/clk/uniphier/clk-uniphier.h
-+++ b/drivers/clk/uniphier/clk-uniphier.h
-@@ -20,15 +20,24 @@ struct clk_hw;
- struct device;
- struct regmap;
- 
--#define UNIPHIER_CLK_MUX_MAX_PARENTS	8
-+#define UNIPHIER_CLK_CPUGEAR_MAX_PARENTS	16
-+#define UNIPHIER_CLK_MUX_MAX_PARENTS		8
- 
- enum uniphier_clk_type {
-+	UNIPHIER_CLK_TYPE_CPUGEAR,
- 	UNIPHIER_CLK_TYPE_FIXED_FACTOR,
- 	UNIPHIER_CLK_TYPE_FIXED_RATE,
- 	UNIPHIER_CLK_TYPE_GATE,
- 	UNIPHIER_CLK_TYPE_MUX,
- };
- 
-+struct uniphier_clk_cpugear_data {
-+	const char *parent_names[UNIPHIER_CLK_CPUGEAR_MAX_PARENTS];
-+	unsigned int num_parents;
-+	unsigned int regbase;
-+	unsigned int mask;
-+};
-+
- struct uniphier_clk_fixed_factor_data {
- 	const char *parent_name;
- 	unsigned int mult;
-@@ -58,6 +67,7 @@ struct uniphier_clk_data {
- 	enum uniphier_clk_type type;
- 	int idx;
- 	union {
-+		struct uniphier_clk_cpugear_data cpugear;
- 		struct uniphier_clk_fixed_factor_data factor;
- 		struct uniphier_clk_fixed_rate_data rate;
- 		struct uniphier_clk_gate_data gate;
-@@ -90,7 +100,10 @@ struct uniphier_clk_data {
- 		},						\
- 	}
- 
--
-+struct clk_hw *uniphier_clk_register_cpugear(struct device *dev,
-+					     struct regmap *regmap,
-+					     const char *name,
-+				const struct uniphier_clk_cpugear_data *data);
- struct clk_hw *uniphier_clk_register_fixed_factor(struct device *dev,
- 						  const char *name,
- 			const struct uniphier_clk_fixed_factor_data *data);
+
+
 -- 
-2.7.4
+Best Regards
+Masahiro Yamada
