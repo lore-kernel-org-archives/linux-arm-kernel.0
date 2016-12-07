@@ -1,23 +1,103 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Wed, 07 Dec 2016 12:58:16 -0500
-Subject: [PATCH 3/3] pwm: lpc32xx: remove handling of PWM channels
-In-Reply-To: <20161205014308.1741-2-vz@mleia.com>
-References: <20161205014237.1689-1-vz@mleia.com>
- <20161205014308.1741-2-vz@mleia.com>
-Message-ID: <1481133496.9248.3.camel@localhost>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Wed,  7 Dec 2016 18:09:27 +0100
+Subject: [PATCH v6 2/2] ARM: davinci: da8xx: Fix sleeping function called from
+ invalid context
+In-Reply-To: <1481130567-27829-1-git-send-email-abailon@baylibre.com>
+References: <1481130567-27829-1-git-send-email-abailon@baylibre.com>
+Message-ID: <1481130567-27829-2-git-send-email-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-12-05 at 03:43 +0200, Vladimir Zapolskiy wrote:
-> Because LPC32xx PWM controllers have single output which is registered as
-> the only PWM device/channel per controller, it is known in advance that
-> pwm->hwpwm value is always 0. On basis of this fact simplify the code
-> by removing operations with pwm->hwpwm, there is no controls which require
-> channel number as input.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> ---
->  drivers/pwm/pwm-lpc32xx.c | 20 +++++++++-----------
->  1 file changed, 9 insertions(+), 11 deletions(-)
-> 
-Reviewed-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
+Everytime the usb20 phy is enabled, there is a
+"sleeping function called from invalid context" BUG.
+In addition, there is a recursive locking happening
+because of the recurse call to clk_enable().
+
+clk_enable() from arch/arm/mach-davinci/clock.c uses spin_lock_irqsave()
+before to invoke the callback usb20_phy_clk_enable().
+usb20_phy_clk_enable() uses clk_get() and clk_enable_prepapre()
+which may sleep.
+replace clk_prepare_enable() by davinci_clk_enable().
+
+Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+Suggested-by: David Lechner <david@lechnology.com>
+---
+ arch/arm/mach-davinci/usb-da8xx.c | 33 +++++++++++++++------------------
+ 1 file changed, 15 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
+index c6feecf..9edd2d8 100644
+--- a/arch/arm/mach-davinci/usb-da8xx.c
++++ b/arch/arm/mach-davinci/usb-da8xx.c
+@@ -22,6 +22,8 @@
+ #define DA8XX_USB0_BASE		0x01e00000
+ #define DA8XX_USB1_BASE		0x01e25000
+ 
++static struct clk *usb20_clk;
++
+ static struct platform_device da8xx_usb_phy = {
+ 	.name		= "da8xx-usb-phy",
+ 	.id		= -1,
+@@ -158,26 +160,14 @@ int __init da8xx_register_usb_refclkin(int rate)
+ 
+ static void usb20_phy_clk_enable(struct clk *clk)
+ {
+-	struct clk *usb20_clk;
+ 	int err;
+ 	u32 val;
+ 	u32 timeout = 500000; /* 500 msec */
+ 
+ 	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+ 
+-	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
+-	if (IS_ERR(usb20_clk)) {
+-		pr_err("could not get usb20 clk: %ld\n", PTR_ERR(usb20_clk));
+-		return;
+-	}
+-
+ 	/* The USB 2.O PLL requires that the USB 2.O PSC is enabled as well. */
+-	err = clk_prepare_enable(usb20_clk);
+-	if (err) {
+-		pr_err("failed to enable usb20 clk: %d\n", err);
+-		clk_put(usb20_clk);
+-		return;
+-	}
++	davinci_clk_enable(usb20_clk);
+ 
+ 	/*
+ 	 * Turn on the USB 2.0 PHY, but just the PLL, and not OTG. The USB 1.1
+@@ -197,8 +187,7 @@ static void usb20_phy_clk_enable(struct clk *clk)
+ 
+ 	pr_err("Timeout waiting for USB 2.0 PHY clock good\n");
+ done:
+-	clk_disable_unprepare(usb20_clk);
+-	clk_put(usb20_clk);
++	davinci_clk_disable(usb20_clk);
+ }
+ 
+ static void usb20_phy_clk_disable(struct clk *clk)
+@@ -285,11 +274,19 @@ static struct clk_lookup usb20_phy_clk_lookup =
+ int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
+ {
+ 	struct clk *parent;
+-	int ret = 0;
++	int ret;
++
++	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
++	ret = PTR_ERR_OR_ZERO(usb20_clk);
++	if (ret)
++		return ret;
+ 
+ 	parent = clk_get(NULL, use_usb_refclkin ? "usb_refclkin" : "pll0_aux");
+-	if (IS_ERR(parent))
+-		return PTR_ERR(parent);
++	ret = PTR_ERR_OR_ZERO(parent);
++	if (ret) {
++		clk_put(usb20_clk);
++		return ret;
++	}
+ 
+ 	usb20_phy_clk.parent = parent;
+ 	ret = clk_register(&usb20_phy_clk);
+-- 
+2.7.3
