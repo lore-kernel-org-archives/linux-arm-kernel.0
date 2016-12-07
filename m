@@ -1,36 +1,89 @@
 From: gerg@uclinux.org (Greg Ungerer)
-Date: Wed,  7 Dec 2016 16:59:51 +1000
-Subject: [PATCH 3/4] ARM: versatile: empty Makefile.boot needed for no-MMU
- compile
-Message-ID: <1481093992-30520-1-git-send-email-gerg@uclinux.org>
+Date: Wed,  7 Dec 2016 16:59:52 +1000
+Subject: [PATCH 4/4] ARM: versatile: support configuring versatile machine for
+ no-MMU
+In-Reply-To: <1481093992-30520-1-git-send-email-gerg@uclinux.org>
+References: <1481093992-30520-1-git-send-email-gerg@uclinux.org>
+Message-ID: <1481093992-30520-2-git-send-email-gerg@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To compile the arm versatile board with the MMU disabled (!CONFIG_MMU)
-a Makefile.boot is required. Without it you get:
+Allow the arm versatile machine to be configured for no-MMU operation.
+The approach taken is similar to the support for no-MMU arm v7 machines.
 
-  SYSMAP  System.map
-arch/arm/boot/Makefile:15: arch/arm/mach-versatile//Makefile.boot: No such file or directory
-make[2]: *** No rule to make target `arch/arm/mach-versatile//Makefile.boot'.  Stop.
+A new define, CONFIG_ARM_SINGLE_ARMV5, is used to enable a class of v5
+core based machines that are supported for building with !CONFIG_MMU.
+Currently only the versatile machine is configured to support this.
 
-Create an empty Makefile.boot for the versatile machine. This is a
-copy of the other empty machine Makefile.boot files. (A few have this
-same commented empty file: stm32, ep93xx, lpc18xx, efm32 and vexpress).
+Older kernels had the ability to build the versatile machine with the MMU
+disabled (!CONFIG_MMU). Recent changes to convert the versatile machine
+to device tree lost this ability. (Although older kernels could be built
+they did not run due to a bug in the IO_ADDRESS() mapping on this machine).
+
+The motivation for this is that the versatile machine is well supported
+in qemu. And this provides an excellent platform for development and
+testing no-MMU support on ARM in general.
 
 Signed-off-by: Greg Ungerer <gerg@uclinux.org>
 ---
- arch/arm/mach-versatile/Makefile.boot | 3 +++
- 1 file changed, 3 insertions(+)
- create mode 100644 arch/arm/mach-versatile/Makefile.boot
+ arch/arm/Kconfig                | 10 ++++++++++
+ arch/arm/Kconfig.debug          |  3 ++-
+ arch/arm/mach-versatile/Kconfig |  3 ++-
+ 3 files changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-versatile/Makefile.boot b/arch/arm/mach-versatile/Makefile.boot
-new file mode 100644
-index 0000000..eacfc3f
---- /dev/null
-+++ b/arch/arm/mach-versatile/Makefile.boot
-@@ -0,0 +1,3 @@
-+# Empty file waiting for deletion once Makefile.boot isn't needed any more.
-+# Patch waits for application at
-+# http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7889/1 .
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index b5d529f..74a0e7a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -353,6 +353,16 @@ config ARM_SINGLE_ARMV7M
+ 	select SPARSE_IRQ
+ 	select USE_OF
+ 
++config ARM_SINGLE_ARMV5
++	bool "ARMv5 based platforms (ARM926T)"
++	depends on !MMU
++	select AUTO_ZRELADDR
++	select CLKSRC_OF
++	select COMMON_CLK
++	select GENERIC_CLOCKEVENTS
++	select SPARSE_IRQ
++	select USE_OF
++
+ config ARCH_GEMINI
+ 	bool "Cortina Systems Gemini"
+ 	select CLKSRC_MMIO
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index d83f7c3..483709e 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1712,7 +1712,8 @@ config DEBUG_UNCOMPRESS
+ config UNCOMPRESS_INCLUDE
+ 	string
+ 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
+-					PLAT_SAMSUNG || ARM_SINGLE_ARMV7M
++					PLAT_SAMSUNG || ARM_SINGLE_ARMV7M || \
++					ARM_SINGLE_ARMV5
+ 	default "mach/uncompress.h"
+ 
+ config EARLY_PRINTK
+diff --git a/arch/arm/mach-versatile/Kconfig b/arch/arm/mach-versatile/Kconfig
+index c257d40..2613f0f 100644
+--- a/arch/arm/mach-versatile/Kconfig
++++ b/arch/arm/mach-versatile/Kconfig
+@@ -1,12 +1,13 @@
+ config ARCH_VERSATILE
+ 	bool "ARM Ltd. Versatile family"
+-	depends on ARCH_MULTI_V5
++	depends on ARCH_MULTI_V5 || ARM_SINGLE_ARMV5
+ 	select ARM_AMBA
+ 	select ARM_TIMER_SP804
+ 	select ARM_VIC
+ 	select CLKSRC_VERSATILE
+ 	select COMMON_CLK_VERSATILE
+ 	select CPU_ARM926T
++	select GPIOLIB
+ 	select ICST
+ 	select MFD_SYSCON
+ 	select PLAT_VERSATILE
 -- 
 1.9.1
