@@ -1,83 +1,87 @@
-From: andreas2025@gmail.com (Andy Ng)
-Date: Wed, 7 Dec 2016 21:39:03 +0000
-Subject: IMX6S MRII does not work
-In-Reply-To: <CAAVaN8z8jAkPw-=bDxNUvZOL4xB7ZK2_hkGyp8FQSE6ivhzeTQ@mail.gmail.com>
-References: <CAAVaN8z8jAkPw-=bDxNUvZOL4xB7ZK2_hkGyp8FQSE6ivhzeTQ@mail.gmail.com>
-Message-ID: <CAAVaN8z0tKSFBtuOLe_cYboY_R=jeNggZ4Sv+bEVq-ErHq9PTg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 07 Dec 2016 22:44:17 +0100
+Subject: [PATCH v2 1/2] arm64: dts: zx: Fix gic GICR property
+In-Reply-To: <20161207203412.GA10158@localhost>
+References: <1476361881-19685-1-git-send-email-jun.nie@linaro.org>
+ <20161206011244.GC2749@dragon> <20161207203412.GA10158@localhost>
+Message-ID: <5275588.dlJdb2OzJi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just an update...
+On Wednesday, December 7, 2016 12:34:12 PM CET Olof Johansson wrote:
+> 
+> So, it seems that Arnd didn't apply the old patch to fixes-non-critical, or
+> at least didn't push out after doing it. So, I've done that now, as well as
+> applied the fixup you have above.
+> 
 
-I have put a scope on ENET_REF_CLK to check what comes out from the
-PAD_GPIO16. The uboot shows 50MHz, and when in the kernel it goes
-125MHz. And for sure that doesn't do
+My mistake, I forgot to push it out.
 
-On Wed, Dec 7, 2016 at 12:44 AM, Andy Ng <andreas2025@gmail.com> wrote:
-> Hello,
->
-> I have quite recent kernel linux-4.1.20 from Freescale's git repo.
->
->
-> I am using MRII and a fec setup that uses clock that goes to the phy too.
->
->
-> My dtsi has:
->
->     pinctrl_enet: enetgrp {
->             fsl,pins = <
->                 MX6QDL_PAD_ENET_MDIO__ENET_MDIO        0x1b0b0
->                 MX6QDL_PAD_ENET_MDC__ENET_MDC          0x1b0b0
->                 MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN  0x1b0b0
->                 MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0  0x1b0b0
->                 MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1  0x1b0b0
->                 MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN      0x1b0b0
->                 MX6QDL_PAD_ENET_RX_ER__ENET_RX_ER      0x1b0b0
->                 MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0    0x1b0b0
->                 MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1     0x1b0b0
->                MX6QDL_PAD_GPIO_16__ENET_REF_CLK        0x4001b0a8
->
->             >;
->         };
->
->
-> the fec entry:
->
-> &fec {
->     pinctrl-names = "default";
->     pinctrl-0 = <&pinctrl_enet>;
->     phy-mode = "rmii";
->     phy-reset-duration = <2>;
->     phy-reset-gpios = <&gpio2 9 GPIO_ACTIVE_LOW>;
->     status = "okay";
-> };
->
->
-> The kernel comes up and detects the phy (MDIO works), but it seems fec
-> is not doing much:
->
-> INIT: Entering runlevel: 5
-> Configuring network interfaces... RMII Detected
-> fec 2188000.ethernet eth0: Freescale FEC PHY driver [SMSC
-> LAN8710/LAN8720] (mii_bus:phy_addr=2188000.ethernet:00, irq=-1)
-> IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
-> udhcpc (v1.24.1) started
-> Sending discover...
-> Sending discover...
-> Sending discover...
-> No lease, forking to background
-> done.
->
-> I have checked the code, and  I've found very few boards that use
-> rmii, and from those, most of them are using external clock for the
-> phy.
->
-> I have the impression that GPIO_16_ENET_REF_CLK with SION bit ON may
-> not have been tested, as there is no imx6 ref board that uses
-> that mode.
->
-> Did anyone else have seen the same issue?
-> Any thoughts will be very much appreciated.
->
-> Thank you
-> Andy
+I checked the other branches now and found two other commits missing
+in next/fixes-non-critical:
+
+
+arm64: tegra: Add missing Smaug revision
+arm64: tegra: Add VDD_GPU regulator to Jetson TX1
+
+Both sent by Thierry Reding last Friday. I can add them back on top
+or you pick them up again if you are already busy doing merges.
+
+For the first patch, I had amended the changelog text, this is the
+version I had.
+
+	Arnd
+
+8<---------
+>From 4d0a00060c1cec86f5aab57c814afbfb3e152578 Mon Sep 17 00:00:00 2001
+From: Alexandre Courbot <acourbot@nvidia.com>
+Date: Fri, 2 Dec 2016 20:57:55 +0100
+Subject: [PATCH] arm64: tegra: Add VDD_GPU regulator to Jetson TX1
+
+Add the VDD_GPU regulator (a GPIO-enabled PWM regulator) to the Jetson
+TX1 board. This addition allows the GPU to be used provided the
+bootloader properly enabled the GPU node.
+
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+[as pointed out by Thierry on IRC, nobody has reported a bug
+ in the field, but using a new bootloader with a .dtb that
+ has the incorrect data, it will crash on boot]
+Fixes: 336f79c7b6d7 ("arm64: tegra: Add NVIDIA Jetson TX1 Developer Kit support")
+Cc: stable at vger.kernel.org #v4.5+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi b/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
+index 5fda583..906fb83 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
+@@ -21,6 +21,10 @@
+ 		reg = <0x0 0x80000000 0x1 0x0>;
+ 	};
+ 
++	gpu at 57000000 {
++		vdd-supply = <&vdd_gpu>;
++	};
++
+ 	/* debug port */
+ 	serial at 70006000 {
+ 		status = "okay";
+@@ -291,4 +295,18 @@
+ 			clock-frequency = <32768>;
+ 		};
+ 	};
++
++	regulators {
++		vdd_gpu: regulator at 100 {
++			compatible = "pwm-regulator";
++			reg = <100>;
++			pwms = <&pwm 1 4880>;
++			regulator-name = "VDD_GPU";
++			regulator-min-microvolt = <710000>;
++			regulator-max-microvolt = <1320000>;
++			enable-gpios = <&pmic 6 GPIO_ACTIVE_HIGH>;
++			regulator-ramp-delay = <80>;
++			regulator-enable-ramp-delay = <1000>;
++		};
++	};
+ };
