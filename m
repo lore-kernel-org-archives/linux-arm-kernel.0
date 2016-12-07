@@ -1,93 +1,88 @@
 From: christopher.lee.bostic@gmail.com (Chris Bostic)
-Date: Tue,  6 Dec 2016 20:09:30 -0600
-Subject: [PATCH 04/16] drivers/fsi: Add fsi master definition
-Message-ID: <1481076574-54711-1-git-send-email-christopher.lee.bostic@gmail.com>
+Date: Tue,  6 Dec 2016 20:09:31 -0600
+Subject: [PATCH 08/16] drivers/fsi: Add crc4 helpers
+In-Reply-To: <1481076574-54711-1-git-send-email-christopher.lee.bostic@gmail.com>
+References: <1481076574-54711-1-git-send-email-christopher.lee.bostic@gmail.com>
+Message-ID: <1481076574-54711-2-git-send-email-christopher.lee.bostic@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jeremy Kerr <jk@ozlabs.org>
 
+Add some helpers for the crc checks for the slave configuration table.
+This works 4-bits-at-a-time, using a simple table approach.
+
+We will need this in the FSI core code, as well as any master
+implementations that need to calculate CRCs in software.
+
 Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
 ---
- drivers/fsi/fsi-core.c   | 20 ++++++++++++++++++++
- drivers/fsi/fsi-master.h | 37 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 57 insertions(+)
- create mode 100644 drivers/fsi/fsi-master.h
+ drivers/fsi/fsi-core.c   | 21 +++++++++++++++++++++
+ drivers/fsi/fsi-master.h | 21 +++++++++++++++++++++
+ 2 files changed, 42 insertions(+)
 
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 3d55bd5..ce9428d 100644
+index ceaf536..f0832c7 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -17,6 +17,26 @@
- #include <linux/fsi.h>
- #include <linux/module.h>
+@@ -32,6 +32,27 @@ struct fsi_slave {
  
-+#include "fsi-master.h"
-+
-+static atomic_t master_idx = ATOMIC_INIT(-1);
-+
-+/* FSI master support */
-+
-+int fsi_master_register(struct fsi_master *master)
-+{
-+	master->idx = atomic_inc_return(&master_idx);
-+	get_device(master->dev);
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(fsi_master_register);
-+
-+void fsi_master_unregister(struct fsi_master *master)
-+{
-+	put_device(master->dev);
-+}
-+EXPORT_SYMBOL_GPL(fsi_master_unregister);
-+
- /* FSI core & Linux bus type definitions */
+ #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
  
- static int fsi_bus_match(struct device *dev, struct device_driver *drv)
-diff --git a/drivers/fsi/fsi-master.h b/drivers/fsi/fsi-master.h
-new file mode 100644
-index 0000000..e75a810
---- /dev/null
-+++ b/drivers/fsi/fsi-master.h
-@@ -0,0 +1,37 @@
-+/*
-+ * FSI master definitions. These comprise the core <--> master interface,
-+ * to allow the core to interact with the (hardware-specific) masters.
-+ *
-+ * Copyright (C) IBM Corporation 2016
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef DRIVERS_FSI_MASTER_H
-+#define DRIVERS_FSI_MASTER_H
-+
-+#include <linux/device.h>
-+
-+struct fsi_master {
-+	struct device	*dev;
-+	int		idx;
-+	int		n_links;
-+	int		(*read)(struct fsi_master *, int link,
-+				uint8_t slave, uint32_t addr,
-+				void *val, size_t size);
-+	int		(*write)(struct fsi_master *, int link,
-+				uint8_t slave, uint32_t addr,
-+				const void *val, size_t size);
++/* crc helpers */
++static const uint8_t crc4_tab[] = {
++	0x0, 0x7, 0xe, 0x9, 0xb, 0xc, 0x5, 0x2,
++	0x1, 0x6, 0xf, 0x8, 0xa, 0xd, 0x4, 0x3,
 +};
 +
-+extern int fsi_master_register(struct fsi_master *master);
-+extern void fsi_master_unregister(struct fsi_master *master);
++uint8_t fsi_crc4(uint8_t c, uint64_t x, int bits)
++{
++	int i;
 +
-+#endif /* DRIVERS_FSI_MASTER_H */
++	/* Align to 4-bits */
++	bits = (bits + 3) & ~0x3;
++
++	/* Calculate crc4 over four-bit nibbles, starting at the MSbit */
++	for (i = bits; i >= 0; i -= 4)
++		c = crc4_tab[c ^ ((x >> i) & 0xf)];
++
++	return c;
++}
++EXPORT_SYMBOL_GPL(fsi_crc4);
++
+ /* FSI slave support */
+ static int fsi_slave_init(struct fsi_master *master,
+ 		int link, uint8_t slave_id)
+diff --git a/drivers/fsi/fsi-master.h b/drivers/fsi/fsi-master.h
+index e75a810..cafb433 100644
+--- a/drivers/fsi/fsi-master.h
++++ b/drivers/fsi/fsi-master.h
+@@ -34,4 +34,25 @@ struct fsi_master {
+ extern int fsi_master_register(struct fsi_master *master);
+ extern void fsi_master_unregister(struct fsi_master *master);
+ 
++/**
++ * crc4 helper: Given a starting crc4 state @c, calculate the crc4 vaue of @x,
++ * which is @bits in length. This may be required by master implementations
++ * that do not provide their own hardware checksums.
++ *
++ * The crc4 is performed on 4-bit chunks (which is all we need for FSI
++ * calculations). Typically, we'll want a starting state of 0:
++ *
++ *  c = fsi_crc4(0, msg, len);
++ *
++ * To crc4 a message that includes a single start bit, initialise crc4 state
++ * with:
++ *
++ *  c = fsi_crc4(0, 1, 1);
++ *
++ * Then update with message data:
++ *
++ *  c = fsi_crc4(c, msg, len);
++ */
++uint8_t fsi_crc4(uint8_t c, uint64_t x, int bits);
++
+ #endif /* DRIVERS_FSI_MASTER_H */
 -- 
 1.8.2.2
