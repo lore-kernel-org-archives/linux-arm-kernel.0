@@ -1,118 +1,32 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 07 Dec 2016 15:15:19 -0800
-Subject: [PATCH v2 1/4] ARM: dts: davinci: da850: VPIF: add node and muxing
-In-Reply-To: <37047453.6bLpOkkjm4@avalon> (Laurent Pinchart's message of "Wed,
- 07 Dec 2016 21:34:18 +0200")
-References: <20161207193137.27947-1-khilman@baylibre.com>
- <20161207193137.27947-2-khilman@baylibre.com>
- <37047453.6bLpOkkjm4@avalon>
-Message-ID: <m260mvcovs.fsf@baylibre.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Dec 2016 00:25:45 +0100
+Subject: [PATCH v2 1/2] arm64: dts: zx: Fix gic GICR property
+In-Reply-To: <CAOesGMh5=R18+wfM5WjUPnQ2a7UFi35t11cRDyTwCYHxpySnMg@mail.gmail.com>
+References: <1476361881-19685-1-git-send-email-jun.nie@linaro.org>
+ <5275588.dlJdb2OzJi@wuerfel>
+ <CAOesGMh5=R18+wfM5WjUPnQ2a7UFi35t11cRDyTwCYHxpySnMg@mail.gmail.com>
+Message-ID: <2961489.ldUdBv6eDi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Laurent Pinchart <laurent.pinchart@ideasonboard.com> writes:
+On Wednesday, December 7, 2016 2:12:23 PM CET Olof Johansson wrote:
+> > I checked the other branches now and found two other commits missing
+> > in next/fixes-non-critical:
+> >
+> >
+> > arm64: tegra: Add missing Smaug revision
+> > arm64: tegra: Add VDD_GPU regulator to Jetson TX1
+> >
+> > Both sent by Thierry Reding last Friday. I can add them back on top
+> > or you pick them up again if you are already busy doing merges.
+> >
+> > For the first patch, I had amended the changelog text, this is the
+> > version I had.
+> 
+> I'm done touching the tree for today so you can rebase and push your
+> versions if you want -- probably easiest all around.
+> 
 
-> Hi Kevin,
->
-> Thank you for the patch.
->
-> On Wednesday 07 Dec 2016 11:31:34 Kevin Hilman wrote:
->> Add VPIF node an pins to da850 and enable on boards.  VPIF has two input
->> channels described using the standard DT ports and enpoints.
->> 
->> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
->> ---
->>  arch/arm/boot/dts/da850-evm.dts  |  6 ++++++
->>  arch/arm/boot/dts/da850-lcdk.dts |  6 ++++++
->>  arch/arm/boot/dts/da850.dtsi     | 38 +++++++++++++++++++++++++++++++++++-
->>  3 files changed, 49 insertions(+), 1 deletion(-)
->> 
->> diff --git a/arch/arm/boot/dts/da850-evm.dts
->> b/arch/arm/boot/dts/da850-evm.dts index 41de15fe15a2..212b50d4f84b 100644
->> --- a/arch/arm/boot/dts/da850-evm.dts
->> +++ b/arch/arm/boot/dts/da850-evm.dts
->> @@ -289,3 +289,9 @@
->>  		};
->>  	};
->>  };
->> +
->> +&vpif {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&vpif_capture_pins>;
->> +       status = "okay";
->> +};
->> diff --git a/arch/arm/boot/dts/da850-lcdk.dts
->> b/arch/arm/boot/dts/da850-lcdk.dts index 7b8ab21fed6c..67f846f5bb35 100644
->> --- a/arch/arm/boot/dts/da850-lcdk.dts
->> +++ b/arch/arm/boot/dts/da850-lcdk.dts
->> @@ -219,3 +219,9 @@
->>  		};
->>  	};
->>  };
->> +
->> +&vpif {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&vpif_capture_pins>;
->> +       status = "okay";
->> +};
->> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
->> index f79e1b91c680..dd2a13ed106e 100644
->> --- a/arch/arm/boot/dts/da850.dtsi
->> +++ b/arch/arm/boot/dts/da850.dtsi
->> @@ -186,7 +186,18 @@
->>  					0xc 0x88888888 0xffffffff
->> 
->>  				>;
->> 
->>  			};
->> -
->> +			vpif_capture_pins: vpif_capture_pins {
->> +				pinctrl-single,bits = <
->> +					/* VP_DIN[2..7], VP_CLKIN1, VP_CLKIN0 
-> */
->> +					0x38 0x11111111 0xffffffff
->> +					/* VP_DIN[10..15,0..1] */
->> +					0x3c 0x11111111 0xffffffff
->> +					/* VP_DIN[8..9] */
->> +					0x40 0x00000011 0x000000ff
->> +					/* VP_CLKIN3, VP_CLKIN2 */
->> +					0x4c 0x00010100 0x000f0f00
->> +				>;
->> +			};
->>  		};
->>  		edma0: edma at 0 {
->>  			compatible = "ti,edma3-tpcc";
->> @@ -399,7 +410,32 @@
->>  				<&edma0 0 1>;
->>  			dma-names = "tx", "rx";
->>  		};
->> +
->> +		vpif: video at 217000 {
->> +			compatible = "ti,da850-vpif";
->> +			reg = <0x217000 0x1000>;
->> +			interrupts = <92>;
->> +			status = "disabled";
->> +
->> +			/* VPIF capture: input channels */
->> +			port {
->> +				#address-cells = <1>;
->> +				#size-cells = <0>;
->> +
->> +				vpif_ch0: endpoint at 0 {
->> +					  reg = <0>;
->> +					  bus-width = <8>;
->> +				};
->> +
->> +				vpif_ch1: endpoint at 1 {
->> +					  reg = <1>;
->> +					  bus-width = <8>;
->> +					  data-shift = <8>;
->> +				};
->
-> Given that the VPIF can also accept a single 16-bit input, I'd move the 
-> endpoints to board files.
->
+Done.
 
-Yes, good point.  Will move them.
-
-Kevin
+	Arnd
