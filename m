@@ -1,44 +1,47 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed,  7 Dec 2016 15:31:40 +0000
-Subject: [PATCH] drm: hdlcd: Work properly in big-endian mode
-Message-ID: <f484518775c0bf063ae0a6f1e6c11bb404a7acc9.1481124156.git.robin.murphy@arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 7 Dec 2016 16:41:45 +0100
+Subject: [PATCH] ARM: dts: armada-{370, xp}: drop "marvell, orion-spi" from
+ SPI controllers
+In-Reply-To: <87eg1jhi4l.fsf@free-electrons.com>
+References: <20161207152109.17545-1-uwe@kleine-koenig.org>
+ <87eg1jhi4l.fsf@free-electrons.com>
+Message-ID: <20161207154145.yr2iua73xnoyjsse@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Under a big-endian kernel, colours on the framebuffer all come out a
-delightful shade of wrong, since we fail to take the reversed byte
-order into account. Fortunately, the HDLCD has a control bit to make it
-automatically byteswap big-endian data; let's use it as appropriate.
+Hello Gregory,
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/gpu/drm/arm/hdlcd_crtc.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+On Wed, Dec 07, 2016 at 04:30:02PM +0100, Gregory CLEMENT wrote:
+>  On mer., d?c. 07 2016, Uwe Kleine-K?nig <uwe@kleine-koenig.org> wrote:
+> 
+> > From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> >
+> > The SPI controllers on Armada 370 and XP differ from the original Orion
+> > SPI controllers (at least) in the configuration of the baud rate. So
+> > it's wrong to claim compatibility which results in bogus baud rates.
+> 
+> Until two years ago with the commits
+> df59fa7f4bca9658b75f0f5fee225b3a057475c5 and
+> 4dacccfac69494ba70248b134352f299171c41b7
+> we used "marvell,orion-spi" compatible on Armada XP and Armada 370
+> without any problem.
+> 
+> The new compatible "marvell,armada-xp-spi" and "marvell,armada-xp-spi"
+> allows to have more choice for the baudrate for a given clock but it is
+> not true that Armada 370 and Armada XP are not compatible with
+> "marvell,orion-spi".
 
-diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-index 28341b32067f..eceb7bed5dd0 100644
---- a/drivers/gpu/drm/arm/hdlcd_crtc.c
-+++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
-@@ -63,6 +63,7 @@ static int hdlcd_set_pxl_fmt(struct drm_crtc *crtc)
- 	uint32_t pixel_format;
- 	struct simplefb_format *format = NULL;
- 	int i;
-+	u32 reg;
- 
- 	pixel_format = crtc->primary->state->fb->pixel_format;
- 
-@@ -76,7 +77,11 @@ static int hdlcd_set_pxl_fmt(struct drm_crtc *crtc)
- 
- 	/* HDLCD uses 'bytes per pixel', zero means 1 byte */
- 	btpp = (format->bits_per_pixel + 7) / 8;
--	hdlcd_write(hdlcd, HDLCD_REG_PIXEL_FORMAT, (btpp - 1) << 3);
-+	reg = (btpp - 1) << 3;
-+#ifdef __BIG_ENDIAN
-+	reg |= HDLCD_PIXEL_FMT_BIG_ENDIAN;
-+#endif
-+	hdlcd_write(hdlcd, HDLCD_REG_PIXEL_FORMAT, reg);
- 
- 	/*
- 	 * The format of the HDLCD_REG_<color>_SELECT register is:
+The issue I was faced with that made me create this patch is that in
+barebox no special case for 370/XP was active. The result was that a
+device that could be operated at 60 MHz only got a clock of 11 MHz and
+the driver assumed it configured 41.666 MHz. I didn't check if the same
+can happen in the opposite direction (or if there are other important
+incompatibilities) but still I'd say this is a bug with my patch being
+the obvious fix.
+
+Best regards
+Uwe
+
 -- 
-2.10.2.dirty
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
