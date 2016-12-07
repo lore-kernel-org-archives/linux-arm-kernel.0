@@ -1,91 +1,44 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 07 Dec 2016 16:30:02 +0100
-Subject: [PATCH] ARM: dts: armada-{370, xp}: drop "marvell,
- orion-spi" from SPI controllers
-In-Reply-To: <20161207152109.17545-1-uwe@kleine-koenig.org> ("Uwe
- =?utf-8?Q?Kleine-K=C3=B6nig=22's?= message of "Wed, 7 Dec 2016 16:21:09
- +0100")
-References: <20161207152109.17545-1-uwe@kleine-koenig.org>
-Message-ID: <87eg1jhi4l.fsf@free-electrons.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed,  7 Dec 2016 15:31:40 +0000
+Subject: [PATCH] drm: hdlcd: Work properly in big-endian mode
+Message-ID: <f484518775c0bf063ae0a6f1e6c11bb404a7acc9.1481124156.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Under a big-endian kernel, colours on the framebuffer all come out a
+delightful shade of wrong, since we fail to take the reversed byte
+order into account. Fortunately, the HDLCD has a control bit to make it
+automatically byteswap big-endian data; let's use it as appropriate.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/gpu/drm/arm/hdlcd_crtc.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
+index 28341b32067f..eceb7bed5dd0 100644
+--- a/drivers/gpu/drm/arm/hdlcd_crtc.c
++++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
+@@ -63,6 +63,7 @@ static int hdlcd_set_pxl_fmt(struct drm_crtc *crtc)
+ 	uint32_t pixel_format;
+ 	struct simplefb_format *format = NULL;
+ 	int i;
++	u32 reg;
  
- On mer., d?c. 07 2016, Uwe Kleine-K?nig <uwe@kleine-koenig.org> wrote:
-
-> From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->
-> The SPI controllers on Armada 370 and XP differ from the original Orion
-> SPI controllers (at least) in the configuration of the baud rate. So
-> it's wrong to claim compatibility which results in bogus baud rates.
-
-Until two years ago with the commits
-df59fa7f4bca9658b75f0f5fee225b3a057475c5 and
-4dacccfac69494ba70248b134352f299171c41b7
-we used "marvell,orion-spi" compatible on Armada XP and Armada 370
-without any problem.
-
-The new compatible "marvell,armada-xp-spi" and "marvell,armada-xp-spi"
-allows to have more choice for the baudrate for a given clock but it is
-not true that Armada 370 and Armada XP are not compatible with
-"marvell,orion-spi".
-
-Gregory
-
->
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm/boot/dts/armada-370.dtsi | 4 ++--
->  arch/arm/boot/dts/armada-xp.dtsi  | 4 ++--
->  2 files changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-> index b4258105e91f..b9377c11b379 100644
-> --- a/arch/arm/boot/dts/armada-370.dtsi
-> +++ b/arch/arm/boot/dts/armada-370.dtsi
-> @@ -435,13 +435,13 @@
->   * board level if a different configuration is used.
->   */
->  &spi0 {
-> -	compatible = "marvell,armada-370-spi", "marvell,orion-spi";
-> +	compatible = "marvell,armada-370-spi";
->  	pinctrl-0 = <&spi0_pins1>;
->  	pinctrl-names = "default";
->  };
->  
->  &spi1 {
-> -	compatible = "marvell,armada-370-spi", "marvell,orion-spi";
-> +	compatible = "marvell,armada-370-spi";
->  	pinctrl-0 = <&spi1_pins>;
->  	pinctrl-names = "default";
->  };
-> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-> index 4a5f99e65b51..3a416834d80b 100644
-> --- a/arch/arm/boot/dts/armada-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp.dtsi
-> @@ -367,13 +367,13 @@
->  };
->  
->  &spi0 {
-> -	compatible = "marvell,armada-xp-spi", "marvell,orion-spi";
-> +	compatible = "marvell,armada-xp-spi";
->  	pinctrl-0 = <&spi0_pins>;
->  	pinctrl-names = "default";
->  };
->  
->  &spi1 {
-> -	compatible = "marvell,armada-xp-spi", "marvell,orion-spi";
-> +	compatible = "marvell,armada-xp-spi";
->  	pinctrl-0 = <&spi1_pins>;
->  	pinctrl-names = "default";
->  };
-> -- 
-> 2.10.2
->
-
+ 	pixel_format = crtc->primary->state->fb->pixel_format;
+ 
+@@ -76,7 +77,11 @@ static int hdlcd_set_pxl_fmt(struct drm_crtc *crtc)
+ 
+ 	/* HDLCD uses 'bytes per pixel', zero means 1 byte */
+ 	btpp = (format->bits_per_pixel + 7) / 8;
+-	hdlcd_write(hdlcd, HDLCD_REG_PIXEL_FORMAT, (btpp - 1) << 3);
++	reg = (btpp - 1) << 3;
++#ifdef __BIG_ENDIAN
++	reg |= HDLCD_PIXEL_FMT_BIG_ENDIAN;
++#endif
++	hdlcd_write(hdlcd, HDLCD_REG_PIXEL_FORMAT, reg);
+ 
+ 	/*
+ 	 * The format of the HDLCD_REG_<color>_SELECT register is:
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.10.2.dirty
