@@ -1,76 +1,22 @@
-From: dhowells@redhat.com (David Howells)
-Date: Wed, 07 Dec 2016 13:19:02 +0000
-Subject: [PATCH 8/8] efi: Handle secure boot from UEFI-2.6 [ver #5]
-In-Reply-To: <148111668193.23390.6340512985876251017.stgit@warthog.procyon.org.uk>
-References: <148111668193.23390.6340512985876251017.stgit@warthog.procyon.org.uk>
-Message-ID: <148111674243.23390.2201809861006243813.stgit@warthog.procyon.org.uk>
+From: fweimer@redhat.com (Florian Weimer)
+Date: Wed, 7 Dec 2016 14:23:55 +0100
+Subject: [Question] New mmap64 syscall?
+In-Reply-To: <20161206185440.GA4654@yury-N73SV>
+References: <20161206185440.GA4654@yury-N73SV>
+Message-ID: <f544bcc3-8aae-1bd0-b744-9964fc038a51@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-UEFI-2.6 adds a new variable, DeployedMode.  If it exists, this must be 1
-if we're to engage lockdown mode.
+On 12/06/2016 07:54 PM, Yury Norov wrote:
+> 3. Introduce new mmap64() syscall like this:
+> sys_mmap64(void *addr, size_t len, int prot, int flags, int fd, struct off_pair *off);
+> (The pointer here because otherwise we have 7 args, if simply pass off_hi and
+> off_lo in registers.)
 
-Reported-by: James Bottomley <James.Bottomley@HansenPartnership.com>
-Signed-off-by: David Howells <dhowells@redhat.com>
----
+I would prefer a batched mmap/munmap/mremap/mprotect/madvise interface, 
+so that VM changes can be coalesced and the output reduced.  This 
+interface could then be used to implement mmap on 32-bit architectures 
+as well because the offset restrictions would not apply there.
 
- drivers/firmware/efi/libstub/secureboot.c |   16 +++++++++++++++-
- include/linux/efi.h                       |    4 ++++
- 2 files changed, 19 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/firmware/efi/libstub/secureboot.c b/drivers/firmware/efi/libstub/secureboot.c
-index ba6ef717c66f..333b1594cce4 100644
---- a/drivers/firmware/efi/libstub/secureboot.c
-+++ b/drivers/firmware/efi/libstub/secureboot.c
-@@ -22,6 +22,9 @@ static const efi_char16_t const efi_SecureBoot_name[] = {
- static const efi_char16_t const efi_SetupMode_name[] = {
- 	'S', 'e', 't', 'u', 'p', 'M', 'o', 'd', 'e', 0
- };
-+static const efi_char16_t const efi_DeployedMode_name[] = {
-+	'D', 'e', 'p', 'l', 'o', 'y', 'e', 'd', 'M', 'o', 'd', 'e', 0
-+};
- 
- /* SHIM variables */
- static const efi_guid_t shim_guid = EFI_SHIM_LOCK_GUID;
-@@ -40,7 +43,7 @@ static efi_char16_t const shim_MokSBState_name[] = {
- enum efi_secureboot_mode efi_get_secureboot(efi_system_table_t *sys_table_arg)
- {
- 	u32 attr;
--	u8 secboot, setupmode, moksbstate;
-+	u8 secboot, setupmode, deployedmode, moksbstate;
- 	unsigned long size;
- 	efi_status_t status;
- 
-@@ -59,6 +62,17 @@ enum efi_secureboot_mode efi_get_secureboot(efi_system_table_t *sys_table_arg)
- 	if (secboot == 0 || setupmode == 1)
- 		goto secure_boot_disabled;
- 
-+	/* UEFI-2.6 requires DeployedMode to be 1. */
-+	if (sys_table_arg->hdr.revision >= EFI_2_60_SYSTEM_TABLE_REVISION) {
-+		size = sizeof(deployedmode);
-+		status = get_efi_var(efi_DeployedMode_name, &efi_variable_guid,
-+				     NULL, &size, &deployedmode);
-+		if (status != EFI_SUCCESS)
-+			goto out_efi_err;
-+		if (deployedmode == 0)
-+			goto secure_boot_disabled;
-+	}
-+
- 	/* See if a user has put shim into insecure mode.  If so, and if the
- 	 * variable doesn't have the runtime attribute set, we might as well
- 	 * honor that.
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index 135ca9c0c0b5..e1893f5002c3 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -645,6 +645,10 @@ typedef struct {
- 
- #define EFI_SYSTEM_TABLE_SIGNATURE ((u64)0x5453595320494249ULL)
- 
-+#define EFI_2_60_SYSTEM_TABLE_REVISION  ((2 << 16) | (60))
-+#define EFI_2_50_SYSTEM_TABLE_REVISION  ((2 << 16) | (50))
-+#define EFI_2_40_SYSTEM_TABLE_REVISION  ((2 << 16) | (40))
-+#define EFI_2_31_SYSTEM_TABLE_REVISION  ((2 << 16) | (31))
- #define EFI_2_30_SYSTEM_TABLE_REVISION  ((2 << 16) | (30))
- #define EFI_2_20_SYSTEM_TABLE_REVISION  ((2 << 16) | (20))
- #define EFI_2_10_SYSTEM_TABLE_REVISION  ((2 << 16) | (10))
+Thanks,
+Florian
