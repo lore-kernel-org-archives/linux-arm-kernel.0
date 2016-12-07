@@ -1,352 +1,101 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 7 Dec 2016 20:41:32 +0800
-Subject: [PATCH v3 1/3] soc: zte: pm_domains: Prepare for supporting
- ARMv8 2967 family
-In-Reply-To: <1481091204-6559-1-git-send-email-baoyou.xie@linaro.org>
-References: <1481091204-6559-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20161207124130.GD2749@dragon>
+From: romain.perier@free-electrons.com (Romain Perier)
+Date: Wed, 7 Dec 2016 13:42:28 +0100
+Subject: [PATCH v3 1/5] spi: Add basic support for Armada 3700 SPI
+ Controller
+In-Reply-To: <20161205120540.mvihgafelszitzhq@sirena.org.uk>
+References: <20161201102719.4291-1-romain.perier@free-electrons.com>
+ <20161201102719.4291-2-romain.perier@free-electrons.com>
+ <20161205120540.mvihgafelszitzhq@sirena.org.uk>
+Message-ID: <13532b8e-4fd8-fd39-772c-f350ab7473b6@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 02:13:22PM +0800, Baoyou Xie wrote:
-> The ARMv8 2967 family (296718, 296716 etc) uses different value
-> for controlling the power domain on/off registers, Choose the
-> value depending on the compatible.
-> 
-> Multiple domains are prepared for the family, this patch prepares
-> the common functions.
-> 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-> ---
->  drivers/soc/Kconfig          |   1 +
->  drivers/soc/Makefile         |   1 +
->  drivers/soc/zte/Kconfig      |  13 ++++
->  drivers/soc/zte/Makefile     |   4 ++
->  drivers/soc/zte/pm_domains.c | 150 +++++++++++++++++++++++++++++++++++++++++++
->  drivers/soc/zte/pm_domains.h |  48 ++++++++++++++
->  6 files changed, 217 insertions(+)
->  create mode 100644 drivers/soc/zte/Kconfig
->  create mode 100644 drivers/soc/zte/Makefile
->  create mode 100644 drivers/soc/zte/pm_domains.c
->  create mode 100644 drivers/soc/zte/pm_domains.h
-> 
-> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-> index f31bceb..f09023f 100644
-> --- a/drivers/soc/Kconfig
-> +++ b/drivers/soc/Kconfig
-> @@ -11,5 +11,6 @@ source "drivers/soc/tegra/Kconfig"
->  source "drivers/soc/ti/Kconfig"
->  source "drivers/soc/ux500/Kconfig"
->  source "drivers/soc/versatile/Kconfig"
-> +source "drivers/soc/zte/Kconfig"
->  
->  endmenu
-> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-> index 50c23d0..05eae52 100644
-> --- a/drivers/soc/Makefile
-> +++ b/drivers/soc/Makefile
-> @@ -16,3 +16,4 @@ obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
->  obj-$(CONFIG_SOC_TI)		+= ti/
->  obj-$(CONFIG_ARCH_U8500)	+= ux500/
->  obj-$(CONFIG_PLAT_VERSATILE)	+= versatile/
-> +obj-$(CONFIG_ARCH_ZX)		+= zte/
-> diff --git a/drivers/soc/zte/Kconfig b/drivers/soc/zte/Kconfig
-> new file mode 100644
-> index 0000000..4953c3fa
-> --- /dev/null
-> +++ b/drivers/soc/zte/Kconfig
-> @@ -0,0 +1,13 @@
-> +#
-> +# zx SoC drivers
-> +#
-> +menuconfig SOC_ZX
+Hello,
 
-Can we use SOC_ZTE to reflect the folder name 'zte'?  If we take
-drivers/soc/samsung/Kconfig as example, SAMSUNG is like ZTE, while
-EXYNOS is like ZX, I guess.
+Le 05/12/2016 ? 13:05, Mark Brown a ?crit :
+> On Thu, Dec 01, 2016 at 11:27:15AM +0100, Romain Perier wrote:
+>
+>> +config SPI_ARMADA_3700
+>> +	tristate "Marvell Armada 3700 SPI Controller"
+>> +	depends on ARCH_MVEBU && OF
+>
+> Why does this not have a COMPILE_TEST dependency?
 
-> +        bool "zx SoC driver support"
-> +
-> +if SOC_ZX
-> +
-> +config ZX_PM_DOMAINS
-> +        bool "zx PM domains"
-> +        depends on PM_GENERIC_DOMAINS
-> +
-> +endif
-> diff --git a/drivers/soc/zte/Makefile b/drivers/soc/zte/Makefile
-> new file mode 100644
-> index 0000000..97ac8ea
-> --- /dev/null
-> +++ b/drivers/soc/zte/Makefile
-> @@ -0,0 +1,4 @@
-> +#
-> +# zx SOC drivers
-> +#
-> +obj-$(CONFIG_ZX_PM_DOMAINS) += pm_domains.o
-> diff --git a/drivers/soc/zte/pm_domains.c b/drivers/soc/zte/pm_domains.c
-> new file mode 100644
-> index 0000000..e4d1235
-> --- /dev/null
-> +++ b/drivers/soc/zte/pm_domains.c
-> @@ -0,0 +1,150 @@
-> +/*
-> + * Copyright (C) 2015 ZTE Ltd.
+Because that's a mistake, I will fix it.
 
-Do we at least need year 2016?
+>
+>> +	/* Reset SPI unit */
+>> +	val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
+>> +	val |= A3700_SPI_SRST;
+>> +	spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
+>> +
+>> +	for (i = 0; i < A3700_SPI_TIMEOUT; i++)
+>> +		udelay(1);
+>
+> Why not just do a single udelay()?
 
-> + *
-> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
-> + * License terms: GNU General Public License (GPL) version 2
-
-I see drivers/soc/zte/pm_domains.h use a different licence format.  Can
-we make them unified?
-
-> + */
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include "pm_domains.h"
-> +
-> +#define PCU_DM_CLKEN(zpd)	((zpd)->reg_offset[REG_CLKEN])
-> +#define PCU_DM_ISOEN(zpd)	((zpd)->reg_offset[REG_ISOEN])
-> +#define PCU_DM_RSTEN(zpd)	((zpd)->reg_offset[REG_RSTEN])
-> +#define PCU_DM_PWREN(zpd)	((zpd)->reg_offset[REG_PWREN])
-> +#define PCU_DM_PWRDN(zpd)	((zpd)->reg_offset[REG_PWRDN])
-> +#define PCU_DM_ACK_SYNC(zpd)	((zpd)->reg_offset[REG_ACK_SYNC])
-> +
-> +static void __iomem *pcubase;
-> +
-> +int zx_normal_power_on(struct generic_pm_domain *domain)
-
-What does 'normal' in the function name mean?
-
-> +{
-> +	struct zx_pm_domain *zpd = (struct zx_pm_domain *)domain;
-> +	unsigned long loop = 1000;
-> +	u32 val;
-> +
-> +	if (zpd->polarity == PWREN) {
-> +		val = readl_relaxed(pcubase + PCU_DM_PWREN(zpd));
-> +		val |= BIT(zpd->bit);
-> +		writel_relaxed(val, pcubase + PCU_DM_PWREN(zpd));
-> +	} else {
-> +		val = readl_relaxed(pcubase + PCU_DM_PWRDN(zpd));
-> +		val &= ~BIT(zpd->bit);
-> +		writel_relaxed(val, pcubase + PCU_DM_PWRDN(zpd));
-> +	}
-> +
-> +	do {
-> +		udelay(1);
-> +		val = readl_relaxed(pcubase + PCU_DM_ACK_SYNC(zpd))
-> +				   & BIT(zpd->bit);
-> +	} while (--loop && !val);
-> +
-> +	if (!loop) {
-> +		pr_err("Error: %s %s fail\n", __func__, domain->name);
-> +		return -EIO;
-> +	}
-> +
-> +	val = readl_relaxed(pcubase + PCU_DM_RSTEN(zpd));
-> +	val &= ~BIT(zpd->bit);
-> +	writel_relaxed(val | BIT(zpd->bit), pcubase + PCU_DM_RSTEN(zpd));
-
-For a single bit setting, it can be as simple as the following, right?
-
-	val = readl_relaxed(pcubase + PCU_DM_RSTEN(zpd));
-	val |= BIT(zpd->bit);
-	writel_relaxed(val, pcubase + PCU_DM_RSTEN(zpd));
+Mhhhh... good point.
 
 
-> +	udelay(5);
-> +
-> +	val = readl_relaxed(pcubase + PCU_DM_ISOEN(zpd));
-> +	val &= ~BIT(zpd->bit);
-> +	writel_relaxed(val, pcubase + PCU_DM_ISOEN(zpd));
-> +	udelay(5);
-> +
-> +	val = readl_relaxed(pcubase + PCU_DM_CLKEN(zpd));
-> +	val &= ~BIT(zpd->bit);
-> +	writel_relaxed(val | BIT(zpd->bit), pcubase + PCU_DM_CLKEN(zpd));
+>
+>> +static irqreturn_t a3700_spi_interrupt(int irq, void *dev_id)
+>> +{
+>> +	struct spi_master *master = dev_id;
+>> +	struct a3700_spi *a3700_spi;
+>> +	u32 cause;
+>> +
+>> +	a3700_spi = spi_master_get_devdata(master);
+>> +
+>> +	/* Get interrupt causes */
+>> +	cause = spireg_read(a3700_spi, A3700_SPI_INT_STAT_REG);
+>> +
+>> +	/* mask and acknowledge the SPI interrupts */
+>> +	spireg_write(a3700_spi, A3700_SPI_INT_MASK_REG, 0);
+>> +	spireg_write(a3700_spi, A3700_SPI_INT_STAT_REG, cause);
+>> +
+>> +	/* Wake up the transfer */
+>> +	if (a3700_spi->wait_mask & cause)
+>> +		complete(&a3700_spi->done);
+>> +
+>> +	return IRQ_HANDLED;
+>> +}
+>
+> This reports that we handled an interrupt even if we did not in fact
+> handle an interrupt.  It's also a bit dodgy that it doesn't check what
+> the interrupt was but that's less serious.
 
-Ditto
+I don't understand, what do you expect ? That I return something != 
+IRQ_HANDLED when the cause of the interrupt is not present in wait_mask ?
 
-> +	udelay(5);
-> +
-> +	pr_info("normal poweron %s\n", domain->name);
+>
+>> +	master->bus_num = (pdev->id != -1) ? pdev->id : 0;
+>
+> At most this should be just setting the bus number to pdev->id like
+> other drivers do.
 
-Do we really want to see a message on every single power domain on/off
-function call?  A pr_debug is better?
+ack
 
-> +
-> +	return 0;
-> +}
-> +
-> +int zx_normal_power_off(struct generic_pm_domain *domain)
-> +{
-> +	struct zx_pm_domain *zpd = (struct zx_pm_domain *)domain;
-> +	unsigned long loop = 1000;
-> +	u32 val;
-> +
-> +	val = readl_relaxed(pcubase + PCU_DM_CLKEN(zpd));
-> +	val &= ~BIT(zpd->bit);
-> +	writel_relaxed(val, pcubase + PCU_DM_CLKEN(zpd));
-> +	udelay(5);
-> +
-> +	val = readl_relaxed(pcubase + PCU_DM_ISOEN(zpd));
-> +	val &= ~BIT(zpd->bit);
-> +	writel_relaxed(val | BIT(zpd->bit), pcubase + PCU_DM_ISOEN(zpd));
+>
+>> +	ret = clk_prepare_enable(spi->clk);
+>> +	if (ret) {
+>> +		dev_err(dev, "could not prepare clk: %d\n", ret);
+>> +		goto error;
+>> +	}
+>
+> I'd expect the hardware prepare/unprepare to be managing the enable and
+> disable of the clock in order to save a little power.
 
-Same here.
+Ok, if that's better for power management, why not then.
 
-> +	udelay(5);
-> +
-> +	val = readl_relaxed(pcubase + PCU_DM_RSTEN(zpd));
-> +	val &= ~BIT(zpd->bit);
-> +	writel_relaxed(val, pcubase + PCU_DM_RSTEN(zpd));
-> +	udelay(5);
-> +
-> +	if (zpd->polarity == PWREN) {
-> +		val = readl_relaxed(pcubase + PCU_DM_PWREN(zpd));
-> +		val &= ~BIT(zpd->bit);
-> +		writel_relaxed(val, pcubase + PCU_DM_PWREN(zpd));
-> +	} else {
-> +		val = readl_relaxed(pcubase + PCU_DM_PWRDN(zpd));
-> +		val |= BIT(zpd->bit);
-> +		writel_relaxed(val, pcubase + PCU_DM_PWRDN(zpd));
-> +	}
-> +
-> +	do {
-> +		udelay(1);
-> +		val = readl_relaxed(pcubase + PCU_DM_ACK_SYNC(zpd))
-> +				   & BIT(zpd->bit);
-> +	} while (--loop && val);
-> +
-> +	if (!loop) {
-> +		pr_err("Error: %s %s fail\n", __func__, domain->name);
-> +		return -EIO;
-> +	}
-> +
-> +	pr_info("normal poweroff %s\n", domain->name);
+>
+>> +	dev_info(dev, "Marvell Armada 3700 SPI Controller at 0x%08lx, irq %d\n",
+>> +		 (unsigned long)res->start, spi->irq);
+>
+> This is just adding noise to the boot, remove it.  It's not telling us
+> anything we read from the hardware or anything.
 
-pr_debug
+ack
 
-> +
-> +	return 0;
-> +}
-> +
-> +int
-> +zx_pd_probe(struct platform_device *pdev,
 
-I do not see the need to break above two lines.
-
-> +	   struct generic_pm_domain **zx_pm_domains,
-> +	   int domain_num)
-
-As long as the line doesn't exceed column 80, we do not need to break
-the line into two.
-
-> +{
-> +	struct genpd_onecell_data *genpd_data;
-> +	struct resource *res;
-> +	int i;
-> +
-> +	genpd_data = devm_kzalloc(&pdev->dev, sizeof(*genpd_data), GFP_KERNEL);
-> +	if (!genpd_data)
-> +		return -ENOMEM;
-> +
-> +	genpd_data->domains = zx_pm_domains;
-> +	genpd_data->num_domains = domain_num;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "no memory resource defined\n");
-> +		return -ENODEV;
-> +	}
-
-The error check on 'res' is not really necessary, as
-devm_ioremap_resource() will do that for you.
-
-> +
-> +	pcubase = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(pcubase)) {
-> +		dev_err(&pdev->dev, "ioremap fail.\n");
-> +		return -EIO;
-
-PTR_ERR(pcubase) should be returned as error code here.
-
-> +	}
-> +
-> +	for (i = 0; i < domain_num; ++i)
-> +		pm_genpd_init(zx_pm_domains[i], NULL, false);
-> +
-> +	of_genpd_add_provider_onecell(pdev->dev.of_node, genpd_data);
-> +	dev_info(&pdev->dev, "powerdomain init ok\n");
-> +	return 0;
-> +}
-> diff --git a/drivers/soc/zte/pm_domains.h b/drivers/soc/zte/pm_domains.h
-> new file mode 100644
-> index 0000000..d3a52fd
-> --- /dev/null
-> +++ b/drivers/soc/zte/pm_domains.h
-> @@ -0,0 +1,48 @@
-> +/*
-> + * Copyright (c) 2015 ZTE Co., Ltd.
-> + *           http://www.zte.com.cn
-> + *
-> + * Header for ZTE's Power Domain Driver support
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __ZTE_PM_DOMAIN_H
-> +#define __ZTE_PM_DOMAIN_H
-> +
-> +#include <linux/platform_device.h>
-> +#include <linux/pm_domain.h>
-> +
-> +enum {
-> +	REG_CLKEN,
-> +	REG_ISOEN,
-> +	REG_RSTEN,
-> +	REG_PWREN,
-> +	REG_PWRDN,
-> +	REG_ACK_SYNC,
-> +
-> +	/* The size of the array - must be last */
-> +	REG_ARRAY_SIZE,
-> +};
-> +
-> +enum zx_power_polarity {
-> +	PWREN,
-> +	PWRDN,
-> +};
-> +
-> +struct zx_pm_domain {
-> +	struct		generic_pm_domain dm;
-
-You can chose to have more tabs between 'generic_pm_domain' and 'dm'
-for indention, but there should always be one space between 'struct' and
-'generic_pm_domain'.
-
-> +	const u16	bit;
-> +	const enum zx_power_polarity	polarity;
-> +	const u16	*reg_offset;
-> +};
-> +
-> +extern int zx_normal_power_on(struct generic_pm_domain *domain);
-> +extern int zx_normal_power_off(struct generic_pm_domain *domain);
-> +extern int
-> +zx_pd_probe(struct platform_device *pdev,
-> +	   struct generic_pm_domain **zx_pm_domains,
-> +	   int domain_num);
-
-We do not need to break it into so many lines.
-
-> +#endif /* __ZTE_PM_DOMAIN_H */
-> -- 
-> 2.7.4
-> 
+Thanks,
+Romain
