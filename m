@@ -1,102 +1,97 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 7 Dec 2016 16:50:31 +0000
-Subject: [PATCH] drm: hdlcd: Work properly in big-endian mode
-In-Reply-To: <548dc9d9-4d21-7f93-cc92-5bc3234f1b8f@arm.com>
-References: <f484518775c0bf063ae0a6f1e6c11bb404a7acc9.1481124156.git.robin.murphy@arm.com>
- <20161207155714.ldmshptddwvhsdop@phenom.ffwll.local>
- <548dc9d9-4d21-7f93-cc92-5bc3234f1b8f@arm.com>
-Message-ID: <36dcbbc5-607a-1773-17e4-af2a9810a06e@arm.com>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Wed,  7 Dec 2016 11:50:56 -0500
+Subject: [PATCH v2 00/10] perf: arm64: Support for Hisilicon SoC Hardware
+ event counters
+Message-ID: <1481129456-159241-1-git-send-email-anurup.m@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/16 16:42, Robin Murphy wrote:
-> On 07/12/16 15:57, Daniel Vetter wrote:
->> On Wed, Dec 07, 2016 at 03:31:40PM +0000, Robin Murphy wrote:
->>> Under a big-endian kernel, colours on the framebuffer all come out a
->>> delightful shade of wrong, since we fail to take the reversed byte
->>> order into account. Fortunately, the HDLCD has a control bit to make it
->>> automatically byteswap big-endian data; let's use it as appropriate.
->>>
->>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>
->> fourcc codes (and the drm fourcc codes) are supposed to be little-endian.
->> All of them. So either we fix up the drivers and userspace to set that
->> flag correctly (which would mean hdlcd should expose twice as many
->> formats, each one with the little and big endian mode).
-> 
-> AFAICS, SIMPLEFB_FORMATS *is* supposed to be explicitly little-endian
-> modes. I see that DRM_FORMAT_BIG_ENDIAN exists, but nothing in-tree ever
-> sets it :/
-> 
-> My vague (and probably wrong) assumption was that the HDLCD is still
-> expecting little-endian data, but the the CPU is writing framebuffer
-> data as host-endian words, hence what the HDLCD thinks is xRGB is
-> actually RGBx under a big-endian kernel - It's certainly consistent
-> between kernel (fbcon) and userspace (fb-test[1]): white is yellow, blue
-> is black, green is red and red is green. I don't know how to test
-> "proper" DRM (I've failed to get X to work with the Arch Linux ARM
-> distro I have on there at the moment).
-> 
-> Once again I'm somewhat out of my depth here - I just found a thing that
-> seemed appropriate and visibly resolved the immediate problem :)
-> By comparison, the same use-cases (fbcon and fb-test) under the same
-> big-endian kernel do *not* show the same problem with nouveau driving a
-> PCIe 7600GT card, which led me to believe it was HDLCD-specific.
+From: John Garry <john.garry@huawei.com>
 
-Off the back of that, upon closer inspection, nv_crtc_commit() would
-appear to already be doing very much the equivalent thing to what I'm
-doing in this patch, so now I have no idea whether this is right or
-everything's wrong.
+Provide Support for Hisilicon SoC(HiP05/06/07) Hardware event counters.
+The Hisilicon SoC HiP0x series has many uncore or non-CPU performance
+events and counters units.
 
-Robin.
+This patch series is implemented refering to arm-cci, Intel/AMD uncore and
+also the cavium thunderX and xgene uncore pmu patches.
+This v2 version has addressed the review comments of v1 version.
 
-> [1]:https://github.com/prpplague/fb-test-app
-> 
->> Or we nuke the big endian flag from drm fourcc. Adding AMD folks who afaik
->> are the only other ones who ever cared about big endian in drm.
->> -Daniel
->>
->>> ---
->>>  drivers/gpu/drm/arm/hdlcd_crtc.c | 7 ++++++-
->>>  1 file changed, 6 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
->>> index 28341b32067f..eceb7bed5dd0 100644
->>> --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
->>> +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
->>> @@ -63,6 +63,7 @@ static int hdlcd_set_pxl_fmt(struct drm_crtc *crtc)
->>>  	uint32_t pixel_format;
->>>  	struct simplefb_format *format = NULL;
->>>  	int i;
->>> +	u32 reg;
->>>  
->>>  	pixel_format = crtc->primary->state->fb->pixel_format;
->>>  
->>> @@ -76,7 +77,11 @@ static int hdlcd_set_pxl_fmt(struct drm_crtc *crtc)
->>>  
->>>  	/* HDLCD uses 'bytes per pixel', zero means 1 byte */
->>>  	btpp = (format->bits_per_pixel + 7) / 8;
->>> -	hdlcd_write(hdlcd, HDLCD_REG_PIXEL_FORMAT, (btpp - 1) << 3);
->>> +	reg = (btpp - 1) << 3;
->>> +#ifdef __BIG_ENDIAN
->>> +	reg |= HDLCD_PIXEL_FMT_BIG_ENDIAN;
->>> +#endif
->>> +	hdlcd_write(hdlcd, HDLCD_REG_PIXEL_FORMAT, reg);
->>>  
->>>  	/*
->>>  	 * The format of the HDLCD_REG_<color>_SELECT register is:
->>> -- 
->>> 2.10.2.dirty
->>>
->>> _______________________________________________
->>> dri-devel mailing list
->>> dri-devel at lists.freedesktop.org
->>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
->>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Support for Hisilicon L3 cache(L3C) and Misclennaneous nodes(MN) hardware
+events and counters are added in this implementation.
+
+The Hisilicon uncore PMUs can be found under /sys/bus/event_source/devices.
+The counters are exported via sysfs in the corresponding events files
+under the PMU directory so the perf tool can list the event names.
+
+ToDo:
+1) The counter overflow handling is currently unsupported in this
+   patch series.
+2) ACPI support.
+
+Version history
+---------------
+
+v2
+--
+- Fix review comments of v2 version.
+- Move djtag driver to drivers/perf/hisilicon.
+- Have separate PMU instance for each L3 cache banks.
+- Modify device properties in DTS as per review comments.
+- Handle hardware version difference.
+- Change compatible names of djtag so use prefix hisi-
+  and remove chip version as driver only depend on djtag
+  hw version.
+- use devm_kzalloc.
+- Remove DDRC changes in this series. As the DDRC PMU doesnot
+  depend on djtag it will be send separately.
+
+v1
+--
+-Initial version with support for L3C, MN and DDRC event counters
+-Djtag driver is used to access registers of L3 cache and MN.
+
+Anurup M (7):
+  arm64: MAINTAINERS: hisi: Add hisilicon SoC PMU support
+  dt-bindings: perf: hisi: Add Devicetree bindings for Hisilicon SoC PMU
+  Documentation: perf: hisi: Documentation for HIP05/06/07 PMU event
+    counting.
+  perf: hisi: Update Kconfig for Hisilicon PMU support
+  perf: hisi: Add support for Hisilicon SoC event counters
+  perf: hisi: Add sysfs attributes for L3 cache(L3C) PMU
+  dts: arm64: hip06: Add Hisilicon SoC PMU support
+
+Shaokun Zhang (1):
+  perf: hisi: Miscellanous node(MN) event counting in perf
+
+Tan Xiaojun (2):
+  dt-bindings: hisi: Add Hisilicon HiP05/06/07 Djtag dts bindings
+  drivers: perf: hisi: Add support for Hisilicon Djtag driver
+
+ .../devicetree/bindings/arm/hisilicon/djtag.txt    |  66 ++
+ .../devicetree/bindings/arm/hisilicon/pmu.txt      |  98 +++
+ Documentation/perf/hisi-pmu.txt                    |  75 +++
+ MAINTAINERS                                        |   9 +
+ arch/arm64/boot/dts/hisilicon/hip06.dtsi           |  78 +++
+ drivers/perf/Kconfig                               |   8 +
+ drivers/perf/Makefile                              |   1 +
+ drivers/perf/hisilicon/Makefile                    |   1 +
+ drivers/perf/hisilicon/djtag.c                     | 729 +++++++++++++++++++++
+ drivers/perf/hisilicon/djtag.h                     |  39 ++
+ drivers/perf/hisilicon/hisi_uncore_l3c.c           | 629 ++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_mn.c            | 516 +++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_pmu.c           | 365 +++++++++++
+ drivers/perf/hisilicon/hisi_uncore_pmu.h           | 128 ++++
+ 14 files changed, 2742 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
+ create mode 100644 Documentation/perf/hisi-pmu.txt
+ create mode 100644 drivers/perf/hisilicon/Makefile
+ create mode 100644 drivers/perf/hisilicon/djtag.c
+ create mode 100644 drivers/perf/hisilicon/djtag.h
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_l3c.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_mn.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.h
+
+-- 
+2.1.4
