@@ -1,94 +1,74 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 7 Dec 2016 16:32:10 +0000
-Subject: [Question] New mmap64 syscall?
-In-Reply-To: <20161207123944.GA11799@yury-N73SV>
-References: <20161206185440.GA4654@yury-N73SV> <3014428.VXGdOARdm1@wuerfel>
- <20161207103451.GA869@yury-N73SV>
- <0F280FED-870A-42B5-ABC4-1976ACA32462@theobroma-systems.com>
- <20161207123944.GA11799@yury-N73SV>
-Message-ID: <20161207163210.GB31779@e104818-lin.cambridge.arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 7 Dec 2016 22:11:56 +0530
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <5846B237.8060409@free.fr>
+References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
+ <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
+ <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
+ <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
+Message-ID: <20161207164156.GW6408@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 06:09:44PM +0530, Yury Norov wrote:
-> On Wed, Dec 07, 2016 at 12:07:24PM +0100, Dr.Philipp Tomsich wrote:
-> > [Resend, as my mail-client had insisted on using the wrong MIME type?]
+On Tue, Dec 06, 2016 at 01:42:31PM +0100, Mason wrote:
+> On 06/12/2016 06:12, Vinod Koul wrote:
+> 
+> > On Tue, Nov 29, 2016 at 07:25:02PM +0100, Mason wrote:
 > > 
-> > > On 07 Dec 2016, at 11:34, Yury Norov <ynorov@caviumnetworks.com> wrote:
-> > > 
-> > >> If there is a use case for larger than 16TB offsets, we should add
-> > >> the call on all architectures, probably using your approach 3. I don't
-> > >> think that we should treat it as anything special for arm64 though.
-> > > 
-> > > From this point of view, 16+TB offset is a matter of 16+TB storage,
-> > > and it's more than real. The other consideration to add it is that
-> > > we have 64-bit support for offsets in syscalls like sys_llseek().
-> > > So mmap64() will simply extend this support.
+> >> Is there a way to write a driver within the existing framework?
 > > 
-> > I believe the question is rather if the 16TB offset is a real use-case for ILP32.
+> > I think so, looking back at comments from Russell, I do tend to agree with
+> > that. Is there a specific reason why sbox can't be tied to alloc and free
+> > channels?
 > 
-> This is not for ilp32, but for all 32-bit architectures - both native
-> and compat. And because the scope is so generic, I think it's the
-> strong reason for us to support true 64-bit offset in mmap().
-
-When I mentioned it, I didn't realise that we already use 6 registers
-for mmap(). While we can go up to 8 on AArch64/ILP32, I think Arnd has a
-point that we don't want this to diverge from other new 32-bit
-architectures. I don't really have a strong opinion either way here,
-just a remark that AArch64/ILP32 already diverged from _current_ 32-bit
-architectures by introducing 64-bit off_t in a 32-bit world. Introducing
-an mmap64() at the same time wouldn't look too bad either.
-
-> > This seems to bring the discussion full-circle, as this would indicate that 64bit is the 
-> > preferred bit-width for all sizes, offsets, etc. throughout all filesystem-related calls 
-> > (i.e. stat, seek, etc.).
+> Here's a recap of the situation.
 > 
-> AARCH64/ILP32 (and all new arches) exposes ino_t, off_t, blkcnt_t,
-> fsblkcnt_t, fsfilcnt_t and rlim_t as 64-bit types. (Size_t should
-> be 32-bit of course, because it's the same lengths as pointer.)
+> The "SBOX+MBUS" HW is used in several iterations of the tango SoC:
+
+btw is SBOX setup dependent upon the peripheral connected to?
+
 > 
-> It allows to make syscalls that pass it support 64-bit values, refer
-> Documentation/arm64/ilp32.txt for details. Stat and seek are both
-> supporting 64-bit types. From this point of view, mmap() is the (only?)
-> exception in current ILP32 ABI.
+> tango3
+>   2 memory channels available
+>   6 devices ("clients"?) may request an MBUS channel
 
-I thought ILP32 will use llseek() which has its own explicit way of
-passing a 64-bit offset and the result written back by the kernel. We
-wouldn't be able to use lseek() because of the return type.
+But only 2 can get a channel at any time..
 
-> > But if that is the case, then we should have gone with 64bit arguments in a single
-> > register for our ILP32 definition on AArch64.
->  
-> There are 2 unrelated matters - the size of types, and the size of
-> register. Most of 32-bit architectures has hardware limitation on
-> register size (consider aarch32). And it doesn't mean that they are
-> forced to stuck with 32-bit off_t etc. This is still opened question
-> how to pass 64-bit parameters in aarch64/ilp32 because there we have
-> the choice (the reason why it's RFC). If you have new ideas - welcome
-> to that discussion. This topic also covers architectures that has to
-> pass 64-bit parameters in a pair.
-
-We've discussed this a few times already and the only sane option from
-the _kernel_ perspective seemed to be either (a) close to native ABI for
-ILP32 (and breaking POSIX) or (b) just a standard 32-bit ABI. The latter
-implies splitting 64-bit values in register pairs, especially to avoid a
-lot of annotations/wrapping in the generic kernel unistd.h file. IIRC,
-we decided to go with option (b), so I don't think it's worth re-opening
-that discussion.
-
-> > In other words: Why not keep ILP32 simple an ask users that need a 16TB+ offset
-> > to use LP64? It seems much more consistent with the other choices takes so far.
 > 
-> If user can switch to lp64, he doesn't need ilp32 at all, right? :)
-> Also, I don't understand how true 64-bit offset in mmap64() would
-> complicate this port.
+> tango4 (one more channel)
+>   3 memory channels available
+>   7 devices may request an MBUS channel :
+>     NFC0, NFC1, SATA0, SATA1, memcpy, (IDE0, IDE1)
 
-It's more like the user wanting a quick transition from code that was
-only ever compiled for AArch32 (or other 32-bit architecture) with a
-goal of full LP64 transition on the long run. I have yet to see
-convincing benchmarks showing ILP32 as an advantage over LP64 (of
-course, I hear the argument of reading a pointer a loop is twice as fast
-with a half-size pointer but I don't consider such benchmarks relevant).
+Same here
 
+Only thing is users shouldn't hold on to channel and freeup when not in use.
+
+> Notes:
+> The current NFC driver supports only one controller.
+> IDE is mostly obsolete at this point.
+> 
+> tango5 (SATA gets own dedicated MBUS channel pair)
+>   3 memory channels available
+>   5 devices may request an MBUS channel :
+>     NFC0, NFC1, memcpy, (IDE0, IDE1)
+> 
+> 
+> If I understand the current DMA driver (written by Mans), client
+> drivers are instructed to use a specific channel in the DT, and
+> the DMA driver muxes access to that channel. The DMA driver
+> manages a per-channel queue of outstanding DMA transfer requests,
+> and a new transfer is started friom within the DMA ISR
+> (modulo the fact that the interrupt does not signal completion
+> of the transfer, as explained else-thread).
+> 
+> What you're proposing, Vinod, is to make a channel exclusive
+> to a driver, as long as the driver has not explicitly released
+> the channel, via dma_release_channel(), right?
+
+Precisely, but yes the downside of that is concurrent access are limited, but
+am not sure if driver implements virtual channels and allows that..
+
+Thanks
 -- 
-Catalin
+~Vinod
