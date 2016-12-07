@@ -1,146 +1,57 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 7 Dec 2016 10:31:24 +0100
-Subject: [PATCH 14/16] drivers/fsi: Add master unscan
-In-Reply-To: <1481069677-53660-15-git-send-email-christopher.lee.bostic@gmail.com>
-References: <1481069677-53660-1-git-send-email-christopher.lee.bostic@gmail.com>
- <1481069677-53660-15-git-send-email-christopher.lee.bostic@gmail.com>
-Message-ID: <20161207093124.GD14742@kroah.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 7 Dec 2016 09:23:04 +0000
+Subject: [PATCH 0/4] arm/versatile: no-MMU support
+In-Reply-To: <1481090912-29835-1-git-send-email-gerg@uclinux.org>
+References: <1481090912-29835-1-git-send-email-gerg@uclinux.org>
+Message-ID: <5847D4F8.1080108@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2016 at 06:14:35PM -0600, Chris Bostic wrote:
-> From: Chris Bostic <cbostic@us.ibm.com>
+Hi Greg,
+
+On 07/12/16 06:08, Greg Ungerer wrote:
+> Does the ARM Versatile machine have a maintainer?
+> I have CC'ed this patch set to those names reported by get_maintainer.
+> I had no feedback on the first posting of this series back in August.
 > 
-> Allow a master to undo a previous scan.  Should a master scan a bus
-> twice it will need to ensure it doesn't double register any
-> previously detected device.
+> The following patches support configuring and building the versatile
+> machine with a no-MMU kernel.
 > 
-> Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
+> There is only a few minor changes required. It was previously possible
+> in older kernels to build for versatile with CONFIG_MMU disabled, but
+> the change to devicetree lost that capability. These changes make it
+> possible again.
+> 
+> One patch is a fix for address translation (broken in older kernels too),
+> two are build problems when CONFIG_MMU is disabled, and the last is the
+> actuall configuration changes needed.
+> 
+> The motivation for this is that the versatile machine is well supported
+> in qemu. And this provides an excellent platform for development and
+> testing no-MMU support on ARM in general. With these patches applied
+> it is possible to build and run a kernel with MMU disabled on qemu.
+
+I'm wondering if my "Allow NOMMU for MULTIPLATFORM" series [1] work for you?
+
+[1] https://www.spinics.net/lists/arm-kernel/msg546823.html
+
+Cheers
+Vladimir
+
+> 
+> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
 > ---
->  drivers/fsi/fsi-core.c   | 36 +++++++++++++++++++++++++++++++++++-
->  drivers/fsi/fsi-master.h |  2 ++
->  include/linux/fsi.h      |  1 +
->  3 files changed, 38 insertions(+), 1 deletion(-)
+>  arch/arm/Kconfig                       |   10 ++++++++++
+>  arch/arm/Kconfig.debug                 |    3 ++-
+>  arch/arm/include/asm/mach/map.h        |    1 +
+>  arch/arm/mach-versatile/Kconfig        |    3 ++-
+>  arch/arm/mach-versatile/Makefile.boot  |    3 +++
+>  arch/arm/mach-versatile/versatile_dt.c |    4 ++++
+>  6 files changed, 22 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-> index a28434b..8ccfe50 100644
-> --- a/drivers/fsi/fsi-core.c
-> +++ b/drivers/fsi/fsi-core.c
-> @@ -41,6 +41,8 @@
->  static atomic_t master_idx = ATOMIC_INIT(-1);
->  
->  struct fsi_slave {
-> +	struct list_head	list_link;	/* Master's list of slaves */
-> +	struct list_head	my_engines;
->  	struct device		dev;
->  	struct fsi_master	*master;
->  	int			link;
-> @@ -196,6 +198,8 @@ static int fsi_slave_scan(struct fsi_slave *slave)
->  	uint32_t conf;
->  	int rc, i;
->  
-> +	INIT_LIST_HEAD(&slave->my_engines);
-> +
->  	/*
->  	 * scan engines
->  	 *
-> @@ -264,7 +268,9 @@ static int fsi_slave_scan(struct fsi_slave *slave)
->  			if (rc) {
->  				dev_warn(&slave->dev, "add failed: %d\n", rc);
->  				put_device(&dev->dev);
-> +				continue;
->  			}
-> +			list_add(&dev->link, &slave->my_engines);
->  		}
->  
->  		engine_addr += slots * engine_page_size;
-> @@ -357,7 +363,7 @@ static int fsi_slave_init(struct fsi_master *master,
->  		put_device(&slave->dev);
->  		return rc;
->  	}
-> -
-> +	list_add(&slave->list_link, &master->my_slaves);
->  	fsi_slave_scan(slave);
->  	return 0;
->  }
-> @@ -388,6 +394,11 @@ static int fsi_master_scan(struct fsi_master *master)
->  	int link, slave_id, rc;
->  	uint32_t smode;
->  
-> +	if (!master->slave_list) {
-> +		INIT_LIST_HEAD(&master->my_slaves);
-> +		master->slave_list = true;
-> +	}
-> +
->  	for (link = 0; link < master->n_links; link++) {
->  		rc = fsi_master_link_enable(master, link);
->  		if (rc) {
-> @@ -423,9 +434,31 @@ static int fsi_master_scan(struct fsi_master *master)
->  	return 0;
->  }
->  
-> +static void fsi_master_unscan(struct fsi_master *master)
-> +{
-> +	struct fsi_slave *slave, *slave_tmp;
-> +	struct fsi_device *fsi_dev, *fsi_dev_tmp;
-> +
-> +	if (!master->slave_list)
-> +		return;
-> +
-> +	list_for_each_entry_safe(slave, slave_tmp, &master->my_slaves,
-> +							list_link) {
-> +		list_del(&slave->list_link);
-> +		list_for_each_entry_safe(fsi_dev, fsi_dev_tmp,
-> +					&slave->my_engines, link) {
-> +			list_del(&fsi_dev->link);
-> +			put_device(&fsi_dev->dev);
-> +		}
-> +		device_unregister(&slave->dev);
-> +	}
-> +	master->slave_list = false;
-> +}
-> +
->  int fsi_master_register(struct fsi_master *master)
->  {
->  	master->idx = atomic_inc_return(&master_idx);
-> +	master->slave_list = false;
->  	get_device(master->dev);
->  	fsi_master_scan(master);
->  	return 0;
-> @@ -434,6 +467,7 @@ int fsi_master_register(struct fsi_master *master)
->  
->  void fsi_master_unregister(struct fsi_master *master)
->  {
-> +	fsi_master_unscan(master);
->  	put_device(master->dev);
->  }
->  EXPORT_SYMBOL_GPL(fsi_master_unregister);
-> diff --git a/drivers/fsi/fsi-master.h b/drivers/fsi/fsi-master.h
-> index 56aad0e..454af2b 100644
-> --- a/drivers/fsi/fsi-master.h
-> +++ b/drivers/fsi/fsi-master.h
-> @@ -20,6 +20,8 @@
->  #include <linux/device.h>
->  
->  struct fsi_master {
-> +	struct list_head my_slaves;
-> +	bool		slave_list;
->  	struct device	*dev;
->  	int		idx;
->  	int		n_links;
-> diff --git a/include/linux/fsi.h b/include/linux/fsi.h
-> index 66bce48..924502b 100644
-> --- a/include/linux/fsi.h
-> +++ b/include/linux/fsi.h
-> @@ -18,6 +18,7 @@
->  #include <linux/device.h>
->  
->  struct fsi_device {
-> +	struct list_head	link;	/* for slave's list */
-
-Can't you use the device list on the bus instead?  Putting a device on
-multiple lists gets tricky very quickly :(
-
-thanks,
-
-greg k-h
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
