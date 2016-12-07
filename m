@@ -1,29 +1,82 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed,  7 Dec 2016 19:18:35 +0200
-Subject: [PATCH] MAINTAINERS: Add Patchwork URL to Samsung Exynos entry
-Message-ID: <1481131115-11143-1-git-send-email-krzk@kernel.org>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Wed, 7 Dec 2016 09:19:36 -0800
+Subject: [PATCH V2 2/5] ARM: BCM5301X: Specify USB controllers in DT
+In-Reply-To: <20161207075655.7396-2-zajec5@gmail.com>
+References: <20161207075655.7396-1-zajec5@gmail.com>
+ <20161207075655.7396-2-zajec5@gmail.com>
+Message-ID: <64e06cd3-4834-c924-4345-ff88bd49236d@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I use Patchwork for handling incoming patches. Put its address here so
-submitters could know what is in the queue.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 191887bdc49b..ec5137c39572 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1689,6 +1689,7 @@ M:	Krzysztof Kozlowski <krzk@kernel.org>
- R:	Javier Martinez Canillas <javier@osg.samsung.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
-+Q:	https://patchwork.kernel.org/project/linux-samsung-soc/list/
- S:	Maintained
- F:	arch/arm/boot/dts/s3c*
- F:	arch/arm/boot/dts/s5p*
--- 
-2.7.4
+On 12/6/2016 11:56 PM, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
+> 
+> There are 3 separated controllers, one per USB /standard/. With PHY
+> drivers in place they can be simply supported with generic drivers.
+> 
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> ---
+> V2: Fix node names and reorder ehci with ohci. Thanks Ray!
+> ---
+>  arch/arm/boot/dts/bcm5301x.dtsi | 33 ++++++++++++++++++++++++++++++++-
+>  1 file changed, 32 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+> index f09a2bb..a4614c9 100644
+> --- a/arch/arm/boot/dts/bcm5301x.dtsi
+> +++ b/arch/arm/boot/dts/bcm5301x.dtsi
+> @@ -248,8 +248,26 @@
+>  
+>  			#address-cells = <1>;
+>  			#size-cells = <1>;
+> +			ranges;
+>  
+> -			phys = <&usb2_phy>;
+> +			interrupt-parent = <&gic>;
+> +
+> +			ehci: ehci at 21000 {
+> +				#usb-cells = <0>;
+> +
+> +				compatible = "generic-ehci";
+> +				reg = <0x00021000 0x1000>;
+> +				interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
+> +				phys = <&usb2_phy>;
+> +			};
+> +
+> +			ohci: ohci at 22000 {
+> +				#usb-cells = <0>;
+> +
+> +				compatible = "generic-ohci";
+> +				reg = <0x00022000 0x1000>;
+> +				interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+>  		};
+>  
+>  		usb3: usb3 at 23000 {
+> @@ -257,6 +275,19 @@
+>  
+>  			#address-cells = <1>;
+>  			#size-cells = <1>;
+> +			ranges;
+> +
+> +			interrupt-parent = <&gic>;
+> +
+> +			xhci: xhci at 23000 {
+> +				#usb-cells = <0>;
+> +
+> +				compatible = "generic-xhci";
+> +				reg = <0x00023000 0x1000>;
+> +				interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
+> +				phys = <&usb3_phy>;
+> +				phy-names = "usb";
+> +			};
+>  		};
+>  
+>  		spi at 29000 {
+> 
+
+Looks good to me! Thanks!
+
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
