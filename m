@@ -1,47 +1,34 @@
-From: imirkin@alum.mit.edu (Ilia Mirkin)
-Date: Wed, 7 Dec 2016 15:08:06 -0500
-Subject: [Nouveau] 4.9-rc7 nouveau fails on arm64 64k page kernel but
- works with 4k
-In-Reply-To: <CAAVeFuKfo3sZL84wTiR6ur=PVsPhcaU62ggTwy9r1aQEOq2HZw@mail.gmail.com>
-References: <042c54f3-e52b-6658-18c7-9c19492485a4@arm.com>
- <CAKb7Uvhewyhnrnd=fw9QrdEDLecG_VMZ8Wfuh-LyCgeW6X_wCw@mail.gmail.com>
- <CAKb7UvgZLafVmC3N0R-dfm4FDtCxUO3fC-4zLwsKauAj=hx=tw@mail.gmail.com>
- <CAKb7UvgW331K53x3wub5o+6LOqeLN5PqgiiJG6WXi+WJDVDzDg@mail.gmail.com>
- <CAAVeFuJc5y8M4Koj-Ge0XpK3PXVS-fnjrpUyD13skeBM1y_K1w@mail.gmail.com>
- <d196c0c8-f429-4275-6246-a4e817b4bdf9@daenzer.net>
- <CAAVeFuKfo3sZL84wTiR6ur=PVsPhcaU62ggTwy9r1aQEOq2HZw@mail.gmail.com>
-Message-ID: <CAKb7Uvif+WseKjXKPL_-HCk5MgjKMCUjAk_XYMfoSxrOzqm3Rw@mail.gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 7 Dec 2016 22:15:55 +0200
+Subject: Synopsys Ethernet QoS Driver
+In-Reply-To: <87c8a24b-0812-7850-cb3f-7be691bab432@st.com>
+References: <CADvZ6ErjyVR5ShWTk0QesWLYR1m3p8yAMkK8v9gm2kN5xTv8zw@mail.gmail.com>
+ <1dbb6047-2bbb-4d56-2a62-ab65a0254844@synopsys.com>
+ <20161119135654.GA14079@lnxartpec.se.axis.com>
+ <CAJ3bTp7PpUJcz=1JohX=A54UP6vVAafWnB0PGUBSxb5JJiO8Lg@mail.gmail.com>
+ <1248f4ce-4859-10e6-fef9-342ea543f8d4@synopsys.com>
+ <87c8a24b-0812-7850-cb3f-7be691bab432@st.com>
+Message-ID: <CAHp75Vf2ZncJcGguueh2fCsHaZVin8qGSk+hDUt+uRg8ffgZbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 7, 2016 at 4:57 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
-> On Wed, Dec 7, 2016 at 6:53 PM, Michel D?nzer <michel@daenzer.net> wrote:
->> On 07/12/16 06:39 PM, Alexandre Courbot wrote:
->>> On Fri, Dec 2, 2016 at 12:23 PM, Ilia Mirkin <imirkin@alum.mit.edu> wrote:
->>>> That's right -- nouveau currently requires 4k page sizes to work. This is a
->>>> software limitation, not a hardware one though.
->>>
->>> Looking at the trace I wonder - is the limitation in Nouveau or in TTM?
->>
->> Nouveau. Non-4K page sizes work fine with radeon (and presumably amdgpu).
->
-> Thanks for the precision. I will check if Tegra iGPUs are also
-> affected by this - if they are then it gives me a good excuse to take
-> care of this bug.
+On Mon, Nov 21, 2016 at 2:52 PM, Giuseppe CAVALLARO
+<peppe.cavallaro@st.com> wrote:
 
-For the most part it's confusion in the (nouveau) code as to what's a
-gpu page and what's a cpu page (and the shifts involved). There are
-some fringe issues that will need to be addressed, like the fact that
-it's no longer a 1:1 mapping, which might be assumed in some places.
+First of all, +1 to (re-)use stmmac.
 
-However I thought that 64K-pages were frowned upon nowadays for the
-kernel - outside of HPC loads, most of the kernel memory becomes
-pagecache, and files don't tend to be 64K-sized, so you have tons of
-wasted memory (since you never cache multiple files in the same page).
+> The stmmac drivers run since many years on several platforms
+> (sh4, stm32, arm, x86, mips ...) and it supports an huge of amount of
+> configurations starting from 3.1x to 3.7x databooks.
 
-But don't take that as me disapproving of such a project. It'd esp be
-nice to do something like this outside of the PPC64 environment, where
-BE concerns mix in with the 64K page concerns, and nothing works as a
-result.
+As Intel employee who did some clean ups to that, acknowledge above.
 
-  -ilia
+> Concerning the stmicro/stmmac naming, these come from a really old
+> story and have no issue to adopt new folder/file names.
+
+I don't think it would be best idea for platform driver (though we can
+keep driver's name in the structure in async with file name).
+
+-- 
+With Best Regards,
+Andy Shevchenko
