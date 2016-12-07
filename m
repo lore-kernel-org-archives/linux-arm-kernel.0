@@ -1,122 +1,114 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 07 Dec 2016 21:34:18 +0200
-Subject: [PATCH v2 1/4] ARM: dts: davinci: da850: VPIF: add node and muxing
-In-Reply-To: <20161207193137.27947-2-khilman@baylibre.com>
-References: <20161207193137.27947-1-khilman@baylibre.com>
- <20161207193137.27947-2-khilman@baylibre.com>
-Message-ID: <37047453.6bLpOkkjm4@avalon>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 7 Dec 2016 20:39:09 +0100
+Subject: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in Cadence GEM.
+In-Reply-To: <1481134912-2243-1-git-send-email-andrei.pistirica@microchip.com>
+References: <1481134912-2243-1-git-send-email-andrei.pistirica@microchip.com>
+Message-ID: <20161207193908.GA13062@netboy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+On Wed, Dec 07, 2016 at 08:21:51PM +0200, Andrei Pistirica wrote:
+> +#ifdef CONFIG_MACB_USE_HWSTAMP
+> +void gem_ptp_init(struct net_device *ndev);
+> +void gem_ptp_remove(struct net_device *ndev);
+> +
+> +void gem_ptp_do_txstamp(struct macb *bp, struct sk_buff *skb);
+> +void gem_ptp_do_rxstamp(struct macb *bp, struct sk_buff *skb);
 
-Thank you for the patch.
+These are in the hot path, and so you should do the test before
+calling the global function, something like this:
 
-On Wednesday 07 Dec 2016 11:31:34 Kevin Hilman wrote:
-> Add VPIF node an pins to da850 and enable on boards.  VPIF has two input
-> channels described using the standard DT ports and enpoints.
-> 
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
-> ---
->  arch/arm/boot/dts/da850-evm.dts  |  6 ++++++
->  arch/arm/boot/dts/da850-lcdk.dts |  6 ++++++
->  arch/arm/boot/dts/da850.dtsi     | 38 +++++++++++++++++++++++++++++++++++-
->  3 files changed, 49 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/da850-evm.dts
-> b/arch/arm/boot/dts/da850-evm.dts index 41de15fe15a2..212b50d4f84b 100644
-> --- a/arch/arm/boot/dts/da850-evm.dts
-> +++ b/arch/arm/boot/dts/da850-evm.dts
-> @@ -289,3 +289,9 @@
->  		};
->  	};
->  };
-> +
-> +&vpif {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&vpif_capture_pins>;
-> +       status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/da850-lcdk.dts
-> b/arch/arm/boot/dts/da850-lcdk.dts index 7b8ab21fed6c..67f846f5bb35 100644
-> --- a/arch/arm/boot/dts/da850-lcdk.dts
-> +++ b/arch/arm/boot/dts/da850-lcdk.dts
-> @@ -219,3 +219,9 @@
->  		};
->  	};
->  };
-> +
-> +&vpif {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&vpif_capture_pins>;
-> +       status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> index f79e1b91c680..dd2a13ed106e 100644
-> --- a/arch/arm/boot/dts/da850.dtsi
-> +++ b/arch/arm/boot/dts/da850.dtsi
-> @@ -186,7 +186,18 @@
->  					0xc 0x88888888 0xffffffff
-> 
->  				>;
-> 
->  			};
-> -
-> +			vpif_capture_pins: vpif_capture_pins {
-> +				pinctrl-single,bits = <
-> +					/* VP_DIN[2..7], VP_CLKIN1, VP_CLKIN0 
-*/
-> +					0x38 0x11111111 0xffffffff
-> +					/* VP_DIN[10..15,0..1] */
-> +					0x3c 0x11111111 0xffffffff
-> +					/* VP_DIN[8..9] */
-> +					0x40 0x00000011 0x000000ff
-> +					/* VP_CLKIN3, VP_CLKIN2 */
-> +					0x4c 0x00010100 0x000f0f00
-> +				>;
-> +			};
->  		};
->  		edma0: edma at 0 {
->  			compatible = "ti,edma3-tpcc";
-> @@ -399,7 +410,32 @@
->  				<&edma0 0 1>;
->  			dma-names = "tx", "rx";
->  		};
-> +
-> +		vpif: video at 217000 {
-> +			compatible = "ti,da850-vpif";
-> +			reg = <0x217000 0x1000>;
-> +			interrupts = <92>;
-> +			status = "disabled";
-> +
-> +			/* VPIF capture: input channels */
-> +			port {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				vpif_ch0: endpoint at 0 {
-> +					  reg = <0>;
-> +					  bus-width = <8>;
-> +				};
-> +
-> +				vpif_ch1: endpoint at 1 {
-> +					  reg = <1>;
-> +					  bus-width = <8>;
-> +					  data-shift = <8>;
-> +				};
+void gem_ptp_txstamp(struct macb *bp, struct sk_buff *skb);
 
-Given that the VPIF can also accept a single 16-bit input, I'd move the 
-endpoints to board files.
+static void gem_ptp_do_txstamp(struct macb *bp, struct sk_buff *skb)
+{
+	if (!bp->hwts_tx_en)
+		return;
+	gem_ptp_txstamp(bp, skb);
+}
 
-> +			};
-> +		};
->  	};
+Ditto for Rx.
+
+> +#else
+> +static inline void gem_ptp_init(struct net_device *ndev) { }
+> +static inline void gem_ptp_remove(struct net_device *ndev) { }
 > +
->  	aemif: aemif at 68000000 {
->  		compatible = "ti,da850-aemif";
->  		#address-cells = <2>;
+> +static inline void gem_ptp_do_txstamp(struct macb *bp, struct sk_buff *skb) { }
+> +static inline void gem_ptp_do_rxstamp(struct macb *bp, struct sk_buff *skb) { }
+> +#endif
+> +
 
--- 
-Regards,
+> +static int gem_ptp_adjfine(struct ptp_clock_info *ptp, long scaled_ppm)
+> +{
+> +	struct macb *bp = container_of(ptp, struct macb, ptp_caps);
+> +	u32 word, diff;
+> +	u64 adj, rate;
+> +	int neg_adj = 0;
+> +
+> +	if (scaled_ppm < 0) {
+> +		neg_adj = 1;
+> +		scaled_ppm = -scaled_ppm;
+> +	}
+> +	rate = scaled_ppm;
+> +
+> +	/* word: unused(8bit) | ns(8bit) | fractions(16bit) */
+> +	word = (bp->ns_incr << 16) + bp->subns_incr;
+> +
+> +	adj = word;
+> +	adj *= rate;
+> +	adj >>= 16; /* remove fractions */
+> +	adj += 500000UL;
+> +	diff = div_u64(adj, 1000000UL);
 
-Laurent Pinchart
+In order to round correctly, shouldn't this be?
+
+	adj *= rate;
+	adj += 500000UL << 16;
+	adj >>= 16;
+	diff = div_u64(adj, 1000000UL);
+
+> +	word = neg_adj ? word - diff : word + diff;
+> +
+> +	spin_lock(&bp->tsu_clk_lock);
+> +
+> +	gem_writel(bp, TISUBN, GEM_BF(SUBNSINCR, (word & 0xffff)));
+> +	gem_writel(bp, TI, GEM_BF(NSINCR, (word >> 16)));
+> +
+> +	spin_unlock(&bp->tsu_clk_lock);
+> +	return 0;
+> +}
+
+> +static s32 gem_ptp_max_adj(unsigned int f_nom)
+> +{
+> +	u64 adj;
+> +
+> +	/* The 48 bits of seconds for the GEM overflows every:
+> +	 * 2^48/(365.25 * 24 * 60 *60) =~ 8 925 512 years (~= 9 mil years),
+> +	 * thus the maximum adjust frequency must not overflow CNS register:
+> +	 *
+> +	 * addend  = 10^9/nominal_freq
+> +	 * adj_max = +/- addend*ppb_max/10^9
+> +	 * max_ppb = (2^8-1)*nominal_freq-10^9
+> +	 */
+> +	adj = f_nom;
+> +	adj *= 0xffff;
+> +	adj -= 1000000000ULL;
+
+What is this computation, and how does it relate to the comment?
+
+> +	return adj;
+> +}
+
+> +/* While GEM can timestamp PTP packets, it does not mark the RX descriptor
+
+Does it timestamp PTP event packets only, or all packets?
+
+(See my comment in patch 2/2)
+
+> + * to identify them. UDP packets must be parsed to identify PTP packets.
+> + *
+> + * Note: Inspired from drivers/net/ethernet/ti/cpts.c
+> + */
+
+Thanks,
+Richard
