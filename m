@@ -1,37 +1,38 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 07 Dec 2016 17:53:57 +0100
-Subject: [PATCH] arm: dts: rockchip: add qos node for rk3288
-In-Reply-To: <1481077065-11309-1-git-send-email-zhangqing@rock-chips.com>
-References: <1481077065-11309-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <5856854.mtF1yXxMzF@phil>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Wed,  7 Dec 2016 11:54:36 -0500
+Subject: [PATCH v2 01/10] arm64: MAINTAINERS: hisi: Add hisilicon SoC PMU
+ support
+Message-ID: <1481129676-159439-1-git-send-email-anurup.m@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 7. Dezember 2016, 10:17:45 CET schrieb Elaine Zhang:
-> when pd power on/off, the qos regs need to save and restore.
-> 
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> ---
->  arch/arm/boot/dts/rk3288.dtsi | 84
-> +++++++++++++++++++++++++++++++++++++++++++ 1 file changed, 84
-> insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index 4fad13368a7b..2628edc871fa 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -699,6 +699,76 @@
->  		reg = <0xff720000 0x1000>;
->  	};
-> 
-> +	qos_gpu_r: qos at ffaa0000 {
-> +		compatible = "syscon";
-> +		reg = <0xffaa0000 0x20>;
-> +	};
+Add support for Hisilicon SoC hardware event counters
+for HIP05/06/07 chip versions.
 
-applied for 4.11, after moving the qos nodes to their correct place (please 
-sort according to register address [aka 0xffaa.... behind the hdmi])
+Signed-off-by: Anurup M <anurup.m@huawei.com>
+---
+ MAINTAINERS | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-
-Thanks
-Heiko
+diff --git a/MAINTAINERS b/MAINTAINERS
+index b224caa..ce86c07 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -5725,6 +5725,15 @@ S:	Maintained
+ F:	drivers/net/ethernet/hisilicon/
+ F:	Documentation/devicetree/bindings/net/hisilicon*.txt
+ 
++HISILICON SOC PMU
++M:	Anurup M <anurup.m@huawei.com>
++W:	http://www.hisilicon.com
++S:	Supported
++F:	drivers/perf/hisilicon/*
++F:	Documentation/perf/hisi-pmu.txt
++F:	Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
++F:	Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
++
+ HISILICON ROCE DRIVER
+ M:	Lijun Ou <oulijun@huawei.com>
+ M:	Wei Hu(Xavier) <xavier.huwei@huawei.com>
+-- 
+2.1.4
