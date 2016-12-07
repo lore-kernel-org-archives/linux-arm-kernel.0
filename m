@@ -1,45 +1,40 @@
-From: csmanjuvijay@gmail.com (csmanjuvijay at gmail.com)
-Date: Wed,  7 Dec 2016 22:34:16 +0000
-Subject: [PATCH v2 3/3] USB: OHCI: nxp: remove useless extern declaration
-In-Reply-To: <1481150056-3623-1-git-send-email-csmanjuvijay@gmail.com>
-References: <1480735523-23950-1-git-send-email-csmanjuvijay@gmail.com>
- <1481150056-3623-1-git-send-email-csmanjuvijay@gmail.com>
-Message-ID: <1481150056-3623-4-git-send-email-csmanjuvijay@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 07 Dec 2016 23:48:45 +0100
+Subject: [PATCH] clk: uniphier: Fix build with gcc-4.4.
+In-Reply-To: <20161206231642.GA4388@codeaurora.org>
+References: <1480725436-9628-1-git-send-email-vlee@freedesktop.org>
+ <CAK7LNATeswNhoFsA90k=qF4Jock0ytNT-pPT6j+0b9MJFJwu9Q@mail.gmail.com>
+ <20161206231642.GA4388@codeaurora.org>
+Message-ID: <13497466.7JOeCiPKAN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Manjunath Goudar <csmanjuvijay@gmail.com>
+On Tuesday, December 6, 2016 3:16:42 PM CET Stephen Boyd wrote:
+> On 12/03, Masahiro Yamada wrote:
+> > 2016-12-03 9:37 GMT+09:00 Vinson Lee <vlee@freedesktop.org>:
+> > > gcc-4.4 has issues with anonymous unions in initializers.
+> > >
+> > >   CC      drivers/clk/uniphier/clk-uniphier-sys.o
+> > > drivers/clk/uniphier/clk-uniphier-sys.c:45: error: unknown field ?factor? specified in initializer
+> > > 
+> I'll go drop all three patches and wreck Andrew's merge of this
+> patch to -mm.
 
-Remove usb_disabled() extern declaration as it is already declared
-as extern in include/linux/usb.h.
+While the specific bug is resolved now, I'm curious about the
+motivation for the first fix: Vinson, are you actually using
+a seven year old compiler to build modern kernels in order
+to run them on real systems, or is this for the purpose of
+build testing only?
 
-Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
-Cc: Vladimir Zapolskiy <vz@mleia.com>
-Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-usb at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
----
-changelog V1->V2:
-patch discrition is update with proper message.
+It would be good to know if there are actual requirements
+for using compilers this old (or even older, as according
+to the README file, we theoretically support building even
+with gcc-3.2 from 2002), in case we ever want to officially
+raise the minimum required versions.
 
- drivers/usb/host/ohci-nxp.c | 2 --
- 1 file changed, 2 deletions(-)
+I see that gcc-4.3 builds an ARM defconfig kernel 17% faster than
+gcc-7.0, which may be nice for build testing, but it also produces
+thousands of false-positive warnings, which makes it rather
+useless for actually finding bugs in build testing.
 
-diff --git a/drivers/usb/host/ohci-nxp.c b/drivers/usb/host/ohci-nxp.c
-index b7d4756..1843f04 100644
---- a/drivers/usb/host/ohci-nxp.c
-+++ b/drivers/usb/host/ohci-nxp.c
-@@ -56,8 +56,6 @@ static struct hc_driver __read_mostly ohci_nxp_hc_driver;
- 
- static struct i2c_client *isp1301_i2c_client;
- 
--extern int usb_disabled(void);
--
- static struct clk *usb_host_clk;
- 
- static void isp1301_configure_lpc32xx(void)
--- 
-2.7.4
+	Arnd
