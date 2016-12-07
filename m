@@ -1,108 +1,44 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 07 Dec 2016 17:17:45 +0200
-Subject: [PATCH v5 4/5] [media] dt-bindings: add TI VPIF documentation
-In-Reply-To: <20161207050826.23174-5-khilman@baylibre.com>
-References: <20161207050826.23174-1-khilman@baylibre.com>
- <20161207050826.23174-5-khilman@baylibre.com>
-Message-ID: <7493249.S63p6GTauu@avalon>
+From: pmladek@suse.com (Petr Mladek)
+Date: Wed, 7 Dec 2016 16:19:48 +0100
+Subject: [PATCH 0/7] arm: Add livepatch support
+In-Reply-To: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
+References: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
+Message-ID: <20161207151948.GE13288@linux.suse>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-
-Thank you for the patch.
-
-On Tuesday 06 Dec 2016 21:08:25 Kevin Hilman wrote:
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
-> ---
-> .../devicetree/bindings/media/ti,da850-vpif.txt    | 67 +++++++++++++++++++
-> 1 file changed, 67 insertions(+)
-> create mode 100644
-> Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+On Tue 2016-12-06 17:06:00, Abel Vesa wrote:
+> This is just an idea I've been trying out for a while now. 
 > 
-> diff --git a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
-> b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt new file mode
-> 100644
-> index 000000000000..fa06dfdb6898
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
-> @@ -0,0 +1,67 @@
-> +Texas Instruments VPIF
-> +----------------------
-> +
-> +The TI Video Port InterFace (VPIF) is the primary component for video
-> +capture and display on the DA850/AM18x family of TI DaVinci/Sitara
-> +SoCs.
-> +
-> +TI Document reference: SPRUH82C, Chapter 35
-> +http://www.ti.com/lit/pdf/spruh82
-> +
-> +Required properties:
-> +- compatible: must be "ti,da850-vpif"
-> +- reg: physical base address and length of the registers set for the
-> device;
-> +- interrupts: should contain IRQ line for the VPIF
-> +
-> +Video Capture:
-> +
-> +VPIF has a 16-bit parallel bus input, supporting 2 8-bit channels or a
-> +single 16-bit channel.  It should contain at least one port child node
-> +with child 'endpoint' node. Please refer to the bindings defined in
-> +Documentation/devicetree/bindings/media/video-interfaces.txt.
+> Just in case somebody wants to play with it, this applies to linux-arm/for-next.
+> 
+> Also please note that this was only tested in qemu, but I will do some testing 
+> on some real hardware in the following days.
+> 
+> FWICT, on this arch the compiler always generates a function prologue somewhere
+> between these lines:
+> 
+> e1a0c00d        mov     ip, sp
+> e92ddff0        push    {r4-r9, sl, fp, ip, lr, pc}
+> e24cb004        sub     fp, ip, #4
+> e24dd064        sub     sp, sp, #100    ; 0x64 <--- local variables
+> e52de004        push    {lr}            ; (str lr, [sp, #-4]!)
+> ebf9c2c9        bl      80110364 <__gnu_mcount_nc>
+> ....
+> 
+> Every function that follows this pattern (the number of registers pushed and the
+> sp subtraction for the local variables being the only acceptable exception) can
+> be patched with this mechanism. IIRC, only the inline functions and notrace 
+> functions do not follow this pattern.
 
-You might want to clarify how endpoints are use in the two cases. Apart from 
-that,
+Please, where do you check that the given function follows this
+pattern? I do not have experience with arm at all. But compiler
+is able to do crazy optimizations these days.
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+I think that this was already mentioned somewhere. But please, put
+this detailed explanation also to related patch/code so that it
+can later be found in the git commits. It will also help to
+better understand/review the particular patches.
 
-> +Example using 2 8-bit input channels, one of which is connected to an
-> +I2C-connected TVP5147 decoder:
-> +
-> +	vpif: vpif at 217000 {
-> +		compatible = "ti,da850-vpif";
-> +		reg = <0x217000 0x1000>;
-> +		interrupts = <92>;
-> +
-> +		port {
-> +			vpif_ch0: endpoint at 0 {
-> +				  reg = <0>;
-> +				  bus-width = <8>;
-> +				  remote-endpoint = <&composite>;
-> +			};
-> +
-> +			vpif_ch1: endpoint at 1 {
-> +				  reg = <1>;
-> +				  bus-width = <8>;
-> +				  data-shift = <8>;
-> +			};
-> +		};
-> +	};
-> +
-> +[ ... ]
-> +
-> +&i2c0 {
-> +
-> +	tvp5147 at 5d {
-> +		compatible = "ti,tvp5147";
-> +		reg = <0x5d>;
-> +		status = "okay";
-> +
-> +		port {
-> +			composite: endpoint {
-> +				hsync-active = <1>;
-> +				vsync-active = <1>;
-> +				pclk-sample = <0>;
-> +
-> +				/* VPIF channel 0 (lower 8-bits) */
-> +				remote-endpoint = <&vpif_ch0>;
-> +				bus-width = <8>;
-> +			};
-> +		};
-> +	};
-> +};
-
--- 
-Regards,
-
-Laurent Pinchart
+Best Regards,
+Petr
