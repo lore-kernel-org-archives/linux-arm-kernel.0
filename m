@@ -1,88 +1,59 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 6 Dec 2016 20:00:41 -0600
-Subject: [PATCH v3 3/3] ARM: da850: fix da850_set_pll0rate()
-In-Reply-To: <1480932549-30811-4-git-send-email-bgolaszewski@baylibre.com>
-References: <1480932549-30811-1-git-send-email-bgolaszewski@baylibre.com>
- <1480932549-30811-4-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <aa5c2309-c153-1e59-97f4-7e24ab2ce5c5@lechnology.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 7 Dec 2016 10:08:26 +0800
+Subject: [PATCH 3/7] arm: module: Add apply_relocate_add
+In-Reply-To: <1481043967-15602-4-git-send-email-abelvesa@linux.com>
+Message-ID: <201612071023.rq676L5J%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2016 04:09 AM, Bartosz Golaszewski wrote:
-> This function is confusing - its second argument is an index to the
-> freq table, not the requested clock rate in Hz, but it's used as the
-> set_rate callback for the pll0 clock. It leads to an oops when the
-> caller doesn't know the internals and passes the rate in Hz as
-> argument instead of the cpufreq index since this argument isn't bounds
-> checked either.
->
-> Fix it by iterating over the array of supported frequencies and
-> selecting a one that matches or returning -EINVAL for unsupported
-> rates.
->
-> Also: update the davinci cpufreq driver. It's the only user of this
-> clock and currently it passes the cpufreq table index to
-> clk_set_rate(), which is confusing. Make it pass the requested clock
-> rate in Hz.
->
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  arch/arm/mach-davinci/da850.c     | 20 ++++++++++++++++----
->  drivers/cpufreq/davinci-cpufreq.c |  2 +-
->  2 files changed, 17 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-> index 006ec56..9837541 100644
-> --- a/arch/arm/mach-davinci/da850.c
-> +++ b/arch/arm/mach-davinci/da850.c
-> @@ -1179,14 +1179,26 @@ static int da850_set_armrate(struct clk *clk, unsigned long index)
->  	return clk_set_rate(pllclk, index);
->  }
->
-> -static int da850_set_pll0rate(struct clk *clk, unsigned long index)
-> +static int da850_set_pll0rate(struct clk *clk, unsigned long rate)
->  {
-> -	unsigned int prediv, mult, postdiv;
-> -	struct da850_opp *opp;
->  	struct pll_data *pll = clk->pll_data;
-> +	struct cpufreq_frequency_table *freq;
-> +	unsigned int prediv, mult, postdiv;
-> +	struct da850_opp *opp = NULL;
->  	int ret;
->
-> -	opp = (struct da850_opp *) cpufreq_info.freq_table[index].driver_data;
-> +	for (freq = da850_freq_table;
-> +	     freq->frequency != CPUFREQ_TABLE_END; freq++) {
-> +		/* rate is in Hz, freq->frequency is in KHz */
-> +		if (freq->frequency == rate / 1000) {
-> +			opp = (struct da850_opp *)freq->driver_data;
-> +			break;
-> +		}
-> +	}
-> +
-> +	if (opp == NULL)
+Hi Abel,
 
-Would be simpler to write:
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.9-rc8 next-20161206]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-	if (!opp)
+url:    https://github.com/0day-ci/linux/commits/Abel-Vesa/arm-Add-livepatch-support/20161207-074210
+config: arm-simpad_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-> +		return -EINVAL;
-> +
->  	prediv = opp->prediv;
->  	mult = opp->mult;
->  	postdiv = opp->postdiv;
-> diff --git a/drivers/cpufreq/davinci-cpufreq.c b/drivers/cpufreq/davinci-cpufreq.c
-> index b95a872..d54a27c 100644
-> --- a/drivers/cpufreq/davinci-cpufreq.c
-> +++ b/drivers/cpufreq/davinci-cpufreq.c
-> @@ -55,7 +55,7 @@ static int davinci_target(struct cpufreq_policy *policy, unsigned int idx)
->  			return ret;
->  	}
->
-> -	ret = clk_set_rate(armclk, idx);
-> +	ret = clk_set_rate(armclk, new_freq * 1000);
->  	if (ret)
->  		return ret;
->
->
+Note: the linux-review/Abel-Vesa/arm-Add-livepatch-support/20161207-074210 HEAD 49113edc744f38a682a4afa9e904384bb00f2988 builds fine.
+      It only hurts bisectibility.
+
+All errors (new ones prefixed by >>):
+
+>> arch/arm/kernel/module.c:55:1: error: redefinition of 'apply_relocate_add'
+    apply_relocate_add(Elf32_Shdr *sechdrs, const char *strtab,
+    ^~~~~~~~~~~~~~~~~~
+   In file included from arch/arm/kernel/module.c:14:0:
+   include/linux/moduleloader.h:65:19: note: previous definition of 'apply_relocate_add' was here
+    static inline int apply_relocate_add(Elf_Shdr *sechdrs,
+                      ^~~~~~~~~~~~~~~~~~
+
+vim +/apply_relocate_add +55 arch/arm/kernel/module.c
+
+    49					GFP_KERNEL, PAGE_KERNEL_EXEC, 0, NUMA_NO_NODE,
+    50					__builtin_return_address(0));
+    51	}
+    52	#endif
+    53	
+    54	int
+  > 55	apply_relocate_add(Elf32_Shdr *sechdrs, const char *strtab,
+    56			   unsigned int symindex, unsigned int relindex,
+    57			   struct module *module)
+    58	{
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 12460 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161207/f20a428d/attachment-0001.gz>
