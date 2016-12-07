@@ -1,55 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 7 Dec 2016 11:06:16 +0000
-Subject: [PATCH] arm/arm64: KVM: Check for properly initialized timer on
- init
-In-Reply-To: <20161206195652.GF4816@cbox>
-References: <20161205093211.11870-1-christoffer.dall@linaro.org>
- <1ed187ba-965b-6087-f74f-68627f0d0504@arm.com> <20161206195652.GF4816@cbox>
-Message-ID: <f66ed076-cd38-6eb4-40d6-e1ec031fc1ef@arm.com>
+From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
+Date: Wed, 7 Dec 2016 12:07:24 +0100
+Subject: [Question] New mmap64 syscall?
+In-Reply-To: <20161207103451.GA869@yury-N73SV>
+References: <20161206185440.GA4654@yury-N73SV> <3014428.VXGdOARdm1@wuerfel>
+ <20161207103451.GA869@yury-N73SV>
+Message-ID: <0F280FED-870A-42B5-ABC4-1976ACA32462@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/16 19:56, Christoffer Dall wrote:
-> On Tue, Dec 06, 2016 at 11:25:42AM +0000, Marc Zyngier wrote:
->> On 05/12/16 09:32, Christoffer Dall wrote:
->>> When the arch timer code fails to initialize (for example because the
->>> memory mapped timer doesn't work, which is currently seen with the AEM
->>> model), then KVM just continues happily with a final result that KVM
->>> eventually does a NULL pointer dereference of the uninitialized cycle
->>> counter.
->>>
->>> Check directly for this in the init path and give the user a reasonable
->>> error in this case.
->>>
->>> Cc: Shih-Wei Li <shihwei@cs.columbia.edu>
->>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>> ---
->>>  virt/kvm/arm/arch_timer.c | 5 +++++
->>>  1 file changed, 5 insertions(+)
->>>
->>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->>> index 27a1f63..5c12f53 100644
->>> --- a/virt/kvm/arm/arch_timer.c
->>> +++ b/virt/kvm/arm/arch_timer.c
->>> @@ -425,6 +425,11 @@ int kvm_timer_hyp_init(void)
->>>  	info = arch_timer_get_kvm_info();
->>>  	timecounter = &info->timecounter;
->>>  
->>> +	if (!timecounter->cc) {
->>> +		kvm_err("arch_timer: uninitialized timecounter\n");
->>
->> For consistency, I'll change the error message to say "kvm_arch_timer",
->> just like the below case.
->>
+[Resend, as my mail-client had insisted on using the wrong MIME type?]
+
+> On 07 Dec 2016, at 11:34, Yury Norov <ynorov@caviumnetworks.com> wrote:
 > 
-> No objections, only problem is that the patch you queued uses
-> kcm_arch_timer ;)
+>> If there is a use case for larger than 16TB offsets, we should add
+>> the call on all architectures, probably using your approach 3. I don't
+>> think that we should treat it as anything special for arm64 though.
+> 
+> From this point of view, 16+TB offset is a matter of 16+TB storage,
+> and it's more than real. The other consideration to add it is that
+> we have 64-bit support for offsets in syscalls like sys_llseek().
+> So mmap64() will simply extend this support.
 
-Yeah, that's the new and upgraded version: Kernel Cryogenic Machine, it
-freezes time ;-).
+I believe the question is rather if the 16TB offset is a real use-case for ILP32.  This
+seems to bring the discussion full-circle, as this would indicate that 64bit is the 
+preferred bit-width for all sizes, offsets, etc. throughout all filesystem-related calls 
+(i.e. stat, seek, etc.).
 
-I'll fix that shortly, thanks for the heads up!
+But if that is the case, then we should have gone with 64bit arguments in a single
+register for our ILP32 definition on AArch64.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+In other words: Why not keep ILP32 simple an ask users that need a 16TB+ offset
+to use LP64? It seems much more consistent with the other choices takes so far.
+
+?Phil.
