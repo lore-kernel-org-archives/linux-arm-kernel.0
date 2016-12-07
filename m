@@ -1,57 +1,86 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 7 Dec 2016 09:23:04 +0000
-Subject: [PATCH 0/4] arm/versatile: no-MMU support
-In-Reply-To: <1481090912-29835-1-git-send-email-gerg@uclinux.org>
-References: <1481090912-29835-1-git-send-email-gerg@uclinux.org>
-Message-ID: <5847D4F8.1080108@arm.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Wed, 7 Dec 2016 18:39:06 +0900
+Subject: [Nouveau] 4.9-rc7 nouveau fails on arm64 64k page kernel but
+ works with 4k
+In-Reply-To: <CAKb7UvgW331K53x3wub5o+6LOqeLN5PqgiiJG6WXi+WJDVDzDg@mail.gmail.com>
+References: <042c54f3-e52b-6658-18c7-9c19492485a4@arm.com>
+ <CAKb7Uvhewyhnrnd=fw9QrdEDLecG_VMZ8Wfuh-LyCgeW6X_wCw@mail.gmail.com>
+ <CAKb7UvgZLafVmC3N0R-dfm4FDtCxUO3fC-4zLwsKauAj=hx=tw@mail.gmail.com>
+ <CAKb7UvgW331K53x3wub5o+6LOqeLN5PqgiiJG6WXi+WJDVDzDg@mail.gmail.com>
+Message-ID: <CAAVeFuJc5y8M4Koj-Ge0XpK3PXVS-fnjrpUyD13skeBM1y_K1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+On Fri, Dec 2, 2016 at 12:23 PM, Ilia Mirkin <imirkin@alum.mit.edu> wrote:
+> That's right -- nouveau currently requires 4k page sizes to work. This is a
+> software limitation, not a hardware one though.
 
-On 07/12/16 06:08, Greg Ungerer wrote:
-> Does the ARM Versatile machine have a maintainer?
-> I have CC'ed this patch set to those names reported by get_maintainer.
-> I had no feedback on the first posting of this series back in August.
-> 
-> The following patches support configuring and building the versatile
-> machine with a no-MMU kernel.
-> 
-> There is only a few minor changes required. It was previously possible
-> in older kernels to build for versatile with CONFIG_MMU disabled, but
-> the change to devicetree lost that capability. These changes make it
-> possible again.
-> 
-> One patch is a fix for address translation (broken in older kernels too),
-> two are build problems when CONFIG_MMU is disabled, and the last is the
-> actuall configuration changes needed.
-> 
-> The motivation for this is that the versatile machine is well supported
-> in qemu. And this provides an excellent platform for development and
-> testing no-MMU support on ARM in general. With these patches applied
-> it is possible to build and run a kernel with MMU disabled on qemu.
+Looking at the trace I wonder - is the limitation in Nouveau or in TTM?
 
-I'm wondering if my "Allow NOMMU for MULTIPLATFORM" series [1] work for you?
-
-[1] https://www.spinics.net/lists/arm-kernel/msg546823.html
-
-Cheers
-Vladimir
-
-> 
-> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
-> ---
->  arch/arm/Kconfig                       |   10 ++++++++++
->  arch/arm/Kconfig.debug                 |    3 ++-
->  arch/arm/include/asm/mach/map.h        |    1 +
->  arch/arm/mach-versatile/Kconfig        |    3 ++-
->  arch/arm/mach-versatile/Makefile.boot  |    3 +++
->  arch/arm/mach-versatile/versatile_dt.c |    4 ++++
->  6 files changed, 22 insertions(+), 2 deletions(-)
-> 
-> 
+>
+>
+> On Dec 1, 2016 5:13 PM, "Jeremy Linton" <jeremy.linton@arm.com> wrote:
+>
+> Hi,
+>
+> I placed a 9600GT in a softiron 3k running fedora 25, and the nouveau driver
+> failed to claim the device with :
+>
+> [drm] Initialized
+> nouveau 0000:01:00.0: NVIDIA G94 (094100a1)
+> nouveau 0000:01:00.0: bios: version 62.94.0d.00.04
+> nouveau: probe of 0000:01:00.0 failed with error -22
+>
+> Which with a little bit of debugging seems to be a failure in:
+>
+> [77216.692605] [<ffff000001404120>] ttm_bo_validate+0xb0/0x1e8 [ttm]
+> [77216.698697] [<ffff0000014045ac>] ttm_bo_init+0x354/0x410 [ttm]
+> [77216.704706] [<ffff0000019d7bd0>] nouveau_bo_new+0x1f4/0x314 [nouveau]
+> [77216.711308] [<ffff0000019e4620>] nv50_display_create+0x10c/0xa1c
+> [nouveau]
+> [77216.718340] [<ffff0000019df898>] nouveau_display_create+0x50c/0x59c
+> [nouveau]
+> [77216.725632] [<ffff0000019d3e24>] nouveau_drm_load+0x22c/0x8c0 [nouveau]
+> [77216.732286] [<ffff00000137a1a0>] drm_dev_register+0xc0/0xf0 [drm]
+> [77216.738409] [<ffff00000137b8a4>] drm_get_pci_dev+0xbc/0x188 [drm]
+> [77216.744663] [<ffff0000019d35e8>] nouveau_drm_probe+0x180/0x208 [nouveau]
+> [77216.751354] [<ffff0000084c30dc>] local_pci_probe+0x50/0xb4
+> [77216.756827] [<ffff0000084c3e40>] pci_device_probe+0xf8/0x148
+> [77216.762474] [<ffff0000085b6a10>] driver_probe_device+0x284/0x420
+> [77216.768467] [<ffff0000085b6ccc>] __driver_attach+0x120/0x124
+> [77216.774115] [<ffff0000085b446c>] bus_for_each_dev+0x6c/0xac
+> [77216.779673] [<ffff0000085b6204>] driver_attach+0x2c/0x34
+> [77216.784972] [<ffff0000085b5cb4>] bus_add_driver+0x244/0x2b0
+> [77216.790531] [<ffff0000085b78e4>] driver_register+0x68/0xfc
+> [77216.796004] [<ffff0000084c29a8>] __pci_register_driver+0x60/0x6c
+> [77216.802047] [<ffff00000137bcb8>] drm_pci_init+0x108/0x138 [drm]
+> [77216.808146] [<ffff000001530158>] nouveau_drm_init+0x158/0x10000 [nouveau]
+> [77216.814922] [<ffff0000080831a8>] do_one_initcall+0x44/0x128
+> [77216.820483] [<ffff0000081cad6c>] do_init_module+0x68/0x1e0
+> [77216.825957] [<ffff000008150d84>] load_module+0xfac/0x12bc
+> [77216.831343] [<ffff00000815132c>] SyS_finit_module+0xe4/0xf0
+> [77216.836902] [<ffff000008082b70>] el0_svc_naked+0x24/0x28
+>
+> By default fedora is using a 64k page kernel, switching to a mainline
+> 4.9-rc7 kernel using the same configuration the same problem exists (there
+> are a couple others, mentioned briefly in the defect). Changing the mainline
+> kernel from 64k to 4k pages corrects the problem and a terminal display can
+> be seen.
+>
+> The fedora defect is:
+> https://bugzilla.redhat.com/show_bug.cgi?id=1400623
+>
+>
+> Thanks,
 > _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>
+>
+>
+> _______________________________________________
+> Nouveau mailing list
+> Nouveau at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/nouveau
+>
