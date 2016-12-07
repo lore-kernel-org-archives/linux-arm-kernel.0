@@ -1,9 +1,9 @@
 From: zhouchengming1@huawei.com (zhouchengming)
-Date: Wed, 7 Dec 2016 09:35:17 +0800
+Date: Wed, 7 Dec 2016 09:38:07 +0800
 Subject: [PATCH 0/7] arm: Add livepatch support
 In-Reply-To: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
 References: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
-Message-ID: <58476755.2020100@huawei.com>
+Message-ID: <584767FF.6030807@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -82,7 +82,7 @@ But I doubt if we can really undo the work of the prologue correctly ? I don't k
 about arm, but gcc on arm64 may do some tricky things in prologue. So is there any
 chance we may restore a wrong context for the new function ?
 
-Thanks
+Thanks.
 
 > Everything else should be pretty straightforward, so I'll skip explaining that.
 >
