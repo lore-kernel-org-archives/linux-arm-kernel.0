@@ -1,184 +1,152 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 07 Dec 2016 14:00:41 +0530
-Subject: [PATCH] ARM: EXYNOS: remove smp hook from machine descriptor
-Message-ID: <1481099441-27657-1-git-send-email-pankaj.dubey@samsung.com>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Wed, 7 Dec 2016 00:43:01 -0800
+Subject: [RFC PATCH 0/2] arm64: memory-hotplug: Add Memory Hotplug support
+In-Reply-To: <5840E659.6000104@huawei.com>
+References: <1480637999-4320-1-git-send-email-scott.branden@broadcom.com>
+ <5840D333.9050801@huawei.com>
+ <9cfa95ca-a9e9-299d-d020-7e565562dcf5@broadcom.com>
+ <5840E659.6000104@huawei.com>
+Message-ID: <0f24c35b-10d5-d857-356d-01a21be48c2c@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use CPU_METHOD_OF_DECLARE() for smp_ops instead of using it
-via machine descriptor.
+Hi Xishi,
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- arch/arm/boot/dts/exynos3250.dtsi      | 1 +
- arch/arm/boot/dts/exynos4210.dtsi      | 1 +
- arch/arm/boot/dts/exynos4212.dtsi      | 1 +
- arch/arm/boot/dts/exynos4412.dtsi      | 1 +
- arch/arm/boot/dts/exynos5250.dtsi      | 1 +
- arch/arm/boot/dts/exynos5260.dtsi      | 1 +
- arch/arm/boot/dts/exynos5410.dtsi      | 1 +
- arch/arm/boot/dts/exynos5420-cpus.dtsi | 1 +
- arch/arm/boot/dts/exynos5422-cpus.dtsi | 1 +
- arch/arm/boot/dts/exynos5440.dtsi      | 1 +
- arch/arm/mach-exynos/common.h          | 2 --
- arch/arm/mach-exynos/exynos.c          | 1 -
- arch/arm/mach-exynos/platsmp.c         | 2 ++
- 13 files changed, 12 insertions(+), 3 deletions(-)
+I followed you suggestions and found pfn_valid is always true.  Answers 
+to your questions inline.
 
-diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index ba17ee1..f28f669 100644
---- a/arch/arm/boot/dts/exynos3250.dtsi
-+++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -53,6 +53,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "samsung,exynos-smp";
- 
- 		cpu0: cpu at 0 {
- 			device_type = "cpu";
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index 7f3a18c..6dfd98d 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -35,6 +35,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "samsung,exynos-smp";
- 
- 		cpu0: cpu at 900 {
- 			device_type = "cpu";
-diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
-index 5389011..3e8982e 100644
---- a/arch/arm/boot/dts/exynos4212.dtsi
-+++ b/arch/arm/boot/dts/exynos4212.dtsi
-@@ -25,6 +25,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "samsung,exynos-smp";
- 
- 		cpu0: cpu at A00 {
- 			device_type = "cpu";
-diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-index 40beede..faf2fb8 100644
---- a/arch/arm/boot/dts/exynos4412.dtsi
-+++ b/arch/arm/boot/dts/exynos4412.dtsi
-@@ -25,6 +25,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "samsung,exynos-smp";
- 
- 		cpu0: cpu at A00 {
- 			device_type = "cpu";
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index b6d7444..580897c 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -52,6 +52,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "samsung,exynos-smp";
- 
- 		cpu0: cpu at 0 {
- 			device_type = "cpu";
-diff --git a/arch/arm/boot/dts/exynos5260.dtsi b/arch/arm/boot/dts/exynos5260.dtsi
-index 5818718..1af6e76 100644
---- a/arch/arm/boot/dts/exynos5260.dtsi
-+++ b/arch/arm/boot/dts/exynos5260.dtsi
-@@ -32,6 +32,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "samsung,exynos-smp";
- 
- 		cpu at 0 {
- 			device_type = "cpu";
-diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-index 2b6adaf..b092cdc 100644
---- a/arch/arm/boot/dts/exynos5410.dtsi
-+++ b/arch/arm/boot/dts/exynos5410.dtsi
-@@ -33,6 +33,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "samsung,exynos-smp";
- 
- 		cpu0: cpu at 0 {
- 			device_type = "cpu";
-diff --git a/arch/arm/boot/dts/exynos5420-cpus.dtsi b/arch/arm/boot/dts/exynos5420-cpus.dtsi
-index 5c052d7..a587704 100644
---- a/arch/arm/boot/dts/exynos5420-cpus.dtsi
-+++ b/arch/arm/boot/dts/exynos5420-cpus.dtsi
-@@ -24,6 +24,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "samsung,exynos-smp";
- 
- 		cpu0: cpu at 0 {
- 			device_type = "cpu";
-diff --git a/arch/arm/boot/dts/exynos5422-cpus.dtsi b/arch/arm/boot/dts/exynos5422-cpus.dtsi
-index bf3c6f1..7fcdfd0 100644
---- a/arch/arm/boot/dts/exynos5422-cpus.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-cpus.dtsi
-@@ -23,6 +23,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "samsung,exynos-smp";
- 
- 		cpu0: cpu at 100 {
- 			device_type = "cpu";
-diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-index 2a2e570..0a958e8 100644
---- a/arch/arm/boot/dts/exynos5440.dtsi
-+++ b/arch/arm/boot/dts/exynos5440.dtsi
-@@ -50,6 +50,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "samsung,exynos-smp";
- 
- 		cpu at 0 {
- 			device_type = "cpu";
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index fb12d11..051e1ab 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -143,8 +143,6 @@ static inline void exynos_pm_init(void) {}
- extern void exynos_cpu_resume(void);
- extern void exynos_cpu_resume_ns(void);
- 
--extern const struct smp_operations exynos_smp_ops;
--
- extern void exynos_cpu_power_down(int cpu);
- extern void exynos_cpu_power_up(int cpu);
- extern int  exynos_cpu_power_state(int cpu);
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index fa08ef9..f0a766e 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -211,7 +211,6 @@ DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
- 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
- 	.l2c_aux_val	= 0x3c400001,
- 	.l2c_aux_mask	= 0xc20fffff,
--	.smp		= smp_ops(exynos_smp_ops),
- 	.map_io		= exynos_init_io,
- 	.init_early	= exynos_firmware_init,
- 	.init_irq	= exynos_init_irq,
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 94405c7..43eec10 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -474,3 +474,5 @@ const struct smp_operations exynos_smp_ops __initconst = {
- 	.cpu_die		= exynos_cpu_die,
- #endif
- };
-+
-+CPU_METHOD_OF_DECLARE(exynos_smp, "samsung,exynos-smp", &exynos_smp_ops);
--- 
-2.7.4
+I could keep debugging this but hope Marcin sends out some code - I'm 
+quite willing to test and help clean up the patchset.
+
+On 16-12-01 07:11 PM, Xishi Qiu wrote:
+> On 2016/12/2 10:38, Scott Branden wrote:
+>
+>> Hi Xishi,
+>>
+>> Thanks for the reply - please see comments below.
+>>
+>> On 16-12-01 05:49 PM, Xishi Qiu wrote:
+>>> On 2016/12/2 8:19, Scott Branden wrote:
+>>>
+>>>> This patchset is sent for comment to add memory hotplug support for ARM64
+>>>> based platforms.  It follows hotplug code added for other architectures
+>>>> in the linux kernel.
+>>>>
+>>>> I tried testing the memory hotplug feature following documentation from
+>>>> Documentation/memory-hotplug.txt.  I don't think it is working as expected
+>>>> - see below:
+>>>>
+>>>> To add memory to the system I did the following:
+>>>> echo 0x400000000 > /sys/devices/system/memory/probe
+>>>>
+>>>> The memory is displayed as system ram:
+>>>> cat /proc/iomem:
+>>>> 74000000-77ffffff : System RAM
+>>>>   74080000-748dffff : Kernel code
+>>>>   74950000-749d2fff : Kernel data
+>>>> 400000000-43fffffff : System RAM
+>>>>
+>>>> But does not seem to be added to the kernel memory.
+>>>> /proc/meminfo did not change.
+>>>>
+>>>> What else needs to be done so the memory is added to the kernel memory
+>>>> pool for normal allocation?
+>>>>
+>>>
+>>> Hi Scott,
+>>>
+>>> Do you mean it still don't support hod-add after apply this patchset?
+>>
+>> After applying the patch it appears to partially support hot-add. Please let me know if you think it is working as expected?
+>>
+>> The memory probe functions in that the memory is registered with the system and shows up in /proc/iomem.  But, the memory is not available in /proc/meminfo.  Do you think something else needs to be adjusted for ARM64 to hotadd the memory
+>>
+>> I just found another clue:
+>> under /sys/devices/system/memory I only see one memory entry (before or after I try to hotadd additional memory).
+>>
+>> /sys/devices/system/memory # ls
+>> auto_online_blocks  memory0            uevent
+>> block_size_bytes    probe
+>>
+>> In arch/arm64/include/asm/sparsemem.h if I change SECTION_SIZE_BITS from 30 to 28 and recompile I get the following:
+>> /sys/devices/system/memory # ls
+>> auto_online_blocks  memory7            uevent
+>> block_size_bytes    probe
+>>
+>>
+>> In arch/arm64/include/asm/sparsemem.h if I change SECTION_SIZE_BITS from 30 to 27 and recompile I get the following:
+>> /sys/devices/system/memory # ls
+>> auto_online_blocks  memory14            uevent
+>> block_size_bytes    probe
+>>
+>> If looks to me like something is not working properly in the ARM64 implementation.  I should expect to see multiple memoryX entries under /sys/devices/system/memory?
+>>
+>
+> Hi Scott,
+>
+> 1. Do you enable the following configs?
+> CONFIG_SPARSEMEM
+> MEMORY_HOTPLUG
+> CONFIG_MEMORY_HOTPLUG_DEFAULT_ONLINE
+Yes, these configs are enabled
+>
+> 2. I find you missed create mapping in arch_add_memory(), and x86 has it.
+Could you please explain this further?  The patch I submitted hass 
+arch_add_memory identical to the ia64 implementation.
+>
+> 3. We will add memblock first, so pfn_valid() maybe always return true(in the
+> following function), and this will lead __add_section() failed. Please check
+> it.
+You are correct - pfn_valid always returns true.  The function is in 
+arch/arm64/mm/init.c and different than the one you indicated below:
+
+#ifdef CONFIG_HAVE_ARCH_PFN_VALID
+int pfn_valid(unsigned long pfn)
+{
+	return memblock_is_map_memory(pfn << PAGE_SHIFT);
+}
+EXPORT_SYMBOL(pfn_valid);
+#endif
+
+>
+> int pfn_valid(unsigned long pfn)
+> {
+> 	return (pfn & PFN_MASK) == pfn && memblock_is_memory(pfn << PAGE_SHIFT);
+> }
+>
+> add_memory
+>   add_memory_resource
+>     memblock_add_node
+>       arch_add_memory
+>         __add_pages
+>           __add_section
+>             pfn_valid
+>
+> Thanks,
+> Xishi Qiu
+>
+>>
+>>
+>>>
+>>> Thanks,
+>>> Xishi Qiu
+>>>
+>>>> Scott Branden (2):
+>>>>   arm64: memory-hotplug: Add MEMORY_HOTPLUG, MEMORY_HOTREMOVE,
+>>>>     MEMORY_PROBE
+>>>>   arm64: defconfig: enable MEMORY_HOTPLUG config options
+>>>>
+>>>>  arch/arm64/Kconfig           | 10 ++++++++++
+>>>>  arch/arm64/configs/defconfig |  3 +++
+>>>>  arch/arm64/mm/init.c         | 42 ++++++++++++++++++++++++++++++++++++++++++
+>>>>  3 files changed, 55 insertions(+)
+>>>>
+>>>
+>>>
+>>>
+>>
+>> .
+>>
+>
+>
+>
