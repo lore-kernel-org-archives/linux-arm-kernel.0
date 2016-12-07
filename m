@@ -1,92 +1,139 @@
-From: christopher.lee.bostic@gmail.com (Chris Bostic)
-Date: Tue,  6 Dec 2016 20:09:34 -0600
-Subject: [PATCH 12/16] drivers/fsi: Set up links for slave communication
-In-Reply-To: <1481076574-54711-1-git-send-email-christopher.lee.bostic@gmail.com>
-References: <1481076574-54711-1-git-send-email-christopher.lee.bostic@gmail.com>
-Message-ID: <1481076574-54711-5-git-send-email-christopher.lee.bostic@gmail.com>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Wed,  7 Dec 2016 10:17:45 +0800
+Subject: [PATCH] arm: dts: rockchip: add qos node for rk3288
+Message-ID: <1481077065-11309-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Bostic <cbostic@us.ibm.com>
+when pd power on/off, the qos regs need to save and restore.
 
-Enable each link and send a break command in preparation
-for scanning each link for slaves.
-
-Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 ---
- drivers/fsi/fsi-core.c   | 39 ++++++++++++++++++++++++++++++++++++---
- drivers/fsi/fsi-master.h |  2 ++
- 2 files changed, 38 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/rk3288.dtsi | 84 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 84 insertions(+)
 
-diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 80feeb8..93de0f1 100644
---- a/drivers/fsi/fsi-core.c
-+++ b/drivers/fsi/fsi-core.c
-@@ -290,16 +290,49 @@ static int fsi_slave_init(struct fsi_master *master,
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 4fad13368a7b..2628edc871fa 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -699,6 +699,76 @@
+ 		reg = <0xff720000 0x1000>;
+ 	};
  
- /* FSI master support */
- 
-+static int fsi_master_link_enable(struct fsi_master *master, int link)
-+{
-+	if (master->link_enable)
-+		return master->link_enable(master, link);
++	qos_gpu_r: qos at ffaa0000 {
++		compatible = "syscon";
++		reg = <0xffaa0000 0x20>;
++	};
 +
-+	return 0;
-+}
++	qos_gpu_w: qos at ffaa0080 {
++		compatible = "syscon";
++		reg = <0xffaa0080 0x20>;
++	};
 +
-+/*
-+ * Issue a break command on this link
-+ */
-+static int fsi_master_break(struct fsi_master *master, int link)
-+{
-+	if (master->send_break)
-+		return master->send_break(master, link);
++	qos_vio1_vop: qos at ffad0000 {
++		compatible = "syscon";
++		reg = <0xffad0000 0x20>;
++	};
 +
-+	return 0;
-+}
++	qos_vio1_isp_w0: qos at ffad0100 {
++		compatible = "syscon";
++		reg = <0xffad0100 0x20>;
++	};
 +
- static int fsi_master_scan(struct fsi_master *master)
- {
--	int link, slave_id;
-+	int link, slave_id, rc;
++	qos_vio1_isp_w1: qos at ffad0180 {
++		compatible = "syscon";
++		reg = <0xffad0180 0x20>;
++	};
 +
-+	for (link = 0; link < master->n_links; link++) {
-+		rc = fsi_master_link_enable(master, link);
-+		if (rc) {
-+			dev_dbg(master->dev,
-+				"enable link:%d failed with:%d\n", link, rc);
-+			continue;
-+		}
-+		rc = fsi_master_break(master, link);
-+		if (rc) {
-+			dev_dbg(master->dev,
-+				"Break to link:%d failed with:%d\n", link, rc);
-+			continue;
-+		}
++	qos_vio0_vop: qos at ffad0400 {
++		compatible = "syscon";
++		reg = <0xffad0400 0x20>;
++	};
++
++	qos_vio0_vip: qos at ffad0480 {
++		compatible = "syscon";
++		reg = <0xffad0480 0x20>;
++	};
++
++	qos_vio0_iep: qos at ffad0500 {
++		compatible = "syscon";
++		reg = <0xffad0500 0x20>;
++	};
++
++	qos_vio2_rga_r: qos at ffad0800 {
++		compatible = "syscon";
++		reg = <0xffad0800 0x20>;
++	};
++
++	qos_vio2_rga_w: qos at ffad0880 {
++		compatible = "syscon";
++		reg = <0xffad0880 0x20>;
++	};
++
++	qos_vio1_isp_r: qos at ffad0900 {
++		compatible = "syscon";
++		reg = <0xffad0900 0x20>;
++	};
++
++	qos_video: qos at ffae0000 {
++		compatible = "syscon";
++		reg = <0xffae0000 0x20>;
++	};
++
++	qos_hevc_r: qos at ffaf0000 {
++		compatible = "syscon";
++		reg = <0xffaf0000 0x20>;
++	};
++
++	qos_hevc_w: qos at ffaf0080 {
++		compatible = "syscon";
++		reg = <0xffaf0080 0x20>;
++	};
++
+ 	pmu: power-management at ff730000 {
+ 		compatible = "rockchip,rk3288-pmu", "syscon", "simple-mfd";
+ 		reg = <0xff730000 0x100>;
+@@ -762,6 +832,15 @@
+ 					 <&cru SCLK_ISP_JPE>,
+ 					 <&cru SCLK_ISP>,
+ 					 <&cru SCLK_RGA>;
++				pm_qos = <&qos_vio0_iep>,
++					 <&qos_vio1_vop>,
++					 <&qos_vio1_isp_w0>,
++					 <&qos_vio1_isp_w1>,
++					 <&qos_vio0_vop>,
++					 <&qos_vio0_vip>,
++					 <&qos_vio2_rga_r>,
++					 <&qos_vio2_rga_w>,
++					 <&qos_vio1_isp_r>;
+ 			};
  
--	for (link = 0; link < master->n_links; link++)
- 		for (slave_id = 0; slave_id < FSI_N_SLAVES; slave_id++)
- 			fsi_slave_init(master, link, slave_id);
+ 			/*
+@@ -773,6 +852,8 @@
+ 				clocks = <&cru ACLK_HEVC>,
+ 					 <&cru SCLK_HEVC_CABAC>,
+ 					 <&cru SCLK_HEVC_CORE>;
++				pm_qos = <&qos_hevc_r>,
++					 <&qos_hevc_w>;
+ 			};
  
--	return 0;
-+	}
+ 			/*
+@@ -784,6 +865,7 @@
+ 				reg = <RK3288_PD_VIDEO>;
+ 				clocks = <&cru ACLK_VCODEC>,
+ 					 <&cru HCLK_VCODEC>;
++				pm_qos = <&qos_video>;
+ 			};
  
-+	return 0;
- }
+ 			/*
+@@ -793,6 +875,8 @@
+ 			pd_gpu at RK3288_PD_GPU {
+ 				reg = <RK3288_PD_GPU>;
+ 				clocks = <&cru ACLK_GPU>;
++				pm_qos = <&qos_gpu_r>,
++					 <&qos_gpu_w>;
+ 			};
+ 		};
  
- int fsi_master_register(struct fsi_master *master)
-diff --git a/drivers/fsi/fsi-master.h b/drivers/fsi/fsi-master.h
-index cafb433..56aad0e 100644
---- a/drivers/fsi/fsi-master.h
-+++ b/drivers/fsi/fsi-master.h
-@@ -29,6 +29,8 @@ struct fsi_master {
- 	int		(*write)(struct fsi_master *, int link,
- 				uint8_t slave, uint32_t addr,
- 				const void *val, size_t size);
-+	int		(*send_break)(struct fsi_master *, int link);
-+	int		(*link_enable)(struct fsi_master *, int link);
- };
- 
- extern int fsi_master_register(struct fsi_master *master);
 -- 
-1.8.2.2
+1.9.1
