@@ -1,127 +1,89 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 07 Dec 2016 16:25:25 +0200
-Subject: [PATCH v5 3/4] ARM: dts: da850-lcdk: add the vga-bridge node
-In-Reply-To: <1481107365-24839-4-git-send-email-bgolaszewski@baylibre.com>
-References: <1481107365-24839-1-git-send-email-bgolaszewski@baylibre.com>
- <1481107365-24839-4-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1620991.lLXgDihv8c@avalon>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 7 Dec 2016 14:27:08 +0000
+Subject: [PATCH 0/4] arm/versatile: no-MMU support
+In-Reply-To: <22e20a24-5f1e-a23d-0d18-31dc14179cf5@westnet.com.au>
+References: <1481090912-29835-1-git-send-email-gerg@uclinux.org>
+ <5847D4F8.1080108@arm.com> <a2ab1e0c-d24b-ac8d-fb9a-4ae7271455b9@uclinux.org>
+ <22e20a24-5f1e-a23d-0d18-31dc14179cf5@westnet.com.au>
+Message-ID: <58481C3C.9090006@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartosz,
+Hi Greg,
 
-Thank you for the patch.
-
-On Wednesday 07 Dec 2016 11:42:44 Bartosz Golaszewski wrote:
-> Add the vga-bridge node to the board DT together with corresponding
-> ports and vga connector. This allows to retrieve the edid info from
-> the display automatically.
+On 07/12/16 14:21, Greg Ungerer wrote:
+> Hi Vladimir,
 > 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  arch/arm/boot/dts/da850-lcdk.dts | 67 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 67 insertions(+)
+> On 07/12/16 23:57, Greg Ungerer wrote:
+>> On 07/12/16 19:23, Vladimir Murzin wrote:
+>>> On 07/12/16 06:08, Greg Ungerer wrote:
+>>>> Does the ARM Versatile machine have a maintainer?
+>>>> I have CC'ed this patch set to those names reported by get_maintainer.
+>>>> I had no feedback on the first posting of this series back in August.
+>>>>
+>>>> The following patches support configuring and building the versatile
+>>>> machine with a no-MMU kernel.
+>>>>
+>>>> There is only a few minor changes required. It was previously possible
+>>>> in older kernels to build for versatile with CONFIG_MMU disabled, but
+>>>> the change to devicetree lost that capability. These changes make it
+>>>> possible again.
+>>>>
+>>>> One patch is a fix for address translation (broken in older kernels
+>>>> too),
+>>>> two are build problems when CONFIG_MMU is disabled, and the last is the
+>>>> actuall configuration changes needed.
+>>>>
+>>>> The motivation for this is that the versatile machine is well supported
+>>>> in qemu. And this provides an excellent platform for development and
+>>>> testing no-MMU support on ARM in general. With these patches applied
+>>>> it is possible to build and run a kernel with MMU disabled on qemu.
+>>>
+>>> I'm wondering if my "Allow NOMMU for MULTIPLATFORM" series [1] work
+>>> for you?
+>>>
+>>> [1] https://www.spinics.net/lists/arm-kernel/msg546823.html
+>>
+>> Sorry I hadn't seen these patches before.
+>>
+>> Just tried them out. With CONFIG_EXPERT set I can select and
+>> build for the Versatile machine with CONFIG_MMU not set. The
+>> build is successful, but the resulting kernel doesn't boot.
+>>
+>> I see that the resulting .config has CONFIG_PLAT_VERSATILE set
+>> but not CONFIG_ARCH_VERSATILE. Is this intentional?
 > 
-> diff --git a/arch/arm/boot/dts/da850-lcdk.dts
-> b/arch/arm/boot/dts/da850-lcdk.dts index afcb482..39602eb 100644
-> --- a/arch/arm/boot/dts/da850-lcdk.dts
-> +++ b/arch/arm/boot/dts/da850-lcdk.dts
-> @@ -51,6 +51,51 @@
->  			system-clock-frequency = <24576000>;
->  		};
->  	};
-> +
-> +	vga-bridge {
-> +		compatible = "ti,ths8135";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			port at 0 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				reg = <0>;
-> +
-> +				vga_bridge_in: endpoint at 0 {
-> +					reg = <0>;
-> +					remote-endpoint = <&lcdc_out_vga>;
-> +				};
-> +			};
-> +
-> +			port at 1 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				reg = <1>;
-> +
-> +				vga_bridge_out: endpoint at 0 {
-> +					reg = <0>;
-> +					remote-endpoint = <&vga_con_in>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +
-> +	vga {
-> +		compatible = "vga-connector";
-> +
-> +		ddc-i2c-bus = <&i2c0>;
-> +
-> +		port {
-> +			vga_con_in: endpoint {
-> +				remote-endpoint = <&vga_bridge_out>;
-> +			};
-> +		};
-> +	};
->  };
+> Let me revise that. By setting the "Multiple platform selection"
+> selection correctly to v5 platforms I did get CONFIG_ARCH_VERSATILE
+> set, and could still successfully build the kernel.
 > 
->  &pmx_core {
-> @@ -236,3 +281,25 @@
->  &memctrl {
->  	status = "okay";
->  };
-> +
-> +&lcdc {
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&lcd_pins>;
-> +
-> +	ports {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		lcdc_out: port at 1 {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <1>;
-> +
-> +			lcdc_out_vga: endpoint at 0 {
-> +				reg = <0>;
-> +				remote-endpoint = <&vga_bridge_in>;
-> +			};
-> +		};
+> A couple of other config options I had to readjust and I can
+> boot up this kernel under qemu. So success!
+> 
 
-Just to make sure you're aware, when there's a single endpoint you can 
-simplify the DT by omitting the endpoint number. This would become
+Congrats!!!
 
-		lcdc_out: port at 1 {
-			reg = <1>;
+Thanks for trying these patches! It is really nice to see someone else shows
+interest on NOMMU! If you don't mind I'll keep you in Cc when/if I re-spin my
+patches ;)
 
-			lcdc_out_vga: endpoint {
-				remote-endpoint = <&vga_bridge_in>;
-			};
-		};
+Cheers
+Vladimir
 
-It's entirely up to you, both get my
-
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> +	};
-> +};
-
--- 
-Regards,
-
-Laurent Pinchart
+> 
+>> With CONFIG_ARCH_VERSATILE missing the build doesn't traverse
+>> into arch/arm/mach-versatile, and you don't get any device tree
+>> built.
+>>
+>> Ultimately to produce a working kernel we will still need my
+>> patch 01/04 ("ARM: versatile: support no-MMU mode addressing").
+>> No surprise here, this was missing in older kernels too.
+> 
+> So in the end this is the only extra change I needed as well
+> to get the running kernel.
+> 
+> Regards
+> Greg
+> 
+> 
+> 
