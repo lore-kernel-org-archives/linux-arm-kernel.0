@@ -1,44 +1,27 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 07 Dec 2016 09:22:48 -0800
-Subject: [PATCH v5 3/5] [media] davinci: vpif_capture: fix start/stop
- streaming locking
-In-Reply-To: <5753609.tAY8Gxp3ld@avalon> (Laurent Pinchart's message of "Wed,
- 07 Dec 2016 16:47:34 +0200")
-References: <20161207050826.23174-1-khilman@baylibre.com>
- <20161207050826.23174-4-khilman@baylibre.com>
- <5753609.tAY8Gxp3ld@avalon>
-Message-ID: <m2eg1jejrr.fsf@baylibre.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 7 Dec 2016 11:25:31 -0600
+Subject: [Linaro-acpi] [PATCH v17 08/15]
+ clocksource/drivers/arm_arch_timer:
+ move arch_timer_needs_of_probing into DT init call
+In-Reply-To: <CADyBb7uAObQn_JVp_qw9+7POiqUctdzy3cYLsb0rk-JMX5W1uw@mail.gmail.com>
+References: <20161125084623.22515-9-fu.wei@linaro.org>
+ <201611252221.UyJ9iWPV%fengguang.wu@intel.com>
+ <CADyBb7uAObQn_JVp_qw9+7POiqUctdzy3cYLsb0rk-JMX5W1uw@mail.gmail.com>
+Message-ID: <CAOZdJXU7Lg66RKvA=sYtUXUdwLLbh9FtcW0_U-fmjaztnqS3Ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Laurent Pinchart <laurent.pinchart@ideasonboard.com> writes:
+On Fri, Nov 25, 2016 at 9:06 AM, Fu Wei <fu.wei@linaro.org> wrote:
+>
+> a "+ int ret;" should be move from [12/15] to here, I have fix the
+> problem in my repo, it would happen in next patchset
+>
+> https://git.linaro.org/people/fu.wei/linux.git/log/?h=topic-gtdt-wakeup-timer_upstream_v18_devel
 
-> Hi Kevin,
->
-> Thank you for the patch.
->
-> On Tuesday 06 Dec 2016 21:08:24 Kevin Hilman wrote:
->> Video capture subdevs may be over I2C and may sleep during xfer, so we
->> cannot do IRQ-disabled locking when calling the subdev.
->> 
->> The IRQ-disabled locking is meant to protect the DMA queue list
->> throughout the rest of the driver, so update the locking in
->> [start|stop]_streaming to protect just this list.
->> 
->> Suggested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
->
-> I would also add a comment to document the irqlock field as protecting the 
-> dma_queue list only. Something like
->
-> -	/* Used in video-buf */
-> +	/* Protects the dma_queue field */
-> 	spinlock_t irqlock;
->
-> With that,
->
-> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Fu, please post v18 to the mailing list so that it can be picked up
+for 4.10 (if it's not too late already).
 
-OK, will update the comment.  Thanks for the review,
-
-Kevin
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
