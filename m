@@ -1,34 +1,172 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 7 Dec 2016 11:08:23 +0000
-Subject: [PATCH v11 7/7] arm: pmu: Add PMU definitions for cores not
- initially online
-In-Reply-To: <457894f4-67f8-9d32-ee8b-5a34e9a21488@arm.com>
-References: <1480704961-6910-1-git-send-email-jeremy.linton@arm.com>
- <1480704961-6910-8-git-send-email-jeremy.linton@arm.com>
- <20161206152118.GK2498@arm.com>
- <457894f4-67f8-9d32-ee8b-5a34e9a21488@arm.com>
-Message-ID: <20161207110823.GA7054@leverpostej>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 07 Dec 2016 20:17:48 +0900
+Subject: [PATCH 4/5] arm64: dts: exynos5433: Add bus dt node using VDD_INT
+ for Exynos5433
+In-Reply-To: <20161206192104.GB12683@kozik-lap>
+References: <1480663087-4590-1-git-send-email-cw00.choi@samsung.com>
+ <1480663087-4590-5-git-send-email-cw00.choi@samsung.com>
+ <CGME20161206192211epcas1p3d93e8b202e8b579f9632f49fc23ce0dc@epcas1p3.samsung.com>
+ <20161206192104.GB12683@kozik-lap>
+Message-ID: <5847EFDC.8050702@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2016 at 11:56:56AM -0600, Jeremy Linton wrote:
-> Hi,
-
-> Which might not be the right choice because
-> even without these ACPI specific bits, simply running a few cpus
-> online/offline while simultaneously doing something like `perf stat
-> -e cache-misses ls &` in a loop causes deadlocks/crashes.
+On 2016? 12? 07? 04:21, Krzysztof Kozlowski wrote:
+> On Fri, Dec 02, 2016 at 04:18:06PM +0900, Chanwoo Choi wrote:
+>> This patch adds the bus nodes using VDD_INT for Exynos5433 SoC.
+>> Exynos5433 has the following AMBA AXI buses to translate data
+>> between DRAM and sub-blocks.
+>>
+>> Following list specify the detailed correlation between sub-block and clock:
+>> - CLK_ACLK_G2D_{400|266}  : Bus clock for G2D
+>> - CLK_ACLK_MSCL_400       : Bus clock for MSCL (Mobile Scaler)
+>> - CLK_ACLK_GSCL_333       : Bus clock for GSCL (General Scaler)
+>> - CLK_SCLK_JPEG_MSCL      : Bus clock for JPEG
+>> - CLK_ACLK_MFC_400        : Bus clock for MFC (Multi Format Codec)
+>> - CLK_ACLK_HEVC_400       : Bus clock for HEVC (High Effective Video Codec)
+>> - CLK_ACLK_BUS0_400       : NoC(Network On Chip)'s bus clock for PERIC/PERIS/FSYS/MSCL
+>> - CLK_ACLK_BUS1_400       : NoC's bus clock for MFC/HEVC/G3D
+>> - CLK_ACLK_BUS2_400       : NoC's bus clock for GSCL/DISP/G2D/CAM0/CAM1/ISP
+>>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> ---
+>>  arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi | 208 +++++++++++++++++++++++++
+>>  arch/arm64/boot/dts/exynos/exynos5433.dtsi     |   1 +
+>>  2 files changed, 209 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi
+>>
+>> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi
+>> new file mode 100644
+>> index 000000000000..b1e1d9c622e1
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi
+>> @@ -0,0 +1,208 @@
+>> +/*
+>> + * Samsung's Exynos5433 SoC Memory interface and AMBA bus device tree source
+>> + *
+>> + * Copyright (c) 2016 Samsung Electronics Co., Ltd.
+>> + * Chanwoo Choi <cw00.choi@samsung.com>
+>> + *
+>> + * Samsung's Exynos5433 SoC Memory interface and AMBA buses are listed
+>> + * as device tree nodes are listed in this file.
 > 
-> That problem doesn't appear to be specific to the ACPI/PMU so I've
-> stayed away from it in this patch set, although potentially a larger
-> fix might cover this as well.
+> This duplicates the introduction line and does not make sense.
 
-Urrgh; I can reproduce lockups on Seattle with v4.9-rc8.
+I'll remove it.
 
-I'll look into that.
+> 
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +/ {
+> 
+> Shouldn't these be under soc node? It looks like property of SoC itself.
 
-If you see any more issues in this area, please report them in a new
-thread.
+OK. Move to them under SoC.
+- "/ {" -> "&soc {"
 
-Thanks,
-Mark.
+> 
+>> +	/* INT (Internal) block using VDD_INT */
+>> +	bus_g2d_400: bus_g2d_400 {
+> 
+> In node name, the dash '-' is preferred. The name should describe
+> general class of device so probably this should be just "bus"... but I
+> don't see a way how to do it reasonable anyway.
+
+I'll change them as following with 'busX'.
+
+The each dt node has the unique number('X')
+because each dt node does not have the base address
+and then need to identify oneself.
+
+	bus_g2d_400: bus0 {
+	bus_g2d_266: bus1 {
+	bus_gscl: bus2 {
+	bus_hevc: bus3 {
+	bus_jpeg: bus4 {
+	bus_mfc: bus5 {
+	bus_mscl: bus6 {
+	bus_noc0: bus7 {
+	bus_noc1: bus8 {
+	bus_noc2: bus9 {
+
+> 
+>> +		compatible = "samsung,exynos-bus";
+>> +		clocks = <&cmu_top CLK_ACLK_G2D_400>;
+>> +		clock-names = "bus";
+>> +		operating-points-v2 = <&bus_g2d_400_opp_table>;
+>> +		status ="disable";
+> 
+> Hm?
+
+I'll fix it. disable -> disabled
+
+> 
+> 
+>> +	};
+>> +
+>> +	bus_mscl: bus_mscl {
+>> +		compatible = "samsung,exynos-bus";
+>> +		clocks = <&cmu_top CLK_ACLK_MSCL_400>;
+>> +		clock-names = "bus";
+>> +		operating-points-v2 = <&bus_g2d_400_opp_table>;
+>> +		status ="disable";
+>> +	};
+>> +
+>> +	bus_jpeg: bus_jpeg {
+>> +		compatible = "samsung,exynos-bus";
+>> +		clocks = <&cmu_top CLK_SCLK_JPEG_MSCL>;
+>> +		clock-names = "bus";
+>> +		operating-points-v2 = <&bus_g2d_400_opp_table>;
+>> +		status ="disable";
+>> +	};
+>> +
+>> +	bus_mfc: bus_mfc {
+>> +		compatible = "samsung,exynos-bus";
+>> +		clocks = <&cmu_top CLK_ACLK_MFC_400>;
+>> +
+>> +		clock-names = "bus";
+>> +		operating-points-v2 = <&bus_g2d_400_opp_table>;
+>> +		status ="disable";
+>> +	};
+>> +
+>> +	bus_g2d_266: bus_g2d_266 {
+>> +		compatible = "samsung,exynos-bus";
+>> +		clocks = <&cmu_top CLK_ACLK_G2D_266>;
+>> +		clock-names = "bus";
+>> +		operating-points-v2 = <&bus_g2d_266_opp_table>;
+>> +		status ="disable";
+>> +	};
+>> +
+>> +	bus_gscl: bus_gscl {
+>> +		compatible = "samsung,exynos-bus";
+>> +		clocks = <&cmu_top CLK_ACLK_GSCL_333>;
+>> +		clock-names = "bus";
+>> +		operating-points-v2 = <&bus_gscl_opp_table>;
+>> +		status ="disable";
+>> +	};
+>> +
+>> +	bus_hevc: bus_hevc {
+>> +		compatible = "samsung,exynos-bus";
+>> +		clocks = <&cmu_top CLK_ACLK_HEVC_400>;
+>> +		clock-names = "bus";
+>> +		operating-points-v2 = <&bus_hevc_opp_table>;
+>> +		status ="disable";
+>> +	};
+>> +
+>> +	bus_bus0: bus_bus0 {
+> 
+> bus, bus, bus, bus, jackpot! Let's try to find better name and label for
+> these. :)
+
+I'll change the name with 'noc' prefix because this bus is used
+for NoC (Network On Chip)'s bus clock as commit msg.
+- old : bus_bus0
+- new : bus_noc0
+
+
+Best Regards,
+Chanwoo Choi
