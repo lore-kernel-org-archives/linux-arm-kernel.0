@@ -1,38 +1,68 @@
 From: anurupvasu@gmail.com (Anurup M)
-Date: Wed,  7 Dec 2016 11:54:36 -0500
-Subject: [PATCH v2 01/10] arm64: MAINTAINERS: hisi: Add hisilicon SoC PMU
- support
-Message-ID: <1481129676-159439-1-git-send-email-anurup.m@huawei.com>
+Date: Wed,  7 Dec 2016 11:55:19 -0500
+Subject: [PATCH v2 02/10] dt-bindings: hisi: Add Hisilicon HiP05/06/07 Djtag
+ dts bindings
+Message-ID: <1481129719-159487-1-git-send-email-anurup.m@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Hisilicon SoC hardware event counters
-for HIP05/06/07 chip versions.
+From: Tan Xiaojun <tanxiaojun@huawei.com>
 
+Add Hisilicon HiP05/06/07 Djtag dts bindings for CPU and IO Die
+
+Signed-off-by: Tan Xiaojun <tanxiaojun@huawei.com>
 Signed-off-by: Anurup M <anurup.m@huawei.com>
 ---
- MAINTAINERS | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ .../devicetree/bindings/arm/hisilicon/djtag.txt    | 41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index b224caa..ce86c07 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -5725,6 +5725,15 @@ S:	Maintained
- F:	drivers/net/ethernet/hisilicon/
- F:	Documentation/devicetree/bindings/net/hisilicon*.txt
- 
-+HISILICON SOC PMU
-+M:	Anurup M <anurup.m@huawei.com>
-+W:	http://www.hisilicon.com
-+S:	Supported
-+F:	drivers/perf/hisilicon/*
-+F:	Documentation/perf/hisi-pmu.txt
-+F:	Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
-+F:	Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
+diff --git a/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt b/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
+new file mode 100644
+index 0000000..733498e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
+@@ -0,0 +1,41 @@
++The Hisilicon Djtag is an independent component which connects with some other
++components in the SoC by Debug Bus. The djtag is available in CPU and IO dies
++in the chip. The djtag controls access to connecting modules of CPU and IO
++dies.
++The various connecting components in CPU die (like L3 cache, L3 cache PMU etc.)
++are accessed by djtag during real time debugging. In IO die there are connecting
++components like RSA. These components appear as devices atatched to djtag bus.
 +
- HISILICON ROCE DRIVER
- M:	Lijun Ou <oulijun@huawei.com>
- M:	Wei Hu(Xavier) <xavier.huwei@huawei.com>
++Hisilicon HiP05/06 djtag for CPU and HiP05 IO die
++Required properties:
++  - compatible : "hisilicon,hisi-djtag-v1"
++  - reg : Register address and size
++  - scl-id : The Super Cluster ID for CPU or IO die
++
++Hisilicon HiP06 djtag for IO die and HiP07 djtag for CPU and IO die
++Required properties:
++  - compatible : "hisilicon,hisi-djtag-v2"
++  - reg : Register address and size
++  - scl-id : The Super Cluster ID for CPU or IO die
++
++Example 1: Djtag for CPU die
++
++	/* for Hisilicon HiP05 djtag for CPU Die */
++	djtag0: djtag at 80010000 {
++		compatible = "hisilicon,hisi-djtag-v1";
++		reg = <0x0 0x80010000 0x0 0x10000>;
++		scl-id = <0x02>;
++
++		/* All connecting components will appear as child nodes */
++	};
++
++Example 2: Djtag for IO die
++
++	/* for Hisilicon HiP05 djtag for IO Die */
++	djtag1: djtag at d0000000 {
++		compatible = "hisilicon,hisi-djtag-v1";
++		reg = <0x0 0xd0000000 0x0 0x10000>;
++		scl-id = <0x01>;
++
++		/* All connecting components will appear as child nodes */
++	};
 -- 
 2.1.4
