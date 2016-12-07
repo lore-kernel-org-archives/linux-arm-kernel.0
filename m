@@ -1,63 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 7 Dec 2016 14:21:54 -0800
-Subject: [RFC PATCH 00/23] arm: defconfigs: use kconfig fragments
-In-Reply-To: <9c0ed8c5-406a-9304-48b5-6f11f3940271@redhat.com>
-References: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
- <8292218.3BDisRkZdU@wuerfel>
- <CAOesGMi_mLG+tS0Ya8G9KLO_sUYGtLmgcvFfpn0Nwbd-KMKOrQ@mail.gmail.com>
- <2155947.mOKhpZPiAn@wuerfel> <9c0ed8c5-406a-9304-48b5-6f11f3940271@redhat.com>
-Message-ID: <CAOesGMiAKi+uqxUmcTXKvAZ_Eiup4aVvcmQ1jqMMazmDG+m-7Q@mail.gmail.com>
+From: csmanjuvijay@gmail.com (csmanjuvijay at gmail.com)
+Date: Wed,  7 Dec 2016 22:34:16 +0000
+Subject: [PATCH v2 3/3] USB: OHCI: nxp: remove useless extern declaration
+In-Reply-To: <1481150056-3623-1-git-send-email-csmanjuvijay@gmail.com>
+References: <1480735523-23950-1-git-send-email-csmanjuvijay@gmail.com>
+ <1481150056-3623-1-git-send-email-csmanjuvijay@gmail.com>
+Message-ID: <1481150056-3623-4-git-send-email-csmanjuvijay@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 7, 2016 at 1:56 PM, Laura Abbott <labbott@redhat.com> wrote:
-> On 12/07/2016 01:35 PM, Arnd Bergmann wrote:
->> On Wednesday, December 7, 2016 1:14:02 PM CET Olof Johansson wrote:
->>>>
->>>> - A "debug" fragment would be nice, to turn on common options that
->>>>   add a lot of useful runtime checks at the expense of performance
->>>>   or code size.
->>>
->>> Hmm, some of these might work but several useful debug options (in
->>> particular DEBUG_LL for early errors) are per-system/platform.
->>
->> I was thinking mostly of architecture-independent options, i.e.
->> the stuff that is in lib/Kconfig.debug but isn't too expensive
->> to be run in a regular test environment. Enabling those
->> for a build/boot automation environment would be particularly
->> useful as you'd catch more bugs that get introduced through
->> a random patch.
->>
->>>> - A "distro" fragment that turns on all loadable modules that are
->>>>   enabled by common distributions (e.g. two or more of
->>>>   debian/fedora/opensuse/gentoo), to let you build a drop-in
->>>>   replacement kernel for a shipping distro. This would also allow
->>>>   the distros to strip their own config files and just specify
->>>>   whatever differs from the others.
->>>
->>> Keeping this in sync with the distro kernel could be a bit awkward
->>> (and possibly churny).
->>
->> It would certainly need buy-in from distro maintainers. I've discussed
->> this with Laura Abbott in the past, and she was interested in
->> principle.
->>
->>       Arnd
->>
->
-> Yes, I've gotten the request from multiple people now about having
-> some Fedora config in mainline. I agree that churn and keeping in
-> sync would be a concern. For a first pass, I was going to propose
-> a minimal set of options that are unlikely to need to churn. Once
-> those are agreed on, everything else could become a separate .config.
-> My plan was to send a patch out around -rc2/-rc3 each cycle to sync
-> up.
+From: Manjunath Goudar <csmanjuvijay@gmail.com>
 
+Remove usb_disabled() extern declaration as it is already declared
+as extern in include/linux/usb.h.
 
-That sounds reasonable to me -- we could add it as
-fedora_<something>_defconfig. Ideally just one per distro (for their
-multi-platform target), if possible. Makes sense to get coverage of
-this on builders, etc, as well.
+Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
+Cc: Vladimir Zapolskiy <vz@mleia.com>
+Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-usb at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+---
+changelog V1->V2:
+patch discrition is update with proper message.
 
+ drivers/usb/host/ohci-nxp.c | 2 --
+ 1 file changed, 2 deletions(-)
 
--Olof
+diff --git a/drivers/usb/host/ohci-nxp.c b/drivers/usb/host/ohci-nxp.c
+index b7d4756..1843f04 100644
+--- a/drivers/usb/host/ohci-nxp.c
++++ b/drivers/usb/host/ohci-nxp.c
+@@ -56,8 +56,6 @@ static struct hc_driver __read_mostly ohci_nxp_hc_driver;
+ 
+ static struct i2c_client *isp1301_i2c_client;
+ 
+-extern int usb_disabled(void);
+-
+ static struct clk *usb_host_clk;
+ 
+ static void isp1301_configure_lpc32xx(void)
+-- 
+2.7.4
