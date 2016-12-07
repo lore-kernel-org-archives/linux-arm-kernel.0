@@ -1,68 +1,59 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 7 Dec 2016 11:35:26 +0100
-Subject: [PATCH] usb: gadget: udc: atmel: Fix check in usba_ep_enable()
-In-Reply-To: <1481061583-4727-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1481061583-4727-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20161207113526.4fe857ac@bbrezillon>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 7 Dec 2016 18:37:26 +0800
+Subject: [PATCH 2/7] arm: ftrace: Add call modify mechanism
+In-Reply-To: <1481043967-15602-3-git-send-email-abelvesa@linux.com>
+Message-ID: <201612071833.2LIq3ZdA%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  6 Dec 2016 22:59:43 +0100
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+Hi Abel,
 
-> desc->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK is not necessarily
-> equal to ep->index and that's perfectly fine. The usba endpoint index is
-> just an internal identifier used by the driver to know which registers
-> to use for a USB endpoint.
-> 
-> Enforcing this constraint is not only useless, but can also lead to
-> errors since nothing guarantees that the endpoint number and index are
-> matching when an endpoint is selected for a specific descriptor, thus
-> leading to errors at ->enable() time when it's already too late to choose
-> another endpoint.
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.9-rc8 next-20161206]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Please ignore this patch. The real bug has been fixed in commit
-bbe097f092b0 ("usb: gadget: udc: atmel: fix endpoint name").
+url:    https://github.com/0day-ci/linux/commits/Abel-Vesa/arm-Add-livepatch-support/20161207-074210
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
-> Hi,
-> 
-> I intentionally didn't add the Cc stable and Fixes tags because this
-> bug dates back to the drivers creation, and I fear the index <->
-> epnum constraint was actually required at that time.
-> 
-> Note that I discovered this bug thanks to the WARN_ON_ONCE() in
-> usb_ep_queue() [1] which was introduced in 4.5.
-> It might appear that this problem was silently ignored before that
-> (with part of the usba_ep_enable() code being skipped without any
-> notice).
-> 
-> Regards,
-> 
-> Boris
-> 
-> [1]http://lxr.free-electrons.com/source/drivers/usb/gadget/udc/core.c#L264
-> ---
->  drivers/usb/gadget/udc/atmel_usba_udc.c | 7 ++-----
->  1 file changed, 2 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> index bb1f6c8f0f01..981d2639d413 100644
-> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> @@ -531,11 +531,8 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
->  
->  	maxpacket = usb_endpoint_maxp(desc) & 0x7ff;
->  
-> -	if (((desc->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK) != ep->index)
-> -			|| ep->index == 0
-> -			|| desc->bDescriptorType != USB_DT_ENDPOINT
-> -			|| maxpacket == 0
-> -			|| maxpacket > ep->fifo_size) {
-> +	if (ep->index == 0 || desc->bDescriptorType != USB_DT_ENDPOINT ||
-> +	    maxpacket == 0 || maxpacket > ep->fifo_size) {
->  		DBG(DBG_ERR, "ep_enable: Invalid argument");
->  		return -EINVAL;
->  	}
+Note: the linux-review/Abel-Vesa/arm-Add-livepatch-support/20161207-074210 HEAD 49113edc744f38a682a4afa9e904384bb00f2988 builds fine.
+      It only hurts bisectibility.
+
+All errors (new ones prefixed by >>):
+
+>> arch/arm/kernel/ftrace.c:163:5: error: redefinition of 'ftrace_modify_call'
+    int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
+        ^~~~~~~~~~~~~~~~~~
+   In file included from arch/arm/kernel/ftrace.c:15:0:
+   include/linux/ftrace.h:595:19: note: previous definition of 'ftrace_modify_call' was here
+    static inline int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
+                      ^~~~~~~~~~~~~~~~~~
+
+vim +/ftrace_modify_call +163 arch/arm/kernel/ftrace.c
+
+   157		}
+   158	#endif
+   159	
+   160		return ret;
+   161	}
+   162	
+ > 163	int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
+   164		       unsigned long addr)
+   165	{
+   166		unsigned long pc = rec->ip;
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 59384 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161207/a5fd880a/attachment-0001.gz>
