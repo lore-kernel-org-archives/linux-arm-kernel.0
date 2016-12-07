@@ -1,64 +1,70 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Wed, 7 Dec 2016 22:04:16 +0100
-Subject: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in Cadence GEM.
-In-Reply-To: <20161207193908.GA13062@netboy>
-References: <1481134912-2243-1-git-send-email-andrei.pistirica@microchip.com>
- <20161207193908.GA13062@netboy>
-Message-ID: <20161207210416.GA27622@netboy>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Wed,  7 Dec 2016 13:04:37 -0800
+Subject: [PATCH v5 0/3] Altera Cyclone Passive Serial SPI FPGA Manager
+Message-ID: <cover.1481139171.git.stillcompiling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 08:39:09PM +0100, Richard Cochran wrote:
-> > +static s32 gem_ptp_max_adj(unsigned int f_nom)
-> > +{
-> > +	u64 adj;
-> > +
-> > +	/* The 48 bits of seconds for the GEM overflows every:
-> > +	 * 2^48/(365.25 * 24 * 60 *60) =~ 8 925 512 years (~= 9 mil years),
-> > +	 * thus the maximum adjust frequency must not overflow CNS register:
-> > +	 *
-> > +	 * addend  = 10^9/nominal_freq
-> > +	 * adj_max = +/- addend*ppb_max/10^9
-> > +	 * max_ppb = (2^8-1)*nominal_freq-10^9
-> > +	 */
-> > +	adj = f_nom;
-> > +	adj *= 0xffff;
-> > +	adj -= 1000000000ULL;
-> 
-> What is this computation, and how does it relate to the comment?
+This series adds an FPGA manager for Altera cyclone FPGAs
+that can program them using an spi port and a couple of gpios, using
+Alteras passive serial protocol.
 
-I am not sure what you meant, but it sounds like you are on the wrong
-track.  Let me explain...
+Still need an ACK from Russell King on the ARM specific portion of 
+patch 1. Any comment/criticism on the addition of bitrev8x4() to bitrev.h
+would be welcome as well.
 
-The max_adj has nothing at all to do with the width of the time
-register.  Rather, it should reflect the maximum possible change in
-the tuning word.
+Changes from v4:
+- Added the needed return statement to __arch_bitrev8x4()
+- Added Rob Herrings ACK for and fix a typo in the commit log of patch 2
 
-For example, with a nominal 8 ns period, the tuning word is 0x80000.
-Looking at running the clock more slowly, the slowest possible word is
-0x00001, meaning a difference of 0x7FFFF.  This implies an adjustment
-of 0x7FFFF/0x80000 or 999998092 ppb.  Running more quickly, we can
-already have 0x100000, twice as fast, or just under 2 billion ppb.
+Changes from v3:
+- Fixed up the state() function to return the state of the status pin
+  reqested by Alan Tull
+- Switched the pin to ACTIVE_LOW and coresponding logic level, and updated
+  the corresponding documentation. Thanks Rob Herring for pointing out my
+  mistake.
+- Per Rob Herring, switched from "gpio" to "gpios" in dts
 
-You should consider the extreme cases to determine the most limited
-(smallest) max_adj value:
+Changes from v2:
+- Merged patch 3 and 4 as suggested in review by Moritz Fischer
+- Changed FPGA_MIN_DELAY from 250 to 50 ms is the time advertized by
+  Altera. This now works, as we don't assume it is done
 
-Case 1 - high frequency
-~~~~~~~~~~~~~~~~~~~~~~~
+Changes from v1:
+- Changed the name from cyclone-spi-fpga-mgr to cyclone-ps-spi-fpga-mgr
+  This name change was requested by Alan Tull, to be specific about which
+  programming method is being employed on the fpga.
+- Changed the name of the reset-gpio to config-gpio to closer match the
+  way the pins are described in the Altera manual
+- Moved MODULE_LICENCE, _AUTHOR, and _DESCRIPTION to the bottom
 
-With a nominal 1 ns period, we have the nominal tuning word 0x10000.
-The smallest is 0x1 for a difference of 0xFFFF.  This corresponds to
-an adjustment of 0xFFFF/0x10000 = .9999847412109375 or 999984741 ppb.
+- Added a bitrev8x4() function to the bitrev headers and implemented ARM
+ const, runtime, and ARM specific faster versions (This may end up
+ needing to be a standalone patch)
 
-Case 2 - low frequency
-~~~~~~~~~~~~~~~~~~~~~~
+- Moved the bitswapping into cyclonespi_write(), as requested.
+  This falls short of my desired generic lsb first spi support, but is a step
+  in that direction.
 
-With a nominal 255 ns period, the nominal word is 0xFF0000, the
-largest 0xFFFFFF, and the difference is 0xFFFF.  This corresponds to
-and adjustment of 0xFFFF/0xFF0000 = .0039215087890625 or 3921508 ppb.
+- Fixed whitespace problems introduced during refactoring
 
-Since 3921508 ppb is a huge adjustment, you can simply use that as a
-safe maximum, ignoring the actual input clock.
+- Replaced magic number for initial delay with a descriptive macro
+- Poll the fpga to see when it is ready rather than a fixed 1 ms sleep
 
-Thanks,
-Richard
+Joshua Clayton (3):
+  lib: add bitrev8x4()
+  doc: dt: add cyclone-ps-spi binding document
+  fpga manager: Add cyclone-ps-spi driver for Altera FPGAs
+
+ .../bindings/fpga/cyclone-ps-spi-fpga-mgr.txt      |  25 +++
+ arch/arm/include/asm/bitrev.h                      |   6 +
+ drivers/fpga/Kconfig                               |   7 +
+ drivers/fpga/Makefile                              |   1 +
+ drivers/fpga/cyclone-ps-spi.c                      | 181 +++++++++++++++++++++
+ include/linux/bitrev.h                             |  26 +++
+ 6 files changed, 246 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/fpga/cyclone-ps-spi-fpga-mgr.txt
+ create mode 100644 drivers/fpga/cyclone-ps-spi.c
+
+-- 
+2.9.3
