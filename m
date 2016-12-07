@@ -1,29 +1,42 @@
-From: agust@denx.de (Anatolij Gustschin)
-Date: Wed, 7 Dec 2016 22:33:58 +0100
-Subject: [PATCH v5 3/3] fpga manager: Add cyclone-ps-spi driver for
- Altera FPGAs
-In-Reply-To: <6e33619c-e8a4-e372-04ab-d03c379cbfa0@gmail.com>
-References: <cover.1481139171.git.stillcompiling@gmail.com>
- <1778a82d1989d13919b24e47fa09eeb56b2cb8e5.1481139171.git.stillcompiling@gmail.com>
- <20161207222127.23f6b8b4@crub>
- <6e33619c-e8a4-e372-04ab-d03c379cbfa0@gmail.com>
-Message-ID: <20161207223358.3d519259@crub>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 07 Dec 2016 22:35:42 +0100
+Subject: [RFC PATCH 00/23] arm: defconfigs: use kconfig fragments
+In-Reply-To: <CAOesGMi_mLG+tS0Ya8G9KLO_sUYGtLmgcvFfpn0Nwbd-KMKOrQ@mail.gmail.com>
+References: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
+ <8292218.3BDisRkZdU@wuerfel>
+ <CAOesGMi_mLG+tS0Ya8G9KLO_sUYGtLmgcvFfpn0Nwbd-KMKOrQ@mail.gmail.com>
+Message-ID: <2155947.mOKhpZPiAn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 Dec 2016 13:29:29 -0800
-Joshua Clayton stillcompiling at gmail.com wrote:
+On Wednesday, December 7, 2016 1:14:02 PM CET Olof Johansson wrote:
+> >
+> > - A "debug" fragment would be nice, to turn on common options that
+> >   add a lot of useful runtime checks at the expense of performance
+> >   or code size.
+> 
+> Hmm, some of these might work but several useful debug options (in
+> particular DEBUG_LL for early errors) are per-system/platform.
 
->Anatolij,
->Thanks for the quick look and response.
->I guess I should have rebased before submitting.
+I was thinking mostly of architecture-independent options, i.e.
+the stuff that is in lib/Kconfig.debug but isn't too expensive
+to be run in a regular test environment. Enabling those
+for a build/boot automation environment would be particularly
+useful as you'd catch more bugs that get introduced through
+a random patch.
 
-yes, Makefile and Kconfig changes need rebasing, I think.
+> > - A "distro" fragment that turns on all loadable modules that are
+> >   enabled by common distributions (e.g. two or more of
+> >   debian/fedora/opensuse/gentoo), to let you build a drop-in
+> >   replacement kernel for a shipping distro. This would also allow
+> >   the distros to strip their own config files and just specify
+> >   whatever differs from the others.
+> 
+> Keeping this in sync with the distro kernel could be a bit awkward
+> (and possibly churny).
 
->I just realized I also forgot to send this patch series to
->the newly minted FPGA Manager mailing list. V6 coming soon :)
+It would certainly need buy-in from distro maintainers. I've discussed
+this with Laura Abbott in the past, and she was interested in
+principle.
 
-okay, thanks.
-
---
-Anatolij
+	Arnd
