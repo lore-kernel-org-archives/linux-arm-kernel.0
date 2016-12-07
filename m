@@ -1,121 +1,100 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 7 Dec 2016 12:01:52 +0000
-Subject: [PATCH v4 6/7] IIO: add STM32 timer trigger driver
-In-Reply-To: <CA+M3ks4VbV6z6t7aORKGmduZfFF+Ls7Sq8umWRFyo3sn8WZt7g@mail.gmail.com>
-References: <1481027929-13704-1-git-send-email-benjamin.gaignard@st.com>
- <1481027929-13704-7-git-send-email-benjamin.gaignard@st.com>
- <20161206131635.GJ25385@dell.home>
- <CA+M3ks6fxCucmaY0OgpMb_opA=YLrowijJ0YQ+imeprhWg6N_w@mail.gmail.com>
- <20161207105002.GA3625@dell.home>
- <CA+M3ks4VbV6z6t7aORKGmduZfFF+Ls7Sq8umWRFyo3sn8WZt7g@mail.gmail.com>
-Message-ID: <5dcec09c-8b4b-4cc2-ce3f-fde86366ec05@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 7 Dec 2016 12:02:05 +0000
+Subject: [PATCH 15/16] drivers/fsi: Add documentation for GPIO bindings
+In-Reply-To: <1481069677-53660-16-git-send-email-christopher.lee.bostic@gmail.com>
+References: <1481069677-53660-1-git-send-email-christopher.lee.bostic@gmail.com>
+ <1481069677-53660-16-git-send-email-christopher.lee.bostic@gmail.com>
+Message-ID: <20161207120204.GC7054@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/16 11:00, Benjamin Gaignard wrote:
-> 2016-12-07 11:50 GMT+01:00 Lee Jones <lee.jones@linaro.org>:
->> On Tue, 06 Dec 2016, Benjamin Gaignard wrote:
->>
->>> [snip]
->>>>> +
->>>>> +static const char * const triggers0[] = {
->>>>> +     TIM1_TRGO, TIM1_CH1, TIM1_CH2, TIM1_CH3, TIM1_CH4, NULL,
->>>>> +};
->>>>> +
->>>>> +static const char * const triggers1[] = {
->>>>> +     TIM2_TRGO, TIM2_CH1, TIM2_CH2, TIM2_CH3, TIM2_CH4, NULL,
->>>>> +};
->>>>> +
->>>>> +static const char * const triggers2[] = {
->>>>> +     TIM3_TRGO, TIM3_CH1, TIM3_CH2, TIM3_CH3, TIM3_CH4, NULL,
->>>>> +};
->>>>> +
->>>>> +static const char * const triggers3[] = {
->>>>> +     TIM4_TRGO, TIM4_CH1, TIM4_CH2, TIM4_CH3, TIM4_CH4, NULL,
->>>>> +};
->>>>> +
->>>>> +static const char * const triggers4[] = {
->>>>> +     TIM5_TRGO, TIM5_CH1, TIM5_CH2, TIM5_CH3, TIM5_CH4, NULL,
->>>>> +};
->>>>> +
->>>>> +static const char * const triggers5[] = {
->>>>> +     TIM6_TRGO, NULL,
->>>>> +};
->>>>> +
->>>>> +static const char * const triggers6[] = {
->>>>> +     TIM7_TRGO, NULL,
->>>>> +};
->>>>> +
->>>>> +static const char * const triggers7[] = {
->>>>> +     TIM8_TRGO, TIM8_CH1, TIM8_CH2, TIM8_CH3, TIM8_CH4, NULL,
->>>>> +};
->>>>> +
->>>>> +static const char * const triggers8[] = {
->>>>> +     TIM9_TRGO, TIM9_CH1, TIM9_CH2, NULL,
->>>>> +};
->>>>> +
->>>>> +static const char * const triggers9[] = {
->>>>> +     TIM12_TRGO, TIM12_CH1, TIM12_CH2, NULL,
->>>>> +};
->>>>> +
->>>>> +static const void *triggers_table[] = {
->>>>> +     triggers0,
->>>>> +     triggers1,
->>>>> +     triggers2,
->>>>> +     triggers3,
->>>>> +     triggers4,
->>>>> +     triggers5,
->>>>> +     triggers6,
->>>>> +     triggers7,
->>>>> +     triggers8,
->>>>> +     triggers9,
->>>>> +};
->>>>
->>>> What about:
->>>>
->>>> static const char * const triggers[][] = {
->>>>         { TIM1_TRGO, TIM1_CH1, TIM1_CH2, TIM1_CH3, TIM1_CH4, NULL },
->>>>         { TIM2_TRGO, TIM2_CH1, TIM2_CH2, TIM2_CH3, TIM2_CH4, NULL },
->>>>         { TIM3_TRGO, TIM3_CH1, TIM3_CH2, TIM3_CH3, TIM3_CH4, NULL },
->>>>         { TIM4_TRGO, TIM4_CH1, TIM4_CH2, TIM4_CH3, TIM4_CH4, NULL },
->>>>         { TIM5_TRGO, TIM5_CH1, TIM5_CH2, TIM5_CH3, TIM5_CH4, NULL },
->>>>         { TIM6_TRGO, NULL },
->>>>         { TIM7_TRGO, NULL },
->>>>         { TIM8_TRGO, TIM8_CH1, TIM8_CH2, TIM8_CH3, TIM8_CH4, NULL },
->>>>         { TIM9_TRGO, TIM9_CH1, TIM9_CH2, NULL },
->>>>         { TIM12_TRGO, TIM12_CH1, TIM12_CH2, NULL }
->>>> };
->>>
->>> I can't because the second dimension of the array isn't fix.
->>> I could have between 2 and 6 elements per row... to create a dual dimension
->>> array I would have to add NULL entries like that:
->>>
->>> #define MAX_TRIGGERS 6
->>>
->>> static const void *triggers_table[][MAX_TRIGGERS] = {
->>> { TIM1_TRGO, TIM1_CH1, TIM1_CH2, TIM1_CH3, TIM1_CH4, NULL,},
->>> { TIM2_TRGO, TIM2_CH1, TIM2_CH2, TIM2_CH3, TIM2_CH4, NULL,},
->>> { TIM3_TRGO, TIM3_CH1, TIM3_CH2, TIM3_CH3, TIM3_CH4, NULL,},
->>> { TIM4_TRGO, TIM4_CH1, TIM4_CH2, TIM4_CH3, TIM4_CH4, NULL,},
->>> { TIM5_TRGO, TIM5_CH1, TIM5_CH2, TIM5_CH3, TIM5_CH4, NULL,},
->>> { TIM6_TRGO, NULL,     NULL,     NULL,     NULL,     NULL,},
->>> { TIM7_TRGO, NULL,     NULL,     NULL,     NULL,     NULL,},
->>> { TIM8_TRGO, TIM8_CH1, TIM8_CH2, TIM8_CH3, TIM8_CH4, NULL,},
->>> { TIM9_TRGO, TIM9_CH1, TIM9_CH2, NULL,     NULL,     NULL,},
->>> { TIM12_TRGO, TIM12_CH1, TIM12_CH2, NULL,  NULL,     NULL,},
->>> };
->>
->> It was just an idea, not a tested implementation.
->>
->> I don't understand why you have to pad with NULLs, but either way, it
->> looks much better than before and saves lots of lines of code.
->
-> I have tested it this morning and it works fine so I will include it in v5.
-> I use NULL as limit when iterate in the table and for table padding too.
+On Tue, Dec 06, 2016 at 06:14:36PM -0600, Chris Bostic wrote:
+> From: Chris Bostic <cbostic@us.ibm.com>
+> 
+> Add fsi master gpio device tree binding documentation
 
-If the initializer is shorter than the array then the array will be 
-implicitly zero/NULL padded. I don't think there is any need to type out 
-all the NULLs (not even at -Wall).
+Please see Documentation/devicetree/bindings/submitting-patches.txt.
 
+Specifically:
 
-Daniel.
+* Please put binding documents earlier in the series than code
+  implementing the binding.
+
+* Please document _all_ compatible strings used in the
+  series.
+
+Please also write the binding documents in terms of the hardware, rather
+then the driver (e.g. introduce what the hardware is in the document,
+don't mention the driver). The bindings are there to describe the former
+to the latter, and the latter may change arbitrarily.
+
+> Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
+> ---
+>  .../devicetree/bindings/fsi/fsi-master-gpio.txt     | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt b/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
+
+AFAICT, this is the first use of this directory. We should have a
+general FSI binding document in there, covering what FSI is, the
+"ibm,fsi-master" binding, etc.
+
+> new file mode 100644
+> index 0000000..ff3a62e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
+> @@ -0,0 +1,21 @@
+> +Device-tree bindings for gpio-based FSI master driver
+
+There's very little information here, so I'm not sure what to make of
+this. Can you please elaborate on the above to make it clear what this
+means?
+
+IIUC, this is an FSI controller/master that we only communicate with via
+GPIOs, right?
+
+Or is this a *virtual* master? i.e. the GPIOs themselves form the master
+and are directly connected to slaves?
+
+> +-----------------------------------------------------
+> +
+> +Required properties:
+> +	- compatible = "ibm,fsi-master-gpio";
+> +	- clk-gpios;
+> +	- data-gpios;
+
+Please give a description of what each of these are used for, how many
+are required, and what order elements must come in.
+
+> +Optional properties:
+> +	- enable-gpios;
+> +	- trans-gpios;
+> +	- mux-gpios;
+
+Likewise.
+
+> +
+> +fsi-master {
+> +	compatible = "ibm,fsi-master", "ibm,fsi-master-gpio";
+
+This is backwards. The most specific string must come first.
+
+> +	clk-gpios = <&gpio 0 &gpio 6>;
+> +	data-gpios = <&gpio 1 &gpio 7>;
+> +	enable-gpios = <&gpio 2 &gpio 8>;	/* Enable FSI data in/out */
+> +	trans-gpios = <&gpio 3 &gpio 9>;	/* Volts translator direction */
+> +	mux-gpios = <&gpio 4> &gpio 10>;	/* Multiplexer for FSI pins */
+
+If this were described above, we don't need the comment here.
+
+I note that in the patch, the mux-gpios property has an unmatched '>'
+and won't compile.
+
+As a general nit, please bracket elements of a list individually, e.g.
+
+	trans-gpios = <&gpio 3>, <&gpio 9>;
+	mux-gpios = <&gpio 4>, <&gpio 10>;
+
+Thanks,
+Mark.
