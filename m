@@ -1,113 +1,66 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Wed,  7 Dec 2016 12:24:40 +0000
-Subject: [PATCH] arm/xen: Use alloc_percpu rather than __alloc_percpu
-Message-ID: <1481113480-7663-1-git-send-email-julien.grall@arm.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 7 Dec 2016 18:09:44 +0530
+Subject: [Question] New mmap64 syscall?
+In-Reply-To: <0F280FED-870A-42B5-ABC4-1976ACA32462@theobroma-systems.com>
+References: <20161206185440.GA4654@yury-N73SV> <3014428.VXGdOARdm1@wuerfel>
+ <20161207103451.GA869@yury-N73SV>
+ <0F280FED-870A-42B5-ABC4-1976ACA32462@theobroma-systems.com>
+Message-ID: <20161207123944.GA11799@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function xen_guest_init is using __alloc_percpu with an alignment
-which are not power of two.
+Hi Philipp,
 
-However, the percpu allocator never supported alignments which are not power
-of two and has always behaved incorectly in thise case.
+On Wed, Dec 07, 2016 at 12:07:24PM +0100, Dr.Philipp Tomsich wrote:
+> [Resend, as my mail-client had insisted on using the wrong MIME type?]
+> 
+> > On 07 Dec 2016, at 11:34, Yury Norov <ynorov@caviumnetworks.com> wrote:
+> > 
+> >> If there is a use case for larger than 16TB offsets, we should add
+> >> the call on all architectures, probably using your approach 3. I don't
+> >> think that we should treat it as anything special for arm64 though.
+> > 
+> > From this point of view, 16+TB offset is a matter of 16+TB storage,
+> > and it's more than real. The other consideration to add it is that
+> > we have 64-bit support for offsets in syscalls like sys_llseek().
+> > So mmap64() will simply extend this support.
+> 
+> I believe the question is rather if the 16TB offset is a real use-case for ILP32.
 
-Commit 3ca45a4 "percpu: ensure requested alignment is power of two"
-introduced a check which trigger a warning [1] when booting linux-next
-on Xen. But in fine this bug was always present.
+This is not for ilp32, but for all 32-bit architectures - both native
+and compat. And because the scope is so generic, I think it's the
+strong reason for us to support true 64-bit offset in mmap().
 
-This can be fixed by replacing the call to __alloc_percpu with
-alloc_percpu. The latter will use an alignment which are a power of two.
+> This seems to bring the discussion full-circle, as this would indicate that 64bit is the 
+> preferred bit-width for all sizes, offsets, etc. throughout all filesystem-related calls 
+> (i.e. stat, seek, etc.).
 
-[1]
+AARCH64/ILP32 (and all new arches) exposes ino_t, off_t, blkcnt_t,
+fsblkcnt_t, fsfilcnt_t and rlim_t as 64-bit types. (Size_t should
+be 32-bit of course, because it's the same lengths as pointer.)
 
-[    0.023921] illegal size (48) or align (48) for percpu allocation
-[    0.024167] ------------[ cut here ]------------
-[    0.024344] WARNING: CPU: 0 PID: 1 at linux/mm/percpu.c:892 pcpu_alloc+0x88/0x6c0
-[    0.024584] Modules linked in:
-[    0.024708]
-[    0.024804] CPU: 0 PID: 1 Comm: swapper/0 Not tainted
-4.9.0-rc7-next-20161128 #473
-[    0.025012] Hardware name: Foundation-v8A (DT)
-[    0.025162] task: ffff80003d870000 task.stack: ffff80003d844000
-[    0.025351] PC is at pcpu_alloc+0x88/0x6c0
-[    0.025490] LR is at pcpu_alloc+0x88/0x6c0
-[    0.025624] pc : [<ffff00000818e678>] lr : [<ffff00000818e678>]
-pstate: 60000045
-[    0.025830] sp : ffff80003d847cd0
-[    0.025946] x29: ffff80003d847cd0 x28: 0000000000000000
-[    0.026147] x27: 0000000000000000 x26: 0000000000000000
-[    0.026348] x25: 0000000000000000 x24: 0000000000000000
-[    0.026549] x23: 0000000000000000 x22: 00000000024000c0
-[    0.026752] x21: ffff000008e97000 x20: 0000000000000000
-[    0.026953] x19: 0000000000000030 x18: 0000000000000010
-[    0.027155] x17: 0000000000000a3f x16: 00000000deadbeef
-[    0.027357] x15: 0000000000000006 x14: ffff000088f79c3f
-[    0.027573] x13: ffff000008f79c4d x12: 0000000000000041
-[    0.027782] x11: 0000000000000006 x10: 0000000000000042
-[    0.027995] x9 : ffff80003d847a40 x8 : 6f697461636f6c6c
-[    0.028208] x7 : 6120757063726570 x6 : ffff000008f79c84
-[    0.028419] x5 : 0000000000000005 x4 : 0000000000000000
-[    0.028628] x3 : 0000000000000000 x2 : 000000000000017f
-[    0.028840] x1 : ffff80003d870000 x0 : 0000000000000035
-[    0.029056]
-[    0.029152] ---[ end trace 0000000000000000 ]---
-[    0.029297] Call trace:
-[    0.029403] Exception stack(0xffff80003d847b00 to
-                               0xffff80003d847c30)
-[    0.029621] 7b00: 0000000000000030 0001000000000000
-ffff80003d847cd0 ffff00000818e678
-[    0.029901] 7b20: 0000000000000002 0000000000000004
-ffff000008f7c060 0000000000000035
-[    0.030153] 7b40: ffff000008f79000 ffff000008c4cd88
-ffff80003d847bf0 ffff000008101778
-[    0.030402] 7b60: 0000000000000030 0000000000000000
-ffff000008e97000 00000000024000c0
-[    0.030647] 7b80: 0000000000000000 0000000000000000
-0000000000000000 0000000000000000
-[    0.030895] 7ba0: 0000000000000035 ffff80003d870000
-000000000000017f 0000000000000000
-[    0.031144] 7bc0: 0000000000000000 0000000000000005
-ffff000008f79c84 6120757063726570
-[    0.031394] 7be0: 6f697461636f6c6c ffff80003d847a40
-0000000000000042 0000000000000006
-[    0.031643] 7c00: 0000000000000041 ffff000008f79c4d
-ffff000088f79c3f 0000000000000006
-[    0.031877] 7c20: 00000000deadbeef 0000000000000a3f
-[    0.032051] [<ffff00000818e678>] pcpu_alloc+0x88/0x6c0
-[    0.032229] [<ffff00000818ece8>] __alloc_percpu+0x18/0x20
-[    0.032409] [<ffff000008d9606c>] xen_guest_init+0x174/0x2f4
-[    0.032591] [<ffff0000080830f8>] do_one_initcall+0x38/0x130
-[    0.032783] [<ffff000008d90c34>] kernel_init_freeable+0xe0/0x248
-[    0.032995] [<ffff00000899a890>] kernel_init+0x10/0x100
-[    0.033172] [<ffff000008082ec0>] ret_from_fork+0x10/0x50
+It allows to make syscalls that pass it support 64-bit values, refer
+Documentation/arm64/ilp32.txt for details. Stat and seek are both
+supporting 64-bit types. From this point of view, mmap() is the (only?)
+exception in current ILP32 ABI.
 
-Reported-by: Wei Chen <wei.chen@arm.com>
-Link: https://lkml.org/lkml/2016/11/28/669
-Signed-off-by: Julien Grall <julien.grall@arm.com>
-
-Cc: stable at vger.kernel.org
-
----
-
-I have requested backport to stable because the percpu allocator may
-misbehaves when the alignment is not a power of two.
----
- arch/arm/xen/enlighten.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index f193414..4986dc0 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -372,8 +372,7 @@ static int __init xen_guest_init(void)
- 	 * for secondary CPUs as they are brought up.
- 	 * For uniformity we use VCPUOP_register_vcpu_info even on cpu0.
- 	 */
--	xen_vcpu_info = __alloc_percpu(sizeof(struct vcpu_info),
--			                       sizeof(struct vcpu_info));
-+	xen_vcpu_info = alloc_percpu(struct vcpu_info);
- 	if (xen_vcpu_info == NULL)
- 		return -ENOMEM;
+> But if that is the case, then we should have gone with 64bit arguments in a single
+> register for our ILP32 definition on AArch64.
  
--- 
-1.9.1
+There are 2 unrelated matters - the size of types, and the size of
+register. Most of 32-bit architectures has hardware limitation on
+register size (consider aarch32). And it doesn't mean that they are
+forced to stuck with 32-bit off_t etc. This is still opened question
+how to pass 64-bit parameters in aarch64/ilp32 because there we have
+the choice (the reason why it's RFC). If you have new ideas - welcome
+to that discussion. This topic also covers architectures that has to
+pass 64-bit parameters in a pair.
+
+> In other words: Why not keep ILP32 simple an ask users that need a 16TB+ offset
+> to use LP64? It seems much more consistent with the other choices takes so far.
+
+If user can switch to lp64, he doesn't need ilp32 at all, right? :)
+Also, I don't understand how true 64-bit offset in mmap64() would
+complicate this port.
+
+Yury
