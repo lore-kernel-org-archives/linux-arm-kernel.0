@@ -1,26 +1,103 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 7 Dec 2016 13:51:27 +0100
-Subject: [PATCH v2] crypto: sun4i-ss: support the Security System PRNG
-In-Reply-To: <20161207120900.GC20680@gondor.apana.org.au>
-References: <1480934922-20732-1-git-send-email-clabbe.montjoie@gmail.com>
- <20161205123705.GA10732@gondor.apana.org.au>
- <20161205125738.GA13525@Red>
- <20161207120900.GC20680@gondor.apana.org.au>
-Message-ID: <20161207125127.GB28218@Red>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed,  7 Dec 2016 13:17:40 +0000
+Subject: [PATCH] dmaengine: pl330: do not generate unaligned access
+Message-ID: <1481116660-27837-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 08:09:00PM +0800, Herbert Xu wrote:
-> On Mon, Dec 05, 2016 at 01:57:38PM +0100, Corentin Labbe wrote:
-> >
-> > So how to expose PRNG to user space ? or more generally how to "use" a PRNG ?
-> 
-> We do have the algif_rng interface.
-> 
+When PL330 is used with !MMU the following fault is seen:
 
-So I must expose it as a crypto_rng ?
+Unhandled fault: alignment exception (0x801) at 0x8f26a002
+Internal error: : 801 [#1] ARM
+Modules linked in:
+CPU: 0 PID: 640 Comm: dma0chan0-copy0 Not tainted 4.8.0-6a82063-clean+ #1600
+Hardware name: ARM-Versatile Express
+task: 8f1baa80 task.stack: 8e6fe000
+PC is at _setup_req+0x4c/0x350
+LR is at 0x8f2cbc00
+pc : [<801ea538>]    lr : [<8f2cbc00>]    psr: 60000093
+sp : 8e6ffdc0  ip : 00000000  fp : 00000000
+r10: 00000000  r9 : 8f2cba10  r8 : 8f2cbc00
+r7 : 80000013  r6 : 8f21a050  r5 : 8f21a000  r4 : 8f2ac800
+r3 : 8e6ffe18  r2 : 00944251  r1 : ffffffbc  r0 : 8f26a000
+Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment none
+Control: 00c5387c
+Process dma0chan0-copy0 (pid: 640, stack limit = 0x8e6fe210)
+Stack: (0x8e6ffdc0 to 0x8e700000)
+fdc0: 00000001 60000093 00000000 8f2cba10 8f26a000 00000004 8f0ae000 8f2cbc00
+fde0: 8f0ae000 8f2ac800 8f21a000 8f21a050 80000013 8f2cbc00 8f2cba10 00000000
+fe00: 60000093 801ebca0 8e6ffe18 000013ff 40000093 00000000 00944251 8f2ac800
+fe20: a0000013 8f2b1320 00001986 00000000 00000001 000013ff 8f1e4f00 8f2cba10
+fe40: 8e6fff6c 801e9044 00000003 00000000 fef98c80 002faf07 8e6ffe7c 00000000
+fe60: 00000002 00000000 00001986 8f1f158d 8f1e4f00 80568de4 00000002 00000000
+fe80: 00001986 8f1f53ff 40000001 80580500 8f1f158d 8001e00c 00000000 cfdfdfdf
+fea0: fdae2a25 00000001 00000004 8e6fe000 00000008 00000010 00000000 00000005
+fec0: 8f2b1330 8f2b1334 8e6ffe80 8e6ffe8c 00001986 00000000 8f21a014 00000001
+fee0: 8e6ffe60 8e6ffe78 00000002 00000000 000013ff 00000001 80568de4 8f1e8018
+ff00: 0000158d 8055ec30 00000001 803f6b00 00001986 8f2cba10 fdae2a25 00000001
+ff20: 8f1baca8 8e6fff24 8e6fff24 00000000 8e6fff24 ac6f3037 00000000 00000000
+ff40: 00000000 8e6fe000 8f1e4f40 00000000 8f1e4f40 8f1e4f00 801e84ec 00000000
+ff60: 00000000 00000000 00000000 80031714 dfdfdfcf 00000000 dfdfdfcf 8f1e4f00
+ff80: 00000000 8e6fff84 8e6fff84 00000000 8e6fff90 8e6fff90 8e6fffac 8f1e4f40
+ffa0: 80031640 00000000 00000000 8000f548 00000000 00000000 00000000 00000000
+ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ffe0: 00000000 00000000 00000000 00000000 00000013 00000000 dfdfdfcf cfdfdfdf
+[<801ea538>] (_setup_req) from [<801ebca0>] (pl330_tasklet+0x41c/0x490)
+[<801ebca0>] (pl330_tasklet) from [<801e9044>] (dmatest_func+0xb58/0x149c)
+[<801e9044>] (dmatest_func) from [<80031714>] (kthread+0xd4/0xec)
+[<80031714>] (kthread) from [<8000f548>] (ret_from_fork+0x14/0x2c)
+Code: e3a03001 e3e01043 e5c03001 e59d3048 (e5802002)
 
-Could you explain why PRNG must not be used as hw_random ?
+This happens because _emit_{ADDH,MOV,GO) accessing to unaligned data
+while writing to buffer. Fix it with writing to buffer byte by byte.
 
-Regards
-Corentin Labbe
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ drivers/dma/pl330.c |   15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 030fe05..e4c1ba7 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -570,7 +570,8 @@ static inline u32 _emit_ADDH(unsigned dry_run, u8 buf[],
+ 
+ 	buf[0] = CMD_DMAADDH;
+ 	buf[0] |= (da << 1);
+-	*((__le16 *)&buf[1]) = cpu_to_le16(val);
++	buf[1] = val;
++	buf[2] = val >> 8;
+ 
+ 	PL330_DBGCMD_DUMP(SZ_DMAADDH, "\tDMAADDH %s %u\n",
+ 		da == 1 ? "DA" : "SA", val);
+@@ -724,7 +725,10 @@ static inline u32 _emit_MOV(unsigned dry_run, u8 buf[],
+ 
+ 	buf[0] = CMD_DMAMOV;
+ 	buf[1] = dst;
+-	*((__le32 *)&buf[2]) = cpu_to_le32(val);
++	buf[2] = val;
++	buf[3] = val >> 8;
++	buf[4] = val >> 16;
++	buf[5] = val >> 24;
+ 
+ 	PL330_DBGCMD_DUMP(SZ_DMAMOV, "\tDMAMOV %s 0x%x\n",
+ 		dst == SAR ? "SAR" : (dst == DAR ? "DAR" : "CCR"), val);
+@@ -899,10 +903,11 @@ static inline u32 _emit_GO(unsigned dry_run, u8 buf[],
+ 
+ 	buf[0] = CMD_DMAGO;
+ 	buf[0] |= (ns << 1);
+-
+ 	buf[1] = chan & 0x7;
+-
+-	*((__le32 *)&buf[2]) = cpu_to_le32(addr);
++	buf[2] = addr;
++	buf[3] = addr >> 8;
++	buf[4] = addr >> 16;
++	buf[5] = addr >> 24;
+ 
+ 	return SZ_DMAGO;
+ }
+-- 
+1.7.9.5
