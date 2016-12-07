@@ -1,33 +1,43 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 7 Dec 2016 02:52:06 +0100
-Subject: [PATCH 00/16] FSI device driver introduction
-In-Reply-To: <1481069677-53660-1-git-send-email-christopher.lee.bostic@gmail.com>
-References: <1481069677-53660-1-git-send-email-christopher.lee.bostic@gmail.com>
-Message-ID: <20161207015206.5ar7exbfs353aram@earth>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 7 Dec 2016 09:54:00 +0800
+Subject: [PATCH v4 2/7] MFD: add STM32 General Purpose Timer driver
+In-Reply-To: <1481027929-13704-3-git-send-email-benjamin.gaignard@st.com>
+Message-ID: <201612070946.6SOumKdW%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
+Hi Benjamin,
 
-On Tue, Dec 06, 2016 at 06:14:21PM -0600, Chris Bostic wrote:
-> [...]
->
-> Introduction of the IBM 'Flexible Support Interface' (FSI) bus device
-> driver. FSI is a high fan out serial bus consisting of a clock and a serial
-> data line capable of running at speeds up to 166 MHz.
-> 
-> [...]
+[auto build test ERROR on iio/togreg]
+[also build test ERROR on v4.9-rc8]
+[cannot apply to next-20161206]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-I would expect, that this information is added to Documentation/
-and there should be Documentation/ABI/<stable or testing>/sysfs-bus-fsi
+url:    https://github.com/0day-ci/linux/commits/Benjamin-Gaignard/Add-PWM-and-IIO-timer-drivers-for-STM32/20161207-025220
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/jic23/iio.git togreg
+config: sparc-allmodconfig (attached as .config)
+compiler: sparc64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=sparc 
 
-P.S.: I'm not sure, why I'm Cc'd.
+All errors (new ones prefixed by >>):
 
--- Sebastian
+   WARNING: modpost: missing MODULE_LICENSE() in drivers/media/dvb-frontends/gp8psk-fe.o
+   see include/linux/module.h for more information
+   drivers/mfd/stm32-gptimer: struct of_device_id is 200 bytes.  The last of 1 is:
+   0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x73 0x74 0x2c 0x73 0x74 0x6d 0x33 0x32 0x2d 0x67 0x70 0x74 0x69 0x6d 0x65 0x72 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 
+>> FATAL: drivers/mfd/stm32-gptimer: struct of_device_id is not terminated with a NULL entry!
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
+Name: .config.gz
+Type: application/gzip
+Size: 47897 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161207/fdc6ee6c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161207/f177e9ca/attachment-0001.gz>
