@@ -1,31 +1,237 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed,  7 Dec 2016 11:31:37 -0800
-Subject: [PATCH v2 4/4] ARM: davinci: board-da850-evm: add I2C ID for VPIF
+Date: Wed,  7 Dec 2016 11:31:36 -0800
+Subject: [PATCH v2 3/4] ARM: davinci: da8xx: add pdata-quirks,
+ use for VPIF capture
 In-Reply-To: <20161207193137.27947-1-khilman@baylibre.com>
 References: <20161207193137.27947-1-khilman@baylibre.com>
-Message-ID: <20161207193137.27947-5-khilman@baylibre.com>
+Message-ID: <20161207193137.27947-4-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VPIF capture driver now has a way to specific I2C adapter ID (was
-previously hard-coded.)  Use the new interface.
+Add pdata-quirks for da8xx DT platforms, which adds the legacy platform
+data for vpif_capture driver.
+
+Passing legacy platform_data is required until the V4L2 framework, and
+subdevice drivers (such as the tvp514x) grow a way of selecting input
+and output routing  (c.f. V4L2 s_routing API)
 
 Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 ---
- arch/arm/mach-davinci/board-da850-evm.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-davinci/Makefile              |   2 +-
+ arch/arm/mach-davinci/da8xx-dt.c            |   2 +
+ arch/arm/mach-davinci/include/mach/common.h |   4 +
+ arch/arm/mach-davinci/pdata-quirks.c        | 155 ++++++++++++++++++++++++++++
+ 4 files changed, 162 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-davinci/pdata-quirks.c
 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 8e4539f69fdc..60f15f276ab7 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -1229,6 +1229,7 @@ static struct vpif_subdev_info da850_vpif_capture_sdev_info[] = {
- static struct vpif_capture_config da850_vpif_capture_config = {
- 	.subdev_info = da850_vpif_capture_sdev_info,
- 	.subdev_count = ARRAY_SIZE(da850_vpif_capture_sdev_info),
-+	.i2c_adapter_id = 1,
- 	.chan_config[0] = {
- 		.inputs = da850_ch0_inputs,
- 		.input_count = ARRAY_SIZE(da850_ch0_inputs),
+diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
+index da4c336b4637..90d2e6e4d913 100644
+--- a/arch/arm/mach-davinci/Makefile
++++ b/arch/arm/mach-davinci/Makefile
+@@ -21,7 +21,7 @@ obj-$(CONFIG_AINTC)			+= irq.o
+ obj-$(CONFIG_CP_INTC)			+= cp_intc.o
+ 
+ # Board specific
+-obj-$(CONFIG_MACH_DA8XX_DT)		+= da8xx-dt.o
++obj-$(CONFIG_MACH_DA8XX_DT)		+= da8xx-dt.o pdata-quirks.o
+ obj-$(CONFIG_MACH_DAVINCI_EVM)  	+= board-dm644x-evm.o
+ obj-$(CONFIG_MACH_SFFSDR)		+= board-sffsdr.o
+ obj-$(CONFIG_MACH_NEUROS_OSD2)		+= board-neuros-osd2.o
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index c9f7e9274aa8..69c8099de9f5 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -38,6 +38,7 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+ 		       NULL),
+ 	OF_DEV_AUXDATA("ti,da830-mcasp-audio", 0x01d00000, "davinci-mcasp.0", NULL),
+ 	OF_DEV_AUXDATA("ti,da850-aemif", 0x68000000, "ti-aemif", NULL),
++	OF_DEV_AUXDATA("ti,da850-vpif", 0x01e17000, "vpif", NULL),
+ 	{}
+ };
+ 
+@@ -46,6 +47,7 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+ static void __init da850_init_machine(void)
+ {
+ 	of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
++	pdata_quirks_init();
+ }
+ 
+ static const char *const da850_boards_compat[] __initconst = {
+diff --git a/arch/arm/mach-davinci/include/mach/common.h b/arch/arm/mach-davinci/include/mach/common.h
+index 0b3c169758ed..1fd4cd2d1c23 100644
+--- a/arch/arm/mach-davinci/include/mach/common.h
++++ b/arch/arm/mach-davinci/include/mach/common.h
+@@ -102,6 +102,10 @@ int davinci_pm_init(void);
+ static inline int davinci_pm_init(void) { return 0; }
+ #endif
+ 
++#ifdef CONFIG_MACH_DA8XX_DT
++extern void __init pdata_quirks_init(void);
++#endif
++
+ #define SRAM_SIZE	SZ_128K
+ 
+ #endif /* __ARCH_ARM_MACH_DAVINCI_COMMON_H */
+diff --git a/arch/arm/mach-davinci/pdata-quirks.c b/arch/arm/mach-davinci/pdata-quirks.c
+new file mode 100644
+index 000000000000..a186513edf7e
+--- /dev/null
++++ b/arch/arm/mach-davinci/pdata-quirks.c
+@@ -0,0 +1,155 @@
++/*
++ * Legacy platform_data quirks
++ *
++ * Copyright (C) 2016 BayLibre, Inc
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/kernel.h>
++#include <linux/of_platform.h>
++
++#include <media/i2c/tvp514x.h>
++
++#include <mach/common.h>
++#include <mach/da8xx.h>
++#include <mach/mux.h>
++
++struct pdata_init {
++	const char *compatible;
++	void (*fn)(void);
++};
++
++#if IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE)
++
++#define TVP5147_CH0		"tvp514x-0"
++#define TVP5147_CH1		"tvp514x-1"
++
++/* VPIF capture configuration */
++static struct tvp514x_platform_data tvp5146_pdata = {
++		.clk_polarity = 0,
++		.hs_polarity  = 1,
++		.vs_polarity  = 1,
++};
++
++#define TVP514X_STD_ALL (V4L2_STD_NTSC | V4L2_STD_PAL)
++
++static const struct vpif_input da850_ch0_inputs[] = {
++	{
++		.input = {
++			.index = 0,
++			.name  = "Composite",
++			.type  = V4L2_INPUT_TYPE_CAMERA,
++			.capabilities = V4L2_IN_CAP_STD,
++			.std   = TVP514X_STD_ALL,
++		},
++		.input_route = INPUT_CVBS_VI2B,
++		.output_route = OUTPUT_10BIT_422_EMBEDDED_SYNC,
++		.subdev_name = TVP5147_CH0,
++	},
++};
++
++static const struct vpif_input da850_ch1_inputs[] = {
++	{
++		.input = {
++			.index = 0,
++			.name  = "S-Video",
++			.type  = V4L2_INPUT_TYPE_CAMERA,
++			.capabilities = V4L2_IN_CAP_STD,
++			.std   = TVP514X_STD_ALL,
++		},
++		.input_route = INPUT_SVIDEO_VI2C_VI1C,
++		.output_route = OUTPUT_10BIT_422_EMBEDDED_SYNC,
++		.subdev_name = TVP5147_CH1,
++	},
++};
++
++static struct vpif_subdev_info da850_vpif_capture_sdev_info[] = {
++	{
++		.name = TVP5147_CH0,
++		.board_info = {
++			I2C_BOARD_INFO("tvp5146", 0x5d),
++			.platform_data = &tvp5146_pdata,
++		},
++	},
++	{
++		.name = TVP5147_CH1,
++		.board_info = {
++			I2C_BOARD_INFO("tvp5146", 0x5c),
++			.platform_data = &tvp5146_pdata,
++		},
++	},
++};
++
++static struct vpif_capture_config da850_vpif_capture_config = {
++	.subdev_info = da850_vpif_capture_sdev_info,
++	.subdev_count = ARRAY_SIZE(da850_vpif_capture_sdev_info),
++	.chan_config[0] = {
++		.inputs = da850_ch0_inputs,
++		.input_count = ARRAY_SIZE(da850_ch0_inputs),
++		.vpif_if = {
++			.if_type = VPIF_IF_BT656,
++			.hd_pol  = 1,
++			.vd_pol  = 1,
++			.fid_pol = 0,
++		},
++	},
++	.chan_config[1] = {
++		.inputs = da850_ch1_inputs,
++		.input_count = ARRAY_SIZE(da850_ch1_inputs),
++		.vpif_if = {
++			.if_type = VPIF_IF_BT656,
++			.hd_pol  = 1,
++			.vd_pol  = 1,
++			.fid_pol = 0,
++		},
++	},
++	.card_name = "DA850/OMAP-L138 Video Capture",
++};
++
++static void __init da850_vpif_legacy_init(void)
++{
++	int ret;
++	
++	/* LCDK doesn't have the 2nd TVP514x on CH1 */
++	if (of_machine_is_compatible("ti,da850-lcdk"))
++		da850_vpif_capture_config.subdev_count = 1;
++
++	/* EVM (UI card) uses i2c adapter 1 (not default: zero) */
++	if (of_machine_is_compatible("ti,da850-evm"))
++		da850_vpif_capture_config.i2c_adapter_id = 1;
++
++	ret = da850_register_vpif_capture(&da850_vpif_capture_config);
++	if (ret)
++		pr_warn("%s: VPIF capture setup failed: %d\n",
++			__func__, ret);
++}
++#endif
++
++static void pdata_quirks_check(struct pdata_init *quirks)
++{
++	while (quirks->compatible) {
++		if (of_machine_is_compatible(quirks->compatible)) {
++			if (quirks->fn)
++				quirks->fn();
++			break;
++		}
++		quirks++;
++	}
++}
++
++static struct pdata_init pdata_quirks[] __initdata = {
++#if IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE)
++	{ "ti,da850-lcdk", da850_vpif_legacy_init, },
++#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
++	{ "ti,da850-evm", da850_vpif_legacy_init, },
++#endif
++#endif
++	{ /* sentinel */ },
++};
++
++void __init pdata_quirks_init(void)
++{
++	pdata_quirks_check(pdata_quirks);
++}
 -- 
 2.9.3
