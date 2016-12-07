@@ -1,91 +1,155 @@
 From: christopher.lee.bostic@gmail.com (Chris Bostic)
-Date: Tue,  6 Dec 2016 18:14:24 -0600
-Subject: [PATCH 03/16] drivers/fsi: add driver to device matches
+Date: Tue,  6 Dec 2016 18:14:26 -0600
+Subject: [PATCH 05/16] drivers/fsi: Add fake master driver
 In-Reply-To: <1481069677-53660-1-git-send-email-christopher.lee.bostic@gmail.com>
 References: <1481069677-53660-1-git-send-email-christopher.lee.bostic@gmail.com>
-Message-ID: <1481069677-53660-4-git-send-email-christopher.lee.bostic@gmail.com>
+Message-ID: <1481069677-53660-6-git-send-email-christopher.lee.bostic@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jeremy Kerr <jk@ozlabs.org>
 
-Driver bind to devices based on the engine types & (optional) versions.
+For debugging, add a fake master driver, that only supports reads,
+returning a fixed set of data.
+
+Includes changes from Chris Bostic <cbostic@us.ibm.com>.
 
 Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
 ---
- drivers/fsi/fsi-core.c | 21 +++++++++++++++++++++
- include/linux/fsi.h    | 21 +++++++++++++++++++--
- 2 files changed, 40 insertions(+), 2 deletions(-)
+ drivers/fsi/Kconfig           | 10 +++++
+ drivers/fsi/Makefile          |  1 +
+ drivers/fsi/fsi-master-fake.c | 95 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 106 insertions(+)
+ create mode 100644 drivers/fsi/fsi-master-fake.c
 
-diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 3e45306..3d55bd5 100644
---- a/drivers/fsi/fsi-core.c
-+++ b/drivers/fsi/fsi-core.c
-@@ -19,8 +19,29 @@
+diff --git a/drivers/fsi/Kconfig b/drivers/fsi/Kconfig
+index 04c1a0e..f065dbe 100644
+--- a/drivers/fsi/Kconfig
++++ b/drivers/fsi/Kconfig
+@@ -9,4 +9,14 @@ config FSI
+ 	---help---
+ 	  FSI - the FRU Support Interface - is a simple bus for low-level
+ 	  access to POWER-based hardware.
++
++if FSI
++
++config FSI_MASTER_FAKE
++	tristate "Fake FSI master"
++	depends on FSI
++	---help---
++	This option enables a fake FSI master driver for debugging.
++endif
++
+ endmenu
+diff --git a/drivers/fsi/Makefile b/drivers/fsi/Makefile
+index db0e5e7..847c00c 100644
+--- a/drivers/fsi/Makefile
++++ b/drivers/fsi/Makefile
+@@ -1,2 +1,3 @@
  
- /* FSI core & Linux bus type definitions */
- 
-+static int fsi_bus_match(struct device *dev, struct device_driver *drv)
+ obj-$(CONFIG_FSI) += fsi-core.o
++obj-$(CONFIG_FSI_MASTER_FAKE) += fsi-master-fake.o
+diff --git a/drivers/fsi/fsi-master-fake.c b/drivers/fsi/fsi-master-fake.c
+new file mode 100644
+index 0000000..b42fe5b
+--- /dev/null
++++ b/drivers/fsi/fsi-master-fake.c
+@@ -0,0 +1,95 @@
++/*
++ * Fake FSI master driver for FSI development
++ *
++ * Copyright (C) IBM Corporation 2016
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/platform_device.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++
++#include "fsi-master.h"
++
++static const uint8_t data[] = {
++	0xc0, 0x02, 0x08, 0x03,	/* chip id */
++	0x80, 0x01, 0x11, 0x00,	/* peek */
++	0x80, 0x01, 0x20, 0x3e,	/* slave */
++	0x00, 0x01, 0x10, 0xa5,	/* i2c */
++};
++
++
++static int fsi_master_fake_read(struct fsi_master *_master, int link,
++		uint8_t slave, uint32_t addr, void *val, size_t size)
 +{
-+	struct fsi_device *fsi_dev = to_fsi_dev(dev);
-+	struct fsi_driver *fsi_drv = to_fsi_drv(drv);
-+	const struct fsi_device_id *id;
++	if (link != 0)
++		return -ENODEV;
 +
-+	if (!fsi_drv->id_table)
-+		return 0;
-+
-+	for (id = fsi_drv->id_table; id->engine_type; id++) {
-+		if (id->engine_type != fsi_dev->engine_type)
-+			continue;
-+		if (id->version == FSI_VERSION_ANY ||
-+				id->version == fsi_dev->version)
-+			return 1;
-+	}
++	if (addr + size > sizeof(data))
++		memset(val, 0, size);
++	else
++		memcpy(val, data + addr, size);
 +
 +	return 0;
 +}
 +
- struct bus_type fsi_bus_type = {
- 	.name		= "fsi",
-+	.match		= fsi_bus_match,
- };
- EXPORT_SYMBOL_GPL(fsi_bus_type);
- 
-diff --git a/include/linux/fsi.h b/include/linux/fsi.h
-index f73886a..273cbf6 100644
---- a/include/linux/fsi.h
-+++ b/include/linux/fsi.h
-@@ -18,11 +18,28 @@
- #include <linux/device.h>
- 
- struct fsi_device {
--	struct device dev;
-+	struct device		dev;
-+	u8			engine_type;
-+	u8			version;
- };
- 
-+struct fsi_device_id {
-+	u8	engine_type;
-+	u8	version;
++static int fsi_master_fake_write(struct fsi_master *_master, int link,
++		uint8_t slave, uint32_t addr, const void *val, size_t size)
++{
++	if (link != 0)
++		return -ENODEV;
++
++	return -EACCES;
++}
++
++static int fsi_master_fake_probe(struct platform_device *pdev)
++{
++	struct fsi_master *master;
++
++	master = devm_kzalloc(&pdev->dev, sizeof(*master), GFP_KERNEL);
++	if (!master)
++		return -ENOMEM;
++
++	master->dev = &pdev->dev;
++	master->n_links = 1;
++	master->read = fsi_master_fake_read;
++	master->write = fsi_master_fake_write;
++
++	return fsi_master_register(master);
++}
++
++static const struct of_device_id fsi_master_fake_match[] = {
++	{ .compatible = "ibm,fsi-master-fake" },
++	{ },
 +};
 +
-+#define FSI_VERSION_ANY		0
++static struct platform_driver fsi_master_fake_driver = {
++	.driver = {
++		.name		= "fsi-master-fake",
++		.of_match_table	= fsi_master_fake_match,
++	},
++	.probe	= fsi_master_fake_probe,
++};
 +
-+#define FSI_DEVICE(t) \
-+	.engine_type = (t), .version = FSI_VERSION_ANY,
++static int __init fsi_master_fake_init(void)
++{
++	struct device_node *np;
 +
-+#define FSI_DEVICE_VERSIONED(t, v) \
-+	.engine_type = (t), .version = (v),
++	platform_driver_register(&fsi_master_fake_driver);
 +
++	for_each_compatible_node(np, NULL, "ibm,fsi-master-fake")
++		of_platform_device_create(np, NULL, NULL);
 +
- struct fsi_driver {
--	struct device_driver drv;
-+	struct device_driver		drv;
-+	const struct fsi_device_id	*id_table;
- };
- 
- #define to_fsi_dev(devp) container_of(devp, struct fsi_device, dev)
++	return 0;
++}
++
++module_init(fsi_master_fake_init);
 -- 
 1.8.2.2
