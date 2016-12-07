@@ -1,58 +1,62 @@
-From: csmanjuvijay@gmail.com (csmanjuvijay at gmail.com)
-Date: Wed,  7 Dec 2016 23:54:11 +0000
-Subject: [PATCH] USB: OHCI: nxp: fix code warnings
-Message-ID: <1481154851-20876-1-git-send-email-csmanjuvijay@gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 8 Dec 2016 00:59:33 +0100
+Subject: [PATCH] drm: hdlcd: Work properly in big-endian mode
+In-Reply-To: <36dcbbc5-607a-1773-17e4-af2a9810a06e@arm.com>
+References: <f484518775c0bf063ae0a6f1e6c11bb404a7acc9.1481124156.git.robin.murphy@arm.com>
+ <20161207155714.ldmshptddwvhsdop@phenom.ffwll.local>
+ <548dc9d9-4d21-7f93-cc92-5bc3234f1b8f@arm.com>
+ <36dcbbc5-607a-1773-17e4-af2a9810a06e@arm.com>
+Message-ID: <20161207235932.2i7hu6swkd5rrcby@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Manjunath Goudar <csmanjuvijay@gmail.com>
+On Wed, Dec 07, 2016 at 04:50:31PM +0000, Robin Murphy wrote:
+> On 07/12/16 16:42, Robin Murphy wrote:
+> > On 07/12/16 15:57, Daniel Vetter wrote:
+> >> On Wed, Dec 07, 2016 at 03:31:40PM +0000, Robin Murphy wrote:
+> >>> Under a big-endian kernel, colours on the framebuffer all come out a
+> >>> delightful shade of wrong, since we fail to take the reversed byte
+> >>> order into account. Fortunately, the HDLCD has a control bit to make it
+> >>> automatically byteswap big-endian data; let's use it as appropriate.
+> >>>
+> >>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> >>
+> >> fourcc codes (and the drm fourcc codes) are supposed to be little-endian.
+> >> All of them. So either we fix up the drivers and userspace to set that
+> >> flag correctly (which would mean hdlcd should expose twice as many
+> >> formats, each one with the little and big endian mode).
+> > 
+> > AFAICS, SIMPLEFB_FORMATS *is* supposed to be explicitly little-endian
+> > modes. I see that DRM_FORMAT_BIG_ENDIAN exists, but nothing in-tree ever
+> > sets it :/
+> > 
+> > My vague (and probably wrong) assumption was that the HDLCD is still
+> > expecting little-endian data, but the the CPU is writing framebuffer
+> > data as host-endian words, hence what the HDLCD thinks is xRGB is
+> > actually RGBx under a big-endian kernel - It's certainly consistent
+> > between kernel (fbcon) and userspace (fb-test[1]): white is yellow, blue
+> > is black, green is red and red is green. I don't know how to test
+> > "proper" DRM (I've failed to get X to work with the Arch Linux ARM
+> > distro I have on there at the moment).
+> > 
+> > Once again I'm somewhat out of my depth here - I just found a thing that
+> > seemed appropriate and visibly resolved the immediate problem :)
+> > By comparison, the same use-cases (fbcon and fb-test) under the same
+> > big-endian kernel do *not* show the same problem with nouveau driving a
+> > PCIe 7600GT card, which led me to believe it was HDLCD-specific.
+> 
+> Off the back of that, upon closer inspection, nv_crtc_commit() would
+> appear to already be doing very much the equivalent thing to what I'm
+> doing in this patch, so now I have no idea whether this is right or
+> everything's wrong.
 
-This patch will fix the checkpatch.pl following warnings:
-WARNING: Missing a blank line after declarations
-WARNING: braces {} are not necessary for single statement blocks
+Congrats for finding a really big can of worms. Unfortunately I can't
+really help you with figuring out what's the right choice here :(
 
-Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
-Cc: Vladimir Zapolskiy <vz@mleia.com>
-Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-usb at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/usb/host/ohci-nxp.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/usb/host/ohci-nxp.c b/drivers/usb/host/ohci-nxp.c
-index 1843f04..6df8e2e 100644
---- a/drivers/usb/host/ohci-nxp.c
-+++ b/drivers/usb/host/ohci-nxp.c
-@@ -125,6 +125,7 @@ static inline void isp1301_vbus_off(void)
- static void ohci_nxp_start_hc(void)
- {
- 	unsigned long tmp = __raw_readl(USB_OTG_STAT_CONTROL) | HOST_EN;
-+
- 	__raw_writel(tmp, USB_OTG_STAT_CONTROL);
- 	isp1301_vbus_on();
- }
-@@ -132,6 +133,7 @@ static void ohci_nxp_start_hc(void)
- static void ohci_nxp_stop_hc(void)
- {
- 	unsigned long tmp;
-+
- 	isp1301_vbus_off();
- 	tmp = __raw_readl(USB_OTG_STAT_CONTROL) & ~HOST_EN;
- 	__raw_writel(tmp, USB_OTG_STAT_CONTROL);
-@@ -153,9 +155,8 @@ static int ohci_hcd_nxp_probe(struct platform_device *pdev)
- 	}
- 
- 	isp1301_i2c_client = isp1301_get_client(isp1301_node);
--	if (!isp1301_i2c_client) {
-+	if (!isp1301_i2c_client)
- 		return -EPROBE_DEFER;
--	}
- 
- 	ret = dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
- 	if (ret)
+Trying to fix up everything is probably going to be lots of work, but
+assuming that everything is broken for big endian is probably correct.
+-Daniel
 -- 
-2.7.4
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
