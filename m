@@ -1,111 +1,122 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Wed, 7 Dec 2016 17:19:57 +0100
-Subject: [PATCH v3 2/5] spi: armada-3700: Add support for the FIFO mode
-In-Reply-To: <20161205133728.sza2pt4tfkywu35k@sirena.org.uk>
-References: <20161201102719.4291-1-romain.perier@free-electrons.com>
- <20161201102719.4291-3-romain.perier@free-electrons.com>
- <20161205133728.sza2pt4tfkywu35k@sirena.org.uk>
-Message-ID: <a9b86043-b631-8154-edc8-5abe49e47114@free-electrons.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 7 Dec 2016 10:27:19 -0600
+Subject: [PATCH] i2c: rk3x: keep i2c irq ON in suspend
+In-Reply-To: <a6694d7d-6fca-e5ef-7bbd-9956562132a2@rock-chips.com>
+References: <1480924979-13450-1-git-send-email-david.wu@rock-chips.com>
+ <1737869.ycGphUXI8X@phil>
+ <1d570232-af87-467e-e6f4-5b514d583a02@rock-chips.com>
+ <CAD=FV=VgGy5hA4+7nvLs4NPNRuopak+bTW34S6X6S_vWgtnkjg@mail.gmail.com>
+ <a6694d7d-6fca-e5ef-7bbd-9956562132a2@rock-chips.com>
+Message-ID: <e34bab0d-b4b1-ff0d-3a27-c3701b8206c1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-Le 05/12/2016 ? 14:37, Mark Brown a ?crit :
-> On Thu, Dec 01, 2016 at 11:27:16AM +0100, Romain Perier wrote:
->
->> Changes in v3:
->>  - Don't enable the fifo mode based on the compatible string, we introduce
->>    a module parameter "pio_mode". By default this option is set to zero, so
->>    the fifo mode is enabled. Pass pio_mode=1 to the driver enables the PIO
->>    mode.
->
-> Why?  If the hardware supports a more efficient mode of operation it
-> doesn't seem sensible not to use it.
 
-That's just that our customer want to keep both modes, this is why I 
-decided to use the more efficient mode by default and disable it via a 
-module parameter. Previously the more efficient mode was always enabled, 
-based on the "compatible string" of the DT (the PIO mode was simply 
-useless in this case and dead code)
-
->
->> -	int i;
->> +	int i, ret = 0;
->
-> Coding style - don't combine initialized and non-initalized variables on
-> one line.
-
-Ok
-
->
->>  static int a3700_spi_transfer_one(struct spi_master *master,
->>  				  struct spi_device *spi,
->>  				  struct spi_transfer *xfer)
->>  {
->>  	struct a3700_spi *a3700_spi = spi_master_get_devdata(master);
->> -	int ret = 0;
->> +	int ret;
+On 12/06/2016 09:37 PM, David.Wu wrote:
+> Hi Doug,
+> 
+> ? 2016/12/7 0:31, Doug Anderson ??:
+>> Hi,
 >>
->>  	a3700_spi_transfer_setup(spi, xfer);
+>> On Tue, Dec 6, 2016 at 12:12 AM, David.Wu <david.wu@rock-chips.com>
+>> wrote:
+>>> Hi Heiko,
+>>>
+>>> ? 2016/12/5 18:54, Heiko Stuebner ??:
+>>>>
+>>>> Hi David,
+>>>>
+>>>> Am Montag, 5. Dezember 2016, 16:02:59 CET schrieb David Wu:
+>>>>>
+>>>>> During suspend there may still be some i2c access happening.
+>>>>> And if we don't keep i2c irq ON, there may be i2c access timeout if
+>>>>> i2c is in irq mode of operation.
+>>>>
+>>>>
+>>>> can you describe the issue you're trying to fix a bit more please?
+>>>
+>>>
+>>> Sometimes we could see the i2c timeout errors during suspend/resume,
+>>> which
+>>> makes the duration of suspend/resume too longer.
+>>>
+>>> [  484.171541] CPU4: Booted secondary processor [410fd082]
+>>> [  485.172777] rk3x-i2c ff3c0000.i2c: timeout, ipd: 0x10, state: 1
+>>> [  486.172760] rk3x-i2c ff3c0000.i2c: timeout, ipd: 0x10, state: 1
+>>> [  487.172759] rk3x-i2c ff3c0000.i2c: timeout, ipd: 0x10, state: 1
+>>> [  487.172840] cpu cpu4: _set_opp_voltage: failed to set voltage (800000
+>>> 800000 800000 mV): -110
+>>> [  487.172874] cpu cpu4: failed to set volt 800000
+>>>
+>>>>
+>>>> I.e. I'd think the i2c-core does suspend i2c-client devices first,
+>>>> so that
+>>>> these should be able to finish up their ongoing transfers and not start
+>>>> any
+>>>> new ones instead?
+>>>>
+>>>> Your irq can still happen slightly after the system started going to
+>>>> actually
+>>>> sleep, so to me it looks like you just widened the window where irqs
+>>>> can
+>>>> be
+>>>> handled. Especially as your irq could also just simply stem from the
+>>>> start
+>>>> state, so you cannot even be sure if your transaction actually is
+>>>> finished.
+>>>
+>>>
+>>> Okay, you are right. I want to give it a double insurance at first,
+>>> but it
+>>> may hide the unhappend issue.
+>>>
+>>>>
+>>>> So to me it looks like the i2c-connected device driver should be fixed
+>>>> instead?
+>>>
+>>>
+>>> I tell them to fix it in rk808 driver.
 >>
->> @@ -505,6 +737,151 @@ static int a3700_spi_transfer_one(struct spi_master *master,
->>  	return ret;
->>  }
->
-> This appears to be a random unrelated change, should probably be part of
-> the initial driver commit.
+>> To me it seems like perhaps cpufreq should not be changing frequencies
+>> until it is resumed properly.  Presumably if all the ordering is done
+>> right then cpufreq should be resumed _after_ the i2c regulator so you
+>> should be OK.  ...or am I somehow confused about that?
+> 
+> yes?the cpufreq and regulator should start i2c job after they resume
+> properly.
+> 
+>>
+>> Also note that previous i2c busses I worked with simply returned -EIO
+>> in the case where they were called when suspended.  See
+>> "i2c-exynos5.c" and "i2c-s3c2410.c".
+> 
+> In "i2c-exynos5.c", it seems that using the "i2c->suspended" to protect
+> i2c transfer works most of the time. Of course it could prevent the next
+> new i2c transfer to start. But in one case, if the current i2c job was
+> not finished until the i2c irq was disabled by system suspend, the i2c
+> timeout error would also happen, as the current i2c job may have a large
+> data to transfer and it lasts from a long time.
 
-Good catch
+And this means you have bug in some of I2C client drivers which do not stop
+their activities during suspend properly (most usual case - driver uses work
+and this work still active during suspend and can run on one CPU while suspend
+runs on another).
 
->
->> +static int a3700_spi_fifo_transfer_one(struct spi_master *master,
->> +				       struct spi_device *spi,
->> +				       struct spi_transfer *xfer)
->> +{
->> +	struct a3700_spi *a3700_spi = spi_master_get_devdata(master);
->> +	int ret = 0, timeout = A3700_SPI_TIMEOUT;
->> +	unsigned int nbits = 0;
->> +	u32 val;
->> +
->> +	a3700_spi_transfer_setup(spi, xfer);
->> +
->> +	a3700_spi->tx_buf  = xfer->tx_buf;
->> +	a3700_spi->rx_buf  = xfer->rx_buf;
->> +	a3700_spi->buf_len = xfer->len;
->> +
->> +	/* SPI transfer headers */
->> +	a3700_spi_header_set(a3700_spi);
->> +
->> +	if (xfer->tx_buf)
->> +		nbits = xfer->tx_nbits;
->> +	else if (xfer->rx_buf)
->> +		nbits = xfer->rx_nbits;
->> +
->> +	a3700_spi_pin_mode_set(a3700_spi, nbits);
->> +
->> +	if (xfer->rx_buf) {
->> +		/* Set read data length */
->> +		spireg_write(a3700_spi, A3700_SPI_IF_DIN_CNT_REG,
->> +			     a3700_spi->buf_len);
->> +		/* Start READ transfer */
->> +		val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
->> +		val &= ~A3700_SPI_RW_EN;
->> +		val |= A3700_SPI_XFER_START;
->> +		spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
->> +	} else if (xfer->tx_buf) {
->> +		/* Start Write transfer */
->
-> So this only supports single duplex transfers but there doesn't seem to
-> be anything that enforces this.
->
+At the moment .suspend_noirq() callback is called there should be no active
+I2C transactions in general.
 
-A flag or a capability, typically? I will investigate
+> 
+> So is it necessary to add a mutex lock to wait the current job to be
+> finished before the "i2c->suspended" is changed in i2c_suspend_noirq()?
+> 
 
-Thanks,
-Romain
+You need to catch and fix all driver who will try to access I2C after your
+I2C bus driver passes suspend_noirq stage. Smth, like [1], uses i2c_lock_adapter().
+ 
+
+[1] https://git.ti.com/android-sdk/kernel-omap/commit/125ef8f7016e7b205886f93862288a45a312b1d8
 
 -- 
-Romain Perier, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+regards,
+-grygorii
