@@ -1,42 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 07 Dec 2016 22:35:42 +0100
-Subject: [RFC PATCH 00/23] arm: defconfigs: use kconfig fragments
-In-Reply-To: <CAOesGMi_mLG+tS0Ya8G9KLO_sUYGtLmgcvFfpn0Nwbd-KMKOrQ@mail.gmail.com>
-References: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
- <8292218.3BDisRkZdU@wuerfel>
- <CAOesGMi_mLG+tS0Ya8G9KLO_sUYGtLmgcvFfpn0Nwbd-KMKOrQ@mail.gmail.com>
-Message-ID: <2155947.mOKhpZPiAn@wuerfel>
+From: andreas2025@gmail.com (Andy Ng)
+Date: Wed, 7 Dec 2016 21:39:03 +0000
+Subject: IMX6S MRII does not work
+In-Reply-To: <CAAVaN8z8jAkPw-=bDxNUvZOL4xB7ZK2_hkGyp8FQSE6ivhzeTQ@mail.gmail.com>
+References: <CAAVaN8z8jAkPw-=bDxNUvZOL4xB7ZK2_hkGyp8FQSE6ivhzeTQ@mail.gmail.com>
+Message-ID: <CAAVaN8z0tKSFBtuOLe_cYboY_R=jeNggZ4Sv+bEVq-ErHq9PTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, December 7, 2016 1:14:02 PM CET Olof Johansson wrote:
-> >
-> > - A "debug" fragment would be nice, to turn on common options that
-> >   add a lot of useful runtime checks at the expense of performance
-> >   or code size.
-> 
-> Hmm, some of these might work but several useful debug options (in
-> particular DEBUG_LL for early errors) are per-system/platform.
+Just an update...
 
-I was thinking mostly of architecture-independent options, i.e.
-the stuff that is in lib/Kconfig.debug but isn't too expensive
-to be run in a regular test environment. Enabling those
-for a build/boot automation environment would be particularly
-useful as you'd catch more bugs that get introduced through
-a random patch.
+I have put a scope on ENET_REF_CLK to check what comes out from the
+PAD_GPIO16. The uboot shows 50MHz, and when in the kernel it goes
+125MHz. And for sure that doesn't do
 
-> > - A "distro" fragment that turns on all loadable modules that are
-> >   enabled by common distributions (e.g. two or more of
-> >   debian/fedora/opensuse/gentoo), to let you build a drop-in
-> >   replacement kernel for a shipping distro. This would also allow
-> >   the distros to strip their own config files and just specify
-> >   whatever differs from the others.
-> 
-> Keeping this in sync with the distro kernel could be a bit awkward
-> (and possibly churny).
-
-It would certainly need buy-in from distro maintainers. I've discussed
-this with Laura Abbott in the past, and she was interested in
-principle.
-
-	Arnd
+On Wed, Dec 7, 2016 at 12:44 AM, Andy Ng <andreas2025@gmail.com> wrote:
+> Hello,
+>
+> I have quite recent kernel linux-4.1.20 from Freescale's git repo.
+>
+>
+> I am using MRII and a fec setup that uses clock that goes to the phy too.
+>
+>
+> My dtsi has:
+>
+>     pinctrl_enet: enetgrp {
+>             fsl,pins = <
+>                 MX6QDL_PAD_ENET_MDIO__ENET_MDIO        0x1b0b0
+>                 MX6QDL_PAD_ENET_MDC__ENET_MDC          0x1b0b0
+>                 MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN  0x1b0b0
+>                 MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0  0x1b0b0
+>                 MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1  0x1b0b0
+>                 MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN      0x1b0b0
+>                 MX6QDL_PAD_ENET_RX_ER__ENET_RX_ER      0x1b0b0
+>                 MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0    0x1b0b0
+>                 MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1     0x1b0b0
+>                MX6QDL_PAD_GPIO_16__ENET_REF_CLK        0x4001b0a8
+>
+>             >;
+>         };
+>
+>
+> the fec entry:
+>
+> &fec {
+>     pinctrl-names = "default";
+>     pinctrl-0 = <&pinctrl_enet>;
+>     phy-mode = "rmii";
+>     phy-reset-duration = <2>;
+>     phy-reset-gpios = <&gpio2 9 GPIO_ACTIVE_LOW>;
+>     status = "okay";
+> };
+>
+>
+> The kernel comes up and detects the phy (MDIO works), but it seems fec
+> is not doing much:
+>
+> INIT: Entering runlevel: 5
+> Configuring network interfaces... RMII Detected
+> fec 2188000.ethernet eth0: Freescale FEC PHY driver [SMSC
+> LAN8710/LAN8720] (mii_bus:phy_addr=2188000.ethernet:00, irq=-1)
+> IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
+> udhcpc (v1.24.1) started
+> Sending discover...
+> Sending discover...
+> Sending discover...
+> No lease, forking to background
+> done.
+>
+> I have checked the code, and  I've found very few boards that use
+> rmii, and from those, most of them are using external clock for the
+> phy.
+>
+> I have the impression that GPIO_16_ENET_REF_CLK with SION bit ON may
+> not have been tested, as there is no imx6 ref board that uses
+> that mode.
+>
+> Did anyone else have seen the same issue?
+> Any thoughts will be very much appreciated.
+>
+> Thank you
+> Andy
