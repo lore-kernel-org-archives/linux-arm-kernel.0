@@ -1,60 +1,108 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 7 Dec 2016 16:15:08 +0100
-Subject: [RFC v3 05/10] iommu: Do not map reserved regions
-In-Reply-To: <fff44f65-d9a6-1e35-97cd-997b92d2fce3@arm.com>
-References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
- <1479215363-2898-6-git-send-email-eric.auger@redhat.com>
- <fff44f65-d9a6-1e35-97cd-997b92d2fce3@arm.com>
-Message-ID: <a6954c16-dc81-8694-2b4b-10f0c47dd2d6@redhat.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 07 Dec 2016 17:17:45 +0200
+Subject: [PATCH v5 4/5] [media] dt-bindings: add TI VPIF documentation
+In-Reply-To: <20161207050826.23174-5-khilman@baylibre.com>
+References: <20161207050826.23174-1-khilman@baylibre.com>
+ <20161207050826.23174-5-khilman@baylibre.com>
+Message-ID: <7493249.S63p6GTauu@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin
+Hi Kevin,
 
-On 06/12/2016 18:36, Robin Murphy wrote:
-> On 15/11/16 13:09, Eric Auger wrote:
->> As we introduced IOMMU_RESV_NOMAP and IOMMU_RESV_MSI regions,
->> let's prevent those new regions from being mapped.
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->> ---
->>  drivers/iommu/iommu.c | 3 +++
->>  1 file changed, 3 insertions(+)
->>
->> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
->> index 6ee529f..a4530ad 100644
->> --- a/drivers/iommu/iommu.c
->> +++ b/drivers/iommu/iommu.c
->> @@ -343,6 +343,9 @@ static int iommu_group_create_direct_mappings(struct iommu_group *group,
->>  		start = ALIGN(entry->start, pg_size);
->>  		end   = ALIGN(entry->start + entry->length, pg_size);
->>  
->> +		if (entry->prot & IOMMU_RESV_MASK)
-> 
-> This seems to be the only place that this mask is used, and frankly I
-> think it's less clear than simply "(IOMMU_RESV_NOMAP | IOMMU_RESV_MSI)"
-> would be, at which point we may as well drop the mask and special value
-> trickery altogether. Plus, per my previous comment, if it were to be "if
-> (entry->type != <direct mapped type>)" instead, that's about as obvious
-> as it can get.
-OK I will add this new type entry in the reserved window struct.
+Thank you for the patch.
 
-thanks
+On Tuesday 06 Dec 2016 21:08:25 Kevin Hilman wrote:
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> ---
+> .../devicetree/bindings/media/ti,da850-vpif.txt    | 67 +++++++++++++++++++
+> 1 file changed, 67 insertions(+)
+> create mode 100644
+> Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+> b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt new file mode
+> 100644
+> index 000000000000..fa06dfdb6898
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+> @@ -0,0 +1,67 @@
+> +Texas Instruments VPIF
+> +----------------------
+> +
+> +The TI Video Port InterFace (VPIF) is the primary component for video
+> +capture and display on the DA850/AM18x family of TI DaVinci/Sitara
+> +SoCs.
+> +
+> +TI Document reference: SPRUH82C, Chapter 35
+> +http://www.ti.com/lit/pdf/spruh82
+> +
+> +Required properties:
+> +- compatible: must be "ti,da850-vpif"
+> +- reg: physical base address and length of the registers set for the
+> device;
+> +- interrupts: should contain IRQ line for the VPIF
+> +
+> +Video Capture:
+> +
+> +VPIF has a 16-bit parallel bus input, supporting 2 8-bit channels or a
+> +single 16-bit channel.  It should contain at least one port child node
+> +with child 'endpoint' node. Please refer to the bindings defined in
+> +Documentation/devicetree/bindings/media/video-interfaces.txt.
 
-Eric
-> 
-> Robin.
-> 
->> +			continue;
->> +
->>  		for (addr = start; addr < end; addr += pg_size) {
->>  			phys_addr_t phys_addr;
->>  
->>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+You might want to clarify how endpoints are use in the two cases. Apart from 
+that,
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> +Example using 2 8-bit input channels, one of which is connected to an
+> +I2C-connected TVP5147 decoder:
+> +
+> +	vpif: vpif at 217000 {
+> +		compatible = "ti,da850-vpif";
+> +		reg = <0x217000 0x1000>;
+> +		interrupts = <92>;
+> +
+> +		port {
+> +			vpif_ch0: endpoint at 0 {
+> +				  reg = <0>;
+> +				  bus-width = <8>;
+> +				  remote-endpoint = <&composite>;
+> +			};
+> +
+> +			vpif_ch1: endpoint at 1 {
+> +				  reg = <1>;
+> +				  bus-width = <8>;
+> +				  data-shift = <8>;
+> +			};
+> +		};
+> +	};
+> +
+> +[ ... ]
+> +
+> +&i2c0 {
+> +
+> +	tvp5147 at 5d {
+> +		compatible = "ti,tvp5147";
+> +		reg = <0x5d>;
+> +		status = "okay";
+> +
+> +		port {
+> +			composite: endpoint {
+> +				hsync-active = <1>;
+> +				vsync-active = <1>;
+> +				pclk-sample = <0>;
+> +
+> +				/* VPIF channel 0 (lower 8-bits) */
+> +				remote-endpoint = <&vpif_ch0>;
+> +				bus-width = <8>;
+> +			};
+> +		};
+> +	};
+> +};
+
+-- 
+Regards,
+
+Laurent Pinchart
