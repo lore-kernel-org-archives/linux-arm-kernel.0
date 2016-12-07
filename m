@@ -1,83 +1,47 @@
-From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
-Date: Wed, 7 Dec 2016 18:43:50 +0200
-Subject: [PATCH] drm: hdlcd: Work properly in big-endian mode
-In-Reply-To: <20161207155714.ldmshptddwvhsdop@phenom.ffwll.local>
-References: <f484518775c0bf063ae0a6f1e6c11bb404a7acc9.1481124156.git.robin.murphy@arm.com>
- <20161207155714.ldmshptddwvhsdop@phenom.ffwll.local>
-Message-ID: <20161207164350.GQ31595@intel.com>
+From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
+Date: Wed, 7 Dec 2016 17:43:27 +0100
+Subject: [Question] New mmap64 syscall?
+In-Reply-To: <20161207163210.GB31779@e104818-lin.cambridge.arm.com>
+References: <20161206185440.GA4654@yury-N73SV> <3014428.VXGdOARdm1@wuerfel>
+ <20161207103451.GA869@yury-N73SV>
+ <0F280FED-870A-42B5-ABC4-1976ACA32462@theobroma-systems.com>
+ <20161207123944.GA11799@yury-N73SV>
+ <20161207163210.GB31779@e104818-lin.cambridge.arm.com>
+Message-ID: <DF57E4A6-85C9-44EF-AD03-19EA688D19DB@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 04:57:14PM +0100, Daniel Vetter wrote:
-> On Wed, Dec 07, 2016 at 03:31:40PM +0000, Robin Murphy wrote:
-> > Under a big-endian kernel, colours on the framebuffer all come out a
-> > delightful shade of wrong, since we fail to take the reversed byte
-> > order into account. Fortunately, the HDLCD has a control bit to make it
-> > automatically byteswap big-endian data; let's use it as appropriate.
-> > 
-> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> 
-> fourcc codes (and the drm fourcc codes) are supposed to be little-endian.
-> All of them. So either we fix up the drivers and userspace to set that
-> flag correctly (which would mean hdlcd should expose twice as many
-> formats, each one with the little and big endian mode).
-> 
-> Or we nuke the big endian flag from drm fourcc. Adding AMD folks who afaik
-> are the only other ones who ever cared about big endian in drm.
+Catalin,
 
-I don't like the idea of nuking the flag. If the fb endianness is
-defined by the CPU, how would userspace even know that it would have
-to byteswap the data when feeding it to the device if the device
-and CPU don't agree on the endianness?
-
-> -Daniel
+> On 07 Dec 2016, at 17:32, Catalin Marinas <catalin.marinas@arm.com> wrote:
 > 
-> > ---
-> >  drivers/gpu/drm/arm/hdlcd_crtc.c | 7 ++++++-
-> >  1 file changed, 6 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> > index 28341b32067f..eceb7bed5dd0 100644
-> > --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
-> > +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> > @@ -63,6 +63,7 @@ static int hdlcd_set_pxl_fmt(struct drm_crtc *crtc)
-> >  	uint32_t pixel_format;
-> >  	struct simplefb_format *format = NULL;
-> >  	int i;
-> > +	u32 reg;
-> >  
-> >  	pixel_format = crtc->primary->state->fb->pixel_format;
-> >  
-> > @@ -76,7 +77,11 @@ static int hdlcd_set_pxl_fmt(struct drm_crtc *crtc)
-> >  
-> >  	/* HDLCD uses 'bytes per pixel', zero means 1 byte */
-> >  	btpp = (format->bits_per_pixel + 7) / 8;
-> > -	hdlcd_write(hdlcd, HDLCD_REG_PIXEL_FORMAT, (btpp - 1) << 3);
-> > +	reg = (btpp - 1) << 3;
-> > +#ifdef __BIG_ENDIAN
-> > +	reg |= HDLCD_PIXEL_FMT_BIG_ENDIAN;
-> > +#endif
-> > +	hdlcd_write(hdlcd, HDLCD_REG_PIXEL_FORMAT, reg);
-> >  
-> >  	/*
-> >  	 * The format of the HDLCD_REG_<color>_SELECT register is:
-> > -- 
-> > 2.10.2.dirty
-> > 
-> > _______________________________________________
-> > dri-devel mailing list
-> > dri-devel at lists.freedesktop.org
-> > https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>>> In other words: Why not keep ILP32 simple an ask users that need a 16TB+ offset
+>>> to use LP64? It seems much more consistent with the other choices takes so far.
+>> 
+>> If user can switch to lp64, he doesn't need ilp32 at all, right? :)
+>> Also, I don't understand how true 64-bit offset in mmap64() would
+>> complicate this port.
 > 
-> -- 
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> http://blog.ffwll.ch
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> It's more like the user wanting a quick transition from code that was
+> only ever compiled for AArch32 (or other 32-bit architecture) with a
+> goal of full LP64 transition on the long run. I have yet to see
+> convincing benchmarks showing ILP32 as an advantage over LP64 (of
+> course, I hear the argument of reading a pointer a loop is twice as fast
+> with a half-size pointer but I don't consider such benchmarks relevant).
 
--- 
-Ville Syrj?l?
-Intel OTC
+Most of the performance advantage in benchmarks comes from a reduction
+in the size of data-structures and/or tighter packing of arrays.  In other words,
+we can make slightly better use of the caches and push the memory subsystem
+a little further when running multiple instances of benchmarks.
+
+Most of these advantages should eventually go away, when struct-reorg makes
+it way into the compiler. That said, it?s a marginal (but real) improvement for a
+subset of SPEC.
+
+In the real world, the importance of ILP32 as an aid to transition legacy code
+that is not 64bit clean? and this should drive the ILP32 discussion. That we
+get a boost in our SPEC scores is just a nice extra that we get from it ;-)
+
+
+Regards,
+Philipp.
