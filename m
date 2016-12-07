@@ -1,29 +1,33 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 7 Dec 2016 09:57:43 +0100
-Subject: [PATCH 1/3] ARM: dts: at91: add dma1 definition to sama5d2
-In-Reply-To: <20161201104949.23985-1-nicolas.ferre@atmel.com>
-References: <20161201104949.23985-1-nicolas.ferre@atmel.com>
-Message-ID: <20161207085743.qlomgd4ly54q5oah@piout.net>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 7 Dec 2016 10:02:19 +0100
+Subject: [PATCH 08/16] drivers/fsi: Add crc4 helpers
+In-Reply-To: <1481076574-54711-2-git-send-email-christopher.lee.bostic@gmail.com>
+References: <1481076574-54711-1-git-send-email-christopher.lee.bostic@gmail.com>
+ <1481076574-54711-2-git-send-email-christopher.lee.bostic@gmail.com>
+Message-ID: <20161207090219.GA14742@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2016 at 11:49:47 +0100, Nicolas Ferre wrote :
-> The sama5d2 SoC has a second DMA controller and can be used just like DMA0.
-> By default both DMA controllers are configured as "Secure" in
-> MATRIX_SPSELR so we can use whichever we want in a "single Secure World"
-> configuration.
-> Surprisingly the DMA1 has a lower address than DMA0. To avoid confusion
-> place it after DMA0 node anyway.
+On Tue, Dec 06, 2016 at 08:09:31PM -0600, Chris Bostic wrote:
+> From: Jeremy Kerr <jk@ozlabs.org>
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Add some helpers for the crc checks for the slave configuration table.
+> This works 4-bits-at-a-time, using a simple table approach.
+> 
+> We will need this in the FSI core code, as well as any master
+> implementations that need to calculate CRCs in software.
+> 
+> Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+> Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
 > ---
->  arch/arm/boot/dts/sama5d2.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
+>  drivers/fsi/fsi-core.c   | 21 +++++++++++++++++++++
+>  drivers/fsi/fsi-master.h | 21 +++++++++++++++++++++
+>  2 files changed, 42 insertions(+)
 
-All applied, thanks.
+Why not just create lib/crc4.c with these functions, like the other crc
+functions in the kernel?  Don't bury these in some random driver
+subsystem please.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+thanks,
+
+greg k-h
