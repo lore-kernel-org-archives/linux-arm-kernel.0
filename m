@@ -1,136 +1,282 @@
-From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Tue, 6 Dec 2016 17:00:25 -0700
-Subject: [PATCH 3/4] iommu/arm-smmu: Disable stalling faults for all
- endpoints
-In-Reply-To: <CAF6AEGujUb37qagBZK1T13eAh=50zy0z5HpFF9FsuvkZZ7c5qw@mail.gmail.com>
-References: <1471525542-14969-1-git-send-email-will.deacon@arm.com>
- <1471525542-14969-4-git-send-email-will.deacon@arm.com>
- <CAF6AEGujUb37qagBZK1T13eAh=50zy0z5HpFF9FsuvkZZ7c5qw@mail.gmail.com>
-Message-ID: <20161207000025.GB21862@jcrouse-lnx.qualcomm.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Wed, 07 Dec 2016 11:04:41 +1100
+Subject: [PATCH] ipmi: bt-bmc: Use a regmap for register access
+In-Reply-To: <36014e0c-82f8-eeaf-ee2a-6c1e413b957d@kaod.org>
+References: <20161206025715.2002-1-andrew@aj.id.au>
+ <36014e0c-82f8-eeaf-ee2a-6c1e413b957d@kaod.org>
+Message-ID: <1481069081.7840.3.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2016 at 06:30:21PM -0500, Rob Clark wrote:
-> On Thu, Aug 18, 2016 at 9:05 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > Enabling stalling faults can result in hardware deadlock on poorly
-> > designed systems, particularly those with a PCI root complex upstream of
-> > the SMMU.
-> >
-> > Although it's not really Linux's job to save hardware integrators from
-> > their own misfortune, it *is* our job to stop userspace (e.g. VFIO
-> > clients) from hosing the system for everybody else, even if they might
-> > already be required to have elevated privileges.
-> >
-> > Given that the fault handling code currently executes entirely in IRQ
-> > context, there is nothing that can sensibly be done to recover from
-> > things like page faults anyway, so let's rip this code out for now and
-> > avoid the potential for deadlock.
+On Tue, 2016-12-06 at 16:02 +0100, C?dric Le Goater wrote:
+> [ this is a resend bc of some mailing list issues]?
+
+Thanks for resending.
+
 > 
-> Hi Will,
+> On 12/06/2016 03:57 AM, Andrew Jeffery wrote:
+> > The registers for the bt-bmc device live under the Aspeed LPC
+> > controller. Devicetree bindings have recently been introduced for the
+> > LPC controller where the "host" portion of the LPC register space is
+> > described as a syscon device. Future devicetrees describing the bt-bmc
+> > device should nest its node under the appropriate "simple-mfd", "syscon"
+> > compatible node.
+> > 
+> > This change allows the bt-bmc driver to function with both syscon and
+> > non-syscon- based devicetree descriptions by always using a regmap for
+> > register access, either retrieved from the parent syscon device or
+> > instantiated if none exists.
+> > 
+> > The patch has been tested on an OpenPOWER Palmetto machine, successfully
+> > booting, rebooting and powering down the host.
+> > 
+> > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
 > 
-> so, I'd like to re-introduce this feature, I *guess* as some sort of
-> opt-in quirk (ie. disabled by default unless something in DT tells you
-> otherwise??  But I'm open to suggestions.  I'm not entirely sure what
-> hw was having problems due to this feature.)
+> It would be nice to have an example of the associated binding.?
+> I did not see it.
+
+Essentially because the approach of the patch means there's no required
+change to the bindings documentation. So, pulling together the various
+patches I've sent out, a partial devicetree using the new bindings
+might look something like:
+
+lpc: lpc at 1e789000 {
+	compatible = "aspeed,ast2500-lpc", "simple-mfd";
+	reg = <0x1e789000 0x1000>;
+
+	#address-cells = <1>;
+	#size-cells = <1>;
+	ranges = <0 0x1e789000 0x1000>;
+
+	lpc_bmc: lpc-bmc at 0 {
+		compatible = "aspeed,ast2500-lpc-bmc";
+		reg = <0x0 0x80>;
+		reg-io-width = <1>;
+	};
+
+	lpc_host: lpc-host at 80 {
+		compatible = "aspeed,ast2500-lpc-host", "simple-mfd", "syscon";
+		reg = <0x80 0x1e0>;
+
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0 0x80 0x1e0>;
+
+		reg-io-width = <4>;
+
+		ibt: ibt at c0 {
+			compatible = "aspeed,ast2400-bt-bmc";
+			reg = <0xc0 0x18>;
+			interrupts = <8>;
+		};
+	};
+};
+
+It's a bit tedious, but as mentioned in the commit message we need a
+way to arbitrate access to other registers in the "host" portion of the
+LPC controller amongst other complications, and this layout gives us
+that capability without breaking any existing bindings.
+
+Andrew
+
+
+>  A part from that :
 > 
-> On newer snapdragon devices we are using arm-smmu for the GPU, and
-> halting the GPU so the driver's fault handler can dump some GPU state
-> on faults is enormously helpful for debugging and tracking down where
-> in the gpu cmdstream the fault was triggered.  In addition, we will
-> eventually want the ability to update pagetables from fault handler
-> and resuming the faulting transition.
+> > Reviewed-by: C?dric Le Goater <clg@kaod.org>
 > 
-> Some additional comments below..
+> Thanks,
 > 
-> > Cc: <stable@vger.kernel.org>
-> > Reported-by: Matt Evans <matt.evans@arm.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> C.
+> 
 > > ---
-> >  drivers/iommu/arm-smmu.c | 34 +++++++---------------------------
-> >  1 file changed, 7 insertions(+), 27 deletions(-)
-> >
-> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> > index 4f49fe29f202..2db74ebc3240 100644
-> > --- a/drivers/iommu/arm-smmu.c
-> > +++ b/drivers/iommu/arm-smmu.c
-> > @@ -686,8 +686,7 @@ static struct iommu_gather_ops arm_smmu_gather_ops = {
-> >
-> >  static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
-> >  {
-> > -       int flags, ret;
-> > -       u32 fsr, fsynr, resume;
-> > +       u32 fsr, fsynr;
-> >         unsigned long iova;
-> >         struct iommu_domain *domain = dev;
-> >         struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-> > @@ -701,34 +700,15 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
-> >         if (!(fsr & FSR_FAULT))
-> >                 return IRQ_NONE;
-> >
-> > -       if (fsr & FSR_IGN)
-> > -               dev_err_ratelimited(smmu->dev,
-> > -                                   "Unexpected context fault (fsr 0x%x)\n",
-> > -                                   fsr);
-> > -
-> >         fsynr = readl_relaxed(cb_base + ARM_SMMU_CB_FSYNR0);
-> > -       flags = fsynr & FSYNR0_WNR ? IOMMU_FAULT_WRITE : IOMMU_FAULT_READ;
-> > -
-> >         iova = readq_relaxed(cb_base + ARM_SMMU_CB_FAR);
-> > -       if (!report_iommu_fault(domain, smmu->dev, iova, flags)) {
-> > -               ret = IRQ_HANDLED;
-> > -               resume = RESUME_RETRY;
-> > -       } else {
-> > -               dev_err_ratelimited(smmu->dev,
-> > -                   "Unhandled context fault: iova=0x%08lx, fsynr=0x%x, cb=%d\n",
-> > -                   iova, fsynr, cfg->cbndx);
+> > ?drivers/char/ipmi/Kconfig??|??1 +
+> > ?drivers/char/ipmi/bt-bmc.c | 82 ++++++++++++++++++++++++++++++++++------------
+> > ?2 files changed, 62 insertions(+), 21 deletions(-)
+> > 
+> > diff --git a/drivers/char/ipmi/Kconfig b/drivers/char/ipmi/Kconfig
+> > index 7f816655cbbf..b5d48d9af124 100644
+> > --- a/drivers/char/ipmi/Kconfig
+> > +++ b/drivers/char/ipmi/Kconfig
+> > @@ -79,6 +79,7 @@ endif # IPMI_HANDLER
+> > ?
+> > ?config ASPEED_BT_IPMI_BMC
+> > > > ?	depends on ARCH_ASPEED
+> > +????????depends on REGMAP && REGMAP_MMIO && MFD_SYSCON
+> > > > ?	tristate "BT IPMI bmc driver"
+> > > > ?	help
+> > > > ?	??Provides a driver for the BT (Block Transfer) IPMI interface
+> > diff --git a/drivers/char/ipmi/bt-bmc.c b/drivers/char/ipmi/bt-bmc.c
+> > index fc9e8891eae3..ca1e20f6c6c5 100644
+> > --- a/drivers/char/ipmi/bt-bmc.c
+> > +++ b/drivers/char/ipmi/bt-bmc.c
+> > @@ -12,10 +12,13 @@
+> > ?#include <linux/errno.h>
+> > ?#include <linux/interrupt.h>
+> > ?#include <linux/io.h>
+> > +#include <linux/mfd/syscon.h>
+> > ?#include <linux/miscdevice.h>
+> > ?#include <linux/module.h>
+> > +#include <linux/of.h>
+> > ?#include <linux/platform_device.h>
+> > ?#include <linux/poll.h>
+> > +#include <linux/regmap.h>
+> > ?#include <linux/sched.h>
+> > ?#include <linux/timer.h>
+> > ?
+> > @@ -60,7 +63,8 @@
+> > ?struct bt_bmc {
+> > > > > > ?	struct device		dev;
+> > > > > > ?	struct miscdevice	miscdev;
+> > > > > > -	void __iomem		*base;
+> > > > > > +	struct regmap		*map;
+> > > > > > +	int			offset;
+> > > > > > ?	int			irq;
+> > > > > > ?	wait_queue_head_t	queue;
+> > > > > > ?	struct timer_list	poll_timer;
+> > @@ -69,14 +73,31 @@ struct bt_bmc {
+> > ?
+> > ?static atomic_t open_count = ATOMIC_INIT(0);
+> > ?
+> > +static struct regmap_config bt_regmap_cfg = {
+> > > > +	.reg_bits = 32,
+> > > > +	.val_bits = 32,
+> > > > +	.reg_stride = 4,
+> > +};
+> > +
+> > ?static u8 bt_inb(struct bt_bmc *bt_bmc, int reg)
+> > ?{
+> > > > -	return ioread8(bt_bmc->base + reg);
+> > > > +	uint32_t val = 0;
+> > > > +	int rc;
+> > +
+> > > > +	rc = regmap_read(bt_bmc->map, bt_bmc->offset + reg, &val);
+> > > > +	WARN(rc != 0, "%s:%d: regmap_read() failed: %d\n",
+> > > > +			__FILE__, __LINE__, rc);
+> > +
+> > > > +	return rc == 0 ? (u8) val : 0;
+> > ?}
+> > ?
+> > ?static void bt_outb(struct bt_bmc *bt_bmc, u8 data, int reg)
+> > ?{
+> > > > -	iowrite8(data, bt_bmc->base + reg);
+> > > > +	int rc;
+> > +
+> > > > +	rc = regmap_write(bt_bmc->map, bt_bmc->offset + reg, data);
+> > > > +	WARN(rc != 0, "%s:%d: regmap_write() failed: %d\n",
+> > > > +			__FILE__, __LINE__, rc);
+> > ?}
+> > ?
+> > ?static void clr_rd_ptr(struct bt_bmc *bt_bmc)
+> > @@ -367,14 +388,18 @@ static irqreturn_t bt_bmc_irq(int irq, void *arg)
+> > ?{
+> > > > ?	struct bt_bmc *bt_bmc = arg;
+> > > > ?	u32 reg;
+> > > > +	int rc;
+> > +
+> > > > +	rc = regmap_read(bt_bmc->map, bt_bmc->offset + BT_CR2, &reg);
+> > > > +	if (rc)
+> > > > +		return IRQ_NONE;
+> > ?
+> > > > -	reg = ioread32(bt_bmc->base + BT_CR2);
+> > > > ?	reg &= BT_CR2_IRQ_H2B | BT_CR2_IRQ_HBUSY;
+> > > > ?	if (!reg)
+> > > > ?		return IRQ_NONE;
+> > ?
+> > > > ?	/* ack pending IRQs */
+> > > > -	iowrite32(reg, bt_bmc->base + BT_CR2);
+> > > > +	regmap_write(bt_bmc->map, bt_bmc->offset + BT_CR2, reg);
+> > ?
+> > > > ?	wake_up(&bt_bmc->queue);
+> > > > ?	return IRQ_HANDLED;
+> > @@ -384,7 +409,6 @@ static int bt_bmc_config_irq(struct bt_bmc *bt_bmc,
+> > > > ?			?????struct platform_device *pdev)
+> > ?{
+> > > > ?	struct device *dev = &pdev->dev;
+> > > > -	u32 reg;
+> > > > ?	int rc;
+> > ?
+> > > > ?	bt_bmc->irq = platform_get_irq(pdev, 0);
+> > @@ -405,18 +429,17 @@ static int bt_bmc_config_irq(struct bt_bmc *bt_bmc,
+> > > > ?	?* will be cleared (along with B2H) when we can write the next
+> > > > ?	?* message to the BT buffer
+> > > > ?	?*/
+> > > > -	reg = ioread32(bt_bmc->base + BT_CR1);
+> > > > -	reg |= BT_CR1_IRQ_H2B | BT_CR1_IRQ_HBUSY;
+> > > > -	iowrite32(reg, bt_bmc->base + BT_CR1);
+> > > > +	rc = regmap_update_bits(bt_bmc->map, bt_bmc->offset + BT_CR1,
+> > > > +				(BT_CR1_IRQ_H2B | BT_CR1_IRQ_HBUSY),
+> > > > +				(BT_CR1_IRQ_H2B | BT_CR1_IRQ_HBUSY));
+> > ?
+> > > > -	return 0;
+> > > > +	return rc;
+> > ?}
+> > ?
+> > ?static int bt_bmc_probe(struct platform_device *pdev)
+> > ?{
+> > > > ?	struct bt_bmc *bt_bmc;
+> > > > ?	struct device *dev;
+> > > > -	struct resource *res;
+> > > > ?	int rc;
+> > ?
+> > > > ?	if (!pdev || !pdev->dev.of_node)
+> > @@ -431,10 +454,27 @@ static int bt_bmc_probe(struct platform_device *pdev)
+> > ?
+> > > > ?	dev_set_drvdata(&pdev->dev, bt_bmc);
+> > ?
+> > > > -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > > -	bt_bmc->base = devm_ioremap_resource(&pdev->dev, res);
+> > > > -	if (IS_ERR(bt_bmc->base))
+> > > > -		return PTR_ERR(bt_bmc->base);
+> > > > +	bt_bmc->map = syscon_node_to_regmap(pdev->dev.parent->of_node);
+> > > > +	if (IS_ERR(bt_bmc->map)) {
+> > > > +		struct resource *res;
+> > > > +		void __iomem *base;
+> > +
+> > > > +		/*
+> > > > +		?* Assume it's not the MFD-based devicetree description, in
+> > > > +		?* which case generate a regmap ourselves
+> > > > +		?*/
+> > > > +		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > > +		base = devm_ioremap_resource(&pdev->dev, res);
+> > > > +		if (IS_ERR(base))
+> > > > +			return PTR_ERR(base);
+> > +
+> > > > +		bt_bmc->map = devm_regmap_init_mmio(dev, base, &bt_regmap_cfg);
+> > > > +		bt_bmc->offset = 0;
+> > > > +	} else {
+> > > > +		rc = of_property_read_u32(dev->of_node, "reg", &bt_bmc->offset);
+> > > > +		if (rc)
+> > > > +			return rc;
+> > > > +	}
+> > ?
+> > > > ?	mutex_init(&bt_bmc->mutex);
+> > > > ?	init_waitqueue_head(&bt_bmc->queue);
+> > @@ -461,12 +501,12 @@ static int bt_bmc_probe(struct platform_device *pdev)
+> > > > ?		add_timer(&bt_bmc->poll_timer);
+> > > > ?	}
+> > ?
+> > > > -	iowrite32((BT_IO_BASE << BT_CR0_IO_BASE) |
+> > > > -		??(BT_IRQ << BT_CR0_IRQ) |
+> > > > -		??BT_CR0_EN_CLR_SLV_RDP |
+> > > > -		??BT_CR0_EN_CLR_SLV_WRP |
+> > > > -		??BT_CR0_ENABLE_IBT,
+> > > > -		??bt_bmc->base + BT_CR0);
+> > > > +	regmap_write(bt_bmc->map, bt_bmc->offset + BT_CR0,
+> > > > +		?????(BT_IO_BASE << BT_CR0_IO_BASE) |
+> > > > +		?????(BT_IRQ << BT_CR0_IRQ) |
+> > > > +		?????BT_CR0_EN_CLR_SLV_RDP |
+> > > > +		?????BT_CR0_EN_CLR_SLV_WRP |
+> > > > +		?????BT_CR0_ENABLE_IBT);
+> > ?
+> > > > ?	clr_b_busy(bt_bmc);
+> > ?
+> > 
 > 
-> I would like to decouple this dev_err_ratelimit() print from the
-> RESUME_RETRY vs RESUME_TERMINATE behaviour.  I need the ability to
-> indicate by return from my fault handler whether to resume or
-> terminate.  But I already have my own ratelimted prints and would
-> prefer not to spam dmesg twice.
 > 
-> I'm thinking about report_iommu_fault() returning:
-> 
->   0 => RESUME_RETRY
->   -EFAULT => RESUME_TERMINATE but don't print
->   anything else (or specifically -ENOSYS?) => RESUME_TERMINATE and print
-> 
-> thoughts?
-> 
-> > -               ret = IRQ_NONE;
-> > -               resume = RESUME_TERMINATE;
-> > -       }
-> > -
-> > -       /* Clear the faulting FSR */
-> > -       writel(fsr, cb_base + ARM_SMMU_CB_FSR);
-> >
-> > -       /* Retry or terminate any stalled transactions */
-> > -       if (fsr & FSR_SS)
-> > -               writel_relaxed(resume, cb_base + ARM_SMMU_CB_RESUME);
-> 
-> This might be a bug in qcom's implementation of the smmu spec, but
-> seems like we don't have SS bit set, yet we still require RESUME reg
-> to be written, otherwise gpu is perma-wedged.  Maybe topic for a
-> separate quirk?  I'm not sure if writing RESUME reg on other hw when
-> SS bit is not set is likely to cause problems?  If not I suppose we
-> could just unconditionally write it.
-> 
-> Anyways, I'm not super-familiar w/ arm-smmu so suggestions welcome..
-> in between debugging freedreno I'll try to put together some patches.
-
->From what I can tell we need SCTLR_CFCFG to make the stall happen otherwise
-the operation just gets terminated immediately and *then* we get notification
-but by then the system keeps going.
-
-I think SCTLR_HUPCF helps control that behavior (i.e. we don't go off faulting
-through eternity) but I don't know how it works.
-
->From my very unlearned understanding I think we do want to set CFCFG and then
-stall and let the interrupt handler decide to retry/terminate.
-
-Jordan
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161207/5506c9cf/attachment-0001.sig>
