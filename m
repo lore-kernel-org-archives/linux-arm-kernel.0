@@ -1,72 +1,111 @@
-From: liviu.dudau@arm.com (liviu.dudau at arm.com)
-Date: Wed, 7 Dec 2016 16:11:45 +0000
-Subject: [PATCH] drm: hdlcd: Work properly in big-endian mode
-In-Reply-To: <f484518775c0bf063ae0a6f1e6c11bb404a7acc9.1481124156.git.robin.murphy@arm.com>
-References: <f484518775c0bf063ae0a6f1e6c11bb404a7acc9.1481124156.git.robin.murphy@arm.com>
-Message-ID: <20161207161144.GA838@e106497-lin.cambridge.arm.com>
+From: romain.perier@free-electrons.com (Romain Perier)
+Date: Wed, 7 Dec 2016 17:19:57 +0100
+Subject: [PATCH v3 2/5] spi: armada-3700: Add support for the FIFO mode
+In-Reply-To: <20161205133728.sza2pt4tfkywu35k@sirena.org.uk>
+References: <20161201102719.4291-1-romain.perier@free-electrons.com>
+ <20161201102719.4291-3-romain.perier@free-electrons.com>
+ <20161205133728.sza2pt4tfkywu35k@sirena.org.uk>
+Message-ID: <a9b86043-b631-8154-edc8-5abe49e47114@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 03:31:40PM +0000, Robin Murphy wrote:
-> Under a big-endian kernel, colours on the framebuffer all come out a
-> delightful shade of wrong, 
+Hello,
 
-So you are saying that wrong is only a 1 bit value?
+Le 05/12/2016 ? 14:37, Mark Brown a ?crit :
+> On Thu, Dec 01, 2016 at 11:27:16AM +0100, Romain Perier wrote:
+>
+>> Changes in v3:
+>>  - Don't enable the fifo mode based on the compatible string, we introduce
+>>    a module parameter "pio_mode". By default this option is set to zero, so
+>>    the fifo mode is enabled. Pass pio_mode=1 to the driver enables the PIO
+>>    mode.
+>
+> Why?  If the hardware supports a more efficient mode of operation it
+> doesn't seem sensible not to use it.
 
+That's just that our customer want to keep both modes, this is why I 
+decided to use the more efficient mode by default and disable it via a 
+module parameter. Previously the more efficient mode was always enabled, 
+based on the "compatible string" of the DT (the PIO mode was simply 
+useless in this case and dead code)
 
-> since we fail to take the reversed byte
-> order into account. Fortunately, the HDLCD has a control bit to make it
-> automatically byteswap big-endian data; let's use it as appropriate.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>
+>> -	int i;
+>> +	int i, ret = 0;
+>
+> Coding style - don't combine initialized and non-initalized variables on
+> one line.
 
-Change looks good to me, but as Daniel has mentioned, we should have failed
-the modesetting as the buffer we are passed should be in the wrong fourcc format.
+Ok
 
-Any way I can play with a big-endian filesystem that you can share?
+>
+>>  static int a3700_spi_transfer_one(struct spi_master *master,
+>>  				  struct spi_device *spi,
+>>  				  struct spi_transfer *xfer)
+>>  {
+>>  	struct a3700_spi *a3700_spi = spi_master_get_devdata(master);
+>> -	int ret = 0;
+>> +	int ret;
+>>
+>>  	a3700_spi_transfer_setup(spi, xfer);
+>>
+>> @@ -505,6 +737,151 @@ static int a3700_spi_transfer_one(struct spi_master *master,
+>>  	return ret;
+>>  }
+>
+> This appears to be a random unrelated change, should probably be part of
+> the initial driver commit.
 
-Best regards,
-Liviu
+Good catch
 
-> ---
->  drivers/gpu/drm/arm/hdlcd_crtc.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> index 28341b32067f..eceb7bed5dd0 100644
-> --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
-> +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> @@ -63,6 +63,7 @@ static int hdlcd_set_pxl_fmt(struct drm_crtc *crtc)
->  	uint32_t pixel_format;
->  	struct simplefb_format *format = NULL;
->  	int i;
-> +	u32 reg;
->  
->  	pixel_format = crtc->primary->state->fb->pixel_format;
->  
-> @@ -76,7 +77,11 @@ static int hdlcd_set_pxl_fmt(struct drm_crtc *crtc)
->  
->  	/* HDLCD uses 'bytes per pixel', zero means 1 byte */
->  	btpp = (format->bits_per_pixel + 7) / 8;
-> -	hdlcd_write(hdlcd, HDLCD_REG_PIXEL_FORMAT, (btpp - 1) << 3);
-> +	reg = (btpp - 1) << 3;
-> +#ifdef __BIG_ENDIAN
-> +	reg |= HDLCD_PIXEL_FMT_BIG_ENDIAN;
-> +#endif
-> +	hdlcd_write(hdlcd, HDLCD_REG_PIXEL_FORMAT, reg);
->  
->  	/*
->  	 * The format of the HDLCD_REG_<color>_SELECT register is:
-> -- 
-> 2.10.2.dirty
-> 
+>
+>> +static int a3700_spi_fifo_transfer_one(struct spi_master *master,
+>> +				       struct spi_device *spi,
+>> +				       struct spi_transfer *xfer)
+>> +{
+>> +	struct a3700_spi *a3700_spi = spi_master_get_devdata(master);
+>> +	int ret = 0, timeout = A3700_SPI_TIMEOUT;
+>> +	unsigned int nbits = 0;
+>> +	u32 val;
+>> +
+>> +	a3700_spi_transfer_setup(spi, xfer);
+>> +
+>> +	a3700_spi->tx_buf  = xfer->tx_buf;
+>> +	a3700_spi->rx_buf  = xfer->rx_buf;
+>> +	a3700_spi->buf_len = xfer->len;
+>> +
+>> +	/* SPI transfer headers */
+>> +	a3700_spi_header_set(a3700_spi);
+>> +
+>> +	if (xfer->tx_buf)
+>> +		nbits = xfer->tx_nbits;
+>> +	else if (xfer->rx_buf)
+>> +		nbits = xfer->rx_nbits;
+>> +
+>> +	a3700_spi_pin_mode_set(a3700_spi, nbits);
+>> +
+>> +	if (xfer->rx_buf) {
+>> +		/* Set read data length */
+>> +		spireg_write(a3700_spi, A3700_SPI_IF_DIN_CNT_REG,
+>> +			     a3700_spi->buf_len);
+>> +		/* Start READ transfer */
+>> +		val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
+>> +		val &= ~A3700_SPI_RW_EN;
+>> +		val |= A3700_SPI_XFER_START;
+>> +		spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
+>> +	} else if (xfer->tx_buf) {
+>> +		/* Start Write transfer */
+>
+> So this only supports single duplex transfers but there doesn't seem to
+> be anything that enforces this.
+>
+
+A flag or a capability, typically? I will investigate
+
+Thanks,
+Romain
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Romain Perier, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
