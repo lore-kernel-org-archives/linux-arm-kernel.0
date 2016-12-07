@@ -1,34 +1,34 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Wed, 7 Dec 2016 22:15:55 +0200
-Subject: Synopsys Ethernet QoS Driver
-In-Reply-To: <87c8a24b-0812-7850-cb3f-7be691bab432@st.com>
-References: <CADvZ6ErjyVR5ShWTk0QesWLYR1m3p8yAMkK8v9gm2kN5xTv8zw@mail.gmail.com>
- <1dbb6047-2bbb-4d56-2a62-ab65a0254844@synopsys.com>
- <20161119135654.GA14079@lnxartpec.se.axis.com>
- <CAJ3bTp7PpUJcz=1JohX=A54UP6vVAafWnB0PGUBSxb5JJiO8Lg@mail.gmail.com>
- <1248f4ce-4859-10e6-fef9-342ea543f8d4@synopsys.com>
- <87c8a24b-0812-7850-cb3f-7be691bab432@st.com>
-Message-ID: <CAHp75Vf2ZncJcGguueh2fCsHaZVin8qGSk+hDUt+uRg8ffgZbQ@mail.gmail.com>
+From: ebiggers@google.com (Eric Biggers)
+Date: Wed, 7 Dec 2016 12:23:46 -0800
+Subject: [PATCH v3 1/6] crypto: testmgr - avoid overlap in chunked tests
+In-Reply-To: <CAKv+Gu_HUjCparJnZXzZR=m3obt+aypibpHrP_ivA==1QNYksg@mail.gmail.com>
+References: <1480963348-24203-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1480963348-24203-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20161207191920.GA139213@google.com>
+ <CAKv+Gu_HUjCparJnZXzZR=m3obt+aypibpHrP_ivA==1QNYksg@mail.gmail.com>
+Message-ID: <20161207202346.GB125037@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 21, 2016 at 2:52 PM, Giuseppe CAVALLARO
-<peppe.cavallaro@st.com> wrote:
+On Wed, Dec 07, 2016 at 07:53:51PM +0000, Ard Biesheuvel wrote:
+> Does this help at all?
+> 
+> diff --git a/crypto/testmgr.c b/crypto/testmgr.c
+> index 670893bcf361..59e67f5b544b 100644
+> --- a/crypto/testmgr.c
+> +++ b/crypto/testmgr.c
+> @@ -63,7 +63,7 @@ int alg_test(const char *driver, const char *alg,
+> u32 type, u32 mask)
+>   */
+>  #define IDX1           32
+>  #define IDX2           32400
+> -#define IDX3           511
+> +#define IDX3           1511
+>  #define IDX4           8193
+>  #define IDX5           22222
+>  #define IDX6           17101
+> 
 
-First of all, +1 to (re-)use stmmac.
+Yes, with that change made the self-tests pass.
 
-> The stmmac drivers run since many years on several platforms
-> (sh4, stm32, arm, x86, mips ...) and it supports an huge of amount of
-> configurations starting from 3.1x to 3.7x databooks.
-
-As Intel employee who did some clean ups to that, acknowledge above.
-
-> Concerning the stmicro/stmmac naming, these come from a really old
-> story and have no issue to adopt new folder/file names.
-
-I don't think it would be best idea for platform driver (though we can
-keep driver's name in the structure in async with file name).
-
--- 
-With Best Regards,
-Andy Shevchenko
+Eric
