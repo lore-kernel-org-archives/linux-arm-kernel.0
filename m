@@ -1,47 +1,89 @@
-From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
-Date: Wed, 7 Dec 2016 17:43:27 +0100
-Subject: [Question] New mmap64 syscall?
-In-Reply-To: <20161207163210.GB31779@e104818-lin.cambridge.arm.com>
-References: <20161206185440.GA4654@yury-N73SV> <3014428.VXGdOARdm1@wuerfel>
- <20161207103451.GA869@yury-N73SV>
- <0F280FED-870A-42B5-ABC4-1976ACA32462@theobroma-systems.com>
- <20161207123944.GA11799@yury-N73SV>
- <20161207163210.GB31779@e104818-lin.cambridge.arm.com>
-Message-ID: <DF57E4A6-85C9-44EF-AD03-19EA688D19DB@theobroma-systems.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Wed, 07 Dec 2016 16:44:55 +0000
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <20161207164156.GW6408@localhost> (Vinod Koul's message of "Wed,
+ 7 Dec 2016 22:11:56 +0530")
+References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
+ <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
+ <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
+ <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
+ <20161207164156.GW6408@localhost>
+Message-ID: <yw1xvauv1yew.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin,
+Vinod Koul <vinod.koul@intel.com> writes:
 
-> On 07 Dec 2016, at 17:32, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> 
->>> In other words: Why not keep ILP32 simple an ask users that need a 16TB+ offset
->>> to use LP64? It seems much more consistent with the other choices takes so far.
+> On Tue, Dec 06, 2016 at 01:42:31PM +0100, Mason wrote:
+>> On 06/12/2016 06:12, Vinod Koul wrote:
 >> 
->> If user can switch to lp64, he doesn't need ilp32 at all, right? :)
->> Also, I don't understand how true 64-bit offset in mmap64() would
->> complicate this port.
-> 
-> It's more like the user wanting a quick transition from code that was
-> only ever compiled for AArch32 (or other 32-bit architecture) with a
-> goal of full LP64 transition on the long run. I have yet to see
-> convincing benchmarks showing ILP32 as an advantage over LP64 (of
-> course, I hear the argument of reading a pointer a loop is twice as fast
-> with a half-size pointer but I don't consider such benchmarks relevant).
+>> > On Tue, Nov 29, 2016 at 07:25:02PM +0100, Mason wrote:
+>> > 
+>> >> Is there a way to write a driver within the existing framework?
+>> > 
+>> > I think so, looking back at comments from Russell, I do tend to agree with
+>> > that. Is there a specific reason why sbox can't be tied to alloc and free
+>> > channels?
+>> 
+>> Here's a recap of the situation.
+>> 
+>> The "SBOX+MBUS" HW is used in several iterations of the tango SoC:
+>
+> btw is SBOX setup dependent upon the peripheral connected to?
 
-Most of the performance advantage in benchmarks comes from a reduction
-in the size of data-structures and/or tighter packing of arrays.  In other words,
-we can make slightly better use of the caches and push the memory subsystem
-a little further when running multiple instances of benchmarks.
+The sbox is basically a crossbar that connects each of a number of input
+ports to any of a number of output ports.  A few of the inputs and
+outputs are dma channels reading or writing to memory while the rest are
+peripheral devices.  To perform a mem-to-device transfer, you pick a dma
+read channel, program the sbox to connect it to the chosen device, and
+finally program the dma channel with address and size to transfer.
 
-Most of these advantages should eventually go away, when struct-reorg makes
-it way into the compiler. That said, it?s a marginal (but real) improvement for a
-subset of SPEC.
+>> tango3
+>>   2 memory channels available
+>>   6 devices ("clients"?) may request an MBUS channel
+>
+> But only 2 can get a channel at any time..
+>
+>> tango4 (one more channel)
+>>   3 memory channels available
+>>   7 devices may request an MBUS channel :
+>>     NFC0, NFC1, SATA0, SATA1, memcpy, (IDE0, IDE1)
+>
+> Same here
+>
+> Only thing is users shouldn't hold on to channel and freeup when not in use.
+>
+>> Notes:
+>> The current NFC driver supports only one controller.
+>> IDE is mostly obsolete at this point.
+>> 
+>> tango5 (SATA gets own dedicated MBUS channel pair)
+>>   3 memory channels available
+>>   5 devices may request an MBUS channel :
+>>     NFC0, NFC1, memcpy, (IDE0, IDE1)
+>> 
+>> 
+>> If I understand the current DMA driver (written by Mans), client
+>> drivers are instructed to use a specific channel in the DT, and
+>> the DMA driver muxes access to that channel. The DMA driver
+>> manages a per-channel queue of outstanding DMA transfer requests,
+>> and a new transfer is started friom within the DMA ISR
+>> (modulo the fact that the interrupt does not signal completion
+>> of the transfer, as explained else-thread).
+>> 
+>> What you're proposing, Vinod, is to make a channel exclusive
+>> to a driver, as long as the driver has not explicitly released
+>> the channel, via dma_release_channel(), right?
+>
+> Precisely, but yes the downside of that is concurrent access are
+> limited, but am not sure if driver implements virtual channels and
+> allows that..
 
-In the real world, the importance of ILP32 as an aid to transition legacy code
-that is not 64bit clean? and this should drive the ILP32 discussion. That we
-get a boost in our SPEC scores is just a nice extra that we get from it ;-)
+My driver implements virtual channels.  The problem is that the physical
+dma channels signal completion slightly too soon, at least with
+mem-to-device transfers.  Apparently we need to keep the sbox routing
+until the peripheral indicates that it has actually received all the
+data.
 
-
-Regards,
-Philipp.
+-- 
+M?ns Rullg?rd
