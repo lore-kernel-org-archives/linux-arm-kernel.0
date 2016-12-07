@@ -1,89 +1,63 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Wed,  7 Dec 2016 16:59:52 +1000
-Subject: [PATCH 4/4] ARM: versatile: support configuring versatile machine for
- no-MMU
-In-Reply-To: <1481093992-30520-1-git-send-email-gerg@uclinux.org>
-References: <1481093992-30520-1-git-send-email-gerg@uclinux.org>
-Message-ID: <1481093992-30520-2-git-send-email-gerg@uclinux.org>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 7 Dec 2016 15:23:13 +0800
+Subject: [PATCH] usb: mtu3: fix U3 port link issue
+Message-ID: <1481095393-23198-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow the arm versatile machine to be configured for no-MMU operation.
-The approach taken is similar to the support for no-MMU arm v7 machines.
+the issue is introduced when @is_u3_ip is used in mtu3_device_enabe()
+before initialized in mtu3_mem_alloc(), so get global IP information
+at first before used by following functins.
 
-A new define, CONFIG_ARM_SINGLE_ARMV5, is used to enable a class of v5
-core based machines that are supported for building with !CONFIG_MMU.
-Currently only the versatile machine is configured to support this.
-
-Older kernels had the ability to build the versatile machine with the MMU
-disabled (!CONFIG_MMU). Recent changes to convert the versatile machine
-to device tree lost this ability. (Although older kernels could be built
-they did not run due to a bug in the IO_ADDRESS() mapping on this machine).
-
-The motivation for this is that the versatile machine is well supported
-in qemu. And this provides an excellent platform for development and
-testing no-MMU support on ARM in general.
-
-Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- arch/arm/Kconfig                | 10 ++++++++++
- arch/arm/Kconfig.debug          |  3 ++-
- arch/arm/mach-versatile/Kconfig |  3 ++-
- 3 files changed, 14 insertions(+), 2 deletions(-)
+ drivers/usb/mtu3/mtu3_core.c |   18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b5d529f..74a0e7a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -353,6 +353,16 @@ config ARM_SINGLE_ARMV7M
- 	select SPARSE_IRQ
- 	select USE_OF
+diff --git a/drivers/usb/mtu3/mtu3_core.c b/drivers/usb/mtu3/mtu3_core.c
+index 520e55a..af3e531 100644
+--- a/drivers/usb/mtu3/mtu3_core.c
++++ b/drivers/usb/mtu3/mtu3_core.c
+@@ -481,21 +481,14 @@ static int mtu3_mem_alloc(struct mtu3 *mtu)
+ 	void __iomem *mbase = mtu->mac_base;
+ 	struct mtu3_ep *ep_array;
+ 	int in_ep_num, out_ep_num;
+-	u32 cap_epinfo, cap_dev;
++	u32 cap_epinfo;
+ 	int ret;
+ 	int i;
  
-+config ARM_SINGLE_ARMV5
-+	bool "ARMv5 based platforms (ARM926T)"
-+	depends on !MMU
-+	select AUTO_ZRELADDR
-+	select CLKSRC_OF
-+	select COMMON_CLK
-+	select GENERIC_CLOCKEVENTS
-+	select SPARSE_IRQ
-+	select USE_OF
+-	mtu->hw_version = mtu3_readl(mtu->ippc_base, U3D_SSUSB_HW_ID);
+-
+-	cap_dev = mtu3_readl(mtu->ippc_base, U3D_SSUSB_IP_DEV_CAP);
+-	mtu->is_u3_ip = !!SSUSB_IP_DEV_U3_PORT_NUM(cap_dev);
+-
+ 	cap_epinfo = mtu3_readl(mbase, U3D_CAP_EPINFO);
+ 	in_ep_num = CAP_TX_EP_NUM(cap_epinfo);
+ 	out_ep_num = CAP_RX_EP_NUM(cap_epinfo);
+ 
+-	dev_info(mtu->dev, "IP version 0x%x(%s IP)\n", mtu->hw_version,
+-		mtu->is_u3_ip ? "U3" : "U2");
+ 	dev_info(mtu->dev, "fifosz/epnum: Tx=%#x/%d, Rx=%#x/%d\n",
+ 		 mtu3_readl(mbase, U3D_CAP_EPNTXFFSZ), in_ep_num,
+ 		 mtu3_readl(mbase, U3D_CAP_EPNRXFFSZ), out_ep_num);
+@@ -730,8 +723,17 @@ irqreturn_t mtu3_irq(int irq, void *data)
+ 
+ static int mtu3_hw_init(struct mtu3 *mtu)
+ {
++	u32 cap_dev;
+ 	int ret;
+ 
++	mtu->hw_version = mtu3_readl(mtu->ippc_base, U3D_SSUSB_HW_ID);
 +
- config ARCH_GEMINI
- 	bool "Cortina Systems Gemini"
- 	select CLKSRC_MMIO
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index d83f7c3..483709e 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1712,7 +1712,8 @@ config DEBUG_UNCOMPRESS
- config UNCOMPRESS_INCLUDE
- 	string
- 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
--					PLAT_SAMSUNG || ARM_SINGLE_ARMV7M
-+					PLAT_SAMSUNG || ARM_SINGLE_ARMV7M || \
-+					ARM_SINGLE_ARMV5
- 	default "mach/uncompress.h"
++	cap_dev = mtu3_readl(mtu->ippc_base, U3D_SSUSB_IP_DEV_CAP);
++	mtu->is_u3_ip = !!SSUSB_IP_DEV_U3_PORT_NUM(cap_dev);
++
++	dev_info(mtu->dev, "IP version 0x%x(%s IP)\n", mtu->hw_version,
++		mtu->is_u3_ip ? "U3" : "U2");
++
+ 	mtu3_device_reset(mtu);
  
- config EARLY_PRINTK
-diff --git a/arch/arm/mach-versatile/Kconfig b/arch/arm/mach-versatile/Kconfig
-index c257d40..2613f0f 100644
---- a/arch/arm/mach-versatile/Kconfig
-+++ b/arch/arm/mach-versatile/Kconfig
-@@ -1,12 +1,13 @@
- config ARCH_VERSATILE
- 	bool "ARM Ltd. Versatile family"
--	depends on ARCH_MULTI_V5
-+	depends on ARCH_MULTI_V5 || ARM_SINGLE_ARMV5
- 	select ARM_AMBA
- 	select ARM_TIMER_SP804
- 	select ARM_VIC
- 	select CLKSRC_VERSATILE
- 	select COMMON_CLK_VERSATILE
- 	select CPU_ARM926T
-+	select GPIOLIB
- 	select ICST
- 	select MFD_SYSCON
- 	select PLAT_VERSATILE
+ 	ret = mtu3_device_enable(mtu);
 -- 
-1.9.1
+1.7.9.5
