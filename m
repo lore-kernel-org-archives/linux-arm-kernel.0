@@ -1,19 +1,24 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 7 Dec 2016 12:36:29 -0800
-Subject: [GIT PULL] ARM: Xilinx Zynq SOC changes for v4.10
-In-Reply-To: <1ff060ae-b142-9e72-6fef-21b81a147614@monstr.eu>
-References: <1ff060ae-b142-9e72-6fef-21b81a147614@monstr.eu>
-Message-ID: <20161207203629.GD10158@localhost>
+Date: Wed, 7 Dec 2016 12:39:19 -0800
+Subject: [GIT PULL v2] ARM: Xilinx Zynq DT changes for v4.10
+In-Reply-To: <78b672c5-2f17-f166-815f-47b05dba66e7@monstr.eu>
+References: <78b672c5-2f17-f166-815f-47b05dba66e7@monstr.eu>
+Message-ID: <20161207203919.GA11699@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2016 at 01:46:01PM +0100, Michal Simek wrote:
+On Tue, Dec 06, 2016 at 01:51:45PM +0100, Michal Simek wrote:
 > Hi,
 > 
-> please pull this fix to your tree.
+> please add these changes to your arm-soc repo.
+> It fixes dtc warnings, small coding style changes and add support for
+> Microzed.
 > 
 > Thanks,
 > Michal
+> 
+> ---
+> v2: Use correct zynq-dt-for-4.10 tag instead of zynqmp-dt-for-4.10.
 > 
 > 
 > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
@@ -22,24 +27,14 @@ On Tue, Dec 06, 2016 at 01:46:01PM +0100, Michal Simek wrote:
 > 
 > are available in the git repository at:
 > 
->   https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-4.10
+>   https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-4.10
 > 
-> for you to fetch changes up to 7a3cc2a7b2c723aa552028f4e66841cec183756d:
+> for you to fetch changes up to df2f3c48b9cd51e2612a1598342769d09d849f39:
 > 
->   ARM: zynq: Reserve correct amount of non-DMA RAM (2016-11-14 16:07:58
-> +0100)
-> 
-> ----------------------------------------------------------------
-> arm: Xilinx Zynq patches for v4.10
-> 
-> - Fix dma issue
-> 
-> ----------------------------------------------------------------
-> Kyle Roeschley (1):
->       ARM: zynq: Reserve correct amount of non-DMA RAM
+>   arm: dts: zynq: Add MicroZed board support (2016-12-06 13:17:39 +0100)
 
-Merged, thanks.  Should this have been a fix, btw? I queued it for 4.10 merge
-window now.
+Merged. In the future it'd be nice to get these a few weeks earlier in the
+cycle.
 
 
 -Olof
