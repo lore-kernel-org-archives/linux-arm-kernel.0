@@ -1,98 +1,65 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 7 Dec 2016 10:26:25 +0800
-Subject: [PATCH RFC] drm/sun4i: rgb: Add 5% tolerance to dot clock
- frequency check
-In-Reply-To: <20161206172911.z6sbjzgqv3vfcrfh@lukather>
-References: <20161124112231.4297-1-wens@csie.org>
- <20161206172911.z6sbjzgqv3vfcrfh@lukather>
-Message-ID: <CAGb2v65uTH_PD28KqAhhzkE5zhLt54GUb7xXNxxe0xHW0A+xjQ@mail.gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 6 Dec 2016 20:28:10 -0600
+Subject: [PATCH] spi: davinci: Allow device tree devices to use DMA
+In-Reply-To: <fd697f3b-dba1-1e5f-c12c-45f71c0c07a1@ti.com>
+References: <1479530464-12538-1-git-send-email-david@lechnology.com>
+ <79f186b5-ac71-189f-c19f-977670395043@ti.com>
+ <946d60bc-ac14-7934-c1b3-e2de03831459@lechnology.com>
+ <fd697f3b-dba1-1e5f-c12c-45f71c0c07a1@ti.com>
+Message-ID: <588633b2-99c2-528f-35f4-fef898a79961@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 7, 2016 at 1:29 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Thu, Nov 24, 2016 at 07:22:31PM +0800, Chen-Yu Tsai wrote:
->> The panels shipped with Allwinner devices are very "generic", i.e.
->> they do not have model numbers or reliable sources of information
->> for the timings (that we know of) other than the fex files shipped
->> on them. The dot clock frequency provided in the fex files have all
->> been rounded to the nearest MHz, as that is the unit used in them.
+On 11/21/2016 02:37 AM, Sekhar Nori wrote:
+> On Sunday 20 November 2016 10:31 PM, David Lechner wrote:
+>
+>> On 11/20/2016 06:59 AM, Sekhar Nori wrote:
+>
+>>> On Saturday 19 November 2016 10:11 AM, David Lechner wrote:
+>
+>>>> @@ -400,6 +401,9 @@ static int davinci_spi_of_setup(struct spi_device
+>>>> *spi)
+>>>>          if (!of_property_read_u32(np, "ti,spi-wdelay", &prop))
+>>>>              spicfg->wdelay = (u8)prop;
+>>>>          spi->controller_data = spicfg;
+>>>> +        /* Use DMA for device if master supports it */
+>>>> +        if (dspi->dma_rx)
+>>>
+>>> This should be
+>>>
+>>>         if (!(IS_ERR(dpsi->dma_rx) || IS_ERR(dspi->dma_tx))
 >>
->> We were using the simple panel "urt,umsh-8596md-t" as a substitute
->> for the A13 Q8 tablets in the absence of a specific model for what
->> may be many different but otherwise timing compatible panels. This
->> was usable without any visual artifacts or side effects, until the
->> dot clock rate check was added in commit bb43d40d7c83 ("drm/sun4i:
->> rgb: Validate the clock rate").
 >>
->> The reason this check fails is because the dotclock frequency for
->> this model is 33.26 MHz, which is not achievable with our dot clock
->> hardware, and the rate returned by clk_round_rate deviates slightly,
->> causing the driver to reject the display mode.
+>> There is the following code in davinci_spi_probe():
 >>
->> The LCD panels have some tolerance on the dot clock frequency, even
->> if it's not specified in their datasheets.
+>>     ret = davinci_spi_request_dma(dspi);
+>>     if (ret == -EPROBE_DEFER) {
+>>         goto free_clk;
+>>     } else if (ret) {
+>>         dev_info(&pdev->dev, "DMA is not supported (%d)\n", ret);
+>>         dspi->dma_rx = NULL;
+>>         dspi->dma_tx = NULL;
+>>     }
 >>
->> This patch adds a 5% tolerence to the dot clock check.
+>> So, I does not look like it is possible to get anything other than NULL
+>> or a valid pointer for dpsi->dma_rx and that checking dpsi->dma_tx is
+>> not necessary.
+>>
+>> So, I think if (dspi->dma_rx) is sufficient. In fact the same check is
+>> used during unwinding if the probe function fails.
 >
-> As we discussed already, I really believe this is just as arbitrary as
-> the current behaviour.
-
-Yes. I agree. This patch is mainly to give something that works for
-people who don't care about the details, and to get some feedback
-from people that do.
-
+> You are right, I see it now. Setting dma_rx to NULL overriding the error
+> value is confusing since dma_request_chan() itself does not use NULL as
+> an error value.
 >
-> Some panels require an exact frequency, some have a minimal frequency
-> but no maximum, some have a maximum frequency but no minimal, and I
-> guess most of them deviates by how much exactly they can take (and
-> possibly can take more easily a higher frequency, but are less
-> tolerant if you take a frequency lower than the nominal.
+> I think it is better to fix the existing code to remove the NULL
+> overwrite and use IS_ERR() instead. You should probably wait for some
+> feedback from the SPI maintainer though.
 >
-> And we cannot remove that check entirely, since some bridges will
-> report out of range frequencies for higher modes that we know we
-> cannot reach.
-
-I believe this should be handled by the bridge driver in the check
-callback? The callback I'm changing is attached to the connector,
-which I think doesn't get used if you have a bridge instead.
-And this only checks the pre-registered display modes, such as
-those specified in simple-panel or EDID.
-
-> We could just try to see if the screen pixel clock frequency is out of
-> the pixel clock range we can generate, but then we will loop back on
-> how much out of range is it exactly, and is it within the screen
-> tolerancy.
+> Thanks,
+> Sekhar
 >
-> We have an API to deal with the panel tolerancies in the DRM panel
-> framework, we can (and should) use it.
 
-If you mean the get_timings callback, it's not very useful. Most of
-the panels in simple-panel do not use the display_timings structure,
-so they don't return anything. And I get that. The few datasheets
-I found don't list min/max tolerances for the dotclock.
 
-The ones that do have the min/max the same as the recommended value.
-This may or may not be accurate. IIRC the one panel that had this
-that I did check didn't list min/max values in its datasheet.
-
->
-> I'm not sure how others usually deal with this though. I think I
-> remember Eric telling me that for the RPi they just adjusted the
-> timings a bit, but they only really had a single panel to deal with.
->
-> Daniel, Eric, Laurent, Sean? Any ideas?
-
-Yes! Feedback please! Between Maxime and me I think we only have a
-limited number of panels, with some overlap.
-
-Regards
-ChenYu
-
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+There don't seem to be any further comments. Using NULL here makes more 
+sense to me, so I am inclined to leave this patch as-is.
