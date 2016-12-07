@@ -1,27 +1,125 @@
-From: michel@daenzer.net (=?UTF-8?Q?Michel_D=c3=a4nzer?=)
-Date: Wed, 7 Dec 2016 18:53:48 +0900
-Subject: [Nouveau] 4.9-rc7 nouveau fails on arm64 64k page kernel but
- works with 4k
-In-Reply-To: <CAAVeFuJc5y8M4Koj-Ge0XpK3PXVS-fnjrpUyD13skeBM1y_K1w@mail.gmail.com>
-References: <042c54f3-e52b-6658-18c7-9c19492485a4@arm.com>
- <CAKb7Uvhewyhnrnd=fw9QrdEDLecG_VMZ8Wfuh-LyCgeW6X_wCw@mail.gmail.com>
- <CAKb7UvgZLafVmC3N0R-dfm4FDtCxUO3fC-4zLwsKauAj=hx=tw@mail.gmail.com>
- <CAKb7UvgW331K53x3wub5o+6LOqeLN5PqgiiJG6WXi+WJDVDzDg@mail.gmail.com>
- <CAAVeFuJc5y8M4Koj-Ge0XpK3PXVS-fnjrpUyD13skeBM1y_K1w@mail.gmail.com>
-Message-ID: <d196c0c8-f429-4275-6246-a4e817b4bdf9@daenzer.net>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed,  7 Dec 2016 10:14:08 +0000
+Subject: [PATCH v2] arm64: fpsimd: improve stacking logic in non-interruptible
+ context
+Message-ID: <1481105648-19775-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/16 06:39 PM, Alexandre Courbot wrote:
-> On Fri, Dec 2, 2016 at 12:23 PM, Ilia Mirkin <imirkin@alum.mit.edu> wrote:
->> That's right -- nouveau currently requires 4k page sizes to work. This is a
->> software limitation, not a hardware one though.
-> 
-> Looking at the trace I wonder - is the limitation in Nouveau or in TTM?
+Currently, we allow kernel mode NEON in softirq or hardirq context by
+stacking and unstacking a slice of the NEON register file for each call
+to kernel_neon_begin() and kernel_neon_end(), respectively.
 
-Nouveau. Non-4K page sizes work fine with radeon (and presumably amdgpu).
+Given that
+a) a CPU typically spends most of its time in userland, during which time
+   no kernel mode NEON in process context is in progress,
+b) a CPU spends most of its time in the kernel doing other things than
+   kernel mode NEON when it gets interrupted to perform kernel mode NEON
+   in softirq context
 
+the stacking and subsequent unstacking is only necessary if we are
+interrupting a thread while it is performing kernel mode NEON in process
+context, which means that in all other cases, we can simply preserve the
+userland FPSIMD state once, and only restore it upon return to userland,
+even if we are being invoked from softirq or hardirq context.
 
+So instead of checking whether we are running in interrupt context, keep
+track of the level of nested kernel mode NEON calls in progress, and only
+perform the eager stack/unstack if the level exceeds 1.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+v2:
+- BUG() on unexpected values of the nesting level
+- relax the BUG() on num_regs>32 to a WARN, given that nothing actually
+  breaks in that case
+
+ arch/arm64/kernel/fpsimd.c | 48 ++++++++++++++------
+ 1 file changed, 34 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 394c61db5566..ae2c1bf569db 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -220,20 +220,35 @@ void fpsimd_flush_task_state(struct task_struct *t)
+ 
+ #ifdef CONFIG_KERNEL_MODE_NEON
+ 
+-static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
+-static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
++/*
++ * Although unlikely, it is possible for three kernel mode NEON contexts to
++ * be live at the same time: process context, softirq context and hardirq
++ * context. So while the userland context is stashed in the thread's fpsimd
++ * state structure, we need two additional levels of storage.
++ */
++static DEFINE_PER_CPU(struct fpsimd_partial_state, nested_fpsimdstate[2]);
++static DEFINE_PER_CPU(int, kernel_neon_nesting_level);
+ 
+ /*
+  * Kernel-side NEON support functions
+  */
+ void kernel_neon_begin_partial(u32 num_regs)
+ {
+-	if (in_interrupt()) {
+-		struct fpsimd_partial_state *s = this_cpu_ptr(
+-			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
++	struct fpsimd_partial_state *s;
++	int level;
++
++	preempt_disable();
++
++	level = this_cpu_read(kernel_neon_nesting_level);
++	BUG_ON(level > 2);
++
++	if (level > 0) {
++		s = this_cpu_ptr(nested_fpsimdstate);
+ 
+-		BUG_ON(num_regs > 32);
+-		fpsimd_save_partial_state(s, roundup(num_regs, 2));
++		WARN_ON_ONCE(num_regs > 32);
++		num_regs = min(roundup(num_regs, 2), 32U);
++
++		fpsimd_save_partial_state(&s[level - 1], num_regs);
+ 	} else {
+ 		/*
+ 		 * Save the userland FPSIMD state if we have one and if we
+@@ -241,24 +256,29 @@ void kernel_neon_begin_partial(u32 num_regs)
+ 		 * that there is no longer userland FPSIMD state in the
+ 		 * registers.
+ 		 */
+-		preempt_disable();
+ 		if (current->mm &&
+ 		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+ 			fpsimd_save_state(&current->thread.fpsimd_state);
+ 		this_cpu_write(fpsimd_last_state, NULL);
+ 	}
++	this_cpu_write(kernel_neon_nesting_level, level + 1);
+ }
+ EXPORT_SYMBOL(kernel_neon_begin_partial);
+ 
+ void kernel_neon_end(void)
+ {
+-	if (in_interrupt()) {
+-		struct fpsimd_partial_state *s = this_cpu_ptr(
+-			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+-		fpsimd_load_partial_state(s);
+-	} else {
+-		preempt_enable();
++	struct fpsimd_partial_state *s;
++	int level;
++
++	level = this_cpu_read(kernel_neon_nesting_level) - 1;
++	BUG_ON(level < 0);
++
++	if (level > 0) {
++		s = this_cpu_ptr(nested_fpsimdstate);
++		fpsimd_load_partial_state(&s[level - 1]);
+ 	}
++	this_cpu_write(kernel_neon_nesting_level, level);
++	preempt_enable();
+ }
+ EXPORT_SYMBOL(kernel_neon_end);
+ 
 -- 
-Earthling Michel D?nzer               |               http://www.amd.com
-Libre software enthusiast             |             Mesa and X developer
+2.7.4
