@@ -1,172 +1,164 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 07 Dec 2016 20:17:48 +0900
-Subject: [PATCH 4/5] arm64: dts: exynos5433: Add bus dt node using VDD_INT
- for Exynos5433
-In-Reply-To: <20161206192104.GB12683@kozik-lap>
-References: <1480663087-4590-1-git-send-email-cw00.choi@samsung.com>
- <1480663087-4590-5-git-send-email-cw00.choi@samsung.com>
- <CGME20161206192211epcas1p3d93e8b202e8b579f9632f49fc23ce0dc@epcas1p3.samsung.com>
- <20161206192104.GB12683@kozik-lap>
-Message-ID: <5847EFDC.8050702@samsung.com>
+From: qiuxishi@huawei.com (Xishi Qiu)
+Date: Wed, 7 Dec 2016 19:21:14 +0800
+Subject: [RFC PATCH 0/2] arm64: memory-hotplug: Add Memory Hotplug support
+In-Reply-To: <0f24c35b-10d5-d857-356d-01a21be48c2c@broadcom.com>
+References: <1480637999-4320-1-git-send-email-scott.branden@broadcom.com>
+ <5840D333.9050801@huawei.com>
+ <9cfa95ca-a9e9-299d-d020-7e565562dcf5@broadcom.com>
+ <5840E659.6000104@huawei.com>
+ <0f24c35b-10d5-d857-356d-01a21be48c2c@broadcom.com>
+Message-ID: <5847F0AA.5050109@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016? 12? 07? 04:21, Krzysztof Kozlowski wrote:
-> On Fri, Dec 02, 2016 at 04:18:06PM +0900, Chanwoo Choi wrote:
->> This patch adds the bus nodes using VDD_INT for Exynos5433 SoC.
->> Exynos5433 has the following AMBA AXI buses to translate data
->> between DRAM and sub-blocks.
+On 2016/12/7 16:43, Scott Branden wrote:
+
+> Hi Xishi,
+> 
+> I followed you suggestions and found pfn_valid is always true.  Answers to your questions inline.
+> 
+> I could keep debugging this but hope Marcin sends out some code - I'm quite willing to test and help clean up the patchset.
+> 
+> On 16-12-01 07:11 PM, Xishi Qiu wrote:
+>> On 2016/12/2 10:38, Scott Branden wrote:
 >>
->> Following list specify the detailed correlation between sub-block and clock:
->> - CLK_ACLK_G2D_{400|266}  : Bus clock for G2D
->> - CLK_ACLK_MSCL_400       : Bus clock for MSCL (Mobile Scaler)
->> - CLK_ACLK_GSCL_333       : Bus clock for GSCL (General Scaler)
->> - CLK_SCLK_JPEG_MSCL      : Bus clock for JPEG
->> - CLK_ACLK_MFC_400        : Bus clock for MFC (Multi Format Codec)
->> - CLK_ACLK_HEVC_400       : Bus clock for HEVC (High Effective Video Codec)
->> - CLK_ACLK_BUS0_400       : NoC(Network On Chip)'s bus clock for PERIC/PERIS/FSYS/MSCL
->> - CLK_ACLK_BUS1_400       : NoC's bus clock for MFC/HEVC/G3D
->> - CLK_ACLK_BUS2_400       : NoC's bus clock for GSCL/DISP/G2D/CAM0/CAM1/ISP
+>>> Hi Xishi,
+>>>
+>>> Thanks for the reply - please see comments below.
+>>>
+>>> On 16-12-01 05:49 PM, Xishi Qiu wrote:
+>>>> On 2016/12/2 8:19, Scott Branden wrote:
+>>>>
+>>>>> This patchset is sent for comment to add memory hotplug support for ARM64
+>>>>> based platforms.  It follows hotplug code added for other architectures
+>>>>> in the linux kernel.
+>>>>>
+>>>>> I tried testing the memory hotplug feature following documentation from
+>>>>> Documentation/memory-hotplug.txt.  I don't think it is working as expected
+>>>>> - see below:
+>>>>>
+>>>>> To add memory to the system I did the following:
+>>>>> echo 0x400000000 > /sys/devices/system/memory/probe
+>>>>>
+>>>>> The memory is displayed as system ram:
+>>>>> cat /proc/iomem:
+>>>>> 74000000-77ffffff : System RAM
+>>>>>   74080000-748dffff : Kernel code
+>>>>>   74950000-749d2fff : Kernel data
+>>>>> 400000000-43fffffff : System RAM
+>>>>>
+>>>>> But does not seem to be added to the kernel memory.
+>>>>> /proc/meminfo did not change.
+>>>>>
+>>>>> What else needs to be done so the memory is added to the kernel memory
+>>>>> pool for normal allocation?
+>>>>>
+>>>>
+>>>> Hi Scott,
+>>>>
+>>>> Do you mean it still don't support hod-add after apply this patchset?
+>>>
+>>> After applying the patch it appears to partially support hot-add. Please let me know if you think it is working as expected?
+>>>
+>>> The memory probe functions in that the memory is registered with the system and shows up in /proc/iomem.  But, the memory is not available in /proc/meminfo.  Do you think something else needs to be adjusted for ARM64 to hotadd the memory
+>>>
+>>> I just found another clue:
+>>> under /sys/devices/system/memory I only see one memory entry (before or after I try to hotadd additional memory).
+>>>
+>>> /sys/devices/system/memory # ls
+>>> auto_online_blocks  memory0            uevent
+>>> block_size_bytes    probe
+>>>
+>>> In arch/arm64/include/asm/sparsemem.h if I change SECTION_SIZE_BITS from 30 to 28 and recompile I get the following:
+>>> /sys/devices/system/memory # ls
+>>> auto_online_blocks  memory7            uevent
+>>> block_size_bytes    probe
+>>>
+>>>
+>>> In arch/arm64/include/asm/sparsemem.h if I change SECTION_SIZE_BITS from 30 to 27 and recompile I get the following:
+>>> /sys/devices/system/memory # ls
+>>> auto_online_blocks  memory14            uevent
+>>> block_size_bytes    probe
+>>>
+>>> If looks to me like something is not working properly in the ARM64 implementation.  I should expect to see multiple memoryX entries under /sys/devices/system/memory?
+>>>
 >>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> ---
->>  arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi | 208 +++++++++++++++++++++++++
->>  arch/arm64/boot/dts/exynos/exynos5433.dtsi     |   1 +
->>  2 files changed, 209 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi
+>> Hi Scott,
 >>
->> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi
->> new file mode 100644
->> index 000000000000..b1e1d9c622e1
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi
->> @@ -0,0 +1,208 @@
->> +/*
->> + * Samsung's Exynos5433 SoC Memory interface and AMBA bus device tree source
->> + *
->> + * Copyright (c) 2016 Samsung Electronics Co., Ltd.
->> + * Chanwoo Choi <cw00.choi@samsung.com>
->> + *
->> + * Samsung's Exynos5433 SoC Memory interface and AMBA buses are listed
->> + * as device tree nodes are listed in this file.
+>> 1. Do you enable the following configs?
+>> CONFIG_SPARSEMEM
+>> MEMORY_HOTPLUG
+>> CONFIG_MEMORY_HOTPLUG_DEFAULT_ONLINE
+> Yes, these configs are enabled
+>>
+>> 2. I find you missed create mapping in arch_add_memory(), and x86 has it.
+> Could you please explain this further?  The patch I submitted hass arch_add_memory identical to the ia64 implementation.
+
+Hi Scott,
+
+I think we should create page table first for the new hotadd memory.
+e.g. create_mapping_late(start, __phys_to_virt(start), size, PAGE_KERNEL);
+
+I don't know why ia64 don't have this step.
+CC Tony
+
+>>
+>> 3. We will add memblock first, so pfn_valid() maybe always return true(in the
+>> following function), and this will lead __add_section() failed. Please check
+>> it.
+> You are correct - pfn_valid always returns true.  The function is in arch/arm64/mm/init.c and different than the one you indicated below:
 > 
-> This duplicates the introduction line and does not make sense.
 
-I'll remove it.
-
+> #ifdef CONFIG_HAVE_ARCH_PFN_VALID
+> int pfn_valid(unsigned long pfn)
+> {
+>     return memblock_is_map_memory(pfn << PAGE_SHIFT);
+> }
+> EXPORT_SYMBOL(pfn_valid);
+> #endif
 > 
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +/ {
+>>
+>> int pfn_valid(unsigned long pfn)
+>> {
+>>     return (pfn & PFN_MASK) == pfn && memblock_is_memory(pfn << PAGE_SHIFT);
+>> }
+>>
+>> add_memory
+>>   add_memory_resource
+>>     memblock_add_node
+>>       arch_add_memory
+>>         __add_pages
+>>           __add_section
+>>             pfn_valid
+>>
+>> Thanks,
+>> Xishi Qiu
+>>
+>>>
+>>>
+>>>>
+>>>> Thanks,
+>>>> Xishi Qiu
+>>>>
+>>>>> Scott Branden (2):
+>>>>>   arm64: memory-hotplug: Add MEMORY_HOTPLUG, MEMORY_HOTREMOVE,
+>>>>>     MEMORY_PROBE
+>>>>>   arm64: defconfig: enable MEMORY_HOTPLUG config options
+>>>>>
+>>>>>  arch/arm64/Kconfig           | 10 ++++++++++
+>>>>>  arch/arm64/configs/defconfig |  3 +++
+>>>>>  arch/arm64/mm/init.c         | 42 ++++++++++++++++++++++++++++++++++++++++++
+>>>>>  3 files changed, 55 insertions(+)
+>>>>>
+>>>>
+>>>>
+>>>>
+>>>
+>>> .
+>>>
+>>
+>>
+>>
 > 
-> Shouldn't these be under soc node? It looks like property of SoC itself.
-
-OK. Move to them under SoC.
-- "/ {" -> "&soc {"
-
+> .
 > 
->> +	/* INT (Internal) block using VDD_INT */
->> +	bus_g2d_400: bus_g2d_400 {
-> 
-> In node name, the dash '-' is preferred. The name should describe
-> general class of device so probably this should be just "bus"... but I
-> don't see a way how to do it reasonable anyway.
-
-I'll change them as following with 'busX'.
-
-The each dt node has the unique number('X')
-because each dt node does not have the base address
-and then need to identify oneself.
-
-	bus_g2d_400: bus0 {
-	bus_g2d_266: bus1 {
-	bus_gscl: bus2 {
-	bus_hevc: bus3 {
-	bus_jpeg: bus4 {
-	bus_mfc: bus5 {
-	bus_mscl: bus6 {
-	bus_noc0: bus7 {
-	bus_noc1: bus8 {
-	bus_noc2: bus9 {
-
-> 
->> +		compatible = "samsung,exynos-bus";
->> +		clocks = <&cmu_top CLK_ACLK_G2D_400>;
->> +		clock-names = "bus";
->> +		operating-points-v2 = <&bus_g2d_400_opp_table>;
->> +		status ="disable";
-> 
-> Hm?
-
-I'll fix it. disable -> disabled
-
-> 
-> 
->> +	};
->> +
->> +	bus_mscl: bus_mscl {
->> +		compatible = "samsung,exynos-bus";
->> +		clocks = <&cmu_top CLK_ACLK_MSCL_400>;
->> +		clock-names = "bus";
->> +		operating-points-v2 = <&bus_g2d_400_opp_table>;
->> +		status ="disable";
->> +	};
->> +
->> +	bus_jpeg: bus_jpeg {
->> +		compatible = "samsung,exynos-bus";
->> +		clocks = <&cmu_top CLK_SCLK_JPEG_MSCL>;
->> +		clock-names = "bus";
->> +		operating-points-v2 = <&bus_g2d_400_opp_table>;
->> +		status ="disable";
->> +	};
->> +
->> +	bus_mfc: bus_mfc {
->> +		compatible = "samsung,exynos-bus";
->> +		clocks = <&cmu_top CLK_ACLK_MFC_400>;
->> +
->> +		clock-names = "bus";
->> +		operating-points-v2 = <&bus_g2d_400_opp_table>;
->> +		status ="disable";
->> +	};
->> +
->> +	bus_g2d_266: bus_g2d_266 {
->> +		compatible = "samsung,exynos-bus";
->> +		clocks = <&cmu_top CLK_ACLK_G2D_266>;
->> +		clock-names = "bus";
->> +		operating-points-v2 = <&bus_g2d_266_opp_table>;
->> +		status ="disable";
->> +	};
->> +
->> +	bus_gscl: bus_gscl {
->> +		compatible = "samsung,exynos-bus";
->> +		clocks = <&cmu_top CLK_ACLK_GSCL_333>;
->> +		clock-names = "bus";
->> +		operating-points-v2 = <&bus_gscl_opp_table>;
->> +		status ="disable";
->> +	};
->> +
->> +	bus_hevc: bus_hevc {
->> +		compatible = "samsung,exynos-bus";
->> +		clocks = <&cmu_top CLK_ACLK_HEVC_400>;
->> +		clock-names = "bus";
->> +		operating-points-v2 = <&bus_hevc_opp_table>;
->> +		status ="disable";
->> +	};
->> +
->> +	bus_bus0: bus_bus0 {
-> 
-> bus, bus, bus, bus, jackpot! Let's try to find better name and label for
-> these. :)
-
-I'll change the name with 'noc' prefix because this bus is used
-for NoC (Network On Chip)'s bus clock as commit msg.
-- old : bus_bus0
-- new : bus_noc0
-
-
-Best Regards,
-Chanwoo Choi
