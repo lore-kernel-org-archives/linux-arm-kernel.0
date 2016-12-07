@@ -1,114 +1,20 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Wed, 7 Dec 2016 20:39:09 +0100
-Subject: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in Cadence GEM.
-In-Reply-To: <1481134912-2243-1-git-send-email-andrei.pistirica@microchip.com>
-References: <1481134912-2243-1-git-send-email-andrei.pistirica@microchip.com>
-Message-ID: <20161207193908.GA13062@netboy>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Wed,  7 Dec 2016 11:39:59 -0800
+Subject: [PATCH 0/1] arm64: mm: add config options for page table configuration
+Message-ID: <1481139600-24455-1-git-send-email-scott.branden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 08:21:51PM +0200, Andrei Pistirica wrote:
-> +#ifdef CONFIG_MACB_USE_HWSTAMP
-> +void gem_ptp_init(struct net_device *ndev);
-> +void gem_ptp_remove(struct net_device *ndev);
-> +
-> +void gem_ptp_do_txstamp(struct macb *bp, struct sk_buff *skb);
-> +void gem_ptp_do_rxstamp(struct macb *bp, struct sk_buff *skb);
+This patch introduces config option CONFIG_MAX_PHYSMEM_BITS and
+CONFIG_SECTIONS_SIZE_BITS to allow for memory savings for devices with
+small memory areas in sparse memory configurations.
 
-These are in the hot path, and so you should do the test before
-calling the global function, something like this:
+Scott Branden (1):
+  arm64: mm: add config options for page table configuration
 
-void gem_ptp_txstamp(struct macb *bp, struct sk_buff *skb);
+ arch/arm64/Kconfig                 | 21 +++++++++++++++++++++
+ arch/arm64/include/asm/sparsemem.h |  4 ++--
+ 2 files changed, 23 insertions(+), 2 deletions(-)
 
-static void gem_ptp_do_txstamp(struct macb *bp, struct sk_buff *skb)
-{
-	if (!bp->hwts_tx_en)
-		return;
-	gem_ptp_txstamp(bp, skb);
-}
-
-Ditto for Rx.
-
-> +#else
-> +static inline void gem_ptp_init(struct net_device *ndev) { }
-> +static inline void gem_ptp_remove(struct net_device *ndev) { }
-> +
-> +static inline void gem_ptp_do_txstamp(struct macb *bp, struct sk_buff *skb) { }
-> +static inline void gem_ptp_do_rxstamp(struct macb *bp, struct sk_buff *skb) { }
-> +#endif
-> +
-
-> +static int gem_ptp_adjfine(struct ptp_clock_info *ptp, long scaled_ppm)
-> +{
-> +	struct macb *bp = container_of(ptp, struct macb, ptp_caps);
-> +	u32 word, diff;
-> +	u64 adj, rate;
-> +	int neg_adj = 0;
-> +
-> +	if (scaled_ppm < 0) {
-> +		neg_adj = 1;
-> +		scaled_ppm = -scaled_ppm;
-> +	}
-> +	rate = scaled_ppm;
-> +
-> +	/* word: unused(8bit) | ns(8bit) | fractions(16bit) */
-> +	word = (bp->ns_incr << 16) + bp->subns_incr;
-> +
-> +	adj = word;
-> +	adj *= rate;
-> +	adj >>= 16; /* remove fractions */
-> +	adj += 500000UL;
-> +	diff = div_u64(adj, 1000000UL);
-
-In order to round correctly, shouldn't this be?
-
-	adj *= rate;
-	adj += 500000UL << 16;
-	adj >>= 16;
-	diff = div_u64(adj, 1000000UL);
-
-> +	word = neg_adj ? word - diff : word + diff;
-> +
-> +	spin_lock(&bp->tsu_clk_lock);
-> +
-> +	gem_writel(bp, TISUBN, GEM_BF(SUBNSINCR, (word & 0xffff)));
-> +	gem_writel(bp, TI, GEM_BF(NSINCR, (word >> 16)));
-> +
-> +	spin_unlock(&bp->tsu_clk_lock);
-> +	return 0;
-> +}
-
-> +static s32 gem_ptp_max_adj(unsigned int f_nom)
-> +{
-> +	u64 adj;
-> +
-> +	/* The 48 bits of seconds for the GEM overflows every:
-> +	 * 2^48/(365.25 * 24 * 60 *60) =~ 8 925 512 years (~= 9 mil years),
-> +	 * thus the maximum adjust frequency must not overflow CNS register:
-> +	 *
-> +	 * addend  = 10^9/nominal_freq
-> +	 * adj_max = +/- addend*ppb_max/10^9
-> +	 * max_ppb = (2^8-1)*nominal_freq-10^9
-> +	 */
-> +	adj = f_nom;
-> +	adj *= 0xffff;
-> +	adj -= 1000000000ULL;
-
-What is this computation, and how does it relate to the comment?
-
-> +	return adj;
-> +}
-
-> +/* While GEM can timestamp PTP packets, it does not mark the RX descriptor
-
-Does it timestamp PTP event packets only, or all packets?
-
-(See my comment in patch 2/2)
-
-> + * to identify them. UDP packets must be parsed to identify PTP packets.
-> + *
-> + * Note: Inspired from drivers/net/ethernet/ti/cpts.c
-> + */
-
-Thanks,
-Richard
+-- 
+2.5.0
