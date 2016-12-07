@@ -1,40 +1,43 @@
 From: gerg@uclinux.org (Greg Ungerer)
-Date: Wed,  7 Dec 2016 16:08:29 +1000
-Subject: [PATCH 1/4] ARM: versatile: support no-MMU mode addressing
+Date: Wed,  7 Dec 2016 16:08:30 +1000
+Subject: [PATCH 2/4] ARM: versatile: define empty debug_ll_io_init() for no-MMU
 In-Reply-To: <1481090912-29835-1-git-send-email-gerg@uclinux.org>
 References: <1481090912-29835-1-git-send-email-gerg@uclinux.org>
-Message-ID: <1481090912-29835-2-git-send-email-gerg@uclinux.org>
+Message-ID: <1481090912-29835-3-git-send-email-gerg@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently for the versatile boards the IO_ADDRESS() macro applies static
-virtual address mapping for built-in IO devices. When operating without
-the MMU enabled IO devices are accessed at their physical address, no
-address translation is required.
+No-MMU configured targets have no definition for debug_ll_io_init().
+Not all machines use this and it will only be required if CONFIG_DEBUG_LL
+is enabled.
 
-For the !CONFIG_MMU case then define the IO_ADDRESS() macro to return the
-physical address.
+But when compiling for a target that uses it and it is configured for
+no-MMU (!CONFIG_MMU), for example the versatile machine, you will get:
+
+  CC      arch/arm/mach-versatile/versatile_dt.o
+arch/arm/mach-versatile/versatile_dt.c: In function ?versatile_map_io?:
+arch/arm/mach-versatile/versatile_dt.c:283:2: error: implicit declaration of function ?debug_ll_io_init? [-Werror=implicit-function-declaration]
+  debug_ll_io_init();
+  ^
+
+Fix by adding a macro for it to the !CONFIG_MMU path in map.h.
 
 Signed-off-by: Greg Ungerer <gerg@uclinux.org>
 ---
- arch/arm/mach-versatile/versatile_dt.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/include/asm/mach/map.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-versatile/versatile_dt.c b/arch/arm/mach-versatile/versatile_dt.c
-index 3c8d39c..8cfa05a 100644
---- a/arch/arm/mach-versatile/versatile_dt.c
-+++ b/arch/arm/mach-versatile/versatile_dt.c
-@@ -37,7 +37,11 @@
- #include <asm/mach/map.h>
+diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
+index 9b7c328..b1fe9c8 100644
+--- a/arch/arm/include/asm/mach/map.h
++++ b/arch/arm/include/asm/mach/map.h
+@@ -62,6 +62,7 @@ extern int ioremap_page(unsigned long virt, unsigned long phys,
+ #else
+ #define iotable_init(map,num)	do { } while (0)
+ #define vm_reserve_area_early(a,s,c)	do { } while (0)
++#define debug_ll_io_init()	do { } while (0)
+ #endif
  
- /* macro to get at MMIO space when running virtually */
-+#ifdef CONFIG_MMU
- #define IO_ADDRESS(x)		(((x) & 0x0fffffff) + (((x) >> 4) & 0x0f000000) + 0xf0000000)
-+#else
-+#define IO_ADDRESS(x)		(x)
-+#endif
- #define __io_address(n)		((void __iomem __force *)IO_ADDRESS(n))
- 
- /*
+ #endif
 -- 
 1.9.1
