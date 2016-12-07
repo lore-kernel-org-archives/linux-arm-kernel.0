@@ -1,168 +1,116 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 7 Dec 2016 16:02:57 +0100
-Subject: [RFC v3 09/10] iommu/arm-smmu: Implement reserved region get/put
- callbacks
-In-Reply-To: <02c0ce15-fa67-e65f-3a4e-f543cc9fd3b8@arm.com>
-References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
- <1479215363-2898-10-git-send-email-eric.auger@redhat.com>
- <02c0ce15-fa67-e65f-3a4e-f543cc9fd3b8@arm.com>
-Message-ID: <c11755b8-4fb3-3f2f-d0b2-e688a5f8a6b6@redhat.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 7 Dec 2016 15:04:03 +0000
+Subject: [PATCH] dmaengine: pl330: do not generate unaligned access
+In-Reply-To: <1481116660-27837-1-git-send-email-vladimir.murzin@arm.com>
+References: <1481116660-27837-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <99e9e221-0b1a-2a76-c774-3f4be1fb3f3d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-On 06/12/2016 19:55, Robin Murphy wrote:
-> On 15/11/16 13:09, Eric Auger wrote:
->> The get() populates the list with the PCI host bridge windows
->> and the MSI IOVA range.
->>
->> At the moment an arbitray MSI IOVA window is set at 0x8000000
->> of size 1MB. This will allow to report those info in iommu-group
->> sysfs?
-
-
-First thank you for reviewing the series. This is definitively helpful!
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->>
->> RFC v2 -> v3:
->> - use existing get/put_resv_regions
->>
->> RFC v1 -> v2:
->> - use defines for MSI IOVA base and length
->> ---
->>  drivers/iommu/arm-smmu.c | 52 ++++++++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 52 insertions(+)
->>
->> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> index 8f72814..81f1a83 100644
->> --- a/drivers/iommu/arm-smmu.c
->> +++ b/drivers/iommu/arm-smmu.c
->> @@ -278,6 +278,9 @@ enum arm_smmu_s2cr_privcfg {
->>  
->>  #define FSYNR0_WNR			(1 << 4)
->>  
->> +#define MSI_IOVA_BASE			0x8000000
->> +#define MSI_IOVA_LENGTH			0x100000
->> +
->>  static int force_stage;
->>  module_param(force_stage, int, S_IRUGO);
->>  MODULE_PARM_DESC(force_stage,
->> @@ -1545,6 +1548,53 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
->>  	return iommu_fwspec_add_ids(dev, &fwid, 1);
->>  }
->>  
->> +static void arm_smmu_get_resv_regions(struct device *dev,
->> +				      struct list_head *head)
->> +{
->> +	struct iommu_resv_region *region;
->> +	struct pci_host_bridge *bridge;
->> +	struct resource_entry *window;
->> +
->> +	/* MSI region */
->> +	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
->> +					 IOMMU_RESV_MSI);
->> +	if (!region)
->> +		return;
->> +
->> +	list_add_tail(&region->list, head);
->> +
->> +	if (!dev_is_pci(dev))
->> +		return;
->> +
->> +	bridge = pci_find_host_bridge(to_pci_dev(dev)->bus);
->> +
->> +	resource_list_for_each_entry(window, &bridge->windows) {
->> +		phys_addr_t start;
->> +		size_t length;
->> +
->> +		if (resource_type(window->res) != IORESOURCE_MEM &&
->> +		    resource_type(window->res) != IORESOURCE_IO)
+On 07/12/16 13:17, Vladimir Murzin wrote:
+> When PL330 is used with !MMU the following fault is seen:
 > 
-> As Joerg commented elsewhere, considering anything other than memory
-> resources isn't right (I appreciate you've merely copied my own mistake
-> here). We need some other way to handle root complexes where the CPU
-> MMIO views of PCI windows appear in PCI memory space - using the I/O
-> address of I/O resources only works by chance on Juno, and it still
-> doesn't account for config space. I suggest we just leave that out for
-> the time being to make life easier (does it even apply to anything other
-> than Juno?) and figure it out later.
-OK so I understand I should remove IORESOURCE_IO check.
+> Unhandled fault: alignment exception (0x801) at 0x8f26a002
+> Internal error: : 801 [#1] ARM
+> Modules linked in:
+> CPU: 0 PID: 640 Comm: dma0chan0-copy0 Not tainted 4.8.0-6a82063-clean+ #1600
+> Hardware name: ARM-Versatile Express
+> task: 8f1baa80 task.stack: 8e6fe000
+> PC is at _setup_req+0x4c/0x350
+> LR is at 0x8f2cbc00
+> pc : [<801ea538>]    lr : [<8f2cbc00>]    psr: 60000093
+> sp : 8e6ffdc0  ip : 00000000  fp : 00000000
+> r10: 00000000  r9 : 8f2cba10  r8 : 8f2cbc00
+> r7 : 80000013  r6 : 8f21a050  r5 : 8f21a000  r4 : 8f2ac800
+> r3 : 8e6ffe18  r2 : 00944251  r1 : ffffffbc  r0 : 8f26a000
+> Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment none
+> Control: 00c5387c
+> Process dma0chan0-copy0 (pid: 640, stack limit = 0x8e6fe210)
+> Stack: (0x8e6ffdc0 to 0x8e700000)
+> fdc0: 00000001 60000093 00000000 8f2cba10 8f26a000 00000004 8f0ae000 8f2cbc00
+> fde0: 8f0ae000 8f2ac800 8f21a000 8f21a050 80000013 8f2cbc00 8f2cba10 00000000
+> fe00: 60000093 801ebca0 8e6ffe18 000013ff 40000093 00000000 00944251 8f2ac800
+> fe20: a0000013 8f2b1320 00001986 00000000 00000001 000013ff 8f1e4f00 8f2cba10
+> fe40: 8e6fff6c 801e9044 00000003 00000000 fef98c80 002faf07 8e6ffe7c 00000000
+> fe60: 00000002 00000000 00001986 8f1f158d 8f1e4f00 80568de4 00000002 00000000
+> fe80: 00001986 8f1f53ff 40000001 80580500 8f1f158d 8001e00c 00000000 cfdfdfdf
+> fea0: fdae2a25 00000001 00000004 8e6fe000 00000008 00000010 00000000 00000005
+> fec0: 8f2b1330 8f2b1334 8e6ffe80 8e6ffe8c 00001986 00000000 8f21a014 00000001
+> fee0: 8e6ffe60 8e6ffe78 00000002 00000000 000013ff 00000001 80568de4 8f1e8018
+> ff00: 0000158d 8055ec30 00000001 803f6b00 00001986 8f2cba10 fdae2a25 00000001
+> ff20: 8f1baca8 8e6fff24 8e6fff24 00000000 8e6fff24 ac6f3037 00000000 00000000
+> ff40: 00000000 8e6fe000 8f1e4f40 00000000 8f1e4f40 8f1e4f00 801e84ec 00000000
+> ff60: 00000000 00000000 00000000 80031714 dfdfdfcf 00000000 dfdfdfcf 8f1e4f00
+> ff80: 00000000 8e6fff84 8e6fff84 00000000 8e6fff90 8e6fff90 8e6fffac 8f1e4f40
+> ffa0: 80031640 00000000 00000000 8000f548 00000000 00000000 00000000 00000000
+> ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> ffe0: 00000000 00000000 00000000 00000000 00000013 00000000 dfdfdfcf cfdfdfdf
+> [<801ea538>] (_setup_req) from [<801ebca0>] (pl330_tasklet+0x41c/0x490)
+> [<801ebca0>] (pl330_tasklet) from [<801e9044>] (dmatest_func+0xb58/0x149c)
+> [<801e9044>] (dmatest_func) from [<80031714>] (kthread+0xd4/0xec)
+> [<80031714>] (kthread) from [<8000f548>] (ret_from_fork+0x14/0x2c)
+> Code: e3a03001 e3e01043 e5c03001 e59d3048 (e5802002)
 > 
->> +			continue;
->> +
->> +		start = window->res->start - window->offset;
->> +		length = window->res->end - window->res->start + 1;
->> +		region = iommu_alloc_resv_region(start, length,
->> +						 IOMMU_RESV_NOMAP);
->> +		if (!region)
->> +			return;
->> +		list_add_tail(&region->list, head);
->> +	}
->> +}
+> This happens because _emit_{ADDH,MOV,GO) accessing to unaligned data
+> while writing to buffer. Fix it with writing to buffer byte by byte.
 > 
-> Either way, there's nothing SMMU-specific about PCI windows. The fact
-> that we'd have to copy-paste all of this into the SMMUv3 driver
-> unchanged suggests it should go somewhere common (although I would be
-> inclined to leave the insertion of the fake MSI region to driver-private
-> wrappers). As I said before, the current iova_reserve_pci_windows()
-> simply wants splitting into appropriate public callbacks for
-> get_resv_regions and apply_resv_regions.
-Do you mean somewhere common in the arm-smmu subsystem (new file) or in
-another subsystem (pci?)
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 
-More generally the current implementation does not handle the case where
-any of those PCIe host bridge window collide with the MSI window. To me
-this is a flaw.
-1) Either we take into account the PCIe windows and prevent any
-collision when allocating the MSI window.
-2) or we do not care about PCIe host bridge windows at kernel level.
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-If 1) we are back to the original issue of where do we put the MSI
-window. Obviously at a place which might not be QEMU friendly anymore.
-What allocation policy shall we use?
+I don't have a NOMMU setup, but I checked arm64 (both little- and
+big-endian) sees no regressions:
 
-Second option - sorry I may look stubborn - which I definitively prefer
-and which was also advocated by Alex, we handle PCI host bridge windows
-at user level. MSI window is reported through the iommu group sysfs.
-PCIe host bridge windows can be enumerated through /proc/iomem. Both x86
-iommu and arm smmu would report an MSI reserved window. ARM MSI window
-would become a de facto reserved window for guests.
+Tested-by: Robin Murphy <robin.murphy@arm.com>
 
-Thoughts?
+Cheers,
+Robin.
 
-Eric
+> ---
+>  drivers/dma/pl330.c |   15 ++++++++++-----
+>  1 file changed, 10 insertions(+), 5 deletions(-)
 > 
-> Robin.
-> 
->> +static void arm_smmu_put_resv_regions(struct device *dev,
->> +				      struct list_head *head)
->> +{
->> +	struct iommu_resv_region *entry, *next;
->> +
->> +	list_for_each_entry_safe(entry, next, head, list)
->> +		kfree(entry);
->> +}
->> +
->>  static struct iommu_ops arm_smmu_ops = {
->>  	.capable		= arm_smmu_capable,
->>  	.domain_alloc		= arm_smmu_domain_alloc,
->> @@ -1560,6 +1610,8 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
->>  	.domain_get_attr	= arm_smmu_domain_get_attr,
->>  	.domain_set_attr	= arm_smmu_domain_set_attr,
->>  	.of_xlate		= arm_smmu_of_xlate,
->> +	.get_resv_regions	= arm_smmu_get_resv_regions,
->> +	.put_resv_regions	= arm_smmu_put_resv_regions,
->>  	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
->>  };
->>  
->>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 030fe05..e4c1ba7 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -570,7 +570,8 @@ static inline u32 _emit_ADDH(unsigned dry_run, u8 buf[],
+>  
+>  	buf[0] = CMD_DMAADDH;
+>  	buf[0] |= (da << 1);
+> -	*((__le16 *)&buf[1]) = cpu_to_le16(val);
+> +	buf[1] = val;
+> +	buf[2] = val >> 8;
+>  
+>  	PL330_DBGCMD_DUMP(SZ_DMAADDH, "\tDMAADDH %s %u\n",
+>  		da == 1 ? "DA" : "SA", val);
+> @@ -724,7 +725,10 @@ static inline u32 _emit_MOV(unsigned dry_run, u8 buf[],
+>  
+>  	buf[0] = CMD_DMAMOV;
+>  	buf[1] = dst;
+> -	*((__le32 *)&buf[2]) = cpu_to_le32(val);
+> +	buf[2] = val;
+> +	buf[3] = val >> 8;
+> +	buf[4] = val >> 16;
+> +	buf[5] = val >> 24;
+>  
+>  	PL330_DBGCMD_DUMP(SZ_DMAMOV, "\tDMAMOV %s 0x%x\n",
+>  		dst == SAR ? "SAR" : (dst == DAR ? "DAR" : "CCR"), val);
+> @@ -899,10 +903,11 @@ static inline u32 _emit_GO(unsigned dry_run, u8 buf[],
+>  
+>  	buf[0] = CMD_DMAGO;
+>  	buf[0] |= (ns << 1);
+> -
+>  	buf[1] = chan & 0x7;
+> -
+> -	*((__le32 *)&buf[2]) = cpu_to_le32(addr);
+> +	buf[2] = addr;
+> +	buf[3] = addr >> 8;
+> +	buf[4] = addr >> 16;
+> +	buf[5] = addr >> 24;
+>  
+>  	return SZ_DMAGO;
+>  }
 > 
