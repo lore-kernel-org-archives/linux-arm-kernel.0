@@ -1,50 +1,32 @@
 From: jk@ozlabs.org (Jeremy Kerr)
-Date: Thu, 8 Dec 2016 10:27:46 +1100
-Subject: [PATCH 05/16] drivers/fsi: Add fake master driver
-In-Reply-To: <20161207120905.GD7054@leverpostej>
-References: <1481069677-53660-1-git-send-email-christopher.lee.bostic@gmail.com>
- <1481069677-53660-6-git-send-email-christopher.lee.bostic@gmail.com>
- <20161207120905.GD7054@leverpostej>
-Message-ID: <d5443f56-501e-53d4-ae09-a356573c4096@ozlabs.org>
+Date: Thu, 8 Dec 2016 10:33:08 +1100
+Subject: [PATCH 08/16] drivers/fsi: Add crc4 helpers
+In-Reply-To: <20161207090219.GA14742@kroah.com>
+References: <1481076574-54711-1-git-send-email-christopher.lee.bostic@gmail.com>
+ <1481076574-54711-2-git-send-email-christopher.lee.bostic@gmail.com>
+ <20161207090219.GA14742@kroah.com>
+Message-ID: <81146f25-05fa-70f9-e8ff-49c17aede8f2@ozlabs.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark & Chris,
+Hi Greg,
 
-> On Tue, Dec 06, 2016 at 06:14:26PM -0600, Chris Bostic wrote:
->> From: Jeremy Kerr <jk@ozlabs.org>
->>
->> For debugging, add a fake master driver, that only supports reads,
->> returning a fixed set of data.
-> 
->> +config FSI_MASTER_FAKE
->> +	tristate "Fake FSI master"
->> +	depends on FSI
->> +	---help---
->> +	This option enables a fake FSI master driver for debugging.
->> +endif
-> 
->> +static const struct of_device_id fsi_master_fake_match[] = {
->> +	{ .compatible = "ibm,fsi-master-fake" },
->> +	{ },
->> +};
-> 
-> NAK.
-> 
-> DT should be treated as an ABI, and should describe the HW explicitly.
-> This makes no sense. This is also missing a binding document.
-> 
-> Have your module take a module parameter allowing you to bind it to
-> arbitrary devices, or do something like what PCI does where you can
-> bind/unbind arbitrary drivers to devices using sysfs.
+> Why not just create lib/crc4.c with these functions, like the other crc
+> functions in the kernel?
 
-This driver is purely for testing the FSI engine scan code; we could
-probably just drop this patch since I suspect that it's no longer useful
-(now that we have an actual master driver).
+Two (bad) reasons:
 
-If we do want to keep it though, I'd say we remove the device tree
-dependency; all this is doing at the moment is triggering the ->probe,
-and there are better ways to do that.
+ - The crc4 implementation here is pretty specific to the FSI
+   usage (only supporting 4-bit-sized chunks), to keep the math & lookup
+   table simple
+
+ - I'm lazy
+
+So yes, we should spend the effort now to make this generic enough for
+a lib/crc4.c. Would we want to support different values for the
+polynomial?
+
+Chris: do you want me to to that, or will you?
 
 Cheers,
 
