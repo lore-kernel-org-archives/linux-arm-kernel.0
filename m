@@ -1,55 +1,63 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Wed, 7 Dec 2016 10:06:38 +0100
-Subject: [PATCH 0/2] Hibernate fixes for 'Fix memmap to be initialized
- for the entire section'
-In-Reply-To: <20161206173810.GU2498@arm.com>
-References: <1480530091-1092-1-git-send-email-rrichter@cavium.com>
- <20161202144909.18405-1-james.morse@arm.com>
- <CAKv+Gu9AVVPp+UM5pCeYCt4HE-Azijp0iUf0QZv6YKFgAuckYw@mail.gmail.com>
- <20161206173810.GU2498@arm.com>
-Message-ID: <20161207090638.GI10776@rric.localdomain>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Wed, 7 Dec 2016 10:07:21 +0100
+Subject: [PATCH v5] ARM: davinci: da8xx: Fix sleeping function called from
+ invalid context
+In-Reply-To: <22aec236-83f0-ea2d-8657-c99f95389611@lechnology.com>
+References: <1480947224-26222-1-git-send-email-abailon@baylibre.com>
+ <2fc7a4ef-02ad-fc15-66ea-9f75756086f8@ti.com>
+ <cbf4b99b-e453-acd5-d864-f709708fbab0@baylibre.com>
+ <c4e15855-b785-8bc7-5ef2-af4ec24354e6@ti.com>
+ <22aec236-83f0-ea2d-8657-c99f95389611@lechnology.com>
+Message-ID: <b0f37b43-bdb6-10df-126b-7fe4a8ff0165@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.12.16 17:38:11, Will Deacon wrote:
-> On Mon, Dec 05, 2016 at 03:42:14PM +0000, Ard Biesheuvel wrote:
-> > On 2 December 2016 at 14:49, James Morse <james.morse@arm.com> wrote:
-> > > Patch "arm64: mm: Fix memmap to be initialized for the entire section"
-> > > changes pfn_valid() in a way that breaks hibernate. These patches fix
-> > > hibernate, and provided struct page's are allocated for nomap pages,
-> > > can be applied before [0].
-> > >
-> > > Hibernate core code belives 'valid' to mean "I can access this". It
-> > > uses pfn_valid() to test the page if the page is 'valid'.
-> > >
-> > > pfn_valid() needs to be changed so that all struct pages in a numa
-> > > node have the same node-id. Currently 'nomap' pages are skipped, and
-> > > retain their pre-numa node-ids, which leads to a later BUG_ON().
-> > >
-> > > These patches make hibernate's savable_page() take its escape route
-> > > via 'if (PageReserved(page) && pfn_is_nosave(pfn))'.
-> > >
-> > 
-> > This makes me feel slightly uneasy. Robert makes a convincing point,
-> > but I wonder if we can expect more fallout from the ambiguity of
-> > pfn_valid(). Now we are not only forced to assign non-existing (as far
-> > as the OS is concerned) pages to the correct NUMA node, we also need
-> > to set certain page flags.
+On 12/06/2016 07:56 PM, David Lechner wrote:
+> On 12/06/2016 03:57 AM, Sekhar Nori wrote:
+>> On Tuesday 06 December 2016 03:21 PM, Alexandre Bailon wrote:
+>>> On 12/06/2016 10:33 AM, Sekhar Nori wrote:
+>>>> On Monday 05 December 2016 07:43 PM, Alexandre Bailon wrote:
+>>>>> Everytime the usb20 phy is enabled, there is a
+>>>>> "sleeping function called from invalid context" BUG.
+>>>>>
+>>>>> clk_enable() from arch/arm/mach-davinci/clock.c uses
+>>>>> spin_lock_irqsave()
+>>>>> before to invoke the callback usb20_phy_clk_enable().
+>>>>> usb20_phy_clk_enable() uses clk_get() and clk_enable_prepapre()
+>>>>> which may sleep.
+>>>>> Move clk_get() to da8xx_register_usb20_phy_clk() and
+>>>>> replace clk_prepare_enable() by clk_enable().
+>>>>>
+>>>>> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+>>>>
+>>>> This will still cause the recursive locking problem reported by David.
+>>>> Not sure what the point of sending this version was.
+>>>>
+>>>> Thanks,
+>>>> Sekhar
+>>>>
+>>
+>>> What am I supposed to do ?
+>>
+>> That needs to be resolved between you and David. Perhaps convert the fix
+>> sent by David into a proper patch and base this patch on that. Or wait
+>> for David to send it himself and let him also make the modifications
+>> needed in this patch.
+>>
+>> David ?
+>>
+>> Thanks,
+>> Sekhar
+>>
 > 
-> Yes, I really don't know how to proceed here. Playing whack-a-mole with
-> pfn_valid() users doesn't sounds like an improvement on the current
-> situation to me.
+> Alexandre, I was hoping that you would just squash my patch with your
+> patch and take Sekhar's suggestion about a separate patch to make the
+> private __clk_enable() public as davinci_clk_enable() when you re-submit.
+OK.
 > 
-> Robert -- if we leave pfn_valid() as it is, would a point-hack to
-> memmap_init_zone help, or do you anticipate other problems?
+> You can add "Suggested-By: David Lechner <david@lechnology.com>" to the
+> commit message if you would like to give me some credit for my ideas.
+That was my concern. I will do that.
 
-I would suggest to fix the hibernation code as I commented on before
-to use pfn_is_nosave() that defaults to pfn_valid() but uses memblock_
-is_nomap() for arm64. Let's just fix it and see if no other issues
-arise. I am trying to send a patch for this until tomorrow.
-
-I am also going to see how early_pfn_valid() could be redirected to
-use memblock_is_nomap() on arm64. That would "quick fix" the problem,
-though I rather prefer to go further with the current solution.
-
--Robert
+Thanks,
+Alexandre
