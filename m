@@ -1,89 +1,135 @@
 From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Wed,  7 Dec 2016 14:48:19 -0700
-Subject: [PATCH V6 06/10] acpi: apei: panic OS with fatal error status block
+Date: Wed,  7 Dec 2016 14:48:22 -0700
+Subject: [PATCH V6 09/10] trace, ras: add ARM processor error trace event
 In-Reply-To: <1481147303-7979-1-git-send-email-tbaicar@codeaurora.org>
 References: <1481147303-7979-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <1481147303-7979-7-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <1481147303-7979-10-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
+Currently there are trace events for the various RAS
+errors with the exception of ARM processor type errors.
+Add a new trace event for such errors so that the user
+will know when they occur. These trace events are
+consistent with the ARM processor error section type
+defined in UEFI 2.6 spec section N.2.4.4.
 
-Even if an error status block's severity is fatal, the kernel does not
-honor the severity level and panic.
-
-With the firmware first model, the platform could inform the OS about a
-fatal hardware error through the non-NMI GHES notification type. The OS
-should panic when a hardware error record is received with this
-severity.
-
-Call panic() after CPER data in error status block is printed if
-severity is fatal, before each error section is handled.
-
-Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
 Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+Acked-by: Steven Rostedt <rostedt@goodmis.org>
 ---
- drivers/acpi/apei/ghes.c | 19 ++++++++++++++-----
- 1 file changed, 14 insertions(+), 5 deletions(-)
+ drivers/acpi/apei/ghes.c    |  9 +++++++-
+ drivers/firmware/efi/cper.c |  1 +
+ drivers/ras/ras.c           |  1 +
+ include/ras/ras_event.h     | 55 +++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 65 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 66ab3fd..895dec7 100644
+index f2217da..49e6c25 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -141,6 +141,8 @@ static unsigned long ghes_estatus_pool_size_request;
- static struct ghes_estatus_cache *ghes_estatus_caches[GHES_ESTATUS_CACHES_SIZE];
- static atomic_t ghes_estatus_cache_alloced;
+@@ -517,7 +517,14 @@ static void ghes_do_proc(struct ghes *ghes,
  
-+static int ghes_panic_timeout __read_mostly = 30;
+ 		}
+ #endif
+-		else {
++		else if (!uuid_le_cmp(sec_type, CPER_SEC_PROC_ARM)) {
++			struct cper_sec_proc_arm *arm_err;
++			struct cper_arm_err_info *err_info;
 +
- static int ghes_ioremap_init(void)
- {
- 	ghes_ioremap_area = __get_vm_area(PAGE_SIZE * GHES_IOREMAP_PAGES,
-@@ -692,6 +694,13 @@ static int ghes_ack_error(struct acpi_hest_generic_v2 *generic_v2)
- 	return rc;
- }
++			arm_err = acpi_hest_generic_data_payload(gdata);
++			err_info = (void *)(arm_err +1);
++			trace_arm_event(arm_err, err_info);
++		} else {
+ 			void *unknown_err = acpi_hest_generic_data_payload(gdata);
+ 			trace_unknown_sec_event(&sec_type,
+ 					fru_id, fru_text, sec_sev,
+diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
+index 6cfcaa2..3cc0104 100644
+--- a/drivers/firmware/efi/cper.c
++++ b/drivers/firmware/efi/cper.c
+@@ -35,6 +35,7 @@
+ #include <linux/printk.h>
+ #include <linux/bcd.h>
+ #include <acpi/ghes.h>
++#include <ras/ras_event.h>
  
-+static void __ghes_call_panic(void)
-+{
-+	if (panic_timeout == 0)
-+		panic_timeout = ghes_panic_timeout;
-+	panic("Fatal hardware error!");
-+}
+ #define INDENT_SP	" "
+ 
+diff --git a/drivers/ras/ras.c b/drivers/ras/ras.c
+index fb2500b..8ba5a94 100644
+--- a/drivers/ras/ras.c
++++ b/drivers/ras/ras.c
+@@ -28,3 +28,4 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(extlog_mem_event);
+ #endif
+ EXPORT_TRACEPOINT_SYMBOL_GPL(mc_event);
+ EXPORT_TRACEPOINT_SYMBOL_GPL(unknown_sec_event);
++EXPORT_TRACEPOINT_SYMBOL_GPL(arm_event);
+diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
+index 5861b6f..860a5f1 100644
+--- a/include/ras/ras_event.h
++++ b/include/ras/ras_event.h
+@@ -162,6 +162,61 @@ TRACE_EVENT(mc_event,
+ );
+ 
+ /*
++ * ARM Processor Events Report
++ *
++ * This event is generated when hardware detects an ARM processor error
++ * has occurred. UEFI 2.6 spec section N.2.4.4.
++ */
++TRACE_EVENT(arm_event,
 +
- static int ghes_proc(struct ghes *ghes)
- {
- 	int rc;
-@@ -703,6 +712,10 @@ static int ghes_proc(struct ghes *ghes)
- 		if (ghes_print_estatus(NULL, ghes->generic, ghes->estatus))
- 			ghes_estatus_cache_add(ghes->generic, ghes->estatus);
- 	}
-+	if (ghes_severity(ghes->estatus->error_severity) >= GHES_SEV_PANIC) {
-+		__ghes_call_panic();
-+	}
++	TP_PROTO(const struct cper_sec_proc_arm *proc,
++		 struct cper_arm_err_info *err_info),
 +
- 	ghes_do_proc(ghes, ghes->estatus);
- 
- 	if (IS_HEST_TYPE_GENERIC_V2(ghes)) {
-@@ -847,8 +860,6 @@ static atomic_t ghes_in_nmi = ATOMIC_INIT(0);
- 
- static LIST_HEAD(ghes_nmi);
- 
--static int ghes_panic_timeout	__read_mostly = 30;
--
- static void ghes_proc_in_irq(struct irq_work *irq_work)
- {
- 	struct llist_node *llnode, *next;
-@@ -941,9 +952,7 @@ static void __ghes_panic(struct ghes *ghes)
- 	__ghes_print_estatus(KERN_EMERG, ghes->generic, ghes->estatus);
- 
- 	/* reboot to log the error! */
--	if (panic_timeout == 0)
--		panic_timeout = ghes_panic_timeout;
--	panic("Fatal hardware error!");
-+	__ghes_call_panic();
- }
- 
- static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
++	TP_ARGS(proc, err_info),
++
++	TP_STRUCT__entry(
++		__field(u64, mpidr)
++		__field(u64, midr)
++		__field(u64, info)
++		__field(u64, virt_fault_addr)
++		__field(u64, phys_fault_addr)
++		__field(u32, running_state)
++		__field(u32, psci_state)
++		__field(u16, err_count)
++		__field(u8, affinity)
++		__field(u8, version)
++		__field(u8, type)
++		__field(u8, flags)
++	),
++
++	TP_fast_assign(
++		__entry->affinity = proc->affinity_level;
++		__entry->mpidr = proc->mpidr;
++		__entry->midr = proc->midr;
++		__entry->running_state = proc->running_state;
++		__entry->psci_state = proc->psci_state;
++		__entry->version = err_info->version;
++		__entry->type = err_info->type;
++		__entry->err_count = err_info->multiple_error;
++		__entry->flags = err_info->flags;
++		__entry->info = err_info->error_info;
++		__entry->virt_fault_addr = err_info->virt_fault_addr;
++		__entry->phys_fault_addr = err_info->physical_fault_addr;
++	),
++
++	TP_printk("affinity level: %d; MPIDR: %016llx; MIDR: %016llx; "
++		  "running state: %d; PSCI state: %d; version: %d; type: %d; "
++		  "error count: 0x%04x; flags: 0x%02x; info: %016llx; "
++		  "virtual fault address: %016llx; "
++		  "physical fault address: %016llx",
++		  __entry->affinity, __entry->mpidr, __entry->midr,
++		  __entry->running_state, __entry->psci_state, __entry->version,
++		  __entry->type, __entry->err_count, __entry->flags,
++		  __entry->info, __entry->virt_fault_addr,
++		  __entry->phys_fault_addr)
++);
++
++/*
+  * Unknown Section Report
+  *
+  * This event is generated when hardware detected a hardware
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
 Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
