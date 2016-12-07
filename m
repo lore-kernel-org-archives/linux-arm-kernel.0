@@ -1,30 +1,45 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 7 Dec 2016 12:35:15 -0800
-Subject: [GIT PULL 2/2] DaVinci defconfig updates for v4.10 (part 4)
-In-Reply-To: <20161205110316.18514-2-nsekhar@ti.com>
-References: <20161205110316.18514-1-nsekhar@ti.com>
- <20161205110316.18514-2-nsekhar@ti.com>
-Message-ID: <20161207203515.GC10158@localhost>
+Date: Wed, 7 Dec 2016 12:36:29 -0800
+Subject: [GIT PULL] ARM: Xilinx Zynq SOC changes for v4.10
+In-Reply-To: <1ff060ae-b142-9e72-6fef-21b81a147614@monstr.eu>
+References: <1ff060ae-b142-9e72-6fef-21b81a147614@monstr.eu>
+Message-ID: <20161207203629.GD10158@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 05, 2016 at 04:33:16PM +0530, Sekhar Nori wrote:
-> The following changes since commit 213971e7571e27f47b4e926904a9adf794925c51:
+On Tue, Dec 06, 2016 at 01:46:01PM +0100, Michal Simek wrote:
+> Hi,
 > 
->   ARM: davinci_all_defconfig: Enable OHCI as module (2016-11-22 20:50:46 +0530)
+> please pull this fix to your tree.
+> 
+> Thanks,
+> Michal
+> 
+> 
+> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+> 
+>   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.10/defconfig-4
+>   https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-4.10
 > 
-> for you to fetch changes up to 47d03e48efa572109229aec9436948d92f44b689:
+> for you to fetch changes up to 7a3cc2a7b2c723aa552028f4e66841cec183756d:
 > 
->   ARM: davinci_all_defconfig: Enable da8xx usb otg (2016-12-01 19:52:12 +0530)
+>   ARM: zynq: Reserve correct amount of non-DMA RAM (2016-11-14 16:07:58
+> +0100)
 > 
 > ----------------------------------------------------------------
-> Enable support for MUSB based USB OTG on DA850.
+> arm: Xilinx Zynq patches for v4.10
+> 
+> - Fix dma issue
+> 
+> ----------------------------------------------------------------
+> Kyle Roeschley (1):
+>       ARM: zynq: Reserve correct amount of non-DMA RAM
 
-Merged, thanks.
+Merged, thanks.  Should this have been a fix, btw? I queued it for 4.10 merge
+window now.
 
 
 -Olof
