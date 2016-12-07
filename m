@@ -1,30 +1,14 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 7 Dec 2016 15:24:13 +0800
-Subject: [PATCH] usb: mtu3: enable auto switch from U3 to U2
-Message-ID: <1481095453-23497-1-git-send-email-chunfeng.yun@mediatek.com>
+From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
+Date: Wed, 07 Dec 2016 08:29:59 +0100
+Subject: mmc: core: complete/wait_for_completion performance
+In-Reply-To: <1198138554.59982.63209ba1-8fb4-4a13-9ee0-f746a192f4c7.open-xchange@email.1und1.de>
+References: <1479644869.2653.3.camel@embedded.rocks>
+ <585759233.283839.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
+ <1479652929.2841.1.camel@embedded.rocks>
+ <187975187.249177.bccdc17e-e9c6-48c2-aeaf-3b81f1b61ec7.open-xchange@email.1und1.de>
+ <1479669034.1975.1.camel@embedded.rocks>
+ <1198138554.59982.63209ba1-8fb4-4a13-9ee0-f746a192f4c7.open-xchange@email.1und1.de>
+Message-ID: <1481095799.30310.12.camel@embedded.rocks>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-inform mac2 to build U2 link automatically after U3 detect
-fail without software setting soft_connect.
-
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/usb/mtu3/mtu3_core.c |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/usb/mtu3/mtu3_core.c b/drivers/usb/mtu3/mtu3_core.c
-index af3e531..ca05021 100644
---- a/drivers/usb/mtu3/mtu3_core.c
-+++ b/drivers/usb/mtu3/mtu3_core.c
-@@ -568,6 +568,8 @@ static void mtu3_regs_init(struct mtu3 *mtu)
- 				SW_U1_REQUEST_ENABLE | SW_U2_REQUEST_ENABLE);
- 		/* device responses to u3_exit from host automatically */
- 		mtu3_clrbits(mbase, U3D_LTSSM_CTRL, SOFT_U3_EXIT_EN);
-+		/* automatically build U2 link when U3 detect fail */
-+		mtu3_setbits(mbase, U3D_USB2_TEST_MODE, U2U3_AUTO_SWITCH);
- 	}
- 
- 	mtu3_set_speed(mtu);
--- 
-1.7.9.5
