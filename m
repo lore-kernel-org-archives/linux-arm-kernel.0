@@ -1,74 +1,64 @@
 From: dhowells@redhat.com (David Howells)
-Date: Wed, 07 Dec 2016 13:18:47 +0000
-Subject: [PATCH 6/8] efi: Disable secure boot if shim is in insecure mode
- [ver #5]
+Date: Wed, 07 Dec 2016 13:18:54 +0000
+Subject: [PATCH 7/8] efi: Add EFI_SECURE_BOOT bit [ver #5]
 In-Reply-To: <148111668193.23390.6340512985876251017.stgit@warthog.procyon.org.uk>
 References: <148111668193.23390.6340512985876251017.stgit@warthog.procyon.org.uk>
-Message-ID: <148111672749.23390.3812803285687048081.stgit@warthog.procyon.org.uk>
+Message-ID: <148111673487.23390.1034268607109450025.stgit@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Josh Boyer <jwboyer@fedoraproject.org>
 
-A user can manually tell the shim boot loader to disable validation of
-images it loads.  When a user does this, it creates a UEFI variable called
-MokSBState that does not have the runtime attribute set.  Given that the
-user explicitly disabled validation, we can honor that and not enable
-secure boot mode if that variable is set.
+UEFI machines can be booted in Secure Boot mode.  Add a EFI_SECURE_BOOT bit
+that can be passed to efi_enabled() to find out whether secure boot is
+enabled.
+
+This will be used by the SysRq+x handler, registered by the x86 arch, to find
+out whether secure boot mode is enabled so that it can be disabled.
 
 Signed-off-by: Josh Boyer <jwboyer@fedoraproject.org>
 Signed-off-by: David Howells <dhowells@redhat.com>
 ---
 
- drivers/firmware/efi/libstub/secureboot.c |   24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+ arch/x86/kernel/setup.c |   15 +++++++++++++++
+ include/linux/efi.h     |    1 +
+ 2 files changed, 16 insertions(+)
 
-diff --git a/drivers/firmware/efi/libstub/secureboot.c b/drivers/firmware/efi/libstub/secureboot.c
-index 70e2a36577d4..ba6ef717c66f 100644
---- a/drivers/firmware/efi/libstub/secureboot.c
-+++ b/drivers/firmware/efi/libstub/secureboot.c
-@@ -23,6 +23,12 @@ static const efi_char16_t const efi_SetupMode_name[] = {
- 	'S', 'e', 't', 'u', 'p', 'M', 'o', 'd', 'e', 0
- };
+diff --git a/arch/x86/kernel/setup.c b/arch/x86/kernel/setup.c
+index 9c337b0e8ba7..d8972ec6257d 100644
+--- a/arch/x86/kernel/setup.c
++++ b/arch/x86/kernel/setup.c
+@@ -1152,6 +1152,21 @@ void __init setup_arch(char **cmdline_p)
+ 	/* Allocate bigger log buffer */
+ 	setup_log_buf(1);
  
-+/* SHIM variables */
-+static const efi_guid_t shim_guid = EFI_SHIM_LOCK_GUID;
-+static efi_char16_t const shim_MokSBState_name[] = {
-+	'M', 'o', 'k', 'S', 'B', 'S', 't', 'a', 't', 'e', 0
-+};
++	if (IS_ENABLED(CONFIG_EFI)) {
++		switch (boot_params.secure_boot) {
++		case efi_secureboot_mode_disabled:
++			pr_info("Secure boot disabled\n");
++			break;
++		case efi_secureboot_mode_enabled:
++			set_bit(EFI_SECURE_BOOT, &efi.flags);
++			pr_info("Secure boot enabled\n");
++			break;
++		default:
++			pr_info("Secure boot could not be determined\n");
++			break;
++		}
++	}
 +
- #define get_efi_var(name, vendor, ...) \
- 	efi_call_runtime(get_variable, \
- 			 (efi_char16_t *)(name), (efi_guid_t *)(vendor), \
-@@ -33,7 +39,8 @@ static const efi_char16_t const efi_SetupMode_name[] = {
-  */
- enum efi_secureboot_mode efi_get_secureboot(efi_system_table_t *sys_table_arg)
- {
--	u8 secboot, setupmode;
-+	u32 attr;
-+	u8 secboot, setupmode, moksbstate;
- 	unsigned long size;
- 	efi_status_t status;
+ 	reserve_initrd();
  
-@@ -52,6 +59,21 @@ enum efi_secureboot_mode efi_get_secureboot(efi_system_table_t *sys_table_arg)
- 	if (secboot == 0 || setupmode == 1)
- 		goto secure_boot_disabled;
+ 	acpi_table_upgrade();
+diff --git a/include/linux/efi.h b/include/linux/efi.h
+index 92e23f03045e..135ca9c0c0b5 100644
+--- a/include/linux/efi.h
++++ b/include/linux/efi.h
+@@ -1066,6 +1066,7 @@ extern int __init efi_setup_pcdp_console(char *);
+ #define EFI_ARCH_1		7	/* First arch-specific bit */
+ #define EFI_DBG			8	/* Print additional debug info at runtime */
+ #define EFI_NX_PE_DATA		9	/* Can runtime data regions be mapped non-executable? */
++#define EFI_SECURE_BOOT		10	/* Are we in Secure Boot mode? */
  
-+	/* See if a user has put shim into insecure mode.  If so, and if the
-+	 * variable doesn't have the runtime attribute set, we might as well
-+	 * honor that.
-+	 */
-+	size = sizeof(moksbstate);
-+	status = get_efi_var(shim_MokSBState_name, &shim_guid,
-+			     &attr, &size, &moksbstate);
-+
-+	/* If it fails, we don't care why.  Default to secure */
-+	if (status != EFI_SUCCESS)
-+		goto secure_boot_enabled;
-+	if (!(attr & EFI_VARIABLE_RUNTIME_ACCESS) && moksbstate == 1)
-+		goto secure_boot_disabled;
-+
-+secure_boot_enabled:
- 	pr_efi(sys_table_arg, "UEFI Secure Boot is enabled.\n");
- 	return efi_secureboot_mode_enabled;
- 
+ #ifdef CONFIG_EFI
+ /*
