@@ -1,116 +1,113 @@
-From: abelvesa@gmail.com (Abel Vesa)
-Date: Wed, 7 Dec 2016 12:10:26 +0000
-Subject: [PATCH 4/7] arm: Add ftrace with regs support
-In-Reply-To: <cf63d647-b5ce-a41b-31ee-6d14da60f541@arm.com>
-References: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
- <1481043967-15602-5-git-send-email-abelvesa@linux.com>
- <cf63d647-b5ce-a41b-31ee-6d14da60f541@arm.com>
-Message-ID: <20161207121026.GB22174@gce>
+From: julien.grall@arm.com (Julien Grall)
+Date: Wed,  7 Dec 2016 12:24:40 +0000
+Subject: [PATCH] arm/xen: Use alloc_percpu rather than __alloc_percpu
+Message-ID: <1481113480-7663-1-git-send-email-julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 11:58:24AM +0000, Robin Murphy wrote:
-> Hi Abel,
-> 
-> On 06/12/16 17:06, Abel Vesa wrote:
-> > This adds __ftrace_regs_caller which, unlike __ftrace_caller,
-> > adds register saving/restoring and livepatch handling if
-> > the pc register gets modified by klp_ftrace_handler.
-> > 
-> > Signed-off-by: Abel Vesa <abelvesa@linux.com>
-> > ---
-> >  arch/arm/kernel/entry-ftrace.S | 49 ++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 49 insertions(+)
-> > 
-> > diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
-> > index c73c403..b6ada5c 100644
-> > --- a/arch/arm/kernel/entry-ftrace.S
-> > +++ b/arch/arm/kernel/entry-ftrace.S
-> > @@ -92,6 +92,46 @@
-> >  2:	mcount_exit
-> >  .endm
-> >  
-> > +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-> > +
-> > +.macro __ftrace_regs_caller suffix
-> > +
-> > +	stmdb	sp!, {r0-r15}
-> 
-> As the kbuild robot reported, you can't do this. For ARM, it's unknown
-> what the value stored for r13 will be, and for a Thumb-2 kernel the
-> whole instruction is flat out unpredictable (i.e. it might just undef or
-> anything).
-> 
-> > +	mov	r3, sp
-> > +
-> > +	ldr	r10, [sp, #60]
-> > +
-> > +	mcount_get_lr   r1                      @ lr of instrumented func
-> > +	mcount_adjust_addr	r0, lr		@ instrumented function
-> > +
-> > +	.globl ftrace_regs_call\suffix
-> > +ftrace_regs_call\suffix:
-> > +	bl	ftrace_stub
-> > +
-> > +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-> > +	.globl ftrace_regs_graph_call\suffix
-> > +ftrace_regs_graph_call\suffix:
-> > +	mov	r0, r0
-> > +#endif
-> > +#ifdef CONFIG_LIVEPATCH
-> > +	ldr	r0, [sp, #60]
-> > +	cmp	r0, r10
-> > +	beq	ftrace_regs_caller_end
-> > +	ldmia	sp!, {r0-r12}
-> > +	add	sp, sp, #8
-> > +	ldmia	sp!, {r11}
-> > +	sub	sp, r12, #16
-> > +	str	r11, [sp, #12]
-> > +	ldmia	sp!, {r11, r12, lr, pc}
-> > +#endif
-> > +ftrace_regs_caller_end\suffix:
-> > +	ldmia	sp!, {r0-r14}
-> 
-> Again, the value of SP at this point is now unknown (regardless of
-> whether what the value on memory was correct or not). Not good.
-> 
-> Either use non-writeback addressing modes, or avoid saving/restoring SP
-> at all (AFAICS it isn't necessary, since if the SP was changed in
-> between, you then wouldn't know where to restore the saved registers
-> from anyway).
-> 
-> Robin.
->
-Yep, as I said in the cover letter, I'll try to fix that in the next
-iteration of this patch. You're right, sp doesn't need to be pushed or
-popped. I'll send a another patch series which will include a fix for 
-that tomorrow, latest.
+The function xen_guest_init is using __alloc_percpu with an alignment
+which are not power of two.
 
-Thanks. 
-> > +	add	sp, sp, #4
-> > +	mov	pc, lr
-> > +.endm
-> > +
-> > +#endif
-> > +
-> >  .macro __ftrace_caller suffix
-> >  	mcount_enter
-> >  
-> > @@ -212,6 +252,15 @@ UNWIND(.fnstart)
-> >  	__ftrace_caller
-> >  UNWIND(.fnend)
-> >  ENDPROC(ftrace_caller)
-> > +
-> > +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-> > +ENTRY(ftrace_regs_caller)
-> > +UNWIND(.fnstart)
-> > +	__ftrace_regs_caller
-> > +UNWIND(.fnend)
-> > +ENDPROC(ftrace_regs_caller)
-> > +#endif
-> > +
-> >  #endif
-> >  
-> >  #ifdef CONFIG_FUNCTION_GRAPH_TRACER
-> > 
-> 
+However, the percpu allocator never supported alignments which are not power
+of two and has always behaved incorectly in thise case.
+
+Commit 3ca45a4 "percpu: ensure requested alignment is power of two"
+introduced a check which trigger a warning [1] when booting linux-next
+on Xen. But in fine this bug was always present.
+
+This can be fixed by replacing the call to __alloc_percpu with
+alloc_percpu. The latter will use an alignment which are a power of two.
+
+[1]
+
+[    0.023921] illegal size (48) or align (48) for percpu allocation
+[    0.024167] ------------[ cut here ]------------
+[    0.024344] WARNING: CPU: 0 PID: 1 at linux/mm/percpu.c:892 pcpu_alloc+0x88/0x6c0
+[    0.024584] Modules linked in:
+[    0.024708]
+[    0.024804] CPU: 0 PID: 1 Comm: swapper/0 Not tainted
+4.9.0-rc7-next-20161128 #473
+[    0.025012] Hardware name: Foundation-v8A (DT)
+[    0.025162] task: ffff80003d870000 task.stack: ffff80003d844000
+[    0.025351] PC is at pcpu_alloc+0x88/0x6c0
+[    0.025490] LR is at pcpu_alloc+0x88/0x6c0
+[    0.025624] pc : [<ffff00000818e678>] lr : [<ffff00000818e678>]
+pstate: 60000045
+[    0.025830] sp : ffff80003d847cd0
+[    0.025946] x29: ffff80003d847cd0 x28: 0000000000000000
+[    0.026147] x27: 0000000000000000 x26: 0000000000000000
+[    0.026348] x25: 0000000000000000 x24: 0000000000000000
+[    0.026549] x23: 0000000000000000 x22: 00000000024000c0
+[    0.026752] x21: ffff000008e97000 x20: 0000000000000000
+[    0.026953] x19: 0000000000000030 x18: 0000000000000010
+[    0.027155] x17: 0000000000000a3f x16: 00000000deadbeef
+[    0.027357] x15: 0000000000000006 x14: ffff000088f79c3f
+[    0.027573] x13: ffff000008f79c4d x12: 0000000000000041
+[    0.027782] x11: 0000000000000006 x10: 0000000000000042
+[    0.027995] x9 : ffff80003d847a40 x8 : 6f697461636f6c6c
+[    0.028208] x7 : 6120757063726570 x6 : ffff000008f79c84
+[    0.028419] x5 : 0000000000000005 x4 : 0000000000000000
+[    0.028628] x3 : 0000000000000000 x2 : 000000000000017f
+[    0.028840] x1 : ffff80003d870000 x0 : 0000000000000035
+[    0.029056]
+[    0.029152] ---[ end trace 0000000000000000 ]---
+[    0.029297] Call trace:
+[    0.029403] Exception stack(0xffff80003d847b00 to
+                               0xffff80003d847c30)
+[    0.029621] 7b00: 0000000000000030 0001000000000000
+ffff80003d847cd0 ffff00000818e678
+[    0.029901] 7b20: 0000000000000002 0000000000000004
+ffff000008f7c060 0000000000000035
+[    0.030153] 7b40: ffff000008f79000 ffff000008c4cd88
+ffff80003d847bf0 ffff000008101778
+[    0.030402] 7b60: 0000000000000030 0000000000000000
+ffff000008e97000 00000000024000c0
+[    0.030647] 7b80: 0000000000000000 0000000000000000
+0000000000000000 0000000000000000
+[    0.030895] 7ba0: 0000000000000035 ffff80003d870000
+000000000000017f 0000000000000000
+[    0.031144] 7bc0: 0000000000000000 0000000000000005
+ffff000008f79c84 6120757063726570
+[    0.031394] 7be0: 6f697461636f6c6c ffff80003d847a40
+0000000000000042 0000000000000006
+[    0.031643] 7c00: 0000000000000041 ffff000008f79c4d
+ffff000088f79c3f 0000000000000006
+[    0.031877] 7c20: 00000000deadbeef 0000000000000a3f
+[    0.032051] [<ffff00000818e678>] pcpu_alloc+0x88/0x6c0
+[    0.032229] [<ffff00000818ece8>] __alloc_percpu+0x18/0x20
+[    0.032409] [<ffff000008d9606c>] xen_guest_init+0x174/0x2f4
+[    0.032591] [<ffff0000080830f8>] do_one_initcall+0x38/0x130
+[    0.032783] [<ffff000008d90c34>] kernel_init_freeable+0xe0/0x248
+[    0.032995] [<ffff00000899a890>] kernel_init+0x10/0x100
+[    0.033172] [<ffff000008082ec0>] ret_from_fork+0x10/0x50
+
+Reported-by: Wei Chen <wei.chen@arm.com>
+Link: https://lkml.org/lkml/2016/11/28/669
+Signed-off-by: Julien Grall <julien.grall@arm.com>
+
+Cc: stable at vger.kernel.org
+
+---
+
+I have requested backport to stable because the percpu allocator may
+misbehaves when the alignment is not a power of two.
+---
+ arch/arm/xen/enlighten.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index f193414..4986dc0 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -372,8 +372,7 @@ static int __init xen_guest_init(void)
+ 	 * for secondary CPUs as they are brought up.
+ 	 * For uniformity we use VCPUOP_register_vcpu_info even on cpu0.
+ 	 */
+-	xen_vcpu_info = __alloc_percpu(sizeof(struct vcpu_info),
+-			                       sizeof(struct vcpu_info));
++	xen_vcpu_info = alloc_percpu(struct vcpu_info);
+ 	if (xen_vcpu_info == NULL)
+ 		return -ENOMEM;
+ 
+-- 
+1.9.1
