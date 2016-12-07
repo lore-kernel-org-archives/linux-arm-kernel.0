@@ -1,81 +1,49 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Wed, 7 Dec 2016 23:57:43 +1000
-Subject: [PATCH 0/4] arm/versatile: no-MMU support
-In-Reply-To: <5847D4F8.1080108@arm.com>
-References: <1481090912-29835-1-git-send-email-gerg@uclinux.org>
- <5847D4F8.1080108@arm.com>
-Message-ID: <a2ab1e0c-d24b-ac8d-fb9a-4ae7271455b9@uclinux.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 7 Dec 2016 13:57:40 +0000
+Subject: [PATCHv4 09/10] mm/usercopy: Switch to using lm_alias
+In-Reply-To: <CAGXu5jKTdZUbbHU91mbN+Qy80AGXRhpzdLNXr3oxxZyxAzmjmQ@mail.gmail.com>
+References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
+ <1480445729-27130-10-git-send-email-labbott@redhat.com>
+ <CAGXu5jKrBc6R9JYay1L6pd958Vm5-6p=37tiUYgg6uPeZb1HtQ@mail.gmail.com>
+ <20161206181859.GH24177@leverpostej>
+ <CAGXu5jKTdZUbbHU91mbN+Qy80AGXRhpzdLNXr3oxxZyxAzmjmQ@mail.gmail.com>
+Message-ID: <20161207135740.GB25605@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+On Tue, Dec 06, 2016 at 12:10:50PM -0800, Kees Cook wrote:
+> On Tue, Dec 6, 2016 at 10:18 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Tue, Nov 29, 2016 at 11:39:44AM -0800, Kees Cook wrote:
+> >> On Tue, Nov 29, 2016 at 10:55 AM, Laura Abbott <labbott@redhat.com> wrote:
+> >> >
+> >> > The usercopy checking code currently calls __va(__pa(...)) to check for
+> >> > aliases on symbols. Switch to using lm_alias instead.
+> >> >
+> >> > Signed-off-by: Laura Abbott <labbott@redhat.com>
+> >>
+> >> Acked-by: Kees Cook <keescook@chromium.org>
+> >>
+> >> I should probably add a corresponding alias test to lkdtm...
+> >>
+> >> -Kees
+> >
+> > Something like the below?
+> >
+> > It uses lm_alias(), so it depends on Laura's patches. We seem to do the
+> > right thing, anyhow:
+> 
+> Cool, this looks good. What happens on systems without an alias?
 
-On 07/12/16 19:23, Vladimir Murzin wrote:
-> Hi Greg,
->
-> On 07/12/16 06:08, Greg Ungerer wrote:
->> Does the ARM Versatile machine have a maintainer?
->> I have CC'ed this patch set to those names reported by get_maintainer.
->> I had no feedback on the first posting of this series back in August.
->>
->> The following patches support configuring and building the versatile
->> machine with a no-MMU kernel.
->>
->> There is only a few minor changes required. It was previously possible
->> in older kernels to build for versatile with CONFIG_MMU disabled, but
->> the change to devicetree lost that capability. These changes make it
->> possible again.
->>
->> One patch is a fix for address translation (broken in older kernels too),
->> two are build problems when CONFIG_MMU is disabled, and the last is the
->> actuall configuration changes needed.
->>
->> The motivation for this is that the versatile machine is well supported
->> in qemu. And this provides an excellent platform for development and
->> testing no-MMU support on ARM in general. With these patches applied
->> it is possible to build and run a kernel with MMU disabled on qemu.
->
-> I'm wondering if my "Allow NOMMU for MULTIPLATFORM" series [1] work for you?
->
-> [1] https://www.spinics.net/lists/arm-kernel/msg546823.html
+In that case, lm_alias() should be an identity function, and we'll just
+hit the usual kernel address (i.e. it should be identical to
+USERCOPY_KERNEL).
 
-Sorry I hadn't seen these patches before.
+> Laura, feel free to add this to your series:
+> 
+> Acked-by: Kees Cook <keescook@chromium.org>
 
-Just tried them out. With CONFIG_EXPERT set I can select and
-build for the Versatile machine with CONFIG_MMU not set. The
-build is successful, but the resulting kernel doesn't boot.
+I'm happy with that, or I can resend this as a proper patch once the
+rest is in.
 
-I see that the resulting .config has CONFIG_PLAT_VERSATILE set
-but not CONFIG_ARCH_VERSATILE. Is this intentional?
-
-With CONFIG_ARCH_VERSATILE missing the build doesn't traverse
-into arch/arm/mach-versatile, and you don't get any device tree
-built.
-
-Ultimately to produce a working kernel we will still need my
-patch 01/04 ("ARM: versatile: support no-MMU mode addressing").
-No surprise here, this was missing in older kernels too.
-
-Regards
-Greg
-
-
->>
->> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
->> ---
->>  arch/arm/Kconfig                       |   10 ++++++++++
->>  arch/arm/Kconfig.debug                 |    3 ++-
->>  arch/arm/include/asm/mach/map.h        |    1 +
->>  arch/arm/mach-versatile/Kconfig        |    3 ++-
->>  arch/arm/mach-versatile/Makefile.boot  |    3 +++
->>  arch/arm/mach-versatile/versatile_dt.c |    4 ++++
->>  6 files changed, 22 insertions(+), 2 deletions(-)
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
->
+Thanks,
+Mark.
