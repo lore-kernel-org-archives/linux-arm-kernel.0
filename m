@@ -1,63 +1,44 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Wed, 7 Dec 2016 10:07:21 +0100
-Subject: [PATCH v5] ARM: davinci: da8xx: Fix sleeping function called from
- invalid context
-In-Reply-To: <22aec236-83f0-ea2d-8657-c99f95389611@lechnology.com>
-References: <1480947224-26222-1-git-send-email-abailon@baylibre.com>
- <2fc7a4ef-02ad-fc15-66ea-9f75756086f8@ti.com>
- <cbf4b99b-e453-acd5-d864-f709708fbab0@baylibre.com>
- <c4e15855-b785-8bc7-5ef2-af4ec24354e6@ti.com>
- <22aec236-83f0-ea2d-8657-c99f95389611@lechnology.com>
-Message-ID: <b0f37b43-bdb6-10df-126b-7fe4a8ff0165@baylibre.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 7 Dec 2016 10:29:07 +0100
+Subject: [PATCH 11/16] drivers/fsi: Add device read/write/peek functions
+In-Reply-To: <1481076574-54711-4-git-send-email-christopher.lee.bostic@gmail.com>
+References: <1481076574-54711-1-git-send-email-christopher.lee.bostic@gmail.com>
+ <1481076574-54711-4-git-send-email-christopher.lee.bostic@gmail.com>
+Message-ID: <20161207092907.GC14742@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/2016 07:56 PM, David Lechner wrote:
-> On 12/06/2016 03:57 AM, Sekhar Nori wrote:
->> On Tuesday 06 December 2016 03:21 PM, Alexandre Bailon wrote:
->>> On 12/06/2016 10:33 AM, Sekhar Nori wrote:
->>>> On Monday 05 December 2016 07:43 PM, Alexandre Bailon wrote:
->>>>> Everytime the usb20 phy is enabled, there is a
->>>>> "sleeping function called from invalid context" BUG.
->>>>>
->>>>> clk_enable() from arch/arm/mach-davinci/clock.c uses
->>>>> spin_lock_irqsave()
->>>>> before to invoke the callback usb20_phy_clk_enable().
->>>>> usb20_phy_clk_enable() uses clk_get() and clk_enable_prepapre()
->>>>> which may sleep.
->>>>> Move clk_get() to da8xx_register_usb20_phy_clk() and
->>>>> replace clk_prepare_enable() by clk_enable().
->>>>>
->>>>> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
->>>>
->>>> This will still cause the recursive locking problem reported by David.
->>>> Not sure what the point of sending this version was.
->>>>
->>>> Thanks,
->>>> Sekhar
->>>>
->>
->>> What am I supposed to do ?
->>
->> That needs to be resolved between you and David. Perhaps convert the fix
->> sent by David into a proper patch and base this patch on that. Or wait
->> for David to send it himself and let him also make the modifications
->> needed in this patch.
->>
->> David ?
->>
->> Thanks,
->> Sekhar
->>
-> 
-> Alexandre, I was hoping that you would just squash my patch with your
-> patch and take Sekhar's suggestion about a separate patch to make the
-> private __clk_enable() public as davinci_clk_enable() when you re-submit.
-OK.
-> 
-> You can add "Suggested-By: David Lechner <david@lechnology.com>" to the
-> commit message if you would like to give me some credit for my ideas.
-That was my concern. I will do that.
+On Tue, Dec 06, 2016 at 08:09:33PM -0600, Chris Bostic wrote:
+> diff --git a/include/linux/fsi.h b/include/linux/fsi.h
+> index efa55ba..66bce48 100644
+> --- a/include/linux/fsi.h
+> +++ b/include/linux/fsi.h
+> @@ -27,6 +27,12 @@ struct fsi_device {
+>  	uint32_t		size;
+>  };
+>  
+> +extern int fsi_device_read(struct fsi_device *dev, uint32_t addr,
+> +		void *val, size_t size);
+> +extern int fsi_device_write(struct fsi_device *dev, uint32_t addr,
+> +		const void *val, size_t size);
+> +extern int fsi_device_peek(struct fsi_device *dev, void *val);
+> +
+>  struct fsi_device_id {
+>  	u8	engine_type;
+>  	u8	version;
+> @@ -40,7 +46,6 @@ struct fsi_device_id {
+>  #define FSI_DEVICE_VERSIONED(t, v) \
+>  	.engine_type = (t), .version = (v),
+>  
+> -
+>  struct fsi_driver {
+>  	struct device_driver		drv;
+>  	const struct fsi_device_id	*id_table;
 
-Thanks,
-Alexandre
+Strange whitespace change here :)
+
+Not a real problem, I like the fact that you have broken this down into
+very logical pieces making it much easier to review, thanks so much for
+doing this.
+
+greg k-h
