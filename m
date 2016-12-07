@@ -1,124 +1,92 @@
 From: christopher.lee.bostic@gmail.com (Chris Bostic)
-Date: Tue,  6 Dec 2016 20:09:33 -0600
-Subject: [PATCH 11/16] drivers/fsi: Add device read/write/peek functions
+Date: Tue,  6 Dec 2016 20:09:34 -0600
+Subject: [PATCH 12/16] drivers/fsi: Set up links for slave communication
 In-Reply-To: <1481076574-54711-1-git-send-email-christopher.lee.bostic@gmail.com>
 References: <1481076574-54711-1-git-send-email-christopher.lee.bostic@gmail.com>
-Message-ID: <1481076574-54711-4-git-send-email-christopher.lee.bostic@gmail.com>
+Message-ID: <1481076574-54711-5-git-send-email-christopher.lee.bostic@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+From: Chris Bostic <cbostic@us.ibm.com>
 
-This change introduces the fsi device API: simple read, write and peek
-accessors for the devices' address spaces.
+Enable each link and send a break command in preparation
+for scanning each link for slaves.
 
-Includes contributions from Chris Bostic <cbostic@us.ibm.com>
-
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
 ---
- drivers/fsi/fsi-core.c | 47 +++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/fsi.h    |  7 ++++++-
- 2 files changed, 53 insertions(+), 1 deletion(-)
+ drivers/fsi/fsi-core.c   | 39 ++++++++++++++++++++++++++++++++++++---
+ drivers/fsi/fsi-master.h |  2 ++
+ 2 files changed, 38 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index b51ea35..80feeb8 100644
+index 80feeb8..93de0f1 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -33,6 +33,8 @@
- #define FSI_SLAVE_CONF_CRC_MASK		0x0000000f
- #define FSI_SLAVE_CONF_DATA_BITS	28
+@@ -290,16 +290,49 @@ static int fsi_slave_init(struct fsi_master *master,
  
-+#define FSI_PEEK_BASE			0x410
-+
- static const int engine_page_size = 0x400;
+ /* FSI master support */
  
- static atomic_t master_idx = ATOMIC_INIT(-1);
-@@ -46,8 +48,46 @@ struct fsi_slave {
- 
- #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
- 
-+static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
-+		void *val, size_t size);
-+static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
-+		const void *val, size_t size);
-+
- /* FSI endpoint-device support */
- 
-+int fsi_device_read(struct fsi_device *dev, uint32_t addr, void *val,
-+		size_t size)
++static int fsi_master_link_enable(struct fsi_master *master, int link)
 +{
-+	if (addr > dev->size)
-+		return -EINVAL;
++	if (master->link_enable)
++		return master->link_enable(master, link);
 +
-+	if (addr + size > dev->size)
-+		return -EINVAL;
-+
-+	return fsi_slave_read(dev->slave, dev->addr + addr, val, size);
-+}
-+EXPORT_SYMBOL_GPL(fsi_device_read);
-+
-+int fsi_device_write(struct fsi_device *dev, uint32_t addr, const void *val,
-+		size_t size)
-+{
-+	if (addr > dev->size)
-+		return -EINVAL;
-+
-+	if (addr + size > dev->size)
-+		return -EINVAL;
-+
-+	return fsi_slave_write(dev->slave, dev->addr + addr, val, size);
-+}
-+EXPORT_SYMBOL_GPL(fsi_device_write);
-+
-+int fsi_device_peek(struct fsi_device *dev, void *val)
-+{
-+	uint32_t addr = FSI_PEEK_BASE + ((dev->unit - 2) * sizeof(uint32_t));
-+
-+	return fsi_slave_read(dev->slave, addr, val, sizeof(uint32_t));
++	return 0;
 +}
 +
- static void fsi_device_release(struct device *_device)
++/*
++ * Issue a break command on this link
++ */
++static int fsi_master_break(struct fsi_master *master, int link)
++{
++	if (master->send_break)
++		return master->send_break(master, link);
++
++	return 0;
++}
++
+ static int fsi_master_scan(struct fsi_master *master)
  {
- 	struct fsi_device *device = to_fsi_dev(_device);
-@@ -100,6 +140,13 @@ static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
- 			slave->id, addr, val, size);
+-	int link, slave_id;
++	int link, slave_id, rc;
++
++	for (link = 0; link < master->n_links; link++) {
++		rc = fsi_master_link_enable(master, link);
++		if (rc) {
++			dev_dbg(master->dev,
++				"enable link:%d failed with:%d\n", link, rc);
++			continue;
++		}
++		rc = fsi_master_break(master, link);
++		if (rc) {
++			dev_dbg(master->dev,
++				"Break to link:%d failed with:%d\n", link, rc);
++			continue;
++		}
+ 
+-	for (link = 0; link < master->n_links; link++)
+ 		for (slave_id = 0; slave_id < FSI_N_SLAVES; slave_id++)
+ 			fsi_slave_init(master, link, slave_id);
+ 
+-	return 0;
++	}
+ 
++	return 0;
  }
  
-+static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
-+			const void *val, size_t size)
-+{
-+	return slave->master->write(slave->master, slave->link,
-+			slave->id, addr, val, size);
-+}
-+
- static int fsi_slave_scan(struct fsi_slave *slave)
- {
- 	uint32_t engine_addr;
-diff --git a/include/linux/fsi.h b/include/linux/fsi.h
-index efa55ba..66bce48 100644
---- a/include/linux/fsi.h
-+++ b/include/linux/fsi.h
-@@ -27,6 +27,12 @@ struct fsi_device {
- 	uint32_t		size;
+ int fsi_master_register(struct fsi_master *master)
+diff --git a/drivers/fsi/fsi-master.h b/drivers/fsi/fsi-master.h
+index cafb433..56aad0e 100644
+--- a/drivers/fsi/fsi-master.h
++++ b/drivers/fsi/fsi-master.h
+@@ -29,6 +29,8 @@ struct fsi_master {
+ 	int		(*write)(struct fsi_master *, int link,
+ 				uint8_t slave, uint32_t addr,
+ 				const void *val, size_t size);
++	int		(*send_break)(struct fsi_master *, int link);
++	int		(*link_enable)(struct fsi_master *, int link);
  };
  
-+extern int fsi_device_read(struct fsi_device *dev, uint32_t addr,
-+		void *val, size_t size);
-+extern int fsi_device_write(struct fsi_device *dev, uint32_t addr,
-+		const void *val, size_t size);
-+extern int fsi_device_peek(struct fsi_device *dev, void *val);
-+
- struct fsi_device_id {
- 	u8	engine_type;
- 	u8	version;
-@@ -40,7 +46,6 @@ struct fsi_device_id {
- #define FSI_DEVICE_VERSIONED(t, v) \
- 	.engine_type = (t), .version = (v),
- 
--
- struct fsi_driver {
- 	struct device_driver		drv;
- 	const struct fsi_device_id	*id_table;
+ extern int fsi_master_register(struct fsi_master *master);
 -- 
 1.8.2.2
