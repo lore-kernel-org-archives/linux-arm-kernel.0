@@ -1,10 +1,10 @@
 From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Wed, 07 Dec 2016 13:09:25 -0500
-Subject: [PATCH] mtd: nand: lpc32xx: fix invalid error handling of a
+Date: Wed, 07 Dec 2016 13:13:07 -0500
+Subject: [PATCH] Input: lpc32xx-keys - fix invalid error handling of a
  requested irq
-In-Reply-To: <20161205014710.2015-1-vz@mleia.com>
-References: <20161205014710.2015-1-vz@mleia.com>
-Message-ID: <1481134165.9248.4.camel@localhost>
+In-Reply-To: <20161205014753.2092-1-vz@mleia.com>
+References: <20161205014753.2092-1-vz@mleia.com>
+Message-ID: <1481134387.9248.8.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,11 +16,17 @@ On Mon, 2016-12-05 at 03:47 +0200, Vladimir Zapolskiy wrote:
 > platform_get_irq() is completely invalid, don't attempt to overrule
 > irq subsystem in the driver.
 > 
-> The change fixes LPC32xx NAND MLC driver initialization on boot.
+> The change fixes lpc32xx_keys driver initialization on boot:
+> 
+>   lpc32xx_keys 40050000.key: failed to get platform irq
+>   lpc32xx_keys: probe of 40050000.key failed with error -22
 > 
 > Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 > ---
->  drivers/mtd/nand/lpc32xx_mlc.c | 2 +-
+>  drivers/input/keyboard/lpc32xx-keys.c | 2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
+Cosmetic - please update the subject line when doing the commit:
+replace " -" by ":" after lpc32xx-keys
+
 Acked-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
