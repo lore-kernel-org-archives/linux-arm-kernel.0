@@ -1,46 +1,53 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 7 Dec 2016 10:41:16 +0100
-Subject: Synopsys Ethernet QoS Driver
-In-Reply-To: <2eefdb8f-7e87-6009-6e50-c536d4b95dd6@synopsys.com>
-References: <20161119135654.GA14079@lnxartpec.se.axis.com>
- <CAJ3bTp7PpUJcz=1JohX=A54UP6vVAafWnB0PGUBSxb5JJiO8Lg@mail.gmail.com>
- <1248f4ce-4859-10e6-fef9-342ea543f8d4@synopsys.com>
- <87c8a24b-0812-7850-cb3f-7be691bab432@st.com>
- <BFA799B0-BB22-4515-AC14-3544A3167B0A@axis.com>
- <ffd3b27c-0bc9-b53b-cc65-c7808595a553@st.com>
- <b126021d-e902-7a53-4d7a-e73ea89a66cf@synopsys.com>
- <A001080B-2DC8-48D9-BD82-8276A9B3BE3D@axis.com>
- <7c7798b5-8cd4-ba99-f526-22d3e06e05db@synopsys.com>
- <2eefdb8f-7e87-6009-6e50-c536d4b95dd6@synopsys.com>
-Message-ID: <20161207094116.GA5399@amd>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Wed, 7 Dec 2016 15:14:37 +0530
+Subject: [RESEND PATCH V6 0/6] Add support for privileged mappings
+In-Reply-To: <ad7a90ce-c1cd-856e-8573-394c05fda6e4@arm.com>
+References: <1480690509-13490-1-git-send-email-sricharan@codeaurora.org>
+ <e7e05493-e216-d744-b828-351d2c70150d@arm.com>
+ <000d01d24e02$e3023700$a906a500$@codeaurora.org>
+ <ad7a90ce-c1cd-856e-8573-394c05fda6e4@arm.com>
+Message-ID: <003001d2506e$8a9b64b0$9fd22e10$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Robin,
 
-> > Thanks!
-> 
-> Regarding this subject, I am thinking of making the following adaption:
-> 
-> a) delete ethernet/synopsys
-> b) rename ethernet/stmicro/stmmac to ethernet/synopsys
-> 
-> and send you a patch for you to evaluate. Both agree with the approach?
-> To have a new work base would be important, because I will add to the "new"
-> structure some missing QoS features like Multichannel support, CBS
-> and later TSN.
+>>> Hi Sricharan,
+>>>
+>>> On 02/12/16 14:55, Sricharan R wrote:
+>>>> This series is a resend of the V5 that Mitch sent sometime back [2]
+>>>> All the patches are the same and i have just rebased. Not sure why this
+>>>> finally did not make it last time. The last patch in the previous
+>>>> series does not apply now [3], so just redid that. Also Copied the tags
+>>>> that he had from last time as well.
+>>>
+>>> Heh, I was assuming this would be down to me to pick up. Vinod did have
+>>> some complaints last time about the commit message on the PL330 patch -
+>>> I did get as far as rewriting that and reworking onto my SMMU
+>>> changes[1], I just hadn't got round to sending it, so it fell onto the
+>>> "after the next merge window" pile.
+>>>
+>>> I'd give some review comments, but they'd essentially be a diff against
+>>> that branch :)
+>>>
+>>
+>> Sure, i did not knew that you were on this already. I can repost with the diff
+>> from your branch taken in or wait for you as well. I am fine with either ways
+>> that you suggest.
+>>
+>> I checked the patches against your branch, i see that the changes are,
+>>
+>> 1) one patch for implementing it for armv7s descriptor
+>> 2) Changes on pl330 patch commit logs and
+>> 3) One patch for doing the revert on arm-smmuv3 as well.
+>
+>If you want to pick up my short-descriptor and SMMUv3 patches and run
+>with them you're more than welcome - the rest is just cosmetic stuff
+>which doesn't really matter, especially as it's picking up acks as-is.
+>
 
-Rename should be the easy part. Please do that last.
+Sure, i will repost with additional stuff picked up from your branch and
+the acks as well.
 
-Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161207/ec5e4ab2/attachment-0001.sig>
+Regards,
+ Sricharan
