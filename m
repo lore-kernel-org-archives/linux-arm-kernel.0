@@ -1,136 +1,56 @@
-From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Wed,  7 Dec 2016 14:48:23 -0700
-Subject: [PATCH V6 10/10] arm/arm64: KVM: add guest SEA support
-In-Reply-To: <1481147303-7979-1-git-send-email-tbaicar@codeaurora.org>
-References: <1481147303-7979-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <1481147303-7979-11-git-send-email-tbaicar@codeaurora.org>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 7 Dec 2016 13:56:58 -0800
+Subject: [RFC PATCH 00/23] arm: defconfigs: use kconfig fragments
+In-Reply-To: <2155947.mOKhpZPiAn@wuerfel>
+References: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
+ <8292218.3BDisRkZdU@wuerfel>
+ <CAOesGMi_mLG+tS0Ya8G9KLO_sUYGtLmgcvFfpn0Nwbd-KMKOrQ@mail.gmail.com>
+ <2155947.mOKhpZPiAn@wuerfel>
+Message-ID: <9c0ed8c5-406a-9304-48b5-6f11f3940271@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently external aborts are unsupported by the guest abort
-handling. Add handling for SEAs so that the host kernel reports
-SEAs which occur in the guest kernel.
+On 12/07/2016 01:35 PM, Arnd Bergmann wrote:
+> On Wednesday, December 7, 2016 1:14:02 PM CET Olof Johansson wrote:
+>>>
+>>> - A "debug" fragment would be nice, to turn on common options that
+>>>   add a lot of useful runtime checks at the expense of performance
+>>>   or code size.
+>>
+>> Hmm, some of these might work but several useful debug options (in
+>> particular DEBUG_LL for early errors) are per-system/platform.
+> 
+> I was thinking mostly of architecture-independent options, i.e.
+> the stuff that is in lib/Kconfig.debug but isn't too expensive
+> to be run in a regular test environment. Enabling those
+> for a build/boot automation environment would be particularly
+> useful as you'd catch more bugs that get introduced through
+> a random patch.
+> 
+>>> - A "distro" fragment that turns on all loadable modules that are
+>>>   enabled by common distributions (e.g. two or more of
+>>>   debian/fedora/opensuse/gentoo), to let you build a drop-in
+>>>   replacement kernel for a shipping distro. This would also allow
+>>>   the distros to strip their own config files and just specify
+>>>   whatever differs from the others.
+>>
+>> Keeping this in sync with the distro kernel could be a bit awkward
+>> (and possibly churny).
+> 
+> It would certainly need buy-in from distro maintainers. I've discussed
+> this with Laura Abbott in the past, and she was interested in
+> principle.
+> 
+> 	Arnd
+> 
 
-Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
----
- arch/arm/include/asm/kvm_arm.h       |  1 +
- arch/arm/include/asm/system_misc.h   |  5 +++++
- arch/arm/kvm/mmu.c                   | 18 ++++++++++++++++--
- arch/arm64/include/asm/kvm_arm.h     |  1 +
- arch/arm64/include/asm/system_misc.h |  2 ++
- arch/arm64/mm/fault.c                | 13 +++++++++++++
- 6 files changed, 38 insertions(+), 2 deletions(-)
+Yes, I've gotten the request from multiple people now about having
+some Fedora config in mainline. I agree that churn and keeping in
+sync would be a concern. For a first pass, I was going to propose
+a minimal set of options that are unlikely to need to churn. Once
+those are agreed on, everything else could become a separate .config.
+My plan was to send a patch out around -rc2/-rc3 each cycle to sync
+up.
 
-diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-index e22089f..33a77509 100644
---- a/arch/arm/include/asm/kvm_arm.h
-+++ b/arch/arm/include/asm/kvm_arm.h
-@@ -187,6 +187,7 @@
- #define FSC_FAULT	(0x04)
- #define FSC_ACCESS	(0x08)
- #define FSC_PERM	(0x0c)
-+#define FSC_EXTABT	(0x10)
- 
- /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
- #define HPFAR_MASK	(~0xf)
-diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
-index a3d61ad..ea45d94 100644
---- a/arch/arm/include/asm/system_misc.h
-+++ b/arch/arm/include/asm/system_misc.h
-@@ -24,4 +24,9 @@ extern unsigned int user_debug;
- 
- #endif /* !__ASSEMBLY__ */
- 
-+static inline int handle_guest_sea(unsigned long addr, unsigned int esr)
-+{
-+	return -1;
-+}
-+
- #endif /* __ASM_ARM_SYSTEM_MISC_H */
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index e9a5c0e..1152966 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -29,6 +29,7 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
- #include <asm/virt.h>
-+#include <asm/system_misc.h>
- 
- #include "trace.h"
- 
-@@ -1441,8 +1442,21 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- 	/* Check the stage-2 fault is trans. fault or write fault */
- 	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
--	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
--	    fault_status != FSC_ACCESS) {
-+
-+	/* The host kernel will handle the synchronous external abort. There
-+	 * is no need to pass the error into the guest.
-+	 */
-+	if (fault_status == FSC_EXTABT) {
-+		if(handle_guest_sea((unsigned long)fault_ipa,
-+				    kvm_vcpu_get_hsr(vcpu))) {
-+			kvm_err("Failed to handle guest SEA, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
-+				kvm_vcpu_trap_get_class(vcpu),
-+				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
-+				(unsigned long)kvm_vcpu_get_hsr(vcpu));
-+			return -EFAULT;
-+		}
-+	} else if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
-+		   fault_status != FSC_ACCESS) {
- 		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
- 			kvm_vcpu_trap_get_class(vcpu),
- 			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 4b5c977..be0efb6 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -201,6 +201,7 @@
- #define FSC_FAULT	ESR_ELx_FSC_FAULT
- #define FSC_ACCESS	ESR_ELx_FSC_ACCESS
- #define FSC_PERM	ESR_ELx_FSC_PERM
-+#define FSC_EXTABT	ESR_ELx_FSC_EXTABT
- 
- /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
- #define HPFAR_MASK	(~UL(0xf))
-diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-index 9040e1d..3a142a5 100644
---- a/arch/arm64/include/asm/system_misc.h
-+++ b/arch/arm64/include/asm/system_misc.h
-@@ -77,4 +77,6 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
- int register_synchronous_ext_abort_notifier(struct notifier_block *nb);
- void unregister_synchronous_ext_abort_notifier(struct notifier_block *nb);
- 
-+int handle_guest_sea(unsigned long addr, unsigned int esr);
-+
- #endif	/* __ASM_SYSTEM_MISC_H */
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index fcc49f1..691399e 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -597,6 +597,19 @@ static const char *fault_name(unsigned int esr)
- }
- 
- /*
-+ * Handle Synchronous External Aborts that occur in a guest kernel.
-+ */
-+int handle_guest_sea(unsigned long addr, unsigned int esr)
-+{
-+	atomic_notifier_call_chain(&sea_handler_chain, 0, NULL);
-+
-+	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
-+		fault_name(esr), esr, addr);
-+
-+	return 0;
-+}
-+
-+/*
-  * Dispatch a data abort to the relevant handler.
-  */
- asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Thanks,
+Laura
