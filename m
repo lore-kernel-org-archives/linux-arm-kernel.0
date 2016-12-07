@@ -1,183 +1,88 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 6 Dec 2016 18:00:36 -0800
-Subject: [PATCH 3/3] ARM: Add support for CONFIG_DEBUG_VIRTUAL
-In-Reply-To: <20161206195312.22354-4-f.fainelli@gmail.com>
-References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
- <20161206195312.22354-1-f.fainelli@gmail.com>
- <20161206195312.22354-4-f.fainelli@gmail.com>
-Message-ID: <a50d7d1b-643f-cf17-b38f-475916c971c1@redhat.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 6 Dec 2016 20:00:41 -0600
+Subject: [PATCH v3 3/3] ARM: da850: fix da850_set_pll0rate()
+In-Reply-To: <1480932549-30811-4-git-send-email-bgolaszewski@baylibre.com>
+References: <1480932549-30811-1-git-send-email-bgolaszewski@baylibre.com>
+ <1480932549-30811-4-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <aa5c2309-c153-1e59-97f4-7e24ab2ce5c5@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/2016 11:53 AM, Florian Fainelli wrote:
-> x86 has an option: CONFIG_DEBUG_VIRTUAL to do additional checks on
-> virt_to_phys calls. The goal is to catch users who are calling
-> virt_to_phys on non-linear addresses immediately. This includes caller
-> using __virt_to_phys() on image addresses instead of __pa_symbol(). This
-> is a generally useful debug feature to spot bad code (particulary in
-> drivers).
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+On 12/05/2016 04:09 AM, Bartosz Golaszewski wrote:
+> This function is confusing - its second argument is an index to the
+> freq table, not the requested clock rate in Hz, but it's used as the
+> set_rate callback for the pll0 clock. It leads to an oops when the
+> caller doesn't know the internals and passes the rate in Hz as
+> argument instead of the cpufreq index since this argument isn't bounds
+> checked either.
+>
+> Fix it by iterating over the array of supported frequencies and
+> selecting a one that matches or returning -EINVAL for unsupported
+> rates.
+>
+> Also: update the davinci cpufreq driver. It's the only user of this
+> clock and currently it passes the cpufreq table index to
+> clk_set_rate(), which is confusing. Make it pass the requested clock
+> rate in Hz.
+>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 > ---
->  arch/arm/Kconfig              |  1 +
->  arch/arm/include/asm/memory.h | 16 ++++++++++++--
->  arch/arm/mm/Makefile          |  1 +
->  arch/arm/mm/physaddr.c        | 51 +++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 67 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm/mm/physaddr.c
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index b5d529fdffab..5e66173c5787 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -2,6 +2,7 @@ config ARM
->  	bool
->  	default y
->  	select ARCH_CLOCKSOURCE_DATA
-> +	select ARCH_HAS_DEBUG_VIRTUAL
->  	select ARCH_HAS_DEVMEM_IS_ALLOWED
->  	select ARCH_HAS_ELF_RANDOMIZE
->  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index bee7511c5098..46f192218be7 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -213,7 +213,7 @@ extern const void *__pv_table_begin, *__pv_table_end;
->  	: "r" (x), "I" (__PV_BITS_31_24)		\
->  	: "cc")
->  
-> -static inline phys_addr_t __virt_to_phys(unsigned long x)
-> +static inline phys_addr_t __virt_to_phys_nodebug(unsigned long x)
->  {
->  	phys_addr_t t;
->  
-> @@ -245,7 +245,7 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
->  #define PHYS_OFFSET	PLAT_PHYS_OFFSET
->  #define PHYS_PFN_OFFSET	((unsigned long)(PHYS_OFFSET >> PAGE_SHIFT))
->  
-> -static inline phys_addr_t __virt_to_phys(unsigned long x)
-> +static inline phys_addr_t __virt_to_phys_nodebug(unsigned long x)
->  {
->  	return (phys_addr_t)x - PAGE_OFFSET + PHYS_OFFSET;
+>  arch/arm/mach-davinci/da850.c     | 20 ++++++++++++++++----
+>  drivers/cpufreq/davinci-cpufreq.c |  2 +-
+>  2 files changed, 17 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index 006ec56..9837541 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+> @@ -1179,14 +1179,26 @@ static int da850_set_armrate(struct clk *clk, unsigned long index)
+>  	return clk_set_rate(pllclk, index);
 >  }
-> @@ -261,6 +261,16 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
->  	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
->  	 PHYS_PFN_OFFSET)
->  
-> +#define __pa_symbol_nodebug(x)	((x) - (unsigned long)KERNEL_START)
+>
+> -static int da850_set_pll0rate(struct clk *clk, unsigned long index)
+> +static int da850_set_pll0rate(struct clk *clk, unsigned long rate)
+>  {
+> -	unsigned int prediv, mult, postdiv;
+> -	struct da850_opp *opp;
+>  	struct pll_data *pll = clk->pll_data;
+> +	struct cpufreq_frequency_table *freq;
+> +	unsigned int prediv, mult, postdiv;
+> +	struct da850_opp *opp = NULL;
+>  	int ret;
+>
+> -	opp = (struct da850_opp *) cpufreq_info.freq_table[index].driver_data;
+> +	for (freq = da850_freq_table;
+> +	     freq->frequency != CPUFREQ_TABLE_END; freq++) {
+> +		/* rate is in Hz, freq->frequency is in KHz */
+> +		if (freq->frequency == rate / 1000) {
+> +			opp = (struct da850_opp *)freq->driver_data;
+> +			break;
+> +		}
+> +	}
+> +
+> +	if (opp == NULL)
 
-On arm64 the kernel image lives in a separate linear offset. arm doesn't
-do anything like that so __phys_addr_symbol should just be the regular
-__virt_to_phys
+Would be simpler to write:
 
-> +
-> +#ifdef CONFIG_DEBUG_VIRTUAL
-> +extern phys_addr_t __virt_to_phys(unsigned long x);
-> +extern phys_addr_t __phys_addr_symbol(unsigned long x);
-> +#else
-> +#define __virt_to_phys(x)	__virt_to_phys_nodebug(x)
-> +#define __phys_addr_symbol(x)	__pa_symbol_nodebug(x)
-> +#endif
-> +
->  /*
->   * These are *only* valid on the kernel direct mapped RAM memory.
->   * Note: Drivers should NOT use these.  They are the wrong
-> @@ -283,9 +293,11 @@ static inline void *phys_to_virt(phys_addr_t x)
->   * Drivers should NOT use these either.
->   */
->  #define __pa(x)			__virt_to_phys((unsigned long)(x))
-> +#define __pa_symbol(x)		__phys_addr_symbol(RELOC_HIDE((unsigned long)(x), 0))
->  #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
->  #define pfn_to_kaddr(pfn)	__va((phys_addr_t)(pfn) << PAGE_SHIFT)
->  
-> +
->  extern long long arch_phys_to_idmap_offset;
->  
->  /*
-> diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-> index e8698241ece9..b3dea80715b4 100644
-> --- a/arch/arm/mm/Makefile
-> +++ b/arch/arm/mm/Makefile
-> @@ -14,6 +14,7 @@ endif
->  
->  obj-$(CONFIG_ARM_PTDUMP)	+= dump.o
->  obj-$(CONFIG_MODULES)		+= proc-syms.o
-> +obj-$(CONFIG_DEBUG_VIRTUAL)	+= physaddr.o
->  
->  obj-$(CONFIG_ALIGNMENT_TRAP)	+= alignment.o
->  obj-$(CONFIG_HIGHMEM)		+= highmem.o
-> diff --git a/arch/arm/mm/physaddr.c b/arch/arm/mm/physaddr.c
-> new file mode 100644
-> index 000000000000..00f6dcffab8b
-> --- /dev/null
-> +++ b/arch/arm/mm/physaddr.c
-> @@ -0,0 +1,51 @@
-> +#include <linux/bug.h>
-> +#include <linux/export.h>
-> +#include <linux/types.h>
-> +#include <linux/mmdebug.h>
-> +#include <linux/mm.h>
-> +
-> +#include <asm/sections.h>
-> +#include <asm/memory.h>
-> +#include <asm/fixmap.h>
-> +
-> +#include "mm.h"
-> +
-> +static inline bool __virt_addr_valid(unsigned long x)
-> +{
-> +	if (x < PAGE_OFFSET)
-> +		return false;
-> +	if (arm_lowmem_limit && is_vmalloc_or_module_addr((void *)x))
-> +		return false;
-> +	if (x >= FIXADDR_START && x < FIXADDR_END)
-> +		return false;
-> +	return true;
-> +}
+	if (!opp)
 
-I'd rather see this return true for only the linear range and
-reject everything else. asm/memory.h already has
-
-#define virt_addr_valid(kaddr)  (((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory) \
-                                        && pfn_valid(virt_to_pfn(kaddr)))
-
-So we can make the check x >= PAGE_OFFSET && x < high_memory
-
+> +		return -EINVAL;
 > +
-> +phys_addr_t __virt_to_phys(unsigned long x)
-> +{
-> +	WARN(!__virt_addr_valid(x),
-> +	     "virt_to_phys used for non-linear address :%pK\n", (void *)x);
-> +
-> +	return __virt_to_phys_nodebug(x);
-> +}
-> +EXPORT_SYMBOL(__virt_to_phys);
-> +
-> +static inline bool __phys_addr_valid(unsigned long x)
-> +{
-> +	/* This is bounds checking against the kernel image only.
-> +	 * __pa_symbol should only be used on kernel symbol addresses.
-> +	 */
-> +	if (x < (unsigned long)KERNEL_START ||
-> +	    x > (unsigned long)KERNEL_END)
-> +		return false;
-> +
-> +	return true;
-> +}
-
-This is a confusing name for this function, it's not checking if
-a physical address is valid, it's checking if a virtual address
-corresponding to a kernel symbol is valid.
-
-> +
-> +phys_addr_t __phys_addr_symbol(unsigned long x)
-> +{
-> +	VIRTUAL_BUG_ON(!__phys_addr_valid(x));
-> +
-> +	return __pa_symbol_nodebug(x);
-> +}
-> +EXPORT_SYMBOL(__phys_addr_symbol);
-> 
-
-Thanks,
-Laura
+>  	prediv = opp->prediv;
+>  	mult = opp->mult;
+>  	postdiv = opp->postdiv;
+> diff --git a/drivers/cpufreq/davinci-cpufreq.c b/drivers/cpufreq/davinci-cpufreq.c
+> index b95a872..d54a27c 100644
+> --- a/drivers/cpufreq/davinci-cpufreq.c
+> +++ b/drivers/cpufreq/davinci-cpufreq.c
+> @@ -55,7 +55,7 @@ static int davinci_target(struct cpufreq_policy *policy, unsigned int idx)
+>  			return ret;
+>  	}
+>
+> -	ret = clk_set_rate(armclk, idx);
+> +	ret = clk_set_rate(armclk, new_freq * 1000);
+>  	if (ret)
+>  		return ret;
+>
+>
