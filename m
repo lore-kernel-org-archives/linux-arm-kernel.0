@@ -1,81 +1,57 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 07 Dec 2016 13:12:49 +0900
-Subject: [PATCH 3/5] arm64: dts: exynos5433: Add PPMU dt node
-In-Reply-To: <20161206190756.GA12683@kozik-lap>
-References: <1480663087-4590-1-git-send-email-cw00.choi@samsung.com>
- <1480663087-4590-4-git-send-email-cw00.choi@samsung.com>
- <CGME20161206190841epcas1p33b8c4f39ff4ff396a5602231a2ffc59c@epcas1p3.samsung.com>
- <20161206190756.GA12683@kozik-lap>
-Message-ID: <58478C41.5090500@samsung.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue,  6 Dec 2016 21:08:21 -0800
+Subject: [PATCH v5 0/5] davinci: VPIF: add DT support
+Message-ID: <20161207050826.23174-1-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016? 12? 07? 04:07, Krzysztof Kozlowski wrote:
-> On Fri, Dec 02, 2016 at 04:18:05PM +0900, Chanwoo Choi wrote:
->> This patch adds PPMU (Platform Performance Monitoring Unit) Device-tree node
->> to measure the utilization of each IP in Exynos SoC.
->>
->> - PPMU_D{0|1}_CPU are used to measure the utilization of MIF (Memory Interface)
->>   block with VDD_MIF power source.
->> - PPMU_D{0|1}_GENERAL are used to measure the utilization of INT(Internal)
->>   block with VDD_INT power source.
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> ---
->>  arch/arm64/boot/dts/exynos/exynos5433.dtsi | 24 ++++++++++++++++++++++++
->>  1 file changed, 24 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
->> index 64226d5ae471..8c4ee84d5232 100644
->> --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
->> +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
->> @@ -599,6 +599,30 @@
->>  			clock-names = "fin_pll", "mct";
->>  		};
->>  
->> +		ppmu_d0_cpu: ppmu at 10480000 {
->> +			compatible = "samsung,exynos-ppmu-v2";
->> +			reg = <0x10480000 0x2000>;
->> +			status = "disabled";
-> 
-> Why these are disabled? They have some external dependencies?
+Prepare the groundwork for adding DT support for davinci VPIF drivers.
+This series does some fixups/cleanups and then adds the DT binding and
+DT compatible string matching for DT probing.
 
-There is no any dependency. If you want to remain it always enabled,
-I'm OK.
+The controversial part from previous versions around async subdev
+parsing, and specifically hard-coding the input/output routing of
+subdevs, has been left out of this series.  That part can be done as a
+follow-on step after agreement has been reached on the path forward.
+With this version, platforms can still use the VPIF capture/display
+drivers, but must provide platform_data for the subdevs and subdev
+routing.
 
-Best Regards,
-Chanwoo Choi
+Tested video capture to memory on da850-lcdk board using composite
+input.
 
-> 
-> Best regards,
-> Krzysztof
-> 
->> +		};
->> +
->> +		ppmu_d0_general: ppmu at 10490000 {
->> +			compatible = "samsung,exynos-ppmu-v2";
->> +			reg = <0x10490000 0x2000>;
->> +			status = "disabled";
->> +		};
->> +
->> +		ppmu_d1_cpu: ppmu at 104b0000 {
->> +			compatible = "samsung,exynos-ppmu-v2";
->> +			reg = <0x104b0000 0x2000>;
->> +			status = "disabled";
->> +		};
->> +
->> +		ppmu_d1_general: ppmu at 104c0000 {
->> +			compatible = "samsung,exynos-ppmu-v2";
->> +			reg = <0x104c0000 0x2000>;
->> +			status = "disabled";
->> +		};
->> +
->>  		pinctrl_alive: pinctrl at 10580000 {
->>  			compatible = "samsung,exynos5433-pinctrl";
->>  			reg = <0x10580000 0x1a20>, <0x11090000 0x100>;
->> -- 
->> 1.9.1
->>
-> 
-> 
-> 
+Changes since v4:
+- dropped controversial async subdev parsing support.  That can be
+  done as a follow-up step after the discussions have finalized on the
+  right approach.
+- DT binding Acked by DT maintainer (Rob H.)
+- reworked locking fix (suggested by Laurent)
+
+Changes since v3:
+- move to a single VPIF node, DT binding updated accordingly
+- misc fixes/updates based on reviews from Sakari
+
+Changes since v2:
+- DT binding doc: fix example to use correct compatible
+
+Changes since v1:
+- more specific compatible strings, based on SoC: ti,da850-vpif*
+- fix locking bug when unlocking over subdev s_stream
+
+Kevin Hilman (5):
+  [media] davinci: VPIF: fix module loading, init errors
+  [media] davinci: vpif_capture: remove hard-coded I2C adapter id
+  [media] davinci: vpif_capture: fix start/stop streaming locking
+  [media] dt-bindings: add TI VPIF documentation
+  [media] davinci: VPIF: add basic support for DT init
+
+ .../devicetree/bindings/media/ti,da850-vpif.txt    | 67 ++++++++++++++++++++++
+ drivers/media/platform/davinci/vpif.c              | 14 ++++-
+ drivers/media/platform/davinci/vpif_capture.c      | 26 +++++++--
+ drivers/media/platform/davinci/vpif_display.c      |  6 ++
+ include/media/davinci/vpif_types.h                 |  1 +
+ 5 files changed, 108 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+
+-- 
+2.9.3
