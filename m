@@ -1,188 +1,108 @@
 From: anurupvasu@gmail.com (Anurup M)
-Date: Wed,  7 Dec 2016 11:57:55 -0500
-Subject: [PATCH v2 08/10] perf: hisi: Add sysfs attributes for L3 cache(L3C)
- PMU
-Message-ID: <1481129875-159765-1-git-send-email-anurup.m@huawei.com>
+Date: Wed,  7 Dec 2016 11:58:33 -0500
+Subject: [PATCH v2 10/10] dts: arm64: hip06: Add Hisilicon SoC PMU support
+Message-ID: <1481129913-159858-1-git-send-email-anurup.m@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. Add L3 caches events to /sys/devices/hisi_l3c0_2/events/
-   The events can be selected as shown in perf list
-   e.g.: For L3C_READ_ALLOCATE event for Super CPU cluster 2 the
-   event format is -e "hisi_l3c0_2/read_allocate/"
-2. Add cpu_mask attribute group for showing the available CPU
-   for counting.
+1. Add nodes for hip06 L3 cache to support uncore events.
+2. Add nodes for hip06 MN to support uncore events.
 
-Signed-off-by: Anurup M <anurup.m@huawei.com>
 Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+Signed-off-by: John Garry <john.garry@huawei.com>
+Signed-off-by: Anurup M <anurup.m@huawei.com>
 ---
- drivers/perf/hisilicon/hisi_uncore_l3c.c | 57 ++++++++++++++++++++++++++++++++
- drivers/perf/hisilicon/hisi_uncore_pmu.c | 40 ++++++++++++++++++++++
- drivers/perf/hisilicon/hisi_uncore_pmu.h | 21 ++++++++++++
- 3 files changed, 118 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hip06.dtsi | 78 ++++++++++++++++++++++++++++++++
+ 1 file changed, 78 insertions(+)
 
-diff --git a/drivers/perf/hisilicon/hisi_uncore_l3c.c b/drivers/perf/hisilicon/hisi_uncore_l3c.c
-index a59700f..9eafed8 100644
---- a/drivers/perf/hisilicon/hisi_uncore_l3c.c
-+++ b/drivers/perf/hisilicon/hisi_uncore_l3c.c
-@@ -448,6 +448,62 @@ static int init_hisi_l3c_data(struct hisi_pmu *l3c_pmu,
- 	return 0;
- }
+diff --git a/arch/arm64/boot/dts/hisilicon/hip06.dtsi b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+index e861698..309b974 100644
+--- a/arch/arm64/boot/dts/hisilicon/hip06.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+@@ -963,6 +963,84 @@
+ 			status = "disabled";
+ 		};
  
-+static struct attribute *hisi_l3c_format_attr[] = {
-+	HISI_PMU_FORMAT_ATTR(event, "config:0-11"),
-+	NULL,
-+};
++		djtag0: djtag at 60010000 {
++			compatible = "hisilicon,hisi-djtag-v1";
++			reg = <0x0 0x60010000 0x0 0x10000>;
++			scl-id = <0x02>;
 +
-+static struct attribute_group hisi_l3c_format_group = {
-+	.name = "format",
-+	.attrs = hisi_l3c_format_attr,
-+};
++			/* L3 cache bank 0 for socket0 CPU die scl#2 */
++			pmul3c0 {
++				compatible = "hisilicon,hisi-pmu-l3c-v1";
++				module-id = <0x04 0x02>;
++			};
 +
-+static struct attribute *hisi_l3c_events_attr[] = {
-+	HISI_PMU_EVENT_ATTR_STR(read_allocate,
-+					"event=0x0"),
-+	HISI_PMU_EVENT_ATTR_STR(write_allocate,
-+					"event=0x01"),
-+	HISI_PMU_EVENT_ATTR_STR(read_noallocate,
-+					"event=0x02"),
-+	HISI_PMU_EVENT_ATTR_STR(write_noallocate,
-+					"event=0x03"),
-+	HISI_PMU_EVENT_ATTR_STR(read_hit, "event=0x04"),
-+	HISI_PMU_EVENT_ATTR_STR(write_hit, "event=0x05"),
-+	NULL,
-+};
++			/* L3 cache bank 1 for socket0 CPU die scl#2 */
++			pmul3c1 {
++				compatible = "hisilicon,hisi-pmu-l3c-v1";
++				module-id = <0x04 0x04>;
++			};
 +
-+static struct attribute_group hisi_l3c_events_group = {
-+	.name = "events",
-+	.attrs = hisi_l3c_events_attr,
-+};
++			/* L3 cache bank 2 for socket0 CPU die scl#2 */
++			pmul3c2 {
++				compatible = "hisilicon,hisi-pmu-l3c-v1";
++				module-id = <0x04 0x01>;
++			};
 +
-+static struct attribute *hisi_l3c_attrs[] = {
-+	NULL,
-+};
++			/* L3 cache bank 3 for socket0 CPU die scl#2 */
++			pmul3c3 {
++				compatible = "hisilicon,hisi-pmu-l3c-v1";
++				module-id = <0x04 0x08>;
++			};
 +
-+struct attribute_group hisi_l3c_attr_group = {
-+	.attrs = hisi_l3c_attrs,
-+};
++			/*
++			 * Miscellaneous node for socket0
++			 * CPU die scl#2
++			 */
++			pmumn0 {
++				compatible = "hisilicon,hisi-pmu-mn-v1";
++				module-id = <0x0b>;
++			};
++		};
 +
-+static DEVICE_ATTR(cpumask, 0444, hisi_cpumask_sysfs_show, NULL);
++		djtag1: djtag at 40010000 {
++			compatible = "hisilicon,hisi-djtag-v1";
++			reg = <0x0 0x40010000 0x0 0x10000>;
++			scl-id = <0x01>;
 +
-+static struct attribute *hisi_l3c_cpumask_attrs[] = {
-+	&dev_attr_cpumask.attr,
-+	NULL,
-+};
++			/* L3 cache bank 0 for socket0 CPU die scl#1 */
++			pmul3c0 {
++				compatible = "hisilicon,hisi-pmu-l3c-v1";
++				module-id = <0x04 0x02>;
++			};
 +
-+static const struct attribute_group hisi_l3c_cpumask_attr_group = {
-+	.attrs = hisi_l3c_cpumask_attrs,
-+};
++			/* L3 cache bank 1 for socket0 CPU die scl#1 */
++			pmul3c1 {
++				compatible = "hisilicon,hisi-pmu-l3c-v1";
++				module-id = <0x04 0x04>;
++			};
 +
-+static const struct attribute_group *hisi_l3c_pmu_attr_groups[] = {
-+	&hisi_l3c_attr_group,
-+	&hisi_l3c_format_group,
-+	&hisi_l3c_events_group,
-+	&hisi_l3c_cpumask_attr_group,
-+	NULL,
-+};
++			/* L3 cache bank 2 for socket0 CPU die scl#1 */
++			pmul3c2 {
++				compatible = "hisilicon,hisi-pmu-l3c-v1";
++				module-id = <0x04 0x01>;
++			};
 +
- static struct hisi_uncore_ops hisi_uncore_l3c_ops = {
- 	.set_evtype = hisi_l3c_set_evtype,
- 	.clear_evtype = hisi_l3c_clear_evtype,
-@@ -511,6 +567,7 @@ static int hisi_pmu_l3c_dev_probe(struct hisi_djtag_client *client)
- 		.start = hisi_uncore_pmu_start,
- 		.stop = hisi_uncore_pmu_stop,
- 		.read = hisi_uncore_pmu_read,
-+		.attr_groups = hisi_l3c_pmu_attr_groups,
- 	};
- 
- 	ret = hisi_uncore_pmu_setup(l3c_pmu, l3c_pmu->name);
-diff --git a/drivers/perf/hisilicon/hisi_uncore_pmu.c b/drivers/perf/hisilicon/hisi_uncore_pmu.c
-index 950e38d..db7f666 100644
---- a/drivers/perf/hisilicon/hisi_uncore_pmu.c
-+++ b/drivers/perf/hisilicon/hisi_uncore_pmu.c
-@@ -26,6 +26,46 @@
- #include <linux/perf_event.h>
- #include "hisi_uncore_pmu.h"
- 
-+/*
-+ * PMU format attributes
-+ */
-+ssize_t hisi_format_sysfs_show(struct device *dev,
-+			struct device_attribute *attr, char *buf)
-+{
-+	struct dev_ext_attribute *eattr;
++			/* L3 cache bank 3 for socket0 CPU die scl#1 */
++			pmul3c3 {
++				compatible = "hisilicon,hisi-pmu-l3c-v1";
++				module-id = <0x04 0x08>;
++			};
 +
-+	eattr = container_of(attr, struct dev_ext_attribute,
-+					     attr);
-+	return sprintf(buf, "%s\n", (char *) eattr->var);
-+}
++			/*
++			 * Miscellaneous node for socket0
++			 * CPU die scl#1
++			 */
++			pmumn1 {
++				compatible = "hisilicon,hisi-pmu-mn-v1";
++				module-id = <0x0b>;
++			};
++		};
 +
-+/*
-+ * PMU event attributes
-+ */
-+ssize_t hisi_event_sysfs_show(struct device *dev,
-+				  struct device_attribute *attr, char *page)
-+{
-+	struct perf_pmu_events_attr *pmu_attr =
-+		container_of(attr, struct perf_pmu_events_attr, attr);
-+
-+	if (pmu_attr->event_str)
-+		return sprintf(page, "%s", pmu_attr->event_str);
-+
-+	return 0;
-+}
-+
-+/*
-+ * sysfs cpumask attributes
-+ */
-+ssize_t hisi_cpumask_sysfs_show(struct device *dev,
-+				struct device_attribute *attr, char *buf)
-+{
-+	struct pmu *pmu = dev_get_drvdata(dev);
-+	struct hisi_pmu *hisi_pmu = to_hisi_pmu(pmu);
-+
-+	return cpumap_print_to_pagebuf(true, buf, &hisi_pmu->cpu);
-+}
-+
- /* djtag read interface - Call djtag driver to access SoC registers */
- int hisi_djtag_readreg(int module_id, int bank, u32 offset,
- 				struct hisi_djtag_client *client, u32 *pvalue)
-diff --git a/drivers/perf/hisilicon/hisi_uncore_pmu.h b/drivers/perf/hisilicon/hisi_uncore_pmu.h
-index 28b7565..7957f2d 100644
---- a/drivers/perf/hisilicon/hisi_uncore_pmu.h
-+++ b/drivers/perf/hisilicon/hisi_uncore_pmu.h
-@@ -47,6 +47,21 @@
- #define GET_CNTR_IDX(hwc) (hwc->idx)
- #define to_hisi_pmu(c)	(container_of(c, struct hisi_pmu, pmu))
- 
-+#define HISI_PMU_FORMAT_ATTR(_name, _config)		\
-+	(&((struct dev_ext_attribute[]) {		\
-+		{ .attr = __ATTR(_name, 0444,	\
-+			hisi_format_sysfs_show, NULL),	\
-+		  .var = (void *) _config,		\
-+		}					\
-+	})[0].attr.attr)
-+
-+#define HISI_PMU_EVENT_ATTR_STR(_name, _str)		\
-+	(&((struct perf_pmu_events_attr[]) {		\
-+		{ .attr = __ATTR(_name, 0444,	\
-+			 hisi_event_sysfs_show, NULL),	\
-+		  .event_str = _str,			\
-+		}					\
-+	  })[0].attr.attr)
- 
- struct hisi_pmu;
- 
-@@ -104,4 +119,10 @@ int hisi_djtag_writereg(int module_id, int bank,
- 				u32 offset, u32 value,
- 				struct hisi_djtag_client *client);
- struct hisi_pmu *hisi_pmu_alloc(struct device *dev);
-+ssize_t hisi_event_sysfs_show(struct device *dev,
-+				  struct device_attribute *attr, char *buf);
-+ssize_t hisi_format_sysfs_show(struct device *dev,
-+				  struct device_attribute *attr, char *buf);
-+ssize_t hisi_cpumask_sysfs_show(struct device *dev,
-+				struct device_attribute *attr, char *buf);
- #endif /* __HISI_UNCORE_PMU_H__ */
+ 		sas1: sas at a2000000 {
+ 			compatible = "hisilicon,hip06-sas-v2";
+ 			reg = <0 0xa2000000 0 0x10000>;
 -- 
 2.1.4
