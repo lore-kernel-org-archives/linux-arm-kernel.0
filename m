@@ -1,99 +1,120 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 07 Dec 2016 21:32:31 +0200
-Subject: [PATCH RFC] drm/sun4i: rgb: Add 5% tolerance to dot clock
- frequency check
-In-Reply-To: <87oa0nbldb.fsf@eliezer.anholt.net>
-References: <20161124112231.4297-1-wens@csie.org>
- <20161206172911.z6sbjzgqv3vfcrfh@lukather>
- <87oa0nbldb.fsf@eliezer.anholt.net>
-Message-ID: <49390277.JzpHL51lDs@avalon>
+Date: Wed, 07 Dec 2016 21:34:18 +0200
+Subject: [PATCH v2 1/4] ARM: dts: davinci: da850: VPIF: add node and muxing
+In-Reply-To: <20161207193137.27947-2-khilman@baylibre.com>
+References: <20161207193137.27947-1-khilman@baylibre.com>
+ <20161207193137.27947-2-khilman@baylibre.com>
+Message-ID: <37047453.6bLpOkkjm4@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi Kevin,
 
-On Wednesday 07 Dec 2016 11:16:32 Eric Anholt wrote:
-> Maxime Ripard <maxime.ripard@free-electrons.com> writes:
-> > [ Unknown signature status ]
-> > 
-> > On Thu, Nov 24, 2016 at 07:22:31PM +0800, Chen-Yu Tsai wrote:
-> >> The panels shipped with Allwinner devices are very "generic", i.e.
-> >> they do not have model numbers or reliable sources of information
-> >> for the timings (that we know of) other than the fex files shipped
-> >> on them. The dot clock frequency provided in the fex files have all
-> >> been rounded to the nearest MHz, as that is the unit used in them.
-> >> 
-> >> We were using the simple panel "urt,umsh-8596md-t" as a substitute
-> >> for the A13 Q8 tablets in the absence of a specific model for what
-> >> may be many different but otherwise timing compatible panels. This
-> >> was usable without any visual artifacts or side effects, until the
-> >> dot clock rate check was added in commit bb43d40d7c83 ("drm/sun4i:
-> >> rgb: Validate the clock rate").
-> >> 
-> >> The reason this check fails is because the dotclock frequency for
-> >> this model is 33.26 MHz, which is not achievable with our dot clock
-> >> hardware, and the rate returned by clk_round_rate deviates slightly,
-> >> causing the driver to reject the display mode.
-> >> 
-> >> The LCD panels have some tolerance on the dot clock frequency, even
-> >> if it's not specified in their datasheets.
-> >> 
-> >> This patch adds a 5% tolerence to the dot clock check.
-> > 
-> > As we discussed already, I really believe this is just as arbitrary as
-> > the current behaviour.
-> > 
-> > Some panels require an exact frequency, some have a minimal frequency
-> > but no maximum, some have a maximum frequency but no minimal, and I
-> > guess most of them deviates by how much exactly they can take (and
-> > possibly can take more easily a higher frequency, but are less
-> > tolerant if you take a frequency lower than the nominal.
-> > 
-> > And we cannot remove that check entirely, since some bridges will
-> > report out of range frequencies for higher modes that we know we
-> > cannot reach.
-> > 
-> > We could just try to see if the screen pixel clock frequency is out of
-> > the pixel clock range we can generate, but then we will loop back on
-> > how much out of range is it exactly, and is it within the screen
-> > tolerancy.
-> > 
-> > We have an API to deal with the panel tolerancies in the DRM panel
-> > framework, we can (and should) use it.
-> > 
-> > I'm not sure how others usually deal with this though. I think I
-> > remember Eric telling me that for the RPi they just adjusted the
-> > timings a bit, but they only really had a single panel to deal with.
+Thank you for the patch.
+
+On Wednesday 07 Dec 2016 11:31:34 Kevin Hilman wrote:
+> Add VPIF node an pins to da850 and enable on boards.  VPIF has two input
+> channels described using the standard DT ports and enpoints.
 > 
-> For RPi, you just adjust the pixel clock of the panel's mode to be
-> whatever the platform can support, and expand the blanking intervals to
-> get the refresh rate back to desired.  This is nothing like what the
-> datasheet says, but it's not important what the datasheet says, it's
-> important what makes the product work.
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> ---
+>  arch/arm/boot/dts/da850-evm.dts  |  6 ++++++
+>  arch/arm/boot/dts/da850-lcdk.dts |  6 ++++++
+>  arch/arm/boot/dts/da850.dtsi     | 38 +++++++++++++++++++++++++++++++++++-
+>  3 files changed, 49 insertions(+), 1 deletion(-)
 > 
-> Our clock driver looks for the best matching clock that's not over the
-> target rate.  This is somewhat unfortunate, as you end up slightly
-> inflating your requested clocks so that a possible clock lands under
-> that.  I'd rather we chose the closest matching clock, but then people
-> get worried about what if selected clock rate is 1% higher than expected
-> (the answer is "nothing").
+> diff --git a/arch/arm/boot/dts/da850-evm.dts
+> b/arch/arm/boot/dts/da850-evm.dts index 41de15fe15a2..212b50d4f84b 100644
+> --- a/arch/arm/boot/dts/da850-evm.dts
+> +++ b/arch/arm/boot/dts/da850-evm.dts
+> @@ -289,3 +289,9 @@
+>  		};
+>  	};
+>  };
+> +
+> +&vpif {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&vpif_capture_pins>;
+> +       status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/da850-lcdk.dts
+> b/arch/arm/boot/dts/da850-lcdk.dts index 7b8ab21fed6c..67f846f5bb35 100644
+> --- a/arch/arm/boot/dts/da850-lcdk.dts
+> +++ b/arch/arm/boot/dts/da850-lcdk.dts
+> @@ -219,3 +219,9 @@
+>  		};
+>  	};
+>  };
+> +
+> +&vpif {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&vpif_capture_pins>;
+> +       status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> index f79e1b91c680..dd2a13ed106e 100644
+> --- a/arch/arm/boot/dts/da850.dtsi
+> +++ b/arch/arm/boot/dts/da850.dtsi
+> @@ -186,7 +186,18 @@
+>  					0xc 0x88888888 0xffffffff
+> 
+>  				>;
+> 
+>  			};
+> -
+> +			vpif_capture_pins: vpif_capture_pins {
+> +				pinctrl-single,bits = <
+> +					/* VP_DIN[2..7], VP_CLKIN1, VP_CLKIN0 
+*/
+> +					0x38 0x11111111 0xffffffff
+> +					/* VP_DIN[10..15,0..1] */
+> +					0x3c 0x11111111 0xffffffff
+> +					/* VP_DIN[8..9] */
+> +					0x40 0x00000011 0x000000ff
+> +					/* VP_CLKIN3, VP_CLKIN2 */
+> +					0x4c 0x00010100 0x000f0f00
+> +				>;
+> +			};
+>  		};
+>  		edma0: edma at 0 {
+>  			compatible = "ti,edma3-tpcc";
+> @@ -399,7 +410,32 @@
+>  				<&edma0 0 1>;
+>  			dma-names = "tx", "rx";
+>  		};
+> +
+> +		vpif: video at 217000 {
+> +			compatible = "ti,da850-vpif";
+> +			reg = <0x217000 0x1000>;
+> +			interrupts = <92>;
+> +			status = "disabled";
+> +
+> +			/* VPIF capture: input channels */
+> +			port {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				vpif_ch0: endpoint at 0 {
+> +					  reg = <0>;
+> +					  bus-width = <8>;
+> +				};
+> +
+> +				vpif_ch1: endpoint at 1 {
+> +					  reg = <1>;
+> +					  bus-width = <8>;
+> +					  data-shift = <8>;
+> +				};
 
-But if the closest match is 10% off and higher results could be different, in 
-which case a lower match that is 11% off might be better. The hard part is to 
-decide where to set the limit, and I'm afraid the answer is likely system-
-dependent.
+Given that the VPIF can also accept a single 16-bit input, I'd move the 
+endpoints to board files.
 
-> I think this patch is a fine solution, and the alternative would be to
-> just drop the mode high/low check and say that if you're pairing a panel
-> with some display hardware, it's up to you to make sure that the panel's
-> mode actually scans out successfully.  Then, since compatible strings
-> are cheap, you can use a new one if necessary to attach better modes to
-> the panel for a particular clock driver by adjusting your timings to get
-> closer to the refresh rates you want.
-
-Given that timings tolerance can be system-dependent and not only panel-
-dependent, it would make sense to specify them in DT (possibly an optional 
-properties with reasonable default values computed by drivers).
+> +			};
+> +		};
+>  	};
+> +
+>  	aemif: aemif at 68000000 {
+>  		compatible = "ti,da850-aemif";
+>  		#address-cells = <2>;
 
 -- 
 Regards,
