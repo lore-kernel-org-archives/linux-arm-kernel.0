@@ -1,54 +1,72 @@
-From: abelvesa@gmail.com (Abel Vesa)
-Date: Wed, 7 Dec 2016 16:11:17 +0000
-Subject: [PATCH 6/7] arm: Add livepatch to build if CONFIG_LIVEPATCH
-In-Reply-To: <20161207150525.GD13288@linux.suse>
-References: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
- <1481043967-15602-7-git-send-email-abelvesa@linux.com>
- <20161207150525.GD13288@linux.suse>
-Message-ID: <20161207161117.GA16293@gce>
+From: liviu.dudau@arm.com (liviu.dudau at arm.com)
+Date: Wed, 7 Dec 2016 16:11:45 +0000
+Subject: [PATCH] drm: hdlcd: Work properly in big-endian mode
+In-Reply-To: <f484518775c0bf063ae0a6f1e6c11bb404a7acc9.1481124156.git.robin.murphy@arm.com>
+References: <f484518775c0bf063ae0a6f1e6c11bb404a7acc9.1481124156.git.robin.murphy@arm.com>
+Message-ID: <20161207161144.GA838@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 04:05:25PM +0100, Petr Mladek wrote:
-> On Tue 2016-12-06 17:06:06, Abel Vesa wrote:
-> > Necessary livepatch file added to makefile.
-> > 
-> > Signed-off-by: Abel Vesa <abelvesa@linux.com>
-> > ---
-> >  arch/arm/kernel/Makefile | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> > index ad325a8..9e70220 100644
-> > --- a/arch/arm/kernel/Makefile
-> > +++ b/arch/arm/kernel/Makefile
-> > @@ -48,6 +48,7 @@ obj-$(CONFIG_HAVE_ARM_TWD)	+= smp_twd.o
-> >  obj-$(CONFIG_ARM_ARCH_TIMER)	+= arch_timer.o
-> >  obj-$(CONFIG_FUNCTION_TRACER)	+= entry-ftrace.o
-> >  obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o insn.o
-> > +obj-$(CONFIG_LIVEPATCH)		+= livepatch.o
-> 
-> It is strange that you add a source file in one patch and make it
-> build in a much later patch.
-> 
-> I suggest to restructure the entire patchset a bit. Please, first
-> add support for FTRACE_WITH_REGS. It makes sense on its own.
-> Then add the livepatch support on top of it.
-> 
-> Otherwise, it is not necessary to send v2 immediately for such
-> non-trivial code. There might be more people that would want
-> to look at it and it might take days until they find a time.
-> It is always better to collect some feedback, think about it
-> over night(s). Every question often opens many other questions
-> and it usually takes some time until all settles down into
-> a good picture again.
-> 
-> Best Regards,
-> Petr
-You're right, I should send this into two steps. One patchset that
-adds FTRACE_WITH_REGS and then a second one that implements the
-livepatch and is based on the first one.
+On Wed, Dec 07, 2016 at 03:31:40PM +0000, Robin Murphy wrote:
+> Under a big-endian kernel, colours on the framebuffer all come out a
+> delightful shade of wrong, 
 
-Will do that.
+So you are saying that wrong is only a 1 bit value?
 
-Thanks.
+
+> since we fail to take the reversed byte
+> order into account. Fortunately, the HDLCD has a control bit to make it
+> automatically byteswap big-endian data; let's use it as appropriate.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+
+Change looks good to me, but as Daniel has mentioned, we should have failed
+the modesetting as the buffer we are passed should be in the wrong fourcc format.
+
+Any way I can play with a big-endian filesystem that you can share?
+
+Best regards,
+Liviu
+
+> ---
+>  drivers/gpu/drm/arm/hdlcd_crtc.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
+> index 28341b32067f..eceb7bed5dd0 100644
+> --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
+> +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
+> @@ -63,6 +63,7 @@ static int hdlcd_set_pxl_fmt(struct drm_crtc *crtc)
+>  	uint32_t pixel_format;
+>  	struct simplefb_format *format = NULL;
+>  	int i;
+> +	u32 reg;
+>  
+>  	pixel_format = crtc->primary->state->fb->pixel_format;
+>  
+> @@ -76,7 +77,11 @@ static int hdlcd_set_pxl_fmt(struct drm_crtc *crtc)
+>  
+>  	/* HDLCD uses 'bytes per pixel', zero means 1 byte */
+>  	btpp = (format->bits_per_pixel + 7) / 8;
+> -	hdlcd_write(hdlcd, HDLCD_REG_PIXEL_FORMAT, (btpp - 1) << 3);
+> +	reg = (btpp - 1) << 3;
+> +#ifdef __BIG_ENDIAN
+> +	reg |= HDLCD_PIXEL_FMT_BIG_ENDIAN;
+> +#endif
+> +	hdlcd_write(hdlcd, HDLCD_REG_PIXEL_FORMAT, reg);
+>  
+>  	/*
+>  	 * The format of the HDLCD_REG_<color>_SELECT register is:
+> -- 
+> 2.10.2.dirty
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
