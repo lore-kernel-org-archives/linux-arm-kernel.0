@@ -1,67 +1,81 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 7 Dec 2016 16:57:14 +0100
-Subject: [PATCH] drm: hdlcd: Work properly in big-endian mode
-In-Reply-To: <f484518775c0bf063ae0a6f1e6c11bb404a7acc9.1481124156.git.robin.murphy@arm.com>
-References: <f484518775c0bf063ae0a6f1e6c11bb404a7acc9.1481124156.git.robin.murphy@arm.com>
-Message-ID: <20161207155714.ldmshptddwvhsdop@phenom.ffwll.local>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 07 Dec 2016 08:06:36 -0800
+Subject: [PATCH v4 1/4] [media] davinci: vpif_capture: don't lock over
+ s_stream
+In-Reply-To: <4999781.kd7ueUSsQd@avalon> (Laurent Pinchart's message of "Wed,
+ 07 Dec 2016 17:47:59 +0200")
+References: <20161129235712.29846-1-khilman@baylibre.com>
+ <4747860.QGGHSuFRpz@avalon> <m237i1gfz1.fsf@baylibre.com>
+ <4999781.kd7ueUSsQd@avalon>
+Message-ID: <m21sxjg1v7.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 03:31:40PM +0000, Robin Murphy wrote:
-> Under a big-endian kernel, colours on the framebuffer all come out a
-> delightful shade of wrong, since we fail to take the reversed byte
-> order into account. Fortunately, the HDLCD has a control bit to make it
-> automatically byteswap big-endian data; let's use it as appropriate.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Laurent Pinchart <laurent.pinchart@ideasonboard.com> writes:
 
-fourcc codes (and the drm fourcc codes) are supposed to be little-endian.
-All of them. So either we fix up the drivers and userspace to set that
-flag correctly (which would mean hdlcd should expose twice as many
-formats, each one with the little and big endian mode).
+ > Hi Kevin,
+>
+> On Tuesday 06 Dec 2016 08:49:38 Kevin Hilman wrote:
+>> Laurent Pinchart writes:
+>> > On Tuesday 29 Nov 2016 15:57:09 Kevin Hilman wrote:
+>> >> Video capture subdevs may be over I2C and may sleep during xfer, so we
+>> >> cannot do IRQ-disabled locking when calling the subdev.
+>> >> 
+>> >> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+>> >> ---
+>> >>  drivers/media/platform/davinci/vpif_capture.c | 3 +++
+>> >>  1 file changed, 3 insertions(+)
+>> >> 
+>> >> diff --git a/drivers/media/platform/davinci/vpif_capture.c
+>> >> b/drivers/media/platform/davinci/vpif_capture.c index
+>> >> 5104cc0ee40e..9f8f41c0f251 100644
+>> >> --- a/drivers/media/platform/davinci/vpif_capture.c
+>> >> +++ b/drivers/media/platform/davinci/vpif_capture.c
+>> >> @@ -193,7 +193,10 @@ static int vpif_start_streaming(struct vb2_queue
+>> >> *vq, unsigned int count)
+>> >>  		}
+>> >>  	}
+>> >> 
+>> >> +	spin_unlock_irqrestore(&common->irqlock, flags);
+>> >>  	ret = v4l2_subdev_call(ch->sd, video, s_stream, 1);
+>> >> +	spin_lock_irqsave(&common->irqlock, flags);
+>> > 
+>> > I always get anxious when I see a spinlock being released randomly with an
+>> > operation in the middle of a protected section. Looking at the code it
+>> > looks like the spinlock is abused here. irqlock should only protect the
+>> > dma_queue and should thus only be taken around the following code:
+>> > 
+>> > spin_lock_irqsave(&common->irqlock, flags);
+>> > /* Get the next frame from the buffer queue */
+>> > common->cur_frm = common->next_frm = list_entry(common->dma_queue.next,
+>> >                             struct vpif_cap_buffer, list);
+>> > 
+>> > /* Remove buffer from the buffer queue */
+>> > list_del(&common->cur_frm->list);
+>> > spin_unlock_irqrestore(&common->irqlock, flags);
+>> 
+>> Yes, that looks correct.  Will update.
+>> 
+>> > The code that is currently protected by the lock in the start and stop
+>> > streaming functions should be protected by a mutex instead.
+>> 
+>> I tried taking the mutex here, but lockdep pointed out a deadlock.  I
+>> may not be fully understanding the V4L2 internals here, but it seems
+>> that the ioctl is already taking a mutex, so taking it again in
+>> start/stop streaming is a deadlock.  Unless you think the locking should
+>> be nested here, it seems to me that the mutex isn't needed.
+>
+> The V4L2 core can lock all ioctls using struct video_device::lock. For buffer-
+> related ioctls, it can optionally use a separate lock from struct 
+> vb2_queue::lock. See v4l2_ioctl_get_lock() in drivers/media/v4l2-core/v4l2-
+> ioctl.c.
+>
+> The vpif-capture driver sets both the video_device and vb2_queue locks to the 
+> same lock (which would have the same effect as leaving the vb2_queue lock 
+> NULL). All ioctls are thus serialized. You would only need to handle locking 
+> in start_streaming and stop_streaming manually if you didn't rely on the core 
+> serializing the ioctls.
 
-Or we nuke the big endian flag from drm fourcc. Adding AMD folks who afaik
-are the only other ones who ever cared about big endian in drm.
--Daniel
+OK, thanks for clarifying how that works.
 
-> ---
->  drivers/gpu/drm/arm/hdlcd_crtc.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> index 28341b32067f..eceb7bed5dd0 100644
-> --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
-> +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> @@ -63,6 +63,7 @@ static int hdlcd_set_pxl_fmt(struct drm_crtc *crtc)
->  	uint32_t pixel_format;
->  	struct simplefb_format *format = NULL;
->  	int i;
-> +	u32 reg;
->  
->  	pixel_format = crtc->primary->state->fb->pixel_format;
->  
-> @@ -76,7 +77,11 @@ static int hdlcd_set_pxl_fmt(struct drm_crtc *crtc)
->  
->  	/* HDLCD uses 'bytes per pixel', zero means 1 byte */
->  	btpp = (format->bits_per_pixel + 7) / 8;
-> -	hdlcd_write(hdlcd, HDLCD_REG_PIXEL_FORMAT, (btpp - 1) << 3);
-> +	reg = (btpp - 1) << 3;
-> +#ifdef __BIG_ENDIAN
-> +	reg |= HDLCD_PIXEL_FMT_BIG_ENDIAN;
-> +#endif
-> +	hdlcd_write(hdlcd, HDLCD_REG_PIXEL_FORMAT, reg);
->  
->  	/*
->  	 * The format of the HDLCD_REG_<color>_SELECT register is:
-> -- 
-> 2.10.2.dirty
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Kevin
