@@ -1,69 +1,47 @@
-From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Wed, 7 Dec 2016 12:51:01 -0600
-Subject: [RFC PATCH v3 07/11] arm64: compat: Add a 32-bit vDSO
-In-Reply-To: <20161206160353.14581-8-kevin.brodsky@arm.com>
-References: <20161206160353.14581-1-kevin.brodsky@arm.com>
- <20161206160353.14581-8-kevin.brodsky@arm.com>
-Message-ID: <87r35jmv3e.fsf@wedge.i-did-not-set--mail-host-address--so-tickle-me>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Wed, 07 Dec 2016 13:51:32 -0500
+Subject: [PATCH] Input: lpc32xx-keys - fix invalid error handling of a
+ requested irq
+In-Reply-To: <7AAD38C5-E1CF-40EF-8E5B-8BCB9B5897C4@gmail.com>
+References: <20161205014753.2092-1-vz@mleia.com>
+ <1481134387.9248.8.camel@localhost>
+ <7AAD38C5-E1CF-40EF-8E5B-8BCB9B5897C4@gmail.com>
+Message-ID: <1481136692.5635.1.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+On Wed, 2016-12-07 at 10:46 -0800, Dmitry Torokhov wrote:
+> On December 7, 2016 10:13:07 AM PST, Sylvain Lemieux <slemieux.tyco@gmail.com> wrote:
+> >On Mon, 2016-12-05 at 03:47 +0200, Vladimir Zapolskiy wrote:
+> >> Semantics of NR_IRQS is different on machines with SPARSE_IRQ option
+> >> disabled or enabled, in the latter case IRQs are allocated starting
+> >> at least from the value specified by NR_IRQS and going upwards, so
+> >> the check of (irq >= NR_IRQ) to decide about an error code returned
+> >by
+> >> platform_get_irq() is completely invalid, don't attempt to overrule
+> >> irq subsystem in the driver.
+> >> 
+> >> The change fixes lpc32xx_keys driver initialization on boot:
+> >> 
+> >>   lpc32xx_keys 40050000.key: failed to get platform irq
+> >>   lpc32xx_keys: probe of 40050000.key failed with error -22
+> >> 
+> >> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> >> ---
+> >>  drivers/input/keyboard/lpc32xx-keys.c | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >> 
+> >Cosmetic - please update the subject line when doing the commit:
+> >replace " -" by ":" after lpc32xx-keys
+> 
+> Why? The format on all input patches is "Input: <driver> - <subject>" and had been this for 10+ years.
+> 
+My mistake; did not look at the tree "subject line" commit log 
 
-Kevin Brodsky <kevin.brodsky@arm.com> writes:
-> diff --git a/arch/arm64/kernel/vdso32/vgettimeofday.c b/arch/arm64/kernel/vdso32/vgettimeofday.c
-> new file mode 100644
-> index 000000000000..53c3d1f82b26
-> --- /dev/null
-> +++ b/arch/arm64/kernel/vdso32/vgettimeofday.c
+You can dropped my comment.
 
-As I said at LPC last month, I'm not excited to have arch/arm's
-vgettimeofday.c copied into arch/arm64 and tweaked; I'd rather see this
-part of the implementation shared between arch/arm and arch/arm64
-somehow, even if there's not an elegant way to do so.
-
-The situation which must be avoided is one where the arch/arm64 compat
-VDSO incompatibly diverges from the arch/arm VDSO.  That becomes much
-less likely if there's only one copy of the userspace-exposed code to
-maintain.
-
-
-[...]
-
-> +/*
-> + * We use the hidden visibility to prevent the compiler from generating a GOT
-> + * relocation. Not only is going through a GOT useless (the entry couldn't and
-> + * musn't be overridden by another library), it does not even work: the linker
-> + * cannot generate an absolute address to the data page.
-> + *
-> + * With the hidden visibility, the compiler simply generates a PC-relative
-> + * relocation (R_ARM_REL32), and this is what we need.
-> + */
-> +extern const struct vdso_data _vdso_data __attribute__((visibility("hidden")));
-> +
-> +static inline const struct vdso_data *get_vdso_data(void)
-> +{
-> +	const struct vdso_data *ret;
-> +	/*
-> +	 * This simply puts &_vdso_data into ret. The reason why we don't use
-> +	 * `ret = &_vdso_data` is that the compiler tends to optimise this in a
-> +	 * very suboptimal way: instead of keeping &_vdso_data in a register,
-> +	 * it goes through a relocation almost every time _vdso_data must be
-> +	 * accessed (even in subfunctions). This is both time and space
-> +	 * consuming: each relocation uses a word in the code section, and it
-> +	 * has to be loaded at runtime.
-> +	 *
-> +	 * This trick hides the assignment from the compiler. Since it cannot
-> +	 * track where the pointer comes from, it will only use one relocation
-> +	 * where get_vdso_data() is called, and then keep the result in a
-> +	 * register.
-> +	 */
-> +	asm("mov %0, %1" : "=r"(ret) : "r"(&_vdso_data));
-> +	return ret;
-> +}
-
-I think this is an instructive case: this code looks like an improvement
-over how the arch/arm VDSO accesses the data page.  Enhancements like
-this (not to mention fixes) shouldn't require a patch-per-architecture;
-things inevitably get out of sync and it's more of a maintenance burden
-in the long term.
+Regards,
+Sylvain
+> 
+> Thanks.
+> 
