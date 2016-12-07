@@ -1,43 +1,54 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 7 Dec 2016 09:54:00 +0800
-Subject: [PATCH v4 2/7] MFD: add STM32 General Purpose Timer driver
-In-Reply-To: <1481027929-13704-3-git-send-email-benjamin.gaignard@st.com>
-Message-ID: <201612070946.6SOumKdW%fengguang.wu@intel.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 6 Dec 2016 19:54:44 -0600
+Subject: [PATCH v3 1/3] ARM: da850: fix infinite loop in clk_set_rate()
+In-Reply-To: <1480932549-30811-2-git-send-email-bgolaszewski@baylibre.com>
+References: <1480932549-30811-1-git-send-email-bgolaszewski@baylibre.com>
+ <1480932549-30811-2-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <148e4d35-da65-a212-1490-c2d902dd4410@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benjamin,
+On 12/05/2016 04:09 AM, Bartosz Golaszewski wrote:
+> The aemif clock is added twice to the lookup table in da850.c. This
+> breaks the children list of pll0_sysclk3 as we're using the same list
+> links in struct clk. When calling clk_set_rate(), we get stuck in
+> propagate_rate().
 
-[auto build test ERROR on iio/togreg]
-[also build test ERROR on v4.9-rc8]
-[cannot apply to next-20161206]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+&emac_clk is used twice in this list as well. Shouldn't we fix it too? I 
+would expect that it causes the same problem.
 
-url:    https://github.com/0day-ci/linux/commits/Benjamin-Gaignard/Add-PWM-and-IIO-timer-drivers-for-STM32/20161207-025220
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/jic23/iio.git togreg
-config: sparc-allmodconfig (attached as .config)
-compiler: sparc64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=sparc 
-
-All errors (new ones prefixed by >>):
-
-   WARNING: modpost: missing MODULE_LICENSE() in drivers/media/dvb-frontends/gp8psk-fe.o
-   see include/linux/module.h for more information
-   drivers/mfd/stm32-gptimer: struct of_device_id is 200 bytes.  The last of 1 is:
-   0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x73 0x74 0x2c 0x73 0x74 0x6d 0x33 0x32 0x2d 0x67 0x70 0x74 0x69 0x6d 0x65 0x72 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 
->> FATAL: drivers/mfd/stm32-gptimer: struct of_device_id is not terminated with a NULL entry!
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 47897 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161207/f177e9ca/attachment-0001.gz>
+>
+> Create a separate clock for nand, inheriting the rate of the aemif
+> clock and retrieve it in the davinci_nand module.
+>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/arm/mach-davinci/da850.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index e770c97..c008e5e 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+> @@ -367,6 +367,11 @@ static struct clk aemif_clk = {
+>  	.flags		= ALWAYS_ENABLED,
+>  };
+>
+> +static struct clk aemif_nand_clk = {
+> +	.name		= "nand",
+> +	.parent		= &aemif_clk,
+> +};
+> +
+>  static struct clk usb11_clk = {
+>  	.name		= "usb11",
+>  	.parent		= &pll0_sysclk4,
+> @@ -537,7 +542,7 @@ static struct clk_lookup da850_clks[] = {
+>  	CLK("da830-mmc.0",	NULL,		&mmcsd0_clk),
+>  	CLK("da830-mmc.1",	NULL,		&mmcsd1_clk),
+>  	CLK("ti-aemif",		NULL,		&aemif_clk),
+> -	CLK(NULL,		"aemif",	&aemif_clk),
+> +	CLK(NULL,		"aemif",	&aemif_nand_clk),
+>  	CLK("ohci-da8xx",	"usb11",	&usb11_clk),
+>  	CLK("musb-da8xx",	"usb20",	&usb20_clk),
+>  	CLK("spi_davinci.0",	NULL,		&spi0_clk),
+>
