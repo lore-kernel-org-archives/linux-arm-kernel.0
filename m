@@ -1,102 +1,124 @@
 From: christopher.lee.bostic@gmail.com (Chris Bostic)
-Date: Tue,  6 Dec 2016 20:09:32 -0600
-Subject: [PATCH 09/16] drivers/fsi: Implement slave initialisation
+Date: Tue,  6 Dec 2016 20:09:33 -0600
+Subject: [PATCH 11/16] drivers/fsi: Add device read/write/peek functions
 In-Reply-To: <1481076574-54711-1-git-send-email-christopher.lee.bostic@gmail.com>
 References: <1481076574-54711-1-git-send-email-christopher.lee.bostic@gmail.com>
-Message-ID: <1481076574-54711-3-git-send-email-christopher.lee.bostic@gmail.com>
+Message-ID: <1481076574-54711-4-git-send-email-christopher.lee.bostic@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jeremy Kerr <jk@ozlabs.org>
 
-Create fsi_slave devices during the master scan.
+This change introduces the fsi device API: simple read, write and peek
+accessors for the devices' address spaces.
+
+Includes contributions from Chris Bostic <cbostic@us.ibm.com>
 
 Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
 ---
- drivers/fsi/fsi-core.c | 55 ++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 53 insertions(+), 2 deletions(-)
+ drivers/fsi/fsi-core.c | 47 +++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/fsi.h    |  7 ++++++-
+ 2 files changed, 53 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index f0832c7..aa4330a 100644
+index b51ea35..80feeb8 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -16,10 +16,14 @@
- #include <linux/device.h>
- #include <linux/fsi.h>
- #include <linux/module.h>
-+#include <linux/slab.h>
+@@ -33,6 +33,8 @@
+ #define FSI_SLAVE_CONF_CRC_MASK		0x0000000f
+ #define FSI_SLAVE_CONF_DATA_BITS	28
  
- #include "fsi-master.h"
- 
- #define FSI_N_SLAVES	4
-+#define FSI_SLAVE_CONF_CRC_SHIFT        4
-+#define FSI_SLAVE_CONF_CRC_MASK         0x0000000f
-+#define FSI_SLAVE_CONF_DATA_BITS        28
++#define FSI_PEEK_BASE			0x410
++
+ static const int engine_page_size = 0x400;
  
  static atomic_t master_idx = ATOMIC_INIT(-1);
+@@ -46,8 +48,46 @@ struct fsi_slave {
  
-@@ -54,12 +58,59 @@ uint8_t fsi_crc4(uint8_t c, uint64_t x, int bits)
- EXPORT_SYMBOL_GPL(fsi_crc4);
+ #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
  
- /* FSI slave support */
++static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
++		void *val, size_t size);
++static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
++		const void *val, size_t size);
 +
-+static void fsi_slave_release(struct device *dev)
+ /* FSI endpoint-device support */
+ 
++int fsi_device_read(struct fsi_device *dev, uint32_t addr, void *val,
++		size_t size)
 +{
-+	struct fsi_slave *slave = to_fsi_slave(dev);
++	if (addr > dev->size)
++		return -EINVAL;
 +
-+	kfree(slave);
++	if (addr + size > dev->size)
++		return -EINVAL;
++
++	return fsi_slave_read(dev->slave, dev->addr + addr, val, size);
++}
++EXPORT_SYMBOL_GPL(fsi_device_read);
++
++int fsi_device_write(struct fsi_device *dev, uint32_t addr, const void *val,
++		size_t size)
++{
++	if (addr > dev->size)
++		return -EINVAL;
++
++	if (addr + size > dev->size)
++		return -EINVAL;
++
++	return fsi_slave_write(dev->slave, dev->addr + addr, val, size);
++}
++EXPORT_SYMBOL_GPL(fsi_device_write);
++
++int fsi_device_peek(struct fsi_device *dev, void *val)
++{
++	uint32_t addr = FSI_PEEK_BASE + ((dev->unit - 2) * sizeof(uint32_t));
++
++	return fsi_slave_read(dev->slave, addr, val, sizeof(uint32_t));
 +}
 +
- static int fsi_slave_init(struct fsi_master *master,
- 		int link, uint8_t slave_id)
+ static void fsi_device_release(struct device *_device)
  {
--	/* todo: initialise slave device, perform engine scan */
-+	struct fsi_slave *slave;
-+	uint32_t chip_id;
-+	int rc;
-+	uint8_t crc;
-+
-+	rc = master->read(master, link, slave_id, 0, &chip_id, sizeof(chip_id));
-+	if (rc) {
-+		dev_warn(master->dev, "can't read slave %02x:%02x: %d\n",
-+				link, slave_id, rc);
-+		return -ENODEV;
-+	}
-+	crc = fsi_crc4(0, chip_id >> FSI_SLAVE_CONF_CRC_SHIFT,
-+			FSI_SLAVE_CONF_DATA_BITS);
-+	if (crc != (chip_id & FSI_SLAVE_CONF_CRC_MASK)) {
-+		dev_warn(master->dev, "slave %02x:%02x invalid chip id CRC!\n",
-+				link, slave_id);
-+		return -EIO;
-+	}
-+
-+	pr_debug("fsi: found chip %08x at %02x:%02x:%02x\n",
-+			master->idx, chip_id, link, slave_id);
-+
-+	/* we can communicate with a slave; create devices and scan */
-+	slave = kzalloc(sizeof(*slave), GFP_KERNEL);
-+	if (!slave)
-+		return -ENOMEM;
-+
-+	slave->master = master;
-+	slave->id = slave_id;
-+	slave->dev.parent = master->dev;
-+	slave->dev.release = fsi_slave_release;
-+
-+	dev_set_name(&slave->dev, "slave@%02x:%02x", link, slave_id);
-+	rc = device_register(&slave->dev);
-+	if (rc < 0) {
-+		dev_warn(master->dev, "failed to create slave device: %d\n",
-+				rc);
-+		put_device(&slave->dev);
-+		return rc;
-+	}
- 
--	return -ENODEV;
-+	return rc;
+ 	struct fsi_device *device = to_fsi_dev(_device);
+@@ -100,6 +140,13 @@ static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
+ 			slave->id, addr, val, size);
  }
  
- /* FSI master support */
++static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
++			const void *val, size_t size)
++{
++	return slave->master->write(slave->master, slave->link,
++			slave->id, addr, val, size);
++}
++
+ static int fsi_slave_scan(struct fsi_slave *slave)
+ {
+ 	uint32_t engine_addr;
+diff --git a/include/linux/fsi.h b/include/linux/fsi.h
+index efa55ba..66bce48 100644
+--- a/include/linux/fsi.h
++++ b/include/linux/fsi.h
+@@ -27,6 +27,12 @@ struct fsi_device {
+ 	uint32_t		size;
+ };
+ 
++extern int fsi_device_read(struct fsi_device *dev, uint32_t addr,
++		void *val, size_t size);
++extern int fsi_device_write(struct fsi_device *dev, uint32_t addr,
++		const void *val, size_t size);
++extern int fsi_device_peek(struct fsi_device *dev, void *val);
++
+ struct fsi_device_id {
+ 	u8	engine_type;
+ 	u8	version;
+@@ -40,7 +46,6 @@ struct fsi_device_id {
+ #define FSI_DEVICE_VERSIONED(t, v) \
+ 	.engine_type = (t), .version = (v),
+ 
+-
+ struct fsi_driver {
+ 	struct device_driver		drv;
+ 	const struct fsi_device_id	*id_table;
 -- 
 1.8.2.2
