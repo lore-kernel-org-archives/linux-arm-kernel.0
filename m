@@ -1,71 +1,98 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 6 Dec 2016 18:24:35 -0800
-Subject: [PATCH 3/3] ARM: Add support for CONFIG_DEBUG_VIRTUAL
-In-Reply-To: <a50d7d1b-643f-cf17-b38f-475916c971c1@redhat.com>
-References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
- <20161206195312.22354-1-f.fainelli@gmail.com>
- <20161206195312.22354-4-f.fainelli@gmail.com>
- <a50d7d1b-643f-cf17-b38f-475916c971c1@redhat.com>
-Message-ID: <22eb9bb0-f1dc-7923-b7f5-e278c19b374c@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 7 Dec 2016 10:26:25 +0800
+Subject: [PATCH RFC] drm/sun4i: rgb: Add 5% tolerance to dot clock
+ frequency check
+In-Reply-To: <20161206172911.z6sbjzgqv3vfcrfh@lukather>
+References: <20161124112231.4297-1-wens@csie.org>
+ <20161206172911.z6sbjzgqv3vfcrfh@lukather>
+Message-ID: <CAGb2v65uTH_PD28KqAhhzkE5zhLt54GUb7xXNxxe0xHW0A+xjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/2016 06:00 PM, Laura Abbott wrote:
->> @@ -261,6 +261,16 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
->>  	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
->>  	 PHYS_PFN_OFFSET)
->>  
->> +#define __pa_symbol_nodebug(x)	((x) - (unsigned long)KERNEL_START)
-> 
-> On arm64 the kernel image lives in a separate linear offset. arm doesn't
-> do anything like that so __phys_addr_symbol should just be the regular
-> __virt_to_phys
+On Wed, Dec 7, 2016 at 1:29 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Thu, Nov 24, 2016 at 07:22:31PM +0800, Chen-Yu Tsai wrote:
+>> The panels shipped with Allwinner devices are very "generic", i.e.
+>> they do not have model numbers or reliable sources of information
+>> for the timings (that we know of) other than the fex files shipped
+>> on them. The dot clock frequency provided in the fex files have all
+>> been rounded to the nearest MHz, as that is the unit used in them.
+>>
+>> We were using the simple panel "urt,umsh-8596md-t" as a substitute
+>> for the A13 Q8 tablets in the absence of a specific model for what
+>> may be many different but otherwise timing compatible panels. This
+>> was usable without any visual artifacts or side effects, until the
+>> dot clock rate check was added in commit bb43d40d7c83 ("drm/sun4i:
+>> rgb: Validate the clock rate").
+>>
+>> The reason this check fails is because the dotclock frequency for
+>> this model is 33.26 MHz, which is not achievable with our dot clock
+>> hardware, and the rate returned by clk_round_rate deviates slightly,
+>> causing the driver to reject the display mode.
+>>
+>> The LCD panels have some tolerance on the dot clock frequency, even
+>> if it's not specified in their datasheets.
+>>
+>> This patch adds a 5% tolerence to the dot clock check.
+>
+> As we discussed already, I really believe this is just as arbitrary as
+> the current behaviour.
 
-Yep, which is what I have queued locally now too, thanks!
+Yes. I agree. This patch is mainly to give something that works for
+people who don't care about the details, and to get some feedback
+from people that do.
 
+>
+> Some panels require an exact frequency, some have a minimal frequency
+> but no maximum, some have a maximum frequency but no minimal, and I
+> guess most of them deviates by how much exactly they can take (and
+> possibly can take more easily a higher frequency, but are less
+> tolerant if you take a frequency lower than the nominal.
+>
+> And we cannot remove that check entirely, since some bridges will
+> report out of range frequencies for higher modes that we know we
+> cannot reach.
 
->> +static inline bool __virt_addr_valid(unsigned long x)
->> +{
->> +	if (x < PAGE_OFFSET)
->> +		return false;
->> +	if (arm_lowmem_limit && is_vmalloc_or_module_addr((void *)x))
->> +		return false;
->> +	if (x >= FIXADDR_START && x < FIXADDR_END)
->> +		return false;
->> +	return true;
->> +}
-> 
-> I'd rather see this return true for only the linear range and
-> reject everything else. asm/memory.h already has
-> 
-> #define virt_addr_valid(kaddr)  (((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory) \
->                                         && pfn_valid(virt_to_pfn(kaddr)))
-> 
-> So we can make the check x >= PAGE_OFFSET && x < high_memory
+I believe this should be handled by the bridge driver in the check
+callback? The callback I'm changing is attached to the connector,
+which I think doesn't get used if you have a bridge instead.
+And this only checks the pre-registered display modes, such as
+those specified in simple-panel or EDID.
 
-OK that's simpler indeed. I did the check this way because we have early
-callers of __pa() from drivers/of/fdt.c, in particular MIN_MEMBLOCK_ADDR
-there, and we also have pcpu_dfl_fc_alloc which uses DMA_MAX_ADDR (which
-is 0xffff_ffff on my platform).
+> We could just try to see if the screen pixel clock frequency is out of
+> the pixel clock range we can generate, but then we will loop back on
+> how much out of range is it exactly, and is it within the screen
+> tolerancy.
+>
+> We have an API to deal with the panel tolerancies in the DRM panel
+> framework, we can (and should) use it.
 
->> +static inline bool __phys_addr_valid(unsigned long x)
->> +{
->> +	/* This is bounds checking against the kernel image only.
->> +	 * __pa_symbol should only be used on kernel symbol addresses.
->> +	 */
->> +	if (x < (unsigned long)KERNEL_START ||
->> +	    x > (unsigned long)KERNEL_END)
->> +		return false;
->> +
->> +	return true;
->> +}
-> 
-> This is a confusing name for this function, it's not checking if
-> a physical address is valid, it's checking if a virtual address
-> corresponding to a kernel symbol is valid.
+If you mean the get_timings callback, it's not very useful. Most of
+the panels in simple-panel do not use the display_timings structure,
+so they don't return anything. And I get that. The few datasheets
+I found don't list min/max tolerances for the dotclock.
 
-I have removed it and just moved the check within VIRTUAL_BUG_ON().
+The ones that do have the min/max the same as the recommended value.
+This may or may not be accurate. IIRC the one panel that had this
+that I did check didn't list min/max values in its datasheet.
 
-Thanks!
--- 
-Florian
+>
+> I'm not sure how others usually deal with this though. I think I
+> remember Eric telling me that for the RPi they just adjusted the
+> timings a bit, but they only really had a single panel to deal with.
+>
+> Daniel, Eric, Laurent, Sean? Any ideas?
+
+Yes! Feedback please! Between Maxime and me I think we only have a
+limited number of panels, with some overlap.
+
+Regards
+ChenYu
+
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
