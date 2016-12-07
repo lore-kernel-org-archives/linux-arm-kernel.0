@@ -1,47 +1,83 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 7 Dec 2016 16:41:45 +0100
-Subject: [PATCH] ARM: dts: armada-{370, xp}: drop "marvell, orion-spi" from
- SPI controllers
-In-Reply-To: <87eg1jhi4l.fsf@free-electrons.com>
-References: <20161207152109.17545-1-uwe@kleine-koenig.org>
- <87eg1jhi4l.fsf@free-electrons.com>
-Message-ID: <20161207154145.yr2iua73xnoyjsse@pengutronix.de>
+From: rob.rice@broadcom.com (Rob (William) Rice)
+Date: Wed, 7 Dec 2016 10:46:04 -0500
+Subject: [PATCH 1/3] crypto: brcm: DT documentation for Broadcom SPU driver
+In-Reply-To: <20161206140607.GB24177@leverpostej>
+References: <1480536453-24781-1-git-send-email-rob.rice@broadcom.com>
+ <1480536453-24781-2-git-send-email-rob.rice@broadcom.com>
+ <20161206140607.GB24177@leverpostej>
+Message-ID: <930dc7ae-42fe-8945-5b86-db3a4304aa96@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Gregory,
+Mark,
 
-On Wed, Dec 07, 2016 at 04:30:02PM +0100, Gregory CLEMENT wrote:
->  On mer., d?c. 07 2016, Uwe Kleine-K?nig <uwe@kleine-koenig.org> wrote:
-> 
-> > From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> >
-> > The SPI controllers on Armada 370 and XP differ from the original Orion
-> > SPI controllers (at least) in the configuration of the baud rate. So
-> > it's wrong to claim compatibility which results in bogus baud rates.
-> 
-> Until two years ago with the commits
-> df59fa7f4bca9658b75f0f5fee225b3a057475c5 and
-> 4dacccfac69494ba70248b134352f299171c41b7
-> we used "marvell,orion-spi" compatible on Armada XP and Armada 370
-> without any problem.
-> 
-> The new compatible "marvell,armada-xp-spi" and "marvell,armada-xp-spi"
-> allows to have more choice for the baudrate for a given clock but it is
-> not true that Armada 370 and Armada XP are not compatible with
-> "marvell,orion-spi".
+Thanks for your comments. Replies below.
 
-The issue I was faced with that made me create this patch is that in
-barebox no special case for 370/XP was active. The result was that a
-device that could be operated at 60 MHz only got a clock of 11 MHz and
-the driver assumed it configured 41.666 MHz. I didn't check if the same
-can happen in the opposite direction (or if there are other important
-incompatibilities) but still I'd say this is a bug with my patch being
-the obvious fix.
+Rob
 
-Best regards
-Uwe
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+On 12/6/2016 9:06 AM, Mark Rutland wrote:
+> On Wed, Nov 30, 2016 at 03:07:31PM -0500, Rob Rice wrote:
+>> Device tree documentation for Broadcom Secure Processing Unit
+>> (SPU) crypto driver.
+>>
+>> Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
+>> Signed-off-by: Rob Rice <rob.rice@broadcom.com>
+>> ---
+>>   .../devicetree/bindings/crypto/brcm,spu-crypto.txt | 25 ++++++++++++++++++++++
+>>   1 file changed, 25 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt b/Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
+>> new file mode 100644
+>> index 0000000..e5fe942
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
+>> @@ -0,0 +1,25 @@
+>> +The Broadcom Secure Processing Unit (SPU) driver supports symmetric
+>> +cryptographic offload for Broadcom SoCs with SPU hardware. A SoC may have
+>> +multiple SPU hardware blocks.
+> Bindings shound describe *hardware*, not *drivers*. Please drop mention
+> of the driver, and just decribe the hardware.
+Makes sense. I'll change it.
+>
+>> +Required properties:
+>> +- compatible : Should be "brcm,spum-crypto" for devices with SPU-M hardware
+>> +  (e.g., Northstar2) or "brcm,spum-nsp-crypto" for the Northstar Plus variant
+>> +  of the SPU-M hardware.
+>> +
+>> +- reg: Should contain SPU registers location and length.
+>> +- mboxes: A list of mailbox channels to be used by the kernel driver. Mailbox
+>> +channels correspond to DMA rings on the device.
+>> +
+>> +Example:
+>> +	spu-crypto at 612d0000 {
+>> +		compatible = "brcm,spum-crypto";
+>> +		reg = <0 0x612d0000 0 0x900>,    /* SPU 0 control regs */
+>> +			<0 0x612f0000 0 0x900>,  /* SPU 1 control regs */
+>> +			<0 0x61310000 0 0x900>,  /* SPU 2 control regs */
+>> +			<0 0x61330000 0 0x900>;  /* SPU 3 control regs */
+> The above didn't mention there were several register sets, and the
+> comment beside each makes them sound like they're separate SPU
+> instances, so I don't think it makes sense to group them as one node.
+>
+> What's going on here?
+That's right. For the SoC I used as the example, there are four SPU 
+hardware blocks. The driver round robins crypto requests to the hardware 
+blocks to handle requests in parallel and increase throughput. I want 
+one instance of the SPU driver that registers algos once with the crypto 
+API and manages all the mailbox channels. Maybe I can achieve that with 
+separate device tree entries for each SPU block, I'm not sure. I'll look 
+into it.
+>
+>> +		mboxes = <&pdc0 0>,
+>> +			<&pdc1 0>,
+>> +			<&pdc2 0>,
+>> +			<&pdc3 0>;
+> Does each mbox correspond to one of the SPUs above? Or is there a shared
+> pool?
+Yes, each of these mailbox channels corresponds to a different SPU. PDC 
+is a DMA ring manager for DMAs to the SPUs.
+>
+> Thanks,
+> Mark.
