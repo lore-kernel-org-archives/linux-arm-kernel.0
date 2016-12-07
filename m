@@ -1,40 +1,108 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed,  7 Dec 2016 10:30:25 -0800
-Subject: [PATCH v6 5/5] [media] davinci: VPIF: add basic support for DT init
+Date: Wed,  7 Dec 2016 10:30:24 -0800
+Subject: [PATCH v6 4/5] [media] dt-bindings: add TI VPIF documentation
 In-Reply-To: <20161207183025.20684-1-khilman@baylibre.com>
 References: <20161207183025.20684-1-khilman@baylibre.com>
-Message-ID: <20161207183025.20684-6-khilman@baylibre.com>
+Message-ID: <20161207183025.20684-5-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic support for initialization via DT
-
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 ---
- drivers/media/platform/davinci/vpif.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ .../devicetree/bindings/media/ti,da850-vpif.txt    | 83 ++++++++++++++++++++++
+ 1 file changed, 83 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/ti,da850-vpif.txt
 
-diff --git a/drivers/media/platform/davinci/vpif.c b/drivers/media/platform/davinci/vpif.c
-index f50148dcba64..1b02a6363f77 100644
---- a/drivers/media/platform/davinci/vpif.c
-+++ b/drivers/media/platform/davinci/vpif.c
-@@ -467,8 +467,17 @@ static const struct dev_pm_ops vpif_pm = {
- #define vpif_pm_ops NULL
- #endif
- 
-+#if IS_ENABLED(CONFIG_OF)
-+static const struct of_device_id vpif_of_match[] = {
-+	{ .compatible = "ti,da850-vpif", },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, vpif_of_match);
-+#endif
+diff --git a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+new file mode 100644
+index 000000000000..6d25d7f23d26
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+@@ -0,0 +1,83 @@
++Texas Instruments VPIF
++----------------------
 +
- static struct platform_driver vpif_driver = {
- 	.driver = {
-+		.of_match_table = of_match_ptr(vpif_of_match),
- 		.name	= VPIF_DRIVER_NAME,
- 		.pm	= vpif_pm_ops,
- 	},
++The TI Video Port InterFace (VPIF) is the primary component for video
++capture and display on the DA850/AM18x family of TI DaVinci/Sitara
++SoCs.
++
++TI Document reference: SPRUH82C, Chapter 35
++http://www.ti.com/lit/pdf/spruh82
++
++Required properties:
++- compatible: must be "ti,da850-vpif"
++- reg: physical base address and length of the registers set for the device;
++- interrupts: should contain IRQ line for the VPIF
++
++Video Capture:
++
++VPIF has a 16-bit parallel bus input, supporting 2 8-bit channels or a
++single 16-bit channel.  It should contain at least one port child node
++with child 'endpoint' node. Please refer to the bindings defined in
++Documentation/devicetree/bindings/media/video-interfaces.txt.
++
++Example using 2 8-bit input channels, one of which is connected to an
++I2C-connected TVP5147 decoder:
++
++	vpif: vpif at 217000 {
++		compatible = "ti,da850-vpif";
++		reg = <0x217000 0x1000>;
++		interrupts = <92>;
++
++		port {
++			vpif_ch0: endpoint at 0 {
++				  reg = <0>;
++				  bus-width = <8>;
++				  remote-endpoint = <&composite>;
++			};
++
++			vpif_ch1: endpoint at 1 {
++				  reg = <1>;
++				  bus-width = <8>;
++				  data-shift = <8>;
++			};
++		};
++	};
++
++[ ... ]
++
++&i2c0 {
++
++	tvp5147 at 5d {
++		compatible = "ti,tvp5147";
++		reg = <0x5d>;
++		status = "okay";
++
++		port {
++			composite: endpoint {
++				hsync-active = <1>;
++				vsync-active = <1>;
++				pclk-sample = <0>;
++
++				/* VPIF channel 0 (lower 8-bits) */
++				remote-endpoint = <&vpif_ch0>;
++				bus-width = <8>;
++			};
++		};
++	};
++};
++
++
++Alternatively, an example when the bus is configured as a single
++16-bit input (e.g. for raw-capture mode):
++
++	vpif: vpif at 217000 {
++		compatible = "ti,da850-vpif";
++		reg = <0x217000 0x1000>;
++		interrupts = <92>;
++
++		port {
++			vpif_ch0: endpoint {
++				  bus-width = <16>;
++			};
++		};
++	};
 -- 
 2.9.3
