@@ -1,139 +1,71 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Wed,  7 Dec 2016 10:17:45 +0800
-Subject: [PATCH] arm: dts: rockchip: add qos node for rk3288
-Message-ID: <1481077065-11309-1-git-send-email-zhangqing@rock-chips.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 6 Dec 2016 18:24:35 -0800
+Subject: [PATCH 3/3] ARM: Add support for CONFIG_DEBUG_VIRTUAL
+In-Reply-To: <a50d7d1b-643f-cf17-b38f-475916c971c1@redhat.com>
+References: <1480445729-27130-1-git-send-email-labbott@redhat.com>
+ <20161206195312.22354-1-f.fainelli@gmail.com>
+ <20161206195312.22354-4-f.fainelli@gmail.com>
+ <a50d7d1b-643f-cf17-b38f-475916c971c1@redhat.com>
+Message-ID: <22eb9bb0-f1dc-7923-b7f5-e278c19b374c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-when pd power on/off, the qos regs need to save and restore.
+On 12/06/2016 06:00 PM, Laura Abbott wrote:
+>> @@ -261,6 +261,16 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+>>  	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
+>>  	 PHYS_PFN_OFFSET)
+>>  
+>> +#define __pa_symbol_nodebug(x)	((x) - (unsigned long)KERNEL_START)
+> 
+> On arm64 the kernel image lives in a separate linear offset. arm doesn't
+> do anything like that so __phys_addr_symbol should just be the regular
+> __virt_to_phys
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
----
- arch/arm/boot/dts/rk3288.dtsi | 84 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 84 insertions(+)
+Yep, which is what I have queued locally now too, thanks!
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 4fad13368a7b..2628edc871fa 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -699,6 +699,76 @@
- 		reg = <0xff720000 0x1000>;
- 	};
- 
-+	qos_gpu_r: qos at ffaa0000 {
-+		compatible = "syscon";
-+		reg = <0xffaa0000 0x20>;
-+	};
-+
-+	qos_gpu_w: qos at ffaa0080 {
-+		compatible = "syscon";
-+		reg = <0xffaa0080 0x20>;
-+	};
-+
-+	qos_vio1_vop: qos at ffad0000 {
-+		compatible = "syscon";
-+		reg = <0xffad0000 0x20>;
-+	};
-+
-+	qos_vio1_isp_w0: qos at ffad0100 {
-+		compatible = "syscon";
-+		reg = <0xffad0100 0x20>;
-+	};
-+
-+	qos_vio1_isp_w1: qos at ffad0180 {
-+		compatible = "syscon";
-+		reg = <0xffad0180 0x20>;
-+	};
-+
-+	qos_vio0_vop: qos at ffad0400 {
-+		compatible = "syscon";
-+		reg = <0xffad0400 0x20>;
-+	};
-+
-+	qos_vio0_vip: qos at ffad0480 {
-+		compatible = "syscon";
-+		reg = <0xffad0480 0x20>;
-+	};
-+
-+	qos_vio0_iep: qos at ffad0500 {
-+		compatible = "syscon";
-+		reg = <0xffad0500 0x20>;
-+	};
-+
-+	qos_vio2_rga_r: qos at ffad0800 {
-+		compatible = "syscon";
-+		reg = <0xffad0800 0x20>;
-+	};
-+
-+	qos_vio2_rga_w: qos at ffad0880 {
-+		compatible = "syscon";
-+		reg = <0xffad0880 0x20>;
-+	};
-+
-+	qos_vio1_isp_r: qos at ffad0900 {
-+		compatible = "syscon";
-+		reg = <0xffad0900 0x20>;
-+	};
-+
-+	qos_video: qos at ffae0000 {
-+		compatible = "syscon";
-+		reg = <0xffae0000 0x20>;
-+	};
-+
-+	qos_hevc_r: qos at ffaf0000 {
-+		compatible = "syscon";
-+		reg = <0xffaf0000 0x20>;
-+	};
-+
-+	qos_hevc_w: qos at ffaf0080 {
-+		compatible = "syscon";
-+		reg = <0xffaf0080 0x20>;
-+	};
-+
- 	pmu: power-management at ff730000 {
- 		compatible = "rockchip,rk3288-pmu", "syscon", "simple-mfd";
- 		reg = <0xff730000 0x100>;
-@@ -762,6 +832,15 @@
- 					 <&cru SCLK_ISP_JPE>,
- 					 <&cru SCLK_ISP>,
- 					 <&cru SCLK_RGA>;
-+				pm_qos = <&qos_vio0_iep>,
-+					 <&qos_vio1_vop>,
-+					 <&qos_vio1_isp_w0>,
-+					 <&qos_vio1_isp_w1>,
-+					 <&qos_vio0_vop>,
-+					 <&qos_vio0_vip>,
-+					 <&qos_vio2_rga_r>,
-+					 <&qos_vio2_rga_w>,
-+					 <&qos_vio1_isp_r>;
- 			};
- 
- 			/*
-@@ -773,6 +852,8 @@
- 				clocks = <&cru ACLK_HEVC>,
- 					 <&cru SCLK_HEVC_CABAC>,
- 					 <&cru SCLK_HEVC_CORE>;
-+				pm_qos = <&qos_hevc_r>,
-+					 <&qos_hevc_w>;
- 			};
- 
- 			/*
-@@ -784,6 +865,7 @@
- 				reg = <RK3288_PD_VIDEO>;
- 				clocks = <&cru ACLK_VCODEC>,
- 					 <&cru HCLK_VCODEC>;
-+				pm_qos = <&qos_video>;
- 			};
- 
- 			/*
-@@ -793,6 +875,8 @@
- 			pd_gpu at RK3288_PD_GPU {
- 				reg = <RK3288_PD_GPU>;
- 				clocks = <&cru ACLK_GPU>;
-+				pm_qos = <&qos_gpu_r>,
-+					 <&qos_gpu_w>;
- 			};
- 		};
- 
+
+>> +static inline bool __virt_addr_valid(unsigned long x)
+>> +{
+>> +	if (x < PAGE_OFFSET)
+>> +		return false;
+>> +	if (arm_lowmem_limit && is_vmalloc_or_module_addr((void *)x))
+>> +		return false;
+>> +	if (x >= FIXADDR_START && x < FIXADDR_END)
+>> +		return false;
+>> +	return true;
+>> +}
+> 
+> I'd rather see this return true for only the linear range and
+> reject everything else. asm/memory.h already has
+> 
+> #define virt_addr_valid(kaddr)  (((unsigned long)(kaddr) >= PAGE_OFFSET && (unsigned long)(kaddr) < (unsigned long)high_memory) \
+>                                         && pfn_valid(virt_to_pfn(kaddr)))
+> 
+> So we can make the check x >= PAGE_OFFSET && x < high_memory
+
+OK that's simpler indeed. I did the check this way because we have early
+callers of __pa() from drivers/of/fdt.c, in particular MIN_MEMBLOCK_ADDR
+there, and we also have pcpu_dfl_fc_alloc which uses DMA_MAX_ADDR (which
+is 0xffff_ffff on my platform).
+
+>> +static inline bool __phys_addr_valid(unsigned long x)
+>> +{
+>> +	/* This is bounds checking against the kernel image only.
+>> +	 * __pa_symbol should only be used on kernel symbol addresses.
+>> +	 */
+>> +	if (x < (unsigned long)KERNEL_START ||
+>> +	    x > (unsigned long)KERNEL_END)
+>> +		return false;
+>> +
+>> +	return true;
+>> +}
+> 
+> This is a confusing name for this function, it's not checking if
+> a physical address is valid, it's checking if a virtual address
+> corresponding to a kernel symbol is valid.
+
+I have removed it and just moved the check within VIRTUAL_BUG_ON().
+
+Thanks!
 -- 
-1.9.1
+Florian
