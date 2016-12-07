@@ -1,61 +1,62 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 07 Dec 2016 12:41:29 +0100
-Subject: [RFC PATCH 00/23] arm: defconfigs: use kconfig fragments
-In-Reply-To: <CAOesGMi6gqNLUZw_bQZE2foBts0c70z57bHcMVg1hVZ_E4easg@mail.gmail.com>
-References: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
- <CGME20161206190338epcas3p2f1fbd4ee54e51c055e9258843046964b@epcas3p2.samsung.com>
- <CAOesGMi6gqNLUZw_bQZE2foBts0c70z57bHcMVg1hVZ_E4easg@mail.gmail.com>
-Message-ID: <4222703.VA8eKM008t@amdc3058>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 7 Dec 2016 19:48:16 +0800
+Subject: [PATCH] dt: bindings: zx: Add header for PM domains specifiers
+In-Reply-To: <1480983711-29955-1-git-send-email-baoyou.xie@linaro.org>
+References: <1480983711-29955-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20161207114814.GA17071@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-On Tuesday, December 06, 2016 11:03:34 AM Olof Johansson wrote:
-> On Tue, Dec 6, 2016 at 4:38 AM, Bartlomiej Zolnierkiewicz
-> <b.zolnierkie@samsung.com> wrote:
-> > Hi,
-> >
-> > This RFC patchset starts convertion of ARM defconfigs to use kconfig
-> > fragments and dynamically generate defconfigs.  The goals of this
-> > work are to:
+On Tue, Dec 06, 2016 at 08:21:51AM +0800, Baoyou Xie wrote:
+> This patch adds header with values used for ZTE 2967
+> SoC's power domain driver.
 > 
-> You don't provide any motivation as to why this is better. As far as I
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> ---
+>  include/dt-bindings/arm/zte_pm_domains.h | 23 +++++++++++++++++++++++
 
-Benefits are:
+Considering that we are adding power domain drivers into
+drivers/soc/zte, it might be better to put the header into folder
+include/dt-bindings/soc/.
 
-- no code duplication (this initial patchset alone removes ~1700 lines
-  from defconfigs without any change in functionality)
-
-- prevention of "multi" defconfigs (i.e. multi_v7_defconfig) going out
-  of sync with "SoC-family" ones (i.e. exynos_defconfig) - there will
-  be just one place to update when changing things
-
-- possibility to add support for more optimized defconfigs (i.e. board
-  specific ones) in the future without duplicating the code
-
-- making it easier to define arch specific parts of defconfigs in
-  the future if we decide on doing it (i.e. we may want to enable
-  things like CONFIG_SYSVIPC for all defconfigs)
-
-> am concerned it'll just be a mess.
+>  1 file changed, 23 insertions(+)
+>  create mode 100644 include/dt-bindings/arm/zte_pm_domains.h
 > 
-> So:
+> diff --git a/include/dt-bindings/arm/zte_pm_domains.h b/include/dt-bindings/arm/zte_pm_domains.h
+> new file mode 100644
+> index 0000000..1485e8d
+> --- /dev/null
+> +++ b/include/dt-bindings/arm/zte_pm_domains.h
+> @@ -0,0 +1,23 @@
+> +/*
+> + * Copyright (C) 2015 Linaro Ltd.
+> + *
+> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
+> + * License terms: GNU General Public License (GPL) version 2
+> + */
+> +#ifndef _DT_BINDINGS_ARM_ZTE_PM_DOMAINS_H
+> +#define _DT_BINDINGS_ARM_ZTE_PM_DOMAINS_H
+> +
+> +#define DM_ZX296718_SAPPU	0
+> +#define DM_ZX296718_VDE		1  /*g1v6*/
+> +#define DM_ZX296718_VCE		2  /*h1v6*/
+> +#define DM_ZX296718_HDE		3  /*g2v2*/
+
+The single line comment should be /* blabla */.  Note there is space
+after and before *.
+
+Shawn
+
+> +#define DM_ZX296718_VIU		4
+> +#define DM_ZX296718_USB20	5
+> +#define DM_ZX296718_USB21	6
+> +#define DM_ZX296718_USB30	7
+> +#define DM_ZX296718_HSIC	8
+> +#define DM_ZX296718_GMAC	9
+> +#define DM_ZX296718_TS		10
+> +#define DM_ZX296718_VOU		11
+> +
+> +#endif /* _DT_BINDINGS_ARM_ZTE_PM_DOMAINS_H */
+> -- 
+> 2.7.4
 > 
-> Nack. So much nack. I really don't want to see a proliferation of
-> config fragments like this.
-> 
-> I had a feeling it was a bad idea to pick up that one line config
-> fragment before, since it opened the door for this kind of mess. :(
-
-Like I said in the cover-letter I'm not satisfied with the current
-patches and they have much room for improvement.
-
-However I see that you don't like the idea itself... :(
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
