@@ -1,48 +1,39 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Wed,  7 Dec 2016 14:30:47 -0500
-Subject: [PATCH v2] ARM: dts: lpc32xx: add pwm-cells to base dts file
-Message-ID: <1481139047-13166-1-git-send-email-slemieux.tyco@gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed,  7 Dec 2016 11:31:35 -0800
+Subject: [PATCH v2 2/4] ARM: davinci_all_defconfig: enable video capture as
+ modules
+In-Reply-To: <20161207193137.27947-1-khilman@baylibre.com>
+References: <20161207193137.27947-1-khilman@baylibre.com>
+Message-ID: <20161207193137.27947-3-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sylvain Lemieux <slemieux@tycoint.com>
+Enable media support and V4L2 capture, along with video decoders used
+on da850 platforms.
 
-There is no need to define the "pwm-cells" in the board
-specific dts file; move the entry to the base dts file.
+Tested on da850-lcdk.
 
-Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 ---
-Changes in v2:
-* Update the "pwm-cells" to be compatible with the latest
-  lpc32xx-pwm driver implementation.
+ arch/arm/configs/davinci_all_defconfig | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Note:
-* This patch have a dependency on the following patcheset:
-  "pwm: lpc32xx: switch driver to one phandle argument for PWM consumers"
-  http://www.spinics.net/lists/arm-kernel/msg547013.html
-
- arch/arm/boot/dts/lpc32xx.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
-index 218d9fa..c031c94 100644
---- a/arch/arm/boot/dts/lpc32xx.dtsi
-+++ b/arch/arm/boot/dts/lpc32xx.dtsi
-@@ -472,6 +472,7 @@
- 				assigned-clocks = <&clk LPC32XX_CLK_PWM1>;
- 				assigned-clock-parents = <&clk LPC32XX_CLK_PERIPH>;
- 				status = "disabled";
-+				#pwm-cells = <1>;
- 			};
- 
- 			pwm2: pwm at 4005C004 {
-@@ -481,6 +482,7 @@
- 				assigned-clocks = <&clk LPC32XX_CLK_PWM2>;
- 				assigned-clock-parents = <&clk LPC32XX_CLK_PERIPH>;
- 				status = "disabled";
-+				#pwm-cells = <1>;
- 			};
- 
- 			timer3: timer at 40060000 {
+diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
+index 5e5dd6bc5ed9..fd05bc35fb36 100644
+--- a/arch/arm/configs/davinci_all_defconfig
++++ b/arch/arm/configs/davinci_all_defconfig
+@@ -123,6 +123,12 @@ CONFIG_TPS6507X=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_TPS6507X=y
++CONFIG_MEDIA_SUPPORT=m
++CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_V4L_PLATFORM_DRIVERS=y
++CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE=m
++# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
++CONFIG_VIDEO_TVP514X=m
+ CONFIG_FB=y
+ CONFIG_FIRMWARE_EDID=y
+ CONFIG_FB_DA8XX=y
 -- 
-1.8.3.1
+2.9.3
