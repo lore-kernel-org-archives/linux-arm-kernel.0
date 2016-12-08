@@ -1,123 +1,58 @@
-From: yao.yuan@freescale.com (Yuan Yao)
-Date: Thu, 8 Dec 2016 17:23:03 +0800
-Subject: [PATCH 4/5] arm64: dts: ls1012a: add the DTS node for QSPI support
-In-Reply-To: <1481188984-43683-1-git-send-email-yao.yuan@freescale.com>
-References: <1481188984-43683-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <1481188984-43683-5-git-send-email-yao.yuan@freescale.com>
+From: mhocko@suse.com (Michal Hocko)
+Date: Thu, 8 Dec 2016 10:52:54 +0100
+Subject: [PATCH v3 0/4] mm: fix the "counter.sh" failure for libhugetlbfs
+In-Reply-To: <20161208093623.GA4551@sha-win-210.asiapac.arm.com>
+References: <1480929431-22348-1-git-send-email-shijie.huang@arm.com>
+ <20161205093100.GF30758@dhcp22.suse.cz>
+ <20161206100358.GA4619@sha-win-210.asiapac.arm.com>
+ <20161207150237.GC31797@dhcp22.suse.cz>
+ <20161208093623.GA4551@sha-win-210.asiapac.arm.com>
+Message-ID: <20161208095253.GB8330@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yuan Yao <yao.yuan@nxp.com>
+On Thu 08-12-16 17:36:24, Huang Shijie wrote:
+> On Wed, Dec 07, 2016 at 11:02:38PM +0800, Michal Hocko wrote:
+[...]
+> > I haven't yet checked your patchset but I can tell you one thing.
+>
+> Could you please review the patch set when you have time? Thanks a lot.
 
-There is a s25fs512s qspi flash on QDS, RDB and FRDM board.
+>From a quick glance you do not handle the reservation code at all. You
+just make sure that the allocation doesn't fail unconditionally. I might
+be wrong here and Naoya resp. Mike will know much better but this seems
+far from enough to me.
 
-Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts | 14 ++++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts  | 15 +++++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts  | 15 +++++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     | 15 +++++++++++++++
- 4 files changed, 59 insertions(+)
+> 
+> > Surplus and subpool pages code is tricky as hell. And it is not just a
+> Agree. 
+> 
+> Do we really need so many accountings? such as reserve/ovorcommit/surplus.
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
-index 81bd689..34f9e76 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
-@@ -110,6 +110,20 @@
- 	};
- };
- 
-+&qspi {
-+	num-cs = <2>;
-+	bus-num = <0>;
-+	status = "okay";
-+
-+	qflash0: s25fs512s at 0 {
-+		compatible = "spansion,m25p80";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+	};
-+};
-+
- &sai2 {
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-index 3d32c76..0e5befa 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-@@ -156,6 +156,21 @@
- 	};
- };
- 
-+&qspi {
-+	num-cs = <2>;
-+	bus-num = <0>;
-+	status = "okay";
-+
-+	qflash0: s25fs512s at 0 {
-+		compatible = "spansion,m25p80";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		spi-max-frequency = <20000000>;
-+		m25p,fast-read;
-+		reg = <0>;
-+	};
-+};
-+
- &sai2 {
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-index 62c5c71..c20bfd3 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-@@ -57,3 +57,18 @@
- &i2c0 {
- 	status = "okay";
- };
-+
-+&qspi {
-+	num-cs = <2>;
-+	bus-num = <0>;
-+	status = "okay";
-+
-+	qflash0: s25fs512s at 0 {
-+		compatible = "spansion,m25p80";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		spi-max-frequency = <20000000>;
-+		m25p,fast-read;
-+		reg = <0>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-index c917a87..72e61c5 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-@@ -195,6 +195,21 @@
- 			#interrupt-cells = <2>;
- 		};
- 
-+		qspi: quadspi at 1550000 {
-+			compatible = "fsl,ls1012a-qspi", "fsl,ls1021a-qspi";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0 0x1550000 0x0 0x10000>,
-+				<0x0 0x40000000 0x0 0x10000000>;
-+			reg-names = "QuadSPI", "QuadSPI-memory";
-+			interrupts = <0 99 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-names = "qspi_en", "qspi";
-+			clocks = <&clockgen 4 0>, <&clockgen 4 0>;
-+			big-endian;
-+			fsl,qspi-has-second-chip;
-+			status = "disabled";
-+		};
-+
- 		wdog0: wdog at 2ad0000 {
- 			compatible = "fsl,ls1012a-wdt",
- 				     "fsl,imx21-wdt";
+If we want to make giga page the first class citizen then the whole
+reservation/surplus code has to independent on the page size.
+
+> > matter of teaching the huge page allocation code to do the right thing.
+> > There are subtle details all over the place. E.g. we currently
+> > do not free giga pages AFAICS. In fact I believe that the giga pages are
+> Please correct me if I am wrong. :)
+> 
+> I think the free-giga-pages can work well.
+> Please see the code in update_and_free_page(). 
+
+Hmm, I have missed that part. I guess you are right but I would have to
+look much closer. Hugetlb code tends to be full of surprises.
+
+> Could you please list all the subtle details you think the code is wrong?
+> I can check them one by one.
+
+Well, this would take me quite some time and basically restudy the whole
+hugetlb code again. What you are trying to achieve is not a simple "fix
+a test case" thing. You are trying to implement full featured giga pages
+suport. And as I've said this requires a deeper understanding of the
+current code and clean it up considerably wrt. giga pages. This is
+definitely desirable plan longterm and I would like to encourage you for
+that but it is not a simple project at the same time. 
 -- 
-2.1.0.27.g96db324
+Michal Hocko
+SUSE Labs
