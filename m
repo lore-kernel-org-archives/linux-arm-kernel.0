@@ -1,73 +1,66 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 8 Dec 2016 12:26:34 -0600
-Subject: [PATCH pci/host-iproc] pci-iproc: skip check for legacy IRQ on
- PAXC buses
-In-Reply-To: <1480624492-32420-1-git-send-email-gospo@broadcom.com>
-References: <1480624492-32420-1-git-send-email-gospo@broadcom.com>
-Message-ID: <20161208182634.GA30533@bhelgaas-glaptop.roam.corp.google.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 8 Dec 2016 18:42:12 +0000
+Subject: [RFC v3 00/10] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
+ reserved regions
+In-Reply-To: <20161208100132.4e9cc3c5@t450s.home>
+References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
+ <c5d4efa7-699d-4aa3-44cc-4ce03d0ce185@redhat.com>
+ <cd16fc5c-8649-0bfa-d67d-8f257aa38bd6@arm.com>
+ <20161208100132.4e9cc3c5@t450s.home>
+Message-ID: <f25e9cdd-dede-44e3-4579-39726afaaf2c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2016 at 03:34:52PM -0500, Andy Gospodarek wrote:
-> PAXC and PAXCv2 buses do not support legacy IRQs so there is no reason
-> to even try and map them.  Without a change like this, one cannot create
-> VFs on Nitro ports since legacy interrupts are checked as part of the
-> PCI device creation process.  Testing on PAXC hardware showed that VFs
-> are properly created with only the change to not set pcie->map_irq, but
-> just to be safe the change in iproc_pcie_setup will ensure that
-> pdev_fixup_irq will not panic.
+On 08/12/16 17:01, Alex Williamson wrote:
+> On Thu, 8 Dec 2016 13:14:04 +0000
+> Robin Murphy <robin.murphy@arm.com> wrote:
+>> On 08/12/16 09:36, Auger Eric wrote:
+>>> 3) RMRR reporting in the iommu group sysfs? Joerg: yes; Don: no
+>>>    My current series does not expose them in iommu group sysfs.
+>>>    I understand we can expose the RMRR regions in the iomm group sysfs
+>>>    without necessarily supporting RMRR requiring device assignment.
+>>>    We can also add this support later.  
+>>
+>> As you say, reporting them doesn't necessitate allowing device
+>> assignment, and it's information which can already be easily grovelled
+>> out of dmesg (for intel-iommu at least) - there doesn't seem to be any
+>> need to hide them, but the x86 folks can have the final word on that.
 > 
-> Signed-off-by: Andy Gospodarek <gospo@broadcom.com>
-> Signed-off-by: Ray Jui <rjui@broadcom.com>
+> Eric and I talked about this and I don't see the value in identifying
+> an RMRR as anything other than a reserved range for a device.  It's not
+> userspace's job to maintain an identify mapped range for the device,
+> and it can't be trusted to do so anyway.  It does throw a kink in the
+> machinery though as an RMRR is a reserved memory range unique to a
+> device.  It doesn't really fit into a monolithic /sys/class/iommu view
+> of global reserved regions as an RMRR is only relevant to the device
+> paths affected.
 
-Applied to pci/host-iproc for v4.10 with Ray's acked-by, thanks!
+I think we're in violent agreement then - to clarify, I was thinking in
+terms of patch 7 of this series, where everything relevant to a
+particular group would be exposed as just an opaque "don't use this
+address range" regardless of the internal type.
 
-> ---
->  drivers/pci/host/pcie-iproc-platform.c | 9 ++++++++-
->  drivers/pci/host/pcie-iproc.c          | 5 ++++-
->  2 files changed, 12 insertions(+), 2 deletions(-)
+I'm less convinced the kernel has any need to provide its own 'global'
+view of reservations which strictly are always at least per-IOMMU, if
+not per-root-complex, even when all the instances do share the same
+address by design. The group-based interface fits the reality neatly,
+and userspace can easily iterate all the groups if it wants to consider
+everything. Plus if it doesn't want to, then it needn't bother reserving
+anything which doesn't apply to the group(s) it's going to bind to VFIO.
+
+Robin.
+
+> Another kink is that sometimes we know what the RMRR is for, know that
+> it's irrelevant for our use case, and ignore it.  This is true for USB
+> and Intel graphics use cases of RMRRs.
 > 
-> diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
-> index fd3ed9b..22d814a 100644
-> --- a/drivers/pci/host/pcie-iproc-platform.c
-> +++ b/drivers/pci/host/pcie-iproc-platform.c
-> @@ -108,7 +108,14 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> -	pcie->map_irq = of_irq_parse_and_map_pci;
-> +	/* PAXC doesn't support legacy IRQs, skip mapping */
-> +	switch (pcie->type) {
-> +	case IPROC_PCIE_PAXC:
-> +	case IPROC_PCIE_PAXC_V2:
-> +		break;
-> +	default:
-> +		pcie->map_irq = of_irq_parse_and_map_pci;
-> +	}
->  
->  	ret = iproc_pcie_setup(pcie, &res);
->  	if (ret)
-> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-> index cd51334..3ebc025 100644
-> --- a/drivers/pci/host/pcie-iproc.c
-> +++ b/drivers/pci/host/pcie-iproc.c
-> @@ -1274,7 +1274,10 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
->  
->  	pci_scan_child_bus(bus);
->  	pci_assign_unassigned_bus_resources(bus);
-> -	pci_fixup_irqs(pci_common_swizzle, pcie->map_irq);
-> +
-> +	if (pcie->map_irq)
-> +		pci_fixup_irqs(pci_common_swizzle, pcie->map_irq);
-> +
->  	pci_bus_add_devices(bus);
->  
->  	return 0;
-> -- 
-> 2.1.0
+> Also, aside from the above mentioned cases, devices with RMRRs are
+> currently excluded from participating in the IOMMU API by the
+> intel-iommu driver and I expect this to continue in the general case
+> regardless of whether the ranges are more easily exposed to userspace.
+> ARM may have to deal with mangling a guest memory map due to lack of
+> any standard layout, de facto or otherwise, but for x86 I don't think
+> it's worth the migration and hotplug implications.  Thanks,
 > 
+> Alex
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
