@@ -1,73 +1,64 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Thu, 8 Dec 2016 17:34:33 +0100
-Subject: [Linaro-acpi] [PATCH V1 1/2] PCI: thunder: Enable ACPI PCI
- controller for ThunderX pass2.x silicon version
-In-Reply-To: <20161202162743.GB9903@bhelgaas-glaptop.roam.corp.google.com>
-References: <1479201298-25494-1-git-send-email-tn@semihalf.com>
- <1479201298-25494-2-git-send-email-tn@semihalf.com>
- <20161201002812.GB9409@bhelgaas-glaptop.roam.corp.google.com>
- <e5b1f09c-ca4c-fbf0-e9d7-c943ad0df2ff@redhat.com>
- <CADaLNDm8Zp_kAqVvSd0po9S3j2rSXxtUJ1M33dW7gLZzvueweQ@mail.gmail.com>
- <30ad6c65-4a4a-6346-00f6-11250133a251@semihalf.com>
- <20161202104500.GE10776@rric.localdomain>
- <20161202162743.GB9903@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20161208163433.GK10776@rric.localdomain>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Thu, 08 Dec 2016 16:36:28 +0000
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <20161208155043.GE6408@localhost> (Vinod Koul's message of "Thu,
+ 8 Dec 2016 21:20:43 +0530")
+References: <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
+ <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
+ <yw1xwpfd2o9f.fsf@unicorn.mansr.com> <20161207164341.GX6408@localhost>
+ <yw1xr35j1yd5.fsf@unicorn.mansr.com> <20161208103921.GC6408@localhost>
+ <yw1x60mu1w7e.fsf@unicorn.mansr.com>
+ <CAMuHMdUEXJtWF3S8yK5RY5e60nOnb-Wc9U2E_L553hZvsijvcw@mail.gmail.com>
+ <yw1xshpyzk6p.fsf@unicorn.mansr.com> <20161208155043.GE6408@localhost>
+Message-ID: <yw1x7f7az8c3.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.12.16 10:27:43, Bjorn Helgaas wrote:
-> On Fri, Dec 02, 2016 at 11:45:00AM +0100, Robert Richter wrote:
-> > On 02.12.16 11:06:24, Tomasz Nowicki wrote:
-> > > On 02.12.2016 07:42, Duc Dang wrote:
-> > 
-> > > >@@ -98,16 +98,16 @@ struct mcfg_fixup {
-> > > >        { "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,                 \
-> > > >        &pci_thunder_ecam_ops }
-> > > >        /* SoC pass1.x */
-> > > >-   THUNDER_PEM_QUIRK(2,  0),       /* off-chip devices */
-> > > >-   THUNDER_PEM_QUIRK(2,  1),       /* off-chip devices */
-> > > >-   THUNDER_ECAM_QUIRK(2,  0),
-> > > >-   THUNDER_ECAM_QUIRK(2,  1),
-> > > >-   THUNDER_ECAM_QUIRK(2,  2),
-> > > >-   THUNDER_ECAM_QUIRK(2,  3),
-> > > >-   THUNDER_ECAM_QUIRK(2, 10),
-> > > >-   THUNDER_ECAM_QUIRK(2, 11),
-> > > >-   THUNDER_ECAM_QUIRK(2, 12),
-> > > >-   THUNDER_ECAM_QUIRK(2, 13),
-> > > >+ THUNDER_PEM_QUIRK(2, 0UL),  /* off-chip devices */
-> > > >+ THUNDER_PEM_QUIRK(2, 1UL),  /* off-chip devices */
-> > > >+ THUNDER_ECAM_QUIRK(2, 0UL),
-> > > >+ THUNDER_ECAM_QUIRK(2, 1UL),
-> > > >+ THUNDER_ECAM_QUIRK(2, 2UL),
-> > > >+ THUNDER_ECAM_QUIRK(2, 3UL),
-> > > >+ THUNDER_ECAM_QUIRK(2, 10UL),
-> > > >+ THUNDER_ECAM_QUIRK(2, 11UL),
-> > > >+ THUNDER_ECAM_QUIRK(2, 12UL),
-> > > >+ THUNDER_ECAM_QUIRK(2, 13UL),
-> > > >
-> > > 
-> > > The UL suffix is needed for *THUNDER_PEM_QUIRK* only. THUNDER_ECAM_QUIRK is
-> > > fine.
-> > 
-> > We should better make the type cast part of the macro.
-> > 
-> > + this:
-> > 
-> > ---
-> > #define THUNDER_MCFG_RES(addr, node) \
-> >        DEFINE_RES_MEM(addr + (node << 44), 0x39 * SZ_16M)
-> > ---
-> > 
-> > The args in the macro need parentheses.
-> 
-> Would you mind sending me a little incremental patch doing what you
-> want?  I could try myself, but since I don't have an arm64 cross-build
-> setup, I'm working in the dark.
+Vinod Koul <vinod.koul@intel.com> writes:
 
-Your current branch looks good.
+> On Thu, Dec 08, 2016 at 12:20:30PM +0000, M?ns Rullg?rd wrote:
+>> >
+>> > I'm far from claiming that drivers/tty/serial/sh-sci.c is perfect, but
+>> > it does request DMA channels at open time, not at probe time.
+>> 
+>> In the part quoted above, I said most drivers request dma channels in
+>> their probe or open functions.  For the purposes of this discussion,
+>> that distinction is irrelevant.  In either case, the channel is held
+>> indefinitely.  
+>
+> And the answer was it is wrong and not _all_ do that!!
 
- 5d06f9125ec0 PCI: Explain ARM64 ACPI/MCFG quirk Kconfig and build strategy
+Show me one that doesn't.
 
-Thanks,
+>> If this wasn't the correct way to use the dmaengine,
+>> there would be no need for the virt-dma helpers which are specifically
+>> designed for cases the one currently at hand.
+>
+> That is incorrect.
+>
+> virt-dma helps to have multiple request from various clients. For many
+> controllers which implement a SW mux, they can transfer data for one client
+> and then next transfer can be for some other one.
+>
+> This allows better utilization of dma channels and helps in case where we
+> have fewer dma channels than users.
 
--Robert
+Which is *exactly* the situation we have here.
+
+I have no idea what you're arguing for or against any more.  Perhaps
+you're just arguing.
+
+>> The only problem we have is that nobody envisioned hardware where the
+>> dma engine indicates completion slightly too soon.  I suspect there's a
+>> fifo or such somewhere, and the interrupt is triggered when the last
+>> byte has been placed in the fifo rather than when it has been removed
+>> which would have been more correct.
+>
+> That is pretty common hardware optimization but usually hardware shows up
+> with flush commands to let in flight transactions be completed.
+
+Well, this hardware seems to lack that particular feature.  Pretending
+otherwise isn't helping.
+
+-- 
+M?ns Rullg?rd
