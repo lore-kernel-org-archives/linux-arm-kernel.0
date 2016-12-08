@@ -1,19 +1,39 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 8 Dec 2016 08:54:55 +0800
-Subject: [PATCH] ARM: dts: imx7d: fix LCDIF clock assignment
-In-Reply-To: <20161207205314.GA20203@localhost>
-References: <20161123004204.10851-1-stefan@agner.ch>
- <CAOMZO5AqKupmmKb4biGfmy4v3ZwS-BFjPY=MLd8Rc0ZXL+vQvg@mail.gmail.com>
- <7e4829f484f6c4425fc9d01bea1a094f@agner.ch>
- <20161205020123.GA2066@dragon> <20161207205314.GA20203@localhost>
-Message-ID: <20161208005454.GF2749@dragon>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Wed,  7 Dec 2016 16:57:42 -0800
+Subject: [PATCH 01/12] ARM: dts: imx6qdl: Add compatible, clocks,
+ irqs to MIPI CSI-2 node
+In-Reply-To: <1481158673-15937-1-git-send-email-steve_longerbeam@mentor.com>
+References: <1481158673-15937-1-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1481158673-15937-2-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 12:53:14PM -0800, Olof Johansson wrote:
-> Applied, with the fixes line. In the future, please email arm at kernel.org too,
-> it's easier to make sure we don't miss it that way.
+Add to the MIPI CSI2 receiver node: compatible string, interrupt sources,
+clocks.
 
-Noted.  Thanks, Olof.
+Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Shawn
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index b13b0b2..e01e5d5 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1121,7 +1121,14 @@
+ 			};
+ 
+ 			mipi_csi: mipi at 021dc000 {
++				compatible = "fsl,imx-mipi-csi2";
+ 				reg = <0x021dc000 0x4000>;
++				interrupts = <0 100 0x04>, <0 101 0x04>;
++				clocks = <&clks IMX6QDL_CLK_HSI_TX>,
++					 <&clks IMX6QDL_CLK_VIDEO_27M>,
++					 <&clks IMX6QDL_CLK_EIM_SEL>;
++				clock-names = "dphy_clk", "cfg_clk", "pix_clk";
++				status = "disabled";
+ 			};
+ 
+ 			mipi_dsi: mipi at 021e0000 {
+-- 
+2.7.4
