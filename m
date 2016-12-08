@@ -1,7 +1,7 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu,  8 Dec 2016 10:54:16 -0800
+Date: Thu,  8 Dec 2016 10:54:47 -0800
 Subject: [PATCH] ARM: Ignore compressed kernel build products
-Message-ID: <20161208185418.32589-1-f.fainelli@gmail.com>
+Message-ID: <20161208185449.7196-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
