@@ -1,72 +1,63 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Thu, 8 Dec 2016 23:57:17 +0800
-Subject: [bug report v4.8] fs/locks.c: kernel oops during posix lock
- stress test
-In-Reply-To: <1480340400.2606.10.camel@poochiereds.net>
-References: <CACVXFVPsHjh3CWjdUrKB_r6=hkXK=qS3wpykbacdKe1rzz1H8Q@mail.gmail.com>
- <1480340400.2606.10.camel@poochiereds.net>
-Message-ID: <CACVXFVMA4mKCUt9gnwbdYVMqSTk-H+LX7dQiAxz_FqwKPQ1X9Q@mail.gmail.com>
+From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
+Date: Thu, 8 Dec 2016 17:57:55 +0200
+Subject: [PATCH] drm: zte: add overlay plane support
+In-Reply-To: <1481166761-5100-1-git-send-email-shawnguo@kernel.org>
+References: <1481166761-5100-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <20161208155755.GY31595@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Dec 08, 2016 at 11:12:41AM +0800, Shawn Guo wrote:
+<snip>
+> +static void zx_vl_plane_atomic_update(struct drm_plane *plane,
+> +				      struct drm_plane_state *old_state)
+> +{
+> +	struct zx_plane *zplane = to_zx_plane(plane);
+> +	struct drm_framebuffer *fb = plane->state->fb;
+> +	struct drm_gem_cma_object *cma_obj;
+> +	void __iomem *layer = zplane->layer;
+> +	void __iomem *hbsc = zplane->hbsc;
+> +	void __iomem *paddr_reg;
+> +	dma_addr_t paddr;
+> +	u32 src_x, src_y, src_w, src_h;
+> +	u32 dst_x, dst_y, dst_w, dst_h;
+> +	uint32_t format;
+> +	u32 fmt;
+> +	int num_planes;
+> +	int i;
+> +
+> +	if (!fb)
+> +		return;
+> +
+> +	format = fb->pixel_format;
+> +
+> +	src_x = plane->state->src_x >> 16;
+> +	src_y = plane->state->src_y >> 16;
+> +	src_w = plane->state->src_w >> 16;
+> +	src_h = plane->state->src_h >> 16;
+> +
+> +	dst_x = plane->state->crtc_x;
+> +	dst_y = plane->state->crtc_y;
+> +	dst_w = plane->state->crtc_w;
+> +	dst_h = plane->state->crtc_h;
 
-On Mon, Nov 28, 2016 at 9:40 PM, Jeff Layton <jlayton@poochiereds.net> wrote:
-> On Mon, 2016-11-28 at 11:10 +0800, Ming Lei wrote:
->> Hi Guys,
->>
->> When I run stress-ng via the following steps on one ARM64 dual
->> socket system(Cavium Thunder), the kernel oops[1] can often be
->> triggered after running the stress test for several hours(sometimes
->> it may take longer):
->>
->> - git clone git://kernel.ubuntu.com/cking/stress-ng.git
->> - apply the attachment patch which just makes the posix file
->> lock stress test more aggressive
->> - run the test via '~/git/stress-ng$./stress-ng --lockf 128 --aggressive'
->>
->>
->> From the oops log, looks one garbage file_lock node is got
->> from the linked list of 'ctx->flc_posix' when the issue happens.
->>
->> BTW, the issue isn't observed on single socket Cavium Thunder yet,
->> and the same issue can be seen on Ubuntu Xenial(v4.4 based kernel)
->> too.
->>
->> Thanks,
->> Ming
->>
->
-> Some questions just for clarification:
->
-> - I assume this is being run on a local fs of some sort? ext4 or xfs or
-> something?
->
-> - have you seen this on any other arch, besides ARM?
->
-> The file locking code does do some lockless checking to see whether the
-> i_flctx is even present and whether the list is empty in
-> locks_remove_posix. It's possible we have some barrier problems there,
+This shouls use the clipped coordiantes.
 
-I have used ebpf trace to see what is going on when 'stress-ng --lockf'
-is running, and almost all exported symbols in fs/locks.c are covered.
+> +
+> +	/* Set up data address registers for Y, Cb and Cr planes */
+> +	num_planes = drm_format_num_planes(format);
+> +	paddr_reg = layer + VL_Y;
+> +	for (i = 0; i < num_planes; i++) {
+> +		cma_obj = drm_fb_cma_get_gem_obj(fb, i);
+> +		paddr = cma_obj->paddr + fb->offsets[i];
+> +		paddr += src_y * fb->pitches[i];
+> +		paddr += src_x * drm_format_plane_cpp(format, i);
+> +		zx_writel(paddr_reg, paddr);
+> +		paddr_reg += 4;
+> +	}
+> +
 
-Except for locks_alloc/locks_free/locks_copy/locks_init, the only observable
-symbols are fcntl_setlk, vfs_lock_file and locks_remove_posix, but
-locks_remove_posix() is just run at the begining and ending of the
-test.
 
-So seems not related with locks_remove_posix().
-
-Then looks only fcntl_setlk() is running from different contexts
-during the test,
-but in this path, the 'ctx->flc_lock' is always held when operating the list.
-That said it is very strange to see the list corrupted even though it is
-protected by the lock.
-
-Thanks,
-Ming
-
-> but I don't quite see how that would cause us to have a corrupt lock on
-> the flc_posix list.
->
+-- 
+Ville Syrj?l?
+Intel OTC
