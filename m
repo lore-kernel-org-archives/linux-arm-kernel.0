@@ -1,330 +1,114 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 8 Dec 2016 12:45:49 +0200
-Subject: [PATCH 3/3] clk: keystone: Add sci-clk driver support
-In-Reply-To: <20161208001348.GC5423@codeaurora.org>
-References: <1477053961-27128-1-git-send-email-t-kristo@ti.com>
- <1477053961-27128-4-git-send-email-t-kristo@ti.com>
- <20161208001348.GC5423@codeaurora.org>
-Message-ID: <cb608729-b617-0eab-5ddf-d78ff47b237e@ti.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 8 Dec 2016 18:47:17 +0800
+Subject: [PATCH v5 2/5] i2c: Add STM32F4 I2C driver
+In-Reply-To: <1481185563-8735-3-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <201612081812.ctflB7YA%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/16 02:13, Stephen Boyd wrote:
-> On 10/21, Tero Kristo wrote:
->> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
->> index 6a8ac04..dce08a7 100644
->> --- a/drivers/clk/Kconfig
->> +++ b/drivers/clk/Kconfig
->> @@ -169,6 +169,15 @@ config COMMON_CLK_NXP
->>  	---help---
->>  	  Support for clock providers on NXP platforms.
->>
->> +config TI_SCI_CLK
->> +	tristate "TI System Control Interface clock drivers"
->> +	depends on (TI_SCI_PROTOCOL && COMMON_CLK_KEYSTONE) || COMPILE_TEST
->
-> Given that we depend on COMMON_CLK_KEYSTONE (just for the
-> Makefile dependency?) this should be moved to right below the
-> COMMON_CLK_KEYSTONE config. And we should consider making a
-> Kconfig file in drivers/clk/keystone/ to hold both those configs
-> instead of having them at the toplevel.
+Hi M'boumba,
 
-Its a makefile dependency only right now. I'll have a look at how to 
-handle this properly.
+[auto build test WARNING on wsa/i2c/for-next]
+[also build test WARNING on v4.9-rc8 next-20161208]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
->
->> +	default TI_SCI_PROTOCOL
->> +	---help---
->> +	  This adds the clock driver support over TI System Control Interface.
->> +	  If you wish to use clock resources from the PMMC firmware, say Y.
->> +	  Otherwise, say N.
->> +
->>  config COMMON_CLK_PALMAS
->>  	tristate "Clock driver for TI Palmas devices"
->>  	depends on MFD_PALMAS
->> diff --git a/drivers/clk/keystone/Makefile b/drivers/clk/keystone/Makefile
->> index 0477cf6..0e7993d 100644
->> --- a/drivers/clk/keystone/Makefile
->> +++ b/drivers/clk/keystone/Makefile
->> @@ -1 +1,2 @@
->>  obj-y			+= pll.o gate.o
->> +obj-$(CONFIG_TI_SCI_CLK)	+= sci-clk.o
->> diff --git a/drivers/clk/keystone/sci-clk.c b/drivers/clk/keystone/sci-clk.c
->> new file mode 100644
->> index 0000000..f6af5bd
->> --- /dev/null
->> +++ b/drivers/clk/keystone/sci-clk.c
->> @@ -0,0 +1,589 @@
-> [...]
->> +
->> +/**
->> + * sci_clk_recalc_rate - Get clock rate for a TI SCI clock
->> + * @hw: clock to get rate for
->> + * @parent_rate: parent rate provided by common clock framework, not used
->> + *
->> + * Gets the current clock rate of a TI SCI clock. Returns the current
->> + * clock rate, or zero in failure.
->> + */
->> +static unsigned long sci_clk_recalc_rate(struct clk_hw *hw,
->> +					 unsigned long parent_rate)
->> +{
->> +	struct sci_clk *clk = to_sci_clk(hw);
->> +	u64 freq;
->> +	int ret;
->> +
->> +	ret = clk->provider->ops->get_freq(clk->provider->sci, clk->dev_id,
->> +					   clk->clk_id, &freq);
->> +	if (ret) {
->> +		dev_err(clk->provider->dev,
->> +			"recalc-rate failed for dev=%d, clk=%d, ret=%d\n",
->> +			clk->dev_id, clk->clk_id, ret);
->> +		return 0;
->> +	}
->> +
->> +	return (u32)freq;
->
-> Do we need the cast? sizeof(u32) doesn't always equal
-> sizeof(unsigned long).
+url:    https://github.com/0day-ci/linux/commits/M-boumba-Cedric-Madianga/Add-support-for-the-STM32F4-I2C/20161208-173240
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/for-next
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-Hmm, not sure where that came from. But yea, can be dropped.
+All warnings (new ones prefixed by >>):
 
+   In file included from include/linux/clk.h:16:0,
+                    from drivers/i2c/busses/i2c-stm32f4.c:12:
+   drivers/i2c/busses/i2c-stm32f4.c: In function 'stm32f4_i2c_set_periph_clk_freq':
+   include/linux/kernel.h:749:16: warning: comparison of distinct pointer types lacks a cast
+     (void) (&max1 == &max2);   \
+                   ^
+   include/linux/kernel.h:737:2: note: in definition of macro '__min'
+     t1 min1 = (x);     \
+     ^~
+   include/linux/kernel.h:778:28: note: in expansion of macro 'min'
+    #define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
+                               ^~~
+>> include/linux/kernel.h:752:2: note: in expansion of macro '__max'
+     __max(typeof(x), typeof(y),   \
+     ^~~~~
+>> include/linux/kernel.h:778:45: note: in expansion of macro 'max'
+    #define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
+                                                ^~~
+>> drivers/i2c/busses/i2c-stm32f4.c:201:9: note: in expansion of macro 'clamp'
+     freq = clamp(freq, STM32F4_I2C_MIN_FREQ, STM32F4_I2C_MAX_FREQ);
+            ^~~~~
+   include/linux/kernel.h:749:16: warning: comparison of distinct pointer types lacks a cast
+     (void) (&max1 == &max2);   \
+                   ^
+   include/linux/kernel.h:737:13: note: in definition of macro '__min'
+     t1 min1 = (x);     \
+                ^
+   include/linux/kernel.h:778:28: note: in expansion of macro 'min'
+    #define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
+                               ^~~
+>> include/linux/kernel.h:752:2: note: in expansion of macro '__max'
+     __max(typeof(x), typeof(y),   \
+     ^~~~~
+>> include/linux/kernel.h:778:45: note: in expansion of macro 'max'
+    #define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
+                                                ^~~
+>> drivers/i2c/busses/i2c-stm32f4.c:201:9: note: in expansion of macro 'clamp'
+     freq = clamp(freq, STM32F4_I2C_MIN_FREQ, STM32F4_I2C_MAX_FREQ);
+            ^~~~~
+   include/linux/kernel.h:739:16: warning: comparison of distinct pointer types lacks a cast
+     (void) (&min1 == &min2);   \
+                   ^
+   include/linux/kernel.h:742:2: note: in expansion of macro '__min'
+     __min(typeof(x), typeof(y),   \
+     ^~~~~
+   include/linux/kernel.h:778:28: note: in expansion of macro 'min'
+    #define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
+                               ^~~
+>> drivers/i2c/busses/i2c-stm32f4.c:201:9: note: in expansion of macro 'clamp'
+     freq = clamp(freq, STM32F4_I2C_MIN_FREQ, STM32F4_I2C_MAX_FREQ);
+            ^~~~~
 
->
->> +
->> +/**
->> + * _sci_clk_get - Gets a handle for an SCI clock
->> + * @provider: Handle to SCI clock provider
->> + * @dev_id: device ID for the clock to register
->> + * @clk_id: clock ID for the clock to register
->> + *
->> + * Gets a handle to an existing TI SCI hw clock, or builds a new clock
->> + * entry and registers it with the common clock framework. Called from
->> + * the common clock framework, when a corresponding of_clk_get call is
->> + * executed, or recursively from itself when parsing parent clocks.
->> + * Returns a pointer to the hw clock struct, or ERR_PTR value in failure.
->> + */
->> +static struct clk_hw *_sci_clk_build(struct sci_clk_provider *provider,
->> +				     u16 dev_id, u8 clk_id)
->> +{
->> +	struct clk_init_data init = { NULL };
->> +	struct sci_clk *sci_clk = NULL;
->> +	char *name = NULL;
->> +	char **parent_names = NULL;
->> +	int i;
->> +	int ret;
->> +
->> +	sci_clk = devm_kzalloc(provider->dev, sizeof(*sci_clk), GFP_KERNEL);
->> +	if (!sci_clk)
->> +		return ERR_PTR(-ENOMEM);
->> +
->> +	sci_clk->dev_id = dev_id;
->> +	sci_clk->clk_id = clk_id;
->> +	sci_clk->provider = provider;
->> +
->> +	ret = provider->ops->get_num_parents(provider->sci, dev_id,
->> +					     clk_id,
->> +					     &init.num_parents);
->> +	if (ret)
->> +		goto err;
->> +
->> +	name = kasprintf(GFP_KERNEL, "%s:%d:%d", dev_name(provider->dev),
->> +			 sci_clk->dev_id, sci_clk->clk_id);
->> +
->> +	init.name = name;
->> +
->> +	if (init.num_parents < 2)
->> +		init.num_parents = 0;
->
-> This deserves a comment. Why is num_parents == 1 the same as
-> num_parents == 0?
+vim +/clamp +201 drivers/i2c/busses/i2c-stm32f4.c
 
-I'll add a comment on this. Basically some clocks can be root clocks 
-which don't have parents, and we only want to have parent control for 
-clocks that can switch their parent. This is kind of a quirk of the 
-firmware.
+   185	
+   186	static void stm32f4_i2c_disable_it(struct stm32f4_i2c_dev *i2c_dev)
+   187	{
+   188		void __iomem *reg = i2c_dev->base + STM32F4_I2C_CR2;
+   189	
+   190		stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR2_IRQ_MASK);
+   191	}
+   192	
+   193	static void stm32f4_i2c_set_periph_clk_freq(struct stm32f4_i2c_dev *i2c_dev)
+   194	{
+   195		u32 clk_rate, cr2, freq;
+   196	
+   197		cr2 = readl_relaxed(i2c_dev->base + STM32F4_I2C_CR2);
+   198		cr2 &= ~STM32F4_I2C_CR2_FREQ_MASK;
+   199		clk_rate = clk_get_rate(i2c_dev->clk);
+   200		freq = clk_rate / MHZ_TO_HZ;
+ > 201		freq = clamp(freq, STM32F4_I2C_MIN_FREQ, STM32F4_I2C_MAX_FREQ);
+   202		cr2 |= STM32F4_I2C_CR2_FREQ(freq);
+   203		writel_relaxed(cr2, i2c_dev->base + STM32F4_I2C_CR2);
+   204	}
+   205	
+   206	static void stm32f4_i2c_set_rise_time(struct stm32f4_i2c_dev *i2c_dev)
+   207	{
+   208		u32 trise, freq, cr2, val;
+   209	
 
->
->> +
->> +	if (init.num_parents) {
->> +		parent_names = devm_kcalloc(provider->dev, init.num_parents,
->> +					    sizeof(char *), GFP_KERNEL);
->> +
->> +		if (!parent_names) {
->> +			ret = -ENOMEM;
->> +			goto err;
->> +		}
->> +
->> +		for (i = 0; i < init.num_parents; i++) {
->> +			char *parent_name;
->> +
->> +			parent_name = kasprintf(GFP_KERNEL, "%s:%d:%d",
->> +						dev_name(provider->dev),
->> +						sci_clk->dev_id,
->> +						sci_clk->clk_id + 1 + i);
->> +			if (!parent_name) {
->> +				ret = -ENOMEM;
->> +				goto err;
->> +			}
->> +			parent_names[i] = parent_name;
->> +		}
->> +		init.parent_names = (const char * const *)parent_names;
->
-> Does that really need a cast?
-
-Doesn't seem like so... I think without this it was generating some 
-checkpatch issue sometime back, but doesn't seem to be the case anymore.
-
->
->> +	}
->> +
->> +	init.ops = &sci_clk_ops;
->> +	sci_clk->hw.init = &init;
->> +
->> +	ret = devm_clk_hw_register(provider->dev, &sci_clk->hw);
->> +	if (ret) {
->> +		dev_err(provider->dev, "failed clk register with %d\n", ret);
->> +		goto err;
->> +	}
->> +	kfree(name);
->> +
->> +	return &sci_clk->hw;
->> +
->> +err:
->> +	if (parent_names) {
->> +		for (i = 0; i < init.num_parents; i++)
->> +			devm_kfree(provider->dev, parent_names[i]);
->> +
->> +		devm_kfree(provider->dev, parent_names);
->
-> Shouldn't we be freeing the parent names all the time? It should
-> be deep copied in the framework.
-
-I'll check this.
-
->
->> +	}
->> +
->> +	devm_kfree(provider->dev, sci_clk);
->> +
->> +	kfree(name);
->> +
->> +	return ERR_PTR(ret);
->> +}
-> [..]
->> +
->> +static int ti_sci_init_clocks(struct sci_clk_provider *p)
->> +{
->> +	struct sci_clk_data *data = p->clocks;
->> +	struct clk_hw *hw;
->> +	int i;
->> +
->> +	while (data->num_clks) {
->> +		data->clocks = devm_kcalloc(p->dev, data->num_clks,
->> +					    sizeof(struct sci_clk),
->> +					    GFP_KERNEL);
->> +		if (!data->clocks)
->> +			return -ENOMEM;
->> +
->> +		for (i = 0; i < data->num_clks; i++) {
->> +			hw = _sci_clk_build(p, data->dev, i);
->> +			if (!IS_ERR(hw)) {
->> +				data->clocks[i] = hw;
->> +				continue;
->> +			}
->> +
->> +			/* Skip any holes in the clock lists */
->> +			if (PTR_ERR(hw) == -ENODEV)
->
-> Does this happen? I don't see where _sci_clk_build() returns
-> -ENODEV.
-
-Yes, it can and will happen. get_num_parents() called by sci_clk_build 
-will return ENODEV for device/clock pairs that don't exist.
-
->
->> +				continue;
->> +
->> +			return PTR_ERR(hw);
->> +		}
->> +		data++;
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->
->> +
->> +/**
->> + * ti_sci_clk_probe - Probe function for the TI SCI clock driver
->> + * @pdev: platform device pointer to be probed
->> + *
->> + * Probes the TI SCI clock device. Allocates a new clock provider
->> + * and registers this to the common clock framework. Also applies
->> + * any required flags to the identified clocks via clock lists
->> + * supplied from DT. Returns 0 for success, negative error value
->> + * for failure.
->> + */
->> +static int ti_sci_clk_probe(struct platform_device *pdev)
->> +{
->> +	struct device *dev = &pdev->dev;
->> +	struct device_node *np = dev->of_node;
->> +	struct sci_clk_provider *provider;
->> +	const struct ti_sci_handle *handle;
->> +	struct sci_clk_data *data;
->> +	int ret;
->> +
->> +	data = (struct sci_clk_data *)
->> +		of_match_node(ti_sci_clk_of_match, np)->data;
->
-> Just use of_device_get_match_data() instead.
-
-All righty.
-
->
->> +
->> +	handle = devm_ti_sci_get_handle(dev);
->> +	if (IS_ERR(handle))
->> +		return PTR_ERR(handle);
->> +
->> +	provider = devm_kzalloc(dev, sizeof(*provider), GFP_KERNEL);
->> +	if (!provider)
->> +		return -ENOMEM;
->> +
->> +	provider->clocks = data;
->> +
->> +	provider->sci = handle;
->> +	provider->ops = &handle->ops.clk_ops;
->> +	provider->dev = dev;
->> +
->> +	ti_sci_init_clocks(provider);
->
-> And if this fails?
-
-Yea this is kind of controversial. ti_sci_init_clocks() can fail if any 
-of the clocks registered will fail. I decided to have it this way so 
-that at least some clocks might work in failure cause, and you might 
-have a booting device instead of total lock-up.
-
-Obviously it could be done so that if any clock fails, we would 
-de-register all clocks at that point, but personally I think this is a 
-worse option.
-
-ti_sci_init_clocks could probably be modified to continue registering 
-clocks when a single clock fails though. Currently it aborts at first 
-failure.
-
-Thoughts on that?
-
->
->> +
->> +	ret = of_clk_add_hw_provider(np, sci_clk_get, provider);
->> +	if (ret)
->> +		return ret;
->> +
->> +	return 0;
->
-> Just "return of_clk_add_hw_provider()" please.
-
-True that, will fix.
-
--Tero
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 56838 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161208/776da99e/attachment-0001.gz>
