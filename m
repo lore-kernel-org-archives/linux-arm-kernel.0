@@ -1,34 +1,43 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 8 Dec 2016 16:09:21 +0530
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <yw1xr35j1yd5.fsf@unicorn.mansr.com>
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
- <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
- <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
- <yw1xwpfd2o9f.fsf@unicorn.mansr.com>
- <20161207164341.GX6408@localhost>
- <yw1xr35j1yd5.fsf@unicorn.mansr.com>
-Message-ID: <20161208103921.GC6408@localhost>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 8 Dec 2016 10:31:16 +0000
+Subject: [PATCH 2/3] arm64: Work around Falkor erratum 1003
+In-Reply-To: <20161207200028.4420-2-cov@codeaurora.org>
+References: <20161207200028.4420-1-cov@codeaurora.org>
+ <20161207200028.4420-2-cov@codeaurora.org>
+Message-ID: <20161208103115.GF33075@MBP.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 04:45:58PM +0000, M?ns Rullg?rd wrote:
-> Vinod Koul <vinod.koul@intel.com> writes:
+On Wed, Dec 07, 2016 at 03:00:26PM -0500, Christopher Covington wrote:
+> From: Shanker Donthineni <shankerd@codeaurora.org>
 > 
-> > On Tue, Dec 06, 2016 at 01:14:20PM +0000, M?ns Rullg?rd wrote:
-> >> 
-> >> That's not going to work very well.  Device drivers typically request
-> >> dma channels in their probe functions or when the device is opened.
-> >> This means that reserving one of the few channels there will inevitably
-> >> make some other device fail to operate.
-> >
-> > No that doesnt make sense at all, you should get a channel only when you
-> > want to use it and not in probe!
+> On the Qualcomm Datacenter Technologies Falkor v1 CPU, memory accesses may
+> allocate TLB entries using an incorrect ASID when TTBRx_EL1 is being
+> updated. Changing the TTBRx_EL1[ASID] and TTBRx_EL1[BADDR] fields
+> separately using a reserved ASID will ensure that there are no TLB entries
+> with incorrect ASID after changing the the ASID.
 > 
-> Tell that to just about every single driver ever written.
+> Pseudo code:
+>   write TTBRx_EL1[ASID] to a reserved value
+>   ISB
+>   write TTBRx_EL1[BADDR] to a desired value
+>   ISB
+>   write TTBRx_EL1[ASID] to a desired value
+>   ISB
 
-Not really, few do yes which is wrong but not _all_ do that.
+While the new ASID probably won't have incorrect TLB entries, the
+reserved ASID will have random entries from all over the place. That's
+because in step 1 you change the ASID to the reserved one while leaving
+the old BADDR in place. There is a brief time before changing the ASID
+when speculative page table walks will populate the TLB with entries
+tagged with the reserved ASID. Such entries are never removed during TLB
+shoot-down for the real ASID, so, depending on how this CPU implements
+the walk cache, you could end up with intermediate level entries still
+active and pointing to freed/reused pages. It will eventually hit an
+entry that looks global with weird consequences.
+
+We've been bitten by this in the past on arm32: 52af9c6cd863 ("ARM:
+6943/1: mm: use TTBR1 instead of reserved context ID").
 
 -- 
-~Vinod
+Catalin
