@@ -1,30 +1,52 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 8 Dec 2016 15:06:32 -0800
-Subject: [PATCH 1/2] clk: bcm: Support rate change propagation on bcm2835
- clocks
-In-Reply-To: <1480626020-20031-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1480626020-20031-1-git-send-email-boris.brezillon@free-electrons.com>
- <1480626020-20031-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20161208230632.GS5423@codeaurora.org>
+From: sboyd@codeaurora.org (sboyd at codeaurora.org)
+Date: Thu, 8 Dec 2016 15:10:10 -0800
+Subject: [PATCH v3] clk: qoriq: added ls1012a clock configuration
+In-Reply-To: <DB6PR0402MB2837A0811DDF5A5DC9E82EF7F0890@DB6PR0402MB2837.eurprd04.prod.outlook.com>
+References: <1479955015-37514-1-git-send-email-yuantian.tang@nxp.com>
+ <DB5PR0401MB1928925ACE6E6E066961C64A91B60@DB5PR0401MB1928.eurprd04.prod.outlook.com>
+ <DB6PR0402MB2837A0811DDF5A5DC9E82EF7F0890@DB6PR0402MB2837.eurprd04.prod.outlook.com>
+Message-ID: <20161208231010.GV5423@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01, Boris Brezillon wrote:
-> Some peripheral clocks, like the VEC (Video EnCoder) clock need to be set
-> to a precise rate (in our case 108MHz). With the current implementation,
-> where peripheral clocks are not allowed to forward rate change requests
-> to their parents, it is impossible to match this requirement unless the
-> bootloader has configured things correctly, or a specific rate has been
-> assigned through the DT (with the assigned-clk-rates property).
+On 11/25, Y.T. Tang wrote:
+> Hi Scott,
 > 
-> Add a new field to struct bcm2835_clock_data to specify which parent
-> clocks accept rate change propagation, and support set rate propagation
-> in bcm2835_clock_determine_rate().
+> > -----Original Message-----
+> > From: Scott Wood
+> > Sent: Thursday, November 24, 2016 4:21 PM
+> > To: Y.T. Tang <yuantian.tang@nxp.com>; mturquette at baylibre.com
+> > Cc: sboyd at codeaurora.org; linux-clk at vger.kernel.org; linux-
+> > kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCH v3] clk: qoriq: added ls1012a clock configuration
+> > 
+> > On 11/23/2016 08:50 PM, yuantian.tang at nxp.com wrote:
+> > > From: Tang Yuantian <Yuantian.Tang@nxp.com>
+> > >
+> > > Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
+> > > ---
+> > > v3:
+> > >   - rebased to latest kernel and re-sorted the code
+> > [snip]
+> > > @@ -1316,6 +1334,7 @@ CLK_OF_DECLARE(qoriq_clockgen_2,
+> > > "fsl,qoriq-clockgen-2.0", clockgen_init);
+> > > CLK_OF_DECLARE(qoriq_clockgen_ls1021a, "fsl,ls1021a-clockgen",
+> > > clockgen_init);  CLK_OF_DECLARE(qoriq_clockgen_ls1043a,
+> > > "fsl,ls1043a-clockgen", clockgen_init);
+> > > CLK_OF_DECLARE(qoriq_clockgen_ls1046a, "fsl,ls1046a-clockgen",
+> > > clockgen_init);
+> > > +CLK_OF_DECLARE(qoriq_clockgen_ls1012a, "fsl,ls1012a-clockgen",
+> > > +clockgen_init);
+> > >  CLK_OF_DECLARE(qoriq_clockgen_ls2080a, "fsl,ls2080a-clockgen",
+> > > clockgen_init);
+> > 
+> > You need a better sorting algorithm. :-P
+> > 
+> I don't think so. This time, each code snip goes right after ls1046a.
+> The sorting 'algorithm' is best ever. :)
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
 
-Applied to clk-next
+I will sort it and apply it? Ack Scott?
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
