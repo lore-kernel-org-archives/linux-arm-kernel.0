@@ -1,64 +1,75 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Thu, 08 Dec 2016 16:36:28 +0000
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 8 Dec 2016 22:07:55 +0530
 Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <20161208155043.GE6408@localhost> (Vinod Koul's message of "Thu,
- 8 Dec 2016 21:20:43 +0530")
-References: <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
+In-Reply-To: <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
+References: <20161125045549.GC2698@localhost>
+ <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
+ <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
  <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
- <yw1xwpfd2o9f.fsf@unicorn.mansr.com> <20161207164341.GX6408@localhost>
- <yw1xr35j1yd5.fsf@unicorn.mansr.com> <20161208103921.GC6408@localhost>
- <yw1x60mu1w7e.fsf@unicorn.mansr.com>
- <CAMuHMdUEXJtWF3S8yK5RY5e60nOnb-Wc9U2E_L553hZvsijvcw@mail.gmail.com>
- <yw1xshpyzk6p.fsf@unicorn.mansr.com> <20161208155043.GE6408@localhost>
-Message-ID: <yw1x7f7az8c3.fsf@unicorn.mansr.com>
+ <yw1xwpfd2o9f.fsf@unicorn.mansr.com>
+ <20161207164341.GX6408@localhost>
+ <yw1xr35j1yd5.fsf@unicorn.mansr.com>
+ <20161208103921.GC6408@localhost>
+ <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
+Message-ID: <20161208163755.GH6408@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod Koul <vinod.koul@intel.com> writes:
+On Thu, Dec 08, 2016 at 11:54:51AM +0100, Mason wrote:
+> On 08/12/2016 11:39, Vinod Koul wrote:
+> 
+> > On Wed, Dec 07, 2016 at 04:45:58PM +0000, M?ns Rullg?rd wrote:
+> >
+> >> Vinod Koul <vinod.koul@intel.com> writes:
+> >>
+> >>> On Tue, Dec 06, 2016 at 01:14:20PM +0000, M?ns Rullg?rd wrote:
+> >>>>
+> >>>> That's not going to work very well.  Device drivers typically request
+> >>>> dma channels in their probe functions or when the device is opened.
+> >>>> This means that reserving one of the few channels there will inevitably
+> >>>> make some other device fail to operate.
+> >>>
+> >>> No that doesn't make sense at all, you should get a channel only when you
+> >>> want to use it and not in probe!
+> >>
+> >> Tell that to just about every single driver ever written.
+> > 
+> > Not really, few do yes which is wrong but not _all_ do that.
+> 
+> Vinod,
+> 
+> Could you explain something to me in layman's terms?
+> 
+> I have a NAND Flash Controller driver that depends on the
+> DMA driver under discussion.
+> 
+> Suppose I move the dma_request_chan() call from the driver's
+> probe function, to the actual DMA transfer function.
+> 
+> I would want dma_request_chan() to put the calling thread
+> to sleep until a channel becomes available (possibly with
+> a timeout value).
+> 
+> But Maxime told me dma_request_chan() will just return
+> -EBUSY if no channels are available.
 
-> On Thu, Dec 08, 2016 at 12:20:30PM +0000, M?ns Rullg?rd wrote:
->> >
->> > I'm far from claiming that drivers/tty/serial/sh-sci.c is perfect, but
->> > it does request DMA channels at open time, not at probe time.
->> 
->> In the part quoted above, I said most drivers request dma channels in
->> their probe or open functions.  For the purposes of this discussion,
->> that distinction is irrelevant.  In either case, the channel is held
->> indefinitely.  
->
-> And the answer was it is wrong and not _all_ do that!!
+That is correct
 
-Show me one that doesn't.
+> Am I supposed to busy wait in my driver's DMA function
+> until a channel becomes available?
 
->> If this wasn't the correct way to use the dmaengine,
->> there would be no need for the virt-dma helpers which are specifically
->> designed for cases the one currently at hand.
->
-> That is incorrect.
->
-> virt-dma helps to have multiple request from various clients. For many
-> controllers which implement a SW mux, they can transfer data for one client
-> and then next transfer can be for some other one.
->
-> This allows better utilization of dma channels and helps in case where we
-> have fewer dma channels than users.
+If someone else is using the channels then the bust wait will not help, so
+in this case you should fall back to PIO, few drivers do that
 
-Which is *exactly* the situation we have here.
+> I don't understand how the multiplexing of few memory
+> channels to many clients is supposed to happen efficiently?
 
-I have no idea what you're arguing for or against any more.  Perhaps
-you're just arguing.
-
->> The only problem we have is that nobody envisioned hardware where the
->> dma engine indicates completion slightly too soon.  I suspect there's a
->> fifo or such somewhere, and the interrupt is triggered when the last
->> byte has been placed in the fifo rather than when it has been removed
->> which would have been more correct.
->
-> That is pretty common hardware optimization but usually hardware shows up
-> with flush commands to let in flight transactions be completed.
-
-Well, this hardware seems to lack that particular feature.  Pretending
-otherwise isn't helping.
+To make it efficient, disregarding your Sbox HW issue, the solution is
+virtual channels. You can delink physical channels and virtual channels. If
+one has SW controlled MUX then a channel can service any client. For few
+controllers request lines are hard wired so they cant use any channel. But
+if you dont have this restriction then driver can queue up many transactions
+from different controllers.
 
 -- 
-M?ns Rullg?rd
+~Vinod
