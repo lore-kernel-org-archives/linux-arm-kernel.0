@@ -1,85 +1,180 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 8 Dec 2016 09:45:36 -0600
-Subject: [PATCH 1/2] Documentation: sample averaging for imx6ul_tsc
-In-Reply-To: <82b04890-692d-4e22-36c1-a21affad5126@mobi-wize.com>
-References: <1480232698-23075-1-git-send-email-guy.shapiro@mobi-wize.com>
- <20161201161343.g7p2maxiatp4m5di@rob-hp-laptop>
- <82b04890-692d-4e22-36c1-a21affad5126@mobi-wize.com>
-Message-ID: <CAL_JsqKLPsdi+fm8Dt=hRBqnd+JOr+1wcbimD+ynXaUj5Udn-Q@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 8 Dec 2016 15:46:33 +0000
+Subject: [RFC v3 00/10] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
+ reserved regions
+In-Reply-To: <48e7d75a-8499-7f41-42d0-08fe081c192b@redhat.com>
+References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
+ <c5d4efa7-699d-4aa3-44cc-4ce03d0ce185@redhat.com>
+ <cd16fc5c-8649-0bfa-d67d-8f257aa38bd6@arm.com>
+ <48e7d75a-8499-7f41-42d0-08fe081c192b@redhat.com>
+Message-ID: <fb97fbbe-0de3-cffe-e7f5-d17eec8b3a53@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 8, 2016 at 9:15 AM, Guy Shapiro <guy.shapiro@mobi-wize.com> wrote:
-> On 01/12/2016 18:13, Rob Herring wrote:
+On 08/12/16 13:36, Auger Eric wrote:
+> Hi Robin,
+> 
+> On 08/12/2016 14:14, Robin Murphy wrote:
+>> On 08/12/16 09:36, Auger Eric wrote:
+>>> Hi,
+>>>
+>>> On 15/11/2016 14:09, Eric Auger wrote:
+>>>> Following LPC discussions, we now report reserved regions through
+>>>> iommu-group sysfs reserved_regions attribute file.
+>>>
+>>>
+>>> While I am respinning this series into v4, here is a tentative summary
+>>> of technical topics for which no consensus was reached at this point.
+>>>
+>>> 1) Shall we report the usable IOVA range instead of reserved IOVA
+>>>    ranges. Not discussed at/after LPC.
+>>>    x I currently report reserved regions. Alex expressed the need to
+>>>      report the full usable IOVA range instead (x86 min-max range
+>>>      minus MSI APIC window). I think this is meaningful for ARM
+>>>      too where arm-smmu might not support the full 64b range.
+>>>    x Any objection we report the usable IOVA regions instead?
 >>
->> On Sun, Nov 27, 2016 at 09:44:57AM +0200, Guy Shapiro wrote:
->>>
->>> The i.MX6UL internal touchscreen controller contains an option to
->>> average upon samples. This feature reduces noise from the produced
->>> touch locations.
->>>
->>> This patch introduces a new device tree optional property for this
->>> feature. It provides control over the amount of averaged samples per
->>> touch event.
->>>
->>> The property was inspired by a similar property on the
->>> "brcm,iproc-touchscreen" binding.
->>>
->>> Signed-off-by: Guy Shapiro <guy.shapiro@mobi-wize.com>
->>> ---
->>>   .../devicetree/bindings/input/touchscreen/imx6ul_tsc.txt          | 8
+>> The issue with that is that we can't actually report "the usable
+>> regions" at the moment, as that involves pulling together disjoint
+>> properties of arbitrary hardware unrelated to the IOMMU. We'd be
+>> reporting "the not-definitely-unusable regions, which may have some
+>> unusable holes in them still". That seems like an ABI nightmare - I'd
+>> still much rather say "here are some, but not necessarily all, regions
+>> you definitely can't use", because saying "here are some regions which
+>> you might be able to use most of, probably" is what we're already doing
+>> today, via a single implicit region from 0 to ULONG_MAX ;)
 >>
->> ++++++++
->>>
->>>   1 file changed, 8 insertions(+)
->>>
->>> diff --git
+>> The address space limits are definitely useful to know, but I think it
+>> would be better to expose them separately to avoid the ambiguity. At
+>> worst, I guess it would be reasonable to express the limits via an
+>> "out-of-range" reserved region type for 0 to $base and $top to
+>> ULONG-MAX. To *safely* expose usable regions, we'd have to start out
+>> with a very conservative assumption (e.g. only IOVAs matching physical
+>> RAM), and only expand them once we're sure we can detect every possible
+>> bit of problematic hardware in the system - that's just too limiting to
+>> be useful. And if we expose something knowingly inaccurate, we risk
+>> having another "bogoMIPS in /proc/cpuinfo" ABI burden on our hands, and
+>> nobody wants that...
+> Makes sense to me. "out-of-range reserved region type for 0 to $base and
+> $top to ULONG-MAX" can be an alternative to fulfill the requirement.
 >>
->> a/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
->> b/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
->>>
->>> index 853dff9..a66069f 100644
->>> --- a/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
->>> +++ b/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
->>> @@ -17,6 +17,13 @@ Optional properties:
->>>     This value depends on the touch screen.
->>>   - pre-charge-time: the touch screen need some time to precharge.
->>>     This value depends on the touch screen.
->>> +- average-samples: Number of data samples which are averaged for each
+>>> 2) Shall the kernel check collision with MSI window* when userspace
+>>>    calls VFIO_IOMMU_MAP_DMA?
+>>>    Joerg/Will No; Alex yes
+>>>    *for IOVA regions consumed downstream to the IOMMU: everyone says NO
 >>
->> read.
->>>
->>> +       Valid values 0-4
->>> +       0 =  1 sample
->>> +       1 =  4 samples
->>> +       2 =  8 samples
->>> +       3 = 16 samples
->>> +       4 = 32 samples
+>> If we're starting off by having the SMMU drivers expose it as a fake
+>> fixed region, I don't think we need to worry about this yet. We all seem
+>> to agree that as long as we communicate the fixed regions to userspace,
+>> it's then userspace's job to work around them. Let's come back to this
+>> one once we actually get to the point of dynamically sizing and
+>> allocating 'real' MSI remapping region(s).
 >>
->> Either this needs a vendor prefix or should be documented as a generic
->> property. In the latter case, you should use actual number of samples
->> (1-32) for the values.
->
-> In the term "generic property", do you mean to document it on
-> bindings/input/touchscreen/touchscreen.txt ?
+>> Ultimately, the kernel *will* police collisions either way, because an
+>> underlying iommu_map() is going to fail if overlapping IOVAs are ever
+>> actually used, so it's really just a question of whether to have a more
+>> user-friendly failure mode.
+> That's true on ARM but not on x86 where the APIC MSI region is not
+> mapped I think.
 
-Yes.
+Yes, but the APIC interrupt region is fixed, i.e. it falls under "IOVA
+regions consumed downstream to the IOMMU" since the DMAR units are
+physically incapable of remapping those addresses. I take "MSI window"
+to mean specifically the thing we have to set aside and get a magic
+remapping cookie for, which is also why it warrants its own special
+internal type - we definitely *don't* want VFIO trying to set up a
+remapping cookie on x86. We just don't let userspace know about the
+difference, yet (if ever).
 
-> If so, should I add the "touchscreen-" prefix like all the other properties
-> in that file?
+Robin.
 
-Yes.
-
-> Grepping bindings/input/touchscreen/, I found two other device drivers that
-> implement a
-> similar property - "ti-tsc-adc" and "brcm,iproc-touchscreen" (The latter,
-> BTW, uses a non
-> vendor prefixed property name).
-
-Unfortunately, the brcm one doesn't look directly usable.
-
-> Do we want to move from per-vendor properties to a generic one?
-
-No. Those are set already. I just don't want to get more vendor properties.
-
-Rob
+>>> 3) RMRR reporting in the iommu group sysfs? Joerg: yes; Don: no
+>>>    My current series does not expose them in iommu group sysfs.
+>>>    I understand we can expose the RMRR regions in the iomm group sysfs
+>>>    without necessarily supporting RMRR requiring device assignment.
+>>>    We can also add this support later.
+>>
+>> As you say, reporting them doesn't necessitate allowing device
+>> assignment, and it's information which can already be easily grovelled
+>> out of dmesg (for intel-iommu at least) - there doesn't seem to be any
+>> need to hide them, but the x86 folks can have the final word on that.
+> agreed
+> 
+> Thanks
+> 
+> Eric
+>>
+>> Robin.
+>>
+>>> Thanks
+>>>
+>>> Eric
+>>>
+>>>
+>>>>
+>>>> Reserved regions are populated through the IOMMU get_resv_region callback
+>>>> (former get_dm_regions), now implemented by amd-iommu, intel-iommu and
+>>>> arm-smmu.
+>>>>
+>>>> The intel-iommu reports the [FEE0_0000h - FEF0_000h] MSI window as an
+>>>> IOMMU_RESV_NOMAP reserved region.
+>>>>
+>>>> arm-smmu reports the MSI window (arbitrarily located at 0x8000000 and
+>>>> 1MB large) and the PCI host bridge windows.
+>>>>
+>>>> The series integrates a not officially posted patch from Robin:
+>>>> "iommu/dma: Allow MSI-only cookies".
+>>>>
+>>>> This series currently does not address IRQ safety assessment.
+>>>>
+>>>> Best Regards
+>>>>
+>>>> Eric
+>>>>
+>>>> Git: complete series available at
+>>>> https://github.com/eauger/linux/tree/v4.9-rc5-reserved-rfc-v3
+>>>>
+>>>> History:
+>>>> RFC v2 -> v3:
+>>>> - switch to an iommu-group sysfs API
+>>>> - use new dummy allocator provided by Robin
+>>>> - dummy allocator initialized by vfio-iommu-type1 after enumerating
+>>>>   the reserved regions
+>>>> - at the moment ARM MSI base address/size is left unchanged compared
+>>>>   to v2
+>>>> - we currently report reserved regions and not usable IOVA regions as
+>>>>   requested by Alex
+>>>>
+>>>> RFC v1 -> v2:
+>>>> - fix intel_add_reserved_regions
+>>>> - add mutex lock/unlock in vfio_iommu_type1
+>>>>
+>>>>
+>>>> Eric Auger (10):
+>>>>   iommu/dma: Allow MSI-only cookies
+>>>>   iommu: Rename iommu_dm_regions into iommu_resv_regions
+>>>>   iommu: Add new reserved IOMMU attributes
+>>>>   iommu: iommu_alloc_resv_region
+>>>>   iommu: Do not map reserved regions
+>>>>   iommu: iommu_get_group_resv_regions
+>>>>   iommu: Implement reserved_regions iommu-group sysfs file
+>>>>   iommu/vt-d: Implement reserved region get/put callbacks
+>>>>   iommu/arm-smmu: Implement reserved region get/put callbacks
+>>>>   vfio/type1: Get MSI cookie
+>>>>
+>>>>  drivers/iommu/amd_iommu.c       |  20 +++---
+>>>>  drivers/iommu/arm-smmu.c        |  52 +++++++++++++++
+>>>>  drivers/iommu/dma-iommu.c       | 116 ++++++++++++++++++++++++++-------
+>>>>  drivers/iommu/intel-iommu.c     |  50 ++++++++++----
+>>>>  drivers/iommu/iommu.c           | 141 ++++++++++++++++++++++++++++++++++++----
+>>>>  drivers/vfio/vfio_iommu_type1.c |  26 ++++++++
+>>>>  include/linux/dma-iommu.h       |   7 ++
+>>>>  include/linux/iommu.h           |  49 ++++++++++----
+>>>>  8 files changed, 391 insertions(+), 70 deletions(-)
+>>>>
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe kvm" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
