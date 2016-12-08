@@ -1,105 +1,41 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 8 Dec 2016 10:36:55 +0100
-Subject: [RFC v3 00/10] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
- reserved regions
-In-Reply-To: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
-References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <c5d4efa7-699d-4aa3-44cc-4ce03d0ce185@redhat.com>
+From: yao.yuan@freescale.com (Yuan Yao)
+Date: Thu, 8 Dec 2016 17:23:02 +0800
+Subject: [PATCH 3/5] Documentation: dt: mtd: add chip support for "jedec,
+ spi-nor"
+In-Reply-To: <1481188984-43683-1-git-send-email-yao.yuan@freescale.com>
+References: <1481188984-43683-1-git-send-email-yao.yuan@freescale.com>
+Message-ID: <1481188984-43683-4-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Yuan Yao <yao.yuan@nxp.com>
 
-On 15/11/2016 14:09, Eric Auger wrote:
-> Following LPC discussions, we now report reserved regions through
-> iommu-group sysfs reserved_regions attribute file.
+"sst25wf040b" and "en25s64" are also chip compatible with SPI NOR flash.
 
+Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
+---
+ Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-While I am respinning this series into v4, here is a tentative summary
-of technical topics for which no consensus was reached at this point.
-
-1) Shall we report the usable IOVA range instead of reserved IOVA
-   ranges. Not discussed at/after LPC.
-   x I currently report reserved regions. Alex expressed the need to
-     report the full usable IOVA range instead (x86 min-max range
-     minus MSI APIC window). I think this is meaningful for ARM
-     too where arm-smmu might not support the full 64b range.
-   x Any objection we report the usable IOVA regions instead?
-
-2) Shall the kernel check collision with MSI window* when userspace
-   calls VFIO_IOMMU_MAP_DMA?
-   Joerg/Will No; Alex yes
-   *for IOVA regions consumed downstream to the IOMMU: everyone says NO
-
-3) RMRR reporting in the iommu group sysfs? Joerg: yes; Don: no
-   My current series does not expose them in iommu group sysfs.
-   I understand we can expose the RMRR regions in the iomm group sysfs
-   without necessarily supporting RMRR requiring device assignment.
-   We can also add this support later.
-
-Thanks
-
-Eric
-
-
-> 
-> Reserved regions are populated through the IOMMU get_resv_region callback
-> (former get_dm_regions), now implemented by amd-iommu, intel-iommu and
-> arm-smmu.
-> 
-> The intel-iommu reports the [FEE0_0000h - FEF0_000h] MSI window as an
-> IOMMU_RESV_NOMAP reserved region.
-> 
-> arm-smmu reports the MSI window (arbitrarily located at 0x8000000 and
-> 1MB large) and the PCI host bridge windows.
-> 
-> The series integrates a not officially posted patch from Robin:
-> "iommu/dma: Allow MSI-only cookies".
-> 
-> This series currently does not address IRQ safety assessment.
-> 
-> Best Regards
-> 
-> Eric
-> 
-> Git: complete series available at
-> https://github.com/eauger/linux/tree/v4.9-rc5-reserved-rfc-v3
-> 
-> History:
-> RFC v2 -> v3:
-> - switch to an iommu-group sysfs API
-> - use new dummy allocator provided by Robin
-> - dummy allocator initialized by vfio-iommu-type1 after enumerating
->   the reserved regions
-> - at the moment ARM MSI base address/size is left unchanged compared
->   to v2
-> - we currently report reserved regions and not usable IOVA regions as
->   requested by Alex
-> 
-> RFC v1 -> v2:
-> - fix intel_add_reserved_regions
-> - add mutex lock/unlock in vfio_iommu_type1
-> 
-> 
-> Eric Auger (10):
->   iommu/dma: Allow MSI-only cookies
->   iommu: Rename iommu_dm_regions into iommu_resv_regions
->   iommu: Add new reserved IOMMU attributes
->   iommu: iommu_alloc_resv_region
->   iommu: Do not map reserved regions
->   iommu: iommu_get_group_resv_regions
->   iommu: Implement reserved_regions iommu-group sysfs file
->   iommu/vt-d: Implement reserved region get/put callbacks
->   iommu/arm-smmu: Implement reserved region get/put callbacks
->   vfio/type1: Get MSI cookie
-> 
->  drivers/iommu/amd_iommu.c       |  20 +++---
->  drivers/iommu/arm-smmu.c        |  52 +++++++++++++++
->  drivers/iommu/dma-iommu.c       | 116 ++++++++++++++++++++++++++-------
->  drivers/iommu/intel-iommu.c     |  50 ++++++++++----
->  drivers/iommu/iommu.c           | 141 ++++++++++++++++++++++++++++++++++++----
->  drivers/vfio/vfio_iommu_type1.c |  26 ++++++++
->  include/linux/dma-iommu.h       |   7 ++
->  include/linux/iommu.h           |  49 ++++++++++----
->  8 files changed, 391 insertions(+), 70 deletions(-)
-> 
+diff --git a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+index 2c91c03..86614ee 100644
+--- a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
++++ b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+@@ -13,6 +13,7 @@ Required properties:
+                  at25df321a
+                  at25df641
+                  at26df081a
++                 en25s64
+                  mr25h256
+                  mx25l4005a
+                  mx25l1606e
+@@ -29,6 +30,7 @@ Required properties:
+                  s25fl008k
+                  s25fl064k
+                  sst25vf040b
++                 sst25wf040b
+                  m25p40
+                  m25p80
+                  m25p16
+-- 
+2.1.0.27.g96db324
