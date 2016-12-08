@@ -1,97 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 8 Dec 2016 11:20:43 +0000
-Subject: [PATCH] arm64: Work around Falkor erratum 1009
-In-Reply-To: <20161207200431.4587-1-cov@codeaurora.org>
-References: <20161207200028.4420-1-cov@codeaurora.org>
- <20161207200431.4587-1-cov@codeaurora.org>
-Message-ID: <20161208112042.GB706@arm.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Thu, 8 Dec 2016 19:20:59 +0800
+Subject: [Linaro-acpi] [PATCH v17 08/15]
+ clocksource/drivers/arm_arch_timer:
+ move arch_timer_needs_of_probing into DT init call
+In-Reply-To: <20161208110410.GA9768@leverpostej>
+References: <20161125084623.22515-9-fu.wei@linaro.org>
+ <201611252221.UyJ9iWPV%fengguang.wu@intel.com>
+ <CADyBb7uAObQn_JVp_qw9+7POiqUctdzy3cYLsb0rk-JMX5W1uw@mail.gmail.com>
+ <CAOZdJXU7Lg66RKvA=sYtUXUdwLLbh9FtcW0_U-fmjaztnqS3Ng@mail.gmail.com>
+ <CADyBb7vAfMGV5ERFqAbwo4v4BhJv5s_-x4DXmdvy=iUacBzJWQ@mail.gmail.com>
+ <20161208110410.GA9768@leverpostej>
+Message-ID: <CADyBb7u+EJ2ehan4suUCtXaP09S-OuZ6BMnCVF3=MpE0W2-Nag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 03:04:31PM -0500, Christopher Covington wrote:
-> From: Shanker Donthineni <shankerd@codeaurora.org>
-> 
-> During a TLB invalidate sequence targeting the inner shareable
-> domain, Falkor may prematurely complete the DSB before all loads
-> and stores using the old translation are observed; instruction
-> fetches are not subject to the conditions of this erratum.
-> 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> Signed-off-by: Christopher Covington <cov@codeaurora.org>
-> ---
->  arch/arm64/Kconfig                | 10 +++++++++
->  arch/arm64/include/asm/cpucaps.h  |  3 ++-
->  arch/arm64/include/asm/tlbflush.h | 43 +++++++++++++++++++++++++++++++++++++++
->  arch/arm64/kernel/cpu_errata.c    |  7 +++++++
->  arch/arm64/kvm/hyp/tlb.c          | 39 ++++++++++++++++++++++++++++++-----
->  5 files changed, 96 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 1004a3d..125440f 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -485,6 +485,16 @@ config QCOM_FALKOR_ERRATUM_E1003
->  
->  	  If unsure, say Y.
->  
-> +config QCOM_FALKOR_ERRATUM_E1009
-> +	bool "Falkor E1009: Prematurely complete a DSB after a TLBI"
-> +	default y
-> +	help
-> +	  Falkor CPU may prematurely complete a DSB following a TLBI xxIS
-> +	  invalidate maintenance operations. Repeat the TLBI operation one
-> +	  more time to fix the issue.
-> +
-> +	  If unsure, say Y.
+Hi Mark,
 
-Call me perverse, but I like this workaround. People often tend to screw
-up TLBI and DVM sync, but the IPI-based workaround is horribly invasive
-and fragile. Simply repeating the operation tends to be enough to make
-the chance of failure small enough to be acceptable.
+On 8 December 2016 at 19:04, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Dec 08, 2016 at 11:16:21AM +0800, Fu Wei wrote:
+>> Hi Timur,
+>>
+>> On 8 December 2016 at 01:25, Timur Tabi <timur@codeaurora.org> wrote:
+>> > On Fri, Nov 25, 2016 at 9:06 AM, Fu Wei <fu.wei@linaro.org> wrote:
+>> >>
+>> >> a "+ int ret;" should be move from [12/15] to here, I have fix the
+>> >> problem in my repo, it would happen in next patchset
+>> >>
+>> >> https://git.linaro.org/people/fu.wei/linux.git/log/?h=topic-gtdt-wakeup-timer_upstream_v18_devel
+>> >
+>> > Fu, please post v18 to the mailing list so that it can be picked up
+>> > for 4.10 (if it's not too late already).
+>
+> Unfortunately, it's too late for v4.10. It hasn't been sat in linux-next
+> at all, and we've seen kbuild test failures.
+>
+> Hopefully there's time to beat this into shape and get it into
+> linux-next so that it's ready to queue for v4.11, though.
 
-> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-> index cb6a8c2..5357d7f 100644
-> --- a/arch/arm64/include/asm/cpucaps.h
-> +++ b/arch/arm64/include/asm/cpucaps.h
-> @@ -35,7 +35,8 @@
->  #define ARM64_HYP_OFFSET_LOW			14
->  #define ARM64_MISMATCHED_CACHE_LINE_SIZE	15
->  #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	16
-> +#define ARM64_WORKAROUND_QCOM_FALKOR_E1009	17
+cross fingers for getting into v4.11 :-)
 
-Could you rename this to something like ARM64_WORKAROUND_REPEAT_TLBI, so
-that it could potentially be used by others?
+>
+>> Great thanks for your suggestion!  :-)
+>> yes, you are right, I would love to post v18 ASAP.
+>>
+>> But I am still waiting for more feedback from the maintainers.
+>
+> Please post a version which passes inspection by the kbuild test robot.
+> I haven't had a chance to look at this yet, and it'll be better to look
+> at a version that actually works.
 
->  
-> -#define ARM64_NCAPS				17
-> +#define ARM64_NCAPS				18
->  
->  #endif /* __ASM_CPUCAPS_H */
-> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-> index deab523..03bafc5 100644
-> --- a/arch/arm64/include/asm/tlbflush.h
-> +++ b/arch/arm64/include/asm/tlbflush.h
-> @@ -23,6 +23,7 @@
->  
->  #include <linux/sched.h>
->  #include <asm/cputype.h>
-> +#include <asm/alternative.h>
->  
->  /*
->   * Raw TLBI operations.
-> @@ -94,6 +95,13 @@ static inline void flush_tlb_all(void)
->  	dsb(ishst);
->  	__tlbi(vmalle1is);
->  	dsb(ish);
-> +	asm volatile(ALTERNATIVE(
-> +		     "nop \n"
-> +		     "nop \n",
-> +		     "tlbi vmalle1is \n"
-> +		     "dsb ish \n",
-> +		     ARM64_WORKAROUND_QCOM_FALKOR_E1009)
-> +		     : :);
+OK, NP, will post them in several hours
+Great thanks for your feedback.
 
-I'd much rather this was part of the __tlbi macro, which would hopefully
-restrict this to one place in the code.
+>
+> Thanks,
+> Mark.
 
-Will
+
+
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
