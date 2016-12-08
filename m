@@ -1,39 +1,37 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 7 Dec 2016 17:22:54 -0800
-Subject: [PATCH] Input: lpc32xx-keys - fix invalid error handling of a
- requested irq
-In-Reply-To: <1481134387.9248.8.camel@localhost>
-References: <20161205014753.2092-1-vz@mleia.com>
- <1481134387.9248.8.camel@localhost>
-Message-ID: <20161208012254.GB27638@dtor-ws>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Thu, 8 Dec 2016 03:35:24 +0200
+Subject: [PATCH v2 3/3] USB: OHCI: nxp: remove useless extern declaration
+In-Reply-To: <1481150056-3623-4-git-send-email-csmanjuvijay@gmail.com>
+References: <1480735523-23950-1-git-send-email-csmanjuvijay@gmail.com>
+ <1481150056-3623-1-git-send-email-csmanjuvijay@gmail.com>
+ <1481150056-3623-4-git-send-email-csmanjuvijay@gmail.com>
+Message-ID: <5040084d-3d99-b07e-ceab-3e849dc4c472@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 01:13:07PM -0500, Sylvain Lemieux wrote:
-> On Mon, 2016-12-05 at 03:47 +0200, Vladimir Zapolskiy wrote:
-> > Semantics of NR_IRQS is different on machines with SPARSE_IRQ option
-> > disabled or enabled, in the latter case IRQs are allocated starting
-> > at least from the value specified by NR_IRQS and going upwards, so
-> > the check of (irq >= NR_IRQ) to decide about an error code returned by
-> > platform_get_irq() is completely invalid, don't attempt to overrule
-> > irq subsystem in the driver.
-> > 
-> > The change fixes lpc32xx_keys driver initialization on boot:
-> > 
-> >   lpc32xx_keys 40050000.key: failed to get platform irq
-> >   lpc32xx_keys: probe of 40050000.key failed with error -22
-> > 
-> > Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> > ---
-> >  drivers/input/keyboard/lpc32xx-keys.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> Cosmetic - please update the subject line when doing the commit:
-> replace " -" by ":" after lpc32xx-keys
+On 12/08/2016 12:34 AM, csmanjuvijay at gmail.com wrote:
+> From: Manjunath Goudar <csmanjuvijay@gmail.com>
 > 
-> Acked-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
+> Remove usb_disabled() extern declaration as it is already declared
+> as extern in include/linux/usb.h.
+> 
+> Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
+> Cc: Vladimir Zapolskiy <vz@mleia.com>
+> Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-usb at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+> changelog V1->V2:
+> patch discrition is update with proper message.
+> 
 
-Applied, thank you.
+I'm fine with the change, thank you for the clean-up.
 
--- 
-Dmitry
+Acked-by: Vladimir Zapolskiy <vz@mleia.com>
+
+--
+With best wishes,
+Vladimir
