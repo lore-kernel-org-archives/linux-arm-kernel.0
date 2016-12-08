@@ -1,47 +1,39 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Dec 2016 18:09:08 +0000
-Subject: [PATCH 3/3] rtc: armada38x: Prepare for being use on 64 bits
-In-Reply-To: <20161208171010.29446-4-gregory.clement@free-electrons.com>
-References: <20161208171010.29446-1-gregory.clement@free-electrons.com>
- <20161208171010.29446-4-gregory.clement@free-electrons.com>
-Message-ID: <20161208180908.GL14217@n2100.armlinux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 8 Dec 2016 10:19:00 -0800
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.9 (#2)
+In-Reply-To: <87r35ifl13.fsf@free-electrons.com>
+References: <87r35ifl13.fsf@free-electrons.com>
+Message-ID: <CAOesGMiw4e5L6PtLfT=YVukfhN6vKSa1ZGZbFA7aKWiSy=Z2Gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2016 at 06:10:10PM +0100, Gregory CLEMENT wrote:
-> The drivers are supposed to be portable, however there are few assumption
-> done here about the unsigned long size. Make sure we use the accurate
-> width for the variable.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  drivers/rtc/rtc-armada38x.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
-> index b8a74ffaae80..c4138130febf 100644
-> --- a/drivers/rtc/rtc-armada38x.c
-> +++ b/drivers/rtc/rtc-armada38x.c
-> @@ -84,14 +84,14 @@ static void rtc_update_mbus_timing_params(struct armada38x_rtc *rtc)
->  }
->  
->  struct str_value_to_freq {
-> -	unsigned long value;
-> +	u32 value;
->  	u8 freq;
->  } __packed;
->  
-> -static unsigned long read_rtc_register_wa(struct armada38x_rtc *rtc, u8 rtc_reg)
-> +static u32 read_rtc_register_wa(struct armada38x_rtc *rtc, u8 rtc_reg)
->  {
-> -	unsigned long value_array[SAMPLE_NR], i, j, value;
-> -	unsigned long max = 0, index_max = SAMPLE_NR - 1;
-> +	int i, j, index_max = SAMPLE_NR - 1;
-> +	u32 value_array[SAMPLE_NR], value, max = 0;
+On Thu, Dec 8, 2016 at 8:22 AM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi,
+>
+> Here is the second pull request for fixes for mvebu for v4.9.
+>
+> Gregory
+>
+> The following changes since commit 8d897006fe9206d64cbe353310be26d7c911e69d:
+>
+>   arm64: dts: marvell: add unique identifiers for Armada A8k SPI controllers (2016-11-09 09:44:08 +0100)
+>
+> are available in the git repository at:
+>
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.9-2
+>
+> for you to fetch changes up to b150e59f1d217473b3eab354a9e5e9fe907868ff:
+>
+>   ARM: dts: orion5x: fix number of sata port for linkstation ls-gl (2016-12-05 16:43:05 +0100)
+>
+> ----------------------------------------------------------------
+> mvebu fixes for 4.9 (part 2)
+>
+> Fix number of sata port for linkstation ls-gl: without this the hard
+> drive is not detected as it was before the dt conversion
 
-Ah, I see my comments on patch 1 got addressed in patch 3... :)
+Merged, thanks.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+
+-Olof
