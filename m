@@ -1,64 +1,69 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 8 Dec 2016 18:09:37 +0530
-Subject: [PATCH v6 1/2] ARM: davinci: Export two clocks function
-In-Reply-To: <4e313609-0acc-4e06-85e6-ba36b7916b33@ti.com>
-References: <1481130567-27829-1-git-send-email-abailon@baylibre.com>
- <4e313609-0acc-4e06-85e6-ba36b7916b33@ti.com>
-Message-ID: <ad4880cf-f89a-fdb4-1008-beb7911fe2b7@ti.com>
+From: lukas@wunner.de (Lukas Wunner)
+Date: Thu, 8 Dec 2016 13:42:36 +0100
+Subject: [PATCH 5/8] efi: Get the secure boot status [ver #5]
+In-Reply-To: <6009.1481184981@warthog.procyon.org.uk>
+References: <20161208065735.GB8549@wunner.de>
+ <148111668193.23390.6340512985876251017.stgit@warthog.procyon.org.uk>
+ <148111671977.23390.12452925207541146423.stgit@warthog.procyon.org.uk>
+ <6009.1481184981@warthog.procyon.org.uk>
+Message-ID: <20161208124236.GA8757@wunner.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 December 2016 06:02 PM, Sekhar Nori wrote:
-> On Wednesday 07 December 2016 10:39 PM, Alexandre Bailon wrote:
->> Rename and export __clk_enable() and __clk_disable() in order
->> to use them from usb-da8xx.c. This file implements the usb20 phy clock
->> that must be able to enable or disable usb20 clock.
->> To prevent a recurssive call to clk_enable() that would cause a recursive
->> locking issue, we must use __clk_enable() and __clk_disable().
->> Rename these methods in davinci_clk_enable() and davinci_clk_disable(),
->> and export them.
->>
->> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
->> Suggested-by: David Lechner <david@lechnology.com>
->> ---
->>  arch/arm/mach-davinci/clock.c | 14 ++++++++------
->>  arch/arm/mach-davinci/clock.h |  2 ++
->>  2 files changed, 10 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
->> index df42c93..0f967c3 100644
->> --- a/arch/arm/mach-davinci/clock.c
->> +++ b/arch/arm/mach-davinci/clock.c
->> @@ -31,10 +31,10 @@ static LIST_HEAD(clocks);
->>  static DEFINE_MUTEX(clocks_mutex);
->>  static DEFINE_SPINLOCK(clockfw_lock);
->>  
->> -static void __clk_enable(struct clk *clk)
->> +void davinci_clk_enable(struct clk *clk)
->>  {
->>  	if (clk->parent)
->> -		__clk_enable(clk->parent);
->> +		davinci_clk_enable(clk->parent);
->>  	if (clk->usecount++ == 0) {
->>  		if (clk->flags & CLK_PSC)
->>  			davinci_psc_config(clk->domain, clk->gpsc, clk->lpsc,
->> @@ -43,8 +43,9 @@ static void __clk_enable(struct clk *clk)
->>  			clk->clk_enable(clk);
->>  	}
->>  }
->> +EXPORT_SYMBOL(davinci_clk_enable);
-> 
-> We don't want to export these as we dont want drivers to use this API.
-> This is to be used within mach-davinci only.
+On Thu, Dec 08, 2016 at 08:16:21AM +0000, David Howells wrote:
+> +/*
+> + * Determine whether we're in secure boot mode.
+> + */
+> +enum efi_secureboot_mode efi_get_secureboot(efi_system_table_t *sys_table_arg)
+> +{
+> +	u8 secboot, setupmode;
+> +	unsigned long size;
+> +	efi_status_t status;
+> +
+> +	size = sizeof(secboot);
+> +	status = get_efi_var(efi_SecureBoot_name, &efi_variable_guid,
+> +			     NULL, &size, &secboot);
+> +	if (status != EFI_SUCCESS)
+> +		goto out_efi_err;
+> +
+> +	size = sizeof(setupmode);
+> +	status = get_efi_var(efi_SetupMode_name, &efi_variable_guid,
+> +			     NULL, &size, &setupmode);
+> +	if (status != EFI_SUCCESS)
+> +		goto out_efi_err;
+> +
+> +	if (secboot == 0 || setupmode == 1)
+> +		return efi_secureboot_mode_disabled;
+> +
+> +	pr_efi(sys_table_arg, "UEFI Secure Boot is enabled.\n");
+> +	return efi_secureboot_mode_enabled;
+> +
+> +out_efi_err:
+> +	pr_efi_err(sys_table_arg, "Could not determine UEFI Secure Boot status.\n");
+> +	if (status == EFI_NOT_FOUND)
+> +		return efi_secureboot_mode_disabled;
+> +	return efi_secureboot_mode_unknown;
+> +}
 
-Also, subject line is pretty vague. What about:
+In the out_efi_err path, the if-statement needs to come before the
+pr_efi_err() call.  Otherwise it would be a change of behaviour for
+ARM to what we have now.
 
-ARM: davinci: provide lock-less versions of clk_{enable|disable}
+Also, minor nit, I'd expect Matt to ask for a newline between the
+if-statement and the following statements, so:
 
-In the description too, please talk about on the main difference between
-davinci_clk_{enable|disable}() (lockless) vs clk_enable() (locked). Use
-USB case only as an example. Using them in usb-da8xx.c might be the
-current motivation but this addresses similar needs in future too.
+out_efi_err:
+	if (status == EFI_NOT_FOUND)
+		return efi_secureboot_mode_disabled;
+
+	pr_efi_err(sys_table_arg, "Could not determine UEFI Secure Boot status.\n");
+	return efi_secureboot_mode_unknown;
+
+The error message doesn't say what the consequence is of the
+failure to determine the status, but IIUC this differs between
+x86 and ARM, is that correct?  (If I remember the discussion
+correctly, x86 defaults to disabled, ARM to enabled.)
 
 Thanks,
-Sekhar
+
+Lukas
