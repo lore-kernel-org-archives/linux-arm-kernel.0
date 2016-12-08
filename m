@@ -1,169 +1,46 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 8 Dec 2016 11:05:52 +0000
-Subject: [PATCH V8 1/3] ACPI: Add support for ResourceSource/IRQ domain
- mapping
-In-Reply-To: <1480460259-8585-2-git-send-email-agustinv@codeaurora.org>
-References: <1480460259-8585-1-git-send-email-agustinv@codeaurora.org>
- <1480460259-8585-2-git-send-email-agustinv@codeaurora.org>
-Message-ID: <20161208110552.GA17398@red-moon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 8 Dec 2016 11:04:10 +0000
+Subject: [Linaro-acpi] [PATCH v17 08/15]
+ clocksource/drivers/arm_arch_timer: move arch_timer_needs_of_probing into DT
+ init call
+In-Reply-To: <CADyBb7vAfMGV5ERFqAbwo4v4BhJv5s_-x4DXmdvy=iUacBzJWQ@mail.gmail.com>
+References: <20161125084623.22515-9-fu.wei@linaro.org>
+ <201611252221.UyJ9iWPV%fengguang.wu@intel.com>
+ <CADyBb7uAObQn_JVp_qw9+7POiqUctdzy3cYLsb0rk-JMX5W1uw@mail.gmail.com>
+ <CAOZdJXU7Lg66RKvA=sYtUXUdwLLbh9FtcW0_U-fmjaztnqS3Ng@mail.gmail.com>
+ <CADyBb7vAfMGV5ERFqAbwo4v4BhJv5s_-x4DXmdvy=iUacBzJWQ@mail.gmail.com>
+Message-ID: <20161208110410.GA9768@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Agustin,
-
-please CC me for next version.
-
-On Tue, Nov 29, 2016 at 05:57:37PM -0500, Agustin Vega-Frias wrote:
-> When an Extended IRQ Resource contains a valid ResourceSource
-> use it to map the IRQ on the domain associated with the ACPI
-> device referenced.
+On Thu, Dec 08, 2016 at 11:16:21AM +0800, Fu Wei wrote:
+> Hi Timur,
 > 
-> With this in place an irqchip driver can create its domain using
-> irq_domain_create_linear and pass the device fwnode to create
-> the domain mapping. When dependent devices are probed these
-> changes allow the ACPI core find the domain and map the IRQ.
+> On 8 December 2016 at 01:25, Timur Tabi <timur@codeaurora.org> wrote:
+> > On Fri, Nov 25, 2016 at 9:06 AM, Fu Wei <fu.wei@linaro.org> wrote:
+> >>
+> >> a "+ int ret;" should be move from [12/15] to here, I have fix the
+> >> problem in my repo, it would happen in next patchset
+> >>
+> >> https://git.linaro.org/people/fu.wei/linux.git/log/?h=topic-gtdt-wakeup-timer_upstream_v18_devel
+> >
+> > Fu, please post v18 to the mailing list so that it can be picked up
+> > for 4.10 (if it's not too late already).
+
+Unfortunately, it's too late for v4.10. It hasn't been sat in linux-next
+at all, and we've seen kbuild test failures.
+
+Hopefully there's time to beat this into shape and get it into
+linux-next so that it's ready to queue for v4.11, though.
+
+> Great thanks for your suggestion!  :-)
+> yes, you are right, I would love to post v18 ASAP.
 > 
-> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
-> ---
->  drivers/acpi/Makefile         |  2 +-
->  drivers/acpi/{gsi.c => irq.c} | 99 +++++++++++++++++++++++++++++++++++++------
+> But I am still waiting for more feedback from the maintainers.
 
-[...]
-
-> -static void acpi_dev_get_irqresource(struct resource *res, u32 gsi,
-> +static void acpi_dev_get_irqresource(struct resource *res, u32 hwirq,
-> +				     struct fwnode_handle *source,
->  				     u8 triggering, u8 polarity, u8 shareable,
->  				     bool legacy)
->  {
->  	int irq, p, t;
->  
-> -	if (!valid_IRQ(gsi)) {
-> -		acpi_dev_irqresource_disabled(res, gsi);
-> +	if (!source && !valid_IRQ(hwirq)) {
-
-If you make source a struct acpi_resource_source pointer it could be:
-
-if (source || !valid_IRQ(hwirq))
-
-Actually we would not even need to pass the pointer, if we detect
-an acpi_resource_source dependency we can just disable the resource
-(without even looking-up the fwnode_handle, see below), it is a design
-choice we have to make.
-
-> +		acpi_dev_irqresource_disabled(res, hwirq);
->  		return;
->  	}
->  
-> @@ -402,25 +403,25 @@ static void acpi_dev_get_irqresource(struct resource *res, u32 gsi,
->  	 * using extended IRQ descriptors we take the IRQ configuration
->  	 * from _CRS directly.
->  	 */
-> -	if (legacy && !acpi_get_override_irq(gsi, &t, &p)) {
-> +	if (legacy && !acpi_get_override_irq(hwirq, &t, &p)) {
->  		u8 trig = t ? ACPI_LEVEL_SENSITIVE : ACPI_EDGE_SENSITIVE;
->  		u8 pol = p ? ACPI_ACTIVE_LOW : ACPI_ACTIVE_HIGH;
->  
->  		if (triggering != trig || polarity != pol) {
-> -			pr_warning("ACPI: IRQ %d override to %s, %s\n", gsi,
-> -				   t ? "level" : "edge", p ? "low" : "high");
-> +			pr_warn("ACPI: IRQ %d override to %s, %s\n", hwirq,
-> +				t ? "level" : "edge", p ? "low" : "high");
->  			triggering = trig;
->  			polarity = pol;
->  		}
->  	}
->  
->  	res->flags = acpi_dev_irq_flags(triggering, polarity, shareable);
-> -	irq = acpi_register_gsi(NULL, gsi, triggering, polarity);
-> +	irq = acpi_register_irq(source, hwirq, triggering, polarity);
->  	if (irq >= 0) {
->  		res->start = irq;
->  		res->end = irq;
->  	} else {
-> -		acpi_dev_irqresource_disabled(res, gsi);
-> +		acpi_dev_irqresource_disabled(res, hwirq);
->  	}
->  }
->  
-> @@ -448,6 +449,7 @@ bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
->  {
->  	struct acpi_resource_irq *irq;
->  	struct acpi_resource_extended_irq *ext_irq;
-> +	struct fwnode_handle *src;
->  
->  	switch (ares->type) {
->  	case ACPI_RESOURCE_TYPE_IRQ:
-> @@ -460,7 +462,7 @@ bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
->  			acpi_dev_irqresource_disabled(res, 0);
->  			return false;
->  		}
-> -		acpi_dev_get_irqresource(res, irq->interrupts[index],
-> +		acpi_dev_get_irqresource(res, irq->interrupts[index], NULL,
->  					 irq->triggering, irq->polarity,
->  					 irq->sharable, true);
->  		break;
-> @@ -470,7 +472,8 @@ bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
->  			acpi_dev_irqresource_disabled(res, 0);
->  			return false;
->  		}
-> -		acpi_dev_get_irqresource(res, ext_irq->interrupts[index],
-> +		src = acpi_get_irq_source_fwhandle(&ext_irq->resource_source);
-
-I think the only pending question on my side for this series is whether
-we still carry out the domain look-up here (as you are doing now), or,
-if we detect a resource_source dependency, we just disable the resource
-and leave the deferred probing mechanism to deal with it, this will
-completely decouple the current resource parsing from the deferred probe
-mechanism that you are introducing; basically this is equivalent to
-saying "if the IRQ resource has a dependency let's resolve it at
-acpi_irq_get() time, not now".
-
-I am fine either way, I just think that leaving the domain look-up
-in the middle of the IRQ resource parsing is not really clean-cut.
+Please post a version which passes inspection by the kbuild test robot.
+I haven't had a chance to look at this yet, and it'll be better to look
+at a version that actually works.
 
 Thanks,
-Lorenzo
-
-> +		acpi_dev_get_irqresource(res, ext_irq->interrupts[index], src,
->  					 ext_irq->triggering, ext_irq->polarity,
->  					 ext_irq->sharable, false);
->  		break;
-> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> index 61a3d90..154e576 100644
-> --- a/include/linux/acpi.h
-> +++ b/include/linux/acpi.h
-> @@ -321,6 +321,25 @@ void acpi_set_irq_model(enum acpi_irq_model_id model,
->   */
->  void acpi_unregister_gsi (u32 gsi);
->  
-> +#ifdef CONFIG_ACPI_GENERIC_GSI
-> +struct fwnode_handle *
-> +acpi_get_irq_source_fwhandle(const struct acpi_resource_source *source);
-> +int acpi_register_irq(struct fwnode_handle *source, u32 hwirq, int trigger,
-> +		      int polarity);
-> +void acpi_unregister_irq(struct fwnode_handle *source, u32 hwirq);
-> +#else
-> +#define acpi_get_irq_source_fwhandle(source) (NULL)
-> +static inline int acpi_register_irq(struct fwnode_handle *source, u32 hwirq,
-> +				    int trigger, int polarity)
-> +{
-> +	return acpi_register_gsi(NULL, hwirq, trigger, polarity);
-> +}
-> +static inline void acpi_unregister_irq(struct fwnode_handle *source, u32 hwirq)
-> +{
-> +	acpi_unregister_gsi(hwirq);
-> +}
-> +#endif
-> +
->  struct pci_dev;
->  
->  int acpi_pci_irq_enable (struct pci_dev *dev);
-> -- 
-> Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Mark.
