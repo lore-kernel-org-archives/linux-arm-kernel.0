@@ -1,215 +1,317 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 8 Dec 2016 08:57:49 +0100
-Subject: [RFC v3 09/10] iommu/arm-smmu: Implement reserved region get/put
- callbacks
-In-Reply-To: <5de00158-c82d-6b47-cf64-d4ba0183868d@arm.com>
-References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
- <1479215363-2898-10-git-send-email-eric.auger@redhat.com>
- <02c0ce15-fa67-e65f-3a4e-f543cc9fd3b8@arm.com>
- <c11755b8-4fb3-3f2f-d0b2-e688a5f8a6b6@redhat.com>
- <5de00158-c82d-6b47-cf64-d4ba0183868d@arm.com>
-Message-ID: <d55b33b1-3242-cffd-cc0a-88b0de767e05@redhat.com>
+From: dhowells@redhat.com (David Howells)
+Date: Thu, 08 Dec 2016 08:16:21 +0000
+Subject: [PATCH 5/8] efi: Get the secure boot status [ver #5]
+In-Reply-To: <20161208065735.GB8549@wunner.de>
+References: <20161208065735.GB8549@wunner.de>
+ <148111668193.23390.6340512985876251017.stgit@warthog.procyon.org.uk>
+ <148111671977.23390.12452925207541146423.stgit@warthog.procyon.org.uk>
+Message-ID: <6009.1481184981@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+How about the attached?
 
-On 07/12/2016 19:24, Robin Murphy wrote:
-> On 07/12/16 15:02, Auger Eric wrote:
->> Hi Robin,
->> On 06/12/2016 19:55, Robin Murphy wrote:
->>> On 15/11/16 13:09, Eric Auger wrote:
->>>> The get() populates the list with the PCI host bridge windows
->>>> and the MSI IOVA range.
->>>>
->>>> At the moment an arbitray MSI IOVA window is set at 0x8000000
->>>> of size 1MB. This will allow to report those info in iommu-group
->>>> sysfs?
->>
->>
->> First thank you for reviewing the series. This is definitively helpful!
->>>>
->>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>>>
->>>> ---
->>>>
->>>> RFC v2 -> v3:
->>>> - use existing get/put_resv_regions
->>>>
->>>> RFC v1 -> v2:
->>>> - use defines for MSI IOVA base and length
->>>> ---
->>>>  drivers/iommu/arm-smmu.c | 52 ++++++++++++++++++++++++++++++++++++++++++++++++
->>>>  1 file changed, 52 insertions(+)
->>>>
->>>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->>>> index 8f72814..81f1a83 100644
->>>> --- a/drivers/iommu/arm-smmu.c
->>>> +++ b/drivers/iommu/arm-smmu.c
->>>> @@ -278,6 +278,9 @@ enum arm_smmu_s2cr_privcfg {
->>>>  
->>>>  #define FSYNR0_WNR			(1 << 4)
->>>>  
->>>> +#define MSI_IOVA_BASE			0x8000000
->>>> +#define MSI_IOVA_LENGTH			0x100000
->>>> +
->>>>  static int force_stage;
->>>>  module_param(force_stage, int, S_IRUGO);
->>>>  MODULE_PARM_DESC(force_stage,
->>>> @@ -1545,6 +1548,53 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
->>>>  	return iommu_fwspec_add_ids(dev, &fwid, 1);
->>>>  }
->>>>  
->>>> +static void arm_smmu_get_resv_regions(struct device *dev,
->>>> +				      struct list_head *head)
->>>> +{
->>>> +	struct iommu_resv_region *region;
->>>> +	struct pci_host_bridge *bridge;
->>>> +	struct resource_entry *window;
->>>> +
->>>> +	/* MSI region */
->>>> +	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
->>>> +					 IOMMU_RESV_MSI);
->>>> +	if (!region)
->>>> +		return;
->>>> +
->>>> +	list_add_tail(&region->list, head);
->>>> +
->>>> +	if (!dev_is_pci(dev))
->>>> +		return;
->>>> +
->>>> +	bridge = pci_find_host_bridge(to_pci_dev(dev)->bus);
->>>> +
->>>> +	resource_list_for_each_entry(window, &bridge->windows) {
->>>> +		phys_addr_t start;
->>>> +		size_t length;
->>>> +
->>>> +		if (resource_type(window->res) != IORESOURCE_MEM &&
->>>> +		    resource_type(window->res) != IORESOURCE_IO)
->>>
->>> As Joerg commented elsewhere, considering anything other than memory
->>> resources isn't right (I appreciate you've merely copied my own mistake
->>> here). We need some other way to handle root complexes where the CPU
->>> MMIO views of PCI windows appear in PCI memory space - using the I/O
->>> address of I/O resources only works by chance on Juno, and it still
->>> doesn't account for config space. I suggest we just leave that out for
->>> the time being to make life easier (does it even apply to anything other
->>> than Juno?) and figure it out later.
->> OK so I understand I should remove IORESOURCE_IO check.
->>>
->>>> +			continue;
->>>> +
->>>> +		start = window->res->start - window->offset;
->>>> +		length = window->res->end - window->res->start + 1;
->>>> +		region = iommu_alloc_resv_region(start, length,
->>>> +						 IOMMU_RESV_NOMAP);
->>>> +		if (!region)
->>>> +			return;
->>>> +		list_add_tail(&region->list, head);
->>>> +	}
->>>> +}
->>>
->>> Either way, there's nothing SMMU-specific about PCI windows. The fact
->>> that we'd have to copy-paste all of this into the SMMUv3 driver
->>> unchanged suggests it should go somewhere common (although I would be
->>> inclined to leave the insertion of the fake MSI region to driver-private
->>> wrappers). As I said before, the current iova_reserve_pci_windows()
->>> simply wants splitting into appropriate public callbacks for
->>> get_resv_regions and apply_resv_regions.
->> Do you mean somewhere common in the arm-smmu subsystem (new file) or in
->> another subsystem (pci?)
->>
->> More generally the current implementation does not handle the case where
->> any of those PCIe host bridge window collide with the MSI window. To me
->> this is a flaw.
->> 1) Either we take into account the PCIe windows and prevent any
->> collision when allocating the MSI window.
->> 2) or we do not care about PCIe host bridge windows at kernel level.
-> 
-> Even more generally, the MSI window also needs to avoid any other
-> IOMMU-specific reserved regions as well - fortunately I don't think
-> there's any current intersection between platforms with RMRR-type
-> reservations and platforms which require MSI mapping - so I think we've
-> got enough freedom for the moment, but it's certainly an argument in
-> favour of ultimately expressing PCI windows through the same mechanism
-> to keep everything in the same place. The other big advantage of
-> reserved regions is that they will automatically apply to DMA domains as
-> well.
-> 
->> If 1) we are back to the original issue of where do we put the MSI
->> window. Obviously at a place which might not be QEMU friendly anymore.
->> What allocation policy shall we use?
->>
->> Second option - sorry I may look stubborn - which I definitively prefer
->> and which was also advocated by Alex, we handle PCI host bridge windows
->> at user level. MSI window is reported through the iommu group sysfs.
->> PCIe host bridge windows can be enumerated through /proc/iomem. Both x86
->> iommu and arm smmu would report an MSI reserved window. ARM MSI window
->> would become a de facto reserved window for guests.
-> 
-> So from the ABI perspective, the sysfs iommu_group/*/reserved_regions
-> represents a minimum set of regions (MSI, RMRR, etc.) which definitely
-> *must* be reserved, but offers no guarantee that there aren't also other
-> regions not represented there. That seems reasonable to start with, and
-> still leaves us free to expand the scope of reserved regions in future
-> without breaking anything.
-> 
->> Thoughts?
-> 
-> I like the second option too - "grep PCI /proc/iomem" already catches
-> more than enumerating the resources does (i.e. ECAM space) - and neither
-> does it preclude growing the more extensive version on top over time.
-> 
-> For the sake of moving forward, I'd be happy with just dropping the PCI
-> stuff from here, and leaving the SMMU drivers exposing the single
-> hard-coded MSI region directly (to be fair, it'd hardly be the first
-> function which is identical between the two).
-OK cool
+Thanks,
+David
+---
+commit 6788837a26d517d10d00138aadd338cc73d69237
+Author: David Howells <dhowells@redhat.com>
+Date:   Mon Nov 21 23:55:55 2016 +0000
 
-Thanks
+    efi: Get the secure boot status
+    
+    Get the firmware's secure-boot status in the kernel boot wrapper and stash
+    it somewhere that the main kernel image can find.
+    
+    The efi_get_secureboot() function is extracted from the arm stub and (a)
+    generalised so that it can be called from x86 and (b) made to use
+    efi_call_runtime() so that it can be run in mixed-mode.
+    
+    Suggested-by: Lukas Wunner <lukas@wunner.de>
+    Signed-off-by: David Howells <dhowells@redhat.com>
 
-Eric
- We can take a look into
-> making iommu-dma implement PCI windows as nomap resv_regions properly as
-> an orthogonal thing (for the sake of DMA domains), after which we should
-> be in a position to drop the hard-coding and start placing the MSI
-> window dynamically where appropriate.
-> 
-> Robin.
-> 
->>>> +static void arm_smmu_put_resv_regions(struct device *dev,
->>>> +				      struct list_head *head)
->>>> +{
->>>> +	struct iommu_resv_region *entry, *next;
->>>> +
->>>> +	list_for_each_entry_safe(entry, next, head, list)
->>>> +		kfree(entry);
->>>> +}
->>>> +
->>>>  static struct iommu_ops arm_smmu_ops = {
->>>>  	.capable		= arm_smmu_capable,
->>>>  	.domain_alloc		= arm_smmu_domain_alloc,
->>>> @@ -1560,6 +1610,8 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
->>>>  	.domain_get_attr	= arm_smmu_domain_get_attr,
->>>>  	.domain_set_attr	= arm_smmu_domain_set_attr,
->>>>  	.of_xlate		= arm_smmu_of_xlate,
->>>> +	.get_resv_regions	= arm_smmu_get_resv_regions,
->>>> +	.put_resv_regions	= arm_smmu_put_resv_regions,
->>>>  	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
->>>>  };
->>>>  
->>>>
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/Documentation/x86/zero-page.txt b/Documentation/x86/zero-page.txt
+index 95a4d34af3fd..b8527c6b7646 100644
+--- a/Documentation/x86/zero-page.txt
++++ b/Documentation/x86/zero-page.txt
+@@ -31,6 +31,8 @@ Offset	Proto	Name		Meaning
+ 1E9/001	ALL	eddbuf_entries	Number of entries in eddbuf (below)
+ 1EA/001	ALL	edd_mbr_sig_buf_entries	Number of entries in edd_mbr_sig_buffer
+ 				(below)
++1EB/001	ALL     kbd_status      Numlock is enabled
++1EC/001	ALL     secure_boot	Secure boot is enabled in the firmware
+ 1EF/001	ALL	sentinel	Used to detect broken bootloaders
+ 290/040	ALL	edd_mbr_sig_buffer EDD MBR signatures
+ 2D0/A00	ALL	e820_map	E820 memory map table
+diff --git a/arch/x86/boot/compressed/eboot.c b/arch/x86/boot/compressed/eboot.c
+index c8c32ebcdfdb..5b151c262ac2 100644
+--- a/arch/x86/boot/compressed/eboot.c
++++ b/arch/x86/boot/compressed/eboot.c
+@@ -1158,6 +1158,8 @@ struct boot_params *efi_main(struct efi_config *c,
+ 	else
+ 		setup_boot_services32(efi_early);
+ 
++	boot_params->secure_boot = efi_get_secureboot(sys_table);
++
+ 	setup_graphics(boot_params);
+ 
+ 	setup_efi_pci(boot_params);
+diff --git a/arch/x86/boot/compressed/head_32.S b/arch/x86/boot/compressed/head_32.S
+index d85b9625e836..c635f7e32f5c 100644
+--- a/arch/x86/boot/compressed/head_32.S
++++ b/arch/x86/boot/compressed/head_32.S
+@@ -61,6 +61,7 @@
+ 
+ 	__HEAD
+ ENTRY(startup_32)
++	movb	$0, BP_secure_boot(%esi)
+ #ifdef CONFIG_EFI_STUB
+ 	jmp	preferred_addr
+ 
+diff --git a/arch/x86/boot/compressed/head_64.S b/arch/x86/boot/compressed/head_64.S
+index beab8322f72a..ccd2c7461b7f 100644
+--- a/arch/x86/boot/compressed/head_64.S
++++ b/arch/x86/boot/compressed/head_64.S
+@@ -244,6 +244,7 @@ ENTRY(startup_64)
+ 	 * that maps our entire kernel(text+data+bss+brk), zero page
+ 	 * and command line.
+ 	 */
++	movb	$0, BP_secure_boot(%rsi)
+ #ifdef CONFIG_EFI_STUB
+ 	/*
+ 	 * The entry point for the PE/COFF executable is efi_pe_entry, so
+diff --git a/arch/x86/include/asm/bootparam_utils.h b/arch/x86/include/asm/bootparam_utils.h
+index 4a8cb8d7cbd5..7e16d53ff6a3 100644
+--- a/arch/x86/include/asm/bootparam_utils.h
++++ b/arch/x86/include/asm/bootparam_utils.h
+@@ -38,9 +38,10 @@ static void sanitize_boot_params(struct boot_params *boot_params)
+ 		memset(&boot_params->ext_ramdisk_image, 0,
+ 		       (char *)&boot_params->efi_info -
+ 			(char *)&boot_params->ext_ramdisk_image);
+-		memset(&boot_params->kbd_status, 0,
++		boot_params->kbd_status = 0;
++		memset(&boot_params->_pad5, 0,
+ 		       (char *)&boot_params->hdr -
+-		       (char *)&boot_params->kbd_status);
++		       (char *)&boot_params->_pad5);
+ 		memset(&boot_params->_pad7[0], 0,
+ 		       (char *)&boot_params->edd_mbr_sig_buffer[0] -
+ 			(char *)&boot_params->_pad7[0]);
+diff --git a/arch/x86/include/uapi/asm/bootparam.h b/arch/x86/include/uapi/asm/bootparam.h
+index b10bf319ed20..5138dacf8bb8 100644
+--- a/arch/x86/include/uapi/asm/bootparam.h
++++ b/arch/x86/include/uapi/asm/bootparam.h
+@@ -135,7 +135,8 @@ struct boot_params {
+ 	__u8  eddbuf_entries;				/* 0x1e9 */
+ 	__u8  edd_mbr_sig_buf_entries;			/* 0x1ea */
+ 	__u8  kbd_status;				/* 0x1eb */
+-	__u8  _pad5[3];					/* 0x1ec */
++	__u8  secure_boot;				/* 0x1ec */
++	__u8  _pad5[2];					/* 0x1ed */
+ 	/*
+ 	 * The sentinel is set to a nonzero value (0xff) in header.S.
+ 	 *
+diff --git a/arch/x86/kernel/asm-offsets.c b/arch/x86/kernel/asm-offsets.c
+index c62e015b126c..de827d6ac8c2 100644
+--- a/arch/x86/kernel/asm-offsets.c
++++ b/arch/x86/kernel/asm-offsets.c
+@@ -81,6 +81,7 @@ void common(void) {
+ 
+ 	BLANK();
+ 	OFFSET(BP_scratch, boot_params, scratch);
++	OFFSET(BP_secure_boot, boot_params, secure_boot);
+ 	OFFSET(BP_loadflags, boot_params, hdr.loadflags);
+ 	OFFSET(BP_hardware_subarch, boot_params, hdr.hardware_subarch);
+ 	OFFSET(BP_version, boot_params, hdr.version);
+diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+index 6621b13c370f..9af966863612 100644
+--- a/drivers/firmware/efi/libstub/Makefile
++++ b/drivers/firmware/efi/libstub/Makefile
+@@ -28,7 +28,7 @@ OBJECT_FILES_NON_STANDARD	:= y
+ # Prevents link failures: __sanitizer_cov_trace_pc() is not linked in.
+ KCOV_INSTRUMENT			:= n
+ 
+-lib-y				:= efi-stub-helper.o gop.o
++lib-y				:= efi-stub-helper.o gop.o secureboot.o
+ 
+ # include the stub's generic dependencies from lib/ when building for ARM/arm64
+ arm-deps := fdt_rw.c fdt_ro.c fdt_wip.c fdt.c fdt_empty_tree.c fdt_sw.c sort.c
+diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+index b4f7d78f9e8b..9984d0442442 100644
+--- a/drivers/firmware/efi/libstub/arm-stub.c
++++ b/drivers/firmware/efi/libstub/arm-stub.c
+@@ -20,52 +20,6 @@
+ 
+ bool __nokaslr;
+ 
+-static int efi_get_secureboot(efi_system_table_t *sys_table_arg)
+-{
+-	static efi_char16_t const sb_var_name[] = {
+-		'S', 'e', 'c', 'u', 'r', 'e', 'B', 'o', 'o', 't', 0 };
+-	static efi_char16_t const sm_var_name[] = {
+-		'S', 'e', 't', 'u', 'p', 'M', 'o', 'd', 'e', 0 };
+-
+-	efi_guid_t var_guid = EFI_GLOBAL_VARIABLE_GUID;
+-	efi_get_variable_t *f_getvar = sys_table_arg->runtime->get_variable;
+-	u8 val;
+-	unsigned long size = sizeof(val);
+-	efi_status_t status;
+-
+-	status = f_getvar((efi_char16_t *)sb_var_name, (efi_guid_t *)&var_guid,
+-			  NULL, &size, &val);
+-
+-	if (status != EFI_SUCCESS)
+-		goto out_efi_err;
+-
+-	if (val == 0)
+-		return 0;
+-
+-	status = f_getvar((efi_char16_t *)sm_var_name, (efi_guid_t *)&var_guid,
+-			  NULL, &size, &val);
+-
+-	if (status != EFI_SUCCESS)
+-		goto out_efi_err;
+-
+-	if (val == 1)
+-		return 0;
+-
+-	return 1;
+-
+-out_efi_err:
+-	switch (status) {
+-	case EFI_NOT_FOUND:
+-		return 0;
+-	case EFI_DEVICE_ERROR:
+-		return -EIO;
+-	case EFI_SECURITY_VIOLATION:
+-		return -EACCES;
+-	default:
+-		return -EINVAL;
+-	}
+-}
+-
+ efi_status_t efi_open_volume(efi_system_table_t *sys_table_arg,
+ 			     void *__image, void **__fh)
+ {
+@@ -226,7 +180,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 	efi_guid_t loaded_image_proto = LOADED_IMAGE_PROTOCOL_GUID;
+ 	unsigned long reserve_addr = 0;
+ 	unsigned long reserve_size = 0;
+-	int secure_boot = 0;
++	enum efi_secureboot_mode secure_boot;
+ 	struct screen_info *si;
+ 
+ 	/* Check if we were booted by the EFI firmware */
+@@ -296,19 +250,14 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 		pr_efi_err(sys_table, "Failed to parse EFI cmdline options\n");
+ 
+ 	secure_boot = efi_get_secureboot(sys_table);
+-	if (secure_boot > 0)
+-		pr_efi(sys_table, "UEFI Secure Boot is enabled.\n");
+-
+-	if (secure_boot < 0) {
+-		pr_efi_err(sys_table,
+-			"could not determine UEFI Secure Boot status.\n");
+-	}
+ 
+ 	/*
+-	 * Unauthenticated device tree data is a security hazard, so
+-	 * ignore 'dtb=' unless UEFI Secure Boot is disabled.
++	 * Unauthenticated device tree data is a security hazard, so ignore
++	 * 'dtb=' unless UEFI Secure Boot is disabled.  We assume that secure
++	 * boot is enabled if we can't determine its state.
+ 	 */
+-	if (secure_boot != 0 && strstr(cmdline_ptr, "dtb=")) {
++	if (secure_boot != efi_secureboot_mode_disabled &&
++	    strstr(cmdline_ptr, "dtb=")) {
+ 		pr_efi(sys_table, "Ignoring DTB from command line.\n");
+ 	} else {
+ 		status = handle_cmdline_files(sys_table, image, cmdline_ptr,
+diff --git a/drivers/firmware/efi/libstub/secureboot.c b/drivers/firmware/efi/libstub/secureboot.c
+new file mode 100644
+index 000000000000..62d6904da800
+--- /dev/null
++++ b/drivers/firmware/efi/libstub/secureboot.c
+@@ -0,0 +1,63 @@
++/*
++ * Secure boot handling.
++ *
++ * Copyright (C) 2013,2014 Linaro Limited
++ *     Roy Franz <roy.franz at linaro.org
++ * Copyright (C) 2013 Red Hat, Inc.
++ *     Mark Salter <msalter@redhat.com>
++ *
++ * This file is part of the Linux kernel, and is made available under the
++ * terms of the GNU General Public License version 2.
++ *
++ */
++
++#include <linux/efi.h>
++#include <asm/efi.h>
++
++/* BIOS variables */
++static const efi_guid_t efi_variable_guid = EFI_GLOBAL_VARIABLE_GUID;
++static const efi_char16_t const efi_SecureBoot_name[] = {
++	'S', 'e', 'c', 'u', 'r', 'e', 'B', 'o', 'o', 't', 0
++};
++static const efi_char16_t const efi_SetupMode_name[] = {
++	'S', 'e', 't', 'u', 'p', 'M', 'o', 'd', 'e', 0
++};
++
++#define get_efi_var(name, vendor, ...) \
++	efi_call_runtime(get_variable, \
++			 (efi_char16_t *)(name), (efi_guid_t *)(vendor), \
++			 __VA_ARGS__);
++
++/*
++ * Determine whether we're in secure boot mode.
++ */
++enum efi_secureboot_mode efi_get_secureboot(efi_system_table_t *sys_table_arg)
++{
++	u8 secboot, setupmode;
++	unsigned long size;
++	efi_status_t status;
++
++	size = sizeof(secboot);
++	status = get_efi_var(efi_SecureBoot_name, &efi_variable_guid,
++			     NULL, &size, &secboot);
++	if (status != EFI_SUCCESS)
++		goto out_efi_err;
++
++	size = sizeof(setupmode);
++	status = get_efi_var(efi_SetupMode_name, &efi_variable_guid,
++			     NULL, &size, &setupmode);
++	if (status != EFI_SUCCESS)
++		goto out_efi_err;
++
++	if (secboot == 0 || setupmode == 1)
++		return efi_secureboot_mode_disabled;
++
++	pr_efi(sys_table_arg, "UEFI Secure Boot is enabled.\n");
++	return efi_secureboot_mode_enabled;
++
++out_efi_err:
++	pr_efi_err(sys_table_arg, "Could not determine UEFI Secure Boot status.\n");
++	if (status == EFI_NOT_FOUND)
++		return efi_secureboot_mode_disabled;
++	return efi_secureboot_mode_unknown;
++}
+diff --git a/include/linux/efi.h b/include/linux/efi.h
+index c7904556d7a8..92e23f03045e 100644
+--- a/include/linux/efi.h
++++ b/include/linux/efi.h
+@@ -1477,6 +1477,14 @@ efi_status_t efi_setup_gop(efi_system_table_t *sys_table_arg,
+ bool efi_runtime_disabled(void);
+ extern void efi_call_virt_check_flags(unsigned long flags, const char *call);
+ 
++enum efi_secureboot_mode {
++	efi_secureboot_mode_unset,
++	efi_secureboot_mode_unknown,
++	efi_secureboot_mode_disabled,
++	efi_secureboot_mode_enabled,
++};
++enum efi_secureboot_mode efi_get_secureboot(efi_system_table_t *sys_table);
++
+ /*
+  * Arch code can implement the following three template macros, avoiding
+  * reptition for the void/non-void return cases of {__,}efi_call_virt():
