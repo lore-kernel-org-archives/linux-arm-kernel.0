@@ -1,64 +1,139 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 8 Dec 2016 21:29:35 +0530
-Subject: [PATCH] dmaengine: pl330: do not generate unaligned access
-In-Reply-To: <1481116660-27837-1-git-send-email-vladimir.murzin@arm.com>
-References: <1481116660-27837-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20161208155935.GF6408@localhost>
+From: david.wu@rock-chips.com (David.Wu)
+Date: Thu, 8 Dec 2016 23:50:15 +0800
+Subject: [PATCH] i2c: rk3x: keep i2c irq ON in suspend
+In-Reply-To: <e34bab0d-b4b1-ff0d-3a27-c3701b8206c1@ti.com>
+References: <1480924979-13450-1-git-send-email-david.wu@rock-chips.com>
+ <1737869.ycGphUXI8X@phil>
+ <1d570232-af87-467e-e6f4-5b514d583a02@rock-chips.com>
+ <CAD=FV=VgGy5hA4+7nvLs4NPNRuopak+bTW34S6X6S_vWgtnkjg@mail.gmail.com>
+ <a6694d7d-6fca-e5ef-7bbd-9956562132a2@rock-chips.com>
+ <e34bab0d-b4b1-ff0d-3a27-c3701b8206c1@ti.com>
+Message-ID: <f6fe8a66-05d2-91c9-ddfe-b90b929ac8a1@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 01:17:40PM +0000, Vladimir Murzin wrote:
-> When PL330 is used with !MMU the following fault is seen:
-> 
-> Unhandled fault: alignment exception (0x801) at 0x8f26a002
-> Internal error: : 801 [#1] ARM
-> Modules linked in:
-> CPU: 0 PID: 640 Comm: dma0chan0-copy0 Not tainted 4.8.0-6a82063-clean+ #1600
-> Hardware name: ARM-Versatile Express
-> task: 8f1baa80 task.stack: 8e6fe000
-> PC is at _setup_req+0x4c/0x350
-> LR is at 0x8f2cbc00
-> pc : [<801ea538>]    lr : [<8f2cbc00>]    psr: 60000093
-> sp : 8e6ffdc0  ip : 00000000  fp : 00000000
-> r10: 00000000  r9 : 8f2cba10  r8 : 8f2cbc00
-> r7 : 80000013  r6 : 8f21a050  r5 : 8f21a000  r4 : 8f2ac800
-> r3 : 8e6ffe18  r2 : 00944251  r1 : ffffffbc  r0 : 8f26a000
-> Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment none
-> Control: 00c5387c
-> Process dma0chan0-copy0 (pid: 640, stack limit = 0x8e6fe210)
-> Stack: (0x8e6ffdc0 to 0x8e700000)
-> fdc0: 00000001 60000093 00000000 8f2cba10 8f26a000 00000004 8f0ae000 8f2cbc00
-> fde0: 8f0ae000 8f2ac800 8f21a000 8f21a050 80000013 8f2cbc00 8f2cba10 00000000
-> fe00: 60000093 801ebca0 8e6ffe18 000013ff 40000093 00000000 00944251 8f2ac800
-> fe20: a0000013 8f2b1320 00001986 00000000 00000001 000013ff 8f1e4f00 8f2cba10
-> fe40: 8e6fff6c 801e9044 00000003 00000000 fef98c80 002faf07 8e6ffe7c 00000000
-> fe60: 00000002 00000000 00001986 8f1f158d 8f1e4f00 80568de4 00000002 00000000
-> fe80: 00001986 8f1f53ff 40000001 80580500 8f1f158d 8001e00c 00000000 cfdfdfdf
-> fea0: fdae2a25 00000001 00000004 8e6fe000 00000008 00000010 00000000 00000005
-> fec0: 8f2b1330 8f2b1334 8e6ffe80 8e6ffe8c 00001986 00000000 8f21a014 00000001
-> fee0: 8e6ffe60 8e6ffe78 00000002 00000000 000013ff 00000001 80568de4 8f1e8018
-> ff00: 0000158d 8055ec30 00000001 803f6b00 00001986 8f2cba10 fdae2a25 00000001
-> ff20: 8f1baca8 8e6fff24 8e6fff24 00000000 8e6fff24 ac6f3037 00000000 00000000
-> ff40: 00000000 8e6fe000 8f1e4f40 00000000 8f1e4f40 8f1e4f00 801e84ec 00000000
-> ff60: 00000000 00000000 00000000 80031714 dfdfdfcf 00000000 dfdfdfcf 8f1e4f00
-> ff80: 00000000 8e6fff84 8e6fff84 00000000 8e6fff90 8e6fff90 8e6fffac 8f1e4f40
-> ffa0: 80031640 00000000 00000000 8000f548 00000000 00000000 00000000 00000000
-> ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-> ffe0: 00000000 00000000 00000000 00000000 00000013 00000000 dfdfdfcf cfdfdfdf
-> [<801ea538>] (_setup_req) from [<801ebca0>] (pl330_tasklet+0x41c/0x490)
-> [<801ebca0>] (pl330_tasklet) from [<801e9044>] (dmatest_func+0xb58/0x149c)
-> [<801e9044>] (dmatest_func) from [<80031714>] (kthread+0xd4/0xec)
-> [<80031714>] (kthread) from [<8000f548>] (ret_from_fork+0x14/0x2c)
-> Code: e3a03001 e3e01043 e5c03001 e59d3048 (e5802002)
-> 
-> This happens because _emit_{ADDH,MOV,GO) accessing to unaligned data
-> while writing to buffer. Fix it with writing to buffer byte by byte.
+Hi Grygorii, Doug and Heiko,
 
-Applied, now.
+Thanks for your replies.
+I will do 2 steps:
 
-Although I didn't really like duplicating code for writing bytes, that could
-be made a common fn
+1. Add "suspended" flag in suspend_noirq()/resume_noirq() callback to 
+prevent new i2c started, and use i2c_lock_adapter() to wait for current 
+i2c transfer finished.
 
-Thanks
--- 
-~Vinod
+2. IRQF_NO_SUSPEND added could make i2c work well during the time 
+between suspend_device_irqs() and i2c_suspend_noirq() callback. In the 
+other side, it is the the time between resume_device_irqs() and 
+i2c_resume_noirq() callback.
+
+If any i2c client try to access I2C after suspend_noirq() or before 
+resume_noirq() callback, print the warning, and they should fix it, not 
+to start i2c access and the moment.
+
+? 2016/12/8 0:27, Grygorii Strashko ??:
+>
+>
+> On 12/06/2016 09:37 PM, David.Wu wrote:
+>> Hi Doug,
+>>
+>> ? 2016/12/7 0:31, Doug Anderson ??:
+>>> Hi,
+>>>
+>>> On Tue, Dec 6, 2016 at 12:12 AM, David.Wu <david.wu@rock-chips.com>
+>>> wrote:
+>>>> Hi Heiko,
+>>>>
+>>>> ? 2016/12/5 18:54, Heiko Stuebner ??:
+>>>>>
+>>>>> Hi David,
+>>>>>
+>>>>> Am Montag, 5. Dezember 2016, 16:02:59 CET schrieb David Wu:
+>>>>>>
+>>>>>> During suspend there may still be some i2c access happening.
+>>>>>> And if we don't keep i2c irq ON, there may be i2c access timeout if
+>>>>>> i2c is in irq mode of operation.
+>>>>>
+>>>>>
+>>>>> can you describe the issue you're trying to fix a bit more please?
+>>>>
+>>>>
+>>>> Sometimes we could see the i2c timeout errors during suspend/resume,
+>>>> which
+>>>> makes the duration of suspend/resume too longer.
+>>>>
+>>>> [  484.171541] CPU4: Booted secondary processor [410fd082]
+>>>> [  485.172777] rk3x-i2c ff3c0000.i2c: timeout, ipd: 0x10, state: 1
+>>>> [  486.172760] rk3x-i2c ff3c0000.i2c: timeout, ipd: 0x10, state: 1
+>>>> [  487.172759] rk3x-i2c ff3c0000.i2c: timeout, ipd: 0x10, state: 1
+>>>> [  487.172840] cpu cpu4: _set_opp_voltage: failed to set voltage (800000
+>>>> 800000 800000 mV): -110
+>>>> [  487.172874] cpu cpu4: failed to set volt 800000
+>>>>
+>>>>>
+>>>>> I.e. I'd think the i2c-core does suspend i2c-client devices first,
+>>>>> so that
+>>>>> these should be able to finish up their ongoing transfers and not start
+>>>>> any
+>>>>> new ones instead?
+>>>>>
+>>>>> Your irq can still happen slightly after the system started going to
+>>>>> actually
+>>>>> sleep, so to me it looks like you just widened the window where irqs
+>>>>> can
+>>>>> be
+>>>>> handled. Especially as your irq could also just simply stem from the
+>>>>> start
+>>>>> state, so you cannot even be sure if your transaction actually is
+>>>>> finished.
+>>>>
+>>>>
+>>>> Okay, you are right. I want to give it a double insurance at first,
+>>>> but it
+>>>> may hide the unhappend issue.
+>>>>
+>>>>>
+>>>>> So to me it looks like the i2c-connected device driver should be fixed
+>>>>> instead?
+>>>>
+>>>>
+>>>> I tell them to fix it in rk808 driver.
+>>>
+>>> To me it seems like perhaps cpufreq should not be changing frequencies
+>>> until it is resumed properly.  Presumably if all the ordering is done
+>>> right then cpufreq should be resumed _after_ the i2c regulator so you
+>>> should be OK.  ...or am I somehow confused about that?
+>>
+>> yes?the cpufreq and regulator should start i2c job after they resume
+>> properly.
+>>
+>>>
+>>> Also note that previous i2c busses I worked with simply returned -EIO
+>>> in the case where they were called when suspended.  See
+>>> "i2c-exynos5.c" and "i2c-s3c2410.c".
+>>
+>> In "i2c-exynos5.c", it seems that using the "i2c->suspended" to protect
+>> i2c transfer works most of the time. Of course it could prevent the next
+>> new i2c transfer to start. But in one case, if the current i2c job was
+>> not finished until the i2c irq was disabled by system suspend, the i2c
+>> timeout error would also happen, as the current i2c job may have a large
+>> data to transfer and it lasts from a long time.
+>
+> And this means you have bug in some of I2C client drivers which do not stop
+> their activities during suspend properly (most usual case - driver uses work
+> and this work still active during suspend and can run on one CPU while suspend
+> runs on another).
+>
+> At the moment .suspend_noirq() callback is called there should be no active
+> I2C transactions in general.
+>
+>>
+>> So is it necessary to add a mutex lock to wait the current job to be
+>> finished before the "i2c->suspended" is changed in i2c_suspend_noirq()?
+>>
+>
+> You need to catch and fix all driver who will try to access I2C after your
+> I2C bus driver passes suspend_noirq stage. Smth, like [1], uses i2c_lock_adapter().
+>
+>
+> [1] https://git.ti.com/android-sdk/kernel-omap/commit/125ef8f7016e7b205886f93862288a45a312b1d8
+>
