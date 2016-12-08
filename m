@@ -1,69 +1,200 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Thu, 08 Dec 2016 11:47:13 +0000
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <CAMuHMdUULnPuTqEwRN2Z3gy2nmV37iLwJdNzrEvgpcG-EJS8OQ@mail.gmail.com>
- (Geert Uytterhoeven's message of "Thu, 8 Dec 2016 12:18:59 +0100")
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
- <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
- <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
- <yw1xwpfd2o9f.fsf@unicorn.mansr.com> <20161207164341.GX6408@localhost>
- <yw1xr35j1yd5.fsf@unicorn.mansr.com> <20161208103921.GC6408@localhost>
- <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
- <CAMuHMdUULnPuTqEwRN2Z3gy2nmV37iLwJdNzrEvgpcG-EJS8OQ@mail.gmail.com>
-Message-ID: <yw1x1sxi1w3i.fsf@unicorn.mansr.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 8 Dec 2016 12:52:39 +0100
+Subject: [PATCH v9 05/11] arm/arm64: vgic: Introduce VENG0 and VENG1
+ fields to vmcr struct
+In-Reply-To: <20161128142836.GE18170@cbox>
+References: <1479906118-15832-1-git-send-email-vijay.kilari@gmail.com>
+ <1479906118-15832-6-git-send-email-vijay.kilari@gmail.com>
+ <20161128142836.GE18170@cbox>
+Message-ID: <ace0aa83-aa6e-ca64-8edf-fcd2dd07585e@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geert Uytterhoeven <geert@linux-m68k.org> writes:
+Hi Vijay,
 
-> On Thu, Dec 8, 2016 at 11:54 AM, Mason <slash.tmp@free.fr> wrote:
->> On 08/12/2016 11:39, Vinod Koul wrote:
->>> On Wed, Dec 07, 2016 at 04:45:58PM +0000, M?ns Rullg?rd wrote:
->>>> Vinod Koul <vinod.koul@intel.com> writes:
->>>>> On Tue, Dec 06, 2016 at 01:14:20PM +0000, M?ns Rullg?rd wrote:
->>>>>> That's not going to work very well.  Device drivers typically request
->>>>>> dma channels in their probe functions or when the device is opened.
->>>>>> This means that reserving one of the few channels there will inevitably
->>>>>> make some other device fail to operate.
->>>>>
->>>>> No that doesn't make sense at all, you should get a channel only when you
->>>>> want to use it and not in probe!
->>>>
->>>> Tell that to just about every single driver ever written.
->>>
->>> Not really, few do yes which is wrong but not _all_ do that.
+On 28/11/2016 15:28, Christoffer Dall wrote:
+> On Wed, Nov 23, 2016 at 06:31:52PM +0530, vijay.kilari at gmail.com wrote:
+>> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
 >>
->> Vinod,
+>> ICC_VMCR_EL2 supports virtual access to ICC_IGRPEN1_EL1.Enable
+>> and ICC_IGRPEN0_EL1.Enable fields. Add grpen0 and grpen1 member
+>> variables to struct vmcr to support read and write of these fields.
 >>
->> Could you explain something to me in layman's terms?
+>> Also refactor vgic_set_vmcr and vgic_get_vmcr() code.
+>> Drop ICH_VMCR_CTLR_SHIFT and ICH_VMCR_CTLR_MASK macros and instead
+>> use ICH_VMCR_EOI* and ICH_VMCR_CBPR* macros
+>> .
+>> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>> ---
+>>  include/linux/irqchip/arm-gic-v3.h |  2 --
+>>  virt/kvm/arm/vgic/vgic-mmio-v2.c   | 16 ----------------
+>>  virt/kvm/arm/vgic/vgic-mmio.c      | 16 ++++++++++++++++
+>>  virt/kvm/arm/vgic/vgic-v3.c        | 22 ++++++++++++++++++++--
+>>  virt/kvm/arm/vgic/vgic.h           |  5 +++++
+>>  5 files changed, 41 insertions(+), 20 deletions(-)
 >>
->> I have a NAND Flash Controller driver that depends on the
->> DMA driver under discussion.
->>
->> Suppose I move the dma_request_chan() call from the driver's
->> probe function, to the actual DMA transfer function.
->>
->> I would want dma_request_chan() to put the calling thread
->> to sleep until a channel becomes available (possibly with
->> a timeout value).
->>
->> But Maxime told me dma_request_chan() will just return
->> -EBUSY if no channels are available.
->>
->> Am I supposed to busy wait in my driver's DMA function
->> until a channel becomes available?
->
-> Can you fall back to PIO if requesting a channel fails?
->
-> Alternatively, dma_request_chan() could always succeed, and
-> dmaengine_prep_slave_sg() could fail if the channel is currently not
-> available due to a limitation on the number of active channels, and
-> the driver could fall back to PIO for that transfer.
+>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>> index b4f8287..406fc3e 100644
+>> --- a/include/linux/irqchip/arm-gic-v3.h
+>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>> @@ -404,8 +404,6 @@
+>>  #define ICH_HCR_EN			(1 << 0)
+>>  #define ICH_HCR_UIE			(1 << 1)
+>>  
+>> -#define ICH_VMCR_CTLR_SHIFT		0
+>> -#define ICH_VMCR_CTLR_MASK		(0x21f << ICH_VMCR_CTLR_SHIFT)
+>>  #define ICH_VMCR_CBPR_SHIFT		4
+>>  #define ICH_VMCR_CBPR_MASK		(1 << ICH_VMCR_CBPR_SHIFT)
+>>  #define ICH_VMCR_EOIM_SHIFT		9
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>> index 2cb04b7..ad353b5 100644
+>> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>> @@ -212,22 +212,6 @@ static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
+>>  	}
+>>  }
+>>  
+>> -static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+>> -{
+>> -	if (kvm_vgic_global_state.type == VGIC_V2)
+>> -		vgic_v2_set_vmcr(vcpu, vmcr);
+>> -	else
+>> -		vgic_v3_set_vmcr(vcpu, vmcr);
+>> -}
+>> -
+>> -static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+>> -{
+>> -	if (kvm_vgic_global_state.type == VGIC_V2)
+>> -		vgic_v2_get_vmcr(vcpu, vmcr);
+>> -	else
+>> -		vgic_v3_get_vmcr(vcpu, vmcr);
+>> -}
+>> -
+>>  #define GICC_ARCH_VERSION_V2	0x2
+>>  
+>>  /* These are for userland accesses only, there is no guest-facing emulation. */
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+>> index 0d1bc98..f81e0e5 100644
+>> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+>> @@ -416,6 +416,22 @@ int vgic_validate_mmio_region_addr(struct kvm_device *dev,
+>>  	return -ENXIO;
+>>  }
+>>  
+>> +void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+>> +{
+>> +	if (kvm_vgic_global_state.type == VGIC_V2)
+>> +		vgic_v2_set_vmcr(vcpu, vmcr);
+>> +	else
+>> +		vgic_v3_set_vmcr(vcpu, vmcr);
+>> +}
+>> +
+>> +void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+>> +{
+>> +	if (kvm_vgic_global_state.type == VGIC_V2)
+>> +		vgic_v2_get_vmcr(vcpu, vmcr);
+>> +	else
+>> +		vgic_v3_get_vmcr(vcpu, vmcr);
+>> +}
+>> +
+>>  /*
+>>   * kvm_mmio_read_buf() returns a value in a format where it can be converted
+>>   * to a byte array and be directly observed as the guest wanted it to appear
+>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+>> index 9f0dae3..a3ff04b 100644
+>> --- a/virt/kvm/arm/vgic/vgic-v3.c
+>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+>> @@ -175,10 +175,19 @@ void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+>>  {
+>>  	u32 vmcr;
+>>  
+>> -	vmcr  = (vmcrp->ctlr << ICH_VMCR_CTLR_SHIFT) & ICH_VMCR_CTLR_MASK;
+>> +	/*
+>> +	 * Ignore the FIQen bit, because GIC emulation always implies
+>> +	 * SRE=1 which means the vFIQEn bit is also RES1.
+>> +	 */
+>> +	vmcr = (vmcrp->ctlr & ICC_CTLR_EL1_EOImode_MASK) >>
+>> +		ICC_CTLR_EL1_EOImode_SHIFT;
+>> +	vmcr = (vmcr << ICH_VMCR_EOIM_SHIFT) & ICH_VMCR_EOIM_MASK;
+I am not able to understand why we use ICC_CTLR _*macros here? Please
+could you explain it to me? Besides if we want to ignore the FIQen bit
+can't we change the ICH_VMCR_CTLR_MASK value?
 
-Why are we debating this nonsense?  There is an easy fix that doesn't
-require changing the semantics of existing functions or falling back to
-slow pio.
+Thanks
 
--- 
-M?ns Rullg?rd
+Eric
+> 
+> Nit: I think this can be written more nicely as:
+> 	vmcr = ((vmcrp->ctlr >> ICC_CTLR_EL1_EOImode_SHIFT)
+> 		<< ICH_VMCR_EOIM_SHIFT) & ICH_VMCR_EOIM_MASK;
+> 
+>> +	vmcr |= (vmcrp->ctlr << ICH_VMCR_CBPR_SHIFT) & ICH_VMCR_CBPR_MASK;
+>>  	vmcr |= (vmcrp->abpr << ICH_VMCR_BPR1_SHIFT) & ICH_VMCR_BPR1_MASK;
+>>  	vmcr |= (vmcrp->bpr << ICH_VMCR_BPR0_SHIFT) & ICH_VMCR_BPR0_MASK;
+>>  	vmcr |= (vmcrp->pmr << ICH_VMCR_PMR_SHIFT) & ICH_VMCR_PMR_MASK;
+>> +	vmcr |= (vmcrp->grpen0 << ICH_VMCR_ENG0_SHIFT) & ICH_VMCR_ENG0_MASK;
+>> +	vmcr |= (vmcrp->grpen1 << ICH_VMCR_ENG1_SHIFT) & ICH_VMCR_ENG1_MASK;
+>>  
+>>  	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = vmcr;
+>>  }
+>> @@ -187,10 +196,19 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+>>  {
+>>  	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr;
+>>  
+>> -	vmcrp->ctlr = (vmcr & ICH_VMCR_CTLR_MASK) >> ICH_VMCR_CTLR_SHIFT;
+>> +	/*
+>> +	 * Ignore the FIQen bit, because GIC emulation always implies
+>> +	 * SRE=1 which means the vFIQEn bit is also RES1.
+>> +	 */
+>> +	vmcrp->ctlr = (vmcr & ICH_VMCR_EOIM_MASK) >> ICH_VMCR_EOIM_SHIFT;
+>> +	vmcrp->ctlr = (vmcrp->ctlr << ICC_CTLR_EL1_EOImode_SHIFT) &
+>> +		       ICC_CTLR_EL1_EOImode_MASK;
+> 
+> similarly, this could be written as:
+> 	vmcrp->ctlr = ((vmcr >> ICH_VMCR_EOIM_SHIFT) <<
+> 			ICC_CTLR_EL1_EOImode_SHIFT) & ICC_CTLR_EL1_EOImode_MASK;
+> 
+>> +	vmcrp->ctlr |= (vmcr & ICH_VMCR_CBPR_MASK) >> ICH_VMCR_CBPR_SHIFT;
+>>  	vmcrp->abpr = (vmcr & ICH_VMCR_BPR1_MASK) >> ICH_VMCR_BPR1_SHIFT;
+>>  	vmcrp->bpr  = (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
+>>  	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
+>> +	vmcrp->grpen0 = (vmcr & ICH_VMCR_ENG0_MASK) >> ICH_VMCR_ENG0_SHIFT;
+>> +	vmcrp->grpen1 = (vmcr & ICH_VMCR_ENG1_MASK) >> ICH_VMCR_ENG1_SHIFT;
+>>  }
+>>  
+>>  #define INITIAL_PENDBASER_VALUE						  \
+>> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+>> index 91f58b2..9232791 100644
+>> --- a/virt/kvm/arm/vgic/vgic.h
+>> +++ b/virt/kvm/arm/vgic/vgic.h
+>> @@ -78,6 +78,9 @@ struct vgic_vmcr {
+>>  	u32	abpr;
+>>  	u32	bpr;
+>>  	u32	pmr;
+>> +	/* Below member variable are valid only for GICv3 */
+>> +	u32	grpen0;
+>> +	u32	grpen1;
+>>  };
+>>  
+>>  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+>> @@ -138,6 +141,8 @@ int vgic_v3_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+>>  int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+>>  			 int offset, u32 *val);
+>>  int kvm_register_vgic_device(unsigned long type);
+>> +void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>> +void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>>  int vgic_lazy_init(struct kvm *kvm);
+>>  int vgic_init(struct kvm *kvm);
+>>  
+>> -- 
+>> 1.9.1
+>>
+> My comments on style above notwithstanding:
+> 
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
