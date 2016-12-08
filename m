@@ -1,61 +1,53 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 8 Dec 2016 13:31:34 +0100
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <yw1xshpyzk6p.fsf@unicorn.mansr.com>
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
- <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
- <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
- <yw1xwpfd2o9f.fsf@unicorn.mansr.com> <20161207164341.GX6408@localhost>
- <yw1xr35j1yd5.fsf@unicorn.mansr.com> <20161208103921.GC6408@localhost>
- <yw1x60mu1w7e.fsf@unicorn.mansr.com>
- <CAMuHMdUEXJtWF3S8yK5RY5e60nOnb-Wc9U2E_L553hZvsijvcw@mail.gmail.com>
- <yw1xshpyzk6p.fsf@unicorn.mansr.com>
-Message-ID: <CAMuHMdUAYRuYtmdQpNKyq5Xo0keFa7Oyess-L-p7oLd8MegY2A@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 8 Dec 2016 18:02:50 +0530
+Subject: [PATCH v6 1/2] ARM: davinci: Export two clocks function
+In-Reply-To: <1481130567-27829-1-git-send-email-abailon@baylibre.com>
+References: <1481130567-27829-1-git-send-email-abailon@baylibre.com>
+Message-ID: <4e313609-0acc-4e06-85e6-ba36b7916b33@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 8, 2016 at 1:20 PM, M?ns Rullg?rd <mans@mansr.com> wrote:
-> Geert Uytterhoeven <geert@linux-m68k.org> writes:
->> On Thu, Dec 8, 2016 at 12:44 PM, M?ns Rullg?rd <mans@mansr.com> wrote:
->>> Vinod Koul <vinod.koul@intel.com> writes:
->>>> On Wed, Dec 07, 2016 at 04:45:58PM +0000, M?ns Rullg?rd wrote:
->>>>> Vinod Koul <vinod.koul@intel.com> writes:
->>>>> > On Tue, Dec 06, 2016 at 01:14:20PM +0000, M?ns Rullg?rd wrote:
->>>>> >> That's not going to work very well.  Device drivers typically request
->>>>> >> dma channels in their probe functions or when the device is opened.
->>>>> >> This means that reserving one of the few channels there will inevitably
->>>>> >> make some other device fail to operate.
->>>>> >
->>>>> > No that doesnt make sense at all, you should get a channel only when you
->>>>> > want to use it and not in probe!
->>>>>
->>>>> Tell that to just about every single driver ever written.
->>>>
->>>> Not really, few do yes which is wrong but not _all_ do that.
->>>
->>> Every driver I ever looked at does.  Name one you consider "correct."
->>
->> I'm far from claiming that drivers/tty/serial/sh-sci.c is perfect, but
->> it does request DMA channels at open time, not at probe time.
->
-> In the part quoted above, I said most drivers request dma channels in
-> their probe or open functions.  For the purposes of this discussion,
-> that distinction is irrelevant.  In either case, the channel is held
-> indefinitely.  If this wasn't the correct way to use the dmaengine,
-> there would be no need for the virt-dma helpers which are specifically
-> designed for cases the one currently at hand.
+On Wednesday 07 December 2016 10:39 PM, Alexandre Bailon wrote:
+> Rename and export __clk_enable() and __clk_disable() in order
+> to use them from usb-da8xx.c. This file implements the usb20 phy clock
+> that must be able to enable or disable usb20 clock.
+> To prevent a recurssive call to clk_enable() that would cause a recursive
+> locking issue, we must use __clk_enable() and __clk_disable().
+> Rename these methods in davinci_clk_enable() and davinci_clk_disable(),
+> and export them.
+> 
+> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+> Suggested-by: David Lechner <david@lechnology.com>
+> ---
+>  arch/arm/mach-davinci/clock.c | 14 ++++++++------
+>  arch/arm/mach-davinci/clock.h |  2 ++
+>  2 files changed, 10 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
+> index df42c93..0f967c3 100644
+> --- a/arch/arm/mach-davinci/clock.c
+> +++ b/arch/arm/mach-davinci/clock.c
+> @@ -31,10 +31,10 @@ static LIST_HEAD(clocks);
+>  static DEFINE_MUTEX(clocks_mutex);
+>  static DEFINE_SPINLOCK(clockfw_lock);
+>  
+> -static void __clk_enable(struct clk *clk)
+> +void davinci_clk_enable(struct clk *clk)
+>  {
+>  	if (clk->parent)
+> -		__clk_enable(clk->parent);
+> +		davinci_clk_enable(clk->parent);
+>  	if (clk->usecount++ == 0) {
+>  		if (clk->flags & CLK_PSC)
+>  			davinci_psc_config(clk->domain, clk->gpsc, clk->lpsc,
+> @@ -43,8 +43,9 @@ static void __clk_enable(struct clk *clk)
+>  			clk->clk_enable(clk);
+>  	}
+>  }
+> +EXPORT_SYMBOL(davinci_clk_enable);
 
-Sorry, I mainly read Vinod's "not in probe", and missed your "or when the
-device is opened".
+We don't want to export these as we dont want drivers to use this API.
+This is to be used within mach-davinci only.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Sekhar
