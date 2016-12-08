@@ -1,37 +1,87 @@
 From: yao.yuan@freescale.com (Yuan Yao)
-Date: Thu, 8 Dec 2016 17:22:59 +0800
-Subject: [PATCH 0/5] arm64: dts: ls1012a: add the DTS node for QSPI/DSPI
- support
-Message-ID: <1481188984-43683-1-git-send-email-yao.yuan@freescale.com>
+Date: Thu, 8 Dec 2016 17:23:00 +0800
+Subject: [PATCH 1/5] arm64: dts: ls1012a: add the DTS node for DSPI support
+In-Reply-To: <1481188984-43683-1-git-send-email-yao.yuan@freescale.com>
+References: <1481188984-43683-1-git-send-email-yao.yuan@freescale.com>
+Message-ID: <1481188984-43683-2-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Yuan Yao <yao.yuan@nxp.com>
 
-LS1012A also support QSPI and DSPI.
-This patch set is used to add the QSPI/DSPI node for LS1012A.
+Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts | 33 +++++++++++++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi    | 13 +++++++++
+ 2 files changed, 46 insertions(+)
 
-This patch set is depend on the patch for add LS1012A platform dts support:
-arm64: Add DTS support for FSL's LS1012A SoC
-
-The patchwork link:
-https://patchwork.kernel.org/patch/9462399/
-
-Yuan Yao (5):
-  arm64: dts: ls1012a: add the DTS node for DSPI support
-  Documentation: fsl: dspi: Add fsl,ls1012a-dspi compatible string
-  Documentation: dt: mtd: add chip support for "jedec, spi-nor"
-  arm64: dts: ls1012a: add the DTS node for QSPI support
-  Documentation: fsl-quadspi: Add fsl,ls1012a-qspi compatible string
-
- .../devicetree/bindings/mtd/fsl-quadspi.txt        |  1 +
- .../devicetree/bindings/mtd/jedec,spi-nor.txt      |  2 +
- .../devicetree/bindings/spi/spi-fsl-dspi.txt       |  1 +
- arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts | 14 +++++++
- arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts  | 48 ++++++++++++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts  | 15 +++++++
- arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     | 28 +++++++++++++
- 7 files changed, 109 insertions(+)
-
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
+index b841251..3d32c76 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
+@@ -93,6 +93,39 @@
+ 	};
+ };
+ 
++&dspi {
++	bus-num = <0>;
++	status = "okay";
++
++	flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "n25q128a11", "jedec,spi-nor";
++		reg = <0>;
++		spi-max-frequency = <10000000>;
++	};
++
++	flash at 1 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "sst25wf040b", "jedec,spi-nor";
++		spi-cpol;
++		spi-cpha;
++		reg = <1>;
++		spi-max-frequency = <10000000>;
++	};
++
++	flash at 2 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "en25s64", "jedec,spi-nor";
++		spi-cpol;
++		spi-cpha;
++		reg = <2>;
++		spi-max-frequency = <10000000>;
++	};
++};
++
+ &duart0 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+index 92e64f3..c917a87 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+@@ -148,6 +148,19 @@
+ 			status = "disabled";
+ 		};
+ 
++		dspi: dspi at 2100000 {
++			compatible = "fsl,ls1012a-dspi", "fsl,ls1021a-v1.0-dspi";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x0 0x2100000 0x0 0x10000>;
++			interrupts = <0 64 IRQ_TYPE_LEVEL_HIGH>;
++			clock-names = "dspi";
++			clocks = <&clockgen 4 0>;
++			spi-num-chipselects = <5>;
++			big-endian;
++			status = "disabled";
++		};
++
+ 		duart0: serial at 21c0500 {
+ 			compatible = "fsl,ns16550", "ns16550a";
+ 			reg = <0x00 0x21c0500 0x0 0x100>;
 -- 
 2.1.0.27.g96db324
