@@ -1,153 +1,63 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 8 Dec 2016 13:50:43 +0100
-Subject: [PATCH v9 05/11] arm/arm64: vgic: Introduce VENG0 and VENG1
- fields to vmcr struct
-In-Reply-To: <20161208122115.GG4816@cbox>
-References: <1479906118-15832-1-git-send-email-vijay.kilari@gmail.com>
- <1479906118-15832-6-git-send-email-vijay.kilari@gmail.com>
- <20161128142836.GE18170@cbox>
- <ace0aa83-aa6e-ca64-8edf-fcd2dd07585e@redhat.com>
- <20161208122115.GG4816@cbox>
-Message-ID: <df037898-57d3-93d1-e59c-4055d0f6f0b0@redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 8 Dec 2016 13:12:32 +0000
+Subject: [PATCH 16/18] arm64: ptrace: handle ptrace_request differently
+ for aarch32 and ilp32
+In-Reply-To: <3703608.GKr1zzErMk@wuerfel>
+References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+ <20161206062508.GA17835@yury-N73SV>
+ <20161207165913.GD31779@e104818-lin.cambridge.arm.com>
+ <3703608.GKr1zzErMk@wuerfel>
+Message-ID: <20161208131232.GA15141@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+On Wed, Dec 07, 2016 at 09:40:13PM +0100, Arnd Bergmann wrote:
+> On Wednesday, December 7, 2016 4:59:13 PM CET Catalin Marinas wrote:
+> > On Tue, Dec 06, 2016 at 11:55:08AM +0530, Yury Norov wrote:
+> > > On Mon, Dec 05, 2016 at 04:34:23PM +0000, Catalin Marinas wrote:
+> > > > On Fri, Oct 21, 2016 at 11:33:15PM +0300, Yury Norov wrote:
+> > > > > New aarch32 ptrace syscall handler is introduced to avoid run-time
+> > > > > detection of the task type.
+> > > > 
+> > > > What's wrong with the run-time detection? If it's just to avoid a
+> > > > negligible overhead, I would rather keep the code simpler by avoiding
+> > > > duplicating the generic compat_sys_ptrace().
+> > > 
+> > > Nothing wrong. This is how Arnd asked me to do. You already asked this
+> > > question: http://lkml.iu.edu/hypermail/linux/kernel/1604.3/00930.html
+> > 
+> > Hmm, I completely forgot about this ;). There is still an advantage to
+> > doing run-time checking if we avoid touching core code (less acks to
+> > gather and less code duplication).
+> > 
+> > Let's see what Arnd says but the initial patch looked simpler.
+> 
+> I don't currently have either version of the patch in my inbox
+> (the archive is on a different machine), but in general I'd still
+> think it's best to avoid the runtime check for aarch64-ilp32
+> altogether. I'd have to look at the overall kernel source to
+> see if it's worth avoiding one or two instances though, or
+> if there are an overwhelming number of other checks that we
+> can't avoid at all.
 
-On 08/12/2016 13:21, Christoffer Dall wrote:
-> On Thu, Dec 08, 2016 at 12:52:39PM +0100, Auger Eric wrote:
->> Hi Vijay,
->>
->> On 28/11/2016 15:28, Christoffer Dall wrote:
->>> On Wed, Nov 23, 2016 at 06:31:52PM +0530, vijay.kilari at gmail.com wrote:
->>>> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
->>>>
->>>> ICC_VMCR_EL2 supports virtual access to ICC_IGRPEN1_EL1.Enable
->>>> and ICC_IGRPEN0_EL1.Enable fields. Add grpen0 and grpen1 member
->>>> variables to struct vmcr to support read and write of these fields.
->>>>
->>>> Also refactor vgic_set_vmcr and vgic_get_vmcr() code.
->>>> Drop ICH_VMCR_CTLR_SHIFT and ICH_VMCR_CTLR_MASK macros and instead
->>>> use ICH_VMCR_EOI* and ICH_VMCR_CBPR* macros
->>>> .
->>>> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
->>>> ---
->>>>  include/linux/irqchip/arm-gic-v3.h |  2 --
->>>>  virt/kvm/arm/vgic/vgic-mmio-v2.c   | 16 ----------------
->>>>  virt/kvm/arm/vgic/vgic-mmio.c      | 16 ++++++++++++++++
->>>>  virt/kvm/arm/vgic/vgic-v3.c        | 22 ++++++++++++++++++++--
->>>>  virt/kvm/arm/vgic/vgic.h           |  5 +++++
->>>>  5 files changed, 41 insertions(+), 20 deletions(-)
->>>>
->>>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
->>>> index b4f8287..406fc3e 100644
->>>> --- a/include/linux/irqchip/arm-gic-v3.h
->>>> +++ b/include/linux/irqchip/arm-gic-v3.h
->>>> @@ -404,8 +404,6 @@
->>>>  #define ICH_HCR_EN			(1 << 0)
->>>>  #define ICH_HCR_UIE			(1 << 1)
->>>>  
->>>> -#define ICH_VMCR_CTLR_SHIFT		0
->>>> -#define ICH_VMCR_CTLR_MASK		(0x21f << ICH_VMCR_CTLR_SHIFT)
->>>>  #define ICH_VMCR_CBPR_SHIFT		4
->>>>  #define ICH_VMCR_CBPR_MASK		(1 << ICH_VMCR_CBPR_SHIFT)
->>>>  #define ICH_VMCR_EOIM_SHIFT		9
->>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->>>> index 2cb04b7..ad353b5 100644
->>>> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
->>>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->>>> @@ -212,22 +212,6 @@ static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
->>>>  	}
->>>>  }
->>>>  
->>>> -static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
->>>> -{
->>>> -	if (kvm_vgic_global_state.type == VGIC_V2)
->>>> -		vgic_v2_set_vmcr(vcpu, vmcr);
->>>> -	else
->>>> -		vgic_v3_set_vmcr(vcpu, vmcr);
->>>> -}
->>>> -
->>>> -static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
->>>> -{
->>>> -	if (kvm_vgic_global_state.type == VGIC_V2)
->>>> -		vgic_v2_get_vmcr(vcpu, vmcr);
->>>> -	else
->>>> -		vgic_v3_get_vmcr(vcpu, vmcr);
->>>> -}
->>>> -
->>>>  #define GICC_ARCH_VERSION_V2	0x2
->>>>  
->>>>  /* These are for userland accesses only, there is no guest-facing emulation. */
->>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
->>>> index 0d1bc98..f81e0e5 100644
->>>> --- a/virt/kvm/arm/vgic/vgic-mmio.c
->>>> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
->>>> @@ -416,6 +416,22 @@ int vgic_validate_mmio_region_addr(struct kvm_device *dev,
->>>>  	return -ENXIO;
->>>>  }
->>>>  
->>>> +void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
->>>> +{
->>>> +	if (kvm_vgic_global_state.type == VGIC_V2)
->>>> +		vgic_v2_set_vmcr(vcpu, vmcr);
->>>> +	else
->>>> +		vgic_v3_set_vmcr(vcpu, vmcr);
->>>> +}
->>>> +
->>>> +void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
->>>> +{
->>>> +	if (kvm_vgic_global_state.type == VGIC_V2)
->>>> +		vgic_v2_get_vmcr(vcpu, vmcr);
->>>> +	else
->>>> +		vgic_v3_get_vmcr(vcpu, vmcr);
->>>> +}
->>>> +
->>>>  /*
->>>>   * kvm_mmio_read_buf() returns a value in a format where it can be converted
->>>>   * to a byte array and be directly observed as the guest wanted it to appear
->>>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
->>>> index 9f0dae3..a3ff04b 100644
->>>> --- a/virt/kvm/arm/vgic/vgic-v3.c
->>>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
->>>> @@ -175,10 +175,19 @@ void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
->>>>  {
->>>>  	u32 vmcr;
->>>>  
->>>> -	vmcr  = (vmcrp->ctlr << ICH_VMCR_CTLR_SHIFT) & ICH_VMCR_CTLR_MASK;
->>>> +	/*
->>>> +	 * Ignore the FIQen bit, because GIC emulation always implies
->>>> +	 * SRE=1 which means the vFIQEn bit is also RES1.
->>>> +	 */
->>>> +	vmcr = (vmcrp->ctlr & ICC_CTLR_EL1_EOImode_MASK) >>
->>>> +		ICC_CTLR_EL1_EOImode_SHIFT;
->>>> +	vmcr = (vmcr << ICH_VMCR_EOIM_SHIFT) & ICH_VMCR_EOIM_MASK;
-> 
->> I am not able to understand why we use ICC_CTLR _*macros here? Please
->> could you explain it to me? Besides if we want to ignore the FIQen bit
->> can't we change the ICH_VMCR_CTLR_MASK value?
->>
-> This first statement is setting the vmcr to the ctlr's bit[1], but
-> placed in bit[0], and then the next statement is moving that bit value
-> to the corresponding place in the vmcr.  I think this is correct
-> (although a little opaque).
-Yes the question was more about the semantic of the vmcrp->ctlr field. I
-thought it was supposed to store ICH_VMCR_EL2 ctrl bits as they are and
-not with a different layout.
-> 
-> There's also a newer series on the list, just so you know.
+Just in case you haven't found them already, current version:
 
-Argh OK I missed it. I will check the diffs in the AArch64 related patches.
+https://marc.info/?l=linux-arm-kernel&m=147708276818318&w=2
 
-Thanks
+Original version:
 
-Eric
-> 
-> Thanks,
-> -Christoffer
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+https://patchwork.kernel.org/patch/7980521/
+
+The old one looks more readable and given that ptrace is not really a
+fast path, I'm not two worried about run-time checks
+
+> Regarding ptrace, I notice that arch/tile doesn't even use
+> the compat entry point for its ilp32 user space on 64-bit
+> kernels, it just calls the regular 64-bit one. Would that
+> help here?
+
+I don't know whether it would work, we have incompatible siginfo_t on
+AArch64/ILP32.
+
+-- 
+Catalin
