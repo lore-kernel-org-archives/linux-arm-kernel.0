@@ -1,68 +1,64 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 8 Dec 2016 13:10:44 -0800
-Subject: [PATCH 3/3] clk: keystone: Add sci-clk driver support
-In-Reply-To: <cb608729-b617-0eab-5ddf-d78ff47b237e@ti.com>
-References: <1477053961-27128-1-git-send-email-t-kristo@ti.com>
- <1477053961-27128-4-git-send-email-t-kristo@ti.com>
- <20161208001348.GC5423@codeaurora.org>
- <cb608729-b617-0eab-5ddf-d78ff47b237e@ti.com>
-Message-ID: <20161208211044.GI5423@codeaurora.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 8 Dec 2016 15:11:39 -0600
+Subject: [PATCH] ARM: keystone: dts: fix netcp clocks and add names
+Message-ID: <20161208211139.3678-1-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08, Tero Kristo wrote:
-> On 08/12/16 02:13, Stephen Boyd wrote:
-> >On 10/21, Tero Kristo wrote:
-> >>diff --git a/drivers/clk/keystone/sci-clk.c b/drivers/clk/keystone/sci-clk.c
-> >>new file mode 100644
-> >>index 0000000..f6af5bd
-> >>--- /dev/null
-> >>+++ b/drivers/clk/keystone/sci-clk.c
-> 
-> >
-> >>+
-> >>+	handle = devm_ti_sci_get_handle(dev);
-> >>+	if (IS_ERR(handle))
-> >>+		return PTR_ERR(handle);
-> >>+
-> >>+	provider = devm_kzalloc(dev, sizeof(*provider), GFP_KERNEL);
-> >>+	if (!provider)
-> >>+		return -ENOMEM;
-> >>+
-> >>+	provider->clocks = data;
-> >>+
-> >>+	provider->sci = handle;
-> >>+	provider->ops = &handle->ops.clk_ops;
-> >>+	provider->dev = dev;
-> >>+
-> >>+	ti_sci_init_clocks(provider);
-> >
-> >And if this fails?
-> 
-> Yea this is kind of controversial. ti_sci_init_clocks() can fail if
-> any of the clocks registered will fail. I decided to have it this
-> way so that at least some clocks might work in failure cause, and
-> you might have a booting device instead of total lock-up.
-> 
-> Obviously it could be done so that if any clock fails, we would
-> de-register all clocks at that point, but personally I think this is
-> a worse option.
-> 
-> ti_sci_init_clocks could probably be modified to continue
-> registering clocks when a single clock fails though. Currently it
-> aborts at first failure.
-> 
+From: Murali Karicheri <m-karicheri2@ti.com>
 
-That sounds like a better approach if we don't care about
-failures to register a clock. Returning a value from a function
-and not using it isn't really a great design.
+Fix the pa clock to point to the clkpa which has clock rate of 1/3 of PA
+PLL clock and add clock names.
 
-I worry that if we start returning errors from clk_hw_register()
-that something will go wrong though, so really I don't know why
-we want to ignore errors at all. Just for debugging a boot hang?
-Can't we use early console to at least see that this driver is
-failing to probe and debug that way?
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ arch/arm/boot/dts/keystone-k2e-netcp.dtsi  | 3 ++-
+ arch/arm/boot/dts/keystone-k2hk-netcp.dtsi | 3 ++-
+ arch/arm/boot/dts/keystone-k2l-netcp.dtsi  | 3 ++-
+ 3 files changed, 6 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/boot/dts/keystone-k2e-netcp.dtsi b/arch/arm/boot/dts/keystone-k2e-netcp.dtsi
+index ac990f6..ba828cb 100644
+--- a/arch/arm/boot/dts/keystone-k2e-netcp.dtsi
++++ b/arch/arm/boot/dts/keystone-k2e-netcp.dtsi
+@@ -138,7 +138,8 @@ netcp: netcp at 24000000 {
+ 	/* NetCP address range */
+ 	ranges = <0 0x24000000 0x1000000>;
+ 
+-	clocks = <&papllclk>, <&clkcpgmac>, <&chipclk12>;
++	clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
++	clock-names = "pa_clk", "ethss_clk", "cpts";
+ 	dma-coherent;
+ 
+ 	ti,navigator-dmas = <&dma_gbe 0>,
+diff --git a/arch/arm/boot/dts/keystone-k2hk-netcp.dtsi b/arch/arm/boot/dts/keystone-k2hk-netcp.dtsi
+index f86d6dd..a5ac845 100644
+--- a/arch/arm/boot/dts/keystone-k2hk-netcp.dtsi
++++ b/arch/arm/boot/dts/keystone-k2hk-netcp.dtsi
+@@ -155,7 +155,8 @@ netcp: netcp at 2000000 {
+ 	/* NetCP address range */
+ 	ranges  = <0 0x2000000 0x100000>;
+ 
+-	clocks = <&papllclk>, <&clkcpgmac>, <&chipclk12>;
++	clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>;
++	clock-names = "pa_clk", "ethss_clk", "cpts";
+ 	dma-coherent;
+ 
+ 	ti,navigator-dmas = <&dma_gbe 22>,
+diff --git a/arch/arm/boot/dts/keystone-k2l-netcp.dtsi b/arch/arm/boot/dts/keystone-k2l-netcp.dtsi
+index 5acbd0d..b6f2682 100644
+--- a/arch/arm/boot/dts/keystone-k2l-netcp.dtsi
++++ b/arch/arm/boot/dts/keystone-k2l-netcp.dtsi
+@@ -137,7 +137,8 @@ netcp: netcp at 26000000 {
+ 	/* NetCP address range */
+ 	ranges = <0 0x26000000 0x1000000>;
+ 
+-	clocks = <&clkosr>, <&papllclk>, <&clkcpgmac>, <&chipclk12>;
++	clocks = <&clkpa>, <&clkcpgmac>, <&chipclk12>, <&clkosr>;
++	clock-names = "pa_clk", "ethss_clk", "cpts", "osr_clk";
+ 	dma-coherent;
+ 
+ 	ti,navigator-dmas = <&dma_gbe 0>,
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.10.1
