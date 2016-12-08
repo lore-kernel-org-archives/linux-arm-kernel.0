@@ -1,33 +1,20 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Thu, 8 Dec 2016 03:38:31 +0200
-Subject: [PATCH] USB: OHCI: nxp: fix code warnings
-In-Reply-To: <1481154851-20876-1-git-send-email-csmanjuvijay@gmail.com>
-References: <1481154851-20876-1-git-send-email-csmanjuvijay@gmail.com>
-Message-ID: <62e29356-5090-09a1-3f84-d54d4097b595@mleia.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 8 Dec 2016 12:37:53 +1030
+Subject: [PATCH v3 3/6] mfd: dt: Add Aspeed Low Pin Count Controller
+ bindings
+In-Reply-To: <20161206025321.1792-4-andrew@aj.id.au>
+References: <20161206025321.1792-1-andrew@aj.id.au>
+ <20161206025321.1792-4-andrew@aj.id.au>
+Message-ID: <CACPK8XdCG7HPdNFPa18AgG284U2vrDk5Sqf7OArQumdsjFGkyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08/2016 01:54 AM, csmanjuvijay at gmail.com wrote:
-> From: Manjunath Goudar <csmanjuvijay@gmail.com>
-> 
-> This patch will fix the checkpatch.pl following warnings:
-> WARNING: Missing a blank line after declarations
-> WARNING: braces {} are not necessary for single statement blocks
-> 
-> Signed-off-by: Manjunath Goudar <csmanjuvijay@gmail.com>
-> Cc: Vladimir Zapolskiy <vz@mleia.com>
-> Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-usb at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
+On Tue, Dec 6, 2016 at 1:23 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
+> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+
+Reviewed-by: Joel Stanley <joel@jms.id.au>
+
 > ---
-
-Looks good, thank you for the change.
-
-Acked-by: Vladimir Zapolskiy <vz@mleia.com>
-
---
-With best wishes,
-Vladimir
+>  .../devicetree/bindings/mfd/aspeed-lpc.txt         | 111 +++++++++++++++++++++
+>  1 file changed, 111 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/aspeed-lpc.txt
