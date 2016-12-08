@@ -1,63 +1,69 @@
-From: guy.shapiro@mobi-wize.com (Guy Shapiro)
-Date: Thu, 8 Dec 2016 17:15:17 +0200
-Subject: [PATCH 1/2] Documentation: sample averaging for imx6ul_tsc
-In-Reply-To: <20161201161343.g7p2maxiatp4m5di@rob-hp-laptop>
-References: <1480232698-23075-1-git-send-email-guy.shapiro@mobi-wize.com>
- <20161201161343.g7p2maxiatp4m5di@rob-hp-laptop>
-Message-ID: <82b04890-692d-4e22-36c1-a21affad5126@mobi-wize.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Thu, 8 Dec 2016 20:48:08 +0530
+Subject: [PATCH 01/16] ARM: scu: Provide support for parsing SCU device
+ node to enable SCU
+In-Reply-To: <2339821.zs8sl71mMv@wuerfel>
+References: <1479099731-28108-1-git-send-email-pankaj.dubey@samsung.com>
+ <9481995.AMBiYg893F@wuerfel> <20161118124805.GJ1041@n2100.armlinux.org.uk>
+ <2339821.zs8sl71mMv@wuerfel>
+Message-ID: <CAGcde9GZkaqN=7Xaenm9YsNUGoaX0vHDpRhn07heoqLMdBw=FA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2016 18:13, Rob Herring wrote:
-> On Sun, Nov 27, 2016 at 09:44:57AM +0200, Guy Shapiro wrote:
->> The i.MX6UL internal touchscreen controller contains an option to
->> average upon samples. This feature reduces noise from the produced
->> touch locations.
+On 18 November 2016 at 19:02, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday, November 18, 2016 12:48:07 PM CET Russell King - ARM Linux wrote:
+>> On Fri, Nov 18, 2016 at 01:14:35PM +0100, Arnd Bergmann wrote:
+>> > @@ -41,6 +43,9 @@ void scu_enable(void __iomem *scu_base)
+>> >  {
+>> >       u32 scu_ctrl;
+>> >
+>> > +     if (scu_base)
+>> > +             scu_base = scu_base_addr;
+>> > +
 >>
->> This patch introduces a new device tree optional property for this
->> feature. It provides control over the amount of averaged samples per
->> touch event.
+>> This looks to me like nonsense.
 >>
->> The property was inspired by a similar property on the
->> "brcm,iproc-touchscreen" binding.
+>> >  #ifdef CONFIG_ARM_ERRATA_764369
+>> >       /* Cortex-A9 only */
+>> >       if ((read_cpuid_id() & 0xff0ffff0) == 0x410fc090) {
+>> > @@ -85,6 +90,9 @@ int scu_power_mode(void __iomem *scu_base, unsigned int mode)
+>> >       unsigned int val;
+>> >       int cpu = MPIDR_AFFINITY_LEVEL(cpu_logical_map(smp_processor_id()), 0);
+>> >
+>> > +     if (scu_base)
+>> > +             scu_base = scu_base_addr;
+>> > +
 >>
->> Signed-off-by: Guy Shapiro <guy.shapiro@mobi-wize.com>
->> ---
->>   .../devicetree/bindings/input/touchscreen/imx6ul_tsc.txt          | 8
-> ++++++++
->>   1 file changed, 8 insertions(+)
+>> Ditto.
 >>
->> diff --git
-> a/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
-> b/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
->> index 853dff9..a66069f 100644
->> --- a/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
->> +++ b/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
->> @@ -17,6 +17,13 @@ Optional properties:
->>     This value depends on the touch screen.
->>   - pre-charge-time: the touch screen need some time to precharge.
->>     This value depends on the touch screen.
->> +- average-samples: Number of data samples which are averaged for each
-> read.
->> +	Valid values 0-4
->> +	0 =  1 sample
->> +	1 =  4 samples
->> +	2 =  8 samples
->> +	3 = 16 samples
->> +	4 = 32 samples
-> Either this needs a vendor prefix or should be documented as a generic
-> property. In the latter case, you should use actual number of samples
-> (1-32) for the values.
-In the term "generic property", do you mean to document it on 
-bindings/input/touchscreen/touchscreen.txt ?
-If so, should I add the "touchscreen-" prefix like all the other 
-properties in that file?
+>> Rather than doing this, I'd much prefer to always store the SCU base in
+>> the SCU code, and remove the "void __iomem *scu_base" argment from all
+>> these functions.
+>
+> Ok, then we just need one scu_probe_*() variant for each of the
+> four methods of initializing it (iotable, of_iomap,
+> ioremap(scu_a9_get_base) and hardcoded.
+>
+> The intention of doing the fallback for the NULL argument was
+> to avoid having to add lots of new API while also allowing
+> the change to be done one platform at a time.
+>
+> If we remove the argument from the other functions, they either
+> need to get a new name, or we change them all to the new prototype
+> at once. Either way works fine, do you have a preference between
+> them?
+>
 
-Grepping bindings/input/touchscreen/, I found two other device drivers 
-that implement a
-similar property - "ti-tsc-adc" and "brcm,iproc-touchscreen" (The 
-latter, BTW, uses a non
-vendor prefixed property name).
+Russell,
 
-Do we want to move from per-vendor properties to a generic one?
-If we do, should we deprecate the existing vendor specific properties?
+Any opinion on this. Are you OK, with the approach suggested by Arnd?
+
+Thanks,
+Pankaj Dubey
+
+>         Arnd
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
