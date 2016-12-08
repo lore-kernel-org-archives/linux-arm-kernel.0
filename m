@@ -1,44 +1,47 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  8 Dec 2016 16:29:29 +0100
-Subject: [PATCH renesas/devel] arm64: dts: r8a7795: Use Gen 3 fallback compat
- string for PCIE
-Message-ID: <1481210969-2574-1-git-send-email-horms+renesas@verge.net.au>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 8 Dec 2016 21:10:18 +0530
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <yw1x60mu1w7e.fsf@unicorn.mansr.com>
+References: <20161125045549.GC2698@localhost>
+ <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
+ <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
+ <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
+ <yw1xwpfd2o9f.fsf@unicorn.mansr.com>
+ <20161207164341.GX6408@localhost>
+ <yw1xr35j1yd5.fsf@unicorn.mansr.com>
+ <20161208103921.GC6408@localhost>
+ <yw1x60mu1w7e.fsf@unicorn.mansr.com>
+Message-ID: <20161208154018.GD6408@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently added en 3 fallback compat string for PCIE
-in r8a7795 DT.
+On Thu, Dec 08, 2016 at 11:44:53AM +0000, M?ns Rullg?rd wrote:
+> Vinod Koul <vinod.koul@intel.com> writes:
+> 
+> > On Wed, Dec 07, 2016 at 04:45:58PM +0000, M?ns Rullg?rd wrote:
+> >> Vinod Koul <vinod.koul@intel.com> writes:
+> >> 
+> >> > On Tue, Dec 06, 2016 at 01:14:20PM +0000, M?ns Rullg?rd wrote:
+> >> >> 
+> >> >> That's not going to work very well.  Device drivers typically request
+> >> >> dma channels in their probe functions or when the device is opened.
+> >> >> This means that reserving one of the few channels there will inevitably
+> >> >> make some other device fail to operate.
+> >> >
+> >> > No that doesnt make sense at all, you should get a channel only when you
+> >> > want to use it and not in probe!
+> >> 
+> >> Tell that to just about every single driver ever written.
+> >
+> > Not really, few do yes which is wrong but not _all_ do that.
+> 
+> Every driver I ever looked at does.  Name one you consider "correct."
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-Based on renesas-devel-20161207-v4.9-rc8
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+That only tells me you haven't looked enough and want to rant!
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 598bec1629cf..e8718e7d8d97 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -1259,7 +1259,8 @@
- 		};
- 
- 		pciec0: pcie at fe000000 {
--			compatible = "renesas,pcie-r8a7795";
-+			compatible = "renesas,pcie-r8a7795",
-+				     "renesas,pcie-rcar-gen3";
- 			reg = <0 0xfe000000 0 0x80000>;
- 			#address-cells = <3>;
- 			#size-cells = <2>;
-@@ -1284,7 +1285,8 @@
- 		};
- 
- 		pciec1: pcie at ee800000 {
--			compatible = "renesas,pcie-r8a7795";
-+			compatible = "renesas,pcie-r8a7795",
-+				     "renesas,pcie-rcar-gen3";
- 			reg = <0 0xee800000 0 0x80000>;
- 			#address-cells = <3>;
- 			#size-cells = <2>;
+FWIW look at ALSA-dmaengine lib, thereby every audio driver that uses it. I
+could find other examples and go on and on, but that's besides the point and
+looks like you don't want to listen to people telling you something..
+
 -- 
-2.7.0.rc3.207.g0ac5344
+~Vinod
