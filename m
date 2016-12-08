@@ -1,7 +1,9 @@
 From: hongtao.jia@nxp.com (Jia Hongtao)
-Date: Thu, 8 Dec 2016 11:28:25 +0800
-Subject: [PATCH 1/2] arm64:dt:ls1046a: Add TMU device tree support for LS1046A
-Message-ID: <1481167706-44234-1-git-send-email-hongtao.jia@nxp.com>
+Date: Thu, 8 Dec 2016 11:28:26 +0800
+Subject: [PATCH 2/2] arm64:dt:ls1012a: Add TMU device tree support for LS1012A
+In-Reply-To: <1481167706-44234-1-git-send-email-hongtao.jia@nxp.com>
+References: <1481167706-44234-1-git-send-email-hongtao.jia@nxp.com>
+Message-ID: <1481167706-44234-2-git-send-email-hongtao.jia@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,34 +11,28 @@ Also add nodes and properties for thermal management support.
 
 Signed-off-by: Jia Hongtao <hongtao.jia@nxp.com>
 ---
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 79 ++++++++++++++++++++++++++
- 1 file changed, 79 insertions(+)
+Depend on patch "[v3] arm64: Add DTS support for FSL's LS1012A SoC".
+https://patchwork.kernel.org/patch/9462399/
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index 38806ca..40604e9 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -45,6 +45,8 @@
+ arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi | 76 ++++++++++++++++++++++++++
+ 1 file changed, 76 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+index 92e64f3..bc694b4 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+@@ -43,6 +43,7 @@
   */
  
- #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
 +#include <dt-bindings/thermal/thermal.h>
-+
  
  / {
- 	compatible = "fsl,ls1046a";
-@@ -67,6 +69,7 @@
- 			clocks = <&clockgen 1 0>;
- 			next-level-cache = <&l2>;
- 			cpu-idle-states = <&CPU_PH20>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		cpu1: cpu at 1 {
-@@ -279,6 +282,82 @@
+ 	compatible = "fsl,ls1012a";
+@@ -127,6 +128,81 @@
+ 			#clock-cells = <2>;
  			clocks = <&sysclk>;
  		};
- 
 +		tmu: tmu at 1f00000 {
 +			compatible = "fsl,qoriq-tmu";
 +			reg = <0x0 0x1f00000 0x0 0x10000>;
@@ -87,7 +83,7 @@ index 38806ca..40604e9 100644
 +				polling-delay-passive = <1000>;
 +				polling-delay = <5000>;
 +
-+				thermal-sensors = <&tmu 3>;
++				thermal-sensors = <&tmu 0>;
 +
 +				trips {
 +					cpu_alert: cpu-alert {
@@ -112,9 +108,8 @@ index 38806ca..40604e9 100644
 +				};
 +			};
 +		};
-+
- 		dspi: dspi at 2100000 {
- 			compatible = "fsl,ls1021a-v1.0-dspi";
- 			#address-cells = <1>;
+ 
+ 		i2c0: i2c at 2180000 {
+ 			compatible = "fsl,vf610-i2c";
 -- 
 2.1.0.27.g96db324
