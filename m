@@ -1,58 +1,110 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 8 Dec 2016 11:54:51 +0100
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <20161208103921.GC6408@localhost>
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
- <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
- <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
- <yw1xwpfd2o9f.fsf@unicorn.mansr.com> <20161207164341.GX6408@localhost>
- <yw1xr35j1yd5.fsf@unicorn.mansr.com> <20161208103921.GC6408@localhost>
-Message-ID: <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
+From: kevin.brodsky@arm.com (Kevin Brodsky)
+Date: Thu, 8 Dec 2016 10:59:45 +0000
+Subject: [RFC PATCH v3 07/11] arm64: compat: Add a 32-bit vDSO
+In-Reply-To: <87r35jmv3e.fsf@wedge.i-did-not-set--mail-host-address--so-tickle-me>
+References: <20161206160353.14581-1-kevin.brodsky@arm.com>
+ <20161206160353.14581-8-kevin.brodsky@arm.com>
+ <87r35jmv3e.fsf@wedge.i-did-not-set--mail-host-address--so-tickle-me>
+Message-ID: <0707aecb-6638-2447-cf4a-9c30fc08dae5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2016 11:39, Vinod Koul wrote:
+On 07/12/16 18:51, Nathan Lynch wrote:
+> Hi Kevin,
 
-> On Wed, Dec 07, 2016 at 04:45:58PM +0000, M?ns Rullg?rd wrote:
+Hi Nathan,
+
+Thanks for taking a look at these patches!
+
+> Kevin Brodsky <kevin.brodsky@arm.com> writes:
+>> diff --git a/arch/arm64/kernel/vdso32/vgettimeofday.c b/arch/arm64/kernel/vdso32/vgettimeofday.c
+>> new file mode 100644
+>> index 000000000000..53c3d1f82b26
+>> --- /dev/null
+>> +++ b/arch/arm64/kernel/vdso32/vgettimeofday.c
+> As I said at LPC last month, I'm not excited to have arch/arm's
+> vgettimeofday.c copied into arch/arm64 and tweaked; I'd rather see this
+> part of the implementation shared between arch/arm and arch/arm64
+> somehow, even if there's not an elegant way to do so.
 >
->> Vinod Koul <vinod.koul@intel.com> writes:
->>
->>> On Tue, Dec 06, 2016 at 01:14:20PM +0000, M?ns Rullg?rd wrote:
->>>>
->>>> That's not going to work very well.  Device drivers typically request
->>>> dma channels in their probe functions or when the device is opened.
->>>> This means that reserving one of the few channels there will inevitably
->>>> make some other device fail to operate.
->>>
->>> No that doesn't make sense at all, you should get a channel only when you
->>> want to use it and not in probe!
->>
->> Tell that to just about every single driver ever written.
-> 
-> Not really, few do yes which is wrong but not _all_ do that.
+> The situation which must be avoided is one where the arch/arm64 compat
+> VDSO incompatibly diverges from the arch/arm VDSO.  That becomes much
+> less likely if there's only one copy of the userspace-exposed code to
+> maintain.
 
-Vinod,
+I still agree this is very suboptimal. However, I also think this is by far the most 
+straightforward solution, and I would like to stick to it *as a first step*. If you 
+diff this "tweaked" vgettimeofday.c with the original one, you'll see that it is 
+really not obvious to share even parts of vgettimeofday.c in the current state of arm 
+and arm64. Besides, arm's vDSO hasn't changed much since it has been introduced last 
+year, and vgettimeofday.c hasn't changed at all, so I think it's fair to say 
+divergences are unlikely to happen in the near future.
 
-Could you explain something to me in layman's terms?
+Nevertheless, I completely agree this is not a good situation in the long run, and I 
+am not happy with leaving things in this state. After this series is merged, my plan 
+is to try and align arm and arm64 both in terms of vDSO features and kernel-vDSO 
+interface. This would notably involve:
+* Aligning the vDSO data struct's (especially vdso_data's member names), so that 
+vgettimeofday.c can be (mostly) shared.
+* Non-trivial Makefile work to share the same one between the arm and arm64 compat 
+vDSOs. The refactoring I did in v3 is a first step, as not using top-level flags 
+makes it more feasible to share the same Makefile.
+* Adding support for CLOCK_MONOTONIC_RAW, as I did in the 64-bit vDSO.
+* Moving arm's sigreturn trampolines to its vDSO (if enabled), and convince glibc to 
+use the kernel's trampolines like on arm64.
 
-I have a NAND Flash Controller driver that depends on the
-DMA driver under discussion.
+This represents a substantial amount of work, which I think should be in a separate 
+series (this one has already grown bigger than I expected).
 
-Suppose I move the dma_request_chan() call from the driver's
-probe function, to the actual DMA transfer function.
+The final step would be to investigate whether the 64-bit vDSO could reasonably move 
+to a C implementation, and if it is the case unify the 3 vDSOs.
 
-I would want dma_request_chan() to put the calling thread
-to sleep until a channel becomes available (possibly with
-a timeout value).
+> [...]
+>
+>> +/*
+>> + * We use the hidden visibility to prevent the compiler from generating a GOT
+>> + * relocation. Not only is going through a GOT useless (the entry couldn't and
+>> + * musn't be overridden by another library), it does not even work: the linker
+>> + * cannot generate an absolute address to the data page.
+>> + *
+>> + * With the hidden visibility, the compiler simply generates a PC-relative
+>> + * relocation (R_ARM_REL32), and this is what we need.
+>> + */
+>> +extern const struct vdso_data _vdso_data __attribute__((visibility("hidden")));
+>> +
+>> +static inline const struct vdso_data *get_vdso_data(void)
+>> +{
+>> +	const struct vdso_data *ret;
+>> +	/*
+>> +	 * This simply puts &_vdso_data into ret. The reason why we don't use
+>> +	 * `ret = &_vdso_data` is that the compiler tends to optimise this in a
+>> +	 * very suboptimal way: instead of keeping &_vdso_data in a register,
+>> +	 * it goes through a relocation almost every time _vdso_data must be
+>> +	 * accessed (even in subfunctions). This is both time and space
+>> +	 * consuming: each relocation uses a word in the code section, and it
+>> +	 * has to be loaded at runtime.
+>> +	 *
+>> +	 * This trick hides the assignment from the compiler. Since it cannot
+>> +	 * track where the pointer comes from, it will only use one relocation
+>> +	 * where get_vdso_data() is called, and then keep the result in a
+>> +	 * register.
+>> +	 */
+>> +	asm("mov %0, %1" : "=r"(ret) : "r"(&_vdso_data));
+>> +	return ret;
+>> +}
+> I think this is an instructive case: this code looks like an improvement
+> over how the arch/arm VDSO accesses the data page.  Enhancements like
+> this (not to mention fixes) shouldn't require a patch-per-architecture;
+> things inevitably get out of sync and it's more of a maintenance burden
+> in the long term.
 
-But Maxime told me dma_request_chan() will just return
--EBUSY if no channels are available.
+What arm does is suboptimal indeed, as it uses a whole function to derive vdso_data's 
+address instead of a simple relocation. However both methods are functionally 
+equivalent. The approach I used here is simply consistent with how vdso_data is 
+accessed in the 64-bit vDSO (with those two tricks because of both an assembler 
+difference and the fact we are using C here, and GCC is not being smart). Again, I 
+agree the arm vDSO should use the same approach, but unification requires other 
+changes beyond the scope of this first series.
 
-Am I supposed to busy wait in my driver's DMA function
-until a channel becomes available?
-
-I don't understand how the multiplexing of few memory
-channels to many clients is supposed to happen efficiently?
-
-Regards.
+Thanks,
+Kevin
