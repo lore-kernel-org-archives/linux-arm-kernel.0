@@ -1,46 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 8 Dec 2016 11:04:10 +0000
-Subject: [Linaro-acpi] [PATCH v17 08/15]
- clocksource/drivers/arm_arch_timer: move arch_timer_needs_of_probing into DT
- init call
-In-Reply-To: <CADyBb7vAfMGV5ERFqAbwo4v4BhJv5s_-x4DXmdvy=iUacBzJWQ@mail.gmail.com>
-References: <20161125084623.22515-9-fu.wei@linaro.org>
- <201611252221.UyJ9iWPV%fengguang.wu@intel.com>
- <CADyBb7uAObQn_JVp_qw9+7POiqUctdzy3cYLsb0rk-JMX5W1uw@mail.gmail.com>
- <CAOZdJXU7Lg66RKvA=sYtUXUdwLLbh9FtcW0_U-fmjaztnqS3Ng@mail.gmail.com>
- <CADyBb7vAfMGV5ERFqAbwo4v4BhJv5s_-x4DXmdvy=iUacBzJWQ@mail.gmail.com>
-Message-ID: <20161208110410.GA9768@leverpostej>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 8 Dec 2016 12:18:59 +0100
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
+References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
+ <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
+ <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
+ <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
+ <yw1xwpfd2o9f.fsf@unicorn.mansr.com> <20161207164341.GX6408@localhost>
+ <yw1xr35j1yd5.fsf@unicorn.mansr.com> <20161208103921.GC6408@localhost>
+ <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
+Message-ID: <CAMuHMdUULnPuTqEwRN2Z3gy2nmV37iLwJdNzrEvgpcG-EJS8OQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2016 at 11:16:21AM +0800, Fu Wei wrote:
-> Hi Timur,
-> 
-> On 8 December 2016 at 01:25, Timur Tabi <timur@codeaurora.org> wrote:
-> > On Fri, Nov 25, 2016 at 9:06 AM, Fu Wei <fu.wei@linaro.org> wrote:
-> >>
-> >> a "+ int ret;" should be move from [12/15] to here, I have fix the
-> >> problem in my repo, it would happen in next patchset
-> >>
-> >> https://git.linaro.org/people/fu.wei/linux.git/log/?h=topic-gtdt-wakeup-timer_upstream_v18_devel
-> >
-> > Fu, please post v18 to the mailing list so that it can be picked up
-> > for 4.10 (if it's not too late already).
+On Thu, Dec 8, 2016 at 11:54 AM, Mason <slash.tmp@free.fr> wrote:
+> On 08/12/2016 11:39, Vinod Koul wrote:
+>> On Wed, Dec 07, 2016 at 04:45:58PM +0000, M?ns Rullg?rd wrote:
+>>> Vinod Koul <vinod.koul@intel.com> writes:
+>>>> On Tue, Dec 06, 2016 at 01:14:20PM +0000, M?ns Rullg?rd wrote:
+>>>>> That's not going to work very well.  Device drivers typically request
+>>>>> dma channels in their probe functions or when the device is opened.
+>>>>> This means that reserving one of the few channels there will inevitably
+>>>>> make some other device fail to operate.
+>>>>
+>>>> No that doesn't make sense at all, you should get a channel only when you
+>>>> want to use it and not in probe!
+>>>
+>>> Tell that to just about every single driver ever written.
+>>
+>> Not really, few do yes which is wrong but not _all_ do that.
+>
+> Vinod,
+>
+> Could you explain something to me in layman's terms?
+>
+> I have a NAND Flash Controller driver that depends on the
+> DMA driver under discussion.
+>
+> Suppose I move the dma_request_chan() call from the driver's
+> probe function, to the actual DMA transfer function.
+>
+> I would want dma_request_chan() to put the calling thread
+> to sleep until a channel becomes available (possibly with
+> a timeout value).
+>
+> But Maxime told me dma_request_chan() will just return
+> -EBUSY if no channels are available.
+>
+> Am I supposed to busy wait in my driver's DMA function
+> until a channel becomes available?
 
-Unfortunately, it's too late for v4.10. It hasn't been sat in linux-next
-at all, and we've seen kbuild test failures.
+Can you fall back to PIO if requesting a channel fails?
 
-Hopefully there's time to beat this into shape and get it into
-linux-next so that it's ready to queue for v4.11, though.
+Alternatively, dma_request_chan() could always succeed, and
+dmaengine_prep_slave_sg() could fail if the channel is currently not
+available due to a limitation on the number of active channels, and
+the driver could fall back to PIO for that transfer.
 
-> Great thanks for your suggestion!  :-)
-> yes, you are right, I would love to post v18 ASAP.
-> 
-> But I am still waiting for more feedback from the maintainers.
+Gr{oetje,eeting}s,
 
-Please post a version which passes inspection by the kbuild test robot.
-I haven't had a chance to look at this yet, and it'll be better to look
-at a version that actually works.
+                        Geert
 
-Thanks,
-Mark.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
