@@ -1,69 +1,97 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 8 Dec 2016 12:18:59 +0100
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
- <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
- <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
- <yw1xwpfd2o9f.fsf@unicorn.mansr.com> <20161207164341.GX6408@localhost>
- <yw1xr35j1yd5.fsf@unicorn.mansr.com> <20161208103921.GC6408@localhost>
- <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
-Message-ID: <CAMuHMdUULnPuTqEwRN2Z3gy2nmV37iLwJdNzrEvgpcG-EJS8OQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 8 Dec 2016 11:20:43 +0000
+Subject: [PATCH] arm64: Work around Falkor erratum 1009
+In-Reply-To: <20161207200431.4587-1-cov@codeaurora.org>
+References: <20161207200028.4420-1-cov@codeaurora.org>
+ <20161207200431.4587-1-cov@codeaurora.org>
+Message-ID: <20161208112042.GB706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 8, 2016 at 11:54 AM, Mason <slash.tmp@free.fr> wrote:
-> On 08/12/2016 11:39, Vinod Koul wrote:
->> On Wed, Dec 07, 2016 at 04:45:58PM +0000, M?ns Rullg?rd wrote:
->>> Vinod Koul <vinod.koul@intel.com> writes:
->>>> On Tue, Dec 06, 2016 at 01:14:20PM +0000, M?ns Rullg?rd wrote:
->>>>> That's not going to work very well.  Device drivers typically request
->>>>> dma channels in their probe functions or when the device is opened.
->>>>> This means that reserving one of the few channels there will inevitably
->>>>> make some other device fail to operate.
->>>>
->>>> No that doesn't make sense at all, you should get a channel only when you
->>>> want to use it and not in probe!
->>>
->>> Tell that to just about every single driver ever written.
->>
->> Not really, few do yes which is wrong but not _all_ do that.
->
-> Vinod,
->
-> Could you explain something to me in layman's terms?
->
-> I have a NAND Flash Controller driver that depends on the
-> DMA driver under discussion.
->
-> Suppose I move the dma_request_chan() call from the driver's
-> probe function, to the actual DMA transfer function.
->
-> I would want dma_request_chan() to put the calling thread
-> to sleep until a channel becomes available (possibly with
-> a timeout value).
->
-> But Maxime told me dma_request_chan() will just return
-> -EBUSY if no channels are available.
->
-> Am I supposed to busy wait in my driver's DMA function
-> until a channel becomes available?
+On Wed, Dec 07, 2016 at 03:04:31PM -0500, Christopher Covington wrote:
+> From: Shanker Donthineni <shankerd@codeaurora.org>
+> 
+> During a TLB invalidate sequence targeting the inner shareable
+> domain, Falkor may prematurely complete the DSB before all loads
+> and stores using the old translation are observed; instruction
+> fetches are not subject to the conditions of this erratum.
+> 
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> ---
+>  arch/arm64/Kconfig                | 10 +++++++++
+>  arch/arm64/include/asm/cpucaps.h  |  3 ++-
+>  arch/arm64/include/asm/tlbflush.h | 43 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/cpu_errata.c    |  7 +++++++
+>  arch/arm64/kvm/hyp/tlb.c          | 39 ++++++++++++++++++++++++++++++-----
+>  5 files changed, 96 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 1004a3d..125440f 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -485,6 +485,16 @@ config QCOM_FALKOR_ERRATUM_E1003
+>  
+>  	  If unsure, say Y.
+>  
+> +config QCOM_FALKOR_ERRATUM_E1009
+> +	bool "Falkor E1009: Prematurely complete a DSB after a TLBI"
+> +	default y
+> +	help
+> +	  Falkor CPU may prematurely complete a DSB following a TLBI xxIS
+> +	  invalidate maintenance operations. Repeat the TLBI operation one
+> +	  more time to fix the issue.
+> +
+> +	  If unsure, say Y.
 
-Can you fall back to PIO if requesting a channel fails?
+Call me perverse, but I like this workaround. People often tend to screw
+up TLBI and DVM sync, but the IPI-based workaround is horribly invasive
+and fragile. Simply repeating the operation tends to be enough to make
+the chance of failure small enough to be acceptable.
 
-Alternatively, dma_request_chan() could always succeed, and
-dmaengine_prep_slave_sg() could fail if the channel is currently not
-available due to a limitation on the number of active channels, and
-the driver could fall back to PIO for that transfer.
+> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+> index cb6a8c2..5357d7f 100644
+> --- a/arch/arm64/include/asm/cpucaps.h
+> +++ b/arch/arm64/include/asm/cpucaps.h
+> @@ -35,7 +35,8 @@
+>  #define ARM64_HYP_OFFSET_LOW			14
+>  #define ARM64_MISMATCHED_CACHE_LINE_SIZE	15
+>  #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	16
+> +#define ARM64_WORKAROUND_QCOM_FALKOR_E1009	17
 
-Gr{oetje,eeting}s,
+Could you rename this to something like ARM64_WORKAROUND_REPEAT_TLBI, so
+that it could potentially be used by others?
 
-                        Geert
+>  
+> -#define ARM64_NCAPS				17
+> +#define ARM64_NCAPS				18
+>  
+>  #endif /* __ASM_CPUCAPS_H */
+> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+> index deab523..03bafc5 100644
+> --- a/arch/arm64/include/asm/tlbflush.h
+> +++ b/arch/arm64/include/asm/tlbflush.h
+> @@ -23,6 +23,7 @@
+>  
+>  #include <linux/sched.h>
+>  #include <asm/cputype.h>
+> +#include <asm/alternative.h>
+>  
+>  /*
+>   * Raw TLBI operations.
+> @@ -94,6 +95,13 @@ static inline void flush_tlb_all(void)
+>  	dsb(ishst);
+>  	__tlbi(vmalle1is);
+>  	dsb(ish);
+> +	asm volatile(ALTERNATIVE(
+> +		     "nop \n"
+> +		     "nop \n",
+> +		     "tlbi vmalle1is \n"
+> +		     "dsb ish \n",
+> +		     ARM64_WORKAROUND_QCOM_FALKOR_E1009)
+> +		     : :);
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+I'd much rather this was part of the __tlbi macro, which would hopefully
+restrict this to one place in the code.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Will
