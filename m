@@ -1,134 +1,40 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 08 Dec 2016 15:51:50 +0200
-Subject: [PATCH v2.1 1/4] ARM: dts: davinci: da850: VPIF: add node and
- muxing
-In-Reply-To: <20161208001418.4469-1-khilman@baylibre.com>
-References: <20161207193137.27947-2-khilman@baylibre.com>
- <20161208001418.4469-1-khilman@baylibre.com>
-Message-ID: <1720737.m5D29H51CH@avalon>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  8 Dec 2016 14:28:57 +0000
+Subject: [PATCH 0/2] crypto: arm64/ARM: NEON accelerated ChaCha20
+Message-ID: <1481207339-17332-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Another port of existing x86 SSE code to NEON, again both for arm64 and ARM.
 
-Thank you for the patch.
+ChaCha20 is a stream cipher described in RFC 7539, and is intended to be
+an efficient software implementable 'standby cipher', in case AES cannot
+be used.
 
-On Wednesday 07 Dec 2016 16:14:18 Kevin Hilman wrote:
-> Add VPIF node an pins to da850 and enable on boards.  VPIF has two input
-> channels described using the standard DT ports and enpoints.
-> 
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+This NEON implementation is almost 2x as fast as the generic C code
+(measured on Cortex-A57 using the arm64 version)
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+I'm aware that blkciphers are deprecated in favor of skciphers, but this
+code (like the x86 version) uses the init and setkey routines of the generic
+version, so it is probably better to port all implementations at once.
 
-> ---
-> v2 -> v2.1: moved ports from SoC .dtsi to board .dts files.
-> 
->  arch/arm/boot/dts/da850-evm.dts  | 20 ++++++++++++++++++++
->  arch/arm/boot/dts/da850-lcdk.dts | 13 +++++++++++++
->  arch/arm/boot/dts/da850.dtsi     | 27 ++++++++++++++++++++++++++-
->  3 files changed, 59 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/da850-evm.dts
-> b/arch/arm/boot/dts/da850-evm.dts index 41de15fe15a2..cea36ee6fd07 100644
-> --- a/arch/arm/boot/dts/da850-evm.dts
-> +++ b/arch/arm/boot/dts/da850-evm.dts
-> @@ -289,3 +289,23 @@
->  		};
->  	};
->  };
-> +
-> +&vpif {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&vpif_capture_pins>;
-> +	status = "okay";
-> +
-> +	/* VPIF capture port */
-> +	port {
-> +		vpif_ch0: endpoint at 0 {
-> +			  reg = <0>;
-> +			  bus-width = <8>;
-> +		};
-> +
-> +		vpif_ch1: endpoint at 1 {
-> +			  reg = <1>;
-> +			  bus-width = <8>;
-> +			  data-shift = <8>;
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/da850-lcdk.dts
-> b/arch/arm/boot/dts/da850-lcdk.dts index 7b8ab21fed6c..5fc21528e0ba 100644
-> --- a/arch/arm/boot/dts/da850-lcdk.dts
-> +++ b/arch/arm/boot/dts/da850-lcdk.dts
-> @@ -219,3 +219,16 @@
->  		};
->  	};
->  };
-> +
-> +&vpif {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&vpif_capture_pins>;
-> +	status = "okay";
-> +
-> +	/* VPIF capture port */
-> +	port {
-> +		vpif_ch0: endpoint {
-> +			  bus-width = <8>;
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> index f79e1b91c680..5f0b40510b2b 100644
-> --- a/arch/arm/boot/dts/da850.dtsi
-> +++ b/arch/arm/boot/dts/da850.dtsi
-> @@ -186,7 +186,18 @@
->  					0xc 0x88888888 0xffffffff
-> 
->  				>;
-> 
->  			};
-> -
-> +			vpif_capture_pins: vpif_capture_pins {
-> +				pinctrl-single,bits = <
-> +					/* VP_DIN[2..7], VP_CLKIN1, VP_CLKIN0 
-*/
-> +					0x38 0x11111111 0xffffffff
-> +					/* VP_DIN[10..15,0..1] */
-> +					0x3c 0x11111111 0xffffffff
-> +					/* VP_DIN[8..9] */
-> +					0x40 0x00000011 0x000000ff
-> +					/* VP_CLKIN3, VP_CLKIN2 */
-> +					0x4c 0x00010100 0x000f0f00
-> +				>;
-> +			};
->  		};
->  		edma0: edma at 0 {
->  			compatible = "ti,edma3-tpcc";
-> @@ -399,7 +410,21 @@
->  				<&edma0 0 1>;
->  			dma-names = "tx", "rx";
->  		};
-> +
-> +		vpif: video at 217000 {
-> +			compatible = "ti,da850-vpif";
-> +			reg = <0x217000 0x1000>;
-> +			interrupts = <92>;
-> +			status = "disabled";
-> +
-> +			/* VPIF capture port */
-> +			port {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +			};
-> +		};
->  	};
-> +
->  	aemif: aemif at 68000000 {
->  		compatible = "ti,da850-aemif";
->  		#address-cells = <2>;
+Ard Biesheuvel (2):
+  crypto: arm64/chacha20 - implement NEON version based on SSE3 code
+  crypto: arm/chacha20 - implement NEON version based on SSE3 code
+
+ arch/arm/crypto/Kconfig                |   6 +
+ arch/arm/crypto/Makefile               |   2 +
+ arch/arm/crypto/chacha20-neon-core.S   | 524 ++++++++++++++++++++
+ arch/arm/crypto/chacha20-neon-glue.c   | 136 +++++
+ arch/arm64/crypto/Kconfig              |   6 +
+ arch/arm64/crypto/Makefile             |   3 +
+ arch/arm64/crypto/chacha20-neon-core.S | 480 ++++++++++++++++++
+ arch/arm64/crypto/chacha20-neon-glue.c | 131 +++++
+ 8 files changed, 1288 insertions(+)
+ create mode 100644 arch/arm/crypto/chacha20-neon-core.S
+ create mode 100644 arch/arm/crypto/chacha20-neon-glue.c
+ create mode 100644 arch/arm64/crypto/chacha20-neon-core.S
+ create mode 100644 arch/arm64/crypto/chacha20-neon-glue.c
 
 -- 
-Regards,
-
-Laurent Pinchart
+2.7.4
