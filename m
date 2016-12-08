@@ -1,50 +1,56 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed,  7 Dec 2016 16:57:48 -0800
-Subject: [PATCH 07/12] ARM: dts: imx6-sabreauto: add reset-gpios property for
- max7310_b
+Date: Wed,  7 Dec 2016 16:57:51 -0800
+Subject: [PATCH 10/12] gpu: ipu-v3: Add ipu_unit_type enumeration
 In-Reply-To: <1481158673-15937-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1481158673-15937-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1481158673-15937-8-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1481158673-15937-11-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reset pin to the port expander chip (MAX7310) is controlled by a gpio,
-so define a reset-gpios property to control it. There are three MAX7310's
-on the SabreAuto CPU card (max7310_[abc]), but all use the same pin for
-their reset. Since all can't acquire the same pin, assign it to max7310_b,
-that chip is needed by more functions (usb and adv7180).
+Adds an enumeration of the major IPUv3 subunits. Provide that info
+in struct ipu_client_platformdata to more easily determine the IPU
+client type.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ include/video/imx-ipu-v3.h | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index 043d20c..944a4fa 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -136,6 +136,9 @@
- 				reg = <0x32>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_max7310>;
-+				reset-gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
- 			};
+diff --git a/include/video/imx-ipu-v3.h b/include/video/imx-ipu-v3.h
+index 53cd07c..7709af7 100644
+--- a/include/video/imx-ipu-v3.h
++++ b/include/video/imx-ipu-v3.h
+@@ -28,6 +28,23 @@ enum ipuv3_type {
+ 	IPUV3H,
+ };
  
- 			max7310_c: gpio at 34 {
-@@ -442,6 +445,12 @@
- 			>;
- 		};
- 
-+		pinctrl_max7310: max7310grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD2_DAT0__GPIO1_IO15 0x80000000
-+			>;
-+		};
++/*
++ * Enumeration of the major IPU subunits
++ */
++enum ipu_unit_type {
++	IPU_IDMAC = 0,
++	IPU_CM,
++	IPU_CSI,
++	IPU_SMFC,
++	IPU_IC,
++	IPU_VDI,
++	IPU_IRT,
++	IPU_DC,
++	IPU_DI,
++	IPU_DP,
++	IPU_DMFC,
++};
 +
- 		pinctrl_pwm3: pwm1grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
+ #define IPU_PIX_FMT_GBR24	v4l2_fourcc('G', 'B', 'R', '3')
+ 
+ /*
+@@ -399,6 +416,7 @@ int ipu_rot_mode_to_degrees(int *degrees, enum ipu_rotate_mode mode,
+ 			    bool hflip, bool vflip);
+ 
+ struct ipu_client_platformdata {
++	enum ipu_unit_type type;
+ 	int csi;
+ 	int di;
+ 	int dc;
 -- 
 2.7.4
