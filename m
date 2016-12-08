@@ -1,108 +1,147 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed,  7 Dec 2016 16:57:50 -0800
-Subject: [PATCH 09/12] ARM: dts: imx6-sabreauto: add the ADV7180 video decoder
+Date: Wed,  7 Dec 2016 16:57:53 -0800
+Subject: [PATCH 12/12] gpu: ipu-v3: Add smfc and ic client devices
 In-Reply-To: <1481158673-15937-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1481158673-15937-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1481158673-15937-10-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1481158673-15937-13-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enables the ADV7180 decoder sensor. The ADV7180 connects to the
-parallel-bus mux input on ipu1_csi0_mux.
-
-On the sabreauto, two analog video inputs are routed to the ADV7180,
-composite on Ain1, and composite on Ain3. Those inputs are defined
-via inputs and input-names under the ADV7180 node. The ADV7180 power
-pin is via max7310_b port expander.
+Adds IPU client devices for the SMFC and IC task units.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 62 ++++++++++++++++++++++++++++++++
- 1 file changed, 62 insertions(+)
+ drivers/gpu/ipu-v3/ipu-common.c | 87 +++++++++++++++++++++++++++++++++++++++--
+ include/video/imx-ipu-v3.h      |  3 ++
+ 2 files changed, 87 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index d74882a..9222026 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -147,10 +147,48 @@
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 			};
-+
-+			camera: adv7180 at 21 {
-+				compatible = "adi,adv7180";
-+				reg = <0x21>;
-+				powerdown-gpios = <&max7310_b 2 GPIO_ACTIVE_LOW>;
-+				interrupt-parent = <&gpio1>;
-+				interrupts = <27 0x8>;
-+				inputs = <0x00 0x02>;
-+				input-names = "ADV7180 Composite on Ain1",
-+						"ADV7180 Composite on Ain3";
-+
-+				port {
-+					adv7180_to_ipu1_csi0_mux: endpoint {
-+						remote-endpoint = <&ipu1_csi0_mux_from_parallel_sensor>;
-+						bus-width = <8>;
-+					};
-+				};
-+			};
- 		};
- 	};
- };
- 
-+&ipu1_smfc0 {
-+	fim {
-+		enable = <1>;
-+	};
-+};
-+
-+&ipu1_csi0_from_ipu1_csi0_mux {
-+	bus-width = <8>;
-+};
-+
-+&ipu1_csi0_mux_from_parallel_sensor {
-+	remote-endpoint = <&adv7180_to_ipu1_csi0_mux>;
-+	bus-width = <8>;
-+};
-+
-+&ipu1_csi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ipu1_csi0>;
-+};
-+
- &clks {
- 	assigned-clocks = <&clks IMX6QDL_PLL4_BYPASS_SRC>,
- 			  <&clks IMX6QDL_PLL4_BYPASS>,
-@@ -451,6 +489,30 @@
- 			>;
- 		};
- 
-+		pinctrl_ipu1_csi0: ipu1grp-csi0 {
-+			fsl,pins = <
-+				MX6QDL_PAD_CSI0_DAT4__IPU1_CSI0_DATA04   0x80000000
-+				MX6QDL_PAD_CSI0_DAT5__IPU1_CSI0_DATA05   0x80000000
-+				MX6QDL_PAD_CSI0_DAT6__IPU1_CSI0_DATA06   0x80000000
-+				MX6QDL_PAD_CSI0_DAT7__IPU1_CSI0_DATA07   0x80000000
-+				MX6QDL_PAD_CSI0_DAT8__IPU1_CSI0_DATA08   0x80000000
-+				MX6QDL_PAD_CSI0_DAT9__IPU1_CSI0_DATA09   0x80000000
-+				MX6QDL_PAD_CSI0_DAT10__IPU1_CSI0_DATA10  0x80000000
-+				MX6QDL_PAD_CSI0_DAT11__IPU1_CSI0_DATA11  0x80000000
-+				MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12  0x80000000
-+				MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13  0x80000000
-+				MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14  0x80000000
-+				MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15  0x80000000
-+				MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16  0x80000000
-+				MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17  0x80000000
-+				MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18  0x80000000
-+				MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19  0x80000000
-+				MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK 0x80000000
-+				MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC    0x80000000
-+				MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC   0x80000000
-+			>;
-+		};
-+
- 		pinctrl_pwm3: pwm1grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
+diff --git a/drivers/gpu/ipu-v3/ipu-common.c b/drivers/gpu/ipu-v3/ipu-common.c
+index b6ca36b..729581d 100644
+--- a/drivers/gpu/ipu-v3/ipu-common.c
++++ b/drivers/gpu/ipu-v3/ipu-common.c
+@@ -1161,18 +1161,77 @@ static struct ipu_platform_reg client_reg[] = {
+ 		.pdata = {
+ 			.type = IPU_CSI,
+ 			.csi = 0,
+-			.dma[0] = IPUV3_CHANNEL_CSI0,
+-			.dma[1] = -EINVAL,
++			.dma[0] = -EINVAL,
+ 		},
+ 		.name = "imx-ipuv3-csi",
+ 	}, {
+ 		.pdata = {
+ 			.type = IPU_CSI,
+ 			.csi = 1,
++			.dma[0] = -EINVAL,
++		},
++		.name = "imx-ipuv3-csi",
++	}, {
++		.pdata = {
++			.type = IPU_SMFC,
++			.smfc = 0,
++			.dma[0] = IPUV3_CHANNEL_CSI0,
++			.dma[1] = -EINVAL,
++		},
++		.name = "imx-ipuv3-smfc",
++	}, {
++		.pdata = {
++			.type = IPU_SMFC,
++			.smfc = 1,
+ 			.dma[0] = IPUV3_CHANNEL_CSI1,
+ 			.dma[1] = -EINVAL,
+ 		},
+-		.name = "imx-ipuv3-csi",
++		.name = "imx-ipuv3-smfc",
++	}, {
++		.pdata = {
++			.type = IPU_IC,
++			.ic_task = IC_TASK_ENCODER,
++			.ic = 0,
++			.dma[0] = IPUV3_CHANNEL_IC_PRP_ENC_MEM,
++			.dma[1] = -EINVAL,
++		},
++		.name = "imx-ipuv3-ic",
++	}, {
++		.pdata = {
++			.type = IPU_IC,
++			.ic_task = IC_TASK_VIEWFINDER,
++			.ic = 0,
++			.dma[0] = IPUV3_CHANNEL_IC_PRP_VF_MEM,
++			.dma[1] = -EINVAL,
++		},
++		.name = "imx-ipuv3-ic",
++	}, {
++		.pdata = {
++			.type = IPU_IC,
++			.ic_task = IC_TASK_POST_PROCESSOR,
++			.ic = 0,
++			.dma[0] = IPUV3_CHANNEL_IC_PP_MEM,
++			.dma[1] = -EINVAL,
++		},
++		.name = "imx-ipuv3-ic",
++	}, {
++		.pdata = {
++			.type = IPU_IC,
++			.ic_task = IC_TASK_POST_PROCESSOR,
++			.ic = 1,
++			.dma[0] = IPUV3_CHANNEL_IC_PP_MEM,
++			.dma[1] = -EINVAL,
++		},
++		.name = "imx-ipuv3-ic",
++	}, {
++		.pdata = {
++			.type = IPU_IC,
++			.ic_task = IC_TASK_POST_PROCESSOR,
++			.ic = 2,
++			.dma[0] = IPUV3_CHANNEL_IC_PP_MEM,
++			.dma[1] = -EINVAL,
++		},
++		.name = "imx-ipuv3-ic",
+ 	}, {
+ 		.pdata = {
+ 			.type = IPU_DI,
+@@ -1213,6 +1272,28 @@ of_get_ipu_client_node(struct ipu_soc *ipu, struct ipu_platform_reg *reg)
+ 			 "ipu%d_csi", ipu->id + 1);
+ 		client_id = reg->pdata.csi;
+ 		break;
++	case IPU_SMFC:
++		snprintf(node_name, sizeof(node_name), "ipu%d_smfc",
++			 ipu->id + 1);
++		client_id = reg->pdata.smfc;
++		break;
++	case IPU_IC:
++		switch (reg->pdata.ic_task) {
++		case IC_TASK_ENCODER:
++			snprintf(node_name, sizeof(node_name),
++				 "ipu%d_ic_prpenc", ipu->id + 1);
++			break;
++		case IC_TASK_VIEWFINDER:
++			snprintf(node_name, sizeof(node_name),
++				 "ipu%d_ic_prpvf", ipu->id + 1);
++			break;
++		case IC_TASK_POST_PROCESSOR:
++			snprintf(node_name, sizeof(node_name),
++				 "ipu%d_ic_pp", ipu->id + 1);
++			break;
++		}
++		client_id = reg->pdata.ic;
++		break;
+ 	case IPU_DI:
+ 		snprintf(node_name, sizeof(node_name),
+ 			 "ipu%d_di", ipu->id + 1);
+diff --git a/include/video/imx-ipu-v3.h b/include/video/imx-ipu-v3.h
+index 7709af7..4e70ca4 100644
+--- a/include/video/imx-ipu-v3.h
++++ b/include/video/imx-ipu-v3.h
+@@ -418,6 +418,9 @@ int ipu_rot_mode_to_degrees(int *degrees, enum ipu_rotate_mode mode,
+ struct ipu_client_platformdata {
+ 	enum ipu_unit_type type;
+ 	int csi;
++	int smfc;
++	int ic_task;
++	int ic;
+ 	int di;
+ 	int dc;
+ 	int dp;
 -- 
 2.7.4
