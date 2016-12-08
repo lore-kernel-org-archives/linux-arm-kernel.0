@@ -1,154 +1,90 @@
 From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Fri,  9 Dec 2016 01:33:09 +0800
-Subject: [PATCH v18 05/15] clocksource/drivers/arm_arch_timer: rework PPI
- determination
+Date: Fri,  9 Dec 2016 01:33:11 +0800
+Subject: [PATCH v18 07/15] clocksource/drivers/arm_arch_timer: Refactor
+ arch_timer_needs_probing
 In-Reply-To: <20161208173319.6618-1-fu.wei@linaro.org>
 References: <20161208173319.6618-1-fu.wei@linaro.org>
-Message-ID: <20161208173319.6618-6-fu.wei@linaro.org>
+Message-ID: <20161208173319.6618-8-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fu Wei <fu.wei@linaro.org>
 
-Currently, the arch timer driver uses ARCH_TIMER_PHYS_SECURE_PPI to
-mean the driver will use the secure PPI *and* potentialy also use the
-non-secure PPI. This is somewhat confusing.
+When system init with device-tree, we don't know which node will be
+initialized first. And the code in arch_timer_common_init should wait
+until per-cpu timer and MMIO timer are both initialized. So we need
+arch_timer_needs_probing to detect the init status of system.
 
-For arm64, where it never makes sense to use the secure PPI, this
-means we must always request the useless secure PPI, adding to the
-confusion. For ACPI, where we may not even have a valid secure PPI
-number, this is additionally problematic. We need the driver to be
-able to use *only* the non-secure PPI.
+But currently the code is dispersed in arch_timer_needs_probing and
+arch_timer_common_init. And the function name doesn't specify that
+it's only for device-tree. This is somewhat confusing.
 
-The logic to choose which PPI to use is intertwined with other logic
-in arch_timer_init(). This patch factors the PPI determination out
-into a new function named arch_timer_select_ppi, and then reworks it
-so that we can handle having only a non-secure PPI.
-
-This patch also moves arch_timer_ppi verification out to caller,
-because we can verify the configuration from device-tree for ARM by this
-way.
-
-Meanwhile, because we will select ARCH_TIMER_PHYS_NONSECURE_PPI for ARM64,
-the logic in arch_timer_register also need to be updated.
+This patch move all related code from arch_timer_common_init to
+arch_timer_needs_probing, refactor it, and rename it to
+arch_timer_needs_of_probing. And make sure that it will be called
+only if acpi is disabled.
 
 Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 77 +++++++++++++++++++++---------------
- 1 file changed, 46 insertions(+), 31 deletions(-)
+ drivers/clocksource/arm_arch_timer.c | 34 +++++++++++++++++++---------------
+ 1 file changed, 19 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 231175b..e43be0a 100644
+index e554081..2c9085a 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -699,7 +699,7 @@ static int __init arch_timer_register(void)
- 	case ARCH_TIMER_PHYS_NONSECURE_PPI:
- 		err = request_percpu_irq(ppi, arch_timer_handler_phys,
- 					 "arch_timer", arch_timer_evt);
--		if (!err && arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI]) {
-+		if (!err && arch_timer_has_nonsecure_ppi()) {
- 			ppi = arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI];
- 			err = request_percpu_irq(ppi, arch_timer_handler_phys,
- 						 "arch_timer", arch_timer_evt);
-@@ -821,39 +821,41 @@ static int __init arch_timer_common_init(void)
- 	return arch_timer_arch_init();
- }
+@@ -792,15 +792,28 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
+ 	{},
+ };
  
--static int __init arch_timer_init(void)
-+/**
-+ * arch_timer_select_ppi() - Select suitable PPI for the current system.
-+ *
-+ * If HYP mode is available, we know that the physical timer
-+ * has been configured to be accessible from PL1. Use it, so
-+ * that a guest can use the virtual timer instead.
-+ *
-+ * On ARMv8.1 with VH extensions, the kernel runs in HYP. VHE
-+ * accesses to CNTP_*_EL1 registers are silently redirected to
-+ * their CNTHP_*_EL2 counterparts, and use a different PPI
-+ * number.
-+ *
-+ * If no interrupt provided for virtual timer, we'll have to
-+ * stick to the physical timer. It'd better be accessible...
-+ * For arm64 we never use the secure interrupt.
-+ *
-+ * Return: a suitable PPI type for the current system.
-+ */
-+static enum arch_timer_ppi_nr __init arch_timer_select_ppi(void)
+-static bool __init
+-arch_timer_needs_probing(int type, const struct of_device_id *matches)
++static bool __init arch_timer_needs_of_probing(void)
  {
--	int ret;
--	/*
--	 * If HYP mode is available, we know that the physical timer
--	 * has been configured to be accessible from PL1. Use it, so
--	 * that a guest can use the virtual timer instead.
--	 *
--	 * If no interrupt provided for virtual timer, we'll have to
--	 * stick to the physical timer. It'd better be accessible...
--	 *
--	 * On ARMv8.1 with VH extensions, the kernel runs in HYP. VHE
--	 * accesses to CNTP_*_EL1 registers are silently redirected to
--	 * their CNTHP_*_EL2 counterparts, and use a different PPI
--	 * number.
--	 */
--	if (is_hyp_mode_available() || !arch_timer_ppi[ARCH_TIMER_VIRT_PPI]) {
--		bool has_ppi;
-+	if (is_hyp_mode_available() && is_kernel_in_hyp_mode())
-+		return ARCH_TIMER_HYP_PPI;
+ 	struct device_node *dn;
+ 	bool needs_probing = false;
++	unsigned int mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
  
--		if (is_kernel_in_hyp_mode()) {
--			arch_timer_uses_ppi = ARCH_TIMER_HYP_PPI;
--			has_ppi = !!arch_timer_ppi[ARCH_TIMER_HYP_PPI];
--		} else {
--			arch_timer_uses_ppi = ARCH_TIMER_PHYS_SECURE_PPI;
--			has_ppi = (!!arch_timer_ppi[ARCH_TIMER_PHYS_SECURE_PPI] ||
--				   !!arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI]);
--		}
-+	if (arch_timer_ppi[ARCH_TIMER_VIRT_PPI])
-+		return ARCH_TIMER_VIRT_PPI;
- 
--		if (!has_ppi) {
--			pr_warn("No interrupt available, giving up\n");
--			return -EINVAL;
--		}
--	}
-+	if (IS_ENABLED(CONFIG_ARM64))
-+		return ARCH_TIMER_PHYS_NONSECURE_PPI;
+-	dn = of_find_matching_node(NULL, matches);
+-	if (dn && of_device_is_available(dn) && !(arch_timers_present & type))
++	/* We have two timers, and both device-tree nodes are probed. */
++	if ((arch_timers_present & mask) == mask)
++		return false;
 +
-+	return ARCH_TIMER_PHYS_SECURE_PPI;
-+}
-+
-+static int __init arch_timer_init(void)
-+{
-+	int ret;
- 
- 	ret = arch_timer_register();
- 	if (ret)
-@@ -901,6 +903,13 @@ static int __init arch_timer_of_init(struct device_node *np)
- 	if (IS_ENABLED(CONFIG_ARM) &&
- 	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
- 		arch_timer_uses_ppi = ARCH_TIMER_PHYS_SECURE_PPI;
++	/*
++	 * Only one type of timer is probed,
++	 * check if we have another type of timer node in device-tree.
++	 */
++	if (arch_timers_present & ARCH_TIMER_TYPE_CP15)
++		dn = of_find_matching_node(NULL, arch_timer_mem_of_match);
 +	else
-+		arch_timer_uses_ppi = arch_timer_select_ppi();
++		dn = of_find_matching_node(NULL, arch_timer_of_match);
 +
-+	if (!arch_timer_ppi[arch_timer_uses_ppi]) {
-+		pr_err("No interrupt available, giving up\n");
-+		return -EINVAL;
-+	}
- 
- 	return arch_timer_init();
- }
-@@ -1041,6 +1050,12 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 	/* Get the frequency from CNTFRQ */
- 	arch_timer_detect_rate(NULL, NULL);
- 
-+	arch_timer_uses_ppi = arch_timer_select_ppi();
-+	if (!arch_timer_ppi[arch_timer_uses_ppi]) {
-+		pr_err("No interrupt available, giving up\n");
-+		return -EINVAL;
-+	}
++	if (dn && of_device_is_available(dn))
+ 		needs_probing = true;
 +
- 	/* Always-on capability */
- 	arch_timer_c3stop = !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
+ 	of_node_put(dn);
  
+ 	return needs_probing;
+@@ -808,17 +821,8 @@ arch_timer_needs_probing(int type, const struct of_device_id *matches)
+ 
+ static int __init arch_timer_common_init(void)
+ {
+-	unsigned mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
+-
+-	/* Wait until both nodes are probed if we have two timers */
+-	if ((arch_timers_present & mask) != mask) {
+-		if (arch_timer_needs_probing(ARCH_TIMER_TYPE_MEM,
+-					     arch_timer_mem_of_match))
+-			return 0;
+-		if (arch_timer_needs_probing(ARCH_TIMER_TYPE_CP15,
+-					     arch_timer_of_match))
+-			return 0;
+-	}
++	if (acpi_disabled && arch_timer_needs_of_probing())
++		return 0;
+ 
+ 	arch_timer_banner(arch_timers_present);
+ 	arch_counter_register(arch_timers_present);
 -- 
 2.9.3
