@@ -1,66 +1,83 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 8 Dec 2016 15:25:20 +0000
-Subject: [PATCH V1] pinctrl:pxa:pinctrl-pxa2xx:- No need of devm functions
-In-Reply-To: <28f80351-a89d-06b4-bd8e-d4a1810ee3c5@arm.com>
-References: <1481207730-6332-1-git-send-email-arvind.yadav.cs@gmail.com>
- <28f80351-a89d-06b4-bd8e-d4a1810ee3c5@arm.com>
-Message-ID: <ef260e14-c785-cac6-b8c1-d3c5cfeb44fc@arm.com>
+From: dubepankaj1980@gmail.com (Pankaj Dubey)
+Date: Thu, 8 Dec 2016 20:58:02 +0530
+Subject: [GIT PULL 1/3] ARM: exynos: Soc/mach for v4.10
+In-Reply-To: <20161203170347.GA3553@kozik-lap>
+References: <1479967709-6619-1-git-send-email-krzk@kernel.org>
+ <1479967709-6619-2-git-send-email-krzk@kernel.org>
+ <20161201183404.GA2134@kozik-lap>
+ <57568492.9hbg5JCdec@wuerfel> <20161203170347.GA3553@kozik-lap>
+Message-ID: <CAGcde9HwfPbw6NMEmcTfn+Df+-AkyyrP3u=7NUyT1XDVbCjtqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/16 15:20, Robin Murphy wrote:
-> On 08/12/16 14:35, Arvind Yadav wrote:
->> In functions pxa2xx_build_functions, the memory allocated for
->> 'functions' is live within the function only. After the
->> allocation it is immediately freed with devm_kfree. There is
->> no need to allocate memory for 'functions' with devm function
->> so replace devm_kcalloc  with kcalloc and devm_kfree with kfree.
+On 3 December 2016 at 22:33, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Fri, Dec 02, 2016 at 10:52:57PM +0100, Arnd Bergmann wrote:
+>> On Thursday, December 1, 2016 8:34:04 PM CET Krzysztof Kozlowski wrote:
+>> > On Thu, Nov 24, 2016 at 08:08:27AM +0200, Krzysztof Kozlowski wrote:
+>> > > Hi,
+>> > >
+>> > > This contains previous dts branch because SCU node in dts is needed
+>> > > prior to removing it from mach code.
+>> > >
+>> > > Below you will find full pull request and one stripped from dependency.
+>> > >
+>> >
+>> > Hi Arnd, Kevin and Olof,
+>> >
+>> > What about this pull from the set?
+>> >
 >>
->> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
->> ---
->>  drivers/pinctrl/pxa/pinctrl-pxa2xx.c | 8 +++++---
->>  1 file changed, 5 insertions(+), 3 deletions(-)
+>> Sorry, I initially deferred it and then didn't get back to it.
 >>
->> diff --git a/drivers/pinctrl/pxa/pinctrl-pxa2xx.c b/drivers/pinctrl/pxa/pinctrl-pxa2xx.c
->> index 866aa3c..47b8e3a 100644
->> --- a/drivers/pinctrl/pxa/pinctrl-pxa2xx.c
->> +++ b/drivers/pinctrl/pxa/pinctrl-pxa2xx.c
->> @@ -277,7 +277,7 @@ static int pxa2xx_build_functions(struct pxa_pinctrl *pctl)
->>  	 * alternate function, 6 * npins is an absolute high limit of the number
->>  	 * of functions.
->>  	 */
->> -	functions = devm_kcalloc(pctl->dev, pctl->npins * 6,
->> +	functions = kcalloc(pctl->npins * 6,
->>  				 sizeof(*functions), GFP_KERNEL);
-> 
-> AFAICS, this is allocating a mere 72 bytes. Why not just declare
-> 
-> 	struct pxa_pinctrl_function functions[6] = {0};
-> 
-> locally and save *all* the bother?
-
-Bah, ignore me, that was an incredible comprehension failure.
-
-Sorry for the noise.
-
-Robin.
-
->>  	if (!functions)
->>  		return -ENOMEM;
->> @@ -289,10 +289,12 @@ static int pxa2xx_build_functions(struct pxa_pinctrl *pctl)
->>  	pctl->functions = devm_kmemdup(pctl->dev, functions,
->>  				       pctl->nfuncs * sizeof(*functions),
->>  				       GFP_KERNEL);
->> -	if (!pctl->functions)
->> +	if (!pctl->functions) {
->> +		kfree(functions);
->>  		return -ENOMEM;
->> +	}
->>  
->> -	devm_kfree(pctl->dev, functions);
->> +	kfree(functions);
->>  	return 0;
->>  }
->>  
+>> The dependency on the .dts changes made me a bit nervous about
+>> taking it, mostly because the changelog fails to explain the
+>> exact dependencies.
 >>
-> 
+>> This breaks compatibility with existing .dtb files, right?
+>
+> No, strictly speaking not. There was no dt-bindings change here, no DT
+> properties for SCU before. We are converting our drivers to DTB so this
+> is the same as before when switching for pinctrl, clocks or all other
+> drivers to DT.
+>
+> We are not braking DTB ABI because there was no ABI around it before.
+> Otherwise, one would say that lack of SCU DT node was an ABI. That is
+> wrong, because DT should describe the hardware and SCU is in hardware.
+>
+>> What I'd like to see here is an explanation about:
+>>
+>> - what the upside of breaking compatibility is
+>
+> DTBs which do not have SCU are not proper because they skip that part of
+> hardware. However we are breaking them in the way the SMP won't work
+> there. It is not an ABI break, as I mentioned above.
+>
+>> - what exactly stops working with an old dtb
+>> - why we don't keep a fallback for handling old dtb files
+>
+> What is the point for it? This is not an ABI break. Even if it was,
+> Samsung guys don't care for ABI breaks at all (and in fact we wanted to
+> mark the platform experimental...).
+>
+>> It would also be helpful to have a separate pull request for
+>> the commits require the new dtb, and the stuff that is unrelated.
+>
+> I can do that but the pull will be small.
+>
+
+Arnd,
+
+Any update on this? Intention of this change is to improve
+Exynos SoC's DT support in mainline kernel. This will help in removing static
+mapping from exynos machine files and simplify mach-exynos code-base.
+
+Thanks,
+Pankaj Dubey
+
+> Best regards,
+> Krzysztof
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
