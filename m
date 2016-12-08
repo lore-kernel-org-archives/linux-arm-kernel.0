@@ -1,37 +1,64 @@
-From: fweimer@redhat.com (Florian Weimer)
-Date: Thu, 8 Dec 2016 16:47:34 +0100
-Subject: [Question] New mmap64 syscall?
-In-Reply-To: <20161207154811.GA15248@yury-N73SV>
-References: <20161206185440.GA4654@yury-N73SV>
- <f544bcc3-8aae-1bd0-b744-9964fc038a51@redhat.com>
- <20161207154811.GA15248@yury-N73SV>
-Message-ID: <14981df2-b120-17c3-a5a8-5cbbd2008c4f@redhat.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 8 Dec 2016 21:29:35 +0530
+Subject: [PATCH] dmaengine: pl330: do not generate unaligned access
+In-Reply-To: <1481116660-27837-1-git-send-email-vladimir.murzin@arm.com>
+References: <1481116660-27837-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20161208155935.GF6408@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/2016 04:48 PM, Yury Norov wrote:
-> On Wed, Dec 07, 2016 at 02:23:55PM +0100, Florian Weimer wrote:
->> On 12/06/2016 07:54 PM, Yury Norov wrote:
->>> 3. Introduce new mmap64() syscall like this:
->>> sys_mmap64(void *addr, size_t len, int prot, int flags, int fd, struct off_pair *off);
->>> (The pointer here because otherwise we have 7 args, if simply pass off_hi and
->>> off_lo in registers.)
->>
->> I would prefer a batched mmap/munmap/mremap/mprotect/madvise interface, so
->> that VM changes can be coalesced and the output reduced.  This interface
->> could then be used to implement mmap on 32-bit architectures as well because
->> the offset restrictions would not apply there.
->
-> Hi Florian,
->
-> I frankly don't understand what you mean, All syscalls you mentioned
-> doesn't take off_t or other 64-bit arguments. 'VM changes' - virtual
-> memory? If so, I don't see any changes in VM with this approach, just
-> correct handling of big offsets.
+On Wed, Dec 07, 2016 at 01:17:40PM +0000, Vladimir Murzin wrote:
+> When PL330 is used with !MMU the following fault is seen:
+> 
+> Unhandled fault: alignment exception (0x801) at 0x8f26a002
+> Internal error: : 801 [#1] ARM
+> Modules linked in:
+> CPU: 0 PID: 640 Comm: dma0chan0-copy0 Not tainted 4.8.0-6a82063-clean+ #1600
+> Hardware name: ARM-Versatile Express
+> task: 8f1baa80 task.stack: 8e6fe000
+> PC is at _setup_req+0x4c/0x350
+> LR is at 0x8f2cbc00
+> pc : [<801ea538>]    lr : [<8f2cbc00>]    psr: 60000093
+> sp : 8e6ffdc0  ip : 00000000  fp : 00000000
+> r10: 00000000  r9 : 8f2cba10  r8 : 8f2cbc00
+> r7 : 80000013  r6 : 8f21a050  r5 : 8f21a000  r4 : 8f2ac800
+> r3 : 8e6ffe18  r2 : 00944251  r1 : ffffffbc  r0 : 8f26a000
+> Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment none
+> Control: 00c5387c
+> Process dma0chan0-copy0 (pid: 640, stack limit = 0x8e6fe210)
+> Stack: (0x8e6ffdc0 to 0x8e700000)
+> fdc0: 00000001 60000093 00000000 8f2cba10 8f26a000 00000004 8f0ae000 8f2cbc00
+> fde0: 8f0ae000 8f2ac800 8f21a000 8f21a050 80000013 8f2cbc00 8f2cba10 00000000
+> fe00: 60000093 801ebca0 8e6ffe18 000013ff 40000093 00000000 00944251 8f2ac800
+> fe20: a0000013 8f2b1320 00001986 00000000 00000001 000013ff 8f1e4f00 8f2cba10
+> fe40: 8e6fff6c 801e9044 00000003 00000000 fef98c80 002faf07 8e6ffe7c 00000000
+> fe60: 00000002 00000000 00001986 8f1f158d 8f1e4f00 80568de4 00000002 00000000
+> fe80: 00001986 8f1f53ff 40000001 80580500 8f1f158d 8001e00c 00000000 cfdfdfdf
+> fea0: fdae2a25 00000001 00000004 8e6fe000 00000008 00000010 00000000 00000005
+> fec0: 8f2b1330 8f2b1334 8e6ffe80 8e6ffe8c 00001986 00000000 8f21a014 00000001
+> fee0: 8e6ffe60 8e6ffe78 00000002 00000000 000013ff 00000001 80568de4 8f1e8018
+> ff00: 0000158d 8055ec30 00000001 803f6b00 00001986 8f2cba10 fdae2a25 00000001
+> ff20: 8f1baca8 8e6fff24 8e6fff24 00000000 8e6fff24 ac6f3037 00000000 00000000
+> ff40: 00000000 8e6fe000 8f1e4f40 00000000 8f1e4f40 8f1e4f00 801e84ec 00000000
+> ff60: 00000000 00000000 00000000 80031714 dfdfdfcf 00000000 dfdfdfcf 8f1e4f00
+> ff80: 00000000 8e6fff84 8e6fff84 00000000 8e6fff90 8e6fff90 8e6fffac 8f1e4f40
+> ffa0: 80031640 00000000 00000000 8000f548 00000000 00000000 00000000 00000000
+> ffc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> ffe0: 00000000 00000000 00000000 00000000 00000013 00000000 dfdfdfcf cfdfdfdf
+> [<801ea538>] (_setup_req) from [<801ebca0>] (pl330_tasklet+0x41c/0x490)
+> [<801ebca0>] (pl330_tasklet) from [<801e9044>] (dmatest_func+0xb58/0x149c)
+> [<801e9044>] (dmatest_func) from [<80031714>] (kthread+0xd4/0xec)
+> [<80031714>] (kthread) from [<8000f548>] (ret_from_fork+0x14/0x2c)
+> Code: e3a03001 e3e01043 e5c03001 e59d3048 (e5802002)
+> 
+> This happens because _emit_{ADDH,MOV,GO) accessing to unaligned data
+> while writing to buffer. Fix it with writing to buffer byte by byte.
 
-What I was trying to suggest is a completely different interface which 
-is not subject to register size constraints and which has been requested 
-before (a mechanism for batching mm updates).
+Applied, now.
 
-Thanks,
-Florian
+Although I didn't really like duplicating code for writing bytes, that could
+be made a common fn
+
+Thanks
+-- 
+~Vinod
