@@ -1,38 +1,37 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 8 Dec 2016 21:51:04 +0530
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <3cbad5e4-0569-fdab-3ebd-28fae7d2a174@free.fr>
-References: <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
- <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
- <yw1xwpfd2o9f.fsf@unicorn.mansr.com>
- <20161207164341.GX6408@localhost>
- <yw1xr35j1yd5.fsf@unicorn.mansr.com>
- <20161208103921.GC6408@localhost>
- <yw1x60mu1w7e.fsf@unicorn.mansr.com>
- <20161208154018.GD6408@localhost>
- <3cbad5e4-0569-fdab-3ebd-28fae7d2a174@free.fr>
-Message-ID: <20161208162104.GG6408@localhost>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 08 Dec 2016 17:22:32 +0100
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.9 (#2)
+Message-ID: <87r35ifl13.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2016 at 04:43:53PM +0100, Mason wrote:
-> On 08/12/2016 16:40, Vinod Koul wrote:
-> 
-> > FWIW look at ALSA-dmaengine lib, thereby every audio driver that uses it. I
-> > could find other examples and go on and on, but that's besides the point and
-> > looks like you don't want to listen to people telling you something..
-> 
-> Hello Vinod,
-> 
-> FWIW, your system clock seems to be 10 minutes ahead ;-)
+Hi,
 
-Ah thanks for pointing, fixed now :)
-> 
-> I am willing to learn. I have a few outstanding questions
-> in the thread. Could you have a look at them?
+Here is the second pull request for fixes for mvebu for v4.9.
 
-Sure thing, I have replied/ing to few things, feel free to ping me if I miss
-something today..
+Gregory
 
--- 
-~Vinod
+The following changes since commit 8d897006fe9206d64cbe353310be26d7c911e69d:
+
+  arm64: dts: marvell: add unique identifiers for Armada A8k SPI controllers (2016-11-09 09:44:08 +0100)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.9-2
+
+for you to fetch changes up to b150e59f1d217473b3eab354a9e5e9fe907868ff:
+
+  ARM: dts: orion5x: fix number of sata port for linkstation ls-gl (2016-12-05 16:43:05 +0100)
+
+----------------------------------------------------------------
+mvebu fixes for 4.9 (part 2)
+
+Fix number of sata port for linkstation ls-gl: without this the hard
+drive is not detected as it was before the dt conversion
+
+----------------------------------------------------------------
+Roger Shimizu (1):
+      ARM: dts: orion5x: fix number of sata port for linkstation ls-gl
+
+ arch/arm/boot/dts/orion5x-linkstation-lsgl.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
