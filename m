@@ -1,109 +1,41 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 08 Dec 2016 13:58:11 +0900
-Subject: [PATCH v2 5/5] arm64: dts: exynos5433: Add support of bus frequency
- using VDD_INT on TM2
-In-Reply-To: <1481173091-9728-1-git-send-email-cw00.choi@samsung.com>
-References: <1481173091-9728-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1481173091-9728-6-git-send-email-cw00.choi@samsung.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Thu, 8 Dec 2016 13:38:55 +0800
+Subject: [PATCH] arm64: defconfig: Enable NUMA and NUMA_BALANCING
+In-Reply-To: <1480499575-43628-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1480499575-43628-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <b9838176-487a-117a-01b0-d5c4a4b3646f@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the bus Device-tree nodes for INT (Internal) block
-to enable the bus frequency scaling.
++ Arnd
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- arch/arm64/boot/dts/exynos/exynos5433-tm2.dts | 70 +++++++++++++++++++++++++++
- 1 file changed, 70 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-index c08589970134..451788642b21 100644
---- a/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-+++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
-@@ -170,6 +170,58 @@
- 	};
- };
- 
-+&bus_g2d_400 {
-+	devfreq-events = <&ppmu_event0_d0_general>, <&ppmu_event0_d1_general>;
-+	vdd-supply = <&buck4_reg>;
-+	exynos,saturation-ratio = <10>;
-+	status = "okay";
-+};
-+
-+&bus_g2d_266 {
-+	devfreq = <&bus_g2d_400>;
-+	status = "okay";
-+};
-+
-+&bus_gscl {
-+	devfreq = <&bus_g2d_400>;
-+	status = "okay";
-+};
-+
-+&bus_hevc {
-+	devfreq = <&bus_g2d_400>;
-+	status = "okay";
-+};
-+
-+&bus_jpeg {
-+	devfreq = <&bus_g2d_400>;
-+	status = "okay";
-+};
-+
-+&bus_mfc {
-+	devfreq = <&bus_g2d_400>;
-+	status = "okay";
-+};
-+
-+&bus_mscl {
-+	devfreq = <&bus_g2d_400>;
-+	status = "okay";
-+};
-+
-+&bus_noc0 {
-+	devfreq = <&bus_g2d_400>;
-+	status = "okay";
-+};
-+
-+&bus_noc1 {
-+	devfreq = <&bus_g2d_400>;
-+	status = "okay";
-+};
-+
-+&bus_noc2 {
-+	devfreq = <&bus_g2d_400>;
-+	status = "okay";
-+};
-+
- &cmu_aud {
- 	assigned-clocks = <&cmu_aud CLK_MOUT_AUD_PLL_USER>;
- 	assigned-clock-parents = <&cmu_top CLK_FOUT_AUD_PLL>;
-@@ -794,6 +846,24 @@
- 	bus-width = <4>;
- };
- 
-+&ppmu_d0_general {
-+	status = "okay";
-+	events {
-+		ppmu_event0_d0_general: ppmu-event0-d0-general {
-+			event-name = "ppmu-event0-d0-general";
-+		};
-+	};
-+};
-+
-+&ppmu_d1_general {
-+	status = "okay";
-+	events {
-+		ppmu_event0_d1_general: ppmu-event0-d1-general {
-+		       event-name = "ppmu-event0-d1-general";
-+	       };
-+       };
-+};
-+
- &pinctrl_alive {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&initial_alive>;
--- 
-1.9.1
+On 2016/11/30 17:52, Kefeng Wang wrote:
+> Enable NUMA and NUMA_BALANCING to improve the performance on board
+> with multiple numa nodes.
+> 
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
+>  arch/arm64/configs/defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index dab2cb0..967f6e5 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -12,6 +12,7 @@ CONFIG_TASK_IO_ACCOUNTING=y
+>  CONFIG_IKCONFIG=y
+>  CONFIG_IKCONFIG_PROC=y
+>  CONFIG_LOG_BUF_SHIFT=14
+> +CONFIG_NUMA_BALANCING=y
+>  CONFIG_MEMCG=y
+>  CONFIG_MEMCG_SWAP=y
+>  CONFIG_BLK_CGROUP=y
+> @@ -72,6 +73,7 @@ CONFIG_PCIE_QCOM=y
+>  CONFIG_PCIE_ARMADA_8K=y
+>  CONFIG_ARM64_VA_BITS_48=y
+>  CONFIG_SCHED_MC=y
+> +CONFIG_NUMA=y
+>  CONFIG_PREEMPT=y
+>  CONFIG_KSM=y
+>  CONFIG_TRANSPARENT_HUGEPAGE=y
+> 
