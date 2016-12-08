@@ -1,74 +1,134 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Thu, 08 Dec 2016 13:39:31 +0000
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <68bbe77a-c991-4e64-c189-fafbcda8e7ae@free.fr> (Mason's message
- of "Thu, 8 Dec 2016 14:29:17 +0100")
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
- <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
- <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
- <yw1xwpfd2o9f.fsf@unicorn.mansr.com> <20161207164341.GX6408@localhost>
- <yw1xr35j1yd5.fsf@unicorn.mansr.com> <20161208103921.GC6408@localhost>
- <yw1x60mu1w7e.fsf@unicorn.mansr.com>
- <CAMuHMdUEXJtWF3S8yK5RY5e60nOnb-Wc9U2E_L553hZvsijvcw@mail.gmail.com>
- <yw1xshpyzk6p.fsf@unicorn.mansr.com>
- <a865e7d0-4247-657e-25db-9093731005d3@free.fr>
- <yw1xfulyzj2b.fsf@unicorn.mansr.com>
- <68bbe77a-c991-4e64-c189-fafbcda8e7ae@free.fr>
-Message-ID: <yw1xbmwmzgj0.fsf@unicorn.mansr.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 08 Dec 2016 15:51:50 +0200
+Subject: [PATCH v2.1 1/4] ARM: dts: davinci: da850: VPIF: add node and
+ muxing
+In-Reply-To: <20161208001418.4469-1-khilman@baylibre.com>
+References: <20161207193137.27947-2-khilman@baylibre.com>
+ <20161208001418.4469-1-khilman@baylibre.com>
+Message-ID: <1720737.m5D29H51CH@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+Hi Kevin,
 
-> On 08/12/2016 13:44, M?ns Rullg?rd wrote:
->
->> Mason <slash.tmp@free.fr> writes:
->> 
->>> On 08/12/2016 13:20, M?ns Rullg?rd wrote:
->>>
->>>> The only problem we have is that nobody envisioned hardware where the
->>>> dma engine indicates completion slightly too soon.  I suspect there's a
->>>> fifo or such somewhere, and the interrupt is triggered when the last
->>>> byte has been placed in the fifo rather than when it has been removed
->>>> which would have been more correct.
->>>
->>> As I (tried to) explain here:
->>> https://marc.info/?l=dmaengine&m=148007808418242&w=2
->>>
->>> A *read* MBUS agent raises its IRQ when it is safe for the memory
->>> to be overwritten (i.e. every byte has been pushed into the pipe).
->>>
->>> A *write* MBUS agent raises its IRQ when it is safe for another
->>> agent to read any one of the transferred bytes.
->>>
->>> The issue comes from the fact that, for a memory-to-device transfer,
->>> the system will receive the read agent's IRQ, but most devices
->>> (NFC, SATA) don't have an IRQ line to signal that their part of the
->>> operation is complete.
->> 
->> SATA does, actually.  Nevertheless, it's an unusual design.
->
-> Thanks, I was mistaken about the SATA controller.
->
-> On tango3 (and also tango4, I assume)
->
-> IRQ 41 = Serial ATA #0
-> IRQ 42 = Serial ATA DMA #0
-> IRQ 54 = Serial ATA #1
-> IRQ 55 = Serial ATA DMA #1
->
-> But in the end, whether there is a device interrupt (SATA)
-> or not (NFC), for a memory-to-device transfer, the DMA
-> driver will get the read agent notification (which should
-> be ignored) and the client driver should either spin until
-> idle (NFC) or wait for its completion IRQ (SATA).
->
-> Correct?
+Thank you for the patch.
 
-Yes, and when the client device is finished, the driver needs to signal
-this to the dma driver so it can reuse the channel.  It's this last
-piece that's missing.
+On Wednesday 07 Dec 2016 16:14:18 Kevin Hilman wrote:
+> Add VPIF node an pins to da850 and enable on boards.  VPIF has two input
+> channels described using the standard DT ports and enpoints.
+> 
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> ---
+> v2 -> v2.1: moved ports from SoC .dtsi to board .dts files.
+> 
+>  arch/arm/boot/dts/da850-evm.dts  | 20 ++++++++++++++++++++
+>  arch/arm/boot/dts/da850-lcdk.dts | 13 +++++++++++++
+>  arch/arm/boot/dts/da850.dtsi     | 27 ++++++++++++++++++++++++++-
+>  3 files changed, 59 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/da850-evm.dts
+> b/arch/arm/boot/dts/da850-evm.dts index 41de15fe15a2..cea36ee6fd07 100644
+> --- a/arch/arm/boot/dts/da850-evm.dts
+> +++ b/arch/arm/boot/dts/da850-evm.dts
+> @@ -289,3 +289,23 @@
+>  		};
+>  	};
+>  };
+> +
+> +&vpif {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&vpif_capture_pins>;
+> +	status = "okay";
+> +
+> +	/* VPIF capture port */
+> +	port {
+> +		vpif_ch0: endpoint at 0 {
+> +			  reg = <0>;
+> +			  bus-width = <8>;
+> +		};
+> +
+> +		vpif_ch1: endpoint at 1 {
+> +			  reg = <1>;
+> +			  bus-width = <8>;
+> +			  data-shift = <8>;
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/da850-lcdk.dts
+> b/arch/arm/boot/dts/da850-lcdk.dts index 7b8ab21fed6c..5fc21528e0ba 100644
+> --- a/arch/arm/boot/dts/da850-lcdk.dts
+> +++ b/arch/arm/boot/dts/da850-lcdk.dts
+> @@ -219,3 +219,16 @@
+>  		};
+>  	};
+>  };
+> +
+> +&vpif {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&vpif_capture_pins>;
+> +	status = "okay";
+> +
+> +	/* VPIF capture port */
+> +	port {
+> +		vpif_ch0: endpoint {
+> +			  bus-width = <8>;
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> index f79e1b91c680..5f0b40510b2b 100644
+> --- a/arch/arm/boot/dts/da850.dtsi
+> +++ b/arch/arm/boot/dts/da850.dtsi
+> @@ -186,7 +186,18 @@
+>  					0xc 0x88888888 0xffffffff
+> 
+>  				>;
+> 
+>  			};
+> -
+> +			vpif_capture_pins: vpif_capture_pins {
+> +				pinctrl-single,bits = <
+> +					/* VP_DIN[2..7], VP_CLKIN1, VP_CLKIN0 
+*/
+> +					0x38 0x11111111 0xffffffff
+> +					/* VP_DIN[10..15,0..1] */
+> +					0x3c 0x11111111 0xffffffff
+> +					/* VP_DIN[8..9] */
+> +					0x40 0x00000011 0x000000ff
+> +					/* VP_CLKIN3, VP_CLKIN2 */
+> +					0x4c 0x00010100 0x000f0f00
+> +				>;
+> +			};
+>  		};
+>  		edma0: edma at 0 {
+>  			compatible = "ti,edma3-tpcc";
+> @@ -399,7 +410,21 @@
+>  				<&edma0 0 1>;
+>  			dma-names = "tx", "rx";
+>  		};
+> +
+> +		vpif: video at 217000 {
+> +			compatible = "ti,da850-vpif";
+> +			reg = <0x217000 0x1000>;
+> +			interrupts = <92>;
+> +			status = "disabled";
+> +
+> +			/* VPIF capture port */
+> +			port {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +			};
+> +		};
+>  	};
+> +
+>  	aemif: aemif at 68000000 {
+>  		compatible = "ti,da850-aemif";
+>  		#address-cells = <2>;
 
 -- 
-M?ns Rullg?rd
+Regards,
+
+Laurent Pinchart
