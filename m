@@ -1,114 +1,58 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 8 Dec 2016 18:47:17 +0800
-Subject: [PATCH v5 2/5] i2c: Add STM32F4 I2C driver
-In-Reply-To: <1481185563-8735-3-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <201612081812.ctflB7YA%fengguang.wu@intel.com>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 8 Dec 2016 11:54:51 +0100
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <20161208103921.GC6408@localhost>
+References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
+ <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
+ <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
+ <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
+ <yw1xwpfd2o9f.fsf@unicorn.mansr.com> <20161207164341.GX6408@localhost>
+ <yw1xr35j1yd5.fsf@unicorn.mansr.com> <20161208103921.GC6408@localhost>
+Message-ID: <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi M'boumba,
+On 08/12/2016 11:39, Vinod Koul wrote:
 
-[auto build test WARNING on wsa/i2c/for-next]
-[also build test WARNING on v4.9-rc8 next-20161208]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> On Wed, Dec 07, 2016 at 04:45:58PM +0000, M?ns Rullg?rd wrote:
+>
+>> Vinod Koul <vinod.koul@intel.com> writes:
+>>
+>>> On Tue, Dec 06, 2016 at 01:14:20PM +0000, M?ns Rullg?rd wrote:
+>>>>
+>>>> That's not going to work very well.  Device drivers typically request
+>>>> dma channels in their probe functions or when the device is opened.
+>>>> This means that reserving one of the few channels there will inevitably
+>>>> make some other device fail to operate.
+>>>
+>>> No that doesn't make sense at all, you should get a channel only when you
+>>> want to use it and not in probe!
+>>
+>> Tell that to just about every single driver ever written.
+> 
+> Not really, few do yes which is wrong but not _all_ do that.
 
-url:    https://github.com/0day-ci/linux/commits/M-boumba-Cedric-Madianga/Add-support-for-the-STM32F4-I2C/20161208-173240
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/for-next
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+Vinod,
 
-All warnings (new ones prefixed by >>):
+Could you explain something to me in layman's terms?
 
-   In file included from include/linux/clk.h:16:0,
-                    from drivers/i2c/busses/i2c-stm32f4.c:12:
-   drivers/i2c/busses/i2c-stm32f4.c: In function 'stm32f4_i2c_set_periph_clk_freq':
-   include/linux/kernel.h:749:16: warning: comparison of distinct pointer types lacks a cast
-     (void) (&max1 == &max2);   \
-                   ^
-   include/linux/kernel.h:737:2: note: in definition of macro '__min'
-     t1 min1 = (x);     \
-     ^~
-   include/linux/kernel.h:778:28: note: in expansion of macro 'min'
-    #define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
-                               ^~~
->> include/linux/kernel.h:752:2: note: in expansion of macro '__max'
-     __max(typeof(x), typeof(y),   \
-     ^~~~~
->> include/linux/kernel.h:778:45: note: in expansion of macro 'max'
-    #define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
-                                                ^~~
->> drivers/i2c/busses/i2c-stm32f4.c:201:9: note: in expansion of macro 'clamp'
-     freq = clamp(freq, STM32F4_I2C_MIN_FREQ, STM32F4_I2C_MAX_FREQ);
-            ^~~~~
-   include/linux/kernel.h:749:16: warning: comparison of distinct pointer types lacks a cast
-     (void) (&max1 == &max2);   \
-                   ^
-   include/linux/kernel.h:737:13: note: in definition of macro '__min'
-     t1 min1 = (x);     \
-                ^
-   include/linux/kernel.h:778:28: note: in expansion of macro 'min'
-    #define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
-                               ^~~
->> include/linux/kernel.h:752:2: note: in expansion of macro '__max'
-     __max(typeof(x), typeof(y),   \
-     ^~~~~
->> include/linux/kernel.h:778:45: note: in expansion of macro 'max'
-    #define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
-                                                ^~~
->> drivers/i2c/busses/i2c-stm32f4.c:201:9: note: in expansion of macro 'clamp'
-     freq = clamp(freq, STM32F4_I2C_MIN_FREQ, STM32F4_I2C_MAX_FREQ);
-            ^~~~~
-   include/linux/kernel.h:739:16: warning: comparison of distinct pointer types lacks a cast
-     (void) (&min1 == &min2);   \
-                   ^
-   include/linux/kernel.h:742:2: note: in expansion of macro '__min'
-     __min(typeof(x), typeof(y),   \
-     ^~~~~
-   include/linux/kernel.h:778:28: note: in expansion of macro 'min'
-    #define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
-                               ^~~
->> drivers/i2c/busses/i2c-stm32f4.c:201:9: note: in expansion of macro 'clamp'
-     freq = clamp(freq, STM32F4_I2C_MIN_FREQ, STM32F4_I2C_MAX_FREQ);
-            ^~~~~
+I have a NAND Flash Controller driver that depends on the
+DMA driver under discussion.
 
-vim +/clamp +201 drivers/i2c/busses/i2c-stm32f4.c
+Suppose I move the dma_request_chan() call from the driver's
+probe function, to the actual DMA transfer function.
 
-   185	
-   186	static void stm32f4_i2c_disable_it(struct stm32f4_i2c_dev *i2c_dev)
-   187	{
-   188		void __iomem *reg = i2c_dev->base + STM32F4_I2C_CR2;
-   189	
-   190		stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR2_IRQ_MASK);
-   191	}
-   192	
-   193	static void stm32f4_i2c_set_periph_clk_freq(struct stm32f4_i2c_dev *i2c_dev)
-   194	{
-   195		u32 clk_rate, cr2, freq;
-   196	
-   197		cr2 = readl_relaxed(i2c_dev->base + STM32F4_I2C_CR2);
-   198		cr2 &= ~STM32F4_I2C_CR2_FREQ_MASK;
-   199		clk_rate = clk_get_rate(i2c_dev->clk);
-   200		freq = clk_rate / MHZ_TO_HZ;
- > 201		freq = clamp(freq, STM32F4_I2C_MIN_FREQ, STM32F4_I2C_MAX_FREQ);
-   202		cr2 |= STM32F4_I2C_CR2_FREQ(freq);
-   203		writel_relaxed(cr2, i2c_dev->base + STM32F4_I2C_CR2);
-   204	}
-   205	
-   206	static void stm32f4_i2c_set_rise_time(struct stm32f4_i2c_dev *i2c_dev)
-   207	{
-   208		u32 trise, freq, cr2, val;
-   209	
+I would want dma_request_chan() to put the calling thread
+to sleep until a channel becomes available (possibly with
+a timeout value).
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 56838 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161208/776da99e/attachment-0001.gz>
+But Maxime told me dma_request_chan() will just return
+-EBUSY if no channels are available.
+
+Am I supposed to busy wait in my driver's DMA function
+until a channel becomes available?
+
+I don't understand how the multiplexing of few memory
+channels to many clients is supposed to happen efficiently?
+
+Regards.
