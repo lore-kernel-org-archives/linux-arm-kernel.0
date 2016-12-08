@@ -1,127 +1,108 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed,  7 Dec 2016 16:57:52 -0800
-Subject: [PATCH 11/12] gpu: ipu-v3: lookup ipu client nodes by name
+Date: Wed,  7 Dec 2016 16:57:50 -0800
+Subject: [PATCH 09/12] ARM: dts: imx6-sabreauto: add the ADV7180 video decoder
 In-Reply-To: <1481158673-15937-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1481158673-15937-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1481158673-15937-12-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1481158673-15937-10-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow for IPU clients containing multiple ports, they are no longer
-a single port node name, but have a name of the format
-"ipu<id>_<unit>". So we can no longer use of_graph_get_port_by_id()
-to lookup the client node.
+Enables the ADV7180 decoder sensor. The ADV7180 connects to the
+parallel-bus mux input on ipu1_csi0_mux.
 
-Create the function of_get_ipu_client_node() that looks up the client
-node by node name and unit id. The ipu_unit_type enumeration is added
-to the client_reg[] entries to compose the node names.
+On the sabreauto, two analog video inputs are routed to the ADV7180,
+composite on Ain1, and composite on Ain3. Those inputs are defined
+via inputs and input-names under the ADV7180 node. The ADV7180 power
+pin is via max7310_b port expander.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- drivers/gpu/ipu-v3/ipu-common.c | 55 +++++++++++++++++++++++++++++++++++------
- 1 file changed, 47 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 62 ++++++++++++++++++++++++++++++++
+ 1 file changed, 62 insertions(+)
 
-diff --git a/drivers/gpu/ipu-v3/ipu-common.c b/drivers/gpu/ipu-v3/ipu-common.c
-index 97218af..b6ca36b 100644
---- a/drivers/gpu/ipu-v3/ipu-common.c
-+++ b/drivers/gpu/ipu-v3/ipu-common.c
-@@ -1159,6 +1159,7 @@ struct ipu_platform_reg {
- static struct ipu_platform_reg client_reg[] = {
- 	{
- 		.pdata = {
-+			.type = IPU_CSI,
- 			.csi = 0,
- 			.dma[0] = IPUV3_CHANNEL_CSI0,
- 			.dma[1] = -EINVAL,
-@@ -1166,6 +1167,7 @@ static struct ipu_platform_reg client_reg[] = {
- 		.name = "imx-ipuv3-csi",
- 	}, {
- 		.pdata = {
-+			.type = IPU_CSI,
- 			.csi = 1,
- 			.dma[0] = IPUV3_CHANNEL_CSI1,
- 			.dma[1] = -EINVAL,
-@@ -1173,6 +1175,7 @@ static struct ipu_platform_reg client_reg[] = {
- 		.name = "imx-ipuv3-csi",
- 	}, {
- 		.pdata = {
-+			.type = IPU_DI,
- 			.di = 0,
- 			.dc = 5,
- 			.dp = IPU_DP_FLOW_SYNC_BG,
-@@ -1182,6 +1185,7 @@ static struct ipu_platform_reg client_reg[] = {
- 		.name = "imx-ipuv3-crtc",
- 	}, {
- 		.pdata = {
-+			.type = IPU_DI,
- 			.di = 1,
- 			.dc = 1,
- 			.dp = -EINVAL,
-@@ -1195,6 +1199,46 @@ static struct ipu_platform_reg client_reg[] = {
- static DEFINE_MUTEX(ipu_client_id_mutex);
- static int ipu_client_id;
- 
-+static struct device_node *
-+of_get_ipu_client_node(struct ipu_soc *ipu, struct ipu_platform_reg *reg)
-+{
-+	struct device *dev = ipu->dev;
-+	struct device_node *client;
-+	char node_name[32];
-+	u32 id, client_id = 0;
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index d74882a..9222026 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -147,10 +147,48 @@
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 			};
 +
-+	switch (reg->pdata.type) {
-+	case IPU_CSI:
-+		snprintf(node_name, sizeof(node_name),
-+			 "ipu%d_csi", ipu->id + 1);
-+		client_id = reg->pdata.csi;
-+		break;
-+	case IPU_DI:
-+		snprintf(node_name, sizeof(node_name),
-+			 "ipu%d_di", ipu->id + 1);
-+		client_id = reg->pdata.di;
-+		break;
-+	default:
-+		client = NULL;
-+		goto out;
-+	}
++			camera: adv7180 at 21 {
++				compatible = "adi,adv7180";
++				reg = <0x21>;
++				powerdown-gpios = <&max7310_b 2 GPIO_ACTIVE_LOW>;
++				interrupt-parent = <&gpio1>;
++				interrupts = <27 0x8>;
++				inputs = <0x00 0x02>;
++				input-names = "ADV7180 Composite on Ain1",
++						"ADV7180 Composite on Ain3";
 +
-+	for_each_child_of_node(dev->of_node, client) {
-+		if (client->name &&
-+		    (of_node_cmp(client->name, node_name) == 0)) {
-+			of_property_read_u32(client, "reg", &id);
-+			if (id == client_id)
-+				break;
-+		}
-+	}
-+out:
-+	if (!client)
-+		dev_info(dev, "no %s%d node in %s, not using %s%d\n",
-+			 node_name, client_id, dev->of_node->full_name,
-+			 node_name, client_id);
-+	return client;
-+}
++				port {
++					adv7180_to_ipu1_csi0_mux: endpoint {
++						remote-endpoint = <&ipu1_csi0_mux_from_parallel_sensor>;
++						bus-width = <8>;
++					};
++				};
++			};
+ 		};
+ 	};
+ };
+ 
++&ipu1_smfc0 {
++	fim {
++		enable = <1>;
++	};
++};
 +
- static int ipu_add_client_devices(struct ipu_soc *ipu, unsigned long ipu_base)
- {
- 	struct device *dev = ipu->dev;
-@@ -1211,15 +1255,10 @@ static int ipu_add_client_devices(struct ipu_soc *ipu, unsigned long ipu_base)
- 		struct platform_device *pdev;
- 		struct device_node *of_node;
++&ipu1_csi0_from_ipu1_csi0_mux {
++	bus-width = <8>;
++};
++
++&ipu1_csi0_mux_from_parallel_sensor {
++	remote-endpoint = <&adv7180_to_ipu1_csi0_mux>;
++	bus-width = <8>;
++};
++
++&ipu1_csi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ipu1_csi0>;
++};
++
+ &clks {
+ 	assigned-clocks = <&clks IMX6QDL_PLL4_BYPASS_SRC>,
+ 			  <&clks IMX6QDL_PLL4_BYPASS>,
+@@ -451,6 +489,30 @@
+ 			>;
+ 		};
  
--		/* Associate subdevice with the corresponding port node */
--		of_node = of_graph_get_port_by_id(dev->of_node, i);
--		if (!of_node) {
--			dev_info(dev,
--				 "no port@%d node in %s, not using %s%d\n",
--				 i, dev->of_node->full_name,
--				 (i / 2) ? "DI" : "CSI", i % 2);
-+		/* Associate subdevice with the corresponding client node */
-+		of_node = of_get_ipu_client_node(ipu, reg);
-+		if (!of_node)
- 			continue;
--		}
- 
- 		pdev = platform_device_alloc(reg->name, id++);
- 		if (!pdev) {
++		pinctrl_ipu1_csi0: ipu1grp-csi0 {
++			fsl,pins = <
++				MX6QDL_PAD_CSI0_DAT4__IPU1_CSI0_DATA04   0x80000000
++				MX6QDL_PAD_CSI0_DAT5__IPU1_CSI0_DATA05   0x80000000
++				MX6QDL_PAD_CSI0_DAT6__IPU1_CSI0_DATA06   0x80000000
++				MX6QDL_PAD_CSI0_DAT7__IPU1_CSI0_DATA07   0x80000000
++				MX6QDL_PAD_CSI0_DAT8__IPU1_CSI0_DATA08   0x80000000
++				MX6QDL_PAD_CSI0_DAT9__IPU1_CSI0_DATA09   0x80000000
++				MX6QDL_PAD_CSI0_DAT10__IPU1_CSI0_DATA10  0x80000000
++				MX6QDL_PAD_CSI0_DAT11__IPU1_CSI0_DATA11  0x80000000
++				MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12  0x80000000
++				MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13  0x80000000
++				MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14  0x80000000
++				MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15  0x80000000
++				MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16  0x80000000
++				MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17  0x80000000
++				MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18  0x80000000
++				MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19  0x80000000
++				MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK 0x80000000
++				MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC    0x80000000
++				MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC   0x80000000
++			>;
++		};
++
+ 		pinctrl_pwm3: pwm1grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
 -- 
 2.7.4
