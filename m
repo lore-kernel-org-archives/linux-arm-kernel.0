@@ -1,50 +1,61 @@
-From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Thu, 8 Dec 2016 09:47:46 +0100
-Subject: [PATCH v5 4/5] ARM: dts: Add I2C1 support for STM32429 eval board
-In-Reply-To: <e61ae4d6-a65a-5cfa-6845-27351ac43af6@st.com>
-References: <1481185563-8735-1-git-send-email-cedric.madianga@gmail.com>
- <1481185563-8735-5-git-send-email-cedric.madianga@gmail.com>
- <e61ae4d6-a65a-5cfa-6845-27351ac43af6@st.com>
-Message-ID: <CAOAejn239D+R9AZuCVB8MChidAcQqWZvFzkkTTJF7s9UprzoaQ@mail.gmail.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Thu, 8 Dec 2016 17:05:26 +0800
+Subject: [PATCH v1 1/2] Add crypto driver support for some MediaTek chips
+In-Reply-To: <20161205085220.GA333@Red>
+References: <1480921284-45827-1-git-send-email-ryder.lee@mediatek.com>
+ <1480921284-45827-2-git-send-email-ryder.lee@mediatek.com>
+ <20161205085220.GA333@Red>
+Message-ID: <1481187926.14860.19.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+Hello,
 
+On Mon, 2016-12-05 at 09:52 +0100, Corentin Labbe wrote:
+> Hello
+> 
+> I have two minor comment.
+> 
+> On Mon, Dec 05, 2016 at 03:01:23PM +0800, Ryder Lee wrote:
+> > This adds support for the MediaTek hardware accelerator on
+> > mt7623/mt2701/mt8521p SoC.
+> > 
+> > This driver currently implement:
+> > - SHA1 and SHA2 family(HMAC) hash alogrithms.
+> 
+> There is a typo for algorithms.
+> 
+> [...]
+> > +/**
+> > + * struct mtk_desc - DMA descriptor
+> > + * @hdr:	the descriptor control header
+> > + * @buf:	DMA address of input buffer segment
+> > + * @ct:		DMA address of command token that control operation flow
+> > + * @ct_hdr:	the command token control header
+> > + * @tag:	the user-defined field
+> > + * @tfm:	DMA address of transform state
+> > + * @bound:	align descriptors offset boundary
+> > + *
+> > + * Structure passed to the crypto engine to describe where source
+> > + * data needs to be fetched and how it needs to be processed.
+> > + */
+> > +struct mtk_desc {
+> > +	u32 hdr;
+> > +	u32 buf;
+> > +	u32 ct;
+> > +	u32 ct_hdr;
+> > +	u32 tag;
+> > +	u32 tfm;
+> > +	u32 bound[2];
+> > +};
+> 
+> Do you have tested this descriptor with BE/LE kernel ?
 
-2016-12-08 9:39 GMT+01:00 Alexandre Torgue <alexandre.torgue@st.com>:
-> Hi Cedric,
->
-> On 12/08/2016 09:26 AM, M'boumba Cedric Madianga wrote:
->>
->> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
->> ---
->>  arch/arm/boot/dts/stm32429i-eval.dts | 6 ++++++
->>  1 file changed, 6 insertions(+)
->>
-> Can you change the commit header by: ARM: dts: stm32: Add I2C1 support for
-> STM32429 eval board
-Ok, I will use this typo in the next version
+I did not test it with BE kernel, because both CPU and accelerator in
+our SoC just run on LE system. 
 
->
-> thx
-> Alex
->
->
->> diff --git a/arch/arm/boot/dts/stm32429i-eval.dts
->> b/arch/arm/boot/dts/stm32429i-eval.dts
->> index afb90bc..74e0045 100644
->> --- a/arch/arm/boot/dts/stm32429i-eval.dts
->> +++ b/arch/arm/boot/dts/stm32429i-eval.dts
->> @@ -141,3 +141,9 @@
->>         pinctrl-names = "default";
->>         status = "okay";
->>  };
->> +
->> +&i2c1 {
->> +       pinctrl-0 = <&i2c1_pins_b>;
->> +       pinctrl-names = "default";
->> +       status = "okay";
->> +};
->>
->
+Thanks for reminding me, i will use byteorder conversion macros and type
+identifiers.
+
+> Regards
+> Corentin Labbe
