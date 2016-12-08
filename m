@@ -1,203 +1,57 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 8 Dec 2016 19:33:49 +0200
-Subject: [RESEND-PATCH] ARM: EXYNOS: remove smp hook from machine
- descriptor
-In-Reply-To: <1481166135-1588-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1481166135-1588-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <20161208173349.GA8522@kozik-lap>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Fri,  9 Dec 2016 01:33:06 +0800
+Subject: [PATCH v18 02/15] clocksource/drivers/arm_arch_timer: Add a new enum
+ for spi type
+In-Reply-To: <20161208173319.6618-1-fu.wei@linaro.org>
+References: <20161208173319.6618-1-fu.wei@linaro.org>
+Message-ID: <20161208173319.6618-3-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2016 at 08:32:15AM +0530, Pankaj Dubey wrote:
-> Use CPU_METHOD_OF_DECLARE() for smp_ops instead of using it
-> via machine descriptor.
-> 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
-> 
-> Resending as I missed to include samsung mailing list.
-> 
->  arch/arm/boot/dts/exynos3250.dtsi      | 1 +
->  arch/arm/boot/dts/exynos4210.dtsi      | 1 +
->  arch/arm/boot/dts/exynos4212.dtsi      | 1 +
->  arch/arm/boot/dts/exynos4412.dtsi      | 1 +
->  arch/arm/boot/dts/exynos5250.dtsi      | 1 +
->  arch/arm/boot/dts/exynos5260.dtsi      | 1 +
->  arch/arm/boot/dts/exynos5410.dtsi      | 1 +
->  arch/arm/boot/dts/exynos5420-cpus.dtsi | 1 +
->  arch/arm/boot/dts/exynos5422-cpus.dtsi | 1 +
->  arch/arm/boot/dts/exynos5440.dtsi      | 1 +
->  arch/arm/mach-exynos/common.h          | 2 --
->  arch/arm/mach-exynos/exynos.c          | 1 -
->  arch/arm/mach-exynos/platsmp.c         | 2 ++
->  13 files changed, 12 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-> index ba17ee1..f28f669 100644
-> --- a/arch/arm/boot/dts/exynos3250.dtsi
-> +++ b/arch/arm/boot/dts/exynos3250.dtsi
-> @@ -53,6 +53,7 @@
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		enable-method = "samsung,exynos-smp";
->  
->  		cpu0: cpu at 0 {
->  			device_type = "cpu";
-> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-> index 7f3a18c..6dfd98d 100644
-> --- a/arch/arm/boot/dts/exynos4210.dtsi
-> +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> @@ -35,6 +35,7 @@
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		enable-method = "samsung,exynos-smp";
->  
->  		cpu0: cpu at 900 {
->  			device_type = "cpu";
-> diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
-> index 5389011..3e8982e 100644
-> --- a/arch/arm/boot/dts/exynos4212.dtsi
-> +++ b/arch/arm/boot/dts/exynos4212.dtsi
-> @@ -25,6 +25,7 @@
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		enable-method = "samsung,exynos-smp";
->  
->  		cpu0: cpu at A00 {
->  			device_type = "cpu";
-> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-> index 40beede..faf2fb8 100644
-> --- a/arch/arm/boot/dts/exynos4412.dtsi
-> +++ b/arch/arm/boot/dts/exynos4412.dtsi
-> @@ -25,6 +25,7 @@
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		enable-method = "samsung,exynos-smp";
->  
->  		cpu0: cpu at A00 {
->  			device_type = "cpu";
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index b6d7444..580897c 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -52,6 +52,7 @@
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		enable-method = "samsung,exynos-smp";
->  
->  		cpu0: cpu at 0 {
->  			device_type = "cpu";
-> diff --git a/arch/arm/boot/dts/exynos5260.dtsi b/arch/arm/boot/dts/exynos5260.dtsi
-> index 5818718..1af6e76 100644
-> --- a/arch/arm/boot/dts/exynos5260.dtsi
-> +++ b/arch/arm/boot/dts/exynos5260.dtsi
-> @@ -32,6 +32,7 @@
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		enable-method = "samsung,exynos-smp";
->  
->  		cpu at 0 {
->  			device_type = "cpu";
-> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-> index 2b6adaf..b092cdc 100644
-> --- a/arch/arm/boot/dts/exynos5410.dtsi
-> +++ b/arch/arm/boot/dts/exynos5410.dtsi
-> @@ -33,6 +33,7 @@
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		enable-method = "samsung,exynos-smp";
->  
->  		cpu0: cpu at 0 {
->  			device_type = "cpu";
-> diff --git a/arch/arm/boot/dts/exynos5420-cpus.dtsi b/arch/arm/boot/dts/exynos5420-cpus.dtsi
-> index 5c052d7..a587704 100644
-> --- a/arch/arm/boot/dts/exynos5420-cpus.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420-cpus.dtsi
-> @@ -24,6 +24,7 @@
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		enable-method = "samsung,exynos-smp";
->  
->  		cpu0: cpu at 0 {
->  			device_type = "cpu";
-> diff --git a/arch/arm/boot/dts/exynos5422-cpus.dtsi b/arch/arm/boot/dts/exynos5422-cpus.dtsi
-> index bf3c6f1..7fcdfd0 100644
-> --- a/arch/arm/boot/dts/exynos5422-cpus.dtsi
-> +++ b/arch/arm/boot/dts/exynos5422-cpus.dtsi
-> @@ -23,6 +23,7 @@
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		enable-method = "samsung,exynos-smp";
->  
->  		cpu0: cpu at 100 {
->  			device_type = "cpu";
-> diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-> index 2a2e570..0a958e8 100644
-> --- a/arch/arm/boot/dts/exynos5440.dtsi
-> +++ b/arch/arm/boot/dts/exynos5440.dtsi
-> @@ -50,6 +50,7 @@
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		enable-method = "samsung,exynos-smp";
->  
->  		cpu at 0 {
->  			device_type = "cpu";
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-> index fb12d11..051e1ab 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -143,8 +143,6 @@ static inline void exynos_pm_init(void) {}
->  extern void exynos_cpu_resume(void);
->  extern void exynos_cpu_resume_ns(void);
->  
-> -extern const struct smp_operations exynos_smp_ops;
-> -
->  extern void exynos_cpu_power_down(int cpu);
->  extern void exynos_cpu_power_up(int cpu);
->  extern int  exynos_cpu_power_state(int cpu);
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index fa08ef9..f0a766e 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -211,7 +211,6 @@ DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
->  	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
->  	.l2c_aux_val	= 0x3c400001,
->  	.l2c_aux_mask	= 0xc20fffff,
-> -	.smp		= smp_ops(exynos_smp_ops),
->  	.map_io		= exynos_init_io,
->  	.init_early	= exynos_firmware_init,
->  	.init_irq	= exynos_init_irq,
-> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-> index 94405c7..43eec10 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -474,3 +474,5 @@ const struct smp_operations exynos_smp_ops __initconst = {
->  	.cpu_die		= exynos_cpu_die,
->  #endif
->  };
-> +
-> +CPU_METHOD_OF_DECLARE(exynos_smp, "samsung,exynos-smp", &exynos_smp_ops);
+From: Fu Wei <fu.wei@linaro.org>
 
-Three issues:
-1. This has to be documented. Checkpatch did not complain about it?
-2. I think this breaks the ABI with existing DTBs because now the
-   enable-method of cpus becomes mandatory. But the
-   Documentation/devicetree/bindings/arm/cpus.txt is saying that:
-   "On ARM 32-bit systems this property is optional and can be one of"
+This patch add a new enum "arch_timer_spi_nr" and use it in the driver.
+Just for code's readability, no functional change.
 
-3. Please split DTS changes to separate patches. This is, by the way,
-   connected with #2 above: if there was no ABI break, then the DTS
-   could go to separate branch easily.
+Signed-off-by: Fu Wei <fu.wei@linaro.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+---
+ drivers/clocksource/arm_arch_timer.c | 4 ++--
+ include/clocksource/arm_arch_timer.h | 6 ++++++
+ 2 files changed, 8 insertions(+), 2 deletions(-)
 
-Best regards,
-Krzysztof
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 21068be..63bb532 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -960,9 +960,9 @@ static int __init arch_timer_mem_init(struct device_node *np)
+ 	}
+ 
+ 	if (arch_timer_mem_use_virtual)
+-		irq = irq_of_parse_and_map(best_frame, 1);
++		irq = irq_of_parse_and_map(best_frame, ARCH_TIMER_VIRT_SPI);
+ 	else
+-		irq = irq_of_parse_and_map(best_frame, 0);
++		irq = irq_of_parse_and_map(best_frame, ARCH_TIMER_PHYS_SPI);
+ 
+ 	ret = -EINVAL;
+ 	if (!irq) {
+diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+index 557f869..d23c381 100644
+--- a/include/clocksource/arm_arch_timer.h
++++ b/include/clocksource/arm_arch_timer.h
+@@ -46,6 +46,12 @@ enum arch_timer_ppi_nr {
+ 	MAX_TIMER_PPI
+ };
+ 
++enum arch_timer_spi_nr {
++	ARCH_TIMER_PHYS_SPI,
++	ARCH_TIMER_VIRT_SPI,
++	ARCH_TIMER_MAX_TIMER_SPI
++};
++
+ #define ARCH_TIMER_PHYS_ACCESS		0
+ #define ARCH_TIMER_VIRT_ACCESS		1
+ #define ARCH_TIMER_MEM_PHYS_ACCESS	2
+-- 
+2.9.3
