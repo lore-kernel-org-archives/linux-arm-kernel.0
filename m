@@ -1,69 +1,43 @@
-From: lukas@wunner.de (Lukas Wunner)
-Date: Thu, 8 Dec 2016 13:42:36 +0100
-Subject: [PATCH 5/8] efi: Get the secure boot status [ver #5]
-In-Reply-To: <6009.1481184981@warthog.procyon.org.uk>
-References: <20161208065735.GB8549@wunner.de>
- <148111668193.23390.6340512985876251017.stgit@warthog.procyon.org.uk>
- <148111671977.23390.12452925207541146423.stgit@warthog.procyon.org.uk>
- <6009.1481184981@warthog.procyon.org.uk>
-Message-ID: <20161208124236.GA8757@wunner.de>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 8 Dec 2016 13:41:29 +0100
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <yw1xshpyzk6p.fsf@unicorn.mansr.com>
+References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
+ <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
+ <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
+ <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
+ <yw1xwpfd2o9f.fsf@unicorn.mansr.com> <20161207164341.GX6408@localhost>
+ <yw1xr35j1yd5.fsf@unicorn.mansr.com> <20161208103921.GC6408@localhost>
+ <yw1x60mu1w7e.fsf@unicorn.mansr.com>
+ <CAMuHMdUEXJtWF3S8yK5RY5e60nOnb-Wc9U2E_L553hZvsijvcw@mail.gmail.com>
+ <yw1xshpyzk6p.fsf@unicorn.mansr.com>
+Message-ID: <a865e7d0-4247-657e-25db-9093731005d3@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2016 at 08:16:21AM +0000, David Howells wrote:
-> +/*
-> + * Determine whether we're in secure boot mode.
-> + */
-> +enum efi_secureboot_mode efi_get_secureboot(efi_system_table_t *sys_table_arg)
-> +{
-> +	u8 secboot, setupmode;
-> +	unsigned long size;
-> +	efi_status_t status;
-> +
-> +	size = sizeof(secboot);
-> +	status = get_efi_var(efi_SecureBoot_name, &efi_variable_guid,
-> +			     NULL, &size, &secboot);
-> +	if (status != EFI_SUCCESS)
-> +		goto out_efi_err;
-> +
-> +	size = sizeof(setupmode);
-> +	status = get_efi_var(efi_SetupMode_name, &efi_variable_guid,
-> +			     NULL, &size, &setupmode);
-> +	if (status != EFI_SUCCESS)
-> +		goto out_efi_err;
-> +
-> +	if (secboot == 0 || setupmode == 1)
-> +		return efi_secureboot_mode_disabled;
-> +
-> +	pr_efi(sys_table_arg, "UEFI Secure Boot is enabled.\n");
-> +	return efi_secureboot_mode_enabled;
-> +
-> +out_efi_err:
-> +	pr_efi_err(sys_table_arg, "Could not determine UEFI Secure Boot status.\n");
-> +	if (status == EFI_NOT_FOUND)
-> +		return efi_secureboot_mode_disabled;
-> +	return efi_secureboot_mode_unknown;
-> +}
+On 08/12/2016 13:20, M?ns Rullg?rd wrote:
 
-In the out_efi_err path, the if-statement needs to come before the
-pr_efi_err() call.  Otherwise it would be a change of behaviour for
-ARM to what we have now.
+> The only problem we have is that nobody envisioned hardware where the
+> dma engine indicates completion slightly too soon.  I suspect there's a
+> fifo or such somewhere, and the interrupt is triggered when the last
+> byte has been placed in the fifo rather than when it has been removed
+> which would have been more correct.
 
-Also, minor nit, I'd expect Matt to ask for a newline between the
-if-statement and the following statements, so:
+As I (tried to) explain here:
+https://marc.info/?l=dmaengine&m=148007808418242&w=2
 
-out_efi_err:
-	if (status == EFI_NOT_FOUND)
-		return efi_secureboot_mode_disabled;
+A *read* MBUS agent raises its IRQ when it is safe for the memory
+to be overwritten (i.e. every byte has been pushed into the pipe).
 
-	pr_efi_err(sys_table_arg, "Could not determine UEFI Secure Boot status.\n");
-	return efi_secureboot_mode_unknown;
+A *write* MBUS agent raises its IRQ when it is safe for another
+agent to read any one of the transferred bytes.
 
-The error message doesn't say what the consequence is of the
-failure to determine the status, but IIUC this differs between
-x86 and ARM, is that correct?  (If I remember the discussion
-correctly, x86 defaults to disabled, ARM to enabled.)
+The issue comes from the fact that, for a memory-to-device transfer,
+the system will receive the read agent's IRQ, but most devices
+(NFC, SATA) don't have an IRQ line to signal that their part of the
+operation is complete.
 
-Thanks,
+As I explained, if one sets up a memory-to-memory DMA copy, then
+the system will actually receive *two* IRQs.
 
-Lukas
+Regards.
