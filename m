@@ -1,68 +1,248 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 08 Dec 2016 13:58:07 +0900
-Subject: [PATCH v2 1/5] clk: samsung: exynos5433: Set NoC (Network On Chip)
- clocks as critical
+Date: Thu, 08 Dec 2016 13:58:10 +0900
+Subject: [PATCH v2 4/5] arm64: dts: exynos5433: Add bus dt node using VDD_INT
+ for Exynos5433
 In-Reply-To: <1481173091-9728-1-git-send-email-cw00.choi@samsung.com>
 References: <1481173091-9728-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1481173091-9728-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1481173091-9728-5-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ACLK_BUS0/1/2 are used for NoC (Network on Chip). If NoC's clocks are
-disabled, the system halt happen. Following clock must be always enabled.
-- CLK_ACLK_BUS0_400 : NoC's bus clock for PERIC/PERIS/FSYS/MSCL
-- CLK_ACLK_BUS1_400 : NoC's bus clock for MFC/HEVC/G3D
-- CLK_ACLK_BUS2_400 : NoC's bus clock for GSCL/DISP/G2D/CAM0/CAM1/ISP
+This patch adds the bus nodes using VDD_INT for Exynos5433 SoC.
+Exynos5433 has the following AMBA AXI buses to translate data
+between DRAM and sub-blocks.
 
-Also, this patch adds the CLK_SET_RATE_PARENT flag to the CLK_SCLK_JPEG_MSCL
-because this clock should be used for bus frequency scaling. This clock need to
-be changed on the fly with CLK_SET_RATE_PARENT flag.
+Following list specify the detailed correlation between sub-block and clock:
+- CLK_ACLK_G2D_{400|266}  : Bus clock for G2D (2D graphic engine)
+- CLK_ACLK_MSCL_400       : Bus clock for MSCL (Memory to memory Scaler)
+- CLK_ACLK_GSCL_333       : Bus clock for GSCL (General Scaler)
+- CLK_SCLK_JPEG_MSCL      : Bus clock for JPEG
+- CLK_ACLK_MFC_400        : Bus clock for MFC (Multi Format Codec)
+- CLK_ACLK_HEVC_400       : Bus clock for HEVC (High Efficient Video Codec)
+- CLK_ACLK_BUS0_400       : NoC(Network On Chip)'s bus clock for PERIC/PERIS/FSYS/MSCL
+- CLK_ACLK_BUS1_400       : NoC's bus clock for MFC/HEVC/G3D
+- CLK_ACLK_BUS2_400       : NoC's bus clock for GSCL/DISP/G2D/CAM0/CAM1/ISP
 
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Chanwoo Choi <cw00.choi@samsung.com>
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc:linux-clk at vger.kernel.org
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- drivers/clk/samsung/clk-exynos5433.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi | 197 +++++++++++++++++++++++++
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi     |   1 +
+ 2 files changed, 198 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi
 
-diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
-index f096bd7df40c..0db5204c307c 100644
---- a/drivers/clk/samsung/clk-exynos5433.c
-+++ b/drivers/clk/samsung/clk-exynos5433.c
-@@ -549,10 +549,10 @@
- 			29, CLK_IGNORE_UNUSED, 0),
- 	GATE(CLK_ACLK_BUS0_400, "aclk_bus0_400", "div_aclk_bus0_400",
- 			ENABLE_ACLK_TOP, 26,
--			CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
-+			CLK_IS_CRITICAL | CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_ACLK_BUS1_400, "aclk_bus1_400", "div_aclk_bus1_400",
- 			ENABLE_ACLK_TOP, 25,
--			CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
-+			CLK_IS_CRITICAL | CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_ACLK_IMEM_200, "aclk_imem_200", "div_aclk_imem_266",
- 			ENABLE_ACLK_TOP, 24,
- 			CLK_IS_CRITICAL | CLK_SET_RATE_PARENT, 0),
-@@ -616,7 +616,7 @@
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi
+new file mode 100644
+index 000000000000..09dac0124f73
+--- /dev/null
++++ b/arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi
+@@ -0,0 +1,197 @@
++/*
++ * Samsung's Exynos5433 SoC Memory interface and AMBA bus device tree source
++ *
++ * Copyright (c) 2016 Samsung Electronics Co., Ltd.
++ * Chanwoo Choi <cw00.choi@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++&soc {
++	bus_g2d_400: bus0 {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu_top CLK_ACLK_G2D_400>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_g2d_400_opp_table>;
++		status ="disabled";
++	};
++
++	bus_g2d_266: bus1 {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu_top CLK_ACLK_G2D_266>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_g2d_266_opp_table>;
++		status ="disabled";
++	};
++
++	bus_gscl: bus2 {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu_top CLK_ACLK_GSCL_333>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_gscl_opp_table>;
++		status ="disabled";
++	};
++
++	bus_hevc: bus3 {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu_top CLK_ACLK_HEVC_400>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_hevc_opp_table>;
++		status ="disabled";
++	};
++
++	bus_jpeg: bus4 {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu_top CLK_SCLK_JPEG_MSCL>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_g2d_400_opp_table>;
++		status ="disabled";
++	};
++
++	bus_mfc: bus5 {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu_top CLK_ACLK_MFC_400>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_g2d_400_opp_table>;
++		status ="disabled";
++	};
++
++	bus_mscl: bus6 {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu_top CLK_ACLK_MSCL_400>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_g2d_400_opp_table>;
++		status ="disabled";
++	};
++
++	bus_noc0: bus7 {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu_top CLK_ACLK_BUS0_400>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_hevc_opp_table>;
++		status ="disabled";
++	};
++
++	bus_noc1: bus8 {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu_top CLK_ACLK_BUS1_400>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_hevc_opp_table>;
++		status ="disabled";
++	};
++
++	bus_noc2: bus9 {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu_mif CLK_ACLK_BUS2_400>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_noc2_opp_table>;
++		status ="disabled";
++	};
++
++	bus_g2d_400_opp_table: opp_table2 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 400000000 {
++			opp-hz = /bits/ 64 <400000000>;
++			opp-microvolt = <1075000>;
++		};
++		opp at 267000000 {
++			opp-hz = /bits/ 64 <267000000>;
++			opp-microvolt = <1000000>;
++		};
++		opp at 200000000 {
++			opp-hz = /bits/ 64 <200000000>;
++			opp-microvolt = <975000>;
++		};
++		opp at 160000000 {
++			opp-hz = /bits/ 64 <160000000>;
++			opp-microvolt = <962500>;
++		};
++		opp at 134000000 {
++			opp-hz = /bits/ 64 <134000000>;
++			opp-microvolt = <950000>;
++		};
++		opp at 100000000 {
++			opp-hz = /bits/ 64 <100000000>;
++			opp-microvolt = <937500>;
++		};
++	};
++
++	bus_g2d_266_opp_table: opp_table3 {
++		compatible = "operating-points-v2";
++
++		opp at 267000000 {
++			opp-hz = /bits/ 64 <267000000>;
++		};
++		opp at 200000000 {
++			opp-hz = /bits/ 64 <200000000>;
++		};
++		opp at 160000000 {
++			opp-hz = /bits/ 64 <160000000>;
++		};
++		opp at 134000000 {
++			opp-hz = /bits/ 64 <134000000>;
++		};
++		opp at 100000000 {
++			opp-hz = /bits/ 64 <100000000>;
++		};
++	};
++
++	bus_gscl_opp_table: opp_table4 {
++		compatible = "operating-points-v2";
++
++		opp at 333000000 {
++			opp-hz = /bits/ 64 <333000000>;
++		};
++		opp at 222000000 {
++			opp-hz = /bits/ 64 <222000000>;
++		};
++		opp at 166500000 {
++			opp-hz = /bits/ 64 <166500000>;
++		};
++	};
++
++	bus_hevc_opp_table: opp_table5 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 400000000 {
++			opp-hz = /bits/ 64 <400000000>;
++		};
++		opp at 267000000 {
++			opp-hz = /bits/ 64 <267000000>;
++		};
++		opp at 200000000 {
++			opp-hz = /bits/ 64 <200000000>;
++		};
++		opp at 160000000 {
++			opp-hz = /bits/ 64 <160000000>;
++		};
++		opp at 134000000 {
++			opp-hz = /bits/ 64 <134000000>;
++		};
++		opp at 100000000 {
++			opp-hz = /bits/ 64 <100000000>;
++		};
++	};
++
++	bus_noc2_opp_table: opp_table6 {
++		compatible = "operating-points-v2";
++
++		opp at 400000000 {
++			opp-hz = /bits/ 64 <400000000>;
++		};
++		opp at 200000000 {
++			opp-hz = /bits/ 64 <200000000>;
++		};
++		opp at 134000000 {
++			opp-hz = /bits/ 64 <134000000>;
++		};
++		opp at 100000000 {
++			opp-hz = /bits/ 64 <100000000>;
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+index 8c4ee84d5232..68f764e5851c 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+@@ -1482,5 +1482,6 @@
+ 	};
+ };
  
- 	/* ENABLE_SCLK_TOP_MSCL */
- 	GATE(CLK_SCLK_JPEG_MSCL, "sclk_jpeg_mscl", "div_sclk_jpeg",
--			ENABLE_SCLK_TOP_MSCL, 0, 0, 0),
-+			ENABLE_SCLK_TOP_MSCL, 0, CLK_SET_RATE_PARENT, 0),
- 
- 	/* ENABLE_SCLK_TOP_CAM1 */
- 	GATE(CLK_SCLK_ISP_SENSOR2, "sclk_isp_sensor2", "div_sclk_isp_sensor2_b",
-@@ -1382,7 +1382,7 @@ static void __init exynos5433_cmu_cpif_init(struct device_node *np)
- 	/* ENABLE_ACLK_MIF3 */
- 	GATE(CLK_ACLK_BUS2_400, "aclk_bus2_400", "div_aclk_bus2_400",
- 			ENABLE_ACLK_MIF3, 4,
--			CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
-+			CLK_IS_CRITICAL | CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_ACLK_DISP_333, "aclk_disp_333", "div_aclk_disp_333",
- 			ENABLE_ACLK_MIF3, 1,
- 			CLK_IS_CRITICAL | CLK_SET_RATE_PARENT, 0),
++#include "exynos5433-bus.dtsi"
+ #include "exynos5433-pinctrl.dtsi"
+ #include "exynos5433-tmu.dtsi"
 -- 
 1.9.1
