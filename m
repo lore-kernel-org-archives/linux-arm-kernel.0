@@ -1,54 +1,118 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 8 Dec 2016 11:13:59 +1100
-Subject: linux-next: manual merge of the sunxi tree with the arm-soc tree
-Message-ID: <20161208111359.7d201b0f@canb.auug.org.au>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed,  7 Dec 2016 16:14:18 -0800
+Subject: [PATCH v2.1 1/4] ARM: dts: davinci: da850: VPIF: add node and muxing
+In-Reply-To: <20161207193137.27947-2-khilman@baylibre.com>
+References: <20161207193137.27947-2-khilman@baylibre.com>
+Message-ID: <20161208001418.4469-1-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Add VPIF node an pins to da850 and enable on boards.  VPIF has two input
+channels described using the standard DT ports and enpoints.
 
-Today's linux-next merge of the sunxi tree got a conflict in:
+Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+---
+v2 -> v2.1: moved ports from SoC .dtsi to board .dts files.
 
-  arch/arm/boot/dts/sun8i-h3.dtsi
+ arch/arm/boot/dts/da850-evm.dts  | 20 ++++++++++++++++++++
+ arch/arm/boot/dts/da850-lcdk.dts | 13 +++++++++++++
+ arch/arm/boot/dts/da850.dtsi     | 27 ++++++++++++++++++++++++++-
+ 3 files changed, 59 insertions(+), 1 deletion(-)
 
-between commit:
-
-  4367c1d84655 ("dts: sun8i-h3: correct UART3 pin definitions")
-
-from the arm-soc tree and commits:
-
-  acac77949d26 ("ARM: sunxi: Remove useless allwinner,drive property")
-  3872abae96ef ("ARM: sunxi: Remove useless allwinner,pull property")
-  264969c22623 ("ARM: sunxi: Convert pinctrl nodes to generic bindings")
-
-from the sunxi tree.
-
-I fixed it up (see below) and can carry the fix as necessary. This
-is now fixed as far as linux-next is concerned, but any non trivial
-conflicts should be mentioned to your upstream maintainer when your tree
-is submitted for merging.  You may also want to consider cooperating
-with the maintainer of the conflicting tree to minimise any particularly
-complex conflicts.
-
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index 41de15fe15a2..cea36ee6fd07 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -289,3 +289,23 @@
+ 		};
+ 	};
+ };
++
++&vpif {
++	pinctrl-names = "default";
++	pinctrl-0 = <&vpif_capture_pins>;
++	status = "okay";
++
++	/* VPIF capture port */
++	port {
++		vpif_ch0: endpoint at 0 {
++			  reg = <0>;
++			  bus-width = <8>;
++		};
++
++		vpif_ch1: endpoint at 1 {
++			  reg = <1>;
++			  bus-width = <8>;
++			  data-shift = <8>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+index 7b8ab21fed6c..5fc21528e0ba 100644
+--- a/arch/arm/boot/dts/da850-lcdk.dts
++++ b/arch/arm/boot/dts/da850-lcdk.dts
+@@ -219,3 +219,16 @@
+ 		};
+ 	};
+ };
++
++&vpif {
++	pinctrl-names = "default";
++	pinctrl-0 = <&vpif_capture_pins>;
++	status = "okay";
++
++	/* VPIF capture port */
++	port {
++		vpif_ch0: endpoint {
++			  bus-width = <8>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index f79e1b91c680..5f0b40510b2b 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -186,7 +186,18 @@
+ 					0xc 0x88888888 0xffffffff
+ 				>;
+ 			};
+-
++			vpif_capture_pins: vpif_capture_pins {
++				pinctrl-single,bits = <
++					/* VP_DIN[2..7], VP_CLKIN1, VP_CLKIN0 */
++					0x38 0x11111111 0xffffffff
++					/* VP_DIN[10..15,0..1] */
++					0x3c 0x11111111 0xffffffff
++					/* VP_DIN[8..9] */
++					0x40 0x00000011 0x000000ff
++					/* VP_CLKIN3, VP_CLKIN2 */
++					0x4c 0x00010100 0x000f0f00
++				>;
++			};
+ 		};
+ 		edma0: edma at 0 {
+ 			compatible = "ti,edma3-tpcc";
+@@ -399,7 +410,21 @@
+ 				<&edma0 0 1>;
+ 			dma-names = "tx", "rx";
+ 		};
++
++		vpif: video at 217000 {
++			compatible = "ti,da850-vpif";
++			reg = <0x217000 0x1000>;
++			interrupts = <92>;
++			status = "disabled";
++
++			/* VPIF capture port */
++			port {
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
++		};
+ 	};
++
+ 	aemif: aemif at 68000000 {
+ 		compatible = "ti,da850-aemif";
+ 		#address-cells = <2>;
 -- 
-Cheers,
-Stephen Rothwell
-
-diff --cc arch/arm/boot/dts/sun8i-h3.dtsi
-index 6c14a6f72820,fca66bf2dec5..000000000000
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@@ -425,10 -406,8 +406,8 @@@
-  			};
-  
-  			uart3_pins: uart3 {
-- 				allwinner,pins = "PA13", "PA14";
-- 				allwinner,function = "uart3";
-- 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- -				pins = "PG13", "PG14";
-++				pins = "PA13", "PA14";
-+ 				function = "uart3";
-  			};
-  		};
-  
+2.9.3
