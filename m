@@ -1,56 +1,134 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Thu, 08 Dec 2016 12:20:30 +0000
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <CAMuHMdUEXJtWF3S8yK5RY5e60nOnb-Wc9U2E_L553hZvsijvcw@mail.gmail.com>
- (Geert Uytterhoeven's message of "Thu, 8 Dec 2016 12:59:54 +0100")
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
- <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
- <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
- <yw1xwpfd2o9f.fsf@unicorn.mansr.com> <20161207164341.GX6408@localhost>
- <yw1xr35j1yd5.fsf@unicorn.mansr.com> <20161208103921.GC6408@localhost>
- <yw1x60mu1w7e.fsf@unicorn.mansr.com>
- <CAMuHMdUEXJtWF3S8yK5RY5e60nOnb-Wc9U2E_L553hZvsijvcw@mail.gmail.com>
-Message-ID: <yw1xshpyzk6p.fsf@unicorn.mansr.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 8 Dec 2016 13:21:15 +0100
+Subject: [PATCH v9 05/11] arm/arm64: vgic: Introduce VENG0 and VENG1
+ fields to vmcr struct
+In-Reply-To: <ace0aa83-aa6e-ca64-8edf-fcd2dd07585e@redhat.com>
+References: <1479906118-15832-1-git-send-email-vijay.kilari@gmail.com>
+ <1479906118-15832-6-git-send-email-vijay.kilari@gmail.com>
+ <20161128142836.GE18170@cbox>
+ <ace0aa83-aa6e-ca64-8edf-fcd2dd07585e@redhat.com>
+Message-ID: <20161208122115.GG4816@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geert Uytterhoeven <geert@linux-m68k.org> writes:
+On Thu, Dec 08, 2016 at 12:52:39PM +0100, Auger Eric wrote:
+> Hi Vijay,
+> 
+> On 28/11/2016 15:28, Christoffer Dall wrote:
+> > On Wed, Nov 23, 2016 at 06:31:52PM +0530, vijay.kilari at gmail.com wrote:
+> >> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> >>
+> >> ICC_VMCR_EL2 supports virtual access to ICC_IGRPEN1_EL1.Enable
+> >> and ICC_IGRPEN0_EL1.Enable fields. Add grpen0 and grpen1 member
+> >> variables to struct vmcr to support read and write of these fields.
+> >>
+> >> Also refactor vgic_set_vmcr and vgic_get_vmcr() code.
+> >> Drop ICH_VMCR_CTLR_SHIFT and ICH_VMCR_CTLR_MASK macros and instead
+> >> use ICH_VMCR_EOI* and ICH_VMCR_CBPR* macros
+> >> .
+> >> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> >> ---
+> >>  include/linux/irqchip/arm-gic-v3.h |  2 --
+> >>  virt/kvm/arm/vgic/vgic-mmio-v2.c   | 16 ----------------
+> >>  virt/kvm/arm/vgic/vgic-mmio.c      | 16 ++++++++++++++++
+> >>  virt/kvm/arm/vgic/vgic-v3.c        | 22 ++++++++++++++++++++--
+> >>  virt/kvm/arm/vgic/vgic.h           |  5 +++++
+> >>  5 files changed, 41 insertions(+), 20 deletions(-)
+> >>
+> >> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> >> index b4f8287..406fc3e 100644
+> >> --- a/include/linux/irqchip/arm-gic-v3.h
+> >> +++ b/include/linux/irqchip/arm-gic-v3.h
+> >> @@ -404,8 +404,6 @@
+> >>  #define ICH_HCR_EN			(1 << 0)
+> >>  #define ICH_HCR_UIE			(1 << 1)
+> >>  
+> >> -#define ICH_VMCR_CTLR_SHIFT		0
+> >> -#define ICH_VMCR_CTLR_MASK		(0x21f << ICH_VMCR_CTLR_SHIFT)
+> >>  #define ICH_VMCR_CBPR_SHIFT		4
+> >>  #define ICH_VMCR_CBPR_MASK		(1 << ICH_VMCR_CBPR_SHIFT)
+> >>  #define ICH_VMCR_EOIM_SHIFT		9
+> >> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> >> index 2cb04b7..ad353b5 100644
+> >> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> >> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> >> @@ -212,22 +212,6 @@ static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
+> >>  	}
+> >>  }
+> >>  
+> >> -static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+> >> -{
+> >> -	if (kvm_vgic_global_state.type == VGIC_V2)
+> >> -		vgic_v2_set_vmcr(vcpu, vmcr);
+> >> -	else
+> >> -		vgic_v3_set_vmcr(vcpu, vmcr);
+> >> -}
+> >> -
+> >> -static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+> >> -{
+> >> -	if (kvm_vgic_global_state.type == VGIC_V2)
+> >> -		vgic_v2_get_vmcr(vcpu, vmcr);
+> >> -	else
+> >> -		vgic_v3_get_vmcr(vcpu, vmcr);
+> >> -}
+> >> -
+> >>  #define GICC_ARCH_VERSION_V2	0x2
+> >>  
+> >>  /* These are for userland accesses only, there is no guest-facing emulation. */
+> >> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> >> index 0d1bc98..f81e0e5 100644
+> >> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> >> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> >> @@ -416,6 +416,22 @@ int vgic_validate_mmio_region_addr(struct kvm_device *dev,
+> >>  	return -ENXIO;
+> >>  }
+> >>  
+> >> +void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+> >> +{
+> >> +	if (kvm_vgic_global_state.type == VGIC_V2)
+> >> +		vgic_v2_set_vmcr(vcpu, vmcr);
+> >> +	else
+> >> +		vgic_v3_set_vmcr(vcpu, vmcr);
+> >> +}
+> >> +
+> >> +void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+> >> +{
+> >> +	if (kvm_vgic_global_state.type == VGIC_V2)
+> >> +		vgic_v2_get_vmcr(vcpu, vmcr);
+> >> +	else
+> >> +		vgic_v3_get_vmcr(vcpu, vmcr);
+> >> +}
+> >> +
+> >>  /*
+> >>   * kvm_mmio_read_buf() returns a value in a format where it can be converted
+> >>   * to a byte array and be directly observed as the guest wanted it to appear
+> >> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> >> index 9f0dae3..a3ff04b 100644
+> >> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> >> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> >> @@ -175,10 +175,19 @@ void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+> >>  {
+> >>  	u32 vmcr;
+> >>  
+> >> -	vmcr  = (vmcrp->ctlr << ICH_VMCR_CTLR_SHIFT) & ICH_VMCR_CTLR_MASK;
+> >> +	/*
+> >> +	 * Ignore the FIQen bit, because GIC emulation always implies
+> >> +	 * SRE=1 which means the vFIQEn bit is also RES1.
+> >> +	 */
+> >> +	vmcr = (vmcrp->ctlr & ICC_CTLR_EL1_EOImode_MASK) >>
+> >> +		ICC_CTLR_EL1_EOImode_SHIFT;
+> >> +	vmcr = (vmcr << ICH_VMCR_EOIM_SHIFT) & ICH_VMCR_EOIM_MASK;
 
-> On Thu, Dec 8, 2016 at 12:44 PM, M?ns Rullg?rd <mans@mansr.com> wrote:
->> Vinod Koul <vinod.koul@intel.com> writes:
->>> On Wed, Dec 07, 2016 at 04:45:58PM +0000, M?ns Rullg?rd wrote:
->>>> Vinod Koul <vinod.koul@intel.com> writes:
->>>> > On Tue, Dec 06, 2016 at 01:14:20PM +0000, M?ns Rullg?rd wrote:
->>>> >> That's not going to work very well.  Device drivers typically request
->>>> >> dma channels in their probe functions or when the device is opened.
->>>> >> This means that reserving one of the few channels there will inevitably
->>>> >> make some other device fail to operate.
->>>> >
->>>> > No that doesnt make sense at all, you should get a channel only when you
->>>> > want to use it and not in probe!
->>>>
->>>> Tell that to just about every single driver ever written.
->>>
->>> Not really, few do yes which is wrong but not _all_ do that.
->>
->> Every driver I ever looked at does.  Name one you consider "correct."
->
-> I'm far from claiming that drivers/tty/serial/sh-sci.c is perfect, but
-> it does request DMA channels at open time, not at probe time.
+> I am not able to understand why we use ICC_CTLR _*macros here? Please
+> could you explain it to me? Besides if we want to ignore the FIQen bit
+> can't we change the ICH_VMCR_CTLR_MASK value?
+> 
+This first statement is setting the vmcr to the ctlr's bit[1], but
+placed in bit[0], and then the next statement is moving that bit value
+to the corresponding place in the vmcr.  I think this is correct
+(although a little opaque).
 
-In the part quoted above, I said most drivers request dma channels in
-their probe or open functions.  For the purposes of this discussion,
-that distinction is irrelevant.  In either case, the channel is held
-indefinitely.  If this wasn't the correct way to use the dmaengine,
-there would be no need for the virt-dma helpers which are specifically
-designed for cases the one currently at hand.
+There's also a newer series on the list, just so you know.
 
-The only problem we have is that nobody envisioned hardware where the
-dma engine indicates completion slightly too soon.  I suspect there's a
-fifo or such somewhere, and the interrupt is triggered when the last
-byte has been placed in the fifo rather than when it has been removed
-which would have been more correct.
-
--- 
-M?ns Rullg?rd
+Thanks,
+-Christoffer
