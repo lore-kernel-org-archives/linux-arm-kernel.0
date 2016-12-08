@@ -1,41 +1,83 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 8 Dec 2016 19:52:43 +0200
-Subject: [PATCH v2 4/5] arm64: dts: exynos5433: Add bus dt node using
- VDD_INT for Exynos5433
-In-Reply-To: <1481173091-9728-5-git-send-email-cw00.choi@samsung.com>
-References: <1481173091-9728-1-git-send-email-cw00.choi@samsung.com>
- <1481173091-9728-5-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20161208175243.GA9451@kozik-lap>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Dec 2016 18:08:14 +0000
+Subject: [PATCH 2/3] rtc: armada38x: Convert to time64_t
+In-Reply-To: <20161208171010.29446-3-gregory.clement@free-electrons.com>
+References: <20161208171010.29446-1-gregory.clement@free-electrons.com>
+ <20161208171010.29446-3-gregory.clement@free-electrons.com>
+Message-ID: <20161208180814.GK14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2016 at 01:58:10PM +0900, Chanwoo Choi wrote:
-> This patch adds the bus nodes using VDD_INT for Exynos5433 SoC.
-> Exynos5433 has the following AMBA AXI buses to translate data
-> between DRAM and sub-blocks.
-> 
-> Following list specify the detailed correlation between sub-block and clock:
-> - CLK_ACLK_G2D_{400|266}  : Bus clock for G2D (2D graphic engine)
-> - CLK_ACLK_MSCL_400       : Bus clock for MSCL (Memory to memory Scaler)
-> - CLK_ACLK_GSCL_333       : Bus clock for GSCL (General Scaler)
-> - CLK_SCLK_JPEG_MSCL      : Bus clock for JPEG
-> - CLK_ACLK_MFC_400        : Bus clock for MFC (Multi Format Codec)
-> - CLK_ACLK_HEVC_400       : Bus clock for HEVC (High Efficient Video Codec)
-> - CLK_ACLK_BUS0_400       : NoC(Network On Chip)'s bus clock for PERIC/PERIS/FSYS/MSCL
-> - CLK_ACLK_BUS1_400       : NoC's bus clock for MFC/HEVC/G3D
-> - CLK_ACLK_BUS2_400       : NoC's bus clock for GSCL/DISP/G2D/CAM0/CAM1/ISP
-> 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> ---
->  arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi | 197 +++++++++++++++++++++++++
->  arch/arm64/boot/dts/exynos/exynos5433.dtsi     |   1 +
->  2 files changed, 198 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi
+On Thu, Dec 08, 2016 at 06:10:09PM +0100, Gregory CLEMENT wrote:
+> It is one more step to remove the deprecated functions rtc_time_to_tm
+> and rtc_tm_to_time.
 
-For the reference:
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+I fail to see any advantage to this patch, or in fact the y2038 patch
+merged into rtc.
 
-I'll queue it for v4.11, after this merge window.
+Let's first look at the original rtc_time_to_tm():
 
-Best regards,
-Krzysztof
++void rtc_time_to_tm(unsigned long time, struct rtc_time *tm)
++{
++       days = time / 86400;
++       year = 1970 + days / 365;
+
+time is an unsigned long, so is 32-bit or 64-bit.  Let's assume 32-bit.
+The maximum value it can have is 2^32-1 - which gives a maximum days
+value of 49710 (it always fits in an int or unsigned int as a positive
+value on any arch supported by Linux.)
+
+That gives a maximum value of 'year' as 2106.  So, actually
+rtc_time_to_tm() doesn't have a y2038 problem, it has a y2106 problem.
+So, the commentary in the original commit is actually wrong!
+
+
+Okay, that aside, let's look at what your patch actually achieves.
+
+Old code to set the time:
+
+	unsigned long time;
+
+	ret = rtc_tm_to_time(tm, &time);
+	if (ret)
+		goto out;
+	/* write time to a 32-bit register */
+
+New code:
+
+	time64_t time;
+
+	time = rtc_tm_to_time64(tm);
+	/* write time to a 32-bit register */
+
+I fail to see how this is any kind of improvement, or aids to solve the
+y2106 problem (not y2038) here.
+
+A better approach would have been to also provide a rtc_tm_to_time32()
+following the function signature of rtc_tm_to_time(), but replacing the
+unsigned long pointer with a u32 pointer, and (importantly) making it
+fail if the time was unrepresentable as a u32 value.
+
+Why u32 and not time_t?  time_t is a signed value, which suffers from
+the y2038 problem.  u32 suffers from a y2106 problem, and is what we
+have with the original rtc_tm_to_time() on 32-bit platforms.  So it's
+safe _not_ to needlessly chop off a bit there which wasn't done in the
+original code.
+
+This would mean that drivers (such as armada38x) which are only capable
+of storing a 32-bit time fail gracefully to set times beyond y2106.
+
+The problem as I see it right now is that the y2038 patch which
+deprecates rtc_time_to_tm() etc wasn't thought out thoroughly enough,
+and is making the situation much worse by pushing the problem in many
+drivers in a way that results in it being less visible.
+
+I think this needs to be reconsidered, and it needs a much better
+implementation - one which at least tells the user that their hardware
+has broken when trying to set the time to something the hardware can't
+support.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
