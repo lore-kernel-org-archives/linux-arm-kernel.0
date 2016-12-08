@@ -1,66 +1,108 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Thu, 8 Dec 2016 19:20:59 +0800
-Subject: [Linaro-acpi] [PATCH v17 08/15]
- clocksource/drivers/arm_arch_timer:
- move arch_timer_needs_of_probing into DT init call
-In-Reply-To: <20161208110410.GA9768@leverpostej>
-References: <20161125084623.22515-9-fu.wei@linaro.org>
- <201611252221.UyJ9iWPV%fengguang.wu@intel.com>
- <CADyBb7uAObQn_JVp_qw9+7POiqUctdzy3cYLsb0rk-JMX5W1uw@mail.gmail.com>
- <CAOZdJXU7Lg66RKvA=sYtUXUdwLLbh9FtcW0_U-fmjaztnqS3Ng@mail.gmail.com>
- <CADyBb7vAfMGV5ERFqAbwo4v4BhJv5s_-x4DXmdvy=iUacBzJWQ@mail.gmail.com>
- <20161208110410.GA9768@leverpostej>
-Message-ID: <CADyBb7u+EJ2ehan4suUCtXaP09S-OuZ6BMnCVF3=MpE0W2-Nag@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 8 Dec 2016 11:31:43 +0000
+Subject: [PATCH 2/3] arm64: Work around Falkor erratum 1003
+In-Reply-To: <20161207200028.4420-2-cov@codeaurora.org>
+References: <20161207200028.4420-1-cov@codeaurora.org>
+ <20161207200028.4420-2-cov@codeaurora.org>
+Message-ID: <20161208113143.GB9768@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Wed, Dec 07, 2016 at 03:00:26PM -0500, Christopher Covington wrote:
+> From: Shanker Donthineni <shankerd@codeaurora.org>
+> 
+> On the Qualcomm Datacenter Technologies Falkor v1 CPU, memory accesses may
+> allocate TLB entries using an incorrect ASID when TTBRx_EL1 is being
+> updated. Changing the TTBRx_EL1[ASID] and TTBRx_EL1[BADDR] fields
+> separately using a reserved ASID will ensure that there are no TLB entries
+> with incorrect ASID after changing the the ASID.
+> 
+> Pseudo code:
+>   write TTBRx_EL1[ASID] to a reserved value
+>   ISB
+>   write TTBRx_EL1[BADDR] to a desired value
+>   ISB
+>   write TTBRx_EL1[ASID] to a desired value
+>   ISB
+> 
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> ---
+>  arch/arm64/Kconfig               | 11 +++++++++++
+>  arch/arm64/include/asm/cpucaps.h |  3 ++-
+>  arch/arm64/kernel/cpu_errata.c   |  7 +++++++
+>  arch/arm64/mm/context.c          | 10 ++++++++++
+>  arch/arm64/mm/proc.S             | 21 +++++++++++++++++++++
+>  5 files changed, 51 insertions(+), 1 deletion(-)
 
-On 8 December 2016 at 19:04, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Dec 08, 2016 at 11:16:21AM +0800, Fu Wei wrote:
->> Hi Timur,
->>
->> On 8 December 2016 at 01:25, Timur Tabi <timur@codeaurora.org> wrote:
->> > On Fri, Nov 25, 2016 at 9:06 AM, Fu Wei <fu.wei@linaro.org> wrote:
->> >>
->> >> a "+ int ret;" should be move from [12/15] to here, I have fix the
->> >> problem in my repo, it would happen in next patchset
->> >>
->> >> https://git.linaro.org/people/fu.wei/linux.git/log/?h=topic-gtdt-wakeup-timer_upstream_v18_devel
->> >
->> > Fu, please post v18 to the mailing list so that it can be picked up
->> > for 4.10 (if it's not too late already).
->
-> Unfortunately, it's too late for v4.10. It hasn't been sat in linux-next
-> at all, and we've seen kbuild test failures.
->
-> Hopefully there's time to beat this into shape and get it into
-> linux-next so that it's ready to queue for v4.11, though.
+This needs an update to Documentation/arm64/silicon-errata.txt.
 
-cross fingers for getting into v4.11 :-)
+> diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+> index efcf1f7..f8d94ff 100644
+> --- a/arch/arm64/mm/context.c
+> +++ b/arch/arm64/mm/context.c
+> @@ -87,6 +87,11 @@ static void flush_context(unsigned int cpu)
+>  	/* Update the list of reserved ASIDs and the ASID bitmap. */
+>  	bitmap_clear(asid_map, 0, NUM_USER_ASIDS);
+>  
+> +	/* Reserve ASID '1' for Falkor erratum E1003 */
+> +	if (IS_ENABLED(CONFIG_QCOM_FALKOR_ERRATUM_E1003) &&
+> +	    cpus_have_cap(ARM64_WORKAROUND_QCOM_FALKOR_E1003))
+> +		__set_bit(1, asid_map);
+> +
+>  	/*
+>  	 * Ensure the generation bump is observed before we xchg the
+>  	 * active_asids.
+> @@ -239,6 +244,11 @@ static int asids_init(void)
+>  		panic("Failed to allocate bitmap for %lu ASIDs\n",
+>  		      NUM_USER_ASIDS);
+>  
+> +	/* Reserve ASID '1' for Falkor erratum E1003 */
+> +	if (IS_ENABLED(CONFIG_QCOM_FALKOR_ERRATUM_E1003) &&
+> +	    cpus_have_cap(ARM64_WORKAROUND_QCOM_FALKOR_E1003))
+> +		__set_bit(1, asid_map);
+> +
+>  	pr_info("ASID allocator initialised with %lu entries\n", NUM_USER_ASIDS);
+>  	return 0;
+>  }
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index 352c73b..b4d6508 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -134,6 +134,27 @@ ENDPROC(cpu_do_resume)
+>  ENTRY(cpu_do_switch_mm)
+>  	mmid	x1, x1				// get mm->context.id
+>  	bfi	x0, x1, #48, #16		// set the ASID
+> +#ifdef CONFIG_QCOM_FALKOR_ERRATUM_E1003
+> +alternative_if_not ARM64_WORKAROUND_QCOM_FALKOR_E1003
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +alternative_else
+> +	mrs     x2, ttbr0_el1                   // get cuurent TTBR0_EL1
+> +	mov     x3, #1                          // reserved ASID
 
->
->> Great thanks for your suggestion!  :-)
->> yes, you are right, I would love to post v18 ASAP.
->>
->> But I am still waiting for more feedback from the maintainers.
->
-> Please post a version which passes inspection by the kbuild test robot.
-> I haven't had a chance to look at this yet, and it'll be better to look
-> at a version that actually works.
+It might be best to define a FALCOR_E1003_RESERVED_ASID constant
+somewhere, rather than using 1 directly here and in the ASID allocator.
 
-OK, NP, will post them in several hours
-Great thanks for your feedback.
+> +	bfi     x2, x3, #48, #16                // set the reserved ASID + old BADDR
+> +	msr     ttbr0_el1, x2                   // update TTBR0_EL1
+> +	isb
+> +	bfi     x2, x0, #0, #48                 // set the desired BADDR + reserved ASID
+> +	msr     ttbr0_el1, x2                   // update TTBR0_EL1
+> +	isb
+> +alternative_endif
 
->
-> Thanks,
-> Mark.
+Please use alternative_if and alternative_else_nop_endif.
 
+As Catalin noted, there are issues with stale and/or conflicting TLB
+entries allocated with the reserved ASID, so we likely have to
+invalidate that after the final switch.
 
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+Thanks,
+Mark.
