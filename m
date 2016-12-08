@@ -1,28 +1,30 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 8 Dec 2016 18:29:23 +0100
-Subject: [PATCH 1/3] rtc: armada38x: improve RTC errata implementation
-In-Reply-To: <20161208171010.29446-2-gregory.clement@free-electrons.com>
-References: <20161208171010.29446-1-gregory.clement@free-electrons.com>
- <20161208171010.29446-2-gregory.clement@free-electrons.com>
-Message-ID: <20161208172923.GQ26852@lunn.ch>
+From: dhowells@redhat.com (David Howells)
+Date: Thu, 08 Dec 2016 17:31:13 +0000
+Subject: [PATCH 5/8] efi: Get the secure boot status [ver #5]
+In-Reply-To: <20161208124236.GA8757@wunner.de>
+References: <20161208124236.GA8757@wunner.de> <20161208065735.GB8549@wunner.de>
+ <148111668193.23390.6340512985876251017.stgit@warthog.procyon.org.uk>
+ <148111671977.23390.12452925207541146423.stgit@warthog.procyon.org.uk>
+ <6009.1481184981@warthog.procyon.org.uk>
+Message-ID: <14655.1481218273@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +struct str_value_to_freq {
-> +	unsigned long value;
-> +	u8 freq;
-> +} __packed;
-> +
-> +static unsigned long read_rtc_register_wa(struct armada38x_rtc *rtc, u8 rtc_reg)
-> +{
-> +	unsigned long value_array[SAMPLE_NR], i, j, value;
-> +	unsigned long max = 0, index_max = SAMPLE_NR - 1;
-> +	struct str_value_to_freq value_to_freq[SAMPLE_NR];
+Lukas Wunner <lukas@wunner.de> wrote:
 
-Hi Gregory
+> > +out_efi_err:
+> > +	pr_efi_err(sys_table_arg, "Could not determine UEFI Secure Boot status.\n");
+> > +	if (status == EFI_NOT_FOUND)
+> > +		return efi_secureboot_mode_disabled;
+> > +	return efi_secureboot_mode_unknown;
+> > +}
+> 
+> In the out_efi_err path, the if-statement needs to come before the
+> pr_efi_err() call.  Otherwise it would be a change of behaviour for
+> ARM to what we have now.
 
-This appears to be putting over 900 bytes on the stack. Is there any
-danger of overflowing the stack? Would it be safer to make these
-arrays part of armada38x_rtc?
+As I understand it, if the BIOS is an EFI BIOS, these variables must exist -
+in which case I would argue that the pr_efi_err-statement should be before the
+if-statement.
 
-       Andrew
+David
