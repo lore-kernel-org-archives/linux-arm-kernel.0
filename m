@@ -1,48 +1,73 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Thu, 8 Dec 2016 08:30:36 -0800
-Subject: [PATCH 1/1] arm64: mm: add config options for page table
- configuration
-In-Reply-To: <20161208100014.GE33075@MBP.local>
-References: <1481139600-24455-1-git-send-email-scott.branden@broadcom.com>
- <1481139600-24455-2-git-send-email-scott.branden@broadcom.com>
- <20161208100014.GE33075@MBP.local>
-Message-ID: <762b8bec-60da-0bb8-28f4-b407ad70687b@broadcom.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Thu, 8 Dec 2016 17:34:33 +0100
+Subject: [Linaro-acpi] [PATCH V1 1/2] PCI: thunder: Enable ACPI PCI
+ controller for ThunderX pass2.x silicon version
+In-Reply-To: <20161202162743.GB9903@bhelgaas-glaptop.roam.corp.google.com>
+References: <1479201298-25494-1-git-send-email-tn@semihalf.com>
+ <1479201298-25494-2-git-send-email-tn@semihalf.com>
+ <20161201002812.GB9409@bhelgaas-glaptop.roam.corp.google.com>
+ <e5b1f09c-ca4c-fbf0-e9d7-c943ad0df2ff@redhat.com>
+ <CADaLNDm8Zp_kAqVvSd0po9S3j2rSXxtUJ1M33dW7gLZzvueweQ@mail.gmail.com>
+ <30ad6c65-4a4a-6346-00f6-11250133a251@semihalf.com>
+ <20161202104500.GE10776@rric.localdomain>
+ <20161202162743.GB9903@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20161208163433.GK10776@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+On 02.12.16 10:27:43, Bjorn Helgaas wrote:
+> On Fri, Dec 02, 2016 at 11:45:00AM +0100, Robert Richter wrote:
+> > On 02.12.16 11:06:24, Tomasz Nowicki wrote:
+> > > On 02.12.2016 07:42, Duc Dang wrote:
+> > 
+> > > >@@ -98,16 +98,16 @@ struct mcfg_fixup {
+> > > >        { "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,                 \
+> > > >        &pci_thunder_ecam_ops }
+> > > >        /* SoC pass1.x */
+> > > >-   THUNDER_PEM_QUIRK(2,  0),       /* off-chip devices */
+> > > >-   THUNDER_PEM_QUIRK(2,  1),       /* off-chip devices */
+> > > >-   THUNDER_ECAM_QUIRK(2,  0),
+> > > >-   THUNDER_ECAM_QUIRK(2,  1),
+> > > >-   THUNDER_ECAM_QUIRK(2,  2),
+> > > >-   THUNDER_ECAM_QUIRK(2,  3),
+> > > >-   THUNDER_ECAM_QUIRK(2, 10),
+> > > >-   THUNDER_ECAM_QUIRK(2, 11),
+> > > >-   THUNDER_ECAM_QUIRK(2, 12),
+> > > >-   THUNDER_ECAM_QUIRK(2, 13),
+> > > >+ THUNDER_PEM_QUIRK(2, 0UL),  /* off-chip devices */
+> > > >+ THUNDER_PEM_QUIRK(2, 1UL),  /* off-chip devices */
+> > > >+ THUNDER_ECAM_QUIRK(2, 0UL),
+> > > >+ THUNDER_ECAM_QUIRK(2, 1UL),
+> > > >+ THUNDER_ECAM_QUIRK(2, 2UL),
+> > > >+ THUNDER_ECAM_QUIRK(2, 3UL),
+> > > >+ THUNDER_ECAM_QUIRK(2, 10UL),
+> > > >+ THUNDER_ECAM_QUIRK(2, 11UL),
+> > > >+ THUNDER_ECAM_QUIRK(2, 12UL),
+> > > >+ THUNDER_ECAM_QUIRK(2, 13UL),
+> > > >
+> > > 
+> > > The UL suffix is needed for *THUNDER_PEM_QUIRK* only. THUNDER_ECAM_QUIRK is
+> > > fine.
+> > 
+> > We should better make the type cast part of the macro.
+> > 
+> > + this:
+> > 
+> > ---
+> > #define THUNDER_MCFG_RES(addr, node) \
+> >        DEFINE_RES_MEM(addr + (node << 44), 0x39 * SZ_16M)
+> > ---
+> > 
+> > The args in the macro need parentheses.
+> 
+> Would you mind sending me a little incremental patch doing what you
+> want?  I could try myself, but since I don't have an arm64 cross-build
+> setup, I'm working in the dark.
 
-On 16-12-08 02:00 AM, Catalin Marinas wrote:
-> On Wed, Dec 07, 2016 at 11:40:00AM -0800, Scott Branden wrote:
->> Make MAX_PHYSMEM_BITS and SECTIONS_SIZE_BITS configurable by adding
->> config options.
->> Default to current settings currently defined in sparesmem.h.
->> For systems wishing to save memory the config options can be overridden.
->> Example, changing MAX_PHYSMEM_BITS from 48 to 36 at the same time as
->> changing SECTION_SIZE_BITS from 30 to 26 frees 13MB of memory.
->
-> I'm not keen on such change, it's a big departure from the single Image
-> aims.
-A single Image is not entirely possible when the system needs to be 
-tuned for memory usage, boot time, and other performance related issues. 
-  These are key features in embedded systems vs. general purpose computers.
+Your current branch looks good.
 
-I would rather reduce SECTION_SIZE_BITS permanently where
-> feasible, like in this patch:
->
-> http://lkml.kernel.org/r/1465821119-3384-1-git-send-email-jszhang at marvell.com
->
-This patch does not meet my requirements as I need SECTION_SIZE_BITS to 
-be set to 28 to reduce memory and to allow memory hotplug to allocate a 
-256 MB section.  My patch future proofs the tuning of the parameters by 
-allowing any section size to be made.  I could combine the patch you 
-list such that SECTION_SIZE_BITS defaults to 30 when 
-CONFIG_ARM64_64_PAGES is selected and 27 otherwise.  Should it default 
-to something else for 16K and 4K pages?
+ 5d06f9125ec0 PCI: Explain ARM64 ACPI/MCFG quirk Kconfig and build strategy
 
-In terms of MAX_PHYSMEM_BITS, if our SoCs only use 40 (or less) bits I 
-would also like the configuration functionality.  This allows us to make 
-the SECTION_SIZE_BITS smaller.
+Thanks,
 
-Regards,
-Scott
+-Robert
