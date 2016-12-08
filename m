@@ -1,244 +1,116 @@
-From: abelvesa@linux.com (Abel Vesa)
-Date: Thu,  8 Dec 2016 21:46:35 +0000
-Subject: [PATCH] arm: ftrace: Adds support for CONFIG_DYNAMIC_FTRACE_WITH_REGS
-Message-ID: <1481233595-22112-1-git-send-email-abelvesa@linux.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 9 Dec 2016 05:49:03 +0800
+Subject: [PATCH v2 4/4] ARM: treewide: Replace uses of virt_to_phys with
+ __pa_symbol
+In-Reply-To: <20161208185933.13749-5-f.fainelli@gmail.com>
+Message-ID: <201612090545.mM8wL2jp%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+Hi Florian,
 
-From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.9-rc8]
+[cannot apply to arm-soc/for-next next-20161208]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-The DYNAMIC_FTRACE_WITH_REGS configuration makes it possible for a ftrace
-operation to specify if registers need to saved/restored by the ftrace handler.
-This is needed by kgraft and possibly other ftrace-based tools, and the ARM
-architecture is currently lacking this feature. It would also be the first step
-to support the "Kprobes-on-ftrace" optimization on ARM.
+url:    https://github.com/0day-ci/linux/commits/Florian-Fainelli/ARM-Add-support-for-CONFIG_DEBUG_VIRTUAL/20161209-032753
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-This patch introduces a new ftrace handler that stores the registers on the
-stack before calling the next stage. The registers are restored from the stack
-before going back to the instrumented function.
+All error/warnings (new ones prefixed by >>):
 
-A side-effect of this patch is to activate the support for ftrace_modify_call()
-as it defines ARCH_SUPPORTS_FTRACE_OPS for the ARM architecture
+   arch/arm/mach-realview/platsmp-dt.c: In function 'realview_smp_prepare_cpus':
+>> arch/arm/mach-realview/platsmp-dt.c:79:50: error: expected ')' before ';' token
+           __pa_symbol((versatile_secondary_startup));)
+                                                     ^
+>> arch/arm/mach-realview/platsmp-dt.c:80:1: error: expected ';' before '}' token
+    }
+    ^
+--
+   In file included from arch/arm/include/asm/delay.h:9:0,
+                    from include/linux/delay.h:14,
+                    from arch/arm/mach-zx/platsmp.c:10:
+   arch/arm/mach-zx/platsmp.c: In function 'zx_smp_prepare_cpus':
+>> arch/arm/mach-zx/platsmp.c:97:62: error: expected ')' before ';' token
+     zx_secondary_startup_pa = __pa_symbol((zx_secondary_startup);)
+                                                                 ^
+   arch/arm/include/asm/memory.h:264:56: note: in definition of macro '__pa_symbol_nodebug'
+    #define __pa_symbol_nodebug(x) __virt_to_phys_nodebug((x))
+                                                           ^
+   arch/arm/include/asm/memory.h:296:25: note: in expansion of macro '__phys_addr_symbol'
+    #define __pa_symbol(x)  __phys_addr_symbol(RELOC_HIDE((unsigned long)(x), 0))
+                            ^~~~~~~~~~~~~~~~~~
+>> arch/arm/include/asm/memory.h:296:44: note: in expansion of macro 'RELOC_HIDE'
+    #define __pa_symbol(x)  __phys_addr_symbol(RELOC_HIDE((unsigned long)(x), 0))
+                                               ^~~~~~~~~~
+>> arch/arm/mach-zx/platsmp.c:97:28: note: in expansion of macro '__pa_symbol'
+     zx_secondary_startup_pa = __pa_symbol((zx_secondary_startup);)
+                               ^~~~~~~~~~~
+>> arch/arm/mach-zx/platsmp.c:97:62: error: expected ')' before ';' token
+     zx_secondary_startup_pa = __pa_symbol((zx_secondary_startup);)
+                                                                 ^
+   arch/arm/include/asm/memory.h:264:56: note: in definition of macro '__pa_symbol_nodebug'
+    #define __pa_symbol_nodebug(x) __virt_to_phys_nodebug((x))
+                                                           ^
+   arch/arm/include/asm/memory.h:296:25: note: in expansion of macro '__phys_addr_symbol'
+    #define __pa_symbol(x)  __phys_addr_symbol(RELOC_HIDE((unsigned long)(x), 0))
+                            ^~~~~~~~~~~~~~~~~~
+>> arch/arm/include/asm/memory.h:296:44: note: in expansion of macro 'RELOC_HIDE'
+    #define __pa_symbol(x)  __phys_addr_symbol(RELOC_HIDE((unsigned long)(x), 0))
+                                               ^~~~~~~~~~
+>> arch/arm/mach-zx/platsmp.c:97:28: note: in expansion of macro '__pa_symbol'
+     zx_secondary_startup_pa = __pa_symbol((zx_secondary_startup);)
+                               ^~~~~~~~~~~
+   In file included from arch/arm/mach-zx/platsmp.c:21:0:
+>> arch/arm/include/asm/fncpy.h:71:39: error: expected expression before '{' token
+    #define fncpy(dest_buf, funcp, size) ({     \
+                                          ^
+>> arch/arm/mach-zx/platsmp.c:98:2: note: in expansion of macro 'fncpy'
+     fncpy(sys_iram, &zx_resume_jump, zx_suspend_iram_sz);
+     ^~~~~
+   In file included from arch/arm/include/asm/delay.h:9:0,
+                    from include/linux/delay.h:14,
+                    from arch/arm/mach-zx/platsmp.c:10:
+>> arch/arm/include/asm/memory.h:264:32: error: called object is not a function or function pointer
+    #define __pa_symbol_nodebug(x) __virt_to_phys_nodebug((x))
+                                   ^
+   arch/arm/include/asm/memory.h:271:31: note: in expansion of macro '__pa_symbol_nodebug'
+    #define __phys_addr_symbol(x) __pa_symbol_nodebug(x)
+                                  ^~~~~~~~~~~~~~~~~~~
+   arch/arm/include/asm/memory.h:296:25: note: in expansion of macro '__phys_addr_symbol'
+    #define __pa_symbol(x)  __phys_addr_symbol(RELOC_HIDE((unsigned long)(x), 0))
+                            ^~~~~~~~~~~~~~~~~~
+>> arch/arm/mach-zx/platsmp.c:97:28: note: in expansion of macro '__pa_symbol'
+     zx_secondary_startup_pa = __pa_symbol((zx_secondary_startup);)
+                               ^~~~~~~~~~~
 
-Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-Signed-off-by: Abel Vesa <abelvesa@linux.com>
+vim +79 arch/arm/mach-realview/platsmp-dt.c
+
+    73		if (IS_ERR(map)) {
+    74			pr_err("PLATSMP: No syscon regmap\n");
+    75			return;
+    76		}
+    77		/* Put the boot address in this magic register */
+    78		regmap_write(map, REALVIEW_SYS_FLAGSSET_OFFSET,
+  > 79			     __pa_symbol((versatile_secondary_startup));)
+  > 80	}
+    81	
+    82	static const struct smp_operations realview_dt_smp_ops __initconst = {
+    83		.smp_prepare_cpus	= realview_smp_prepare_cpus,
+
 ---
- arch/arm/Kconfig               |  2 ++
- arch/arm/include/asm/ftrace.h  |  4 +++
- arch/arm/kernel/entry-ftrace.S | 78 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/ftrace.c       | 33 ++++++++++++++++++
- 4 files changed, 117 insertions(+)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b5d529f..87f1a9f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -50,6 +50,7 @@ config ARM
- 	select HAVE_DMA_API_DEBUG
- 	select HAVE_DMA_CONTIGUOUS if MMU
- 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
-+	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
- 	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
- 	select HAVE_EXIT_THREAD
- 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
-@@ -90,6 +91,7 @@ config ARM
- 	select PERF_USE_VMALLOC
- 	select RTC_LIB
- 	select SYS_SUPPORTS_APM_EMULATION
-+	select FRAME_POINTER if DYNAMIC_FTRACE_WITH_REGS && FUNCTION_GRAPH_TRACER
- 	# Above selects are sorted alphabetically; please add new ones
- 	# according to that.  Thanks.
- 	help
-diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
-index bfe2a2f..f434ce9 100644
---- a/arch/arm/include/asm/ftrace.h
-+++ b/arch/arm/include/asm/ftrace.h
-@@ -1,6 +1,10 @@
- #ifndef _ASM_ARM_FTRACE
- #define _ASM_ARM_FTRACE
- 
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+#define ARCH_SUPPORTS_FTRACE_OPS 1
-+#endif
-+
- #ifdef CONFIG_FUNCTION_TRACER
- #define MCOUNT_ADDR		((unsigned long)(__gnu_mcount_nc))
- #define MCOUNT_INSN_SIZE	4 /* sizeof mcount call */
-diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
-index c73c403..fd75bae 100644
---- a/arch/arm/kernel/entry-ftrace.S
-+++ b/arch/arm/kernel/entry-ftrace.S
-@@ -92,12 +92,73 @@
- 2:	mcount_exit
- .endm
- 
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+
-+.macro __ftrace_regs_caller
-+
-+	add 	ip, sp, #4	@ move in IP the value of SP as it was
-+				@ before the push {lr} of the mcount mechanism
-+	stmdb	sp!, {ip,lr,pc}
-+	stmdb	sp!, {r0-r11,lr}
-+
-+	@ stack content at this point:
-+	@ 0  4          44    48   52       56   60   64
-+	@ RO | R1 | ... | R11 | LR | SP + 4 | LR | PC | previous LR |
-+
-+	mov r3, sp				@ struct pt_regs*
-+	ldr r2, =function_trace_op
-+	ldr r2, [r2]				@ pointer to the current
-+						@ function tracing op
-+	ldr	r1, [sp, #64]			@ lr of instrumented func
-+	mcount_adjust_addr	r0, lr		@ instrumented function
-+
-+	.globl ftrace_regs_call
-+ftrace_regs_call:
-+	bl	ftrace_stub
-+
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	.globl ftrace_graph_regs_call
-+ftrace_graph_regs_call:
-+	mov	r0, r0
-+#endif
-+	ldr	lr, [sp, #64]		@ get the previous LR value from stack
-+	ldmia	sp, {r0-r11, ip, sp}	@ pop the saved registers INCLUDING
-+					@ the stack pointer
-+	ret	ip
-+.endm
-+
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+.macro __ftrace_graph_regs_caller
-+
-+	sub	r0, fp, #4			@ lr of instrumented routine (parent)
-+
-+	@ called from __ftrace_regs_caller
-+	ldr	r1, [sp, #56]			@ instrumented routine (func)
-+	mcount_adjust_addr	r1, r1
-+
-+	mov	r2, fp				@ frame pointer
-+	bl	prepare_ftrace_return
-+
-+	ldr	lr, [fp, #-4]			@ restore lr from the stack
-+	ldmia	sp, {r0-r11, ip, sp}		@ restore r0 through sp
-+	ret	ip
-+.endm
-+#endif
-+#endif
-+
- .macro __ftrace_caller suffix
- 	mcount_enter
- 
- 	mcount_get_lr	r1			@ lr of instrumented func
- 	mcount_adjust_addr	r0, lr		@ instrumented function
- 
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+	ldr r2, =function_trace_op
-+	ldr r2, [r2]				@ pointer to the current
-+						@ function tracing op
-+	mov r3, #0				@ regs is NULL
-+#endif
-+
- 	.globl ftrace_call\suffix
- ftrace_call\suffix:
- 	bl	ftrace_stub
-@@ -212,6 +273,15 @@ UNWIND(.fnstart)
- 	__ftrace_caller
- UNWIND(.fnend)
- ENDPROC(ftrace_caller)
-+
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+ENTRY(ftrace_regs_caller)
-+UNWIND(.fnstart)
-+	__ftrace_regs_caller
-+UNWIND(.fnend)
-+ENDPROC(ftrace_regs_caller)
-+#endif
-+
- #endif
- 
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
-@@ -220,6 +290,14 @@ UNWIND(.fnstart)
- 	__ftrace_graph_caller
- UNWIND(.fnend)
- ENDPROC(ftrace_graph_caller)
-+
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+ENTRY(ftrace_graph_regs_caller)
-+UNWIND(.fnstart)
-+	__ftrace_graph_regs_caller
-+UNWIND(.fnend)
-+ENDPROC(ftrace_graph_regs_caller)
-+#endif
- #endif
- 
- .purgem mcount_enter
-diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-index 3f17594..d8d4753 100644
---- a/arch/arm/kernel/ftrace.c
-+++ b/arch/arm/kernel/ftrace.c
-@@ -139,6 +139,15 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
- 
- 	ret = ftrace_modify_code(pc, 0, new, false);
- 
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+	if (!ret) {
-+		pc = (unsigned long)&ftrace_regs_call;
-+		new = ftrace_call_replace(pc, (unsigned long)func);
-+
-+		ret = ftrace_modify_code(pc, 0, new, false);
-+	}
-+#endif
-+
- #ifdef CONFIG_OLD_MCOUNT
- 	if (!ret) {
- 		pc = (unsigned long)&ftrace_call_old;
-@@ -157,6 +166,20 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
- 	unsigned long ip = rec->ip;
- 
- 	old = ftrace_nop_replace(rec);
-+
-+	new = ftrace_call_replace(ip, adjust_address(rec, addr));
-+
-+	return ftrace_modify_code(rec->ip, old, new, true);
-+}
-+
-+int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
-+				unsigned long addr)
-+{
-+	unsigned long new, old;
-+	unsigned long ip = rec->ip;
-+
-+	old = ftrace_call_replace(ip, adjust_address(rec, old_addr));
-+
- 	new = ftrace_call_replace(ip, adjust_address(rec, addr));
- 
- 	return ftrace_modify_code(rec->ip, old, new, true);
-@@ -229,6 +252,8 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
- extern unsigned long ftrace_graph_call;
- extern unsigned long ftrace_graph_call_old;
- extern void ftrace_graph_caller_old(void);
-+extern unsigned long ftrace_graph_regs_call;
-+extern void ftrace_graph_regs_caller(void);
- 
- static int __ftrace_modify_caller(unsigned long *callsite,
- 				  void (*func) (void), bool enable)
-@@ -251,6 +276,14 @@ static int ftrace_modify_graph_caller(bool enable)
- 				     ftrace_graph_caller,
- 				     enable);
- 
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+	if (!ret)
-+		ret = __ftrace_modify_caller(&ftrace_graph_regs_call,
-+				     ftrace_graph_regs_caller,
-+				     enable);
-+#endif
-+
-+
- #ifdef CONFIG_OLD_MCOUNT
- 	if (!ret)
- 		ret = __ftrace_modify_caller(&ftrace_graph_call_old,
--- 
-2.7.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 59402 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161209/ae6a2497/attachment-0001.gz>
