@@ -1,39 +1,111 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 8 Dec 2016 13:17:08 +0100
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <CAMuHMdWXVW9BG=MZGptibDTxDd5=7iCbiq1cmbD+qu-CZ0Y_7g@mail.gmail.com>
-References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
- <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
- <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
- <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
- <yw1xwpfd2o9f.fsf@unicorn.mansr.com> <20161207164341.GX6408@localhost>
- <yw1xr35j1yd5.fsf@unicorn.mansr.com> <20161208103921.GC6408@localhost>
- <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
- <CAMuHMdUULnPuTqEwRN2Z3gy2nmV37iLwJdNzrEvgpcG-EJS8OQ@mail.gmail.com>
- <yw1x1sxi1w3i.fsf@unicorn.mansr.com>
- <CAMuHMdWXVW9BG=MZGptibDTxDd5=7iCbiq1cmbD+qu-CZ0Y_7g@mail.gmail.com>
-Message-ID: <964975b8-5c00-9726-20e4-a1e801ce28d6@free.fr>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 8 Dec 2016 20:18:38 +0800
+Subject: [PATCH v5 2/5] i2c: Add STM32F4 I2C driver
+In-Reply-To: <1481185563-8735-3-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <201612082011.VNNsRbpL%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/2016 13:03, Geert Uytterhoeven wrote:
+Hi M'boumba,
 
-> M?ns Rullg?rd wrote:
->
->> Geert Uytterhoeven writes:
->>
->>> Can you fall back to PIO if requesting a channel fails?
->>
->> Why are we debating this nonsense?  There is an easy fix that doesn't
->> require changing the semantics of existing functions or falling back to
->> slow pio.
-> 
-> You still want to fall back to PIO if the DMA engine is not available
-> at all (e.g. DMA engine driver not compiled in, or module not loaded).
+[auto build test WARNING on wsa/i2c/for-next]
+[also build test WARNING on v4.9-rc8 next-20161208]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-FWIW, the ECC engine is tied to the DMA engine. So PIO means
-not only taking a hit from tying up the CPU for a slooow
-transfer, but also a huge hit if ECC must be computed in SW.
-(A 100x perf degradation is not unlikely.)
+url:    https://github.com/0day-ci/linux/commits/M-boumba-Cedric-Madianga/Add-support-for-the-STM32F4-I2C/20161208-173240
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/for-next
+reproduce:
+        # apt-get install sparse
+        make ARCH=x86_64 allmodconfig
+        make C=1 CF=-D__CHECK_ENDIAN__
 
-Regards.
+
+sparse warnings: (new ones prefixed by >>)
+
+   include/linux/compiler.h:253:8: sparse: attribute 'no_sanitize_address': unknown attribute
+>> drivers/i2c/busses/i2c-stm32f4.c:201:16: sparse: incompatible types in comparison expression (different signedness)
+>> drivers/i2c/busses/i2c-stm32f4.c:201:16: sparse: incompatible types in comparison expression (different signedness)
+>> drivers/i2c/busses/i2c-stm32f4.c:201:16: sparse: incompatible types in comparison expression (different signedness)
+   In file included from include/linux/clk.h:16:0,
+                    from drivers/i2c/busses/i2c-stm32f4.c:12:
+   drivers/i2c/busses/i2c-stm32f4.c: In function 'stm32f4_i2c_set_periph_clk_freq':
+   include/linux/kernel.h:749:16: warning: comparison of distinct pointer types lacks a cast
+     (void) (&max1 == &max2);   \
+                   ^
+   include/linux/kernel.h:737:2: note: in definition of macro '__min'
+     t1 min1 = (x);     \
+     ^~
+   include/linux/kernel.h:778:28: note: in expansion of macro 'min'
+    #define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
+                               ^~~
+   include/linux/kernel.h:752:2: note: in expansion of macro '__max'
+     __max(typeof(x), typeof(y),   \
+     ^~~~~
+   include/linux/kernel.h:778:45: note: in expansion of macro 'max'
+    #define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
+                                                ^~~
+   drivers/i2c/busses/i2c-stm32f4.c:201:9: note: in expansion of macro 'clamp'
+     freq = clamp(freq, STM32F4_I2C_MIN_FREQ, STM32F4_I2C_MAX_FREQ);
+            ^~~~~
+   include/linux/kernel.h:749:16: warning: comparison of distinct pointer types lacks a cast
+     (void) (&max1 == &max2);   \
+                   ^
+   include/linux/kernel.h:737:13: note: in definition of macro '__min'
+     t1 min1 = (x);     \
+                ^
+   include/linux/kernel.h:778:28: note: in expansion of macro 'min'
+    #define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
+                               ^~~
+   include/linux/kernel.h:752:2: note: in expansion of macro '__max'
+     __max(typeof(x), typeof(y),   \
+     ^~~~~
+   include/linux/kernel.h:778:45: note: in expansion of macro 'max'
+    #define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
+                                                ^~~
+   drivers/i2c/busses/i2c-stm32f4.c:201:9: note: in expansion of macro 'clamp'
+     freq = clamp(freq, STM32F4_I2C_MIN_FREQ, STM32F4_I2C_MAX_FREQ);
+            ^~~~~
+   include/linux/kernel.h:739:16: warning: comparison of distinct pointer types lacks a cast
+     (void) (&min1 == &min2);   \
+                   ^
+   include/linux/kernel.h:742:2: note: in expansion of macro '__min'
+     __min(typeof(x), typeof(y),   \
+     ^~~~~
+   include/linux/kernel.h:778:28: note: in expansion of macro 'min'
+    #define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
+                               ^~~
+   drivers/i2c/busses/i2c-stm32f4.c:201:9: note: in expansion of macro 'clamp'
+     freq = clamp(freq, STM32F4_I2C_MIN_FREQ, STM32F4_I2C_MAX_FREQ);
+            ^~~~~
+
+vim +201 drivers/i2c/busses/i2c-stm32f4.c
+
+   185	
+   186	static void stm32f4_i2c_disable_it(struct stm32f4_i2c_dev *i2c_dev)
+   187	{
+   188		void __iomem *reg = i2c_dev->base + STM32F4_I2C_CR2;
+   189	
+   190		stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR2_IRQ_MASK);
+   191	}
+   192	
+   193	static void stm32f4_i2c_set_periph_clk_freq(struct stm32f4_i2c_dev *i2c_dev)
+   194	{
+   195		u32 clk_rate, cr2, freq;
+   196	
+   197		cr2 = readl_relaxed(i2c_dev->base + STM32F4_I2C_CR2);
+   198		cr2 &= ~STM32F4_I2C_CR2_FREQ_MASK;
+   199		clk_rate = clk_get_rate(i2c_dev->clk);
+   200		freq = clk_rate / MHZ_TO_HZ;
+ > 201		freq = clamp(freq, STM32F4_I2C_MIN_FREQ, STM32F4_I2C_MAX_FREQ);
+   202		cr2 |= STM32F4_I2C_CR2_FREQ(freq);
+   203		writel_relaxed(cr2, i2c_dev->base + STM32F4_I2C_CR2);
+   204	}
+   205	
+   206	static void stm32f4_i2c_set_rise_time(struct stm32f4_i2c_dev *i2c_dev)
+   207	{
+   208		u32 trise, freq, cr2, val;
+   209	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
