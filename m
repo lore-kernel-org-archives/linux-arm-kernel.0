@@ -1,41 +1,47 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Thu, 8 Dec 2016 13:38:55 +0800
-Subject: [PATCH] arm64: defconfig: Enable NUMA and NUMA_BALANCING
-In-Reply-To: <1480499575-43628-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1480499575-43628-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <b9838176-487a-117a-01b0-d5c4a4b3646f@huawei.com>
+From: jerry.huang@nxp.com (Changming Huang)
+Date: Thu, 8 Dec 2016 14:06:08 +0800
+Subject: [PATCH] fsl/usb: Add USB node in FSL's ls1012a DTS
+Message-ID: <1481177168-11347-1-git-send-email-jerry.huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Arnd
+Add USB node in ls1012a device tree
 
-On 2016/11/30 17:52, Kefeng Wang wrote:
-> Enable NUMA and NUMA_BALANCING to improve the performance on board
-> with multiple numa nodes.
-> 
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> ---
->  arch/arm64/configs/defconfig | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index dab2cb0..967f6e5 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -12,6 +12,7 @@ CONFIG_TASK_IO_ACCOUNTING=y
->  CONFIG_IKCONFIG=y
->  CONFIG_IKCONFIG_PROC=y
->  CONFIG_LOG_BUF_SHIFT=14
-> +CONFIG_NUMA_BALANCING=y
->  CONFIG_MEMCG=y
->  CONFIG_MEMCG_SWAP=y
->  CONFIG_BLK_CGROUP=y
-> @@ -72,6 +73,7 @@ CONFIG_PCIE_QCOM=y
->  CONFIG_PCIE_ARMADA_8K=y
->  CONFIG_ARM64_VA_BITS_48=y
->  CONFIG_SCHED_MC=y
-> +CONFIG_NUMA=y
->  CONFIG_PREEMPT=y
->  CONFIG_KSM=y
->  CONFIG_TRANSPARENT_HUGEPAGE=y
-> 
+Signed-off-by: Changming Huang <jerry.huang@nxp.com>
+---
+Dependence on patch "[v3] arm64: Add DTS support for FSL's LS1012A SoC".
+https://patchwork.kernel.org/patch/9462399/
+
+ arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+index 92e64f3..3e4bda6 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+@@ -235,6 +235,23 @@
+ 				 <&clockgen 4 3>;
+ 		};
+ 
++		usb0: usb3 at 2f00000 {
++			compatible = "snps,dwc3";
++			reg = <0x0 0x2f00000 0x0 0x10000>;
++			interrupts = <0 60 0x4>;
++			dr_mode = "host";
++			snps,quirk-frame-length-adjustment = <0x20>;
++			snps,dis_rxdet_inp3_quirk;
++		};
++
++		usb1: usb2 at 8600000 {
++			compatible = "fsl-usb2-dr-v2.5", "fsl-usb2-dr";
++			reg = <0x0 0x8600000 0x0 0x1000>;
++			interrupts = <0 139 0x4>;
++			dr_mode = "host";
++			phy_type = "ulpi";
++		};
++
+ 		sata: sata at 3200000 {
+ 			compatible = "fsl,ls1012a-ahci", "fsl,ls1043a-ahci";
+ 			reg = <0x0 0x3200000 0x0 0x10000>;
+-- 
+1.7.9.5
