@@ -1,60 +1,40 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 8 Dec 2016 12:43:58 +0100
-Subject: [GIT PULL v2] ARM: Xilinx Zynq DT changes for v4.10
-In-Reply-To: <20161207203919.GA11699@localhost>
-References: <78b672c5-2f17-f166-815f-47b05dba66e7@monstr.eu>
- <20161207203919.GA11699@localhost>
-Message-ID: <1f64ea4e-9714-87d0-09d6-b0b2263efc60@monstr.eu>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Thu, 08 Dec 2016 11:44:23 +0000
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <20161208103730.GB6408@localhost> (Vinod Koul's message of "Thu,
+ 8 Dec 2016 16:07:30 +0530")
+References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
+ <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
+ <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
+ <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
+ <20161207164156.GW6408@localhost> <yw1xvauv1yew.fsf@unicorn.mansr.com>
+ <20161208103730.GB6408@localhost>
+Message-ID: <yw1xa8c61w88.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7.12.2016 21:39, Olof Johansson wrote:
-> On Tue, Dec 06, 2016 at 01:51:45PM +0100, Michal Simek wrote:
->> Hi,
->>
->> please add these changes to your arm-soc repo.
->> It fixes dtc warnings, small coding style changes and add support for
->> Microzed.
->>
->> Thanks,
->> Michal
->>
->> ---
->> v2: Use correct zynq-dt-for-4.10 tag instead of zynqmp-dt-for-4.10.
->>
->>
->> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
->>
->>   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
->>
->> are available in the git repository at:
->>
->>   https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-4.10
->>
->> for you to fetch changes up to df2f3c48b9cd51e2612a1598342769d09d849f39:
->>
->>   arm: dts: zynq: Add MicroZed board support (2016-12-06 13:17:39 +0100)
-> 
-> Merged. In the future it'd be nice to get these a few weeks earlier in the
-> cycle.
+Vinod Koul <vinod.koul@intel.com> writes:
 
-I know and sorry about it - busy time before Christmas.
+> On Wed, Dec 07, 2016 at 04:44:55PM +0000, M?ns Rullg?rd wrote:
+>> Vinod Koul <vinod.koul@intel.com> writes:
+>> >> 
+>> >> What you're proposing, Vinod, is to make a channel exclusive
+>> >> to a driver, as long as the driver has not explicitly released
+>> >> the channel, via dma_release_channel(), right?
+>> >
+>> > Precisely, but yes the downside of that is concurrent access are
+>> > limited, but am not sure if driver implements virtual channels and
+>> > allows that..
+>> 
+>> My driver implements virtual channels.  The problem is that the physical
+>> dma channels signal completion slightly too soon, at least with
+>> mem-to-device transfers.  Apparently we need to keep the sbox routing
+>> until the peripheral indicates that it has actually received all the
+>> data.
+>
+> So do we need concurrent accesses by all clients.
 
-Thanks,
-Michal
+Depends on what people do with the chips.
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161208/934e330c/attachment.sig>
+M?ns Rullg?rd
