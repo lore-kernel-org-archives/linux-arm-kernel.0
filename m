@@ -1,118 +1,26 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed,  7 Dec 2016 16:14:18 -0800
-Subject: [PATCH v2.1 1/4] ARM: dts: davinci: da850: VPIF: add node and muxing
-In-Reply-To: <20161207193137.27947-2-khilman@baylibre.com>
-References: <20161207193137.27947-2-khilman@baylibre.com>
-Message-ID: <20161208001418.4469-1-khilman@baylibre.com>
+From: imirkin@alum.mit.edu (Ilia Mirkin)
+Date: Wed, 7 Dec 2016 19:16:30 -0500
+Subject: [PATCH] drm: hdlcd: Work properly in big-endian mode
+In-Reply-To: <548dc9d9-4d21-7f93-cc92-5bc3234f1b8f@arm.com>
+References: <f484518775c0bf063ae0a6f1e6c11bb404a7acc9.1481124156.git.robin.murphy@arm.com>
+ <20161207155714.ldmshptddwvhsdop@phenom.ffwll.local>
+ <548dc9d9-4d21-7f93-cc92-5bc3234f1b8f@arm.com>
+Message-ID: <CAKb7UvhNx_OPqXS4wKj59ReRaQ4jkY7YJ4KfvVKj0DUniFjrGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add VPIF node an pins to da850 and enable on boards.  VPIF has two input
-channels described using the standard DT ports and enpoints.
+On Wed, Dec 7, 2016 at 11:42 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+> By comparison, the same use-cases (fbcon and fb-test) under the same
+> big-endian kernel do *not* show the same problem with nouveau driving a
+> PCIe 7600GT card, which led me to believe it was HDLCD-specific.
 
-Signed-off-by: Kevin Hilman <khilman@baylibre.com>
----
-v2 -> v2.1: moved ports from SoC .dtsi to board .dts files.
+Just to randomly insert info here... NV11+ cards have a "big endian"
+mode, where you can do 32-bit mmio from a big-endian cpu, and the card
+will auto-swap those. There are similar additional bits that make
+operating and accelerating off a big-endian CPU tolerable. Some care
+has gone into the kernel to make sure that all that stuff works. (One
+of those bits is that data gets byteswapped on upload to VRAM by
+virtue of being uploaded by sticking data into a pushbuf, as I
+recall.)
 
- arch/arm/boot/dts/da850-evm.dts  | 20 ++++++++++++++++++++
- arch/arm/boot/dts/da850-lcdk.dts | 13 +++++++++++++
- arch/arm/boot/dts/da850.dtsi     | 27 ++++++++++++++++++++++++++-
- 3 files changed, 59 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 41de15fe15a2..cea36ee6fd07 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -289,3 +289,23 @@
- 		};
- 	};
- };
-+
-+&vpif {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&vpif_capture_pins>;
-+	status = "okay";
-+
-+	/* VPIF capture port */
-+	port {
-+		vpif_ch0: endpoint at 0 {
-+			  reg = <0>;
-+			  bus-width = <8>;
-+		};
-+
-+		vpif_ch1: endpoint at 1 {
-+			  reg = <1>;
-+			  bus-width = <8>;
-+			  data-shift = <8>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index 7b8ab21fed6c..5fc21528e0ba 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -219,3 +219,16 @@
- 		};
- 	};
- };
-+
-+&vpif {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&vpif_capture_pins>;
-+	status = "okay";
-+
-+	/* VPIF capture port */
-+	port {
-+		vpif_ch0: endpoint {
-+			  bus-width = <8>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index f79e1b91c680..5f0b40510b2b 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -186,7 +186,18 @@
- 					0xc 0x88888888 0xffffffff
- 				>;
- 			};
--
-+			vpif_capture_pins: vpif_capture_pins {
-+				pinctrl-single,bits = <
-+					/* VP_DIN[2..7], VP_CLKIN1, VP_CLKIN0 */
-+					0x38 0x11111111 0xffffffff
-+					/* VP_DIN[10..15,0..1] */
-+					0x3c 0x11111111 0xffffffff
-+					/* VP_DIN[8..9] */
-+					0x40 0x00000011 0x000000ff
-+					/* VP_CLKIN3, VP_CLKIN2 */
-+					0x4c 0x00010100 0x000f0f00
-+				>;
-+			};
- 		};
- 		edma0: edma at 0 {
- 			compatible = "ti,edma3-tpcc";
-@@ -399,7 +410,21 @@
- 				<&edma0 0 1>;
- 			dma-names = "tx", "rx";
- 		};
-+
-+		vpif: video at 217000 {
-+			compatible = "ti,da850-vpif";
-+			reg = <0x217000 0x1000>;
-+			interrupts = <92>;
-+			status = "disabled";
-+
-+			/* VPIF capture port */
-+			port {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+		};
- 	};
-+
- 	aemif: aemif at 68000000 {
- 		compatible = "ti,da850-aemif";
- 		#address-cells = <2>;
--- 
-2.9.3
+  -ilia
