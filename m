@@ -1,21 +1,27 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 8 Dec 2016 14:26:42 +0100
-Subject: [PATCH renesas/devel 1/2] ARM: shmobile: defconfig: Enable
- r8a774[35] SoCs
-In-Reply-To: <CAMuHMdUyCcT3k22b-N8J8aasE=YDYfQYfU5GqFKEtsdFnUnHCw@mail.gmail.com>
-References: <1481031173-18600-1-git-send-email-horms+renesas@verge.net.au>
- <1481031173-18600-2-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdUyCcT3k22b-N8J8aasE=YDYfQYfU5GqFKEtsdFnUnHCw@mail.gmail.com>
-Message-ID: <20161208132642.GB7150@verge.net.au>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 8 Dec 2016 13:27:46 +0000
+Subject: [PATCH] arm64: Work around Falkor erratum 1009
+In-Reply-To: <20161208114511.GC9768@leverpostej>
+References: <20161207200028.4420-1-cov@codeaurora.org>
+ <20161207200431.4587-1-cov@codeaurora.org>
+ <20161208114511.GC9768@leverpostej>
+Message-ID: <20161208132746.GB15141@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2016 at 03:00:53PM +0100, Geert Uytterhoeven wrote:
-> On Tue, Dec 6, 2016 at 2:32 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> > Enable recently added r8a7743 (RZ/G1M) and r8a7745 (RZ/G1E) SoCs.
-> >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On Thu, Dec 08, 2016 at 11:45:12AM +0000, Mark Rutland wrote:
+> On Wed, Dec 07, 2016 at 03:04:31PM -0500, Christopher Covington wrote:
+> > +	asm volatile(ALTERNATIVE(
+> > +		     "nop \n"
+> > +		     "nop \n",
+> > +		     "tlbi vmalle1is \n"
+> > +		     "dsb ish \n",
 > 
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> As a general note, perhaps we want a C compatible NOP_ALTERNATIVE() so
+> that the nop case can be implicitly generated for sequences like this.
 
-Thanks, I have queued up this and the following patch for v4.11.
+It's also worth checking what cpus_have_const_cap() would generate for
+the default (no workaround required) case.
+
+-- 
+Catalin
