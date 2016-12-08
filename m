@@ -1,29 +1,56 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 8 Dec 2016 14:08:24 -0800
-Subject: [PATCH 0/3] clkdev: add devm_get_clk_from_child()
-In-Reply-To: <874m2jvtmw.wl%kuninori.morimoto.gx@renesas.com>
+Date: Thu, 8 Dec 2016 14:09:01 -0800
+Subject: [PATCH 3/3] ASoC: simple-card-utils: enable
+ clocks/clock-names/clock-ranges
+In-Reply-To: <87zikbuezr.wl%kuninori.morimoto.gx@renesas.com>
 References: <874m2jvtmw.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20161208220824.GM5423@codeaurora.org>
+ <87zikbuezr.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20161208220901.GN5423@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 12/05, Kuninori Morimoto wrote:
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 > 
-> Hi Stephen
+> Current simple-card is supporting this style for clocks
 > 
-> This is v5 of "clkdev: add devm_of_clk_get()", but new series.
-> I hope my understanding was correct with your idea.
+> 	sound {
+> 		...
+> 		simple-audio-card,cpu {
+> 			sound-dai = <&xxx>;
+> 			clocks = <&cpu_clock>;
+> 		};
+> 		simple-audio-card,codec {
+> 			sound-dai = <&xxx>;
+> 			clocks = <&codec_clock>;
+> 		};
+> 	};
+> 
+> Now, it can support this style too, because we can use
+> devm_get_clk_from_child() now.
+> 
+> 	sound {
+> 		...
+> 		clocks = <&cpu_clock>, <&codec_clock>;
+> 		clock-names = "cpu", "codec";
+> 		clock-ranges;
+> 		...
+> 		simple-audio-card,cpu {
+> 			sound-dai = <&xxx>;
+> 		};
+> 		simple-audio-card,codec {
+> 			sound-dai = <&xxx>;
+> 		};
+> 	};
+> 
+> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Yes this looks good. Given that we're so close to the merge
-window, perhaps I should just merge the first patch into clk-next
-and then it will be ready for anyone who wants to use it? The
-sound patches can be left up to others to handle.
-
-> 
-> Kuninori Morimoto (3):
->   1) clkdev: add devm_get_clk_from_child()
->   2) ASoC: simple-card: use devm_get_clk_from_child()
->   3) ASoC: simple-card-utils: enable clocks/clock-names/clock-ranges
+I don't see any reason why we need this patch though. The binding
+works as is, so supporting different styles doesn't seem like a
+good idea to me. Let's just keep what we have? Even if a sub-node
+like cpu or codec gets more than one element in the clocks list
+property, we can make that work by passing a clock-name then
+based on some sort of other knowledge.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
