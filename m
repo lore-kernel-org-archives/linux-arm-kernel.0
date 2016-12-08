@@ -1,55 +1,244 @@
-From: gospo@broadcom.com (Andy Gospodarek)
-Date: Thu,  8 Dec 2016 16:30:18 -0500
-Subject: [PATCH pci/host-iproc] PCI: iproc: Allow more than slot 0 on PAXC
-Message-ID: <1481232618-10614-1-git-send-email-gospo@broadcom.com>
+From: abelvesa@linux.com (Abel Vesa)
+Date: Thu,  8 Dec 2016 21:46:35 +0000
+Subject: [PATCH] arm: ftrace: Adds support for CONFIG_DYNAMIC_FTRACE_WITH_REGS
+Message-ID: <1481233595-22112-1-git-send-email-abelvesa@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The iproc host driver limits the number of slots that are available on
-PAXC devices.  Enforcing this limit prevents VFs from being created
-beyond the first port.  After this change it is possible to create VFs
-associated with all four devices.
+From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
 
-The first four devices below are the PFs and the next four are the newly
-created VFs:
+From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
 
-0008:01:00.0 Ethernet controller: Broadcom Limited Device 16cd
-0008:01:00.1 Ethernet controller: Broadcom Limited Device 16cd
-0008:01:00.2 Ethernet controller: Broadcom Limited Device 16cd
-0008:01:00.3 Ethernet controller: Broadcom Limited Device 16cd
-0008:01:00.4 Ethernet controller: Broadcom Limited BCM57304 NetXtreme-C Ethernet Virtual Function
-0008:01:01.0 Ethernet controller: Broadcom Limited BCM57304 NetXtreme-C Ethernet Virtual Function
-0008:01:01.4 Ethernet controller: Broadcom Limited BCM57304 NetXtreme-C Ethernet Virtual Function
-0008:01:02.0 Ethernet controller: Broadcom Limited BCM57304 NetXtreme-C Ethernet Virtual Function
+The DYNAMIC_FTRACE_WITH_REGS configuration makes it possible for a ftrace
+operation to specify if registers need to saved/restored by the ftrace handler.
+This is needed by kgraft and possibly other ftrace-based tools, and the ARM
+architecture is currently lacking this feature. It would also be the first step
+to support the "Kprobes-on-ftrace" optimization on ARM.
 
-Based on the git history around 923c6bb1f641 ("PCI: iproc: Allow multiple
-devices except on PAXC") and 943ebae781f5 ("PCI: iproc: Add PAXC interface
-support") I expect there may be an unmentioned or unknown-to-me reason why this
-code exists.  I certainly cannot create and use VFs without some kind of change
-around this space, so I would like to see the current limitation simply removed.
+This patch introduces a new ftrace handler that stores the registers on the
+stack before calling the next stage. The registers are restored from the stack
+before going back to the instrumented function.
 
-Fixes: 923c6bb1f641 ("PCI: iproc: Allow multiple devices except on PAXC")
-Signed-off-by: Andy Gospodarek <gospo@broadcom.com>
+A side-effect of this patch is to activate the support for ftrace_modify_call()
+as it defines ARCH_SUPPORTS_FTRACE_OPS for the ARM architecture
+
+Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+Signed-off-by: Abel Vesa <abelvesa@linux.com>
 ---
- drivers/pci/host/pcie-iproc.c | 8 --------
- 1 file changed, 8 deletions(-)
+ arch/arm/Kconfig               |  2 ++
+ arch/arm/include/asm/ftrace.h  |  4 +++
+ arch/arm/kernel/entry-ftrace.S | 78 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/ftrace.c       | 33 ++++++++++++++++++
+ 4 files changed, 117 insertions(+)
 
-diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-index 3ebc025..9311826 100644
---- a/drivers/pci/host/pcie-iproc.c
-+++ b/drivers/pci/host/pcie-iproc.c
-@@ -477,14 +477,6 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
- 			return (pcie->base + offset);
- 	}
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index b5d529f..87f1a9f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -50,6 +50,7 @@ config ARM
+ 	select HAVE_DMA_API_DEBUG
+ 	select HAVE_DMA_CONTIGUOUS if MMU
+ 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
++	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
+ 	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
+ 	select HAVE_EXIT_THREAD
+ 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+@@ -90,6 +91,7 @@ config ARM
+ 	select PERF_USE_VMALLOC
+ 	select RTC_LIB
+ 	select SYS_SUPPORTS_APM_EMULATION
++	select FRAME_POINTER if DYNAMIC_FTRACE_WITH_REGS && FUNCTION_GRAPH_TRACER
+ 	# Above selects are sorted alphabetically; please add new ones
+ 	# according to that.  Thanks.
+ 	help
+diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+index bfe2a2f..f434ce9 100644
+--- a/arch/arm/include/asm/ftrace.h
++++ b/arch/arm/include/asm/ftrace.h
+@@ -1,6 +1,10 @@
+ #ifndef _ASM_ARM_FTRACE
+ #define _ASM_ARM_FTRACE
  
--	/*
--	 * PAXC is connected to an internally emulated EP within the SoC.  It
--	 * allows only one device.
--	 */
--	if (pcie->ep_is_internal)
--		if (slot > 0)
--			return NULL;
--
- 	/* EP device access */
- 	val = (busno << CFG_ADDR_BUS_NUM_SHIFT) |
- 		(slot << CFG_ADDR_DEV_NUM_SHIFT) |
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++#define ARCH_SUPPORTS_FTRACE_OPS 1
++#endif
++
+ #ifdef CONFIG_FUNCTION_TRACER
+ #define MCOUNT_ADDR		((unsigned long)(__gnu_mcount_nc))
+ #define MCOUNT_INSN_SIZE	4 /* sizeof mcount call */
+diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
+index c73c403..fd75bae 100644
+--- a/arch/arm/kernel/entry-ftrace.S
++++ b/arch/arm/kernel/entry-ftrace.S
+@@ -92,12 +92,73 @@
+ 2:	mcount_exit
+ .endm
+ 
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++
++.macro __ftrace_regs_caller
++
++	add 	ip, sp, #4	@ move in IP the value of SP as it was
++				@ before the push {lr} of the mcount mechanism
++	stmdb	sp!, {ip,lr,pc}
++	stmdb	sp!, {r0-r11,lr}
++
++	@ stack content at this point:
++	@ 0  4          44    48   52       56   60   64
++	@ RO | R1 | ... | R11 | LR | SP + 4 | LR | PC | previous LR |
++
++	mov r3, sp				@ struct pt_regs*
++	ldr r2, =function_trace_op
++	ldr r2, [r2]				@ pointer to the current
++						@ function tracing op
++	ldr	r1, [sp, #64]			@ lr of instrumented func
++	mcount_adjust_addr	r0, lr		@ instrumented function
++
++	.globl ftrace_regs_call
++ftrace_regs_call:
++	bl	ftrace_stub
++
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++	.globl ftrace_graph_regs_call
++ftrace_graph_regs_call:
++	mov	r0, r0
++#endif
++	ldr	lr, [sp, #64]		@ get the previous LR value from stack
++	ldmia	sp, {r0-r11, ip, sp}	@ pop the saved registers INCLUDING
++					@ the stack pointer
++	ret	ip
++.endm
++
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++.macro __ftrace_graph_regs_caller
++
++	sub	r0, fp, #4			@ lr of instrumented routine (parent)
++
++	@ called from __ftrace_regs_caller
++	ldr	r1, [sp, #56]			@ instrumented routine (func)
++	mcount_adjust_addr	r1, r1
++
++	mov	r2, fp				@ frame pointer
++	bl	prepare_ftrace_return
++
++	ldr	lr, [fp, #-4]			@ restore lr from the stack
++	ldmia	sp, {r0-r11, ip, sp}		@ restore r0 through sp
++	ret	ip
++.endm
++#endif
++#endif
++
+ .macro __ftrace_caller suffix
+ 	mcount_enter
+ 
+ 	mcount_get_lr	r1			@ lr of instrumented func
+ 	mcount_adjust_addr	r0, lr		@ instrumented function
+ 
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++	ldr r2, =function_trace_op
++	ldr r2, [r2]				@ pointer to the current
++						@ function tracing op
++	mov r3, #0				@ regs is NULL
++#endif
++
+ 	.globl ftrace_call\suffix
+ ftrace_call\suffix:
+ 	bl	ftrace_stub
+@@ -212,6 +273,15 @@ UNWIND(.fnstart)
+ 	__ftrace_caller
+ UNWIND(.fnend)
+ ENDPROC(ftrace_caller)
++
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++ENTRY(ftrace_regs_caller)
++UNWIND(.fnstart)
++	__ftrace_regs_caller
++UNWIND(.fnend)
++ENDPROC(ftrace_regs_caller)
++#endif
++
+ #endif
+ 
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+@@ -220,6 +290,14 @@ UNWIND(.fnstart)
+ 	__ftrace_graph_caller
+ UNWIND(.fnend)
+ ENDPROC(ftrace_graph_caller)
++
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++ENTRY(ftrace_graph_regs_caller)
++UNWIND(.fnstart)
++	__ftrace_graph_regs_caller
++UNWIND(.fnend)
++ENDPROC(ftrace_graph_regs_caller)
++#endif
+ #endif
+ 
+ .purgem mcount_enter
+diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
+index 3f17594..d8d4753 100644
+--- a/arch/arm/kernel/ftrace.c
++++ b/arch/arm/kernel/ftrace.c
+@@ -139,6 +139,15 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
+ 
+ 	ret = ftrace_modify_code(pc, 0, new, false);
+ 
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++	if (!ret) {
++		pc = (unsigned long)&ftrace_regs_call;
++		new = ftrace_call_replace(pc, (unsigned long)func);
++
++		ret = ftrace_modify_code(pc, 0, new, false);
++	}
++#endif
++
+ #ifdef CONFIG_OLD_MCOUNT
+ 	if (!ret) {
+ 		pc = (unsigned long)&ftrace_call_old;
+@@ -157,6 +166,20 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+ 	unsigned long ip = rec->ip;
+ 
+ 	old = ftrace_nop_replace(rec);
++
++	new = ftrace_call_replace(ip, adjust_address(rec, addr));
++
++	return ftrace_modify_code(rec->ip, old, new, true);
++}
++
++int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
++				unsigned long addr)
++{
++	unsigned long new, old;
++	unsigned long ip = rec->ip;
++
++	old = ftrace_call_replace(ip, adjust_address(rec, old_addr));
++
+ 	new = ftrace_call_replace(ip, adjust_address(rec, addr));
+ 
+ 	return ftrace_modify_code(rec->ip, old, new, true);
+@@ -229,6 +252,8 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
+ extern unsigned long ftrace_graph_call;
+ extern unsigned long ftrace_graph_call_old;
+ extern void ftrace_graph_caller_old(void);
++extern unsigned long ftrace_graph_regs_call;
++extern void ftrace_graph_regs_caller(void);
+ 
+ static int __ftrace_modify_caller(unsigned long *callsite,
+ 				  void (*func) (void), bool enable)
+@@ -251,6 +276,14 @@ static int ftrace_modify_graph_caller(bool enable)
+ 				     ftrace_graph_caller,
+ 				     enable);
+ 
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++	if (!ret)
++		ret = __ftrace_modify_caller(&ftrace_graph_regs_call,
++				     ftrace_graph_regs_caller,
++				     enable);
++#endif
++
++
+ #ifdef CONFIG_OLD_MCOUNT
+ 	if (!ret)
+ 		ret = __ftrace_modify_caller(&ftrace_graph_call_old,
+-- 
+2.7.4
