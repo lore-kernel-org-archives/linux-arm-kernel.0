@@ -1,58 +1,50 @@
-From: mhocko@suse.com (Michal Hocko)
-Date: Thu, 8 Dec 2016 10:52:54 +0100
-Subject: [PATCH v3 0/4] mm: fix the "counter.sh" failure for libhugetlbfs
-In-Reply-To: <20161208093623.GA4551@sha-win-210.asiapac.arm.com>
-References: <1480929431-22348-1-git-send-email-shijie.huang@arm.com>
- <20161205093100.GF30758@dhcp22.suse.cz>
- <20161206100358.GA4619@sha-win-210.asiapac.arm.com>
- <20161207150237.GC31797@dhcp22.suse.cz>
- <20161208093623.GA4551@sha-win-210.asiapac.arm.com>
-Message-ID: <20161208095253.GB8330@dhcp22.suse.cz>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 8 Dec 2016 10:59:47 +0100
+Subject: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in Cadence GEM.
+In-Reply-To: <20161207193908.GA13062@netboy>
+References: <1481134912-2243-1-git-send-email-andrei.pistirica@microchip.com>
+ <20161207193908.GA13062@netboy>
+Message-ID: <19ff9840-62cb-0de1-9d3d-f1312cfaf715@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 08-12-16 17:36:24, Huang Shijie wrote:
-> On Wed, Dec 07, 2016 at 11:02:38PM +0800, Michal Hocko wrote:
-[...]
-> > I haven't yet checked your patchset but I can tell you one thing.
->
-> Could you please review the patch set when you have time? Thanks a lot.
-
->From a quick glance you do not handle the reservation code at all. You
-just make sure that the allocation doesn't fail unconditionally. I might
-be wrong here and Naoya resp. Mike will know much better but this seems
-far from enough to me.
-
+Le 07/12/2016 ? 20:39, Richard Cochran a ?crit :
+> On Wed, Dec 07, 2016 at 08:21:51PM +0200, Andrei Pistirica wrote:
+>> +#ifdef CONFIG_MACB_USE_HWSTAMP
+>> +void gem_ptp_init(struct net_device *ndev);
+>> +void gem_ptp_remove(struct net_device *ndev);
+>> +
+>> +void gem_ptp_do_txstamp(struct macb *bp, struct sk_buff *skb);
+>> +void gem_ptp_do_rxstamp(struct macb *bp, struct sk_buff *skb);
 > 
-> > Surplus and subpool pages code is tricky as hell. And it is not just a
-> Agree. 
+> These are in the hot path, and so you should do the test before
+> calling the global function, something like this:
 > 
-> Do we really need so many accountings? such as reserve/ovorcommit/surplus.
-
-If we want to make giga page the first class citizen then the whole
-reservation/surplus code has to independent on the page size.
-
-> > matter of teaching the huge page allocation code to do the right thing.
-> > There are subtle details all over the place. E.g. we currently
-> > do not free giga pages AFAICS. In fact I believe that the giga pages are
-> Please correct me if I am wrong. :)
+> void gem_ptp_txstamp(struct macb *bp, struct sk_buff *skb);
 > 
-> I think the free-giga-pages can work well.
-> Please see the code in update_and_free_page(). 
+> static void gem_ptp_do_txstamp(struct macb *bp, struct sk_buff *skb)
+> {
+> 	if (!bp->hwts_tx_en)
+> 		return;
+> 	gem_ptp_txstamp(bp, skb);
+> }
+> 
+> Ditto for Rx.
 
-Hmm, I have missed that part. I guess you are right but I would have to
-look much closer. Hugetlb code tends to be full of surprises.
+Hi Richard,
 
-> Could you please list all the subtle details you think the code is wrong?
-> I can check them one by one.
+So you mean that as the "global" function won't be "inlined" by the
+compiler as the function is not "static" neither in the same file and
+that the jump will be implemented anyway. And this even if the function
+is only called at a single location...
 
-Well, this would take me quite some time and basically restudy the whole
-hugetlb code again. What you are trying to achieve is not a simple "fix
-a test case" thing. You are trying to implement full featured giga pages
-suport. And as I've said this requires a deeper understanding of the
-current code and clean it up considerably wrt. giga pages. This is
-definitely desirable plan longterm and I would like to encourage you for
-that but it is not a simple project at the same time. 
+This way, if we add a kind or accessors function like the one that you
+propose, with the test in it, the branch prediction can play his role
+without breaking the processor pipeline as the accessors function will
+be inlined by the compiler: Am I right?
+
+So, yes, makes sense. Thanks for the hint.
+
+Regards,
 -- 
-Michal Hocko
-SUSE Labs
+Nicolas Ferre
