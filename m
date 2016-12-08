@@ -1,124 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  8 Dec 2016 16:49:39 +0000
-Subject: [PATCH v3] arm64: fpsimd: improve stacking logic in non-interruptible
- context
-Message-ID: <1481215779-23432-1-git-send-email-ard.biesheuvel@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 08 Dec 2016 16:55:08 +0000
+Subject: Applied "ASoC: zte: spdif: correct ZX_SPDIF_CLK_RAT define" to the
+ asoc tree
+In-Reply-To: <1481186655-8213-2-git-send-email-shawnguo@kernel.org>
+Message-ID: <E1cF1yO-0004we-Kg@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, we allow kernel mode NEON in softirq or hardirq context by
-stacking and unstacking a slice of the NEON register file for each call
-to kernel_neon_begin() and kernel_neon_end(), respectively.
+The patch
 
-Given that
-a) a CPU typically spends most of its time in userland, during which time
-   no kernel mode NEON in process context is in progress,
-b) a CPU spends most of its time in the kernel doing other things than
-   kernel mode NEON when it gets interrupted to perform kernel mode NEON
-   in softirq context
+   ASoC: zte: spdif: correct ZX_SPDIF_CLK_RAT define
 
-the stacking and subsequent unstacking is only necessary if we are
-interrupting a thread while it is performing kernel mode NEON in process
-context, which means that in all other cases, we can simply preserve the
-userland FPSIMD state once, and only restore it upon return to userland,
-even if we are being invoked from softirq or hardirq context.
+has been applied to the asoc tree at
 
-So instead of checking whether we are running in interrupt context, keep
-track of the level of nested kernel mode NEON calls in progress, and only
-perform the eager stack/unstack if the level exceeds 1.
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 44b1c9a6e7a2692e761e35ada2ffe84b20c2a377 Mon Sep 17 00:00:00 2001
+From: Shawn Guo <shawn.guo@linaro.org>
+Date: Thu, 8 Dec 2016 16:44:15 +0800
+Subject: [PATCH] ASoC: zte: spdif: correct ZX_SPDIF_CLK_RAT define
+
+The macro ZX_SPDIF_CLK_RAT should be 2 instead of 4.  With this
+fix, we can get correct audio output on HDMI through SPDIF interface.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Acked-by: Jun Nie <jun.nie@linaro.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
-v3:
-- avoid corruption by concurrent invocations of kernel_neon_begin()/_end()
+ sound/soc/zte/zx-spdif.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-v2:
-- BUG() on unexpected values of the nesting level
-- relax the BUG() on num_regs>32 to a WARN, given that nothing actually
-  breaks in that case
-
- arch/arm64/kernel/fpsimd.c | 47 ++++++++++++++------
- 1 file changed, 33 insertions(+), 14 deletions(-)
-
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 394c61db5566..536ddab9316d 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -220,20 +220,35 @@ void fpsimd_flush_task_state(struct task_struct *t)
+diff --git a/sound/soc/zte/zx-spdif.c b/sound/soc/zte/zx-spdif.c
+index 26265ce4caca..9fa6463ce5d7 100644
+--- a/sound/soc/zte/zx-spdif.c
++++ b/sound/soc/zte/zx-spdif.c
+@@ -71,7 +71,7 @@
+ #define ZX_VALID_RIGHT_TRACK		(2 << 0)
+ #define ZX_VALID_TRACK_MASK		(3 << 0)
  
- #ifdef CONFIG_KERNEL_MODE_NEON
+-#define ZX_SPDIF_CLK_RAT		(4 * 32)
++#define ZX_SPDIF_CLK_RAT		(2 * 32)
  
--static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
--static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
-+/*
-+ * Although unlikely, it is possible for three kernel mode NEON contexts to
-+ * be live at the same time: process context, softirq context and hardirq
-+ * context. So while the userland context is stashed in the thread's fpsimd
-+ * state structure, we need two additional levels of storage.
-+ */
-+static DEFINE_PER_CPU(struct fpsimd_partial_state, nested_fpsimdstate[2]);
-+static DEFINE_PER_CPU(atomic_t, kernel_neon_nesting_level);
- 
- /*
-  * Kernel-side NEON support functions
-  */
- void kernel_neon_begin_partial(u32 num_regs)
- {
--	if (in_interrupt()) {
--		struct fpsimd_partial_state *s = this_cpu_ptr(
--			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
-+	struct fpsimd_partial_state *s;
-+	int level;
-+
-+	preempt_disable();
-+
-+	level = atomic_inc_return(this_cpu_ptr(&kernel_neon_nesting_level));
-+	BUG_ON(level > 3);
-+
-+	if (level > 1) {
-+		s = this_cpu_ptr(nested_fpsimdstate);
- 
--		BUG_ON(num_regs > 32);
--		fpsimd_save_partial_state(s, roundup(num_regs, 2));
-+		WARN_ON_ONCE(num_regs > 32);
-+		num_regs = min(roundup(num_regs, 2), 32U);
-+
-+		fpsimd_save_partial_state(&s[level - 2], num_regs);
- 	} else {
- 		/*
- 		 * Save the userland FPSIMD state if we have one and if we
-@@ -241,7 +256,6 @@ void kernel_neon_begin_partial(u32 num_regs)
- 		 * that there is no longer userland FPSIMD state in the
- 		 * registers.
- 		 */
--		preempt_disable();
- 		if (current->mm &&
- 		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
- 			fpsimd_save_state(&current->thread.fpsimd_state);
-@@ -252,13 +266,18 @@ EXPORT_SYMBOL(kernel_neon_begin_partial);
- 
- void kernel_neon_end(void)
- {
--	if (in_interrupt()) {
--		struct fpsimd_partial_state *s = this_cpu_ptr(
--			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
--		fpsimd_load_partial_state(s);
--	} else {
--		preempt_enable();
-+	struct fpsimd_partial_state *s;
-+	int level;
-+
-+	level = atomic_read(this_cpu_ptr(&kernel_neon_nesting_level));
-+	BUG_ON(level < 1);
-+
-+	if (level > 1) {
-+		s = this_cpu_ptr(nested_fpsimdstate);
-+		fpsimd_load_partial_state(&s[level - 2]);
- 	}
-+	atomic_dec(this_cpu_ptr(&kernel_neon_nesting_level));
-+	preempt_enable();
- }
- EXPORT_SYMBOL(kernel_neon_end);
- 
+ struct zx_spdif_info {
+ 	struct snd_dmaengine_dai_dma_data	dma_data;
 -- 
-2.7.4
+2.10.2
