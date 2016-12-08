@@ -1,64 +1,61 @@
-From: dhowells@redhat.com (David Howells)
-Date: Thu, 08 Dec 2016 12:31:08 +0000
-Subject: [PATCH 8/8] efi: Add EFI_SECURE_BOOT bit [ver #6]
-In-Reply-To: <148120020832.5854.5448601415491330495.stgit@warthog.procyon.org.uk>
-References: <148120020832.5854.5448601415491330495.stgit@warthog.procyon.org.uk>
-Message-ID: <148120026820.5854.13036556358308461345.stgit@warthog.procyon.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 8 Dec 2016 13:31:34 +0100
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <yw1xshpyzk6p.fsf@unicorn.mansr.com>
+References: <58356EA8.2010806@free.fr> <20161125045549.GC2698@localhost>
+ <092f44ee-4560-be17-25f7-00948dba3cfa@free.fr>
+ <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
+ <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
+ <yw1xwpfd2o9f.fsf@unicorn.mansr.com> <20161207164341.GX6408@localhost>
+ <yw1xr35j1yd5.fsf@unicorn.mansr.com> <20161208103921.GC6408@localhost>
+ <yw1x60mu1w7e.fsf@unicorn.mansr.com>
+ <CAMuHMdUEXJtWF3S8yK5RY5e60nOnb-Wc9U2E_L553hZvsijvcw@mail.gmail.com>
+ <yw1xshpyzk6p.fsf@unicorn.mansr.com>
+Message-ID: <CAMuHMdUAYRuYtmdQpNKyq5Xo0keFa7Oyess-L-p7oLd8MegY2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Josh Boyer <jwboyer@fedoraproject.org>
+On Thu, Dec 8, 2016 at 1:20 PM, M?ns Rullg?rd <mans@mansr.com> wrote:
+> Geert Uytterhoeven <geert@linux-m68k.org> writes:
+>> On Thu, Dec 8, 2016 at 12:44 PM, M?ns Rullg?rd <mans@mansr.com> wrote:
+>>> Vinod Koul <vinod.koul@intel.com> writes:
+>>>> On Wed, Dec 07, 2016 at 04:45:58PM +0000, M?ns Rullg?rd wrote:
+>>>>> Vinod Koul <vinod.koul@intel.com> writes:
+>>>>> > On Tue, Dec 06, 2016 at 01:14:20PM +0000, M?ns Rullg?rd wrote:
+>>>>> >> That's not going to work very well.  Device drivers typically request
+>>>>> >> dma channels in their probe functions or when the device is opened.
+>>>>> >> This means that reserving one of the few channels there will inevitably
+>>>>> >> make some other device fail to operate.
+>>>>> >
+>>>>> > No that doesnt make sense at all, you should get a channel only when you
+>>>>> > want to use it and not in probe!
+>>>>>
+>>>>> Tell that to just about every single driver ever written.
+>>>>
+>>>> Not really, few do yes which is wrong but not _all_ do that.
+>>>
+>>> Every driver I ever looked at does.  Name one you consider "correct."
+>>
+>> I'm far from claiming that drivers/tty/serial/sh-sci.c is perfect, but
+>> it does request DMA channels at open time, not at probe time.
+>
+> In the part quoted above, I said most drivers request dma channels in
+> their probe or open functions.  For the purposes of this discussion,
+> that distinction is irrelevant.  In either case, the channel is held
+> indefinitely.  If this wasn't the correct way to use the dmaengine,
+> there would be no need for the virt-dma helpers which are specifically
+> designed for cases the one currently at hand.
 
-UEFI machines can be booted in Secure Boot mode.  Add a EFI_SECURE_BOOT bit
-that can be passed to efi_enabled() to find out whether secure boot is
-enabled.
+Sorry, I mainly read Vinod's "not in probe", and missed your "or when the
+device is opened".
 
-This will be used by the SysRq+x handler, registered by the x86 arch, to find
-out whether secure boot mode is enabled so that it can be disabled.
+Gr{oetje,eeting}s,
 
-Signed-off-by: Josh Boyer <jwboyer@fedoraproject.org>
-Signed-off-by: David Howells <dhowells@redhat.com>
----
+                        Geert
 
- arch/x86/kernel/setup.c |   15 +++++++++++++++
- include/linux/efi.h     |    1 +
- 2 files changed, 16 insertions(+)
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-diff --git a/arch/x86/kernel/setup.c b/arch/x86/kernel/setup.c
-index 9c337b0e8ba7..d8972ec6257d 100644
---- a/arch/x86/kernel/setup.c
-+++ b/arch/x86/kernel/setup.c
-@@ -1152,6 +1152,21 @@ void __init setup_arch(char **cmdline_p)
- 	/* Allocate bigger log buffer */
- 	setup_log_buf(1);
- 
-+	if (IS_ENABLED(CONFIG_EFI)) {
-+		switch (boot_params.secure_boot) {
-+		case efi_secureboot_mode_disabled:
-+			pr_info("Secure boot disabled\n");
-+			break;
-+		case efi_secureboot_mode_enabled:
-+			set_bit(EFI_SECURE_BOOT, &efi.flags);
-+			pr_info("Secure boot enabled\n");
-+			break;
-+		default:
-+			pr_info("Secure boot could not be determined\n");
-+			break;
-+		}
-+	}
-+
- 	reserve_initrd();
- 
- 	acpi_table_upgrade();
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index c894ed5bfa1c..e1893f5002c3 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -1070,6 +1070,7 @@ extern int __init efi_setup_pcdp_console(char *);
- #define EFI_ARCH_1		7	/* First arch-specific bit */
- #define EFI_DBG			8	/* Print additional debug info at runtime */
- #define EFI_NX_PE_DATA		9	/* Can runtime data regions be mapped non-executable? */
-+#define EFI_SECURE_BOOT		10	/* Are we in Secure Boot mode? */
- 
- #ifdef CONFIG_EFI
- /*
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
