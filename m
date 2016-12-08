@@ -1,21 +1,19 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 7 Dec 2016 16:17:09 -0800
-Subject: [PATCH v3 2/2] clk: uniphier: add cpufreq data for LD11, LD20 SoCs
-In-Reply-To: <1481074353-31535-2-git-send-email-yamada.masahiro@socionext.com>
-References: <1481074353-31535-1-git-send-email-yamada.masahiro@socionext.com>
- <1481074353-31535-2-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20161208001709.GF5423@codeaurora.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 8 Dec 2016 08:54:55 +0800
+Subject: [PATCH] ARM: dts: imx7d: fix LCDIF clock assignment
+In-Reply-To: <20161207205314.GA20203@localhost>
+References: <20161123004204.10851-1-stefan@agner.ch>
+ <CAOMZO5AqKupmmKb4biGfmy4v3ZwS-BFjPY=MLd8Rc0ZXL+vQvg@mail.gmail.com>
+ <7e4829f484f6c4425fc9d01bea1a094f@agner.ch>
+ <20161205020123.GA2066@dragon> <20161207205314.GA20203@localhost>
+Message-ID: <20161208005454.GF2749@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07, Masahiro Yamada wrote:
-> Add more data to 64bit SoCs for the cpufreq support.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+On Wed, Dec 07, 2016 at 12:53:14PM -0800, Olof Johansson wrote:
+> Applied, with the fixes line. In the future, please email arm at kernel.org too,
+> it's easier to make sure we don't miss it that way.
 
-Applied to clk-next
+Noted.  Thanks, Olof.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Shawn
