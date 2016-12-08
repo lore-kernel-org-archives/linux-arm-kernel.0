@@ -1,47 +1,71 @@
-From: jerry.huang@nxp.com (Changming Huang)
-Date: Thu, 8 Dec 2016 14:06:08 +0800
-Subject: [PATCH] fsl/usb: Add USB node in FSL's ls1012a DTS
-Message-ID: <1481177168-11347-1-git-send-email-jerry.huang@nxp.com>
+From: lukas@wunner.de (Lukas Wunner)
+Date: Thu, 8 Dec 2016 07:57:35 +0100
+Subject: [PATCH 5/8] efi: Get the secure boot status [ver #5]
+In-Reply-To: <148111671977.23390.12452925207541146423.stgit@warthog.procyon.org.uk>
+References: <148111668193.23390.6340512985876251017.stgit@warthog.procyon.org.uk>
+ <148111671977.23390.12452925207541146423.stgit@warthog.procyon.org.uk>
+Message-ID: <20161208065735.GB8549@wunner.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add USB node in ls1012a device tree
+On Wed, Dec 07, 2016 at 01:18:39PM +0000, David Howells wrote:
+> @@ -226,7 +180,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+>  	efi_guid_t loaded_image_proto = LOADED_IMAGE_PROTOCOL_GUID;
+>  	unsigned long reserve_addr = 0;
+>  	unsigned long reserve_size = 0;
+> -	int secure_boot = 0;
+> +	enum efi_secureboot_mode secure_boot = efi_secureboot_mode_unknown;
 
-Signed-off-by: Changming Huang <jerry.huang@nxp.com>
----
-Dependence on patch "[v3] arm64: Add DTS support for FSL's LS1012A SoC".
-https://patchwork.kernel.org/patch/9462399/
+You're setting this variable unconditionally further down, so no need
+to initialize it.
 
- arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-index 92e64f3..3e4bda6 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-@@ -235,6 +235,23 @@
- 				 <&clockgen 4 3>;
- 		};
- 
-+		usb0: usb3 at 2f00000 {
-+			compatible = "snps,dwc3";
-+			reg = <0x0 0x2f00000 0x0 0x10000>;
-+			interrupts = <0 60 0x4>;
-+			dr_mode = "host";
-+			snps,quirk-frame-length-adjustment = <0x20>;
-+			snps,dis_rxdet_inp3_quirk;
-+		};
-+
-+		usb1: usb2 at 8600000 {
-+			compatible = "fsl-usb2-dr-v2.5", "fsl-usb2-dr";
-+			reg = <0x0 0x8600000 0x0 0x1000>;
-+			interrupts = <0 139 0x4>;
-+			dr_mode = "host";
-+			phy_type = "ulpi";
-+		};
-+
- 		sata: sata at 3200000 {
- 			compatible = "fsl,ls1012a-ahci", "fsl,ls1043a-ahci";
- 			reg = <0x0 0x3200000 0x0 0x10000>;
--- 
-1.7.9.5
+> +/*
+> + * Determine whether we're in secure boot mode.  We return:
+> + */
+
+We return?  Looks like something's missing here.
+
+
+> +enum efi_secureboot_mode efi_get_secureboot(efi_system_table_t *sys_table_arg)
+> +{
+> +	u8 secboot, setupmode;
+> +	unsigned long size;
+> +	efi_status_t status;
+> +
+> +	size = sizeof(secboot);
+> +	status = get_efi_var(efi_SecureBoot_name, &efi_variable_guid,
+> +			     NULL, &size, &secboot);
+> +	if (status != EFI_SUCCESS)
+> +		goto out_efi_err;
+> +
+> +	size = sizeof(setupmode);
+> +	status = get_efi_var(efi_SetupMode_name, &efi_variable_guid,
+> +			     NULL, &size, &setupmode);
+> +	if (status != EFI_SUCCESS)
+> +		goto out_efi_err;
+> +
+> +	if (secboot == 0 || setupmode == 1)
+> +		goto secure_boot_disabled;
+
+Well, you could just return efi_secureboot_mode_disabled directly here
+instead of doing a jump.
+
+
+> +
+> +	pr_efi(sys_table_arg, "UEFI Secure Boot is enabled.\n");
+> +	return efi_secureboot_mode_enabled;
+> +
+> +secure_boot_disabled:
+> +	return efi_secureboot_mode_disabled;
+> +
+> +out_efi_err:
+> +	pr_efi_err(sys_table_arg, "Could not determine UEFI Secure Boot status.\n");
+> +	if (status == EFI_NOT_FOUND)
+> +		goto secure_boot_disabled;
+> +	return efi_secureboot_mode_unknown;
+> +}
+
+Thanks,
+
+Lukas
