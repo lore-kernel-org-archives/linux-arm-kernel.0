@@ -1,29 +1,83 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Fri,  9 Dec 2016 10:47:58 +0900
-Subject: [PATCH] ARM: dts: sun8i: Support DTB build for NanoPi M1
-Message-ID: <20161209014758.27368-1-woogyom.kim@gmail.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Fri, 9 Dec 2016 10:00:53 +0800
+Subject: [PATCH v3 1/2] dt-bindings: Document the hi3660 reset bindings
+In-Reply-To: <1481031753.3202.57.camel@pengutronix.de>
+References: <1480989092-31847-1-git-send-email-zhangfei.gao@linaro.org>
+ <1480989092-31847-2-git-send-email-zhangfei.gao@linaro.org>
+ <1481031753.3202.57.camel@pengutronix.de>
+Message-ID: <8d06d67a-1acd-9e46-24ef-f8de0713e099@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 10efbf5f1633 introduced NanoPi M1 board but it's missing in
-Allwinner H3 DTB build.
 
-Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
----
- arch/arm/boot/dts/Makefile | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index cccdbcb..4cbdf6f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -845,6 +845,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a83t-allwinner-h8homlet-v2.dtb \
- 	sun8i-a83t-cubietruck-plus.dtb \
- 	sun8i-h3-bananapi-m2-plus.dtb \
-+	sun8i-h3-nanopi-m1.dtb \
- 	sun8i-h3-nanopi-neo.dtb \
- 	sun8i-h3-orangepi-2.dtb \
- 	sun8i-h3-orangepi-lite.dtb \
--- 
-2.9.3
+On 2016?12?06? 21:42, Philipp Zabel wrote:
+> Am Dienstag, den 06.12.2016, 09:51 +0800 schrieb Zhangfei Gao:
+>> Add DT bindings documentation for hi3660 SoC reset controller.
+>>
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>> ---
+>>   .../bindings/reset/hisilicon,hi3660-reset.txt      | 36 ++++++++++++++++++++++
+>>   1 file changed, 36 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+>> new file mode 100644
+>> index 0000000..178e478
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+>> @@ -0,0 +1,36 @@
+>> +Hisilicon System Reset Controller
+>> +======================================
+>> +
+>> +Please also refer to reset.txt in this directory for common reset
+>> +controller binding usage.
+>> +
+>> +The reset controller registers are part of the system-ctl block on
+>> +hi3660 SoC.
+>> +
+>> +Required properties:
+>> +- compatible: should be
+>> +		 "hisilicon,hi3660-reset"
+>> +- #reset-cells: 2, see below
+>> +- hisi,rst-syscon: phandle of the reset's syscon.
+>> +
+>> +Example:
+>> +	iomcu: iomcu at ffd7e000 {
+>> +		compatible = "hisilicon,hi3660-iomcu", "syscon";
+>> +		reg = <0x0 0xffd7e000 0x0 0x1000>;
+>> +	};
+>> +
+>> +	iomcu_rst: iomcu_rst_controller {
+>> +		compatible = "hisilicon,hi3660-reset";
+>> +		hisi,rst-syscon = <&iomcu>;
+>> +		#reset-cells = <2>;
+>> +	};
+>> +
+>> +Specifying reset lines connected to IP modules
+>> +==============================================
+>> +example:
+>> +
+>> +        i2c0: i2c at ..... {
+>> +                ...
+>> +		resets = <&iomcu_rst 0x20 3>; /* offset: 0x20; bit: 3 */
+> Should this mention somewhere what register the offset is supposed to
+> point to? This is the address offset to the set register, with the
+> corresponding clear register being placed at offset + 4.
+
+How about this description.
+
+-- #reset-cells: 2, see below
+  - hisi,rst-syscon: phandle of the reset's syscon.
++- #reset-cells : Specifies the number of cells needed to encode a
++  reset source.  The type shall be a <u32> and the value shall be 2.
++
++        Cell #1 : offset of the reset assert control
++                  register from the syscon register base
++                  offset + 4: deassert control register
++                  offset + 8: status control register
++        Cell #2 : bit position of the reset in the reset control register
+
+May paste in this thread for a clear view.
+
+Thanks
