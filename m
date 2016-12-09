@@ -1,59 +1,58 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri,  9 Dec 2016 12:04:10 +0100
-Subject: [PATCH v2 02/11] mfd: axp20x: add volatile and writeable reg ranges
- for VBUS power supply driver
-In-Reply-To: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
-References: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
-Message-ID: <20161209110419.28981-3-quentin.schulz@free-electrons.com>
+Date: Fri,  9 Dec 2016 12:04:08 +0100
+Subject: [PATCH v2 00/11] add support for VBUS max current and min voltage
+ limits AXP20X and AXP22X PMICs
+Message-ID: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The X-Powers AXP20X and AXP22X PMICs allow to choose the maximum voltage
-and minimum current delivered by the VBUS power supply.
+The X-Powers AXP209 and AXP20X PMICs are able to set a limit for the
+VBUS power supply for both max current and min voltage supplied. This
+series of patch adds the possibility to set these limits from sysfs.
 
-This adds the register used by the VBUS power supply driver to the range
-of volatile and writeable regs ranges.
+Also, the AXP223 PMIC shares most of its behaviour with the AXP221 but
+the former can set the VBUS power supply max current to 100mA, unlike
+the latter. The AXP223 VBUS power supply driver used to probe on the
+AXP221 compatible. This series of patch introduces a new compatible for
+the AXP223 to be able to set the current max limit to 100mA.
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
----
+With that new compatible, boards having the AXP223 see their DT updated
+to use the VBUS power supply driver with the correct compatible.
 
-added in v2
+This series of patch also migrates from of_device_is_compatible function
+to the data field of of_device_id to identify the compatible used to
+probe. This improves the code readability.
 
- drivers/mfd/axp20x.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Mostly cosmetic changes in v2 and adding volatile and writeable regs to
+AXP20X and AXP22X MFD cells for the VBUS power supply driver.
 
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index ba130be..6ee2cc6 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -65,12 +65,14 @@ static const struct regmap_access_table axp152_volatile_table = {
- 
- static const struct regmap_range axp20x_writeable_ranges[] = {
- 	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
-+	regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
- 	regmap_reg_range(AXP20X_DCDC_MODE, AXP20X_FG_RES),
- 	regmap_reg_range(AXP20X_RDC_H, AXP20X_OCV(AXP20X_OCV_MAX)),
- };
- 
- static const struct regmap_range axp20x_volatile_ranges[] = {
- 	regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_USB_OTG_STATUS),
-+	regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
- 	regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL2),
- 	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
- 	regmap_reg_range(AXP20X_ACIN_V_ADC_H, AXP20X_IPSOUT_V_HIGH_L),
-@@ -91,11 +93,13 @@ static const struct regmap_access_table axp20x_volatile_table = {
- /* AXP22x ranges are shared with the AXP809, as they cover the same range */
- static const struct regmap_range axp22x_writeable_ranges[] = {
- 	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
-+	regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
- 	regmap_reg_range(AXP20X_DCDC_MODE, AXP22X_BATLOW_THRES1),
- };
- 
- static const struct regmap_range axp22x_volatile_ranges[] = {
- 	regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_PWR_OP_MODE),
-+	regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
- 	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
- 	regmap_reg_range(AXP22X_GPIO_STATE, AXP22X_GPIO_STATE),
- 	regmap_reg_range(AXP20X_FG_RES, AXP20X_FG_RES),
+Quentin Schulz (11):
+  power: supply: axp20x_usb_power: use of_device_id data field instead
+    of device_is_compatible
+  mfd: axp20x: add volatile and writeable reg ranges for VBUS power
+    supply driver
+  power: supply: axp20x_usb_power: set min voltage and max current from
+    sysfs
+  Documentation: DT: binding: axp20x_usb_power: add axp223 compatible
+  power: supply: axp20x_usb_power: add 100mA max current limit for
+    AXP223
+  mfd: axp20x: add separate MFD cell for AXP223
+  ARM: dtsi: add DTSI for AXP223
+  ARM: dts: sun8i-a33-olinuxino: use AXP223 DTSI
+  ARM: dts: sun8i-a33-sinlinx-sina33: use AXP223 DTSI
+  ARM: dts: sun8i-r16-parrot: use AXP223 DTSI
+  ARM: dtsi: sun8i-reference-design-tablet: use AXP223 DTSI
+
+ .../bindings/power/supply/axp20x_usb_power.txt     |   5 +
+ arch/arm/boot/dts/axp223.dtsi                      |  58 +++++++++++
+ arch/arm/boot/dts/sun8i-a33-olinuxino.dts          |   2 +-
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts     |   2 +-
+ arch/arm/boot/dts/sun8i-r16-parrot.dts             |   2 +-
+ .../boot/dts/sun8i-reference-design-tablet.dtsi    |   2 +-
+ drivers/mfd/axp20x.c                               |  32 +++++-
+ drivers/power/supply/axp20x_usb_power.c            | 116 ++++++++++++++++++---
+ 8 files changed, 197 insertions(+), 22 deletions(-)
+ create mode 100644 arch/arm/boot/dts/axp223.dtsi
+
 -- 
 2.9.3
