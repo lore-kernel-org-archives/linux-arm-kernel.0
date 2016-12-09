@@ -1,263 +1,73 @@
-From: sergio.prado@e-labworks.com (Sergio Prado)
-Date: Fri,  9 Dec 2016 11:14:44 -0200
-Subject: [PATCH v2 2/2] mmc: host: s3cmci: allow probing from device tree
-In-Reply-To: <1481289284-19919-1-git-send-email-sergio.prado@e-labworks.com>
-References: <1481289284-19919-1-git-send-email-sergio.prado@e-labworks.com>
-Message-ID: <1481289284-19919-3-git-send-email-sergio.prado@e-labworks.com>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Fri, 9 Dec 2016 21:15:12 +0800
+Subject: [PATCH v2] arm64: mm: Fix memmap to be initialized for the entire
+ section
+In-Reply-To: <584AA257.3080608@linaro.org>
+References: <1480530091-1092-1-git-send-email-rrichter@cavium.com>
+ <bc099ca6-d927-3eb6-438c-291a66ecf5f9@huawei.com>
+ <CAKv+Gu_XsKU6godiQC7wVDmCUC9bZL=kv0RarTOTATuQ5EZp2Q@mail.gmail.com>
+ <584AA257.3080608@linaro.org>
+Message-ID: <ffaa77c7-8982-524f-f624-e4463a463daf@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allows configuring Samsung S3C24XX MMC/SD/SDIO controller using a device
-tree.
 
-Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
----
- drivers/mmc/host/s3cmci.c | 155 +++++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 131 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-index 932a4b1fed33..bfeb90e8ffee 100644
---- a/drivers/mmc/host/s3cmci.c
-+++ b/drivers/mmc/host/s3cmci.c
-@@ -23,6 +23,9 @@
- #include <linux/gpio.h>
- #include <linux/irq.h>
- #include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_gpio.h>
- 
- #include <plat/gpio-cfg.h>
- #include <mach/dma.h>
-@@ -127,6 +130,22 @@ enum dbg_channels {
- 	dbg_conf  = (1 << 8),
- };
- 
-+struct s3cmci_drv_data {
-+	int is2440;
-+};
-+
-+static const struct s3cmci_drv_data s3c2410_s3cmci_drv_data = {
-+	.is2440 = 0,
-+};
-+
-+static const struct s3cmci_drv_data s3c2412_s3cmci_drv_data = {
-+	.is2440 = 1,
-+};
-+
-+static const struct s3cmci_drv_data s3c2440_s3cmci_drv_data = {
-+	.is2440 = 1,
-+};
-+
- static const int dbgmap_err   = dbg_fail;
- static const int dbgmap_info  = dbg_info | dbg_conf;
- static const int dbgmap_debug = dbg_err | dbg_debug;
-@@ -1241,8 +1260,9 @@ static void s3cmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 	case MMC_POWER_ON:
- 	case MMC_POWER_UP:
- 		/* Configure GPE5...GPE10 pins in SD mode */
--		s3c_gpio_cfgall_range(S3C2410_GPE(5), 6, S3C_GPIO_SFN(2),
--				      S3C_GPIO_PULL_NONE);
-+		if (!host->pdev->dev.of_node)
-+			s3c_gpio_cfgall_range(S3C2410_GPE(5), 6, S3C_GPIO_SFN(2),
-+					      S3C_GPIO_PULL_NONE);
- 
- 		if (host->pdata->set_power)
- 			host->pdata->set_power(ios->power_mode, ios->vdd);
-@@ -1254,7 +1274,8 @@ static void s3cmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 
- 	case MMC_POWER_OFF:
- 	default:
--		gpio_direction_output(S3C2410_GPE(5), 0);
-+		if (!host->pdev->dev.of_node)
-+			gpio_direction_output(S3C2410_GPE(5), 0);
- 
- 		if (host->is2440)
- 			mci_con |= S3C2440_SDICON_SDRESET;
-@@ -1544,21 +1565,12 @@ static inline void s3cmci_debugfs_remove(struct s3cmci_host *host) { }
- 
- #endif /* CONFIG_DEBUG_FS */
- 
--static int s3cmci_probe(struct platform_device *pdev)
-+static int s3cmci_probe_pdata(struct s3cmci_host *host)
- {
--	struct s3cmci_host *host;
--	struct mmc_host	*mmc;
--	int ret;
--	int is2440;
--	int i;
-+	struct platform_device *pdev = host->pdev;
-+	int i, ret;
- 
--	is2440 = platform_get_device_id(pdev)->driver_data;
--
--	mmc = mmc_alloc_host(sizeof(struct s3cmci_host), &pdev->dev);
--	if (!mmc) {
--		ret = -ENOMEM;
--		goto probe_out;
--	}
-+	host->is2440 = platform_get_device_id(pdev)->driver_data;
- 
- 	for (i = S3C2410_GPE(5); i <= S3C2410_GPE(10); i++) {
- 		ret = gpio_request(i, dev_name(&pdev->dev));
-@@ -1568,14 +1580,90 @@ static int s3cmci_probe(struct platform_device *pdev)
- 			for (i--; i >= S3C2410_GPE(5); i--)
- 				gpio_free(i);
- 
--			goto probe_free_host;
-+			return ret;
- 		}
- 	}
- 
-+	return 0;
-+}
-+
-+static int s3cmci_probe_dt(struct s3cmci_host *host)
-+{
-+	struct platform_device *pdev = host->pdev;
-+	struct s3c24xx_mci_pdata *pdata;
-+	const struct s3cmci_drv_data *drvdata;
-+	struct mmc_host *mmc = host->mmc;
-+	int gpio, ret;
-+
-+	drvdata = of_device_get_match_data(&pdev->dev);
-+	if (!drvdata)
-+		return -ENODEV;
-+
-+	host->is2440 = drvdata->is2440;
-+
-+	ret = mmc_of_parse(mmc);
-+	if (ret)
-+		return ret;
-+
-+	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata)
-+		return -ENOMEM;
-+
-+	pdata->ocr_avail = mmc->ocr_avail;
-+
-+	if (mmc->caps2 & MMC_CAP2_NO_WRITE_PROTECT)
-+		pdata->no_wprotect = 1;
-+
-+	if (mmc->caps & MMC_CAP_NEEDS_POLL)
-+		pdata->no_detect = 1;
-+
-+	if (mmc->caps2 & MMC_CAP2_RO_ACTIVE_HIGH)
-+		pdata->wprotect_invert = 1;
-+
-+	if (mmc->caps2 & MMC_CAP2_CD_ACTIVE_HIGH)
-+		pdata->detect_invert = 1;
-+
-+	gpio = of_get_named_gpio(pdev->dev.of_node, "cd-gpios", 0);
-+	if (gpio_is_valid(gpio)) {
-+		pdata->gpio_detect = gpio;
-+		gpio_free(gpio);
-+	}
-+
-+	gpio = of_get_named_gpio(pdev->dev.of_node, "wp-gpios", 0);
-+	if (gpio_is_valid(gpio)) {
-+		pdata->gpio_wprotect = gpio;
-+		gpio_free(gpio);
-+	}
-+
-+	pdev->dev.platform_data = pdata;
-+
-+	return 0;
-+}
-+
-+static int s3cmci_probe(struct platform_device *pdev)
-+{
-+	struct s3cmci_host *host;
-+	struct mmc_host	*mmc;
-+	int ret;
-+	int i;
-+
-+	mmc = mmc_alloc_host(sizeof(struct s3cmci_host), &pdev->dev);
-+	if (!mmc) {
-+		ret = -ENOMEM;
-+		goto probe_out;
-+	}
-+
- 	host = mmc_priv(mmc);
- 	host->mmc 	= mmc;
- 	host->pdev	= pdev;
--	host->is2440	= is2440;
-+
-+	if (pdev->dev.of_node)
-+		ret = s3cmci_probe_dt(host);
-+	else
-+		ret = s3cmci_probe_pdata(host);
-+
-+	if (ret)
-+		goto probe_free_host;
- 
- 	host->pdata = pdev->dev.platform_data;
- 	if (!host->pdata) {
-@@ -1586,7 +1674,7 @@ static int s3cmci_probe(struct platform_device *pdev)
- 	spin_lock_init(&host->complete_lock);
- 	tasklet_init(&host->pio_tasklet, pio_tasklet, (unsigned long) host);
- 
--	if (is2440) {
-+	if (host->is2440) {
- 		host->sdiimsk	= S3C2440_SDIIMSK;
- 		host->sdidata	= S3C2440_SDIDATA;
- 		host->clk_div	= 1;
-@@ -1789,8 +1877,9 @@ static int s3cmci_probe(struct platform_device *pdev)
- 	release_mem_region(host->mem->start, resource_size(host->mem));
- 
-  probe_free_gpio:
--	for (i = S3C2410_GPE(5); i <= S3C2410_GPE(10); i++)
--		gpio_free(i);
-+	if (!pdev->dev.of_node)
-+		for (i = S3C2410_GPE(5); i <= S3C2410_GPE(10); i++)
-+			gpio_free(i);
- 
-  probe_free_host:
- 	mmc_free_host(mmc);
-@@ -1837,9 +1926,9 @@ static int s3cmci_remove(struct platform_device *pdev)
- 	if (!pd->no_detect)
- 		gpio_free(pd->gpio_detect);
- 
--	for (i = S3C2410_GPE(5); i <= S3C2410_GPE(10); i++)
--		gpio_free(i);
--
-+	if (!pdev->dev.of_node)
-+		for (i = S3C2410_GPE(5); i <= S3C2410_GPE(10); i++)
-+			gpio_free(i);
- 
- 	iounmap(host->base);
- 	release_mem_region(host->mem->start, resource_size(host->mem));
-@@ -1848,6 +1937,23 @@ static int s3cmci_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id s3cmci_dt_match[] = {
-+	{
-+		.compatible = "samsung,s3c2410-sdi",
-+		.data = &s3c2410_s3cmci_drv_data,
-+	},
-+	{
-+		.compatible = "samsung,s3c2412-sdi",
-+		.data = &s3c2412_s3cmci_drv_data,
-+	},
-+	{
-+		.compatible = "samsung,s3c2440-sdi",
-+		.data = &s3c2440_s3cmci_drv_data,
-+	},
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
-+
- static const struct platform_device_id s3cmci_driver_ids[] = {
- 	{
- 		.name	= "s3c2410-sdi",
-@@ -1867,6 +1973,7 @@ static int s3cmci_remove(struct platform_device *pdev)
- static struct platform_driver s3cmci_driver = {
- 	.driver	= {
- 		.name	= "s3c-sdi",
-+		.of_match_table = s3cmci_dt_match,
- 	},
- 	.id_table	= s3cmci_driver_ids,
- 	.probe		= s3cmci_probe,
--- 
-1.9.1
+On 2016/12/9 20:23, Hanjun Guo wrote:
+> On 12/09/2016 08:19 PM, Ard Biesheuvel wrote:
+>> On 9 December 2016 at 12:14, Yisheng Xie <xieyisheng1@huawei.com> wrote:
+>>> Hi Robert,
+>>> We have merged your patch to 4.9.0-rc8, however we still meet the similar problem
+>>> on our D05 board:
+>>>
+>>
+>> To be clear: does this issue also occur on D05 *without* the patch?
+> 
+> It boots ok on D05 without this patch.
+> 
+> But I think the problem Robert described in the commit message is
+> still there, just not triggered in the boot. we met this problem
+> when having LTP stress memory test and hit the same BUG_ON.
+> 
+That's right. for D05's case, when trigger the BUG_ON on:
+1863         VM_BUG_ON(page_zone(start_page) != page_zone(end_page));
+
+the end_page is not nomap, but BIOS reserved. here is the log I got:
+
+[    0.000000] efi:   0x00003fc00000-0x00003fffffff [Reserved           |   |  |  |  |  |  |  |   |  |  |  |  ]
+[...]
+[    5.081443] move_freepages: phys(start_page: 0x20000000,end_page:0x3fff0000)
+
+For invalid pages, their zone and node information is not initialized, and it
+do have risk to trigger the BUG_ON, so I have a silly question,
+why not just change the BUG_ON:
+-----------
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 6de9440..af199b8 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -1860,12 +1860,13 @@ int move_freepages(struct zone *zone,
+         * Remove at a later date when no bug reports exist related to
+         * grouping pages by mobility
+         */
+-       VM_BUG_ON(page_zone(start_page) != page_zone(end_page));
++       VM_BUG_ON(early_pfn_valid(start_page) && early_pfn_valid(end_page) &&
++                       page_zone(start_page) != page_zone(end_page));
+ #endif
+
+        for (page = start_page; page <= end_page;) {
+                /* Make sure we are not inadvertently changing nodes */
+-               VM_BUG_ON_PAGE(page_to_nid(page) != zone_to_nid(zone), page);
++               VM_BUG_ON_PAGE(early_pfn_valid(page) && (page_to_nid(page) != zone_to_nid(zone)), page);
+
+                if (!pfn_valid_within(page_to_pfn(page))) {
+                        page++;
+
+Thanks,
+Yisheng Xie
+
+> Thanks
+> Hanjun
+> 
+> .
+> 
