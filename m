@@ -1,61 +1,118 @@
-From: mans@mansr.com (1=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 09 Dec 2016 11:35:20 +0000
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <6ce1ea97-1d68-2203-c7b4-73315e801655@laposte.net> (Sebastian
- Frias's message of "Fri, 9 Dec 2016 11:25:57 +0100")
-References: <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
- <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
- <yw1xwpfd2o9f.fsf@unicorn.mansr.com> <20161207164341.GX6408@localhost>
- <yw1xr35j1yd5.fsf@unicorn.mansr.com> <20161208103921.GC6408@localhost>
- <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
- <20161208163755.GH6408@localhost> <yw1xy3zqxt7x.fsf@unicorn.mansr.com>
- <20161209065955.GJ6408@localhost>
- <6ce1ea97-1d68-2203-c7b4-73315e801655@laposte.net>
-Message-ID: <yw1xoa0lxrlz.fsf@unicorn.mansr.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 09 Dec 2016 12:39:30 +0100
+Subject: [PATCH 02/12] ARM: dts: imx6qdl: rename ipu client nodes
+In-Reply-To: <1481158673-15937-3-git-send-email-steve_longerbeam@mentor.com>
+References: <1481158673-15937-1-git-send-email-steve_longerbeam@mentor.com>
+ <1481158673-15937-3-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1481283570.2520.17.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian Frias <sf84@laposte.net> writes:
+Hi Steve,
 
-> On 09/12/16 07:59, Vinod Koul wrote:
->> On Thu, Dec 08, 2016 at 04:48:18PM +0000, M?ns Rullg?rd wrote:
->>> Vinod Koul <vinod.koul@intel.com> writes:
->>>
->>>> To make it efficient, disregarding your Sbox HW issue, the solution is
->>>> virtual channels. You can delink physical channels and virtual channels. If
->>>> one has SW controlled MUX then a channel can service any client. For few
->>>> controllers request lines are hard wired so they cant use any channel. But
->>>> if you dont have this restriction then driver can queue up many transactions
->>>> from different controllers.
->>>
->>> Have you been paying attention at all?  This exactly what the driver
->>> ALREADY DOES.
->> 
->> And have you read what the question was?
+Am Mittwoch, den 07.12.2016, 16:57 -0800 schrieb Steve Longerbeam:
+> To allow for IPU client devices that are composed of more than one
+> port for input and output (SMFC and IC), change the nodes from being
+> a single port node to nodes that can contain multiple ports. Rename
+> the nodes to use the following format: "ipu<id>_<subunit>".
 
-I wrote the driver.  I think I know what Mason and I are asking.
+Don't do this. These are not IPU client device nodes, they are input and
+output port nodes according to the of graph bindings, as described in
+Documentation/devicetree/bindings/display/imx/fsl-imx-drm.txt.
 
-> I think many people appreciate the quick turn around time and
-> responsiveness of knowledgeable people making constructive remarks in
-> this thread, but it looks we are slowly drifting away from the main
-> problem.
->
-> If we had to sum up the discussion, the current DMA API/framework in
-> Linux seems to lack a way to properly handle this HW (or if it has a
-> way, the information got lost somewhere).
->
-> What concrete solution do you propose?
->
-> Alternatively, one can think of the current issue (i.e.: the fact that
-> the IRQ arrives "too soon") in a different way.  Instead of thinking
-> the IRQ indicates "transfer complete", it is indicating "ready to
-> accept another command", which in practice (and with proper API
-> support) can translate into efficient queuing of DMA operations.
+They happen to match to the CSI0/1 and DI0/1 modules, but really what is
+described here are the external connections of the IPU. The IPU
+internals are not described in the device tree at all.
 
-For multiple back to back transfers to the same peripheral, it is indeed
-a slight optimisation.  What's apparently lacking is some way of doing a
-full flush at the end of a series of transfers, before switching the
-channel to another device.
+regards
+Philipp
 
--- 
-M?ns Rullg?rd
+> The IPUv3 driver will then need to lookup the client nodes by name
+> rather than by port id.
+> 
+> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> ---
+>  arch/arm/boot/dts/imx6q.dtsi   | 12 ++++++------
+>  arch/arm/boot/dts/imx6qdl.dtsi | 12 ++++++------
+>  2 files changed, 12 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index e9a5d0b..2b261ba 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -141,18 +141,18 @@
+>  			clock-names = "bus", "di0", "di1";
+>  			resets = <&src 4>;
+>  
+> -			ipu2_csi0: port at 0 {
+> +			ipu2_csi0: ipu2_csi at 0 {
+>  				reg = <0>;
+>  			};
+>  
+> -			ipu2_csi1: port at 1 {
+> +			ipu2_csi1: ipu2_csi at 1 {
+>  				reg = <1>;
+>  			};
+>  
+> -			ipu2_di0: port at 2 {
+> +			ipu2_di0: ipu2_di at 0 {
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> -				reg = <2>;
+> +				reg = <0>;
+>  
+>  				ipu2_di0_disp0: disp0-endpoint {
+>  				};
+> @@ -174,10 +174,10 @@
+>  				};
+>  			};
+>  
+> -			ipu2_di1: port at 3 {
+> +			ipu2_di1: ipu2_di at 1 {
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> -				reg = <3>;
+> +				reg = <1>;
+>  
+>  				ipu2_di1_hdmi: hdmi-endpoint {
+>  					remote-endpoint = <&hdmi_mux_3>;
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index e01e5d5..2465187 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -1226,18 +1226,18 @@
+>  			clock-names = "bus", "di0", "di1";
+>  			resets = <&src 2>;
+>  
+> -			ipu1_csi0: port at 0 {
+> +			ipu1_csi0: ipu1_csi at 0 {
+>  				reg = <0>;
+>  			};
+>  
+> -			ipu1_csi1: port at 1 {
+> +			ipu1_csi1: ipu1_csi at 1 {
+>  				reg = <1>;
+>  			};
+>  
+> -			ipu1_di0: port at 2 {
+> +			ipu1_di0: ipu1_di at 0 {
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> -				reg = <2>;
+> +				reg = <0>;
+>  
+>  				ipu1_di0_disp0: disp0-endpoint {
+>  				};
+> @@ -1259,10 +1259,10 @@
+>  				};
+>  			};
+>  
+> -			ipu1_di1: port at 3 {
+> +			ipu1_di1: ipu1_di at 1 {
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> -				reg = <3>;
+> +				reg = <1>;
+>  
+>  				ipu1_di1_disp1: disp1-endpoint {
+>  				};
