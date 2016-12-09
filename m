@@ -1,42 +1,42 @@
 From: woogyom.kim@gmail.com (Milo Kim)
-Date: Fri,  9 Dec 2016 15:28:32 +0900
-Subject: [PATCH 3/4] dt-bindings: power/supply: Update TPS65217 properties
+Date: Fri,  9 Dec 2016 15:28:33 +0900
+Subject: [PATCH 4/4] dt-bindings: input: Specify the interrupt number of
+ TPS65217 power button
 In-Reply-To: <20161209062833.5768-1-woogyom.kim@gmail.com>
 References: <20161209062833.5768-1-woogyom.kim@gmail.com>
-Message-ID: <20161209062833.5768-4-woogyom.kim@gmail.com>
+Message-ID: <20161209062833.5768-5-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add interrupt specifiers for USB and AC charger input. Interrupt numbers
-are from the datasheet.
-Fix wrong property for compatible string.
+Specify the power button interrupt number which is from the datasheet.
 
 Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
 ---
- .../devicetree/bindings/power/supply/tps65217_charger.txt          | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/input/tps65218-pwrbutton.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/power/supply/tps65217_charger.txt b/Documentation/devicetree/bindings/power/supply/tps65217_charger.txt
-index 98d131a..a11072c 100644
---- a/Documentation/devicetree/bindings/power/supply/tps65217_charger.txt
-+++ b/Documentation/devicetree/bindings/power/supply/tps65217_charger.txt
-@@ -2,11 +2,16 @@ TPS65217 Charger
+diff --git a/Documentation/devicetree/bindings/input/tps65218-pwrbutton.txt b/Documentation/devicetree/bindings/input/tps65218-pwrbutton.txt
+index 3e5b979..8682ab6 100644
+--- a/Documentation/devicetree/bindings/input/tps65218-pwrbutton.txt
++++ b/Documentation/devicetree/bindings/input/tps65218-pwrbutton.txt
+@@ -8,8 +8,9 @@ This driver provides a simple power button event via an Interrupt.
+ Required properties:
+ - compatible: should be "ti,tps65217-pwrbutton" or "ti,tps65218-pwrbutton"
  
- Required Properties:
- -compatible: "ti,tps65217-charger"
-+-interrupts: TPS65217 interrupt numbers for the AC and USB charger input change.
-+             Should be <0> for the USB charger and <1> for the AC adapter.
-+-interrupt-names: Should be "USB" and "AC"
+-Required properties for TPS65218:
++Required properties:
+ - interrupts: should be one of the following
++   - <2>: For controllers compatible with tps65217
+    - <3 IRQ_TYPE_EDGE_BOTH>: For controllers compatible with tps65218
  
- This node is a subnode of the tps65217 PMIC.
- 
- Example:
- 
- 	tps65217-charger {
--		compatible = "ti,tps65090-charger";
-+		compatible = "ti,tps65217-charger";
-+		interrupts = <0>, <1>;
-+		interrupt-names = "USB", "AC";
+ Examples:
+@@ -17,6 +18,7 @@ Examples:
+ &tps {
+ 	tps65217-pwrbutton {
+ 		compatible = "ti,tps65217-pwrbutton";
++		interrupts = <2>;
  	};
+ };
+ 
 -- 
 2.9.3
