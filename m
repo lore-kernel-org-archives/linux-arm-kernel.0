@@ -1,30 +1,30 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri,  9 Dec 2016 12:04:18 +0100
-Subject: [PATCH v2 10/11] ARM: dts: sun8i-r16-parrot: use AXP223 DTSI
+Date: Fri,  9 Dec 2016 12:04:17 +0100
+Subject: [PATCH v2 09/11] ARM: dts: sun8i-a33-sinlinx-sina33: use AXP223 DTSI
 In-Reply-To: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
 References: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
-Message-ID: <20161209110419.28981-11-quentin.schulz@free-electrons.com>
+Message-ID: <20161209110419.28981-10-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously, the Allwinner Parrot R16 used everything declared in AXP221
-DTSI while it has an AXP223 PMIC.
+Previously, the Sinlinx SinA33 used everything declared in AXP221 DTSI
+while it has an AXP223 PMIC.
 
-This corrects that so the Allwinner Parrot R16 can get some features the
+This corrects that so the Sinlinx SinA33 can get some features the
 AXP223 has (at the moment, ability to have 100mA as maximal current on
 VBUS power supply).
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-r16-parrot.dts | 2 +-
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-r16-parrot.dts b/arch/arm/boot/dts/sun8i-r16-parrot.dts
-index 47553e5..6afdba3 100644
---- a/arch/arm/boot/dts/sun8i-r16-parrot.dts
-+++ b/arch/arm/boot/dts/sun8i-r16-parrot.dts
-@@ -209,7 +209,7 @@
+diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+index fef6abc..1fc459c 100644
+--- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
++++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+@@ -145,7 +145,7 @@
  	};
  };
  
