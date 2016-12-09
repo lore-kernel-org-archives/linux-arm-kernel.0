@@ -1,64 +1,106 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri,  9 Dec 2016 12:04:13 +0100
-Subject: [PATCH v2 05/11] power: supply: axp20x_usb_power: add 100mA max
- current limit for AXP223
-In-Reply-To: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
-References: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
-Message-ID: <20161209110419.28981-6-quentin.schulz@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 9 Dec 2016 11:20:18 +0000
+Subject: [PATCH v2 2/2] mfd: axp20x: Fix AXP806 access errors on cold boot
+In-Reply-To: <20161123031616.10114-3-wens@csie.org>
+References: <20161123031616.10114-1-wens@csie.org>
+ <20161123031616.10114-3-wens@csie.org>
+Message-ID: <20161209112018.GL3625@dell.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The X-Powers AXP223 shares most of its behaviour with the AXP221 PMIC
-but allows the VBUS power supply max current to be set to 100mA (like
-the AXP209 PMIC).
+Mark,
 
-This basically adds a new compatible to the VBUS power supply driver and
-adds a check on the compatible when setting current max limit.
+Is the following valid/necessary?
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/power/supply/axp20x_usb_power.c | 13 ++++++++-----
- 1 file changed, 8 insertions(+), 5 deletions(-)
+On Wed, 23 Nov 2016, Chen-Yu Tsai wrote:
+> The AXP806 supports either master/standalone or slave mode.
+> Slave mode allows sharing the serial bus, even with multiple
+> AXP806 which all have the same hardware address.
+> 
+> This is done with extra "serial interface address extension",
+> or AXP806_BUS_ADDR_EXT, and "register address extension", or
+> AXP806_REG_ADDR_EXT, registers. The former is read-only, with
+> 1 bit customizable at the factory, and 1 bit depending on the
+> state of an external pin. The latter is writable. Only when
+> the these device addressing bits (in the upper 4 bits of the
+> registers) match, will the device respond to operations on
+> its other registers.
+> 
+> The AXP806_REG_ADDR_EXT was previously configured by Allwinner's
+> bootloader. Work on U-boot SPL support now allows us to switch
+> to mainline U-boot, which doesn't do this for us. There might
+> be other bare minimum bootloaders out there which don't to this
+> either. It's best to handle this in the kernel.
+> 
+> This patch sets AXP806_REG_ADDR_EXT to 0x10, which is what we
+> know to be the proper value for a standard AXP806 in slave mode.
+> Afterwards it will reinitialize the regmap cache, to purge any
+> invalid stale values.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/mfd/axp20x.c | 38 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+> 
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index cdaeb34a9a38..a0166c667656 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -31,6 +31,8 @@
+>  
+>  #define AXP20X_OFF	0x80
+>  
+> +#define AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE	BIT(4)
+> +
+>  static const char * const axp20x_model_names[] = {
+>  	"AXP152",
+>  	"AXP202",
+> @@ -829,6 +831,42 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
+>  {
+>  	int ret;
+>  
+> +	/*
+> +	 * The AXP806 supports either master/standalone or slave mode.
+> +	 * Slave mode allows sharing the serial bus, even with multiple
+> +	 * AXP806 which all have the same hardware address.
+> +	 *
+> +	 * This is done with extra "serial interface address extension",
+> +	 * or AXP806_BUS_ADDR_EXT, and "register address extension", or
+> +	 * AXP806_REG_ADDR_EXT, registers. The former is read-only, with
+> +	 * 1 bit customizable at the factory, and 1 bit depending on the
+> +	 * state of an external pin. The latter is writable. Only when
+> +	 * the these device addressing bits (in the upper 4 bits of the
+> +	 * registers) match, will the device respond to operations on its
+> +	 * other registers.
+> +	 *
+> +	 * Since we only support an AXP806 chained to an AXP809 in slave
+> +	 * mode, and there isn't any existing hardware which uses AXP806
+> +	 * in master mode, or has 2 AXP806s in the same system, we can
+> +	 * just program the register address extension to the slave mode
+> +	 * address.
+> +	 */
+> +	if (axp20x->variant == AXP806_ID) {
+> +		/* Write to the register address extension register */
+> +		regmap_write(axp20x->regmap, AXP806_REG_ADDR_EXT,
+> +			     AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE);
+> +
+> +		/* Make sure the write hits the device */
+> +		regcache_sync_region(axp20x->regmap, AXP806_REG_ADDR_EXT,
+> +				     AXP806_REG_ADDR_EXT);
+> +
+> +		/*
+> +		 * Reinitialize the regmap cache in case the device didn't
+> +		 * properly respond to our reads before.
+> +		 */
+> +		regmap_reinit_cache(axp20x->regmap, axp20x->regmap_cfg);
+> +	}
+> +
+>  	ret = regmap_add_irq_chip(axp20x->regmap, axp20x->irq,
+>  				  IRQF_ONESHOT | IRQF_SHARED, -1,
+>  				  axp20x->regmap_irq_chip,
 
-diff --git a/drivers/power/supply/axp20x_usb_power.c b/drivers/power/supply/axp20x_usb_power.c
-index 9e3f4ae..1bcb025 100644
---- a/drivers/power/supply/axp20x_usb_power.c
-+++ b/drivers/power/supply/axp20x_usb_power.c
-@@ -90,11 +90,10 @@ static int axp20x_usb_power_get_property(struct power_supply *psy,
- 
- 		switch (v & AXP20X_VBUS_CLIMIT_MASK) {
- 		case AXP20X_VBUC_CLIMIT_100mA:
--			if (power->axp20x_id == AXP202_ID) {
--				val->intval = 100000;
--			} else {
-+			if (power->axp20x_id == AXP221_ID)
- 				val->intval = -1; /* No 100mA limit */
--			}
-+			else
-+				val->intval = 100000;
- 			break;
- 		case AXP20X_VBUC_CLIMIT_500mA:
- 			val->intval = 500000;
-@@ -317,7 +316,8 @@ static int axp20x_usb_power_probe(struct platform_device *pdev)
- 
- 		usb_power_desc = &axp20x_usb_power_desc;
- 		irq_names = axp20x_irq_names;
--	} else if (power->axp20x_id == AXP221_ID) {
-+	} else if (power->axp20x_id == AXP221_ID ||
-+		   power->axp20x_id == AXP223_ID) {
- 		usb_power_desc = &axp22x_usb_power_desc;
- 		irq_names = axp22x_irq_names;
- 	} else {
-@@ -360,6 +360,9 @@ static const struct of_device_id axp20x_usb_power_match[] = {
- 	}, {
- 		.compatible = "x-powers,axp221-usb-power-supply",
- 		.data = (void *)AXP221_ID,
-+	}, {
-+		.compatible = "x-powers,axp223-usb-power-supply",
-+		.data = (void *)AXP223_ID,
- 	}, { /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, axp20x_usb_power_match);
 -- 
-2.9.3
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
