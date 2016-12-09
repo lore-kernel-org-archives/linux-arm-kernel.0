@@ -1,33 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 9 Dec 2016 09:17:34 +0100
-Subject: [PATCH v3 -next 2/2] ARM: dts: sunxi: add support for Orange Pi
- Zero board
-In-Reply-To: <20161202150513.34691-2-icenowy@aosc.xyz>
-References: <20161202150513.34691-1-icenowy@aosc.xyz>
- <20161202150513.34691-2-icenowy@aosc.xyz>
-Message-ID: <20161209081734.ves6ljo4hz57n4tp@lukather>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Fri, 9 Dec 2016 16:24:54 +0800
+Subject: [PATCH v18 03/15] clocksource/drivers/arm_arch_timer: Improve
+ printk relevant code
+In-Reply-To: <1481231430.5946.34.camel@perches.com>
+References: <20161208173319.6618-1-fu.wei@linaro.org>
+ <20161208173319.6618-4-fu.wei@linaro.org>
+ <1481231430.5946.34.camel@perches.com>
+Message-ID: <CADyBb7uW6rsKVRRy_CJDmsDxK7qm=Trgae46NdbAKtmQd_DD8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 11:05:13PM +0800, Icenowy Zheng wrote:
-> Orange Pi Zero is a board that came with the new Allwinner H2+ SoC and a
-> SDIO Wi-Fi chip by Allwinner (XR819).
-> 
-> Add a device tree file for it.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Hi Joe,
 
-Applied, thanks!
-Maxime
+On 9 December 2016 at 05:10, Joe Perches <joe@perches.com> wrote:
+> On Fri, 2016-12-09 at 01:33 +0800, fu.wei at linaro.org wrote:
+>> From: Fu Wei <fu.wei@linaro.org>
+>>
+>> This patch defines pr_fmt(fmt) for all pr_* functions,
+>> then the pr_* doesn't need to add "arch_timer:" everytime.
+>
+> trivia:
+>
+>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> []
+>> @@ -966,7 +967,7 @@ static int __init arch_timer_mem_init(struct device_node *np)
+>>
+>>       ret = -EINVAL;
+>>       if (!irq) {
+>> -             pr_err("arch_timer: Frame missing %s irq",
+>> +             pr_err("Frame missing %s irq",
+>>                      arch_timer_mem_use_virtual ? "virt" : "phys");
+>>               goto out;
+>>       }
+>
+> Missing terminating newline
+>
+>                 pr_err("Frame missing %s irq\n",
+
+yes, you are right , will fix it. :-)
+Thanks
+
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161209/2380b316/attachment-0001.sig>
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
