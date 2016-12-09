@@ -1,90 +1,48 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 9 Dec 2016 10:45:00 +0100
-Subject: [PATCH v1 2/2] crypto: mediatek - add DT bindings documentation
-In-Reply-To: <1481188776.14860.26.camel@mtkswgap22>
-References: <1480921284-45827-1-git-send-email-ryder.lee@mediatek.com>
- <1480921284-45827-3-git-send-email-ryder.lee@mediatek.com>
- <4b0df417-825f-65c6-4c02-85fe1c20ce50@gmail.com>
- <1481188776.14860.26.camel@mtkswgap22>
-Message-ID: <826b263f-8963-11c9-0302-8048cd1dea8e@gmail.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 09 Dec 2016 09:57:07 +0000
+Subject: [PATCH v2 2/2] firmware: arm_scpi: check the payload length in
+ scpi_send_message
+In-Reply-To: <20161125005432.1205-3-martin.blumenstingl@googlemail.com>
+References: <20161124001845.20830-1-martin.blumenstingl@googlemail.com>
+ <20161125005432.1205-1-martin.blumenstingl@googlemail.com>
+ <20161125005432.1205-3-martin.blumenstingl@googlemail.com>
+Message-ID: <1481277427.2902.12.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 2016-11-25 at 01:54 +0100, Martin Blumenstingl wrote:
+> This adds a sanity check to ensure we're not writing data beyond the
+> end of our rx_buf and tx_buf. Currently we are still far from reaching
+> this limit, so this is a non-critical fix.
+> 
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  drivers/firmware/arm_scpi.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+> index 8c183d8..78ea8c7 100644
+> --- a/drivers/firmware/arm_scpi.c
+> +++ b/drivers/firmware/arm_scpi.c
+> @@ -538,6 +538,11 @@ static int scpi_send_message(u8 idx, void *tx_buf, unsigned int tx_len,
+>  			scpi_info->num_chans;
+>  	scpi_chan = scpi_info->channels + chan;
+>  
+> +	if (tx_len > scpi_chan->max_payload_len)
+> +		return -EINVAL;
+> +	if (rx_len > scpi_chan->max_payload_len)
+> +		return -EINVAL;
 
+What is max_payload_len? I don't see it in anywhere in the kernel tree.
+Also, why is the check needed? Surely having a channel not be able to
+support the requirements of the SCPI protocol is a bit of a
+design/configuration flaw of the system and shouldn't happen. If a check
+is really needed perhaps it also warrants a WARN_ON or similar?
 
-On 08/12/16 10:19, Ryder Lee wrote:
-> Hello,
->
-> On Mon, 2016-12-05 at 11:18 +0100, Matthias Brugger wrote:
->>
->> On 05/12/16 08:01, Ryder Lee wrote:
->>> Add DT bindings documentation for the crypto driver
->>>
->>> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
->>> ---
->>>  .../devicetree/bindings/crypto/mediatek-crypto.txt | 32 ++++++++++++++++++++++
->>>  1 file changed, 32 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/crypto/mediatek-crypto.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/crypto/mediatek-crypto.txt b/Documentation/devicetree/bindings/crypto/mediatek-crypto.txt
->>> new file mode 100644
->>> index 0000000..8b1db08
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/crypto/mediatek-crypto.txt
->>> @@ -0,0 +1,32 @@
->>> +MediaTek cryptographic accelerators
->>> +
->>> +Required properties:
->>> +- compatible: Should be "mediatek,mt7623-crypto"
->>
->> Do you know how big the difference is between the crypto engine for
->> mt7623/mt2701/mt8521p in comparison, let's say mt8173 or mt6797?
->> Do this SoCs have a crypot engine? If so and they are quite similar, we
->> might think of adding a mtk-crypto binding and add soc specific bindings.
->
-> This engine is just available in mt7623/mt2701/mt8521p series SoCs and
-> they have no difference.
->
-> But there are still other crypto IPs in MTK, i think maybe we could use
-> "mediatek,{IP name}-crypto? to distinguish them ?
->
+> +
+>  	msg = get_scpi_xfer(scpi_chan);
+>  	if (!msg)
+>  		return -ENOMEM;
 
-Sounds good, thanks for the clarification.
-
-Matthias
-
-
->> Regards,
->> Matthias
->>
->>> +- reg: Address and length of the register set for the device
->>> +- interrupts: Should contain the five crypto engines interrupts in numeric
->>> +	order. These are global system and four descriptor rings.
->>> +- clocks: the clock used by the core
->>> +- clock-names: the names of the clock listed in the clocks property. These are
->>> +	"ethif", "cryp"
->>> +- power-domains: Must contain a reference to the PM domain.
->>> +
->>> +
->>> +Optional properties:
->>> +- interrupt-parent: Should be the phandle for the interrupt controller
->>> +  that services interrupts for this device
->>> +
->>> +
->>> +Example:
->>> +	crypto: crypto at 1b240000 {
->>> +		compatible = "mediatek,mt7623-crypto";
->>> +		reg = <0 0x1b240000 0 0x20000>;
->>> +		interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_LOW>,
->>> +			     <GIC_SPI 83 IRQ_TYPE_LEVEL_LOW>,
->>> +			     <GIC_SPI 84 IRQ_TYPE_LEVEL_LOW>,
->>> +			     <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>,
->>> +			     <GIC_SPI 97 IRQ_TYPE_LEVEL_LOW>;
->>> +		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
->>> +			 <&ethsys CLK_ETHSYS_CRYPTO>;
->>> +		clock-names = "ethif","cryp";
->>> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
->>> +	};
->>>
->
->
+-- 
+Tixy
