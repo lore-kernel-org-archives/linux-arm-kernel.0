@@ -1,149 +1,128 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 09 Dec 2016 17:37:34 +0100
-Subject: [PATCH 1/3] rtc: armada38x: improve RTC errata implementation
-In-Reply-To: <20161208173717.GJ14217@n2100.armlinux.org.uk> (Russell King's
- message of "Thu, 8 Dec 2016 17:37:17 +0000")
-References: <20161208171010.29446-1-gregory.clement@free-electrons.com>
- <20161208171010.29446-2-gregory.clement@free-electrons.com>
- <20161208173717.GJ14217@n2100.armlinux.org.uk>
-Message-ID: <871sxhf48h.fsf@free-electrons.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri,  9 Dec 2016 16:46:32 +0000
+Subject: [PATCH v4] arm64: fpsimd: improve stacking logic in non-interruptible
+ context
+Message-ID: <1481301992-2344-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell King,
+Currently, we allow kernel mode NEON in softirq or hardirq context by
+stacking and unstacking a slice of the NEON register file for each call
+to kernel_neon_begin() and kernel_neon_end(), respectively.
+
+Given that
+a) a CPU typically spends most of its time in userland, during which time
+   no kernel mode NEON in process context is in progress,
+b) a CPU spends most of its time in the kernel doing other things than
+   kernel mode NEON when it gets interrupted to perform kernel mode NEON
+   in softirq context
+
+the stacking and subsequent unstacking is only necessary if we are
+interrupting a thread while it is performing kernel mode NEON in process
+context, which means that in all other cases, we can simply preserve the
+userland FPSIMD state once, and only restore it upon return to userland,
+even if we are being invoked from softirq or hardirq context.
+
+So instead of checking whether we are running in interrupt context, keep
+track of the level of nested kernel mode NEON calls in progress, and only
+perform the eager stack/unstack if the level exceeds 1.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+v4:
+- use this_cpu_inc/dec, which give sufficient guarantees regarding
+  concurrency, but do not imply SMP barriers, which are not needed here
+
+v3:
+- avoid corruption by concurrent invocations of kernel_neon_begin()/_end()
+
+v2:
+- BUG() on unexpected values of the nesting level
+- relax the BUG() on num_regs>32 to a WARN, given that nothing actually
+  breaks in that case
+
+ arch/arm64/kernel/fpsimd.c | 47 ++++++++++++++------
+ 1 file changed, 33 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 394c61db5566..37d6dfc9059b 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -220,20 +220,35 @@ void fpsimd_flush_task_state(struct task_struct *t)
  
- On jeu., d?c. 08 2016, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
-
-> On Thu, Dec 08, 2016 at 06:10:08PM +0100, Gregory CLEMENT wrote:
->> From: Shaker Daibes <shaker@marvell.com>
->> 
->> According to FE-3124064:
->> The device supports CPU write and read access to the RTC time register.
->> However, due to this errata, read from RTC TIME register may fail.
->> 
->> Workaround:
->> General configuration:
->> 1. Configure the RTC Mbus Bridge Timing Control register (offset 0x184A0)
->>    to value 0xFD4D4FFF
->>    Write RTC WRCLK Period to its maximum value (0x3FF)
->>    Write RTC WRCLK setup to 0x53 (default value )
->>    Write RTC WRCLK High Time to 0x53 (default value )
->>    Write RTC Read Output Delay to its maximum value (0x1F)
->>    Mbus - Read All Byte Enable to 0x1 (default value )
->> 2. Configure the RTC Test Configuration Register (offset 0xA381C) bit3
->>    to '1' (Reserved, Marvell internal)
->> 
->> For any RTC register read operation:
->> 1. Read the requested register 100 times.
->> 2. Find the result that appears most frequently and use this result
->>    as the correct value.
->> 
->> For any RTC register write operation:
->> 1. Issue two dummy writes of 0x0 to the RTC Status register (offset
->>    0xA3800).
->> 2. Write the time to the RTC Time register (offset 0xA380C).
->> 
->> [gregory.clement at free-electrons.com: cosmetic changes and fix issues for
->> interrupt in original patch]
->
-> A particularly interesting question here is whether the above description
-> came first or whether the code below came first, and which was derived
-> from which.
-
-Well, it is difficult to say. the above description comes from the
-errata datasheet (since rev B). But the errata sheet itself mentioned
-the software implementation in one of the Marvell release. 
-
-
->
-> Given that both readl() writel() involves a barrier operation, which is
-> not mentioned in the above workaround text, is it appropriate to use the
-> barriered operations?
-
-Do you suggest to use the the relaxed version of readl() and writel()?
-
->
->> 
->> Reviewed-by: Lior Amsalem <alior@marvell.com>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  drivers/rtc/rtc-armada38x.c | 109 ++++++++++++++++++++++++++++++++++----------
->>  1 file changed, 85 insertions(+), 24 deletions(-)
->> 
->> diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
->> index 9a3f2a6f512e..a0859286a4c4 100644
->> --- a/drivers/rtc/rtc-armada38x.c
->> +++ b/drivers/rtc/rtc-armada38x.c
->> @@ -29,12 +29,21 @@
->>  #define RTC_TIME	    0xC
->>  #define RTC_ALARM1	    0x10
->>  
->> +#define SOC_RTC_BRIDGE_TIMING_CTL   0x0
->> +#define SOC_RTC_PERIOD_OFFS		0
->> +#define SOC_RTC_PERIOD_MASK		(0x3FF << SOC_RTC_PERIOD_OFFS)
->> +#define SOC_RTC_READ_DELAY_OFFS		26
->> +#define SOC_RTC_READ_DELAY_MASK		(0x1F << SOC_RTC_READ_DELAY_OFFS)
->> +
->>  #define SOC_RTC_INTERRUPT   0x8
->>  #define SOC_RTC_ALARM1		BIT(0)
->>  #define SOC_RTC_ALARM2		BIT(1)
->>  #define SOC_RTC_ALARM1_MASK	BIT(2)
->>  #define SOC_RTC_ALARM2_MASK	BIT(3)
->>  
->> +
->> +#define SAMPLE_NR 100
->> +
->>  struct armada38x_rtc {
->>  	struct rtc_device   *rtc_dev;
->>  	void __iomem	    *regs;
->> @@ -47,32 +56,85 @@ struct armada38x_rtc {
->>   * According to the datasheet, the OS should wait 5us after every
->>   * register write to the RTC hard macro so that the required update
->>   * can occur without holding off the system bus
->> + * According to errata FE-3124064, Write to any RTC register
->> + * may fail. As a workaround, before writing to RTC
->> + * register, issue a dummy write of 0x0 twice to RTC Status
->> + * register.
->>   */
->> +
->>  static void rtc_delayed_write(u32 val, struct armada38x_rtc *rtc, int offset)
->>  {
->> +	writel(0, rtc->regs + RTC_STATUS);
->> +	writel(0, rtc->regs + RTC_STATUS);
->>  	writel(val, rtc->regs + offset);
->>  	udelay(5);
->>  }
->>  
->> +/* Update RTC-MBUS bridge timing parameters */
->> +static void rtc_update_mbus_timing_params(struct armada38x_rtc *rtc)
->> +{
->> +	uint32_t reg;
->> +
->> +	reg = readl(rtc->regs_soc + SOC_RTC_BRIDGE_TIMING_CTL);
->> +	reg &= ~SOC_RTC_PERIOD_MASK;
->> +	reg |= 0x3FF << SOC_RTC_PERIOD_OFFS; /* Maximum value */
->> +	reg &= ~SOC_RTC_READ_DELAY_MASK;
->> +	reg |= 0x1F << SOC_RTC_READ_DELAY_OFFS; /* Maximum value */
->> +	writel(reg, rtc->regs_soc + SOC_RTC_BRIDGE_TIMING_CTL);
->> +}
->> +
->> +struct str_value_to_freq {
->> +	unsigned long value;
->> +	u8 freq;
->> +} __packed;
->
-> Why packed?  This makes accesses to this structure very inefficient -
-> the compiler for some CPUs will load "value" by bytes.
-
-As pointed by Andrew, I think the intent was to reduce the amount of
-memory used from the stack.
-
-Thanks,
-
-Gregory
-
+ #ifdef CONFIG_KERNEL_MODE_NEON
+ 
+-static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
+-static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
++/*
++ * Although unlikely, it is possible for three kernel mode NEON contexts to
++ * be live at the same time: process context, softirq context and hardirq
++ * context. So while the userland context is stashed in the thread's fpsimd
++ * state structure, we need two additional levels of storage.
++ */
++static DEFINE_PER_CPU(struct fpsimd_partial_state, nested_fpsimdstate[2]);
++static DEFINE_PER_CPU(int, kernel_neon_nesting_level);
+ 
+ /*
+  * Kernel-side NEON support functions
+  */
+ void kernel_neon_begin_partial(u32 num_regs)
+ {
+-	if (in_interrupt()) {
+-		struct fpsimd_partial_state *s = this_cpu_ptr(
+-			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
++	struct fpsimd_partial_state *s;
++	int level;
++
++	preempt_disable();
++
++	level = this_cpu_inc_return(kernel_neon_nesting_level);
++	BUG_ON(level > 3);
++
++	if (level > 1) {
++		s = this_cpu_ptr(nested_fpsimdstate);
+ 
+-		BUG_ON(num_regs > 32);
+-		fpsimd_save_partial_state(s, roundup(num_regs, 2));
++		WARN_ON_ONCE(num_regs > 32);
++		num_regs = min(roundup(num_regs, 2), 32U);
++
++		fpsimd_save_partial_state(&s[level - 2], num_regs);
+ 	} else {
+ 		/*
+ 		 * Save the userland FPSIMD state if we have one and if we
+@@ -241,7 +256,6 @@ void kernel_neon_begin_partial(u32 num_regs)
+ 		 * that there is no longer userland FPSIMD state in the
+ 		 * registers.
+ 		 */
+-		preempt_disable();
+ 		if (current->mm &&
+ 		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+ 			fpsimd_save_state(&current->thread.fpsimd_state);
+@@ -252,13 +266,18 @@ EXPORT_SYMBOL(kernel_neon_begin_partial);
+ 
+ void kernel_neon_end(void)
+ {
+-	if (in_interrupt()) {
+-		struct fpsimd_partial_state *s = this_cpu_ptr(
+-			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+-		fpsimd_load_partial_state(s);
+-	} else {
+-		preempt_enable();
++	struct fpsimd_partial_state *s;
++	int level;
++
++	level = this_cpu_read(kernel_neon_nesting_level);
++	BUG_ON(level < 1);
++
++	if (level > 1) {
++		s = this_cpu_ptr(nested_fpsimdstate);
++		fpsimd_load_partial_state(&s[level - 2]);
+ 	}
++	this_cpu_dec(kernel_neon_nesting_level);
++	preempt_enable();
+ }
+ EXPORT_SYMBOL(kernel_neon_end);
+ 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.7.4
