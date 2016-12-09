@@ -1,90 +1,103 @@
 From: abailon@baylibre.com (Alexandre Bailon)
-Date: Fri,  9 Dec 2016 17:59:32 +0100
-Subject: [PATCH v7 1/2] provide lock-less versions of clk_{enable|disable}
-Message-ID: <1481302773-14181-1-git-send-email-abailon@baylibre.com>
+Date: Fri,  9 Dec 2016 17:59:33 +0100
+Subject: [PATCH v7 2/2] ARM: davinci: da8xx: Fix sleeping function called from
+ invalid context
+In-Reply-To: <1481302773-14181-1-git-send-email-abailon@baylibre.com>
+References: <1481302773-14181-1-git-send-email-abailon@baylibre.com>
+Message-ID: <1481302773-14181-2-git-send-email-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename __clk_{enable|disble} in davinci_clk_{enable|disable}.
-davinci_clk_{enable|disable} is a lock-less version of
-clk_{enable|disable}.
-This is useful to recursively enable clock without doing recursive call
-to clk_enable(), which would cause a recursive locking issue.
-The lock-less version could be used by example by the usb20 phy clock,
-that need to enable the usb20 clock before to start.
+Everytime the usb20 phy is enabled, there is a
+"sleeping function called from invalid context" BUG.
+In addition, there is a recursive locking happening
+because of the recurse call to clk_enable().
+
+clk_enable() from arch/arm/mach-davinci/clock.c uses spin_lock_irqsave()
+before to invoke the callback usb20_phy_clk_enable().
+usb20_phy_clk_enable() uses clk_get() and clk_enable_prepapre()
+which may sleep.
+replace clk_prepare_enable() by davinci_clk_enable().
 
 Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
 Suggested-by: David Lechner <david@lechnology.com>
 ---
- arch/arm/mach-davinci/clock.c | 12 ++++++------
- arch/arm/mach-davinci/clock.h |  2 ++
- 2 files changed, 8 insertions(+), 6 deletions(-)
+ arch/arm/mach-davinci/usb-da8xx.c | 34 +++++++++++++++-------------------
+ 1 file changed, 15 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
-index df42c93..f5dce9b 100644
---- a/arch/arm/mach-davinci/clock.c
-+++ b/arch/arm/mach-davinci/clock.c
-@@ -31,10 +31,10 @@ static LIST_HEAD(clocks);
- static DEFINE_MUTEX(clocks_mutex);
- static DEFINE_SPINLOCK(clockfw_lock);
+diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
+index b010e5f..71f1e81 100644
+--- a/arch/arm/mach-davinci/usb-da8xx.c
++++ b/arch/arm/mach-davinci/usb-da8xx.c
+@@ -22,6 +22,8 @@
+ #define DA8XX_USB0_BASE		0x01e00000
+ #define DA8XX_USB1_BASE		0x01e25000
  
--static void __clk_enable(struct clk *clk)
-+void davinci_clk_enable(struct clk *clk)
++static struct clk *usb20_clk;
++
+ static struct platform_device da8xx_usb_phy = {
+ 	.name		= "da8xx-usb-phy",
+ 	.id		= -1,
+@@ -158,26 +160,13 @@ int __init da8xx_register_usb_refclkin(int rate)
+ 
+ static void usb20_phy_clk_enable(struct clk *clk)
  {
- 	if (clk->parent)
--		__clk_enable(clk->parent);
-+		davinci_clk_enable(clk->parent);
- 	if (clk->usecount++ == 0) {
- 		if (clk->flags & CLK_PSC)
- 			davinci_psc_config(clk->domain, clk->gpsc, clk->lpsc,
-@@ -44,7 +44,7 @@ static void __clk_enable(struct clk *clk)
- 	}
+-	struct clk *usb20_clk;
+-	int err;
+ 	u32 val;
+ 	u32 timeout = 500000; /* 500 msec */
+ 
+ 	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+ 
+-	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
+-	if (IS_ERR(usb20_clk)) {
+-		pr_err("could not get usb20 clk: %ld\n", PTR_ERR(usb20_clk));
+-		return;
+-	}
+-
+ 	/* The USB 2.O PLL requires that the USB 2.O PSC is enabled as well. */
+-	err = clk_prepare_enable(usb20_clk);
+-	if (err) {
+-		pr_err("failed to enable usb20 clk: %d\n", err);
+-		clk_put(usb20_clk);
+-		return;
+-	}
++	davinci_clk_enable(usb20_clk);
+ 
+ 	/*
+ 	 * Turn on the USB 2.0 PHY, but just the PLL, and not OTG. The USB 1.1
+@@ -197,8 +186,7 @@ static void usb20_phy_clk_enable(struct clk *clk)
+ 
+ 	pr_err("Timeout waiting for USB 2.0 PHY clock good\n");
+ done:
+-	clk_disable_unprepare(usb20_clk);
+-	clk_put(usb20_clk);
++	davinci_clk_disable(usb20_clk);
  }
  
--static void __clk_disable(struct clk *clk)
-+void davinci_clk_disable(struct clk *clk)
+ static void usb20_phy_clk_disable(struct clk *clk)
+@@ -285,11 +273,19 @@ static struct clk_lookup usb20_phy_clk_lookup =
+ int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
  {
- 	if (WARN_ON(clk->usecount == 0))
- 		return;
-@@ -56,7 +56,7 @@ static void __clk_disable(struct clk *clk)
- 			clk->clk_disable(clk);
- 	}
- 	if (clk->parent)
--		__clk_disable(clk->parent);
-+		davinci_clk_disable(clk->parent);
- }
+ 	struct clk *parent;
+-	int ret = 0;
++	int ret;
++
++	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
++	ret = PTR_ERR_OR_ZERO(usb20_clk);
++	if (ret)
++		return ret;
  
- int davinci_clk_reset(struct clk *clk, bool reset)
-@@ -103,7 +103,7 @@ int clk_enable(struct clk *clk)
- 		return -EINVAL;
+ 	parent = clk_get(NULL, use_usb_refclkin ? "usb_refclkin" : "pll0_aux");
+-	if (IS_ERR(parent))
+-		return PTR_ERR(parent);
++	ret = PTR_ERR_OR_ZERO(parent);
++	if (ret) {
++		clk_put(usb20_clk);
++		return ret;
++	}
  
- 	spin_lock_irqsave(&clockfw_lock, flags);
--	__clk_enable(clk);
-+	davinci_clk_enable(clk);
- 	spin_unlock_irqrestore(&clockfw_lock, flags);
- 
- 	return 0;
-@@ -118,7 +118,7 @@ void clk_disable(struct clk *clk)
- 		return;
- 
- 	spin_lock_irqsave(&clockfw_lock, flags);
--	__clk_disable(clk);
-+	davinci_clk_disable(clk);
- 	spin_unlock_irqrestore(&clockfw_lock, flags);
- }
- EXPORT_SYMBOL(clk_disable);
-diff --git a/arch/arm/mach-davinci/clock.h b/arch/arm/mach-davinci/clock.h
-index e2a5437..fa2b837 100644
---- a/arch/arm/mach-davinci/clock.h
-+++ b/arch/arm/mach-davinci/clock.h
-@@ -132,6 +132,8 @@ int davinci_set_sysclk_rate(struct clk *clk, unsigned long rate);
- int davinci_set_refclk_rate(unsigned long rate);
- int davinci_simple_set_rate(struct clk *clk, unsigned long rate);
- int davinci_clk_reset(struct clk *clk, bool reset);
-+void davinci_clk_enable(struct clk *clk);
-+void davinci_clk_disable(struct clk *clk);
- 
- extern struct platform_device davinci_wdt_device;
- extern void davinci_watchdog_reset(struct platform_device *);
+ 	usb20_phy_clk.parent = parent;
+ 	ret = clk_register(&usb20_phy_clk);
 -- 
 2.7.3
