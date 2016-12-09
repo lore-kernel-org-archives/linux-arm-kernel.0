@@ -1,154 +1,111 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 9 Dec 2016 17:13:40 +0000
-Subject: [PATCH v8 04/16] MSI-X: update GSI routing after changed MSI-X
- configuration
-In-Reply-To: <20161104173203.21168-5-andre.przywara@arm.com>
-References: <20161104173203.21168-1-andre.przywara@arm.com>
- <20161104173203.21168-5-andre.przywara@arm.com>
-Message-ID: <da4e554a-ebd1-fa59-3e94-0e0190ddade3@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri,  9 Dec 2016 17:15:01 +0000
+Subject: [BUG/RFC] efi/libstub: Preserve the memory map pointed to by the FDT
+Message-ID: <20161209171501.21269-1-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/16 17:31, Andre Przywara wrote:
-> When we set up GSI routing to map MSIs to KVM's GSI numbers, we
-> write the current device's MSI setup into the kernel routing table.
-> However the device driver in the guest can use PCI configuration space
-> accesses to change the MSI configuration (address and/or payload data).
-> Whenever this happens after we have setup the routing table already,
-> we must amend the previously sent data.
-> So when MSI-X PCI config space accesses write address or payload,
-> find the associated GSI number and the matching routing table entry
-> and update the kernel routing table (only if the data has changed).
-> 
-> This fixes vhost-net, where the queue's IRQFD was setup before the
-> MSI vectors.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  include/kvm/irq.h |  1 +
->  irq.c             | 31 +++++++++++++++++++++++++++++++
->  virtio/pci.c      | 36 +++++++++++++++++++++++++++++++++---
->  3 files changed, 65 insertions(+), 3 deletions(-)
-> 
-> diff --git a/include/kvm/irq.h b/include/kvm/irq.h
-> index bb71521..f35eb7e 100644
-> --- a/include/kvm/irq.h
-> +++ b/include/kvm/irq.h
-> @@ -21,5 +21,6 @@ int irq__exit(struct kvm *kvm);
->  
->  int irq__allocate_routing_entry(void);
->  int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg);
-> +void irq__update_msix_route(struct kvm *kvm, u32 gsi, struct msi_msg *msg);
->  
->  #endif
-> diff --git a/irq.c b/irq.c
-> index a742aa2..895e5eb 100644
-> --- a/irq.c
-> +++ b/irq.c
-> @@ -93,6 +93,37 @@ int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg)
->  	return next_gsi++;
->  }
->  
-> +static bool update_data(u32 *ptr, u32 newdata)
-> +{
-> +	if (*ptr == newdata)
-> +		return false;
-> +
-> +	*ptr = newdata;
-> +	return true;
-> +}
-> +
-> +void irq__update_msix_route(struct kvm *kvm, u32 gsi, struct msi_msg *msg)
-> +{
-> +	struct kvm_irq_routing_msi *entry;
-> +	unsigned int i;
-> +	bool changed;
-> +
-> +	for (i = 0; i < irq_routing->nr; i++)
-> +		if (gsi == irq_routing->entries[i].gsi)
-> +			break;
-> +	if (i == irq_routing->nr)
-> +		return;
-> +
-> +	entry = &irq_routing->entries[i].u.msi;
-> +
-> +	changed  = update_data(&entry->address_hi, msg->address_hi);
-> +	changed |= update_data(&entry->address_lo, msg->address_lo);
-> +	changed |= update_data(&entry->data, msg->data);
-> +
-> +	if (changed)
-> +		ioctl(kvm->vm_fd, KVM_SET_GSI_ROUTING, irq_routing);
+allocate_new_fdt_and_exit_boot() bakes a pointer to the UEFI memory map
+into the FDT for later use. The corresponding memory is then free()d
+and (hopefully) allocated again via efi_exit_boot_services() calling
+efi_get_memory_map() as part of the exit_boot_services() loop. The
+final copy is annotated with virtual mappings and used to create the
+runtime map.
 
-Check the return value and let the caller know if something has failed?
+Linux expects the FDT to contain a pointer to the UEFI memory map
+with the virtual mapping annotations, which will only happen if
+AllocatePool() returns memory to the stub that was just FreePool()d
+by the stub. This behaviour doesn't appear to guaranteed by the spec.
 
-> +}
-> +
->  int __attribute__((weak)) irq__exit(struct kvm *kvm)
->  {
->  	free(irq_routing);
-> diff --git a/virtio/pci.c b/virtio/pci.c
-> index 072e5b7..b3b4aac 100644
-> --- a/virtio/pci.c
-> +++ b/virtio/pci.c
-> @@ -152,6 +152,30 @@ static bool virtio_pci__io_in(struct ioport *ioport, struct kvm_cpu *vcpu, u16 p
->  	return ret;
->  }
->  
-> +static void update_msix_map(struct virtio_pci *vpci,
-> +			    struct msix_table *msix_entry, u32 vecnum)
-> +{
-> +	u32 gsi, i;
-> +
-> +	/* Find the GSI number used for that vector */
-> +	if (vecnum == vpci->config_vector) {
-> +		gsi = vpci->config_gsi;
-> +	} else {
-> +		for (i = 0; i < VIRTIO_PCI_MAX_VQ; i++)
-> +			if (vpci->vq_vector[i] == vecnum)
-> +				break;
-> +		if (i == VIRTIO_PCI_MAX_VQ)
-> +			return;
-> +		gsi = vpci->gsis[i];
-> +	}
-> +
-> +	if (gsi == 0)
-> +		return;
-> +
-> +	msix_entry = &msix_entry[vecnum];
-> +	irq__update_msix_route(vpci->kvm, gsi, &msix_entry->msg);
-> +}
-> +
->  static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *vdev, u16 port,
->  					void *data, int size, int offset)
->  {
-> @@ -270,10 +294,16 @@ static void virtio_pci__msix_mmio_callback(struct kvm_cpu *vcpu,
->  		offset	= vpci->msix_io_block;
->  	}
->  
-> -	if (is_write)
-> -		memcpy(table + addr - offset, data, len);
-> -	else
-> +	if (!is_write) {
->  		memcpy(data, table + addr - offset, len);
-> +		return;
-> +	}
-> +
-> +	memcpy(table + addr - offset, data, len);
-> +
-> +	/* Did we just update the address or payload? */
-> +	if (addr % 0x10 < 0xc)
-> +		update_msix_map(vpci, table, (addr - offset) / 16);
+Platforms that don't do this will use the stale memory map (assuming
+no later owner of the freed() memory changed it) and fail to initialise
+runtime services.
 
-Where are these constants coming from? Please stick to either decimal or
-hex...
+Instead, keep the memory map we baked info the FDT, and create a new
+'exit_map' pointer for use in the exit_boot_services() loop. (This was
+already different, it just had the same name and we hoped it would be
+in the same place).
 
->  }
->  
->  static void virtio_pci__signal_msi(struct kvm *kvm, struct virtio_pci *vpci, int vec)
-> 
+Annotate the memory map pointed to by the FDT with virtual mappings.
+This assumes the final memory map (which may be different), has
+not moved any of the regions with the runtime attribute.
 
-Thanks,
+(Take the opportunity to remove some comments that are stale since
+ commit ed9cc156c42f ("efi/libstub: Use efi_exit_boot_services() in FDT"))
 
-	M.
+Signed-off-by: James Morse <james.morse@arm.com>
+Fixes: ed9cc156c42f ("efi/libstub: Use efi_exit_boot_services() in FDT")
+Cc: Jeffrey Hugo <jhugo@codeaurora.org>
+---
+I haven't seen this causing problems on any real platforms, only kvmtool
+which I'm busily hacking up to have primitive UEFI support. Needless to
+say my AllocatePool() doesn't re-use memory.
+
+ drivers/firmware/efi/libstub/fdt.c | 23 +++++++++++------------
+ 1 file changed, 11 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
+index a6a93116a8f0..f623894c633c 100644
+--- a/drivers/firmware/efi/libstub/fdt.c
++++ b/drivers/firmware/efi/libstub/fdt.c
+@@ -181,10 +181,6 @@ static efi_status_t exit_boot_func(efi_system_table_t *sys_table_arg,
+  * which are fixed at 4K bytes, so in most cases the first
+  * allocation should succeed.
+  * EFI boot services are exited at the end of this function.
+- * There must be no allocations between the get_memory_map()
+- * call and the exit_boot_services() call, so the exiting of
+- * boot services is very tightly tied to the creation of the FDT
+- * with the final memory map in it.
+  */
+ 
+ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+@@ -199,7 +195,7 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 	unsigned long map_size, desc_size, buff_size;
+ 	u32 desc_ver;
+ 	unsigned long mmap_key;
+-	efi_memory_desc_t *memory_map, *runtime_map;
++	efi_memory_desc_t *memory_map, *runtime_map, *exit_map;
+ 	unsigned long new_fdt_size;
+ 	efi_status_t status;
+ 	int runtime_entry_count = 0;
+@@ -243,11 +239,6 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 			goto fail;
+ 		}
+ 
+-		/*
+-		 * Now that we have done our final memory allocation (and free)
+-		 * we can get the memory map key  needed for
+-		 * exit_boot_services().
+-		 */
+ 		status = efi_get_memory_map(sys_table, &map);
+ 		if (status != EFI_SUCCESS)
+ 			goto fail_free_new_fdt;
+@@ -259,8 +250,16 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 				    memory_map, map_size, desc_size, desc_ver);
+ 
+ 		/* Succeeding the first time is the expected case. */
+-		if (status == EFI_SUCCESS)
++		if (status == EFI_SUCCESS) {
++			/*
++			 * Annotate the memory_map in the FDT with virtual
++			 * addresses. These shouldn't change as the placement
++			 * of EFI_MEMORY_RUNTIME regions should be fixed.
++			 */
++			efi_get_virtmap(memory_map, map_size, desc_size,
++					runtime_map, &runtime_entry_count);
+ 			break;
++		}
+ 
+ 		if (status == EFI_BUFFER_TOO_SMALL) {
+ 			/*
+@@ -279,7 +278,7 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 		}
+ 	}
+ 
+-	sys_table->boottime->free_pool(memory_map);
++	map.map = &exit_map;
+ 	priv.runtime_map = runtime_map;
+ 	priv.runtime_entry_count = &runtime_entry_count;
+ 	status = efi_exit_boot_services(sys_table, handle, &map, &priv,
 -- 
-Jazz is not dead. It just smells funny...
+2.10.1
