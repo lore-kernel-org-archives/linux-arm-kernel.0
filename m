@@ -1,118 +1,146 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 09 Dec 2016 12:39:30 +0100
-Subject: [PATCH 02/12] ARM: dts: imx6qdl: rename ipu client nodes
-In-Reply-To: <1481158673-15937-3-git-send-email-steve_longerbeam@mentor.com>
-References: <1481158673-15937-1-git-send-email-steve_longerbeam@mentor.com>
- <1481158673-15937-3-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1481283570.2520.17.camel@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 9 Dec 2016 11:55:50 +0000
+Subject: [PATCH v8 01/16] FDT: introduce global phandle allocation
+In-Reply-To: <20161104173203.21168-2-andre.przywara@arm.com>
+References: <20161104173203.21168-1-andre.przywara@arm.com>
+ <20161104173203.21168-2-andre.przywara@arm.com>
+Message-ID: <be44a9ad-f820-9a62-9a5d-682867674e91@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+Hi Andre,
 
-Am Mittwoch, den 07.12.2016, 16:57 -0800 schrieb Steve Longerbeam:
-> To allow for IPU client devices that are composed of more than one
-> port for input and output (SMFC and IC), change the nodes from being
-> a single port node to nodes that can contain multiple ports. Rename
-> the nodes to use the following format: "ipu<id>_<subunit>".
-
-Don't do this. These are not IPU client device nodes, they are input and
-output port nodes according to the of graph bindings, as described in
-Documentation/devicetree/bindings/display/imx/fsl-imx-drm.txt.
-
-They happen to match to the CSI0/1 and DI0/1 modules, but really what is
-described here are the external connections of the IPU. The IPU
-internals are not described in the device tree at all.
-
-regards
-Philipp
-
-> The IPUv3 driver will then need to lookup the client nodes by name
-> rather than by port id.
+On 04/11/16 17:31, Andre Przywara wrote:
+> Allocating an FDT phandle (a unique identifier) using a static
+> variable in a static inline function defined in a header file works
+> only if all users are in the same source file. So trying to allocate
+> a handle from two different compilation units fails.
+> Introduce global phandle allocation and reference code to properly
+> allocate unique phandles.
 > 
-> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > ---
->  arch/arm/boot/dts/imx6q.dtsi   | 12 ++++++------
->  arch/arm/boot/dts/imx6qdl.dtsi | 12 ++++++------
->  2 files changed, 12 insertions(+), 12 deletions(-)
+>  Makefile          |  1 +
+>  arm/fdt.c         |  2 +-
+>  arm/gic.c         |  2 +-
+>  include/kvm/fdt.h | 10 +++++-----
+>  kvm-fdt.c         | 26 ++++++++++++++++++++++++++
+>  5 files changed, 34 insertions(+), 7 deletions(-)
+>  create mode 100644 kvm-fdt.c
 > 
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index e9a5d0b..2b261ba 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -141,18 +141,18 @@
->  			clock-names = "bus", "di0", "di1";
->  			resets = <&src 4>;
+> diff --git a/Makefile b/Makefile
+> index 1f0196f..e4a4002 100644
+> --- a/Makefile
+> +++ b/Makefile
+> @@ -98,6 +98,7 @@ OBJS	+= kvm-ipc.o
+>  OBJS	+= builtin-sandbox.o
+>  OBJS	+= virtio/mmio.o
+>  OBJS	+= hw/i8042.o
+> +OBJS	+= kvm-fdt.o
 >  
-> -			ipu2_csi0: port at 0 {
-> +			ipu2_csi0: ipu2_csi at 0 {
->  				reg = <0>;
->  			};
+>  # Translate uname -m into ARCH string
+>  ARCH ?= $(shell uname -m | sed -e s/i.86/i386/ -e s/ppc.*/powerpc/ \
+> diff --git a/arm/fdt.c b/arm/fdt.c
+> index 381d48f..8bcfffb 100644
+> --- a/arm/fdt.c
+> +++ b/arm/fdt.c
+> @@ -114,7 +114,7 @@ static int setup_fdt(struct kvm *kvm)
+>  {
+>  	struct device_header *dev_hdr;
+>  	u8 staging_fdt[FDT_MAX_SIZE];
+> -	u32 gic_phandle		= fdt__alloc_phandle();
+> +	u32 gic_phandle		= fdt__get_phandle(PHANDLE_GIC);
+>  	u64 mem_reg_prop[]	= {
+>  		cpu_to_fdt64(kvm->arch.memory_guest_start),
+>  		cpu_to_fdt64(kvm->ram_size),
+> diff --git a/arm/gic.c b/arm/gic.c
+> index d6d6dd0..b60437e 100644
+> --- a/arm/gic.c
+> +++ b/arm/gic.c
+> @@ -222,7 +222,7 @@ void gic__generate_fdt_nodes(void *fdt, u32 phandle, enum irqchip_type type)
+>  	_FDT(fdt_property_cell(fdt, "#interrupt-cells", GIC_FDT_IRQ_NUM_CELLS));
+>  	_FDT(fdt_property(fdt, "interrupt-controller", NULL, 0));
+>  	_FDT(fdt_property(fdt, "reg", reg_prop, sizeof(reg_prop)));
+> -	_FDT(fdt_property_cell(fdt, "phandle", phandle));
+> +	_FDT(fdt_property_cell(fdt, "phandle", fdt__get_phandle(PHANDLE_GIC)));
+>  	_FDT(fdt_end_node(fdt));
+>  }
 >  
-> -			ipu2_csi1: port at 1 {
-> +			ipu2_csi1: ipu2_csi at 1 {
->  				reg = <1>;
->  			};
+> diff --git a/include/kvm/fdt.h b/include/kvm/fdt.h
+> index 53d85a4..cd2bb72 100644
+> --- a/include/kvm/fdt.h
+> +++ b/include/kvm/fdt.h
+> @@ -8,6 +8,10 @@
+>  #include <linux/types.h>
 >  
-> -			ipu2_di0: port at 2 {
-> +			ipu2_di0: ipu2_di at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <0>;
-> -				reg = <2>;
-> +				reg = <0>;
+>  #define FDT_MAX_SIZE	0x10000
+> +#define FDT_INVALID_PHANDLE 0
+> +#define FDT_IS_VALID_PHANDLE(phandle) ((phandle) != FDT_INVALID_PHANDLE)
+> +
+> +enum phandles {PHANDLE_GIC, PHANDLES_MAX};
 >  
->  				ipu2_di0_disp0: disp0-endpoint {
->  				};
-> @@ -174,10 +174,10 @@
->  				};
->  			};
+>  /* Those definitions are generic FDT values for specifying IRQ
+>   * types and are used in the Linux kernel internally as well as in
+> @@ -33,10 +37,6 @@ enum irq_type {
+>  		}							\
+>  	} while (0)
 >  
-> -			ipu2_di1: port at 3 {
-> +			ipu2_di1: ipu2_di at 1 {
->  				#address-cells = <1>;
->  				#size-cells = <0>;
-> -				reg = <3>;
-> +				reg = <1>;
+> -static inline u32 fdt__alloc_phandle(void)
+> -{
+> -	static u32 phandle = 0;
+> -	return ++phandle;
+> -}
+> +u32 fdt__get_phandle(enum phandles phandle);
 >  
->  				ipu2_di1_hdmi: hdmi-endpoint {
->  					remote-endpoint = <&hdmi_mux_3>;
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index e01e5d5..2465187 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -1226,18 +1226,18 @@
->  			clock-names = "bus", "di0", "di1";
->  			resets = <&src 2>;
->  
-> -			ipu1_csi0: port at 0 {
-> +			ipu1_csi0: ipu1_csi at 0 {
->  				reg = <0>;
->  			};
->  
-> -			ipu1_csi1: port at 1 {
-> +			ipu1_csi1: ipu1_csi at 1 {
->  				reg = <1>;
->  			};
->  
-> -			ipu1_di0: port at 2 {
-> +			ipu1_di0: ipu1_di at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <0>;
-> -				reg = <2>;
-> +				reg = <0>;
->  
->  				ipu1_di0_disp0: disp0-endpoint {
->  				};
-> @@ -1259,10 +1259,10 @@
->  				};
->  			};
->  
-> -			ipu1_di1: port at 3 {
-> +			ipu1_di1: ipu1_di at 1 {
->  				#address-cells = <1>;
->  				#size-cells = <0>;
-> -				reg = <3>;
-> +				reg = <1>;
->  
->  				ipu1_di1_disp1: disp1-endpoint {
->  				};
+>  #endif /* KVM__FDT_H */
+> diff --git a/kvm-fdt.c b/kvm-fdt.c
+> new file mode 100644
+> index 0000000..d05f3fe
+> --- /dev/null
+> +++ b/kvm-fdt.c
+> @@ -0,0 +1,26 @@
+> +/*
+> + * Commonly used FDT functions.
+> + */
+> +
+> +#include <stdio.h>
+> +#include "kvm/fdt.h"
+> +#include "kvm/util.h"
+> +
+> +u32 phandles[PHANDLES_MAX] = {};
+
+It is a bit weird that you're initializing this to zero...
+
+> +u32 next_phandle = 1;
+> +
+> +u32 fdt__get_phandle(enum phandles phandle)
+> +{
+> +	u32 ret;
+> +
+> +	if (phandle >= PHANDLES_MAX)
+> +		return FDT_INVALID_PHANDLE;
+> +
+> +	ret = phandles[phandle];
+> +	if (ret == FDT_INVALID_PHANDLE) {
+
+and yet test against a #define that isn't the initializer.
+
+Also, given that fdt__get_phandle() can now fail by returning
+FDT_INVALID_HANDLE, maybe we should abort instead of returning something
+that is definitely wrong and use it blindly (which is going to be fun to
+debug...).
+
+
+> +		ret = next_phandle++;
+> +		phandles[phandle] = ret;
+> +	}
+> +
+> +	return ret;
+> +}
+> 
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
