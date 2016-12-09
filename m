@@ -1,111 +1,60 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri,  9 Dec 2016 17:15:01 +0000
-Subject: [BUG/RFC] efi/libstub: Preserve the memory map pointed to by the FDT
-Message-ID: <20161209171501.21269-1-james.morse@arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 9 Dec 2016 22:47:27 +0530
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <6ce1ea97-1d68-2203-c7b4-73315e801655@laposte.net>
+References: <5846B237.8060409@free.fr> <yw1xwpfd2o9f.fsf@unicorn.mansr.com>
+ <20161207164341.GX6408@localhost>
+ <yw1xr35j1yd5.fsf@unicorn.mansr.com>
+ <20161208103921.GC6408@localhost>
+ <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
+ <20161208163755.GH6408@localhost>
+ <yw1xy3zqxt7x.fsf@unicorn.mansr.com>
+ <20161209065955.GJ6408@localhost>
+ <6ce1ea97-1d68-2203-c7b4-73315e801655@laposte.net>
+Message-ID: <20161209171727.GK6408@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-allocate_new_fdt_and_exit_boot() bakes a pointer to the UEFI memory map
-into the FDT for later use. The corresponding memory is then free()d
-and (hopefully) allocated again via efi_exit_boot_services() calling
-efi_get_memory_map() as part of the exit_boot_services() loop. The
-final copy is annotated with virtual mappings and used to create the
-runtime map.
+On Fri, Dec 09, 2016 at 11:25:57AM +0100, Sebastian Frias wrote:
+> 
+> What concrete solution do you propose?
 
-Linux expects the FDT to contain a pointer to the UEFI memory map
-with the virtual mapping annotations, which will only happen if
-AllocatePool() returns memory to the stub that was just FreePool()d
-by the stub. This behaviour doesn't appear to guaranteed by the spec.
+I have already proposed two solutions.
 
-Platforms that don't do this will use the stale memory map (assuming
-no later owner of the freed() memory changed it) and fail to initialise
-runtime services.
+A) Request a channel only when you need it. Obviously we can't do virtual
+channels with this (though we should still use virt-channels framework).
+The sbox setup and teardown can be done as part of channel request and
+freeup. PL08x already does this.
 
-Instead, keep the memory map we baked info the FDT, and create a new
-'exit_map' pointer for use in the exit_boot_services() loop. (This was
-already different, it just had the same name and we hoped it would be
-in the same place).
+Downside is that we can only have as many consumers at a time as channels.
 
-Annotate the memory map pointed to by the FDT with virtual mappings.
-This assumes the final memory map (which may be different), has
-not moved any of the regions with the runtime attribute.
+I have not heard any technical reason for not doing this apart from drivers
+grab the channel at probe, which is incorrect and needs to be fixed
+irrespective of the problem at hand.
 
-(Take the opportunity to remove some comments that are stale since
- commit ed9cc156c42f ("efi/libstub: Use efi_exit_boot_services() in FDT"))
+This is my preferred option.
 
-Signed-off-by: James Morse <james.morse@arm.com>
-Fixes: ed9cc156c42f ("efi/libstub: Use efi_exit_boot_services() in FDT")
-Cc: Jeffrey Hugo <jhugo@codeaurora.org>
----
-I haven't seen this causing problems on any real platforms, only kvmtool
-which I'm busily hacking up to have primitive UEFI support. Needless to
-say my AllocatePool() doesn't re-use memory.
+B) Create a custom driver specific API. This API for example:
+	sbox_setup(bool enable, ...)
+can be called by client to explicitly setup and clear up the sbox setting.
 
- drivers/firmware/efi/libstub/fdt.c | 23 +++++++++++------------
- 1 file changed, 11 insertions(+), 12 deletions(-)
+This way we can have transactions muxed.
 
-diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-index a6a93116a8f0..f623894c633c 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -181,10 +181,6 @@ static efi_status_t exit_boot_func(efi_system_table_t *sys_table_arg,
-  * which are fixed at 4K bytes, so in most cases the first
-  * allocation should succeed.
-  * EFI boot services are exited at the end of this function.
-- * There must be no allocations between the get_memory_map()
-- * call and the exit_boot_services() call, so the exiting of
-- * boot services is very tightly tied to the creation of the FDT
-- * with the final memory map in it.
-  */
- 
- efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
-@@ -199,7 +195,7 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 	unsigned long map_size, desc_size, buff_size;
- 	u32 desc_ver;
- 	unsigned long mmap_key;
--	efi_memory_desc_t *memory_map, *runtime_map;
-+	efi_memory_desc_t *memory_map, *runtime_map, *exit_map;
- 	unsigned long new_fdt_size;
- 	efi_status_t status;
- 	int runtime_entry_count = 0;
-@@ -243,11 +239,6 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 			goto fail;
- 		}
- 
--		/*
--		 * Now that we have done our final memory allocation (and free)
--		 * we can get the memory map key  needed for
--		 * exit_boot_services().
--		 */
- 		status = efi_get_memory_map(sys_table, &map);
- 		if (status != EFI_SUCCESS)
- 			goto fail_free_new_fdt;
-@@ -259,8 +250,16 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 				    memory_map, map_size, desc_size, desc_ver);
- 
- 		/* Succeeding the first time is the expected case. */
--		if (status == EFI_SUCCESS)
-+		if (status == EFI_SUCCESS) {
-+			/*
-+			 * Annotate the memory_map in the FDT with virtual
-+			 * addresses. These shouldn't change as the placement
-+			 * of EFI_MEMORY_RUNTIME regions should be fixed.
-+			 */
-+			efi_get_virtmap(memory_map, map_size, desc_size,
-+					runtime_map, &runtime_entry_count);
- 			break;
-+		}
- 
- 		if (status == EFI_BUFFER_TOO_SMALL) {
- 			/*
-@@ -279,7 +278,7 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 		}
- 	}
- 
--	sys_table->boottime->free_pool(memory_map);
-+	map.map = &exit_map;
- 	priv.runtime_map = runtime_map;
- 	priv.runtime_entry_count = &runtime_entry_count;
- 	status = efi_exit_boot_services(sys_table, handle, &map, &priv,
+I have not heard any arguments on why we shouldn't do this except Russell's
+comment that A) solves this.
+
+> Alternatively, one can think of the current issue (i.e.: the fact that the IRQ
+> arrives "too soon") in a different way.
+> Instead of thinking the IRQ indicates "transfer complete", it is indicating "ready
+> to accept another command", which in practice (and with proper API support) can
+> translate into efficient queuing of DMA operations.
+
+That IMO is a better understanding of this issue. But based on discussion, I
+think the issue is that submitting next transaction cannot be done until
+sbox is setup (as a consequence torn down for previous). Tear down can be
+down only when client knows that transfer is done, from dma controller data
+has been pushed and in-flight.
+
+
 -- 
-2.10.1
+~Vinod
