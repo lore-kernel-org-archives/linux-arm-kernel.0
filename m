@@ -1,8 +1,7 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 09 Dec 2016 17:28:01 +0000
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 9 Dec 2016 18:34:15 +0100
 Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <20161209171727.GK6408@localhost> (Vinod Koul's message of "Fri,
- 9 Dec 2016 22:47:27 +0530")
+In-Reply-To: <20161209171727.GK6408@localhost>
 References: <5846B237.8060409@free.fr> <yw1xwpfd2o9f.fsf@unicorn.mansr.com>
  <20161207164341.GX6408@localhost> <yw1xr35j1yd5.fsf@unicorn.mansr.com>
  <20161208103921.GC6408@localhost>
@@ -11,47 +10,35 @@ References: <5846B237.8060409@free.fr> <yw1xwpfd2o9f.fsf@unicorn.mansr.com>
  <20161209065955.GJ6408@localhost>
  <6ce1ea97-1d68-2203-c7b4-73315e801655@laposte.net>
  <20161209171727.GK6408@localhost>
-Message-ID: <yw1xbmwlxba6.fsf@unicorn.mansr.com>
+Message-ID: <ec33d3f0-6474-2b13-8a26-077ce3785d31@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod Koul <vinod.koul@intel.com> writes:
+On 09/12/2016 18:17, Vinod Koul wrote:
 
 > On Fri, Dec 09, 2016 at 11:25:57AM +0100, Sebastian Frias wrote:
->> 
+>>
 >> What concrete solution do you propose?
->
+> 
 > I have already proposed two solutions.
->
+> 
 > A) Request a channel only when you need it. Obviously we can't do virtual
 > channels with this (though we should still use virt-channels framework).
 > The sbox setup and teardown can be done as part of channel request and
 > freeup. PL08x already does this.
->
+> 
 > Downside is that we can only have as many consumers at a time as channels.
->
+> 
 > I have not heard any technical reason for not doing this apart from drivers
 > grab the channel at probe, which is incorrect and needs to be fixed
 > irrespective of the problem at hand.
->
+> 
 > This is my preferred option.
 
-Sorry, but this is not acceptable.
+There is one important drawback with this solution. If a driver calls
+dma_request_chan() when no channels are currently available, it will
+get -EBUSY. If there were a flag in dma_request_chan to be put to
+sleep (with timeout) until a channel is available, then it would
+work. But busy waiting in the client driver is a waste of power.
 
-> B) Create a custom driver specific API. This API for example:
-> 	sbox_setup(bool enable, ...)
-> can be called by client to explicitly setup and clear up the sbox setting.
->
-> This way we can have transactions muxed.
->
-> I have not heard any arguments on why we shouldn't do this except Russell's
-> comment that A) solves this.
-
-Driver-specific interfaces are not the solution.  That way lies chaos
-and madness.
-
-This would all be so much easier if you all would just shut up for a
-moment and let me fix it properly.
-
--- 
-M?ns Rullg?rd
+Regards.
