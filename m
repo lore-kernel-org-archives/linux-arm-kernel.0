@@ -1,58 +1,219 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 9 Dec 2016 15:26:18 -0600
-Subject: [PATCH v2 1/3] crypto: brcm: DT documentation for Broadcom SPU
- driver
-In-Reply-To: <1480714499-1476-2-git-send-email-rob.rice@broadcom.com>
-References: <1480714499-1476-1-git-send-email-rob.rice@broadcom.com>
- <1480714499-1476-2-git-send-email-rob.rice@broadcom.com>
-Message-ID: <20161209212618.gvjdjhmryobrmwrp@rob-hp-laptop>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Fri, 09 Dec 2016 13:28:45 -0800
+Subject: [PATCHv4 11/15] clk: ti: clockdomain: add clock provider support
+ to clockdomains
+In-Reply-To: <20161209204015.GL4920@atomide.com>
+References: <20161028125112.xfyrx7l7m64z6cu6@atomide.com>
+ <20161028235448.57squdf6cu2wxxvm@atomide.com>
+ <148071802182.32158.11479184984645880313@resonance>
+ <20161202231240.GH4705@atomide.com>
+ <148072274164.32158.6012452044533845688@resonance>
+ <20161203001852.GI4705@atomide.com>
+ <ed253013-1f12-9fd8-d007-400a6c6fd427@ti.com>
+ <20161205152534.GJ4705@atomide.com>
+ <148131376868.16621.16082839810419290638@resonance>
+ <20161209204015.GL4920@atomide.com>
+Message-ID: <148131892585.16621.5033331614135070003@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 04:34:57PM -0500, Rob Rice wrote:
-> Device tree documentation for Broadcom Secure Processing Unit
-> (SPU) crypto driver.
+Quoting Tony Lindgren (2016-12-09 12:40:16)
+> * Michael Turquette <mturquette@baylibre.com> [161209 12:02]:
+> > Quoting Tony Lindgren (2016-12-05 07:25:34)
+> > > * Tero Kristo <t-kristo@ti.com> [161205 02:09]:
+> ...
+> <snip>
 > 
-> Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
-> Signed-off-by: Rob Rice <rob.rice@broadcom.com>
-> ---
->  .../devicetree/bindings/crypto/brcm,spu-crypto.txt | 25 ++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
+> > I had a recent conversation with Kevin Hilman about a related issue
+> > (we were not discussing this thread or this series) and we both agreed
+> > that most drivers don't even need to managed their clocks directly, so
+> > much as they need to manage their on/off resources. Clocks are just one
+> > part of that, and if we can hide that stuff inside of an attached genpd
+> > then it would be better than having the driver manage clocks explicitly.
+> > 
+> > Obviously some devices such as audio codec or uart will need to manage
+> > clocks directly, but this is mostly the exception, not the rule.
 > 
-> diff --git a/Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt b/Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
-> new file mode 100644
-> index 0000000..e5fe942
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
-> @@ -0,0 +1,25 @@
-> +The Broadcom Secure Processing Unit (SPU) driver supports symmetric
+> Yes. And we do that already for clkctrl clocks via PM runtime where
+> hwmod manages them. Tero's series still has hwmod manage the clocks,
+> but the clock register handling is moved to live under drivers/clock.
+> 
+> > > > > > There is certainly no API for that in the clock framework, but for genpd
+> > > > > > your runtime_pm_get() callback for clkdm_A could call runtime_pm_get
+> > > > > > against clkdm_B, which would satisfy the requirement. See section
+> > > > > > 3.1.1.1.7 Clock Domain Dependency in the OMAP4 TRM, version AB.
+> > > > 
+> > > > For static dependencies the apis genpd_add/remove_subdomain could probably
+> > > > be used.
+> > > > 
+> > > > > To me it seems the API is just clk_get() :) Do you have some
+> > > > > specific example we can use to check? My guess is that the
+> > > > > TRM "Clock Domain Dependency" is just the usual parent child
+> > > > > relationship between clocks that are the clockdomains..
+> > 
+> > clk_get() only fetches a pointer to the clk. I guess you mean
+> > clk_prepare_enable() to actually increment the use count?
+> 
+> Right, with clocks that's all we should need to do :)
+> 
+> > If we used the clk framework here is that it would look something like
+> > this:
+> > 
+> > clk_enable(clk_a)
+> > -> .enable(clk_a_hw)
+> >    -> clk_enable(clk_b)
+> > 
+> > However, clk_a and clk_b do not have a parent-child relationship in the
+> > clock tree. This is purely a functional relationship between IP blocks.
+> > Modeling this sort of thing in the clk framework would be wrong, and
+> > genpd is a much better place to establish these arbitrary relationships.
+> 
+> Hmm yes, and I don't mean the clock framework should do anything more
+> complex beyond what it already does.
+> 
+> We just want to represent the clocks as clocks, then have the
+> interconnect code manage those clocks. That's currently hwmod, eventually
+> it will be genpd.
+> 
+> > > > > If there is something more magical there certainly that should
+> > > > > be considered though.
+> > > > 
+> > > > The hwmods could be transformed to individual genpds also I guess. On DT
+> > > > level though, we would still need a clock pointer to the main clock and a
+> > > > genpd pointer in addition to that.
+> > > 
+> > > Hmm a genpd pointer to where exactly? AFAIK each interconnect
+> > > instance should be a genpd provider, and the individual interconnect
+> > > target modules should be consumers for that genpd.
+> > 
+> > I was thinking that the clock domains would be modeled as genpd objects
+> > with the interconnect target modules attached as struct devices.
+> 
+> I think clock domains should be just clocks, then we let the interconnect
+> code and eventually genpd manage them.
+> 
+> > > > Tony, any thoughts on that? Would this break up the plans for the
+> > > > interconnect completely?
+> > > 
+> > > Does using genpd for clockdomains cause issues for using genpd for
+> > > interconnect instances and the target modules?
+> > 
+> > Can they be the same object in Linux? If there is a one-to-one mapping
+> > between clock domains and the interconnect port then maybe you can just
+> > model them together.
+> 
+> I'm thinking that it should be the interconnect code implementing
+> genpd, and use clk_request_enable().
+> 
+> > > The thing I'd be worried about there is that the clockdomains and
+> > > their child clocks are just devices sitting on the interconnect,
+> > > so we could easily end up with genpd modeling something that does
+> > > not represent the hardware.
+> > > 
+> > > For example, on 4430 we have:
+> > > 
+> > > l4_cfg interconnect
+> > >        ...
+> > >        segment at 0
+> > >                 ...
+> > >                 target_module at 4000
+> > >                         cm1: cm1 at 0
+> > 
+> > How about:
+> > 
+> > l4_cfg interconnect
+> >        ...
+> >        segment at 0
+> >                 ...
+> >                 cm1 at 4000
+> >                       module: foo_module at 0
+> 
+> That's the wrong way around from hardware point of view. There's
+> a generic interconnect wrapper module with it's own registers,
+> then cm1 (and possibly other devices) are children of that target
+> module.
+> 
+> > I don't know much about the segments. Do they map one-to-one with the
+> > clock domains?
+> 
+> I need to check, it's been a while, but I recall some interconnects
+> are partioned to segments based on voltages or clocks.
+> 
+> > If my quick-and-dirty DT above makes sense, then the target modules
+> > (e.g. io controller) would not get clocks anymore, but just
+> > pm_runtime_get(). The genpd backing object would call clk_enable/disable
+> > as needed.
+> 
+> Yeah that's what we already have with hwmod and PM runtime for the
+> clockctrl register. But hwmod currently directly manages the clkctrl
+> register, we just want to move that part to be a clock driver.
+> 
+> The children of the interconnect target modules just need to use
+> PM runtime, but the interconnect target module driver needs to know
+> it's clkctrl clock.
 
-Bindings describe h/w, not drivers.
+OK, that sounds good to me but I'm not quite sure about the difference
+between "children of interconnect target modules" versus just the
+"interconnect target module".
 
-> +cryptographic offload for Broadcom SoCs with SPU hardware. A SoC may have
-> +multiple SPU hardware blocks.
-> +
-> +Required properties:
-> +- compatible : Should be "brcm,spum-crypto" for devices with SPU-M hardware
+Can you give an example on each? I just want to understand for my own
+curiosity.
 
-Additionally, you should have SoC specific compatible here.
+> 
+> > If fine grained control of a clock is needed (e.g. for clk_set_rate)
+> > then the driver can still clk_get it. Whether or not the clockdomain
+> > provides that clock or if it comes from the clock generator (e.g. cm1,
+> > cm2, prm, etc) isn't as important to me, but I prefer for the
+> > clockdomain to not be a clock provider if possible.
+> 
+> Yeah I totally agree with that, and that's already what we mostly
+> have.
+> 
+> > > I don't at least yet
+> > > follow what we need to do with the clockdomains with genpd :)
+> > 
+> > Use the clockdomain genpd to call clk_enable/disable under the hood.
+> > Don't use them as clock providers to the target modules. Clockdomain
+> > genpds would be the clock consumers.
+> 
+> I don't think the clockdomain should be a genpd provider because
+> that creates a genpd network of dependencies instead of a tree
+> structure. If we end up setting the clockdomains with genpd, then
+> only the other clockdomains should use them, but I don't know how
+> we ever keep drivers from directly tinkering with them..
 
-> +  (e.g., Northstar2) or "brcm,spum-nsp-crypto" for the Northstar Plus variant
-> +  of the SPU-M hardware.
-> +
-> +- reg: Should contain SPU registers location and length.
-> +- mboxes: A list of mailbox channels to be used by the kernel driver. Mailbox
-> +channels correspond to DMA rings on the device.
+Genpd is set up as an arbitrary graph, not strictly a tree, so these
+types of dependencies should be OK.
 
-What determines the mbox assignment?
+> 
+> IMO, the clockdomain clock driver should just provides clocks, then
+> we can have the interconnect target module driver deal with the
+> clockdomain dependencies.
+> 
+> > > Wouldn't just doing clk_get() from one clockdomain clock to
+> > > another clockdomain clock (or it's output) be enough to
+> > > represent the clockdomain dependencies?
+> > 
+> > s/clk_get/clk_prepare_enable/
+> > 
+> > Yes, but you're stuffing functional dependencies into the clock tree,
+> > which sucks. genpd was created to model these arbitrary dependencies.
+> 
+> Well let's not stuff anything beyond clock framework to the
+> clockdomain clock drivers. We already have the clockdomain
+> dependencies handled by the interconnect code (hwmod), and there
+> should be no problem moving those to be handled by genpd and the
+> interconnect target driver instances.
+> 
+> Care to take another look at Tero's patches with the assumption
+> that the clockdomain clocks stay just as a clocks?
 
-Needs to specify how many.
+Sure.
 
-> +
-> +Example:
-> +	spu-crypto at 612d0000 {
+Regards,
+Mike
 
-Just crypto at ...
-
-Rob
+> 
+> Regards,
+> 
+> Tony
