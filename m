@@ -1,21 +1,21 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Fri, 9 Dec 2016 12:07:41 +0200
-Subject: [PATCH v6 1/5] [media] davinci: VPIF: fix module loading, init
- errors
-In-Reply-To: <20161207183025.20684-2-khilman@baylibre.com>
-References: <20161207183025.20684-1-khilman@baylibre.com>
- <20161207183025.20684-2-khilman@baylibre.com>
-Message-ID: <20161209100741.GL16630@valkosipuli.retiisi.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 9 Dec 2016 11:13:37 +0100
+Subject: [PATCH renesas/devel] arm64: dts: r8a7795: Use Gen 3 fallback
+ compat string for PCIE
+In-Reply-To: <CAMuHMdV9uumxxwsU_7pL+8Eo+n7+-Os+h7n8tbNvtdVp4pH5hg@mail.gmail.com>
+References: <1481210969-2574-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdV9uumxxwsU_7pL+8Eo+n7+-Os+h7n8tbNvtdVp4pH5hg@mail.gmail.com>
+Message-ID: <20161209101337.GA6439@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 10:30:21AM -0800, Kevin Hilman wrote:
-> Fix problems with automatic module loading by adding MODULE_ALIAS.  Also
-> fix various load-time errors cause by incorrect or not present
-> platform_data.
+On Fri, Dec 09, 2016 at 11:01:00AM +0100, Geert Uytterhoeven wrote:
+> On Thu, Dec 8, 2016 at 4:29 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> > Use recently added en 3 fallback compat string for PCIE
+> > in r8a7795 DT.
+> >
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-
--- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+Thanks, I have queued this up for v4.11.
