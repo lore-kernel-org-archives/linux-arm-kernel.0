@@ -1,87 +1,61 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 09 Dec 2016 10:16:55 +0000
-Subject: [PATCH v2 1/2] firmware: arm_scpi: zero RX buffer before
- requesting data from the mbox
-In-Reply-To: <20161125005432.1205-2-martin.blumenstingl@googlemail.com>
-References: <20161124001845.20830-1-martin.blumenstingl@googlemail.com>
- <20161125005432.1205-1-martin.blumenstingl@googlemail.com>
- <20161125005432.1205-2-martin.blumenstingl@googlemail.com>
-Message-ID: <1481278615.2902.25.camel@linaro.org>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Fri, 9 Dec 2016 12:20:35 +0200
+Subject: [PATCH v6 2/5] [media] davinci: vpif_capture: remove hard-coded
+ I2C adapter id
+In-Reply-To: <20161207183025.20684-3-khilman@baylibre.com>
+References: <20161207183025.20684-1-khilman@baylibre.com>
+ <20161207183025.20684-3-khilman@baylibre.com>
+Message-ID: <20161209102035.GM16630@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-11-25 at 01:54 +0100, Martin Blumenstingl wrote:
-> The original code was relying on the fact that the SCPI firmware
-> responds with the same number of bytes (or more, all extra data would be
-> ignored in that case) as requested.
-> However, we have some pre-v1.0 SCPI firmwares which are responding with
-> less data for some commands (sensor_value.hi_val did not exist in the
-> old implementation). This means that some data from the previous
-> command's RX buffer was leaked into the current command (as the RX
-> buffer is re-used for all commands on the same channel). Clearing the
-> RX buffer before (re-) using it ensures we get a consistent result, even
-> if the SCPI firmware returns less bytes than requested.
+Hi Kevin,
+
+On Wed, Dec 07, 2016 at 10:30:22AM -0800, Kevin Hilman wrote:
+> Remove hard-coded I2C adapter in favor of getting the
+> ID from platform_data.
 > 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 > ---
->  drivers/firmware/arm_scpi.c | 19 ++++++++++++++++++-
->  1 file changed, 18 insertions(+), 1 deletion(-)
+>  drivers/media/platform/davinci/vpif_capture.c | 5 ++++-
+>  include/media/davinci/vpif_types.h            | 1 +
+>  2 files changed, 5 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-> index 70e1323..8c183d8 100644
-> --- a/drivers/firmware/arm_scpi.c
-> +++ b/drivers/firmware/arm_scpi.c
-> @@ -259,6 +259,7 @@ struct scpi_chan {
->  	struct mbox_chan *chan;
->  	void __iomem *tx_payload;
->  	void __iomem *rx_payload;
-> +	resource_size_t max_payload_len;
-
-Ah, here's max_payload_len, sorry, I reviewed the patches in the wrong
-order. And reflecting on things, having the runtime
-
->  	struct list_head rx_pending;
->  	struct list_head xfers_list;
->  	struct scpi_xfer *xfers;
-> @@ -470,6 +471,20 @@ static void scpi_tx_prepare(struct mbox_client *c, void *msg)
->  	if (t->rx_buf) {
->  		if (!(++ch->token))
->  			++ch->token;
-> +
-> +		/* clear the RX buffer as it is shared across all commands on
-> +		 * the same channel (to make sure we're not leaking data from
-> +		 * the previous response into the current command if the SCPI
-> +		 * firmware writes less data than requested).
-> +		 * This is especially important for pre-v1.0 SCPI firmwares
-> +		 * where some fields in the responses do not exist (while they
-> +		 * exist but are optional in newer versions). One example for
-> +		 * this problem is sensor_value.hi_val, which would contain
-> +		 * ("leak") the second 4 bytes of the RX buffer from the
-> +		 * previous command.
-> +		 */
-> +		memset_io(ch->rx_payload, 0, ch->max_payload_len);
-> +
-
-Isn't the payload size specified in the header? In which case the bug
-you describe is due to the implementation writing 4 bytes and setting
-the length to 8. Anyway, this seems almost like a quirk of a specific
-implementation and perhaps should be handled as such, rather that doing
-this for all commands on all boards using SCPI.
-
->  		ADD_SCPI_TOKEN(t->cmd, ch->token);
->  		spin_lock_irqsave(&ch->rx_lock, flags);
->  		list_add_tail(&t->node, &ch->rx_pending);
-> @@ -921,7 +936,9 @@ static int scpi_probe(struct platform_device *pdev)
->  			ret = -EADDRNOTAVAIL;
->  			goto err;
->  		}
-> -		pchan->tx_payload = pchan->rx_payload + (size >> 1);
-> +
-> +		pchan->max_payload_len = size / 2;
-> +		pchan->tx_payload = pchan->rx_payload + pchan->max_payload_len;
+> diff --git a/drivers/media/platform/davinci/vpif_capture.c b/drivers/media/platform/davinci/vpif_capture.c
+> index 20c4344ed118..c24049acd40a 100644
+> --- a/drivers/media/platform/davinci/vpif_capture.c
+> +++ b/drivers/media/platform/davinci/vpif_capture.c
+> @@ -1486,7 +1486,10 @@ static __init int vpif_probe(struct platform_device *pdev)
+>  	}
 >  
->  		cl->dev = dev;
->  		cl->rx_callback = scpi_handle_remote_msg;
+>  	if (!vpif_obj.config->asd_sizes) {
+> -		i2c_adap = i2c_get_adapter(1);
+> +		int i2c_id = vpif_obj.config->i2c_adapter_id;
+
+Is there a particular reason to use a temporary variable just once? I'd use
+the i2c_adapter_field directly instead. Up to you.
+
+Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+
+> +
+> +		i2c_adap = i2c_get_adapter(i2c_id);
+> +		WARN_ON(!i2c_adap);
+>  		for (i = 0; i < subdev_count; i++) {
+>  			subdevdata = &vpif_obj.config->subdev_info[i];
+>  			vpif_obj.sd[i] =
+> diff --git a/include/media/davinci/vpif_types.h b/include/media/davinci/vpif_types.h
+> index 3cb1704a0650..4282a7db99d4 100644
+> --- a/include/media/davinci/vpif_types.h
+> +++ b/include/media/davinci/vpif_types.h
+> @@ -82,6 +82,7 @@ struct vpif_capture_config {
+>  	struct vpif_capture_chan_config chan_config[VPIF_CAPTURE_MAX_CHANNELS];
+>  	struct vpif_subdev_info *subdev_info;
+>  	int subdev_count;
+> +	int i2c_adapter_id;
+>  	const char *card_name;
+>  	struct v4l2_async_subdev **asd;	/* Flat array, arranged in groups */
+>  	int *asd_sizes;		/* 0-terminated array of asd group sizes */
 
 -- 
-Tixy
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
