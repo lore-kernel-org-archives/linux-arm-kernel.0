@@ -1,43 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  9 Dec 2016 10:50:44 +0000
-Subject: [PATCH] builddeb: Use aarch64 instead of arm64 for UTS_MACHINE
-Message-ID: <1481280644-15614-1-git-send-email-will.deacon@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 9 Dec 2016 10:51:20 +0000
+Subject: [RFC, PATCHv1 00/28] 5-level paging
+In-Reply-To: <13962749.Q2mLWEctkQ@wuerfel>
+References: <20161208162150.148763-1-kirill.shutemov@linux.intel.com>
+ <20161209050130.GC2595@gmail.com> <13962749.Q2mLWEctkQ@wuerfel>
+Message-ID: <20161209105120.GA3705@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michal Marek <mmarek@suse.com>
+On Fri, Dec 09, 2016 at 11:24:12AM +0100, Arnd Bergmann wrote:
+> On Friday, December 9, 2016 6:01:30 AM CET Ingo Molnar wrote:
+> > >   - Handle opt-in wider address space for userspace.
+> > > 
+> > >     Not all userspace is ready to handle addresses wider than current
+> > >     47-bits. At least some JIT compiler make use of upper bits to encode
+> > >     their info.
+> > > 
+> > >     We need to have an interface to opt-in wider addresses from userspace
+> > >     to avoid regressions.
+> > > 
+> > >     For now, I've included testing-only patch which bumps TASK_SIZE to
+> > >     56-bits. This can be handy for testing to see what breaks if we max-out
+> > >     size of virtual address space.
+> > 
+> > So this is just a detail - but it sounds a bit limiting to me to provide an 'opt 
+> > in' flag for something that will work just fine on the vast majority of 64-bit 
+> > software.
+> > 
+> > Please make this an opt out compatibility flag instead: similar to how we handle 
+> > address space layout limitations/quirks ABI details, such as ADDR_LIMIT_32BIT, 
+> > ADDR_LIMIT_3GB, ADDR_COMPAT_LAYOUT, READ_IMPLIES_EXEC, etc.
+> 
+> We've had a similar discussion about JIT software on ARM64, which has a wide
+> range of supported page table layouts and some software wants to limit that
+> to a specific number.
+> 
+> I don't remember the outcome of that discussion, but I'm adding a few people
+> to Cc that might remember.
 
-On arm64-based systems, uname -m reports "aarch64", so this is what
-we should be using for UTS_MACHINE and matching that in the builddeb
-script instead of "arm64".
+The arm64 kernel supports several user VA space configurations (though
+commonly 39 and 48-bit) and has had these from the initial port. We
+realised that certain JITs (e.g.
+https://bugzilla.mozilla.org/show_bug.cgi?id=1143022) and IIRC LLVM
+assume a 47-bit user VA but AFAICT, most have been fixed.
 
-There was a patch fixing this:
+ARMv8.1 also supports 52-bit VA (though only with 64K pages and we
+haven't added support for it yet). However, it's likely that if we make
+a 52-bit TASK_SIZE this the default, we will break some user
+assumptions. While arguably that's not necessarily ABI, if user relies
+on a 47 or 48-bit VA the kernel shouldn't break it. So I'm strongly
+inclined to make the 52-bit TASK_SIZE an opt-in on arm64.
 
-  https://patchwork.kernel.org/patch/9305483/
-
-but I accidentally merged v1 of the patch, which omitted the update to
-builddeb. This patch follows up with that missing hunk.
-
-Reported-by: Victor Chong <victor.chong@linaro.org>
-Signed-off-by: Michal Marek <mmarek@suse.com>
-[will: salvaged missing hunk from original patch]
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- scripts/package/builddeb | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/scripts/package/builddeb b/scripts/package/builddeb
-index 8ea9fd2b6573..9530b1634a02 100755
---- a/scripts/package/builddeb
-+++ b/scripts/package/builddeb
-@@ -51,7 +51,7 @@ set_debarch() {
- 		debarch=hppa ;;
- 	mips*)
- 		debarch=mips$(grep -q CPU_LITTLE_ENDIAN=y $KCONFIG_CONFIG && echo el || true) ;;
--	arm64)
-+	aarch64*)
- 		debarch=arm64 ;;
- 	arm*)
- 		if grep -q CONFIG_AEABI=y $KCONFIG_CONFIG; then
 -- 
-2.1.4
+Catalin
