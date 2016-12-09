@@ -1,129 +1,26 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  9 Dec 2016 18:24:03 +0000
-Subject: [PATCH] efi/libstub: arm*: Pass latest memory map to the kernel
-Message-ID: <1481307843-18521-1-git-send-email-ard.biesheuvel@linaro.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 10 Dec 2016 02:27:50 +0800
+Subject: [PATCH v3 08/12] mmc: sdhci-xenon: Add support to PHYs of
+ Marvell Xenon SDHC.
+In-Reply-To: <fd1e454d2d8c30c4b191ae78e911d481315352e0.1481279228.git-series.gregory.clement@free-electrons.com>
+Message-ID: <201612100213.2R0DRXrE%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As reported by James, the current libstub code involving the annotated
-memory map only works somewhat correctly by accident, due to the fact
-that a pool allocation happens to be reused immediately, retaining its
-former contents.
+Hi Hu,
 
-Instead of juggling memory maps, which makes the code more complex than
-it needs to be, simply put a placholder value into the FDT, and only
-write the actual value after ExitBootServices() has been called.
+[auto build test WARNING on ]
 
-Reported-by: James Morse <james.morse@arm.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+url:    https://github.com/0day-ci/linux/commits/Gregory-CLEMENT/mmc-Add-support-to-Marvell-Xenon-SD-Host-Controller/20161210-002602
+base:    
+
+
+coccinelle warnings: (new ones prefixed by >>)
+
+>> drivers/mmc/host/sdhci-xenon-phy.c:469:9-10: WARNING: return of 0/1 in function 'emmc_phy_slow_mode' with return type bool
+
+Please review and possibly fold the followup patch.
+
 ---
- drivers/firmware/efi/libstub/fdt.c | 51 ++++++++++++++++++++++++--------------
- 1 file changed, 32 insertions(+), 19 deletions(-)
-
-diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-index a6a93116a8f0..5d39dff77f17 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -101,7 +101,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 	if (status)
- 		goto fdt_set_fail;
- 
--	fdt_val64 = cpu_to_fdt64((u64)(unsigned long)memory_map);
-+	fdt_val64 = U64_MAX; /* placeholder */
- 	status = fdt_setprop(fdt, node, "linux,uefi-mmap-start",
- 			     &fdt_val64,  sizeof(fdt_val64));
- 	if (status)
-@@ -148,6 +148,24 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 	return EFI_LOAD_ERROR;
- }
- 
-+static efi_status_t update_fdt_memmap(void *fdt, u64 memmap)
-+{
-+	int node = fdt_path_offset(fdt, "/chosen");
-+	efi_status_t status;
-+
-+	if (node < 0)
-+		return EFI_LOAD_ERROR;
-+
-+	memmap = cpu_to_fdt64(memmap);
-+	status = fdt_setprop_inplace(fdt, node, "linux,uefi-mmap-start",
-+				     &memmap, sizeof(memmap));
-+
-+	if (status)
-+		return EFI_LOAD_ERROR;
-+
-+	return EFI_SUCCESS;
-+}
-+
- #ifndef EFI_FDT_ALIGN
- #define EFI_FDT_ALIGN EFI_PAGE_SIZE
- #endif
-@@ -243,15 +261,6 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 			goto fail;
- 		}
- 
--		/*
--		 * Now that we have done our final memory allocation (and free)
--		 * we can get the memory map key  needed for
--		 * exit_boot_services().
--		 */
--		status = efi_get_memory_map(sys_table, &map);
--		if (status != EFI_SUCCESS)
--			goto fail_free_new_fdt;
--
- 		status = update_fdt(sys_table,
- 				    (void *)fdt_addr, fdt_size,
- 				    (void *)*new_fdt_addr, new_fdt_size,
-@@ -266,20 +275,16 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 			/*
- 			 * We need to allocate more space for the new
- 			 * device tree, so free existing buffer that is
--			 * too small.  Also free memory map, as we will need
--			 * to get new one that reflects the free/alloc we do
--			 * on the device tree buffer.
-+			 * too small.
- 			 */
- 			efi_free(sys_table, new_fdt_size, *new_fdt_addr);
--			sys_table->boottime->free_pool(memory_map);
- 			new_fdt_size += EFI_PAGE_SIZE;
- 		} else {
- 			pr_efi_err(sys_table, "Unable to construct new device tree.\n");
--			goto fail_free_mmap;
-+			goto fail_free_new_fdt;
- 		}
- 	}
- 
--	sys_table->boottime->free_pool(memory_map);
- 	priv.runtime_map = runtime_map;
- 	priv.runtime_entry_count = &runtime_entry_count;
- 	status = efi_exit_boot_services(sys_table, handle, &map, &priv,
-@@ -288,6 +293,17 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 	if (status == EFI_SUCCESS) {
- 		efi_set_virtual_address_map_t *svam;
- 
-+		status = update_fdt_memmap((void *)*new_fdt_addr,
-+					   (u64)memory_map);
-+		if (status != EFI_SUCCESS) {
-+			/*
-+			 * The kernel won't get far without the memory map, but
-+			 * may still be able to print something meaningful so
-+			 * return success here.
-+			 */
-+			return EFI_SUCCESS;
-+		}
-+
- 		/* Install the new virtual address map */
- 		svam = sys_table->runtime->set_virtual_address_map;
- 		status = svam(runtime_entry_count * desc_size, desc_size,
-@@ -319,9 +335,6 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 
- 	pr_efi_err(sys_table, "Exit boot services failed.\n");
- 
--fail_free_mmap:
--	sys_table->boottime->free_pool(memory_map);
--
- fail_free_new_fdt:
- 	efi_free(sys_table, new_fdt_size, *new_fdt_addr);
- 
--- 
-2.7.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
