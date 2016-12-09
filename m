@@ -1,68 +1,22 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Fri,  9 Dec 2016 10:11:44 +0800
-Subject: [PATCH] dt-bindings: Document the hi3660 reset bindings
-In-Reply-To: <1480989092-31847-2-git-send-email-zhangfei.gao@linaro.org>
-References: <1480989092-31847-2-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1481249504-7942-1-git-send-email-zhangfei.gao@linaro.org>
+From: sdliyong@gmail.com (Yong Li)
+Date: Fri, 9 Dec 2016 10:28:49 +0800
+Subject: boot hang issue on S5PV210 with the latest kernel
+Message-ID: <CADO9-pdnfb+noSZ3A_Y+AEZ6pJYzO=KD1pHDzB5WHQ5RoqBsrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings documentation for hi3660 SoC reset controller.
+Hi all,
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- .../bindings/reset/hisilicon,hi3660-reset.txt      | 43 ++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+I am testing the latest kernel(4.8+) on my S5PV210 ARM boards. I found I
+have to add the kputc debug in __armv7_mmu_cache_on in
+boot/compressed/head.S:
+mov r11, r3
+kputc #'x'
+mov r3, r11
 
-diff --git a/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
-new file mode 100644
-index 0000000..2bf3344
---- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
-@@ -0,0 +1,43 @@
-+Hisilicon System Reset Controller
-+======================================
-+
-+Please also refer to reset.txt in this directory for common reset
-+controller binding usage.
-+
-+The reset controller registers are part of the system-ctl block on
-+hi3660 SoC.
-+
-+Required properties:
-+- compatible: should be
-+		 "hisilicon,hi3660-reset"
-+- hisi,rst-syscon: phandle of the reset's syscon.
-+- #reset-cells : Specifies the number of cells needed to encode a
-+  reset source.  The type shall be a <u32> and the value shall be 2.
-+
-+	 Cell #1 : offset of the reset assert control
-+	           register from the syscon register base
-+		   offset + 4: deassert control register
-+		   offset + 8: status control register
-+	 Cell #2 : bit position of the reset in the reset control register
-+
-+Example:
-+	iomcu: iomcu at ffd7e000 {
-+		compatible = "hisilicon,hi3660-iomcu", "syscon";
-+		reg = <0x0 0xffd7e000 0x0 0x1000>;
-+	};
-+
-+	iomcu_rst: iomcu_rst_controller {
-+		compatible = "hisilicon,hi3660-reset";
-+		hisi,rst-syscon = <&iomcu>;
-+		#reset-cells = <2>;
-+	};
-+
-+Specifying reset lines connected to IP modules
-+==============================================
-+example:
-+
-+        i2c0: i2c at ..... {
-+                ...
-+		resets = <&iomcu_rst 0x20 3>; /* offset: 0x20; bit: 3 */
-+                ...
-+        };
--- 
-2.7.4
+Without the above kputc, the kernel boot hang, there is no any output on UART
+
+Any suggestions?
+
+Thanks,
+Yong
