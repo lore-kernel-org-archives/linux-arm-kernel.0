@@ -1,18 +1,27 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 9 Dec 2016 16:42:23 -0600
-Subject: [PATCH v3 1/6] mfd: dt: Fix "indicates" typo in mfd bindings
- document
-In-Reply-To: <20161206025321.1792-2-andrew@aj.id.au>
-References: <20161206025321.1792-1-andrew@aj.id.au>
- <20161206025321.1792-2-andrew@aj.id.au>
-Message-ID: <20161209224223.av33kjjtvaxvzmts@rob-hp-laptop>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 9 Dec 2016 16:46:39 -0600
+Subject: [PATCH] usb: dwc3: omap: remove devm_request_threaded_irq
+In-Reply-To: <20161209215958.GN4920@atomide.com>
+References: <20161209205508.6456-1-grygorii.strashko@ti.com>
+ <20161209215958.GN4920@atomide.com>
+Message-ID: <db75608b-f92c-6bfa-80a9-a3ab3adf7c23@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2016 at 01:53:16PM +1100, Andrew Jeffery wrote:
-> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-> ---
->  Documentation/devicetree/bindings/mfd/mfd.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Acked-by: Rob Herring <robh@kernel.org>
+
+On 12/09/2016 03:59 PM, Tony Lindgren wrote:
+> * Grygorii Strashko <grygorii.strashko@ti.com> [161209 12:55]:
+>> Switch back from devm_request_threaded_irq() to request_threaded_irq() to
+>> avoid races between interrupt handler execution and PM runtime in error
+>> handling code path in probe and in dwc3_omap_remove():
+>
+> Can't you just call disable_irq() on the exit path instead of removing
+> devm?
+>
+
+I can. But what will be the benefit from using devm then?
+
+-- 
+regards,
+-grygorii
