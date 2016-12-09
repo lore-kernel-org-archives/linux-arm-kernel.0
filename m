@@ -1,89 +1,191 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 9 Dec 2016 19:29:32 +0000
-Subject: [PATCH v4] arm64: fpsimd: improve stacking logic in
- non-interruptible context
-In-Reply-To: <20161209182155.GB21051@e104818-lin.cambridge.arm.com>
-References: <1481301992-2344-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161209182155.GB21051@e104818-lin.cambridge.arm.com>
-Message-ID: <20161209192932.GD1574@e103592.cambridge.arm.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Fri, 09 Dec 2016 19:49:37 +0000
+Subject: [PATCH] ARM: soft-reboot into same mode that we entered the kernel
+Message-ID: <E1cFRAn-0003ob-HH@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2016 at 06:21:55PM +0000, Catalin Marinas wrote:
-> On Fri, Dec 09, 2016 at 04:46:32PM +0000, Ard Biesheuvel wrote:
-> >  void kernel_neon_begin_partial(u32 num_regs)
-> >  {
-> > -	if (in_interrupt()) {
-> > -		struct fpsimd_partial_state *s = this_cpu_ptr(
-> > -			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
-> > +	struct fpsimd_partial_state *s;
-> > +	int level;
-> > +
-> > +	preempt_disable();
-> > +
-> > +	level = this_cpu_inc_return(kernel_neon_nesting_level);
-> > +	BUG_ON(level > 3);
-> > +
-> > +	if (level > 1) {
-> > +		s = this_cpu_ptr(nested_fpsimdstate);
-> >  
-> > -		BUG_ON(num_regs > 32);
-> > -		fpsimd_save_partial_state(s, roundup(num_regs, 2));
-> > +		WARN_ON_ONCE(num_regs > 32);
-> > +		num_regs = min(roundup(num_regs, 2), 32U);
-> > +
-> > +		fpsimd_save_partial_state(&s[level - 2], num_regs);
-> >  	} else {
-> >  		/*
-> >  		 * Save the userland FPSIMD state if we have one and if we
-> > @@ -241,7 +256,6 @@ void kernel_neon_begin_partial(u32 num_regs)
-> >  		 * that there is no longer userland FPSIMD state in the
-> >  		 * registers.
-> >  		 */
-> > -		preempt_disable();
-> >  		if (current->mm &&
-> >  		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
-> >  			fpsimd_save_state(&current->thread.fpsimd_state);
-> 
-> I wonder whether we could actually do this saving and flag/level setting
-> in reverse to simplify the races. Something like your previous patch but
-> only set TIF_FOREIGN_FPSTATE after saving:
-> 
-> 	level = this_cpu_read(kernel_neon_nesting_level);
-> 	if (level > 0) {
-> 		...
-> 		fpsimd_save_partial_state();
-> 	} else {
-> 		if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
-> 			fpsimd_save_state();
-> 		set_thread_flag(TIF_FOREIGN_FPSTATE);
-> 	}
-> 	this_cpu_inc(kernel_neon_nesting_level);
-> 
-> There is a risk of extra saving if we get an interrupt after
-> test_thread_flag() and before set_thread_flag() but I don't think this
-> would corrupt any state, just writing things twice.
+When we soft-reboot (eg, kexec) from one kernel into the next, we need
+to ensure that we enter the new kernel in the same processor mode as
+when we were entered, so that (eg) the new kernel can install its own
+hypervisor - the old kernel's hypervisor will have been overwritten.
 
-I would worry that we can save two states over the same buffer and then
-restore an uninitialised buffer in this case unless we are careful.
-Because the level-dependent code is now misbracketed by the inc/dec,
-a preempting call races with the outer call and use the same value.
+In order to do this, we need to pass a flag to cpu_reset() so it knows
+what to do, and we need to modify the kernel's own hypervisor stub to
+allow it to handle a soft-reboot.
 
-I guess we could do
+As we are always guaranteed to install our own hypervisor if we're
+entered in HYP32 mode, and KVM will have moved itself out of the way
+on kexec/normal reboot, we can assume that our hypervisor is in place
+when we want to kexec, so changing our hypervisor API should not be a
+problem.
 
-if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
-	fpsimd_save_state();
-clear_thread_flag(TIF_FOREIGN_FPSTATE);
+Tested-by: Keerthy <j-keerthy@ti.com>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+Mark,
 
-at the start unconditionally, before the _inc_return().
+Any opinions on this?
 
-The task state may then get saved in the middle of being saved, but
-as you say it shouldn't have changed in the meantime.  The nested
-save code may then do a partial save of the same state on top of that
-which could get restored at the inner kernel_neon_end() call.
+Thanks.
 
-> (disclaimer: I haven't thought of all the possible races and I'm not
-> entirely sure about the kernel_neon_end() part)
+ arch/arm/include/asm/proc-fns.h |  4 ++--
+ arch/arm/kernel/hyp-stub.S      | 36 ++++++++++++++++++++++++++++++------
+ arch/arm/kernel/reboot.c        | 12 ++++++++++--
+ arch/arm/mm/proc-v7.S           | 12 ++++++++----
+ 4 files changed, 50 insertions(+), 14 deletions(-)
 
-Cheers
----Dave
+diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
+index 8877ad5ffe10..f2e1af45bd6f 100644
+--- a/arch/arm/include/asm/proc-fns.h
++++ b/arch/arm/include/asm/proc-fns.h
+@@ -43,7 +43,7 @@ extern struct processor {
+ 	/*
+ 	 * Special stuff for a reset
+ 	 */
+-	void (*reset)(unsigned long addr) __attribute__((noreturn));
++	void (*reset)(unsigned long addr, bool hvc) __attribute__((noreturn));
+ 	/*
+ 	 * Idle the processor
+ 	 */
+@@ -88,7 +88,7 @@ extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte);
+ #else
+ extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte, unsigned int ext);
+ #endif
+-extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
++extern void cpu_reset(unsigned long addr, bool hvc) __attribute__((noreturn));
+ 
+ /* These three are private to arch/arm/kernel/suspend.c */
+ extern void cpu_do_suspend(void *);
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index 15d073ae5da2..cab1ac36939d 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -22,6 +22,9 @@
+ #include <asm/assembler.h>
+ #include <asm/virt.h>
+ 
++#define HVC_GET_VECTORS -1
++#define HVC_SOFT_RESTART 1
++
+ #ifndef ZIMAGE
+ /*
+  * For the kernel proper, we need to find out the CPU boot mode long after
+@@ -202,9 +205,18 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
+ ENDPROC(__hyp_stub_install_secondary)
+ 
+ __hyp_stub_do_trap:
+-	cmp	r0, #-1
+-	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
+-	mcrne	p15, 4, r0, c12, c0, 0	@ set HVBAR
++	cmp	r0, #HVC_GET_VECTORS
++	bne	1f
++	mrc	p15, 4, r0, c12, c0, 0	@ get HVBAR
++	b	__hyp_stub_exit
++
++1:	teq	r0, #HVC_SOFT_RESTART
++	bne	1f
++	mov	r0, r3
++	bx	r0
++
++1:	mcrne	p15, 4, r0, c12, c0, 0	@ set HVBAR
++__hyp_stub_exit:
+ 	__ERET
+ ENDPROC(__hyp_stub_do_trap)
+ 
+@@ -231,14 +243,26 @@ ENDPROC(__hyp_stub_do_trap)
+  * initialisation entry point.
+  */
+ ENTRY(__hyp_get_vectors)
+-	mov	r0, #-1
++	mov	r0, #HVC_GET_VECTORS
++	__HVC(0)
++	ret	lr
+ ENDPROC(__hyp_get_vectors)
+-	@ fall through
++
+ ENTRY(__hyp_set_vectors)
++	tst	r0, #31
++	bne	1f
+ 	__HVC(0)
+-	ret	lr
++1:	ret	lr
+ ENDPROC(__hyp_set_vectors)
+ 
++ENTRY(__hyp_soft_restart)
++	mov	r3, r0
++	mov	r0, #HVC_SOFT_RESTART
++	__HVC(0)
++	mov	r0, r3
++	ret	lr
++ENDPROC(__hyp_soft_restart)
++
+ #ifndef ZIMAGE
+ .align 2
+ .L__boot_cpu_mode_offset:
+diff --git a/arch/arm/kernel/reboot.c b/arch/arm/kernel/reboot.c
+index 3fa867a2aae6..f0e3c7f1ea21 100644
+--- a/arch/arm/kernel/reboot.c
++++ b/arch/arm/kernel/reboot.c
+@@ -12,10 +12,11 @@
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/idmap.h>
++#include <asm/virt.h>
+ 
+ #include "reboot.h"
+ 
+-typedef void (*phys_reset_t)(unsigned long);
++typedef void (*phys_reset_t)(unsigned long, bool);
+ 
+ /*
+  * Function pointers to optional machine specific functions
+@@ -36,6 +37,7 @@ static u64 soft_restart_stack[16];
+ static void __soft_restart(void *addr)
+ {
+ 	phys_reset_t phys_reset;
++	bool hvc = false;
+ 
+ 	/* Take out a flat memory mapping. */
+ 	setup_mm_for_reboot();
+@@ -51,7 +53,13 @@ static void __soft_restart(void *addr)
+ 
+ 	/* Switch to the identity mapping. */
+ 	phys_reset = (phys_reset_t)virt_to_idmap(cpu_reset);
+-	phys_reset((unsigned long)addr);
++
++#ifdef CONFIG_ARM_VIRT_EXT
++	/* original stub should be restored by kvm */
++	hvc = is_hyp_mode_available();
++#endif
++
++	phys_reset((unsigned long)addr, hvc);
+ 
+ 	/* Should never get here. */
+ 	BUG();
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index d00d52c9de3e..1846ca4255d0 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -53,11 +53,15 @@ ENDPROC(cpu_v7_proc_fin)
+ 	.align	5
+ 	.pushsection	.idmap.text, "ax"
+ ENTRY(cpu_v7_reset)
+-	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
+-	bic	r1, r1, #0x1			@ ...............m
+- THUMB(	bic	r1, r1, #1 << 30 )		@ SCTLR.TE (Thumb exceptions)
+-	mcr	p15, 0, r1, c1, c0, 0		@ disable MMU
++	mrc	p15, 0, r2, c1, c0, 0		@ ctrl register
++	bic	r2, r2, #0x1			@ ...............m
++ THUMB(	bic	r2, r2, #1 << 30 )		@ SCTLR.TE (Thumb exceptions)
++	mcr	p15, 0, r2, c1, c0, 0		@ disable MMU
+ 	isb
++#ifdef CONFIG_ARM_VIRT_EXT
++	teq	r1, #0
++	bne	__hyp_soft_restart
++#endif
+ 	bx	r0
+ ENDPROC(cpu_v7_reset)
+ 	.popsection
+-- 
+2.7.4
