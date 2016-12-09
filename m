@@ -1,12 +1,12 @@
 From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Fri, 9 Dec 2016 00:21:58 +0000
+Date: Fri, 9 Dec 2016 00:22:21 +0000
 Subject: [PATCH 3/3] ASoC: simple-card-utils: enable
  clocks/clock-names/clock-ranges
 In-Reply-To: <20161208220901.GN5423@codeaurora.org>
 References: <874m2jvtmw.wl%kuninori.morimoto.gx@renesas.com>
  <87zikbuezr.wl%kuninori.morimoto.gx@renesas.com>
  <20161208220901.GN5423@codeaurora.org>
-Message-ID: <8760muymuo.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <874m2eymu3.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -56,4 +56,4 @@ Hi Stephen
 > based on some sort of other knowledge.
 
 OK, thanks. Let's skip this patch.
-But I believe this idea itself is not wrong (?)
+But I believe this idea/method itself is not wrong (?)
