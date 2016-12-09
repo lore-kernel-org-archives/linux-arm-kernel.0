@@ -1,132 +1,97 @@
-From: rrichter@cavium.com (Robert Richter)
-Date: Fri, 9 Dec 2016 19:10:41 +0100
-Subject: [PATCH] arm64: mm: Fix NOMAP page initialization
-Message-ID: <1481307042-29773-1-git-send-email-rrichter@cavium.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 9 Dec 2016 12:12:01 -0600
+Subject: [PATCH 10/11] Document: dt: binding: imx: update doc for imx6sll
+In-Reply-To: <1480660774-25055-11-git-send-email-ping.bai@nxp.com>
+References: <1480660774-25055-1-git-send-email-ping.bai@nxp.com>
+ <1480660774-25055-11-git-send-email-ping.bai@nxp.com>
+Message-ID: <20161209181201.ewcqeqslyf3je7kq@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ThunderX systems with certain memory configurations we see the
-following BUG_ON():
+On Fri, Dec 02, 2016 at 02:39:33PM +0800, Bai Ping wrote:
+> Add necessary document update for i.MX6SLL support.
+> 
+> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> ---
+>  .../devicetree/bindings/clock/imx6sll-clock.txt    | 13 ++++++++
+>  .../bindings/pinctrl/fsl,imx6sll-pinctrl.txt       | 37 ++++++++++++++++++++++
+>  2 files changed, 50 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/imx6sll-clock.txt
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx6sll-pinctrl.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/imx6sll-clock.txt b/Documentation/devicetree/bindings/clock/imx6sll-clock.txt
+> new file mode 100644
+> index 0000000..4f52efa
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/imx6sll-clock.txt
+> @@ -0,0 +1,13 @@
+> +* Clock bindings for Freescale i.MX6 UltraLite
 
- kernel BUG at mm/page_alloc.c:1848!
+I thought UltraLite was MX6UL?
 
-This happens for some configs with 64k page size enabled. The BUG_ON()
-checks if start and end page of a memmap range belongs to the same
-zone.
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,imx6sll-ccm"
+> +- reg: Address and length of the register set
+> +- #clock-cells: Should be <1>
+> +- clocks: list of clock specifiers, must contain an entry for each required
+> +  entry in clock-names
+> +- clock-names: should include entries "ckil", "osc", "ipp_di0" and "ipp_di1"
+> +
+> +The clock consumer should specify the desired clock by having the clock
+> +ID in its "clocks" phandle cell.  See include/dt-bindings/clock/imx6sll-clock.h
+> +for the full list of i.MX6 SLL clock IDs.
+> diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx6sll-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx6sll-pinctrl.txt
+> new file mode 100644
+> index 0000000..096e471
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx6sll-pinctrl.txt
+> @@ -0,0 +1,37 @@
+> +* Freescale i.MX6 UltraLite IOMUX Controller
 
-The BUG_ON() check fails if a memory zone contains NOMAP regions. In
-this case the node information of those pages is not initialized. This
-causes an inconsistency of the page links with wrong zone and node
-information for that pages. NOMAP pages from node 1 still point to the
-mem zone from node 0 and have the wrong nid assigned.
+ditto
 
-The reason for the mis-configuration is a change in pfn_valid() which
-reports pages marked NOMAP as invalid:
-
- 68709f45385a arm64: only consider memblocks with NOMAP cleared for linear mapping
-
-This causes pages marked as nomap being no longer reassigned to the
-new zone in memmap_init_zone() by calling __init_single_pfn().
-
-Fixing this by implementing an arm64 specific early_pfn_valid(). This
-causes the whole mem range including NOMAP memory to be initialized by
-__init_single_page() and ensures consistency of page links to zone,
-node and section.
-
-The HAVE_ARCH_PFN_VALID config option now requires an explicit
-definiton of early_pfn_valid() in the same way as pfn_valid(). This
-allows a customized implementation of early_pfn_valid() which
-redirects to memblock_is_memory() for arm64.
-
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- arch/arm/include/asm/page.h   |  1 +
- arch/arm64/include/asm/page.h |  2 ++
- arch/arm64/mm/init.c          | 12 ++++++++++++
- include/linux/mmzone.h        |  5 ++++-
- 4 files changed, 19 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
-index 4355f0ec44d6..79761bd55f94 100644
---- a/arch/arm/include/asm/page.h
-+++ b/arch/arm/include/asm/page.h
-@@ -158,6 +158,7 @@ typedef struct page *pgtable_t;
- 
- #ifdef CONFIG_HAVE_ARCH_PFN_VALID
- extern int pfn_valid(unsigned long);
-+#define early_pfn_valid(pfn)	pfn_valid(pfn)
- #endif
- 
- #include <asm/memory.h>
-diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
-index 8472c6def5ef..17ceb7435ded 100644
---- a/arch/arm64/include/asm/page.h
-+++ b/arch/arm64/include/asm/page.h
-@@ -49,6 +49,8 @@ typedef struct page *pgtable_t;
- 
- #ifdef CONFIG_HAVE_ARCH_PFN_VALID
- extern int pfn_valid(unsigned long);
-+extern int early_pfn_valid(unsigned long);
-+#define early_pfn_valid early_pfn_valid
- #endif
- 
- #include <asm/memory.h>
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 212c4d1e2f26..fbc136533472 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -145,11 +145,23 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
- #endif /* CONFIG_NUMA */
- 
- #ifdef CONFIG_HAVE_ARCH_PFN_VALID
-+
- int pfn_valid(unsigned long pfn)
- {
- 	return memblock_is_map_memory(pfn << PAGE_SHIFT);
- }
- EXPORT_SYMBOL(pfn_valid);
-+
-+/*
-+ * We use memblock_is_memory() here to make sure all pages including
-+ * NOMAP ranges are initialized with __init_single_page().
-+ */
-+int early_pfn_valid(unsigned long pfn)
-+{
-+	return memblock_is_memory(pfn << PAGE_SHIFT);
-+}
-+EXPORT_SYMBOL(early_pfn_valid);
-+
- #endif
- 
- #ifndef CONFIG_SPARSEMEM
-diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
-index 0f088f3a2fed..bedcf8a95881 100644
---- a/include/linux/mmzone.h
-+++ b/include/linux/mmzone.h
-@@ -1170,12 +1170,16 @@ static inline struct mem_section *__pfn_to_section(unsigned long pfn)
- }
- 
- #ifndef CONFIG_HAVE_ARCH_PFN_VALID
-+
- static inline int pfn_valid(unsigned long pfn)
- {
- 	if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
- 		return 0;
- 	return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
- }
-+
-+#define early_pfn_valid(pfn)	pfn_valid(pfn)
-+
- #endif
- 
- static inline int pfn_present(unsigned long pfn)
-@@ -1200,7 +1204,6 @@ static inline int pfn_present(unsigned long pfn)
- #define pfn_to_nid(pfn)		(0)
- #endif
- 
--#define early_pfn_valid(pfn)	pfn_valid(pfn)
- void sparse_init(void);
- #else
- #define sparse_init()	do {} while (0)
--- 
-2.1.4
+> +
+> +Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
+> +and usage.
+> +
+> +Required properties:
+> +- compatible: "fsl,imx6sll-iomuxc"
+> +- fsl,pins: each entry consists of 6 integers and represents the mux and config
+> +  setting for one pin.  The first 5 integers <mux_reg conf_reg input_reg mux_val
+> +  input_val> are specified using a PIN_FUNC_ID macro, which can be found in
+> +  imx6ul-pinfunc.h under device tree source folder.  The last integer CONFIG is
+> +  the pad setting value like pull-up on this pin.  Please refer to i.MX6SLL
+> +  Reference Manual for detailed CONFIG settings.
+> +
+> +CONFIG bits definition:
+> +PAD_CTL_LVE			(1 << 22)
+> +PAD_CTL_HYS                     (1 << 16)
+> +PAD_CTL_PUS_100K_DOWN           (0 << 14)
+> +PAD_CTL_PUS_47K_UP              (1 << 14)
+> +PAD_CTL_PUS_100K_UP             (2 << 14)
+> +PAD_CTL_PUS_22K_UP              (3 << 14)
+> +PAD_CTL_PUE                     (1 << 13)
+> +PAD_CTL_PKE                     (1 << 12)
+> +PAD_CTL_ODE                     (1 << 11)
+> +PAD_CTL_SPEED_LOW               (0 << 6)
+> +PAD_CTL_SPEED_MED               (1 << 6)
+> +PAD_CTL_SPEED_HIGH              (3 << 6)
+> +PAD_CTL_DSE_DISABLE             (0 << 3)
+> +PAD_CTL_DSE_260ohm              (1 << 3)
+> +PAD_CTL_DSE_130ohm              (2 << 3)
+> +PAD_CTL_DSE_87ohm               (3 << 3)
+> +PAD_CTL_DSE_65ohm               (4 << 3)
+> +PAD_CTL_DSE_52ohm               (5 << 3)
+> +PAD_CTL_DSE_43ohm               (6 << 3)
+> +PAD_CTL_DSE_37ohm               (7 << 3)
+> +PAD_CTL_SRE_FAST                (1 << 0)
+> +PAD_CTL_SRE_SLOW                (0 << 0)
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
