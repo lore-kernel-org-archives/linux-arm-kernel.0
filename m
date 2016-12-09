@@ -1,34 +1,29 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 9 Dec 2016 12:29:55 +0530
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <yw1xy3zqxt7x.fsf@unicorn.mansr.com>
-References: <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
- <20161206051222.GQ6408@localhost> <5846B237.8060409@free.fr>
- <yw1xwpfd2o9f.fsf@unicorn.mansr.com>
- <20161207164341.GX6408@localhost>
- <yw1xr35j1yd5.fsf@unicorn.mansr.com>
- <20161208103921.GC6408@localhost>
- <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
- <20161208163755.GH6408@localhost>
- <yw1xy3zqxt7x.fsf@unicorn.mansr.com>
-Message-ID: <20161209065955.GJ6408@localhost>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 9 Dec 2016 08:22:37 +0100 (CET)
+Subject: [RESEND PATCH v2 0/7] drm/vc4: VEC (SDTV) output support
+In-Reply-To: <1480686493-4813-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1480686493-4813-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <68783643.33021.1481268157922@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2016 at 04:48:18PM +0000, M?ns Rullg?rd wrote:
-> Vinod Koul <vinod.koul@intel.com> writes:
-> 
-> > To make it efficient, disregarding your Sbox HW issue, the solution is
-> > virtual channels. You can delink physical channels and virtual channels. If
-> > one has SW controlled MUX then a channel can service any client. For few
-> > controllers request lines are hard wired so they cant use any channel. But
-> > if you dont have this restriction then driver can queue up many transactions
-> > from different controllers.
-> 
-> Have you been paying attention at all?  This exactly what the driver
-> ALREADY DOES.
+Hi,
 
-And have you read what the question was?
+> Boris Brezillon <boris.brezillon@free-electrons.com> hat am 2. Dezember 2016 um 14:48 geschrieben:
+> 
+> 
+> Sorry for the noise, but I forgot to Cc the DT maintainers.
+> 
+> Here is the 2nd version of the VC4/VEC series.
+> 
+> We still miss the two clock patches mentioned by Eric in the first
+> version to make the encoder work no matter the setting applied by the
+> bootloader.
 
--- 
-~Vinod
+are there any advices to test this feature?
+
+Is it possible to use an old Raspberry Pi B (256 MB RAM) for this?
+
+Thanks
+
+Stefan
