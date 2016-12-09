@@ -1,40 +1,59 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri,  9 Dec 2016 12:04:12 +0100
-Subject: [PATCH v2 04/11] Documentation: DT: binding: axp20x_usb_power: add
- axp223 compatible
+Date: Fri,  9 Dec 2016 12:04:10 +0100
+Subject: [PATCH v2 02/11] mfd: axp20x: add volatile and writeable reg ranges
+ for VBUS power supply driver
 In-Reply-To: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
 References: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
-Message-ID: <20161209110419.28981-5-quentin.schulz@free-electrons.com>
+Message-ID: <20161209110419.28981-3-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the "x-powers,axp223-usb-power-supply" to the list of
-compatibles for AXP20X VBUS power supply driver.
+The X-Powers AXP20X and AXP22X PMICs allow to choose the maximum voltage
+and minimum current delivered by the VBUS power supply.
+
+This adds the register used by the VBUS power supply driver to the range
+of volatile and writeable regs ranges.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
 
-v2:
- - adding small explanation on AXP223 variation compared to the AXP221,
+added in v2
 
- Documentation/devicetree/bindings/power/supply/axp20x_usb_power.txt | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/mfd/axp20x.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power/supply/axp20x_usb_power.txt b/Documentation/devicetree/bindings/power/supply/axp20x_usb_power.txt
-index f1d7bee..ba8d35f 100644
---- a/Documentation/devicetree/bindings/power/supply/axp20x_usb_power.txt
-+++ b/Documentation/devicetree/bindings/power/supply/axp20x_usb_power.txt
-@@ -3,6 +3,11 @@ AXP20x USB power supply
- Required Properties:
- -compatible: One of: "x-powers,axp202-usb-power-supply"
-                      "x-powers,axp221-usb-power-supply"
-+                     "x-powers,axp223-usb-power-supply"
-+
-+The AXP223 PMIC shares most of its behaviour with the AXP221 but has slight
-+variations such as the former being able to set the VBUS power supply max
-+current to 100mA, unlike the latter.
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index ba130be..6ee2cc6 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -65,12 +65,14 @@ static const struct regmap_access_table axp152_volatile_table = {
  
- This node is a subnode of the axp20x PMIC.
+ static const struct regmap_range axp20x_writeable_ranges[] = {
+ 	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
++	regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
+ 	regmap_reg_range(AXP20X_DCDC_MODE, AXP20X_FG_RES),
+ 	regmap_reg_range(AXP20X_RDC_H, AXP20X_OCV(AXP20X_OCV_MAX)),
+ };
  
+ static const struct regmap_range axp20x_volatile_ranges[] = {
+ 	regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_USB_OTG_STATUS),
++	regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
+ 	regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL2),
+ 	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
+ 	regmap_reg_range(AXP20X_ACIN_V_ADC_H, AXP20X_IPSOUT_V_HIGH_L),
+@@ -91,11 +93,13 @@ static const struct regmap_access_table axp20x_volatile_table = {
+ /* AXP22x ranges are shared with the AXP809, as they cover the same range */
+ static const struct regmap_range axp22x_writeable_ranges[] = {
+ 	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
++	regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
+ 	regmap_reg_range(AXP20X_DCDC_MODE, AXP22X_BATLOW_THRES1),
+ };
+ 
+ static const struct regmap_range axp22x_volatile_ranges[] = {
+ 	regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_PWR_OP_MODE),
++	regmap_reg_range(AXP20X_VBUS_IPSOUT_MGMT, AXP20X_VBUS_IPSOUT_MGMT),
+ 	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
+ 	regmap_reg_range(AXP22X_GPIO_STATE, AXP22X_GPIO_STATE),
+ 	regmap_reg_range(AXP20X_FG_RES, AXP20X_FG_RES),
 -- 
 2.9.3
