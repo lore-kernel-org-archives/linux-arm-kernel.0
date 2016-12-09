@@ -1,50 +1,52 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 9 Dec 2016 10:01:47 -0800
-Subject: [GIT PULL] ARM: SoC fixes
-Message-ID: <20161209180147.GA29286@localhost>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 9 Dec 2016 18:07:56 +0000
+Subject: [PATCH v4] arm64: fpsimd: improve stacking logic in
+ non-interruptible context
+In-Reply-To: <20161209172407.GC1574@e103592.cambridge.arm.com>
+References: <1481301992-2344-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20161209172407.GC1574@e103592.cambridge.arm.com>
+Message-ID: <20161209180756.GA21051@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Dec 09, 2016 at 05:24:08PM +0000, Dave P Martin wrote:
+> On Fri, Dec 09, 2016 at 04:46:32PM +0000, Ard Biesheuvel wrote:
+> > Currently, we allow kernel mode NEON in softirq or hardirq context by
+> > stacking and unstacking a slice of the NEON register file for each call
+> > to kernel_neon_begin() and kernel_neon_end(), respectively.
+> > 
+> > Given that
+> > a) a CPU typically spends most of its time in userland, during which time
+> >    no kernel mode NEON in process context is in progress,
+> > b) a CPU spends most of its time in the kernel doing other things than
+> >    kernel mode NEON when it gets interrupted to perform kernel mode NEON
+> >    in softirq context
+> > 
+> > the stacking and subsequent unstacking is only necessary if we are
+> > interrupting a thread while it is performing kernel mode NEON in process
+> > context, which means that in all other cases, we can simply preserve the
+> > userland FPSIMD state once, and only restore it upon return to userland,
+> > even if we are being invoked from softirq or hardirq context.
+> > 
+> > So instead of checking whether we are running in interrupt context, keep
+> > track of the level of nested kernel mode NEON calls in progress, and only
+> > perform the eager stack/unstack if the level exceeds 1.
+> > 
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> 
+> This looks good to me.
+> 
+> This should also make the SVE case trivial now: there can only be live
+> SVE state when in process context with !TIF_FOREIGN_FPSTATE, and the
+> SVE save/restore is then handled by fpsimd_{save,load}_state()
+> directly.  For deeper nesting levels, there is already no live SVE
+> state, so kernel_neon_{save,load}_partial_state() are enough in that
+> case.
 
-This should be our last set of fixes for 4.9. Please merge!
+That's still tricky for SVE. If you get an interrupt in
+kernel_neon_begin_partial() after the level has been incremented to 1
+but before fpsimd_save_state() has been called, SVE-unaware
+kernel_neon_{save,load}_partial_state() would corrupt the SVE state.
 
-
-Thanks,
-
--Olof
-
-The following changes since commit 909e481e2467f202b97d42beef246e8829416a85:
-
-  arm64: dts: juno: fix cluster sleep state entry latency on all SoC versions (2016-12-02 17:28:17 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
-
-for you to fetch changes up to 038ccb3e8cee52e07dc118ff99f47eaebc1d0746:
-
-  ARM: dts: orion5x: fix number of sata port for linkstation ls-gl (2016-12-08 10:19:24 -0800)
-
-----------------------------------------------------------------
-ARM: Final batch of SoC fixes
-
-A few fixes that have trickled in over the last week, all fixing minor
-errors in devicetrees -- UART pin assignment on Allwinner H3, correcting
-number of SATA ports on a Marvell-based Linkstation platform and a display
-clock fix for Freescale/NXP i.MX7D that fixes a freeze when starting up X.
-
-----------------------------------------------------------------
-Jorik Jonker (1):
-      dts: sun8i-h3: correct UART3 pin definitions
-
-Roger Shimizu (1):
-      ARM: dts: orion5x: fix number of sata port for linkstation ls-gl
-
-Stefan Agner (1):
-      ARM: dts: imx7d: fix LCDIF clock assignment
-
- arch/arm/boot/dts/imx7s.dtsi                   | 5 ++---
- arch/arm/boot/dts/orion5x-linkstation-lsgl.dts | 4 ++++
- arch/arm/boot/dts/sun8i-h3.dtsi                | 2 +-
- 3 files changed, 7 insertions(+), 4 deletions(-)
+-- 
+Catalin
