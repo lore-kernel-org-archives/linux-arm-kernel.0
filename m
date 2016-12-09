@@ -1,77 +1,67 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 9 Dec 2016 10:05:01 +0200
-Subject: [PATCH 3/3] clk: keystone: Add sci-clk driver support
-In-Reply-To: <20161208211044.GI5423@codeaurora.org>
-References: <1477053961-27128-1-git-send-email-t-kristo@ti.com>
- <1477053961-27128-4-git-send-email-t-kristo@ti.com>
- <20161208001348.GC5423@codeaurora.org>
- <cb608729-b617-0eab-5ddf-d78ff47b237e@ti.com>
- <20161208211044.GI5423@codeaurora.org>
-Message-ID: <22dacb0c-a3bc-50ce-e4b9-f74a0c706f20@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 9 Dec 2016 09:07:53 +0100
+Subject: [PATCH] ARM: dts: sun8i-q8-common: enable bluetooth on SDIO Wi-Fi
+In-Reply-To: <20161206080838.7523-1-icenowy@aosc.xyz>
+References: <20161206080838.7523-1-icenowy@aosc.xyz>
+Message-ID: <20161209080753.jmtbt6or2zylxtza@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/16 23:10, Stephen Boyd wrote:
-> On 12/08, Tero Kristo wrote:
->> On 08/12/16 02:13, Stephen Boyd wrote:
->>> On 10/21, Tero Kristo wrote:
->>>> diff --git a/drivers/clk/keystone/sci-clk.c b/drivers/clk/keystone/sci-clk.c
->>>> new file mode 100644
->>>> index 0000000..f6af5bd
->>>> --- /dev/null
->>>> +++ b/drivers/clk/keystone/sci-clk.c
->>
->>>
->>>> +
->>>> +	handle = devm_ti_sci_get_handle(dev);
->>>> +	if (IS_ERR(handle))
->>>> +		return PTR_ERR(handle);
->>>> +
->>>> +	provider = devm_kzalloc(dev, sizeof(*provider), GFP_KERNEL);
->>>> +	if (!provider)
->>>> +		return -ENOMEM;
->>>> +
->>>> +	provider->clocks = data;
->>>> +
->>>> +	provider->sci = handle;
->>>> +	provider->ops = &handle->ops.clk_ops;
->>>> +	provider->dev = dev;
->>>> +
->>>> +	ti_sci_init_clocks(provider);
->>>
->>> And if this fails?
->>
->> Yea this is kind of controversial. ti_sci_init_clocks() can fail if
->> any of the clocks registered will fail. I decided to have it this
->> way so that at least some clocks might work in failure cause, and
->> you might have a booting device instead of total lock-up.
->>
->> Obviously it could be done so that if any clock fails, we would
->> de-register all clocks at that point, but personally I think this is
->> a worse option.
->>
->> ti_sci_init_clocks could probably be modified to continue
->> registering clocks when a single clock fails though. Currently it
->> aborts at first failure.
->>
->
-> That sounds like a better approach if we don't care about
-> failures to register a clock. Returning a value from a function
-> and not using it isn't really a great design.
->
-> I worry that if we start returning errors from clk_hw_register()
-> that something will go wrong though, so really I don't know why
-> we want to ignore errors at all. Just for debugging a boot hang?
-> Can't we use early console to at least see that this driver is
-> failing to probe and debug that way?
+On Tue, Dec 06, 2016 at 04:08:38PM +0800, Icenowy Zheng wrote:
+> Some SDIO Wi-Fi chips (such as RTL8703AS) have a UART bluetooth, which
+> has a dedicated enable pin (PL8 in the reference design).
+> 
+> Enable the pin in the same way as the WLAN enable pins.
+> 
+> Tested on an A33 Q8 tablet with RTL8703AS.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+> 
+> This patch should be coupled with the uart1 node patch I send before:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/471997.html
+> 
+> For RTL8703AS, the rtl8723bs bluetooth code is used, which can be retrieve from:
+> https://github.com/lwfinger/rtl8723bs_bt
+> 
+>  arch/arm/boot/dts/sun8i-q8-common.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
+> index c676940..4aeb5bb 100644
+> --- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
+> @@ -88,7 +88,7 @@
+>  
+>  &r_pio {
+>  	wifi_pwrseq_pin_q8: wifi_pwrseq_pin at 0 {
+> -		pins = "PL6", "PL7", "PL11";
+> +		pins = "PL6", "PL7", "PL8", "PL11";
+>  		function = "gpio_in";
+>  		bias-pull-up;
+>  	};
 
-Early console can be used to debug that, but it is kind of annoying to 
-recompile most of the kernel when you suddenly need to use it.
+There's several things wrong here. The first one is that you rely
+solely on the pinctrl state to maintain a reset line. This is very
+fragile (especially since the GPIO pinctrl state are likely to go away
+at some point), but it also means that if your driver wants to recover
+from that situation at some point, it won't work.
 
-How about modifying the ti_sci_init_clocks func to print an error for 
-each failed clock?
+The other one is that the bluetooth and wifi chips are two devices in
+linux, and you assign that pin to the wrong device (wifi).
 
-If you insist on aborting the probe though if a single clock fails, I 
-can do that also.
+rfkill-gpio is made just for that, so please use it.
 
--Tero
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161209/8ee44e83/attachment.sig>
