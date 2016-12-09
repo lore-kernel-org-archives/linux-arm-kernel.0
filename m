@@ -1,5 +1,5 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 09 Dec 2016 11:34:36 +0000
+From: mans@mansr.com (1=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 09 Dec 2016 11:35:20 +0000
 Subject: Tearing down DMA transfer setup after DMA client has finished
 In-Reply-To: <6ce1ea97-1d68-2203-c7b4-73315e801655@laposte.net> (Sebastian
  Frias's message of "Fri, 9 Dec 2016 11:25:57 +0100")
@@ -11,7 +11,7 @@ References: <20fc9020-7278-bc2f-2a8d-43aff5cabff8@free.fr>
  <20161208163755.GH6408@localhost> <yw1xy3zqxt7x.fsf@unicorn.mansr.com>
  <20161209065955.GJ6408@localhost>
  <6ce1ea97-1d68-2203-c7b4-73315e801655@laposte.net>
-Message-ID: <yw1xpol1xrn7.fsf@unicorn.mansr.com>
+Message-ID: <yw1xoa0lxrlz.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -54,7 +54,8 @@ I wrote the driver.  I think I know what Mason and I are asking.
 
 For multiple back to back transfers to the same peripheral, it is indeed
 a slight optimisation.  What's apparently lacking is some way of doing a
-full flush 
+full flush at the end of a series of transfers, before switching the
+channel to another device.
 
 -- 
 M?ns Rullg?rd
