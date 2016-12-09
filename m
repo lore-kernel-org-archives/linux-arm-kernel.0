@@ -1,31 +1,28 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Fri, 9 Dec 2016 00:55:18 +0000
-Subject: [PATCH 3/3] ASoC: simple-card-utils: enable
- clocks/clock-names/clock-ranges
-In-Reply-To: <20161209002635.GD5423@codeaurora.org>
-References: <874m2jvtmw.wl%kuninori.morimoto.gx@renesas.com>
- <87zikbuezr.wl%kuninori.morimoto.gx@renesas.com>
- <20161208220901.GN5423@codeaurora.org>
- <874m2eymu3.wl%kuninori.morimoto.gx@renesas.com>
- <20161209002635.GD5423@codeaurora.org>
-Message-ID: <87y3zpylbc.wl%kuninori.morimoto.gx@renesas.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu,  8 Dec 2016 16:57:56 -0800
+Subject: [PATCH] ARM64: defconfig: enable DRM_MESON as module
+Message-ID: <20161209005756.12599-1-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+---
+To be added when the DRM driver lands upstream.
 
-Hi Stephen
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-> > > I don't see any reason why we need this patch though. The binding
-> > > works as is, so supporting different styles doesn't seem like a
-> > > good idea to me. Let's just keep what we have? Even if a sub-node
-> > > like cpu or codec gets more than one element in the clocks list
-> > > property, we can make that work by passing a clock-name then
-> > > based on some sort of other knowledge.
-> > 
-> > OK, thanks. Let's skip this patch.
-> > But I believe this idea/method itself is not wrong (?)
-> > 
-> Right it's not wrong, just seems confusing to have two methods.
-
-Thanks.
-Very clear for me :)
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 0f9d8900d685..2ce367dffb05 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -301,6 +301,7 @@ CONFIG_DRM_TEGRA=m
+ CONFIG_DRM_PANEL_SIMPLE=m
+ CONFIG_DRM_I2C_ADV7511=m
+ CONFIG_DRM_HISI_KIRIN=m
++CONFIG_DRM_MESON=m
+ CONFIG_FB=y
+ CONFIG_FB_ARMCLCD=y
+ CONFIG_BACKLIGHT_GENERIC=m
+-- 
+2.9.3
