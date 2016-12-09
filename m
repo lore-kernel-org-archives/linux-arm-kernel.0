@@ -1,38 +1,85 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri,  9 Dec 2016 12:04:19 +0100
-Subject: [PATCH v2 11/11] ARM: dtsi: sun8i-reference-design-tablet: use AXP223
- DTSI
+Date: Fri,  9 Dec 2016 12:04:14 +0100
+Subject: [PATCH v2 06/11] mfd: axp20x: add separate MFD cell for AXP223
 In-Reply-To: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
 References: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
-Message-ID: <20161209110419.28981-12-quentin.schulz@free-electrons.com>
+Message-ID: <20161209110419.28981-7-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously, the sun8i tablets used everything declared in AXP221 DTSI
-while they have an AXP223 PMIC.
+The AXP223 shares most of its logic with the AXP221 but has some
+differences for the VBUS power supply driver. Thus, to probe the driver
+with the correct compatible, the AXP221 and the AXP223 now have separate
+MFD cells.
 
-This corrects that so the sun8i tablets can get some features the AXP223
-has (at the moment, ability to have 100mA as maximal current on VBUS
-power supply).
+AXP221 MFD cells are renamed from axp22x_cells to axp221_cells to avoid
+confusion.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-index 08cd001..ea79c33 100644
---- a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-+++ b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-@@ -136,7 +136,7 @@
- 	};
+v2:
+ - correct indentation,
+ - renaming axp22x_cells to axp221_cells to avoid confusion between axp22x,
+axp221 and axp223
+
+ drivers/mfd/axp20x.c | 28 ++++++++++++++++++++++++----
+ 1 file changed, 24 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index 6ee2cc6..b31f123 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -591,7 +591,22 @@ static struct mfd_cell axp20x_cells[] = {
+ 	},
  };
  
--#include "axp22x.dtsi"
-+#include "axp223.dtsi"
- 
- &reg_aldo1 {
- 	regulator-always-on;
+-static struct mfd_cell axp22x_cells[] = {
++static struct mfd_cell axp221_cells[] = {
++	{
++		.name		= "axp20x-pek",
++		.num_resources	= ARRAY_SIZE(axp22x_pek_resources),
++		.resources	= axp22x_pek_resources,
++	}, {
++		.name		= "axp20x-regulator",
++	}, {
++		.name		= "axp20x-usb-power-supply",
++		.of_compatible	= "x-powers,axp221-usb-power-supply",
++		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
++		.resources	= axp22x_usb_power_supply_resources,
++	},
++};
++
++static struct mfd_cell axp223_cells[] = {
+ 	{
+ 		.name			= "axp20x-pek",
+ 		.num_resources		= ARRAY_SIZE(axp22x_pek_resources),
+@@ -600,7 +615,7 @@ static struct mfd_cell axp22x_cells[] = {
+ 		.name			= "axp20x-regulator",
+ 	}, {
+ 		.name		= "axp20x-usb-power-supply",
+-		.of_compatible	= "x-powers,axp221-usb-power-supply",
++		.of_compatible	= "x-powers,axp223-usb-power-supply",
+ 		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
+ 		.resources	= axp22x_usb_power_supply_resources,
+ 	},
+@@ -793,9 +808,14 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
+ 		axp20x->regmap_irq_chip = &axp20x_regmap_irq_chip;
+ 		break;
+ 	case AXP221_ID:
++		axp20x->nr_cells = ARRAY_SIZE(axp221_cells);
++		axp20x->cells = axp221_cells;
++		axp20x->regmap_cfg = &axp22x_regmap_config;
++		axp20x->regmap_irq_chip = &axp22x_regmap_irq_chip;
++		break;
+ 	case AXP223_ID:
+-		axp20x->nr_cells = ARRAY_SIZE(axp22x_cells);
+-		axp20x->cells = axp22x_cells;
++		axp20x->nr_cells = ARRAY_SIZE(axp223_cells);
++		axp20x->cells = axp223_cells;
+ 		axp20x->regmap_cfg = &axp22x_regmap_config;
+ 		axp20x->regmap_irq_chip = &axp22x_regmap_irq_chip;
+ 		break;
 -- 
 2.9.3
