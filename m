@@ -1,31 +1,47 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 09 Dec 2016 15:37:15 -0800
-Subject: [RESEND PATCH v2 5/7] drm/vc4: Document VEC DT binding
-In-Reply-To: <20161209210028.ehylahb6o4mv5eil@rob-hp-laptop>
-References: <1480686493-4813-1-git-send-email-boris.brezillon@free-electrons.com>
- <1480686493-4813-6-git-send-email-boris.brezillon@free-electrons.com>
- <20161209210028.ehylahb6o4mv5eil@rob-hp-laptop>
-Message-ID: <87bmwkvfmc.fsf@eliezer.anholt.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 9 Dec 2016 15:37:29 -0800
+Subject: [PATCH] usb: dwc3: omap: remove devm_request_threaded_irq
+In-Reply-To: <e394c44c-3ae3-b0ac-2b02-a886ca2510bd@ti.com>
+References: <20161209205508.6456-1-grygorii.strashko@ti.com>
+ <20161209215958.GN4920@atomide.com>
+ <db75608b-f92c-6bfa-80a9-a3ab3adf7c23@ti.com>
+ <20161209230457.GO4920@atomide.com>
+ <e394c44c-3ae3-b0ac-2b02-a886ca2510bd@ti.com>
+Message-ID: <20161209233728.GP4920@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring <robh@kernel.org> writes:
+* Grygorii Strashko <grygorii.strashko@ti.com> [161209 15:32]:
+> 
+> 
+> On 12/09/2016 05:04 PM, Tony Lindgren wrote:
+> > * Grygorii Strashko <grygorii.strashko@ti.com> [161209 14:46]:
+> >>
+> >>
+> >> On 12/09/2016 03:59 PM, Tony Lindgren wrote:
+> >>> * Grygorii Strashko <grygorii.strashko@ti.com> [161209 12:55]:
+> >>>> Switch back from devm_request_threaded_irq() to request_threaded_irq() to
+> >>>> avoid races between interrupt handler execution and PM runtime in error
+> >>>> handling code path in probe and in dwc3_omap_remove():
+> >>>
+> >>> Can't you just call disable_irq() on the exit path instead of removing
+> >>> devm?
+> >>>
+> >>
+> >> I can. But what will be the benefit from using devm then?
+> > 
+> > Hmm good point. Probably the least number of code would be to just
+> > do NOAUTOEN before devm_request_irq(), then only do enable_irq()
+> > just before returning from the probe. After all, we don't really
+> > want the irq running until the probe is done.
+> > 
+> > I think that would leave out the extra handling from the error
+> > path?
+> > 
+> 
+> Good question here is - do we need this irq to be enabled for sub-device
+> probing from of_platform_populate()? ;)  
 
-> On Fri, Dec 02, 2016 at 02:48:11PM +0100, Boris Brezillon wrote:
->> Document the DT binding for the VEC (Video EnCoder) IP.
->> 
->> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->> ---
->>  Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt | 14 ++++++++++++++
->>  1 file changed, 14 insertions(+)
->
-> Acked-by: Rob Herring <robh@kernel.org>
+No!
 
-Thanks.  Pulling the series now.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161209/86746d63/attachment.sig>
+Tony
