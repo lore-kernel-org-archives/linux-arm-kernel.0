@@ -1,53 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  9 Dec 2016 15:53:31 +0000
-Subject: [PATCH 6/6] arm64: KVM: pmu: Reset PMSELR_EL0.SEL to a sane value
- before entering the guest
-In-Reply-To: <1481298811-30798-1-git-send-email-marc.zyngier@arm.com>
-References: <1481298811-30798-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1481298811-30798-7-git-send-email-marc.zyngier@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 09 Dec 2016 17:19:07 +0100
+Subject: [PATCH 1/3] rtc: armada38x: improve RTC errata implementation
+In-Reply-To: <20161208172923.GQ26852@lunn.ch> (Andrew Lunn's message of "Thu,
+ 8 Dec 2016 18:29:23 +0100")
+References: <20161208171010.29446-1-gregory.clement@free-electrons.com>
+ <20161208171010.29446-2-gregory.clement@free-electrons.com>
+ <20161208172923.GQ26852@lunn.ch>
+Message-ID: <8760mtf538.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARMv8 architecture allows the cycle counter to be configured
-by setting PMSELR_EL0.SEL==0x1f and then accessing PMXEVTYPER_EL0,
-hence accessing PMCCFILTR_EL0. But it disallows the use of
-PMSELR_EL0.SEL==0x1f to access the cycle counter itself through
-PMXEVCNTR_EL0.
+Hi Andrew,
+ 
+ On jeu., d?c. 08 2016, Andrew Lunn <andrew@lunn.ch> wrote:
 
-Linux itself doesn't violate this rule, but we may end up with
-PMSELR_EL0.SEL being set to 0x1f when we enter a guest. If that
-guest accesses PMXEVCNTR_EL0, the access may UNDEF at EL1,
-despite the guest not having done anything wrong.
+>> +struct str_value_to_freq {
+>> +	unsigned long value;
+>> +	u8 freq;
+>> +} __packed;
+>> +
+>> +static unsigned long read_rtc_register_wa(struct armada38x_rtc *rtc, u8 rtc_reg)
+>> +{
+>> +	unsigned long value_array[SAMPLE_NR], i, j, value;
+>> +	unsigned long max = 0, index_max = SAMPLE_NR - 1;
+>> +	struct str_value_to_freq value_to_freq[SAMPLE_NR];
+>
+> Hi Gregory
+>
+> This appears to be putting over 900 bytes on the stack. Is there any
 
-In order to avoid this unfortunate course of events (haha!), let's
-sanitize PMSELR_EL0 on guest entry. This ensures that the guest
-won't explode unexpectedly.
+Actually the structure being packed it is 500 bytes.
 
-Cc: stable at vger.kernel.org #4.6+
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kvm/hyp/switch.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+> danger of overflowing the stack? Would it be safer to make these
+> arrays part of armada38x_rtc?
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 83037cd..0c848c1 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -85,7 +85,13 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
- 	write_sysreg(val, hcr_el2);
- 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
- 	write_sysreg(1 << 15, hstr_el2);
--	/* Make sure we trap PMU access from EL0 to EL2 */
-+	/*
-+	 * Make sure we trap PMU access from EL0 to EL2. Also sanitize
-+	 * PMSELR_EL0 to make sure it never contains the cycle
-+	 * counter, which could make a PMXEVCNTR_EL0 access UNDEF at
-+	 * EL1 instead of being trapped to EL2.
-+	 */
-+	write_sysreg(0, pmselr_el0);
- 	write_sysreg(ARMV8_PMU_USERENR_MASK, pmuserenr_el0);
- 	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
- 	__activate_traps_arch()();
+We could do this if you fear a stack overflow.
+
+Gregory
+
+>
+>        Andrew
+
 -- 
-2.1.4
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
