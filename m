@@ -1,99 +1,113 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 9 Dec 2016 09:57:57 +0100
-Subject: [PATCH RFC] drm/sun4i: rgb: Add 5% tolerance to dot clock
- frequency check
-In-Reply-To: <7603150.D9x404uVey@avalon>
-References: <20161124112231.4297-1-wens@csie.org>
- <20161206172911.z6sbjzgqv3vfcrfh@lukather>
- <CAGb2v65uTH_PD28KqAhhzkE5zhLt54GUb7xXNxxe0xHW0A+xjQ@mail.gmail.com>
- <7603150.D9x404uVey@avalon>
-Message-ID: <20161209085757.gsgw5xsmmxogx7cz@lukather>
+From: rafalo@cadence.com (Rafal Ozieblo)
+Date: Fri, 9 Dec 2016 09:20:08 +0000
+Subject: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in Cadence GEM.
+In-Reply-To: <07C910AB6AC6C345A093D5A08F5AF568CB74AF28@CHN-SV-EXMX03.mchp-main.com>
+References: <1481134912-2243-1-git-send-email-andrei.pistirica@microchip.com>
+ <20161207193908.GA13062@netboy> <20161207210416.GA27622@netboy>
+ <07C910AB6AC6C345A093D5A08F5AF568CB74AF28@CHN-SV-EXMX03.mchp-main.com>
+Message-ID: <BN3PR07MB2516992DEE883FAD6DC3ED08C9870@BN3PR07MB2516.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moi,
+-----Original Message-----
+> From: Andrei.Pistirica at microchip.com [mailto:Andrei.Pistirica at microchip.com]
+> Sent: 8 grudnia 2016 15:42
+> To: richardcochran at gmail.com
+> Cc: netdev at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; davem at davemloft.net; nicolas.ferre at atmel.com; harinikatakamlinux at gmail.com; harini.katakam at xilinx.com; punnaia at xilinx.com; michals at xilinx.com; anirudh at xilinx.com; boris.brezillon at free-electrons.com; alexandre.belloni at free-electrons.com; tbultel at pixelsurmer.com; Rafal Ozieblo
+> Subject: RE: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in Cadence GEM.
+>
+>
+>
+> > -----Original Message-----
+> > From: Richard Cochran [mailto:richardcochran at gmail.com]
+> > Sent: Wednesday, December 07, 2016 11:04 PM
+> > To: Andrei Pistirica - M16132
+> > Cc: netdev at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> > kernel at lists.infradead.org; davem at davemloft.net;
+> > nicolas.ferre at atmel.com; harinikatakamlinux at gmail.com;
+> > harini.katakam at xilinx.com; punnaia at xilinx.com; michals at xilinx.com;
+> > anirudh at xilinx.com; boris.brezillon at free-electrons.com;
+> > alexandre.belloni at free-electrons.com; tbultel at pixelsurmer.com;
+> > rafalo at cadence.com
+> > Subject: Re: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in
+> > Cadence GEM.
+> >
+> > On Wed, Dec 07, 2016 at 08:39:09PM +0100, Richard Cochran wrote:
+> > > > +static s32 gem_ptp_max_adj(unsigned int f_nom) {
+> > > > +       u64 adj;
+> > > > +
+> > > > +       /* The 48 bits of seconds for the GEM overflows every:
+> > > > +        * 2^48/(365.25 * 24 * 60 *60) =~ 8 925 512 years (~= 9 mil years),
+> > > > +        * thus the maximum adjust frequency must not overflow CNS
+> > register:
+> > > > +        *
+> > > > +        * addend  = 10^9/nominal_freq
+> > > > +        * adj_max = +/- addend*ppb_max/10^9
+> > > > +        * max_ppb = (2^8-1)*nominal_freq-10^9
+> > > > +        */
+> > > > +       adj = f_nom;
+> > > > +       adj *= 0xffff;
+> > > > +       adj -= 1000000000ULL;
+> > >
+> > > What is this computation, and how does it relate to the comment?
+>
+> I considered the following simple equation: increment value at nominal frequency (which is 10^9/nominal frequency nsecs) + the maximum drift value (nsecs) <= maximum increment value@nominal frequency (which is 8bit:0xffff).
+> If maximum drift is written as function of nominal frequency and maximum ppb, then the equation above yields that the maximum ppb is: (2^8 - 1) *nominal_frequency - 10^9. The equation is also simplified by the fact that the drift is written as ppm + 16bit_fractions and the increment value is written as nsec + 16bit_fractions.
+>
+> Rafal said that this value is hardcoded: 0x64E6, while Harini said: 250000000.
 
-On Wed, Dec 07, 2016 at 11:48:55AM +0200, Laurent Pinchart wrote:
-> On Wednesday 07 Dec 2016 10:26:25 Chen-Yu Tsai wrote:
-> > On Wed, Dec 7, 2016 at 1:29 AM, Maxime Ripard wrote:
-> > > On Thu, Nov 24, 2016 at 07:22:31PM +0800, Chen-Yu Tsai wrote:
-> > >> The panels shipped with Allwinner devices are very "generic", i.e.
-> > >> they do not have model numbers or reliable sources of information
-> > >> for the timings (that we know of) other than the fex files shipped
-> > >> on them. The dot clock frequency provided in the fex files have all
-> > >> been rounded to the nearest MHz, as that is the unit used in them.
-> > >> 
-> > >> We were using the simple panel "urt,umsh-8596md-t" as a substitute
-> > >> for the A13 Q8 tablets in the absence of a specific model for what
-> > >> may be many different but otherwise timing compatible panels. This
-> > >> was usable without any visual artifacts or side effects, until the
-> > >> dot clock rate check was added in commit bb43d40d7c83 ("drm/sun4i:
-> > >> rgb: Validate the clock rate").
-> > >> 
-> > >> The reason this check fails is because the dotclock frequency for
-> > >> this model is 33.26 MHz, which is not achievable with our dot clock
-> > >> hardware, and the rate returned by clk_round_rate deviates slightly,
-> > >> causing the driver to reject the display mode.
-> > >> 
-> > >> The LCD panels have some tolerance on the dot clock frequency, even
-> > >> if it's not specified in their datasheets.
-> > >> 
-> > >> This patch adds a 5% tolerence to the dot clock check.
-> > > 
-> > > As we discussed already, I really believe this is just as arbitrary as
-> > > the current behaviour.
-> > 
-> > Yes. I agree. This patch is mainly to give something that works for
-> > people who don't care about the details, and to get some feedback
-> > from people that do.
-> > 
-> > > Some panels require an exact frequency,
-> 
-> There's no such thing as an exact frequency, there will always be some 
-> tolerance (and if your display controller can really generate an exact 
-> frequency I'd be very interested in that hardware :-)).
-> 
-> This is something that has been bugging me for some time now. The problem has 
-> been mostly ignored, or worked around in different ways by different drivers. 
-> I'm afraid I have no generic solution available, but I think we should try to 
-> agree on a common behaviour.
-> 
-> I don't believe it would be reasonable to request each panel to report a 
-> tolerance, as the value is most of the time not available from the 
-> documentation (when documentation is available). Worse, I'm pretty sure that 
-> most panels documented as fixed timing can actually accept a wide range of 
-> timings. The timings reported in the datasheet are just the nominal values.
-> 
-> Panels that don't support multiple resolutions obviously require fixed active 
-> h/v values. Even if they can tolerate some departure from the nominal timings 
-> for the sync and porches lengths, it might not be very useful to support that 
-> as I don't expect the display controllers and encoders to be a limiting factor 
-> by not supporting the particular timings that a panel considers as nominal. On 
-> the other hand, departing from the nominal pixel clock frequency is needed as 
-> we can't achieve an exact match, and even possibly to have some control over 
-> the frame rate (although that might also require changing the sync and porches 
-> timings). Without specific information about panel tolerance, do we have any 
-> option other than picking an arbitrary value ?
+To clarify a little bit. In my reference code this value (0x64E6) was taken from our legacy code. It was used for testing only. I know it should be change to something more accurate. This is the reason why I asked how did you count it (250000000). According to our calculations this value depends on actual set period (incr_ns and incr_sub_ns) and min and max value we can set. The calculation were a little bit intricate, so we decided to leave it as it was.
 
-If you consider only panels, yes, chances are the EE picked a panel
-that has a decent chance to work (especially since most of the boards
-we support are consumer electronics products, and people like to have
-a panel that works on their tablet).
+>
+> I need to dig into this...
+>
+> >
+> > I am not sure what you meant, but it sounds like you are on the wrong track.
+> > Let me explain...
+>
+> Thanks.
+>
+> >
+> > The max_adj has nothing at all to do with the width of the time register.
+> > Rather, it should reflect the maximum possible change in the tuning word.
+> >
+> > For example, with a nominal 8 ns period, the tuning word is 0x80000.
+> > Looking at running the clock more slowly, the slowest possible word is
+> > 0x00001, meaning a difference of 0x7FFFF.  This implies an adjustment
+> > of
+> > 0x7FFFF/0x80000 or 999998092 ppb.  Running more quickly, we can
+> > already have 0x100000, twice as fast, or just under 2 billion ppb.
+> >
+> > You should consider the extreme cases to determine the most limited
+> > (smallest) max_adj value:
+> >
+> > Case 1 - high frequency
+> > ~~~~~~~~~~~~~~~~~~~~~~~
+> >
+> > With a nominal 1 ns period, we have the nominal tuning word 0x10000.
+> > The smallest is 0x1 for a difference of 0xFFFF.  This corresponds to
+> > an adjustment of 0xFFFF/0x10000 = .9999847412109375 or 999984741 ppb.
+> >
+> > Case 2 - low frequency
+> > ~~~~~~~~~~~~~~~~~~~~~~
+> >
+> > With a nominal 255 ns period, the nominal word is 0xFF0000, the
+> > largest 0xFFFFFF, and the difference is 0xFFFF.  This corresponds to
+> > and adjustment of 0xFFFF/0xFF0000 = .0039215087890625 or 3921508 ppb.
+> >
+> > Since 3921508 ppb is a huge adjustment, you can simply use that as a
+> > safe maximum, ignoring the actual input clock.
+> >
+> > Thanks,
+> > Richard
+> >
+> >
+>
+> Regards,
+> Andrei
+>
 
-However, bridges are a different story, and provide on some SoCs modes
-that are way out of reach for our pixel clock, which is why we had
-that test in the first place.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161209/89de3049/attachment.sig>
+Best regards,
+Rafal Ozieblo   |   Firmware System Engineer, 
+phone nbr.: +48 32 5085469
+www.cadence.com
