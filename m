@@ -1,56 +1,42 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 9 Dec 2016 09:07:53 +0100
-Subject: [PATCH] ARM: dts: sun8i-q8-common: enable bluetooth on SDIO Wi-Fi
-In-Reply-To: <20161206080838.7523-1-icenowy@aosc.xyz>
-References: <20161206080838.7523-1-icenowy@aosc.xyz>
-Message-ID: <20161209080753.jmtbt6or2zylxtza@lukather>
+Date: Fri, 9 Dec 2016 09:11:03 +0100
+Subject: [PATCH 2/2] arm: dts: sun8i: reuse the uart1 node of iNet D978
+ rev2 board
+In-Reply-To: <20161205184745.lfW8ji5w@smtp1m.mail.yandex.net>
+References: <20161205184745.lfW8ji5w@smtp1m.mail.yandex.net>
+Message-ID: <20161209081103.4h3irlbq6t4pz2ac@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2016 at 04:08:38PM +0800, Icenowy Zheng wrote:
-> Some SDIO Wi-Fi chips (such as RTL8703AS) have a UART bluetooth, which
-> has a dedicated enable pin (PL8 in the reference design).
+On Mon, Dec 05, 2016 at 05:03:35PM +0800, Icenowy Zheng wrote:
 > 
-> Enable the pin in the same way as the WLAN enable pins.
+> 2016?12?5? 16:50? Maxime Ripard <maxime.ripard@free-electrons.com>???
+> >
+> > On Fri, Dec 02, 2016 at 11:19:13PM +0800, Icenowy Zheng wrote: 
+> > > As a uart1 node is added into sun8i-reference-design-tablet.dtsi, simply 
+> > > use it in iNet D978 rev2 device tree. 
+> > > 
+> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz> 
+> >
+> > I'd like to see more consolidation before that change is needed. If we 
+> > find more boards using that, it will make sense, but for a single 
+> > board it's not worth it. 
 > 
-> Tested on an A33 Q8 tablet with RTL8703AS.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
-> 
-> This patch should be coupled with the uart1 node patch I send before:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/471997.html
-> 
-> For RTL8703AS, the rtl8723bs bluetooth code is used, which can be retrieve from:
-> https://github.com/lwfinger/rtl8723bs_bt
-> 
->  arch/arm/boot/dts/sun8i-q8-common.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-> index c676940..4aeb5bb 100644
-> --- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-> @@ -88,7 +88,7 @@
->  
->  &r_pio {
->  	wifi_pwrseq_pin_q8: wifi_pwrseq_pin at 0 {
-> -		pins = "PL6", "PL7", "PL11";
-> +		pins = "PL6", "PL7", "PL8", "PL11";
->  		function = "gpio_in";
->  		bias-pull-up;
->  	};
+> At least 2~3 Q8 A33 tablets in #linux-sunxi are found to have
+> rtl8703as, which contains UART bluetooth. (including mine)
 
-There's several things wrong here. The first one is that you rely
-solely on the pinctrl state to maintain a reset line. This is very
-fragile (especially since the GPIO pinctrl state are likely to go away
-at some point), but it also means that if your driver wants to recover
-from that situation at some point, it won't work.
+Still, I'm not fond of creating a default on such a low count sample
+of (out-of-tree) DTs. Support and enable the bluetooth on more boards,
+and then consolidate.
 
-The other one is that the bluetooth and wifi chips are two devices in
-linux, and you assign that pin to the wrong device (wifi).
+> In fact, what I want to do is to get the node ready-to-be-okay in Q8
+> dts, so it can be enabled by either u-boot command or (theortically)
+> Hans de Goede's q8-hardwaremgr, just like what is done at
+> touchscreen node.
 
-rfkill-gpio is made just for that, so please use it.
+If your plan is to enable all the combinations possible accross the Q8
+tablets and let the bootloader/user figure it all out, then it's not
+going to happen, sorry.
 
 Maxime
 
@@ -64,4 +50,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161209/8ee44e83/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161209/1271c094/attachment.sig>
