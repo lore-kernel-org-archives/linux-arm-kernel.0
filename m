@@ -1,75 +1,69 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 9 Dec 2016 23:47:15 +0530
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <20161209175606.GM6408@localhost>
-References: <yw1xr35j1yd5.fsf@unicorn.mansr.com>
- <20161208103921.GC6408@localhost>
- <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
- <20161208163755.GH6408@localhost>
- <yw1xy3zqxt7x.fsf@unicorn.mansr.com>
- <20161209065955.GJ6408@localhost>
- <6ce1ea97-1d68-2203-c7b4-73315e801655@laposte.net>
- <20161209171727.GK6408@localhost>
- <ec33d3f0-6474-2b13-8a26-077ce3785d31@free.fr>
- <20161209175606.GM6408@localhost>
-Message-ID: <20161209181715.GN6408@localhost>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 9 Dec 2016 18:21:55 +0000
+Subject: [PATCH v4] arm64: fpsimd: improve stacking logic in
+ non-interruptible context
+In-Reply-To: <1481301992-2344-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1481301992-2344-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20161209182155.GB21051@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2016 at 11:26:06PM +0530, Vinod Koul wrote:
-> On Fri, Dec 09, 2016 at 06:34:15PM +0100, Mason wrote:
-> > On 09/12/2016 18:17, Vinod Koul wrote:
-> > 
-> > > On Fri, Dec 09, 2016 at 11:25:57AM +0100, Sebastian Frias wrote:
-> > >>
-> > >> What concrete solution do you propose?
-> > > 
-> > > I have already proposed two solutions.
-> > > 
-> > > A) Request a channel only when you need it. Obviously we can't do virtual
-> > > channels with this (though we should still use virt-channels framework).
-> > > The sbox setup and teardown can be done as part of channel request and
-> > > freeup. PL08x already does this.
-> > > 
-> > > Downside is that we can only have as many consumers at a time as channels.
-> > > 
-> > > I have not heard any technical reason for not doing this apart from drivers
-> > > grab the channel at probe, which is incorrect and needs to be fixed
-> > > irrespective of the problem at hand.
-> > > 
-> > > This is my preferred option.
-> > 
-> > There is one important drawback with this solution. If a driver calls
-> > dma_request_chan() when no channels are currently available, it will
-> > get -EBUSY. If there were a flag in dma_request_chan to be put to
-> > sleep (with timeout) until a channel is available, then it would
-> > work. But busy waiting in the client driver is a waste of power.
-> 
-> Right, but in that case the fallback would be PIO mode, and if that is
-> not availble (IIRC some f your devices don't) then reject the usage with
-> EAGAIN.
+On Fri, Dec 09, 2016 at 04:46:32PM +0000, Ard Biesheuvel wrote:
+>  void kernel_neon_begin_partial(u32 num_regs)
+>  {
+> -	if (in_interrupt()) {
+> -		struct fpsimd_partial_state *s = this_cpu_ptr(
+> -			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+> +	struct fpsimd_partial_state *s;
+> +	int level;
+> +
+> +	preempt_disable();
+> +
+> +	level = this_cpu_inc_return(kernel_neon_nesting_level);
+> +	BUG_ON(level > 3);
+> +
+> +	if (level > 1) {
+> +		s = this_cpu_ptr(nested_fpsimdstate);
+>  
+> -		BUG_ON(num_regs > 32);
+> -		fpsimd_save_partial_state(s, roundup(num_regs, 2));
+> +		WARN_ON_ONCE(num_regs > 32);
+> +		num_regs = min(roundup(num_regs, 2), 32U);
+> +
+> +		fpsimd_save_partial_state(&s[level - 2], num_regs);
+>  	} else {
+>  		/*
+>  		 * Save the userland FPSIMD state if we have one and if we
+> @@ -241,7 +256,6 @@ void kernel_neon_begin_partial(u32 num_regs)
+>  		 * that there is no longer userland FPSIMD state in the
+>  		 * registers.
+>  		 */
+> -		preempt_disable();
+>  		if (current->mm &&
+>  		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+>  			fpsimd_save_state(&current->thread.fpsimd_state);
 
-Alternatively I can think of one more way.
+I wonder whether we could actually do this saving and flag/level setting
+in reverse to simplify the races. Something like your previous patch but
+only set TIF_FOREIGN_FPSTATE after saving:
 
-If there is fixed delay or maximum delay predicted between ISR being
-fired and transaction being completed from client, then we can use that
-magic value and degrade the performance a bit but make a simpler system
-than other two suggestions.
+	level = this_cpu_read(kernel_neon_nesting_level);
+	if (level > 0) {
+		...
+		fpsimd_save_partial_state();
+	} else {
+		if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
+			fpsimd_save_state();
+		set_thread_flag(TIF_FOREIGN_FPSTATE);
+	}
+	this_cpu_inc(kernel_neon_nesting_level);
 
-The idea here is that typically the subsequent transaction should be
-issued as soon as possible, best case being in the ISR. But we can
-degrade that performance a bit and issue in the tasklet. But that can be
-done after introducing a delay, that too only in the case where new sbox
-configuration is different from previous one (so performance degrade is
-only on the switch and not for txn for same setup). You can possible
-optimize even further by issuing in ISR for same sbox setup and issuing
-in tasklet if configuration is different.
+There is a risk of extra saving if we get an interrupt after
+test_thread_flag() and before set_thread_flag() but I don't think this
+would corrupt any state, just writing things twice.
 
-Yes this is bit iffy and adds more burden on driver, but lets us get
-away with decent performance and being able to handle the hardware
-condition.
-
-Would that work for your case...?
+(disclaimer: I haven't thought of all the possible races and I'm not
+entirely sure about the kernel_neon_end() part)
 
 -- 
-~Vinod
+Catalin
