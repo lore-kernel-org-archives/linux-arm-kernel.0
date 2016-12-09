@@ -1,54 +1,58 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 Dec 2016 20:29:01 +0000
-Subject: [PATCH 4/4] ARM: versatile: support configuring versatile
- machine for no-MMU
-In-Reply-To: <58481DD1.6090606@arm.com>
-References: <1481093992-30520-1-git-send-email-gerg@uclinux.org>
- <1481093992-30520-2-git-send-email-gerg@uclinux.org>
- <CACRpkdZywn46QbnvKcN-jkt43Vf+GBSNQkLgnnNg-DC-8aSO5w@mail.gmail.com>
- <58481DD1.6090606@arm.com>
-Message-ID: <20161209202901.GQ14217@n2100.armlinux.org.uk>
+Date: Fri, 9 Dec 2016 20:31:27 +0000
+Subject: [PATCH 1/3] clkdev: add devm_get_clk_from_child()
+In-Reply-To: <8737i3vtl7.wl%kuninori.morimoto.gx@renesas.com>
+References: <874m2jvtmw.wl%kuninori.morimoto.gx@renesas.com>
+ <8737i3vtl7.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20161209203127.GR14217@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 02:33:53PM +0000, Vladimir Murzin wrote:
-> Hi Linus,
+On Mon, Dec 05, 2016 at 05:23:20AM +0000, Kuninori Morimoto wrote:
 > 
-> On 07/12/16 14:11, Linus Walleij wrote:
-> > Another target I had in mind was the Integrator which
-> > incidentally supports a bunch of the old noMMU core
-> > tiles where we can swap in an ARM946, which I guess
-> > could work with this?
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 > 
-> Do you mind trying my "Allow NOMMU for MULTIPLATFORM" series [1]? Greg just
-> reported it did a trick for Versatile, there is a good chance it would work
-> for Integrator too ;)
+> Some driver is using this type of DT bindings for clock (more detail,
+> see ${LINUX}/Documentation/devicetree/bindings/sound/simple-card.txt).
+> 
+> 	sound_soc {
+> 		...
+> 		cpu {
+> 			clocks = <&xxx>;
+> 			...
+> 		};
+> 		codec {
+> 			clocks = <&xxx>;
+> 			...
+> 		};
+> 	};
+> 
+> Current driver in this case uses of_clk_get() for each node, but there
+> is no devm_of_clk_get() today.
+> OTOH, the problem of having devm_of_clk_get() is that it encourages the
+> use of of_clk_get() when clk_get() is more desirable.
+> 
+> Thus, this patch adds new devm_get_clk_from_chile() which explicitly
+> reads as get a clock from a child node of this device.
+> By this function, we can also use this type of DT bindings
+> 
+> 	sound_soc {
+> 		clocks = <&xxx>, <&xxx>;
+> 		clock-names = "cpu", "codec";
+> 		...
+> 		cpu {
+> 			...
+> 		};
+> 		codec {
+> 			...
+> 		};
+> 	};
+> 
+> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-My views on gluing multiplatform and nommu together have already been
-stated several times, and remain unchanged.
+This looks lots better, thanks.
 
-Greg's patch looks almost sane, but what I'd like to see is instead of
-directly doing this:
-
- config ARCH_VERSATILE
-        bool "ARM Ltd. Versatile family"
--       depends on ARCH_MULTI_V5
-+       depends on ARCH_MULTI_V5 || ARM_SINGLE_ARMV5
-
-we could do:
-
- config ARCH_VERSATILE
-        bool "ARM Ltd. Versatile family" if ARCH_MULTI_V5
--       depends on ARCH_MULTI_V5
-+       depends on ARCH_MULTI_V5 || ARM_SINGLE_ARMV5
-	default y if ARM_SINGLE_ARCH_VERSATILE
-
-adding the versatile entry in the upper level choice (where it always used
-to be) but with "ARM_SINGLE_ARCH_VERSATILE" instead.
-
-This would have the effect of allowing the multiplatform-converted stuff
-to start being used on nommu (again) but without running into the problems
-I've highlighted.
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
