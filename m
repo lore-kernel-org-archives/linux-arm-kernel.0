@@ -1,53 +1,56 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 9 Dec 2016 23:26:06 +0530
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <ec33d3f0-6474-2b13-8a26-077ce3785d31@free.fr>
-References: <20161207164341.GX6408@localhost>
- <yw1xr35j1yd5.fsf@unicorn.mansr.com>
- <20161208103921.GC6408@localhost>
- <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
- <20161208163755.GH6408@localhost>
- <yw1xy3zqxt7x.fsf@unicorn.mansr.com>
- <20161209065955.GJ6408@localhost>
- <6ce1ea97-1d68-2203-c7b4-73315e801655@laposte.net>
- <20161209171727.GK6408@localhost>
- <ec33d3f0-6474-2b13-8a26-077ce3785d31@free.fr>
-Message-ID: <20161209175606.GM6408@localhost>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 9 Dec 2016 12:01:32 -0600
+Subject: [PATCH v2 2/2] dt-bindings: Add DT bindings info for FlexRM ring
+ manager
+In-Reply-To: <1480653536-5551-3-git-send-email-anup.patel@broadcom.com>
+References: <1480653536-5551-1-git-send-email-anup.patel@broadcom.com>
+ <1480653536-5551-3-git-send-email-anup.patel@broadcom.com>
+Message-ID: <20161209180132.lnpvwybnij5uykuq@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2016 at 06:34:15PM +0100, Mason wrote:
-> On 09/12/2016 18:17, Vinod Koul wrote:
+On Fri, Dec 02, 2016 at 10:08:56AM +0530, Anup Patel wrote:
+> This patch adds device tree bindings document for the FlexRM
+> ring manager found on Broadcom iProc SoCs.
 > 
-> > On Fri, Dec 09, 2016 at 11:25:57AM +0100, Sebastian Frias wrote:
-> >>
-> >> What concrete solution do you propose?
-> > 
-> > I have already proposed two solutions.
-> > 
-> > A) Request a channel only when you need it. Obviously we can't do virtual
-> > channels with this (though we should still use virt-channels framework).
-> > The sbox setup and teardown can be done as part of channel request and
-> > freeup. PL08x already does this.
-> > 
-> > Downside is that we can only have as many consumers at a time as channels.
-> > 
-> > I have not heard any technical reason for not doing this apart from drivers
-> > grab the channel at probe, which is incorrect and needs to be fixed
-> > irrespective of the problem at hand.
-> > 
-> > This is my preferred option.
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> ---
+>  .../bindings/mailbox/brcm,iproc-flexrm-mbox.txt    | 60 ++++++++++++++++++++++
+>  1 file changed, 60 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
 > 
-> There is one important drawback with this solution. If a driver calls
-> dma_request_chan() when no channels are currently available, it will
-> get -EBUSY. If there were a flag in dma_request_chan to be put to
-> sleep (with timeout) until a channel is available, then it would
-> work. But busy waiting in the client driver is a waste of power.
+> diff --git a/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
+> new file mode 100644
+> index 0000000..e81f116
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
+> @@ -0,0 +1,60 @@
 
-Right, but in that case the fallback would be PIO mode, and if that is
-not availble (IIRC some f your devices don't) then reject the usage with
-EAGAIN.
+[...]
 
+> +Example:
+> +--------
+> +crypto_mbox: mbox at 67000000 {
+> +	compatible = "brcm,flexrm-mbox";
+> +	reg = <0x67000000 0x200000>;
+> +	msi-parent = <&gic_its 0x7f00>;
+> +	#mbox-cells = <3>;
+> +};
+> +
+> +crypto_client {
+> +	...
+> +	mboxes = <&crypto_mbox 0 0x1 0xffff>,
+> +		 <&crypto_mbox 1 0x1 0xffff>,
+> +		 <&crypto_mbox 16 0x1 0xffff>,
+> +		 <&crypto_mbox 17 0x1 0xffff>,
+> +		 <&crypto_mbox 30 0x1 0xffff>,
+> +		 <&crypto_mbox 31 0x1 0xffff>;
 
--- 
-~Vinod
+The FlexRM part looks fine. I still don't understand what this node is. 
+Is this a h/w block or just a list of mailboxes? What determines the 
+mailbox channel numbers here? I need to see what the complete node looks 
+like.
+
+Rob
