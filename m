@@ -1,24 +1,68 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Fri, 9 Dec 2016 00:25:48 +0000
-Subject: [PATCH 0/3] clkdev: add devm_get_clk_from_child()
-In-Reply-To: <20161208220824.GM5423@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 8 Dec 2016 16:26:35 -0800
+Subject: [PATCH 3/3] ASoC: simple-card-utils: enable
+ clocks/clock-names/clock-ranges
+In-Reply-To: <874m2eymu3.wl%kuninori.morimoto.gx@renesas.com>
 References: <874m2jvtmw.wl%kuninori.morimoto.gx@renesas.com>
- <20161208220824.GM5423@codeaurora.org>
-Message-ID: <8737hyymo9.wl%kuninori.morimoto.gx@renesas.com>
+ <87zikbuezr.wl%kuninori.morimoto.gx@renesas.com>
+ <20161208220901.GN5423@codeaurora.org>
+ <874m2eymu3.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20161209002635.GD5423@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Stephen, Mark
-
-> > This is v5 of "clkdev: add devm_of_clk_get()", but new series.
-> > I hope my understanding was correct with your idea.
+On 12/09, Kuninori Morimoto wrote:
 > 
-> Yes this looks good. Given that we're so close to the merge
-> window, perhaps I should just merge the first patch into clk-next
-> and then it will be ready for anyone who wants to use it? The
-> sound patches can be left up to others to handle.
+> Hi Stephen
+> 
+> > > From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > > 
+> > > Current simple-card is supporting this style for clocks
+> > > 
+> > > 	sound {
+> > > 		...
+> > > 		simple-audio-card,cpu {
+> > > 			sound-dai = <&xxx>;
+> > > 			clocks = <&cpu_clock>;
+> > > 		};
+> > > 		simple-audio-card,codec {
+> > > 			sound-dai = <&xxx>;
+> > > 			clocks = <&codec_clock>;
+> > > 		};
+> > > 	};
+> > > 
+> > > Now, it can support this style too, because we can use
+> > > devm_get_clk_from_child() now.
+> > > 
+> > > 	sound {
+> > > 		...
+> > > 		clocks = <&cpu_clock>, <&codec_clock>;
+> > > 		clock-names = "cpu", "codec";
+> > > 		clock-ranges;
+> > > 		...
+> > > 		simple-audio-card,cpu {
+> > > 			sound-dai = <&xxx>;
+> > > 		};
+> > > 		simple-audio-card,codec {
+> > > 			sound-dai = <&xxx>;
+> > > 		};
+> > > 	};
+> > > 
+> > > Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > 
+> > I don't see any reason why we need this patch though. The binding
+> > works as is, so supporting different styles doesn't seem like a
+> > good idea to me. Let's just keep what we have? Even if a sub-node
+> > like cpu or codec gets more than one element in the clocks list
+> > property, we can make that work by passing a clock-name then
+> > based on some sort of other knowledge.
+> 
+> OK, thanks. Let's skip this patch.
+> But I believe this idea/method itself is not wrong (?)
+> 
 
-OK thanks.
-Mark, I think I should re-post 2nd patch (3rd will be dropped) after
-merge window ? There will be no branch dependency
+Right it's not wrong, just seems confusing to have two methods.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
