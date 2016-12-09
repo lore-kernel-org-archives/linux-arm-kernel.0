@@ -1,85 +1,64 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri,  9 Dec 2016 12:04:14 +0100
-Subject: [PATCH v2 06/11] mfd: axp20x: add separate MFD cell for AXP223
+Date: Fri,  9 Dec 2016 12:04:13 +0100
+Subject: [PATCH v2 05/11] power: supply: axp20x_usb_power: add 100mA max
+ current limit for AXP223
 In-Reply-To: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
 References: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
-Message-ID: <20161209110419.28981-7-quentin.schulz@free-electrons.com>
+Message-ID: <20161209110419.28981-6-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP223 shares most of its logic with the AXP221 but has some
-differences for the VBUS power supply driver. Thus, to probe the driver
-with the correct compatible, the AXP221 and the AXP223 now have separate
-MFD cells.
+The X-Powers AXP223 shares most of its behaviour with the AXP221 PMIC
+but allows the VBUS power supply max current to be set to 100mA (like
+the AXP209 PMIC).
 
-AXP221 MFD cells are renamed from axp22x_cells to axp221_cells to avoid
-confusion.
+This basically adds a new compatible to the VBUS power supply driver and
+adds a check on the compatible when setting current max limit.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
+ drivers/power/supply/axp20x_usb_power.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
-v2:
- - correct indentation,
- - renaming axp22x_cells to axp221_cells to avoid confusion between axp22x,
-axp221 and axp223
-
- drivers/mfd/axp20x.c | 28 ++++++++++++++++++++++++----
- 1 file changed, 24 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index 6ee2cc6..b31f123 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -591,7 +591,22 @@ static struct mfd_cell axp20x_cells[] = {
- 	},
- };
+diff --git a/drivers/power/supply/axp20x_usb_power.c b/drivers/power/supply/axp20x_usb_power.c
+index 9e3f4ae..1bcb025 100644
+--- a/drivers/power/supply/axp20x_usb_power.c
++++ b/drivers/power/supply/axp20x_usb_power.c
+@@ -90,11 +90,10 @@ static int axp20x_usb_power_get_property(struct power_supply *psy,
  
--static struct mfd_cell axp22x_cells[] = {
-+static struct mfd_cell axp221_cells[] = {
-+	{
-+		.name		= "axp20x-pek",
-+		.num_resources	= ARRAY_SIZE(axp22x_pek_resources),
-+		.resources	= axp22x_pek_resources,
-+	}, {
-+		.name		= "axp20x-regulator",
-+	}, {
-+		.name		= "axp20x-usb-power-supply",
-+		.of_compatible	= "x-powers,axp221-usb-power-supply",
-+		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
-+		.resources	= axp22x_usb_power_supply_resources,
-+	},
-+};
-+
-+static struct mfd_cell axp223_cells[] = {
- 	{
- 		.name			= "axp20x-pek",
- 		.num_resources		= ARRAY_SIZE(axp22x_pek_resources),
-@@ -600,7 +615,7 @@ static struct mfd_cell axp22x_cells[] = {
- 		.name			= "axp20x-regulator",
+ 		switch (v & AXP20X_VBUS_CLIMIT_MASK) {
+ 		case AXP20X_VBUC_CLIMIT_100mA:
+-			if (power->axp20x_id == AXP202_ID) {
+-				val->intval = 100000;
+-			} else {
++			if (power->axp20x_id == AXP221_ID)
+ 				val->intval = -1; /* No 100mA limit */
+-			}
++			else
++				val->intval = 100000;
+ 			break;
+ 		case AXP20X_VBUC_CLIMIT_500mA:
+ 			val->intval = 500000;
+@@ -317,7 +316,8 @@ static int axp20x_usb_power_probe(struct platform_device *pdev)
+ 
+ 		usb_power_desc = &axp20x_usb_power_desc;
+ 		irq_names = axp20x_irq_names;
+-	} else if (power->axp20x_id == AXP221_ID) {
++	} else if (power->axp20x_id == AXP221_ID ||
++		   power->axp20x_id == AXP223_ID) {
+ 		usb_power_desc = &axp22x_usb_power_desc;
+ 		irq_names = axp22x_irq_names;
+ 	} else {
+@@ -360,6 +360,9 @@ static const struct of_device_id axp20x_usb_power_match[] = {
  	}, {
- 		.name		= "axp20x-usb-power-supply",
--		.of_compatible	= "x-powers,axp221-usb-power-supply",
-+		.of_compatible	= "x-powers,axp223-usb-power-supply",
- 		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
- 		.resources	= axp22x_usb_power_supply_resources,
- 	},
-@@ -793,9 +808,14 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
- 		axp20x->regmap_irq_chip = &axp20x_regmap_irq_chip;
- 		break;
- 	case AXP221_ID:
-+		axp20x->nr_cells = ARRAY_SIZE(axp221_cells);
-+		axp20x->cells = axp221_cells;
-+		axp20x->regmap_cfg = &axp22x_regmap_config;
-+		axp20x->regmap_irq_chip = &axp22x_regmap_irq_chip;
-+		break;
- 	case AXP223_ID:
--		axp20x->nr_cells = ARRAY_SIZE(axp22x_cells);
--		axp20x->cells = axp22x_cells;
-+		axp20x->nr_cells = ARRAY_SIZE(axp223_cells);
-+		axp20x->cells = axp223_cells;
- 		axp20x->regmap_cfg = &axp22x_regmap_config;
- 		axp20x->regmap_irq_chip = &axp22x_regmap_irq_chip;
- 		break;
+ 		.compatible = "x-powers,axp221-usb-power-supply",
+ 		.data = (void *)AXP221_ID,
++	}, {
++		.compatible = "x-powers,axp223-usb-power-supply",
++		.data = (void *)AXP223_ID,
+ 	}, { /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, axp20x_usb_power_match);
 -- 
 2.9.3
