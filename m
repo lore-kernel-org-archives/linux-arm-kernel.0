@@ -1,54 +1,90 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 9 Dec 2016 10:36:57 +0100
-Subject: [PATCH RFC] drm/sun4i: rgb: Add 5% tolerance to dot clock
- frequency check
-In-Reply-To: <CAGb2v65uTH_PD28KqAhhzkE5zhLt54GUb7xXNxxe0xHW0A+xjQ@mail.gmail.com>
-References: <20161124112231.4297-1-wens@csie.org>
- <20161206172911.z6sbjzgqv3vfcrfh@lukather>
- <CAGb2v65uTH_PD28KqAhhzkE5zhLt54GUb7xXNxxe0xHW0A+xjQ@mail.gmail.com>
-Message-ID: <20161209093657.jcalemg5xpumr2ma@lukather>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 9 Dec 2016 10:45:00 +0100
+Subject: [PATCH v1 2/2] crypto: mediatek - add DT bindings documentation
+In-Reply-To: <1481188776.14860.26.camel@mtkswgap22>
+References: <1480921284-45827-1-git-send-email-ryder.lee@mediatek.com>
+ <1480921284-45827-3-git-send-email-ryder.lee@mediatek.com>
+ <4b0df417-825f-65c6-4c02-85fe1c20ce50@gmail.com>
+ <1481188776.14860.26.camel@mtkswgap22>
+Message-ID: <826b263f-8963-11c9-0302-8048cd1dea8e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 07, 2016 at 10:26:25AM +0800, Chen-Yu Tsai wrote:
-> > Some panels require an exact frequency, some have a minimal frequency
-> > but no maximum, some have a maximum frequency but no minimal, and I
-> > guess most of them deviates by how much exactly they can take (and
-> > possibly can take more easily a higher frequency, but are less
-> > tolerant if you take a frequency lower than the nominal.
-> >
-> > And we cannot remove that check entirely, since some bridges will
-> > report out of range frequencies for higher modes that we know we
-> > cannot reach.
-> 
-> I believe this should be handled by the bridge driver in the check
-> callback?
 
-This doesn't really have anything to do with the bridge itself, it's a
-limitation on the encoder. For all we know, the bridge might be able
-to operate at the higher resolutions without any issues if the encoder
-was able to.
 
-> The callback I'm changing is attached to the connector, which I
-> think doesn't get used if you have a bridge instead.  And this only
-> checks the pre-registered display modes, such as those specified in
-> simple-panel or EDID.
+On 08/12/16 10:19, Ryder Lee wrote:
+> Hello,
+>
+> On Mon, 2016-12-05 at 11:18 +0100, Matthias Brugger wrote:
+>>
+>> On 05/12/16 08:01, Ryder Lee wrote:
+>>> Add DT bindings documentation for the crypto driver
+>>>
+>>> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+>>> ---
+>>>  .../devicetree/bindings/crypto/mediatek-crypto.txt | 32 ++++++++++++++++++++++
+>>>  1 file changed, 32 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/crypto/mediatek-crypto.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/crypto/mediatek-crypto.txt b/Documentation/devicetree/bindings/crypto/mediatek-crypto.txt
+>>> new file mode 100644
+>>> index 0000000..8b1db08
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/crypto/mediatek-crypto.txt
+>>> @@ -0,0 +1,32 @@
+>>> +MediaTek cryptographic accelerators
+>>> +
+>>> +Required properties:
+>>> +- compatible: Should be "mediatek,mt7623-crypto"
+>>
+>> Do you know how big the difference is between the crypto engine for
+>> mt7623/mt2701/mt8521p in comparison, let's say mt8173 or mt6797?
+>> Do this SoCs have a crypot engine? If so and they are quite similar, we
+>> might think of adding a mtk-crypto binding and add soc specific bindings.
+>
+> This engine is just available in mt7623/mt2701/mt8521p series SoCs and
+> they have no difference.
+>
+> But there are still other crypto IPs in MTK, i think maybe we could use
+> "mediatek,{IP name}-crypto? to distinguish them ?
+>
 
-Geeee, I forgot to send that one (and thought I did)... I'll send that
-patch next week, but basically, I was creating a mode_valid hook at
-the encoder level, and moving the RGB mode_valid hook from the
-connector to the encoder (since it really is an encoder limitation).
+Sounds good, thanks for the clarification.
 
-Maxime
+Matthias
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161209/18a5ba71/attachment.sig>
+
+>> Regards,
+>> Matthias
+>>
+>>> +- reg: Address and length of the register set for the device
+>>> +- interrupts: Should contain the five crypto engines interrupts in numeric
+>>> +	order. These are global system and four descriptor rings.
+>>> +- clocks: the clock used by the core
+>>> +- clock-names: the names of the clock listed in the clocks property. These are
+>>> +	"ethif", "cryp"
+>>> +- power-domains: Must contain a reference to the PM domain.
+>>> +
+>>> +
+>>> +Optional properties:
+>>> +- interrupt-parent: Should be the phandle for the interrupt controller
+>>> +  that services interrupts for this device
+>>> +
+>>> +
+>>> +Example:
+>>> +	crypto: crypto at 1b240000 {
+>>> +		compatible = "mediatek,mt7623-crypto";
+>>> +		reg = <0 0x1b240000 0 0x20000>;
+>>> +		interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_LOW>,
+>>> +			     <GIC_SPI 83 IRQ_TYPE_LEVEL_LOW>,
+>>> +			     <GIC_SPI 84 IRQ_TYPE_LEVEL_LOW>,
+>>> +			     <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>,
+>>> +			     <GIC_SPI 97 IRQ_TYPE_LEVEL_LOW>;
+>>> +		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
+>>> +			 <&ethsys CLK_ETHSYS_CRYPTO>;
+>>> +		clock-names = "ethif","cryp";
+>>> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
+>>> +	};
+>>>
+>
+>
