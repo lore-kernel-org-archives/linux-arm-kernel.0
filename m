@@ -1,103 +1,154 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Fri,  9 Dec 2016 17:59:33 +0100
-Subject: [PATCH v7 2/2] ARM: davinci: da8xx: Fix sleeping function called from
- invalid context
-In-Reply-To: <1481302773-14181-1-git-send-email-abailon@baylibre.com>
-References: <1481302773-14181-1-git-send-email-abailon@baylibre.com>
-Message-ID: <1481302773-14181-2-git-send-email-abailon@baylibre.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 9 Dec 2016 17:13:40 +0000
+Subject: [PATCH v8 04/16] MSI-X: update GSI routing after changed MSI-X
+ configuration
+In-Reply-To: <20161104173203.21168-5-andre.przywara@arm.com>
+References: <20161104173203.21168-1-andre.przywara@arm.com>
+ <20161104173203.21168-5-andre.przywara@arm.com>
+Message-ID: <da4e554a-ebd1-fa59-3e94-0e0190ddade3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Everytime the usb20 phy is enabled, there is a
-"sleeping function called from invalid context" BUG.
-In addition, there is a recursive locking happening
-because of the recurse call to clk_enable().
+On 04/11/16 17:31, Andre Przywara wrote:
+> When we set up GSI routing to map MSIs to KVM's GSI numbers, we
+> write the current device's MSI setup into the kernel routing table.
+> However the device driver in the guest can use PCI configuration space
+> accesses to change the MSI configuration (address and/or payload data).
+> Whenever this happens after we have setup the routing table already,
+> we must amend the previously sent data.
+> So when MSI-X PCI config space accesses write address or payload,
+> find the associated GSI number and the matching routing table entry
+> and update the kernel routing table (only if the data has changed).
+> 
+> This fixes vhost-net, where the queue's IRQFD was setup before the
+> MSI vectors.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  include/kvm/irq.h |  1 +
+>  irq.c             | 31 +++++++++++++++++++++++++++++++
+>  virtio/pci.c      | 36 +++++++++++++++++++++++++++++++++---
+>  3 files changed, 65 insertions(+), 3 deletions(-)
+> 
+> diff --git a/include/kvm/irq.h b/include/kvm/irq.h
+> index bb71521..f35eb7e 100644
+> --- a/include/kvm/irq.h
+> +++ b/include/kvm/irq.h
+> @@ -21,5 +21,6 @@ int irq__exit(struct kvm *kvm);
+>  
+>  int irq__allocate_routing_entry(void);
+>  int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg);
+> +void irq__update_msix_route(struct kvm *kvm, u32 gsi, struct msi_msg *msg);
+>  
+>  #endif
+> diff --git a/irq.c b/irq.c
+> index a742aa2..895e5eb 100644
+> --- a/irq.c
+> +++ b/irq.c
+> @@ -93,6 +93,37 @@ int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg)
+>  	return next_gsi++;
+>  }
+>  
+> +static bool update_data(u32 *ptr, u32 newdata)
+> +{
+> +	if (*ptr == newdata)
+> +		return false;
+> +
+> +	*ptr = newdata;
+> +	return true;
+> +}
+> +
+> +void irq__update_msix_route(struct kvm *kvm, u32 gsi, struct msi_msg *msg)
+> +{
+> +	struct kvm_irq_routing_msi *entry;
+> +	unsigned int i;
+> +	bool changed;
+> +
+> +	for (i = 0; i < irq_routing->nr; i++)
+> +		if (gsi == irq_routing->entries[i].gsi)
+> +			break;
+> +	if (i == irq_routing->nr)
+> +		return;
+> +
+> +	entry = &irq_routing->entries[i].u.msi;
+> +
+> +	changed  = update_data(&entry->address_hi, msg->address_hi);
+> +	changed |= update_data(&entry->address_lo, msg->address_lo);
+> +	changed |= update_data(&entry->data, msg->data);
+> +
+> +	if (changed)
+> +		ioctl(kvm->vm_fd, KVM_SET_GSI_ROUTING, irq_routing);
 
-clk_enable() from arch/arm/mach-davinci/clock.c uses spin_lock_irqsave()
-before to invoke the callback usb20_phy_clk_enable().
-usb20_phy_clk_enable() uses clk_get() and clk_enable_prepapre()
-which may sleep.
-replace clk_prepare_enable() by davinci_clk_enable().
+Check the return value and let the caller know if something has failed?
 
-Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
-Suggested-by: David Lechner <david@lechnology.com>
----
- arch/arm/mach-davinci/usb-da8xx.c | 34 +++++++++++++++-------------------
- 1 file changed, 15 insertions(+), 19 deletions(-)
+> +}
+> +
+>  int __attribute__((weak)) irq__exit(struct kvm *kvm)
+>  {
+>  	free(irq_routing);
+> diff --git a/virtio/pci.c b/virtio/pci.c
+> index 072e5b7..b3b4aac 100644
+> --- a/virtio/pci.c
+> +++ b/virtio/pci.c
+> @@ -152,6 +152,30 @@ static bool virtio_pci__io_in(struct ioport *ioport, struct kvm_cpu *vcpu, u16 p
+>  	return ret;
+>  }
+>  
+> +static void update_msix_map(struct virtio_pci *vpci,
+> +			    struct msix_table *msix_entry, u32 vecnum)
+> +{
+> +	u32 gsi, i;
+> +
+> +	/* Find the GSI number used for that vector */
+> +	if (vecnum == vpci->config_vector) {
+> +		gsi = vpci->config_gsi;
+> +	} else {
+> +		for (i = 0; i < VIRTIO_PCI_MAX_VQ; i++)
+> +			if (vpci->vq_vector[i] == vecnum)
+> +				break;
+> +		if (i == VIRTIO_PCI_MAX_VQ)
+> +			return;
+> +		gsi = vpci->gsis[i];
+> +	}
+> +
+> +	if (gsi == 0)
+> +		return;
+> +
+> +	msix_entry = &msix_entry[vecnum];
+> +	irq__update_msix_route(vpci->kvm, gsi, &msix_entry->msg);
+> +}
+> +
+>  static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *vdev, u16 port,
+>  					void *data, int size, int offset)
+>  {
+> @@ -270,10 +294,16 @@ static void virtio_pci__msix_mmio_callback(struct kvm_cpu *vcpu,
+>  		offset	= vpci->msix_io_block;
+>  	}
+>  
+> -	if (is_write)
+> -		memcpy(table + addr - offset, data, len);
+> -	else
+> +	if (!is_write) {
+>  		memcpy(data, table + addr - offset, len);
+> +		return;
+> +	}
+> +
+> +	memcpy(table + addr - offset, data, len);
+> +
+> +	/* Did we just update the address or payload? */
+> +	if (addr % 0x10 < 0xc)
+> +		update_msix_map(vpci, table, (addr - offset) / 16);
 
-diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
-index b010e5f..71f1e81 100644
---- a/arch/arm/mach-davinci/usb-da8xx.c
-+++ b/arch/arm/mach-davinci/usb-da8xx.c
-@@ -22,6 +22,8 @@
- #define DA8XX_USB0_BASE		0x01e00000
- #define DA8XX_USB1_BASE		0x01e25000
- 
-+static struct clk *usb20_clk;
-+
- static struct platform_device da8xx_usb_phy = {
- 	.name		= "da8xx-usb-phy",
- 	.id		= -1,
-@@ -158,26 +160,13 @@ int __init da8xx_register_usb_refclkin(int rate)
- 
- static void usb20_phy_clk_enable(struct clk *clk)
- {
--	struct clk *usb20_clk;
--	int err;
- 	u32 val;
- 	u32 timeout = 500000; /* 500 msec */
- 
- 	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
- 
--	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
--	if (IS_ERR(usb20_clk)) {
--		pr_err("could not get usb20 clk: %ld\n", PTR_ERR(usb20_clk));
--		return;
--	}
--
- 	/* The USB 2.O PLL requires that the USB 2.O PSC is enabled as well. */
--	err = clk_prepare_enable(usb20_clk);
--	if (err) {
--		pr_err("failed to enable usb20 clk: %d\n", err);
--		clk_put(usb20_clk);
--		return;
--	}
-+	davinci_clk_enable(usb20_clk);
- 
- 	/*
- 	 * Turn on the USB 2.0 PHY, but just the PLL, and not OTG. The USB 1.1
-@@ -197,8 +186,7 @@ static void usb20_phy_clk_enable(struct clk *clk)
- 
- 	pr_err("Timeout waiting for USB 2.0 PHY clock good\n");
- done:
--	clk_disable_unprepare(usb20_clk);
--	clk_put(usb20_clk);
-+	davinci_clk_disable(usb20_clk);
- }
- 
- static void usb20_phy_clk_disable(struct clk *clk)
-@@ -285,11 +273,19 @@ static struct clk_lookup usb20_phy_clk_lookup =
- int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
- {
- 	struct clk *parent;
--	int ret = 0;
-+	int ret;
-+
-+	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
-+	ret = PTR_ERR_OR_ZERO(usb20_clk);
-+	if (ret)
-+		return ret;
- 
- 	parent = clk_get(NULL, use_usb_refclkin ? "usb_refclkin" : "pll0_aux");
--	if (IS_ERR(parent))
--		return PTR_ERR(parent);
-+	ret = PTR_ERR_OR_ZERO(parent);
-+	if (ret) {
-+		clk_put(usb20_clk);
-+		return ret;
-+	}
- 
- 	usb20_phy_clk.parent = parent;
- 	ret = clk_register(&usb20_phy_clk);
+Where are these constants coming from? Please stick to either decimal or
+hex...
+
+>  }
+>  
+>  static void virtio_pci__signal_msi(struct kvm *kvm, struct virtio_pci *vpci, int vec)
+> 
+
+Thanks,
+
+	M.
 -- 
-2.7.3
+Jazz is not dead. It just smells funny...
