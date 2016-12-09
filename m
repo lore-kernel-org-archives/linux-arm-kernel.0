@@ -1,121 +1,103 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 9 Dec 2016 09:39:07 +0100
-Subject: [PATCH RFC] drm/sun4i: rgb: Add 5% tolerance to dot clock
- frequency check
-In-Reply-To: <87oa0nbldb.fsf@eliezer.anholt.net>
-References: <20161124112231.4297-1-wens@csie.org>
- <20161206172911.z6sbjzgqv3vfcrfh@lukather>
- <87oa0nbldb.fsf@eliezer.anholt.net>
-Message-ID: <20161209083907.276era3af336q3wz@lukather>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 9 Dec 2016 08:53:31 +0000
+Subject: [PATCH v5 1/7] MFD: add bindings for STM32 General Purpose Timer
+ driver
+In-Reply-To: <1481199650-22484-2-git-send-email-benjamin.gaignard@st.com>
+References: <1481199650-22484-1-git-send-email-benjamin.gaignard@st.com>
+ <1481199650-22484-2-git-send-email-benjamin.gaignard@st.com>
+Message-ID: <20161209085331.GB3625@dell.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Sorry to do this Ben.  Not much to do now though!
 
-On Wed, Dec 07, 2016 at 11:16:32AM -0800, Eric Anholt wrote:
-> Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+> Add bindings information for STM32 General Purpose Timer
 > 
-> > [ Unknown signature status ]
-> > On Thu, Nov 24, 2016 at 07:22:31PM +0800, Chen-Yu Tsai wrote:
-> >> The panels shipped with Allwinner devices are very "generic", i.e.
-> >> they do not have model numbers or reliable sources of information
-> >> for the timings (that we know of) other than the fex files shipped
-> >> on them. The dot clock frequency provided in the fex files have all
-> >> been rounded to the nearest MHz, as that is the unit used in them.
-> >> 
-> >> We were using the simple panel "urt,umsh-8596md-t" as a substitute
-> >> for the A13 Q8 tablets in the absence of a specific model for what
-> >> may be many different but otherwise timing compatible panels. This
-> >> was usable without any visual artifacts or side effects, until the
-> >> dot clock rate check was added in commit bb43d40d7c83 ("drm/sun4i:
-> >> rgb: Validate the clock rate").
-> >> 
-> >> The reason this check fails is because the dotclock frequency for
-> >> this model is 33.26 MHz, which is not achievable with our dot clock
-> >> hardware, and the rate returned by clk_round_rate deviates slightly,
-> >> causing the driver to reject the display mode.
-> >> 
-> >> The LCD panels have some tolerance on the dot clock frequency, even
-> >> if it's not specified in their datasheets.
-> >> 
-> >> This patch adds a 5% tolerence to the dot clock check.
-> >
-> > As we discussed already, I really believe this is just as arbitrary as
-> > the current behaviour.
-> >
-> > Some panels require an exact frequency, some have a minimal frequency
-> > but no maximum, some have a maximum frequency but no minimal, and I
-> > guess most of them deviates by how much exactly they can take (and
-> > possibly can take more easily a higher frequency, but are less
-> > tolerant if you take a frequency lower than the nominal.
-> >
-> > And we cannot remove that check entirely, since some bridges will
-> > report out of range frequencies for higher modes that we know we
-> > cannot reach.
-> >
-> > We could just try to see if the screen pixel clock frequency is out of
-> > the pixel clock range we can generate, but then we will loop back on
-> > how much out of range is it exactly, and is it within the screen
-> > tolerancy.
-> >
-> > We have an API to deal with the panel tolerancies in the DRM panel
-> > framework, we can (and should) use it.
-> >
-> > I'm not sure how others usually deal with this though. I think I
-> > remember Eric telling me that for the RPi they just adjusted the
-> > timings a bit, but they only really had a single panel to deal with.
+> version 2:
+> - rename stm32-mfd-timer to stm32-gptimer
+> - only keep one compatible string
 > 
-> For RPi, you just adjust the pixel clock of the panel's mode to be
-> whatever the platform can support, and expand the blanking intervals to
-> get the refresh rate back to desired.  This is nothing like what the
-> datasheet says, but it's not important what the datasheet says, it's
-> important what makes the product work.
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> ---
+>  .../bindings/mfd/stm32-general-purpose-timer.txt   | 39 ++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-general-purpose-timer.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/stm32-general-purpose-timer.txt b/Documentation/devicetree/bindings/mfd/stm32-general-purpose-timer.txt
+> new file mode 100644
+> index 0000000..ce67755
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/stm32-general-purpose-timer.txt
+> @@ -0,0 +1,39 @@
+> +STM32 General Purpose Timer driver bindings
 
-Ok, that was what I was recalling from our previous discussion on that
-topic.
+This is a great place to describe what we're *actually* trying to
+achieve with this driver, and the worst place to use the term "general
+purpose", since this IP is so much more than that.
 
-> Our clock driver looks for the best matching clock that's not over the
-> target rate.  This is somewhat unfortunate, as you end up slightly
-> inflating your requested clocks so that a possible clock lands under
-> that.  I'd rather we chose the closest matching clock, but then people
-> get worried about what if selected clock rate is 1% higher than expected
-> (the answer is "nothing").
 
-Whose feedback was that? Users?
+"STM32 Timers
 
-> I think this patch is a fine solution, and the alternative would be to
-> just drop the mode high/low check and say that if you're pairing a panel
-> with some display hardware, it's up to you to make sure that the panel's
-> mode actually scans out successfully.  Then, since compatible strings
-> are cheap, you can use a new one if necessary to attach better modes to
-> the panel for a particular clock driver by adjusting your timings to get
-> closer to the refresh rates you want.
+This IP provides 3 types of timer along with PWM functionality.
 
-That's one expectation we can have for panels, but we had that test
-for bridges. On some SoCs, the pixel clock is pretty limited and can
-only reach around 720p60 or 1080p30. If you have a monitor attached
-that will return EDIDs, chances are that it will report modes that you
-know have no chance to work.
+[...]"
 
-This check was here to rule out those cases and prevent them from
-showing up in the list of modes.
+... then go on to explain what the 3 types are and how they can be
+used.
 
-So we basically have two different things to care about. We want to be
-tolerant so that most panels just work, but not too tolerant to rule
-out modes that we know we can't reach. We're only covering the latter,
-and we should take into account the former, but we definitely need
-some kind of check.
+> +Required parameters:
+> +- compatible: must be "st,stm32-gptimer"
 
-Maxime
+I vehemently disagree that this entire IP is a GP Timer.  It contains
+GP timers, sure, but it also contains Advanced and Basic timers.
+
+IMHO this compatible should be "st,stm32-timers".
+
+And the file name of both this and the *.c file should reflect that
+too.
+
+Remainder looks nice.
+
+> +- reg:			Physical base address and length of the controller's
+> +			registers.
+> +- clock-names: 		Set to "clk_int".
+> +- clocks: 		Phandle to the clock used by the timer module.
+> +			For Clk properties, please refer to ../clock/clock-bindings.txt
+> +
+> +Optional parameters:
+> +- resets:		Phandle to the parent reset controller.
+> +			See ../reset/st,stm32-rcc.txt
+> +
+> +Optional subnodes:
+> +- pwm:			See ../pwm/pwm-stm32.txt
+> +- timer:		See ../iio/timer/stm32-timer-trigger.txt
+> +
+> +Example:
+> +	timers at 40010000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "st,stm32-gptimer";
+> +		reg = <0x40010000 0x400>;
+> +		clocks = <&rcc 0 160>;
+> +		clock-names = "clk_int";
+> +
+> +		pwm at 0 {
+
+Out of interest, do you use the "@0", "@1" for anything now?
+
+> +			compatible = "st,stm32-pwm";
+> +			pinctrl-0	= <&pwm1_pins>;
+> +			pinctrl-names	= "default";
+> +		};
+> +
+> +		timer at 0 {
+> +			compatible = "st,stm32-timer-trigger";
+> +			reg = <0>;
+> +		};
+> +	};
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161209/4b5f65f7/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
