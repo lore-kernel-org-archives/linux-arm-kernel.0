@@ -1,13 +1,12 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 8 Dec 2016 16:26:35 -0800
-Subject: [PATCH 3/3] ASoC: simple-card-utils: enable
- clocks/clock-names/clock-ranges
-In-Reply-To: <874m2eymu3.wl%kuninori.morimoto.gx@renesas.com>
+Date: Thu, 8 Dec 2016 16:28:37 -0800
+Subject: [PATCH 2/3] ASoC: simple-card: use devm_get_clk_from_child()
+In-Reply-To: <877f7aymxu.wl%kuninori.morimoto.gx@renesas.com>
 References: <874m2jvtmw.wl%kuninori.morimoto.gx@renesas.com>
- <87zikbuezr.wl%kuninori.morimoto.gx@renesas.com>
- <20161208220901.GN5423@codeaurora.org>
- <874m2eymu3.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20161209002635.GD5423@codeaurora.org>
+ <871sxnvtkp.wl%kuninori.morimoto.gx@renesas.com>
+ <20161208220942.GO5423@codeaurora.org>
+ <877f7aymxu.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20161209002837.GE5423@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,53 +14,38 @@ On 12/09, Kuninori Morimoto wrote:
 > 
 > Hi Stephen
 > 
-> > > From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> > > 
-> > > Current simple-card is supporting this style for clocks
-> > > 
-> > > 	sound {
-> > > 		...
-> > > 		simple-audio-card,cpu {
-> > > 			sound-dai = <&xxx>;
-> > > 			clocks = <&cpu_clock>;
-> > > 		};
-> > > 		simple-audio-card,codec {
-> > > 			sound-dai = <&xxx>;
-> > > 			clocks = <&codec_clock>;
-> > > 		};
-> > > 	};
-> > > 
-> > > Now, it can support this style too, because we can use
-> > > devm_get_clk_from_child() now.
-> > > 
-> > > 	sound {
-> > > 		...
-> > > 		clocks = <&cpu_clock>, <&codec_clock>;
-> > > 		clock-names = "cpu", "codec";
-> > > 		clock-ranges;
-> > > 		...
-> > > 		simple-audio-card,cpu {
-> > > 			sound-dai = <&xxx>;
-> > > 		};
-> > > 		simple-audio-card,codec {
-> > > 			sound-dai = <&xxx>;
-> > > 		};
-> > > 	};
-> > > 
-> > > Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > > @@ -111,14 +112,13 @@ int asoc_simple_card_parse_clk(struct device_node *node,
+> > >  	 *  or "system-clock-frequency = <xxx>"
+> > >  	 *  or device's module clock.
+> > >  	 */
+> > > -	clk = of_clk_get(node, 0);
+> > > +	clk = devm_get_clk_from_child(dev, node, NULL);
+> > >  	if (!IS_ERR(clk)) {
+> > >  		simple_dai->sysclk = clk_get_rate(clk);
+> > > -		simple_dai->clk = clk;
+> > >  	} else if (!of_property_read_u32(node, "system-clock-frequency", &val)) {
+> > >  		simple_dai->sysclk = val;
+> > >  	} else {
+> > > -		clk = of_clk_get(dai_of_node, 0);
+> > > +		clk = devm_get_clk_from_child(dev, dai_of_node, NULL);
 > > 
-> > I don't see any reason why we need this patch though. The binding
-> > works as is, so supporting different styles doesn't seem like a
-> > good idea to me. Let's just keep what we have? Even if a sub-node
-> > like cpu or codec gets more than one element in the clocks list
-> > property, we can make that work by passing a clock-name then
-> > based on some sort of other knowledge.
+> > 
+> > I was confused for a minute about how the second of_clk_get()
+> > call with the dai_link node could work. Is that documented
+> > anywhere or used by anyone? It seems like it's at least another
+> > child node of the sound node (which is dev here) so it seems ok.
 > 
-> OK, thanks. Let's skip this patch.
-> But I believe this idea/method itself is not wrong (?)
+> Documentation/devicetree/bindings/sound/simple-card.txt
+> explains 1st of_clk_get will be used as "if needed",
+> 2nd of_clk_get will be used as "not needed pattern".
+> 1st pattern will use specific clock, 2nd pattern will use
+> "cpu" or "codec" clock.
+> 2nd one was added by someone (I forgot), and many driver is
+> based on this feature.
 > 
 
-Right it's not wrong, just seems confusing to have two methods.
+Can you point to some dts file in the kernel that falls into the
+devm_get_clk_from_child(dev, dai_of_node, NULL) part?
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
