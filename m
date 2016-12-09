@@ -1,34 +1,112 @@
-From: maninder1.s@samsung.com (=?UTF-8?B?TWFuaW5kZXIgU2luZ2g=?=)
-Date: Mon, 05 Dec 2016 08:18:03 +0000
-Subject: =?UTF-8?B?UkU6IFJlOiBbUEFUQ0ggMS8yXSBhcm02NDogQ29ycmVjdGlu?=
- =?UTF-8?B?ZyBmb3JtYXQgc3BlY2lmaWVyIGZvciBwcmludGluIDY0IGJp?=
- =?UTF-8?B?dCBhZGRyZXNzZXM=?=
-References: <1480493036-47334-1-git-send-email-maninder1.s@samsung.com>
- <CGME20161130105054epcas2p2d8e6fbfc65564ff74c646e1ca00d3bf5@epcas2p2.samsung.com>
-Message-ID: <20161205081803epcms5p508a7587d144d706b7ce86ff611a833e4@epcms5p5>
+From: harinikatakamlinux@gmail.com (Harini Katakam)
+Date: Fri, 9 Dec 2016 11:07:23 +0530
+Subject: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in Cadence GEM.
+In-Reply-To: <07C910AB6AC6C345A093D5A08F5AF568CB74AF28@CHN-SV-EXMX03.mchp-main.com>
+References: <1481134912-2243-1-git-send-email-andrei.pistirica@microchip.com>
+ <20161207193908.GA13062@netboy> <20161207210416.GA27622@netboy>
+ <07C910AB6AC6C345A093D5A08F5AF568CB74AF28@CHN-SV-EXMX03.mchp-main.com>
+Message-ID: <CAFcVECJutEu2=POtAU=jX6E3-ZHsLXpOMMw+UJ0hcQgZ0n4ZVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?
-Hi Will,
+Hi,
 
->There are a bunch of these you haven't caught:
+On Thu, Dec 8, 2016 at 8:11 PM,  <Andrei.Pistirica@microchip.com> wrote:
 >
-....
->arch/arm64/mm/mmu.c:            pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
 >
->so it would probably make sense to fix these to be consistent.
+>> -----Original Message-----
+>> From: Richard Cochran [mailto:richardcochran at gmail.com]
+>> Sent: Wednesday, December 07, 2016 11:04 PM
+>> To: Andrei Pistirica - M16132
+>> Cc: netdev at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+>> kernel at lists.infradead.org; davem at davemloft.net;
+>> nicolas.ferre at atmel.com; harinikatakamlinux at gmail.com;
+>> harini.katakam at xilinx.com; punnaia at xilinx.com; michals at xilinx.com;
+>> anirudh at xilinx.com; boris.brezillon at free-electrons.com;
+>> alexandre.belloni at free-electrons.com; tbultel at pixelsurmer.com;
+>> rafalo at cadence.com
+>> Subject: Re: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in
+>> Cadence GEM.
+>>
+>> On Wed, Dec 07, 2016 at 08:39:09PM +0100, Richard Cochran wrote:
+>> > > +static s32 gem_ptp_max_adj(unsigned int f_nom) {
+>> > > + u64 adj;
+>> > > +
+>> > > + /* The 48 bits of seconds for the GEM overflows every:
+>> > > +  * 2^48/(365.25 * 24 * 60 *60) =~ 8 925 512 years (~= 9 mil years),
+>> > > +  * thus the maximum adjust frequency must not overflow CNS
+>> register:
+>> > > +  *
+>> > > +  * addend  = 10^9/nominal_freq
+>> > > +  * adj_max = +/- addend*ppb_max/10^9
+>> > > +  * max_ppb = (2^8-1)*nominal_freq-10^9
+>> > > +  */
+>> > > + adj = f_nom;
+>> > > + adj *= 0xffff;
+>> > > + adj -= 1000000000ULL;
+>> >
+>> > What is this computation, and how does it relate to the comment?
 >
->Will
+> I considered the following simple equation: increment value at nominal frequency (which is 10^9/nominal frequency nsecs) + the maximum drift value (nsecs) <= maximum increment value@nominal frequency (which is 8bit:0xffff).
+> If maximum drift is written as function of nominal frequency and maximum ppb, then the equation above yields that the maximum ppb is: (2^8 - 1) *nominal_frequency - 10^9. The equation is also simplified by the fact that the drift is written as ppm + 16bit_fractions and the increment value is written as nsec + 16bit_fractions.
+>
+> Rafal said that this value is hardcoded: 0x64E6, while Harini said: 250000000.
 
-All changes are sent in new patch except kvm changes, because for kvm we don't not much idea.
+@ Andrei, I may have equated max ppb to max tsu frequency allowed on
+the system and set that.
+That will be wrong.
 
+>
+> I need to dig into this...
+>
+>>
+>> I am not sure what you meant, but it sounds like you are on the wrong track.
+>> Let me explain...
+>
+> Thanks.
+>
+>>
+>> The max_adj has nothing at all to do with the width of the time register.
+>> Rather, it should reflect the maximum possible change in the tuning word.
+>>
+>> For example, with a nominal 8 ns period, the tuning word is 0x80000.
+>> Looking at running the clock more slowly, the slowest possible word is
+>> 0x00001, meaning a difference of 0x7FFFF.  This implies an adjustment of
+>> 0x7FFFF/0x80000 or 999998092 ppb.  Running more quickly, we can already
+>> have 0x100000, twice as fast, or just under 2 billion ppb.
+>>
+>> You should consider the extreme cases to determine the most limited
+>> (smallest) max_adj value:
+>>
+>> Case 1 - high frequency
+>> ~~~~~~~~~~~~~~~~~~~~~~~
+>>
+>> With a nominal 1 ns period, we have the nominal tuning word 0x10000.
+>> The smallest is 0x1 for a difference of 0xFFFF.  This corresponds to an
+>> adjustment of 0xFFFF/0x10000 = .9999847412109375 or 999984741 ppb.
+>>
+>> Case 2 - low frequency
+>> ~~~~~~~~~~~~~~~~~~~~~~
+>>
+>> With a nominal 255 ns period, the nominal word is 0xFF0000, the largest
+>> 0xFFFFFF, and the difference is 0xFFFF.  This corresponds to and adjustment
+>> of 0xFFFF/0xFF0000 = .0039215087890625 or 3921508 ppb.
+>>
+>> Since 3921508 ppb is a huge adjustment, you can simply use that as a safe
+>> maximum, ignoring the actual input clock.
+>>
 
->arch/arm64/kernel/signal32.c:           pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
->arch/arm64/kernel/signal32.c:           pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
+Thanks Richard.
+So, if I understand right, this is theoretically limited by the
+maximum input clock:
+So if the highest frequency allowed (also commonly sourced in my case)
+is 200MHz,
+then with a 5ns time period, considering the adjustment to slowest
+possible word,
+0x4FFFF/0x50000 will be 999996948 ppb.
+Shouldn't this be the max_adj?
+I'm afraid I don't get why we are choosing the most limited max adj..
+Sorry if I'm missing something - could you please help me understand?
 
-and signal32 fiel changes are not required, because it meant only for 32 bit.
-
---------------------
-Thanks and Regards,
-Maninder Singh
+Regards,
+Harini
