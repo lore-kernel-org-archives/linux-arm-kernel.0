@@ -1,51 +1,77 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 9 Dec 2016 08:45:41 +0100
-Subject: [RESEND PATCH v2 0/7] drm/vc4: VEC (SDTV) output support
-In-Reply-To: <68783643.33021.1481268157922@email.1und1.de>
-References: <1480686493-4813-1-git-send-email-boris.brezillon@free-electrons.com>
- <68783643.33021.1481268157922@email.1und1.de>
-Message-ID: <20161209084541.0e89e533@bbrezillon>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 9 Dec 2016 10:05:01 +0200
+Subject: [PATCH 3/3] clk: keystone: Add sci-clk driver support
+In-Reply-To: <20161208211044.GI5423@codeaurora.org>
+References: <1477053961-27128-1-git-send-email-t-kristo@ti.com>
+ <1477053961-27128-4-git-send-email-t-kristo@ti.com>
+ <20161208001348.GC5423@codeaurora.org>
+ <cb608729-b617-0eab-5ddf-d78ff47b237e@ti.com>
+ <20161208211044.GI5423@codeaurora.org>
+Message-ID: <22dacb0c-a3bc-50ce-e4b9-f74a0c706f20@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Dec 2016 08:22:37 +0100 (CET)
-Stefan Wahren <stefan.wahren@i2se.com> wrote:
+On 08/12/16 23:10, Stephen Boyd wrote:
+> On 12/08, Tero Kristo wrote:
+>> On 08/12/16 02:13, Stephen Boyd wrote:
+>>> On 10/21, Tero Kristo wrote:
+>>>> diff --git a/drivers/clk/keystone/sci-clk.c b/drivers/clk/keystone/sci-clk.c
+>>>> new file mode 100644
+>>>> index 0000000..f6af5bd
+>>>> --- /dev/null
+>>>> +++ b/drivers/clk/keystone/sci-clk.c
+>>
+>>>
+>>>> +
+>>>> +	handle = devm_ti_sci_get_handle(dev);
+>>>> +	if (IS_ERR(handle))
+>>>> +		return PTR_ERR(handle);
+>>>> +
+>>>> +	provider = devm_kzalloc(dev, sizeof(*provider), GFP_KERNEL);
+>>>> +	if (!provider)
+>>>> +		return -ENOMEM;
+>>>> +
+>>>> +	provider->clocks = data;
+>>>> +
+>>>> +	provider->sci = handle;
+>>>> +	provider->ops = &handle->ops.clk_ops;
+>>>> +	provider->dev = dev;
+>>>> +
+>>>> +	ti_sci_init_clocks(provider);
+>>>
+>>> And if this fails?
+>>
+>> Yea this is kind of controversial. ti_sci_init_clocks() can fail if
+>> any of the clocks registered will fail. I decided to have it this
+>> way so that at least some clocks might work in failure cause, and
+>> you might have a booting device instead of total lock-up.
+>>
+>> Obviously it could be done so that if any clock fails, we would
+>> de-register all clocks at that point, but personally I think this is
+>> a worse option.
+>>
+>> ti_sci_init_clocks could probably be modified to continue
+>> registering clocks when a single clock fails though. Currently it
+>> aborts at first failure.
+>>
+>
+> That sounds like a better approach if we don't care about
+> failures to register a clock. Returning a value from a function
+> and not using it isn't really a great design.
+>
+> I worry that if we start returning errors from clk_hw_register()
+> that something will go wrong though, so really I don't know why
+> we want to ignore errors at all. Just for debugging a boot hang?
+> Can't we use early console to at least see that this driver is
+> failing to probe and debug that way?
 
-> Hi,
-> 
-> > Boris Brezillon <boris.brezillon@free-electrons.com> hat am 2. Dezember 2016 um 14:48 geschrieben:
-> > 
-> > 
-> > Sorry for the noise, but I forgot to Cc the DT maintainers.
-> > 
-> > Here is the 2nd version of the VC4/VEC series.
-> > 
-> > We still miss the two clock patches mentioned by Eric in the first
-> > version to make the encoder work no matter the setting applied by the
-> > bootloader.  
-> 
-> are there any advices to test this feature?
+Early console can be used to debug that, but it is kind of annoying to 
+recompile most of the kernel when you suddenly need to use it.
 
-Apply these patches [1][2][3][4] in addition to this series, and you
-should see the SDTV output when running modetest (this is what I used
-to test/debug the driver).
+How about modifying the ti_sci_init_clocks func to print an error for 
+each failed clock?
 
-This is the command I use to test the SDTV output in NTSC mode
+If you insist on aborting the probe though if a single clock fails, I 
+can do that also.
 
-modetest -s 39:720x480
-
-> 
-> Is it possible to use an old Raspberry Pi B (256 MB RAM) for this?
-
-I did most of my test on a RPi-2, but IIRC, Eric tested it on a RPi
-(don't know which model).
-
-> 
-> Thanks
-> 
-> Stefan
-
-[1]https://patchwork.kernel.org/patch/9442127/
-[2]https://patchwork.kernel.org/patch/9456911/
-[3]https://patchwork.kernel.org/patch/9456909/
-[4]https://patchwork.kernel.org/patch/9456731/
+-Tero
