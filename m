@@ -1,152 +1,57 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 9 Dec 2016 17:24:08 +0000
-Subject: [PATCH v4] arm64: fpsimd: improve stacking logic in
- non-interruptible context
-In-Reply-To: <1481301992-2344-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1481301992-2344-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20161209172407.GC1574@e103592.cambridge.arm.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 09 Dec 2016 17:28:01 +0000
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <20161209171727.GK6408@localhost> (Vinod Koul's message of "Fri,
+ 9 Dec 2016 22:47:27 +0530")
+References: <5846B237.8060409@free.fr> <yw1xwpfd2o9f.fsf@unicorn.mansr.com>
+ <20161207164341.GX6408@localhost> <yw1xr35j1yd5.fsf@unicorn.mansr.com>
+ <20161208103921.GC6408@localhost>
+ <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
+ <20161208163755.GH6408@localhost> <yw1xy3zqxt7x.fsf@unicorn.mansr.com>
+ <20161209065955.GJ6408@localhost>
+ <6ce1ea97-1d68-2203-c7b4-73315e801655@laposte.net>
+ <20161209171727.GK6408@localhost>
+Message-ID: <yw1xbmwlxba6.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2016 at 04:46:32PM +0000, Ard Biesheuvel wrote:
-> Currently, we allow kernel mode NEON in softirq or hardirq context by
-> stacking and unstacking a slice of the NEON register file for each call
-> to kernel_neon_begin() and kernel_neon_end(), respectively.
-> 
-> Given that
-> a) a CPU typically spends most of its time in userland, during which time
->    no kernel mode NEON in process context is in progress,
-> b) a CPU spends most of its time in the kernel doing other things than
->    kernel mode NEON when it gets interrupted to perform kernel mode NEON
->    in softirq context
-> 
-> the stacking and subsequent unstacking is only necessary if we are
-> interrupting a thread while it is performing kernel mode NEON in process
-> context, which means that in all other cases, we can simply preserve the
-> userland FPSIMD state once, and only restore it upon return to userland,
-> even if we are being invoked from softirq or hardirq context.
-> 
-> So instead of checking whether we are running in interrupt context, keep
-> track of the level of nested kernel mode NEON calls in progress, and only
-> perform the eager stack/unstack if the level exceeds 1.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Vinod Koul <vinod.koul@intel.com> writes:
 
-This looks good to me.
+> On Fri, Dec 09, 2016 at 11:25:57AM +0100, Sebastian Frias wrote:
+>> 
+>> What concrete solution do you propose?
+>
+> I have already proposed two solutions.
+>
+> A) Request a channel only when you need it. Obviously we can't do virtual
+> channels with this (though we should still use virt-channels framework).
+> The sbox setup and teardown can be done as part of channel request and
+> freeup. PL08x already does this.
+>
+> Downside is that we can only have as many consumers at a time as channels.
+>
+> I have not heard any technical reason for not doing this apart from drivers
+> grab the channel at probe, which is incorrect and needs to be fixed
+> irrespective of the problem at hand.
+>
+> This is my preferred option.
 
-This should also make the SVE case trivial now: there can only be live
-SVE state when in process context with !TIF_FOREIGN_FPSTATE, and the
-SVE save/restore is then handled by fpsimd_{save,load}_state()
-directly.  For deeper nesting levels, there is already no live SVE
-state, so kernel_neon_{save,load}_partial_state() are enough in that
-case.
+Sorry, but this is not acceptable.
 
-As and when KERNEL_MODE_SVE comes along this will need another look,
-but this patch looks like a step forward for now.
+> B) Create a custom driver specific API. This API for example:
+> 	sbox_setup(bool enable, ...)
+> can be called by client to explicitly setup and clear up the sbox setting.
+>
+> This way we can have transactions muxed.
+>
+> I have not heard any arguments on why we shouldn't do this except Russell's
+> comment that A) solves this.
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+Driver-specific interfaces are not the solution.  That way lies chaos
+and madness.
 
-> ---
-> v4:
-> - use this_cpu_inc/dec, which give sufficient guarantees regarding
->   concurrency, but do not imply SMP barriers, which are not needed here
-> 
-> v3:
-> - avoid corruption by concurrent invocations of kernel_neon_begin()/_end()
-> 
-> v2:
-> - BUG() on unexpected values of the nesting level
-> - relax the BUG() on num_regs>32 to a WARN, given that nothing actually
->   breaks in that case
-> 
->  arch/arm64/kernel/fpsimd.c | 47 ++++++++++++++------
->  1 file changed, 33 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 394c61db5566..37d6dfc9059b 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -220,20 +220,35 @@ void fpsimd_flush_task_state(struct task_struct *t)
->  
->  #ifdef CONFIG_KERNEL_MODE_NEON
->  
-> -static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
-> -static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
-> +/*
-> + * Although unlikely, it is possible for three kernel mode NEON contexts to
-> + * be live at the same time: process context, softirq context and hardirq
-> + * context. So while the userland context is stashed in the thread's fpsimd
-> + * state structure, we need two additional levels of storage.
-> + */
-> +static DEFINE_PER_CPU(struct fpsimd_partial_state, nested_fpsimdstate[2]);
-> +static DEFINE_PER_CPU(int, kernel_neon_nesting_level);
->  
->  /*
->   * Kernel-side NEON support functions
->   */
->  void kernel_neon_begin_partial(u32 num_regs)
->  {
-> -	if (in_interrupt()) {
-> -		struct fpsimd_partial_state *s = this_cpu_ptr(
-> -			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
-> +	struct fpsimd_partial_state *s;
-> +	int level;
-> +
-> +	preempt_disable();
-> +
-> +	level = this_cpu_inc_return(kernel_neon_nesting_level);
-> +	BUG_ON(level > 3);
-> +
-> +	if (level > 1) {
-> +		s = this_cpu_ptr(nested_fpsimdstate);
->  
-> -		BUG_ON(num_regs > 32);
-> -		fpsimd_save_partial_state(s, roundup(num_regs, 2));
-> +		WARN_ON_ONCE(num_regs > 32);
-> +		num_regs = min(roundup(num_regs, 2), 32U);
-> +
-> +		fpsimd_save_partial_state(&s[level - 2], num_regs);
->  	} else {
->  		/*
->  		 * Save the userland FPSIMD state if we have one and if we
-> @@ -241,7 +256,6 @@ void kernel_neon_begin_partial(u32 num_regs)
->  		 * that there is no longer userland FPSIMD state in the
->  		 * registers.
->  		 */
-> -		preempt_disable();
->  		if (current->mm &&
->  		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
->  			fpsimd_save_state(&current->thread.fpsimd_state);
-> @@ -252,13 +266,18 @@ EXPORT_SYMBOL(kernel_neon_begin_partial);
->  
->  void kernel_neon_end(void)
->  {
-> -	if (in_interrupt()) {
-> -		struct fpsimd_partial_state *s = this_cpu_ptr(
-> -			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
-> -		fpsimd_load_partial_state(s);
-> -	} else {
-> -		preempt_enable();
-> +	struct fpsimd_partial_state *s;
-> +	int level;
-> +
-> +	level = this_cpu_read(kernel_neon_nesting_level);
-> +	BUG_ON(level < 1);
-> +
-> +	if (level > 1) {
-> +		s = this_cpu_ptr(nested_fpsimdstate);
-> +		fpsimd_load_partial_state(&s[level - 2]);
->  	}
-> +	this_cpu_dec(kernel_neon_nesting_level);
-> +	preempt_enable();
->  }
->  EXPORT_SYMBOL(kernel_neon_end);
->  
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+This would all be so much easier if you all would just shut up for a
+moment and let me fix it properly.
+
+-- 
+M?ns Rullg?rd
