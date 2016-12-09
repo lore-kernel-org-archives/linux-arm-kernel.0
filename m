@@ -1,128 +1,90 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  9 Dec 2016 16:46:32 +0000
-Subject: [PATCH v4] arm64: fpsimd: improve stacking logic in non-interruptible
- context
-Message-ID: <1481301992-2344-1-git-send-email-ard.biesheuvel@linaro.org>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Fri,  9 Dec 2016 17:59:32 +0100
+Subject: [PATCH v7 1/2] provide lock-less versions of clk_{enable|disable}
+Message-ID: <1481302773-14181-1-git-send-email-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, we allow kernel mode NEON in softirq or hardirq context by
-stacking and unstacking a slice of the NEON register file for each call
-to kernel_neon_begin() and kernel_neon_end(), respectively.
+Rename __clk_{enable|disble} in davinci_clk_{enable|disable}.
+davinci_clk_{enable|disable} is a lock-less version of
+clk_{enable|disable}.
+This is useful to recursively enable clock without doing recursive call
+to clk_enable(), which would cause a recursive locking issue.
+The lock-less version could be used by example by the usb20 phy clock,
+that need to enable the usb20 clock before to start.
 
-Given that
-a) a CPU typically spends most of its time in userland, during which time
-   no kernel mode NEON in process context is in progress,
-b) a CPU spends most of its time in the kernel doing other things than
-   kernel mode NEON when it gets interrupted to perform kernel mode NEON
-   in softirq context
-
-the stacking and subsequent unstacking is only necessary if we are
-interrupting a thread while it is performing kernel mode NEON in process
-context, which means that in all other cases, we can simply preserve the
-userland FPSIMD state once, and only restore it upon return to userland,
-even if we are being invoked from softirq or hardirq context.
-
-So instead of checking whether we are running in interrupt context, keep
-track of the level of nested kernel mode NEON calls in progress, and only
-perform the eager stack/unstack if the level exceeds 1.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+Suggested-by: David Lechner <david@lechnology.com>
 ---
-v4:
-- use this_cpu_inc/dec, which give sufficient guarantees regarding
-  concurrency, but do not imply SMP barriers, which are not needed here
+ arch/arm/mach-davinci/clock.c | 12 ++++++------
+ arch/arm/mach-davinci/clock.h |  2 ++
+ 2 files changed, 8 insertions(+), 6 deletions(-)
 
-v3:
-- avoid corruption by concurrent invocations of kernel_neon_begin()/_end()
-
-v2:
-- BUG() on unexpected values of the nesting level
-- relax the BUG() on num_regs>32 to a WARN, given that nothing actually
-  breaks in that case
-
- arch/arm64/kernel/fpsimd.c | 47 ++++++++++++++------
- 1 file changed, 33 insertions(+), 14 deletions(-)
-
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 394c61db5566..37d6dfc9059b 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -220,20 +220,35 @@ void fpsimd_flush_task_state(struct task_struct *t)
+diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
+index df42c93..f5dce9b 100644
+--- a/arch/arm/mach-davinci/clock.c
++++ b/arch/arm/mach-davinci/clock.c
+@@ -31,10 +31,10 @@ static LIST_HEAD(clocks);
+ static DEFINE_MUTEX(clocks_mutex);
+ static DEFINE_SPINLOCK(clockfw_lock);
  
- #ifdef CONFIG_KERNEL_MODE_NEON
- 
--static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
--static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
-+/*
-+ * Although unlikely, it is possible for three kernel mode NEON contexts to
-+ * be live at the same time: process context, softirq context and hardirq
-+ * context. So while the userland context is stashed in the thread's fpsimd
-+ * state structure, we need two additional levels of storage.
-+ */
-+static DEFINE_PER_CPU(struct fpsimd_partial_state, nested_fpsimdstate[2]);
-+static DEFINE_PER_CPU(int, kernel_neon_nesting_level);
- 
- /*
-  * Kernel-side NEON support functions
-  */
- void kernel_neon_begin_partial(u32 num_regs)
+-static void __clk_enable(struct clk *clk)
++void davinci_clk_enable(struct clk *clk)
  {
--	if (in_interrupt()) {
--		struct fpsimd_partial_state *s = this_cpu_ptr(
--			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
-+	struct fpsimd_partial_state *s;
-+	int level;
-+
-+	preempt_disable();
-+
-+	level = this_cpu_inc_return(kernel_neon_nesting_level);
-+	BUG_ON(level > 3);
-+
-+	if (level > 1) {
-+		s = this_cpu_ptr(nested_fpsimdstate);
- 
--		BUG_ON(num_regs > 32);
--		fpsimd_save_partial_state(s, roundup(num_regs, 2));
-+		WARN_ON_ONCE(num_regs > 32);
-+		num_regs = min(roundup(num_regs, 2), 32U);
-+
-+		fpsimd_save_partial_state(&s[level - 2], num_regs);
- 	} else {
- 		/*
- 		 * Save the userland FPSIMD state if we have one and if we
-@@ -241,7 +256,6 @@ void kernel_neon_begin_partial(u32 num_regs)
- 		 * that there is no longer userland FPSIMD state in the
- 		 * registers.
- 		 */
--		preempt_disable();
- 		if (current->mm &&
- 		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
- 			fpsimd_save_state(&current->thread.fpsimd_state);
-@@ -252,13 +266,18 @@ EXPORT_SYMBOL(kernel_neon_begin_partial);
- 
- void kernel_neon_end(void)
- {
--	if (in_interrupt()) {
--		struct fpsimd_partial_state *s = this_cpu_ptr(
--			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
--		fpsimd_load_partial_state(s);
--	} else {
--		preempt_enable();
-+	struct fpsimd_partial_state *s;
-+	int level;
-+
-+	level = this_cpu_read(kernel_neon_nesting_level);
-+	BUG_ON(level < 1);
-+
-+	if (level > 1) {
-+		s = this_cpu_ptr(nested_fpsimdstate);
-+		fpsimd_load_partial_state(&s[level - 2]);
+ 	if (clk->parent)
+-		__clk_enable(clk->parent);
++		davinci_clk_enable(clk->parent);
+ 	if (clk->usecount++ == 0) {
+ 		if (clk->flags & CLK_PSC)
+ 			davinci_psc_config(clk->domain, clk->gpsc, clk->lpsc,
+@@ -44,7 +44,7 @@ static void __clk_enable(struct clk *clk)
  	}
-+	this_cpu_dec(kernel_neon_nesting_level);
-+	preempt_enable();
  }
- EXPORT_SYMBOL(kernel_neon_end);
  
+-static void __clk_disable(struct clk *clk)
++void davinci_clk_disable(struct clk *clk)
+ {
+ 	if (WARN_ON(clk->usecount == 0))
+ 		return;
+@@ -56,7 +56,7 @@ static void __clk_disable(struct clk *clk)
+ 			clk->clk_disable(clk);
+ 	}
+ 	if (clk->parent)
+-		__clk_disable(clk->parent);
++		davinci_clk_disable(clk->parent);
+ }
+ 
+ int davinci_clk_reset(struct clk *clk, bool reset)
+@@ -103,7 +103,7 @@ int clk_enable(struct clk *clk)
+ 		return -EINVAL;
+ 
+ 	spin_lock_irqsave(&clockfw_lock, flags);
+-	__clk_enable(clk);
++	davinci_clk_enable(clk);
+ 	spin_unlock_irqrestore(&clockfw_lock, flags);
+ 
+ 	return 0;
+@@ -118,7 +118,7 @@ void clk_disable(struct clk *clk)
+ 		return;
+ 
+ 	spin_lock_irqsave(&clockfw_lock, flags);
+-	__clk_disable(clk);
++	davinci_clk_disable(clk);
+ 	spin_unlock_irqrestore(&clockfw_lock, flags);
+ }
+ EXPORT_SYMBOL(clk_disable);
+diff --git a/arch/arm/mach-davinci/clock.h b/arch/arm/mach-davinci/clock.h
+index e2a5437..fa2b837 100644
+--- a/arch/arm/mach-davinci/clock.h
++++ b/arch/arm/mach-davinci/clock.h
+@@ -132,6 +132,8 @@ int davinci_set_sysclk_rate(struct clk *clk, unsigned long rate);
+ int davinci_set_refclk_rate(unsigned long rate);
+ int davinci_simple_set_rate(struct clk *clk, unsigned long rate);
+ int davinci_clk_reset(struct clk *clk, bool reset);
++void davinci_clk_enable(struct clk *clk);
++void davinci_clk_disable(struct clk *clk);
+ 
+ extern struct platform_device davinci_wdt_device;
+ extern void davinci_watchdog_reset(struct platform_device *);
 -- 
-2.7.4
+2.7.3
