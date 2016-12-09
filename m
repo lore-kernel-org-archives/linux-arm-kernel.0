@@ -1,113 +1,239 @@
-From: rafalo@cadence.com (Rafal Ozieblo)
-Date: Fri, 9 Dec 2016 09:20:08 +0000
-Subject: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in Cadence GEM.
-In-Reply-To: <07C910AB6AC6C345A093D5A08F5AF568CB74AF28@CHN-SV-EXMX03.mchp-main.com>
-References: <1481134912-2243-1-git-send-email-andrei.pistirica@microchip.com>
- <20161207193908.GA13062@netboy> <20161207210416.GA27622@netboy>
- <07C910AB6AC6C345A093D5A08F5AF568CB74AF28@CHN-SV-EXMX03.mchp-main.com>
-Message-ID: <BN3PR07MB2516992DEE883FAD6DC3ED08C9870@BN3PR07MB2516.namprd07.prod.outlook.com>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Fri, 09 Dec 2016 14:42:36 +0530
+Subject: [RESEND-PATCH] ARM: EXYNOS: remove smp hook from machine
+ descriptor
+In-Reply-To: <20161208173349.GA8522@kozik-lap>
+References: <1481166135-1588-1-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20161208173359epcas2p4ee51a2589fba2bc67418d4e82661bea2@epcas2p4.samsung.com>
+ <20161208173349.GA8522@kozik-lap>
+Message-ID: <fbc36736-ce7c-3eed-2833-c2e45ea02ce5@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------Original Message-----
-> From: Andrei.Pistirica at microchip.com [mailto:Andrei.Pistirica at microchip.com]
-> Sent: 8 grudnia 2016 15:42
-> To: richardcochran at gmail.com
-> Cc: netdev at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; davem at davemloft.net; nicolas.ferre at atmel.com; harinikatakamlinux at gmail.com; harini.katakam at xilinx.com; punnaia at xilinx.com; michals at xilinx.com; anirudh at xilinx.com; boris.brezillon at free-electrons.com; alexandre.belloni at free-electrons.com; tbultel at pixelsurmer.com; Rafal Ozieblo
-> Subject: RE: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in Cadence GEM.
->
->
->
-> > -----Original Message-----
-> > From: Richard Cochran [mailto:richardcochran at gmail.com]
-> > Sent: Wednesday, December 07, 2016 11:04 PM
-> > To: Andrei Pistirica - M16132
-> > Cc: netdev at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> > kernel at lists.infradead.org; davem at davemloft.net;
-> > nicolas.ferre at atmel.com; harinikatakamlinux at gmail.com;
-> > harini.katakam at xilinx.com; punnaia at xilinx.com; michals at xilinx.com;
-> > anirudh at xilinx.com; boris.brezillon at free-electrons.com;
-> > alexandre.belloni at free-electrons.com; tbultel at pixelsurmer.com;
-> > rafalo at cadence.com
-> > Subject: Re: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in
-> > Cadence GEM.
-> >
-> > On Wed, Dec 07, 2016 at 08:39:09PM +0100, Richard Cochran wrote:
-> > > > +static s32 gem_ptp_max_adj(unsigned int f_nom) {
-> > > > +       u64 adj;
-> > > > +
-> > > > +       /* The 48 bits of seconds for the GEM overflows every:
-> > > > +        * 2^48/(365.25 * 24 * 60 *60) =~ 8 925 512 years (~= 9 mil years),
-> > > > +        * thus the maximum adjust frequency must not overflow CNS
-> > register:
-> > > > +        *
-> > > > +        * addend  = 10^9/nominal_freq
-> > > > +        * adj_max = +/- addend*ppb_max/10^9
-> > > > +        * max_ppb = (2^8-1)*nominal_freq-10^9
-> > > > +        */
-> > > > +       adj = f_nom;
-> > > > +       adj *= 0xffff;
-> > > > +       adj -= 1000000000ULL;
-> > >
-> > > What is this computation, and how does it relate to the comment?
->
-> I considered the following simple equation: increment value at nominal frequency (which is 10^9/nominal frequency nsecs) + the maximum drift value (nsecs) <= maximum increment value@nominal frequency (which is 8bit:0xffff).
-> If maximum drift is written as function of nominal frequency and maximum ppb, then the equation above yields that the maximum ppb is: (2^8 - 1) *nominal_frequency - 10^9. The equation is also simplified by the fact that the drift is written as ppm + 16bit_fractions and the increment value is written as nsec + 16bit_fractions.
->
-> Rafal said that this value is hardcoded: 0x64E6, while Harini said: 250000000.
+Hi Krzysztof,
 
-To clarify a little bit. In my reference code this value (0x64E6) was taken from our legacy code. It was used for testing only. I know it should be change to something more accurate. This is the reason why I asked how did you count it (250000000). According to our calculations this value depends on actual set period (incr_ns and incr_sub_ns) and min and max value we can set. The calculation were a little bit intricate, so we decided to leave it as it was.
+On Thursday 08 December 2016 11:03 PM, Krzysztof Kozlowski wrote:
+> On Thu, Dec 08, 2016 at 08:32:15AM +0530, Pankaj Dubey wrote:
+>> Use CPU_METHOD_OF_DECLARE() for smp_ops instead of using it
+>> via machine descriptor.
+>>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> ---
+>>
+>> Resending as I missed to include samsung mailing list.
+>>
+>>  arch/arm/boot/dts/exynos3250.dtsi      | 1 +
+>>  arch/arm/boot/dts/exynos4210.dtsi      | 1 +
+>>  arch/arm/boot/dts/exynos4212.dtsi      | 1 +
+>>  arch/arm/boot/dts/exynos4412.dtsi      | 1 +
+>>  arch/arm/boot/dts/exynos5250.dtsi      | 1 +
+>>  arch/arm/boot/dts/exynos5260.dtsi      | 1 +
+>>  arch/arm/boot/dts/exynos5410.dtsi      | 1 +
+>>  arch/arm/boot/dts/exynos5420-cpus.dtsi | 1 +
+>>  arch/arm/boot/dts/exynos5422-cpus.dtsi | 1 +
+>>  arch/arm/boot/dts/exynos5440.dtsi      | 1 +
+>>  arch/arm/mach-exynos/common.h          | 2 --
+>>  arch/arm/mach-exynos/exynos.c          | 1 -
+>>  arch/arm/mach-exynos/platsmp.c         | 2 ++
+>>  13 files changed, 12 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+>> index ba17ee1..f28f669 100644
+>> --- a/arch/arm/boot/dts/exynos3250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+>> @@ -53,6 +53,7 @@
+>>  	cpus {
+>>  		#address-cells = <1>;
+>>  		#size-cells = <0>;
+>> +		enable-method = "samsung,exynos-smp";
+>>  
+>>  		cpu0: cpu at 0 {
+>>  			device_type = "cpu";
+>> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+>> index 7f3a18c..6dfd98d 100644
+>> --- a/arch/arm/boot/dts/exynos4210.dtsi
+>> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+>> @@ -35,6 +35,7 @@
+>>  	cpus {
+>>  		#address-cells = <1>;
+>>  		#size-cells = <0>;
+>> +		enable-method = "samsung,exynos-smp";
+>>  
+>>  		cpu0: cpu at 900 {
+>>  			device_type = "cpu";
+>> diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
+>> index 5389011..3e8982e 100644
+>> --- a/arch/arm/boot/dts/exynos4212.dtsi
+>> +++ b/arch/arm/boot/dts/exynos4212.dtsi
+>> @@ -25,6 +25,7 @@
+>>  	cpus {
+>>  		#address-cells = <1>;
+>>  		#size-cells = <0>;
+>> +		enable-method = "samsung,exynos-smp";
+>>  
+>>  		cpu0: cpu at A00 {
+>>  			device_type = "cpu";
+>> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+>> index 40beede..faf2fb8 100644
+>> --- a/arch/arm/boot/dts/exynos4412.dtsi
+>> +++ b/arch/arm/boot/dts/exynos4412.dtsi
+>> @@ -25,6 +25,7 @@
+>>  	cpus {
+>>  		#address-cells = <1>;
+>>  		#size-cells = <0>;
+>> +		enable-method = "samsung,exynos-smp";
+>>  
+>>  		cpu0: cpu at A00 {
+>>  			device_type = "cpu";
+>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+>> index b6d7444..580897c 100644
+>> --- a/arch/arm/boot/dts/exynos5250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+>> @@ -52,6 +52,7 @@
+>>  	cpus {
+>>  		#address-cells = <1>;
+>>  		#size-cells = <0>;
+>> +		enable-method = "samsung,exynos-smp";
+>>  
+>>  		cpu0: cpu at 0 {
+>>  			device_type = "cpu";
+>> diff --git a/arch/arm/boot/dts/exynos5260.dtsi b/arch/arm/boot/dts/exynos5260.dtsi
+>> index 5818718..1af6e76 100644
+>> --- a/arch/arm/boot/dts/exynos5260.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5260.dtsi
+>> @@ -32,6 +32,7 @@
+>>  	cpus {
+>>  		#address-cells = <1>;
+>>  		#size-cells = <0>;
+>> +		enable-method = "samsung,exynos-smp";
+>>  
+>>  		cpu at 0 {
+>>  			device_type = "cpu";
+>> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+>> index 2b6adaf..b092cdc 100644
+>> --- a/arch/arm/boot/dts/exynos5410.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5410.dtsi
+>> @@ -33,6 +33,7 @@
+>>  	cpus {
+>>  		#address-cells = <1>;
+>>  		#size-cells = <0>;
+>> +		enable-method = "samsung,exynos-smp";
+>>  
+>>  		cpu0: cpu at 0 {
+>>  			device_type = "cpu";
+>> diff --git a/arch/arm/boot/dts/exynos5420-cpus.dtsi b/arch/arm/boot/dts/exynos5420-cpus.dtsi
+>> index 5c052d7..a587704 100644
+>> --- a/arch/arm/boot/dts/exynos5420-cpus.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5420-cpus.dtsi
+>> @@ -24,6 +24,7 @@
+>>  	cpus {
+>>  		#address-cells = <1>;
+>>  		#size-cells = <0>;
+>> +		enable-method = "samsung,exynos-smp";
+>>  
+>>  		cpu0: cpu at 0 {
+>>  			device_type = "cpu";
+>> diff --git a/arch/arm/boot/dts/exynos5422-cpus.dtsi b/arch/arm/boot/dts/exynos5422-cpus.dtsi
+>> index bf3c6f1..7fcdfd0 100644
+>> --- a/arch/arm/boot/dts/exynos5422-cpus.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5422-cpus.dtsi
+>> @@ -23,6 +23,7 @@
+>>  	cpus {
+>>  		#address-cells = <1>;
+>>  		#size-cells = <0>;
+>> +		enable-method = "samsung,exynos-smp";
+>>  
+>>  		cpu0: cpu at 100 {
+>>  			device_type = "cpu";
+>> diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+>> index 2a2e570..0a958e8 100644
+>> --- a/arch/arm/boot/dts/exynos5440.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5440.dtsi
+>> @@ -50,6 +50,7 @@
+>>  	cpus {
+>>  		#address-cells = <1>;
+>>  		#size-cells = <0>;
+>> +		enable-method = "samsung,exynos-smp";
+>>  
+>>  		cpu at 0 {
+>>  			device_type = "cpu";
+>> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+>> index fb12d11..051e1ab 100644
+>> --- a/arch/arm/mach-exynos/common.h
+>> +++ b/arch/arm/mach-exynos/common.h
+>> @@ -143,8 +143,6 @@ static inline void exynos_pm_init(void) {}
+>>  extern void exynos_cpu_resume(void);
+>>  extern void exynos_cpu_resume_ns(void);
+>>  
+>> -extern const struct smp_operations exynos_smp_ops;
+>> -
+>>  extern void exynos_cpu_power_down(int cpu);
+>>  extern void exynos_cpu_power_up(int cpu);
+>>  extern int  exynos_cpu_power_state(int cpu);
+>> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+>> index fa08ef9..f0a766e 100644
+>> --- a/arch/arm/mach-exynos/exynos.c
+>> +++ b/arch/arm/mach-exynos/exynos.c
+>> @@ -211,7 +211,6 @@ DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
+>>  	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+>>  	.l2c_aux_val	= 0x3c400001,
+>>  	.l2c_aux_mask	= 0xc20fffff,
+>> -	.smp		= smp_ops(exynos_smp_ops),
+>>  	.map_io		= exynos_init_io,
+>>  	.init_early	= exynos_firmware_init,
+>>  	.init_irq	= exynos_init_irq,
+>> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+>> index 94405c7..43eec10 100644
+>> --- a/arch/arm/mach-exynos/platsmp.c
+>> +++ b/arch/arm/mach-exynos/platsmp.c
+>> @@ -474,3 +474,5 @@ const struct smp_operations exynos_smp_ops __initconst = {
+>>  	.cpu_die		= exynos_cpu_die,
+>>  #endif
+>>  };
+>> +
+>> +CPU_METHOD_OF_DECLARE(exynos_smp, "samsung,exynos-smp", &exynos_smp_ops);
+> 
+> Three issues:
+> 1. This has to be documented. Checkpatch did not complain about it?
 
->
-> I need to dig into this...
->
-> >
-> > I am not sure what you meant, but it sounds like you are on the wrong track.
-> > Let me explain...
->
-> Thanks.
->
-> >
-> > The max_adj has nothing at all to do with the width of the time register.
-> > Rather, it should reflect the maximum possible change in the tuning word.
-> >
-> > For example, with a nominal 8 ns period, the tuning word is 0x80000.
-> > Looking at running the clock more slowly, the slowest possible word is
-> > 0x00001, meaning a difference of 0x7FFFF.  This implies an adjustment
-> > of
-> > 0x7FFFF/0x80000 or 999998092 ppb.  Running more quickly, we can
-> > already have 0x100000, twice as fast, or just under 2 billion ppb.
-> >
-> > You should consider the extreme cases to determine the most limited
-> > (smallest) max_adj value:
-> >
-> > Case 1 - high frequency
-> > ~~~~~~~~~~~~~~~~~~~~~~~
-> >
-> > With a nominal 1 ns period, we have the nominal tuning word 0x10000.
-> > The smallest is 0x1 for a difference of 0xFFFF.  This corresponds to
-> > an adjustment of 0xFFFF/0x10000 = .9999847412109375 or 999984741 ppb.
-> >
-> > Case 2 - low frequency
-> > ~~~~~~~~~~~~~~~~~~~~~~
-> >
-> > With a nominal 255 ns period, the nominal word is 0xFF0000, the
-> > largest 0xFFFFFF, and the difference is 0xFFFF.  This corresponds to
-> > and adjustment of 0xFFFF/0xFF0000 = .0039215087890625 or 3921508 ppb.
-> >
-> > Since 3921508 ppb is a huge adjustment, you can simply use that as a
-> > safe maximum, ignoring the actual input clock.
-> >
-> > Thanks,
-> > Richard
-> >
-> >
->
-> Regards,
-> Andrei
->
+No it didn't.
 
-Best regards,
-Rafal Ozieblo   |   Firmware System Engineer, 
-phone nbr.: +48 32 5085469
-www.cadence.com
+> 2. I think this breaks the ABI with existing DTBs because now the
+>    enable-method of cpus becomes mandatory. But the
+>    Documentation/devicetree/bindings/arm/cpus.txt is saying that:
+>    "On ARM 32-bit systems this property is optional and can be one of"
+> 
+
+I am not very sure that this is an ABI break, as other platforms (e.g
+hisilicon,hip01-smp) also adopted this as some later stage and they also
+removed smp hook support from their machine files when they adopted to
+this enable-method in DTS files.
+
+If we want to keep older DTBs keep working with new Kernel image, then I
+need to drop patch from mach-exynos and keep smp_ops hook in machine
+descriptor as it is to keep supporting older DTBs. I can see some
+platforms have adopted this way as well.
+
+Surely I will add new bindings details in
+Documentation/devicetree/bindings/arm/cpus.txt file. I am not sure why
+checkpatch did not complain about this?
+
+> 3. Please split DTS changes to separate patches. This is, by the way,
+>    connected with #2 above: if there was no ABI break, then the DTS
+>    could go to separate branch easily.
+> 
+
+Since I am not sure if this will considered as ABI break or not, I just
+looked how this was handled in other platforms, I can see some platforms
+have clubbed DTS change along with mach files, and some have done in
+separate patch as well. So I will look for suggestion from you for this
+how we can go for exynos platform?
+
+
+Thanks,
+Pankaj Dubey
+> Best regards,
+> Krzysztof
+> 
+> 
+> 
