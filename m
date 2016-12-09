@@ -1,112 +1,26 @@
-From: harinikatakamlinux@gmail.com (Harini Katakam)
-Date: Fri, 9 Dec 2016 11:07:23 +0530
-Subject: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in Cadence GEM.
-In-Reply-To: <07C910AB6AC6C345A093D5A08F5AF568CB74AF28@CHN-SV-EXMX03.mchp-main.com>
-References: <1481134912-2243-1-git-send-email-andrei.pistirica@microchip.com>
- <20161207193908.GA13062@netboy> <20161207210416.GA27622@netboy>
- <07C910AB6AC6C345A093D5A08F5AF568CB74AF28@CHN-SV-EXMX03.mchp-main.com>
-Message-ID: <CAFcVECJutEu2=POtAU=jX6E3-ZHsLXpOMMw+UJ0hcQgZ0n4ZVA@mail.gmail.com>
+From: woogyom.kim@gmail.com (Milo Kim)
+Date: Fri,  9 Dec 2016 15:28:29 +0900
+Subject: [PATCH 0/4] dt-bindings: mfd: Update TPS65217 interrupts
+Message-ID: <20161209062833.5768-1-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch-set fixes wrong property name and uses TPS65217 HW interrupt 
+number from the datasheet instead of the DT ABI. DT bindings are also 
+updated.
 
-On Thu, Dec 8, 2016 at 8:11 PM,  <Andrei.Pistirica@microchip.com> wrote:
->
->
->> -----Original Message-----
->> From: Richard Cochran [mailto:richardcochran at gmail.com]
->> Sent: Wednesday, December 07, 2016 11:04 PM
->> To: Andrei Pistirica - M16132
->> Cc: netdev at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; davem at davemloft.net;
->> nicolas.ferre at atmel.com; harinikatakamlinux at gmail.com;
->> harini.katakam at xilinx.com; punnaia at xilinx.com; michals at xilinx.com;
->> anirudh at xilinx.com; boris.brezillon at free-electrons.com;
->> alexandre.belloni at free-electrons.com; tbultel at pixelsurmer.com;
->> rafalo at cadence.com
->> Subject: Re: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in
->> Cadence GEM.
->>
->> On Wed, Dec 07, 2016 at 08:39:09PM +0100, Richard Cochran wrote:
->> > > +static s32 gem_ptp_max_adj(unsigned int f_nom) {
->> > > + u64 adj;
->> > > +
->> > > + /* The 48 bits of seconds for the GEM overflows every:
->> > > +  * 2^48/(365.25 * 24 * 60 *60) =~ 8 925 512 years (~= 9 mil years),
->> > > +  * thus the maximum adjust frequency must not overflow CNS
->> register:
->> > > +  *
->> > > +  * addend  = 10^9/nominal_freq
->> > > +  * adj_max = +/- addend*ppb_max/10^9
->> > > +  * max_ppb = (2^8-1)*nominal_freq-10^9
->> > > +  */
->> > > + adj = f_nom;
->> > > + adj *= 0xffff;
->> > > + adj -= 1000000000ULL;
->> >
->> > What is this computation, and how does it relate to the comment?
->
-> I considered the following simple equation: increment value at nominal frequency (which is 10^9/nominal frequency nsecs) + the maximum drift value (nsecs) <= maximum increment value@nominal frequency (which is 8bit:0xffff).
-> If maximum drift is written as function of nominal frequency and maximum ppb, then the equation above yields that the maximum ppb is: (2^8 - 1) *nominal_frequency - 10^9. The equation is also simplified by the fact that the drift is written as ppm + 16bit_fractions and the increment value is written as nsec + 16bit_fractions.
->
-> Rafal said that this value is hardcoded: 0x64E6, while Harini said: 250000000.
+Milo Kim (4):
+  ARM: dts: am335x: Fix the interrupt name of TPS65217
+  dt-bindings: mfd: Remove TPS65217 interrupts
+  dt-bindings: power/supply: Update TPS65217 properties
+  dt-bindings: input: Add interrupt number for TPS65217
 
-@ Andrei, I may have equated max ppb to max tsu frequency allowed on
-the system and set that.
-That will be wrong.
+ .../bindings/input/tps65218-pwrbutton.txt          |  4 +++-
+ .../bindings/power/supply/tps65217_charger.txt     |  7 +++++-
+ arch/arm/boot/dts/am335x-bone-common.dtsi          |  8 +++----
+ include/dt-bindings/mfd/tps65217.h                 | 26 ----------------------
+ 4 files changed, 12 insertions(+), 33 deletions(-)
+ delete mode 100644 include/dt-bindings/mfd/tps65217.h
 
->
-> I need to dig into this...
->
->>
->> I am not sure what you meant, but it sounds like you are on the wrong track.
->> Let me explain...
->
-> Thanks.
->
->>
->> The max_adj has nothing at all to do with the width of the time register.
->> Rather, it should reflect the maximum possible change in the tuning word.
->>
->> For example, with a nominal 8 ns period, the tuning word is 0x80000.
->> Looking at running the clock more slowly, the slowest possible word is
->> 0x00001, meaning a difference of 0x7FFFF.  This implies an adjustment of
->> 0x7FFFF/0x80000 or 999998092 ppb.  Running more quickly, we can already
->> have 0x100000, twice as fast, or just under 2 billion ppb.
->>
->> You should consider the extreme cases to determine the most limited
->> (smallest) max_adj value:
->>
->> Case 1 - high frequency
->> ~~~~~~~~~~~~~~~~~~~~~~~
->>
->> With a nominal 1 ns period, we have the nominal tuning word 0x10000.
->> The smallest is 0x1 for a difference of 0xFFFF.  This corresponds to an
->> adjustment of 0xFFFF/0x10000 = .9999847412109375 or 999984741 ppb.
->>
->> Case 2 - low frequency
->> ~~~~~~~~~~~~~~~~~~~~~~
->>
->> With a nominal 255 ns period, the nominal word is 0xFF0000, the largest
->> 0xFFFFFF, and the difference is 0xFFFF.  This corresponds to and adjustment
->> of 0xFFFF/0xFF0000 = .0039215087890625 or 3921508 ppb.
->>
->> Since 3921508 ppb is a huge adjustment, you can simply use that as a safe
->> maximum, ignoring the actual input clock.
->>
-
-Thanks Richard.
-So, if I understand right, this is theoretically limited by the
-maximum input clock:
-So if the highest frequency allowed (also commonly sourced in my case)
-is 200MHz,
-then with a 5ns time period, considering the adjustment to slowest
-possible word,
-0x4FFFF/0x50000 will be 999996948 ppb.
-Shouldn't this be the max_adj?
-I'm afraid I don't get why we are choosing the most limited max adj..
-Sorry if I'm missing something - could you please help me understand?
-
-Regards,
-Harini
+-- 
+2.9.3
