@@ -1,77 +1,47 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Fri, 9 Dec 2016 16:47:20 +0100
-Subject: [PATCH] nommu: allow mmap when !CONFIG_MMU
-In-Reply-To: <584ACF82.5090609@arm.com>
-References: <1480600080-30196-1-git-send-email-benjamin.gaignard@linaro.org>
- <CA+M3ks67a9H2Ro87mPZ1_3=ucnyWNMMKnr_EW=dLS1kBxuU3Lw@mail.gmail.com>
- <584ACF82.5090609@arm.com>
-Message-ID: <CA+M3ks7HG5xLJeA8SW4Le0hyvBMivjKQuRsAG7rZdRM1q5pQYg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri,  9 Dec 2016 15:53:29 +0000
+Subject: [PATCH 4/6] KVM: arm/arm64: vgic-v2: Limit ITARGETSR bits to number
+ of VCPUs
+In-Reply-To: <1481298811-30798-1-git-send-email-marc.zyngier@arm.com>
+References: <1481298811-30798-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1481298811-30798-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-12-09 16:36 GMT+01:00 Vladimir Murzin <vladimir.murzin@arm.com>:
-> On 09/12/16 15:27, Benjamin Gaignard wrote:
->> + Vladimir
->
-> I'm not in DMA, but I can see that with your patch it deviates from
-> dma_common_mmap(), can you give more context, please?
+From: Andre Przywara <andre.przywara@arm.com>
 
-I'm working on ARM platform with MMU (stm32f4) to enable display driver.
-Framebuffer is allocated with dma_alloc_wc() and when userland try to mmap
-drm/kms fraemwork calls dma_mmap_wc().
-All this is in drivers/gpu/drm/drm_gem_cma_helper.c
+The GICv2 spec says in section 4.3.12 that a "CPU targets field bit that
+corresponds to an unimplemented CPU interface is RAZ/WI."
+Currently we allow the guest to write any value in there and it can
+read that back.
+Mask the written value with the proper CPU mask to be spec compliant.
 
-dma_mmap_wc() call failed because __arm_dma_mmap() always return an
-error if CONFIG_MMU
-isn't defined.
-That what I try to solve with this patch.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-> Cheers
-> Vladimir
->
->>
->> 2016-12-01 14:48 GMT+01:00 Benjamin Gaignard <benjamin.gaignard@linaro.org>:
->>> commit ab6494f0c96f ("nommu: Add noMMU support to the DMA API") have
->>> add CONFIG_MMU compilation flag but that prohibit to use dma_mmap_wc()
->>> when the platform doesn't have MMU.
->>>
->>> This patch call vm_iomap_memory() in noMMU case to test if addresses
->>> are correct and set wma->vm_flags rather than all return an error.
->>>
->>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
->>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>> Cc: arnd at arndb.de
->>> ---
->>>  arch/arm/mm/dma-mapping.c | 3 +++
->>>  1 file changed, 3 insertions(+)
->>>
->>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->>> index ab4f745..230875e 100644
->>> --- a/arch/arm/mm/dma-mapping.c
->>> +++ b/arch/arm/mm/dma-mapping.c
->>> @@ -868,6 +868,9 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
->>>                                       vma->vm_end - vma->vm_start,
->>>                                       vma->vm_page_prot);
->>>         }
->>> +#else
->>> +       ret = vm_iomap_memory(vma, vma->vm_start,
->>> +                             (vma->vm_end - vma->vm_start));
->>>  #endif /* CONFIG_MMU */
->>>
->>>         return ret;
->>> --
->>> 1.9.1
->>>
->>
->
-
-
-
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index b44b359..78e34bc 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -129,6 +129,7 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
+ 				   unsigned long val)
+ {
+ 	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
++	u8 cpu_mask = GENMASK(atomic_read(&vcpu->kvm->online_vcpus) - 1, 0);
+ 	int i;
+ 
+ 	/* GICD_ITARGETSR[0-7] are read-only */
+@@ -141,7 +142,7 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
+ 
+ 		spin_lock(&irq->irq_lock);
+ 
+-		irq->targets = (val >> (i * 8)) & 0xff;
++		irq->targets = (val >> (i * 8)) & cpu_mask;
+ 		target = irq->targets ? __ffs(irq->targets) : 0;
+ 		irq->target_vcpu = kvm_get_vcpu(vcpu->kvm, target);
+ 
 -- 
-Benjamin Gaignard
-
-Graphic Study Group
-
-Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro: Facebook | Twitter | Blog
+2.1.4
