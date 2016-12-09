@@ -1,55 +1,43 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  9 Dec 2016 11:30:07 +0100
-Subject: [PATCH v3 11/12] arm64: dts: marvell: add sdhci support for Armada
- 7K/8K
-In-Reply-To: <cover.e0137cef24a16a2c7d795548de554993595d4a98.1481279228.git-series.gregory.clement@free-electrons.com>
-References: <cover.e0137cef24a16a2c7d795548de554993595d4a98.1481279228.git-series.gregory.clement@free-electrons.com>
-Message-ID: <923c97f32a828b579756bf86946689ed54a0a174.1481279228.git-series.gregory.clement@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  9 Dec 2016 10:50:44 +0000
+Subject: [PATCH] builddeb: Use aarch64 instead of arm64 for UTS_MACHINE
+Message-ID: <1481280644-15614-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also enable it on the Armada 7040 DB board
+From: Michal Marek <mmarek@suse.com>
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+On arm64-based systems, uname -m reports "aarch64", so this is what
+we should be using for UTS_MACHINE and matching that in the builddeb
+script instead of "arm64".
+
+There was a patch fixing this:
+
+  https://patchwork.kernel.org/patch/9305483/
+
+but I accidentally merged v1 of the patch, which omitted the update to
+builddeb. This patch follows up with that missing hunk.
+
+Reported-by: Victor Chong <victor.chong@linaro.org>
+Signed-off-by: Michal Marek <mmarek@suse.com>
+[will: salvaged missing hunk from original patch]
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/boot/dts/marvell/armada-7040-db.dts |  7 +++++++
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi  |  9 +++++++++
- 2 files changed, 16 insertions(+)
+ scripts/package/builddeb | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-index 070b589680c5..f7f978a12a49 100644
---- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-@@ -146,3 +146,10 @@
- &cpm_usb3_1 {
- 	status = "okay";
- };
-+
-+&sdhci0 {
-+	status = "okay";
-+	bus-width = <4>;
-+	no-1-8-v;
-+	non-removable;
-+};
-diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-index 7b6136182ad0..e812fb59fb80 100644
---- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-@@ -229,6 +229,15 @@
- 
- 			};
- 
-+			sdhci0: sdhci at 6e0000 {
-+				compatible = "marvell,armada-7000-sdhci";
-+				reg = <0x6e0000 0x300>;
-+				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-+				clock-names = "core";
-+				clocks = <&cpm_syscon0 1 4>;
-+				status = "disabled";
-+			};
-+
- 			ap_syscon: system-controller at 6f4000 {
- 				compatible = "marvell,ap806-system-controller",
- 					     "syscon";
+diff --git a/scripts/package/builddeb b/scripts/package/builddeb
+index 8ea9fd2b6573..9530b1634a02 100755
+--- a/scripts/package/builddeb
++++ b/scripts/package/builddeb
+@@ -51,7 +51,7 @@ set_debarch() {
+ 		debarch=hppa ;;
+ 	mips*)
+ 		debarch=mips$(grep -q CPU_LITTLE_ENDIAN=y $KCONFIG_CONFIG && echo el || true) ;;
+-	arm64)
++	aarch64*)
+ 		debarch=arm64 ;;
+ 	arm*)
+ 		if grep -q CONFIG_AEABI=y $KCONFIG_CONFIG; then
 -- 
-git-series 0.9.1
+2.1.4
