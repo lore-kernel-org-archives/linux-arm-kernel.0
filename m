@@ -1,175 +1,165 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  9 Dec 2016 13:47:26 +0000
-Subject: [PATCH] crypto: arm/aes-neonbs - process 8 blocks in parallel if we
- can
-Message-ID: <1481291246-20216-1-git-send-email-ard.biesheuvel@linaro.org>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Fri,  9 Dec 2016 15:15:11 +0100
+Subject: [PATCH v6 0/8] Add PWM and IIO timer drivers for STM32
+Message-ID: <1481292919-26587-1-git-send-email-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bit-sliced NEON implementation of AES only performs optimally if
-it can process 8 blocks of input in parallel. This is due to the nature
-of bit slicing, where the n-th bit of each byte of AES state of each input
-block is collected into NEON register 'n', for registers q0 - q7.
+version 6:
+- rename stm32-gptimer in stm32-timers.
+- change "st,stm32-gptimer" compatible to "st,stm32-timers".
+- modify "st,breakinput" parameter in pwm part.
+- split DT patch in 2
 
-This implies that the amount of work for the transform is fixed,
-regardless of whether we are handling just one block or 8 in parallel.
+version 5:
+- fix comments done on version 4
+- rebased on kernel 4.9-rc8
+- change nodes names and re-order then by addresses
 
-So let's try a bit harder to iterate over the input in suitably sized
-chunks, by increasing the chunksize to 8 * AES_BLOCK_SIZE, and tweaking
-the loops to only process multiples of the chunk size, unless we are
-handling the last chunk in the input stream.
+version 4:
+- fix comments done on version 3
+- don't use interrupts anymore in IIO timer
+- detect hardware capabilities at probe time to simplify binding
 
-Note that the skcipher walk API guarantees that a step in the walk never
-returns less that 'chunksize' bytes if there are at least that many bytes
-of input still available. However, it does *not* guarantee that those steps
-produce an exact multiple of the chunk size.
+version 3:
+- no change on mfd and pwm divers patches
+- add cross reference between bindings
+- change compatible to "st,stm32-timer-trigger"
+- fix attributes access rights
+- use string instead of int for master_mode and slave_mode
+- document device attributes in sysfs-bus-iio-timer-stm32
+- update DT with the new compatible
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/crypto/aesbs-glue.c | 68 +++++++++++++++++++++++++-------------------
- 1 file changed, 38 insertions(+), 30 deletions(-)
+version 2:
+- keep only one compatible per driver
+- use DT parameters to describe hardware block configuration:
+  - pwm channels, complementary output, counter size, break input
+  - triggers accepted and create by IIO timers
+- change DT to limite use of reference to the node
+- interrupt is now in IIO timer driver
+- rename stm32-mfd-timer to stm32-timers (for general purpose timer)
 
-diff --git a/arch/arm/crypto/aesbs-glue.c b/arch/arm/crypto/aesbs-glue.c
-index d8e06de72ef3..938d1e1bf9a3 100644
---- a/arch/arm/crypto/aesbs-glue.c
-+++ b/arch/arm/crypto/aesbs-glue.c
-@@ -121,39 +121,26 @@ static int aesbs_cbc_encrypt(struct skcipher_request *req)
- 	return crypto_cbc_encrypt_walk(req, aesbs_encrypt_one);
- }
- 
--static inline void aesbs_decrypt_one(struct crypto_skcipher *tfm,
--				     const u8 *src, u8 *dst)
--{
--	struct aesbs_cbc_ctx *ctx = crypto_skcipher_ctx(tfm);
--
--	AES_decrypt(src, dst, &ctx->dec.rk);
--}
--
- static int aesbs_cbc_decrypt(struct skcipher_request *req)
- {
- 	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
- 	struct aesbs_cbc_ctx *ctx = crypto_skcipher_ctx(tfm);
- 	struct skcipher_walk walk;
--	unsigned int nbytes;
- 	int err;
- 
--	for (err = skcipher_walk_virt(&walk, req, false);
--	     (nbytes = walk.nbytes); err = skcipher_walk_done(&walk, nbytes)) {
--		u32 blocks = nbytes / AES_BLOCK_SIZE;
--		u8 *dst = walk.dst.virt.addr;
--		u8 *src = walk.src.virt.addr;
--		u8 *iv = walk.iv;
--
--		if (blocks >= 8) {
--			kernel_neon_begin();
--			bsaes_cbc_encrypt(src, dst, nbytes, &ctx->dec, iv);
--			kernel_neon_end();
--			nbytes %= AES_BLOCK_SIZE;
--			continue;
--		}
-+	err = skcipher_walk_virt(&walk, req, false);
-+
-+	while (walk.nbytes) {
-+		unsigned int nbytes = walk.nbytes;
-+
-+		if (nbytes < walk.total)
-+			nbytes = round_down(nbytes, walk.chunksize);
- 
--		nbytes = crypto_cbc_decrypt_blocks(&walk, tfm,
--						   aesbs_decrypt_one);
-+		kernel_neon_begin();
-+		bsaes_cbc_encrypt(walk.src.virt.addr, walk.dst.virt.addr,
-+				  nbytes, &ctx->dec, walk.iv);
-+		kernel_neon_end();
-+		err = skcipher_walk_done(&walk, walk.nbytes - nbytes);
- 	}
- 	return err;
- }
-@@ -186,6 +173,12 @@ static int aesbs_ctr_encrypt(struct skcipher_request *req)
- 		__be32 *ctr = (__be32 *)walk.iv;
- 		u32 headroom = UINT_MAX - be32_to_cpu(ctr[3]);
- 
-+		if (walk.nbytes < walk.total) {
-+			blocks = round_down(blocks,
-+					    walk.chunksize / AES_BLOCK_SIZE);
-+			tail = walk.nbytes - blocks * AES_BLOCK_SIZE;
-+		}
-+
- 		/* avoid 32 bit counter overflow in the NEON code */
- 		if (unlikely(headroom < blocks)) {
- 			blocks = headroom + 1;
-@@ -198,6 +191,9 @@ static int aesbs_ctr_encrypt(struct skcipher_request *req)
- 		kernel_neon_end();
- 		inc_be128_ctr(ctr, blocks);
- 
-+		if (tail > 0 && tail < AES_BLOCK_SIZE)
-+			break;
-+
- 		err = skcipher_walk_done(&walk, tail);
- 	}
- 	if (walk.nbytes) {
-@@ -227,11 +223,16 @@ static int aesbs_xts_encrypt(struct skcipher_request *req)
- 	AES_encrypt(walk.iv, walk.iv, &ctx->twkey);
- 
- 	while (walk.nbytes) {
-+		unsigned int nbytes = walk.nbytes;
-+
-+		if (nbytes < walk.total)
-+			nbytes = round_down(nbytes, walk.chunksize);
-+
- 		kernel_neon_begin();
- 		bsaes_xts_encrypt(walk.src.virt.addr, walk.dst.virt.addr,
--				  walk.nbytes, &ctx->enc, walk.iv);
-+				  nbytes, &ctx->enc, walk.iv);
- 		kernel_neon_end();
--		err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
-+		err = skcipher_walk_done(&walk, walk.nbytes - nbytes);
- 	}
- 	return err;
- }
-@@ -249,11 +250,16 @@ static int aesbs_xts_decrypt(struct skcipher_request *req)
- 	AES_encrypt(walk.iv, walk.iv, &ctx->twkey);
- 
- 	while (walk.nbytes) {
-+		unsigned int nbytes = walk.nbytes;
-+
-+		if (nbytes < walk.total)
-+			nbytes = round_down(nbytes, walk.chunksize);
-+
- 		kernel_neon_begin();
- 		bsaes_xts_decrypt(walk.src.virt.addr, walk.dst.virt.addr,
--				  walk.nbytes, &ctx->dec, walk.iv);
-+				  nbytes, &ctx->dec, walk.iv);
- 		kernel_neon_end();
--		err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
-+		err = skcipher_walk_done(&walk, walk.nbytes - nbytes);
- 	}
- 	return err;
- }
-@@ -272,6 +278,7 @@ static struct skcipher_alg aesbs_algs[] = { {
- 	.min_keysize	= AES_MIN_KEY_SIZE,
- 	.max_keysize	= AES_MAX_KEY_SIZE,
- 	.ivsize		= AES_BLOCK_SIZE,
-+	.chunksize	= 8 * AES_BLOCK_SIZE,
- 	.setkey		= aesbs_cbc_set_key,
- 	.encrypt	= aesbs_cbc_encrypt,
- 	.decrypt	= aesbs_cbc_decrypt,
-@@ -289,7 +296,7 @@ static struct skcipher_alg aesbs_algs[] = { {
- 	.min_keysize	= AES_MIN_KEY_SIZE,
- 	.max_keysize	= AES_MAX_KEY_SIZE,
- 	.ivsize		= AES_BLOCK_SIZE,
--	.chunksize	= AES_BLOCK_SIZE,
-+	.chunksize	= 8 * AES_BLOCK_SIZE,
- 	.setkey		= aesbs_ctr_set_key,
- 	.encrypt	= aesbs_ctr_encrypt,
- 	.decrypt	= aesbs_ctr_encrypt,
-@@ -307,6 +314,7 @@ static struct skcipher_alg aesbs_algs[] = { {
- 	.min_keysize	= 2 * AES_MIN_KEY_SIZE,
- 	.max_keysize	= 2 * AES_MAX_KEY_SIZE,
- 	.ivsize		= AES_BLOCK_SIZE,
-+	.chunksize	= 8 * AES_BLOCK_SIZE,
- 	.setkey		= aesbs_xts_set_key,
- 	.encrypt	= aesbs_xts_encrypt,
- 	.decrypt	= aesbs_xts_decrypt,
+The following patches enable PWM and IIO Timer features for STM32 platforms.
+
+Those two features are mixed into the registers of the same hardware block
+(named general purpose timer) which lead to introduce a multifunctions driver 
+on the top of them to be able to share the registers.
+
+In STM32f4 14 instances of timer hardware block exist, even if they all have
+the same register mapping they could have a different number of pwm channels
+and/or different triggers capabilities. We use various parameters in DT to 
+describe the differences between hardware blocks
+
+The MFD (stm32-timers.c) takes care of clock and register mapping
+by using regmap. stm32_timers structure is provided to its sub-node to
+share those information.
+
+PWM driver is implemented into pwm-stm32.c. Depending of the instance we may
+have up to 4 channels, sometime with complementary outputs or 32 bits counter
+instead of 16 bits. Some hardware blocks may also have a break input function
+which allows to stop pwm depending of a level, defined in devicetree, on an
+external pin.
+
+IIO timer driver (stm32-timer-trigger.c and stm32-timer-trigger.h) define a list
+of hardware triggers usable by hardware blocks like ADC, DAC or other timers. 
+
+The matrix of possible connections between blocks is quite complex so we use 
+trigger names and is_stm32_iio_timer_trigger() function to be sure that
+triggers are valid and configure the IPs.
+
+At run time IIO timer hardware blocks can configure (through "master_mode" 
+IIO device attribute) which internal signal (counter enable, reset,
+comparison block, etc...) is used to generate the trigger.
+
+By using "slave_mode" IIO device attribute timer can also configure on which
+event (level, rising edge) of the block is enabled.
+
+Since we can use trigger from one hardware to control an other block, we can
+use a pwm to control an other one. The following example shows how to configure
+pwm1 and pwm3 to make pwm3 generate pulse only when pwm1 pulse level is high.
+
+/sys/bus/iio/devices # ls
+iio:device0  iio:device1  trigger0     trigger1
+
+configure timer1 to use pwm1 channel 0 as output trigger
+/sys/bus/iio/devices # echo 'OC1REF' > iio\:device0/master_mode
+configure timer3 to enable only when input is high
+/sys/bus/iio/devices # echo 'gated' > iio\:device1/slave_mode
+/sys/bus/iio/devices # cat trigger0/name
+tim1_trgo
+configure timer2 to use timer1 trigger is input
+/sys/bus/iio/devices # echo "tim1_trgo" > iio\:device1/trigger/current_trigger
+
+configure pwm3 channel 0 to generate a signal with a period of 100ms and a
+duty cycle of 50%
+/sys/devices/platform/soc/40000400.timers/40000400.timers:pwm/pwm/pwmchip4 # echo 0 > export
+/sys/devices/platform/soc/40000400.timers/40000400.timers:pwm/pwm/pwmchip4 # echo 100000000 > pwm0/period
+/sys/devices/platform/soc/40000400.timers/40000400.timers:pwm/pwm/pwmchip4 # echo 50000000 > pwm0/duty_cycle
+/sys/devices/platform/soc/40000400.timers/40000400.timers:pwm/pwm/pwmchip4 # echo 1 > pwm0/enable
+here pwm3 channel 0, as expected, doesn't start because has to be triggered by
+pwm1 channel 0
+
+configure pwm1 channel 0 to generate a signal with a period of 1s and a
+duty cycle of 50%
+/sys/devices/platform/soc/40010000.timers/40010000.timers:pwm/pwm/pwmchip0 # echo 0 > export
+/sys/devices/platform/soc/40010000.timers/40010000.timers:pwm/pwm/pwmchip0 # echo 1000000000 > pwm0/period
+/sys/devices/platform/soc/40010000.timers/40010000.timers:pwm/pwm/pwmchip0 # echo 500000000 > pwm0/duty_cycle
+/sys/devices/platform/soc/40010000.timers/40010000.timers:pwm/pwm/pwmchip0 # echo 1 > pwm0/enable 
+finally pwm1 starts and pwm3 only generates pulse when pwm1 signal is high
+
+An other example to use a timer as source of clock for another device.
+Here timer1 is used a source clock for pwm3:
+
+/sys/bus/iio/devices # echo 100000 > trigger0/sampling_frequency 
+/sys/bus/iio/devices # echo "tim1_trgo" > iio\:device1/trigger/current_trigger 
+/sys/bus/iio/devices # echo 'external_clock' > iio\:device1/slave_mode
+/sys/devices/platform/soc/40000400.timers/40000400.timers:pwm/pwm/pwmchip4 # echo 0 > export 
+/sys/devices/platform/soc/40000400.timers/40000400.timers:pwm/pwm/pwmchip4 # echo 1000000 > pwm0/period 
+/sys/devices/platform/soc/40000400.timers/40000400.timers:pwm/pwm/pwmchip4 # echo 500000 > pwm0/duty_cycle 
+/sys/devices/platform/soc/40000400.timers/40000400.timers:pwm/pwm/pwmchip4 # echo 1 > pwm0/enable
+
+Benjamin Gaignard (8):
+  MFD: add bindings for STM32 Timers driver
+  MFD: add STM32 Timers driver
+  PWM: add pwm-stm32 DT bindings
+  PWM: add PWM driver for STM32 plaftorm
+  IIO: add bindings for STM32 timer trigger driver
+  IIO: add STM32 timer trigger driver
+  ARM: dts: stm32: add Timers driver for stm32f429 MCU
+  ARM: dts: stm32: Enable pw1 and pwm3 for stm32f469-disco
+
+ .../ABI/testing/sysfs-bus-iio-timer-stm32          |  55 +++
+ .../bindings/iio/timer/stm32-timer-trigger.txt     |  23 +
+ .../devicetree/bindings/mfd/stm32-timers.txt       |  46 ++
+ .../devicetree/bindings/pwm/pwm-stm32.txt          |  33 ++
+ arch/arm/boot/dts/stm32f429.dtsi                   | 275 ++++++++++++
+ arch/arm/boot/dts/stm32f469-disco.dts              |  28 ++
+ drivers/iio/Kconfig                                |   2 +-
+ drivers/iio/Makefile                               |   1 +
+ drivers/iio/timer/Kconfig                          |  13 +
+ drivers/iio/timer/Makefile                         |   1 +
+ drivers/iio/timer/stm32-timer-trigger.c            | 466 +++++++++++++++++++++
+ drivers/iio/trigger/Kconfig                        |   1 -
+ drivers/mfd/Kconfig                                |  11 +
+ drivers/mfd/Makefile                               |   2 +
+ drivers/mfd/stm32-timers.c                         |  80 ++++
+ drivers/pwm/Kconfig                                |   9 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-stm32.c                            | 434 +++++++++++++++++++
+ include/linux/iio/timer/stm32-timer-trigger.h      |  62 +++
+ include/linux/mfd/stm32-timers.h                   |  71 ++++
+ 20 files changed, 1612 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-timer-stm32
+ create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/stm32-timers.txt
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+ create mode 100644 drivers/iio/timer/Kconfig
+ create mode 100644 drivers/iio/timer/Makefile
+ create mode 100644 drivers/iio/timer/stm32-timer-trigger.c
+ create mode 100644 drivers/mfd/stm32-timers.c
+ create mode 100644 drivers/pwm/pwm-stm32.c
+ create mode 100644 include/linux/iio/timer/stm32-timer-trigger.h
+ create mode 100644 include/linux/mfd/stm32-timers.h
+
 -- 
-2.7.4
+1.9.1
