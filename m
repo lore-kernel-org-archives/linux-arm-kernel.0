@@ -1,55 +1,24 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 9 Dec 2016 10:51:20 +0000
-Subject: [RFC, PATCHv1 00/28] 5-level paging
-In-Reply-To: <13962749.Q2mLWEctkQ@wuerfel>
-References: <20161208162150.148763-1-kirill.shutemov@linux.intel.com>
- <20161209050130.GC2595@gmail.com> <13962749.Q2mLWEctkQ@wuerfel>
-Message-ID: <20161209105120.GA3705@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 Dec 2016 10:57:22 +0000
+Subject: [PATCH 1/1] arm64: mm: add config options for page table
+ configuration
+In-Reply-To: <dd102973-5737-3168-bffe-7ac5e769aecb@broadcom.com>
+References: <1481139600-24455-1-git-send-email-scott.branden@broadcom.com>
+ <1481139600-24455-2-git-send-email-scott.branden@broadcom.com>
+ <20161208100014.GE33075@MBP.local>
+ <762b8bec-60da-0bb8-28f4-b407ad70687b@broadcom.com>
+ <20161208185717.GC15141@e104818-lin.cambridge.arm.com>
+ <dd102973-5737-3168-bffe-7ac5e769aecb@broadcom.com>
+Message-ID: <20161209105722.GD11767@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2016 at 11:24:12AM +0100, Arnd Bergmann wrote:
-> On Friday, December 9, 2016 6:01:30 AM CET Ingo Molnar wrote:
-> > >   - Handle opt-in wider address space for userspace.
-> > > 
-> > >     Not all userspace is ready to handle addresses wider than current
-> > >     47-bits. At least some JIT compiler make use of upper bits to encode
-> > >     their info.
-> > > 
-> > >     We need to have an interface to opt-in wider addresses from userspace
-> > >     to avoid regressions.
-> > > 
-> > >     For now, I've included testing-only patch which bumps TASK_SIZE to
-> > >     56-bits. This can be handy for testing to see what breaks if we max-out
-> > >     size of virtual address space.
-> > 
-> > So this is just a detail - but it sounds a bit limiting to me to provide an 'opt 
-> > in' flag for something that will work just fine on the vast majority of 64-bit 
-> > software.
-> > 
-> > Please make this an opt out compatibility flag instead: similar to how we handle 
-> > address space layout limitations/quirks ABI details, such as ADDR_LIMIT_32BIT, 
-> > ADDR_LIMIT_3GB, ADDR_COMPAT_LAYOUT, READ_IMPLIES_EXEC, etc.
-> 
-> We've had a similar discussion about JIT software on ARM64, which has a wide
-> range of supported page table layouts and some software wants to limit that
-> to a specific number.
-> 
-> I don't remember the outcome of that discussion, but I'm adding a few people
-> to Cc that might remember.
+On Thu, Dec 08, 2016 at 11:33:39AM -0800, Scott Branden wrote:
+> Since I currently have your attention:  I do think there is fundamental bug
+> in the ARM64 mm implementation.  If you look at /sys/devices/system/memory
+> it only shows the last memoryX section created after init.
 
-The arm64 kernel supports several user VA space configurations (though
-commonly 39 and 48-bit) and has had these from the initial port. We
-realised that certain JITs (e.g.
-https://bugzilla.mozilla.org/show_bug.cgi?id=1143022) and IIRC LLVM
-assume a 47-bit user VA but AFAICT, most have been fixed.
+That directory doesn't seem to exist on my arm64 systems. Do I have to
+enable something specific in the .config?
 
-ARMv8.1 also supports 52-bit VA (though only with 64K pages and we
-haven't added support for it yet). However, it's likely that if we make
-a 52-bit TASK_SIZE this the default, we will break some user
-assumptions. While arguably that's not necessarily ABI, if user relies
-on a 47 or 48-bit VA the kernel shouldn't break it. So I'm strongly
-inclined to make the 52-bit TASK_SIZE an opt-in on arm64.
-
--- 
-Catalin
+Will
