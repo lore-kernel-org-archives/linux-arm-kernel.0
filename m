@@ -1,22 +1,39 @@
-From: sdliyong@gmail.com (Yong Li)
-Date: Fri, 9 Dec 2016 10:28:49 +0800
-Subject: boot hang issue on S5PV210 with the latest kernel
-Message-ID: <CADO9-pdnfb+noSZ3A_Y+AEZ6pJYzO=KD1pHDzB5WHQ5RoqBsrw@mail.gmail.com>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Fri, 9 Dec 2016 13:02:45 +1000
+Subject: [PATCH 4/4] ARM: versatile: support configuring versatile machine
+ for no-MMU
+In-Reply-To: <58481DD1.6090606@arm.com>
+References: <1481093992-30520-1-git-send-email-gerg@uclinux.org>
+ <1481093992-30520-2-git-send-email-gerg@uclinux.org>
+ <CACRpkdZywn46QbnvKcN-jkt43Vf+GBSNQkLgnnNg-DC-8aSO5w@mail.gmail.com>
+ <58481DD1.6090606@arm.com>
+Message-ID: <ed67c89a-3f40-2634-f873-5890ba2c2f90@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Vladimir,
 
-I am testing the latest kernel(4.8+) on my S5PV210 ARM boards. I found I
-have to add the kputc debug in __armv7_mmu_cache_on in
-boot/compressed/head.S:
-mov r11, r3
-kputc #'x'
-mov r3, r11
+On 08/12/16 00:33, Vladimir Murzin wrote:
+> Hi Linus,
+> 
+> On 07/12/16 14:11, Linus Walleij wrote:
+>> Another target I had in mind was the Integrator which
+>> incidentally supports a bunch of the old noMMU core
+>> tiles where we can swap in an ARM946, which I guess
+>> could work with this?
+> 
+> Do you mind trying my "Allow NOMMU for MULTIPLATFORM" series [1]? Greg just
+> reported it did a trick for Versatile, there is a good chance it would work
+> for Integrator too ;)
+> 
+> [1] https://www.spinics.net/lists/arm-kernel/msg546823.html
 
-Without the above kputc, the kernel boot hang, there is no any output on UART
+I won't speak for Linus...
 
-Any suggestions?
+But I tried building with your patches for Integrator/CP and
+that builds (with an appropriate configuration) with CONFIG_MMU
+disabled and runs successfully in qemu (with machine target
+"integratorcp"). No other patches required.
 
-Thanks,
-Yong
+Regards
+Greg
