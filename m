@@ -1,56 +1,50 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 9 Dec 2016 12:01:32 -0600
-Subject: [PATCH v2 2/2] dt-bindings: Add DT bindings info for FlexRM ring
- manager
-In-Reply-To: <1480653536-5551-3-git-send-email-anup.patel@broadcom.com>
-References: <1480653536-5551-1-git-send-email-anup.patel@broadcom.com>
- <1480653536-5551-3-git-send-email-anup.patel@broadcom.com>
-Message-ID: <20161209180132.lnpvwybnij5uykuq@rob-hp-laptop>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 9 Dec 2016 10:01:47 -0800
+Subject: [GIT PULL] ARM: SoC fixes
+Message-ID: <20161209180147.GA29286@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 10:08:56AM +0530, Anup Patel wrote:
-> This patch adds device tree bindings document for the FlexRM
-> ring manager found on Broadcom iProc SoCs.
-> 
-> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> ---
->  .../bindings/mailbox/brcm,iproc-flexrm-mbox.txt    | 60 ++++++++++++++++++++++
->  1 file changed, 60 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
-> new file mode 100644
-> index 0000000..e81f116
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
-> @@ -0,0 +1,60 @@
+Hi Linus,
 
-[...]
+This should be our last set of fixes for 4.9. Please merge!
 
-> +Example:
-> +--------
-> +crypto_mbox: mbox at 67000000 {
-> +	compatible = "brcm,flexrm-mbox";
-> +	reg = <0x67000000 0x200000>;
-> +	msi-parent = <&gic_its 0x7f00>;
-> +	#mbox-cells = <3>;
-> +};
-> +
-> +crypto_client {
-> +	...
-> +	mboxes = <&crypto_mbox 0 0x1 0xffff>,
-> +		 <&crypto_mbox 1 0x1 0xffff>,
-> +		 <&crypto_mbox 16 0x1 0xffff>,
-> +		 <&crypto_mbox 17 0x1 0xffff>,
-> +		 <&crypto_mbox 30 0x1 0xffff>,
-> +		 <&crypto_mbox 31 0x1 0xffff>;
 
-The FlexRM part looks fine. I still don't understand what this node is. 
-Is this a h/w block or just a list of mailboxes? What determines the 
-mailbox channel numbers here? I need to see what the complete node looks 
-like.
+Thanks,
 
-Rob
+-Olof
+
+The following changes since commit 909e481e2467f202b97d42beef246e8829416a85:
+
+  arm64: dts: juno: fix cluster sleep state entry latency on all SoC versions (2016-12-02 17:28:17 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
+
+for you to fetch changes up to 038ccb3e8cee52e07dc118ff99f47eaebc1d0746:
+
+  ARM: dts: orion5x: fix number of sata port for linkstation ls-gl (2016-12-08 10:19:24 -0800)
+
+----------------------------------------------------------------
+ARM: Final batch of SoC fixes
+
+A few fixes that have trickled in over the last week, all fixing minor
+errors in devicetrees -- UART pin assignment on Allwinner H3, correcting
+number of SATA ports on a Marvell-based Linkstation platform and a display
+clock fix for Freescale/NXP i.MX7D that fixes a freeze when starting up X.
+
+----------------------------------------------------------------
+Jorik Jonker (1):
+      dts: sun8i-h3: correct UART3 pin definitions
+
+Roger Shimizu (1):
+      ARM: dts: orion5x: fix number of sata port for linkstation ls-gl
+
+Stefan Agner (1):
+      ARM: dts: imx7d: fix LCDIF clock assignment
+
+ arch/arm/boot/dts/imx7s.dtsi                   | 5 ++---
+ arch/arm/boot/dts/orion5x-linkstation-lsgl.dts | 4 ++++
+ arch/arm/boot/dts/sun8i-h3.dtsi                | 2 +-
+ 3 files changed, 7 insertions(+), 4 deletions(-)
