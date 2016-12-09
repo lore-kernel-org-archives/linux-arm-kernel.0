@@ -1,49 +1,74 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  9 Dec 2016 15:53:28 +0000
-Subject: [PATCH 3/6] arm/arm64: KVM: Clean up useless code in kvm_timer_enable
-In-Reply-To: <1481298811-30798-1-git-send-email-marc.zyngier@arm.com>
-References: <1481298811-30798-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1481298811-30798-4-git-send-email-marc.zyngier@arm.com>
+Date: Fri,  9 Dec 2016 15:53:25 +0000
+Subject: [PULL] KVM/ARM updates for 4.10
+Message-ID: <1481298811-30798-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Longpeng(Mike)" <longpeng2@huawei.com>
+[Now with the various lists on Cc... sorry for the duplicates]
 
-1) Since commit:41a54482 changed timer enabled variable to per-vcpu,
-   the correlative comment in kvm_timer_enable is useless now.
+Paolo, Radim,
 
-2) After the kvm module init successfully, the timecounter is always
-   non-null, so we can remove the checking of timercounter.
+Here's the KVM/ARM updates for 4.10. Only a handful of patches this
+time, as what we had planned for this cycle (GICv3 save/restore,
+mainly) is taking much more time than expected.
 
-Signed-off-by: Longpeng(Mike) <longpeng2@huawei.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/arch_timer.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+The only feature worth mentionning is the support of the GICv3 ITS on
+32bit ARMv8 platforms. The rest is only a bunch of fixes.
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 27a1f63..17b8fa5 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -498,17 +498,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 	if (ret)
- 		return ret;
- 
--
--	/*
--	 * There is a potential race here between VCPUs starting for the first
--	 * time, which may be enabling the timer multiple times.  That doesn't
--	 * hurt though, because we're just setting a variable to the same
--	 * variable that it already was.  The important thing is that all
--	 * VCPUs have the enabled variable set, before entering the guest, if
--	 * the arch timers are enabled.
--	 */
--	if (timecounter)
--		timer->enabled = 1;
-+	timer->enabled = 1;
- 
- 	return 0;
- }
--- 
-2.1.4
+Thanks,
+
+	M.
+
+The following changes since commit a25f0944ba9b1d8a6813fd6f1a86f1bd59ac25a6:
+
+  Linux 4.9-rc5 (2016-11-13 10:32:32 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.10
+
+for you to fetch changes up to 21cbe3cc8a48ff17059912e019fbde28ed54745a:
+
+  arm64: KVM: pmu: Reset PMSELR_EL0.SEL to a sane value before entering the guest (2016-12-09 15:47:00 +0000)
+
+----------------------------------------------------------------
+KVM/ARM updates for 4.10:
+
+- Support for the GICv3 ITS on 32bit platforms
+- A handful of timer and GIC emulation fixes
+- A PMU architecture fix
+
+----------------------------------------------------------------
+Andre Przywara (1):
+      KVM: arm/arm64: vgic-v2: Limit ITARGETSR bits to number of VCPUs
+
+Christoffer Dall (1):
+      KVM: arm/arm64: timer: Check for properly initialized timer on init
+
+Longpeng(Mike) (1):
+      arm/arm64: KVM: Clean up useless code in kvm_timer_enable
+
+Marc Zyngier (1):
+      arm64: KVM: pmu: Reset PMSELR_EL0.SEL to a sane value before entering the guest
+
+Vladimir Murzin (2):
+      KVM: arm64: vgic-its: Fix compatibility with 32-bit
+      ARM: KVM: Support vGICv3 ITS
+
+ Documentation/virtual/kvm/api.txt   |  2 +-
+ arch/arm/include/uapi/asm/kvm.h     |  2 ++
+ arch/arm/kvm/Kconfig                |  1 +
+ arch/arm/kvm/Makefile               |  1 +
+ arch/arm/kvm/arm.c                  |  6 ++++++
+ arch/arm64/kvm/Kconfig              |  4 ----
+ arch/arm64/kvm/hyp/switch.c         |  8 +++++++-
+ arch/arm64/kvm/reset.c              |  6 ------
+ include/linux/irqchip/arm-gic-v3.h  |  8 ++++----
+ virt/kvm/arm/arch_timer.c           | 17 ++++++-----------
+ virt/kvm/arm/vgic/vgic-its.c        | 11 ++++++-----
+ virt/kvm/arm/vgic/vgic-kvm-device.c |  2 --
+ virt/kvm/arm/vgic/vgic-mmio-v2.c    |  3 ++-
+ virt/kvm/arm/vgic/vgic-mmio-v3.c    |  2 --
+ virt/kvm/arm/vgic/vgic.h            | 26 --------------------------
+ 15 files changed, 36 insertions(+), 63 deletions(-)
