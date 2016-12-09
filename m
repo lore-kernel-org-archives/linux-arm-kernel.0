@@ -1,48 +1,37 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Sat, 10 Dec 2016 09:25:15 +1030
-Subject: [PATCH v3 2/6] mfd: dt: ranges, #address-cells and #size-cells
- as optional properties
-In-Reply-To: <20161209224927.3indhfdjgyndtjid@rob-hp-laptop>
-References: <20161206025321.1792-1-andrew@aj.id.au>
- <20161206025321.1792-3-andrew@aj.id.au>
- <20161209224927.3indhfdjgyndtjid@rob-hp-laptop>
-Message-ID: <1481324115.3112.8.camel@aj.id.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 9 Dec 2016 15:04:58 -0800
+Subject: [PATCH] usb: dwc3: omap: remove devm_request_threaded_irq
+In-Reply-To: <db75608b-f92c-6bfa-80a9-a3ab3adf7c23@ti.com>
+References: <20161209205508.6456-1-grygorii.strashko@ti.com>
+ <20161209215958.GN4920@atomide.com>
+ <db75608b-f92c-6bfa-80a9-a3ab3adf7c23@ti.com>
+Message-ID: <20161209230457.GO4920@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-12-09 at 16:49 -0600, Rob Herring wrote:
-> On Tue, Dec 06, 2016 at 01:53:17PM +1100, Andrew Jeffery wrote:
-> > Whilst describing a device and not a bus, simple-mfd is modelled on
-> > simple-bus where child nodes are iterated and registered as platform
-> > devices. Some complex devices, e.g. the Aspeed LPC controller, can
-> > benefit from address space mapping such that child nodes can use the
-> > regs property to describe their resources within the multi-function
-> > device.
+* Grygorii Strashko <grygorii.strashko@ti.com> [161209 14:46]:
+> 
+> 
+> On 12/09/2016 03:59 PM, Tony Lindgren wrote:
+> > * Grygorii Strashko <grygorii.strashko@ti.com> [161209 12:55]:
+> > > Switch back from devm_request_threaded_irq() to request_threaded_irq() to
+> > > avoid races between interrupt handler execution and PM runtime in error
+> > > handling code path in probe and in dwc3_omap_remove():
 > > 
-> > > > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-> > ---
-> > ?Documentation/devicetree/bindings/mfd/mfd.txt | 10 ++++++++++
-> > ?1 file changed, 10 insertions(+)
+> > Can't you just call disable_irq() on the exit path instead of removing
+> > devm?
+> > 
 > 
-> No objections to this, but this is all implied by having a reg property.
+> I can. But what will be the benefit from using devm then?
 
-Thanks for clarifying. I wasn't sure so I wrote the patch with the
-thought that we could drop it if it wasn't necessary. Regardless, I
-think being explicit about the properties is nice.
+Hmm good point. Probably the least number of code would be to just
+do NOAUTOEN before devm_request_irq(), then only do enable_irq()
+just before returning from the probe. After all, we don't really
+want the irq running until the probe is done.
 
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
+I think that would leave out the extra handling from the error
+path?
 
-Thanks,
+Regards,
 
-Andrew
-
-> 
-> Rob
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161210/2a6b2791/attachment.sig>
+Tony
