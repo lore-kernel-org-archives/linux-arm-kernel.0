@@ -1,31 +1,61 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 08 Dec 2016 20:39:03 -0800
-Subject: [PATCH v2 0/2] GXL and GXM SCPI improvements
-In-Reply-To: <20161202230849.11422-1-martin.blumenstingl@googlemail.com>
- (Martin Blumenstingl's message of "Sat, 3 Dec 2016 00:08:47 +0100")
-References: <20161123162040.24843-1-martin.blumenstingl@googlemail.com>
- <20161202230849.11422-1-martin.blumenstingl@googlemail.com>
-Message-ID: <m2d1h1btso.fsf@baylibre.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Thu, 8 Dec 2016 21:20:44 -0800
+Subject: [PATCH 3/3] iio: adc: add a driver for Qualcomm PM8xxx HK/XOADC
+In-Reply-To: <1481032279-27115-1-git-send-email-linus.walleij@linaro.org>
+References: <1481032279-27115-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20161209052044.GV30492@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+On Tue 06 Dec 05:51 PST 2016, Linus Walleij wrote:
 
-> This series adds SCPI support to GXL and GXM SoCs by moving the nodes
-> to meson-gx.dtsi.
-> Now that we have SCPI support for GXM we can also use it to configure
-> the CPU cores using the SCPI DVFS clocks.
->
-> Changes since v1:
-> - added Tested-By and Acked-By tags from Neil Armstrong (thanks!)
-> - rebased to khilman/linux-amlogic.git/amlogic-dt64-2-v2
-> - updated description of patch 1 because the "arm,scpi-pre-1.0" change
->   is already part of the amlogic-dt64-2-v2 tag
+> +static struct pm8xxx_chan_info *
+> +pm8xxx_get_channel(struct pm8xxx_xoadc *adc, u8 chan)
+> +{
+> +	struct pm8xxx_chan_info *ch;
+> +	int i;
+> +
+> +	if (chan >= adc->nchans)
+> +		return NULL;
 
-Thanks for the respin.  It's now too late for v4.10 (I freeze things
-around -rc6 or -rc7, and it's now -rc8), but I'll queue this up for
-v4.11.
+nchans is the number of children and chan is the channel id, so this
+doesn't seem right (I think you should just drop this check).
 
-Thanks,
+> +
+> +	for (i = 0; i < adc->nchans; i++) {
+> +		ch = &adc->chans[i];
+> +		if (ch->amux_channel == chan)
+> +			break;
+> +	}
+> +	if (i == adc->nchans)
+> +		return NULL;
+> +
+> +	return ch;
+> +}
+> +
+> +static int pm8xxx_read_channel_rsv(struct pm8xxx_xoadc *adc,
+> +				   const struct pm8xxx_chan_info *ch,
+> +				   u8 rsv, u16 *adc_code)
+> +{
+> +	int ret;
+> +	unsigned int val;
+> +	u8 rsvmask, rsvval;
+> +	u8 lsb, msb;
+> +
+> +	dev_dbg(adc->dev, "read channel \"%s\", amux %d, mpp %d, rsv %d\n",
+> +		ch->name, ch->amux_channel, ch->amux_mpp_channel, rsv);
+> +
+> +	/* Mux in this channel */
+> +	ret = regmap_write(adc->map, ADC_ARB_USRP_AMUX_CNTRL,
+> +			   ch->amux_channel << ADC_AMUX_SEL_SHIFT |
+> +			   ch->amux_mpp_channel << ADC_AMUX_PREMUX_SHIFT);
 
-Kevin
+Does this need synchronization to stop multiple clients to stomp on each
+other here?
+
+> +	if (ret)
+> +		return ret;
+> +
+
+Regards,
+Bjorn
