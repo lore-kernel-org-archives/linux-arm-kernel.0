@@ -1,87 +1,122 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 9 Dec 2016 12:33:26 +0000
-Subject: [PATCH v3] arm64: fpsimd: improve stacking logic in
- non-interruptible context
-In-Reply-To: <CAKv+Gu-P6ReNVVyyuwF8mE3S7U+X3uK6A=qKmmzU7vQy_SgXWQ@mail.gmail.com>
-References: <1481215779-23432-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161209122021.GA1574@e103592.cambridge.arm.com>
- <CAKv+Gu-P6ReNVVyyuwF8mE3S7U+X3uK6A=qKmmzU7vQy_SgXWQ@mail.gmail.com>
-Message-ID: <20161209123326.GB1574@e103592.cambridge.arm.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Fri, 9 Dec 2016 13:40:16 +0100
+Subject: [PATCH v5 1/7] MFD: add bindings for STM32 General Purpose Timer
+ driver
+In-Reply-To: <20161209085331.GB3625@dell.home>
+References: <1481199650-22484-1-git-send-email-benjamin.gaignard@st.com>
+ <1481199650-22484-2-git-send-email-benjamin.gaignard@st.com>
+ <20161209085331.GB3625@dell.home>
+Message-ID: <CA+M3ks4AKfj9_uXo9AiW22TnB8WUzDV1NnmsO1yJ3hZfHUvoJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2016 at 12:24:03PM +0000, Ard Biesheuvel wrote:
-> On 9 December 2016 at 12:20, Dave Martin <Dave.Martin@arm.com> wrote:
-> > On Thu, Dec 08, 2016 at 04:49:39PM +0000, Ard Biesheuvel wrote:
-> >> Currently, we allow kernel mode NEON in softirq or hardirq context by
-> >> stacking and unstacking a slice of the NEON register file for each call
-> >> to kernel_neon_begin() and kernel_neon_end(), respectively.
-> >>
-> >> Given that
-> >> a) a CPU typically spends most of its time in userland, during which time
-> >>    no kernel mode NEON in process context is in progress,
-> >> b) a CPU spends most of its time in the kernel doing other things than
-> >>    kernel mode NEON when it gets interrupted to perform kernel mode NEON
-> >>    in softirq context
-> >>
-> >> the stacking and subsequent unstacking is only necessary if we are
-> >> interrupting a thread while it is performing kernel mode NEON in process
-> >> context, which means that in all other cases, we can simply preserve the
-> >> userland FPSIMD state once, and only restore it upon return to userland,
-> >> even if we are being invoked from softirq or hardirq context.
-> >>
-> >> So instead of checking whether we are running in interrupt context, keep
-> >> track of the level of nested kernel mode NEON calls in progress, and only
-> >> perform the eager stack/unstack if the level exceeds 1.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >> v3:
-> >> - avoid corruption by concurrent invocations of kernel_neon_begin()/_end()
-> >>
-> >> v2:
-> >> - BUG() on unexpected values of the nesting level
-> >> - relax the BUG() on num_regs>32 to a WARN, given that nothing actually
-> >>   breaks in that case
-> >>
-> >>  arch/arm64/kernel/fpsimd.c | 47 ++++++++++++++------
-> >>  1 file changed, 33 insertions(+), 14 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> >> index 394c61db5566..536ddab9316d 100644
-> >> --- a/arch/arm64/kernel/fpsimd.c
-> >> +++ b/arch/arm64/kernel/fpsimd.c
-> >> @@ -220,20 +220,35 @@ void fpsimd_flush_task_state(struct task_struct *t)
+2016-12-09 9:53 GMT+01:00 Lee Jones <lee.jones@linaro.org>:
+> Sorry to do this Ben.  Not much to do now though!
+>
+>> Add bindings information for STM32 General Purpose Timer
+>>
+>> version 2:
+>> - rename stm32-mfd-timer to stm32-gptimer
+>> - only keep one compatible string
+>>
+>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>> ---
+>>  .../bindings/mfd/stm32-general-purpose-timer.txt   | 39 ++++++++++++++++++++++
+>>  1 file changed, 39 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-general-purpose-timer.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/stm32-general-purpose-timer.txt b/Documentation/devicetree/bindings/mfd/stm32-general-purpose-timer.txt
+>> new file mode 100644
+>> index 0000000..ce67755
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mfd/stm32-general-purpose-timer.txt
+>> @@ -0,0 +1,39 @@
+>> +STM32 General Purpose Timer driver bindings
+>
+> This is a great place to describe what we're *actually* trying to
+> achieve with this driver, and the worst place to use the term "general
+> purpose", since this IP is so much more than that.
+>
+>
+> "STM32 Timers
+>
+> This IP provides 3 types of timer along with PWM functionality.
+>
+> [...]"
+>
+> ... then go on to explain what the 3 types are and how they can be
+> used.
+>
+>> +Required parameters:
+>> +- compatible: must be "st,stm32-gptimer"
+>
+> I vehemently disagree that this entire IP is a GP Timer.  It contains
+> GP timers, sure, but it also contains Advanced and Basic timers.
+>
+> IMHO this compatible should be "st,stm32-timers".
+>
+> And the file name of both this and the *.c file should reflect that
+> too.
 
-[...]
+I will do those name changes in v6.
 
-> >> + * state structure, we need two additional levels of storage.
-> >> + */
-> >> +static DEFINE_PER_CPU(struct fpsimd_partial_state, nested_fpsimdstate[2]);
-> >> +static DEFINE_PER_CPU(atomic_t, kernel_neon_nesting_level);
-> >
-> > Come to think of it, should we use this_cpu_{read,add}() etc?
-> >
-> 
-> I wasn't aware those existed ...
+>
+> Remainder looks nice.
+>
+>> +- reg:                       Physical base address and length of the controller's
+>> +                     registers.
+>> +- clock-names:               Set to "clk_int".
+>> +- clocks:            Phandle to the clock used by the timer module.
+>> +                     For Clk properties, please refer to ../clock/clock-bindings.txt
+>> +
+>> +Optional parameters:
+>> +- resets:            Phandle to the parent reset controller.
+>> +                     See ../reset/st,stm32-rcc.txt
+>> +
+>> +Optional subnodes:
+>> +- pwm:                       See ../pwm/pwm-stm32.txt
+>> +- timer:             See ../iio/timer/stm32-timer-trigger.txt
+>> +
+>> +Example:
+>> +     timers at 40010000 {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +             compatible = "st,stm32-gptimer";
+>> +             reg = <0x40010000 0x400>;
+>> +             clocks = <&rcc 0 160>;
+>> +             clock-names = "clk_int";
+>> +
+>> +             pwm at 0 {
+>
+> Out of interest, do you use the "@0", "@1" for anything now?
 
-Actually, nor was I ... I asked Will about local atomics and he
-suggested to use those ... then he remembered about the this_cpu_
-variants.
+No I don't use them so I will remove them in v6
 
-The local atomic might still have some barrier semantics, apparently.
-For arm64, they're just implemented using the non-local atomics anyway.
+>
+>> +                     compatible = "st,stm32-pwm";
+>> +                     pinctrl-0       = <&pwm1_pins>;
+>> +                     pinctrl-names   = "default";
+>> +             };
+>> +
+>> +             timer at 0 {
+>> +                     compatible = "st,stm32-timer-trigger";
+>> +                     reg = <0>;
+>> +             };
+>> +     };
+>
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
 
-> 
-> > I'm not sure why we need the barrier semantics of atomic_t ops here.
-> >
-> 
-> I don't think we do. We only need the atomic increment/decrement, afaict
 
-That's what I was thinking.
 
-Otherwise, the patch looked reasonable to me, but I'll take another look
-if you wanted to twiddle the atomics.
+-- 
+Benjamin Gaignard
 
-Cheers
----Dave
+Graphic Study Group
+
+Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro: Facebook | Twitter | Blog
