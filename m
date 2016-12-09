@@ -1,55 +1,68 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 9 Dec 2016 17:44:53 -0600
-Subject: [PATCH] usb: dwc3: omap: remove devm_request_threaded_irq
-In-Reply-To: <20161209233728.GP4920@atomide.com>
-References: <20161209205508.6456-1-grygorii.strashko@ti.com>
- <20161209215958.GN4920@atomide.com>
- <db75608b-f92c-6bfa-80a9-a3ab3adf7c23@ti.com>
- <20161209230457.GO4920@atomide.com>
- <e394c44c-3ae3-b0ac-2b02-a886ca2510bd@ti.com>
- <20161209233728.GP4920@atomide.com>
-Message-ID: <32eba9f6-c3c7-c56a-88c4-cf0fed569aba@ti.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Sat, 10 Dec 2016 01:51:01 +0200
+Subject: [PATCH 1/3] dt: pwm: lpc32xx: add description of clocks and
+ #pwm-cells properties
+In-Reply-To: <20161209214137.2hdugl5rmnwjrus4@rob-hp-laptop>
+References: <20161205014237.1689-1-vz@mleia.com>
+ <20161205014237.1689-2-vz@mleia.com>
+ <20161209214137.2hdugl5rmnwjrus4@rob-hp-laptop>
+Message-ID: <015305d5-c22f-52da-9605-f2c19e3108b1@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rob,
 
-
-On 12/09/2016 05:37 PM, Tony Lindgren wrote:
-> * Grygorii Strashko <grygorii.strashko@ti.com> [161209 15:32]:
+On 12/09/2016 11:41 PM, Rob Herring wrote:
+> On Mon, Dec 05, 2016 at 03:42:37AM +0200, Vladimir Zapolskiy wrote:
+>> NXP LPC32xx SoCs have two simple independent PWM controllers with a single
+>> output each, in this case there is no need to specify PWM channel argument
+>> on client side, one cell for setting PWM output frequency is sufficient.
 >>
+>> Another added to the description property 'clocks' has a standard meaning
+>> of a controller supply clock, in the LPC32xx User's Manual the clock is
+>> denoted as PWM1_CLK or PWM2_CLK clock.
 >>
->> On 12/09/2016 05:04 PM, Tony Lindgren wrote:
->>> * Grygorii Strashko <grygorii.strashko@ti.com> [161209 14:46]:
->>>>
->>>>
->>>> On 12/09/2016 03:59 PM, Tony Lindgren wrote:
->>>>> * Grygorii Strashko <grygorii.strashko@ti.com> [161209 12:55]:
->>>>>> Switch back from devm_request_threaded_irq() to request_threaded_irq() to
->>>>>> avoid races between interrupt handler execution and PM runtime in error
->>>>>> handling code path in probe and in dwc3_omap_remove():
->>>>>
->>>>> Can't you just call disable_irq() on the exit path instead of removing
->>>>> devm?
->>>>>
->>>>
->>>> I can. But what will be the benefit from using devm then?
->>>
->>> Hmm good point. Probably the least number of code would be to just
->>> do NOAUTOEN before devm_request_irq(), then only do enable_irq()
->>> just before returning from the probe. After all, we don't really
->>> want the irq running until the probe is done.
->>>
->>> I think that would leave out the extra handling from the error
->>> path?
->>>
+>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+>> ---
+>>  Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt | 7 +++++++
+>>  1 file changed, 7 insertions(+)
 >>
->> Good question here is - do we need this irq to be enabled for sub-device
->> probing from of_platform_populate()? ;)
->
-> No!
+>> diff --git a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
+>> index 74b5bc5..523d796 100644
+>> --- a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
+>> +++ b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
+>> @@ -3,15 +3,22 @@ LPC32XX PWM controller
+>>  Required properties:
+>>  - compatible: should be "nxp,lpc3220-pwm"
+>>  - reg: physical base address and length of the controller's registers
+>> +- clocks: clock phandle and clock specifier pair
+>> +- #pwm-cells: should be 1, the cell is used to specify the period in
+>> +  nanoseconds.
+> 
+> This use of the cell is a bit odd as the period is s/w config and this 
+> would typically be a channel selection or such.
 
-Ok, then it should work this way.
+this is a classic PWM channel configuration property for PWM consumers
+described in DT, for instance PWM frequency for display panel backlight
+on boot.
 
--- 
-regards,
--grygorii
+I think >90% of PWM controllers with device tree bindings have this
+argument in #pwm-cells, from bindings/pwm/pwm.txt :
+
+    pwm-specifier typically encodes the chip-relative PWM number and
+    the PWM period in nanoseconds.
+
+You also may skim through phandle arguments of 'pwms' property,
+commonly the second argument is the requested frequency.
+
+In this particular case I just drop PWM channel number, because
+the LPC32xx PWM controller has a single output channel.
+
+> What if I want user specified/changed periods?
+> 
+
+The preset period still can be changed over sysfs in runtime.
+
+--
+With best wishes,
+Vladimir
