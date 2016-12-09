@@ -1,61 +1,129 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 9 Dec 2016 19:23:17 +0100
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <20161209175606.GM6408@localhost>
-References: <20161207164341.GX6408@localhost>
- <yw1xr35j1yd5.fsf@unicorn.mansr.com> <20161208103921.GC6408@localhost>
- <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
- <20161208163755.GH6408@localhost> <yw1xy3zqxt7x.fsf@unicorn.mansr.com>
- <20161209065955.GJ6408@localhost>
- <6ce1ea97-1d68-2203-c7b4-73315e801655@laposte.net>
- <20161209171727.GK6408@localhost>
- <ec33d3f0-6474-2b13-8a26-077ce3785d31@free.fr>
- <20161209175606.GM6408@localhost>
-Message-ID: <7900ae24-6803-a271-944c-8830f718fef0@free.fr>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri,  9 Dec 2016 18:24:03 +0000
+Subject: [PATCH] efi/libstub: arm*: Pass latest memory map to the kernel
+Message-ID: <1481307843-18521-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ Dropping Mans to preserve his peace-of-mind ]
+As reported by James, the current libstub code involving the annotated
+memory map only works somewhat correctly by accident, due to the fact
+that a pool allocation happens to be reused immediately, retaining its
+former contents.
 
-On 09/12/2016 18:56, Vinod Koul wrote:
-> On Fri, Dec 09, 2016 at 06:34:15PM +0100, Mason wrote:
->> On 09/12/2016 18:17, Vinod Koul wrote:
->>
->>> On Fri, Dec 09, 2016 at 11:25:57AM +0100, Sebastian Frias wrote:
->>>>
->>>> What concrete solution do you propose?
->>>
->>> I have already proposed two solutions.
->>>
->>> A) Request a channel only when you need it. Obviously we can't do virtual
->>> channels with this (though we should still use virt-channels framework).
->>> The sbox setup and teardown can be done as part of channel request and
->>> freeup. PL08x already does this.
->>>
->>> Downside is that we can only have as many consumers at a time as channels.
->>>
->>> I have not heard any technical reason for not doing this apart from drivers
->>> grab the channel at probe, which is incorrect and needs to be fixed
->>> irrespective of the problem at hand.
->>>
->>> This is my preferred option.
->>
->> There is one important drawback with this solution. If a driver calls
->> dma_request_chan() when no channels are currently available, it will
->> get -EBUSY. If there were a flag in dma_request_chan to be put to
->> sleep (with timeout) until a channel is available, then it would
->> work. But busy waiting in the client driver is a waste of power.
-> 
-> Right, but in that case the fallback would be PIO mode, and if that is
-> not availble (IIRC some f your devices don't) then reject the usage with
-> EAGAIN.
+Instead of juggling memory maps, which makes the code more complex than
+it needs to be, simply put a placholder value into the FDT, and only
+write the actual value after ExitBootServices() has been called.
 
-Maybe I'm missing something, but I don't see how that would help.
-Take the NAND Flash controller driver, for instance. PIO is not
-an option, because the ECC engine is tied to DMA.
+Reported-by: James Morse <james.morse@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ drivers/firmware/efi/libstub/fdt.c | 51 ++++++++++++++++++++++++--------------
+ 1 file changed, 32 insertions(+), 19 deletions(-)
 
-And failing with -EAGAIN doesn't help the busy looping situation.
-The caller should be put on some kind of queue to wait for a
-"channel ready" event.
-
-Regards.
+diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
+index a6a93116a8f0..5d39dff77f17 100644
+--- a/drivers/firmware/efi/libstub/fdt.c
++++ b/drivers/firmware/efi/libstub/fdt.c
+@@ -101,7 +101,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+ 	if (status)
+ 		goto fdt_set_fail;
+ 
+-	fdt_val64 = cpu_to_fdt64((u64)(unsigned long)memory_map);
++	fdt_val64 = U64_MAX; /* placeholder */
+ 	status = fdt_setprop(fdt, node, "linux,uefi-mmap-start",
+ 			     &fdt_val64,  sizeof(fdt_val64));
+ 	if (status)
+@@ -148,6 +148,24 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+ 	return EFI_LOAD_ERROR;
+ }
+ 
++static efi_status_t update_fdt_memmap(void *fdt, u64 memmap)
++{
++	int node = fdt_path_offset(fdt, "/chosen");
++	efi_status_t status;
++
++	if (node < 0)
++		return EFI_LOAD_ERROR;
++
++	memmap = cpu_to_fdt64(memmap);
++	status = fdt_setprop_inplace(fdt, node, "linux,uefi-mmap-start",
++				     &memmap, sizeof(memmap));
++
++	if (status)
++		return EFI_LOAD_ERROR;
++
++	return EFI_SUCCESS;
++}
++
+ #ifndef EFI_FDT_ALIGN
+ #define EFI_FDT_ALIGN EFI_PAGE_SIZE
+ #endif
+@@ -243,15 +261,6 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 			goto fail;
+ 		}
+ 
+-		/*
+-		 * Now that we have done our final memory allocation (and free)
+-		 * we can get the memory map key  needed for
+-		 * exit_boot_services().
+-		 */
+-		status = efi_get_memory_map(sys_table, &map);
+-		if (status != EFI_SUCCESS)
+-			goto fail_free_new_fdt;
+-
+ 		status = update_fdt(sys_table,
+ 				    (void *)fdt_addr, fdt_size,
+ 				    (void *)*new_fdt_addr, new_fdt_size,
+@@ -266,20 +275,16 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 			/*
+ 			 * We need to allocate more space for the new
+ 			 * device tree, so free existing buffer that is
+-			 * too small.  Also free memory map, as we will need
+-			 * to get new one that reflects the free/alloc we do
+-			 * on the device tree buffer.
++			 * too small.
+ 			 */
+ 			efi_free(sys_table, new_fdt_size, *new_fdt_addr);
+-			sys_table->boottime->free_pool(memory_map);
+ 			new_fdt_size += EFI_PAGE_SIZE;
+ 		} else {
+ 			pr_efi_err(sys_table, "Unable to construct new device tree.\n");
+-			goto fail_free_mmap;
++			goto fail_free_new_fdt;
+ 		}
+ 	}
+ 
+-	sys_table->boottime->free_pool(memory_map);
+ 	priv.runtime_map = runtime_map;
+ 	priv.runtime_entry_count = &runtime_entry_count;
+ 	status = efi_exit_boot_services(sys_table, handle, &map, &priv,
+@@ -288,6 +293,17 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 	if (status == EFI_SUCCESS) {
+ 		efi_set_virtual_address_map_t *svam;
+ 
++		status = update_fdt_memmap((void *)*new_fdt_addr,
++					   (u64)memory_map);
++		if (status != EFI_SUCCESS) {
++			/*
++			 * The kernel won't get far without the memory map, but
++			 * may still be able to print something meaningful so
++			 * return success here.
++			 */
++			return EFI_SUCCESS;
++		}
++
+ 		/* Install the new virtual address map */
+ 		svam = sys_table->runtime->set_virtual_address_map;
+ 		status = svam(runtime_entry_count * desc_size, desc_size,
+@@ -319,9 +335,6 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+ 
+ 	pr_efi_err(sys_table, "Exit boot services failed.\n");
+ 
+-fail_free_mmap:
+-	sys_table->boottime->free_pool(memory_map);
+-
+ fail_free_new_fdt:
+ 	efi_free(sys_table, new_fdt_size, *new_fdt_addr);
+ 
+-- 
+2.7.4
