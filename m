@@ -1,39 +1,66 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Fri, 9 Dec 2016 13:02:45 +1000
-Subject: [PATCH 4/4] ARM: versatile: support configuring versatile machine
- for no-MMU
-In-Reply-To: <58481DD1.6090606@arm.com>
-References: <1481093992-30520-1-git-send-email-gerg@uclinux.org>
- <1481093992-30520-2-git-send-email-gerg@uclinux.org>
- <CACRpkdZywn46QbnvKcN-jkt43Vf+GBSNQkLgnnNg-DC-8aSO5w@mail.gmail.com>
- <58481DD1.6090606@arm.com>
-Message-ID: <ed67c89a-3f40-2634-f873-5890ba2c2f90@uclinux.org>
+From: jk@ozlabs.org (Jeremy Kerr)
+Date: Fri, 9 Dec 2016 15:12:05 +1100
+Subject: [PATCH 16/16] drivers/fsi: Add GPIO based FSI master
+In-Reply-To: <1481069677-53660-17-git-send-email-christopher.lee.bostic@gmail.com>
+References: <1481069677-53660-1-git-send-email-christopher.lee.bostic@gmail.com>
+ <1481069677-53660-17-git-send-email-christopher.lee.bostic@gmail.com>
+Message-ID: <6a39f4d9-0f20-a146-3122-86d3f75c58fa@ozlabs.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+Hi Chris,
 
-On 08/12/16 00:33, Vladimir Murzin wrote:
-> Hi Linus,
-> 
-> On 07/12/16 14:11, Linus Walleij wrote:
->> Another target I had in mind was the Integrator which
->> incidentally supports a bunch of the old noMMU core
->> tiles where we can swap in an ARM946, which I guess
->> could work with this?
-> 
-> Do you mind trying my "Allow NOMMU for MULTIPLATFORM" series [1]? Greg just
-> reported it did a trick for Versatile, there is a good chance it would work
-> for Integrator too ;)
-> 
-> [1] https://www.spinics.net/lists/arm-kernel/msg546823.html
+> +static ssize_t store_scan(struct device *dev,
+> +				struct device_attribute *attr,
+> +				const char *buf,
+> +				size_t count)
+> +{
+> +	struct fsi_master_gpio *master = dev_get_drvdata(dev);
+> +
+> +	fsi_master_gpio_init(master);
+> +
+> +	/* clear out any old scan data if present */
+> +	fsi_master_unregister(&master->master);
+> +	fsi_master_register(&master->master);
+> +
+> +	return count;
+> +}
+> +
+> +static DEVICE_ATTR(scan, 0200, NULL, store_scan);
 
-I won't speak for Linus...
+I think it would make more sense to have the scan attribute populated by
+the fsi core; we want this on all masters, not just GPIO.
 
-But I tried building with your patches for Integrator/CP and
-that builds (with an appropriate configuration) with CONFIG_MMU
-disabled and runs successfully in qemu (with machine target
-"integratorcp"). No other patches required.
+Currently, the only GPIO-master-specific functionality here is the
+fsi_master_gpio_init() - but isn't this something that we can do at
+probe time instead?
 
-Regards
-Greg
+> +static int fsi_master_gpio_probe(struct platform_device *pdev)
+> +{
+> +	struct fsi_master_gpio *master;
+> +	struct gpio_desc *gpio;
+> +
+> +	master = devm_kzalloc(&pdev->dev, sizeof(*master), GFP_KERNEL);
+> +	if (!master)
+> +		return -ENOMEM;
+
+We should be populating master->dev.parent, see
+
+  https://github.com/jk-ozlabs/linux/commit/5225d6c47
+
+
+> +	/* Optional pins */
+> +
+> +	gpio = devm_gpiod_get(&pdev->dev, "trans", 0);
+> +	if (IS_ERR(gpio))
+> +		dev_dbg(&pdev->dev, "probe: failed to get trans pin\n");
+> +	else
+> +		master->gpio_trans = gpio;
+
+I found devm_gpiod_get_optional(), which might make this a little
+neater.
+
+Cheers,
+
+
+Jeremy
