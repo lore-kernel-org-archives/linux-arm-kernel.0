@@ -1,24 +1,76 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Dec 2016 10:57:22 +0000
-Subject: [PATCH 1/1] arm64: mm: add config options for page table
- configuration
-In-Reply-To: <dd102973-5737-3168-bffe-7ac5e769aecb@broadcom.com>
-References: <1481139600-24455-1-git-send-email-scott.branden@broadcom.com>
- <1481139600-24455-2-git-send-email-scott.branden@broadcom.com>
- <20161208100014.GE33075@MBP.local>
- <762b8bec-60da-0bb8-28f4-b407ad70687b@broadcom.com>
- <20161208185717.GC15141@e104818-lin.cambridge.arm.com>
- <dd102973-5737-3168-bffe-7ac5e769aecb@broadcom.com>
-Message-ID: <20161209105722.GD11767@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 9 Dec 2016 11:05:05 +0000
+Subject: [PATCH v2 1/2] mfd: axp20x: Add address extension registers for
+ AXP806 regmap
+In-Reply-To: <20161123031616.10114-2-wens@csie.org>
+References: <20161123031616.10114-1-wens@csie.org>
+ <20161123031616.10114-2-wens@csie.org>
+Message-ID: <20161209110505.GK3625@dell.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 08, 2016 at 11:33:39AM -0800, Scott Branden wrote:
-> Since I currently have your attention:  I do think there is fundamental bug
-> in the ARM64 mm implementation.  If you look at /sys/devices/system/memory
-> it only shows the last memoryX section created after init.
+On Wed, 23 Nov 2016, Chen-Yu Tsai wrote:
 
-That directory doesn't seem to exist on my arm64 systems. Do I have to
-enable something specific in the .config?
+> The AXP806 supports either master/standalone or slave mode.
+> Slave mode allows sharing the serial bus, even with multiple
+> AXP806 which all have the same hardware address.
+> 
+> This is done with extra "serial interface address extension",
+> or AXP806_BUS_ADDR_EXT, and "register address extension", or
+> AXP806_REG_ADDR_EXT, registers. The former is read-only, with
+> 1 bit customizable at the factory, and 1 bit depending on the
+> state of an external pin. The latter is writable. Only when
+> the these device addressing bits (in the upper 4 bits of the
+> registers) match, will the device respond to operations on
+> its other registers.
+> 
+> Add these 2 registers to the regmap so we can access them.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/mfd/axp20x.c       | 3 ++-
+>  include/linux/mfd/axp20x.h | 2 ++
+>  2 files changed, 4 insertions(+), 1 deletion(-)
 
-Will
+Applied for v4.11, thanks.
+
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index ba130be32e61..cdaeb34a9a38 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -135,6 +135,7 @@ static const struct regmap_range axp806_writeable_ranges[] = {
+>  	regmap_reg_range(AXP806_PWR_OUT_CTRL1, AXP806_CLDO3_V_CTRL),
+>  	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ2_EN),
+>  	regmap_reg_range(AXP20X_IRQ1_STATE, AXP20X_IRQ2_STATE),
+> +	regmap_reg_range(AXP806_REG_ADDR_EXT, AXP806_REG_ADDR_EXT),
+>  };
+>  
+>  static const struct regmap_range axp806_volatile_ranges[] = {
+> @@ -305,7 +306,7 @@ static const struct regmap_config axp806_regmap_config = {
+>  	.val_bits	= 8,
+>  	.wr_table	= &axp806_writeable_table,
+>  	.volatile_table	= &axp806_volatile_table,
+> -	.max_register	= AXP806_VREF_TEMP_WARN_L,
+> +	.max_register	= AXP806_REG_ADDR_EXT,
+>  	.cache_type	= REGCACHE_RBTREE,
+>  };
+>  
+> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+> index fec597fb34cb..7e85ececcedf 100644
+> --- a/include/linux/mfd/axp20x.h
+> +++ b/include/linux/mfd/axp20x.h
+> @@ -115,6 +115,8 @@ enum {
+>  #define AXP806_CLDO2_V_CTRL		0x25
+>  #define AXP806_CLDO3_V_CTRL		0x26
+>  #define AXP806_VREF_TEMP_WARN_L		0xf3
+> +#define AXP806_BUS_ADDR_EXT		0xfe
+> +#define AXP806_REG_ADDR_EXT		0xff
+>  
+>  /* Interrupt */
+>  #define AXP152_IRQ1_EN			0x40
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
