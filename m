@@ -1,97 +1,75 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 9 Dec 2016 12:12:01 -0600
-Subject: [PATCH 10/11] Document: dt: binding: imx: update doc for imx6sll
-In-Reply-To: <1480660774-25055-11-git-send-email-ping.bai@nxp.com>
-References: <1480660774-25055-1-git-send-email-ping.bai@nxp.com>
- <1480660774-25055-11-git-send-email-ping.bai@nxp.com>
-Message-ID: <20161209181201.ewcqeqslyf3je7kq@rob-hp-laptop>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 9 Dec 2016 23:47:15 +0530
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <20161209175606.GM6408@localhost>
+References: <yw1xr35j1yd5.fsf@unicorn.mansr.com>
+ <20161208103921.GC6408@localhost>
+ <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
+ <20161208163755.GH6408@localhost>
+ <yw1xy3zqxt7x.fsf@unicorn.mansr.com>
+ <20161209065955.GJ6408@localhost>
+ <6ce1ea97-1d68-2203-c7b4-73315e801655@laposte.net>
+ <20161209171727.GK6408@localhost>
+ <ec33d3f0-6474-2b13-8a26-077ce3785d31@free.fr>
+ <20161209175606.GM6408@localhost>
+Message-ID: <20161209181715.GN6408@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 02, 2016 at 02:39:33PM +0800, Bai Ping wrote:
-> Add necessary document update for i.MX6SLL support.
+On Fri, Dec 09, 2016 at 11:26:06PM +0530, Vinod Koul wrote:
+> On Fri, Dec 09, 2016 at 06:34:15PM +0100, Mason wrote:
+> > On 09/12/2016 18:17, Vinod Koul wrote:
+> > 
+> > > On Fri, Dec 09, 2016 at 11:25:57AM +0100, Sebastian Frias wrote:
+> > >>
+> > >> What concrete solution do you propose?
+> > > 
+> > > I have already proposed two solutions.
+> > > 
+> > > A) Request a channel only when you need it. Obviously we can't do virtual
+> > > channels with this (though we should still use virt-channels framework).
+> > > The sbox setup and teardown can be done as part of channel request and
+> > > freeup. PL08x already does this.
+> > > 
+> > > Downside is that we can only have as many consumers at a time as channels.
+> > > 
+> > > I have not heard any technical reason for not doing this apart from drivers
+> > > grab the channel at probe, which is incorrect and needs to be fixed
+> > > irrespective of the problem at hand.
+> > > 
+> > > This is my preferred option.
+> > 
+> > There is one important drawback with this solution. If a driver calls
+> > dma_request_chan() when no channels are currently available, it will
+> > get -EBUSY. If there were a flag in dma_request_chan to be put to
+> > sleep (with timeout) until a channel is available, then it would
+> > work. But busy waiting in the client driver is a waste of power.
 > 
-> Signed-off-by: Bai Ping <ping.bai@nxp.com>
-> ---
->  .../devicetree/bindings/clock/imx6sll-clock.txt    | 13 ++++++++
->  .../bindings/pinctrl/fsl,imx6sll-pinctrl.txt       | 37 ++++++++++++++++++++++
->  2 files changed, 50 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/imx6sll-clock.txt
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx6sll-pinctrl.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/imx6sll-clock.txt b/Documentation/devicetree/bindings/clock/imx6sll-clock.txt
-> new file mode 100644
-> index 0000000..4f52efa
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/imx6sll-clock.txt
-> @@ -0,0 +1,13 @@
-> +* Clock bindings for Freescale i.MX6 UltraLite
+> Right, but in that case the fallback would be PIO mode, and if that is
+> not availble (IIRC some f your devices don't) then reject the usage with
+> EAGAIN.
 
-I thought UltraLite was MX6UL?
+Alternatively I can think of one more way.
 
-> +
-> +Required properties:
-> +- compatible: Should be "fsl,imx6sll-ccm"
-> +- reg: Address and length of the register set
-> +- #clock-cells: Should be <1>
-> +- clocks: list of clock specifiers, must contain an entry for each required
-> +  entry in clock-names
-> +- clock-names: should include entries "ckil", "osc", "ipp_di0" and "ipp_di1"
-> +
-> +The clock consumer should specify the desired clock by having the clock
-> +ID in its "clocks" phandle cell.  See include/dt-bindings/clock/imx6sll-clock.h
-> +for the full list of i.MX6 SLL clock IDs.
-> diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx6sll-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx6sll-pinctrl.txt
-> new file mode 100644
-> index 0000000..096e471
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx6sll-pinctrl.txt
-> @@ -0,0 +1,37 @@
-> +* Freescale i.MX6 UltraLite IOMUX Controller
+If there is fixed delay or maximum delay predicted between ISR being
+fired and transaction being completed from client, then we can use that
+magic value and degrade the performance a bit but make a simpler system
+than other two suggestions.
 
-ditto
+The idea here is that typically the subsequent transaction should be
+issued as soon as possible, best case being in the ISR. But we can
+degrade that performance a bit and issue in the tasklet. But that can be
+done after introducing a delay, that too only in the case where new sbox
+configuration is different from previous one (so performance degrade is
+only on the switch and not for txn for same setup). You can possible
+optimize even further by issuing in ISR for same sbox setup and issuing
+in tasklet if configuration is different.
 
-> +
-> +Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
-> +and usage.
-> +
-> +Required properties:
-> +- compatible: "fsl,imx6sll-iomuxc"
-> +- fsl,pins: each entry consists of 6 integers and represents the mux and config
-> +  setting for one pin.  The first 5 integers <mux_reg conf_reg input_reg mux_val
-> +  input_val> are specified using a PIN_FUNC_ID macro, which can be found in
-> +  imx6ul-pinfunc.h under device tree source folder.  The last integer CONFIG is
-> +  the pad setting value like pull-up on this pin.  Please refer to i.MX6SLL
-> +  Reference Manual for detailed CONFIG settings.
-> +
-> +CONFIG bits definition:
-> +PAD_CTL_LVE			(1 << 22)
-> +PAD_CTL_HYS                     (1 << 16)
-> +PAD_CTL_PUS_100K_DOWN           (0 << 14)
-> +PAD_CTL_PUS_47K_UP              (1 << 14)
-> +PAD_CTL_PUS_100K_UP             (2 << 14)
-> +PAD_CTL_PUS_22K_UP              (3 << 14)
-> +PAD_CTL_PUE                     (1 << 13)
-> +PAD_CTL_PKE                     (1 << 12)
-> +PAD_CTL_ODE                     (1 << 11)
-> +PAD_CTL_SPEED_LOW               (0 << 6)
-> +PAD_CTL_SPEED_MED               (1 << 6)
-> +PAD_CTL_SPEED_HIGH              (3 << 6)
-> +PAD_CTL_DSE_DISABLE             (0 << 3)
-> +PAD_CTL_DSE_260ohm              (1 << 3)
-> +PAD_CTL_DSE_130ohm              (2 << 3)
-> +PAD_CTL_DSE_87ohm               (3 << 3)
-> +PAD_CTL_DSE_65ohm               (4 << 3)
-> +PAD_CTL_DSE_52ohm               (5 << 3)
-> +PAD_CTL_DSE_43ohm               (6 << 3)
-> +PAD_CTL_DSE_37ohm               (7 << 3)
-> +PAD_CTL_SRE_FAST                (1 << 0)
-> +PAD_CTL_SRE_SLOW                (0 << 0)
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Yes this is bit iffy and adds more burden on driver, but lets us get
+away with decent performance and being able to handle the hardware
+condition.
+
+Would that work for your case...?
+
+-- 
+~Vinod
