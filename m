@@ -1,37 +1,32 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Sat, 10 Dec 2016 16:15:59 +0530
-Subject: [PATCH v2 0/3] Add enable method support for Exynos SoCs
-Message-ID: <1481366762-26413-1-git-send-email-pankaj.dubey@samsung.com>
+Date: Sat, 10 Dec 2016 16:16:00 +0530
+Subject: [PATCH v2 1/3] Documentation: bindings: Add binding doc for exynos
+ enable method
+In-Reply-To: <1481366762-26413-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1481366762-26413-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1481366762-26413-2-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lets use CPU_METHOD_OF_DECLARE() for smp_ops instead of using it
-via machine descriptor. To keep compatibility of older DTBs lets not 
-remove smp_ops hooks from machnine_descriptor.
+Add "samsung,exynos-smp" as enable-method for Samsung's Exynos SoC.
 
-Changes since v1:
- - Dropped code removing smp_ops hooks from exynos.c
- - Separated patch into three patches separating change in .c, .dtsi
-   and updated binding Documentation.
-
-Pankaj Dubey (3):
-  Documentation: bindings: Add binding doc for exynos enable method
-  ARM: EXYNOS: dts: add enable-method property for cpus node
-  ARM: EXYNOS: add CPU_METHOD_OF_DECLARE for exynos SoCs
-
+CC: Rob Herring <robh+dt@kernel.org> 
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
  Documentation/devicetree/bindings/arm/cpus.txt | 1 +
- arch/arm/boot/dts/exynos3250.dtsi              | 1 +
- arch/arm/boot/dts/exynos4210.dtsi              | 1 +
- arch/arm/boot/dts/exynos4212.dtsi              | 1 +
- arch/arm/boot/dts/exynos4412.dtsi              | 1 +
- arch/arm/boot/dts/exynos5250.dtsi              | 1 +
- arch/arm/boot/dts/exynos5260.dtsi              | 1 +
- arch/arm/boot/dts/exynos5410.dtsi              | 1 +
- arch/arm/boot/dts/exynos5420-cpus.dtsi         | 1 +
- arch/arm/boot/dts/exynos5422-cpus.dtsi         | 1 +
- arch/arm/boot/dts/exynos5440.dtsi              | 1 +
- arch/arm/mach-exynos/platsmp.c                 | 2 ++
- 12 files changed, 13 insertions(+)
+ 1 file changed, 1 insertion(+)
 
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index e6782d5..12730c8 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -209,6 +209,7 @@ nodes to be present and contain the properties described below.
+ 			    "renesas,apmu"
+ 			    "rockchip,rk3036-smp"
+ 			    "rockchip,rk3066-smp"
++			    "samsung,exynos-smp"
+ 			    "ste,dbx500-smp"
+ 
+ 	- cpu-release-addr
 -- 
 2.7.4
