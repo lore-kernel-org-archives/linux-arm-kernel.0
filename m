@@ -1,34 +1,50 @@
-From: peter@korsgaard.com (Peter Korsgaard)
-Date: Sat, 10 Dec 2016 22:15:35 +0100
-Subject: [RFC v3 PATCH 00/25] Allow NOMMU for MULTIPLATFORM
-In-Reply-To: <20161210181639.GA5660@afzalpc> (Afzal Mohammed's message of
- "Sat, 10 Dec 2016 23:46:39 +0530")
-References: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
- <20161210181639.GA5660@afzalpc>
-Message-ID: <878trntrig.fsf@dell.be.48ers.dk>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Sun, 11 Dec 2016 00:37:37 +0200
+Subject: [RFC PATCH 1/2] watchdog: imx2: fix hang-up on boot for i.MX21,
+ i.MX27 and i.MX31 SoCs
+In-Reply-To: <CAM=E1R6hzob5ZzyTLmrLL5s-6=vbZQbCig1sLHMSLChJEz9YgA@mail.gmail.com>
+References: <1474850361-20884-1-git-send-email-vz@mleia.com>
+ <1474850361-20884-2-git-send-email-vz@mleia.com>
+ <ebece25b-7a3b-3fdf-d117-dd0a3a2975b7@roeck-us.net>
+ <CAM=E1R6hzob5ZzyTLmrLL5s-6=vbZQbCig1sLHMSLChJEz9YgA@mail.gmail.com>
+Message-ID: <0a621c8e-9f75-5951-5f0a-a8e1f62572b7@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Afzal" == Afzal Mohammed <afzal.mohd.ma@gmail.com> writes:
+Hi Magnus,
 
-Hi,
+On 12/10/2016 09:28 PM, Magnus Lilja wrote:
+> Hi,
+>
+> On 26 September 2016 at 15:02, Guenter Roeck <linux@roeck-us.net> wrote:
+>> On 09/25/2016 05:39 PM, Vladimir Zapolskiy wrote:
+>>>
+>>> Power down counter enable/disable bit switch is located in WMCR
+>>> register, but watchdog controllers found on legacy i.MX21, i.MX27 and
+>>> i.MX31 SoCs don't have this register. As a result of writing data to
+>>> the non-existing register on driver probe the SoC hangs up, to fix the
+>>> problem add more OF compatible strings and on this basis get
+>>> information about availability of the WMCR register.
+>>>
+>>> Fixes: 5fe65ce7ccbb ("watchdog: imx2_wdt: Disable power down counter on
+>>> boot")
+>>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+>>> ---
 
- > Creating user space executables suitable for Cortex-A !MMU is the
- > distance to reach prompt.
+[snip]
 
- > Seems no !MMU A-class suitable toolchains are available, the existing
- > !MMU toolchains available are for either M or R class. Looks like
- > FDPIC one's also are so (cc'ing Maxime & Mickeal in case they have
- > some input here).
+>
+> Has this patch (or an updated one) been merged in any tree? I've
+> tested it on a i.MX31 board with positive result.
+>
 
- > And compiling a suitable compiler failed.
+no, it's not in the linux-watchdog repository at the moment, I'm going
+to fix Guenter's review comments and send the change today or tomorrow
+in hope that it enters v4.10.
 
- > Let know if any signposts to travel the remaining distance.
+Thank you for testing, for your information I'm on the way to send more
+i.MX31 changes to get better i.MX31 device tree support.
 
-You can build a toolchain and initramfs with Buildroot. Have a look at
-the stm32f429 nommu config:
-
-https://git.buildroot.net/buildroot/tree/configs/stm32f429_disco_defconfig
-
--- 
-Bye, Peter Korsgaard
+--
+With best wishes,
+Vladimir
