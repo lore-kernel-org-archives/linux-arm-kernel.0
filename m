@@ -1,40 +1,47 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 10 Dec 2016 15:47:35 +0200
-Subject: [RFC 4/7] ARM: s3c64xx: Annotate external clock frequencies
- __ro_after_init
+Date: Sat, 10 Dec 2016 15:47:36 +0200
+Subject: [PATCH 5/7] ARM: SAMSUNG: Constify array of wake irqs passed to
+ samsung_sync_wakemask
 In-Reply-To: <1481377658-22603-1-git-send-email-krzk@kernel.org>
 References: <1481377658-22603-1-git-send-email-krzk@kernel.org>
-Message-ID: <1481377658-22603-4-git-send-email-krzk@kernel.org>
+Message-ID: <1481377658-22603-5-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The xtal_f and xusbxti_f static variables are modified only through
-__init accessors (like s3c64xx_set_xtal_freq()).  Later these variables
-are used only in read-only way so we can mark them __ro_after_init to
-increase code safeness.
+The samsung_sync_wakemask() iterates over passed array of wake irqs but
+does not modify it.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-
 ---
+ arch/arm/plat-samsung/include/plat/wakeup-mask.h | 2 +-
+ arch/arm/plat-samsung/wakeup-mask.c              | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Looks safe, but not tested.
----
- arch/arm/mach-s3c64xx/common.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-s3c64xx/common.c b/arch/arm/mach-s3c64xx/common.c
-index 7c66ce1a6bb6..9843eb4dd04e 100644
---- a/arch/arm/mach-s3c64xx/common.c
-+++ b/arch/arm/mach-s3c64xx/common.c
-@@ -56,7 +56,8 @@
- #include "watchdog-reset.h"
+diff --git a/arch/arm/plat-samsung/include/plat/wakeup-mask.h b/arch/arm/plat-samsung/include/plat/wakeup-mask.h
+index 43e4acd2e1c6..bbfa84b0505a 100644
+--- a/arch/arm/plat-samsung/include/plat/wakeup-mask.h
++++ b/arch/arm/plat-samsung/include/plat/wakeup-mask.h
+@@ -38,7 +38,7 @@ struct samsung_wakeup_mask {
+  * required to be correct before we enter sleep.
+  */
+ extern void samsung_sync_wakemask(void __iomem *reg,
+-				  struct samsung_wakeup_mask *masks,
++				  const struct samsung_wakeup_mask *masks,
+ 				  int nr_masks);
  
- /* External clock frequency */
--static unsigned long xtal_f = 12000000, xusbxti_f = 48000000;
-+static unsigned long xtal_f __ro_after_init = 12000000;
-+static unsigned long xusbxti_f __ro_after_init = 48000000;
+ #endif /* __PLAT_WAKEUP_MASK_H */
+diff --git a/arch/arm/plat-samsung/wakeup-mask.c b/arch/arm/plat-samsung/wakeup-mask.c
+index 20c3d9117cc2..b9de6b543330 100644
+--- a/arch/arm/plat-samsung/wakeup-mask.c
++++ b/arch/arm/plat-samsung/wakeup-mask.c
+@@ -20,7 +20,7 @@
+ #include <plat/pm.h>
  
- void __init s3c64xx_set_xtal_freq(unsigned long freq)
+ void samsung_sync_wakemask(void __iomem *reg,
+-			   struct samsung_wakeup_mask *mask, int nr_mask)
++			   const struct samsung_wakeup_mask *mask, int nr_mask)
  {
+ 	struct irq_data *data;
+ 	u32 val;
 -- 
 2.7.4
