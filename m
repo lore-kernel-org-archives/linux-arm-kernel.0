@@ -1,62 +1,41 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 10 Dec 2016 21:47:06 +0100
-Subject: [RFC PATCH 1/7] arm64: Use physical counter for in-kernel reads
+Date: Sat, 10 Dec 2016 21:47:07 +0100
+Subject: [RFC PATCH 2/7] KVM: arm/arm64: Move kvm_vgic_flush_hwstate under
+ disabled irq
 In-Reply-To: <20161210204712.21830-1-christoffer.dall@linaro.org>
 References: <20161210204712.21830-1-christoffer.dall@linaro.org>
-Message-ID: <20161210204712.21830-2-christoffer.dall@linaro.org>
+Message-ID: <20161210204712.21830-3-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using the physical counter allows KVM to retain the offset between the
-virtual and physical counter as long as it is actively running a VCPU.
-
-As soon as a VCPU is released, another thread is scheduled or we start
-running userspace applications, we reset the offset to 0, so that VDSO
-operations can still read the virtual counter and get the same view of
-time as the kernel.
-
-This opens up potential improvements for KVM performance.
-
-VHE kernels or kernels using the virtual timer are unaffected by this.
+As we are about to play tricks with the timer to be more lazy in saving
+and restoring state, we need to move the timer flush function under a
+disabled irq section and since we hav to flush the vgic state after the
+timer state, move it as well.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/include/asm/arch_timer.h  | 6 ++++--
- drivers/clocksource/arm_arch_timer.c | 2 +-
- 2 files changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/kvm/arm.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index eaa5bbe..cec2549 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -139,11 +139,13 @@ static inline void arch_timer_set_cntkctl(u32 cntkctl)
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 13e54e8..6591af7 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -627,11 +627,12 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 */
+ 		preempt_disable();
+ 		kvm_pmu_flush_hwstate(vcpu);
+-		kvm_timer_flush_hwstate(vcpu);
+-		kvm_vgic_flush_hwstate(vcpu);
  
- static inline u64 arch_counter_get_cntpct(void)
- {
-+	u64 cval;
- 	/*
- 	 * AArch64 kernel and user space mandate the use of CNTVCT.
- 	 */
--	BUG();
--	return 0;
-+	isb();
-+	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
-+	return cval;
- }
+ 		local_irq_disable();
  
- static inline u64 arch_counter_get_cntvct(void)
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 73c487d..a5b0789 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -597,7 +597,7 @@ static void __init arch_counter_register(unsigned type)
- 
- 	/* Register the CP15 based counter if we have one */
- 	if (type & ARCH_CP15_TIMER) {
--		if (IS_ENABLED(CONFIG_ARM64) || arch_timer_uses_ppi == VIRT_PPI)
-+		if (arch_timer_uses_ppi == VIRT_PPI || is_kernel_in_hyp_mode())
- 			arch_timer_read_counter = arch_counter_get_cntvct;
- 		else
- 			arch_timer_read_counter = arch_counter_get_cntpct;
++		kvm_timer_flush_hwstate(vcpu);
++		kvm_vgic_flush_hwstate(vcpu);
++
+ 		/*
+ 		 * Re-check atomic conditions
+ 		 */
 -- 
 2.9.0
