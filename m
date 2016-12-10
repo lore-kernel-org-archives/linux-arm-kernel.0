@@ -1,98 +1,88 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 10 Dec 2016 11:51:11 +0200
-Subject: [PATCH] ASoC: samsung: Remove tests of member address
-Message-ID: <1481363471-21364-1-git-send-email-krzk@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 10 Dec 2016 11:36:34 +0100
+Subject: [PATCH] ARM: add cmpxchg64 helper for ARMv7-M
+Message-ID: <20161210103646.1407256-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver was checking for non-NULL address of struct's members:
- - s3c_audio_pdata->type (union),
- - s3c_audio_pdata->type.i2s (embedded struct).
+A change to the netfilter code in net-next introduced the first caller of
+cmpxchg64 that can get built on ARMv7-M, leading to an error from the
+assembler that points out the lack of 64-bit atomics on this architecture:
 
-This is pointless as these will be always non-NULL.  The 's3c_audio_pdata'
-is always initialized in static memory so it will be zeroed.
-Additionally the 'type' member was an union with only one member.
+/tmp/ccMe7djj.s: Assembler messages:
+/tmp/ccMe7djj.s:367: Error: selected processor does not support `ldrexd r0,r1,[lr]' in Thumb mode
+/tmp/ccMe7djj.s:371: Error: selected processor does not support `strexd ip,r2,r3,[lr]' in Thumb mode
+/tmp/ccMe7djj.s:389: Error: selected processor does not support `ldrexd r8,r9,[r7]' in Thumb mode
+/tmp/ccMe7djj.s:393: Error: selected processor does not support `strexd lr,r0,r1,[r7]' in Thumb mode
+scripts/Makefile.build:299: recipe for target 'net/netfilter/nft_counter.o' failed
 
-It is safe to reorganize the structures to get rid of useless union and
-checks for addresses to fix the coccinelle warning:
-	>> sound/soc/samsung/i2s.c:1270:2-4: ERROR: test of a variable/field address
+This makes ARMv7-M use the same emulation from asm-generic/cmpxchg-local.h
+that we use on architectures earlier than ARMv6K, to fix the build. The
+32-bit atomics are available on ARMv7-M and we keep using them there.
+This ARM specific change is probably something we should do regardless
+of the netfilter code.
 
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+However, looking at the new nft_counter_reset() function in nft_counter.c,
+this looks incorrect to me not just on ARMv7-M but also on other
+architectures, with at least the following possible race:
 
+	CPU A				CPU B
+					u64_stats_fetch_begin_irq
+	u64_stats_update_begin
+	fetch(upper 32 bits)
+					fetch(old)
+					cmpxchg64(counter, old, 0);
+	fetch(lower 32 bits)
+					u64_stats_fetch_retry_irq == true
+	store(upper 32 bits)
+					fetch(old)
+					cmpxchg64(counter, old, 0);
+	store(lower 32 bits)
+	u64_stats_update_end
+					u64_stats_fetch_retry_irq == true
+					fetch(old)
+					cmpxchg64(counter, old, 0);
+					u64_stats_fetch_retry_irq == false
+
+In this example, the data returned by __nft_counter_reset() is zero
+as we overwrite the per-cpu counter value during the retries.
+
+Fixes: 43da04a593d8 ("netfilter: nf_tables: atomic dump and reset for stateful objects")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
+ arch/arm/include/asm/cmpxchg.h | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-Not tested on the hardware.
----
- arch/arm/mach-s3c64xx/dev-audio.c      |  4 +---
- include/linux/platform_data/asoc-s3c.h |  6 ++----
- sound/soc/samsung/i2s.c                | 10 ++--------
- 3 files changed, 5 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm/mach-s3c64xx/dev-audio.c b/arch/arm/mach-s3c64xx/dev-audio.c
-index b57783371d52..247dcc0b691e 100644
---- a/arch/arm/mach-s3c64xx/dev-audio.c
-+++ b/arch/arm/mach-s3c64xx/dev-audio.c
-@@ -106,9 +106,7 @@ static struct s3c_audio_pdata i2sv4_pdata = {
- 	.dma_playback = DMACH_HSI_I2SV40_TX,
- 	.dma_capture = DMACH_HSI_I2SV40_RX,
- 	.type = {
--		.i2s = {
--			.quirks = QUIRK_PRI_6CHAN,
--		},
-+		.quirks = QUIRK_PRI_6CHAN,
- 	},
- };
+diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
+index 97882f9bad12..12215515ba02 100644
+--- a/arch/arm/include/asm/cmpxchg.h
++++ b/arch/arm/include/asm/cmpxchg.h
+@@ -240,6 +240,7 @@ static inline unsigned long __cmpxchg_local(volatile void *ptr,
+ 				        sizeof(*(ptr)));		\
+ })
  
-diff --git a/include/linux/platform_data/asoc-s3c.h b/include/linux/platform_data/asoc-s3c.h
-index 15bf56ee8af7..90641a5daaf0 100644
---- a/include/linux/platform_data/asoc-s3c.h
-+++ b/include/linux/platform_data/asoc-s3c.h
-@@ -18,7 +18,7 @@
++#ifndef CONFIG_CPU_V7M
+ static inline unsigned long long __cmpxchg64(unsigned long long *ptr,
+ 					     unsigned long long old,
+ 					     unsigned long long new)
+@@ -273,6 +274,18 @@ static inline unsigned long long __cmpxchg64(unsigned long long *ptr,
  
- extern void s3c64xx_ac97_setup_gpio(int);
+ #define cmpxchg64_local(ptr, o, n) cmpxchg64_relaxed((ptr), (o), (n))
  
--struct samsung_i2s {
-+struct samsung_i2s_type {
- /* If the Primary DAI has 5.1 Channels */
- #define QUIRK_PRI_6CHAN		(1 << 0)
- /* If the I2S block has a Stereo Overlay Channel */
-@@ -47,7 +47,5 @@ struct s3c_audio_pdata {
- 	void *dma_capture;
- 	void *dma_play_sec;
- 	void *dma_capture_mic;
--	union {
--		struct samsung_i2s i2s;
--	} type;
-+	struct samsung_i2s_type type;
- };
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index e00974bc5616..d55326289a4a 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -1218,7 +1218,6 @@ static int samsung_i2s_probe(struct platform_device *pdev)
- {
- 	struct i2s_dai *pri_dai, *sec_dai = NULL;
- 	struct s3c_audio_pdata *i2s_pdata = pdev->dev.platform_data;
--	struct samsung_i2s *i2s_cfg = NULL;
- 	struct resource *res;
- 	u32 regs_base, quirks = 0, idma_addr = 0;
- 	struct device_node *np = pdev->dev.of_node;
-@@ -1267,13 +1266,8 @@ static int samsung_i2s_probe(struct platform_device *pdev)
- 		pri_dai->dma_capture.filter_data = i2s_pdata->dma_capture;
- 		pri_dai->filter = i2s_pdata->dma_filter;
++#else
++
++/* ARMv7-M has 32-bit ldrex/strex but no ldrexd/strexd */
++
++#define cmpxchg64(ptr, o, n)		__cmpxchg64_local_generic((ptr), (o), (n))
++#define cmpxchg64_relaxed(ptr, o, n)	__cmpxchg64_local_generic((ptr), (o), (n))
++#define cmpxchg64_local(ptr, o, n)	__cmpxchg64_local_generic((ptr), (o), (n))
++
++#include <asm-generic/cmpxchg-local.h>
++
++#endif
++
+ #endif	/* __LINUX_ARM_ARCH__ >= 6 */
  
--		if (&i2s_pdata->type)
--			i2s_cfg = &i2s_pdata->type.i2s;
--
--		if (i2s_cfg) {
--			quirks = i2s_cfg->quirks;
--			idma_addr = i2s_cfg->idma_addr;
--		}
-+		quirks = i2s_pdata->type.quirks;
-+		idma_addr = i2s_pdata->type.idma_addr;
- 	} else {
- 		quirks = i2s_dai_data->quirks;
- 		if (of_property_read_u32(np, "samsung,idma-addr",
+ #endif /* __ASM_ARM_CMPXCHG_H */
 -- 
-2.7.4
+2.9.0
