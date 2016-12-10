@@ -1,44 +1,37 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 10 Dec 2016 09:16:04 +0100
-Subject: [RFC PATCH] ARM: dts: Add support for Turris Omnia
-In-Reply-To: <1480078151.381.4@smtp.gmail.com>
-References: <1479851991.26813.2@smtp.gmail.com>
- <1479859770-9375-1-git-send-email-tmshlvck@gmail.com>
- <20161123003505.GL2691@lunn.ch>
- <4e3f9628-dbf8-27c1-abea-d0ef58a67e51@kleine-koenig.org>
- <20161124150700.GD7155@lunn.ch> <1480078151.381.4@smtp.gmail.com>
-Message-ID: <20161210081604.GA8273@xo-6d-61-c0.localdomain>
+Date: Sat, 10 Dec 2016 10:10:01 +0100
+Subject: [Question] New mmap64 syscall?
+In-Reply-To: <12011325.PfzMMUCfyS@wuerfel>
+References: <20161206185440.GA4654@yury-N73SV>
+ <20161207163210.GB31779@e104818-lin.cambridge.arm.com>
+ <DF57E4A6-85C9-44EF-AD03-19EA688D19DB@theobroma-systems.com>
+ <12011325.PfzMMUCfyS@wuerfel>
+Message-ID: <20161210091001.GA17896@xo-6d-61-c0.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi!
 
-> >Yes. That is fine. It is just unusual. Most boards have gpio-led and
-> >gpio-keys, which are easy to add. That is why i asked. Adding an LED
-> >driver which talks to this M0 can be added later.
+> > Most of these advantages should eventually go away, when struct-reorg makes
+> > it way into the compiler. That said, it?s a marginal (but real) improvement for a
+> > subset of SPEC.
+> > 
+> > In the real world, the importance of ILP32 as an aid to transition legacy code
+> > that is not 64bit clean? and this should drive the ILP32 discussion. That we
+> > get a boost in our SPEC scores is just a nice extra that we get from it 
 > 
-> Actually the WiP driver for MCU LED interface, that we use in our
-> kernel is here: https://github.com/tmshlvck/omnia-linux/commit/2121afd8fbd2e4c720edcdd472b11b5303bc0dfb
+> To bring this back from the philosophical questions of ABI design
+> to the specific point of what file offset width you want for mmap()
+> on 32-bit architectures.
 > 
-> It definitely needs some cleanup and it adds non-standard features
-> (main PWM for all LEDs, autonomous blink mode, colors) via custom
-> /sys files, which I suspect that is not going to be acceptable for
-> upstream. Let's keep it for the next iteration.
+> For all I can tell, using mmap() to access a file that is many thousand
+> times larger than your virtual address space is completely crazy.
 
-Actually, LEDs that can do PWM intensity on their own are common and
-supported.
+Dunno. Wanting to mmap part of a partition does not seem too crazy... I'm pretty
+sure there's some tool out there that uses mmap(), just because mmap() was nicer
+to use then read(). And when the partition is big, the offset may be big.
 
-LEDs that can do PWM pretty advanced patterns are common in the cellphones,
-as is the color. Unfortunately, good support in kernel is missing. It
-would be good to change that.
-
-In n900, I have a LED that can compute prime numbers then blink them,
-autonomously. We probably don't need to support _that_, but common
-support for patterns would be good.
-
-Best regards,
-								Pavel
-
+									Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
