@@ -1,38 +1,32 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Fri, 9 Dec 2016 21:20:01 -0800
-Subject: [PATCH 1/1] arm64: mm: add config options for page table
- configuration
-In-Reply-To: <20161209105722.GD11767@arm.com>
-References: <1481139600-24455-1-git-send-email-scott.branden@broadcom.com>
- <1481139600-24455-2-git-send-email-scott.branden@broadcom.com>
- <20161208100014.GE33075@MBP.local>
- <762b8bec-60da-0bb8-28f4-b407ad70687b@broadcom.com>
- <20161208185717.GC15141@e104818-lin.cambridge.arm.com>
- <dd102973-5737-3168-bffe-7ac5e769aecb@broadcom.com>
- <20161209105722.GD11767@arm.com>
-Message-ID: <9c613ead-d215-3e53-40bf-126be3f1ad3e@broadcom.com>
+From: zhongjiang@huawei.com (zhongjiang)
+Date: Sat, 10 Dec 2016 15:04:29 +0800
+Subject: [RFC PATCH] arm64: change from CONT_PMD_SHIFT to CONT_PTE_SHIFT
+Message-ID: <1481353469-38755-1-git-send-email-zhongjiang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+From: zhong jiang <zhongjiang@huawei.com>
 
-On 16-12-09 02:57 AM, Will Deacon wrote:
-> On Thu, Dec 08, 2016 at 11:33:39AM -0800, Scott Branden wrote:
->> Since I currently have your attention:  I do think there is fundamental bug
->> in the ARM64 mm implementation.  If you look at /sys/devices/system/memory
->> it only shows the last memoryX section created after init.
->
-> That directory doesn't seem to exist on my arm64 systems. Do I have to
-> enable something specific in the .config?
-I looked in the /sys/devices/system/memory at it doesn't look like it 
-appears until memory hotplug is enabled in the system.  This is another 
-patch I'm trying to work through at the same time:
-https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1284943.html
+I think that CONT_PTE_SHIFT is more reasonable even if they are some
+value. and the patch is not any functional change.
 
-The internals of the memory management subsystem is not something I'm 
-too familiar with at this point.
->
-> Will
->
-Regards,
-Scott
+Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+---
+ arch/arm64/mm/hugetlbpage.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+index 2e49bd2..0a4c97b 100644
+--- a/arch/arm64/mm/hugetlbpage.c
++++ b/arch/arm64/mm/hugetlbpage.c
+@@ -323,7 +323,7 @@ static __init int setup_hugepagesz(char *opt)
+ static __init int add_default_hugepagesz(void)
+ {
+ 	if (size_to_hstate(CONT_PTES * PAGE_SIZE) == NULL)
+-		hugetlb_add_hstate(CONT_PMD_SHIFT);
++		hugetlb_add_hstate(CONT_PTE_SHIFT);
+ 	return 0;
+ }
+ arch_initcall(add_default_hugepagesz);
+-- 
+1.8.3.1
