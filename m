@@ -1,129 +1,58 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Sat, 10 Dec 2016 18:38:35 +0530
-Subject: [PATCH v8 0/8] Introducing Exynos ChipId driver
-Message-ID: <1481375323-29724-1-git-send-email-pankaj.dubey@samsung.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sat, 10 Dec 2016 15:47:32 +0200
+Subject: [PATCH 1/7] ARM: EXYNOS: Constify list of retention registers
+Message-ID: <1481377658-22603-1-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Each Exynos SoC has ChipID block which can give information about SoC's
-product Id and revision number.
+The list of retention registers (release_ret_regs field of struct
+exynos_pm_data and arrays with values) are not modified and can be made
+const to improve the const safeness.
 
-This patch series introduces Exynos Chipid SoC driver. At the same time
-it reduces dependency of mach-exynos files from plat-samsung, by removing
-soc_is_exynosMMMM and samsung_rev API. Instead of it now we can use
-soc_device_match API proposed by Arnd and getting discussed in thread [1].
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ arch/arm/mach-exynos/suspend.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Until now we are using static mapping of Exynos Chipid and using this static
-mapping to know about SoC name and revision via soc_is_exynosMMMM macro. This
-is quite cumbersome and every time new ARMv7 based Exynos SoC supports lands in
-mainline a bunch of such new macros needs to be added. Quite long back during
-support of Exynos5260 it has been discussed to solve this problem.
-
-To solve this issue this patchset replaces use of soc_is_exynosMMMM by either
-of_machine_is_compatible or soc_device_match depending upon usecase.
-
-I have tested this patch series on Exynos4210 based Origen board for normal SMP
-boot.
-
-
-Although I submitted this series as a whole of 8 patchsets, following are dependency
-details among the patches.
-
-Patch 1/8 can be taken without any dependency on other patches.
-Patch 2/8 and 3/8 has dependency on 1/8 and can be taken along with 1/8.
-Patch 4/8 has no dependency and can be taken without chipid driver patch 1/8.
-Patch 5/8 has depency on 1/8
-Patch 6/8 has no dependency and can be taken without any other patches.
-Patch 7/8 has dependency on 6/8 and 1/8
-Patch 8/8 has dependency on rest of patches
-
-[1]: https://patchwork.kernel.org/patch/9361389/
-
-Revision 7 and it's discussion can be found here:
- - https://www.spinics.net/lists/arm-kernel/msg540790.html
-
-Revision 6 and it's discussion can be found here:
- - https://lkml.org/lkml/2016/5/25/101
-
-Revision 5 and it's discussion can be found here:
- - http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310046.html
-
-Revision 4 and it's discussion can be found here:
- - https://lkml.org/lkml/2014/12/3/115
-
-Changes since v7:
- - Added ARM64 based Exynos7 and Exynos5433 support in chipid driver.
- - Removed Exynos4415 support from chipid driver, as exynos4415 has been removed from tree
- - Added patch to enable chipid driver for ARM64 based Exynos platform
- - Addressed review comments from Arnd for firmware.c, platsmp.c and pm.c files/
- - Splitted changes in firmware.c, platsmp.c and pm.c in separate patches 
-   for better code review
- - Included suggested code improvement in exynos-chipid.c from Marek Szyprowski
-
-Chances since v6:
- - Removed platform driver from chipid, instead use early_init to register soc_device
- - Removed export functions from exynos chipid driver
- - Replace soc_is_exynosMMMM via either of_machine_is_compatible or soc_device_match in
-   files in arm/mach-exynos folder
- - This patchset depends on the following patch series by Geert Uytterhoeven. This series
-   includes patch which introduces soc_device_match.
-   http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1261739.html
- - Rebased on latest krzk/for-next branch and retested.
-
-Change since v5:
- - Addressed Rob's review comments.
- - Rebased on latest krzk/for-next branch and retested.
-
-Changes since v4:
- - Removed custom sysfs entries as they were not providing any new information
-   as pointed out by Arnd.
- - Removed functions exporting product_id and revision, instead we will export
-   exynos_chipid_info structure. It will be helpfull when we need to provide more
-   fields of chipid outside of chipid, as commented by Yadwinder
- - Converted all funcions as __init. 
-
-Change since v3: 
- - This patch set contains 5/6 and 6/6 patch from v3 series.
- - Made EXYNOS_CHIPID config option non-user selectable,
-   as suggested by Tomasz Figa.
- - Made uniform macro for EXYNOS4/5_SOC_MASK as EXYNOS_SOC_MASK as
-   suggested by Tomasz Figa.
- - Made local variables static in chipid driver.
- - Added existing SoC's product id's.
- - Added platform driver support.
-
-Changes since v2:
- - Reorganized patches as suggested by Tomasz Figa.
- - Addressed review comments of Tomasz Figa in i2c-s3c2410.c file.
-
-Pankaj Dubey (8):
-  soc: samsung: add exynos chipid driver support
-  ARM: EXYNOS: enable exynos_chipid for ARCH_EXYNOS
-  ARM64: EXYNOS: enable exynos_chipid for ARCH_EXYNOS
-  ARM: EXYNOS: refactor firmware specific routines
-  ARM: EXYNOS: refactor power management specific routines
-  ARM: EXYNOS: remove secondary startup initialization from
-    smp_prepare_cpus
-  ARM: EXYNOS: refactor smp specific code and routines
-  ARM: EXYNOS: refactor of mach-exynos to use chipid information
-
- arch/arm/mach-exynos/Kconfig                 |   1 +
- arch/arm/mach-exynos/common.h                |  92 ---------
- arch/arm/mach-exynos/exynos.c                |  38 ----
- arch/arm/mach-exynos/firmware.c              | 100 +++++++---
- arch/arm/mach-exynos/include/mach/map.h      |  21 ---
- arch/arm/mach-exynos/platsmp.c               | 267 +++++++++++++++++++++------
- arch/arm/mach-exynos/pm.c                    | 185 ++++++++++++++++---
- arch/arm/plat-samsung/cpu.c                  |  14 --
- arch/arm/plat-samsung/include/plat/cpu.h     |   2 -
- arch/arm/plat-samsung/include/plat/map-s5p.h |   2 -
- arch/arm64/Kconfig.platforms                 |   1 +
- drivers/soc/samsung/Kconfig                  |   5 +
- drivers/soc/samsung/Makefile                 |   1 +
- drivers/soc/samsung/exynos-chipid.c          | 116 ++++++++++++
- 14 files changed, 563 insertions(+), 282 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/include/mach/map.h
- create mode 100644 drivers/soc/samsung/exynos-chipid.c
-
+diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+index 73df9f3ffbf7..d0e6ac7938f3 100644
+--- a/arch/arm/mach-exynos/suspend.c
++++ b/arch/arm/mach-exynos/suspend.c
+@@ -55,7 +55,7 @@ struct exynos_wkup_irq {
+ struct exynos_pm_data {
+ 	const struct exynos_wkup_irq *wkup_irq;
+ 	unsigned int wake_disable_mask;
+-	unsigned int *release_ret_regs;
++	const unsigned int *release_ret_regs;
+ 
+ 	void (*pm_prepare)(void);
+ 	void (*pm_resume_prepare)(void);
+@@ -93,7 +93,7 @@ static const struct exynos_wkup_irq exynos5250_wkup_irq[] = {
+ 	{ /* sentinel */ },
+ };
+ 
+-static unsigned int exynos_release_ret_regs[] = {
++static const unsigned int exynos_release_ret_regs[] = {
+ 	S5P_PAD_RET_MAUDIO_OPTION,
+ 	S5P_PAD_RET_GPIO_OPTION,
+ 	S5P_PAD_RET_UART_OPTION,
+@@ -104,7 +104,7 @@ static unsigned int exynos_release_ret_regs[] = {
+ 	REG_TABLE_END,
+ };
+ 
+-static unsigned int exynos3250_release_ret_regs[] = {
++static const unsigned int exynos3250_release_ret_regs[] = {
+ 	S5P_PAD_RET_MAUDIO_OPTION,
+ 	S5P_PAD_RET_GPIO_OPTION,
+ 	S5P_PAD_RET_UART_OPTION,
+@@ -117,7 +117,7 @@ static unsigned int exynos3250_release_ret_regs[] = {
+ 	REG_TABLE_END,
+ };
+ 
+-static unsigned int exynos5420_release_ret_regs[] = {
++static const unsigned int exynos5420_release_ret_regs[] = {
+ 	EXYNOS_PAD_RET_DRAM_OPTION,
+ 	EXYNOS_PAD_RET_MAUDIO_OPTION,
+ 	EXYNOS_PAD_RET_JTAG_OPTION,
 -- 
 2.7.4
