@@ -1,32 +1,31 @@
-From: zhongjiang@huawei.com (zhongjiang)
-Date: Sat, 10 Dec 2016 15:04:29 +0800
-Subject: [RFC PATCH] arm64: change from CONT_PMD_SHIFT to CONT_PTE_SHIFT
-Message-ID: <1481353469-38755-1-git-send-email-zhongjiang@huawei.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 10 Dec 2016 10:19:07 +0100
+Subject: [PATCH V1] pinctrl:pxa:pinctrl-pxa2xx:- No need of devm functions
+In-Reply-To: <1481207730-6332-1-git-send-email-arvind.yadav.cs@gmail.com>
+ (Arvind Yadav's message of "Thu, 8 Dec 2016 20:05:30 +0530")
+References: <1481207730-6332-1-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <87eg1g16r8.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: zhong jiang <zhongjiang@huawei.com>
+Arvind Yadav <arvind.yadav.cs@gmail.com> writes:
 
-I think that CONT_PTE_SHIFT is more reasonable even if they are some
-value. and the patch is not any functional change.
+Hi Arvind,
 
-Signed-off-by: zhong jiang <zhongjiang@huawei.com>
----
- arch/arm64/mm/hugetlbpage.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> In functions pxa2xx_build_functions, the memory allocated for
+> 'functions' is live within the function only. After the
+> allocation it is immediately freed with devm_kfree. There is
+> no need to allocate memory for 'functions' with devm function
+> so replace devm_kcalloc  with kcalloc and devm_kfree with kfree.
 
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 2e49bd2..0a4c97b 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -323,7 +323,7 @@ static __init int setup_hugepagesz(char *opt)
- static __init int add_default_hugepagesz(void)
- {
- 	if (size_to_hstate(CONT_PTES * PAGE_SIZE) == NULL)
--		hugetlb_add_hstate(CONT_PMD_SHIFT);
-+		hugetlb_add_hstate(CONT_PTE_SHIFT);
- 	return 0;
- }
- arch_initcall(add_default_hugepagesz);
--- 
-1.8.3.1
+That's not very true : the "need" is to spare the "manual" kfree you're adding
+in your patch for one, and make it consistent with pxa2xx_build_groups() and
+pxa2xx_build_state() for two.
+
+Therefore I'm not very thrilled by this patch and unless it fixes a defect in
+the driver I'd rather not have it in.
+
+Cheers.
+
+--
+Robert
