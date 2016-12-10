@@ -1,146 +1,87 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 10 Dec 2016 12:14:15 -0800
-Subject: [RFC PATCH 1/2] watchdog: imx2: fix hang-up on boot for i.MX21,
- i.MX27 and i.MX31 SoCs
-In-Reply-To: <CAM=E1R6hzob5ZzyTLmrLL5s-6=vbZQbCig1sLHMSLChJEz9YgA@mail.gmail.com>
-References: <1474850361-20884-1-git-send-email-vz@mleia.com>
- <1474850361-20884-2-git-send-email-vz@mleia.com>
- <ebece25b-7a3b-3fdf-d117-dd0a3a2975b7@roeck-us.net>
- <CAM=E1R6hzob5ZzyTLmrLL5s-6=vbZQbCig1sLHMSLChJEz9YgA@mail.gmail.com>
-Message-ID: <9e6a5422-4587-5e1d-0dd4-ca6d77f1baa9@roeck-us.net>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sat, 10 Dec 2016 21:47:05 +0100
+Subject: [RFC PATCH 0/7] KVM: arm/arm64: Optimize arch timer register handling
+Message-ID: <20161210204712.21830-1-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2016 11:28 AM, Magnus Lilja wrote:
-> Hi,
->
-> On 26 September 2016 at 15:02, Guenter Roeck <linux@roeck-us.net> wrote:
->> On 09/25/2016 05:39 PM, Vladimir Zapolskiy wrote:
->>>
->>> Power down counter enable/disable bit switch is located in WMCR
->>> register, but watchdog controllers found on legacy i.MX21, i.MX27 and
->>> i.MX31 SoCs don't have this register. As a result of writing data to
->>> the non-existing register on driver probe the SoC hangs up, to fix the
->>> problem add more OF compatible strings and on this basis get
->>> information about availability of the WMCR register.
->>>
->>> Fixes: 5fe65ce7ccbb ("watchdog: imx2_wdt: Disable power down counter on
->>> boot")
->>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
->>> ---
->>>  drivers/watchdog/imx2_wdt.c | 47
->>> +++++++++++++++++++++++++++++++++++++++++++--
->>>  1 file changed, 45 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
->>> index 62f346b..b6763e0 100644
->>> --- a/drivers/watchdog/imx2_wdt.c
->>> +++ b/drivers/watchdog/imx2_wdt.c
->>> @@ -29,6 +29,7 @@
->>>  #include <linux/module.h>
->>>  #include <linux/moduleparam.h>
->>>  #include <linux/of_address.h>
->>> +#include <linux/of_device.h>
->>>  #include <linux/platform_device.h>
->>>  #include <linux/regmap.h>
->>>  #include <linux/watchdog.h>
->>> @@ -57,6 +58,10 @@
->>>
->>>  #define WDOG_SEC_TO_COUNT(s)   ((s * 2 - 1) << 8)
->>>
->>> +struct imx2_wdt_data {
->>> +       bool has_pdc;
->>> +};
->>> +
->>>  struct imx2_wdt_device {
->>>         struct clk *clk;
->>>         struct regmap *regmap;
->>> @@ -64,6 +69,8 @@ struct imx2_wdt_device {
->>>         bool ext_reset;
->>>  };
->>>
->>> +static const struct of_device_id imx2_wdt_dt_ids[];
->>> +
->>>  static bool nowayout = WATCHDOG_NOWAYOUT;
->>>  module_param(nowayout, bool, 0);
->>>  MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started
->>> (default="
->>> @@ -200,10 +207,13 @@ static const struct regmap_config
->>> imx2_wdt_regmap_config = {
->>>
->>>  static int __init imx2_wdt_probe(struct platform_device *pdev)
->>>  {
->>> +       const struct of_device_id *of_id;
->>> +       const struct imx2_wdt_data *data;
->>>         struct imx2_wdt_device *wdev;
->>>         struct watchdog_device *wdog;
->>>         struct resource *res;
->>>         void __iomem *base;
->>> +       bool has_pdc;
->>>         int ret;
->>>         u32 val;
->>>
->>> @@ -261,12 +271,24 @@ static int __init imx2_wdt_probe(struct
->>> platform_device *pdev)
->>>                 set_bit(WDOG_HW_RUNNING, &wdog->status);
->>>         }
->>>
->>> +       if (pdev->dev.of_node) {
->>> +               of_id = of_match_device(imx2_wdt_dt_ids, &pdev->dev);
->>> +               if (!of_id)
->>> +                       return -ENODEV;
->>> +
->>> +               data = of_id->data;
->>> +               has_pdc = data->has_pdc;
->>> +       } else {
->>> +               has_pdc = false;
->>> +       }
->>> +
->>>         /*
->>>          * Disable the watchdog power down counter at boot. Otherwise the
->>> power
->>>          * down counter will pull down the #WDOG interrupt line for one
->>> clock
->>>          * cycle.
->>>          */
->>> -       regmap_write(wdev->regmap, IMX2_WDT_WMCR, 0);
->>> +       if (has_pdc)
->>> +               regmap_write(wdev->regmap, IMX2_WDT_WMCR, 0);
->>>
->>>         ret = watchdog_register_device(wdog);
->>>         if (ret) {
->>> @@ -363,8 +385,29 @@ static int imx2_wdt_resume(struct device *dev)
->>>  static SIMPLE_DEV_PM_OPS(imx2_wdt_pm_ops, imx2_wdt_suspend,
->>>                          imx2_wdt_resume);
->>>
->>> +static const struct imx2_wdt_data imx21_wdt_data = {
->>> +       .has_pdc = false,
->>> +};
->>> +
->>> +static const struct imx2_wdt_data imx25_wdt_data = {
->>> +       .has_pdc = true,
->>> +};
->>> +
->>>  static const struct of_device_id imx2_wdt_dt_ids[] = {
->>> -       { .compatible = "fsl,imx21-wdt", },
->>> +       { .compatible = "fsl,imx21-wdt",  .data = &imx21_wdt_data },
->>
->>
->> Please just specify the flag directly, as in
->>                                         .data = (void *) true
->> or, if you prefer, use defines.
->>                                         .data = (void *) IMX_SUPPORTS_PDC
->>
->> Then, in above code:
->>                 has_pdc = (bool) of_id->data;
->>
->> Guenter
->
-> Has this patch (or an updated one) been merged in any tree? I've
-> tested it on a i.MX31 board with positive result.
->
+We currently spend around ~400 cycles on each entry/exit to the guest
+dealing with arch timer registers, even when the timer is not pending
+and not doing anything.
 
-I had asked for a change, and I don't recall seeing v2. So, at least as far
-as I know, the answer is no.
+We can do much better by moving the arch timer save/restore to the
+vcpu_load and vcpu_put functions, but this means that if we don't read
+back the timer state on every exit from the guest, then we have to be
+able to start taking timer interrupts for the virtual timer in KVM and
+handle that properly.
 
-Guenter
+That has a number of funny consequences, such as having to make sure we
+don't deadlock between any of the vgic code and interrupt injection
+happening from an ISR.  On the plus side, being able to inject
+virtual interrupts corresponding to a physical interrupt directly from
+an ISR is probably a good system design change.
+
+We also have to change the use of the physical vs. virtual counter in
+the arm64 kernel to avoid having to save/restore the CNTVOFF_EL2
+register on every return to the hypervisor.  The only reason I could
+find for using the virtual counter for the kernel on systems with access
+to the physical counter is to detect if firmware did not properly clear
+CNTVOFF_EL2, and this change has to weighed against the existing check
+(assuming I got this right).
+
+On a non-VHE system (AMD Seattle) I have measured this to improve the
+world-switch time by about ~100 cycles, but on an EL2 kernel (emulating
+VHE behavior on the same hardware) this gives us around ~250 cycles
+worth of improvement, because we can avoid the extra configuration of
+trapping accesses to the physical timer from EL1 on every switch.
+
+I'm not sure if the benefits outweigh the complexity of this patch set,
+nor am I sure if I'm missing an overall better approach, hence the RFC
+tag on the series.
+
+I'm looking forward to overall comments on the approach.
+
+These patches are based on arm64/for-next/core as of a few days ago with
+Jintacks CNTHCTL_EL2 patch on top, because they give us has_vhe() in the
+hyp code using static keys.
+
+Code is also available here:
+git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git timer-optimize-rfc
+
+Thanks,
+  Christoffer
+
+Christoffer Dall (7):
+  arm64: Use physical counter for in-kernel reads
+  KVM: arm/arm64: Move kvm_vgic_flush_hwstate under disabled irq
+  KVM: arm/arm64: Support calling vgic_update_irq_pending from irq
+    context
+  KVM: arm/arm64: Check that system supports split eoi/deactivate
+  KVM: arm/arm64: Move timer save/restore out of hyp code where possible
+  KVM: arm/arm64: Remove unnecessary timer BUG_ON operations
+  KVM: arm/arm64: Guard kvm_vgic_map_is_active against !vgic_initialized
+
+ arch/arm/include/asm/kvm_asm.h       |   2 +
+ arch/arm/include/asm/kvm_hyp.h       |   4 +-
+ arch/arm/kvm/arm.c                   |  17 ++-
+ arch/arm/kvm/hyp/switch.c            |   5 +-
+ arch/arm64/include/asm/arch_timer.h  |   6 +-
+ arch/arm64/include/asm/kvm_asm.h     |   2 +
+ arch/arm64/include/asm/kvm_hyp.h     |   4 +-
+ arch/arm64/kvm/hyp/switch.c          |   4 +-
+ drivers/clocksource/arm_arch_timer.c |   2 +-
+ include/kvm/arm_arch_timer.h         |   7 +-
+ virt/kvm/arm/arch_timer.c            | 222 ++++++++++++++++++++++++-----------
+ virt/kvm/arm/hyp/timer-sr.c          |  32 ++---
+ virt/kvm/arm/vgic/vgic-its.c         |  17 +--
+ virt/kvm/arm/vgic/vgic-mmio-v2.c     |  22 ++--
+ virt/kvm/arm/vgic/vgic-mmio-v3.c     |  10 +-
+ virt/kvm/arm/vgic/vgic-mmio.c        |  38 +++---
+ virt/kvm/arm/vgic/vgic-v2.c          |   5 +-
+ virt/kvm/arm/vgic/vgic-v3.c          |   5 +-
+ virt/kvm/arm/vgic/vgic.c             |  59 ++++++----
+ virt/kvm/arm/vgic/vgic.h             |   3 +-
+ 20 files changed, 292 insertions(+), 174 deletions(-)
+
+-- 
+2.9.0
