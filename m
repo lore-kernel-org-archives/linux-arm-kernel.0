@@ -1,701 +1,566 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 10 Dec 2016 21:47:08 +0100
-Subject: [RFC PATCH 3/7] KVM: arm/arm64: Support calling
- vgic_update_irq_pending from irq context
+Date: Sat, 10 Dec 2016 21:47:10 +0100
+Subject: [RFC PATCH 5/7] KVM: arm/arm64: Move timer save/restore out of hyp
+ code where possible
 In-Reply-To: <20161210204712.21830-1-christoffer.dall@linaro.org>
 References: <20161210204712.21830-1-christoffer.dall@linaro.org>
-Message-ID: <20161210204712.21830-4-christoffer.dall@linaro.org>
+Message-ID: <20161210204712.21830-6-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are about to optimize our timer handling logic which involves
-injecting irqs to the vgic directly from the irq handler.
+We can access the virtual timer registers from EL1 so there's no need to
+do this from the hyp path.  This gives us some advantages in being able to
+optimize our handling of timer registers.
 
-Unfortunately, the injection path can take any AP list lock and irq lock
-and we must therefore make sure to use spin_lock_irqsave whereever
-interrupts are enabled and we are taking any of those locks, to avoid
-deadlocking between process context and the ISR.
+We don't adjust the cntvoff during vcpu execution so we add a hyp hook
+to be able to call into hyp mode for setting the cntvoff whenever we
+load/put the timer, but we don't have to touch this register on every
+entry/exit to the VM.
 
-This changes a lot of the VGIC code, but The good news are that the
-changes are mostly mechanichal.
+On VHE systems we also don't need to enable and disable physical counter
+access traps on every trip to the VM, we can just do that when we load a
+VCPU and put a VCPU.
+
+Therefore we factor out the trap configuration from the save/restore of
+the virtual timer state, which is moved to the main arch timer file and
+use static keys to avoid touching the trap configuration registers on
+VHE systems.
+
+We can now leave the timer running on exiting the guest, and handle
+interrupts from the vtimer directly and inject the interrupt as a
+virtual interrupt to the GIC directly from the ISR.  An added benefit is
+that we no longer have to actively write the active state to the
+physical distributor, because we set the affinity of the vtimer
+interrupt when loading the timer state, so that the interrupt
+automatically stays active after firing.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-its.c     | 17 +++++++-----
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 22 +++++++++-------
- virt/kvm/arm/vgic/vgic-mmio-v3.c | 10 ++++---
- virt/kvm/arm/vgic/vgic-mmio.c    | 38 ++++++++++++++++-----------
- virt/kvm/arm/vgic/vgic-v2.c      |  5 ++--
- virt/kvm/arm/vgic/vgic-v3.c      |  5 ++--
- virt/kvm/arm/vgic/vgic.c         | 56 +++++++++++++++++++++++++---------------
- virt/kvm/arm/vgic/vgic.h         |  3 ++-
- 8 files changed, 95 insertions(+), 61 deletions(-)
+ arch/arm/include/asm/kvm_asm.h   |   2 +
+ arch/arm/include/asm/kvm_hyp.h   |   4 +-
+ arch/arm/kvm/arm.c               |  12 ++-
+ arch/arm/kvm/hyp/switch.c        |   5 +-
+ arch/arm64/include/asm/kvm_asm.h |   2 +
+ arch/arm64/include/asm/kvm_hyp.h |   4 +-
+ arch/arm64/kvm/hyp/switch.c      |   4 +-
+ include/kvm/arm_arch_timer.h     |   7 +-
+ virt/kvm/arm/arch_timer.c        | 190 +++++++++++++++++++++++++--------------
+ virt/kvm/arm/hyp/timer-sr.c      |  32 ++-----
+ 10 files changed, 156 insertions(+), 106 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 8c2b3cd..140ee78 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -207,6 +207,7 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
- 	u64 propbase = PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
- 	u8 prop;
- 	int ret;
-+	unsigned long flags;
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 8ef0538..1eabfe2 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -68,6 +68,8 @@ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+ extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+ extern void __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu);
  
- 	ret = kvm_read_guest(kvm, propbase + irq->intid - GIC_LPI_OFFSET,
- 			     &prop, 1);
-@@ -214,15 +215,15 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
- 	if (ret)
- 		return ret;
- 
--	spin_lock(&irq->irq_lock);
-+	spin_lock_irqsave(&irq->irq_lock, flags);
- 
- 	if (!filter_vcpu || filter_vcpu == irq->target_vcpu) {
- 		irq->priority = LPI_PROP_PRIORITY(prop);
- 		irq->enabled = LPI_PROP_ENABLE_BIT(prop);
- 
--		vgic_queue_irq_unlock(kvm, irq);
-+		vgic_queue_irq_unlock(kvm, irq, flags);
- 	} else {
--		spin_unlock(&irq->irq_lock);
-+		spin_unlock_irqrestore(&irq->irq_lock, flags);
- 	}
- 
- 	return 0;
-@@ -322,6 +323,7 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
- 	int ret = 0;
- 	u32 *intids;
- 	int nr_irqs, i;
-+	unsigned long flags;
- 
- 	nr_irqs = vgic_copy_lpi_list(vcpu->kvm, &intids);
- 	if (nr_irqs < 0)
-@@ -349,9 +351,9 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
- 		}
- 
- 		irq = vgic_get_irq(vcpu->kvm, NULL, intids[i]);
--		spin_lock(&irq->irq_lock);
-+		spin_lock_irqsave(&irq->irq_lock, flags);
- 		irq->pending = pendmask & (1U << bit_nr);
--		vgic_queue_irq_unlock(vcpu->kvm, irq);
-+		vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
- 
-@@ -449,6 +451,7 @@ static int vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
- {
- 	struct kvm_vcpu *vcpu;
- 	struct its_itte *itte;
-+	unsigned long flags;
- 
- 	if (!its->enabled)
- 		return -EBUSY;
-@@ -464,9 +467,9 @@ static int vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
- 	if (!vcpu->arch.vgic_cpu.lpis_enabled)
- 		return -EBUSY;
- 
--	spin_lock(&itte->irq->irq_lock);
-+	spin_lock_irqsave(&itte->irq->irq_lock, flags);
- 	itte->irq->pending = true;
--	vgic_queue_irq_unlock(kvm, itte->irq);
-+	vgic_queue_irq_unlock(kvm, itte->irq, flags);
- 
- 	return 0;
- }
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index b44b359..f08d3e6 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -74,6 +74,7 @@ static void vgic_mmio_write_sgir(struct kvm_vcpu *source_vcpu,
- 	int mode = (val >> 24) & 0x03;
- 	int c;
- 	struct kvm_vcpu *vcpu;
-+	unsigned long flags;
- 
- 	switch (mode) {
- 	case 0x0:		/* as specified by targets */
-@@ -97,11 +98,11 @@ static void vgic_mmio_write_sgir(struct kvm_vcpu *source_vcpu,
- 
- 		irq = vgic_get_irq(source_vcpu->kvm, vcpu, intid);
- 
--		spin_lock(&irq->irq_lock);
-+		spin_lock_irqsave(&irq->irq_lock, flags);
- 		irq->pending = true;
- 		irq->source |= 1U << source_vcpu->vcpu_id;
- 
--		vgic_queue_irq_unlock(source_vcpu->kvm, irq);
-+		vgic_queue_irq_unlock(source_vcpu->kvm, irq, flags);
- 		vgic_put_irq(source_vcpu->kvm, irq);
- 	}
- }
-@@ -130,6 +131,7 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
- {
- 	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
- 	int i;
-+	unsigned long flags;
- 
- 	/* GICD_ITARGETSR[0-7] are read-only */
- 	if (intid < VGIC_NR_PRIVATE_IRQS)
-@@ -139,13 +141,13 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
- 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid + i);
- 		int target;
- 
--		spin_lock(&irq->irq_lock);
-+		spin_lock_irqsave(&irq->irq_lock, flags);
- 
- 		irq->targets = (val >> (i * 8)) & 0xff;
- 		target = irq->targets ? __ffs(irq->targets) : 0;
- 		irq->target_vcpu = kvm_get_vcpu(vcpu->kvm, target);
- 
--		spin_unlock(&irq->irq_lock);
-+		spin_unlock_irqrestore(&irq->irq_lock, flags);
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
- }
-@@ -173,17 +175,18 @@ static void vgic_mmio_write_sgipendc(struct kvm_vcpu *vcpu,
- {
- 	u32 intid = addr & 0x0f;
- 	int i;
-+	unsigned long flags;
- 
- 	for (i = 0; i < len; i++) {
- 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
- 
--		spin_lock(&irq->irq_lock);
-+		spin_lock_irqsave(&irq->irq_lock, flags);
- 
- 		irq->source &= ~((val >> (i * 8)) & 0xff);
- 		if (!irq->source)
- 			irq->pending = false;
- 
--		spin_unlock(&irq->irq_lock);
-+		spin_unlock_irqrestore(&irq->irq_lock, flags);
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
- }
-@@ -194,19 +197,20 @@ static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
- {
- 	u32 intid = addr & 0x0f;
- 	int i;
-+	unsigned long flags;
- 
- 	for (i = 0; i < len; i++) {
- 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
- 
--		spin_lock(&irq->irq_lock);
-+		spin_lock_irqsave(&irq->irq_lock, flags);
- 
- 		irq->source |= (val >> (i * 8)) & 0xff;
- 
- 		if (irq->source) {
- 			irq->pending = true;
--			vgic_queue_irq_unlock(vcpu->kvm, irq);
-+			vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
- 		} else {
--			spin_unlock(&irq->irq_lock);
-+			spin_unlock_irqrestore(&irq->irq_lock, flags);
- 		}
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index 50f42f0..b1c2676 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -127,6 +127,7 @@ static void vgic_mmio_write_irouter(struct kvm_vcpu *vcpu,
- {
- 	int intid = VGIC_ADDR_TO_INTID(addr, 64);
- 	struct vgic_irq *irq;
-+	unsigned long flags;
- 
- 	/* The upper word is WI for us since we don't implement Aff3. */
- 	if (addr & 4)
-@@ -137,13 +138,13 @@ static void vgic_mmio_write_irouter(struct kvm_vcpu *vcpu,
- 	if (!irq)
- 		return;
- 
--	spin_lock(&irq->irq_lock);
-+	spin_lock_irqsave(&irq->irq_lock, flags);
- 
- 	/* We only care about and preserve Aff0, Aff1 and Aff2. */
- 	irq->mpidr = val & GENMASK(23, 0);
- 	irq->target_vcpu = kvm_mpidr_to_vcpu(vcpu->kvm, irq->mpidr);
- 
--	spin_unlock(&irq->irq_lock);
-+	spin_unlock_irqrestore(&irq->irq_lock, flags);
- 	vgic_put_irq(vcpu->kvm, irq);
- }
- 
-@@ -607,6 +608,7 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
- 	int sgi, c;
- 	int vcpu_id = vcpu->vcpu_id;
- 	bool broadcast;
-+	unsigned long flags;
- 
- 	sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
- 	broadcast = reg & BIT_ULL(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
-@@ -645,10 +647,10 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
- 
- 		irq = vgic_get_irq(vcpu->kvm, c_vcpu, sgi);
- 
--		spin_lock(&irq->irq_lock);
-+		spin_lock_irqsave(&irq->irq_lock, flags);
- 		irq->pending = true;
- 
--		vgic_queue_irq_unlock(vcpu->kvm, irq);
-+		vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
- }
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index ebe1b9f..a7b7dc5 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -69,13 +69,14 @@ void vgic_mmio_write_senable(struct kvm_vcpu *vcpu,
- {
- 	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
- 	int i;
-+	unsigned long flags;
- 
- 	for_each_set_bit(i, &val, len * 8) {
- 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
- 
--		spin_lock(&irq->irq_lock);
-+		spin_lock_irqsave(&irq->irq_lock, flags);
- 		irq->enabled = true;
--		vgic_queue_irq_unlock(vcpu->kvm, irq);
-+		vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
- 
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
-@@ -87,15 +88,16 @@ void vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
- {
- 	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
- 	int i;
-+	unsigned long flags;
- 
- 	for_each_set_bit(i, &val, len * 8) {
- 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
- 
--		spin_lock(&irq->irq_lock);
-+		spin_lock_irqsave(&irq->irq_lock, flags);
- 
- 		irq->enabled = false;
- 
--		spin_unlock(&irq->irq_lock);
-+		spin_unlock_irqrestore(&irq->irq_lock, flags);
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
- }
-@@ -126,16 +128,17 @@ void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
- {
- 	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
- 	int i;
-+	unsigned long flags;
- 
- 	for_each_set_bit(i, &val, len * 8) {
- 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
- 
--		spin_lock(&irq->irq_lock);
-+		spin_lock_irqsave(&irq->irq_lock, flags);
- 		irq->pending = true;
- 		if (irq->config == VGIC_CONFIG_LEVEL)
- 			irq->soft_pending = true;
- 
--		vgic_queue_irq_unlock(vcpu->kvm, irq);
-+		vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
- }
-@@ -146,11 +149,12 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
- {
- 	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
- 	int i;
-+	unsigned long flags;
- 
- 	for_each_set_bit(i, &val, len * 8) {
- 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
- 
--		spin_lock(&irq->irq_lock);
-+		spin_lock_irqsave(&irq->irq_lock, flags);
- 
- 		if (irq->config == VGIC_CONFIG_LEVEL) {
- 			irq->soft_pending = false;
-@@ -159,7 +163,7 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
- 			irq->pending = false;
- 		}
- 
--		spin_unlock(&irq->irq_lock);
-+		spin_unlock_irqrestore(&irq->irq_lock, flags);
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
- }
-@@ -187,7 +191,9 @@ unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
- static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
- 				    bool new_active_state)
- {
--	spin_lock(&irq->irq_lock);
-+	unsigned long flags;
++extern void __kvm_timer_set_cntvoff(u32 cntvoff_low, u32 cntvoff_high);
 +
-+	spin_lock_irqsave(&irq->irq_lock, flags);
+ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+ 
+ extern void __init_stage2_translation(void);
+diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
+index 5850890..92db213 100644
+--- a/arch/arm/include/asm/kvm_hyp.h
++++ b/arch/arm/include/asm/kvm_hyp.h
+@@ -98,8 +98,8 @@
+ #define cntvoff_el2			CNTVOFF
+ #define cnthctl_el2			CNTHCTL
+ 
+-void __timer_save_state(struct kvm_vcpu *vcpu);
+-void __timer_restore_state(struct kvm_vcpu *vcpu);
++void __timer_enable_traps(struct kvm_vcpu *vcpu);
++void __timer_disable_traps(struct kvm_vcpu *vcpu);
+ 
+ void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
+ void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 6591af7..582e2f7 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -347,10 +347,13 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+ 	vcpu->arch.host_cpu_context = this_cpu_ptr(kvm_host_cpu_state);
+ 
+ 	kvm_arm_set_running_vcpu(vcpu);
++	kvm_timer_vcpu_load(vcpu);
+ }
+ 
+ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+ {
++	kvm_timer_vcpu_put(vcpu);
++
  	/*
- 	 * If this virtual IRQ was written into a list register, we
- 	 * have to make sure the CPU that runs the VCPU thread has
-@@ -207,9 +213,9 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+ 	 * The arch-generic KVM code expects the cpu field of a vcpu to be -1
+ 	 * if the vcpu is no longer assigned to a cpu.  This is used for the
+@@ -359,7 +362,6 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+ 	vcpu->cpu = -1;
  
- 	irq->active = new_active_state;
- 	if (new_active_state)
--		vgic_queue_irq_unlock(vcpu->kvm, irq);
-+		vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
- 	else
--		spin_unlock(&irq->irq_lock);
-+		spin_unlock_irqrestore(&irq->irq_lock, flags);
+ 	kvm_arm_set_running_vcpu(NULL);
+-	kvm_timer_vcpu_put(vcpu);
  }
  
- /*
-@@ -305,14 +311,15 @@ void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
- {
- 	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
- 	int i;
-+	unsigned long flags;
- 
- 	for (i = 0; i < len; i++) {
- 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
- 
--		spin_lock(&irq->irq_lock);
-+		spin_lock_irqsave(&irq->irq_lock, flags);
- 		/* Narrow the priority range to what we actually support */
- 		irq->priority = (val >> (i * 8)) & GENMASK(7, 8 - VGIC_PRI_BITS);
--		spin_unlock(&irq->irq_lock);
-+		spin_unlock_irqrestore(&irq->irq_lock, flags);
- 
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
-@@ -343,6 +350,7 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
- {
- 	u32 intid = VGIC_ADDR_TO_INTID(addr, 2);
- 	int i;
-+	unsigned long flags;
- 
- 	for (i = 0; i < len * 4; i++) {
- 		struct vgic_irq *irq;
-@@ -357,7 +365,7 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+ int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
+@@ -645,7 +647,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 			vcpu->arch.power_off || vcpu->arch.pause) {
+ 			local_irq_enable();
+ 			kvm_pmu_sync_hwstate(vcpu);
+-			kvm_timer_sync_hwstate(vcpu);
+ 			kvm_vgic_sync_hwstate(vcpu);
+ 			preempt_enable();
  			continue;
+@@ -671,6 +672,12 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		kvm_arm_clear_debug(vcpu);
  
- 		irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
--		spin_lock(&irq->irq_lock);
-+		spin_lock_irqsave(&irq->irq_lock, flags);
- 
- 		if (test_bit(i * 2 + 1, &val)) {
- 			irq->config = VGIC_CONFIG_EDGE;
-@@ -366,7 +374,7 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
- 			irq->pending = irq->line_level | irq->soft_pending;
- 		}
- 
--		spin_unlock(&irq->irq_lock);
-+		spin_unlock_irqrestore(&irq->irq_lock, flags);
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
- }
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 0a063af..95cbc9f 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -86,6 +86,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
- 	int lr;
-+	unsigned long flags;
- 
- 	for (lr = 0; lr < vcpu->arch.vgic_cpu.used_lrs; lr++) {
- 		u32 val = cpuif->vgic_lr[lr];
-@@ -94,7 +95,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
- 
- 		irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
- 
--		spin_lock(&irq->irq_lock);
-+		spin_lock_irqsave(&irq->irq_lock, flags);
- 
- 		/* Always preserve the active bit */
- 		irq->active = !!(val & GICH_LR_ACTIVE_BIT);
-@@ -123,7 +124,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
- 			irq->pending = irq->line_level || irq->soft_pending;
- 		}
- 
--		spin_unlock(&irq->irq_lock);
-+		spin_unlock_irqrestore(&irq->irq_lock, flags);
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
- }
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 9f0dae3..9edeffd 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -70,6 +70,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
- 	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
- 	u32 model = vcpu->kvm->arch.vgic.vgic_model;
- 	int lr;
-+	unsigned long flags;
- 
- 	for (lr = 0; lr < vcpu->arch.vgic_cpu.used_lrs; lr++) {
- 		u64 val = cpuif->vgic_lr[lr];
-@@ -84,7 +85,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
- 		if (!irq)	/* An LPI could have been unmapped. */
- 			continue;
- 
--		spin_lock(&irq->irq_lock);
-+		spin_lock_irqsave(&irq->irq_lock, flags);
- 
- 		/* Always preserve the active bit */
- 		irq->active = !!(val & ICH_LR_ACTIVE_BIT);
-@@ -114,7 +115,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
- 			irq->pending = irq->line_level || irq->soft_pending;
- 		}
- 
--		spin_unlock(&irq->irq_lock);
-+		spin_unlock_irqrestore(&irq->irq_lock, flags);
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
- }
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 6440b56..67d231d 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -50,6 +50,10 @@ struct vgic_global __section(.hyp.text) kvm_vgic_global_state = {.gicv3_cpuif =
-  *   vcpuX->vcpu_id < vcpuY->vcpu_id:
-  *     spin_lock(vcpuX->arch.vgic_cpu.ap_list_lock);
-  *     spin_lock(vcpuY->arch.vgic_cpu.ap_list_lock);
-+ *
-+ * Since the VGIC must support injecting virtual interrupts from ISRs, we have
-+ * to use the spin_lock_irqsave/spin_unlock_irqrestore versions of outer
-+ * spinlocks for any lock that may be taken while injecting an interrupt.
-  */
- 
- /*
-@@ -254,7 +258,8 @@ static bool vgic_validate_injection(struct vgic_irq *irq, bool level)
-  * Needs to be entered with the IRQ lock already held, but will return
-  * with all locks dropped.
-  */
--bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq)
-+bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq,
-+			   unsigned long flags)
- {
- 	struct kvm_vcpu *vcpu;
- 
-@@ -272,7 +277,7 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq)
- 		 * not need to be inserted into an ap_list and there is also
- 		 * no more work for us to do.
+ 		/*
++		 * Sync timer state before enabling interrupts as the sync
++		 * must not collide with a timer interrupt.
++		 */
++		kvm_timer_sync_hwstate(vcpu);
++
++		/*
+ 		 * We may have taken a host interrupt in HYP mode (ie
+ 		 * while executing the guest). This interrupt is still
+ 		 * pending, as we haven't serviced it yet!
+@@ -699,7 +706,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 * interrupt line.
  		 */
--		spin_unlock(&irq->irq_lock);
-+		spin_unlock_irqrestore(&irq->irq_lock, flags);
+ 		kvm_pmu_sync_hwstate(vcpu);
+-		kvm_timer_sync_hwstate(vcpu);
  
- 		/*
- 		 * We have to kick the VCPU here, because we could be
-@@ -292,11 +297,11 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq)
- 	 * We must unlock the irq lock to take the ap_list_lock where
- 	 * we are going to insert this new pending interrupt.
- 	 */
--	spin_unlock(&irq->irq_lock);
-+	spin_unlock_irqrestore(&irq->irq_lock, flags);
+ 		kvm_vgic_sync_hwstate(vcpu);
  
- 	/* someone can do stuff here, which we re-check below */
+diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+index 92678b7..f4f3ebf 100644
+--- a/arch/arm/kvm/hyp/switch.c
++++ b/arch/arm/kvm/hyp/switch.c
+@@ -172,7 +172,7 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 	__activate_vm(vcpu);
  
--	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
-+	spin_lock_irqsave(&vcpu->arch.vgic_cpu.ap_list_lock, flags);
- 	spin_lock(&irq->irq_lock);
+ 	__vgic_restore_state(vcpu);
+-	__timer_restore_state(vcpu);
++	__timer_enable_traps(vcpu);
+ 
+ 	__sysreg_restore_state(guest_ctxt);
+ 	__banked_restore_state(guest_ctxt);
+@@ -189,7 +189,8 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 
+ 	__banked_save_state(guest_ctxt);
+ 	__sysreg_save_state(guest_ctxt);
+-	__timer_save_state(vcpu);
++	__timer_disable_traps(vcpu);
++
+ 	__vgic_save_state(vcpu);
+ 
+ 	__deactivate_traps(vcpu);
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index ec3553eb..5daf476 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -56,6 +56,8 @@ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+ extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+ extern void __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu);
+ 
++extern void __kvm_timer_set_cntvoff(u32 cntvoff_low, u32 cntvoff_high);
++
+ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+ 
+ extern u64 __vgic_v3_get_ich_vtr_el2(void);
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index b18e852..7bbc717 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -128,8 +128,8 @@ int __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu);
+ void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+ void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+ 
+-void __timer_save_state(struct kvm_vcpu *vcpu);
+-void __timer_restore_state(struct kvm_vcpu *vcpu);
++void __timer_enable_traps(struct kvm_vcpu *vcpu);
++void __timer_disable_traps(struct kvm_vcpu *vcpu);
+ 
+ void __sysreg_save_host_state(struct kvm_cpu_context *ctxt);
+ void __sysreg_restore_host_state(struct kvm_cpu_context *ctxt);
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 8bcae7b..db920a34 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -281,7 +281,7 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 	__activate_vm(vcpu);
+ 
+ 	__vgic_restore_state(vcpu);
+-	__timer_restore_state(vcpu);
++	__timer_enable_traps(vcpu);
  
  	/*
-@@ -313,9 +318,9 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq)
+ 	 * We must restore the 32-bit state before the sysregs, thanks
+@@ -337,7 +337,7 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
  
- 	if (unlikely(irq->vcpu || vcpu != vgic_target_oracle(irq))) {
- 		spin_unlock(&irq->irq_lock);
--		spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
-+		spin_unlock_irqrestore(&vcpu->arch.vgic_cpu.ap_list_lock, flags);
+ 	__sysreg_save_guest_state(guest_ctxt);
+ 	__sysreg32_save_state(vcpu);
+-	__timer_save_state(vcpu);
++	__timer_disable_traps(vcpu);
+ 	__vgic_save_state(vcpu);
  
--		spin_lock(&irq->irq_lock);
-+		spin_lock_irqsave(&irq->irq_lock, flags);
- 		goto retry;
- 	}
+ 	__deactivate_traps(vcpu);
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index 2d54903..3e518a6 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -50,11 +50,12 @@ struct arch_timer_cpu {
+ 	/* Timer IRQ */
+ 	struct kvm_irq_level		irq;
  
-@@ -328,7 +333,7 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq)
- 	irq->vcpu = vcpu;
+-	/* Active IRQ state caching */
+-	bool				active_cleared_last;
  
- 	spin_unlock(&irq->irq_lock);
--	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
-+	spin_unlock_irqrestore(&vcpu->arch.vgic_cpu.ap_list_lock, flags);
+ 	/* Is the timer enabled */
+ 	bool			enabled;
++
++	/* Is the timer state loaded on the hardware timer */
++	bool			loaded;
+ };
  
- 	kvm_vcpu_kick(vcpu);
+ int kvm_timer_hyp_init(void);
+@@ -74,7 +75,9 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu);
+ void kvm_timer_schedule(struct kvm_vcpu *vcpu);
+ void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
  
-@@ -341,6 +346,7 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
++void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu);
+ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
+ 
+ void kvm_timer_init_vhe(void);
++
+ #endif
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index f27a086..beede1b 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -35,10 +35,8 @@ static struct timecounter *timecounter;
+ static unsigned int host_vtimer_irq;
+ static u32 host_vtimer_irq_flags;
+ 
+-void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
+-{
+-	vcpu->arch.timer_cpu.active_cleared_last = false;
+-}
++static bool kvm_timer_irq_can_fire(struct kvm_vcpu *vcpu);
++static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level);
+ 
+ static cycle_t kvm_phys_timer_read(void)
  {
- 	struct kvm_vcpu *vcpu;
- 	struct vgic_irq *irq;
-+	unsigned long flags;
- 	int ret;
- 
- 	trace_vgic_update_irq_pending(cpuid, intid, level);
-@@ -362,11 +368,11 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
- 		return -EINVAL;
- 	}
- 
--	spin_lock(&irq->irq_lock);
-+	spin_lock_irqsave(&irq->irq_lock, flags);
- 
- 	if (!vgic_validate_injection(irq, level)) {
- 		/* Nothing to see here, move along... */
--		spin_unlock(&irq->irq_lock);
-+		spin_unlock_irqrestore(&irq->irq_lock, flags);
- 		vgic_put_irq(kvm, irq);
- 		return 0;
- 	}
-@@ -378,7 +384,7 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
- 		irq->pending = true;
- 	}
- 
--	vgic_queue_irq_unlock(kvm, irq);
-+	vgic_queue_irq_unlock(kvm, irq, flags);
- 	vgic_put_irq(kvm, irq);
- 
- 	return 0;
-@@ -413,15 +419,16 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq)
+@@ -70,14 +68,14 @@ static void timer_disarm(struct arch_timer_cpu *timer)
+ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
  {
- 	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
-+	unsigned long flags;
+ 	struct kvm_vcpu *vcpu = *(struct kvm_vcpu **)dev_id;
++	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
++
++	if (!timer->irq.level) {
++		timer->cntv_ctl = read_sysreg_el0(cntv_ctl);
++		if (kvm_timer_irq_can_fire(vcpu))
++			kvm_timer_update_irq(vcpu, true);
++	}
  
- 	BUG_ON(!irq);
- 
--	spin_lock(&irq->irq_lock);
-+	spin_lock_irqsave(&irq->irq_lock, flags);
- 
- 	irq->hw = true;
- 	irq->hwintid = phys_irq;
- 
--	spin_unlock(&irq->irq_lock);
-+	spin_unlock_irqrestore(&irq->irq_lock, flags);
- 	vgic_put_irq(vcpu->kvm, irq);
- 
- 	return 0;
-@@ -430,6 +437,7 @@ int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq)
- int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
- {
- 	struct vgic_irq *irq;
-+	unsigned long flags;
- 
- 	if (!vgic_initialized(vcpu->kvm))
- 		return -EAGAIN;
-@@ -437,12 +445,12 @@ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
- 	irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
- 	BUG_ON(!irq);
- 
--	spin_lock(&irq->irq_lock);
-+	spin_lock_irqsave(&irq->irq_lock, flags);
- 
- 	irq->hw = false;
- 	irq->hwintid = 0;
- 
--	spin_unlock(&irq->irq_lock);
-+	spin_unlock_irqrestore(&irq->irq_lock, flags);
- 	vgic_put_irq(vcpu->kvm, irq);
- 
- 	return 0;
-@@ -460,9 +468,10 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 	struct vgic_irq *irq, *tmp;
-+	unsigned long flags;
- 
- retry:
--	spin_lock(&vgic_cpu->ap_list_lock);
-+	spin_lock_irqsave(&vgic_cpu->ap_list_lock, flags);
- 
- 	list_for_each_entry_safe(irq, tmp, &vgic_cpu->ap_list_head, ap_list) {
- 		struct kvm_vcpu *target_vcpu, *vcpuA, *vcpuB;
-@@ -502,7 +511,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
- 		/* This interrupt looks like it has to be migrated. */
- 
- 		spin_unlock(&irq->irq_lock);
--		spin_unlock(&vgic_cpu->ap_list_lock);
-+		spin_unlock_irqrestore(&vgic_cpu->ap_list_lock, flags);
- 
- 		/*
- 		 * Ensure locking order by always locking the smallest
-@@ -516,7 +525,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
- 			vcpuB = vcpu;
- 		}
- 
--		spin_lock(&vcpuA->arch.vgic_cpu.ap_list_lock);
-+		spin_lock_irqsave(&vcpuA->arch.vgic_cpu.ap_list_lock, flags);
- 		spin_lock_nested(&vcpuB->arch.vgic_cpu.ap_list_lock,
- 				 SINGLE_DEPTH_NESTING);
- 		spin_lock(&irq->irq_lock);
-@@ -540,11 +549,11 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
- 
- 		spin_unlock(&irq->irq_lock);
- 		spin_unlock(&vcpuB->arch.vgic_cpu.ap_list_lock);
--		spin_unlock(&vcpuA->arch.vgic_cpu.ap_list_lock);
-+		spin_unlock_irqrestore(&vcpuA->arch.vgic_cpu.ap_list_lock, flags);
- 		goto retry;
- 	}
- 
--	spin_unlock(&vgic_cpu->ap_list_lock);
-+	spin_unlock_irqrestore(&vgic_cpu->ap_list_lock, flags);
+-	/*
+-	 * We disable the timer in the world switch and let it be
+-	 * handled by kvm_timer_sync_hwstate(). Getting a timer
+-	 * interrupt at this point is a sure sign of some major
+-	 * breakage.
+-	 */
+-	pr_warn("Unexpected interrupt %d on vcpu %p\n", irq, vcpu);
+ 	return IRQ_HANDLED;
  }
  
- static inline void vgic_process_maintenance_interrupt(struct kvm_vcpu *vcpu)
-@@ -671,6 +680,8 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
- 	if (unlikely(!vgic_initialized(vcpu->kvm)))
- 		return;
+@@ -158,6 +156,16 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	cycle_t cval, now;
  
-+	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
++	/*
++	 * If somebody is asking if the timer should fire, but the timer state
++	 * is maintained in hardware, we need to take a snapshot of the
++	 * current hardware state first.
++	 */
++	if (timer->loaded) {
++		timer->cntv_ctl = read_sysreg_el0(cntv_ctl);
++		timer->cntv_cval = read_sysreg_el0(cntv_cval);
++	}
 +
- 	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
- 	vgic_flush_lr_state(vcpu);
- 	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
-@@ -681,11 +692,12 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 	struct vgic_irq *irq;
- 	bool pending = false;
-+	unsigned long flags;
- 
- 	if (!vcpu->kvm->arch.vgic.enabled)
+ 	if (!kvm_timer_irq_can_fire(vcpu))
  		return false;
  
--	spin_lock(&vgic_cpu->ap_list_lock);
-+	spin_lock_irqsave(&vgic_cpu->ap_list_lock, flags);
+@@ -174,7 +182,6 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
  
- 	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
- 		spin_lock(&irq->irq_lock);
-@@ -696,7 +708,7 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
- 			break;
- 	}
+ 	BUG_ON(!vgic_initialized(vcpu->kvm));
  
--	spin_unlock(&vgic_cpu->ap_list_lock);
-+	spin_unlock_irqrestore(&vgic_cpu->ap_list_lock, flags);
- 
- 	return pending;
+-	timer->active_cleared_last = false;
+ 	timer->irq.level = new_level;
+ 	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
+ 				   timer->irq.level);
+@@ -207,6 +214,29 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ 	return 0;
  }
-@@ -721,6 +733,8 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
- 	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
- 	bool map_is_active;
  
-+	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
++static void timer_save_state(struct kvm_vcpu *vcpu)
++{
++	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
++	unsigned long flags;
 +
- 	spin_lock(&irq->irq_lock);
- 	map_is_active = irq->hw && irq->active;
- 	spin_unlock(&irq->irq_lock);
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 859f65c..2132c66 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -40,7 +40,8 @@ struct vgic_vmcr {
- struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
- 			      u32 intid);
- void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq);
--bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
-+bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq,
-+			   unsigned long flags);
- void vgic_kick_vcpus(struct kvm *kvm);
++	local_irq_save(flags);
++
++	if (!timer->loaded)
++		goto out;
++
++	if (timer->enabled) {
++		timer->cntv_ctl = read_sysreg_el0(cntv_ctl);
++		timer->cntv_cval = read_sysreg_el0(cntv_cval);
++	}
++
++	/* Disable the virtual timer */
++	write_sysreg_el0(0, cntv_ctl);
++
++	timer->loaded = false;
++out:
++	local_irq_restore(flags);
++}
++
+ /*
+  * Schedule the background timer before calling kvm_vcpu_block, so that this
+  * thread is removed from its waitqueue and made runnable when there's a timer
+@@ -218,6 +248,8 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
  
- int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
+ 	BUG_ON(timer_is_armed(timer));
+ 
++	timer_save_state(vcpu);
++
+ 	/*
+ 	 * No need to schedule a background timer if the guest timer has
+ 	 * already expired, because kvm_vcpu_block will return before putting
+@@ -237,77 +269,91 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
+ 	timer_arm(timer, kvm_timer_compute_delta(vcpu));
+ }
+ 
++static void timer_restore_state(struct kvm_vcpu *vcpu)
++{
++	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
++	unsigned long flags;
++
++	local_irq_save(flags);
++
++	if (timer->loaded)
++		goto out;
++
++	if (timer->enabled) {
++		write_sysreg_el0(timer->cntv_cval, cntv_cval);
++		isb();
++		write_sysreg_el0(timer->cntv_ctl, cntv_ctl);
++	}
++
++	timer->loaded = true;
++out:
++	local_irq_restore(flags);
++}
++
+ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	timer_disarm(timer);
++
++	timer_restore_state(vcpu);
+ }
+ 
+-/**
+- * kvm_timer_flush_hwstate - prepare to move the virt timer to the cpu
+- * @vcpu: The vcpu pointer
+- *
+- * Check if the virtual timer has expired while we were running in the host,
+- * and inject an interrupt if that was the case.
+- */
+-void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
++static void set_cntvoff(u64 cntvoff)
++{
++	u32 low = cntvoff & GENMASK(31, 0);
++	u32 high = (cntvoff >> 32) & GENMASK(31, 0);
++	kvm_call_hyp(__kvm_timer_set_cntvoff, low, high);
++}
++
++void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	bool phys_active;
+ 	int ret;
+ 
+-	if (kvm_timer_update_state(vcpu))
+-		return;
+-
+-	/*
+-	* If we enter the guest with the virtual input level to the VGIC
+-	* asserted, then we have already told the VGIC what we need to, and
+-	* we don't need to exit from the guest until the guest deactivates
+-	* the already injected interrupt, so therefore we should set the
+-	* hardware active state to prevent unnecessary exits from the guest.
+-	*
+-	* Also, if we enter the guest with the virtual timer interrupt active,
+-	* then it must be active on the physical distributor, because we set
+-	* the HW bit and the guest must be able to deactivate the virtual and
+-	* physical interrupt at the same time.
+-	*
+-	* Conversely, if the virtual input level is deasserted and the virtual
+-	* interrupt is not active, then always clear the hardware active state
+-	* to ensure that hardware interrupts from the timer triggers a guest
+-	* exit.
+-	*/
+-	phys_active = timer->irq.level ||
+-			kvm_vgic_map_is_active(vcpu, timer->irq.irq);
+-
+-	/*
+-	 * We want to avoid hitting the (re)distributor as much as
+-	 * possible, as this is a potentially expensive MMIO access
+-	 * (not to mention locks in the irq layer), and a solution for
+-	 * this is to cache the "active" state in memory.
+-	 *
+-	 * Things to consider: we cannot cache an "active set" state,
+-	 * because the HW can change this behind our back (it becomes
+-	 * "clear" in the HW). We must then restrict the caching to
+-	 * the "clear" state.
+-	 *
+-	 * The cache is invalidated on:
+-	 * - vcpu put, indicating that the HW cannot be trusted to be
+-	 *   in a sane state on the next vcpu load,
+-	 * - any change in the interrupt state
+-	 *
+-	 * Usage conditions:
+-	 * - cached value is "active clear"
+-	 * - value to be programmed is "active clear"
+-	 */
+-	if (timer->active_cleared_last && !phys_active)
+-		return;
++	ret = irq_set_vcpu_affinity(host_vtimer_irq, vcpu);
++	WARN(ret, "irq_set_vcpu_affinity ret %d\n", ret);
+ 
++	if (timer->irq.level || kvm_vgic_map_is_active(vcpu, timer->irq.irq))
++		phys_active = true;
++	else
++		phys_active = false;
+ 	ret = irq_set_irqchip_state(host_vtimer_irq,
+ 				    IRQCHIP_STATE_ACTIVE,
+ 				    phys_active);
+ 	WARN_ON(ret);
+ 
+-	timer->active_cleared_last = !phys_active;
++	set_cntvoff(vcpu->kvm->arch.timer.cntvoff);
++	timer_restore_state(vcpu);
++
++	if (is_kernel_in_hyp_mode())
++		__timer_enable_traps(vcpu);
++}
++
++void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
++{
++	int ret;
++
++	if (is_kernel_in_hyp_mode())
++		__timer_disable_traps(vcpu);
++
++	timer_save_state(vcpu);
++
++	set_cntvoff(0);
++
++	ret = irq_set_vcpu_affinity(host_vtimer_irq, NULL);
++	WARN(ret, "irq_set_vcpu_affinity ret %d\n", ret);
++}
++
++/**
++ * kvm_timer_flush_hwstate - prepare to move the virt timer to the cpu
++ * @vcpu: The vcpu pointer
++ *
++ * Check if the virtual timer has expired while we were running in the host,
++ * and inject an interrupt if that was the case.
++ */
++void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
++{
+ }
+ 
+ /**
+@@ -324,10 +370,16 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+ 	BUG_ON(timer_is_armed(timer));
+ 
+ 	/*
+-	 * The guest could have modified the timer registers or the timer
+-	 * could have expired, update the timer state.
++	 * If we entered the guest with the timer output asserted we have to
++	 * check if the guest has modified the timer so that we should lower
++	 * the line at this point.
+ 	 */
+-	kvm_timer_update_state(vcpu);
++	if (timer->irq.level) {
++		timer->cntv_ctl = read_sysreg_el0(cntv_ctl);
++		timer->cntv_cval = read_sysreg_el0(cntv_cval);
++		if (!kvm_timer_should_fire(vcpu))
++			kvm_timer_update_irq(vcpu, false);
++	}
+ }
+ 
+ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
+index 63e28dd..3786ac65 100644
+--- a/virt/kvm/arm/hyp/timer-sr.c
++++ b/virt/kvm/arm/hyp/timer-sr.c
+@@ -21,19 +21,15 @@
+ 
+ #include <asm/kvm_hyp.h>
+ 
+-/* vcpu is already in the HYP VA space */
+-void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
++void __hyp_text __kvm_timer_set_cntvoff(u32 cntvoff_low, u32 cntvoff_high)
+ {
+-	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+-	u64 val;
+-
+-	if (timer->enabled) {
+-		timer->cntv_ctl = read_sysreg_el0(cntv_ctl);
+-		timer->cntv_cval = read_sysreg_el0(cntv_cval);
+-	}
++	u64 cntvoff = (u64)cntvoff_high << 32 | cntvoff_low;
++	write_sysreg(cntvoff, cntvoff_el2);
++}
+ 
+-	/* Disable the virtual timer */
+-	write_sysreg_el0(0, cntv_ctl);
++void __hyp_text __timer_disable_traps(struct kvm_vcpu *vcpu)
++{
++	u64 val;
+ 
+ 	/*
+ 	 * We don't need to do this for VHE since the host kernel runs in EL2
+@@ -45,15 +41,10 @@ void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
+ 		val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
+ 		write_sysreg(val, cnthctl_el2);
+ 	}
+-
+-	/* Clear cntvoff for the host */
+-	write_sysreg(0, cntvoff_el2);
+ }
+ 
+-void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
++void __hyp_text __timer_enable_traps(struct kvm_vcpu *vcpu)
+ {
+-	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+-	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	u64 val;
+ 
+ 	/* Those bits are already configured at boot on VHE-system */
+@@ -67,11 +58,4 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
+ 		val |= CNTHCTL_EL1PCTEN;
+ 		write_sysreg(val, cnthctl_el2);
+ 	}
+-
+-	if (timer->enabled) {
+-		write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
+-		write_sysreg_el0(timer->cntv_cval, cntv_cval);
+-		isb();
+-		write_sysreg_el0(timer->cntv_ctl, cntv_ctl);
+-	}
+ }
 -- 
 2.9.0
