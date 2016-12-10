@@ -1,95 +1,55 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 10 Dec 2016 10:44:29 +0100
-Subject: [PATCH v8 3/3] iio: adc: add support for Allwinner SoCs ADC
-In-Reply-To: <20161209102236.17655-4-quentin.schulz@free-electrons.com>
-References: <20161209102236.17655-1-quentin.schulz@free-electrons.com>
- <20161209102236.17655-4-quentin.schulz@free-electrons.com>
-Message-ID: <20161210094429.yp26sfoz54oqy3dz@lukather>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 10 Dec 2016 10:46:23 +0100
+Subject: [RFC PATCH 15/23] arm: use kconfig fragments for ARCH_PXA
+ defconfigs (part 1)
+In-Reply-To: <1481027938-31831-16-git-send-email-b.zolnierkie@samsung.com>
+ (Bartlomiej Zolnierkiewicz's message of "Tue, 06 Dec 2016 13:38:50
+ +0100")
+References: <1481027938-31831-1-git-send-email-b.zolnierkie@samsung.com>
+ <1481027938-31831-16-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <87a8c415hs.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> writes:
 
-Just some minor comments.
+> Replace [lpd270,lubbock,mainstone,pxa255-idp]_defconfig-s with
+> a Makefile target using merge_config.
+>
+> The patch was verified with doing:
+>
+>     $ make [lpd270,...]_defconfig
+>     $ make savedefconfig
+>
+> and comparing resulting defconfig files (before/after the patch).
+>
+> Cc: Daniel Mack <daniel@zonque.org>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: Robert Jarzmik <robert.jarzmik@free.fr>
+> Cc: Cyril Bur <cyrilbur@gmail.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-On Fri, Dec 09, 2016 at 11:22:36AM +0100, Quentin Schulz wrote:
-> +	/*
-> +	 * Since the thermal sensor needs the IP to be in touchscreen mode and
-> +	 * there is no register to know if the IP has finished its transition
-> +	 * between the two modes, a delay is required when switching modes. This
-> +	 * slows down ADC readings while the latter are critical data to the
+Hi Bartolomiej,
 
-The latter between what and what?
+It's a bit hard to judge without any context for me, especially I'm receiving
+patches 11 to 21 but not the others. I suppose the advantage of defconfig
+fragments was already discussed somewhere, could you point me to that please ?
 
-> +	 * user. Disabling CONFIG_THERMAL_OF in kernel configuration allows the
-> +	 * user to avoid registering the thermal sensor (thus unavailable) and
+One small thing that could be improved is the "pxa_basic*" names.
 
-Isn't it obvious that it's not going to be available if you do not
-register it?
+I think pxa_basic1 is "pxa_refboards" or something like that, as these are the
+initial reference designs as far as I know from Intel and validation vehicles
+rather that form factors.
 
-> +	 * does not switch between modes thus "quicken" the ADC readings.
-> +	 * The thermal sensor should be enabled by default since the SoC
-> +	 * temperature is usually more critical than ADC readings.
+In the same way, pxa_basic2 is rather "pxa_sharpsl" as these are sharp designs.
 
-This last sentence should be in the Kconfig help. You cannot expect
-that all your users will read all the source code they want to compile
-:)
+And pxa_basic3 looks like Motorola platforms, so "pxa_motorola" perhaps ?
 
-Overall, I think this comment is kind of missing the point, maybe
-something like:
+I noticed imote2.config ended up based on pxa_basic3, while I would have
+expected it to be based on pxa_basic1 as it looks like a reference board to me
+...
 
-/*
- * Since the controller needs to be in touchscreen mode for its
- * thermal sensor to operate properly, and that switching between the
- * two modes needs a delay, always registering in the thermal
- * framework will significantly slow down the conversion rate of the
- * ADCs.
- *
- * Therefore, instead of depending on THERMAL_OF in Kconfig, we only
- * register the sensor if that option is enabled, eventually leaving
- * that choice to the user.
- */
+Cheers.
 
-Would be much clearer.
-
-> +	 */
-> +
-> +	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
-> +	/*
-> +	 * This driver is a child of an MFD which has a node in the DT but not
-> +	 * its children. Therefore, the resulting devices of this driver do not
-
-Wrong indentation for the comment, and saying why the MFD children
-don't have a node in the DT (backward compatibility) would be nice.
-
-> +	 * have an of_node variable.
-> +	 * However, its parent (the MFD driver) has an of_node variable and
-> +	 * since devm_thermal_zone_of_sensor_register uses its first argument to
-> +	 * match the phandle defined in the node of the thermal driver with the
-> +	 * of_node of the device passed as first argument and the third argument
-> +	 * to call ops from thermal_zone_of_device_ops, the solution is to use
-> +	 * the parent device as first argument to match the phandle with its
-> +	 * of_node, and the device from this driver as third argument to return
-> +	 * the temperature.
-> +	 */
-> +		tzd = devm_thermal_zone_of_sensor_register(pdev->dev.parent, 0,
-> +							   info,
-> +							   &sun4i_ts_tz_ops);
-
-I don't think tzd is used anywhere else in your function, it can be
-made local to this block.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161210/bd1b17fb/attachment.sig>
+--
+Robert
