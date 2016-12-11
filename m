@@ -1,20 +1,25 @@
-From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Sun, 11 Dec 2016 22:50:28 +0100
-Subject: [PATCH] pinctrl: meson: fix gpio request disabling other modes
-In-Reply-To: <20161206140817.11708-1-narmstrong@baylibre.com>
-References: <20161206140817.11708-1-narmstrong@baylibre.com>
-Message-ID: <20161211215028.GA22499@gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sun, 11 Dec 2016 14:17:48 -0800
+Subject: [PATCH 0/2] FPGA: TS-7300 FPGA manager
+Message-ID: <20161211221750.27743-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2016 at 03:08:16PM +0100, Neil Armstrong wrote:
-> The pinctrl_gpio_request is called with the "full" gpio number, already
-> containing the base, then meson_pmx_request_gpio is then called with the
-> final pin number.
-> Remove the base addition when calling meson_pmx_disable_other_groups.
-> 
-> Fixes: 6ac730951104 ("pinctrl: add driver for Amlogic Meson SoCs")
-> CC: Beniamino Galvani <b.galvani@gmail.com>
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Hi all,
 
-Acked-by: Beniamino Galvani <b.galvani@gmail.com>
+This patch series adds support for loading bitstreams into the Altera Cyclone II
+connected to an EP9302 on a TS-7300 board.
+
+Florian Fainelli (1):
+  ARM: ep93xx: Register ts73xx-fpga manager driver for TS-7300
+  FPGA: Add TS-7300 FPGA manager
+
+ drivers/fpga/Kconfig       |   7 ++
+ drivers/fpga/Makefile      |   1 +
+ drivers/fpga/ts73xx-fpga.c | 165 +++++++++++++++++++++++++++++++++++++++++++++
+ drivers/mfd/Kconfig        |   7 ++
+ 4 files changed, 180 insertions(+)
+ create mode 100644 drivers/fpga/ts73xx-fpga.c
+
+-- 
+2.9.3
