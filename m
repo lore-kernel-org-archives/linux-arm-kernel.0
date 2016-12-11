@@ -1,246 +1,58 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Sun, 11 Dec 2016 14:38:07 -0800
-Subject: [PATCH 2/2] FPGA: Add TS-7300 FPGA manager
-In-Reply-To: <20161211221750.27743-3-f.fainelli@gmail.com>
-References: <20161211221750.27743-1-f.fainelli@gmail.com>
- <20161211221750.27743-3-f.fainelli@gmail.com>
-Message-ID: <CAAtXAHc7Ni3kj7Oq6wttRPFJ2EMY_397b6=SYpiTObS1qKDmNg@mail.gmail.com>
+From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
+Date: Sun, 11 Dec 2016 23:54:06 +0000
+Subject: sunxi-ng clocks: leaving certain clocks alone?
+Message-ID: <d70f2809-102c-a3de-c77c-43af27bbcbbc@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+Hi,
 
-can you Cc: linxu-fpga at vger.kernel.org for your next round?
+I was observing that the new sunxi-ng clock code apparently explicitly
+turns off _all_ clocks that are not used or needed. I find this rather
+unfortunate, as I wanted to use the THS temperature sensor from ARM
+Trusted Firmware to implement emergency shutdown or DVFS throttling.
+That works until the clock framework finds the clock (as enumerated in
+ccu-sun50i-a64.c) and obviously explicitly clears bit 31 in the THS mod
+clock register and bit 8 in the respective clock gate register.
+Turning them manually back on via /dev/mem or removing the THS clock
+from the sunxi-ng driver fixes this for me.
 
-On Sun, Dec 11, 2016 at 2:17 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> Add support for loading bitstreams on the Altera Cyclone II FPGA
-> populated on the TS-7300 board. This is done through the configuration
-> and data registers offered through a memory interface between the EP93xx
-> SoC and the FPGA.
->
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  drivers/fpga/Kconfig       |   7 ++
->  drivers/fpga/Makefile      |   1 +
->  drivers/fpga/ts73xx-fpga.c | 165 +++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 173 insertions(+)
->  create mode 100644 drivers/fpga/ts73xx-fpga.c
->
-> diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
-> index cd84934774cc..109625707ef0 100644
-> --- a/drivers/fpga/Kconfig
-> +++ b/drivers/fpga/Kconfig
-> @@ -26,6 +26,13 @@ config FPGA_MGR_ZYNQ_FPGA
->         help
->           FPGA manager driver support for Xilinx Zynq FPGAs.
->
-> +config FPGA_MGR_TS73XX
-> +       tristate "Technologic Systems TS-73xx SBC FPGA Manager"
-> +       depends on ARCH_EP93XX && MACH_TS72XX
-> +       help
-> +         FPGA manager driver support for the Altera Cyclone II FPGA
-> +         present on the TS-73xx SBC boards.
-> +
->  endif # FPGA
->
->  endmenu
-> diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
-> index 8d83fc6b1613..5d51265cc1b4 100644
-> --- a/drivers/fpga/Makefile
-> +++ b/drivers/fpga/Makefile
-> @@ -8,3 +8,4 @@ obj-$(CONFIG_FPGA)                      += fpga-mgr.o
->  # FPGA Manager Drivers
->  obj-$(CONFIG_FPGA_MGR_SOCFPGA)         += socfpga.o
->  obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)       += zynq-fpga.o
-> +obj-$(CONFIG_FPGA_MGR_TS73XX)          += ts73xx-fpga.o
-> diff --git a/drivers/fpga/ts73xx-fpga.c b/drivers/fpga/ts73xx-fpga.c
-> new file mode 100644
-> index 000000000000..2b3d5d668dfc
-> --- /dev/null
-> +++ b/drivers/fpga/ts73xx-fpga.c
-> @@ -0,0 +1,165 @@
-> +/*
-> + * Technologic Systems TS-73xx SBC FPGA loader
-> + *
-> + * Copyright (C) 2016 Florian Fainelli <f.fainelli@gmail.com>
-> + *
-> + * FPGA Manager Driver for the on-board Altera Cyclone II FPGA found on
-> + * TS-7300, heavily based on load_fpga.c in their vendor tree.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; version 2 of the License.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/delay.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/string.h>
-> +#include <linux/bitrev.h>
-> +#include <linux/fpga/fpga-mgr.h>
-> +
-> +#define TS73XX_FPGA_DATA_REG   0
-> +#define TS73XX_FPGA_CONFIG_REG 1
-> +
-> +struct ts73xx_fpga_priv {
-> +       void __iomem    *io_base;
-> +       struct device   *dev;
-> +};
-> +
-> +static enum fpga_mgr_states ts73xx_fpga_state(struct fpga_manager *mgr)
-> +{
-> +       return FPGA_MGR_STATE_UNKNOWN;
-> +}
-> +
-> +static int ts73xx_fpga_write_init(struct fpga_manager *mgr, u32 flags,
-> +                                 const char *buf, size_t count)
-> +{
-> +       struct ts73xx_fpga_priv *priv = mgr->priv;
-> +
-> +       /* Reset the FPGA */
-> +       writeb(0, priv->io_base + TS73XX_FPGA_CONFIG_REG);
-> +       udelay(30);
-> +       writeb(0x2, priv->io_base + TS73XX_FPGA_CONFIG_REG);
-> +       udelay(80);
-> +
-> +       return 0;
-> +}
-> +
-> +static inline int ts73xx_fpga_can_write(struct ts73xx_fpga_priv *priv)
-> +{
-> +       unsigned int timeout = 1000;
-> +       u8 reg;
-> +
-> +       while (timeout--) {
-> +               reg = readb(priv->io_base + TS73XX_FPGA_CONFIG_REG);
-> +               if (!(reg & 0x1))
-> +                       return 0;
-> +               cpu_relax();
-> +       }
+This was not happening with the old Allwinner clocks, since the kernel
+wouldn't even know about it if there was no driver and the clock wasn't
+mentioned in the DT.
 
-You can use readb_poll_timeout() for this I think.
-> +
-> +       return -ETIMEDOUT;
-> +}
-> +
-> +static int ts73xx_fpga_write(struct fpga_manager *mgr, const char *buf,
-> +                            size_t count)
-> +{
-> +       struct ts73xx_fpga_priv *priv = mgr->priv;
-> +       size_t i = 0;
-> +       int ret;
-> +       u8 reg;
-> +
-> +       while (count--) {
-> +               ret = ts73xx_fpga_can_write(priv);
-> +               if (ret < 0)
-> +                       return ret;
-> +
-> +               writeb(buf[i], priv->io_base + TS73XX_FPGA_DATA_REG);
-> +               i++;
-> +       }
-> +
-> +       usleep_range(1000, 2000);
-> +       reg = readb(priv->io_base + TS73XX_FPGA_CONFIG_REG);
-> +       reg |= 0x8;
+Now with sunxi-ng even though the THS clock is not actually referenced
+or used in the DT, the kernel turns it off. I would expect that upon
+entering the kernel all unneeded clocks are turned off anyway, so there
+is no need to mess with clocks that have no user, but are enumerated in
+the ccu driver.
 
-What's happening here?
+I wonder if this kills simplefb as well, for instance, since I believe
+that U-Boot needs to turn on certain clocks and relies on them staying up.
 
-> +       writeb(reg, priv->io_base + TS73XX_FPGA_CONFIG_REG);
-> +       usleep_range(1000, 2000);
-> +
-> +       reg = readb(priv->io_base + TS73XX_FPGA_CONFIG_REG);
-> +       reg &= ~0x8;
+So my questions:
+1) Is this expected behaviour?
+2) If yes, should it really be?
+3) If yes, shouldn't there be way to explicitly tell Linux to leave that
+clock alone, preferably via DT? Although the sunxi-ng clocks take
+control over the whole CCU unit, I wonder if it should really mess with
+clocks there are not referenced in the DT.
 
-and here? Can we have a named constant for these, or a comment to
-explain what happens?
-> +       writeb(reg, priv->io_base + TS73XX_FPGA_CONFIG_REG);
-> +
-> +       return 0;
-> +}
-> +
-> +static int ts73xx_fpga_write_complete(struct fpga_manager *mgr, u32 flags)
-> +{
-> +       struct ts73xx_fpga_priv *priv = mgr->priv;
-> +       u8 reg;
-> +
-> +       reg = readb(priv->io_base + TS73XX_FPGA_CONFIG_REG);
-> +       if ((reg & 0x4) != 0x4)
+Maybe there is some way to reference those clocks via some dummy driver
+or DT node to avoid this behaviour? Is there any prior art in this respect?
 
-Named constants, please
+I think this issue will affect more future users (thinking of EFI RTC,
+EFI graphics, etc.), so I wanted to start a discussion on this.
 
-> +               return -ETIMEDOUT;
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct fpga_manager_ops ts73xx_fpga_ops = {
-> +       .state          = ts73xx_fpga_state,
-> +       .write_init     = ts73xx_fpga_write_init,
-> +       .write          = ts73xx_fpga_write,
-> +       .write_complete = ts73xx_fpga_write_complete,
-> +};
-> +
-> +static int ts73xx_fpga_probe(struct platform_device *pdev)
-> +{
-> +       struct device *kdev = &pdev->dev;
-> +       struct ts73xx_fpga_priv *priv;
-> +       struct fpga_manager *mgr;
-> +       struct resource *res;
-> +       int err;
-> +
-> +       priv = devm_kzalloc(kdev, sizeof(*priv), GFP_KERNEL);
-> +       if (!priv)
-> +               return -ENOMEM;
-> +
-> +       priv->dev = kdev;
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       priv->io_base = devm_ioremap_resource(kdev, res);
-> +       if (IS_ERR(priv->io_base))
-> +               return PTR_ERR(priv->io_base);
+Any input welcome.
 
-Maybe an error message here?
-> +
-> +       err = fpga_mgr_register(kdev, "TS-73xx FPGA Manager",
-> +                               &ts73xx_fpga_ops, priv);
-> +       if (err) {
-> +               dev_err(kdev, "failed to register FPGA manager\n");
-> +               return err;
-> +       }
-> +
-> +       return err;
-> +}
-> +
-> +static int ts73xx_fpga_remove(struct platform_device *pdev)
-> +{
-> +       fpga_mgr_unregister(&pdev->dev);
-> +
-> +       return 0;
-> +}
-> +
-> +static struct platform_driver ts73xx_fpga_driver = {
-> +       .driver = {
-> +               .name   = "ts73xx-fpga-mgr",
-> +       },
-> +       .probe  = ts73xx_fpga_probe,
-> +       .remove = ts73xx_fpga_remove,
-> +};
-> +module_platform_driver(ts73xx_fpga_driver);
-> +
-> +MODULE_AUTHOR("Florian Fainelli <f.fainelli@gmail.com>");
-> +MODULE_DESCRIPTION("TS-73xx FPGA Manager driver");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 2.9.3
->
+Cheers,
+Andre.
 
-Thanks,
-
-Moritz
+P.S. For reference my use case: ARM Trusted Firmware (ATF) enables the
+temperature sensor (THS) and programs a shutdown value. It programs the
+respective interrupt as secure and registers an IRQ handler in ATF to
+shutdown the system or take other appropriate matters to avoid
+overheating. Additionally the sensor is exported via the generic SCPI
+interface, so the existing scpi-hwmon driver picks it up and reports it
+to whoever is interested in Linux land via the normal interfaces.
