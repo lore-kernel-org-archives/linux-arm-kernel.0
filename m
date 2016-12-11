@@ -1,91 +1,43 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 11 Dec 2016 22:16:25 +0100
-Subject: [PATCH] firmware: arm_scpi: fix reading sensor values on pre-1.0
- SCPI firmwares
-In-Reply-To: <663deed4-fbbb-20ad-1943-dbd4e66e797f@arm.com>
-References: <20161124001845.20830-1-martin.blumenstingl@googlemail.com>
- <20161124001845.20830-2-martin.blumenstingl@googlemail.com>
- <663deed4-fbbb-20ad-1943-dbd4e66e797f@arm.com>
-Message-ID: <CAFBinCAiS5CFo5c6L4HF1JCcOiOBHdggDZjRN3Tsa8JGJexs4w@mail.gmail.com>
+From: alex.popov@linux.com (Alexander Popov)
+Date: Mon, 12 Dec 2016 00:37:16 +0300
+Subject: [PATCH 2/2] kcov: make kcov work properly with KASLR enabled
+In-Reply-To: <CACT4Y+bOd-Lzs45jyEr73GkRc7zZDxL8Z3fSc+TeZVRNVC6M-A@mail.gmail.com>
+References: <1481417456-28826-1-git-send-email-alex.popov@linux.com>
+ <1481417456-28826-3-git-send-email-alex.popov@linux.com>
+ <CACT4Y+bOd-Lzs45jyEr73GkRc7zZDxL8Z3fSc+TeZVRNVC6M-A@mail.gmail.com>
+Message-ID: <f3f9c3a3-349d-65ff-6c84-51878cfd8072@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 7, 2016 at 7:44 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 24/11/16 00:18, Martin Blumenstingl wrote:
->> The pre-1.0 SCPI firmwares are using one __le32 as sensor value, while
->> the 1.0 SCPI protocol uses two __le32 as sensor values (a total of
->> 64bit, split into 32bit upper and 32bit lower value).
->> Using an "struct sensor_value" to read the sensor value on a pre-1.0
->> SCPI firmware gives garbage in the "hi_val" field. Introducing a
->> separate function which handles scpi_ops.sensor_get_value for pre-1.0
->> SCPI firmware implementations ensures that we do not read memory which
->> was not written by the SCPI firmware (which fixes for example the
->> temperature reported by scpi-hwmon).
+On 11.12.2016 12:32, Dmitry Vyukov wrote:
+> On Sun, Dec 11, 2016 at 1:50 AM, Alexander Popov <alex.popov@linux.com> wrote:
+>> Subtract KASLR offset from the kernel addresses reported by kcov.
+>> Tested on x86_64 and AArch64 (Hikey LeMaker).
 >>
->> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>> Signed-off-by: Alexander Popov <alex.popov@linux.com>
 >> ---
->>  drivers/firmware/arm_scpi.c | 15 +++++++++++++++
->>  1 file changed, 15 insertions(+)
->>
->> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
->> index 70e1323..19f750d 100644
->> --- a/drivers/firmware/arm_scpi.c
->> +++ b/drivers/firmware/arm_scpi.c
->> @@ -728,6 +728,20 @@ static int scpi_sensor_get_value(u16 sensor, u64 *val)
->>       return ret;
->>  }
->>
->> +static int legacy_scpi_sensor_get_value(u16 sensor, u64 *val)
->> +{
->> +     __le16 id = cpu_to_le16(sensor);
->> +     __le32 value;
->> +     int ret;
->> +
->> +     ret = scpi_send_message(CMD_SENSOR_VALUE, &id, sizeof(id),
->> +                             &value, sizeof(value));
->> +     if (!ret)
->> +             *val = le32_to_cpu(value);
->> +
->> +     return ret;
->> +}
->
-> Instead of duplicating the code so much, can we just manage something
-> like this. If more commands need Rx len, then we can think of adding
-> that. Even then reseting shared buffers is not good, we can clear the
-> buffers on the stack.
-I tested this approach and it's working fine! I just went ahead and
-took your patch, moved the comment to a separate line, added a
-description and send the patch as v3 (feel free to add yourself as
-author and simply replace my Signed-off-by with a Tested-by).
+>>  kernel/kcov.c | 8 +++++++-
+>>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> I think generally this is the right thing to do.
+> 
+>  There are 2 pending patches for kcov by +Quentin (hopefully in mm):
+> "kcov: add AFL-style tracing"
+> "kcov: size of arena is now given in bytes"
+> https://groups.google.com/forum/#!topic/syzkaller/gcqbIhKjGcY
+> https://groups.google.com/d/msg/syzkaller/gcqbIhKjGcY/KQFryjBKCAAJ
+> 
+> Your patch probably conflicts with them.
+> Should you base them on top of these patches, so that Andrew can merge
+> it without conflicts?
 
-> diff --git i/drivers/firmware/arm_scpi.c w/drivers/firmware/arm_scpi.c
-> index 70e13230d8db..04aa873205e9 100644
-> --- i/drivers/firmware/arm_scpi.c
-> +++ w/drivers/firmware/arm_scpi.c
-> @@ -721,11 +721,15 @@ static int scpi_sensor_get_value(u16 sensor, u64 *val)
->
->         ret = scpi_send_message(CMD_SENSOR_VALUE, &id, sizeof(id),
->                                 &buf, sizeof(buf));
-> -       if (!ret)
-> +       if (ret)
-> +               return ret;
-> +
-> +       if (scpi_info->is_legacy) /* 32-bits supported, hi_val can be
-> junk */
-> +               *val = le32_to_cpu(buf.lo_val);
-> +       else
->                 *val = (u64)le32_to_cpu(buf.hi_val) << 32 |
->                         le32_to_cpu(buf.lo_val);
-> -
-> -       return ret;
-> +       return 0;
->  }
->
->  static int scpi_device_get_power_state(u16 dev_id)
->
->
-> --
-> Regards,
-> Sudeep
+Excuse me, I can't find these patches in:
+git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
+git://git.kernel.org/pub/scm/linux/kernel/git/mhocko/mm.git
+git://git.cmpxchg.org/linux-mmots.git
+
+Could you point at the tree which I can rebase onto?
+Should I cherry-pick Quentin's patches manually?
+
+Best regards,
+Alexander
