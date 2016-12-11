@@ -1,43 +1,48 @@
-From: peter@korsgaard.com (Peter Korsgaard)
-Date: Sun, 11 Dec 2016 21:01:59 +0100
-Subject: [RFC v3 PATCH 00/25] Allow NOMMU for MULTIPLATFORM
-In-Reply-To: <20161211070104.GB3035@afzalpc> (Afzal Mohammed's message of
- "Sun, 11 Dec 2016 12:31:04 +0530")
-References: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
- <20161210181639.GA5660@afzalpc> <878trntrig.fsf@dell.be.48ers.dk>
- <20161211070104.GB3035@afzalpc>
-Message-ID: <87fulus094.fsf@dell.be.48ers.dk>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sun, 11 Dec 2016 22:14:31 +0100
+Subject: [PATCH v3] SCPI (pre-v1.0): fix reading sensor value
+In-Reply-To: <20161125005432.1205-1-martin.blumenstingl@googlemail.com>
+References: <20161125005432.1205-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20161211211432.13252-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Afzal" == Afzal Mohammed <afzal.mohd.ma@gmail.com> writes:
+I observed the following "strange" value when trying to read the SCPI
+temperature sensor on my Amlogic GXM S912 device:
+$ cat /sys/class/hwmon/hwmon0/temp1_input
+6875990994467160116
 
-Hi,
+The value reported by the original kernel (Amlogic vendor kernel, after
+a reboot obviously) was 53C.
+The Amlogic SCPI driver only uses a single 32bit value to read the
+sensor value, instead of two. After stripping the upper 32bits from
+above value gives "52" as result, which is basically identical to
+what the vendor kernel reports.
+I also compared this with the value shown by u-boot (since there's
+less delay between "reboot to u-boot" compared to "reboot from mainline
+kernel to vendor kernel") and the temperature reported by u-boot always
+matches the lower 32bits of the value from scpi-hwmon temp1_input.
 
- >> You can build a toolchain and initramfs with Buildroot. Have a look at
- >> the stm32f429 nommu config:
- >> 
- >> https://git.buildroot.net/buildroot/tree/configs/stm32f429_disco_defconfig
+Changes since v2:
+- use simplified approach from Sudeep Holla which is similar to v1
+  but avoids duplicate code by adding a simple
+  "if (scpi_info->is_legacy)" to scpi_sensor_get_value() instead of
+  duplicating the logic
 
- > iiuc, it builds one for Cortex-M. i already had a file system w/
- > busybox compiled using a Cortex-M toolchain (stolen from
- > Pengutronix's OSELAS.Toolchain), which works on Cortex M4 (Vybrid
- > VF610 M4 core). But it does not work here, i.e. on Cortex A, seems the
- > above mentioned also would have the same effect.
+Changes since v1:
+- zero out the rx_buf before reading the mbox buffer (see long
+  description above) instead of introducing a separate legacy command
+  for reading the sensor value
+- added patch 2/2 which validates the payload lengths (so nobody can
+  read or write data beyond rx_buf or tx_buf). This optional and patch
+  1/2 can be applied without it
 
-Hmm, I'm not sure why a cortex-M toolchain wouldn't work on cortex-A, I
-thought the 'M' instruction set was a pure subset of the 'A'.
+Martin Blumenstingl (1):
+  firmware: arm_scpi: fix reading sensor values on pre-1.0 SCPI
+    firmwares
 
- > And in buildroot, couldn't see Cortex R option in menuconfig, and
- > selecting Cortex-A's excludes flat binary target & presents only with
- > ELF.
-
-We indeed don't have cortex-R support. I'm not aware of any cortex-R
-Linux support.
-
-When you select a cortex-A variant, then we enable MMU support by
-default, but you can disable it under toolchain options (Enable MMU) and
-then the flat binary option is available.
+ drivers/firmware/arm_scpi.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
 -- 
-Bye, Peter Korsgaard
+2.10.2
