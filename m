@@ -1,36 +1,72 @@
 From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Sun, 11 Dec 2016 18:41:58 +0530
-Subject: [PATCH 1/2] ARM: nommu: allow enabling REMAP_VECTORS_TO_RAM
+Date: Sun, 11 Dec 2016 18:42:55 +0530
+Subject: [PATCH RFC 2/2] ARM: nommu: remap exception base address to RAM
 In-Reply-To: <20161211131028.3019-1-afzal.mohd.ma@gmail.com>
 References: <20161211131028.3019-1-afzal.mohd.ma@gmail.com>
-Message-ID: <20161211131158.3120-1-afzal.mohd.ma@gmail.com>
+Message-ID: <20161211131255.3221-1-afzal.mohd.ma@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-REMAP_VECTORS_TO_RAM depends on DRAM_BASE, but since DRAM_BASE is a
-hex, REMAP_VECTORS_TO_RAM could never get enabled. Also depending on
-DRAM_BASE is redundant as whenever REMAP_VECTORS_TO_RAM makes itself
-available to Kconfig, DRAM_BASE also is available as the Kconfig gets
-sourced on !MMU.
+Remap exception base address to start of RAM in Kernel in !MMU mode.
+
+Based on existing Kconfig help, Kernel was expecting it to be
+configured by external support. Also earlier it was not possible to
+copy the exception table to start of RAM due to Kconfig dependency,
+which has been fixed by a change prior to this.
+
+Kernel text start at an offset of at least 32K to account for page
+tables in MMU case. On a !MMU build too this space is kept aside, and
+since 2 pages (8K) is the maximum for exception plus stubs, it can be
+placed at the start of RAM.
 
 Signed-off-by: Afzal Mohammed <afzal.mohd.ma@gmail.com>
 ---
- arch/arm/Kconfig-nommu | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+
+i am a bit shaky about this change, though it works here on Cortex-A9,
+this probably would have to be made robust so as to not cause issue on
+other v7-A's upon trying to do !MMU (this won't affect normal MMU boot),
+or specifically where security extensions are not enabled. Also effect
+of hypervisor extension also need to be considered. Please let know if
+any better ways to handle this.
+
+
+ arch/arm/Kconfig-nommu       | 6 +++---
+ arch/arm/kernel/head-nommu.S | 6 ++++++
+ 2 files changed, 9 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/Kconfig-nommu b/arch/arm/Kconfig-nommu
-index aed66d5df7f1..b7576349528c 100644
+index b7576349528c..f57fbe3d5eb0 100644
 --- a/arch/arm/Kconfig-nommu
 +++ b/arch/arm/Kconfig-nommu
-@@ -34,8 +34,7 @@ config PROCESSOR_ID
- 	  used instead of the auto-probing which utilizes the register.
+@@ -46,9 +46,9 @@ config REMAP_VECTORS_TO_RAM
+ 	  If your CPU provides a remap facility which allows the exception
+ 	  vectors to be mapped to writable memory, say 'n' here.
  
- config REMAP_VECTORS_TO_RAM
--	bool 'Install vectors to the beginning of RAM' if DRAM_BASE
--	depends on DRAM_BASE
-+	bool 'Install vectors to the beginning of RAM'
- 	help
- 	  The kernel needs to change the hardware exception vectors.
- 	  In nommu mode, the hardware exception vectors are normally
+-	  Otherwise, say 'y' here.  In this case, the kernel will require
+-	  external support to redirect the hardware exception vectors to
+-	  the writable versions located at DRAM_BASE.
++	  Otherwise, say 'y' here.  In this case, the kernel will
++	  redirect the hardware exception vectors to the writable
++	  versions located at DRAM_BASE.
+ 
+ config ARM_MPU
+        bool 'Use the ARM v7 PMSA Compliant MPU'
+diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+index 6b4eb27b8758..ac31c9647830 100644
+--- a/arch/arm/kernel/head-nommu.S
++++ b/arch/arm/kernel/head-nommu.S
+@@ -158,6 +158,12 @@ __after_proc_init:
+ 	bic	r0, r0, #CR_V
+ #endif
+ 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
++
++#ifdef CONFIG_REMAP_VECTORS_TO_RAM
++	mov	r3, #CONFIG_VECTORS_BASE	@ read VECTORS_BASE
++	mcr	p15, 0, r3, c12, c0, 0		@ write to VBAR
++#endif
++
+ #elif defined (CONFIG_CPU_V7M)
+ 	/* For V7M systems we want to modify the CCR similarly to the SCTLR */
+ #ifdef CONFIG_CPU_DCACHE_DISABLE
 -- 
 2.11.0
