@@ -1,52 +1,81 @@
 From: alex.popov@linux.com (Alexander Popov)
-Date: Sun, 11 Dec 2016 03:50:56 +0300
-Subject: [PATCH 2/2] kcov: make kcov work properly with KASLR enabled
+Date: Sun, 11 Dec 2016 03:50:55 +0300
+Subject: [PATCH 1/2] arm64: setup: introduce kaslr_offset()
 In-Reply-To: <1481417456-28826-1-git-send-email-alex.popov@linux.com>
 References: <1481417456-28826-1-git-send-email-alex.popov@linux.com>
-Message-ID: <1481417456-28826-3-git-send-email-alex.popov@linux.com>
+Message-ID: <1481417456-28826-2-git-send-email-alex.popov@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Subtract KASLR offset from the kernel addresses reported by kcov.
-Tested on x86_64 and AArch64 (Hikey LeMaker).
+Introduce kaslr_offset() similarly to x86_64 for fixing kcov.
 
 Signed-off-by: Alexander Popov <alex.popov@linux.com>
 ---
- kernel/kcov.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/setup.h      | 19 +++++++++++++++++++
+ arch/arm64/include/uapi/asm/setup.h |  4 ++--
+ arch/arm64/kernel/setup.c           |  8 ++++----
+ 3 files changed, 25 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm64/include/asm/setup.h
 
-diff --git a/kernel/kcov.c b/kernel/kcov.c
-index 3cbb0c8..f8f3f4c 100644
---- a/kernel/kcov.c
-+++ b/kernel/kcov.c
-@@ -14,6 +14,7 @@
- #include <linux/debugfs.h>
- #include <linux/uaccess.h>
- #include <linux/kcov.h>
-+#include <asm/setup.h>
- 
- /*
-  * kcov descriptor (one per opened debugfs file).
-@@ -68,6 +69,11 @@ void notrace __sanitizer_cov_trace_pc(void)
- 	if (mode == KCOV_MODE_TRACE) {
- 		unsigned long *area;
- 		unsigned long pos;
-+		unsigned long ip = _RET_IP_;
+diff --git a/arch/arm64/include/asm/setup.h b/arch/arm64/include/asm/setup.h
+new file mode 100644
+index 0000000..e7b59b9
+--- /dev/null
++++ b/arch/arm64/include/asm/setup.h
+@@ -0,0 +1,19 @@
++/*
++ * arch/arm64/include/asm/setup.h
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+#ifdef CONFIG_RANDOMIZE_BASE
-+		ip -= kaslr_offset();
++#ifndef __ASM_SETUP_H
++#define __ASM_SETUP_H
++
++#include <uapi/asm/setup.h>
++
++static inline unsigned long kaslr_offset(void)
++{
++	return kimage_vaddr - KIMAGE_VADDR;
++}
++
 +#endif
+diff --git a/arch/arm64/include/uapi/asm/setup.h b/arch/arm64/include/uapi/asm/setup.h
+index 9cf2e46..26631c8 100644
+--- a/arch/arm64/include/uapi/asm/setup.h
++++ b/arch/arm64/include/uapi/asm/setup.h
+@@ -16,8 +16,8 @@
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+-#ifndef __ASM_SETUP_H
+-#define __ASM_SETUP_H
++#ifndef _UAPI__ASM_SETUP_H
++#define _UAPI__ASM_SETUP_H
  
- 		/*
- 		 * There is some code that runs in interrupts but for which
-@@ -81,7 +87,7 @@ void notrace __sanitizer_cov_trace_pc(void)
- 		/* The first word is number of subsequent PCs. */
- 		pos = READ_ONCE(area[0]) + 1;
- 		if (likely(pos < t->kcov_size)) {
--			area[pos] = _RET_IP_;
-+			area[pos] = ip;
- 			WRITE_ONCE(area[0], pos);
- 		}
+ #include <linux/types.h>
+ 
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index f534f49..11eefda5 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -329,11 +329,11 @@ subsys_initcall(topology_init);
+ static int dump_kernel_offset(struct notifier_block *self, unsigned long v,
+ 			      void *p)
+ {
+-	u64 const kaslr_offset = kimage_vaddr - KIMAGE_VADDR;
++	const unsigned long offset = kaslr_offset();
+ 
+-	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE) && kaslr_offset > 0) {
+-		pr_emerg("Kernel Offset: 0x%llx from 0x%lx\n",
+-			 kaslr_offset, KIMAGE_VADDR);
++	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE) && offset > 0) {
++		pr_emerg("Kernel Offset: 0x%lx from 0x%lx\n",
++			 offset, KIMAGE_VADDR);
+ 	} else {
+ 		pr_emerg("Kernel Offset: disabled\n");
  	}
 -- 
 2.7.4
