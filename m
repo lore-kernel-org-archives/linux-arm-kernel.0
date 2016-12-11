@@ -1,111 +1,81 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 10 Dec 2016 18:18:48 -0800
-Subject: [PATCH v1] watchdog: imx2: fix hang-up on boot for i.MX21, i.MX27
- and i.MX31 SoCs
-In-Reply-To: <20161211010648.6591-1-vz@mleia.com>
-References: <20161211010648.6591-1-vz@mleia.com>
-Message-ID: <2063cf00-d9fd-e312-e97a-4ac75a58b6aa@roeck-us.net>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 11 Dec 2016 14:13:13 +0800
+Subject: [PATCH v5 3/3] fpga manager: Add cyclone-ps-spi driver for
+ Altera FPGAs
+In-Reply-To: <1778a82d1989d13919b24e47fa09eeb56b2cb8e5.1481139171.git.stillcompiling@gmail.com>
+Message-ID: <201612111429.nYbHqrq3%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/10/2016 05:06 PM, Vladimir Zapolskiy wrote:
-> Power down counter enable/disable bit switch is located in WMCR
-> register, but watchdog controllers found on legacy i.MX21, i.MX27 and
-> i.MX31 SoCs don't have this register. As a result of writing data to
-> the non-existing register on driver probe the SoC hangs up, to fix the
-> problem add more OF compatible strings and on this basis get
-> information about availability of the WMCR register.
->
-> Fixes: 5fe65ce7ccbb ("watchdog: imx2_wdt: Disable power down counter on boot")
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+Hi Joshua,
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.9-rc8]
+[cannot apply to next-20161209]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> ---
-> Changes from RFC to v1:
-> * replaced private data struct with a macro as suggested by Guenter,
-> * updated the comment in the source code to reflect the change,
-> * rearranged and simplified the logic of detecting WMCR presence,
-> * pulled the fix out from the series with optional proposed DTS changes.
->
->  drivers/watchdog/imx2_wdt.c | 30 +++++++++++++++++++++++++-----
->  1 file changed, 25 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-> index 4874b0f..66bd454 100644
-> --- a/drivers/watchdog/imx2_wdt.c
-> +++ b/drivers/watchdog/imx2_wdt.c
-> @@ -30,6 +30,7 @@
->  #include <linux/module.h>
->  #include <linux/moduleparam.h>
->  #include <linux/of_address.h>
-> +#include <linux/of_device.h>
->  #include <linux/platform_device.h>
->  #include <linux/regmap.h>
->  #include <linux/watchdog.h>
-> @@ -57,6 +58,7 @@
->  #define IMX2_WDT_WICR_WICT	0xFF		/* -> Interrupt Count Timeout */
->
->  #define IMX2_WDT_WMCR		0x08		/* Misc Register */
-> +#define IMX2_WDT_NO_WMCR	((void *)true)	/* Indicates unavailable WMCR */
->
->  #define IMX2_WDT_MAX_TIME	128
->  #define IMX2_WDT_DEFAULT_TIME	60		/* in seconds */
-> @@ -70,6 +72,8 @@ struct imx2_wdt_device {
->  	bool ext_reset;
->  };
->
-> +static const struct of_device_id imx2_wdt_dt_ids[];
-> +
->  static bool nowayout = WATCHDOG_NOWAYOUT;
->  module_param(nowayout, bool, 0);
->  MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
-> @@ -242,6 +246,7 @@ static const struct regmap_config imx2_wdt_regmap_config = {
->
->  static int __init imx2_wdt_probe(struct platform_device *pdev)
->  {
-> +	const struct of_device_id *of_id;
->  	struct imx2_wdt_device *wdev;
->  	struct watchdog_device *wdog;
->  	struct resource *res;
-> @@ -310,11 +315,13 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
->  	}
->
->  	/*
-> -	 * Disable the watchdog power down counter at boot. Otherwise the power
-> -	 * down counter will pull down the #WDOG interrupt line for one clock
-> -	 * cycle.
-> +	 * If watchdog controller has WMCR, disable the watchdog power
-> +	 * down counter at boot. Otherwise the power down counter will
-> +	 * pull down the #WDOG interrupt line for one clock cycle.
->  	 */
-> -	regmap_write(wdev->regmap, IMX2_WDT_WMCR, 0);
-> +	of_id = of_match_device(imx2_wdt_dt_ids, &pdev->dev);
-> +	if (of_id && !of_id->data)
-> +		regmap_write(wdev->regmap, IMX2_WDT_WMCR, 0);
->
->  	ret = watchdog_register_device(wdog);
->  	if (ret) {
-> @@ -412,7 +419,20 @@ static SIMPLE_DEV_PM_OPS(imx2_wdt_pm_ops, imx2_wdt_suspend,
->  			 imx2_wdt_resume);
->
->  static const struct of_device_id imx2_wdt_dt_ids[] = {
-> -	{ .compatible = "fsl,imx21-wdt", },
-> +	{ .compatible = "fsl,imx21-wdt", .data = IMX2_WDT_NO_WMCR },
-> +	{ .compatible = "fsl,imx25-wdt",  },
-> +	{ .compatible = "fsl,imx27-wdt", .data = IMX2_WDT_NO_WMCR },
-> +	{ .compatible = "fsl,imx31-wdt", .data = IMX2_WDT_NO_WMCR },
-> +	{ .compatible = "fsl,imx35-wdt",  },
-> +	{ .compatible = "fsl,imx50-wdt",  },
-> +	{ .compatible = "fsl,imx51-wdt",  },
-> +	{ .compatible = "fsl,imx53-wdt",  },
-> +	{ .compatible = "fsl,imx6q-wdt",  },
-> +	{ .compatible = "fsl,imx6sl-wdt", },
-> +	{ .compatible = "fsl,imx6sx-wdt", },
-> +	{ .compatible = "fsl,imx6ul-wdt", },
-> +	{ .compatible = "fsl,imx7d-wdt",  },
-> +	{ .compatible = "fsl,vf610-wdt",  },
->  	{ /* sentinel */ }
->  };
->  MODULE_DEVICE_TABLE(of, imx2_wdt_dt_ids);
->
+url:    https://github.com/0day-ci/linux/commits/Joshua-Clayton/lib-add-bitrev8x4/20161208-070638
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
+
+All errors (new ones prefixed by >>):
+
+   In file included from drivers/fpga/cyclone-ps-spi.c:13:0:
+   drivers/fpga/cyclone-ps-spi.c: In function 'rev_buf':
+>> include/linux/bitrev.h:12:21: error: implicit declaration of function '__arch_bitrev8x4' [-Werror=implicit-function-declaration]
+    #define __bitrev8x4 __arch_bitrev8x4
+                        ^
+   include/linux/bitrev.h:101:2: note: in expansion of macro '__bitrev8x4'
+     __bitrev8x4(__x);    \
+     ^~~~~~~~~~~
+   drivers/fpga/cyclone-ps-spi.c:84:11: note: in expansion of macro 'bitrev8x4'
+      *fw32 = bitrev8x4(*fw32);
+              ^~~~~~~~~
+   In file included from include/linux/delay.h:10:0,
+                    from drivers/fpga/cyclone-ps-spi.c:14:
+   drivers/fpga/cyclone-ps-spi.c: In function 'cyclonespi_write':
+   include/linux/kernel.h:739:16: warning: comparison of distinct pointer types lacks a cast
+     (void) (&min1 == &min2);   \
+                   ^
+   include/linux/kernel.h:742:2: note: in expansion of macro '__min'
+     __min(typeof(x), typeof(y),   \
+     ^~~~~
+   drivers/fpga/cyclone-ps-spi.c:98:19: note: in expansion of macro 'min'
+      size_t stride = min(fw_data_end - fw_data, SZ_4K);
+                      ^~~
+   cc1: some warnings being treated as errors
+
+vim +/__arch_bitrev8x4 +12 include/linux/bitrev.h
+
+556d2f05 Yalin Wang     2014-11-03   6  #ifdef CONFIG_HAVE_ARCH_BITREVERSE
+556d2f05 Yalin Wang     2014-11-03   7  #include <asm/bitrev.h>
+556d2f05 Yalin Wang     2014-11-03   8  
+556d2f05 Yalin Wang     2014-11-03   9  #define __bitrev32 __arch_bitrev32
+556d2f05 Yalin Wang     2014-11-03  10  #define __bitrev16 __arch_bitrev16
+556d2f05 Yalin Wang     2014-11-03  11  #define __bitrev8 __arch_bitrev8
+533d0eab Joshua Clayton 2016-12-07 @12  #define __bitrev8x4 __arch_bitrev8x4
+a5cfc1ec Akinobu Mita   2006-12-08  13  
+556d2f05 Yalin Wang     2014-11-03  14  #else
+556d2f05 Yalin Wang     2014-11-03  15  extern u8 const byte_rev_table[256];
+
+:::::: The code at line 12 was first introduced by commit
+:::::: 533d0eabff8f37edfdec7fdf6e705fdecb297daa lib: add bitrev8x4()
+
+:::::: TO: Joshua Clayton <stillcompiling@gmail.com>
+:::::: CC: 0day robot <fengguang.wu@intel.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 52456 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161211/4a13661a/attachment-0001.gz>
