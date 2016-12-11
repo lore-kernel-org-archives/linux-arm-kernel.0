@@ -1,69 +1,139 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Sun, 11 Dec 2016 10:32:08 +0100
-Subject: [PATCH 2/2] kcov: make kcov work properly with KASLR enabled
-In-Reply-To: <1481417456-28826-3-git-send-email-alex.popov@linux.com>
-References: <1481417456-28826-1-git-send-email-alex.popov@linux.com>
- <1481417456-28826-3-git-send-email-alex.popov@linux.com>
-Message-ID: <CACT4Y+bOd-Lzs45jyEr73GkRc7zZDxL8Z3fSc+TeZVRNVC6M-A@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 11 Dec 2016 10:35:20 +0100
+Subject: [PATCH v1] watchdog: imx2: fix hang-up on boot for i.MX21,
+ i.MX27 and i.MX31 SoCs
+In-Reply-To: <20161211010648.6591-1-vz@mleia.com>
+References: <20161211010648.6591-1-vz@mleia.com>
+Message-ID: <20161211093519.xrxxhrqpc7fmadfr@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 11, 2016 at 1:50 AM, Alexander Popov <alex.popov@linux.com> wrote:
-> Subtract KASLR offset from the kernel addresses reported by kcov.
-> Tested on x86_64 and AArch64 (Hikey LeMaker).
->
-> Signed-off-by: Alexander Popov <alex.popov@linux.com>
+On Sun, Dec 11, 2016 at 03:06:48AM +0200, Vladimir Zapolskiy wrote:
+> Power down counter enable/disable bit switch is located in WMCR
+> register, but watchdog controllers found on legacy i.MX21, i.MX27 and
+> i.MX31 SoCs don't have this register. As a result of writing data to
+> the non-existing register on driver probe the SoC hangs up, to fix the
+> problem add more OF compatible strings and on this basis get
+> information about availability of the WMCR register.
+> 
+> Fixes: 5fe65ce7ccbb ("watchdog: imx2_wdt: Disable power down counter on boot")
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 > ---
->  kernel/kcov.c | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
->
-> diff --git a/kernel/kcov.c b/kernel/kcov.c
-> index 3cbb0c8..f8f3f4c 100644
-> --- a/kernel/kcov.c
-> +++ b/kernel/kcov.c
-> @@ -14,6 +14,7 @@
->  #include <linux/debugfs.h>
->  #include <linux/uaccess.h>
->  #include <linux/kcov.h>
-> +#include <asm/setup.h>
->
->  /*
->   * kcov descriptor (one per opened debugfs file).
-> @@ -68,6 +69,11 @@ void notrace __sanitizer_cov_trace_pc(void)
->         if (mode == KCOV_MODE_TRACE) {
->                 unsigned long *area;
->                 unsigned long pos;
-> +               unsigned long ip = _RET_IP_;
+> Changes from RFC to v1:
+> * replaced private data struct with a macro as suggested by Guenter,
+> * updated the comment in the source code to reflect the change,
+> * rearranged and simplified the logic of detecting WMCR presence,
+> * pulled the fix out from the series with optional proposed DTS changes.
+> 
+>  drivers/watchdog/imx2_wdt.c | 30 +++++++++++++++++++++++++-----
+>  1 file changed, 25 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+> index 4874b0f..66bd454 100644
+> --- a/drivers/watchdog/imx2_wdt.c
+> +++ b/drivers/watchdog/imx2_wdt.c
+> @@ -30,6 +30,7 @@
+>  #include <linux/module.h>
+>  #include <linux/moduleparam.h>
+>  #include <linux/of_address.h>
+> +#include <linux/of_device.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/regmap.h>
+>  #include <linux/watchdog.h>
+> @@ -57,6 +58,7 @@
+>  #define IMX2_WDT_WICR_WICT	0xFF		/* -> Interrupt Count Timeout */
+>  
+>  #define IMX2_WDT_WMCR		0x08		/* Misc Register */
+> +#define IMX2_WDT_NO_WMCR	((void *)true)	/* Indicates unavailable WMCR */
+>  
+>  #define IMX2_WDT_MAX_TIME	128
+>  #define IMX2_WDT_DEFAULT_TIME	60		/* in seconds */
+> @@ -70,6 +72,8 @@ struct imx2_wdt_device {
+>  	bool ext_reset;
+>  };
+>  
+> +static const struct of_device_id imx2_wdt_dt_ids[];
 > +
-> +#ifdef CONFIG_RANDOMIZE_BASE
-> +               ip -= kaslr_offset();
-> +#endif
->
->                 /*
->                  * There is some code that runs in interrupts but for which
-> @@ -81,7 +87,7 @@ void notrace __sanitizer_cov_trace_pc(void)
->                 /* The first word is number of subsequent PCs. */
->                 pos = READ_ONCE(area[0]) + 1;
->                 if (likely(pos < t->kcov_size)) {
-> -                       area[pos] = _RET_IP_;
-> +                       area[pos] = ip;
->                         WRITE_ONCE(area[0], pos);
->                 }
->         }
-> --
-> 2.7.4
+>  static bool nowayout = WATCHDOG_NOWAYOUT;
+>  module_param(nowayout, bool, 0);
+>  MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
+> @@ -242,6 +246,7 @@ static const struct regmap_config imx2_wdt_regmap_config = {
+>  
+>  static int __init imx2_wdt_probe(struct platform_device *pdev)
+>  {
+> +	const struct of_device_id *of_id;
+>  	struct imx2_wdt_device *wdev;
+>  	struct watchdog_device *wdog;
+>  	struct resource *res;
+> @@ -310,11 +315,13 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	/*
+> -	 * Disable the watchdog power down counter at boot. Otherwise the power
+> -	 * down counter will pull down the #WDOG interrupt line for one clock
+> -	 * cycle.
+> +	 * If watchdog controller has WMCR, disable the watchdog power
+> +	 * down counter at boot. Otherwise the power down counter will
+> +	 * pull down the #WDOG interrupt line for one clock cycle.
+>  	 */
+> -	regmap_write(wdev->regmap, IMX2_WDT_WMCR, 0);
+> +	of_id = of_match_device(imx2_wdt_dt_ids, &pdev->dev);
+> +	if (of_id && !of_id->data)
+> +		regmap_write(wdev->regmap, IMX2_WDT_WMCR, 0);
+>  
+>  	ret = watchdog_register_device(wdog);
+>  	if (ret) {
+> @@ -412,7 +419,20 @@ static SIMPLE_DEV_PM_OPS(imx2_wdt_pm_ops, imx2_wdt_suspend,
+>  			 imx2_wdt_resume);
+>  
+>  static const struct of_device_id imx2_wdt_dt_ids[] = {
+> -	{ .compatible = "fsl,imx21-wdt", },
+> +	{ .compatible = "fsl,imx21-wdt", .data = IMX2_WDT_NO_WMCR },
+> +	{ .compatible = "fsl,imx25-wdt",  },
+> +	{ .compatible = "fsl,imx27-wdt", .data = IMX2_WDT_NO_WMCR },
+> +	{ .compatible = "fsl,imx31-wdt", .data = IMX2_WDT_NO_WMCR },
+> +	{ .compatible = "fsl,imx35-wdt",  },
+> +	{ .compatible = "fsl,imx50-wdt",  },
+> +	{ .compatible = "fsl,imx51-wdt",  },
+> +	{ .compatible = "fsl,imx53-wdt",  },
+> +	{ .compatible = "fsl,imx6q-wdt",  },
+> +	{ .compatible = "fsl,imx6sl-wdt", },
+> +	{ .compatible = "fsl,imx6sx-wdt", },
+> +	{ .compatible = "fsl,imx6ul-wdt", },
+> +	{ .compatible = "fsl,imx7d-wdt",  },
+> +	{ .compatible = "fsl,vf610-wdt",  },
 
+Up to now we only had fsl,imx21-wdt, now it seems that iMX31, i.MX27 and
+i.MX21 form a group of equal watchdog IPs and the others form another
+group, right?
 
-Hi,
+So conceptually we should differenciate between
 
-I think generally this is the right thing to do.
+	fsl,imx21-wdt (which is used on i.MX21, i.MX27 and i.MX31)
+	fsl,imx35-wdt (which is used on all others)
 
- There are 2 pending patches for kcov by +Quentin (hopefully in mm):
-"kcov: add AFL-style tracing"
-"kcov: size of arena is now given in bytes"
-https://groups.google.com/forum/#!topic/syzkaller/gcqbIhKjGcY
-https://groups.google.com/d/msg/syzkaller/gcqbIhKjGcY/KQFryjBKCAAJ
+A reason to add e.g. fsl,imx6sl-wdt is that dtbs in the wild use
 
-Your patch probably conflicts with them.
-Should you base them on top of these patches, so that Andrew can merge
-it without conflicts?
+	"fsl,imx6sl-wdt", "fsl,imx21-wdt"
+
+. But then I wonder if 
+
+	5fe65ce7ccbb ("watchdog: imx2_wdt: Disable power down counter on boot")
+
+is that important to justify to add these all.
+
+Independant of this I'd like to have all dtsi for the newer SoCs changed
+to get
+
+	"fsl,imx6sl-wdt", "fsl,imx35-wdt"
+
+and if you really want to add all these compatibles, add a comment that
+these are really fsl,imx35-wdt and were added to work around broken
+dtbs.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
