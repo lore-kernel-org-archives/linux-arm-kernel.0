@@ -1,54 +1,43 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sun, 11 Dec 2016 11:16:15 -0800
-Subject: [PATCH] ARM: ep93xx: Disable TS-72xx watchdog before uncompressing
-Message-ID: <20161211191615.13696-1-f.fainelli@gmail.com>
+From: peter@korsgaard.com (Peter Korsgaard)
+Date: Sun, 11 Dec 2016 21:01:59 +0100
+Subject: [RFC v3 PATCH 00/25] Allow NOMMU for MULTIPLATFORM
+In-Reply-To: <20161211070104.GB3035@afzalpc> (Afzal Mohammed's message of
+ "Sun, 11 Dec 2016 12:31:04 +0530")
+References: <1480691143-19845-1-git-send-email-vladimir.murzin@arm.com>
+ <20161210181639.GA5660@afzalpc> <878trntrig.fsf@dell.be.48ers.dk>
+ <20161211070104.GB3035@afzalpc>
+Message-ID: <87fulus094.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TS-72xx/73xx boards have a CPLD watchdog which is configured to
-reset the board after 8 seconds, if the kernel is large enough that this
-takes about this time to decompress the kernel, we will encounter a
-spurious reboot.
+>>>>> "Afzal" == Afzal Mohammed <afzal.mohd.ma@gmail.com> writes:
 
-Do not pull ts72xx.h, but instead locally define what we need to disable
-the watchdog.
+Hi,
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/mach-ep93xx/include/mach/uncompress.h | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ >> You can build a toolchain and initramfs with Buildroot. Have a look at
+ >> the stm32f429 nommu config:
+ >> 
+ >> https://git.buildroot.net/buildroot/tree/configs/stm32f429_disco_defconfig
 
-diff --git a/arch/arm/mach-ep93xx/include/mach/uncompress.h b/arch/arm/mach-ep93xx/include/mach/uncompress.h
-index 03c42e5400d2..b0cf2de77f81 100644
---- a/arch/arm/mach-ep93xx/include/mach/uncompress.h
-+++ b/arch/arm/mach-ep93xx/include/mach/uncompress.h
-@@ -10,6 +10,7 @@
-  */
- 
- #include <mach/ep93xx-regs.h>
-+#include <asm/mach-types.h>
- 
- static unsigned char __raw_readb(unsigned int ptr)
- {
-@@ -75,8 +76,19 @@ static void ethernet_reset(void)
- 		;
- }
- 
-+#define TS72XX_WDT_CONTROL_PHYS_BASE	0x23800000
-+#define TS72XX_WDT_FEED_PHYS_BASE	0x23c00000
-+#define TS72XX_WDT_FEED_VAL		0x05
-+
-+static void __maybe_unused ts72xx_watchdog_disable(void)
-+{
-+	__raw_writeb(TS72XX_WDT_FEED_VAL, TS72XX_WDT_FEED_PHYS_BASE);
-+	__raw_writeb(0, TS72XX_WDT_CONTROL_PHYS_BASE);
-+}
- 
- static void arch_decomp_setup(void)
- {
-+	if (machine_is_ts72xx())
-+		ts72xx_watchdog_disable();
- 	ethernet_reset();
- }
+ > iiuc, it builds one for Cortex-M. i already had a file system w/
+ > busybox compiled using a Cortex-M toolchain (stolen from
+ > Pengutronix's OSELAS.Toolchain), which works on Cortex M4 (Vybrid
+ > VF610 M4 core). But it does not work here, i.e. on Cortex A, seems the
+ > above mentioned also would have the same effect.
+
+Hmm, I'm not sure why a cortex-M toolchain wouldn't work on cortex-A, I
+thought the 'M' instruction set was a pure subset of the 'A'.
+
+ > And in buildroot, couldn't see Cortex R option in menuconfig, and
+ > selecting Cortex-A's excludes flat binary target & presents only with
+ > ELF.
+
+We indeed don't have cortex-R support. I'm not aware of any cortex-R
+Linux support.
+
+When you select a cortex-A variant, then we enable MMU support by
+default, but you can disable it under toolchain options (Enable MMU) and
+then the flat binary option is available.
+
 -- 
-2.9.3
+Bye, Peter Korsgaard
