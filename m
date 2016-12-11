@@ -1,157 +1,88 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 11 Dec 2016 11:26:34 +0100
-Subject: [PATCH v1] watchdog: imx2: fix hang-up on boot for i.MX21,
- i.MX27 and i.MX31 SoCs
-In-Reply-To: <d6d987f1-3461-214a-0ca1-16d310ddd370@mleia.com>
-References: <20161211010648.6591-1-vz@mleia.com>
- <20161211093519.xrxxhrqpc7fmadfr@pengutronix.de>
- <d6d987f1-3461-214a-0ca1-16d310ddd370@mleia.com>
-Message-ID: <20161211102634.jn3awmlzdrm3pqai@pengutronix.de>
+From: lilja.magnus@gmail.com (Magnus Lilja)
+Date: Sun, 11 Dec 2016 11:34:29 +0100
+Subject: i.MX31 3DS board not booting after commit 1c2f87c22... ARM: 8025/1:
+ Get rid of meminfo
+Message-ID: <27bbaa4c-7c8d-cf76-c98f-e8edc89367db@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vladimir,
+Hi,
 
-On Sun, Dec 11, 2016 at 12:01:08PM +0200, Vladimir Zapolskiy wrote:
-> On 12/11/2016 11:35 AM, Uwe Kleine-K?nig wrote:
-> > On Sun, Dec 11, 2016 at 03:06:48AM +0200, Vladimir Zapolskiy wrote:
-> >> Power down counter enable/disable bit switch is located in WMCR
-> >> register, but watchdog controllers found on legacy i.MX21, i.MX27 and
-> >> i.MX31 SoCs don't have this register. As a result of writing data to
-> >> the non-existing register on driver probe the SoC hangs up, to fix the
-> >> problem add more OF compatible strings and on this basis get
-> >> information about availability of the WMCR register.
-> >>
-> >> Fixes: 5fe65ce7ccbb ("watchdog: imx2_wdt: Disable power down counter on boot")
-> >> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> >> ---
-> 
-> [snip]
-> 
-> >>  
-> >>  static const struct of_device_id imx2_wdt_dt_ids[] = {
-> >> -	{ .compatible = "fsl,imx21-wdt", },
-> >> +	{ .compatible = "fsl,imx21-wdt", .data = IMX2_WDT_NO_WMCR },
-> >> +	{ .compatible = "fsl,imx25-wdt",  },
-> >> +	{ .compatible = "fsl,imx27-wdt", .data = IMX2_WDT_NO_WMCR },
-> >> +	{ .compatible = "fsl,imx31-wdt", .data = IMX2_WDT_NO_WMCR },
-> >> +	{ .compatible = "fsl,imx35-wdt",  },
-> >> +	{ .compatible = "fsl,imx50-wdt",  },
-> >> +	{ .compatible = "fsl,imx51-wdt",  },
-> >> +	{ .compatible = "fsl,imx53-wdt",  },
-> >> +	{ .compatible = "fsl,imx6q-wdt",  },
-> >> +	{ .compatible = "fsl,imx6sl-wdt", },
-> >> +	{ .compatible = "fsl,imx6sx-wdt", },
-> >> +	{ .compatible = "fsl,imx6ul-wdt", },
-> >> +	{ .compatible = "fsl,imx7d-wdt",  },
-> >> +	{ .compatible = "fsl,vf610-wdt",  },
-> > 
-> > Up to now we only had fsl,imx21-wdt, now it seems that iMX31, i.MX27 and
-> > i.MX21 form a group of equal watchdog IPs and the others form another
-> > group, right?
-> > 
-> > So conceptually we should differenciate between
-> > 
-> > 	fsl,imx21-wdt (which is used on i.MX21, i.MX27 and i.MX31)
-> > 	fsl,imx35-wdt (which is used on all others)
-> > 
-> 
-> The problem is that "fsl,imx35-wdt" is not used on all others in the
-> existing DTS, i.e. in the old firmware, which shall be compatible with
-> new changes.
+I'm trying to get current modern Linux kernels to boot on the i.MX31 PDK 
+board (a.k.a MX31_3DS).
 
-So old i.MX53 has
+One problem I've noticed is that I have to comment out the following 
+code from mach-mx31_3ds.c, the reserve function is registered as 
+mach_desc->reserve . If I leave this function as is the kernel stops 
+very early in the boot (see end of the mail).
 
-	compatible = "fsl,imx53-wdt", "fsl,imx21-wdt";
+static void __init mx31_3ds_reserve(void)
+{
+	/* reserve MX31_3DS_CAMERA_BUF_SIZE bytes for mx3-camera */
+	mx3_camera_base = arm_memblock_steal(MX31_3DS_CAMERA_BUF_SIZE,
+					 MX31_3DS_CAMERA_BUF_SIZE);
+}
 
-. With the change to the driver it's like using the watchdog driver in
-it's pre-5fe65ce7ccbb4-state on it. If this is bad, we must indeed make
-fsl,imx53-wdt known to the driver. If not, just adding a single new
-compatible to the driver is just fine.
+The commits that causes this problem (according to git bisect) is:
+[1c2f87c22566cd057bc8cde10c37ae9da1a1bb76] ARM: 8025/1: Get rid of meminfo
 
-If you want to call it imx25 or imx35 doesn't matter much. The reason I
-picked imx35 is that this one was already picked before for cspi. This
-suggests that i.MX35 is older than i.MX25 and so this is the canonical
-choice.
+(Yes, it's been a while since I last tried to boot a modern kernel on 
+this board)
 
-> $ grep -H 'fsl,imx.*-wdt' arch/arm/boot/dts/*.dtsi
-> arch/arm/boot/dts/imx25.dtsi:				compatible = "fsl,imx25-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx27.dtsi:				compatible = "fsl,imx27-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx35.dtsi:				compatible = "fsl,imx35-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx50.dtsi:				compatible = "fsl,imx50-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx51.dtsi:				compatible = "fsl,imx51-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx51.dtsi:				compatible = "fsl,imx51-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx53.dtsi:				compatible = "fsl,imx53-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx53.dtsi:				compatible = "fsl,imx53-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx6qdl.dtsi:				compatible = "fsl,imx6q-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx6qdl.dtsi:				compatible = "fsl,imx6q-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx6sl.dtsi:				compatible = "fsl,imx6sl-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx6sl.dtsi:				compatible = "fsl,imx6sl-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx6sx.dtsi:				compatible = "fsl,imx6sx-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx6sx.dtsi:				compatible = "fsl,imx6sx-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx6sx.dtsi:				compatible = "fsl,imx6sx-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx6ul.dtsi:				compatible = "fsl,imx6ul-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx6ul.dtsi:				compatible = "fsl,imx6ul-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx7s.dtsi:				compatible = "fsl,imx7d-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx7s.dtsi:				compatible = "fsl,imx7d-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx7s.dtsi:				compatible = "fsl,imx7d-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/imx7s.dtsi:				compatible = "fsl,imx7d-wdt", "fsl,imx21-wdt";
-> arch/arm/boot/dts/ls1021a.dtsi:			compatible = "fsl,imx21-wdt";
-> arch/arm/boot/dts/vfxxx.dtsi:				compatible = "fsl,vf610-wdt", "fsl,imx21-wdt";
-> 
-> I don't see a confirmation of the fact that "fsl,imx35-wdt" is the best
-> selection, hence definitely "fsl,imx25-wdt" overscores it.
+I'm using the imx_v6_v7_defconfig.
 
-I stated my reason to pick imx35 over imx25 above. Why do yo prefer
-imx25?
+Kernel boot log using earlyprintk. (the arm_memblock_init NNN lines are 
+my added printk's)
 
-> > A reason to add e.g. fsl,imx6sl-wdt is that dtbs in the wild use
-> > 
-> > 	"fsl,imx6sl-wdt", "fsl,imx21-wdt"
-> > 
-> > . But then I wonder if 
-> > 
-> > 	5fe65ce7ccbb ("watchdog: imx2_wdt: Disable power down counter on boot")
-> > 
-> > is that important to justify to add these all.
-> 
-> About this comment I don't know, you may have better insight about the original
-> change. By the way, in barebox you may want to fix the same hang-up, because
-> you touch WMCR unconditionally.
+Uncompressing Linux... done, booting the kernel.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 4.9.0-rc7-dirty (lilja at xubuntu-14-04) (gcc 
+version 4. 8.3 20140320 (prerelease) (Sourcery CodeBench Lite 
+2014.05-29) ) #150 SMP Sun Dec 11 11:12:32 CET 2016
+[    0.000000] CPU: ARMv6-compatible processor [4107b364] revision 4 
+(ARMv6TEJ), cr=00c5387d
+[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT nonaliasing 
+instruction cache
+[    0.000000] Machine: Freescale MX31PDK (3DS)
+[    0.000000] bootconsole [earlycon0] enabled
+[    0.000000] arm_memblock_init 268
+[    0.000000] arm_memblock_init 273
+[    0.000000] arm_memblock_init 277
+[    0.000000] cma: Reserved 16 MiB at 0x86800000
+[    0.000000] arm_memblock_init 281
+[    0.000000] Memory policy: Data cache writeback
+[    0.000000] CPU: All CPU(s) started in SVC mode.
+[    0.000000] percpu: Embedded 14 pages/cpu @c64f0000 s26688 r8192 
+d22464 u57344
+[    0.000000] Built 1 zonelists in Zone order, mobility grouping on. 
+Total pages: 30464
+[    0.000000] Kernel command line: console=ttymxc0,115200 earlyprintk
+[    0.000000] PID hash table entries: 512 (order: -1, 2048 bytes)
+[    0.000000] Dentry cache hash table entries: 16384 (order: 4, 65536 
+bytes)
+[    0.000000] Inode-cache hash table entries: 8192 (order: 3, 32768 bytes)
 
-Sure.
- 
-> > Independant of this I'd like to have all dtsi for the newer SoCs changed
-> > to get
-> > 
-> > 	"fsl,imx6sl-wdt", "fsl,imx35-wdt"
-> > 
-> > and if you really want to add all these compatibles, add a comment that
-> > these are really fsl,imx35-wdt and were added to work around broken
-> > dtbs.
-> 
-> No objections, but
-> 
-> 1) I'd like to see "fsl,imx25-wdt" as a new common compatible, and that's
-> what have been proposed and shared in RFC 2/2.
+This is where boot stops. If I comment out the arm_memblock_steal() call 
+from mx31_3ds_reserve() the boot works and the next couple of lines are:
 
-Yeah, I missed that other patch (which was not part of this series).
+[    0.000000] Memory: 92564K/131072K available (8192K kernel code, 360K 
+rwdata, 2 280K rodata, 1024K init, 8218K bss, 22124K reserved, 16384K 
+cma-reserved, 0K highmem)
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+[    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+[    0.000000]     vmalloc : 0xc8800000 - 0xff800000   ( 880 MB)
+[    0.000000]     lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
+[    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+[    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+[    0.000000]       .text : 0xc0008000 - 0xc0900000   (9184 kB)
+[    0.000000]       .init : 0xc0c00000 - 0xc0d00000   (1024 kB)
+[    0.000000]       .data : 0xc0d00000 - 0xc0d5a120   ( 361 kB
 
-> 2) Please remind me, why do you ask to drop "fsl,imx21-wdt" from the list?
-> 
->      compatible = "fsl,imx6sx-wdt", "fsl,imx25-wdt", "fsl,imx21-wdt";
-> 
-> The list of compatibles above is valid (from the most specific on the left
-> to the most generic on the right), and that compatible property is rightly
-> handled in the driver with this change applied. I don't see a need to
-> drop "fsl,imx21-wdt".
 
-If the wdt in the i.MX6SX can be operated by the watchdog driver in it's
-imx21 mode, you should keep the imx21 entry. If not, you shouldn't.
+I have really no clue why that commit causes problems. There are not a 
+lot of boards using mach_desc->reserve .
 
-Best regards
-Uwe
+Any ideas on how to fix or debug this?
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards, Magnus
