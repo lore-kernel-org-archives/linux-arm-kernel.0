@@ -1,81 +1,106 @@
-From: alex.popov@linux.com (Alexander Popov)
-Date: Sun, 11 Dec 2016 03:50:55 +0300
-Subject: [PATCH 1/2] arm64: setup: introduce kaslr_offset()
-In-Reply-To: <1481417456-28826-1-git-send-email-alex.popov@linux.com>
-References: <1481417456-28826-1-git-send-email-alex.popov@linux.com>
-Message-ID: <1481417456-28826-2-git-send-email-alex.popov@linux.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Sun, 11 Dec 2016 03:06:48 +0200
+Subject: [PATCH v1] watchdog: imx2: fix hang-up on boot for i.MX21,
+ i.MX27 and i.MX31 SoCs
+Message-ID: <20161211010648.6591-1-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce kaslr_offset() similarly to x86_64 for fixing kcov.
+Power down counter enable/disable bit switch is located in WMCR
+register, but watchdog controllers found on legacy i.MX21, i.MX27 and
+i.MX31 SoCs don't have this register. As a result of writing data to
+the non-existing register on driver probe the SoC hangs up, to fix the
+problem add more OF compatible strings and on this basis get
+information about availability of the WMCR register.
 
-Signed-off-by: Alexander Popov <alex.popov@linux.com>
+Fixes: 5fe65ce7ccbb ("watchdog: imx2_wdt: Disable power down counter on boot")
+Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
- arch/arm64/include/asm/setup.h      | 19 +++++++++++++++++++
- arch/arm64/include/uapi/asm/setup.h |  4 ++--
- arch/arm64/kernel/setup.c           |  8 ++++----
- 3 files changed, 25 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm64/include/asm/setup.h
+Changes from RFC to v1:
+* replaced private data struct with a macro as suggested by Guenter,
+* updated the comment in the source code to reflect the change,
+* rearranged and simplified the logic of detecting WMCR presence,
+* pulled the fix out from the series with optional proposed DTS changes.
 
-diff --git a/arch/arm64/include/asm/setup.h b/arch/arm64/include/asm/setup.h
-new file mode 100644
-index 0000000..e7b59b9
---- /dev/null
-+++ b/arch/arm64/include/asm/setup.h
-@@ -0,0 +1,19 @@
-+/*
-+ * arch/arm64/include/asm/setup.h
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ASM_SETUP_H
-+#define __ASM_SETUP_H
-+
-+#include <uapi/asm/setup.h>
-+
-+static inline unsigned long kaslr_offset(void)
-+{
-+	return kimage_vaddr - KIMAGE_VADDR;
-+}
-+
-+#endif
-diff --git a/arch/arm64/include/uapi/asm/setup.h b/arch/arm64/include/uapi/asm/setup.h
-index 9cf2e46..26631c8 100644
---- a/arch/arm64/include/uapi/asm/setup.h
-+++ b/arch/arm64/include/uapi/asm/setup.h
-@@ -16,8 +16,8 @@
-  * You should have received a copy of the GNU General Public License
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
--#ifndef __ASM_SETUP_H
--#define __ASM_SETUP_H
-+#ifndef _UAPI__ASM_SETUP_H
-+#define _UAPI__ASM_SETUP_H
+ drivers/watchdog/imx2_wdt.c | 30 +++++++++++++++++++++++++-----
+ 1 file changed, 25 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+index 4874b0f..66bd454 100644
+--- a/drivers/watchdog/imx2_wdt.c
++++ b/drivers/watchdog/imx2_wdt.c
+@@ -30,6 +30,7 @@
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/platform_device.h>
+ #include <linux/regmap.h>
+ #include <linux/watchdog.h>
+@@ -57,6 +58,7 @@
+ #define IMX2_WDT_WICR_WICT	0xFF		/* -> Interrupt Count Timeout */
  
- #include <linux/types.h>
+ #define IMX2_WDT_WMCR		0x08		/* Misc Register */
++#define IMX2_WDT_NO_WMCR	((void *)true)	/* Indicates unavailable WMCR */
  
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index f534f49..11eefda5 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -329,11 +329,11 @@ subsys_initcall(topology_init);
- static int dump_kernel_offset(struct notifier_block *self, unsigned long v,
- 			      void *p)
+ #define IMX2_WDT_MAX_TIME	128
+ #define IMX2_WDT_DEFAULT_TIME	60		/* in seconds */
+@@ -70,6 +72,8 @@ struct imx2_wdt_device {
+ 	bool ext_reset;
+ };
+ 
++static const struct of_device_id imx2_wdt_dt_ids[];
++
+ static bool nowayout = WATCHDOG_NOWAYOUT;
+ module_param(nowayout, bool, 0);
+ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
+@@ -242,6 +246,7 @@ static const struct regmap_config imx2_wdt_regmap_config = {
+ 
+ static int __init imx2_wdt_probe(struct platform_device *pdev)
  {
--	u64 const kaslr_offset = kimage_vaddr - KIMAGE_VADDR;
-+	const unsigned long offset = kaslr_offset();
- 
--	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE) && kaslr_offset > 0) {
--		pr_emerg("Kernel Offset: 0x%llx from 0x%lx\n",
--			 kaslr_offset, KIMAGE_VADDR);
-+	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE) && offset > 0) {
-+		pr_emerg("Kernel Offset: 0x%lx from 0x%lx\n",
-+			 offset, KIMAGE_VADDR);
- 	} else {
- 		pr_emerg("Kernel Offset: disabled\n");
++	const struct of_device_id *of_id;
+ 	struct imx2_wdt_device *wdev;
+ 	struct watchdog_device *wdog;
+ 	struct resource *res;
+@@ -310,11 +315,13 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
  	}
+ 
+ 	/*
+-	 * Disable the watchdog power down counter at boot. Otherwise the power
+-	 * down counter will pull down the #WDOG interrupt line for one clock
+-	 * cycle.
++	 * If watchdog controller has WMCR, disable the watchdog power
++	 * down counter at boot. Otherwise the power down counter will
++	 * pull down the #WDOG interrupt line for one clock cycle.
+ 	 */
+-	regmap_write(wdev->regmap, IMX2_WDT_WMCR, 0);
++	of_id = of_match_device(imx2_wdt_dt_ids, &pdev->dev);
++	if (of_id && !of_id->data)
++		regmap_write(wdev->regmap, IMX2_WDT_WMCR, 0);
+ 
+ 	ret = watchdog_register_device(wdog);
+ 	if (ret) {
+@@ -412,7 +419,20 @@ static SIMPLE_DEV_PM_OPS(imx2_wdt_pm_ops, imx2_wdt_suspend,
+ 			 imx2_wdt_resume);
+ 
+ static const struct of_device_id imx2_wdt_dt_ids[] = {
+-	{ .compatible = "fsl,imx21-wdt", },
++	{ .compatible = "fsl,imx21-wdt", .data = IMX2_WDT_NO_WMCR },
++	{ .compatible = "fsl,imx25-wdt",  },
++	{ .compatible = "fsl,imx27-wdt", .data = IMX2_WDT_NO_WMCR },
++	{ .compatible = "fsl,imx31-wdt", .data = IMX2_WDT_NO_WMCR },
++	{ .compatible = "fsl,imx35-wdt",  },
++	{ .compatible = "fsl,imx50-wdt",  },
++	{ .compatible = "fsl,imx51-wdt",  },
++	{ .compatible = "fsl,imx53-wdt",  },
++	{ .compatible = "fsl,imx6q-wdt",  },
++	{ .compatible = "fsl,imx6sl-wdt", },
++	{ .compatible = "fsl,imx6sx-wdt", },
++	{ .compatible = "fsl,imx6ul-wdt", },
++	{ .compatible = "fsl,imx7d-wdt",  },
++	{ .compatible = "fsl,vf610-wdt",  },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, imx2_wdt_dt_ids);
 -- 
-2.7.4
+2.10.2
