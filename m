@@ -1,50 +1,39 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Sun, 11 Dec 2016 00:37:37 +0200
-Subject: [RFC PATCH 1/2] watchdog: imx2: fix hang-up on boot for i.MX21,
- i.MX27 and i.MX31 SoCs
-In-Reply-To: <CAM=E1R6hzob5ZzyTLmrLL5s-6=vbZQbCig1sLHMSLChJEz9YgA@mail.gmail.com>
-References: <1474850361-20884-1-git-send-email-vz@mleia.com>
- <1474850361-20884-2-git-send-email-vz@mleia.com>
- <ebece25b-7a3b-3fdf-d117-dd0a3a2975b7@roeck-us.net>
- <CAM=E1R6hzob5ZzyTLmrLL5s-6=vbZQbCig1sLHMSLChJEz9YgA@mail.gmail.com>
-Message-ID: <0a621c8e-9f75-5951-5f0a-a8e1f62572b7@mleia.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 11 Dec 2016 08:14:04 +0800
+Subject: [PATCH 3/3] crypto: brcm: Add Broadcom SPU driver DT entry.
+In-Reply-To: <1480536453-24781-4-git-send-email-rob.rice@broadcom.com>
+Message-ID: <201612110810.BEVbRp0B%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+Hi Rob,
 
-On 12/10/2016 09:28 PM, Magnus Lilja wrote:
-> Hi,
->
-> On 26 September 2016 at 15:02, Guenter Roeck <linux@roeck-us.net> wrote:
->> On 09/25/2016 05:39 PM, Vladimir Zapolskiy wrote:
->>>
->>> Power down counter enable/disable bit switch is located in WMCR
->>> register, but watchdog controllers found on legacy i.MX21, i.MX27 and
->>> i.MX31 SoCs don't have this register. As a result of writing data to
->>> the non-existing register on driver probe the SoC hangs up, to fix the
->>> problem add more OF compatible strings and on this basis get
->>> information about availability of the WMCR register.
->>>
->>> Fixes: 5fe65ce7ccbb ("watchdog: imx2_wdt: Disable power down counter on
->>> boot")
->>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
->>> ---
+[auto build test ERROR on cryptodev/master]
+[also build test ERROR on v4.9-rc8]
+[cannot apply to next-20161209]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-[snip]
+url:    https://github.com/0day-ci/linux/commits/Rob-Rice/crypto-brcm-DT-documentation-for-Broadcom-SPU-driver/20161202-010038
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/herbert/cryptodev-2.6.git master
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
->
-> Has this patch (or an updated one) been merged in any tree? I've
-> tested it on a i.MX31 board with positive result.
->
+All errors (new ones prefixed by >>):
 
-no, it's not in the linux-watchdog repository at the moment, I'm going
-to fix Guenter's review comments and send the change today or tomorrow
-in hope that it enters v4.10.
+>> ERROR: Input tree has errors, aborting (use -f to force output)
 
-Thank you for testing, for your information I'm on the way to send more
-i.MX31 changes to get better i.MX31 device tree support.
-
---
-With best wishes,
-Vladimir
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 31957 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161211/bead5da1/attachment-0001.gz>
