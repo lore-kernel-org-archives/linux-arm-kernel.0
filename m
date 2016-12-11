@@ -1,37 +1,31 @@
-From: arvind.yadav.cs@gmail.com (arvind Yadav)
-Date: Sun, 11 Dec 2016 13:34:06 +0530
-Subject: [PATCH V1] pinctrl:pxa:pinctrl-pxa2xx:- No need of devm functions
-In-Reply-To: <87eg1g16r8.fsf@belgarion.home>
-References: <1481207730-6332-1-git-send-email-arvind.yadav.cs@gmail.com>
- <87eg1g16r8.fsf@belgarion.home>
-Message-ID: <e6f176d2-c5f0-e3f5-0cc4-576c605da387@gmail.com>
+From: lilja.magnus@gmail.com (Magnus Lilja)
+Date: Sun, 11 Dec 2016 09:58:33 +0100
+Subject: [PATCH v1] watchdog: imx2: fix hang-up on boot for i.MX21, i.MX27
+ and i.MX31 SoCs
+In-Reply-To: <20161211010648.6591-1-vz@mleia.com>
+References: <20161211010648.6591-1-vz@mleia.com>
+Message-ID: <CAM=E1R4Mr_QG1H9S8vriBvMRrWE8frYgQpXB2EZ=1d2U-pRaiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yes, It will not fixes any defect. But we are going to free allocate
-memory then why we need devm api. In this case Devm will first add this
-entry to list and immediately  it will remove from list.
+Hi
 
--Arvind
+Excellent!
 
-On Saturday 10 December 2016 02:49 PM, Robert Jarzmik wrote:
-> Arvind Yadav <arvind.yadav.cs@gmail.com> writes:
+On 11 December 2016 at 02:06, Vladimir Zapolskiy <vz@mleia.com> wrote:
+> Power down counter enable/disable bit switch is located in WMCR
+> register, but watchdog controllers found on legacy i.MX21, i.MX27 and
+> i.MX31 SoCs don't have this register. As a result of writing data to
+> the non-existing register on driver probe the SoC hangs up, to fix the
+> problem add more OF compatible strings and on this basis get
+> information about availability of the WMCR register.
 >
-> Hi Arvind,
->
->> In functions pxa2xx_build_functions, the memory allocated for
->> 'functions' is live within the function only. After the
->> allocation it is immediately freed with devm_kfree. There is
->> no need to allocate memory for 'functions' with devm function
->> so replace devm_kcalloc  with kcalloc and devm_kfree with kfree.
-> That's not very true : the "need" is to spare the "manual" kfree you're adding
-> in your patch for one, and make it consistent with pxa2xx_build_groups() and
-> pxa2xx_build_state() for two.
->
-> Therefore I'm not very thrilled by this patch and unless it fixes a defect in
-> the driver I'd rather not have it in.
->
-> Cheers.
->
-> --
-> Robert
+> Fixes: 5fe65ce7ccbb ("watchdog: imx2_wdt: Disable power down counter on boot")
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> ---
+
+Tested-by: Magnus Lilja <lilja.magnus@gmail.com>
+
+(Tested on i.MX31 without device tree)
+
+/Magnus
