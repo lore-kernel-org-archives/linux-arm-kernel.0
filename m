@@ -1,117 +1,111 @@
-From: ddutile@redhat.com (Don Dutile)
-Date: Sat, 10 Dec 2016 21:05:53 -0500
-Subject: [RFC v3 00/10] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
- reserved regions
-In-Reply-To: <c5d4efa7-699d-4aa3-44cc-4ce03d0ce185@redhat.com>
-References: <1479215363-2898-1-git-send-email-eric.auger@redhat.com>
- <c5d4efa7-699d-4aa3-44cc-4ce03d0ce185@redhat.com>
-Message-ID: <584CB481.3040902@redhat.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 10 Dec 2016 18:18:48 -0800
+Subject: [PATCH v1] watchdog: imx2: fix hang-up on boot for i.MX21, i.MX27
+ and i.MX31 SoCs
+In-Reply-To: <20161211010648.6591-1-vz@mleia.com>
+References: <20161211010648.6591-1-vz@mleia.com>
+Message-ID: <2063cf00-d9fd-e312-e97a-4ac75a58b6aa@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08/2016 04:36 AM, Auger Eric wrote:
-> Hi,
+On 12/10/2016 05:06 PM, Vladimir Zapolskiy wrote:
+> Power down counter enable/disable bit switch is located in WMCR
+> register, but watchdog controllers found on legacy i.MX21, i.MX27 and
+> i.MX31 SoCs don't have this register. As a result of writing data to
+> the non-existing register on driver probe the SoC hangs up, to fix the
+> problem add more OF compatible strings and on this basis get
+> information about availability of the WMCR register.
 >
-> On 15/11/2016 14:09, Eric Auger wrote:
->> Following LPC discussions, we now report reserved regions through
->> iommu-group sysfs reserved_regions attribute file.
->
->
-> While I am respinning this series into v4, here is a tentative summary
-> of technical topics for which no consensus was reached at this point.
->
-> 1) Shall we report the usable IOVA range instead of reserved IOVA
->     ranges. Not discussed at/after LPC.
->     x I currently report reserved regions. Alex expressed the need to
->       report the full usable IOVA range instead (x86 min-max range
->       minus MSI APIC window). I think this is meaningful for ARM
->       too where arm-smmu might not support the full 64b range.
->     x Any objection we report the usable IOVA regions instead?
->
-> 2) Shall the kernel check collision with MSI window* when userspace
->     calls VFIO_IOMMU_MAP_DMA?
->     Joerg/Will No; Alex yes
->     *for IOVA regions consumed downstream to the IOMMU: everyone says NO
->
-> 3) RMRR reporting in the iommu group sysfs? Joerg: yes; Don: no
-Um, I'm missing context, but the only thing I recall saying no to wrt RMRR
-is that _any_ device that has an RMRR cannot be assigned to a guest.
-Or, are you saying, RMRR's should be exposed in the guest os?  if so, then
-you have my 'no' there.
+> Fixes: 5fe65ce7ccbb ("watchdog: imx2_wdt: Disable power down counter on boot")
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 
->     My current series does not expose them in iommu group sysfs.
->     I understand we can expose the RMRR regions in the iomm group sysfs
->     without necessarily supporting RMRR requiring device assignment.
-This sentence doesn't make sense to me.
-Can you try re-wording it?
-I can't tell what RMRR has to do w/device assignment, other than what I said above.
-Exposing RMRR's in sysfs is not an issue in general.
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
->     We can also add this support later.
+> ---
+> Changes from RFC to v1:
+> * replaced private data struct with a macro as suggested by Guenter,
+> * updated the comment in the source code to reflect the change,
+> * rearranged and simplified the logic of detecting WMCR presence,
+> * pulled the fix out from the series with optional proposed DTS changes.
 >
-> Thanks
+>  drivers/watchdog/imx2_wdt.c | 30 +++++++++++++++++++++++++-----
+>  1 file changed, 25 insertions(+), 5 deletions(-)
 >
-> Eric
+> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+> index 4874b0f..66bd454 100644
+> --- a/drivers/watchdog/imx2_wdt.c
+> +++ b/drivers/watchdog/imx2_wdt.c
+> @@ -30,6 +30,7 @@
+>  #include <linux/module.h>
+>  #include <linux/moduleparam.h>
+>  #include <linux/of_address.h>
+> +#include <linux/of_device.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/regmap.h>
+>  #include <linux/watchdog.h>
+> @@ -57,6 +58,7 @@
+>  #define IMX2_WDT_WICR_WICT	0xFF		/* -> Interrupt Count Timeout */
 >
+>  #define IMX2_WDT_WMCR		0x08		/* Misc Register */
+> +#define IMX2_WDT_NO_WMCR	((void *)true)	/* Indicates unavailable WMCR */
 >
->>
->> Reserved regions are populated through the IOMMU get_resv_region callback
->> (former get_dm_regions), now implemented by amd-iommu, intel-iommu and
->> arm-smmu.
->>
->> The intel-iommu reports the [FEE0_0000h - FEF0_000h] MSI window as an
->> IOMMU_RESV_NOMAP reserved region.
->>
->> arm-smmu reports the MSI window (arbitrarily located at 0x8000000 and
->> 1MB large) and the PCI host bridge windows.
->>
->> The series integrates a not officially posted patch from Robin:
->> "iommu/dma: Allow MSI-only cookies".
->>
->> This series currently does not address IRQ safety assessment.
->>
->> Best Regards
->>
->> Eric
->>
->> Git: complete series available at
->> https://github.com/eauger/linux/tree/v4.9-rc5-reserved-rfc-v3
->>
->> History:
->> RFC v2 -> v3:
->> - switch to an iommu-group sysfs API
->> - use new dummy allocator provided by Robin
->> - dummy allocator initialized by vfio-iommu-type1 after enumerating
->>    the reserved regions
->> - at the moment ARM MSI base address/size is left unchanged compared
->>    to v2
->> - we currently report reserved regions and not usable IOVA regions as
->>    requested by Alex
->>
->> RFC v1 -> v2:
->> - fix intel_add_reserved_regions
->> - add mutex lock/unlock in vfio_iommu_type1
->>
->>
->> Eric Auger (10):
->>    iommu/dma: Allow MSI-only cookies
->>    iommu: Rename iommu_dm_regions into iommu_resv_regions
->>    iommu: Add new reserved IOMMU attributes
->>    iommu: iommu_alloc_resv_region
->>    iommu: Do not map reserved regions
->>    iommu: iommu_get_group_resv_regions
->>    iommu: Implement reserved_regions iommu-group sysfs file
->>    iommu/vt-d: Implement reserved region get/put callbacks
->>    iommu/arm-smmu: Implement reserved region get/put callbacks
->>    vfio/type1: Get MSI cookie
->>
->>   drivers/iommu/amd_iommu.c       |  20 +++---
->>   drivers/iommu/arm-smmu.c        |  52 +++++++++++++++
->>   drivers/iommu/dma-iommu.c       | 116 ++++++++++++++++++++++++++-------
->>   drivers/iommu/intel-iommu.c     |  50 ++++++++++----
->>   drivers/iommu/iommu.c           | 141 ++++++++++++++++++++++++++++++++++++----
->>   drivers/vfio/vfio_iommu_type1.c |  26 ++++++++
->>   include/linux/dma-iommu.h       |   7 ++
->>   include/linux/iommu.h           |  49 ++++++++++----
->>   8 files changed, 391 insertions(+), 70 deletions(-)
->>
+>  #define IMX2_WDT_MAX_TIME	128
+>  #define IMX2_WDT_DEFAULT_TIME	60		/* in seconds */
+> @@ -70,6 +72,8 @@ struct imx2_wdt_device {
+>  	bool ext_reset;
+>  };
+>
+> +static const struct of_device_id imx2_wdt_dt_ids[];
+> +
+>  static bool nowayout = WATCHDOG_NOWAYOUT;
+>  module_param(nowayout, bool, 0);
+>  MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
+> @@ -242,6 +246,7 @@ static const struct regmap_config imx2_wdt_regmap_config = {
+>
+>  static int __init imx2_wdt_probe(struct platform_device *pdev)
+>  {
+> +	const struct of_device_id *of_id;
+>  	struct imx2_wdt_device *wdev;
+>  	struct watchdog_device *wdog;
+>  	struct resource *res;
+> @@ -310,11 +315,13 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
+>  	}
+>
+>  	/*
+> -	 * Disable the watchdog power down counter at boot. Otherwise the power
+> -	 * down counter will pull down the #WDOG interrupt line for one clock
+> -	 * cycle.
+> +	 * If watchdog controller has WMCR, disable the watchdog power
+> +	 * down counter at boot. Otherwise the power down counter will
+> +	 * pull down the #WDOG interrupt line for one clock cycle.
+>  	 */
+> -	regmap_write(wdev->regmap, IMX2_WDT_WMCR, 0);
+> +	of_id = of_match_device(imx2_wdt_dt_ids, &pdev->dev);
+> +	if (of_id && !of_id->data)
+> +		regmap_write(wdev->regmap, IMX2_WDT_WMCR, 0);
+>
+>  	ret = watchdog_register_device(wdog);
+>  	if (ret) {
+> @@ -412,7 +419,20 @@ static SIMPLE_DEV_PM_OPS(imx2_wdt_pm_ops, imx2_wdt_suspend,
+>  			 imx2_wdt_resume);
+>
+>  static const struct of_device_id imx2_wdt_dt_ids[] = {
+> -	{ .compatible = "fsl,imx21-wdt", },
+> +	{ .compatible = "fsl,imx21-wdt", .data = IMX2_WDT_NO_WMCR },
+> +	{ .compatible = "fsl,imx25-wdt",  },
+> +	{ .compatible = "fsl,imx27-wdt", .data = IMX2_WDT_NO_WMCR },
+> +	{ .compatible = "fsl,imx31-wdt", .data = IMX2_WDT_NO_WMCR },
+> +	{ .compatible = "fsl,imx35-wdt",  },
+> +	{ .compatible = "fsl,imx50-wdt",  },
+> +	{ .compatible = "fsl,imx51-wdt",  },
+> +	{ .compatible = "fsl,imx53-wdt",  },
+> +	{ .compatible = "fsl,imx6q-wdt",  },
+> +	{ .compatible = "fsl,imx6sl-wdt", },
+> +	{ .compatible = "fsl,imx6sx-wdt", },
+> +	{ .compatible = "fsl,imx6ul-wdt", },
+> +	{ .compatible = "fsl,imx7d-wdt",  },
+> +	{ .compatible = "fsl,vf610-wdt",  },
+>  	{ /* sentinel */ }
+>  };
+>  MODULE_DEVICE_TABLE(of, imx2_wdt_dt_ids);
+>
