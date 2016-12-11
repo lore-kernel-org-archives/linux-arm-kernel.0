@@ -1,22 +1,38 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Sun, 11 Dec 2016 20:12:13 +0530
-Subject: [PATCH RFC 2/2] ARM: nommu: remap exception base address to RAM
-In-Reply-To: <20161211131255.3221-1-afzal.mohd.ma@gmail.com>
-References: <20161211131028.3019-1-afzal.mohd.ma@gmail.com>
- <20161211131255.3221-1-afzal.mohd.ma@gmail.com>
-Message-ID: <20161211144213.GA3199@afzalpc>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 11 Dec 2016 22:48:13 +0800
+Subject: [PATCH 2/3] sys_mmap64()
+In-Reply-To: <1481461003-14361-3-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <201612112221.s0YOV80d%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Yury,
 
-On Sun, Dec 11, 2016 at 06:42:55PM +0530, Afzal Mohammed wrote:
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.9-rc8 next-20161209]
+[cannot apply to mmotm/master]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> Kernel text start at an offset of at least 32K to account for page
-> tables in MMU case.
+url:    https://github.com/0day-ci/linux/commits/Yury-Norov/mm-move-argument-checkers-of-mmap_pgoff-to-separated-routine/20161211-211314
+config: h8300-h8300h-sim_defconfig (attached as .config)
+compiler: h8300-linux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=h8300 
 
-Proper way to put it might have been "32K (to account for 16K initial
-page tables & the old atags)", unless i missed something.
+All errors (new ones prefixed by >>):
 
-Regards
-afzal
+>> arch/h8300/kernel/built-in.o:(.data+0x48c): undefined reference to `sys_mmap64'
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 4484 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161211/8d970fd7/attachment.gz>
