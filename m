@@ -1,44 +1,39 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Sun, 11 Dec 2016 13:51:09 +0100
-Subject: i.MX31 3DS board not booting after commit 1c2f87c22... ARM:
- 8025/1: Get rid of meminfo
-In-Reply-To: <CAOMZO5ChFGrOfgnmaCxw=KwB7ZSp=ZOsmKb_v12_ti48U1NwgA@mail.gmail.com>
-References: <27bbaa4c-7c8d-cf76-c98f-e8edc89367db@gmail.com>
- <CAOMZO5ChFGrOfgnmaCxw=KwB7ZSp=ZOsmKb_v12_ti48U1NwgA@mail.gmail.com>
-Message-ID: <CAM=E1R7yT_TkzMNVHv3ZYud0w+A7t2x+MKU76ViKC7EVuT1+kg@mail.gmail.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Sun, 11 Dec 2016 18:26:39 +0530
+Subject: [Question] New mmap64 syscall?
+In-Reply-To: <20161210092130.GA19309@xo-6d-61-c0.localdomain>
+Message-ID: <1481461003-14361-1-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio,
+This is the draft of sys_mmap64() support in the kernel. For 64-bit
+kernels everything is simple. For 32-bit kernels we have a problem.
+pgoff_t is declared as unsigned long, and should be turned to 
+unsigned long long. It affects the number of structures and interfaces.
+Last patch does the change. It should be wide-tested on 32-bit kernels
+whith I didn't do. Arm64 kernel is working with this patchset, and I don't
+expect difficulties there.
 
-On 11 December 2016 at 13:36, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Magnus,
->
-> On Sun, Dec 11, 2016 at 8:34 AM, Magnus Lilja <lilja.magnus@gmail.com> wrote:
->> Hi,
->>
->> I'm trying to get current modern Linux kernels to boot on the i.MX31 PDK
->> board (a.k.a MX31_3DS).
->>
->> One problem I've noticed is that I have to comment out the following code
->> from mach-mx31_3ds.c, the reserve function is registered as
->> mach_desc->reserve . If I leave this function as is the kernel stops very
->> early in the boot (see end of the mail).
->>
->> static void __init mx31_3ds_reserve(void)
->> {
->>         /* reserve MX31_3DS_CAMERA_BUF_SIZE bytes for mx3-camera */
->>         mx3_camera_base = arm_memblock_steal(MX31_3DS_CAMERA_BUF_SIZE,
->>                                          MX31_3DS_CAMERA_BUF_SIZE);
->> }
->
-> The mx31_3ds_reserve() was used for reserving the buffer for the old
-> mx3_camera driver.
->
-> The mx3_camera driver has been removed since c93cc61475ebbe6 ("[media]
-> staging/media: remove deprecated mx3 driver"), so I would suggest you
-> to send a patch that just removes mx31_3ds_reserve().
+Yury Norov (3):
+  mm: move argument checkers of mmap_pgoff() to separated routine
+  sys_mmap64()
+  mm: turn page offset types to 64-bit
 
-Thanks for the info! Will send a patch later!
+ fs/btrfs/extent_io.c              |  2 +-
+ fs/ext2/dir.c                     |  4 +--
+ include/linux/mm.h                |  9 +++---
+ include/linux/radix-tree.h        |  8 ++---
+ include/linux/syscalls.h          |  3 ++
+ include/linux/types.h             |  2 +-
+ include/uapi/asm-generic/unistd.h |  4 ++-
+ lib/radix-tree.c                  |  8 ++---
+ mm/debug.c                        |  2 +-
+ mm/internal.h                     |  2 +-
+ mm/memory.c                       |  4 +--
+ mm/mmap.c                         | 66 ++++++++++++++++++++++++++++++++-------
+ mm/readahead.c                    |  4 +--
+ mm/util.c                         |  3 +-
+ 14 files changed, 85 insertions(+), 36 deletions(-)
 
-Regards, Magnus
+-- 
+2.7.4
