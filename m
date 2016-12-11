@@ -1,30 +1,72 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Sun, 11 Dec 2016 14:21:35 +0100
-Subject: i.MX31 3DS board not booting after commit 1c2f87c22... ARM:
- 8025/1: Get rid of meminfo
-In-Reply-To: <CAOMZO5DYwAHdRqqYM-7dKtRJhuV9oGVWYFWmD0JTZR+WFr-XXA@mail.gmail.com>
-References: <27bbaa4c-7c8d-cf76-c98f-e8edc89367db@gmail.com>
- <CAOMZO5ChFGrOfgnmaCxw=KwB7ZSp=ZOsmKb_v12_ti48U1NwgA@mail.gmail.com>
- <CAM=E1R7yT_TkzMNVHv3ZYud0w+A7t2x+MKU76ViKC7EVuT1+kg@mail.gmail.com>
- <CAOMZO5DYwAHdRqqYM-7dKtRJhuV9oGVWYFWmD0JTZR+WFr-XXA@mail.gmail.com>
-Message-ID: <CAM=E1R5r2F9A61aL_aNicAEoWxQwS+YCmHYpmc+FuSLjgS8Z1w@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 11 Dec 2016 21:31:56 +0800
+Subject: [PATCH 3/3] mm: make pagoff_t type 64-bit
+In-Reply-To: <1481461003-14361-4-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <201612112116.8GzvAvNR%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Hi Yury,
 
-On 11 December 2016 at 13:59, Fabio Estevam <festevam@gmail.com> wrote:
-> Thinking more about it we see that commit c93cc61475ebbe6 ("[media]
-> staging/media: remove deprecated mx3 driver") only appeared in 4.8, so
-> it is OK to remove mx31_3ds_reserve() now, but it will not fix the
-> kernel boot in the previous kernels.
->
-> Commit 1c2f87c22 ("ARM: 8025/1: Get rid of meminfo") is from kernel 3.16 though.
->
-> So it seems we need a proper fix for kernels 3.16-4.8.
+[auto build test WARNING on linus/master]
+[also build test WARNING on v4.9-rc8]
+[cannot apply to mmotm/master next-20161209]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Yes, indeed. There are a couple long term stable kernels in that range
-that needs to be fixed (and also might need other fixes as well to
-boot mx31_3ds).
+url:    https://github.com/0day-ci/linux/commits/Yury-Norov/mm-move-argument-checkers-of-mmap_pgoff-to-separated-routine/20161211-211314
+config: i386-tinyconfig (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-Regards, Magnus
+All warnings (new ones prefixed by >>):
+
+   arch/x86/mm/pgtable.c: In function 'pgd_set_mm':
+>> arch/x86/mm/pgtable.c:108:29: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+     virt_to_page(pgd)->index = (pgoff_t)mm;
+                                ^
+   arch/x86/mm/pgtable.c: In function 'pgd_page_get_mm':
+>> arch/x86/mm/pgtable.c:113:9: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+     return (struct mm_struct *)page->index;
+            ^
+--
+   mm/percpu.c: In function 'pcpu_get_page_chunk':
+>> mm/percpu.c:240:9: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+     return (struct pcpu_chunk *)page->index;
+            ^
+
+vim +108 arch/x86/mm/pgtable.c
+
+68db065c Jeremy Fitzhardinge 2008-03-17  102  	(SHARED_KERNEL_PMD ? KERNEL_PGD_BOUNDARY : PTRS_PER_PGD)
+4f76cd38 Jeremy Fitzhardinge 2008-03-17  103  
+617d34d9 Jeremy Fitzhardinge 2010-09-21  104  
+617d34d9 Jeremy Fitzhardinge 2010-09-21  105  static void pgd_set_mm(pgd_t *pgd, struct mm_struct *mm)
+617d34d9 Jeremy Fitzhardinge 2010-09-21  106  {
+617d34d9 Jeremy Fitzhardinge 2010-09-21  107  	BUILD_BUG_ON(sizeof(virt_to_page(pgd)->index) < sizeof(mm));
+617d34d9 Jeremy Fitzhardinge 2010-09-21 @108  	virt_to_page(pgd)->index = (pgoff_t)mm;
+617d34d9 Jeremy Fitzhardinge 2010-09-21  109  }
+617d34d9 Jeremy Fitzhardinge 2010-09-21  110  
+617d34d9 Jeremy Fitzhardinge 2010-09-21  111  struct mm_struct *pgd_page_get_mm(struct page *page)
+617d34d9 Jeremy Fitzhardinge 2010-09-21  112  {
+617d34d9 Jeremy Fitzhardinge 2010-09-21 @113  	return (struct mm_struct *)page->index;
+617d34d9 Jeremy Fitzhardinge 2010-09-21  114  }
+617d34d9 Jeremy Fitzhardinge 2010-09-21  115  
+617d34d9 Jeremy Fitzhardinge 2010-09-21  116  static void pgd_ctor(struct mm_struct *mm, pgd_t *pgd)
+
+:::::: The code at line 108 was first introduced by commit
+:::::: 617d34d9e5d8326ec8f188c616aa06ac59d083fe x86, mm: Hold mm->page_table_lock while doing vmalloc_sync
+
+:::::: TO: Jeremy Fitzhardinge <jeremy.fitzhardinge@citrix.com>
+:::::: CC: H. Peter Anvin <hpa@linux.intel.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 6363 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161211/a02f0aed/attachment.gz>
