@@ -1,30 +1,22 @@
-From: peter@korsgaard.com (Peter Korsgaard)
-Date: Mon, 12 Dec 2016 21:42:01 +0100
-Subject: [PATCH 0/2] ARM: v7-A !MMU fixes for fun (&fame)
-In-Reply-To: <20161212184429.GA5219@afzalpc> (Afzal Mohammed's message of
- "Tue, 13 Dec 2016 00:14:29 +0530")
-References: <20161211131028.3019-1-afzal.mohd.ma@gmail.com>
- <20161212184429.GA5219@afzalpc>
-Message-ID: <87fuls517q.fsf@dell.be.48ers.dk>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Mon, 12 Dec 2016 22:09:17 +0100
+Subject: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in Cadence GEM.
+In-Reply-To: <07C910AB6AC6C345A093D5A08F5AF568CB74D84D@CHN-SV-EXMX03.mchp-main.com>
+References: <1481134912-2243-1-git-send-email-andrei.pistirica@microchip.com>
+ <20161207193908.GA13062@netboy> <20161207210416.GA27622@netboy>
+ <07C910AB6AC6C345A093D5A08F5AF568CB74AF28@CHN-SV-EXMX03.mchp-main.com>
+ <BN3PR07MB2516992DEE883FAD6DC3ED08C9870@BN3PR07MB2516.namprd07.prod.outlook.com>
+ <07C910AB6AC6C345A093D5A08F5AF568CB74D84D@CHN-SV-EXMX03.mchp-main.com>
+Message-ID: <20161212210917.GA1298@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Afzal" == Afzal Mohammed <afzal.mohd.ma@gmail.com> writes:
+On Mon, Dec 12, 2016 at 10:22:43AM +0000, Andrei.Pistirica at microchip.com wrote:
+> Richard, are you agree with this?
 
- > Hi,
- > On Sun, Dec 11, 2016 at 06:40:28PM +0530, Afzal Mohammed wrote:
+Yes, but please trim your replies next time.  Scrolling through pages
+of quoted headers and stale content in order to read one line is very
+annoying.
 
- >> Kernel reached the stage of invoking user space init & panicked, though
- >> it could not reach till prompt for want of user space executables
- >> 
- >> So far i have not come across a toolchain (or a way to create toolchain)
- >> to create !MMU user space executables for Cortex-A.
-
- > Now able to reach prompt using buildroot initramfs, Thanks to
- > Peter Korsgaard for suggesting the way to create user space executables
- > for !MMU Cortex-A.
-
-Great, thats nice to hear!
-
--- 
-Bye, Peter Korsgaard
+Thanks,
+Richard
