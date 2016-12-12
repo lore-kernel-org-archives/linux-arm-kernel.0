@@ -1,144 +1,114 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 12 Dec 2016 12:16:07 +0000
-Subject: [linux-sunxi] sunxi-ng clocks: leaving certain clocks alone?
-In-Reply-To: <CAGb2v67kCAr6Ty5=Gg8vOGNC6xhuRM66Wa=H+C3AD=_d_H+N8w@mail.gmail.com>
-References: <d70f2809-102c-a3de-c77c-43af27bbcbbc@arm.com>
- <CAGb2v67kCAr6Ty5=Gg8vOGNC6xhuRM66Wa=H+C3AD=_d_H+N8w@mail.gmail.com>
-Message-ID: <4e6ddb18-0686-1639-544c-c02371331d3c@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 12 Dec 2016 12:22:42 +0000
+Subject: [PATCH 1/1] arm: mm: Fix comments in sg_sync functions
+In-Reply-To: <20161212113053.GR16630@valkosipuli.retiisi.org.uk>
+References: <1443471655-28302-1-git-send-email-sakari.ailus@linux.intel.com>
+ <560A6C80.1050808@arm.com>
+ <20161212113053.GR16630@valkosipuli.retiisi.org.uk>
+Message-ID: <7205a598-aa85-89d0-7cff-80ac117ee85b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+Hi Sakari,
 
-thanks for the answer!
-
-On 12/12/16 04:41, Chen-Yu Tsai wrote:
-> On Mon, Dec 12, 2016 at 7:54 AM, Andr? Przywara <andre.przywara@arm.com> wrote:
->> Hi,
->>
->> I was observing that the new sunxi-ng clock code apparently explicitly
->> turns off _all_ clocks that are not used or needed. I find this rather
->> unfortunate, as I wanted to use the THS temperature sensor from ARM
->> Trusted Firmware to implement emergency shutdown or DVFS throttling.
->> That works until the clock framework finds the clock (as enumerated in
->> ccu-sun50i-a64.c) and obviously explicitly clears bit 31 in the THS mod
->> clock register and bit 8 in the respective clock gate register.
->> Turning them manually back on via /dev/mem or removing the THS clock
->> from the sunxi-ng driver fixes this for me.
->>
->> This was not happening with the old Allwinner clocks, since the kernel
->> wouldn't even know about it if there was no driver and the clock wasn't
->> mentioned in the DT.
->>
->> Now with sunxi-ng even though the THS clock is not actually referenced
->> or used in the DT, the kernel turns it off. I would expect that upon
->> entering the kernel all unneeded clocks are turned off anyway, so there
->> is no need to mess with clocks that have no user, but are enumerated in
->> the ccu driver.
+On 12/12/16 11:30, Sakari Ailus wrote:
+> Hi Robin and others,
 > 
-> I can't say that's absolutely true (wink).
-> 
+> On Tue, Sep 29, 2015 at 11:48:32AM +0100, Robin Murphy wrote:
+>> Hi Sakari,
 >>
->> I wonder if this kills simplefb as well, for instance, since I believe
->> that U-Boot needs to turn on certain clocks and relies on them staying up.
+>> On 28/09/15 21:20, Sakari Ailus wrote:
+>>> The comment on the usage of arm_dma_sync_sg_for_cpu(),
+>>> arm_dma_sync_sg_for_device(), arm_iommu_sync_sg_for_cpu() and
+>>> arm_iommu_sync_sg_for_device() functions wrongly noted that the "nelems"
+>>> parameter is the number of sglist entries returned by dma_map_sg(), while
+>>> this must be the number of entiries passed to dma_map_sg() instead.
+>>
+>> Oops, I somehow missed you off cc when I posted [0] last week, apologies. I
+>> was planning to stick that in Russell's patch system today, but since you've
+>> done a slightly more thorough job with s/map/sync/ than I managed, I'm happy
+>> for this version to take precedence over mine:
+>>
+>> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 > 
-> The simplefb bindings takes clocks and regulators expressly for the
-> purpose of keeping them enabled.
+> I was cleaning up my old branches and noticed this patch isn't merged yet.
+> It still applies cleanly though. How shall we proceed, should I send a pull
+> request?
 
-Right, I should have checked this before ...
+I guess it should probably go through the ARM tree, so the best course
+of action would be to submit it to Russell's patch system[1] for him to
+pick up.
+
+Robin.
+
+[1]:http://www.armlinux.org.uk/developer/patches/
 
 >>
->> So my questions:
->> 1) Is this expected behaviour?
-> 
-> Yes.
-> 
->> 2) If yes, should it really be?
->> 3) If yes, shouldn't there be way to explicitly tell Linux to leave that
->> clock alone, preferably via DT? Although the sunxi-ng clocks take
->> control over the whole CCU unit, I wonder if it should really mess with
->> clocks there are not referenced in the DT.
-> 
-> As it owns the whole CCU unit, why not? And how would it know if some
-> clock is referenced or not, unless going through the whole device tree?
-
-I was hoping that it just provides clocks to any users (drivers) and
-wouldn't bother with tinkering with every clock unless explicitly being
-asked for (by a driver being pointed to a specific clock through DT).
-So it would need to iterate through anything - neither the whole DT nor
-it's own list of clocks.
-
-> Furthermore, nothing prevents another device driver from referencing
-> said clock and turning it off when it's not in use. Think THS driver
-> with runtime PM.
-
-I am totally OK with that: Any potential Linux THS driver can take over,
-if the DT references this device and the clock.
-My point is that atm there is no such driver and so the clocks framework
-shouldn't turn that clock off.
-
-> Are you also mapping the THS to secure only? Otherwise nothing would
-> prevent Linux from also claiming it.
-
-Unfortunately the THS is always unsecure. And even if it could be
-switched, after a recent IRC discussion I came to believe that those
-secure peripherals features only works when the secure boot feature is
-used, which requires to blow an efuse and thus is not easily doable on
-most boards and also irreversible.
-Also I am not sure whether this security feature actually extends to the
-mod clocks and the bus reset and clock gates bits.
-
-But I was relying on that Linux doesn't touch hardware that's not
-referenced in the DT, so if firmware uses the THS, any Linux THS node
-would need to go - or the other way around: if there is a Linux THS
-node, firmware backs off.
-
->> Maybe there is some way to reference those clocks via some dummy driver
->> or DT node to avoid this behaviour? Is there any prior art in this respect?
-> 
-> If you want a clock to not be disabled by anyone, adding CLK_IS_CRITICAL
-> to its flags is the proper option. This is done in the clk driver though.
-
-Yes, I was thinking about that, but it indeed sounds like a hack to
-follow this.
-
-> If you just don't want the clk subsystem to disable unused clks at boot
-> time, you can add "clk_ignore_unused" to the kernel boot parameters.
-> I think this is more of a hack and debugging tool though.
-
-Good point, but indeed looks like a debug feature.
-
-> About dummy drivers, simplefb comes to mind again. But simplefb disables
-> them when it gets kicked out by the drm driver.
-
-Which I am fine with. If people are desperate about a THS driver, this
-could take over, although I would expect a firmware driving the THS
-would discourage this - for instance by removing a THS node.
-
-> Maybe there are other examples.
-
-OK, thanks for the pointer, I will look into this direction.
-
-Cheers,
-Andre.
-
->> I think this issue will affect more future users (thinking of EFI RTC,
->> EFI graphics, etc.), so I wanted to start a discussion on this.
+>> I'd hope that the lack of objections to my patch so far (and Dan's approval)
+>> also apply transitively to this one  ;)
 >>
->> Any input welcome.
+>> Robin.
 >>
->> Cheers,
->> Andre.
+>> [0]:http://thread.gmane.org/gmane.linux.ports.arm.kernel/441862
 >>
->> P.S. For reference my use case: ARM Trusted Firmware (ATF) enables the
->> temperature sensor (THS) and programs a shutdown value. It programs the
->> respective interrupt as secure and registers an IRQ handler in ATF to
->> shutdown the system or take other appropriate matters to avoid
->> overheating. Additionally the sensor is exported via the generic SCPI
->> interface, so the existing scpi-hwmon driver picks it up and reports it
->> to whoever is interested in Linux land via the normal interfaces.
+>>> Suggested-by: Daniel Kurtz <djkurtz@chromium.org>
+>>> Signed-off-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+>>> ---
+>>> Hi folks,
+>>>
+>>> This related patch was applied to Jonathan Corbet's tree:
+>>>
+>>> <URL:http://www.spinics.net/lists/linux-doc/msg31801.html>
+>>>
+>>> The comments were indeed wrong. This may have contributed to a related
+>>> videobuf2 bug:
+>>>
+>>> <URL:http://www.spinics.net/lists/linux-media/msg93765.html>
+>>>
+>>>  arch/arm/mm/dma-mapping.c | 8 ++++----
+>>>  1 file changed, 4 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>>> index e626043..1c0154a 100644
+>>> --- a/arch/arm/mm/dma-mapping.c
+>>> +++ b/arch/arm/mm/dma-mapping.c
+>>> @@ -958,7 +958,7 @@ void arm_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+>>>   * arm_dma_sync_sg_for_cpu
+>>>   * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+>>>   * @sg: list of buffers
+>>> - * @nents: number of buffers to map (returned from dma_map_sg)
+>>> + * @nents: number of buffers to sync (same as was passed to dma_map_sg)
+>>>   * @dir: DMA transfer direction (same as was passed to dma_map_sg)
+>>>   */
+>>>  void arm_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+>>> @@ -977,7 +977,7 @@ void arm_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+>>>   * arm_dma_sync_sg_for_device
+>>>   * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+>>>   * @sg: list of buffers
+>>> - * @nents: number of buffers to map (returned from dma_map_sg)
+>>> + * @nents: number of buffers to sync (same as was passed to dma_map_sg)
+>>>   * @dir: DMA transfer direction (same as was passed to dma_map_sg)
+>>>   */
+>>>  void arm_dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
+>>> @@ -1672,7 +1672,7 @@ void arm_iommu_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+>>>   * arm_iommu_sync_sg_for_cpu
+>>>   * @dev: valid struct device pointer
+>>>   * @sg: list of buffers
+>>> - * @nents: number of buffers to map (returned from dma_map_sg)
+>>> + * @nents: number of buffers to sync (same as was passed to dma_map_sg)
+>>>   * @dir: DMA transfer direction (same as was passed to dma_map_sg)
+>>>   */
+>>>  void arm_iommu_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+>>> @@ -1690,7 +1690,7 @@ void arm_iommu_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+>>>   * arm_iommu_sync_sg_for_device
+>>>   * @dev: valid struct device pointer
+>>>   * @sg: list of buffers
+>>> - * @nents: number of buffers to map (returned from dma_map_sg)
+>>> + * @nents: number of buffers to sync (same as was passed to dma_map_sg)
+>>>   * @dir: DMA transfer direction (same as was passed to dma_map_sg)
+>>>   */
+>>>  void arm_iommu_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
+>>>
 >>
->> --
->> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
->> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
->> For more options, visit https://groups.google.com/d/optout.
+>>
+> 
