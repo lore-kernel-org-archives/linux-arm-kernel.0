@@ -1,44 +1,47 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue, 13 Dec 2016 00:08:41 +0530
-Subject: [PATCH V7 2/8] iommu/io-pgtable-arm: add support for the IOMMU_PRIV
- flag
+Date: Tue, 13 Dec 2016 00:08:42 +0530
+Subject: [PATCH V7 3/8] iommu/io-pgtable-arm-v7s: Add support for the
+ IOMMU_PRIV flag
 In-Reply-To: <1481567927-14791-1-git-send-email-sricharan@codeaurora.org>
 References: <1481567927-14791-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1481567927-14791-3-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1481567927-14791-4-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Gebben <jgebben@codeaurora.org>
+From: Robin Murphy <robin.murphy@arm.com>
 
-Allow the creation of privileged mode mappings, for stage 1 only.
+The short-descriptor format also allows privileged-only mappings, so
+let's wire it up.
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-Tested-by: Robin Murphy <robin.murphy@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Jeremy Gebben <jgebben@codeaurora.org>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Tested-by: Sricharan R <sricharan@codeaurora.org>
 ---
- drivers/iommu/io-pgtable-arm.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/iommu/io-pgtable-arm-v7s.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index f5c90e1..69ba83a 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -350,11 +350,14 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable *data,
- 
- 	if (data->iop.fmt == ARM_64_LPAE_S1 ||
- 	    data->iop.fmt == ARM_32_LPAE_S1) {
--		pte = ARM_LPAE_PTE_AP_UNPRIV | ARM_LPAE_PTE_nG;
-+		pte = ARM_LPAE_PTE_nG;
- 
- 		if (!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
- 			pte |= ARM_LPAE_PTE_AP_RDONLY;
- 
+diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+index f50e51c..1177782 100644
+--- a/drivers/iommu/io-pgtable-arm-v7s.c
++++ b/drivers/iommu/io-pgtable-arm-v7s.c
+@@ -265,7 +265,9 @@ static arm_v7s_iopte arm_v7s_prot_to_pte(int prot, int lvl,
+ 	if (!(prot & IOMMU_MMIO))
+ 		pte |= ARM_V7S_ATTR_TEX(1);
+ 	if (ap) {
+-		pte |= ARM_V7S_PTE_AF | ARM_V7S_PTE_AP_UNPRIV;
++		pte |= ARM_V7S_PTE_AF;
 +		if (!(prot & IOMMU_PRIV))
-+			pte |= ARM_LPAE_PTE_AP_UNPRIV;
-+
- 		if (prot & IOMMU_MMIO)
- 			pte |= (ARM_LPAE_MAIR_ATTR_IDX_DEV
- 				<< ARM_LPAE_PTE_ATTRINDX_SHIFT);
++			pte |= ARM_V7S_PTE_AP_UNPRIV;
+ 		if (!(prot & IOMMU_WRITE))
+ 			pte |= ARM_V7S_PTE_AP_RDONLY;
+ 	}
+@@ -288,6 +290,8 @@ static int arm_v7s_pte_to_prot(arm_v7s_iopte pte, int lvl)
+ 
+ 	if (!(attr & ARM_V7S_PTE_AP_RDONLY))
+ 		prot |= IOMMU_WRITE;
++	if (!(attr & ARM_V7S_PTE_AP_UNPRIV))
++		prot |= IOMMU_PRIV;
+ 	if ((attr & (ARM_V7S_TEX_MASK << ARM_V7S_TEX_SHIFT)) == 0)
+ 		prot |= IOMMU_MMIO;
+ 	else if (pte & ARM_V7S_ATTR_C)
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
