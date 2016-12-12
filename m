@@ -1,20 +1,26 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Dec 2016 11:20:41 -0600
-Subject: [PATCH] dt-bindings: Document the hi3660 reset bindings
-In-Reply-To: <1481249504-7942-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1480989092-31847-2-git-send-email-zhangfei.gao@linaro.org>
- <1481249504-7942-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <20161212172041.7v2s573tt6qbzlfz@rob-hp-laptop>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 12 Dec 2016 09:24:36 -0800
+Subject: [PATCH] clk: bcm: Fix 'maybe-uninitialized' warning in
+ bcm2835_clock_choose_div_and_prate()
+In-Reply-To: <1481529653-28133-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1481529653-28133-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <87twa93vsb.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2016 at 10:11:44AM +0800, Zhangfei Gao wrote:
-> Add DT bindings documentation for hi3660 SoC reset controller.
-> 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> ---
->  .../bindings/reset/hisilicon,hi3660-reset.txt      | 43 ++++++++++++++++++++++
->  1 file changed, 43 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+Boris Brezillon <boris.brezillon@free-electrons.com> writes:
 
-Acked-by: Rob Herring <robh@kernel.org>
+> best_rate is reported as potentially uninitialized by gcc.
+>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Fixes: 155e8b3b0ee3 ("clk: bcm: Support rate change propagation on bcm2835 clocks")
+> Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
+
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161212/65cadde3/attachment.sig>
