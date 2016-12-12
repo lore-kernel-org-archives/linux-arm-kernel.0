@@ -1,34 +1,35 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 12 Dec 2016 14:35:10 +0100
-Subject: [PATCH renesas/devel 05/13] ARM: dts: r8a7792: Use R-Car Gen 2
- fallback binding for i2c nodes
-In-Reply-To: <1481533902-14789-6-git-send-email-horms+renesas@verge.net.au>
-References: <1481533902-14789-1-git-send-email-horms+renesas@verge.net.au>
- <1481533902-14789-6-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXvzmbAk7+jgiyzMsfa=Yv8=f6g+AqiOjdusnpJB2Jktg@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 12 Dec 2016 14:35:41 +0100
+Subject: [PATCH] ASoC: samsung: Remove tests of member address
+In-Reply-To: <1481363471-21364-1-git-send-email-krzk@kernel.org>
+References: <1481363471-21364-1-git-send-email-krzk@kernel.org>
+Message-ID: <2863148.52BcI6omVF@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2016 at 10:11 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Use recently added R-Car Gen 2 fallback binding for i2c nodes in
-> DT for r8a7792 SoC.
->
-> This has no run-time effect for the current driver as the initialisation
-> sequence is the same for the SoC-specific binding for r8a7792 and the
-> fallback binding for R-Car Gen 2.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi,
 
-Gr{oetje,eeting}s,
+On Saturday, December 10, 2016 11:51:11 AM Krzysztof Kozlowski wrote:
+> The driver was checking for non-NULL address of struct's members:
+>  - s3c_audio_pdata->type (union),
+>  - s3c_audio_pdata->type.i2s (embedded struct).
+> 
+> This is pointless as these will be always non-NULL.  The 's3c_audio_pdata'
+> is always initialized in static memory so it will be zeroed.
+> Additionally the 'type' member was an union with only one member.
+> 
+> It is safe to reorganize the structures to get rid of useless union and
+> checks for addresses to fix the coccinelle warning:
+> 	>> sound/soc/samsung/i2s.c:1270:2-4: ERROR: test of a variable/field address
+> 
+> Reported-by: kbuild test robot <fengguang.wu@intel.com>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-                        Geert
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
+Best regards,
 --
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
