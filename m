@@ -1,37 +1,29 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Mon, 12 Dec 2016 11:27:12 +0100
-Subject: [PATCH v7 1/2] provide lock-less versions of clk_{enable|disable}
-In-Reply-To: <e548f7cf-a1d5-0bc2-1095-db8464a1bcc4@ti.com>
-References: <1481302773-14181-1-git-send-email-abailon@baylibre.com>
- <20161209185421.fybpk4bdq6b7yglf@pengutronix.de>
- <e548f7cf-a1d5-0bc2-1095-db8464a1bcc4@ti.com>
-Message-ID: <35adff3d-c6a6-7b65-fb61-6da447dd6c3f@baylibre.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 12 Dec 2016 13:28:30 +0300
+Subject: [PATCH renesas/devel 10/13] ARM: dts: r8a7790: Use R-Car Gen 2
+ fallback binding for i2c nodes
+In-Reply-To: <1481533902-14789-11-git-send-email-horms+renesas@verge.net.au>
+References: <1481533902-14789-1-git-send-email-horms+renesas@verge.net.au>
+ <1481533902-14789-11-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <0db5b88e-41fb-03db-fa61-48e754356901@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/2016 10:02 AM, Sekhar Nori wrote:
-> Hi Uwe,
-> 
-> On Saturday 10 December 2016 12:24 AM, Uwe Kleine-K?nig wrote:
->> Hello,
->>
->> On Fri, Dec 09, 2016 at 05:59:32PM +0100, Alexandre Bailon wrote:
->>> Rename __clk_{enable|disble} in davinci_clk_{enable|disable}.
->>> davinci_clk_{enable|disable} is a lock-less version of
->>> clk_{enable|disable}.
->>> This is useful to recursively enable clock without doing recursive call
->>> to clk_enable(), which would cause a recursive locking issue.
->>> The lock-less version could be used by example by the usb20 phy clock,
->>> that need to enable the usb20 clock before to start.
->>
->> I wouldn't call that lock-less. The difference is that the newly exposed
->> funcion requires the caller to already hold the lock. So maybe a better
-> 
-> Right.
-Is it enough to update the commit message or should I also update the
-patch title?
-If so, could you suggest one because I don't know how to describe it
-shortly.
+Hello!
 
-Thanks,
-Alexandre
+On 12/12/2016 12:11 PM, Simon Horman wrote:
+
+> Use recently added R-Car Gen 2 fallback binding for iii nodes in
+
+    s/iii/iic/?
+
+> DT for r8a7790 SoC.
+>
+> This has no run-time effect for the current driver as the initialisation
+> sequence is the same for the SoC-specific binding for r8a7790 and the
+> fallback binding for R-Car Gen 2.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+[...]
+
+MBR, Sergei
