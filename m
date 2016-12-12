@@ -1,31 +1,48 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Dec 2016 10:34:23 -0600
-Subject: [PATCH v2 2/2] ASoC: atmel: tse850: rely on the ssc to register
- as a cpu dai by itself
-In-Reply-To: <1481052157-23400-3-git-send-email-peda@axentia.se>
-References: <1481052157-23400-1-git-send-email-peda@axentia.se>
- <1481052157-23400-3-git-send-email-peda@axentia.se>
-Message-ID: <20161212163423.kwlxy56ys2o2e7nn@rob-hp-laptop>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 12 Dec 2016 17:37:56 +0100
+Subject: [PATCH v3 11/12] arm64: dts: marvell: add sdhci support for
+ Armada 7K/8K
+In-Reply-To: <20161209200729.GO14217@n2100.armlinux.org.uk> (Russell King's
+ message of "Fri, 9 Dec 2016 20:07:29 +0000")
+References: <cover.e0137cef24a16a2c7d795548de554993595d4a98.1481279228.git-series.gregory.clement@free-electrons.com>
+ <923c97f32a828b579756bf86946689ed54a0a174.1481279228.git-series.gregory.clement@free-electrons.com>
+ <20161209200729.GO14217@n2100.armlinux.org.uk>
+Message-ID: <87bmwhdrx7.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 06, 2016 at 08:22:37PM +0100, Peter Rosin wrote:
-> This breaks devicetree compatibility, but in this case that is ok. All
-> affected units are either on my desk, or running an even older version
-> of the driver that is not compatible with the upstreamed version anyway
-> (and when these other units are eventually updated, they will get a
-> fresh dtb as well, so that is not a significant problem either).
+Hi Russell King,
+ 
+ On ven., d?c. 09 2016, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 
-Perfect.
+> On Fri, Dec 09, 2016 at 11:30:07AM +0100, Gregory CLEMENT wrote:
+>> Also enable it on the Armada 7040 DB board
+>> 
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>
+> Hi,
+>
+> Can this also be added to the cp110 on the 7k/8k SoCs as well, or does
+> it rely on other unmerged support?
 
-> All of that is of course assuming that noone else has managed to build
-> something that can use this driver, but that seems extremely improbable.
-> 
-> Signed-off-by: Peter Rosin <peda@axentia.se>
-> ---
->  .../bindings/sound/axentia,tse850-pcm5142.txt      | 11 ++++++++---
+I did not add this one because until now I had not the hardware setup
+available to test it.
 
-Acked-by: Rob Herring <robh@kernel.org>
+But at least I can add the ressources in the device tree and now I can
+test it partially.
 
->  sound/soc/atmel/tse850-pcm5142.c                   | 23 +++-------------------
->  2 files changed, 11 insertions(+), 23 deletions(-)
+Gregory
+
+>
+> Thanks.
+>
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
