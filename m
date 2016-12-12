@@ -1,21 +1,21 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 12 Dec 2016 14:32:37 +0100
-Subject: [PATCH renesas/devel 01/13] ARM: dts: r8a7779: Use R-Car Gen 1
+Date: Mon, 12 Dec 2016 14:32:48 +0100
+Subject: [PATCH renesas/devel 02/13] ARM: dts: r8a7778: Use R-Car Gen 1
  fallback binding for i2c nodes
-In-Reply-To: <1481533902-14789-2-git-send-email-horms+renesas@verge.net.au>
+In-Reply-To: <1481533902-14789-3-git-send-email-horms+renesas@verge.net.au>
 References: <1481533902-14789-1-git-send-email-horms+renesas@verge.net.au>
- <1481533902-14789-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVjNQ_ioz=nYQJodB2r78K56MWpbphu=yqBwQL58-d0RA@mail.gmail.com>
+ <1481533902-14789-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXi8WExEa5UiWOfAeZ6z1Vkbq6v-9sQcdVUTdezG+=fQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Dec 12, 2016 at 10:11 AM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
 > Use recently added R-Car Gen 1 fallback binding for i2c nodes in
-> DT for r8a7779 SoC.
+> DT for r8a7778 SoC.
 >
 > This has no run-time effect for the current driver as the initialisation
-> sequence is the same for the SoC-specific binding for r8a7779 and the
+> sequence is the same for the SoC-specific binding for r8a7778 and the
 > fallback binding for R-Car Gen 1.
 >
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
