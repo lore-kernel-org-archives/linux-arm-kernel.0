@@ -1,63 +1,109 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 12 Dec 2016 14:50:20 +0000
-Subject: [Xen-devel] [PATCH v2 4/4] Explicitly clean linux-system.axf and
- xen-system.axf
-In-Reply-To: <20161212144729.GD1686@char.us.oracle.com>
-References: <20161122150917.16524-1-andre.przywara@arm.com>
- <20161122150917.16524-5-andre.przywara@arm.com>
- <20161212144729.GD1686@char.us.oracle.com>
-Message-ID: <cb5e65ca-65a2-6e0c-47f5-1773d6173739@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 12 Dec 2016 13:24:27 +0100
+Subject: [PATCH 1/2] pwm: sunxi: allow the pwm to finish its pulse before
+ disable
+In-Reply-To: <afcb938d-d2df-4740-6c85-cdf2766f671c@schinagl.nl>
+References: <1472147411-30424-1-git-send-email-oliver@schinagl.nl>
+ <1472147411-30424-2-git-send-email-oliver@schinagl.nl>
+ <20160826221900.GG3165@lukather>
+ <afcb938d-d2df-4740-6c85-cdf2766f671c@schinagl.nl>
+Message-ID: <20161212122427.4ixo7terrlvnuqmd@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Konrad,
-
-On 12/12/16 14:47, Konrad Rzeszutek Wilk wrote:
-> On Tue, Nov 22, 2016 at 03:09:17PM +0000, Andre Przywara wrote:
->> From: Christoffer Dall <christoffer.dall@linaro.org>
->>
->> When doing a make clean, only the output image currently configured to
->> build is being removed.  However, one would expect all build artifacts
->> to be removed when doing a 'make clean' and when switching between Xen
->> and Linux builds, it is easy to accidentally run an older build than
->> intended.  Simply hardcode the axf image file names.
->>
->> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> Reviewed-by: Julien Grall <julien.grall@arm.com>
+On Thu, Dec 08, 2016 at 02:23:39PM +0100, Olliver Schinagl wrote:
+> Hey Maxime,
 > 
-> Tested-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> first off, also sorry for the slow delay :) (pun not intended)
+> 
+> On 27-08-16 00:19, Maxime Ripard wrote:
+> > On Thu, Aug 25, 2016 at 07:50:10PM +0200, Olliver Schinagl wrote:
+> > > When we inform the PWM block to stop toggeling the output, we may end up
+> > > in a state where the output is not what we would expect (e.g. not the
+> > > low-pulse) but whatever the output was at when the clock got disabled.
+> > > 
+> > > To counter this we have to wait for maximally the time of one whole
+> > > period to ensure the pwm hardware was able to finish. Since we already
+> > > told the PWM hardware to disable it self, it will not continue toggling
+> > > but merly finish its current pulse.
+> > > 
+> > > If a whole period is considered to much, it may be contemplated to use a
+> > > half period + a little bit to ensure we get passed the transition.
+> > > 
+> > > Signed-off-by: Olliver Schinagl<oliver@schinagl.nl>
+> > > ---
+> > >   drivers/pwm/pwm-sun4i.c | 11 +++++++++++
+> > >   1 file changed, 11 insertions(+)
+> > > 
+> > > diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
+> > > index 03a99a5..5e97c8a 100644
+> > > --- a/drivers/pwm/pwm-sun4i.c
+> > > +++ b/drivers/pwm/pwm-sun4i.c
+> > > @@ -8,6 +8,7 @@
+> > >   #include <linux/bitops.h>
+> > >   #include <linux/clk.h>
+> > > +#include <linux/delay.h>
+> > >   #include <linux/err.h>
+> > >   #include <linux/io.h>
+> > >   #include <linux/module.h>
+> > > @@ -245,6 +246,16 @@ static void sun4i_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+> > >   	spin_lock(&sun4i_pwm->ctrl_lock);
+> > >   	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
+> > >   	val &= ~BIT_CH(PWM_EN, pwm->hwpwm);
+> > > +	sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
+> > > +	spin_unlock(&sun4i_pwm->ctrl_lock);
+> > > +
+> > > +	/* Allow for the PWM hardware to finish its last toggle. The pulse
+> > > +	 * may have just started and thus we should wait a full period.
+> > > +	 */
+> > > +	ndelay(pwm_get_period(pwm));
+> > Can't that use the ready bit as well?
+> 
+> I started to implement our earlier discussed suggestions, but I do not think
+> they will work. The read bit is not to let the user know it is ready with
+> all of its commands, but only if the period registers are ready. I think it
+> is some write lock while it copies the data into its internal control loop.
+> From the manual:
+> PWM0 period register ready.
+> 0: PWM0 period register is ready to write,
+> 1: PWM0 period register is busy.
+> 
+> 
+> So no, I don't think i can use the ready bit here at all. The only thing we
+> can do here, but I doubt it's worth it, is to read the period register,
+> caluclate a time from it, and then ndelay(pwm_get_period(pwm) - ran_time)
+> 
+> The only 'win' then is that we could are potentially not waiting the full
+> pwm period, but only a fraction of it. Since we are disabling the hardware
+> (for power reasons) anyway, I don't think this is any significant win,
+> except for extreme situations. E.g. we have a pwm period of 10 seconds, we
+> disable it after 9.9 second, and now we have to wait for 10 seconds before
+> the pwm_disable is finally done. So this could in that case be reduced to
+> then only wait for 0.2 seconds since it is 'done' sooner.
+> 
+> However that optimization is also not 'free'. We have to read the period
+> register and calculate back the time. I suggest to do that when reworking
+> this driver to work with atomic mode, and merge this patch 'as is' to
+> atleast fix te bug where simply not finish properly.
 
-Thanks a lot!
+That whole discussion made me realise something that is really
+bad. AFAIK, pwm_get_period returns a 32 bits register, which means a
+theorical period of 4s. Busy looping during 4 seconds is already very
+bad, as you basically kill one CPU during that time, but doing so in a
+(potentially) atomic context is even worse.
 
-I will try to poke Mark to see if we can get this merged eventually.
+NACK.
 
-Cheers,
-Andre.
+Maxime
 
->> ---
->>  Makefile.am | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/Makefile.am b/Makefile.am
->> index db97f9c..506a1d9 100644
->> --- a/Makefile.am
->> +++ b/Makefile.am
->> @@ -130,7 +130,7 @@ OFILES		+= $(addprefix $(ARCH_SRC),boot.o stack.o $(BOOTMETHOD) utils.o)
->>  
->>  all: $(IMAGE)
->>  
->> -CLEANFILES = $(IMAGE) $(OFILES) model.lds fdt.dtb
->> +CLEANFILES = $(IMAGE) linux-system.axf xen-system.axf $(OFILES) model.lds fdt.dtb
->>  
->>  $(IMAGE): $(OFILES) model.lds fdt.dtb $(KERNEL_IMAGE) $(FILESYSTEM) $(XEN_IMAGE)
->>  	$(LD) $(LDFLAGS) $(OFILES) -o $@ --script=model.lds
->> -- 
->> 2.9.0
->>
->>
->> _______________________________________________
->> Xen-devel mailing list
->> Xen-devel at lists.xen.org
->> https://lists.xen.org/xen-devel
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161212/e5f22cbb/attachment.sig>
