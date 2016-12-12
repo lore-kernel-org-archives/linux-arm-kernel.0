@@ -1,54 +1,41 @@
-From: xuejiancheng@hisilicon.com (Jiancheng Xue)
-Date: Mon, 12 Dec 2016 15:11:44 +0800
-Subject: [PATCH 1/3] arm: hisi: add ARCH_MULTI_V5 support
-In-Reply-To: <fb89c03e-ea67-d339-b222-6f0e08988563@gmail.com>
-References: <20161017120705.3726-1-wenpan@hisilicon.com>
- <20161017120705.3726-2-wenpan@hisilicon.com> <5893354.6MrIxqzRoI@wuerfel>
- <2fcf5a5f-8935-c4f0-a034-c8a72dc2be0f@hisilicon.com>
- <fb89c03e-ea67-d339-b222-6f0e08988563@gmail.com>
-Message-ID: <cfecdd06-90c4-6e9c-30cb-59b1ee70e8a5@hisilicon.com>
+From: weo@reccoware.de (Wolfgang Ocker)
+Date: Mon, 12 Dec 2016 08:21:01 +0100
+Subject: [PATCH] serial: mxs-auart: support CMSPAR termios cflag
+Message-ID: <20161212072101.9909-1-weo@reccoware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+If CMSPAR is set in the c_cflag of termios, "stick" parity is enabled.
 
+Tested on an i.MX28 system
 
-On 2016/12/9 23:07, Marty Plummer wrote:
-> On 12/04/2016 08:03 PM, Jiancheng Xue wrote:
->> Hi Arnd,
->>
->> On 2016/10/17 21:48, Arnd Bergmann wrote:
->>> On Monday, October 17, 2016 8:07:03 PM CEST Pan Wen wrote:
->>>> Add support for some HiSilicon SoCs which depend on ARCH_MULTI_V5.
->>>>
->>>> Signed-off-by: Pan Wen <wenpan@hisilicon.com>
->>>>
->>>
->>> Looks ok. I've added Marty Plummer to Cc, he was recently proposing
->>> patches for Hi3520, which I think is closely related to this one.
->>> Please try to work together so the patches don't conflict. It should
->>> be fairly straightforward since you are basically doing the same
->>> change here.
->>>
->> Marty hasn't give any replies about this thread until now. I reviewed
->> the patch for Hi3520. And I think this patch won't conflict with Hi3520.
->> Could you help us to ack this patch?
->>
->> Thanks,
->> Jiancheng
->>
->>
-> Hello all
-> 
-> Sorry for my lack of activity, I've just been very busy lately with real
-> world considerations (well, real world but related to this; I have
-> another board based on hi3521a I've been tinkering with, trying to get
-> the manuf. to release gpl source via the sfconfservancy). I've not given
-> up on the project, however, since devices like this really need updates
-> in light of the recent botnets targeting devices of this sort as
-> manpower.
+Signed-off-by: Wolfgang Ocker <weo@reccoware.de>
+---
+v2: require PARENB to be also set in termios' c_cflag for CMSPAR
+---
+ drivers/tty/serial/mxs-auart.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Do you have any objections to this patch?  If not, I hope this patch can
-be merged in 4.10.  Thank you.
-
-Regards,
-Jiancheng
+diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+index 770454e0dfa3..fd819ea26762 100644
+--- a/drivers/tty/serial/mxs-auart.c
++++ b/drivers/tty/serial/mxs-auart.c
+@@ -95,6 +95,7 @@
+ #define AUART_LINECTRL_BAUD_DIVFRAC_SHIFT	8
+ #define AUART_LINECTRL_BAUD_DIVFRAC_MASK	0x00003f00
+ #define AUART_LINECTRL_BAUD_DIVFRAC(v)		(((v) & 0x3f) << 8)
++#define AUART_LINECTRL_SPS			(1 << 7)
+ #define AUART_LINECTRL_WLEN_MASK		0x00000060
+ #define AUART_LINECTRL_WLEN(v)			(((v) & 0x3) << 5)
+ #define AUART_LINECTRL_FEN			(1 << 4)
+@@ -1014,6 +1015,8 @@ static void mxs_auart_settermios(struct uart_port *u,
+ 		ctrl |= AUART_LINECTRL_PEN;
+ 		if ((cflag & PARODD) == 0)
+ 			ctrl |= AUART_LINECTRL_EPS;
++		if (cflag & CMSPAR)
++			ctrl |= AUART_LINECTRL_SPS;
+ 	}
+ 
+ 	u->read_status_mask = 0;
+-- 
+2.10.0
