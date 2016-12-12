@@ -1,101 +1,75 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 12 Dec 2016 12:41:21 +0800
-Subject: [linux-sunxi] sunxi-ng clocks: leaving certain clocks alone?
-In-Reply-To: <d70f2809-102c-a3de-c77c-43af27bbcbbc@arm.com>
-References: <d70f2809-102c-a3de-c77c-43af27bbcbbc@arm.com>
-Message-ID: <CAGb2v67kCAr6Ty5=Gg8vOGNC6xhuRM66Wa=H+C3AD=_d_H+N8w@mail.gmail.com>
+From: sramana@codeaurora.org (Srinivas Ramana)
+Date: Mon, 12 Dec 2016 10:31:52 +0530
+Subject: [PATCH] trace: extend trace_clock to support arch_arm clock
+ counter
+In-Reply-To: <20161206121346.GF2498@arm.com>
+References: <1480666495-26536-1-git-send-email-sramana@codeaurora.org>
+ <20161202110845.GC8266@arm.com> <5843D587.5010407@codeaurora.org>
+ <20161206121346.GF2498@arm.com>
+Message-ID: <584E2F40.10904@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2016 at 7:54 AM, Andr? Przywara <andre.przywara@arm.com> wrote:
-> Hi,
+On 12/06/2016 05:43 PM, Will Deacon wrote:
+> On Sun, Dec 04, 2016 at 02:06:23PM +0530, Srinivas Ramana wrote:
+>> On 12/02/2016 04:38 PM, Will Deacon wrote:
+>>> On Fri, Dec 02, 2016 at 01:44:55PM +0530, Srinivas Ramana wrote:
+>>>> Extend the trace_clock to support the arch timer cycle
+>>>> counter so that we can get the monotonic cycle count
+>>>> in the traces. This will help in correlating the traces with the
+>>>> timestamps/events in other subsystems in the soc which share
+>>>> this common counter for driving their timers.
+>>>
+>>> I'm not sure I follow this reasoning. What's wrong with nanoseconds? In
+>>> particular, the "perf" trace_clock hangs off sched_clock, which should
+>>> be backed by the architected counter anyway. What does the cycle counter in
+>>> isolation tell you, given that the frequency isn't architected?
+>>>
+>>> I think I'm missing something here.
+>>>
+>>
+>> Having cycle counter would help in the cases where we want to correlate the
+>> time with other subsystems which are outside cpu subsystem.
 >
-> I was observing that the new sunxi-ng clock code apparently explicitly
-> turns off _all_ clocks that are not used or needed. I find this rather
-> unfortunate, as I wanted to use the THS temperature sensor from ARM
-> Trusted Firmware to implement emergency shutdown or DVFS throttling.
-> That works until the clock framework finds the clock (as enumerated in
-> ccu-sun50i-a64.c) and obviously explicitly clears bit 31 in the THS mod
-> clock register and bit 8 in the respective clock gate register.
-> Turning them manually back on via /dev/mem or removing the THS clock
-> from the sunxi-ng driver fixes this for me.
->
-> This was not happening with the old Allwinner clocks, since the kernel
-> wouldn't even know about it if there was no driver and the clock wasn't
-> mentioned in the DT.
->
-> Now with sunxi-ng even though the THS clock is not actually referenced
-> or used in the DT, the kernel turns it off. I would expect that upon
-> entering the kernel all unneeded clocks are turned off anyway, so there
-> is no need to mess with clocks that have no user, but are enumerated in
-> the ccu driver.
+> Do you have an example of these subsystems? Can they be used to generate
+> trace data with mainline?
 
-I can't say that's absolutely true (wink).
-
->
-> I wonder if this kills simplefb as well, for instance, since I believe
-> that U-Boot needs to turn on certain clocks and relies on them staying up.
-
-The simplefb bindings takes clocks and regulators expressly for the
-purpose of keeping them enabled.
+Some of the subsystems i can list are Modem(on a mobilephone), GPU or 
+video subsystem, or a DSP among others.
 
 >
-> So my questions:
-> 1) Is this expected behaviour?
+>> local_clock or even the perf track_clock uses sched_clock which gets
+>> suspended during system suspend. Yes, they are backed up by the
+>> architected counter but they ignore the cycles spent in suspend.i
+>
+> Does mono_raw solve this (also hangs off the architected counter and is
+> supported in the vdso)?
 
-Yes.
-
-> 2) If yes, should it really be?
-> 3) If yes, shouldn't there be way to explicitly tell Linux to leave that
-> clock alone, preferably via DT? Although the sunxi-ng clocks take
-> control over the whole CCU unit, I wonder if it should really mess with
-> clocks there are not referenced in the DT.
-
-As it owns the whole CCU unit, why not? And how would it know if some
-clock is referenced or not, unless going through the whole device tree?
-
-Furthermore, nothing prevents another device driver from referencing
-said clock and turning it off when it's not in use. Think THS driver
-with runtime PM.
-
-Are you also mapping the THS to secure only? Otherwise nothing would
-prevent Linux from also claiming it.
+Doesn't seem like. Any of the existing clock sources are designed not 
+show the jump, when there is a suspend and resume. Even though they run 
+out of architected counter they just cane give exact correlation with 
+the counter. Furthermore, during the initial kernel boot, these just run 
+out of jiffies clock source. They also not account for the time spent in 
+boot loaders.
 
 >
-> Maybe there is some way to reference those clocks via some dummy driver
-> or DT node to avoid this behaviour? Is there any prior art in this respect?
-
-If you want a clock to not be disabled by anyone, adding CLK_IS_CRITICAL
-to its flags is the proper option. This is done in the clk driver though.
-
-If you just don't want the clk subsystem to disable unused clks at boot
-time, you can add "clk_ignore_unused" to the kernel boot parameters.
-I think this is more of a hack and debugging tool though.
-
-About dummy drivers, simplefb comes to mind again. But simplefb disables
-them when it gets kicked out by the drm driver. Maybe there are other
-examples.
-
-Regards
-ChenYu
-
-> I think this issue will affect more future users (thinking of EFI RTC,
-> EFI graphics, etc.), so I wanted to start a discussion on this.
+>> so, when comparing with monotonically increasing cycle counter, other
+>> clocks doesn't help. It seems X86 uses the TSC counter to help such cases.
 >
-> Any input welcome.
+> Does this mean we need a way to expose the frequency to userspace, too?
+
+Not really. The CNTFRQ_EL0 of timer subsystem holds the clock frequency 
+of system timer and is available to EL0.
+
 >
-> Cheers,
-> Andre.
+> Will
 >
-> P.S. For reference my use case: ARM Trusted Firmware (ATF) enables the
-> temperature sensor (THS) and programs a shutdown value. It programs the
-> respective interrupt as secure and registers an IRQ handler in ATF to
-> shutdown the system or take other appropriate matters to avoid
-> overheating. Additionally the sensor is exported via the generic SCPI
-> interface, so the existing scpi-hwmon driver picks it up and reports it
-> to whoever is interested in Linux land via the normal interfaces.
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+
+
+Thanks,
+-- Srinivas R
+
+-- 
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center, 
+Inc., is a member of Code Aurora Forum, a Linux Foundation Collaborative 
+Project.
