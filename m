@@ -1,72 +1,58 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 12 Dec 2016 10:31:43 +0530
-Subject: Tearing down DMA transfer setup after DMA client has finished
-In-Reply-To: <7900ae24-6803-a271-944c-8830f718fef0@free.fr>
-References: <20161208103921.GC6408@localhost>
- <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
- <20161208163755.GH6408@localhost>
- <yw1xy3zqxt7x.fsf@unicorn.mansr.com>
- <20161209065955.GJ6408@localhost>
- <6ce1ea97-1d68-2203-c7b4-73315e801655@laposte.net>
- <20161209171727.GK6408@localhost>
- <ec33d3f0-6474-2b13-8a26-077ce3785d31@free.fr>
- <20161209175606.GM6408@localhost>
- <7900ae24-6803-a271-944c-8830f718fef0@free.fr>
-Message-ID: <20161212050143.GO6408@localhost>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Mon, 12 Dec 2016 15:48:17 +1000
+Subject: [PATCH 4/4] ARM: versatile: support configuring versatile machine
+ for no-MMU
+In-Reply-To: <20161209202901.GQ14217@n2100.armlinux.org.uk>
+References: <1481093992-30520-1-git-send-email-gerg@uclinux.org>
+ <1481093992-30520-2-git-send-email-gerg@uclinux.org>
+ <CACRpkdZywn46QbnvKcN-jkt43Vf+GBSNQkLgnnNg-DC-8aSO5w@mail.gmail.com>
+ <58481DD1.6090606@arm.com> <20161209202901.GQ14217@n2100.armlinux.org.uk>
+Message-ID: <48483769-1fef-86a6-feff-d98981cfb330@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 09, 2016 at 07:23:17PM +0100, Mason wrote:
-> [ Dropping Mans to preserve his peace-of-mind ]
+On 10/12/16 06:29, Russell King - ARM Linux wrote:
+> On Wed, Dec 07, 2016 at 02:33:53PM +0000, Vladimir Murzin wrote:
+>> Hi Linus,
+>>
+>> On 07/12/16 14:11, Linus Walleij wrote:
+>>> Another target I had in mind was the Integrator which
+>>> incidentally supports a bunch of the old noMMU core
+>>> tiles where we can swap in an ARM946, which I guess
+>>> could work with this?
+>>
+>> Do you mind trying my "Allow NOMMU for MULTIPLATFORM" series [1]? Greg just
+>> reported it did a trick for Versatile, there is a good chance it would work
+>> for Integrator too ;)
 > 
-> On 09/12/2016 18:56, Vinod Koul wrote:
-> > On Fri, Dec 09, 2016 at 06:34:15PM +0100, Mason wrote:
-> >> On 09/12/2016 18:17, Vinod Koul wrote:
-> >>
-> >>> On Fri, Dec 09, 2016 at 11:25:57AM +0100, Sebastian Frias wrote:
-> >>>>
-> >>>> What concrete solution do you propose?
-> >>>
-> >>> I have already proposed two solutions.
-> >>>
-> >>> A) Request a channel only when you need it. Obviously we can't do virtual
-> >>> channels with this (though we should still use virt-channels framework).
-> >>> The sbox setup and teardown can be done as part of channel request and
-> >>> freeup. PL08x already does this.
-> >>>
-> >>> Downside is that we can only have as many consumers at a time as channels.
-> >>>
-> >>> I have not heard any technical reason for not doing this apart from drivers
-> >>> grab the channel at probe, which is incorrect and needs to be fixed
-> >>> irrespective of the problem at hand.
-> >>>
-> >>> This is my preferred option.
-> >>
-> >> There is one important drawback with this solution. If a driver calls
-> >> dma_request_chan() when no channels are currently available, it will
-> >> get -EBUSY. If there were a flag in dma_request_chan to be put to
-> >> sleep (with timeout) until a channel is available, then it would
-> >> work. But busy waiting in the client driver is a waste of power.
-> > 
-> > Right, but in that case the fallback would be PIO mode, and if that is
-> > not availble (IIRC some f your devices don't) then reject the usage with
-> > EAGAIN.
+> My views on gluing multiplatform and nommu together have already been
+> stated several times, and remain unchanged.
 > 
-> Maybe I'm missing something, but I don't see how that would help.
-> Take the NAND Flash controller driver, for instance. PIO is not
-> an option, because the ECC engine is tied to DMA.
+> Greg's patch looks almost sane, but what I'd like to see is instead of
+> directly doing this:
 > 
-> And failing with -EAGAIN doesn't help the busy looping situation.
-> The caller should be put on some kind of queue to wait for a
-> "channel ready" event.
+>  config ARCH_VERSATILE
+>         bool "ARM Ltd. Versatile family"
+> -       depends on ARCH_MULTI_V5
+> +       depends on ARCH_MULTI_V5 || ARM_SINGLE_ARMV5
+> 
+> we could do:
+> 
+>  config ARCH_VERSATILE
+>         bool "ARM Ltd. Versatile family" if ARCH_MULTI_V5
+> -       depends on ARCH_MULTI_V5
+> +       depends on ARCH_MULTI_V5 || ARM_SINGLE_ARMV5
+> 	default y if ARM_SINGLE_ARCH_VERSATILE
+> 
+> adding the versatile entry in the upper level choice (where it always used
+> to be) but with "ARM_SINGLE_ARCH_VERSATILE" instead.
+> 
+> This would have the effect of allowing the multiplatform-converted stuff
+> to start being used on nommu (again) but without running into the problems
+> I've highlighted.
 
-So if you go down this route then we have do a bit of engineering for this
-solutions to solve the hardware issue.
+Thanks for the feedback Russell. Let me re-spin this patch with
+this in mind.
 
-Can you tell me the clients for this controller and channels available?
-
-In this case possibly we can dedicate one for NAND and keep the ones with
-PIO mode dynamic in nature.. But yes it is not an elegant one.
-
--- 
-~Vinod
+Regards
+Greg
