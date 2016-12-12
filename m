@@ -1,60 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 12 Dec 2016 12:02:42 +0000
-Subject: [PATCH v2] arm64: mm: Fix memmap to be initialized for the entire
- section
-In-Reply-To: <20161209145234.GB14257@rric.localdomain>
-References: <1480530091-1092-1-git-send-email-rrichter@cavium.com>
- <bc099ca6-d927-3eb6-438c-291a66ecf5f9@huawei.com>
- <CAKv+Gu_XsKU6godiQC7wVDmCUC9bZL=kv0RarTOTATuQ5EZp2Q@mail.gmail.com>
- <584AA257.3080608@linaro.org>
- <ffaa77c7-8982-524f-f624-e4463a463daf@huawei.com>
- <20161209145234.GB14257@rric.localdomain>
-Message-ID: <CAKv+Gu-uu0a-8rOoCjF9ZLMzVWG_JbCHRPBEnP+vi42BwwiSew@mail.gmail.com>
+From: v.narang@samsung.com (=?UTF-8?B?VmFuZWV0IE5hcmFuZw==?=)
+Date: Mon, 12 Dec 2016 11:22:30 +0000
+Subject: =?UTF-8?B?UkU6IFJlOiBbUEFUQ0ggMS8xXSBhcm0vbW9kdWxlOiBtYXhp?=
+ =?UTF-8?B?bXVtIHV0aWxpemF0aW9uIG9mIG1vZHVsZSBhcmVhLg==?=
+References: <1481012975-44478-1-git-send-email-maninder1.s@samsung.com>
+ <CGME20161212102403epcas4p2e039072e2acdc3d20c1b8ac86e823375@epcas4p2.samsung.com>
+Message-ID: <20161212112230epcms5p6af05aef34f72eab15061a166d18cff00@epcms5p6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 December 2016 at 14:52, Robert Richter <robert.richter@cavium.com> wrote:
-> On 09.12.16 21:15:12, Yisheng Xie wrote:
->> For invalid pages, their zone and node information is not initialized, and it
->> do have risk to trigger the BUG_ON, so I have a silly question,
->> why not just change the BUG_ON:
+Hi,
+
+>A PC24 relocation has a range of +/-32MB.  This means that where-ever
+>the module is placed, it must be capable of reaching any function
+>within the kernel text, which may itself be quite large (eg, 8MB, or
+>possibly larger).  The module area exists to allow modules to be
+>located in an area where PC24 relocations are able to reach all of the
+>kernel text on sensibly configured kernels, thereby allowing for
+>optimal performance.
 >
-> We need to get the page handling correct. Modifying the BUG_ON() just
-> hides that something is wrong.
+>If you wish to load large modules, then enable ARM_MODULE_PLTS, which
+>will use the less efficient PLT method (which is basically an indirect
+>function call) for relocations that PC24 can't handle, and will allow
+>the module to be loaded into the vmalloc area.
 >
+>Growing the module area so that smaller modules also get penalised by
+>the PLT indirection is not sane.
 
-Actually, I think this is a reasonable question. We are trying very
-hard to work around the BUG_ON(), which arguably does something wrong
-by calling page_to_nid() on a struct page without checking if it is a
-valid page.
+This is exactly what i am saying. These changes are useful to accomdate
+22MB modules without enabling ARM_MODULE_PLTS. 
+Without these changes ARM_MODULE_PLTS needs to be enabled to insert more than 14MB
+modules but with these changes 22MB modules (considering 8MB uImage) can be inserted 
+without enabling ARM_MODULE_PLTS.
 
-Looking at commit 344c790e3821 ("mm: make setup_zone_migrate_reserve()
-aware of overlapping nodes"), the BUG_ON() has a specific purpose
-related to adjacent zones.
+So till 22MB modules are not penalised but without these changes once size of modules
+gets over 14MB PLT becomes must.?
 
-What will go wrong if we ignore this check?
-
-
->
->> -----------
->> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
->> index 6de9440..af199b8 100644
->> --- a/mm/page_alloc.c
->> +++ b/mm/page_alloc.c
->> @@ -1860,12 +1860,13 @@ int move_freepages(struct zone *zone,
->>          * Remove at a later date when no bug reports exist related to
->>          * grouping pages by mobility
->>          */
->> -       VM_BUG_ON(page_zone(start_page) != page_zone(end_page));
->> +       VM_BUG_ON(early_pfn_valid(start_page) && early_pfn_valid(end_page) &&
->> +                       page_zone(start_page) != page_zone(end_page));
->>  #endif
->>
->>         for (page = start_page; page <= end_page;) {
->>                 /* Make sure we are not inadvertently changing nodes */
->> -               VM_BUG_ON_PAGE(page_to_nid(page) != zone_to_nid(zone), page);
->> +               VM_BUG_ON_PAGE(early_pfn_valid(page) && (page_to_nid(page) != zone_to_nid(zone)), page);
->>
->>                 if (!pfn_valid_within(page_to_pfn(page))) {
->>                         page++;
->
+Regards,
+Vaneet Narang
