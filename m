@@ -1,75 +1,72 @@
-From: sramana@codeaurora.org (Srinivas Ramana)
-Date: Mon, 12 Dec 2016 10:31:52 +0530
-Subject: [PATCH] trace: extend trace_clock to support arch_arm clock
- counter
-In-Reply-To: <20161206121346.GF2498@arm.com>
-References: <1480666495-26536-1-git-send-email-sramana@codeaurora.org>
- <20161202110845.GC8266@arm.com> <5843D587.5010407@codeaurora.org>
- <20161206121346.GF2498@arm.com>
-Message-ID: <584E2F40.10904@codeaurora.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 12 Dec 2016 10:31:43 +0530
+Subject: Tearing down DMA transfer setup after DMA client has finished
+In-Reply-To: <7900ae24-6803-a271-944c-8830f718fef0@free.fr>
+References: <20161208103921.GC6408@localhost>
+ <91b0d10c-1bc2-c3e1-4088-f4ad9adcd6c0@free.fr>
+ <20161208163755.GH6408@localhost>
+ <yw1xy3zqxt7x.fsf@unicorn.mansr.com>
+ <20161209065955.GJ6408@localhost>
+ <6ce1ea97-1d68-2203-c7b4-73315e801655@laposte.net>
+ <20161209171727.GK6408@localhost>
+ <ec33d3f0-6474-2b13-8a26-077ce3785d31@free.fr>
+ <20161209175606.GM6408@localhost>
+ <7900ae24-6803-a271-944c-8830f718fef0@free.fr>
+Message-ID: <20161212050143.GO6408@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/2016 05:43 PM, Will Deacon wrote:
-> On Sun, Dec 04, 2016 at 02:06:23PM +0530, Srinivas Ramana wrote:
->> On 12/02/2016 04:38 PM, Will Deacon wrote:
->>> On Fri, Dec 02, 2016 at 01:44:55PM +0530, Srinivas Ramana wrote:
->>>> Extend the trace_clock to support the arch timer cycle
->>>> counter so that we can get the monotonic cycle count
->>>> in the traces. This will help in correlating the traces with the
->>>> timestamps/events in other subsystems in the soc which share
->>>> this common counter for driving their timers.
->>>
->>> I'm not sure I follow this reasoning. What's wrong with nanoseconds? In
->>> particular, the "perf" trace_clock hangs off sched_clock, which should
->>> be backed by the architected counter anyway. What does the cycle counter in
->>> isolation tell you, given that the frequency isn't architected?
->>>
->>> I think I'm missing something here.
->>>
->>
->> Having cycle counter would help in the cases where we want to correlate the
->> time with other subsystems which are outside cpu subsystem.
->
-> Do you have an example of these subsystems? Can they be used to generate
-> trace data with mainline?
+On Fri, Dec 09, 2016 at 07:23:17PM +0100, Mason wrote:
+> [ Dropping Mans to preserve his peace-of-mind ]
+> 
+> On 09/12/2016 18:56, Vinod Koul wrote:
+> > On Fri, Dec 09, 2016 at 06:34:15PM +0100, Mason wrote:
+> >> On 09/12/2016 18:17, Vinod Koul wrote:
+> >>
+> >>> On Fri, Dec 09, 2016 at 11:25:57AM +0100, Sebastian Frias wrote:
+> >>>>
+> >>>> What concrete solution do you propose?
+> >>>
+> >>> I have already proposed two solutions.
+> >>>
+> >>> A) Request a channel only when you need it. Obviously we can't do virtual
+> >>> channels with this (though we should still use virt-channels framework).
+> >>> The sbox setup and teardown can be done as part of channel request and
+> >>> freeup. PL08x already does this.
+> >>>
+> >>> Downside is that we can only have as many consumers at a time as channels.
+> >>>
+> >>> I have not heard any technical reason for not doing this apart from drivers
+> >>> grab the channel at probe, which is incorrect and needs to be fixed
+> >>> irrespective of the problem at hand.
+> >>>
+> >>> This is my preferred option.
+> >>
+> >> There is one important drawback with this solution. If a driver calls
+> >> dma_request_chan() when no channels are currently available, it will
+> >> get -EBUSY. If there were a flag in dma_request_chan to be put to
+> >> sleep (with timeout) until a channel is available, then it would
+> >> work. But busy waiting in the client driver is a waste of power.
+> > 
+> > Right, but in that case the fallback would be PIO mode, and if that is
+> > not availble (IIRC some f your devices don't) then reject the usage with
+> > EAGAIN.
+> 
+> Maybe I'm missing something, but I don't see how that would help.
+> Take the NAND Flash controller driver, for instance. PIO is not
+> an option, because the ECC engine is tied to DMA.
+> 
+> And failing with -EAGAIN doesn't help the busy looping situation.
+> The caller should be put on some kind of queue to wait for a
+> "channel ready" event.
 
-Some of the subsystems i can list are Modem(on a mobilephone), GPU or 
-video subsystem, or a DSP among others.
+So if you go down this route then we have do a bit of engineering for this
+solutions to solve the hardware issue.
 
->
->> local_clock or even the perf track_clock uses sched_clock which gets
->> suspended during system suspend. Yes, they are backed up by the
->> architected counter but they ignore the cycles spent in suspend.i
->
-> Does mono_raw solve this (also hangs off the architected counter and is
-> supported in the vdso)?
+Can you tell me the clients for this controller and channels available?
 
-Doesn't seem like. Any of the existing clock sources are designed not 
-show the jump, when there is a suspend and resume. Even though they run 
-out of architected counter they just cane give exact correlation with 
-the counter. Furthermore, during the initial kernel boot, these just run 
-out of jiffies clock source. They also not account for the time spent in 
-boot loaders.
-
->
->> so, when comparing with monotonically increasing cycle counter, other
->> clocks doesn't help. It seems X86 uses the TSC counter to help such cases.
->
-> Does this mean we need a way to expose the frequency to userspace, too?
-
-Not really. The CNTFRQ_EL0 of timer subsystem holds the clock frequency 
-of system timer and is available to EL0.
-
->
-> Will
->
-
-
-Thanks,
--- Srinivas R
+In this case possibly we can dedicate one for NAND and keep the ones with
+PIO mode dynamic in nature.. But yes it is not an elegant one.
 
 -- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center, 
-Inc., is a member of Code Aurora Forum, a Linux Foundation Collaborative 
-Project.
+~Vinod
