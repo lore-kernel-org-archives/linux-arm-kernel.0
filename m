@@ -1,64 +1,68 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 12 Dec 2016 10:11:30 +0100
-Subject: [PATCH renesas/devel 01/13] ARM: dts: r8a7779: Use R-Car Gen 1
+Date: Mon, 12 Dec 2016 10:11:39 +0100
+Subject: [PATCH renesas/devel 10/13] ARM: dts: r8a7790: Use R-Car Gen 2
  fallback binding for i2c nodes
 In-Reply-To: <1481533902-14789-1-git-send-email-horms+renesas@verge.net.au>
 References: <1481533902-14789-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1481533902-14789-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1481533902-14789-11-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently added R-Car Gen 1 fallback binding for i2c nodes in
-DT for r8a7779 SoC.
+Use recently added R-Car Gen 2 fallback binding for iii nodes in
+DT for r8a7790 SoC.
 
 This has no run-time effect for the current driver as the initialisation
-sequence is the same for the SoC-specific binding for r8a7779 and the
-fallback binding for R-Car Gen 1.
+sequence is the same for the SoC-specific binding for r8a7790 and the
+fallback binding for R-Car Gen 2.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7779.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/r8a7790.dtsi | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index 55a7c1e37c57..f47a0edc26d4 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -173,7 +173,7 @@
- 	i2c0: i2c at ffc70000 {
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 823ab536175d..ddf6a8cbe6c1 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -528,7 +528,8 @@
+ 	iic0: i2c at e6500000 {
  		#address-cells = <1>;
  		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7779";
-+		compatible = "renesas,i2c-r8a7779", "renesas,rcar-gen1-i2c";
- 		reg = <0xffc70000 0x1000>;
- 		interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7779_CLK_I2C0>;
-@@ -184,7 +184,7 @@
- 	i2c1: i2c at ffc71000 {
+-		compatible = "renesas,iic-r8a7790", "renesas,rmobile-iic";
++		compatible = "renesas,iic-r8a7790", "renesas,rcar-gen2-iic",
++			     "renesas,rmobile-iic";
+ 		reg = <0 0xe6500000 0 0x425>;
+ 		interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7790_CLK_IIC0>;
+@@ -542,7 +543,8 @@
+ 	iic1: i2c at e6510000 {
  		#address-cells = <1>;
  		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7779";
-+		compatible = "renesas,i2c-r8a7779", "renesas,rcar-gen1-i2c";
- 		reg = <0xffc71000 0x1000>;
- 		interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7779_CLK_I2C1>;
-@@ -195,7 +195,7 @@
- 	i2c2: i2c at ffc72000 {
+-		compatible = "renesas,iic-r8a7790", "renesas,rmobile-iic";
++		compatible = "renesas,iic-r8a7790", "renesas,rcar-gen2-iic",
++			     "renesas,rmobile-iic";
+ 		reg = <0 0xe6510000 0 0x425>;
+ 		interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7790_CLK_IIC1>;
+@@ -556,7 +558,8 @@
+ 	iic2: i2c at e6520000 {
  		#address-cells = <1>;
  		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7779";
-+		compatible = "renesas,i2c-r8a7779", "renesas,rcar-gen1-i2c";
- 		reg = <0xffc72000 0x1000>;
- 		interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7779_CLK_I2C2>;
-@@ -206,7 +206,7 @@
- 	i2c3: i2c at ffc73000 {
+-		compatible = "renesas,iic-r8a7790", "renesas,rmobile-iic";
++		compatible = "renesas,iic-r8a7790", "renesas,rcar-gen2-iic",
++			     "renesas,rmobile-iic";
+ 		reg = <0 0xe6520000 0 0x425>;
+ 		interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7790_CLK_IIC2>;
+@@ -570,7 +573,8 @@
+ 	iic3: i2c at e60b0000 {
  		#address-cells = <1>;
  		#size-cells = <0>;
--		compatible = "renesas,i2c-r8a7779";
-+		compatible = "renesas,i2c-r8a7779", "renesas,rcar-gen1-i2c";
- 		reg = <0xffc73000 0x1000>;
- 		interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7779_CLK_I2C3>;
+-		compatible = "renesas,iic-r8a7790", "renesas,rmobile-iic";
++		compatible = "renesas,iic-r8a7790", "renesas,rcar-gen2-iic",
++			     "renesas,rmobile-iic";
+ 		reg = <0 0xe60b0000 0 0x425>;
+ 		interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7790_CLK_IICDVFS>;
 -- 
 2.7.0.rc3.207.g0ac5344
