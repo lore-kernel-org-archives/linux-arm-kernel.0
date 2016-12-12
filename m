@@ -1,22 +1,40 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 12 Dec 2016 22:09:17 +0100
-Subject: [RFC PATCH net-next v3 1/2] macb: Add 1588 support in Cadence GEM.
-In-Reply-To: <07C910AB6AC6C345A093D5A08F5AF568CB74D84D@CHN-SV-EXMX03.mchp-main.com>
-References: <1481134912-2243-1-git-send-email-andrei.pistirica@microchip.com>
- <20161207193908.GA13062@netboy> <20161207210416.GA27622@netboy>
- <07C910AB6AC6C345A093D5A08F5AF568CB74AF28@CHN-SV-EXMX03.mchp-main.com>
- <BN3PR07MB2516992DEE883FAD6DC3ED08C9870@BN3PR07MB2516.namprd07.prod.outlook.com>
- <07C910AB6AC6C345A093D5A08F5AF568CB74D84D@CHN-SV-EXMX03.mchp-main.com>
-Message-ID: <20161212210917.GA1298@localhost.localdomain>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 Dec 2016 13:10:12 -0800
+Subject: [PATCH v2] usb: dwc3: omap: fix race of pm runtime with irq
+ handler in probe
+In-Reply-To: <20161212193752.32029-1-grygorii.strashko@ti.com>
+References: <20161212193752.32029-1-grygorii.strashko@ti.com>
+Message-ID: <20161212211012.GQ4920@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2016 at 10:22:43AM +0000, Andrei.Pistirica at microchip.com wrote:
-> Richard, are you agree with this?
+* Grygorii Strashko <grygorii.strashko@ti.com> [161212 11:38]:
+> Now races can happen between interrupt handler execution and PM runtime in
+> error handling code path in probe and in dwc3_omap_remove() which will lead
+> to system crash:
+> 
+> in probe:
+> ...
+>  err1:
+> 	pm_runtime_put_sync(dev);
+> ^^ PM runtime can race with IRQ handler when deferred probing happening
+>    due to extcon
+> 	pm_runtime_disable(dev);
+> 
+> 	return ret;
+> 
+> in dwc3_omap_remove:
+> ...
+> 	dwc3_omap_disable_irqs(omap);
+> ^^ IRQs are disabled in HW, but handler may still run
+> 	of_platform_depopulate(omap->dev);
+> 	pm_runtime_put_sync(&pdev->dev);
+> ^^ PM runtime can race with IRQ handler
+> 	pm_runtime_disable(&pdev->dev);
+> 
+> 	return 0;
+> 
+> So, OMAP DWC3 IRQ need to be disabled before calling
+> pm_runtime_put() in probe and in dwc3_omap_remove().
 
-Yes, but please trim your replies next time.  Scrolling through pages
-of quoted headers and stale content in order to read one line is very
-annoying.
-
-Thanks,
-Richard
+Acked-by: Tony Lindgren <tony@atomide.com>
