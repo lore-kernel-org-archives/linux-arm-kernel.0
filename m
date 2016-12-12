@@ -1,34 +1,28 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 12 Dec 2016 14:37:48 +0100
-Subject: [PATCH renesas/devel 09/13] arm64: dts: r8a7796: Use R-Car Gen 3
- fallback binding for i2c nodes
-In-Reply-To: <1481533902-14789-10-git-send-email-horms+renesas@verge.net.au>
-References: <1481533902-14789-1-git-send-email-horms+renesas@verge.net.au>
- <1481533902-14789-10-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWzfwb_ww_t3iv1DOT4GLOdZdo2CevtiYzwvoKJQoiPGA@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 12 Dec 2016 14:39:19 +0100
+Subject: [PATCH 1/7] ARM: EXYNOS: Constify list of retention registers
+In-Reply-To: <1481377658-22603-1-git-send-email-krzk@kernel.org>
+References: <1481377658-22603-1-git-send-email-krzk@kernel.org>
+Message-ID: <10896763.srQzQduvXa@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2016 at 10:11 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Use recently added R-Car Gen 3 fallback binding for i2c nodes in
-> DT for r8a7796 SoC.
->
-> This has no run-time effect for the current driver as the initialisation
-> sequence is the same for the SoC-specific binding for r8a7796 and the
-> fallback binding for R-Car Gen 3.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi,
 
-Gr{oetje,eeting}s,
+On Saturday, December 10, 2016 03:47:32 PM Krzysztof Kozlowski wrote:
+> The list of retention registers (release_ret_regs field of struct
+> exynos_pm_data and arrays with values) are not modified and can be made
+> const to improve the const safeness.
+> 
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-                        Geert
+for patches #1-7
 
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+
+Best regards,
 --
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
