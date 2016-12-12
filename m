@@ -1,123 +1,64 @@
-From: rick.chang@mediatek.com (Rick Chang)
-Date: Mon, 12 Dec 2016 17:07:01 +0800
-Subject: [PATCH v8 2/4] vcodec: mediatek: Add Mediatek JPEG Decoder Driver
-In-Reply-To: <CAAJzSMfNyMiia==mXKo6aBw1VxMBxGE20LB870Zm1u9mCoioyQ@mail.gmail.com>
-References: <1480475340-21893-1-git-send-email-rick.chang@mediatek.com>
- <1480475340-21893-3-git-send-email-rick.chang@mediatek.com>
- <CAAJzSMfNyMiia==mXKo6aBw1VxMBxGE20LB870Zm1u9mCoioyQ@mail.gmail.com>
-Message-ID: <1481533621.13825.2.camel@mtksdaap41>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 12 Dec 2016 10:11:31 +0100
+Subject: [PATCH renesas/devel 02/13] ARM: dts: r8a7778: Use R-Car Gen 1
+ fallback binding for i2c nodes
+In-Reply-To: <1481533902-14789-1-git-send-email-horms+renesas@verge.net.au>
+References: <1481533902-14789-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1481533902-14789-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ricky,
+Use recently added R-Car Gen 1 fallback binding for i2c nodes in
+DT for r8a7778 SoC.
 
-Thanks for your feedback. We will fix the problem in another patch.
+This has no run-time effect for the current driver as the initialisation
+sequence is the same for the SoC-specific binding for r8a7778 and the
+fallback binding for R-Car Gen 1.
 
-On Mon, 2016-12-12 at 12:34 +0800, Ricky Liang wrote:
-> Hi Rick,
-> 
-> On Wed, Nov 30, 2016 at 11:08 AM, Rick Chang <rick.chang@mediatek.com> wrote:
-> > Add v4l2 driver for Mediatek JPEG Decoder
-> >
-> > Signed-off-by: Rick Chang <rick.chang@mediatek.com>
-> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-> 
-> <snip...>
-> 
-> > +static bool mtk_jpeg_check_resolution_change(struct mtk_jpeg_ctx *ctx,
-> > +                                            struct mtk_jpeg_dec_param *param)
-> > +{
-> > +       struct mtk_jpeg_dev *jpeg = ctx->jpeg;
-> > +       struct mtk_jpeg_q_data *q_data;
-> > +
-> > +       q_data = &ctx->out_q;
-> > +       if (q_data->w != param->pic_w || q_data->h != param->pic_h) {
-> > +               v4l2_dbg(1, debug, &jpeg->v4l2_dev, "Picture size change\n");
-> > +               return true;
-> > +       }
-> > +
-> > +       q_data = &ctx->cap_q;
-> > +       if (q_data->fmt != mtk_jpeg_find_format(ctx, param->dst_fourcc,
-> > +                                               MTK_JPEG_FMT_TYPE_CAPTURE)) {
-> > +               v4l2_dbg(1, debug, &jpeg->v4l2_dev, "format change\n");
-> > +               return true;
-> > +       }
-> > +       return false;
-> 
-> <snip...>
-> 
-> > +static void mtk_jpeg_device_run(void *priv)
-> > +{
-> > +       struct mtk_jpeg_ctx *ctx = priv;
-> > +       struct mtk_jpeg_dev *jpeg = ctx->jpeg;
-> > +       struct vb2_buffer *src_buf, *dst_buf;
-> > +       enum vb2_buffer_state buf_state = VB2_BUF_STATE_ERROR;
-> > +       unsigned long flags;
-> > +       struct mtk_jpeg_src_buf *jpeg_src_buf;
-> > +       struct mtk_jpeg_bs bs;
-> > +       struct mtk_jpeg_fb fb;
-> > +       int i;
-> > +
-> > +       src_buf = v4l2_m2m_next_src_buf(ctx->fh.m2m_ctx);
-> > +       dst_buf = v4l2_m2m_next_dst_buf(ctx->fh.m2m_ctx);
-> > +       jpeg_src_buf = mtk_jpeg_vb2_to_srcbuf(src_buf);
-> > +
-> > +       if (jpeg_src_buf->flags & MTK_JPEG_BUF_FLAGS_LAST_FRAME) {
-> > +               for (i = 0; i < dst_buf->num_planes; i++)
-> > +                       vb2_set_plane_payload(dst_buf, i, 0);
-> > +               buf_state = VB2_BUF_STATE_DONE;
-> > +               goto dec_end;
-> > +       }
-> > +
-> > +       if (mtk_jpeg_check_resolution_change(ctx, &jpeg_src_buf->dec_param)) {
-> > +               mtk_jpeg_queue_src_chg_event(ctx);
-> > +               ctx->state = MTK_JPEG_SOURCE_CHANGE;
-> > +               v4l2_m2m_job_finish(jpeg->m2m_dev, ctx->fh.m2m_ctx);
-> > +               return;
-> > +       }
-> 
-> This only detects source change if multiple OUPUT buffers are queued.
-> It does not catch the source change in the following scenario:
-> 
-> - OUPUT buffers for jpeg1 enqueued
-> - OUTPUT queue STREAMON
-> - userspace creates CAPTURE buffers
-> - CAPTURE buffers enqueued
-> - CAPTURE queue STREAMON
-> - decode
-> - OUTPUT queue STREAMOFF
-> - userspace recreates OUTPUT buffers for jpeg2
-> - OUTPUT buffers for jpeg2 enqueued
-> - OUTPUT queue STREAMON
-> 
-> In the above sequence if jpeg2's decoded size is larger than jpeg1 the
-> function fails to detect that the existing CAPTURE buffers are not big
-> enough to hold the decoded data.
-> 
-> A possible fix is to pass *dst_buf to
-> mtk_jpeg_check_resolution_change(), and check in the function that all
-> the dst_buf planes are large enough to hold the decoded data.
-> 
-> > +
-> > +       mtk_jpeg_set_dec_src(ctx, src_buf, &bs);
-> > +       if (mtk_jpeg_set_dec_dst(ctx, &jpeg_src_buf->dec_param, dst_buf, &fb))
-> > +               goto dec_end;
-> > +
-> > +       spin_lock_irqsave(&jpeg->hw_lock, flags);
-> > +       mtk_jpeg_dec_reset(jpeg->dec_reg_base);
-> > +       mtk_jpeg_dec_set_config(jpeg->dec_reg_base,
-> > +                               &jpeg_src_buf->dec_param, &bs, &fb);
-> > +
-> > +       mtk_jpeg_dec_start(jpeg->dec_reg_base);
-> > +       spin_unlock_irqrestore(&jpeg->hw_lock, flags);
-> > +       return;
-> > +
-> > +dec_end:
-> > +       v4l2_m2m_src_buf_remove(ctx->fh.m2m_ctx);
-> > +       v4l2_m2m_dst_buf_remove(ctx->fh.m2m_ctx);
-> > +       v4l2_m2m_buf_done(to_vb2_v4l2_buffer(src_buf), buf_state);
-> > +       v4l2_m2m_buf_done(to_vb2_v4l2_buffer(dst_buf), buf_state);
-> > +       v4l2_m2m_job_finish(jpeg->m2m_dev, ctx->fh.m2m_ctx);
-> > +}
-> 
-> <snip...>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7778.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
+index b0c9674fad17..1e93c94a9eac 100644
+--- a/arch/arm/boot/dts/r8a7778.dtsi
++++ b/arch/arm/boot/dts/r8a7778.dtsi
+@@ -150,7 +150,7 @@
+ 	i2c0: i2c at ffc70000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,i2c-r8a7778";
++		compatible = "renesas,i2c-r8a7778", "renesas,rcar-gen1-i2c";
+ 		reg = <0xffc70000 0x1000>;
+ 		interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp0_clks R8A7778_CLK_I2C0>;
+@@ -161,7 +161,7 @@
+ 	i2c1: i2c at ffc71000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,i2c-r8a7778";
++		compatible = "renesas,i2c-r8a7778", "renesas,rcar-gen1-i2c";
+ 		reg = <0xffc71000 0x1000>;
+ 		interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp0_clks R8A7778_CLK_I2C1>;
+@@ -172,7 +172,7 @@
+ 	i2c2: i2c at ffc72000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,i2c-r8a7778";
++		compatible = "renesas,i2c-r8a7778", "renesas,rcar-gen1-i2c";
+ 		reg = <0xffc72000 0x1000>;
+ 		interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp0_clks R8A7778_CLK_I2C2>;
+@@ -183,7 +183,7 @@
+ 	i2c3: i2c at ffc73000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		compatible = "renesas,i2c-r8a7778";
++		compatible = "renesas,i2c-r8a7778", "renesas,rcar-gen1-i2c";
+ 		reg = <0xffc73000 0x1000>;
+ 		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp0_clks R8A7778_CLK_I2C3>;
+-- 
+2.7.0.rc3.207.g0ac5344
