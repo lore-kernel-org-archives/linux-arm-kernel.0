@@ -1,43 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 12 Dec 2016 15:25:13 +0000
-Subject: [PATCH] arm64: Re-enable PAN on uaccess_enable
-In-Reply-To: <20161212151432.GB3203@e104818-lin.cambridge.arm.com>
-References: <1481550626-30956-1-git-send-email-marc.zyngier@arm.com>
- <20161212150636.GA7070@cbox>
- <20161212151432.GB3203@e104818-lin.cambridge.arm.com>
-Message-ID: <1d9546db-69c8-1813-200f-6f168dcdd8b0@arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 12 Dec 2016 10:28:20 -0500 (EST)
+Subject: [PATCH 1/1] arm/module: maximum utilization of module
+ area.
+In-Reply-To: <20161212112230epcms5p6af05aef34f72eab15061a166d18cff00@epcms5p6>
+References: <1481012975-44478-1-git-send-email-maninder1.s@samsung.com>
+ <CGME20161212102403epcas4p2e039072e2acdc3d20c1b8ac86e823375@epcas4p2.samsung.com>
+ <20161212112230epcms5p6af05aef34f72eab15061a166d18cff00@epcms5p6>
+Message-ID: <alpine.LFD.2.20.1612121026250.1657@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/12/16 15:14, Catalin Marinas wrote:
-> On Mon, Dec 12, 2016 at 04:06:36PM +0100, Christoffer Dall wrote:
->> On Mon, Dec 12, 2016 at 01:50:26PM +0000, Marc Zyngier wrote:
->>> Commit 4b65a5db3627 ("arm64: Introduce uaccess_{disable,enable}
->>> functionality based on TTBR0_EL1") added conditional PAN
->>> enable/disable. Unfortunately, a typo prevents PAN from being
->>> re-enabled once it has been disabled.
->>>
->>> Restore the PAN functionnality by adding the missing '!'.
->>>
->>> Fixes: b65a5db3627 ("arm64: Introduce uaccess_{disable,enable} functionality based on TTBR0_EL1")
->>> Reported-by: Christoffer Dall <christoffer.dall@linaro.org>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>> Christoffer, any chance you could give this a go and let me know
->>> if that fixes your issues?
->>
->> Yep, fixes the issue.  Thanks!
-> 
-> Thanks for confirming. I merged this with a slightly updated commit log:
-> 
-> ------8<-----------------
-> Commit 4b65a5db3627 ("arm64: Introduce uaccess_{disable,enable}
-> functionality based on TTBR0_EL1") added conditional user access
-> enable/disable. Unfortunately, a typo prevents the PAN bit from being
-> cleared for user access functions.
+On Mon, 12 Dec 2016, Vaneet Narang wrote:
 
-That looks indeed much better. Thanks!
+> Hi,
+> 
+> >A PC24 relocation has a range of +/-32MB.  This means that where-ever
+> >the module is placed, it must be capable of reaching any function
+> >within the kernel text, which may itself be quite large (eg, 8MB, or
+> >possibly larger).  The module area exists to allow modules to be
+> >located in an area where PC24 relocations are able to reach all of the
+> >kernel text on sensibly configured kernels, thereby allowing for
+> >optimal performance.
+> >
+> >If you wish to load large modules, then enable ARM_MODULE_PLTS, which
+> >will use the less efficient PLT method (which is basically an indirect
+> >function call) for relocations that PC24 can't handle, and will allow
+> >the module to be loaded into the vmalloc area.
+> >
+> >Growing the module area so that smaller modules also get penalised by
+> >the PLT indirection is not sane.
+> 
+> This is exactly what i am saying. These changes are useful to accomdate
+> 22MB modules without enabling ARM_MODULE_PLTS. 
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I think you need to figure out why you need such a huge module in the 
+first place.  That is very uncommon indeed.
+
+
+Nicolas
