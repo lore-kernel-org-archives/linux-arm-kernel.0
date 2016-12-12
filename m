@@ -1,68 +1,72 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 12 Dec 2016 09:37:58 +0000
-Subject: Tegra baseline test results for v4.9-rc7
-Message-ID: <2bfa1561-9257-3b32-8020-b8ec038df8f3@nvidia.com>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Mon, 12 Dec 2016 17:53:02 +0800
+Subject: [PATCH] arm64: mm: Fix NOMAP page initialization
+In-Reply-To: <83d6e6d0-cfb3-ec8b-241b-ec6a50dc2aa9@huawei.com>
+References: <1481307042-29773-1-git-send-email-rrichter@cavium.com>
+ <83d6e6d0-cfb3-ec8b-241b-ec6a50dc2aa9@huawei.com>
+Message-ID: <9168b603-04aa-4302-3197-00f17fb336bd@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.9-rc7.
-Logs and other details at:
+hi Robert,
 
-    https://nvtb.github.io//linux/test_v4.9-rc7/20161127133104/
-
-
-Test summary
+On 2016/12/12 11:12, Yisheng Xie wrote:
+> hi Robert,
+> 
+> On 2016/12/10 2:10, Robert Richter wrote:
+>> On ThunderX systems with certain memory configurations we see the
+>> following BUG_ON():
+>>
+>>  kernel BUG at mm/page_alloc.c:1848!
+>>
+>> This happens for some configs with 64k page size enabled. The BUG_ON()
+>> checks if start and end page of a memmap range belongs to the same
+>> zone.
+>>
+>> The BUG_ON() check fails if a memory zone contains NOMAP regions. In
+>> this case the node information of those pages is not initialized. This
+>> causes an inconsistency of the page links with wrong zone and node
+>> information for that pages. NOMAP pages from node 1 still point to the
+>> mem zone from node 0 and have the wrong nid assigned.
+>>
+> The patch can work for zone contains NOMAP regions.
+> 
+> However, if BIOS do not add WB/WT/WC attribute to a physical address range, the
+> is_memory(md) will return false and this range will not be added to memblock.
+>    efi_init
+>       -> reserve_regions
+>             if (is_memory(md)) {
+>                 early_init_dt_add_memory_arch(paddr, size);
+> 
+>                 if (!is_usable_memory(md))
+>                     memblock_mark_nomap(paddr, size);
+>             }
+> 
+> Then BUG_ON() check will also fails. Any idea about it?
+> 
+It seems that memblock_is_memory() is also too strict for early_pfn_valid,
+so what about this patch, which use common pfn_valid as early_pfn_valid
+when CONFIG_HAVE_ARCH_PFN_VALID=y:
 ------------
+diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+index 0f088f3..9d596f3 100644
+--- a/include/linux/mmzone.h
++++ b/include/linux/mmzone.h
+@@ -1200,7 +1200,17 @@ static inline int pfn_present(unsigned long pfn)
+ #define pfn_to_nid(pfn)                (0)
+ #endif
 
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.9-rc6 (9c763584b7c8911106bb77af7e648bef09af9d80)):
-   text     data      bss    total  kernel
-    -88      +88        0        0  defconfig
-  +1312        0        0    +1312  multi_v7_defconfig
-   +928        0        0     +928  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.9-rc6 (9c763584b7c8911106bb77af7e648bef09af9d80))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
++#ifdef CONFIG_HAVE_ARCH_PFN_VALID
++static inline int early_pfn_valid(unsigned long pfn)
++{
++       if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
++               return 0;
++       return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
++}
++#define early_pfn_valid early_pfn_valid
++#else
+ #define early_pfn_valid(pfn)   pfn_valid(pfn)
++#endif
+ void sparse_init(void);
+ #else
+ #define sparse_init()  do {} while (0)
